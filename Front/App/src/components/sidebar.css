@@ -1,0 +1,77 @@
+/* src/components/Sidebar.css */
+
+.sidebar {
+  width: 90px; /* Largura reduzida quando fechada */
+  height: 100%;
+  position: fixed;
+  top: 0;
+  left: 0px; /* Sidebar começando fora da tela */
+  background-color: #333;
+  color: white;
+  transition: left 0.3s ease, width 0.3s ease;
+  padding-top: 50px;
+  z-index: 100;
+}
+
+.sidebar.open {
+  left: 0; /* Quando aberta, fica a esquerda */
+  width: 200px; /* Largura completa quando aberta */
+}
+
+.sidebar ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.sidebar li {
+    margin-bottom: 10px;
+  padding: 10px 20px;
+  text-align: left;
+  display: flex;
+  align-items: center;
+}
+
+.sidebar li a {
+
+  color: white;
+  text-decoration: none;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+}
+
+.sidebar li a span {
+  margin-left: 10px;
+  transition: opacity 0.3s ease;
+}
+
+.sidebar li a span {
+  opacity: 1; /* Texto visível quando a sidebar está aberta */
+}
+
+.sidebar li:hover {
+  background-color: #444;
+}
+
+.sidebar .close-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 20px;
+  background: transparent;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+.sidebar .close-btn:hover {
+  background-color: #444;
+}
+
+.sidebar li a svg {
+  font-size: 24px; /* Ajuste o tamanho do ícone */
+}
+
+.react{
+    height: 40px;
+}

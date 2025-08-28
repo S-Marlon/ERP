@@ -1,13 +1,31 @@
 import { useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
+import Sidebar from './components/sidebar'
 import './App.css'
 
 function App() {
   const [count, setCount] = useState(0)
 
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
+
+
   return (
     <>
+     <div className="App">
+      
+
+      <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
+
+      <div className="content" style={{ marginLeft: isSidebarOpen ? '250px' : '60px' }}>
+        <h1>Bem-vindo ao meu App!</h1>
+        <p>Conteúdo principal vai aqui.</p>
+      </div>
+    </div>
+    
       <div>
         <a href="https://vitejs.dev" target="_blank">
           <img src={viteLogo} className="logo" alt="Vite logo" />
