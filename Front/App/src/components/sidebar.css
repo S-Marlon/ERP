@@ -11,6 +11,10 @@
   transition: left 0.3s ease, width 0.3s ease;
   padding-top: 50px;
   z-index: 100;
+  
+    
+    z-index: 1100; /* maior que o header */
+
 }
 
 .sidebar.open {
