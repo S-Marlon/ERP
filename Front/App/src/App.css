@@ -1,13 +1,6 @@
 *{
   transition: filter 300ms;
-
-}
-
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+ transition: left 0.3s, width 0.0s;
 }
 
 .logo {
@@ -22,30 +15,42 @@
   filter: drop-shadow(0 0 2em #61dafbaa);
 }
 
+
+.admin-grid-container {
+  display: grid;
+  /* Define as colunas: 250px para o sidebar e o resto para o conteúdo */
+  grid-template-columns: 200px 1fr; 
+  /* Define as linhas: 80px para o header e o resto para o conteúdo */
+  grid-template-rows: 80px 1fr;
+  /* Atribui os componentes às áreas */
+  grid-template-areas:
+    "sidebar header"
+    "sidebar content";
+  height: 100vh;
+  width: 100vw;
+  transition: all 0.3s ease;
+  
+}
+
+.header {
+  grid-area: header;
+ 
+  border: green 5px solid;
+
+}
+
+.sidebar {
+  grid-area: sidebar;
+  
+  
+
+
+}
+
 .content {
-   background-color:red;
-   
-}
+  grid-area: content;
+  
+  border: rgb(46, 237, 247) 5px solid;
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
-
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
 }

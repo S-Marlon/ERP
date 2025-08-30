@@ -8,12 +8,16 @@ interface SidebarProps {
   // Defina props se necessário, como o estado de aberto/fechado
   isOpen: boolean;
   toggleSidebar: () => void;
+  sidebarWidth: number;
+
 }
 
  
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
   return (
-    <div className={`sidebar ${isOpen ? 'open' : ''}`}>
+    // <div className={`sidebar ${isOpen ? 'open' : ''}`}>
+    <div className={`sidebar ${isOpen ? 'open' : ''}`}
+     >
       <button className="close-btn" onClick={toggleSidebar} > {isOpen ? '<<' : '>>'}
       </button>
       
@@ -21,7 +25,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
         <li>
           <a href="#home">
             <img src={reactLogo}  className="react" alt="React logo" />
-            {isOpen && <span>Home</span>}
+            {isOpen && <span >Home</span>}
           </a>
         </li>
         <li>

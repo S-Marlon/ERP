@@ -1,7 +1,8 @@
+import './App.css'
 import { useState } from 'react'
 import Sidebar from './components/sidebar'
-import './App.css'
 import Header from './components/header';
+import Panel from './components/panel';
 
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -9,15 +10,19 @@ function App() {
     setIsSidebarOpen(!isSidebarOpen);
   };
 
-  const sidebarWidth = isSidebarOpen ? 90 : 0;
+  const sidebarWidth = isSidebarOpen ? 200 : 90;
+  const headerHeight = 80;
 
   return (
     <>
-      <div className="App">
-        <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
-        <Header headtext="Sistema ERP" sidebarWidth={sidebarWidth} />
-        <div className="content" style={{ marginLeft: `${sidebarWidth}px` }}>
-        </div>
+      <div className="admin-grid-container" style={{
+        gridTemplateColumns: `${sidebarWidth}px`,
+        gridTemplateRows: `${headerHeight}px`,
+      }}>
+        
+        <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar}  sidebarWidth={sidebarWidth}/> 
+        <Header headtext="Sistema ERP" headerHeight={headerHeight} />
+        <Panel />
       </div>
     </>
   )

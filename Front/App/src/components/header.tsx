@@ -3,19 +3,17 @@ import './Header.css';
 
 interface HeaderProps {
   headtext: string;
-  sidebarWidth: number;
+  headerHeight: number;
+  
 }
 
-const Header: React.FC<HeaderProps> = ({ headtext, sidebarWidth }) => {
+const Header: React.FC<HeaderProps> = ({ headtext }) => {
   return (
     <div
       className="header"
-      style={{
-        left: `${sidebarWidth}px`,
-        width: `calc(100% - ${sidebarWidth}px)`
-      }}
+      
     >
-      <h1>{headtext}</h1>
+      <h3>{headtext}</h3>
     </div>
   );
 };

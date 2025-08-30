@@ -1,4 +1,4 @@
-/* src/components/Sidebar.css */
+/* src/components/Sidebar.css */ 
 
 .sidebar {
   width: 90px; /* Largura reduzida quando fechada */
@@ -11,9 +11,6 @@
   transition: left 0.3s ease, width 0.3s ease;
   padding-top: 50px;
   z-index: 100;
-  
-    
-    z-index: 1100; /* maior que o header */
 
 }
 
@@ -42,15 +39,21 @@
   font-size: 18px;
   display: flex;
   align-items: center;
-}
-
-.sidebar li a span {
-  margin-left: 10px;
-  transition: opacity 0.3s ease;
+  animation-timing-function: ease;
 }
 
 .sidebar li a span {
   opacity: 1; /* Texto visível quando a sidebar está aberta */
+  margin-left: 10px;
+
+  position: relative;
+  animation: mymove 0.2s;
+  animation-fill-mode: forwards;
+}
+
+@keyframes mymove {
+  from {left: -150px;}
+  to {left: 0px;}
 }
 
 .sidebar li:hover {
