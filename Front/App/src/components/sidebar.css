@@ -32,23 +32,18 @@
   align-items: center;
 }
 
-.sidebar li a {
-
-  color: white;
+.sidebar li span {
+  opacity: 1; /* Texto visível quando a sidebar está aberta */
+  margin-left: 10px;
+  position: relative;
+  animation: mymove 0.2s;
+  animation-fill-mode: forwards;
+   color: white;
   text-decoration: none;
   font-size: 18px;
   display: flex;
   align-items: center;
   animation-timing-function: ease;
-}
-
-.sidebar li a span {
-  opacity: 1; /* Texto visível quando a sidebar está aberta */
-  margin-left: 10px;
-
-  position: relative;
-  animation: mymove 0.2s;
-  animation-fill-mode: forwards;
 }
 
 @keyframes mymove {

@@ -1,23 +1,17 @@
 // src/components/Sidebar.tsx
 import './Panel.css';
+import { ReactNode } from "react";
 
 interface PanelProps {
-    sidebarWidth?: number;
-    headerHeight?: number;
+    children: ReactNode;
 }
 
-const Panel: React.FC<PanelProps> = () => {
+export default function Panel({ children }: PanelProps) {
   return (
-    <div
-      className="content"
-      
+    <main className="content"
+    
     >
-      <span>
-        Painel de Conteúdo
-        </span>  
-
-    </div>
+      {children}
+    </main>
   );
-};
-
-export default Panel;
+}

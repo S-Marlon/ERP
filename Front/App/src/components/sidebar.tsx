@@ -2,6 +2,7 @@
 
 import './Sidebar.css';
 import reactLogo from '../assets/react.svg'
+import { Link } from "react-router-dom";
 
 
 interface SidebarProps {
@@ -22,49 +23,44 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
       </button>
       
       <ul>
+
+          <Link to="/">
         <li>
-          <a href="#home">
             <img src={reactLogo}  className="react" alt="React logo" />
             {isOpen && <span >Home</span>}
-          </a>
         </li>
-        <li>
-          <a href="#about">
-            <img src={reactLogo} className="react" alt="React logo" />
-            {isOpen && <span>Dashboard</span>}
-          </a>
-        </li>
-        
-        <li>
-          <a href="#contact">
-            <img src={reactLogo} className="react" alt="React logo" />
-            {isOpen && <span>Equipe</span>}
-          </a>
-        </li>
-        <li>
-          <a href="#contact">
-            <img src={reactLogo} className="react" alt="React logo" />
-            {isOpen && <span>Estoque</span>}
-          </a>
-        </li>
-        <li>
-          <a href="#contact">
-            <img src={reactLogo} className="react" alt="React logo" />
-            {isOpen && <span>Relatorios</span>}
-          </a>
-        </li>
-        <li>
-          <a href="#contact">
-            <img src={reactLogo} className="react" alt="React logo" />
-            {isOpen && <span>Serviços</span>}
-          </a>
-        </li>
+          </Link>
+
+            <Link to="/clientes">
           <li>
-          <a href="#contact">
-            <img src={reactLogo} className="react" alt="React logo" />
-            {isOpen && <span>Reservas</span>}
-          </a>
-        </li>
+           <img src={reactLogo}  className="react" alt="React logo" />
+            {isOpen && <span >clientes</span>}
+          </li>
+          </Link>
+            <Link to="/produtos">
+          <li>
+          <img src={reactLogo}  className="react" alt="React logo" />
+            {isOpen && <span >produtos</span>}
+          </li>
+          </Link>
+            <Link to="/vendas">
+          <li>
+            <img src={reactLogo}  className="react" alt="React logo" />
+            {isOpen && <span >vendas</span>}
+            </li>
+            </Link>
+             <Link to="/Estoque">
+          <li>
+            <img src={reactLogo}  className="react" alt="React logo" />
+            {isOpen && <span >Estoque</span>}
+            </li>
+            </Link>
+            <Link to="/Servicos">
+          <li>
+            <img src={reactLogo}  className="react" alt="React logo" />
+            {isOpen && <span >Servicos</span>}
+            </li>
+            </Link>
       </ul>
     </div>
   );

@@ -1,0 +1,12 @@
+.grids-container {
+        display: grid;
+        grid-template-rows: auto auto auto auto; 
+        padding: 10px;
+        gap: 10px; /* Adiciona espaçamento entre os itens do grid */
+    }
+
+.grid-item {
+
+        text-align: center;
+        color: white;
+}
