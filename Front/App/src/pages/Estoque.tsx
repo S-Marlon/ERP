@@ -10,7 +10,7 @@ const Header: React.FC<Props> = ({ text }) => {
   return (
     <>
 <div className="grids-container">
-    <div className="grid-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 10px' }}>
+    <div className="grid-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 100px' }}>
     150 produtos Em Registro
     <button>
         adcionar produto

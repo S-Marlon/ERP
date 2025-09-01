@@ -1,119 +1,114 @@
  .grid-container {
-        display: grid;
-        /* Define o número de colunas. 'auto' significa que o navegador
+     display: grid;
+     /* Define o número de colunas. 'auto' significa que o navegador
            determinará a largura das colunas. */
-        grid-template-columns: 3fr 7fr; 
-        
-        /* Define 4 linhas com 50px de altura cada. */
-        
-        
-        padding: 10px;
-        gap: 10px; /* Adiciona espaçamento entre os itens do grid */
-    }
+     grid-template-columns: 2fr 8fr;
+     /* Define 4 linhas com 50px de altura cada. */
+     padding: 10px;
+     gap: 10px;
+     /* Adiciona espaçamento entre os itens do grid */
+ }
 
-    .grid-item {
-       text-align: center;
-        
-    }
+ .grid-item {
+     text-align: center;
+ }
 
-     
+ .flex-container {
+     display: flex;
+     /* Permite a quebra de linha */
+     flex-wrap: wrap;
+     /* Adiciona espaçamento entre os itens */
+     gap: 10px;
+     border: 1px dashed olivedrab;
+     padding: 10px;
+    container-type: inline-size;
+ }
 
-  .flex-container {
-            display: flex;
-            /* Permite a quebra de linha */
-            flex-wrap: wrap; 
-            /* Adiciona espaçamento entre os itens */
-            gap: 10px; 
-           border: 2px dashed olivedrab;
-            padding: 10px;
-            
-        }
+ .flex-item {
+     background-color: #3C3C3C;
 
-        .flex-item {
-            background-color: #ff0000;
-            
-            color: white;
-            text-align: center;
-            
-            /* flex-grow: 1 -> Permite que o item cresça para ocupar o espaço disponível.
+     border-radius: 6px;
+     color: white;
+     text-align: center;
+
+     /* flex-grow: 1 -> Permite que o item cresça para ocupar o espaço disponível.
                flex-shrink: 1 -> Permite que o item encolha se necessário.
                flex-basis: 0 -> Define a largura base para 0. A largura será determinada
                                pelo crescimento (`flex-grow`) e pelo conteúdo.
             */
-            flex: 1 1 0%;
-            
-            /* Define uma largura mínima para evitar que os itens fiquem muito pequenos */
-            min-width: calc(20% - 10px); 
-            
-        }
+     flex: 1 1 0%;
 
-                /* Mídia Query para tablets (telas de até 768px de largura) */
-        @media (max-width: 1100px) {
-            .flex-item {
-                /* Altera o min-width para 33.33% - 10px, permitindo 3 itens por linha */
-                min-width: calc(33.33% - 10px); 
-            }
-        }
+     /* Define uma largura mínima para evitar que os itens fiquem muito pequenos */
+     min-width: calc(20% - 10px);
 
-        /* --- */
-        
-        /* Mídia Query para celulares (telas de até 480px de largura) */
-        @media (max-width: 768px) {
-            .flex-item {
-                /* Altera o min-width para 100% - 10px, permitindo 1 item por linha */
-                min-width: calc(50% - 10px); 
-            }
-        }
+ }
 
-        /* Mídia Query para celulares (telas de até 480px de largura) */
-        @media (max-width: 500px) {
-            .flex-item {
-                /* Altera o min-width para 100% - 10px, permitindo 1 item por linha */
-                min-width: calc(100% - 10px); 
-            }
-        }
+ /* Mídia Query para tablets (telas de até 768px de largura) */
+ @media (max-width: 1100px) {
+     .flex-item {
+         /* Altera o min-width para 33.33% - 10px, permitindo 3 itens por linha */
+         min-width: calc(33.33% - 10px);
+     }
+ }
 
-        /* Contêiner principal usando Grid */
-        .subgrid-container {
-            display: grid;
-            /* Cria 5 linhas de altura automática */
-            grid-template-rows: repeat(5, auto); 
-            gap: 0px;
-            padding: 0px;
-            width: 100%;
-            
-        }
+ /* --- */
 
-        /* Cada célula do Grid */
-        .subgrid-item {
-            
-            
-            border: 1px solid #000000;
-        }
-        
-        /* Contêiner Flexbox dentro de cada célula do Grid */
-        .subflex-content {
-            display: flex;
-            /* Ajusta os itens para ocupar o espaço de forma elástica */
-            flex-grow: 1; 
-            flex-wrap: wrap;
-            /* justifyContent: 'space-between', alignItems: 'center'
+ /* Mídia Query para celulares (telas de até 480px de largura) */
+ @media (max-width: 900px) {
+     .flex-item {
+         /* Altera o min-width para 100% - 10px, permitindo 1 item por linha */
+         min-width: calc(50% - 10px);
+     }
+ }
+
+ /* Mídia Query para celulares (telas de até 480px de largura) */
+ @media (max-width: 730px) {
+     .flex-item {
+         /* Altera o min-width para 100% - 10px, permitindo 1 item por linha */
+         min-width: calc(100% - 10px);
+     }
+ }
+
+ /* Contêiner principal usando Grid */
+ .subgrid-container {
+     display: grid;
+     /* Cria 5 linhas de altura automática */
+     grid-template-rows: repeat(5, auto);
+     gap: 2px;
+     padding: 5px;
+     width: 100%;
+
+ }
+
+ /* Cada célula do Grid */
+ .subgrid-item {
+
+
+     border: 1px solid #000000;
+ }
+
+ /* Contêiner Flexbox dentro de cada célula do Grid */
+ .subflex-content {
+     display: flex;
+     /* Ajusta os itens para ocupar o espaço de forma elástica */
+     flex-grow: 1;
+     flex-wrap: wrap;
+     /* justifyContent: 'space-between', alignItems: 'center'
              */
 
-             
-             align-items: center;
-            font-size: small;
-            
-        }
 
-        /* Itens dentro do Flexbox */
-        .subflex-item {
-            flex: 1 1 0; /* Permite que os itens cresçam e encolham */
-            /* min-width: 150px; Largura mínima para o item */
-            
-            color: white;
-            padding: 5px;
-            text-align: center;
-        }
+     align-items: center;
+     font-size: small;
 
-     
+ }
+
+ /* Itens dentro do Flexbox */
+ .subflex-item {
+     flex: 1 1 0;
+     /* Permite que os itens cresçam e encolham */
+     /* min-width: 150px; Largura mínima para o item */
+
+     color: white;
+     padding: 5px;
+     text-align: center;
+ }
