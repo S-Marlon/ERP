@@ -17,9 +17,14 @@ function App() {
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
   };
+    const toggleTheme = () => {
+    setIsDarkMode(!isDarkMode);
+    // Você pode salvar a preferência do usuário no localStorage aqui, se quiser
+  };
+   const [isDarkMode, setIsDarkMode] = useState(false);
 
   const sidebarWidth = isSidebarOpen ? 200 : 90;
-  const headerHeight = 80;
+  const headerHeight = 70;
 
   return (
     <>
@@ -30,14 +35,15 @@ function App() {
       }}>
         
         <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar}  sidebarWidth={sidebarWidth}/> 
-        <Header headtext="Sistema ERP" headerHeight={headerHeight} />
+        <Header title="Sistema ERP" headerHeight={headerHeight} onThemeToggle={toggleTheme} 
+        isDarkMode={isDarkMode} />
         <Panel>
            
             <Routes>
             <Route path="/" element={<Dashboard text='Dashboard'/>} />
             <Route path="/clientes" element={<Clientes  text='Clientes'/>} />
             <Route path="/produtos" element={<Produtos  text='Produtos'/>} />
-            <Route path="/vendas" element={<Vendas  text='Vendas'/>} />
+            <Route path="/vendas" element={<Vendas/>} />
             <Route path="/Estoque" element={<Estoque  text='Estoque'/>} />
             <Route path="/Servicos" element={<Servicos  text='Servicos'/>} />
           </Routes>
