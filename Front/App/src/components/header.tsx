@@ -40,7 +40,7 @@ const Header: React.FC<HeaderProps> = ({ title, onBackButtonClick,
           >
             ← Voltar
           </button>
-      <h3>{title}</h3>
+      <h1 style={{alignContent: 'center', fontSize:"1.3rem"}}>{title}</h1>
 
       <button
         onClick={onThemeToggle}

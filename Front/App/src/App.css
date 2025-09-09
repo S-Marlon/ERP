@@ -32,25 +32,25 @@
   
 }
 
-.header {
-  grid-area: header;
- 
-  border: green 5px solid;
-
-}
 
 .sidebar {
   grid-area: sidebar;
   
   
-
+  
+  
+}
+.header {
+  grid-area: header;
+ 
+  border: green 1px solid;
 
 }
 
 .content {
   grid-area: content;
   
-  border: rgb(46, 237, 247) 5px solid;
+  border: rgb(46, 237, 247) 0px solid;
 
 
 }

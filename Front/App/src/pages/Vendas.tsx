@@ -89,7 +89,7 @@ const PDVScreen: React.FC = () => {
     <div style={{ display: 'flex', height: '100vh', backgroundColor: '#f5f5f5' }}>
 
       {/* Coluna 1: Lista de Produtos */}
-      <div style={{ flex: 1, padding: '1rem', borderRight: '1px solid #ddd', overflowY: 'auto' }}>
+      <div style={{ flex: 1, padding: '1rem', borderRight: '1px solid #ddd', overflowY: 'auto' , }}>
         <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#333' }}>Catálogo de Produtos</h2>
         <input
           type="text"
@@ -98,28 +98,32 @@ const PDVScreen: React.FC = () => {
           onChange={(e) => setSearchTerm(e.target.value)}
           style={{ width: '100%', padding: '0.5rem', marginBottom: '1rem', border: '1px solid #ccc', borderRadius: '4px' }}
         />
+        
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '1rem' }}>
+          
           {filteredProducts.map(product => (
             <div
               key={product.id}
               onClick={() => handleAddToCart(product)}
               style={{
                 backgroundColor: '#fff',
-                padding: '1rem',
                 borderRadius: '8px',
                 boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
                 cursor: 'pointer',
                 textAlign: 'center',
                 transition: 'transform 0.2s',
-              }}
-            >
+              }}>
               <h3 style={{ fontSize: '1rem', fontWeight: 'bold', color:'black' }}>{product.name}</h3>
-              <p style={{ color: '#059669', fontWeight: 'bold', marginTop: '0.5rem' }}>
+              <span style={{background: "blue"}}>Cod: #45445</span>
+              <span style={{background: "red"}}>Mangueira Hidraulicas</span>
+              <p style={{ color: '#059669', fontWeight: 'bold', marginTop: '0.3rem' }}>
                 R$ {product.price.toFixed(2).replace('.', ',')}
               </p>
               <p style={{ fontSize: '0.8rem', color: '#666' }}>Estoque: {product.stock}</p>
             </div>
           ))}
+
+
         </div>
       </div>
 

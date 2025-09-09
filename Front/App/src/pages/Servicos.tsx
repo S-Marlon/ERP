@@ -1,203 +1,132 @@
-import './Servicos.css';
+import React, { useState } from 'react';
+import ServiceFilter from '../components/ServiceFilter';
+import ServiceItem from '../components/ServiceItem';
+import { FilterState, ServiceItem as ServiceItemType } from '../types';
+import './Servicos.css'; // Estilos específicos para a página
 
-interface Props {
-    text: string;
-}
+// Seus dados de exemplo ou a lógica para buscar dados de uma API
+const mockServices: ServiceItemType[] = [
+    {
+        orderNumber: '01',
+        clientName: 'Watson Johnson',
+        clientDetails: 'tiua mae',
+        status: 'Completo',
+        day: 'Quarta',
+        time: '16:48',
+        date: '28/08/2025',
+        items: [
+            { quantity: 1, name: 'Item A', price: 5.00 },
+            { quantity: 2, name: 'Item B', price: 5.99 },
+        ],
+        total: 16.98,
+        tags: ['Lapis', 'Pssssai bill'],
+        responsible: 'cleonardones',
+    }, {
+        orderNumber: '01',
+        clientName: 'Watson Johnson',
+        clientDetails: 'tiua mae',
+        status: 'Completo',
+        day: 'Quarta',
+        time: '16:48',
+        date: '28/08/2025',
+        items: [
+            { quantity: 1, name: 'Item A', price: 5.00 },
+            { quantity: 2, name: 'Item B', price: 5.99 },
+        ],
+        total: 16.98,
+        tags: ['Lapis', 'Pssssai bill'],
+        responsible: 'cleonardones',
+    }, {
+        orderNumber: '01',
+        clientName: 'Watson Johnson',
+        clientDetails: 'tiua mae',
+        status: 'Completo',
+        day: 'Quarta',
+        time: '16:48',
+        date: '28/08/2025',
+        items: [
+            { quantity: 1, name: 'Item A', price: 5.00 },
+            { quantity: 2, name: 'Item B', price: 5.99 },
+        ],
+        total: 16.98,
+        tags: ['Lapis', 'Pssssai bill'],
+        responsible: 'thgtrghbgr',
+    },
+    // ... mais serviços
+];
 
-const Header: React.FC<Props> = ({ text }) => {
-    return (
-        <>
+// O componente Serv
+// icesPage não precisa de props, a menos que você
+// queira passar algo do layout principal.
+const ServicesPage: React.FC = () => {
+    const [filters, setFilters] = useState<FilterState>({
+        clientName: '',
+        clientEmail: '',
+        clientCpf: '',
+        clientPhone: '',
+        orderNumber: '',
+        status: '',
+        serviceType: '',
+        date: '',
+        paymentMethod: '',
+    });
 
-            <div className="grid-container">
-                <div className="grid-item" style={{ backgroundColor: '#3c3c3cff' }}>
-                    Filtro de servico
+    const [services, setServices] = useState<ServiceItemType[]>(mockServices);
 
-                    <table className="subflex-item" >
-                        Cliente:
-                        <tbody style={{ backgroundColor: '#262626ff', }}>
-                            <tr>
-                                <td><button>
-                                    Nome
-                                </button></td>
-                                <td> <button>
-                                    Email
-                                </button></td>
+    const handleFilterChange = (key: keyof FilterState, value: string) => {
+        setFilters(prevFilters => ({ ...prevFilters, [key]: value }));
+    };
 
-                            </tr>
-                            <tr>
-                                <td><button>
-                                    Telefone
-                                </button></td>
-                                <td><button>
-                                    CPF
-                                </button></td>
+    const handleApplyFilter = () => {
+        const filteredList = mockServices.filter(service => {
+            return (
+                service.clientName.toLowerCase().includes(filters.clientName.toLowerCase())
+            );
+        });
+        setServices(filteredList);
+    };
 
-                            </tr>
+    const handleClearFilters = () => {
+        setFilters({
+            clientName: '',
+            clientEmail: '',
+            clientCpf: '',
+            clientPhone: '',
+            orderNumber: '',
+            status: '',
+            serviceType: '',
+            date: '',
+            paymentMethod: '',
+        });
+        setServices(mockServices);
+    };
 
-                        </tbody>
-
-                    </table>
-
-                     <table className="subflex-item" >
-                        Dados do serviço:
-                        <tbody style={{ backgroundColor: '#262626ff', }}>
-                            <tr>
-                                <td><button>
-                                    numero de ordem
-                                </button></td>
-                                <td> <button>
-                                    Status Atual
-                                </button></td>
-
-                            </tr>
-                            <tr>
-                                <td><button>
-                                    Tipo Serviço
-                                </button></td>
-                                
-
-                            </tr>
-
-                        </tbody>
-
-                    </table>
-
-                     <table className="subflex-item" >
-                        Dados do serviço:
-                        <tbody style={{ backgroundColor: '#262626ff', }}>
-                            <tr>
-                                <td><button>
-                                    Data
-                                </button></td>
-                                <td> <button>
-                                    Hora
-                                </button></td>
-
-                            </tr>
-                            <tr>
-                                <td><button>
-                                    Forma de pagamento
-                                </button></td>
-                                
-
-                            </tr>
-
-                        </tbody>
-
-                    </table>
-
-
-<button>
-                       Limpar campos
-                    </button>
-                    <button>
-                        Aplicar Filtro de {text}
-                    </button>
-                </div>
-
-                <div className="grid-item" >
-
-                    <div className="flex-container">
-                        <div className="flex-item">
-
-                            <div className="flex-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
-
-
-                                <div className="subgrid-container" >
-
-
-                                    <div className="subflex-content" >
-                                        <div className="subflex-item" style={{ backgroundColor: 'red', flexGrow: "0", padding: '10px', borderRadius: '5px' }}>01</div>
-                                        <div className="subflex-item" style={{ textAlign: "left" }} >Watson jHonson <br /> tiua mae</div>
-                                    </div>
-                                    <div className="subflex-item" style={{ backgroundColor: 'green', flexGrow: "0", padding: '2px', borderRadius: '5px' }}>Completo</div>
-
-
-
-
-                                    <div className="subflex-content">
-                                        <div className="subflex-item">Quarta</div>
-                                        <div className="subflex-item" >16:48</div>
-                                        <div className="subflex-item">28/08/2025</div>
-                                    </div>
-
-
-
-
-                                    <div className="subflex-content">
-
-                                        <table className="subflex-item" >
-                                            <thead style={{ backgroundColor: 'gray', }}>
-                                                <tr >
-                                                    <th>qtd</th>
-                                                    <th>itens</th>
-                                                    <th>preços</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody style={{ backgroundColor: '#262626ff', }}>
-                                                <tr>
-                                                    <td>qtd</td>
-                                                    <td>itens</td>
-                                                    <td>preços</td>
-                                                </tr>
-                                                <tr>
-                                                    <td>qtd</td>
-                                                    <td>itens</td>
-                                                    <td>preços</td>
-                                                </tr>
-                                                <tr>
-                                                    <td>qtd</td>
-                                                    <td>itens</td>
-                                                    <td>preços</td>
-                                                </tr>
-                                            </tbody>
-
-
-                                        </table>
-                                    </div>
-
-
-
-
-                                    <div className="subflex-content">
-                                        <div className="subflex-item">sub total</div>
-                                        <div className="subflex-item">R$ 16,98</div>
-                                    </div>
-
-
-
-
-                                    <div className="subflex-content">
-                                        <div className="subflex-item"><button>Lapis</button></div>
-                                        <div className="subflex-item"><button>Pai bill</button></div>
-
-                                    </div>
-
-                                    <div className="subflex-item">responsavel: cleonardones</div>
-
-                                </div>
-
-
-
-
-
-
-
-
-                            </div>
-
-                        </div>
-                        <div className="flex-item">Lista de item 2</div>
-                        <div className="flex-item">Lista de item 3</div>
-                        <div className="flex-item">Lista de item 4</div>
-
-                    </div>
-
-                </div>
+    return  (
+        // Este é o container principal
+        <div className="main-grid-container">
+            {/* Coluna da esquerda: Filtro */}
+            <div className="filter-sidebar">
+                <ServiceFilter
+                    filters={filters}
+                    onFilterChange={handleFilterChange}
+                    onClear={handleClearFilters}
+                    onApply={handleApplyFilter}
+                />
             </div>
 
-        </>
+            {/* Coluna da direita: Lista de serviços */}
+            <div className="services-container">
+                {services.length > 0 ? (
+                    services.map((service, index) => (
+                        <ServiceItem key={index} service={service} />
+                    ))
+                ) : (
+                    <p>Nenhum serviço encontrado com os filtros aplicados.</p>
+                )}
+            </div>
+        </div>
     );
+
 };
 
-export default Header;
+export default ServicesPage;

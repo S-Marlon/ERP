@@ -24,7 +24,7 @@ function App() {
    const [isDarkMode, setIsDarkMode] = useState(false);
 
   const sidebarWidth = isSidebarOpen ? 200 : 90;
-  const headerHeight = 70;
+  const headerHeight = 60;
 
   return (
     <>
@@ -37,7 +37,7 @@ function App() {
         <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar}  sidebarWidth={sidebarWidth}/> 
         <Header title="Sistema ERP" headerHeight={headerHeight} onThemeToggle={toggleTheme} 
         isDarkMode={isDarkMode} />
-        <Panel>
+        <Panel isDarkMode={isDarkMode}>
            
             <Routes>
             <Route path="/" element={<Dashboard text='Dashboard'/>} />
@@ -45,7 +45,7 @@ function App() {
             <Route path="/produtos" element={<Produtos  text='Produtos'/>} />
             <Route path="/vendas" element={<Vendas/>} />
             <Route path="/Estoque" element={<Estoque  text='Estoque'/>} />
-            <Route path="/Servicos" element={<Servicos  text='Servicos'/>} />
+            <Route path="/Servicos" element={<Servicos />} />
           </Routes>
           
         </Panel>

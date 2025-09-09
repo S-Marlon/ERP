@@ -8,7 +8,7 @@ export const colors = {
   // Cores de texto e fundo
   text: '#1f2937',
   textLight: '#f3f4f6',
-  background: '#f0f4f8',
+  background: '#F5F5F5',
   backgroundLight: '#ffffff',
   backgroundDark: '#111827',
   
