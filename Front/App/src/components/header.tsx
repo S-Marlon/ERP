@@ -41,7 +41,11 @@ const Header: React.FC<HeaderProps> = ({ title, onBackButtonClick,
             ← Voltar
           </button>
       <h1 style={{alignContent: 'center', fontSize:"1.3rem"}}>{title}</h1>
+                
+                <div>
 
+                <button>A-</button>
+                <button>A+</button>
       <button
         onClick={onThemeToggle}
         style={{
@@ -56,6 +60,8 @@ const Header: React.FC<HeaderProps> = ({ title, onBackButtonClick,
       >
         {isDarkMode ? '🌙 Modo Escuro' : '☀️ Modo Claro'}
       </button>
+                </div>
+
     </div>
   );
 };

@@ -23,8 +23,8 @@ function App() {
   };
    const [isDarkMode, setIsDarkMode] = useState(false);
 
-  const sidebarWidth = isSidebarOpen ? 200 : 90;
-  const headerHeight = 60;
+  const sidebarWidth = isSidebarOpen ? 170 : 90;
+  const headerHeight = 50;
 
   return (
     <>
@@ -44,7 +44,7 @@ function App() {
             <Route path="/clientes" element={<Clientes  text='Clientes'/>} />
             <Route path="/produtos" element={<Produtos  text='Produtos'/>} />
             <Route path="/vendas" element={<Vendas/>} />
-            <Route path="/Estoque" element={<Estoque  text='Estoque'/>} />
+            <Route path="/Estoque" element={<Estoque />} />
             <Route path="/Servicos" element={<Servicos />} />
           </Routes>
           

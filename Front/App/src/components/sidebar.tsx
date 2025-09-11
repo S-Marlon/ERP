@@ -2,6 +2,10 @@
 
 import './Sidebar.css';
 import reactLogo from '../assets/react.svg'
+import img from '../pic/icons8-binóculos-50.png'
+import img2 from '../pic/icons8-cancelar-50.png'
+import img3 from '../pic/icons8-configurações-50.png'
+import img4 from '../pic/icons8-suporte-50.png'
 import { Link } from "react-router-dom";
 
 
@@ -39,25 +43,25 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
           </Link>
             <Link to="/produtos">
           <li>
-          <img src={reactLogo}  className="react" alt="React logo" />
+          <img src={img2}  className="react" alt="React logo" />
             {isOpen && <span >produtos</span>}
           </li>
           </Link>
             <Link to="/vendas">
           <li>
-            <img src={reactLogo}  className="react" alt="React logo" />
+            <img src={img3}  className="react" alt="React logo" />
             {isOpen && <span >vendas</span>}
             </li>
             </Link>
              <Link to="/Estoque">
           <li>
-            <img src={reactLogo}  className="react" alt="React logo" />
+            <img src={img}  className="react" alt="React logo" />
             {isOpen && <span >Estoque</span>}
             </li>
             </Link>
             <Link to="/Servicos">
           <li>
-            <img src={reactLogo}  className="react" alt="React logo" />
+            <img src={img4}  className="react" alt="React logo" />
             {isOpen && <span >Servicos</span>}
             </li>
             </Link>

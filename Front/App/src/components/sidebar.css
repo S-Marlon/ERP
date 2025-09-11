@@ -16,7 +16,7 @@
 
 .sidebar.open {
   left: 0; /* Quando aberta, fica a esquerda */
-  width: 200px; /* Largura completa quando aberta */
+  width: 170px; /* Largura completa quando aberta */
 }
 
 .sidebar ul {

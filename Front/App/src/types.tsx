@@ -29,3 +29,15 @@ export interface FilterState {
   date: string;
   paymentMethod: string;
 }
+
+// Nova interface para o produto
+export interface Product {
+    id: string;
+    sku: string;
+    name: string;
+    pictureUrl: string; // URL para a imagem
+    category: string;
+    stock: number;
+    status: 'Ativo' | 'Inativo' | 'Baixo Estoque';
+    price: number;
+}

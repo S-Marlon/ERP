@@ -1,90 +1,166 @@
+// src/pages/EstoquePage.tsx
+
+import React, { useState } from 'react';
+import ProductHeader from '../components/ProductHeader';
+import ProductFilter from '../components/ProductFilter';
+import ProductTable from '../components/ProductTable';
+import { Product } from '../types';
 import './Estoque.css';
+import ProductInfo from '../components/ProductInfo';
 
-interface Props {
-  text: string;
-}
+// Dados de exemplo
+const mockProducts: Product[] = [
+    {
+        id: '1', sku: 'PROD-001', name: 'Teclado Gamer', pictureUrl: 'url_teclado',
+        category: 'Periféricos', stock: 15, status: 'Ativo', price: 250.00
+    },
+    {
+        id: '2', sku: 'PROD-002', name: 'Mouse Sem Fio', pictureUrl: 'url_mouse',
+        category: 'Periféricos', stock: 5, status: 'Baixo Estoque', price: 80.00
+    },
+    {
+        id: '2', sku: 'PROD-002', name: 'Mangueira hidraulica R1AT, 1/4 Solai', pictureUrl: 'url_mouse',
+        category: 'Periféricos', stock: 5, status: 'Baixo Estoque', price: 80.00
+    },{
+        id: '2', sku: 'PROD-002', name: 'Mangueira automotiva j188, ar condicionado, 3/8', pictureUrl: 'url_mouse',
+        category: 'Periféricos', stock: 5, status: 'Baixo Estoque', price: 80.00
+    },{
+        id: '2', sku: 'PROD-002', name: 'Mouse Sem Fio', pictureUrl: 'url_mouse',
+        category: 'Periféricos', stock: 5, status: 'Baixo Estoque', price: 80.00
+    },{
+        id: '2', sku: 'PROD-002', name: 'Mouse Sem Fio', pictureUrl: 'url_mouse',
+        category: 'Periféricos', stock: 5, status: 'Baixo Estoque', price: 80.00
+    },{
+        id: '2', sku: 'PROD-002', name: 'Mouse Sem Fio', pictureUrl: 'url_mouse',
+        category: 'Periféricos', stock: 5, status: 'Baixo Estoque', price: 80.00
+    },{
+        id: '2', sku: 'PROD-002', name: 'Mouse Sem Fio', pictureUrl: 'url_mouse',
+        category: 'Periféricos', stock: 5, status: 'Baixo Estoque', price: 80.00
+    },{
+        id: '2', sku: 'PROD-002', name: 'Mouse Sem Fio', pictureUrl: 'url_mouse',
+        category: 'Periféricos', stock: 5, status: 'Baixo Estoque', price: 80.00
+    },{
+        id: '2', sku: 'PROD-002', name: 'Mouse Sem Fio', pictureUrl: 'url_mouse',
+        category: 'Periféricos', stock: 5, status: 'Baixo Estoque', price: 80.00
+    },{
+        id: '2', sku: 'PROD-002', name: 'Mouse Sem Fio', pictureUrl: 'url_mouse',
+        category: 'Periféricos', stock: 5, status: 'Baixo Estoque', price: 80.00
+    },{
+        id: '2', sku: 'PROD-002', name: 'Mouse Sem Fio', pictureUrl: 'url_mouse',
+        category: 'Periféricos', stock: 5, status: 'Baixo Estoque', price: 80.00
+    },{
+        id: '2', sku: 'PROD-002', name: 'Mouse Sem Fio', pictureUrl: 'url_mouse',
+        category: 'Periféricos', stock: 5, status: 'Baixo Estoque', price: 80.00
+    },{
+        id: '2', sku: 'PROD-002', name: 'Mouse Sem Fio', pictureUrl: 'url_mouse',
+        category: 'Periféricos', stock: 5, status: 'Baixo Estoque', price: 80.00
+    },{
+        id: '2', sku: 'PROD-002', name: 'Mouse Sem Fio', pictureUrl: 'url_mouse',
+        category: 'Periféricos', stock: 5, status: 'Baixo Estoque', price: 80.00
+    },{
+        id: '2', sku: 'PROD-002', name: 'Mouse Sem Fio', pictureUrl: 'url_mouse',
+        category: 'Periféricos', stock: 5, status: 'Baixo Estoque', price: 80.00
+    },{
+        id: '2', sku: 'PROD-002', name: 'Mouse Sem Fio', pictureUrl: 'url_mouse',
+        category: 'Periféricos', stock: 5, status: 'Baixo Estoque', price: 80.00
+    },{
+        id: '2', sku: 'PROD-002', name: 'Mouse Sem Fio', pictureUrl: 'url_mouse',
+        category: 'Periféricos', stock: 5, status: 'Baixo Estoque', price: 80.00
+    },{
+        id: '2', sku: 'PROD-002', name: 'Mouse Sem Fio', pictureUrl: 'url_mouse',
+        category: 'Periféricos', stock: 5, status: 'Baixo Estoque', price: 80.00
+    },{
+        id: '2', sku: 'PROD-002', name: 'Mouse Sem Fio', pictureUrl: 'url_mouse',
+        category: 'Periféricos', stock: 5, status: 'Baixo Estoque', price: 80.00
+    },{
+        id: '2', sku: 'PROD-002', name: 'Mouse Sem Fio', pictureUrl: 'url_mouse',
+        category: 'Periféricos', stock: 5, status: 'Baixo Estoque', price: 80.00
+    },{
+        id: '2', sku: 'PROD-002', name: 'Mouse Sem Fio', pictureUrl: 'url_mouse',
+        category: 'Periféricos', stock: 5, status: 'Baixo Estoque', price: 80.00
+    },{
+        id: '2', sku: 'PROD-002', name: 'Mouse Sem Fio', pictureUrl: 'url_mouse',
+        category: 'Periféricos', stock: 5, status: 'Baixo Estoque', price: 80.00
+    },{
+        id: '2', sku: 'PROD-002', name: 'Mouse Sem Fio', pictureUrl: 'url_mouse',
+        category: 'Periféricos', stock: 5, status: 'Baixo Estoque', price: 80.00
+    },
+    // ... mais produtos
+];
 
-
-const Header: React.FC<Props> = ({ text }) => {
+const EstoquePage: React.FC = () => {
+    const [products, setProducts] = useState<Product[]>(mockProducts);
     
-  return (
-    <>
-<div className="grids-container">
-    <div className="grid-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 100px' }}>
-    150 produtos Em Registro
-    <button>
-        adcionar produto
-    </button>
-    </div>
-    <div className="grid-item">
+    const [filters, setFilters] = useState({
+        status: '',
+        category: '',
+        minPrice: '',
+        maxPrice: '',
+        minStock: '',
+        maxStock: '',
+    });
+
+    const handleFilterChange = (key: string, value: string) => {
+        setFilters(prev => ({ ...prev, [key]: value }));
+    };
+
+    
+
    
-    Filtro de produto
-    <button>
-        Aplicar Filtro de produto  
-    </button>
 
-    Status:
-    <select>
-        <option>Todos</option>
-        <option>Ativo</option>
-        <option>Inativo</option>
-        <option>baixo estoque</option>
-    </select>
-    Categoria:
-    <select>
-        <option>Todos</option>
-        <option>Categoria 1</option>
-        <option>Categoria 2</option>
-        <option>Categoria 3</option>
-    </select>
-    Preço:
-    <select>
-        <option>Todos</option>
-        <option>Menor que 50</option>
-        <option>Entre 50 e 100</option>
-        <option>Maior que 100</option>
-    </select>
-    Quantidade em estoque:
-    <select>
-        <option>Todos</option>
-        <option>Menor que 10</option>
-        <option>Entre 10 e 50</option>
-        <option>Maior que 50</option>
-    </select>
+    const handleApplyFilter = () => {
+        const filteredList = mockProducts.filter(product => {
+            // Lógica de filtro aqui
+            return (
+                (filters.status === '' || product.status === filters.status) &&
+                (filters.category === '' || product.category === filters.category)
+                // ... adicione as outras lógicas de filtro
+            );
+        });
+        setProducts(filteredList);
+    };
 
+    // const handleResetFilters = () => {
+    //     setFilters({
+    //         status: '', category: '', minPrice: '', maxPrice: '', minStock: '', maxStock: ''
+    //     });
+    //     setProducts(mockProducts);
+    // };
 
-    </div>
-    <div className="grid-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 10px' }}>
-    <button>
-        Resetar Filtro de produto
-    </button>
-    150 produtos encontrados
-    </div>
-    <div className="grid-item">
-    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center', backgroundColor: '#2f2f2fff' , padding: '100px', color: 'white'}}>
-  <tbody>
-    <tr style={{ borderBottom: '1px solid #ddd' , padding: '150px'}}>
-      <td  style={{ borderBottom: '1px solid #ddd' , paddingTop: '15px', paddingBottom: "15px"}}>{text}</td>
-      <td>Chicken Parmesan</td>
-      <td>picture</td>
-      <td>SKU</td>
-      <td>Category</td>
-      <td>10 in stock</td>
-      <td>Status</td>
-      <td>Preco venda</td>
-      <td>✏️</td>
-      <td>🗑️</td>
-    </tr>
-</tbody>
-</table>
-    </div>
-  
-</div>
+    const handleAddProduct = () => {
+        console.log('Adicionar produto!');
+        // Lógica para abrir um modal ou navegar para outra página
+    };
 
-
-
-</>
-  );
+    return (
+        <div className="estoque-container">
+            <ProductHeader
+                totalProducts={mockProducts.length}
+                foundProducts={products.length}
+                onAddProduct={handleAddProduct}
+            />
+            <div className="content-grid">
+                <div className="product-filter">
+                    <ProductFilter
+                        filters={filters}
+                        onFilterChange={handleFilterChange}
+                        onApply={handleApplyFilter}
+                    />
+                </div>
+                
+                <div className="product-table-wrapper">
+                    <ProductTable products={products} />
+                </div>
+                <div className="product-info">
+                    
+                    {/* Painel de detalhes do produto pode ser adicionado aqui */}
+                    <ProductInfo product={products[0]} onClose={() => {}} />
+                    
+                    
+                </div>
+            </div>
+        </div>
+    );
 };
 
-export default Header;
+export default EstoquePage;

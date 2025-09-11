@@ -16,6 +16,18 @@ interface CartItem {
   total: number;
 }
 
+// interface Order {
+//   id: string;
+//   clientName: string;
+//   clientInfo: string; // CPF, telefone, etc.
+//   status: 'Pendente' | 'Concluído' | 'Cancelado'| 'Em Andamento' | 'Aguardando Peças' | 'Orçamento' | 'pagamento parcial';
+//   date: Date;
+//   responsible: string; // Nome do funcionário responsável
+//   paymentMethod: string;
+//   totalAmount: number;
+//   items: OrderItem[]; // Este é o array que vai unir tudo
+// }
+
 const products: Product[] = [
   { id: '1', name: 'Mangueira R1at 1/2', price: 5.50, stock: 100 },
   { id: '2', name: 'Mangueira R2at 1/2', price: 8.00, stock: 150 },
@@ -89,7 +101,7 @@ const PDVScreen: React.FC = () => {
     <div style={{ display: 'flex', height: '100vh', backgroundColor: '#f5f5f5' }}>
 
       {/* Coluna 1: Lista de Produtos */}
-      <div style={{ flex: 1, padding: '1rem', borderRight: '1px solid #ddd', overflowY: 'auto' , }}>
+      <div style={{ flex: 1, padding: '1rem', borderRight: '1px solid #ddd', overflowY: 'auto', }}>
         <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#333' }}>Catálogo de Produtos</h2>
         <input
           type="text"
@@ -98,9 +110,9 @@ const PDVScreen: React.FC = () => {
           onChange={(e) => setSearchTerm(e.target.value)}
           style={{ width: '100%', padding: '0.5rem', marginBottom: '1rem', border: '1px solid #ccc', borderRadius: '4px' }}
         />
-        
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '1rem' }}>
-          
+
           {filteredProducts.map(product => (
             <div
               key={product.id}
@@ -113,9 +125,9 @@ const PDVScreen: React.FC = () => {
                 textAlign: 'center',
                 transition: 'transform 0.2s',
               }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 'bold', color:'black' }}>{product.name}</h3>
-              <span style={{background: "blue"}}>Cod: #45445</span>
-              <span style={{background: "red"}}>Mangueira Hidraulicas</span>
+              <h3 style={{ fontSize: '1rem', fontWeight: 'bold', color: 'black' }}>{product.name}</h3>
+              <span style={{ background: "blue" }}>Cod: #45445</span>
+              <span style={{ background: "red" }}>Mangueira Hidraulicas</span>
               <p style={{ color: '#059669', fontWeight: 'bold', marginTop: '0.3rem' }}>
                 R$ {product.price.toFixed(2).replace('.', ',')}
               </p>
@@ -137,19 +149,19 @@ const PDVScreen: React.FC = () => {
             cart.map(item => (
               <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', padding: '0.75rem', borderRadius: '4px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', marginBottom: '0.5rem' }}>
                 <div style={{ flex: 1 }}>
-                  <h4 style={{ margin: 0, fontWeight: 'bold',  color:'black' }}>{item.name}</h4>
+                  <h4 style={{ margin: 0, fontWeight: 'bold', color: 'black' }}>{item.name}</h4>
                   <p style={{ margin: 0, fontSize: '0.9rem', color: '#555' }}>
                     R$ {item.price.toFixed(2).replace('.', ',')}
                   </p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <input 
+                  <input
                     type="number"
                     value={item.quantity}
                     onChange={(e) => handleUpdateQuantity(item.id, parseInt(e.target.value) || 0)}
                     style={{ width: '60px', textAlign: 'center', padding: '0.25rem', borderRadius: '4px', border: '1px solid #ccc', }}
                   />
-                  <span style={{ fontWeight: 'bold', minWidth: '80px', textAlign: 'right', color:'black' }}>
+                  <span style={{ fontWeight: 'bold', minWidth: '80px', textAlign: 'right', color: 'black' }}>
                     R$ {item.total.toFixed(2).replace('.', ',')}
                   </span>
                   <button onClick={() => handleRemoveFromCart(item.id)} style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.25rem 0.5rem', cursor: 'pointer' }}>
@@ -171,9 +183,12 @@ const PDVScreen: React.FC = () => {
       </div>
 
       {/* Coluna 3: Pagamento e Finalização */}
-      <div style={{ flex: 0.8, padding: '1rem', backgroundColor: '#e2e8f0', display: 'flex', flexDirection: 'column' }}>
+      <div style={{
+        flex: 0.8, padding: '1rem', backgroundColor: '#e2e8f0', display: 'flex', flexDirection: 'column'
+      }}>
+
         <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#333' }}>Pagamento</h2>
-        
+
         {/* Formas de Pagamento */}
         <div style={{ marginBottom: '1rem' }}>
           <h3 style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>Método de Pagamento</h3>

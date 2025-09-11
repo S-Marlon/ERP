@@ -22,7 +22,7 @@ const mockServices: ServiceItemType[] = [
         tags: ['Lapis', 'Pssssai bill'],
         responsible: 'cleonardones',
     }, {
-        orderNumber: '01',
+        orderNumber: '02',
         clientName: 'Watson Johnson',
         clientDetails: 'tiua mae',
         status: 'Completo',
@@ -37,7 +37,7 @@ const mockServices: ServiceItemType[] = [
         tags: ['Lapis', 'Pssssai bill'],
         responsible: 'cleonardones',
     }, {
-        orderNumber: '01',
+        orderNumber: '03',
         clientName: 'Watson Johnson',
         clientDetails: 'tiua mae',
         status: 'Completo',
@@ -51,7 +51,22 @@ const mockServices: ServiceItemType[] = [
         total: 16.98,
         tags: ['Lapis', 'Pssssai bill'],
         responsible: 'thgtrghbgr',
-    },
+    },{
+        orderNumber: '03',
+        clientName: 'Watson Johnson',
+        clientDetails: 'tiua mae',
+        status: 'Completo',
+        day: 'Quarta',
+        time: '16:48',
+        date: '28/08/2025',
+        items: [
+            { quantity: 1, name: 'Item A', price: 5.00 },
+            { quantity: 2, name: 'Item B', price: 5.99 },
+        ],
+        total: 16.98,
+        tags: ['Lapis', 'Pssssai bill'],
+        responsible: 'thgtrghbgr',
+    }
     // ... mais serviços
 ];
 
