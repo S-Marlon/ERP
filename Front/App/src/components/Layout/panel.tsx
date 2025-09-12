@@ -1,7 +1,7 @@
 // src/components/Sidebar.tsx
 import './Panel.css';
 import { ReactNode } from "react";
-import { colors, darkColors } from '../styles/colors';
+import { colors, darkColors } from '../../styles/colors';
 
 
 interface PanelProps {

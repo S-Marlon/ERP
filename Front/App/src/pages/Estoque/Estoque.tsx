@@ -1,12 +1,12 @@
 // src/pages/EstoquePage.tsx
 
 import React, { useState } from 'react';
-import ProductHeader from '../components/ProductHeader';
-import ProductFilter from '../components/ProductFilter';
-import ProductTable from '../components/ProductTable';
-import { Product } from '../types';
+import ProductHeader from './Components/ProductHeader';
+import ProductFilter from './Components/ProductFilter';
+import ProductTable from './Components/ProductTable';
+import { Product } from '../../types/types';
 import './Estoque.css';
-import ProductInfo from '../components/ProductInfo';
+import ProductInfo from './Components/ProductInfo';
 
 // Dados de exemplo
 const mockProducts: Product[] = [
@@ -159,6 +159,11 @@ const EstoquePage: React.FC = () => {
                     
                 </div>
             </div>
+            <ProductHeader
+                totalProducts={mockProducts.length}
+                foundProducts={products.length}
+                onAddProduct={handleAddProduct}
+            />
         </div>
     );
 };

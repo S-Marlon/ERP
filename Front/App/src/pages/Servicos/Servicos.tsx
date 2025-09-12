@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import ServiceFilter from '../components/ServiceFilter';
-import ServiceItem from '../components/ServiceItem';
-import { FilterState, ServiceItem as ServiceItemType } from '../types';
+import ServiceFilter from './Component/ServiceFilter';
+import ServiceItem from './Component/ServiceItem';
+import { FilterState, ServiceItem as ServiceItemType } from '../../types/types';
 import './Servicos.css'; // Estilos específicos para a página
 
 // Seus dados de exemplo ou a lógica para buscar dados de uma API

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ServiceItem as ServiceItemType } from '../types'; // Renomeie para evitar conflito de nomes
+import { ServiceItem as ServiceItemType } from '../../../types/types'; // Renomeie para evitar conflito de nomes
 
 interface ServiceItemProps {
   service: ServiceItemType;

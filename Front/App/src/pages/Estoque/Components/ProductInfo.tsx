@@ -1,5 +1,5 @@
     import React from 'react';
-import { Product } from '../types';
+import { Product } from '../../../types/types';
 
 interface ProductInfoProps {
     product: Product;
@@ -12,8 +12,8 @@ const ProductInfo: React.FC<ProductInfoProps> = ({ product, onClose }) => {
 
             <div className="product-info-header">
                 <div>
-                <h2>{product.name}</h2> 
-                <p><strong>SKU:</strong> {product.sku}</p>
+                <span>{product.name}</span> 
+                <span><strong>SKU:</strong> {product.sku}</span>
                 </div>
                 <button className="close-button" onClick={onClose}>&times;</button>
             </div>

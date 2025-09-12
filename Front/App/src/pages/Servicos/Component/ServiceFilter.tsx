@@ -1,5 +1,5 @@
 import React from 'react';
-import { FilterState } from '../types';
+import { FilterState } from '../../../types/types';
 
 // Define a interface para as props do componente
 interface ServiceFilterProps {

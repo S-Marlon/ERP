@@ -1,16 +1,16 @@
 import './App.css'
 import { useState } from 'react'
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Sidebar from './components/sidebar'
-import Header from './components/header';
-import Panel from './components/panel';
+import Sidebar from './components/Layout/sidebar'
+import Header from './components/Layout/header';
+import Panel from './components/Layout/panel';
 
-import Dashboard from "./pages/Dashboard";
-import Clientes from "./pages/Clientes";
-import Produtos from "./pages/Produtos";
-import Vendas from "./pages/Vendas";
-import Estoque from "./pages/Estoque";
-import Servicos from "./pages/Servicos";
+import Dashboard from "./pages/Dashboard/Dashboard";
+import Clientes from "./pages/Clientes/Clientes";
+import Produtos from "./pages/Produtos/Produtos";
+import Vendas from "./pages/Vendas/Vendas";
+import Estoque from "./pages/Estoque/Estoque";
+import Servicos from "./pages/Servicos/Servicos";
 
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);

@@ -1,11 +1,11 @@
 // src/components/Sidebar.tsx
 
 import './Sidebar.css';
-import reactLogo from '../assets/react.svg'
-import img from '../pic/icons8-binóculos-50.png'
-import img2 from '../pic/icons8-cancelar-50.png'
-import img3 from '../pic/icons8-configurações-50.png'
-import img4 from '../pic/icons8-suporte-50.png'
+import reactLogo from '../../assets/react.svg'
+import img from '../../assets/pic/icons8-binóculos-50.png'
+import img2 from '../../assets/pic/icons8-cancelar-50.png'
+import img3 from '../../assets/pic/icons8-configurações-50.png'
+import img4 from '../../assets/pic/icons8-suporte-50.png'
 import { Link } from "react-router-dom";
 
 

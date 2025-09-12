@@ -1,5 +1,5 @@
 import React from 'react';
-import '../pages/Estoque.css';
+import "../Estoque.css";
 
 interface ProductHeaderProps {
     totalProducts: number;
