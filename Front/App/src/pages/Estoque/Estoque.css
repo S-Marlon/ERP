@@ -1,13 +1,3 @@
-/* Container principal da página de estoque */
-.estoque-container {
-  display: flex;
-  flex-direction: column;
-
-  padding: 0px 20px;
-  background-color: #262626ff;
-  color: white;
-}
-
 /* Cabeçalho superior */
 .product-header {
   display: flex;
@@ -43,23 +33,36 @@
   cursor: pointer;
 }
 
+/* Quando não há produto selecionado */
+.content-grid-hide {
+  display: grid;
+  grid-template-columns: 1fr 10px; /* ocupa 100% só com filtro e tabela */
+  grid-template-areas:
+    "filter filter"
+    "table table";
+  transition: all 5s ease;
+
+}
+
 /* Layout do filtro e da tabela */
 .content-grid {
   display: grid;
   grid-template-columns: 4fr 1fr;
   /* Barra de filtro de 250px, tabela ocupa o resto */
-  grid-template-rows: 150px auto;
+  grid-template-rows: 180px auto;
+  justify-content: center;
   /* Ajusta as linhas automaticamente */
   grid-template-areas:
-    "filter pinfo"
-    "table pinfo";
+  "filter pinfo"
+  "table pinfo";
   gap: 0px 10px;
+  transition: all 0.3s ease;
 }
 
-/* Estilo do filtro lateral */
-
-tr:hover {
-  background-color: #444;
+.product-info {
+  grid-area: pinfo;
+  position: sticky;
+  top: 20px;
 }
 
 .product-filter {
@@ -69,11 +72,49 @@ tr:hover {
   border-radius: 8px;
 }
 
+/* Tabela de produtos */
+.product-table-wrapper {
+  grid-area: table;
+  overflow-x: auto;
+  /* Adiciona barra de rolagem horizontal em telas pequenas */
+  overflow-y: auto;
+  /* Adiciona barra de rolagem horizontal em telas pequenas */
+}
+/* Estilo do filtro lateral */
+
+tr:hover {
+  background-color: #444;
+}
+
+
+
 .product-filter-container {
   display: flex;
-  padding: 10px;
+  padding: 0 10px;
   flex-direction: row;
   justify-content: space-between;
+}
+
+.min-max-group {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+}
+
+.min-max-group fieldset {
+  font-size: small;
+  padding: 0px;
+  border: none;
+}
+
+.min-max-group .min-max-input {
+  width: 60px;
+  padding: 8px;
+  border-radius: 4px;
+  color: white;
+  border: 1px solid #555;
 }
 
 .filter-group {
@@ -83,13 +124,7 @@ tr:hover {
   justify-content: space-evenly;
 
 }
-.filter-group input{
-    background-color: #2f2f2fff;
-    padding: 3px;
-    border-radius: 4px;
-    border: 1px solid #555;
-    color: white;
-}
+
 
 .filter-group label {
   display: block;
@@ -105,19 +140,18 @@ tr:hover {
   border: 1px solid #555;
 }
 
-/* Tabela de produtos */
-.product-table-wrapper {
-  grid-area: table;
-  overflow-x: auto;
-  /* Adiciona barra de rolagem horizontal em telas pequenas */
-  overflow-y: auto;
-  /* Adiciona barra de rolagem horizontal em telas pequenas */
+.filter-group input {
+  width: 100%;
+  padding: 8px;
+  border-radius: 4px;
+  background-color: #2f2f2fff;
+  color: white;
+  border: 1px solid #555;
 }
 
-.product-info {
-  position: sticky;
-  top: 20px;
-}
+
+
+
 
 .product-table {
   font-size: small;
@@ -171,14 +205,28 @@ tr:hover {
 .product-info-header div {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: start;
   border-bottom: 1px solid #555;
   flex-direction: column;
+
 }
 
-.product-info-header h2 {
-  margin: 0;
-  font-size: 1rem;
+.product-info-header .close-button {
+  align-self: flex-start;
+  margin-left: auto;
+  background-color: transparent;
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 5px 10px;
+  height: 100%;
+  transition: background-color 0.3s;
+}
+
+.close-button:hover {
+  background-color: rgb(255, 0, 0);
 }
 
 .close-button {
@@ -193,7 +241,7 @@ tr:hover {
 .product-info-content {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 5px;
 }
 
 .product-info-content p {
@@ -201,7 +249,8 @@ tr:hover {
 }
 
 .product-image-wrapper {
-  width: 150px;
+  background-color: rgb(0, 0, 0);
+  width: 100%;
   height: 150px;
   overflow: hidden;
   border-radius: 8px;
@@ -211,8 +260,13 @@ tr:hover {
 .product-image-wrapper img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
 }
+
+.product-image-wrapper img:hover {
+  transform: scale(1.1);
+  transition: transform 0.15s ease;
+}
+
 
 .product-details p {
   margin: 5px 0;
@@ -231,13 +285,13 @@ tr:hover {
   flex-direction: row;
 }
 
-.table-header button{
-    background-color: transparent;
-    color: white;
-    padding: 5px 15px;
-    border: 1px solid rgb(255, 0, 0);
-    cursor: pointer;
-    border-style: outset;
+.table-header button {
+  background-color: transparent;
+  color: white;
+  padding: 5px 15px;
+  border: 1px solid rgb(255, 0, 0);
+  cursor: pointer;
+  border-style: outset;
 }
 
 .table-header div {
@@ -251,8 +305,4 @@ tr:hover {
   display: flex;
   gap: 20px;
   align-items: center;
-}
-
-.close-button:hover {
-  background-color: rgb(255, 0, 0);
 }

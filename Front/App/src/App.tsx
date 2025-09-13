@@ -43,7 +43,7 @@ function App() {
             <Route path="/" element={<Dashboard text='Dashboard'/>} />
             <Route path="/clientes" element={<Clientes  text='Clientes'/>} />
             <Route path="/produtos" element={<Produtos  text='Produtos'/>} />
-            <Route path="/vendas" element={<Vendas/>} />
+            <Route path="/vendas"  element={<Vendas/>} />
             <Route path="/Estoque" element={<Estoque />} />
             <Route path="/Servicos" element={<Servicos />} />
           </Routes>

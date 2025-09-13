@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 
+import { ProductContext } from "../../context/ProductContext";
 // Tipos para os dados do produto e da venda
 interface Product {
   id: string;
@@ -28,16 +29,8 @@ interface CartItem {
 //   items: OrderItem[]; // Este é o array que vai unir tudo
 // }
 
-const products: Product[] = [
-  { id: '1', name: 'Mangueira R1at 1/2', price: 5.50, stock: 100 },
-  { id: '2', name: 'Mangueira R2at 1/2', price: 8.00, stock: 150 },
-  { id: '3', name: 'Mangueira R2at 1', price: 21.75, stock: 80 },
-  { id: '4', name: 'Água Mineral 500ml', price: 2.50, stock: 200 },
-  { id: '5', name: 'Pacote de Café 250g', price: 15.00, stock: 50 },
-  { id: '6', name: 'Suco de Laranja 1L', price: 7.25, stock: 65 },
-];
-
 const PDVScreen: React.FC = () => {
+  const { products } = useContext(ProductContext)!;
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');

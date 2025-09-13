@@ -13,7 +13,7 @@ export default function Panel({ children, isDarkMode }: PanelProps) {
   const themeColors = isDarkMode ? darkColors : colors;
   
   return (
-    <main className="content" style={{ overflowY: 'auto', backgroundColor: isDarkMode ? themeColors.background : themeColors.background,}}>
+    <main  className="geral-container" style={{ overflowY: 'auto', backgroundColor: isDarkMode ? themeColors.background : themeColors.background,}}>
       {children}
     </main>
   );

@@ -1,6 +1,6 @@
     import React from 'react';
 import { Product } from '../../../types/types';
-
+import reactLogo from '../../../assets/react.svg'
 interface ProductInfoProps {
     product: Product;
     onClose: () => void; // Função para fechar o painel de detalhes
@@ -12,15 +12,15 @@ const ProductInfo: React.FC<ProductInfoProps> = ({ product, onClose }) => {
 
             <div className="product-info-header">
                 <div>
-                <span>{product.name}</span> 
-                <span><strong>SKU:</strong> {product.sku}</span>
+                    <span>{product.name}</span> 
+                    <span><strong>SKU:</strong> {product.sku}</span>
                 </div>
                 <button className="close-button" onClick={onClose}>&times;</button>
             </div>
             
             <div className="product-info-content">
                 <div className="product-image-wrapper">
-                    <img src={product.pictureUrl} alt={product.name} /> 
+                    <img src={reactLogo} alt={product.name} /> 
                 </div>
                 
                 <div className="product-details">

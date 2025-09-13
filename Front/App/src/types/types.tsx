@@ -19,12 +19,17 @@ export interface ServiceProduct {
 }
 
 export interface FilterState {
+  status: string;
+  category: string;
+  minPrice: string;
+  maxPrice: string;
+  minStock: string;
+  maxStock: string;
   clientName: string;
   clientEmail: string;
   clientCpf: string;
   clientPhone: string;
   orderNumber: string;
-  status: string;
   serviceType: string;
   date: string;
   paymentMethod: string;

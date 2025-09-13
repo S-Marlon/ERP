@@ -2,11 +2,14 @@ import React from "react";
 import "../Estoque.css";
 import { Product } from "../../../types/types";
 
+
+
 interface ProductTableProps {
   products: Product[];
+  onSelectProduct: (product: Product) => void;
 }
 
-const ProductTable: React.FC<ProductTableProps> = ({ products }) => {
+const ProductTable: React.FC<ProductTableProps> = ({ products, onSelectProduct }) => {
   return (
     <>
       <div className="table-header">
@@ -55,7 +58,8 @@ const ProductTable: React.FC<ProductTableProps> = ({ products }) => {
         </thead>
         <tbody>
           {products.map((product) => (
-            <tr key={product.id}>
+            <tr key={product.id}
+            onClick={() => onSelectProduct(product)}>
               <td>100</td>
 
               <td>{product.name}</td>
