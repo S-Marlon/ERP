@@ -1,0 +1,141 @@
+.pdv-container {
+  display: grid;
+  height: 100vh;
+  
+  background: #f5f5f5;
+  color: black;
+  padding-bottom: 20px;
+  gap: 1rem;
+    grid-template-columns: 6fr 4fr ;
+
+}
+
+.pdv-right-panel{
+  display: flex;
+    flex-direction: column;
+  background: #f5f5f5;
+  color: black;
+  gap: 1rem;
+}
+
+/* Produtos */
+.pdv-products {
+  display: flex;
+flex-direction: column;
+  flex: 1;
+}
+
+.pdv-products input {
+    padding: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.pdv-product-grid {
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+.pdv-categories-card {
+  background: #e33636;
+  color: white;
+  text-align: center;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: transform 0.2s;
+  margin-bottom: 10px;
+}
+
+.pdv-product-card {
+  background: #fff;
+  padding: 0.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.pdv-product-card:hover {
+  transform: scale(1.05);
+}
+
+.pdv-price {
+  color: green;
+  font-weight: bold;
+}
+
+/* Carrinho */
+.pdv-cart {
+  flex: 1.2;
+  border-right: 1px solid #ddd;
+  background-color: white;
+  border-left: 1px solid #ddd;
+  display: flex;
+  flex-direction: column;
+}
+
+.pdv-cart-items {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.pdv-cart-item {
+  background: #fff;
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+  display: flex;
+  justify-content: space-between;
+  border-radius: 4px;
+}
+
+.pdv-cart-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.pdv-subtotal {
+  border-top: 2px solid #ddd;
+  margin-top: 1rem;
+  padding-top: 0.5rem;
+  font-weight: bold;
+  font-size: 1.2rem;
+}
+
+/* Pagamento */
+.pdv-payment {
+  flex: 0.8;
+ 
+  background: #e2e8f0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pdv-methods {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.pdv-methods button.active {
+  background: #059669;
+  color: #fff;
+}
+
+.pdv-change {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #2563eb;
+  margin: 1rem 0;
+}
+
+.pdv-finalize {
+  margin-top: auto;
+  background: #059669;
+  color: #fff;
+  padding: 1rem;
+  font-size: 1.2rem;
+  font-weight: bold;
+  border: none;
+  border-radius: 8px;
+}

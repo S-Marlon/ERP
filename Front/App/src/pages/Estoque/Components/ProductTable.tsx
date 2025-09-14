@@ -1,6 +1,7 @@
 import React from "react";
 import "../Estoque.css";
 import { Product } from "../../../types/types";
+import TableHeader from "./TableHeader";
 
 
 
@@ -12,32 +13,7 @@ interface ProductTableProps {
 const ProductTable: React.FC<ProductTableProps> = ({ products, onSelectProduct }) => {
   return (
     <>
-      <div className="table-header">
-        <div>{99999} produtos encontrados</div>
-
-        <div>
-          <button>Prev</button>
-          <button>1</button>
-          <button>
-            <strong>2</strong>
-          </button>
-          <button>3</button>
-          <button>Pos</button>
-        </div>
-
-        <div>
-          <div>
-            <section>
-              <button>A-</button>
-              <button>A+</button>
-            </section>
-            <section style={{ border: "1px outset  rgb(255, 0, 0)", padding: "1px 5px", borderRadius: "5px" }}>
-              <button>20</button> 
-             &nbsp; por pagina
-            </section>
-          </div>
-        </div>
-      </div>
+      <TableHeader />
 
       <table className="product-table">
         <thead>
@@ -87,26 +63,7 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, onSelectProduct }
         </tbody>
       </table>
 
-      <div className="table-header" style={{ flexDirection: "row-reverse" }}>
-        <div>{99999} produtossss encontrados</div>
-
-        <div>
-          <button>°</button>
-          <button>1</button>
-          <button>
-            <strong>2</strong>
-          </button>
-          <button>3</button>
-          <button>°</button>
-        </div>
-
-        <div>
-          <button>A+</button>
-          <button>A-</button>
-          <button>20</button>
-          por pagina
-        </div>
-      </div>
+     <TableHeader />
     </>
   );
 };

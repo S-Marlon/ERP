@@ -7,11 +7,11 @@ const TableHeader: React.FC = () => {
       <div>{99999} produtos encontrados</div>
       <div>
         {/* Lógica de Paginação */}
-        <button>°</button>
+        <button>Prev</button>
         <button>1</button>
         <button><strong>2</strong></button>
         <button>3</button>
-        <button>°</button>
+        <button>Post</button>
       </div>
       <div>
         <section>

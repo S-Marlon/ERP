@@ -8,7 +8,7 @@ import Panel from './components/Layout/panel';
 import Dashboard from "./pages/Dashboard/Dashboard";
 import Clientes from "./pages/Clientes/Clientes";
 import Produtos from "./pages/Produtos/Produtos";
-import Vendas from "./pages/Vendas/Vendas";
+import Vendas from "./pages/PDV/PDVScreen";
 import Estoque from "./pages/Estoque/Estoque";
 import Servicos from "./pages/Servicos/Servicos";
 
