@@ -1,18 +1,16 @@
 .pdv-container {
   display: grid;
   height: 100vh;
-  
   background: #f5f5f5;
   color: black;
-  padding-bottom: 20px;
-  gap: 1rem;
-    grid-template-columns: 6fr 4fr ;
+  gap: 10px;
+  grid-template-columns: 2fr 8fr 2fr;
 
 }
 
-.pdv-right-panel{
+.pdv-right-panel {
   display: flex;
-    flex-direction: column;
+  flex-direction: column;
   background: #f5f5f5;
   color: black;
   gap: 1rem;
@@ -21,30 +19,18 @@
 /* Produtos */
 .pdv-products {
   display: flex;
-flex-direction: column;
+  flex-direction: column;
   flex: 1;
 }
 
 .pdv-products input {
-    padding: 0.5rem;
-    margin-bottom: 1rem;
+  padding: 0.5rem;
+  margin-bottom: 1rem;
 }
-
 .pdv-product-grid {
-  overflow-y: auto;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 1rem;
-}
-
-.pdv-categories-card {
-  background: #e33636;
-  color: white;
-  text-align: center;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: transform 0.2s;
-  margin-bottom: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); /* Creates columns that are at least 150px and grow equally */
+  gap: 10px;
 }
 
 .pdv-product-card {
@@ -53,6 +39,16 @@ flex-direction: column;
   border-radius: 8px;
   cursor: pointer;
   transition: transform 0.2s;
+  /* No specific width needed here as Grid controls it */
+}
+.pdv-categories-card {
+  background: #e33636;
+  color: white;
+  text-align: center;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: transform 0.2s;
+  margin-bottom: 10px;
 }
 
 .pdv-product-card:hover {
@@ -66,6 +62,8 @@ flex-direction: column;
 
 /* Carrinho */
 .pdv-cart {
+  padding: 0 10px;
+
   flex: 1.2;
   border-right: 1px solid #ddd;
   background-color: white;
@@ -105,7 +103,7 @@ flex-direction: column;
 /* Pagamento */
 .pdv-payment {
   flex: 0.8;
- 
+  padding: 0 10px;
   background: #e2e8f0;
   display: flex;
   flex-direction: column;
@@ -138,4 +136,185 @@ flex-direction: column;
   font-weight: bold;
   border: none;
   border-radius: 8px;
+}
+
+fieldset input {
+  height: 25px;
+  padding: 8px;
+  border-radius: 4px;
+  color: white;
+  border: 1px solid #555;
+}
+
+fieldset {
+  padding: 2px;
+
+}
+
+
+
+/* Estilos gerais para o container de produtos */
+.pdv-products {
+  font-family: sans-serif;
+  padding: 20px;
+}
+
+.pdv-products h2 {
+  margin-bottom: 20px;
+  color: #333;
+}
+
+/* Container para agrupar todos os filtros */
+.pdv-filters-container {
+  display: flex;
+  flex-wrap: wrap; /* Permite que os filtros quebrem para a linha de baixo */
+  gap: 20px; /* Espaço entre os filtros */
+  margin-bottom: 20px;
+}
+
+/* Filtro de Categorias */
+.pdv-categories-filter {
+  flex: 1; /* Permite que este filtro ocupe o espaço disponível */
+  min-width: 250px; /* Largura mínima para garantir legibilidade */
+  background-color: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.pdv-categories-filter > span {
+  font-weight: bold;
+  margin-bottom: 10px;
+  display: block; /* Para que o margin-bottom funcione */
+  color: #555;
+}
+
+.pdv-category-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px; /* Espaço entre os botões de categoria */
+  margin-bottom: 15px;
+}
+
+.pdv-category-button {
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #fff;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+  font-size: 0.9rem;
+}
+
+.pdv-category-button:hover {
+  background-color: #e9ecef;
+  border-color: #bbb;
+}
+
+.pdv-category-button.active {
+  background-color: #007bff; /* Cor principal */
+  color: #fff;
+  border-color: #007bff;
+  font-weight: bold;
+}
+
+/* Tags de Categorias Selecionadas */
+.pdv-selected-categories-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px; /* Espaço entre as tags */
+}
+
+.selected-tag {
+  display: inline-flex; /* Para alinhar o texto e o 'x' */
+  align-items: center;
+  background-color: #e9ecef;
+  color: #333;
+  padding: 5px 10px;
+  border-radius: 15px; /* Bordas arredondadas para um visual de "tag" */
+  font-size: 0.85rem;
+  cursor: pointer; /* Para indicar que pode ser clicado */
+  transition: background-color 0.2s;
+}
+
+.selected-tag:hover {
+  background-color: #dee2e6;
+}
+
+.selected-tag:before {
+  content: "• "; /* Marcador visual */
+  color: #007bff;
+  margin-right: 5px;
+  font-weight: bold;
+}
+
+.selected-tag:hover:before {
+  content: "✖ "; /* Ícone de fechar no hover */
+  color: #dc3545; /* Cor de erro/danger */
+}
+
+
+/* Filtro de Busca */
+.pdv-search-filter {
+  flex: 1; /* Permite que este filtro ocupe o espaço disponível */
+
+  background-color: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.pdv-search-filter fieldset {
+  border: 1px solid #ced4da;
+  padding: 15px;
+  border-radius: 5px;
+  display: flex;
+  flex-direction: column; /* Coloca os elementos dentro do fieldset em coluna */
+  gap: 10px; /* Espaço entre os elementos dentro do fieldset */
+}
+
+.pdv-search-filter legend {
+  font-weight: bold;
+  color: #555;
+  padding: 0 5px; /* Espaçamento para a legenda */
+}
+
+.pdv-search-inputs {
+  display: flex;
+  flex-direction: column; /* Inputs em coluna */
+  gap: 10px;
+}
+
+.pdv-search-filter input[type="text"] {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 1rem;
+  box-sizing: border-box; /* Garante que padding e border não aumentem o tamanho */
+}
+
+.pdv-search-filter input[type="text"]:focus {
+  outline: none;
+  border-color: #007bff; /* Destaca o input ativo */
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* Media Query para telas menores (opcional) */
+@media (max-width: 768px) {
+  .pdv-filters-container {
+    flex-direction: column; /* Empilha os filtros verticalmente em telas pequenas */
+  }
+  .pdv-categories-filter,
+  .pdv-search-filter {
+    min-width: unset; /* Remove a largura mínima em telas pequenas */
+    width: 100%; /* Ocupa toda a largura */
+  }
+}
+
+.pdv-product-table{
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10pt;
+  text-align: center;
 }

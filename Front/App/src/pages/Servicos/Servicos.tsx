@@ -117,7 +117,14 @@ const ServicesPage: React.FC = () => {
     };
 
     return  (
-        // Este é o container principal
+
+        <div>
+            <div className='head'>
+
+            <p>Serviços</p>
+            </div>
+
+        
         <div className="main-grid-container">
             {/* Coluna da esquerda: Filtro */}
             <div className="filter-sidebar">
@@ -139,6 +146,12 @@ const ServicesPage: React.FC = () => {
                     <p>Nenhum serviço encontrado com os filtros aplicados.</p>
                 )}
             </div>
+        </div>
+        <div className="foot">
+            <p>footer</p>
+            </div >
+
+        
         </div>
     );
 

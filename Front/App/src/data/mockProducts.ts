@@ -58,5 +58,58 @@ export const mockProducts: Product[] = [
     status: "Baixo Estoque",
     price: 80.0,
   },
+  {
+    id: "7",
+    sku: "PROD-007",
+    name: "headset",
+    pictureUrl: "set",
+    category: "fone",
+    stock: 5,
+    status: "Baixo Estoque",
+    price: 80.0,
+  },
+  {
+    id: "8",
+    sku: "PROD-008",
+    name: "cabo",
+    pictureUrl: "cabo",
+    category: "cabos",
+    stock: 5,
+    status: "Baixo Estoque",
+    price: 5.0,
+  },
+  {
+    id: "9",
+    sku: "PROD-009",
+    name: "lluz",
+    pictureUrl: "lluz",
+    category: "lampadas",
+    stock: 5,
+    status: "Baixo Estoque",
+    price: 8.0,
+  },
+  {
+    id: "10",
+    sku: "PROD-010",
+    name: "cadeira",
+    pictureUrl: "lluz",
+    category: "cadeiras",
+    stock: 5,
+    status: "Baixo Estoque",
+    price: 400.0,
+  },
+  {
+    id: "11",
+    sku: "PROD-011",
+    name: "monitor",
+    pictureUrl: "monitor",
+    category: "monitores",
+    stock: 5,
+    status: "Baixo Estoque",
+    price: 110.0,
+  },
   // ... mais produtos
 ];
+
+
+

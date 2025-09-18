@@ -1,10 +1,12 @@
 import React, { useState, useContext } from "react";
 import { ProductContext } from "../../context/ProductContext";
-import ProductList from "./components/ProductList";
+// import ProductList from "./components/ProductList";
+import ProductListFilter from "./components/ProductListFilter";
 import Cart from "./components/Cart";
 import Payment from "./components/Payment";
-import { CartItem, Product } from "../../types/types";
+import { CartItem } from "../../types/types";
 import "./PDV.css";
+import ProductTable from "./components/ProductTable";
 
 const PDVScreen: React.FC = () => {
   const { products } = useContext(ProductContext)!;
@@ -19,32 +21,32 @@ const PDVScreen: React.FC = () => {
   const change = receivedAmount ? receivedAmount - subtotal : 0; 
 
 
-  const handleAddToCart = (product: Product) => {
-    const existingItem = cart.find((item) => item.id === product.id);
-    if (existingItem) {
-      setCart(
-        cart.map((item) =>
-          item.id === product.id
-            ? {
-                ...item,
-                quantity: item.quantity + 1,
-                total: (item.quantity + 1) * item.price,
-              }
-            : item
-        )
-      );
-    } else {
-      setCart([
-        ...cart,
-        {
-          ...product,
-          productId: product.id,
-          quantity: 1,
-          total: product.price,
-        },
-      ]);
-    }
-  };
+  // const handleAddToCart = (product: Product) => {
+  //   const existingItem = cart.find((item) => item.id === product.id);
+  //   if (existingItem) {
+  //     setCart(
+  //       cart.map((item) =>
+  //         item.id === product.id
+  //           ? {
+  //               ...item,
+  //               quantity: item.quantity + 1,
+  //               total: (item.quantity + 1) * item.price,
+  //             }
+  //           : item
+  //       )
+  //     );
+  //   } else {
+  //     setCart([
+  //       ...cart,
+  //       {
+  //         ...product,
+  //         productId: product.id,
+  //         quantity: 1,
+  //         total: product.price,
+  //       },
+  //     ]);
+  //   }
+  // };
 
   
 
@@ -102,14 +104,30 @@ const PDVScreen: React.FC = () => {
   );
 
   return (
-    <div className="pdv-container">
-       {!showPayment && ( // 👈 Renderiza ProductList apenas se showPayment for falso
-          <ProductList
+
+    <div>
+      <div className="head">
+
+      head
+        
+      </div>
+
+      <div className="pdv-container">
+        {!showPayment && ( // 👈 Renderiza ProductList apenas se showPayment for falso
+          <ProductListFilter
             products={filteredProducts}
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}
-            handleAddToCart={handleAddToCart}
           />
+        )}
+
+       {!showPayment && ( // 👈 Renderiza ProductList apenas se showPayment for falso
+          <div style={{backgroundColor: '#ff0000', padding: "0"}}>
+            
+            
+            <ProductTable
+            products={filteredProducts}/>
+          </div>
         )}
 
     
@@ -137,6 +155,16 @@ const PDVScreen: React.FC = () => {
         )}
     
     </div>
+
+      <div className="foot">
+      foot
+    </div>
+    </div>
+
+
+    // -------------------------------------
+
+    
   );
 };
 

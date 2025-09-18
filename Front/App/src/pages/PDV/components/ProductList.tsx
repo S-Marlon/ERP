@@ -10,51 +10,14 @@ interface Props {
 
 const ProductList: React.FC<Props> = ({
   products,
-  searchTerm,
-  setSearchTerm,
-  handleAddToCart,
+    handleAddToCart,
 }) => {
   // Extraindo categorias únicas dos produtos para os botões de filtro
-  const uniqueCategories = [...new Set(products.map(p => p.category))];
-
+  
   return (
     <div className="pdv-products">
-        <h2>Lista de Produtos</h2>
-
-      <div className="pdv-search-filter">
-        <fieldset>
-          <legend>Filtros</legend>
-          {/* Campo de pesquisa de produto principal */}
-          <input
-            type="text"
-            placeholder="Pesquisar produto..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </fieldset>
-      </div>
-
-      <div className="pdv-categories-filter">
-        <h2>Categorias</h2>
-        <div className="pdv-category-buttons">
-          {uniqueCategories.map(category => (
-            <button
-              key={category}
-              className={`pdv-category-button ${searchTerm === category ? 'active' : ''}`}
-            >
-              {category}
-            </button>
-          ))}
-          {/* Botão para limpar a pesquisa/filtro */}
-          <button
-            className={`pdv-category-button ${searchTerm === '' ? 'active' : ''}`}
-            onClick={() => setSearchTerm('')}
-          >
-            Todas
-          </button>
-        </div>
-      </div>
-
+      <h2>Lista de Produtos</h2>
+      
       <div className="pdv-product-grid">
         {products.length > 0 ? (
           products.map((product) => (
@@ -64,7 +27,7 @@ const ProductList: React.FC<Props> = ({
               onClick={() => handleAddToCart(product)}
             >
               <h3>{product.name}</h3>
-              <span className="pdv-code">Cod: #{product.id}</span>
+              <span className="pdv-code">Cod: #{product.sku}</span>
               <span className="pdv-category">{product.category}</span>
               <p className="pdv-price">
                 R$ {product.price.toFixed(2).replace(".", ",")}
