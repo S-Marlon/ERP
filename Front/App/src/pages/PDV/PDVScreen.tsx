@@ -7,6 +7,7 @@ import Payment from "./components/Payment";
 import { CartItem } from "../../types/types";
 import "./PDV.css";
 import ProductTable from "./components/ProductTable";
+import { Product } from "../../types/types"; // Make sure Product is imported
 
 const PDVScreen: React.FC = () => {
   const { products } = useContext(ProductContext)!;
@@ -21,32 +22,33 @@ const PDVScreen: React.FC = () => {
   const change = receivedAmount ? receivedAmount - subtotal : 0; 
 
 
-  // const handleAddToCart = (product: Product) => {
-  //   const existingItem = cart.find((item) => item.id === product.id);
-  //   if (existingItem) {
-  //     setCart(
-  //       cart.map((item) =>
-  //         item.id === product.id
-  //           ? {
-  //               ...item,
-  //               quantity: item.quantity + 1,
-  //               total: (item.quantity + 1) * item.price,
-  //             }
-  //           : item
-  //       )
-  //     );
-  //   } else {
-  //     setCart([
-  //       ...cart,
-  //       {
-  //         ...product,
-  //         productId: product.id,
-  //         quantity: 1,
-  //         total: product.price,
-  //       },
-  //     ]);
-  //   }
-  // };
+
+  const handleAddToCart = (product: Product) => {
+    const existingItem = cart.find((item) => item.id === product.id);
+    if (existingItem) {
+      setCart(
+        cart.map((item) =>
+          item.id === product.id
+            ? {
+                ...item,
+                quantity: item.quantity + 1,
+                total: (item.quantity + 1) * item.price,
+              }
+            : item
+        )
+      );
+    } else {
+      setCart([
+        ...cart,
+        {
+          ...product,
+          productId: product.id,
+          quantity: 1,
+          total: product.price,
+        },
+      ]);
+    }
+  };
 
   
 
@@ -87,10 +89,10 @@ const PDVScreen: React.FC = () => {
 
   const handleProceedToPayment = () => {
     // 👈 Esta função é nova, ela será chamada pelo botão no componente Cart
-    if (cart.length === 0) {
-        alert("Adicione itens ao carrinho para prosseguir com o pagamento.");
-        return;
-    }
+    // if (cart.length === 0) {
+    //     alert("Adicione itens ao carrinho para prosseguir com o pagamento.");
+    //     return;
+    // }
     setShowPayment(true);
   };
 
@@ -105,12 +107,12 @@ const PDVScreen: React.FC = () => {
 
   return (
 
-    <div>
-      <div className="head">
+    <div >
+      {/* <div className="head">
 
       head
         
-      </div>
+      </div> */}
 
       <div className="pdv-container">
         {!showPayment && ( // 👈 Renderiza ProductList apenas se showPayment for falso
@@ -122,11 +124,37 @@ const PDVScreen: React.FC = () => {
         )}
 
        {!showPayment && ( // 👈 Renderiza ProductList apenas se showPayment for falso
-          <div style={{backgroundColor: '#ff0000', padding: "0"}}>
+          <div >
             
-            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <h2>Lista de Produtos</h2>
+       <fieldset className="inter">
+        <legend>Buscar Produto</legend>
+        <div className="pdv-search-inputs">
+          <input
+            type="text"
+            placeholder="Pesquisar nome do produto"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          {/* Você pode adicionar outros campos de filtro aqui, se necessário */}
+          {/* Exemplo: */}
+          {/* <input
+            type="text"
+            placeholder="Filtrar por marca"
+            // value={brandFilter}
+            // onChange={(e) => setBrandFilter(e.target.value)}
+          /> */}
+        </div>
+      </fieldset>
+
+            </div>
+            <div className="pdv-product-table-container">
+
             <ProductTable
+            handleAddToCart={handleAddToCart}
             products={filteredProducts}/>
+            </div>
           </div>
         )}
 
@@ -156,9 +184,9 @@ const PDVScreen: React.FC = () => {
     
     </div>
 
-      <div className="foot">
+      {/* <div className="foot">
       foot
-    </div>
+    </div> */}
     </div>
 
 

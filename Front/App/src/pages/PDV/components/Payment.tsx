@@ -25,7 +25,7 @@ const Payment: React.FC<Props> = ({
       <h2>Pagamento</h2>
 
       <div className="pdv-methods">
-        {["dinheiro", "cartao", "pix"].map((method) => (
+        {["dinheiro", "cartão", "pix"].map((method) => (
           <button
             key={method}
             onClick={() => setPaymentMethod(method)}

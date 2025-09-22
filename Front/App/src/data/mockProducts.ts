@@ -51,9 +51,9 @@ export const mockProducts: Product[] = [
   {
     id: "6",
     sku: "PROD-006",
-    name: "toko",
+    name: "mangueira hidraulica r1at, 1/4 pol, 3000psi - 10m - trançada aço galvanizado ",
     pictureUrl: "url_mouse",
-    category: "conectores",
+    category: "mangueiras",
     stock: 5,
     status: "Baixo Estoque",
     price: 80.0,

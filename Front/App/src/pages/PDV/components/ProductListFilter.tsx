@@ -18,10 +18,10 @@ const ProductListFilter: React.FC<Props> = ({
   const uniqueCategories = [...new Set(products.map(p => p.category))];
 
   return (
-    <div className="pdv-products">
-      
+    <div className="pdv-side-panel">
+     
 
-  <div className="pdv-filters-container">
+  <div className="pdv-filters-container flex-column">
     <div className="pdv-search-filter">
       <fieldset>
         <legend>Filtros de Busca</legend>
@@ -66,11 +66,6 @@ const ProductListFilter: React.FC<Props> = ({
       <div className="pdv-selected-categories-tags">
         {/* Renderizar as tags dinamicamente aqui */}
         <span className="selected-tag">Categoria 1</span>
-        <span className="selected-tag">Categoria 2</span>
-        <span className="selected-tag">mangueiras</span>
-        <span className="selected-tag">Categoria 2</span>
-        <span className="selected-tag">Categoria 2</span>
-        <span className="selected-tag">Categoria 2</span>
         {/* ... mais tags ... */}
       </div>
       <span>Sub-Categorias</span>
@@ -97,11 +92,7 @@ const ProductListFilter: React.FC<Props> = ({
       <div className="pdv-selected-categories-tags">
         {/* Renderizar as tags dinamicamente aqui */}
         <span className="selected-tag">Categoria 1</span>
-        <span className="selected-tag">Categoria 2</span>
-        <span className="selected-tag">mangueiras</span>
-        <span className="selected-tag">Categoria 2</span>
-        <span className="selected-tag">Categoria 2</span>
-        <span className="selected-tag">Categoria 2</span>
+        
         {/* ... mais tags ... */}
       </div>
     </div>

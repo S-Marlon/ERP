@@ -71,3 +71,97 @@
   grid-area: content;
   border: rgb(46, 237, 247) 0px solid;
 }
+
+/* Container com itens lado a lado (padrão) */
+.flex-row {
+  display: flex;
+  flex-direction: row;
+}
+
+/* Container com itens um em cima do outro */
+.flex-col {
+  display: flex;
+  flex-direction: column;
+}
+
+
+
+
+/* -------------------------------------------------------
+ */
+
+
+
+ /* Estilo base para todos os inputs */
+.input-base {
+    width: 100%; /* Ocupa a largura total do container */
+    padding: 10px 12px; /* Espaçamento interno */
+    border: 1px solid #ced4da; /* Borda cinza suave */
+    border-radius: 8px; /* Cantos arredondados */
+    font-size: 1rem; /* Tamanho da fonte padrão */
+    color: #333333; /* Cor do texto */
+    box-sizing: border-box; /* Garante que padding e borda não aumentem o tamanho */
+    transition: border-color 0.2s, box-shadow 0.2s; /* Transição suave */
+}
+
+/* Estilo para quando o input está em foco (clicado) */
+.input-base:focus {
+    outline: none; /* Remove a borda padrão do navegador */
+    border-color: #007bff; /* Borda azul vibrante */
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25); /* Sombra suave */
+}
+
+
+/* Estilo base para todos os botões */
+.btn-base {
+    padding: 12px 20px; /* Espaçamento interno */
+    border-radius: 8px; /* Cantos arredondados */
+    font-size: 1rem; /* Tamanho da fonte */
+    font-weight: 600; /* Negrito */
+    cursor: pointer; /* Muda o cursor para indicar que é clicável */
+    border: none;
+    transition: background-color 0.2s, transform 0.2s; /* Transição suave */
+}
+
+.btn-base:hover {
+    transform: translateY(-2px); /* Efeito de elevação ao passar o mouse */
+}
+
+/* Estilo para o botão principal */
+.btn-primary {
+    background-color: #007bff;
+    color: #fff;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+}
+
+/* Estilo para o botão secundário */
+.btn-secondary {
+    background-color: #6c757d;
+    color: #fff;
+}
+
+.btn-secondary:hover {
+    background-color: #5a6268;
+}
+
+/* Classes para botões de ação (verde para sucesso, vermelho para perigo) */
+.btn-success {
+    background-color: #28a745;
+    color: #fff;
+}
+
+.btn-success:hover {
+    background-color: #218838;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+    color: #fff;
+}
+
+.btn-danger:hover {
+    background-color: #c82333;
+}
