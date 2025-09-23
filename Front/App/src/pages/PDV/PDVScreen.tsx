@@ -1,15 +1,18 @@
 import React, { useState, useContext } from "react";
 import { ProductContext } from "../../context/ProductContext";
+import { ServiceProductContext } from "../../context/ServiceProductContext";
 // import ProductList from "./components/ProductList";
 import ProductListFilter from "./components/ProductListFilter";
 import Cart from "./components/Cart";
 import Payment from "./components/Payment";
-import { CartItem } from "../../types/types";
+import { CartItem, ServiceProduct } from "../../types/types";
 import "./PDV.css";
 import ProductTable from "./components/ProductTable";
 import { Product } from "../../types/types"; // Make sure Product is imported
+import AddService from "./components/pdvAddService";
 
 const PDVScreen: React.FC = () => {
+  const { services } = useContext(ServiceProductContext)!;
   const { products } = useContext(ProductContext)!;
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -19,9 +22,7 @@ const PDVScreen: React.FC = () => {
 
   const subtotal = cart.reduce((acc, item) => acc + item.total, 0);
   const totalItems = cart.reduce((acc, item) => acc + item.quantity, 0);
-  const change = receivedAmount ? receivedAmount - subtotal : 0; 
-
-
+  const change = receivedAmount ? receivedAmount - subtotal : 0;
 
   const handleAddToCart = (product: Product) => {
     const existingItem = cart.find((item) => item.id === product.id);
@@ -50,7 +51,32 @@ const PDVScreen: React.FC = () => {
     }
   };
 
-  
+  const handleServiceAddToCart = (service: ServiceProduct) => {
+    const existingItem = cart.find((item) => item.id === service.id);
+    if (existingItem) {
+      setCart(
+        cart.map((item) =>
+          item.id === service.id
+            ? {
+                ...item,
+                quantity: item.quantity + 1,
+                total: (item.quantity + 1) * item.price,
+              }
+            : item
+        )
+      );
+    } else {
+      setCart([
+        ...cart,
+        {
+          ...service,
+          productId: service.id,
+          quantity: 1,
+          total: service.price,
+        },
+      ]);
+    }
+  };
 
   const handleRemoveFromCart = (productId: string) => {
     setCart(cart.filter((item) => item.id !== productId));
@@ -96,8 +122,7 @@ const PDVScreen: React.FC = () => {
     setShowPayment(true);
   };
 
-   const back = () => {
-   
+  const back = () => {
     setShowPayment(false);
   };
 
@@ -105,16 +130,19 @@ const PDVScreen: React.FC = () => {
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  return (
+  const filteredServicesProducts = services.filter((s) =>
+    s.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-    <div >
+  return (
+    <div>
       {/* <div className="head">
 
       head
         
       </div> */}
 
-      <div className="pdv-container">
+      <div className={!showPayment ? 'pdv-container' : 'pdv-container-payment'}>
         {!showPayment && ( // 👈 Renderiza ProductList apenas se showPayment for falso
           <ProductListFilter
             products={filteredProducts}
@@ -123,76 +151,84 @@ const PDVScreen: React.FC = () => {
           />
         )}
 
-       {!showPayment && ( // 👈 Renderiza ProductList apenas se showPayment for falso
-          <div >
-            
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <h2>Lista de Produtos</h2>
-       <fieldset className="inter">
-        <legend>Buscar Produto</legend>
-        <div className="pdv-search-inputs">
-          <input
-            type="text"
-            placeholder="Pesquisar nome do produto"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+        {showPayment && ( // 👈 Renderiza ProductList apenas se showPayment for falso
+          <AddService
+           handleServiceAddToCart={handleServiceAddToCart}
+                services={filteredServicesProducts}
+                back={back}
+          showPayment={showPayment}
           />
-          {/* Você pode adicionar outros campos de filtro aqui, se necessário */}
-          {/* Exemplo: */}
-          {/* <input
+        )}
+
+        {!showPayment && ( // 👈 Renderiza ProductList apenas se showPayment for falso
+          <div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <h2>Lista de Produtos</h2>
+              <fieldset className="inter">
+                <legend>Buscar Produto</legend>
+                <div className="pdv-search-inputs">
+                  <input
+                    type="text"
+                    placeholder="Pesquisar nome do produto"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                  {/* Você pode adicionar outros campos de filtro aqui, se necessário */}
+                  {/* Exemplo: */}
+                  {/* <input
             type="text"
             placeholder="Filtrar por marca"
             // value={brandFilter}
             // onChange={(e) => setBrandFilter(e.target.value)}
           /> */}
-        </div>
-      </fieldset>
-
+                </div>
+              </fieldset>
             </div>
             <div className="pdv-product-table-container">
-
-            <ProductTable
-            handleAddToCart={handleAddToCart}
-            products={filteredProducts}/>
+              <ProductTable
+                handleAddToCart={handleAddToCart}
+                products={filteredProducts}
+              />
             </div>
           </div>
         )}
 
-    
-      <Cart
-        cart={cart}
-        totalItems={totalItems}
-        subtotal={subtotal}
-        handleUpdateQuantity={handleUpdateQuantity}
-        handleRemoveFromCart={handleRemoveFromCart}
-        handleProceedToPayment={handleProceedToPayment}
-        back={back}
-        showPayment={showPayment}
-      />
+        <Cart
+          cart={cart}
+          totalItems={totalItems}
+          subtotal={subtotal}
+          handleUpdateQuantity={handleUpdateQuantity}
+          handleRemoveFromCart={handleRemoveFromCart}
+          handleProceedToPayment={handleProceedToPayment}
+          // back={back}
+          showPayment={showPayment}
+        />
 
-       {showPayment && ( // 👈 Renderiza Payment apenas se showPayment for verdadeiro
-           <Payment
-              cart={cart}
-              paymentMethod={paymentMethod}
-              setPaymentMethod={setPaymentMethod}
-              receivedAmount={receivedAmount}
-              setReceivedAmount={setReceivedAmount}
-              change={change}
-              handleFinalizeSale={handleFinalizeSale}
-            />
+        {showPayment && ( // 👈 Renderiza Payment apenas se showPayment for verdadeiro
+          <Payment
+            cart={cart}
+            paymentMethod={paymentMethod}
+            setPaymentMethod={setPaymentMethod}
+            receivedAmount={receivedAmount}
+            setReceivedAmount={setReceivedAmount}
+            change={change}
+            handleFinalizeSale={handleFinalizeSale}
+          />
         )}
-    
-    </div>
+      </div>
 
       {/* <div className="foot">
       foot
     </div> */}
     </div>
 
-
     // -------------------------------------
-
-    
   );
 };
 

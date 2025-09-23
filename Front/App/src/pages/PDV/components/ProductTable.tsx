@@ -30,7 +30,7 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, handleAddToCart }
             <tr key={product.id} className="pdv-table-row" onClick={() => handleAddToCart(product)}>
               <td> &#9634;</td>
               <td> {index + 1}</td>
-              <td>{product.name}</td>
+              <td> <span  className="truncado" title={product.name}>{product.name}</span></td>
               <td>{product.sku}</td>
               <td>{product.category}</td>
               <td>{product.category}</td>

@@ -1,5 +1,6 @@
 export interface ServiceItem {
   orderNumber: string;
+  serviceType: string;
   clientName: string;
   clientDetails: string;
   status: 'Completo' | 'Pendente' | 'Em Andamento'; // Tipos literais são ótimos aqui
@@ -13,9 +14,11 @@ export interface ServiceItem {
 }
 
 export interface ServiceProduct {
-  quantity: number;
-  name: string;
-  price: number;
+    id: string;
+    sku: string;
+    name: string;
+    category: string;
+    price: number;
 }
 
 export interface FilterState {

@@ -8,7 +8,7 @@ interface Props {
   handleUpdateQuantity: (id: string, newQuantity: number) => void;
   handleRemoveFromCart: (id: string) => void;
   handleProceedToPayment: () => void;
-  back: () => void;
+  
   showPayment: boolean;
 }
 
@@ -19,14 +19,11 @@ const Cart: React.FC<Props> = ({
   handleUpdateQuantity,
   handleRemoveFromCart,
   handleProceedToPayment,
-  back,
-  showPayment,
+  
 }) => {
   return (
     <div className="pdv-side-panel pdv-cart">
-      {showPayment && ( // 👈 Renderiza ProductList apenas se showPayment for falso
-        <button onClick={() => back()}> voltar</button>
-      )}
+      
       <h2>Carrinho ({totalItems} itens)</h2>
       <div className="pdv-cart-items">
         {cart.length === 0 ? (
@@ -36,45 +33,53 @@ const Cart: React.FC<Props> = ({
             <div key={item.id} className="pdv-cart-item">
               {/* Agrupa as informações do produto */}
 
-              <div className="flex-row">
-                <div className="flex-column">
-                  <span>{item.sku}</span>
-                  <div className="product-name">
-                    <span>{item.name}</span>
-                  </div>
 
-                  <div className="flex-column">
-                    <div className="product-details">
-                      <span>{item.category}</span>
-                    </div>
 
-                    <div className="pricing-details">
-                      <div className="unit-price">
-                        <span>
-                          R$ {item.price.toFixed(2).replace(".", ",")}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
 
-                  {/* Contêiner para o valor total e o botão de remover */}
-                </div>
-                <div className="total-and-remove-container">
+                <div className="product-details">
+
+                  <span>{item.sku} - {item.category}</span>
                   <button
                     onClick={() => handleRemoveFromCart(item.id)}
                     className="remove-button"
                   >
                     &times;
                   </button>
+                </div>
+
+
+
+
+                  <div className="product-name truncado">
+                    <span title={item.name}>{item.name}</span>
+                  </div>
+
+                  <div className="linha-vertical"></div>
+
+                  {/* Contêiner para o valor total e o botão de remover */}
+               
                   <div className="quantity-controls">
-                    <button
+                     <div className="unit-price">
+                        <span>
+                          R$ {item.price.toFixed(2).replace(".", ",")}
+                        </span>
+                      </div>
+
+
+
+
+
+
+                    <div className="container">
+                    <button className="input-number-decrement"
                       onClick={() =>
-                        handleUpdateQuantity(item.id, item.quantity + 1)
+                        handleUpdateQuantity(item.id, item.quantity - 1)
                       }
                     >
-                      +
+                      -
                     </button>
-                    <input
+
+                    <input className="input-number"
                       type="number"
                       value={item.quantity}
                       onChange={(e) =>
@@ -84,20 +89,41 @@ const Cart: React.FC<Props> = ({
                         )
                       }
                     />
-                    <button
+                    <button className="input-number-increment"
                       onClick={() =>
-                        handleUpdateQuantity(item.id, item.quantity - 1)
+                        handleUpdateQuantity(item.id, item.quantity + 1)
                       }
                     >
-                      -
+                      +
                     </button>
-                  </div>
+                    </div>
+
+
+
+
+
+
+
+
+
+
+
 
                   <div className="total-price">
                     <span>R$ {item.total.toFixed(2).replace(".", ",")}</span>
                   </div>
-                </div>
-              </div>
+                  </div>
+
+
+
+
+
+
+
+
+
+
+
             </div>
           ))
         )}
