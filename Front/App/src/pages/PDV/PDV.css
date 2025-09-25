@@ -1,29 +1,27 @@
- .pdv-container {
+.pdv-container {
   display: grid;
   background: #f5f5f5;
   color: black;
   gap: 10px;
   grid-template-columns: 3fr 10fr 4fr;
-  height: calc(100vh - 50px)
-} 
+  height: calc(100vh - 50px);
+}
 .pdv-container-payment {
   display: grid;
   background: #f5f5f5;
   color: black;
   gap: 10px;
   grid-template-columns: 3fr 4fr 3fr;
-  height: calc(100vh - 50px)
+  height: calc(100vh - 50px);
 }
 
 .pdv-side-panel {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  max-height: 100%;   /* Limita à altura do elemento pai */
-  overflow-y: auto;   /* Adiciona rolagem se o conteúdo passar do limite */
+  max-height: 100%; /* Limita à altura do elemento pai */
+  overflow-y: auto; /* Adiciona rolagem se o conteúdo passar do limite */
 }
-
-
 
 /* Produtos */
 .pdv-products {
@@ -32,9 +30,6 @@
   padding: 10px;
 }
 
-.pdv-products input {
-  padding: 0.5rem;
-}
 
 .pdv-product-grid {
   display: grid;
@@ -75,11 +70,8 @@
 .pdv-cart {
   padding: 10px;
   background-color: #ffffff;
-  
-}
-
-.pdv-cart h2{
-  margin:0.2em 0;
+  display: flex;
+  justify-content: space-between;
 }
 
 .pdv-cart-items {
@@ -93,8 +85,8 @@
   flex-direction: column;
   padding: 5px;
   border: #9cc4f8 1px solid;
-  
-  border-style: outset;;
+
+  border-style: outset;
   /* border-top: #e2e8f0 2px solid; */
   background: #f8f9fa;
   transition: background-color 0.2s;
@@ -105,26 +97,11 @@
 }
 
 .pdv-cart-controls {
-
   gap: 8px;
   align-items: center;
 }
 
-.pdv-cart input {
-  width: 40px;
-}
-
-.pdv-subtotal {
-  border-top: 2px solid #e2e8f0;
-  margin-top: 15px;
-  padding-top: 15px;
-  font-weight: 700;
-  font-size: 1.4rem;
-  color: #007bff;
-}
-
 /* Pagamento */
-
 
 .pdv-methods {
   display: flex;
@@ -155,33 +132,15 @@
   border-radius: 8px;
 }
 
-fieldset input {
-  height: 25px;
-  padding: 8px;
-  border-radius: 4px;
-  color: white;
-  border: 1px solid #555;
+.pdv-search-inputs {
+  display: flex;
+  flex-direction: column;
 }
 
 fieldset.inter {
   width: 70%;
   border: none;
   padding: 0;
-}
-
-
-
-
-
-
-/* Container para agrupar todos os filtros */
-.pdv-filters-container {
-  display: flex;
-  flex-direction: column;
-  /* Permite que os filtros quebrem para a linha de baixo */
-  gap: 5px;
-  /* Espaço entre os filtros */
-  margin: 8px 0;
 }
 
 /* Filtro de Categorias */
@@ -193,7 +152,7 @@ fieldset.inter {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
-.pdv-categories-filter>span {
+.pdv-categories-filter > span {
   font-weight: bold;
   margin-bottom: 10px;
   display: block;
@@ -202,10 +161,10 @@ fieldset.inter {
 }
 .pdv-category-buttons {
   display: -webkit-box;
-  -webkit-line-clamp: 3;    /* Limita a 3 linhas */
+  -webkit-line-clamp: 3; /* Limita a 3 linhas */
   -webkit-box-orient: vertical;
-  overflow:auto;
-  max-height: 7.5em;        /* Ajuste conforme o tamanho dos botões */
+  overflow: auto;
+  max-height: 7.5em; /* Ajuste conforme o tamanho dos botões */
 }
 .pdv-category-buttons {
   display: flex;
@@ -215,12 +174,12 @@ fieldset.inter {
   margin-bottom: 15px;
 }
 
-.pdv-selected-categories-tags{
-   display: -webkit-box;
-  -webkit-line-clamp: 3;    /* Limita a 3 linhas */
+.pdv-selected-categories-tags {
+  display: -webkit-box;
+  -webkit-line-clamp: 3; /* Limita a 3 linhas */
   -webkit-box-orient: vertical;
-  overflow:auto;
-  max-height: 4em;        /* Ajuste conforme o tamanho dos botões */
+  overflow: auto;
+  max-height: 4em; /* Ajuste conforme o tamanho dos botões */
 }
 
 /* Tags de Categorias Selecionadas */
@@ -232,9 +191,7 @@ fieldset.inter {
   justify-content: flex-start;
   /* Alinha as tags à esquerda */
   margin-bottom: 10px;
-
 }
-
 
 .pdv-category-button {
   color: black;
@@ -259,8 +216,6 @@ fieldset.inter {
   border-color: #007bff;
   font-weight: bold;
 }
-
-
 
 .selected-tag {
   display: inline-flex;
@@ -296,7 +251,6 @@ fieldset.inter {
   /* Cor de erro/danger */
 }
 
-
 /* Filtro de Busca */
 .pdv-search-filter {
   flex: 1;
@@ -325,45 +279,7 @@ fieldset.inter {
   /* Espaçamento para a legenda */
 }
 
-.pdv-search-inputs {
-  display: flex;
-  flex-direction: column;
-  /* Inputs em coluna */
-}
 
-.pdv-search-filter input[type="text"] {
-  width: 100%;
-  height: auto;
-  border: 1px solid #ced4da;
-  border-radius: 4px;
-  font-size: 1rem;
-  box-sizing: border-box;
-  /* Garante que padding e border não aumentem o tamanho */
-}
-
-.pdv-search-filter input[type="text"]:focus {
-  outline: none;
-  border-color: #007bff;
-  /* Destaca o input ativo */
-  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
-}
-
-/* Media Query para telas menores (opcional) */
-@media (max-width: 768px) {
-  .pdv-filters-container {
-    flex-direction: column;
-    /* Empilha os filtros verticalmente em telas pequenas */
-  }
-
-  .pdv-categories-filter,
-  .pdv-search-filter {
-    min-width: unset;
-    /* Remove a largura mínima em telas pequenas */
-    padding: 4px;
-    width: 100%;
-    /* Ocupa toda a largura */
-  }
-}
 
 .pdv-product-table-container {
   overflow-y: auto;
@@ -374,7 +290,6 @@ fieldset.inter {
 }
 
 .pdv-product-table {
-
   font-size: 10pt;
   width: 100%;
   border-collapse: collapse;
@@ -382,7 +297,6 @@ fieldset.inter {
   border-radius: 8px;
 
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-
 }
 
 .pdv-product-table th,
@@ -402,12 +316,10 @@ fieldset.inter {
   background-color: #fff;
 }
 
-
 .product-name {
   font-weight: bold;
- text-transform: capitalize;
+  text-transform: capitalize;
   font-size: 0.9em;
-
 }
 
 .product-details {
@@ -415,7 +327,7 @@ fieldset.inter {
   font-style: italic;
   color: #555;
   font-size: 0.9em;
-  
+
   justify-content: space-between;
 }
 .linha-vertical {
@@ -423,46 +335,42 @@ fieldset.inter {
   margin: 5px 0;
   font-size: 1.4rem;
   font-weight: 700;
-
 }
 
 .pdv-subtotal {
   border-top: 2px solid #e2e8f0;
-  margin-top: 15px;
-  padding-top: 15px;
+  padding-top: 0px;
   font-weight: 700;
   font-size: 1.4rem;
   color: #007bff;
 }
 
-
 .total-and-remove-container {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  
 }
 
 .unit-price {
-  font-weight:400;
-  text-decoration:underline;
-  font-size: 1em;  color: #000000;
+  font-weight: 400;
+  text-decoration: underline;
+  font-size: 1em;
+  color: #000000;
 }
 
 .total-price {
   font-weight: bold;
-  font-size: 1em;  color: #0051a8;
-
+  font-size: 1em;
+  color: #0051a8;
 }
 
 .remove-button {
   background: none;
   border: none;
-  
+
   cursor: pointer;
   color: #999;
   padding: 0px 5px;
-
 }
 
 .remove-button:hover {
@@ -474,7 +382,7 @@ fieldset.inter {
   display: flex;
   flex-direction: row;
   justify-content: space-between;
-  
+
   gap: 8px;
   /* Adiciona espaço entre os elementos */
 }
@@ -486,13 +394,6 @@ fieldset.inter {
 
 
 
-.quantity-controls input[type="number"] {
-  text-align: center;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  padding: 2px;
-}
-
 .quantity-controls button {
   font-size: 0.5em;
   font-weight: bold;
@@ -503,28 +404,26 @@ fieldset.inter {
   cursor: pointer;
 }
 
-.sku-and-close{
+.sku-and-close {
   display: flex;
   justify-content: space-between;
 }
 
 
-
-.input-number{
-  height: 25px; /* Defina a altura dos botões */
-  font-size: 0.9em;
-}
-
-
-.container{
+.container {
   display: flex;
   align-items: stretch;
   flex-direction: row; /* Opcional, mas explicita a direção */
 }
 
+.input-number {
+  height: 25px; /* Defina a altura dos botões */
+  font-size: 0.9em;
+  border-radius: 0px;
+}
 .input-number,
 .input-number-decrement,
-.input-number-increment{
+.input-number-increment {
   border: 1px solid #ccc;
   flex: 1;
   /* box-sizing: border-box é importante para o padding e a borda não aumentarem o tamanho */
@@ -532,32 +431,34 @@ fieldset.inter {
 }
 
 .input-number-decrement,
-.input-number-increment{
-  display: inline-block; 
+.input-number-increment {
+  display: inline-block;
   height: 25px; /* Defina a altura dos botões */
   background: #f1f1f1;
   color: #444;
   text-align: center;
   font-weight: bold;
-  cursor: pointer}
+  cursor: pointer;
+}
 
-
-.input-number-decrement{
+.input-number-decrement {
   border-right: none;
-  border-radius: 4px 0 0 4px}
+  border-radius: 4px 0 0 4px;
+}
 
-.input-number-increment{
+.input-number-increment {
   border-left: none;
-  border-radius: 0 4px 4px 0}
+  border-radius: 0 8px 8px 0;
+}
 
-  input::-webkit-outer-spin-button,
+input::-webkit-outer-spin-button,
 input::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
 
 /* Firefox */
-input[type=number] {
+input[type="number"] {
   -moz-appearance: textfield;
 }
 
@@ -568,7 +469,6 @@ input[type=number] {
   overflow: hidden; /* Oculta qualquer texto que exceda o contêiner */
   text-overflow: ellipsis; /* Adiciona "..." no final */
 }
-
 
 /* sevices ------------------------------------------------ */
 
@@ -581,7 +481,7 @@ input[type=number] {
 }
 
 /* Grid para os serviços fixos */
-.services-buttons{
+.services-buttons {
   justify-content: space-between;
   gap: 5px;
 }
@@ -612,10 +512,6 @@ input[type=number] {
   border-radius: 8px;
 }
 
-.custom-service-section h3 {
-  margin: 0;
-}
-
 .custom-service-section input,
 .custom-service-section textarea {
   padding: 10px;
@@ -624,7 +520,6 @@ input[type=number] {
 }
 
 .custom-service-button {
-  
   padding: 10px;
   background-color: #007bff;
   color: white;
@@ -633,9 +528,8 @@ input[type=number] {
   cursor: pointer;
 }
 
-.custom-service-desc{
+.custom-service-desc {
   max-height: 140px; /* Limita a altura do campo */
   box-sizing: border-box; /* O mais importante! */
-   resize: vertical; /* Permite redimensionar apenas na vertical */
- 
+  resize: vertical; /* Permite redimensionar apenas na vertical */
 }

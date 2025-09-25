@@ -5,19 +5,7 @@
   align-items: center;
 }
 
-.header-info button {
-  background-color: #4caf50;
-  color: white;
-  padding: 10px 15px;
-  border: none;
-  cursor: pointer;
-}
 
-.header-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
 
 .filter-info {
   display: flex;
@@ -26,7 +14,7 @@
 }
 
 .filter-info button {
-  background-color: transparent;
+  background-color: parent;
   border: 1px solid white;
   color: white;
   padding: 10px 15px;
@@ -41,7 +29,6 @@
     "filter filter"
     "table table";
   transition: all 5s ease;
-
 }
 
 /* Layout do filtro e da tabela */
@@ -53,8 +40,8 @@
   justify-content: center;
   /* Ajusta as linhas automaticamente */
   grid-template-areas:
-  "filter pinfo"
-  "table pinfo";
+    "filter pinfo"
+    "table pinfo";
   gap: 0px 10px;
   transition: all 0.3s ease;
 }
@@ -86,45 +73,12 @@ tr:hover {
   background-color: #444;
 }
 
-
-
-.product-filter-container {
-  display: flex;
-  padding: 0 10px;
-  flex-direction: row;
-  justify-content: space-between;
-}
-
-.min-max-group {
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
-  align-items: center;
-  gap: 5px;
-}
-
-.min-max-group fieldset {
-  font-size: small;
-  padding: 0px;
-  border: none;
-}
-
-.min-max-group .min-max-input {
-  width: 60px;
-  padding: 8px;
-  border-radius: 4px;
-  color: white;
-  border: 1px solid #555;
-}
-
 .filter-group {
   margin-bottom: 10px;
   display: flex;
   flex-direction: column;
   justify-content: space-evenly;
-
 }
-
 
 .filter-group label {
   display: block;
@@ -148,10 +102,6 @@ tr:hover {
   color: white;
   border: 1px solid #555;
 }
-
-
-
-
 
 .product-table {
   font-size: small;
@@ -208,7 +158,6 @@ tr:hover {
   align-items: start;
   border-bottom: 1px solid #555;
   flex-direction: column;
-
 }
 
 .product-info-header .close-button {
@@ -266,7 +215,6 @@ tr:hover {
   transform: scale(1.1);
   transition: transform 0.15s ease;
 }
-
 
 .product-details p {
   margin: 5px 0;

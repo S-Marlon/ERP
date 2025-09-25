@@ -119,9 +119,10 @@ const ServicesPage: React.FC = () => {
     return  (
 
         <div>
-            <div className='head'>
+            <div className='head header-info'>
 
             <p>Serviços</p>
+            <button>hahaha</button>
             </div>
 
         

@@ -17,7 +17,7 @@ const ProductListFilter: React.FC<Props> = ({
 
   return (
     <div className="pdv-side-panel">
-      <div className="pdv-filters-container flex-column">
+      <div className="filter-container-column flex-column">
         <div className="pdv-search-filter">
           <fieldset>
             <legend>Filtros de Busca</legend>
@@ -53,7 +53,6 @@ const ProductListFilter: React.FC<Props> = ({
             type="number"
             min={0}
             placeholder="Min"
-            onChange={(e) => onFilterChange("minPrice", e.target.value)}
           />
           </fieldset>
 
@@ -66,7 +65,6 @@ const ProductListFilter: React.FC<Props> = ({
             type="number"
             min={0}
             placeholder="Max"
-            onChange={(e) => onFilterChange("maxPrice", e.target.value)}
           />
           </fieldset>
         </div>

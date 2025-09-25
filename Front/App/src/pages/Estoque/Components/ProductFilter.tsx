@@ -13,7 +13,7 @@ const ProductFilter: React.FC<ProductFilterProps> = ({
   onApply,
 }) => {
   return (
-    <div className="product-filter-container">
+    <div className="filter-container-row">
       <div className="filter-group">
         <label>Nome Do produto:</label>
 

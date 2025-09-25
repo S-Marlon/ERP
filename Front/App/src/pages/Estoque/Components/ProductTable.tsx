@@ -18,7 +18,7 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, onSelectProduct }
       <table className="product-table">
         <thead>
           <tr>
-            <th style={{ width: "6%" }}>Número</th>
+            <th colSpan={2} style={{ width: "6%" }}>Número</th>
             <th style={{ width: "25%" }}>Nome do Produto</th>
 
             <th style={{ width: "6%" }}>SKU</th>
@@ -33,10 +33,11 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, onSelectProduct }
           </tr>
         </thead>
         <tbody>
-          {products.map((product) => (
+          {products.map((product, index) => (
             <tr key={product.id}
             onClick={() => onSelectProduct(product)}>
-              <td>100</td>
+              <td> &#9634;</td>
+              <td> {index + 1}</td>
 
               <td>{product.name}</td>
               {/* <td><img src={product.pictureUrl} alt={product.name} style={{ width: '50px' }} /></td> */}
