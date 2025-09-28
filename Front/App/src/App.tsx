@@ -11,6 +11,8 @@ import Produtos from "./pages/Produtos/Produtos";
 import Vendas from "./pages/PDV/PDVScreen";
 import Estoque from "./pages/Estoque/Estoque";
 import Servicos from "./pages/Servicos/Servicos";
+import { ServiceProductProvider } from './context/NewServiceProductContext';
+import { ProductProvider } from './context/NewProductContext';
 
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -40,13 +42,29 @@ function App() {
         <Panel isDarkMode={isDarkMode}>
            
             <Routes>
-            <Route path="/" element={<Dashboard text='Dashboard'/>} />
-            <Route path="/clientes" element={<Clientes  text='Clientes'/>} />
-            <Route path="/produtos" element={<Produtos  text='Produtos'/>} />
-            <Route path="/vendas"  element={<Vendas/>} />
-            <Route path="/Estoque" element={<Estoque />} />
-            <Route path="/Servicos" element={<Servicos />} />
-          </Routes>
+        <Route path="/" element={<Dashboard text='Dashboard'/>} />
+        <Route path="/clientes" element={<Clientes title={''} children={undefined} />} />
+        
+        {/*
+          CORREÇÃO PRINCIPAL: Envolver a rota '/vendas' com os Providers.
+          A ordem não importa muito aqui, mas é bom aninhar.
+        */}
+        <Route 
+            path="/vendas" 
+            element={
+                <ServiceProductProvider>
+                    <ProductProvider>
+                        {/* Seu PDVScreen agora tem acesso aos dados! */}
+                        <Vendas/> 
+                    </ProductProvider>
+                </ServiceProductProvider>
+            } 
+        />
+        
+        <Route path="/produtos" element={<Produtos  text='Produtos'/>} />
+        <Route path="/Estoque" element={<Estoque />} />
+        <Route path="/Servicos" element={<Servicos />} />
+    </Routes>
           
         </Panel>
       </div>

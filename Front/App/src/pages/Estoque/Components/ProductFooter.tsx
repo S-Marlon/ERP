@@ -9,13 +9,21 @@ interface ProductFooterProps {
 
 const ProductFooter: React.FC<ProductFooterProps> = () => {
     return (
-        <div className="product-footer">
-          
+        <div>
+          <span>
+
           data:
+          </span>
           
+          <span>
+
           informações: link
+          </span>
+
+<span>
 
             feito por Marlon.
+</span>
         caso de uso: controle de estoque.
         duvida contato: 
           

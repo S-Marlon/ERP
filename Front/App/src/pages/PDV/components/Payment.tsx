@@ -1,8 +1,10 @@
 import React from "react";
-import { CartItem } from "../../../types/types";
+// 1. IMPORTAÇÃO ATUALIZADA: Trazendo o novo tipo ItemOrdem
+import { ItemOrdem } from "../../../types/newtypes"; 
 
+// 2. TIPAGEM DAS PROPS CORRIGIDA: Usa ItemOrdem[]
 interface Props {
-  cart: CartItem[];
+  cart: ItemOrdem[]; // Apenas o tipo da lista de itens foi alterado
   paymentMethod: string;
   setPaymentMethod: (value: string) => void;
   receivedAmount: number | null;
@@ -25,6 +27,7 @@ const Payment: React.FC<Props> = ({
       <h2>Pagamento</h2>
 
       <div className="pdv-methods">
+        {/* Métodos de pagamento fixos */}
         {["dinheiro", "cartão", "pix"].map((method) => (
           <button
             key={method}
@@ -36,6 +39,7 @@ const Payment: React.FC<Props> = ({
         ))}
       </div>
 
+      {/* Input de Valor Recebido, visível apenas para pagamento em DINHEIRO */}
       {paymentMethod === "dinheiro" && (
         <div>
           <h3>Valor Recebido</h3>
@@ -50,6 +54,7 @@ const Payment: React.FC<Props> = ({
         </div>
       )}
 
+      {/* Exibição do Troco, se aplicável */}
       {receivedAmount !== null && change >= 0 && (
         <div className="pdv-change">
           <span>Troco:</span>
@@ -57,9 +62,11 @@ const Payment: React.FC<Props> = ({
         </div>
       )}
 
+      {/* Botão Finalizar Venda */}
       <button
         onClick={handleFinalizeSale}
-        disabled={cart.length === 0 || !paymentMethod}
+        // Desabilitado se o carrinho estiver vazio OU se o método de pagamento não foi selecionado
+        disabled={cart.length === 0 || !paymentMethod} 
         className="pdv-finalize"
       >
         Finalizar Venda

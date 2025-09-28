@@ -1,15 +1,16 @@
 import React from "react";
-import { CartItem } from "../../../types/types";
+// 1. IMPORTAÇÃO ATUALIZADA: Trazendo o novo tipo ItemOrdem
+import { ItemOrdem } from "../../../types/newtypes"; 
 
+// 2. TIPAGEM DAS PROPS ATUALIZADA: Usando ItemOrdem[]
 interface Props {
-  cart: CartItem[];
+  cart: ItemOrdem[];
   totalItems: number;
   subtotal: number;
   handleUpdateQuantity: (id: string, newQuantity: number) => void;
   handleRemoveFromCart: (id: string) => void;
   handleProceedToPayment: () => void;
-  
-  showPayment: boolean;
+  showPayment: boolean; // Embora não esteja sendo usado na renderização, mantive-o nas props
 }
 
 const Cart: React.FC<Props> = ({
@@ -19,7 +20,7 @@ const Cart: React.FC<Props> = ({
   handleUpdateQuantity,
   handleRemoveFromCart,
   handleProceedToPayment,
-  
+  // showPayment não foi desestruturado pois não é usado aqui, mas está em Props
 }) => {
   return (
     <div className="pdv-side-panel pdv-cart">
@@ -30,110 +31,92 @@ const Cart: React.FC<Props> = ({
           <p className="pdv-empty">Nenhum item no carrinho.</p>
         ) : (
           cart.map((item) => (
+            // 3. MAPEAMENTO DE CAMPOS - ATUALIZADO
             <div key={item.id} className="pdv-cart-item">
-              {/* Agrupa as informações do produto */}
+              
+              <div className="product-details">
+                {/* SKU (se for produto) e Tipo do Item */}
+                <span>
+                    {item.sku ? `${item.sku} - ` : ''} 
+                    {item.tipoItem} 
+                </span>
+                
+                <button
+                  onClick={() => handleRemoveFromCart(item.id)}
+                  className="remove-button"
+                >
+                  &times;
+                </button>
+              </div>
 
+              <div className="product-name truncado">
+                {/* Nome do item (produto ou serviço) */}
+                <span title={item.nome}>{item.nome}</span>
+              </div>
 
+              <div className="linha-vertical"></div>
 
+              <div className="quantity-controls">
+                <div className="unit-price">
+                  {/* Preço Praticado (Unitário no momento da compra) */}
+                  <span>
+                    R$ {item.precoPraticado.toFixed(2).replace(".", ",")}
+                  </span>
+                </div>
 
-                <div className="product-details">
-
-                  <span>{item.sku} - {item.category}</span>
-                  <button
-                    onClick={() => handleRemoveFromCart(item.id)}
-                    className="remove-button"
+                <div className="container">
+                  {/* Botão de Decrementar */}
+                  <button className="input-number-decrement"
+                    onClick={() =>
+                      handleUpdateQuantity(item.id, item.quantidade - 1)
+                    }
                   >
-                    &times;
+                    -
+                  </button>
+
+                  {/* Input de Quantidade */}
+                  <input className="input-number"
+                    type="number"
+                    value={item.quantidade}
+                    onChange={(e) =>
+                      handleUpdateQuantity(
+                        item.id,
+                        // Usa 'quantidade' em vez de 'quantity'
+                        parseFloat(e.target.value) || 0 
+                      )
+                    }
+                  />
+                  
+                  {/* Botão de Incrementar */}
+                  <button className="input-number-increment"
+                    onClick={() =>
+                      handleUpdateQuantity(item.id, item.quantidade + 1)
+                    }
+                  >
+                    +
                   </button>
                 </div>
 
-
-
-
-                  <div className="product-name truncado">
-                    <span title={item.name}>{item.name}</span>
-                  </div>
-
-                  <div className="linha-vertical"></div>
-
-                  {/* Contêiner para o valor total e o botão de remover */}
-               
-                  <div className="quantity-controls">
-                     <div className="unit-price">
-                        <span>
-                          R$ {item.price.toFixed(2).replace(".", ",")}
-                        </span>
-                      </div>
-
-
-
-
-
-
-                    <div className="container">
-                    <button className="input-number-decrement"
-                      onClick={() =>
-                        handleUpdateQuantity(item.id, item.quantity - 1)
-                      }
-                    >
-                      -
-                    </button>
-
-                    <input className="input-number"
-                      type="number"
-                      value={item.quantity}
-                      onChange={(e) =>
-                        handleUpdateQuantity(
-                          item.id,
-                          parseFloat(e.target.value) || 0
-                        )
-                      }
-                    />
-                    <button className="input-number-increment"
-                      onClick={() =>
-                        handleUpdateQuantity(item.id, item.quantity + 1)
-                      }
-                    >
-                      +
-                    </button>
-                    </div>
-
-
-
-
-
-
-
-
-
-
-
-
-                  <div className="total-price">
-                    <span>R$ {item.total.toFixed(2).replace(".", ",")}</span>
-                  </div>
-                  </div>
-
-
-
-
-
-
-
-
-
-
-
+                <div className="total-price">
+                  {/* Subtotal (Preço total da linha) */}
+                  <span>R$ {item.subtotal.toFixed(2).replace(".", ",")}</span>
+                </div>
+              </div>
             </div>
           ))
         )}
       </div>
+      
+      {/* Footer do Carrinho (Subtotal) */}
       <div className="pdv-subtotal">
         <span>Subtotal:</span>
         <span>R$ {subtotal.toFixed(2).replace(".", ",")}</span>
       </div>
 
-      <button onClick={() => handleProceedToPayment()}>Finalizar compra</button>
+      {/* Botão de Ação */}
+      <button onClick={handleProceedToPayment}>
+          Finalizar compra
+      </button>
     </div>
   );
 };

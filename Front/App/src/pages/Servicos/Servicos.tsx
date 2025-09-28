@@ -119,10 +119,13 @@ const ServicesPage: React.FC = () => {
     return  (
 
         <div>
-            <div className='head header-info'>
+            <div className="page-header">
 
-            <p>Serviços</p>
+            <div>
+
+            <span>Serviços</span>
             <button>hahaha</button>
+            </div>
             </div>
 
         

@@ -1,56 +1,85 @@
 import React, { useState } from "react";
-import {ServiceProduct } from "../../../types/types";
+// ATENÇÃO: Estou assumindo que o tipo Servico é o novo tipo (com valorBase).
+// Se o seu arquivo types/types ainda tiver ServiceProduct, você pode renomeá-lo localmente
+// ou atualizar o arquivo original. Usarei Servico como o novo padrão:
+import { Servico } from "../../../types/newtypes"; // << Usando o novo tipo Servico
 
+// O componente agora recebe Servico[] nas props
 interface AddServiceProps {
-   services: ServiceProduct[];
-  back: () => void;
-  showPayment: boolean;
-  handleServiceAddToCart: (service: ServiceProduct) => void;
-
+    services: Servico[];
+    back: () => void;
+    showPayment: boolean;
+    // A função de callback deve receber o novo tipo Servico
+    handleServiceAddToCart: (service: Servico) => void; 
 }
 
 
-const AddService: React.FC<AddServiceProps> = ({ services,handleServiceAddToCart,back,
+const AddService: React.FC<AddServiceProps> = ({ services, handleServiceAddToCart, back,
   showPayment, }) => {
-  // Estado para o serviço personalizado
+  
+  // O estado para o preço agora é Servico['valorBase'] ou number | ''
   const [customServiceName, setCustomServiceName] = useState('');
   const [customServicePrice, setCustomServicePrice] = useState<number | ''>('');
 
 
+  // Função para adicionar o serviço personalizado (Reativada e Ajustada)
+  const handleAddCustomService = () => {
+    // 1. Validação simples
+    if (customServiceName.trim() === '' || customServicePrice === '' || (customServicePrice as number) <= 0) {
+      alert("Por favor, preencha a descrição e um valor válido para o serviço.");
+      return;
+    }
 
-  // Função para adicionar o serviço personalizado
-//   const handleAddCustomService = () => {
-//     if (customServiceName && customServicePrice !== '') {
-//       const newProduct: Product = {
-//         id: `custom-service-${Date.now()}`,
-//         name: customServiceName,
-//         price: customServicePrice as number,
-//         quantity: 1,
-//       };
-//       handleAddServiceToCart(newProduct);
-//       // Limpa os campos após adicionar
-//       setCustomServiceName('');
-//       setCustomServicePrice('');
-//     } else {
-//       alert("Por favor, preencha a descrição e o valor do serviço.");
-//     }
-//   };
+    // 2. Cria o objeto Servico temporário (Personalizado)
+    const newCustomService: Servico = {
+      // Cria um ID temporário único para o carrinho. O prefixo é útil para debugging.
+      id: `custom-svc-${Date.now()}`, 
+      nome: customServiceName,
+      descricao: `Serviço personalizado: ${customServiceName}`, // Descrição padrão
+      valorBase: customServicePrice as number,
+    };
+    
+    // 3. Adiciona ao carrinho via função callback
+    handleServiceAddToCart(newCustomService); 
+    
+    // 4. Limpa os campos após adicionar
+    setCustomServiceName('');
+    setCustomServicePrice('');
+  };
+  
+  // Helper para garantir que o input de preço só receba números válidos
+  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value === '') {
+      setCustomServicePrice('');
+    } else {
+      const parsedValue = parseFloat(value);
+      if (!isNaN(parsedValue)) {
+        setCustomServicePrice(parsedValue);
+      }
+    }
+  };
+
+
   return (
     <div className="add-service-container">
-        {showPayment && ( // 👈 Renderiza ProductList apenas se showPayment for falso
-        <button onClick={() => back()}> voltar</button>
-      )}
-      {/* Seção de serviços fixos (grid) */}
-      <h2>Adicionar Serviços Fixos</h2>
-      <div className="flex-row services-buttons">
-        {services.map((service, index) => (
         
+      {/* Botão Voltar */}
+      {showPayment && ( 
+        <button onClick={back}> ← Voltar</button>
+      )}
+      
+      {/* Seção de serviços fixos (grid) */}
+      <h2>Serviços Fixos do Catálogo</h2>
+      <div className="flex-row services-buttons">
+        {/* Renderização de serviços fixos */}
+        {services.map((service, index) => (
           <button
-            key={index}
+            key={service.id || index} // Use service.id se existir, senão index
             className="service-button"
             onClick={() => handleServiceAddToCart(service)}
           >
-            {service.name} <br/> R$ {service.price.toFixed(2)}
+            {service.nome} <br/> R$ {service.valorBase.toFixed(2)} {/* Usando 'nome' e 'valorBase' */}
           </button>
         ))}
       </div>
@@ -66,7 +95,7 @@ const AddService: React.FC<AddServiceProps> = ({ services,handleServiceAddToCart
           value={customServiceName}
           onChange={(e) => setCustomServiceName(e.target.value)}
           rows={3}
-          placeholder="Ex: Instalação de software complexo"
+          placeholder="Ex: Instalação de software complexo ou Horas extras"
         />
 
         <label htmlFor="custom-service-price">Valor (R$):</label>
@@ -75,13 +104,14 @@ const AddService: React.FC<AddServiceProps> = ({ services,handleServiceAddToCart
           type="number"
           step="0.01"
           value={customServicePrice}
-          onChange={(e) => setCustomServicePrice(parseFloat(e.target.value))}
+          onChange={handlePriceChange} // Usando o helper para garantir o parsing
           placeholder="Ex: 150.00"
         />
 
-        {/* <button className="custom-service-button" onClick={handleAddCustomService}>
+        {/* Botão de Ação Reativado */}
+        <button className="custom-service-button" onClick={handleAddCustomService}>
           Adicionar Serviço Personalizado
-        </button> */}
+        </button>
       </div>
     </div>
   );

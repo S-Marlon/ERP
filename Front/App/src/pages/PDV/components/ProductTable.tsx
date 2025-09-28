@@ -1,50 +1,65 @@
 import React from "react";
-import { Product } from "../../../types/types";
-
+// 1. IMPORTAÇÃO ATUALIZADA: Trazendo o novo tipo Produto
+import { Produto } from "../../../types/newtypes"; 
 
 
 interface ProductTableProps {
-  products: Product[];
-  handleAddToCart: (product: Product) => void;
+  // 2. TIPAGEM CORRIGIDA: Usa o novo tipo Produto[]
+  products: Produto[];
+  handleAddToCart: (product: Produto) => void;
 }
 
 const ProductTable: React.FC<ProductTableProps> = ({ products, handleAddToCart }) => {
   return (
-   
-      <table className="pdv-product-table">
-        <thead>
-          <tr>
-            <th className="pdv-table-header"  colSpan={2} style={{ width: "4%" }}>Nmr</th>
-            <th className="pdv-table-header" style={{ width: "25%" }}>Nome do Produto</th>
-            <th className="pdv-table-header" style={{ width: "12%" }}>SKU</th>
-            <th className="pdv-table-header" style={{ width: "12%" }}>Categoria</th>
-            <th className="pdv-table-header" style={{ width: "12%" }}>Sub-Categoria</th>
-            <th className="pdv-table-header" style={{ width: "5%" }}>Estoque</th>
-            <th className="pdv-table-header" style={{ width: "11%" }}><select><option>status</option></select></th>
-            <th className="pdv-table-header" style={{ width: "10%" }}>Preço</th>
-            <th className="pdv-table-header" style={{ width: "10%" }}>Fornecedor</th>
+    <table className="pdv-product-table">
+      <thead>
+        <tr>
+          {/* Coluna Nmr (Número) */}
+          <th className="pdv-table-header" colSpan={2} style={{ width: "4%" }}>Nmr</th>
+          {/* Nome do Produto */}
+          <th className="pdv-table-header" style={{ width: "25%" }}>Nome do Produto</th>
+          {/* SKU */}
+          <th className="pdv-table-header" style={{ width: "12%" }}>SKU</th>
+          {/* Categoria */}
+          <th className="pdv-table-header" style={{ width: "12%" }}>Categoria</th>
+          {/* Sub-Categoria */}
+          <th className="pdv-table-header" style={{ width: "12%" }}>Sub-Categoria</th>
+          {/* Estoque */}
+          <th className="pdv-table-header" style={{ width: "5%" }}>Estoque</th>
+          {/* Status (Mudei o select do cabeçalho para 'Status' puro) */}
+          <th className="pdv-table-header" style={{ width: "11%" }}>Status</th> 
+          {/* Preço */}
+          <th className="pdv-table-header" style={{ width: "10%" }}>Preço</th>
+          {/* Fornecedor */}
+          <th className="pdv-table-header" style={{ width: "10%" }}>Fornecedor</th>
+        </tr>
+      </thead>
+      <tbody>
+        {products.map((product, index) => (
+          // O clique na linha chama handleAddToCart com o objeto Produto
+          <tr 
+            key={product.id} 
+            className="pdv-table-row" 
+            onClick={() => handleAddToCart(product)}
+          >
+            <td> &#9634;</td>
+            <td> {index + 1}</td>
+            
+            {/* 3. MAPEAMENTO DE CAMPOS - ATUALIZADO */}
+            <td> <span className="truncado" title={product.nome}>{product.nome}</span></td>
+            <td>{product.sku}</td>
+            <td>{product.categoriaNome}</td> {/* Novo campo 'categoriaNome' */}
+            <td>{product.subcategoriaNome || 'N/A'}</td> {/* Novo campo 'subcategoriaNome' */}
+            <td>{product.estoque}</td> {/* Novo campo 'estoque' */}
+            <td>
+              <span>{product.status}</span>
+            </td>
+            <td>R$ {product.precoUnitario.toFixed(2)}</td> {/* Novo campo 'precoUnitario' */}
+            <td>{product.fornecedorNome || 'N/A'}</td> {/* Novo campo 'fornecedorNome' */}
           </tr>
-        </thead>
-        <tbody>
-          {products.map((product, index) => (
-            <tr key={product.id} className="pdv-table-row" onClick={() => handleAddToCart(product)}>
-              <td> &#9634;</td>
-              <td> {index + 1}</td>
-              <td> <span  className="truncado" title={product.name}>{product.name}</span></td>
-              <td>{product.sku}</td>
-              <td>{product.category}</td>
-              <td>{product.category}</td>
-              <td>{product.stock}</td>
-              <td>
-                <span>{product.status}</span>
-              </td>
-              <td>R$ {product.price.toFixed(2)}</td>
-              <td>{product.category}</td>
-              
-            </tr>
-          ))}
-        </tbody>
-      </table>
+        ))}
+      </tbody>
+    </table>
   );
 };
 

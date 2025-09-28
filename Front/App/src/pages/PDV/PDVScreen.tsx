@@ -1,96 +1,117 @@
 import React, { useState, useContext } from "react";
-import { ProductContext } from "../../context/ProductContext";
-import { ServiceProductContext } from "../../context/ServiceProductContext";
-// import ProductList from "./components/ProductList";
+// Importações de contexto (presumimos que os contextos ainda trazem os dados antigos por enquanto)
+import { ProductContext } from "../../context/NewProductContext";
+import { ServiceProductContext } from "../../context/NewServiceProductContext";
+
+// Importa os novos tipos do arquivo provisório 'newtypes.tsx'
+import { Produto, Servico, ItemOrdem, OrdemVenda } from "../../types/newtypes";
+
+// Importações de componentes (mantidas)
 import ProductListFilter from "./components/ProductListFilter";
 import Cart from "./components/Cart";
 import Payment from "./components/Payment";
-import { CartItem, ServiceProduct } from "../../types/types";
 import "./PDV.css";
 import ProductTable from "./components/ProductTable";
-import { Product } from "../../types/types"; // Make sure Product is imported
 import AddService from "./components/pdvAddService";
 
 const PDVScreen: React.FC = () => {
-  const { services } = useContext(ServiceProductContext)!;
-  const { products } = useContext(ProductContext)!;
-  const [cart, setCart] = useState<CartItem[]>([]);
+  // ATENÇÃO: Seus Contextos precisam ser atualizados para retornar os novos tipos (Produto/Servico)
+  const { services } = useContext(ServiceProductContext)!; // serviços agora deve ser Servico[]
+  const { products } = useContext(ProductContext)!; // products agora deve ser Produto[]
+
+  // O estado 'cart' é atualizado para usar o novo tipo ItemOrdem[]
+  const [cart, setCart] = useState<ItemOrdem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [receivedAmount, setReceivedAmount] = useState<number | null>(null);
-  const [showPayment, setShowPayment] = useState(false); // 👈 Adicionei este novo estado
+  const [showPayment, setShowPayment] = useState(false);
 
-  const subtotal = cart.reduce((acc, item) => acc + item.total, 0);
-  const totalItems = cart.reduce((acc, item) => acc + item.quantity, 0);
+  // Lógica de cálculo atualizada para usar 'subtotal' e 'quantidade' do ItemOrdem
+  const subtotal = cart.reduce((acc, item) => acc + item.subtotal, 0);
+  const totalItems = cart.reduce((acc, item) => acc + item.quantidade, 0);
   const change = receivedAmount ? receivedAmount - subtotal : 0;
 
-  const handleAddToCart = (product: Product) => {
-    const existingItem = cart.find((item) => item.id === product.id);
+  // Função para adicionar PRODUTO (do catálogo) ao carrinho (ItemOrdem)
+  const handleAddToCart = (product: Produto) => {
+    const existingItem = cart.find((item) => item.produtoId === product.id);
+
     if (existingItem) {
       setCart(
         cart.map((item) =>
-          item.id === product.id
+          item.produtoId === product.id
             ? {
                 ...item,
-                quantity: item.quantity + 1,
-                total: (item.quantity + 1) * item.price,
+                quantidade: item.quantidade + 1,
+                subtotal: (item.quantidade + 1) * item.precoPraticado,
               }
             : item
         )
       );
     } else {
-      setCart([
-        ...cart,
-        {
-          ...product,
-          productId: product.id,
-          quantity: 1,
-          total: product.price,
-        },
-      ]);
+      // Cria um novo ItemOrdem a partir do Produto
+      const newItem: ItemOrdem = {
+        id: Math.random().toString(), // ID único para o item do carrinho
+        tipoItem: "Produto",
+        produtoId: product.id,
+        nome: product.nome,
+        sku: product.sku,
+        quantidade: 1,
+        precoPraticado: product.precoUnitario,
+        subtotal: product.precoUnitario,
+      };
+      setCart([...cart, newItem]);
     }
   };
 
-  const handleServiceAddToCart = (service: ServiceProduct) => {
-    const existingItem = cart.find((item) => item.id === service.id);
+  // Função para adicionar SERVIÇO (do catálogo) ao carrinho (ItemOrdem)
+  const handleServiceAddToCart = (service: Servico) => {
+    const existingItem = cart.find((item) => item.servicoId === service.id);
+
     if (existingItem) {
       setCart(
         cart.map((item) =>
-          item.id === service.id
+          item.servicoId === service.id
             ? {
                 ...item,
-                quantity: item.quantity + 1,
-                total: (item.quantity + 1) * item.price,
+                quantidade: item.quantidade + 1,
+                subtotal: (item.quantidade + 1) * item.precoPraticado,
               }
             : item
         )
       );
     } else {
-      setCart([
-        ...cart,
-        {
-          ...service,
-          productId: service.id,
-          quantity: 1,
-          total: service.price,
-        },
-      ]);
+      // Cria um novo ItemOrdem a partir do Serviço
+      const newItem: ItemOrdem = {
+        id: Math.random().toString(), // ID único para o item do carrinho
+        tipoItem: "Servico",
+        servicoId: service.id,
+        nome: service.nome,
+        quantidade: 1,
+        precoPraticado: service.valorBase, // Usa valorBase como preço praticado
+        subtotal: service.valorBase,
+      };
+      setCart([...cart, newItem]);
     }
   };
 
-  const handleRemoveFromCart = (productId: string) => {
-    setCart(cart.filter((item) => item.id !== productId));
+  // As funções de remoção e atualização de quantidade precisam usar os IDs corretos
+  const handleRemoveFromCart = (itemId: string) => { // Agora remove pelo ID do ItemOrdem
+    setCart(cart.filter((item) => item.id !== itemId));
   };
 
-  const handleUpdateQuantity = (productId: string, newQuantity: number) => {
+  const handleUpdateQuantity = (itemId: string, newQuantity: number) => { // Agora atualiza pelo ID do ItemOrdem
     if (newQuantity <= 0) {
-      handleRemoveFromCart(productId);
+      handleRemoveFromCart(itemId);
       return;
     }
     setCart(
       cart.map((item) =>
-        item.id === productId
-          ? { ...item, quantity: newQuantity, total: newQuantity * item.price }
+        item.id === itemId
+          ? {
+              ...item,
+              quantidade: newQuantity,
+              subtotal: newQuantity * item.precoPraticado,
+            }
           : item
       )
     );
@@ -106,7 +127,29 @@ const PDVScreen: React.FC = () => {
       return;
     }
 
+    // Lógica para salvar a OrdemVenda (OrderHeader + Itens)
+    const newOrder: OrdemVenda = {
+      id: Math.random().toString(), // Gere um ID real no backend
+      orderNumber: `ORD-${Date.now()}`, // Gere um número de ordem
+      clientName: "Cliente Padrão", // Substitua pelo cliente real
+      clienteId: "CL001", // Substitua pelo ID do cliente real
+      status: 'Concluído',
+      dataCriacao: new Date(),
+      responsavel: "Usuário Logado",
+      total: subtotal,
+      itens: cart, // O array de ItemOrdem
+      pagamentos: [{ id: "PAG001", metodo: paymentMethod, valor: subtotal, dataPagamento: new Date() }], // Simples, ajuste conforme a interface Pagamento
+      tags: [],
+      tipoServico: '',
+      metodoPagamento: paymentMethod,
+      items: [],
+      responsible: ""
+    }
+
+    console.log("Ordem de Venda a ser salva:", newOrder);
     alert("Venda finalizada com sucesso!");
+    
+    // Reset dos estados
     setCart([]);
     setPaymentMethod("");
     setReceivedAmount(null);
@@ -114,11 +157,10 @@ const PDVScreen: React.FC = () => {
   };
 
   const handleProceedToPayment = () => {
-    // 👈 Esta função é nova, ela será chamada pelo botão no componente Cart
-    // if (cart.length === 0) {
-    //     alert("Adicione itens ao carrinho para prosseguir com o pagamento.");
-    //     return;
-    // }
+    if (cart.length === 0) {
+        alert("Adicione itens ao carrinho para prosseguir com o pagamento.");
+        return;
+    }
     setShowPayment(true);
   };
 
@@ -126,41 +168,41 @@ const PDVScreen: React.FC = () => {
     setShowPayment(false);
   };
 
-  const filteredProducts = products.filter((p) =>
-    p.name.toLowerCase().includes(searchTerm.toLowerCase())
+  
+
+  // Assumindo que os dados em 'products' e 'services' já usam Produto e Servico
+  const filteredProducts = products.filter((p: Produto) =>
+    p.nome.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredServicesProducts = services.filter((s) =>
-    s.name.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredServicesProducts = services.filter((s: Servico) =>
+    s.nome.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
     <div>
-      {/* <div className="head">
-
-      head
-        
-      </div> */}
-
       <div className={!showPayment ? 'pdv-container' : 'pdv-container-payment'}>
-        {!showPayment && ( // 👈 Renderiza ProductList apenas se showPayment for falso
+        {/* Lado Esquerdo: Produtos/Serviços */}
+        {!showPayment && (
           <ProductListFilter
             products={filteredProducts}
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}
+            onCategoryClick={() => {}} // Provide a no-op or your actual handler
+            activeCategory={""} // Provide the current active category or an empty string
           />
         )}
 
-        {showPayment && ( // 👈 Renderiza ProductList apenas se showPayment for falso
+        {showPayment && (
           <AddService
-           handleServiceAddToCart={handleServiceAddToCart}
-                services={filteredServicesProducts}
-                back={back}
-          showPayment={showPayment}
+            handleServiceAddToCart={handleServiceAddToCart}
+            services={filteredServicesProducts}
+            back={back}
+            showPayment={showPayment}
           />
         )}
 
-        {!showPayment && ( // 👈 Renderiza ProductList apenas se showPayment for falso
+        {!showPayment && (
           <div>
             <div
               style={{
@@ -179,18 +221,11 @@ const PDVScreen: React.FC = () => {
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
-                  {/* Você pode adicionar outros campos de filtro aqui, se necessário */}
-                  {/* Exemplo: */}
-                  {/* <input
-            type="text"
-            placeholder="Filtrar por marca"
-            // value={brandFilter}
-            // onChange={(e) => setBrandFilter(e.target.value)}
-          /> */}
                 </div>
               </fieldset>
             </div>
             <div className="pdv-product-table-container">
+              {/* O ProductTable deve ser atualizado internamente para receber Produto[] */}
               <ProductTable
                 handleAddToCart={handleAddToCart}
                 products={filteredProducts}
@@ -199,18 +234,19 @@ const PDVScreen: React.FC = () => {
           </div>
         )}
 
+        {/* Lado Central/Direito: Carrinho */}
         <Cart
-          cart={cart}
+          cart={cart} // ItemOrdem[]
           totalItems={totalItems}
           subtotal={subtotal}
           handleUpdateQuantity={handleUpdateQuantity}
           handleRemoveFromCart={handleRemoveFromCart}
           handleProceedToPayment={handleProceedToPayment}
-          // back={back}
           showPayment={showPayment}
         />
 
-        {showPayment && ( // 👈 Renderiza Payment apenas se showPayment for verdadeiro
+        {/* Lado Direito: Pagamento (condicional) */}
+        {showPayment && (
           <Payment
             cart={cart}
             paymentMethod={paymentMethod}
@@ -222,13 +258,7 @@ const PDVScreen: React.FC = () => {
           />
         )}
       </div>
-
-      {/* <div className="foot">
-      foot
-    </div> */}
     </div>
-
-    // -------------------------------------
   );
 };
 

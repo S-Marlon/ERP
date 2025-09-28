@@ -46,9 +46,9 @@ const EstoquePage: React.FC = () => {
 
   return (
     <div>
-      <div className="head">
+      <div className="page-header">
 
-      <ProductHeader
+      <ProductHeader 
         totalProducts={products.length}
         foundProducts={products.length}
         onAddProduct={handleAddProduct}
@@ -66,7 +66,7 @@ const EstoquePage: React.FC = () => {
         onSelectProduct={setSelectedProduct}
       />
 
-      <div className="foot">
+      <div className="page-footer">
       <ProductFooter
         totalProducts={products.length}
         foundProducts={products.length}
