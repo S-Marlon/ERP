@@ -1,0 +1,259 @@
+.input-base {
+  width: 100%; /* Ocupa a largura total do container */
+  padding: 10px 12px; /* Espaçamento interno */
+  border: 1px solid #ced4da; /* Borda cinza suave */
+  border-radius: 8px; /* Cantos arredondados */
+  font-size: 1rem; /* Tamanho da fonte padrão */
+  color: #333333; /* Cor do texto */
+  box-sizing: border-box; /* Garante que padding e borda não aumentem o tamanho */
+  transition: border-color 0.2s, box-shadow 0.2s; /* Transição suave */
+}
+
+/* Estilo para quando o input está em foco (clicado) */
+.input-base:focus {
+  outline: none; /* Remove a borda padrão do navegador */
+  border-color: #007bff; /* Borda azul vibrante */
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25); /* Sombra suave */
+}
+
+/* Estilo base para todos os botões */
+.btn-base {
+  padding: 12px 20px; /* Espaçamento interno */
+  border-radius: 8px; /* Cantos arredondados */
+  font-size: 1rem; /* Tamanho da fonte */
+  font-weight: 600; /* Negrito */
+  cursor: pointer; /* Muda o cursor para indicar que é clicável */
+  border: none;
+  transition: background-color 0.2s, transform 0.2s; /* Transição suave */
+}
+
+.btn-base:hover {
+  transform: translateY(-2px); /* Efeito de elevação ao passar o mouse */
+}
+
+/* Estilo para o botão principal */
+.btn-primary {
+  background-color: #007bff;
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background-color: #0056b3;
+}
+
+/* Estilo para o botão secundário */
+.btn-secondary {
+  background-color: #6c757d;
+  color: #fff;
+}
+
+.btn-secondary:hover {
+  background-color: #5a6268;
+}
+
+/* Classes para botões de ação (verde para sucesso, vermelho para perigo) */
+.btn-success {
+  background-color: #28a745;
+  color: #fff;
+}
+
+.btn-success:hover {
+  background-color: #218838;
+}
+
+.btn-danger {
+  background-color: #dc3545;
+  color: #fff;
+}
+
+.btn-danger:hover {
+  background-color: #c82333;
+}
+
+/* inputs  */
+
+.min-max-group {
+  display: flex;
+  flex-direction: wrap;
+  justify-content: center;
+  align-items: center;
+}
+
+.min-max-group fieldset {
+  font-size: small;
+  padding: 0px;
+  border: none;
+}
+
+.min-max-group .min-max-input {
+  max-width: 80px;
+  padding: 5px;
+  border-radius: 10px 0 10px 0;
+  color: white;
+  border: 1px solid #555;
+}
+
+fieldset input {
+  height: auto;
+  padding: 8px;
+  border-radius: 4px;
+  color: white;
+  border: 1px solid #555;
+}
+
+.pdv-search-filter input[type="text"] {
+  width: 100%;
+  height: auto;
+  border: 1px solid #555;
+  border-radius: 4px;
+  font-size: 1rem;
+  box-sizing: border-box;
+  /* Garante que padding e border não aumentem o tamanho */
+}
+
+.quantity-controls input[type="number"] {
+  text-align: center;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 2px;
+  width: 40px;
+}
+
+.pdv-search-filter input[type="text"]:focus {
+  outline: none;
+  border-color: #57a8ff;
+  /* Destaca o input ativo */
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+
+
+
+/* ----------------------
+ */
+
+
+
+ /* =================================== */
+/* CONTROLES               */
+/* =================================== */
+
+.label {
+    display: flex;
+    flex-direction: column;
+    font-size: 0.9em;
+    font-weight: bold;
+}
+
+/* Estilo base para Input, Select e Textarea */
+.input-base {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-top: 5px;
+    width: 100%;
+    box-sizing: border-box; /* Garante que padding e border fiquem dentro da largura */
+}
+
+/* Estilos específicos */
+.input, .select {
+    /* Herda de .input-base, pode adicionar overrides se necessário */
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-top: 5px;
+    width: 100%;
+    box-sizing: border-box; 
+}
+
+.textarea {
+    /* Herda de .input-base, com margem inferior adicional */
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-top: 5px;
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 15px;
+}
+
+/* Input de Garantia (apenas leitura) */
+.read-only-input {
+    background-color: #f0f0f0;
+    cursor: default;
+    font-weight: bold;
+}
+
+/* =================================== */
+/* CHECKBOX / LISTAS          */
+/* =================================== */
+
+.checkbox-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 20px;
+    margin-top: 15px;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    font-weight: normal;
+    gap: 5px;
+    font-size: 0.9em;
+}
+
+/* =================================== */
+/* BOTÕES                  */
+/* =================================== */
+
+.button-container {
+    display: flex;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.submit-button, .cancel-button {
+    padding: 12px;
+    flex: 1;
+    border: none;
+    border-radius: 4px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.submit-button {
+    background-color: #007bff;
+    color: white;
+}
+
+.submit-button:hover {
+    background-color: #0056b3;
+}
+
+.cancel-button {
+    background-color: #264f72;
+    color: white;
+}
+
+.cancel-button:hover {
+    background-color: #0091ff;
+}
+
+/* =================================== */
+/* MEDIA QUERIES            */
+/* =================================== */
+
+/* Para telas pequenas, as colunas do grid podem ser empilhadas */
+@media (max-width: 600px) {
+    .grid-2-cols, .grid-3-cols, .grid-4-cols, .fieldset-container {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .fieldset {
+        /* Garante que o fieldset ocupe 100% da largura em telas pequenas */
+        flex: 1 1 100%; 
+    }
+}

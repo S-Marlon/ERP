@@ -1,25 +1,3 @@
-export interface ServiceItem {
-  orderNumber: string;
-  serviceType: string;
-  clientName: string;
-  clientDetails: string;
-  status: 'Completo' | 'Pendente' | 'Em Andamento'; // Tipos literais são ótimos aqui
-  day: string;
-  time: string;
-  date: string;
-  items: ServiceProduct[];
-  total: number;
-  tags: string[];
-  responsible: string;
-}
-
-export interface ServiceProduct {
-    id: string;
-    sku: string;
-    name: string;
-    category: string;
-    price: number;
-}
 
 export interface FilterState {
   status: string;
@@ -62,4 +40,27 @@ export interface CartItem {
   price: number;        // Preço unitário no momento da compra
   quantity: number;     // Quantidade no carrinho
   total: number;        // Preço total (price * quantity)
+}
+
+export interface ServiceItem {
+  orderNumber: string;
+  serviceType: string;
+  clientName: string;
+  clientDetails: string;
+  status: 'Completo' | 'Pendente' | 'Em Andamento'; // Tipos literais são ótimos aqui
+  day: string;
+  time: string;
+  date: string;
+  items: ServiceProduct[];
+  total: number;
+  tags: string[];
+  responsible: string;
+}
+
+export interface ServiceProduct {
+    id: string;
+    sku: string;
+    name: string;
+    category: string;
+    price: number;
 }

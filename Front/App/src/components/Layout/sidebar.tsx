@@ -65,6 +65,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
             {isOpen && <span >Servicos</span>}
             </li>
             </Link>
+            <Link to="/Obras">
+          <li>
+            <img src={img4}  className="react" alt="React logo" />
+            {isOpen && <span >Obras</span>}
+            </li>
+            </Link>
       </ul>
     </div>
   );

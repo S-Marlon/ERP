@@ -1,4 +1,5 @@
 import './App.css'
+import './forms.css'
 import { useState } from 'react'
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Sidebar from './components/Layout/sidebar'
@@ -11,6 +12,7 @@ import Produtos from "./pages/Produtos/Produtos";
 import Vendas from "./pages/PDV/PDVScreen";
 import Estoque from "./pages/Estoque/Estoque";
 import Servicos from "./pages/Servicos/Servicos";
+import { ObrasModule } from './pages/Obras/ObrasModule';
 import { ServiceProductProvider } from './context/NewServiceProductContext';
 import { ProductProvider } from './context/NewProductContext';
 
@@ -64,6 +66,7 @@ function App() {
         <Route path="/produtos" element={<Produtos  text='Produtos'/>} />
         <Route path="/Estoque" element={<Estoque />} />
         <Route path="/Servicos" element={<Servicos />} />
+        <Route path="/Obras" element={<ObrasModule />} />
     </Routes>
           
         </Panel>

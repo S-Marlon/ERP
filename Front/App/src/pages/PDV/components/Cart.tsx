@@ -40,13 +40,24 @@ const Cart: React.FC<Props> = ({
                     {item.sku ? `${item.sku} - ` : ''} 
                     {item.tipoItem} 
                 </span>
-                
-                <button
+
+                <div>
+                  <button
                   onClick={() => handleRemoveFromCart(item.id)}
                   className="remove-button"
                 >
+                   
+    &#x1F6C8;
+                </button>
+
+                <button
+                  onClick={() => handleRemoveFromCart(item.id)}
+                  className="remove-button"
+                  >
                   &times;
                 </button>
+                  </div>
+                
               </div>
 
               <div className="product-name truncado">
