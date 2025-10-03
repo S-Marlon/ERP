@@ -1,23 +1,28 @@
-.input-base {
+/* bases */
+
+
+
+
+.input{
   width: 100%; /* Ocupa a largura total do container */
-  padding: 10px 12px; /* Espaçamento interno */
+  padding: 8px;
+  border-radius: 4px;
   border: 1px solid #ced4da; /* Borda cinza suave */
-  border-radius: 8px; /* Cantos arredondados */
   font-size: 1rem; /* Tamanho da fonte padrão */
-  color: #333333; /* Cor do texto */
+  color: #ffffff; /* Cor do texto */
   box-sizing: border-box; /* Garante que padding e borda não aumentem o tamanho */
   transition: border-color 0.2s, box-shadow 0.2s; /* Transição suave */
 }
 
 /* Estilo para quando o input está em foco (clicado) */
-.input-base:focus {
+.input:focus {
   outline: none; /* Remove a borda padrão do navegador */
   border-color: #007bff; /* Borda azul vibrante */
   box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25); /* Sombra suave */
 }
 
 /* Estilo base para todos os botões */
-.btn-base {
+.btn {
   padding: 12px 20px; /* Espaçamento interno */
   border-radius: 8px; /* Cantos arredondados */
   font-size: 1rem; /* Tamanho da fonte */
@@ -27,9 +32,12 @@
   transition: background-color 0.2s, transform 0.2s; /* Transição suave */
 }
 
-.btn-base:hover {
+.btn:hover {
   transform: translateY(-2px); /* Efeito de elevação ao passar o mouse */
 }
+
+/* bases */
+
 
 /* Estilo para o botão principal */
 .btn-primary {
@@ -93,14 +101,6 @@
   border: 1px solid #555;
 }
 
-fieldset input {
-  height: auto;
-  padding: 8px;
-  border-radius: 4px;
-  color: white;
-  border: 1px solid #555;
-}
-
 .pdv-search-filter input[type="text"] {
   width: 100%;
   height: auto;
@@ -157,8 +157,8 @@ fieldset input {
 
 /* Estilos específicos */
 .input, .select {
-    /* Herda de .input-base, pode adicionar overrides se necessário */
-    padding: 8px;
+    
+    padding: 5px;
     border: 1px solid #ddd;
     border-radius: 4px;
     margin-top: 5px;
@@ -179,7 +179,7 @@ fieldset input {
 
 /* Input de Garantia (apenas leitura) */
 .read-only-input {
-    background-color: #f0f0f0;
+    background-color: #5a5a5a;
     cursor: default;
     font-weight: bold;
 }
@@ -191,7 +191,8 @@ fieldset input {
 .checkbox-group {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px 20px;
+    justify-content:baseline;
+    gap: 5px 10px;
     margin-top: 15px;
 }
 
@@ -200,7 +201,14 @@ fieldset input {
     align-items: center;
     font-weight: normal;
     gap: 5px;
-    font-size: 0.9em;
+    font-size: 0.8em;
+    cursor: pointer;
+  user-select: none; /* Evita seleção de texto ao clicar */
+ 
+}
+
+input[type="checkbox"]  {
+  cursor: pointer;
 }
 
 /* =================================== */
@@ -256,4 +264,58 @@ fieldset input {
         /* Garante que o fieldset ocupe 100% da largura em telas pequenas */
         flex: 1 1 100%; 
     }
+}
+
+
+
+/* =================================== */
+/* GRIDS                   */
+/* =================================== */
+
+.grid-2-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+
+    margin-bottom: 15px;
+}
+
+.grid-3-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 5px;
+
+    margin-bottom: 15px;
+}
+
+.grid-4-cols {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 5px;
+    margin-bottom: 15px;
+}
+
+.grid-5-cols {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 5px;
+
+    margin-bottom: 15px;
+}
+
+.grid-6-cols {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 5px;
+
+    margin-bottom: 1px;
+}
+
+/* Grid de 1 coluna (para manter o espaçamento consistente) */
+.grid-full {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 5px;
+
+    margin-bottom: 15px;
 }
