@@ -198,14 +198,40 @@ export const ObraFormulario: React.FC = () => {
 
     return (
         <div className="obraform-container">
-            <h2>{isEditing ? `Editar Obra: ${formData.titulo}` : 'Nova Obra'}</h2>
+            
             <form onSubmit={handleSubmit} className="form">
 
                 {/* Seções do formulário divididas em componentes */}
                 {/* 1. cliente */}
                 <div className='flex-row'>
                     <div className='flex-column'>
-                        <ClienteForm  />
+                        <div>
+                            <fieldset className='fieldset-principal'>
+                                <legend className='legend'>
+                                    identificação da Obra
+                                </legend>
+                                <label className="label">código do contrato:
+                            <input type="text" placeholder='P0001-0825AT' name="titulo"  required className="input" />
+                        </label>
+                         <label className="label">CPF/CNPJ do Cliente:
+                    <input
+                        type="text"
+                        name="clienteDocumento"
+                        required
+                        className="input-base input"
+                        placeholder="000.000.000-00 ou 00.000.000/0001-00"
+                    />
+                </label>
+                <label className="label">Telefone
+                    <input type="text" name="clienteTelefone" required className="input-base input" placeholder="(00) 00000-0000"
+                    />
+                </label>
+                <label className="label">Email:
+                    <input type="email" name="clienteEmail" required className="input-base input" placeholder="email@email.com"
+                    />
+                </label>
+                            </fieldset>
+                            </div>
                         <ClienteForm  />
                      </div>
                     <div className='flex-column'>
@@ -220,18 +246,8 @@ export const ObraFormulario: React.FC = () => {
 
 
                 <ChecklistOcorrenciasForm  />
-                </div>
-                </div>
 
-                
-
-
-                
-
-
-
-
-                {/* BOTÕES */}
+                 {/* BOTÕES */}
                 {/* CLASSE: button-container */}
                 <div className="button-container">
                     {/* CLASSE: submit-button */}
@@ -241,6 +257,18 @@ export const ObraFormulario: React.FC = () => {
                     {/* CLASSE: cancel-button */}
                     <button type="button" onClick={handleCancel} className="cancel-button">Cancelar</button>
                 </div>
+                </div>
+                </div>
+
+                
+
+
+                
+
+
+
+
+               
             </form>
         </div>
     );

@@ -74,3 +74,59 @@
     outline: none;
     box-shadow: 0 0 0 1px #007bff;
 }
+
+
+
+/* 1. Estilização do Body/HTML para permitir rolagem */
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+}
+
+/* 2. Container Principal (Usa CSS Grid para as colunas) */
+.layout-container {
+    display: grid;
+    /* Define as colunas: 1 parte fracionada para a sidebar, 2 partes para o conteúdo */
+    grid-template-columns: 1fr 2fr;
+    /* Ajuste de altura para que a área de conteúdo preencha a tela */
+}
+
+/* 3. Estilização da Sidebar (1fr) */
+.sidebar-fixa {
+    /* Define o posicionamento fixo/sticky dentro do grid */
+    position: sticky;
+    /* Mantém a sidebar alinhada ao topo da viewport */
+    top: 0; 
+    /* Garante que ela ocupe toda a altura da tela, mesmo com pouco conteúdo */
+    align-self: start; 
+    
+    /* Estilos Visuais */
+    background-color: #333;
+    color: white;
+    padding: 20px 10px;
+    overflow-y: auto; /* Permite rolar o conteúdo interno da sidebar se necessário */
+}
+
+.sidebar-fixa h2 {
+    margin-top: 0;
+    font-size: 1em;
+}
+
+.sidebar-fixa ul {
+    list-style: none;
+    padding: 0;
+}
+
+.sidebar-fixa li {
+    padding: 10px 0;
+    text-align: center;
+    border-bottom: 1px solid #444;
+    cursor: pointer;
+}
+
+
+/* 4. Estilização da Área Principal (2fr) */
+.conteudo-principal {
+    /* É a área que rola normalmente */
+    padding: 0 10px;
+}

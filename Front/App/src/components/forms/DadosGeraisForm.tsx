@@ -9,7 +9,7 @@ const DadosGeraisForm: React.FC = () => {
     return (
         <fieldset className="fieldset-principal">
                     <legend className="legend">Dados Gerais</legend>
-                    <div className="grid-3-cols">
+                    <div className="grid-2-cols">
                         <label className="label">Tipo de serviço:
                             <select className='input'>
                                 <option>Perfuração</option>
@@ -23,9 +23,7 @@ const DadosGeraisForm: React.FC = () => {
                                 {statusOptions.map(status => (<option key={status} value={status}>{status}</option>))}
                             </select>
                         </label>
-                        <label className="label">código do contrato:
-                            <input type="text" placeholder='P0001-0825AT' name="titulo"  required className="input" />
-                        </label>
+                        
                     </div>
 
 
