@@ -95,15 +95,7 @@ const ClienteForm: React.FC = () => {
                     />
                 </label>
 
-                    <label className="label">Estado:
-                    <input
-                        type="text"
-                        name="endereco_estado"
-                        required
-                        className="input-base input"
-                        maxLength={2}
-                    />
-                </label>
+                    
             </div>
 
 

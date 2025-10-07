@@ -11,6 +11,13 @@ import DadosGeraisForm from '../../components/forms/DadosGeraisForm';
 import DadosPerfuracaoForm from '../../components/forms/DadosPerfuracaoForm';
 import DadosRevestimentoForm from '../../components/forms/DadosPerfuracaoForm';
 import ChecklistOcorrenciasForm from '../../components/forms/ChecklistOcorrenciasForm';
+import { ObrasLista } from './Components/ObrasLista';
+import { ObraFormulario } from './Components/ObraFormulario';
+import CadastroCliente from '../../components/forms/CadastroCliente';
+import CadastroContrato from '../../components/forms/CadastroContrato';
+import RelatorioPoco from '../../components/forms/RelatorioPoco';
+import PainelDetalhePoco from './Components/PainelDetalhePoco';
+import SearchDashboard from './Components/SearchDashboard';
 
 // Supondo que você tenha os componentes de conteúdo para cada aba
 const AbaGeralContent: React.FC = () => <DadosGeraisForm />; // Usando o formulário existente
@@ -46,6 +53,16 @@ export const ObrasModule: React.FC = () => {
             label: 'Localização',
             content: <AbaLocalizacaoContent />
         },
+        {
+            id: 'servicos',
+            label: 'Serviços Futuros',
+            content: <AbaLocalizacaoContent />
+        },
+        {
+            id: 'galeria',
+            label: 'galeria',
+            content: <AbaLocalizacaoContent />
+        },
     ];
 
     // O restante do seu layout (Sidebar 1fr e Elementos de Controle) estaria aqui.
@@ -54,7 +71,7 @@ export const ObrasModule: React.FC = () => {
 
   return (
 
-    <div className="page-layout">
+    <div>
       
       {/* (A) PAGE HEADER */}
       <header className="page-header">
@@ -69,12 +86,15 @@ export const ObrasModule: React.FC = () => {
       </header>
       {/* (B) PAGE CONTENT */}
       <main className="page-content layout-container" >
-
+        <SearchDashboard />
+        {/* <PainelDetalhePoco pocoId={''} /> */}
+        {/* <ObraFormulario /> */}
        
-    
+{/* 
     <aside className="sidebar-fixa">
         
         <PesquisaRapida/>
+        <ObrasLista />
 
     </aside>
 
@@ -82,43 +102,36 @@ export const ObrasModule: React.FC = () => {
 
 
         <h1>Detalhes da Obra</h1>
+
+        <div className="flex-row" style={{justifyContent:'space-between', alignItems:'center'}}>
+        <h2>P001-0825 - João vicente</h2>
+        <h2 style={{textAlign:'right', background: 'orange', borderRadius:'8px', padding: '5px' }}>Em Andamento</h2>
+
+        </div>
+
+        <div className="action-buttons-container">
+
+    <button className="action-button edit-button" >
+        Editar
+    </button>
+    <button className="action-button time-log-button">
+        Novo Registro de Tempo
+    </button>
+    <select className="dropdown">
+        <option className="action-button dropdown-toggle">
+            Ações
+        </option>
+            <option>Finalizar Obra</option>
+            <option>Pausar Obra</option>
+            <option>Gerar Relatório</option>
+        
+    </select>
+</div>
+        
+
 <TabsContainer tabs={obraTabs} />
 
-      
-        {/* <h1>Detalhes da Obra</h1>
-        
-        <table>
-            <thead>
-                <tr>
-                    <th>Código do Contrato</th>
-                    <th>Cliente</th>
-                    <th>Tipo de Serviço</th>
-                    <th>Status</th>
-                    <th>Data Início</th>
-                    <th>Data Fim Prevista</th>
-                    <th>Responsável</th>
-                    <th>Ações</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>P0001-0825AT</td>
-                    <td>João Silva</td>
-                    <td>Perfuração</td>
-                    <td>Em Andamento</td>
-                    <td>01/08/2024</td>
-                    <td>30/09/2024</td>
-                    <td>william</td>
-                    <td>
-                        <button>Editar</button>
-                        <button>Excluir</button>
-                    </td>
-                </tr>
-                
-            </tbody>
-        </table> */}
-        
-    </main>
+    </main>  */}
 
 
       </main>

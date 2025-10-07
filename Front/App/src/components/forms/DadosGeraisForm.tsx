@@ -9,7 +9,7 @@ const DadosGeraisForm: React.FC = () => {
     return (
         <fieldset className="fieldset-principal">
                     <legend className="legend">Dados Gerais</legend>
-                    <div className="grid-2-cols">
+                    <div className="grid-2d-cols">
                         <label className="label">Tipo de serviço:
                             <select className='input'>
                                 <option>Perfuração</option>

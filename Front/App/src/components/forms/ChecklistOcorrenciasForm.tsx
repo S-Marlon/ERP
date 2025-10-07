@@ -33,6 +33,8 @@ const ChecklistOcorrenciasForm: React.FC = () => {
                         <label className="checkbox-label red">
                             <input type="checkbox" name="checklistEstruturasSubterraneas" /> Estruturas Subterrâneas (Obstáculo)
                         </label>
+                        
+                        
 
                         {/* SUB-CHECKLIST CONDICIONAL */}
                         {/* {formData.checklistEstruturasSubterraneas && (

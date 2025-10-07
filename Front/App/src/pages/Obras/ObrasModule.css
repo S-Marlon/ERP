@@ -32,7 +32,7 @@
 /* Fieldset Principal (Destaque) */
 .fieldset-principal {
     border: 2px solid #007bff;
-    padding: 20px;
+    padding: 15px;
     border-radius: 8px;
 }
 
@@ -87,9 +87,18 @@ body {
 .layout-container {
     display: grid;
     /* Define as colunas: 1 parte fracionada para a sidebar, 2 partes para o conteúdo */
-    grid-template-columns: 1fr 2fr;
+    grid-template-columns: auto;
     /* Ajuste de altura para que a área de conteúdo preencha a tela */
 }
+
+.obraform-container {
+    display: grid;
+    /* Define as colunas: 1 parte fracionada para a sidebar, 2 partes para o conteúdo */
+    grid-template-columns: 3fr 8fr;
+    /* Ajuste de altura para que a área de conteúdo preencha a tela */
+}
+
+
 
 /* 3. Estilização da Sidebar (1fr) */
 .sidebar-fixa {

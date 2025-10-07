@@ -66,23 +66,33 @@ export const ObrasLista: React.FC = () => {
       <table>
         <thead>
           <tr>
-            <th>Título</th>
-            <th>Cliente</th>
-            <th>Status</th>
-            <th>Ações</th>
+                    <th>Código do Contrato</th>
+                    <th>Cliente</th>
+                    <th>Tipo de Serviço</th>
+                    <th>Data Início</th>
+                    <th>Status</th>
+                    <th>Data Fim -Prevista- </th>
+                    <th>Ações</th>
           </tr>
         </thead>
         <tbody>
           {obrasFiltradas.map((obra) => {
             const cliente = mockClientes.find(c => c.id === obra.clienteId);
             return (
-              <tr key={obra.id}>
+              <tr key={obra.id} style={{fontSize:'16px'}}>
                 <td>{obra.titulo}</td>
                 <td>{cliente ? cliente.nome : 'N/A'}</td>
-                <td>{obra.status}</td>
+
+                <td>Perfuração</td>
+
+                <td>12/02/20025</td>
+                <td  style={{textAlign:'center', background: 'orange', borderRadius:'4px', padding: '2px' }}>{obra.status}</td>
+                <td>12/02/20025</td>
+
                 <td>
                   <Link to={`/obras/${obra.id}`}>Ver Detalhes</Link>
                 </td>
+
               </tr>
             );
           })}

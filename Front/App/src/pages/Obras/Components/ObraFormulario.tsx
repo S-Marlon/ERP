@@ -199,19 +199,17 @@ export const ObraFormulario: React.FC = () => {
     return (
         <div className="obraform-container">
             
-            <form onSubmit={handleSubmit} className="form">
 
                 {/* Seções do formulário divididas em componentes */}
                 {/* 1. cliente */}
-                <div className='flex-row'>
-                    <div className='flex-column'>
-                        <div>
+                    <div className='flex-column' >
+                        
                             <fieldset className='fieldset-principal'>
                                 <legend className='legend'>
                                     identificação da Obra
                                 </legend>
-                                <label className="label">código do contrato:
-                            <input type="text" placeholder='P0001-0825AT' name="titulo"  required className="input" />
+                                <label className="label">nome do cliente:
+                            <input type="text" placeholder='' name="titulo"  required className="input" />
                         </label>
                          <label className="label">CPF/CNPJ do Cliente:
                     <input
@@ -230,9 +228,18 @@ export const ObraFormulario: React.FC = () => {
                     <input type="email" name="clienteEmail" required className="input-base input" placeholder="email@email.com"
                     />
                 </label>
+
+<div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+
+                <button >
+                    Buscar Cliente
+                </button>
+</div>
+
                             </fieldset>
-                            </div>
-                        <ClienteForm  />
+
+                               <ClienteForm  />
+                            
                      </div>
                     <div className='flex-column'>
                         {/* 2. Dados Gerais e Localização */}
@@ -258,7 +265,11 @@ export const ObraFormulario: React.FC = () => {
                     <button type="button" onClick={handleCancel} className="cancel-button">Cancelar</button>
                 </div>
                 </div>
-                </div>
+
+                <div className='flex-column'>
+                        
+                     
+                     </div>
 
                 
 
@@ -269,7 +280,6 @@ export const ObraFormulario: React.FC = () => {
 
 
                
-            </form>
         </div>
     );
 }
