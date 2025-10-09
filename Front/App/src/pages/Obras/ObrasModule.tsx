@@ -18,6 +18,7 @@ import CadastroContrato from '../../components/forms/CadastroContrato';
 import RelatorioPoco from '../../components/forms/RelatorioPoco';
 import PainelDetalhePoco from './Components/PainelDetalhePoco';
 import SearchDashboard from './Components/SearchDashboard';
+import { ObraDetalhes } from './Components/ObraDetalhes';
 
 // Supondo que você tenha os componentes de conteúdo para cada aba
 const AbaGeralContent: React.FC = () => <DadosGeraisForm />; // Usando o formulário existente
@@ -86,52 +87,35 @@ export const ObrasModule: React.FC = () => {
       </header>
       {/* (B) PAGE CONTENT */}
       <main className="page-content layout-container" >
-        <SearchDashboard />
+
+       
         {/* <PainelDetalhePoco pocoId={''} /> */}
         {/* <ObraFormulario /> */}
        
-{/* 
+
     <aside className="sidebar-fixa">
         
         <PesquisaRapida/>
-        <ObrasLista />
+
+         {/* Filtros Laterais (Intuitivos) */}
+        
 
     </aside>
 
     <main className="conteudo-principal">
 
+      <SearchDashboard />
 
-        <h1>Detalhes da Obra</h1>
 
-        <div className="flex-row" style={{justifyContent:'space-between', alignItems:'center'}}>
-        <h2>P001-0825 - João vicente</h2>
-        <h2 style={{textAlign:'right', background: 'orange', borderRadius:'8px', padding: '5px' }}>Em Andamento</h2>
+        {/* <ObrasLista /> */}
+       
 
-        </div>
+    </main> 
 
-        <div className="action-buttons-container">
-
-    <button className="action-button edit-button" >
-        Editar
-    </button>
-    <button className="action-button time-log-button">
-        Novo Registro de Tempo
-    </button>
-    <select className="dropdown">
-        <option className="action-button dropdown-toggle">
-            Ações
-        </option>
-            <option>Finalizar Obra</option>
-            <option>Pausar Obra</option>
-            <option>Gerar Relatório</option>
-        
-    </select>
-</div>
-        
-
-<TabsContainer tabs={obraTabs} />
-
-    </main>  */}
+    <div>
+      
+<ObraDetalhes/>
+    </div>
 
 
       </main>

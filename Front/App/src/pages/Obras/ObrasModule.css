@@ -87,7 +87,7 @@ body {
 .layout-container {
     display: grid;
     /* Define as colunas: 1 parte fracionada para a sidebar, 2 partes para o conteúdo */
-    grid-template-columns: auto;
+    grid-template-columns: 3fr 7fr 8fr    ;
     /* Ajuste de altura para que a área de conteúdo preencha a tela */
 }
 
@@ -139,3 +139,5 @@ body {
     /* É a área que rola normalmente */
     padding: 0 10px;
 }
+
+

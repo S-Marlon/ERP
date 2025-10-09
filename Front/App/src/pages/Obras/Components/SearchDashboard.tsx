@@ -2,146 +2,213 @@ import React, { useState, ChangeEvent, useMemo } from 'react';
 
 // Tipos para os resultados de busca
 interface ResultadoBusca {
-  id: string;
-  tipo: 'Cliente' | 'Contrato' | 'Poço';
-  titulo: string; // Nome do Cliente, Título do Contrato, Nome do Poço
-  subDetalhe: string; // CPF/CNPJ, Cliente associado, Vazão do Poço
+    id: string;
+    tipo: 'Cliente' | 'Contrato' | 'Poco';
+    titulo: string; // Nome do Cliente, Título do Contrato, Nome do Poço
+    subDetalhe: string; // CPF/CNPJ, Cliente associado, Vazão do Poço
 }
 
 // Dados mockados para simular a base de dados
 const DADOS_MOCK: ResultadoBusca[] = [
-  { id: 'cli-001', tipo: 'Cliente', titulo: 'João da Silva (PF)', subDetalhe: '000.111.222-33' },
-  { id: 'cli-002', tipo: 'Cliente', titulo: 'Empresa Alpha Ltda (PJ)', subDetalhe: '11.222.333/0001-44' },
-  { id: 'cont-005', tipo: 'Contrato', titulo: 'Poço Novo - Fazenda Esperança', subDetalhe: 'Cliente: João da Silva' },
-  { id: 'cont-008', tipo: 'Contrato', titulo: 'Aprofundamento - Sítio da Pedra', subDetalhe: 'Cliente: Empresa Alpha' },
-  { id: 'poco-101', tipo: 'Poço', titulo: 'Poço Principal - Fazenda Esperança', subDetalhe: 'Vazão: 5.8 m³/h' },
-  { id: 'poco-102', tipo: 'Poço', titulo: 'Poço Secundário - Construtora Beta', subDetalhe: 'Vazão: 0 m³/h (Pendente)' },
+    { id: 'cli-001', tipo: 'Cliente', titulo: 'João da Silva (PF)', subDetalhe: '000.111.222-33' },
+    { id: 'cli-002', tipo: 'Cliente', titulo: 'Empresa Alpha Ltda (PJ)', subDetalhe: '11.222.333/0001-44' },
+    { id: 'cont-005', tipo: 'Contrato', titulo: 'Poço Novo - Fazenda Esperança', subDetalhe: 'Cliente: João da Silva' },
+    { id: 'cont-008', tipo: 'Contrato', titulo: 'Aprofundamento - Sítio da Pedra', subDetalhe: 'Cliente: Empresa Alpha' },
+    { id: 'poco-101', tipo: 'Poco', titulo: 'Poço Principal - Fazenda Esperança', subDetalhe: 'Vazão: 5.8 m³/h' },
+    { id: 'poco-102', tipo: 'Poco', titulo: 'Poço Secundário - Construtora Beta', subDetalhe: 'Vazão: 0 m³/h (Pendente)' },
 ];
 
 // Tipos para o estado de filtros
 type FiltroTipo = 'Todos' | 'Cliente' | 'Contrato' | 'Poço';
 
 const SearchDashboard: React.FC = () => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<FiltroTipo>('Todos');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filterType, setFilterType] = useState<FiltroTipo>('Todos');
 
-  // Handler para a barra de pesquisa principal
-  const handleSearchChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(e.target.value);
-  };
+    // Handler para a barra de pesquisa principal
+    const handleSearchChange = (e: ChangeEvent<HTMLInputElement>) => {
+        setSearchTerm(e.target.value);
+    };
 
-  // Handler para os botões de filtro
-  const handleFilterChange = (tipo: FiltroTipo) => {
-    setFilterType(tipo);
-  };
+    // Handler para os botões de filtro
+    const handleFilterChange = (tipo: FiltroTipo) => {
+        setFilterType(tipo);
+    };
 
-  // 3. Lógica de Filtragem e Busca (usando useMemo para performance)
-  const resultadosFiltrados = useMemo(() => {
-    let resultados = DADOS_MOCK;
+    // 3. Lógica de Filtragem e Busca (usando useMemo para performance)
+    const resultadosFiltrados = useMemo(() => {
+        let resultados = DADOS_MOCK;
 
-    // 1. Filtrar por Tipo
-    if (filterType !== 'Todos') {
-      resultados = resultados.filter(item => item.tipo === filterType);
+        // 1. Filtrar por Tipo
+        if (filterType !== 'Todos') {
+            resultados = resultados.filter(item => item.tipo === filterType);
+        }
+
+        // 2. Filtrar por Termo de Busca (case insensitive)
+        if (searchTerm.trim() === '') {
+            return resultados; // Retorna todos os filtrados por tipo se a busca for vazia
+        }
+
+        const term = searchTerm.toLowerCase();
+
+        return resultados.filter(item =>
+            item.titulo.toLowerCase().includes(term) ||
+            item.subDetalhe.toLowerCase().includes(term)
+        );
+    }, [searchTerm, filterType]);
+
+    // Função para simular a navegação (levar para o painel de detalhe)
+    const handleItemClick = (item: ResultadoBusca) => {
+        alert(`Navegando para o Painel de Detalhes de: ${item.tipo} - ${item.titulo}`);
+        // Em um app real: navigate(`/detalhe/${item.tipo.toLowerCase()}/${item.id}`);
     }
 
-    // 2. Filtrar por Termo de Busca (case insensitive)
-    if (searchTerm.trim() === '') {
-      return resultados; // Retorna todos os filtrados por tipo se a busca for vazia
-    }
+    // ----------------- RENDERIZAÇÃO -----------------
 
-    const term = searchTerm.toLowerCase();
-    
-    return resultados.filter(item => 
-      item.titulo.toLowerCase().includes(term) ||
-      item.subDetalhe.toLowerCase().includes(term)
-    );
-  }, [searchTerm, filterType]);
-  
-  // Função para simular a navegação (levar para o painel de detalhe)
-  const handleItemClick = (item: ResultadoBusca) => {
-      alert(`Navegando para o Painel de Detalhes de: ${item.tipo} - ${item.titulo}`);
-      // Em um app real: navigate(`/detalhe/${item.tipo.toLowerCase()}/${item.id}`);
-  }
+    return (
+        <div>
+            <h1 className="main-title">Busca Global</h1>
 
-  // ----------------- RENDERIZAÇÃO -----------------
+            <div style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
+                   {/* Busca por Título */}
+                   <input
+                     type="text"
+                     placeholder="Buscar por Título..."
+                    //  value={busca}
+                    //  onChange={(e) => setBusca(e.target.value)}
+                   />
+           
+                   {/* Filtro por Status */}
+                   <select
+                    //  value={filtroStatus}
+                    //  onChange={(e) => setFiltroStatus(e.target.value as StatusObra | 'Todos')}
+                   >
+                     <option value="Todos">Filtrar por Status (Todos)</option>
+                     {/* {statusOptions.map(status => (
+                       <option key={status} value={status}>{status}</option>
+                     ))} */}
+                   </select>
+           
+                   {/* Filtro por Cliente */}
+                   <select
+                    //  value={filtroClienteId}
+                    //  onChange={(e) => setFiltroClienteId(e.target.value)}
+                   >
+                     <option value="Todos">Filtrar por Cliente (Todos)</option>
+                     {/* {mockClientes.map(cliente => (
+                       <option key={cliente.id} value={cliente.id}>{cliente.nome}</option>
+                     ))} */}
+                   </select>
+                 </div>
 
-  return (
-    <div className="search-dashboard-container">
-      <h1 className="main-title">Busca Global</h1>
-      
-      {/* Barra de Pesquisa Principal */}
-      <input
-        type="text"
-        placeholder="Buscar por Cliente, Contrato, Poço, CPF/CNPJ..."
-        value={searchTerm}
-        onChange={handleSearchChange}
-        className="search-input"
-      />
-      
-      <div className="content-area">
-        
-        {/* Filtros Laterais (Intuitivos) */}
-        <div className="filter-sidebar">
-          <h3>Filtrar por Tipo</h3>
-          {['Todos', 'Cliente', 'Contrato', 'Poço'].map((tipo) => (
-            <button
-              key={tipo}
-              className={`filter-button ${filterType === tipo ? 'active' : ''}`}
-              onClick={() => handleFilterChange(tipo as FiltroTipo)}
-            >
-              {tipo}
-            </button>
-          ))}
-        </div>
+            {/* Barra de Pesquisa Principal */}
 
-        {/* Lista de Resultados */}
-        <div className="results-list">
-            <h3 className="results-header">Resultados ({resultadosFiltrados.length})</h3>
-            
-            {resultadosFiltrados.length > 0 ? (
-                resultadosFiltrados.map(item => (
-                    <div 
-                        key={item.id} 
-                        className={`result-item result-item-${item.tipo.toLowerCase()}`}
-                        onClick={() => handleItemClick(item)}
-                    >
-                        <span className="item-title">{item.titulo}</span>
-                        <span className="item-type">{item.tipo}</span>
-                        <span className="item-detail">{item.subDetalhe}</span>
+
+
+            <div className="content-area">
+
+
+                {/* Lista de Resultados */}
+                <div className="results-list">
+
+                    <div className=" flex-row results-header" style={{ justifyContent: 'space-between' }}>
+
+                        <h3>
+
+                            Resultados ({resultadosFiltrados.length})
+                        </h3>
+
+                        <div>
+                            <label > Filtrar Por: </label>
+                            {['Todos', 'Cliente', 'Contrato', 'Poço'].map((tipo) => (
+                                <button
+                                    key={tipo}
+                                    className={`filter-button ${filterType === tipo ? 'active' : ''}`}
+
+                                    onClick={() => handleFilterChange(tipo as FiltroTipo)}
+                                >
+                                    {tipo}
+                                </button>
+                            ))}
+                        </div>
+
                     </div>
-                ))
-            ) : (
-                <div className="no-results">
-                    Nenhum resultado encontrado para "{searchTerm}" no filtro de {filterType}.
+
+                    {resultadosFiltrados.length > 0 ? (
+                        resultadosFiltrados.map(item => (
+                            <div
+                                key={item.id}
+                                className={`result-item result-item-${item.tipo.toLowerCase()}`}
+                                onClick={() => handleItemClick(item)}
+                            >
+
+                                <div className='innertable'>
+                                <div className="flex-column">
+                                     <div  className="item-type">{item.tipo}</div>
+                                     <div className="item-detail">{item.subDetalhe} Lorem ipsum dolor, sit amet consectetur adipisicing elit. Repellat fugit eum illo aspernatur! Magnam facere beatae officiis dolor quidem. Maiores eaque harum quisquam culpa totam! Facilis nisi expedita harum rerum.</div>
+                                </div>
+                                <div className="flex-column">
+                                     <div  className="item-type">{item.tipo}</div>
+                                     <div className="item-detail">{item.subDetalhe}Lorem ipsum dolor, sit amet consectetur adipisicing elit. Repellat fugit eum illo aspernatur! Magnam facere beatae officiis dolor quidem. Maiores eaque harum quisquam culpa totam! Facilis nisi expedita harum rerum.</div>
+                                </div><div className="flex-column">
+                                     <div  className="item-type">{item.tipo}</div>
+                                     <div className="item-detail">{item.subDetalhe}Lorem ipsum dolor, sit amet consectetur adipisicing elit. Repellat fugit eum illo aspernatur! Magnam facere beatae officiis dolor quidem. Maiores eaque harum quisquam culpa totam! Facilis nisi expedita harum rerum.</div>
+                                </div><div className="flex-column">
+                                     <div  className="item-type">{item.tipo}</div>
+                                     <div className="item-detail">{item.subDetalhe}Lorem ipsum dolor, sit amet consectetur adipisicing elit. Repellat fugit eum illo aspernatur! Magnam facere beatae officiis dolor quidem. Maiores eaque harum quisquam culpa totam! Facilis nisi expedita harum rerum.</div>
+                                </div>
+
+                                </div>
+                                
+                                
+                                {/* <table>
+                                    <tr>
+                                        <th  className="item-type">{item.tipo}</th>
+                                        <th >Cliente</th>
+                                        <th>Status</th>
+                                        <th>Ações/detalhes</th>
+                                    </tr>
+                                    <tr>
+
+                                        <td><span className="item-detail">{item.subDetalhe}</span></td>
+                                        <td><span className="item-title">{item.titulo}</span></td>
+                                        <td><span style={{ textAlign: 'center', background: 'orange', borderRadius: '4px', padding: '2px' }}>Em andamento</span></td>
+                                        <td><span className="item-detail">{item.subDetalhe}</span></td>
+                                    </tr>
+                                </table> */}
+
+                            </div>
+                        ))
+                    ) : (
+                        <div className="no-results">
+                            Nenhum resultado encontrado para "{searchTerm}" no filtro de {filterType}.
+                        </div>
+                    )}
                 </div>
-            )}
+            </div>
         </div>
-      </div>
-    </div>
-  );
+    );
 };
 
 // ----------------- ESTILOS (CSS) -----------------
 const style = `
-.search-dashboard-container {
-    max-width: 1200px;
-    margin: 20px auto;
-    padding: 30px;
-    font-family: Arial, sans-serif;
+
+
+.innertable {
+    display: grid;
+    /* Define as colunas: 1 parte fracionada para a sidebar, 2 partes para o conteúdo */
+    grid-template-columns: 1fr 2fr 2fr 1fr;
+    /* Ajuste de altura para que a área de conteúdo preencha a tela */
 }
+
+
 .main-title {
     text-align: center;
     color: #333;
     margin-bottom: 25px;
 }
-.search-input {
-    width: 100%;
-    padding: 15px 20px;
-    font-size: 1.2em;
-    border: 2px solid #007bff;
-    border-radius: 8px;
-    margin-bottom: 30px;
-    box-shadow: 0 4px 8px rgba(0, 123, 255, 0.1);
+.search {
+   max-width:150px;
 }
 
 .content-area {
@@ -164,8 +231,9 @@ const style = `
     padding-bottom: 10px;
 }
 .filter-button {
-    display: block;
-    width: 100%;
+    
+    color:black;
+   
     padding: 10px;
     margin-bottom: 8px;
     text-align: left;
@@ -193,16 +261,18 @@ const style = `
     flex: 1;
 }
 .results-header {
+
+display flex;
+flex-direction: row;
     color: #007bff;
     border-bottom: 2px solid #eee;
     padding-bottom: 10px;
     margin-bottom: 15px;
 }
 .result-item {
-    display: grid;
-    grid-template-columns: 2fr 1fr 2fr; /* Título | Tipo | Detalhe */
+    display: flex;
     align-items: center;
-    padding: 15px;
+    padding: 10px;
     margin-bottom: 10px;
     border: 1px solid #ddd;
     border-radius: 6px;
@@ -250,9 +320,9 @@ const style = `
 
 // Opcional: Adicionar estilos ao DOM para visualização
 if (typeof document !== 'undefined') {
-  const styleTag = document.createElement('style');
-  styleTag.textContent = style;
-  document.head.appendChild(styleTag);
+    const styleTag = document.createElement('style');
+    styleTag.textContent = style;
+    document.head.appendChild(styleTag);
 }
 
 export default SearchDashboard;
