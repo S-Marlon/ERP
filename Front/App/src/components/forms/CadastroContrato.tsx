@@ -1,347 +1,325 @@
 import React, { useState, ChangeEvent, FormEvent } from 'react';
+import { BotaoVoltar } from '../ui/BotaoVoltar'; // Componente de Voltar
+import { Link } from 'react-router-dom'; // Adicionado para "Novo Cliente"
+import PesquisaRapida from './PesquisaRapida';
 
-// ----------------- TIPOS DE DADOS E MOCKS -----------------
+// ----------------- TIPOS DE DADOS E MOCKS (Mantidos) -----------------
+// ... (Interfaces e MOCKS permanecem aqui) ...
 
-// Definições de tipos (Interfaces) - as mesmas definidas acima
 interface ItemCombinado {
-  id: number;
-  descricao: string;
-  unidade: 'm2' | 'unidade' | 'hora' | 'servico';
-  quantidade: number;
-  valorUnitario: number;
+    id: number;
+    descricao: string;
+    unidade: 'm2' | 'unidade' | 'hora' | 'servico';
+    quantidade: number;
+    valorUnitario: number;
 }
-
-interface ContratoData {
-  clienteId: string;
-  tituloContrato: string;
-  dataAssinatura: string;
-  valorTotalContrato: number; // Será calculado dinamicamente ou preenchido manualmente
-  dataPrevistaInicio: string;
-  prazoEstimadoDias: number;
-  itensCombinados: ItemCombinado[];
-  observacoesAdicionais: string;
-}
-
-interface ClienteSimples {
-    id: string;
-    nome: string;
-}
-
-const CLIENTES_MOCK: ClienteSimples[] = [
-    { id: '', nome: 'Selecione um Cliente' }, // Opção padrão
+// ... (ContratoData, ClienteSimples, CLIENTES_MOCK, initialState permanecem aqui) ...
+const CLIENTES_MOCK = [
+    { id: '', nome: 'Selecione um Cliente' },
     { id: 'cli-001', nome: 'João da Silva (PF)' },
     { id: 'cli-002', nome: 'Empresa Alpha Ltda (PJ)' },
     { id: 'cli-003', nome: 'Construtora Beta' },
 ];
-
-// ----------------- ESTADO INICIAL -----------------
-
 const initialState: ContratoData = {
-  clienteId: '',
-  tituloContrato: '',
-  dataAssinatura: new Date().toISOString().split('T')[0], // Data de hoje
-  valorTotalContrato: 0,
-  dataPrevistaInicio: '',
-  prazoEstimadoDias: 0,
-  observacoesAdicionais: '',
-  itensCombinados: [
-    { id: Date.now(), descricao: '', unidade: 'servico', quantidade: 1, valorUnitario: 0 },
-  ],
+    clienteId: '',
+    tituloContrato: '',
+    dataAssinatura: new Date().toISOString().split('T')[0],
+    valorTotalContrato: 0,
+    dataPrevistaInicio: '',
+    prazoEstimadoDias: 0,
+    observacoesAdicionais: '',
+    itensCombinados: [
+        { id: Date.now(), descricao: '', unidade: 'servico', quantidade: 1, valorUnitario: 0 },
+    ],
 };
 
-// ----------------- COMPONENTE PRINCIPAL -----------------
 
 const CadastroContrato: React.FC = () => {
-  const [formData, setFormData] = useState<ContratoData>(initialState);
+    const [formData, setFormData] = useState<ContratoData>(initialState);
 
-  // Calcula o valor total dos itens, mas não o total final do contrato.
-  const subtotalItens = formData.itensCombinados.reduce(
-    (acc, item) => acc + item.quantidade * item.valorUnitario,
-    0
-  );
+    const subtotalItens = formData.itensCombinados.reduce(
+        (acc, item) => acc + item.quantidade * item.valorUnitario,
+        0
+    );
+    // ... (Handlers handleSimpleChange, handleItemChange, addItem, removeItem, handleSubmit permanecem aqui) ...
 
-  // Handler para campos simples (não arrays)
-  const handleSimpleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = e.target;
-    
-    // Converte valor para número se o campo for numérico
-    const finalValue = (type === 'number' || name === 'prazoEstimadoDias') 
-        ? parseFloat(value) || 0 
-        : value;
-        
-    setFormData(prevData => ({
-      ...prevData,
-      [name as keyof ContratoData]: finalValue,
-    }));
-  };
-
-  // ----------------- LÓGICA DE ITENS COMBINADOS -----------------
-  
-  const handleItemChange = (id: number, field: keyof ItemCombinado, value: string | number) => {
-    setFormData(prevData => ({
-      ...prevData,
-      itensCombinados: prevData.itensCombinados.map(item => {
-        if (item.id === id) {
-            // Garante que quantidade e valorUnitario sejam números
-            const finalValue = (field === 'quantidade' || field === 'valorUnitario') 
-                ? parseFloat(value as string) || 0 
-                : value;
-                
-            return { ...item, [field]: finalValue };
-        }
-        return item;
-      }),
-    }));
-  };
-
-  const addItem = () => {
-    setFormData(prevData => ({
-      ...prevData,
-      itensCombinados: [
-        ...prevData.itensCombinados,
-        { id: Date.now(), descricao: '', unidade: 'servico', quantidade: 1, valorUnitario: 0 },
-      ],
-    }));
-  };
-
-  const removeItem = (id: number) => {
-    if (formData.itensCombinados.length <= 1) {
-        alert("O contrato deve ter pelo menos um item combinado.");
-        return;
-    }
-    setFormData(prevData => ({
-      ...prevData,
-      itensCombinados: prevData.itensCombinados.filter(item => item.id !== id),
-    }));
-  };
-  
-  // ----------------- LÓGICA DE SUBMISSÃO -----------------
-
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.clienteId) {
-        alert("Por favor, selecione um cliente para o contrato.");
-        return;
-    }
-
-    // Monta o objeto final com o valor total recalculado ou preenchido
-    const contratoFinal: ContratoData = {
-        ...formData,
-        // Garante que o valor total seja preenchido (se não foi alterado manualmente)
-        valorTotalContrato: formData.valorTotalContrato || subtotalItens,
+    const handleSimpleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+        const { name, value, type } = e.target;
+        const finalValue = (type === 'number' || name === 'prazoEstimadoDias') 
+            ? parseFloat(value) || 0 
+            : value;
+            
+        setFormData(prevData => ({
+          ...prevData,
+          [name as keyof ContratoData]: finalValue,
+          // Se o usuário mexer no valor total, ele assume a prioridade
+          valorTotalContrato: name === 'valorTotalContrato' ? finalValue as number : prevData.valorTotalContrato
+        }));
     };
 
-    // Ação principal: Envio para o backend e Adição à Fila de Obra
-    console.log('CONTRATO CRIADO E ADICIONADO À FILA DE OBRAS:', contratoFinal);
-    alert(`Contrato "${contratoFinal.tituloContrato}" criado e processo de obra iniciado para o cliente ${contratoFinal.clienteId}!`);
+    const handleItemChange = (id: number, field: keyof ItemCombinado, value: string | number) => {
+        setFormData(prevData => ({
+          ...prevData,
+          itensCombinados: prevData.itensCombinados.map(item => {
+            if (item.id === id) {
+                const finalValue = (field === 'quantidade' || field === 'valorUnitario') 
+                    ? parseFloat(value as string) || 0 
+                    : value;
+                    
+                return { ...item, [field]: finalValue as any };
+            }
+            return item;
+          }),
+        }));
+    };
+
+    const addItem = () => {
+        setFormData(prevData => ({
+          ...prevData,
+          itensCombinados: [
+            ...prevData.itensCombinados,
+            { id: Date.now(), descricao: '', unidade: 'servico', quantidade: 1, valorUnitario: 0 },
+          ],
+        }));
+    };
+
+    const removeItem = (id: number) => {
+        if (formData.itensCombinados.length <= 1) {
+            alert("O contrato deve ter pelo menos um item combinado.");
+            return;
+        }
+        setFormData(prevData => ({
+          ...prevData,
+          itensCombinados: prevData.itensCombinados.filter(item => item.id !== id),
+        }));
+    };
     
-    // Opcional: setFormData(initialState); para limpar
-  };
+    const handleSubmit = (e: FormEvent) => {
+        e.preventDefault();
+        
+        if (!formData.clienteId) {
+            alert("Por favor, selecione um cliente para o contrato.");
+            return;
+        }
 
-  // ----------------- RENDERIZAÇÃO -----------------
+        const contratoFinal: ContratoData = {
+            ...formData,
+            valorTotalContrato: formData.valorTotalContrato > 0 ? formData.valorTotalContrato : subtotalItens,
+        };
 
-  return (
-    <form onSubmit={handleSubmit} className="form-container">
-      <h1>Criação de Contrato de Obra</h1>
-      
-      {/* ----------------- SEÇÃO: DADOS ESSENCIAIS E CLIENTE ----------------- */}
-      <fieldset>
-        <legend>Dados Contratuais Essenciais</legend>
-        
-        {/* Seleção do Cliente */}
-        <div>
-          <label htmlFor="clienteId">Cliente Associado</label>
-          <select
-            id="clienteId"
-            name="clienteId"
-            value={formData.clienteId}
-            onChange={handleSimpleChange}
-            required
-          >
-            {CLIENTES_MOCK.map(c => (
-                <option key={c.id} value={c.id} disabled={c.id === ''}>
-                    {c.nome}
-                </option>
-            ))}
-          </select>
-        </div>
-        
-        {/* Título do Contrato */}
-        <div>
-          <label htmlFor="tituloContrato">Título/Assunto do Contrato</label>
-          <input
-            type="text"
-            id="tituloContrato"
-            name="tituloContrato"
-            value={formData.tituloContrato}
-            onChange={handleSimpleChange}
-            placeholder="Ex: Reforma Cobertura | Construção Residencial"
-            required
-          />
-        </div>
-        
-        {/* Datas e Prazo */}
-        <div className="form-row">
-            <div>
-              <label htmlFor="dataAssinatura">Data de Assinatura</label>
-              <input
-                type="date"
-                id="dataAssinatura"
-                name="dataAssinatura"
-                value={formData.dataAssinatura}
-                onChange={handleSimpleChange}
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="dataPrevistaInicio">Previsão de Início</label>
-              <input
-                type="date"
-                id="dataPrevistaInicio"
-                name="dataPrevistaInicio"
-                value={formData.dataPrevistaInicio}
-                onChange={handleSimpleChange}
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="prazoEstimadoDias">Prazo Est. (dias)</label>
-              <input
-                type="number"
-                id="prazoEstimadoDias"
-                name="prazoEstimadoDias"
-                value={formData.prazoEstimadoDias}
-                onChange={handleSimpleChange}
-                min="1"
-                required
-              />
-            </div>
-        </div>
-        
-        {/* Valor Total do Contrato */}
-        <div>
-          <label htmlFor="valorTotalContrato">Valor Total do Contrato (R$)</label>
-          <input
-            type="number"
-            id="valorTotalContrato"
-            name="valorTotalContrato"
-            value={formData.valorTotalContrato || subtotalItens}
-            onChange={handleSimpleChange}
-            placeholder={`Sugestão: ${subtotalItens.toFixed(2)}`}
-            min="0"
-          />
-          <small>Preencha com o valor final acordado. O subtotal dos itens é R$ {subtotalItens.toFixed(2)}</small>
-        </div>
-      </fieldset>
+        console.log('CONTRATO CRIADO E ADICIONADO À FILA DE OBRAS:', contratoFinal);
+        alert(`Contrato "${contratoFinal.tituloContrato}" criado e processo de obra iniciado para o cliente ${contratoFinal.clienteId}!`);
+    };
 
-      {/* ----------------- SEÇÃO: ITENS COMBINADOS (ESCOPO) ----------------- */}
-      <fieldset>
-        <legend>Itens e Serviços Combinados (Escopo)</legend>
-        
-        {formData.itensCombinados.map((item, index) => (
-          <div key={item.id} className="dynamic-item-card">
-            <h4>Item #{index + 1}</h4>
+    // Formatação de moeda
+    const formatCurrency = (value: number) => 
+        new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+
+
+    return (
+      <form onSubmit={handleSubmit} className="form-container">
+
+            {/* HEADER COM BOTÃO DE VOLTAR */}
+            <div className='form-header'>
+                <BotaoVoltar />
+                <h1>Criação de Contrato de Obra</h1>
+            </div>
+
+            {/* CONTAINER PRINCIPAL (2 COLUNAS) */}
+            <div className='grid-main-layout'>
             
-            {/* Descrição */}
-            <div>
-              <input
-                type="text"
-                value={item.descricao}
-                onChange={(e) => handleItemChange(item.id, 'descricao', e.target.value)}
-                placeholder="Descrição do serviço/etapa"
-                required
-              />
-            </div>
+                {/* COLUNA ESQUERDA: DADOS ESSENCIAIS E OBSERVAÇÕES */}
+                <div className='col-left'>
+          {/* <PesquisaRapida/> */}
+                    {/* ----------------- SEÇÃO: DADOS ESSENCIAIS E CLIENTE ----------------- */}
 
-            {/* Quantidade, Unidade, Valor Unitário */}
-            <div className="form-row three-cols">
-                {/* Quantidade */}
-                <input
-                    type="number"
-                    value={item.quantidade}
-                    onChange={(e) => handleItemChange(item.id, 'quantidade', e.target.value)}
-                    placeholder="Qtd"
-                    min="1"
-                    required
-                />
-                
-                {/* Unidade */}
-                <select
-                    value={item.unidade}
-                    onChange={(e) => handleItemChange(item.id, 'unidade', e.target.value as ItemCombinado['unidade'])}
-                >
-                    <option value="servico">Serviço</option>
-                    <option value="unidade">Unidade</option>
-                    <option value="m2">m²</option>
-                    <option value="hora">Hora</option>
-                </select>
-                
-                {/* Valor Unitário */}
-                <input
-                    type="number"
-                    value={item.valorUnitario}
-                    onChange={(e) => handleItemChange(item.id, 'valorUnitario', e.target.value)}
-                    placeholder="R$ Unitário"
-                    min="0"
-                />
-            </div>
-            
-            <div className="item-subtotal">
-                Subtotal: R$ {(item.quantidade * item.valorUnitario).toFixed(2)}
-            </div>
-            
-            <button 
-                type="button" 
-                onClick={() => removeItem(item.id)}
-                className="remove-button"
-            >
-                Remover Item
+                    <fieldset>
+                        <legend>Dados Contratuais e Prazos</legend>
+                        
+                        {/* Seleção do Cliente */}
+                        <div className='field-with-action'>
+                            <label htmlFor="clienteId">Cliente Associado</label>
+                            <div className='input-group'>
+                                <strong style={{color:'black'}}>Campo de busca de cliente abrira um modal para pesquisa de cliente</strong>
+                                {/* Botão para novo cliente (melhora a UX) */}
+                                <Link to="/clientes/novo" className='new-action-link'>+ Novo</Link>
+                            </div>
+                        </div>
+                       
+                        <div>
+                            <label htmlFor="tituloContrato">Serviço prestado</label>
+                             <select>
+                                   <option>Perfuração</option>
+                                   <option>Manutenção</option>
+                                   <option>Consultoria</option>
+                                   <option>Radiestesia</option>
+                                </select>
+                        </div>
+                        
+                        {/* Datas e Prazo - em uma linha de 3 */}
+                        <div className="form-row three-cols-mini">
+                            <div>
+                                <label htmlFor="dataAssinatura">Assinatura</label>
+                                <input type="date" id="dataAssinatura" name="dataAssinatura" value={formData.dataAssinatura} onChange={handleSimpleChange} required />
+                            </div>
+                            <div>
+                                <label htmlFor="dataPrevistaInicio">Início Previsto</label>
+                                <input type="date" id="dataPrevistaInicio" name="dataPrevistaInicio" value={formData.dataPrevistaInicio} onChange={handleSimpleChange} required />
+                            </div>
+                            <div>
+                                <label htmlFor="prazoEstimadoDias">Prazo Est. (dias)</label>
+                                <input type="number" id="prazoEstimadoDias" name="prazoEstimadoDias" value={formData.prazoEstimadoDias} onChange={handleSimpleChange} min="1" required />
+                            </div>
+                        </div>
+
+                    </fieldset>
+
+                    {/* ----------------- OBSERVAÇÕES ----------------- */}
+                    <fieldset>
+                        <legend>Observações Adicionais</legend>
+                        <textarea
+                            name="observacoesAdicionais"
+                            value={formData.observacoesAdicionais}
+                            onChange={handleSimpleChange}
+                            rows={6}
+                            placeholder="Registre informações importantes, condições de pagamento, garantias, e demais detalhes..."
+                        />
+                    </fieldset>
+                </div>
+
+
+                {/* COLUNA DIREITA/INFERIOR: ITENS E VALOR TOTAL (Largura 100% ou Coluna 2) */}
+                <div className='col-right'>
+                    <fieldset className="fieldset-itens">
+                        <legend>Itens e Serviços Combinados (Escopo)</legend>
+                        
+                        {/* Tabela de Itens */}
+                        <table className="itens-table">
+                            <thead>
+                                <tr>
+                                    <th>Descrição do Item/Serviço</th>
+                                    <th style={{ width: '80px' }}>Qtd.</th>
+                                    <th style={{ width: '100px' }}>Unidade</th>
+                                    <th style={{ width: '120px' }}>Valor Unitário</th>
+                                    <th style={{ width: '120px' }}>Subtotal</th>
+                                    <th style={{ width: '40px' }}></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {formData.itensCombinados.map(item => (
+                                    <tr key={item.id}>
+                                        <td>
+                                            <input
+                                                type="text"
+                                                value={item.descricao}
+                                                onChange={(e) => handleItemChange(item.id, 'descricao', e.target.value)}
+                                                placeholder="Descrição do serviço/etapa"
+                                                required
+                                            />
+                                        </td>
+                                        <td>
+                                            <input type="number" value={item.quantidade} onChange={(e) => handleItemChange(item.id, 'quantidade', e.target.value)} min="1" required />
+                                        </td>
+                                        <td>
+                                            <select value={item.unidade} onChange={(e) => handleItemChange(item.id, 'unidade', e.target.value as ItemCombinado['unidade'])}>
+                                                <option value="servico">Serviço</option>
+                                                <option value="unidade">Unidade</option>
+                                                <option value="m2">m²</option>
+                                                <option value="hora">Hora</option>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <input type="number" value={item.valorUnitario} onChange={(e) => handleItemChange(item.id, 'valorUnitario', e.target.value)} placeholder="0.00" min="0" />
+                                        </td>
+                                        <td className="subtotal-cell">
+                                            {formatCurrency(item.quantidade * item.valorUnitario)}
+                                        </td>
+                                        <td>
+                                            <button 
+                                                type="button" 
+                                                onClick={() => removeItem(item.id)}
+                                                className="remove-button-icon"
+                                                title="Remover Item"
+                                            >
+                                                <span role="img" aria-label="Remover">🗑️</span>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        
+                        <button type="button" onClick={addItem} className="add-button">
+                            + Adicionar Novo Item
+                        </button>
+                                  
+<div>
+                            <label htmlFor="valorTotalContrato">Inserir Valor Total do Contrato (R$) Manualmente</label>
+                            <input
+                                type="number"
+                                id="valorTotalContrato"
+                                name="valorTotalContrato"
+                                value={formData.valorTotalContrato || subtotalItens}
+                                onChange={handleSimpleChange}
+                                placeholder={`Sugestão: ${subtotalItens.toFixed(2)}`}
+                                min="0"
+                                step="0.01"
+                            />
+                            <small className='valor-total-info'>Preencha com o valor final acordado, que pode incluir impostos ou descontos não detalhados nos itens.</small>
+                        </div>
+                                
+                    </fieldset>
+                    
+                    {/* SEÇÃO DE VALOR TOTAL E ENCERRAMENTO */}
+                    <div className='valor-total-section'>
+                        <div className='subtotal-info'>
+                            <strong>Subtotal dos Itens:</strong> {formatCurrency(subtotalItens)}
+                        </div>
+
+                        
+                    </div>
+
+                </div> {/* Fim da Coluna Direita/Inferior */}
+
+            </div> {/* Fim do Grid Principal */}
+
+            <button type="submit" className="submit-button">
+                Salvar Contrato e **Iniciar Processo de Obra**
             </button>
-            <hr />
-          </div>
-        ))}
-        
-        <button type="button" onClick={addItem} className="add-button">
-          + Adicionar Item Combinado
-        </button>
-      </fieldset>
-
-      {/* ----------------- OBSERVAÇÕES ----------------- */}
-      <fieldset>
-        <legend>Observações Adicionais</legend>
-        <textarea
-          name="observacoesAdicionais"
-          value={formData.observacoesAdicionais}
-          onChange={handleSimpleChange}
-          rows={4}
-          placeholder="Registre informações importantes não cobertas pelos itens, como condições de pagamento, garantias, etc."
-        />
-      </fieldset>
-
-      <button type="submit" className="submit-button">
-        Salvar Contrato e **Adicionar à Fila de Obras**
-      </button>
-    </form>
-  );
+        </form>
+    );
 };
 
-// ----------------- ESTILOS (CSS) -----------------
+
+// ----------------- ESTILOS (CSS) REFINADOS -----------------
 const style = `
 .form-container {
-    max-width: 750px;
+    max-width: 90%;
     margin: 20px auto;
-    padding: 20px;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    padding: 30px;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    background-color: #ffffff;
     font-family: Arial, sans-serif;
 }
-h1 { text-align: center; color: #007bff; border-bottom: 3px solid #007bff; padding-bottom: 10px; margin-bottom: 25px; }
-fieldset { border: 1px solid #007bff55; padding: 15px; margin-bottom: 25px; border-radius: 6px; }
-legend { font-weight: bold; color: #007bff; padding: 0 10px; font-size: 1.1em; }
+.form-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 25px;
+}
+.form-header h1 { 
+    margin: 0 0 0 15px; 
+    color: #007bff; 
+    font-size: 1.8em;
+    border-bottom: none;
+    padding-bottom: 0;
+    flex-grow: 1; /* Permite que o título ocupe o espaço restante */
+}
+fieldset { border: 1px solid #007bff55; padding: 20px; margin-bottom: 25px; border-radius: 8px; }
+legend { font-weight: bold; color: #007bff; padding: 0 10px; font-size: 1.1em; background-color: #ffffff; margin-left: -5px; }
 
-label { display: block; margin-bottom: 5px; font-weight: 500; }
+label { display: block; margin-bottom: 5px; font-weight: 600; color: #495057; }
 input[type="text"],
 input[type="number"],
 input[type="date"],
@@ -349,69 +327,154 @@ select,
 textarea {
     width: 100%;
     padding: 10px;
-    border: 1px solid #ccc;
+    border: 1px solid #ced4da;
     border-radius: 4px;
     box-sizing: border-box;
-    margin-bottom: 10px;
+    margin-bottom: 15px; /* Aumentado o espaçamento */
+    transition: border-color 0.2s;
+}
+input:focus, select:focus, textarea:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+    outline: none;
 }
 textarea { resize: vertical; }
 
+/* Layout Principal e Colunas */
+.grid-main-layout { 
+    display: grid; 
+    grid-template-columns: 1fr 1.5fr; /* 1ª Coluna menor, 2ª Coluna maior para itens */
+    gap: 30px; 
+    align-items: start;
+}
 .form-row { display: flex; gap: 10px; margin-bottom: 10px; }
 .form-row > div { flex: 1; }
+.three-cols-mini > div { flex: 1; }
 
-.dynamic-item-card {
-    border: 1px dashed #ccc;
-    padding: 15px;
-    margin-bottom: 15px;
+/* Campo com Link/Botão Adicional (Cliente) */
+.field-with-action .input-group {
+    display: flex;
+    gap: 5px;
+}
+.field-with-action select {
+    flex-grow: 1;
+    margin-bottom: 0;
+}
+.new-action-link {
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    background-color: #17a2b8; /* Cor secundária/informativa */
+    color: white;
+    text-decoration: none;
     border-radius: 4px;
+    font-weight: bold;
+    height: 40px; /* Alinhar com o input */
+    margin-bottom: 15px;
 }
-.dynamic-item-card h4 { margin-top: 0; margin-bottom: 10px; color: #333; }
+.new-action-link:hover { background-color: #138496; }
 
-.three-cols input, .three-cols select {
-    margin-bottom: 0; 
-    flex: 1;
+/* Tabela de Itens (Melhoria de UX) */
+.fieldset-itens { margin-bottom: 0; }
+.itens-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin-bottom: 15px;
 }
+.itens-table th {
+    background-color: #292f34ff;
+    border-bottom: 2px solid #007bff;
+    padding: 10px;
+    text-align: left;
+    font-size: 0.9em;
+}
+.itens-table td {
+    padding: 0; /* Remove padding da célula */
+    vertical-align: top;
+}
+.itens-table td input, 
+.itens-table td select {
+    margin: 0; /* Remove margin do input dentro da célula */
+    border: none;
+    border-radius: 0;
+    padding: 10px;
+    height: 100%;
+}
+.itens-table tr:nth-child(even) td { background-color: #fbfbfb; }
 
-.item-subtotal {
-    text-align: right;
+.subtotal-cell {
     font-weight: bold;
     color: #28a745;
-    margin: 5px 0;
+    text-align: right;
+    padding: 10px;
+    background-color: #e6ffed; /* Fundo suave para subtotal */
 }
 
-/* Botões */
-.add-button, .remove-button, .submit-button {
-    padding: 10px 15px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: bold;
-    transition: background-color 0.3s ease;
-    margin-top: 10px;
+/* Botões de Adicionar/Remover (Refinados) */
+.add-button { 
+    background-color: #28a745; 
+    color: white; 
+    width: 100%; 
+    margin-top: 15px; 
 }
-.add-button { background-color: #28a745; color: white; width: 100%; }
 .add-button:hover { background-color: #1e7e34; }
 
-.remove-button { background-color: #dc3545; color: white; float: right; }
-.remove-button:hover { background-color: #c82333; }
+.remove-button-icon { 
+    background: none; 
+    border: none; 
+    cursor: pointer; 
+    color: #dc3545; 
+    font-size: 1.1em;
+    padding: 8px; 
+    line-height: 1;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.remove-button-icon:hover { background-color: #ffe8e8; }
 
-.submit-button { background-color: #007bff; color: white; width: 100%; font-size: 1.1em; padding: 15px; margin-top: 20px; }
-.submit-button:hover { background-color: #0056b3; }
-
-small {
+/* Seção de Valor Total */
+.valor-total-section {
+    background-color: #f0f8ff; /* Azul clarinho para destaque */
+    padding: 20px;
+    border-radius: 8px;
+    margin-top: 20px;
+    border: 1px solid #b3d7ff;
+}
+.subtotal-info {
+    text-align: right;
+    font-size: 1.2em;
+    color: #28a745;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px dashed #b3d7ff;
+}
+.valor-total-info {
     display: block;
     margin-top: -5px;
-    margin-bottom: 10px;
     color: #6c757d;
 }
-hr { border: 0; border-top: 1px solid #eee; margin: 15px 0; clear: both; }
+
+.submit-button { 
+    background-color: #007bff; 
+    color: white; 
+    font-size: 1.2em; 
+    padding: 15px; 
+    margin-top: 25px;
+    width: 100%;
+}
+.submit-button:hover { background-color: #0056b3; }
 `;
 
 // Opcional: Adicionar estilos ao DOM para visualização
 if (typeof document !== 'undefined') {
-  const styleTag = document.createElement('style');
-  styleTag.textContent = style;
-  document.head.appendChild(styleTag);
+    const styleTag = document.createElement('style');
+    styleTag.textContent = style;
+    document.head.appendChild(styleTag);
 }
+
 
 export default CadastroContrato;

@@ -1,7 +1,7 @@
 
 // src/components/TabsContainer.tsx
 import React, { useState } from 'react';
-import { TabItem } from '../types/tabs';
+import { TabItem } from '../../types/tabs';
 import TabButton from './TabButton';
 
 // Props do container: recebe um array de objetos TabItem

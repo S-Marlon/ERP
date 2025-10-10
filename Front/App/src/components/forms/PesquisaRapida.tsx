@@ -5,7 +5,7 @@ const PesquisaRapida: React.FC = () => {
         <div className="filter-sidebar">
           <h3>Busca rápida</h3>
 
-          <div className="grid-1-cols">
+          <div className="grid-2-cols">
 
                 <label className="label">Nome do Cliente:
                     <input
@@ -26,7 +26,7 @@ const PesquisaRapida: React.FC = () => {
                     />
                 </label>
             </div>
-             <div className="grid-1-cols">
+             <div className="grid-2-cols">
 
                 <label className="label">Codigo contrato                    <input
                         type="text"
@@ -46,7 +46,7 @@ const PesquisaRapida: React.FC = () => {
                     />
                 </label>
             </div>
-             <div className="grid-1-cols">
+             <div className="grid-2-cols">
 
                 <label className="label">Email do Cliente:
                     <input

@@ -1,13 +1,14 @@
 // src/modules/Obras/ObrasModule.tsx
 import React from 'react';
 // import { Routes, Route } from 'react-router-dom';
+import { Link } from 'react-router-dom'; // ESSENCIAL para a navegação dos botões de ação
 
 import './ObrasModule.css';
 import PesquisaRapida from '../../components/forms/PesquisaRapida';
 
-import TabsContainer from '../../components/TabsContainer';
+import TabsContainer from '../../components/ui/TabsContainer';
 import { TabItem } from '../../types/tabs';
-import DadosGeraisForm from '../../components/forms/DadosGeraisForm';
+import DadosGeraisForm from '../../components/forms/-DadosGeraisForm';
 import DadosPerfuracaoForm from '../../components/forms/DadosPerfuracaoForm';
 import DadosRevestimentoForm from '../../components/forms/DadosPerfuracaoForm';
 import ChecklistOcorrenciasForm from '../../components/forms/ChecklistOcorrenciasForm';
@@ -79,7 +80,12 @@ export const ObrasModule: React.FC = () => {
         <div className="title-section">
         
             <h2>{ 'Módulo Obras" ou "Gerenciamento de Projetos/Obras'}</h2>
-            <button>+ Nova Obra</button>
+             <div className="action-buttons-global" style={{ display: 'flex', gap: '10px' }}>
+                    {/* Botões de navegação usando Link e estilizados  */}
+                    <Link to="/clientes/novo" ><button>+ Novo Cliente</button></Link>
+                    <Link to="/contratos/novo" ><button>+ Novo Contrato</button></Link>
+                    <Link to="/pocos/novo" ><button>+ Novo Poço</button></Link> 
+                </div> 
           
           
         </div>

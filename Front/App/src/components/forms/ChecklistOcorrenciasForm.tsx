@@ -94,7 +94,7 @@ const ChecklistOcorrenciasForm: React.FC = () => {
                         </label>
                     </div>
 
-                    <textarea className='textarea' placeholder='Relatório Manual de Ocorrências:'></textarea>
+                    <textarea className='textarea' placeholder='Relatório Manual de Ocorrências: Detalhes adicionais sobre o serviço, perfil do furo, recomendações e próximos passos.'></textarea>
                     Relatório Manual de Ocorrências:
 
                     Atenção: Preencha este campo detalhando a profundidade, a causa e as ações corretivas tomadas para todos os problemas críticos (especialmente Perda de Retorno, Colapso e Ferramenta Presa).

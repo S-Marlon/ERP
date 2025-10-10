@@ -2,10 +2,13 @@ import './App.css'
 import './forms.css'
 import { useState } from 'react'
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+
+// Componentes de Layout
 import Sidebar from './components/Layout/sidebar'
 import Header from './components/Layout/header';
 import Panel from './components/Layout/panel';
 
+// Páginas Principais
 import Dashboard from "./pages/Dashboard/Dashboard";
 import Clientes from "./pages/Clientes/Clientes";
 import Produtos from "./pages/Produtos/Produtos";
@@ -13,19 +16,28 @@ import Vendas from "./pages/PDV/PDVScreen";
 import Estoque from "./pages/Estoque/Estoque";
 import Servicos from "./pages/Servicos/Servicos";
 import { ObrasModule } from './pages/Obras/ObrasModule';
+
+// Contexts
 import { ServiceProductProvider } from './context/NewServiceProductContext';
 import { ProductProvider } from './context/NewProductContext';
+
+// 🆕 NOVAS IMPORTAÇÕES DE FORMULÁRIOS
+// (Ajuste os caminhos conforme sua estrutura real, se necessário)
+import CadastroCliente from './components/forms/CadastroCliente'; 
+import CadastroContrato from './components/forms/CadastroContrato';
+import RelatorioPoco from './components/forms/RelatorioPoco'; // Usado para "Novo Poço"
 
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
   };
-    const toggleTheme = () => {
+    
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
     // Você pode salvar a preferência do usuário no localStorage aqui, se quiser
   };
-   const [isDarkMode, setIsDarkMode] = useState(false);
 
   const sidebarWidth = isSidebarOpen ? 170 : 90;
   const headerHeight = 50;
@@ -38,37 +50,61 @@ function App() {
         gridTemplateRows: `${headerHeight}px`,
       }}>
         
-        <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar}  sidebarWidth={sidebarWidth}/> 
+        <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} sidebarWidth={sidebarWidth}/> 
         <Header title="Sistema ERP" headerHeight={headerHeight} onThemeToggle={toggleTheme} 
         isDarkMode={isDarkMode} />
+        
         <Panel isDarkMode={isDarkMode}>
-           
+            
             <Routes>
-        <Route path="/" element={<Dashboard text='Dashboard'/>} />
-        <Route path="/clientes" element={<Clientes title={''} children={undefined} />} />
+              <Route path="/" element={<Dashboard text='Dashboard'/>} />
+              
+              {/* Rota principal de Clientes (Lista/Dashboard) */}
+              <Route path="/clientes" element={<Clientes title={''} children={undefined} />} />
+              
+              {/* 🆕 ROTA: NOVO CLIENTE */}
+              <Route 
+                path="/clientes/novo" 
+                element={<CadastroCliente />} 
+              />
+              
+              {/* 🆕 ROTA: NOVO CONTRATO */}
+              {/* Nota: Se '/contratos' for uma página principal, adicione-a também! */}
+              <Route 
+                path="/contratos/novo" 
+                element={<CadastroContrato />} 
+              />
+
+              {/* 🆕 ROTA: NOVO POÇO */}
+              <Route 
+                path="/pocos/novo" 
+                element={<RelatorioPoco />} // Usando o RelatorioPoco como o formulário de cadastro de novo poço
+              />
+
+              {/* Rota de Vendas/PDV envolvida pelos Contexts */}
+              <Route 
+                  path="/vendas" 
+                  element={
+                      <ServiceProductProvider>
+                          <ProductProvider>
+                              <Vendas/> 
+                          </ProductProvider>
+                      </ServiceProductProvider>
+                  } 
+              />
+              
+              <Route path="/produtos" element={<Produtos text='Produtos'/>} />
+              <Route path="/Estoque" element={<Estoque />} />
+              <Route path="/Servicos" element={<Servicos />} />
+              
+              {/* Rota principal do Módulo Obras */}
+              <Route path="/obras" element={<ObrasModule />} />
+
+              {/* Rota de fallback para qualquer caminho não encontrado */}
+              <Route path="*" element={<h2>404 | Página Não Encontrada</h2>} />
+
+            </Routes>
         
-        {/*
-          CORREÇÃO PRINCIPAL: Envolver a rota '/vendas' com os Providers.
-          A ordem não importa muito aqui, mas é bom aninhar.
-        */}
-        <Route 
-            path="/vendas" 
-            element={
-                <ServiceProductProvider>
-                    <ProductProvider>
-                        {/* Seu PDVScreen agora tem acesso aos dados! */}
-                        <Vendas/> 
-                    </ProductProvider>
-                </ServiceProductProvider>
-            } 
-        />
-        
-        <Route path="/produtos" element={<Produtos  text='Produtos'/>} />
-        <Route path="/Estoque" element={<Estoque />} />
-        <Route path="/Servicos" element={<Servicos />} />
-        <Route path="/Obras" element={<ObrasModule />} />
-    </Routes>
-          
         </Panel>
       </div>
       </BrowserRouter>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { mockObras, mockClientes } from '../../../types/Obras';
-import DadosGeraisForm from '../../../components/forms/DadosGeraisForm';
+import DadosGeraisForm from '../../../components/forms/-DadosGeraisForm';
 import ClienteForm from '../../../components/forms/ClienteForm';
 import DadosPerfuracaoForm from '../../../components/forms/DadosPerfuracaoForm';
 import DadosRevestimentoForm from '../../../components/forms/DadosRevestimentoForm';

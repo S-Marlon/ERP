@@ -1,4 +1,5 @@
 import React, { useState, ChangeEvent, FormEvent } from 'react';
+import { BotaoVoltar } from '../ui/BotaoVoltar';
 
 // ----------------- TIPOS DE DADOS -----------------
 
@@ -151,7 +152,107 @@ const CadastroCliente: React.FC = () => {
 
   return (
     <form onSubmit={handleSubmit} className="form-container">
+      <BotaoVoltar />
       <h1>Registro de Novo Cliente</h1>
+
+      <div className="grid-3-cols">
+
+         {/* ----------------- SEÇÃO: ENDEREÇOS (DINÂMICO) ----------------- */}
+      <fieldset>
+        <legend>Endereços</legend>
+        
+        {formData.enderecos.map((endereco, index) => (
+          <div key={endereco.id} className="endereco-card">
+            <h4>Endereço #{index + 1}</h4>
+            
+            {/* Linha 1: CEP, Número, Principal */}
+            <div className="form-row">
+                <input
+                  type="text"
+                  value={endereco.cep}
+                  onChange={(e) => handleEnderecoChange(endereco.id, 'cep', e.target.value)}
+                  placeholder="CEP"
+                  required
+                />
+                <input
+                  type="text"
+                  value={endereco.numero}
+                  onChange={(e) => handleEnderecoChange(endereco.id, 'numero', e.target.value)}
+                  placeholder="Número"
+                  required
+                />
+                <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={endereco.principal}
+                      onChange={(e) => handleEnderecoChange(endereco.id, 'principal', e.target.checked)}
+                    />
+                    Principal
+                </label>
+            </div>
+            
+            {/* Linha 2: Rua */}
+            <div>
+                <input
+                  type="text"
+                  value={endereco.rua}
+                  onChange={(e) => handleEnderecoChange(endereco.id, 'rua', e.target.value)}
+                  placeholder="Rua / Avenida"
+                  required
+                />
+            </div>
+
+            {/* Linha 3: Bairro, Complemento */}
+            <div className="form-row">
+                <input
+                  type="text"
+                  value={endereco.bairro}
+                  onChange={(e) => handleEnderecoChange(endereco.id, 'bairro', e.target.value)}
+                  placeholder="Bairro"
+                  required
+                />
+                <input
+                  type="text"
+                  value={endereco.complemento}
+                  onChange={(e) => handleEnderecoChange(endereco.id, 'complemento', e.target.value)}
+                  placeholder="Complemento"
+                />
+            </div>
+            
+            {/* Linha 4: Cidade, Estado */}
+            <div className="form-row">
+                <input
+                  type="text"
+                  value={endereco.cidade}
+                  onChange={(e) => handleEnderecoChange(endereco.id, 'cidade', e.target.value)}
+                  placeholder="Cidade"
+                  required
+                />
+                <input
+                  type="text"
+                  value={endereco.estado}
+                  onChange={(e) => handleEnderecoChange(endereco.id, 'estado', e.target.value)}
+                  placeholder="Estado (Ex: SP)"
+                  maxLength={2}
+                  required
+                />
+            </div>
+            
+            <button 
+                type="button" 
+                onClick={() => removeEndereco(endereco.id)}
+                className="remove-button-endereco"
+            >
+                Remover Endereço
+            </button>
+            <hr />
+          </div>
+        ))}
+
+        <button type="button" onClick={addEndereco} className="add-button">
+          + Adicionar Endereço
+        </button>
+      </fieldset>
       
       {/* ----------------- SEÇÃO: DADOS BÁSICOS E FISCAIS ----------------- */}
       <fieldset>
@@ -282,106 +383,17 @@ const CadastroCliente: React.FC = () => {
         </button>
       </fieldset>
 
-      {/* ----------------- SEÇÃO: ENDEREÇOS (DINÂMICO) ----------------- */}
-      <fieldset>
-        <legend>Endereços</legend>
-        
-        {formData.enderecos.map((endereco, index) => (
-          <div key={endereco.id} className="endereco-card">
-            <h4>Endereço #{index + 1}</h4>
-            
-            {/* Linha 1: CEP, Número, Principal */}
-            <div className="form-row">
-                <input
-                  type="text"
-                  value={endereco.cep}
-                  onChange={(e) => handleEnderecoChange(endereco.id, 'cep', e.target.value)}
-                  placeholder="CEP"
-                  required
-                />
-                <input
-                  type="text"
-                  value={endereco.numero}
-                  onChange={(e) => handleEnderecoChange(endereco.id, 'numero', e.target.value)}
-                  placeholder="Número"
-                  required
-                />
-                <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={endereco.principal}
-                      onChange={(e) => handleEnderecoChange(endereco.id, 'principal', e.target.checked)}
-                    />
-                    Principal
-                </label>
-            </div>
-            
-            {/* Linha 2: Rua */}
-            <div>
-                <input
-                  type="text"
-                  value={endereco.rua}
-                  onChange={(e) => handleEnderecoChange(endereco.id, 'rua', e.target.value)}
-                  placeholder="Rua / Avenida"
-                  required
-                />
-            </div>
+     
 
-            {/* Linha 3: Bairro, Complemento */}
-            <div className="form-row">
-                <input
-                  type="text"
-                  value={endereco.bairro}
-                  onChange={(e) => handleEnderecoChange(endereco.id, 'bairro', e.target.value)}
-                  placeholder="Bairro"
-                  required
-                />
-                <input
-                  type="text"
-                  value={endereco.complemento}
-                  onChange={(e) => handleEnderecoChange(endereco.id, 'complemento', e.target.value)}
-                  placeholder="Complemento"
-                />
-            </div>
-            
-            {/* Linha 4: Cidade, Estado */}
-            <div className="form-row">
-                <input
-                  type="text"
-                  value={endereco.cidade}
-                  onChange={(e) => handleEnderecoChange(endereco.id, 'cidade', e.target.value)}
-                  placeholder="Cidade"
-                  required
-                />
-                <input
-                  type="text"
-                  value={endereco.estado}
-                  onChange={(e) => handleEnderecoChange(endereco.id, 'estado', e.target.value)}
-                  placeholder="Estado (Ex: SP)"
-                  maxLength={2}
-                  required
-                />
-            </div>
-            
-            <button 
-                type="button" 
-                onClick={() => removeEndereco(endereco.id)}
-                className="remove-button-endereco"
-            >
-                Remover Endereço
-            </button>
-            <hr />
-          </div>
-        ))}
-
-        <button type="button" onClick={addEndereco} className="add-button">
-          + Adicionar Endereço
-        </button>
-      </fieldset>
+      </div>
 
 
       <button type="submit" className="submit-button">
         Salvar Cliente
+      </button>
+
+      <button type="submit" className="submit-button">
+        Salvar Cliente e adicionar Contrato
       </button>
     </form>
   );
@@ -390,7 +402,7 @@ const CadastroCliente: React.FC = () => {
 // ----------------- ESTILOS (CSS) -----------------
 const style = `
 .form-container {
-    max-width: 700px;
+    max-width: 80%;
     margin: 20px auto;
     padding: 20px;
     border: 1px solid #ddd;

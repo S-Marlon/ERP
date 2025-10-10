@@ -1,0 +1,219 @@
+/* Geral */
+.search-dashboard-container {
+    padding: 5px;
+    max-width: 100%;
+    margin: 0 auto;
+}
+
+.main-title {
+    text-align: center;
+    color: #333;
+    margin-bottom: 25px;
+}
+
+
+
+/* Área de Conteúdo */
+.content-area {
+    display: flex;
+    gap: 30px; /* Mantido para caso queira adicionar sidebar no futuro */
+}
+
+/* Lista de Resultados */
+.results-list {
+    flex: 1;
+}
+
+.results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #eee;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+}
+
+.results-header h3 {
+    color: #007bff;
+    margin: 0;
+}
+
+/* Botões de Filtro */
+.filter-buttons-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.filter-buttons-container label {
+    font-weight: bold;
+    color: #555;
+    margin-right: 5px;
+}
+
+.filter-button {
+    padding: 8px 15px;
+    border: 1px solid #ccc;
+    background-color: transparent;
+    cursor: pointer;
+    font-size: 0.95em;
+    border-radius: 4px;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.filter-button:hover {
+    background-color: #e9ecef;
+}
+
+.filter-button.active {
+    background-color: #007bff;
+    color: white;
+    border-color: #007bff;
+    font-weight: bold;
+}
+
+.filter-button.active:hover {
+    background-color: #0056b3;
+}
+
+/* Item de Resultado */
+.result-item {
+    padding: 10px 5px;
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.result-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0, 123, 255, 0.2);
+}
+
+/* Layout de 4 colunas (tabela interna) */
+.innertable {
+    display: grid;
+    /* 1: ID/Tipo (menor), 2: Título (maior), 3: Detalhe (médio), 4: Status (menor) */
+    grid-template-columns: 1.5fr 2.5fr 3fr 1.8fr; 
+    gap: 0px; 
+    align-items:center;
+}
+
+.flex-column {
+    display: flex;
+    flex-direction: column;
+    padding: 0 5px;
+    
+    /* --- CORREÇÃO DE OVERFLOW HORIZONTAL (Obrigatório em Grid/Flexbox) --- */
+    /* Garante que o item da coluna possa ser menor que o seu conteúdo intrínseco */
+    min-width: 0; 
+    /* --------------------------------------------------------------------- */
+}
+
+.item-label {
+    font-size: 0.8em;
+    color: #999;
+    margin-bottom: 3px;
+    font-weight: normal;
+}
+
+/* Coluna Tipo/ID */
+.item-column-type {
+    text-align: center;
+}
+
+.item-type {
+
+
+    font-size: 0.9em;
+    font-weight: bold;
+    padding: 5px 10px;
+    border-radius: 3px;
+    color: white;
+    width: 85%;
+    align-self: center;
+}
+
+.item-id {
+    font-size: 0.8em;
+    color: #6c757d;
+    margin-top: 5px;
+}
+/* Coluna Título */
+.item-title {
+    font-size: 1.0em;
+    font-weight: bold;
+    color: #333;
+    /* --- Regras para Truncamento de Texto --- */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap; /* Impede que o texto quebre linha */
+    /* -------------------------------------- */
+}
+
+/* Coluna Detalhe */
+.item-detail {
+    font-size: 0.9em;
+    color: #6c757d;
+    /* --- Regras para Truncamento de Texto --- */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap; /* Impede que o texto quebre linha */
+    /* -------------------------------------- */
+}
+
+/* Coluna Status (Exemplo) */
+.item-status {
+    text-align: center;
+    background-color: orange;
+    color: white;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-weight: bold;
+    width: fit-content;
+    align-self: center;
+}
+
+
+/* Estilos por Tipo de Item */
+.result-item-cliente .item-type { background-color: #28a745; }
+.result-item-contrato .item-type { background-color: #ffc107; color: #333; }
+.result-item-poco .item-type { background-color: #17a2b8; }
+
+/* Sem Resultados */
+.no-results {
+    padding: 20px;
+    text-align: center;
+    color: #a72834;
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    border-radius: 6px;
+    font-weight: bold;
+}
+/* 
+ Navegação por Abas
+      <div style={{ display: 'flex', gap: '10px', borderBottom: '1px solid #ccc', marginBottom: '15px' }}>
+        <button onClick={() => setAbaAtiva('Geral')} style={{ fontWeight: abaAtiva === 'Geral' ? 'bold' : 'normal' }}>Geral</button>
+        <button onClick={() => setAbaAtiva('Atividades')} style={{ fontWeight: abaAtiva === 'Atividades' ? 'bold' : 'normal' }}>Atividades/Tarefas</button>
+        <button onClick={() => setAbaAtiva('Registros')} style={{ fontWeight: abaAtiva === 'Registros' ? 'bold' : 'normal' }}>Registros de Tempo</button>
+        <button onClick={() => setAbaAtiva('Localizacao')} style={{ fontWeight: abaAtiva === 'Localizacao' ? 'bold' : 'normal' }}>Localização</button>
+        <button onClick={() => setAbaAtiva('Imagens')} style={{ fontWeight: abaAtiva === 'Imagens' ? 'bold' : 'normal' }}>Imagens</button>
+      </div>
+
+      {/* Conteúdo da Aba Ativa 
+      <div style={{ border: '1px solid #eee', padding: '15px' }}>
+        {renderizarAba()}
+      </div>
+
+      <TabsContainer tabs={obraTabs} />  */
+
+
+
+
+       /* <div className="action-buttons-global" style={{ display: 'flex', gap: '10px' }}>
+                    {/* Botões de navegação usando Link e estilizados 
+                    <Link to="/clientes/novo" style={primaryButtonStyle}>+ Novo Cliente</Link>
+                    <Link to="/contratos/novo" style={primaryButtonStyle}>+ Novo Contrato</Link>
+                    <Link to="/pocos/novo" style={primaryButtonStyle}>+ Novo Poço</Link> 
+                </div> */
