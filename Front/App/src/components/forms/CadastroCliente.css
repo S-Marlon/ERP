@@ -1,0 +1,46 @@
+/* =================== Layout de CadastroCliente (Substituir o CSS original) =================== */
+
+.cliente-form-container {
+    max-width: 80%;
+    margin: 30px auto;
+    padding: 30px;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    background-color: #ffffff;
+    color: #333;
+}
+
+
+fieldset {
+    border: 1px solid #dee2e6; 
+    padding: 20px; 
+    margin-bottom: 20px; 
+    border-radius: 8px; 
+    background-color: #f8f9fa; /* Fundo sutil para fieldset */
+}
+legend {
+    font-weight: 600;
+    color: #007bff;
+    padding: 0 10px;
+    font-size: 1.1em;
+    background-color: #ffffff;
+    margin-left: -5px;
+}
+
+
+
+/* --- Estilos de Endereço (Dinâmico) --- */
+
+
+
+
+
+.form-row {
+    display: flex;
+    gap: 150px;
+    /* O FormControl já possui margin-bottom, então não precisamos dela aqui */
+}
+.form-row > * {
+    flex: 1;
+}

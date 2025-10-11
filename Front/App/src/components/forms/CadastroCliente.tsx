@@ -1,7 +1,9 @@
 import React, { useState, ChangeEvent, FormEvent } from 'react';
 import { BotaoVoltar } from '../ui/BotaoVoltar';
-
-// ----------------- TIPOS DE DADOS -----------------
+import FormControl from '../ui/FormControl';
+import './CadastroCliente.css';
+import Typography from '../ui/Typography';
+import Card from '../ui/Card';
 
 interface Contato {
   id: number;
@@ -22,26 +24,23 @@ interface Endereco {
 }
 
 interface ClienteData {
-  // Dados Básicos e Fiscais
   nomeCompleto: string;
   tipoPessoa: 'PF' | 'PJ';
   documento: string;
   inscricaoEstadual: string;
-  
-  // Listas Dinâmicas
+  dataNascimento: string; 
+
   contatos: Contato[];
   enderecos: Endereco[];
 }
-
-// ----------------- ESTADO INICIAL -----------------
 
 const initialState: ClienteData = {
   nomeCompleto: '',
   tipoPessoa: 'PF',
   documento: '',
   inscricaoEstadual: '',
+  dataNascimento: '', 
   contatos: [
-    // Inicia com um contato e um endereço vazio
     { id: 1, tipo: 'Email', valor: '' },
   ],
   enderecos: [
@@ -49,15 +48,13 @@ const initialState: ClienteData = {
   ],
 };
 
-// ----------------- COMPONENTE PRINCIPAL -----------------
-
 const CadastroCliente: React.FC = () => {
   const [formData, setFormData] = useState<ClienteData>(initialState);
 
   const documentoLabel = formData.tipoPessoa === 'PF' ? 'CPF' : 'CNPJ';
   const documentoPlaceholder = formData.tipoPessoa === 'PF' ? '000.000.000-00' : '00.000.000/0000-00';
 
-  // Handler para campos simples (não arrays)
+  // Inclui a 'dataNascimento' no handler simples
   const handleSimpleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prevData => ({
@@ -66,12 +63,10 @@ const CadastroCliente: React.FC = () => {
     }));
   };
 
-  // ----------------- LÓGICA DE CONTATOS -----------------
-  
   const handleContatoChange = (id: number, field: keyof Contato, value: string) => {
     setFormData(prevData => ({
       ...prevData,
-      contatos: prevData.contatos.map(contato => 
+      contatos: prevData.contatos.map(contato =>
         contato.id === id ? { ...contato, [field]: value } : contato
       ),
     }));
@@ -82,28 +77,26 @@ const CadastroCliente: React.FC = () => {
       ...prevData,
       contatos: [
         ...prevData.contatos,
-        { id: Date.now(), tipo: 'Telefone', valor: '' }, // Novo ID para a key
+        { id: Date.now(), tipo: 'Telefone', valor: '' },
       ],
     }));
   };
 
   const removeContato = (id: number) => {
     if (formData.contatos.length <= 1) {
-        alert("É necessário manter pelo menos um contato.");
-        return;
+      alert("É necessário manter pelo menos um contato.");
+      return;
     }
     setFormData(prevData => ({
       ...prevData,
       contatos: prevData.contatos.filter(contato => contato.id !== id),
     }));
   };
-  
-  // ----------------- LÓGICA DE ENDEREÇOS -----------------
 
   const handleEnderecoChange = (id: number, field: keyof Endereco, value: string | boolean) => {
     setFormData(prevData => ({
       ...prevData,
-      enderecos: prevData.enderecos.map(endereco => 
+      enderecos: prevData.enderecos.map(endereco =>
         endereco.id === id ? { ...endereco, [field]: value } : endereco
       ),
     }));
@@ -121,8 +114,8 @@ const CadastroCliente: React.FC = () => {
 
   const removeEndereco = (id: number) => {
     if (formData.enderecos.length <= 1) {
-        alert("É necessário manter pelo menos um endereço.");
-        return;
+      alert("É necessário manter pelo menos um endereço.");
+      return;
     }
     setFormData(prevData => ({
       ...prevData,
@@ -131,19 +124,15 @@ const CadastroCliente: React.FC = () => {
   };
 
 
-  // ----------------- LÓGICA DE SUBMISSÃO -----------------
-
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    
-    // Validações básicas antes de enviar
+
     const contatoValido = formData.contatos.some(c => c.valor.trim() !== '');
     if (!formData.nomeCompleto || !formData.documento || !contatoValido) {
-        alert("Por favor, preencha o Nome Completo, Documento e pelo menos um Contato.");
-        return;
+      alert("Por favor, preencha o Nome Completo, Documento e pelo menos um Contato.");
+      return;
     }
 
-    // Apenas para demonstração
     console.log('Dados do Cliente Enviados:', formData);
     alert(`Cliente ${formData.nomeCompleto} pronto para envio ao servidor!`);
   };
@@ -151,147 +140,54 @@ const CadastroCliente: React.FC = () => {
   // ----------------- RENDERIZAÇÃO -----------------
 
   return (
-    <form onSubmit={handleSubmit} className="form-container">
-      <BotaoVoltar />
-      <h1>Registro de Novo Cliente</h1>
-
-      <div className="grid-3-cols">
-
-         {/* ----------------- SEÇÃO: ENDEREÇOS (DINÂMICO) ----------------- */}
-      <fieldset>
-        <legend>Endereços</legend>
-        
-        {formData.enderecos.map((endereco, index) => (
-          <div key={endereco.id} className="endereco-card">
-            <h4>Endereço #{index + 1}</h4>
-            
-            {/* Linha 1: CEP, Número, Principal */}
-            <div className="form-row">
-                <input
-                  type="text"
-                  value={endereco.cep}
-                  onChange={(e) => handleEnderecoChange(endereco.id, 'cep', e.target.value)}
-                  placeholder="CEP"
-                  required
-                />
-                <input
-                  type="text"
-                  value={endereco.numero}
-                  onChange={(e) => handleEnderecoChange(endereco.id, 'numero', e.target.value)}
-                  placeholder="Número"
-                  required
-                />
-                <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={endereco.principal}
-                      onChange={(e) => handleEnderecoChange(endereco.id, 'principal', e.target.checked)}
-                    />
-                    Principal
-                </label>
-            </div>
-            
-            {/* Linha 2: Rua */}
-            <div>
-                <input
-                  type="text"
-                  value={endereco.rua}
-                  onChange={(e) => handleEnderecoChange(endereco.id, 'rua', e.target.value)}
-                  placeholder="Rua / Avenida"
-                  required
-                />
-            </div>
-
-            {/* Linha 3: Bairro, Complemento */}
-            <div className="form-row">
-                <input
-                  type="text"
-                  value={endereco.bairro}
-                  onChange={(e) => handleEnderecoChange(endereco.id, 'bairro', e.target.value)}
-                  placeholder="Bairro"
-                  required
-                />
-                <input
-                  type="text"
-                  value={endereco.complemento}
-                  onChange={(e) => handleEnderecoChange(endereco.id, 'complemento', e.target.value)}
-                  placeholder="Complemento"
-                />
-            </div>
-            
-            {/* Linha 4: Cidade, Estado */}
-            <div className="form-row">
-                <input
-                  type="text"
-                  value={endereco.cidade}
-                  onChange={(e) => handleEnderecoChange(endereco.id, 'cidade', e.target.value)}
-                  placeholder="Cidade"
-                  required
-                />
-                <input
-                  type="text"
-                  value={endereco.estado}
-                  onChange={(e) => handleEnderecoChange(endereco.id, 'estado', e.target.value)}
-                  placeholder="Estado (Ex: SP)"
-                  maxLength={2}
-                  required
-                />
-            </div>
-            
-            <button 
-                type="button" 
-                onClick={() => removeEndereco(endereco.id)}
-                className="remove-button-endereco"
-            >
-                Remover Endereço
-            </button>
-            <hr />
-          </div>
-        ))}
-
-        <button type="button" onClick={addEndereco} className="add-button">
-          + Adicionar Endereço
-        </button>
-      </fieldset>
-      
-      {/* ----------------- SEÇÃO: DADOS BÁSICOS E FISCAIS ----------------- */}
-      <fieldset>
-        <legend>Dados Gerais e Fiscais</legend>
-        
-        {/* Nome Completo */}
+    <form onSubmit={handleSubmit} className="cliente-form-container">
+      <div className="flex-row">
+        <BotaoVoltar />
+        <h1>Registro de Novo Cliente</h1>
         <div>
-          <label htmlFor="nomeCompleto">Nome Completo / Razão Social</label>
-          <input
-            type="text"
-            id="nomeCompleto"
-            name="nomeCompleto"
-            value={formData.nomeCompleto}
-            onChange={handleSimpleChange}
-            required
-          />
+          <button type="submit">
+            Salvar Cliente
+          </button>
+          <button type="submit">
+            Salvar Cliente e Adicionar Contrato
+          </button>
         </div>
+      </div>
 
-        {/* Tipo de Pessoa */}
-        <div className="form-row">
-            <div>
-              <label htmlFor="tipoPessoa">Tipo de Pessoa</label>
-              <select
-                id="tipoPessoa"
+      <div className="grid-2-cols"> {/* Reajustado para 2 colunas para melhor organização */}
+
+        {/* ======================= COLUNA 1 ======================= */}
+        <div >
+          <fieldset>
+            <legend>Dados Gerais e Fiscais</legend>
+
+            {/* Nome Completo */}
+            <FormControl
+              label="Nome Completo / Razão Social"
+              name="nomeCompleto"
+              value={formData.nomeCompleto}
+              onChange={handleSimpleChange}
+              required
+            />
+
+            <div className="form-row">
+              {/* Tipo de Pessoa */}
+              <FormControl
+                label="Tipo de Pessoa"
                 name="tipoPessoa"
+                control="select"
                 value={formData.tipoPessoa}
                 onChange={handleSimpleChange}
-              >
-                <option value="PF">Pessoa Física (PF)</option>
-                <option value="PJ">Pessoa Jurídica (PJ)</option>
-              </select>
-            </div>
-            
-            {/* Documento (CPF/CNPJ) */}
-            <div>
-              <label htmlFor="documento">{documentoLabel}</label>
-              <input
-                type="text"
-                id="documento"
+                options={[
+                  { value: 'PF', label: 'Pessoa Física (PF)' },
+                  { value: 'PJ', label: 'Pessoa Jurídica (PJ)' },
+                ]}
+                required
+              />
+
+              {/* Documento (CPF/CNPJ) */}
+              <FormControl
+                label={documentoLabel}
                 name="documento"
                 value={formData.documento}
                 onChange={handleSimpleChange}
@@ -299,257 +195,187 @@ const CadastroCliente: React.FC = () => {
                 required
               />
             </div>
-        </div>
 
-        {/* Inscrição Estadual (IE) */}
-        <div className="form-row">
+            <div className="form-row">
+              {/* Inscrição Estadual (IE) */}
+              <FormControl
+                label="Inscrição Estadual (Opcional)"
+                name="inscricaoEstadual"
+                value={formData.inscricaoEstadual}
+                onChange={handleSimpleChange}
+                placeholder="Ex: Isento ou 123.456.789.012"
+              />
 
-        <div>
-          <label htmlFor="inscricaoEstadual">Inscrição Estadual (Opcional)</label>
-          <input
-            type="text"
-            id="inscricaoEstadual"
-            name="inscricaoEstadual"
-            value={formData.inscricaoEstadual}
-            onChange={handleSimpleChange}
-          />
-        </div>
-        <div>
-          <label htmlFor="inscricaoEstadual">data de nascimento</label>
-          <input
-            type="date"
-            
-            
-           
-          />
-        </div>
-        </div>
-      </fieldset>
+              {/* Data de Nascimento/Fundação */}
+              <FormControl
+                label={formData.tipoPessoa === 'PF' ? "Data de Nascimento" : "Data de Fundação"}
+                name="dataNascimento"
+                type="date"
+                value={formData.dataNascimento}
+                onChange={handleSimpleChange}
+              />
+            </div>
+          </fieldset>
 
-      {/* ----------------- SEÇÃO: CONTATOS (DINÂMICO) ----------------- */}
-      <fieldset>
-        <legend>Contatos</legend>
-        
-        {formData.contatos.map((contato) => (
-          <div key={contato.id} className="dynamic-item-row">
-            
-            {/* Tipo de Contato */}
+         
+          <fieldset>
+            <legend>Contatos</legend>
 
-            <select
-              value={contato.tipo}
-              onChange={(e) => handleContatoChange(contato.id, 'tipo', e.target.value)}
-              className="contato-select"
-            >
-              <option value="Email">E-mail</option>
-              <option value="Telefone">Telefone</option>
-            </select>
-            
-            {/* Valor do Contato */}
-            <input
-              type={contato.tipo === 'Email' ? 'email' : 'tel'}
-              value={contato.valor}
-              onChange={(e) => handleContatoChange(contato.id, 'valor', e.target.value)}
-              placeholder={`Digite o ${contato.tipo}...`}
-              required
-            />
-            <input
-              type='text'
-              placeholder={`Digite o nome da referencia...`}
-              required
-            />
+            {formData.contatos.map((contato) => (
+              <div key={contato.id} className="form-row">
 
-            <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                    />
-                    Principal
+                {/* Tipo de Contato */}
+                <FormControl
+                  label="Tipo"
+                  control="select"
+                  value={contato.tipo}
+                  onChange={(e) => handleContatoChange(contato.id, 'tipo', e.target.value)}
+                  options={[
+                    { value: 'Email', label: 'E-mail' },
+                    { value: 'Telefone', label: 'Telefone' },
+                  ]}
+
+                />
+
+                {/* Valor do Contato */}
+                <FormControl
+                  label="Valor"
+                  type={contato.tipo === 'Email' ? 'email' : 'tel'}
+                  value={contato.valor}
+                  onChange={(e) => handleContatoChange(contato.id, 'valor', e.target.value)}
+                  placeholder={`Digite o ${contato.tipo}...`}
+                  required
+
+                />
+
+                <div >
+                  <label className="ui-form-label">Nome de Referência</label>
+                  <input
+                    type='text'
+                    placeholder={`Ex: Comercial, Diretor...`}
+                    className="ui-form-input"
+                  />
+                </div>
+
+                {/* Nova: Checkbox Principal */}
+                <label className="checkbox-label flex-1-4 is-principal-contact">
+                  <input type="checkbox" />
+                  Principal
                 </label>
 
-            
-            
-            {/* Botão de Remover */}
-            <button 
-                type="button" 
-                onClick={() => removeContato(contato.id)}
-                className="remove-button"
-            >
-                Remover
+                {/* Botão de Remover */}
+                <button
+                  type="button"
+                  onClick={() => removeContato(contato.id)}
+
+                >
+                  X
+                </button>
+              </div>
+            ))}
+
+            <button type="button" onClick={addContato}>
+              + Adicionar Contato
             </button>
-          </div>
-        ))}
-        
-        <button type="button" onClick={addContato} className="add-button">
-          + Adicionar Contato
-        </button>
-      </fieldset>
+          </fieldset>
 
-     
+        </div>
+        {/* ======================= COLUNA 2 ======================= */}
+        <div>
+          <fieldset>
+            <legend>Endereços</legend>
 
+            {formData.enderecos.map((endereco, index) => (
+
+              <Card key={endereco.id} variant='highlight' >
+
+                <div className="grid-2-cols">
+                  <Typography variant='h2'>Endereço #{index + 1}</Typography>
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={endereco.principal}
+                      onChange={(e) => handleEnderecoChange(endereco.id, 'principal', e.target.checked)}
+                    />
+                    Endereço Principal
+                  </label>
+                </div>
+
+                {/* Linha 1: CEP, Número */}
+                <div className="form-row">
+                  <FormControl
+                    label="CEP"
+                    value={endereco.cep}
+                    onChange={(e) => handleEnderecoChange(endereco.id, 'cep', e.target.value)}
+                    required
+                  />
+                  <FormControl
+                    label="Número"
+                    value={endereco.numero}
+                    onChange={(e) => handleEnderecoChange(endereco.id, 'numero', e.target.value)}
+                    required
+                  />
+                </div>
+
+                {/* Linha 2: Rua */}
+                <FormControl
+                  label="Rua / Avenida"
+                  value={endereco.rua}
+                  onChange={(e) => handleEnderecoChange(endereco.id, 'rua', e.target.value)}
+                  required
+                />
+
+                {/* Linha 3: Bairro, Complemento */}
+                <div className="form-row">
+                  <FormControl
+                    label="Bairro"
+                    value={endereco.bairro}
+                    onChange={(e) => handleEnderecoChange(endereco.id, 'bairro', e.target.value)}
+                    required
+                  />
+                  <FormControl
+                    label="Complemento (Opcional)"
+                    value={endereco.complemento}
+                    onChange={(e) => handleEnderecoChange(endereco.id, 'complemento', e.target.value)}
+                  />
+                </div>
+
+                {/* Linha 4: Cidade, Estado */}
+                <div className="form-row">
+                  <FormControl
+                    label="Cidade"
+                    value={endereco.cidade}
+                    onChange={(e) => handleEnderecoChange(endereco.id, 'cidade', e.target.value)}
+                    required
+                  />
+                  <FormControl
+                    label="Estado (UF)"
+                    value={endereco.estado}
+                    onChange={(e) => handleEnderecoChange(endereco.id, 'estado', e.target.value)}
+                    maxLength={2}
+                    required
+                  />
+                </div>
+                {/* Checkbox Principal e Botão de Remover */}
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => removeEndereco(endereco.id)}>
+                    Remover Endereço
+                  </button>
+                </div>
+
+              </Card>
+            ))}
+
+            <button type="button" onClick={addEndereco} >
+              + Adicionar Endereço
+            </button>
+          </fieldset>
+        </div>
       </div>
 
-
-      <button type="submit" className="submit-button">
-        Salvar Cliente
-      </button>
-
-      <button type="submit" className="submit-button">
-        Salvar Cliente e adicionar Contrato
-      </button>
     </form>
   );
 };
-
-// ----------------- ESTILOS (CSS) -----------------
-const style = `
-.form-container {
-    max-width: 80%;
-    margin: 20px auto;
-    padding: 20px;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.05);
-    font-family: Arial, sans-serif;
-}
-h1 {
-    text-align: center;
-    color: #1a1a1a;
-    border-bottom: 3px solid #007bff;
-    padding-bottom: 10px;
-    margin-bottom: 25px;
-}
-fieldset {
-    border: 1px solid #007bff55;
-    padding: 15px;
-    margin-bottom: 25px;
-    border-radius: 6px;
-}
-legend {
-    font-weight: bold;
-    color: #007bff;
-    padding: 0 10px;
-    font-size: 1.1em;
-}
-label {
-    display: block;
-    margin-bottom: 5px;
-    font-weight: 500;
-}
-input[type="text"],
-input[type="email"],
-input[type="tel"],
-select {
-    width: 100%;
-    padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    box-sizing: border-box;
-    margin-bottom: 10px;
-}
-.form-row {
-    display: flex;
-    gap: 10px;
-}
-.form-row > div, .form-row > input {
-    flex: 1;
-}
-
-/* Estilos para Itens Dinâmicos (Contatos e Endereços) */
-.dynamic-item-row {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    margin-bottom: 15px;
-}
-.dynamic-item-row input, .contato-select {
-    margin-bottom: 0;
-}
-.dynamic-item-row .contato-select {
-    flex: 0 0 120px; /* Largura fixa para o select */
-}
-.dynamic-item-row input {
-    flex: 1;
-}
-
-.endereco-card {
-    border: 1px solid #eee;
-    padding: 15px;
-    margin-bottom: 15px;
-    border-radius: 6px;
-}
-.endereco-card h4 {
-    margin-top: 0;
-    margin-bottom: 10px;
-    color: #333;
-}
-.form-row input {
-    margin-bottom: 0;
-}
-.checkbox-label {
-    display: flex;
-    align-items: center;
-    font-weight: normal;
-    white-space: nowrap;
-}
-.checkbox-label input {
-    width: auto;
-    margin-right: 5px;
-}
-
-/* Botões */
-.add-button, .remove-button, .remove-button-endereco {
-    padding: 8px 12px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: bold;
-    transition: background-color 0.3s ease;
-}
-.add-button {
-    background-color: #28a745; /* Verde */
-    color: white;
-    width: 100%;
-    margin-top: 10px;
-}
-.add-button:hover {
-    background-color: #1e7e34;
-}
-.remove-button {
-    background-color: #dc3545; /* Vermelho */
-    color: white;
-    padding: 10px 10px; /* Mais preenchimento para o botão de contato */
-    flex-shrink: 0;
-}
-.remove-button-endereco {
-    background-color: #dc3545; /* Vermelho */
-    color: white;
-    display: block;
-    width: 100%;
-    margin-top: 10px;
-}
-.remove-button:hover, .remove-button-endereco:hover {
-    background-color: #c82333;
-}
-.submit-button {
-    display: block;
-    width: 100%;
-    padding: 15px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    font-size: 1.1em;
-    cursor: pointer;
-}
-.submit-button:hover {
-    background-color: #0056b3;
-}
-`;
-
-// Opcional: Adicionar estilos ao DOM para visualização
-if (typeof document !== 'undefined') {
-  const styleTag = document.createElement('style');
-  styleTag.textContent = style;
-  document.head.appendChild(styleTag);
-}
-
 export default CadastroCliente;

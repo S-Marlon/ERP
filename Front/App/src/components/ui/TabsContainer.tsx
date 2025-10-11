@@ -25,7 +25,7 @@ const TabsContainer: React.FC<TabsContainerProps> = ({ tabs }) => {
     <div className="tabs-container">
       
       {/* NAVEGAÇÃO DAS ABAS */}
-      <nav role="tablist" style={{ borderBottom: '2px solid #ddd', marginBottom: '20px' }}>
+      <nav role="tablist" style={{ borderBottom: '2px solid #ddd', marginBottom: '10px', display: 'flex', gap: '5px', justifyContent:'space-between', }}>
         {tabs.map((tab) => (
           <TabButton
             key={tab.id}

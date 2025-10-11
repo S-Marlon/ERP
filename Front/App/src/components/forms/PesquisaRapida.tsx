@@ -1,83 +1,65 @@
-import React from 'react';
+import React from "react";
+import FormControl from "../ui/FormControl";
+import Button from "../ui/Button";
+import Typography from "../ui/Typography";
+import Card from "../ui/Card";
 
 const PesquisaRapida: React.FC = () => {
-    return (
-        <div className="filter-sidebar">
-          <h3>Busca rápida</h3>
+  return (
+    <Card variant="panel">
+    
+      <Typography variant="h1Alt">Busca rápida</Typography>
 
-          <div className="grid-2-cols">
+      <div className="grid-1-cols">
+        <FormControl
+          label="Nome do Cliente"
+          name="clienteNome"
+          required
+          placeholder="Digite o nome"
+        />
+        <FormControl
+          label="CPF/CNPJ do Cliente"
+          name="clienteDocumento"
+          required
+          placeholder="000.000.000-00 ou 00.000.000/0001-00"
+        />
+      
+        <FormControl
+          label="Código contrato"
+          name="codigoContrato"
+          required
+          placeholder="Digite o código"
+        />
+        <FormControl
+          label="Telefone do Cliente"
+          name="telefoneCliente"
+          required
+          placeholder="(99) 99999-9999"
+        />
+      
+        <FormControl
+          label="Email do Cliente"
+          name="emailCliente"
+          required
+          placeholder="email@exemplo.com"
+          type="email"
+        />
+        <FormControl
+          label="CEP do Cliente"
+          name="cepCliente"
+          required
+          placeholder="00000-000"
+        />
 
-                <label className="label">Nome do Cliente:
-                    <input
-                        type="text"
-                        name="clienteNome"
-
-                        required
-                        className="input-base input"
-                    />
-                </label>
-                <label className="label">CPF/CNPJ do Cliente:
-                    <input
-                        type="text"
-                        name="clienteDocumento"
-                        required
-                        className="input-base input"
-                        placeholder="000.000.000-00 ou 00.000.000/0001-00"
-                    />
-                </label>
-            </div>
-             <div className="grid-2-cols">
-
-                <label className="label">Codigo contrato                    <input
-                        type="text"
-                        name="clienteNome"
-
-                        required
-                        className="input-base input"
-                    />
-                </label>
-                <label className="label">Telefone do Cliente:
-                    <input
-                        type="text"
-                        name="clienteDocumento"
-                        required
-                        className="input-base input"
-                        placeholder="000.000.000-00 ou 00.000.000/0001-00"
-                    />
-                </label>
-            </div>
-             <div className="grid-2-cols">
-
-                <label className="label">Email do Cliente:
-                    <input
-                        type="text"
-                        name="clienteNome"
-
-                        required
-                        className="input-base input"
-                    />
-                </label>
-                <label className="label">CEP do Cliente:
-                    <input
-                        type="text"
-                        name="clienteDocumento"
-                        required
-                        className="input-base input"
-                        placeholder="000.000.000-00 ou 00.000.000/0001-00"
-                    />
-                </label>
-
-                <button>
-                    Limpar
-                </button>
-                <button>
-                    Pesquisar
-                </button>
-
-            </div>
-          
-        </div>
-    );
+        <Button variant="outline" type="reset" style={{ marginTop: "1em" }}>
+          Limpar
+        </Button>
+        <Button variant="primary" type="submit" style={{ marginTop: "1em" }}>
+          Pesquisar
+        </Button>
+      </div>
+    </Card>
+  );
 };
 
 export default PesquisaRapida;

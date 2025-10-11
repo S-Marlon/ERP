@@ -1,11 +1,11 @@
 // src/components/TabButton.tsx
 import React from 'react';
-import { TabButtonProps } from '../types/tabs';
+import { TabButtonProps } from '../../types/tabs';
 
 // O estilo pode ser definido em um arquivo CSS separado ou como JSS/TSX
 const styles: { [key: string]: React.CSSProperties } = {
   button: {
-    padding: '10px 15px',
+    padding: '10px 10px',
     border: 'none',
     borderRadius: '0',
     backgroundColor: 'transparent',
@@ -14,7 +14,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     color: '#666',
     borderBottom: '5px solid transparent',
     fontWeight: 'normal',
-    transition: 'all 0.3s',
   },
   active: {
     color: '#007BFF',

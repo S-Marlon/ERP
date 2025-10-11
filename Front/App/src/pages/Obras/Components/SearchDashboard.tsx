@@ -1,4 +1,7 @@
 import React, { useState, ChangeEvent, useMemo } from 'react';
+import Typography from '../../../components/ui/Typography';
+import Button from '../../../components/ui/Button';
+import Badge from '../../../components/ui/Badge';
 import './SearchDashboard.css'; // Importa o CSS
 
 // ----------------- TIPOS E DADOS MOCKADOS -----------------
@@ -76,34 +79,24 @@ const SearchDashboard: React.FC = () => {
 
     return (
         <div className="search-dashboard-container">
-            <h1 className="main-title">Busca Global</h1>
-           
-
+            <Typography variant="h1" className="main-title">Busca Global</Typography>
             <div className="content-area">
                 <div className="results-list">
-                   
-
- <div className=" results-header" >
-
-                        <h3>
-
-                            Resultados ({resultadosFiltrados.length})
-                        </h3>
-
+                    <div className="results-header">
+                        <Typography variant="h3">Resultados ({resultadosFiltrados.length})</Typography>
                         <div>
-                            <label > Filtrar Por: </label>
+                            <Typography variant="strong" as="label">Filtrar Por:</Typography>
                             {['Todos', 'Cliente', 'Contrato', 'Poço'].map((tipo) => (
-                                <button
+                                <Button
                                     key={tipo}
-                                    className={`filter-button ${filterType === tipo ? 'active' : ''}`}
-
+                                    variant={filterType === tipo ? "primary" : "outline"}
+                                    style={{ marginLeft: 8 }}
                                     onClick={() => handleFilterChange(tipo as FiltroTipo)}
                                 >
                                     {tipo}
-                                </button>
+                                </Button>
                             ))}
                         </div>
-
                     </div>
                     {resultadosFiltrados.length > 0 ? (
                         resultadosFiltrados.map(item => (
@@ -115,32 +108,34 @@ const SearchDashboard: React.FC = () => {
                                 <div className='innertable'>
                                     {/* Coluna 1: Tipo */}
                                     <div className="flex-column item-column-type">
-                                        <div className="item-type">{item.tipo}</div>
-                                        <div className="item-id">{item.id}</div>
+                                        <Typography variant="strong" className="item-type">{item.tipo}</Typography>
+                                        <Typography variant="small" className="item-id">{item.id}</Typography>
                                     </div>
                                     
                                     {/* Coluna 2: Título Principal */}
                                     <div className="flex-column item-column-title">
-                                        <div className="item-label">Nome</div>
-                                        <div className="item-title">{item.titulo}</div>
+                                        <Typography variant="small" className="item-label">Nome</Typography>
+                                        <Typography variant="p" className="item-title">{item.titulo}</Typography>
                                     </div>
                                     
                                     {/* Coluna 3: Subdetalhe/CNPJ/Cliente Associado */}
                                     <div className="flex-column item-column-detail">
-                                        <div className="item-label">Detalhe Secundário</div>
-                                        <div className="item-detail">Lorem ipsum dolor sit amet consectetur, adipisicing elit. Dolorum, deserunt incidunt. Alias quam minima molestias, velit officiis consectetur sapiente corporis saepe ut dolorum voluptatem ipsa animi nulla voluptates repudiandae dicta.</div>
+                                        <Typography variant="small" className="item-label">Detalhe Secundário</Typography>
+                                        <Typography variant="p" className="item-detail">{item.subDetalhe}</Typography>
                                     </div>
                                     
-                                    {/* Coluna 4: Status (Exemplo fixo) */}
+                                    {/* Coluna 4: Status */}
                                     <div className="flex-column item-column-status">
-                                        <h5 className="item-status">Em Andamento</h5>
+                                        <Badge color="warning">Em Andamento</Badge>
                                     </div>
                                 </div>
                             </div>
                         ))
                     ) : (
                         <div className="no-results">
-                            Nenhum resultado encontrado para **"{searchTerm}"** no filtro de **{filterType}**.
+                            <Typography variant="p">
+                                Nenhum resultado encontrado para <strong>"{searchTerm}"</strong> no filtro de <strong>{filterType}</strong>.
+                            </Typography>
                         </div>
                     )}
                 </div>

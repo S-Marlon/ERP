@@ -2,6 +2,10 @@ import React, { useState, ChangeEvent, FormEvent } from 'react';
 import { BotaoVoltar } from '../ui/BotaoVoltar'; // Componente de Voltar
 import { Link } from 'react-router-dom'; // Adicionado para "Novo Cliente"
 import PesquisaRapida from './PesquisaRapida';
+import Button from '../ui/Button';
+import Card from '../ui/Card';
+import Typography from '../ui/Typography';
+import FormControl from '../ui/FormControl';
 
 // ----------------- TIPOS DE DADOS E MOCKS (Mantidos) -----------------
 // ... (Interfaces e MOCKS permanecem aqui) ...
@@ -117,83 +121,93 @@ const CadastroContrato: React.FC = () => {
 
 
     return (
-      <form onSubmit={handleSubmit} className="form-container">
-
-            {/* HEADER COM BOTÃO DE VOLTAR */}
+        <form onSubmit={handleSubmit} className="form-container">
             <div className='form-header'>
                 <BotaoVoltar />
-                <h1>Criação de Contrato de Obra</h1>
+                <Typography variant="h1Alt">Criação de Contrato de Obra</Typography>
             </div>
 
-            {/* CONTAINER PRINCIPAL (2 COLUNAS) */}
             <div className='grid-main-layout'>
-            
-                {/* COLUNA ESQUERDA: DADOS ESSENCIAIS E OBSERVAÇÕES */}
+                {/* COLUNA ESQUERDA */}
                 <div className='col-left'>
-          {/* <PesquisaRapida/> */}
-                    {/* ----------------- SEÇÃO: DADOS ESSENCIAIS E CLIENTE ----------------- */}
-
-                    <fieldset>
-                        <legend>Dados Contratuais e Prazos</legend>
-                        
-                        {/* Seleção do Cliente */}
-                        <div className='field-with-action'>
-                            <label htmlFor="clienteId">Cliente Associado</label>
-                            <div className='input-group'>
-                                <strong style={{color:'black'}}>Campo de busca de cliente abrira um modal para pesquisa de cliente</strong>
-                                {/* Botão para novo cliente (melhora a UX) */}
-                                <Link to="/clientes/novo" className='new-action-link'>+ Novo</Link>
-                            </div>
+                    {/* <PesquisaRapida/> */}
+                    <Card>
+                        <Typography variant="h2Alt">Dados Contratuais e Prazos</Typography>
+                        <FormControl
+                            label="Cliente Associado"
+                            name="clienteId"
+                            control="select"
+                            value={formData.clienteId}
+                            onChange={handleSimpleChange}
+                            options={CLIENTES_MOCK.map(c => ({ value: c.id, label: c.nome }))}
+                            required
+                        />
+                        <div className='input-group'>
+                            <Typography variant="pMuted">
+                                Campo de busca de cliente abrirá um modal para pesquisa de cliente
+                            </Typography>
+                            <Link to="/clientes/novo" className='new-action-link'>+ Novo</Link>
                         </div>
-                       
-                        <div>
-                            <label htmlFor="tituloContrato">Serviço prestado</label>
-                             <select>
-                                   <option>Perfuração</option>
-                                   <option>Manutenção</option>
-                                   <option>Consultoria</option>
-                                   <option>Radiestesia</option>
-                                </select>
-                        </div>
-                        
-                        {/* Datas e Prazo - em uma linha de 3 */}
+                        <FormControl
+                            label="Serviço prestado"
+                            name="tituloContrato"
+                            control="select"
+                            value={formData.tituloContrato}
+                            onChange={handleSimpleChange}
+                            options={[
+                                { value: "Perfuração", label: "Perfuração" },
+                                { value: "Manutenção", label: "Manutenção" },
+                                { value: "Consultoria", label: "Consultoria" },
+                                { value: "Radiestesia", label: "Radiestesia" }
+                            ]}
+                            required
+                        />
                         <div className="form-row three-cols-mini">
-                            <div>
-                                <label htmlFor="dataAssinatura">Assinatura</label>
-                                <input type="date" id="dataAssinatura" name="dataAssinatura" value={formData.dataAssinatura} onChange={handleSimpleChange} required />
-                            </div>
-                            <div>
-                                <label htmlFor="dataPrevistaInicio">Início Previsto</label>
-                                <input type="date" id="dataPrevistaInicio" name="dataPrevistaInicio" value={formData.dataPrevistaInicio} onChange={handleSimpleChange} required />
-                            </div>
-                            <div>
-                                <label htmlFor="prazoEstimadoDias">Prazo Est. (dias)</label>
-                                <input type="number" id="prazoEstimadoDias" name="prazoEstimadoDias" value={formData.prazoEstimadoDias} onChange={handleSimpleChange} min="1" required />
-                            </div>
+                            <FormControl
+                                label="Assinatura"
+                                name="dataAssinatura"
+                                type="date"
+                                value={formData.dataAssinatura}
+                                onChange={handleSimpleChange}
+                                required
+                            />
+                            <FormControl
+                                label="Início Previsto"
+                                name="dataPrevistaInicio"
+                                type="date"
+                                value={formData.dataPrevistaInicio}
+                                onChange={handleSimpleChange}
+                                required
+                            />
+                            <FormControl
+                                label="Prazo Est. (dias)"
+                                name="prazoEstimadoDias"
+                                type="number"
+                                value={formData.prazoEstimadoDias}
+                                onChange={handleSimpleChange}
+                                min={1}
+                                required
+                            />
                         </div>
-
-                    </fieldset>
-
-                    {/* ----------------- OBSERVAÇÕES ----------------- */}
-                    <fieldset>
-                        <legend>Observações Adicionais</legend>
-                        <textarea
+                    </Card>
+                    <Card>
+                        <Typography variant="h2Alt">Observações Adicionais</Typography>
+                        <FormControl
+                            label="Observações"
                             name="observacoesAdicionais"
+                            control="textarea"
                             value={formData.observacoesAdicionais}
                             onChange={handleSimpleChange}
                             rows={6}
                             placeholder="Registre informações importantes, condições de pagamento, garantias, e demais detalhes..."
                         />
-                    </fieldset>
+                    </Card>
                 </div>
 
-
-                {/* COLUNA DIREITA/INFERIOR: ITENS E VALOR TOTAL (Largura 100% ou Coluna 2) */}
+                {/* COLUNA DIREITA */}
                 <div className='col-right'>
-                    <fieldset className="fieldset-itens">
-                        <legend>Itens e Serviços Combinados (Escopo)</legend>
-                        
-                        {/* Tabela de Itens */}
+                    <Card>
+                        <Typography variant="h2Alt">Itens e Serviços Combinados (Escopo)</Typography>
                         <table className="itens-table">
                             <thead>
                                 <tr>
@@ -209,83 +223,91 @@ const CadastroContrato: React.FC = () => {
                                 {formData.itensCombinados.map(item => (
                                     <tr key={item.id}>
                                         <td>
-                                            <input
-                                                type="text"
+                                            <FormControl
+                                                name={`descricao-${item.id}`}
                                                 value={item.descricao}
-                                                onChange={(e) => handleItemChange(item.id, 'descricao', e.target.value)}
+                                                onChange={e => handleItemChange(item.id, 'descricao', e.target.value)}
                                                 placeholder="Descrição do serviço/etapa"
+                                                required label={''}                                            />
+                                        </td>
+                                        <td>
+                                            <FormControl
+                                                name={`quantidade-${item.id}`}
+                                                type="number"
+                                                value={item.quantidade}
+                                                onChange={e => handleItemChange(item.id, 'quantidade', e.target.value)}
+                                                min={1}
                                                 required
                                             />
                                         </td>
                                         <td>
-                                            <input type="number" value={item.quantidade} onChange={(e) => handleItemChange(item.id, 'quantidade', e.target.value)} min="1" required />
+                                            <FormControl
+                                                name={`unidade-${item.id}`}
+                                                control="select"
+                                                value={item.unidade}
+                                                onChange={e => handleItemChange(item.id, 'unidade', e.target.value)}
+                                                options={[
+                                                    { value: "servico", label: "Serviço" },
+                                                    { value: "unidade", label: "Unidade" },
+                                                    { value: "m2", label: "m²" },
+                                                    { value: "hora", label: "Hora" }
+                                                ]} label={''}                                            />
                                         </td>
                                         <td>
-                                            <select value={item.unidade} onChange={(e) => handleItemChange(item.id, 'unidade', e.target.value as ItemCombinado['unidade'])}>
-                                                <option value="servico">Serviço</option>
-                                                <option value="unidade">Unidade</option>
-                                                <option value="m2">m²</option>
-                                                <option value="hora">Hora</option>
-                                            </select>
-                                        </td>
-                                        <td>
-                                            <input type="number" value={item.valorUnitario} onChange={(e) => handleItemChange(item.id, 'valorUnitario', e.target.value)} placeholder="0.00" min="0" />
+                                            <FormControl
+                                                name={`valorUnitario-${item.id}`}
+                                                type="number"
+                                                value={item.valorUnitario}
+                                                onChange={e => handleItemChange(item.id, 'valorUnitario', e.target.value)}
+                                                placeholder="0.00"
+                                                min={0}
+                                            />
                                         </td>
                                         <td className="subtotal-cell">
                                             {formatCurrency(item.quantidade * item.valorUnitario)}
                                         </td>
                                         <td>
-                                            <button 
-                                                type="button" 
+                                            <Button
+                                                type="button"
+                                                variant="danger"
                                                 onClick={() => removeItem(item.id)}
-                                                className="remove-button-icon"
-                                                title="Remover Item"
+                                                style={{ width: "100%" }}
                                             >
                                                 <span role="img" aria-label="Remover">🗑️</span>
-                                            </button>
+                                            </Button>
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
-                        
-                        <button type="button" onClick={addItem} className="add-button">
+                        <Button type="button" variant="success" onClick={addItem} style={{ width: "100%", marginTop: 10 }}>
                             + Adicionar Novo Item
-                        </button>
-                                  
-<div>
-                            <label htmlFor="valorTotalContrato">Inserir Valor Total do Contrato (R$) Manualmente</label>
-                            <input
-                                type="number"
-                                id="valorTotalContrato"
-                                name="valorTotalContrato"
-                                value={formData.valorTotalContrato || subtotalItens}
-                                onChange={handleSimpleChange}
-                                placeholder={`Sugestão: ${subtotalItens.toFixed(2)}`}
-                                min="0"
-                                step="0.01"
-                            />
-                            <small className='valor-total-info'>Preencha com o valor final acordado, que pode incluir impostos ou descontos não detalhados nos itens.</small>
+                        </Button>
+                        <FormControl
+                            label="Inserir Valor Total do Contrato (R$) Manualmente"
+                            name="valorTotalContrato"
+                            type="number"
+                            value={formData.valorTotalContrato || subtotalItens}
+                            onChange={handleSimpleChange}
+                            placeholder={`Sugestão: ${subtotalItens.toFixed(2)}`}
+                            min={0}
+                        />
+                        <Typography variant="small" className='valor-total-info'>
+                            Preencha com o valor final acordado, que pode incluir impostos ou descontos não detalhados nos itens.
+                        </Typography>
+                    </Card>
+                    <Card>
+                        <div className='valor-total-section'>
+                            <Typography variant="strong" className='subtotal-info'>
+                                Subtotal dos Itens: {formatCurrency(subtotalItens)}
+                            </Typography>
                         </div>
-                                
-                    </fieldset>
-                    
-                    {/* SEÇÃO DE VALOR TOTAL E ENCERRAMENTO */}
-                    <div className='valor-total-section'>
-                        <div className='subtotal-info'>
-                            <strong>Subtotal dos Itens:</strong> {formatCurrency(subtotalItens)}
-                        </div>
-
-                        
-                    </div>
-
-                </div> {/* Fim da Coluna Direita/Inferior */}
-
-            </div> {/* Fim do Grid Principal */}
-
-            <button type="submit" className="submit-button">
-                Salvar Contrato e **Iniciar Processo de Obra**
-            </button>
+                    </Card>
+                </div>
+            </div>
+            <Button type="submit" variant="primary" style={{ width: "100%", marginTop: 20 }}>
+                Salvar Contrato e Iniciar Processo de Obra
+            </Button>
         </form>
     );
 };

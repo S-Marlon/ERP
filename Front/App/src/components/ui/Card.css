@@ -1,0 +1,26 @@
+.ui-card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  padding: 0.8em 0.5em;
+  margin-bottom: 1.2em;
+  transition: box-shadow 0.2s;
+}
+
+.ui-card--panel {
+  background: #f8f9fa;
+  border: 1px solid #e3e6ea;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+
+.ui-card--highlight {
+  border: 1px solid #ced4da;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 8px;
+    background-color: #ffffff;
+}
+
+.ui-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+}

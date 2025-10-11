@@ -1,0 +1,78 @@
+.ui-typography {
+  font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+  margin: 0 0 0.5em 0;
+  color: #212529;
+}
+
+.ui-typography--h1 {
+  font-size: 2.2rem;
+  font-weight: 400;
+  letter-spacing: -1px;
+}
+
+.ui-typography--h1Alt {
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: #007bff;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.ui-typography--h2 {
+  font-size: 1.7rem;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+}
+
+
+.ui-typography--h2Alt {
+  font-size: 1.7rem;
+  font-weight: 600;
+  color: #28a745;
+  font-style: italic;
+}
+
+.ui-typography--h3 {
+  font-size: 1.3rem;
+  font-weight: 500;
+}
+
+.ui-typography--h4 {
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+.ui-typography--h5 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.ui-typography--h6 {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.ui-typography--p {
+  font-size: 1rem;
+  font-weight: 400;
+}
+
+.ui-typography--pMuted {
+  font-size: 1rem;
+  color: #6c757d;
+  font-style: italic;
+}
+
+.ui-typography--small {
+  font-size: 0.85rem;
+  color: #6c757d;
+}
+
+.ui-typography--strong {
+  font-weight: 700;
+}
+
+.ui-typography--em {
+  font-style: italic;
+}
+

@@ -87,7 +87,7 @@ body {
 .layout-container {
     display: grid;
     /* Define as colunas: 1 parte fracionada para a sidebar, 2 partes para o conteúdo */
-    grid-template-columns: 3fr 7fr 8fr    ;
+    grid-template-columns: 2.5fr 6fr 8fr    ;
     /* Ajuste de altura para que a área de conteúdo preencha a tela */
 }
 
@@ -112,7 +112,7 @@ body {
     /* Estilos Visuais */
     background-color: #333;
     color: white;
-    padding: 20px 10px;
+    padding: 10px 5px;
     overflow-y: auto; /* Permite rolar o conteúdo interno da sidebar se necessário */
 }
 
