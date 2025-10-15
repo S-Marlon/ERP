@@ -3,6 +3,7 @@ import Typography from '../../../components/ui/Typography';
 import Button from '../../../components/ui/Button';
 import Badge from '../../../components/ui/Badge';
 import './SearchDashboard.css'; // Importa o CSS
+import Card from '../../../components/ui/Card';
 
 // ----------------- TIPOS E DADOS MOCKADOS -----------------
 
@@ -78,8 +79,8 @@ const SearchDashboard: React.FC = () => {
     // ----------------- RENDERIZAÇÃO -----------------
 
     return (
-        <div className="search-dashboard-container">
-            <Typography variant="h1" className="main-title">Busca Global</Typography>
+        <Card variant='highlight' className="search-dashboard-container">
+            <Typography variant="h1Alt" className="main-title">Busca Global</Typography>
             <div className="content-area">
                 <div className="results-list">
                     <div className="results-header">
@@ -140,7 +141,7 @@ const SearchDashboard: React.FC = () => {
                     )}
                 </div>
             </div>
-        </div>
+        </Card>
     );
 };
 

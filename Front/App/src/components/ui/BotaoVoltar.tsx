@@ -9,7 +9,7 @@ interface BotaoVoltarProps {
     children?: React.ReactNode; 
 }
 
-export const BotaoVoltar: React.FC<BotaoVoltarProps> = ({ children = '← Voltar' }) => {
+export const BotaoVoltar: React.FC<BotaoVoltarProps> = ({ children = ' ← Voltar' }) => {
     const navigate = useNavigate();
 
     const handleBack = () => {

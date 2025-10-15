@@ -6,7 +6,6 @@ import "./ObrasModule.css";
 import PesquisaRapida from "../../components/forms/PesquisaRapida";
 import SearchDashboard from "./Components/SearchDashboard";
 import { ObraDetalhes } from "./Components/ObraDetalhes";
-import { ObraFormulario } from "./Components/ObraFormulario";
 
 export const ObrasModule: React.FC = () => {
   return (
@@ -27,7 +26,7 @@ export const ObrasModule: React.FC = () => {
               <button>+ Novo Contrato</button>
             </Link>
             <Link to="/pocos/novo">
-              <button>+ Novo Poço</button>
+              <button>+ Novo relatorio de Poço</button>
             </Link>
           </div>
         </div>

@@ -184,32 +184,6 @@
     font-weight: bold;
 }
 
-/* =================================== */
-/* CHECKBOX / LISTAS          */
-/* =================================== */
-
-.checkbox-group {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content:baseline;
-    gap: 5px 10px;
-    margin-top: 15px;
-}
-
-.checkbox-label {
-    display: flex;
-    align-items: center;
-    font-weight: normal;
-    gap: 5px;
-    font-size: 0.8em;
-    cursor: pointer;
-  user-select: none; /* Evita seleção de texto ao clicar */
- 
-}
-
-input[type="checkbox"]  {
-  cursor: pointer;
-}
 
 /* =================================== */
 /* BOTÕES                  */
@@ -255,15 +229,12 @@ input[type="checkbox"]  {
 
 /* Para telas pequenas, as colunas do grid podem ser empilhadas */
 @media (max-width: 600px) {
-    .grid-2-cols, .grid-3-cols, .grid-4-cols, .fieldset-container {
+    .grid-2-cols, .grid-3-cols, .grid-4-cols{
         display: flex;
         flex-direction: column;
     }
 
-    .fieldset {
-        /* Garante que o fieldset ocupe 100% da largura em telas pequenas */
-        flex: 1 1 100%; 
-    }
+   
 }
 
 

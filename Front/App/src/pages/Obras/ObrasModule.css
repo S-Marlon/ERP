@@ -21,20 +21,7 @@
 /* FIELDSETS               */
 /* =================================== */
 
-.fieldset {
-    border: 1px solid #ccc;
-    padding: 15px;
-    /* Permite flexionar e define um tamanho base mínimo de 400px */
-    flex: 1 1;
-    border-radius: 8px;
-}
 
-/* Fieldset Principal (Destaque) */
-.fieldset-principal {
-    border: 2px solid #007bff;
-    padding: 15px;
-    border-radius: 8px;
-}
 
 .legend {
     font-weight: bold;
@@ -110,9 +97,7 @@ body {
     align-self: start; 
     
     /* Estilos Visuais */
-    background-color: #333;
     color: white;
-    padding: 10px 5px;
     overflow-y: auto; /* Permite rolar o conteúdo interno da sidebar se necessário */
 }
 

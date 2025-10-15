@@ -9,13 +9,16 @@
 
 .botao-voltar {
     padding: 8px 15px;
-    border: 1px solid #ccc;
-    background: #f8f9fa;
-    color: #333;
-    border-radius: 4px;
+    color: #ffffff;
     cursor: pointer;
     font-size: 1em;
-    margin-right: 15px; /* Adiciona um pequeno espaçamento se houver outro conteúdo */
+
+    font-size: large;
+
+
+  background-color: 'transparent';
+  border: 1px solid;
+  border-radius: 4px;
 }
 
 .ui-btn--primary {

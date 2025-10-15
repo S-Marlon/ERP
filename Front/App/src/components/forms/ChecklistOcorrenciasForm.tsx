@@ -1,104 +1,170 @@
-import React from 'react';
+import React, { useState } from 'react';
+import Typography from '../ui/Typography';
+import FormControl from '../ui/FormControl';
+import Fieldset from '../ui/Fieldset';
 
-// Crie a lista de opções para o sub-checklist
 export const estruturaSubterraneaOptions = [
     'Natural (Fraturas, pedras soltas, rochas caídas)',
     'Artificial (Fundações, tubos, entulhos, bueiros)',
 ];
 
 const ChecklistOcorrenciasForm: React.FC = () => {
+    // É uma boa prática adicionar o 'setFormData' se você pretende atualizar o estado.
+    // Também é crucial usar o 'value' e 'onChange' nos FormControls.
+    const [formData, setFormData] = useState({
+        checklistPerdaTotalRetorno: false,
+        checklistColapsoParede: false,
+        checklistCaimento: false,
+        checklistFerramentaPresa: false,
+        checklistEstruturasSubterraneas: false,
+        estruturaSubterraneaTipo: '',
+        checklistBaixaVazao: false,
+        checklistAguaNaoLimpou: false,
+        checklistEnergiaRuim: false,
+        checklistAcessoDificil: false,
+        checklistClimaAdverso: false,
+        relatorioManual: '',
+    });
+
+    // Função de handler (exemplo básico)
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+        const { name, value, type } = e.target;
+        
+        // Lógica para checkbox (usa 'checked')
+        if (type === 'checkbox' && e.target instanceof HTMLInputElement) {
+            setFormData(prev => ({
+                ...prev,
+                [name]: e.target.checked,
+            }));
+        } else {
+            // Lógica para outros inputs (usa 'value')
+            setFormData(prev => ({
+                ...prev,
+                [name]: value,
+            }));
+        }
+    };
+    
+
     return (
-        <fieldset className="fieldset">
-                    {/* ... Dados de Revestimento (acima deste bloco) ... */}
+        <Fieldset variant='standard' legend='<Typography variant="h3">Checklist de Ocorrências</Typography>' className="fieldset">
+            <legend className="legend">
+                
+            </legend>
 
-                    <legend className="legend">Checklist de ocorrencias</legend>
+            <Typography variant="h4">Problemas de Perfuração (Circulação)</Typography>
+            <div className="checkbox-group">
+                <FormControl
+                    label="Perda de Retorno de Ar/Fluido (Fratura/Galeria)"
+                    // CORRIGIDO: Deve ser 'control="checkbox"'
+                    control="checkbox" 
+                    name="checklistPerdaTotalRetorno"
+                    checked={formData.checklistPerdaTotalRetorno}
+                    onChange={handleChange}
+                />
+                <FormControl
+                    label="Colapso / Instabilidade da Parede"
+                    // CORRIGIDO: Deve ser 'control="checkbox"'
+                    control="checkbox"
+                    name="checklistColapsoParede"
+                    checked={formData.checklistColapsoParede}
+                    onChange={handleChange}
+                />
+                <FormControl
+                    label="Caimento após revestir (Deslizamento de material)"
+                    // CORRIGIDO: Deve ser 'control="checkbox"'
+                    control="checkbox"
+                    name="checklistCaimento"
+                    onChange={handleChange}
+                />
+                <FormControl
+                    label="Ferramenta Presa / Avariada"
+                    // CORRIGIDO: Deve ser 'control="checkbox"'
+                    control="checkbox"
+                    name="checklistFerramentaPresa"
+                    onChange={handleChange}
+                />
+                <FormControl
+                    label="Estruturas Subterrâneas (Obstáculo)"
+                    // CORRIGIDO: Deve ser 'control="checkbox"'
+                    control="checkbox"
+                    name="checklistEstruturasSubterraneas"
+                    onChange={handleChange}
+                />
+                {formData.checklistEstruturasSubterraneas && (
+                    <FormControl
+                        label="Tipo de Obstáculo"
+                        name="estruturaSubterraneaTipo"
+                        control="select"
+                        value={formData.estruturaSubterraneaTipo}
+                        onChange={handleChange} // Adicionado o handler
+                        options={estruturaSubterraneaOptions.map(tipo => ({
+                            value: tipo,
+                            label: tipo
+                        }))}
+                        required
+                    />
+                )}
+            </div>
 
-                    {/* ... Inputs de Revestimento (acima deste bloco) ... */}
+            <Typography variant="h4">Qualidade e Vazão</Typography>
+            <div className="checkbox-group">
+                <FormControl
+                    label="Baixa Vazão Inesperada"
+                    // CORRIGIDO: Deve ser 'control="checkbox"'
+                    control="checkbox"
+                    name="checklistBaixaVazao"
+                    onChange={handleChange}
+                    required
+                />
+                <FormControl
+                    label="Água com Alta Turbidez (Não Limpou)"
+                    // CORRIGIDO: Deve ser 'control="checkbox"'
+                    control="checkbox"
+                    name="checklistAguaNaoLimpou"
+                    onChange={handleChange}
+                />
+            </div>
 
-                    <h4 >Problemas de Perfuração (Circulação)</h4>
-                    <div className="checkbox-group">
-                        {/* PROBLEMAS DE CIRCULAÇÃO E ESTRUTURA */}
-                        <label className="checkbox-label red">
-                            <input type="checkbox" name="checklistPerdaTotalRetorno"/> Perda de Retorno de Ar/Fluido (Fratura/Galeria)
-                        </label>
-                        <label className="checkbox-label red">
-                            <input type="checkbox" name="checklistColapsoParede"  /> Colapso / Instabilidade da Parede
-                        </label>
-                        <label className="checkbox-label yellow">
-                            <input type="checkbox" name="checklistCaimento" /> Caimento após revestir (Deslizamento de material)
-                        </label>
-                        <label className="checkbox-label red">
-                            <input type="checkbox" name="checklistFerramentaPresa" /> Ferramenta Presa / Avariada
-                        </label>
-                        <label className="checkbox-label red">
-                            <input type="checkbox" name="checklistEstruturasSubterraneas" /> Estruturas Subterrâneas (Obstáculo)
-                        </label>
-                        
-                        
+            <Typography variant="h4">Logística e Infraestrutura</Typography>
+            <div className="checkbox-group">
+                <FormControl
+                    label="Energia Elétrica Insuficiente/Ruim"
+                    // CORRIGIDO: Deve ser 'control="checkbox"'
+                    control="checkbox"
+                    name="checklistEnergiaRuim"
+                    onChange={handleChange}
+                />
+                <FormControl
+                    label="Acesso / Terreno Difícil (Mobilização)"
+                    // CORRIGIDO: Deve ser 'control="checkbox"'
+                    control="checkbox"
+                    name="checklistAcessoDificil"
+                    onChange={handleChange}
+                />
+                <FormControl
+                    label="Clima Adverso (Interrupção por Chuva, etc.)"
+                    // CORRIGIDO: Deve ser 'control="checkbox"'
+                    control="checkbox"
+                    name="checklistClimaAdverso"
+                    onChange={handleChange}
+                />
+            </div>
 
-                        {/* SUB-CHECKLIST CONDICIONAL */}
-                        {/* {formData.checklistEstruturasSubterraneas && (
-                            <div
-                                // Usa style inline para não interferir no checkbox-group, 
-                                // garantindo que ele vá para uma nova linha e se destaque.
-                                style={{
-                                    width: '100%',
-                                    marginTop: '10px',
-                                    padding: '10px',
-                                    borderLeft: '3px solid #ffc107',
-                                    backgroundColor: '#fffbe6',
-                                    color: '#333'
-                                }}
-                            >
-                                <label className="label">
-                                    **Tipo de Obstáculo:**
-                                    <select
-                                        name="estruturaSubterraneaTipo"
-                                        value={formData.estruturaSubterraneaTipo}
-                                        onChange={handleChange}
-                                        required
-                                        className="input-base select"
-                                    >
-                                        <option value="" disabled>Selecione a Natureza do Obstáculo</option>
-                                        {estruturaSubterraneaOptions.map(tipo => (
-                                            <option key={tipo} value={tipo}>{tipo}</option>
-                                        ))}
-                                    </select>
-                                </label>
-                            </div>
-                        )} */}
-                    </div>
-
-                    <h4>Qualidade e Vazão</h4>
-                    <div className="checkbox-group">
-                        {/* PROBLEMAS DE ÁGUA E VAZÃO */}
-                        <label className="checkbox-label">
-                            <input type="checkbox" name="checklistBaixaVazao"  /> Baixa Vazão Inesperada
-                        </label>
-                        <label className="checkbox-label">
-                            <input type="checkbox" name="checklistAguaNaoLimpou" /> Água com Alta Turbidez (Não Limpou)
-                        </label>
-                    </div>
-
-                    <h4>Logística e Infraestrutura</h4>
-                    <div className="checkbox-group">
-                        {/* PROBLEMAS EXTERNOS */}
-                        <label className="checkbox-label">
-                            <input type="checkbox" name="checklistEnergiaRuim" /> Energia Elétrica Insuficiente/Ruim
-                        </label>
-                        <label className="checkbox-label yellow">
-                            <input type="checkbox" name="checklistAcessoDificil" /> Acesso / Terreno Difícil (Mobilização)
-                        </label>
-                        <label className="checkbox-label">
-                            <input type="checkbox" name="checklistClimaAdverso" /> Clima Adverso (Interrupção por Chuva, etc.)
-                        </label>
-                    </div>
-
-                    <textarea className='textarea' placeholder='Relatório Manual de Ocorrências: Detalhes adicionais sobre o serviço, perfil do furo, recomendações e próximos passos.'></textarea>
-                    Relatório Manual de Ocorrências:
-
-                    Atenção: Preencha este campo detalhando a profundidade, a causa e as ações corretivas tomadas para todos os problemas críticos (especialmente Perda de Retorno, Colapso e Ferramenta Presa).
-                </fieldset>
+            <FormControl
+                label="Relatório Manual de Ocorrências"
+                name="relatorioManual"
+                control="textarea"
+                value={formData.relatorioManual}
+                onChange={handleChange} // Adicionado o handler
+                rows={4}
+                placeholder="Detalhe profundidade, causa e ações corretivas para problemas críticos."
+            />
+            <Typography variant="pMuted">
+                Atenção: Preencha este campo detalhando a profundidade, a causa e as ações corretivas tomadas para todos os problemas críticos (especialmente Perda de Retorno, Colapso e Ferramenta Presa).
+            </Typography>
+        </Fieldset>
     );
 };
+
 export default ChecklistOcorrenciasForm;

@@ -1,29 +1,13 @@
 // src/modules/Obras/ObraDetalhes.tsx
-import React, { useState, useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import React, {  useMemo } from 'react';
+import { useParams  } from 'react-router-dom';
 import { mockObras, mockClientes, mockAtividades, mockRegistrosTempo, Obra } from '../../../types/Obras';
-import DadosPerfuracaoForm from '../../../components/forms/DadosPerfuracaoForm';
-import DadosRevestimentoForm from '../../../components/forms/DadosRevestimentoForm';
-import ChecklistOcorrenciasForm from '../../../components/forms/ChecklistOcorrenciasForm';
 import Badge from '../../../components/ui/Badge';
 import Typography from '../../../components/ui/Typography';
 import Card from '../../../components/ui/Card';
 import Button from '../../../components/ui/Button';
 import FormControl from '../../../components/ui/FormControl';
 import TabsContainer from '../../../components/ui/TabsContainer';
-
-
-
-const statusColorMap: Record<string, "success" | "info" | "danger"> = {
-  "Concluída": "success",
-  "Em Andamento": "info",
-  "Pendente": "danger",
-};
-
-// Componentes de Conteúdo das Abas (Exemplo - mantive os componentes originais)
-const AbaAtividadesContent: React.FC = () => <DadosPerfuracaoForm />; 
-const AbaRegistrosTempoContent: React.FC = () => <DadosRevestimentoForm />; 
-const AbaLocalizacaoContent: React.FC = () => <ChecklistOcorrenciasForm />; 
 
 
 // Componentes das Abas (Implementação SIMPLIFICADA e ESTILIZADA)
@@ -66,8 +50,8 @@ const AbaAtividades: React.FC<{ obraId: string }> = ({ obraId }) => {
             <ul style={{ listStyleType: "none", padding: 0 }}>
                 {atividades.map(atv => (
                     <li key={atv.id} style={{ display: "flex", alignItems: "center", marginBottom: "1em" }}>
-                        <Typography variant="p">{atv.titulo}</Typography>
-                        <Badge color={statusColorMap[atv.status]}>{atv.status}</Badge>
+                        <Typography variant="p">{atv.descricao}</Typography>
+                        <Badge color="warning">{atv.obraId}</Badge>
                     </li>
                 ))}
             </ul>
@@ -100,7 +84,7 @@ const AbaRegistrosTempo: React.FC<{ obraId: string }> = ({ obraId }) => {
                                 <Typography variant="p">{reg.descricao}</Typography>
                             </td>
                             <td>
-                                <Typography variant="p">{reg.tempo}</Typography>
+                                <Typography variant="p">{reg.horas}</Typography>
                             </td>
                         </tr>
                     ))}
@@ -187,7 +171,7 @@ export const ObraDetalhes: React.FC = () => {
     return (
         <div>
             {/* 1. CABEÇALHO OTIMIZADO */}
-            <header className="header-container" style={{ marginBottom: '10px', paddingBottom: '10px' }}>
+            <header className="header-container">
                 <div style={{ display: 'flex', justifyContent: 'space-between', flexDirection: 'column' }}>
                     
                     
@@ -202,7 +186,7 @@ export const ObraDetalhes: React.FC = () => {
             </header>
 
             {/* 2. BARRA DE AÇÕES ESTILIZADA */}
-            <div className="action-buttons-container" style={{ marginBottom: '20px', display: 'flex', gap: '10px', justifyContent: 'space-between' }}>
+            <div className="action-buttons-container" >
                 <Button variant="secondary">Editar</Button>
                 <Button variant="primary">Novo Registro de Tempo</Button>
                 <FormControl

@@ -396,14 +396,7 @@ textarea { resize: vertical; }
 }
 .new-action-link:hover { background-color: #138496; }
 
-/* Tabela de Itens (Melhoria de UX) */
-.fieldset-itens { margin-bottom: 0; }
-.itens-table {
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-    margin-bottom: 15px;
-}
+
 .itens-table th {
     background-color: #292f34ff;
     border-bottom: 2px solid #007bff;

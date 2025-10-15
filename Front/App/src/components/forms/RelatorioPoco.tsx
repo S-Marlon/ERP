@@ -189,7 +189,15 @@ const RelatorioPoco: React.FC = () => {
                     <Card>
                         <Typography variant="h2Alt">Ações e Detalhes</Typography>
                         <Button type="button" variant="outline" style={{ marginBottom: 10 }}>
-                            📊 Registrar Testes de Campo
+                          Documentação Técnica (ex: ART, Laudos, etc.)
+                        </Button><Button type="button" variant="outline" style={{ marginBottom: 10 }}>
+                            📊 Registrar Testes hidraulicos de Campo
+                        </Button>
+                        <Button type="button" variant="outline" style={{ marginBottom: 10 }}>
+                            analise da agua
+                        </Button>
+                        <Button type="button" variant="outline" style={{ marginBottom: 10 }}>
+                            perfil geologico
                         </Button>
                         <Button type="button" variant="outline" style={{ marginBottom: 10 }}>
                             📸 Adicionar Fotos/Mídias

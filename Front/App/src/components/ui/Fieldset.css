@@ -1,0 +1,103 @@
+/* Fieldset.module.css */
+
+/* Estilo Base */
+.fieldset {
+  border: 1px solid #ccc;
+  padding: 15px 20px;
+  margin-bottom: 20px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.legend {
+  font-weight: bold;
+  padding: 0 10px;
+  color: #333;
+}
+
+/* -------------------------------------- */
+/* VARIANT 1: Standard (Padrão) */
+/* -------------------------------------- */
+.standard {
+  border-color: #007bff; /* Azul primário */
+}
+
+.standard .legend {
+  color: #007bff;
+}
+
+/* -------------------------------------- */
+/* VARIANT 2: Card (Estilo de Cartão) */
+/* -------------------------------------- */
+.card {
+  border: none;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Sombra suave */
+  background-color: #fff;
+}
+
+.card .legend {
+  font-size: 1.2em;
+  border-bottom: 2px solid #f0f0f0;
+  padding: 0 0 5px 0;
+  margin-bottom: 10px;
+  display: block; /* Para que a borda de baixo se estenda */
+  width: 100%;
+  box-sizing: border-box;
+  color: #555;
+}
+
+/* O elemento <fieldset> ignora a tag <legend> na borda,
+   então o estilo de cartão não precisa de borda no fieldset.
+   A sombra e padding já o diferenciam. */
+
+/* -------------------------------------- */
+/* VARIANT 3: Highlight (Destaque) */
+/* -------------------------------------- */
+.highlight {
+  border: 2px solid #ffc107; /* Amarelo/Laranja de destaque */
+  background-color: #fffbe6; /* Fundo suavemente amarelado */
+}
+
+.highlight .legend {
+  background-color: #ffc107;
+  color: #333;
+  padding: 2px 10px;
+  border-radius: 4px;
+  margin-left: -10px; /* Ajusta a posição */
+}
+
+
+
+/* ------------------------
+
+*/
+
+
+
+
+
+
+.fieldset {
+    border: 1px solid #ccc;
+    padding: 15px;
+    /* Permite flexionar e define um tamanho base mínimo de 400px */
+    flex: 1 1;
+    border-radius: 8px;
+}
+
+/* Fieldset Principal (Destaque) */
+.fieldset-principal {
+    border: 2px solid #007bff;
+    padding: 15px;
+    border-radius: 8px;
+}
+
+
+/* Tabela de Itens (Melhoria de UX) */
+.fieldset-itens { margin-bottom: 0; }
+.itens-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin-bottom: 15px;
+}

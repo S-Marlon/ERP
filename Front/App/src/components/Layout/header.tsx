@@ -2,6 +2,7 @@
 import './Header.css';
 
 import { colors, darkColors } from '../../styles/colors';
+import { BotaoVoltar } from '../ui/BotaoVoltar';
 
 // Define os tipos das propriedades (props) que o componente vai receber
 interface HeaderProps {
@@ -13,7 +14,7 @@ interface HeaderProps {
   isDarkMode: boolean; // Booleano para saber o estado atual do tema
 }
 
-const Header: React.FC<HeaderProps> = ({ title, onBackButtonClick,
+const Header: React.FC<HeaderProps> = ({ title,
   onThemeToggle,
   isDarkMode }) => {
     
@@ -26,20 +27,9 @@ const Header: React.FC<HeaderProps> = ({ title, onBackButtonClick,
           color: isDarkMode ? '#f3f4f6' : '#1f2937', 
         }}>
 
-      <button 
-            onClick={onBackButtonClick}
-            style={{
-              backgroundColor: 'transparent',
-              border: '1px solid',
-              borderColor: isDarkMode ? '#d1d5db' : '#4b5563',
-              color: isDarkMode ? '#d1d5db' : '#4b5563',
-             
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
-          >
-            ← Voltar
-          </button>
+      
+            <BotaoVoltar />
+           
       <h1 style={{alignContent: 'center', fontSize:"1.3rem"}}>{title}</h1>
                 
                 <div>

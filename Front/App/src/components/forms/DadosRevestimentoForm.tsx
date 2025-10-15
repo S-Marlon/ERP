@@ -1,4 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
+import Typography from '../ui/Typography';
+import Button from '../ui/Button';
+import FormControl from '../ui/FormControl';
+
 export const revestimentoMaterialOptions: string[] = [
     'PVC (Série Reforçada)',
     'Aço Carbono',
@@ -18,69 +22,97 @@ export const revestimentoUniaoOptions: string[] = [
     'Parafusado / Flangeado',
 ];
 
-
-
 const DadosRevestimentoForm: React.FC = () => {
+    const [rows, setRows] = useState([
+        {
+            de: '',
+            ate: '',
+            material: '',
+            diametro: '',
+            uniao: ''
+        }
+    ]);
+
+    const addRow = () => {
+        setRows([...rows, { de: '', ate: '', material: '', diametro: '', uniao: '' }]);
+    };
+
+    const handleChange = (idx: number, field: string, value: string) => {
+        const newRows = rows.map((row, i) =>
+            i === idx ? { ...row, [field]: value } : row
+        );
+        setRows(newRows);
+    };
+
     return (
-         <fieldset className="fieldset">
-                    <legend className="legend">Dados de Revestimento</legend>
-                    <div className="grid-6-cols">
-                        <label className="label">De (m):
-                            <input type="number" step="0.1" name="revestimentoDe"  className="input" />
-                        </label>
-                        <label className="label">Até (m):
-                            <input type="number" step="0.1" name="revestimentoAte"className="input" />
-                        </label>
-
-                        <label className="label">Material Utilizado:
-                            {/* Substituímos o input por select. Usamos a classe 'select' e 'input-base' se você estiver usando herança. */}
-                            <select
-                                name="revestimentoMaterial"
-                                required // Adicione 'required' se este campo for obrigatório
-                                className="input-base select"
-                            >
-                                {/* Opção inicial/padrão, se necessário */}
-                                <option value="" disabled>Selecione o Material</option>
-
-                                {/* Mapeia a lista de opções importada */}
-                                {revestimentoMaterialOptions.map(material => (
-                                    <option key={material} value={material}>
-                                        {material}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
-
-                        <label className="label">Diâmetro (pol):
-                            {/* CLASSE: input */}
-                            <input type="number" step="0.1" name="revestimentoDiametroPolegadas" className="input" />
-                        </label>
-
-                        <label className="label">União Por:
-                            {/* Usamos a classe 'select' e 'input-base' para estilizar o campo */}
-                            <select
-                                name="revestimentoUniao"
-                                required // Adicione 'required' se este campo for obrigatório
-                                className="input-base select"
-                            >
-                                {/* Opção inicial/padrão */}
-                                <option value="" disabled>Selecione o Método de União</option>
-
-                                {/* Mapeia a lista de opções importada */}
-                                {revestimentoUniaoOptions.map(uniao => (
-                                    <option key={uniao} value={uniao}>
-                                        {uniao}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
-                        <label className="label">adcionar mais:
-                            <button className='btn'>+</button>
-                        </label>
+        <fieldset className="fieldset">
+            <legend className="legend">
+                <Typography variant="h3">Dados de Revestimento</Typography>
+            </legend>
+            {rows.map((row, idx) => (
+                <div className="grid-6-cols" key={idx}>
+                    <FormControl
+                        label="De (m)"
+                        name={`revestimentoDe-${idx}`}
+                        type="number"
+                        step={0.1}
+                        value={row.de}
+                        onChange={e => handleChange(idx, 'de', e.target.value)}
+                        required
+                    />
+                    <FormControl
+                        label="Até (m)"
+                        name={`revestimentoAte-${idx}`}
+                        type="number"
+                        step={0.1}
+                        value={row.ate}
+                        onChange={e => handleChange(idx, 'ate', e.target.value)}
+                        required
+                    />
+                    <FormControl
+                        label="Material Utilizado"
+                        name={`revestimentoMaterial-${idx}`}
+                        control="select"
+                        value={row.material}
+                        onChange={e => handleChange(idx, 'material', e.target.value)}
+                        options={revestimentoMaterialOptions.map(material => ({
+                            value: material,
+                            label: material
+                        }))}
+                        required
+                    />
+                    <FormControl
+                        label="Diâmetro (pol)"
+                        name={`revestimentoDiametroPolegadas-${idx}`}
+                        type="number"
+                        step={0.1}
+                        value={row.diametro}
+                        onChange={e => handleChange(idx, 'diametro', e.target.value)}
+                        required
+                    />
+                    <FormControl
+                        label="União Por"
+                        name={`revestimentoUniao-${idx}`}
+                        control="select"
+                        value={row.uniao}
+                        onChange={e => handleChange(idx, 'uniao', e.target.value)}
+                        options={revestimentoUniaoOptions.map(uniao => ({
+                            value: uniao,
+                            label: uniao
+                        }))}
+                        required
+                    />
+                    <div style={{ display: 'flex', alignItems: 'flex-end', height: '100%' }}>
+                        {idx === rows.length - 1 && (
+                            <Button type="button" variant="success" onClick={addRow}>
+                                +
+                            </Button>
+                        )}
                     </div>
-
-
-                </fieldset>
+                </div>
+            ))}
+        </fieldset>
     );
 };
+
 export default DadosRevestimentoForm;

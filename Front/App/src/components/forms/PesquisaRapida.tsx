@@ -6,7 +6,7 @@ import Card from "../ui/Card";
 
 const PesquisaRapida: React.FC = () => {
   return (
-    <Card variant="panel">
+    <Card variant="highlight">
     
       <Typography variant="h1Alt">Busca rápida</Typography>
 
