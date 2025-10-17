@@ -338,8 +338,6 @@ const style = `
     padding-bottom: 0;
     flex-grow: 1; /* Permite que o título ocupe o espaço restante */
 }
-fieldset { border: 1px solid #007bff55; padding: 20px; margin-bottom: 25px; border-radius: 8px; }
-legend { font-weight: bold; color: #007bff; padding: 0 10px; font-size: 1.1em; background-color: #ffffff; margin-left: -5px; }
 
 label { display: block; margin-bottom: 5px; font-weight: 600; color: #495057; }
 input[type="text"],

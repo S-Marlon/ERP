@@ -12,21 +12,7 @@
 }
 
 
-fieldset {
-    border: 1px solid #dee2e6; 
-    padding: 20px; 
-    margin-bottom: 20px; 
-    border-radius: 8px; 
-    background-color: #f8f9fa; /* Fundo sutil para fieldset */
-}
-legend {
-    font-weight: 600;
-    color: #007bff;
-    padding: 0 10px;
-    font-size: 1.1em;
-    background-color: #ffffff;
-    margin-left: -5px;
-}
+
 
 
 

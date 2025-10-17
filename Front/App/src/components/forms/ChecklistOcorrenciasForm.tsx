@@ -47,10 +47,8 @@ const ChecklistOcorrenciasForm: React.FC = () => {
     
 
     return (
-        <Fieldset variant='standard' legend='<Typography variant="h3">Checklist de Ocorrências</Typography>' className="fieldset">
-            <legend className="legend">
-                
-            </legend>
+        <Fieldset variant='standard' legend='Checklist de Ocorrências'>
+            
 
             <Typography variant="h4">Problemas de Perfuração (Circulação)</Typography>
             <div className="checkbox-group">

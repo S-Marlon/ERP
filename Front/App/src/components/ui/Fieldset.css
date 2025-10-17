@@ -1,12 +1,9 @@
-/* Fieldset.module.css */
-
-/* Estilo Base */
 .fieldset {
   border: 1px solid #ccc;
   padding: 15px 20px;
   margin-bottom: 20px;
-  border-radius: 6px;
   transition: all 0.3s ease;
+  border-radius: 8px;
 }
 
 .legend {
@@ -14,18 +11,12 @@
   padding: 0 10px;
   color: #333;
 }
-
 /* -------------------------------------- */
 /* VARIANT 1: Standard (Padrão) */
 /* -------------------------------------- */
 .standard {
-  border-color: #007bff; /* Azul primário */
+  border-color: #000000; /* Azul primário */
 }
-
-.standard .legend {
-  color: #007bff;
-}
-
 /* -------------------------------------- */
 /* VARIANT 2: Card (Estilo de Cartão) */
 /* -------------------------------------- */
@@ -66,38 +57,13 @@
   margin-left: -10px; /* Ajusta a posição */
 }
 
-
-
-/* ------------------------
-
-*/
-
-
-
-
-
-
-.fieldset {
-    border: 1px solid #ccc;
-    padding: 15px;
-    /* Permite flexionar e define um tamanho base mínimo de 400px */
-    flex: 1 1;
-    border-radius: 8px;
-}
-
-/* Fieldset Principal (Destaque) */
-.fieldset-principal {
-    border: 2px solid #007bff;
-    padding: 15px;
-    border-radius: 8px;
-}
-
-
 /* Tabela de Itens (Melhoria de UX) */
-.fieldset-itens { margin-bottom: 0; }
+.fieldset-itens {
+  margin-bottom: 0;
+}
 .itens-table {
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-    margin-bottom: 15px;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-bottom: 15px;
 }

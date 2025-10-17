@@ -3,15 +3,16 @@ import Typography from '../ui/Typography';
 import Button from '../ui/Button';
 import FormControl from '../ui/FormControl';
 import Card from '../ui/Card';
+// Importação dos Módulos (Sub-formulários)
 import DadosPerfuracaoForm from './DadosPerfuracaoForm';
 import DadosRevestimentoForm from './DadosRevestimentoForm';
 import ChecklistOcorrenciasForm from './ChecklistOcorrenciasForm';
-import { BotaoVoltar } from '../ui/BotaoVoltar';
+// Importação dos Componentes de Layout
+import TabPanel from '../ui/TabPanel';
+import VerticalTabs from '../ui/VerticalTabs';
 
-// ----------------- TIPOS DE DADOS E MOCKS -----------------
+// ----------------- TIPOS DE DADOS E MOCKS (MANTIDOS) -----------------
 
-// Defina as interfaces de seção, se elas existirem em seus respectivos arquivos
-// Exemplo:
 interface SecaoPerfuracao {
     deMetros: number;
     aMetros: number;
@@ -23,8 +24,6 @@ interface SecaoRevestimento {
     deMetros: number;
     aMetros: number;
 }
-
-
 interface PocoData {
     // DADOS GERAIS
     contratoId: string;
@@ -37,8 +36,8 @@ interface PocoData {
     diametroConstrucaoMm: number;
     formacaoGeologica: string;
     observacoes: string;
-    
-    // DADOS DO CONJUNTO DE BOMBEAMENTO (Atualizados)
+
+    // DADOS DO CONJUNTO DE BOMBEAMENTO
     marcaBomba: string;
     modeloBomba: string;
     dataInstalacaoBomba: string;
@@ -46,16 +45,15 @@ interface PocoData {
     tubulacaoEdutora: string;
     cabeamentoEletrico: string;
     cavaleteSaida: string;
-    
-    // DADOS DOS TESTES (Atualizados - Foco em Nível Estático/Dinâmico/Vazão do Teste)
-    vazaoTesteM3Hora: number; 
+
+    // DADOS DOS TESTES
+    vazaoTesteM3Hora: number;
     nivelEstaticoTesteMetros: number;
     nivelDinamicoTesteMetros: number;
-    
-    // Módulos de Lista (Para DadosPerfuracaoForm, RevestimentoForm, etc.)
+
+    // Módulos de Lista
     secoesPerfuracao: SecaoPerfuracao[];
     secoesRevestimento: SecaoRevestimento[];
-    // ... outros arrays de dados (ocorrências, fotos, etc.)
 }
 
 interface ContratoSimples {
@@ -70,32 +68,19 @@ const CONTRATOS_MOCK: ContratoSimples[] = [
 ];
 
 const initialState: PocoData = {
-    // DADOS GERAIS
+    // ... (restante do seu initial state)
     contratoId: '',
     nomeIdentificacao: '',
     dataConclusao: new Date().toISOString().split('T')[0],
-    latitude: 0,
-    longitude: 0,
-    elevacaoMetros: 0,
-    profundidadeTotalMetros: 0,
-    diametroConstrucaoMm: 0,
-    formacaoGeologica: '',
-    observacoes: '',
-    
-    // DADOS DE BOMBEAMENTO E TESTE (Iniciados)
-    marcaBomba: '',
-    modeloBomba: '',
+    latitude: 0, longitude: 0, elevacaoMetros: 0,
+    profundidadeTotalMetros: 0, diametroConstrucaoMm: 0,
+    formacaoGeologica: '', observacoes: '',
+    marcaBomba: '', modeloBomba: '',
     dataInstalacaoBomba: new Date().toISOString().split('T')[0],
     profundidadeBombaMetros: 0,
-    tubulacaoEdutora: '', 
-    cabeamentoEletrico: '', 
-    cavaleteSaida: '',
-    vazaoTesteM3Hora: 0,
-    nivelEstaticoTesteMetros: 0,
-    nivelDinamicoTesteMetros: 0,
-    
-    // Módulos (Arrays vazios)
-    secoesPerfuracao: [], 
+    tubulacaoEdutora: '', cabeamentoEletrico: '', cavaleteSaida: '',
+    vazaoTesteM3Hora: 0, nivelEstaticoTesteMetros: 0, nivelDinamicoTesteMetros: 0,
+    secoesPerfuracao: [],
     secoesRevestimento: [],
 };
 
@@ -105,6 +90,7 @@ const RelatorioPoco: React.FC = () => {
     const [formData, setFormData] = useState<PocoData>(initialState);
     const [showBombeamento, setShowBombeamento] = useState(false);
 
+    // Função genérica para campos simples (mantida)
     const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value, type } = e.target;
         const numericFields = [
@@ -120,200 +106,298 @@ const RelatorioPoco: React.FC = () => {
         }));
     };
 
+    // Função específica para atualizar dados de lista (Perfuracao, Revestimento, etc.)
+    const handleListChange = <K extends keyof PocoData>(name: K, list: PocoData[K]) => {
+        setFormData(prevData => ({
+            ...prevData,
+            [name]: list,
+        }));
+    };
+
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
-        if (!formData.contratoId || !formData.nomeIdentificacao || formData.profundidadeTotalMetros <= 0) {
-            alert("Erro: Preencha o Contrato, a Identificação e a Profundidade Total.");
-            return;
-        }
+        // ... (lógica de validação)
         console.log('Relatório de Poço Enviado:', formData);
         alert(`Relatório do poço "${formData.nomeIdentificacao}" salvo com sucesso!`);
     };
 
     return (
-        <form onSubmit={handleSubmit} className="form-container">
-            {/* HEADER COM BOTÃO DE VOLTAR */}
-            <div className='form-header'>
-                <BotaoVoltar />
-                <Typography variant="h1Alt">Registro Técnico do Poço</Typography>
+        <form onSubmit={handleSubmit} className="relatorio-poco-form">
+            {/* ------------------ HEADER AJUSTADO ------------------ */}
+            <div className='form-header-row'>
+
+                <Typography variant="h1Alt">
+                    Registro Técnico do Poço
+                </Typography>
             </div>
-            <Typography variant="pMuted" className="subtitle">
-                Relatório pós-serviço (Perfuração/Manutenção)
-            </Typography>
 
-            {/* GRID PRINCIPAL DE DUAS COLUNAS */}
-            <div className="grid-2-cols">
-                {/* COLUNA PRINCIPAL */}
+            <div className='flex-row'>
+                <Typography variant="pMuted" className="subtitle" >
+                    Relatório pós-serviço (Perfuração/Manutenção)
+                </Typography>
+                <FormControl
+                    label="Obra/Contrato de Origem"
+                    name="contratoId"
+                    control="select"
+                    value={formData.contratoId}
+                    onChange={handleChange}
+                    options={CONTRATOS_MOCK.map(c => ({ value: c.id, label: c.titulo }))}
+                    required
+                />
+                <FormControl
+                    label="Nome de Identificação do Poço"
+                    name="nomeIdentificacao"
+                    value={formData.nomeIdentificacao}
+                    onChange={handleChange}
+                    placeholder="Ex: Poço Principal - Casa 1"
+                    required
+                />
+                <FormControl
+                    label="Data do Relatório"
+                    name="dataConclusao"
+                    type="date"
+                    value={formData.dataConclusao}
+                    onChange={handleChange}
+                    required
+                />
+            </div>
+
+            {/* ------------------ GRID PRINCIPAL (7fr 3fr) ------------------ */}
+            <div className="grid-container">
+
+                {/* COLUNA PRINCIPAL (7fr) - ABAS VERTICAIS */}
                 <div className="coluna-principal">
-                    <Card>
-                        <Typography variant="h2Alt">Identificação da Obra</Typography>
-                        <div className="form-row">
-                            <FormControl
-                                label="Obra/Contrato de Origem"
-                                name="contratoId"
-                                control="select"
-                                value={formData.contratoId}
-                                onChange={handleChange}
-                                options={CONTRATOS_MOCK.map(c => ({
-                                    value: c.id,
-                                    label: c.titulo
-                                }))}
-                                required
-                            />
-                            <FormControl
-                                label="Nome de Identificação do Poço"
-                                name="nomeIdentificacao"
-                                value={formData.nomeIdentificacao}
-                                onChange={handleChange}
-                                placeholder="Ex: Poço Principal - Casa 1"
-                                required
-                            />
-                            <FormControl
-                                label="Data do Relatório"
-                                name="dataConclusao"
-                                type="date"
-                                value={formData.dataConclusao}
-                                onChange={handleChange}
-                                required
-                            />
-                        </div>
-                    </Card>
+                    <VerticalTabs defaultActiveIndex={0}>
 
-                    <DadosPerfuracaoForm /* Propriedades de controle de estado/data devem ser adicionadas */ />
-                    <DadosRevestimentoForm /* Propriedades de controle de estado/data devem ser adicionadas */ />
-                    <ChecklistOcorrenciasForm />
+                         <TabPanel label="1. Dados Gerais do poço">
+                            <Typography variant="h3">Localização e Características</Typography>
+                            <div className="form-row">
+                                <FormControl label="Latitude" name="latitude" type="number" value={formData.latitude} onChange={handleChange} placeholder="00.000000" />
+                                <FormControl label="Longitude" name="longitude" type="number" value={formData.longitude} onChange={handleChange} placeholder="00.000000" />
+                            </div>
+                            <div className="form-row">
+                                <FormControl label="Profundidade Total (m)" name="profundidadeTotalMetros" type="number" value={formData.profundidadeTotalMetros} onChange={handleChange} placeholder="100.00" min={0} required />
+                                <FormControl label="Diâmetro Construção (mm)" name="diametroConstrucaoMm" type="number" value={formData.diametroConstrucaoMm} onChange={handleChange} placeholder="203.2 (8'')" min={0} />
+                                <FormControl label="Formação Geológica Predominante" name="formacaoGeologica" value={formData.formacaoGeologica} onChange={handleChange} placeholder="Ex: Cristalino, Sedimentar, Arenito" />
+                            </div>
+                           
+                        </TabPanel>
+
+                        <TabPanel label="2. Dados da Perfuração">
+                            <DadosPerfuracaoForm
+                                data={formData.secoesPerfuracao}
+                                onChange={(list) => handleListChange('secoesPerfuracao', list)}
+                            />
+                        </TabPanel>
+
+                        <TabPanel label="3. Dados do Revestimento">
+                            <DadosRevestimentoForm
+                                data={formData.secoesRevestimento}
+                                onChange={(list) => handleListChange('secoesRevestimento', list)}
+                            />
+                        </TabPanel>
+
+                        <TabPanel label="4. Checklist e Observações">
+                            {/* Passar observações e ocorrências se houver */}
+                            <ChecklistOcorrenciasForm />
+                        </TabPanel>
+
+                        <TabPanel label="5. Conjunto de Bombeamento ">
+                            <fieldset style={{ border: '1px solid #ddd', padding: '15px', borderRadius: '4px' }}>
+                                <legend style={{ fontWeight: 'bold', padding: '0 10px' }}>Detalhes da Instalação</legend>
+                                <Typography variant="h4" >Detalhes da Bomba</Typography>
+                                <div className="form-row">
+                                    <FormControl label="Marca" name="marcaBomba" value={formData.marcaBomba} onChange={handleChange} placeholder="Grundfos, Leão" />
+                                    <FormControl label="Modelo" name="modeloBomba" value={formData.modeloBomba} onChange={handleChange} placeholder="SP 5A-18" />
+                                </div>
+                                <div className="form-row">
+                                    <FormControl label="Profundidade (m)" name="profundidadeBombaMetros" type="number" value={formData.profundidadeBombaMetros} onChange={handleChange} placeholder="60.00" min={0} />
+                                    <FormControl label="Data Instalação" name="dataInstalacaoBomba" type="date" value={formData.dataInstalacaoBomba} onChange={handleChange} />
+                                </div>
+                                <Typography variant="h4" >Testes de Campo</Typography>
+                                <div className="form-row">
+                                    <FormControl label="Vazão (m³/h)" name="vazaoTesteM3Hora" type="number" value={formData.vazaoTesteM3Hora} onChange={handleChange} placeholder="5.2" min={0} />
+                                    <FormControl label="Nível Estático (m)" name="nivelEstaticoTesteMetros" type="number" value={formData.nivelEstaticoTesteMetros} onChange={handleChange} placeholder="45.00" min={0} />
+                                    <FormControl label="Nível Dinâmico (m)" name="nivelDinamicoTesteMetros" type="number" value={formData.nivelDinamicoTesteMetros} onChange={handleChange} placeholder="55.50" min={0} />
+                                </div>
+                            </fieldset>
+                        </TabPanel>
+                    </VerticalTabs>
                 </div>
 
-                {/* COLUNA SECUNDÁRIA */}
+                {/* COLUNA SECUNDÁRIA (3fr) - AÇÕES E BOMBEAMENTO */}
                 <div className="coluna-secundaria">
-                    <Card>
-                        <Typography variant="h2Alt">Ações e Detalhes</Typography>
-                        <Button type="button" variant="outline" style={{ marginBottom: 10 }}>
-                          Documentação Técnica (ex: ART, Laudos, etc.)
-                        </Button><Button type="button" variant="outline" style={{ marginBottom: 10 }}>
-                            📊 Registrar Testes hidraulicos de Campo
-                        </Button>
-                        <Button type="button" variant="outline" style={{ marginBottom: 10 }}>
-                            analise da agua
-                        </Button>
-                        <Button type="button" variant="outline" style={{ marginBottom: 10 }}>
-                            perfil geologico
-                        </Button>
-                        <Button type="button" variant="outline" style={{ marginBottom: 10 }}>
-                            📸 Adicionar Fotos/Mídias
-                        </Button>
-                    </Card>
+
+                    {/* COLUNA SECUNDÁRIA (3fr) */}
+                    <div className="coluna-secundaria">
+
+                        {/* CARD 1: AÇÕES PRINCIPAIS E EDIÇÃO DE METADADOS */}
+                        <Card >
+                            <Typography variant="h2Alt">Ações Essenciais</Typography>
+
+                            
+                            <Button type="button" variant="outline" style={{ width: '100%', marginBottom: 10 }}>
+                                📊 Registrar Testes Hidráulicos de Campo {/* Ação de registro de dados */}
+                            </Button>
+
+                            <Typography variant="h3" >Documentação e Mídia</Typography>
+
+                            
+                            <Button type="button" variant="outline" style={{ width: '100%', marginBottom: 10 }}>
+                                📁 Anexar Documentos/Laudos
+                            </Button>
+                            <Button type="button" variant="outline" style={{ width: '100%', marginBottom: 10 }}>
+                                📸 Adicionar Fotos/Mídias
+                            </Button>
+                        </Card>
+
+
+                        {/* CARD 3: INFORMAÇÕES TÉCNICAS E MONITORAMENTO (Menos Frequentes) */}
+                        <Card>
+                            <Typography variant="h2Alt">Dados Técnicos e Históricos</Typography>
+
+                            {/* DADOS DETALHADOS E HISTÓRICOS */}
+                            <Button type="button" variant="outline" style={{ width: '100%', marginBottom: 10 }}>
+                                Perfil geológico detalhado
+                            </Button>
+                            <Button type="button" variant="outline" style={{ width: '100%', marginBottom: 10 }}>
+                                documentação técnica do poço
+                            </Button>
+                            <Button type="button" variant="outline" style={{ width: '100%', marginBottom: 10 }}>
+                                análises de qualidade da água
+                            </Button>
+                            <Button type="button" variant="outline" style={{ width: '100%', marginBottom: 10 }}>
+                                monitoramento de níveis e vazões
+                            </Button>
+
+                           
+                            
+                            
+                           
+                        </Card>
+
+                        {/* AÇÕES DE RISCO (MANTIDAS FORA DO CARD PRINCIPAL OU COM VISUAL DIFERENCIADO) */}
+                        <Card style={{ marginTop: 20, backgroundColor: '#ffe6e6', border: '1px solid #ff4d4f' }}>
+                            <Typography variant="h2Alt" style={{ color: '#ff4d4f' }}>Zona de Risco</Typography>
+                            <Button type="button" variant="danger" style={{ width: '100%', marginBottom: 10 }}>
+                                🗑️ Excluir Relatório do Poço
+                            </Button>
+                        </Card>
+
+                    </div>
+
+
+
+
+                    {/* CARD DE BOMBEAMENTO E TESTES (toggle) */}
                     <Card>
                         <Button
                             type="button"
-                            variant="outline"
+                            variant="primary"
                             onClick={() => setShowBombeamento(!showBombeamento)}
-                            style={{ width: "100%", marginBottom: 10 }}
+                            style={{ width: "100%", marginBottom: showBombeamento ? 15 : 0 }}
                         >
                             {showBombeamento ? '➖ Ocultar' : '➕ Adicionar'} Conjunto de Bombeamento
                         </Button>
                         {showBombeamento && (
-                            <fieldset>
-                                <legend>Dados do Conjunto de Bombeamento e Teste</legend>
-                                <Typography variant="h3">Detalhes da Bomba Instalada</Typography>
+                            <fieldset style={{ border: '1px solid #ddd', padding: '15px', borderRadius: '4px' }}>
+                                <legend style={{ fontWeight: 'bold', padding: '0 10px' }}>Detalhes da Instalação</legend>
+                                <Typography variant="h4" >Detalhes da Bomba</Typography>
                                 <div className="form-row">
-                                    <FormControl
-                                        label="Marca da Bomba"
-                                        name="marcaBomba"
-                                        value={formData.marcaBomba}
-                                        onChange={handleChange}
-                                        placeholder="Ex: Grundfos, Schneider, Leão"
-                                    />
-                                    <FormControl
-                                        label="Modelo da Bomba"
-                                        name="modeloBomba"
-                                        value={formData.modeloBomba}
-                                        onChange={handleChange}
-                                        placeholder="Ex: SP 5A-18, E-tech 4''"
-                                    />
-                                    <FormControl
-                                        label="Data de Instalação"
-                                        name="dataInstalacaoBomba"
-                                        type="date"
-                                        value={formData.dataInstalacaoBomba}
-                                        onChange={handleChange}
-                                    />
-                                    <FormControl
-                                        label="Profundidade da Bomba (m)"
-                                        name="profundidadeBombaMetros"
-                                        type="number"
-                                        value={formData.profundidadeBombaMetros}
-                                        onChange={handleChange}
-                                        placeholder="60.00"
-                                        min={0}
-                                    />
+                                    <FormControl label="Marca" name="marcaBomba" value={formData.marcaBomba} onChange={handleChange} placeholder="Grundfos, Leão" />
+                                    <FormControl label="Modelo" name="modeloBomba" value={formData.modeloBomba} onChange={handleChange} placeholder="SP 5A-18" />
                                 </div>
-                                <Typography variant="h3">Acessórios e Infraestrutura</Typography>
                                 <div className="form-row">
-                                    <FormControl
-                                        label="Tubulação Edutora"
-                                        name="tubulacaoEdutora"
-                                        value={formData.tubulacaoEdutora}
-                                        onChange={handleChange}
-                                        placeholder="Ex: PVC Roscável 2'', Aço 3''"
-                                    />
-                                    <FormControl
-                                        label="Cabeamento Elétrico"
-                                        name="cabeamentoEletrico"
-                                        value={formData.cabeamentoEletrico}
-                                        onChange={handleChange}
-                                        placeholder="Ex: Cabo 3 vias 6mm²"
-                                    />
-                                    <FormControl
-                                        label="Cavalete de Saída"
-                                        name="cavaleteSaida"
-                                        value={formData.cavaleteSaida}
-                                        onChange={handleChange}
-                                        placeholder="Ex: PVC, Aço Galvanizado"
-                                    />
+                                    <FormControl label="Profundidade (m)" name="profundidadeBombaMetros" type="number" value={formData.profundidadeBombaMetros} onChange={handleChange} placeholder="60.00" min={0} />
+                                    <FormControl label="Data Instalação" name="dataInstalacaoBomba" type="date" value={formData.dataInstalacaoBomba} onChange={handleChange} />
                                 </div>
-                                <Typography variant="h3" style={{ marginTop: '20px' }}>
-                                    Testes de Campo (Pós-Instalação)
-                                </Typography>
+                                <Typography variant="h4" >Testes de Campo</Typography>
                                 <div className="form-row">
-                                    <FormControl
-                                        label="Vazão Aferida (m³/h)"
-                                        name="vazaoTesteM3Hora"
-                                        type="number"
-                                        value={formData.vazaoTesteM3Hora}
-                                        onChange={handleChange}
-                                        placeholder="5.2"
-                                        min={0}
-                                    />
-                                    <FormControl
-                                        label="Nível Estático (Teste) (m)"
-                                        name="nivelEstaticoTesteMetros"
-                                        type="number"
-                                        value={formData.nivelEstaticoTesteMetros}
-                                        onChange={handleChange}
-                                        placeholder="45.00"
-                                        min={0}
-                                    />
-                                    <FormControl
-                                        label="Nível Dinâmico (Teste) (m)"
-                                        name="nivelDinamicoTesteMetros"
-                                        type="number"
-                                        value={formData.nivelDinamicoTesteMetros}
-                                        onChange={handleChange}
-                                        placeholder="55.50"
-                                        min={0}
-                                    />
+                                    <FormControl label="Vazão (m³/h)" name="vazaoTesteM3Hora" type="number" value={formData.vazaoTesteM3Hora} onChange={handleChange} placeholder="5.2" min={0} />
+                                    <FormControl label="Nível Estático (m)" name="nivelEstaticoTesteMetros" type="number" value={formData.nivelEstaticoTesteMetros} onChange={handleChange} placeholder="45.00" min={0} />
+                                    <FormControl label="Nível Dinâmico (m)" name="nivelDinamicoTesteMetros" type="number" value={formData.nivelDinamicoTesteMetros} onChange={handleChange} placeholder="55.50" min={0} />
                                 </div>
                             </fieldset>
                         )}
                     </Card>
                 </div>
             </div>
-            <Button type="submit" variant="primary" style={{ width: "100%", marginTop: 30 }}>
-                Finalizar Relatório e Salvar Dados do Poço
+
+            {/* ------------------ BOTÃO DE SUBMISSÃO ------------------ */}
+            <Button type="submit" variant="success" style={{ width: "100%", marginTop: 30, fontSize: '1.2em' }}>
+                ✅ Finalizar Relatório e Salvar Dados do Poço
+            </Button>
+
+
+            <Button type="button" variant="outline" style={{ width: "100%", marginTop: 30, fontSize: '1.2em' }}>
+                💾 Salvar Rascunho do Relatório
             </Button>
         </form>
     );
 };
 
 export default RelatorioPoco;
+
+
+// ----------------- ESTILOS CSS INLINE PARA DEMONSTRAÇÃO -----------------
+
+// Adicione este bloco de estilos ao seu arquivo CSS global ou CSS Module
+const style = `
+.relatorio-poco-form {
+    max-width: 1600px; /* Ajuste o máximo para melhor visualização */
+    margin: 0 auto 50px auto;
+}
+
+.form-header-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px;
+    border-bottom: 2px solid #eee;
+}
+
+
+
+.form-row {
+    display: flex;
+    gap: 10px;
+}
+.form-row > * {
+    flex: 1; /* Faz com que os FormControls ocupem o mesmo espaço */
+}
+
+.grid-container {
+    display: grid; 
+    grid-template-columns: 8fr 3fr; 
+    gap: 10px; /* Mais espaço entre as colunas */
+    width: 100%;
+}
+
+.coluna-principal {
+    /* Sem bordas de debug. O VerticalTabs deve ter suas próprias bordas. */
+}
+
+.coluna-secundaria {
+    /* Sem bordas de debug. Os Cards devem ter suas próprias sombras/bordas. */
+}
+
+/* Opcional: Responsividade para telas menores */
+@media (max-width: 1024px) {
+    .grid-container {
+        grid-template-columns: 1fr; /* Volta para coluna única */
+    }
+}
+@media (max-width: 768px) {
+   
+}
+`;
+
+// *******************************************************************
+// ADICIONANDO O STYLE AO DOCUMENTO (Mantenha este bloco no final do arquivo .tsx para a demo)
+// Em produção, mova os estilos acima para um arquivo CSS Module ou componente de Estilo.
+if (typeof document !== "undefined" && !document.querySelector('style#relatorio-poco-styles')) {
+    const styleTag = document.createElement("style");
+    styleTag.id = 'relatorio-poco-styles';
+    styleTag.innerHTML = style;
+    document.head.appendChild(styleTag);
+}
+// *******************************************************************

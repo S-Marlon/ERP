@@ -1,6 +1,6 @@
 // Fieldset.tsx
 import React from 'react';
-import styles from './Fieldset.css'; // Importa os estilos CSS Modules
+import './Fieldset.css'; // Importa os estilos CSS Modules
 
 /**
  * Define os tipos de variantes de estilo.
@@ -28,7 +28,6 @@ const Fieldset: React.FC<FieldsetProps> = ({
   variant = 'standard', // Define 'standard' como padrão
   children,
   
-  ...rest
 }) => {
   // Constrói a lista de classes CSS
   // styles.fieldset é a classe base.
@@ -36,9 +35,9 @@ const Fieldset: React.FC<FieldsetProps> = ({
    
 
   return (
-    <fieldset className={variant} {...rest}>
+    <fieldset className={'fieldset fieldset-'+variant} >
       {/* O elemento <legend> recebe a classe de estilo para a legenda */}
-      <legend >{legend}sss</legend>
+      <legend className='legend' >{legend}</legend>
       {children}
     </fieldset>
   );

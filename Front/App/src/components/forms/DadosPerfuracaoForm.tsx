@@ -32,20 +32,7 @@ const DadosPerfuracaoForm: React.FC = () => {
                     options={tipoSoloSuperficialOptions.map(tipo => ({ value: tipo, label: tipo }))}
                     required
                 />
-                <FormControl
-                    label="Profundidade Total (m)"
-                    name="profundidadeTotal"
-                    type="number"
-                    step={0.1}
-                    required
-                />
-                <FormControl
-                    label="Diâmetro Interno (mm)"
-                    name="diametroInterno"
-                    type="number"
-                    step={0.1}
-                    required
-                />
+               
             </div>
 
             <Typography variant="h4" >

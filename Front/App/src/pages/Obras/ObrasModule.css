@@ -17,52 +17,6 @@
     margin: 0 auto;
 }
 
-/* =================================== */
-/* FIELDSETS               */
-/* =================================== */
-
-
-
-.legend {
-    font-weight: bold;
-    color: #007bff;
-    padding: 0 10px;
-}
-
-
-
-.textarea {
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    margin-top: 5px;
-    width: 100%;
-
-    /* 1. ESSENCIAL: Garante que padding e border não aumentem a largura total */
-    box-sizing: border-box;
-
-    /* 2. SOLUÇÃO: Controla como o usuário pode redimensionar o campo */
-    /* Permite apenas o redimensionamento vertical, impedindo a expansão horizontal */
-    resize: vertical;
-
-    /* Alternativamente, para desabilitar totalmente o redimensionamento, use: */
-    /* resize: none; */
-
-    margin-bottom: 15px;
-    font-size: 1em;
-    font-family: inherit;
-    min-height: 80px;
-    /* Adicionado: Garante uma altura mínima para começar */
-}
-
-/* Você pode adicionar um estilo de foco para melhor usabilidade */
-.textarea:focus {
-    border-color: #007bff;
-    outline: none;
-    box-shadow: 0 0 0 1px #007bff;
-}
-
-
 
 /* 1. Estilização do Body/HTML para permitir rolagem */
 body {
@@ -74,7 +28,7 @@ body {
 .layout-container {
     display: grid;
     /* Define as colunas: 1 parte fracionada para a sidebar, 2 partes para o conteúdo */
-    grid-template-columns: 2.5fr 6fr 8fr    ;
+    grid-template-columns: 2.5fr 6fr 8fr;
     /* Ajuste de altura para que a área de conteúdo preencha a tela */
 }
 
@@ -92,19 +46,17 @@ body {
     /* Define o posicionamento fixo/sticky dentro do grid */
     position: sticky;
     /* Mantém a sidebar alinhada ao topo da viewport */
-    top: 0; 
+    top: 0;
     /* Garante que ela ocupe toda a altura da tela, mesmo com pouco conteúdo */
-    align-self: start; 
-    
+    align-self: start;
+
     /* Estilos Visuais */
     color: white;
-    overflow-y: auto; /* Permite rolar o conteúdo interno da sidebar se necessário */
+    overflow-y: auto;
+    /* Permite rolar o conteúdo interno da sidebar se necessário */
 }
 
-.sidebar-fixa h2 {
-    margin-top: 0;
-    font-size: 1em;
-}
+
 
 .sidebar-fixa ul {
     list-style: none;
@@ -124,5 +76,3 @@ body {
     /* É a área que rola normalmente */
     padding: 0 10px;
 }
-
-

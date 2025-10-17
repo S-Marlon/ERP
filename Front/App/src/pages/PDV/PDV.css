@@ -137,11 +137,6 @@
   flex-direction: column;
 }
 
-fieldset.inter {
-  width: 70%;
-  border: none;
-  padding: 0;
-}
 
 /* Filtro de Categorias */
 .pdv-categories-filter {
@@ -260,17 +255,17 @@ fieldset.inter {
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
-
+/* 
 .pdv-search-filter fieldset {
   border: none;
   padding: 5px;
   border-radius: 4px;
   display: flex;
   flex-direction: column;
-  /* Coloca os elementos dentro do fieldset em coluna */
+  /* Coloca os elementos dentro do fieldset em coluna 
   gap: 0px;
-  /* Espaço entre os elementos dentro do fieldset */
-}
+  /* Espaço entre os elementos dentro do fieldset 
+} */
 
 .pdv-search-filter legend {
   font-weight: bold;

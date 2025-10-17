@@ -15,6 +15,19 @@ import TabsContainer from '../../../components/ui/TabsContainer';
 // 1. Aba Geral: Estrutura em duas colunas para campos
 const AbaGeral: React.FC<{ obra: Obra, clienteNome: string }> = ({ obra, clienteNome }) => (
     <Card>
+        {/* DADOS DETALHADOS E HISTÓRICOS */}
+                            <Button type="button" variant="outline">
+                                Perfil geológico detalhado
+                            </Button>
+                            <Button type="button" variant="outline">
+                                documentação técnica do poço
+                            </Button>
+                            <Button type="button" variant="outline">
+                                análises de qualidade da água
+                            </Button>
+                            <Button type="button" variant="outline">
+                                monitoramento de níveis e vazões
+                            </Button>
         <Typography variant="h2">Dados Gerais da Obra</Typography>
         <FormControl
           label="Nome do Cliente"
@@ -46,6 +59,9 @@ const AbaAtividades: React.FC<{ obraId: string }> = ({ obraId }) => {
 
     return (
         <Card variant="panel">
+            <Button type="button" variant="outline">
+                                📅 Agendar Manutenção Futura
+                            </Button>
             <Typography variant="h2Alt">Atividades da Obra</Typography>
             <ul style={{ listStyleType: "none", padding: 0 }}>
                 {atividades.map(atv => (
@@ -65,6 +81,9 @@ const AbaRegistrosTempo: React.FC<{ obraId: string }> = ({ obraId }) => {
     const registros = mockRegistrosTempo.filter(r => r.obraId === obraId);
     return (
         <Card variant="panel">
+            <Button type="button" variant="outline">
+                                🔍 Visualizar Histórico de Alterações
+                            </Button>
             <Typography variant="h2Alt">Registros de Tempo</Typography>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
@@ -101,6 +120,9 @@ const ObraLocalizacao: React.FC<{ latitude: number; longitude: number; titulo: s
   titulo,
 }) => (
   <Card variant="panel">
+    <Button type="button" variant="outline">
+                                🗺️  mapa de localização do poço
+                            </Button>
     <Typography variant="h2Alt">Localização</Typography>
     <Typography variant="pMuted">Aqui você teria um componente de mapa (Leaflet, Google Maps, etc.)</Typography>
     <Typography variant="small">
@@ -112,6 +134,7 @@ const ObraLocalizacao: React.FC<{ latitude: number; longitude: number; titulo: s
     <Typography variant="pMuted">
       <strong>Título:</strong> {titulo}
     </Typography>
+    
   </Card>
 );
 
@@ -154,7 +177,9 @@ export const ObraDetalhes: React.FC = () => {
         {
             id: 'Imagens',
             label: 'Imagens',
-            content: <Typography variant="pMuted">Conteúdo da aba Imagens</Typography>
+            content: <Button type="button" variant="outline">
+                                📁 Anexar Documentos/Laudos
+                            </Button>
         },
         {
             id: 'Serviços',
@@ -164,7 +189,10 @@ export const ObraDetalhes: React.FC = () => {
         {
             id: 'Galeria',
             label: 'Galeria',
-            content: <Typography variant="pMuted">Conteúdo da aba Galeria</Typography>
+            content:  <Button type="button" variant="outline">
+                                📸 Adicionar Fotos/Mídias
+                            </Button>
+                            
         }
     ];
 
@@ -187,8 +215,36 @@ export const ObraDetalhes: React.FC = () => {
 
             {/* 2. BARRA DE AÇÕES ESTILIZADA */}
             <div className="action-buttons-container" >
-                <Button variant="secondary">Editar</Button>
-                <Button variant="primary">Novo Registro de Tempo</Button>
+
+                
+                            <Typography variant="h2Alt">Ações Essenciais</Typography>
+                <Button variant="outline">➕ Novo Registro de Tempo</Button>
+
+                            {/* AÇÕES DE EDIÇÃO/REGISTRO */}
+                            <Button type="button" variant="outline" >
+                                📝 Editar Dados Gerais do Poço {/* Mantém a edição de dados gerais acessível */}
+                            </Button>
+                            <Button type="button" variant="primary">
+                                📋 Gerar Relatório Completo (PDF) {/* Destaque o botão principal de saída */}
+                            </Button>
+                            <Button type="button" variant="outline">
+                                🖨️ Imprimir Relatório do Poço
+                            </Button>
+                            <Button type="button" variant="outline">
+                                📤 Compartilhar Relatório do Poço
+                            </Button>
+                             <Button type="button" variant="outline">
+                                ⚙️ Configurações Avançadas do Relatório
+                            </Button>
+                            
+                            
+                            
+                            
+
+                            
+                           
+
+
                 <FormControl
                     label=""
                     name="acoes"

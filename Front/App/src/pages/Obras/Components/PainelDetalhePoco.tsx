@@ -237,9 +237,6 @@ h1 { color: #007bff; border-bottom: 2px solid #eee; padding-bottom: 10px; margin
     grid-template-columns: 2fr 1fr; /* Cadastros e Ações */
     gap: 20px;
 }
-fieldset { border: 1px solid #ccc; padding: 20px; border-radius: 8px; }
-legend { font-weight: bold; color: #007bff; padding: 0 10px; font-size: 1.1em; }
-
 /* Linhas de Ação */
 .action-row {
     display: flex;
