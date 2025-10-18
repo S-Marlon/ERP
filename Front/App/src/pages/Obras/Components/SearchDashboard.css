@@ -95,7 +95,7 @@
 .innertable {
     display: grid;
     /* 1: ID/Tipo (menor), 2: Título (maior), 3: Detalhe (médio), 4: Status (menor) */
-    grid-template-columns: 1.5fr 2.5fr 3fr 1.8fr; 
+    grid-template-columns: 2fr 3fr 1.5fr 1.5fr; 
     gap: 0px; 
     align-items:center;
 }
