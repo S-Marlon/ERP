@@ -183,7 +183,7 @@ const RelatorioPoco: React.FC = () => {
                            
                         </TabPanel>
 
-                        <TabPanel label="2. Dados da Perfuração">
+                        <TabPanel label="2. Dados da P  erfuração">
                             <DadosPerfuracaoForm
                                 data={formData.secoesPerfuracao}
                                 onChange={(list) => handleListChange('secoesPerfuracao', list)}
