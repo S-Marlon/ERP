@@ -1,0 +1,34 @@
+/* FlexGridContainer.css (Exemplo) */
+
+/* * 1. Estilos Base (Opcionais, pois os estilos inline já definem o display e gap)
+ */
+.container-modular-flex,
+.container-modular-grid {
+    padding: 10px;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+}
+
+/* * 2. Responsividade via Media Queries
+ * Usamos os atributos data- para aplicar o layout móvel.
+ */
+
+@media (max-width: 768px) {
+    /* * Se for um grid e tiver a opção de mobileTemplate:
+     * Altera o gridTemplateColumns para o valor definido na prop `mobileTemplate`
+     */
+    .container-modular-grid[data-mobile-template]:not([data-mobile-template=""]) {
+        grid-template-columns: var(--mobile-template); 
+        /* Usar CSS custom property ou ajustar via JS/lib de estilo */
+    }
+
+    /* Exemplo: Forçar 1 coluna no mobile para qualquer grid, a menos que especificado */
+    .container-modular-grid {
+        grid-template-columns: 1fr !important;
+    }
+    
+    /* Exemplo: Forçar o Flex a ser 'column' no mobile */
+    .container-modular-flex {
+        flex-direction: column !important;
+    }
+}

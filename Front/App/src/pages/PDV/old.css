@@ -1,0 +1,530 @@
+.pdv-container {
+  display: grid;
+  background: #f5f5f5;
+  color: black;
+  gap: 10px;
+  grid-template-columns: 3fr 10fr 4fr;
+  height: calc(100vh - 50px);
+}
+.pdv-container-payment {
+  display: grid;
+  background: #f5f5f5;
+  color: black;
+  gap: 10px;
+  grid-template-columns: 3fr 4fr 3fr;
+  height: calc(100vh - 50px);
+}
+
+.pdv-side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-height: 100%; /* Limita à altura do elemento pai */
+  overflow-y: auto; /* Adiciona rolagem se o conteúdo passar do limite */
+}
+
+/* Produtos */
+.pdv-products {
+  display: flex;
+  flex-direction: row;
+  padding: 10px;
+}
+
+
+.pdv-product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  /* Creates columns that are at least 150px and grow equally */
+  gap: 10px;
+}
+
+.pdv-product-card {
+  background: #fff;
+  padding: 0.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s;
+  /* No specific width needed here as Grid controls it */
+}
+
+.pdv-categories-card {
+  background: #e33636;
+  color: white;
+  text-align: center;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: transform 0.2s;
+  margin-bottom: 10px;
+}
+
+.pdv-product-card:hover {
+  transform: scale(1.05);
+}
+
+.pdv-price {
+  color: green;
+  font-weight: bold;
+}
+
+/* Carrinho */
+.pdv-cart {
+  padding: 10px;
+  background-color: #ffffff;
+  display: flex;
+  justify-content: space-between;
+}
+
+.pdv-cart-items {
+  overflow-y: auto;
+  padding-right: 10px;
+  /* Espaço para a barra de rolagem */
+}
+
+.pdv-cart-item {
+  display: flex;
+  flex-direction: column;
+  padding: 5px;
+  border: #9cc4f8 1px solid;
+
+  border-style: outset;
+  /* border-top: #e2e8f0 2px solid; */
+  background: #f8f9fa;
+  transition: background-color 0.2s;
+}
+
+.pdv-cart-item:hover {
+  background: #e9ecef;
+}
+
+.pdv-cart-controls {
+  gap: 8px;
+  align-items: center;
+}
+
+/* Pagamento */
+
+.pdv-methods {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.pdv-methods button.active {
+  background: #059669;
+  color: #fff;
+}
+
+.pdv-change {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #2563eb;
+  margin: 1rem 0;
+}
+
+.pdv-finalize {
+  margin-top: auto;
+  background: #059669;
+  color: #fff;
+  padding: 1rem;
+  font-size: 1.2rem;
+  font-weight: bold;
+  border: none;
+  border-radius: 8px;
+}
+
+.pdv-search-inputs {
+  display: flex;
+  flex-direction: column;
+}
+
+
+/* Filtro de Categorias */
+.pdv-categories-filter {
+  /* min-width: 250px; Largura mínima para garantir legibilidade */
+  background-color: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.pdv-categories-filter > span {
+  font-weight: bold;
+  margin-bottom: 10px;
+  display: block;
+  /* Para que o margin-bottom funcione */
+  color: #555;
+}
+.pdv-category-buttons {
+  display: -webkit-box;
+  -webkit-line-clamp: 3; /* Limita a 3 linhas */
+  -webkit-box-orient: vertical;
+  overflow: auto;
+  max-height: 7.5em; /* Ajuste conforme o tamanho dos botões */
+}
+.pdv-category-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  /* Espaço entre os botões de categoria */
+  margin-bottom: 15px;
+}
+
+.pdv-selected-categories-tags {
+  display: -webkit-box;
+  -webkit-line-clamp: 3; /* Limita a 3 linhas */
+  -webkit-box-orient: vertical;
+  overflow: auto;
+  max-height: 4em; /* Ajuste conforme o tamanho dos botões */
+}
+
+/* Tags de Categorias Selecionadas */
+.pdv-selected-categories-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  /* Espaço entre as tags */
+  justify-content: flex-start;
+  /* Alinha as tags à esquerda */
+  margin-bottom: 10px;
+}
+
+.pdv-category-button {
+  color: black;
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #fff;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+  font-size: 0.8rem;
+}
+
+.pdv-category-button:hover {
+  background-color: #e9ecef;
+  border-color: #bbb;
+}
+
+.pdv-category-button.active {
+  background-color: #007bff;
+  /* Cor principal */
+  color: #fff;
+  border-color: #007bff;
+  font-weight: bold;
+}
+
+.selected-tag {
+  display: inline-flex;
+  /* Para alinhar o texto e o 'x' */
+  align-items: center;
+  background-color: #e9ecef;
+  color: #333;
+  padding: 5px 10px;
+  border-radius: 15px;
+  /* Bordas arredondadas para um visual de "tag" */
+  font-size: 0.8rem;
+  cursor: pointer;
+  /* Para indicar que pode ser clicado */
+  transition: background-color 0.2s;
+}
+
+.selected-tag:hover {
+  background-color: #dee2e6;
+}
+
+.selected-tag:after {
+  content: "•";
+  /* Marcador visual */
+  color: #007bff;
+  margin-left: 4px;
+  font-weight: bold;
+}
+
+.selected-tag:hover:after {
+  content: "✖";
+  /* Ícone de fechar no hover */
+  color: #dc3545;
+  /* Cor de erro/danger */
+}
+
+/* Filtro de Busca */
+.pdv-search-filter {
+  flex: 1;
+  /* Permite que este filtro ocupe o espaço disponível */
+  background-color: #f8f9fa;
+  padding: 4px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+/* 
+.pdv-search-filter fieldset {
+  border: none;
+  padding: 5px;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  /* Coloca os elementos dentro do fieldset em coluna 
+  gap: 0px;
+  /* Espaço entre os elementos dentro do fieldset 
+} */
+
+.pdv-search-filter legend {
+  font-weight: bold;
+  color: #555;
+  padding: 0 5px;
+  /* Espaçamento para a legenda */
+}
+
+
+
+.pdv-product-table-container {
+  overflow-y: auto;
+  max-height: 550px;
+  padding-right: 12px;
+  /* espaço para a scrollbar */
+  box-sizing: content-box;
+}
+
+.pdv-product-table {
+  font-size: 10pt;
+  width: 100%;
+  border-collapse: collapse;
+  background-color: #e4e4e4;
+  border-radius: 8px;
+
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.pdv-product-table th,
+.pdv-product-table td {
+  text-align: center;
+  padding: 2px 0px;
+  border: 1px solid #ccc;
+}
+
+.pdv-product-table th {
+  background-color: #d4d4d4;
+  padding: 5px 0px;
+  font-weight: bold;
+}
+
+.pdv-product-table tr:hover {
+  background-color: #fff;
+}
+
+.product-name {
+  font-weight: bold;
+  text-transform: capitalize;
+  font-size: 0.9em;
+}
+
+.product-details {
+  display: flex;
+  font-style: italic;
+  color: #555;
+  font-size: 0.9em;
+
+  justify-content: space-between;
+}
+.linha-vertical {
+  border-top: #e2e8f0 2px solid;
+  margin: 5px 0;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.pdv-subtotal {
+  border-top: 2px solid #e2e8f0;
+  padding-top: 0px;
+  font-weight: 700;
+  font-size: 1.4rem;
+  color: #007bff;
+}
+
+.total-and-remove-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.unit-price {
+  font-weight: 400;
+  text-decoration: underline;
+  font-size: 1em;
+  color: #000000;
+}
+
+.total-price {
+  font-weight: bold;
+  font-size: 1em;
+  color: #0051a8;
+}
+
+.remove-button {
+  background: none;
+  border: none;
+
+  cursor: pointer;
+  color: #999;
+  padding: 0px 5px;
+}
+
+.remove-button:hover {
+  background: #f5b8b8;
+  color: white;
+}
+
+.quantity-controls {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+
+  gap: 8px;
+  /* Adiciona espaço entre os elementos */
+}
+
+.quantity-controls span {
+  width: 30px;
+  text-align: center;
+}
+
+
+
+.quantity-controls button {
+  font-size: 0.5em;
+  font-weight: bold;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #f0f0f0;
+  color: darkblue;
+  cursor: pointer;
+}
+
+.sku-and-close {
+  display: flex;
+  justify-content: space-between;
+}
+
+
+.container {
+  display: flex;
+  align-items: stretch;
+  flex-direction: row; /* Opcional, mas explicita a direção */
+}
+
+.input-number {
+  height: 25px; /* Defina a altura dos botões */
+  font-size: 0.9em;
+  border-radius: 0px;
+}
+.input-number,
+.input-number-decrement,
+.input-number-increment {
+  border: 1px solid #ccc;
+  flex: 1;
+  /* box-sizing: border-box é importante para o padding e a borda não aumentarem o tamanho */
+  box-sizing: border-box;
+}
+
+.input-number-decrement,
+.input-number-increment {
+  display: inline-block;
+  height: 25px; /* Defina a altura dos botões */
+  background: #f1f1f1;
+  color: #444;
+  text-align: center;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.input-number-decrement {
+  border-right: none;
+  border-radius: 4px 0 0 4px;
+}
+
+.input-number-increment {
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+}
+
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Firefox */
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+.truncado {
+  display: -webkit-box; /* Necessário para navegadores WebKit (Chrome, Safari, etc.) */
+  -webkit-line-clamp: 1; /* Limita o texto a 2 linhas */
+  -webkit-box-orient: vertical; /* Define a orientação da caixa para vertical */
+  overflow: hidden; /* Oculta qualquer texto que exceda o contêiner */
+  text-overflow: ellipsis; /* Adiciona "..." no final */
+}
+
+/* sevices ------------------------------------------------ */
+
+/* Container principal da seção de serviços */
+.add-service-container {
+  margin-top: 20px;
+  padding: 15px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+
+/* Grid para os serviços fixos */
+.services-buttons {
+  justify-content: space-between;
+  gap: 5px;
+}
+
+/* Estilo para os botões de serviço */
+.service-button {
+  flex: 1; /* Permite que o botão cresça e ocupe o espaço igual aos outros */
+  padding: 10px;
+  color: #000;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.service-button:hover {
+  background-color: #e9e9e9;
+}
+
+/* Seção para serviço personalizado */
+.custom-service-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 15px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+}
+
+.custom-service-section input,
+.custom-service-section textarea {
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.custom-service-button {
+  padding: 10px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.custom-service-desc {
+  max-height: 140px; /* Limita a altura do campo */
+  box-sizing: border-box; /* O mais importante! */
+  resize: vertical; /* Permite redimensionar apenas na vertical */
+}

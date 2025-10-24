@@ -174,26 +174,21 @@ export const ObraDetalhes: React.FC = () => {
             label: 'Localização',
             content: <ObraLocalizacao latitude={obra.latitude} longitude={obra.longitude} titulo={obra.titulo} />
         },
+        
         {
-            id: 'Imagens',
-            label: 'Imagens',
-            content: <Button type="button" variant="outline">
-                                📁 Anexar Documentos/Laudos
+            id: 'Acervo',
+            label: 'Acervo',
+            content:  <Button type="button" variant="outline">
+                                📸 Adicionar Fotos/Mídias
+                                 📁 Anexar Documentos/Laudos
                             </Button>
+                            
         },
         {
             id: 'Serviços',
             label: 'Serviços Futuros',
             content: <Typography variant="pMuted">Conteúdo da aba Serviços Futuros</Typography>
         },
-        {
-            id: 'Galeria',
-            label: 'Galeria',
-            content:  <Button type="button" variant="outline">
-                                📸 Adicionar Fotos/Mídias
-                            </Button>
-                            
-        }
     ];
 
     return (
@@ -203,10 +198,10 @@ export const ObraDetalhes: React.FC = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', flexDirection: 'column' }}>
                     
                     
-                        <Typography variant="h1Alt">{obra.titulo}</Typography>
-                        <div className='flex-row' style={{ alignItems: 'center', justifyContent:'space-between', marginTop: '5px' }}>   
+                        <Typography variant="h1Alt">P001-0825 - {cliente?.nome || 'N/A'}</Typography>
+                        <div className='flex-row' style={{ alignItems: 'center', justifyContent:'space-between'}}>   
+                            <Typography variant="h2Alt">Ações Essenciais</Typography>
 
-                        <Typography variant="h2" className='title'>P001-0825 - {cliente?.nome || 'N/A'}</Typography>
                     <Badge color="warning">Em Andamento</Badge>
                         </div>
                     
@@ -217,7 +212,6 @@ export const ObraDetalhes: React.FC = () => {
             <div className="action-buttons-container" >
 
                 
-                            <Typography variant="h2Alt">Ações Essenciais</Typography>
                 <Button variant="outline">➕ Novo Registro de Tempo</Button>
 
                             {/* AÇÕES DE EDIÇÃO/REGISTRO */}

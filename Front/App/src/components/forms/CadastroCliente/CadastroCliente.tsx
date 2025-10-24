@@ -1,9 +1,10 @@
 import React, { useState, ChangeEvent, FormEvent } from 'react';
-import { BotaoVoltar } from '../ui/BotaoVoltar';
-import FormControl from '../ui/FormControl';
+import FormControl from '../../ui/FormControl';
 import './CadastroCliente.css';
-import Typography from '../ui/Typography';
-import Card from '../ui/Card';
+import Typography from '../../ui/Typography';
+import Card from '../../ui/Card';
+import Button from '../../ui/Button';
+import Fieldset from '../../ui/Fieldset';
 
 interface Contato {
   id: number;
@@ -141,16 +142,15 @@ const CadastroCliente: React.FC = () => {
 
   return (
     <form onSubmit={handleSubmit} className="cliente-form-container">
-      <div className="flex-row">
-        <BotaoVoltar />
+      <div className="form-row">
         <h1>Registro de Novo Cliente</h1>
         <div>
-          <button type="submit">
+          <Button variant="primary">
             Salvar Cliente
-          </button>
-          <button type="submit">
+          </Button>
+          <Button variant="success">
             Salvar Cliente e Adicionar Contrato
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -158,8 +158,7 @@ const CadastroCliente: React.FC = () => {
 
         {/* ======================= COLUNA 1 ======================= */}
         <div >
-          <fieldset>
-            <legend>Dados Gerais e Fiscais</legend>
+          <Fieldset variant='standard' legend='Dados Gerais e Fiscais'>
 
             {/* Nome Completo */}
             <FormControl
@@ -215,13 +214,14 @@ const CadastroCliente: React.FC = () => {
                 onChange={handleSimpleChange}
               />
             </div>
-          </fieldset>
+          </Fieldset>
 
          
-          <fieldset>
-            <legend>Contatos</legend>
+          <Fieldset variant='standard' legend='Contatos'>
 
             {formData.contatos.map((contato) => (
+            <Card  variant='highlight' >
+
               <div key={contato.id} className="form-row">
 
                 {/* Tipo de Contato */}
@@ -248,6 +248,10 @@ const CadastroCliente: React.FC = () => {
 
                 />
 
+
+                <div className='flex-column xcol'>
+
+
                 <div >
                   <label className="ui-form-label">Nome de Referência</label>
                   <input
@@ -256,34 +260,34 @@ const CadastroCliente: React.FC = () => {
                     className="ui-form-input"
                   />
                 </div>
+                {/* Botão de Remover */}
 
                 {/* Nova: Checkbox Principal */}
-                <label className="checkbox-label flex-1-4 is-principal-contact">
+                <label className="checkbox-label is-principal-contact">
                   <input type="checkbox" />
                   Principal
                 </label>
-
-                {/* Botão de Remover */}
-                <button
-                  type="button"
-                  onClick={() => removeContato(contato.id)}
-
-                >
+                </div>
+                <Button
+                  style={{maxWidth:'30px'}}
+                  variant='danger'
+                  onClick={() => removeContato(contato.id)}>
                   X
-                </button>
+                </Button>
+
               </div>
+                </Card>
             ))}
 
-            <button type="button" onClick={addContato}>
+            <Button variant='primary' onClick={addContato}>
               + Adicionar Contato
-            </button>
-          </fieldset>
+            </Button>
+          </Fieldset>
 
         </div>
         {/* ======================= COLUNA 2 ======================= */}
         <div>
-          <fieldset>
-            <legend>Endereços</legend>
+          <Fieldset variant='standard' legend='Endereços'>
 
             {formData.enderecos.map((endereco, index) => (
 
@@ -358,20 +362,19 @@ const CadastroCliente: React.FC = () => {
                 </div>
                 {/* Checkbox Principal e Botão de Remover */}
                 <div>
-                  <button
-                    type="button"
+                  <Button variant='danger'
                     onClick={() => removeEndereco(endereco.id)}>
                     Remover Endereço
-                  </button>
+                  </Button>
                 </div>
 
               </Card>
             ))}
 
-            <button type="button" onClick={addEndereco} >
+            <Button variant='primary' onClick={addEndereco} >
               + Adicionar Endereço
-            </button>
-          </fieldset>
+            </Button>
+          </Fieldset>
         </div>
       </div>
 

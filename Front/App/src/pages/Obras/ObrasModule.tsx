@@ -6,6 +6,7 @@ import "./ObrasModule.css";
 import PesquisaRapida from "../../components/forms/PesquisaRapida";
 import SearchDashboard from "./Components/SearchDashboard";
 import { ObraDetalhes } from "./Components/ObraDetalhes";
+import FlexGridContainer from "../../components/Layout/FlexGridContainer/FlexGridContainer";
 
 export const ObrasModule: React.FC = () => {
   return (
@@ -34,6 +35,17 @@ export const ObrasModule: React.FC = () => {
 
       {/* (B) PAGE CONTENT */}
       <main className="layout-container">
+
+        <FlexGridContainer 
+                layout="grid" 
+                gap="20px" 
+                template="1fr 2fr 1fr"
+                mobileTemplate="1fr" // No mobile, força 1 coluna
+            >
+                <div style={{ backgroundColor: '#f0f0f0', padding: '10px' }}>Item A</div>
+                <div style={{ backgroundColor: '#e0e0e0', padding: '10px' }}>Item B (Maior)</div>
+                <div style={{ backgroundColor: '#d0d0d0', padding: '10px' }}>Item C</div>
+            </FlexGridContainer>
         {/* <PainelDetalhePoco pocoId={''} /> */}
         {/* <ObraFormulario /> */}
 

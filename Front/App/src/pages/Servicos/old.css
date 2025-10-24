@@ -1,0 +1,57 @@
+/* Layout principal: Filtro e Área de Serviços lado a lado */
+.main-grid-container {
+    display: grid;
+    /* Define o layout de duas colunas:
+       - Filtro com largura fixa (300px)
+       - Serviços ocupando o restante do espaço (1fr) */
+    grid-template-columns: 300px 1fr;
+    gap: 20px; /* Espaço entre as duas colunas principais */
+    height: 100vh;
+}
+
+/* Estilização da barra de filtro (coluna esquerda) */
+.filter-sidebar {
+    background-color: #3c3c3cff;
+    padding: 20px;
+    overflow-y: auto; 
+}
+
+/* Layout responsivo dos cards de serviço (coluna direita) */
+.services-container {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    padding: 20px;
+    overflow-y: auto;
+    
+    /* A SOLUÇÃO ESTÁ AQUI: */
+    /* Impede que os itens se estiquem verticalmente */
+    align-items: start;
+}
+
+/* Media Queries para responsividade */
+/* ... (Mantenha as media queries anteriores para o layout de colunas) ... */
+
+/* Para telas entre 992px e 1199px: 3 colunas */
+@media (max-width: 1199px) {
+    .services-container {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* Para telas entre 768px e 991px: 2 colunas */
+@media (max-width: 991px) {
+    .services-container {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Para telas pequenas (celulares): 1 coluna */
+@media (max-width: 767px) {
+    .main-grid-container {
+        grid-template-columns: 1fr;
+    }
+    .services-container {
+        grid-template-columns: 1fr;
+    }
+}

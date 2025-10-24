@@ -1,0 +1,65 @@
+/* Table.css */
+
+/* ---------------------------------- */
+/* Estilos Base Comuns */
+/* ---------------------------------- */
+.custom-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: Arial, sans-serif;
+    margin: 20px 0;
+}
+
+.custom-table th, .custom-table td {
+    padding: 10px;
+    text-align: left;
+}
+
+.custom-table thead th {
+    background-color: #3f51b5; /* Azul primário */
+    color: white;
+    font-weight: bold;
+}
+
+
+/* ---------------------------------- */
+/* VARIANT: striped (Listras) */
+/* ---------------------------------- */
+.custom-table.variant-striped tbody tr:nth-child(odd) {
+    background-color: #f7f7f7; /* Cinza claro nas linhas ímpares */
+}
+
+/* Mantém o fundo da linha par como branco (ou transparente) */
+.custom-table.variant-striped tbody tr:nth-child(even) {
+    background-color: white;
+}
+
+
+/* ---------------------------------- */
+/* VARIANT: default (Bordas Visíveis) */
+/* ---------------------------------- */
+/* O estilo base já dá uma borda simples. Podemos reforçar. */
+.custom-table.variant-default th, 
+.custom-table.variant-default td {
+    border: 1px solid #ddd;
+}
+
+
+/* ---------------------------------- */
+/* VARIANT: borderless (Sem Bordas) */
+/* ---------------------------------- */
+.custom-table.variant-borderless {
+    border: none; /* Remove a borda principal se houver */
+}
+
+.custom-table.variant-borderless th, 
+.custom-table.variant-borderless td {
+    border: none; /* Remove todas as bordas */
+    /* Adiciona uma linha sutil apenas na parte inferior de TH/TD */
+    border-bottom: 1px solid #eee;
+}
+
+/* Remove a borda inferior do último item para limpar */
+.custom-table.variant-borderless tbody tr:last-child td {
+    border-bottom: none;
+}

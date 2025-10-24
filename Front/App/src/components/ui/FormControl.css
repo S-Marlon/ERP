@@ -1,17 +1,12 @@
 .ui-form-control {
   display: flex;
   flex-direction: column;
-  margin-bottom: 0.2em;
-}
-
-.ui-form-control{
-  display: flex;
-  /* flex-direction: row-reverse; */
+  margin-bottom: 0.1em;
 }
 
 .ui-form-label {
   font-weight: 500;
-  margin-bottom: 0.3em;
+  margin-bottom: 0.2em;
   color: #212529;
 }
 
@@ -24,20 +19,14 @@
 /* -------------------------------------- */
 /* NOVOS ESTILOS PARA CHECKBOX */
 /* -------------------------------------- */
-
-
 .checkbox-group {
     gap: 5px 10px;
     margin-top: 10px;
 }
-
  
-
-
 input[type="checkbox"]  {
   cursor: pointer;
 }
-/* No seu FormControl.css, na seção NOVOS ESTILOS PARA CHECKBOX */
 
 .ui-form-checkbox-wrapper {
   display: flex;
@@ -60,38 +49,6 @@ input[type="checkbox"]  {
   font-weight: 400; 
   cursor: pointer;
 }
-
-/* -------------------------------------- */
-/* ESTILOS EXISTENTES (Repetidos para Contexto) */
-/* -------------------------------------- */
-
-.ui-form-input,
-.ui-form-select,
-.ui-form-textarea {
-  padding: 0.6em;
-  border-radius: 4px;
-  border: 1px solid #ced4da;
-  font-size: 1rem;
-  background: #fff;
-  transition: border-color 0.2s;
-  color: #212529;
-}
-
-.ui-form-input:focus,
-.ui-form-select:focus,
-.ui-form-textarea:focus {
-  border-color: #007bff;
-  outline: none;
-}
-
-.ui-form-error {
-  color: #dc3545;
-  font-size: 0.9em;
-  margin-top: 0.3em;
-}
-
-
-
 /* 1. O wrapper deve usar Flexbox */
 .ui-form-checkbox-wrapper {
     /* Ativa o Flexbox: coloca os itens em linha */
@@ -118,3 +75,31 @@ input[type="checkbox"]  {
     /* Permite que o texto se ajuste e quebre a linha se necessário */
     word-break: break-word; 
 }
+/* -------------------------------------- */
+/* ESTILOS EXISTENTES (Repetidos para Contexto) */
+/* -------------------------------------- */
+.ui-form-input,
+.ui-form-select,
+.ui-form-textarea {
+  padding: 0.6em;
+  border-radius: 4px;
+  border: 1px solid #ced4da;
+  font-size: 1rem;
+  background: #fff;
+  transition: border-color 0.2s;
+  color: #212529;
+}
+
+.ui-form-input:focus,
+.ui-form-select:focus,
+.ui-form-textarea:focus {
+  border-color: #007bff;
+  outline: none;
+}
+
+.ui-form-error {
+  color: #dc3545;
+  font-size: 0.9em;
+  margin-top: 0.3em;
+}
+
