@@ -1,8 +1,24 @@
 import React, { useMemo } from 'react';
 
+// Importação do CSS (mantida, mas lembre-se que o foco está nos estilos inline para as props)
 import './flesGridContainer.css';
 
-// Reutilize as interfaces definidas acima
+// 1. NOVAS INTERFACES DE ALINHAMENTO FLEXBOX
+type JustifyContent = 
+    | 'flex-start' 
+    | 'flex-end' 
+    | 'center' 
+    | 'space-between' 
+    | 'space-around' 
+    | 'space-evenly' 
+    | 'stretch';
+
+type AlignItems = 
+    | 'flex-start' 
+    | 'flex-end' 
+    | 'center' 
+    | 'baseline' 
+    | 'stretch';
 
 type LayoutType = 'flex' | 'grid';
 
@@ -12,23 +28,30 @@ interface FlexGridContainerProps extends React.PropsWithChildren {
     template?: string; // Para 'grid' (ex: '1fr 2fr') ou 'flex' ('row' | 'column')
     className?: string;
     mobileTemplate?: string; // Para demonstração de responsividade simples
+
+    // 2. NOVAS PROPS PARA FLEXBOX
+    justifyContent?: JustifyContent;
+    alignItems?: AlignItems;
+    flex?: string;
 }
 
 /**
  * Componente Contêiner Modular que pode se comportar como Flex ou Grid.
- * A responsividade é tratada principalmente via CSS ou Media Queries no arquivo de estilo.
+ * Adicionado suporte completo para alinhamento Flexbox.
  */
 const FlexGridContainer: React.FC<FlexGridContainerProps> = ({
     layout,
-    gap = '16px', // Padrão
+    gap = '15px', // Padrão
     template,
     className = '',
     mobileTemplate,
+    // 3. DESESTRUTURAÇÃO DAS NOVAS PROPS
+    justifyContent, 
+    alignItems, 
     children,
 }) => {
 
-    // 1. Geração dos Estilos Dinâmicos (Inline)
-    // NOTA: Em produção, o ideal é mover isso para um arquivo CSS Module.
+    // 4. Geração dos Estilos Dinâmicos (Inline)
     const containerStyle: React.CSSProperties = useMemo(() => {
         const baseStyle: React.CSSProperties = {
             display: layout,
@@ -41,7 +64,10 @@ const FlexGridContainer: React.FC<FlexGridContainerProps> = ({
                 ...baseStyle,
                 flexDirection: template === 'column' ? 'column' : 'row',
                 flexWrap: 'wrap', // Permite que os itens quebrem a linha
-                alignItems: 'flex-start',
+                // APLICAÇÃO DOS NOVOS ESTILOS FLEXBOX (com fallback para valores padrão se a prop não for fornecida)
+                justifyContent: justifyContent || 'flex-start', // Novo! Padrão 'flex-start'
+                alignItems: alignItems || 'stretch', // Novo! Padrão 'stretch'
+                flex: '1 0 100%'
             };
         }
 
@@ -54,17 +80,11 @@ const FlexGridContainer: React.FC<FlexGridContainerProps> = ({
         }
 
         return baseStyle;
-    }, [layout, gap, template]);
+    }, [layout, gap, template, justifyContent, alignItems]); // Incluídas as novas props no array de dependências
 
-    // 2. Montagem da Classe CSS para Responsividade
-    // Usamos uma classe genérica para aplicar media queries externas
+    // 5. Montagem da Classe CSS
     const finalClassName = `container-modular-${layout} ${className}`;
     
-    // NOTA DE IMPLEMENTAÇÃO: Para a responsividade baseada em 'mobileTemplate' funcionar 
-    // com estilos inline sem uma biblioteca de estilo, precisaríamos de algo 
-    // mais complexo (ex: usar useLayoutEffect para injetar media queries).
-    // A melhor prática é usar classes CSS.
-
     return (
         <div 
             className={finalClassName} 

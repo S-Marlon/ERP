@@ -6,8 +6,8 @@ import Button from '../../ui/Button';
 import FormControl from '../../ui/FormControl';
 import Typography from '../../ui/Typography';
 import Card from '../../ui/Card';
-import { BotaoVoltar } from '../../ui/BotaoVoltar'; 
 import { Link } from 'react-router-dom';
+import FlexGridContainer from '../../Layout/FlexGridContainer/FlexGridContainer';
 
 // ----------------- TIPOS DE DADOS E MOCKS -----------------
 
@@ -237,7 +237,7 @@ const CadastroContrato: React.FC = () => {
                 <Typography variant="h1Alt">Criação de Contrato de Obra</Typography>
             </div>
 
-            <div className='grid-main-layout'>
+            <FlexGridContainer layout='grid' template='1fr 1fr'>
                 {/* COLUNA ESQUERDA */}
                 <div className='col-left'>
                     {/* ... (Seção de Dados Contratuais e Prazos) ... */}
@@ -355,7 +355,7 @@ const CadastroContrato: React.FC = () => {
                         </div>
                     </Card>
                 </div>
-            </div>
+            </FlexGridContainer>
             <Button type="submit" variant="primary" style={{ width: "100%", marginTop: 20 }}>
                 Salvar Contrato e Iniciar Processo de Obra
             </Button>

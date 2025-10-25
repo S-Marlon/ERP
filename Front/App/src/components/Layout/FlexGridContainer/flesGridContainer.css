@@ -4,8 +4,7 @@
  */
 .container-modular-flex,
 .container-modular-grid {
-    padding: 10px;
-    border: 1px solid #ccc;
+    padding: 0px;
     box-sizing: border-box;
 }
 

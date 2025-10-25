@@ -5,6 +5,7 @@ import Button from '../../ui/Button';
 import Column from './rigtsidebar';
 import Tabss from './Left-sidebar';
 import Topbar from './TopBar';
+import FlexGridContainer from '../../Layout/FlexGridContainer/FlexGridContainer';
 
 // ----------------- TIPOS DE DADOS E MOCKS (MANTIDOS) -----------------
 
@@ -85,14 +86,14 @@ const RelatorioPoco: React.FC = () => {
             <Topbar/>
 
             {/* ------------------ GRID PRINCIPAL (7fr 3fr) ------------------ */}
-            <div className="grid-container">
+            <FlexGridContainer layout='grid' template='8fr 3fr'>
 
                 {/* COLUNA PRINCIPAL (7fr) - ABAS VERTICAIS */}
                 <Tabss/>
 
                 {/* COLUNA SECUNDÁRIA (3fr) - AÇÕES E BOMBEAMENTO */}
                 <Column/>
-            </div>
+            </FlexGridContainer>
 
             {/* ------------------ BOTÃO DE SUBMISSÃO ------------------ */}
             <Button type="submit" variant="success" style={{ width: "100%", marginTop: 30, fontSize: '1.2em' }}>
@@ -108,49 +109,3 @@ const RelatorioPoco: React.FC = () => {
 };
 
 export default RelatorioPoco;
-
-
-// ----------------- ESTILOS CSS INLINE PARA DEMONSTRAÇÃO -----------------
-
-// Adicione este bloco de estilos ao seu arquivo CSS global ou CSS Module
-const style = `
-.relatorio-poco-form {
-    max-width: 1600px; /* Ajuste o máximo para melhor visualização */
-    margin: 0 auto 50px auto;
-}
-
-.form-header-row {
-    display: flex;
-    align-items: center;
-    margin-bottom: 5px;
-    border-bottom: 2px solid #eee;
-}
-
-.form-row {
-    display: flex;
-    gap: 10px;
-}
-.form-row > * {
-    flex: 1; /* Faz com que os FormControls ocupem o mesmo espaço */
-}
-
-.grid-container {
-    display: grid; 
-    grid-template-columns: 8fr 3fr; 
-    gap: 10px; /* Mais espaço entre as colunas */
-    width: 100%;
-}
-
-
-`;
-
-// *******************************************************************
-// ADICIONANDO O STYLE AO DOCUMENTO (Mantenha este bloco no final do arquivo .tsx para a demo)
-// Em produção, mova os estilos acima para um arquivo CSS Module ou componente de Estilo.
-if (typeof document !== "undefined" && !document.querySelector('style#relatorio-poco-styles')) {
-    const styleTag = document.createElement("style");
-    styleTag.id = 'relatorio-poco-styles';
-    styleTag.innerHTML = style;
-    document.head.appendChild(styleTag);
-}
-// *******************************************************************

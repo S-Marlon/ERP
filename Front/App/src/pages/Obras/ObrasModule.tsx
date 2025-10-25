@@ -4,9 +4,11 @@ import React from "react";
 import { Link } from "react-router-dom"; // ESSENCIAL para a navegação dos botões de ação
 import "./ObrasModule.css";
 import PesquisaRapida from "../../components/forms/PesquisaRapida";
+import Button from "../../components/ui/Button";
 import SearchDashboard from "./Components/SearchDashboard";
 import { ObraDetalhes } from "./Components/ObraDetalhes";
 import FlexGridContainer from "../../components/Layout/FlexGridContainer/FlexGridContainer";
+import Typography from "../../components/ui/Typography";
 
 export const ObrasModule: React.FC = () => {
   return (
@@ -14,20 +16,20 @@ export const ObrasModule: React.FC = () => {
       {/* (A) PAGE HEADER */}
       <header className="page-header">
         <div className="title-section">
-          <h2>{'Módulo Obras" ou "Gerenciamento de Projetos/Obras'}</h2>
+          <Typography variant="h2Alt">{'Módulo Obras" ou "Gerenciamento de Projetos/Obras'}</Typography>
           <div
             className="action-buttons-global"
             style={{ display: "flex", gap: "10px" }}
           >
             {/* Botões de navegação usando Link e estilizados  */}
             <Link to="/clientes/novo">
-              <button>+ Novo Cliente</button>
+              <Button variant='primary'>+ Novo Cliente</Button>
             </Link>
             <Link to="/contratos/novo">
-              <button>+ Novo Contrato</button>
+              <Button variant='secondary'>+ Novo Contrato</Button>
             </Link>
             <Link to="/pocos/novo">
-              <button>+ Novo relatorio de Poço</button>
+              <Button variant='outline'>+ Novo relatorio de Poço</Button>
             </Link>
           </div>
         </div>
@@ -38,32 +40,17 @@ export const ObrasModule: React.FC = () => {
 
         <FlexGridContainer 
                 layout="grid" 
-                gap="20px" 
-                template="1fr 2fr 1fr"
+                gap="5px" 
+                template="2.5fr 6fr 8fr"
                 mobileTemplate="1fr" // No mobile, força 1 coluna
             >
-                <div style={{ backgroundColor: '#f0f0f0', padding: '10px' }}>Item A</div>
-                <div style={{ backgroundColor: '#e0e0e0', padding: '10px' }}>Item B (Maior)</div>
-                <div style={{ backgroundColor: '#d0d0d0', padding: '10px' }}>Item C</div>
-            </FlexGridContainer>
-        {/* <PainelDetalhePoco pocoId={''} /> */}
-        {/* <ObraFormulario /> */}
-
-        <aside className="sidebar-fixa">
-          <PesquisaRapida />
-
-          {/* Filtros Laterais (Intuitivos) */}
-        </aside>
-
-        <main className="conteudo-principal">
+              <PesquisaRapida />
           <SearchDashboard />
-
-          {/* <ObrasLista /> */}
-        </main>
-
-        <div>
           <ObraDetalhes />
-        </div>
+
+
+                
+            </FlexGridContainer>
       </main>
       {/* (C) PAGE FOOTER (Opcional) */}
 
