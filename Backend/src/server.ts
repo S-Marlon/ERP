@@ -117,6 +117,35 @@ app.get('/pocos', async (req, res) => {
     }
 });
 
+
+// Rota para criar cliente
+app.post('/clientes', async (req, res) => {
+  const cliente = req.body;
+  try {
+    // ajuste os campos e a tabela conforme seu schema
+    const [result] = await pool.execute(
+      `INSERT INTO clientes (nomeCompleto, tipoPessoa, documento, inscricaoEstadual, dataNascimento, contatos_json, enderecos_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        cliente.nomeCompleto,
+        cliente.tipoPessoa,
+        cliente.documento,
+        cliente.inscricaoEstadual,
+        cliente.dataNascimento,
+        JSON.stringify(cliente.contatos || []),
+        JSON.stringify(cliente.enderecos || []),
+      ]
+    );
+    // result contém insertId em mysql
+    // @ts-ignore
+    const insertId = (result as any).insertId;
+    res.status(201).json({ ok: true, id: insertId });
+  } catch (err: any) {
+    console.error('Erro ao inserir cliente:', err);
+    res.status(500).json({ ok: false, error: err.message || 'Erro' });
+  }
+});
+
 app.listen(PORT, () => {
     console.log(`Servidor rodando em http://localhost:${PORT}`);
 });
