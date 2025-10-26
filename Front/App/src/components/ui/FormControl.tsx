@@ -10,11 +10,11 @@ interface FormControlProps {
     type?: string;
     control?: ControlType;
     value?: any; 
-    onChange?: React.ChangeEventHandler<any>; // Permite passar qualquer handler (incluindo o que retorna booleano)
+    onChange?: React.ChangeEventHandler<any>;
     options?: { value: string; label: string }[];
     placeholder?: string;
-    error?: string;
-    checked?: boolean; // ✨ Essencial para o checkbox controlado
+    error?: string; // 💡 Propriedade para a mensagem de erro
+    checked?: boolean;
     disabled?: boolean;
     required?: boolean;
     rows?: number;
@@ -32,8 +32,8 @@ const FormControl: React.FC<FormControlProps> = ({
     onChange,
     options = [],
     placeholder,
-    checked, // ✨ Desestruturado e usado
-    error,
+    checked,
+    error, // 💡 Desestruturado para uso
     disabled,
     required,
     maxLength,
@@ -41,6 +41,7 @@ const FormControl: React.FC<FormControlProps> = ({
     step = 1,
     className = "",
 }) => (
+    // O container principal não precisa de classe de erro, apenas o input
     <div className={`
         ${control === "checkbox" ? 'ui-form-control-checkbox' : 'ui-form-control'}
         ${className}
@@ -54,7 +55,7 @@ const FormControl: React.FC<FormControlProps> = ({
             </label>
         )}
 
-        {/* RENDERIZAÇÃO DO CHECKBOX (CORRETO: Usa 'checked') */}
+        {/* RENDERIZAÇÃO DO CHECKBOX */}
         {control === "checkbox" && (
             <div className="ui-form-checkbox-wrapper">
                 
@@ -62,11 +63,12 @@ const FormControl: React.FC<FormControlProps> = ({
                     id={name}
                     name={name}
                     type="checkbox"
-                    checked={checked} // ✅ LIGAÇÃO CRUCIAL
+                    checked={checked}
                     onChange={onChange}
                     disabled={disabled}
                     required={required}
                     className="ui-form-checkbox"
+                    // Não aplicamos a classe ui-input-error no checkbox para manter a UX padrão
                 />
 
                 <label htmlFor={name} className="ui-form-label ui-form-checkbox-label">
@@ -76,31 +78,35 @@ const FormControl: React.FC<FormControlProps> = ({
             </div>
         )}
 
-        {/* Renderização dos Outros Controles (Input, Select, Textarea - Usam 'value') */}
+        {/* Renderização do INPUT (COM REALCE DE ERRO) */}
         {control === "input" && (
             <input
                 id={name}
                 name={name}
                 type={type}
-                value={value} // ✅ LIGAÇÃO CRUCIAL
+                value={value}
                 onChange={onChange}
                 placeholder={placeholder}
                 disabled={disabled}
                 required={required}
                 maxLength={maxLength}
                 step={step}
-                className="ui-form-input"
+                // 💡 ADIÇÃO: Adiciona 'ui-input-error' se houver a prop error
+                className={`ui-form-input ${error ? 'ui-input-error' : ''}`}
             />
         )}
+        
+        {/* Renderização do SELECT (COM REALCE DE ERRO) */}
         {control === "select" && (
             <select
                 id={name}
                 name={name}
-                value={value} // ✅ LIGAÇÃO CRUCIAL
+                value={value}
                 onChange={onChange}
                 disabled={disabled}
                 required={required}
-                className="ui-form-select"
+                // 💡 ADIÇÃO: Adiciona 'ui-input-error' se houver a prop error
+                className={`ui-form-select ${error ? 'ui-input-error' : ''}`}
             >
                 <option value="">Selecione...</option>
                 {options.map((opt) => (
@@ -110,19 +116,24 @@ const FormControl: React.FC<FormControlProps> = ({
                 ))}
             </select>
         )}
+
+        {/* Renderização do TEXTAREA (COM REALCE DE ERRO) */}
         {control === "textarea" && (
             <textarea
                 id={name}
                 name={name}
-                value={value} // ✅ LIGAÇÃO CRUCIAL
+                value={value}
                 onChange={onChange}
                 placeholder={placeholder}
                 disabled={disabled}
                 required={required}
                 rows={rows}
-                className="ui-form-textarea"
+                // 💡 ADIÇÃO: Adiciona 'ui-input-error' se houver a prop error
+                className={`ui-form-textarea ${error ? 'ui-input-error' : ''}`}
             />
         )}
+        
+        {/* 💡 EXIBIÇÃO DA MENSAGEM DE ERRO */}
         {error && <span className="ui-form-error">{error}</span>}
     </div>
 );

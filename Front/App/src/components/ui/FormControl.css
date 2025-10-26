@@ -103,3 +103,24 @@ input[type="checkbox"]  {
   margin-top: 0.3em;
 }
 
+/* Arquivo: FormControl.css */
+
+/* --- Estilo para Realçar o Campo com Erro --- */
+.ui-form-input.ui-input-error,
+.ui-form-select.ui-input-error,
+.ui-form-textarea.ui-input-error {
+    border-color: #e02424; /* Cor da borda vermelha */
+    box-shadow: 0 0 0 1px #e02424; /* Opcional: Adiciona um glow sutil */
+}
+
+/* --- Estilo para a Mensagem de Erro --- */
+/* .ui-form-error {
+    color: #e02424; /* Cor do texto vermelho */
+    font-size: 0.85rem;
+    margin-top: 4px;
+    display: block; /* Garante que a mensagem ocupe sua própria linha */
+} */
+
+/* * Nota: Certifique-se de que seus estilos base (ui-form-input, ui-form-select, etc.) 
+ * já estejam definidos em cores neutras. 
+ */
