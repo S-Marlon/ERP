@@ -212,24 +212,7 @@ export const ObraDetalhes: React.FC = () => {
             <div className="action-buttons-container" >
 
                 
-                <Button variant="outline">➕ Novo Registro de Tempo</Button>
-
-                            {/* AÇÕES DE EDIÇÃO/REGISTRO */}
-                            <Button type="button" variant="outline" >
-                                📝 Editar Dados Gerais do Poço {/* Mantém a edição de dados gerais acessível */}
-                            </Button>
-                            <Button type="button" variant="primary">
-                                📋 Gerar Relatório Completo (PDF) {/* Destaque o botão principal de saída */}
-                            </Button>
-                            <Button type="button" variant="outline">
-                                🖨️ Imprimir Relatório do Poço
-                            </Button>
-                            <Button type="button" variant="outline">
-                                📤 Compartilhar Relatório do Poço
-                            </Button>
-                             <Button type="button" variant="outline">
-                                ⚙️ Configurações Avançadas do Relatório
-                            </Button>
+                
                             
                             
                             

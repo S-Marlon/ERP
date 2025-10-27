@@ -1,250 +1,336 @@
-import React, { useState, ChangeEvent, useMemo, useEffect } from 'react';
+import React, { useState, ChangeEvent, useMemo } from 'react';
 import Typography from '../../../components/ui/Typography';
 import Button from '../../../components/ui/Button';
 import Badge from '../../../components/ui/Badge';
-import './SearchDashboard.css';
+import './SearchDashboard.css'; // Presume-se que você tenha o estilo
 import Card from '../../../components/ui/Card';
 
 // ----------------- TIPOS E DADOS MOCKADOS -----------------
 
-// Tipos para os resultados de busca
-interface ResultadoBusca {
-  id: string;
-  idr: string;
+export interface ResultadoBusca {
+  id: string; // ID único do item
+  idr: string; 
   tipo: 'Cliente' | 'Contrato' | 'Poco';
   titulo: string;
   subDetalhe: string;
+  // Campos para simular o relacionamento (usados pela lógica abaixo)
+  fk_cliente_id?: string;
+  fk_contrato_id?: string;
 }
 
-// Dados mockados para simular a base de dados (mantido como fallback)
+// Dados mockados focados em um cliente e seus relacionamentos
 const DADOS_MOCK: ResultadoBusca[] = [
-  { id: 'cli-001',idr: 'cli-001', tipo: 'Cliente', titulo: 'João da Silva (PF)', subDetalhe: '000.111.222-33' },
-  { id: 'cli-002',idr: 'cli-001', tipo: 'Cliente', titulo: 'Empresa Alpha Ltda (PJ)', subDetalhe: '11.222.333/0001-44' },
-  { id: 'cont-005',idr: 'cli-001', tipo: 'Contrato', titulo: 'Poço Novo - Fazenda Esperança', subDetalhe: 'Cliente: João da Silva' },
-  { id: 'cont-008',idr: 'cli-001', tipo: 'Contrato', titulo: 'Aprofundamento - Sítio da Pedra', subDetalhe: 'Cliente: Empresa Alpha' },
-  { id: 'poco-101',idr: 'cli-001', tipo: 'Poco', titulo: 'Poço Principal - Fazenda Esperança', subDetalhe: 'Vazão: 5.8 m³/h' },
-  { id: 'poco-102',idr: 'cli-001', tipo: 'Poco', titulo: 'Poço Secundário - Construtora Beta', subDetalhe: 'Vazão: 0 m³/h (Pendente)' },
+  // 1. O Cliente Principal
+  { id: 'cli-001', idr: '000.111.222-33', tipo: 'Cliente', titulo: 'João da Silva (PF)', subDetalhe: '000.111.222-33' },
+  
+  // 2. Contrato (Relacionado ao Cliente 1)
+  { 
+    id: 'cont-005', idr: 'C-005', tipo: 'Contrato', titulo: 'Poço Novo - Fazenda Esperança', 
+    subDetalhe: 'Cliente ID: cli-001', fk_cliente_id: 'cli-001' 
+  },
+  
+  // 3. Poço (Relacionado ao Contrato 5, que por sua vez se relaciona ao Cliente 1)
+  { 
+    id: 'poco-101', idr: 'P-101', tipo: 'Poco', titulo: 'Poço Principal - Fazenda Esperança', 
+    subDetalhe: 'Contrato ID: cont-005 | Vazão: 5.8 m³/h', fk_contrato_id: 'cont-005', fk_cliente_id: 'cli-001' 
+  },
 ];
 
-// Tipos para o estado de filtros
 type FiltroTipo = 'Todos' | 'Cliente' | 'Contrato' | 'Poço';
+type ContextoTipo = 'Cliente' | 'Contrato' | 'Poco';
 
-// ----------------- FUNÇÕES AUXILIARES -----------------
+// ----------------- FUNÇÕES AUXILIARES DE RELACIONAMENTO (MOCK) -----------------
 
 /**
- * Mapeia os dados brutos de uma tabela para o formato ResultadoBusca.
- * ATENÇÃO: Os campos (r.nome, r.cpf, r.nome_contrato, r.vazao, etc.) devem
- * ser ajustados para corresponder aos nomes reais das colunas em suas tabelas MySQL.
- * * @param rows Dados brutos do banco (sua tabela).
- * @param type O tipo a ser atribuído (Cliente, Contrato, Poco).
- * @returns Array de ResultadoBusca.
+ * Simula a busca de dados relacionados a um item específico (o contexto atual).
+ * * @param contextType O tipo do item que estamos vendo (Contrato ou Poço)
+ * @param data O array completo de dados
+ * @returns Um objeto com os dados de Cliente, Contrato e Poço relacionados.
  */
-const mapToResultadoBusca = (rows: any[], type: ResultadoBusca['tipo']): ResultadoBusca[] => {
-     return rows.map((r, idx) => {
-        let idr = '';
-        let titulo = '';
-        let subDetalhe = ''; // Este campo será o CPF, CÓDIGO, VAZÃO, etc.
+const getRelatedData = (contextType: ContextoTipo, data: ResultadoBusca[]) => {
+    let cliente: ResultadoBusca | undefined;
+    let contrato: ResultadoBusca | undefined;
+    let poco: ResultadoBusca | undefined;
+    
+    // Supondo que o item de contexto seja o primeiro item daquele tipo nos mocks
+    const contextItem = data.find(item => item.tipo === mapFiltroToDataType(contextType));
 
-        // Lógica de mapeamento baseada no tipo de dado
-        if (type === 'Cliente') {
-            // Mapeamento para CLIENTE
-            idr = String(r.cpf_cnpj ?? r.cnpj ?? 'CPF/CNPJ não disponível')
-            titulo = String(r.nome ?? r.razao_social ?? `Cliente ${idx + 1}`);
-            // SUBDETALHE: Usa o CPF ou o CNPJ
-            subDetalhe = String(r.fk_endereco_principal ?? 'CPF/CNPJ não disponível');
-        } else if (type === 'Contrato') {
-            // Mapeamento para CONTRATO
-            // Ex: r.numero_contrato ou r.titulo
-            idr = String(r.codigo_contrato ?? 'CPF/CNPJ não disponível')
+    if (contextType === 'Contrato' && contextItem) {
+        // Se o contexto é CONTRATO, buscamos o CLIENTE e o POÇO
+        const clienteId = contextItem.fk_cliente_id;
+        cliente = data.find(item => item.id === clienteId && item.tipo === 'Cliente');
+        poco = data.find(item => item.fk_contrato_id === contextItem.id && item.tipo === 'Poco');
+        contrato = contextItem;
 
-            titulo = String(r.fk_cliente ?? `Contrato ${idx + 1}`); 
-            // SUBDETALHE: Usa o código do contrato (ou o nome/ID do cliente relacionado)
-            subDetalhe = String(r.valor_total ?? 'Detalhe do Contrato não disponível');
-        } else if (type === 'Poco') {
-            // Mapeamento para POÇO
-            // Ex: r.nome_poco ou r.localizacao
-            idr = String(r.fk_contrato ?? 'CPF/CNPJ não disponível')
+    } else if (contextType === 'Poco' && contextItem) {
+        // Se o contexto é POÇO, buscamos o CLIENTE e o CONTRATO
+        const contratoId = contextItem.fk_contrato_id;
+        contrato = data.find(item => item.id === contratoId && item.tipo === 'Contrato');
+        const clienteId = contrato?.fk_cliente_id; // Pega o cliente a partir do contrato relacionado
+        cliente = data.find(item => item.id === clienteId && item.tipo === 'Cliente');
+        poco = contextItem;
+    } else if (contextType === 'Cliente' && contextItem) {
+        // No contexto Cliente, o cliente é o item principal. Contrato e Poço são os relacionados
+        cliente = contextItem;
+        contrato = data.find(item => item.fk_cliente_id === contextItem.id && item.tipo === 'Contrato');
+        // Este mock só suporta 1:1, em uma aplicação real faria-se um filter para 1:N
+        poco = data.find(item => item.fk_cliente_id === contextItem.id && item.tipo === 'Poco'); 
+    }
 
-            titulo = String(r.fk_cliente ?? `Poço ${idx + 1}`);
-            // SUBDETALHE: Usa a vazão e/ou o status
-            subDetalhe = String(r.profundidade_atual ?? 'Vazão/Status não disponível');
-        }
-
-        return {
-            // ID: Geralmente é a chave primária da tabela
-            id: String(r.id ?? r._id ?? `err-${type}-${idx}`),
-            idr: idr,
-            tipo: type,
-            titulo: titulo,
-            subDetalhe: subDetalhe, // O campo dinâmico que você queria
-        };
-    });
+    return { cliente, contrato, poco };
 };
+
+// Função auxiliar para mapear o FiltroTipo (com 'Poço') para o tipo de dado (com 'Poco')
+const mapFiltroToDataType = (filtro: FiltroTipo | ContextoTipo): ResultadoBusca['tipo'] | null => {
+    if (filtro === 'Todos') return null;
+    return filtro === 'Poço' || filtro === 'Poco' ? 'Poco' : filtro as Exclude<FiltroTipo, 'Todos' | 'Poço'>;
+};
+
+
+// ----------------- PROPS DO COMPONENTE -----------------
+
+interface SearchDashboardProps {
+  initialData?: ResultadoBusca[];
+  onItemClick?: (item: ResultadoBusca) => void;
+  loading?: boolean;
+  error?: string | null;
+}
 
 // ----------------- COMPONENTE -----------------
 
-const SearchDashboard: React.FC = () => {
+const SearchDashboard: React.FC<SearchDashboardProps> = ({
+  initialData = DADOS_MOCK, 
+  onItemClick,
+  loading = false, 
+  error = null,
+}) => {
+  const [contextType, setContextType] = useState<ContextoTipo>('Cliente'); 
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<'Todos' | 'Cliente' | 'Contrato' | 'Poço'>('Todos');
+  const [filterType, setFilterType] = useState<FiltroTipo>('Todos');
 
-  // Estado para resultados vindos do servidor
-  const [serverResults, setServerResults] = useState<ResultadoBusca[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    const urls = [
-      { url: 'http://localhost:3001/clientes', tipo: 'Cliente' as const },
-      { url: 'http://localhost:3001/contratos', tipo: 'Contrato' as const },
-      { url: 'http://localhost:3001/pocos', tipo: 'Poco' as const },
-    ];
-
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
-      let fetchError: string | null = null;
-
-      try {
-        // Usa Promise.all para buscar todos os dados em paralelo
-        const responses = await Promise.all(
-          urls.map(item => 
-            fetch(item.url, { signal: controller.signal })
-              .then(res => {
-                if (!res.ok) throw new Error(`${item.tipo} - HTTP ${res.status}`);
-                return res.json();
-              })
-              .then(json => {
-                const rows = json.data ?? json; // Espera { data: rows } ou apenas o array
-                return mapToResultadoBusca(rows, item.tipo); // Mapeia os dados
-              })
-              // Captura erros de cada fetch, mas continua com os outros
-              .catch(err => {
-                console.error(`Falha ao buscar ${item.tipo}:`, err);
-                // Armazena a primeira mensagem de erro para exibir ao usuário
-                if (!fetchError) fetchError = err.message; 
-                return []; // Retorna array vazio para que Promise.all não falhe
-              })
-          )
-        );
-
-        // Junta todos os arrays de resultados
-        const allResults = responses.flat();
-        
-        if (fetchError) {
-             setError(`Alguns dados falharam ao carregar. Detalhe do erro: ${fetchError}`);
-        } else if (allResults.length === 0) {
-             // Só exibe esta mensagem se não houver erro anterior e a busca for vazia
-             setError('Nenhum dado retornado de todas as rotas (clientes, contratos, poços).');
-        } else {
-             setError(null); // Limpa o erro se a busca foi bem sucedida
-        }
-
-        setServerResults(allResults);
-
-      } catch (err: any) {
-        // Este catch pega apenas erros de rede graves ou se o AbortController agiu
-        if (err.name !== 'AbortError') setError(err.message || 'Erro de rede desconhecido');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-    return () => controller.abort();
-  }, []); // Array de dependência vazio para rodar apenas no mont
-
-  // Define a fonte dos resultados: dados do servidor (se houver) ou mockados
-  const sourceResults = serverResults !== null ? serverResults : DADOS_MOCK;
+  const sourceResults = initialData;
 
   const handleSearchChange = (e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value);
-  const handleFilterChange = (tipo: 'Todos' | 'Cliente' | 'Contrato' | 'Poço') => setFilterType(tipo);
-
-  const resultadosFiltrados = useMemo(() => {
-    let resultados = sourceResults;
-    if (filterType !== 'Todos') {
-      // O tipo no estado é 'Poço', mas o tipo na interface é 'Poco'
-      const tipoBusca = filterType === 'Poço' ? 'Poco' : filterType; 
-      resultados = resultados.filter(item => item.tipo === tipoBusca);
+  const handleFilterChange = (tipo: FiltroTipo) => setFilterType(tipo);
+  
+  const handleItemClick = (item: ResultadoBusca) => {
+    if (onItemClick) {
+        onItemClick(item);
+    } else {
+        alert(`Navegando para: ${item.tipo} - ${item.titulo}`);
     }
+  };
+
+  // ----------------- LÓGICA DE FILTROS DINÂMICOS (Botões de Filtro) -----------------
+
+  const availableFilters = useMemo<FiltroTipo[]>(() => {
+    // Não mostra botões se for Contrato ou Poço
+    if (contextType !== 'Cliente') return []; 
+    
+    // Se for Cliente, mostra Contrato e Poço
+    const todosTipos = ['Todos', 'Cliente', 'Contrato', 'Poço'] as const;
+    const typeToExclude = contextType === 'Poco' ? 'Poço' : contextType;
+
+    // Remove o botão 'Cliente' (o próprio contexto)
+    return todosTipos.filter(tipo => tipo === 'Todos' || tipo !== typeToExclude);
+
+  }, [contextType]);
+
+  // ----------------- LÓGICA DE FILTRAGEM DE DADOS (Modo Cliente) -----------------
+  
+  const resultadosFiltrados = useMemo(() => {
+    // Esta lógica só é usada se o contextType for 'Cliente'
+    if (contextType !== 'Cliente') return []; 
+
+    let resultados = sourceResults;
+
+    // 1. FILTRO DE CONTEXTO (Exclui o Cliente principal da lista de resultados, 
+    //    pois o foco são os itens relacionados, Contrato e Poço)
+    resultados = resultados.filter(item => item.tipo !== 'Cliente'); 
+    
+    // 2. FILTRO DE TIPO (Quando o usuário clica nos botões 'Contrato' ou 'Poço')
+    if (filterType !== 'Todos') {
+      const tipoBusca = mapFiltroToDataType(filterType);
+      if (tipoBusca) {
+        resultados = resultados.filter(item => item.tipo === tipoBusca);
+      }
+    }
+
+    // 3. FILTRO DE TEXTO
     if (searchTerm.trim() === '') return resultados;
     const term = searchTerm.toLowerCase();
+
+    // Filtra por título, subDetalhe ou ID de referência
     return resultados.filter(item =>
       item.titulo.toLowerCase().includes(term) ||
-      item.subDetalhe.toLowerCase().includes(term)
+      item.subDetalhe.toLowerCase().includes(term) ||
+      item.idr.toLowerCase().includes(term)
     );
-  }, [searchTerm, filterType, sourceResults]);
+  }, [searchTerm, filterType, sourceResults, contextType]); // contextType é uma dependência crucial
 
-  const handleItemClick = (item: ResultadoBusca) => {
-    // Implemente aqui a lógica de navegação real (e.g., usando useHistory/useNavigate)
-    alert(`Navegando para: ${item.tipo} - ${item.titulo}`);
+  // ----------------- DADOS RELACIONADOS (Modo Contrato/Poço) -----------------
+
+  const { cliente, contrato, poco } = useMemo(() => {
+      // Busca os dados relacionados para Contrato/Poço ou o próprio Cliente
+      return getRelatedData(contextType, sourceResults);
+  }, [contextType, sourceResults]);
+
+
+  // ----------------- RENDERIZAÇÃO CONDICIONAL -----------------
+
+  const renderRelatedItem = (item: ResultadoBusca | undefined, label: string) => {
+    if (!item) {
+        return (
+            <fieldset className="related-fieldset no-data">
+                <legend><Typography variant="label">{label}</Typography></legend>
+                <Typography variant="pMuted">Nenhum {label.toLowerCase()} relacionado encontrado.</Typography>
+            </fieldset>
+        );
+    }
+    return (
+        <fieldset 
+            className={`related-fieldset related-fieldset-${item.tipo.toLowerCase()}`}
+            onClick={() => handleItemClick(item)}
+        >
+            <legend><Typography variant="label">{label}</Typography></legend>
+            <div className='flex-content'>
+                <div className='flex-column'>
+                    <Typography variant="strong" className="item-title">{item.titulo}</Typography>
+                    <Typography variant="small" className="item-detail">{item.subDetalhe}</Typography>
+                </div>
+                <Badge color="primary">{item.tipo}</Badge>
+            </div>
+        </fieldset>
+    );
   };
+  
+  const renderResultsArea = () => {
+    if (contextType === 'Cliente') {
+        // Lógica de Busca Global e Filtragem para itens RELACIONADOS (Contrato/Poço)
+        return (
+            <>
+                <div className="search-input-container">
+                    <input 
+                        type="text" 
+                        placeholder="Digite para buscar Contratos ou Poços relacionados..." 
+                        value={searchTerm} 
+                        onChange={handleSearchChange} 
+                        className="search-input"
+                    />
+                </div>
+                
+                <div className="results-list">
+                    <div className="results-header">
+                        <Typography variant="h3">Resultados Relacionados ({resultadosFiltrados.length})</Typography>
+                        <div className='filter-buttons'>
+                            <Typography variant="strong" as="label">Filtrar Por:</Typography>
+                            {availableFilters.map((tipo) => (
+                                <Button
+                                    key={tipo}
+                                    variant={filterType === tipo ? "primary" : "outline"}
+                                    style={{ marginLeft: 8 }}
+                                    onClick={() => handleFilterChange(tipo)}
+                                >
+                                    {tipo}
+                                </Button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {resultadosFiltrados.length > 0 ? (
+                        resultadosFiltrados.map(item => (
+                            <div
+                                key={item.id}
+                                className={`result-item result-item-${item.tipo.toLowerCase()}`} 
+                                onClick={() => handleItemClick(item)}
+                            >
+                                <div className='innertable'>
+                                    <div className="flex-column item-column-type">
+                                        <Typography variant="strong" className="item-type">{item.tipo}</Typography>
+                                        <Typography variant="small" className="item-id">{item.idr}</Typography>
+                                    </div>
+                                    <div className="flex-column item-column-title">
+                                        <Typography variant="p" className="item-title">{item.titulo}</Typography>
+                                    </div>
+                                    <div className="flex-column item-column-detail">
+                                        <Typography variant="p" className="item-detail">{item.subDetalhe}</Typography>
+                                    </div>
+                                    <div className="flex-column item-column-status">
+                                        <Badge color="warning">Em Andamento</Badge> 
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="no-results">
+                            <Typography variant="p">
+                                Nenhum resultado encontrado.
+                            </Typography>
+                        </div>
+                    )}
+                </div>
+            </>
+        );
+    } else if (contextType === 'Contrato') {
+        // Lógica para Contrato: mostra Cliente e Poço relacionados
+        return (
+            <div className="related-data-display">
+                <Typography variant="h3">Relacionamentos para o Contrato: {contrato?.titulo || contrato?.idr}</Typography>
+                {renderRelatedItem(cliente, 'Cliente')}
+                {renderRelatedItem(poco, 'Poço')}
+            </div>
+        );
+    } else if (contextType === 'Poco') {
+        // Lógica para Poço: mostra Cliente e Contrato relacionados
+        return (
+            <div className="related-data-display">
+                <Typography variant="h3">Relacionamentos para o Poço: {poco?.titulo || poco?.idr}</Typography>
+                {renderRelatedItem(cliente, 'Cliente')}
+                {renderRelatedItem(contrato, 'Contrato')}
+            </div>
+        );
+    }
+  };
+
+
+  // ----------------- RENDERIZAÇÃO -----------------
 
   return (
     <Card variant="highlight" className="search-dashboard-container">
-      <Typography variant="h1Alt" className="main-title">Busca Global</Typography>
+      <Typography variant="h2Alt" className="main-title">Busca de Relacionamentos</Typography>
 
-      {/* Exibe erro ou loading */}
+      {/* ----------------- SELETOR DE CONTEXTO TEMPORÁRIO ----------------- */}
+      <div style={{ padding: '15px 0', borderBottom: '1px solid #ccc', marginBottom: '15px', background: '#f5f5f5' }}>
+          <Typography variant="strong" style={{ marginRight: '10px' }}>
+              Simular Contexto Atual:
+          </Typography>
+          {(['Cliente', 'Contrato', 'Poco'] as const).map((tipo) => (
+              <Button
+                  key={tipo}
+                  variant={contextType === tipo ? "primary" : "outline"}
+                  style={{ marginLeft: 8 }}
+                  onClick={() => {
+                    setContextType(tipo);
+                    setFilterType('Todos'); // Resetar filtro
+                    setSearchTerm(''); // Limpar busca
+                  }}
+              >
+                  {tipo}
+              </Button>
+          ))}
+          <Typography variant="pMuted" style={{ marginTop: '10px' }}>
+              **Contexto Simulado: {contextType}**
+          </Typography>
+      </div>
+      {/* ----------------- FIM DO SELETOR DE CONTEXTO TEMPORÁRIO ----------------- */}
+
+      {/* Exibe erro ou loading (vindo do componente pai) */}
       {loading && <Typography variant="pMuted">Carregando resultados...</Typography>}
       {error && <Typography variant="pMuted" style={{ color: 'red' }}>Erro: {error}</Typography>}
       {/* Fim da exibição de erro/loading */}
 
       <div className="content-area">
-        <div className="results-list">
-          <div className="results-header">
-            <Typography variant="h3">Resultados ({resultadosFiltrados.length})</Typography>
-            <div>
-              <Typography variant="strong" as="label">Filtrar Por:</Typography>
-              {['Todos', 'Cliente', 'Contrato', 'Poço'].map((tipo) => (
-                <Button
-                  key={tipo}
-                  // TypeScript: Forçamos o tipo para garantir que a comparação funcione
-                  variant={filterType === tipo ? "primary" : "outline"}
-                  style={{ marginLeft: 8 }}
-                  onClick={() => handleFilterChange(tipo as FiltroTipo)}
-                >
-                  {tipo}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          {resultadosFiltrados.length > 0 ? (
-            resultadosFiltrados.map(item => (
-              <div
-                key={item.id}
-                // Adiciona classe para estilização específica por tipo
-                className={`result-item result-item-${item.tipo.toLowerCase()}`} 
-                onClick={() => handleItemClick(item)}
-              >
-                <div className='innertable'>
-                  <div className="flex-column item-column-type">
-                    <Typography variant="strong" className="item-type">{item.tipo}</Typography>
-                    <Typography variant="small" className="item-id">{item.idr}</Typography>
-                  </div>
-                  <div className="flex-column item-column-title">
-                    <Typography variant="small" className="item-label">Nome</Typography>
-                    <Typography variant="p" className="item-title">{item.titulo}</Typography>
-                  </div>
-                  <div className="flex-column item-column-detail">
-                    <Typography variant="small" className="item-label">Detalhe Secundário</Typography>
-                    <Typography variant="p" className="item-detail">{item.subDetalhe}</Typography>
-                  </div>
-                  <div className="flex-column item-column-status">
-                    {/* Placeholder de Badge. A cor e o texto deveriam ser dinâmicos */}
-                    <Badge color="warning">Em Andamento</Badge> 
-                  </div>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="no-results">
-              <Typography variant="p">
-                Nenhum resultado encontrado para <strong>"{searchTerm}"</strong> no filtro de <strong>{filterType}</strong>.
-              </Typography>
-            </div>
-          )}
-        </div>
+        {renderResultsArea()}
       </div>
     </Card>
   );

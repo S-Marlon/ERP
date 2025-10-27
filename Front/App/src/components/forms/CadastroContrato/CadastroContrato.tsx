@@ -8,6 +8,7 @@ import Typography from '../../ui/Typography';
 import Card from '../../ui/Card';
 import { Link } from 'react-router-dom';
 import FlexGridContainer from '../../Layout/FlexGridContainer/FlexGridContainer';
+import ClienteSelect, { Cliente } from './BuscaCliente';
 
 // ----------------- TIPOS DE DADOS E MOCKS -----------------
 
@@ -25,6 +26,8 @@ interface ClienteSimples {
     id: string;
     nome: string;
 }
+
+// O tipo Cliente é importado de BuscaCliente.tsx (ver import acima)
 
 interface ContratoData {
     clienteId: string;
@@ -230,6 +233,15 @@ const CadastroContrato: React.FC = () => {
         },
     ];
 
+
+    const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
+    // Você pode usar este estado para simular um loading externo se precisar
+    const [isSaving, setIsSaving] = useState(false); 
+
+    const handleClienteChange = (cliente: Cliente | null) => {
+        setClienteSelecionado(cliente);
+        console.log('Cliente selecionado mudou:', cliente);
+    };
     // ----------------- RENDERIZAÇÃO -----------------
     return (
         <form onSubmit={handleSubmit} className="cliente-form-container">
@@ -237,30 +249,21 @@ const CadastroContrato: React.FC = () => {
                 <Typography variant="h1Alt">Criação de Contrato de Obra</Typography>
             </div>
 
-            <FlexGridContainer layout='grid' template='1fr 1fr'>
+            <FlexGridContainer layout='grid' template='1fr 2fr'>
                 {/* COLUNA ESQUERDA */}
                 <div className='col-left'>
                     {/* ... (Seção de Dados Contratuais e Prazos) ... */}
                     <Card>
                         <Typography variant="h2Alt">Dados Contratuais e Prazos</Typography>
-                        <div className='form-row'>
-                            <FormControl
-                                label="Cliente Associado"
-                                name="clienteId"
-                                control="select"
-                                value={formData.clienteId}
-                                onChange={handleSimpleChange}
-                                options={CLIENTES_MOCK.map(c => ({ value: c.id, label: c.nome }))}
-                                required
-                            />
-                            <Link to="/clientes/novo" className='new-action-link'><Button variant='primary'>+ Novo CLiente</Button></Link>
-                        </div>
-                        <div className='input-group'>
-                             {/* ... (restante dos form controls simples) ... */}
-                            <Typography variant="pMuted">
-                                Campo de busca de cliente abrirá um modal para pesquisa de cliente
-                            </Typography>
-                        </div>
+                        
+                            <ClienteSelect
+                clienteSelecionado={clienteSelecionado}
+                onClienteSelecionadoChange={handleClienteChange}
+                // Passando o estado de loading externo
+                isLoading={isSaving} 
+            />
+                           
+                        
                         <FormControl
                             label="Serviço prestado"
                             name="tituloContrato"
@@ -275,7 +278,10 @@ const CadastroContrato: React.FC = () => {
                             ]}
                             required
                         />
-                        <div className="form-row three-cols-mini">
+
+                        <FlexGridContainer layout='grid' template='1fr 1fr 1fr'>
+
+                       
                             <FormControl
                                 label="Assinatura"
                                 name="dataAssinatura"
@@ -301,7 +307,7 @@ const CadastroContrato: React.FC = () => {
                                 min={1}
                                 required
                             />
-                        </div>
+                        </FlexGridContainer>
                     </Card>
                     <Card>
                         <Typography variant="h2Alt">Observações Adicionais</Typography>
