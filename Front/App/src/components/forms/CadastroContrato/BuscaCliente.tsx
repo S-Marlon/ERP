@@ -7,7 +7,8 @@ import Card from '../../ui/Card';
 import SelectionBox from '../../ui/SelectionBox';
 import SearchDropdown from '../../ui/SearchDropdown';
 import TypeSwitch from '../../ui/TypeSwitch';
-import TabButton from '../../ui/TabButtonn';
+// Importando o TabButton que você quer usar (o que tem role="tab")
+import TabButton from '../../ui/TabButton';
 import ResultsList from '../../ui/ResultsList';
 import ResultItem from '../../ui/ResultItem';
 
@@ -55,14 +56,14 @@ const clientesMockData: Cliente[] = [
 ];
 
 /**
- * 6. Função de busca no "banco de dados" (simulada)
- */
+  * 6. Função de busca no "banco de dados" (simulada)
+  */
 const fetchClientes = async (): Promise<Cliente[]> => {
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            resolve(clientesMockData);
-        }, 300); 
-    });
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(clientesMockData);
+    }, 300);
+  });
 };
 
 const ClienteSelectTabs: React.FC<ClienteSelectProps> = ({
@@ -74,10 +75,10 @@ const ClienteSelectTabs: React.FC<ClienteSelectProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<Cliente[]>([]);
   const [internalLoading, setInternalLoading] = useState(false);
-  
+
   // NOVO ESTADO: Filtro por tipo de cliente (PF, PJ ou AMBOS)
   const [clientTypeFilter, setClientTypeFilter] = useState<ClienteTypeFilter>('AMBOS');
-  
+
   // NOVO ESTADO CRUCIAL: Controle de visibilidade do dropdown de busca
   const [isSearchVisible, setIsSearchVisible] = useState(false);
 
@@ -85,44 +86,39 @@ const ClienteSelectTabs: React.FC<ClienteSelectProps> = ({
 
   // Handler para mostrar/ocultar a área de busca
   const toggleSearchVisibility = () => {
-      setIsSearchVisible(prev => !prev);
+    setIsSearchVisible(prev => !prev);
   };
-    
-  // 7. Função de busca e filtragem (inalterada)
+
+  // 7. Função de busca e filtragem 
   const executeSearch = useCallback(async (query: string, tab: TabKey, typeFilter: ClienteTypeFilter) => {
     if (query.length < 3 && query.length !== 0) {
       setSearchResults([]);
       return;
     }
-    
+
     setInternalLoading(true);
     try {
-        // 1. Simulação: Busca todos os dados (como se a API trouxesse todos ou fizesse a busca básica)
-        const allData = await fetchClientes();
-        
-        // 2. Filtragem: Aplica os filtros de Tipo e Termo/Aba
-        const lowerQuery = query.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const allData = await fetchClientes();
 
-        const filteredData = allData.filter(cliente => {
-            // A) Filtragem por Tipo de Cliente (PF/PJ/AMBOS)
-            if (typeFilter !== 'AMBOS' && cliente.tipo !== typeFilter) {
-                return false;
-            }
+      const lowerQuery = query.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-            // B) Filtragem por Termo e Aba
-            if (!query) return true; // Se não tem termo, retorna todos que passaram no filtro de Tipo
+      const filteredData = allData.filter(cliente => {
+        if (typeFilter !== 'AMBOS' && cliente.tipo !== typeFilter) {
+          return false;
+        }
 
-            // Pega o valor do campo da aba ativa para a busca
-            const valueToSearch = cliente[tab]; 
+        if (!query) return true;
 
-            if (typeof valueToSearch === 'string') {
-                const cleanedValue = valueToSearch.toLowerCase().replace(/[^a-z0-9]/g, '');
-                return cleanedValue.includes(lowerQuery);
-            }
-            return false;
-        });
+        const valueToSearch = cliente[tab];
 
-        setSearchResults(filteredData);
+        if (typeof valueToSearch === 'string') {
+          const cleanedValue = valueToSearch.toLowerCase().replace(/[^a-z0-9]/g, '');
+          return cleanedValue.includes(lowerQuery);
+        }
+        return false;
+      });
+
+      setSearchResults(filteredData);
     } catch (error) {
       console.error('Erro ao buscar clientes:', error);
       setSearchResults([]);
@@ -131,42 +127,39 @@ const ClienteSelectTabs: React.FC<ClienteSelectProps> = ({
     }
   }, []);
 
-  // 8. Hook para executar a busca após um pequeno delay (debounce simples) (inalterado)
+  // 8. Hook para executar a busca (debounce)
   useEffect(() => {
     const handler = setTimeout(() => {
-      // Executa a busca sempre que searchTerm, activeTab ou clientTypeFilter mudarem
-      // E SE a busca estiver visível! (Adicionamos isSearchVisible como dependência e condição)
       if (isSearchVisible && (searchTerm || clientTypeFilter || searchResults.length === 0)) {
         executeSearch(searchTerm, activeTab, clientTypeFilter);
       }
-    }, 500); 
+    }, 500);
 
     return () => {
       clearTimeout(handler);
     };
-  }, [searchTerm, activeTab, clientTypeFilter, executeSearch, searchResults.length, isSearchVisible]); 
+  }, [searchTerm, activeTab, clientTypeFilter, executeSearch, searchResults.length, isSearchVisible]);
 
-  // Handlers (inalterados)
+  // Handlers
   const handleTabChange = (tab: TabKey) => {
     setActiveTab(tab);
-    setSearchTerm(''); 
+    setSearchTerm('');
   };
 
+  // *** FUNÇÃO handleTypeFilterChange ADICIONADA AQUI ***
   const handleTypeFilterChange = (type: ClienteTypeFilter) => {
     setClientTypeFilter(type);
-    setSearchTerm(''); 
+    setSearchTerm('');
   };
-  
+
   const handleClienteSelect = useCallback((cliente: Cliente) => {
     onClienteSelecionadoChange(cliente);
-    // OCULTA a busca após a seleção!
-    setIsSearchVisible(false); 
+    setIsSearchVisible(false);
   }, [onClienteSelecionadoChange]);
-  
+
   const handleClearSelection = useCallback(() => {
     onClienteSelecionadoChange(null);
-    // MOSTRA a busca após limpar a seleção, incentivando nova busca
-    setIsSearchVisible(true); 
+    setIsSearchVisible(true);
   }, [onClienteSelecionadoChange]);
 
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -175,52 +168,50 @@ const ClienteSelectTabs: React.FC<ClienteSelectProps> = ({
 
   // 9. Renderização do componente
   return (
-    <Card className="cliente-select-card"> {/* Substitui styles.container */}
+    <Card className="cliente-select-card">
       <FlexGridContainer layout='flex' justifyContent='space-between' alignItems='center'>
-        {/* Use um componente Typography para o H3 e trate a margem se necessário */}
-        <Typography variant="h3" style={{ marginBottom: '15px' }}>Busca de Cliente</Typography> 
+        <Typography variant="h3" >Busca de Cliente</Typography>
         <Link to="/clientes/novo" className='new-action-link'><Button variant='primary'>+ Novo Cliente</Button></Link>
       </FlexGridContainer>
 
-      {/* --- BOTÃO/CAMPO DE SELEÇÃO QUE ABRE O DROPDOWN --- */}
-      <SelectionBox 
-          onClick={toggleSearchVisibility} 
-          status={clienteSelecionado ? "selected" : "placeholder"}
-          isSearchVisible={isSearchVisible}
+      {/* --- SELEÇÃO/DISPLAY DO CLIENTE --- */}
+      <SelectionBox
+        onClick={toggleSearchVisibility}
+        status={clienteSelecionado ? "selected" : "placeholder"}
+        isSearchVisible={isSearchVisible}
       >
-          {/* Conteúdo do SelectionBox */}
-          {clienteSelecionado ? (
-              <>
-                  <Typography variant="p">Cliente Selecionado ({clienteSelecionado.tipo}):</Typography>
-                  <Typography variant="strong">{clienteSelecionado.nome}</Typography> | {clienteSelecionado.documento}
-                  <Button 
-                      variant='danger' // Novo variant: 'clear' ou 'danger-text'
-                      onClick={(e) => { 
-                          e.stopPropagation(); 
-                          handleClearSelection(); 
-                      }} 
-                      disabled={isLoading}
-                  >
-                      Limpar Seleção
-                  </Button>
-              </>
-          ) : (
-              <Typography variant="pMuted">
-                  {isSearchVisible ? 'Clique para fechar' : 'Clique para buscar ou selecionar um cliente...'}
-              </Typography>
-          )}
+        {clienteSelecionado ? (
+          <>
+            <Typography variant="p">Cliente Selecionado ({clienteSelecionado.tipo}):</Typography>
+            <Typography variant="strong">{clienteSelecionado.nome}</Typography> | {clienteSelecionado.documento}
+            <Button
+              variant='danger'
+              onClick={(e) => {
+                e.stopPropagation();
+                handleClearSelection();
+              }}
+              disabled={isLoading}
+            >
+              Limpar Seleção
+            </Button>
+          </>
+        ) : (
+          <Typography variant="pMuted">
+            {isSearchVisible ? 'Clique para fechar' : 'Clique para buscar ou selecionar um cliente...'}
+          </Typography>
+        )}
       </SelectionBox>
 
       {/* --- DROPDOWN/ÁREA DE BUSCA CONDICIONAL --- */}
       {isSearchVisible && (
-        <SearchDropdown> {/* Substitui styles.dropdown */}
-          
-          {/* Switch PF/PJ/AMBOS */}
-          <TypeSwitch> {/* Substitui styles.typeSwitchContainer */}
+        <SearchDropdown>
+
+          {/* Switch PF/PJ/AMBOS - A função handleTypeFilterChange agora está no escopo correto */}
+          <TypeSwitch>
             {(['AMBOS', 'PF', 'PJ'] as ClienteTypeFilter[]).map(type => (
               <Button
                 key={type}
-                variant="switch" // Novo variant: 'switch'
+                variant="switch" // Usamos "switch" para aplicar os estilos de grupo/ativo
                 active={clientTypeFilter === type}
                 onClick={() => handleTypeFilterChange(type)}
                 disabled={isLoading}
@@ -230,12 +221,13 @@ const ClienteSelectTabs: React.FC<ClienteSelectProps> = ({
             ))}
           </TypeSwitch>
 
-          {/* Abas */}
-          <div className='tabs-container'> {/* Precisa de um wrapper com CSS para as tabs */}
+          {/* Abas (UTILIZANDO O NOVO TabButton) */}
+          <div className='tabs-container'>
             {(Object.keys(tabLabels) as TabKey[]).map(tab => (
               <TabButton
                 key={tab}
-                active={activeTab === tab}
+                label={tabLabels[tab]} // Prop 'label'
+                isActive={activeTab === tab} // Prop 'isActive'
                 onClick={() => handleTabChange(tab)}
                 disabled={isLoading}
               >
@@ -251,11 +243,10 @@ const ClienteSelectTabs: React.FC<ClienteSelectProps> = ({
             value={searchTerm}
             onChange={handleSearchChange}
             disabled={isLoading}
-            // fullWidth // Prop para aplicar width: 100% e estilos básicos
           />
-          
+
           {/* Lista de Resultados */}
-          <ResultsList> {/* Substitui styles.resultsContainer */}
+          <ResultsList>
             {isLoading ? (
               <Typography variant="p">Carregando resultados...</Typography>
             ) : searchResults.length > 0 ? (
@@ -263,7 +254,7 @@ const ClienteSelectTabs: React.FC<ClienteSelectProps> = ({
                 <ResultItem
                   key={cliente.id}
                   onClick={() => handleClienteSelect(cliente)}
-                  selected={cliente.id === clienteSelecionado?.id} // Prop para styles.resultItemSelected
+                  selected={cliente.id === clienteSelecionado?.id}
                 >
                   <Typography variant="strong">{cliente.nome} ({cliente.tipo})</Typography> | {cliente.documento}
                   <br />

@@ -68,3 +68,28 @@
     transform: rotate(360deg);
   }
 }
+
+
+
+/* Seu CSS existente para TypeSwitch container */
+.cliente-select-type-switch-container {
+    /* ... estilos de container ... */
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+/* 1. Estilo para o variant Switch (inativo) */
+.ui-btn--switch {
+    background-color: #f8f8f8;
+    color: #333;
+    border: none; /* remove qualquer borda padrão */
+    flex-grow: 1; /* Para funcionar no TypeSwitch container (se for o caso) */
+}
+
+/* 2. Estilo para o variant Switch quando ATIVO */
+.ui-btn--switch.ui-btn--active {
+    background-color: #007BFF; /* Cor de destaque (ex: azul) */
+    color: white;
+    font-weight: bold;
+}

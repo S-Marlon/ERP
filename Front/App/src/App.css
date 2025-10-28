@@ -220,28 +220,50 @@ h6 {
     /* ... estilos base do botão switch */
 }
 
-/* 4. TabButton.tsx */
-.tabs-container {
-    display: flex; 
-    margin-bottom: 10px;
-    border-bottom: 2px solid #ccc;
+
+/* Estilização para o contêiner do TypeSwitch (baseado na sua descrição) */
+.cliente-select-type-switch-container {
+    display: flex;
+    margin-bottom: 20px;
+    border-radius: 5px;
+    overflow: hidden; 
+    border: 1px solid #ccc; /* Borda externa */
 }
 
-.cliente-select-tab-button {
-    padding: 10px 15px;
-    border: none;
-    border-bottom: 3px solid transparent;
-    background-color: transparent;
+/* Estilo Base para cada botão dentro do switch */
+.cliente-select-type-switch-container .type-switch-item {
+    /* Aplica ao Button que é item do switch */
+    flex-grow: 1; /* Faz com que os botões ocupem o espaço igualmente */
+    border: none; /* Remove bordas internas do próprio botão se houverem */
+    border-radius: 0; /* Remove o arredondamento individual, pois o contêiner faz o arredondamento */
+    background-color: #f8f8f8; /* Cor de fundo padrão (inativo) */
+    color: #333;
     cursor: pointer;
-    margin-right: 5px;
-    /* Estilos base da aba */
+    padding: 10px 15px;
+    text-align: center;
+    transition: background-color 0.3s, color 0.3s;
 }
 
-.cliente-select-tab-button--active {
-    border-bottom: 3px solid #007bff;
+/* Estilo para quando o botão está ATIVO (selecionado) */
+.cliente-select-type-switch-container .type-switch-item.active {
+    background-color: #007BFF; /* Cor de destaque (ex: azul) */
+    color: white;
     font-weight: bold;
-    color: #007bff;
+    /* Opcional: Mudar a borda para simular a união, se não usar overflow:hidden */
 }
+
+/* Estilo para quando o botão está DESABILITADO */
+.cliente-select-type-switch-container .type-switch-item:disabled {
+    background-color: #eee;
+    color: #aaa;
+    cursor: not-allowed;
+}
+
+/* Estilo para quando o mouse passa sobre um botão DESATIVO */
+.cliente-select-type-switch-container .type-switch-item:not(.active):hover {
+    background-color: #e0e0e0;
+}
+
 
 /* 5. ResultsList.tsx */
 .cliente-select-results-list {

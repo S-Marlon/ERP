@@ -21,21 +21,6 @@
   border-radius: 4px;
 }
 
-.ui-btn--primary {
-  background: #2e7d32;
-  color: #fff;
-}
-
-.ui-btn--secondary {
-  background: #1976d2;
-  color: #fff;
-}
-
-.ui-btn--danger {
-  background: #d32f2f;
-  color: #fff;
-}
-
 .ui-input {
   padding: 0.5rem;
   border-radius: 4px;
@@ -50,7 +35,3 @@
   font-weight: 700;
   margin-bottom: 0.5em;
 }
-
-.ui-heading--1 { font-size: 2rem; }
-.ui-heading--2 { font-size: 1.5rem; }
-.ui-heading--3 { font-size: 1.2rem; }
