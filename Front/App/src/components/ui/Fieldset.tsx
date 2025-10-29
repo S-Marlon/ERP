@@ -1,11 +1,11 @@
 // Fieldset.tsx
 import React from 'react';
-import './Fieldset.css'; // Importa os estilos CSS Modules
+import './Fieldset.css'; // Importa os estilos
 
 /**
  * Define os tipos de variantes de estilo.
  */
-export type FieldsetVariant = 'standard' | 'card' | 'highlight';
+export type FieldsetVariant = 'standard' | 'card' | 'highlight' | 'basic'; // Adicionado 'basic'
 
 /**
  * Propriedades aceitas pelo componente Fieldset.
@@ -25,19 +25,24 @@ export interface FieldsetProps extends React.FieldsetHTMLAttributes<HTMLFieldSet
  */
 const Fieldset: React.FC<FieldsetProps> = ({
   legend,
-  variant = 'standard', // Define 'standard' como padrão
+  variant = 'standard', // 'standard' como padrão
   children,
-  
+  ...rest // Captura quaisquer outras props padrão de fieldset (como `className`, `id`, etc.)
 }) => {
   // Constrói a lista de classes CSS
-  // styles.fieldset é a classe base.
-  // styles[variant] adiciona a classe da variante específica (e.g., styles.card).
-   
+  // A classe base 'fieldset' é aplicada.
+  // A classe de variante específica (e.g., 'fieldset-card') é aplicada e sobrescreve, se necessário.
+  
+  // Combina as classes passadas via props com as classes internas
+  const fieldsetClassName = `fieldset fieldset-${variant} ${rest.className || ''}`.trim();
+
+  // Remove className das props a serem passadas para o fieldset
+  const { className, ...fieldsetProps } = rest; 
 
   return (
-    <fieldset className={'fieldset fieldset-'+variant} >
+    <fieldset className={fieldsetClassName} {...fieldsetProps}> {/* Usa a classe combinada e as props restantes */}
       {/* O elemento <legend> recebe a classe de estilo para a legenda */}
-      <legend className='legend' >{legend}</legend>
+      <legend className='legend'>{legend}</legend>
       {children}
     </fieldset>
   );

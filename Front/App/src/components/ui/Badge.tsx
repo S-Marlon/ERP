@@ -2,7 +2,7 @@ import React from "react";
 import "./Badge.css";
 
 interface BadgeProps {
-  color?: "default" | "success" | "warning" | "danger" | "info";
+  color?: "default" | "success" | "warning" | "danger" | "poco" | "paper";
   children: React.ReactNode;
   className?: string;
 }

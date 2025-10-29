@@ -1,69 +1,48 @@
 // src/components/TabButton.tsx
 import React from 'react';
+import './TabButton.css'; // Importa o arquivo CSS
 
-// Assumindo que você tem uma interface TabButtonProps no seu projeto:
-// interface TabButtonProps {
-//   label: string;
-//   isActive: boolean;
-//   onClick: () => void;
-//   disabled?: boolean;
-//   isTab?: boolean; // Nova propriedade para determinar se é uma aba ARIA
-// }
+// Define o tipo para as variantes
+type TabVariant = 'tab' | 'switch' | 'pill';
 
-// O estilo pode ser definido em um arquivo CSS separado ou como JSS/TSX
-const styles: { [key: string]: React.CSSProperties } = {
-  button: {
-    padding: '10px 10px',
-    border: 'none',
-    borderRadius: '0',
-    backgroundColor: 'transparent',
-    cursor: 'pointer',
-    fontSize: '1em',
-    color: '#666',
-    borderBottom: '5px solid transparent',
-    fontWeight: 'normal',
-    transition: 'all 0.2s ease-in-out', // Adicionado transição para melhor UX
-    minWidth: '80px', // Opcional: Para dar uma largura mínima
-  },
-  active: {
-    color: '#007BFF',
-    borderBottomColor: '#007BFF',
-    fontWeight: 'bold',
-  },
-  // Estilo para o TypeSwitch (sem borda inferior, mas ainda ativo/inativo)
-  switch: {
-    padding: '8px 15px',
-    border: 'none',
-    borderBottom: 'none',
-  },
-  switchActive: {
-    backgroundColor: '#007BFF',
-    color: 'white',
-    // Remove a borda inferior, usa cor de fundo
-    borderBottomColor: 'transparent', 
-  },
-};
+/**
+ * @interface TabButtonProps
+ * Propriedades para o componente TabButton.
+ */
+interface TabButtonProps {
+  label: string;
+  isActive: boolean;
+  onClick: () => void;
+  disabled?: boolean;
+  /**
+   * Define se o botão deve se comportar como uma aba ARIA (role="tab").
+   * Padrão: true.
+   */
+  isTab?: boolean;
+  /**
+   * Define a variante de estilo do botão.
+   * Valores possíveis: 'tab' (padrão), 'switch', 'pill'.
+   */
+  variant?: TabVariant;
+}
 
-// Adicionei 'isTab' e 'variant' à desestruturação para flexibilidade máxima.
-const TabButton: React.FC<any> = ({ label, isActive, onClick, disabled, isTab = true, variant = 'tab' }) => {
-  
-  // 1. Define os estilos base com base no variant (tab ou switch)
-  let baseStyle = styles.button;
-  let activeStyle = styles.active;
+const TabButton: React.FC<TabButtonProps> = ({
+  label,
+  isActive,
+  onClick,
+  disabled,
+  isTab = true,
+  variant = 'tab', // Padrão 'tab'
+}) => {
+  // Constrói a lista de classes CSS
+  const classNames = [
+    'tab-button', // Classe base
+    `tab-button--${variant}`, // Classe da variante (ex: tab-button--switch)
+    isActive ? 'tab-button--active' : '', // Classe de estado ativo
+    disabled ? 'tab-button--disabled' : '', // Classe de estado desabilitado
+  ].filter(Boolean).join(' '); // Filtra vazios e junta com espaço
 
-  if (variant === 'switch') {
-    // Mescla o estilo padrão com o estilo de switch
-    baseStyle = { ...styles.button, ...styles.switch };
-    activeStyle = { ...styles.active, ...styles.switchActive };
-  }
-
-  // 2. Mescla o estilo base com o estilo ativo, se necessário
-  const combinedStyle = {
-    ...baseStyle,
-    ...(isActive ? activeStyle : {}),
-  };
-
-  // 3. Define os atributos ARIA (Apenas se for um Tab Button real)
+  // Define os atributos ARIA (Apenas se for um Tab Button real)
   const ariaProps = isTab
     ? {
         role: 'tab',
@@ -73,10 +52,10 @@ const TabButton: React.FC<any> = ({ label, isActive, onClick, disabled, isTab = 
 
   return (
     <button
-      style={combinedStyle}
+      className={classNames}
       onClick={onClick}
       disabled={disabled}
-      {...ariaProps} // Aplica as propriedades ARIA condicionalmente
+      {...ariaProps}
     >
       {label}
     </button>

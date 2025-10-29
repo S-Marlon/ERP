@@ -1,23 +1,23 @@
 import React, { useMemo } from 'react';
 
-// Importação do CSS (mantida, mas lembre-se que o foco está nos estilos inline para as props)
-import './flesGridContainer.css';
+// Importação do CSS
+import './flexGridContainer.css';
 
-// 1. NOVAS INTERFACES DE ALINHAMENTO FLEXBOX
-type JustifyContent = 
-    | 'flex-start' 
-    | 'flex-end' 
-    | 'center' 
-    | 'space-between' 
-    | 'space-around' 
-    | 'space-evenly' 
+// 1. NOVAS INTERFACES DE ALINHAMENTO  FLEXBOX
+type JustifyContent =
+    | 'flex-start'
+    | 'flex-end'
+    | 'center'
+    | 'space-between'
+    | 'space-around'
+    | 'space-evenly'
     | 'stretch';
 
-type AlignItems = 
-    | 'flex-start' 
-    | 'flex-end' 
-    | 'center' 
-    | 'baseline' 
+type AlignItems =
+    | 'flex-start'
+    | 'flex-end'
+    | 'center'
+    | 'baseline'
     | 'stretch';
 
 type LayoutType = 'flex' | 'grid';
@@ -29,7 +29,10 @@ interface FlexGridContainerProps extends React.PropsWithChildren {
     className?: string;
     mobileTemplate?: string; // Para demonstração de responsividade simples
 
-    // 2. NOVAS PROPS PARA FLEXBOX
+    // NOVO: Prop para mudar a cor de fundo (Estilo Inline)
+    backgroundColor?: string;
+
+    // 2. PROPS PARA FLEXBOX
     justifyContent?: JustifyContent;
     alignItems?: AlignItems;
     flex?: string;
@@ -37,17 +40,18 @@ interface FlexGridContainerProps extends React.PropsWithChildren {
 
 /**
  * Componente Contêiner Modular que pode se comportar como Flex ou Grid.
- * Adicionado suporte completo para alinhamento Flexbox.
+ * Adicionado suporte completo para alinhamento Flexbox e cor de fundo personalizável.
  */
 const FlexGridContainer: React.FC<FlexGridContainerProps> = ({
     layout,
-    gap = '15px', // Padrão
+    gap = '0px', // Padrão
     template,
     className = '',
     mobileTemplate,
     // 3. DESESTRUTURAÇÃO DAS NOVAS PROPS
-    justifyContent, 
-    alignItems, 
+    justifyContent,
+    alignItems,
+    backgroundColor, // NOVO: Desestruturação da nova prop
     children,
 }) => {
 
@@ -57,6 +61,8 @@ const FlexGridContainer: React.FC<FlexGridContainerProps> = ({
             display: layout,
             gap: gap,
             width: '100%',
+            // NOVO: Aplica a cor de fundo se fornecida
+            backgroundColor: backgroundColor,
         };
 
         if (layout === 'flex') {
@@ -64,9 +70,9 @@ const FlexGridContainer: React.FC<FlexGridContainerProps> = ({
                 ...baseStyle,
                 flexDirection: template === 'column' ? 'column' : 'row',
                 flexWrap: 'wrap', // Permite que os itens quebrem a linha
-                // APLICAÇÃO DOS NOVOS ESTILOS FLEXBOX (com fallback para valores padrão se a prop não for fornecida)
-                justifyContent: justifyContent || 'flex-start', // Novo! Padrão 'flex-start'
-                alignItems: alignItems || 'stretch', // Novo! Padrão 'stretch'
+                // APLICAÇÃO DOS NOVOS ESTILOS FLEXBOX
+                justifyContent: justifyContent || 'flex-start',
+                alignItems: alignItems || 'stretch',
                 flex: '1 0 100%'
             };
         }
@@ -80,18 +86,18 @@ const FlexGridContainer: React.FC<FlexGridContainerProps> = ({
         }
 
         return baseStyle;
-    }, [layout, gap, template, justifyContent, alignItems]); // Incluídas as novas props no array de dependências
+    }, [layout, gap, template, justifyContent, alignItems, backgroundColor]); // NOVO: Incluída backgroundColor
 
     // 5. Montagem da Classe CSS
     const finalClassName = `container-modular-${layout} ${className}`;
-    
+
     return (
-        <div 
-            className={finalClassName} 
+        <div
+            className={finalClassName}
             style={containerStyle}
             // Adicionamos um atributo data- para facilitar a estilização com CSS
-            data-layout={layout} 
-            data-template={template} 
+            data-layout={layout}
+            data-template={template}
             data-mobile-template={mobileTemplate}
         >
             {children}

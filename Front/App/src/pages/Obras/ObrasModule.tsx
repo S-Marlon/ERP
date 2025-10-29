@@ -14,20 +14,17 @@ import TypeSwitch from "../../components/ui/TypeSwitch";
 import TabButton from "../../components/ui/TabButton";
 
 // DEFINIÇÕES DE TIPO FORA DO COMPONENTE PARA MELHOR ESCOPO
-type SearchFilterType = 'Todos' | 'Cliente' | 'Contrato' | 'Poço';
 type SearchType = 'Cliente' | 'Contrato' | 'Poço';
 
 
 export const ObrasModule: React.FC = () => {
     // ESTADOS GLOBAIS DO MÓDULO OBRAS
-    const [filterType, setFilterType] = useState<SearchFilterType>('Todos'); // Se precisar de um filtro geral
     const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
     const [isSaving, setIsSaving] = useState(false); // Usado como loading externo
     
     // ESTADO PARA O FILTRO CLIENTE/CONTRATO/POÇO
     const [activeSearchType, setActiveSearchType] = useState<SearchType>('Cliente');
     // NOVO ESTADO: Para armazenar o termo de busca
-    const [searchTerm, setSearchTerm] = useState(''); 
 
     // HANDLERS
     const handleClienteChange = (cliente: Cliente | null) => {
@@ -35,40 +32,16 @@ export const ObrasModule: React.FC = () => {
         console.log('Cliente selecionado mudou:', cliente);
     };
 
-    const handleFilterChange = (tipo: SearchFilterType) => setFilterType(tipo);
 
     // NOVO HANDLER: Atualiza o tipo de busca (Cliente/Contrato/Poço)
     const handleSearchTypeChange = (type: SearchType) => {
         setActiveSearchType(type);
         // **RESETAR TERMO DE BUSCA AO MUDAR O TIPO DE BUSCA É UMA BOA PRÁTICA**
-        setSearchTerm(''); 
     };
 
     // Usamos 'isSaving' como nosso estado de loading para os botões
     const isLoading = isSaving; 
 
-    // Função auxiliar para simular a busca/renderizar o conteúdo dinâmico
-    const renderSearchContent = () => {
-        if (searchTerm === '') {
-            return (
-                <Typography variant="body1" style={{ marginTop: '20px', color: 'gray' }}>
-                    {`Aguardando termo para busca por ${activeSearchType}...`}
-                </Typography>
-            );
-        }
-        
-        // Aqui você colocaria a lógica de renderização com base no tipo de busca e no termo
-        switch (activeSearchType) {
-            case 'Cliente':
-                return <Typography variant="h5" style={{ marginTop: '20px' }}>{`Resultado da Busca por Cliente: "${searchTerm}"`}</Typography>;
-            case 'Contrato':
-                return <Typography variant="h5" style={{ marginTop: '20px' }}>{`Resultado da Busca por Contrato: "${searchTerm}"`}</Typography>;
-            case 'Poço':
-                return <Typography variant="h5" style={{ marginTop: '20px' }}>{`Resultado da Busca por Poço: "${searchTerm}"`}</Typography>;
-            default:
-                return null;
-        }
-    };
 
 
     return (
@@ -95,7 +68,7 @@ export const ObrasModule: React.FC = () => {
                 <FlexGridContainer 
                     layout="grid" 
                     gap="5px" 
-                    template="3fr 3fr 6fr 1fr"
+                    template="2fr 1.5fr 4fr 1fr"
                     mobileTemplate="1fr" 
                 >
                     <div>
@@ -131,18 +104,6 @@ export const ObrasModule: React.FC = () => {
                         {/* Você precisará de um campo de input (que deve estar no SearchDashboard ou aqui) para setar 'searchTerm' */}
                         {/* Exemplo para testar a renderização: */}
                         {/* Apenas para demonstração, você deve adicionar um input de busca real */}
-                        <div style={{ marginTop: '15px' }}>
-                            <input 
-                                type="text" 
-                                placeholder={`Digite o termo de busca para ${activeSearchType}...`}
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                disabled={isLoading}
-                                style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
-                            />
-                        </div>
-                        
-                        {renderSearchContent()}
                         {/* FIM DO NOVO CONTEÚDO DINÂMICO */}
 
                     </div>

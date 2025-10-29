@@ -1,3 +1,6 @@
+/* -------------------------------------- */
+/* BASE STYLES (Estilos base aplicados a todas as variantes) */
+/* -------------------------------------- */
 .fieldset {
   border: 1px solid #ccc;
   padding: 15px 20px;
@@ -11,53 +14,74 @@
   padding: 0 10px;
   color: #333;
 }
+
 /* -------------------------------------- */
 /* VARIANT 1: Standard (Padrão) */
+/* (Estende a classe base 'fieldset') */
 /* -------------------------------------- */
-.standard {
-  border-color: #000000; /* Azul primário */
+.fieldset-standard {
+  border-color: #000000;
 }
+
 /* -------------------------------------- */
 /* VARIANT 2: Card (Estilo de Cartão) */
 /* -------------------------------------- */
-.card {
-  border: none;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Sombra suave */
+.fieldset-card {
+  border: none; /* Remove a borda padrão */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   background-color: #fff;
 }
 
-.card .legend {
+.fieldset-card .legend {
   font-size: 1.2em;
   border-bottom: 2px solid #f0f0f0;
   padding: 0 0 5px 0;
   margin-bottom: 10px;
-  display: block; /* Para que a borda de baixo se estenda */
+  display: block;
   width: 100%;
   box-sizing: border-box;
   color: #555;
 }
 
-/* O elemento <fieldset> ignora a tag <legend> na borda,
-   então o estilo de cartão não precisa de borda no fieldset.
-   A sombra e padding já o diferenciam. */
-
 /* -------------------------------------- */
 /* VARIANT 3: Highlight (Destaque) */
 /* -------------------------------------- */
-.highlight {
-  border: 2px solid #ffc107; /* Amarelo/Laranja de destaque */
-  background-color: #fffbe6; /* Fundo suavemente amarelado */
+.fieldset-highlight {
+  border: 2px solid #ffc107;
+  background-color: #fffbe6;
 }
 
-.highlight .legend {
+.fieldset-highlight .legend {
   background-color: #ffc107;
   color: #333;
   padding: 2px 10px;
   border-radius: 4px;
-  margin-left: -10px; /* Ajusta a posição */
+  margin-left: -10px;
 }
 
-/* Tabela de Itens (Melhoria de UX) */
+/* -------------------------------------- */
+/* VARIANT 4: Basic (Básico - SEM padding/margin) */
+/* Foco na <legend> como descrição acima do campo */
+/* -------------------------------------- */
+.fieldset-basic {
+  /* Zera os estilos da base para um visual 'limpo' */
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.fieldset-basic .legend {
+  /* Estilo para que a <legend> atue como um label/descrição */
+  font-weight: normal; /* Geralmente labels não são em negrito */
+  font-size: 0.9em; /* Tamanho um pouco menor */
+  color: #666; /* Cor de texto mais suave */
+  padding: 0; /* Remove padding */
+  margin-bottom: 5px; /* Espaço entre a descrição e o conteúdo */
+}
+
+/* -------------------------------------- */
+/* Tabela de Itens (Melhoria de UX) - Estilos globais/extras */
+/* -------------------------------------- */
 .fieldset-itens {
   margin-bottom: 0;
 }

@@ -1,0 +1,118 @@
+/* src/components/TabButton.css */
+
+/* --- Estilo Base (Tab Padrão) --- */
+
+.tab-button {
+    /* Reset e Base */
+    padding: 10px 10px;
+    border: none;
+    background-color: transparent;
+    cursor: pointer;
+    font-size: 1em;
+    font-family: inherit; /* Garante consistência da fonte */
+    white-space: nowrap; /* Impede que o texto quebre */
+    text-align: center;
+    transition: all 0.2s ease-in-out;
+    
+    /* Cores Inativas */
+    color: #666;
+    border-bottom: 5px solid transparent; /* Para a variante 'tab' */
+    font-weight: normal;
+}
+
+.tab-button:hover:not(.tab-button--disabled) {
+    color: #333;
+}
+
+/* Estado Ativo (Para a variante 'tab' padrão) */
+.tab-button--active.tab-button--tab {
+    color: #007BFF;
+    border-bottom-color: #007BFF;
+    font-weight: bold;
+}
+
+/* Estado Desabilitado */
+.tab-button--disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+    pointer-events: none; /* Garante que o clique não funcione */
+}
+
+/* --- Variante 1: Switch (Sem borda, com fundo) --- */
+
+.tab-button--switch {
+    padding: 8px 8px;
+    border-radius: 4px; /* Arredonda as bordas */
+    border-bottom: none; /* Remove a borda inferior */
+    background-color: #eee;
+}
+
+.tab-button--active.tab-button--switch {
+    background-color: #007BFF;
+    color: white;
+    font-weight: 600;
+    /* Remove o estilo de borda inferior do estado ativo de 'tab' */
+    border-bottom: none; 
+}
+
+.tab-button--switch:hover:not(.tab-button--disabled):not(.tab-button--active) {
+    background-color: #ddd;
+    color: #333;
+}
+
+/* --- Variante 2: Pill (Botão totalmente arredondado) --- */
+
+.tab-button--pill {
+    padding: 8px 20px;
+    border-radius: 9999px; /* Totalmente arredondado */
+    border: 1px solid #ccc; /* Adiciona uma borda sutil */
+    border-bottom: none; /* Remove borda inferior se estiver no base */
+    background-color: white;
+    font-weight: normal;
+}
+
+.tab-button--active.tab-button--pill {
+    background-color: #007BFF;
+    color: white;
+    border-color: #007BFF;
+    font-weight: 600;
+    /* Garante que a borda inferior não apareça */
+    border-bottom: none; 
+}
+
+.tab-button--pill:hover:not(.tab-button--disabled):not(.tab-button--active) {
+    background-color: #f0f0f0;
+}
+
+/* --- Responsividade (Para dispositivos menores, empilha ou comprime) --- */
+
+@media (max-width: 600px) {
+    /* Diminui o padding em telas pequenas para economizar espaço */
+    .tab-button {
+        padding: 8px 10px;
+        min-width: auto; /* Permite que o botão seja menor */
+        font-size: 0.95em;
+    }
+    
+    /* Exemplo de mudança para a variante 'tab' (opcional, pode ser mantido) */
+    .tab-button--tab {
+        border-bottom-width: 3px; /* Borda mais fina */
+    }
+
+    /* Ajuste na variante 'pill' */
+    .tab-button--pill {
+        padding: 6px 15px;
+    }
+    
+    /* Se você quiser que as abas se ajustem à largura total do contêiner */
+    /*
+    .tab-button-container {
+        display: flex;
+        flex-direction: column; 
+    }
+    .tab-button {
+        width: 100%;
+        margin-bottom: 5px;
+    }
+    */
+}

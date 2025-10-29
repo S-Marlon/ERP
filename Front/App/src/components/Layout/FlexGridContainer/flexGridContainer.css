@@ -1,0 +1,31 @@
+/* Estilo Base */
+.container-modular-flex,
+.container-modular-grid {
+ /* Cor de fundo Padrão (será sobrescrita pela prop backgroundColor se fornecida) */
+ /* background-color: #f0f0f0;  <-- Descomente se quiser um padrão */
+ padding: 0px; /* Adiciona algum preenchimento para ver a cor de fundo */
+ border-radius: 8px;
+}
+
+/* --- Classes para mudar a cor via prop 'className' --- */
+
+.theme-dark {
+ background-color: #333;
+ color: white; /* Cor do texto para contraste */
+}
+
+.theme-accent {
+ background-color: #007bff; /* Azul vibrante */
+ color: white;
+}
+
+/* Estilo de responsividade simples (exemplo) */
+/* Quando a largura da tela for menor que 768px, usa o mobile-template */
+@media (max-width: 768px) {
+ .container-modular-grid[data-mobile-template] {
+  /* Reverte para 1 coluna no mobile se houver mobile-template */
+  grid-template-columns: var(--mobile-template); /* Isso não funciona diretamente, mas serve como intenção. O ideal seria usar uma classe específica ou JS. */
+  /* Para o CSS simples, use algo como: */
+  grid-template-columns: 1fr;
+ }
+}

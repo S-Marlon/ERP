@@ -7,13 +7,15 @@ import Card from '../../ui/Card';
 import SelectionBox from '../../ui/SelectionBox';
 import SearchDropdown from '../../ui/SearchDropdown';
 import TypeSwitch from '../../ui/TypeSwitch';
-// Importando o TabButton que você quer usar (o que tem role="tab")
 import TabButton from '../../ui/TabButton';
 import ResultsList from '../../ui/ResultsList';
 import ResultItem from '../../ui/ResultItem';
+import Badge from '../../ui/Badge';
+import Fieldset from '../../ui/Fieldset';
+import FormControl from '../../ui/FormControl';
 
 // 1. Tipos de Cliente (PF/PJ)
-type ClienteTipo = 'PF' | 'PJ';
+type ClienteTipo = 'CPF' | 'CNPJ';
 type ClienteTypeFilter = ClienteTipo | 'AMBOS';
 
 // 2. Definição da interface do Cliente
@@ -37,27 +39,27 @@ interface ClienteSelectProps {
 // 4. Tipos de Abas de Busca
 type TabKey = 'nome' | 'documento' | 'telefone' | 'email' | 'cep';
 
-// Mapeamento para exibir os labels
+// Mapeamento para exibir os labels (Ajustado para 'Documento' genérico)
 const tabLabels: Record<TabKey, string> = {
-  nome: 'Nome do Cliente',
-  documento: 'CPF/CNPJ',
+  nome: 'Nome',
+  documento: 'Documento', // Valor base, será sobrescrito
   telefone: 'Telefone',
   email: 'E-mail',
   cep: 'CEP',
 };
 
-// 5. Simulação de um banco de dados local (com dados de busca e tipo)
+// 5. Simulação de um banco de dados local (mantido como está)
 const clientesMockData: Cliente[] = [
-  { id: 1, nome: 'João da Silva', documento: '111.222.333-44', telefone: '11988887777', email: 'joao.silva@exemplo.com', cep: '01000-000', tipo: 'PF' },
-  { id: 2, nome: 'Maria Oliveira', documento: '555.666.777-88', telefone: '21977776666', email: 'maria.o@exemplo.com', cep: '20000-000', tipo: 'PF' },
-  { id: 3, nome: 'Tech Solutions LTDA', documento: '00.111.222/0001-33', telefone: '31966665555', email: 'contato@tech.com', cep: '30000-000', tipo: 'PJ' },
-  { id: 4, nome: 'Comércio ABC S.A.', documento: '99.888.777/0001-66', telefone: '41955554444', email: 'adm@comercioabc.com', cep: '40000-000', tipo: 'PJ' },
-  { id: 5, nome: 'Ana Costa', documento: '999.888.777-66', telefone: '41955554444', email: 'ana.c@exemplo.com', cep: '40000-000', tipo: 'PF' },
+  { id: 1, nome: 'João da Silva', documento: '111.222.333-44', telefone: '11988887777', email: 'joao.silva@exemplo.com', cep: '01000-000', tipo: 'CPF' },
+  { id: 2, nome: 'Maria Oliveira', documento: '555.666.777-88', telefone: '21977776666', email: 'maria.o@exemplo.com', cep: '20000-000', tipo: 'CPF' },
+  { id: 3, nome: 'Tech Solutions LTDA', documento: '00.111.222/0001-33', telefone: '31966665555', email: 'contato@tech.com', cep: '30000-000', tipo: 'CNPJ' },
+  { id: 4, nome: 'Comércio ABC S.A.', documento: '99.888.777/0001-66', telefone: '41955554444', email: 'adm@comercioabc.com', cep: '40000-000', tipo: 'CNPJ' },
+  { id: 5, nome: 'Ana Costa', documento: '999.888.777-66', telefone: '41955554444', email: 'ana.c@exemplo.com', cep: '40000-000', tipo: 'CPF' },
 ];
 
 /**
-  * 6. Função de busca no "banco de dados" (simulada)
-  */
+    * 6. Função de busca no "banco de dados" (simulada)
+    */
 const fetchClientes = async (): Promise<Cliente[]> => {
   return new Promise((resolve) => {
     setTimeout(() => {
@@ -89,7 +91,7 @@ const ClienteSelectTabs: React.FC<ClienteSelectProps> = ({
     setIsSearchVisible(prev => !prev);
   };
 
-  // 7. Função de busca e filtragem 
+  // 7. Função de busca e filtragem (mantida como está)
   const executeSearch = useCallback(async (query: string, tab: TabKey, typeFilter: ClienteTypeFilter) => {
     if (query.length < 3 && query.length !== 0) {
       setSearchResults([]);
@@ -127,7 +129,7 @@ const ClienteSelectTabs: React.FC<ClienteSelectProps> = ({
     }
   }, []);
 
-  // 8. Hook para executar a busca (debounce)
+  // 8. Hook para executar a busca (debounce - mantido como está)
   useEffect(() => {
     const handler = setTimeout(() => {
       if (isSearchVisible && (searchTerm || clientTypeFilter || searchResults.length === 0)) {
@@ -140,13 +142,12 @@ const ClienteSelectTabs: React.FC<ClienteSelectProps> = ({
     };
   }, [searchTerm, activeTab, clientTypeFilter, executeSearch, searchResults.length, isSearchVisible]);
 
-  // Handlers
+  // Handlers (mantidos como estão)
   const handleTabChange = (tab: TabKey) => {
     setActiveTab(tab);
     setSearchTerm('');
   };
 
-  // *** FUNÇÃO handleTypeFilterChange ADICIONADA AQUI ***
   const handleTypeFilterChange = (type: ClienteTypeFilter) => {
     setClientTypeFilter(type);
     setSearchTerm('');
@@ -174,31 +175,80 @@ const ClienteSelectTabs: React.FC<ClienteSelectProps> = ({
         <Link to="/clientes/novo" className='new-action-link'><Button variant='primary'>+ Novo Cliente</Button></Link>
       </FlexGridContainer>
 
-      {/* --- SELEÇÃO/DISPLAY DO CLIENTE --- */}
+      {/* --- SELEÇÃO/DISPLAY DO CLIENTE --- (Mantido como está) */}
       <SelectionBox
         onClick={toggleSearchVisibility}
         status={clienteSelecionado ? "selected" : "placeholder"}
         isSearchVisible={isSearchVisible}
-      >
+      > 
         {clienteSelecionado ? (
           <>
-            <Typography variant="p">Cliente Selecionado ({clienteSelecionado.tipo}):</Typography>
-            <Typography variant="strong">{clienteSelecionado.nome}</Typography> | {clienteSelecionado.documento}
-            <Button
-              variant='danger'
-              onClick={(e) => {
-                e.stopPropagation();
-                handleClearSelection();
-              }}
-              disabled={isLoading}
-            >
-              Limpar Seleção
-            </Button>
+            <FlexGridContainer layout='flex' template='column'>
+
+
+
+              <FlexGridContainer layout='flex' justifyContent='space-between' >
+
+                <Fieldset legend={`Cliente Selecionado (${clienteSelecionado.tipo}):`} variant='basic'>
+
+                  <Typography variant="strong">{clienteSelecionado.nome}</Typography>
+                </Fieldset>
+                <Button
+                  variant='danger'
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleClearSelection();
+                  }}
+                  disabled={isLoading}
+                >
+                  Limpar Seleção
+                </Button>
+              </FlexGridContainer>
+              <FlexGridContainer layout='flex' justifyContent='space-between' >
+
+
+                <Fieldset legend='Cidade' variant='basic'>
+                  <Typography variant="strong"> Atibaia - SP </Typography>
+                </Fieldset>
+
+
+                <Fieldset legend='Documento' variant='basic'>
+
+                  <Typography variant="strong">{clienteSelecionado.documento}</Typography>
+                </Fieldset>
+              </FlexGridContainer>
+
+              <FlexGridContainer layout='flex' justifyContent='space-between' >
+                <Fieldset legend='telefone' variant='basic'>
+
+                  <Typography variant="strong">{clienteSelecionado.telefone}</Typography>
+                </Fieldset>
+
+                <Fieldset legend='cep' variant='basic'>
+
+                  <Typography variant="strong">{clienteSelecionado.cep}</Typography>
+                </Fieldset>
+
+              </FlexGridContainer>
+
+
+            </FlexGridContainer>
           </>
         ) : (
-          <Typography variant="pMuted">
-            {isSearchVisible ? 'Clique para fechar' : 'Clique para buscar ou selecionar um cliente...'}
-          </Typography>
+          <FlexGridContainer layout='flex' template='row' justifyContent='space-between' 
+            >
+            {isSearchVisible ?
+              <FlexGridContainer layout='flex' template='row' justifyContent='space-between'>
+                <span>Clique para fechar</span>
+                <button>⬆️</button>
+              </FlexGridContainer>
+              :
+              <FlexGridContainer layout='flex' template='row' justifyContent='space-between'>
+                <span>Clique para buscar ou selecionar um cliente...</span>
+                <button>⬇️</button>
+              </FlexGridContainer>
+            }
+          </FlexGridContainer>
         )}
       </SelectionBox>
 
@@ -206,46 +256,66 @@ const ClienteSelectTabs: React.FC<ClienteSelectProps> = ({
       {isSearchVisible && (
         <SearchDropdown>
 
-          {/* Switch PF/PJ/AMBOS - A função handleTypeFilterChange agora está no escopo correto */}
-          <TypeSwitch>
-            {(['AMBOS', 'PF', 'PJ'] as ClienteTypeFilter[]).map(type => (
-              <Button
-                key={type}
-                variant="switch" // Usamos "switch" para aplicar os estilos de grupo/ativo
-                active={clientTypeFilter === type}
-                onClick={() => handleTypeFilterChange(type)}
-                disabled={isLoading}
-              >
-                {type === 'AMBOS' ? 'Ambos' : type}
-              </Button>
-            ))}
-          </TypeSwitch>
+          {/* Switch PF/PJ/AMBOS - Mantido como está */}
+          <Fieldset variant='basic' legend='Tipo de Cliente'>
+            <TypeSwitch>
+              {(['CPF', 'CNPJ', 'AMBOS'] as ClienteTypeFilter[]).map(type => (
+                <Button
+                  key={type}
+                  variant="switch"
+                  active={clientTypeFilter === type}
+                  onClick={() => handleTypeFilterChange(type)}
+                  disabled={isLoading}
+                >
+                  {type === 'AMBOS' ? 'Ambos' : type}
+                </Button>
+              ))}
+            </TypeSwitch>
+          </Fieldset>
 
-          {/* Abas (UTILIZANDO O NOVO TabButton) */}
-          <div className='tabs-container'>
-            {(Object.keys(tabLabels) as TabKey[]).map(tab => (
-              <TabButton
-                key={tab}
-                label={tabLabels[tab]} // Prop 'label'
-                isActive={activeTab === tab} // Prop 'isActive'
-                onClick={() => handleTabChange(tab)}
-                disabled={isLoading}
-              >
-                {tabLabels[tab]}
-              </TabButton>
-            ))}
-          </div>
+          {/* Abas (UTILIZANDO O NOVO TabButton) - LÓGICA DE RÓTULO ADICIONADA AQUI! */}
+          <Fieldset variant='basic' legend='Buscar Cliente por:' style={{ display: 'flex', justifyContent: 'space-between' }}>
 
-          {/* Input de Busca */}
-          <input
+            {(Object.keys(tabLabels) as TabKey[]).map(tab => {
+
+              // 1. Determina o rótulo condicionalmente
+              const conditionalLabel =
+                tab === 'documento'
+                  ? (clientTypeFilter === 'AMBOS' ? 'CPF/CNPJ' : clientTypeFilter) // Usa CPF, CNPJ ou Documento (se AMBOS)
+                  : tabLabels[tab]; // Mantém o rótulo original para outras abas
+
+              return (
+
+                <TabButton
+                  key={tab}
+                  label={conditionalLabel} // Aplica o rótulo condicional
+                  isActive={activeTab === tab}
+                  onClick={() => handleTabChange(tab)}
+                  disabled={isLoading}
+                  variant='tab'
+                >
+                </TabButton>
+              )
+            })}
+
+
+            {/* Input de Busca - Mantido como está */}
+
+          </Fieldset>
+          <FormControl label=''
             type="text"
-            placeholder={`Buscar ${clientTypeFilter === 'AMBOS' ? 'PJ e PF' : clientTypeFilter} por ${tabLabels[activeTab]}...`}
+            placeholder={`Buscar ${clientTypeFilter === 'AMBOS' ? 'CPF e CNPJ' : clientTypeFilter} por ${tabLabels[activeTab]}...`}
             value={searchTerm}
             onChange={handleSearchChange}
-            disabled={isLoading}
-          />
+            disabled={isLoading} />
 
-          {/* Lista de Resultados */}
+          <br />
+
+
+
+
+
+          {/* Lista de Resultados - Mantida como está */}
           <ResultsList>
             {isLoading ? (
               <Typography variant="p">Carregando resultados...</Typography>
@@ -256,9 +326,28 @@ const ClienteSelectTabs: React.FC<ClienteSelectProps> = ({
                   onClick={() => handleClienteSelect(cliente)}
                   selected={cliente.id === clienteSelecionado?.id}
                 >
-                  <Typography variant="strong">{cliente.nome} ({cliente.tipo})</Typography> | {cliente.documento}
+                  <div className='flex-row' style={{ justifyContent: 'space-between' }}>
+
+                    <Typography variant="strong">{cliente.nome} ({cliente.tipo})</Typography> | <Typography variant="strong">{cliente.documento} </Typography>
+                  </div>
+                  <FlexGridContainer layout='flex' justifyContent="space-between">
+
+                    <Typography variant="small">Tel: {cliente.telefone}</Typography>
+
+                    <div >
+
+                      <Badge color='paper' >
+                        <Typography variant='strong' > Contrato </Typography>
+                      </Badge>
+                      <Badge color='poco'>
+                        <Typography variant='strong' color='white'>    Poço </Typography>
+
+                      </Badge>
+                    </div>
+
+                  </FlexGridContainer>
+
                   <br />
-                  <Typography variant="small">E-mail: {cliente.email} | Tel: {cliente.telefone}</Typography>
                 </ResultItem>
               ))
             ) : (

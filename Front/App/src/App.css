@@ -173,8 +173,8 @@ h6 {
     border: 1px solid #ccc;
     border-radius: 4px;
     cursor: pointer;
-    margin-bottom: 10px;
-    background-color: white;
+    margin: 10px 0px;
+    background-color: rgb(254, 255, 212);
     transition: border-color 0.2s;
     display: flex;
     justify-content: space-between;
@@ -195,24 +195,19 @@ h6 {
 
 /* 2. SearchDropdown.tsx */
 .cliente-select-dropdown {
-    position: relative; /* Ajuste para o seu layout, se precisar de absolute, use position: absolute no TSX */
-    z-index: 10;
     background-color: #ffffff;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    padding: 15px;
-    margin-top: 5px;
+    padding: 0px;
+    margin: 0px 0px;
 }
 
-/* 3. TypeSwitch.tsx */
+/* /* 3. TypeSwitch.tsx 
 .cliente-select-type-switch-container {
     display: flex;
     margin-bottom: 20px;
     border-radius: 5px;
     overflow: hidden; 
     border: 1px solid #ccc;
-}
+} */
 
 /* Os estilos dos botões do switch estariam no seu componente Button */
 .cliente-select-type-switch-container button {
@@ -224,25 +219,24 @@ h6 {
 /* Estilização para o contêiner do TypeSwitch (baseado na sua descrição) */
 .cliente-select-type-switch-container {
     display: flex;
-    margin-bottom: 20px;
+    margin-bottom: 0px;
     border-radius: 5px;
     overflow: hidden; 
-    border: 1px solid #ccc; /* Borda externa */
 }
 
-/* Estilo Base para cada botão dentro do switch */
+/* Estilo Base para cada botão dentro do switch
 .cliente-select-type-switch-container .type-switch-item {
-    /* Aplica ao Button que é item do switch */
-    flex-grow: 1; /* Faz com que os botões ocupem o espaço igualmente */
-    border: none; /* Remove bordas internas do próprio botão se houverem */
-    border-radius: 0; /* Remove o arredondamento individual, pois o contêiner faz o arredondamento */
-    background-color: #f8f8f8; /* Cor de fundo padrão (inativo) */
+    /* Aplica ao Button que é item do switch 
+    flex-grow: 1; /* Faz com que os botões ocupem o espaço igualmente 
+    border: none; /* Remove bordas internas do próprio botão se houverem 
+    border-radius: 0; /* Remove o arredondamento individual, pois o contêiner faz o arredondamento 
+    background-color: #ff0000; /* Cor de fundo padrão (inativo) 
     color: #333;
     cursor: pointer;
     padding: 10px 15px;
     text-align: center;
     transition: background-color 0.3s, color 0.3s;
-}
+} */
 
 /* Estilo para quando o botão está ATIVO (selecionado) */
 .cliente-select-type-switch-container .type-switch-item.active {
@@ -267,17 +261,20 @@ h6 {
 
 /* 5. ResultsList.tsx */
 .cliente-select-results-list {
-    max-height: 200px;
+    max-height: 300px;
     overflow-y: auto;
     border: 1px solid #eee;
-    padding: 10px;
+    padding: 0px 4px;
+    margin: 0px  ;
     background-color: white;
     border-radius: 4px;
 }
 
 /* 6. ResultItem.tsx */
 .cliente-select-result-item {
-    padding: 10px;
+  display: flex;
+  flex-direction: column;
+    padding: 3px;
     border-bottom: 1px solid #eee;
     cursor: pointer;
     transition: background-color 0.2s;
@@ -290,3 +287,4 @@ h6 {
 .cliente-select-result-item--selected {
     background-color: #d0eaff;
     border-left: 4px solid #007bff
+}

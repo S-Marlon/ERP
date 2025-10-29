@@ -25,7 +25,12 @@
   color: #fff;
 }
 
-.ui-badge--info {
+.ui-badge--poco {
   background: #17a2b8;
   color: #fff;
+}
+
+.ui-badge--paper {
+  background: #cacaca;
+  color: #272727;
 }

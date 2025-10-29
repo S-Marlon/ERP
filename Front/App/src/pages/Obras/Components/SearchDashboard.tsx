@@ -4,6 +4,9 @@ import Button from '../../../components/ui/Button';
 import Badge from '../../../components/ui/Badge';
 import './SearchDashboard.css'; // Presume-se que você tenha o estilo
 import Card from '../../../components/ui/Card';
+import FormControl from '../../../components/ui/FormControl';
+import TypeSwitch from '../../../components/ui/TypeSwitch';
+import TabButton from '../../../components/ui/TabButton';
 
 // ----------------- TIPOS E DADOS MOCKADOS -----------------
 
@@ -182,7 +185,7 @@ const SearchDashboard: React.FC<SearchDashboardProps> = ({
     if (!item) {
         return (
             <fieldset className="related-fieldset no-data">
-                <legend><Typography variant="label">{label}</Typography></legend>
+                <legend><Typography variant="p">{label}</Typography></legend>
                 <Typography variant="pMuted">Nenhum {label.toLowerCase()} relacionado encontrado.</Typography>
             </fieldset>
         );
@@ -192,13 +195,14 @@ const SearchDashboard: React.FC<SearchDashboardProps> = ({
             className={`related-fieldset related-fieldset-${item.tipo.toLowerCase()}`}
             onClick={() => handleItemClick(item)}
         >
-            <legend><Typography variant="label">{label}</Typography></legend>
+            <legend><Typography variant="p">
+                <Badge color='poco'>{item.tipo}</Badge>
+                </Typography></legend>
             <div className='flex-content'>
                 <div className='flex-column'>
                     <Typography variant="strong" className="item-title">{item.titulo}</Typography>
                     <Typography variant="small" className="item-detail">{item.subDetalhe}</Typography>
                 </div>
-                <Badge color="primary">{item.tipo}</Badge>
             </div>
         </fieldset>
     );
@@ -209,34 +213,41 @@ const SearchDashboard: React.FC<SearchDashboardProps> = ({
         // Lógica de Busca Global e Filtragem para itens RELACIONADOS (Contrato/Poço)
         return (
             <>
-                <div className="search-input-container">
-                    <input 
+                        
+                
+                    <FormControl label='' 
                         type="text" 
                         placeholder="Digite para buscar Contratos ou Poços relacionados..." 
                         value={searchTerm} 
                         onChange={handleSearchChange} 
                         className="search-input"
                     />
-                </div>
-                
-                <div className="results-list">
-                    <div className="results-header">
-                        <Typography variant="h3">Resultados Relacionados ({resultadosFiltrados.length})</Typography>
-                        <div className='filter-buttons'>
-                            <Typography variant="strong" as="label">Filtrar Por:</Typography>
-                            {availableFilters.map((tipo) => (
-                                <Button
-                                    key={tipo}
-                                    variant={filterType === tipo ? "primary" : "outline"}
-                                    style={{ marginLeft: 8 }}
-                                    onClick={() => handleFilterChange(tipo)}
-                                >
-                                    {tipo}
-                                </Button>
-                            ))}
-                        </div>
-                    </div>
 
+                    <Typography variant="h3">Resultados Relacionados ({resultadosFiltrados.length})</Typography>
+                
+                
+                
+                    
+                        
+                            <Typography variant="strong">Filtrar Por:</Typography>
+                            <br/>
+
+                        <TypeSwitch>
+                            {availableFilters.map((tipo)=> (
+                                <TabButton
+                                    key={tipo} 
+                                    label={tipo} 
+                                    isActive={true} 
+                                    onClick={() => handleFilterChange(tipo)}
+                                    disabled={false} // 'isLoading' agora usa 'isSaving'
+                                    // CRUCIAL: Configurações para que o TabButton atue como um switch/filtro:
+                                    isTab={false}    // Desativa role="tab" e aria-selected
+                                    variant="switch"   // Aplica o estilo de switch/grupo
+                                />
+                            ))}
+                        </TypeSwitch>
+
+                            
                     {resultadosFiltrados.length > 0 ? (
                         resultadosFiltrados.map(item => (
                             <div
@@ -268,14 +279,14 @@ const SearchDashboard: React.FC<SearchDashboardProps> = ({
                             </Typography>
                         </div>
                     )}
-                </div>
+                
             </>
         );
     } else if (contextType === 'Contrato') {
         // Lógica para Contrato: mostra Cliente e Poço relacionados
         return (
             <div className="related-data-display">
-                <Typography variant="h3">Relacionamentos para o Contrato: {contrato?.titulo || contrato?.idr}</Typography>
+                <Typography variant="em">Relacionamentos para o Contrato:  <br/><strong>{contrato?.titulo || contrato?.idr}</strong></Typography>
                 {renderRelatedItem(cliente, 'Cliente')}
                 {renderRelatedItem(poco, 'Poço')}
             </div>
@@ -284,7 +295,7 @@ const SearchDashboard: React.FC<SearchDashboardProps> = ({
         // Lógica para Poço: mostra Cliente e Contrato relacionados
         return (
             <div className="related-data-display">
-                <Typography variant="h3">Relacionamentos para o Poço: {poco?.titulo || poco?.idr}</Typography>
+                <Typography variant="em">Relacionamentos para o Poço: <br/><strong>{poco?.titulo || poco?.idr}</strong></Typography>
                 {renderRelatedItem(cliente, 'Cliente')}
                 {renderRelatedItem(contrato, 'Contrato')}
             </div>
@@ -297,11 +308,11 @@ const SearchDashboard: React.FC<SearchDashboardProps> = ({
 
   return (
     <Card variant="highlight" className="search-dashboard-container">
-      <Typography variant="h2Alt" className="main-title">Busca de Relacionamentos</Typography>
+      <Typography variant="h2Alt" className="main-title">Itens Relacionados</Typography>
 
       {/* ----------------- SELETOR DE CONTEXTO TEMPORÁRIO ----------------- */}
       <div style={{ padding: '15px 0', borderBottom: '1px solid #ccc', marginBottom: '15px', background: '#f5f5f5' }}>
-          <Typography variant="strong" style={{ marginRight: '10px' }}>
+          <Typography variant="strong" >
               Simular Contexto Atual:
           </Typography>
           {(['Cliente', 'Contrato', 'Poco'] as const).map((tipo) => (
@@ -318,7 +329,7 @@ const SearchDashboard: React.FC<SearchDashboardProps> = ({
                   {tipo}
               </Button>
           ))}
-          <Typography variant="pMuted" style={{ marginTop: '10px' }}>
+          <Typography variant="pMuted">
               **Contexto Simulado: {contextType}**
           </Typography>
       </div>
@@ -326,7 +337,7 @@ const SearchDashboard: React.FC<SearchDashboardProps> = ({
 
       {/* Exibe erro ou loading (vindo do componente pai) */}
       {loading && <Typography variant="pMuted">Carregando resultados...</Typography>}
-      {error && <Typography variant="pMuted" style={{ color: 'red' }}>Erro: {error}</Typography>}
+      {error && <Typography variant="pMuted">Erro: {error}</Typography>}
       {/* Fim da exibição de erro/loading */}
 
       <div className="content-area">
