@@ -2,47 +2,59 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom"; 
 import "./ObrasModule.css";
 
-// IMPORTAÇÕES
+// IMPORTAÇÕES DE COMPONENTES DE UI/LAYOUT
 import Button from "../../components/ui/Button";
-import SearchDashboard from "./Components/SearchDashboard";
-import { ObraDetalhes } from "./Components/ObraDetalhes";
 import FlexGridContainer from "../../components/Layout/FlexGridContainer/FlexGridContainer";
 import Typography from "../../components/ui/Typography";
-// Assumindo que o ClienteSelect também exporta a interface Cliente
-import ClienteSelect, { Cliente } from '../../components/forms/CadastroContrato/BuscaCliente';
 import TypeSwitch from "../../components/ui/TypeSwitch";
 import TabButton from "../../components/ui/TabButton";
 
-// DEFINIÇÕES DE TIPO FORA DO COMPONENTE PARA MELHOR ESCOPO
+// IMPORTAÇÕES DE COMPONENTES ESPECÍFICOS DE BUSCA E MÓDULO
+import SearchDashboard from "./Components/SearchDashboard";
+import { ObraDetalhes } from "./Components/ObraDetalhes";
+
+// **CORREÇÃO:** Importando o componente e as interfaces de tipo
+import ClienteSelect, { Cliente } from '../../components/forms/CadastroContrato/BuscaCliente';
+import ContratoSelectTabs, { Contrato } from "../../components/forms/CadastroContrato/BuscaContrato";
+import PocoSelectTabs, { Poco } from "../../components/forms/CadastroContrato/BuscaPoco";
+
+// DEFINIÇÕES DE TIPO
 type SearchType = 'Cliente' | 'Contrato' | 'Poço';
 
 
 export const ObrasModule: React.FC = () => {
-    // ESTADOS GLOBAIS DO MÓDULO OBRAS
+    // ESTADOS GLOBAIS DE SELEÇÃO
     const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
-    const [isSaving, setIsSaving] = useState(false); // Usado como loading externo
+    const [contratoSelecionado, setContratoSelecionado] = useState<Contrato | null>(null);
+    const [pocoSelecionado, setPocoSelecionado] = useState<Poco | null>(null);
     
-    // ESTADO PARA O FILTRO CLIENTE/CONTRATO/POÇO
+    // ESTADO DE CARREGAMENTO E TIPO DE BUSCA ATIVO
+    const [isSaving, setIsSaving] = useState(false); // Usado como loading externo
     const [activeSearchType, setActiveSearchType] = useState<SearchType>('Cliente');
-    // NOVO ESTADO: Para armazenar o termo de busca
-
-    // HANDLERS
-    const handleClienteChange = (cliente: Cliente | null) => {
-        setClienteSelecionado(cliente);
-        console.log('Cliente selecionado mudou:', cliente);
-    };
-
-
-    // NOVO HANDLER: Atualiza o tipo de busca (Cliente/Contrato/Poço)
-    const handleSearchTypeChange = (type: SearchType) => {
-        setActiveSearchType(type);
-        // **RESETAR TERMO DE BUSCA AO MUDAR O TIPO DE BUSCA É UMA BOA PRÁTICA**
-    };
-
-    // Usamos 'isSaving' como nosso estado de loading para os botões
+    
+    // Alias para o estado de loading
     const isLoading = isSaving; 
 
+    // HANDLERS
+    
+    const handleClienteChange = (cliente: Cliente | null) => {
+        setClienteSelecionado(cliente);
+        // console.log('Cliente selecionado mudou:', cliente); // console.log removido
+    };
 
+    const handleContratoChange = (contrato: Contrato | null) => {
+        setContratoSelecionado(contrato);
+    };
+
+    const handlePocoChange = (poco: Poco | null) => {
+        setPocoSelecionado(poco);
+    };
+
+    // Handler: Atualiza o tipo de busca (Cliente/Contrato/Poço)
+    const handleSearchTypeChange = (type: SearchType) => {
+        setActiveSearchType(type);
+        // Lógica opcional para limpar seleções ao mudar o filtro de busca
+    };
 
     return (
         <div>
@@ -98,6 +110,21 @@ export const ObrasModule: React.FC = () => {
                                 onClienteSelecionadoChange={handleClienteChange}
                                 isLoading={isSaving} // Usamos 'isSaving' como loading
                             />
+                        )}
+                        {activeSearchType === 'Contrato' && (
+                            <ContratoSelectTabs
+                contratoSelecionado={contratoSelecionado}
+                onContratoSelecionadoChange={handleContratoChange}
+                isLoading={isSaving} // Exemplo de uso de uma prop de carregamento
+            />
+                        )}
+
+                        {activeSearchType === 'Poço' && (
+                            <PocoSelectTabs
+                pocoSelecionado={pocoSelecionado}
+                onPocoSelecionadoChange={handlePocoChange}
+                isLoading={isSaving} // Opcional: passa o estado de carregamento
+            />
                         )}
                         
                         {/* ** NOVO CONTEÚDO DINÂMICO APARECE AQUI ** */}

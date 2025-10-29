@@ -1,6 +1,7 @@
 // Fieldset.tsx
 import React from 'react';
 import './Fieldset.css'; // Importa os estilos
+import Badge from './Badge';
 
 /**
  * Define os tipos de variantes de estilo.
@@ -12,7 +13,7 @@ export type FieldsetVariant = 'standard' | 'card' | 'highlight' | 'basic'; // Ad
  */
 export interface FieldsetProps extends React.FieldsetHTMLAttributes<HTMLFieldSetElement> {
   /** O título (legend) a ser exibido no fieldset. */
-  legend: string;
+  legend: string | React.ReactNode;
   /** A variante de estilo para o fieldset. Padrão: 'standard'. */
   variant?: FieldsetVariant;
   /** O conteúdo a ser renderizado dentro do fieldset. */
@@ -44,6 +45,7 @@ const Fieldset: React.FC<FieldsetProps> = ({
       {/* O elemento <legend> recebe a classe de estilo para a legenda */}
       <legend className='legend'>{legend}</legend>
       {children}
+      
     </fieldset>
   );
 };
