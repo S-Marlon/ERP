@@ -13,6 +13,10 @@ import Payment from "./components/Payment";
 import "./PDV.css";
 import ProductTable from "./components/ProductTable";
 import AddService from "./components/pdvAddService";
+import FlexGridContainer from "../../components/Layout/FlexGridContainer/FlexGridContainer";
+import Typography from "../../components/ui/Typography";
+import Fieldset from "../../components/ui/Fieldset";
+import FormControl from "../../components/ui/FormControl";
 
 const PDVScreen: React.FC = () => {
   // ATENÇÃO: Seus Contextos precisam ser atualizados para retornar os novos tipos (Produto/Servico)
@@ -32,7 +36,7 @@ const PDVScreen: React.FC = () => {
   const change = receivedAmount ? receivedAmount - subtotal : 0;
 
   // Função para adicionar PRODUTO (do catálogo) ao carrinho (ItemOrdem)
-  const handleAddToCart = (product: Produto) => {
+  const handleAddToCart = (product: any) => {
     const existingItem = cart.find((item) => item.produtoId === product.id);
 
     if (existingItem) {
@@ -180,8 +184,13 @@ const PDVScreen: React.FC = () => {
   );
 
   return (
-    <div>
-      <div className={!showPayment ? 'pdv-container' : 'pdv-container-payment'}>
+     <FlexGridContainer 
+                        layout="grid" 
+                        gap="5px" 
+                        template="4fr 10fr 4fr"
+                        mobileTemplate="1fr" 
+                    >
+      {/* <div className={!showPayment ? 'pdv-container' : 'pdv-container-payment'}> */}
         {/* Lado Esquerdo: Produtos/Serviços */}
         {!showPayment && (
           <ProductListFilter
@@ -211,25 +220,28 @@ const PDVScreen: React.FC = () => {
                 alignItems: "center",
               }}
             >
-              <h2>Lista de Produtos</h2>
-              <fieldset className="inter">
-                <legend>Buscar Produto</legend>
+              <Typography variant="h2">Lista de Produtos</Typography>
+              <Fieldset legend="Buscar Produto" >
                 <div className="pdv-search-inputs">
-                  <input
+                  <FormControl label=""
                     type="text"
                     placeholder="Pesquisar nome do produto"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
-              </fieldset>
+              </Fieldset>
             </div>
             <div className="pdv-product-table-container">
               {/* O ProductTable deve ser atualizado internamente para receber Produto[] */}
               <ProductTable
-                handleAddToCart={handleAddToCart}
-                products={filteredProducts}
-              />
+            // Função que lida com o clique na linha (item: Produto)
+            handleAddToCart={handleAddToCart} 
+            // Array de dados (linhas da tabela)
+            products={filteredProducts}
+            // [OPCIONAL] Adiciona a variação visual, se desejado
+            variant="striped" // Exemplo: usa a variação "striped"
+        />
             </div>
           </div>
         )}
@@ -257,8 +269,8 @@ const PDVScreen: React.FC = () => {
             handleFinalizeSale={handleFinalizeSale}
           />
         )}
-      </div>
-    </div>
+      {/* </div> */}
+    </FlexGridContainer>
   );
 };
 

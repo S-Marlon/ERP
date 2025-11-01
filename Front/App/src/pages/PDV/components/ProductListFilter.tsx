@@ -1,6 +1,12 @@
 import React from "react";
 // 1. IMPORTAÇÃO ATUALIZADA: Trazendo o novo tipo Produto
 import { Produto } from "../../../types/newtypes"; 
+import Card from "../../../components/ui/Card";
+import Fieldset from "../../../components/ui/Fieldset";
+import FormControl from "../../../components/ui/FormControl";
+import Button from "../../../components/ui/Button";
+
+import Badge from "../../../components/ui/Badge";
 
 // 2. TIPAGEM CORRIGIDA: Usa o novo tipo Produto[]
 interface Props {
@@ -38,68 +44,59 @@ const ProductListFilter: React.FC<Props> = ({
   };
     
   return (
-    <div className="pdv-side-panel">
+    <Card>
       <div className="filter-container-column flex-column">
         
         {/* Filtro de Busca por Texto */}
-        <div className="pdv-search-filter">
-          <fieldset>
-            <legend>Busca por Nome</legend>
-            <div className="pdv-search-inputs">
-              <input
+          <Fieldset legend="Busca por Nome">
+              <FormControl
+              label=""
                 type="text"
                 placeholder="Pesquisar nome do produto"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
-            </div>
-          </fieldset>
-        </div>
+          </Fieldset>
 
         {/* Filtro de Preço (Mantido, mas sem integração de estado neste componente) */}
-        <div className="pdv-search-filter">
-          <fieldset>
-            <legend>Preço</legend>
+          <Fieldset legend="Preço">
             <div className="min-max-group">
-              <fieldset>
-                <legend>Min:</legend>
-                <input
+              <Fieldset legend="Min:">
+                <FormControl
                   className="min-max-input"
                   type="number"
                   min={0}
                   placeholder="Min"
                   // Adicione a lógica de estado de preço aqui, se necessário
                 />
-              </fieldset>
-              <fieldset>
-                <legend>Max:</legend>
-                <input
+              </Fieldset>
+              <Fieldset legend="Max">
+                <FormControl
                   className="min-max-input"
                   type="number"
                   min={0}
                   placeholder="Max"
                   // Adicione a lógica de estado de preço aqui, se necessário
                 />
-              </fieldset>
+              </Fieldset>
             </div>
-          </fieldset>
-        </div>
+          </Fieldset>
 
         {/* Botões de Categoria */}
         <div className="pdv-categories-filter">
           <span>Categorias</span>
           <div className="pdv-category-buttons">
             {/* Botão Todas */}
-            <button
+            <Button variant="primary"
               className={`pdv-category-button ${activeCategory === "" ? "active" : ""}`}
               onClick={() => handleCategoryClick("")}
             >
               Todas
-            </button>
+            </Button>
             
             {/* Botões de Categorias Únicas */}
             {uniqueCategories.map((category) => (
-              <button
+              <Button variant="primary"
                 key={category}
                 className={`pdv-category-button ${
                   activeCategory === category ? "active" : ""
@@ -107,15 +104,15 @@ const ProductListFilter: React.FC<Props> = ({
                 onClick={() => handleCategoryClick(category)}
               >
                 {category}
-              </button>
+              </Button>
             ))}
           </div>
 
           {/* Tags (Estáticas, apenas para layout) */}
           <div className="pdv-selected-categories-tags">
             {/* Mantenha estas tags como mock, ou remova-as se não forem tags selecionadas reais */}
-            <span className="selected-tag">perifericos</span>
-            <span className="selected-tag">FOntes</span>
+            <Badge className="selected-tag">perifericos</Badge>
+            <Badge className="selected-tag">Fontes</Badge>
             {/* ... */}
           </div>
         </div>
@@ -125,16 +122,16 @@ const ProductListFilter: React.FC<Props> = ({
           <span>Sub-Categorias</span>
           <div className="pdv-category-buttons">
             {/* Botão Todas para Sub-Categoria */}
-            <button
+            <Button
               className={`pdv-category-button ${activeCategory === "" ? "active" : ""}`}
               onClick={() => handleCategoryClick("")}
             >
               Todas
-            </button>
+            </Button>
             
             {/* Botões de Sub-Categorias Únicas */}
             {uniqueSubCategories.map((subCategory) => (
-              <button
+              <Button
                 key={subCategory}
                 className={`pdv-category-button ${
                   activeCategory === subCategory ? "active" : ""
@@ -142,19 +139,19 @@ const ProductListFilter: React.FC<Props> = ({
                 onClick={() => handleCategoryClick(subCategory)}
               >
                 {subCategory}
-              </button>
+              </Button>
             ))}
           </div>
 
           {/* Tags de subcategorias selecionadas (Estáticas, apenas para layout) */}
           <div className="pdv-selected-categories-tags">
              {/* Mantenha estas tags como mock, ou remova-as se não forem tags selecionadas reais */}
-            <span className="selected-tag">Categoria 1</span>
+            <Badge className="selected-tag">Categoria 1</Badge>
             {/* ... */}
           </div>
         </div>
       </div>
-    </div>
+    </Card>
   );
 };
 

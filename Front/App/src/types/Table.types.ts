@@ -1,5 +1,9 @@
-// Table.types.ts
-export type TableVariant = 'default' | 'striped' | 'borderless';
+// Table.types.ts (CORRIGIDO)
+
+import React from 'react';
+
+// Tipos de variação da tabela (já estava correto)
+export type TableVariant = 'default' | 'striped' | 'borderless' | 'compact'; // Adicionei 'compact' por boas práticas
 
 /**
  * Define a estrutura de uma coluna da tabela.
@@ -24,4 +28,8 @@ export interface TableProps<T> {
   columns: TableColumn<T>[];
   /** (Opcional) Título/legenda para a tabela (usando a tag <caption>). */
   caption?: string;
+  /** Variação de estilo da tabela. */
+  variant?: TableVariant; // Adicionada a propriedade 'variant'
+  /** (Opcional) Função a ser executada ao clicar em uma linha. */
+  onRowClick?: (item: T) => void; 
 }

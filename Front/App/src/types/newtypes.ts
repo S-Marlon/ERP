@@ -176,3 +176,10 @@ export interface FiltroServico {
     date: string; // Para filtrar por data (formato ISO string)
     paymentMethod: string | 'Todos';
 }
+
+export interface ProductTableProps {
+  // Use o tipo Produto importado
+  products: Produto[]; 
+  handleAddToCart: (product: Produto) => void;
+  variant?: 'default' | 'striped' | 'compact';
+}

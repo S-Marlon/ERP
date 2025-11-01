@@ -80,7 +80,7 @@ export const ObrasModule: React.FC = () => {
                 <FlexGridContainer 
                     layout="grid" 
                     gap="5px" 
-                    template="2fr 1.5fr 4fr 1fr"
+                    template="2fr 1fr 4fr 1fr"
                     mobileTemplate="1fr" 
                 >
                     <div>

@@ -14,22 +14,26 @@ import Badge from '../../ui/Badge';
 import Fieldset from '../../ui/Fieldset';
 import FormControl from '../../ui/FormControl';
 
+// 🚨 IMPORTAÇÃO DO MOCK CENTRALIZADO
+// Ajuste o caminho conforme a estrutura real do seu projeto!
+import { CONTRATOS_MOCK, ContratoMock } from '../../../data/entities/clients'; 
+
 // ----------------- TIPOS E DADOS -----------------
 
-// Tipos de Contrato (Ex: Serviço, Obra, Fornecimento)
-type ContratoTipo = 'Serviço' | 'Obra' | 'Fornecimento';
+// Tipos de Contrato (Ajustado para bater com o mock e a lógica de filtro)
+type ContratoTipo = 'Serviço' | 'Obra' | 'Fornecimento'; // Mantido para o filtro de Tipo (se não vier do mock, injetamos)
 type ContratoTypeFilter = ContratoTipo | 'TODOS';
 
-// Definição da interface do Contrato
+// Definição da interface que o COMPONENTE ESPERA (fazemos o mapeamento do mock para esta interface)
 interface Contrato {
-    id: number;
-    numero: string; // Número do contrato (ex: C-2023/001)
-    titulo: string; // Título/Descrição
-    dataInicio: string;
-    valor: number;
-    tipo: ContratoTipo;
-    status: 'Ativo' | 'Inativo' | 'Pendente';
-    fk_cliente_id: number; // Chave estrangeira para o Cliente
+    id: string; // Vem de ContratoMock.id
+    numero: string; // Campo obrigatório para a aba 'numero'. Mapeado de titulo, ou simulado.
+    titulo: string; // Vem de ContratoMock.titulo
+    dataAssinatura: string; // Vem de ContratoMock.dataAssinatura
+    valor: number; // Mapeado de ContratoMock.valorTotal
+    tipo: ContratoTipo; // Simulado, já que o mock não tem este campo.
+    status: 'Ativo' | 'Concluido' | 'Cancelado' | 'Pendente'; // Mapeado de ContratoMock.status
+    fk_cliente_id: number; // Mapeado/convertido de ContratoMock.clienteId
 }
 
 // Props para o componente ContratoSelect
@@ -44,27 +48,41 @@ type ContratoTabKey = 'numero' | 'titulo' | 'fk_cliente_id' | 'status';
 
 // Mapeamento para exibir os labels
 const contratoTabLabels: Record<ContratoTabKey, string> = {
-    numero: 'Número',
+    numero: 'Número', // Será mapeado para o ID do contrato ou um valor simulado
     titulo: 'Título',
     fk_cliente_id: 'ID Cliente',
     status: 'Status',
 };
 
-// Simulação de um banco de dados local (Contratos)
-const contratosMockData: Contrato[] = [
-    { id: 101, numero: 'C-2023/001', titulo: 'Contrato de Manutenção Anual', dataInicio: '2023-01-01', valor: 12000.50, tipo: 'Serviço', status: 'Ativo', fk_cliente_id: 1 }, // Cliente ID 1
-    { id: 102, numero: 'C-2023/002', titulo: 'Obra de Expansão - Galpão Novo', dataInicio: '2023-03-15', valor: 85000.00, tipo: 'Obra', status: 'Pendente', fk_cliente_id: 3 }, // Cliente ID 3
-    { id: 103, numero: 'C-2023/003', titulo: 'Fornecimento de Peças - Q2', dataInicio: '2023-07-20', valor: 3500.00, tipo: 'Fornecimento', status: 'Ativo', fk_cliente_id: 4 }, // Cliente ID 4
-    { id: 104, numero: 'C-2023/004', titulo: 'Manutenção Mensal de Equipamentos', dataInicio: '2023-11-01', valor: 2500.00, tipo: 'Serviço', status: 'Ativo', fk_cliente_id: 1 }, // Cliente ID 1
-];
-
-/**
- * Função de busca no "banco de dados" (simulada)
- */
+// 🚨 FUNÇÃO DE ADAPTAÇÃO: Usa o mock importado e o transforma na interface Contrato
 const fetchContratos = async (): Promise<Contrato[]> => {
     return new Promise((resolve) => {
         setTimeout(() => {
-            resolve(contratosMockData);
+            const mappedContratos: Contrato[] = CONTRATOS_MOCK.map((mock, index) => {
+                // Simulação dos campos que faltam no mock: 'numero' e 'tipo'
+                const tipoSimulado: ContratoTipo = index % 3 === 0 ? 'Serviço' : index % 3 === 1 ? 'Obra' : 'Fornecimento';
+                
+                // Conversão de 'cli-001' para 1. Usamos 0 se for undefined/null.
+                const clienteIdNumber = mock.clienteId 
+                    ? Number(mock.clienteId.replace('cli-', '')) 
+                    : 0; 
+
+                // Usamos o ID do mock como 'numero' para busca.
+                const numeroSimulado = mock.id.replace('cont-', 'C-2024/');
+                
+                return {
+                    id: mock.id,
+                    numero: numeroSimulado, // Mapeado/Simulado
+                    titulo: mock.titulo,
+                    dataAssinatura: mock.dataAssinatura || 'N/A',
+                    valor: mock.valorTotal ?? 0, // Usa 0 se for undefined
+                    tipo: tipoSimulado, // Simulado
+                    status: mock.status ?? 'Pendente', // Usa 'Pendente' se for undefined
+                    fk_cliente_id: clienteIdNumber, // Mapeado/Convertido
+                } as Contrato; 
+            });
+
+            resolve(mappedContratos);
         }, 300);
     });
 };
@@ -106,7 +124,8 @@ const ContratoSelectTabs: React.FC<ContratoSelectProps> = ({
 
         setInternalLoading(true);
         try {
-            const allData = await fetchContratos();
+            // 🚀 Chama a função que simula o fetch e ADAPTA OS DADOS
+            const allData = await fetchContratos(); 
 
             const lowerQuery = query.toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -166,12 +185,12 @@ const ContratoSelectTabs: React.FC<ContratoSelectProps> = ({
     // Handlers
     const handleTabChange = (tab: ContratoTabKey) => {
         setActiveTab(tab);
-        setSearchTerm(''); // Limpa o termo ao mudar a aba
+        setSearchTerm(''); 
     };
 
     const handleTypeFilterChange = (type: ContratoTypeFilter) => {
         setContractTypeFilter(type);
-        setSearchTerm(''); // Limpa o termo ao mudar o filtro de tipo
+        setSearchTerm(''); 
     };
 
     const handleContratoSelect = useCallback((contrato: Contrato) => {
@@ -193,11 +212,13 @@ const ContratoSelectTabs: React.FC<ContratoSelectProps> = ({
     const formatCurrency = (value: number) => 
         new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
     
+    // Mapeamento de cor para status do NOVO MOCK
     const getStatusColor = (status: Contrato['status']): string => {
         switch (status) {
             case 'Ativo': return 'success';
             case 'Pendente': return 'warning';
-            case 'Inativo': return 'danger';
+            case 'Concluido': return 'default';
+            case 'Cancelado': return 'danger';
             default: return 'default';
         }
     }
@@ -298,7 +319,6 @@ const ContratoSelectTabs: React.FC<ContratoSelectProps> = ({
                         value={searchTerm}
                         onChange={handleSearchChange}
                         disabled={isLoading} 
-                        
                     />
 
                     <br />

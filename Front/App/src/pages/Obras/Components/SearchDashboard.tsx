@@ -230,14 +230,14 @@ const SearchDashboard: React.FC<SearchDashboardProps> = ({
                             className="search-input"
                         />
 
-                        <Typography variant="h3">Resultados Relacionados ({resultadosFiltrados.length})</Typography>
+                        <Typography variant="small">Resultados Relacionados ({resultadosFiltrados.length})</Typography>
 
 
 
 
 
-                        <Typography variant="strong">Filtrar Por:</Typography>
                         <br />
+                        <Typography variant="strong">Filtrar Por:</Typography>
 
                        <TypeSwitch>
     {availableFilters.map((tipo) => (

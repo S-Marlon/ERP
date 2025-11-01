@@ -13,23 +13,30 @@ import ResultItem from '../../ui/ResultItem';
 import Badge from '../../ui/Badge';
 import Fieldset from '../../ui/Fieldset';
 import FormControl from '../../ui/FormControl';
+// 🚨 Importação do NOVO mock com alias:
+import { POCOS_MOCK, PocoMock } from '../../../data/entities/clients';
 
 // ----------------- TIPOS E DADOS -----------------
 
-// Tipos de Uso do Poço (Ex: Industrial, Residencial, Irrigação)
+// Os tipos de uso e status são mantidos, pois são usados na lógica do componente
 type PocoUso = 'Industrial' | 'Residencial' | 'Irrigação';
 type PocoTypeFilter = PocoUso | 'TODOS';
+type PocoStatus = 'Operacional' | 'Manutenção' | 'Inativo';
 
-// Definição da interface do Poço
+// 🚨 Interface Mapeada (Poco): Define a estrutura que o COMPONENTE ESPERA
+// Usamos a interface Poco para manter o restante do componente inalterado
+// e fazemos o mapeamento em fetchPocos.
 export interface Poco {
-    id: number;
-    codigo: string; // Código/Identificador do poço (ex: P-001/ATB)
-    localizacao: string; // Endereço ou referência geográfica
-    vazao: number; // Vazão em m³/h (simulada)
-    uso: PocoUso;
-    status: 'Operacional' | 'Manutenção' | 'Inativo';
-    fk_cliente_id: number; // Chave estrangeira para o Cliente proprietário
+    id: string; // Novo: ID é string
+    codigo: string; // Mantido: Mapeado de nomeIdentificacao
+    localizacao: string; // Mantido: Mapeado de nomeIdentificacao
+    vazao: number; // Mantido
+    uso: PocoUso; // Mantido: Injetado no mapeamento
+    status: PocoStatus; // Mantido: Injetado no mapeamento
+    fk_cliente_id: number; // Mantido: Mapeado de clienteId
 }
+
+// 🚨 A interface PocoMock é a Poco real após a importação (PocoMock as Poco foi substituído pelo mapeamento acima)
 
 // Props para o componente PocoSelect
 interface PocoSelectProps {
@@ -49,21 +56,32 @@ const pocoTabLabels: Record<PocoTabKey, string> = {
     status: 'Status',
 };
 
-// Simulação de um banco de dados local (Poços)
-const pocosMockData: Poco[] = [
-    { id: 201, codigo: 'P-001/ATB', localizacao: 'Rua das Flores, 100 - Atibaia', vazao: 15.2, uso: 'Residencial', status: 'Operacional', fk_cliente_id: 1 }, // Cliente ID 1
-    { id: 202, codigo: 'P-002/SP', localizacao: 'Av. Paulista, 1000 - São Paulo', vazao: 50.0, uso: 'Industrial', status: 'Manutenção', fk_cliente_id: 3 }, // Cliente ID 3
-    { id: 203, codigo: 'P-003/IRR', localizacao: 'Fazenda Oeste - Bragança', vazao: 120.5, uso: 'Irrigação', status: 'Operacional', fk_cliente_id: 5 }, // Cliente ID 5
-    { id: 204, codigo: 'P-004/ATB', localizacao: 'Estrada Velha, 50 - Atibaia', vazao: 10.0, uso: 'Residencial', status: 'Inativo', fk_cliente_id: 1 }, // Cliente ID 1
-];
-
-/**
- * Função de busca no "banco de dados" (simulada)
- */
+// 🚨 Função de busca AGORA USA O POCOS_MOCK E MAPEA PARA A ESTRUTURA ESPERADA
 const fetchPocos = async (): Promise<Poco[]> => {
     return new Promise((resolve) => {
         setTimeout(() => {
-            resolve(pocosMockData);
+            const mappedPocos: Poco[] = POCOS_MOCK.map((pocoMock, index) => {
+                // Lógica para simular os campos que faltam no PocoMock
+                const usoSimulado: PocoUso = pocoMock.nomeIdentificacao.includes('Fazenda')
+                    ? 'Irrigação'
+                    : pocoMock.nomeIdentificacao.includes('Secundário')
+                    ? 'Industrial'
+                    : 'Residencial';
+
+                const statusSimulado: PocoStatus = pocoMock.contratoId ? 'Operacional' : 'Inativo';
+                
+                return {
+                    id: pocoMock.id,
+                    codigo: pocoMock.nomeIdentificacao.split(' - ')[0] || pocoMock.nomeIdentificacao,
+                    localizacao: pocoMock.nomeIdentificacao.split(' - ')[1] || 'Localização Indefinida',
+                    vazao: pocoMock.vazao ?? 0,
+                    fk_cliente_id: Number(pocoMock.clienteId?.replace(/\D/g, '') ?? index + 1), // Transforma 'cli-001' em 1
+                    uso: usoSimulado,
+                    status: statusSimulado,
+                } as Poco; // Faz o cast para a estrutura Poco que o componente espera
+            });
+
+            resolve(mappedPocos);
         }, 300);
     });
 };
@@ -105,7 +123,7 @@ const PocoSelectTabs: React.FC<PocoSelectProps> = ({
 
         setInternalLoading(true);
         try {
-            const allData = await fetchPocos();
+            const allData = await fetchPocos(); // 🚀 Busca os dados MOCADOS e MAPEADOS
 
             const lowerQuery = query.toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -118,7 +136,7 @@ const PocoSelectTabs: React.FC<PocoSelectProps> = ({
                 // Filtro 2: Termo de Busca (depende da aba ativa)
                 if (!query) return true;
 
-                let valueToSearch: string | number;
+                let valueToSearch: string | number | undefined; // Modificado para aceitar undefined
 
                 if (tab === 'fk_cliente_id') {
                     // Busca por ID do Cliente
@@ -127,11 +145,14 @@ const PocoSelectTabs: React.FC<PocoSelectProps> = ({
                     // Busca por Status
                     valueToSearch = poco.status;
                     return valueToSearch.toLowerCase().includes(query.toLowerCase());
-                } else {
-                    // Busca por Código ou Localização
-                    valueToSearch = poco[tab];
+                } else if (tab === 'codigo') {
+                    // Busca por Código (usa o campo 'codigo' mapeado)
+                    valueToSearch = poco.codigo;
+                } else if (tab === 'localizacao') {
+                    // Busca por Localização (usa o campo 'localizacao' mapeado)
+                    valueToSearch = poco.localizacao;
                 }
-
+                
                 if (typeof valueToSearch === 'string' || typeof valueToSearch === 'number') {
                     const stringValue = String(valueToSearch);
                     const cleanedValue = stringValue.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -229,7 +250,7 @@ const PocoSelectTabs: React.FC<PocoSelectProps> = ({
                                 }}
                                 disabled={isLoading}
                             >
-                                 Limpar Seleção
+                                    Limpar Seleção
                             </Button>
                         </FlexGridContainer>
 
