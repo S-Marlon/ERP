@@ -1,6 +1,6 @@
 import React, { ChangeEvent } from 'react';
-import Fieldset from '../../ui/Fieldset/Fieldset';
-import FormControl from '../../ui/FormControl/FormControl';
+import Fieldset from '../../../ui/Fieldset/Fieldset';
+import FormControl from '../../../ui/FormControl/FormControl';
 
 // 🛠️ NOVO: Interface para os erros (importada ou definida no topo)
 interface DadosGeraisFiscaisErrors {

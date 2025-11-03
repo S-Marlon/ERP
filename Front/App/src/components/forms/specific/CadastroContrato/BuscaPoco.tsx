@@ -2,18 +2,18 @@ import React from 'react';
 
 // Importa o componente genérico e seus tipos
 // 🚨 Ajuste o caminho conforme onde você salvou o EntitySelectTabs.tsx
-import EntitySelectTabs, { EntitySelectProps } from '../../EntitySelectTabs'; 
+import EntitySelectTabs, { EntitySelectProps } from '../../../EntitySelectTabs'; 
 
 // Importações de UI necessárias para as funções de renderização
-import Button from '../../ui/Button/Button';
-import FlexGridContainer from '../../Layout/FlexGridContainer/FlexGridContainer';
-import Typography from '../../ui/Typography/Typography';
-import ResultItem from '../../ui/ResultItem';
-import Badge from '../../ui/Badge/Badge';
-import Fieldset from '../../ui/Fieldset/Fieldset';
+import Button from '../../../ui/Button/Button';
+import FlexGridContainer from '../../../Layout/FlexGridContainer/FlexGridContainer';
+import Typography from '../../../ui/Typography/Typography';
+import ResultItem from '../../../ui/ResultItem';
+import Badge from '../../../ui/Badge/Badge';
+import Fieldset from '../../../ui/Fieldset/Fieldset';
 
 // 🚨 IMPORTAÇÃO DO MOCK CENTRALIZADO
-import { POCOS_MOCK, PocoMock } from '../../../data/entities/clients';
+import { POCOS_MOCK, PocoMock } from '../../../../data/entities/clients';
 
 // ----------------- 1. TIPOS ESPECÍFICOS DE POÇO -----------------
 

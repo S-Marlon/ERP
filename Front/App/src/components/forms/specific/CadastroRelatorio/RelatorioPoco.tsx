@@ -1,11 +1,11 @@
 import React, { useState, ChangeEvent, FormEvent } from 'react';
-import Button from '../../ui/Button/Button';
+import Button from '../../../ui/Button/Button';
 // Importação dos Módulos (Sub-formulários)
 // Importação dos Componentes de Layout
 import Column from './rigtsidebar';
 import Tabss from './Left-sidebar';
 import Topbar from './TopBar';
-import FlexGridContainer from '../../Layout/FlexGridContainer/FlexGridContainer';
+import FlexGridContainer from '../../../Layout/FlexGridContainer/FlexGridContainer';
 
 // ----------------- TIPOS DE DADOS E MOCKS (MANTIDOS) -----------------
 

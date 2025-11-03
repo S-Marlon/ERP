@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import Typography from '../ui/Typography/Typography';
-import FormControl from '../ui/FormControl/FormControl';
-import Fieldset from '../ui/Fieldset/Fieldset';
+import Typography from '../../ui/Typography/Typography';
+import FormControl from '../../ui/FormControl/FormControl';
+import Fieldset from '../../ui/Fieldset/Fieldset';
 
 export const estruturaSubterraneaOptions = [
     'Natural (Fraturas, pedras soltas, rochas caídas)',

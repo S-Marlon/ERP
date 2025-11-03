@@ -1,11 +1,11 @@
-import Typography from '../../ui/Typography/Typography';
-import FormControl from '../../ui/FormControl/FormControl';
-import VerticalTabs, { TabPanel } from '../../ui/VerticalTabs/VerticalTabs';
+import Typography from '../../../ui/Typography/Typography';
+import FormControl from '../../../ui/FormControl/FormControl';
+import VerticalTabs, { TabPanel } from '../../../ui/VerticalTabs/VerticalTabs';
+import FlexGridContainer from '../../../Layout/FlexGridContainer/FlexGridContainer';
+import FlexGridItem from '../../../Layout/FlexGridContainer/FlexGridItem';
 import DadosPerfuracaoForm from '../DadosPerfuracaoForm';
 import DadosRevestimentoForm from '../DadosRevestimentoForm';
-import ChecklistOcorrenciasForm from '../ChecklistOcorrenciasForm';
-import FlexGridContainer from '../../Layout/FlexGridContainer/FlexGridContainer';
-import FlexGridItem from '../../Layout/FlexGridContainer/FlexGridItem';
+import ChecklistOcorrenciasForm from '../../fields/ChecklistOcorrenciasForm';
 
 const Tabss: React.FC = () => {
 

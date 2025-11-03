@@ -1,8 +1,8 @@
 import React, { ChangeEvent } from 'react';
-import Fieldset from '../../ui/Fieldset/Fieldset';
-import Card from '../../ui/Card/Card';
-import FormControl from '../../ui/FormControl/FormControl';
-import Button from '../../ui/Button/Button';
+import Fieldset from '../../../ui/Fieldset/Fieldset';
+import Card from '../../../ui/Card/Card';
+import FormControl from '../../../ui/FormControl/FormControl';
+import Button from '../../../ui/Button/Button';
 
 // Supondo que essas interfaces venham de CadastroCliente.tsx
 interface ContatoItem {
@@ -12,7 +12,38 @@ interface ContatoItem {
   referencia: string; // OK
   principal: boolean; // Adicionar principal aqui
 }
-// ... (ContatoProps permanece o mesmo)
+
+// 2. Interface para o objeto de dados que contém o array de contatos
+// (Assumindo que ela é parte do estado maior de CadastroCliente, mas aqui só tipamos a parte relevante)
+export interface ContatoData {
+  contatos: ContatoItem[];
+  // Poderia ter outros campos de dados do cliente aqui, como:
+  // nome: string; 
+  // cpf: string;
+}
+
+// 3. Interface principal para as Props do componente Contato
+// Ela tipa o objeto de dados e todas as funções de callback (handlers)
+export interface ContatoProps {
+  // Recebe o objeto de dados completo (ou a parte relevante)
+  data: ContatoData;
+
+  // Handler para atualizar um campo de um contato específico
+  // id: O ID do contato a ser atualizado
+  // name: A chave do campo a ser atualizado ('tipo', 'valor', 'referencia', 'principal')
+  // value: O novo valor (string para texto/select, boolean para checkbox)
+  handleContatoChange: (
+    id: number,
+    name: keyof ContatoItem,
+    value: string | boolean // Aceita string (para input/select) OU boolean (para checkbox)
+  ) => void;
+
+  // Handler para adicionar um novo contato ao array
+  handleAddContato: () => void;
+
+  // Handler para remover um contato pelo ID
+  handleRemoveContato: (id: number) => void;
+}
 
 // O componente recebe as props
 const Contato: React.FC<ContatoProps> = ({ data, handleContatoChange, handleAddContato, handleRemoveContato }) => {

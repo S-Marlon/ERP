@@ -14,9 +14,9 @@ import SearchDashboard from "./Components/SearchDashboard";
 import { ObraDetalhes } from "./Components/ObraDetalhes";
 
 // **CORREÇÃO:** Importando o componente e as interfaces de tipo
-import ClienteSelect, { Cliente } from '../../components/forms/CadastroContrato/BuscaCliente';
-import ContratoSelectTabs, { Contrato } from "../../components/forms/CadastroContrato/BuscaContrato";
-import PocoSelectTabs, { Poco } from "../../components/forms/CadastroContrato/BuscaPoco";
+import ClienteSelect, { Cliente } from '../../components/forms/specific/CadastroContrato/BuscaCliente';
+import ContratoSelectTabs, { Contrato } from "../../components/forms/specific/CadastroContrato/BuscaContrato";
+import PocoSelectTabs, { Poco } from "../../components/forms/specific/CadastroContrato/BuscaPoco";
 
 // DEFINIÇÕES DE TIPO
 type SearchType = 'Cliente' | 'Contrato' | 'Poço';

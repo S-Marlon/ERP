@@ -1,9 +1,9 @@
 import React, { ChangeEvent } from 'react';
-import FormControl from '../../ui/FormControl/FormControl';
-import Button from '../../ui/Button/Button';
-import Fieldset from '../../ui/Fieldset/Fieldset';
-import Card from '../../ui/Card/Card';
-import Typography from '../../ui/Typography/Typography';
+import FormControl from '../../../ui/FormControl/FormControl';
+import Button from '../../../ui/Button/Button';
+import Fieldset from '../../../ui/Fieldset/Fieldset';
+import Card from '../../../ui/Card/Card';
+import Typography from '../../../ui/Typography/Typography';
 
 // -----------------------------------------------------------------
 // Interfaces (Você deve garantir que EnderecoItem tem todos os campos)

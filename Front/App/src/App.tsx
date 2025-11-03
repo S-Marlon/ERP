@@ -23,9 +23,9 @@ import { ProductProvider } from './context/NewProductContext';
 
 // 🆕 NOVAS IMPORTAÇÕES DE FORMULÁRIOS
 // (Ajuste os caminhos conforme sua estrutura real, se necessário)
-import CadastroCliente from './components/forms/CadastroCliente/CadastroCliente'; 
-import CadastroContrato from './components/forms/CadastroContrato/CadastroContrato';
-import RelatorioPoco from './components/forms/CadastroRelatorio/RelatorioPoco'; // Usado para "Novo Poço"
+import CadastroCliente from './components/forms/specific/CadastroCliente/CadastroCliente'; 
+import CadastroContrato from './components/forms/specific/CadastroContrato/CadastroContrato';
+import RelatorioPoco from './components/forms/specific/CadastroRelatorio/RelatorioPoco'; // Usado para "Novo Poço"
 
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);

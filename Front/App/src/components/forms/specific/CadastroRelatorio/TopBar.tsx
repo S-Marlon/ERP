@@ -1,21 +1,21 @@
 import React, { useState } from 'react';
-import Card from '../../ui/Card/Card';
-import Typography from '../../ui/Typography/Typography';
-import FormControl from '../../ui/FormControl/FormControl';
-import ClienteSelect from '../CadastroContrato/BuscaCliente';
+import Card from '../../../ui/Card/Card';
+import Typography from '../../../ui/Typography/Typography';
+import FormControl from '../../../ui/FormControl/FormControl';
+import ClienteSelect from '../../specific/CadastroContrato/BuscaCliente';
 // 🚨 ASSUMIMOS que você exporta a interface 'Poco' aqui também, se não, ajuste
-import { Cliente } from '../../../types/newtypes'; 
-import FlexGridContainer from '../../Layout/FlexGridContainer/FlexGridContainer';
-import PocoSelect from '../CadastroContrato/BuscaPoco';
-import TypeSwitch from '../../ui/TypeSwitch';
-import TabButton from '../../ui/TabButton/TabButton';
-import Modal from '../../ui/Modal/modal';
-import ButtonGroup from '../../ui/ButtonGroup/ButtonGroup';
+import { Cliente } from '../../../../types/newtypes'; 
+import FlexGridContainer from '../../../Layout/FlexGridContainer/FlexGridContainer';
+import PocoSelect from '../../specific/CadastroContrato/BuscaPoco';
+import TypeSwitch from '../../../ui/TypeSwitch';
+import TabButton from '../../../ui/TabButton/TabButton';
+import Modal from '../../../ui/Modal/modal';
+import ButtonGroup from '../../../ui/ButtonGroup/ButtonGroup';
 
 // 🚨 CORREÇÃO ESSENCIAL: Você precisa importar o tipo GroupButton
 // (Ajuste o caminho se o seu ButtonTypes.ts não estiver nesta pasta relativa)
-import { GroupButton } from '../../ui/ButtonGroup/ButtonTypes'; 
-import ContratoSelect from '../CadastroContrato/BuscaContrato';
+import { GroupButton } from '../../../ui/ButtonGroup/ButtonTypes'; 
+import ContratoSelect from '../../specific/CadastroContrato/BuscaContrato';
 
 // 🚨 CORREÇÃO: Definição do SearchType, que estava faltando.
 type SearchType = 'Cliente' | 'Contrato'; 
