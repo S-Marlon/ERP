@@ -1,12 +1,12 @@
 import React, { useState, ChangeEvent, FormEvent } from "react";
 import "./CadastroCliente.css";
-import Button from "../../ui/Button";
+import Button from "../../ui/Button/Button";
 import FlexGridContainer from "../../Layout/FlexGridContainer/FlexGridContainer";
 import DadosGeraisFiscais from "./DadosGeraisFiscais";
 import Contato from "./Contatos";
 import Endereco from "./Endereco";
-import Card from "../../ui/Card";
-import Typography from "../../ui/Typography";
+import Card from "../../ui/Card/Card";
+import Typography from "../../ui/Typography/Typography";
 
 
 

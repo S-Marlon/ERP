@@ -1,7 +1,7 @@
 // Fieldset.tsx
 import React from 'react';
 import './Fieldset.css'; // Importa os estilos
-import Badge from './Badge';
+import Badge from './Badge/Badge';
 
 /**
  * Define os tipos de variantes de estilo.

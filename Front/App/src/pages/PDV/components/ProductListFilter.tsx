@@ -1,12 +1,12 @@
 import React from "react";
 // 1. IMPORTAÇÃO ATUALIZADA: Trazendo o novo tipo Produto
 import { Produto } from "../../../types/newtypes"; 
-import Card from "../../../components/ui/Card";
-import Fieldset from "../../../components/ui/Fieldset";
-import FormControl from "../../../components/ui/FormControl";
-import Button from "../../../components/ui/Button";
+import Card from "../../../components/ui/Card/Card";
+import Fieldset from "../../../components/ui/Fieldset/Fieldset";
+import FormControl from "../../../components/ui/FormControl/FormControl";
+import Button from "../../../components/ui/Button/Button";
 
-import Badge from "../../../components/ui/Badge";
+import Badge from "../../../components/ui/Badge/Badge";
 
 // 2. TIPAGEM CORRIGIDA: Usa o novo tipo Produto[]
 interface Props {

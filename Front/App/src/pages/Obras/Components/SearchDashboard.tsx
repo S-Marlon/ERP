@@ -1,13 +1,13 @@
 import React, { useState, ChangeEvent, useMemo } from 'react';
-import Typography from '../../../components/ui/Typography';
-import Button from '../../../components/ui/Button';
-import Badge from '../../../components/ui/Badge';
+import Typography from '../../../components/ui/Typography/Typography';
+import Button from '../../../components/ui/Button/Button';
+import Badge from '../../../components/ui/Badge/Badge';
 import './SearchDashboard.css'; // Presume-se que você tenha o estilo
-import Card from '../../../components/ui/Card';
-import FormControl from '../../../components/ui/FormControl';
+import Card from '../../../components/ui/Card/Card';
+import FormControl from '../../../components/ui/FormControl/FormControl';
 import TypeSwitch from '../../../components/ui/TypeSwitch';
-import TabButton from '../../../components/ui/TabButton';
-import Fieldset from '../../../components/ui/Fieldset';
+import TabButton from '../../../components/ui/TabButton/TabButton';
+import Fieldset from '../../../components/ui/Fieldset/Fieldset';
 
 // ----------------- TIPOS E DADOS MOCKADOS -----------------
 

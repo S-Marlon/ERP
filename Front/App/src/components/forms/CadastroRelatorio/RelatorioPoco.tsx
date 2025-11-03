@@ -1,5 +1,5 @@
 import React, { useState, ChangeEvent, FormEvent } from 'react';
-import Button from '../../ui/Button';
+import Button from '../../ui/Button/Button';
 // Importação dos Módulos (Sub-formulários)
 // Importação dos Componentes de Layout
 import Column from './rigtsidebar';

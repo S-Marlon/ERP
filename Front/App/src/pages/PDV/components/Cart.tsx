@@ -1,10 +1,10 @@
 import React from "react";
 // 1. IMPORTAÇÃO ATUALIZADA: Trazendo o novo tipo ItemOrdem
 import { ItemOrdem } from "../../../types/newtypes";
-import Card from "../../../components/ui/Card";
-import Button from "../../../components/ui/Button";
-import Typography from "../../../components/ui/Typography";
-import FormControl from "../../../components/ui/FormControl";
+import Card from "../../../components/ui/Card/Card";
+import Button from "../../../components/ui/Button/Button";
+import Typography from "../../../components/ui/Typography/Typography";
+import FormControl from "../../../components/ui/FormControl/FormControl";
 
 // 2. TIPAGEM DAS PROPS ATUALIZADA: Usando ItemOrdem[]
 interface Props {

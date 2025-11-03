@@ -1,8 +1,8 @@
 import React from "react";
-import FormControl from "../ui/FormControl";
-import Button from "../ui/Button";
-import Typography from "../ui/Typography";
-import Card from "../ui/Card";
+import FormControl from "../ui/FormControl/FormControl";
+import Button from "../ui/Button/Button";
+import Typography from "../ui/Typography/Typography";
+import Card from "../ui/Card/Card";
 
 const PesquisaRapida: React.FC = () => {
   return (

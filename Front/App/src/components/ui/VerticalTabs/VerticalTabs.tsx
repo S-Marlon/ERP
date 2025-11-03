@@ -1,6 +1,6 @@
 // VerticalTabs.tsx
 import React, { useState, useMemo } from 'react';
-import TabPanel, { TabPanelProps } from './TabPanel';
+import TabPanel, { TabPanelProps } from '../TabPanel';
 import styles from './VerticalTabs.module.css'; // Importa os estilos
 
 interface VerticalTabsProps {

@@ -2,11 +2,11 @@
 import React, {  useMemo } from 'react';
 import { useParams  } from 'react-router-dom';
 import { mockObras, mockClientes, mockAtividades, mockRegistrosTempo, Obra } from '../../../types/Obras';
-import Badge from '../../../components/ui/Badge';
-import Typography from '../../../components/ui/Typography';
-import Card from '../../../components/ui/Card';
-import Button from '../../../components/ui/Button';
-import FormControl from '../../../components/ui/FormControl';
+import Badge from '../../../components/ui/Badge/Badge';
+import Typography from '../../../components/ui/Typography/Typography';
+import Card from '../../../components/ui/Card/Card';
+import Button from '../../../components/ui/Button/Button';
+import FormControl from '../../../components/ui/FormControl/FormControl';
 import TabsContainer from '../../../components/ui/TabsContainer';
 
 

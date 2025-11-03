@@ -1,6 +1,6 @@
-import Typography from '../../ui/Typography';
-import FormControl from '../../ui/FormControl';
-import VerticalTabs, { TabPanel } from '../../ui/VerticalTabs';
+import Typography from '../../ui/Typography/Typography';
+import FormControl from '../../ui/FormControl/FormControl';
+import VerticalTabs, { TabPanel } from '../../ui/VerticalTabs/VerticalTabs';
 import DadosPerfuracaoForm from '../DadosPerfuracaoForm';
 import DadosRevestimentoForm from '../DadosRevestimentoForm';
 import ChecklistOcorrenciasForm from '../ChecklistOcorrenciasForm';

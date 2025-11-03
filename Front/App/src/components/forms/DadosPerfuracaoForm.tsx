@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import Typography from '../ui/Typography';
-import Button from '../ui/Button';
-import FormControl from '../ui/FormControl';
-import Card from '../ui/Card';
+import Typography from '../ui/Typography/Typography';
+import Button from '../ui/Button/Button';
+import FormControl from '../ui/FormControl/FormControl';
+import Card from '../ui/Card/Card';
 import FlexGridItem from '../Layout/FlexGridContainer/FlexGridItem';
 import FlexGridContainer from '../Layout/FlexGridContainer/FlexGridContainer';
 // IMPORTAÇÕES DOS NOVOS COMPONENTES:

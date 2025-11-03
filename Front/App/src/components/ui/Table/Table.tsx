@@ -1,7 +1,7 @@
 // Table.tsx (Versão Final Otimizada)
 
 import React from 'react';
-import { TableColumn, TableProps } from '../../types/Table.types';
+import { TableColumn, TableProps } from '../../../types/Table.types';
 import './Table.css'; // Importa o arquivo CSS
 
 const Table = <T extends Record<string, any>>({

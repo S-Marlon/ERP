@@ -2,19 +2,19 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 
 // IMPORTAÇÕES DE UI (Manter o estilo e layout)
-import Button from './ui/Button';
+import Button from './ui/Button/Button';
 import FlexGridContainer from './Layout/FlexGridContainer/FlexGridContainer';
-import Typography from './ui/Typography';
-import Card from './ui/Card';
+import Typography from './ui/Typography/Typography';
+import Card from './ui/Card/Card';
 import SelectionBox from './ui/SelectionBox';
 import SearchDropdown from './ui/SearchDropdown';
 import TypeSwitch from './ui/TypeSwitch';
-import TabButton from './ui/TabButton';
+import TabButton from './ui/TabButton/TabButton';
 import ResultsList from './ui/ResultsList';
 import ResultItem from './ui/ResultItem';
-import Badge from './ui/Badge';
-import Fieldset from './ui/Fieldset';
-import FormControl from './ui/FormControl';
+import Badge from './ui/Badge/Badge';
+import Fieldset from './ui/Fieldset/Fieldset';
+import FormControl from './ui/FormControl/FormControl';
 
 // ----------------------------------------------------
 // 1. DEFINIÇÕES GENÉRICAS DE TIPOS

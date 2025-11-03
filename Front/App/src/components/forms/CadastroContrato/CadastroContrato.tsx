@@ -1,11 +1,11 @@
 import React, { useState, ChangeEvent, FormEvent } from 'react';
 // Importação do seu componente Table e tipagem
-import Table from '../../ui/Table';
+import Table from '../../ui/Table/Table';
 import { TableColumn } from '../ui/Table.types'; 
-import Button from '../../ui/Button';
-import FormControl from '../../ui/FormControl';
-import Typography from '../../ui/Typography';
-import Card from '../../ui/Card';
+import Button from '../../ui/Button/Button';
+import FormControl from '../../ui/FormControl/FormControl';
+import Typography from '../../ui/Typography/Typography';
+import Card from '../../ui/Card/Card';
 import { Link } from 'react-router-dom';
 import FlexGridContainer from '../../Layout/FlexGridContainer/FlexGridContainer';
 import ClienteSelect, { Cliente } from './BuscaCliente';

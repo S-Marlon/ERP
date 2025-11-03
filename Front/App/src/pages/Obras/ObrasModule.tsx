@@ -3,11 +3,11 @@ import { Link } from "react-router-dom";
 import "./ObrasModule.css";
 
 // IMPORTAÇÕES DE COMPONENTES DE UI/LAYOUT
-import Button from "../../components/ui/Button";
+import Button from "../../components/ui/Button/Button";
 import FlexGridContainer from "../../components/Layout/FlexGridContainer/FlexGridContainer";
-import Typography from "../../components/ui/Typography";
+import Typography from "../../components/ui/Typography/Typography";
 import TypeSwitch from "../../components/ui/TypeSwitch";
-import TabButton from "../../components/ui/TabButton";
+import TabButton from "../../components/ui/TabButton/TabButton";
 
 // IMPORTAÇÕES DE COMPONENTES ESPECÍFICOS DE BUSCA E MÓDULO
 import SearchDashboard from "./Components/SearchDashboard";

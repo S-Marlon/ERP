@@ -3,11 +3,11 @@ import React, { useCallback } from 'react';
 import EntitySelectTabs, { EntitySelectProps } from '../../EntitySelectTabs'; 
 import { CLIENTES_MOCK, ClienteMock } from '../../../data/entities/clients'; 
 import FlexGridContainer from '../../Layout/FlexGridContainer/FlexGridContainer';
-import Fieldset from '../../ui/Fieldset';
-import Button from '../../ui/Button';
-import Typography from '../../ui/Typography';
+import Fieldset from '../../ui/Fieldset/Fieldset';
+import Button from '../../ui/Button/Button';
+import Typography from '../../ui/Typography/Typography';
 import ResultItem from '../../ui/ResultItem';
-import Badge from '../../ui/Badge';
+import Badge from '../../ui/Badge/Badge';
 // ... Importações de UI necessárias para renderSelectedEntity e renderResultItem (Typography, Fieldset, Badge, Button, FlexGridContainer)
 
 // ----------------- TIPOS ESPECÍFICOS DE CLIENTE -----------------

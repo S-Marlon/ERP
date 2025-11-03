@@ -1,8 +1,8 @@
 import React, { ChangeEvent } from 'react';
-import Fieldset from '../../ui/Fieldset';
-import Card from '../../ui/Card';
-import FormControl from '../../ui/FormControl';
-import Button from '../../ui/Button';
+import Fieldset from '../../ui/Fieldset/Fieldset';
+import Card from '../../ui/Card/Card';
+import FormControl from '../../ui/FormControl/FormControl';
+import Button from '../../ui/Button/Button';
 
 // Supondo que essas interfaces venham de CadastroCliente.tsx
 interface ContatoItem {

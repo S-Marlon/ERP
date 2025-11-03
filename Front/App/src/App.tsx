@@ -4,9 +4,9 @@ import { useState } from 'react'
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 // Componentes de Layout
-import Sidebar from './components/Layout/sidebar'
-import Header from './components/Layout/header';
-import Panel from './components/Layout/panel';
+import Sidebar from './components/Layout/AppSidebar/sidebar'
+import Header from './components/Layout/AppHeader/header';
+import Panel from './components/Layout/AppContent/panel';
 
 // Páginas Principais
 import Dashboard from "./pages/Dashboard/Dashboard";

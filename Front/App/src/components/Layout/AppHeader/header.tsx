@@ -1,8 +1,8 @@
 // src/components/Sidebar.tsx
 import './Header.css';
 
-import { colors, darkColors } from '../../styles/colors';
-import { BotaoVoltar } from '../ui/BotaoVoltar';
+import { colors, darkColors } from '../../../styles/colors';
+import { BotaoVoltar } from '../../ui/BotaoVoltar';
 
 // Define os tipos das propriedades (props) que o componente vai receber
 interface HeaderProps {

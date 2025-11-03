@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import Typography from '../ui/Typography';
-import Button from '../ui/Button';
-import FormControl from '../ui/FormControl';
+import Typography from '../ui/Typography/Typography';
+import Button from '../ui/Button/Button';
+import FormControl from '../ui/FormControl/FormControl';
 import FlexGridItem from '../Layout/FlexGridContainer/FlexGridItem';
 import FlexGridContainer from '../Layout/FlexGridContainer/FlexGridContainer';
-import Card from '../ui/Card';
+import Card from '../ui/Card/Card';
 // IMPORTAÇÕES DOS NOVOS COMPONENTES
 
 export const revestimentoMaterialOptions: string[] = [

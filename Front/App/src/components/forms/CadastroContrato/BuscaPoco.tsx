@@ -5,12 +5,12 @@ import React from 'react';
 import EntitySelectTabs, { EntitySelectProps } from '../../EntitySelectTabs'; 
 
 // Importações de UI necessárias para as funções de renderização
-import Button from '../../ui/Button';
+import Button from '../../ui/Button/Button';
 import FlexGridContainer from '../../Layout/FlexGridContainer/FlexGridContainer';
-import Typography from '../../ui/Typography';
+import Typography from '../../ui/Typography/Typography';
 import ResultItem from '../../ui/ResultItem';
-import Badge from '../../ui/Badge';
-import Fieldset from '../../ui/Fieldset';
+import Badge from '../../ui/Badge/Badge';
+import Fieldset from '../../ui/Fieldset/Fieldset';
 
 // 🚨 IMPORTAÇÃO DO MOCK CENTRALIZADO
 import { POCOS_MOCK, PocoMock } from '../../../data/entities/clients';

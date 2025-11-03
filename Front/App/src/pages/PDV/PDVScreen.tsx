@@ -14,9 +14,9 @@ import "./PDV.css";
 import ProductTable from "./components/ProductTable";
 import AddService from "./components/pdvAddService";
 import FlexGridContainer from "../../components/Layout/FlexGridContainer/FlexGridContainer";
-import Typography from "../../components/ui/Typography";
-import Fieldset from "../../components/ui/Fieldset";
-import FormControl from "../../components/ui/FormControl";
+import Typography from "../../components/ui/Typography/Typography";
+import Fieldset from "../../components/ui/Fieldset/Fieldset";
+import FormControl from "../../components/ui/FormControl/FormControl";
 
 const PDVScreen: React.FC = () => {
   // ATENÇÃO: Seus Contextos precisam ser atualizados para retornar os novos tipos (Produto/Servico)

@@ -5,7 +5,7 @@ import React from 'react';
 import { TableColumn } from '../../../types/Table.types'; // Ajuste o caminho para os tipos do Table
 import { Produto, ProductTableProps } from '../../../types/ProductTable.types';
 import { formatCurrency } from '../../../utils/utils';
-import Table from '../../../components/ui/Table';
+import Table from '../../../components/ui/Table/Table';
 
 // 1. Definição das Colunas para a Tabela de Produtos
 // Usamos a função 'render' para customizar a exibição das células.
