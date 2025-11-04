@@ -60,50 +60,107 @@ interface ContratoSimples {
 
 const initialState: PocoData = {
     // ... (restante do seu initial state)
-    contratoId: '',
-    nomeIdentificacao: '',
+    contratoId: '12345-EXEMPLO', // Exemplo
+    nomeIdentificacao: 'Poço de Teste 001', // Exemplo
     dataConclusao: new Date().toISOString().split('T')[0],
-    latitude: 0, longitude: 0, elevacaoMetros: 0,
-    profundidadeTotalMetros: 0, diametroConstrucaoMm: 0,
-    formacaoGeologica: '', observacoes: '',
-    marcaBomba: '', modeloBomba: '',
+    latitude: -23.5505, longitude: -46.6333, elevacaoMetros: 760, // Exemplo
+    profundidadeTotalMetros: 150.5, diametroConstrucaoMm: 200, // Exemplo
+    formacaoGeologica: 'Arenito Bauru', observacoes: 'Primeiro teste de preenchimento.',
+    marcaBomba: 'Grundfos', modeloBomba: 'SP 123-A',
     dataInstalacaoBomba: new Date().toISOString().split('T')[0],
-    profundidadeBombaMetros: 0,
-    tubulacaoEdutora: '', cabeamentoEletrico: '', cavaleteSaida: '',
-    vazaoTesteM3Hora: 0, nivelEstaticoTesteMetros: 0, nivelDinamicoTesteMetros: 0,
-    secoesPerfuracao: [],
-    secoesRevestimento: [],
+    profundidadeBombaMetros: 50,
+    tubulacaoEdutora: 'PVC 2"', cabeamentoEletrico: 'Cabo Submersível 3x4mm', cavaleteSaida: 'Válvula Esfera',
+    vazaoTesteM3Hora: 20, nivelEstaticoTesteMetros: 15.5, nivelDinamicoTesteMetros: 25.8,
+    // Exemplo para visualização das listas:
+    secoesPerfuracao: [
+        { deMetros: 0, aMetros: 10, litologia: 'Solo' },
+        { deMetros: 10, aMetros: 50, litologia: 'Argilito' },
+    ],
+    secoesRevestimento: [
+        { tipo: 'Aço Carbono', diametroMm: 200, deMetros: 0, aMetros: 6 },
+    ],
 };
 
 // ----------------- COMPONENTE PRINCIPAL -----------------
 
 const RelatorioPoco: React.FC = () => {
+    // 1. Integrar o Estado (useState)
+    const [pocoData, setPocoData] = useState<PocoData>(initialState);
+
+    // Função de exemplo para demonstração (você deve ter algo assim nos seus inputs)
+    // const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    //     const { name, value, type } = e.target;
+    //     setPocoData(prevData => ({
+    //         ...prevData,
+    //         [name]: type === 'number' ? parseFloat(value) : value
+    //     }));
+    // };
+
+    // 2. Adicionar a Função de Submissão
+    const handleSubmit = (e: FormEvent) => {
+        e.preventDefault();
+        console.log("Dados prontos para envio:", pocoData);
+        // Aqui você faria a chamada para o backend (ex: axios.post)
+        alert('Formulário Submetido (Verifique o console para os dados)');
+    };
 
     return (
-        <form className="relatorio-poco-form">
+        <form className="relatorio-poco-form" onSubmit={handleSubmit}>
             {/* ------------------ HEADER AJUSTADO ------------------ */}
-            
             <Topbar/>
 
-            {/* ------------------ GRID PRINCIPAL (7fr 3fr) ------------------ */}
+            {/* ------------------ GRID PRINCIPAL (8fr 3fr) ------------------ */}
             <FlexGridContainer layout='grid' template='8fr 3fr'>
 
-                {/* COLUNA PRINCIPAL (7fr) - ABAS VERTICAIS */}
+                {/* COLUNA PRINCIPAL (8fr) - ABAS VERTICAIS */}
                 <Tabss/>
 
                 {/* COLUNA SECUNDÁRIA (3fr) - AÇÕES E BOMBEAMENTO */}
                 <Column/>
             </FlexGridContainer>
 
-            {/* ------------------ BOTÃO DE SUBMISSÃO ------------------ */}
+            {/* ------------------ BOTÕES DE SUBMISSÃO ------------------ */}
             <Button type="submit" variant="success" style={{ width: "100%", marginTop: 30, fontSize: '1.2em' }}>
                 ✅ Finalizar Relatório e Salvar Dados do Poço
             </Button>
 
-
             <Button type="button" variant="outline" style={{ width: "100%", marginTop: 30, fontSize: '1.2em' }}>
                 💾 Salvar Rascunho do Relatório
             </Button>
+            
+            {/* ------------------ 3. NOVA SEÇÃO DE VISUALIZAÇÃO DE DADOS ------------------ */}
+            <div style={{ 
+                marginTop: '40px', 
+                padding: '20px', 
+                border: '1px solid #ccc', 
+                borderRadius: '8px',
+                backgroundColor: '#f9f9f9'
+            }}>
+                <h3 style={{ borderBottom: '2px solid #ddd', paddingBottom: '10px', marginBottom: '15px' }}>
+                    👀 Visualização de Variáveis (Pré-envio)
+                </h3>
+                
+                {/* Oculta se pocoData estiver vazio (embora com o initialState isso não ocorra) */}
+                {pocoData && (
+                    <pre style={{ 
+                        whiteSpace: 'pre-wrap', // Quebra as linhas longas
+                        wordBreak: 'break-word', // Quebra palavras longas
+                        backgroundColor: '#000000ff', 
+                        padding: '15px', 
+                        borderRadius: '4px',
+                        fontSize: '0.85em',
+                        overflowX: 'auto' // Adiciona barra de rolagem horizontal se necessário
+                    }}>
+                        {/* JSON.stringify(valor, replacer, espaço)
+                            O 'null' é o replacer (não estamos usando).
+                            O '2' formata com 2 espaços de indentação, tornando-o legível.
+                        */}
+                        {JSON.stringify(pocoData, null, 2)}
+                    </pre>
+                )}
+                {!pocoData && <p>Nenhum dado do poço disponível para visualização.</p>}
+            </div>
+            {/* ------------------------------------------------------------------------------------ */}
         </form>
     );
 };

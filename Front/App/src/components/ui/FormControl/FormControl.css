@@ -114,13 +114,28 @@ input[type="checkbox"]  {
 }
 
 /* --- Estilo para a Mensagem de Erro --- */
-/* .ui-form-error {
+ .ui-form-error {
     color: #e02424; /* Cor do texto vermelho */
     font-size: 0.85rem;
     margin-top: 4px;
     display: block; /* Garante que a mensagem ocupe sua própria linha */
-} */
+} 
 
 /* * Nota: Certifique-se de que seus estilos base (ui-form-input, ui-form-select, etc.) 
  * já estejam definidos em cores neutras. 
  */
+
+
+ /* Estilo para a visualização travada (readOnlyDisplay) */
+.ui-form-read-only-display {
+    padding: 8px 12px;
+    border: 1px solid #ccc; /* Borda simples */
+    border-radius: 4px;
+    background-color: #f7f7f7; /* Fundo cinza suave */
+    color: #333; /* Cor do texto */
+    min-height: 38px; /* Para alinhar com a altura de um input padrão */
+    box-sizing: border-box;
+    width: 100%;
+    /* Garante que o texto não seja selecionável ou alterável */
+    user-select: text; 
+}

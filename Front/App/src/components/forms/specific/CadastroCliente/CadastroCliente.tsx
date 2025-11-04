@@ -212,6 +212,7 @@ const CadastroCliente: React.FC = () => {
     <Card variant="highlight">
       <Typography variant="h1Alt">Registro de Novo Cliente</Typography>
       <Button variant="primary" onClick={handleSubmit}>Salvar Cliente</Button>
+      <Button variant="outline">Relacionar com poço existente</Button>
 
       <FlexGridContainer layout="grid" gap="5px" template="1fr 1fr" mobileTemplate="1fr">
         <div>

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { Link } from "react-router-dom"; 
 import "./ObrasModule.css";
 
@@ -13,47 +13,84 @@ import TabButton from "../../components/ui/TabButton/TabButton";
 import SearchDashboard from "./Components/SearchDashboard";
 import { ObraDetalhes } from "./Components/ObraDetalhes";
 
-// **CORREÇÃO:** Importando o componente e as interfaces de tipo
-import ClienteSelect, { Cliente } from '../../components/forms/specific/CadastroContrato/BuscaCliente';
-import ContratoSelectTabs, { Contrato } from "../../components/forms/specific/CadastroContrato/BuscaContrato";
-import PocoSelectTabs, { Poco } from "../../components/forms/specific/CadastroContrato/BuscaPoco";
+// **IMPORTAÇÕES DE COMPONENTES E TIPOS**
+import ClienteSelect, { Cliente } from '../../components/forms/search/BuscaCliente';
+import ContratoSelectTabs, { Contrato } from "../../components/forms/search/BuscaContrato";
+import PocoSelectTabs, { Poco } from "../../components/forms/search/BuscaPoco";
 
 // DEFINIÇÕES DE TIPO
 type SearchType = 'Cliente' | 'Contrato' | 'Poço';
 
 
 export const ObrasModule: React.FC = () => {
-    // ESTADOS GLOBAIS DE SELEÇÃO
+    // ESTADOS GLOBAIS DE SELEÇÃO (OBJETOS COMPLETOS)
     const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
     const [contratoSelecionado, setContratoSelecionado] = useState<Contrato | null>(null);
     const [pocoSelecionado, setPocoSelecionado] = useState<Poco | null>(null);
+    
+    // ** NOVOS ESTADOS PARA OS IDS (CHAVES PRIMÁRIAS) **
+    const [clienteIdParaBackend, setClienteIdParaBackend] = useState<string | null>(null);
+    const [contratoIdParaBackend, setContratoIdParaBackend] = useState<string | null>(null);
+    const [pocoIdParaBackend, setPocoIdParaBackend] = useState<string | null>(null);
     
     // ESTADO DE CARREGAMENTO E TIPO DE BUSCA ATIVO
     const [isSaving, setIsSaving] = useState(false); // Usado como loading externo
     const [activeSearchType, setActiveSearchType] = useState<SearchType>('Cliente');
     
-    // Alias para o estado de loading
     const isLoading = isSaving; 
 
     // HANDLERS
     
-    const handleClienteChange = (cliente: Cliente | null) => {
+    const handleClienteChange = useCallback((cliente: Cliente | null) => {
+        // Atualiza o estado do objeto completo
         setClienteSelecionado(cliente);
-        // console.log('Cliente selecionado mudou:', cliente); // console.log removido
-    };
+        
+        // Extrai o ID
+        const id = cliente ? cliente.id : null;
+        setClienteIdParaBackend(id);
+        
+        console.log(`✅ ID do Cliente pronto para o backend: ${id}`);
+        
+        // Regra de limpeza: Se o Cliente muda, as seleções relacionadas abaixo dele são limpas
+        if (id) {
+            setContratoSelecionado(null);
+            setContratoIdParaBackend(null);
+            setPocoSelecionado(null);
+            setPocoIdParaBackend(null);
+        }
+    }, []);
 
-    const handleContratoChange = (contrato: Contrato | null) => {
+    const handleContratoChange = useCallback((contrato: Contrato | null) => {
+        // 1. Atualiza o estado do objeto completo
         setContratoSelecionado(contrato);
-    };
 
-    const handlePocoChange = (poco: Poco | null) => {
+        // 2. Extrai o ID
+        const id = contrato ? contrato.id : null;
+        setContratoIdParaBackend(id); // <--- Contrato ID extraído
+        
+        console.log(`✅ ID do Contrato pronto para o backend: ${id}`);
+
+        // Regra de limpeza: Se o Contrato muda, as seleções relacionadas abaixo dele são limpas
+        if (id) {
+            setPocoSelecionado(null);
+            setPocoIdParaBackend(null);
+        }
+    }, []); // Dependências vazias
+
+    const handlePocoChange = useCallback((poco: Poco | null) => {
+        // 1. Atualiza o estado do objeto completo
         setPocoSelecionado(poco);
-    };
 
-    // Handler: Atualiza o tipo de busca (Cliente/Contrato/Poço)
+        // 2. Extrai o ID
+        const id = poco ? poco.id : null;
+        setPocoIdParaBackend(id); // <--- Poço ID extraído
+
+        console.log(`✅ ID do Poço pronto para o backend: ${id}`);
+    }, []); // Dependências vazias
+
+    // Handler: Atualiza o tipo de busca (Mantido)
     const handleSearchTypeChange = (type: SearchType) => {
         setActiveSearchType(type);
-        // Lógica opcional para limpar seleções ao mudar o filtro de busca
     };
 
     return (
@@ -71,8 +108,8 @@ export const ObrasModule: React.FC = () => {
                         <Link to="/contratos/novo"><Button variant='secondary'>+ Novo Contrato</Button></Link>
                         <Link to="/pocos/novo"><Button variant='outline'>+ Novo relatorio de Poço</Button></Link>
                     </div>
-                </div>
-            </header>
+                </div>            
+                </header>
 
             {/* (B) PAGE CONTENT */}
             <main className="layout-container">
@@ -86,7 +123,7 @@ export const ObrasModule: React.FC = () => {
                     <div>
                         <Typography variant="h4">{'Buscar Por:'}</Typography>
 
-                        {/* BLOCO CORRIGIDO: Agora as variáveis estão no escopo */}
+                        {/* BLOCO TYPE SWITCH (Mantido) */}
                         <TypeSwitch>
                             {(['Cliente', 'Contrato', 'Poço'] as SearchType[]).map((searchType) => (
                                 <TabButton
@@ -94,49 +131,62 @@ export const ObrasModule: React.FC = () => {
                                     label={searchType} 
                                     isActive={activeSearchType === searchType} 
                                     onClick={() => handleSearchTypeChange(searchType)}
-                                    disabled={isLoading} // 'isLoading' agora usa 'isSaving'
-                                    // CRUCIAL: Configurações para que o TabButton atue como um switch/filtro:
-                                    isTab={false}    // Desativa role="tab" e aria-selected
-                                    variant="switch"   // Aplica o estilo de switch/grupo
+                                    disabled={isLoading}
+                                    isTab={false}
+                                    variant="switch"
                                 />
                             ))}
                         </TypeSwitch>
 
-                        {/* ClienteSelect (Busca o Cliente) */}
-                        {/* Opcional: Mostrar ClienteSelect apenas quando activeSearchType for 'Cliente' */}
+                        {/* ClienteSelect */}
                         {activeSearchType === 'Cliente' && (
                             <ClienteSelect
-                                clienteSelecionado={clienteSelecionado}
-                                onClienteSelecionadoChange={handleClienteChange}
-                                isLoading={isSaving} // Usamos 'isSaving' como loading
+                                entitySelecionada={clienteSelecionado}
+                                onEntitySelecionadaChange={handleClienteChange}
+                                isLoading={isSaving}
                             />
                         )}
+                        
+                        {/* ContratoSelectTabs */}
                         {activeSearchType === 'Contrato' && (
                             <ContratoSelectTabs
-                contratoSelecionado={contratoSelecionado}
-                onContratoSelecionadoChange={handleContratoChange}
-                isLoading={isSaving} // Exemplo de uso de uma prop de carregamento
-            />
+                                // Requer o objeto completo (Contrato | null)
+                                entitySelecionada={contratoSelecionado}
+                                // Handler que recebe o objeto completo
+                                onEntitySelecionadaChange={handleContratoChange}
+                                isLoading={isSaving}
+                            />
                         )}
 
+                        {/* PocoSelectTabs */}
                         {activeSearchType === 'Poço' && (
                             <PocoSelectTabs
-                pocoSelecionado={pocoSelecionado}
-                onPocoSelecionadoChange={handlePocoChange}
-                isLoading={isSaving} // Opcional: passa o estado de carregamento
-            />
+                                // Requer o objeto completo (Poco | null)
+                                entitySelecionada={pocoSelecionado}
+                                // Handler que recebe o objeto completo
+                                onEntitySelecionadaChange={handlePocoChange}
+                                isLoading={isSaving}
+                            />
                         )}
                         
-                        {/* ** NOVO CONTEÚDO DINÂMICO APARECE AQUI ** */}
-                        {/* Você precisará de um campo de input (que deve estar no SearchDashboard ou aqui) para setar 'searchTerm' */}
-                        {/* Exemplo para testar a renderização: */}
-                        {/* Apenas para demonstração, você deve adicionar um input de busca real */}
-                        {/* FIM DO NOVO CONTEÚDO DINÂMICO */}
+                        {/* -------------------- VISUALIZAÇÃO DOS IDS PARA CONFIRMAÇÃO -------------------- */}
+                        <div style={{ marginTop: '30px', padding: '15px', border: '1px solid #ddd', borderRadius: '5px' }}>
+                            <Typography variant="h5">Valores Atuais dos IDs (Pronto para Backend)</Typography>
+                            <hr style={{margin: '10px 0'}} />
+                            <Typography variant="small">ID Cliente: **{clienteIdParaBackend || 'Nenhum'}**</Typography><br/>
+                            <Typography variant="small">ID Contrato: **{contratoIdParaBackend || 'Nenhum'}**</Typography><br/>
+                            <Typography variant="small">ID Poço: **{pocoIdParaBackend || 'Nenhum'}**</Typography>
+                        </div>
+                        {/* ------------------------------------------------------------------------------- */}
 
                     </div>
                     
                     <SearchDashboard />
-                    <ObraDetalhes />
+                    <ObraDetalhes 
+                        cliente={clienteSelecionado} 
+                        contrato={contratoSelecionado} 
+                        poco={pocoSelecionado} 
+                    />
 
                     <div>
                         <Button variant="outline">➕ Novo Registro de Tempo</Button>

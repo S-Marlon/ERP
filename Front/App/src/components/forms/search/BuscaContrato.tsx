@@ -1,25 +1,25 @@
+// BuscaContrato.tsx (Corrigido)
 import React, { useCallback } from 'react';
 
 // Importa o componente genérico e seus tipos
-// 🚨 Ajuste o caminho conforme onde você salvou o EntitySelectTabs.tsx
-import EntitySelectTabs, { EntitySelectProps } from '../../../EntitySelectTabs'; 
+import EntitySelectTabs, { EntitySelectProps } from '../../EntitySelectTabs'; 
 
 // Importações de UI necessárias para as funções de renderização
-import Button from '../../../ui/Button/Button';
-import FlexGridContainer from '../../../Layout/FlexGridContainer/FlexGridContainer';
-import Typography from '../../../ui/Typography/Typography';
-import Card from '../../../ui/Card/Card';
-import ResultItem from '../../../ui/ResultItem';
-import Badge from '../../../ui/Badge/Badge';
-import Fieldset from '../../../ui/Fieldset/Fieldset';
+import Button from '../../ui/Button/Button';
+import FlexGridContainer from '../../Layout/FlexGridContainer/FlexGridContainer';
+import Typography from '../../ui/Typography/Typography';
+import ResultItem from '../../ui/ResultItem';
+import Badge from '../../ui/Badge/Badge';
+import Fieldset from '../../ui/Fieldset/Fieldset';
 
 // 🚨 IMPORTAÇÃO DO MOCK CENTRALIZADO
-import { CONTRATOS_MOCK, ContratoMock } from '../../../../data/entities/clients'; 
+import { CONTRATOS_MOCK, ContratoMock } from '../../../data/entities/clients'; 
 
 // ----------------- 1. TIPOS ESPECÍFICOS DE CONTRATO -----------------
 
 type ContratoTipo = 'Serviço' | 'Obra' | 'Fornecimento';
-type Contrato = {
+// 🚨 Usando 'export' aqui para que o ObrasModule possa importar
+export type Contrato = { 
     id: string; 
     numero: string; 
     titulo: string; 
@@ -34,16 +34,16 @@ type ContratoSearchKey = 'numero' | 'titulo' | 'fk_cliente_id' | 'status';
 type ContratoTypeFilter = ContratoTipo | 'TODOS';
 
 
-// ----------------- 2. FUNÇÕES AUXILIARES -----------------
+// ----------------- 2. FUNÇÕES AUXILIARES E DE BUSCA (Mantidas) -----------------
 
 /**
- * Função auxiliar para formatação de moeda (extraída do componente original).
+ * Função auxiliar para formatação de moeda.
  */
 const formatCurrency = (value: number) => 
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
 /**
- * Função auxiliar para mapeamento de cores (extraída do componente original).
+ * Função auxiliar para mapeamento de cores.
  */
 const getStatusColor = (status: Contrato['status']): 'success' | 'warning' | 'default' | 'danger' => {
     switch (status) {
@@ -56,13 +56,12 @@ const getStatusColor = (status: Contrato['status']): 'success' | 'warning' | 'de
 }
 
 /**
- * Função de Adaptação e Busca (usando a lógica do seu arquivo 02)
- * Implementa a lógica de filtro do arquivo original, mas agora recebe os parâmetros de busca.
+ * Função de Adaptação e Busca (fetchContratos - Mantida)
  */
 const fetchContratos = async (query: string, tab: ContratoSearchKey, typeFilter: ContratoTypeFilter): Promise<Contrato[]> => {
     return new Promise((resolve) => {
         setTimeout(() => {
-            // 1. Adaptação dos dados Mock para a interface Contrato
+            // ... (Lógica de adaptação e filtragem mantida)
             const allData: Contrato[] = CONTRATOS_MOCK.map((mock, index) => {
                 const tipoSimulado: ContratoTipo = index % 3 === 0 ? 'Serviço' : index % 3 === 1 ? 'Obra' : 'Fornecimento';
                 const clienteIdNumber = mock.clienteId 
@@ -82,7 +81,6 @@ const fetchContratos = async (query: string, tab: ContratoSearchKey, typeFilter:
                 } as Contrato; 
             });
 
-            // 2. Lógica de Filtragem (Baseada no seu componente original)
             const lowerQuery = query.toLowerCase().replace(/[^a-z0-9]/g, '');
 
             const filteredData = allData.filter(contrato => {
@@ -99,11 +97,10 @@ const fetchContratos = async (query: string, tab: ContratoSearchKey, typeFilter:
                 if (tab === 'fk_cliente_id') {
                     valueToSearch = String(contrato.fk_cliente_id);
                 } else if (tab === 'status') {
-                    // Status não deve limpar caracteres especiais
                     valueToSearch = contrato.status;
                     return valueToSearch.toLowerCase().includes(query.toLowerCase());
                 } else {
-                    valueToSearch = contrato[tab as keyof Contrato]; // Garante que a chave é válida
+                    valueToSearch = (contrato as any)[tab];
                 }
 
                 if (typeof valueToSearch === 'string' || typeof valueToSearch === 'number') {
@@ -120,12 +117,10 @@ const fetchContratos = async (query: string, tab: ContratoSearchKey, typeFilter:
 };
 
 
-// ----------------- 3. RENDERIZAÇÕES ESPECÍFICAS DE CONTRATO -----------------
+// ----------------- 3. RENDERIZAÇÕES ESPECÍFICAS (Mantidas) -----------------
 
-/**
- * Renderiza a visualização do Contrato Selecionado.
- */
 const renderSelectedContrato = (contrato: Contrato, handleClear: () => void, isLoading: boolean) => (
+    // ... (Markup mantido)
     <FlexGridContainer layout='flex' template='column'>
         <FlexGridContainer layout='flex' justifyContent='space-between' alignItems='flex-start' >
             <Fieldset legend={`Contrato Selecionado (${contrato.tipo}):`} variant='basic'>
@@ -150,10 +145,8 @@ const renderSelectedContrato = (contrato: Contrato, handleClear: () => void, isL
     </FlexGridContainer>
 );
 
-/**
- * Renderiza um Contrato na Lista de Resultados.
- */
 const renderContratoResult = (contrato: Contrato, isSelected: boolean, handleSelect: (c: Contrato) => void) => (
+    // ... (Markup mantido)
     <ResultItem
         key={contrato.id}
         onClick={() => handleSelect(contrato)}
@@ -172,42 +165,44 @@ const renderContratoResult = (contrato: Contrato, isSelected: boolean, handleSel
 );
 
 
-// ----------------- 4. COMPONENTE WRAPPER PRINCIPAL -----------------
+// ----------------- 4. COMPONENTE WRAPPER PRINCIPAL (CORRIGIDO) -----------------
 
-// Usa Omit para tipar as props que vêm do EntitySelectTabs, mas remove as que serão fixadas no defaultProps
-type ContratoSelectFixedProps = keyof typeof defaultProps;
-type ContratoSelectOwnProps = Omit<EntitySelectProps<Contrato, ContratoSearchKey, ContratoTypeFilter>, ContratoSelectFixedProps>;
+// Definições fixas e específicas da entidade Contrato (MOVIDAS PARA FORA)
+const defaultContratoProps = {
+    title: "**Busca de Contrato**",
+    newEntityLink: "/contratos/novo",
+    newEntityLabel: "Novo Contrato",
+    defaultTypeFilter: 'TODOS' as ContratoTypeFilter,
+    
+    tabLabels: {
+        numero: 'Número', 
+        titulo: 'Título',
+        fk_cliente_id: 'ID Cliente',
+        status: 'Status',
+    } as Record<ContratoSearchKey, string>,
+
+    typeFilterOptions: [
+        { key: 'Serviço', label: 'Serviço' },
+        { key: 'Obra', label: 'Obra' },
+        { key: 'Fornecimento', label: 'Fornecimento' },
+        { key: 'TODOS', label: 'Todos' },
+    ] as { key: ContratoTypeFilter, label: string }[],
+    
+    fetchEntities: fetchContratos,
+    renderSelectedEntity: renderSelectedContrato,
+    renderResultItem: renderContratoResult,
+};
+
+// Define as props que o componente ContratoSelect VAI RECEBER (Omitindo as que são padrão)
+type ContratoSelectProps = Omit<
+    EntitySelectProps<Contrato, ContratoSearchKey, ContratoTypeFilter>, 
+    keyof typeof defaultContratoProps
+>;
 
 
-const ContratoSelect: React.FC<ContratoSelectOwnProps> = (props) => {
-    // Definições fixas e específicas da entidade Contrato
-    const defaultProps = {
-        title: "**Busca de Contrato**",
-        newEntityLink: "/contratos/novo",
-        newEntityLabel: "Novo Contrato",
-        defaultTypeFilter: 'TODOS' as ContratoTypeFilter,
-        
-        tabLabels: {
-            numero: 'Número', 
-            titulo: 'Título',
-            fk_cliente_id: 'ID Cliente',
-            status: 'Status',
-        } as Record<ContratoSearchKey, string>,
-
-        typeFilterOptions: [
-            { key: 'Serviço', label: 'Serviço' },
-            { key: 'Obra', label: 'Obra' },
-            { key: 'Fornecimento', label: 'Fornecimento' },
-            { key: 'TODOS', label: 'Todos' },
-        ] as { key: ContratoTypeFilter, label: string }[],
-        
-        // Injeta as funções específicas de Contrato no componente genérico
-        fetchEntities: fetchContratos,
-        renderSelectedEntity: renderSelectedContrato,
-        renderResultItem: renderContratoResult,
-    };
-
-    return <EntitySelectTabs {...defaultProps} {...props} />;
+const ContratoSelect: React.FC<ContratoSelectProps> = (props) => {
+    // Passa as props padrões (defaultContratoProps) e as props dinâmicas (props)
+    return <EntitySelectTabs {...defaultContratoProps} {...props} />;
 };
 
 export default ContratoSelect;

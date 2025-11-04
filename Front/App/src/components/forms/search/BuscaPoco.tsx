@@ -1,19 +1,19 @@
+// BuscaPoco.tsx (Corrigido)
 import React from 'react';
 
 // Importa o componente genérico e seus tipos
-// 🚨 Ajuste o caminho conforme onde você salvou o EntitySelectTabs.tsx
-import EntitySelectTabs, { EntitySelectProps } from '../../../EntitySelectTabs'; 
+import EntitySelectTabs, { EntitySelectProps } from '../../EntitySelectTabs'; 
 
 // Importações de UI necessárias para as funções de renderização
-import Button from '../../../ui/Button/Button';
-import FlexGridContainer from '../../../Layout/FlexGridContainer/FlexGridContainer';
-import Typography from '../../../ui/Typography/Typography';
-import ResultItem from '../../../ui/ResultItem';
-import Badge from '../../../ui/Badge/Badge';
-import Fieldset from '../../../ui/Fieldset/Fieldset';
+import Button from '../../ui/Button/Button';
+import FlexGridContainer from '../../Layout/FlexGridContainer/FlexGridContainer';
+import Typography from '../../ui/Typography/Typography';
+import ResultItem from '../../ui/ResultItem';
+import Badge from '../../ui/Badge/Badge';
+import Fieldset from '../../ui/Fieldset/Fieldset';
 
 // 🚨 IMPORTAÇÃO DO MOCK CENTRALIZADO
-import { POCOS_MOCK, PocoMock } from '../../../../data/entities/clients';
+import { POCOS_MOCK, PocoMock } from '../../../data/entities/clients';
 
 // ----------------- 1. TIPOS ESPECÍFICOS DE POÇO -----------------
 
@@ -21,8 +21,8 @@ type PocoUso = 'Industrial' | 'Residencial' | 'Irrigação';
 type PocoStatus = 'Operacional' | 'Manutenção' | 'Inativo';
 type PocoTypeFilter = PocoUso | 'TODOS';
 
-// Interface Poco (A estrutura final que o componente deve manipular)
-interface Poco {
+// 🚨 Usando 'export' aqui para que o ObrasModule possa importar
+export interface Poco {
     id: string; 
     codigo: string;
     localizacao: string;
@@ -35,10 +35,10 @@ interface Poco {
 type PocoSearchKey = 'codigo' | 'localizacao' | 'fk_cliente_id' | 'status';
 
 
-// ----------------- 2. FUNÇÕES AUXILIARES DE POÇO -----------------
+// ----------------- 2. FUNÇÕES AUXILIARES E DE BUSCA (Mantidas) -----------------
 
 /**
- * Função auxiliar para mapeamento de cores (extraída do componente original).
+ * Função auxiliar para mapeamento de cores (getStatusColor - Mantida).
  */
 const getStatusColor = (status: Poco['status']): 'success' | 'warning' | 'danger' | 'default' => {
     switch (status) {
@@ -50,15 +50,13 @@ const getStatusColor = (status: Poco['status']): 'success' | 'warning' | 'danger
 }
 
 /**
- * Função de Adaptação e Busca (Baseada no seu componente original)
- * Mapeia os dados do mock e filtra de acordo com a query, aba e filtro de tipo.
+ * Função de Adaptação e Busca (fetchPocos - Mantida).
  */
 const fetchPocos = async (query: string, tab: PocoSearchKey, typeFilter: PocoTypeFilter): Promise<Poco[]> => {
     return new Promise((resolve) => {
         setTimeout(() => {
-            // 1. Adaptação dos dados Mock para a interface Poco
+            // ... (Lógica de adaptação e filtragem mantida)
             const allData: Poco[] = POCOS_MOCK.map((pocoMock, index) => {
-                // Simulação dos campos
                 const usoSimulado: PocoUso = pocoMock.nomeIdentificacao.includes('Fazenda')
                     ? 'Irrigação'
                     : pocoMock.nomeIdentificacao.includes('Secundário')
@@ -78,7 +76,6 @@ const fetchPocos = async (query: string, tab: PocoSearchKey, typeFilter: PocoTyp
                 } as Poco; 
             });
 
-            // 2. Lógica de Filtragem (Baseada no seu componente original)
             const lowerQuery = query.toLowerCase().replace(/[^a-z0-9]/g, '');
 
             const filteredData = allData.filter(poco => {
@@ -95,12 +92,10 @@ const fetchPocos = async (query: string, tab: PocoSearchKey, typeFilter: PocoTyp
                 if (tab === 'fk_cliente_id') {
                     valueToSearch = String(poco.fk_cliente_id);
                 } else if (tab === 'status') {
-                    // Status não remove caracteres especiais/espaços
                     valueToSearch = poco.status;
                     return valueToSearch.toLowerCase().includes(query.toLowerCase());
                 } else {
-                    // Busca por Código ou Localização
-                    valueToSearch = poco[tab as keyof Poco];
+                    valueToSearch = (poco as any)[tab];
                 }
 
                 if (typeof valueToSearch === 'string' || typeof valueToSearch === 'number') {
@@ -117,12 +112,10 @@ const fetchPocos = async (query: string, tab: PocoSearchKey, typeFilter: PocoTyp
 };
 
 
-// ----------------- 3. RENDERIZAÇÕES ESPECÍFICAS DE POÇO -----------------
+// ----------------- 3. RENDERIZAÇÕES ESPECÍFICAS (Mantidas) -----------------
 
-/**
- * Renderiza a visualização do Poço Selecionado (renderSelectedEntity).
- */
 const renderSelectedPoco = (poco: Poco, handleClear: () => void, isLoading: boolean) => (
+    // ... (Markup mantido)
     <FlexGridContainer layout='flex' template='column'>
         <FlexGridContainer layout='flex' justifyContent='space-between' alignItems='flex-start' >
             <Fieldset legend={`Poço Selecionado (${poco.uso}):`} variant='basic'>
@@ -150,10 +143,8 @@ const renderSelectedPoco = (poco: Poco, handleClear: () => void, isLoading: bool
     </FlexGridContainer>
 );
 
-/**
- * Renderiza um Poço na Lista de Resultados (renderResultItem).
- */
 const renderPocoResult = (poco: Poco, isSelected: boolean, handleSelect: (p: Poco) => void) => (
+    // ... (Markup mantido)
     <ResultItem
         key={poco.id}
         onClick={() => handleSelect(poco)}
@@ -172,46 +163,44 @@ const renderPocoResult = (poco: Poco, isSelected: boolean, handleSelect: (p: Poc
 );
 
 
-// ----------------- 4. COMPONENTE WRAPPER PRINCIPAL -----------------
+// ----------------- 4. COMPONENTE WRAPPER PRINCIPAL (CORRIGIDO) -----------------
 
-// Define as chaves que serão fixadas
-type PocoSelectFixedProps = 'title' | 'newEntityLink' | 'newEntityLabel' | 'defaultTypeFilter' | 'tabLabels' | 'typeFilterOptions' | 'fetchEntities' | 'renderSelectedEntity' | 'renderResultItem';
+// Definições fixas e específicas da entidade Poço (MOVIDAS PARA FORA)
+const defaultPocoProps = {
+    title: "**Busca de Poço**",
+    newEntityLink: "/pocos/novo",
+    newEntityLabel: "Novo Poço",
+    defaultTypeFilter: 'TODOS' as PocoTypeFilter,
+    
+    tabLabels: {
+        codigo: 'Código',
+        localizacao: 'Localização',
+        fk_cliente_id: 'ID Cliente',
+        status: 'Status',
+    } as Record<PocoSearchKey, string>,
 
-// Define as props que o componente PocoSelect receberá (as únicas dinâmicas do EntitySelect)
-type PocoSelectOwnProps = Omit<EntitySelectProps<Poco, PocoSearchKey, PocoTypeFilter>, PocoSelectFixedProps>;
+    typeFilterOptions: [
+        { key: 'Industrial', label: 'Industrial' },
+        { key: 'Residencial', label: 'Residencial' },
+        { key: 'Irrigação', label: 'Irrigação' },
+        { key: 'TODOS', label: 'Todos' },
+    ] as { key: PocoTypeFilter, label: string }[],
+    
+    fetchEntities: fetchPocos,
+    renderSelectedEntity: renderSelectedPoco,
+    renderResultItem: renderPocoResult,
+};
+
+// Define as props que o componente PocoSelect VAI RECEBER (Omitindo as que são padrão)
+type PocoSelectProps = Omit<
+    EntitySelectProps<Poco, PocoSearchKey, PocoTypeFilter>, 
+    keyof typeof defaultPocoProps
+>;
 
 
-const PocoSelect: React.FC<PocoSelectOwnProps> = (props) => {
-    // Definições fixas e específicas da entidade Poço
-    const defaultProps = {
-        title: "**Busca de Poço**",
-        newEntityLink: "/pocos/novo",
-        newEntityLabel: "Novo Poço",
-        defaultTypeFilter: 'TODOS' as PocoTypeFilter,
-        
-        tabLabels: {
-            codigo: 'Código',
-            localizacao: 'Localização',
-            fk_cliente_id: 'ID Cliente',
-            status: 'Status',
-        } as Record<PocoSearchKey, string>,
-
-        typeFilterOptions: [
-            { key: 'Industrial', label: 'Industrial' },
-            { key: 'Residencial', label: 'Residencial' },
-            { key: 'Irrigação', label: 'Irrigação' },
-            { key: 'TODOS', label: 'Todos' },
-        ] as { key: PocoTypeFilter, label: string }[],
-        
-        // Injeta as funções específicas de Poço no componente genérico
-        fetchEntities: fetchPocos,
-        renderSelectedEntity: renderSelectedPoco,
-        renderResultItem: renderPocoResult,
-    };
-
-    // O PocoSelect passa suas próprias props (como pocoSelecionado, onPocoSelecionadoChange, isLoading)
-    // junto com as props padrões específicas da entidade.
-    return <EntitySelectTabs {...defaultProps} {...props} />;
+const PocoSelect: React.FC<PocoSelectProps> = (props) => {
+    // Passa as props padrões (defaultPocoProps) e as props dinâmicas (props)
+    return <EntitySelectTabs {...defaultPocoProps} {...props} />;
 };
 
 export default PocoSelect;

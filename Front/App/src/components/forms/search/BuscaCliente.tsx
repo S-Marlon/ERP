@@ -1,14 +1,14 @@
-// ClienteSelect.tsx (Novo arquivo)
+// ClienteSelect.tsx (Corrigido)
 import React, { useCallback } from 'react';
-import EntitySelectTabs, { EntitySelectProps } from '../../../EntitySelectTabs'; 
-import { CLIENTES_MOCK, ClienteMock } from '../../../../data/entities/clients'; 
-import FlexGridContainer from '../../../Layout/FlexGridContainer/FlexGridContainer';
-import Fieldset from '../../../ui/Fieldset/Fieldset';
-import Button from '../../../ui/Button/Button';
-import Typography from '../../../ui/Typography/Typography';
-import ResultItem from '../../../ui/ResultItem';
-import Badge from '../../../ui/Badge/Badge';
-// ... Importações de UI necessárias para renderSelectedEntity e renderResultItem (Typography, Fieldset, Badge, Button, FlexGridContainer)
+import EntitySelectTabs, { EntitySelectProps } from '../../EntitySelectTabs'; 
+import { CLIENTES_MOCK, ClienteMock } from '../../../data/entities/clients'; 
+// Importações de UI necessárias
+import FlexGridContainer from '../../Layout/FlexGridContainer/FlexGridContainer';
+import Fieldset from '../../ui/Fieldset/Fieldset';
+import Button from '../../ui/Button/Button';
+import Typography from '../../ui/Typography/Typography';
+import ResultItem from '../../ui/ResultItem';
+import Badge from '../../ui/Badge/Badge';
 
 // ----------------- TIPOS ESPECÍFICOS DE CLIENTE -----------------
 type Cliente = ClienteMock;
@@ -17,7 +17,7 @@ type ClienteTypeFilter = 'CPF' | 'CNPJ' | 'AMBOS';
 
 // Função de Busca Específica (usando a lógica do seu arquivo 01)
 const fetchClientes = async (query: string, tab: ClienteSearchKey, typeFilter: ClienteTypeFilter): Promise<Cliente[]> => {
-    // ... (Lógica de simulação de fetch e filtragem do arquivo 01)
+    // ... (Sua lógica de simulação de fetch e filtragem - mantida)
     return new Promise((resolve) => {
         setTimeout(() => {
             let filteredData = CLIENTES_MOCK;
@@ -52,7 +52,7 @@ const fetchClientes = async (query: string, tab: ClienteSearchKey, typeFilter: C
 // 1. Renderização do Item Selecionado
 const renderSelectedCliente = (cliente: Cliente, handleClear: () => void, isLoading: boolean) => (
     <FlexGridContainer layout='flex' template='column' gap='10px'>
-        {/* ... (Todo o markup do Fieldset e Typography para o cliente selecionado do arquivo 01) */}
+        {/* ... (Todo o markup do Fieldset e Typography para o cliente selecionado) */}
         <FlexGridContainer layout='flex' justifyContent='space-between' alignItems='flex-start' >
             <Fieldset legend={`Cliente Selecionado (${cliente.tipo}):`} variant='basic'>
                 <Typography variant="strong">{cliente.nome}</Typography>
@@ -71,23 +71,22 @@ const renderClienteResult = (cliente: Cliente, isSelected: boolean, handleSelect
         onClick={() => handleSelect(cliente)}
         selected={isSelected}
     >
-        {/* ... (Todo o markup do ResultItem para o cliente do arquivo 01) */}
+        {/* ... (Todo o markup do ResultItem para o cliente) */}
         <div className='flex-row' style={{ justifyContent: 'space-between' }}>
             <Typography variant="strong">**{cliente.nome}** ({cliente.tipo})</Typography>
             <Typography variant="pMuted">{cliente.documento}</Typography>
         </div>
         <FlexGridContainer layout='flex' justifyContent="space-between" style={{ marginTop: '5px' }}>
             <Typography variant="small">E-mail: {cliente.email}</Typography>
-            <Badge color='info'><Typography variant='strong'>1 Contrato</Typography></Badge>
+            <Badge color='paper'><Typography variant='strong'>1 Contrato</Typography></Badge>
             {/* ... */}
         </FlexGridContainer>
     </ResultItem>
 );
 
 
-// ----------------- COMPONENTE WRAPPER -----------------
-const ClienteSelect: React.FC<Omit<EntitySelectProps<Cliente, ClienteSearchKey, ClienteTypeFilter>, keyof typeof defaultProps>> = (props) => {
-  const defaultProps = {
+// ----------------- DEFINIÇÃO DAS PROPS PADRÃO (Corrigido: Mover para fora) -----------------
+const defaultClientProps = {
     title: "**Busca de Cliente**",
     newEntityLink: "/clientes/novo",
     newEntityLabel: "Novo Cliente",
@@ -113,9 +112,18 @@ const ClienteSelect: React.FC<Omit<EntitySelectProps<Cliente, ClienteSearchKey, 
     fetchEntities: fetchClientes,
     renderSelectedEntity: renderSelectedCliente,
     renderResultItem: renderClienteResult,
-  };
+};
 
-  return <EntitySelectTabs {...defaultProps} {...props} />;
+// Define o tipo das props que o componente ClienteSelect VAI RECEBER (Omitindo as que são padrão)
+type ClienteSelectProps = Omit<
+    EntitySelectProps<Cliente, ClienteSearchKey, ClienteTypeFilter>, 
+    keyof typeof defaultClientProps
+>;
+
+// ----------------- COMPONENTE WRAPPER -----------------
+const ClienteSelect: React.FC<ClienteSelectProps> = (props) => {
+    // Combina as default props e as props recebidas antes de passar para o EntitySelectTabs
+  return <EntitySelectTabs {...defaultClientProps} {...props} />;
 };
 
 export default ClienteSelect;
