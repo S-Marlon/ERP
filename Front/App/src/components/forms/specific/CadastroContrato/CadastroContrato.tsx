@@ -229,13 +229,15 @@ const CadastroContrato: React.FC = () => {
                         <Typography variant="h2Alt">Cliente Relacionado</Typography>
                         
                         <ClienteSelect
-                            clienteSelecionado={clienteSelecionado}
-                            onClienteSelecionadoChange={handleClienteChange}
-                            isLoading={isSaving} 
-                        />
+                                entitySelecionada={clienteSelecionado}
+                                onEntitySelecionadaChange={handleClienteChange}
+                                isLoading={isSaving}
+                            />
                         
                         
                     </Card>
+
+                    
 
                     
 
