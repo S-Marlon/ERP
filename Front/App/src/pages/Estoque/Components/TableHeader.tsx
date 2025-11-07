@@ -1,26 +1,28 @@
 // src/components/TableHeader.tsx
 import React from 'react';
+import Typography from '../../../components/ui/Typography/Typography';
+import Button from '../../../components/ui/Button/Button';
 
 const TableHeader: React.FC = () => {
   return (
     <div className="table-header">
-      <div>{99999} produtos encontrados</div>
+      <Typography variant='h2Alt'>{99999} produtos encontrados</Typography>
       <div>
         {/* Lógica de Paginação */}
-        <button>Prev</button>
-        <button>1</button>
-        <button><strong>2</strong></button>
-        <button>3</button>
-        <button>Post</button>
+        <Button variant='warning'>Prev</Button>
+        <Button variant='warning'>1</Button>
+        <Button variant='warning'><strong>2</strong></Button>
+        <Button variant='warning'>3</Button>
+        <Button variant='warning'>Post</Button>
       </div>
       <div>
         <section>
-          <button>A+</button>
-          <button>A-</button>
+          <Button variant='warning'>A+</Button>
+          <Button variant='warning'>A-</Button>
         </section>
         <section>
-          <button>20</button>
-          por página
+          <Button variant='warning'>20</Button>
+         <Typography variant='h2Alt'> por página</Typography> 
         </section>
       </div>
     </div>

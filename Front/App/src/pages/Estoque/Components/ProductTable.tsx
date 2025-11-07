@@ -1,70 +1,100 @@
-import React from "react";
-import "../Estoque.css";
+import React, { useMemo } from "react";
+import "../Estoque.css"; // Preservado, se necessário para estilos gerais
 import { Product } from "../../../types/types";
 import TableHeader from "./TableHeader";
+// Importações
+import Table from "../../../components/ui/Table/Table";
+import { TableColumn } from "../../../types/Table.types"; // Importe o tipo TableColumn
+// Importamos o tipo Produto, mas para manter a flexibilidade, usaremos o tipo Product diretamente
 
-
-
+// O tipo Product é usado como T do componente Table<T>
 interface ProductTableProps {
   products: Product[];
   onSelectProduct: (product: Product) => void;
 }
 
+// Define o tipo para garantir a compatibilidade com a função render
+type ProductWithIndex = Product & { index: number };
+
 const ProductTable: React.FC<ProductTableProps> = ({ products, onSelectProduct }) => {
+  
+  // 1. Prepara os dados: Adiciona o índice (Número) a cada produto para ser exibido facilmente
+  const dataWithIndex = useMemo(() => 
+    products.map((product, index) => ({ ...product, index: index + 1 })),
+    [products]
+  );
+
+  // 2. Define as colunas (productColumns)
+  // Use useMemo para evitar recriar o array a cada renderização
+  const productColumns: TableColumn<ProductWithIndex>[] = useMemo(() => [
+    {
+      key: 'index', 
+      header: 'Número', 
+      // Renderiza o quadrado e o número
+      render: (item) => (
+        <>
+          <span style={{ marginRight: '5px' }}>&#9634;</span> 
+          {item.index}
+        </>
+      ),
+    },
+    { key: 'name', header: 'Nome do Produto' },
+    { key: 'sku', header: 'SKU' },
+    { key: 'category', header: 'Categoria' },
+    // A coluna 'sub-Categoria' usa a mesma chave 'category' no seu HTML original,
+    // se for um campo diferente em 'Product', ajuste a 'key'.
+    { key: 'category', header: 'Sub-Categoria' }, 
+    { key: 'stock', header: 'Estoque' },
+    { key: 'status', header: 'Status', render: (item) => <span>{item.status}</span> },
+    { 
+      key: 'price', 
+      header: 'Preço de Venda',
+      render: (item) => `R$ ${item.price.toFixed(2)}`,
+    },
+    // Coluna 'Fornecedor' era fixa "SOLAI", vamos deixá-la assim por enquanto.
+    // Se 'supplier' for uma propriedade de 'Product', mude para { key: 'supplier', header: 'Fornecedor' }
+    { key: 'supplierName', header: 'Fornecedor', render: () => 'SOLAI' }, 
+    { 
+      key: 'actions', 
+      header: 'Editar',
+      render: () => (
+        <button
+          className="icon-button"
+          // O clique deve ser definido DENTRO do render se for uma ação específica de célula,
+          // ou fora se for o clique na linha inteira (que já está configurado).
+          // Vamos deixar o clique na linha fazer a seleção, e o botão de editar aqui é apenas visual.
+          onClick={(e) => {
+            e.stopPropagation(); // Impede que o clique suba para a linha (onRowClick)
+            // Aqui você pode adicionar a lógica de edição, ex: onEdit(item)
+            alert('Editar acionado!'); 
+          }}
+          style={{ fontSize: "small", background: "black", border: "none", cursor: "pointer" }}
+        >
+          ✏️
+        </button>
+      ),
+    },
+  ], []); // Dependências do useMemo
+
+  // 3. Define a variante, se necessário
+  const variant = 'striped'; // Exemplo de variante, pode ser 'default', 'compact', etc.
+
   return (
     <>
       <TableHeader />
 
-      <table className="product-table">
-        <thead>
-          <tr>
-            <th colSpan={2} style={{ width: "6%" }}>Número</th>
-            <th style={{ width: "25%" }}>Nome do Produto</th>
+      <Table<ProductWithIndex>
+        data={dataWithIndex} // Passa os dados com o índice
+        columns={productColumns} // Passa as colunas definidas
+        caption="Lista de Produtos"
+        variant={variant}
+        onRowClick={onSelectProduct} // Adiciona a função de clique na linha
+      />
 
-            <th style={{ width: "6%" }}>SKU</th>
-            <th style={{ width: "7%" }}>Categoria</th>
-            <th style={{ width: "9%" }}>sub-Categoria</th>
-            <th style={{ width: "4%" }}>Estoque</th>
-            <th style={{ width: "8%" }}>Status</th>
-            <th style={{ width: "8%" }}>Preço de Venda</th>
-            <th style={{ width: "8%" }}>Fornecedor</th>
-
-            <th style={{ width: "5%" }}>Editar</th>
-          </tr>
-        </thead>
-        <tbody>
-          {products.map((product, index) => (
-            <tr key={product.id}
-            onClick={() => onSelectProduct(product)}>
-              <td> &#9634;</td>
-              <td> {index + 1}</td>
-
-              <td>{product.name}</td>
-              {/* <td><img src={product.pictureUrl} alt={product.name} style={{ width: '50px' }} /></td> */}
-              <td>{product.sku}</td>
-              <td>{product.category}</td>
-              <td>{product.category}</td>
-              <td>{product.stock}</td>
-              <td>
-                {" "}
-                <span>{product.status}</span>
-              </td>
-              <td>R$ {product.price.toFixed(2)}</td>
-              <td>SOLAI</td>
-              <td>
-                <button
-                  className="icon-button"
-                  style={{ fontSize: "small", background: "black" }}
-                >
-                  ✏️
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-     <TableHeader />
+      {/* A tabela HTML estática foi removida para usar o componente <Table />.
+        Se você precisar de TableHeader na parte inferior, ele está aqui:
+      */}
+      <TableHeader /> 
     </>
   );
 };

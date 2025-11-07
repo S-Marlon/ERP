@@ -27,11 +27,15 @@
 /* ---------------------------------- */
 .custom-table.variant-striped tbody tr:nth-child(odd) {
     background-color: #f7f7f7; /* Cinza claro nas linhas ímpares */
+    color: black;
+
 }
 
 /* Mantém o fundo da linha par como branco (ou transparente) */
 .custom-table.variant-striped tbody tr:nth-child(even) {
     background-color: white;
+    color: black;
+
 }
 
 
