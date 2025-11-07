@@ -1,4 +1,4 @@
-// BuscaPoco.tsx (Corrigido)
+// BuscaPoco.tsx (Final Integrado)
 import React from 'react';
 
 // Importa o componente genérico e seus tipos
@@ -12,33 +12,40 @@ import ResultItem from '../../ui/ResultItem';
 import Badge from '../../ui/Badge/Badge';
 import Fieldset from '../../ui/Fieldset/Fieldset';
 
-// 🚨 IMPORTAÇÃO DO MOCK CENTRALIZADO
-import { POCOS_MOCK, PocoMock } from '../../../data/entities/clients';
+const API_URL = 'http://localhost:3001';
 
-// ----------------- 1. TIPOS ESPECÍFICOS DE POÇO -----------------
+// ----------------- 1. TIPOS ESPECÍFICOS DE POÇO (Refletindo o DB e JOINs) -----------------
 
-type PocoUso = 'Industrial' | 'Residencial' | 'Irrigação';
-type PocoStatus = 'Operacional' | 'Manutenção' | 'Inativo';
+// Tipos de UI mantidos, assumindo que serão mapeados pelo backend
+type PocoUso = 'Industrial' | 'Residencial' | 'Irrigação' | string;
+type PocoStatus = 'Operacional' | 'Manutenção' | 'Inativo' | string;
 type PocoTypeFilter = PocoUso | 'TODOS';
 
-// 🚨 Usando 'export' aqui para que o ObrasModule possa importar
+/**
+ * Estrutura do Poço Retornado da API. 
+ * Combina campos do DB (`pocos`) com campos obtidos por JOIN/Simulação (`nome_cliente`, `codigo`, etc.).
+ */
 export interface Poco {
-    id: string; 
-    codigo: string;
+    id_poco: number; 
+    fk_cliente: number; 
+    fk_contrato: number; // Adicionada a chave de contrato, essencial para a busca
+    nome_cliente: string; // Vem do JOIN
+    
+    // Campos que o backend irá simular no SELECT (baseado na estrutura do DB)
+    codigo: string; 
     localizacao: string;
-    vazao: number;
-    uso: PocoUso;
+    vazao_max: number; 
+    uso: PocoUso; 
     status: PocoStatus;
-    fk_cliente_id: number;
 }
+// Chaves de Busca ajustadas para usar as FKs numéricas
+type PocoSearchKey = 'fk_contrato' | 'fk_cliente'; 
 
-type PocoSearchKey = 'codigo' | 'localizacao' | 'fk_cliente_id' | 'status';
 
-
-// ----------------- 2. FUNÇÕES AUXILIARES E DE BUSCA (Mantidas) -----------------
+// ----------------- 2. FUNÇÕES AUXILIARES E DE BUSCA -----------------
 
 /**
- * Função auxiliar para mapeamento de cores (getStatusColor - Mantida).
+ * Função auxiliar para mapeamento de cores.
  */
 const getStatusColor = (status: Poco['status']): 'success' | 'warning' | 'danger' | 'default' => {
     switch (status) {
@@ -50,72 +57,44 @@ const getStatusColor = (status: Poco['status']): 'success' | 'warning' | 'danger
 }
 
 /**
- * Função de Adaptação e Busca (fetchPocos - Mantida).
+ * Função de Adaptação e Busca (fetchPocos) - Mantém a lógica de API
  */
-const fetchPocos = async (query: string, tab: PocoSearchKey, typeFilter: PocoTypeFilter): Promise<Poco[]> => {
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            // ... (Lógica de adaptação e filtragem mantida)
-            const allData: Poco[] = POCOS_MOCK.map((pocoMock, index) => {
-                const usoSimulado: PocoUso = pocoMock.nomeIdentificacao.includes('Fazenda')
-                    ? 'Irrigação'
-                    : pocoMock.nomeIdentificacao.includes('Secundário')
-                    ? 'Industrial'
-                    : 'Residencial';
+const fetchPocos = async (
+    query: string, 
+    tab: PocoSearchKey, 
+    typeFilter: PocoTypeFilter
+): Promise<Poco[]> => {
+    if (!query && typeFilter === 'TODOS') {
+        return [];
+    }
 
-                const statusSimulado: PocoStatus = pocoMock.contratoId ? 'Operacional' : 'Inativo';
-                
-                return {
-                    id: pocoMock.id,
-                    codigo: pocoMock.nomeIdentificacao.split(' - ')[0] || pocoMock.nomeIdentificacao,
-                    localizacao: pocoMock.nomeIdentificacao.split(' - ')[1] || 'Localização Indefinida',
-                    vazao: pocoMock.vazao ?? 0,
-                    fk_cliente_id: Number(pocoMock.clienteId?.replace(/\D/g, '') ?? index + 1), // Transforma 'cli-001' em 1
-                    uso: usoSimulado,
-                    status: statusSimulado,
-                } as Poco; 
-            });
+    const tipo = typeFilter === 'TODOS' ? '' : typeFilter;
 
-            const lowerQuery = query.toLowerCase().replace(/[^a-z0-9]/g, '');
-
-            const filteredData = allData.filter(poco => {
-                // Filtro 1: Tipo de Uso
-                if (typeFilter !== 'TODOS' && poco.uso !== typeFilter) {
-                    return false;
-                }
-
-                // Filtro 2: Termo de Busca
-                if (!query) return true;
-
-                let valueToSearch: string | number;
-
-                if (tab === 'fk_cliente_id') {
-                    valueToSearch = String(poco.fk_cliente_id);
-                } else if (tab === 'status') {
-                    valueToSearch = poco.status;
-                    return valueToSearch.toLowerCase().includes(query.toLowerCase());
-                } else {
-                    valueToSearch = (poco as any)[tab];
-                }
-
-                if (typeof valueToSearch === 'string' || typeof valueToSearch === 'number') {
-                    const stringValue = String(valueToSearch);
-                    const cleanedValue = stringValue.toLowerCase().replace(/[^a-z0-9]/g, '');
-                    return cleanedValue.includes(lowerQuery);
-                }
-                return false;
-            });
-
-            resolve(filteredData);
-        }, 300);
+    const searchParams = new URLSearchParams({
+        query: query,
+        searchKey: tab,
+        typeFilter: tipo
     });
+
+    try {
+        const response = await fetch(`${API_URL}/pocos/search?${searchParams.toString()}`);
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: 'Erro desconhecido.' }));
+            throw new Error(errorData.message || 'Falha ao buscar poços na API.');
+        }
+        const result = await response.json();
+        // Assume que o backend retorna os dados com a estrutura Poco
+        return result.data as Poco[];
+    } catch (error) {
+        console.error("Erro na busca de poços:", (error as Error).message);
+        return [];
+    }
 };
 
 
-// ----------------- 3. RENDERIZAÇÕES ESPECÍFICAS (Mantidas) -----------------
+// ----------------- 3. RENDERIZAÇÕES ESPECÍFICAS (Ajustadas para a tipagem final) -----------------
 
 const renderSelectedPoco = (poco: Poco, handleClear: () => void, isLoading: boolean) => (
-    // ... (Markup mantido)
     <FlexGridContainer layout='flex' template='column'>
         <FlexGridContainer layout='flex' justifyContent='space-between' alignItems='flex-start' >
             <Fieldset legend={`Poço Selecionado (${poco.uso}):`} variant='basic'>
@@ -130,23 +109,23 @@ const renderSelectedPoco = (poco: Poco, handleClear: () => void, isLoading: bool
             <Fieldset legend='Localização' variant='basic'>
                 <Typography variant="strong"> {poco.localizacao}</Typography>
             </Fieldset>
-            <Fieldset legend='Vazão (m³/h)' variant='basic'>
-                <Typography variant="strong">{poco.vazao.toFixed(1)}</Typography>
+            <Fieldset legend='Vazão Máx. (m³/h)' variant='basic'>
+                <Typography variant="strong"></Typography>
             </Fieldset>
             <Fieldset legend='Status' variant='basic'>
                 <Badge color={getStatusColor(poco.status)}><Typography variant='strong'>{poco.status}</Typography></Badge>
             </Fieldset>
         </FlexGridContainer>
-        <Fieldset legend='Cliente Proprietário ID' variant='basic' style={{marginTop: '10px'}}>
-            <Typography variant="small">ID: {poco.fk_cliente_id}</Typography>
+        <Fieldset legend='Cliente Proprietário' variant='basic' style={{marginTop: '10px'}}>
+            {/* Exibe o nome do cliente obtido via JOIN */}
+            <Typography variant="small">**{poco.nome_cliente}** (ID Cliente: {poco.fk_cliente} | ID Contrato: {poco.fk_contrato})</Typography> 
         </Fieldset>
     </FlexGridContainer>
 );
 
 const renderPocoResult = (poco: Poco, isSelected: boolean, handleSelect: (p: Poco) => void) => (
-    // ... (Markup mantido)
     <ResultItem
-        key={poco.id}
+        key={poco.id_poco}
         onClick={() => handleSelect(poco)}
         selected={isSelected}
     >
@@ -156,27 +135,26 @@ const renderPocoResult = (poco: Poco, isSelected: boolean, handleSelect: (p: Poc
         </div>
         <FlexGridContainer layout='flex' justifyContent="space-between" style={{ marginTop: '5px' }}>
             <Typography variant="small">Uso: {poco.uso}</Typography>
-            <Typography variant="small">Vazão: {poco.vazao.toFixed(1)} m³/h</Typography>
-            <Typography variant="small">Cliente ID: {poco.fk_cliente_id}</Typography>
+            <Typography variant="small">Vazão:  m³/h</Typography>
+            {/* Exibe o nome do cliente na lista de resultados */}
+            <Typography variant="small">Cliente: {poco.nome_cliente}</Typography> 
         </FlexGridContainer>
     </ResultItem>
 );
 
 
-// ----------------- 4. COMPONENTE WRAPPER PRINCIPAL (CORRIGIDO) -----------------
+// ----------------- 4. COMPONENTE WRAPPER PRINCIPAL -----------------
 
-// Definições fixas e específicas da entidade Poço (MOVIDAS PARA FORA)
 const defaultPocoProps = {
     title: "**Busca de Poço**",
     newEntityLink: "/pocos/novo",
     newEntityLabel: "Novo Poço",
     defaultTypeFilter: 'TODOS' as PocoTypeFilter,
     
+    // Chaves de busca ajustadas para as FKs numéricas do DB
     tabLabels: {
-        codigo: 'Código',
-        localizacao: 'Localização',
-        fk_cliente_id: 'ID Cliente',
-        status: 'Status',
+        fk_contrato: 'ID Contrato', 
+        fk_cliente: 'ID Cliente',
     } as Record<PocoSearchKey, string>,
 
     typeFilterOptions: [
@@ -187,11 +165,10 @@ const defaultPocoProps = {
     ] as { key: PocoTypeFilter, label: string }[],
     
     fetchEntities: fetchPocos,
-    renderSelectedEntity: renderSelectedPoco,
+    renderSelectedEntity: renderSelectedPoco, 
     renderResultItem: renderPocoResult,
 };
 
-// Define as props que o componente PocoSelect VAI RECEBER (Omitindo as que são padrão)
 type PocoSelectProps = Omit<
     EntitySelectProps<Poco, PocoSearchKey, PocoTypeFilter>, 
     keyof typeof defaultPocoProps
@@ -199,7 +176,6 @@ type PocoSelectProps = Omit<
 
 
 const PocoSelect: React.FC<PocoSelectProps> = (props) => {
-    // Passa as props padrões (defaultPocoProps) e as props dinâmicas (props)
     return <EntitySelectTabs {...defaultPocoProps} {...props} />;
 };
 

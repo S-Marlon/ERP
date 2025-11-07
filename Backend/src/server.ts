@@ -289,95 +289,272 @@ app.post('/clientes', async (req: Request<{}, {}, ClientePayload>, res: Response
     }
 });
 
+app.get('/clientes/search', async (req: Request, res: Response) => {
+    // Captura os parâmetros de busca
+    const { query, searchKey, typeFilter } = req.query;
+
+    if (!query && typeFilter === 'AMBOS') {
+        // Se não houver filtro, retorna a lista completa (ou com limite)
+        return res.status(400).json({ status: 'Error', message: 'É necessário informar um termo de busca ou um filtro de tipo de cliente diferente de AMBOS.' });
+    }
+
+    let sqlBase = `
+        SELECT 
+            c.id_cliente, c.nome, c.cpf_cnpj, c.tipo_cliente, c.data_nascimento,
+            c.fk_endereco_principal, ec.cep, ec.logradouro, ec.cidade, ec.estado,
+            (SELECT COUNT(*) FROM contratos WHERE fk_cliente = c.id_cliente) AS num_contratos
+        FROM clientes c
+        LEFT JOIN enderecos_cliente ec ON c.fk_endereco_principal = ec.id_endereco
+    `;
+    
+    let whereClauses: string[] = [];
+    let params: (string | number)[] = [];
+
+    // 1. Filtro por Tipo (PF ou PJ)
+    if (typeFilter && typeFilter !== 'AMBOS') {
+        whereClauses.push(`c.tipo_cliente = ?`);
+        params.push(String(typeFilter));
+    }
+
+    // 2. Filtro por Termo de Busca (nome, documento, etc.)
+    if (query && searchKey) {
+        const term = `%${String(query).replace(/\D/g, '')}%`; // Limpa para documentos
+        const likeTerm = `%${String(query)}%`;
+
+        switch (searchKey) {
+            case 'nome':
+                whereClauses.push(`c.nome LIKE ?`);
+                params.push(likeTerm);
+                break;
+            case 'documento':
+                whereClauses.push(`c.cpf_cnpj LIKE ?`);
+                params.push(term);
+                break;
+            case 'cep':
+                whereClauses.push(`ec.cep LIKE ?`);
+                params.push(term);
+                break;
+            // Para 'email' e 'telefone', precisaríamos de um JOIN com a tabela 'contatos'
+            // Omitido aqui por brevidade e complexidade de JOIN.
+            default:
+                // Se a chave não for suportada na API, apenas ignora o filtro de query
+                break;
+        }
+    }
+    
+    // Constrói a query final
+    if (whereClauses.length > 0) {
+        sqlBase += ' WHERE ' + whereClauses.join(' AND ');
+    }
+    
+    sqlBase += ' LIMIT 50;'; // Limita resultados para performance
+
+    try {
+        const [rows] = await pool.execute(sqlBase, params);
+
+        res.status(200).json({
+            status: 'OK',
+            message: 'Clientes encontrados.',
+            data: rows
+        });
+
+    } catch (error) {
+        console.error('Erro ao buscar clientes:', error);
+        res.status(500).json({ 
+            status: 'Error', 
+            message: 'Falha ao executar a busca no banco de dados.'
+        });
+    }
+});
+
+
+app.get('/contratos/search', async (req: Request, res: Response) => {
+    // 🚨 Captura o typeFilter
+    const { query, searchKey, typeFilter } = req.query; 
+
+    if (!query && typeFilter === 'TODOS') {
+        return res.status(400).json({ status: 'Error', message: 'É necessário informar um termo de busca ou um filtro de tipo diferente de TODOS.' });
+    }
+
+    let sqlBase = `
+        SELECT 
+            co.id_contrato, co.fk_cliente, co.codigo_contrato, co.data_inicio, 
+            co.descricao, co.valor_total, co.data_termino,
+            c.nome AS nome_cliente,
+            
+            -- SIMULAÇÃO DO STATUS (Mantida)
+            CASE
+                WHEN co.data_termino < CURDATE() THEN 'Concluido'
+                WHEN co.data_inicio > CURDATE() THEN 'Pendente'
+                ELSE 'Ativo'
+            END AS status,
+            
+            -- 🚨 SIMULAÇÃO DO TIPO (NOVO CAMPO)
+            -- Simula o tipo baseado no ID do contrato (Ex: ímpar=Serviço, par=Obra, múltiplo de 3=Fornecimento)
+            CASE
+                WHEN co.id_contrato % 3 = 0 THEN 'Serviço'
+                WHEN co.id_contrato % 3 = 1 THEN 'Obra'
+                ELSE 'Fornecimento'
+            END AS tipo
+
+        FROM contratos co
+        JOIN clientes c ON co.fk_cliente = c.id_cliente
+    `;
+    
+    let whereClauses: string[] = [];
+    let params: (string | number)[] = [];
+
+    // 1. 🚨 FILTRO POR TIPO DE CONTRATO
+    if (typeFilter && typeFilter !== 'TODOS') {
+        // Para filtrar na simulação, repetimos a lógica CASE WHEN dentro da cláusula WHERE
+        const typeFilterString = String(typeFilter);
+        
+        // Esta abordagem é complexa. O ideal seria uma coluna 'tipo' no DB.
+        // Usaremos uma cláusula WHERE que se baseia na nossa simulação:
+        let typeCondition = '';
+        if (typeFilterString === 'Serviço') {
+            typeCondition = 'co.id_contrato % 3 = 0';
+        } else if (typeFilterString === 'Obra') {
+            typeCondition = 'co.id_contrato % 3 = 1';
+        } else if (typeFilterString === 'Fornecimento') {
+            typeCondition = 'co.id_contrato % 3 <> 0 AND co.id_contrato % 3 <> 1';
+        }
+
+        if (typeCondition) {
+            whereClauses.push(typeCondition);
+        }
+    }
+
+
+    // 2. Filtro por Termo de Busca e Chave (Mantido)
+    if (query && searchKey) {
+        const likeTerm = `%${String(query)}%`;
+        const numericQuery = parseInt(String(query).replace(/\D/g, ''), 10);
+
+        switch (searchKey) {
+            case 'codigo_contrato':
+                whereClauses.push(`co.codigo_contrato LIKE ?`);
+                params.push(likeTerm);
+                break;
+            case 'descricao':
+                whereClauses.push(`co.descricao LIKE ?`);
+                params.push(likeTerm);
+                break;
+            case 'fk_cliente':
+                if (!isNaN(numericQuery) && numericQuery > 0) {
+                    whereClauses.push(`co.fk_cliente = ?`);
+                    params.push(numericQuery);
+                } else {
+                    return res.status(400).json({ status: 'Error', message: 'ID de Cliente inválido.' });
+                }
+                break;
+        }
+    }
+    
+    // Constrói a query final
+    if (whereClauses.length > 0) {
+        sqlBase += ' WHERE ' + whereClauses.join(' AND ');
+    }
+    
+    sqlBase += ' LIMIT 50;'; 
+
+    try {
+        const [rows] = await pool.execute(sqlBase, params);
+
+        res.status(200).json({
+            status: 'OK',
+            message: 'Contratos encontrados.',
+            data: rows
+        });
+
+    } catch (error) {
+        console.error('Erro ao buscar contratos:', error);
+        res.status(500).json({ 
+            status: 'Error', 
+            message: 'Falha ao executar a busca de contratos no banco de dados.',
+            details: (error instanceof Error ? error.message : 'Erro desconhecido.')
+        });
+    }
+});
+
+app.get('/pocos/search', async (req: Request, res: Response) => {
+    const { query, searchKey, typeFilter } = req.query;
+
+    if (!query && typeFilter === 'TODOS') {
+        return res.status(400).json({ status: 'Error', message: 'É necessário informar um termo de busca ou um filtro de uso diferente de TODOS.' });
+    }
+
+    // Corrigido: Usando CONCAT() para concatenação e removendo os comentários
+    let sqlBase = `
+        SELECT 
+            p.id_poco, p.fk_cliente, p.fk_contrato, p.profundidade_atual, 
+            c.nome AS nome_cliente,
+            
+            -- CAMPOS SIMULADOS PARA ATENDER O FRONTEND:
+            CONCAT('P-', p.id_poco) AS codigo, 
+            CONCAT('Localizacao N/D (ID ', p.fk_local, ')') AS localizacao,
+            15.5 AS vazao_max, -- Valor fixo temporário
+            'Industrial' AS uso, -- Valor fixo temporário
+            'Operacional' AS status -- Valor fixo temporário
+
+        FROM pocos p
+        JOIN clientes c ON p.fk_cliente = c.id_cliente
+    `;
+    
+    let whereClauses: string[] = [];
+    let params: (string | number)[] = [];
+
+    const queryValue = String(query).replace(/\D/g, ''); 
+    const numericQuery = parseInt(queryValue, 10);
+
+    // ... (Filtro por Tipo de Uso — Mantido, mas inativo sem a tabela 'uso')
+
+    // 2. Filtro por Termo de Busca e Chave
+    if (query && searchKey && !isNaN(numericQuery) && numericQuery > 0) {
+        switch (searchKey) {
+            case 'fk_contrato':
+                whereClauses.push(`p.fk_contrato = ?`);
+                params.push(numericQuery);
+                break;
+            case 'fk_cliente':
+                whereClauses.push(`p.fk_cliente = ?`);
+                params.push(numericQuery);
+                break;
+            default:
+                whereClauses.push(`p.fk_contrato = ?`);
+                params.push(numericQuery);
+                break;
+        }
+    } else if (query) {
+        return res.status(400).json({ status: 'Error', message: `O filtro '${searchKey}' requer um valor numérico para busca.` });
+    }
+    
+    // Constrói a query final
+    if (whereClauses.length > 0) {
+        sqlBase += ' WHERE ' + whereClauses.join(' AND ');
+    }
+    
+    sqlBase += ' LIMIT 50;'; 
+
+    try {
+        const [rows] = await pool.execute(sqlBase, params);
+
+        res.status(200).json({
+            status: 'OK',
+            message: 'Poços encontrados.',
+            data: rows
+        });
+
+    } catch (error) {
+        console.error('Erro ao buscar poços:', error);
+        res.status(500).json({ 
+            status: 'Error', 
+            message: 'Falha ao executar a busca de poços no banco de dados.',
+            details: (error instanceof Error ? error.message : 'Erro desconhecido.')
+        });
+    }
+});
 
 app.listen(PORT, () => {
     console.log(`Servidor rodando em http://localhost:${PORT}`);
 });
-
-
-
-// -- Variável para armazenar o ID do usuário que está fazendo a ação (Assumimos que '1' já existe)
-// SET @USUARIO_CRIADOR_ID = 1; 
-
-// -- 1. INSERIR O ENDEREÇO PRINCIPAL
-// -- O SGBD gerará o ID do endereço (id_endereco).
-// INSERT INTO enderecos_cliente (
-//     fk_cliente, -- O valor será NULL ou um placeholder temporário se o SGBD permitir
-//                 -- Visto que a coluna é NOT NULL, precisaremos de um valor temporário, 
-//                 -- ou usar a abordagem 1.B (abaixo)
-//     tipo_endereco,
-//     cep,
-//     logradouro,
-//     numero,
-//     complemento,
-//     bairro,
-//     cidade,
-//     estado,
-//     is_principal
-// ) VALUES (
-//     0, -- VALOR TEMPORÁRIO, será atualizado no passo 3
-//     'Residencial',
-//     '12345-000',
-//     'Rua das Águas Claras',
-//     '456',
-//     'Apto 101',
-//     'Centro',
-//     'São Paulo',
-//     'SP',
-//     TRUE
-// );
-
-// -- Captura o ID do endereço que acabou de ser criado (depende do SGBD)
-// SET @ENDERECO_PRINCIPAL_ID = LAST_INSERT_ID();
-
-
-// -- 2. INSERIR O CLIENTE, REFERENCIANDO O ENDEREÇO E O USUÁRIO CRIADOR
-// -- O SGBD gerará o ID do cliente (id_cliente).
-// INSERT INTO clientes (
-//     nome,
-//     cpf_cnpj,
-//     tipo_cliente,
-//     data_nascimento,
-//     fk_endereco_principal, -- Referencia o ID do endereço criado no passo 1
-//     fk_criado_por
-// ) VALUES (
-//     'João da Silva e Filhos Ltda.',
-//     '12.345.678/0001-90',
-//     'PJ',
-//     NULL, -- Pessoa Jurídica não tem data de nascimento
-//     @ENDERECO_PRINCIPAL_ID,
-//     @USUARIO_CRIADOR_ID
-// );
-
-// -- Captura o ID do cliente que acabou de ser criado (depende do SGBD)
-// SET @CLIENTE_ID = LAST_INSERT_ID();
-
-
-// -- 3. AJUSTAR A FK DO ENDEREÇO PRINCIPAL (Passo de Integridade Crítico)
-// -- Atualiza a FK na tabela 'enderecos_cliente' para referenciar o ID do cliente que acabamos de criar.
-// -- Isso é necessário porque `fk_cliente` em `enderecos_cliente` é NOT NULL, mas não 
-// -- conhecíamos o `id_cliente` no Passo 1.
-// UPDATE enderecos_cliente
-// SET fk_cliente = @CLIENTE_ID
-// WHERE id_endereco = @ENDERECO_PRINCIPAL_ID;
-
-
-// -- 4. INSERIR UM CONTATO PRINCIPAL (Opcional, mas recomendado)
-// INSERT INTO contatos (
-//     fk_cliente,
-//     fk_tipo_contato, -- Assumindo que '1' é o ID para 'Email' (Você deve buscar isso na look-up table)
-//     valor,
-//     nome_contato,
-//     is_principal
-// ) VALUES (
-//     @CLIENTE_ID,
-//     1, 
-//     'contato@joaosilva.com.br',
-//     'E-mail Principal',
-//     TRUE
-// );
-
-// -- FIM DA TRANSAÇÃO (Idealmente, tudo isso estaria dentro de uma TRANSAÇÃO)
-// COMMIT;
-
-// SELECT 'Cliente e Endereço inseridos com sucesso!';

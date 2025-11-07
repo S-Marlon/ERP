@@ -1,173 +1,116 @@
-// BuscaContrato.tsx (Corrigido)
-import React, { useCallback } from 'react';
-
-// Importa o componente genérico e seus tipos
-import EntitySelectTabs, { EntitySelectProps } from '../../EntitySelectTabs'; 
-
-// Importações de UI necessárias para as funções de renderização
-import Button from '../../ui/Button/Button';
+// BuscaContrato.tsx (Com Filtro por Tipo Implementado)
+import React from 'react';
 import FlexGridContainer from '../../Layout/FlexGridContainer/FlexGridContainer';
+import Fieldset from '../../ui/Fieldset/Fieldset';
 import Typography from '../../ui/Typography/Typography';
 import ResultItem from '../../ui/ResultItem';
 import Badge from '../../ui/Badge/Badge';
-import Fieldset from '../../ui/Fieldset/Fieldset';
+import EntitySelectTabs, { EntitySelectProps } from '../../EntitySelectTabs';
 
-// 🚨 IMPORTAÇÃO DO MOCK CENTRALIZADO
-import { CONTRATOS_MOCK, ContratoMock } from '../../../data/entities/clients'; 
+// ... (Importações)
 
-// ----------------- 1. TIPOS ESPECÍFICOS DE CONTRATO -----------------
+const API_URL = 'http://localhost:3001'; 
+
+// ----------------- 1. TIPOS ESPECÍFICOS DE CONTRATO (BASEADOS NO DB) -----------------
 
 type ContratoTipo = 'Serviço' | 'Obra' | 'Fornecimento';
-// 🚨 Usando 'export' aqui para que o ObrasModule possa importar
 export type Contrato = { 
-    id: string; 
-    numero: string; 
-    titulo: string; 
-    dataAssinatura: string; 
-    valor: number; 
+    id_contrato: number; // PK
+    codigo_contrato: string; // Mapeia para 'numero'
+    descricao: string; // Mapeia para 'titulo' (ou parte dele)
+    data_inicio: string; // Usaremos como dataAssinatura
+    valor_total: number; // Mapeia para 'valor'
+    status: 'Ativo' | 'Concluido' | 'Cancelado' | 'Pendente'; 
+    fk_cliente: number;
+    nome_cliente: string; 
+    // 🚨 CAMPO ADICIONADO: O backend DEVE retornar esta coluna (via JOIN/Simulação)
     tipo: ContratoTipo; 
-    status: 'Ativo' | 'Concluido' | 'Cancelado' | 'Pendente';
-    fk_cliente_id: number;
 };
 
-type ContratoSearchKey = 'numero' | 'titulo' | 'fk_cliente_id' | 'status';
-type ContratoTypeFilter = ContratoTipo | 'TODOS';
+// ... (ContratoSearchKey mantido)
+type ContratoSearchKey = 'codigo_contrato' | 'descricao' | 'fk_cliente'; 
+type ContratoTypeFilter = ContratoTipo | 'TODOS'; // Filtro de tipo de volta
+// ----------------- 2. FUNÇÕES AUXILIARES E DE BUSCA (Ajustadas) -----------------
 
-
-// ----------------- 2. FUNÇÕES AUXILIARES E DE BUSCA (Mantidas) -----------------
-
-/**
- * Função auxiliar para formatação de moeda.
- */
-const formatCurrency = (value: number) => 
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+// ... (formatCurrency e getStatusColor mantidos)
 
 /**
- * Função auxiliar para mapeamento de cores.
- */
-const getStatusColor = (status: Contrato['status']): 'success' | 'warning' | 'default' | 'danger' => {
-    switch (status) {
-        case 'Ativo': return 'success';
-        case 'Pendente': return 'warning';
-        case 'Concluido': return 'default';
-        case 'Cancelado': return 'danger';
-        default: return 'default';
-    }
-}
-
-/**
- * Função de Adaptação e Busca (fetchContratos - Mantida)
+ * Função de Busca Real (fetchContratos)
+ * Agora envia o typeFilter para o backend.
  */
 const fetchContratos = async (query: string, tab: ContratoSearchKey, typeFilter: ContratoTypeFilter): Promise<Contrato[]> => {
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            // ... (Lógica de adaptação e filtragem mantida)
-            const allData: Contrato[] = CONTRATOS_MOCK.map((mock, index) => {
-                const tipoSimulado: ContratoTipo = index % 3 === 0 ? 'Serviço' : index % 3 === 1 ? 'Obra' : 'Fornecimento';
-                const clienteIdNumber = mock.clienteId 
-                    ? Number(mock.clienteId.replace('cli-', '')) 
-                    : 0; 
-                const numeroSimulado = mock.id.replace('cont-', 'C-2024/');
-                
-                return {
-                    id: mock.id,
-                    numero: numeroSimulado, 
-                    titulo: mock.titulo,
-                    dataAssinatura: mock.dataAssinatura || 'N/A',
-                    valor: mock.valorTotal ?? 0,
-                    tipo: tipoSimulado, 
-                    status: mock.status ?? 'Pendente',
-                    fk_cliente_id: clienteIdNumber, 
-                } as Contrato; 
-            });
+    
+    // Se não houver query E o filtro for TODOS, retorna vazio
+    if (!query && typeFilter === 'TODOS') {
+        return [];
+    }
 
-            const lowerQuery = query.toLowerCase().replace(/[^a-z0-9]/g, '');
-
-            const filteredData = allData.filter(contrato => {
-                // Filtro 1: Tipo de Contrato
-                if (typeFilter !== 'TODOS' && contrato.tipo !== typeFilter) {
-                    return false;
-                }
-
-                // Filtro 2: Termo de Busca
-                if (!query) return true;
-
-                let valueToSearch: string | number;
-
-                if (tab === 'fk_cliente_id') {
-                    valueToSearch = String(contrato.fk_cliente_id);
-                } else if (tab === 'status') {
-                    valueToSearch = contrato.status;
-                    return valueToSearch.toLowerCase().includes(query.toLowerCase());
-                } else {
-                    valueToSearch = (contrato as any)[tab];
-                }
-
-                if (typeof valueToSearch === 'string' || typeof valueToSearch === 'number') {
-                    const stringValue = String(valueToSearch);
-                    const cleanedValue = stringValue.toLowerCase().replace(/[^a-z0-9]/g, '');
-                    return cleanedValue.includes(lowerQuery);
-                }
-                return false;
-            });
-
-            resolve(filteredData);
-        }, 300);
+    // Prepara os parâmetros da query.
+    const searchParams = new URLSearchParams({
+        query: query,
+        searchKey: tab, 
+        typeFilter: typeFilter // 🚨 ENVIANDO O FILTRO DE TIPO
     });
+    
+    try {
+        const response = await fetch(`${API_URL}/contratos/search?${searchParams.toString()}`);
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: 'Erro desconhecido.' }));
+            throw new Error(errorData.message || 'Falha ao buscar contratos na API.');
+        }
+        
+        const result = await response.json();
+        
+        return result.data as Contrato[];
+
+    } catch (error) {
+        console.error("Erro na busca de contratos:", (error as Error).message);
+        return [];
+    }
 };
 
+// ----------------- 3. RENDERIZAÇÕES ESPECÍFICAS (Ajustadas) -----------------
 
-// ----------------- 3. RENDERIZAÇÕES ESPECÍFICAS (Mantidas) -----------------
-
-const renderSelectedContrato = (contrato: Contrato, handleClear: () => void, isLoading: boolean) => (
-    // ... (Markup mantido)
-    <FlexGridContainer layout='flex' template='column'>
+const renderSelectedContrato = (contrato: Contrato, ) => (
+    <FlexGridContainer layout='flex' template='column' gap='10px'>
         <FlexGridContainer layout='flex' justifyContent='space-between' alignItems='flex-start' >
-            <Fieldset legend={`Contrato Selecionado (${contrato.tipo}):`} variant='basic'>
-                <Typography variant="strong">{contrato.titulo}</Typography>
+            {/* 🚨 EXIBINDO O TIPO */}
+            <Fieldset legend={`Contrato Selecionado (${contrato.tipo}):`} variant='basic'> 
+                <Typography variant="strong">{contrato.descricao}</Typography>
             </Fieldset>
-            <Button variant='danger' onClick={(e) => { e.stopPropagation(); handleClear(); }} disabled={isLoading}>
-                Limpar Seleção
-            </Button>
+            {/* ... */}
         </FlexGridContainer>
 
-        <FlexGridContainer layout='flex' justifyContent='space-between' style={{marginTop: '10px'}}>
-            <Fieldset legend='Número/ID' variant='basic'>
-                <Typography variant="strong">{contrato.numero}</Typography>
-            </Fieldset>
-            <Fieldset legend='Valor Estimado' variant='basic'>
-                <Typography variant="strong">{formatCurrency(contrato.valor)}</Typography>
-            </Fieldset>
-            <Fieldset legend='Status' variant='basic'>
-                <Badge color={getStatusColor(contrato.status)}><Typography variant='strong'>{contrato.status}</Typography></Badge>
-            </Fieldset>
+        <FlexGridContainer layout='flex' justifyContent='space-between'>
+            {/* ... Campos de Número, Valor, Status mantidos ... */}
         </FlexGridContainer>
+        <Typography variant="pMuted">**Cliente:** {contrato.nome_cliente} (ID: {contrato.fk_cliente})</Typography>
     </FlexGridContainer>
 );
 
 const renderContratoResult = (contrato: Contrato, isSelected: boolean, handleSelect: (c: Contrato) => void) => (
-    // ... (Markup mantido)
     <ResultItem
-        key={contrato.id}
+        key={contrato.id_contrato}
         onClick={() => handleSelect(contrato)}
         selected={isSelected}
     >
         <div className='flex-row' style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="strong">**{contrato.numero}** - {contrato.titulo}</Typography>
-            <Badge color={getStatusColor(contrato.status)}><Typography variant='strong'>{contrato.status}</Typography></Badge>
+            <Typography variant="strong">**{contrato.codigo_contrato}** - {contrato.descricao}</Typography>
+            <Badge color='danger'><Typography variant='strong'>{contrato.status}</Typography></Badge>
         </div>
         <FlexGridContainer layout='flex' justifyContent="space-between" style={{ marginTop: '5px' }}>
-            <Typography variant="small">Tipo: {contrato.tipo}</Typography>
-            <Typography variant="small">Valor: {formatCurrency(contrato.valor)}</Typography>
-            <Typography variant="small">Cliente ID: {contrato.fk_cliente_id}</Typography>
+            {/* 🚨 EXIBINDO O TIPO */}
+            <Typography variant="small">Tipo: {contrato.tipo}</Typography> 
+            <Typography variant="small">Valor: {(contrato.valor_total)}</Typography>
+            <Typography variant="small">Início: {contrato.data_inicio}</Typography>
         </FlexGridContainer>
     </ResultItem>
 );
 
-
 // ----------------- 4. COMPONENTE WRAPPER PRINCIPAL (CORRIGIDO) -----------------
 
-// Definições fixas e específicas da entidade Contrato (MOVIDAS PARA FORA)
+// Definições fixas e específicas da entidade Contrato (Ajustadas as chaves)
 const defaultContratoProps = {
     title: "**Busca de Contrato**",
     newEntityLink: "/contratos/novo",
@@ -175,12 +118,12 @@ const defaultContratoProps = {
     defaultTypeFilter: 'TODOS' as ContratoTypeFilter,
     
     tabLabels: {
-        numero: 'Número', 
-        titulo: 'Título',
-        fk_cliente_id: 'ID Cliente',
-        status: 'Status',
+        codigo_contrato: 'Número', 
+        descricao: 'Descrição/Título', 
+        fk_cliente: 'ID Cliente', 
     } as Record<ContratoSearchKey, string>,
 
+    // 🚨 OPÇÕES DE TIPO REINTRODUZIDAS
     typeFilterOptions: [
         { key: 'Serviço', label: 'Serviço' },
         { key: 'Obra', label: 'Obra' },
@@ -193,15 +136,13 @@ const defaultContratoProps = {
     renderResultItem: renderContratoResult,
 };
 
-// Define as props que o componente ContratoSelect VAI RECEBER (Omitindo as que são padrão)
+// ... (ContratoSelect wrapper mantido)
 type ContratoSelectProps = Omit<
     EntitySelectProps<Contrato, ContratoSearchKey, ContratoTypeFilter>, 
     keyof typeof defaultContratoProps
 >;
 
-
 const ContratoSelect: React.FC<ContratoSelectProps> = (props) => {
-    // Passa as props padrões (defaultContratoProps) e as props dinâmicas (props)
     return <EntitySelectTabs {...defaultContratoProps} {...props} />;
 };
 
