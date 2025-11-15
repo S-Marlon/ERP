@@ -10,6 +10,9 @@ import Button from '../../ui/Button/Button';
 import Typography from '../../ui/Typography/Typography';
 import ResultItem from '../../ui/ResultItem';
 import Badge from '../../ui/Badge/Badge';
+// Importações de tipos e constantes
+import { Cliente, ClienteSearchKey, ClienteTypeFilter, ClienteAPI } from '../../types/cliente';
+import { API_URL } from '../../constants/api';
 
 // Endpoint da sua API
 const API_URL = 'http://localhost:3001'; 
@@ -116,6 +119,7 @@ const renderSelectedCliente = (cliente: Cliente, handleClear: () => void, isLoad
 const renderClienteResult = (cliente: Cliente, isSelected: boolean, handleSelect: (c: Cliente) => void) => (
     <ResultItem
         key={cliente.id_cliente} // Usamos a PK do DB
+        key={cliente.id} // Usamos a PK do DB
         onClick={() => handleSelect(cliente)}
         selected={isSelected}
     >
@@ -172,6 +176,7 @@ type ClienteSelectProps = Omit<
 const ClienteSelect: React.FC<ClienteSelectProps> = (props) => {
     // Combina as default props e as props recebidas antes de passar para o EntitySelectTabs
     return <EntitySelectTabs {...defaultClientProps} {...props} />;;
+    return <EntitySelectTabs {...defaultClientProps} {...props} />;
 };
 
 export default ClienteSelect;

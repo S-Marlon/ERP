@@ -1,18 +1,23 @@
-// src/types/Cliente.ts (Novo arquivo ou ajustado)
+// src/types/cliente.ts
 
-/** Estrutura básica do Cliente que virá da sua API */
+/** * Estrutura do Cliente Retornado pela rota '/clientes/search'.
+ * Deve espelhar a estrutura do SELECT no backend (incluindo JOINs).
+ */
 export interface ClienteAPI {
-    id_cliente: number;
+    id: number; // Renomeado id_cliente para id para compatibilidade com EntitySelectTabs
     nome: string;
     cpf_cnpj: string;
-    tipo_cliente: 'PF' | 'PJ'; // Mapeia para ClienteTypeFilter
+    tipo_cliente: 'PF' | 'PJ'; // Corresponde ao ENUM do DB
     data_nascimento: string | null;
     fk_endereco_principal: number | null;
-    // Você precisará de rotas adicionais (ou um JOIN na API) para pegar contatos e endereços.
-    // Para simplificar a exibição:
-    contatos?: { tipo: 'Email' | 'Telefone', valor: string, nome: string }[];
-    enderecos?: { cep: string, logradouro: string, cidade: string, estado: string }[];
+    cep: string | null;
+    logradouro: string | null;
+    cidade: string | null;
+    estado: string | null;
+    num_contratos: number; // Campo agregado (COUNT)
 }
 
-// Tipo usado no Frontend para o componente (usa o tipo da API)
-type Cliente = ClienteAPI;
+// Tipo de Cliente usado no componente (pode ser um alias para ClienteAPI ou ter campos adicionais de UI)
+export type Cliente = ClienteAPI;
+export type ClienteSearchKey = 'nome' | 'documento' | 'cep'; // 'telefone' e 'email' requerem JOINs mais complexos
+export type ClienteTypeFilter = 'PF' | 'PJ' | 'AMBOS';
