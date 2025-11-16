@@ -3,21 +3,23 @@ import React from 'react';
 import Typography from '../../../components/ui/Typography/Typography';
 import Button from '../../../components/ui/Button/Button';
 
-const TableHeader: React.FC = () => {
+// 1. Define the props interface
 interface TableHeaderProps {
   productCount: number;
 }
 
+// 2. Define the functional component using the interface
+// The error-causing lines have been removed.
 const TableHeader: React.FC<TableHeaderProps> = ({ productCount }) => {
   return (
     <div className="table-header">
-      <Typography variant='h2Alt'>{99999} produtos encontrados</Typography>
+      {/* <Typography variant='h2Alt'>{99999} produtos encontrados</Typography> // Removed duplicate line */}
       <Typography variant='h2Alt'>{productCount} produtos encontrados</Typography>
       <div>
         {/* Lógica de Paginação */}
         <Button variant='warning'>Prev</Button>
         <Button variant='warning'>1</Button>
-        <Button variant='warning'><strong>2</strong></Button>
+        <Button variant='warning'>**2**</Button>
         <Button variant='warning'>3</Button>
         <Button variant='warning'>Post</Button>
       </div>
@@ -28,7 +30,7 @@ const TableHeader: React.FC<TableHeaderProps> = ({ productCount }) => {
         </section>
         <section>
           <Button variant='warning'>20</Button>
-         <Typography variant='h2Alt'> por página</Typography> 
+          <Typography variant='h2Alt'> por página</Typography> 
         </section>
       </div>
     </div>

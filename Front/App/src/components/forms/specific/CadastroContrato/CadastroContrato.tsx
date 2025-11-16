@@ -1,4 +1,4 @@
-import React, { useState, ChangeEvent, FormEvent } from 'react';
+import React, { useState, ChangeEvent, FormEvent, useCallback } from 'react';
 // Importação do seu componente Table e tipagem
 import Table from '../../../ui/Table/Table';
 import { TableColumn } from '../ui/Table.types'; 
@@ -8,7 +8,11 @@ import Typography from '../../../ui/Typography/Typography';
 import Card from '../../../ui/Card/Card';
 import { Link } from 'react-router-dom';
 import FlexGridContainer from '../../../Layout/FlexGridContainer/FlexGridContainer';
-import ClienteSelect from '../../search/BuscaCliente';
+import ClienteSelect, { ClienteAPI as Cliente }  from '../../search/BuscaCliente';
+import Badge from '../../../ui/Badge/Badge';
+import Modal from '../../../ui/Modal/modal';
+
+
 // Importação do tipo Cliente (presumindo que está em outro lugar ou no ClienteSelect)
 // type Cliente = any; 
 
@@ -93,12 +97,59 @@ const initialState: ContratoData = {
 // ----------------- COMPONENTE PRINCIPAL -----------------
 
 const CadastroContrato: React.FC = () => {
+     
+// --- HANDLERS de Modal (usamos useCallback para evitar warnings) ---
+    const handleOpenModal = useCallback(() => setIsModalOpen(true), []);
+    const handleCloseModal = useCallback(() => setIsModalOpen(false), []);
+    const handleOpenModal2 = useCallback(() => setIsModalOpen2(true), []);
+    const handleCloseModal2 = useCallback(() => setIsModalOpen2(false), []);
+    
+// ** NOVOS ESTADOS PARA OS IDS (CHAVES PRIMÁRIAS) **
+    const [clienteIdParaBackend, setClienteIdParaBackend] = useState<number | null>(null)
+    const [contratoIdParaBackend, setContratoIdParaBackend] = useState<string | null>(null);
+    const [pocoIdParaBackend, setPocoIdParaBackend] = useState<string | null>(null);
+
+
+    const [isModalOpen, setIsModalOpen] = useState(false); // Modal Cliente
+        const [contratoSelecionado, setContratoSelecionado] = useState<ContratoSimples | null>(null);
+    
     
     const [formData, setFormData] = useState<ContratoData>(initialState);
-    const [clienteSelecionado, setClienteSelecionado] = useState<any | null>(null); // Use 'Cliente' se estiver importado
-    const [isSaving, setIsSaving] = useState(false); 
+    const [pocoSelecionado, setPocoSelecionado] = useState<PocoSimples | null>(null); // Usando PocoSimples
+    const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
+    const [isSaving, setIsSaving] = useState(false); // Usado como loading externo
+    
 
+    const handleClienteChange = useCallback((cliente: Cliente | null) => {
+    setClienteSelecionado(cliente);
+
+    // tenta obter id em diferentes formatos (ajuste conforme seu objeto Cliente)
+    const id = cliente ? (cliente.id ?? cliente.id_cliente ?? cliente._id ?? null) : null;
+
+    // atualiza o id usado para chamadas ao backend
+    setClienteIdParaBackend(id ?? null);
+
+    // atualiza também o campo clienteId dentro do formData (para envio)
+    setFormData(prev => ({
+      ...prev,
+      clienteId: id ? String(id) : ''
+    }));
+
+    console.log(`✅ Cliente ID e Objeto atualizados: ${id}`);
+
+    if (!cliente) {
+      setContratoSelecionado(null);
+      setPocoSelecionado(null);
+    } else {
+      // limpa seleção anterior de contrato/poço quando troca o cliente
+      setContratoSelecionado(null);
+      setPocoSelecionado(null);
+      handleCloseModal();
+    }
+}, [handleCloseModal]); 
    
+      
+       
 
     // Calcula a soma dos subtotais dos itens
     const subtotalItens = formData.itensCombinados.reduce(
@@ -112,16 +163,6 @@ const CadastroContrato: React.FC = () => {
     const formatCurrency = (value: number) =>
         new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
-
-    // --- Handlers ---
-    
-    const handleClienteChange = (cliente: any | null) => { 
-        setClienteSelecionado(cliente);
-        setFormData(prevData => ({
-            ...prevData,
-            clienteId: cliente?.id || '',
-        }));
-    };
 
     
     
@@ -213,6 +254,38 @@ const CadastroContrato: React.FC = () => {
         { key: 'subtotal' as keyof ItemCombinado, header: 'Subtotal', style: { width: '120px', textAlign: 'right', fontWeight: 'bold' }, cellClass: 'subtotal-cell', render: (item: ItemCombinado) => ( formatCurrency(item.quantidade * item.valorUnitario) ) },
         { key: 'actions' as keyof ItemCombinado, header: '', style: { width: '20px' }, render: (item: ItemCombinado) => ( <Button type="button" variant="danger" onClick={() => removeItem(item.id)} style={{ width: "100%" }}><span role="img" aria-label="Remover">🗑️</span></Button> ) },
     ];
+
+    const ContextCard: React.FC<ContextCardProps> = ({ tipo, item, onClick }) => {
+        const isSelected = !!item;
+        const titleKey = tipo === 'Cliente' ? 'nome' : tipo === 'Contrato' ? 'numeroContrato' : 'nome';
+        
+        // Conteúdo
+        const title = isSelected ? item[titleKey] : `Selecione o ${tipo}`;
+        const subtitle = isSelected ? `ID: ${item.id}` : `Clique para buscar o ${tipo.toLowerCase()}.`;
+        
+        // Estilo (usando classes Tailwind/in-line mockado, pois o CSS real não foi fornecido)
+        const cardStyle: React.CSSProperties = {
+            padding: '10px',
+            borderRadius: '8px',
+            border: isSelected ? '2px solid #3b82f6' : '1px solid #d1d5db',
+            backgroundColor: isSelected ? '#eff6ff' : '#f9fafb',
+            cursor: 'pointer',
+            boxShadow: isSelected ? '0 4px 6px -1px rgba(0,0,0,0.1)' : 'none',
+            transition: 'all 0.3s',
+            minHeight: '80px'
+        };
+    
+        return (
+            <div style={cardStyle} onClick={onClick}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="strong">{tipo}</Typography>
+                    <Badge color={isSelected ? 'success' : 'secondary'}>{isSelected ? 'Selecionado' : 'Pendente'}</Badge>
+                </div>
+                <Typography variant="pMuted">{title}</Typography>
+                <Typography variant="small" >{subtitle}</Typography>
+            </div>
+        );
+    };
     // ----------------- RENDERIZAÇÃO -----------------
     return (
         <form onSubmit={handleSubmit} >
@@ -224,18 +297,48 @@ const CadastroContrato: React.FC = () => {
             <FlexGridContainer layout='grid' template='2fr 3fr'  gap='10px'>
                 {/* COLUNA ESQUERDA */}
                 <FlexGridContainer layout='flex' template='column' gap='10px'>
-                    {/* SEÇÃO 1: CLIENTE E SERVIÇO */}
+                    <FlexGridContainer layout="flex" template='column' >
+                                            <Typography variant='strong'>
+                                                Contexto de Registro
+                                            </Typography>
+                                            
+                                          
+                         <ContextCard
+                            tipo='Cliente'
+                            item={clienteSelecionado}
+                            onClick={handleOpenModal}
+                        />
+                                            
+                                           
+                                            
+                                            {/* <ContextCard
+                                                tipo='Poço'
+                                                item={pocoSelecionado}
+                                                onClick={() => console.log('Abre busca de Poço (Mock)')}
+                                            /> */}
+                                            {/* SEÇÃO 5: DOCUMENTAÇÃO E OBSERVAÇÕES (Novo/Ajustado) */}
                     <Card>
-                        <Typography variant="h2Alt">Cliente Relacionado</Typography>
-                        
-                        <ClienteSelect
-                                entitySelecionada={clienteSelecionado}
-                                onEntitySelecionadaChange={handleClienteChange}
-                                isLoading={isSaving}
-                            />
-                        
-                        
+                        <Typography variant="h2Alt">Documentação e Observações</Typography>
+                        <FormControl
+                            label="Link para Contrato Assinado (Drive, Dropbox, etc.)"
+                            name="linkContratoDigital"
+                            value={formData.linkContratoDigital}
+                            onChange={handleSimpleChange}
+                            placeholder="URL do arquivo PDF/digitalizado"
+                        />
+                        <FormControl
+                            label="Observações Adicionais"
+                            name="observacoesAdicionais"
+                            control="textarea"
+                            value={formData.observacoesAdicionais}
+                            onChange={handleSimpleChange}
+                            rows={4}
+                            placeholder="Detalhes sobre pagamento, garantias, especificações técnicas não listadas no escopo..."
+                        />
                     </Card>
+                    
+                                        </FlexGridContainer>
+                  
 
                     
 
@@ -334,26 +437,7 @@ const CadastroContrato: React.FC = () => {
                         </FlexGridContainer>
                     </Card>
 
-                    {/* SEÇÃO 5: DOCUMENTAÇÃO E OBSERVAÇÕES (Novo/Ajustado) */}
-                    <Card>
-                        <Typography variant="h2Alt">Documentação e Observações</Typography>
-                        <FormControl
-                            label="Link para Contrato Assinado (Drive, Dropbox, etc.)"
-                            name="linkContratoDigital"
-                            value={formData.linkContratoDigital}
-                            onChange={handleSimpleChange}
-                            placeholder="URL do arquivo PDF/digitalizado"
-                        />
-                        <FormControl
-                            label="Observações Adicionais"
-                            name="observacoesAdicionais"
-                            control="textarea"
-                            value={formData.observacoesAdicionais}
-                            onChange={handleSimpleChange}
-                            rows={4}
-                            placeholder="Detalhes sobre pagamento, garantias, especificações técnicas não listadas no escopo..."
-                        />
-                    </Card>
+                    
                 </FlexGridContainer>
 
                 {/* COLUNA DIREITA - ESCOPO E TOTAIS */}
@@ -367,7 +451,7 @@ const CadastroContrato: React.FC = () => {
                                 columns={colunasItens} 
                                 variant="borderless" 
                             />
-                        <Button type="button" variant="success" onClick={addItem} style={{ width: "100%", marginTop: 10 }}>
+                        <Button type="button" variant="success" onClick={addItem} >
                             + Adicionar Novo Item
                         </Button>
                         
@@ -428,10 +512,10 @@ const CadastroContrato: React.FC = () => {
                             <Typography variant="strong">
                                 Subtotal Bruto (Itens): {formatCurrency(subtotalItens)}
                             </Typography>
-                            <Typography variant="strong" style={{ color: 'red' }}>
+                            <Typography variant="strong">
                                 Desconto Aplicado: - {formatCurrency(formData.descontoTotal)}
                             </Typography>
-                             <Typography variant="h3" style={{ borderTop: '1px dashed #ccc', paddingTop: '10px' }}>
+                             <Typography variant="h3" >
                                  VALOR TOTAL FINAL: {formatCurrency(formData.valorTotalContrato > 0 ? formData.valorTotalContrato : valorSugerido)}
                             </Typography>
                         
@@ -466,7 +550,7 @@ const CadastroContrato: React.FC = () => {
            
 
             {/* SNIPPET DE DEBUG */}
-            <Card style={{ marginTop: 30, backgroundColor: '#f0f0f0', border: '1px solid #ccc' }}>
+            <Card >
                 <Typography variant="h3" style={{ color: '#000000' }}>🔍 DEBUG: Dados Atuais do Formulário</Typography>
                 <pre style={{ 
                     whiteSpace: 'pre-wrap', 
@@ -481,6 +565,20 @@ const CadastroContrato: React.FC = () => {
                     {JSON.stringify(formData, null, 2)}
                 </pre>
             </Card>
+            
+
+            {/* -------------------- MODAL 1 (Buscar Cliente) -------------------- */}
+                        <Modal 
+                            isOpen={isModalOpen} 
+                            onClose={handleCloseModal}
+                            title="Buscar Cliente"
+                        >
+                            <ClienteSelect
+                                entitySelecionada={clienteSelecionado}
+                                onEntitySelecionadaChange={handleClienteChange}
+                                isLoading={isSaving}
+                            />
+                        </Modal>
         </form>
     );
 };

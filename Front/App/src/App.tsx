@@ -25,7 +25,7 @@ import { ProductProvider } from './context/NewProductContext';
 // (Ajuste os caminhos conforme sua estrutura real, se necessário)
 import CadastroCliente from './components/forms/specific/CadastroCliente/CadastroCliente'; 
 import CadastroContrato from './components/forms/specific/CadastroContrato/CadastroContrato';
-import RelatorioPoco from './components/forms/specific/CadastroRelatorio/RelatorioPoco'; // Usado para "Novo Poço"
+import RelatorioPoco from './components/forms/specific/CadastroRelatorio/CadastroRelatorio'; // Usado para "Novo Poço"
 
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);

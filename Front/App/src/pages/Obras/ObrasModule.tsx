@@ -14,7 +14,7 @@ import SearchDashboard from "./Components/SearchDashboard";
 import { ObraDetalhes } from "./Components/ObraDetalhes";
 
 // **IMPORTAÇÕES DE COMPONENTES E TIPOS**
-import ClienteSelect, { Cliente } from '../../components/forms/search/BuscaCliente';
+import ClienteSelect, { ClienteAPI as Cliente  } from '../../components/forms/search/BuscaCliente';
 import ContratoSelectTabs, { Contrato } from "../../components/forms/search/BuscaContrato";
 import PocoSelectTabs, { Poco } from "../../components/forms/search/BuscaPoco";
 
@@ -29,7 +29,7 @@ export const ObrasModule: React.FC = () => {
     const [pocoSelecionado, setPocoSelecionado] = useState<Poco | null>(null);
     
     // ** NOVOS ESTADOS PARA OS IDS (CHAVES PRIMÁRIAS) **
-    const [clienteIdParaBackend, setClienteIdParaBackend] = useState<string | null>(null);
+    const [clienteIdParaBackend, setClienteIdParaBackend] = useState<number | null>(null)
     const [contratoIdParaBackend, setContratoIdParaBackend] = useState<string | null>(null);
     const [pocoIdParaBackend, setPocoIdParaBackend] = useState<string | null>(null);
     
@@ -41,31 +41,24 @@ export const ObrasModule: React.FC = () => {
 
     // HANDLERS
     
-    const handleClienteChange = useCallback((cliente: Cliente | null) => {
-        // Atualiza o estado do objeto completo
-        setClienteSelecionado(cliente);
-        
-        // Extrai o ID
-        const id = cliente ? cliente.id : null;
-        setClienteIdParaBackend(id);
-        
-        console.log(`✅ ID do Cliente pronto para o backend: ${id}`);
-        
-        // Regra de limpeza: Se o Cliente muda, as seleções relacionadas abaixo dele são limpas
-        if (id) {
-            setContratoSelecionado(null);
-            setContratoIdParaBackend(null);
-            setPocoSelecionado(null);
-            setPocoIdParaBackend(null);
-        }
-    }, []);
+   const handleClienteChange = useCallback((cliente: Cliente | null) => {
+    // Atualiza o estado do objeto completo
+    setClienteSelecionado(cliente);
+    
+    // Extrai o ID
+    const id = cliente ? cliente.id_cliente : null;
+    setClienteIdParaBackend(id);  // Atualiza o ID para ser enviado ao backend
+    
+    console.log(`✅ ID do Cliente pronto para o backend: ${id}`);
+}, []);
+
 
     const handleContratoChange = useCallback((contrato: Contrato | null) => {
         // 1. Atualiza o estado do objeto completo
         setContratoSelecionado(contrato);
 
         // 2. Extrai o ID
-        const id = contrato ? contrato.id : null;
+        const id = contrato ? contrato.codigo_contrato : null;
         setContratoIdParaBackend(id); // <--- Contrato ID extraído
         
         console.log(`✅ ID do Contrato pronto para o backend: ${id}`);
@@ -82,7 +75,7 @@ export const ObrasModule: React.FC = () => {
         setPocoSelecionado(poco);
 
         // 2. Extrai o ID
-        const id = poco ? poco.id : null;
+        const id = poco ? poco.codigo : null;
         setPocoIdParaBackend(id); // <--- Poço ID extraído
 
         console.log(`✅ ID do Poço pronto para o backend: ${id}`);
@@ -181,11 +174,16 @@ export const ObrasModule: React.FC = () => {
 
                     </div>
                     
-                    <SearchDashboard />
+                    <SearchDashboard 
+                        clienteId={clienteIdParaBackend}
+                        contratoId={contratoIdParaBackend}
+                        pocoId={pocoIdParaBackend}
+
+                    
+                    />
                     <ObraDetalhes 
-                        cliente={clienteSelecionado} 
-                        contrato={contratoSelecionado} 
-                        poco={pocoSelecionado} 
+                       
+                       
                     />
 
                     <div>

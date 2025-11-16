@@ -11,8 +11,6 @@ import Typography from '../../ui/Typography/Typography';
 import ResultItem from '../../ui/ResultItem';
 import Badge from '../../ui/Badge/Badge';
 // Importações de tipos e constantes
-import { Cliente, ClienteSearchKey, ClienteTypeFilter, ClienteAPI } from '../../types/cliente';
-import { API_URL } from '../../constants/api';
 
 // Endpoint da sua API
 const API_URL = 'http://localhost:3001'; 
@@ -175,7 +173,6 @@ type ClienteSelectProps = Omit<
 // ----------------- COMPONENTE WRAPPER -----------------
 const ClienteSelect: React.FC<ClienteSelectProps> = (props) => {
     // Combina as default props e as props recebidas antes de passar para o EntitySelectTabs
-    return <EntitySelectTabs {...defaultClientProps} {...props} />;;
     return <EntitySelectTabs {...defaultClientProps} {...props} />;
 };
 

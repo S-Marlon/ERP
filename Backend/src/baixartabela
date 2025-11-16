@@ -1,0 +1,60 @@
+app.get('/export-json-local', async (req: Request, res: Response) => {
+    const tableName = req.query.table as string;
+    const DATA_DIR = 'jsondata'; // Pasta de destino
+
+    if (!tableName || !/^[a-zA-Z0-9_]+$/.test(tableName)) {
+        return res.status(400).json({ 
+            status: 'Error', 
+            message: 'Nome da tabela inválido ou ausente.' 
+        });
+    }
+
+    const query = `SELECT * FROM ${tableName}`; 
+
+    try {
+        // 1. Criar a pasta 'jsondata' se ela não existir
+        const dirPath = path.join(__dirname, '..', DATA_DIR); // Caminho absoluto para a pasta
+        
+        // __dirname é o diretório do arquivo atual (src). '..' sobe para backend/
+        // Se a sua estrutura for 'backend/src/server.ts', '..' leva para 'backend'
+        // Ajuste '..' se o seu caminho for diferente, mas essa é a prática comum.
+
+        if (!fs.existsSync(dirPath)) {
+            fs.mkdirSync(dirPath, { recursive: true });
+            console.log(`Pasta '${DATA_DIR}' criada.`);
+        }
+
+        // 2. Executar a consulta no banco de dados
+        const [rows] = await pool.execute(query);
+
+        // 3. Converter para string JSON formatada
+        const jsonString = JSON.stringify(rows, null, 2);
+
+        // 4. Definir o caminho completo do arquivo
+        const fileName = `Temp_${tableName}.json`;
+        const filePath = path.join(dirPath, fileName);
+
+        // 5. Salvar o arquivo localmente
+        fs.writeFileSync(filePath, jsonString, 'utf-8');
+
+        console.log(`Sucesso! Tabela '${tableName}' salva em: ${filePath}`);
+
+        // 6. Retornar uma resposta de sucesso ao cliente
+        res.status(200).json({ 
+            status: 'OK', 
+            message: `Tabela '${tableName}' exportada com sucesso.`,
+            file: `${DATA_DIR}/${fileName}`,
+            path: filePath
+        });
+
+    } catch (error) {
+        console.error(`Erro ao exportar a tabela '${tableName}':`, error);
+        const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+        
+        res.status(500).json({ 
+            status: 'Error', 
+            message: `Falha ao exportar a tabela '${tableName}'.`, 
+            error: errorMessage 
+        });
+    }
+});
