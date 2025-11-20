@@ -10,56 +10,64 @@ import TypeSwitch from "../../components/ui/TypeSwitch";
 import TabButton from "../../components/ui/TabButton/TabButton";
 
 // IMPORTAÇÕES DE COMPONENTES ESPECÍFICOS DE BUSCA E MÓDULO
-import SearchDashboard from "./Components/SearchDashboard";
 import { ObraDetalhes } from "./Components/ObraDetalhes";
 
 // **IMPORTAÇÕES DE COMPONENTES E TIPOS**
 import ClienteSelect, { ClienteAPI as Cliente  } from '../../components/forms/search/BuscaCliente';
-import ContratoSelectTabs, { Contrato } from "../../components/forms/search/BuscaContrato";
-import PocoSelectTabs, { Poco } from "../../components/forms/search/BuscaPoco";
+
+// importar tipos de entidades
+import { Contrato } from '../../types/entities/contract';
+import { Poco } from '../../types/entities/poco';
+import ContratoSelect from "../../components/forms/search/BuscaContrato";
+import PocoSelect from "../../components/forms/search/BuscaPoco";
 
 // DEFINIÇÕES DE TIPO
 type SearchType = 'Cliente' | 'Contrato' | 'Poço';
 
-
 export const ObrasModule: React.FC = () => {
+    
     // ESTADOS GLOBAIS DE SELEÇÃO (OBJETOS COMPLETOS)
     const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
     const [contratoSelecionado, setContratoSelecionado] = useState<Contrato | null>(null);
     const [pocoSelecionado, setPocoSelecionado] = useState<Poco | null>(null);
     
     // ** NOVOS ESTADOS PARA OS IDS (CHAVES PRIMÁRIAS) **
-    const [clienteIdParaBackend, setClienteIdParaBackend] = useState<number | null>(null)
+    const [clienteIdParaBackend, setClienteIdParaBackend] = useState<string | null>(null);
     const [contratoIdParaBackend, setContratoIdParaBackend] = useState<string | null>(null);
     const [pocoIdParaBackend, setPocoIdParaBackend] = useState<string | null>(null);
     
     // ESTADO DE CARREGAMENTO E TIPO DE BUSCA ATIVO
-    const [isSaving, setIsSaving] = useState(false); // Usado como loading externo
+    const [isSaving] = useState(false);
     const [activeSearchType, setActiveSearchType] = useState<SearchType>('Cliente');
     
     const isLoading = isSaving; 
 
     // HANDLERS
     
-   const handleClienteChange = useCallback((cliente: Cliente | null) => {
-    // Atualiza o estado do objeto completo
-    setClienteSelecionado(cliente);
-    
-    // Extrai o ID
-    const id = cliente ? cliente.id_cliente : null;
-    setClienteIdParaBackend(id);  // Atualiza o ID para ser enviado ao backend
-    
-    console.log(`✅ ID do Cliente pronto para o backend: ${id}`);
-}, []);
-
+    const handleClienteChange = useCallback((cliente: Cliente | null) => {
+        // Atualiza o estado do objeto completo
+        setClienteSelecionado(cliente);
+        
+        // Extrai o ID e converte para string
+        const id = cliente ? String(cliente.id_cliente ?? cliente.id_cliente ?? '') : null;
+        setClienteIdParaBackend(id);
+        
+        // 🔥 NOVO: Limpar seleções dependentes quando trocar cliente
+        setContratoSelecionado(null);
+        setContratoIdParaBackend(null);
+        setPocoSelecionado(null);
+        setPocoIdParaBackend(null);
+        
+        console.log(`✅ ID do Cliente pronto para o backend: ${id}`);
+    }, []);
 
     const handleContratoChange = useCallback((contrato: Contrato | null) => {
         // 1. Atualiza o estado do objeto completo
         setContratoSelecionado(contrato);
 
         // 2. Extrai o ID
-        const id = contrato ? contrato.codigo_contrato : null;
-        setContratoIdParaBackend(id); // <--- Contrato ID extraído
+        const id = contrato ? String(contrato.id  ?? '') : null;
+        setContratoIdParaBackend(id);
         
         console.log(`✅ ID do Contrato pronto para o backend: ${id}`);
 
@@ -68,20 +76,20 @@ export const ObrasModule: React.FC = () => {
             setPocoSelecionado(null);
             setPocoIdParaBackend(null);
         }
-    }, []); // Dependências vazias
+    }, []);
 
     const handlePocoChange = useCallback((poco: Poco | null) => {
         // 1. Atualiza o estado do objeto completo
         setPocoSelecionado(poco);
 
         // 2. Extrai o ID
-        const id = poco ? poco.codigo : null;
-        setPocoIdParaBackend(id); // <--- Poço ID extraído
+        const id = poco ? String(poco.id  ?? '') : null;
+        setPocoIdParaBackend(id);
 
         console.log(`✅ ID do Poço pronto para o backend: ${id}`);
-    }, []); // Dependências vazias
+    }, []);
 
-    // Handler: Atualiza o tipo de busca (Mantido)
+    // Handler: Atualiza o tipo de busca
     const handleSearchTypeChange = (type: SearchType) => {
         setActiveSearchType(type);
     };
@@ -110,7 +118,7 @@ export const ObrasModule: React.FC = () => {
                 <FlexGridContainer 
                     layout="grid" 
                     gap="5px" 
-                    template="2fr 1fr 4fr 1fr"
+                    template="2fr 4fr 1fr"
                     mobileTemplate="1fr" 
                 >
                     <div>
@@ -142,18 +150,16 @@ export const ObrasModule: React.FC = () => {
                         
                         {/* ContratoSelectTabs */}
                         {activeSearchType === 'Contrato' && (
-                            <ContratoSelectTabs
-                                // Requer o objeto completo (Contrato | null)
-                                entitySelecionada={contratoSelecionado}
-                                // Handler que recebe o objeto completo
-                                onEntitySelecionadaChange={handleContratoChange}
+                            <ContratoSelect
+                              entitySelecionada={clienteSelecionado}
+                                onEntitySelecionadaChange={handleClienteChange}
                                 isLoading={isSaving}
                             />
                         )}
 
                         {/* PocoSelectTabs */}
                         {activeSearchType === 'Poço' && (
-                            <PocoSelectTabs
+                            <PocoSelect
                                 // Requer o objeto completo (Poco | null)
                                 entitySelecionada={pocoSelecionado}
                                 // Handler que recebe o objeto completo
@@ -174,16 +180,14 @@ export const ObrasModule: React.FC = () => {
 
                     </div>
                     
-                    <SearchDashboard 
+                    
+                    <ObraDetalhes
+                        cliente={clienteSelecionado}
+                        contrato={contratoSelecionado}
+                        poco={pocoSelecionado}
                         clienteId={clienteIdParaBackend}
                         contratoId={contratoIdParaBackend}
                         pocoId={pocoIdParaBackend}
-
-                    
-                    />
-                    <ObraDetalhes 
-                       
-                       
                     />
 
                     <div>

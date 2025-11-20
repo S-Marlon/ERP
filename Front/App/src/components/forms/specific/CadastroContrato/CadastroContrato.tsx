@@ -11,7 +11,9 @@ import FlexGridContainer from '../../../Layout/FlexGridContainer/FlexGridContain
 import ClienteSelect, { ClienteAPI as Cliente }  from '../../search/BuscaCliente';
 import Badge from '../../../ui/Badge/Badge';
 import Modal from '../../../ui/Modal/modal';
-
+import { Poco } from '../../../../types/entities/poco';
+// importar tipo de contrato correto
+import { Contrato } from '../../../../types/entities/contract';
 
 // Importação do tipo Cliente (presumindo que está em outro lugar ou no ClienteSelect)
 // type Cliente = any; 
@@ -105,48 +107,49 @@ const CadastroContrato: React.FC = () => {
     const handleCloseModal2 = useCallback(() => setIsModalOpen2(false), []);
     
 // ** NOVOS ESTADOS PARA OS IDS (CHAVES PRIMÁRIAS) **
-    const [clienteIdParaBackend, setClienteIdParaBackend] = useState<number | null>(null)
+    const [clienteIdParaBackend, setClienteIdParaBackend] = useState<string | null>(null);
     const [contratoIdParaBackend, setContratoIdParaBackend] = useState<string | null>(null);
     const [pocoIdParaBackend, setPocoIdParaBackend] = useState<string | null>(null);
 
 
     const [isModalOpen, setIsModalOpen] = useState(false); // Modal Cliente
-        const [contratoSelecionado, setContratoSelecionado] = useState<ContratoSimples | null>(null);
+        const [contratoSelecionado, setContratoSelecionado] = useState<Contrato | null>(null);
     
     
-    const [formData, setFormData] = useState<ContratoData>(initialState);
-    const [pocoSelecionado, setPocoSelecionado] = useState<PocoSimples | null>(null); // Usando PocoSimples
-    const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
-    const [isSaving, setIsSaving] = useState(false); // Usado como loading externo
+     const [formData, setFormData] = useState<ContratoData>(initialState);
+     const [pocoSelecionado, setPocoSelecionado] = useState<Poco | null>(null); // Usando PocoSimples
+     const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
+     const [isSaving, setIsSaving] = useState(false); // Usado como loading externo
     
 
     const handleClienteChange = useCallback((cliente: Cliente | null) => {
-    setClienteSelecionado(cliente);
+      setClienteSelecionado(cliente);
 
-    // tenta obter id em diferentes formatos (ajuste conforme seu objeto Cliente)
-    const id = cliente ? (cliente.id ?? cliente.id_cliente ?? cliente._id ?? null) : null;
+      // tenta obter id em diferentes formatos e sempre converte para string
+      const rawId = cliente ? (cliente.id ?? cliente.id_cliente ?? cliente._id ?? '') : '';
+      const id = rawId ? String(rawId) : null;
 
-    // atualiza o id usado para chamadas ao backend
-    setClienteIdParaBackend(id ?? null);
+      // atualiza o id usado para chamadas ao backend
+      setClienteIdParaBackend(id);
 
-    // atualiza também o campo clienteId dentro do formData (para envio)
-    setFormData(prev => ({
-      ...prev,
-      clienteId: id ? String(id) : ''
-    }));
+      // atualiza também o campo clienteId dentro do formData (para envio)
+      setFormData(prev => ({
+        ...prev,
+        clienteId: id ?? ''
+      }));
 
-    console.log(`✅ Cliente ID e Objeto atualizados: ${id}`);
+      console.log(`✅ Cliente ID e Objeto atualizados: ${id}`);
 
-    if (!cliente) {
-      setContratoSelecionado(null);
-      setPocoSelecionado(null);
-    } else {
-      // limpa seleção anterior de contrato/poço quando troca o cliente
-      setContratoSelecionado(null);
-      setPocoSelecionado(null);
-      handleCloseModal();
-    }
-}, [handleCloseModal]); 
+      if (!cliente) {
+        setContratoSelecionado(null);
+        setPocoSelecionado(null);
+      } else {
+        // limpa seleção anterior de contrato/poço quando troca o cliente
+        setContratoSelecionado(null);
+        setPocoSelecionado(null);
+        handleCloseModal();
+      }
+    }, [handleCloseModal]); 
    
       
        
@@ -255,6 +258,12 @@ const CadastroContrato: React.FC = () => {
         { key: 'actions' as keyof ItemCombinado, header: '', style: { width: '20px' }, render: (item: ItemCombinado) => ( <Button type="button" variant="danger" onClick={() => removeItem(item.id)} style={{ width: "100%" }}><span role="img" aria-label="Remover">🗑️</span></Button> ) },
     ];
 
+    interface ContextCardProps {
+        tipo: 'Cliente' | 'Contrato' | 'Poço';
+        item?: any | null;
+        onClick?: () => void;
+    }
+
     const ContextCard: React.FC<ContextCardProps> = ({ tipo, item, onClick }) => {
         const isSelected = !!item;
         const titleKey = tipo === 'Cliente' ? 'nome' : tipo === 'Contrato' ? 'numeroContrato' : 'nome';
@@ -299,7 +308,7 @@ const CadastroContrato: React.FC = () => {
                 <FlexGridContainer layout='flex' template='column' gap='10px'>
                     <FlexGridContainer layout="flex" template='column' >
                                             <Typography variant='strong'>
-                                                Contexto de Registro
+                                                Contrato Vinculado á 
                                             </Typography>
                                             
                                           
@@ -527,13 +536,6 @@ const CadastroContrato: React.FC = () => {
                 type="submit" 
                 variant="primary" 
                 
-                disabled={isSaving} 
-            >
-                {isSaving ? 'Salvando...' : 'Salvar Contrato e Iniciar Processo de Obra'}
-            </Button>
-                     <Button 
-                type="submit" 
-                variant="primary" 
                 disabled={isSaving} 
             >
                 {isSaving ? 'Salvando...' : 'Salvar Contrato e Iniciar Processo de Obra'}

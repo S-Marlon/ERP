@@ -124,11 +124,11 @@ const ContextCard: React.FC<ContextCardProps> = ({ tipo, item, onClick }) => {
     return (
         <div style={cardStyle} onClick={onClick}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="strong" style={{ fontSize: '1.1em' }}>{tipo}</Typography>
+                <Typography variant="strong" >{tipo}</Typography>
                 <Badge color={isSelected ? 'success' : 'secondary'}>{isSelected ? 'Selecionado' : 'Pendente'}</Badge>
             </div>
-            <Typography variant="pMuted" style={{ marginTop: '5px', lineHeight: '1.2' }}>{title}</Typography>
-            <Typography variant="small" style={{ color: isSelected ? '#3b82f6' : '#6b7280' }}>{subtitle}</Typography>
+            <Typography variant="pMuted" >{title}</Typography>
+            <Typography variant="small">{subtitle}</Typography>
         </div>
     );
 };
@@ -142,7 +142,7 @@ const RelatorioPoco: React.FC = () => {
     const [pocoData, setPocoData] = useState<PocoData>(initialState);
     const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
     const [contratoSelecionado, setContratoSelecionado] = useState<ContratoSimples | null>(null);
-    const [pocoSelecionado, setPocoSelecionado] = useState<PocoSimples | null>(null); // Usando PocoSimples
+    // const [pocoSelecionado, setPocoSelecionado] = useState<PocoSimples | null>(null); // Usando PocoSimples
     const [isSaving, setIsSaving] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false); // Modal Cliente
     const [isModalOpen2, setIsModalOpen2] = useState(false); // Modal Contrato
@@ -250,19 +250,13 @@ const RelatorioPoco: React.FC = () => {
             onClick: handleOpenModal2,
             disabled: !clienteSelecionado // Contrato depende do Cliente
         },
-        { 
-            id: 3, 
-            label: 'Buscar/Trocar Poço',
-            variant: 'outline', 
-            onClick: () => console.log('Abre busca de Poço'),
-            disabled: !contratoSelecionado // Poço depende do Contrato
-        },
+        
     ];
 
     return (
         <form className="relatorio-poco-form" onSubmit={handleSubmit}>
             
-            <Card className='flex-row' style={{ padding: '20px' }}>
+            <Card className='flex-row' >
                 <FlexGridContainer layout="grid" template='1fr 1fr'>
                     
                     {/* COLUNA ESQUERDA: TÍTULOS E FORMS GERAIS */}
@@ -270,7 +264,7 @@ const RelatorioPoco: React.FC = () => {
                         <Typography variant="h1Alt">
                             Registro Técnico do Poço
                         </Typography>
-                        <Typography variant="pMuted" className="subtitle" style={{ marginBottom: '15px' }}>
+                        <Typography variant="pMuted" className="subtitle" >
                             Relatório pós-serviço (Perfuração/Manutenção)
                         </Typography>
 
@@ -295,8 +289,8 @@ const RelatorioPoco: React.FC = () => {
                         </FlexGridContainer>
 
                         {/* -------------------- BOTÕES DE BUSCA -------------------- */}
-                        <div style={{ marginTop: '20px' }}>
-                            <Typography variant='pMuted' style={{ marginBottom: '10px' }}>
+                        <div >
+                            <Typography variant='pMuted' >
                                 Selecione os contextos:
                             </Typography>
                             <ButtonGroup buttons={modalButtons} />
@@ -305,8 +299,8 @@ const RelatorioPoco: React.FC = () => {
                     </FlexGridContainer>
 
                     {/* COLUNA DIREITA: CARDS DE CONTEXTO VISUAL */}
-                    <FlexGridContainer layout="flex" template='column' style={{ gap: '10px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '6px' }}>
-                        <Typography variant='strong' style={{ borderBottom: '1px solid #ddd', paddingBottom: '5px' }}>
+                    <FlexGridContainer layout="flex" template='column'>
+                        <Typography variant='strong' >
                             Contexto de Registro
                         </Typography>
                         
@@ -322,11 +316,7 @@ const RelatorioPoco: React.FC = () => {
                             onClick={handleOpenModal2}
                         />
                         
-                        <ContextCard
-                            tipo='Poço'
-                            item={pocoSelecionado}
-                            onClick={() => console.log('Abre busca de Poço (Mock)')}
-                        />
+                        
 
                     </FlexGridContainer>
 
