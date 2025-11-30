@@ -1,11 +1,11 @@
 // src/pages/Dashboard.tsx
 
-import React, { useMemo, useState, useEffect } from 'react';
-import './Dashboard.css'; // Estilos
+import React, { useMemo, useState } from 'react';
+import './Dashboard.css'; // Certifique-se de que este arquivo CSS existe para o layout
 import IndicadorCard from './Components/IndicadorCard';
 import AlertaList from './Components/AlertaList';
 import { AlertaEstoque, MovimentacaoFormData, Produto } from './types/estoque';
-import MovimentacaoForm from './Components/MovimentacaoForm';
+import MovimentacaoForm from './Components/MovimentacaoForm'; // Componente de Ação Rápida
 
 const mockProdutos: Produto[] = [
   { id: 1, nome: 'Teclado Mecânico', sku: 'TM001', quantidadeAtual: 15, estoqueMinimo: 10, precoCusto: 150.00 },
@@ -19,42 +19,47 @@ const EstoqueDashboard: React.FC = () => {
   const [produtos, setProdutos] = useState<Produto[]>(mockProdutos);
   
   // --- FUNÇÃO PARA MANIPULAR O ENVIO DO FORMULÁRIO DE MOVIMENTAÇÃO ---
-    const handleMovimentacaoSubmit = (data: MovimentacaoFormData) => {
-      // 1. Encontre o produto a ser atualizado
-      const produtoIndex = produtos.findIndex(p => p.id === data.produtoId);
-  
-      if (produtoIndex !== -1) {
-        const produtoAntigo = produtos[produtoIndex];
-        let novaQuantidade = produtoAntigo.quantidadeAtual;
-  
-        // 2. Calcule a nova quantidade
-        const quantidade = data.quantidade as number; // Já validamos que não é string/null
-  
-        if (data.tipoMovimento === 'ENTRADA') {
-          novaQuantidade += quantidade;
-        } else if (data.tipoMovimento === 'SAIDA' || data.tipoMovimento === 'AJUSTE') {
-          novaQuantidade -= quantidade;
+  const handleMovimentacaoSubmit = (data: MovimentacaoFormData) => {
+    // 1. Encontre o produto a ser atualizado
+    const produtoIndex = produtos.findIndex(p => p.id === data.produtoId);
+
+    if (produtoIndex !== -1) {
+      const produtoAntigo = produtos[produtoIndex];
+      let novaQuantidade = produtoAntigo.quantidadeAtual;
+
+      // 2. Calcule a nova quantidade
+      const quantidade = data.quantidade as number; 
+
+      if (data.tipoMovimento === 'ENTRADA') {
+        novaQuantidade += quantidade;
+      } else if (data.tipoMovimento === 'SAIDA' || data.tipoMovimento === 'AJUSTE') {
+        // Garante que o estoque não fique negativo, a menos que seja um ajuste de inventário
+        if (data.tipoMovimento === 'SAIDA' && novaQuantidade - quantidade < 0) {
+          console.error("Erro: Saída não pode deixar o estoque negativo.");
+          alert(`Erro: A saída de ${quantidade} itens faria o estoque de ${produtoAntigo.nome} ficar negativo.`);
+          return; // Aborta a atualização
         }
-        
-        // 3. Crie o novo produto atualizado
-        const produtoAtualizado: Produto = {
-          ...produtoAntigo,
-          quantidadeAtual: novaQuantidade,
-        };
-  
-        // 4. Atualize o estado da lista de produtos (importante para o React renderizar)
-        const novaLista = [...produtos];
-        novaLista[produtoIndex] = produtoAtualizado;
-        
-        setProdutos(novaLista);
-  
-        // (Aqui você faria a chamada à API para salvar a transação e o produto atualizado)
-        console.log('Movimentação Registrada:', data); 
-        console.log('Novo Estoque do Produto:', produtoAtualizado.nome, novaQuantidade);
+        novaQuantidade -= quantidade;
       }
+      
+      // 3. Crie o novo produto atualizado
+      const produtoAtualizado: Produto = {
+        ...produtoAntigo,
+        quantidadeAtual: novaQuantidade,
+      };
+
+      // 4. Atualize o estado da lista de produtos (Imutabilidade do estado)
+      const novaLista = [...produtos];
+      novaLista[produtoIndex] = produtoAtualizado;
+      
+      setProdutos(novaLista);
+
+      console.log('Movimentação Registrada:', data); 
+      console.log('Novo Estoque do Produto:', produtoAtualizado.nome, novaQuantidade);
+    }
+  };
   
-    };
-  // --- LÓGICA DE CÁLCULO DOS INDICADORES ---
+  // --- LÓGICA DE CÁLCULO DOS INDICADORES (KPIs) ---
 
   const valorTotalEstoque = useMemo(() => {
     return produtos.reduce((total, p) => total + (p.quantidadeAtual * p.precoCusto), 0);
@@ -77,7 +82,9 @@ const EstoqueDashboard: React.FC = () => {
 
   return (
     <div className="dashboard-container">
-      <h1 className="dashboard-header">📈 Visão Geral do Estoque</h1>
+      
+
+      {/* 1. Indicadores-Chave de Desempenho (KPIs) */}
       <div className="indicadores-grid">
         <IndicadorCard 
           titulo="Total de Produtos" 
@@ -86,24 +93,35 @@ const EstoqueDashboard: React.FC = () => {
         />
         <IndicadorCard 
           titulo="Valor Total do Estoque" 
-          valor={valorTotalEstoque.toFixed(2).replace('.', ',')} // Formatação
+          valor={valorTotalEstoque.toFixed(2).replace('.', ',')} 
           unidade="BRL" 
         />
         <IndicadorCard 
           titulo="Produtos em Alerta" 
           valor={alertasEstoqueBaixo.length} 
           unidade="itens" 
+          // Opcional: Adicionar classe de destaque se houver alertas
+          className={alertasEstoqueBaixo.length > 0 ? 'alerta-kpi' : ''} 
         />
-      </div>
-
-      <div className="alertas-section">
+        
+        <div className="alertas-section">
         <AlertaList alertas={alertasEstoqueBaixo} />
       </div>
 
-      <MovimentacaoForm 
-          listaProdutos={produtos} 
-          onSubmitMovimentacao={handleMovimentacaoSubmit} 
-        />
+      </div>
+
+      {/* <hr /> */}
+
+      {/* 2. Ações Rápidas / Gerenciamento de Movimentação */}
+      {/* <div className="acoes-rapidas-section">
+        <h3>✍️ Ações Rápidas: Registrar Movimentação</h3>
+        
+      </div> */}
+      
+      <hr />
+
+      {/* 3. Alertas e Notificações */}
+      
 
     </div>
   );

@@ -7,6 +7,7 @@ import { Product, FilterState } from "../../types/types";
 import "./Estoque.css";
 
 import { ProductContext } from "../../context/ProductContext";
+import EstoqueDashboard from "./EstoqueDashboard";
 
 const EstoquePage: React.FC = () => {
   const { products,  } = useContext(ProductContext)!;
@@ -54,7 +55,10 @@ const EstoquePage: React.FC = () => {
         onAddProduct={handleAddProduct}
         
       />
+
+        
       </div>
+      <EstoqueDashboard/>
 
       <ProductContent
         filters={filters}
