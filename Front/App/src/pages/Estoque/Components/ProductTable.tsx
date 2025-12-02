@@ -81,7 +81,7 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, onSelectProduct }
 
   return (
     <>
-      <TableHeader />
+      <TableHeader productCount={0} />
 
       <Table<ProductWithIndex>
         data={dataWithIndex} // Passa os dados com o índice
@@ -94,7 +94,7 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, onSelectProduct }
       {/* A tabela HTML estática foi removida para usar o componente <Table />.
         Se você precisar de TableHeader na parte inferior, ele está aqui:
       */}
-      <TableHeader /> 
+      <TableHeader productCount={0} /> 
     </>
   );
 };

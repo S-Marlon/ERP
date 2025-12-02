@@ -1,6 +1,7 @@
 import React from 'react';
 import "../Estoque.css";
 import Typography from '../../../components/ui/Typography/Typography';
+import Button from '../../../components/ui/Button/Button';
 
 interface ProductHeaderProps {
     totalProducts: number;
@@ -15,11 +16,21 @@ const ProductHeader: React.FC<ProductHeaderProps> = ({ foundProducts, onAddProdu
                 <button>Resetar Filtro de produto</button>
                 <span>{totalProducts} produtos em registro</span>
             </div> */}
-            <Typography  variant='h1Alt'>Filtro de Produto</Typography>
+            <Typography  variant='h1Alt'>Dashboard de estoque</Typography>
             <div className="header-info">
                 <span>{foundProducts} produtos em registro</span>
-                <button onClick={onAddProduct}>Adicionar produto</button>
+                <a href='/Estoque/consulta'>Adicionar produto</a>
+                <a href='/Estoque/gerenciamento'>Registrar Entrada</a>
+                <a href='/Estoque/operacoes'>Inventário</a>
             </div>
+
+
+<div>
+
+            <Button variant='warning' onClick={onAddProduct}><a href='/Estoque/consulta'>Cadastro e Gerenciamento de Produtos</a></Button>
+            <Button variant='warning' onClick={onAddProduct}> <a href='/Estoque/gerenciamento'>Movimentação e Operações Diárias</a></Button>
+            <Button variant='warning' onClick={onAddProduct}> <a href='/Estoque/operacoes'>Consultas e Relatórios (Análise)</a></Button>
+</div>
         </div>
     );
 };

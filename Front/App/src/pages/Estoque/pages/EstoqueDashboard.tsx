@@ -1,11 +1,10 @@
 // src/pages/Dashboard.tsx
 
 import React, { useMemo, useState } from 'react';
-import './Dashboard.css'; // Certifique-se de que este arquivo CSS existe para o layout
-import IndicadorCard from './Components/IndicadorCard';
-import AlertaList from './Components/AlertaList';
-import { AlertaEstoque, MovimentacaoFormData, Produto } from './types/estoque';
-import MovimentacaoForm from './Components/MovimentacaoForm'; // Componente de Ação Rápida
+import IndicadorCard from '../Components/IndicadorCard';
+import AlertaList from '../Components/AlertaList';
+import { AlertaEstoque, MovimentacaoFormData, Produto } from '../types/estoque';
+import MovimentacaoForm from '../Components/MovimentacaoForm'; // Componente de Ação Rápida
 
 const mockProdutos: Produto[] = [
   { id: 1, nome: 'Teclado Mecânico', sku: 'TM001', quantidadeAtual: 15, estoqueMinimo: 10, precoCusto: 150.00 },
@@ -103,6 +102,14 @@ const EstoqueDashboard: React.FC = () => {
           // Opcional: Adicionar classe de destaque se houver alertas
           className={alertasEstoqueBaixo.length > 0 ? 'alerta-kpi' : ''} 
         />
+
+        <IndicadorCard 
+          titulo="Giro de Vendas (Top 3) 📈" 
+          valor={alertasEstoqueBaixo.length} 
+          unidade="itens" 
+          // Opcional: Adicionar classe de destaque se houver alertas
+          className={alertasEstoqueBaixo.length > 0 ? 'alerta-kpi' : ''} 
+        />
         
         <div className="alertas-section">
         <AlertaList alertas={alertasEstoqueBaixo} />
@@ -121,6 +128,59 @@ const EstoqueDashboard: React.FC = () => {
       <hr />
 
       {/* 3. Alertas e Notificações */}
+      1. Dashboard (Visão Geral)
+
+Esta deve ser a página de entrada no módulo de estoque.
+
+    Finalidade: Oferecer um panorama imediato da saúde do estoque.
+
+    Conteúdo Essencial:
+
+        Alertas de Estoque Mínimo: Lista de produtos que precisam ser repostos imediatamente.
+
+        Itens Mais Vendidos (Giro): Visão dos produtos com maior saída no período recente.
+
+        Valor Total do Estoque: O custo total dos itens em estoque.
+
+        Gráfico de Movimentação: Visualização das entradas vs. saídas nos últimos 7/30 dias.
+
+        Acesso Rápido: Botões para as operações mais comuns (Ex: Registrar Entrada, Novo Produto, Inventário).
+
+
+
+        {/* --- Coluna de Alerta de Estoque Baixo --- */}
+        <div className="panel alerts-panel">
+          <h2 className="panel-title alerts-title">
+            🚨 Alertas de Reposição ({})
+          </h2>
+          <div className="table-container">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Produto</th>
+                  <th>Estoque Atual</th>
+                  <th>Estoque Mínimo</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* --- Coluna de Itens de Maior Giro --- */}
+        <div className="panel">
+          <h2 className="panel-title">
+            📈 Itens de Maior Giro (Curva A)
+          </h2>
+          <ul className="high-moving-list">
+            
+            
+          </ul>
+        
+      </div>
       
 
     </div>

@@ -26,7 +26,10 @@ import { ProductProvider } from './context/NewProductContext';
 import CadastroCliente from './components/forms/specific/CadastroCliente/CadastroCliente'; 
 import CadastroContrato from './components/forms/specific/CadastroContrato/CadastroContrato';
 import RelatorioPoco from './components/forms/specific/CadastroRelatorio/CadastroRelatorio'; // Usado para "Novo Poço"
-import EstoqueDashboard from './pages/Estoque/EstoqueDashboard';
+import EstoqueDashboard from './pages/Estoque/pages/EstoqueDashboard';
+import StockEntryForm from './pages/Estoque/pages/Gerenciamento';
+import StockAdjustmentForm from './pages/Estoque/pages/Operacoes';
+import StockInventory from './pages/Estoque/pages/Consulta';
 
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -96,7 +99,9 @@ function App() {
               
               <Route path="/produtos" element={<Produtos text='Produtos'/>} />
               <Route path="/Estoque" element={<Estoque />} />
-              <Route path="/Estoque/dashboard" element={<EstoqueDashboard/>} />
+              <Route path="/Estoque/consulta" element={<StockInventory/>} />
+              <Route path="/Estoque/gerenciamento" element={<StockEntryForm/>} />
+              <Route path="/Estoque/operacoes" element={<StockAdjustmentForm/>} />
 
               <Route path="/Servicos" element={<Servicos />} />
               

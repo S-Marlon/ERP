@@ -7,7 +7,7 @@ import { Product, FilterState } from "../../types/types";
 import "./Estoque.css";
 
 import { ProductContext } from "../../context/ProductContext";
-import EstoqueDashboard from "./EstoqueDashboard";
+import EstoqueDashboard from "./pages/EstoqueDashboard";
 
 const EstoquePage: React.FC = () => {
   const { products,  } = useContext(ProductContext)!;
@@ -58,9 +58,10 @@ const EstoquePage: React.FC = () => {
 
         
       </div>
-      <EstoqueDashboard/>
 
-      <ProductContent
+<EstoqueDashboard />
+
+      {/* <ProductContent
         filters={filters}
         products={products}
         onFilterChange={handleFilterChange}
@@ -68,7 +69,7 @@ const EstoquePage: React.FC = () => {
         selectedProduct={selectedProduct}
         onCloseInfo={() => setSelectedProduct(undefined)}
         onSelectProduct={setSelectedProduct}
-      />
+      /> */}
 
       <div className="page-footer">
       <ProductFooter

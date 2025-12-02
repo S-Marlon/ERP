@@ -96,11 +96,11 @@ const ProductContent: React.FC<ProductContentProps> = ({
         
         {/* 1. Filtros */}
         <div className="product-filter">
-          <ProductFilter
+          {/* <ProductFilter
             filters={filters}
             onFilterChange={onFilterChange}
             onApply={onApplyFilter}
-          />
+          /> */}
         </div>
 
         {/* 2. Tabela de Produtos */}
