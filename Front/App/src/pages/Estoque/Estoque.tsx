@@ -51,7 +51,6 @@ const EstoquePage: React.FC = () => {
 
       <ProductHeader 
         totalProducts={products.length}
-        foundProducts={products.length}
         onAddProduct={handleAddProduct}
         
       />

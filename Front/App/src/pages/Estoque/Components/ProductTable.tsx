@@ -8,20 +8,20 @@ import { TableColumn } from "../../../types/Table.types"; // Importe o tipo Tabl
 
 // O tipo Product é usado como T do componente Table<T>
 interface ProductTableProps {
-  products: Product[];
-  onSelectProduct: (product: Product) => void;
+  products?: Product[]; // agora opcional
+  onSelect?: (p: Product) => void;
+  onEdit?: (p: Product) => void;
 }
 
 // Define o tipo para garantir a compatibilidade com a função render
 type ProductWithIndex = Product & { index: number };
 
-const ProductTable: React.FC<ProductTableProps> = ({ products, onSelectProduct }) => {
-  
-  // 1. Prepara os dados: Adiciona o índice (Número) a cada produto para ser exibido facilmente
-  const dataWithIndex = useMemo(() => 
-    products.map((product, index) => ({ ...product, index: index + 1 })),
-    [products]
-  );
+const ProductTable: React.FC<ProductTableProps> = ({ products, onSelect, onEdit }) => {
+  // garante array mesmo se undefined
+  const safeProducts = products ?? [];
+
+  // preserva a lógica anterior (ex.: adicionar índice)
+  const dataWithIndex = safeProducts.map((p, i) => ({ ...p, __index: i + 1 }));
 
   // 2. Define as colunas (productColumns)
   // Use useMemo para evitar recriar o array a cada renderização
@@ -87,7 +87,7 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, onSelectProduct }
         columns={productColumns} // Passa as colunas definidas
         caption="Lista de Produtos"
         variant={variant}
-        onRowClick={onSelectProduct} // Adiciona a função de clique na linha
+        onRowClick={onSelect} // Adiciona a função de clique na linha
       />
 
       {/* A tabela HTML estática foi removida para usar o componente <Table />.
