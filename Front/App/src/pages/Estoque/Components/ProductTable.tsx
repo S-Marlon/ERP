@@ -1,5 +1,4 @@
 import React, { useMemo } from "react";
-import "../Estoque.css"; // Preservado, se necessário para estilos gerais
 import { Product } from "../../../types/types";
 import TableHeader from "./TableHeader";
 // Importações
@@ -77,7 +76,7 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, onSelectProduct }
   ], []); // Dependências do useMemo
 
   // 3. Define a variante, se necessário
-  const variant = 'striped'; // Exemplo de variante, pode ser 'default', 'compact', etc.
+  const variant = 'inventory'; // Exemplo de variante, pode ser 'default', 'compact', etc.
 
   return (
     <>

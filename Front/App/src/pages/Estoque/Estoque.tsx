@@ -61,15 +61,7 @@ const EstoquePage: React.FC = () => {
 
 <EstoqueDashboard />
 
-      {/* <ProductContent
-        filters={filters}
-        products={products}
-        onFilterChange={handleFilterChange}
-        onApplyFilter={() => console.log("Aplicar filtros")}
-        selectedProduct={selectedProduct}
-        onCloseInfo={() => setSelectedProduct(undefined)}
-        onSelectProduct={setSelectedProduct}
-      /> */}
+      
 
       <div className="page-footer">
       <ProductFooter

@@ -1,5 +1,15 @@
 // src/pages/StockInventory.tsx
-import React, { useState } from 'react';
+
+
+
+// src/pages/EstoquePage.tsx
+import React, { useState, useContext } from "react";
+import ProductContent from "../Components/ProductContent";
+import { Product, FilterState } from "../../../types/types";
+
+import { ProductContext } from "../../../context/ProductContext";
+import TableHeader from "../Components/TableHeader";
+import ProductFilter from "../Components/ProductFilter";
 
 // --- Interfaces ---
 interface Product {
@@ -11,16 +21,17 @@ interface Product {
     minStock: number;
     salePrice: number;
     status: 'Ativo' | 'Inativo';
+    fornecedor?: string;
 }
 
 // --- Dados Mock ---
 const mockProducts: Product[] = [
-    { id: 1001, sku: 'AG-500', name: 'Água Mineral 500ml', category: 'Bebidas', currentStock: 350, minStock: 50, salePrice: 2.50, status: 'Ativo' },
-    { id: 1002, sku: 'PAO-FR', name: 'Pão Francês Kg', category: 'Padaria', currentStock: 15, minStock: 30, salePrice: 15.00, status: 'Ativo' },
-    { id: 1003, sku: 'AZ-EVO', name: 'Azeite Extra Virgem 500ml', category: 'Mercearia', currentStock: 5, minStock: 10, salePrice: 35.90, status: 'Ativo' },
-    { id: 1004, sku: 'CHOC-70', name: 'Chocolate Amargo 70%', category: 'Doces', currentStock: 80, minStock: 20, salePrice: 12.00, status: 'Ativo' },
-    { id: 1005, sku: 'LIM-G', name: 'Limão Galego Kg', category: 'Hortifruti', currentStock: 12, minStock: 15, salePrice: 6.99, status: 'Ativo' },
-    { id: 1006, sku: 'SERV-P', name: 'Serviço de Entrega Premium', category: 'Serviços', currentStock: 999, minStock: 0, salePrice: 10.00, status: 'Inativo' },
+    { id: 1001, sku: 'AG-500', name: 'Água Mineral 500ml', category: 'Bebidas', currentStock: 350, minStock: 50, salePrice: 2.50, status: 'Ativo', fornecedor: 'Coca-Cola'},
+    { id: 1002, sku: 'PAO-FR', name: 'Pão Francês Kg', category: 'Padaria', currentStock: 15, minStock: 30, salePrice: 15.00, status: 'Ativo', fornecedor: 'Pão de Açúcar'},
+    { id: 1003, sku: 'AZ-EVO', name: 'Azeite Extra Virgem 500ml', category: 'Mercearia', currentStock: 5, minStock: 10, salePrice: 35.90, status: 'Ativo' , fornecedor: 'Gallo'},
+    { id: 1004, sku: 'CHOC-70', name: 'Chocolate Amargo 70%', category: 'Doces', currentStock: 80, minStock: 20, salePrice: 12.00, status: 'Ativo' ,    fornecedor: 'Lindt'},
+    { id: 1005, sku: 'LIM-G', name: 'Limão Galego Kg', category: 'Hortifruti', currentStock: 12, minStock: 15, salePrice: 6.99, status: 'Ativo' , fornecedor: 'Ceasa'},
+    { id: 1006, sku: 'SERV-P', name: 'Serviço de Entrega Premium', category: 'Serviços', currentStock: 999, minStock: 0, salePrice: 10.00, status: 'Inativo' , fornecedor: ''},
 ];
 
 const StockInventory: React.FC = () => {
@@ -52,6 +63,50 @@ const StockInventory: React.FC = () => {
         alert(`Navegando para a página de edição do Produto ID: ${id}`);
     };
 
+
+
+
+
+
+
+
+
+
+      const { products,  } = useContext(ProductContext)!;
+      const [selectedProduct, setSelectedProduct] = useState<Product | undefined>(undefined);
+    
+      const [filters, setFilters] = useState<FilterState>({
+        status: "",
+        category: "",
+        minPrice: "",
+        maxPrice: "",
+        minStock: "",
+        maxStock: "",
+        clientName: "",
+        clientEmail: "",
+        clientCpf: "",
+        clientPhone: "",
+        orderNumber: "",
+        serviceType: "",
+        date: "",
+        paymentMethod: "",
+      });
+    
+      const handleAddProduct = () => {
+        console.log("Adicionar produto!");
+        // Exemplo: setProducts([...products, novoProduto]);
+      };
+    
+      const handleFilterChange = (
+        key: keyof FilterState,
+        value: string | number | boolean
+      ) => {
+        setFilters((prevFilters) => ({
+          ...prevFilters,
+          [key]: value,
+        }));
+      };
+
     return (
         <div style={styles.inventoryContainer}>
             <div style={styles.inventoryHeader}>
@@ -65,6 +120,17 @@ const StockInventory: React.FC = () => {
             </div>
 
             {/* --- Área de Busca e Filtros --- */}
+
+
+ <ProductFilter
+                filters={filters} onFilterChange={function (key: keyof FilterState, value: string | number | boolean): void {
+                    throw new Error("Function not implemented.");
+                } } onApply={function (): void {
+                    throw new Error("Function not implemented.");
+                } } onReset={function (): void {
+                    throw new Error("Function not implemented.");
+                } }          />
+
             <div style={styles.searchFilterArea}>
                 <input
                     type="text"
@@ -92,17 +158,21 @@ const StockInventory: React.FC = () => {
             </div>
 
             {/* --- Tabela de Produtos --- */}
+                    <TableHeader productCount={0} />
             <div style={styles.inventoryPanel}>
                 <div style={styles.tableResponsive}>
+
                     <table style={styles.dataTable}>
                         <thead>
                             <tr style={styles.tableHead}>
+                                <th style={styles.tableTh}>#</th>
                                 <th style={styles.tableTh}>Cód. SKU</th>
                                 <th style={styles.tableTh}>Nome do Produto</th>
                                 <th style={styles.tableTh}>Categoria</th>
                                 <th style={styles.tableTh}>Estoque Atual</th>
                                 <th style={styles.tableTh}>Preço de Venda</th>
                                 <th style={styles.tableTh}>Status</th>
+                                <th style={styles.tableTh}>Fornecedor</th>
                                 <th style={styles.tableTh}>Ações</th>
                             </tr>
                         </thead>
@@ -110,6 +180,7 @@ const StockInventory: React.FC = () => {
                             {filteredProducts.length > 0 ? (
                                 filteredProducts.map((product) => (
                                     <tr key={product.id} style={styles.tableRow}>
+                                        <td style={{ ...styles.tableTd, fontWeight: 500, color: '#1f2937' /* gray-900 */ }}>{(filteredProducts.indexOf(product) + 1).toString().padStart(2, '0')}</td>
                                         <td style={{ ...styles.tableTd, fontWeight: 500, color: '#1f2937' /* gray-900 */ }}>{product.sku}</td>
                                         <td style={styles.tableTd}>{product.name}</td>
                                         <td style={styles.tableTd}>{product.category}</td>
@@ -122,6 +193,8 @@ const StockInventory: React.FC = () => {
                                                 {product.status}
                                             </span>
                                         </td>
+                                        <td style={styles.tableTd}>{product.fornecedor}</td>
+                                        
                                         <td style={styles.tableTd}>
                                             <button 
                                                 style={styles.editButton} 
@@ -141,8 +214,11 @@ const StockInventory: React.FC = () => {
                             )}
                         </tbody>
                     </table>
+
                 </div>
             </div>
+                    <TableHeader productCount={0} />
+
 
         </div>
     );
