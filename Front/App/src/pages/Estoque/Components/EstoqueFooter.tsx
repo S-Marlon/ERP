@@ -1,5 +1,4 @@
 import React from 'react';
-import "../Estoque.css";
 
 interface ProductFooterProps {
     totalProducts: number;
@@ -7,7 +6,7 @@ interface ProductFooterProps {
     onAddProduct: () => void;
 }
 
-const ProductFooter: React.FC<ProductFooterProps> = () => {
+const EstoqueFooter: React.FC<ProductFooterProps> = () => {
     return (
         <div>
           <span>
@@ -31,4 +30,4 @@ const ProductFooter: React.FC<ProductFooterProps> = () => {
     );
 };
 
-export default ProductFooter;
+export default EstoqueFooter;

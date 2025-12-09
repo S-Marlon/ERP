@@ -50,7 +50,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onEdit }) => {
             padding: '8px 12px',
             borderRadius: 6,
             border: 'none',
-            background: '#4f46e5',
+            background: '#29239fff',
             color: '#fff',
             cursor: 'pointer'
           }}

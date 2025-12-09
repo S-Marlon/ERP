@@ -26,10 +26,9 @@ import { ProductProvider } from './context/NewProductContext';
 import CadastroCliente from './components/forms/specific/CadastroCliente/CadastroCliente'; 
 import CadastroContrato from './components/forms/specific/CadastroContrato/CadastroContrato';
 import RelatorioPoco from './components/forms/specific/CadastroRelatorio/CadastroRelatorio'; // Usado para "Novo Poço"
-import EstoqueDashboard from './pages/Estoque/pages/EstoqueDashboard';
-import StockEntryForm from './pages/Estoque/pages/Gerenciamento';
-import StockAdjustmentForm from './pages/Estoque/pages/Operacoes';
-import StockInventory from './pages/Estoque/pages/Consulta';
+import StockEntryForm from './pages/Estoque/pages/StockEntryForm';
+import StockAdjustmentForm from './pages/Estoque/pages/StockAdjustmentForm';
+import StockInventory from './pages/Estoque/pages/StockInventory';
 
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);

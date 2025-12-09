@@ -1,5 +1,4 @@
 import React from 'react';
-import "../Estoque.css";
 import Typography from '../../../components/ui/Typography/Typography';
 import Button from '../../../components/ui/Button/Button';
 
@@ -9,7 +8,7 @@ interface ProductHeaderProps {
     onAddProduct: () => void;
 }
 
-const ProductHeader: React.FC<ProductHeaderProps> = ({  onAddProduct }) => {
+const EstoqueHeader: React.FC<ProductHeaderProps> = ({  onAddProduct }) => {
     return (
         <div className="product-header" >
             
@@ -27,4 +26,4 @@ const ProductHeader: React.FC<ProductHeaderProps> = ({  onAddProduct }) => {
     );
 };
 
-export default ProductHeader;
+export default EstoqueHeader;

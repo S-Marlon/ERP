@@ -1,7 +1,6 @@
 // src/pages/StockInventory.tsx
 
 import React, { useState, useContext } from "react";
-import ProductContent from "../Components/ProductContent"; 
 import { Product, FilterState } from "../../../types/types"; // Importando tipos globais (Ajuste o caminho se necessário)
 import ProductDetails from "../Components/ProductDetails";
 

@@ -1,10 +1,8 @@
 // src/pages/EstoquePage.tsx
 import React, { useState, useContext } from "react";
-import ProductHeader from "./Components/ProductHeader";
-import ProductFooter from "./Components/ProductFooter";
-import ProductContent from "./Components/ProductContent";
+import ProductHeader from "./Components/EstoqueHeader";
+import ProductFooter from "./Components/EstoqueFooter";
 import { Product, FilterState } from "../../types/types";
-import "./Estoque.css";
 
 import { ProductContext } from "../../context/ProductContext";
 import EstoqueDashboard from "./pages/EstoqueDashboard";

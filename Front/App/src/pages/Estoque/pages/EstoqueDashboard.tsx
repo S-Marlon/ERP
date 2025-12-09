@@ -136,13 +136,11 @@ Esta deve ser a página de entrada no módulo de estoque.
 
     Conteúdo Essencial:
 
-        Alertas de Estoque Mínimo: Lista de produtos que precisam ser repostos imediatamente.
-
-        Itens Mais Vendidos (Giro): Visão dos produtos com maior saída no período recente.
-
-        Valor Total do Estoque: O custo total dos itens em estoque.
+       
+        <br></br>
 
         Gráfico de Movimentação: Visualização das entradas vs. saídas nos últimos 7/30 dias.
+        <br></br>
 
         Acesso Rápido: Botões para as operações mais comuns (Ex: Registrar Entrada, Novo Produto, Inventário).
 
@@ -151,7 +149,7 @@ Esta deve ser a página de entrada no módulo de estoque.
         {/* --- Coluna de Alerta de Estoque Baixo --- */}
         <div className="panel alerts-panel">
           <h2 className="panel-title alerts-title">
-            🚨 Alertas de Reposição ({})
+            🚨 Alertas de Reposição ({4})
           </h2>
           <div className="table-container">
             <table className="data-table">
