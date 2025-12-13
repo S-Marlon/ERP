@@ -15,6 +15,8 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
    variant?: ButtonVariant;
    loading?: boolean;
    active?: boolean; // Propriedade para estado ativo/selecionado
+   fontsize?: string;
+   padding?: string;
 }
 
 const Button: React.FC<ButtonProps> = ({
@@ -22,6 +24,8 @@ const Button: React.FC<ButtonProps> = ({
    loading = false,
    disabled,
    active = false, // Inclua a prop e defina um valor padrão
+   fontsize = '14px',
+   padding = '8px 10x',
    children,
    ...props
 }) => {
@@ -40,7 +44,7 @@ const Button: React.FC<ButtonProps> = ({
    }
 
    return (
-      <button
+      <button style={{fontSize:fontsize, padding:padding}}
          className={className}
          disabled={disabled || loading}
          {...props}

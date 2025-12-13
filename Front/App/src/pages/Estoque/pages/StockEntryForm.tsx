@@ -1,325 +1,722 @@
-// src/pages/StockEntryForm.tsx (APRIMORADO)
+// src/pages/StockEntryForm.tsx (FINAL COMPLETO E INTEGRADO)
 import React, { useState, useMemo } from 'react';
+import Button from '../../../components/ui/Button/Button';
+import FlexGridContainer from '../../../components/Layout/FlexGridContainer/FlexGridContainer';
+import Card from '../../../components/ui/Card/Card';
+import Typography from '../../../components/ui/Typography/Typography';
+import FormControl from '../../../components/ui/FormControl/FormControl';
+import MappingModal from '../Components/MappingModal'; // Modal de Mapeamento
+import { parseNfeXmlToData, NfeDataFromXML } from '../utils/nfeParser';
+import Badge from '../../../components/ui/Badge/Badge';
 
-// --- Interfaces (adicionando o campo mappedId para simular o mapeamento interno) ---
+// --- Interfaces ---
 interface ProductEntry {
     tempId: number;
-    sku: string; // SKU do Fornecedor
-    mappedId?: string; // ID do produto no sistema (Seu SKU)
+    sku: string;
+    mappedId?: string;
     name: string;
-    unitPrice: number; // Preço de Custo (com impostos, simplificado)
+    unitPrice: number;
     quantity: number;
+    quantityReceived: number;
+    difference: number;
     total: number;
+    isConfirmed: boolean;
+    unitCostWithTaxes: number;
+    category?: string;
 }
 
-// --- Dados Mock (Adicionando Mapeamento e Custo Variável) ---
-const mockEntryItems: ProductEntry[] = [
-    { tempId: 1, sku: 'AG-500', mappedId: 'PROD-123', name: 'Água Mineral 500ml', unitPrice: 1.50, quantity: 200, total: 300.00 },
-    { tempId: 2, sku: 'PAO-FR', mappedId: 'PROD-456', name: 'Farinha de Trigo Kg', unitPrice: 4.80, quantity: 50, total: 240.00 },
-    // Este item está sem mapeamento (necessita de ação do usuário)
-    { tempId: 3, sku: 'CHOC-70', mappedId: undefined, name: 'Chocolate Amargo 70%', unitPrice: 8.50, quantity: 100, total: 850.00 }, 
-];
+interface NfeData {
+    invoiceNumber: string;
+    supplier: string;
+    entryDate: string;
+    accessKey: string;
+    totalFreight: number;
+    totalIpi: number;
+    totalOtherExpenses: number;
+    totalNoteValue: number;
+    items: ProductEntry[];
+}
 
+// --- Helpers ---
+const formatCurrency = (value: number): string =>
+    value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+const mapNfeDataToEntryForm = (xmlData: NfeDataFromXML): NfeData => {
+    const totalFreight = parseFloat(xmlData.valorTotalFrete || '0.00');
+    const totalIpi = parseFloat(xmlData.valorTotalIpi || '0.00');
+    const totalOtherExpenses = parseFloat(xmlData.valorOutrasDespesas || '0.00');
+
+    const subtotalProducts = xmlData.produtos.reduce((sum, p) => {
+        const total = parseFloat(p.valorTotal || '0.00');
+        return sum + total;
+    }, 0);
+
+    const items: ProductEntry[] = xmlData.produtos.map((produto, index) => {
+        const quantity = parseFloat(produto.quantidade || '0.00');
+        const unitPrice = parseFloat(produto.valorUnitario || '0.00');
+        const totalProductValue = parseFloat(produto.valorTotal || '0.00');
+        const ratio = subtotalProducts > 0 ? (totalProductValue / subtotalProducts) : 0;
+        const freightRate = totalFreight * ratio;
+        const ipiRate = totalIpi * ratio;
+        const otherExpensesRate = totalOtherExpenses * ratio;
+        const totalCostItem = totalProductValue + freightRate + ipiRate + otherExpensesRate;
+        const unitCostWithTaxes = quantity > 0 ? (totalCostItem / quantity) : unitPrice;
+
+        return {
+            tempId: index + 1,
+            sku: produto.codigo,
+            mappedId: undefined,
+            name: produto.descricao,
+            unitPrice: parseFloat(unitPrice.toFixed(4)),
+            quantity: parseFloat(quantity.toFixed(4)),
+            quantityReceived: parseFloat(quantity.toFixed(4)),
+            difference: 0,
+            total: parseFloat(totalProductValue.toFixed(2)),
+            unitCostWithTaxes: parseFloat(unitCostWithTaxes.toFixed(4)),
+            isConfirmed: false,
+            category: '',
+        };
+    });
+
+    return {
+        invoiceNumber: `NF ${xmlData.numero}`,
+        supplier: xmlData.emitente.nome,
+        entryDate: xmlData.dataEmissao.substring(0, 10),
+        accessKey: xmlData.chaveAcesso,
+        totalFreight,
+        totalIpi,
+        totalOtherExpenses,
+        totalNoteValue: parseFloat(xmlData.valorTotal || '0.00'),
+        items,
+    };
+};
+
+// Cabeçalho da tabela
+const renderTableHead = (itemsList: ProductEntry[], toggleSelectAll: (isPending: boolean) => void, isPendingTable: boolean, selectedIds: Set<number>) => {
+    const allSelected = itemsList.length > 0 && itemsList.every(item => selectedIds.has(item.tempId));
+    return (
+        <thead>
+            <tr style={styles.tableHead}>
+                <th style={styles.tableTh}>
+                    {itemsList.length > 0 && (
+                        <input
+                            type="checkbox"
+                            checked={allSelected}
+                            onChange={() => toggleSelectAll(isPendingTable)}
+                        />
+                    )}
+                </th>
+                <th style={styles.tableTh}>Mapeamento</th>
+                <th style={{ ...styles.tableTh , width: '70px'}}>SKU Forn.</th>
+                <th style={{ ...styles.tableTh , width: '450px'}}>Produto (NF)</th>
+                <th style={{ ...styles.tableTh, width: '100px' }}>Preço Unitário (NF)</th>
+                <th style={{ ...styles.tableTh, width: '80px' }}>Qtd. NF</th>
+                <th style={{ ...styles.tableTh, width: '70px' }}>*Qtd. Recebida*</th>
+                <th style={{ ...styles.tableTh, width: '80px' }}>*Dif.*</th>
+                <th style={{ ...styles.tableTh, width: '120px' }}>Categoria</th>
+                <th style={{ ...styles.tableTh, width: '60px' }}>Total Produto</th>
+                <th style={{ ...styles.tableTh, width: '30px' }}>Ações</th>
+            </tr>
+        </thead>
+    );
+};
+
+// --- Componente Principal ---
 const StockEntryForm: React.FC = () => {
-    const [invoiceNumber, setInvoiceNumber] = useState('NFe 000123456');
-    const [supplier, setSupplier] = useState('Distribuidora Central S.A.');
+    // Header / nota
+    const [invoiceNumber, setInvoiceNumber] = useState('');
+    const [supplier, setSupplier] = useState('');
     const [entryDate, setEntryDate] = useState(new Date().toISOString().substring(0, 10));
-    const [items, setItems] = useState<ProductEntry[]>(mockEntryItems);
+    const [items, setItems] = useState<ProductEntry[]>([]);
 
-    // --- Cálculos Dinâmicos ---
+    // seleções separadas
+    const [selectedPendingIds, setSelectedPendingIds] = useState<Set<number>>(new Set());
+    const [selectedConfirmedIds, setSelectedConfirmedIds] = useState<Set<number>>(new Set());
+
+    const [availableCategories] = useState<string[]>(['Material', 'Insumo', 'Serviço', 'Outro']);
+    const [bulkCategory, setBulkCategory] = useState<string>(availableCategories[0]);
+
+    const [accessKey, setAccessKey] = useState('');
+    const [totalFreight, setTotalFreight] = useState(0);
+    const [totalIpi, setTotalIpi] = useState(0);
+    const [totalOtherExpenses, setTotalOtherExpenses] = useState(0);
+    const [totalNoteValue, setTotalNoteValue] = useState(0);
+
+    // modal mapping
+    const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
+    const [itemToMap, setItemToMap] = useState<ProductEntry | null>(null);
+
     const subtotal = useMemo(() => items.reduce((sum, item) => sum + item.total, 0), [items]);
-    const totalItems = useMemo(() => items.reduce((sum, item) => sum + item.quantity, 0), [items]);
-    
-    // Verifica se todos os itens estão mapeados antes de confirmar
-    const hasUnmappedItems = items.some(item => !item.mappedId);
+    const totalItems = useMemo(() => items.reduce((sum, item) => sum + item.quantityReceived, 0), [items]);
 
-    const formatCurrency = (value: number): string => {
-        return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const hasUnmappedItems = items.some(item => !item.mappedId);
+    const divergentItems = useMemo(() => items.filter(i => i.difference !== 0), [items]);
+    const hasDivergence = divergentItems.length > 0;
+
+    const pendingItems = useMemo(() => items.filter(item => !item.isConfirmed), [items]);
+    const confirmedItems = useMemo(() => items.filter(item => item.isConfirmed), [items]);
+    const hasPendingItems = pendingItems.length > 0;
+
+    // Upload XML
+    const handleXmlUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        if (file.type !== 'text/xml' && !file.name.endsWith('.xml')) {
+            alert('Por favor, selecione um arquivo XML (.xml) válido.');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const xmlContent = e.target?.result as string;
+                const rawXmlData = parseNfeXmlToData(xmlContent);
+                if (!rawXmlData) throw new Error('Falha ao extrair dados do XML.');
+                const xmlData = mapNfeDataToEntryForm(rawXmlData);
+
+                setInvoiceNumber(xmlData.invoiceNumber);
+                setSupplier(xmlData.supplier);
+                setEntryDate(xmlData.entryDate);
+                setAccessKey(xmlData.accessKey);
+                setTotalFreight(xmlData.totalFreight);
+                setTotalIpi(xmlData.totalIpi);
+                setTotalOtherExpenses(xmlData.totalOtherExpenses);
+                setTotalNoteValue(xmlData.totalNoteValue);
+                setItems(xmlData.items);
+
+                // reset seleções
+                setSelectedPendingIds(new Set(xmlData.items.filter(i => !i.isConfirmed).map(i => i.tempId)));
+                setSelectedConfirmedIds(new Set());
+
+                alert(`XML importado com sucesso! ${xmlData.items.length} itens carregados.`);
+            } catch (error) {
+                console.error('Erro ao processar XML:', error);
+                alert('Erro ao processar o arquivo XML. Detalhes: ' + (error instanceof Error ? error.message : 'Erro desconhecido'));
+            }
+        };
+        reader.onerror = () => { alert('Erro ao ler o arquivo.'); };
+        reader.readAsText(file);
     };
 
-    // --- Manipuladores da Tabela ---
+    // Manipuladores
+    const toggleConfirmation = (tempId: number) => {
+        const current = items.find(i => i.tempId === tempId);
+        if (!current) return;
+        const willConfirm = !current.isConfirmed;
 
-    const handleUpdateItem = (tempId: number, field: keyof ProductEntry, value: string | number) => {
-        setItems(prevItems => prevItems.map(item => {
-            if (item.tempId === tempId) {
-                let newItem = { ...item, [field]: value };
+        setItems(prev => prev.map(it => it.tempId === tempId ? { ...it, isConfirmed: willConfirm } : it));
 
-                // Recálculo do Total
-                if (field === 'quantity' || field === 'unitPrice') {
-                    const qty = field === 'quantity' ? Number(value) : item.quantity;
-                    const price = field === 'unitPrice' ? Number(value) : item.unitPrice;
-                    
-                    // Garante que o total é calculado com números válidos
-                    newItem.total = isNaN(qty) || isNaN(price) ? 0 : parseFloat((qty * price).toFixed(2));
-                }
-                return newItem as ProductEntry;
+        if (willConfirm) {
+            setSelectedPendingIds(prev => { const n = new Set(prev); n.delete(tempId); return n; });
+            setSelectedConfirmedIds(prev => { const n = new Set(prev); n.add(tempId); return n; });
+        } else {
+            setSelectedConfirmedIds(prev => { const n = new Set(prev); n.delete(tempId); return n; });
+            setSelectedPendingIds(prev => { const n = new Set(prev); n.add(tempId); return n; });
+        }
+
+        if (willConfirm) {
+            if (current.difference !== 0) alert('Atenção: Item com divergência de quantidade. Ele será movido para Conferidos.');
+            if (!current.mappedId) alert('Atenção: Item não mapeado. O mapeamento é obrigatório para a entrada final. Ele será movido para Conferidos.');
+        }
+    };
+
+    const handleUpdateReceivedQuantity = (tempId: number, value: string) => {
+        const received = parseFloat(value);
+        if (isNaN(received) || received < 0) return;
+        setItems(prev => prev.map(it => {
+            if (it.tempId === tempId) {
+                const diff = received - it.quantity;
+                return { ...it, quantityReceived: received, difference: parseFloat(diff.toFixed(4)) };
             }
-            return item;
+            return it;
         }));
     };
-    
+
+      const handleResetReceivedQuantity = (tempId?: number, value?: string) => {
+          // se houver seleção, reseta apenas os selecionados; senão reseta todos os pendentes
+          const ids = Array.from(selectedPendingIds);
+  
+          setItems(prev =>
+              prev.map(it => {
+                  if (ids.length > 0) {
+                      return ids.includes(it.tempId)
+                          ? { ...it, quantityReceived: it.quantity, difference: 0 }
+                          : it;
+                  }
+                  // quando não há seleção, reseta todos os pendentes (não conferidos)
+                  return !it.isConfirmed ? { ...it, quantityReceived: it.quantity, difference: 0 } : it;
+              })
+          );
+  
+          // limpa seleção após o reset
+          setSelectedPendingIds(new Set());
+  
+          const count = ids.length > 0 ? ids.length : pendingItems.length;
+          alert(`${count} item(s) tiveram a quantidade recebida resetada para o valor da NF.`);
+      };
+
+    const handleUpdateItem = (tempId: number, field: keyof ProductEntry, value: string | number) => {
+        setItems(prev => prev.map(it => {
+            if (it.tempId === tempId) {
+                let newItem = { ...it, [field]: value } as ProductEntry;
+                if (field === 'unitPrice') {
+                    const price = Number(value);
+                    newItem.total = isNaN(price) ? 0 : parseFloat((it.quantity * price).toFixed(2));
+                }
+                return newItem;
+            }
+            return it;
+        }));
+    };
+
     const handleRemoveItem = (tempId: number) => {
-        if (window.confirm('Tem certeza que deseja remover este item da lista de entrada?')) {
-             setItems(items.filter(item => item.tempId !== tempId));
-        }
+        if (!window.confirm('Remover este item da lista de entrada?')) return;
+        setItems(prev => prev.filter(it => it.tempId !== tempId));
+        setSelectedPendingIds(prev => { const n = new Set(prev); n.delete(tempId); return n; });
+        setSelectedConfirmedIds(prev => { const n = new Set(prev); n.delete(tempId); return n; });
     };
 
     const handleMapProduct = (tempId: number) => {
-        // Simulação de abertura de modal de busca e mapeamento
-        const newMappedId = prompt(`Mapear item ID ${tempId} (SKU Forn: ${items.find(i => i.tempId === tempId)?.sku}). Digite o ID do produto interno (ex: PROD-999):`);
-        
-        if (newMappedId) {
-            handleUpdateItem(tempId, 'mappedId', newMappedId.toUpperCase().trim());
-            alert(`Item ${tempId} mapeado para ${newMappedId.toUpperCase().trim()}.`);
+        const item = items.find(i => i.tempId === tempId);
+        if (!item) return;
+        setItemToMap(item);
+        setIsMappingModalOpen(true);
+    };
+
+    const handleModalMap = (tempId: number, mappedId: string, category: string) => {
+        setItems(prev => prev.map(it => it.tempId === tempId ? { ...it, mappedId, category } : it));
+        setIsMappingModalOpen(false);
+        setItemToMap(null);
+        alert(`Item ${tempId} mapeado para ${mappedId}. Categoria: ${category}.`);
+    };
+
+    const closeModal = () => { setIsMappingModalOpen(false); setItemToMap(null); };
+
+    // Seleção por linha (isPending = true para pendentes)
+    const toggleSelectItem = (tempId: number, isPending: boolean) => {
+        if (isPending) {
+            setSelectedPendingIds(prev => { const n = new Set(prev); n.has(tempId) ? n.delete(tempId) : n.add(tempId); return n; });
+        } else {
+            setSelectedConfirmedIds(prev => { const n = new Set(prev); n.has(tempId) ? n.delete(tempId) : n.add(tempId); return n; });
         }
     };
 
-    // --- Ação Final ---
+    const toggleSelectAll = (isPendingTable: boolean) => {
+        const list = isPendingTable ? pendingItems : confirmedItems;
+        if (isPendingTable) {
+            const all = list.length > 0 && list.every(i => selectedPendingIds.has(i.tempId));
+            setSelectedPendingIds(prev => {
+                const n = new Set(prev);
+                list.forEach(i => all ? n.delete(i.tempId) : n.add(i.tempId));
+                return n;
+            });
+        } else {
+            const all = list.length > 0 && list.every(i => selectedConfirmedIds.has(i.tempId));
+            setSelectedConfirmedIds(prev => {
+                const n = new Set(prev);
+                list.forEach(i => all ? n.delete(i.tempId) : n.add(i.tempId));
+                return n;
+            });
+        }
+    };
 
+   
+
+   
+
+    const handleBulkConfirmSelected = () => {
+        const ids = Array.from(selectedPendingIds);
+        setItems(prev => prev.map(it => ids.includes(it.tempId) ? { ...it, isConfirmed: true } : it));
+        setSelectedPendingIds(new Set());
+        setSelectedConfirmedIds(prev => { const n = new Set(prev); ids.forEach(id => n.add(id)); return n; });
+        alert(`${ids.length} itens marcados como Conferidos.`);
+    };
+
+    
+    const handleBulkUnconfirmSelected = () => {
+        const ids = Array.from(selectedConfirmedIds);
+        setItems(prev => prev.map(it => ids.includes(it.tempId) ? { ...it, isConfirmed: false } : it));
+        setSelectedConfirmedIds(new Set());
+        setSelectedPendingIds(prev => { const n = new Set(prev); ids.forEach(id => n.add(id)); return n; });
+        alert(`${ids.length} itens desmarcados (movidos para Pendentes).`);
+    };
+
+    // Render linha (agora recebe isPending + toggleSelectItem)
+    const renderItemRow = (
+        item: ProductEntry,
+        toggleConfirmationFn: (tempId: number) => void,
+        handleUpdateReceivedQuantityFn: (tempId: number, value: string) => void,
+        handleMapProductFn: (tempId: number) => void,
+        handleUpdateItemFn: (tempId: number, field: keyof ProductEntry, value: string | number) => void,
+        handleRemoveItemFn: (tempId: number) => void,
+        toggleSelectItemFn: (tempId: number, isPending: boolean) => void,
+        isSelected: boolean,
+        isPending: boolean
+    ) => {
+        const isDivergent = item.difference !== 0;
+        // Alternância de cores por linha (índice do item)
+        const rowIndex = (isPending ? pendingItems : confirmedItems).findIndex(i => i.tempId === item.tempId);
+        const isEvenRow = rowIndex % 2 === 0;
+        const baseRowColor = isEvenRow ? '#ffffff' : '#f9fafb';
+        const selectedRowColor = '#dbeafe'; // azul claro ao selecionar
+        const rowBackgroundColor = isSelected ? selectedRowColor : baseRowColor;
+        const rowBorderLeft = isSelected ? '4px solid #3b82f6' : 'none';
+        const rowPaddingLeft = isSelected ? '8px' : '12px';
+
+        return (
+            <tr key={item.tempId} style={{
+                ...styles.tableRow,
+                backgroundColor: rowBackgroundColor,
+                borderLeft: rowBorderLeft,
+                transition: 'all 0.2s ease-in-out',
+                cursor: 'pointer',
+            }}>
+                <td style={{ ...styles.tableCell, textAlign: 'center' }}>
+                    <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelectItemFn(item.tempId, isPending)}
+                        style={{ cursor: 'pointer', transform: 'scale(1.2)' }}
+                    />
+                </td>
+                <td style={styles.tableCell}>
+                    {item.mappedId ? (
+                        <span style={{ ...styles.mappedIdBadge, fontSize: '0.75rem', fontWeight: 700 }}>{item.mappedId}</span>
+                    ) : (
+                        <Button onClick={() => handleMapProductFn(item.tempId)} variant='warning' fontsize='11px' padding='5px' >
+                            🔗 Mapear
+                        </Button>
+                    )}
+                </td>
+                <td style={styles.tableCell}>{item.sku}</td>
+                <td style={{ ...styles.tableCell, fontWeight: 500 }}>{item.name}</td>
+                <td style={styles.tableCell}>R$ {item.unitPrice.toFixed(3)}</td>
+                <td style={{ ...styles.tableCell, fontWeight: 700, color: '#4b5563' }}>{item.quantity.toFixed(2)}</td>
+                <td style={styles.tableCell}>
+                    {item.isConfirmed ? (
+                        <span style={{ fontWeight: 600, color: '#10b981' }}>{item.quantityReceived}</span>
+                    ) : (
+                        <input
+                            type="number" min="0" step="1"
+                            value={item.quantityReceived}
+                            onChange={(e) => handleUpdateReceivedQuantityFn(item.tempId, e.target.value)}
+                            style={{
+                                maxWidth: '50px',
+                                backgroundColor: isDivergent ? '#fee2e2' : '#ffffffff',
+                                border: isDivergent ? '2px solid #dc2626' : '2px solid #10b981',
+                                color: isDivergent ? '#991b1b' : '#10b981',
+                            }}
+                            disabled={item.isConfirmed}
+                        />
+                    )}
+                </td>
+                <td style={{
+                    ...styles.tableCell, fontWeight: 700,
+                    color: isDivergent ? (item.difference > 0 ? '#f97316' : '#dc2626') : '#10b981',
+                    backgroundColor: isDivergent ? (item.difference > 0 ? '#fef3c7' : '#fee2e2') : 'transparent',
+                    padding: '3px 6px',
+                    borderRadius: '4px',
+                }}>
+                    {item.difference.toFixed(2)}
+                </td>
+                <td style={styles.tableCell}>
+                    {item.category && item.category !== '' ? (
+                        <span style={{
+                            padding: '3px 8px',
+                            backgroundColor: '#d1fae5',
+                            color: '#065f46',
+                            borderRadius: '4px',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                        }}>
+                            {item.category}
+                        </span>
+                    ) : (
+                        <span style={{
+                            padding: '5px 0px',
+                            backgroundColor: '#fee2e2',
+                            color: '#991b1b',
+                            borderRadius: '4px',
+                            fontSize: '0.7rem',
+                            fontWeight: 500,
+                        }}>
+                            Sem Categoria
+                        </span>
+                    )}
+                </td>
+                <td style={{ ...styles.tableCell, fontWeight: 700, color: '#10b981' }}>{formatCurrency(item.total)}</td>
+                <td style={styles.tableCell}>
+                    <button
+                        onClick={() => toggleConfirmationFn(item.tempId)}
+                        style={{
+                            ...( item.isConfirmed ? styles.uncheckButton : styles.checkButton),
+                            transition: 'all 0.15s',
+                            fontWeight: 600,
+                        }}
+                    >
+                        {item.isConfirmed ? 'Desmarcar' : 'Conferir'}
+                    </button>
+                    {!item.isConfirmed && (
+                        <button
+                            onClick={() => handleUpdateReceivedQuantityFn(item.tempId, String(item.quantity))}
+                            style={{
+                                ...styles.uncheckButton,
+                                backgroundColor: '#9a3d51',
+                                marginTop: '6px',
+                                transition: 'all 0.15s',
+                            }}
+                            title="Resetar para quantidade da NF"
+                        >
+                            ↺ Resetar
+                        </button>
+                    )}
+                </td>
+            </tr>
+        );
+    };
+
+    // Confirma entrada
     const handleConfirmEntry = () => {
-        if (items.length === 0) {
-            alert('Não há itens para dar entrada no estoque.');
-            return;
+        if (items.length === 0) { alert('Não há itens para dar entrada no estoque.'); return; }
+        if (hasPendingItems) { alert('ERRO: Todos os itens devem ser conferidos antes de finalizar a entrada.'); return; }
+        const allMapped = items.every(item => item.mappedId);
+        if (!allMapped) { alert('ERRO: Todos os itens devem estar mapeados antes de confirmar a entrada.'); return; }
+        if (hasDivergence) {
+            const confirmDivergence = window.confirm(`ATENÇÃO: ${divergentItems.length} divergência(s). Confirmar entrada dos itens recebidos (${totalItems.toFixed(2)} unidades)?`);
+            if (!confirmDivergence) return;
         }
-        if (hasUnmappedItems) {
-            alert('ERRO: Você deve Mapear todos os produtos da NF para produtos internos antes de confirmar a entrada.');
-            return;
-        }
-
-        // Lógica de envio para a API (ex: POST /api/stock/entry)
-        alert(`Entrada de NF ${invoiceNumber} do fornecedor ${supplier} confirmada! ${items.length} itens adicionados e custos atualizados no estoque.`);
-        // Resetar o formulário ou redirecionar
+        alert(`Entrada de NF ${invoiceNumber} confirmada! ${totalItems.toFixed(2)} unidades serão atualizadas no estoque.`);
     };
-
 
     return (
         <div style={styles.container}>
-            <h1 style={styles.title}>📥 Entrada de Mercadorias (Registro de NF)</h1>
+            <div className="page-header"><h1 style={styles.title}>📥 Entrada de Mercadorias (Registro de NF-e)</h1></div>
 
-            {/* ... Seção 1: Informações da Nota Fiscal (sem alteração) ... */}
-            <div style={styles.panel}>
-                 <h2 style={styles.panelTitle}>1. Informações da Nota Fiscal</h2>
-                <div style={styles.importArea}>
-                    <input type="file" style={styles.fileInput} accept=".xml" id="xml-upload"/>
-                    <label htmlFor="xml-upload" style={styles.importButton}>
-                        ⬆️ Importar XML da NF-e
-                    </label>
-                    <span style={{ color: '#6b7280', fontSize: '0.9rem' }}>
-                        (Recomendado: Preenche automaticamente campos e a lista de produtos)
-                    </span>
-                </div>
+            <FlexGridContainer layout='grid'>
+                <Card variant='default' padding='20px'>
+                    <Typography variant='h2'>1. Informações da Nota Fiscal</Typography>
+                    <div style={styles.importArea}>
+                        <input type="file" style={styles.fileInput} accept=".xml" id="xml-upload" onChange={handleXmlUpload} />
+                        <label htmlFor="xml-upload" style={styles.importButton}>⬆️ Importar XML da NF-e</label>
+                        <Typography variant='pMuted' style={{ marginTop: '10px' }}>(Preenche automaticamente cabeçalho, totais e lista de produtos)</Typography>
+                    </div>
+                    <FlexGridContainer layout='grid' template='2fr 5fr 1fr' gap='10px'>
+                        <FormControl label='Nº da Nota Fiscal:' type="text" readOnlyDisplay={true} value={invoiceNumber} />
+                        <FormControl label='Fornecedor:' type="text" value={supplier} readOnlyDisplay={true}/>
+                        <FormControl label='Data da Entrada:' type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)}  />
+                    </FlexGridContainer>
+                </Card>
 
-                <div style={styles.formRow}>
-                    <div style={styles.inputGroup}>
-                        <label style={styles.label}>Nº da Nota Fiscal:</label>
-                        <input type="text" value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} style={styles.input} />
-                    </div>
-                    <div style={styles.inputGroup}>
-                        <label style={styles.label}>Fornecedor:</label>
-                        <input type="text" value={supplier} onChange={(e) => setSupplier(e.target.value)} style={styles.input} />
-                    </div>
-                    <div style={styles.inputGroup}>
-                        <label style={styles.label}>Data da Entrada:</label>
-                        <input type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} style={styles.input} />
-                    </div>
-                </div>
-            </div>
+                {accessKey && (
+                    <Card variant='default' padding='20px'>
+                        <Typography variant='h2'>2. Conferência de Totais Fiscais e Logísticos</Typography>
+                        <FlexGridContainer layout='grid' template='3fr 2fr' gap='30px'>
+                            <div>
+                                <p style={styles.summaryItem}><span style={styles.summaryLabel}>Chave de Acesso:</span><span style={{ ...styles.summaryValue, fontSize: '0.85rem' }}>**{accessKey}**</span></p>
+                                <p style={styles.summaryItem}><span style={styles.summaryLabel}>Total IPI (Rateável):</span><span style={styles.summaryValue}>{formatCurrency(totalIpi)}</span></p>
+                                <p style={styles.summaryItem}><span style={styles.summaryLabel}>Total Frete (Rateável):</span><span style={styles.summaryValue}>{formatCurrency(totalFreight)}</span></p>
+                                <p style={styles.summaryItem}><span style={styles.summaryLabel}>Total Outras Despesas:</span><span style={styles.summaryValue}>{formatCurrency(totalOtherExpenses)}</span></p>
+                            </div>
+                            <div style={styles.totalsBox}>
+                                <p style={styles.totalLine}><span style={styles.totalLabel}>Soma dos Produtos (vProd NF): </span></p>
+                                <span style={{ ...styles.totalValue, color: '#2675dcff', fontSize: '1.25rem' }}>{formatCurrency(subtotal)}</span>
+                                <p style={{ ...styles.totalLine, borderTop: '1px solid #e5e7eb', paddingTop: '10px' }}><span style={{ ...styles.totalLabel, fontWeight: 700 }}>Valor Total da Nota (vNF):</span></p>
+                                <span style={{ ...styles.totalValue, color: '#dc2626', fontSize: '1.25rem' }}>{formatCurrency(totalNoteValue)}</span>
+                            </div>
+                        </FlexGridContainer>
+                    </Card>
+                )}
+            </FlexGridContainer>
 
-            {/* --- Seção 2: Tabela de Itens da Nota (Com Edição e Mapeamento) --- */}
-            <div style={{ ...styles.panel, marginTop: '20px' }}>
-                <h2 style={styles.panelTitle}>2. Itens para Entrada no Estoque ({items.length} produtos)</h2>
-                
-                {hasUnmappedItems && (
-                    <div style={styles.warningMessage}>
-                        ⚠️ Atenção! **{items.filter(i => !i.mappedId).length}** item(ns) precisam de Mapeamento. Use a coluna "Mapeamento" antes de confirmar.
+            <hr />
+
+                    <h2 style={styles.panelTitle}>4. Conferência Detalhada de Itens ({items.length} itens totais)</h2>
+            <FlexGridContainer layout='grid'>
+
+                    <FlexGridContainer layout='flex'>
+                        <h3 style={styles.subTitle}>🔴 Itens Pendentes de Ação ({pendingItems.length} produtos)</h3>
+
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                            <button onClick={handleBulkConfirmSelected} style={{ padding: '6px 10px', borderRadius: 4, backgroundColor: '#4f46e5', color: '#fff' }}>
+                                Conferir Selecionados
+                            </button>
+                            <button onClick={() => handleResetReceivedQuantity()} style={{ padding: '6px 10px', borderRadius: 4, backgroundColor: '#f59e0b', color: '#fff' }}>
+                                Resetar Quantidade
+                            </button>
+                             <button onClick={() => setSelectedPendingIds(new Set())} style={{ padding: '6px 10px', borderRadius: 4, backgroundColor: '#9ca3af', color: '#fff' }}>Limpar Seleção</button>
+                             <span style={{ marginLeft: 8, color: '#6b7280' }}>{selectedPendingIds.size > 0 ? `${selectedPendingIds.size} selecionado(s)` : 'Selecione itens para ações em lote'}</span>
+                         </div>
+
+                        {hasUnmappedItems && hasPendingItems && <div style={styles.warningMessage}>⚠️ {items.filter(i => !i.mappedId).length} item(ns) precisam de Mapeamento.</div>}
+
+                        <div style={{ ...styles.tableResponsive, marginBottom: '30px' }}>
+                            <table style={styles.dataTable}>
+                                {renderTableHead(pendingItems, toggleSelectAll, true, selectedPendingIds)}
+                                <tbody>
+                                    {pendingItems.length === 0 ? (
+                                        <tr style={styles.tableRow}>
+                                            <td colSpan={12} style={{ ...styles.tableCell, textAlign: 'center', color: '#065f46', backgroundColor: '#ecfdf5' }}>
+                                                🎉 Não há itens pendentes. Role para baixo e finalize a entrada.
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        pendingItems.map(item =>
+                                            renderItemRow(item, toggleConfirmation, handleUpdateReceivedQuantity, handleMapProduct, handleUpdateItem, handleRemoveItem, toggleSelectItem, selectedPendingIds.has(item.tempId), true)
+                                        )
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </FlexGridContainer>
+
+
+                    <FlexGridContainer >
+
+                        <h3 style={{ ...styles.subTitle, borderTop: '1px solid #e5e7eb', paddingTop: '15px' }}>🟢 Itens Conferidos ({confirmedItems.length} produtos)</h3>
+
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                            <button onClick={handleBulkUnconfirmSelected} style={{ padding: '6px 10px', borderRadius: 4, backgroundColor: '#ef4444', color: '#fff' }}>Desmarcar Selecionados</button>
+                            <button onClick={() => setSelectedConfirmedIds(new Set())} style={{ padding: '6px 10px', borderRadius: 4, backgroundColor: '#9ca3af', color: '#fff' }}>Limpar Seleção</button>
+                            <span style={{ marginLeft: 8, color: '#6b7280' }}>{selectedConfirmedIds.size > 0 ? `${selectedConfirmedIds.size} selecionado(s)` : 'Selecione itens para desmarcar em lote'}</span>
+                        </div>
+
+                        <div style={styles.tableResponsive}>
+                            <table style={styles.dataTable}>
+                                {renderTableHead(confirmedItems, toggleSelectAll, false, selectedConfirmedIds)}
+                                <tbody>
+                                    {confirmedItems.length === 0 ? (
+                                        <tr style={styles.tableRow}>
+                                            <td colSpan={12} style={{ ...styles.tableCell, textAlign: 'center', color: '#6b7280' }}>Nenhum item foi marcado como conferido ainda.</td>
+                                        </tr>
+                                    ) : (
+                                        confirmedItems.map(item =>
+                                            renderItemRow(item, toggleConfirmation, handleUpdateReceivedQuantity, handleMapProduct, handleUpdateItem, handleRemoveItem, toggleSelectItem, selectedConfirmedIds.has(item.tempId), false)
+                                        )
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                    </FlexGridContainer>
+
+
+                {hasDivergence && (
+                    <div style={{ ...styles.panel, backgroundColor: '#fef2f2' }}>
+                        <h2 style={{ ...styles.panelTitle, color: '#dc2626' }}>🚨 3. Divergência Encontrada ({divergentItems.length})</h2>
+                        <div style={styles.divergenceList}>
+                            {divergentItems.map(item => (
+                                <div key={item.tempId} style={styles.divergenceItem}>
+                                    <Typography variant='p'><strong>SKU {item.sku}:</strong> {item.name}</Typography>
+                                    <p style={styles.divergenceDetails}>
+                                        Quantidade na NF: <strong>{item.quantity.toFixed(2)}</strong> | Recebido: <strong>{item.quantityReceived.toFixed(2)}</strong> |
+                                        Diferença: <span style={{ color: item.difference > 0 ? '#f59e0b' : '#dc2626', fontWeight: 700 }}>{item.difference > 0 ? `+${item.difference.toFixed(2)}` : item.difference.toFixed(2)}</span>
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                        <Button variant='secondary'>Gerar Relatório</Button>
                     </div>
                 )}
-                
-                <div style={styles.tableResponsive}>
-                    <table style={styles.dataTable}>
-                        <thead>
-                            <tr style={styles.tableHead}>
-                                <th style={styles.tableTh}>SKU Forn.</th>
-                                <th style={styles.tableTh}>Mapeamento (Seu Cód)</th>
-                                <th style={styles.tableTh}>Produto (NF)</th>
-                                <th style={{ ...styles.tableTh, width: '100px' }}>Preço Unitário (Custo)</th>
-                                <th style={{ ...styles.tableTh, width: '80px' }}>Quantidade</th>
-                                <th style={{ ...styles.tableTh, width: '100px' }}>Total do Item</th>
-                                <th style={styles.tableTh}>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {items.map((item) => (
-                                <tr key={item.tempId} style={styles.tableRow}>
-                                    <td style={styles.tableCell}>{item.sku}</td>
-                                    
-                                    {/* --- Célula de Mapeamento --- */}
-                                    <td style={{ ...styles.tableCell, ...styles.mappingCell }}>
-                                        {item.mappedId ? (
-                                            <span style={styles.mappedIdBadge}>ID: {item.mappedId}</span>
-                                        ) : (
-                                            <button 
-                                                onClick={() => handleMapProduct(item.tempId)} 
-                                                style={styles.mapButton}
-                                            >
-                                                Mapear Produto
-                                            </button>
-                                        )}
-                                    </td>
-                                    
-                                    <td style={{ ...styles.tableCell, fontWeight: 500 }}>{item.name}</td>
-                                    
-                                    {/* --- Edição de Preço Unitário --- */}
-                                    <td style={styles.tableCell}>
-                                        <input
-                                            type="number"
-                                            min="0.01"
-                                            step="0.01"
-                                            value={item.unitPrice}
-                                            onChange={(e) => handleUpdateItem(item.tempId, 'unitPrice', e.target.value)}
-                                            style={styles.inputInline}
-                                        />
-                                    </td>
-                                    
-                                    {/* --- Edição de Quantidade --- */}
-                                    <td style={styles.tableCell}>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            step="1"
-                                            value={item.quantity}
-                                            onChange={(e) => handleUpdateItem(item.tempId, 'quantity', e.target.value)}
-                                            style={styles.inputInline}
-                                        />
-                                    </td>
-                                    
-                                    {/* --- Total (Recálculo Automático) --- */}
-                                    <td style={{ ...styles.tableCell, fontWeight: 700, color: '#10b981' }}>
-                                        {formatCurrency(item.total)}
-                                    </td>
-                                    
-                                    <td style={styles.tableCell}>
-                                        <button onClick={() => handleRemoveItem(item.tempId)} style={styles.removeButton}>
-                                            Remover
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                            {items.length === 0 && (
-                                <tr style={styles.tableRow}>
-                                    <td colSpan={7} style={{ ...styles.tableCell, textAlign: 'center', color: '#6b7280' }}>
-                                        Nenhum item carregado. Importe o XML ou adicione manualmente.
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
 
-            {/* --- Área de Totais e Confirmação --- */}
-            <div style={styles.confirmationArea}>
-                <div style={styles.totalsBox}>
-                    <p style={styles.totalLine}>
-                        <span style={styles.totalLabel}>Total de Itens Físicos:</span>
-                        <span style={styles.totalValue}>{totalItems}</span>
-                    </p>
-                    <p style={{ ...styles.totalLine, borderTop: '1px solid #e5e7eb', paddingTop: '10px' }}>
-                        <span style={{ ...styles.totalLabel, fontWeight: 700 }}>Valor Total da Entrada:</span>
-                        <span style={{ ...styles.totalValue, color: '#10b981', fontSize: '1.5rem' }}>
-                            {formatCurrency(subtotal)}
-                        </span>
-                    </p>
+                <div style={styles.confirmationArea}>
+                    <div style={styles.totalsBoxFooter}>
+                        <p style={styles.totalLine}><span style={styles.totalLabel}>Total de Itens Físicos (Recebidos):</span><span style={styles.totalValue}>{totalItems.toFixed(2)}</span></p>
+                        <p style={{ ...styles.totalLine, borderTop: '1px solid #e5e7eb', paddingTop: '10px' }}>
+                            <span style={{ ...styles.totalLabel, fontWeight: 700 }}>Total dos Produtos (Soma NF):</span>
+                            <span style={{ ...styles.totalValue, color: '#10b981', fontSize: '1.5rem' }}>{formatCurrency(subtotal)}</span>
+                        </p>
+                        <p style={{ ...styles.totalLine, borderTop: '1px dashed #e5e7eb', paddingTop: '10px', fontSize: '1.1rem' }}>
+                            <span style={{ ...styles.totalLabel, fontWeight: 700, color: '#047857' }}>Custo Total (Ajustado):</span>
+                            <span style={{ ...styles.totalValue, color: '#047857', fontSize: '1.3rem' }}>{formatCurrency(subtotal + totalFreight + totalIpi + totalOtherExpenses)}</span>
+                        </p>
+                    </div>
+
+                    <button onClick={handleConfirmEntry} style={styles.confirmButton} disabled={items.length === 0 || hasUnmappedItems || hasPendingItems}>
+                        {items.length === 0 ? '🚫 Importe o XML' : hasPendingItems ? '🚫 Finalize a conferência' : hasUnmappedItems ? '🚫 Mapeie os itens' : '✅ Confirmar Entrada e Atualizar Estoque'}
+                    </button>
                 </div>
-                
-                <button 
-                    onClick={handleConfirmEntry} 
-                    style={styles.confirmButton}
-                    // Desabilita se não houver itens ou se houver itens não mapeados
-                    disabled={items.length === 0 || hasUnmappedItems} 
-                >
-                    {hasUnmappedItems ? '🚫 Mapeie os itens primeiro' : '✅ Confirmar Entrada e Atualizar Estoque'}
-                </button>
-            </div>
+            </FlexGridContainer>
+
+            {isMappingModalOpen && itemToMap && (
+                <MappingModal item={itemToMap} onMap={handleModalMap} onClose={closeModal} availableCategories={availableCategories} />
+            )}
         </div>
     );
 };
 
-// --- Estilos CSS Puros (Objeto Styles) ---
+// --- styles ---
 const styles: { [key: string]: React.CSSProperties } = {
-    // ... (Mantendo os estilos de container, title, panel, panelTitle, formRow, inputGroup, label, input)
-    // ... (Mantendo os estilos de importArea, fileInput, importButton)
-    // ... (Mantendo os estilos de confirmationArea, totalsBox, totalLine, totalLabel, totalValue)
-    // ... (Mantendo os estilos de confirmButton, removeButton)
-    
-    // Adicionando novos e alterando existentes:
-    
-    container: { padding: '24px', backgroundColor: '#f9fafb', minHeight: '100vh', },
-    title: { fontSize: '1.875rem', fontWeight: 600, color: '#1f2937', marginBottom: '24px', },
-    panel: { backgroundColor: '#ffffff', padding: '24px', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', },
-    panelTitle: { fontSize: '1.25rem', fontWeight: 600, color: '#374151', marginBottom: '16px', borderBottom: '1px solid #e5e7eb', paddingBottom: '8px', },
-    importArea: { display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px', padding: '10px', border: '1px dashed #93c5fd', backgroundColor: '#eff6ff', borderRadius: '6px', },
-    fileInput: { display: 'none', },
-    importButton: { padding: '10px 15px', backgroundColor: '#4f46e5', color: 'white', borderRadius: '6px', fontWeight: 500, cursor: 'pointer', transition: 'background-color 0.15s', },
-    formRow: { display: 'flex', gap: '20px', },
-    inputGroup: { flex: 1, display: 'flex', flexDirection: 'column', },
-    label: { fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '4px', },
-    input: { padding: '10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '1rem', },
-    
-    // Tabela e Células
-    tableResponsive: { overflowX: 'auto', },
-    dataTable: { width: '100%', borderCollapse: 'collapse', },
-    tableHead: { backgroundColor: '#f9fafb', borderBottom: '2px solid #e5e7eb', },
-    tableTh: { padding: '12px 16px', textAlign: 'left', fontSize: '0.75rem', fontWeight: 600, color: '#4b5563', textTransform: 'uppercase', },
-    tableRow: { borderBottom: '1px solid #e5e7eb', },
-    tableCell: { padding: '8px 16px', textAlign: 'left', fontSize: '0.875rem', color: '#1f2937', verticalAlign: 'middle' },
-    removeButton: { padding: '4px 8px', backgroundColor: '#fca5a5', color: '#991b1b', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, },
-    confirmButton: { padding: '15px 30px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '1.125rem', transition: 'background-color 0.15s', },
-    confirmationArea: { marginTop: '20px', display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-end', gap: '20px', },
-    totalsBox: { padding: '15px', border: '1px solid #d1d5db', borderRadius: '6px', backgroundColor: '#ffffff', width: '300px', },
-    totalLine: { display: 'flex', justifyContent: 'space-between', fontSize: '1rem', marginBottom: '5px', },
-    totalLabel: { color: '#4b5563', },
-    totalValue: { fontWeight: 600, },
-
-    // NOVOS ESTILOS
-    inputInline: { // Estilo para inputs dentro da célula da tabela
-        padding: '5px',
-        border: '1px solid #ccc',
-        borderRadius: '4px',
-        width: '100%',
-        boxSizing: 'border-box',
+    container: { padding: '24px', backgroundColor: '#f9fafb', minHeight: '100vh', fontFamily: 'Arial, sans-serif' },
+    title: { fontSize: '1.875rem', fontWeight: 600, color: '#1f2937', marginBottom: '24px' },
+    panel: { backgroundColor: '#ffffff', padding: '24px', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' },
+    panelTitle: { fontSize: '1.25rem', fontWeight: 600, color: '#374151', marginBottom: '16px', borderBottom: '1px solid #e5e7eb', paddingBottom: '8px' },
+    subTitle: { fontSize: '1.125rem', fontWeight: 600, color: '#374151', marginBottom: '10px', marginTop: '10px' },
+    importArea: { display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px', padding: '10px', border: '1px dashed #93c5fd', backgroundColor: '#eff6ff', borderRadius: '6px' },
+    fileInput: { display: 'none' },
+    importButton: { padding: '10px 15px', backgroundColor: '#4f46e5', color: 'white', borderRadius: '6px', fontWeight: 500, cursor: 'pointer' },
+    input: { padding: '8px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '1rem' },
+    tableResponsive: { overflowX: 'auto' },
+    dataTable: { width: '100%', borderCollapse: 'collapse' },
+    tableHead: { backgroundColor: '#f9fafb', borderBottom: '2px solid #e5e7eb' },
+    tableTh: { padding: '5px 5px', textAlign: 'left', fontSize: '0.70rem', fontWeight: 600, color: '#4b5563', textTransform: 'uppercase' },
+    tableRow: {
+        borderBottom: '1px solid #e5e7eb',
+        transition: 'background-color 0.2s, border-left 0.2s',
     },
-    warningMessage: {
-        padding: '10px 15px',
-        backgroundColor: '#fef3c7', /* bg-amber-100 */
-        color: '#b45309', /* text-amber-700 */
-        border: '1px solid #fcd34d',
-        borderRadius: '6px',
-        marginBottom: '15px',
-        fontWeight: 500,
+    ':hover': { // CSS-in-JS não suporta pseudo-seletores direto, mas adicionamos via inline styles nas linhas
+        backgroundColor: 'rgba(59, 130, 246, 0.05)',
     },
-    mappingCell: {
-        minWidth: '150px',
-        textAlign: 'center',
-    },
-    mapButton: {
-        padding: '5px 10px',
-        backgroundColor: '#f59e0b', /* bg-amber-500 */
+    tableCell: { padding: '3px 5px', textAlign: 'left', fontSize: '0.75rem', color: '#1f2937', verticalAlign: 'middle' },
+    removeButton: { padding: '4px 8px', backgroundColor: '#fca5a5', color: '#991b1b', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 },
+    checkButton: {
+        padding: '4px 8px',
+        backgroundColor: '#10b981',
         color: 'white',
         border: 'none',
         borderRadius: '4px',
         cursor: 'pointer',
-        fontSize: '0.8rem',
-        fontWeight: 600,
+        transition: 'all 0.15s ease-in-out',
+    },
+    uncheckButton: {
+        padding: '4px 8px',
+        backgroundColor: '#6b7280',
+        color: 'white',
+        border: 'none',
+        borderRadius: '4px',
+        cursor: 'pointer',
+        transition: 'all 0.15s ease-in-out',
+    },
+    mapButton: {
+        padding: '5px 10px',
+        backgroundColor: '#f97316',
+        color: 'white',
+        border: 'none',
+        borderRadius: '4px',
+        cursor: 'pointer',
+        transition: 'all 0.15s ease-in-out',
     },
     mappedIdBadge: {
         padding: '5px 8px',
-        backgroundColor: '#d1fae5', /* bg-green-100 */
-        color: '#065f46', /* text-green-800 */
+        backgroundColor: '#d1fae5',
+        color: '#065f46',
         borderRadius: '4px',
         fontWeight: 600,
         fontSize: '0.8rem',
-    }
+        display: 'inline-block',
+        transition: 'all 0.15s',
+    },
+    confirmationArea: { marginTop: '20px', display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-end', gap: '20px' },
+    totalsBoxFooter: { padding: '15px', border: '1px solid #d1d5db', borderRadius: '6px', backgroundColor: '#ffffff', width: '300px' },
+    confirmButton: { padding: '15px 30px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer' },
+    summaryGrid: { display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '40px', alignItems: 'flex-start' },
+    summaryItem: { display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.9rem' },
+    summaryLabel: { color: '#4b5563', fontWeight: 500 },
+    summaryValue: { fontWeight: 600, color: '#1f2937' },
+    totalLine: { display: 'flex', justifyContent: 'space-between', fontSize: '1rem', marginBottom: '5px' },
+    totalLabel: { color: '#4b5563' },
+    totalValue: { fontWeight: 600 },
+    divergenceList: { display: 'flex', flexDirection: 'column', gap: '10px' },
+    divergenceItem: { padding: '10px', borderLeft: '4px solid #f87171', backgroundColor: '#fefefe', borderRadius: '4px' },
+    divergenceDetails: { fontSize: '0.9rem', color: '#4b5563' },
 };
 
 export default StockEntryForm;

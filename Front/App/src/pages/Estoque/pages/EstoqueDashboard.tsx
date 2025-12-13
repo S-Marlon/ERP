@@ -111,9 +111,7 @@ const EstoqueDashboard: React.FC = () => {
           className={alertasEstoqueBaixo.length > 0 ? 'alerta-kpi' : ''} 
         />
         
-        <div className="alertas-section">
-        <AlertaList alertas={alertasEstoqueBaixo} />
-      </div>
+        
 
       </div>
 
@@ -148,37 +146,15 @@ Esta deve ser a página de entrada no módulo de estoque.
 
         {/* --- Coluna de Alerta de Estoque Baixo --- */}
         <div className="panel alerts-panel">
-          <h2 className="panel-title alerts-title">
-            🚨 Alertas de Reposição ({4})
-          </h2>
-          <div className="table-container">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Produto</th>
-                  <th>Estoque Atual</th>
-                  <th>Estoque Mínimo</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
 
-              </tbody>
-            </table>
-          </div>
+          <div className="alertas-section">
+        <AlertaList alertas={alertasEstoqueBaixo} />
+      </div>
+
+          
         </div>
 
-        {/* --- Coluna de Itens de Maior Giro --- */}
-        <div className="panel">
-          <h2 className="panel-title">
-            📈 Itens de Maior Giro (Curva A)
-          </h2>
-          <ul className="high-moving-list">
-            
-            
-          </ul>
-        
-      </div>
+       
       
 
     </div>
