@@ -107,12 +107,12 @@ const renderTableHead = (itemsList: ProductEntry[], toggleSelectAll: (isPending:
                     )}
                 </th>
                 <th style={styles.tableTh}>Mapeamento</th>
-                <th style={{ ...styles.tableTh , width: '70px'}}>SKU Forn.</th>
+                <th style={{ ...styles.tableTh , width: '60px'}}>SKU Forn.</th>
                 <th style={{ ...styles.tableTh , width: '450px'}}>Produto (NF)</th>
                 <th style={{ ...styles.tableTh, width: '100px' }}>Preço Unitário (NF)</th>
                 <th style={{ ...styles.tableTh, width: '80px' }}>Qtd. NF</th>
                 <th style={{ ...styles.tableTh, width: '70px' }}>*Qtd. Recebida*</th>
-                <th style={{ ...styles.tableTh, width: '80px' }}>*Dif.*</th>
+                <th style={{ ...styles.tableTh, width: '30px' }}>*Dif.*</th>
                 <th style={{ ...styles.tableTh, width: '120px' }}>Categoria</th>
                 <th style={{ ...styles.tableTh, width: '60px' }}>Total Produto</th>
                 <th style={{ ...styles.tableTh, width: '30px' }}>Ações</th>
@@ -546,7 +546,7 @@ const StockEntryForm: React.FC = () => {
                              <span style={{ marginLeft: 8, color: '#6b7280' }}>{selectedPendingIds.size > 0 ? `${selectedPendingIds.size} selecionado(s)` : 'Selecione itens para ações em lote'}</span>
                          </div>
 
-                        {hasUnmappedItems && hasPendingItems && <div style={styles.warningMessage}>⚠️ {items.filter(i => !i.mappedId).length} item(ns) precisam de Mapeamento.</div>}
+                        {hasUnmappedItems && hasPendingItems && <Badge color='warning'>⚠️ {items.filter(i => !i.mappedId).length} item(ns) precisam de Mapeamento.</Badge>}
 
                         <div style={{ ...styles.tableResponsive, marginBottom: '30px' }}>
                             <table style={styles.dataTable}>

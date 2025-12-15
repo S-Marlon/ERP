@@ -2,8 +2,11 @@
 import express, { Request, Response, NextFunction } from 'express'; // Importado Request e Response
 import cors from 'cors';
 import pool from './db.config'; // Importa a conexão com o banco (deve ser um Pool do mysql2/promise)
+import bodyParser from 'body-parser';
 
 const app = express();
+app.use(bodyParser.json());
+
 const PORT = 3001; // Porta padrão para APIs, o React rodará em 3000
 
 // =========================================================================
@@ -554,6 +557,8 @@ app.get('/pocos/search', async (req: Request, res: Response) => {
         });
     }
 });
+
+
 
 app.listen(PORT, () => {
     console.log(`Servidor rodando em http://localhost:${PORT}`);

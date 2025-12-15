@@ -38,6 +38,9 @@ export interface NfeDataFromXML {
 
     // 🚨 NOVO TOTAL: Total de tributos da nota
     valorTotalTributos: string; // vTotTrib (total)
+
+    // 🚨 NOVO CAMPO
+    xmlBruto: string;
     
     produtos: Produto[];
 }
@@ -145,6 +148,7 @@ export const parseNfeXmlToData = (xmlString: string): NfeDataFromXML | null => {
             valorTotalIpi: vIPI,
             valorOutrasDespesas: vOutro, 
             valorTotalTributos: vTotTribTotal, // Total geral de tributos
+            xmlBruto: xmlString,
             produtos: produtos,
         } as NfeDataFromXML;
 
