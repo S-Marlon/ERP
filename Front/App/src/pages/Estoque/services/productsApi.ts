@@ -1,7 +1,20 @@
-// services/productsApi.ts
+import { Category, CategoryTreeBuilder } from '../utils/CategoryTreeBuilder';
+// Use a interface Category do seu componente (se já existir)
+// Importe a classe que acabamos de criar (ajuste o caminho se necessário)
 
 // A base da API será lida do ambiente (VITE_API_BASE) ou usa o fallback local.
 const apiBase = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:3001/api';
+
+
+
+// --- 2. Tipagem do Formato de Árvore (para o Frontend) ---
+// Deve ser idêntica à interface Category que seu CategoryTree espera
+export interface TreeCategory {
+  id: string;
+  name: string;
+  children: TreeCategory[];
+}
+
 
 
 /**
@@ -70,28 +83,41 @@ export async function createStockEntry(payload: {
 }
 
 /**
- * 5. CATEGORIAS: Busca categorias e faz o parsing (Usado no useEffect).
- */
-export async function getCategories() {
-    const res = await fetch(`${apiBase}/products/categories`);
-    const text = await res.text();
-    if (!res.ok) {
-        throw new Error(`GET /products/categories failed: ${res.status} ${res.statusText}. Body: ${String(text).slice(0,1000)}`);
-    }
-    try {
-        const data = JSON.parse(text);
-        if (!Array.isArray(data)) throw new Error('GET /products/categories: resposta inesperada (não é array)');
-        return data;
-    } catch (err) {
-        throw new Error(`GET /products/categories: payload inválido (não é JSON). Body: ${String(text).slice(0,1000)}`);
-    }
-}
-
-/**
  * 6. CATEGORIAS RAW: Busca categorias e retorna a resposta bruta (Usado no loadCategories para debug/tratamento).
  */
 export async function fetchCategoriesRaw() {
     const res = await fetch(`${apiBase}/products/categories`);
     const body = await res.text();
     return { ok: res.ok, status: res.status, statusText: res.statusText, body };
+}
+
+
+
+
+// --- 4. Função Principal da API de Produtos (FINALIZADA) ---
+
+export async function getCategoryTree(): Promise<Category[]> {
+    // 1. Busca a lista da API
+    const res = await fetch(`${apiBase}/categories/tree`);
+    if (!res.ok) {
+        throw new Error(`GET ${apiBase}/categories/tree failed: ${res.status} ${res.statusText}`);
+    }
+
+    // A API retorna a árvore bruta
+    const rawTreeCategories = await res.json(); 
+    
+    // 🛑 DEBUG: Log do que a API retorna (para confirmar que é uma árvore)
+    console.log('flatCategories Tree:', rawTreeCategories); 
+
+    if (!Array.isArray(rawTreeCategories)) {
+        throw new Error("A API não retornou um array de categorias raiz.");
+    }
+    
+    // 2. Converte a árvore bruta em árvore limpa
+    const categoryTree = CategoryTreeBuilder.mapRawTreeToCleanTree(rawTreeCategories);
+    
+    // 🛑 DEBUG: Log do resultado final
+    console.log('Category Tree:', categoryTree);
+
+    return categoryTree;
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 // Importação revisada para incluir createNewCategory
-import { searchProducts, findOrCreateProduct, getCategories, fetchCategoriesRaw, createNewCategory } from '../services/productsApi';
+import { searchProducts, findOrCreateProduct, getCategories, fetchCategoriesRaw, createNewCategory, getCategoryTree } from '../services/productsApi';
+import CategoryTree from "./CategoryTree";
 
 // --- Interfaces ---
 interface ProductEntry {
@@ -9,6 +10,7 @@ interface ProductEntry {
     name: string; // Nome do Fornecedor (da NF)
     unitCostWithTaxes: number; // Custo Unitário da NF
 }
+
 
 interface InternalProductData {
     id: string; // ID Padrão do Sistema
@@ -37,6 +39,8 @@ const useDebounce = (value: string, delay: number) => {
     }, [value, delay]);
     return debouncedValue;
 };
+
+
 
 // Verifica existência do produto no backend (procura por ID/sku)
 const checkProductIdExists = async (id: string): Promise<boolean> => {
@@ -72,7 +76,7 @@ const modalStyles: { [key: string]: React.CSSProperties } = {
 interface MappingModalProps {
     item: ProductEntry;
     // onMap deve receber o ID mapeado e a Categoria Padrão para vincular.
-    onMap: (tempId: number, mappedId: string, category: string) => void;
+    onMap: (tempId: number, mappedId: string, category: string, ItemName: string) => void;
     onClose: () => void;
     availableCategories?: string[]; // Mantido, embora o componente use a chamada direta
 }
@@ -92,7 +96,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ item, onMap, onClose
     const [newProductId, setNewProductId] = useState('');
     const [newProductName, setNewProductName] = useState(item.name);
     const [newProductUnit, setNewProductUnit] = useState('UN');
-    const [newProductCategory, setNewProductCategory] = useState(''); // Armazena o FULL NAME da categoria selecionada
+    const [newProductCategory, setNewProductCategory] = useState<string | null>(null); // Inicialize com null ou ''
     const [idExistsError, setIdExistsError] = useState(false);
 
     // ESTADOS DE CATEGORIA HIERÁRQUICA
@@ -105,6 +109,8 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ item, onMap, onClose
     const [categoriesLoading, setCategoriesLoading] = useState(false);
     const [categoriesError, setCategoriesError] = useState<string | null>(null);
     const [categoriesRaw, setCategoriesRaw] = useState<string | null>(null);
+
+    const [selectedCategoryShortName, setSelectedCategoryShortName] = useState<string | null>(null);
         
     // helper: busca com timeout para evitar "buscando..." eterno
     const loadSearchResults = async (term: string) => {
@@ -192,7 +198,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ item, onMap, onClose
             alert('Por favor, selecione um produto padrão para mapear.');
             return;
         }
-        onMap(item.tempId, selectedProduct.id, selectedProduct.category);
+        onMap(item.tempId, selectedProduct.id, selectedProduct.category, selectedProduct.name);
         onClose();
     }, [selectedProduct, item.tempId, onMap, onClose]);
 
@@ -233,44 +239,35 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ item, onMap, onClose
 
         setIsSaving(true);
         try {
-            let finalCategory = newProductCategory;
-
-            // 1. CRIAÇÃO DE NOVA CATEGORIA (SE NECESSÁRIO)
-            if (isInputtingNewCategory) {
-                const parent = availableCats.find(c => c.fullName === selectedParentId); // Busca o Parent pelo FullName
-                const parentFullName = parent ? parent.fullName : undefined;
-                
-                // Constrói o Full Name final
-                finalCategory = parentFullName ? `${parentFullName} / ${newCategoryName.trim()}` : newCategoryName.trim();
-                
-                // CHAMA A API PARA PERSISTIR A NOVA CATEGORIA
-                // O backend deve aceitar o nome do nó e o full name do pai
-                await createNewCategory({ 
-                    name: newCategoryName.trim(), 
-                    parentId: parentFullName 
-                });
-                
-                // Recarrega todas as categorias para atualizar o estado local
-                await loadCategories();
-            }
             
-            // 2. CRIAÇÃO DO PRODUTO PADRÃO (OPCIONAL/MOCKADO)
-            // Se você precisa criar o produto no backend antes de mapear,
-            // descomente e use a função findOrCreateProduct:
-            /*
-            const createdProduct = await findOrCreateProduct({
-                sku: newProductId.trim(), // Usando o novo ID como SKU temporário para criação
-                name: newProductName.trim(),
-                unitCost: item.unitCostWithTaxes,
-                category: finalCategory,
-                // Nota: O backend precisa de mais campos como unitOfMeasure, dependendo da sua API
-            });
-            const finalProductId = createdProduct.id;
-            */
-            const finalProductId = newProductId.trim(); // Mantido o mapeamento local simples
+        
+            
+            // const finalCategory = selectedCategoryShortName
 
+
+
+
+            let finalCategory;
+        // ... (lógica para definir finalCategory)
+        if (selectedCategoryShortName) {
+            finalCategory = selectedCategoryShortName
+        } else {
+            // Se for categoria existente, o ID (newProductCategory) é o Full Name (caminho completo)
+            finalCategory = newProductCategory; 
+        } 
+        
+        if (finalCategory === null) {
+            finalCategory = '';
+        }
+        
+
+
+            const ProductName = item.name;
+
+            
+            const finalProductId = newProductId.trim(); // Mantido o mapeamento local simples
             // 3. Apenas altera o item na tabela (mapeia localmente)
-            onMap(item.tempId, finalProductId, finalCategory || '');
+            onMap(item.tempId, finalProductId, finalCategory, ProductName || '');
 
             // Fecha modal e limpa estado
             setIsSaving(false);
@@ -282,10 +279,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ item, onMap, onClose
             setIsSaving(false);
         }
     }, [
-        newProductId, newProductName, newProductUnit, newProductCategory,
-        isInputtingNewCategory, newCategoryName, selectedParentId,
-        idExistsError, onMap, onClose, item.tempId, item.unitCostWithTaxes,
-        availableCats, loadCategories // Dependência de loadCategories é importante aqui!
+        newProductId,item.name, newProductName, newProductUnit, newProductCategory,isInputtingNewCategory, newCategoryName, idExistsError, onMap, onClose, item.tempId, selectedCategoryShortName, 
     ]);
 
     // Renderização do Novo Produto (Formulário DETALHADO com Hierarquia de Categoria)
@@ -342,14 +336,16 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ item, onMap, onClose
                         <option value="PC">PC (Peça)</option>
                         <option value="KG">KG (Quilograma)</option>
                         <option value="LT">LT (Litro)</option>
+                        <option value="MT">MT (Metro)</option>
                     </select>
                 </div>
             </div>
 
             {/* SELEÇÃO/CRIAÇÃO DE CATEGORIA - FLUXO HIERÁRQUICO */}
             <div style={{ marginTop: '15px', border: '1px solid #ddd', padding: '15px', borderRadius: '6px' }}>
-                <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold', fontSize: '1rem', color:'black' }}>* Categoria Padrão:</label>
+                <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold', fontSize: '1rem', color:'black' }}>* Categoria Principal:</label>
                 
+
                 {!isInputtingNewCategory ? (
                     // 1. SELEÇÃO DE CATEGORIA EXISTENTE
                     <>
@@ -373,25 +369,25 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ item, onMap, onClose
                                     <button onClick={loadCategories} style={{ ...modalStyles.button, backgroundColor:'#0ea5e9' }}>Tentar novamente</button>
                                 </div>
                             ) : (
-                                <select
-                                    value={newProductCategory}
-                                    onChange={(e) => setNewProductCategory(e.target.value)}
-                                    style={{ ...modalStyles.input, flexGrow: 1, marginBottom: 0 }}
-                                >
-                                    {availableCats.map(cat => (
-                                        <option key={cat.fullName} value={cat.fullName}>
-                                            {cat.fullName}
-                                        </option>
-                                    ))}
-                                </select>
+                                <div style={{display:'flex'}}>
+
+                                
+<CategoryTree
+    // categories={categoriesData}
+    selectedCategoryId={newProductCategory}
+    onSelectCategory={(catId) => setNewProductCategory(catId)}
+    onCategoryNameChange={setSelectedCategoryShortName} // <--- NOVO
+    />
+      
+                                </div>
                             )}
+                        </div>
                             <button 
                                 onClick={() => { setIsInputtingNewCategory(true); setNewProductCategory(''); }}
                                 style={{ ...modalStyles.button, backgroundColor: '#047857', padding: '8px' }}
                             >
                                 ➕ Criar Nova Categoria
                             </button>
-                        </div>
                     </>
                 ) : (
                     // 2. CRIAÇÃO DE NOVA CATEGORIA (Com seleção de Pai)
@@ -574,3 +570,11 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ item, onMap, onClose
 };
 
 export default ProductMappingModal;
+
+// primeiro arrumar a nova seletora de categorias
+
+// depois implementar a insersção do produto da nota no BD
+
+// depois implementar o fluxo de criação de nova categoria hierárquica
+
+// seletora de quantidade precisa ter medida (PC, UN, KG, LT, MT) e não só número, junto de padronização de acordo com a NF, ex: PC numero inteiros, MT com 2 casas decimais, KG com 3 casas decimais, LT com 3 casas decimais

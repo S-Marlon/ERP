@@ -235,7 +235,50 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
     });
 });
 
+app.get('/api/categories/tree', async (req: Request, res: Response) => {
+    // Função para transformar a lista plana em árvore
+    const buildCategoryTree = (flatCategories: { id: string; nome: string; parent_id: string | null }[]) => {
+        const tree: any[] = [];
+        const categoryMap: Record<string, any> = {};
+        // 1. Mapeia todos os nós
+        flatCategories.forEach(item => {
+            categoryMap[item.id] = { id: item.id, name: item.nome, children: [] };
+        });
+        // 2. Construi a árvore
+        flatCategories.forEach(item => {
+            if (item.parent_id) {
+                const parent = categoryMap[item.parent_id];
+                if (parent) {
+                    parent.children.push(categoryMap[item.id]);
+                }
+            } else {
+                tree.push(categoryMap[item.id]);
+            }
+        });
+        return tree;
+    };
+
+    try {
+        // Busca a lista plana do banco de dados
+        const [rows]: any = await pool.execute('SELECT id_categoria AS id, nome_categoria AS nome, id_categoria_pai AS parent_id FROM categorias');
+        const flatCategories = rows as { id: string; nome: string; parent_id: string | null }[];
+        // Converte a lista plana em árvore
+        const categoryTree = buildCategoryTree(flatCategories);
+        console.log(categoryTree);
+        res.json(categoryTree);
+    } catch (error) {
+        console.error('Erro ao obter árvore de categorias:', error);
+        res.status(500).json({ error: 'Erro ao obter árvore de categorias.' });
+    }
+});
+
 
 app.listen(PORT, () => {
     console.log(`Servidor rodando em http://localhost:${PORT}`);
 });
+
+
+
+
+
+// Proximo passo é Criar o produto no banco de dados com base nos dados fornecidos pela nota FIscal.

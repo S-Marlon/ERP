@@ -282,11 +282,11 @@ const StockEntryForm: React.FC = () => {
         setIsMappingModalOpen(true);
     };
 
-    const handleModalMap = (tempId: number, mappedId: string, category: string) => {
+    const handleModalMap = (tempId: number, mappedId: string, category: string, ItemName: string) => {
         setItems(prev => prev.map(it => it.tempId === tempId ? { ...it, mappedId, category } : it));
         setIsMappingModalOpen(false);
         setItemToMap(null);
-        alert(`Item ${tempId} mapeado para ${mappedId}. Categoria: ${category}.`);
+        alert(`Item ${ItemName} mapeado para ${mappedId}. Categoria: ${category}.`);
     };
 
     const closeModal = () => { setIsMappingModalOpen(false); setItemToMap(null); };
