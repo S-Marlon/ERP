@@ -1,0 +1,70 @@
+1. Componentes Globais (Shared UI / Atoms)
+
+Estes são os blocos básicos que não possuem lógica de negócio e são usados em todo o sistema (botões, inputs, cards).
+
+    Local: src/components/ui
+
+    Exemplo: Button.tsx, Badge.tsx, Typography.tsx.
+
+2. Componentes de Feature (Feature-specific)
+
+Componentes que possuem lógica de negócio do Estoque, mas são usados em mais de uma tela dentro do módulo de estoque.
+
+    Local: src/features/Estoque/components
+
+    Exemplo: MappingModal.tsx, CategoryTree.tsx.
+
+3. Componentes de Página (Internal Components)
+
+Componentes que são tão específicos que só existem para compor uma única tela. Eles não devem "poluir" as pastas globais.
+
+    Local: Dentro da pasta da própria página.
+
+Exemplo Visual da Estrutura
+Plaintext
+
+src/
+├── features/
+│   └── Estoque/
+│       ├── components/             <-- Compartilhados NO ESTOQUE
+│       │   ├── MappingModal/
+│       │   └── CategoryTree/
+│       └── pages/
+│           └── StockEntry/         <-- Pasta da página específica
+│               ├── StockEntryPage.tsx
+│               ├── StockEntry.styles.ts
+│               └── _components/     <-- Componentes EXCLUSIVOS desta página
+│                   ├── ProductTable.tsx
+│                   ├── ProductRow.tsx
+│                   └── InvoiceSummary.tsx
+
+Por que usar a pasta _components (com underscore)?
+
+Essa é uma convenção comum em times grandes. O prefixo _ ou colocar dentro da pasta da página indica que esses componentes não devem ser importados por mais ninguém fora daquela tela.
+Como decidir onde colocar um componente?
+
+Faça estas 3 perguntas:
+
+    Ele tem lógica de negócio?
+
+        Não (é só visual) -> src/components/ui
+
+        Sim -> Vá para a pergunta 2.
+
+    Ele é usado em mais de uma tela do estoque?
+
+        Sim -> src/features/Estoque/components
+
+        Não -> Vá para a pergunta 3.
+
+    Ele é muito grande para ficar no mesmo arquivo da página?
+
+        Sim -> Crie a pasta _components dentro da página.
+
+Vantagens dessa separação:
+
+    Manutenção: Se você mudar algo no ProductRow, sabe que isso só afeta a página de Entrada de Estoque.
+
+    Performance: Facilita o uso de React.memo em componentes menores e isolados.
+
+    Organização: Sua pasta de componentes principal não vira um "cemitério" de arquivos que ninguém sabe para que servem.

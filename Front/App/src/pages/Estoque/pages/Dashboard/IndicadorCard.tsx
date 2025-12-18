@@ -1,7 +1,7 @@
 // src/components/IndicadorCard.tsx
 
 import React from 'react';
-import '../Dashboard.css'; // O mesmo arquivo CSS para todos
+import './Dashboard.css'; // O mesmo arquivo CSS para todos
 
 interface IndicadorCardProps {
   titulo: string;

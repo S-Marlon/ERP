@@ -1,19 +1,18 @@
 // src/pages/StockEntryForm.tsx (FINAL COMPLETO E INTEGRADO)
-import React, { useState, useMemo } from 'react';
-import Button from '../../../components/ui/Button/Button';
-import FlexGridContainer from '../../../components/Layout/FlexGridContainer/FlexGridContainer';
-import Card from '../../../components/ui/Card/Card';
-import Typography from '../../../components/ui/Typography/Typography';
-import FormControl from '../../../components/ui/FormControl/FormControl';
-import MappingModal from '../Components/MappingModal'; // Modal de Mapeamento
-import { parseNfeXmlToData, NfeDataFromXML } from '../utils/nfeParser';
-import Badge from '../../../components/ui/Badge/Badge';
+import React, { useState, useMemo, useCallback } from 'react';
+import Button from '../../../../components/ui/Button/Button';
+import FlexGridContainer from '../../../../components/Layout/FlexGridContainer/FlexGridContainer';
+import Card from '../../../../components/ui/Card/Card';
+import Typography from '../../../../components/ui/Typography/Typography';
+import FormControl from '../../../../components/ui/FormControl/FormControl';
+import MappingModal from './_components/MappingModal'; // Modal de Mapeamento
+import { parseNfeXmlToData, NfeDataFromXML } from '../../utils/nfeParser';
+import Badge from '../../../../components/ui/Badge/Badge';
 
 // --- Interfaces ---
 interface ProductEntry {
     tempId: number;
     sku: string;
-    mappedId?: string;
     name: string;
     unitPrice: number;
     quantity: number;
@@ -22,7 +21,10 @@ interface ProductEntry {
     total: number;
     isConfirmed: boolean;
     unitCostWithTaxes: number;
+    // Novos campos:
+    mappedId?: string; 
     category?: string;
+    mappedData?: any; // Para guardar o objeto completo se precisar
 }
 
 interface NfeData {
@@ -198,7 +200,7 @@ const StockEntryForm: React.FC = () => {
     };
 
     // Manipuladores
-    const toggleConfirmation = (tempId: number) => {
+    const toggleConfirmation = useCallback((tempId: number) => {
         const current = items.find(i => i.tempId === tempId);
         if (!current) return;
         const willConfirm = !current.isConfirmed;
@@ -217,7 +219,7 @@ const StockEntryForm: React.FC = () => {
             if (current.difference !== 0) alert('Atenção: Item com divergência de quantidade. Ele será movido para Conferidos.');
             if (!current.mappedId) alert('Atenção: Item não mapeado. O mapeamento é obrigatório para a entrada final. Ele será movido para Conferidos.');
         }
-    };
+    }, [items, setSelectedPendingIds, setSelectedConfirmedIds]);
 
     const handleUpdateReceivedQuantity = (tempId: number, value: string) => {
         const received = parseFloat(value);
@@ -282,12 +284,24 @@ const StockEntryForm: React.FC = () => {
         setIsMappingModalOpen(true);
     };
 
-    const handleModalMap = (tempId: number, mappedId: string, category: string, ItemName: string) => {
-        setItems(prev => prev.map(it => it.tempId === tempId ? { ...it, mappedId, category } : it));
-        setIsMappingModalOpen(false);
-        setItemToMap(null);
-        alert(`Item ${ItemName} mapeado para ${mappedId}. Categoria: ${category}.`);
-    };
+    const handleModalMap = (tempId: number, data: any) => {
+    // 'data' aqui é o MappingPayload que vem do Modal
+    setItems(prev => prev.map(it => {
+        if (it.tempId === tempId) {
+            return { 
+                ...it, 
+                mappedId: data.mapped.id,        // Extrai o ID para a coluna da tabela
+                category: data.mapped.category,  // Extrai a Categoria
+                name: data.mapped.name,          // Opcional: Atualiza o nome para o nome interno
+                mappedData: data.mapped          // Guarda o objeto todo por segurança
+            };
+        }
+        return it;
+    }));
+    
+    setIsMappingModalOpen(false);
+    setItemToMap(null);
+};
 
     const closeModal = () => { setIsMappingModalOpen(false); setItemToMap(null); };
 
@@ -319,10 +333,6 @@ const StockEntryForm: React.FC = () => {
         }
     };
 
-   
-
-   
-
     const handleBulkConfirmSelected = () => {
         const ids = Array.from(selectedPendingIds);
         setItems(prev => prev.map(it => ids.includes(it.tempId) ? { ...it, isConfirmed: true } : it));
@@ -331,7 +341,6 @@ const StockEntryForm: React.FC = () => {
         alert(`${ids.length} itens marcados como Conferidos.`);
     };
 
-    
     const handleBulkUnconfirmSelected = () => {
         const ids = Array.from(selectedConfirmedIds);
         setItems(prev => prev.map(it => ids.includes(it.tempId) ? { ...it, isConfirmed: false } : it));
@@ -456,19 +465,24 @@ const StockEntryForm: React.FC = () => {
                         {item.isConfirmed ? 'Desmarcar' : 'Conferir'}
                     </button>
                     {!item.isConfirmed && (
-                        <button
-                            onClick={() => handleUpdateReceivedQuantityFn(item.tempId, String(item.quantity))}
-                            style={{
-                                ...styles.uncheckButton,
-                                backgroundColor: '#9a3d51',
-                                marginTop: '6px',
-                                transition: 'all 0.15s',
-                            }}
-                            title="Resetar para quantidade da NF"
-                        >
-                            ↺ Resetar
-                        </button>
+
+                        <select                                //trocar futuramente por um popover
+  value="" // Mantém vazio para sempre parecer um menu de "Ações"
+  onChange={(e) => {
+    const action = e.target.value;
+    if (action === 'reset_qty') handleUpdateReceivedQuantityFn(item.tempId, String(item.quantity));
+    if (action === 'reset_map') /* sua função de reset de mapeamento */;
+    if (action === 'reset_cat') /* sua função de reset de categoria */;
+  }}
+  style={styles.selectAction}
+>
+  <option value="" disabled selected>⚙️ Ações</option>
+  <option value="reset_qty">↺ Resetar Quantidade</option>
+  <option value="reset_map">🔗 Resetar Mapeamento</option>
+  <option value="reset_cat">📁 Resetar Categoria</option>
+</select>
                     )}
+                    
                 </td>
             </tr>
         );
@@ -492,6 +506,7 @@ const StockEntryForm: React.FC = () => {
             <div className="page-header"><h1 style={styles.title}>📥 Entrada de Mercadorias (Registro de NF-e)</h1></div>
 
             <FlexGridContainer layout='grid'>
+
                 <Card variant='default' padding='20px'>
                     <Typography variant='h2'>1. Informações da Nota Fiscal</Typography>
                     <div style={styles.importArea}>
@@ -529,7 +544,7 @@ const StockEntryForm: React.FC = () => {
 
             <hr />
 
-                    <h2 style={styles.panelTitle}>4. Conferência Detalhada de Itens ({items.length} itens totais)</h2>
+                    <h2 style={styles.panelTitle}>3. Conferência Detalhada de Itens {items.length == 1 ? '(1 item)' : `(${items.length} itens)`}</h2>
             <FlexGridContainer layout='grid'>
 
                     <FlexGridContainer layout='flex'>
@@ -571,7 +586,7 @@ const StockEntryForm: React.FC = () => {
 
                     <FlexGridContainer >
 
-                        <h3 style={{ ...styles.subTitle, borderTop: '1px solid #e5e7eb', paddingTop: '15px' }}>🟢 Itens Conferidos ({confirmedItems.length} produtos)</h3>
+                        <Typography variant='h3'>🟢 Itens Conferidos {confirmedItems.length == 1 ? '(1 item)' : `(${confirmedItems.length} itens)`}</Typography>
 
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
                             <button onClick={handleBulkUnconfirmSelected} style={{ padding: '6px 10px', borderRadius: 4, backgroundColor: '#ef4444', color: '#fff' }}>Desmarcar Selecionados</button>
@@ -637,8 +652,14 @@ const StockEntryForm: React.FC = () => {
             </FlexGridContainer>
 
             {isMappingModalOpen && itemToMap && (
-                <MappingModal item={itemToMap} onMap={handleModalMap} onClose={closeModal} availableCategories={availableCategories} />
-            )}
+    <MappingModal
+        item={itemToMap}
+        onClose={closeModal}
+        onMap={handleModalMap} // Passa a função que agora entende o objeto
+    />
+)}
+
+            
         </div>
     );
 };

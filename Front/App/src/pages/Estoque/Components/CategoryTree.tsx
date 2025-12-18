@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, CSSProperties, useMemo } from 'react';
 import { Category } from '../utils/CategoryTreeBuilder';
-import { getCategoryTree } from '../services/productsApi';
+import { getCategoryTree } from '../api/productsApi';
+import FlexGridContainer from '../../../components/Layout/FlexGridContainer/FlexGridContainer';
 // Certifique-se de que o caminho para getCategoryTree e Category estão corretos
 
 // --- Tipagem de Props (Simplificada) ---
@@ -244,14 +245,30 @@ useEffect(() => {
 
   return (
     <div style={{ padding: '10px' }}>
+            <h3 style={{ margin: 0, color: '#333' }}>🌳 Árvore de Categorias</h3>
+        <FlexGridContainer layout='flex' justifyContent='space-between' alignItems='center' style={{ marginBottom: '10px' }}>
       <p style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#666' }}>
         Selecione uma categoria 
         ({selectedCategoryId 
             ? `ID: ${selectedCategoryId} | Nome: ${selectedCategoryName || 'Carregando Nome...'}` 
             : 'Nenhum item selecionado'
         })
+
+        
       </p>
-      <ul style={styles.categoryTree}>
+
+<select>
+        <option value="all">Todas as Categorias</option>
+        <option value="electronics">Eletrônicos</option>
+        <option value="books">Livros</option>
+        <option value="fashion">Moda</option>
+        <option value="home">Casa e Cozinha</option>
+        <option value="sports">Esportes</option>
+        <option value="toys">Brinquedos</option>
+      </select> 
+
+            </FlexGridContainer>
+     <ul style={styles.categoryTree}>
         {isLoading && (
           <li style={{ padding: '10px', color: '#007bff' }}>Carregando categorias...</li>
         )}

@@ -1,8 +1,8 @@
 // src/components/AlertaList.tsx
 
 import React from 'react';
-import '../Dashboard.css';
-import { AlertaEstoque } from '../types/estoque';
+import './Dashboard.css';
+import { AlertaEstoque } from '../../types/estoque';
 
 interface AlertaListProps {
   alertas: AlertaEstoque[];

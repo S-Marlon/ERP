@@ -1,10 +1,9 @@
 // src/pages/Dashboard.tsx
 
 import React, { useMemo, useState } from 'react';
-import IndicadorCard from '../Components/IndicadorCard';
-import AlertaList from '../Components/AlertaList';
-import { AlertaEstoque, MovimentacaoFormData, Produto } from '../types/estoque';
-import MovimentacaoForm from '../Components/MovimentacaoForm'; // Componente de Ação Rápida
+import IndicadorCard from './IndicadorCard';
+import AlertaList from './AlertaList';
+import { AlertaEstoque, MovimentacaoFormData, Produto } from '../../types/estoque';
 
 const mockProdutos: Produto[] = [
   { id: 1, nome: 'Teclado Mecânico', sku: 'TM001', quantidadeAtual: 15, estoqueMinimo: 10, precoCusto: 150.00 },

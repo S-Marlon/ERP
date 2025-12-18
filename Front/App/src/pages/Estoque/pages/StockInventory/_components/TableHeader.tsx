@@ -1,7 +1,7 @@
 // src/components/TableHeader.tsx
 import React from 'react';
-import Typography from '../../../components/ui/Typography/Typography';
-import Button from '../../../components/ui/Button/Button';
+import Typography from '../../../../../components/ui/Typography/Typography';
+import Button from '../../../../../components/ui/Button/Button';
 
 // 1. Define the props interface
 interface TableHeaderProps {

@@ -1,13 +1,13 @@
 // src/pages/StockInventory.tsx
 
 import React, { useState, useContext } from "react";
-import { Product, FilterState } from "../../../types/types"; // Importando tipos globais (Ajuste o caminho se necessário)
-import ProductDetails from "../Components/ProductDetails";
+import { Product, FilterState } from "../../../../types/types"; // Importando tipos globais (Ajuste o caminho se necessário)
 
 // Se você não tem ProductContext/FilterState, remova as linhas abaixo
 // import { ProductContext } from "../../../context/ProductContext";
-import TableHeader from "../Components/TableHeader";
-import ProductFilter from "../Components/ProductFilter";
+import TableHeader from "./_components/TableHeader";
+import ProductFilter from "./_components/ProductFilter";
+import ProductDetails from "./_components/ProductDetails";
 // import ProductHeader from "../Components/ProductHeader"; // Não usado
 
 

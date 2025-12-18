@@ -5,7 +5,7 @@ import ProductFooter from "./Components/EstoqueFooter";
 import { Product, FilterState } from "../../types/types";
 
 import { ProductContext } from "../../context/ProductContext";
-import EstoqueDashboard from "./pages/EstoqueDashboard";
+import EstoqueDashboard from "./pages/Dashboard/EstoqueDashboard";
 
 const EstoquePage: React.FC = () => {
   const { products,  } = useContext(ProductContext)!;
