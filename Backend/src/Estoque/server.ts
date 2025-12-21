@@ -79,6 +79,48 @@ app.get('/api/products', asyncHandler(async (req, res) => {
 }));
 
 
+// Rota dedicada para o MappingModal (Entrada de NF)
+app.get('/api/products/mapping', asyncHandler(async (req, res) => {
+    const query = (req.query.query as string || '').trim();
+    const searchTerm = `%${query}%`;
+
+    const sql = `
+        SELECT 
+            p.id_produto AS id, 
+            p.codigo_interno AS sku, 
+            p.descricao AS name, 
+            COALESCE(c.nome_categoria, 'Sem Categoria') AS category, 
+            COALESCE(e.quantidade, 0) AS currentStock,
+            p.estoque_minimo AS minStock,
+            p.preco_venda AS salePrice,
+            p.status AS status
+        FROM produtos AS p
+        LEFT JOIN categorias c ON p.id_categoria = c.id_categoria  
+        LEFT JOIN estoque_atual e ON p.id_produto = e.id_produto
+        WHERE 
+            (? = '' OR p.codigo_interno LIKE ? OR p.descricao LIKE ? OR p.codigo_barras LIKE ?)
+        ORDER BY 
+            CASE 
+                WHEN p.codigo_interno LIKE ? THEN 1
+                WHEN p.descricao LIKE ? THEN 2
+                ELSE 3
+            END,
+            p.descricao ASC
+        LIMIT 50
+    `;
+
+    try {
+        const [rows]: any = await pool.execute(sql, [
+            query, searchTerm, searchTerm, searchTerm, // Filtros
+            `${query}%`, `${query}%`                  // Prioridade na ordenação
+        ]);
+        return res.json(rows);
+    } catch (error) {
+        console.error('Erro na busca completa:', error);
+        return res.status(500).json({ error: 'Erro interno' });
+    }
+}));
+
 /**
  * Rota 2: GET /api/products/categories (Já existente)
  * Retorna lista de fullNames de categorias.

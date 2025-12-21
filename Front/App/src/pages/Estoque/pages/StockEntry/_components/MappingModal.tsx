@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from "react";
 import { searchProducts, fetchCategoriesRaw } from '../../../api/productsApi';
 import CategoryTree from "../../../Components/CategoryTree";
 import Swal from 'sweetalert2';
+import FormControl from "../../../../../components/ui/FormControl/FormControl";
+import SKUGenerator from "../../StockInventory/_components/SKUGenerator";
 
 // --- Interfaces ---
 interface ProductEntry {
@@ -231,8 +233,17 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ item, onMap, onClose
                 <div style={{ padding: '15px', backgroundColor: '#fffbe6', borderRadius: '6px' }}>
                     <h5 style={{ margin: '0 0 10px 0', color: '#b45309' }}>📄 Dados da Nota Fiscal</h5>
                     <p style={{ fontSize: '0.9rem', color: '#b45309' }}>
-                        <strong>SKU NF:</strong> {item.sku}<br/>
-                        <strong>Nome NF:</strong> {item.name}
+                        <strong>SKU NF:</strong> 
+                         <FormControl label='' readOnlyDisplay={true} value={item.sku} />
+                        <strong>Nome NF:</strong> 
+                         <FormControl label='' readOnlyDisplay={true} value={item.name} />
+                         <strong>Custo Unitário NF:</strong> 
+                         <FormControl label='' readOnlyDisplay={true} value={item.unitCostWithTaxes} />
+                         <strong>Unidade de Medida NF:</strong> 
+
+                <FormControl  readOnlyDisplay={true} value={newProductUnit} />
+
+                        
                     </p>
                 </div>
                 <div style={{ padding: '15px', backgroundColor: '#e0f2f1', borderRadius: '6px' }}>
@@ -240,28 +251,34 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ item, onMap, onClose
                     <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'black' }}>ID Padrão:</label>
                     <input 
                         style={{ ...modalStyles.input, ...(idExistsError ? modalStyles.inputError : {}) }} 
-                        value={newProductId} 
+                        value={item.sku} 
                         onChange={e => setNewProductId(e.target.value.toUpperCase())}
                     />
-                </div>
-            </div>
+                    <strong>Nome NF:</strong> 
+                         <FormControl label=''value={item.name} />
 
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
-                <input style={modalStyles.input} placeholder="Nome Padrão" value={newProductName} onChange={e => setNewProductName(e.target.value)} />
-                <select style={modalStyles.input} value={newProductUnit} onChange={e => setNewProductUnit(e.target.value)}>
-                    <option value="UN">UN</option><option value="PC">PC</option><option value="KG">KG</option>
-                </select>
-            </div>
-
-            <div style={{ marginTop: '10px', padding: '10px', border: '1px solid #ddd' }}>
-                <CategoryTree 
+                         <CategoryTree 
                     selectedCategoryId={newProductCategory} 
                     onSelectCategory={setNewProductCategory} 
                     onCategoryNameChange={setSelectedCategoryShortName} 
                 />
+                       
+                </div>
             </div>
 
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
+                {/* <input style={modalStyles.input} placeholder="Nome Padrão" value={newProductName} onChange={e => setNewProductName(e.target.value)} />
+                <select style={modalStyles.input} value={newProductUnit} onChange={e => setNewProductUnit(e.target.value)}>
+                    <option value="UN">UN</option><option value="PC">PC</option><option value="KG">KG</option>
+                </select> */}
+
+            </div>
+
+           
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+                <SKUGenerator />
+                    
                 <button onClick={() => setIsCreatingNew(false)} style={{ ...modalStyles.button, backgroundColor: '#6b7280' }}>Voltar</button>
                 <button onClick={handleFinalizeNewProductCreation} style={{ ...modalStyles.button, backgroundColor: '#f97316' }}>Mapear Novo Produto</button>
             </div>

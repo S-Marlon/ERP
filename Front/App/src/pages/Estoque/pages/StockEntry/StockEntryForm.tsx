@@ -2,12 +2,12 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import Button from '../../../../components/ui/Button/Button';
 import FlexGridContainer from '../../../../components/Layout/FlexGridContainer/FlexGridContainer';
-import Card from '../../../../components/ui/Card/Card';
 import Typography from '../../../../components/ui/Typography/Typography';
-import FormControl from '../../../../components/ui/FormControl/FormControl';
 import MappingModal from './_components/MappingModal'; // Modal de Mapeamento
 import { parseNfeXmlToData, NfeDataFromXML } from '../../utils/nfeParser';
 import Badge from '../../../../components/ui/Badge/Badge';
+import { ActionPopover } from '../../../../components/ui/Popover/ActionPopover';
+import NfeCards from './_components/NfeCards';
 
 // --- Interfaces ---
 interface ProductEntry {
@@ -16,15 +16,15 @@ interface ProductEntry {
     name: string;
     unitPrice: number;
     quantity: number;
+    unitOfMeasure: string; // ✨ Adicionado
     quantityReceived: number;
     difference: number;
     total: number;
     isConfirmed: boolean;
     unitCostWithTaxes: number;
-    // Novos campos:
-    mappedId?: string; 
+    mappedId?: string;
     category?: string;
-    mappedData?: any; // Para guardar o objeto completo se precisar
+    mappedData?: any;
 }
 
 interface NfeData {
@@ -38,6 +38,25 @@ interface NfeData {
     totalNoteValue: number;
     items: ProductEntry[];
 }
+
+const itemActions = [
+    {
+        label: 'Resetar Quantidade',
+        icon: '↺',
+        onClick: () => resetQuantity(item.id)
+    },
+    {
+        label: 'Resetar Mapeamento',
+        icon: '🔗',
+        onClick: () => resetMap(item.id)
+    },
+    {
+        label: 'Resetar Categoria',
+        icon: '🏷️',
+        variant: 'danger' as const,
+        onClick: () => removeItem(item.id)
+    },
+];
 
 // --- Helpers ---
 const formatCurrency = (value: number): string =>
@@ -69,6 +88,7 @@ const mapNfeDataToEntryForm = (xmlData: NfeDataFromXML): NfeData => {
             sku: produto.codigo,
             mappedId: undefined,
             name: produto.descricao,
+            unitOfMeasure: produto.unidadeMedida || 'UN', // ✨ Capturando do XML
             unitPrice: parseFloat(unitPrice.toFixed(4)),
             quantity: parseFloat(quantity.toFixed(4)),
             quantityReceived: parseFloat(quantity.toFixed(4)),
@@ -109,10 +129,11 @@ const renderTableHead = (itemsList: ProductEntry[], toggleSelectAll: (isPending:
                     )}
                 </th>
                 <th style={styles.tableTh}>Mapeamento</th>
-                <th style={{ ...styles.tableTh , width: '60px'}}>SKU Forn.</th>
-                <th style={{ ...styles.tableTh , width: '450px'}}>Produto (NF)</th>
+                <th style={{ ...styles.tableTh, width: '60px' }}>SKU Forn.</th>
+                <th style={{ ...styles.tableTh, width: '450px' }}>Produto (NF)</th>
                 <th style={{ ...styles.tableTh, width: '100px' }}>Preço Unitário (NF)</th>
                 <th style={{ ...styles.tableTh, width: '80px' }}>Qtd. NF</th>
+                <th style={{ ...styles.tableTh, width: '80px' }}>UN. NF</th>
                 <th style={{ ...styles.tableTh, width: '70px' }}>*Qtd. Recebida*</th>
                 <th style={{ ...styles.tableTh, width: '30px' }}>*Dif.*</th>
                 <th style={{ ...styles.tableTh, width: '120px' }}>Categoria</th>
@@ -130,14 +151,11 @@ const StockEntryForm: React.FC = () => {
     const [supplier, setSupplier] = useState('');
     const [entryDate, setEntryDate] = useState(new Date().toISOString().substring(0, 10));
     const [items, setItems] = useState<ProductEntry[]>([]);
-
     // seleções separadas
     const [selectedPendingIds, setSelectedPendingIds] = useState<Set<number>>(new Set());
     const [selectedConfirmedIds, setSelectedConfirmedIds] = useState<Set<number>>(new Set());
-
     const [availableCategories] = useState<string[]>(['Material', 'Insumo', 'Serviço', 'Outro']);
     const [bulkCategory, setBulkCategory] = useState<string>(availableCategories[0]);
-
     const [accessKey, setAccessKey] = useState('');
     const [totalFreight, setTotalFreight] = useState(0);
     const [totalIpi, setTotalIpi] = useState(0);
@@ -147,14 +165,11 @@ const StockEntryForm: React.FC = () => {
     // modal mapping
     const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
     const [itemToMap, setItemToMap] = useState<ProductEntry | null>(null);
-
     const subtotal = useMemo(() => items.reduce((sum, item) => sum + item.total, 0), [items]);
     const totalItems = useMemo(() => items.reduce((sum, item) => sum + item.quantityReceived, 0), [items]);
-
     const hasUnmappedItems = items.some(item => !item.mappedId);
     const divergentItems = useMemo(() => items.filter(i => i.difference !== 0), [items]);
     const hasDivergence = divergentItems.length > 0;
-
     const pendingItems = useMemo(() => items.filter(item => !item.isConfirmed), [items]);
     const confirmedItems = useMemo(() => items.filter(item => item.isConfirmed), [items]);
     const hasPendingItems = pendingItems.length > 0;
@@ -184,11 +199,9 @@ const StockEntryForm: React.FC = () => {
                 setTotalOtherExpenses(xmlData.totalOtherExpenses);
                 setTotalNoteValue(xmlData.totalNoteValue);
                 setItems(xmlData.items);
-
                 // reset seleções
                 setSelectedPendingIds(new Set(xmlData.items.filter(i => !i.isConfirmed).map(i => i.tempId)));
                 setSelectedConfirmedIds(new Set());
-
                 alert(`XML importado com sucesso! ${xmlData.items.length} itens carregados.`);
             } catch (error) {
                 console.error('Erro ao processar XML:', error);
@@ -201,25 +214,39 @@ const StockEntryForm: React.FC = () => {
 
     // Manipuladores
     const toggleConfirmation = useCallback((tempId: number) => {
-        const current = items.find(i => i.tempId === tempId);
-        if (!current) return;
-        const willConfirm = !current.isConfirmed;
+    const current = items.find(i => i.tempId === tempId);
+    if (!current) return;
 
-        setItems(prev => prev.map(it => it.tempId === tempId ? { ...it, isConfirmed: willConfirm } : it));
+    const willConfirm = !current.isConfirmed;
 
-        if (willConfirm) {
-            setSelectedPendingIds(prev => { const n = new Set(prev); n.delete(tempId); return n; });
-            setSelectedConfirmedIds(prev => { const n = new Set(prev); n.add(tempId); return n; });
-        } else {
-            setSelectedConfirmedIds(prev => { const n = new Set(prev); n.delete(tempId); return n; });
-            setSelectedPendingIds(prev => { const n = new Set(prev); n.add(tempId); return n; });
-        }
+    // Bloqueio estrito: Se for para confirmar e NÃO estiver mapeado, interrompe.
+    if (willConfirm && !current.mappedId) {
+        alert('Operação interrompida: Você precisa mapear o produto antes de confirmar a conferência.');
+        return; 
+    }
 
-        if (willConfirm) {
-            if (current.difference !== 0) alert('Atenção: Item com divergência de quantidade. Ele será movido para Conferidos.');
-            if (!current.mappedId) alert('Atenção: Item não mapeado. O mapeamento é obrigatório para a entrada final. Ele será movido para Conferidos.');
-        }
-    }, [items, setSelectedPendingIds, setSelectedConfirmedIds]);
+    // Postura de aviso: Se houver divergência, apenas avisa, mas permite seguir.
+    if (willConfirm && current.difference !== 0) {
+        console.warn(`Item ${current.sku} confirmado com divergência de ${current.difference}.`);
+        // Se quiser um aviso visual para o usuário sem travar:
+        // alert('Atenção: Este item possui divergência, mas será movido para conferidos.');
+    }
+
+    // Execução da atualização
+    setItems(prev => prev.map(it => 
+        it.tempId === tempId ? { ...it, isConfirmed: willConfirm } : it
+    ));
+
+    // Gerenciamento de IDs selecionados
+    if (willConfirm) {
+        setSelectedPendingIds(prev => { const n = new Set(prev); n.delete(tempId); return n; });
+        setSelectedConfirmedIds(prev => { const n = new Set(prev); n.add(tempId); return n; });
+    } else {
+        setSelectedConfirmedIds(prev => { const n = new Set(prev); n.delete(tempId); return n; });
+        setSelectedPendingIds(prev => { const n = new Set(prev); n.add(tempId); return n; });
+    }
+
+}, [items, setSelectedPendingIds, setSelectedConfirmedIds]);
 
     const handleUpdateReceivedQuantity = (tempId: number, value: string) => {
         const received = parseFloat(value);
@@ -228,33 +255,32 @@ const StockEntryForm: React.FC = () => {
             if (it.tempId === tempId) {
                 const diff = received - it.quantity;
                 return { ...it, quantityReceived: received, difference: parseFloat(diff.toFixed(4)) };
-            }
-            return it;
+            } return it;
         }));
     };
 
-      const handleResetReceivedQuantity = (tempId?: number, value?: string) => {
-          // se houver seleção, reseta apenas os selecionados; senão reseta todos os pendentes
-          const ids = Array.from(selectedPendingIds);
-  
-          setItems(prev =>
-              prev.map(it => {
-                  if (ids.length > 0) {
-                      return ids.includes(it.tempId)
-                          ? { ...it, quantityReceived: it.quantity, difference: 0 }
-                          : it;
-                  }
-                  // quando não há seleção, reseta todos os pendentes (não conferidos)
-                  return !it.isConfirmed ? { ...it, quantityReceived: it.quantity, difference: 0 } : it;
-              })
-          );
-  
-          // limpa seleção após o reset
-          setSelectedPendingIds(new Set());
-  
-          const count = ids.length > 0 ? ids.length : pendingItems.length;
-          alert(`${count} item(s) tiveram a quantidade recebida resetada para o valor da NF.`);
-      };
+    const handleResetReceivedQuantity = (tempId?: number, value?: string) => {
+        // se houver seleção, reseta apenas os selecionados; senão reseta todos os pendentes
+        const ids = Array.from(selectedPendingIds);
+
+        setItems(prev =>
+            prev.map(it => {
+                if (ids.length > 0) {
+                    return ids.includes(it.tempId)
+                        ? { ...it, quantityReceived: it.quantity, difference: 0 }
+                        : it;
+                }
+                // quando não há seleção, reseta todos os pendentes (não conferidos)
+                return !it.isConfirmed ? { ...it, quantityReceived: it.quantity, difference: 0 } : it;
+            })
+        );
+
+        // limpa seleção após o reset
+        setSelectedPendingIds(new Set());
+
+        const count = ids.length > 0 ? ids.length : pendingItems.length;
+        alert(`${count} item(s) tiveram a quantidade recebida resetada para o valor da NF.`);
+    };
 
     const handleUpdateItem = (tempId: number, field: keyof ProductEntry, value: string | number) => {
         setItems(prev => prev.map(it => {
@@ -285,23 +311,22 @@ const StockEntryForm: React.FC = () => {
     };
 
     const handleModalMap = (tempId: number, data: any) => {
-    // 'data' aqui é o MappingPayload que vem do Modal
-    setItems(prev => prev.map(it => {
-        if (it.tempId === tempId) {
-            return { 
-                ...it, 
-                mappedId: data.mapped.id,        // Extrai o ID para a coluna da tabela
-                category: data.mapped.category,  // Extrai a Categoria
-                name: data.mapped.name,          // Opcional: Atualiza o nome para o nome interno
-                mappedData: data.mapped          // Guarda o objeto todo por segurança
-            };
-        }
-        return it;
-    }));
-    
-    setIsMappingModalOpen(false);
-    setItemToMap(null);
-};
+        // 'data' aqui é o MappingPayload que vem do Modal
+        setItems(prev => prev.map(it => {
+            if (it.tempId === tempId) {
+                return {
+                    ...it,
+                    mappedId: data.mapped.id,        // Extrai o ID para a coluna da tabela
+                    category: data.mapped.category,  // Extrai a Categoria
+                    name: data.mapped.name,          // Opcional: Atualiza o nome para o nome interno
+                    mappedData: data.mapped          // Guarda o objeto todo por segurança
+                };
+            } return it;
+        }));
+
+        setIsMappingModalOpen(false);
+        setItemToMap(null);
+    };
 
     const closeModal = () => { setIsMappingModalOpen(false); setItemToMap(null); };
 
@@ -340,7 +365,6 @@ const StockEntryForm: React.FC = () => {
         setSelectedConfirmedIds(prev => { const n = new Set(prev); ids.forEach(id => n.add(id)); return n; });
         alert(`${ids.length} itens marcados como Conferidos.`);
     };
-
     const handleBulkUnconfirmSelected = () => {
         const ids = Array.from(selectedConfirmedIds);
         setItems(prev => prev.map(it => ids.includes(it.tempId) ? { ...it, isConfirmed: false } : it));
@@ -348,7 +372,6 @@ const StockEntryForm: React.FC = () => {
         setSelectedPendingIds(prev => { const n = new Set(prev); ids.forEach(id => n.add(id)); return n; });
         alert(`${ids.length} itens desmarcados (movidos para Pendentes).`);
     };
-
     // Render linha (agora recebe isPending + toggleSelectItem)
     const renderItemRow = (
         item: ProductEntry,
@@ -400,6 +423,7 @@ const StockEntryForm: React.FC = () => {
                 <td style={{ ...styles.tableCell, fontWeight: 500 }}>{item.name}</td>
                 <td style={styles.tableCell}>R$ {item.unitPrice.toFixed(3)}</td>
                 <td style={{ ...styles.tableCell, fontWeight: 700, color: '#4b5563' }}>{item.quantity.toFixed(2)}</td>
+                <td style={{ ...styles.tableCell, fontWeight: 700, color: '#4b5563' }}>{item.unitOfMeasure}</td>
                 <td style={styles.tableCell}>
                     {item.isConfirmed ? (
                         <span style={{ fontWeight: 600, color: '#10b981' }}>{item.quantityReceived}</span>
@@ -457,7 +481,7 @@ const StockEntryForm: React.FC = () => {
                     <button
                         onClick={() => toggleConfirmationFn(item.tempId)}
                         style={{
-                            ...( item.isConfirmed ? styles.uncheckButton : styles.checkButton),
+                            ...(item.isConfirmed ? styles.uncheckButton : styles.checkButton),
                             transition: 'all 0.15s',
                             fontWeight: 600,
                         }}
@@ -466,23 +490,9 @@ const StockEntryForm: React.FC = () => {
                     </button>
                     {!item.isConfirmed && (
 
-                        <select                                //trocar futuramente por um popover
-  value="" // Mantém vazio para sempre parecer um menu de "Ações"
-  onChange={(e) => {
-    const action = e.target.value;
-    if (action === 'reset_qty') handleUpdateReceivedQuantityFn(item.tempId, String(item.quantity));
-    if (action === 'reset_map') /* sua função de reset de mapeamento */;
-    if (action === 'reset_cat') /* sua função de reset de categoria */;
-  }}
-  style={styles.selectAction}
->
-  <option value="" disabled selected>⚙️ Ações</option>
-  <option value="reset_qty">↺ Resetar Quantidade</option>
-  <option value="reset_map">🔗 Resetar Mapeamento</option>
-  <option value="reset_cat">📁 Resetar Categoria</option>
-</select>
+                        <ActionPopover actions={itemActions} />
                     )}
-                    
+
                 </td>
             </tr>
         );
@@ -500,120 +510,108 @@ const StockEntryForm: React.FC = () => {
         }
         alert(`Entrada de NF ${invoiceNumber} confirmada! ${totalItems.toFixed(2)} unidades serão atualizadas no estoque.`);
     };
-
     return (
         <div style={styles.container}>
-            <div className="page-header"><h1 style={styles.title}>📥 Entrada de Mercadorias (Registro de NF-e)</h1></div>
+            <div className="page-header">
+                <FlexGridContainer layout='grid' template='3fr 2fr' gap='10px'>
 
-            <FlexGridContainer layout='grid'>
+                    <h1 style={styles.title}>📥 Entrada de Mercadorias (Registro de NF-e)</h1>
+                    {!accessKey && (
+                        <div style={styles.importArea}>
+                            <input type="file" style={styles.fileInput} accept=".xml" id="xml-upload" onChange={handleXmlUpload} />
+                            <label htmlFor="xml-upload" style={styles.importButton}>⬆️ Importar XML da NF-e</label>
+                            <Typography variant='pMuted' style={{ marginTop: '10px' }}>(Preenche automaticamente cabeçalho, totais e lista de produtos)</Typography>
+                        </div>
+                    )}
+                    {accessKey && (
+                        <div style={styles.importArea}>
+                            <label style={styles.importButton}> ✅ XML importado com sucesso. Dados da NF carregados.</label>
 
-                <Card variant='default' padding='20px'>
-                    <Typography variant='h2'>1. Informações da Nota Fiscal</Typography>
-                    <div style={styles.importArea}>
-                        <input type="file" style={styles.fileInput} accept=".xml" id="xml-upload" onChange={handleXmlUpload} />
-                        <label htmlFor="xml-upload" style={styles.importButton}>⬆️ Importar XML da NF-e</label>
-                        <Typography variant='pMuted' style={{ marginTop: '10px' }}>(Preenche automaticamente cabeçalho, totais e lista de produtos)</Typography>
-                    </div>
-                    <FlexGridContainer layout='grid' template='2fr 5fr 1fr' gap='10px'>
-                        <FormControl label='Nº da Nota Fiscal:' type="text" readOnlyDisplay={true} value={invoiceNumber} />
-                        <FormControl label='Fornecedor:' type="text" value={supplier} readOnlyDisplay={true}/>
-                        <FormControl label='Data da Entrada:' type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)}  />
-                    </FlexGridContainer>
-                </Card>
 
-                {accessKey && (
-                    <Card variant='default' padding='20px'>
-                        <Typography variant='h2'>2. Conferência de Totais Fiscais e Logísticos</Typography>
-                        <FlexGridContainer layout='grid' template='3fr 2fr' gap='30px'>
-                            <div>
-                                <p style={styles.summaryItem}><span style={styles.summaryLabel}>Chave de Acesso:</span><span style={{ ...styles.summaryValue, fontSize: '0.85rem' }}>**{accessKey}**</span></p>
-                                <p style={styles.summaryItem}><span style={styles.summaryLabel}>Total IPI (Rateável):</span><span style={styles.summaryValue}>{formatCurrency(totalIpi)}</span></p>
-                                <p style={styles.summaryItem}><span style={styles.summaryLabel}>Total Frete (Rateável):</span><span style={styles.summaryValue}>{formatCurrency(totalFreight)}</span></p>
-                                <p style={styles.summaryItem}><span style={styles.summaryLabel}>Total Outras Despesas:</span><span style={styles.summaryValue}>{formatCurrency(totalOtherExpenses)}</span></p>
-                            </div>
-                            <div style={styles.totalsBox}>
-                                <p style={styles.totalLine}><span style={styles.totalLabel}>Soma dos Produtos (vProd NF): </span></p>
-                                <span style={{ ...styles.totalValue, color: '#2675dcff', fontSize: '1.25rem' }}>{formatCurrency(subtotal)}</span>
-                                <p style={{ ...styles.totalLine, borderTop: '1px solid #e5e7eb', paddingTop: '10px' }}><span style={{ ...styles.totalLabel, fontWeight: 700 }}>Valor Total da Nota (vNF):</span></p>
-                                <span style={{ ...styles.totalValue, color: '#dc2626', fontSize: '1.25rem' }}>{formatCurrency(totalNoteValue)}</span>
-                            </div>
-                        </FlexGridContainer>
-                    </Card>
-                )}
-            </FlexGridContainer>
+                            <label style={styles.importButton}>Alterar XML</label>
+                        </div>
+                    )}
 
+                </FlexGridContainer>
+            </div>
+
+            <NfeCards
+                invoiceNumber={invoiceNumber}
+                accessKey={accessKey}
+                entryDate={entryDate}
+                setEntryDate={setEntryDate}
+                supplier={supplier}
+                totalIpi={totalIpi}
+                totalFreight={totalFreight}
+                totalOtherExpenses={totalOtherExpenses}
+                subtotal={subtotal}
+                totalNoteValue={totalNoteValue}
+                formatCurrency={formatCurrency}
+                styles={styles}
+            />
             <hr />
-
-                    <h2 style={styles.panelTitle}>3. Conferência Detalhada de Itens {items.length == 1 ? '(1 item)' : `(${items.length} itens)`}</h2>
+            <h2 style={styles.panelTitle}>3. Conferência Detalhada de Itens {items.length == 1 ? '(1 item)' : `(${items.length} itens)`}</h2>
             <FlexGridContainer layout='grid'>
 
-                    <FlexGridContainer layout='flex'>
-                        <h3 style={styles.subTitle}>🔴 Itens Pendentes de Ação ({pendingItems.length} produtos)</h3>
+                <FlexGridContainer layout='flex'>
+                    <h3 style={styles.subTitle}>🔴 Itens Pendentes de Ação ({pendingItems.length} produtos)</h3>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                        <button onClick={handleBulkConfirmSelected} style={{ padding: '6px 10px', borderRadius: 4, backgroundColor: '#4f46e5', color: '#fff' }}>
+                            Conferir Selecionados
+                        </button>
+                        <button onClick={() => handleResetReceivedQuantity()} style={{ padding: '6px 10px', borderRadius: 4, backgroundColor: '#f59e0b', color: '#fff' }}>
+                            Resetar Quantidade
+                        </button>
+                        <button onClick={() => setSelectedPendingIds(new Set())} style={{ padding: '6px 10px', borderRadius: 4, backgroundColor: '#9ca3af', color: '#fff' }}>Limpar Seleção</button>
+                        <span style={{ marginLeft: 8, color: '#6b7280' }}>{selectedPendingIds.size > 0 ? `${selectedPendingIds.size} selecionado(s)` : 'Selecione itens para ações em lote'}</span>
+                    </div>
 
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-                            <button onClick={handleBulkConfirmSelected} style={{ padding: '6px 10px', borderRadius: 4, backgroundColor: '#4f46e5', color: '#fff' }}>
-                                Conferir Selecionados
-                            </button>
-                            <button onClick={() => handleResetReceivedQuantity()} style={{ padding: '6px 10px', borderRadius: 4, backgroundColor: '#f59e0b', color: '#fff' }}>
-                                Resetar Quantidade
-                            </button>
-                             <button onClick={() => setSelectedPendingIds(new Set())} style={{ padding: '6px 10px', borderRadius: 4, backgroundColor: '#9ca3af', color: '#fff' }}>Limpar Seleção</button>
-                             <span style={{ marginLeft: 8, color: '#6b7280' }}>{selectedPendingIds.size > 0 ? `${selectedPendingIds.size} selecionado(s)` : 'Selecione itens para ações em lote'}</span>
-                         </div>
+                    {hasUnmappedItems && hasPendingItems && <Badge color='warning'>⚠️ {items.filter(i => !i.mappedId).length} item(ns) precisam de Mapeamento.</Badge>}
+                    <div style={{ ...styles.tableResponsive, marginBottom: '30px' }}>
+                        <table style={styles.dataTable}>
+                            {renderTableHead(pendingItems, toggleSelectAll, true, selectedPendingIds)}
+                            <tbody>
+                                {pendingItems.length === 0 ? (
+                                    <tr style={styles.tableRow}>
+                                        <td colSpan={12} style={{ ...styles.tableCell, textAlign: 'center', color: '#065f46', backgroundColor: '#ecfdf5' }}>
+                                            🎉 Não há itens pendentes. Role para baixo e finalize a entrada.
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    pendingItems.map(item =>
+                                        renderItemRow(item, toggleConfirmation, handleUpdateReceivedQuantity, handleMapProduct, handleUpdateItem, handleRemoveItem, toggleSelectItem, selectedPendingIds.has(item.tempId), true)
+                                    )
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </FlexGridContainer>
+                <FlexGridContainer >
+                    <Typography variant='h3'>🟢 Itens Conferidos {confirmedItems.length == 1 ? '(1 item)' : `(${confirmedItems.length} itens)`}</Typography>
 
-                        {hasUnmappedItems && hasPendingItems && <Badge color='warning'>⚠️ {items.filter(i => !i.mappedId).length} item(ns) precisam de Mapeamento.</Badge>}
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                        <button onClick={handleBulkUnconfirmSelected} style={{ padding: '6px 10px', borderRadius: 4, backgroundColor: '#ef4444', color: '#fff' }}>Desmarcar Selecionados</button>
+                        <button onClick={() => setSelectedConfirmedIds(new Set())} style={{ padding: '6px 10px', borderRadius: 4, backgroundColor: '#9ca3af', color: '#fff' }}>Limpar Seleção</button>
+                        <span style={{ marginLeft: 8, color: '#6b7280' }}>{selectedConfirmedIds.size > 0 ? `${selectedConfirmedIds.size} selecionado(s)` : 'Selecione itens para desmarcar em lote'}</span>
+                    </div>
 
-                        <div style={{ ...styles.tableResponsive, marginBottom: '30px' }}>
-                            <table style={styles.dataTable}>
-                                {renderTableHead(pendingItems, toggleSelectAll, true, selectedPendingIds)}
-                                <tbody>
-                                    {pendingItems.length === 0 ? (
-                                        <tr style={styles.tableRow}>
-                                            <td colSpan={12} style={{ ...styles.tableCell, textAlign: 'center', color: '#065f46', backgroundColor: '#ecfdf5' }}>
-                                                🎉 Não há itens pendentes. Role para baixo e finalize a entrada.
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        pendingItems.map(item =>
-                                            renderItemRow(item, toggleConfirmation, handleUpdateReceivedQuantity, handleMapProduct, handleUpdateItem, handleRemoveItem, toggleSelectItem, selectedPendingIds.has(item.tempId), true)
-                                        )
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </FlexGridContainer>
-
-
-                    <FlexGridContainer >
-
-                        <Typography variant='h3'>🟢 Itens Conferidos {confirmedItems.length == 1 ? '(1 item)' : `(${confirmedItems.length} itens)`}</Typography>
-
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-                            <button onClick={handleBulkUnconfirmSelected} style={{ padding: '6px 10px', borderRadius: 4, backgroundColor: '#ef4444', color: '#fff' }}>Desmarcar Selecionados</button>
-                            <button onClick={() => setSelectedConfirmedIds(new Set())} style={{ padding: '6px 10px', borderRadius: 4, backgroundColor: '#9ca3af', color: '#fff' }}>Limpar Seleção</button>
-                            <span style={{ marginLeft: 8, color: '#6b7280' }}>{selectedConfirmedIds.size > 0 ? `${selectedConfirmedIds.size} selecionado(s)` : 'Selecione itens para desmarcar em lote'}</span>
-                        </div>
-
-                        <div style={styles.tableResponsive}>
-                            <table style={styles.dataTable}>
-                                {renderTableHead(confirmedItems, toggleSelectAll, false, selectedConfirmedIds)}
-                                <tbody>
-                                    {confirmedItems.length === 0 ? (
-                                        <tr style={styles.tableRow}>
-                                            <td colSpan={12} style={{ ...styles.tableCell, textAlign: 'center', color: '#6b7280' }}>Nenhum item foi marcado como conferido ainda.</td>
-                                        </tr>
-                                    ) : (
-                                        confirmedItems.map(item =>
-                                            renderItemRow(item, toggleConfirmation, handleUpdateReceivedQuantity, handleMapProduct, handleUpdateItem, handleRemoveItem, toggleSelectItem, selectedConfirmedIds.has(item.tempId), false)
-                                        )
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-
-                    </FlexGridContainer>
-
-
+                    <div style={styles.tableResponsive}>
+                        <table style={styles.dataTable}>
+                            {renderTableHead(confirmedItems, toggleSelectAll, false, selectedConfirmedIds)}
+                            <tbody>
+                                {confirmedItems.length === 0 ? (
+                                    <tr style={styles.tableRow}>
+                                        <td colSpan={12} style={{ ...styles.tableCell, textAlign: 'center', color: '#6b7280' }}>Nenhum item foi marcado como conferido ainda.</td>
+                                    </tr>
+                                ) : (
+                                    confirmedItems.map(item =>
+                                        renderItemRow(item, toggleConfirmation, handleUpdateReceivedQuantity, handleMapProduct, handleUpdateItem, handleRemoveItem, toggleSelectItem, selectedConfirmedIds.has(item.tempId), false)
+                                    )
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </FlexGridContainer>
                 {hasDivergence && (
                     <div style={{ ...styles.panel, backgroundColor: '#fef2f2' }}>
                         <h2 style={{ ...styles.panelTitle, color: '#dc2626' }}>🚨 3. Divergência Encontrada ({divergentItems.length})</h2>
@@ -631,7 +629,6 @@ const StockEntryForm: React.FC = () => {
                         <Button variant='secondary'>Gerar Relatório</Button>
                     </div>
                 )}
-
                 <div style={styles.confirmationArea}>
                     <div style={styles.totalsBoxFooter}>
                         <p style={styles.totalLine}><span style={styles.totalLabel}>Total de Itens Físicos (Recebidos):</span><span style={styles.totalValue}>{totalItems.toFixed(2)}</span></p>
@@ -652,14 +649,12 @@ const StockEntryForm: React.FC = () => {
             </FlexGridContainer>
 
             {isMappingModalOpen && itemToMap && (
-    <MappingModal
-        item={itemToMap}
-        onClose={closeModal}
-        onMap={handleModalMap} // Passa a função que agora entende o objeto
-    />
-)}
-
-            
+                <MappingModal
+                    item={itemToMap}
+                    onClose={closeModal}
+                    onMap={handleModalMap} // Passa a função que agora entende o objeto
+                />
+            )}
         </div>
     );
 };

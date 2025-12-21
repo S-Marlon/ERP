@@ -15,6 +15,17 @@ export interface TreeCategory {
   children: TreeCategory[];
 }
 
+export async function searchProductsMapping(query: string): Promise<any[]> {
+    const res = await fetch(`${apiBase}/products/mapping?query=${encodeURIComponent(query)}`);
+    
+    if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Erro na busca de mapeamento: ${res.status}. ${errorText}`);
+    }
+    
+    return res.json();
+}
+
 
 
 /**
