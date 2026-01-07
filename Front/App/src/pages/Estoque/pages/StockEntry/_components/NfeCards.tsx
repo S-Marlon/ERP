@@ -3,6 +3,7 @@ import FormControl from '../../../../../components/ui/FormControl/FormControl';
 import Typography from '../../../../../components/ui/Typography/Typography';
 import FlexGridContainer from '../../../../../components/Layout/FlexGridContainer/FlexGridContainer';
 import Card from '../../../../../components/ui/Card/Card';
+import Badge from '../../../../../components/ui/Badge/Badge';
 // Importe aqui os seus componentes de UI de acordo com sua biblioteca
 // import { FlexGridContainer, Card, Typography, FormControl } from './sua-biblioteca-de-ui';
 
@@ -20,6 +21,10 @@ interface NfeCardsProps {
     totalNoteValue: number;
     formatCurrency: (value: number) => string;
     styles: any; // Idealmente, você deve tipar seus estilos CSS-in-JS
+    // Novo: status do fornecedor
+    supplierExists?: boolean | null; // null => desconhecido, true/false => conhecido
+    isSupplierChecking?: boolean;
+    onCreateSupplier?: () => void; // acionado quando usuário quer criar fornecedor manualmente
 }
 
 const NfeCards: React.FC<NfeCardsProps> = ({
@@ -35,7 +40,10 @@ const NfeCards: React.FC<NfeCardsProps> = ({
     subtotal,
     totalNoteValue,
     formatCurrency,
-    styles
+    styles,
+    supplierExists = null,
+    isSupplierChecking = false,
+    onCreateSupplier,
 }) => {
     return (
         <FlexGridContainer layout='grid'>
@@ -66,12 +74,31 @@ const NfeCards: React.FC<NfeCardsProps> = ({
                 </FlexGridContainer>
 
                 <FlexGridContainer layout='grid' template='5fr 1fr' gap='10px'>
-                    <FormControl 
-                        label='Fornecedor:' 
-                        type="text" 
-                        value={supplier} 
-                        readOnlyDisplay={true} 
-                    />
+                    <div>
+                        <FormControl 
+                            label='Fornecedor:' 
+                            type="text" 
+                            value={supplier} 
+                            readOnlyDisplay={true} 
+                        />
+                        {/* Badge de status do fornecedor */}
+                        {isSupplierChecking ? (
+                            <div style={{ marginTop: 6 }}><Badge color='paper'>Checando fornecedor...</Badge></div>
+                        ) : (
+                            supplierExists === true ? (
+                                <div style={{ marginTop: 6 }}><Badge color='success'>Fornecedor no banco</Badge></div>
+                            ) : (
+                                supplierExists === false ? (
+                                    <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center' }}>
+                                        <Badge color='warning'>Fornecedor não encontrado</Badge>
+                                        {onCreateSupplier && (
+                                            <button onClick={onCreateSupplier} style={{ padding: '6px 10px', backgroundColor: '#10b981', color: '#fff', borderRadius: 6, border: 'none', cursor: 'pointer' }}>Criar</button>
+                                        )}
+                                    </div>
+                                ) : null
+                            )
+                        )}
+                    </div>
                     <FormControl 
                         label='CNPJ:' 
                         type="text" 

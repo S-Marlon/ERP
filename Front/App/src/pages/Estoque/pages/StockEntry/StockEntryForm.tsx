@@ -3,16 +3,16 @@ import React, { useState, useMemo, useCallback } from 'react';
 import Button from '../../../../components/ui/Button/Button';
 import FlexGridContainer from '../../../../components/Layout/FlexGridContainer/FlexGridContainer';
 import Typography from '../../../../components/ui/Typography/Typography';
-import MappingModal from './_components/MappingModal'; // Modal de Mapeamento
+import MappingModal, { MappingPayload } from './_components/MappingModal'; // Modal de Mapeamento
 import { parseNfeXmlToData, NfeDataFromXML } from '../../utils/nfeParser';
 import Badge from '../../../../components/ui/Badge/Badge';
 import { ActionPopover } from '../../../../components/ui/Popover/ActionPopover';
 import NfeCards from './_components/NfeCards';
-import { checkExistingMappings } from '../../api/productsApi';
+import { checkExistingMappings, checkSupplier, createSupplier } from '../../api/productsApi';
 
 // --- Interfaces ---
 interface ProductEntry {
-    isMapped: any;
+    isMapped: boolean;
     tempId: number;
     sku: string;
     name: string;
@@ -32,6 +32,7 @@ interface ProductEntry {
 interface NfeData {
     invoiceNumber: string;
     supplier: string;
+    supplierCnpj: string; // CNPJ extraído do XML
     entryDate: string;
     accessKey: string;
     totalFreight: number;
@@ -41,28 +42,19 @@ interface NfeData {
     items: ProductEntry[];
 }
 
-const itemActions = [
-    {
-        label: 'Resetar Quantidade',
-        icon: '↺',
-        onClick: () => resetQuantity(item.id)
-    },
-    {
-        label: 'Resetar Mapeamento',
-        icon: '🔗',
-        onClick: () => resetMap(item.id)
-    },
-    {
-        label: 'Resetar Categoria',
-        icon: '🏷️',
-        variant: 'danger' as const,
-        onClick: () => removeItem(item.id)
-    },
-];
+
 
 // --- Helpers ---
 const formatCurrency = (value: number): string =>
     value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+// Formata CNPJ para o padrão 00.000.000/0000-00 quando possível
+const formatCnpj = (cnpj?: string): string => {
+    if (!cnpj) return '';
+    const digits = cnpj.replace(/\D/g, '');
+    if (digits.length !== 14) return cnpj;
+    return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+};
 
 const mapNfeDataToEntryForm = (xmlData: NfeDataFromXML): NfeData => {
     const totalFreight = parseFloat(xmlData.valorTotalFrete || '0.00');
@@ -89,6 +81,7 @@ const mapNfeDataToEntryForm = (xmlData: NfeDataFromXML): NfeData => {
             tempId: index + 1,
             sku: produto.codigo,
             mappedId: undefined,
+            isMapped: false,
             name: produto.descricao,
             unitOfMeasure: produto.unidadeMedida || 'UN', // ✨ Capturando do XML
             unitPrice: parseFloat(unitPrice.toFixed(4)),
@@ -99,12 +92,13 @@ const mapNfeDataToEntryForm = (xmlData: NfeDataFromXML): NfeData => {
             unitCostWithTaxes: parseFloat(unitCostWithTaxes.toFixed(4)),
             isConfirmed: false,
             category: '',
-        };
+        }; 
     });
 
     return {
         invoiceNumber: `NF ${xmlData.numero}`,
-        supplier: xmlData.emitente.nome,
+        supplier: xmlData.emitente?.nome || '',
+        supplierCnpj: xmlData.emitente?.cnpj || '',
         entryDate: xmlData.dataEmissao.substring(0, 10),
         accessKey: xmlData.chaveAcesso,
         totalFreight,
@@ -151,6 +145,16 @@ const StockEntryForm: React.FC = () => {
     // Header / nota
     const [invoiceNumber, setInvoiceNumber] = useState('');
     const [supplier, setSupplier] = useState('');
+    const [supplierCnpj, setSupplierCnpj] = useState('');
+    const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
+    const [supplierToCreate, setSupplierToCreate] = useState<{ cnpj: string; name: string } | null>(null);
+    // Form state for creating supplier
+    const [supplierCreationName, setSupplierCreationName] = useState('');
+    const [supplierCreationLoading, setSupplierCreationLoading] = useState(false);
+    const [isSupplierChecking, setIsSupplierChecking] = useState(false);
+    const [supplierExists, setSupplierExists] = useState<boolean | null>(null);
+    const [pendingXmlData, setPendingXmlData] = useState<NfeData | null>(null);
+    const [pendingSkus, setPendingSkus] = useState<string[] | null>(null);
     const [entryDate, setEntryDate] = useState(new Date().toISOString().substring(0, 10));
     const [items, setItems] = useState<ProductEntry[]>([]);
     // seleções separadas
@@ -176,6 +180,47 @@ const StockEntryForm: React.FC = () => {
     const confirmedItems = useMemo(() => items.filter(item => item.isConfirmed), [items]);
     const hasPendingItems = pendingItems.length > 0;
 
+    // Função que faz a sincronização de mapeamentos e atualiza os itens (usada ao importar XML e após criar fornecedor)
+    const performMappingSync = async (cnpjToUse: string, xmlToUse: NfeData) => {
+        try {
+            const skus = xmlToUse.items.map(i => i.sku);
+            const existingMappings = await checkExistingMappings(cnpjToUse, skus);
+            const reconciledItems = xmlToUse.items.map((item: any) => {
+                const mapping = existingMappings.find((m: any) => m.sku_fornecedor === item.sku);
+                if (mapping) {
+                    return {
+                        ...item,
+                        isMapped: true,
+                        mappedId: mapping.codigo_interno,
+                        category: mapping.nome_categoria,
+                        mappedData: {
+                            id: mapping.codigo_interno,
+                            name: mapping.descricao,
+                            category: mapping.nome_categoria,
+                            unitOfMeasure: mapping.unidade,
+                        },
+                    };
+                }
+                return { ...item, isMapped: false };
+            });
+
+            // Atualiza itens e seleção
+            setItems(reconciledItems);
+            setSelectedPendingIds(new Set(reconciledItems.filter((i: any) => !i.isConfirmed).map((i: any) => i.tempId)));
+            setSelectedConfirmedIds(new Set());
+
+            const mapeadosCount = reconciledItems.filter((i: any) => i.isMapped).length;
+            alert(`XML importado! ${reconciledItems.length} itens carregados (${mapeadosCount} sincronizados automaticamente).`);
+
+            // limpa pendentes
+            setPendingXmlData(null);
+            setPendingSkus(null);
+        } catch (err) {
+            console.error('Erro ao sincronizar mapeamentos:', err);
+            alert('Erro ao sincronizar mapeamentos: ' + (err instanceof Error ? err.message : 'Erro desconhecido'));
+        }
+    };
+
     // Upload XML
     const handleXmlUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -198,37 +243,14 @@ const StockEntryForm: React.FC = () => {
 
             // --- INÍCIO DA RECONCILIAÇÃO AUTOMÁTICA ---
             
-            // 1. Pegamos o CNPJ do emitente (certifique-se que o mapNfeDataToEntryForm retorna isso)
-            // const supplierCnpj = xmlData.supplierCnpj || rawXmlData.emitenteCnpj; 
-            const supplierCnpj = '00.000.000/0000-00'; 
-            
-            // 2. Coletamos todos os SKUs dos itens da nota
-            const skusDaNota = xmlData.items.map((i: any) => i.sku);
+            // 1. Pegamos o CNPJ do emitente (vindo do XML) e o formatamos para o padrão
+            const supplierCnpjRaw = (rawXmlData.emitente && (rawXmlData.emitente.cnpj || (rawXmlData as any).emitenteCnpj)) || xmlData.supplierCnpj || '';
+            const formattedSupplierCnpj = formatCnpj(supplierCnpjRaw);
+            setSupplierCnpj(formattedSupplierCnpj);
 
-            // 3. Consultamos o backend para ver o que já está mapeado
-            const existingMappings = await checkExistingMappings(supplierCnpj, skusDaNota);
 
-            // 4. Cruzamos os dados: se existir mapeamento, o item já nasce "conectado"
-            const reconciledItems = xmlData.items.map((item: any) => {
-                const mapping = existingMappings.find((m: any) => m.sku_fornecedor === item.sku);
 
-                if (mapping) {
-                    return {
-                        ...item,
-                        isMapped: true, // Indica vínculo existente
-                        internalProduct: {
-                            id: mapping.codigo_interno,
-                            name: mapping.descricao,
-                            category: mapping.nome_categoria,
-                            unitOfMeasure: mapping.unidade
-                        }
-                    };
-                }
-                return { ...item, isMapped: false };
-            });
-            // --- FIM DA RECONCILIAÇÃO ---
-
-            // Atualização dos Estados
+                    // Popula cabeçalho imediatamente (o usuário deve ver os dados mesmo antes da sincronização)
             setInvoiceNumber(xmlData.invoiceNumber);
             setSupplier(xmlData.supplier);
             setEntryDate(xmlData.entryDate);
@@ -237,15 +259,44 @@ const StockEntryForm: React.FC = () => {
             setTotalIpi(xmlData.totalIpi);
             setTotalOtherExpenses(xmlData.totalOtherExpenses);
             setTotalNoteValue(xmlData.totalNoteValue);
-            
-            // Agora setamos os itens já reconciliados
-            setItems(reconciledItems);
 
-            setSelectedPendingIds(new Set(reconciledItems.filter((i: any) => !i.isConfirmed).map((i: any) => i.tempId)));
-            setSelectedConfirmedIds(new Set());
 
-            const mapeadosCount = reconciledItems.filter((i: any) => i.isMapped).length;
-            alert(`XML importado! ${reconciledItems.length} itens carregados (${mapeadosCount} sincronizados automaticamente).`);
+            // 2. Coletamos todos os SKUs dos itens da nota
+            const skusDaNota = xmlData.items.map((i: any) => i.sku);
+
+            // 2b. Verificamos se o fornecedor já existe no sistema
+            setIsSupplierChecking(true);
+            try {
+                const supplierCheck = await checkSupplier(formattedSupplierCnpj);
+                if (!supplierCheck.exists) {
+                    setSupplierExists(false);
+                    // Abrimos um modal sugerindo criar o fornecedor
+                    setSupplierToCreate({ cnpj: formattedSupplierCnpj, name: xmlData.supplier || '' });
+                    // preenche o campo do formulário com o nome extraído da NF
+                    setSupplierCreationName(xmlData.supplier || '');
+                    // mantém os dados temporários para sincronização após criação
+                    setPendingXmlData(xmlData);
+                    setPendingSkus(skusDaNota);
+                    setItems(xmlData.items);
+                    setSelectedPendingIds(new Set(xmlData.items.map((i: any) => i.tempId)));
+                    setIsSupplierModalOpen(true);
+
+                    // IMPORTANTE: NÃO podemos prosseguir com a sincronização até que o fornecedor seja criado
+                    return;
+                } else {
+                    setSupplierExists(true);
+                    // Se existir, podemos opcionalmente armazenar o nome retornado
+                    setSupplier(supplierCheck.supplier?.name || xmlData.supplier || '');
+                }
+            } catch (err) {
+                console.error('Erro ao checar fornecedor:', err);
+                setSupplierExists(false);
+            } finally {
+                setIsSupplierChecking(false);
+            }
+
+            // Se chegamos aqui, o fornecedor existe — vamos sincronizar
+            await performMappingSync(formattedSupplierCnpj, xmlData);
 
         } catch (error) {
             console.error('Erro ao processar XML:', error);
@@ -431,6 +482,30 @@ const StockEntryForm: React.FC = () => {
         setSelectedPendingIds(prev => { const n = new Set(prev); ids.forEach(id => n.add(id)); return n; });
         alert(`${ids.length} itens desmarcados (movidos para Pendentes).`);
     };
+    // Per-item actions (fix undefined top-level actions)
+    const getItemActions = (item: ProductEntry) => [
+        {
+            label: 'Resetar Quantidade',
+            icon: '↺',
+            onClick: () => handleResetReceivedQuantity(item.tempId)
+        },
+        {
+            label: 'Resetar Mapeamento',
+            icon: '🔗',
+            onClick: () => {
+                if (!window.confirm('Deseja resetar o mapeamento deste item?')) return;
+                setItems(prev => prev.map(it => it.tempId === item.tempId ? { ...it, mappedId: undefined, isMapped: false, mappedData: undefined, category: '' } : it));
+                setSelectedPendingIds(prev => { const n = new Set(prev); n.add(item.tempId); return n; });
+            }
+        },
+        {
+            label: 'Remover Item',
+            icon: '🗑️',
+            variant: 'danger' as const,
+            onClick: () => handleRemoveItem(item.tempId)
+        }
+    ];
+
     // Render linha (agora recebe isPending + toggleSelectItem)
     const renderItemRow = (
         item: ProductEntry,
@@ -471,7 +546,7 @@ const StockEntryForm: React.FC = () => {
                 </td>
                 <td style={styles.tableCell}>
                     {item.isMapped ? (
-                        <Badge color="success">Cod Interno: {item.sku}</Badge>
+                        <Badge color="success">Cod Interno: {item.mappedId}</Badge>
                     ) : (
                         <Button onClick={() => handleMapProductFn(item.tempId)} variant='warning' fontsize='11px' padding='5px' >
                             🔗 Mapear
@@ -489,12 +564,12 @@ const StockEntryForm: React.FC = () => {
                         <span style={{ fontWeight: 600, color: '#10b981' }}>{item.quantityReceived}</span>
                     ) : (
                         <input
-                            type="number" min="0" step="1"
-                            value={item.quantityReceived}
+                            type="number" min="0" step="0.01"
+                            value={String(item.quantityReceived)}
                             onChange={(e) => handleUpdateReceivedQuantityFn(item.tempId, e.target.value)}
                             style={{
                                 maxWidth: '50px',
-                                backgroundColor: isDivergent ? '#fee2e2' : '#ffffffff',
+                                backgroundColor: isDivergent ? '#fee2e2' : '#ffffff',
                                 border: isDivergent ? '2px solid #dc2626' : '2px solid #10b981',
                                 color: isDivergent ? '#991b1b' : '#10b981',
                             }}
@@ -550,7 +625,7 @@ const StockEntryForm: React.FC = () => {
                     </button>
                     {!item.isConfirmed && (
 
-                        <ActionPopover actions={itemActions} />
+                        <ActionPopover actions={getItemActions(item)} />
                     )}
 
                 </td>
@@ -601,6 +676,20 @@ const StockEntryForm: React.FC = () => {
                 entryDate={entryDate}
                 setEntryDate={setEntryDate}
                 supplier={supplier}
+                cnpj={supplierCnpj}
+                supplierExists={supplierExists}
+                isSupplierChecking={isSupplierChecking}
+                onCreateSupplier={() => {
+                    // Abre o modal de criação com os dados extraídos da NF (se disponíveis)
+                    if (supplierToCreate) {
+                        setSupplierCreationName(supplierToCreate.name || '');
+                        setIsSupplierModalOpen(true);
+                    } else if (supplierCnpj) {
+                        setSupplierToCreate({ cnpj: supplierCnpj, name: supplier || '' });
+                        setSupplierCreationName(supplier || '');
+                        setIsSupplierModalOpen(true);
+                    }
+                }}
                 totalIpi={totalIpi}
                 totalFreight={totalFreight}
                 totalOtherExpenses={totalOtherExpenses}
@@ -702,9 +791,9 @@ const StockEntryForm: React.FC = () => {
                         </p>
                     </div>
 
-                    <button onClick={handleConfirmEntry} style={styles.confirmButton} disbled={items.length === 0 || hasUnmappedItems || hasPendingItems}>
+                    <button onClick={handleConfirmEntry} style={styles.confirmButton} disabled={items.length === 0 || hasUnmappedItems || hasPendingItems}>
                         {items.length === 0 ? '🚫 Importe o XML' : hasPendingItems ? '🚫 Finalize a conferência' : hasUnmappedItems ? '🚫 Mapeie os itens' : '✅ Confirmar Entrada e Atualizar Estoque'}
-                    </button>
+                    </button> 
                 </div>
             </FlexGridContainer>
 
@@ -713,8 +802,78 @@ const StockEntryForm: React.FC = () => {
                     item={itemToMap}
                     onClose={closeModal}
                     onMap={handleModalMap} // Passa a função que agora entende o objeto
-                    supplierCnpj={'00.000.000/0000-00'} // Certifique-se que este valor existe
+                    supplierCnpj={supplierCnpj}
                 />
+            )}
+
+            {isSupplierModalOpen && supplierToCreate && (
+                <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+                    <div style={{ width: 480, padding: 20, borderRadius: 8, backgroundColor: 'white', boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }}>
+                        <h3 style={{ marginTop: 0 }}>Criar Fornecedor</h3>
+                        <p>O fornecedor extraído da NF não foi localizado no sistema. Preencha os dados abaixo para criá-lo.</p>
+
+                        <div style={{ display: 'grid', gap: 10, marginTop: 8 }}>
+                            <div>
+                                <label style={{ display: 'block', fontSize: '0.85rem', color: '#374151', marginBottom: 6 }}>Nome do Fornecedor</label>
+                                <input
+                                    value={supplierCreationName}
+                                    onChange={(e) => setSupplierCreationName(e.target.value)}
+                                    style={{ width: '100%', padding: '8px', borderRadius: 6, border: '1px solid #d1d5db' }}
+                                    placeholder='Nome do fornecedor'
+                                />
+                            </div>
+
+                            <div>
+                                <label style={{ display: 'block', fontSize: '0.85rem', color: '#374151', marginBottom: 6 }}>CNPJ</label>
+                                <input value={supplierToCreate.cnpj} readOnly style={{ width: '100%', padding: '8px', borderRadius: 6, border: '1px solid #e5e7eb', backgroundColor: '#f9fafb' }} />
+                            </div>
+
+                            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 6 }}>
+                                <button onClick={() => {
+                                    setIsSupplierModalOpen(false);
+                                    setSupplierToCreate(null);
+                                    setSupplierExists(false);
+                                    setSupplierCreationName('');
+                                    setIsSupplierChecking(false);
+                                    setPendingXmlData(null);
+                                    setPendingSkus(null);
+                                }} style={{ padding: '8px 12px', backgroundColor: '#9ca3af', color: 'white', border: 'none', borderRadius: 6 }}>Cancelar</button>
+
+                                <button
+                                    disabled={supplierCreationLoading || supplierCreationName.trim() === ''}
+                                    onClick={async () => {
+                                        setSupplierCreationLoading(true);
+                                        try {
+                                            const created = await createSupplier({ cnpj: supplierToCreate.cnpj, name: supplierCreationName.trim() });
+                                            alert(`Fornecedor criado: ${created.name} (ID ${created.id})`);
+                                            setSupplier(created.name);
+                                            setSupplierExists(true);
+                                            setIsSupplierModalOpen(false);
+                                            setSupplierToCreate(null);
+                                            setSupplierCreationName('');
+
+                                            // Se há XML pendente, executa a sincronização agora que o fornecedor existe
+                                            if (pendingXmlData) {
+                                                try {
+                                                    await performMappingSync(created.cnpj || supplierToCreate.cnpj, pendingXmlData);
+                                                } catch (syncErr) {
+                                                    console.error('Erro ao sincronizar após criar fornecedor:', syncErr);
+                                                }
+                                            }
+                                        } catch (err: any) {
+                                            console.error('Erro ao criar fornecedor:', err);
+                                            alert('Erro ao criar fornecedor: ' + (err?.message || String(err)));
+                                        } finally {
+                                            setSupplierCreationLoading(false);
+                                        }
+                                    }}
+                                    style={{ padding: '8px 12px', backgroundColor: supplierCreationLoading || supplierCreationName.trim() === '' ? '#9ca3af' : '#10b981', color: 'white', border: 'none', borderRadius: 6 }}>
+                                    {supplierCreationLoading ? 'Criando...' : 'Criar Fornecedor'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

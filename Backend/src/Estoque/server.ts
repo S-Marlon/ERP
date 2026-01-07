@@ -422,6 +422,44 @@ app.post('/api/products/check-mappings', asyncHandler(async (req, res) => {
 }));
 
 
+// Endpoint: Verifica se fornecedor existe pelo CNPJ
+app.post('/api/suppliers/check', asyncHandler(async (req, res) => {
+    const { cnpj } = req.body;
+    if (!cnpj) return res.status(400).json({ error: 'CNPJ é obrigatório' });
+
+    const [rows]: any = await pool.execute(
+        "SELECT id_fornecedor, razao_social FROM fornecedores WHERE cnpj = ? LIMIT 1",
+        [cnpj]
+    );
+
+    if (rows.length === 0) return res.json({ exists: false });
+
+    const f = rows[0];
+    // Mapeia razao_social para 'name' na resposta para consistência com o frontend
+    res.json({ exists: true, supplier: { id: f.id_fornecedor, name: f.razao_social } });
+}));
+
+// Endpoint: Cria um fornecedor
+app.post('/api/suppliers', asyncHandler(async (req, res) => {
+    const { cnpj, name } = req.body;
+    if (!cnpj || !name) return res.status(400).json({ error: 'CNPJ e nome são obrigatórios' });
+
+    try {
+        const [result]: any = await pool.execute(
+            'INSERT INTO fornecedores (cnpj, razao_social) VALUES (?, ?)',
+            [cnpj, name]
+        );
+        const insertId = result.insertId;
+        res.status(201).json({ id: insertId, cnpj, name });
+    } catch (err: any) {
+        // Duplicate / constraint handling
+        if (err && err.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({ error: 'Fornecedor já existe' });
+        }
+        throw err;
+    }
+}));
+
 
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     console.error(err);

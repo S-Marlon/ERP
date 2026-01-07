@@ -171,6 +171,45 @@ export const saveProductMapping = async (payload: MappingPayload) => {
 };
 
 
+// Verifica se um fornecedor existe pelo CNPJ
+export const checkSupplier = async (supplierCnpj: string) => {
+    // Sanitização: É recomendável remover pontos e traços antes de enviar, 
+    // dependendo de como você salva no banco (varchar 18 permite ambos).
+    const response = await fetch(`${apiBase}/suppliers/check`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cnpj: supplierCnpj })
+    });
+
+    if (!response.ok) throw new Error(await response.text());
+    
+    // O retorno esperado do seu backend deve mapear id_fornecedor e razao_social
+    return await response.json(); 
+    // Exemplo de retorno: { exists: true, supplier: { id_fornecedor: 1, razao_social: "Empresa X" } }
+};
+
+// Cria fornecedor com CNPJ e nome
+export const createSupplier = async (payload: { cnpj: string; name: string }) => {
+    // Mapeia diretamente para os campos esperados pelo backend: { cnpj, name }
+    // Caso seu backend aceite outras chaves como razao_social, você pode incluí-las também.
+    const body = {
+        cnpj: payload.cnpj,
+        name: payload.name, // Nome vindo do formulário/NFe
+        // Opcional: nome_fantasia: payload.name, razao_social: payload.name
+    };
+
+    const response = await fetch(`${apiBase}/suppliers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+        const err = await response.text();
+        throw new Error(err);
+    }
+    return await response.json();
+};
 
 export const checkExistingMappings = async (supplierCnpj: string, skus: string[]) => {
     const response = await fetch('http://localhost:3001/api/products/check-mappings', {
