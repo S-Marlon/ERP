@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { searchProducts, fetchCategoriesRaw } from '../../../api/productsApi';
+import { searchProducts, fetchCategoriesRaw, saveProductMapping } from '../../../api/productsApi';
 import CategoryTree from "../../../Components/CategoryTree";
 import Swal from 'sweetalert2';
 import FormControl from "../../../../../components/ui/FormControl/FormControl";
@@ -40,10 +40,12 @@ export interface MappingPayload {
         category: string;
         unitOfMeasure: string;
     };
+    supplierCnpj: string;
 }
 
 interface MappingModalProps {
     item: ProductEntry;
+    supplierCnpj: string; // <--- ADICIONE ESTO
     onMap: (tempId: number, data: MappingPayload) => void;
     onClose: () => void;
 }
@@ -75,7 +77,7 @@ const modalStyles: { [key: string]: React.CSSProperties } = {
     button: { padding: '8px 16px', borderRadius: '6px', border: 'none', color: 'white', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.95rem' }
 };
 
-const ProductMappingModal: React.FC<MappingModalProps> = ({ item, onMap, onClose }) => {
+const ProductMappingModal: React.FC<MappingModalProps> = ({ item, onMap, onClose, supplierCnpj }) => {
     // ESTADOS
     const [searchTerm, setSearchTerm] = useState(item.sku || '');
     const [selectedProduct, setSelectedProduct] = useState<InternalProductData | null>(null);
@@ -102,8 +104,8 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ item, onMap, onClose
     const [categoriesLoading, setCategoriesLoading] = useState(false);
 
     // --- LÓGICA DE CONFIRMAÇÃO SWAL ---
-    const confirmAndSend = (payload: MappingPayload) => {
-        Swal.fire({
+    const confirmAndSend = async (payload: MappingPayload) => {
+        const result = await Swal.fire({
             title: 'Confirmar Mapeamento',
             icon: 'info',
             width: 850,
@@ -155,45 +157,73 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ item, onMap, onClose
             cancelButtonText: '↩️ Revisar',
             confirmButtonColor: '#38a169',
             cancelButtonColor: '#5a67d8',
-        }).then((result) => {
-            if (result.isConfirmed) {
-                onMap(item.tempId, payload);
-                onClose();
+            showLoaderOnConfirm: true, // Habilita o loader no botão do Swal
+            preConfirm: async () => {       
+            
+                try {
+                // Aqui chamamos a API que criamos no productsApi.ts
+                const response = await saveProductMapping(payload);
+                return response; 
+            } catch (error: any) {
+                Swal.showValidationMessage(`Erro no servidor: ${error.message}`);
             }
+        
+            
+            },
+            allowOutsideClick: () => !Swal.isLoading()
         });
+
+        if (result.isConfirmed) {
+            // 2. Notifica o componente pai para atualizar a UI local
+            onMap(item.tempId, payload);
+            
+            // 3. Feedback de sucesso e fecha
+            await Swal.fire({
+                icon: 'success',
+                title: 'Sucesso!',
+                text: 'Mapeamento salvo e vinculado com sucesso.',
+                timer: 1500,
+                showConfirmButton: false
+            });
+            
+            onClose();
+        }
     };
 
     // --- HANDLERS ---
-    const handleConfirmExisting = useCallback(() => {
-        if (!selectedProduct) return;
-        confirmAndSend({
-            original: { sku: item.sku, name: item.name, unitCost: item.unitCostWithTaxes },
-            mapped: { 
-                id: selectedProduct.id, 
-                name: selectedProduct.name, 
-                category: selectedProduct.category, 
-                unitOfMeasure: selectedProduct.unitOfMeasure 
-            }
-        });
-    }, [selectedProduct, item]);
+   const handleConfirmExisting = useCallback(() => {
+    if (!selectedProduct) return;
+    confirmAndSend({
+        original: { sku: item.sku, name: item.name, unitCost: item.unitCostWithTaxes },
+        mapped: { 
+            id: selectedProduct.id, 
+            name: selectedProduct.name, 
+            category: selectedProduct.category, 
+            unitOfMeasure: selectedProduct.unitOfMeasure 
+        },
+        supplierCnpj: supplierCnpj // <--- ADICIONE ESTA LINHA
+    });
+}, [selectedProduct, item, supplierCnpj]); // Adicione supplierCnpj às dependências
+
 
     const handleFinalizeNewProductCreation = useCallback(async () => {
-        if (idExistsError || !newProductId.trim() || !newProductName.trim()) {
-            alert('Preencha os campos obrigatórios corretamente.');
-            return;
-        }
+    if (idExistsError || !newProductId.trim() || !newProductName.trim()) {
+        alert('Preencha os campos obrigatórios corretamente.');
+        return;
+    }
 
         const finalCategory = selectedCategoryShortName || newProductCategory || '';
-        confirmAndSend({
-            original: { sku: item.sku, name: item.name, unitCost: item.unitCostWithTaxes },
-            mapped: { 
-                id: newProductId.trim(), 
-                name: newProductName.trim(), 
-                category: finalCategory, 
-                unitOfMeasure: newProductUnit 
-            }
-        });
-    }, [newProductId, newProductName, newProductUnit, newProductCategory, selectedCategoryShortName, idExistsError, item]);
+    confirmAndSend({
+        original: { sku: item.sku, name: item.name, unitCost: item.unitCostWithTaxes },
+        mapped: { 
+            id: newProductId.trim(), 
+            name: newProductName.trim(), 
+            category: finalCategory, 
+            unitOfMeasure: newProductUnit 
+        },
+        supplierCnpj: supplierCnpj // <--- ADICIONE ESTA LINHA
+    });
+}, [newProductId, newProductName, newProductUnit, newProductCategory, selectedCategoryShortName, idExistsError, item, supplierCnpj]);
 
     // --- BUSCA E CATEGORIAS (MANTIDOS DO ORIGINAL) ---
     const loadCategories = useCallback(async () => {
@@ -277,7 +307,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ item, onMap, onClose
            
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-                <SKUGenerator />
+                {/* <SKUGenerator /> */}
                     
                 <button onClick={() => setIsCreatingNew(false)} style={{ ...modalStyles.button, backgroundColor: '#6b7280' }}>Voltar</button>
                 <button onClick={handleFinalizeNewProductCreation} style={{ ...modalStyles.button, backgroundColor: '#f97316' }}>Mapear Novo Produto</button>

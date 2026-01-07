@@ -8,9 +8,11 @@ import { parseNfeXmlToData, NfeDataFromXML } from '../../utils/nfeParser';
 import Badge from '../../../../components/ui/Badge/Badge';
 import { ActionPopover } from '../../../../components/ui/Popover/ActionPopover';
 import NfeCards from './_components/NfeCards';
+import { checkExistingMappings } from '../../api/productsApi';
 
 // --- Interfaces ---
 interface ProductEntry {
+    isMapped: any;
     tempId: number;
     sku: string;
     name: string;
@@ -176,41 +178,83 @@ const StockEntryForm: React.FC = () => {
 
     // Upload XML
     const handleXmlUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-        if (file.type !== 'text/xml' && !file.name.endsWith('.xml')) {
-            alert('Por favor, selecione um arquivo XML (.xml) válido.');
-            return;
-        }
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                const xmlContent = e.target?.result as string;
-                const rawXmlData = parseNfeXmlToData(xmlContent);
-                if (!rawXmlData) throw new Error('Falha ao extrair dados do XML.');
-                const xmlData = mapNfeDataToEntryForm(rawXmlData);
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-                setInvoiceNumber(xmlData.invoiceNumber);
-                setSupplier(xmlData.supplier);
-                setEntryDate(xmlData.entryDate);
-                setAccessKey(xmlData.accessKey);
-                setTotalFreight(xmlData.totalFreight);
-                setTotalIpi(xmlData.totalIpi);
-                setTotalOtherExpenses(xmlData.totalOtherExpenses);
-                setTotalNoteValue(xmlData.totalNoteValue);
-                setItems(xmlData.items);
-                // reset seleções
-                setSelectedPendingIds(new Set(xmlData.items.filter(i => !i.isConfirmed).map(i => i.tempId)));
-                setSelectedConfirmedIds(new Set());
-                alert(`XML importado com sucesso! ${xmlData.items.length} itens carregados.`);
-            } catch (error) {
-                console.error('Erro ao processar XML:', error);
-                alert('Erro ao processar o arquivo XML. Detalhes: ' + (error instanceof Error ? error.message : 'Erro desconhecido'));
-            }
-        };
-        reader.onerror = () => { alert('Erro ao ler o arquivo.'); };
-        reader.readAsText(file);
+    if (file.type !== 'text/xml' && !file.name.endsWith('.xml')) {
+        alert('Por favor, selecione um arquivo XML (.xml) válido.');
+        return;
+    }
+
+    const reader = new FileReader();
+    // Tornamos a função assíncrona para usar o await da API
+    reader.onload = async (e) => {
+        try {
+            const xmlContent = e.target?.result as string;
+            const rawXmlData = parseNfeXmlToData(xmlContent);
+            if (!rawXmlData) throw new Error('Falha ao extrair dados do XML.');
+            
+            const xmlData = mapNfeDataToEntryForm(rawXmlData);
+
+            // --- INÍCIO DA RECONCILIAÇÃO AUTOMÁTICA ---
+            
+            // 1. Pegamos o CNPJ do emitente (certifique-se que o mapNfeDataToEntryForm retorna isso)
+            // const supplierCnpj = xmlData.supplierCnpj || rawXmlData.emitenteCnpj; 
+            const supplierCnpj = '00.000.000/0000-00'; 
+            
+            // 2. Coletamos todos os SKUs dos itens da nota
+            const skusDaNota = xmlData.items.map((i: any) => i.sku);
+
+            // 3. Consultamos o backend para ver o que já está mapeado
+            const existingMappings = await checkExistingMappings(supplierCnpj, skusDaNota);
+
+            // 4. Cruzamos os dados: se existir mapeamento, o item já nasce "conectado"
+            const reconciledItems = xmlData.items.map((item: any) => {
+                const mapping = existingMappings.find((m: any) => m.sku_fornecedor === item.sku);
+
+                if (mapping) {
+                    return {
+                        ...item,
+                        isMapped: true, // Indica vínculo existente
+                        internalProduct: {
+                            id: mapping.codigo_interno,
+                            name: mapping.descricao,
+                            category: mapping.nome_categoria,
+                            unitOfMeasure: mapping.unidade
+                        }
+                    };
+                }
+                return { ...item, isMapped: false };
+            });
+            // --- FIM DA RECONCILIAÇÃO ---
+
+            // Atualização dos Estados
+            setInvoiceNumber(xmlData.invoiceNumber);
+            setSupplier(xmlData.supplier);
+            setEntryDate(xmlData.entryDate);
+            setAccessKey(xmlData.accessKey);
+            setTotalFreight(xmlData.totalFreight);
+            setTotalIpi(xmlData.totalIpi);
+            setTotalOtherExpenses(xmlData.totalOtherExpenses);
+            setTotalNoteValue(xmlData.totalNoteValue);
+            
+            // Agora setamos os itens já reconciliados
+            setItems(reconciledItems);
+
+            setSelectedPendingIds(new Set(reconciledItems.filter((i: any) => !i.isConfirmed).map((i: any) => i.tempId)));
+            setSelectedConfirmedIds(new Set());
+
+            const mapeadosCount = reconciledItems.filter((i: any) => i.isMapped).length;
+            alert(`XML importado! ${reconciledItems.length} itens carregados (${mapeadosCount} sincronizados automaticamente).`);
+
+        } catch (error) {
+            console.error('Erro ao processar XML:', error);
+            alert('Erro ao processar o arquivo XML. Detalhes: ' + (error instanceof Error ? error.message : 'Erro desconhecido'));
+        }
     };
+    reader.onerror = () => { alert('Erro ao ler o arquivo.'); };
+    reader.readAsText(file);
+};
 
     // Manipuladores
     const toggleConfirmation = useCallback((tempId: number) => {
@@ -310,23 +354,38 @@ const StockEntryForm: React.FC = () => {
         setIsMappingModalOpen(true);
     };
 
-    const handleModalMap = (tempId: number, data: any) => {
-        // 'data' aqui é o MappingPayload que vem do Modal
-        setItems(prev => prev.map(it => {
-            if (it.tempId === tempId) {
-                return {
-                    ...it,
-                    mappedId: data.mapped.id,        // Extrai o ID para a coluna da tabela
-                    category: data.mapped.category,  // Extrai a Categoria
-                    name: data.mapped.name,          // Opcional: Atualiza o nome para o nome interno
-                    mappedData: data.mapped          // Guarda o objeto todo por segurança
-                };
-            } return it;
-        }));
+    const handleModalMap = useCallback((tempId: number, data: MappingPayload) => {
+    setItems(prev => prev.map(it => {
+        if (it.tempId === tempId) {
+            return {
+                ...it,
+                // O mappedId é o ID oficial que veio do sistema/banco
+                mappedId: data.mapped.id, 
+                
+                // Atualizamos a categoria com a que foi selecionada no modal
+                category: data.mapped.category,
+                
+                // UNIDADE DE MEDIDA: É importante sincronizar se o sistema usa uma 
+                // unidade diferente da que veio na nota fiscal
+                unitOfMeasure: data.mapped.unitOfMeasure,
 
-        setIsMappingModalOpen(false);
-        setItemToMap(null);
-    };
+                // Mantemos o nome interno do sistema para clareza na conferência
+                // Se preferir manter o nome da NF, pode comentar a linha abaixo
+                name: data.mapped.name,
+
+                // Guardamos o objeto completo para uso posterior no POST final da nota
+                mappedData: data.mapped 
+            };
+        }
+        return it;
+    }));
+
+    // Fecha o modal e limpa o estado
+    setIsMappingModalOpen(false);
+    setItemToMap(null);
+    
+    console.log(`Produto ${tempId} mapeado com sucesso para o ID: ${data.mapped.id}`);
+}, []);
 
     const closeModal = () => { setIsMappingModalOpen(false); setItemToMap(null); };
 
@@ -411,14 +470,15 @@ const StockEntryForm: React.FC = () => {
                     />
                 </td>
                 <td style={styles.tableCell}>
-                    {item.mappedId ? (
-                        <span style={{ ...styles.mappedIdBadge, fontSize: '0.75rem', fontWeight: 700 }}>{item.mappedId}</span>
+                    {item.isMapped ? (
+                        <Badge color="success">Cod Interno: {item.sku}</Badge>
                     ) : (
                         <Button onClick={() => handleMapProductFn(item.tempId)} variant='warning' fontsize='11px' padding='5px' >
                             🔗 Mapear
                         </Button>
                     )}
                 </td>
+                
                 <td style={styles.tableCell}>{item.sku}</td>
                 <td style={{ ...styles.tableCell, fontWeight: 500 }}>{item.name}</td>
                 <td style={styles.tableCell}>R$ {item.unitPrice.toFixed(3)}</td>
@@ -513,7 +573,7 @@ const StockEntryForm: React.FC = () => {
     return (
         <div style={styles.container}>
             <div className="page-header">
-                <FlexGridContainer layout='grid' template='3fr 2fr' gap='10px'>
+                <FlexGridContainer layout='grid' template='3fr 3fr' gap='10px'>
 
                     <h1 style={styles.title}>📥 Entrada de Mercadorias (Registro de NF-e)</h1>
                     {!accessKey && (
@@ -642,7 +702,7 @@ const StockEntryForm: React.FC = () => {
                         </p>
                     </div>
 
-                    <button onClick={handleConfirmEntry} style={styles.confirmButton} disabled={items.length === 0 || hasUnmappedItems || hasPendingItems}>
+                    <button onClick={handleConfirmEntry} style={styles.confirmButton} disbled={items.length === 0 || hasUnmappedItems || hasPendingItems}>
                         {items.length === 0 ? '🚫 Importe o XML' : hasPendingItems ? '🚫 Finalize a conferência' : hasUnmappedItems ? '🚫 Mapeie os itens' : '✅ Confirmar Entrada e Atualizar Estoque'}
                     </button>
                 </div>
@@ -653,6 +713,7 @@ const StockEntryForm: React.FC = () => {
                     item={itemToMap}
                     onClose={closeModal}
                     onMap={handleModalMap} // Passa a função que agora entende o objeto
+                    supplierCnpj={'00.000.000/0000-00'} // Certifique-se que este valor existe
                 />
             )}
         </div>

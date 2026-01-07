@@ -306,7 +306,7 @@ app.get('/api/categories/tree', async (req: Request, res: Response) => {
         const flatCategories = rows as { id: string; nome: string; parent_id: string | null }[];
         // Converte a lista plana em árvore
         const categoryTree = buildCategoryTree(flatCategories);
-        console.log(categoryTree);
+        // console.log(categoryTree);
         res.json(categoryTree);
     } catch (error) {
         console.error('Erro ao obter árvore de categorias:', error);
@@ -321,6 +321,113 @@ app.listen(PORT, () => {
 
 
 
+
+
+app.post('/api/products/map', asyncHandler(async (req, res) => {
+    const { original, mapped, supplierCnpj } = req.body;
+    const connection = await pool.getConnection();
+
+    try {
+        await connection.beginTransaction();
+
+        // 1. Localizar o Fornecedor (Usando a coluna 'cnpj' da sua tabela 'fornecedores')
+        const [forns]: any = await connection.execute(
+            "SELECT id_fornecedor FROM fornecedores WHERE cnpj = ? LIMIT 1",
+            [supplierCnpj]
+        );
+
+        if (forns.length === 0) {
+            return res.status(400).json({ error: `Fornecedor com CNPJ ${supplierCnpj} não encontrado.` });
+        }
+        const idFornecedor = forns[0].id_fornecedor;
+
+        // 2. Verificar/Inserir Produto (Tabela 'produtos')
+        let [prod]: any = await connection.execute(
+            "SELECT id_produto FROM produtos WHERE codigo_interno = ? LIMIT 1",
+            [mapped.id]
+        );
+
+        let idProdutoInterno: number;
+
+        if (prod.length === 0) {
+            // Pegar ID da categoria (Sua tabela 'categorias' usa 'nome_categoria')
+            const [cat]: any = await connection.execute(
+                "SELECT id_categoria FROM categorias WHERE nome_categoria = ? LIMIT 1",
+                [mapped.category]
+            );
+            const idCat = cat.length > 0 ? cat[0].id_categoria : null;
+
+            const [newProd]: any = await connection.execute(
+                "INSERT INTO produtos (codigo_interno, descricao, unidade, id_categoria) VALUES (?, ?, ?, ?)",
+                [mapped.id, mapped.name, mapped.unitOfMeasure, idCat]
+            );
+            idProdutoInterno = newProd.insertId;
+
+            // Inserir saldo inicial no estoque (Sua tabela 'estoque_atual')
+            await connection.execute(
+                "INSERT INTO estoque_atual (id_produto, quantidade, valor_medio) VALUES (?, 0, ?)",
+                [idProdutoInterno, original.unitCost]
+            );
+        } else {
+            idProdutoInterno = prod[0].id_produto;
+        }
+
+        // 3. Criar o Vínculo (Tabela 'produto_fornecedor')
+        // Usando as colunas: id_produto, id_fornecedor, sku_fornecedor, descricao_fornecedor
+        await connection.execute(
+            `INSERT INTO produto_fornecedor 
+            (id_produto, id_fornecedor, sku_fornecedor, descricao_fornecedor) 
+            VALUES (?, ?, ?, ?) 
+            ON DUPLICATE KEY UPDATE sku_fornecedor = sku_fornecedor`,
+            [idProdutoInterno, idFornecedor, original.sku, original.name]
+        );
+
+        await connection.commit();
+        res.json({ success: true, id_produto: idProdutoInterno });
+
+    } catch (error: any) {
+        await connection.rollback();
+        console.error(error);
+        res.status(500).json({ error: error.message });
+    } finally {
+        connection.release();
+    }
+}));
+
+
+
+
+
+
+
+
+
+
+
+
+
+app.post('/api/products/check-mappings', asyncHandler(async (req, res) => {
+    const { supplierCnpj, skus } = req.body; // skus é um array ['ABC', 'DEF']
+    
+    const [mappings]: any = await pool.execute(`
+        SELECT pf.sku_fornecedor, p.id_produto, p.codigo_interno, p.descricao, p.unidade, c.nome_categoria
+        FROM produto_fornecedor pf
+        JOIN produtos p ON pf.id_produto = p.id_produto
+        JOIN fornecedores f ON pf.id_fornecedor = f.id_fornecedor
+        LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
+        WHERE f.cnpj = ? AND pf.sku_fornecedor IN (${skus.map(() => '?').join(',')})
+    `, [supplierCnpj, ...skus]);
+
+    res.json(mappings);
+}));
+
+
+
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+    console.error(err);
+    // Garante que o erro sempre retorne um JSON
+    res.status(500).json({ error: err.message || 'Erro interno no servidor' });
+});
 
 
 // Proximo passo é Criar o produto no banco de dados com base nos dados fornecidos pela nota FIscal.

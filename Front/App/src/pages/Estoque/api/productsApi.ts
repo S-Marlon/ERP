@@ -7,6 +7,25 @@ const apiBase = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:300
 
 
 
+
+
+// Define a interface para garantir que o frontend envie tudo o que o backend precisa
+export interface MappingPayload {
+    original: {
+        sku: string;
+        name: string;
+    };
+    mapped: {
+        id: string; // codigo_interno
+        name: string;
+        category: string;
+        unitOfMeasure: string;
+    };
+    supplierCnpj: string; // Necessário para a tabela produto_fornecedor
+}
+
+
+
 // --- 2. Tipagem do Formato de Árvore (para o Frontend) ---
 // Deve ser idêntica à interface Category que seu CategoryTree espera
 export interface TreeCategory {
@@ -132,3 +151,32 @@ export async function getCategoryTree(): Promise<Category[]> {
 
     return categoryTree;
 }
+
+
+export const saveProductMapping = async (payload: MappingPayload) => {
+    const response = await fetch(`${apiBase}/products/map`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+
+    // Se não for OK, pegue o texto bruto para entender o erro
+    if (!response.ok) {
+        const errorText = await response.text(); // Lê como texto, não JSON
+        console.error("Erro bruto do servidor:", errorText);
+        throw new Error(`Erro ${response.status}: Verifique o console do VS Code/Terminal.`);
+    }
+
+    return await response.json();
+};
+
+
+
+export const checkExistingMappings = async (supplierCnpj: string, skus: string[]) => {
+    const response = await fetch('http://localhost:3001/api/products/check-mappings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ supplierCnpj, skus })
+    });
+    return await response.json();
+};
