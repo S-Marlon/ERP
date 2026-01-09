@@ -4,9 +4,13 @@ import CategoryTree from "../../../Components/CategoryTree";
 import Swal from 'sweetalert2';
 import FormControl from "../../../../../components/ui/FormControl/FormControl";
 import SKUGenerator from "../../StockInventory/_components/SKUGenerator";
+import Badge from "../../../../../components/ui/Badge/Badge";
+import FlexGridContainer from "../../../../../components/Layout/FlexGridContainer/FlexGridContainer";
+import Button from "../../../../../components/ui/Button/Button";
 
 // --- Interfaces ---
 interface ProductEntry {
+    unitOfMeasure: string;
     tempId: number;
     sku: string; // SKU do Fornecedor (da NF)
     name: string; // Nome do Fornecedor (da NF)
@@ -68,13 +72,47 @@ const useDebounce = (value: string, delay: number) => {
 
 // --- Estilos do Modal Principal ---
 const modalStyles: { [key: string]: React.CSSProperties } = {
-    overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.75)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
-    modal: { backgroundColor: '#ffffff', padding: '30px', borderRadius: '8px', width: '95%', maxWidth: '1200px', boxShadow: '0 8px 16px rgba(0, 0, 0, 0.2)', maxHeight: '90vh', overflowY: 'auto' },
-    input: { width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '6px', border: '1px solid #ccc', boxSizing: 'border-box', fontSize: '0.95rem' },
-    inputError: { border: '1px solid #ef4444', backgroundColor: '#fef2f2' },
-    resultsContainer: { maxHeight: '300px', overflowY: 'auto', border: '1px solid #e0e0e0', borderRadius: '6px', marginBottom: '15px' },
-    resultItem: { padding: '12px', cursor: 'pointer', borderBottom: '1px solid #f0f0f0', transition: 'background-color 0.15s' },
-    button: { padding: '8px 16px', borderRadius: '6px', border: 'none', color: 'white', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.95rem' }
+    overlay: { 
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+        backgroundColor: 'rgba(15, 23, 42, 0.85)', 
+        display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000,
+        backdropFilter: 'blur(5px)'
+    },
+    modal: { 
+        backgroundColor: '#ffffff', borderRadius: '16px', 
+        width: '98%', maxWidth: '1400px', // Aumentado para acomodar a árvore lateral
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', 
+        height: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' 
+    },
+    header: {
+        padding: '16px 24px', borderBottom: '1px solid #e2e8f0', background: '#fff',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+    },
+    contentGrid: {
+        display: 'grid',
+        gridTemplateColumns: '2fr 3fr 2fr', // NF | Cadastro | Árvore
+        gap: '5px',
+        flex: 1,
+        overflow: 'hidden'
+    },
+    sectionColumn: {
+        padding: '24px',
+        overflowY: 'auto',
+        height: '100%',
+        borderRight: '1px solid #f1f5f9'
+    },
+    footer: {
+        padding: '16px 24px', borderTop: '1px solid #e2e8f0', background: '#f8fafc',
+        display: 'flex', justifyContent: 'flex-end', gap: '12px'
+    },
+    inputLabel: {
+        display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#64748b',
+        marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.025em'
+    },
+    modernInput: {
+        width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1',
+        fontSize: '0.9rem', marginBottom: '16px', outline: 'none', transition: 'all 0.2s'
+    }
 };
 
 const ProductMappingModal: React.FC<MappingModalProps> = ({ item, onMap, onClose, supplierCnpj }) => {
@@ -89,7 +127,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ item, onMap, onClose
     // ESTADOS NOVO PRODUTO
     const [newProductId, setNewProductId] = useState('');
     const [newProductName, setNewProductName] = useState(item.name);
-    const [newProductUnit, setNewProductUnit] = useState('UN');
+    const [newProductUnit, setNewProductUnit] = useState(item.unitOfMeasure || 'UN');
     const [newProductCategory, setNewProductCategory] = useState<string | null>(null);
     const [selectedCategoryShortName, setSelectedCategoryShortName] = useState<string | null>(null);
     const [idExistsError, setIdExistsError] = useState(false);
@@ -102,6 +140,52 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ item, onMap, onClose
     
     const [searchError, setSearchError] = useState<string | null>(null);
     const [categoriesLoading, setCategoriesLoading] = useState(false);
+
+const [isGeneric, setIsGeneric] = useState<boolean>(true);
+const [inconsistencyError, setInconsistencyError] = useState<string | null>(null);
+
+// Sincroniza o newProductId com item.sku quando em modo específico, ou limpa quando genérico
+useEffect(() => {
+    if (!isGeneric) {
+        // Modo ESPECÍFICO: o código deve ser o da NF
+        setNewProductId(item.sku);
+    } else {
+        // Modo GENÉRICO: limpa o campo para o usuário digitar um novo código
+        setNewProductId('');
+    }
+}, [isGeneric, item.sku]);
+
+
+// --- LÓGICA DE VALIDAÇÃO (TRADUTOR) ---
+    const identifyProductType = (code: string): 'GENERIC' | 'SPECIFIC' => {
+        const cleanCode = code.trim();
+        const isEan = /^\d{13}$/.test(cleanCode); // Apenas números, 13 dígitos
+        return isEan ? 'SPECIFIC' : 'GENERIC';
+    };
+
+    useEffect(() => {
+        if (!newProductId) { setInconsistencyError(null); return; }
+        
+        // Regra de Negócio:
+        // - ESPECÍFICO: o código deve ser o da NF (item.sku)
+        // - GENÉRICO: o código não pode ser idêntico ao da NF
+        
+        if (isGeneric) {
+            // Modo GENÉRICO: validar que NÃO seja igual ao SKU da NF
+            if (newProductId === item.sku) {
+                setInconsistencyError('Atenção: Código genérico não pode ser idêntico ao SKU da nota fiscal.');
+            } else {
+                setInconsistencyError(null);
+            }
+        } else {
+            // Modo ESPECÍFICO: validar que seja igual ao SKU da NF
+            if (newProductId !== item.sku) {
+                setInconsistencyError('Atenção: Em modo específico, o código deve ser o da nota fiscal.');
+            } else {
+                setInconsistencyError(null);
+            }
+        }
+    }, [newProductId, isGeneric, item.sku]);
 
     // --- LÓGICA DE CONFIRMAÇÃO SWAL ---
     const confirmAndSend = async (payload: MappingPayload) => {
@@ -118,6 +202,8 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ item, onMap, onClose
                                 <th style="${tableThStyle}">Nome Item NF</th>
                                 <th style="${tableThStyle}">SKU Fornecedor</th>
                                 <th style="${tableThStyle}">Custo Unit.</th>
+                                <th style="${tableThStyle}">UoM</th>
+
                             </tr>
                         </thead>
                         <tbody>
@@ -125,6 +211,8 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ item, onMap, onClose
                                 <td style="${tableCellStyle}">${payload.original.name}</td>
                                 <td style="${tableCellStyle}">${payload.original.sku}</td>
                                 <td style="${tableCellStyle}">R$ ${payload.original.unitCost.toFixed(4)}</td>
+                                <td style="${tableCellStyle}">${item.unitOfMeasure}</td>
+
                             </tr>
                         </tbody>
                     </table>
@@ -134,6 +222,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ item, onMap, onClose
                         <thead>
                             <tr style="${tableHeadStyleSys}">
                                 <th style="${tableThStyle}">Nome Padrão</th>
+                                <th style="${tableThStyle}">descrição Padrão</th>
                                 <th style="${tableThStyle}">ID Interno</th>
                                 <th style="${tableThStyle}">Categoria</th>
                                 <th style="${tableThStyle}">Unid.</th>
@@ -142,6 +231,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ item, onMap, onClose
                         <tbody>
                             <tr>
                                 <td style="${tableCellStyle}">${payload.mapped.name}</td>
+                                <td style="${tableCellStyle}">${payload.mapped.description}</td>
                                 <td style="${tableCellStyle}">${payload.mapped.id}</td>
                                 <td style="${tableCellStyle}">${payload.mapped.category}</td>
                                 <td style="${tableCellStyle}">${payload.mapped.unitOfMeasure}</td>
@@ -194,14 +284,15 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ item, onMap, onClose
    const handleConfirmExisting = useCallback(() => {
     if (!selectedProduct) return;
     confirmAndSend({
-        original: { sku: item.sku, name: item.name, unitCost: item.unitCostWithTaxes },
+        original: { sku: item.sku, name: item.name, unitCost: item.unitCostWithTaxes, description: item.name },
         mapped: { 
             id: selectedProduct.id, 
             name: selectedProduct.name, 
             category: selectedProduct.category, 
-            unitOfMeasure: selectedProduct.unitOfMeasure 
+            unitOfMeasure: selectedProduct.unitOfMeasure,
+            description: selectedProduct.name
         },
-        supplierCnpj: supplierCnpj // <--- ADICIONE ESTA LINHA
+        supplierCnpj: supplierCnpj
     });
 }, [selectedProduct, item, supplierCnpj]); // Adicione supplierCnpj às dependências
 
@@ -214,14 +305,15 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ item, onMap, onClose
 
         const finalCategory = selectedCategoryShortName || newProductCategory || '';
     confirmAndSend({
-        original: { sku: item.sku, name: item.name, unitCost: item.unitCostWithTaxes },
+        original: { sku: item.sku, name: item.name, unitCost: item.unitCostWithTaxes, description: item.name },
         mapped: { 
             id: newProductId.trim(), 
             name: newProductName.trim(), 
             category: finalCategory, 
-            unitOfMeasure: newProductUnit 
+            unitOfMeasure: newProductUnit,
+            description: newProductName.trim()
         },
-        supplierCnpj: supplierCnpj // <--- ADICIONE ESTA LINHA
+        supplierCnpj: supplierCnpj
     });
 }, [newProductId, newProductName, newProductUnit, newProductCategory, selectedCategoryShortName, idExistsError, item, supplierCnpj]);
 
@@ -257,119 +349,150 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ item, onMap, onClose
 
     // --- RENDERS ---
     const renderNewProductForm = () => (
-        <div style={{ padding: '15px', border: '2px dashed #f97316', borderRadius: '8px', marginTop: '15px' }}>
-            <h4 style={{ color: '#f97316', marginTop: 0 }}>➕ Definir Novo Produto Padrão</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '15px',color: '#4b5563' }}>
-                <div style={{ padding: '15px', backgroundColor: '#fffbe6', borderRadius: '6px' }}>
-                    <h5 style={{ margin: '0 0 10px 0', color: '#b45309' }}>📄 Dados da Nota Fiscal</h5>
-                    <p style={{ fontSize: '0.9rem', color: '#b45309' }}>
-                        <strong>SKU NF:</strong> 
-                         <FormControl label='' readOnlyDisplay={true} value={item.sku} />
-                        <strong>Nome NF:</strong> 
-                         <FormControl label='' readOnlyDisplay={true} value={item.name} />
-                         <strong>Custo Unitário NF:</strong> 
-                         <FormControl label='' readOnlyDisplay={true} value={item.unitCostWithTaxes} />
-                         <strong>Unidade de Medida NF:</strong> 
+        <div style={modalStyles.contentGrid}>
+            
+            {/* COLUNA 1: REFERÊNCIA NOTA FISCAL */}
+            <aside style={{ ...modalStyles.sectionColumn, backgroundColor: '#fcfcfd', width: '300px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+                    <div style={{ padding: '6px', background: '#fee2e2', borderRadius: '6px', color: '#dc2626' }}>📄</div>
+                    <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#1e293b' }}>Dados da Nota Fiscal</h4>
+                </div>
+                
+                <FormControl label="SKU Original" readOnlyDisplay value={item.sku} />
+                <FormControl label="Nome na NF" readOnlyDisplay value={item.name} />
+                <FormControl label="Custo Unitário" readOnlyDisplay value={`R$ ${item.unitCostWithTaxes.toFixed(4)}`} />
+                <FormControl label="Unidade de Medida" readOnlyDisplay value={item.unitOfMeasure} />
 
-                <FormControl  readOnlyDisplay={true} value={newProductUnit} />
-
-                        
+                
+                
+                <div style={{ marginTop: '20px', padding: '15px', background: '#fef3c7', borderRadius: '8px', border: '1px solid #fde68a' }}>
+                    <p style={{ margin: 0, fontSize: '0.75rem', color: '#92400e', lineHeight: '1.4' }}>
+                        <strong>Nota:</strong> Estes dados são apenas para referência e não serão alterados no seu sistema.
                     </p>
                 </div>
-                <div style={{ padding: '15px', backgroundColor: '#e0f2f1', borderRadius: '6px' }}>
-                    <h5 style={{ margin: '0 0 10px 0', color: '#065f46' }}>⚙️ Dados para Cadastro</h5>
-                    <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'black' }}>ID Padrão:</label>
-                    <input 
-                        style={{ ...modalStyles.input, ...(idExistsError ? modalStyles.inputError : {}) }} 
-                        value={item.sku} 
-                        onChange={e => setNewProductId(e.target.value.toUpperCase())}
-                    />
-                    <strong>Nome NF:</strong> 
-                         <FormControl label=''value={item.name} />
+            </aside>
 
-                         <CategoryTree 
-                    selectedCategoryId={newProductCategory} 
-                    onSelectCategory={setNewProductCategory} 
-                    onCategoryNameChange={setSelectedCategoryShortName} 
-                />
-                       
+            {/* COLUNA 2: CADASTRO DO PRODUTO (EDIÇÃO) */}
+            <main style={modalStyles.sectionColumn}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+                    <div style={{ padding: '6px', background: '#dcfce7', borderRadius: '6px', color: '#16a34a' }}>✏️</div>
+                    <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#1e293b' }}>Informações do Produto no Sistema</h4>
                 </div>
-            </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
-                {/* <input style={modalStyles.input} placeholder="Nome Padrão" value={newProductName} onChange={e => setNewProductName(e.target.value)} />
-                <select style={modalStyles.input} value={newProductUnit} onChange={e => setNewProductUnit(e.target.value)}>
-                    <option value="UN">UN</option><option value="PC">PC</option><option value="KG">KG</option>
-                </select> */}
-
-            </div>
-
-           
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-                {/* <SKUGenerator /> */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '5px' }}>
                     
-                <button onClick={() => setIsCreatingNew(false)} style={{ ...modalStyles.button, backgroundColor: '#6b7280' }}>Voltar</button>
-                <button onClick={handleFinalizeNewProductCreation} style={{ ...modalStyles.button, backgroundColor: '#f97316' }}>Mapear Novo Produto</button>
-            </div>
+
+                    
+                    <div>
+                        <FormControl 
+                            label={isGeneric ? "Código Genérico (Interno)" : "Código Específico (EAN)"} 
+                            readOnlyDisplay={!isGeneric}
+                            value={isGeneric ? newProductId : item.sku} 
+                            placeholder={isGeneric ? "Ex: PA-001" : "Ex: 1234567890123"} 
+                            onChange={(e) => isGeneric && setNewProductId(e.target.value)}
+                        />
+                    </div>
+                    
+                </div>
+
+                <FormControl label="Nome Padrão (Como aparecerá no seu estoque):"
+                    value={newProductName}
+                    onChange={e => setNewProductName(e.target.value)}
+                    placeholder="Ex: Parafuso Sextavado Zincado 1/4"
+                />
+
+                <FormControl label="Descrição Detalhada / Observações:" control="textarea"
+                    placeholder="Adicione informações técnicas adicionais..."
+                />
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '5px' }}>
+                    <FormControl label="NCM" readOnlyDisplay value="8481.80.19" />
+                    <FormControl label="CEST" readOnlyDisplay value="01.001.00" />
+                    <FormControl label="Origem" readOnlyDisplay value="0 - Nacional" />
+                </div>
+            </main>
+
+            {/* COLUNA 3: CATEGORIA (ÁRVORE DEDICADA) */}
+            <aside style={{ ...modalStyles.sectionColumn, backgroundColor: '#f8fafc', borderRight: 'none', width: '350px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '20px' }}>
+                    <div style={{ padding: '6px', background: '#e0f2fe', borderRadius: '6px', color: '#0284c7' }}>🌳</div>
+                    <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#1e293b' }}>Classificação Fiscal</h4>
+                </div>
+                
+                <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '12px' }}>
+                    Selecione a categoria hierárquica abaixo:
+                </p>
+
+                <div style={{ 
+                    background: '#fff', 
+                    border: '1px solid #e2e8f0', 
+                    borderRadius: '8px', 
+                    overflowY: 'auto'
+                }}>
+                    <CategoryTree 
+                        selectedCategoryId={newProductCategory} 
+                        onSelectCategory={setNewProductCategory} 
+                        onCategoryNameChange={setSelectedCategoryShortName} 
+                    />
+                </div>
+            </aside>
         </div>
     );
 
     return (
         <div style={modalStyles.overlay}>
             <div style={modalStyles.modal}>
-                <h3 style={{ color: 'black', borderBottom: '2px solid #eee', paddingBottom: '10px' }}>
-                    🔗 Mapeamento de Produto: <span style={{ color: '#5a67d8' }}>{item.name}</span>
-                </h3>
-
-                {isCreatingNew ? renderNewProductForm() : (
-                    <>
-                        <p style={{ color: '#4b5563', marginBottom: '10px' }}>Busque o produto interno correspondente:</p>
-                        <input 
-                            style={modalStyles.input} 
-                            placeholder="Buscar por ID ou Nome..." 
-                            value={searchTerm} 
-                            onChange={e => setSearchTerm(e.target.value)} 
-                        />
-                        <div style={modalStyles.resultsContainer}>
-                            {isLoading ? <p style={{color: '#4b5563', padding: '20px', textAlign: 'center' }}>Buscando...</p> : 
-                             results.length > 0 ? results.map(prod => (
-                                <div 
-                                    key={prod.id} 
-                                    onClick={() => setSelectedProduct(prod)}
-                                    style={{ ...modalStyles.resultItem, backgroundColor: selectedProduct?.id === prod.id ? '#e3f2fd' : 'white', color: '#4b5563' }}
-                                >
-                                    <strong>{prod.id} - {prod.name}</strong> | <small>{prod.category}</small>
-                                </div>
-                             )) : (
-                                <div style={{ padding: '20px', textAlign: 'center' }}>
-                                    <p style={{color: '#4b5563'}}>Nenhum produto encontrado.</p>
-                                    <button onClick={() => setIsCreatingNew(true)} style={{ ...modalStyles.button, backgroundColor: '#f97316' }}>➕ Criar Novo Produto</button>
-                                </div>
-                             )}
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-                            <button onClick={onClose} style={{ ...modalStyles.button, backgroundColor: '#6b7280' }}>Fechar</button>
+                
+                <header style={modalStyles.header}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                        <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.1rem' }}>Mapeamento de Novo Produto</h3>
+                        <div style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '8px' }}>
                             <button 
-                                onClick={handleConfirmExisting} 
-                                disabled={!selectedProduct} 
-                                style={{ ...modalStyles.button, backgroundColor: selectedProduct ? '#10b981' : '#ccc' }}
-                            >
-                                ✅ Confirmar Mapeamento
-                            </button>
+                                onClick={() => setIsGeneric(true)}
+                                style={{ 
+                                    padding: '6px 12px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600,
+                                    backgroundColor: isGeneric ? '#fff' : 'transparent', color: isGeneric ? '#f97316' : '#64748b',
+                                    boxShadow: isGeneric ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                                }}
+                            >GENÉRICO</button>
+                            <button 
+                                onClick={() => setIsGeneric(false)}
+                                style={{ 
+                                    padding: '6px 12px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600,
+                                    backgroundColor: !isGeneric ? '#fff' : 'transparent', color: !isGeneric ? '#3b82f6' : '#64748b',
+                                    boxShadow: !isGeneric ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                                }}
+                            >ESPECÍFICO</button>
                         </div>
-                    </>
-                )}
+                    </div>
+                    {inconsistencyError && (
+                         <Badge color="danger">⚠️ {inconsistencyError}</Badge>
+                    )}
+                </header>
+
+                {renderNewProductForm()}
+
+                <footer style={modalStyles.footer}>
+                    <Button variant="secondary" onClick={onClose}>
+                        Cancelar
+                    </Button>
+                    <Button 
+                        onClick={handleFinalizeNewProductCreation}
+                        disabled={!!inconsistencyError}
+                        loading={isSaving}
+                        variant="primary"
+                        style={{ backgroundColor: '#4f46e5' }}
+                    >
+                        Salvar e Mapear Produto
+                    </Button>
+                </footer>
             </div>
         </div>
     );
 };
 
 export default ProductMappingModal;
-
-// primeiro arrumar a nova seletora de categorias => selecionar categoria pai antes das subcategorias
-
-// depois implementar a insersção do produto da nota no BD
+// TO-DO LISTA DE MELHORIAS FUTURAS:
 
 // depois implementar o fluxo de criação de nova categoria hierárquica
 

@@ -49,33 +49,39 @@ app.get('/check-db', asyncHandler(async (req, res) => {
  */
 app.get('/api/products', asyncHandler(async (req, res) => {
     const query = req.query.query as string;
+    
+    // Se query for vazia ou undefined, usamos '%' para o SQL trazer tudo
+    const isSearchEmpty = !query || query.trim() === '';
+    const searchTerm = isSearchEmpty ? '%' : `%${query}%`;
 
-    if (!query || query.length < 2) {
-        return res.json([]);
-    }
-
-    const searchTerm = `%${query}%`;
     const [rows]: any = await pool.execute(
         `
         SELECT 
-            p.codigo_interno AS id, 
+            p.id_produto AS id, 
+            p.codigo_interno AS sku, 
             p.descricao AS name, 
             c.nome_categoria AS category, 
-            p.unidade AS unitOfMeasure
+            p.unidade AS unitOfMeasure,
+            p.preco_venda AS salePrice,
+            p.estoque_minimo AS minStock,
+            p.status,
+            COALESCE(e.quantidade, 0) AS currentStock,
+            GROUP_CONCAT(DISTINCT f.nome_fantasia SEPARATOR ', ') AS suppliers
         FROM produtos AS p
-        JOIN 
-            categorias c ON p.id_categoria = c.id_categoria  
+        LEFT JOIN categorias c ON p.id_categoria = c.id_categoria  
+        LEFT JOIN estoque_atual e ON p.id_produto = e.id_produto
+        LEFT JOIN produto_fornecedor pf ON p.id_produto = pf.id_produto
+        LEFT JOIN fornecedores f ON pf.id_fornecedor = f.id_fornecedor
         WHERE 
-            p.codigo_interno LIKE ? OR 
-            p.descricao LIKE ? OR 
-            p.codigo_interno LIKE ?
+            (? = '%' OR p.codigo_interno LIKE ? OR p.descricao LIKE ? OR pf.sku_fornecedor LIKE ?)
+        GROUP BY p.id_produto
         ORDER BY p.descricao
-        LIMIT 10
+        LIMIT 100
         `,
-        [searchTerm, searchTerm, searchTerm]
+        [searchTerm, searchTerm, searchTerm, searchTerm]
     );
-    const products: InternalProductData[] = rows;
-    return res.json(products);
+
+    return res.json(rows);
 }));
 
 

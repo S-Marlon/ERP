@@ -4,12 +4,15 @@ const NFE_NS = 'http://www.portalfiscal.inf.br/nfe';
 
 // --- Interfaces ---
 export interface Produto {
-    codigo: string;
-    descricao: string;
-    quantidade: string;
-    unidadeMedida: string;      // ✨ ADICIONADO: uCom
-    valorUnitario: string;
-    valorTotal: string; 
+    codigo: string;             // cProd (SKU do Fornecedor)
+    descricao: string;          // xProd
+    ncm: string;                // ✨ ADICIONADO
+    cfop: string;               // ✨ ADICIONADO
+    quantidade: string;         // qCom
+    unidadeMedida: string;      // uCom
+    valorUnitario: string;      // vUnCom (Preço de tabela)
+    valorCustoReal: string;     // ✨ ADICIONADO: (vProd + vIPI + vOutro - vDesc) / Qtd
+    valorTotal: string;         // vProd
     valorIcms: string;
     valorIpi: string;
     valorTotalTributos: string;
@@ -21,7 +24,8 @@ export interface NfeDataFromXML {
     dataEmissao: string;
     emitente: {
         cnpj: string;
-        nome: string;
+        nome: string;           // xNome (Razão Social)
+        nomeFantasia: string;   // ✨ ADICIONADO: xFant
         uf: string;
     };
     destinatario: {
@@ -77,7 +81,7 @@ export const parseNfeXmlToData = (xmlString: string): NfeDataFromXML | null => {
                 
                 if (!prod) return null;
 
-                // Lógica para ICMS (pode estar em diferentes tags: ICMS00, ICMS40, etc)
+                // Lógica para ICMS
                 let vICMS = '0.00';
                 const icmsNode = imposto?.getElementsByTagNameNS(NFE_NS, 'ICMS')[0];
                 if (icmsNode && icmsNode.firstElementChild) {
@@ -87,12 +91,26 @@ export const parseNfeXmlToData = (xmlString: string): NfeDataFromXML | null => {
                 const vIPI = getTagValue(imposto?.getElementsByTagNameNS(NFE_NS, 'IPI')[0]?.getElementsByTagNameNS(NFE_NS, 'IPITrib')[0] || imposto, 'vIPI');
                 const vTotTribItem = getTagValue(imposto, 'vTotTrib');
 
+                // --- Lógica de Custo Real Unitário ---
+                const vProd = parseFloat(getTagValue(prod, 'vProd'));
+                const vDesc = parseFloat(getTagValue(prod, 'vDesc'));
+                const vOutro = parseFloat(getTagValue(prod, 'vOutro'));
+                const vIpiNum = parseFloat(vIPI);
+                const qtd = parseFloat(getTagValue(prod, 'qCom'));
+
+                // O custo real leva em conta impostos e despesas extras (frete/seguro rateado no item)
+                const custoRealTotal = (vProd - vDesc + vIpiNum + vOutro);
+                const custoRealUnitario = qtd > 0 ? (custoRealTotal / qtd).toFixed(4) : '0.0000';
+
                 return {
                     codigo: getTagValue(prod, 'cProd'),
                     descricao: getTagValue(prod, 'xProd'),
+                    ncm: getTagValue(prod, 'NCM'),
+                    cfop: getTagValue(prod, 'CFOP'),
                     quantidade: getTagValue(prod, 'qCom'),
-                    unidadeMedida: getTagValue(prod, 'uCom'), // ✨ CAPTURANDO A UNIDADE (uCom)
+                    unidadeMedida: getTagValue(prod, 'uCom'),
                     valorUnitario: getTagValue(prod, 'vUnCom'),
+                    valorCustoReal: custoRealUnitario, // ✨ Valor vital para seu alerta de 5-10%
                     valorTotal: getTagValue(prod, 'vProd'), 
                     valorIcms: vICMS,
                     valorIpi: vIPI,
@@ -101,14 +119,21 @@ export const parseNfeXmlToData = (xmlString: string): NfeDataFromXML | null => {
             })
             .filter((p): p is Produto => p !== null);
 
-        // --- 2. Extração de Totais ---
+        // --- 2. Extração do Nome Fantasia ---
+        const razaoSocial = getTagValue(emit, 'xNome');
+        const nomeFantasiaRaw = getTagValue(emit, 'xFant');
+        // Se xFant for '0.00' (default do parser) ou vazio, usamos a Razão Social
+        const nomeFantasiaFinal = (nomeFantasiaRaw === '0.00' || !nomeFantasiaRaw) ? razaoSocial : nomeFantasiaRaw;
+
+        // --- 3. Extração de Totais ---
         return {
             chaveAcesso: chaveAcesso,
             numero: getTagValue(ide, 'nNF'),
             dataEmissao: getTagValue(ide, 'dhEmi').substring(0, 10),
             emitente: {
                 cnpj: getTagValue(emit, 'CNPJ'),
-                nome: getTagValue(emit, 'xNome'),
+                nome: razaoSocial,
+                nomeFantasia: nomeFantasiaFinal, // ✨ Agora capturado
                 uf: getTagValue(emit.getElementsByTagNameNS(NFE_NS, 'enderEmit')[0], 'UF'),
             },
             destinatario: {

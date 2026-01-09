@@ -17,28 +17,18 @@ import NovoProdutoForm from "./_components/NovoProdutoForm";
 
 
 // --- Interfaces (Mantenha aqui se 'types/types' for inacessível ou se precisar de uma definição local) ---
-// interface Product {
-//     id: number;
-//     sku: string;
-//     name: string;
-//     category: string;
-//     currentStock: number;
-//     minStock: number;
-//     salePrice: number;
-//     status: 'Ativo' | 'Inativo';
-//     fornecedor?: string;
-// }
-
 interface Product {
     id: number;
-    sku: string;         // Mapeado de codigo_interno
-    name: string;        // Mapeado de descricao
+    sku: string;
+    name: string;
     category: string;
     currentStock: number;
     minStock: number;
     salePrice: number;
     status: 'Ativo' | 'Inativo';
-    fornecedor?: string;
+    unitOfMeasure: string;
+    suppliers?: string;      // Campo vindo do GROUP_CONCAT
+    supplierCodes?: string;  // Campo vindo do GROUP_CONCAT
 }
 
 // Assumindo que FilterState existe em outro lugar, mas definindo localmente para evitar erros de compilação
@@ -58,8 +48,6 @@ interface FilterState {
     date: string;
     paymentMethod: string;
 }
-
-
 
 
 const StockInventory: React.FC = () => {
@@ -85,29 +73,28 @@ const StockInventory: React.FC = () => {
     });
 
     // 2. Efeito de Busca na API com Debounce
-    useEffect(() => {
-        const fetchProductsData = async () => {
-            setIsLoading(true);
-            setError(null);
-            try {
-                // Agora chamamos a API sempre, mesmo se searchTerm for ""
-                const data = await searchProductsMapping(searchTerm);
-                setProducts(data);
-            } catch (err: any) {
-                console.error("Erro ao buscar produtos:", err);
-                setError("Erro ao carregar lista de produtos.");
-            } finally {
-                setIsLoading(false);
-            }
-        };
+   useEffect(() => {
+    const fetchProductsData = async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            // Enviamos o searchTerm exatamente como está (mesmo vazio "")
+            const data = await searchProductsMapping(searchTerm);
+            setProducts(Array.isArray(data) ? data : []);
+        } catch (err: any) {
+            console.error("Erro ao buscar produtos:", err);
+            setError("Erro ao carregar lista de produtos.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
-        const delayDebounceFn = setTimeout(() => {
-            fetchProductsData();
-        }, 300); // Debounce um pouco mais rápido
+    const delayDebounceFn = setTimeout(() => {
+        fetchProductsData();
+    }, 300);
 
-        return () => clearTimeout(delayDebounceFn);
-    }, [searchTerm]); // Dispara sempre que o termo mudar
-
+    return () => clearTimeout(delayDebounceFn);
+}, [searchTerm]); // searchTerm vazio agora dispara a busca normalmente
     const handleFilterChange = (
         key: keyof FilterState,
         value: string | number | boolean
@@ -201,11 +188,12 @@ const StockInventory: React.FC = () => {
                                     <tr style={styles.tableHead}>
                                         <th style={styles.tableTh}>#</th>
                                         <th style={styles.tableTh}>Cód. Interno</th>
-                                        <th style={styles.tableTh}>Nome</th>
+                                        <th style={styles.tableTh}>Nome & Categoria</th>
                                         <th style={styles.tableTh}>Unidade</th>
                                         <th style={styles.tableTh}>Estoque</th>
                                         <th style={styles.tableTh}>Preço</th>
-                                        <th style={styles.tableTh}>Ações</th>
+                                        <th style={styles.tableTh}>Fornecedor</th>
+                                        <th style={styles.tableTh}>Status</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -237,9 +225,11 @@ const StockInventory: React.FC = () => {
                                                     </div>
                                                 </td>
 
+                                               
+
 
                                                 <td style={styles.tableTd}>
-                                                    UN
+                                                    {product.unitOfMeasure || 'UN'}
                                                 </td>
 
                                                 {/* Estoque com Alerta Visual */}
@@ -254,11 +244,31 @@ const StockInventory: React.FC = () => {
                                                 </td>
 
                                                 {/* Preço de Venda */}
-                                                <td style={styles.tableTd}>{formatCurrency(product.salePrice)}</td>
+                                                <td style={styles.tableTd}>R$ {formatCurrency(product.salePrice)}</td>
 
 
 
-                                                {/* Status e Ações */}
+                                                 <td style={styles.tableTd}>
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {product.suppliers && (
+                <span style={{ 
+                    backgroundColor: '#eff6ff', 
+                    color: '#1d4ed8', 
+                    padding: '0 4px', 
+                    borderRadius: '4px',
+                    border: '1px solid #bfdbfe'
+                }}>
+                    {product.suppliers.split(',')[0]} {product.suppliers.split(',').length > 1 ? `+${product.suppliers.split(',').length - 1}` : ''}
+                </span>
+            )}
+        </div>
+    </div>
+</td>
+
+
+
+                                                {/* Status */}
                                                 <td style={styles.tableTd}>
                                                     <span style={product.status === 'Ativo' ? styles.statusActive : styles.statusInactive}>
                                                         {product.status}
@@ -449,8 +459,8 @@ const styles: { [key: string]: React.CSSProperties } = {
         backgroundColor: '#f9fafb',
     },
     tableTh: {
-        padding: '12px 24px',
-        textAlign: 'left',
+        padding: '8px 20px',
+        textAlign: 'center',
         whiteSpace: 'nowrap',
         fontSize: '0.75rem',
         fontWeight: 500,
@@ -462,7 +472,7 @@ const styles: { [key: string]: React.CSSProperties } = {
         transition: 'background-color 0.2s',
     },
     tableTd: {
-        padding: '16px 24px',
+        padding: '12px 20px',
         fontSize: '0.875rem',
         color: '#374151',
         borderBottom: '1px solid #e5e7eb',

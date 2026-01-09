@@ -32,6 +32,7 @@ interface ProductEntry {
 interface NfeData {
     invoiceNumber: string;
     supplier: string;
+    supplierFantasyName: string; // ✨ Adicionado
     supplierCnpj: string; // CNPJ extraído do XML
     entryDate: string;
     accessKey: string;
@@ -98,8 +99,9 @@ const mapNfeDataToEntryForm = (xmlData: NfeDataFromXML): NfeData => {
     return {
         invoiceNumber: `NF ${xmlData.numero}`,
         supplier: xmlData.emitente?.nome || '',
+        supplierFantasyName: xmlData.emitente?.nomeFantasia || '', // ✨ Capturando do parser
         supplierCnpj: xmlData.emitente?.cnpj || '',
-        entryDate: xmlData.dataEmissao.substring(0, 10),
+        entryDate: xmlData.dataEmissao ? xmlData.dataEmissao.substring(0, 10) : '',
         accessKey: xmlData.chaveAcesso,
         totalFreight,
         totalIpi,
@@ -145,6 +147,7 @@ const StockEntryForm: React.FC = () => {
     // Header / nota
     const [invoiceNumber, setInvoiceNumber] = useState('');
     const [supplier, setSupplier] = useState('');
+    const [supplierFantasyName, setSupplierFantasyName] = useState(''); // ✨ Novo estado
     const [supplierCnpj, setSupplierCnpj] = useState('');
     const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
     const [supplierToCreate, setSupplierToCreate] = useState<{ cnpj: string; name: string } | null>(null);
@@ -155,7 +158,7 @@ const StockEntryForm: React.FC = () => {
     const [supplierExists, setSupplierExists] = useState<boolean | null>(null);
     const [pendingXmlData, setPendingXmlData] = useState<NfeData | null>(null);
     const [pendingSkus, setPendingSkus] = useState<string[] | null>(null);
-    const [entryDate, setEntryDate] = useState(new Date().toISOString().substring(0, 10));
+    const [entryDate, setEntryDate] = useState(''); // Começa vazio
     const [items, setItems] = useState<ProductEntry[]>([]);
     // seleções separadas
     const [selectedPendingIds, setSelectedPendingIds] = useState<Set<number>>(new Set());
@@ -253,6 +256,7 @@ const StockEntryForm: React.FC = () => {
                     // Popula cabeçalho imediatamente (o usuário deve ver os dados mesmo antes da sincronização)
             setInvoiceNumber(xmlData.invoiceNumber);
             setSupplier(xmlData.supplier);
+            setSupplierFantasyName(xmlData.supplierFantasyName); // ✨ Atualiza o nome fantasia
             setEntryDate(xmlData.entryDate);
             setAccessKey(xmlData.accessKey);
             setTotalFreight(xmlData.totalFreight);
@@ -564,7 +568,7 @@ const StockEntryForm: React.FC = () => {
                         <span style={{ fontWeight: 600, color: '#10b981' }}>{item.quantityReceived}</span>
                     ) : (
                         <input
-                            type="number" min="0" step="0.01"
+                            type="number" min="0" step={item.unitOfMeasure === 'UN' || item.unitOfMeasure === 'PC' ? '1' : '0.1'}
                             value={String(item.quantityReceived)}
                             onChange={(e) => handleUpdateReceivedQuantityFn(item.tempId, e.target.value)}
                             style={{
@@ -671,33 +675,33 @@ const StockEntryForm: React.FC = () => {
             </div>
 
             <NfeCards
-                invoiceNumber={invoiceNumber}
-                accessKey={accessKey}
-                entryDate={entryDate}
-                setEntryDate={setEntryDate}
-                supplier={supplier}
-                cnpj={supplierCnpj}
-                supplierExists={supplierExists}
-                isSupplierChecking={isSupplierChecking}
-                onCreateSupplier={() => {
-                    // Abre o modal de criação com os dados extraídos da NF (se disponíveis)
-                    if (supplierToCreate) {
-                        setSupplierCreationName(supplierToCreate.name || '');
-                        setIsSupplierModalOpen(true);
-                    } else if (supplierCnpj) {
-                        setSupplierToCreate({ cnpj: supplierCnpj, name: supplier || '' });
-                        setSupplierCreationName(supplier || '');
-                        setIsSupplierModalOpen(true);
-                    }
+                data={{
+                    invoiceNumber,
+                    accessKey,
+                    entryDate,
+                    supplier,
+                    supplierCnpj,
+                    supplierFantasyName, // ✨ Passando o estado que criamos
+                    totalIpi,
+                    totalFreight,
+                    totalOtherExpenses,
+                    subtotal,
+                    totalNoteValue
                 }}
-                totalIpi={totalIpi}
-                totalFreight={totalFreight}
-                totalOtherExpenses={totalOtherExpenses}
-                subtotal={subtotal}
-                totalNoteValue={totalNoteValue}
-                formatCurrency={formatCurrency}
+                supplierStatus={{
+                    exists: supplierExists,
+                    isChecking: isSupplierChecking
+                }}
+                actions={{
+                    setEntryDate,
+                    onCreateSupplier: () => setIsSupplierModalOpen(true),
+                    formatCurrency
+                }}
                 styles={styles}
             />
+
+            {/* Restante do seu código (Tabelas de itens, etc) */}
+
             <hr />
             <h2 style={styles.panelTitle}>3. Conferência Detalhada de Itens {items.length == 1 ? '(1 item)' : `(${items.length} itens)`}</h2>
             <FlexGridContainer layout='grid'>

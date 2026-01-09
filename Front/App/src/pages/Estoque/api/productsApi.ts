@@ -10,18 +10,18 @@ const apiBase = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:300
 
 
 // Define a interface para garantir que o frontend envie tudo o que o backend precisa
-export interface MappingPayload {
-    original: {
-        sku: string;
-        name: string;
-    };
-    mapped: {
-        id: string; // codigo_interno
-        name: string;
-        category: string;
-        unitOfMeasure: string;
-    };
-    supplierCnpj: string; // Necessário para a tabela produto_fornecedor
+export interface InternalProductData {
+    id: number;
+    sku: string;         // codigo_interno
+    name: string;        // descricao
+    category: string;
+    unitOfMeasure: string;
+    currentStock: number;
+    minStock: number;
+    salePrice: number;
+    status: 'Ativo' | 'Inativo';
+    suppliers?: string;      // Novo: nomes dos fornecedores concatenados
+    supplierCodes?: string;  // Novo: SKUs dos fornecedores concatenados
 }
 
 
@@ -34,12 +34,12 @@ export interface TreeCategory {
   children: TreeCategory[];
 }
 
-export async function searchProductsMapping(query: string): Promise<any[]> {
-    const res = await fetch(`${apiBase}/products/mapping?query=${encodeURIComponent(query)}`);
+export async function searchProductsMapping(query: string): Promise<InternalProductData[]> {
+    const res = await fetch(`${apiBase}/products?query=${encodeURIComponent(query)}`); // Note que mudei para a rota principal
     
     if (!res.ok) {
         const errorText = await res.text();
-        throw new Error(`Erro na busca de mapeamento: ${res.status}. ${errorText}`);
+        throw new Error(`Erro na busca: ${res.status}. ${errorText}`);
     }
     
     return res.json();
