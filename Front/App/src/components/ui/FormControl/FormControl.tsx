@@ -10,6 +10,7 @@ interface FormControlProps {
     control?: ControlType;
     value?: any; 
     onChange?: React.ChangeEventHandler<any>;
+    onKeyDown?: React.KeyboardEventHandler<any>;
     options?: { value: string; label: string }[];
     placeholder?: string;
     error?: string;
@@ -24,25 +25,10 @@ interface FormControlProps {
     readOnlyDisplay?: boolean; 
 }
 
-const FormControl: React.FC<FormControlProps> = ({
-    label,
-    name,
-    type = "text",
-    control = "input",
-    value,
-    onChange,
-    options = [],
-    placeholder,
-    checked,
-    error,
-    disabled,
-    required,
-    maxLength,
-    rows = 3,
-    step = 1,
-    className = "",
-    readOnlyDisplay = false,
-}) => {
+const FormControl = React.forwardRef<
+    HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
+    FormControlProps
+>(({ label, name, type = "text", control = "input", value, onChange, onKeyDown, options = [], placeholder, checked, error, disabled, required, maxLength, rows = 3, step = 1, className = "", readOnlyDisplay = false }, ref) => {
     
     // --- 🎯 LÓGICA DE RETORNO CONDICIONAL (DEVE ESTAR AQUI) ---
     if (readOnlyDisplay) {
@@ -96,6 +82,7 @@ const FormControl: React.FC<FormControlProps> = ({
                         type="checkbox"
                         checked={checked}
                         onChange={onChange}
+                        onKeyDown={onKeyDown}
                         disabled={disabled}
                         required={required}
                         className="ui-form-checkbox"
@@ -111,11 +98,13 @@ const FormControl: React.FC<FormControlProps> = ({
             {/* Renderização do INPUT (COM REALCE DE ERRO) */}
             {control === "input" && (
                 <input
+                    ref={ref as React.Ref<HTMLInputElement>}
                     id={name}
                     name={name}
                     type={type}
                     value={value}
                     onChange={onChange}
+                    onKeyDown={onKeyDown}
                     placeholder={placeholder}
                     disabled={disabled}
                     required={required}
@@ -128,10 +117,12 @@ const FormControl: React.FC<FormControlProps> = ({
             {/* Renderização do SELECT (COM REALCE DE ERRO) */}
             {control === "select" && (
                 <select
+                    ref={ref as React.Ref<HTMLSelectElement>}
                     id={name}
                     name={name}
                     value={value}
                     onChange={onChange}
+                    onKeyDown={onKeyDown}
                     disabled={disabled}
                     required={required}
                     className={`ui-form-select ${error ? 'ui-input-error' : ''}`}
@@ -148,10 +139,12 @@ const FormControl: React.FC<FormControlProps> = ({
             {/* Renderização do TEXTAREA (COM REALCE DE ERRO) */}
             {control === "textarea" && (
                 <textarea
+                    ref={ref as React.Ref<HTMLTextAreaElement>}
                     id={name}
                     name={name}
                     value={value}
                     onChange={onChange}
+                    onKeyDown={onKeyDown}
                     placeholder={placeholder}
                     disabled={disabled}
                     required={required}
@@ -164,6 +157,6 @@ const FormControl: React.FC<FormControlProps> = ({
             {error && <span className="ui-form-error">{error}</span>}
         </div>
     );
-};
+});
 
 export default FormControl;

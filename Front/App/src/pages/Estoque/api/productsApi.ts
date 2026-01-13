@@ -219,3 +219,37 @@ export const checkExistingMappings = async (supplierCnpj: string, skus: string[]
     });
     return await response.json();
 };
+/**
+ * Consolida a entrada de NF no banco de dados
+ * Cria registros de NF, itens, movimentações e atualiza estoque
+ */
+export const submitStockEntry = async (payload: {
+    invoiceNumber: string;
+    accessKey: string;
+    entryDate: string;
+    supplierCnpj: string;
+    supplierName: string;
+    totalFreight: number;
+    totalIpi: number;
+    totalOtherExpenses: number;
+    totalNoteValue: number;
+    items: {
+        codigoInterno: string;
+        skuFornecedor: string;
+        quantidadeRecebida: number;
+        unidade: string;
+        custoUnitario: number;
+    }[];
+}) => {
+    const response = await fetch(`${apiBase}/stock-entry`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        const err = await response.text();
+        throw new Error(err);
+    }
+    return await response.json();
+};

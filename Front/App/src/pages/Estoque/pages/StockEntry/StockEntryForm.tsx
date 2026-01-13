@@ -8,7 +8,7 @@ import { parseNfeXmlToData, NfeDataFromXML } from '../../utils/nfeParser';
 import Badge from '../../../../components/ui/Badge/Badge';
 import { ActionPopover } from '../../../../components/ui/Popover/ActionPopover';
 import NfeCards from './_components/NfeCards';
-import { checkExistingMappings, checkSupplier, createSupplier } from '../../api/productsApi';
+import { checkExistingMappings, checkSupplier, createSupplier, submitStockEntry } from '../../api/productsApi';
 
 // --- Interfaces ---
 interface ProductEntry {
@@ -57,6 +57,23 @@ const formatCnpj = (cnpj?: string): string => {
     return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
 };
 
+// ✨ Arredonda quantidade baseado na unidade de medida
+const roundQuantityByUnit = (quantity: number, unitOfMeasure: string): number => {
+    const unit = (unitOfMeasure || 'UN').toUpperCase();
+    let decimalPlaces = 2; // padrão para MT, KG, LT
+    
+    if (['UN', 'PC', 'CX', 'FD', 'RST'].includes(unit)) {
+        decimalPlaces = 0; // unidades inteiras
+    } else if (['M', 'MT', 'M2', 'M3'].includes(unit)) {
+        decimalPlaces = 2; // metros: 2 casas
+    } else if (['KG', 'L', 'LT', 'ML'].includes(unit)) {
+        decimalPlaces = 3; // peso/volume: 3 casas
+    }
+    
+    const factor = Math.pow(10, decimalPlaces);
+    return Math.round(quantity * factor) / factor;
+};
+
 const mapNfeDataToEntryForm = (xmlData: NfeDataFromXML): NfeData => {
     const totalFreight = parseFloat(xmlData.valorTotalFrete || '0.00');
     const totalIpi = parseFloat(xmlData.valorTotalIpi || '0.00');
@@ -68,7 +85,13 @@ const mapNfeDataToEntryForm = (xmlData: NfeDataFromXML): NfeData => {
     }, 0);
 
     const items: ProductEntry[] = xmlData.produtos.map((produto, index) => {
-        const quantity = parseFloat(produto.quantidade || '0.00');
+        const rawQuantity = parseFloat(produto.quantidade || '0.00');
+        const unitOfMeasure = produto.unidadeMedida || 'UN';
+        const quantity = roundQuantityByUnit(rawQuantity, unitOfMeasure);
+        
+        // ✨ DEBUG: log quantidade para verificar arredondamento
+        console.log(`[ESTOQUE] SKU: ${produto.codigo}, Raw: ${rawQuantity}, Unit: ${unitOfMeasure}, Rounded: ${quantity}`);
+        
         const unitPrice = parseFloat(produto.valorUnitario || '0.00');
         const totalProductValue = parseFloat(produto.valorTotal || '0.00');
         const ratio = subtotalProducts > 0 ? (totalProductValue / subtotalProducts) : 0;
@@ -84,10 +107,10 @@ const mapNfeDataToEntryForm = (xmlData: NfeDataFromXML): NfeData => {
             mappedId: undefined,
             isMapped: false,
             name: produto.descricao,
-            unitOfMeasure: produto.unidadeMedida || 'UN', // ✨ Capturando do XML
+            unitOfMeasure: unitOfMeasure,
             unitPrice: parseFloat(unitPrice.toFixed(4)),
-            quantity: parseFloat(quantity.toFixed(4)),
-            quantityReceived: parseFloat(quantity.toFixed(4)),
+            quantity: quantity,
+            quantityReceived: quantity,
             difference: 0,
             total: parseFloat(totalProductValue.toFixed(2)),
             unitCostWithTaxes: parseFloat(unitCostWithTaxes.toFixed(4)),
@@ -638,16 +661,72 @@ const StockEntryForm: React.FC = () => {
     };
 
     // Confirma entrada
-    const handleConfirmEntry = () => {
+    const handleConfirmEntry = async () => {
         if (items.length === 0) { alert('Não há itens para dar entrada no estoque.'); return; }
         if (hasPendingItems) { alert('ERRO: Todos os itens devem ser conferidos antes de finalizar a entrada.'); return; }
         const allMapped = items.every(item => item.mappedId);
         if (!allMapped) { alert('ERRO: Todos os itens devem estar mapeados antes de confirmar a entrada.'); return; }
+        
         if (hasDivergence) {
             const confirmDivergence = window.confirm(`ATENÇÃO: ${divergentItems.length} divergência(s). Confirmar entrada dos itens recebidos (${totalItems.toFixed(2)} unidades)?`);
             if (!confirmDivergence) return;
         }
-        alert(`Entrada de NF ${invoiceNumber} confirmada! ${totalItems.toFixed(2)} unidades serão atualizadas no estoque.`);
+
+        try {
+            // Monta o payload conforme esperado pelo backend
+            const payload = {
+                invoiceNumber: invoiceNumber.replace('NF ', ''), // Remove o prefixo "NF "
+                accessKey,
+                entryDate,
+                supplierCnpj,
+                supplierName: supplier,
+                totalFreight,
+                totalIpi,
+                totalOtherExpenses,
+                totalNoteValue,
+                items: items
+                    .filter(item => item.isConfirmed) // Apenas itens conferidos
+                    .map(item => ({
+                        codigoInterno: item.mappedId!,
+                        skuFornecedor: item.sku,
+                        quantidadeRecebida: item.quantityReceived,
+                        unidade: item.unitOfMeasure,
+                        custoUnitario: item.unitCostWithTaxes
+                    }))
+            };
+
+            // ✨ DEBUG: Log do payload sendo enviado
+            console.log('[PAYLOAD ENVIADO] Total de itens:', payload.items.length);
+            console.log('[PAYLOAD ENVIADO] Itens completos:', payload.items);
+            payload.items.forEach((item, idx) => {
+                console.log(`  [Item ${idx + 1}] SKU: ${item.skuFornecedor}, ID: ${item.codigoInterno}, Qty: ${item.quantidadeRecebida}, Unit: ${item.unidade}`);
+            });
+
+            // Chama a API para consolidar a entrada
+            const response = await submitStockEntry(payload);
+
+            // Sucesso!
+            alert(`✅ ${response.message}\nNota ID: ${response.notaId}\nItens processados: ${response.itemsProcessed}`);
+
+            // Limpa o formulário para uma nova importação
+            setInvoiceNumber('');
+            setSupplier('');
+            setSupplierFantasyName('');
+            setSupplierCnpj('');
+            setEntryDate('');
+            setAccessKey('');
+            setItems([]);
+            setTotalFreight(0);
+            setTotalIpi(0);
+            setTotalOtherExpenses(0);
+            setTotalNoteValue(0);
+            setSelectedPendingIds(new Set());
+            setSelectedConfirmedIds(new Set());
+
+        } catch (error) {
+            console.error('Erro ao confirmar entrada:', error);
+            alert('Erro ao consolidar a entrada: ' + (error instanceof Error ? error.message : 'Erro desconhecido'));
+        }
     };
     return (
         <div style={styles.container}>
@@ -885,78 +964,68 @@ const StockEntryForm: React.FC = () => {
 
 // --- styles ---
 const styles: { [key: string]: React.CSSProperties } = {
-    container: { padding: '24px', backgroundColor: '#f9fafb', minHeight: '100vh', fontFamily: 'Arial, sans-serif' },
-    title: { fontSize: '1.875rem', fontWeight: 600, color: '#1f2937', marginBottom: '24px' },
-    panel: { backgroundColor: '#ffffff', padding: '24px', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' },
-    panelTitle: { fontSize: '1.25rem', fontWeight: 600, color: '#374151', marginBottom: '16px', borderBottom: '1px solid #e5e7eb', paddingBottom: '8px' },
-    subTitle: { fontSize: '1.125rem', fontWeight: 600, color: '#374151', marginBottom: '10px', marginTop: '10px' },
-    importArea: { display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '20px', padding: '10px', border: '1px dashed #93c5fd', backgroundColor: '#eff6ff', borderRadius: '6px' },
-    fileInput: { display: 'none' },
-    importButton: { padding: '10px 15px', backgroundColor: '#4f46e5', color: 'white', borderRadius: '6px', fontWeight: 500, cursor: 'pointer' },
-    input: { padding: '8px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '1rem' },
-    tableResponsive: { overflowX: 'auto' },
-    dataTable: { width: '100%', borderCollapse: 'collapse' },
-    tableHead: { backgroundColor: '#f9fafb', borderBottom: '2px solid #e5e7eb' },
-    tableTh: { padding: '5px 5px', textAlign: 'left', fontSize: '0.70rem', fontWeight: 600, color: '#4b5563', textTransform: 'uppercase' },
-    tableRow: {
-        borderBottom: '1px solid #e5e7eb',
-        transition: 'background-color 0.2s, border-left 0.2s',
+    container: { padding: '24px', backgroundColor: '#f3f4f6', minHeight: '100vh', fontFamily: 'Inter, system-ui, sans-serif' },
+    title: { fontSize: '1.5rem', fontWeight: 700, color: '#111827', marginBottom: '20px', letterSpacing: '-0.025em' },
+    panel: { backgroundColor: '#ffffff', padding: '24px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e5e7eb' },
+    panelTitle: { fontSize: '1.1rem', fontWeight: 600, color: '#374151', marginBottom: '16px', borderBottom: '1px solid #f3f4f6', paddingBottom: '12px' },
+    subTitle: { fontSize: '1rem', fontWeight: 600, color: '#4b5563', marginBottom: '0px' }, // Removi a margem para alinhar com botões
+    
+    importArea: { 
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
+        padding: '16px', backgroundColor: '#ffffff', border: '1px solid #e5e7eb', 
+        borderRadius: '8px', marginBottom: '24px' 
     },
-    ':hover': { // CSS-in-JS não suporta pseudo-seletores direto, mas adicionamos via inline styles nas linhas
-        backgroundColor: 'rgba(59, 130, 246, 0.05)',
+    importButton: { 
+        padding: '8px 16px', backgroundColor: '#4f46e5', color: 'white', 
+        borderRadius: '6px', fontWeight: 500, cursor: 'pointer', fontSize: '0.875rem',
+        transition: 'background-color 0.2s'
     },
-    tableCell: { padding: '3px 5px', textAlign: 'left', fontSize: '0.75rem', color: '#1f2937', verticalAlign: 'middle' },
-    removeButton: { padding: '4px 8px', backgroundColor: '#fca5a5', color: '#991b1b', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 },
-    checkButton: {
-        padding: '4px 8px',
-        backgroundColor: '#10b981',
-        color: 'white',
-        border: 'none',
-        borderRadius: '4px',
-        cursor: 'pointer',
-        transition: 'all 0.15s ease-in-out',
+    
+    tableResponsive: { 
+        overflowX: 'auto', backgroundColor: '#ffffff', borderRadius: '8px', 
+        border: '1px solid #e5e7eb', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' 
     },
-    uncheckButton: {
-        padding: '4px 8px',
-        backgroundColor: '#6b7280',
-        color: 'white',
-        border: 'none',
-        borderRadius: '4px',
-        cursor: 'pointer',
-        transition: 'all 0.15s ease-in-out',
+    dataTable: { width: '100%', borderCollapse: 'collapse', minWidth: '800px' },
+    tableTh: { 
+        padding: '12px 8px', textAlign: 'left', fontSize: '0.75rem', 
+        fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', 
+        backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' 
     },
-    mapButton: {
-        padding: '5px 10px',
-        backgroundColor: '#f97316',
-        color: 'white',
-        border: 'none',
-        borderRadius: '4px',
-        cursor: 'pointer',
-        transition: 'all 0.15s ease-in-out',
+    tableCell: { 
+        padding: '10px 8px', textAlign: 'left', fontSize: '0.875rem', 
+        color: '#374151', borderBottom: '1px solid #f3f4f6', verticalAlign: 'middle' 
     },
-    mappedIdBadge: {
-        padding: '5px 8px',
-        backgroundColor: '#d1fae5',
-        color: '#065f46',
-        borderRadius: '4px',
-        fontWeight: 600,
-        fontSize: '0.8rem',
-        display: 'inline-block',
-        transition: 'all 0.15s',
+    
+    // Botões de Ação na Tabela
+    checkButton: { padding: '6px 12px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 500 },
+    uncheckButton: { padding: '6px 12px', backgroundColor: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', borderRadius: '6px', cursor: 'pointer' },
+    mapButton: { padding: '6px 12px', backgroundColor: '#f59e0b', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' },
+    
+    // Rodapé de Confirmação
+    confirmationArea: { 
+        marginTop: '32px', display: 'flex', flexDirection: 'column', 
+        alignItems: 'flex-end', gap: '16px', borderTop: '2px solid #e5e7eb', paddingTop: '24px' 
     },
-    confirmationArea: { marginTop: '20px', display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-end', gap: '20px' },
-    totalsBoxFooter: { padding: '15px', border: '1px solid #d1d5db', borderRadius: '6px', backgroundColor: '#ffffff', width: '300px' },
-    confirmButton: { padding: '15px 30px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer' },
-    summaryGrid: { display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '40px', alignItems: 'flex-start' },
-    summaryItem: { display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.9rem' },
-    summaryLabel: { color: '#4b5563', fontWeight: 500 },
-    summaryValue: { fontWeight: 600, color: '#1f2937' },
-    totalLine: { display: 'flex', justifyContent: 'space-between', fontSize: '1rem', marginBottom: '5px' },
-    totalLabel: { color: '#4b5563' },
-    totalValue: { fontWeight: 600 },
-    divergenceList: { display: 'flex', flexDirection: 'column', gap: '10px' },
-    divergenceItem: { padding: '10px', borderLeft: '4px solid #f87171', backgroundColor: '#fefefe', borderRadius: '4px' },
-    divergenceDetails: { fontSize: '0.9rem', color: '#4b5563' },
+    totalsBoxFooter: { 
+        padding: '20px', backgroundColor: '#ffffff', borderRadius: '12px', 
+        border: '1px solid #e5e7eb', width: '100%', maxWidth: '400px',
+        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
+    },
+    confirmButton: { 
+        width: '100%', maxWidth: '400px', padding: '16px', 
+        backgroundColor: '#059669', color: 'white', border: 'none', 
+        borderRadius: '8px', fontWeight: 600, fontSize: '1rem', cursor: 'pointer',
+        boxShadow: '0 10px 15px -3px rgba(16, 185, 129, 0.2)'
+    },
+    
+    totalLine: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' },
+    totalLabel: { color: '#6b7280', fontSize: '0.875rem' },
+    totalValue: { fontWeight: 600, color: '#111827' },
+    
+    divergenceItem: { 
+        padding: '12px 16px', borderLeft: '4px solid #ef4444', 
+        backgroundColor: '#fff1f2', borderRadius: '4px', marginBottom: '8px' 
+    }
 };
 
 export default StockEntryForm;

@@ -466,6 +466,141 @@ app.post('/api/suppliers', asyncHandler(async (req, res) => {
     }
 }));
 
+/**
+ * POST /api/stock-entry
+ * Consolida a entrada de NF no banco de dados usando as tabelas compras_notas e compras_itens
+ * Cria registros em: compras_notas, compras_itens, estoque_movimentos, e atualiza estoque_atual
+ */
+app.post('/api/stock-entry', asyncHandler(async (req, res) => {
+    const { invoiceNumber, accessKey, entryDate, supplierCnpj, supplierName, totalFreight, totalIpi, totalOtherExpenses, totalNoteValue, items } = req.body;
+
+    // ✨ DEBUG: Log do que chegou do frontend
+    console.log('[BACKEND] POST /api/stock-entry recebido');
+    console.log('[BACKEND] Total de itens:', items?.length || 0);
+    console.log('[BACKEND] Itens recebidos:', JSON.stringify(items, null, 2));
+    items?.forEach((item: any, idx: number) => {
+        console.log(`  [Item ${idx + 1}] SKU: ${item.skuFornecedor}, ID: ${item.codigoInterno}, Qty: ${item.quantidadeRecebida}, Unit: ${item.unidade}`);
+    });
+
+    // Validações básicas
+    if (!invoiceNumber || !accessKey || !supplierCnpj || !items || items.length === 0) {
+        return res.status(400).json({ error: 'Dados insuficientes. Verifique invoiceNumber, accessKey, supplierCnpj e items.' });
+    }
+
+    const connection = await pool.getConnection();
+
+    try {
+        await connection.beginTransaction();
+
+        // 1️⃣ Obter id_fornecedor pelo CNPJ
+        const [suppliers]: any = await connection.execute(
+            'SELECT id_fornecedor FROM fornecedores WHERE cnpj = ?',
+            [supplierCnpj]
+        );
+
+        if (suppliers.length === 0) {
+            await connection.rollback();
+            return res.status(400).json({ error: 'Fornecedor não encontrado. Verifique o CNPJ.' });
+        }
+
+        const id_fornecedor = suppliers[0].id_fornecedor;
+
+        // 2️⃣ Inserir Nota de Compra na tabela compras_notas
+        const [notaResult]: any = await connection.execute(
+            `INSERT INTO compras_notas (chave_acesso, numero_nota, id_fornecedor, data_emissao, valor_total, status_nota)
+             VALUES (?, ?, ?, ?, ?, 'PROCESSADA')`,
+            [accessKey, invoiceNumber, id_fornecedor, entryDate || new Date(), totalNoteValue || 0]
+        );
+
+        const id_nota = notaResult.insertId;
+
+        // 3️⃣ Processar cada item
+        for (const item of items) {
+            const { codigoInterno, skuFornecedor, quantidadeRecebida, unidade, custoUnitario } = item;
+
+            // Obter id_produto pelo código interno
+            const [products]: any = await connection.execute(
+                'SELECT id_produto FROM produtos WHERE codigo_interno = ?',
+                [codigoInterno]
+            );
+
+            if (products.length === 0) {
+                await connection.rollback();
+                return res.status(400).json({ error: `Produto com código interno "${codigoInterno}" não encontrado.` });
+            }
+
+            const id_produto = products[0].id_produto;
+            const custoTotal = quantidadeRecebida * custoUnitario;
+
+            // 3a. Inserir item na tabela compras_itens
+            await connection.execute(
+                `INSERT INTO compras_itens (id_nota, id_produto, sku_fornecedor_original, quantidade, preco_unitario_custo, valor_total_item, unidade_xml)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [id_nota, id_produto, skuFornecedor || '', quantidadeRecebida, custoUnitario, custoTotal, unidade]
+            );
+
+            // 3b. Inserir movimentação em estoque_movimentos (rastreamento)
+            await connection.execute(
+                `INSERT INTO estoque_movimentos (id_produto, tipo, origem, id_origem, quantidade, valor_unitario, valor_total)
+                 VALUES (?, 'ENTRADA', 'NFE', ?, ?, ?, ?)`,
+                [id_produto, id_nota, quantidadeRecebida, custoUnitario, custoTotal]
+            );
+
+            // 3c. Atualizar estoque_atual (saldo)
+            // Primeiro, verifica se já existe registro
+            const [estoqueAtual]: any = await connection.execute(
+                'SELECT quantidade, valor_medio FROM estoque_atual WHERE id_produto = ?',
+                [id_produto]
+            );
+
+            // ✨ DEBUG: Log da atualização de estoque
+            console.log(`  [ESTOQUE] SKU: ${skuFornecedor}, Produto ID: ${id_produto}, Quantidade recebida: ${quantidadeRecebida}`);
+
+            if (estoqueAtual.length > 0) {
+                // Atualiza existente
+                // Converter valores retornados do banco para número (evita concatenação de string)
+                const qtAnterior = parseFloat(estoqueAtual[0].quantidade) || 0;
+                const custoMedioAnterior = parseFloat(estoqueAtual[0].valor_medio) || 0;
+
+                const novaQtd = qtAnterior + Number(quantidadeRecebida);
+                const novoValorMedio = novaQtd > 0 ? ((custoMedioAnterior * qtAnterior + custoTotal) / novaQtd) : custoMedioAnterior;
+
+                console.log(`    [ESTOQUE] Anterior: ${qtAnterior}, Nova: ${novaQtd}, Adicionado: ${quantidadeRecebida}`);
+
+                await connection.execute(
+                    `UPDATE estoque_atual SET quantidade = ?, valor_medio = ? WHERE id_produto = ?`,
+                    [novaQtd, novoValorMedio, id_produto]
+                );
+            } else {
+                // Insere novo
+                console.log(`    [ESTOQUE] Novo registro, quantidade: ${quantidadeRecebida}`);
+                await connection.execute(
+                    `INSERT INTO estoque_atual (id_produto, quantidade, valor_medio)
+                     VALUES (?, ?, ?)`,
+                    [id_produto, Number(quantidadeRecebida), Number(custoUnitario)]
+                );
+            }
+        }
+
+        // ✅ Commit de toda a transação
+        await connection.commit();
+
+        res.status(201).json({
+            success: true,
+            message: `Nota de Compra ${invoiceNumber} consolidada com sucesso!`,
+            notaId: id_nota,
+            itemsProcessed: items.length
+        });
+
+    } catch (error) {
+        // ❌ Rollback em caso de erro
+        await connection.rollback();
+        console.error('Erro ao consolidar entrada de estoque:', error);
+        throw error;
+    } finally {
+        connection.release();
+    }
+}));
 
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     console.error(err);

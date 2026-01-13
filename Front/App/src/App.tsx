@@ -29,6 +29,7 @@ import RelatorioPoco from './components/forms/specific/CadastroRelatorio/Cadastr
 import StockEntryForm from './pages/Estoque/pages/StockEntry/StockEntryForm';
 import StockAdjustmentForm from './pages/Estoque/pages/StockAdjustment/StockAdjustmentForm';
 import StockInventory from './pages/Estoque/pages/StockInventory/StockInventory';
+import { PDV } from './pages/PDV/PDV';
 
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -85,7 +86,7 @@ function App() {
               />
 
               {/* Rota de Vendas/PDV envolvida pelos Contexts */}
-              <Route 
+              {/* <Route 
                   path="/vendas" 
                   element={
                       <ServiceProductProvider>
@@ -94,8 +95,12 @@ function App() {
                           </ProductProvider>
                       </ServiceProductProvider>
                   } 
-              />
-              
+              /> */}
+
+
+
+
+              <Route path="/vendas" element={<PDV />} />
               <Route path="/produtos" element={<Produtos text='Produtos'/>} />
               <Route path="/Estoque" element={<Estoque />} />
               <Route path="/Estoque/consulta" element={<StockInventory/>} />
