@@ -1,6 +1,7 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import styles from './PDV.module.css';
-import { AutoPart, CartItem } from './types';
+import { AutoPart } from './types';
+import { searchProducts, Product } from '../../data/api';
 
 type SaleItem = (AutoPart | { 
   id: string; 
@@ -10,41 +11,94 @@ type SaleItem = (AutoPart | {
   category: string;
 }) & { type: 'part' | 'service'; stock?: number };
 
-const MOCK_PARTS: AutoPart[] = [
-  { id: '1', name: 'Pastilha de Freio Dianteira', brand: 'Bosch', oemCode: '0204T123', sku: 'PA-1010', compatibility: 'Gol G5/G6', location: 'A-12', price: 145.90, stock: 12 },
-  { id: '2', name: 'Filtro de Óleo', brand: 'Fram', oemCode: 'PH5949', sku: 'FO-55', compatibility: 'Motor EA111 VW', location: 'B-03', price: 32.50, stock: 45 },
-  { id: '3', name: 'Amortecedor Traseiro', brand: 'Monroe', oemCode: '377456SP', sku: 'AM-99', compatibility: 'Fiat Palio 2008-2015', location: 'D-01', price: 389.00, stock: 4 },
-  { id: '4', name: 'Bomba d\'Água', brand: 'Urba', oemCode: 'UB0620', sku: 'BA-202', compatibility: 'Fiat Fire 1.0/1.4', location: 'A-05', price: 189.90, stock: 8 },
-];
 
 const MOCK_SERVICES: SaleItem[] = [
-  { id: 's1', name: 'Alinhamento e Balanceamento', category: 'Suspensão', price: 120.00, type: 'service' },
-  { id: 's2', name: 'Troca de Óleo e Filtro (Mão de Obra)', category: 'Revisão', price: 60.00, type: 'service' },
-  { id: 's3', name: 'Limpeza de Sistema de Arrefecimento', category: 'Motor', price: 180.00, type: 'service' },
+  { id: 's1', name: 'Prensagem de Mangueira 1 Trama (R1)', category: 'Hidráulica', price: 20.00, type: 'service' },
+  { id: 's2', name: 'Prensagem de Mangueira 2 Tramas (R2)', category: 'Hidráulica', price: 25.00, type: 'service' },
+  { id: 's3', name: 'Prensagem de Mangueira 4 Tramas (R12/R13)', category: 'Alta Pressão', price: 30.00, type: 'service' },
+  { id: 's4', name: 'Corte e Montagem de Terminais', category: 'Manutenção', price: 20.00, type: 'service' },
+  { id: 's5', name: 'Teste de Estanqueidade e Pressão', category: 'Qualidade', price: 10.00, type: 'service' },
+  { id: 's6', name: 'Limpeza Interna de Mangueira (Projétil)', category: 'Manutenção', price: 0.00, type: 'service' },
 ];
 
 export const PDV: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(true);
   const [filterBrand, setFilterBrand] = useState('');
-  const [activeTab, setActiveTab] = useState<'parts' | 'services'>('parts');
+  const [activeTab, setActiveTab] = useState<'parts' | 'services' | 'os'>('parts');  
   const [cart, setCart] = useState<(SaleItem & { quantity: number })[]>([]);
   const [selectedPart, setSelectedPart] = useState<AutoPart | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+
+  useEffect(() => {
+    console.log('useEffect triggered: activeTab=', activeTab, 'searchTerm=', searchTerm);
+    if (activeTab === 'parts') {
+      console.log('Buscando produtos...');
+      setLoadingProducts(true);
+      searchProducts(searchTerm).then((data) => {
+        console.log('Produtos recebidos:', data);
+        setProducts(data);
+        setLoadingProducts(false);
+      }).catch(() => {
+        console.log('Erro na busca');
+        setProducts([]);
+        setLoadingProducts(false);
+      });
+    } else {
+      console.log('Não buscando, aba não é parts');
+      setProducts([]);
+    }
+  }, [searchTerm, activeTab]);
+
+  // Unificação do estado da OS
+  const [osData, setOsData] = useState({
+    vehicle: '',
+    plate: '',
+    laborValue: 0,
+    laborType: 'fixed' as 'fixed' | 'percent' | 'service',
+    selectedServiceId: ''
+  });
 
   const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
-  // Filtragem
+  // Cálculo da Mão de Obra Dinâmica
+  const calculatedLabor = useMemo(() => {
+    const itemsTotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+    
+    if (osData.laborType === 'percent') {
+      return itemsTotal * (osData.laborValue / 100);
+    }
+    if (osData.laborType === 'service') {
+      const service = MOCK_SERVICES.find(s => s.id === osData.selectedServiceId);
+      return service ? service.price : 0;
+    }
+    return osData.laborValue; // fixed
+  }, [cart, osData.laborType, osData.laborValue, osData.selectedServiceId]);
+
+  // Cálculo do Total Geral
+  const total = useMemo(() => {
+    const itemsTotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+    return itemsTotal + calculatedLabor;
+  }, [cart, calculatedLabor]);
+
   const filteredData = useMemo(() => {
+    if (activeTab === 'os') return [];
     if (activeTab === 'parts') {
-      return MOCK_PARTS.filter(p => {
-        const match = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                      p.oemCode.toLowerCase().includes(searchTerm.toLowerCase());
-        const brandMatch = filterBrand === '' || p.brand === filterBrand;
-        return match && brandMatch;
-      }).map(p => ({ ...p, type: 'part' as const }));
+      return products.map(p => ({
+        id: p.id,
+        name: p.name,
+        price: p.salePrice,
+        brand: '', // Não temos no banco
+        category: p.category,
+        type: 'part' as const,
+        stock: p.currentStock,
+        sku: p.sku,
+        // Outros campos não mapeados
+      }));
     }
     return MOCK_SERVICES.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [searchTerm, filterBrand, activeTab]);
+  }, [searchTerm, filterBrand, activeTab, products]);
 
   const addToCart = useCallback((item: SaleItem) => {
     setCart(prev => {
@@ -59,13 +113,10 @@ export const PDV: React.FC = () => {
     });
   }, []);
 
-  const total = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-
   return (
-    <div className={styles.container}>
+    <div className={`${styles.container} ${!isFilterOpen ? styles.sidebarCollapsed : ''}`}>
       
-      {/* SIDEBAR DE FILTROS */}
-      <aside className={`${styles.filterSidebar} ${isFilterOpen ? styles.sidebarOpen : ''}`}>
+      <aside className={`${styles.filterSidebar} ${!isFilterOpen ? styles.hidden : ''}`}>
         <div className={styles.sidebarHeader}>
           <h3>Filtros</h3>
           <button onClick={() => setIsFilterOpen(false)} className={styles.btnClose}>✕</button>
@@ -75,7 +126,7 @@ export const PDV: React.FC = () => {
             <label>Marca</label>
             <select value={filterBrand} onChange={(e) => setFilterBrand(e.target.value)}>
               <option value="">Todas</option>
-              {Array.from(new Set(MOCK_PARTS.map(p => p.brand))).map(b => <option key={b} value={b}>{b}</option>)}
+              {/* Temporariamente sem marcas, pois não temos no banco */}
             </select>
           </div>
           <button className={styles.btnClear} onClick={() => {setFilterBrand(''); setSearchTerm('');}}>Limpar</button>
@@ -85,12 +136,15 @@ export const PDV: React.FC = () => {
       <main className={styles.mainContent}>
         <header className={styles.topHeader}>
           <div className={styles.searchContainer}>
-            <button className={styles.btnFilterToggle} onClick={() => setIsFilterOpen(!isFilterOpen)}>☰ Filtros</button>
+            <button className={styles.btnFilterToggle} onClick={() => setIsFilterOpen(!isFilterOpen)}>
+              {isFilterOpen ? '⇠ Ocultar' : '☰ Filtros'}
+            </button>
             <input 
               className={styles.mainInput}
               placeholder={`Buscar ${activeTab === 'parts' ? 'peças...' : 'serviços...'}`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              disabled={activeTab === 'os'}
             />
           </div>
         </header>
@@ -98,78 +152,197 @@ export const PDV: React.FC = () => {
         <nav className={styles.tabsContainer}>
           <button className={`${styles.tabButton} ${activeTab === 'parts' ? styles.tabButtonActive : ''}`} onClick={() => setActiveTab('parts')}>📦 Peças</button>
           <button className={`${styles.tabButton} ${activeTab === 'services' ? styles.tabButtonActive : ''}`} onClick={() => setActiveTab('services')}>🛠️ Serviços</button>
+          <button className={`${styles.tabButton} ${activeTab === 'os' ? styles.tabButtonActive : ''}`} onClick={() => setActiveTab('os')}>📋 Gerar OS</button>
         </nav>
 
-        <section className={styles.tableSection}>
-          <table className={styles.partsTable}>
-            <thead>
-              <tr>
-                <th>Descrição</th>
-                <th>Marca</th>
-                {activeTab === 'parts' ? <><th>Local</th><th>Estoque</th></> : <th>Categoria</th>}
-                <th>Preço</th>
-                <th style={{ textAlign: 'center' }}>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredData.map(item => (
-                <tr key={item.id}>
-                  <td>
-                    <div className={styles.partPrimary}>
-                      <strong>{item.name}</strong>
-                      {'oemCode' in item && <code>{item.oemCode}</code>}
-                    </div>
-                  </td>
-                  {activeTab === 'parts' ? (
-                    <>
-                      <td className={styles.location}>                      {item.brand}
-</td>
-                      <td className={styles.location}>📍 {(item as any).location}</td>
-                      <td>{(item as any).stock} un</td>
-                    </>
-                  ) : (
-                    <td><span className={styles.compatibilityBadge}>{(item as any).category}</span></td>
-                  )}
-                  <td className={styles.price}>{money.format(item.price)}</td>
-                  <td className={styles.actions}>
-                    {item.type === 'part' && (
-                      <button className={styles.btnInfo} onClick={() => setSelectedPart(item as AutoPart)}>ℹ️</button>
-                    )}
-                    <button className={styles.btnAddToCart} onClick={() => addToCart(item as SaleItem)}>Adicionar</button>
-                  </td>
+        {activeTab === 'os' ? (
+         
+<section className={styles.osSection}>
+  <div className={styles.osForm}>
+    <h2>Configuração da Montagem Hidráulica</h2>
+
+    {/* Identificação da Máquina */}
+    <div className={styles.inputGroupRow}>
+      <div className={styles.inputField}>
+        <label>Equipamento / Frota</label>
+        <input 
+          placeholder="Ex: Escavadeira PC200 / Lote 04" 
+          value={osData.equipment}
+          onChange={e => setOsData({...osData, equipment: e.target.value})}
+        />
+      </div>
+      <div className={styles.inputField}>
+        <label>Local de Aplicação</label>
+        <input 
+          placeholder="Ex: Comando Central / Lança" 
+          value={osData.application}
+          onChange={e => setOsData({...osData, application: e.target.value})}
+        />
+      </div>
+    </div>
+
+    {/* Especificações da Mangueira (Prensagem) */}
+    <div className={styles.specsContainer}>
+      <h4>Especificações de Prensagem</h4>
+      <div className={styles.inputGroupRow}>
+        <div className={styles.inputField}>
+          <label>Bitola (Pol/Dash)</label>
+          <select 
+            value={osData.gauge}
+            onChange={e => setOsData({...osData, gauge: e.target.value})}
+          >
+            <option value="">Selecione...</option>
+            <option value="1/4">1/4" (-04)</option>
+            <option value="3/8">3/8" (-06)</option>
+            <option value="1/2">1/2" (-08)</option>
+            <option value="3/4">3/4" (-12)</option>
+            <option value="1">1" (-16)</option>
+          </select>
+        </div>
+        <div className={styles.inputField}>
+          <label>Nº de Tramas/Reforço</label>
+          <select 
+            value={osData.layers}
+            onChange={e => setOsData({...osData, layers: e.target.value})}
+          >
+            <option value="1">1 Trama (R1)</option>
+            <option value="2">2 Tramas (R2)</option>
+            <option value="4">4 Espirais (4SH/4SP)</option>
+            <option value="6">6 Espirais (R13/R15)</option>
+          </select>
+        </div>
+        <div className={styles.inputField}>
+          <label>Medida Final (mm)</label>
+          <input 
+            type="number"
+            placeholder="Ex: 1250" 
+            value={osData.finalLength}
+            onChange={e => setOsData({...osData, finalLength: e.target.value})}
+          />
+        </div>
+      </div>
+    </div>
+
+    <div className={styles.laborContainer}>
+      <label>Serviço de Prensagem</label>
+      <div className={styles.laborTypeSelector}>
+        <button 
+          className={osData.laborType === 'per_point' ? styles.activeType : ''} 
+          onClick={() => setOsData({...osData, laborType: 'per_point'})}
+        >R$ Por Terminal</button>
+        <button 
+          className={osData.laborType === 'fixed' ? styles.activeType : ''} 
+          onClick={() => setOsData({...osData, laborType: 'fixed'})}
+        >Valor Fixo Montagem</button>
+        <button 
+          className={osData.laborType === 'table' ? styles.activeType : ''} 
+          onClick={() => setOsData({...osData, laborType: 'table'})}
+        >📋 Tabela por Bitola</button>
+      </div>
+
+      <div className={styles.laborInputWrapper}>
+        <div className={styles.inputWithIcon}>
+          <span className={styles.currencyBadge}>R$</span>
+          <input 
+            type="number"
+            placeholder="Custo da prensagem"
+            value={osData.laborValue}
+            onChange={e => setOsData({...osData, laborValue: parseFloat(e.target.value) || 0})}
+          />
+        </div>
+        {osData.laborType === 'per_point' && (
+           <span className={styles.infoHelper}>* Multiplicado pelo número de terminais adicionados.</span>
+        )}
+      </div>
+      
+      <p className={styles.laborPreview}>
+        Subtotal do serviço: <strong>{money.format(calculatedLabor)}</strong>
+      </p>
+    </div>
+
+    <div className={styles.osInstructions}>
+      <button className={styles.btnTabSwitch} onClick={() => setActiveTab('parts')}>
+        ← Adicionar Mangueira e Terminais (Peças)
+      </button>
+    </div>
+  </div>
+</section>
+        ) : (
+          <section className={styles.tableSection}>
+            {loadingProducts && <p>Carregando produtos...</p>}
+            <table className={styles.partsTable}>
+              <thead>
+                <tr>
+                  <th>Descrição</th>
+                  <th>SKU</th>
+                  {activeTab === 'parts' ? <><th>Categoria</th><th>Estoque</th></> : <th>Categoria</th>}
+                  <th>Preço</th>
+                  <th style={{ textAlign: 'center' }}>Ações</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
+              </thead>
+              <tbody>
+                {filteredData.map(item => (
+                  <tr key={item.id}>
+                    <td>
+                      <div className={styles.partPrimary}>
+                        <strong>{item.name}</strong>
+                        {'sku' in item && <code>{item.sku}</code>}
+                      </div>
+                    </td>
+                    <td>{item.brand || '-'}</td>
+                    {activeTab === 'parts' ? (
+                      <>
+                        <td className={styles.location}>{item.category}</td>
+                        <td>{(item as any).stock} {(item as any).unitOfMeasure || 'un'}</td>
+                      </>
+                    ) : (
+                      <td><span className={styles.compatibilityBadge}>{(item as any).category}</span></td>
+                    )}
+                    <td className={styles.price}>{money.format(item.price)}</td>
+                    <td className={styles.actions}>
+                      {/* Removido botão de info por enquanto */}
+                      <button className={styles.btnAddToCart} onClick={() => addToCart(item as SaleItem)}>Adicionar</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        )}
       </main>
 
-      {/* CARRINHO */}
       <aside className={styles.cartAside}>
         <div className={styles.cartHeader}>
-          <h2>Carrinho</h2>
+          <h2>{activeTab === 'os' ? 'Resumo OS' : 'Carrinho'}</h2>
           <span className={styles.itemCount}>{cart.length} itens</span>
         </div>
         <div className={styles.cartList}>
           {cart.map(item => (
             <div key={item.id} className={styles.cartItem}>
-              <span className={`${styles.typeBadge} ${item.type === 'service' ? styles.badgeService : styles.badgePart}`}>
-                {item.type === 'service' ? 'Serviço' : 'Peça'}
-              </span>
               <div className={styles.cartItemInfo}>
                 <strong>{item.name}</strong>
-                <span>{money.format(item.price * item.quantity)}</span>
+                <span>{item.quantity}x {money.format(item.price)}</span>
               </div>
-              <div className={styles.cartItemActions}>
-                <span>Qtd: {item.quantity}</span>
-                <button className={styles.btnRemoveMini} onClick={() => setCart(c => c.filter(i => i.id !== item.id))}>✕</button>
-              </div>
+              <button className={styles.btnRemoveMini} onClick={() => setCart(c => c.filter(i => i.id !== item.id))}>✕</button>
             </div>
           ))}
+          {calculatedLabor > 0 && (
+             <div className={styles.cartItem}>
+                <div className={styles.cartItemInfo}>
+                  <strong>Mão de Obra/Taxa</strong>
+                  <span>{money.format(calculatedLabor)}</span>
+                </div>
+             </div>
+          )}
         </div>
         <div className={styles.cartFooter}>
-          <strong>Total: {money.format(total)}</strong>
-          <button className={styles.btnCheckout} onClick={() => alert('Venda Finalizada')}>Finalizar (F2)</button>
+          <div className={styles.totalRow}>
+            <span>Total:</span>
+            <strong>{money.format(total)}</strong>
+          </div>
+          <button className={styles.btnCheckout} onClick={() => alert('Finalizado')}>
+            {activeTab === 'os' ? 'Gerar Orçamento' : 'Finalizar Venda'}
+          </button>
         </div>
       </aside>
 
