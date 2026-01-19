@@ -10,7 +10,7 @@ import { ActionPopover } from '../../../../components/ui/Popover/ActionPopover';
 import NfeCards from './_components/NfeCards';
 import { checkExistingMappings, checkSupplier, createSupplier, submitStockEntry } from '../../api/productsApi';
 
-// --- Interfaces ---
+// --- Interfaces Atualizadas ---
 interface ProductEntry {
     isMapped: boolean;
     tempId: number;
@@ -18,12 +18,17 @@ interface ProductEntry {
     name: string;
     unitPrice: number;
     quantity: number;
-    unitOfMeasure: string; // ✨ Adicionado
+    unitOfMeasure: string;
     quantityReceived: number;
     difference: number;
     total: number;
     isConfirmed: boolean;
-    unitCostWithTaxes: number;
+    // Campos essenciais para 2026
+    unitCostReal: number;       // (vProd + IPI + ST + Frete + Outros - Desc) / Qtd
+    valorIBS?: number;
+    valorCBS?: number;
+    ncm: string;
+    cest?: string;
     mappedId?: string;
     category?: string;
     mappedData?: any;
@@ -32,24 +37,27 @@ interface ProductEntry {
 interface NfeData {
     invoiceNumber: string;
     supplier: string;
-    supplierFantasyName: string; // ✨ Adicionado
-    supplierCnpj: string; // CNPJ extraído do XML
+    supplierFantasyName: string;
+    supplierCnpj: string;
     entryDate: string;
     accessKey: string;
+    // Totais para conferência
     totalFreight: number;
     totalIpi: number;
+    totalIcmsST: number;        // ✨ Adicionado: Vital para custo de revenda
+    totalIBS?: number;          // ✨ Adicionado: Reforma 2026
+    totalCBS?: number;          // ✨ Adicionado: Reforma 2026
     totalOtherExpenses: number;
     totalNoteValue: number;
     items: ProductEntry[];
 }
 
-
-
 // --- Helpers ---
+
+
 const formatCurrency = (value: number): string =>
     value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-// Formata CNPJ para o padrão 00.000.000/0000-00 quando possível
 const formatCnpj = (cnpj?: string): string => {
     if (!cnpj) return '';
     const digits = cnpj.replace(/\D/g, '');
@@ -57,19 +65,14 @@ const formatCnpj = (cnpj?: string): string => {
     return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
 };
 
-// ✨ Arredonda quantidade baseado na unidade de medida
 const roundQuantityByUnit = (quantity: number, unitOfMeasure: string): number => {
     const unit = (unitOfMeasure || 'UN').toUpperCase();
-    let decimalPlaces = 2; // padrão para MT, KG, LT
-    
-    if (['UN', 'PC', 'CX', 'FD', 'RST'].includes(unit)) {
-        decimalPlaces = 0; // unidades inteiras
-    } else if (['M', 'MT', 'M2', 'M3'].includes(unit)) {
-        decimalPlaces = 2; // metros: 2 casas
-    } else if (['KG', 'L', 'LT', 'ML'].includes(unit)) {
-        decimalPlaces = 3; // peso/volume: 3 casas
-    }
-    
+    let decimalPlaces = 2;
+
+    if (['UN', 'PC', 'CX', 'FD', 'RST'].includes(unit)) decimalPlaces = 0;
+    else if (['M', 'MT', 'M2', 'M3'].includes(unit)) decimalPlaces = 2;
+    else if (['KG', 'L', 'LT', 'ML'].includes(unit)) decimalPlaces = 3;
+
     const factor = Math.pow(10, decimalPlaces);
     return Math.round(quantity * factor) / factor;
 };
@@ -77,59 +80,86 @@ const roundQuantityByUnit = (quantity: number, unitOfMeasure: string): number =>
 const mapNfeDataToEntryForm = (xmlData: NfeDataFromXML): NfeData => {
     const totalFreight = parseFloat(xmlData.valorTotalFrete || '0.00');
     const totalIpi = parseFloat(xmlData.valorTotalIpi || '0.00');
+    const totalIcmsST = parseFloat(xmlData.valorTotalIcmsST || '0.00');
+    const totalIBS = parseFloat(xmlData.valorTotalIBS || '0.00');
+    const totalCBS = parseFloat(xmlData.valorTotalCBS || '0.00');
     const totalOtherExpenses = parseFloat(xmlData.valorOutrasDespesas || '0.00');
 
     const subtotalProducts = xmlData.produtos.reduce((sum, p) => {
-        const total = parseFloat(p.valorTotal || '0.00');
-        return sum + total;
+        return sum + parseFloat(p.valorTotal || '0.00');
     }, 0);
 
     const items: ProductEntry[] = xmlData.produtos.map((produto, index) => {
         const rawQuantity = parseFloat(produto.quantidade || '0.00');
         const unitOfMeasure = produto.unidadeMedida || 'UN';
         const quantity = roundQuantityByUnit(rawQuantity, unitOfMeasure);
-        
-        // ✨ DEBUG: log quantidade para verificar arredondamento
-        console.log(`[ESTOQUE] SKU: ${produto.codigo}, Raw: ${rawQuantity}, Unit: ${unitOfMeasure}, Rounded: ${quantity}`);
-        
+
         const unitPrice = parseFloat(produto.valorUnitario || '0.00');
         const totalProductValue = parseFloat(produto.valorTotal || '0.00');
-        const ratio = subtotalProducts > 0 ? (totalProductValue / subtotalProducts) : 0;
+
+        const ratio = subtotalProducts > 0 ? totalProductValue / subtotalProducts : 0;
+
         const freightRate = totalFreight * ratio;
         const ipiRate = totalIpi * ratio;
+        const icmsSTRate = totalIcmsST * ratio;
         const otherExpensesRate = totalOtherExpenses * ratio;
-        const totalCostItem = totalProductValue + freightRate + ipiRate + otherExpensesRate;
-        const unitCostWithTaxes = quantity > 0 ? (totalCostItem / quantity) : unitPrice;
+
+        const ibsRate = parseFloat(produto.valorIBS || '0.00') * ratio;
+        const cbsRate = parseFloat(produto.valorCBS || '0.00') * ratio;
+
+        const totalCostItem =
+            totalProductValue +
+            freightRate +
+            ipiRate +
+            icmsSTRate +
+            otherExpensesRate;
+
+        const unitCostReal =
+            quantity > 0 ? totalCostItem / quantity : unitPrice;
 
         return {
             tempId: index + 1,
             sku: produto.codigo,
-            mappedId: undefined,
             isMapped: false,
+
             name: produto.descricao,
-            unitOfMeasure: unitOfMeasure,
+            unitOfMeasure,
+
             unitPrice: parseFloat(unitPrice.toFixed(4)),
-            quantity: quantity,
+            quantity,
             quantityReceived: quantity,
             difference: 0,
+
             total: parseFloat(totalProductValue.toFixed(2)),
-            unitCostWithTaxes: parseFloat(unitCostWithTaxes.toFixed(4)),
+            unitCostReal: parseFloat(unitCostReal.toFixed(4)),
+
+            valorIBS: ibsRate,
+            valorCBS: cbsRate,
+
+            ncm: produto.ncm || '',
+            cest: produto.cest,
+
             isConfirmed: false,
             category: '',
-        }; 
+        };
     });
 
     return {
         invoiceNumber: `NF ${xmlData.numero}`,
         supplier: xmlData.emitente?.nome || '',
-        supplierFantasyName: xmlData.emitente?.nomeFantasia || '', // ✨ Capturando do parser
+        supplierFantasyName: xmlData.emitente?.nomeFantasia || '',
         supplierCnpj: xmlData.emitente?.cnpj || '',
-        entryDate: xmlData.dataEmissao ? xmlData.dataEmissao.substring(0, 10) : '',
+        entryDate: xmlData.dataEmissao?.substring(0, 10) || '',
         accessKey: xmlData.chaveAcesso,
+
         totalFreight,
         totalIpi,
+        totalIcmsST,
+        totalIBS,
+        totalCBS,
         totalOtherExpenses,
         totalNoteValue: parseFloat(xmlData.valorTotal || '0.00'),
+
         items,
     };
 };
@@ -171,7 +201,7 @@ const StockEntryForm: React.FC = () => {
     const [invoiceNumber, setInvoiceNumber] = useState('');
     const [supplier, setSupplier] = useState('');
     const [supplierFantasyName, setSupplierFantasyName] = useState(''); // ✨ Novo estado
-    const [supplierCnpj, setSupplierCnpj] = useState('');
+const [supplierCnpj, setSupplierCnpj] = useState<string>('');
     const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
     const [supplierToCreate, setSupplierToCreate] = useState<{ cnpj: string; name: string } | null>(null);
     // Form state for creating supplier
@@ -194,9 +224,22 @@ const StockEntryForm: React.FC = () => {
     const [totalOtherExpenses, setTotalOtherExpenses] = useState(0);
     const [totalNoteValue, setTotalNoteValue] = useState(0);
 
+
+const [totalIcmsST, setTotalIcmsST] = useState(0);
+const [totalIBS, setTotalIBS] = useState<number | undefined>(undefined);
+const [totalCBS, setTotalCBS] = useState<number | undefined>(undefined);
+const [mappedItems, setMappedItems] = useState<Record<number, MappingPayload>>({});
+
+
+
+
+
+
+
+
     // modal mapping
     const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
-    const [itemToMap, setItemToMap] = useState<ProductEntry | null>(null);
+const [itemToMap, setItemToMap] = useState<ProductEntry | null>(null);
     const subtotal = useMemo(() => items.reduce((sum, item) => sum + item.total, 0), [items]);
     const totalItems = useMemo(() => items.reduce((sum, item) => sum + item.quantityReceived, 0), [items]);
     const hasUnmappedItems = items.some(item => !item.mappedId);
@@ -247,8 +290,8 @@ const StockEntryForm: React.FC = () => {
         }
     };
 
-    // Upload XML
-    const handleXmlUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+   // Upload XML
+const handleXmlUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -258,62 +301,92 @@ const StockEntryForm: React.FC = () => {
     }
 
     const reader = new FileReader();
-    // Tornamos a função assíncrona para usar o await da API
+
     reader.onload = async (e) => {
         try {
             const xmlContent = e.target?.result as string;
+
             const rawXmlData = parseNfeXmlToData(xmlContent);
-            if (!rawXmlData) throw new Error('Falha ao extrair dados do XML.');
-            
+            if (!rawXmlData) {
+                throw new Error('Falha ao extrair dados do XML.');
+            }
+
             const xmlData = mapNfeDataToEntryForm(rawXmlData);
 
-            // --- INÍCIO DA RECONCILIAÇÃO AUTOMÁTICA ---
-            
-            // 1. Pegamos o CNPJ do emitente (vindo do XML) e o formatamos para o padrão
-            const supplierCnpjRaw = (rawXmlData.emitente && (rawXmlData.emitente.cnpj || (rawXmlData as any).emitenteCnpj)) || xmlData.supplierCnpj || '';
+            // =====================================================
+            // 1️⃣ CNPJ DO FORNECEDOR
+            // =====================================================
+            const supplierCnpjRaw =
+                (rawXmlData.emitente &&
+                    (rawXmlData.emitente.cnpj ||
+                        (rawXmlData as any).emitenteCnpj)) ||
+                xmlData.supplierCnpj ||
+                '';
+
             const formattedSupplierCnpj = formatCnpj(supplierCnpjRaw);
             setSupplierCnpj(formattedSupplierCnpj);
 
-
-
-                    // Popula cabeçalho imediatamente (o usuário deve ver os dados mesmo antes da sincronização)
+            // =====================================================
+            // 2️⃣ POPULA CABEÇALHO DA NOTA (IMEDIATO)
+            // =====================================================
             setInvoiceNumber(xmlData.invoiceNumber);
             setSupplier(xmlData.supplier);
-            setSupplierFantasyName(xmlData.supplierFantasyName); // ✨ Atualiza o nome fantasia
+            setSupplierFantasyName(xmlData.supplierFantasyName);
             setEntryDate(xmlData.entryDate);
             setAccessKey(xmlData.accessKey);
+
+            // 👉 Totais comerciais
             setTotalFreight(xmlData.totalFreight);
             setTotalIpi(xmlData.totalIpi);
             setTotalOtherExpenses(xmlData.totalOtherExpenses);
             setTotalNoteValue(xmlData.totalNoteValue);
 
+            // 👉 Totais fiscais (✨ AQUI ESTAVA O PROBLEMA)
+            setTotalIcmsST(xmlData.totalIcmsST);
+            setTotalIBS(xmlData.totalIBS);
+            setTotalCBS(xmlData.totalCBS);
 
-            // 2. Coletamos todos os SKUs dos itens da nota
-            const skusDaNota = xmlData.items.map((i: any) => i.sku);
+            // =====================================================
+            // 3️⃣ ITENS DA NOTA
+            // =====================================================
+            const skusDaNota = xmlData.items.map(i => i.sku);
 
-            // 2b. Verificamos se o fornecedor já existe no sistema
+            // =====================================================
+            // 4️⃣ VERIFICA SE FORNECEDOR EXISTE
+            // =====================================================
             setIsSupplierChecking(true);
+
             try {
                 const supplierCheck = await checkSupplier(formattedSupplierCnpj);
+
                 if (!supplierCheck.exists) {
                     setSupplierExists(false);
-                    // Abrimos um modal sugerindo criar o fornecedor
-                    setSupplierToCreate({ cnpj: formattedSupplierCnpj, name: xmlData.supplier || '' });
-                    // preenche o campo do formulário com o nome extraído da NF
+
+                    setSupplierToCreate({
+                        cnpj: formattedSupplierCnpj,
+                        name: xmlData.supplier || '',
+                    });
+
                     setSupplierCreationName(xmlData.supplier || '');
-                    // mantém os dados temporários para sincronização após criação
+
+                    // Mantém dados temporários
                     setPendingXmlData(xmlData);
                     setPendingSkus(skusDaNota);
+
                     setItems(xmlData.items);
-                    setSelectedPendingIds(new Set(xmlData.items.map((i: any) => i.tempId)));
+                    setSelectedPendingIds(
+                        new Set(xmlData.items.map(i => i.tempId))
+                    );
+
                     setIsSupplierModalOpen(true);
 
-                    // IMPORTANTE: NÃO podemos prosseguir com a sincronização até que o fornecedor seja criado
+                    // ⛔ Não sincroniza enquanto fornecedor não existir
                     return;
                 } else {
                     setSupplierExists(true);
-                    // Se existir, podemos opcionalmente armazenar o nome retornado
-                    setSupplier(supplierCheck.supplier?.name || xmlData.supplier || '');
+                    setSupplier(
+                        supplierCheck.supplier?.name || xmlData.supplier || ''
+                    );
                 }
             } catch (err) {
                 console.error('Erro ao checar fornecedor:', err);
@@ -322,15 +395,26 @@ const StockEntryForm: React.FC = () => {
                 setIsSupplierChecking(false);
             }
 
-            // Se chegamos aqui, o fornecedor existe — vamos sincronizar
+            // =====================================================
+            // 5️⃣ SINCRONIZA MAPEAMENTOS
+            // =====================================================
             await performMappingSync(formattedSupplierCnpj, xmlData);
 
         } catch (error) {
             console.error('Erro ao processar XML:', error);
-            alert('Erro ao processar o arquivo XML. Detalhes: ' + (error instanceof Error ? error.message : 'Erro desconhecido'));
+            alert(
+                'Erro ao processar o arquivo XML. Detalhes: ' +
+                    (error instanceof Error
+                        ? error.message
+                        : 'Erro desconhecido')
+            );
         }
     };
-    reader.onerror = () => { alert('Erro ao ler o arquivo.'); };
+
+    reader.onerror = () => {
+        alert('Erro ao ler o arquivo.');
+    };
+
     reader.readAsText(file);
 };
 
@@ -426,18 +510,24 @@ const StockEntryForm: React.FC = () => {
     };
 
     const handleMapProduct = (tempId: number) => {
-        const item = items.find(i => i.tempId === tempId);
-        if (!item) return;
-        setItemToMap(item);
-        setIsMappingModalOpen(true);
-    };
+    const item = items.find(i => i.tempId === tempId);
+    if (!item) return;
+    setItemToMap(item);
+};
 
     const handleModalMap = useCallback((tempId: number, data: MappingPayload) => {
+        setMappedItems(prev => ({
+    ...prev,
+    [tempId]: data
+}));
+
     setItems(prev => prev.map(it => {
         if (it.tempId === tempId) {
             return {
                 ...it,
                 // O mappedId é o ID oficial que veio do sistema/banco
+                    isMapped: true, // ✅ FALTAVA
+
                 mappedId: data.mapped.id, 
                 
                 // Atualizamos a categoria com a que foi selecionada no modal
@@ -465,8 +555,14 @@ const StockEntryForm: React.FC = () => {
     console.log(`Produto ${tempId} mapeado com sucesso para o ID: ${data.mapped.id}`);
 }, []);
 
-    const closeModal = () => { setIsMappingModalOpen(false); setItemToMap(null); };
 
+const openMappingModal = (item: ProductEntry) => {
+    setItemToMap(item);
+};
+
+const closeModal = () => {
+    setItemToMap(null);
+};
     // Seleção por linha (isPending = true para pendentes)
     const toggleSelectItem = (tempId: number, isPending: boolean) => {
         if (isPending) {
@@ -675,25 +771,41 @@ const StockEntryForm: React.FC = () => {
         try {
             // Monta o payload conforme esperado pelo backend
             const payload = {
-                invoiceNumber: invoiceNumber.replace('NF ', ''), // Remove o prefixo "NF "
-                accessKey,
-                entryDate,
-                supplierCnpj,
-                supplierName: supplier,
-                totalFreight,
-                totalIpi,
-                totalOtherExpenses,
-                totalNoteValue,
-                items: items
-                    .filter(item => item.isConfirmed) // Apenas itens conferidos
-                    .map(item => ({
-                        codigoInterno: item.mappedId!,
-                        skuFornecedor: item.sku,
-                        quantidadeRecebida: item.quantityReceived,
-                        unidade: item.unitOfMeasure,
-                        custoUnitario: item.unitCostWithTaxes
-                    }))
-            };
+    invoiceNumber: invoiceNumber.replace('NF ', ''),
+    accessKey,
+    entryDate,
+    supplierCnpj,
+    supplierName: supplier,
+
+    totalFreight,
+    totalIpi,
+    totalIcmsST,
+    totalIBS,
+    totalCBS,
+    totalOtherExpenses,
+    totalNoteValue,
+
+    items: items
+        .filter(item => item.isConfirmed)
+        .map(item => ({
+            codigoInterno: item.mappedId!,
+            skuFornecedor: item.sku,
+            quantidadeRecebida: item.quantityReceived,
+            unidade: item.unitOfMeasure,
+
+            custoUnitario: item.unitCostReal,
+
+            impostos: {
+                ipi: totalIpi,
+                icmsST: totalIcmsST,
+                ibs: item.valorIBS,
+                cbs: item.valorCBS,
+            },
+
+            ncm: item.ncm,
+            cest: item.cest,
+        }))
+};
 
             // ✨ DEBUG: Log do payload sendo enviado
             console.log('[PAYLOAD ENVIADO] Total de itens:', payload.items.length);
@@ -754,30 +866,44 @@ const StockEntryForm: React.FC = () => {
             </div>
 
             <NfeCards
-                data={{
-                    invoiceNumber,
-                    accessKey,
-                    entryDate,
-                    supplier,
-                    supplierCnpj,
-                    supplierFantasyName, // ✨ Passando o estado que criamos
-                    totalIpi,
-                    totalFreight,
-                    totalOtherExpenses,
-                    subtotal,
-                    totalNoteValue
-                }}
-                supplierStatus={{
-                    exists: supplierExists,
-                    isChecking: isSupplierChecking
-                }}
-                actions={{
-                    setEntryDate,
-                    onCreateSupplier: () => setIsSupplierModalOpen(true),
-                    formatCurrency
-                }}
-                styles={styles}
-            />
+    data={{
+        ide: {
+            numero: invoiceNumber.replace('NF ', ''),
+            serie: '', // pode vir do XML futuramente
+            modelo: '55', // NF-e padrão
+            naturezaOperacao: '', // pode vir do XML depois
+            dataEmissao: entryDate,
+            ambiente: 'Produção',
+            chaveAcesso: accessKey,
+        },
+        emitente: {
+            razaoSocial: supplier,
+            nomeFantasia: supplierFantasyName,
+            cnpj: supplierCnpj,
+        },
+        totais: {
+            vProd: subtotal,
+            vIPI: totalIpi,
+            vFrete: totalFreight,
+            vOutro: totalOtherExpenses,
+            vDesc: 0,
+            vICMS: 0,
+            vICMSST: totalIcmsST,
+            vNF: totalNoteValue,
+            vTotTrib: (totalIpi + totalIcmsST + (totalIBS || 0) + (totalCBS || 0)),
+        },
+    }}
+    supplierStatus={{
+        exists: supplierExists,
+        isChecking: isSupplierChecking,
+    }}
+    actions={{
+        setEntryDate,
+        onCreateSupplier: () => setIsSupplierModalOpen(true),
+        formatCurrency,
+    }}
+    styles={styles}
+/>
 
             {/* Restante do seu código (Tabelas de itens, etc) */}
 
@@ -880,14 +1006,14 @@ const StockEntryForm: React.FC = () => {
                 </div>
             </FlexGridContainer>
 
-            {isMappingModalOpen && itemToMap && (
-                <MappingModal
-                    item={itemToMap}
-                    onClose={closeModal}
-                    onMap={handleModalMap} // Passa a função que agora entende o objeto
-                    supplierCnpj={supplierCnpj}
-                />
-            )}
+            {itemToMap && (
+    <MappingModal
+        item={itemToMap}
+        supplierCnpj={supplierCnpj}
+        onClose={() => setItemToMap(null)}
+        onMap={handleModalMap}
+    />
+)}
 
             {isSupplierModalOpen && supplierToCreate && (
                 <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.4)' }}>

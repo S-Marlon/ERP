@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { searchProducts, fetchCategoriesRaw, saveProductMapping } from '../../../api/productsApi';
 import CategoryTree from "../../../Components/CategoryTree";
 import Swal from 'sweetalert2';
@@ -8,19 +8,34 @@ import Badge from "../../../../../components/ui/Badge/Badge";
 import FlexGridContainer from "../../../../../components/Layout/FlexGridContainer/FlexGridContainer";
 import Button from "../../../../../components/ui/Button/Button";
 
-// --- Interfaces ---
+
+
+/* ======================================================
+   INTERFACES
+====================================================== */
+
 interface ProductEntry {
-    unitOfMeasure: string;
     tempId: number;
-    sku: string; // SKU do Fornecedor (da NF)
-    name: string; // Nome do Fornecedor (da NF)
-    unitCostWithTaxes: number; // Custo Unitário da NF
+    sku: string;
+    name: string;
+    unitOfMeasure: string;
+
+    unitCost: number;
+    unitCostWithRateio?: number;
+
+    ipiValue?: number;
+    icmsSTValue?: number;
+    valorIBS?: number;
+    valorCBS?: number;
+
+    individualUnit?: string;
+unitsPerPackage?: number;
+
 }
 
 interface InternalProductData {
     id: string;
     name: string;
-    lastCost: number;
     category: string;
     unitOfMeasure: string;
 }
@@ -31,7 +46,6 @@ interface CategoryNode {
     parentId?: string;
 }
 
-// Interface de saída para o componente pai
 export interface MappingPayload {
     original: {
         sku: string;
@@ -39,36 +53,46 @@ export interface MappingPayload {
         unitCost: number;
     };
     mapped: {
-        id: string;
-        name: string;
-        category: string;
-        unitOfMeasure: string;
+         id: string;
+  name: string;
+  category: string;
+  unitOfMeasure: string;
+  individualUnit?: string;
+  unitsPerPackage?: number;
+
     };
     supplierCnpj: string;
 }
 
 interface MappingModalProps {
     item: ProductEntry;
-    supplierCnpj: string; // <--- ADICIONE ESTO
+    supplierCnpj: string;
     onMap: (tempId: number, data: MappingPayload) => void;
     onClose: () => void;
 }
 
-// --- Estilos Auxiliares para Tabelas do Swal ---
-const tableThStyle = 'border: 1px solid #ddd; padding: 8px; text-align: left; background-color: #f2f2f2; color: black; font-size: 0.85rem;';
-const tableCellStyle = 'border: 1px solid #ddd; padding: 8px; text-align: left; color: #333; font-size: 0.85rem;';
-const tableHeadStyleNF = 'background-color: #5a67d8; color: white;'; 
-const tableHeadStyleSys = 'background-color: #38a169; color: white;';
 
-// --- Hook de Debounce ---
-const useDebounce = (value: string, delay: number) => {
-    const [debouncedValue, setDebouncedValue] = useState(value);
-    useEffect(() => {
-        const handler = setTimeout(() => setDebouncedValue(value), delay);
-        return () => clearTimeout(handler);
-    }, [value, delay]);
-    return debouncedValue;
-};
+/* ======================================================
+   Estilos
+====================================================== */
+
+// const tableThStyle = 'border: 1px solid #ddd; padding: 8px; text-align: left; background-color: #f2f2f2; color: black; font-size: 0.85rem;';
+// const tableCellStyle = 'border: 1px solid #ddd; padding: 8px; text-align: left; color: #333; font-size: 0.85rem;';
+// const tableHeadStyleNF = 'background-color: #5a67d8; color: white;'; 
+// const tableHeadStyleSys = 'background-color: #38a169; color: white;';
+
+
+const PACKAGING_UNITS = [
+  "CX", "CXA", "CAIXA",
+  "PCT", "PACOTE",
+  "FD", "FARDO",
+  "KIT"
+];
+
+
+
+
+
 
 // --- Estilos do Modal Principal ---
 const modalStyles: { [key: string]: React.CSSProperties } = {
@@ -115,238 +139,167 @@ const modalStyles: { [key: string]: React.CSSProperties } = {
     }
 };
 
-const ProductMappingModal: React.FC<MappingModalProps> = ({ item, onMap, onClose, supplierCnpj }) => {
-    // ESTADOS
-    const [searchTerm, setSearchTerm] = useState(item.sku || '');
-    const [selectedProduct, setSelectedProduct] = useState<InternalProductData | null>(null);
-    const [results, setResults] = useState<InternalProductData[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [isCreatingNew, setIsCreatingNew] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
+/* ======================================================
+   COMPONENTE
+====================================================== */
 
-    // ESTADOS NOVO PRODUTO
-    const [newProductId, setNewProductId] = useState('');
+const ProductMappingModal: React.FC<MappingModalProps> = ({
+    item,
+    supplierCnpj,
+    onMap,
+    onClose
+}) => {
+
+    /* ======================================================
+       ESTADOS
+    ====================================================== */
+
+    const [isGeneric, setIsGeneric] = useState(true);
+    const [newProductId, setNewProductId] = useState("");
     const [newProductName, setNewProductName] = useState(item.name);
-    const [newProductUnit, setNewProductUnit] = useState(item.unitOfMeasure || 'UN');
+    const [newProductUnit, setNewProductUnit] = useState(item.unitOfMeasure || "UN");
+
     const [newProductCategory, setNewProductCategory] = useState<string | null>(null);
     const [selectedCategoryShortName, setSelectedCategoryShortName] = useState<string | null>(null);
-    const [idExistsError, setIdExistsError] = useState(false);
 
-    // ESTADOS CATEGORIAS
-    const [availableCats, setAvailableCats] = useState<CategoryNode[]>([]);
-    const [isInputtingNewCategory, setIsInputtingNewCategory] = useState(false);
-    const [newCategoryName, setNewCategoryName] = useState('');
-    const [selectedParentId, setSelectedParentId] = useState<string | undefined>(undefined);
-    
-    const [searchError, setSearchError] = useState<string | null>(null);
-    const [categoriesLoading, setCategoriesLoading] = useState(false);
+    const [inconsistencyError, setInconsistencyError] = useState<string | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
 
-const [isGeneric, setIsGeneric] = useState<boolean>(true);
-const [inconsistencyError, setInconsistencyError] = useState<string | null>(null);
-
-// Sincroniza o newProductId com item.sku quando em modo específico, ou limpa quando genérico
-useEffect(() => {
-    if (!isGeneric) {
-        // Modo ESPECÍFICO: o código deve ser o da NF
-        setNewProductId(item.sku);
-    } else {
-        // Modo GENÉRICO: limpa o campo para o usuário digitar um novo código
-        setNewProductId('');
-    }
-}, [isGeneric, item.sku]);
+    const [individualUnit, setIndividualUnit] = useState<string>("");
+const [unitsPerPackage, setUnitsPerPackage] = useState<number | null>(null);
 
 
-// --- LÓGICA DE VALIDAÇÃO (TRADUTOR) ---
-    const identifyProductType = (code: string): 'GENERIC' | 'SPECIFIC' => {
-        const cleanCode = code.trim();
-        const isEan = /^\d{13}$/.test(cleanCode); // Apenas números, 13 dígitos
-        return isEan ? 'SPECIFIC' : 'GENERIC';
-    };
+
+    const isPackagingUnit = useMemo(() => {
+  return PACKAGING_UNITS.includes(
+    item.unitOfMeasure?.toUpperCase()
+  );
+}, [item.unitOfMeasure]);
+
+    /* ======================================================
+       CÁLCULO FISCAL CENTRALIZADO (CRÍTICO)
+    ====================================================== */
+
+    const unitCostWithTaxes = useMemo(() => {
+        return (
+            (item.unitCostWithRateio ?? item.unitCost ?? 0) +
+            (item.ipiValue ?? 0) +
+            (item.icmsSTValue ?? 0) +
+            (item.valorIBS ?? 0) +
+            (item.valorCBS ?? 0)
+        );
+    }, [item]);
+
+    /* ======================================================
+       SINCRONIZA SKU (GENÉRICO vs ESPECÍFICO)
+    ====================================================== */
 
     useEffect(() => {
-        if (!newProductId) { setInconsistencyError(null); return; }
-        
-        // Regra de Negócio:
-        // - ESPECÍFICO: o código deve ser o da NF (item.sku)
-        // - GENÉRICO: o código não pode ser idêntico ao da NF
-        
-        if (isGeneric) {
-            // Modo GENÉRICO: validar que NÃO seja igual ao SKU da NF
-            if (newProductId === item.sku) {
-                setInconsistencyError('Atenção: Código genérico não pode ser idêntico ao SKU da nota fiscal.');
-            } else {
-                setInconsistencyError(null);
-            }
+        if (!isGeneric) {
+            setNewProductId(item.sku);
         } else {
-            // Modo ESPECÍFICO: validar que seja igual ao SKU da NF
-            if (newProductId !== item.sku) {
-                setInconsistencyError('Atenção: Em modo específico, o código deve ser o da nota fiscal.');
-            } else {
-                setInconsistencyError(null);
-            }
+            setNewProductId("");
         }
+    }, [isGeneric, item.sku]);
+
+    /* ======================================================
+       VALIDAÇÃO DE CONSISTÊNCIA
+    ====================================================== */
+
+    useEffect(() => {
+        if (!newProductId) {
+            setInconsistencyError(null);
+            return;
+        }
+
+        if (isGeneric && newProductId === item.sku) {
+            setInconsistencyError(
+                "Código genérico não pode ser igual ao SKU da NF."
+            );
+            return;
+        }
+
+        if (!isGeneric && newProductId !== item.sku) {
+            setInconsistencyError(
+                "Em modo específico, o código deve ser o SKU da NF."
+            );
+            return;
+        }
+
+        setInconsistencyError(null);
     }, [newProductId, isGeneric, item.sku]);
 
-    // --- LÓGICA DE CONFIRMAÇÃO SWAL ---
+    /* ======================================================
+       CONFIRMAÇÃO E SALVAMENTO
+    ====================================================== */
+
     const confirmAndSend = async (payload: MappingPayload) => {
         const result = await Swal.fire({
-            title: 'Confirmar Mapeamento',
-            icon: 'info',
-            width: 850,
-            html: `
-                <div style="text-align: left; font-family: sans-serif;">
-                    <p style="font-weight: bold; color: #5a67d8; margin-bottom: 5px;">📄 ITEM DA NOTA FISCAL (ORIGEM)</p>
-                    <table style="width:100%; border-collapse: collapse; margin-bottom: 20px;">
-                        <thead>
-                            <tr style="${tableHeadStyleNF}">
-                                <th style="${tableThStyle}">Nome Item NF</th>
-                                <th style="${tableThStyle}">SKU Fornecedor</th>
-                                <th style="${tableThStyle}">Custo Unit.</th>
-                                <th style="${tableThStyle}">UoM</th>
-
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td style="${tableCellStyle}">${payload.original.name}</td>
-                                <td style="${tableCellStyle}">${payload.original.sku}</td>
-                                <td style="${tableCellStyle}">R$ ${payload.original.unitCost.toFixed(4)}</td>
-                                <td style="${tableCellStyle}">${item.unitOfMeasure}</td>
-
-                            </tr>
-                        </tbody>
-                    </table>
-
-                    <p style="font-weight: bold; color: #38a169; margin-bottom: 5px;">⚙️ PRODUTO NO SISTEMA (DESTINO)</p>
-                    <table style="width:100%; border-collapse: collapse;">
-                        <thead>
-                            <tr style="${tableHeadStyleSys}">
-                                <th style="${tableThStyle}">Nome Padrão</th>
-                                <th style="${tableThStyle}">descrição Padrão</th>
-                                <th style="${tableThStyle}">ID Interno</th>
-                                <th style="${tableThStyle}">Categoria</th>
-                                <th style="${tableThStyle}">Unid.</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td style="${tableCellStyle}">${payload.mapped.name}</td>
-                                <td style="${tableCellStyle}">${payload.mapped.description}</td>
-                                <td style="${tableCellStyle}">${payload.mapped.id}</td>
-                                <td style="${tableCellStyle}">${payload.mapped.category}</td>
-                                <td style="${tableCellStyle}">${payload.mapped.unitOfMeasure}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <br>
-                    <p style="text-align: center; font-weight: bold; font-size: 1.1rem;">Deseja confirmar este vínculo?</p>
-                </div>
-            `,
+            title: "Confirmar Mapeamento",
+            icon: "info",
+            width: 820,
             showCancelButton: true,
-            confirmButtonText: '✅ Salvar Mapeamento',
-            cancelButtonText: '↩️ Revisar',
-            confirmButtonColor: '#38a169',
-            cancelButtonColor: '#5a67d8',
-            showLoaderOnConfirm: true, // Habilita o loader no botão do Swal
-            preConfirm: async () => {       
-            
+            confirmButtonText: "Salvar",
+            cancelButtonText: "Revisar",
+            confirmButtonColor: "#16a34a",
+            preConfirm: async () => {
                 try {
-                // Aqui chamamos a API que criamos no productsApi.ts
-                const response = await saveProductMapping(payload);
-                return response; 
-            } catch (error: any) {
-                Swal.showValidationMessage(`Erro no servidor: ${error.message}`);
+                    return await saveProductMapping(payload);
+                } catch (err: any) {
+                    Swal.showValidationMessage(err.message);
+                }
             }
-        
-            
-            },
-            allowOutsideClick: () => !Swal.isLoading()
         });
 
         if (result.isConfirmed) {
-            // 2. Notifica o componente pai para atualizar a UI local
             onMap(item.tempId, payload);
-            
-            // 3. Feedback de sucesso e fecha
             await Swal.fire({
-                icon: 'success',
-                title: 'Sucesso!',
-                text: 'Mapeamento salvo e vinculado com sucesso.',
-                timer: 1500,
+                icon: "success",
+                title: "Mapeamento salvo!",
+                timer: 1400,
                 showConfirmButton: false
             });
-            
             onClose();
         }
     };
 
-    // --- HANDLERS ---
-   const handleConfirmExisting = useCallback(() => {
-    if (!selectedProduct) return;
-    confirmAndSend({
-        original: { sku: item.sku, name: item.name, unitCost: item.unitCostWithTaxes, description: item.name },
-        mapped: { 
-            id: selectedProduct.id, 
-            name: selectedProduct.name, 
-            category: selectedProduct.category, 
-            unitOfMeasure: selectedProduct.unitOfMeasure,
-            description: selectedProduct.name
-        },
-        supplierCnpj: supplierCnpj
-    });
-}, [selectedProduct, item, supplierCnpj]); // Adicione supplierCnpj às dependências
+    /* ======================================================
+       FINALIZAR NOVO PRODUTO
+    ====================================================== */
 
+    const handleFinalizeNewProductCreation = useCallback(() => {
+        if (inconsistencyError) return;
 
-    const handleFinalizeNewProductCreation = useCallback(async () => {
-    if (idExistsError || !newProductId.trim() || !newProductName.trim()) {
-        alert('Preencha os campos obrigatórios corretamente.');
-        return;
-    }
+        const category =
+            selectedCategoryShortName ||
+            newProductCategory ||
+            "Sem categoria";
 
-        const finalCategory = selectedCategoryShortName || newProductCategory || '';
-    confirmAndSend({
-        original: { sku: item.sku, name: item.name, unitCost: item.unitCostWithTaxes, description: item.name },
-        mapped: { 
-            id: newProductId.trim(), 
-            name: newProductName.trim(), 
-            category: finalCategory, 
-            unitOfMeasure: newProductUnit,
-            description: newProductName.trim()
-        },
-        supplierCnpj: supplierCnpj
-    });
-}, [newProductId, newProductName, newProductUnit, newProductCategory, selectedCategoryShortName, idExistsError, item, supplierCnpj]);
-
-    // --- BUSCA E CATEGORIAS (MANTIDOS DO ORIGINAL) ---
-    const loadCategories = useCallback(async () => {
-        setCategoriesLoading(true);
-        try {
-            const raw = await fetchCategoriesRaw();
-            const parsed = JSON.parse(raw.body);
-            const nodes = parsed.map((fullName: string) => {
-                const parts = fullName.split(' / ');
-                return { name: parts[parts.length - 1], fullName, parentId: parts.length > 1 ? parts[0] : undefined };
-            });
-            setAvailableCats(nodes);
-            if (!newProductCategory && nodes.length > 0) setNewProductCategory(nodes[0].fullName);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setCategoriesLoading(false);
-        }
-    }, [newProductCategory]);
-
-    useEffect(() => { loadCategories(); }, [loadCategories]);
-
-    const debouncedSearch = useDebounce(searchTerm, 400);
-    useEffect(() => {
-        if (!debouncedSearch) return;
-        setIsLoading(true);
-        searchProducts(debouncedSearch)
-            .then(res => setResults(Array.isArray(res) ? res : []))
-            .finally(() => setIsLoading(false));
-    }, [debouncedSearch]);
-
+        confirmAndSend({
+            original: {
+                sku: item.sku,
+                name: item.name,
+                unitCost: unitCostWithTaxes
+            },
+            mapped: {
+                id: newProductId.trim(),
+                name: newProductName.trim(),
+                category,
+                unitOfMeasure: newProductUnit
+            },
+            supplierCnpj
+        });
+    }, [
+        inconsistencyError,
+        item,
+        newProductId,
+        newProductName,
+        newProductUnit,
+        newProductCategory,
+        selectedCategoryShortName,
+        supplierCnpj,
+        unitCostWithTaxes
+    ]);
     // --- RENDERS ---
     const renderNewProductForm = () => (
         <div style={modalStyles.contentGrid}>
@@ -360,8 +313,37 @@ useEffect(() => {
                 
                 <FormControl label="SKU Original" readOnlyDisplay value={item.sku} />
                 <FormControl label="Nome na NF" readOnlyDisplay value={item.name} />
-                <FormControl label="Custo Unitário" readOnlyDisplay value={`R$ ${item.unitCostWithTaxes.toFixed(4)}`} />
+                <FormControl label="Custo Unitário" readOnlyDisplay value={`R$ ${unitCostWithTaxes.toFixed(4)}`} />
                 <FormControl label="Unidade de Medida" readOnlyDisplay value={item.unitOfMeasure} />
+
+                {isPackagingUnit && (
+  <>
+    <FormControl
+      label="Unidade do Item Individual"
+      type="select"
+      value={individualUnit}
+      onChange={(e: any) => setIndividualUnit(e.target.value)}
+      options={[
+        { label: "Selecione", value: "" },
+        { label: "Unidade (UN)", value: "UN" },
+        { label: "Quilo (KG)", value: "KG" },
+        { label: "Metro (M)", value: "M" },
+        { label: "Litro (L)", value: "L" },
+      ]}
+    />
+
+    <FormControl
+      label="Quantidade por Embalagem"
+      type="number"
+      min={1}
+      value={unitsPerPackage ?? ""}
+      onChange={(e: any) =>
+        setUnitsPerPackage(Number(e.target.value))
+      }
+      placeholder="Ex: 12"
+    />
+  </>
+)}
 
                 
                 
@@ -497,3 +479,11 @@ export default ProductMappingModal;
 // depois implementar o fluxo de criação de nova categoria hierárquica
 
 // seletora de quantidade precisa ter medida (PC, UN, KG, LT, MT) e não só número, junto de padronização de acordo com a NF, ex: PC numero inteiros, MT com 2 casas decimais, KG com 3 casas decimais, LT com 3 casas decimais
+
+// se Unidade de Medida for igual a cx (caixa), implementar lógica para quando adicionar ao estoque, perguntar quantas unidades vêm na caixa, e assim calcular o estoque corretamente
+
+// implementar lógica para quando o usuário tentar criar um código que já existe no sistema, avisar que já existe e pedir para corrigir
+
+// identificar Cód. EAN (13 dígitos numéricos) vs Código Genérico (outros formatos)
+
+// melhorar a usabilidade da árvore de categorias, talvez com busca, e com scroll melhorado
