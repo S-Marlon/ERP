@@ -5,32 +5,30 @@ import FlexGridContainer from '../../../../../components/Layout/FlexGridContaine
 import Card from '../../../../../components/ui/Card/Card';
 import Badge from '../../../../../components/ui/Badge/Badge';
 
+// --- Interface Atualizada conforme o novo nfeParser.ts ---
 interface NfeCardsProps {
     data: {
-        ide: {
-            numero: string;
-            serie: string;
-            modelo: string;
-            naturezaOperacao: string;
-            dataEmissao: string;
-            ambiente: string;
-            chaveAcesso: string;
-        };
+        chaveAcesso: string;
+        numero: string;
+        serie: string;
+        dataEmissao: string;
         emitente: {
-            razaoSocial: string;
-            nomeFantasia?: string;
             cnpj: string;
+            nome: string;
+            nomeFantasia?: string;
         };
         totais: {
-            vProd: number;
-            vIPI: number;
-            vFrete: number;
-            vOutro: number;
-            vDesc: number;
-            vICMS: number;
-            vICMSST: number;
-            vNF: number;
-            vTotTrib: number;
+            valorTotalProdutos: number;
+            valorTotalIpi: number;
+            valorTotalFrete: number;
+            valorOutrasDespesas: number;
+            valorTotalDesconto: number;
+            valorTotalIcms: number;
+            valorTotalIcmsST: number;
+            valorTotalIBS?: number; // Reforma 2026
+            valorTotalCBS?: number; // Reforma 2026
+            valorTotalNf: number;
+            valorTotalTributos: number;
         };
     };
     supplierStatus: {
@@ -38,7 +36,6 @@ interface NfeCardsProps {
         isChecking: boolean;
     };
     actions: {
-        setEntryDate: (value: string) => void;
         onCreateSupplier: () => void;
         formatCurrency: (value: number) => string;
     };
@@ -52,130 +49,123 @@ const NfeCards: React.FC<NfeCardsProps> = ({
     styles,
 }) => {
     const { formatCurrency } = actions;
-    const { ide, emitente, totais } = data;
+    const { totais, emitente } = data;
 
     return (
-        <FlexGridContainer layout="grid"  template="2fr 1fr 1fr">
-
-            {/* 1. Identificação da Nota Fiscal */}
-            <Card variant="default" padding="20px">
-                <FlexGridContainer layout="grid" template="2fr 1fr " gap="10px">
-                    <Typography variant="h2">1. Identificação da Nota Fiscal</Typography>
-
-                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                        {supplierStatus.isChecking && <Badge color="paper">Checando fornecedor...</Badge>}
-                        {supplierStatus.exists === true && <Badge color="success">Fornecedor cadastrado</Badge>}
+        <FlexGridContainer layout="grid" template="1fr" gap="20px">
+            
+            {/* 1. Identificação e Emitente (Cards Lado a Lado) */}
+            <FlexGridContainer layout="grid" template="1.5fr 1fr 1fr" gap="20px">
+                
+                {/* Identificação da NF */}
+                <Card variant="default" padding="20px">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
+                        <Typography variant="h2">1. Identificação da NF</Typography>
+                        {supplierStatus.isChecking && <Badge color="paper">Verificando...</Badge>}
+                        {supplierStatus.exists === true && <Badge color="success">Fornecedor Ativo</Badge>}
                         {supplierStatus.exists === false && (
-                            <div style={{ display: 'flex', gap: 8 }}>
-                                <Badge color="warning">Fornecedor não encontrado</Badge>
-                                <button
-                                    onClick={actions.onCreateSupplier}
-                                    style={{
-                                        padding: '6px 10px',
-                                        backgroundColor: '#10b981',
-                                        color: '#fff',
-                                        borderRadius: 6,
-                                        border: 'none',
-                                        cursor: 'pointer',
-                                    }}
-                                >
-                                    Criar
-                                </button>
-                            </div>
+                             <div style={{ display: 'flex', gap: 8 }}>
+                                <Badge color="warning">Não Cadastrado</Badge>
+                                <button onClick={actions.onCreateSupplier} style={styles.miniButton}>Criar</button>
+                             </div>
                         )}
                     </div>
-                </FlexGridContainer>
 
-                <FlexGridContainer layout="grid" template="1fr 1fr 1fr" gap="10px" style={{ marginTop: 15 }}>
-                    <FormControl label="Número NF" value={ide.numero} readOnlyDisplay />
-                    <FormControl label="Série" value={ide.serie} readOnlyDisplay />
-                    <FormControl label="Modelo" value={ide.modelo} readOnlyDisplay />
-                </FlexGridContainer>
+                    <FlexGridContainer layout="grid" template="1fr 1fr 2fr" gap="10px">
+                        <FormControl label="Número" value={data.numero} readOnlyDisplay />
+                        <FormControl label="Série" value={data.serie} readOnlyDisplay />
+                        <FormControl label="Emissão" value={new Date(data.dataEmissao).toLocaleDateString('pt-BR')} readOnlyDisplay />
+                    </FlexGridContainer>
+                    
+                    <div style={{ marginTop: 10 }}>
+                        <FormControl label="Chave de Acesso" value={data.chaveAcesso} readOnlyDisplay />
+                    </div>
+                </Card>
 
-                <FlexGridContainer layout="grid" template="2fr 2fr 1fr" gap="10px" style={{ marginTop: 10 }}>
-                    <FormControl label="Natureza da Operação" value={ide.naturezaOperacao} readOnlyDisplay />
-                    <FormControl label="Chave de Acesso" value={ide.chaveAcesso} readOnlyDisplay />
-                    <FormControl label="Ambiente" value={ide.ambiente} readOnlyDisplay />
-                </FlexGridContainer>
-            </Card>
+                {/* Emitente */}
+                <Card variant="default" padding="20px">
+                    <Typography variant="h2">2. Fornecedor (Emitente)</Typography>
+                    <div style={{ marginTop: 15 }}>
+                        <FormControl label="CNPJ" value={emitente.cnpj} readOnlyDisplay />
+                        <FormControl 
+                            label="Razão Social" 
+                            value={emitente.nome} 
+                            readOnlyDisplay 
+                            style={{ marginTop: 10 }}
+                        />
+                    </div>
+                </Card>
+            
 
-            {/* 2. Emitente */}
-            <Card variant="default" padding="20px" style={{ marginTop: 20 }}>
-                <Typography variant="h2">2. Emitente</Typography>
+            {/* 3. Totais Fiscais (Incluso Reforma 2026) */}
+            <Card variant="default" padding="20px">
+                <Typography variant="h2">3. Resumo Financeiro e Tributário</Typography>
 
-                <FlexGridContainer layout="grid" template="2fr 3fr 1fr" gap="10px">
-                    <FormControl
-                        label="Nome Fantasia"
-                        value={emitente.nomeFantasia || '-'}
-                        readOnlyDisplay
-                    />
-                    <FormControl
-                        label="Razão Social"
-                        value={emitente.razaoSocial}
-                        readOnlyDisplay
-                    />
-                    <FormControl
-                        label="CNPJ"
-                        value={emitente.cnpj}
-                        readOnlyDisplay
-                    />
-                </FlexGridContainer>
-            </Card>
-
-            {/* 3. Totais Fiscais */}
-            <Card variant="default" padding="20px" style={{ marginTop: 20 }}>
-                <Typography variant="h2">3. Totais Fiscais da Nota</Typography>
-
-                <FlexGridContainer layout="grid" template="2fr 2fr" gap="30px">
+                <FlexGridContainer layout="grid" template="1fr 1fr 1.2fr" gap="30px" style={{ marginTop: 20 }}>
+                    {/* Coluna 1: Base e Comerciais */}
                     <div>
                         <p style={styles.summaryItem}>
                             <span style={styles.summaryLabel}>Total Produtos:</span>
-                            <span style={styles.summaryValue}>{formatCurrency(totais.vProd)}</span>
+                            <span style={styles.summaryValue}>{formatCurrency(totais.valorTotalProdutos)}</span>
                         </p>
                         <p style={styles.summaryItem}>
-                            <span style={styles.summaryLabel}>IPI:</span>
-                            <span style={styles.summaryValue}>{formatCurrency(totais.vIPI)}</span>
+                            <span style={styles.summaryLabel}>Frete (+) :</span>
+                            <span style={styles.summaryValue}>{formatCurrency(totais.valorTotalFrete)}</span>
                         </p>
                         <p style={styles.summaryItem}>
-                            <span style={styles.summaryLabel}>ICMS:</span>
-                            <span style={styles.summaryValue}>{formatCurrency(totais.vICMS)}</span>
-                        </p>
-                        <p style={styles.summaryItem}>
-                            <span style={styles.summaryLabel}>ICMS ST:</span>
-                            <span style={styles.summaryValue}>{formatCurrency(totais.vICMSST)}</span>
+                            <span style={styles.summaryLabel}>Desconto (-) :</span>
+                            <span style={{...styles.summaryValue, color: '#10b981'}}>{formatCurrency(totais.valorTotalDesconto)}</span>
                         </p>
                         <p style={styles.summaryItem}>
                             <span style={styles.summaryLabel}>Outras Despesas:</span>
-                            <span style={styles.summaryValue}>{formatCurrency(totais.vOutro)}</span>
+                            <span style={styles.summaryValue}>{formatCurrency(totais.valorOutrasDespesas)}</span>
                         </p>
                     </div>
 
-                    <div style={styles.totalsBox}>
-                        <p style={styles.totalLine}>
-                            <span style={styles.totalLabel}>Total Tributos:</span>
+                    {/* Coluna 2: Impostos (Transição 2026) */}
+                    <div style={{ borderLeft: '1px solid #eee', paddingLeft: 20 }}>
+                        <p style={styles.summaryItem}>
+                            <span style={styles.summaryLabel}>IPI:</span>
+                            <span style={styles.summaryValue}>{formatCurrency(totais.valorTotalIpi)}</span>
                         </p>
-                        <span style={{ ...styles.totalValue, color: '#7c3aed' }}>
-                            {formatCurrency(totais.vTotTrib)}
-                        </span>
+                        <p style={styles.summaryItem}>
+                            <span style={styles.summaryLabel}>ICMS + ST:</span>
+                            <span style={styles.summaryValue}>{formatCurrency(totais.valorTotalIcms + totais.valorTotalIcmsST)}</span>
+                        </p>
+                        {/* Se houver valores de IBS/CBS (Reforma), exibe-os */}
+                        {(totais.valorTotalIBS || totais.valorTotalCBS) && (
+                            <div style={{ marginTop: 10, paddingTop: 5, borderTop: '1px dashed #ddd' }}>
+                                <p style={styles.summaryItem}>
+                                    <span style={styles.summaryLabel}>IBS (Novo):</span>
+                                    <span style={styles.summaryValue}>{formatCurrency(totais.valorTotalIBS || 0)}</span>
+                                </p>
+                                <p style={styles.summaryItem}>
+                                    <span style={styles.summaryLabel}>CBS (Novo):</span>
+                                    <span style={styles.summaryValue}>{formatCurrency(totais.valorTotalCBS || 0)}</span>
+                                </p>
+                            </div>
+                        )}
+                    </div>
 
-                        <p
-                            style={{
-                                ...styles.totalLine,
-                                borderTop: '1px solid #e5e7eb',
-                                paddingTop: 10,
-                                marginTop: 10,
-                            }}
-                        >
-                            <span style={{ ...styles.totalLabel, fontWeight: 700 }}>
-                                Valor Total da NF:
-                            </span>
-                        </p>
-                        <span style={{ ...styles.totalValue, color: '#dc2626', fontSize: '1.3rem' }}>
-                            {formatCurrency(totais.vNF)}
-                        </span>
+                    {/* Coluna 3: Totais Finais */}
+                    <div style={styles.totalsBox}>
+                        <div style={{ textAlign: 'right' }}>
+                            <Typography variant="small" style={{ color: '#6b7280' }}>Total Tributos (Lei 12.741)</Typography>
+                            <Typography variant="h3" style={{ color: '#7c3aed', marginBottom: 15 }}>
+                                {formatCurrency(totais.valorTotalTributos)}
+                            </Typography>
+                            
+                            <div style={{ borderTop: '2px solid #e5e7eb', paddingTop: 10 }}>
+                                <Typography variant="small" style={{ fontWeight: 700 }}>VALOR TOTAL DA NOTA</Typography>
+                                <Typography variant="h1" style={{ color: '#dc2626', fontSize: '1.8rem' }}>
+                                    {formatCurrency(totais.valorTotalNf)}
+                                </Typography>
+                            </div>
+                        </div>
                     </div>
                 </FlexGridContainer>
             </Card>
+            </FlexGridContainer>
         </FlexGridContainer>
     );
 };

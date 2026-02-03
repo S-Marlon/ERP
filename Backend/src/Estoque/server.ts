@@ -3,6 +3,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import pool from './db.config'; // Assume que é um Pool do mysql2/promise
+import { ResultSetHeader } from 'mysql2';
 
 const app = express();
 app.use(cors()); 
@@ -86,46 +87,46 @@ app.get('/api/products', asyncHandler(async (req, res) => {
 
 
 // Rota dedicada para o MappingModal (Entrada de NF)
-app.get('/api/products/mapping', asyncHandler(async (req, res) => {
-    const query = (req.query.query as string || '').trim();
-    const searchTerm = `%${query}%`;
+// app.get('/api/products/mapping', asyncHandler(async (req, res) => {
+//     const query = (req.query.query as string || '').trim();
+//     const searchTerm = `%${query}%`;
 
-    const sql = `
-        SELECT 
-            p.id_produto AS id, 
-            p.codigo_interno AS sku, 
-            p.descricao AS name, 
-            COALESCE(c.nome_categoria, 'Sem Categoria') AS category, 
-            COALESCE(e.quantidade, 0) AS currentStock,
-            p.estoque_minimo AS minStock,
-            p.preco_venda AS salePrice,
-            p.status AS status
-        FROM produtos AS p
-        LEFT JOIN categorias c ON p.id_categoria = c.id_categoria  
-        LEFT JOIN estoque_atual e ON p.id_produto = e.id_produto
-        WHERE 
-            (? = '' OR p.codigo_interno LIKE ? OR p.descricao LIKE ? OR p.codigo_barras LIKE ?)
-        ORDER BY 
-            CASE 
-                WHEN p.codigo_interno LIKE ? THEN 1
-                WHEN p.descricao LIKE ? THEN 2
-                ELSE 3
-            END,
-            p.descricao ASC
-        LIMIT 50
-    `;
+//     const sql = `
+//         SELECT 
+//             p.id_produto AS id, 
+//             p.codigo_interno AS sku, 
+//             p.descricao AS name, 
+//             COALESCE(c.nome_categoria, 'Sem Categoria') AS category, 
+//             COALESCE(e.quantidade, 0) AS currentStock,
+//             p.estoque_minimo AS minStock,
+//             p.preco_venda AS salePrice,
+//             p.status AS status
+//         FROM produtos AS p
+//         LEFT JOIN categorias c ON p.id_categoria = c.id_categoria  
+//         LEFT JOIN estoque_atual e ON p.id_produto = e.id_produto
+//         WHERE 
+//             (? = '' OR p.codigo_interno LIKE ? OR p.descricao LIKE ? OR p.codigo_barras LIKE ?)
+//         ORDER BY 
+//             CASE 
+//                 WHEN p.codigo_interno LIKE ? THEN 1
+//                 WHEN p.descricao LIKE ? THEN 2
+//                 ELSE 3
+//             END,
+//             p.descricao ASC
+//         LIMIT 50
+//     `;
 
-    try {
-        const [rows]: any = await pool.execute(sql, [
-            query, searchTerm, searchTerm, searchTerm, // Filtros
-            `${query}%`, `${query}%`                  // Prioridade na ordenação
-        ]);
-        return res.json(rows);
-    } catch (error) {
-        console.error('Erro na busca completa:', error);
-        return res.status(500).json({ error: 'Erro interno' });
-    }
-}));
+//     try {
+//         const [rows]: any = await pool.execute(sql, [
+//             query, searchTerm, searchTerm, searchTerm, // Filtros
+//             `${query}%`, `${query}%`                  // Prioridade na ordenação
+//         ]);
+//         return res.json(rows);
+//     } catch (error) {
+//         console.error('Erro na busca completa:', error);
+//         return res.status(500).json({ error: 'Erro interno' });
+//     }
+// }));
 
 /**
  * Rota 2: GET /api/products/categories (Já existente)
@@ -328,72 +329,75 @@ app.listen(PORT, () => {
 
 
 
-
 app.post('/api/products/map', asyncHandler(async (req, res) => {
+    console.log("Body recebido:", req.body);
+
     const { original, mapped, supplierCnpj } = req.body;
+
+    if (!mapped) {
+        return res.status(400).json({ error: "Propriedade 'mapped' ausente." });
+    }
+
     const connection = await pool.getConnection();
 
     try {
         await connection.beginTransaction();
 
-        // 1. Localizar o Fornecedor (Usando a coluna 'cnpj' da sua tabela 'fornecedores')
+        // 1. Localizar o Fornecedor
         const [forns]: any = await connection.execute(
             "SELECT id_fornecedor FROM fornecedores WHERE cnpj = ? LIMIT 1",
             [supplierCnpj]
         );
 
         if (forns.length === 0) {
-            return res.status(400).json({ error: `Fornecedor com CNPJ ${supplierCnpj} não encontrado.` });
+            return res.status(400).json({ error: `Fornecedor não encontrado.` });
         }
         const idFornecedor = forns[0].id_fornecedor;
 
-        // 2. Verificar/Inserir Produto (Tabela 'produtos')
-        let [prod]: any = await connection.execute(
-            "SELECT id_produto FROM produtos WHERE codigo_interno = ? LIMIT 1",
-            [mapped.id]
+        // 2. Inserir Produto - AJUSTADO PARA OS NOMES DO SEU LOG
+        const [newProd] = await connection.execute<ResultSetHeader>(
+            `INSERT INTO produtos 
+            (codigo_interno, codigo_barras, ncm, cest, descricao, tipo_produto, unidade, estoque_minimo, preco_venda, status, id_marca, exige_gtin, id_categoria) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                mapped.CodInterno || original.sku,        // Usa o código interno ou o SKU da NF
+                mapped.gtin || null,                      // No seu log está 'gtin', não 'barcode'
+                mapped.ncm || null,
+                mapped.cest || null,
+                mapped.name || null,
+                'COMERCIAL',
+                mapped.individualUnit || 'UN',
+                0,
+                mapped.Preço_Final_de_Venda || 0,
+                'Ativo',
+                1,                                        // id_marca (fixo 1 por enquanto, já que mapped.MarcaId não existe no log)
+                0,
+                parseInt(mapped.Categorias) || null       // Converte '1' para número
+            ]
         );
 
-        let idProdutoInterno: number;
-
-        if (prod.length === 0) {
-            // Pegar ID da categoria (Sua tabela 'categorias' usa 'nome_categoria')
-            const [cat]: any = await connection.execute(
-                "SELECT id_categoria FROM categorias WHERE nome_categoria = ? LIMIT 1",
-                [mapped.category]
-            );
-            const idCat = cat.length > 0 ? cat[0].id_categoria : null;
-
-            const [newProd]: any = await connection.execute(
-                "INSERT INTO produtos (codigo_interno, descricao, unidade, id_categoria) VALUES (?, ?, ?, ?)",
-                [mapped.id, mapped.name, mapped.unitOfMeasure, idCat]
-            );
-            idProdutoInterno = newProd.insertId;
-
-            // Inserir saldo inicial no estoque (Sua tabela 'estoque_atual')
-            await connection.execute(
-                "INSERT INTO estoque_atual (id_produto, quantidade, valor_medio) VALUES (?, 0, ?)",
-                [idProdutoInterno, original.unitCost]
-            );
-        } else {
-            idProdutoInterno = prod[0].id_produto;
-        }
-
-        // 3. Criar o Vínculo (Tabela 'produto_fornecedor')
-        // Usando as colunas: id_produto, id_fornecedor, sku_fornecedor, descricao_fornecedor
+        // 3. Inserir no Produto-Fornecedor
         await connection.execute(
             `INSERT INTO produto_fornecedor 
-            (id_produto, id_fornecedor, sku_fornecedor, descricao_fornecedor) 
-            VALUES (?, ?, ?, ?) 
-            ON DUPLICATE KEY UPDATE sku_fornecedor = sku_fornecedor`,
-            [idProdutoInterno, idFornecedor, original.sku, original.name]
+            (id_produto, id_fornecedor, sku_fornecedor, ean_fornecedor, descricao_fornecedor, fator_conversao, ultimo_custo)
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [
+                newProd.insertId,
+                idFornecedor,
+                original.sku || null,
+                original.gtin || null,
+                original.descricao || null,
+                mapped.unitsPerPackage || 1.000,
+                original.valorUnitario || 0.0000          // No seu log é 'valorUnitario'
+            ]
         );
 
         await connection.commit();
-        res.json({ success: true, id_produto: idProdutoInterno });
+        res.json({ success: true, id_produto: newProd.insertId });
 
     } catch (error: any) {
         await connection.rollback();
-        console.error(error);
+        console.error("ERRO NO SQL:", error);
         res.status(500).json({ error: error.message });
     } finally {
         connection.release();

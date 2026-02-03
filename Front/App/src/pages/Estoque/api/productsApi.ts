@@ -1,4 +1,5 @@
 import { Category, CategoryTreeBuilder } from '../utils/CategoryTreeBuilder';
+import { ProdutoNF } from '../utils/nfeParser';
 // Use a interface Category do seu componente (se já existir)
 // Importe a classe que acabamos de criar (ajuste o caminho se necessário)
 
@@ -8,22 +9,26 @@ const apiBase = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:300
 
 
 
+interface ProdutoPersistencia extends ProdutoNF {
 
-// Define a interface para garantir que o frontend envie tudo o que o backend precisa
-export interface InternalProductData {
-    id: number;
-    sku: string;         // codigo_interno
-    name: string;        // descricao
-    category: string;
-    unitOfMeasure: string;
-    currentStock: number;
-    minStock: number;
-    salePrice: number;
-    status: 'Ativo' | 'Inativo';
-    suppliers?: string;      // Novo: nomes dos fornecedores concatenados
-    supplierCodes?: string;  // Novo: SKUs dos fornecedores concatenados
+    CodInterno: string;
+
+    name: string;
+    Categorias: string;
+    Marca?: string;
+    Descrição?: string;
+    Margem_Lucro?: number;
+    Preço_Final_de_Venda?: number;
+    individualUnit: string;
+    unitsPerPackage?: number | null; // ✅ Alinha com estado inicial
+
 }
 
+export interface MappingPayload {
+    original: any;
+    mapped: any; // Ou a interface ProdutoPersistencia se você a exportar
+    supplierCnpj: string;
+}
 
 
 // --- 2. Tipagem do Formato de Árvore (para o Frontend) ---
@@ -160,11 +165,20 @@ export const saveProductMapping = async (payload: MappingPayload) => {
         body: JSON.stringify(payload)
     });
 
-    // Se não for OK, pegue o texto bruto para entender o erro
     if (!response.ok) {
-        const errorText = await response.text(); // Lê como texto, não JSON
-        console.error("Erro bruto do servidor:", errorText);
-        throw new Error(`Erro ${response.status}: Verifique o console do VS Code/Terminal.`);
+        const errorData = await response.text();
+        let errorMessage = `Erro ${response.status}`;
+        
+        try {
+            // Tenta transformar em JSON para pegar a mensagem amigável que você criou no backend
+            const parsedError = JSON.parse(errorData);
+            errorMessage = parsedError.error || errorMessage;
+        } catch {
+            // Se não for JSON (ex: erro 500 com stack trace), usa o texto bruto
+            console.error("Erro bruto do servidor:", errorData);
+        }
+
+        throw new Error(errorMessage);
     }
 
     return await response.json();

@@ -1,59 +1,44 @@
-// src/pages/StockEntryForm.tsx (FINAL COMPLETO E INTEGRADO)
+// src/pages/StockEntryForm.tsx 
 import React, { useState, useMemo, useCallback } from 'react';
 import Button from '../../../../components/ui/Button/Button';
 import FlexGridContainer from '../../../../components/Layout/FlexGridContainer/FlexGridContainer';
 import Typography from '../../../../components/ui/Typography/Typography';
 import MappingModal, { MappingPayload } from './_components/MappingModal'; // Modal de Mapeamento
-import { parseNfeXmlToData, NfeDataFromXML } from '../../utils/nfeParser';
+import { parseNfeXmlToData, NfeDataFromXML, ProdutoNF } from '../../utils/nfeParser';
 import Badge from '../../../../components/ui/Badge/Badge';
 import { ActionPopover } from '../../../../components/ui/Popover/ActionPopover';
 import NfeCards from './_components/NfeCards';
 import { checkExistingMappings, checkSupplier, createSupplier, submitStockEntry } from '../../api/productsApi';
 
-// --- Interfaces Atualizadas ---
-interface ProductEntry {
-    isMapped: boolean;
-    tempId: number;
-    sku: string;
-    name: string;
-    unitPrice: number;
-    quantity: number;
-    unitOfMeasure: string;
-    quantityReceived: number;
-    difference: number;
-    total: number;
-    isConfirmed: boolean;
-    // Campos essenciais para 2026
-    unitCostReal: number;       // (vProd + IPI + ST + Frete + Outros - Desc) / Qtd
-    valorIBS?: number;
-    valorCBS?: number;
-    ncm: string;
-    cest?: string;
-    mappedId?: string;
-    category?: string;
-    mappedData?: any;
+
+interface ProductEntry extends ProdutoNF {
+  tempId: number;
+  isMapped: boolean;
+  mappedId?: string;
+  isConfirmed: boolean;
+  category?: string;
+  mappedData?: any;
+  quantityReceived: number;
+  difference: number;
+  total: number;
 }
 
-interface NfeData {
-    invoiceNumber: string;
-    supplier: string;
-    supplierFantasyName: string;
-    supplierCnpj: string;
-    entryDate: string;
-    accessKey: string;
-    // Totais para conferência
-    totalFreight: number;
-    totalIpi: number;
-    totalIcmsST: number;        // ✨ Adicionado: Vital para custo de revenda
-    totalIBS?: number;          // ✨ Adicionado: Reforma 2026
-    totalCBS?: number;          // ✨ Adicionado: Reforma 2026
-    totalOtherExpenses: number;
-    totalNoteValue: number;
-    items: ProductEntry[];
-}
+type NfeData = Omit<NfeDataFromXML, 'produtos'> & {
+  invoiceNumber: string;
+  supplier: string;
+  supplierFantasyName: string;
+  supplierCnpj: string;
+  entryDate: string;
+  accessKey: string;
+  totalFreight: number;
+  totalIpi: number;
+  totalIcmsST: number;
+  totalOtherExpenses: number;
+  totalNoteValue: number;
+  items: ProductEntry[];
+};
 
 // --- Helpers ---
-
 
 const formatCurrency = (value: number): string =>
     value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -78,121 +63,34 @@ const roundQuantityByUnit = (quantity: number, unitOfMeasure: string): number =>
 };
 
 const mapNfeDataToEntryForm = (xmlData: NfeDataFromXML): NfeData => {
-    const totalFreight = parseFloat(xmlData.valorTotalFrete || '0.00');
-    const totalIpi = parseFloat(xmlData.valorTotalIpi || '0.00');
-    const totalIcmsST = parseFloat(xmlData.valorTotalIcmsST || '0.00');
-    const totalIBS = parseFloat(xmlData.valorTotalIBS || '0.00');
-    const totalCBS = parseFloat(xmlData.valorTotalCBS || '0.00');
-    const totalOtherExpenses = parseFloat(xmlData.valorOutrasDespesas || '0.00');
-
-    const subtotalProducts = xmlData.produtos.reduce((sum, p) => {
-        return sum + parseFloat(p.valorTotal || '0.00');
-    }, 0);
-
-    const items: ProductEntry[] = xmlData.produtos.map((produto, index) => {
-        const rawQuantity = parseFloat(produto.quantidade || '0.00');
-        const unitOfMeasure = produto.unidadeMedida || 'UN';
-        const quantity = roundQuantityByUnit(rawQuantity, unitOfMeasure);
-
-        const unitPrice = parseFloat(produto.valorUnitario || '0.00');
-        const totalProductValue = parseFloat(produto.valorTotal || '0.00');
-
-        const ratio = subtotalProducts > 0 ? totalProductValue / subtotalProducts : 0;
-
-        const freightRate = totalFreight * ratio;
-        const ipiRate = totalIpi * ratio;
-        const icmsSTRate = totalIcmsST * ratio;
-        const otherExpensesRate = totalOtherExpenses * ratio;
-
-        const ibsRate = parseFloat(produto.valorIBS || '0.00') * ratio;
-        const cbsRate = parseFloat(produto.valorCBS || '0.00') * ratio;
-
-        const totalCostItem =
-            totalProductValue +
-            freightRate +
-            ipiRate +
-            icmsSTRate +
-            otherExpensesRate;
-
-        const unitCostReal =
-            quantity > 0 ? totalCostItem / quantity : unitPrice;
-
-        return {
-            tempId: index + 1,
-            sku: produto.codigo,
-            isMapped: false,
-
-            name: produto.descricao,
-            unitOfMeasure,
-
-            unitPrice: parseFloat(unitPrice.toFixed(4)),
-            quantity,
-            quantityReceived: quantity,
-            difference: 0,
-
-            total: parseFloat(totalProductValue.toFixed(2)),
-            unitCostReal: parseFloat(unitCostReal.toFixed(4)),
-
-            valorIBS: ibsRate,
-            valorCBS: cbsRate,
-
-            ncm: produto.ncm || '',
-            cest: produto.cest,
-
-            isConfirmed: false,
-            category: '',
-        };
-    });
+   const items: ProductEntry[] = xmlData.produtos.map((produto, index) => ({
+    ...produto,                  // pega todos os campos do ProdutoNF
+    tempId: index + 1,
+    isMapped: false,
+    isConfirmed: false,
+    category: '',
+    mappedData: undefined,
+    quantityReceived: produto.quantidade || 0,                       // inicializa a quantidade recebida
+    total: (produto.quantidade || 0) * (produto.valorUnitario || 0), // inicializa total
+    difference: 0,                                                   // inicializa diferença
+}));
 
     return {
         invoiceNumber: `NF ${xmlData.numero}`,
-        supplier: xmlData.emitente?.nome || '',
-        supplierFantasyName: xmlData.emitente?.nomeFantasia || '',
-        supplierCnpj: xmlData.emitente?.cnpj || '',
-        entryDate: xmlData.dataEmissao?.substring(0, 10) || '',
+        supplier: xmlData.emitente.nome,
+        supplierFantasyName: xmlData.emitente.nomeFantasia || xmlData.emitente.nome,
+        supplierCnpj: xmlData.emitente.cnpj,
+        entryDate: xmlData.dataEmissao.substring(0, 10),
         accessKey: xmlData.chaveAcesso,
-
-        totalFreight,
-        totalIpi,
-        totalIcmsST,
-        totalIBS,
-        totalCBS,
-        totalOtherExpenses,
-        totalNoteValue: parseFloat(xmlData.valorTotal || '0.00'),
-
+        totalFreight: xmlData.valorTotalFrete,
+        totalIpi: xmlData.valorTotalIpi,
+        totalIcmsST: xmlData.valorTotalIcmsST,
+        totalIBS: xmlData.valorTotalIBS,
+        totalCBS: xmlData.valorTotalCBS,
+        totalOtherExpenses: xmlData.valorOutrasDespesas,
+        totalNoteValue: xmlData.valorTotalNf,
         items,
     };
-};
-
-// Cabeçalho da tabela
-const renderTableHead = (itemsList: ProductEntry[], toggleSelectAll: (isPending: boolean) => void, isPendingTable: boolean, selectedIds: Set<number>) => {
-    const allSelected = itemsList.length > 0 && itemsList.every(item => selectedIds.has(item.tempId));
-    return (
-        <thead>
-            <tr style={styles.tableHead}>
-                <th style={styles.tableTh}>
-                    {itemsList.length > 0 && (
-                        <input
-                            type="checkbox"
-                            checked={allSelected}
-                            onChange={() => toggleSelectAll(isPendingTable)}
-                        />
-                    )}
-                </th>
-                <th style={styles.tableTh}>Mapeamento</th>
-                <th style={{ ...styles.tableTh, width: '60px' }}>SKU Forn.</th>
-                <th style={{ ...styles.tableTh, width: '450px' }}>Produto (NF)</th>
-                <th style={{ ...styles.tableTh, width: '100px' }}>Preço Unitário (NF)</th>
-                <th style={{ ...styles.tableTh, width: '80px' }}>Qtd. NF</th>
-                <th style={{ ...styles.tableTh, width: '80px' }}>UN. NF</th>
-                <th style={{ ...styles.tableTh, width: '70px' }}>*Qtd. Recebida*</th>
-                <th style={{ ...styles.tableTh, width: '30px' }}>*Dif.*</th>
-                <th style={{ ...styles.tableTh, width: '120px' }}>Categoria</th>
-                <th style={{ ...styles.tableTh, width: '60px' }}>Total Produto</th>
-                <th style={{ ...styles.tableTh, width: '30px' }}>Ações</th>
-            </tr>
-        </thead>
-    );
 };
 
 // --- Componente Principal ---
@@ -305,89 +203,59 @@ const handleXmlUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     reader.onload = async (e) => {
         try {
             const xmlContent = e.target?.result as string;
-
             const rawXmlData = parseNfeXmlToData(xmlContent);
-            if (!rawXmlData) {
-                throw new Error('Falha ao extrair dados do XML.');
-            }
+
+            if (!rawXmlData) throw new Error('Falha ao extrair dados do XML.');
 
             const xmlData = mapNfeDataToEntryForm(rawXmlData);
+            const formattedSupplierCnpj = formatCnpj(xmlData.supplierCnpj);
 
-            // =====================================================
-            // 1️⃣ CNPJ DO FORNECEDOR
-            // =====================================================
-            const supplierCnpjRaw =
-                (rawXmlData.emitente &&
-                    (rawXmlData.emitente.cnpj ||
-                        (rawXmlData as any).emitenteCnpj)) ||
-                xmlData.supplierCnpj ||
-                '';
-
-            const formattedSupplierCnpj = formatCnpj(supplierCnpjRaw);
+            // 1️⃣ Popula Cabeçalho e Totais
             setSupplierCnpj(formattedSupplierCnpj);
-
-            // =====================================================
-            // 2️⃣ POPULA CABEÇALHO DA NOTA (IMEDIATO)
-            // =====================================================
             setInvoiceNumber(xmlData.invoiceNumber);
             setSupplier(xmlData.supplier);
             setSupplierFantasyName(xmlData.supplierFantasyName);
             setEntryDate(xmlData.entryDate);
             setAccessKey(xmlData.accessKey);
 
-            // 👉 Totais comerciais
             setTotalFreight(xmlData.totalFreight);
             setTotalIpi(xmlData.totalIpi);
             setTotalOtherExpenses(xmlData.totalOtherExpenses);
             setTotalNoteValue(xmlData.totalNoteValue);
-
-            // 👉 Totais fiscais (✨ AQUI ESTAVA O PROBLEMA)
+            
+            // Novos campos 2026
             setTotalIcmsST(xmlData.totalIcmsST);
             setTotalIBS(xmlData.totalIBS);
             setTotalCBS(xmlData.totalCBS);
 
-            // =====================================================
-            // 3️⃣ ITENS DA NOTA
-            // =====================================================
-            const skusDaNota = xmlData.items.map(i => i.sku);
-
-            // =====================================================
-            // 4️⃣ VERIFICA SE FORNECEDOR EXISTE
-            // =====================================================
+            // 2️⃣ Verifica Fornecedor
             setIsSupplierChecking(true);
-
             try {
                 const supplierCheck = await checkSupplier(formattedSupplierCnpj);
 
                 if (!supplierCheck.exists) {
                     setSupplierExists(false);
-
                     setSupplierToCreate({
                         cnpj: formattedSupplierCnpj,
-                        name: xmlData.supplier || '',
+                        name: xmlData.supplier,
                     });
+                    setSupplierCreationName(xmlData.supplier);
 
-                    setSupplierCreationName(xmlData.supplier || '');
-
-                    // Mantém dados temporários
+                    // Dados pendentes para processar após criar fornecedor
                     setPendingXmlData(xmlData);
-                    setPendingSkus(skusDaNota);
-
                     setItems(xmlData.items);
-                    setSelectedPendingIds(
-                        new Set(xmlData.items.map(i => i.tempId))
-                    );
-
+                    setSelectedPendingIds(new Set(xmlData.items.map(i => i.tempId)));
+                    
                     setIsSupplierModalOpen(true);
+                    return; // Interrompe para aguardar criação do fornecedor
+                } 
+                
+                setSupplierExists(true);
+                setSupplier(supplierCheck.supplier?.name || xmlData.supplier);
+                
+                // 3️⃣ Sincroniza Mapeamentos (Se o fornecedor já existe)
+                await performMappingSync(formattedSupplierCnpj, xmlData);
 
-                    // ⛔ Não sincroniza enquanto fornecedor não existir
-                    return;
-                } else {
-                    setSupplierExists(true);
-                    setSupplier(
-                        supplierCheck.supplier?.name || xmlData.supplier || ''
-                    );
-                }
             } catch (err) {
                 console.error('Erro ao checar fornecedor:', err);
                 setSupplierExists(false);
@@ -395,24 +263,10 @@ const handleXmlUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
                 setIsSupplierChecking(false);
             }
 
-            // =====================================================
-            // 5️⃣ SINCRONIZA MAPEAMENTOS
-            // =====================================================
-            await performMappingSync(formattedSupplierCnpj, xmlData);
-
         } catch (error) {
             console.error('Erro ao processar XML:', error);
-            alert(
-                'Erro ao processar o arquivo XML. Detalhes: ' +
-                    (error instanceof Error
-                        ? error.message
-                        : 'Erro desconhecido')
-            );
+            alert(`Erro: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
         }
-    };
-
-    reader.onerror = () => {
-        alert('Erro ao ler o arquivo.');
     };
 
     reader.readAsText(file);
@@ -521,46 +375,37 @@ const handleXmlUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     [tempId]: data
 }));
 
-    setItems(prev => prev.map(it => {
-        if (it.tempId === tempId) {
-            return {
-                ...it,
-                // O mappedId é o ID oficial que veio do sistema/banco
-                    isMapped: true, // ✅ FALTAVA
-
-                mappedId: data.mapped.id, 
-                
-                // Atualizamos a categoria com a que foi selecionada no modal
-                category: data.mapped.category,
-                
-                // UNIDADE DE MEDIDA: É importante sincronizar se o sistema usa uma 
-                // unidade diferente da que veio na nota fiscal
-                unitOfMeasure: data.mapped.unitOfMeasure,
-
-                // Mantemos o nome interno do sistema para clareza na conferência
-                // Se preferir manter o nome da NF, pode comentar a linha abaixo
-                name: data.mapped.name,
-
-                // Guardamos o objeto completo para uso posterior no POST final da nota
-                mappedData: data.mapped 
-            };
-        }
-        return it;
-    }));
+   setItems(prev => prev.map(it => {
+    if (it.tempId === tempId) {
+        return {
+            ...it,
+            isMapped: true,
+            // ⬇️ AJUSTE OS NOMES AQUI PARA BATER COM A SUA INTERFACE
+            mappedId: data.mapped.CodInterno, 
+            category: data.mapped.Categorias,
+            unitOfMeasure: data.mapped.individualUnit,
+            name: data.mapped.name,
+            mappedData: data.mapped 
+        };
+    }
+    return it;
+}));
 
     // Fecha o modal e limpa o estado
     setIsMappingModalOpen(false);
     setItemToMap(null);
     
-    console.log(`Produto ${tempId} mapeado com sucesso para o ID: ${data.mapped.id}`);
+console.log(`Produto ${tempId} mapeado com sucesso para o ID: ${data.mapped.CodInterno}`);
 }, []);
 
 
 const openMappingModal = (item: ProductEntry) => {
+      console.log('🔥 ABRINDO MODAL COM:', item);  // ← ADICIONE
     setItemToMap(item);
 };
 
 const closeModal = () => {
+      console.log('🔥 FECHANDO MODAL');  // ← ADICIONE
     setItemToMap(null);
 };
     // Seleção por linha (isPending = true para pendentes)
@@ -629,6 +474,41 @@ const closeModal = () => {
         }
     ];
 
+
+    // Cabeçalho da tabela
+const renderTableHead = (itemsList: ProductEntry[], toggleSelectAll: (isPending: boolean) => void, isPendingTable: boolean, selectedIds: Set<number>) => {
+    const allSelected = itemsList.length > 0 && itemsList.every(item => selectedIds.has(item.tempId));
+    return (
+        <thead>
+            <tr style={styles.tableHead}>
+                <th style={styles.tableTh}>
+                    {itemsList.length > 0 && (
+                        <input
+                            type="checkbox"
+                            checked={allSelected}
+                            onChange={() => toggleSelectAll(isPendingTable)}
+                        />
+                    )}
+                </th>
+                <th style={styles.tableTh}>Mapeamento</th>
+                <th style={{ ...styles.tableTh, width: '60px' }}>SKU Forn.</th>
+                <th style={{ ...styles.tableTh, width: '60px' }}>EAN</th>
+                <th style={{ ...styles.tableTh, width: '450px' }}>Produto (NF)</th>
+                <th style={{ ...styles.tableTh, width: '100px' }}>Preço Unitário (NF)</th>
+                <th style={{ ...styles.tableTh, width: '80px' }}>Qtd. NF</th>
+                <th style={{ ...styles.tableTh, width: '80px' }}>UN. NF</th>
+                <th style={{ ...styles.tableTh, width: '70px' }}>*Qtd. Recebida*</th>
+                <th style={{ ...styles.tableTh, width: '30px' }}>*Dif.*</th>
+                <th style={{ ...styles.tableTh, width: '120px' }}>Categoria</th>
+                <th style={{ ...styles.tableTh, width: '60px' }}>Total Produto</th>
+                <th style={{ ...styles.tableTh, width: '30px' }}>Ações</th>
+            </tr>
+        </thead>
+    );
+};
+
+
+
     // Render linha (agora recebe isPending + toggleSelectItem)
     const renderItemRow = (
         item: ProductEntry,
@@ -666,29 +546,31 @@ const closeModal = () => {
                         onChange={() => toggleSelectItemFn(item.tempId, isPending)}
                         style={{ cursor: 'pointer', transform: 'scale(1.2)' }}
                     />
+                    {item.tempId}
                 </td>
                 <td style={styles.tableCell}>
                     {item.isMapped ? (
                         <Badge color="success">Cod Interno: {item.mappedId}</Badge>
                     ) : (
-                        <Button onClick={() => handleMapProductFn(item.tempId)} variant='warning' fontsize='11px' padding='5px' >
+                        <Button onClick={() => openMappingModal(item)} variant='warning' fontsize='11px' padding='5px' >
                             🔗 Mapear
                         </Button>
                     )}
                 </td>
                 
                 <td style={styles.tableCell}>{item.sku}</td>
-                <td style={{ ...styles.tableCell, fontWeight: 500 }}>{item.name}</td>
-                <td style={styles.tableCell}>R$ {item.unitPrice.toFixed(3)}</td>
-                <td style={{ ...styles.tableCell, fontWeight: 700, color: '#4b5563' }}>{item.quantity.toFixed(2)}</td>
-                <td style={{ ...styles.tableCell, fontWeight: 700, color: '#4b5563' }}>{item.unitOfMeasure}</td>
+                <td style={styles.tableCell}>{item.gtin || '-'}</td>
+                <td style={{ ...styles.tableCell, fontWeight: 500 }}>{item.descricao}</td>
+                <td style={styles.tableCell}>R$ {item.valorProdutos.toFixed(3)}</td>
+                <td style={{ ...styles.tableCell, fontWeight: 700, color: '#4b5563' }}>{item.quantidade.toFixed(2)}</td>
+                <td style={{ ...styles.tableCell, fontWeight: 700, color: '#4b5563' }}>{item.unidadeMedida}</td>
                 <td style={styles.tableCell}>
                     {item.isConfirmed ? (
-                        <span style={{ fontWeight: 600, color: '#10b981' }}>{item.quantityReceived}</span>
+                        <span style={{ fontWeight: 600, color: '#10b981' }}>{item.quantidade}</span>
                     ) : (
                         <input
-                            type="number" min="0" step={item.unitOfMeasure === 'UN' || item.unitOfMeasure === 'PC' ? '1' : '0.1'}
-                            value={String(item.quantityReceived)}
+                            type="number" min="0" step={item.unidadeMedida === 'UN' || item.unidadeMedida === 'PC' ? '1' : '0.1'}
+                            value={String(item.quantidade)}
                             onChange={(e) => handleUpdateReceivedQuantityFn(item.tempId, e.target.value)}
                             style={{
                                 maxWidth: '50px',
@@ -790,10 +672,10 @@ const closeModal = () => {
         .map(item => ({
             codigoInterno: item.mappedId!,
             skuFornecedor: item.sku,
-            quantidadeRecebida: item.quantityReceived,
-            unidade: item.unitOfMeasure,
+            quantidadeRecebida: item.quantidade,
+            unidade: item.unidadeMedida,
 
-            custoUnitario: item.unitCostReal,
+            custoUnitario: item.valorCustoReal,
 
             impostos: {
                 ipi: totalIpi,
@@ -865,32 +747,30 @@ const closeModal = () => {
                 </FlexGridContainer>
             </div>
 
-            <NfeCards
+           
+<NfeCards
     data={{
-        ide: {
-            numero: invoiceNumber.replace('NF ', ''),
-            serie: '', // pode vir do XML futuramente
-            modelo: '55', // NF-e padrão
-            naturezaOperacao: '', // pode vir do XML depois
-            dataEmissao: entryDate,
-            ambiente: 'Produção',
-            chaveAcesso: accessKey,
-        },
+        chaveAcesso: accessKey,
+        numero: invoiceNumber.replace('NF ', ''),
+        serie: items.length > 0 ? (pendingXmlData?.serie || '') : '', // Recupera a série do estado pendente
+        dataEmissao: entryDate,
         emitente: {
-            razaoSocial: supplier,
-            nomeFantasia: supplierFantasyName,
             cnpj: supplierCnpj,
+            nome: supplier,
+            nomeFantasia: supplierFantasyName,
         },
         totais: {
-            vProd: subtotal,
-            vIPI: totalIpi,
-            vFrete: totalFreight,
-            vOutro: totalOtherExpenses,
-            vDesc: 0,
-            vICMS: 0,
-            vICMSST: totalIcmsST,
-            vNF: totalNoteValue,
-            vTotTrib: (totalIpi + totalIcmsST + (totalIBS || 0) + (totalCBS || 0)),
+            valorTotalProdutos: subtotal, // Soma dos itens processados
+            valorTotalIpi: totalIpi,
+            valorTotalFrete: totalFreight,
+            valorOutrasDespesas: totalOtherExpenses,
+            valorTotalDesconto: items.reduce((acc, it) => acc + (it.valorDesconto || 0), 0), // Opcional: buscar do estado
+            valorTotalIcms: 0, // Pode ser expandido se você criar o estado setTotalIcms
+            valorTotalIcmsST: totalIcmsST,
+            valorTotalIBS: totalIBS,
+            valorTotalCBS: totalCBS,
+            valorTotalNf: totalNoteValue,
+            valorTotalTributos: (totalIpi + totalIcmsST + (totalIBS || 0) + (totalCBS || 0)),
         },
     }}
     supplierStatus={{
@@ -898,7 +778,6 @@ const closeModal = () => {
         isChecking: isSupplierChecking,
     }}
     actions={{
-        setEntryDate,
         onCreateSupplier: () => setIsSupplierModalOpen(true),
         formatCurrency,
     }}
@@ -976,9 +855,9 @@ const closeModal = () => {
                         <div style={styles.divergenceList}>
                             {divergentItems.map(item => (
                                 <div key={item.tempId} style={styles.divergenceItem}>
-                                    <Typography variant='p'><strong>SKU {item.sku}:</strong> {item.name}</Typography>
+                                    <Typography variant='p'><strong>SKU {item.sku}:</strong> {item.descricao}</Typography>
                                     <p style={styles.divergenceDetails}>
-                                        Quantidade na NF: <strong>{item.quantity.toFixed(2)}</strong> | Recebido: <strong>{item.quantityReceived.toFixed(2)}</strong> |
+                                        Quantidade na NF: <strong>{item.quantidade.toFixed(2)}</strong> | Recebido: <strong>{item.quantidade.toFixed(2)}</strong> |
                                         Diferença: <span style={{ color: item.difference > 0 ? '#f59e0b' : '#dc2626', fontWeight: 700 }}>{item.difference > 0 ? `+${item.difference.toFixed(2)}` : item.difference.toFixed(2)}</span>
                                     </p>
                                 </div>
@@ -1006,13 +885,14 @@ const closeModal = () => {
                 </div>
             </FlexGridContainer>
 
-            {itemToMap && (
-    <MappingModal
-        item={itemToMap}
-        supplierCnpj={supplierCnpj}
-        onClose={() => setItemToMap(null)}
-        onMap={handleModalMap}
-    />
+            
+    {itemToMap && (
+  <MappingModal
+    item={itemToMap}          // ✅ ProductEntry (dados originais)
+    supplierCnpj={supplierCnpj} 
+    onClose={closeModal}      // ✅ Fecha modal
+    onMap={handleModalMap}    // ✅ Recebe MappingPayload
+  />
 )}
 
             {isSupplierModalOpen && supplierToCreate && (
@@ -1155,3 +1035,33 @@ const styles: { [key: string]: React.CSSProperties } = {
 };
 
 export default StockEntryForm;
+
+
+
+
+// async function localizarProdutoNoSistema(itemXml: ProdutoNF, idFornecedor: number) {
+//     // 1º PASSO: Busca por GTIN (O mais forte)
+//     if (itemXml.gtin && itemXml.gtin !== 'SEM GTIN') {
+//         const produto = await db.produtos.findFirst({ where: { codigo_barras: itemXml.gtin } });
+//         if (produto) return { produto, tipoMatch: 'GTIN' };
+//     }
+
+//     // 2º PASSO: Busca por Relação SKU/Fornecedor (O de-para já aprendido)
+//     const relacao = await db.produto_fornecedor.findFirst({ 
+//         where: { id_fornecedor: idFornecedor, sku_fornecedor: itemXml.codigo } 
+//     });
+//     if (relacao) {
+//         const produto = await db.produtos.findFirst({ where: { id_produto: relacao.id_produto } });
+//         return { produto, tipoMatch: 'RELACAO_EXISTENTE' };
+//     }
+
+//     // 3º PASSO: Se for "SEM GTIN" e nunca foi relacionado, é um "Órfão"
+//     return { produto: null, tipoMatch: 'NECESSITA_VINCULO_MANUAL' };
+// }
+
+
+
+
+
+
+

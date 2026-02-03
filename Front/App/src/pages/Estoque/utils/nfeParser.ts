@@ -5,7 +5,7 @@ const NFE_NS = 'http://www.portalfiscal.inf.br/nfe';
 // --- Interfaces ---
 export interface ProdutoNF {
     // --- IDENTIFICAÇÃO E RASTREABILIDADE ---
-    codigo: string;             // cProd (Seu SKU ou do fornecedor)
+    sku: string;             // cProd (Seu SKU ou do fornecedor)
     gtin: string;               // cEAN (Obrigatório: EAN-13 ou "SEM GTIN")
     descricao: string;          // xProd
     ncm: string;                // NCM (8 dígitos)
@@ -27,6 +27,9 @@ export interface ProdutoNF {
     valorIcms: number;          // vICMS
     valorIpi: number;           // vIPI
     valorIcmsST: number;        // vICMSST (Fundamental para quem revende)
+    valorPis: number;           // vBC
+    valorCofins: number;        // vBC
+   
     
     // --- REFORMA TRIBUTÁRIA (Essencial em 2026) ---
     valorIBS?: number;          // Imposto sobre Bens e Serviços (Estadual/Municipal)
@@ -80,6 +83,10 @@ export interface NfeDataFromXML {
     valorTotalIBS?: number;     // ✨ Novo: Imposto sobre Bens e Serviços
     valorTotalCBS?: number;     // ✨ Novo: Contribuição sobre Bens e Serviços
     valorTotalTributos: number; // vTotTrib (Lei do Imposto na Nota)
+
+    // ✨ ADICIONE ESTES DOIS CAMPOS ABAIXO:
+    valorTotalPIS: number;    
+    valorTotalCOFINS: number;
 
     // --- CONTEÚDO ---
     xmlBruto: string;           // String original para auditoria ou reprocessamento
@@ -158,6 +165,16 @@ export const parseNfeXmlToData = (xmlString: string): NfeDataFromXML => {
 
         const valorIpi = ipiNode ? parseFloat(getTagValue(ipiNode, 'vIPI')) : 0;
 
+
+        // --- PIS / COFINS com fallback de segurança ---
+    const pisNode = imposto.getElementsByTagNameNS(NFE_NS, 'PIS')[0];
+    const pisSubNode = pisNode?.querySelector('PISAliq, PISOutr, PISNT, PISSN') as Element | undefined;
+    const valorPis = parseFloat(getTagValue(pisSubNode, 'vPIS'));
+
+    const cofinsNode = imposto.getElementsByTagNameNS(NFE_NS, 'COFINS')[0];
+    const cofinsSubNode = cofinsNode?.querySelector('COFINSAliq, COFINSOutr, COFINSNT, COFINSSN') as Element | undefined;
+    const valorCofins = parseFloat(getTagValue(cofinsSubNode, 'vCOFINS'));
+
         // --- Reforma Tributária ---
         const valorIBS = parseFloat(getTagValue(imposto, 'vIBS'));
         const valorCBS = parseFloat(getTagValue(imposto, 'vCBS'));
@@ -189,8 +206,11 @@ export const parseNfeXmlToData = (xmlString: string): NfeDataFromXML => {
         const gtinRaw = getTagValue(prod, 'cEAN');
         const gtin = gtinRaw === 'SEM GTIN' ? '' : gtinRaw;
 
+        // const chNFe = xmlDoc.getElementsByTagNameNS(NFE_NS, 'chNFe')[0]?.textContent || 
+        //       infNFe.getAttribute('Id')?.replace('NFe', '') || '';
+
         return {
-            codigo: getTagValue(prod, 'cProd'),
+            sku: getTagValue(prod, 'cProd'),
             gtin,
             descricao: getTagValue(prod, 'xProd'),
             ncm: getTagValue(prod, 'NCM'),
@@ -212,6 +232,8 @@ export const parseNfeXmlToData = (xmlString: string): NfeDataFromXML => {
             valorIcms,
             valorIpi,
             valorIcmsST,
+            valorPis,
+            valorCofins,
 
             valorIBS: valorIBS > 0 ? valorIBS : undefined,
             valorCBS: valorCBS > 0 ? valorCBS : undefined,
@@ -232,8 +254,10 @@ export const parseNfeXmlToData = (xmlString: string): NfeDataFromXML => {
     const nomeFantasiaRaw = getTagValue(emit, 'xFant');
 
     return {
-        chaveAcesso: infNFe.getAttribute('Id')?.replace('NFe', '') || '',
-        numero: getTagValue(ide, 'nNF'),
+        chaveAcesso: xmlDoc.getElementsByTagNameNS(NFE_NS, 'chNFe')[0]?.textContent || 
+                 infNFe.getAttribute('Id')?.replace('NFe', '') || '',
+    
+    numero: getTagValue(ide, 'nNF'),
         serie: getTagValue(ide, 'serie'),
         dataEmissao: getTagValue(ide, 'dhEmi'),
         tipoOperacao: getTagValue(ide, 'tpNF') as '0' | '1',
@@ -273,6 +297,8 @@ export const parseNfeXmlToData = (xmlString: string): NfeDataFromXML => {
         valorTotalIcms: parseFloat(getTagValue(totalICMS, 'vICMS')),
         valorTotalIcmsST: parseFloat(getTagValue(totalICMS, 'vICMSST')),
         valorTotalTributos: parseFloat(getTagValue(totalICMS, 'vTotTrib')),
+        valorTotalPIS: parseFloat(getTagValue(totalICMS, 'vPIS')),     // Adicionado
+    valorTotalCOFINS: parseFloat(getTagValue(totalICMS, 'vCOFINS')), // Adicionado
 
         xmlBruto: xmlString,
         produtos
