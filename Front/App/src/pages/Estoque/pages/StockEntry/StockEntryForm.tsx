@@ -1,5 +1,5 @@
 // src/pages/StockEntryForm.tsx 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import Button from '../../../../components/ui/Button/Button';
 import FlexGridContainer from '../../../../components/Layout/FlexGridContainer/FlexGridContainer';
 import Typography from '../../../../components/ui/Typography/Typography';
@@ -9,6 +9,7 @@ import Badge from '../../../../components/ui/Badge/Badge';
 import { ActionPopover } from '../../../../components/ui/Popover/ActionPopover';
 import NfeCards from './_components/NfeCards';
 import { checkExistingMappings, checkSupplier, createSupplier, submitStockEntry } from '../../api/productsApi';
+import FormControl from '../../../../components/ui/FormControl/FormControl';
 
 
 interface ProductEntry extends ProdutoNF {
@@ -101,7 +102,7 @@ const StockEntryForm: React.FC = () => {
     const [supplierFantasyName, setSupplierFantasyName] = useState(''); // ✨ Novo estado
 const [supplierCnpj, setSupplierCnpj] = useState<string>('');
     const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
-    const [supplierToCreate, setSupplierToCreate] = useState<{ cnpj: string; name: string } | null>(null);
+    const [supplierToCreate, setSupplierToCreate] = useState<{ cnpj: string; name: string, fantasyName: string } | null>(null);
     // Form state for creating supplier
     const [supplierCreationName, setSupplierCreationName] = useState('');
     const [supplierCreationLoading, setSupplierCreationLoading] = useState(false);
@@ -188,6 +189,29 @@ const [itemToMap, setItemToMap] = useState<ProductEntry | null>(null);
         }
     };
 
+     const [nomeFantasia, setNomeFantasia] = useState("");
+
+// Função auxiliar para gerar o hash MD5 no navegador
+async function gerarHashCNPJ(cnpj: string): Promise<string> {
+    const cnpjLimpo = cnpj.replace(/\D/g, '');
+    const msgUint8 = new TextEncoder().encode(cnpjLimpo);
+    const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgUint8); // Usando SHA-256 (nativo e mais seguro que MD5 no browser)
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+const [siglaGerada, setSiglaGerada] = useState("");
+
+useEffect(() => {
+    if (supplierCnpj.length >= 14) { // Só gera quando o CNPJ estiver completo
+        gerarHashCNPJ(supplierCnpj).then(hash => {
+            setSiglaGerada(hash.substring(0, 4).toUpperCase());
+        });
+    } else {
+        setSiglaGerada("");
+    }
+}, [supplierCnpj]);
+
    // Upload XML
 const handleXmlUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -238,6 +262,7 @@ const handleXmlUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
                     setSupplierToCreate({
                         cnpj: formattedSupplierCnpj,
                         name: xmlData.supplier,
+                        fantasyName: xmlData.supplierFantasyName
                     });
                     setSupplierCreationName(xmlData.supplier);
 
@@ -370,33 +395,36 @@ const handleXmlUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
 };
 
     const handleModalMap = useCallback((tempId: number, data: MappingPayload) => {
+        if (!data) {
+            console.error("Erro: dados de mapeamento não recebidos");
+            return;
+        }
+
         setMappedItems(prev => ({
-    ...prev,
-    [tempId]: data
-}));
+            ...prev,
+            [tempId]: data
+        }));
 
-   setItems(prev => prev.map(it => {
-    if (it.tempId === tempId) {
-        return {
-            ...it,
-            isMapped: true,
-            // ⬇️ AJUSTE OS NOMES AQUI PARA BATER COM A SUA INTERFACE
-            mappedId: data.mapped.CodInterno, 
-            category: data.mapped.Categorias,
-            unitOfMeasure: data.mapped.individualUnit,
-            name: data.mapped.name,
-            mappedData: data.mapped 
-        };
-    }
-    return it;
-}));
+        setItems(prev => prev.map(it => {
+            if (it.tempId === tempId) {
+                return {
+                    ...it,
+                    isMapped: true,
+                    mappedId: data.CodInterno || data.sku,
+                    category: data.Categorias || "",
+                    unitOfMeasure: data.individualUnit || "UN",
+                    name: data.name || "",
+                    mappedData: data
+                };
+            }
+            return it;
+        }));
 
-    // Fecha o modal e limpa o estado
-    setIsMappingModalOpen(false);
-    setItemToMap(null);
-    
-console.log(`Produto ${tempId} mapeado com sucesso para o ID: ${data.mapped.CodInterno}`);
-}, []);
+        setIsMappingModalOpen(false);
+        setItemToMap(null);
+
+        console.log(`Produto ${tempId} mapeado com sucesso para o ID: ${data.CodInterno}`);
+    }, []);
 
 
 const openMappingModal = (item: ProductEntry) => {
@@ -638,6 +666,9 @@ const renderTableHead = (itemsList: ProductEntry[], toggleSelectAll: (isPending:
         );
     };
 
+
+
+
     // Confirma entrada
     const handleConfirmEntry = async () => {
         if (items.length === 0) { alert('Não há itens para dar entrada no estoque.'); return; }
@@ -740,7 +771,8 @@ const renderTableHead = (itemsList: ProductEntry[], toggleSelectAll: (isPending:
                             <label style={styles.importButton}> ✅ XML importado com sucesso. Dados da NF carregados.</label>
 
 
-                            <label style={styles.importButton}>Alterar XML</label>
+                            <label htmlFor="xml-upload" style={styles.importButton}>Alterar XML</label>
+                            
                         </div>
                     )}
 
@@ -898,8 +930,8 @@ const renderTableHead = (itemsList: ProductEntry[], toggleSelectAll: (isPending:
             {isSupplierModalOpen && supplierToCreate && (
                 <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.4)' }}>
                     <div style={{ width: 480, padding: 20, borderRadius: 8, backgroundColor: 'white', boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }}>
-                        <h3 style={{ marginTop: 0 }}>Criar Fornecedor</h3>
-                        <p>O fornecedor extraído da NF não foi localizado no sistema. Preencha os dados abaixo para criá-lo.</p>
+                        <h3 style={{ marginTop: 0, color:'black' }}>Criar Fornecedor</h3>
+                        <p style={{color:'black'}}>O fornecedor extraído da NF não foi localizado no sistema. Preencha os dados abaixo para criá-lo.</p>
 
                         <div style={{ display: 'grid', gap: 10, marginTop: 8 }}>
                             <div>
@@ -914,7 +946,35 @@ const renderTableHead = (itemsList: ProductEntry[], toggleSelectAll: (isPending:
 
                             <div>
                                 <label style={{ display: 'block', fontSize: '0.85rem', color: '#374151', marginBottom: 6 }}>CNPJ</label>
-                                <input value={supplierToCreate.cnpj} readOnly style={{ width: '100%', padding: '8px', borderRadius: 6, border: '1px solid #e5e7eb', backgroundColor: '#f9fafb' }} />
+                                <input value={supplierToCreate.cnpj} readOnly style={{ color: '#374151', width: '100%', padding: '8px', borderRadius: 6, border: '1px solid #e5e7eb', backgroundColor: '#f9fafb' }} />
+                            </div>
+
+                            <div>
+    <label style={{ display: 'block', fontSize: '0.85rem', color: '#374151', marginBottom: 6 }}>
+        Nome Fantasia
+    </label>
+    <input 
+        style={{ 
+            color: '#374151', 
+            width: '100%', 
+            padding: '8px', 
+            borderRadius: 6, 
+            border: '1px solid #e5e7eb', 
+            backgroundColor: '#fff' 
+        }} 
+        value={nomeFantasia}
+        onChange={(e) => setNomeFantasia(e.target.value)} 
+        placeholder="Ex: Lojas São José"
+    />
+</div>
+
+                            <div>
+                                <FormControl 
+    label="Sigla Gerada (BD)" 
+    value={siglaGerada} 
+    readOnlyDisplay 
+    style={{ marginTop: 10, backgroundColor: '#f3f4f6' }}
+/>
                             </div>
 
                             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 6 }}>
@@ -933,7 +993,7 @@ const renderTableHead = (itemsList: ProductEntry[], toggleSelectAll: (isPending:
                                     onClick={async () => {
                                         setSupplierCreationLoading(true);
                                         try {
-                                            const created = await createSupplier({ cnpj: supplierToCreate.cnpj, name: supplierCreationName.trim() });
+                                            const created = await createSupplier({ cnpj: supplierToCreate.cnpj, name: supplierCreationName.trim(), nomeFantasia: nomeFantasia.trim(), siglaGerada });
                                             alert(`Fornecedor criado: ${created.name} (ID ${created.id})`);
                                             setSupplier(created.name);
                                             setSupplierExists(true);

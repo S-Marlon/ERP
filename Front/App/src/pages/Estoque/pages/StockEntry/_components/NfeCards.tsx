@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import FormControl from '../../../../../components/ui/FormControl/FormControl';
 import Typography from '../../../../../components/ui/Typography/Typography';
 import FlexGridContainer from '../../../../../components/Layout/FlexGridContainer/FlexGridContainer';
 import Card from '../../../../../components/ui/Card/Card';
 import Badge from '../../../../../components/ui/Badge/Badge';
+import { buscarSiglaNoBanco } from '../../../api/productsApi';
 
 // --- Interface Atualizada conforme o novo nfeParser.ts ---
 interface NfeCardsProps {
@@ -42,6 +43,8 @@ interface NfeCardsProps {
     styles: any;
 }
 
+
+
 const NfeCards: React.FC<NfeCardsProps> = ({
     data,
     supplierStatus,
@@ -50,6 +53,31 @@ const NfeCards: React.FC<NfeCardsProps> = ({
 }) => {
     const { formatCurrency } = actions;
     const { totais, emitente } = data;
+
+        const [sigla, setSigla] = useState(""); // Aqui vai morar o "9AC5"
+
+
+
+        useEffect(() => {
+            if (emitente.cnpj) {
+                buscarSiglaNoBanco(emitente.cnpj).then(siglaRecebida => {
+                    console.log("Sigla recebida via POST:", siglaRecebida);
+                    setSigla(siglaRecebida);
+                });
+            }
+        }, [emitente.cnpj]);
+    
+
+    const siglaGerada = useMemo(() => {
+    if (!emitente?.nomeFantasia) return "";
+
+    return emitente.nomeFantasia
+        .normalize("NFD")                // Decompõe caracteres acentuados (ex: á -> a + ´)
+        .replace(/[\u0300-\u036f]/g, "") // Remove os acentos
+        .replace(/[^a-zA-Z0-9]/g, "")    // Remove tudo que não for letra ou número (caracteres especiais e espaços)
+        .substring(0, 10)                // Garante o máximo de 10 caracteres
+        .toUpperCase();                  // Padroniza em maiúsculas
+}, [emitente?.nomeFantasia]);
 
     return (
         <FlexGridContainer layout="grid" template="1fr" gap="20px">
@@ -61,14 +89,7 @@ const NfeCards: React.FC<NfeCardsProps> = ({
                 <Card variant="default" padding="20px">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
                         <Typography variant="h2">1. Identificação da NF</Typography>
-                        {supplierStatus.isChecking && <Badge color="paper">Verificando...</Badge>}
-                        {supplierStatus.exists === true && <Badge color="success">Fornecedor Ativo</Badge>}
-                        {supplierStatus.exists === false && (
-                             <div style={{ display: 'flex', gap: 8 }}>
-                                <Badge color="warning">Não Cadastrado</Badge>
-                                <button onClick={actions.onCreateSupplier} style={styles.miniButton}>Criar</button>
-                             </div>
-                        )}
+                        
                     </div>
 
                     <FlexGridContainer layout="grid" template="1fr 1fr 2fr" gap="10px">
@@ -85,6 +106,14 @@ const NfeCards: React.FC<NfeCardsProps> = ({
                 {/* Emitente */}
                 <Card variant="default" padding="20px">
                     <Typography variant="h2">2. Fornecedor (Emitente)</Typography>
+                    {supplierStatus.isChecking && <Badge color="paper">Verificando...</Badge>}
+                        {supplierStatus.exists === true && <Badge color="success">Fornecedor Ativo</Badge>}
+                        {supplierStatus.exists === false && (
+                             <div style={{ display: 'flex', gap: 8 }}>
+                                <Badge color="warning">Não Cadastrado</Badge>
+                                <button onClick={actions.onCreateSupplier} style={styles.miniButton}>Criar</button>
+                             </div>
+                        )}
                     <div style={{ marginTop: 15 }}>
                         <FormControl label="CNPJ" value={emitente.cnpj} readOnlyDisplay />
                         <FormControl 
@@ -93,6 +122,22 @@ const NfeCards: React.FC<NfeCardsProps> = ({
                             readOnlyDisplay 
                             style={{ marginTop: 10 }}
                         />
+                        <FormControl 
+                            label="Nome Fantasia" 
+                            value={emitente.nomeFantasia || emitente.nome} 
+                            readOnlyDisplay 
+                            style={{ marginTop: 10 }}
+                        />
+
+                         <FormControl 
+    label="Sigla" 
+    // Priorizamos a sigla que veio do banco de dados (estado local)
+    // Se não houver, ele pode mostrar um placeholder ou vazio
+    value={sigla || emitente.sigla || "Buscando..."} 
+    readOnlyDisplay 
+    style={{ marginTop: 10 }}
+/>
+                       
                     </div>
                 </Card>
             

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { saveProductMapping } from '../../../api/productsApi';
+import { buscarProdutosExistentes, buscarSiglaNoBanco, saveProductMapping } from '../../../api/productsApi';
 import CategoryTree from "../../../Components/CategoryTree";
 import Swal from 'sweetalert2';
 import FormControl from "../../../../../components/ui/FormControl/FormControl";
@@ -24,7 +24,7 @@ interface ProductEntry extends ProdutoNF {
 interface ProdutoPersistencia extends ProdutoNF {
 
     CodInterno: string;
-
+    
     name: string;
     Categorias: string;
     Marca?: string;
@@ -122,7 +122,6 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
         gtin: (item.gtin && item.gtin.trim() !== "" && !item.gtin.toUpperCase().includes("SEM GTIN"))
             ? item.gtin
             : "SEM GTIN",
-        name: item.gtin,
         name: item.descricao || "",
         Categorias: "",
         Marca: "",
@@ -150,8 +149,9 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
     // Estados necessários no seu componente pai
     const [categoriaPrefixo, setCategoriaPrefixo] = useState(""); // Ex: "MH"
     const [referencia, setReferencia] = useState(""); // Ex: "R1AT-04"
-    const [marca, setMarca] = useState(""); // Ex: "GATES"
+    const [sigla, setSigla] = useState(""); // Aqui vai morar o "9AC5"
 
+   
 
     const [isGeneric, setIsGeneric] = useState("");
 
@@ -172,13 +172,46 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
 
     const [descricaoDetalhada, setDescricaoDetalhada] = useState("");
 
+
     const isPackagingUnit = useMemo(() =>
         PACKAGING_UNITS.includes((item.unidadeMedida || item.unidadeMedida).toUpperCase()),
         [item]
     );
 
-    const [margin, setMargin] = useState<number>(0); // Em porcentagem
-    const [salePrice, setSalePrice] = useState<number>(0);
+    const [newMargin, setNewMargin] = useState<number>(0); // Em porcentagem
+    const [newSalePrice, setNewSalePrice] = useState<number>(item.valorUnitario);
+
+
+
+    /* Estados para a busca */
+const [searchTerm, setSearchTerm] = useState("");
+const [searchResults, setSearchResults] = useState<any[]>([]);
+const [showDropdown, setShowDropdown] = useState(false);
+const [isLoading, setIsLoading] = useState(false);
+
+const handleSearch = async (term: string) => {
+    setSearchTerm(term);
+    
+    if (term.length > 2) {
+        setIsLoading(true);
+        const resultados = await buscarProdutosExistentes(term);
+        setSearchResults(resultados);
+        setShowDropdown(true);
+        setIsLoading(false);
+    } else {
+        setSearchResults([]);
+        setShowDropdown(false);
+    }
+};
+
+const selectProduct = (prod: any) => {
+    setNewProductId(prod.CodInterno);
+    setNewProductName(prod.name);
+    setNewGtin(prod.gtin || "");
+    // Fecha a lista e limpa a busca
+    setShowDropdown(false);
+    setSearchTerm(""); 
+};
 
 
 
@@ -216,50 +249,57 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
     /* ======================================================
        EFEITO PARA CARREGAR DADOS INICIAIS (OPCIONAL)
     ====================================================== */
-    useEffect(() => {
-        // Exemplo: Buscar marcas cadastradas ao abrir o modal
-        // const fetchBrands = async () => { ... }
-        // fetchBrands();
-    }, []);
-
-    /* ======================================================
-       CÁLCULO FISCAL CENTRALIZADO (CRÍTICO)
-    ====================================================== */
-
-    const unitCostWithTaxes = useMemo(() => {
-        const nf = item;  // ✅
-        return nf.valorCustoReal ?? /* cálculo */ 0;
-    }, [item]);
-
-
-    /* ======================================================
-         SINCRONIZAÇÃO DE CÓDIGO
-      ====================================================== */
-    // ✅ SINCRONIZA TODOS OS CAMPOS → ProdutoPersistencia
-    useEffect(() => {
-        setProdutoPersistencia({
-            ...item, // ✅ Sempre mantém dados da NF
-            CodInterno: newProductId || "",
-            sku: newProductSku || "",
-            gtin: newGtin || (item.gtin && item.gtin.trim() !== "" && !item.gtin.toUpperCase().includes("SEM GTIN"))
-                ? item.gtin
-                : "SEM GTIN",
-            
-            name: newProductName || item.descricao || "",
-            Categorias: selectedCategoryShortName || newProductCategory || "Sem categoria",
-            Marca: selectedBrandId === 'new' ? newBrandName :
-                existingBrands.find(b => b.id === selectedBrandId)?.name || "",
-            Descrição: descricaoDetalhada || item.descricao || "",
-            Margem_Lucro: margin,
-            Preço_Final_de_Venda: salePrice,
-            individualUnit: individualUnit || "",
-            unitsPerPackage: unitsPerPackage ?? null
+  useEffect(() => {
+    if (supplierCnpj) {
+        buscarSiglaNoBanco(supplierCnpj).then(siglaRecebida => {
+            console.log("Sigla recebida via POST:", siglaRecebida);
+            setSigla(siglaRecebida);
         });
-    }, [
-        item, newProductId, newProductName, selectedCategoryShortName, newProductCategory,
-        selectedBrandId, newBrandName, descricaoDetalhada, margin, salePrice,
-        individualUnit, unitsPerPackage
-    ]);
+    }
+}, [supplierCnpj]);
+
+        /* ======================================================
+        CÁLCULO FISCAL CENTRALIZADO (CRÍTICO)
+        ====================================================== */
+
+        const unitCostWithTaxes = useMemo(() => {
+            const nf = item;  // ✅
+            return nf.valorCustoReal ?? /* cálculo */ 0;
+        }, [item]);
+
+
+        /* ======================================================
+            SINCRONIZAÇÃO DE CÓDIGO
+        ====================================================== */
+
+
+        // ✅ SINCRONIZA TODOS OS CAMPOS → ProdutoPersistencia
+        useEffect(() => {
+
+            
+            setProdutoPersistencia({
+                ...item, // ✅ Sempre mantém dados da NF
+                CodInterno: newProductId || "",
+                sku: `${newProductSku}/${sigla}`,
+                gtin: newGtin || (item.gtin && item.gtin.trim() !== "" && !item.gtin.toUpperCase().includes("SEM GTIN"))
+                    ? item.gtin
+                    : "SEM GTIN",
+                
+                name: newProductName || item.descricao || "",
+                Categorias: selectedCategoryShortName || newProductCategory || "Sem categoria",
+                Marca: selectedBrandId === 'new' ? newBrandName :
+                    existingBrands.find(b => b.id === selectedBrandId)?.name || "",
+                Descrição: descricaoDetalhada || item.descricao || "",
+                Margem_Lucro: newMargin,
+                Preço_Final_de_Venda: newSalePrice,
+                individualUnit: individualUnit || "",
+                unitsPerPackage: unitsPerPackage ?? null
+            });
+        }, [
+            item, newProductId, newProductName, selectedCategoryShortName, newProductCategory,
+            selectedBrandId, newBrandName, descricaoDetalhada, newMargin, newSalePrice,
+            individualUnit, unitsPerPackage, sigla
+        ]);
 
     useEffect(() => {
         if (!isGeneric) {
@@ -277,20 +317,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
     }, [isGeneric, item.sku, item.gtin]);
 
 
-    useEffect(() => {
-        if (!categoriaPrefixo || !referencia) return;
 
-        const clean = (txt: string) => txt.toUpperCase().replace(/[^A-Z0-9-]/g, '').trim();
-
-        const p = clean(categoriaPrefixo);
-        const r = clean(referencia);
-        const m = clean(marca);
-
-        // Regra: Genérico (P-R) | Marca-Específico (P-R-M)
-        const sugestao = isGeneric ? `${p}-${r}` : `${p}-${r}-${m}`;
-
-        setNewProductSku(sugestao);
-    }, [categoriaPrefixo, referencia, marca, isGeneric]);
 
     /* ======================================================
        VALIDAÇÃO DE CONSISTÊNCIA
@@ -322,6 +349,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
          CONFIRMAÇÃO E SALVAMENTO
       ====================================================== */
     const handleFinalizeMapping = useCallback(async () => {
+        
         if (!newProductId) {
             setInconsistencyError("O código do produto interno é obrigatório.");
             return;
@@ -361,7 +389,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
       </div>
 
       <small>SKU Do Fornecedor</small>
-      <div>${item.sku || '—'}</div>
+      <div style="font-weight:700;">${item.sku || '—'}</div>
 
       <small>GTIN / EAN</small>
       <div>${item.gtin || 'SEM GTIN'}</div>
@@ -527,8 +555,8 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
       <div>${produtoPersistencia.Marca || '—'}</div>
 
       <small>Margem de Lucro</small>
-      <div>${produtoPersistencia.Margem_Lucro?.toFixed(1) || '10.0'}%</div>
-
+      <div>${produtoPersistencia.Margem_Lucro?.toFixed(2)}%</div>
+     
       <small>Preço Final de Venda</small>
       <div style="font-weight:800; font-size:1rem;">
         R$ ${produtoPersistencia.Preço_Final_de_Venda?.toFixed(2) || '—'}
@@ -565,19 +593,24 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
             });
 
             if (result.isConfirmed) {
-                // Montamos o payload esperado pela API
-                const payload = {
-                    original: item,               // Dados vindos da NF
-                    mapped: produtoPersistencia,  // O seu estado com "p" minúsculo
-                    supplierCnpj: supplierCnpj    // CNPJ do fornecedor
+                // Normaliza GTIN: "SEM GTIN" → vazio para evitar erro de constraint UNIQUE
+                const mappedData = {
+                    ...produtoPersistencia,
+                    gtin: produtoPersistencia.gtin === "SEM GTIN" ? "" : produtoPersistencia.gtin
                 };
 
-                // Enviamos o payload (objeto) e não a Interface (tipo)
-                console.log("Enviando payload:", payload); // Adicione este log para conferir
+                // Montamos o payload esperado pela API
+                const payload = {
+                    original: item,
+                    mapped: mappedData,
+                    supplierCnpj: supplierCnpj
+                };
+
+                console.log("Enviando payload:", payload);
                 await saveProductMapping(payload);
 
-                // Notificamos o componente pai usando o estado atualizado
-                onMap(item.tempId, payload);
+                // Notificamos o componente pai usando o objeto normalizado
+                onMap(item.tempId, mappedData);
                 onClose();
             }
         } catch (error: any) {
@@ -585,7 +618,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
         } finally {
             setIsSaving(false);
         }
-    }, [newProductId, newProductName, newProductUnit, newProductCategory, selectedCategoryShortName, item, supplierCnpj, individualUnit, unitsPerPackage, onMap, onClose]);
+    }, [newProductId, newProductName, newMargin, newSalePrice, newProductUnit, newProductCategory, selectedCategoryShortName, item, supplierCnpj, individualUnit, unitsPerPackage, onMap, onClose]);
     /* ======================================================
        FINALIZAR NOVO PRODUTO
     ====================================================== */
@@ -624,6 +657,10 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
         unitCostWithTaxes
     ]);
 
+
+    function handleSuggestedCode(): void {
+        setNewProductId(item.sku);
+    }
 
     /* ======================================================
    CONTEÚDO DO MODAL (ESTRUTURA DE GRID)
@@ -774,13 +811,14 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
                                     <input
                                         type="text"
                                         className="sku-field"
-                                        value={item.sku+'marca'}
+                                        value={newProductSku}
+                                        onChange={(e) => setNewProductSku(e.target.value)}
                                         placeholder="Ex: R1AT-06"
                                     />
 
                                     {/* Sufixo Fixo e Visual */}
                                     <div className="sku-suffix">
-                                        /{marca || "MutliConex"}
+                                        /{sigla}
                                     </div>
                                 </div>
                             </div>
@@ -834,14 +872,80 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
       `}</style>
 
 
-                            <span>  </span>
+
+
+<div className="search-container" style={{ position: 'relative', marginBottom: '20px' }}>
+    <FormControl
+        label="Buscar Produto Existente (Nome, ID ou GTIN)"
+        value={searchTerm}
+        placeholder="Digite para pesquisar e apontar para um produto..."
+        onChange={(e) => handleSearch(e.target.value)}
+    />
+    
+    {isLoading && <small style={{color:'black'}}>Buscando no banco...</small>}
+
+    {showDropdown && searchResults.length > 0 && (
+        <ul style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            backgroundColor: 'white',
+            border: '1px solid #ddd',
+            borderRadius: '4px',
+            zIndex: 1000,
+            maxHeight: '200px',
+            overflowY: 'auto',
+            listStyle: 'none',
+            padding: 0,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+        }}>
+            {searchResults.map((prod) => (
+                <li 
+                    key={prod.CodInterno}
+                    onClick={() => selectProduct(prod)}
+                    style={{
+                        padding: '10px',
+                        cursor: 'pointer',
+                        borderBottom: '1px solid #eee',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        color: 'black'
+                    }}
+                    className="search-item"
+                >
+                    <span style={{ fontWeight: 'bold' }}>{prod.CodInterno} - {prod.name}</span>
+                    <small style={{ color: '#666' }}>Marca: {prod.Marca} | EAN: {prod.gtin}</small>
+                </li>
+            ))}
+        </ul>
+    )}
+</div>
+
+{/* Abaixo, o campo que recebe o valor final */}
+<FormControl 
+    label="Código Interno / ID Selecionado" 
+    value={newProductId} 
+    readOnlyDisplay
+/>
+
 
                             <FormControl
                                 label={"Código Interno / ID do Produto"}
-                                value={item.sku}
+                                value={newProductId}
                                 placeholder={"Ex: PA-001"}
-                                onChange={(e) => setNewSku(e.target.value)}
+                                onChange={(e) => setNewProductId(e.target.value)}
                             />
+                            {/* Criar logica para atribuir codigo interno do sistema */}
+
+                            {/* Se o produto for novo apenas reeber o sku do fornecedor ou criar logica própia */}
+
+                            {/* Se o produto existir fazer a busca no Banco de dados  */}
+
+                            <button className="btn btn-primary" onClick={() => handleSuggestedCode()}>
+                                Receber Codigo Sugerido  ¬
+                            </button>
+
 
 
                             <div className="flex flex-col gap-1">
@@ -955,36 +1059,86 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
                                 Venda por Unidade (Ex: Metro/Peça)
                             </div>
 
+
+
                             <FormControl
                                 label="Margem de Lucro (%)"
                                 type="number"
                                 step={0.01}
-                                value={margin}
+                                value={newMargin}
                                 onChange={(e) => {
                                     const m = Number(e.target.value);
-                                    setMargin(m);
                                     const unitCost = unitsPerPackage ? (item.valorCustoReal / unitsPerPackage!) : item.valorCustoReal;
-                                    setSalePrice(unitCost * (1 + m / 100));
+                                    const newSale = unitCost * (1 + m / 100);
+                                    setNewMargin(m);
+                                    setNewSalePrice(newSale);
+                                    setProdutoPersistencia(prev => ({
+                                        ...prev,
+                                        Margem_Lucro: m,
+                                        Preço_Final_de_Venda: newSale
+                                    }));
                                 }}
                                 placeholder="Ex: 50"
                             />
 
+
+                            <FormControl
+    label="Markup (Fator)"
+    type="number"
+    step={0.01}
+    value={newMargin ? (1 + newMargin / 100).toFixed(2) : ''} // Exibe 1.50 se a margem for 50
+    onChange={(e) => {
+        const f = Number(e.target.value); // Ex: 1.5
+        const unitCost = unitsPerPackage ? (item.valorCustoReal / unitsPerPackage) : item.valorCustoReal;
+        
+        // 1. Converte Markup para Margem Percentual: (Fator - 1) * 100
+        const equivalentMargin = (f - 1) * 100; 
+        
+        // 2. Calcula o novo preço de venda
+        const newSale = unitCost * f;
+
+        // 3. Atualiza todos os estados
+        setNewMargin(Number(equivalentMargin.toFixed(2)));
+        setNewSalePrice(newSale);
+        setProdutoPersistencia(prev => ({
+            ...prev,
+            Margem_Lucro: equivalentMargin,
+            Preço_Final_de_Venda: newSale
+        }));
+    }}
+    placeholder="Ex: 1.5"
+/>
+
                             <FormControl
                                 label="Preço Final de Venda"
-                                type="number"
                                 step={0.01}
+                                type="number"
                                 style={{ fontWeight: 'bold', color: '#1e293b' }}
-                                value={salePrice.toFixed(2)}
-                                onChange={(e) => {
-                                    const p = Number(e.target.value);
-                                    setSalePrice(p);
-                                    const unitCost = unitsPerPackage ? (item.valorCustoReal / unitsPerPackage!) : item.valorCustoReal;
-                                    if (unitCost > 0) {
+                                value={newSalePrice === null || newSalePrice === undefined ? '' : newSalePrice}
+                                onChange={(e: any) => {
+                                    const raw = e.target.value;
+                                    const p = raw === '' ? 0 : Number(raw);
+                                    // Calculate per-unit cost based on package size
+                                    const unitCost = unitsPerPackage ? (item.valorCustoReal / unitsPerPackage) : item.valorCustoReal;
+                                    let formattedMarkup = newMargin;
+
+                                    if (unitCost > 0 && raw !== '') {
                                         const rawMarkup = ((p - unitCost) / unitCost) * 100;
-                                        setMargin(Number(rawMarkup.toFixed(2)));
+                                        formattedMarkup = Number(rawMarkup.toFixed(2));
+                                        setNewMargin(formattedMarkup);
                                     }
+
+                                    setNewSalePrice(p);
+                                    setProdutoPersistencia(prev => ({
+                                        ...prev,
+                                        Margem_Lucro: formattedMarkup,
+                                        Preço_Final_de_Venda: p
+                                    }));
                                 }}
                             />
+
+
+                            
 
                             <div style={{ margin: '15px 0', padding: '10px', background: '#000000ff', borderRadius: '8px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '5px' }}>
@@ -996,7 +1150,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#29d19cff' }}>
                                     <span>Lucro Bruto/Unid:</span>
                                     <span style={{ fontWeight: 600 }}>
-                                        R$ {(salePrice - (unitsPerPackage ? (item.valorCustoReal / unitsPerPackage) : item.valorCustoReal)).toFixed(2)}
+                                        R$ {(newSalePrice - (unitsPerPackage ? (item.valorCustoReal / unitsPerPackage) : item.valorCustoReal)).toFixed(2)}
                                     </span>
                                 </div>
                             </div>
@@ -1006,23 +1160,26 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
                                 step={0.01}
                                 type="number"
                                 style={{ fontWeight: 'bold', color: '#1e293b' }}
-                                value={salePrice.toFixed(2)}
+                                value={newSalePrice === null || newSalePrice === undefined ? '' : newSalePrice}
                                 onChange={(e: any) => {
-                                    const p = Number(e.target.value);
-                                    setSalePrice(p);
-
+                                    const raw = e.target.value;
+                                    const p = raw === '' ? 0 : Number(raw);
                                     // Calculate per-unit cost based on package size
                                     const unitCost = unitsPerPackage ? (item.valorCustoReal / unitsPerPackage) : item.valorCustoReal;
+                                    let formattedMarkup = newMargin;
 
-                                    if (unitCost > 0) {
-                                        // 1. Calculate the raw markup
+                                    if (unitCost > 0 && raw !== '') {
                                         const rawMarkup = ((p - unitCost) / unitCost) * 100;
-
-                                        // 2. Format to 2 decimals (returns string) and convert back to number
-                                        const formattedMarkup = Number(rawMarkup.toFixed(2));
-
-                                        setMargin(formattedMarkup);
+                                        formattedMarkup = Number(rawMarkup.toFixed(2));
+                                        setNewMargin(formattedMarkup);
                                     }
+
+                                    setNewSalePrice(p);
+                                    setProdutoPersistencia(prev => ({
+                                        ...prev,
+                                        Margem_Lucro: formattedMarkup,
+                                        Preço_Final_de_Venda: p
+                                    }));
                                 }}
                             />
 
@@ -1035,10 +1192,10 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
                                             Projeção para o Conjunto ({unitsPerPackage || 1} un):
                                         </p>
                                         <p style={{ margin: 0 }}>
-                                            • Valor total do pacote: <strong>R$ {(salePrice * (unitsPerPackage || 1)).toFixed(2)}</strong>
+                                            • Valor total do pacote: <strong>R$ {(newSalePrice * (unitsPerPackage || 1)).toFixed(2)}</strong>
                                         </p>
                                         <p style={{ margin: 0 }}>
-                                            • Lucro total no pacote: <strong>R$ {((salePrice - (unitsPerPackage ? (item.valorUnitario / unitsPerPackage) : item.valorUnitario)) * (unitsPerPackage || 1)).toFixed(2)}</strong>
+                                            • Lucro total no pacote: <strong>R$ {((newSalePrice - (unitsPerPackage ? (item.valorCustoReal / unitsPerPackage) : item.valorCustoReal)) * (unitsPerPackage || 1)).toFixed(2)}</strong>
                                         </p>
                                         <p style={{ margin: '4px 0 0 0', fontStyle: 'italic', fontSize: '0.65rem', borderTop: '1px solid #fde68a', paddingTop: '4px' }}>
                                             O cálculo considera o custo real processado com impostos da NF.

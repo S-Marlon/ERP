@@ -355,13 +355,16 @@ app.post('/api/products/map', asyncHandler(async (req, res) => {
         const idFornecedor = forns[0].id_fornecedor;
 
         // 2. Inserir Produto - AJUSTADO PARA OS NOMES DO SEU LOG
+        // Normaliza GTIN: se for "SEM GTIN", vazio ou undefined → null
+        const normalizedGtin = (mapped.gtin && mapped.gtin.trim() !== "" && mapped.gtin !== "SEM GTIN") ? mapped.gtin : null;
+        
         const [newProd] = await connection.execute<ResultSetHeader>(
             `INSERT INTO produtos 
             (codigo_interno, codigo_barras, ncm, cest, descricao, tipo_produto, unidade, estoque_minimo, preco_venda, status, id_marca, exige_gtin, id_categoria) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 mapped.CodInterno || original.sku,        // Usa o código interno ou o SKU da NF
-                mapped.gtin || null,                      // No seu log está 'gtin', não 'barcode'
+                normalizedGtin,                           // Normaliza "SEM GTIN" para null
                 mapped.ncm || null,
                 mapped.cest || null,
                 mapped.name || null,
@@ -377,6 +380,9 @@ app.post('/api/products/map', asyncHandler(async (req, res) => {
         );
 
         // 3. Inserir no Produto-Fornecedor
+        // Normaliza EAN do fornecedor também
+        const normalizedEan = (original.gtin && original.gtin.trim() !== "" && original.gtin !== "SEM GTIN") ? original.gtin : null;
+        
         await connection.execute(
             `INSERT INTO produto_fornecedor 
             (id_produto, id_fornecedor, sku_fornecedor, ean_fornecedor, descricao_fornecedor, fator_conversao, ultimo_custo)
@@ -385,7 +391,7 @@ app.post('/api/products/map', asyncHandler(async (req, res) => {
                 newProd.insertId,
                 idFornecedor,
                 original.sku || null,
-                original.gtin || null,
+                normalizedEan,                            // Normaliza EAN
                 original.descricao || null,
                 mapped.unitsPerPackage || 1.000,
                 original.valorUnitario || 0.0000          // No seu log é 'valorUnitario'
@@ -451,13 +457,13 @@ app.post('/api/suppliers/check', asyncHandler(async (req, res) => {
 
 // Endpoint: Cria um fornecedor
 app.post('/api/suppliers', asyncHandler(async (req, res) => {
-    const { cnpj, name } = req.body;
+    const { cnpj, name, nomeFantasia, siglaGerada } = req.body;
     if (!cnpj || !name) return res.status(400).json({ error: 'CNPJ e nome são obrigatórios' });
 
     try {
         const [result]: any = await pool.execute(
-            'INSERT INTO fornecedores (cnpj, razao_social) VALUES (?, ?)',
-            [cnpj, name]
+            'INSERT INTO fornecedores (cnpj, razao_social, nome_fantasia, sigla) VALUES (?, ?, ?, ?)',
+            [cnpj, name, nomeFantasia || null, siglaGerada || null]
         );
         const insertId = result.insertId;
         res.status(201).json({ id: insertId, cnpj, name });
@@ -468,6 +474,23 @@ app.post('/api/suppliers', asyncHandler(async (req, res) => {
         }
         throw err;
     }
+}));
+
+
+app.post('/api/suppliers/get-sigla', asyncHandler(async (req, res) => {
+    const { cnpj } = req.body; // Vem do front como '71.636.179/0001-16'
+
+    // Busca direta sem manipulação de string
+    const [rows]: any = await pool.execute(
+        'SELECT sigla FROM fornecedores WHERE cnpj = ?',
+        [cnpj]
+    );
+
+    if (rows.length === 0) {
+        return res.status(404).json({ sigla: "", error: "Não encontrado" });
+    }
+
+    res.json({ sigla: rows[0].sigla });
 }));
 
 /**
@@ -604,6 +627,47 @@ app.post('/api/stock-entry', asyncHandler(async (req, res) => {
     } finally {
         connection.release();
     }
+}));
+
+
+
+
+
+
+app.get('/api/products/search', asyncHandler(async (req, res) => {
+    const { term } = req.query;
+
+    if (!term) return res.json([]);
+
+    // Query ajustada para as colunas reais da sua tabela `produtos`
+    // Também buscamos o nome da marca fazendo um JOIN simples se desejar, 
+    // mas aqui buscaremos o id_marca direto para simplificar
+    const query = `
+        SELECT 
+            id_produto,
+            codigo_interno, 
+            codigo_barras, 
+            descricao, 
+            unidade, 
+            preco_venda, 
+            id_marca, 
+            id_categoria
+        FROM produtos 
+        WHERE codigo_interno LIKE ? 
+           OR descricao LIKE ? 
+           OR codigo_barras = ?
+        LIMIT 10
+    `;
+
+    const searchPattern = `%${term}%`;
+    
+    const [rows]: any = await pool.execute(query, [
+        searchPattern, // codigo_interno
+        searchPattern, // descricao
+        term           // codigo_barras (exato)
+    ]);
+
+    res.json(rows);
 }));
 
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {

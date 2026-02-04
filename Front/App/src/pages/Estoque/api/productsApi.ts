@@ -202,13 +202,57 @@ export const checkSupplier = async (supplierCnpj: string) => {
     // Exemplo de retorno: { exists: true, supplier: { id_fornecedor: 1, razao_social: "Empresa X" } }
 };
 
+
+// services/supplierService.ts
+export async function buscarSiglaNoBanco(cnpj: string): Promise<string> {
+    if (!cnpj) return "";
+
+    // IMPORTANTE: Não use .replace(/\D/g, '') aqui! 
+    // O CNPJ deve ir como '71.636.179/0001-16'
+    
+    try {
+        const response = await fetch(`${apiBase}/suppliers/get-sigla`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cnpj: cnpj }) 
+        });
+
+        const data = await response.json();
+        return data.sigla || "";
+    } catch (error) {
+        console.error("Erro na busca:", error);
+        return "";
+    }
+}
+
+export async function buscarProdutosExistentes(termo: string): Promise<any[]> {
+    if (!termo || termo.length < 2) return [];
+
+    try {
+        // Aqui usamos GET pois é uma consulta simples por parâmetro
+        const response = await fetch(`${apiBase}/products/search?term=${encodeURIComponent(termo)}`);
+        
+        if (!response.ok) return [];
+
+        const data = await response.json();
+        return Array.isArray(data) ? data : []; 
+    } catch (error) {
+        console.error("Erro ao buscar produtos:", error);
+        return [];
+    }
+}
+
 // Cria fornecedor com CNPJ e nome
-export const createSupplier = async (payload: { cnpj: string; name: string }) => {
+export const createSupplier = async (payload: { cnpj: string; name: string, nomeFantasia: string, siglaGerada: string }) => {
     // Mapeia diretamente para os campos esperados pelo backend: { cnpj, name }
     // Caso seu backend aceite outras chaves como razao_social, você pode incluí-las também.
     const body = {
         cnpj: payload.cnpj,
-        name: payload.name, // Nome vindo do formulário/NFe
+        name: payload.name,
+        nomeFantasia: payload.nomeFantasia,
+        siglaGerada: payload.siglaGerada,
+        
+        // Nome vindo do formulário/NFe
         // Opcional: nome_fantasia: payload.name, razao_social: payload.name
     };
 
