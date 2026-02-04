@@ -235,6 +235,7 @@ export async function buscarProdutosExistentes(termo: string): Promise<any[]> {
         if (!response.ok) return [];
 
         const data = await response.json();
+        console.log("Produtos encontrados:", data);
         return Array.isArray(data) ? data : []; 
     } catch (error) {
         console.error("Erro ao buscar produtos:", error);

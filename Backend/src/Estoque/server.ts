@@ -6,10 +6,10 @@ import pool from './db.config'; // Assume que é um Pool do mysql2/promise
 import { ResultSetHeader } from 'mysql2';
 
 const app = express();
-app.use(cors()); 
+app.use(cors());
 app.use(express.json());
 
-const PORT = 3001; 
+const PORT = 3001;
 
 // --- Interfaces (para tipagem) ---
 interface InternalProductData {
@@ -17,7 +17,7 @@ interface InternalProductData {
     name: string;
     lastCost: number;
     category: string; // Full Name da Categoria
-    unitOfMeasure: string; 
+    unitOfMeasure: string;
 }
 
 // --- Funções Auxiliares ---
@@ -38,7 +38,7 @@ app.get('/', (req, res) => {
 // Rota de Teste de Conexão com o Banco de Dados (Já existente)
 app.get('/check-db', asyncHandler(async (req, res) => {
     // Tenta buscar o nome do banco de dados (query simples)
-    await pool.execute('SELECT 1'); 
+    await pool.execute('SELECT 1');
     res.status(200).json({ status: 'OK', message: 'ssssConexão com o Banco de Dados bem-sucedida!' });
 }));
 
@@ -50,7 +50,7 @@ app.get('/check-db', asyncHandler(async (req, res) => {
  */
 app.get('/api/products', asyncHandler(async (req, res) => {
     const query = req.query.query as string;
-    
+
     // Se query for vazia ou undefined, usamos '%' para o SQL trazer tudo
     const isSearchEmpty = !query || query.trim() === '';
     const searchTerm = isSearchEmpty ? '%' : `%${query}%`;
@@ -159,7 +159,7 @@ app.post('/api/products/categories/create', asyncHandler(async (req, res) => {
     if (existing.length > 0) {
         return res.status(409).json({ error: `Categoria '${fullName}' já existe.` });
     }
-    
+
     // Insere a nova categoria
     await pool.execute('INSERT INTO categorias (nome_categoria) VALUES (?)', [fullName]);
 
@@ -183,7 +183,7 @@ app.post('/api/products/find-or-create', asyncHandler(async (req, res) => {
 
     // 1. Tenta buscar pelo SKU (ou ID, dependendo da sua regra de negócio)
     const [existing]: [any, any] = await pool.execute(
-        `SELECT id_produto, nome_padrao FROM produtos_internos WHERE sku_interno = ? OR id_produto = ?`, 
+        `SELECT id_produto, nome_padrao FROM produtos_internos WHERE sku_interno = ? OR id_produto = ?`,
         [sku, sku]
     );
 
@@ -269,9 +269,9 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 
     // Erro de Conexão com o DB (Pode ser capturado por outros middlewares)
     if (err.message.includes('Falha ao conectar')) {
-        return res.status(503).json({ 
-            error: 'Serviço Indisponível', 
-            message: 'O servidor não conseguiu se conectar ao banco de dados.' 
+        return res.status(503).json({
+            error: 'Serviço Indisponível',
+            message: 'O servidor não conseguiu se conectar ao banco de dados.'
         });
     }
 
@@ -328,6 +328,8 @@ app.listen(PORT, () => {
 
 
 
+// lembrar de : se houver mapped.CodInterno registrado no sistema, deve ser realizado um update (vinculo) ao invés de insert 
+// ou seja produto já existe na tabela produtos, e será criado apenas o vínculo na tabela produto_fornecedor vinculado ao id_produto existente
 
 app.post('/api/products/map', asyncHandler(async (req, res) => {
     console.log("Body recebido:", req.body);
@@ -354,52 +356,73 @@ app.post('/api/products/map', asyncHandler(async (req, res) => {
         }
         const idFornecedor = forns[0].id_fornecedor;
 
-        // 2. Inserir Produto - AJUSTADO PARA OS NOMES DO SEU LOG
-        // Normaliza GTIN: se for "SEM GTIN", vazio ou undefined → null
+        // 2. Lógica de Existência do Produto (Vínculo ou Criação)
+        let idProduto: number;
         const normalizedGtin = (mapped.gtin && mapped.gtin.trim() !== "" && mapped.gtin !== "SEM GTIN") ? mapped.gtin : null;
-        
-        const [newProd] = await connection.execute<ResultSetHeader>(
-            `INSERT INTO produtos 
-            (codigo_interno, codigo_barras, ncm, cest, descricao, tipo_produto, unidade, estoque_minimo, preco_venda, status, id_marca, exige_gtin, id_categoria) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-                mapped.CodInterno || original.sku,        // Usa o código interno ou o SKU da NF
-                normalizedGtin,                           // Normaliza "SEM GTIN" para null
-                mapped.ncm || null,
-                mapped.cest || null,
-                mapped.name || null,
-                'COMERCIAL',
-                mapped.individualUnit || 'UN',
-                0,
-                mapped.Preço_Final_de_Venda || 0,
-                'Ativo',
-                1,                                        // id_marca (fixo 1 por enquanto, já que mapped.MarcaId não existe no log)
-                0,
-                parseInt(mapped.Categorias) || null       // Converte '1' para número
-            ]
-        );
 
-        // 3. Inserir no Produto-Fornecedor
-        // Normaliza EAN do fornecedor também
+        // Inicializamos como array vazio para o TS não reclamar no "existingProd.length"
+        let existingProd: any[] = [];
+
+        if (mapped.CodInterno) {
+            // Aqui fazemos o cast para <any[]> para evitar o erro de 'QueryResult'
+            const [rows] = await connection.execute<any[]>(
+                "SELECT id_produto FROM produtos WHERE codigo_interno = ? LIMIT 1",
+                [mapped.CodInterno]
+            );
+            existingProd = rows;
+        }
+
+        if (existingProd.length > 0) {
+            // PRODUTO JÁ EXISTE
+            idProduto = existingProd[0].id_produto;
+            console.log(`Produto encontrado (ID: ${idProduto}). Realizando apenas vínculo.`);
+        } else {
+            // PRODUTO NÃO EXISTE: INSERT
+            const [newProd] = await connection.execute<ResultSetHeader>(
+                `INSERT INTO produtos 
+        (codigo_interno, codigo_barras, ncm, cest, descricao, tipo_produto, unidade, estoque_minimo, preco_venda, status, id_marca, exige_gtin, id_categoria) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    mapped.CodInterno || original.sku,
+                    normalizedGtin,
+                    mapped.ncm || null,
+                    mapped.cest || null,
+                    mapped.name || null,
+                    'COMERCIAL',
+                    mapped.individualUnit || 'UN',
+                    0,
+                    mapped.Preço_Final_de_Venda || 0,
+                    'Ativo',
+                    1,
+                    0,
+                    parseInt(mapped.Categorias) || null
+                ]
+            );
+            idProduto = newProd.insertId;
+        }
+
+        // 3. Inserir no Produto-Fornecedor (O Vínculo)
         const normalizedEan = (original.gtin && original.gtin.trim() !== "" && original.gtin !== "SEM GTIN") ? original.gtin : null;
-        
+
+        // DICA: Usar 'INSERT IGNORE' ou 'ON DUPLICATE KEY UPDATE' aqui evita erros se o vínculo já existir
         await connection.execute(
             `INSERT INTO produto_fornecedor 
             (id_produto, id_fornecedor, sku_fornecedor, ean_fornecedor, descricao_fornecedor, fator_conversao, ultimo_custo)
-            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE ultimo_custo = VALUES(ultimo_custo)`, // Atualiza o custo se o vínculo já existir
             [
-                newProd.insertId,
+                idProduto,
                 idFornecedor,
                 original.sku || null,
-                normalizedEan,                            // Normaliza EAN
+                normalizedEan,
                 original.descricao || null,
                 mapped.unitsPerPackage || 1.000,
-                original.valorUnitario || 0.0000          // No seu log é 'valorUnitario'
+                original.valorUnitario || 0.0000
             ]
         );
 
         await connection.commit();
-        res.json({ success: true, id_produto: newProd.insertId });
+        res.json({ success: true, id_produto: idProduto });
 
     } catch (error: any) {
         await connection.rollback();
@@ -424,7 +447,7 @@ app.post('/api/products/map', asyncHandler(async (req, res) => {
 
 app.post('/api/products/check-mappings', asyncHandler(async (req, res) => {
     const { supplierCnpj, skus } = req.body; // skus é um array ['ABC', 'DEF']
-    
+
     const [mappings]: any = await pool.execute(`
         SELECT pf.sku_fornecedor, p.id_produto, p.codigo_interno, p.descricao, p.unidade, c.nome_categoria
         FROM produto_fornecedor pf
@@ -660,7 +683,7 @@ app.get('/api/products/search', asyncHandler(async (req, res) => {
     `;
 
     const searchPattern = `%${term}%`;
-    
+
     const [rows]: any = await pool.execute(query, [
         searchPattern, // codigo_interno
         searchPattern, // descricao

@@ -24,7 +24,7 @@ interface ProductEntry extends ProdutoNF {
 interface ProdutoPersistencia extends ProdutoNF {
 
     CodInterno: string;
-    
+
     name: string;
     Categorias: string;
     Marca?: string;
@@ -60,18 +60,21 @@ const modalStyles: { [key: string]: React.CSSProperties } = {
     },
     modal: {
         backgroundColor: '#ffffff', borderRadius: '16px',
-        width: '100%', maxWidth: '1900px', // Aumentado para acomodar a árvore lateral
+        width: '100%', maxWidth: '2100px', // Aumentado para acomodar a árvore lateral
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
         height: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column'
     },
     header: {
         padding: '16px 24px', borderBottom: '1px solid #e2e8f0', background: '#fff',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+        display: 'grid', justifyContent: 'space-between', alignItems: 'center',
+        gridTemplateColumns: '2fr 2fr 4fr 2fr', // NF | Cadastro | Árvore | Margem e preço de venda
+        gap: '0px'
     },
     contentGrid: {
         display: 'grid',
-        gridTemplateColumns: '2fr 3fr 1fr 2fr', // NF | Cadastro | Árvore | Margem e preço de venda
-        gap: '5px',
+        gridTemplateColumns: '2fr 1fr 5fr 2fr', // NF | Cadastro | Árvore | Margem e preço de venda
+        gap: '0px',
+        justifyContent: 'space-between',
         flex: 1,
         overflow: 'hidden'
     },
@@ -85,13 +88,71 @@ const modalStyles: { [key: string]: React.CSSProperties } = {
         padding: '16px 24px', borderTop: '1px solid #e2e8f0', background: '#f8fafc',
         display: 'flex', justifyContent: 'flex-end', gap: '12px'
     },
-    inputLabel: {
-        display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#64748b',
-        marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.025em'
+    headerContainer: {
+        display: 'flex',
+        flexDirection: 'column' as const,
+        gap: '20px',
+        padding: '24px',
+        backgroundColor: '#ffffff',
+        borderBottom: '1px solid #e2e8f0',
+        borderRadius: '12px 12px 0 0',
     },
-    modernInput: {
-        width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1',
-        fontSize: '0.9rem', marginBottom: '16px', outline: 'none', transition: 'all 0.2s'
+    topRow: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    title: {
+        margin: 0,
+        color: '#0f172a',
+        fontSize: '1.25rem',
+        fontWeight: 700,
+        letterSpacing: '-0.025em',
+    },
+    tabsWrapper: {
+        display: 'flex',
+        backgroundColor: '#f1f5f9',
+        padding: '4px',
+        borderRadius: '8px',
+        width: 'fit-content',
+    },
+   
+    searchSection: {
+        backgroundColor: '#f8fafc',
+        padding: '16px',
+        borderRadius: '12px',
+        border: '1px solid #e2e8f0',
+    },
+    fieldset: {
+        border: 'none',
+        padding: 0,
+        margin: 0,
+    },
+    legend: {
+        fontSize: '0.875rem',
+        fontWeight: 600,
+        color: '#475569',
+        marginBottom: '12px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+    },
+    badgeContainer: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        marginTop: '8px',
+    },
+    removeLinkBtn: {
+        padding: '4px 8px',
+        fontSize: '0.75rem',
+        color: '#ef4444',
+        background: '#fef2f2',
+        border: '1px solid #fee2e2',
+        borderRadius: '4px',
+        cursor: 'pointer',
+        fontWeight: 600,
+        transition: 'all 0.2s',
     }
 };
 
@@ -151,7 +212,8 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
     const [referencia, setReferencia] = useState(""); // Ex: "R1AT-04"
     const [sigla, setSigla] = useState(""); // Aqui vai morar o "9AC5"
 
-   
+    const [ProdutoVinculado, setProdutoVinculado] = useState<object | null>(null); // Aqui vai morar o "9AC5"
+
 
     const [isGeneric, setIsGeneric] = useState("");
 
@@ -184,33 +246,36 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
 
 
     /* Estados para a busca */
-const [searchTerm, setSearchTerm] = useState("");
-const [searchResults, setSearchResults] = useState<any[]>([]);
-const [showDropdown, setShowDropdown] = useState(false);
-const [isLoading, setIsLoading] = useState(false);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [showDropdown, setShowDropdown] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
 
-const handleSearch = async (term: string) => {
-    setSearchTerm(term);
+    const handleSearch = async (term: string) => {
+        setSearchTerm(term);
+
+        if (term.length > 2) {
+            setIsLoading(true);
+            const resultados = await buscarProdutosExistentes(term);
+            setSearchResults(resultados);
+            setShowDropdown(true);
+            setIsLoading(false);
+        } else {
+            setSearchResults([]);
+            setShowDropdown(false);
+        }
+    };
+
+    const handleSelectExisting = (prod: any) => {
+    setProdutoVinculado(prod);
     
-    if (term.length > 2) {
-        setIsLoading(true);
-        const resultados = await buscarProdutosExistentes(term);
-        setSearchResults(resultados);
-        setShowDropdown(true);
-        setIsLoading(false);
-    } else {
-        setSearchResults([]);
-        setShowDropdown(false);
-    }
-};
-
-const selectProduct = (prod: any) => {
-    setNewProductId(prod.CodInterno);
-    setNewProductName(prod.name);
-    setNewGtin(prod.gtin || "");
-    // Fecha a lista e limpa a busca
+    // Opcional: Preencher os campos de input com os dados do produto selecionado
+    // setNewProductId(prod.codigo_interno || prod.CodInterno);
+    // setNewProductName(prod.descricao || prod.name);
+    // setNewGtin(prod.codigo_barras || prod.gtin || "");
+    
     setShowDropdown(false);
-    setSearchTerm(""); 
+    setSearchTerm("");
 };
 
 
@@ -249,57 +314,57 @@ const selectProduct = (prod: any) => {
     /* ======================================================
        EFEITO PARA CARREGAR DADOS INICIAIS (OPCIONAL)
     ====================================================== */
-  useEffect(() => {
-    if (supplierCnpj) {
-        buscarSiglaNoBanco(supplierCnpj).then(siglaRecebida => {
-            console.log("Sigla recebida via POST:", siglaRecebida);
-            setSigla(siglaRecebida);
-        });
-    }
-}, [supplierCnpj]);
-
-        /* ======================================================
-        CÁLCULO FISCAL CENTRALIZADO (CRÍTICO)
-        ====================================================== */
-
-        const unitCostWithTaxes = useMemo(() => {
-            const nf = item;  // ✅
-            return nf.valorCustoReal ?? /* cálculo */ 0;
-        }, [item]);
-
-
-        /* ======================================================
-            SINCRONIZAÇÃO DE CÓDIGO
-        ====================================================== */
-
-
-        // ✅ SINCRONIZA TODOS OS CAMPOS → ProdutoPersistencia
-        useEffect(() => {
-
-            
-            setProdutoPersistencia({
-                ...item, // ✅ Sempre mantém dados da NF
-                CodInterno: newProductId || "",
-                sku: `${newProductSku}/${sigla}`,
-                gtin: newGtin || (item.gtin && item.gtin.trim() !== "" && !item.gtin.toUpperCase().includes("SEM GTIN"))
-                    ? item.gtin
-                    : "SEM GTIN",
-                
-                name: newProductName || item.descricao || "",
-                Categorias: selectedCategoryShortName || newProductCategory || "Sem categoria",
-                Marca: selectedBrandId === 'new' ? newBrandName :
-                    existingBrands.find(b => b.id === selectedBrandId)?.name || "",
-                Descrição: descricaoDetalhada || item.descricao || "",
-                Margem_Lucro: newMargin,
-                Preço_Final_de_Venda: newSalePrice,
-                individualUnit: individualUnit || "",
-                unitsPerPackage: unitsPerPackage ?? null
+    useEffect(() => {
+        if (supplierCnpj) {
+            buscarSiglaNoBanco(supplierCnpj).then(siglaRecebida => {
+                console.log("Sigla recebida via POST:", siglaRecebida);
+                setSigla(siglaRecebida);
             });
-        }, [
-            item, newProductId, newProductName, selectedCategoryShortName, newProductCategory,
-            selectedBrandId, newBrandName, descricaoDetalhada, newMargin, newSalePrice,
-            individualUnit, unitsPerPackage, sigla
-        ]);
+        }
+    }, [supplierCnpj]);
+
+    /* ======================================================
+    CÁLCULO FISCAL CENTRALIZADO (CRÍTICO)
+    ====================================================== */
+
+    const unitCostWithTaxes = useMemo(() => {
+        const nf = item;  // ✅
+        return nf.valorCustoReal ?? /* cálculo */ 0;
+    }, [item]);
+
+
+    /* ======================================================
+        SINCRONIZAÇÃO DE CÓDIGO
+    ====================================================== */
+
+
+    // ✅ SINCRONIZA TODOS OS CAMPOS → ProdutoPersistencia
+    useEffect(() => {
+
+
+        setProdutoPersistencia({
+            ...item, // ✅ Sempre mantém dados da NF
+            CodInterno: newProductId || "",
+            sku: `${newProductSku}/${sigla}`,
+            gtin: newGtin || (item.gtin && item.gtin.trim() !== "" && !item.gtin.toUpperCase().includes("SEM GTIN"))
+                ? item.gtin
+                : "SEM GTIN",
+
+            name: newProductName || item.descricao || "",
+            Categorias: selectedCategoryShortName || newProductCategory || "Sem categoria",
+            Marca: selectedBrandId === 'new' ? newBrandName :
+                existingBrands.find(b => b.id === selectedBrandId)?.name || "",
+            Descrição: descricaoDetalhada || item.descricao || "",
+            Margem_Lucro: newMargin,
+            Preço_Final_de_Venda: newSalePrice,
+            individualUnit: individualUnit || "",
+            unitsPerPackage: unitsPerPackage ?? null
+        });
+    }, [
+        item, newProductId, newProductName, selectedCategoryShortName, newProductCategory,
+        selectedBrandId, newBrandName, descricaoDetalhada, newMargin, newSalePrice,
+        individualUnit, unitsPerPackage, sigla
+    ]);
 
     useEffect(() => {
         if (!isGeneric) {
@@ -309,7 +374,7 @@ const selectProduct = (prod: any) => {
             setNewProductSku(item.sku);
         } else {
             setNewProductId(item.gtin || item.sku);
-             setNewBrandName(item.gtin || "SEM GTIN");
+            setNewBrandName(item.gtin || "SEM GTIN");
             setNewProductId(item.gtin || item.sku);
             setNewProductSku(item.sku);
 
@@ -317,6 +382,16 @@ const selectProduct = (prod: any) => {
     }, [isGeneric, item.sku, item.gtin]);
 
 
+
+    useEffect(() => {
+        if ( ProdutoVinculado != null) {
+            setNewProductId((ProdutoVinculado as any).codigo_interno);
+            setNewProductCategory((ProdutoVinculado as any).categoria);
+        }
+        else {
+            setNewProductId(item.gtin || item.sku);
+        }
+    }, [ProdutoVinculado]);
 
 
     /* ======================================================
@@ -341,7 +416,7 @@ const selectProduct = (prod: any) => {
             return;
         }
 
-        
+
 
     }, [newProductId, isGeneric, item.sku, item.gtin]);
 
@@ -349,7 +424,7 @@ const selectProduct = (prod: any) => {
          CONFIRMAÇÃO E SALVAMENTO
       ====================================================== */
     const handleFinalizeMapping = useCallback(async () => {
-        
+
         if (!newProductId) {
             setInconsistencyError("O código do produto interno é obrigatório.");
             return;
@@ -670,36 +745,118 @@ const selectProduct = (prod: any) => {
         <div style={modalStyles.overlay}>
             <div style={modalStyles.modal}>
 
-                <header style={modalStyles.header}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                        <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1.1rem' }}>Mapeamento de Novo Produto</h3>
-                        <div style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '8px' }}>
-                            <button
-                                onClick={() => setIsGeneric(true)}
-                                style={{
-                                    ...tabButtonStyle,
-                                    backgroundColor: isGeneric ? '#fff' : 'transparent',
-                                    color: isGeneric ? '#f97316' : '#64748b',
-                                    boxShadow: isGeneric ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
-                                }}
-                            >Genérico/Misturável</button>
-                            <button
-                                onClick={() => setIsGeneric(false)}
-                                style={{
-                                    ...tabButtonStyle,
-                                    backgroundColor: !isGeneric ? '#fff' : 'transparent',
-                                    color: !isGeneric ? '#3b82f6' : '#64748b',
-                                    boxShadow: !isGeneric ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
-                                }}
-                            >Marca-Específico</button>
-                        </div>
+                <header style={modalStyles.headerContainer}>
+    {/* Linha Superior: Título e Alternador de Tipo */}
+    <div style={modalStyles.topRow}>
+        <h3 style={modalStyles.title}>Mapeamento de Novo Produto</h3>
+        
+        <div style={modalStyles.tabsWrapper}>
+            <button
+                onClick={() => setIsGeneric(true)}
+            >
+                📦 Genérico
+            </button>
+            <button
+                onClick={() => setIsGeneric(false)}
+            >
+                🏷️ Marca-Específico
+            </button>
+        </div>
+    </div>
+
+    {/* Seção de Busca */}
+    <div style={modalStyles.searchSection}>
+        <fieldset style={modalStyles.fieldset}>
+            <legend style={modalStyles.legend}>
+                <span>🔍</span> Relacionar com Produto Existente
+            </legend>
+
+            <div style={{ position: 'relative' }}>
+                <FormControl
+                    value={searchTerm}
+                    placeholder="Pesquisar por Nome, ID ou GTIN..."
+                    onChange={(e) => handleSearch(e.target.value)}
+                    // Adicione um estilo interno ao seu FormControl se puder
+                />
+
+                {isLoading && (
+                    <div style={{ position: 'absolute', right: '12px', top: '10px' }}>
+                        <small style={{ color: '#64748b' }}>Buscando...</small>
                     </div>
-                    {inconsistencyError && (
-                        <Badge color="danger">⚠️ {inconsistencyError}</Badge>
-                    )}
+                )}
 
+                {showDropdown && searchResults.length > 0 && (
+                    <ul style={{
+                        position: 'absolute',
+                        top: 'calc(100% + 5px)',
+                        left: 0,
+                        right: 0,
+                        backgroundColor: 'white',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                        zIndex: 1000,
+                        maxHeight: '280px',
+                        overflowY: 'auto',
+                        listStyle: 'none',
+                        padding: '4px',
+                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                    }}>
+                        {searchResults.map((prod) => (
+                            <li
+                                key={prod.CodInterno}
+                                onClick={() => handleSelectExisting(prod)}
+                                style={{
+                                    padding: '12px',
+                                    cursor: 'pointer',
+                                    borderRadius: '6px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    transition: 'background 0.2s',
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                            >
+                                <span style={{ fontWeight: 600, color: '#1e293b', fontSize: '0.9rem' }}>
+                                    {prod.codigo_interno} - {prod.descricao}
+                                </span>
+                                <small style={{ color: '#64748b', marginTop: '2px' }}>
+                                    EAN: {prod.codigo_barras || 'N/A'} • Categoria: {prod.id_categoria || 'Geral'}
+                                </small>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
+        </fieldset>
 
-                </header>
+        {/* Status do Vínculo */}
+        <div style={modalStyles.badgeContainer}>
+            {ProdutoVinculado ? (
+                <>
+                    <Badge color="success">
+                        ✅ Vinculado: {(ProdutoVinculado as any).descricao}
+                    </Badge>
+                    <button 
+                        onClick={() => setProdutoVinculado(null)} 
+                        style={modalStyles.removeLinkBtn}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = '#fee2e2')}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = '#fef2f2')}
+                    >
+                        Remover vínculo
+                    </button>
+                </>
+            ) : (
+                <Badge color="warning">
+                    ⚠️ Aguardando seleção ou novo cadastro
+                </Badge>
+            )}
+            
+            {inconsistencyError && (
+                <Badge color="danger">🚨 {inconsistencyError}</Badge>
+            )}
+        </div>
+    </div>
+</header>
 
                 <div style={modalStyles.contentGrid}>
 
@@ -717,7 +874,7 @@ const selectProduct = (prod: any) => {
                             <FormControl label="Nome do Item na NF" readOnlyDisplay value={item.descricao} />
                         </div>
 
-                        <hr style={{ border: '0', borderTop: '1px dashed #e2e8f0', margin: '16px 0' }} />
+                        <hr style={{ border: '0', borderTop: '1px dashed #e2e8f0', margin: '8px 0' }} />
 
                         {/* Financeiro e Quantidade */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
@@ -784,6 +941,20 @@ const selectProduct = (prod: any) => {
 
                     </aside>
 
+
+                    {/* COLUNA 3: CATEGORIA */}
+                    <aside style={{ ...modalStyles.sectionColumn, backgroundColor: '#f8fafc', borderRight: 'none', width: '350px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '20px' }}>
+                            <div style={{ padding: '6px', background: '#e0f2fe', borderRadius: '6px', color: '#0284c7' }}>🌳</div>
+                            <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#1e293b' }}>Classificação</h4>
+                        </div>
+
+                        <CategoryTree
+                            selectedCategoryId={newProductCategory}
+                            onSelectCategory={setNewProductCategory}
+                            onCategoryNameChange={setSelectedCategoryShortName}
+                        />
+                    </aside>
                     {/* COLUNA 2: CADASTRO DO PRODUTO (SISTEMA) */}
                     <main style={modalStyles.sectionColumn}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
@@ -873,6 +1044,10 @@ const selectProduct = (prod: any) => {
 
 
 
+                            {/* <fieldset>
+    <legend style={{ marginBottom: '8px', fontWeight: '600', color: '#111827' }}>
+        🔍 Relacionar com Produto Existente no Sistema
+    </legend>
 
 <div className="search-container" style={{ position: 'relative', marginBottom: '20px' }}>
     <FormControl
@@ -914,37 +1089,36 @@ const selectProduct = (prod: any) => {
                     }}
                     className="search-item"
                 >
-                    <span style={{ fontWeight: 'bold' }}>{prod.CodInterno} - {prod.name}</span>
-                    <small style={{ color: '#666' }}>Marca: {prod.Marca} | EAN: {prod.gtin}</small>
+                    <span style={{ fontWeight: 'bold' }}>{prod.codigo_interno} - {prod.descricao}</span>
+                    <small style={{ color: '#666' }}>Categoria: {prod.id_categoria} | EAN: {prod.codigo_barras}</small>
                 </li>
             ))}
         </ul>
     )}
 </div>
-
-{/* Abaixo, o campo que recebe o valor final */}
-<FormControl 
-    label="Código Interno / ID Selecionado" 
-    value={newProductId} 
-    readOnlyDisplay
-/>
+</fieldset> */}
 
 
+                            {/* Abaixo, o campo que recebe o valor final */}
                             <FormControl
                                 label={"Código Interno / ID do Produto"}
                                 value={newProductId}
+                                readOnlyDisplay={ProdutoVinculado != null ? true : false}
                                 placeholder={"Ex: PA-001"}
                                 onChange={(e) => setNewProductId(e.target.value)}
                             />
+
+
+
                             {/* Criar logica para atribuir codigo interno do sistema */}
 
                             {/* Se o produto for novo apenas reeber o sku do fornecedor ou criar logica própia */}
 
                             {/* Se o produto existir fazer a busca no Banco de dados  */}
 
-                            <button className="btn btn-primary" onClick={() => handleSuggestedCode()}>
+                            {/* <button className="btn btn-primary" onClick={() => handleSuggestedCode()}>
                                 Receber Codigo Sugerido  ¬
-                            </button>
+                            </button> */}
 
 
 
@@ -1029,20 +1203,6 @@ const selectProduct = (prod: any) => {
                         </div>
                     </main>
 
-                    {/* COLUNA 3: CATEGORIA */}
-                    <aside style={{ ...modalStyles.sectionColumn, backgroundColor: '#f8fafc', borderRight: 'none', width: '350px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '20px' }}>
-                            <div style={{ padding: '6px', background: '#e0f2fe', borderRadius: '6px', color: '#0284c7' }}>🌳</div>
-                            <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#1e293b' }}>Classificação</h4>
-                        </div>
-
-                        <CategoryTree
-                            selectedCategoryId={newProductCategory}
-                            onSelectCategory={setNewProductCategory}
-                            onCategoryNameChange={setSelectedCategoryShortName}
-                        />
-                    </aside>
-
 
                     {/* COLUNA 4: margem e preço de venda */}
 
@@ -1083,31 +1243,31 @@ const selectProduct = (prod: any) => {
 
 
                             <FormControl
-    label="Markup (Fator)"
-    type="number"
-    step={0.01}
-    value={newMargin ? (1 + newMargin / 100).toFixed(2) : ''} // Exibe 1.50 se a margem for 50
-    onChange={(e) => {
-        const f = Number(e.target.value); // Ex: 1.5
-        const unitCost = unitsPerPackage ? (item.valorCustoReal / unitsPerPackage) : item.valorCustoReal;
-        
-        // 1. Converte Markup para Margem Percentual: (Fator - 1) * 100
-        const equivalentMargin = (f - 1) * 100; 
-        
-        // 2. Calcula o novo preço de venda
-        const newSale = unitCost * f;
+                                label="Markup (Fator)"
+                                type="number"
+                                step={0.01}
+                                value={newMargin ? (1 + newMargin / 100).toFixed(2) : ''} // Exibe 1.50 se a margem for 50
+                                onChange={(e) => {
+                                    const f = Number(e.target.value); // Ex: 1.5
+                                    const unitCost = unitsPerPackage ? (item.valorCustoReal / unitsPerPackage) : item.valorCustoReal;
 
-        // 3. Atualiza todos os estados
-        setNewMargin(Number(equivalentMargin.toFixed(2)));
-        setNewSalePrice(newSale);
-        setProdutoPersistencia(prev => ({
-            ...prev,
-            Margem_Lucro: equivalentMargin,
-            Preço_Final_de_Venda: newSale
-        }));
-    }}
-    placeholder="Ex: 1.5"
-/>
+                                    // 1. Converte Markup para Margem Percentual: (Fator - 1) * 100
+                                    const equivalentMargin = (f - 1) * 100;
+
+                                    // 2. Calcula o novo preço de venda
+                                    const newSale = unitCost * f;
+
+                                    // 3. Atualiza todos os estados
+                                    setNewMargin(Number(equivalentMargin.toFixed(2)));
+                                    setNewSalePrice(newSale);
+                                    setProdutoPersistencia(prev => ({
+                                        ...prev,
+                                        Margem_Lucro: equivalentMargin,
+                                        Preço_Final_de_Venda: newSale
+                                    }));
+                                }}
+                                placeholder="Ex: 1.5"
+                            />
 
                             <FormControl
                                 label="Preço Final de Venda"
@@ -1138,7 +1298,7 @@ const selectProduct = (prod: any) => {
                             />
 
 
-                            
+
 
                             <div style={{ margin: '15px 0', padding: '10px', background: '#000000ff', borderRadius: '8px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '5px' }}>
