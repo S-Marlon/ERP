@@ -29,6 +29,7 @@ import RelatorioPoco from './components/forms/specific/CadastroRelatorio/Cadastr
 import StockEntryForm from './pages/Estoque/pages/StockEntry/StockEntryForm';
 import StockAdjustmentForm from './pages/Estoque/pages/StockAdjustment/StockAdjustmentForm';
 import StockInventory from './pages/Estoque/pages/StockInventory/StockInventory';
+import StockLabelingForm from './pages/Estoque/pages/StockLabelingForm/StockLabelingForm';
 import { PDV } from './pages/PDV/PDV';
 
 function App() {
@@ -106,6 +107,7 @@ function App() {
               <Route path="/Estoque/consulta" element={<StockInventory/>} />
               <Route path="/Estoque/gerenciamento" element={<StockEntryForm/>} />
               <Route path="/Estoque/operacoes" element={<StockAdjustmentForm/>} />
+              <Route path="/Estoque/etiquetagem" element={<StockLabelingForm/>} />
 
               <Route path="/Servicos" element={<Servicos />} />
               

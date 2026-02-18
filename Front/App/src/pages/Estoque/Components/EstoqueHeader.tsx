@@ -18,6 +18,7 @@ const EstoqueHeader: React.FC<ProductHeaderProps> = ({  onAddProduct }) => {
             <Button variant='primary' onClick={onAddProduct}><a href='/Estoque/consulta'>Cadastro e Gerenciamento de Produtos</a></Button>
             <Button variant='primary' onClick={onAddProduct}> <a href='/Estoque/gerenciamento'>Movimentação e Operações Diárias</a></Button>
             <Button variant='primary' onClick={onAddProduct}> <a href='/Estoque/operacoes'>Consultas e Relatórios (Análise)</a></Button>
+            <Button variant='primary' onClick={onAddProduct}> <a href='/Estoque/etiquetagem'>Etiquetagem</a></Button>
             </div>
 
 

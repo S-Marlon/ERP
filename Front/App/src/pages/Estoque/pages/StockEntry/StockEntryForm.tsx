@@ -151,11 +151,37 @@ const [itemToMap, setItemToMap] = useState<ProductEntry | null>(null);
     // Função que faz a sincronização de mapeamentos e atualiza os itens (usada ao importar XML e após criar fornecedor)
     const performMappingSync = async (cnpjToUse: string, xmlToUse: NfeData) => {
         try {
+            console.log('\n=== INICIANDO performMappingSync ===');
+            console.log('CNPJ:', cnpjToUse);
+            
+            // 🔑 Primeiro, gera o hash do CNPJ (mesmo que o backend faz)
+            const cnpjLimpo = cnpjToUse.replace(/\D/g, '');
+            const encoder = new TextEncoder();
+            const hashBuffer = await window.crypto.subtle.digest('SHA-256', encoder.encode(cnpjLimpo));
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const cnpjHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 4).toUpperCase();
+            console.log('CNPJ Hash gerado no frontend:', cnpjHash);
+            
             const skus = xmlToUse.items.map(i => i.sku);
+            console.log('SKUs enviados para o backend:', skus);
+            
             const existingMappings = await checkExistingMappings(cnpjToUse, skus);
+            console.log('Mappings retornados do backend:', existingMappings);
+            console.log('Total de mappings encontrados:', existingMappings.length);
+            
+            // 🔑 Cria um Map para lookup O(1) usando sku_fornecedor como chave
+            const mappingsBySkuFornecedor = new Map(
+                existingMappings.map((m: any) => [m.sku_fornecedor, m])
+            );
+            console.log('Map de mappings criado com chaves:', Array.from(mappingsBySkuFornecedor.keys()));
+            
             const reconciledItems = xmlToUse.items.map((item: any) => {
-                const mapping = existingMappings.find((m: any) => m.sku_fornecedor === item.sku);
+                // ✅ Formata o SKU do item com o hash (igual ao backend)
+                const formattedSkuForLookup = `${item.sku}/${cnpjHash}`;
+                const mapping = mappingsBySkuFornecedor.get(formattedSkuForLookup);
+                console.log(`Processando item SKU: "${item.sku}" -> Formatado: "${formattedSkuForLookup}" -> Encontrado:`, mapping ? 'SIM ✅' : 'NÃO ❌');
                 if (mapping) {
+                    console.log(`  └─ Mapeado para: ${mapping.codigo_interno} (${mapping.descricao})`);
                     return {
                         ...item,
                         isMapped: true,
@@ -169,6 +195,7 @@ const [itemToMap, setItemToMap] = useState<ProductEntry | null>(null);
                         },
                     };
                 }
+                console.log(`  └─ Nenhum mapeamento encontrado`);
                 return { ...item, isMapped: false };
             });
 
@@ -338,7 +365,7 @@ const handleXmlUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         if (isNaN(received) || received < 0) return;
         setItems(prev => prev.map(it => {
             if (it.tempId === tempId) {
-                const diff = received - it.quantity;
+                const diff = received - it.quantidade;
                 return { ...it, quantityReceived: received, difference: parseFloat(diff.toFixed(4)) };
             } return it;
         }));
@@ -519,17 +546,15 @@ const renderTableHead = (itemsList: ProductEntry[], toggleSelectAll: (isPending:
                     )}
                 </th>
                 <th style={styles.tableTh}>Mapeamento</th>
-                <th style={{ ...styles.tableTh, width: '60px' }}>SKU Forn.</th>
-                <th style={{ ...styles.tableTh, width: '60px' }}>EAN</th>
-                <th style={{ ...styles.tableTh, width: '450px' }}>Produto (NF)</th>
-                <th style={{ ...styles.tableTh, width: '100px' }}>Preço Unitário (NF)</th>
-                <th style={{ ...styles.tableTh, width: '80px' }}>Qtd. NF</th>
-                <th style={{ ...styles.tableTh, width: '80px' }}>UN. NF</th>
-                <th style={{ ...styles.tableTh, width: '70px' }}>*Qtd. Recebida*</th>
+                <th style={{ ...styles.tableTh, width: '60px' }}><Badge color='paper'>EAN </Badge> & <Badge color='poco'>SKU Forn.</Badge></th>
+                <th style={{ ...styles.tableTh, width: '500px' }}>Produto (NF)</th>
+                <th style={{ ...styles.tableTh, width: '80px' }}>Preço Unitário (NF)</th>
+                <th style={{ ...styles.tableTh, width: '50px' }}>Qtd. NF</th>
+                <th style={{ ...styles.tableTh }}>UoM</th>
+                <th style={{ ...styles.tableTh }}>*Qtd. Recebida*</th>
                 <th style={{ ...styles.tableTh, width: '30px' }}>*Dif.*</th>
-                <th style={{ ...styles.tableTh, width: '120px' }}>Categoria</th>
                 <th style={{ ...styles.tableTh, width: '60px' }}>Total Produto</th>
-                <th style={{ ...styles.tableTh, width: '30px' }}>Ações</th>
+                <th style={{ ...styles.tableTh }}>Ações</th>
             </tr>
         </thead>
     );
@@ -578,7 +603,7 @@ const renderTableHead = (itemsList: ProductEntry[], toggleSelectAll: (isPending:
                 </td>
                 <td style={styles.tableCell}>
                     {item.isMapped ? (
-                        <Badge color="success">Cod Interno: {item.mappedId}</Badge>
+                        <Badge color="success"  >Cod Interno: {item.mappedId}</Badge>
                     ) : (
                         <Button onClick={() => openMappingModal(item)} variant='warning' fontsize='11px' padding='5px' >
                             🔗 Mapear
@@ -586,41 +611,8 @@ const renderTableHead = (itemsList: ProductEntry[], toggleSelectAll: (isPending:
                     )}
                 </td>
                 
-                <td style={styles.tableCell}>{item.sku}</td>
-                <td style={styles.tableCell}>{item.gtin || '-'}</td>
-                <td style={{ ...styles.tableCell, fontWeight: 500 }}>{item.descricao}</td>
-                <td style={styles.tableCell}>R$ {item.valorProdutos.toFixed(3)}</td>
-                <td style={{ ...styles.tableCell, fontWeight: 700, color: '#4b5563' }}>{item.quantidade.toFixed(2)}</td>
-                <td style={{ ...styles.tableCell, fontWeight: 700, color: '#4b5563' }}>{item.unidadeMedida}</td>
-                <td style={styles.tableCell}>
-                    {item.isConfirmed ? (
-                        <span style={{ fontWeight: 600, color: '#10b981' }}>{item.quantidade}</span>
-                    ) : (
-                        <input
-                            type="number" min="0" step={item.unidadeMedida === 'UN' || item.unidadeMedida === 'PC' ? '1' : '0.1'}
-                            value={String(item.quantidade)}
-                            onChange={(e) => handleUpdateReceivedQuantityFn(item.tempId, e.target.value)}
-                            style={{
-                                maxWidth: '50px',
-                                backgroundColor: isDivergent ? '#fee2e2' : '#ffffff',
-                                border: isDivergent ? '2px solid #dc2626' : '2px solid #10b981',
-                                color: isDivergent ? '#991b1b' : '#10b981',
-                            }}
-                            disabled={item.isConfirmed}
-                        />
-                    )}
-                </td>
-                <td style={{
-                    ...styles.tableCell, fontWeight: 700,
-                    color: isDivergent ? (item.difference > 0 ? '#f97316' : '#dc2626') : '#10b981',
-                    backgroundColor: isDivergent ? (item.difference > 0 ? '#fef3c7' : '#fee2e2') : 'transparent',
-                    padding: '3px 6px',
-                    borderRadius: '4px',
-                }}>
-                    {item.difference.toFixed(2)}
-                </td>
-                <td style={styles.tableCell}>
-                    {item.category && item.category !== '' ? (
+                <td style={styles.tableCell}> <Badge color='paper'> {item.gtin || '-'}</Badge>  <br /> <Badge color='poco'>{item.sku}</Badge> </td>
+                <td style={{ ...styles.tableCell, fontWeight: 500 }}>{item.descricao} <br /> {item.category && item.category !== '' ? (
                         <span style={{
                             padding: '3px 8px',
                             backgroundColor: '#d1fae5',
@@ -642,8 +634,38 @@ const renderTableHead = (itemsList: ProductEntry[], toggleSelectAll: (isPending:
                         }}>
                             Sem Categoria
                         </span>
+                    )}</td>
+                <td style={styles.tableCell}>R$ {item.valorCustoReal.toFixed(3)}</td>
+                <td style={{ ...styles.tableCell, fontWeight: 700, color: '#4b5563' }}>{item.quantidade.toFixed(2)}</td>
+                <td style={{ ...styles.tableCell, fontWeight: 700, color: '#4b5563' }}>{item.unidadeMedida}</td>
+                <td style={styles.tableCell}>
+                    {item.isConfirmed ? (
+                        <span style={{ fontWeight: 600, color: '#10b981' }}>{item.quantidade}</span>
+                    ) : (
+                        <input
+                            type="number" min="0" step={item.unidadeMedida === 'UN' || item.unidadeMedida === 'PC' ? '1' : '0.1'}
+                            value={String(item.quantityReceived)}
+                            onChange={(e) => handleUpdateReceivedQuantityFn(item.tempId, e.target.value)}
+                            style={{
+                                maxWidth: '50px',
+                                backgroundColor: isDivergent ? '#fee2e2' : '#ffffff',
+                                border: isDivergent ? '2px solid #dc2626' : '2px solid #10b981',
+                                color: isDivergent ? '#991b1b' : '#10b981',
+                            }}
+                            disabled={item.isConfirmed}
+                        />
                     )}
                 </td>
+                <td style={{
+                    ...styles.tableCell, fontWeight: 700,
+                    color: isDivergent ? (item.difference > 0 ? '#f97316' : '#dc2626') : '#10b981',
+                    backgroundColor: isDivergent ? (item.difference > 0 ? '#fef3c7' : '#fee2e2') : 'transparent',
+                    padding: '3px 6px',
+                    borderRadius: '4px',
+                }}>
+                    {item.difference.toFixed(2)}
+                </td>
+                
                 <td style={{ ...styles.tableCell, fontWeight: 700, color: '#10b981' }}>{formatCurrency(item.total)}</td>
                 <td style={styles.tableCell}>
                     <button
@@ -703,7 +725,7 @@ const renderTableHead = (itemsList: ProductEntry[], toggleSelectAll: (isPending:
         .map(item => ({
             codigoInterno: item.mappedId!,
             skuFornecedor: item.sku,
-            quantidadeRecebida: item.quantidade,
+            quantidadeRecebida: item.quantityReceived,
             unidade: item.unidadeMedida,
 
             custoUnitario: item.valorCustoReal,
@@ -820,9 +842,9 @@ const renderTableHead = (itemsList: ProductEntry[], toggleSelectAll: (isPending:
 
             <hr />
             <h2 style={styles.panelTitle}>3. Conferência Detalhada de Itens {items.length == 1 ? '(1 item)' : `(${items.length} itens)`}</h2>
-            <FlexGridContainer layout='grid'>
+            <FlexGridContainer layout='grid' template='1fr 1fr' gap='10px'>
 
-                <FlexGridContainer layout='flex'>
+                <div  style={{display:'flex' , flexDirection: 'column'}}>
                     <h3 style={styles.subTitle}>🔴 Itens Pendentes de Ação ({pendingItems.length} produtos)</h3>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
                         <button onClick={handleBulkConfirmSelected} style={{ padding: '6px 10px', borderRadius: 4, backgroundColor: '#4f46e5', color: '#fff' }}>
@@ -854,7 +876,7 @@ const renderTableHead = (itemsList: ProductEntry[], toggleSelectAll: (isPending:
                             </tbody>
                         </table>
                     </div>
-                </FlexGridContainer>
+                </div>
                 <FlexGridContainer >
                     <Typography variant='h3'>🟢 Itens Conferidos {confirmedItems.length == 1 ? '(1 item)' : `(${confirmedItems.length} itens)`}</Typography>
 
@@ -1053,7 +1075,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     },
     dataTable: { width: '100%', borderCollapse: 'collapse', minWidth: '800px' },
     tableTh: { 
-        padding: '12px 8px', textAlign: 'left', fontSize: '0.75rem', 
+        padding: '12px 8px', textAlign: 'left', fontSize: '0.6rem', 
         fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', 
         backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' 
     },

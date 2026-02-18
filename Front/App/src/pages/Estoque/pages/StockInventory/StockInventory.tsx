@@ -1,7 +1,6 @@
 // src/pages/StockInventory.tsx
 
 import React, { useState, useContext, useEffect } from "react";
-import { Product, FilterState } from "../../../../types/types"; // Importando tipos globais (Ajuste o caminho se necessário)
 
 // Importe a função da API
 import { searchProducts, searchProductsMapping } from "../../api/productsApi";
@@ -9,7 +8,7 @@ import { searchProducts, searchProductsMapping } from "../../api/productsApi";
 // Se você não tem ProductContext/FilterState, remova as linhas abaixo
 // import { ProductContext } from "../../../context/ProductContext";
 import TableHeader from "./_components/TableHeader";
-import ProductFilter from "./_components/ProductFilter";
+import ProductFilter from "../../../../components/forms/search/ProductFilter";
 import ProductDetails from "./_components/ProductDetails";
 import NovoProdutoForm from "./_components/NovoProdutoForm";
 // import ProductHeader from "../Components/ProductHeader"; // Não usado
@@ -95,6 +94,7 @@ const StockInventory: React.FC = () => {
 
     return () => clearTimeout(delayDebounceFn);
 }, [searchTerm]); // searchTerm vazio agora dispara a busca normalmente
+
     const handleFilterChange = (
         key: keyof FilterState,
         value: string | number | boolean

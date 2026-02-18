@@ -62,15 +62,27 @@ export async function searchProducts(query: string) {
     return res.json();
 }
 
-/**
- * 2. CRIAÇÃO DE PRODUTO: Encontra ou cria um produto padrão.
- * @param payload Dados mínimos para buscar/criar o produto.
- */
-export async function findOrCreateProduct(payload: { sku: string; name?: string; unitCost?: number; category?: string }) {
-    const res = await fetch(`${apiBase}/products/find-or-create`, {
+
+export async function createNewProduct(payload: { 
+    sku: string; 
+    name: string; 
+    unit: string; 
+    salePrice: number; 
+    categoryId?: number;
+    barcode?: string;
+}) {
+    const res = await fetch(`${apiBase}/products/createNewProduct`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+            codigo_interno: payload.sku,
+            descricao: payload.name,
+            unidade: payload.unit,
+            preco_venda: payload.salePrice,
+            id_categoria: payload.categoryId,
+            codigo_barras: payload.barcode,
+            status: 'Ativo'
+        }),
     });
     if (!res.ok) throw new Error(await res.text());
     return res.json();

@@ -430,11 +430,25 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
             return;
         }
 
-        const category = selectedCategoryShortName || newProductCategory || "Sem categoria";
-
-
-
-
+        // ✅ CONSTRUIR LATEST PERSISTENCE ANTES DE CHAMAR MODAL
+        // Isso garante que o modal sempre mostra os valores ATUAIS
+        const latestPersistencia: ProdutoPersistencia = {
+            ...item,
+            CodInterno: newProductId || "",
+            sku: `${newProductSku}/${sigla}`,
+            gtin: newGtin || (item.gtin && item.gtin.trim() !== "" && !item.gtin.toUpperCase().includes("SEM GTIN"))
+                ? item.gtin
+                : "SEM GTIN",
+            name: newProductName || item.descricao || "",
+            Categorias: selectedCategoryShortName || newProductCategory || "Sem categoria",
+            Marca: selectedBrandId === 'new' ? newBrandName :
+                existingBrands.find(b => b.id === selectedBrandId)?.name || "",
+            Descrição: descricaoDetalhada || item.descricao || "",
+            Margem_Lucro: newMargin,
+            Preço_Final_de_Venda: newSalePrice,
+            individualUnit: individualUnit || "",
+            unitsPerPackage: unitsPerPackage ?? null
+        };
 
         setIsSaving(true);
 
@@ -592,16 +606,19 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
       </div>
 
       <small>Gtin / EAN</small>
-      <div style="font-weight:700;">${produtoPersistencia.gtin || '—aa'}</div>
+      <div style="font-weight:700;">${latestPersistencia.gtin || '—'}</div>
 
       <small>Código Interno Gerado</small>
-      <div style="font-weight:700;">${produtoPersistencia.CodInterno || '—'}</div>
+      <div style="font-weight:700;">${latestPersistencia.CodInterno || '—'}</div>
+
+      <small>Código SKU fornecedor Armazenada</small>
+      <div style="font-weight:700;">${latestPersistencia.sku || '—'}</div>
 
       <small>Nome do Produto</small>
-      <div>${produtoPersistencia.name || '—'}</div>
+      <div>${latestPersistencia.name || '—'}</div>
 
       <small>Categoria</small>
-      <div>${produtoPersistencia.Categorias || '—'}</div>
+      <div>${latestPersistencia.Categorias || '—'}</div>
     </div>
 
     <!-- UNIDADES -->
@@ -614,10 +631,10 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
       <div>${newProductUnit || '—'}</div>
 
       <small>Unidade Individual</small>
-      <div>${produtoPersistencia.individualUnit || '—'}</div>
+      <div>${latestPersistencia.individualUnit || '—'}</div>
 
       <small>Qtd. por Embalagem</small>
-      <div>${produtoPersistencia.unitsPerPackage || 1}</div>
+      <div>${latestPersistencia.unitsPerPackage || 1}</div>
     </div>
 
     <!-- MARCA & PREÇO -->
@@ -627,14 +644,14 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
       </div>
 
       <small>Marca</small>
-      <div>${produtoPersistencia.Marca || '—'}</div>
+      <div>${latestPersistencia.Marca || '—'}</div>
 
       <small>Margem de Lucro</small>
-      <div>${produtoPersistencia.Margem_Lucro?.toFixed(2)}%</div>
+      <div>${latestPersistencia.Margem_Lucro?.toFixed(2)}%</div>
      
       <small>Preço Final de Venda</small>
       <div style="font-weight:800; font-size:1rem;">
-        R$ ${produtoPersistencia.Preço_Final_de_Venda?.toFixed(2) || '—'}
+        R$ ${latestPersistencia.Preço_Final_de_Venda?.toFixed(2) || '—'}
       </div>
     </div>
 
@@ -668,13 +685,13 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
             });
 
             if (result.isConfirmed) {
-                // Normaliza GTIN: "SEM GTIN" → vazio para evitar erro de constraint UNIQUE
+                // ✅ Normaliza GTIN: "SEM GTIN" → vazio para evitar erro de constraint UNIQUE
                 const mappedData = {
-                    ...produtoPersistencia,
-                    gtin: produtoPersistencia.gtin === "SEM GTIN" ? "" : produtoPersistencia.gtin
+                    ...latestPersistencia,
+                    gtin: latestPersistencia.gtin === "SEM GTIN" ? "" : latestPersistencia.gtin
                 };
 
-                // Montamos o payload esperado pela API
+                // ✅ Montamos o payload esperado pela API
                 const payload = {
                     original: item,
                     mapped: mappedData,
@@ -684,7 +701,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
                 console.log("Enviando payload:", payload);
                 await saveProductMapping(payload);
 
-                // Notificamos o componente pai usando o objeto normalizado
+                // ✅ Notificamos o componente pai usando o objeto normalizado
                 onMap(item.tempId, mappedData);
                 onClose();
             }
@@ -693,7 +710,28 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
         } finally {
             setIsSaving(false);
         }
-    }, [newProductId, newProductName, newMargin, newSalePrice, newProductUnit, newProductCategory, selectedCategoryShortName, item, supplierCnpj, individualUnit, unitsPerPackage, onMap, onClose]);
+    }, [
+        newProductId,
+        newProductName,
+        newMargin,
+        newSalePrice,
+        newProductUnit,
+        newProductCategory,
+        selectedCategoryShortName,
+        newProductSku,
+        sigla,
+        newGtin,
+        selectedBrandId,
+        newBrandName,
+        existingBrands,
+        descricaoDetalhada,
+        individualUnit,
+        unitsPerPackage,
+        item,
+        supplierCnpj,
+        onMap,
+        onClose
+    ]);
     /* ======================================================
        FINALIZAR NOVO PRODUTO
     ====================================================== */
@@ -1314,34 +1352,6 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
                                     </span>
                                 </div>
                             </div>
-
-                            <FormControl
-                                label="Preço Final de Venda"
-                                step={0.01}
-                                type="number"
-                                style={{ fontWeight: 'bold', color: '#1e293b' }}
-                                value={newSalePrice === null || newSalePrice === undefined ? '' : newSalePrice}
-                                onChange={(e: any) => {
-                                    const raw = e.target.value;
-                                    const p = raw === '' ? 0 : Number(raw);
-                                    // Calculate per-unit cost based on package size
-                                    const unitCost = unitsPerPackage ? (item.valorCustoReal / unitsPerPackage) : item.valorCustoReal;
-                                    let formattedMarkup = newMargin;
-
-                                    if (unitCost > 0 && raw !== '') {
-                                        const rawMarkup = ((p - unitCost) / unitCost) * 100;
-                                        formattedMarkup = Number(rawMarkup.toFixed(2));
-                                        setNewMargin(formattedMarkup);
-                                    }
-
-                                    setNewSalePrice(p);
-                                    setProdutoPersistencia(prev => ({
-                                        ...prev,
-                                        Margem_Lucro: formattedMarkup,
-                                        Preço_Final_de_Venda: p
-                                    }));
-                                }}
-                            />
 
                             {/* NOTA DINÂMICA: Projeção do Conjunto */}
                             <div style={{ marginTop: '15px', padding: '12px', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fef3c7' }}>

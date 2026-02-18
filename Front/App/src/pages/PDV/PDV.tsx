@@ -2,15 +2,27 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import styles from './PDV.module.css';
 import { AutoPart } from './types';
 import { searchProducts, Product } from '../../data/api';
+import { CartAside } from './pages/Cart/CartAside';
+import Button from '../../components/ui/Button/Button';
+import ProductFilter from '../../components/forms/search/ProductFilter';
 
 type SaleItem = (AutoPart | { 
   id: string; 
+  sku?: string;
   name: string; 
   price: number; 
-  brand?: string; 
+  status?: string; 
   category: string;
 }) & { type: 'part' | 'service'; stock?: number };
 
+
+// Exemplo de interface para clareza
+interface CartItem {
+  id: string | number;
+  name: string;
+  quantity: number;
+  price: number;
+}
 
 const MOCK_SERVICES: SaleItem[] = [
   { id: 's1', name: 'Prensagem de Mangueira 1 Trama (R1)', category: 'Hidráulica', price: 20.00, type: 'service' },
@@ -30,6 +42,70 @@ export const PDV: React.FC = () => {
   const [selectedPart, setSelectedPart] = useState<AutoPart | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
+// Estados e Funções de Filtro Completo (Não totalmente integrados à lógica da tabela, mas mantidos)
+    const [filters, setFilters] = useState<FilterState>({
+        status: "", category: "", minPrice: "", maxPrice: "", minStock: "", maxStock: "",
+        clientName: "", clientEmail: "", clientCpf: "", clientPhone: "",
+        orderNumber: "", serviceType: "", date: "", paymentMethod: "",
+    });
+
+
+
+     const handleFilterChange = (
+        key: keyof FilterState,
+        value: string | number | boolean
+    ) => {
+        setFilters((prevFilters) => ({
+            ...prevFilters,
+            [key]: value,
+        }));
+    };
+
+
+  // ... (seus hooks: cart, setCart, activeTab, total, money, calculatedLabor)
+
+  // Funções de manipulação para manter o JSX limpo
+const updateQuantity = (id: string | number, value: number | string) => {
+  setCart(prev => prev.map(item => {
+    if (item.id === id) {
+      // 1. Identifica se o item atual permite decimais
+      const canFractionate = ['MT', 'LT', 'KG', 'M'].includes(item.unitOfMeasure?.toUpperCase() || '');
+      
+      let newQty: number;
+
+      // 2. Converte o valor recebido
+      if (typeof value === 'string') {
+        // Aceita vírgula ou ponto e converte para decimal
+        newQty = parseFloat(value.replace(',', '.')) || 0;
+      } else {
+        // Soma o delta (0.1 ou 1) vindo dos botões
+        newQty = item.quantity + value;
+      }
+
+      // 3. Aplica as travas de segurança
+      let clampedQty = Math.max(0, newQty);
+      
+      // Se NÃO for fracionável, arredonda para baixo para garantir que seja inteiro
+      if (!canFractionate) {
+        clampedQty = Math.floor(clampedQty);
+      }
+
+      // 4. Checa estoque
+      if (item.type === 'part' && item.stock && clampedQty > item.stock) {
+        alert("Quantidade excede o estoque disponível!");
+        return item;
+      }
+
+      // 5. Retorna o número com no máximo 2 casas decimais para evitar bugs de dízima do JS
+      return { ...item, quantity: Number(clampedQty.toFixed(2)) };
+    }
+    return item;
+  }));
+};
+
+  const removeItem = (id: string | number) => {
+    setCart(prev => prev.filter(item => item.id !== id));
+  };
 
   useEffect(() => {
     console.log('useEffect triggered: activeTab=', activeTab, 'searchTerm=', searchTerm);
@@ -94,6 +170,8 @@ export const PDV: React.FC = () => {
         type: 'part' as const,
         stock: p.currentStock,
         sku: p.sku,
+        unitOfMeasure: p.unitOfMeasure, // CERTIFIQUE-SE QUE ESTA LINHA EXISTE
+        status: p.status,
         // Outros campos não mapeados
       }));
     }
@@ -119,6 +197,10 @@ export const PDV: React.FC = () => {
       <aside className={`${styles.filterSidebar} ${!isFilterOpen ? styles.hidden : ''}`}>
         <div className={styles.sidebarHeader}>
           <h3>Filtros</h3>
+
+                <ProductFilter filters={filters} onFilterChange={handleFilterChange} onApply={() => console.log("Aplicar filtros avançados")} onReset={() => console.log("Resetar filtros avançados")} />
+
+
           <button onClick={() => setIsFilterOpen(false)} className={styles.btnClose}>✕</button>
         </div>
         <div className={styles.filterContent}>
@@ -273,9 +355,9 @@ export const PDV: React.FC = () => {
             <table className={styles.partsTable}>
               <thead>
                 <tr>
-                  <th>Descrição</th>
-                  <th>SKU</th>
-                  {activeTab === 'parts' ? <><th>Categoria</th><th>Estoque</th></> : <th>Categoria</th>}
+                  <th>Codigo ID</th>
+                  <th >Produto</th>
+                  {activeTab === 'parts' ? <><th>Status</th><th>Estoque</th></> : <th>Categoria</th>}
                   <th>Preço</th>
                   <th style={{ textAlign: 'center' }}>Ações</th>
                 </tr>
@@ -283,16 +365,16 @@ export const PDV: React.FC = () => {
               <tbody>
                 {filteredData.map(item => (
                   <tr key={item.id}>
+                    <td>{item.sku || '-'}</td>
                     <td>
                       <div className={styles.partPrimary}>
                         <strong>{item.name}</strong>
-                        {'sku' in item && <code>{item.sku}</code>}
+                        {'sku' in item && <code>{item.category}</code>}
                       </div>
                     </td>
-                    <td>{item.brand || '-'}</td>
                     {activeTab === 'parts' ? (
                       <>
-                        <td className={styles.location}>{item.category}</td>
+                        <td > <div style={{border:'2px solid green', padding: '4px' , color: 'green', borderRadius: '4px', background: '#e6fce8', textAlign: 'center'}}>{item.status}</div></td>
                         <td>{(item as any).stock} {(item as any).unitOfMeasure || 'un'}</td>
                       </>
                     ) : (
@@ -302,6 +384,7 @@ export const PDV: React.FC = () => {
                     <td className={styles.actions}>
                       {/* Removido botão de info por enquanto */}
                       <button className={styles.btnAddToCart} onClick={() => addToCart(item as SaleItem)}>Adicionar</button>
+                      <Button variant='secondary'>Detalhes</Button>
                     </td>
                   </tr>
                 ))}
@@ -311,40 +394,15 @@ export const PDV: React.FC = () => {
         )}
       </main>
 
-      <aside className={styles.cartAside}>
-        <div className={styles.cartHeader}>
-          <h2>{activeTab === 'os' ? 'Resumo OS' : 'Carrinho'}</h2>
-          <span className={styles.itemCount}>{cart.length} itens</span>
-        </div>
-        <div className={styles.cartList}>
-          {cart.map(item => (
-            <div key={item.id} className={styles.cartItem}>
-              <div className={styles.cartItemInfo}>
-                <strong>{item.name}</strong>
-                <span>{item.quantity}x {money.format(item.price)}</span>
-              </div>
-              <button className={styles.btnRemoveMini} onClick={() => setCart(c => c.filter(i => i.id !== item.id))}>✕</button>
-            </div>
-          ))}
-          {calculatedLabor > 0 && (
-             <div className={styles.cartItem}>
-                <div className={styles.cartItemInfo}>
-                  <strong>Mão de Obra/Taxa</strong>
-                  <span>{money.format(calculatedLabor)}</span>
-                </div>
-             </div>
-          )}
-        </div>
-        <div className={styles.cartFooter}>
-          <div className={styles.totalRow}>
-            <span>Total:</span>
-            <strong>{money.format(total)}</strong>
-          </div>
-          <button className={styles.btnCheckout} onClick={() => alert('Finalizado')}>
-            {activeTab === 'os' ? 'Gerar Orçamento' : 'Finalizar Venda'}
-          </button>
-        </div>
-      </aside>
+      <CartAside 
+      cart={cart}
+      activeTab={activeTab}
+      calculatedLabor={calculatedLabor}
+      total={total}
+      money={money}
+      updateQuantity={updateQuantity}
+      removeItem={removeItem}
+    />
 
       {/* MODAL DE DETALHES (SÓ PARA PEÇAS) */}
       {selectedPart && (

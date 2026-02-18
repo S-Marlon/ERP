@@ -4,6 +4,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import pool from './db.config'; // Assume que é um Pool do mysql2/promise
 import { ResultSetHeader } from 'mysql2';
+import crypto from 'crypto';
 
 const app = express();
 app.use(cors());
@@ -41,6 +42,17 @@ app.get('/check-db', asyncHandler(async (req, res) => {
     await pool.execute('SELECT 1');
     res.status(200).json({ status: 'OK', message: 'ssssConexão com o Banco de Dados bem-sucedida!' });
 }));
+
+
+function gerarHashCNPJ(cnpj: string): string {
+    const cnpjLimpo = cnpj.replace(/\D/g, '');
+    return crypto
+        .createHash('sha256')
+        .update(cnpjLimpo)
+        .digest('hex')
+        .substring(0, 4)
+        .toUpperCase(); // Garante o hash em MAIÚSCULO (ex: A1B2)
+}
 
 // --- ROTAS DE PRODUTOS E CATEGORIAS ---
 
@@ -170,41 +182,94 @@ app.post('/api/products/categories/create', asyncHandler(async (req, res) => {
 
 
 /**
- * Rota 4: POST /api/products/find-or-create (Implementa findOrCreateProduct)
+ * Rota 4: POST /api/products/createNewProduct (Implementa createNewProduct)
  * Encontra um produto pelo SKU ou cria um novo se não existir.
  * Nota: Seu frontend usa isso no fluxo de criação.
  */
-app.post('/api/products/find-or-create', asyncHandler(async (req, res) => {
-    const { sku, name, unitCost, category } = req.body;
+app.post('/api/products/createNewProduct', asyncHandler(async (req, res) => {
+    const { 
+        codigo_interno, 
+        descricao, 
+        unidade, 
+        preco_venda, 
+        id_categoria, 
+        codigo_barras 
+    } = req.body;
 
-    if (!sku || !name || !category) {
-        return res.status(400).json({ error: 'sku, name e category são campos obrigatórios para criação/busca.' });
-    }
+    // 1. Validação de campos obrigatórios
+    // Se o EAN for o código interno, garantimos que pelo menos um dos dois chegou
+    const skuFinal = codigo_interno || codigo_barras;
 
-    // 1. Tenta buscar pelo SKU (ou ID, dependendo da sua regra de negócio)
-    const [existing]: [any, any] = await pool.execute(
-        `SELECT id_produto, nome_padrao FROM produtos_internos WHERE sku_interno = ? OR id_produto = ?`,
-        [sku, sku]
+    // --- NOVA VERIFICAÇÃO DE EXISTÊNCIA ---
+    const [existing]: any = await pool.execute(
+        `SELECT id_produto FROM produtos WHERE codigo_interno = ? OR (codigo_barras IS NOT NULL AND codigo_barras = ?)`,
+        [skuFinal, codigo_barras || '---'] 
     );
 
     if (existing.length > 0) {
-        // Produto encontrado
-        return res.json({ action: 'found', id: existing[0].id_produto, name: existing[0].nome_padrao });
+        return res.status(409).json({ 
+            message: "Erro: Já existe um produto com este SKU ou Código de Barras.",
+            id_conflito: existing[0].id_produto 
+        });
+    }
+    // ---------------------------------------
+
+    if (!skuFinal || !descricao) {
+        return res.status(400).send("Identificador do produto (SKU/EAN) e Descrição são obrigatórios.");
     }
 
-    // 2. Produto não encontrado, cria um novo
-    const newProductId = sku; // Usa o SKU como o ID Padrão, conforme o seu frontend sugere
+    // 2. Sanitização para o Banco de Dados
+    // Se a string vier vazia do front, convertemos explicitamente para null
+    // Isso evita erro de duplicidade (ER_DUP_ENTRY) em campos UNIQUE
+    const barrasTratado = codigo_barras?.trim() === "" ? null : codigo_barras;
+    const skuTratado = skuFinal?.trim() === "" ? null : skuFinal;
+    const categoriaTratada = id_categoria || null;
 
-    await pool.execute(
-        `
-        INSERT INTO produtos_internos 
-        (id_produto, nome_padrao, sku_interno, ultimo_custo, categoria_nome, unidade_medida)
-        VALUES (?, ?, ?, ?, ?, ?)
-        `,
-        [newProductId, name, sku, unitCost || 0, category, 'UN'] // 'UN' hardcoded, ajuste conforme necessidade
-    );
+    const sql = `
+        INSERT INTO produtos (
+            codigo_interno, 
+            codigo_barras, 
+            descricao, 
+            unidade, 
+            preco_venda, 
+            preco_venda_manual,
+            metodo_precificacao,
+            id_categoria, 
+            status
+        ) VALUES (?, ?, ?, ?, ?, ?, 'MANUAL', ?, 'Ativo')
+    `;
 
-    res.status(201).json({ action: 'created', id: newProductId, name: name });
+    try {
+        const [result]: any = await pool.execute(sql, [
+            skuTratado,
+            barrasTratado,
+            descricao.toUpperCase(), // Padroniza descrição em maiúsculas
+            unidade || 'UN',
+            preco_venda || 0,
+            preco_venda || 0,
+            categoriaTratada
+        ]);
+
+        // Opcional: Se você quiser que todo produto novo já apareça na tabela de estoque atual com zero
+        await pool.execute(
+            `INSERT INTO estoque_atual (id_produto, quantidade, valor_medio) VALUES (?, 0, 0)`,
+            [result.insertId]
+        );
+
+        res.status(201).json({ 
+            id: result.insertId, 
+            sku: skuTratado,
+            message: "Produto criado com sucesso e inicializado no estoque!" 
+        });
+
+    } catch (error: any) {
+        if (error.code === 'ER_DUP_ENTRY') {
+            res.status(409).send(`Erro: O código '${skuTratado}' já está em uso por outro produto.`);
+        } else {
+            console.error("Erro ao inserir produto:", error);
+            res.status(500).send("Erro interno ao salvar produto.");
+        }
+    }
 }));
 
 
@@ -393,7 +458,7 @@ app.post('/api/products/map', asyncHandler(async (req, res) => {
                     0,
                     mapped.Preço_Final_de_Venda || 0,
                     'Ativo',
-                    1,
+                    null,
                     0,
                     parseInt(mapped.Categorias) || null
                 ]
@@ -413,7 +478,7 @@ app.post('/api/products/map', asyncHandler(async (req, res) => {
             [
                 idProduto,
                 idFornecedor,
-                original.sku || null,
+                mapped.sku || null,
                 normalizedEan,
                 original.descricao || null,
                 mapped.unitsPerPackage || 1.000,
@@ -446,20 +511,45 @@ app.post('/api/products/map', asyncHandler(async (req, res) => {
 
 
 app.post('/api/products/check-mappings', asyncHandler(async (req, res) => {
-    const { supplierCnpj, skus } = req.body; // skus é um array ['ABC', 'DEF']
+    const { supplierCnpj, skus } = req.body;
 
-    const [mappings]: any = await pool.execute(`
+    console.log('\n=== CHECK MAPPINGS INICIADO ===');
+    console.log('CNPJ recebido:', supplierCnpj);
+    console.log('SKUs recebidos (brutos):', skus);
+
+    if (!skus || skus.length === 0) {
+        console.log('❌ SKUs vazios, retornando array vazio');
+        return res.json([]);
+    }
+
+    // 1. Gera o hash único para este fornecedor
+    const cnpjHash = gerarHashCNPJ(supplierCnpj);
+    console.log('CNPJ Hash gerado:', cnpjHash);
+
+    // 2. Transforma '123' ou '123/abc' em '123/hash'
+    const formattedSkus = skus.map((sku: string) => {
+        const prefixo = sku.split('/')[0]; // Pega só o que vem antes de qualquer barra
+        const formatted = `${prefixo}/${cnpjHash}`;
+        console.log(`  SKU "${sku}" -> Formatado: "${formatted}"`);
+        return formatted;
+    });
+
+    const placeholders = formattedSkus.map(() => '?').join(',');
+    const query = `
         SELECT pf.sku_fornecedor, p.id_produto, p.codigo_interno, p.descricao, p.unidade, c.nome_categoria
         FROM produto_fornecedor pf
         JOIN produtos p ON pf.id_produto = p.id_produto
         JOIN fornecedores f ON pf.id_fornecedor = f.id_fornecedor
         LEFT JOIN categorias c ON p.id_categoria = c.id_categoria
-        WHERE f.cnpj = ? AND pf.sku_fornecedor IN (${skus.map(() => '?').join(',')})
-    `, [supplierCnpj, ...skus]);
+        WHERE f.cnpj = ? AND pf.sku_fornecedor IN (${placeholders})
+    `;
+
+    const [mappings]: any = await pool.execute(query, [supplierCnpj, ...formattedSkus]);
+
+
 
     res.json(mappings);
 }));
-
 
 // Endpoint: Verifica se fornecedor existe pelo CNPJ
 app.post('/api/suppliers/check', asyncHandler(async (req, res) => {
