@@ -1074,8 +1074,18 @@
   padding: 0.3rem 1.5rem;
   border-bottom: 1px solid var(--cart-border);
   display: flex;
+  flex-direction: column;
   justify-content: space-between;
   align-items: baseline;
+}
+
+.clientInfo {
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+  justify-content: space-between;
+  gap: 4px;
+  background: var(--cart-surface);
 }
 
 .headerTitle {

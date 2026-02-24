@@ -1,5 +1,10 @@
 import React, { useState, ChangeEvent, FormEvent } from 'react';
 import './CriarFornecedor.css';
+import FormControl from '../../components/ui/FormControl/FormControl';
+
+interface CriarFornecedorProps {
+    onClose: () => void;
+}
 
 interface SupplierData {
   cnpj: string;
@@ -13,7 +18,7 @@ interface Feedback {
   type: 'success' | 'error' | '';
 }
 
-const CriarFornecedor: React.FC = () => {
+const CriarFornecedor: React.FC<CriarFornecedorProps> = ({ onClose }) => {
   const [formData, setFormData] = useState<SupplierData>({
     cnpj: '',
     name: '',
@@ -62,7 +67,11 @@ const CriarFornecedor: React.FC = () => {
   return (
     <div className="container">
       <form className="supplier-form" onSubmit={handleSubmit}>
+        <div>
+
         <h2 className="title">Cadastrar Fornecedor</h2>
+        <button onClick={onClose} style={{ border: 'none', background: 'none', cursor: 'pointer', backgroundColor: '#ff0000', padding: '0.5rem', borderRadius: '50%' }}>X</button>
+        </div>
         
         <div className="form-group">
           <label htmlFor="cnpj">CNPJ *</label>
@@ -106,6 +115,7 @@ const CriarFornecedor: React.FC = () => {
           <label htmlFor="siglaGerada">Sigla</label>
           <input
             type="text"
+            readOnly
             id="siglaGerada"
             name="siglaGerada"
             value={formData.siglaGerada}
@@ -124,6 +134,7 @@ const CriarFornecedor: React.FC = () => {
           {loading ? 'Enviando...' : 'Salvar Fornecedor'}
         </button>
       </form>
+       
     </div>
   );
 };

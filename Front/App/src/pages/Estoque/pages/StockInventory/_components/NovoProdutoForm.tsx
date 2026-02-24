@@ -81,125 +81,140 @@ const NovoProdutoForm: React.FC<NovoProdutoFormProps> = ({ isOpen, onClose, onSa
 
     return (
         <div style={modalStyles.overlay}>
-            {/* Wrapper relativo para permitir o posicionamento do formulário lateral */}
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+<div style={{
+        ...modalStyles.contentWrapper,
+        transform: showFornecedor ? `translateX(${730 / 2}px)` : 'translateX(0)',
+    }}>
+                        {/* Wrapper relativo para permitir o posicionamento do formulário lateral */}
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
 
-                {/* COMPONENTE CRIAR FORNECEDOR COM ANIMAÇÃO */}
-                <div style={{
-                    ...modalStyles.drawer,
-                    transform: showFornecedor ? 'translateX(-100%)' : 'translateX(0)',
-                    opacity: showFornecedor ? 1 : 0,
-                    zIndex: showFornecedor ? 1 : -1, // Fica "atrás" e depois aparece
-                }}>
-                    <CriarFornecedor onClose={() => setShowFornecedor(false)} />
-                </div>
-
-                {/* MODAL PRINCIPAL */}
-                <div style={{ ...modalStyles.modal, zIndex: 2 }}>
-                    <div style={modalStyles.header}>
-                        <h2 style={{ margin: 0 }}>📦 Novo Produto</h2>
-                        <button onClick={onClose} style={modalStyles.closeButton}>&times;</button>
+                    {/* COMPONENTE CRIAR FORNECEDOR COM ANIMAÇÃO */}
+                    <div style={{
+            ...modalStyles.drawer,
+            transform: showFornecedor ? 'translateX(-100%)' : 'translateX(0)',
+            opacity: showFornecedor ? 1 : 0,
+            visibility: showFornecedor ? 'visible' : 'hidden',
+        }}>
+                        <CriarFornecedor onClose={() => setShowFornecedor(false)} />
                     </div>
 
-                    <form onSubmit={handleSubmit} style={modalStyles.form}>
-                        <div style={modalStyles.row}>
-                            <div style={modalStyles.field}>
-                                <label style={modalStyles.label}>Código de Barras (EAN)</label>
-                                <input
-                                    name="codigo_barras"
-                                    style={modalStyles.input}
-                                    onChange={handleChange}
-                                    placeholder="Bipe o produto aqui..."
-                                    autoFocus
-                                />
-                            </div>
-                            <div style={modalStyles.field}>
-                                <label style={modalStyles.label}>Código Interno (SKU)</label>
-                                <input
-                                    name="codigo_interno"
-                                    onBlur={handleBlurSku}
-                                    required
-                                    style={{ ...modalStyles.input, backgroundColor: formData.codigo_barras ? '#f0f0f0' : 'white' }}
-                                    value={formData.codigo_interno}
-                                    onChange={handleChange}
-                                    placeholder="Gerado pelo EAN ou manual"
-                                />
-                            </div>
+                    {/* MODAL PRINCIPAL */}
+                    <div style={{ ...modalStyles.modal }}>
+                        <div style={modalStyles.header}>
+                            <h2 style={{ margin: 0 }}>📦 Novo Produto</h2>
+                            <button onClick={onClose} style={modalStyles.closeButton}>&times;</button>
                         </div>
 
-                        <div style={modalStyles.field}>
-                            <label style={modalStyles.label}>Descrição do Produto</label>
-                            <input name="descricao" required style={modalStyles.input} onChange={handleChange} placeholder="Ex: Mangueira SAE R2AT 3/8" />
-                        </div>
-
-                        <div style={modalStyles.row}>
-                            <div style={modalStyles.field}>
-                                <label style={modalStyles.label}>Unidade</label>
-                                <select name="unidade" style={modalStyles.input} onChange={handleChange}>
-                                    <option value="UN">Unidade (UN)</option>
-                                    <option value="MT">Metro (MT)</option>
-                                    <option value="KG">Quilo (KG)</option>
-                                    <option value="CX">Caixa (CX)</option>
-                                    <option value="PAR">Par (PAR)</option>
-                                </select>
-                            </div>
-                            <div style={modalStyles.field}>
-                                <label style={modalStyles.label}>Status</label>
-                                <select name="status" style={modalStyles.input} onChange={handleChange}>
-                                    <option value="Ativo">Ativo</option>
-                                    <option value="Inativo">Inativo</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div style={modalStyles.row}>
-                            <div style={modalStyles.field}>
-                                <label style={modalStyles.label}>Preço de Venda (R$)</label>
-                                <input type="number" step="0.01" name="preco_venda" style={modalStyles.input} onChange={handleChange} />
-                            </div>
-                            <div style={modalStyles.field}>
-                                <label style={modalStyles.label}>Estoque Mínimo</label>
-                                <input type="number" name="estoque_minimo" style={modalStyles.input} onChange={handleChange} />
-                            </div>
-                        </div>
-
-                        <div style={modalStyles.row}>
-                            <div style={modalStyles.field}>
-                                <label style={modalStyles.label}>Fornecedor Principal</label>
-                                <select name="id_fornecedor" style={modalStyles.input} onChange={handleChange}>
-                                    <option value="">Selecione um fornecedor...</option>
-                                    {/* {fornecedores.map(f => (
+                        <section style={{ padding: '0 24px', marginBottom: '16px', color: '#6b7280' }}>
+                            <h3> Fornecedor</h3>
+                            O fornecedor é a empresa ou pessoa que fornece o produto. Ele é essencial para o processo de compra e reposição de estoque, pois é a partir do fornecedor que você obtém os produtos para vender. Ao cadastrar um produto, você pode associá-lo a um fornecedor específico, facilitando a gestão de compras e o controle de estoque.
+                            <div style={modalStyles.row}>
+                                <div style={modalStyles.field}>
+                                    <label style={modalStyles.label}>Fornecedor Principal</label>
+                                    <select name="id_fornecedor" style={modalStyles.input} onChange={handleChange}>
+                                        <option value="">Selecione um fornecedor...</option>
+                                        {/* {fornecedores.map(f => (
                 <option key={f.id} value={f.id}>{f.nome_fantasia || f.razao_social}</option>
             ))} */}
-                                </select>
+                                    </select>
+                                </div>
+                                <div style={modalStyles.field}>
+                                    <label style={modalStyles.label}>SKU no Fornecedor</label>
+                                    <input
+                                        name="sku_fornecedor"
+                                        style={modalStyles.input}
+                                        onChange={handleChange}
+                                        placeholder="Código na nota fiscal"
+                                        value={formData.codigo_interno}
+                                    />
+                                </div>
                             </div>
+                        </section>
+
+                        <section style={{ padding: '0 24px', marginBottom: '16px', color: '#6b7280' }}>
+                            Dica: Ao cadastrar um produto, o código interno (SKU) é gerado automaticamente a partir do código de barras (EAN). Você pode editá-lo manualmente se necessário, mas certifique-se de que seja único para evitar conflitos no estoque.
+                        </section>
+
+                        <form onSubmit={handleSubmit} style={modalStyles.form}>
+                            <div style={modalStyles.row}>
+                                <div style={modalStyles.field}>
+                                    <label style={modalStyles.label}>Código de Barras (EAN)</label>
+                                    <input
+                                        name="codigo_barras"
+                                        style={modalStyles.input}
+                                        onChange={handleChange}
+                                        placeholder="Bipe o produto aqui..."
+                                        autoFocus
+                                    />
+                                </div>
+                                <div style={modalStyles.field}>
+                                    <label style={modalStyles.label}>Código Interno (SKU)</label>
+                                    <input
+                                        name="codigo_interno"
+                                        onBlur={handleBlurSku}
+                                        required
+                                        style={{ ...modalStyles.input, backgroundColor: formData.codigo_barras ? '#f0f0f0' : 'white' }}
+                                        value={formData.codigo_interno}
+                                        onChange={handleChange}
+                                        placeholder="Gerado pelo EAN ou manual"
+                                    />
+                                </div>
+                            </div>
+
                             <div style={modalStyles.field}>
-                                <label style={modalStyles.label}>SKU no Fornecedor</label>
-                                <input
-                                    name="sku_fornecedor"
-                                    style={modalStyles.input}
-                                    onChange={handleChange}
-                                    placeholder="Código na nota fiscal"
-                                    value={formData.codigo_interno}
-                                />
+                                <label style={modalStyles.label}>Descrição do Produto</label>
+                                <input name="descricao" required style={modalStyles.input} onChange={handleChange} placeholder="Ex: Mangueira SAE R2AT 3/8" />
                             </div>
-                        </div>
 
-                        <div style={modalStyles.footer}>
-                            <button
-                                type="button"
-                                onClick={() => setShowFornecedor(true)} // ATIVA O DRAWER
-                                style={modalStyles.secondaryBtn} // USE O ESTILO QUE VOCÊ ADICIONOU
-                            >
-                                + novo Fornecedor
-                            </button>
-                            <button type="button" onClick={onClose} style={modalStyles.cancelBtn}>Cancelar</button>
-                            <button type="submit" style={modalStyles.saveBtn}>Salvar Produto</button>
-                        </div>
-                    </form>
+                            <div style={modalStyles.row}>
+                                <div style={modalStyles.field}>
+                                    <label style={modalStyles.label}>Unidade</label>
+                                    <select name="unidade" style={modalStyles.input} onChange={handleChange}>
+                                        <option value="UN">Unidade (UN)</option>
+                                        <option value="MT">Metro (MT)</option>
+                                        <option value="KG">Quilo (KG)</option>
+                                        <option value="CX">Caixa (CX)</option>
+                                        <option value="PAR">Par (PAR)</option>
+                                    </select>
+                                </div>
+                                <div style={modalStyles.field}>
+                                    <label style={modalStyles.label}>Status</label>
+                                    <select name="status" style={modalStyles.input} onChange={handleChange}>
+                                        <option value="Ativo">Ativo</option>
+                                        <option value="Inativo">Inativo</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div style={modalStyles.row}>
+                                <div style={modalStyles.field}>
+                                    <label style={modalStyles.label}>Preço de Venda (R$)</label>
+                                    <input type="number" step="0.01" name="preco_venda" style={modalStyles.input} onChange={handleChange} />
+                                </div>
+                                <div style={modalStyles.field}>
+                                    <label style={modalStyles.label}>Estoque Mínimo</label>
+                                    <input type="number" name="estoque_minimo" style={modalStyles.input} onChange={handleChange} />
+                                </div>
+                            </div>
+
+
+
+                            <div style={modalStyles.footer}>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowFornecedor(!showFornecedor)} // Inverte o valor atual
+                                    style={modalStyles.secondaryBtn}
+                                >
+                                    {showFornecedor ? 'Fechar Fornecedor' : '+ novo Fornecedor'}
+                                </button>
+                                <button type="button" onClick={onClose} style={modalStyles.cancelBtn}>Cancelar</button>
+                                <button type="submit" style={modalStyles.saveBtn}>Salvar Produto</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
-            </div>
 
+            </div>
         </div>
     );
 };
@@ -214,26 +229,34 @@ const modalStyles: { [key: string]: React.CSSProperties } = {
         alignItems: 'center',
         zIndex: 1000,
     },
+    contentWrapper: {
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+        transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)', // Animação suave do conjunto
+    },
     modal: {
         backgroundColor: 'white',
         borderRadius: '8px',
-        width: '500px',
-        maxWidth: '90%',
+        width: '800px',
+        maxWidth: '90vw',
         boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)',
-        position: 'relative', // Importante
+        zIndex: 10, // Garante que o modal fique por cima da "emenda"
+        position: 'relative',
     },
     drawer: {
-        position: 'absolute',
-        top: '20px', // Um pouco abaixo do topo para dar estilo
-        right: '0',  // Começa "atrás" do modal principal
-        width: '400px',
+        position: 'absolute', // Não ocupa espaço no fluxo inicial
+        left: '0',           // Preso à esquerda do modal
+        height: '90%',       // Um pouco menor que o modal para estética
         backgroundColor: '#f9fafb',
-        borderRadius: '8px 0 0 8px', // Arredonda só a esquerda
+        borderRadius: '8px 0 0 8px',
         boxShadow: '-10px 0 15px -3px rgba(0,0,0,0.1)',
-        transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)', // Efeito suave
-        padding: '20px',
+        padding: '24px',
         border: '1px solid #e5e7eb',
-        height: 'fit-content',
+        borderRight: 'none',
+        transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+        zIndex: 5,           // Fica atrás do modal, mas desliza para fora
+        overflowY: 'auto',
     },
     secondaryBtn: {
         padding: '10px 16px',

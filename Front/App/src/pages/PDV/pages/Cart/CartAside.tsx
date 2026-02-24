@@ -40,6 +40,10 @@ export const CartAside: React.FC<CartAsideProps> = ({
     return (
         <aside className={styles.cartAside}>
             <header className={styles.cartHeader}>
+                <div className={styles.clientInfo}>
+                    <h2>Cliente:</h2>
+                    <span>Cliente tals</span>
+                </div>
                 <div className={styles.headerTitle}>
                     <h2>{activeTab === 'os' ? 'Resumo OS' : 'Carrinho'}</h2>
                     <span className={styles.itemCount}>{cart.length} itens</span>
