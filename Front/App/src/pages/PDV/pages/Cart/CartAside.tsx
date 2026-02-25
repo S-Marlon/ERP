@@ -31,6 +31,12 @@ export const CartAside: React.FC<CartAsideProps> = ({
     updateQuantity,
     removeItem,
 }) => {
+
+
+    const venda = {
+        cliente: "João Silva",
+        valorTotal: 835.00,
+    };
     // Cálculo do subtotal apenas dos itens (sem a mão de obra)
     const itemsSubtotal = cart.reduce((acc, i) => acc + i.price * i.quantity, 0);
 
@@ -40,14 +46,23 @@ export const CartAside: React.FC<CartAsideProps> = ({
     return (
         <aside className={styles.cartAside}>
             <header className={styles.cartHeader}>
-                <div className={styles.clientInfo}>
-                    <h2>Cliente:</h2>
-                    <span>Cliente tals</span>
-                </div>
+
                 <div className={styles.headerTitle}>
                     <h2>{activeTab === 'os' ? 'Resumo OS' : 'Carrinho'}</h2>
-                    <span className={styles.itemCount}>{cart.length} itens</span>
+                    <span className={styles.itemCount}> ({cart.length} itens)</span>
                 </div>
+
+                {/* TOPO: IDENTIFICAÇÃO */}
+                <div style={{ display: 'flex', flexDirection: 'row' }}>
+                    <div>
+
+                        <span className="badge">VIP - 5% OFF sugerido</span>
+                        <h3>{venda.cliente}</h3>
+                    </div>
+                    <span>CPF/CNPJ: 000.000.000-00</span>
+
+                </div>
+
             </header>
 
             <div className={styles.cartList}>
@@ -152,34 +167,49 @@ export const CartAside: React.FC<CartAsideProps> = ({
             </div>
 
             <footer className={styles.cartFooter}>
-                <div className={styles.summaryInfo}>
+                {/* Bloco de Detalhamento: Informações de apoio */}
+                <div className={styles.summaryDetails}>
                     <div className={styles.summaryRow}>
                         <span>Subtotal Itens:</span>
-                        <span> {money.format(itemsSubtotal)}</span>
+                        <span>{money.format(itemsSubtotal)}</span>
                     </div>
+
                     {calculatedLabor > 0 && (
                         <div className={styles.summaryRow}>
                             <span>Mão de Obra:</span>
-                            <span> {money.format(calculatedLabor)}</span>
+                            <span>{money.format(calculatedLabor)}</span>
                         </div>
                     )}
 
+                    <div className={styles.summaryRow}>
+                        <span>Desconto:</span>
+                        <span className={styles.discountValue}>- {money.format(venda?.desconto || 0)}</span>
+                    </div>
 
-                      <div className={styles.totalRow}>
-                    <span>TOTAL GERAL: </span>
-                    <strong className={styles.totalValue}>{money.format(total)}</strong>
+                    <div className={styles.summaryRow}>
+                        <span>Valor Pago:</span>
+                        <span>{money.format(venda?.valorPago || 0)}</span>
+                    </div>
                 </div>
+
+                {/* Divisor Visual Sutil */}
+                <hr style={{color:'white'}} />
+
+                {/* Bloco de Destaque: Total Geral */}
+                <div className={styles.totalSection}>
+                    <div className={styles.totalInfo}>
+                        <span className={styles.totalLabel}>TOTAL A PAGAR</span>
+                        <strong className={styles.totalAmount}>{money.format(total)}</strong>
+                    </div>
+
+                    <button
+                        className={styles.btnCheckout}
+                        disabled={total <= 0}
+                    // onClick={handleFinalize}
+                    >
+                        FINALIZAR VENDA (F2)
+                    </button>
                 </div>
-
-              
-
-                <button
-                    className={styles.btnCheckout}
-                    disabled={cart.length === 0}
-                    onClick={() => alert('Finalizado')}
-                >
-                    {activeTab === 'os' ? 'Gerar Orçamento' : 'Finalizar Venda'}
-                </button>
             </footer>
         </aside>
     );

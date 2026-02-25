@@ -14,7 +14,6 @@ import Clientes from "./pages/Clientes/Clientes";
 import Produtos from "./pages/Produtos/Produtos";
 import Vendas from "./pages/PDV/PDVScreen";
 import Estoque from "./pages/Estoque/Estoque";
-import Servicos from "./pages/Servicos/Servicos";
 import { ObrasModule } from './pages/Obras/ObrasModule';
 
 // Contexts
@@ -30,9 +29,17 @@ import StockEntryForm from './pages/Estoque/pages/StockEntry/StockEntryForm';
 import StockAdjustmentForm from './pages/Estoque/pages/StockAdjustment/StockAdjustmentForm';
 import StockInventory from './pages/Estoque/pages/StockInventory/StockInventory';
 import StockLabelingForm from './pages/Estoque/pages/StockLabelingForm/StockLabelingForm';
+import { FinalizarVenda} from "./pages/PDV/pages/FinalizarVenda";
 import { PDV } from './pages/PDV/PDV';
+import { HubVendas } from './pages/PDV/HubVendas';
 
 function App() {
+
+
+
+
+
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
@@ -49,6 +56,8 @@ function App() {
 
   return (
     <>
+
+    
     <BrowserRouter>
       <div className="admin-grid-container" style={{
         gridTemplateColumns: `${sidebarWidth}px`,
@@ -101,7 +110,11 @@ function App() {
 
 
 
-              <Route path="/vendas" element={<PDV />} />
+              <Route path="/vendas" element={<HubVendas />} />
+              <Route path="/vendas/pdv" element={<PDV/>} />
+              <Route path="/vendas/pdv/finalizar" element={ <FinalizarVenda  onBack={() => {}}/>  } />
+
+              
               <Route path="/produtos" element={<Produtos text='Produtos'/>} />
               <Route path="/Estoque" element={<Estoque />} />
               <Route path="/Estoque/consulta" element={<StockInventory/>} />
@@ -109,7 +122,6 @@ function App() {
               <Route path="/Estoque/operacoes" element={<StockAdjustmentForm/>} />
               <Route path="/Estoque/etiquetagem" element={<StockLabelingForm/>} />
 
-              <Route path="/Servicos" element={<Servicos />} />
               
               {/* Rota principal do Módulo Obras */}
               <Route path="/obras" element={<ObrasModule />} />

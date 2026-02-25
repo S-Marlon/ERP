@@ -1,10 +1,12 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import styles from './PDV.module.css';
 import { AutoPart } from './types';
 import { searchProducts, Product } from '../../data/api';
 import { CartAside } from './pages/Cart/CartAside';
 import Button from '../../components/ui/Button/Button';
 import ProductFilter from '../../components/forms/search/ProductFilter';
+import { FinalizarVenda } from './pages/FinalizarVenda';
 
 type SaleItem = (AutoPart | { 
   id: string; 
@@ -26,7 +28,9 @@ interface CartItem {
 
 const MOCK_SERVICES: SaleItem[] = [
   { id: 's1', name: 'Prensagem de Mangueira 1 Trama (R1)', category: 'Hidráulica', price: 20.00, type: 'service' },
-  { id: 's2', name: 'Prensagem de Mangueira 2 Tramas (R2)', category: 'Hidráulica', price: 25.00, type: 'service' },
+  { id: 's2', name: 'Prensagem de Mangueira 2 Tramas (R2) bitolas 1/4" até 5/8" ', category: 'Hidráulica', price: 30.00, type: 'service' },
+  { id: 's22', name: 'Prensagem de Mangueira 2 Tramas (R2) bitolas 3/4" até 1.1/4" ', category: 'Hidráulica', price: 40.00, type: 'service' },
+  { id: 's23', name: 'Prensagem de Mangueira 2 Tramas (R2) bitolas 1.1/2" e 2" ', category: 'Hidráulica', price: 45.00, type: 'service' },
   { id: 's3', name: 'Prensagem de Mangueira 4 Tramas (R12/R13)', category: 'Alta Pressão', price: 30.00, type: 'service' },
   { id: 's4', name: 'Corte e Montagem de Terminais', category: 'Manutenção', price: 20.00, type: 'service' },
   { id: 's5', name: 'Teste de Estanqueidade e Pressão', category: 'Qualidade', price: 10.00, type: 'service' },
@@ -34,6 +38,41 @@ const MOCK_SERVICES: SaleItem[] = [
 ];
 
 export const PDV: React.FC = () => {
+
+
+const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  
+  // Estados da Venda
+  const [venda, setVenda] = useState<any>(null);
+  const [mostrarModalCliente, setMostrarModalCliente] = useState(false);
+  const [identificadorCliente, setIdentificadorCliente] = useState("");
+
+  useEffect(() => {
+    if (id) {
+      // Editar Venda Existente
+      const vendaEncontrada = MOCK_VENDAS.find(v => v.id === Number(id));
+      if (vendaEncontrada) {
+        setVenda(vendaEncontrada);
+      }
+    } else {
+      // Nova Venda: Força a identificação do cliente
+      setMostrarModalCliente(true);
+    }
+  }, [id]);
+
+  const confirmarCliente = () => {
+    // Aqui você faria a busca do cliente no backend pelo CPF/CNPJ
+    setVenda({
+      id: Math.floor(Math.random() * 1000), // ID temporário
+      cliente: identificadorCliente || "Consumidor Final",
+      itens: [],
+      valorTotal: 0
+    });
+    setMostrarModalCliente(false);
+  };
+
+
   const [searchTerm, setSearchTerm] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(true);
   const [filterBrand, setFilterBrand] = useState('');
@@ -193,8 +232,32 @@ const updateQuantity = (id: string | number, value: number | string) => {
 
   return (
     <div className={`${styles.container} ${!isFilterOpen ? styles.sidebarCollapsed : ''}`}>
+
+
+      {/* MODAL DE IDENTIFICAÇÃO (Aparece apenas em Nova Venda) */}
+      {mostrarModalCliente && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3>Identificar Cliente</h3>
+            <p>Informe CPF, CNPJ ou Nome para iniciar</p>
+            <input 
+              autoFocus
+              type="text" 
+              className="input-cliente"
+              placeholder="000.000.000-00"
+              value={identificadorCliente}
+              onChange={(e) => setIdentificadorCliente(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && confirmarCliente()}
+            />
+            <div className="modal-actions">
+              <button onClick={confirmarCliente} className="btn-confirmar">Iniciar Venda (Enter)</button>
+              <button onClick={confirmarCliente} className="btn-cancelar">Cancelar (ESC)</button>
+            </div>
+          </div>
+        </div>
+      )}
       
-      <aside className={`${styles.filterSidebar} ${!isFilterOpen ? styles.hidden : ''}`}>
+      {/* <aside className={`${styles.filterSidebar} ${!isFilterOpen ? styles.hidden : ''}`}>
         <div className={styles.sidebarHeader}>
           <h3>Filtros</h3>
 
@@ -208,15 +271,16 @@ const updateQuantity = (id: string | number, value: number | string) => {
             <label>Marca</label>
             <select value={filterBrand} onChange={(e) => setFilterBrand(e.target.value)}>
               <option value="">Todas</option>
-              {/* Temporariamente sem marcas, pois não temos no banco */}
+            
             </select>
           </div>
           <button className={styles.btnClear} onClick={() => {setFilterBrand(''); setSearchTerm('');}}>Limpar</button>
         </div>
       </aside>
+       */}
 
       <main className={styles.mainContent}>
-        <header className={styles.topHeader}>
+        {/* <header className={styles.topHeader}>
           <div className={styles.searchContainer}>
             <button className={styles.btnFilterToggle} onClick={() => setIsFilterOpen(!isFilterOpen)}>
               {isFilterOpen ? '⇠ Ocultar' : '☰ Filtros'}
@@ -229,7 +293,8 @@ const updateQuantity = (id: string | number, value: number | string) => {
               disabled={activeTab === 'os'}
             />
           </div>
-        </header>
+        </header> */}
+
 
         <nav className={styles.tabsContainer}>
           <button className={`${styles.tabButton} ${activeTab === 'parts' ? styles.tabButtonActive : ''}`} onClick={() => setActiveTab('parts')}>📦 Peças</button>
@@ -238,6 +303,9 @@ const updateQuantity = (id: string | number, value: number | string) => {
         </nav>
 
         {activeTab === 'os' ? (
+          <>
+                <ProductFilter filters={filters} onFilterChange={handleFilterChange} onApply={() => console.log("Aplicar filtros avançados")} onReset={() => console.log("Resetar filtros avançados")} />
+
          
 <section className={styles.osSection}>
   <div className={styles.osForm}>
@@ -315,7 +383,7 @@ const updateQuantity = (id: string | number, value: number | string) => {
         <button 
           className={osData.laborType === 'fixed' ? styles.activeType : ''} 
           onClick={() => setOsData({...osData, laborType: 'fixed'})}
-        >Valor Fixo Montagem</button>
+          >Valor Fixo Montagem</button>
         <button 
           className={osData.laborType === 'table' ? styles.activeType : ''} 
           onClick={() => setOsData({...osData, laborType: 'table'})}
@@ -349,8 +417,30 @@ const updateQuantity = (id: string | number, value: number | string) => {
     </div>
   </div>
 </section>
+                </>
         ) : (
           <section className={styles.tableSection}>
+
+            <header className={styles.topHeader}>
+          <div className={styles.searchContainer}>
+            {/* <button className={styles.btnFilterToggle} onClick={() => setIsFilterOpen(!isFilterOpen)}>
+              {isFilterOpen ? '⇠ Ocultar' : '☰ Filtros'}
+            </button> */}
+            <input 
+              className={styles.mainInput}
+              placeholder={`Buscar ${activeTab === 'parts' ? 'peças...' : 'serviços...'}`}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              disabled={activeTab === 'os'}
+            />
+
+
+          </div>
+        </header>
+            <ProductFilter filters={filters} onFilterChange={handleFilterChange} onApply={() => console.log("Aplicar filtros avançados")} onReset={() => console.log("Resetar filtros avançados")} />
+
+
+
             {loadingProducts && <p>Carregando produtos...</p>}
             <table className={styles.partsTable}>
               <thead>
@@ -403,6 +493,11 @@ const updateQuantity = (id: string | number, value: number | string) => {
       updateQuantity={updateQuantity}
       removeItem={removeItem}
     />
+
+  
+
+    <FinalizarVenda onBack={() => console.log("Voltar ao PDV")}  style={{width: '100%'}}/>
+
 
       {/* MODAL DE DETALHES (SÓ PARA PEÇAS) */}
       {selectedPart && (

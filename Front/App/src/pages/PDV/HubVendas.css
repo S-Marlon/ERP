@@ -1,0 +1,150 @@
+:root {
+  --bg-color: #f4f7f6;
+  --primary: #2563eb;
+  --secondary: #454545;
+  --success: #10b981; /* Verde */
+  --danger: #ef4444;  /* Vermelho */
+  --warning: #f59e0b; /* Amarelo */
+  --filter: #1e293b;
+  --sidebar-w: 240px;
+}
+
+.hub-container {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg-color);
+  min-height: 100vh;
+}
+
+/* Header Styles */
+.hub-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background: white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.btn-nova-venda {
+  background: var(--primary);
+  color: rgb(255, 255, 255);
+  border: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.search-bar {
+  margin-left: 1rem;
+  padding: 0.8rem;
+  width: 300px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+
+/* Layout Body */
+.hub-content {
+  display: flex;
+  padding: 1rem;
+  gap: 1rem;
+}
+
+.hub-sidebar {
+  width: var(--sidebar-w);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.filter-btn {
+  text-align: left;
+  padding: 0.7rem;
+  border: none;
+  background: var(--secondary);
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.filter-btn.active { background: var(--primary); color: rgb(255, 255, 255); }
+
+/* Grid & Cards */
+.hub-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.card-venda {
+  background: white;
+  border-radius: 12px;
+  padding: 1rem;
+  position: relative;
+  border-left: 8px solid #ccc;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.status-disponivel { border-left-color: var(--success); }
+.status-editando { border-left-color: var(--danger); opacity: 0.8; }
+.status-pagamento { border-left-color: var(--warning); }
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.card-header h4 { margin: 0; color: var(--text-main); }
+.card-header span { font-size: 0.8rem; color: #64748b; }
+
+.item-list {
+  font-size: 0.85rem;
+  color: #475569;
+  padding-left: 1.2rem;
+  margin-bottom: 1rem;
+}
+
+.card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+  border-top: 1px solid #eee;
+  padding-top: 0.5rem;
+}
+
+.price { font-weight: 800; color: var(--text-main); font-size: 1.1rem; }
+.time { font-size: 0.7rem; color: #94a3b8; }
+
+.card-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.btn-continue, .btn-caixa {
+  flex: 1;
+  padding: 0.5rem;
+  font-size: 0.8rem;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid #ddd;
+}
+
+.btn-continue { background: #f8fafc; }
+.btn-caixa { background: var(--success); color: white; border: none; }
+
+.lock-overlay {
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--danger);
+  font-weight: bold;
+  text-align: center;
+  padding: 0.5rem;
+  border-radius: 4px;
+  margin-top: 1rem;
+}

@@ -22,3 +22,17 @@ export interface SaleSummary {
   taxes: number;
   total: number;
 }
+
+
+export type StatusVenda = 'disponivel' | 'editando' | 'pagamento';
+
+export interface Venda {
+  id: number;
+  cliente: string;
+  vendedor: string;
+  itens: string[];
+  valorTotal: number;
+  ultimaAlteracao: string;
+  status: StatusVenda;
+  editadoPor?: string;
+}

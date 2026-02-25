@@ -296,7 +296,7 @@
 
 .detailGrid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 1.5rem;
 }
 
@@ -1254,7 +1254,6 @@
 .cartFooter {
   padding: 1.5rem;
   background: var(--cart-input-bg);
-  gap: 1rem;
   display: flex;
   flex-direction: column;
 }
