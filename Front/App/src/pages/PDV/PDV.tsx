@@ -1,30 +1,33 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import styles from './PDV.module.css';
-import { AutoPart } from './types';
+import { AutoPart, SaleItem, CartItem } from './types';
 import { searchProducts, Product } from '../../data/api';
 import { CartAside } from './pages/Cart/CartAside';
 import Button from '../../components/ui/Button/Button';
 import ProductFilter from '../../components/forms/search/ProductFilter';
 import { FinalizarVenda } from './pages/FinalizarVenda';
 
-type SaleItem = (AutoPart | { 
-  id: string; 
-  sku?: string;
-  name: string; 
-  price: number; 
-  status?: string; 
+type PDVStep = 'SELECAO' | 'PAGAMENTO';
+
+interface FilterState {
+  status: string;
   category: string;
-}) & { type: 'part' | 'service'; stock?: number };
-
-
-// Exemplo de interface para clareza
-interface CartItem {
-  id: string | number;
-  name: string;
-  quantity: number;
-  price: number;
+  minPrice: string;
+  maxPrice: string;
+  minStock: string;
+  maxStock: string;
+  clientName: string;
+  clientEmail: string;
+  clientCpf: string;
+  clientPhone: string;
+  orderNumber: string;
+  serviceType: string;
+  date: string;
+  paymentMethod: string;
 }
+
+// Observação: CartItem e SaleItem agora são definidos em types.ts
 
 const MOCK_SERVICES: SaleItem[] = [
   { id: 's1', name: 'Prensagem de Mangueira 1 Trama (R1)', category: 'Hidráulica', price: 20.00, type: 'service' },
@@ -38,113 +41,115 @@ const MOCK_SERVICES: SaleItem[] = [
 ];
 
 export const PDV: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
 
-
-const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  
-  // Estados da Venda
-  const [venda, setVenda] = useState<any>(null);
+  /* ===== CENTRALIZED STATE FOR SYNC ===== */
+  // Core sale state
+  const [estagio, setEstagio] = useState<PDVStep>('SELECAO');
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cliente, setCliente] = useState('');
   const [mostrarModalCliente, setMostrarModalCliente] = useState(false);
   const [identificadorCliente, setIdentificadorCliente] = useState("");
 
+  // UI state
+  const [activeTab, setActiveTab] = useState<'parts' | 'services' | 'os'>('parts');
+  const [selectedPart, setSelectedPart] = useState<AutoPart | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Product data
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+
+  // OS-specific data
+  const [osData, setOsData] = useState({
+    equipment: '',
+    application: '',
+    gauge: '',
+    layers: '',
+    finalLength: '',
+    laborType: 'fixed' as 'fixed' | 'percent' | 'service',
+    laborValue: 0,
+    selectedServiceId: ''
+  });
+
+  // Initialize on mount
   useEffect(() => {
     if (id) {
-      // Editar Venda Existente
-      const vendaEncontrada = MOCK_VENDAS.find(v => v.id === Number(id));
-      if (vendaEncontrada) {
-        setVenda(vendaEncontrada);
-      }
+      // Editar venda existente - aqui você buscaria do back se tiver
+      setCliente('Cliente #' + id);
     } else {
-      // Nova Venda: Força a identificação do cliente
       setMostrarModalCliente(true);
     }
   }, [id]);
 
   const confirmarCliente = () => {
-    // Aqui você faria a busca do cliente no backend pelo CPF/CNPJ
-    setVenda({
-      id: Math.floor(Math.random() * 1000), // ID temporário
-      cliente: identificadorCliente || "Consumidor Final",
-      itens: [],
-      valorTotal: 0
-    });
+    setCliente(identificadorCliente || "Consumidor Final");
     setMostrarModalCliente(false);
   };
 
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isFilterOpen, setIsFilterOpen] = useState(true);
-  const [filterBrand, setFilterBrand] = useState('');
-  const [activeTab, setActiveTab] = useState<'parts' | 'services' | 'os'>('parts');  
-  const [cart, setCart] = useState<(SaleItem & { quantity: number })[]>([]);
-  const [selectedPart, setSelectedPart] = useState<AutoPart | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loadingProducts, setLoadingProducts] = useState(false);
-// Estados e Funções de Filtro Completo (Não totalmente integrados à lógica da tabela, mas mantidos)
-    const [filters, setFilters] = useState<FilterState>({
-        status: "", category: "", minPrice: "", maxPrice: "", minStock: "", maxStock: "",
-        clientName: "", clientEmail: "", clientCpf: "", clientPhone: "",
-        orderNumber: "", serviceType: "", date: "", paymentMethod: "",
-    });
+  /* ===== CALCULATED STATE (Memoized) ===== */
+  const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
+  // Subtotal de itens
+  const itemsSubtotal = useMemo(() => {
+    return cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+  }, [cart]);
 
-
-     const handleFilterChange = (
-        key: keyof FilterState,
-        value: string | number | boolean
-    ) => {
-        setFilters((prevFilters) => ({
-            ...prevFilters,
-            [key]: value,
-        }));
-    };
-
-
-  // ... (seus hooks: cart, setCart, activeTab, total, money, calculatedLabor)
-
-  // Funções de manipulação para manter o JSX limpo
-const updateQuantity = (id: string | number, value: number | string) => {
-  setCart(prev => prev.map(item => {
-    if (item.id === id) {
-      // 1. Identifica se o item atual permite decimais
-      const canFractionate = ['MT', 'LT', 'KG', 'M'].includes(item.unitOfMeasure?.toUpperCase() || '');
-      
-      let newQty: number;
-
-      // 2. Converte o valor recebido
-      if (typeof value === 'string') {
-        // Aceita vírgula ou ponto e converte para decimal
-        newQty = parseFloat(value.replace(',', '.')) || 0;
-      } else {
-        // Soma o delta (0.1 ou 1) vindo dos botões
-        newQty = item.quantity + value;
-      }
-
-      // 3. Aplica as travas de segurança
-      let clampedQty = Math.max(0, newQty);
-      
-      // Se NÃO for fracionável, arredonda para baixo para garantir que seja inteiro
-      if (!canFractionate) {
-        clampedQty = Math.floor(clampedQty);
-      }
-
-      // 4. Checa estoque
-      if (item.type === 'part' && item.stock && clampedQty > item.stock) {
-        alert("Quantidade excede o estoque disponível!");
-        return item;
-      }
-
-      // 5. Retorna o número com no máximo 2 casas decimais para evitar bugs de dízima do JS
-      return { ...item, quantity: Number(clampedQty.toFixed(2)) };
+  // Mão de obra calculada dinamicamente
+  const calculatedLabor = useMemo(() => {
+    if (osData.laborType === 'percent') {
+      return itemsSubtotal * (osData.laborValue / 100);
     }
-    return item;
-  }));
-};
+    if (osData.laborType === 'service') {
+      const service = MOCK_SERVICES.find(s => s.id === osData.selectedServiceId);
+      return service ? service.price : 0;
+    }
+    return osData.laborValue; // fixed
+  }, [itemsSubtotal, osData.laborType, osData.laborValue, osData.selectedServiceId]);
+
+  // Total geral (itens + mão de obra)
+  const total = useMemo(() => itemsSubtotal + calculatedLabor, [itemsSubtotal, calculatedLabor]);
+
+  /* ===== UNIFIED HANDLERS ===== */
+  const updateQuantity = (id: string | number, value: number | string) => {
+    setCart(prev => prev.map(item => {
+      if (item.id === id) {
+        const canFractionate = ['MT', 'LT', 'KG', 'M', 'L'].includes(item.unitOfMeasure?.toUpperCase() || '');
+        
+        let newQty: number;
+        if (typeof value === 'string') {
+          newQty = parseFloat(value.replace(',', '.')) || 0;
+        } else {
+          newQty = item.quantity + value;
+        }
+
+        let clampedQty = Math.max(0, newQty);
+        if (!canFractionate) {
+          clampedQty = Math.floor(clampedQty);
+        }
+
+        if (item.type === 'part' && item.stock && clampedQty > item.stock) {
+          alert("Quantidade excede o estoque disponível!");
+          return item;
+        }
+
+        return { ...item, quantity: Number(clampedQty.toFixed(2)) };
+      }
+      return item;
+    }));
+  };
 
   const removeItem = (id: string | number) => {
     setCart(prev => prev.filter(item => item.id !== id));
   };
+
+  const handleFilterChange = (key: keyof FilterState, value: string | number | boolean) => {
+    // Filters kept for continuity with ProductFilter component
+  };
+
+  /* ===== DATA FETCHING ===== */
+
 
   useEffect(() => {
     console.log('useEffect triggered: activeTab=', activeTab, 'searchTerm=', searchTerm);
@@ -166,37 +171,6 @@ const updateQuantity = (id: string | number, value: number | string) => {
     }
   }, [searchTerm, activeTab]);
 
-  // Unificação do estado da OS
-  const [osData, setOsData] = useState({
-    vehicle: '',
-    plate: '',
-    laborValue: 0,
-    laborType: 'fixed' as 'fixed' | 'percent' | 'service',
-    selectedServiceId: ''
-  });
-
-  const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
-
-  // Cálculo da Mão de Obra Dinâmica
-  const calculatedLabor = useMemo(() => {
-    const itemsTotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-    
-    if (osData.laborType === 'percent') {
-      return itemsTotal * (osData.laborValue / 100);
-    }
-    if (osData.laborType === 'service') {
-      const service = MOCK_SERVICES.find(s => s.id === osData.selectedServiceId);
-      return service ? service.price : 0;
-    }
-    return osData.laborValue; // fixed
-  }, [cart, osData.laborType, osData.laborValue, osData.selectedServiceId]);
-
-  // Cálculo do Total Geral
-  const total = useMemo(() => {
-    const itemsTotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-    return itemsTotal + calculatedLabor;
-  }, [cart, calculatedLabor]);
-
   const filteredData = useMemo(() => {
     if (activeTab === 'os') return [];
     if (activeTab === 'parts') {
@@ -204,25 +178,25 @@ const updateQuantity = (id: string | number, value: number | string) => {
         id: p.id,
         name: p.name,
         price: p.salePrice,
-        brand: '', // Não temos no banco
+        brand: '',
         category: p.category,
         type: 'part' as const,
         stock: p.currentStock,
         sku: p.sku,
-        unitOfMeasure: p.unitOfMeasure, // CERTIFIQUE-SE QUE ESTA LINHA EXISTE
+        unitOfMeasure: p.unitOfMeasure,
         status: p.status,
-        // Outros campos não mapeados
-      }));
+      })) as CartItem[];
     }
-    return MOCK_SERVICES.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [searchTerm, filterBrand, activeTab, products]);
+    return MOCK_SERVICES.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase())) as CartItem[];
+  }, [searchTerm, activeTab, products]);
 
   const addToCart = useCallback((item: SaleItem) => {
     setCart(prev => {
       const existing = prev.find(i => i.id === item.id);
       if (existing) {
         if (item.type === 'part' && item.stock && existing.quantity >= item.stock) {
-          alert("Estoque insuficiente!"); return prev;
+          alert("Estoque insuficiente!");
+          return prev;
         }
         return prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
       }
@@ -230,9 +204,9 @@ const updateQuantity = (id: string | number, value: number | string) => {
     });
   }, []);
 
-  return (
-    <div className={`${styles.container} ${!isFilterOpen ? styles.sidebarCollapsed : ''}`}>
 
+  return (
+<div className={`${styles.PDVcontainer} ${estagio === 'PAGAMENTO' ? styles.checkoutActive : ''}`}>
 
       {/* MODAL DE IDENTIFICAÇÃO (Aparece apenas em Nova Venda) */}
       {mostrarModalCliente && (
@@ -257,43 +231,12 @@ const updateQuantity = (id: string | number, value: number | string) => {
         </div>
       )}
       
-      {/* <aside className={`${styles.filterSidebar} ${!isFilterOpen ? styles.hidden : ''}`}>
-        <div className={styles.sidebarHeader}>
-          <h3>Filtros</h3>
-
-                <ProductFilter filters={filters} onFilterChange={handleFilterChange} onApply={() => console.log("Aplicar filtros avançados")} onReset={() => console.log("Resetar filtros avançados")} />
-
-
-          <button onClick={() => setIsFilterOpen(false)} className={styles.btnClose}>✕</button>
-        </div>
-        <div className={styles.filterContent}>
-          <div className={styles.filterGroup}>
-            <label>Marca</label>
-            <select value={filterBrand} onChange={(e) => setFilterBrand(e.target.value)}>
-              <option value="">Todas</option>
-            
-            </select>
-          </div>
-          <button className={styles.btnClear} onClick={() => {setFilterBrand(''); setSearchTerm('');}}>Limpar</button>
-        </div>
-      </aside>
-       */}
+     
 
       <main className={styles.mainContent}>
-        {/* <header className={styles.topHeader}>
-          <div className={styles.searchContainer}>
-            <button className={styles.btnFilterToggle} onClick={() => setIsFilterOpen(!isFilterOpen)}>
-              {isFilterOpen ? '⇠ Ocultar' : '☰ Filtros'}
-            </button>
-            <input 
-              className={styles.mainInput}
-              placeholder={`Buscar ${activeTab === 'parts' ? 'peças...' : 'serviços...'}`}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              disabled={activeTab === 'os'}
-            />
-          </div>
-        </header> */}
+
+        {estagio === 'PAGAMENTO' && <div className={styles.lockOverlay} onClick={() => setEstagio('SELECAO')} />}
+       
 
 
         <nav className={styles.tabsContainer}>
@@ -436,8 +379,8 @@ const updateQuantity = (id: string | number, value: number | string) => {
 
 
           </div>
+            <ProductFilter filters={'obj'} onFilterChange={handleFilterChange} onApply={() => console.log("Aplicar filtros avançados")} onReset={() => console.log("Resetar filtros avançados")} />
         </header>
-            <ProductFilter filters={filters} onFilterChange={handleFilterChange} onApply={() => console.log("Aplicar filtros avançados")} onReset={() => console.log("Resetar filtros avançados")} />
 
 
 
@@ -465,10 +408,10 @@ const updateQuantity = (id: string | number, value: number | string) => {
                     {activeTab === 'parts' ? (
                       <>
                         <td > <div style={{border:'2px solid green', padding: '4px' , color: 'green', borderRadius: '4px', background: '#e6fce8', textAlign: 'center'}}>{item.status}</div></td>
-                        <td>{(item as any).stock} {(item as any).unitOfMeasure || 'un'}</td>
+                        <td>{item.stock} {item.unitOfMeasure || 'un'}</td>
                       </>
                     ) : (
-                      <td><span className={styles.compatibilityBadge}>{(item as any).category}</span></td>
+                      <td><span className={styles.compatibilityBadge}>{item.category}</span></td>
                     )}
                     <td className={styles.price}>{money.format(item.price)}</td>
                     <td className={styles.actions}>
@@ -482,22 +425,29 @@ const updateQuantity = (id: string | number, value: number | string) => {
             </table>
           </section>
         )}
-      </main>
 
+      </main>
       <CartAside 
-      cart={cart}
-      activeTab={activeTab}
-      calculatedLabor={calculatedLabor}
-      total={total}
-      money={money}
-      updateQuantity={updateQuantity}
-      removeItem={removeItem}
-    />
+        cart={cart}
+        cliente={cliente}
+        itemsSubtotal={itemsSubtotal}
+        activeTab={activeTab}
+        calculatedLabor={calculatedLabor}
+        total={total}
+        money={money}
+        updateQuantity={updateQuantity}
+        removeItem={removeItem}
+        onFinalizar={() => setEstagio('PAGAMENTO')}
+      />
 
   
-
-    <FinalizarVenda onBack={() => console.log("Voltar ao PDV")}  style={{width: '100%'}}/>
-
+  <aside className={styles.paymentSidebar}>
+    <FinalizarVenda
+      onBack={() => setEstagio('SELECAO')}
+      total={total}
+      cliente={cliente}
+    />
+  </aside>
 
       {/* MODAL DE DETALHES (SÓ PARA PEÇAS) */}
       {selectedPart && (

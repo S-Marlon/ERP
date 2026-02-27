@@ -140,6 +140,25 @@
 .status-item.paid { background: #dcfce7; color: #166534; }
 .status-item.change { background: #fef9c3; color: #854d0e; }
 
+
+.btn-cancel-sale {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 1.5rem;
+  font-size: 1.25rem;
+  font-weight: bold;
+  border-radius: 8px;
+  cursor: pointer;
+
+  width: 100%;
+  margin-top: auto;
+  padding: 1.2rem;
+  position: sticky;
+  bottom: 0;
+  border-radius: 0; /* Ocupa a largura total na base */
+}
+
 .btn-confirm-sale {
   background: #10b981;
   color: white;
@@ -441,3 +460,257 @@
     border-radius: 4px;
     font-size: 0.9rem;
 }
+
+
+
+
+.changeWrapper {
+    position: relative; /* Pai relativo para o balão ser absoluto a ele */
+    cursor: help;
+}
+
+
+
+.changeHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    color: #94a3b8;
+}
+
+.roundingAlert {
+    background: var(--warning);
+    color: #000;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.65rem;
+}
+
+/* Grid de Notas */
+.changeDetailsGrid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+}
+
+.changeUnitPill {
+    background: var(--cart-surface);
+    border: 1px solid var(--cart-border);
+    padding: 6px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    text-align: center;
+    color: white;
+}
+
+/* Setinha do balão (Opcional, mas dá um toque profissional) */
+.tooltipArrow {
+    position: absolute;
+    bottom: -6px;
+    right: 20px;
+    width: 12px;
+    height: 12px;
+    background: #1e293b;
+    border-right: 1px solid var(--cart-border);
+    border-bottom: 1px solid var(--cart-border);
+    transform: rotate(45deg);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+
+.changeWrapper {
+    position: relative; /* Essencial: define o ponto (0,0) para o balão */
+    display: inline-block; /* Garante que o tamanho do wrapper seja o do conteúdo */
+    width: 100%; 
+}
+
+.change-calculator {
+    position: absolute;
+    /* Faz o balão subir */
+    bottom: calc(100% + 15px); 
+    right: 0;
+    
+    /* Estética de Balão */
+    width: 260px;
+    background: #1e293b; 
+    border: 1px solid #475569;
+    border-radius: 10px;
+    padding: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    
+    /* Garante que fique acima de tudo */
+    z-index: 999; 
+}
+
+/* A setinha apontando para baixo */
+.tooltipArrow {
+    position: absolute;
+    bottom: -6px; /* Metade para fora do balão */
+    right: 20px;
+    width: 12px;
+    height: 12px;
+    background: #1e293b;
+    border-right: 1px solid #475569;
+    border-bottom: 1px solid #475569;
+    transform: rotate(45deg);
+}
+
+
+
+
+
+/* Alternativa garantida: Estilize via classes específicas no seu .map */
+.nota-style {
+    background: #22c55e;
+    padding: 4px 10px;
+    border-radius: 4px;
+    border-left: 8px solid #15803d;
+    font-weight: bold;
+}
+
+.moeda-style {
+    background: #eab308; /* Amarelo/Dourado para moedas */
+    color: #000;
+    padding: 4px 12px;
+    border-radius: 50px; /* Círculo/Pílula */
+    font-weight: bold;
+    border: 2px solid #ca8a04;
+}
+
+/* --- COMPONENTE DE TROCO (BALÃO COMPACTO) --- */
+.changeWrapper {
+    position: relative;
+    width: 100%;
+    cursor: help;
+}
+
+.change-calculator {
+    position: absolute;
+    bottom: calc(100% + 12px);
+    right: 0;
+    width: 240px; /* Compacto */
+    background: #111827; /* Dark Mode para contraste */
+    border: 1px solid #374151;
+    border-radius: 8px;
+    padding: 10px;
+    z-index: 1000;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+    animation: fadeIn 0.2s ease-out;
+}
+
+/* Grid de Notas/Moedas em 2 colunas */
+.change-details-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+
+.unit-qty {
+    background: rgba(0,0,0,0.3);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 0.65rem;
+}
+
+/* --- CORES REAIS DO BRASIL --- */
+/* --- NOTAS --- */
+.v-100 { background-color: #008b8b !important; }
+.v-50  { background-color: #b8860b !important; }
+.v-20  { background-color: #d4af37 !important; color: #000 !important; }
+.v-10  { background-color: #a52a2a !important; }
+.v-5   { background-color: #6a5acd !important; }
+.v-2   { background-color: #191970 !important; }
+
+/* --- MOEDAS (Ajustadas para o novo padrão de classe v-0-5) --- */
+.v-1 { 
+    background: radial-gradient(circle, #c0c0c0 35%, #d4af37 40%) !important; 
+    color: #000 !important; 
+}
+.v-0-5, .v-0-50 { 
+    background: linear-gradient(145deg, #e6e6e6, #808080) !important; 
+    color: #000 !important; 
+}
+.v-0-25 { 
+    background: linear-gradient(145deg, #f1c40f, #967117) !important; 
+    color: #000 !important; 
+}
+.v-0-1, .v-0-10 { 
+    background: linear-gradient(145deg, #d35400, #873600) !important; 
+}
+.v-0-05 { 
+    background: linear-gradient(145deg, #a0522d, #5d2e17) !important; 
+}
+
+/* Garante que o item tenha cor de fundo caso a classe falhe */
+.change-unit-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 10px;
+    border-radius: 4px;
+    min-height: 28px;
+    color: white;
+    box-shadow: inset 0 0 5px rgba(0,0,0,0.2);
+}round: linear-gradient(145deg, #a0522d, #5d2e17) !important; }
+
+/* Setinha do Balão */
+.tooltip-arrow {
+    position: absolute;
+    bottom: -6px;
+    right: 25px;
+    width: 12px;
+    height: 12px;
+    background: #111827;
+    transform: rotate(45deg);
+    border-right: 1px solid #374151;
+    border-bottom: 1px solid #374151;
+}
+
+/* --- BOTÕES E STATUS --- */
+.status-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 1rem;
+}
+
+.status-item {
+    padding: 0.8rem;
+    border-radius: 8px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+}
+
+.status-item.change { 
+    background: #fef9c3; 
+    color: #854d0e; 
+    border: 1px solid #fde047;
+}
+
+.btn-confirm-sale {
+    background: #10b981;
+    color: white;
+    border: none;
+    padding: 1.2rem;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    width: 100%;
+    transition: background 0.2s;
+}
+
+.btn-confirm-sale:hover:not(:disabled) { background: #059669; }
+
+/* --- ANIMAÇÕES --- */
+@keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }

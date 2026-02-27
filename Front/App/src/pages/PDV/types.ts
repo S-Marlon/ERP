@@ -1,18 +1,30 @@
-export interface AutoPart {
+// Representa um item na venda - unificado para parts, services e combos
+export interface CartItem {
   id: string;
+  sku?: string;
   name: string;
-  brand: string;
-  oemCode: string;       // Código Original/Fabricante
-  sku: string;           // Código interno
-  compatibility: string; // Modelos e anos
-  location: string;      // Prateleira/Corredor
+  brand?: string;
   price: number;
-  stock: number;
+  quantity: number;
+  type: 'part' | 'service';
+  stock?: number;           // apenas partes
+  category?: string;
+  status?: string;
+  location?: string;        // apenas partes
+  compatibility?: string;   // apenas partes
+  oemCode?: string;         // apenas partes
 }
 
-export interface CartItem extends AutoPart {
-  quantity: number;
-  discount: number;
+// Item original da lista (antes de entrar no carrinho)
+export type SaleItem = CartItem & { quantity?: never };
+
+export interface AutoPart extends SaleItem {
+  type: 'part';
+  brand: string;
+  oemCode: string;
+  compatibility: string;
+  location: string;
+  stock: number;
 }
 
 export type PaymentMethod = 'CASH' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'PIX';

@@ -14,14 +14,78 @@
   --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
 }
 
-.container {
+/* 1. Ajuste o Container para garantir que ele ocupe a tela toda */
+.PDVcontainer {
   display: flex;
+  width: 100%; /* usa 100% para evitar overflow causado por scrollbar */
+  max-width: 100vw;
   height: 100vh;
   background-color: var(--background);
   color: var(--text-main);
   font-family: 'Inter', system-ui, sans-serif;
   overflow: hidden;
+  position: relative;
 }
+
+
+/* 2. Unifique o mainContent (Remova as duas definições anteriores e use esta) */
+.mainContent {
+  flex: 1; 
+  display: flex;
+  flex-direction: column;
+  min-width: 0; 
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+/* 3. Estágio 2: Ajuste a proporção */
+.checkoutActive .mainContent {
+  flex: 0.85; /* Encolhe bem a parte da esquerda */
+  opacity: 0.5;
+  filter: grayscale(0.8);
+  pointer-events: none;
+}
+
+/* 4. Ajuste o Carrinho (CartAside) para não sumir */
+/* Se o seu CartAside for um componente, garanta que ele tenha uma classe que possamos manipular */
+.checkoutActive .cartAside {
+  /* Opcional: encolhe o carrinho também */
+  flex: 1;
+  min-width: 300px;
+}
+
+/* 5. Sidebar de Pagamento - O SEGREDO ESTÁ AQUI */
+.paymentSidebar {
+  flex: 0 0 0; /* inicia colapsada dentro do flex container */
+  height: 100%;
+  background: white;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  border-left: 0 solid transparent;
+  /* display:block continua válido em flex container */
+}
+
+/* Quando ativa, ela "empurra" os outros componentes */
+.checkoutActive .paymentSidebar {
+  flex: 0 0 750px; /* largura fixa durante o pagamento */
+  border-left: 1px solid var(--border);
+}
+
+/* Ajuste no CartAside para ele também se adaptar se necessário */
+.checkoutActive :global(.CartAside_container_class) { 
+  /* Se o seu carrinho for um componente separado, você pode diminuir ele aqui também */
+  flex: 0.2; 
+}
+
+.lockOverlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.1);
+  z-index: 10;
+  cursor: pointer;
+}
+
+  
 
 /* --- SIDEBAR DE FILTROS --- */
 .filterSidebar {
@@ -76,14 +140,7 @@
   font-size: 0.9rem;
 }
 
-/* --- ÁREA PRINCIPAL --- */
-.mainContent {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  /* Evita quebra de layout com tabelas */
-}
+
 
 .topHeader {
   padding: 1rem 2rem;
@@ -944,15 +1001,7 @@
   --cart-input-bg: #0f172a;
 }
 
-/* --- ESTRUTURA GLOBAL --- */
-.container {
-  display: flex;
-  height: 100vh;
-  background-color: var(--background);
-  color: var(--text-main);
-  font-family: 'Inter', system-ui, sans-serif;
-  overflow: hidden;
-}
+
 
 /* --- SIDEBAR DE FILTROS --- */
 .filterSidebar {
@@ -998,13 +1047,6 @@
   background: white;
 }
 
-/* --- ÁREA PRINCIPAL E TABELA --- */
-.mainContent {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
 
 .topHeader {
   padding: 1rem 2rem;
@@ -1062,7 +1104,8 @@
 
 /* --- CARRINHO (SIDEBAR DIREITA) --- */
 .cartAside {
-  width: 550px;
+  /* base size via flex instead of width to allow shrink when checkout opens */
+  flex: 0 0 550px;
   background: var(--cart-bg);
   color: white;
   display: flex;
@@ -1319,3 +1362,6 @@ input::-webkit-inner-spin-button {
   justify-content: space-between;
   gap: 0.25rem;
 }
+
+
+

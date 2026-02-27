@@ -1,44 +1,38 @@
 import React from 'react';
 import styles from '../../PDV.module.css';
 
-// Interface para garantir que o item tenha as propriedades necessárias
-interface CartItem extends any {
-    id: string | number;
-    name: string;
-    price: number;
-    quantity: number;
-    unitOfMeasure?: string; // MT, LT, KG, UN, PC, etc.
-    type: 'part' | 'service';
-    stock?: number;
-}
+import { CartItem } from '../../types';
+
+// interface acima substituída pelo tipo importado — garante consistência entre os componentes
 
 interface CartAsideProps {
     cart: CartItem[];
+    cliente: string;
+    itemsSubtotal: number;
     activeTab: 'parts' | 'services' | 'os';
     calculatedLabor: number;
     total: number;
     money: Intl.NumberFormat;
     updateQuantity: (id: string | number, value: number | string) => void;
     removeItem: (id: string | number) => void;
+    onFinalizar: () => void; // Callback para quando o usuário clicar em "Finalizar Venda"
 }
 
 export const CartAside: React.FC<CartAsideProps> = ({
     cart,
+    cliente,
+    itemsSubtotal,
     activeTab,
     calculatedLabor,
     total,
     money,
     updateQuantity,
     removeItem,
+    onFinalizar
 }) => {
 
-
-    const venda = {
-        cliente: "João Silva",
-        valorTotal: 835.00,
-    };
-    // Cálculo do subtotal apenas dos itens (sem a mão de obra)
-    const itemsSubtotal = cart.reduce((acc, i) => acc + i.price * i.quantity, 0);
+    // subtotal calculado no pai e recebido via props
+    // const itemsSubtotal = props.itemsSubtotal; // não mais necessário
 
     // Lista de unidades que permitem venda fracionada (decimais)
     const FRACTIONABLE_UNITS = ['MT', 'LT', 'KG', 'M', 'L'];
@@ -55,12 +49,10 @@ export const CartAside: React.FC<CartAsideProps> = ({
                 {/* TOPO: IDENTIFICAÇÃO */}
                 <div style={{ display: 'flex', flexDirection: 'row' }}>
                     <div>
-
                         <span className="badge">VIP - 5% OFF sugerido</span>
-                        <h3>{venda.cliente}</h3>
+                        <h3>{cliente}</h3>
                     </div>
                     <span>CPF/CNPJ: 000.000.000-00</span>
-
                 </div>
 
             </header>
@@ -77,6 +69,11 @@ export const CartAside: React.FC<CartAsideProps> = ({
                             item.unitOfMeasure?.toUpperCase() || ''
                         );
                         const currentStep = canFractionate ? 0.1 : 1;
+
+                        // facilitar a leitura e evitar avisos sobre 'stock' undefined
+                        // prefer usar variável local para evitar warnings
+                        const stock = item.stock ?? 0;
+                        const hasStock = stock > 0;
 
                         return (
                             <div key={item.id} className={styles.cartItem}>
@@ -101,11 +98,12 @@ export const CartAside: React.FC<CartAsideProps> = ({
                                     </span>
 
 
-                                    <span className={styles.skuText}>Cód: {item.sku || item.id}</span>
+                                    {/* exibimos sku se disponível; tipo global agora inclui campo opcional */}
+                                    <span className={styles.skuText}>Cód: {item.sku ?? item.id}</span>
 
                                     {item.type === 'part' && (
-                                        <span className={`${styles.stockInfo} ${item.stock < 5 ? styles.lowStock : ''}`}>
-                                            Estoque: {item.stock}
+                                        <span className={`${styles.stockInfo} ${stock < 5 ? styles.lowStock : ''}`}>
+                                            Estoque: {stock}
                                         </span>
                                     )}
 
@@ -134,7 +132,11 @@ export const CartAside: React.FC<CartAsideProps> = ({
                                             <button
                                                 type="button"
                                                 onClick={() => updateQuantity(item.id, currentStep)}
-                                                disabled={item.type === 'part' && item.quantity >= (item.stock || 99999)}
+                                                disabled={
+                                                    item.type === 'part' &&
+                                                    hasStock &&
+                                                    item.quantity >= stock
+                                                }
                                             >
                                                 +
                                             </button>
@@ -170,7 +172,7 @@ export const CartAside: React.FC<CartAsideProps> = ({
                 {/* Bloco de Detalhamento: Informações de apoio */}
                 <div className={styles.summaryDetails}>
                     <div className={styles.summaryRow}>
-                        <span>Subtotal Itens:</span>
+                                <span>Subtotal Itens:</span>
                         <span>{money.format(itemsSubtotal)}</span>
                     </div>
 
@@ -181,15 +183,7 @@ export const CartAside: React.FC<CartAsideProps> = ({
                         </div>
                     )}
 
-                    <div className={styles.summaryRow}>
-                        <span>Desconto:</span>
-                        <span className={styles.discountValue}>- {money.format(venda?.desconto || 0)}</span>
-                    </div>
-
-                    <div className={styles.summaryRow}>
-                        <span>Valor Pago:</span>
-                        <span>{money.format(venda?.valorPago || 0)}</span>
-                    </div>
+                    {/* descontos e valores pagos não fazem parte do carrinho; tratados no checkout */}
                 </div>
 
                 {/* Divisor Visual Sutil */}
@@ -205,7 +199,7 @@ export const CartAside: React.FC<CartAsideProps> = ({
                     <button
                         className={styles.btnCheckout}
                         disabled={total <= 0}
-                    // onClick={handleFinalize}
+                        onClick={onFinalizar}
                     >
                         FINALIZAR VENDA (F2)
                     </button>
