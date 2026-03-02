@@ -5,19 +5,7 @@
   to { transform: translateX(0); }
 }
 
-.checkout-container {
-  display: flex;
-  flex-direction: column;
-  height: 100vh; /* Ocupa a altura total da lateral */
-  overflow: hidden; /* Evita scroll na borda externa */
-}
 
-.checkout-body {
-  display: flex;
-  flex-direction: column;
-  flex: 1; /* Faz o corpo ocupar todo o espaço disponível */
-  overflow-y: auto; /* Permite scroll apenas na lista de pagamentos se crescer muito */
-}
 
 
 .badge {
@@ -31,12 +19,6 @@
 
 
 
-/* Seção de Pagamentos */
-.payment-methods {
-  padding: 1.5rem;
-  border-right: none;
-  border-bottom: 2px solid #e2e8f0;
-}
 
 /* Histórico de pagamentos adicionados */
 .payment-history {
@@ -49,7 +31,7 @@
   display: flex;
   justify-content: space-between;
   padding: 8px;
-  background: #f1f5f9;
+  background: #ddd;
   border-radius: 6px;
   margin-bottom: 5px;
   font-size: 0.9rem;
@@ -57,9 +39,7 @@
 
 .totals-panel {
   margin-top: auto; /* Empurra o painel para o final do container */
-  padding: 1.5rem;
-  background: #f8fafc;
-  border-top: 2px solid #e2e8f0; /* Linha sutil para separar dos pagamentos */
+  padding: 1rem 0 ;
   
   /* Garante que o painel não encolha */
   flex-shrink: 0; 
@@ -70,18 +50,51 @@
   z-index: 10;
 }
 
-.method-grid {
-  grid-template-columns: repeat(2, 1fr); /* 2 colunas para não apertar */
+
+.cupons-grid {
+  display: grid;
+ grid-template-columns: repeat(3, 1fr);
   gap: 8px;
 }
 
-.method-grid button {
-  padding: 0.8rem;
+.cupons-grid button {
+  color: #0f172a;
+  padding: 0.8rem 0rem ;
   border: 2px solid #e2e8f0;
   border-radius: 8px;
   background: white;
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 700;
+  font-size: xx-small;
+}
+
+
+.method-grid {
+  display: grid;
+ grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+
+
+/* O primeiro botão (Dinheiro) ocupa as 3 colunas do topo */
+.method-grid button:nth-child(1) {
+    grid-column: 1 / 4; /* ou span 3 */
+}
+
+/* O quinto botão (Crediário) ocupa as 3 colunas da base */
+.method-grid button:nth-child(5) {
+    grid-column: 1 / 4; /* ou span 3 */
+}
+
+.method-grid button {
+  padding: 0.8rem 0rem ;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: medium;
 }
 
 .method-grid button.active {
@@ -89,6 +102,8 @@
   background: #eff6ff;
   color: #2563eb;
 }
+
+
 
 .add-payment {
   display: flex;
@@ -107,8 +122,6 @@
 .total-row {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 1rem;
-  font-size: 1.1rem;
 }
 
 .total-main {
@@ -127,7 +140,6 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
-  margin-bottom: 2rem;
 }
 
 .status-item {
@@ -220,7 +232,6 @@
   background: #f8fafc;
   padding: 12px;
   border-radius: 8px;
-  margin-bottom: 1rem;
 }
 
 .discount-label {
@@ -367,57 +378,63 @@
 
 
 .checkout-container {
+  flex: 1; 
   display: flex;
-  flex-direction: column;
-  height: 100%; /* Ocupa a altura total do elemento pai */
-  background: white;
+  flex-direction: column; /* Organiza os itens um abaixo do outro */
+height: 100%; /* Ele vai herdar os 100% do pai que é fixo */
+  overflow: hidden;      /* IMPEDE que o container inteiro role; a rolagem será só no body */
+  padding-left: 10px;
 }
 
-/* O corpo divide o espaço entre pagamentos e totais */
-.checkout-body {
-  display: flex;
-  flex-direction: column;
-  flex: 1; /* Ocupa todo o espaço entre o header e o final da tela */
-  overflow: hidden; /* Garante que o container pai não quebre */
+.checkout-header {
+  flex: 0 0 auto; /* Não cresce, não encolhe, mantém o tamanho do conteúdo */
+  padding: 15px;
+  background: #fff;
+  border-bottom: 1px solid #ddd;
 }
+
+.checkout-body {
+  flex: 1;        /* O SEGREDO: Ele estica para ocupar todo o espaço entre header e footer */
+  overflow-y: auto; /* Se os produtos passarem da altura, a barra de rolagem aparece AQUI */
+  padding: 0px 10px;
+  background-color: #FFFFD5;
+}
+
+.checkout-footer {
+  flex: 0 0 auto; /* Fica sempre "ancorado" no final do container */
+  background: #ffffff;
+
+}
+
+
 
 /* SEÇÃO SUPERIOR (Pagamentos): Esta parte cresce e tem scroll */
 .payment-methods {
   flex: 1; /* Faz esta parte ocupar o máximo de espaço possível */
-  padding: 1.5rem;
   overflow-y: auto; /* Se houver muitos métodos de pagamento, o scroll aparece aqui */
-  border-bottom: 2px solid #e2e8f0;
 }
 
-/* SEÇÃO INFERIOR (Totais): Fixada embaixo, cresce de baixo para cima */
-.totals-panel {
-  flex-shrink: 0; /* Impede que esta parte seja "esmagada" pela lista acima */
-  background: #f8fafc;
-  padding: 1.5rem;
-  /* Não precisa de margin-top: auto pois o flex: 1 acima já empurra tudo */
-}
 
 
 /* Gatilho (Botão que abre) */
 .accordion-trigger {
     width: 100%;
     display: flex;
-    justify-content: space-between;
+    justify-content: space-between; 
     align-items: center;
-    padding: 10px;
-    background: #f1f5f9;
-    border: 1px solid #e2e8f0;
-    border-radius: 6px;
+    padding: 5px;
+    background: #efefef;
+    border: 1px solid #ccc;
+    border-radius: 6px 6px 0 0;
     cursor: pointer;
     font-size: 0.85rem;
     font-weight: 600;
     color: #475569;
-    margin-bottom: 5px;
     transition: background 0.2s;
 }
 
 .accordion-trigger:hover {
-    background: #e2e8f0;
+    background: #ddd;
 }
 
 /* Container da Sanfona */
@@ -438,13 +455,11 @@
 
 /* Wrapper interno para dar espaçamento sem quebrar a animação de altura */
 .accordion-content {
-  background-color: #fdd3a3;
-    padding: 12px;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  background-color: #EFEFEF;
+    border: 1px solid #ddd;
 }
 
 /* Ajuste sutil na área de cupom para caber na lateral */
@@ -676,12 +691,6 @@
 }
 
 /* --- BOTÕES E STATUS --- */
-.status-box {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-bottom: 1rem;
-}
 
 .status-item {
     padding: 0.8rem;
@@ -707,6 +716,8 @@
     cursor: pointer;
     width: 100%;
     transition: background 0.2s;
+  margin-bottom: 10px;
+
 }
 
 .btn-confirm-sale:hover:not(:disabled) { background: #059669; }

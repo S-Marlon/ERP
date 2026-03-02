@@ -85,7 +85,7 @@ const EstoqueDashboard: React.FC = () => {
       {/* 1. Indicadores-Chave de Desempenho (KPIs) */}
       <div className="indicadores-grid">
         <IndicadorCard 
-          titulo="Total de Produtos" 
+          titulo="Total de Produtos " 
           valor={totalProdutos} 
           unidade="itens" 
         />
@@ -109,8 +109,34 @@ const EstoqueDashboard: React.FC = () => {
           // Opcional: Adicionar classe de destaque se houver alertas
           className={alertasEstoqueBaixo.length > 0 ? 'alerta-kpi' : ''} 
         />
+
+        <IndicadorCard 
+          titulo="Variação de Custo Pendente (Inflação Interna) 💸" 
+          valor={alertasEstoqueBaixo.length} 
+          unidade="itens" 
+          // Opcional: Adicionar classe de destaque se houver alertas
+          className={alertasEstoqueBaixo.length > 0 ? 'alerta-kpi' : ''} 
+        />
+
+        <IndicadorCard 
+          titulo="Curva ABC por Categoria (Onde está seu dinheiro?) 📊" 
+          valor={alertasEstoqueBaixo.length} 
+          unidade="itens" 
+          // Opcional: Adicionar classe de destaque se houver alertas
+          className={alertasEstoqueBaixo.length > 0 ? 'alerta-kpi' : ''} 
+        />
+
+        <IndicadorCard 
+          titulo="Produtos Sem Giro (Estoque Parado) 😴" 
+          valor={alertasEstoqueBaixo.length} 
+          unidade="itens" 
+          // Opcional: Adicionar classe de destaque se houver alertas
+          className={alertasEstoqueBaixo.length > 0 ? 'alerta-kpi' : ''} 
+        />
         
+         
         
+
 
       </div>
 

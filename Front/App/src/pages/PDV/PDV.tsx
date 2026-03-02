@@ -116,7 +116,7 @@ export const PDV: React.FC = () => {
     setCart(prev => prev.map(item => {
       if (item.id === id) {
         const canFractionate = ['MT', 'LT', 'KG', 'M', 'L'].includes(item.unitOfMeasure?.toUpperCase() || '');
-        
+
         let newQty: number;
         if (typeof value === 'string') {
           newQty = parseFloat(value.replace(',', '.')) || 0;
@@ -206,7 +206,7 @@ export const PDV: React.FC = () => {
 
 
   return (
-<div className={`${styles.PDVcontainer} ${estagio === 'PAGAMENTO' ? styles.checkoutActive : ''}`}>
+    <div className={`${styles.PDVcontainer} ${estagio === 'PAGAMENTO' ? styles.checkoutActive : ''}`}>
 
       {/* MODAL DE IDENTIFICAÇÃO (Aparece apenas em Nova Venda) */}
       {mostrarModalCliente && (
@@ -214,9 +214,9 @@ export const PDV: React.FC = () => {
           <div className="modal-content">
             <h3>Identificar Cliente</h3>
             <p>Informe CPF, CNPJ ou Nome para iniciar</p>
-            <input 
+            <input
               autoFocus
-              type="text" 
+              type="text"
               className="input-cliente"
               placeholder="000.000.000-00"
               value={identificadorCliente}
@@ -230,13 +230,13 @@ export const PDV: React.FC = () => {
           </div>
         </div>
       )}
-      
-     
+
+
 
       <main className={styles.mainContent}>
 
         {estagio === 'PAGAMENTO' && <div className={styles.lockOverlay} onClick={() => setEstagio('SELECAO')} />}
-       
+
 
 
         <nav className={styles.tabsContainer}>
@@ -244,132 +244,13 @@ export const PDV: React.FC = () => {
           <button className={`${styles.tabButton} ${activeTab === 'services' ? styles.tabButtonActive : ''}`} onClick={() => setActiveTab('services')}>🛠️ Serviços</button>
           <button className={`${styles.tabButton} ${activeTab === 'os' ? styles.tabButtonActive : ''}`} onClick={() => setActiveTab('os')}>📋 Gerar OS</button>
         </nav>
-
-        {activeTab === 'os' ? (
-          <>
-                <ProductFilter filters={filters} onFilterChange={handleFilterChange} onApply={() => console.log("Aplicar filtros avançados")} onReset={() => console.log("Resetar filtros avançados")} />
-
-         
-<section className={styles.osSection}>
-  <div className={styles.osForm}>
-    <h2>Configuração da Montagem Hidráulica</h2>
-
-    {/* Identificação da Máquina */}
-    <div className={styles.inputGroupRow}>
-      <div className={styles.inputField}>
-        <label>Equipamento / Frota</label>
-        <input 
-          placeholder="Ex: Escavadeira PC200 / Lote 04" 
-          value={osData.equipment}
-          onChange={e => setOsData({...osData, equipment: e.target.value})}
-        />
-      </div>
-      <div className={styles.inputField}>
-        <label>Local de Aplicação</label>
-        <input 
-          placeholder="Ex: Comando Central / Lança" 
-          value={osData.application}
-          onChange={e => setOsData({...osData, application: e.target.value})}
-        />
-      </div>
-    </div>
-
-    {/* Especificações da Mangueira (Prensagem) */}
-    <div className={styles.specsContainer}>
-      <h4>Especificações de Prensagem</h4>
-      <div className={styles.inputGroupRow}>
-        <div className={styles.inputField}>
-          <label>Bitola (Pol/Dash)</label>
-          <select 
-            value={osData.gauge}
-            onChange={e => setOsData({...osData, gauge: e.target.value})}
-          >
-            <option value="">Selecione...</option>
-            <option value="1/4">1/4" (-04)</option>
-            <option value="3/8">3/8" (-06)</option>
-            <option value="1/2">1/2" (-08)</option>
-            <option value="3/4">3/4" (-12)</option>
-            <option value="1">1" (-16)</option>
-          </select>
-        </div>
-        <div className={styles.inputField}>
-          <label>Nº de Tramas/Reforço</label>
-          <select 
-            value={osData.layers}
-            onChange={e => setOsData({...osData, layers: e.target.value})}
-          >
-            <option value="1">1 Trama (R1)</option>
-            <option value="2">2 Tramas (R2)</option>
-            <option value="4">4 Espirais (4SH/4SP)</option>
-            <option value="6">6 Espirais (R13/R15)</option>
-          </select>
-        </div>
-        <div className={styles.inputField}>
-          <label>Medida Final (mm)</label>
-          <input 
-            type="number"
-            placeholder="Ex: 1250" 
-            value={osData.finalLength}
-            onChange={e => setOsData({...osData, finalLength: e.target.value})}
-          />
-        </div>
-      </div>
-    </div>
-
-    <div className={styles.laborContainer}>
-      <label>Serviço de Prensagem</label>
-      <div className={styles.laborTypeSelector}>
-        <button 
-          className={osData.laborType === 'per_point' ? styles.activeType : ''} 
-          onClick={() => setOsData({...osData, laborType: 'per_point'})}
-        >R$ Por Terminal</button>
-        <button 
-          className={osData.laborType === 'fixed' ? styles.activeType : ''} 
-          onClick={() => setOsData({...osData, laborType: 'fixed'})}
-          >Valor Fixo Montagem</button>
-        <button 
-          className={osData.laborType === 'table' ? styles.activeType : ''} 
-          onClick={() => setOsData({...osData, laborType: 'table'})}
-        >📋 Tabela por Bitola</button>
-      </div>
-
-      <div className={styles.laborInputWrapper}>
-        <div className={styles.inputWithIcon}>
-          <span className={styles.currencyBadge}>R$</span>
-          <input 
-            type="number"
-            placeholder="Custo da prensagem"
-            value={osData.laborValue}
-            onChange={e => setOsData({...osData, laborValue: parseFloat(e.target.value) || 0})}
-          />
-        </div>
-        {osData.laborType === 'per_point' && (
-           <span className={styles.infoHelper}>* Multiplicado pelo número de terminais adicionados.</span>
-        )}
-      </div>
-      
-      <p className={styles.laborPreview}>
-        Subtotal do serviço: <strong>{money.format(calculatedLabor)}</strong>
-      </p>
-    </div>
-
-    <div className={styles.osInstructions}>
-      <button className={styles.btnTabSwitch} onClick={() => setActiveTab('parts')}>
-        ← Adicionar Mangueira e Terminais (Peças)
-      </button>
-    </div>
-  </div>
-</section>
-                </>
-        ) : (
-          <section className={styles.tableSection}>
-
-            <header className={styles.topHeader}>
+        <ProductFilter filters={'obj'} onFilterChange={handleFilterChange} onApply={() => console.log("Aplicar filtros avançados")} onReset={() => console.log("Resetar filtros avançados")} />
+        <header className={styles.topHeader}>
           <div className={styles.searchContainer}>
             {/* <button className={styles.btnFilterToggle} onClick={() => setIsFilterOpen(!isFilterOpen)}>
               {isFilterOpen ? '⇠ Ocultar' : '☰ Filtros'}
             </button> */}
-            <input 
+            <input
               className={styles.mainInput}
               placeholder={`Buscar ${activeTab === 'parts' ? 'peças...' : 'serviços...'}`}
               value={searchTerm}
@@ -379,12 +260,170 @@ export const PDV: React.FC = () => {
 
 
           </div>
-            <ProductFilter filters={'obj'} onFilterChange={handleFilterChange} onApply={() => console.log("Aplicar filtros avançados")} onReset={() => console.log("Resetar filtros avançados")} />
+
+          <div>
+
+
+            <select>
+              <option value="">Filtrar por Categoria</option>
+              {activeTab === 'parts' ? (
+                <><option value="Hidráulica">Hidráulica</option>
+                  <option value="Pneumática">Pneumática</option>
+                  <option value="Elétrica">Elétrica</option>
+                  <option value="Automotiva">Automotiva</option></>
+              ) : (
+                <><option value="Prensagem">Prensagem</option>
+                  <option value="Manutenção">Manutenção</option>
+                  <option value="Qualidade">Qualidade</option>
+                </>
+              )}
+            </select>
+
+            <input type="checkbox" id="onlyInStock" />
+            <label htmlFor="onlyInStock"> Somente com estoque</label>
+
+            <label className="switch">
+              <input type="checkbox" checked/>
+                <span className="slider round"></span>
+            </label>
+
+            {/* onChange={(e) => setOnlyInStock(e.target.checked)} */}
+
+
+
+          </div>
         </header>
 
+        {activeTab === 'os' ? (
+          <>
+            <ProductFilter filters={filters} onFilterChange={handleFilterChange} onApply={() => console.log("Aplicar filtros avançados")} onReset={() => console.log("Resetar filtros avançados")} />
 
 
-            {loadingProducts && <p>Carregando produtos...</p>}
+            <section className={styles.osSection}>
+              <div className={styles.osForm}>
+                <h2>Configuração da Montagem Hidráulica</h2>
+
+                {/* Identificação da Máquina */}
+                <div className={styles.inputGroupRow}>
+                  <div className={styles.inputField}>
+                    <label>Equipamento / Frota</label>
+                    <input
+                      placeholder="Ex: Escavadeira PC200 / Lote 04"
+                      value={osData.equipment}
+                      onChange={e => setOsData({ ...osData, equipment: e.target.value })}
+                    />
+                  </div>
+                  <div className={styles.inputField}>
+                    <label>Local de Aplicação</label>
+                    <input
+                      placeholder="Ex: Comando Central / Lança"
+                      value={osData.application}
+                      onChange={e => setOsData({ ...osData, application: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                {/* Especificações da Mangueira (Prensagem) */}
+                <div className={styles.specsContainer}>
+                  <h4>Especificações de Prensagem</h4>
+                  <div className={styles.inputGroupRow}>
+                    <div className={styles.inputField}>
+                      <label>Bitola (Pol/Dash)</label>
+                      <select
+                        value={osData.gauge}
+                        onChange={e => setOsData({ ...osData, gauge: e.target.value })}
+                      >
+                        <option value="">Selecione...</option>
+                        <option value="1/4">1/4" (-04)</option>
+                        <option value="3/8">3/8" (-06)</option>
+                        <option value="1/2">1/2" (-08)</option>
+                        <option value="3/4">3/4" (-12)</option>
+                        <option value="1">1" (-16)</option>
+                      </select>
+                    </div>
+                    <div className={styles.inputField}>
+                      <label>Nº de Tramas/Reforço</label>
+                      <select
+                        value={osData.layers}
+                        onChange={e => setOsData({ ...osData, layers: e.target.value })}
+                      >
+                        <option value="1">1 Trama (R1)</option>
+                        <option value="2">2 Tramas (R2)</option>
+                        <option value="4">4 Espirais (4SH/4SP)</option>
+                        <option value="6">6 Espirais (R13/R15)</option>
+                      </select>
+                    </div>
+                    <div className={styles.inputField}>
+                      <label>Medida Final (mm)</label>
+                      <input
+                        type="number"
+                        placeholder="Ex: 1250"
+                        value={osData.finalLength}
+                        onChange={e => setOsData({ ...osData, finalLength: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className={styles.laborContainer}>
+                  <label>Serviço de Prensagem</label>
+                  <div className={styles.laborTypeSelector}>
+                    <button
+                      className={osData.laborType === 'per_point' ? styles.activeType : ''}
+                      onClick={() => setOsData({ ...osData, laborType: 'per_point' })}
+                    >R$ Por Terminal</button>
+                    <button
+                      className={osData.laborType === 'fixed' ? styles.activeType : ''}
+                      onClick={() => setOsData({ ...osData, laborType: 'fixed' })}
+                    >Valor Fixo Montagem</button>
+                    <button
+                      className={osData.laborType === 'table' ? styles.activeType : ''}
+                      onClick={() => setOsData({ ...osData, laborType: 'table' })}
+                    >📋 Tabela por Bitola</button>
+                  </div>
+
+                  <div className={styles.laborInputWrapper}>
+                    <div className={styles.inputWithIcon}>
+                      <span className={styles.currencyBadge}>R$</span>
+                      <input
+                        type="number"
+                        placeholder="Custo da prensagem"
+                        value={osData.laborValue}
+                        onChange={e => setOsData({ ...osData, laborValue: parseFloat(e.target.value) || 0 })}
+                      />
+                    </div>
+                    {osData.laborType === 'per_point' && (
+                      <span className={styles.infoHelper}>* Multiplicado pelo número de terminais adicionados.</span>
+                    )}
+                  </div>
+
+                  <p className={styles.laborPreview}>
+                    Subtotal do serviço: <strong>{money.format(calculatedLabor)}</strong>
+                  </p>
+                </div>
+
+                <div className={styles.osInstructions}>
+                  <button className={styles.btnTabSwitch} onClick={() => setActiveTab('parts')}>
+                    ← Adicionar Mangueira e Terminais (Peças)
+                  </button>
+                </div>
+              </div>
+            </section>
+          </>
+        ) : (
+          <section className={styles.tableSection}>
+
+
+
+
+
+            {loadingProducts && <p>Carregando produtos...</p>}<select>
+              <option value="">Ordenar por...</option>
+              <option value="name_asc">Nome A-Z</option>
+              <option value="name_desc">Nome Z-A</option>
+              <option value="price_asc">Preço: Menor</option>
+              <option value="price_desc">Preço: Maior</option>
+            </select>
             <table className={styles.partsTable}>
               <thead>
                 <tr>
@@ -407,7 +446,7 @@ export const PDV: React.FC = () => {
                     </td>
                     {activeTab === 'parts' ? (
                       <>
-                        <td > <div style={{border:'2px solid green', padding: '4px' , color: 'green', borderRadius: '4px', background: '#e6fce8', textAlign: 'center'}}>{item.status}</div></td>
+                        <td > <div style={{ border: '2px solid green', padding: '4px', color: 'green', borderRadius: '4px', background: '#e6fce8', textAlign: 'center' }}>{item.status}</div></td>
                         <td>{item.stock} {item.unitOfMeasure || 'un'}</td>
                       </>
                     ) : (
@@ -427,7 +466,7 @@ export const PDV: React.FC = () => {
         )}
 
       </main>
-      <CartAside 
+      <CartAside
         cart={cart}
         cliente={cliente}
         itemsSubtotal={itemsSubtotal}
@@ -440,14 +479,14 @@ export const PDV: React.FC = () => {
         onFinalizar={() => setEstagio('PAGAMENTO')}
       />
 
-  
-  <aside className={styles.paymentSidebar}>
-    <FinalizarVenda
-      onBack={() => setEstagio('SELECAO')}
-      total={total}
-      cliente={cliente}
-    />
-  </aside>
+
+      <aside className={styles.paymentSidebar}>
+        <FinalizarVenda
+          onBack={() => setEstagio('SELECAO')}
+          total={total}
+          cliente={cliente}
+        />
+      </aside>
 
       {/* MODAL DE DETALHES (SÓ PARA PEÇAS) */}
       {selectedPart && (
