@@ -1,192 +1,285 @@
-
-
-@keyframes slideIn {
-  from { transform: translateX(100%); }
-  to { transform: translateX(0); }
+:root {
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --success: #10b981;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --bg-body: #f8fafc;
+  --bg-card: #ffffff;
+  --border-color: #e2e8f0;
+  --text-main: #1e293b;
+  --text-muted: #64748b;
 }
 
+/* --- ESTRUTURA PRINCIPAL --- */
+.checkout-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-body);
+  color: var(--text-main);
+  font-family: 'Inter', system-ui, sans-serif;
+}
 
+.checkout-header {
+  flex: 0 0 auto;
+  padding: 1rem;
+  background: var(--bg-card);
+  border-bottom: 2px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 
+.checkout-body {
+  flex: 1;
+overflow-y: hidden; /* Isso desativa a rolagem completamente */  padding: 10px 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+/* Esconde a barra no Firefox */
+  scrollbar-width: none; 
 
-.badge {
-  background: #dcfce7;
-  color: #166534;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 0.75rem;
+  /* Esconde a barra no Internet Explorer e Edge antigo */
+  -ms-overflow-style: none; 
+}
+
+/* Esconde a barra em navegadores Webkit (Chrome, Safari, Edge moderno, Opera) */
+.checkout-body::-webkit-scrollbar {
+  display: none;
+}
+
+.checkout-footer {
+  flex: 0 0 auto;
+  background: var(--bg-card);
+  padding: 1rem 1.5rem;
+  border-top: 2px solid var(--border-color);
+  box-shadow: 0 -4px 6px -1px rgb(0 0 0 / 0.05);
+}
+
+/* --- SEÇÃO DE MÉTODOS (GRID) --- */
+.method-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+}
+
+.method-grid button {
+  color: var(--text-main);
+  padding: 0.5rem ;
+  border: 2px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-card);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.8rem;
+}
+
+.method-grid button.active {
+  border-color: var(--primary);
+  background: #eff6ff;
+  color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+}
+
+/* Ocupação das colunas conforme sua lógica anterior */
+.method-grid button:nth-child(1) { grid-column: span 3; } /* Dinheiro */
+.method-grid button:nth-child(2) { grid-column: span 3; } /* Pix */
+.method-grid button:nth-child(3), 
+.method-grid button:nth-child(4), 
+.method-grid button:nth-child(5) { grid-column: span 2; }
+
+/* --- INPUT DE VALOR E ADIÇÃO --- */
+.add-payment {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.add-payment .input-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr; /* Divide em duas colunas iguais */
+  gap: 10px;
+  width: 100%; /* Garante que o container use o espaço disponível */
+}
+
+/* Remova ou ajuste o seletor abaixo */
+.input-group input {
+  font-weight: 600;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  outline: none;
+  width: 100%; /* Em vez de max-width 50%, use 100% do 1fr disponível */
+  box-sizing: border-box; /* Garante que o padding não "estique" o input */
+}
+
+.btn-add-saldo {
+  width: 100%; /* Garante que o botão também preencha sua metade */
+  height: 100%; /* Opcional: para alinhar a altura com o input */
+  background: #f1f5f9;
+  border: 1px solid var(--border-color);
+  padding: 0.5rem;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  color: var(--primary);
   font-weight: bold;
+  cursor: pointer;
 }
 
 
 
 
-/* Histórico de pagamentos adicionados */
+
+.add-payment input:focus { border-color: var(--primary); }
+
+
+/* --- HISTÓRICO DE PAGAMENTOS --- */
 .payment-history {
   list-style: none;
   padding: 0;
-  margin: 1rem 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .payment-history li {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  padding: 8px;
-  background: #ddd;
-  border-radius: 6px;
-  margin-bottom: 5px;
-  font-size: 0.9rem;
-}
-
-.totals-panel {
-  margin-top: auto; /* Empurra o painel para o final do container */
-  padding: 1rem 0 ;
-  
-  /* Garante que o painel não encolha */
-  flex-shrink: 0; 
-  
-  /* Opcional: fixar mesmo com scroll */
-  position: sticky;
-  bottom: 0;
-  z-index: 10;
-}
-
-
-.cupons-grid {
-  display: grid;
- grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-
-.cupons-grid button {
-  color: #0f172a;
-  padding: 0.8rem 0rem ;
-  border: 2px solid #e2e8f0;
-  border-radius: 8px;
-  background: white;
-  cursor: pointer;
-  font-weight: 700;
-  font-size: xx-small;
-}
-
-
-.method-grid {
-  display: grid;
- grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-
-
-
-/* O primeiro botão (Dinheiro) ocupa as 3 colunas do topo */
-.method-grid button:nth-child(1) {
-    grid-column: 1 / 4; /* ou span 3 */
-}
-
-/* O quinto botão (Crediário) ocupa as 3 colunas da base */
-.method-grid button:nth-child(5) {
-    grid-column: 1 / 4; /* ou span 3 */
-}
-
-.method-grid button {
-  padding: 0.8rem 0rem ;
-  border: 2px solid #e2e8f0;
-  border-radius: 8px;
-  background: white;
-  cursor: pointer;
-  font-weight: 700;
-  font-size: medium;
-}
-
-.method-grid button.active {
-  border-color: #2563eb;
-  background: #eff6ff;
-  color: #2563eb;
-}
-
-
-
-.add-payment {
-  display: flex;
-  gap: 10px;
-}
-
-.add-payment input {
-  flex: 1;
-  font-size: 1.5rem;
-  padding: 0.8rem;
-  border: 2px solid #cbd5e1;
+  padding: 0.75rem 1rem;
+  background: #fff;
+  border: 1px solid var(--border-color);
   border-radius: 8px;
 }
 
-
-.total-row {
+/* --- SISTEMA DE DESCONTO (SANFONA) --- */
+.accordion-trigger {
+  width: 100%;
   display: flex;
   justify-content: space-between;
+  padding: 0.75rem;
+  background: #f1f5f9;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
 }
 
-.total-main {
-  text-align: right;
-  margin: 1.5rem 0;
+.coupon-and-discount {
+  max-height: 0;
+  overflow: hidden;
+  transition: all 0.3s ease-in-out;
+  opacity: 0;
 }
 
-.total-value {
-  display: block;
-  font-size: 2.8rem;
-  font-weight: 900;
-  color: #0f172a;
+.coupon-and-discount.open {
+  max-height: 400px;
+  opacity: 1;
+  padding-top: 1rem;
 }
 
+.accordion-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  padding: 1rem;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+
+
+/* --- PAINEL DE TOTAIS E STATUS --- */
 .status-box {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 1rem;
+  margin-bottom: 1rem;
 }
 
 .status-item {
   padding: 1rem;
-  border-radius: 8px;
+  border-radius: 12px;
   text-align: center;
 }
 
-.status-item.pending { background: #fee2e2; color: #991b1b; }
-.status-item.paid { background: #dcfce7; color: #166534; }
-.status-item.change { background: #fef9c3; color: #854d0e; }
+.status-item.pending { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+.status-item.paid { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+.status-item.change { background: #fef9c3; color: #a16207; border: 1px solid #fef08a; cursor: help; }
 
+/* --- CALCULADORA DE TROCO (TOOLTIP) --- */
+.changeWrapper { position: relative; width: 100%; }
 
-.btn-cancel-sale {
-  background: #ef4444;
+.change-calculator {
+  position: absolute;
+  bottom: calc(100% + 15px);
+  right: 0;
+  width: 280px;
+  background: #1e293b;
+  color: white;
+  border-radius: 12px;
+  padding: 1rem;
+  z-index: 100;
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.2);
+  animation: fadeIn 0.2s ease;
+}
+
+.change-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* --- CLASSES DE DINHEIRO (CÉDULAS) --- */
+.change-unit-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
+.v-100 { background: #008b8b; }
+.v-50  { background: #b8860b; }
+.v-20  { background: #d4af37; color: #000; }
+.v-10  { background: #a52a2a; }
+.v-5   { background: #6a5acd; }
+.v-2   { background: #191970; }
+.v-1   { background: linear-gradient(to right, #d4af37, #c0c0c0); color: #000; }
+
+/* --- BOTÕES DE AÇÃO FINAL --- */
+
+.btn-add-payment {
+  background: #2563eb;
   color: white;
   border: none;
-  padding: 1.5rem;
+  padding: 1rem;
   font-size: 1.25rem;
   font-weight: bold;
-  border-radius: 8px;
   cursor: pointer;
 
   width: 100%;
-  margin-top: auto;
-  padding: 1.2rem;
+  margin-top: 10px;
   position: sticky;
   bottom: 0;
   border-radius: 0; /* Ocupa a largura total na base */
 }
 
 .btn-confirm-sale {
-  background: #10b981;
+  width: 100%;
+  padding: 1.25rem;
+  background: var(--success);
   color: white;
   border: none;
-  padding: 1.5rem;
+  border-radius: 10px;
   font-size: 1.25rem;
-  font-weight: bold;
-  border-radius: 8px;
+  font-weight: 800;
   cursor: pointer;
-
-  width: 100%;
-  margin-top: auto;
-  padding: 1.2rem;
-  position: sticky;
-  bottom: 0;
-  border-radius: 0; /* Ocupa a largura total na base */
+  transition: filter 0.2s;
 }
 
 .btn-confirm-sale:disabled {
@@ -194,36 +287,60 @@
   cursor: not-allowed;
 }
 
-
-
-.change-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid #bbf7d0;
-  padding-bottom: 0.5rem;
+.btn-confirm-sale:hover:not(:disabled) {
+  filter: brightness(1.1);
 }
 
-.rounding-alert {
-  background: #166534;
-  color: white;
-  font-size: 0.65rem;
-  padding: 4px 8px;
-  border-radius: 20px;
-  font-weight: bold;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+/* --- ANIMAÇÕES --- */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.change-unit-pill {
-  font-size: 0.7rem;
-  padding: 4px;
-  border: 1px solid #86efac;
-  background: white;
-  border-radius: 4px;
-  text-align: center;
+
+
+
+
+
+
+
+/* Container do Status por Linha */
+.status-workflow-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
+.select-status-inline {
+  color: var(--text-main);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    background: #f8fafc;
+}
+
+/* Estilização baseada no valor do Status */
+.status-select-Pendente { color: #64748b; background: #f1f5f9; }
+.status-select-Pago { color: #15803d; background: #dcfce7; border-color: #86efac; }
+.status-select-Falha { color: #b91c1c; background: #fee2e2; border-color: #fca5a5; }
+.status-select-Cancelado { color: #475569; background: #e2e8f0; opacity: 0.7; }
+
+/* Linha de pagamento desabilitada visualmente */
+.payment-row-disabled {
+    background-color: #f1f5f9 !important;
+    text-decoration: line-through;
+    color: #94a3b8 !important;
+    border-style: dashed !important;
+}
+
+.payment-row-disabled strong {
+    color: #94a3b8 !important;
+}
+
+/* //area de desconto e cupom */
 
 .discount-area {
   display: flex;
@@ -265,32 +382,9 @@
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.discount-input-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.discount-input-wrapper input {
-  width: 100%;
-  padding: 10px;
-  border: 2px solid #cbd5e1;
-  border-radius: 6px;
-  font-size: 1.1rem;
-  font-weight: bold;
-  text-align: right;
-}
-
-.discount-preview {
-  position: absolute;
-  left: 10px;
-  font-size: 0.85rem;
-  color: #ef4444;
-  font-weight: 500;
-}/* Estilo da área de desconto bloqueada */
 .discount-area.locked {
-  border: 2px solid #fee2e2;
   background: #fff1f2;
+  border: 0px solid #fecaca;
 }
 
 .lock-badge {
@@ -302,426 +396,92 @@
   font-weight: 900;
 }
 
-/* Grid de Moedas ajustado para largura menor */
-.change-details-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 10px;
- /* 2 por linha na sidebar */
-  gap: 5px;
-  margin-top: 10px;
+.discount-input-wrapper {
+  display: flex;
+  gap: 8px; /* Espaço entre input e botão */
+  width: 100%;
+  align-items: stretch; /* Garante que ambos tenham a mesma altura */
+}
+
+.discount-input-wrapper input {
+  flex: 1 1 100%; /* Por padrão, ocupa 100% */
+  min-width: 0; /* Evita que o input quebre o flexbox */
+  padding: 10px;
+  border: 2px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  text-align: right;
+  transition: all 0.3s ease; /* Animação suave ao redimensionar */
+}
+
+/* Quando o botão Solicitar está presente, forçamos o 50/50 */
+.discount-input-wrapper.has-button input {
+  flex: 1 1 50%;
 }
 
 .btn-request-auth {
-  position: absolute;
-  left: 10px;
+  flex: 1 1 50%;
   background: #ef4444;
   color: white;
   border: none;
-  padding: 4px 10px;
-  border-radius: 4px;
-  font-size: 0.7rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
   font-weight: bold;
   cursor: pointer;
+  white-space: nowrap; /* Impede o texto de quebrar linha */
   animation: pulse 1.5s infinite;
 }
 
 @keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
-}
-
-/* MODAL DO GERENTE (Deve continuar centralizado na tela toda) */
-.manager-lock-overlay {
-  position: fixed;
-  top: 0; left: 0; width: 100vw; height: 100vh;
-  background: rgba(15, 23, 42, 0.8);
-  backdrop-filter: blur(4px);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 9999;
-}
-
-.manager-lock-card {
-  background: white;
-  padding: 2.5rem;
-  border-radius: 16px;
-  text-align: center;
-  width: 350px;
-}
-
-.manager-lock-card .icon { font-size: 3rem; display: block; margin-bottom: 1rem; }
-
-.manager-lock-card input {
-  width: 100%;
-  padding: 1rem;
-  margin: 1.5rem 0 1rem 0;
-  font-size: 1.2rem;
-  text-align: center;
-  border: 2px solid #cbd5e1;
-  border-radius: 8px;
-}
-
-.manager-lock-card button {
-  width: 100%;
-  padding: 1rem;
-  background: #1e293b;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-weight: bold;
-  cursor: pointer;
+  0% { opacity: 1; }
+  50% { opacity: 0.8; }
+  100% { opacity: 1; }
 }
 
 
-
-.checkout-container {
-  flex: 1; 
-  display: flex;
-  flex-direction: column; /* Organiza os itens um abaixo do outro */
-height: 100%; /* Ele vai herdar os 100% do pai que é fixo */
-  overflow: hidden;      /* IMPEDE que o container inteiro role; a rolagem será só no body */
-  padding-left: 10px;
-}
-
-.checkout-header {
-  flex: 0 0 auto; /* Não cresce, não encolhe, mantém o tamanho do conteúdo */
-  padding: 15px;
-  background: #fff;
-  border-bottom: 1px solid #ddd;
-}
-
-.checkout-body {
-  flex: 1;        /* O SEGREDO: Ele estica para ocupar todo o espaço entre header e footer */
-  overflow-y: auto; /* Se os produtos passarem da altura, a barra de rolagem aparece AQUI */
-  padding: 0px 10px;
-  background-color: #FFFFD5;
-}
-
-.checkout-footer {
-  flex: 0 0 auto; /* Fica sempre "ancorado" no final do container */
-  background: #ffffff;
-
-}
-
-
-
-/* SEÇÃO SUPERIOR (Pagamentos): Esta parte cresce e tem scroll */
-.payment-methods {
-  flex: 1; /* Faz esta parte ocupar o máximo de espaço possível */
-  overflow-y: auto; /* Se houver muitos métodos de pagamento, o scroll aparece aqui */
-}
-
-
-
-/* Gatilho (Botão que abre) */
-.accordion-trigger {
-    width: 100%;
-    display: flex;
-    justify-content: space-between; 
-    align-items: center;
-    padding: 5px;
-    background: #efefef;
-    border: 1px solid #ccc;
-    border-radius: 6px 6px 0 0;
-    cursor: pointer;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: #475569;
-    transition: background 0.2s;
-}
-
-.accordion-trigger:hover {
-    background: #ddd;
-}
-
-/* Container da Sanfona */
-.coupon-and-discount {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.3s ease-in-out, opacity 0.2s ease-in-out;
-    opacity: 0;
-    background: #fff;
-    /* Importante: remover paddings/borders daqui para não quebrar a animação */
-}
-
-.coupon-and-discount.open {
-    max-height: 500px; /* Valor alto o suficiente para o conteúdo */
-    opacity: 1;
-    margin-bottom: 1rem;
-}
-
-/* Wrapper interno para dar espaçamento sem quebrar a animação de altura */
-.accordion-content {
+.payment-section {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  background-color: #EFEFEF;
-    border: 1px solid #ddd;
+  gap: 10px;
+  /* Altera de start para stretch */
+  align-items: stretch; 
+  padding: 0px;
 }
 
-/* Ajuste sutil na área de cupom para caber na lateral */
-.coupon-area {
-    display: flex;
-    gap: 8px;
+/* As duas colunas principais */
+.payment-methods, .payment-details {
+  display: flex;
+  flex-direction: column;
+  height: 100%; /* Isso força o fundo branco/colorido a ir até o final da linha do grid */
+  background: var(--bg-card); /* ou sua cor de fundo */
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 2px 10px;
+} 
+
+/* As duas colunas principais */
+.payment-methods h4, .payment-details h4 {
+ margin: 10px 0px;      /* Remove o espaço externo */
+  padding: 0;     /* Remove o espaço interno */
+  line-height: 1.2; /* Ajusta a altura da linha para o texto não ocupar mais espaço que o necessário */
+} 
+
+
+
+.payment-history-fieldset {
+  flex: 1;            /* Ocupa todo o espaço restante */
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;   /* Scroll apenas aqui */
+  margin-bottom: 0;   /* Remove espaços acidentais no fundo */
+  padding: 0 1;
+  
+  /* Esconder scrollbar se desejar */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
-.coupon-area input {
-    flex: 1;
-    padding: 8px;
-    border: 1px solid #cbd5e1;
-    border-radius: 4px;
-    font-size: 0.9rem;
+.payment-history-fieldset::-webkit-scrollbar {
+  display: none;
 }
-
-
-
-
-.changeWrapper {
-    position: relative; /* Pai relativo para o balão ser absoluto a ele */
-    cursor: help;
-}
-
-
-
-.changeHeader {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-    font-size: 0.75rem;
-    font-weight: bold;
-    color: #94a3b8;
-}
-
-.roundingAlert {
-    background: var(--warning);
-    color: #000;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 0.65rem;
-}
-
-/* Grid de Notas */
-.changeDetailsGrid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 6px;
-}
-
-.changeUnitPill {
-    background: var(--cart-surface);
-    border: 1px solid var(--cart-border);
-    padding: 6px;
-    border-radius: 6px;
-    font-size: 0.8rem;
-    text-align: center;
-    color: white;
-}
-
-/* Setinha do balão (Opcional, mas dá um toque profissional) */
-.tooltipArrow {
-    position: absolute;
-    bottom: -6px;
-    right: 20px;
-    width: 12px;
-    height: 12px;
-    background: #1e293b;
-    border-right: 1px solid var(--cart-border);
-    border-bottom: 1px solid var(--cart-border);
-    transform: rotate(45deg);
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-
-.changeWrapper {
-    position: relative; /* Essencial: define o ponto (0,0) para o balão */
-    display: inline-block; /* Garante que o tamanho do wrapper seja o do conteúdo */
-    width: 100%; 
-}
-
-.change-calculator {
-    position: absolute;
-    /* Faz o balão subir */
-    bottom: calc(100% + 15px); 
-    right: 0;
-    
-    /* Estética de Balão */
-    width: 260px;
-    background: #1e293b; 
-    border: 1px solid #475569;
-    border-radius: 10px;
-    padding: 12px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    
-    /* Garante que fique acima de tudo */
-    z-index: 999; 
-}
-
-/* A setinha apontando para baixo */
-.tooltipArrow {
-    position: absolute;
-    bottom: -6px; /* Metade para fora do balão */
-    right: 20px;
-    width: 12px;
-    height: 12px;
-    background: #1e293b;
-    border-right: 1px solid #475569;
-    border-bottom: 1px solid #475569;
-    transform: rotate(45deg);
-}
-
-
-
-
-
-/* Alternativa garantida: Estilize via classes específicas no seu .map */
-.nota-style {
-    background: #22c55e;
-    padding: 4px 10px;
-    border-radius: 4px;
-    border-left: 8px solid #15803d;
-    font-weight: bold;
-}
-
-.moeda-style {
-    background: #eab308; /* Amarelo/Dourado para moedas */
-    color: #000;
-    padding: 4px 12px;
-    border-radius: 50px; /* Círculo/Pílula */
-    font-weight: bold;
-    border: 2px solid #ca8a04;
-}
-
-/* --- COMPONENTE DE TROCO (BALÃO COMPACTO) --- */
-.changeWrapper {
-    position: relative;
-    width: 100%;
-    cursor: help;
-}
-
-.change-calculator {
-    position: absolute;
-    bottom: calc(100% + 12px);
-    right: 0;
-    width: 240px; /* Compacto */
-    background: #111827; /* Dark Mode para contraste */
-    border: 1px solid #374151;
-    border-radius: 8px;
-    padding: 10px;
-    z-index: 1000;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.4);
-    animation: fadeIn 0.2s ease-out;
-}
-
-/* Grid de Notas/Moedas em 2 colunas */
-.change-details-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px;
-    margin-top: 8px;
-}
-
-
-.unit-qty {
-    background: rgba(0,0,0,0.3);
-    padding: 1px 4px;
-    border-radius: 3px;
-    font-size: 0.65rem;
-}
-
-/* --- CORES REAIS DO BRASIL --- */
-/* --- NOTAS --- */
-.v-100 { background-color: #008b8b !important; }
-.v-50  { background-color: #b8860b !important; }
-.v-20  { background-color: #d4af37 !important; color: #000 !important; }
-.v-10  { background-color: #a52a2a !important; }
-.v-5   { background-color: #6a5acd !important; }
-.v-2   { background-color: #191970 !important; }
-
-/* --- MOEDAS (Ajustadas para o novo padrão de classe v-0-5) --- */
-.v-1 { 
-    background: radial-gradient(circle, #c0c0c0 35%, #d4af37 40%) !important; 
-    color: #000 !important; 
-}
-.v-0-5, .v-0-50 { 
-    background: linear-gradient(145deg, #e6e6e6, #808080) !important; 
-    color: #000 !important; 
-}
-.v-0-25 { 
-    background: linear-gradient(145deg, #f1c40f, #967117) !important; 
-    color: #000 !important; 
-}
-.v-0-1, .v-0-10 { 
-    background: linear-gradient(145deg, #d35400, #873600) !important; 
-}
-.v-0-05 { 
-    background: linear-gradient(145deg, #a0522d, #5d2e17) !important; 
-}
-
-/* Garante que o item tenha cor de fundo caso a classe falhe */
-.change-unit-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 5px 10px;
-    border-radius: 4px;
-    min-height: 28px;
-    color: white;
-    box-shadow: inset 0 0 5px rgba(0,0,0,0.2);
-}round: linear-gradient(145deg, #a0522d, #5d2e17) !important; }
-
-/* Setinha do Balão */
-.tooltip-arrow {
-    position: absolute;
-    bottom: -6px;
-    right: 25px;
-    width: 12px;
-    height: 12px;
-    background: #111827;
-    transform: rotate(45deg);
-    border-right: 1px solid #374151;
-    border-bottom: 1px solid #374151;
-}
-
-/* --- BOTÕES E STATUS --- */
-
-.status-item {
-    padding: 0.8rem;
-    border-radius: 8px;
-    text-align: center;
-    display: flex;
-    flex-direction: column;
-}
-
-.status-item.change { 
-    background: #fef9c3; 
-    color: #854d0e; 
-    border: 1px solid #fde047;
-}
-
-.btn-confirm-sale {
-    background: #10b981;
-    color: white;
-    border: none;
-    padding: 1.2rem;
-    font-size: 1.1rem;
-    font-weight: bold;
-    cursor: pointer;
-    width: 100%;
-    transition: background 0.2s;
-  margin-bottom: 10px;
-
-}
-
-.btn-confirm-sale:hover:not(:disabled) { background: #059669; }
-
-/* --- ANIMAÇÕES --- */
-@keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }

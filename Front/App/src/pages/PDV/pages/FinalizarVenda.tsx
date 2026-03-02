@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
 import './FinalizarVenda.css';
 import Badge from '../../../components/ui/Badge/Badge';
+import Button from '../../../components/ui/Button/Button';
+import Fieldset from '../../../components/ui/Fieldset/Fieldset';
+import FlexGridContainer from '../../../components/Layout/FlexGridContainer/FlexGridContainer';
 
 interface Pagamento {
     metodo: string;
     valor: number;
     parcelas?: number;
+    status: PaymentStatus; // Status individual por linha
 }
 
 type PaymentStatus = 'Pendente' | 'Processando' | 'Pago' | 'Falha' | 'Cancelado' | 'Reembolsado';
@@ -14,6 +18,7 @@ interface FinalizarVendaProps {
     onBack: () => void;
     total: number;
     cliente: string;
+
 }
 
 export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, cliente }) => {
@@ -29,8 +34,9 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
     // cliente e total já vêm do pai via props (comentário duplicado eliminado)
 
     // Cálculos de Totais
-    const totalPago = pagamentos.reduce((acc, p) => acc + p.valor, 0);
-
+    const totalPago = pagamentos
+        .filter(p => p.status === 'Pago' || p.status === 'Processando')
+        .reduce((acc, p) => acc + p.valor, 0);
     const [showChangeDetails, setShowChangeDetails] = useState(false);
 
     // Cálculo do desconto real aplicado ao total
@@ -47,6 +53,13 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
     const [autorizado, setAutorizado] = useState(false);
     const [pedindoSenha, setPedindoSenha] = useState(false);
     const [senhaGerente, setSenhaGerente] = useState("");
+
+
+    const alterarStatusPagamento = (index: number, novoStatus: PaymentStatus) => {
+        const novosPagamentos = [...pagamentos];
+        novosPagamentos[index].status = novoStatus;
+        setPagamentos(novosPagamentos);
+    };
 
     const LIMITE_VENDEDOR_PORCENT = 4; // 10% de autonomia
 
@@ -175,152 +188,140 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
             <div className="checkout-header" style={{ padding: '1rem', borderBottom: '1px solid #e2e8f0' }}>
                 <strong>Cliente: {cliente}</strong>
 
-                <button
-                    className="btn-cancel-sale"
-                    onClick={onBack}
-                >
-                    CANCELAR PAGAMENTO
-                </button>
+
+                <p>
+                    VALOR TOTAL: <strong>R$ {total.toFixed(2)}</strong>
+                </p>
+                <p>
+                    VALOR Pago: <strong>R$ {pagamentos.reduce((sum, p) => sum + p.valor, 0).toFixed(2)}</strong>
+                </p>
             </div>
 
             <div className="checkout-body">
+                <div className="payment-section">
 
 
 
-                {/* ESQUERDA: PAGAMENTOS */}
-                <section className="payment-methods">
-                    <h4>Métodos de Pagamento</h4>
-                    <div className="method-grid">
-                        {['Dinheiro 💵', 'Cartão Crédito 💳', 'Cartão Débito 💳', 'PIX 💠', 'Crediário 🎫'].map(m => (
-                            <button
-                                key={m}
-                                className={metodoSelecionado === m ? 'active' : ''}
-                                onClick={() => setMetodoSelecionado(m)}
-                            >
-                                {m}
-                            </button>
-                        ))}
-                    </div>
 
-                    <div className="add-payment">
-                        <button onClick={() => console.log('hab')}>Saldo Restante Total</button>
 
-                        <input
-                            type="number"
-                            value={valorInput || ''}
-                            onChange={(e) => setValorInput(Number(e.target.value))}
-                            placeholder={`Valor em ${metodoSelecionado}`}
-                        />
-                        <button onClick={adicionarPagamento}>Adicionar (Enter)</button>
-                    </div>
+                    <section className="payment-methods">
 
-                    <ul className="payment-history">
-                        {pagamentos.map((p, i) => (
-                            <li key={i}>
-                                {p.metodo}: <strong>R$ {p.valor.toFixed(2)}</strong>
-                                <Badge color="success" style={{ marginLeft: '8px' }}>
-                                    {p.parcelas ? `${p.parcelas}x` : 'À vista'}
-                                </Badge>
 
-                                <Badge> Status: {statusPagamento}</Badge>
-                                <button onClick={() => removerPagamento(i)}>✕</button>
-                            </li>
-                        ))}
-                    </ul>
+                            
+                        <div className="payment-methods-header">
+                            <h4>Métodos de Pagamento</h4>
 
-                    {renderParcelamento()}
-                </section>
+
+
+                        </div>
+                        <div className="method-grid">
+                            {['Dinheiro 💵', 'PIX 💠', 'Cartão Crédito 💳', 'Cartão Débito 🏦', 'Crediário 🎫'].map(m => (
+                                <button
+                                    key={m}
+                                    className={metodoSelecionado === m ? 'active' : ''}
+                                    onClick={() => setMetodoSelecionado(m)}
+                                >
+                                    {m}
+                                </button>
+                            ))}
+                        </div>
+
+
+
+
+
+
+
+
+
+                    </section>
+
+
+                    <section className="payment-details">
+
+                        <h4>
+  Detalhes do Pagamento {metodoSelecionado ? [...metodoSelecionado].pop() : ''}
+</h4>
+
+
+
+                        <div className="add-payment">
+
+
+
+                            <div className="input-group"> {/* Adicionei uma classe aqui */}
+
+                                <button className='btn-add-saldo' onClick={() => setValorInput(saldoRestante)}>Saldo Restante Total →</button>
+
+                                <input
+                                    type="number"
+                                    value={valorInput || ''}
+                                    onChange={(e) => setValorInput(Number(e.target.value))}
+                                    placeholder={`Valor à Pagar`}
+                                />
+                            </div>
+
+                            {renderParcelamento()}
+                        </div>
+                    </section>
+                </div>
+
+                {/* Direita: PAGAMENTOS */}
+
+                <Button onClick={adicionarPagamento} color='primary' className='btn-add-payment'>Adicionar ↓ (Enter)</Button>
+
+
+                {
+                    pagamentos.length > 0 && (
+                        <Fieldset variant='card' legend={`pagamento${pagamentos.length > 1 ? 's' : ''} ${pagamentos.length === 1 ? 'adicionado' : 'adicionados'} (${pagamentos.length})`} className="payment-history-fieldset">
+
+                            <ul className="payment-history">
+                                {pagamentos.map((p, i) => {
+                                    const isCanceladoOuFalha = p.status === 'Cancelado' || p.status === 'Falha';
+
+                                    return (
+                                        <li key={p.id || i} className={isCanceladoOuFalha ? 'payment-row-disabled' : ''}>
+                                            <div className="payment-info">
+                                                {p.metodo}: <strong>R$ {p.valor.toFixed(2)}</strong>
+                                                <span className="payment-subtext">
+                                                    {p.parcelas ? ` (${p.parcelas}x)` : ' (À vista)'}
+                                                </span>
+                                            </div>
+
+                                            <div className="status-workflow-wrapper">
+                                                <select
+                                                    className={`select-status-inline status-select-${p.status}`}
+                                                    value={p.status}
+                                                    onChange={(e) => alterarStatusPagamento(i, e.target.value as PaymentStatus)}
+                                                >
+                                                    <option value="Pendente">⏳ Pendente</option>
+                                                    <option value="Processando">🔄 Processando</option>
+                                                    <option value="Pago">✅ Pago</option>
+                                                    <option value="Falha">❌ Falha</option>
+                                                    <option value="Cancelado">🚫 Cancelado</option>
+                                                </select>
+
+                                                {/* Regra: Só permite remover se ainda estiver Pendente e não for Cartão/Pix enviado */}
+                                                {p.status === 'Pendente' ? (
+                                                    <button className="btn-remove-line" onClick={() => removerPagamento(i)}>✕</button>
+                                                ) : (
+                                                    <button className="btn-lock-line" disabled title="Não é possível excluir um pagamento processado">🔒</button>
+                                                )}
+                                            </div>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </Fieldset>
+                    )
+                }
 
 
             </div>
 
 
             <div className="checkout-footer">
-                <div className="accordion-section">
-                    <button
-                        className="accordion-trigger"
-                        onClick={() => setShowDiscount(!showDiscount)}
-                    >
-                        <span>Aplicar Desconto</span>
-                        <span style={{ marginLeft: '8px' }}>
-                            <Badge color="warning">
-                                aplicado: {descontoCalculado > 0 ? `R$ ${descontoCalculado.toFixed(2)}` : 'Nenhum'}
-                            </Badge>
-                        </span>
-                        <span>{showDiscount ? '▼' : '▲'}</span>
-                    </button>
 
-                    <div className={`coupon-and-discount ${showDiscount ? 'open' : ''}`}>
-                        <div className="accordion-content">
-
-
-
-
-                            <div className={`total-row discount-area ${precisaBloquear ? 'locked' : ''}`}>
-                                <div className="discount-label">
-                                    <span>Desconto</span>
-
-                                    {precisaBloquear && <span className="lock-badge">BLOQUEADO</span>}
-
-                                    <div className="toggle-group">
-                                        <button
-                                            className={tipoDesconto === 'real' ? 'active' : ''}
-                                            onClick={() => setTipoDesconto('real')}
-                                        >R$</button>
-                                        <button
-                                            className={tipoDesconto === 'porcent' ? 'active' : ''}
-                                            onClick={() => setTipoDesconto('porcent')}
-                                        >%</button>
-                                    </div>
-                                </div>
-
-                                <div className="discount-input-wrapper">
-                                    <input
-                                        type="number"
-                                        value={descontoValor || ''}
-                                        onChange={(e) => {
-                                            setDescontoValor(Number(e.target.value));
-                                            if (autorizado) setAutorizado(false); // Reset ao mudar valor
-                                        }}
-                                    />
-                                    {precisaBloquear && (
-                                        <button className="btn-request-auth" onClick={() => setPedindoSenha(true)}>
-                                            Solicitar Gerente
-                                        </button>
-                                    )}
-                                </div>
-
-                                Desconto total {descontoCalculado.toFixed(2)}
-
-
-
-
-                            </div>
-
-<div>
-
-                                cupons disponíveis: <br />
-<div className="cupons-grid">
-
-                        {['desconto tal: 10%', 'valor acima de tal: R$ 50'].map(m => (
-                            <button
-                                key={m}
-                                className={metodoSelecionado === m ? 'active' : ''}
-                                
-                            >
-                                {m}
-                            </button>
-                        ))}
-                    </div>
-
-                    </div>
-
-
-                            
-
-                        </div>
-                    </div>
-                </div>
 
 
 

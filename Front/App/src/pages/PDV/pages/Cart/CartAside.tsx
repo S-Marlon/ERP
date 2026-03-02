@@ -16,6 +16,7 @@ interface CartAsideProps {
     updateQuantity: (id: string | number, value: number | string) => void;
     removeItem: (id: string | number) => void;
     onFinalizar: () => void; // Callback para quando o usuário clicar em "Finalizar Venda"
+    onBack: () => void; // Callback para quando o usuário clicar em "Cancelar Pagamento"
 }
 
 export const CartAside: React.FC<CartAsideProps> = ({
@@ -28,7 +29,8 @@ export const CartAside: React.FC<CartAsideProps> = ({
     money,
     updateQuantity,
     removeItem,
-    onFinalizar
+    onFinalizar,
+    onBack, // Callback para quando o usuário clicar em "Cancelar Pagamento"
 }) => {
 
     // subtotal calculado no pai e recebido via props
@@ -203,6 +205,13 @@ export const CartAside: React.FC<CartAsideProps> = ({
                     >
                         FINALIZAR VENDA (F2)
                     </button>
+
+                    <button
+                    className="btn-cancel-sale"
+                    onClick={onBack}
+                >
+                    CANCELAR PAGAMENTO
+                </button>
                 </div>
             </footer>
         </aside>

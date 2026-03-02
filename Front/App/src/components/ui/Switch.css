@@ -1,0 +1,66 @@
+/* Variáveis para facilitar a manutenção */
+:root {
+  --switch-width: 50px;
+  --switch-height: 26px;
+  --circle-size: 20px;
+  --speed: 0.3s;
+  --color-off: #ccc;
+  --color-on: #2196F3;
+}
+
+.switch-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-family: sans-serif;
+  user-select: none;
+}
+
+/* Esconde o checkbox padrão de forma acessível */
+.switch-input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+/* O corpo do Switch */
+.slider {
+  position: relative;
+  display: inline-block;
+  width: var(--switch-width);
+  height: var(--switch-height);
+  background-color: var(--color-off);
+  border-radius: 34px;
+  transition: var(--speed);
+}
+
+/* A bolinha (indicador) */
+.slider::before {
+  content: "";
+  position: absolute;
+  height: var(--circle-size);
+  width: var(--circle-size);
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  border-radius: 50%;
+  transition: var(--speed);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* Estado Ativado (Checked) */
+.switch-input:checked + .slider {
+  background-color: var(--color-on);
+}
+
+.switch-input:checked + .slider::before {
+  transform: translateX(calc(var(--switch-width) - var(--circle-size) - 6px));
+}
+
+/* Foco para acessibilidade via teclado */
+.switch-input:focus-visible + .slider {
+  outline: 2px solid #000;
+  outline-offset: 2px;
+}

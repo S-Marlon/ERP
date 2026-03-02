@@ -7,6 +7,7 @@ import { CartAside } from './pages/Cart/CartAside';
 import Button from '../../components/ui/Button/Button';
 import ProductFilter from '../../components/forms/search/ProductFilter';
 import { FinalizarVenda } from './pages/FinalizarVenda';
+import Switch from '../../components/ui/Switch';
 
 type PDVStep = 'SELECAO' | 'PAGAMENTO';
 
@@ -279,13 +280,8 @@ export const PDV: React.FC = () => {
               )}
             </select>
 
-            <input type="checkbox" id="onlyInStock" />
-            <label htmlFor="onlyInStock"> Somente com estoque</label>
 
-            <label className="switch">
-              <input type="checkbox" checked/>
-                <span className="slider round"></span>
-            </label>
+            <Switch label="Somente com estoque"></Switch>
 
             {/* onChange={(e) => setOnlyInStock(e.target.checked)} */}
 
@@ -296,7 +292,6 @@ export const PDV: React.FC = () => {
 
         {activeTab === 'os' ? (
           <>
-            <ProductFilter filters={filters} onFilterChange={handleFilterChange} onApply={() => console.log("Aplicar filtros avançados")} onReset={() => console.log("Resetar filtros avançados")} />
 
 
             <section className={styles.osSection}>
@@ -477,12 +472,15 @@ export const PDV: React.FC = () => {
         updateQuantity={updateQuantity}
         removeItem={removeItem}
         onFinalizar={() => setEstagio('PAGAMENTO')}
+                  onBack={() => setEstagio('SELECAO')}
+
       />
 
 
       <aside className={styles.paymentSidebar}>
         <FinalizarVenda
-          onBack={() => setEstagio('SELECAO')}
+                  onBack={() => setEstagio('SELECAO')}
+
           total={total}
           cliente={cliente}
         />
