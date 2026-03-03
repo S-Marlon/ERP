@@ -1,51 +1,37 @@
-// Fieldset.tsx
 import React from 'react';
-import './Fieldset.css'; // Importa os estilos
-import Badge from './Badge/Badge';
+import './Fieldset.css';
 
-/**
- * Define os tipos de variantes de estilo.
- */
-export type FieldsetVariant = 'standard' | 'card' | 'highlight' | 'basic'; // Adicionado 'basic'
+export type FieldsetVariant = 'standard' | 'card' | 'highlight' | 'basic';
 
-/**
- * Propriedades aceitas pelo componente Fieldset.
- */
 export interface FieldsetProps extends React.FieldsetHTMLAttributes<HTMLFieldSetElement> {
-  /** O título (legend) a ser exibido no fieldset. */
   legend: string | React.ReactNode;
-  /** A variante de estilo para o fieldset. Padrão: 'standard'. */
   variant?: FieldsetVariant;
-  /** O conteúdo a ser renderizado dentro do fieldset. */
   children: React.ReactNode;
+  /** Se true, a legenda fica dentro do container como um cabeçalho. */
+  legendInner?: boolean; 
 }
 
-/**
- * Um componente React/TypeScript para renderizar um elemento <fieldset>
- * com suporte a diferentes variantes de estilo.
- */
 const Fieldset: React.FC<FieldsetProps> = ({
   legend,
-  variant = 'standard', // 'standard' como padrão
+  variant = 'standard',
+  legendInner = false, // Padrão falso para não quebrar outros componentes
   children,
-  ...rest // Captura quaisquer outras props padrão de fieldset (como `className`, `id`, etc.)
+  ...rest
 }) => {
-  // Constrói a lista de classes CSS
-  // A classe base 'fieldset' é aplicada.
-  // A classe de variante específica (e.g., 'fieldset-card') é aplicada e sobrescreve, se necessário.
-  
-  // Combina as classes passadas via props com as classes internas
-  const fieldsetClassName = `fieldset fieldset-${variant} ${rest.className || ''}`.trim();
-
-  // Remove className das props a serem passadas para o fieldset
-  const { className, ...fieldsetProps } = rest; 
+  const { className, ...fieldsetProps } = rest;
+  const fieldsetClassName = `fieldset fieldset-${variant} ${className || ''}`.trim();
 
   return (
-    <fieldset className={fieldsetClassName} {...fieldsetProps}> {/* Usa a classe combinada e as props restantes */}
-      {/* O elemento <legend> recebe a classe de estilo para a legenda */}
+    <fieldset 
+      className={fieldsetClassName} 
+      data-legend-inner={legendInner} 
+      {...fieldsetProps}
+    >
       <legend className='legend'>{legend}</legend>
-      {children}
-      
+      {/* Container auxiliar para garantir que o padding do conteúdo funcione bem com a legenda interna */}
+      <div className="fieldset-body">
+        {children}
+      </div>
     </fieldset>
   );
 };

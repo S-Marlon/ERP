@@ -196,8 +196,8 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
         <div className="checkout-container">
 
             {/* identifica o cliente em cima */}
-            <div className="checkout-header" style={{ padding: '1rem', borderBottom: '1px solid #e2e8f0' }}>
-                <strong>Cliente: {cliente}</strong>
+            <div className="checkout-header">
+                {/* <strong>Cliente: {cliente}</strong>
 
 
                 <p>
@@ -205,15 +205,7 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
                 </p>
                 <p>
                     VALOR Pago: <strong>R$ {pagamentos.reduce((sum, p) => sum + p.valor, 0).toFixed(2)}</strong>
-                </p>
-            </div>
-
-            <div className="checkout-body">
-
-                <div className="checkout-container">
-
-
-                     {/* Guia de Passos */}
+                </p> */}
        <div className="payment-steps-guide">
     <span 
         className={etapaAtual === 1 ? 'step-active' : 'step-done'}
@@ -243,6 +235,14 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
         3. Adicione o pagamento
     </span>
 </div>
+            </div>
+
+            <div className="checkout-body">
+
+                <div className="checkout-container">
+
+
+                     {/* Guia de Passos */}
        
 
                 <div className={`payment-section ${metodoSelecionado ? 'method-selected' : 'method-picking'}`}>
@@ -277,7 +277,7 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
                     <section className={`payment-details ${!metodoSelecionado ? 'section-locked' : ''} ${passoEmFoco === 2 ? 'step-highlight' : ''}`}>
 
                         <h4>
-                            Detalhes do Pagamento: {metodoSelecionado ? metodoSelecionado : '(Selecione um método)'}
+                             {metodoSelecionado ? 'Pagamento: ' + metodoSelecionado : '(Selecione um método)'}
                         </h4>
 
 
@@ -324,7 +324,19 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
 
                 {
                     pagamentos.length > 0 && (
-                        <Fieldset variant='card' legend={`pagamento${pagamentos.length > 1 ? 's' : ''} ${pagamentos.length === 1 ? 'adicionado' : 'adicionados'} (${pagamentos.length})`} className="payment-history-fieldset">
+                        
+                        <Fieldset variant='card' >
+ {pagamentos.length > 0 && (
+                                        <div className="payment-summary">
+
+                                            <span>
+                                            {`Pagamento${pagamentos.length > 1 ? 's' : ''} ${pagamentos.length === 1 ? 'Adicionado' : 'Adicionados'} (${pagamentos.length})  `}
+                                            </span>
+                                            <Badge color="success">Valor PAGO: R$ 
+                                            {totalPago.toFixed(2)} </Badge>
+                                             
+                                        </div>
+                                    )}
 
                             <ul className="payment-history">
                                 {pagamentos.map((p, i) => {
@@ -332,12 +344,13 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
 
                                     return (
                                         <li key={p.id || i} className={isCanceladoOuFalha ? 'payment-row-disabled' : ''}>
+                                            {p.metodo}:
                                             <div className="payment-info">
-                                                {p.metodo}: <strong>R$ {p.valor.toFixed(2)}</strong>
+                                                <strong>R$ {p.valor.toFixed(2)}</strong>
+                                            </div>
                                                 <span className="payment-subtext">
                                                     {p.parcelas ? ` (${p.parcelas}x)` : ' (À vista)'}
                                                 </span>
-                                            </div>
 
                                             <div className="status-workflow-wrapper">
                                                 <select
@@ -363,6 +376,9 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
                                     );
                                 })}
                             </ul>
+
+                                   
+
                         </Fieldset>
                     )
                 }

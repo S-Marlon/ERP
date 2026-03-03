@@ -43,17 +43,13 @@ export const CartAside: React.FC<CartAsideProps> = ({
         <aside className={styles.cartAside}>
             <header className={styles.cartHeader}>
 
-                <div className={styles.headerTitle}>
-                    <h2>{activeTab === 'os' ? 'Resumo OS' : 'Carrinho'}</h2>
-                    <span className={styles.itemCount}> ({cart.length} itens)</span>
-                </div>
+                <h2>{activeTab === 'os' ? 'Resumo OS' : 'Carrinho'} ({cart.length} itens) </h2>
 
                 {/* TOPO: IDENTIFICAÇÃO */}
-                <div style={{ display: 'flex', flexDirection: 'row' }}>
-                    <div>
-                        <span className="badge">VIP - 5% OFF sugerido</span>
-                        <h3>{cliente}</h3>
-                    </div>
+                <div>
+
+                    <h4>{cliente}</h4>
+
                     <span>CPF/CNPJ: 000.000.000-00</span>
                 </div>
 
@@ -95,9 +91,7 @@ export const CartAside: React.FC<CartAsideProps> = ({
 
                                 {/* 2. Linha de Detalhes: Preço Unitário, Estoque e Unidade */}
                                 <div className={styles.itemSecondaryDetails}>
-                                    <span className={styles.unitPrice}>
-                                        {money.format(item.price)} <small>/{item.unitOfMeasure || 'un'}</small>
-                                    </span>
+
 
 
                                     {/* exibimos sku se disponível; tipo global agora inclui campo opcional */}
@@ -114,6 +108,17 @@ export const CartAside: React.FC<CartAsideProps> = ({
 
                                 {/* 3. Rodapé do Item: Ações e Subtotal */}
                                 <div className={styles.cartActions}>
+
+
+                                    <span className={styles.unitPrice}>
+                                        {money.format(item.price)} <small>/ {item.unitOfMeasure || 'un'}</small>
+                                    </span>
+                                    <button className={styles.btnDiscount} title="Aplicar Desconto">
+                                        %
+                                    </button>
+
+
+
                                     <div className={styles.controlsGroup}>
                                         <div className={styles.quantitySelector}>
                                             <button
@@ -144,9 +149,7 @@ export const CartAside: React.FC<CartAsideProps> = ({
                                             </button>
                                         </div>
 
-                                        <button className={styles.btnDiscount} title="Aplicar Desconto">
-                                            %
-                                        </button>
+
                                     </div>
 
                                     <div className={styles.itemSubtotal}>
@@ -171,32 +174,33 @@ export const CartAside: React.FC<CartAsideProps> = ({
             </div>
 
             <footer className={styles.cartFooter}>
-                {/* Bloco de Detalhamento: Informações de apoio */}
                 <div className={styles.summaryDetails}>
-                    <div className={styles.summaryRow}>
-                                <span>Subtotal Itens:</span>
-                        <span>{money.format(itemsSubtotal)}</span>
-                    </div>
+                    <div className={styles.summaryColumn}>
 
-                    {calculatedLabor > 0 && (
-                        <div className={styles.summaryRow}>
-                            <span>Mão de Obra:</span>
+                        <div >
+                            <span>Subtotal Itens: </span>
+                            <span>{money.format(itemsSubtotal)}</span>
+                        </div>
+
+                        <div >
+                            <span>Mão de Obra: </span>
                             <span>{money.format(calculatedLabor)}</span>
                         </div>
-                    )}
+                    </div>
 
-                    {/* descontos e valores pagos não fazem parte do carrinho; tratados no checkout */}
+                    <div className={styles.totalInfo}>
+                        <small>Valor Total Carrinho</small>
+                        <strong>R$ {total.toFixed(2)}</strong>
+                    </div>
                 </div>
 
-                {/* Divisor Visual Sutil */}
-                <hr style={{color:'white'}} />
+
+                <hr className={styles.separator} />
 
                 {/* Bloco de Destaque: Total Geral */}
-                <div className={styles.totalSection}>
-                    <div className={styles.totalInfo}>
-                        <span className={styles.totalLabel}>TOTAL A PAGAR</span>
-                        <strong className={styles.totalAmount}>{money.format(total)}</strong>
-                    </div>
+                <div className={styles.btnFooteSection}>
+
+                   
 
                     <button
                         className={styles.btnCheckout}
@@ -206,12 +210,18 @@ export const CartAside: React.FC<CartAsideProps> = ({
                         FINALIZAR VENDA (F2)
                     </button>
 
+                    {/* O botão de cancelar só aparece se houver itens no carrinho ou pagamentos realizados */
+                    }
+
+                    {cart.length > 0 || total > 0 ? (
                     <button
-                    className="btn-cancel-sale"
-                    onClick={onBack}
-                >
-                    CANCELAR PAGAMENTO
-                </button>
+                        className={styles.btnCancelSale}
+                        onClick={onBack}
+                    >
+                        CANCELAR PAGAMENTO
+                    </button>
+                    ) : null}
+
                 </div>
             </footer>
         </aside>

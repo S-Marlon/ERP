@@ -22,13 +22,11 @@
 }
 
 .checkout-header {
-  flex: 0 0 auto;
-  padding: 1rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   background: var(--bg-card);
   border-bottom: 2px solid var(--border-color);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
 }
 
 .checkout-body {
@@ -59,7 +57,6 @@
   display: flex;
   flex-direction: column;
   /* grid-template-columns: repeat(6, 1fr); */
-  gap: 5px;
 }
 
 .method-grid button {
@@ -81,13 +78,6 @@
   transform: translateY(-2px);
   box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
 }
-
-/* Ocupação das colunas conforme sua lógica anterior */
-.method-grid button:nth-child(1) { grid-column: span 3; } /* Dinheiro */
-.method-grid button:nth-child(2) { grid-column: span 3; } /* Pix */
-.method-grid button:nth-child(3), 
-.method-grid button:nth-child(4), 
-.method-grid button:nth-child(5) { grid-column: span 2; }
 
 /* --- INPUT DE VALOR E ADIÇÃO --- */
 .add-payment {
@@ -139,12 +129,12 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px; /* Adicione um espacinho entre os itens */
   
   /* Adicione estas linhas: */
   max-height: 250px; /* Ou o valor que melhor couber no seu layout */
   overflow-y: auto; 
   padding-right: 5px; /* Espaço para a barra não cobrir o conteúdo */
+  border: 1px solid var(--border-color); /* Borda externa única */
 }
 
 /* Opcional: Deixe a barra de rolagem bonita e fina em vez de escondê-la totalmente, 
@@ -160,13 +150,23 @@
 }
 
 .payment-history li {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 1fr ; /* Descrição à esquerda, valor à direita */
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 1rem;
+  padding: 0.4rem;
   background: #fff;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+  
+}
+
+
+/* --- ALTERNÂNCIA DE CORES (EFEITO ZEBRA) --- */
+.payment-history li:nth-child(odd) {
+    background-color: #ffffff; /* Linha ímpar branca */
+}
+
+.payment-history li:nth-child(even) {
+    background-color: #efefef; /* Linha par levemente cinza */
 }
 
 /* --- SISTEMA DE DESCONTO (SANFONA) --- */
@@ -472,20 +472,14 @@
 
 /* ESTADO 2: Método escolhido (Métodos encolhem, Detalhes expandem) */
 .method-selected {
-    grid-template-columns: 0.8fr 1fr; /* O 0.6fr que você sugeriu, com foco no Detalhes */
+    grid-template-columns: 0.6fr 1fr; /* O 0.6fr que você sugeriu, com foco no Detalhes */
 }
 
 
 /* Ajuste nos botões de método para não quebrarem ao encolher */
 .method-selected .method-grid {
     grid-template-columns: repeat(2, 1fr); /* Diminui as colunas do grid interno ao encolher */
-    gap: 5px;
-}
-
-.method-selected .method-grid button {
-    font-size: 0.7rem; /* Diminui um pouco a letra para caber no espaço menor */
-    padding: 4px;
-}
+  }
 
 
 
@@ -513,23 +507,7 @@
 
 
 
-.payment-history-fieldset {
-  flex: 1;            /* Ocupa todo o espaço restante */
-  display: flex;
-  flex-direction: column;
-  min-height: 0; /* O segredo do Flexbox para overflow funcionar */
-  overflow-y: auto;   /* Scroll apenas aqui */
-  margin-bottom: 0;   /* Remove espaços acidentais no fundo */
-  padding: 0 1;
-  
-  /* Esconder scrollbar se desejar */
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
 
-.payment-history-fieldset::-webkit-scrollbar {
-  display: none;
-}
 
 /* Seção travada (após seleção feita) */
 .section-locked, .btn-disabled {
@@ -563,9 +541,8 @@
     align-items: center;
     gap: 12px;
     padding: 15px;
-    background: #f1f5f9;
+    /* background: #f1f5f9; */
     border-radius: 8px;
-    margin-bottom: 20px;
     font-size: 0.85rem;
     font-weight: 600;
 }
@@ -620,4 +597,14 @@
 
 .payment-steps-guide span:not(.step-arrow):hover {
     transform: translateY(-2px);
+}
+
+.payment-summary{
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    padding: 12px;
+    background: #eee;
+    align-items: center;
+    justify-content: space-between;
 }
