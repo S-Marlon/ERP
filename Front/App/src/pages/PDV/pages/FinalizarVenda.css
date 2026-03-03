@@ -33,15 +33,12 @@
 
 .checkout-body {
   flex: 1;
-overflow-y: hidden; /* Isso desativa a rolagem completamente */  padding: 10px 1rem;
+  overflow-y: auto; /* Mude de hidden para auto */
+  padding: 10px 1rem;
   display: flex;
   flex-direction: column;
   gap: 10px;
-/* Esconde a barra no Firefox */
-  scrollbar-width: none; 
-
-  /* Esconde a barra no Internet Explorer e Edge antigo */
-  -ms-overflow-style: none; 
+  min-height: 0; /* ESSENCIAL: Permite que o flex-item encolha se necessário */
 }
 
 /* Esconde a barra em navegadores Webkit (Chrome, Safari, Edge moderno, Opera) */
@@ -59,9 +56,10 @@ overflow-y: hidden; /* Isso desativa a rolagem completamente */  padding: 10px 1
 
 /* --- SEÇÃO DE MÉTODOS (GRID) --- */
 .method-grid {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  /* grid-template-columns: repeat(6, 1fr); */
+  gap: 5px;
 }
 
 .method-grid button {
@@ -141,6 +139,24 @@ overflow-y: hidden; /* Isso desativa a rolagem completamente */  padding: 10px 1
   padding: 0;
   display: flex;
   flex-direction: column;
+  gap: 8px; /* Adicione um espacinho entre os itens */
+  
+  /* Adicione estas linhas: */
+  max-height: 250px; /* Ou o valor que melhor couber no seu layout */
+  overflow-y: auto; 
+  padding-right: 5px; /* Espaço para a barra não cobrir o conteúdo */
+}
+
+/* Opcional: Deixe a barra de rolagem bonita e fina em vez de escondê-la totalmente, 
+   para o usuário saber que pode rolar */
+.payment-history::-webkit-scrollbar {
+  width: 6px;
+  display: block; /* Vamos mostrar apenas aqui */
+}
+
+.payment-history::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 10px;
 }
 
 .payment-history li {
@@ -442,12 +458,40 @@ overflow-y: hidden; /* Isso desativa a rolagem completamente */  padding: 10px 1
 
 .payment-section {
   display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 10px;
   /* Altera de start para stretch */
   align-items: stretch; 
   padding: 0px;
+  transition: grid-template-columns 0.5s cubic-bezier(0.4, 0, 0.2, 1); /* Transição suave */
 }
+
+/* ESTADO 1: Escolhendo o método (Métodos largos, Detalhes estreitos) */
+.method-picking {
+    grid-template-columns: 1fr 1fr; 
+}
+
+/* ESTADO 2: Método escolhido (Métodos encolhem, Detalhes expandem) */
+.method-selected {
+    grid-template-columns: 0.8fr 1fr; /* O 0.6fr que você sugeriu, com foco no Detalhes */
+}
+
+
+/* Ajuste nos botões de método para não quebrarem ao encolher */
+.method-selected .method-grid {
+    grid-template-columns: repeat(2, 1fr); /* Diminui as colunas do grid interno ao encolher */
+    gap: 5px;
+}
+
+.method-selected .method-grid button {
+    font-size: 0.7rem; /* Diminui um pouco a letra para caber no espaço menor */
+    padding: 4px;
+}
+
+
+
+
+
+
 
 /* As duas colunas principais */
 .payment-methods, .payment-details {
@@ -473,6 +517,7 @@ overflow-y: hidden; /* Isso desativa a rolagem completamente */  padding: 10px 1
   flex: 1;            /* Ocupa todo o espaço restante */
   display: flex;
   flex-direction: column;
+  min-height: 0; /* O segredo do Flexbox para overflow funcionar */
   overflow-y: auto;   /* Scroll apenas aqui */
   margin-bottom: 0;   /* Remove espaços acidentais no fundo */
   padding: 0 1;
@@ -484,4 +529,95 @@ overflow-y: hidden; /* Isso desativa a rolagem completamente */  padding: 10px 1
 
 .payment-history-fieldset::-webkit-scrollbar {
   display: none;
+}
+
+/* Seção travada (após seleção feita) */
+.section-locked, .btn-disabled {
+  filter: grayscale(0.6) opacity(0.9)  brightness(0.8); /* Deixa cinza e meio transparente */
+  transition: all 0.3s ease;
+}
+
+.section-locked * :hover, .section-locked:hover  , .btn-disabled:hover {
+  cursor:not-allowed;
+}
+
+
+
+/* Estilo do botão de cadeado/alterar */
+.btn-change-method {
+    background: #e2e8f0;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+
+.btn-change-method:hover {
+    background: #cbd5e1;
+}
+
+
+.payment-steps-guide {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 15px;
+    background: #f1f5f9;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.step-arrow {
+    color: #cbd5e1;
+}
+
+/* Etapa que ainda vai acontecer */
+.step-pending {
+    color: #94a3b8;
+}
+
+/* Etapa acontecendo agora */
+.step-active {
+    color: #2563eb;
+    background: #dbeafe;
+    padding: 4px 10px;
+    border-radius: 20px;
+    box-shadow: 0 0 5px rgba(37, 99, 235, 0.2);
+}
+
+/* Etapa concluída */
+.step-done {
+    color: #059669;
+}
+
+/* Brilho para as seções */
+.step-highlight {
+    position: relative;
+    z-index: 20;
+    box-shadow: 0 0 25px rgba(37, 99, 235, 0.4); /* Luz azul suave */
+    transform: scale(1.01);
+    transition: all 0.2s ease;
+    background-color: #ffffff !important; /* Garante que não fique cinza no hover */
+}
+
+/* Brilho especial para o botão de adicionar */
+.step-highlight-btn {
+    display: inline-block;
+    border-radius: 8px;
+    box-shadow: 0 0 20px rgba(37, 99, 235, 0.4);; /* Luz azul para o botão de sucesso */
+    transform: translateY(-3px);
+    transition: all 0.3s ease;
+}
+
+/* Estilo para os spans do guia para indicar que são interativos */
+.payment-steps-guide span:not(.step-arrow) {
+    cursor: help;
+    transition: transform 0.2s ease;
+}
+
+.payment-steps-guide span:not(.step-arrow):hover {
+    transform: translateY(-2px);
 }

@@ -12,6 +12,8 @@ interface Pagamento {
     status: PaymentStatus; // Status individual por linha
 }
 
+type MetodoPagamento = 'Dinheiro 💵' | 'PIX 💠' | 'Cartão Crédito 💳' | 'Cartão Débito 🏦' | 'Crediário 🎫';
+
 type PaymentStatus = 'Pendente' | 'Processando' | 'Pago' | 'Falha' | 'Cancelado' | 'Reembolsado';
 
 interface FinalizarVendaProps {
@@ -26,9 +28,10 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
     const [tipoDesconto, setTipoDesconto] = useState<'real' | 'porcent'>('real');
     const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
     const [statusPagamento, setStatusPagamento] = useState<PaymentStatus>('Pendente');
-    const [metodoSelecionado, setMetodoSelecionado] = useState('Dinheiro');
+    const [metodoSelecionado, setMetodoSelecionado] = useState<MetodoPagamento | null>(null);
     const [valorInput, setValorInput] = useState(0);
     const [parcelasInput, setParcelasInput] = useState(1);
+
 
 
     // cliente e total já vêm do pai via props (comentário duplicado eliminado)
@@ -81,8 +84,7 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
 
     // --- REGRA DE NEGÓCIO: PARCELAMENTO ---
     const renderParcelamento = () => {
-        if (!metodoSelecionado.includes('Cartão')) return null;
-
+        if (!metodoSelecionado?.includes('Cartão')) return null;
         const opcoes = [];
         for (let i = 1; i <= 12; i++) {
             const valorParcela = valorInput / i;
@@ -146,19 +148,28 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
     };
 
     const adicionarPagamento = () => {
-        if (valorInput <= 0) return;
+        // Adicione a verificação !metodoSelecionado
+        if (valorInput <= 0 || !metodoSelecionado) return;
+
         setPagamentos([...pagamentos, {
             metodo: metodoSelecionado,
             valor: valorInput,
-            parcelas: metodoSelecionado.includes('Cartão') ? parcelasInput : undefined
+            status: 'Pendente', // Adicionei o status que faltava no seu objeto
+            // Use ?. para evitar o erro "can't access property includes"
+            parcelas: metodoSelecionado?.includes('Cartão') ? parcelasInput : undefined
         }]);
+
         setValorInput(0);
         setParcelasInput(1);
+        setMetodoSelecionado(null); // Resetar após adicionar libera a trava para o próximo
     };
 
     const removerPagamento = (index: number) => {
         setPagamentos(pagamentos.filter((_, i) => i !== index));
     };
+
+    const etapaAtual = !metodoSelecionado ? 1 : (valorInput <= 0 ? 2 : 3);
+    const [passoEmFoco, setPassoEmFoco] = useState<number | null>(null);
 
     return (
         // <div className="checkout-overlay">
@@ -198,51 +209,89 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
             </div>
 
             <div className="checkout-body">
-                <div className="payment-section">
+
+                <div className="checkout-container">
 
 
+                     {/* Guia de Passos */}
+       <div className="payment-steps-guide">
+    <span 
+        className={etapaAtual === 1 ? 'step-active' : 'step-done'}
+        onMouseEnter={() => setPassoEmFoco(1)}
+        onMouseLeave={() => setPassoEmFoco(null)}
+    >
+        {etapaAtual > 1 ? '✅' : '1.'} Escolha o método
+    </span>
+
+    <span className="step-arrow">→</span>
+
+    <span 
+        className={etapaAtual === 2 ? 'step-active' : (etapaAtual > 2 ? 'step-done' : 'step-pending')}
+        onMouseEnter={() => setPassoEmFoco(2)}
+        onMouseLeave={() => setPassoEmFoco(null)}
+    >
+        {etapaAtual > 2 ? '✅' : '2.'} Insira o valor
+    </span>
+
+    <span className="step-arrow">→</span>
+
+    <span 
+        className={etapaAtual === 3 ? 'step-active' : 'step-pending'}
+        onMouseEnter={() => setPassoEmFoco(3)}
+        onMouseLeave={() => setPassoEmFoco(null)}
+    >
+        3. Adicione o pagamento
+    </span>
+</div>
+       
+
+                <div className={`payment-section ${metodoSelecionado ? 'method-selected' : 'method-picking'}`}>
 
 
+                    
 
-                    <section className="payment-methods">
 
-
-                            
+                    <section className={`payment-methods ${metodoSelecionado ? 'section-locked' : ''} ${passoEmFoco === 1 ? 'step-highlight' : ''}`}>
                         <div className="payment-methods-header">
                             <h4>Métodos de Pagamento</h4>
-
-
+                            {/* Botão para destravar a seleção */}
 
                         </div>
+
                         <div className="method-grid">
                             {['Dinheiro 💵', 'PIX 💠', 'Cartão Crédito 💳', 'Cartão Débito 🏦', 'Crediário 🎫'].map(m => (
                                 <button
                                     key={m}
-                                    className={metodoSelecionado === m ? 'active' : ''}
+                                    // Se algo já foi selecionado e não é este botão, ele fica desativado
+                                    disabled={metodoSelecionado !== null && metodoSelecionado !== m} className={metodoSelecionado === m ? 'active' : ''}
                                     onClick={() => setMetodoSelecionado(m)}
+
                                 >
                                     {m}
                                 </button>
                             ))}
                         </div>
-
-
-
-
-
-
-
-
-
                     </section>
 
 
-                    <section className="payment-details">
+                    <section className={`payment-details ${!metodoSelecionado ? 'section-locked' : ''} ${passoEmFoco === 2 ? 'step-highlight' : ''}`}>
 
                         <h4>
-  Detalhes do Pagamento {metodoSelecionado ? [...metodoSelecionado].pop() : ''}
-</h4>
+                            Detalhes do Pagamento: {metodoSelecionado ? metodoSelecionado : '(Selecione um método)'}
+                        </h4>
 
+
+                        {metodoSelecionado && (
+                            <button
+                                className="btn-change-method"
+                                onClick={() => {
+                                    setMetodoSelecionado(null); // Destrava a seção de métodos
+                                    setValorInput(0);           // Zera o valor (O "IF" que você queria)
+                                }}
+                            >
+                                🔄 Trocar Método
+                            </button>
+                        )}
 
 
                         <div className="add-payment">
@@ -251,12 +300,14 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
 
                             <div className="input-group"> {/* Adicionei uma classe aqui */}
 
-                                <button className='btn-add-saldo' onClick={() => setValorInput(saldoRestante)}>Saldo Restante Total →</button>
+                                <button className='btn-add-saldo' onClick={() => setValorInput(saldoRestante)} disabled={!metodoSelecionado}>Saldo Restante Total →</button>
 
                                 <input
                                     type="number"
                                     value={valorInput || ''}
                                     onChange={(e) => setValorInput(Number(e.target.value))}
+                                    disabled={!metodoSelecionado}
+
                                     placeholder={`Valor à Pagar`}
                                 />
                             </div>
@@ -268,7 +319,7 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
 
                 {/* Direita: PAGAMENTOS */}
 
-                <Button onClick={adicionarPagamento} color='primary' className='btn-add-payment'>Adicionar ↓ (Enter)</Button>
+                <Button onClick={adicionarPagamento} color='primary' className={`btn-add-payment ${valorInput ? '' : 'btn-disabled'} ${passoEmFoco === 3 ? 'step-highlight-btn' : ''}`}>Adicionar ↓ (Enter)</Button>
 
 
                 {
@@ -318,6 +369,7 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
 
 
             </div>
+        </div>
 
 
             <div className="checkout-footer">
@@ -329,7 +381,7 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
 
                     <div className="status-box">
                         <div className={`status-item ${saldoRestante > 0 ? 'pending' : 'paid'}`}>
-                            <small>Faltando</small>
+                            <small>Faltando </small>
                             <strong>R$ {saldoRestante.toFixed(2)}</strong>
                         </div>
                         {troco > 0 && (
@@ -341,7 +393,6 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
                             >
                                 <div className='statusItem change'>
                                     <small>Troco </small>
-                                    <br />
                                     <strong>R$ {troco.toFixed(2)}</strong>
                                 </div>
 
@@ -392,21 +443,7 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
                     </div>
 
 
-
-
-
-
-
-
-
-
-
-
-
                 </section>
-
-
-
 
 
                 <button
@@ -417,10 +454,9 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
                     {precisaBloquear ? "AGUARDANDO GERENTE" : "CONCLUIR VENDA (F5)"}
                 </button>
             </div>
-        </div>
 
 
-        // </div>
+         </div>
 
 
     );
