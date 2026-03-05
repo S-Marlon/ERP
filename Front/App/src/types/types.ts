@@ -16,17 +16,23 @@ export interface FilterState {
   paymentMethod: string;
 }
 
-// Nova interface para o produto
+
+
 export interface Product {
     id: string;
     sku: string;
     name: string;
-    pictureUrl: string; // URL para a imagem
+    pictureUrl: string;
     category: string;
     stock: number;
     status: 'Ativo' | 'Inativo' | 'Baixo Estoque';
     price: number;
+    // Adicionei estas como opcionais caso você ainda use o cálculo de margem
+    costPrice?: number; 
+    markup?: number;
 }
+
+
 
 // types/CartItem.ts
 

@@ -62,8 +62,6 @@ function gerarHashCNPJ(cnpj: string): string {
  */
 app.get('/api/products', asyncHandler(async (req, res) => {
     const query = req.query.query as string;
-
-    // Se query for vazia ou undefined, usamos '%' para o SQL trazer tudo
     const isSearchEmpty = !query || query.trim() === '';
     const searchTerm = isSearchEmpty ? '%' : `%${query}%`;
 
@@ -72,11 +70,18 @@ app.get('/api/products', asyncHandler(async (req, res) => {
         SELECT 
             p.id_produto AS id, 
             p.codigo_interno AS sku, 
+            p.codigo_barras AS barcode,
             p.descricao AS name, 
+            p.imagem_url AS pictureUrl, -- Campo que o formulário precisa
             c.nome_categoria AS category, 
             p.unidade AS unitOfMeasure,
             p.preco_venda AS salePrice,
+            p.preco_venda_manual AS manualPrice,
+            p.metodo_precificacao AS priceMethod,
+            p.markup_praticado AS markup,
             p.estoque_minimo AS minStock,
+            p.ncm,
+            p.cest,
             p.status,
             COALESCE(e.quantidade, 0) AS currentStock,
             GROUP_CONCAT(DISTINCT f.nome_fantasia SEPARATOR ', ') AS suppliers

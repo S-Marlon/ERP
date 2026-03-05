@@ -1,9 +1,11 @@
 // src/pages/StockInventory.tsx
 
 import React, { useState, useContext, useEffect } from "react";
+import { Product } from './types/Stock_Products';
+
 
 // Importe a função da API
-import { searchProducts, searchProductsMapping } from "../../api/productsApi";
+import { getProducts } from "./service/productService";
 
 // Se você não tem ProductContext/FilterState, remova as linhas abaixo
 // import { ProductContext } from "../../../context/ProductContext";
@@ -15,20 +17,7 @@ import NovoProdutoForm from "./_components/NovoProdutoForm";
 
 
 
-// --- Interfaces (Mantenha aqui se 'types/types' for inacessível ou se precisar de uma definição local) ---
-interface Product {
-    id: number;
-    sku: string;
-    name: string;
-    category: string;
-    currentStock: number;
-    minStock: number;
-    salePrice: number;
-    status: 'Ativo' | 'Inativo';
-    unitOfMeasure: string;
-    suppliers?: string;      // Campo vindo do GROUP_CONCAT
-    supplierCodes?: string;  // Campo vindo do GROUP_CONCAT
-}
+
 
 // Assumindo que FilterState existe em outro lugar, mas definindo localmente para evitar erros de compilação
 interface FilterState {
@@ -78,7 +67,7 @@ const StockInventory: React.FC = () => {
         setError(null);
         try {
             // Enviamos o searchTerm exatamente como está (mesmo vazio "")
-            const data = await searchProductsMapping(searchTerm);
+            const data = await getProducts(searchTerm);
             setProducts(Array.isArray(data) ? data : []);
         } catch (err: any) {
             console.error("Erro ao buscar produtos:", err);
@@ -286,58 +275,7 @@ const StockInventory: React.FC = () => {
                                 </tbody>
                             </table>
 
-                            {/* <table style={styles.dataTable}>
-                                <thead>
-                                    <tr style={styles.tableHead}>
-                                        <th style={styles.tableTh}>#</th>
-                                        <th style={styles.tableTh}>Cód. SKU</th>
-                                        <th style={styles.tableTh}>Nome</th>
-                                        <th style={styles.tableTh}>Estoque</th>
-                                        <th style={styles.tableTh}>Preço</th>
-                                        <th style={styles.tableTh}>Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredProducts.length > 0 ? (
-                                        filteredProducts.map((product, index) => (
-                                            <tr 
-                                                key={product.id} 
-                                                style={{
-                                                    ...styles.tableRow, 
-                                                    cursor: 'pointer', 
-                                                    backgroundColor: selectedProduct?.id === product.id ? '#eef2ff' : 'white'
-                                                }}
-                                                onClick={() => setSelectedProduct(product)}
-                                            >
-                                                <td style={styles.tableTd}>{(index + 1).toString().padStart(2, '0')}</td>
-                                                <td style={styles.tableTd}>{product.sku}</td>
-                                                <td style={styles.tableTd}>{product.name}</td>
-                                                <td style={{ ...styles.tableTd, ...getStockStatusStyle(product.currentStock, product.minStock) }}>
-                                                    {product.currentStock}
-                                                </td>
-                                                <td style={styles.tableTd}>{formatCurrency(product.salePrice)}</td>
-                                                <td style={styles.tableTd}>
-                                                    <button 
-                                                        style={styles.editButton} 
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            alert(`Editando ${product.id}`);
-                                                        }}
-                                                    >
-                                                        Editar
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan={6} style={{ ...styles.tableTd, textAlign: 'center' }}>
-                                                {isLoading ? "Buscando produtos..." : "Nenhum produto encontrado."}
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table> */}
+                          
                         </div>
                     </div>
                 </div>

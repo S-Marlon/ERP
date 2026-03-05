@@ -1,0 +1,56 @@
+// export interface Product {
+//   // Identificação
+//   id_produto: number;
+//   codigo_interno: string;
+//   codigo_barras: string;
+//   descricao: string;
+  
+//   // Classificação
+//   tipo_produto: 'COMERCIAL' | 'GENERICO' | 'KIT' | 'SERVICO';
+//   unidade: string;
+//   id_marca?: number;
+//   id_categoria?: number;
+  
+//   // Estoque
+//   estoque_minimo: number;
+//   quantidade_atual?: number; // Vem de um JOIN com a tabela de estoque/movimentação
+  
+//   // Financeiro e Precificação
+//   preco_venda: number;
+//   metodo_precificacao: 'MARKUP' | 'MANUAL';
+//   markup_praticado: number;
+//   preco_venda_manual: number;
+  
+//   // Fiscal
+//   ncm: string;
+//   cest: string;
+//   exige_gtin: boolean;
+  
+//   // Status e Metadados
+//   status: 'Ativo' | 'Inativo'; // No SQL é Enum
+//   criado_em?: string;
+  
+//   // Campos de JOIN (Fornecedores)
+//   suppliers?: string;
+//   supplierCodes?: string;
+// }
+
+export interface Product {
+    id: number;
+    sku: string;
+    barcode?: string;
+    descricao: string;
+    pictureUrl?: string;
+    category: string;
+    unitOfMeasure: string;
+    salePrice: number;
+    manualPrice?: number;
+    priceMethod?: 'MARKUP' | 'MANUAL';
+    markup?: number;
+    minStock: number;
+    currentStock: number;
+    status: 'Ativo' | 'Inativo' | 'Baixo Estoque';
+    ncm?: string;
+    cest?: string;
+    suppliers?: string;
+}

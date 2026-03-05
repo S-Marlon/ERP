@@ -39,16 +39,7 @@ export interface TreeCategory {
   children: TreeCategory[];
 }
 
-export async function searchProductsMapping(query: string): Promise<InternalProductData[]> {
-    const res = await fetch(`${apiBase}/products?query=${encodeURIComponent(query)}`); // Note que mudei para a rota principal
-    
-    if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`Erro na busca: ${res.status}. ${errorText}`);
-    }
-    
-    return res.json();
-}
+
 
 
 
