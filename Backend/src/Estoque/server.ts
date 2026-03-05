@@ -790,4 +790,62 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 });
 
 
+
+
+
+
+
+
+
+
+
+
+// Rota para buscar estatísticas do Dashboard
+app.get('/api/dashboard/stats', asyncHandler(async (req, res) => {
+    const [rows]: any = await pool.execute(`
+        SELECT 
+            -- 1. Total de Produtos
+            (SELECT COUNT(*) FROM produtos WHERE status = 'Ativo') AS totalProdutos,
+            
+            -- 2. Valor Total do Estoque
+            (SELECT SUM(quantidade * valor_medio) FROM estoque_atual) AS valorTotalEstoque,
+            
+            -- 3. Produtos em Alerta
+            (SELECT COUNT(*) FROM produtos p JOIN estoque_atual e ON p.id_produto = e.id_produto 
+             WHERE e.quantidade <= p.estoque_minimo) AS produtosEmAlerta,
+            
+            -- 4. Giro de Vendas (Produtos distintos vendidos nos últimos 30 dias)
+            (SELECT COUNT(DISTINCT id_produto) FROM vendas_itens vi 
+             JOIN vendas v ON vi.id_venda = v.id_venda 
+             WHERE v.data_venda > DATE_SUB(NOW(), INTERVAL 30 DAY)) AS giroVendas,
+
+            -- 5. Inflação Interna (Alertas de preço pendentes)
+            (SELECT COUNT(*) FROM alertas_precos WHERE status = 'PENDENTE') AS variacaoCusto,
+
+            -- 6. Curva ABC (Categorias com maior valor investido)
+            (SELECT c.nome_categoria FROM categorias c
+             JOIN produtos p ON c.id_categoria = p.id_categoria
+             JOIN estoque_atual e ON p.id_produto = e.id_produto
+             GROUP BY c.id_categoria ORDER BY SUM(e.quantidade * e.valor_medio) DESC LIMIT 1) AS categoriaTopABC,
+
+            -- 7. Estoque Parado
+            (SELECT COUNT(*) FROM estoque_atual e 
+             WHERE e.quantidade > 0 AND e.id_produto NOT IN (
+                 SELECT id_produto FROM estoque_movimentos 
+                 WHERE tipo = 'SAIDA' AND data_movimento > DATE_SUB(NOW(), INTERVAL 60 DAY)
+             )) AS estoqueParado
+    `);
+
+    const r = rows[0];
+    res.json({
+        totalProdutos: Number(r.totalProdutos || 0),
+        valorTotalEstoque: Number(r.valorTotalEstoque || 0),
+        produtosEmAlerta: Number(r.produtosEmAlerta || 0),
+        giroVendas: Number(r.giroVendas || 0),
+        variacaoCusto: Number(r.variacaoCusto || 0),
+        categoriaTopABC: r.categoriaTopABC || 'N/A',
+        estoqueParado: Number(r.estoqueParado || 0)
+    });
+}));
+
 // Proximo passo é Criar o produto no banco de dados com base nos dados fornecidos pela nota FIscal.
