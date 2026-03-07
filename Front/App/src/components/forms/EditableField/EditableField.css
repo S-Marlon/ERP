@@ -1,55 +1,95 @@
- .inputGroup {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    gap: 4px;
-  }
-
-.inputContainerDirty{
-  border-color: #2563eb !important;
-  background-color: #eff6ff !important;
-  color: #1e40af !important;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1) !important;
-  font-weight: 500;
-}
-
-/* Estado do Input quando alterado */
-.inputDirty {
-  border-color: #2563eb !important;
-  background-color: #eff6ff !important;
-  color: #1e40af !important;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1) !important;
-  font-weight: 500;
+/* Container que agrupa o Label e o Input Group */
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   width: 100%;
+  margin-bottom: 15px;
 }
 
-/* Botão de Reverter */
-.revertBadge {
-  background-color: #eff6ff;
-  color: #2563eb;
-  border: 1px solid #dbeafe;
-  border-radius: 4px;
-  padding: 2px 6px;
-  font-size: 10px;
-  cursor: pointer;
-  font-weight: bold;
-  margin-left: 8px;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
+.label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+/* O "Corpo" do Input Group */
+.fieldWrapper {
+  display: flex;
+  align-items: stretch; /* Garante que todos os filhos tenham a mesma altura */
+  width: 100%;
+  border-radius: 6px;
+  overflow: hidden; /* Corta as quinas dos botões para seguir o border-radius */
+  border: 1px solid #d1d5db; /* Borda padrão */
   transition: all 0.2s;
+}
+
+/* Quando o campo está alterado, a borda do grupo inteiro muda */
+.fieldWrapper.isDirty {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* O Input no centro */
+.inputDefault {
+  flex: 1; /* Ocupa todo o meio */
+  border: none !important; /* Remove a borda própria para usar a do wrapper */
+  padding: 8px 12px;
   outline: none;
+  font-size: 14px;
+  background-color: #fff;
+  min-width: 0;
+  color: #000;
 }
 
-.revertBadge:hover {
-  background-color: #dbeafe;
-  color: #1d4ed8;
+.inputDefault:disabled {
+  background-color: #f9fafb;
+  cursor: not-allowed;
+  color: #9ca3af;
 }
 
-.labelContainer{
+/* Estilo dos Botões (Cadeado e Reverter) */
+.groupButton {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  width: 100%;
+  justify-content: center;
+  padding: 0 12px;
+  background-color: #f3f4f6; /* Cinza claro por padrão */
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+  transition: all 0.2s;
+  font-size: 14px;
+}
+
+.groupButton:hover {
+  background-color: #e5e7eb;
+}
+
+/* Botão Cadeado (Esquerda) */
+.lockButton {
+  border-right: 1px solid #d1d5db;
+}
+
+.lockButton.unlocked {
+  background-color: #f0fdf4; /* Verde clarinho quando editável */
+  color: #166534;
+}
+
+/* Botão Reverter (Direita) */
+.revertButton {
+  border-left: 1px solid #d1d5db;
+  background-color: #eff6ff;
+  color: #2563eb;
+  font-weight: bold;
+}
+
+.revertButton:hover {
+  background-color: #dbeafe;
+}
+
+.originalValueText {
+  font-size: 11px;
+  color: #2563eb;
+  margin-top: 2px;
 }

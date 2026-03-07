@@ -38,9 +38,9 @@ export async function getProductById(id: number): Promise<Product> {
 /**
  * Salva as alterações de um produto (Update)
  */
-export async function updateProduct(id: number, productData: Partial<Product>): Promise<Product> {
+export async function updateProduct(id: number | string, productData: Partial<Product>): Promise<Product> {
     const res = await fetch(`${apiBase}/produtos/${id}`, {
-        method: 'PUT',
+        method: 'PUT', // Ou 'PATCH' dependendo da sua API
         headers: {
           'Content-Type': 'application/json',
         },

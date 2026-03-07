@@ -854,3 +854,60 @@ app.get('/api/dashboard/stats', asyncHandler(async (req, res) => {
 }));
 
 // Proximo passo é Criar o produto no banco de dados com base nos dados fornecidos pela nota FIscal.
+
+
+
+
+
+
+
+
+
+app.put('/api/produtos/:id', asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const updates = req.body;
+
+    // 1. DEFINIÇÃO DO FIELDMAP (Resolvendo o erro 2304)
+    // Este objeto mapeia: 'nome_no_react': 'nome_na_tabela_mysql'
+    const fieldMap: Record<string, string> = {
+        name: 'descricao',
+        sku: 'codigo_interno',
+        barcode: 'codigo_barras',
+        unitOfMeasure: 'unidade',
+        salePrice: 'preco_venda',
+        priceMethod: 'metodo_precificacao',
+        markup: 'markup_praticado',
+        status: 'status',
+        minStock: 'estoque_minimo',
+        ncm: 'ncm',
+        cest: 'cest'
+    };
+
+    const columns: string[] = [];
+    const values: any[] = [];
+
+    // 2. Montagem dinâmica da query
+    Object.keys(updates).forEach((key) => {
+        if (fieldMap[key]) {
+            columns.push(`${fieldMap[key]} = ?`);
+            values.push(updates[key]);
+        }
+    });
+
+    // Validação de segurança
+    if (columns.length === 0) {
+        return res.status(400).json({ message: "Nenhum campo válido para atualizar." });
+    }
+
+    // 3. Execução no Banco de Dados
+    values.push(id); // O ID vai por último para o WHERE id_produto = ?
+    const sql = `UPDATE produtos SET ${columns.join(', ')} WHERE id_produto = ?`;
+
+    const [result]: any = await pool.execute(sql, values);
+
+    if (result.affectedRows === 0) {
+        return res.status(404).json({ message: "Produto não encontrado ou nenhuma alteração feita." });
+    }
+
+    res.json({ success: true, message: "Produto atualizado com sucesso!" });
+}));

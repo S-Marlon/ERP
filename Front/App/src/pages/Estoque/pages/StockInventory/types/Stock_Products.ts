@@ -37,14 +37,15 @@
 
 export interface Product {
     id: number;
+    name: string;
     sku: string;
     barcode?: string;
-    descricao: string;
     pictureUrl?: string;
     category: string;
+    brand?: string;
     unitOfMeasure: string;
+    costPrice?: number;
     salePrice: number;
-    manualPrice?: number;
     priceMethod?: 'MARKUP' | 'MANUAL';
     markup?: number;
     minStock: number;
@@ -53,4 +54,6 @@ export interface Product {
     ncm?: string;
     cest?: string;
     suppliers?: string;
+    supplierCode?: string;
+    supplierProductCode?: string;
 }
