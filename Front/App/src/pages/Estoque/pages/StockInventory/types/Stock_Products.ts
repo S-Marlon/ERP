@@ -56,4 +56,18 @@ export interface Product {
     suppliers?: string;
     supplierCode?: string;
     supplierProductCode?: string;
+
+    // extras usados pela UI
+    maxStock?: number;
+    cfop_padrao?: string;
+    percentual_margem_sugerida?: number;
+
+    // ecommerce/logistics
+    weight?: number;
+    length?: number;
+    height?: number;
+    width?: number;
+    seoTitle?: string;
+    descriptionHtml?: string;
+    syncEcommerce?: boolean;
 }

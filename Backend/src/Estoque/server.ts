@@ -66,42 +66,73 @@ app.get('/api/products', asyncHandler(async (req, res) => {
     const searchTerm = isSearchEmpty ? '%' : `%${query}%`;
 
     const [rows]: any = await pool.execute(
-        `
-        SELECT 
-            p.id_produto AS id, 
-            p.codigo_interno AS sku, 
-            p.codigo_barras AS barcode,
-            p.descricao AS name, 
-            p.imagem_url AS pictureUrl, -- Campo que o formulário precisa
-            c.nome_categoria AS category, 
-            p.unidade AS unitOfMeasure,
-            p.preco_venda AS salePrice,
-            p.preco_venda_manual AS manualPrice,
-            p.metodo_precificacao AS priceMethod,
-            p.markup_praticado AS markup,
-            p.estoque_minimo AS minStock,
-            p.ncm,
-            p.cest,
-            p.status,
-            COALESCE(e.quantidade, 0) AS currentStock,
-            GROUP_CONCAT(DISTINCT f.nome_fantasia SEPARATOR ', ') AS suppliers
-        FROM produtos AS p
-        LEFT JOIN categorias c ON p.id_categoria = c.id_categoria  
-        LEFT JOIN estoque_atual e ON p.id_produto = e.id_produto
-        LEFT JOIN produto_fornecedor pf ON p.id_produto = pf.id_produto
-        LEFT JOIN fornecedores f ON pf.id_fornecedor = f.id_fornecedor
-        WHERE 
-            (? = '%' OR p.codigo_interno LIKE ? OR p.descricao LIKE ? OR pf.sku_fornecedor LIKE ?)
-        GROUP BY p.id_produto
-        ORDER BY p.descricao
-        LIMIT 100
-        `,
-        [searchTerm, searchTerm, searchTerm, searchTerm]
-    );
+    `
+    SELECT 
+        p.id_produto AS id, 
+        p.codigo_interno AS sku, 
+        p.codigo_barras AS barcode,
+        p.descricao AS name, 
+        p.status,
+        p.unidade AS unitOfMeasure,
+        p.ncm,
+        p.cest,
+        
+        -- Categorização e Marca
+        c.nome_categoria AS category, 
+        m.nome_marca AS brand,
 
-    return res.json(rows);
+        -- Precificação e Rentabilidade
+        p.preco_venda AS salePrice,
+        p.metodo_precificacao AS priceMethod,
+        p.markup_praticado AS markup,
+        COALESCE(e.valor_medio, 0) AS costPrice,
+        
+        -- Estoque com Alerta
+        COALESCE(e.quantidade, 0) AS currentStock,
+        p.estoque_minimo AS minStock,
+
+        -- Dimensões e informações para e‑commerce
+        p.peso AS weight,
+        p.comprimento AS length,
+        p.altura AS height,
+        p.largura AS width,
+        p.seo_title AS seoTitle,
+        p.description_html AS descriptionHtml,
+        p.sync_ecommerce AS syncEcommerce,
+        p.imagem_url AS pictureUrl,
+
+        -- Relacionamento com Fornecedores
+        -- ATENÇÃO: A vírgula foi removida daqui vvv
+        GROUP_CONCAT(DISTINCT f.nome_fantasia SEPARATOR ', ') AS suppliers
+        
+    FROM produtos AS p
+    LEFT JOIN marcas m ON p.id_marca = m.id_marca
+    LEFT JOIN categorias c ON p.id_categoria = c.id_categoria  
+    LEFT JOIN estoque_atual e ON p.id_produto = e.id_produto
+    LEFT JOIN produto_fornecedor pf ON p.id_produto = pf.id_produto
+    LEFT JOIN fornecedores f ON pf.id_fornecedor = f.id_fornecedor
+    WHERE 
+        (? = '%' 
+         OR p.codigo_interno LIKE ? 
+         OR p.codigo_barras LIKE ? 
+         OR p.descricao LIKE ? 
+         OR pf.sku_fornecedor LIKE ?)
+    GROUP BY p.id_produto
+    ORDER BY p.descricao ASC
+    LIMIT 100
+    `,
+    [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm]
+);
+
+    // Opcional: Tratamento de dados antes de enviar ao front
+    const formattedRows = rows.map((row: any) => ({
+    ...row,
+    isStockLow: row.currentStock <= row.minStock,
+    suppliersList: row.suppliers ? row.suppliers.split(', ') : []
 }));
 
+    return res.json(formattedRows);
+}));
 
 // Rota dedicada para o MappingModal (Entrada de NF)
 // app.get('/api/products/mapping', asyncHandler(async (req, res) => {
@@ -198,7 +229,16 @@ app.post('/api/products/createNewProduct', asyncHandler(async (req, res) => {
         unidade, 
         preco_venda, 
         id_categoria, 
-        codigo_barras 
+        codigo_barras,
+        // ecommerce/logistics extras
+        weight,
+        length,
+        height,
+        width,
+        seoTitle,
+        descriptionHtml,
+        syncEcommerce,
+        pictureUrl
     } = req.body;
 
     // 1. Validação de campos obrigatórios
@@ -230,6 +270,7 @@ app.post('/api/products/createNewProduct', asyncHandler(async (req, res) => {
     const skuTratado = skuFinal?.trim() === "" ? null : skuFinal;
     const categoriaTratada = id_categoria || null;
 
+    // optional ecommerce/logistics columns may exist in table
     const sql = `
         INSERT INTO produtos (
             codigo_interno, 
@@ -240,8 +281,10 @@ app.post('/api/products/createNewProduct', asyncHandler(async (req, res) => {
             preco_venda_manual,
             metodo_precificacao,
             id_categoria, 
-            status
-        ) VALUES (?, ?, ?, ?, ?, ?, 'MANUAL', ?, 'Ativo')
+            status,
+            peso, comprimento, altura, largura,
+            seo_title, description_html, sync_ecommerce, picture_url
+        ) VALUES (?, ?, ?, ?, ?, ?, 'MANUAL', ?, 'Ativo', ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     try {
@@ -252,7 +295,15 @@ app.post('/api/products/createNewProduct', asyncHandler(async (req, res) => {
             unidade || 'UN',
             preco_venda || 0,
             preco_venda || 0,
-            categoriaTratada
+            categoriaTratada,
+            weight ?? null,
+            length ?? null,
+            height ?? null,
+            width ?? null,
+            seoTitle ?? null,
+            descriptionHtml ?? null,
+            syncEcommerce ? 1 : 0,
+            pictureUrl ?? null
         ]);
 
         // Opcional: Se você quiser que todo produto novo já apareça na tabela de estoque atual com zero
@@ -261,7 +312,45 @@ app.post('/api/products/createNewProduct', asyncHandler(async (req, res) => {
             [result.insertId]
         );
 
-        res.status(201).json({ 
+        // fetch and return full record to frontend for consistency
+        const [newRows]: any = await pool.execute(`
+          SELECT 
+              p.id_produto AS id, 
+              p.codigo_interno AS sku, 
+              p.codigo_barras AS barcode,
+              p.descricao AS name, 
+              p.status,
+              p.unidade AS unitOfMeasure,
+              p.ncm,
+              p.cest,
+              p.peso AS weight,
+              p.comprimento AS length,
+              p.altura AS height,
+              p.largura AS width,
+              p.seo_title AS seoTitle,
+              p.description_html AS descriptionHtml,
+              p.sync_ecommerce AS syncEcommerce,
+              p.imagem_url AS pictureUrl,
+              c.nome_categoria AS category, 
+              m.nome_marca AS brand,
+              p.preco_venda AS salePrice,
+              p.metodo_precificacao AS priceMethod,
+              p.markup_praticado AS markup,
+              COALESCE(e.valor_medio, 0) AS costPrice,
+              COALESCE(e.quantidade, 0) AS currentStock,
+              p.estoque_minimo AS minStock,
+              GROUP_CONCAT(DISTINCT f.nome_fantasia SEPARATOR ', ') AS suppliers
+          FROM produtos AS p
+          LEFT JOIN marcas m ON p.id_marca = m.id_marca
+          LEFT JOIN categorias c ON p.id_categoria = c.id_categoria  
+          LEFT JOIN estoque_atual e ON p.id_produto = e.id_produto
+          LEFT JOIN produto_fornecedor pf ON p.id_produto = pf.id_produto
+          LEFT JOIN fornecedores f ON pf.id_fornecedor = f.id_fornecedor
+          WHERE p.id_produto = ?
+          GROUP BY p.id_produto
+        `, [result.insertId]);
+
+        res.status(201).json(newRows[0] || { 
             id: result.insertId, 
             sku: skuTratado,
             message: "Produto criado com sucesso e inicializado no estoque!" 
@@ -855,6 +944,54 @@ app.get('/api/dashboard/stats', asyncHandler(async (req, res) => {
 
 // Proximo passo é Criar o produto no banco de dados com base nos dados fornecidos pela nota FIscal.
 
+// GET /api/produtos/:id - retorna dados completos de um produto (inclui estoque atual)
+app.get('/api/produtos/:id', asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+
+    const [rows]: any = await pool.execute(`
+      SELECT 
+          p.id_produto AS id, 
+          p.codigo_interno AS sku, 
+          p.codigo_barras AS barcode,
+          p.descricao AS name, 
+          p.status,
+          p.unidade AS unitOfMeasure,
+          p.ncm,
+          p.cest,
+          p.peso AS weight,
+          p.comprimento AS length,
+          p.altura AS height,
+          p.largura AS width,
+          p.seo_title AS seoTitle,
+          p.description_html AS descriptionHtml,
+          p.sync_ecommerce AS syncEcommerce,
+          p.imagem_url AS pictureUrl,
+          c.nome_categoria AS category, 
+          m.nome_marca AS brand,
+          p.preco_venda AS salePrice,
+          p.metodo_precificacao AS priceMethod,
+          p.markup_praticado AS markup,
+          COALESCE(e.valor_medio, 0) AS costPrice,
+          COALESCE(e.quantidade, 0) AS currentStock,
+          p.estoque_minimo AS minStock,
+          GROUP_CONCAT(DISTINCT f.nome_fantasia SEPARATOR ', ') AS suppliers
+      FROM produtos AS p
+      LEFT JOIN marcas m ON p.id_marca = m.id_marca
+      LEFT JOIN categorias c ON p.id_categoria = c.id_categoria  
+      LEFT JOIN estoque_atual e ON p.id_produto = e.id_produto
+      LEFT JOIN produto_fornecedor pf ON p.id_produto = pf.id_produto
+      LEFT JOIN fornecedores f ON pf.id_fornecedor = f.id_fornecedor
+      WHERE p.id_produto = ?
+      GROUP BY p.id_produto
+    `, [id]);
+
+    if (!rows || rows.length === 0) {
+        return res.status(404).json({ error: 'Produto não encontrado.' });
+    }
+
+    res.json(rows[0]);
+}));
+
 
 
 
@@ -865,7 +1002,12 @@ app.get('/api/dashboard/stats', asyncHandler(async (req, res) => {
 
 app.put('/api/produtos/:id', asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
-    const updates = req.body;
+    const updates = { ...req.body }; // clone para podermos manipular
+
+    // capture estoque se estiver sendo modificado
+    const newStock = updates.currentStock !== undefined ? updates.currentStock : null;
+    // removemos para não tentar mapear na tabela produtos
+    delete updates.currentStock;
 
     // 1. DEFINIÇÃO DO FIELDMAP (Resolvendo o erro 2304)
     // Este objeto mapeia: 'nome_no_react': 'nome_na_tabela_mysql'
@@ -880,7 +1022,16 @@ app.put('/api/produtos/:id', asyncHandler(async (req: Request, res: Response) =>
         status: 'status',
         minStock: 'estoque_minimo',
         ncm: 'ncm',
-        cest: 'cest'
+        cest: 'cest',
+        // ecommerce/logistics fields
+        weight: 'peso',
+        length: 'comprimento',
+        height: 'altura',
+        width: 'largura',
+        seoTitle: 'seo_title',
+        descriptionHtml: 'description_html',
+        syncEcommerce: 'sync_ecommerce',
+        pictureUrl: 'imagem_url'
     };
 
     const columns: string[] = [];
@@ -895,19 +1046,69 @@ app.put('/api/produtos/:id', asyncHandler(async (req: Request, res: Response) =>
     });
 
     // Validação de segurança
-    if (columns.length === 0) {
+    if (columns.length === 0 && newStock === null) {
         return res.status(400).json({ message: "Nenhum campo válido para atualizar." });
     }
 
     // 3. Execução no Banco de Dados
-    values.push(id); // O ID vai por último para o WHERE id_produto = ?
-    const sql = `UPDATE produtos SET ${columns.join(', ')} WHERE id_produto = ?`;
-
-    const [result]: any = await pool.execute(sql, values);
+    let result: any = { affectedRows: 1 };
+    if (columns.length > 0) {
+        values.push(id); // O ID vai por último para o WHERE id_produto = ?
+        const sql = `UPDATE produtos SET ${columns.join(', ')} WHERE id_produto = ?`;
+        [result] = await pool.execute(sql, values);
+    }
 
     if (result.affectedRows === 0) {
         return res.status(404).json({ message: "Produto não encontrado ou nenhuma alteração feita." });
     }
 
-    res.json({ success: true, message: "Produto atualizado com sucesso!" });
+    // se o front enviou novo estoque, ajusta na tabela estoque_atual
+    if (newStock !== null) {
+        await pool.execute(
+            `INSERT INTO estoque_atual (id_produto, quantidade, valor_medio)
+             VALUES (?, ?, 0)
+             ON DUPLICATE KEY UPDATE quantidade = ?`,
+            [id, newStock, newStock]
+        );
+    }
+
+    // after update, fetch the updated record to send back
+    const [updatedRows]: any = await pool.execute(`
+      SELECT 
+          p.id_produto AS id, 
+          p.codigo_interno AS sku, 
+          p.codigo_barras AS barcode,
+          p.descricao AS name, 
+          p.status,
+          p.unidade AS unitOfMeasure,
+          p.ncm,
+          p.cest,
+          p.peso AS weight,
+          p.comprimento AS length,
+          p.altura AS height,
+          p.largura AS width,
+          p.seo_title AS seoTitle,
+          p.description_html AS descriptionHtml,
+          p.sync_ecommerce AS syncEcommerce,
+          p.imagem_url AS pictureUrl,
+          c.nome_categoria AS category, 
+          m.nome_marca AS brand,
+          p.preco_venda AS salePrice,
+          p.metodo_precificacao AS priceMethod,
+          p.markup_praticado AS markup,
+          COALESCE(e.valor_medio, 0) AS costPrice,
+          COALESCE(e.quantidade, 0) AS currentStock,
+          p.estoque_minimo AS minStock,
+          GROUP_CONCAT(DISTINCT f.nome_fantasia SEPARATOR ', ') AS suppliers
+      FROM produtos AS p
+      LEFT JOIN marcas m ON p.id_marca = m.id_marca
+      LEFT JOIN categorias c ON p.id_categoria = c.id_categoria  
+      LEFT JOIN estoque_atual e ON p.id_produto = e.id_produto
+      LEFT JOIN produto_fornecedor pf ON p.id_produto = pf.id_produto
+      LEFT JOIN fornecedores f ON pf.id_fornecedor = f.id_fornecedor
+      WHERE p.id_produto = ?
+      GROUP BY p.id_produto
+    `, [id]);
+
+    res.json(updatedRows[0] || { success: true, message: "Produto atualizado com sucesso!" });
 }));

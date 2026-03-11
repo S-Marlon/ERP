@@ -11,6 +11,15 @@ export interface Product {
   currentStock: number;
   status: string;
   suppliers?: string;
+  // ecommerce/logistics (optional for PDV, etc.)
+  pictureUrl?: string;
+  weight?: number;
+  length?: number;
+  height?: number;
+  width?: number;
+  seoTitle?: string;
+  descriptionHtml?: string;
+  syncEcommerce?: boolean;
 }
 
 export const searchProducts = async (query: string): Promise<Product[]> => {
@@ -35,6 +44,14 @@ export const searchProducts = async (query: string): Promise<Product[]> => {
       currentStock: item.currentStock,
       status: item.status,
       suppliers: item.suppliers,
+      pictureUrl: item.pictureUrl,
+      weight: item.weight,
+      length: item.length,
+      height: item.height,
+      width: item.width,
+      seoTitle: item.seoTitle,
+      descriptionHtml: item.descriptionHtml,
+      syncEcommerce: item.syncEcommerce,
     }));
   } catch (error) {
     console.error('Erro na busca de produtos:', error);

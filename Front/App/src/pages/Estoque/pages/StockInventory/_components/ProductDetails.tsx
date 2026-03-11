@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Product } from '../types/Stock_Products';
 import EditableField from '../../../../../components/forms/EditableField/EditableField';
 import { styles } from './producDetails';
@@ -17,7 +17,8 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onSave, onClos
 
 
   const [formData, setFormData] = useState<Product | null>(null);
-  const [activeTab, setActiveTab] = useState<'financeiro' | 'estoque' | 'fiscal' | 'fornecedor'>('financeiro');
+  const btnUrlRef = useRef<HTMLButtonElement>(null);
+  const [activeTab, setActiveTab] = useState<'financeiro' | 'estoque' | 'fiscal' | 'fornecedor'| 'ecommerce'>('financeiro');
   const fieldLabels: Record<string, string> = {
     name: "Nome do Produto",
     salePrice: "Preço de Venda",
@@ -41,6 +42,8 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onSave, onClos
     else setFormData(null);
     setImageList(product?.pictureUrl ? product.pictureUrl.split(',').filter(Boolean) : []);
   }, [product]);
+
+ 
 
   const margin = useMemo(() => {
     if (!formData || !formData.salePrice || formData.salePrice <= 0) return 0;
@@ -66,6 +69,34 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onSave, onClos
   // Exemplo de como você usaria no seu componente pai:
   const [urlError, setUrlError] = useState(false); // Estado para o aviso de erro
   const [showUrlManager, setShowUrlManager] = useState(false);
+
+
+
+
+ useEffect(() => {
+  const handleClickOutside = (event: MouseEvent) => {
+    const target = event.target as HTMLElement;
+
+    // Se o modal estiver aberto
+    if (showUrlManager) {
+      // Verifica se o clique foi fora do container do gerenciador
+      // E também se não foi no botão que abre o gerenciador (para evitar conflito)
+      const isOutside = !target.closest('.url-manager-container');
+      const isNotToggleButton = !target.closest('.btn-url-manager');
+
+      if (isOutside && isNotToggleButton) {
+        setShowUrlManager(false);
+      }
+    }
+  };
+
+  document.addEventListener('mousedown', handleClickOutside);
+  return () => {
+    document.removeEventListener('mousedown', handleClickOutside);
+  };
+}, [showUrlManager]);
+
+
   const [imageList, setImageList] = useState<string[]>(formData?.pictureUrl ? formData.pictureUrl.split(',').filter(Boolean) : []);
   const [currentUrl, setCurrentUrl] = useState('');
 
@@ -221,17 +252,19 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onSave, onClos
         {/* HEADER */}
         {/* header start */}
         <div style={styles.header}>
-          <div>
             <div style={styles.headerTop}>
 
               <div style={styles.toggleRow}>
-                <span style={styles.label}>Produto Ativo</span>
+                <div>
+
+                <span style={styles.label}> Status do Produto: </span>
                 <button
                   onClick={() => setFormData({ ...formData, status: formData.status === 'Ativo' ? 'Inativo' : 'Ativo' })}
                   style={{ ...styles.switch, backgroundColor: formData.status === 'Ativo' ? '#2563eb' : '#d1d5db' }}
                 >
                   <div style={{ ...styles.switchHandle, transform: formData.status === 'Ativo' ? 'translateX(20px)' : 'translateX(0px)' }} />
                 </button>
+                </div>
                 <span style={{
                   ...styles.badge,
                   backgroundColor: formData.status === 'Ativo' ? '#dcfce7' : '#fee2e2',
@@ -244,9 +277,8 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onSave, onClos
 
 
 
-              <button onClick={onClose} style={styles.btnClose}>&times;</button>
+              {/* <button onClick={onClose} style={styles.btnClose}>&times;</button> */}
             </div>
-          </div>
 
           <div style={styles.section}>
 
@@ -271,10 +303,16 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onSave, onClos
               <label style={styles.label}>SKU / Cód.  Barras {formData.id}</label>
             </FlexGridContainer> */}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'stretch', gap: '10px' }}>
+            <div style={{ 
+  display: 'grid', 
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', // Força as colunas a serem idênticas
+  alignItems: 'stretch', 
+  gap: '10px',
+  width: '100%' 
+}}>
 
-              {/* COLUNA 1: IMAGEM */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {/* COLUNA 1: IMAGEM */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '100%', overflow: 'hidden' }}>
 
                 <EcommerceGallery
                   images={imageList}
@@ -288,119 +326,130 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onSave, onClos
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <label style={styles.label}>Imagens ({imageList.length})</label>
-                    <button
-                      onClick={() => setShowUrlManager(!showUrlManager)}
-                      style={{
-                        padding: '4px 12px',
-                        fontSize: '11px',
-                        backgroundColor: showUrlManager ? '#ef4444' : '#2563eb',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      {showUrlManager ? 'Fechar' : 'Gerenciar URLs'}
-                    </button>
-                  </div>
 
-                  {showUrlManager && (
-                    <div style={{
-                      position: 'absolute',   // Essencial para flutuar
-                      top: '35px',            // Posiciona logo abaixo do botão
-                      left: '0',
-                      right: '0',
-                      zIndex: 999,            // Garante que fique por cima de TUDO
-                      backgroundColor: 'white',
-                      padding: '16px',
-                      borderRadius: '12px',
-                      boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
-                      border: '1px solid #e5e7eb',
-                      minWidth: '280px'
-                    }}>
 
-                      {/* Triângulo indicador (opcional, dá o visual de popover) */}
-                      <div style={{
-                        position: 'absolute',
-                        top: '-6px',
-                        right: '20px',
-                        width: '12px',
-                        height: '12px',
-                        backgroundColor: 'white',
-                        transform: 'rotate(45deg)',
-                        borderLeft: '1px solid #e5e7eb',
-                        borderTop: '1px solid #e5e7eb'
-                      }} />
+{/* Botão que abre o gerenciador */}
+<button
+  ref={btnUrlRef} // Adicione o ref aqui
+  className="btn-url-manager"
+  onClick={() => setShowUrlManager(!showUrlManager)}
+  style={{
+    padding: '4px 12px',
+    fontSize: '11px',
+    backgroundColor: showUrlManager ? '#ef4444' : '#2563eb',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    transition: 'all 0.2s'
+  }}
+>
+  {showUrlManager ? 'Fechar' : 'Gerenciar URLs'}
+</button>
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#6b7280', marginBottom: '4px' }}>
-                          LISTA DE URLS
-                        </span>
+{showUrlManager && (
+  <div
+    className="url-manager-container"
+    style={{
+      position: 'fixed', // Mudança crucial: ignora o overflow do pai
+      top: btnUrlRef.current ? btnUrlRef.current.getBoundingClientRect().bottom + 8 : 0,
+      left: btnUrlRef.current ? btnUrlRef.current.getBoundingClientRect().left - 240 : 0, // Ajusta para a esquerda
+      zIndex: 9999, // Fica acima de tudo, inclusive de outros modais
+      backgroundColor: 'white',
+      padding: '16px',
+      borderRadius: '12px',
+      boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+      border: '1px solid #e5e7eb',
+      width: '320px',
+    }}
+  >
+    {/* Triângulo indicador ajustado para fixed */}
+    <div style={{
+      position: 'absolute',
+      top: '-6px',
+      right: '25px',
+      width: '12px',
+      height: '12px',
+      backgroundColor: 'white',
+      transform: 'rotate(45deg)',
+      borderLeft: '1px solid #e5e7eb',
+      borderTop: '1px solid #e5e7eb'
+    }} />
 
-                        <div style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '8px',
-                          maxHeight: '220px',
-                          overflowY: 'auto',
-                          paddingRight: '5px' // Espaço para a scrollbar
-                        }}>
-                          {[...imageList, ''].map((url, index) => (
-                            <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <input
-                                type="text"
-                                autoFocus={index === imageList.length && index > 0}
-                                placeholder="Cole o link aqui..."
-                                value={url}
-                                style={{
-                                  ...styles.input,
-                                  flex: 1,
-                                  fontSize: '12px',
-                                  height: '32px',
-                                  borderColor: url ? '#2563eb' : '#d1d5db'
-                                }}
-                                onChange={(e) => {
-                                  const newUrl = e.target.value;
-                                  const updatedImages = [...imageList];
-                                  if (index < updatedImages.length) {
-                                    updatedImages[index] = newUrl;
-                                  } else if (newUrl.trim() !== '') {
-                                    updatedImages.push(newUrl);
-                                  }
-                                  setImageList(updatedImages);
-                                  setFormData({ ...formData, pictureUrl: updatedImages.join(',') });
-                                }}
-                              />
-                              {url && (
-                                <button
-                                  onClick={() => {
-                                    const updated = imageList.filter((_, i) => i !== index);
-                                    setImageList(updated);
-                                    setFormData({ ...formData, pictureUrl: updated.join(',') });
-                                  }}
-                                  style={{
-                                    border: 'none',
-                                    background: '#fee2e2',
-                                    color: '#ef4444',
-                                    borderRadius: '4px',
-                                    width: '24px',
-                                    height: '24px',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                  }}
-                                >
-                                  &times;
-                                </button>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+        <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#6b7280' }}>
+          GERENCIAR LINKS DAS IMAGENS
+        </span>
+        <button 
+          onClick={() => setShowUrlManager(false)}
+          style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '16px', backgroundColor: '#f3f4f6', color: '#6b7280', borderRadius: '50%', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          &times;
+        </button>
+      </div>
+
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+        maxHeight: '220px',
+        overflowY: 'auto',
+        paddingRight: '5px'
+      }}>
+        {[...imageList, ''].map((url, index) => (
+          <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <input
+              type="text"
+              placeholder="Cole o link da imagem..."
+              value={url}
+              style={{
+                ...styles.input,
+                flex: 1,
+                fontSize: '12px',
+                height: '32px',
+                borderColor: url ? '#2563eb' : '#d1d5db'
+              }}
+              onChange={(e) => {
+                const newUrl = e.target.value;
+                const updatedImages = [...imageList];
+                if (index < updatedImages.length) {
+                  updatedImages[index] = newUrl;
+                } else if (newUrl.trim() !== '') {
+                  updatedImages.push(newUrl);
+                }
+                const filtered = updatedImages.filter(Boolean);
+                setImageList(filtered);
+                setFormData({ ...formData, pictureUrl: filtered.join(',') });
+              }}
+            />
+            {url && (
+              <button
+                onClick={() => {
+                  const updated = imageList.filter((_, i) => i !== index);
+                  setImageList(updated);
+                  setFormData({ ...formData, pictureUrl: updated.join(',') });
+                }}
+                style={{
+                  border: 'none',
+                  background: '#fee2e2',
+                  color: '#ef4444',
+                  borderRadius: '4px',
+                  width: '24px',
+                  height: '24px',
+                  cursor: 'pointer'
+                }}
+              >
+                &times;
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+)}
+                </div>
                 </div>
 
 
@@ -410,28 +459,46 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onSave, onClos
               </div>
 
               {/* COLUNA 2: INFOS (Ajustada para espaçar) */}
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between', // ISSO VAI ESPAÇAR OS ITENS
-                alignItems: 'flex-start',
-                flex: 1,
-                paddingBottom: '5px'
-              }}>
+             <div style={{
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  flex: 1, 
+  minWidth: 0,        // Importante: permite que a coluna encolha
+  width: '100%',      // Garante que ela ocupe o espaço disponível
+  overflow: 'hidden', // Corta qualquer coisa que tente vazar por erro
+  paddingBottom: '5px',
+  boxSizing: 'border-box'
+}}>
 
                 {/* Grupo do Topo (IDs e Códigos) */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={styles.sku}><strong>CÓD Barras:</strong> {formData.barcode || 'N/A'}</label>
                   <label style={styles.sku}><strong>CÓD Interno:</strong> {formData.sku}</label>
                   <label style={styles.sku}><strong>ID Registro:</strong> {formData.id}</label>
+                   <label style={styles.sku}><strong>NCM:</strong> {formData.ncm || 'N/A'}</label>
+
+                  <label style={styles.sku}><strong>CEST:</strong> {formData.cest || 'N/A'}</label>
+
+<div style={{ 
+  display: 'flex', 
+  flexDirection: 'column', 
+  gap: '4px', 
+  width: '100%',      // Ocupa tudo
+  maxWidth: '100%',   // Não passa de tudo
+  minWidth: 0,        // Permite encolher
+  overflow: 'hidden'  // Previne vazamento de texto longo nas labels
+}}>
 
                   <EditableField
                     label="categoria"
                     isDirty={formData.category !== product?.category}
                     originalValue={product?.category}
                     onRevert={() => revertField('category')}
+                    style={{ width: '100%', maxWidth: '100%' }}
                   >
-                    <select name="category" value={formData.category || ''} onChange={handleChange} style={styles.input}>
+                    <select name="category" value={formData.category || ''} onChange={handleChange} style={styles.input} style={{ ...styles.input, width: '100%', minWidth: 0 }}>
                       <option value="">Selecione...</option>
                       <option value={formData.category || ''}>{formData.category || 'Selecione...'}</option>
                     </select>
@@ -441,17 +508,18 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onSave, onClos
                     label="Marca"
                     isDirty={formData.brand !== product?.brand}
                     originalValue={product?.brand}
+                    showLock={true}
                     onRevert={() => revertField('brand')}
+                    style={{ width: '100%', maxWidth: '100%' }}
                   >
-                    <select name="brand" value={formData.brand || ''} onChange={handleChange} style={styles.input}>
+                    <select name="brand" value={formData.brand || ''} onChange={handleChange} style={styles.input} style={{ ...styles.input, width: '100%', minWidth: 0 }}>
                       <option value="">Selecione...</option>
                       <option value={formData.brand || ''}>{formData.brand || 'Selecione...'}</option>
                     </select>
                   </EditableField>
+</div>
 
-                  <label style={styles.sku}><strong>NCM:</strong> {formData.ncm || 'N/A'}</label>
-
-                  <label style={styles.sku}><strong>CEST:</strong> {formData.cest || 'N/A'}</label>
+                 
 
 
 
@@ -498,197 +566,550 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onSave, onClos
 
 
           <nav style={styles.tabsContainer}>
-            <button style={{ ...styles.tabButton, ... (activeTab === 'financeiro' ? styles.tabButtonActive : {}) }} onClick={() => setActiveTab('financeiro')}> Financeiro</button>
-            <button style={{ ...styles.tabButton, ... (activeTab === 'estoque' ? styles.tabButtonActive : {}) }} onClick={() => setActiveTab('estoque')}> Estoque</button>
-            <button style={{ ...styles.tabButton, ... (activeTab === 'fiscal' ? styles.tabButtonActive : {}) }} onClick={() => setActiveTab('fiscal')}> Fiscal</button>
-            <button style={{ ...styles.tabButton, ... (activeTab === 'fornecedor' ? styles.tabButtonActive : {}) }} onClick={() => setActiveTab('fornecedor')}> Fornecedor</button>
+            <button style={{ ...styles.tabButton, ... (activeTab === 'financeiro' ? styles.tabButtonActive : {}) }} onClick={() => setActiveTab('financeiro')}>💵 Financeiro</button>
+            <button style={{ ...styles.tabButton, ... (activeTab === 'estoque' ? styles.tabButtonActive : {}) }} onClick={() => setActiveTab('estoque')}>📦 Estoque</button>
+            <button style={{ ...styles.tabButton, ... (activeTab === 'ecommerce' ? styles.tabButtonActive : {}) }} onClick={() => setActiveTab('ecommerce')}>🌐 E-commerce</button>
+            <button style={{ ...styles.tabButton, ... (activeTab === 'fiscal' ? styles.tabButtonActive : {}) }} onClick={() => setActiveTab('fiscal')}>📑 Fiscal</button>
+            <button style={{ ...styles.tabButton, ... (activeTab === 'fornecedor' ? styles.tabButtonActive : {}) }} onClick={() => setActiveTab('fornecedor')}>👨‍💼 Fornecedor</button>
           </nav>
 
-          {activeTab === 'financeiro' && (
-            <>
-              <div style={styles.section}>
-                <h3 style={styles.sectionTitle}>💵 Financeiro</h3>
-                <div style={styles.inputGroup}>
-                  <label style={styles.label}>Método de Precificação</label>
-                  <EditableField
-                    label="metodo_precificacao"
-                    showLock={true}
-                    isDirty={formData.priceMethod !== product?.priceMethod}
-                    originalValue={product?.priceMethod}
-                    onRevert={() => revertField('priceMethod')}
-                  >
-                    <select name="priceMethod" value={formData.priceMethod || ''} onChange={handleChange} style={styles.input}>
-                      <option value="">Selecione...</option>
-                      <option value="MARKUP">Markup (%)</option>
-                      <option value="MANUAL">Preço de Venda Manual</option>
-                    </select>
-                  </EditableField>
-                </div>
+         {activeTab === 'financeiro' && (
+  <>
+    <div style={styles.section}>
+      {/* Linha 1: Custos e Referência */}
+      <div style={styles.grid}>
+        <div style={styles.inputGroup}>
+          <EditableField
+            label="Custo Médio (R$)"
+            isDirty={formData.costPrice !== product?.costPrice}
+            showLock={true}
+            originalValue={product?.costPrice}
+            onRevert={() => revertField('costPrice')}
+          >
+            <input
+              type="number"
+              name="costPrice"
+              value={formData.costPrice || 0}
+              onChange={handleChange}
+              style={styles.input}
+            />
+          </EditableField>
+        </div>
 
-                <div style={{ ...styles.grid, marginTop: '12px' }}>
-                  <div style={styles.inputGroup}>
-                    <label style={styles.label}>Markup (%)</label>
-                    <EditableField
-                      label="Markup (%)"
-                      showLock={true}
-                      isDirty={formData.markup !== product?.markup}
-                      originalValue={product?.markup}
-                      onRevert={() => revertField('markup')}
-                    >
-                      <input
-                        type="number"
-                        name="markup"
-                        value={formData.markup || 0}
-                        onChange={handleChange}
-                        style={styles.input}
-                        disabled={formData.priceMethod === 'MANUAL'}
-                      />
-                    </EditableField>
-                  </div>
-                  <div style={styles.inputGroup}>
-                    <label style={styles.label}>Preço de Venda (R$)</label>
-                    <EditableField
-                      label="Preço de Venda (R$)"
-                      showLock={true}
-                      isDirty={formData.salePrice !== product?.salePrice}
-                      originalValue={product?.salePrice}
-                      onRevert={() => revertField('salePrice')}
-                    >
-                      <input
-                        type="number"
-                        name="salePrice"
-                        value={formData.salePrice || 0}
-                        disabled={formData.priceMethod === 'MARKUP'}
-                        onChange={handleChange}
-                        style={styles.input}
-                      />
-                    </EditableField>
-                  </div>
-                </div>
+        {/* Campo Informativo: Último Custo (via JOIN produto_fornecedor) */}
+        <div style={styles.inputGroup}>
+          <label style={styles.label}>Último Custo (NF)</label>
+          <div style={{ ...styles.input, backgroundColor: '#f9fafb', color: '#6b7280' }}>
+            R$ {product?.ultimo_custo || '0,00'}
+          </div>
+        </div>
+      </div>
 
-                <div style={{ ...styles.marginBox, backgroundColor: margin >= 0 ? '#f0fdf4' : '#fef2f2', color: margin >= 0 ? '#166534' : '#991b1b' }}>
-                  <span>Lucro sobre custo médio:</span>
-                  <strong style={{ fontSize: '16px' }}>{margin}%</strong>
-                </div>
-              </div>
-            </>)}
+      {/* Linha 2: Estratégia de Preço */}
+      <div style={{ ...styles.grid, marginTop: '12px' }}>
+        <div style={styles.inputGroup}>
+          <EditableField
+            label="Método de Precificação"
+            showLock={true}
+            isDirty={formData.priceMethod !== product?.priceMethod}
+            originalValue={product?.priceMethod}
+            onRevert={() => revertField('priceMethod')}
+          >
+            <select name="priceMethod" value={formData.priceMethod || ''} onChange={handleChange} style={styles.input}>
+              <option value="MARKUP">Markup (%)</option>
+              <option value="MANUAL">Preço de Venda Manual</option>
+            </select>
+          </EditableField>
+        </div>
+
+        <div style={styles.inputGroup}>
+           <label style={styles.label}>Margem Sugerida (Cat.)</label>
+           <div style={{ ...styles.input, backgroundColor: '#f9fafb', color: '#6366f1', fontWeight: 'bold' }}>
+              {product?.percentual_margem_sugerida || 0}%
+           </div>
+        </div>
+      </div>
+
+      {/* Linha 3: Valores Finais */}
+      <div style={{ ...styles.grid, marginTop: '12px' }}>
+        <div style={styles.inputGroup}>
+          <EditableField
+            label="Markup Atual (x)"
+            showLock={true}
+            isDirty={formData.markup !== product?.markup}
+            originalValue={product?.markup}
+            onRevert={() => revertField('markup')}
+          >
+            <input
+              type="number"
+              step="0.01"
+              name="markup"
+              value={formData.markup || 0}
+              onChange={handleChange}
+              style={styles.input}
+              disabled={formData.priceMethod === 'MANUAL'}
+            />
+          </EditableField>
+        </div>
+
+        <div style={styles.inputGroup}>
+          <EditableField
+            label="Preço de Venda (R$)"
+            showLock={true}
+            isDirty={formData.salePrice !== product?.salePrice}
+            originalValue={product?.salePrice}
+            onRevert={() => revertField('salePrice')}
+          >
+            <input
+              type="number"
+              name="salePrice"
+              value={formData.salePrice || 0}
+              disabled={formData.priceMethod === 'MARKUP'}
+              onChange={handleChange}
+              style={styles.input}
+            />
+          </EditableField>
+        </div>
+      </div>
+
+      {/* Box de Resultado Financeiro */}
+      <div style={{ 
+          ...styles.marginBox, 
+          display: 'flex', 
+          justifyContent: 'space-between',
+          backgroundColor: margin >= (product?.percentual_margem_sugerida || 0) ? '#f0fdf4' : '#fff7ed', 
+          color: margin >= (product?.percentual_margem_sugerida || 0) ? '#166534' : '#9a3412',
+          border: margin < (product?.percentual_margem_sugerida || 0) ? '1px solid #fed7aa' : 'none'
+      }}>
+        <div>
+          <span>Lucro sobre custo médio:</span>
+          <strong style={{ fontSize: '18px', marginLeft: '8px' }}>{margin}%</strong>
+        </div>
+        {margin < (product?.percentual_margem_sugerida || 0) && (
+          <small>⚠️ Abaixo da meta da categoria</small>
+        )}
+      </div>
+    </div>
+  </>
+)}
 
           {activeTab === 'estoque' && (
-            <>
+  <>
+    <div style={styles.section}>
+      <h3 style={styles.sectionTitle}>📦 Controle de Estoque</h3>
+      
+      {/* Grid de Níveis de Estoque */}
+      <div style={styles.grid}>
+        <div style={styles.inputGroup}>
+          <EditableField
+            label="Estoque Mínimo"
+            isDirty={formData.minStock !== product?.minStock}
+            originalValue={product?.minStock}
+            onRevert={() => revertField('minStock')}
+          >
+            <input
+              type="number"
+              name="minStock"
+              value={formData.minStock || 0}
+              onChange={handleChange}
+              style={styles.input}
+            />
+          </EditableField>
+          <small style={{ fontSize: '10px', color: '#6b7280' }}>Gera alerta abaixo deste valor</small>
+        </div>
 
-              <div style={styles.section}>
-                <h3 style={styles.sectionTitle}>📦 Estoque e Logística</h3>
-                <div style={styles.grid}>
-                  <div style={styles.inputGroup}>
-                    <EditableField
-                      label="Estoque Mínimo"
-                      isDirty={formData.minStock !== product?.minStock}
-                      originalValue={product?.minStock}
-                      onRevert={() => revertField('minStock')}
-                    >
-                      <input
-                        type="number"
-                        name="minStock"
-                        value={formData.minStock || 0}
-                        onChange={handleChange}
-                        style={styles.input}
-                      />
-                    </EditableField>
-                  </div>
-                  <div style={styles.inputGroup}>
-                    <EditableField
-                      label="Estoque Atual"
-                      showLock={true}
-                      isDirty={formData.currentStock !== product?.currentStock}
-                      originalValue={product?.currentStock}
-                      onRevert={() => revertField('currentStock')}
-                    >
-                      <input
-                        type="number"
-                        name="currentStock"
-                        style={{ ...styles.input, backgroundColor: '#f9fafb' }}
-                        value={formData.currentStock || 0}
-                      />
-                    </EditableField>
-                    <small style={{ fontSize: '10px', color: '#6b7280' }}>Ajuste via Movimentação</small>
-                  </div>
-                </div>
-              </div>
+        <div style={styles.inputGroup}>
+          <EditableField
+            label="Estoque Máximo / Ideal"
+            isDirty={formData.maxStock !== product?.maxStock}
+            originalValue={product?.maxStock}
+            onRevert={() => revertField('maxStock')}
+          >
+            <input
+              type="number"
+              name="maxStock"
+              value={formData.maxStock || 0}
+              onChange={handleChange}
+              style={styles.input}
+            />
+          </EditableField>
+        </div>
 
-            </>)}
+        <div style={styles.inputGroup}>
+          <EditableField
+            label="Estoque Atual"
+            showLock={true} // Bloqueado pois depende de movimentação
+            isDirty={formData.currentStock !== product?.currentStock}
+            originalValue={product?.currentStock}
+            onRevert={() => revertField('currentStock')}
+          >
+            <input
+              type="number"
+              name="currentStock"
+              value={formData.currentStock || 0}
+              onChange={handleChange}
+              style={styles.input}
+            />
+          </EditableField>
+          <button 
+             style={{ border: 'none', background: 'none', color: '#2563eb', fontSize: '10px', cursor: 'pointer', padding: 0 }}
+             onClick={() => {/* Abrir Modal de Ajuste/Inventário */}}
+          >
+            ⚙️ Ajustar Inventário
+          </button>
+        </div>
+      </div>
+
+      {/* Informativo de Sugestão de Compra */}
+      {formData.currentStock <= formData.minStock && (
+        <div style={{ 
+            marginTop: '15px', 
+            padding: '10px', 
+            borderRadius: '6px', 
+            backgroundColor: '#fff7ed', 
+            border: '1px solid #ffedd5',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+        }}>
+          <span style={{ fontSize: '20px' }}>🛒</span>
+          <div>
+            <div style={{ color: '#9a3412', fontWeight: 'bold', fontSize: '13px' }}>Sugestão de Reposição</div>
+            <div style={{ color: '#c2410c', fontSize: '12px' }}>
+                Comprar <strong>{(formData.maxStock || 0) - (formData.currentStock || 0)}</strong> {product?.unitOfMeasure || 'un'} para atingir o estoque ideal.
+            </div>
+          </div>
+        </div>
+      )}
+
+      <hr style={{ margin: '20px 0', border: '0', borderTop: '1px solid #e5e7eb' }} />
+
+      <h3 style={styles.sectionTitle}>🚛 Logística e Armazenagem</h3>
+      <div style={styles.grid}>
+        <div style={styles.inputGroup}>
+          <EditableField
+            label="Localização (Endereço)"
+            isDirty={formData.location !== product?.location}
+            originalValue={product?.location}
+            onRevert={() => revertField('location')}
+          >
+            <input
+              type="text"
+              name="location"
+              placeholder="Ex: RUA 02 - A10"
+              value={formData.location || ''}
+              onChange={handleChange}
+              style={styles.input}
+            />
+          </EditableField>
+        </div>
+
+        <div style={styles.inputGroup}>
+          <EditableField
+            label="Peso Bruto (kg)"
+            isDirty={formData.weight !== product?.weight}
+            originalValue={product?.weight}
+            onRevert={() => revertField('weight')}
+          >
+            <input
+              type="number"
+              step="0.001"
+              name="weight"
+              value={formData.weight || 0}
+              onChange={handleChange}
+              style={styles.input}
+            />
+          </EditableField>
+        </div>
+      </div>
+    </div>
+  </>
+)}
+
+{activeTab === 'ecommerce' && (
+  <>
+    <div style={styles.section}>
+      <h3 style={styles.sectionTitle}>🌐 Dados para Venda Online</h3>
+      
+      {/* Dimensões para Cálculo de Frete */}
+      <div style={{ ...styles.grid, gap: '15px' }}>
+        <div style={styles.inputGroup}>
+          <EditableField label="Peso Bruto (kg)">
+            <input type="number" step="0.001" name="weight" value={formData.weight || 0} onChange={handleChange} style={styles.input} />
+          </EditableField>
+          <small style={{ fontSize: '10px', color: '#6b7280' }}>Ex: 0.500 para 500g</small>
+        </div>
+
+        <div style={styles.inputGroup}>
+          <EditableField label="Comprimento (cm)">
+            <input type="number" name="length" value={formData.length || 0} onChange={handleChange} style={styles.input} />
+          </EditableField>
+        </div>
+
+        <div style={styles.inputGroup}>
+          <EditableField label="Altura (cm)">
+            <input type="number" name="height" value={formData.height || 0} onChange={handleChange} style={styles.input} />
+          </EditableField>
+        </div>
+
+        <div style={styles.inputGroup}>
+          <EditableField label="Largura (cm)">
+            <input type="number" name="width" value={formData.width || 0} onChange={handleChange} style={styles.input} />
+          </EditableField>
+        </div>
+      </div>
+
+      <div style={{ marginTop: '20px' }}>
+        <EditableField label="Título para Anúncio (SEO)">
+          <input 
+            type="text" 
+            name="seoTitle" 
+            placeholder="Título otimizado para buscas"
+            value={formData.seoTitle || ''} 
+            onChange={handleChange} 
+            style={styles.input} 
+          />
+        </EditableField>
+      </div>
+
+      <div style={{ marginTop: '15px' }}>
+        <label style={styles.label}>Descrição Detalhada (HTML)</label>
+        <textarea 
+          name="descriptionHtml" 
+          rows={5} 
+          style={{ ...styles.input, resize: 'vertical', fontFamily: 'inherit' }}
+          value={formData.descriptionHtml || ''}
+          onChange={handleChange}
+          placeholder="Conteúdo que aparecerá na página do produto..."
+        />
+      </div>
+
+      {/* Checkbox de Ativação */}
+      <div style={{ marginTop: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <input 
+            type="checkbox" 
+            id="syncEcommerce" 
+            name="syncEcommerce" 
+            checked={formData.syncEcommerce} 
+            onChange={(e) => setFormData({...formData, syncEcommerce: e.target.checked})}
+        />
+        <label htmlFor="syncEcommerce" style={{ fontSize: '14px', fontWeight: '500', color: '#374151' }}>
+            Publicar este produto na Loja Virtual
+        </label>
+      </div>
+    </div>
+  </>
+)}
 
           {activeTab === 'fiscal' && (
-            <>
+  <>
+    <div style={styles.section}>
+      <h3 style={styles.sectionTitle}>📑 Classificação Fiscal (NF-e/XML)</h3>
+      
+      <div style={styles.grid}>
+        {/* NCM - Essencial para qualquer nota */}
+        <div style={styles.inputGroup}>
+          <EditableField 
+            label="NCM (Nomenclatura Comum do Mercosul)"
+            isDirty={formData.ncm !== product?.ncm}
+            originalValue={product?.ncm}
+            onRevert={() => revertField('ncm')}
+          >
+            <input
+              type="text"
+              name="ncm"
+              maxLength={8}
+              placeholder="Ex: 61091000"
+              value={formData.ncm || ''}
+              onChange={handleChange}
+              style={styles.input}
+            />
+          </EditableField>
+          <small style={{ fontSize: '10px', color: '#6b7280' }}>8 dígitos - Define a alíquota do IPI/II</small>
+        </div>
 
-              <div style={styles.section}>
-                <h3 style={styles.sectionTitle}>📑 Fiscal (NFE/XML)</h3>
-                <div style={styles.grid}>
-                  <div style={styles.inputGroup}>
-                    <label style={styles.label}>NCM</label>
+        {/* CEST - Necessário se houver Substituição Tributária (ST) */}
+        <div style={styles.inputGroup}>
+          <EditableField 
+            label="CEST (Cód. Esp. Subst. Tributária)"
+            isDirty={formData.cest !== product?.cest}
+            originalValue={product?.cest}
+            onRevert={() => revertField('cest')}
+          >
+            <input
+              type="text"
+              name="cest"
+              maxLength={7}
+              placeholder="Ex: 2803800"
+              value={formData.cest || ''}
+              onChange={handleChange}
+              style={styles.input}
+            />
+          </EditableField>
+          <small style={{ fontSize: '10px', color: '#6b7280' }}>7 dígitos - Obrigatório para produtos com ST</small>
+        </div>
+      </div>
 
-                  </div>
-                </div>
-              </div>
+      <div style={{ ...styles.grid, marginTop: '15px' }}>
+        {/* Origem da Mercadoria - Campo 0 a 8 da NF-e */}
+        <div style={styles.inputGroup}>
+          <EditableField 
+            label="Origem da Mercadoria"
+            isDirty={formData.origem !== product?.origem}
+            originalValue={product?.origem}
+            onRevert={() => revertField('origem')}
+          >
+            <select name="origem" value={formData.origem || '0'} onChange={handleChange} style={styles.input}>
+              <option value="0">0 - Nacional</option>
+              <option value="1">1 - Estrangeira (Importação Direta)</option>
+              <option value="2">2 - Estrangeira (Adquirida no Mercado Interno)</option>
+              <option value="3">3 - Nacional (Conteúdo Importado - 40%)</option>
+              <option value="4">4 - Nacional (Processos Básicos)</option>
+              <option value="5">5 - Nacional (Conteúdo Importado  40%)</option>
+            </select>
+          </EditableField>
+        </div>
 
-            </>)}
+        {/* CFOP Padrão (Sugestão de saída) */}
+        <div style={styles.inputGroup}>
+          <label style={styles.label}>CFOP Padrão de Saída</label>
+          <input
+            type="text"
+            name="cfop_padrao"
+            placeholder="Ex: 5102"
+            value={formData.cfop_padrao || ''}
+            onChange={handleChange}
+            style={styles.input}
+          />
+        </div>
+      </div>
+
+      {/* Alerta de Auditoria Fiscal */}
+      <div style={{ 
+          marginTop: '20px', 
+          padding: '12px', 
+          backgroundColor: '#eff6ff', 
+          borderRadius: '6px', 
+          borderLeft: '4px solid #3b82f6',
+          fontSize: '12px',
+          color: '#1e40af'
+      }}>
+        <strong>💡 Dica Fiscal:</strong> O NCM informado reflete diretamente no cálculo do <strong>IPI</strong> e <strong>ICMS</strong>. Verifique se o código possui 8 dígitos para evitar rejeição no momento da emissão da Nota Fiscal.
+      </div>
+    </div>
+  </>
+)}
 
 
-          {activeTab === 'fornecedor' && (
-            <>
+         {activeTab === 'fornecedor' && (
+  <>
+    <div style={styles.section}>
+      <h3 style={styles.sectionTitle}>🏭 Relacionamento com Fornecedor</h3>
+      
+      <div style={styles.grid}>
+        {/* Seleção do Fornecedor Principal */}
+        <div style={styles.inputGroup}>
+          <EditableField
+            label="Fornecedor Principal"
+            isDirty={formData.id_fornecedor !== product?.id_fornecedor}
+            originalValue={product?.nome_fantasia}
+            onRevert={() => revertField('id_fornecedor')}
+          >
+            <select 
+              name="id_fornecedor" 
+              value={formData.id_fornecedor || ''} 
+              onChange={handleChange} 
+              style={styles.input}
+            >
+              <option value="">Selecione um fornecedor...</option>
+              {/* Aqui você deve mapear o array de fornecedores vindo do seu banco */}
+              {/* {listFornecedores.map(f => (
+                <option key={f.id} value={f.id}>{f.nome_fantasia}</option>
+              ))} */}
+            </select>
+          </EditableField>
+        </div>
 
-              <div style={styles.section}>
-                <h3 style={styles.sectionTitle}>🏭 Fornecedor</h3>
-                <div style={styles.grid}>
-                  <div style={styles.inputGroup}>
-                    <label style={styles.label}>Fornecedor</label>
-                    <EditableField
-                      label="Fornecedor"
-                      isDirty={formData.suppliers !== product?.suppliers}
-                      originalValue={product?.suppliers}
-                      onRevert={() => revertField('suppliers')}
-                    >
-                      <select name="suppliers" value={formData.suppliers || ''} onChange={handleChange} style={styles.input}>
-                        <option value="">Selecione...</option>
-                        <option value={formData.suppliers || ''}>{formData.suppliers || 'Selecione...'}</option>
-                      </select>
-                    </EditableField>
+        {/* Código do Produto no Fornecedor (SKU do Fornecedor) */}
+        <div style={styles.inputGroup}>
+          <EditableField
+            label="SKU no Fornecedor"
+            isDirty={formData.supplierProductCode !== product?.supplierProductCode}
+            originalValue={product?.supplierProductCode}
+            onRevert={() => revertField('supplierProductCode')}
+          >
+            <input
+              type="text"
+              name="supplierProductCode"
+              placeholder="Ex: REF-1234"
+              value={formData.supplierProductCode || ''}
+              onChange={handleChange}
+              style={styles.input}
+            />
+          </EditableField>
+          <small style={{ fontSize: '10px', color: '#6b7280' }}>Útil para conferência de XML de compra</small>
+        </div>
+      </div>
 
-                    <EditableField
-                      label="Código do Fornecedor"
-                      isDirty={formData.supplierCode !== product?.supplierCode}
-                      originalValue={product?.supplierCode}
-                      onRevert={() => revertField('supplierCode')}
-                    >
-                      <input
-                        type="text"
-                        name="supplierCode"
-                        value={formData.supplierCode || ''}
-                        onChange={handleChange}
-                        style={styles.input}
-                      />
-                    </EditableField>
+      <div style={{ ...styles.grid, marginTop: '15px' }}>
+        {/* Fator de Conversão */}
+        <div style={styles.inputGroup}>
+          <EditableField
+            label="Fator de Conversão"
+            isDirty={formData.conversionFactor !== product?.conversionFactor}
+            originalValue={product?.conversionFactor}
+            onRevert={() => revertField('conversionFactor')}
+          >
+            <input
+              type="number"
+              name="conversionFactor"
+              placeholder="Ex: 12 (se comprar caixa c/ 12)"
+              value={formData.conversionFactor || 1}
+              onChange={handleChange}
+              style={styles.input}
+            />
+          </EditableField>
+          <small style={{ fontSize: '10px', color: '#6b7280' }}>Qtde por embalagem de compra</small>
+        </div>
 
-                    <label style={styles.label}>Código do Produto no Fornecedor</label>
-                    <EditableField
-                      label="Código do Produto no Fornecedor"
-                      showLock={true}
-                      isDirty={formData.supplierProductCode !== product?.supplierProductCode}
-                      originalValue={product?.supplierProductCode}
-                      onRevert={() => revertField('supplierProductCode')}
-                    >
-                      <input
-                        type="text"
-                        name="supplierProductCode"
-                        value={formData.supplierProductCode || ''}
-                        onChange={handleChange}
-                        style={styles.input}
-                      />
-                    </EditableField>
-                  </div>
-                </div>
-              </div>
+        {/* Prazo de Entrega Estimado */}
+        <div style={styles.inputGroup}>
+          <EditableField
+            label="Lead Time (Dias)"
+            isDirty={formData.leadTime !== product?.leadTime}
+            originalValue={product?.leadTime}
+            onRevert={() => revertField('leadTime')}
+          >
+            <input
+              type="number"
+              name="leadTime"
+              value={formData.leadTime || 0}
+              onChange={handleChange}
+              style={styles.input}
+            />
+          </EditableField>
+          <small style={{ fontSize: '10px', color: '#6b7280' }}>Dias para o produto chegar após o pedido</small>
+        </div>
+      </div>
 
-            </>)}
+      {/* Histórico de Compras (Informativo) */}
+      <div style={{ 
+          marginTop: '20px', 
+          padding: '12px', 
+          backgroundColor: '#f8fafc', 
+          borderRadius: '8px',
+          border: '1px solid #e2e8f0'
+      }}>
+        <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#475569' }}>📊 Última Negociação</h4>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+          <span><strong>Data:</strong> {product?.data_ultima_compra || 'Nenhuma compra'}</span>
+          <span><strong>Preço NF:</strong> R$ {product?.ultimo_custo || '0,00'}</span>
+          <span><strong>Qtd Comprada:</strong> {product?.ultima_qtd_comprada || 0}</span>
+        </div>
+      </div>
+    </div>
+  </>
+)}
         </div>
 
         <div style={styles.footer}>

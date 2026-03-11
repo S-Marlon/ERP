@@ -30,6 +30,15 @@ export interface Product {
     // Adicionei estas como opcionais caso você ainda use o cálculo de margem
     costPrice?: number; 
     markup?: number;
+    // e-commerce/logistics
+    pictureUrl?: string;
+    weight?: number;
+    length?: number;
+    height?: number;
+    width?: number;
+    seoTitle?: string;
+    descriptionHtml?: string;
+    syncEcommerce?: boolean;
 }
 
 

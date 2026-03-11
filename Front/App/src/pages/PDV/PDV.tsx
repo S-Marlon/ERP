@@ -421,14 +421,19 @@ export const PDV: React.FC = () => {
             </select>
             <table className={styles.partsTable}>
               <thead>
-                <tr>
-                  <th>Codigo ID</th>
-                  <th >Produto</th>
-                  {activeTab === 'parts' ? <><th>Status</th><th>Estoque</th></> : <th>Categoria</th>}
-                  <th>Preço</th>
-                  <th style={{ textAlign: 'center' }}>Ações</th>
-                </tr>
-              </thead>
+    <tr>
+      <th>SKU / Marca</th>
+      <th>Produto / Aplicação</th>
+      {activeTab === 'parts' && (
+        <>
+          <th style={{ textAlign: 'center' }}>Disponível</th>
+          <th>Localização</th> {/* Onde buscar o item? */}
+        </>
+      )}
+      <th>Preço (Un)</th>
+      <th style={{ textAlign: 'center' }}>Ações</th>
+    </tr>
+</thead>
               <tbody>
                 {filteredData.map(item => (
                   <tr key={item.id}>

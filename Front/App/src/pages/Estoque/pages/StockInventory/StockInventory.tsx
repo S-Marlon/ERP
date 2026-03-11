@@ -61,28 +61,28 @@ const StockInventory: React.FC = () => {
     });
 
     // 2. Efeito de Busca na API com Debounce
-   useEffect(() => {
-    const fetchProductsData = async () => {
-        setIsLoading(true);
-        setError(null);
-        try {
-            // Enviamos o searchTerm exatamente como está (mesmo vazio "")
-            const data = await getProducts(searchTerm);
-            setProducts(Array.isArray(data) ? data : []);
-        } catch (err: any) {
-            console.error("Erro ao buscar produtos:", err);
-            setError("Erro ao carregar lista de produtos.");
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    useEffect(() => {
+        const fetchProductsData = async () => {
+            setIsLoading(true);
+            setError(null);
+            try {
+                // Enviamos o searchTerm exatamente como está (mesmo vazio "")
+                const data = await getProducts(searchTerm);
+                setProducts(Array.isArray(data) ? data : []);
+            } catch (err: any) {
+                console.error("Erro ao buscar produtos:", err);
+                setError("Erro ao carregar lista de produtos.");
+            } finally {
+                setIsLoading(false);
+            }
+        };
 
-    const delayDebounceFn = setTimeout(() => {
-        fetchProductsData();
-    }, 300);
+        const delayDebounceFn = setTimeout(() => {
+            fetchProductsData();
+        }, 300);
 
-    return () => clearTimeout(delayDebounceFn);
-}, [searchTerm]); // searchTerm vazio agora dispara a busca normalmente
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchTerm]); // searchTerm vazio agora dispara a busca normalmente
 
     const handleFilterChange = (
         key: keyof FilterState,
@@ -116,8 +116,16 @@ const StockInventory: React.FC = () => {
     };
 
     // NOVA FUNÇÃO: Seleciona o produto e atualiza o estado
-    const handleSelectProduct = (product: Product) => {
-        setSelectedProduct(product);
+    const handleSelectProduct = async (product: Product) => {
+        // ao clicar num produto, buscamos o registro completo (inclui estoque atual atualizado)
+        try {
+            const detailed = await getProductById(product.id);
+            setSelectedProduct(detailed);
+        } catch (err: any) {
+            console.error('Falha ao carregar produto detalhado:', err);
+            // fallback para o objeto simples caso a chamada falhe
+            setSelectedProduct(product);
+        }
     };
 
     // Função de edição anterior (modificada para apenas um alert, pois a linha agora seleciona)
@@ -143,139 +151,194 @@ const StockInventory: React.FC = () => {
                 </button>
             </div>
 
-            <div style={styles.searchFilterArea}>
-                <input
-                    type="text"
-                    placeholder="Buscar por nome ou SKU na API..."
-                    style={styles.searchInput}
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                />
-                <select
-                    style={styles.filterSelect}
-                    value={filterCategory}
-                    onChange={(e) => setFilterCategory(e.target.value)}
-                >
-                    <option value="Todos">Todas as Categorias</option>
-                    {categories.map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                </select>
-                <ProductFilter filters={filters} onFilterChange={handleFilterChange} onApply={() => console.log("Aplicar filtros avançados")} onReset={() => console.log("Resetar filtros avançados")} />
-                {isLoading && <span style={{ fontSize: '0.8rem', color: '#666' }}>Carregando...</span>}
-            </div>
+
 
             {error && <div style={{ color: 'red', marginBottom: '10px' }}>{error}</div>}
 
             <div style={styles.contentArea}>
                 <div style={styles.tableColumn}>
+                    <div style={styles.searchFilterArea}>
+                        <input
+                            type="text"
+                            placeholder="Buscar por nome ou SKU na API..."
+                            style={styles.searchInput}
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                        <select
+                            style={styles.filterSelect}
+                            value={filterCategory}
+                            onChange={(e) => setFilterCategory(e.target.value)}
+                        >
+                            <option value="Todos">Todas as Categorias</option>
+                            {categories.map(cat => (
+                                <option key={cat} value={cat}>{cat}</option>
+                            ))}
+                        </select>
+                        <ProductFilter filters={filters} onFilterChange={handleFilterChange} onApply={() => console.log("Aplicar filtros avançados")} onReset={() => console.log("Resetar filtros avançados")} />
+                        {isLoading && <span style={{ fontSize: '0.8rem', color: '#666' }}>Carregando...</span>}
+                    </div>
                     <TableHeader productCount={filteredProducts.length} />
                     <div style={styles.inventoryPanel}>
                         <div style={styles.tableResponsive}>
                             <table style={styles.dataTable}>
-                                <thead>
-                                    <tr style={styles.tableHead}>
-                                        <th style={styles.tableTh}>#</th>
-                                        <th style={styles.tableTh}>Cód. Interno</th>
-                                        <th style={styles.tableTh}>Nome & Categoria</th>
-                                        <th style={styles.tableTh}>Unidade</th>
-                                        <th style={styles.tableTh}>Estoque</th>
-                                        <th style={styles.tableTh}>Preço</th>
-                                        <th style={styles.tableTh}>Fornecedor</th>
-                                        <th style={styles.tableTh}>Status</th>
-                                    </tr>
-                                </thead>
+                                <thead style={styles.tableHead}>
+    <tr style={styles.tableHead}>
+        <th style={styles.tableTh}>ID</th>
+        <th style={styles.tableTh}>Código / GTIN</th>
+        <th style={styles.tableTh}>Produto & Marca & Categoria </th>
+        <th style={styles.tableTh}>Estoque (UdM)</th>
+        <th style={styles.tableTh}>Custo Médio</th>
+        <th style={styles.tableTh}>Venda (Markup)</th>
+        <th style={styles.tableTh}>Últ. Fornecedor</th>
+        <th style={styles.tableTh}>Status</th>
+    </tr>
+</thead>
                                 <tbody>
+    {filteredProducts.length > 0 ? (
+        filteredProducts.map((product, index) => {
+            // Lógica para cor do estoque
+            const isStockLow = product.currentStock <= product.minStock;
+            
+            return (
+                <tr
+                    key={product.id}
+                    style={{
+                        ...styles.tableRow,
+                        backgroundColor: selectedProduct?.id === product.id ? '#f3f4f6' : 'white',
+                        cursor: 'pointer'
+                    }}
+                    onClick={() => handleSelectProduct(product)}
+                >
+                    {/* # - Numeração formatada */}
+                    <td style={styles.tableTd}>{(index + 1).toString().padStart(2, '0')}</td>
 
-                                    {filteredProducts.length > 0 ? (
-                                        filteredProducts.map((product, index) => (
-                                            <tr
-                                                key={product.id}
-                                                style={{
-                                                    ...styles.tableRow,
-                                                    backgroundColor: selectedProduct?.id === product.id ? '#f3f4f6' : 'white',
-                                                    cursor: 'pointer'
-                                                }}
-                                                onClick={() => handleSelectProduct(product)}
-                                            >
-                                                {/* Numeração formatada */}
-                                                <td style={styles.tableTd}>{(index + 1).toString().padStart(2, '0')}</td>
+                    {/* Cód. Interno */}
+                    <td style={styles.tableTd}>
+                        <span style={{ fontWeight: 500, color: '#4b5563' }}>{product.sku}</span>
+                        {product.barcode && (
+                            <div style={{ fontSize: '0.65rem', color: '#9ca3af' }}>{product.barcode}</div>
+                        )}
+                    </td>
 
-                                                {/* SKU (Código Interno) */}
-                                                <td style={styles.tableTd}>
-                                                    <span style={{ fontWeight: 500, color: '#4b5563' }}>{product.sku}</span>
-                                                </td>
+                    {/* Nome & Categoria */}
+                    <td style={styles.tableTd}>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span style={{ fontWeight: 500 }}>{product.name}</span>
+                            <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+                                <small style={{ color: '#9ca3af', fontSize: '0.7rem' }}>{product.category || 'Sem Categoria'}</small>
+                                {product.brand && (
+                                    <small style={{ color: '#6366f1', fontSize: '0.7rem', fontWeight: 'bold' }}>• {product.brand}</small>
+                                )}
+                            </div>
+                        </div>
+                    </td>
 
-                                                {/* Nome e Categoria */}
-                                                <td style={styles.tableTd}>
-                                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                        <span>{product.name}</span>
-                                                        <small style={{ color: '#9ca3af', fontSize: '0.7rem' }}>{product.category}</small>
-                                                    </div>
-                                                </td>
+                    {/* Unidade */}
+                    <td style={styles.tableTd}>
+                        
+                        {product.unitOfMeasure || 'UN'}
 
-                                               
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ 
+                                fontWeight: 'bold', 
+                                color: isStockLow ? '#ef4444' : '#10b981' 
+                            }}>
+                                {Number(product.currentStock).toLocaleString('pt-BR')}
+                            </span>
+                            {isStockLow && (
+                                <span title={`Estoque crítico! Mínimo: ${product.minStock}`} style={{ cursor: 'help' }}>⚠️</span>
+                            )}
+                        </div>
+                    </td>
 
+                   
 
-                                                <td style={styles.tableTd}>
-                                                    {product.unitOfMeasure || 'UN'}
-                                                </td>
-
-                                                {/* Estoque com Alerta Visual */}
-                                                <td style={{
-                                                    ...styles.tableTd,
-                                                    ...getStockStatusStyle(product.currentStock, product.minStock)
-                                                }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                        {product.currentStock}
-                                                        {product.currentStock <= product.minStock && <span>⚠️</span>}
-                                                    </div>
-                                                </td>
-
-                                                {/* Preço de Venda */}
-                                                <td style={styles.tableTd}>R$ {formatCurrency(product.salePrice)}</td>
-
-
-
-                                                 <td style={styles.tableTd}>
+                    {/* Coluna de Custo Médio */}
+<td style={styles.tableTd}>
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            {product.suppliers && (
-                <span style={{ 
-                    backgroundColor: '#eff6ff', 
-                    color: '#1d4ed8', 
-                    padding: '0 4px', 
-                    borderRadius: '4px',
-                    border: '1px solid #bfdbfe'
-                }}>
-                    {product.suppliers.split(',')[0]} {product.suppliers.split(',').length > 1 ? `+${product.suppliers.split(',').length - 1}` : ''}
-                </span>
-            )}
-        </div>
+        <span style={{ color: '#6b7280' }}>
+            R$ {formatCurrency(product.costPrice || 0)}
+        </span>
+        <small style={{ fontSize: '0.6rem', color: '#9ca3af' }}>Custo Médio</small>
     </div>
 </td>
 
+{/* Coluna de Preço de Venda (Já ajustada para mostrar a margem real) */}
+<td style={styles.tableTd}>
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <span style={{ fontWeight: 600, color: '#111827' }}>
+            R$ {formatCurrency(product.salePrice)}
+        </span>
+        <small style={{ 
+            color: '#059669', 
+            fontSize: '0.65rem', 
+            fontWeight: 'bold' 
+        }}>
+            {/* Cálculo de Margem Simples: (Venda - Custo) / Venda */}
+            Margem: {product.costPrice > 0 
+                ? (((product.salePrice - product.costPrice) / product.salePrice) * 100).toFixed(0) 
+                : 0}%
 
+            
+        </small>
+    </div>
+</td>   
 
-                                                {/* Status */}
-                                                <td style={styles.tableTd}>
-                                                    <span style={product.status === 'Ativo' ? styles.statusActive : styles.statusInactive}>
-                                                        {product.status}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan={6} style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
-                                                {isLoading ? "Carregando produtos..." : "Nenhum produto encontrado."}
-                                            </td>
-                                        </tr>
+                  
+
+                    
+
+                    {/* Fornecedores */}
+                    <td style={styles.tableTd}>
+                        {product.suppliers ? (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                <span style={{
+                                    backgroundColor: '#eff6ff',
+                                    color: '#1d4ed8',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    border: '1px solid #bfdbfe',
+                                    fontSize: '0.75rem',
+                                    whiteSpace: 'nowrap'
+                                }}>
+                                    {product.suppliers.split(',')[0]}
+                                    {product.suppliers.split(',').length > 1 && (
+                                        <span style={{ fontWeight: 'bold', marginLeft: '4px' }}>
+                                            +{product.suppliers.split(',').length - 1}
+                                        </span>
                                     )}
-                                </tbody>
+                                </span>
+                            </div>
+                        ) : (
+                            <span style={{ color: '#d1d5db', fontSize: '0.75rem' }}>-</span>
+                        )}
+                    </td>
+
+                    {/* Status */}
+                    <td style={styles.tableTd}>
+                        <span style={{
+                            ...(product.status === 'Ativo' ? styles.statusActive : styles.statusInactive),
+                            fontSize: '0.7rem',
+                            padding: '2px 8px'
+                        }}>
+                            {product.status}
+                        </span>
+                    </td>
+                </tr>
+            );
+        })
+    ) : (
+        <tr>
+            <td colSpan={8} style={{ textAlign: 'center', padding: '3rem', color: '#9ca3af' }}>
+                {isLoading ? "Buscando dados no servidor..." : "Nenhum produto cadastrado com este critério."}
+            </td>
+        </tr>
+    )}
+</tbody>
                             </table>
 
-                          
+
                         </div>
                     </div>
                 </div>
@@ -359,10 +422,14 @@ const styles: { [key: string]: React.CSSProperties } = {
 
     // NOVOS ESTILOS PARA LAYOUT LADO A LADO
     contentArea: {
-        display: 'flex',
-        gap: '24px',
-        alignItems: 'flex-start',
-    },
+    display: 'grid',
+    // O segredo está no minmax(0, ...) para ambas as colunas
+    gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)',
+    gap: '20px',
+    alignItems: 'flex-start',
+    width: '100%',
+    overflow: 'hidden', // Evita que o grid vaze para fora do container principal
+},
     tableColumn: {
         flex: 3, // Tabela ocupa 3/4 do espaço
         minWidth: 0,

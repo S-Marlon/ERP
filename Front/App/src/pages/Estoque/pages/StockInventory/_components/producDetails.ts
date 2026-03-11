@@ -74,13 +74,14 @@ export const styles: { [key: string]: React.CSSProperties } = {
   // },
   toggleRow: {
     display: 'flex',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: '12px',    // Espaço consistente entre os itens
+    width: '100%',  // Faz a linha ocupar toda a largura
+    justifyContent: 'space-between', // Opcional: empurra o badge para o final da linha
     padding: '10px',
     backgroundColor: '#f9fafb',
     borderRadius: '8px',
-    gap: '20px'
-  },
+},
   switch: {
     width: '40px',
     height: '20px',
