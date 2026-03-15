@@ -13,6 +13,7 @@ import TableHeader from "./_components/TableHeader";
 import ProductFilter from "../../../../components/forms/search/ProductFilter";
 import ProductDetails from "./_components/ProductDetails";
 import NovoProdutoForm from "./_components/NovoProdutoForm";
+import ImageDisplay from "../../../../components/ui/ImageGallery/ImageDysplay";
 // import ProductHeader from "../Components/ProductHeader"; // Não usado
 
 
@@ -186,6 +187,7 @@ const StockInventory: React.FC = () => {
     <tr style={styles.tableHead}>
         <th style={styles.tableTh}>ID</th>
         <th style={styles.tableTh}>Código / GTIN</th>
+        <th style={styles.tableTh}>Imagem</th>
         <th style={styles.tableTh}>Produto & Marca & Categoria </th>
         <th style={styles.tableTh}>Estoque (UdM)</th>
         <th style={styles.tableTh}>Custo Médio</th>
@@ -221,6 +223,16 @@ const StockInventory: React.FC = () => {
                         )}
                     </td>
 
+                    {/* Imagem */}
+                    <td style={styles.tableTd}>
+                        
+                            <ImageDisplay src={product.pictureUrl}  size="60px"
+                            rounded="50%" />
+                        
+                    </td>
+
+
+
                     {/* Nome & Categoria */}
                     <td style={styles.tableTd}>
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -237,9 +249,8 @@ const StockInventory: React.FC = () => {
                     {/* Unidade */}
                     <td style={styles.tableTd}>
                         
-                        {product.unitOfMeasure || 'UN'}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'space-between' }}>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span style={{ 
                                 fontWeight: 'bold', 
                                 color: isStockLow ? '#ef4444' : '#10b981' 
@@ -249,6 +260,7 @@ const StockInventory: React.FC = () => {
                             {isStockLow && (
                                 <span title={`Estoque crítico! Mínimo: ${product.minStock}`} style={{ cursor: 'help' }}>⚠️</span>
                             )}
+                            ({product.unitOfMeasure || 'UN'})
                         </div>
                     </td>
 
@@ -260,7 +272,7 @@ const StockInventory: React.FC = () => {
         <span style={{ color: '#6b7280' }}>
             R$ {formatCurrency(product.costPrice || 0)}
         </span>
-        <small style={{ fontSize: '0.6rem', color: '#9ca3af' }}>Custo Médio</small>
+        {/* <small style={{ fontSize: '0.6rem', color: '#9ca3af' }}>Custo Médio</small> */}
     </div>
 </td>
 

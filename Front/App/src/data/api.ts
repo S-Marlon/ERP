@@ -1,26 +1,43 @@
 const API_BASE_URL = 'http://localhost:3001/api';
 
 export interface Product {
-  id: string;
-  sku: string;
-  name: string;
-  category: string;
-  unitOfMeasure: string;
-  salePrice: number;
-  minStock: number;
-  currentStock: number;
-  status: string;
-  suppliers?: string;
-  // ecommerce/logistics (optional for PDV, etc.)
-  pictureUrl?: string;
-  weight?: number;
-  length?: number;
-  height?: number;
-  width?: number;
-  seoTitle?: string;
-  descriptionHtml?: string;
-  syncEcommerce?: boolean;
+ 
+   id: number;
+    name: string;
+    sku: string;
+    barcode?: string;
+    pictureUrl?: string;
+    category: string;
+    brand?: string;
+    unitOfMeasure: string;
+    costPrice?: number;
+    salePrice: number;
+    priceMethod?: 'MARKUP' | 'MANUAL';
+    markup?: number;
+    minStock: number;
+    currentStock: number;
+    status: 'Ativo' | 'Inativo' | 'Baixo Estoque';
+    ncm?: string;
+    cest?: string;
+    suppliers?: string;
+    supplierCode?: string;
+    supplierProductCode?: string;
+
+    // extras usados pela UI
+    maxStock?: number;
+    cfop_padrao?: string;
+    percentual_margem_sugerida?: number;
+
+    // ecommerce/logistics
+    weight?: number;
+    length?: number;
+    height?: number;
+    width?: number;
+    seoTitle?: string;
+    descriptionHtml?: string;
+    syncEcommerce?: boolean;
 }
+
 
 export const searchProducts = async (query: string): Promise<Product[]> => {
   console.log('Buscando produtos para query:', query);

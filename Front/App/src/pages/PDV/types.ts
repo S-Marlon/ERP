@@ -1,22 +1,25 @@
 // Representa um item na venda - unificado para parts, services e combos
-export interface CartItem {
-  id: string;
-  sku?: string;
-  name: string;
-  brand?: string;
-  price: number;
+export interface CartItem extends SaleItem {
   quantity: number;
-  type: 'part' | 'service';
-  stock?: number;           // apenas partes
-  category?: string;
-  status?: string;
-  location?: string;        // apenas partes
-  compatibility?: string;   // apenas partes
-  oemCode?: string;         // apenas partes
 }
 
 // Item original da lista (antes de entrar no carrinho)
-export type SaleItem = CartItem & { quantity?: never };
+export interface SaleItem {
+  id: string | number;
+  name: string;
+  category: string;
+  price: number;
+  type: 'part' | 'service';
+  stock?: number;
+  sku?: string;
+  unitOfMeasure?: string;
+  status?: string;
+  brand?: string;
+  oemCode?: string;
+  compatibility?: string;
+  location?: string;
+  pictureUrl?: string;
+}
 
 export interface AutoPart extends SaleItem {
   type: 'part';
@@ -47,4 +50,43 @@ export interface Venda {
   ultimaAlteracao: string;
   status: StatusVenda;
   editadoPor?: string;
+}
+
+
+export interface Product {
+ 
+   id: number;
+    name: string;
+    sku: string;
+    barcode?: string;
+    pictureUrl?: string;
+    category: string;
+    brand?: string;
+    unitOfMeasure: string;
+    costPrice?: number;
+    salePrice: number;
+    priceMethod?: 'MARKUP' | 'MANUAL';
+    markup?: number;
+    minStock: number;
+    currentStock: number;
+    status: 'Ativo' | 'Inativo' | 'Baixo Estoque';
+    ncm?: string;
+    cest?: string;
+    suppliers?: string;
+    supplierCode?: string;
+    supplierProductCode?: string;
+
+    // extras usados pela UI
+    maxStock?: number;
+    cfop_padrao?: string;
+    percentual_margem_sugerida?: number;
+
+    // ecommerce/logistics
+    weight?: number;
+    length?: number;
+    height?: number;
+    width?: number;
+    seoTitle?: string;
+    descriptionHtml?: string;
+    syncEcommerce?: boolean;
 }

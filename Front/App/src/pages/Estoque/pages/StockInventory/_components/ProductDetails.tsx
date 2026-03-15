@@ -315,6 +315,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onSave, onClos
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '100%', overflow: 'hidden' }}>
 
                 <EcommerceGallery
+                
                   images={imageList}
                   onValidationError={(hasError: boolean) => setUrlError(hasError)}
                 />

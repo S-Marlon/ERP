@@ -1,13 +1,18 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import styles from './PDV.module.css';
-import { AutoPart, SaleItem, CartItem } from './types';
-import { searchProducts, Product } from '../../data/api';
+import { SaleItem, CartItem } from './types';
+import { Product } from '../Estoque/pages/StockInventory/types/Stock_Products';
+import { getProducts } from '../Estoque/pages/StockInventory/service/productService';
 import { CartAside } from './pages/Cart/CartAside';
 import Button from '../../components/ui/Button/Button';
 import ProductFilter from '../../components/forms/search/ProductFilter';
 import { FinalizarVenda } from './pages/FinalizarVenda';
 import Switch from '../../components/ui/Switch';
+import EcommerceGallery from '../../components/ui/ImageGallery/EcommerceGallery';
+import ImageDisplay from '../../components/ui/ImageGallery/ImageDysplay';
+import Badge from '../../components/ui/Badge/Badge';
+
 
 type PDVStep = 'SELECAO' | 'PAGAMENTO';
 
@@ -54,7 +59,7 @@ export const PDV: React.FC = () => {
 
   // UI state
   const [activeTab, setActiveTab] = useState<'parts' | 'services' | 'os'>('parts');
-  const [selectedPart, setSelectedPart] = useState<AutoPart | null>(null);
+  const [selectedPart, setSelectedPart] = useState<SaleItem | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   // Product data
@@ -68,7 +73,7 @@ export const PDV: React.FC = () => {
     gauge: '',
     layers: '',
     finalLength: '',
-    laborType: 'fixed' as 'fixed' | 'percent' | 'service',
+    laborType: 'fixed' as 'fixed' | 'percent' | 'service' | 'per_point' | 'table',
     laborValue: 0,
     selectedServiceId: ''
   });
@@ -145,7 +150,7 @@ export const PDV: React.FC = () => {
     setCart(prev => prev.filter(item => item.id !== id));
   };
 
-  const handleFilterChange = (key: keyof FilterState, value: string | number | boolean) => {
+  const handleFilterChange = (_key: keyof FilterState, _value: string | number | undefined) => {
     // Filters kept for continuity with ProductFilter component
   };
 
@@ -157,7 +162,7 @@ export const PDV: React.FC = () => {
     if (activeTab === 'parts') {
       console.log('Buscando produtos...');
       setLoadingProducts(true);
-      searchProducts(searchTerm).then((data) => {
+      getProducts(searchTerm).then((data) => {
         console.log('Produtos recebidos:', data);
         setProducts(data);
         setLoadingProducts(false);
@@ -172,23 +177,27 @@ export const PDV: React.FC = () => {
     }
   }, [searchTerm, activeTab]);
 
-  const filteredData = useMemo(() => {
+  const filteredData: SaleItem[] = useMemo(() => {
     if (activeTab === 'os') return [];
     if (activeTab === 'parts') {
       return products.map(p => ({
         id: p.id,
         name: p.name,
         price: p.salePrice,
-        brand: '',
+        brand: p.brand || '',
         category: p.category,
         type: 'part' as const,
         stock: p.currentStock,
         sku: p.sku,
         unitOfMeasure: p.unitOfMeasure,
         status: p.status,
-      })) as CartItem[];
+        oemCode: p.supplierCode || '',
+        compatibility: '',
+        location: '',
+        pictureUrl: p.pictureUrl,
+      })) as SaleItem[];
     }
-    return MOCK_SERVICES.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase())) as CartItem[];
+    return MOCK_SERVICES.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase())) as SaleItem[];
   }, [searchTerm, activeTab, products]);
 
   const addToCart = useCallback((item: SaleItem) => {
@@ -245,7 +254,7 @@ export const PDV: React.FC = () => {
           <button className={`${styles.tabButton} ${activeTab === 'services' ? styles.tabButtonActive : ''}`} onClick={() => setActiveTab('services')}>🛠️ Serviços</button>
           <button className={`${styles.tabButton} ${activeTab === 'os' ? styles.tabButtonActive : ''}`} onClick={() => setActiveTab('os')}>📋 Gerar OS</button>
         </nav>
-        <ProductFilter filters={'obj'} onFilterChange={handleFilterChange} onApply={() => console.log("Aplicar filtros avançados")} onReset={() => console.log("Resetar filtros avançados")} />
+        <ProductFilter filters={{} as FilterState} onFilterChange={handleFilterChange} onApply={() => console.log("Aplicar filtros avançados")} onReset={() => console.log("Resetar filtros avançados")} />
         <header className={styles.topHeader}>
           <div className={styles.searchContainer}>
             {/* <button className={styles.btnFilterToggle} onClick={() => setIsFilterOpen(!isFilterOpen)}>
@@ -421,42 +430,73 @@ export const PDV: React.FC = () => {
             </select>
             <table className={styles.partsTable}>
               <thead>
-    <tr>
-      <th>SKU / Marca</th>
-      <th>Produto / Aplicação</th>
-      {activeTab === 'parts' && (
-        <>
-          <th style={{ textAlign: 'center' }}>Disponível</th>
-          <th>Localização</th> {/* Onde buscar o item? */}
-        </>
-      )}
-      <th>Preço (Un)</th>
-      <th style={{ textAlign: 'center' }}>Ações</th>
-    </tr>
-</thead>
+                <tr>
+                  <th>SKU / Marca</th>
+                   {activeTab === 'parts' && (
+                    <>
+                      <th style={{ textAlign: 'center' }}>Status</th>
+                     
+
+
+                    </>
+                  )}
+                  <th>Fotos</th>
+                  <th>Produto / Aplicação</th>
+                  {activeTab === 'parts' && (
+                    <>
+                      <th style={{ textAlign: 'center' }}>Estoque (UOM)</th>
+                      <th>Localização</th> {/* Onde buscar o item? */}
+
+
+                    </>
+                  )}
+                  <th>Preço</th>
+                  <th style={{ textAlign: 'center' }}>Ações</th>
+                </tr>
+              </thead>
               <tbody>
                 {filteredData.map(item => (
                   <tr key={item.id}>
-                    <td>{item.sku || '-'}</td>
-                    <td>
-                      <div className={styles.partPrimary}>
-                        <strong>{item.name}</strong>
-                        {'sku' in item && <code>{item.category}</code>}
-                      </div>
-                    </td>
-                    {activeTab === 'parts' ? (
-                      <>
-                        <td > <div style={{ border: '2px solid green', padding: '4px', color: 'green', borderRadius: '4px', background: '#e6fce8', textAlign: 'center' }}>{item.status}</div></td>
+                        <td>{item.sku || '-'}</td>
+                    {activeTab === 'parts' && (
+
+                      <td style={{ textAlign: 'center' }}>
+                        <Badge color={item.status === 'Ativo' ? 'success' : 'danger'}>
+                          {item.status}
+                        </Badge>
+                          </td>
+                    ) 
+
+                        }
+                        <td>
+                          <ImageDisplay
+                            src={item.pictureUrl}
+                            size="60px"
+                            rounded="50%"
+                          />
+
+                        </td>
+                        <td>
+                          <div className={styles.partPrimary}>
+                            <strong>{item.name}</strong>
+                            {'sku' in item && <code>{item.category}</code>}
+                          </div>
+                        </td>
+                        {activeTab === 'parts' ? (
+                          <>
+
+
                         <td>{item.stock} {item.unitOfMeasure || 'un'}</td>
                       </>
                     ) : (
                       <td><span className={styles.compatibilityBadge}>{item.category}</span></td>
                     )}
+                    <td className={styles.price}> - </td>
                     <td className={styles.price}>{money.format(item.price)}</td>
                     <td className={styles.actions}>
                       {/* Removido botão de info por enquanto */}
                       <button className={styles.btnAddToCart} onClick={() => addToCart(item as SaleItem)}>Adicionar</button>
-                      <Button variant='secondary'>Detalhes</Button>
+                      <Button variant='secondary' onClick={() => setSelectedPart(item)}>Detalhes</Button>
                     </td>
                   </tr>
                 ))}
@@ -477,14 +517,14 @@ export const PDV: React.FC = () => {
         updateQuantity={updateQuantity}
         removeItem={removeItem}
         onFinalizar={() => setEstagio('PAGAMENTO')}
-                  onBack={() => setEstagio('SELECAO')}
+        onBack={() => setEstagio('SELECAO')}
 
       />
 
 
       <aside className={styles.paymentSidebar}>
         <FinalizarVenda
-                  onBack={() => setEstagio('SELECAO')}
+          onBack={() => setEstagio('SELECAO')}
 
           total={total}
           cliente={cliente}
@@ -500,17 +540,47 @@ export const PDV: React.FC = () => {
               <button onClick={() => setSelectedPart(null)}>✕</button>
             </div>
             <div className={styles.modalBody}>
+              {/* Galeria de Imagens */}
+              {selectedPart.pictureUrl && (
+                <div style={{ marginBottom: '20px' }}>
+                  <EcommerceGallery
+                    images={selectedPart.pictureUrl.split(',').filter(Boolean)}
+                    onValidationError={() => { }}
+                    width="50%"
+                  />
+                </div>
+              )}
               <div className={styles.detailGrid}>
-                <p><strong>Marca:</strong> {selectedPart.brand}</p>
-                <p><strong>OEM:</strong> {selectedPart.oemCode}</p>
-                <p><strong>SKU:</strong> {selectedPart.sku}</p>
-                <p><strong>Compatibilidade:</strong> {selectedPart.compatibility}</p>
-                <p><strong>Estoque:</strong> {selectedPart.stock} un (📍 {selectedPart.location})</p>
+                <p><strong>OEM:</strong> {selectedPart['supplierCode'] || selectedPart['oemCode'] || '-'}</p>
+                <p><strong>SKU:</strong> {selectedPart.sku || '-'}</p>
+                <p><strong>Categoria:</strong> {selectedPart.category || '-'}</p>
+                <p><strong>Unidade:</strong> {selectedPart.unitOfMeasure || '-'}</p>
+                <p><strong>Status:</strong> {selectedPart.status || '-'}</p>
+                <p><strong>Estoque Atual:</strong> {'currentStock' in selectedPart ? selectedPart.currentStock : selectedPart.stock || 0} {selectedPart.unitOfMeasure || 'un'}</p>
+                <p><strong>Estoque Mínimo:</strong> {'minStock' in selectedPart ? selectedPart.minStock : '-'}</p>
+                <p><strong>Preço de Custo:</strong> {'costPrice' in selectedPart ? money.format(selectedPart.costPrice || 0) : '-'}</p>
+                <p><strong>Markup:</strong> {'markup' in selectedPart ? `${selectedPart.markup?.toFixed(2)}%` : '-'}</p>
+                <p><strong>Margem Sugerida:</strong> {'percentual_margem_sugerida' in selectedPart ? `${selectedPart.percentual_margem_sugerida?.toFixed(2)}%` : '-'}</p>
+                <p><strong>CFOP Padrão:</strong> {'cfop_padrao' in selectedPart ? selectedPart.cfop_padrao : '-'}</p>
+                <p><strong>NCM:</strong> {'ncm' in selectedPart ? selectedPart.ncm : '-'}</p>
+                <p><strong>CEST:</strong> {'cest' in selectedPart ? selectedPart.cest : '-'}</p>
+                <p><strong>Fornecedor:</strong> {'suppliers' in selectedPart ? selectedPart.suppliers : '-'}</p>
+                <p><strong>Cód. Fornecedor:</strong> {'supplierCode' in selectedPart ? selectedPart.supplierCode : '-'}</p>
+                {/* E-commerce fields */}
+                <p><strong>Peso:</strong> {'weight' in selectedPart ? `${selectedPart.weight} kg` : '-'}</p>
+                <p><strong>Dimensões:</strong> {'length' in selectedPart && 'height' in selectedPart && 'width' in selectedPart ? `${selectedPart.length}x${selectedPart.height}x${selectedPart.width} cm` : '-'}</p>
+                <p><strong>Título SEO:</strong> {'seoTitle' in selectedPart ? selectedPart.seoTitle : '-'}</p>
+                <p><strong>Descrição:</strong> {'descriptionHtml' in selectedPart ? selectedPart.descriptionHtml?.substring(0, 100) + '...' : '-'}</p>
+                <p><strong>Sincronizar E-commerce:</strong> {'syncEcommerce' in selectedPart ? (selectedPart.syncEcommerce ? 'Sim' : 'Não') : '-'}</p>
               </div>
             </div>
             <div className={styles.modalFooter}>
-              <span className={styles.modalPrice}>{money.format(selectedPart.price)}</span>
-              <button className={styles.btnModalAdd} onClick={() => { addToCart({ ...selectedPart, type: 'part' }); setSelectedPart(null); }}>
+              <span className={styles.modalPrice}>{money.format('salePrice' in selectedPart ? selectedPart.salePrice : selectedPart.price)}</span>
+              <button className={styles.btnModalAdd} onClick={() => {
+                const itemToAdd: SaleItem = 'type' in selectedPart ? selectedPart : { ...selectedPart, price: selectedPart.salePrice, type: 'part' as const };
+                addToCart(itemToAdd);
+                setSelectedPart(null);
+              }}>
                 Adicionar ao Pedido
               </button>
             </div>
