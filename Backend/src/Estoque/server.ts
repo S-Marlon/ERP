@@ -134,6 +134,37 @@ app.get('/api/products', asyncHandler(async (req, res) => {
     return res.json(formattedRows);
 }));
 
+
+/**
+ * Rota: GET /api/categories?type=parts|services
+ * Retorna a lista de nomes de categorias únicas baseada no tipo de item.
+ */
+app.get('/api/categories', asyncHandler(async (req, res) => {
+    const type = req.query.type as string; // 'parts' ou 'services'
+
+    let query = '';
+    
+        // Busca categorias que possuem produtos vinculados
+        query = `
+            SELECT DISTINCT c.nome_categoria 
+            FROM categorias c
+            WHERE c.id_categoria_pai IS NULL
+            ORDER BY c.nome_categoria ASC
+        `;
+   
+
+    try {
+        const [rows]: any = await pool.execute(query);
+        const categories = rows.map((row: any) => row.nome_categoria);
+        return res.json(categories);
+    } catch (error) {
+        console.error("Erro ao buscar categorias:", error);
+        // Retorna categorias padrão para não travar o PDV caso a tabela esteja vazia
+        const defaults = type === 'parts' ? ['Hidráulica', 'Pneumática'] : ['Prensagem'];
+        return res.json(defaults);
+    }
+}));
+
 // Rota dedicada para o MappingModal (Entrada de NF)
 // app.get('/api/products/mapping', asyncHandler(async (req, res) => {
 //     const query = (req.query.query as string || '').trim();

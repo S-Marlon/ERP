@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import styles from './PDV.module.css';
 import { SaleItem, CartItem } from './types';
 import { Product } from '../Estoque/pages/StockInventory/types/Stock_Products';
-import { getProducts } from '../Estoque/pages/StockInventory/service/productService';
+import { getPdvProducts, getPdvCategories } from './services/pdvService';
 import { CartAside } from './pages/Cart/CartAside';
 import Button from '../../components/ui/Button/Button';
 import ProductFilter from '../../components/forms/search/ProductFilter';
@@ -12,6 +12,7 @@ import Switch from '../../components/ui/Switch';
 import EcommerceGallery from '../../components/ui/ImageGallery/EcommerceGallery';
 import ImageDisplay from '../../components/ui/ImageGallery/ImageDysplay';
 import Badge from '../../components/ui/Badge/Badge';
+import EditableField from '../../components/forms/EditableField/EditableField';
 
 
 type PDVStep = 'SELECAO' | 'PAGAMENTO';
@@ -49,6 +50,13 @@ const MOCK_SERVICES: SaleItem[] = [
 export const PDV: React.FC = () => {
   const { id } = useParams<{ id: string }>();
 
+
+
+
+  const [dynamicCategories, setDynamicCategories] = useState<string[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+
+
   /* ===== CENTRALIZED STATE FOR SYNC ===== */
   // Core sale state
   const [estagio, setEstagio] = useState<PDVStep>('SELECAO');
@@ -65,6 +73,21 @@ export const PDV: React.FC = () => {
   // Product data
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
+
+  // Substitua o estado de string por um objeto ou null
+  const [clienteAtivo, setClienteAtivo] = useState<Cliente | null>(null);
+
+
+
+  // 1. Crie um estado para a categoria selecionada
+  const [selectedCategory, setSelectedCategory] = useState<string>('Todas');
+
+
+
+  const [onlyInStock, setOnlyInStock] = useState(true);
+  const [onlyActive, setOnlyActive] = useState(true); // Geralmente PDVs começam mostrando apenas ativos
+
+
 
   // OS-specific data
   const [osData, setOsData] = useState({
@@ -154,15 +177,130 @@ export const PDV: React.FC = () => {
     // Filters kept for continuity with ProductFilter component
   };
 
+
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      setLoadingCategories(true);
+      try {
+        // Busca as categorias baseado na aba ativa
+        const type = activeTab === 'parts' ? 'parts' : 'services';
+        const data = await getPdvCategories(type);
+
+        // Sempre adiciona "Todas" como a primeira opção
+        setDynamicCategories(['Todas', ...data]);
+      } catch (error) {
+        setDynamicCategories(['Todas', 'Erro ao carregar']);
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+
+    loadCategories();
+  }, [activeTab]); // Recarrega sempre que mudar entre Peças e Serviços
+
+
+  // 1. Crie um estado para a ordenação
+  const [sortOrder, setSortOrder] = useState('');
+
+  // 2. Aplique a ordenação dentro do useMemo que já existe (filteredData)
+  const filteredData: SaleItem[] = useMemo(() => {
+    let data: SaleItem[] = [];
+
+    // 1. POPULAR OS DADOS INICIAIS
+    if (activeTab === 'parts') {
+      data = products.map(p => ({
+        id: p.id,
+        name: p.name,
+        price: p.salePrice,
+        brand: p.brand || '',
+        category: p.category,
+        type: 'part' as const,
+        stock: p.currentStock,
+        sku: p.sku,
+        unitOfMeasure: p.unitOfMeasure,
+        status: p.status,
+        pictureUrl: p.pictureUrl,
+      })) as SaleItem[];
+    } else if (activeTab === 'services') {
+      data = MOCK_SERVICES as SaleItem[];
+    }
+
+    // 1. Filtro de Categoria (já existente)
+    if (selectedCategory !== 'Todas') {
+      data = data.filter(item => item.category === selectedCategory);
+    }
+
+    // 2. NOVO: Filtro de Itens Ativos
+    if (onlyActive) {
+      data = data.filter(item => item.status === 'Ativo');
+    }
+
+    // 3. Filtro de Estoque (ajustado)
+    if (onlyInStock && activeTab === 'parts') {
+      data = data.filter(item => (item.stock || 0) > 0);
+    }
+
+    // 3. FILTRAR POR TERMO DE BUSCA (SearchTerm)
+    if (searchTerm.trim() !== '') {
+      const search = searchTerm.toLowerCase();
+      data = data.filter(item =>
+        item.name.toLowerCase().includes(search) ||
+        item.sku?.toLowerCase().includes(search)
+      );
+    }
+
+
+
+    // 5. ORDENAÇÃO FINAL
+    return [...data].sort((a, b) => {
+      switch (sortOrder) {
+        case 'name_asc': return a.name.localeCompare(b.name);
+        case 'name_desc': return b.name.localeCompare(a.name);
+        case 'price_asc': return a.price - b.price;
+        case 'price_desc': return b.price - a.price;
+        default: return 0;
+      }
+    });
+  }, [searchTerm, activeTab, products, sortOrder, selectedCategory, onlyInStock, onlyActive]);
+
+
+  const highlightText = (text: string, highlight: string) => {
+    if (!highlight.trim()) return text;
+
+    // Escapa caracteres especiais e cria uma Regex global e insensível a maiúsculas
+    const regex = new RegExp(`(${highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    const parts = text.split(regex);
+
+    return parts.map((part, i) =>
+      regex.test(part) ? (
+        <mark key={i} style={{ backgroundColor: '#ffeb3b', padding: '2px', borderRadius: '2px' }}>
+          {part}
+        </mark>
+      ) : (
+        part
+      )
+    );
+  };
+
+
+
+
+
   /* ===== DATA FETCHING ===== */
 
+
+  useEffect(() => {
+    setSelectedCategory('Todas');
+    setSearchTerm('');
+  }, [activeTab]);
 
   useEffect(() => {
     console.log('useEffect triggered: activeTab=', activeTab, 'searchTerm=', searchTerm);
     if (activeTab === 'parts') {
       console.log('Buscando produtos...');
       setLoadingProducts(true);
-      getProducts(searchTerm).then((data) => {
+      getPdvProducts(searchTerm).then((data) => {
         console.log('Produtos recebidos:', data);
         setProducts(data);
         setLoadingProducts(false);
@@ -177,42 +315,59 @@ export const PDV: React.FC = () => {
     }
   }, [searchTerm, activeTab]);
 
-  const filteredData: SaleItem[] = useMemo(() => {
-    if (activeTab === 'os') return [];
-    if (activeTab === 'parts') {
-      return products.map(p => ({
-        id: p.id,
-        name: p.name,
-        price: p.salePrice,
-        brand: p.brand || '',
-        category: p.category,
-        type: 'part' as const,
-        stock: p.currentStock,
-        sku: p.sku,
-        unitOfMeasure: p.unitOfMeasure,
-        status: p.status,
-        oemCode: p.supplierCode || '',
-        compatibility: '',
-        location: '',
-        pictureUrl: p.pictureUrl,
-      })) as SaleItem[];
-    }
-    return MOCK_SERVICES.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase())) as SaleItem[];
-  }, [searchTerm, activeTab, products]);
+  // const filteredData: SaleItem[] = useMemo(() => {
+  //   if (activeTab === 'os') return [];
+  //   if (activeTab === 'parts') {
+  //     return products.map(p => ({
+  //       id: p.id,
+  //       name: p.name,
+  //       price: p.salePrice,
+  //       brand: p.brand || '',
+  //       category: p.category,
+  //       type: 'part' as const,
+  //       stock: p.currentStock,
+  //       sku: p.sku,
+  //       unitOfMeasure: p.unitOfMeasure,
+  //       status: p.status,
+  //       oemCode: p.supplierCode || '',
+  //       compatibility: '',
+  //       location: '',
+  //       pictureUrl: p.pictureUrl,
+  //     })) as SaleItem[];
+  //   }
+  //   return MOCK_SERVICES.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase())) as SaleItem[];
+  // }, [searchTerm, activeTab, products]);
 
-  const addToCart = useCallback((item: SaleItem) => {
+  const addToCart = useCallback(async (item: SaleItem) => {
+    let precoVenda = item.price;
+
+    // Se houver um cliente identificado, busca o preço especial
+    if (clienteAtivo?.id_cliente) {
+      try {
+        const regras = await clienteService.listarPrecosEspeciais(clienteAtivo.id_cliente);
+        const regraProd = regras.find(r => r.id_produto === item.id);
+
+        if (regraProd) {
+          if (regraProd.tipo_desconto === 'VALOR_FIXO') {
+            precoVenda = regraProd.valor;
+          } else {
+            precoVenda = item.price * (1 - regraProd.valor / 100);
+          }
+        }
+      } catch (e) {
+        console.error("Erro ao validar preço especial", e);
+      }
+    }
+
     setCart(prev => {
       const existing = prev.find(i => i.id === item.id);
       if (existing) {
-        if (item.type === 'part' && item.stock && existing.quantity >= item.stock) {
-          alert("Estoque insuficiente!");
-          return prev;
-        }
+        // ... sua lógica de estoque atual
         return prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
       }
-      return [...prev, { ...item, quantity: 1 }];
+      return [...prev, { ...item, price: precoVenda, quantity: 1 }];
     });
-  }, []);
+  }, [clienteAtivo]);
 
 
   return (
@@ -254,47 +409,100 @@ export const PDV: React.FC = () => {
           <button className={`${styles.tabButton} ${activeTab === 'services' ? styles.tabButtonActive : ''}`} onClick={() => setActiveTab('services')}>🛠️ Serviços</button>
           <button className={`${styles.tabButton} ${activeTab === 'os' ? styles.tabButtonActive : ''}`} onClick={() => setActiveTab('os')}>📋 Gerar OS</button>
         </nav>
+
         <ProductFilter filters={{} as FilterState} onFilterChange={handleFilterChange} onApply={() => console.log("Aplicar filtros avançados")} onReset={() => console.log("Resetar filtros avançados")} />
+
+
         <header className={styles.topHeader}>
-          <div className={styles.searchContainer}>
-            {/* <button className={styles.btnFilterToggle} onClick={() => setIsFilterOpen(!isFilterOpen)}>
-              {isFilterOpen ? '⇠ Ocultar' : '☰ Filtros'}
-            </button> */}
-            <input
-              className={styles.mainInput}
-              placeholder={`Buscar ${activeTab === 'parts' ? 'peças...' : 'serviços...'}`}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              disabled={activeTab === 'os'}
-            />
-
-
+          <div className={styles.searchSection}>
+            <EditableField
+              label="Busca de Itens"
+              showLock={false}
+              isDirty={searchTerm !== ''}
+              showOriginalValue={false}
+              originalValue="" // Adicionei para não dar erro de prop obrigatória
+              onRevert={() => setSearchTerm('')}
+            >
+              <input
+                className={styles.mainInput}
+                placeholder={`Buscar ${activeTab === 'parts' ? 'peças...' : 'serviços...'}`}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                disabled={activeTab === 'os'}
+              />
+            </EditableField>
           </div>
 
-          <div>
+          <div className={styles.filterBar}>
+            <EditableField
+              label="Ordenar por categoria"
+              showLock={false}
+              isDirty={selectedCategory !== 'Todas'}
+              showOriginalValue={false}
+              originalValue="Todas"
+              onRevert={() => setSelectedCategory('Todas')}
+            >
 
 
-            <select>
-              <option value="">Filtrar por Categoria</option>
-              {activeTab === 'parts' ? (
-                <><option value="Hidráulica">Hidráulica</option>
-                  <option value="Pneumática">Pneumática</option>
-                  <option value="Elétrica">Elétrica</option>
-                  <option value="Automotiva">Automotiva</option></>
-              ) : (
-                <><option value="Prensagem">Prensagem</option>
-                  <option value="Manutenção">Manutenção</option>
-                  <option value="Qualidade">Qualidade</option>
-                </>
-              )}
-            </select>
+
+              <div className={styles.categoryChips}>
+                {loadingCategories ? (
+                  <span className={styles.loaderInline}>Carregando...</span>
+                ) : (
+                  dynamicCategories.map(cat => (
+                    <button
+                      key={cat}
+                      className={`${styles.chip} ${selectedCategory === cat ? styles.chipActive : ''}`}
+                      onClick={() => setSelectedCategory(cat)}
+                    >
+                      {cat}
+                    </button>
+                  ))
+                )}
+              </div>
 
 
-            <Switch label="Somente com estoque"></Switch>
+            </EditableField>
+            <div>
 
-            {/* onChange={(e) => setOnlyInStock(e.target.checked)} */}
 
 
+              {/* Filtro: Estoque */}
+              <EditableField
+                label="Somente com estoque"
+                showLock={false}
+                isDirty={!onlyInStock}
+                showOriginalValue={false}
+                originalValue={true}
+                onRevert={() => setOnlyInStock(true)}
+              >
+                <div className={styles.stockToggle}>
+                  <Switch
+                    checked={onlyInStock}
+                    // Forçamos a inversão baseada no valor atual
+                    onChange={() => setOnlyInStock(prev => !prev)}
+                  />
+                </div>
+              </EditableField>
+
+              {/* Filtro: Ativos */}
+              <EditableField
+                label="Somente Ativos"
+                showLock={false}
+                isDirty={!onlyActive}
+                showOriginalValue={false}
+                originalValue={true}
+                onRevert={() => setOnlyActive(true)}
+              >
+                <div className={styles.stockToggle}>
+                  <Switch
+                    checked={onlyActive}
+                    onChange={() => setOnlyActive(prev => !prev)}
+                  />
+                </div>
+              </EditableField>
+
+            </div>
 
           </div>
         </header>
@@ -421,21 +629,86 @@ export const PDV: React.FC = () => {
 
 
 
-            {loadingProducts && <p>Carregando produtos...</p>}<select>
-              <option value="">Ordenar por...</option>
-              <option value="name_asc">Nome A-Z</option>
-              <option value="name_desc">Nome Z-A</option>
-              <option value="price_asc">Preço: Menor</option>
-              <option value="price_desc">Preço: Maior</option>
-            </select>
+            <div className={styles.productToolbar}>
+              <div className={styles.infoCount}>
+                <button
+                  onClick={async () => {
+                    setSearchTerm('');
+                    setLoadingProducts(true);
+                    try {
+                      const data = await getPdvProducts('');
+                      setProducts(data);
+                    } finally {
+                      setLoadingProducts(false);
+                    }
+                  }}
+                  className={styles.btnSync}
+                  title="Sincronizar Estoque"
+                >
+                  ↺ Atualizar
+                </button>
+                {loadingProducts ? (
+                  <span className={styles.loaderInline}></span>
+                ) : (
+                  <span>{filteredData.length} itens encontrados </span>
+                )}
+              </div>
+
+
+              <div className={styles.actionsGroup}>
+                <button
+                  className={styles.btnSync}
+                >
+                  &larr;
+                </button>
+
+
+                <button
+                  className={styles.btnSync}
+                >
+                  1    </button>
+
+                <button
+                  className={styles.btnSync}
+                >
+                  2    </button>
+
+                <button
+                  className={styles.btnSync}
+                >
+                  3    </button>
+
+                <button
+                  className={styles.btnSync}
+                >
+                  &rarr;
+                </button>
+              </div>
+
+              <div className={styles.actionsGroup}>
+                <select
+                  className={styles.modernSelect}
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(e.target.value)}
+                >
+                  <option value="">⇅ Ordenar por</option>
+                  <option value="name_asc">Nome: A-Z</option>
+                  <option value="name_desc">Nome: Z-A</option>
+                  <option value="price_asc">Preço: Menor</option>
+                  <option value="price_desc">Preço: Maior</option>
+                </select>
+
+
+              </div>
+            </div>
             <table className={styles.partsTable}>
               <thead>
                 <tr>
                   <th>SKU / Marca</th>
-                   {activeTab === 'parts' && (
+                  {activeTab === 'parts' && (
                     <>
                       <th style={{ textAlign: 'center' }}>Status</th>
-                     
+
 
 
                     </>
@@ -457,33 +730,34 @@ export const PDV: React.FC = () => {
               <tbody>
                 {filteredData.map(item => (
                   <tr key={item.id}>
-                        <td>{item.sku || '-'}</td>
+                    <td>{item.sku || '-'}</td>
                     {activeTab === 'parts' && (
 
                       <td style={{ textAlign: 'center' }}>
                         <Badge color={item.status === 'Ativo' ? 'success' : 'danger'}>
                           {item.status}
                         </Badge>
-                          </td>
-                    ) 
+                      </td>
+                    )
 
-                        }
-                        <td>
-                          <ImageDisplay
-                            src={item.pictureUrl}
-                            size="60px"
-                            rounded="50%"
-                          />
+                    }
+                    <td>
+                      <ImageDisplay
+                        src={item.pictureUrl}
+                        size="60px"
+                        rounded="50%"
+                      />
 
-                        </td>
-                        <td>
-                          <div className={styles.partPrimary}>
-                            <strong>{item.name}</strong>
-                            {'sku' in item && <code>{item.category}</code>}
-                          </div>
-                        </td>
-                        {activeTab === 'parts' ? (
-                          <>
+                    </td>
+                    <td>
+                      <div className={styles.partPrimary}>
+                        {/* Agora o nome destaca o que foi digitado no searchTerm */}
+                        <strong>{highlightText(item.name, searchTerm)}</strong>
+                        {'sku' in item && <code>{item.category}</code>}
+                      </div>
+                    </td>
+                    {activeTab === 'parts' ? (
+                      <>
 
 
                         <td>{item.stock} {item.unitOfMeasure || 'un'}</td>

@@ -5,7 +5,7 @@ interface EditableFieldProps {
   label: string;
   isDirty: boolean;
   originalValue: any;
-  onRevert: () => void;
+showOriginalValue?: boolean; // <-- NOVA PROPRIEDADE  onRevert: () => void;
   showLock?: boolean; // Define se este campo terá o cadeado
   children: React.ReactElement;
 }
@@ -13,8 +13,9 @@ interface EditableFieldProps {
 const EditableField: React.FC<EditableFieldProps> = ({
   label,
   isDirty,
-  originalValue,
-  onRevert,
+originalValue,
+showOriginalValue = true, // Padronizei como true para manter o comportamento atual
+onRevert,
   showLock = false,
   children
 }) => {
@@ -62,7 +63,8 @@ const EditableField: React.FC<EditableFieldProps> = ({
         )}
       </div>
 
-      {isDirty && (
+      {/* AJUSTE AQUI: Só mostra se estiver "sujo" E se a prop permitir */}
+      {isDirty && showOriginalValue && (
         <span className="originalValueText">
           Valor original: <strong>{originalValue}</strong>
         </span>
