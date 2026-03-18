@@ -13,30 +13,30 @@ import FormControl from '../../../../components/ui/FormControl/FormControl';
 
 
 interface ProductEntry extends ProdutoNF {
-  tempId: number;
-  isMapped: boolean;
-  mappedId?: string;
-  isConfirmed: boolean;
-  category?: string;
-  mappedData?: any;
-  quantityReceived: number;
-  difference: number;
-  total: number;
+    tempId: number;
+    isMapped: boolean;
+    mappedId?: string;
+    isConfirmed: boolean;
+    category?: string;
+    mappedData?: any;
+    quantityReceived: number;
+    difference: number;
+    total: number;
 }
 
 type NfeData = Omit<NfeDataFromXML, 'produtos'> & {
-  invoiceNumber: string;
-  supplier: string;
-  supplierFantasyName: string;
-  supplierCnpj: string;
-  entryDate: string;
-  accessKey: string;
-  totalFreight: number;
-  totalIpi: number;
-  totalIcmsST: number;
-  totalOtherExpenses: number;
-  totalNoteValue: number;
-  items: ProductEntry[];
+    invoiceNumber: string;
+    supplier: string;
+    supplierFantasyName: string;
+    supplierCnpj: string;
+    entryDate: string;
+    accessKey: string;
+    totalFreight: number;
+    totalIpi: number;
+    totalIcmsST: number;
+    totalOtherExpenses: number;
+    totalNoteValue: number;
+    items: ProductEntry[];
 };
 
 // --- Helpers ---
@@ -64,17 +64,17 @@ const roundQuantityByUnit = (quantity: number, unitOfMeasure: string): number =>
 };
 
 const mapNfeDataToEntryForm = (xmlData: NfeDataFromXML): NfeData => {
-   const items: ProductEntry[] = xmlData.produtos.map((produto, index) => ({
-    ...produto,                  // pega todos os campos do ProdutoNF
-    tempId: index + 1,
-    isMapped: false,
-    isConfirmed: false,
-    category: '',
-    mappedData: undefined,
-    quantityReceived: produto.quantidade || 0,                       // inicializa a quantidade recebida
-    total: (produto.quantidade || 0) * (produto.valorUnitario || 0), // inicializa total
-    difference: 0,                                                   // inicializa diferença
-}));
+    const items: ProductEntry[] = xmlData.produtos.map((produto, index) => ({
+        ...produto,                  // pega todos os campos do ProdutoNF
+        tempId: index + 1,
+        isMapped: false,
+        isConfirmed: false,
+        category: '',
+        mappedData: undefined,
+        quantityReceived: produto.quantidade || 0,                       // inicializa a quantidade recebida
+        total: (produto.quantidade || 0) * (produto.valorUnitario || 0), // inicializa total
+        difference: 0,                                                   // inicializa diferença
+    }));
 
     return {
         invoiceNumber: `NF ${xmlData.numero}`,
@@ -100,7 +100,7 @@ const StockEntryForm: React.FC = () => {
     const [invoiceNumber, setInvoiceNumber] = useState('');
     const [supplier, setSupplier] = useState('');
     const [supplierFantasyName, setSupplierFantasyName] = useState(''); // ✨ Novo estado
-const [supplierCnpj, setSupplierCnpj] = useState<string>('');
+    const [supplierCnpj, setSupplierCnpj] = useState<string>('');
     const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
     const [supplierToCreate, setSupplierToCreate] = useState<{ cnpj: string; name: string, fantasyName: string } | null>(null);
     // Form state for creating supplier
@@ -124,10 +124,10 @@ const [supplierCnpj, setSupplierCnpj] = useState<string>('');
     const [totalNoteValue, setTotalNoteValue] = useState(0);
 
 
-const [totalIcmsST, setTotalIcmsST] = useState(0);
-const [totalIBS, setTotalIBS] = useState<number | undefined>(undefined);
-const [totalCBS, setTotalCBS] = useState<number | undefined>(undefined);
-const [mappedItems, setMappedItems] = useState<Record<number, MappingPayload>>({});
+    const [totalIcmsST, setTotalIcmsST] = useState(0);
+    const [totalIBS, setTotalIBS] = useState<number | undefined>(undefined);
+    const [totalCBS, setTotalCBS] = useState<number | undefined>(undefined);
+    const [mappedItems, setMappedItems] = useState<Record<number, MappingPayload>>({});
 
 
 
@@ -138,7 +138,7 @@ const [mappedItems, setMappedItems] = useState<Record<number, MappingPayload>>({
 
     // modal mapping
     const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
-const [itemToMap, setItemToMap] = useState<ProductEntry | null>(null);
+    const [itemToMap, setItemToMap] = useState<ProductEntry | null>(null);
     const subtotal = useMemo(() => items.reduce((sum, item) => sum + item.total, 0), [items]);
     const totalItems = useMemo(() => items.reduce((sum, item) => sum + item.quantityReceived, 0), [items]);
     const hasUnmappedItems = items.some(item => !item.mappedId);
@@ -153,7 +153,7 @@ const [itemToMap, setItemToMap] = useState<ProductEntry | null>(null);
         try {
             console.log('\n=== INICIANDO performMappingSync ===');
             console.log('CNPJ:', cnpjToUse);
-            
+
             // 🔑 Primeiro, gera o hash do CNPJ (mesmo que o backend faz)
             const cnpjLimpo = cnpjToUse.replace(/\D/g, '');
             const encoder = new TextEncoder();
@@ -161,20 +161,20 @@ const [itemToMap, setItemToMap] = useState<ProductEntry | null>(null);
             const hashArray = Array.from(new Uint8Array(hashBuffer));
             const cnpjHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 4).toUpperCase();
             console.log('CNPJ Hash gerado no frontend:', cnpjHash);
-            
+
             const skus = xmlToUse.items.map(i => i.sku);
             console.log('SKUs enviados para o backend:', skus);
-            
+
             const existingMappings = await checkExistingMappings(cnpjToUse, skus);
             console.log('Mappings retornados do backend:', existingMappings);
             console.log('Total de mappings encontrados:', existingMappings.length);
-            
+
             // 🔑 Cria um Map para lookup O(1) usando sku_fornecedor como chave
             const mappingsBySkuFornecedor = new Map(
                 existingMappings.map((m: any) => [m.sku_fornecedor, m])
             );
             console.log('Map de mappings criado com chaves:', Array.from(mappingsBySkuFornecedor.keys()));
-            
+
             const reconciledItems = xmlToUse.items.map((item: any) => {
                 // ✅ Formata o SKU do item com o hash (igual ao backend)
                 const formattedSkuForLookup = `${item.sku}/${cnpjHash}`;
@@ -216,149 +216,149 @@ const [itemToMap, setItemToMap] = useState<ProductEntry | null>(null);
         }
     };
 
-     const [nomeFantasia, setNomeFantasia] = useState("");
+    const [nomeFantasia, setNomeFantasia] = useState("");
 
-// Função auxiliar para gerar o hash MD5 no navegador
-async function gerarHashCNPJ(cnpj: string): Promise<string> {
-    const cnpjLimpo = cnpj.replace(/\D/g, '');
-    const msgUint8 = new TextEncoder().encode(cnpjLimpo);
-    const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgUint8); // Usando SHA-256 (nativo e mais seguro que MD5 no browser)
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-const [siglaGerada, setSiglaGerada] = useState("");
-
-useEffect(() => {
-    if (supplierCnpj.length >= 14) { // Só gera quando o CNPJ estiver completo
-        gerarHashCNPJ(supplierCnpj).then(hash => {
-            setSiglaGerada(hash.substring(0, 4).toUpperCase());
-        });
-    } else {
-        setSiglaGerada("");
-    }
-}, [supplierCnpj]);
-
-   // Upload XML
-const handleXmlUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    if (file.type !== 'text/xml' && !file.name.endsWith('.xml')) {
-        alert('Por favor, selecione um arquivo XML (.xml) válido.');
-        return;
+    // Função auxiliar para gerar o hash MD5 no navegador
+    async function gerarHashCNPJ(cnpj: string): Promise<string> {
+        const cnpjLimpo = cnpj.replace(/\D/g, '');
+        const msgUint8 = new TextEncoder().encode(cnpjLimpo);
+        const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgUint8); // Usando SHA-256 (nativo e mais seguro que MD5 no browser)
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     }
 
-    const reader = new FileReader();
+    const [siglaGerada, setSiglaGerada] = useState("");
 
-    reader.onload = async (e) => {
-        try {
-            const xmlContent = e.target?.result as string;
-            const rawXmlData = parseNfeXmlToData(xmlContent);
-
-            if (!rawXmlData) throw new Error('Falha ao extrair dados do XML.');
-
-            const xmlData = mapNfeDataToEntryForm(rawXmlData);
-            const formattedSupplierCnpj = formatCnpj(xmlData.supplierCnpj);
-
-            // 1️⃣ Popula Cabeçalho e Totais
-            setSupplierCnpj(formattedSupplierCnpj);
-            setInvoiceNumber(xmlData.invoiceNumber);
-            setSupplier(xmlData.supplier);
-            setSupplierFantasyName(xmlData.supplierFantasyName);
-            setEntryDate(xmlData.entryDate);
-            setAccessKey(xmlData.accessKey);
-
-            setTotalFreight(xmlData.totalFreight);
-            setTotalIpi(xmlData.totalIpi);
-            setTotalOtherExpenses(xmlData.totalOtherExpenses);
-            setTotalNoteValue(xmlData.totalNoteValue);
-            
-            // Novos campos 2026
-            setTotalIcmsST(xmlData.totalIcmsST);
-            setTotalIBS(xmlData.totalIBS);
-            setTotalCBS(xmlData.totalCBS);
-
-            // 2️⃣ Verifica Fornecedor
-            setIsSupplierChecking(true);
-            try {
-                const supplierCheck = await checkSupplier(formattedSupplierCnpj);
-
-                if (!supplierCheck.exists) {
-                    setSupplierExists(false);
-                    setSupplierToCreate({
-                        cnpj: formattedSupplierCnpj,
-                        name: xmlData.supplier,
-                        fantasyName: xmlData.supplierFantasyName
-                    });
-                    setSupplierCreationName(xmlData.supplier);
-
-                    // Dados pendentes para processar após criar fornecedor
-                    setPendingXmlData(xmlData);
-                    setItems(xmlData.items);
-                    setSelectedPendingIds(new Set(xmlData.items.map(i => i.tempId)));
-                    
-                    setIsSupplierModalOpen(true);
-                    return; // Interrompe para aguardar criação do fornecedor
-                } 
-                
-                setSupplierExists(true);
-                setSupplier(supplierCheck.supplier?.name || xmlData.supplier);
-                
-                // 3️⃣ Sincroniza Mapeamentos (Se o fornecedor já existe)
-                await performMappingSync(formattedSupplierCnpj, xmlData);
-
-            } catch (err) {
-                console.error('Erro ao checar fornecedor:', err);
-                setSupplierExists(false);
-            } finally {
-                setIsSupplierChecking(false);
-            }
-
-        } catch (error) {
-            console.error('Erro ao processar XML:', error);
-            alert(`Erro: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+    useEffect(() => {
+        if (supplierCnpj.length >= 14) { // Só gera quando o CNPJ estiver completo
+            gerarHashCNPJ(supplierCnpj).then(hash => {
+                setSiglaGerada(hash.substring(0, 4).toUpperCase());
+            });
+        } else {
+            setSiglaGerada("");
         }
-    };
+    }, [supplierCnpj]);
 
-    reader.readAsText(file);
-};
+    // Upload XML
+    const handleXmlUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        if (file.type !== 'text/xml' && !file.name.endsWith('.xml')) {
+            alert('Por favor, selecione um arquivo XML (.xml) válido.');
+            return;
+        }
+
+        const reader = new FileReader();
+
+        reader.onload = async (e) => {
+            try {
+                const xmlContent = e.target?.result as string;
+                const rawXmlData = parseNfeXmlToData(xmlContent);
+
+                if (!rawXmlData) throw new Error('Falha ao extrair dados do XML.');
+
+                const xmlData = mapNfeDataToEntryForm(rawXmlData);
+                const formattedSupplierCnpj = formatCnpj(xmlData.supplierCnpj);
+
+                // 1️⃣ Popula Cabeçalho e Totais
+                setSupplierCnpj(formattedSupplierCnpj);
+                setInvoiceNumber(xmlData.invoiceNumber);
+                setSupplier(xmlData.supplier);
+                setSupplierFantasyName(xmlData.supplierFantasyName);
+                setEntryDate(xmlData.entryDate);
+                setAccessKey(xmlData.accessKey);
+
+                setTotalFreight(xmlData.totalFreight);
+                setTotalIpi(xmlData.totalIpi);
+                setTotalOtherExpenses(xmlData.totalOtherExpenses);
+                setTotalNoteValue(xmlData.totalNoteValue);
+
+                // Novos campos 2026
+                setTotalIcmsST(xmlData.totalIcmsST);
+                setTotalIBS(xmlData.totalIBS);
+                setTotalCBS(xmlData.totalCBS);
+
+                // 2️⃣ Verifica Fornecedor
+                setIsSupplierChecking(true);
+                try {
+                    const supplierCheck = await checkSupplier(formattedSupplierCnpj);
+
+                    if (!supplierCheck.exists) {
+                        setSupplierExists(false);
+                        setSupplierToCreate({
+                            cnpj: formattedSupplierCnpj,
+                            name: xmlData.supplier,
+                            fantasyName: xmlData.supplierFantasyName
+                        });
+                        setSupplierCreationName(xmlData.supplier);
+
+                        // Dados pendentes para processar após criar fornecedor
+                        setPendingXmlData(xmlData);
+                        setItems(xmlData.items);
+                        setSelectedPendingIds(new Set(xmlData.items.map(i => i.tempId)));
+
+                        setIsSupplierModalOpen(true);
+                        return; // Interrompe para aguardar criação do fornecedor
+                    }
+
+                    setSupplierExists(true);
+                    setSupplier(supplierCheck.supplier?.name || xmlData.supplier);
+
+                    // 3️⃣ Sincroniza Mapeamentos (Se o fornecedor já existe)
+                    await performMappingSync(formattedSupplierCnpj, xmlData);
+
+                } catch (err) {
+                    console.error('Erro ao checar fornecedor:', err);
+                    setSupplierExists(false);
+                } finally {
+                    setIsSupplierChecking(false);
+                }
+
+            } catch (error) {
+                console.error('Erro ao processar XML:', error);
+                alert(`Erro: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+            }
+        };
+
+        reader.readAsText(file);
+    };
 
     // Manipuladores
     const toggleConfirmation = useCallback((tempId: number) => {
-    const current = items.find(i => i.tempId === tempId);
-    if (!current) return;
+        const current = items.find(i => i.tempId === tempId);
+        if (!current) return;
 
-    const willConfirm = !current.isConfirmed;
+        const willConfirm = !current.isConfirmed;
 
-    // Bloqueio estrito: Se for para confirmar e NÃO estiver mapeado, interrompe.
-    if (willConfirm && !current.mappedId) {
-        alert('Operação interrompida: Você precisa mapear o produto antes de confirmar a conferência.');
-        return; 
-    }
+        // Bloqueio estrito: Se for para confirmar e NÃO estiver mapeado, interrompe.
+        if (willConfirm && !current.mappedId) {
+            alert('Operação interrompida: Você precisa mapear o produto antes de confirmar a conferência.');
+            return;
+        }
 
-    // Postura de aviso: Se houver divergência, apenas avisa, mas permite seguir.
-    if (willConfirm && current.difference !== 0) {
-        console.warn(`Item ${current.sku} confirmado com divergência de ${current.difference}.`);
-        // Se quiser um aviso visual para o usuário sem travar:
-        // alert('Atenção: Este item possui divergência, mas será movido para conferidos.');
-    }
+        // Postura de aviso: Se houver divergência, apenas avisa, mas permite seguir.
+        if (willConfirm && current.difference !== 0) {
+            console.warn(`Item ${current.sku} confirmado com divergência de ${current.difference}.`);
+            // Se quiser um aviso visual para o usuário sem travar:
+            // alert('Atenção: Este item possui divergência, mas será movido para conferidos.');
+        }
 
-    // Execução da atualização
-    setItems(prev => prev.map(it => 
-        it.tempId === tempId ? { ...it, isConfirmed: willConfirm } : it
-    ));
+        // Execução da atualização
+        setItems(prev => prev.map(it =>
+            it.tempId === tempId ? { ...it, isConfirmed: willConfirm } : it
+        ));
 
-    // Gerenciamento de IDs selecionados
-    if (willConfirm) {
-        setSelectedPendingIds(prev => { const n = new Set(prev); n.delete(tempId); return n; });
-        setSelectedConfirmedIds(prev => { const n = new Set(prev); n.add(tempId); return n; });
-    } else {
-        setSelectedConfirmedIds(prev => { const n = new Set(prev); n.delete(tempId); return n; });
-        setSelectedPendingIds(prev => { const n = new Set(prev); n.add(tempId); return n; });
-    }
+        // Gerenciamento de IDs selecionados
+        if (willConfirm) {
+            setSelectedPendingIds(prev => { const n = new Set(prev); n.delete(tempId); return n; });
+            setSelectedConfirmedIds(prev => { const n = new Set(prev); n.add(tempId); return n; });
+        } else {
+            setSelectedConfirmedIds(prev => { const n = new Set(prev); n.delete(tempId); return n; });
+            setSelectedPendingIds(prev => { const n = new Set(prev); n.add(tempId); return n; });
+        }
 
-}, [items, setSelectedPendingIds, setSelectedConfirmedIds]);
+    }, [items, setSelectedPendingIds, setSelectedConfirmedIds]);
 
     const handleUpdateReceivedQuantity = (tempId: number, value: string) => {
         const received = parseFloat(value);
@@ -416,10 +416,10 @@ const handleXmlUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     };
 
     const handleMapProduct = (tempId: number) => {
-    const item = items.find(i => i.tempId === tempId);
-    if (!item) return;
-    setItemToMap(item);
-};
+        const item = items.find(i => i.tempId === tempId);
+        if (!item) return;
+        setItemToMap(item);
+    };
 
     const handleModalMap = useCallback((tempId: number, data: MappingPayload) => {
         if (!data) {
@@ -454,15 +454,15 @@ const handleXmlUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     }, []);
 
 
-const openMappingModal = (item: ProductEntry) => {
-      console.log('🔥 ABRINDO MODAL COM:', item);  // ← ADICIONE
-    setItemToMap(item);
-};
+    const openMappingModal = (item: ProductEntry) => {
+        console.log('🔥 ABRINDO MODAL COM:', item);  // ← ADICIONE
+        setItemToMap(item);
+    };
 
-const closeModal = () => {
-      console.log('🔥 FECHANDO MODAL');  // ← ADICIONE
-    setItemToMap(null);
-};
+    const closeModal = () => {
+        console.log('🔥 FECHANDO MODAL');  // ← ADICIONE
+        setItemToMap(null);
+    };
     // Seleção por linha (isPending = true para pendentes)
     const toggleSelectItem = (tempId: number, isPending: boolean) => {
         if (isPending) {
@@ -531,34 +531,34 @@ const closeModal = () => {
 
 
     // Cabeçalho da tabela
-const renderTableHead = (itemsList: ProductEntry[], toggleSelectAll: (isPending: boolean) => void, isPendingTable: boolean, selectedIds: Set<number>) => {
-    const allSelected = itemsList.length > 0 && itemsList.every(item => selectedIds.has(item.tempId));
-    return (
-        <thead>
-            <tr style={styles.tableHead}>
-                <th style={styles.tableTh}>
-                    {itemsList.length > 0 && (
-                        <input
-                            type="checkbox"
-                            checked={allSelected}
-                            onChange={() => toggleSelectAll(isPendingTable)}
-                        />
-                    )}
-                </th>
-                <th style={styles.tableTh}>Mapeamento</th>
-                <th style={{ ...styles.tableTh, width: '60px' }}><Badge color='paper'>EAN </Badge> & <Badge color='poco'>SKU Forn.</Badge></th>
-                <th style={{ ...styles.tableTh, width: '500px' }}>Produto (NF)</th>
-                <th style={{ ...styles.tableTh, width: '80px' }}>Preço Unitário (NF)</th>
-                <th style={{ ...styles.tableTh, width: '50px' }}>Qtd. NF</th>
-                <th style={{ ...styles.tableTh }}>UoM</th>
-                <th style={{ ...styles.tableTh }}>*Qtd. Recebida*</th>
-                <th style={{ ...styles.tableTh, width: '30px' }}>*Dif.*</th>
-                <th style={{ ...styles.tableTh, width: '60px' }}>Total Produto</th>
-                <th style={{ ...styles.tableTh }}>Ações</th>
-            </tr>
-        </thead>
-    );
-};
+    const renderTableHead = (itemsList: ProductEntry[], toggleSelectAll: (isPending: boolean) => void, isPendingTable: boolean, selectedIds: Set<number>) => {
+        const allSelected = itemsList.length > 0 && itemsList.every(item => selectedIds.has(item.tempId));
+        return (
+            <thead>
+                <tr style={styles.tableHead}>
+                    <th style={styles.tableTh}>
+                        {itemsList.length > 0 && (
+                            <input
+                                type="checkbox"
+                                checked={allSelected}
+                                onChange={() => toggleSelectAll(isPendingTable)}
+                            />
+                        )}
+                    </th>
+                    <th style={styles.tableTh}>Mapeamento</th>
+                    <th style={{ ...styles.tableTh, width: '60px' }}><Badge color='paper'>EAN </Badge> & <Badge color='poco'>SKU Forn.</Badge></th>
+                    <th style={{ ...styles.tableTh, width: '500px' }}>Produto (NF)</th>
+                    <th style={{ ...styles.tableTh, width: '80px' }}>Preço Unitário (NF)</th>
+                    <th style={{ ...styles.tableTh, width: '50px' }}>Qtd. NF</th>
+                    <th style={{ ...styles.tableTh }}>UoM</th>
+                    <th style={{ ...styles.tableTh }}>*Qtd. Recebida*</th>
+                    <th style={{ ...styles.tableTh, width: '30px' }}>*Dif.*</th>
+                    <th style={{ ...styles.tableTh, width: '60px' }}>Total Produto</th>
+                    <th style={{ ...styles.tableTh }}>Ações</th>
+                </tr>
+            </thead>
+        );
+    };
 
 
 
@@ -610,31 +610,31 @@ const renderTableHead = (itemsList: ProductEntry[], toggleSelectAll: (isPending:
                         </Button>
                     )}
                 </td>
-                
+
                 <td style={styles.tableCell}> <Badge color='paper'> {item.gtin || '-'}</Badge>  <br /> <Badge color='poco'>{item.sku}</Badge> </td>
                 <td style={{ ...styles.tableCell, fontWeight: 500 }}>{item.descricao} <br /> {item.category && item.category !== '' ? (
-                        <span style={{
-                            padding: '3px 8px',
-                            backgroundColor: '#d1fae5',
-                            color: '#065f46',
-                            borderRadius: '4px',
-                            fontSize: '0.75rem',
-                            fontWeight: 600,
-                        }}>
-                            {item.category}
-                        </span>
-                    ) : (
-                        <span style={{
-                            padding: '5px 0px',
-                            backgroundColor: '#fee2e2',
-                            color: '#991b1b',
-                            borderRadius: '4px',
-                            fontSize: '0.7rem',
-                            fontWeight: 500,
-                        }}>
-                            Sem Categoria
-                        </span>
-                    )}</td>
+                    <span style={{
+                        padding: '3px 8px',
+                        backgroundColor: '#d1fae5',
+                        color: '#065f46',
+                        borderRadius: '4px',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                    }}>
+                        {item.category}
+                    </span>
+                ) : (
+                    <span style={{
+                        padding: '5px 0px',
+                        backgroundColor: '#fee2e2',
+                        color: '#991b1b',
+                        borderRadius: '4px',
+                        fontSize: '0.7rem',
+                        fontWeight: 500,
+                    }}>
+                        Sem Categoria
+                    </span>
+                )}</td>
                 <td style={styles.tableCell}>R$ {item.valorCustoReal.toFixed(3)}</td>
                 <td style={{ ...styles.tableCell, fontWeight: 700, color: '#4b5563' }}>{item.quantidade.toFixed(2)}</td>
                 <td style={{ ...styles.tableCell, fontWeight: 700, color: '#4b5563' }}>{item.unidadeMedida}</td>
@@ -665,7 +665,7 @@ const renderTableHead = (itemsList: ProductEntry[], toggleSelectAll: (isPending:
                 }}>
                     {item.difference.toFixed(2)}
                 </td>
-                
+
                 <td style={{ ...styles.tableCell, fontWeight: 700, color: '#10b981' }}>{formatCurrency(item.total)}</td>
                 <td style={styles.tableCell}>
                     <button
@@ -697,7 +697,7 @@ const renderTableHead = (itemsList: ProductEntry[], toggleSelectAll: (isPending:
         if (hasPendingItems) { alert('ERRO: Todos os itens devem ser conferidos antes de finalizar a entrada.'); return; }
         const allMapped = items.every(item => item.mappedId);
         if (!allMapped) { alert('ERRO: Todos os itens devem estar mapeados antes de confirmar a entrada.'); return; }
-        
+
         if (hasDivergence) {
             const confirmDivergence = window.confirm(`ATENÇÃO: ${divergentItems.length} divergência(s). Confirmar entrada dos itens recebidos (${totalItems.toFixed(2)} unidades)?`);
             if (!confirmDivergence) return;
@@ -706,41 +706,41 @@ const renderTableHead = (itemsList: ProductEntry[], toggleSelectAll: (isPending:
         try {
             // Monta o payload conforme esperado pelo backend
             const payload = {
-    invoiceNumber: invoiceNumber.replace('NF ', ''),
-    accessKey,
-    entryDate,
-    supplierCnpj,
-    supplierName: supplier,
+                invoiceNumber: invoiceNumber.replace('NF ', ''),
+                accessKey,
+                entryDate,
+                supplierCnpj,
+                supplierName: supplier,
 
-    totalFreight,
-    totalIpi,
-    totalIcmsST,
-    totalIBS,
-    totalCBS,
-    totalOtherExpenses,
-    totalNoteValue,
+                totalFreight,
+                totalIpi,
+                totalIcmsST,
+                totalIBS,
+                totalCBS,
+                totalOtherExpenses,
+                totalNoteValue,
 
-    items: items
-        .filter(item => item.isConfirmed)
-        .map(item => ({
-            codigoInterno: item.mappedId!,
-            skuFornecedor: item.sku,
-            quantidadeRecebida: item.quantityReceived,
-            unidade: item.unidadeMedida,
+                items: items
+                    .filter(item => item.isConfirmed)
+                    .map(item => ({
+                        codigoInterno: item.mappedId!,
+                        skuFornecedor: item.sku,
+                        quantidadeRecebida: item.quantityReceived,
+                        unidade: item.unidadeMedida,
 
-            custoUnitario: item.valorCustoReal,
+                        custoUnitario: item.valorCustoReal,
 
-            impostos: {
-                ipi: totalIpi,
-                icmsST: totalIcmsST,
-                ibs: item.valorIBS,
-                cbs: item.valorCBS,
-            },
+                        impostos: {
+                            ipi: totalIpi,
+                            icmsST: totalIcmsST,
+                            ibs: item.valorIBS,
+                            cbs: item.valorCBS,
+                        },
 
-            ncm: item.ncm,
-            cest: item.cest,
-        }))
-};
+                        ncm: item.ncm,
+                        cest: item.cest,
+                    }))
+            };
 
             // ✨ DEBUG: Log do payload sendo enviado
             console.log('[PAYLOAD ENVIADO] Total de itens:', payload.items.length);
@@ -794,49 +794,49 @@ const renderTableHead = (itemsList: ProductEntry[], toggleSelectAll: (isPending:
 
 
                             <label htmlFor="xml-upload" style={styles.importButton}>Alterar XML</label>
-                            
+
                         </div>
                     )}
 
                 </FlexGridContainer>
             </div>
 
-           
-<NfeCards
-    data={{
-        chaveAcesso: accessKey,
-        numero: invoiceNumber.replace('NF ', ''),
-        serie: items.length > 0 ? (pendingXmlData?.serie || '') : '', // Recupera a série do estado pendente
-        dataEmissao: entryDate,
-        emitente: {
-            cnpj: supplierCnpj,
-            nome: supplier,
-            nomeFantasia: supplierFantasyName,
-        },
-        totais: {
-            valorTotalProdutos: subtotal, // Soma dos itens processados
-            valorTotalIpi: totalIpi,
-            valorTotalFrete: totalFreight,
-            valorOutrasDespesas: totalOtherExpenses,
-            valorTotalDesconto: items.reduce((acc, it) => acc + (it.valorDesconto || 0), 0), // Opcional: buscar do estado
-            valorTotalIcms: 0, // Pode ser expandido se você criar o estado setTotalIcms
-            valorTotalIcmsST: totalIcmsST,
-            valorTotalIBS: totalIBS,
-            valorTotalCBS: totalCBS,
-            valorTotalNf: totalNoteValue,
-            valorTotalTributos: (totalIpi + totalIcmsST + (totalIBS || 0) + (totalCBS || 0)),
-        },
-    }}
-    supplierStatus={{
-        exists: supplierExists,
-        isChecking: isSupplierChecking,
-    }}
-    actions={{
-        onCreateSupplier: () => setIsSupplierModalOpen(true),
-        formatCurrency,
-    }}
-    styles={styles}
-/>
+
+            <NfeCards
+                data={{
+                    chaveAcesso: accessKey,
+                    numero: invoiceNumber.replace('NF ', ''),
+                    serie: items.length > 0 ? (pendingXmlData?.serie || '') : '', // Recupera a série do estado pendente
+                    dataEmissao: entryDate,
+                    emitente: {
+                        cnpj: supplierCnpj,
+                        nome: supplier,
+                        nomeFantasia: supplierFantasyName,
+                    },
+                    totais: {
+                        valorTotalProdutos: subtotal, // Soma dos itens processados
+                        valorTotalIpi: totalIpi,
+                        valorTotalFrete: totalFreight,
+                        valorOutrasDespesas: totalOtherExpenses,
+                        valorTotalDesconto: items.reduce((acc, it) => acc + (it.valorDesconto || 0), 0), // Opcional: buscar do estado
+                        valorTotalIcms: 0, // Pode ser expandido se você criar o estado setTotalIcms
+                        valorTotalIcmsST: totalIcmsST,
+                        valorTotalIBS: totalIBS,
+                        valorTotalCBS: totalCBS,
+                        valorTotalNf: totalNoteValue,
+                        valorTotalTributos: (totalIpi + totalIcmsST + (totalIBS || 0) + (totalCBS || 0)),
+                    },
+                }}
+                supplierStatus={{
+                    exists: supplierExists,
+                    isChecking: isSupplierChecking,
+                }}
+                actions={{
+                    onCreateSupplier: () => setIsSupplierModalOpen(true),
+                    formatCurrency,
+                }}
+                styles={styles}
+            />
 
             {/* Restante do seu código (Tabelas de itens, etc) */}
 
@@ -844,7 +844,7 @@ const renderTableHead = (itemsList: ProductEntry[], toggleSelectAll: (isPending:
             <h2 style={styles.panelTitle}>3. Conferência Detalhada de Itens {items.length == 1 ? '(1 item)' : `(${items.length} itens)`}</h2>
             <FlexGridContainer layout='grid' template='1fr 1fr' gap='10px'>
 
-                <div  style={{display:'flex' , flexDirection: 'column'}}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
                     <h3 style={styles.subTitle}>🔴 Itens Pendentes de Ação ({pendingItems.length} produtos)</h3>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
                         <button onClick={handleBulkConfirmSelected} style={{ padding: '6px 10px', borderRadius: 4, backgroundColor: '#4f46e5', color: '#fff' }}>
@@ -911,7 +911,11 @@ const renderTableHead = (itemsList: ProductEntry[], toggleSelectAll: (isPending:
                                 <div key={item.tempId} style={styles.divergenceItem}>
                                     <Typography variant='p'><strong>SKU {item.sku}:</strong> {item.descricao}</Typography>
                                     <p style={styles.divergenceDetails}>
-                                        Quantidade na NF: <strong>{item.quantidade.toFixed(2)}</strong> | Recebido: <strong>{item.quantidade.toFixed(2)}</strong> |
+                                        Quantidade na NF: <strong>{item.quantidade.toFixed(2)}</strong> | Recebido: <strong>
+                                            {item.quantidade && item.difference
+                                                ? (Number(item.quantidade) + Number(item.difference)).toFixed(2).replace('.', ',')
+                                                : 'N/A'}
+                                        </strong> |
                                         Diferença: <span style={{ color: item.difference > 0 ? '#f59e0b' : '#dc2626', fontWeight: 700 }}>{item.difference > 0 ? `+${item.difference.toFixed(2)}` : item.difference.toFixed(2)}</span>
                                     </p>
                                 </div>
@@ -935,25 +939,25 @@ const renderTableHead = (itemsList: ProductEntry[], toggleSelectAll: (isPending:
 
                     <button onClick={handleConfirmEntry} style={styles.confirmButton} disabled={items.length === 0 || hasUnmappedItems || hasPendingItems}>
                         {items.length === 0 ? '🚫 Importe o XML' : hasPendingItems ? '🚫 Finalize a conferência' : hasUnmappedItems ? '🚫 Mapeie os itens' : '✅ Confirmar Entrada e Atualizar Estoque'}
-                    </button> 
+                    </button>
                 </div>
             </FlexGridContainer>
 
-            
-    {itemToMap && (
-  <MappingModal
-    item={itemToMap}          // ✅ ProductEntry (dados originais)
-    supplierCnpj={supplierCnpj} 
-    onClose={closeModal}      // ✅ Fecha modal
-    onMap={handleModalMap}    // ✅ Recebe MappingPayload
-  />
-)}
+
+            {itemToMap && (
+                <MappingModal
+                    item={itemToMap}          // ✅ ProductEntry (dados originais)
+                    supplierCnpj={supplierCnpj}
+                    onClose={closeModal}      // ✅ Fecha modal
+                    onMap={handleModalMap}    // ✅ Recebe MappingPayload
+                />
+            )}
 
             {isSupplierModalOpen && supplierToCreate && (
                 <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.4)' }}>
                     <div style={{ width: 480, padding: 20, borderRadius: 8, backgroundColor: 'white', boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }}>
-                        <h3 style={{ marginTop: 0, color:'black' }}>Criar Fornecedor</h3>
-                        <p style={{color:'black'}}>O fornecedor extraído da NF não foi localizado no sistema. Preencha os dados abaixo para criá-lo.</p>
+                        <h3 style={{ marginTop: 0, color: 'black' }}>Criar Fornecedor</h3>
+                        <p style={{ color: 'black' }}>O fornecedor extraído da NF não foi localizado no sistema. Preencha os dados abaixo para criá-lo.</p>
 
                         <div style={{ display: 'grid', gap: 10, marginTop: 8 }}>
                             <div>
@@ -972,31 +976,31 @@ const renderTableHead = (itemsList: ProductEntry[], toggleSelectAll: (isPending:
                             </div>
 
                             <div>
-    <label style={{ display: 'block', fontSize: '0.85rem', color: '#374151', marginBottom: 6 }}>
-        Nome Fantasia
-    </label>
-    <input 
-        style={{ 
-            color: '#374151', 
-            width: '100%', 
-            padding: '8px', 
-            borderRadius: 6, 
-            border: '1px solid #e5e7eb', 
-            backgroundColor: '#fff' 
-        }} 
-        value={nomeFantasia}
-        onChange={(e) => setNomeFantasia(e.target.value)} 
-        placeholder="Ex: Lojas São José"
-    />
-</div>
+                                <label style={{ display: 'block', fontSize: '0.85rem', color: '#374151', marginBottom: 6 }}>
+                                    Nome Fantasia
+                                </label>
+                                <input
+                                    style={{
+                                        color: '#374151',
+                                        width: '100%',
+                                        padding: '8px',
+                                        borderRadius: 6,
+                                        border: '1px solid #e5e7eb',
+                                        backgroundColor: '#fff'
+                                    }}
+                                    value={nomeFantasia}
+                                    onChange={(e) => setNomeFantasia(e.target.value)}
+                                    placeholder="Ex: Lojas São José"
+                                />
+                            </div>
 
                             <div>
-                                <FormControl 
-    label="Sigla Gerada (BD)" 
-    value={siglaGerada} 
-    readOnlyDisplay 
-    style={{ marginTop: 10, backgroundColor: '#f3f4f6' }}
-/>
+                                <FormControl
+                                    label="Sigla Gerada (BD)"
+                                    value={siglaGerada}
+                                    readOnlyDisplay
+                                    style={{ marginTop: 10, backgroundColor: '#f3f4f6' }}
+                                />
                             </div>
 
                             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 6 }}>
@@ -1057,62 +1061,62 @@ const styles: { [key: string]: React.CSSProperties } = {
     panel: { backgroundColor: '#ffffff', padding: '24px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e5e7eb' },
     panelTitle: { fontSize: '1.1rem', fontWeight: 600, color: '#374151', marginBottom: '16px', borderBottom: '1px solid #f3f4f6', paddingBottom: '12px' },
     subTitle: { fontSize: '1rem', fontWeight: 600, color: '#4b5563', marginBottom: '0px' }, // Removi a margem para alinhar com botões
-    
-    importArea: { 
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
-        padding: '16px', backgroundColor: '#ffffff', border: '1px solid #e5e7eb', 
-        borderRadius: '8px', marginBottom: '24px' 
+
+    importArea: {
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '16px', backgroundColor: '#ffffff', border: '1px solid #e5e7eb',
+        borderRadius: '8px', marginBottom: '24px'
     },
-    importButton: { 
-        padding: '8px 16px', backgroundColor: '#4f46e5', color: 'white', 
+    importButton: {
+        padding: '8px 16px', backgroundColor: '#4f46e5', color: 'white',
         borderRadius: '6px', fontWeight: 500, cursor: 'pointer', fontSize: '0.875rem',
         transition: 'background-color 0.2s'
     },
-    
-    tableResponsive: { 
-        overflowX: 'auto', backgroundColor: '#ffffff', borderRadius: '8px', 
-        border: '1px solid #e5e7eb', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' 
+
+    tableResponsive: {
+        overflowX: 'auto', backgroundColor: '#ffffff', borderRadius: '8px',
+        border: '1px solid #e5e7eb', boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
     },
     dataTable: { width: '100%', borderCollapse: 'collapse', minWidth: '800px' },
-    tableTh: { 
-        padding: '12px 8px', textAlign: 'left', fontSize: '0.6rem', 
-        fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', 
-        backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' 
+    tableTh: {
+        padding: '12px 8px', textAlign: 'left', fontSize: '0.6rem',
+        fontWeight: 600, color: '#6b7280', textTransform: 'uppercase',
+        backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb'
     },
-    tableCell: { 
-        padding: '10px 8px', textAlign: 'left', fontSize: '0.875rem', 
-        color: '#374151', borderBottom: '1px solid #f3f4f6', verticalAlign: 'middle' 
+    tableCell: {
+        padding: '10px 8px', textAlign: 'left', fontSize: '0.875rem',
+        color: '#374151', borderBottom: '1px solid #f3f4f6', verticalAlign: 'middle'
     },
-    
+
     // Botões de Ação na Tabela
     checkButton: { padding: '6px 12px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 500 },
     uncheckButton: { padding: '6px 12px', backgroundColor: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', borderRadius: '6px', cursor: 'pointer' },
     mapButton: { padding: '6px 12px', backgroundColor: '#f59e0b', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' },
-    
+
     // Rodapé de Confirmação
-    confirmationArea: { 
-        marginTop: '32px', display: 'flex', flexDirection: 'column', 
-        alignItems: 'flex-end', gap: '16px', borderTop: '2px solid #e5e7eb', paddingTop: '24px' 
+    confirmationArea: {
+        marginTop: '32px', display: 'flex', flexDirection: 'column',
+        alignItems: 'flex-end', gap: '16px', borderTop: '2px solid #e5e7eb', paddingTop: '24px'
     },
-    totalsBoxFooter: { 
-        padding: '20px', backgroundColor: '#ffffff', borderRadius: '12px', 
+    totalsBoxFooter: {
+        padding: '20px', backgroundColor: '#ffffff', borderRadius: '12px',
         border: '1px solid #e5e7eb', width: '100%', maxWidth: '400px',
         boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
     },
-    confirmButton: { 
-        width: '100%', maxWidth: '400px', padding: '16px', 
-        backgroundColor: '#059669', color: 'white', border: 'none', 
+    confirmButton: {
+        width: '100%', maxWidth: '400px', padding: '16px',
+        backgroundColor: '#059669', color: 'white', border: 'none',
         borderRadius: '8px', fontWeight: 600, fontSize: '1rem', cursor: 'pointer',
         boxShadow: '0 10px 15px -3px rgba(16, 185, 129, 0.2)'
     },
-    
+
     totalLine: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' },
     totalLabel: { color: '#6b7280', fontSize: '0.875rem' },
     totalValue: { fontWeight: 600, color: '#111827' },
-    
-    divergenceItem: { 
-        padding: '12px 16px', borderLeft: '4px solid #ef4444', 
-        backgroundColor: '#fff1f2', borderRadius: '4px', marginBottom: '8px' 
+
+    divergenceItem: {
+        padding: '12px 16px', borderLeft: '4px solid #ef4444',
+        backgroundColor: '#fff1f2', borderRadius: '4px', marginBottom: '8px'
     }
 };
 
@@ -1129,8 +1133,8 @@ export default StockEntryForm;
 //     }
 
 //     // 2º PASSO: Busca por Relação SKU/Fornecedor (O de-para já aprendido)
-//     const relacao = await db.produto_fornecedor.findFirst({ 
-//         where: { id_fornecedor: idFornecedor, sku_fornecedor: itemXml.codigo } 
+//     const relacao = await db.produto_fornecedor.findFirst({
+//         where: { id_fornecedor: idFornecedor, sku_fornecedor: itemXml.codigo }
 //     });
 //     if (relacao) {
 //         const produto = await db.produtos.findFirst({ where: { id_produto: relacao.id_produto } });

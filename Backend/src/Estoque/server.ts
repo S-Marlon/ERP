@@ -732,12 +732,142 @@ app.post('/api/suppliers/get-sigla', asyncHandler(async (req, res) => {
 }));
 
 /**
+ * GET /api/stock-entry
+ * Busca todas as notas fiscais registradas com filtros opcionais
+ * Query params: supplierCnpj, invoiceNumber, startDate, endDate
+ */
+app.get('/api/stock-entry', asyncHandler(async (req, res) => {
+    const { supplierCnpj, invoiceNumber, startDate, endDate } = req.query;
+
+    let query = `
+        SELECT 
+            cn.id_nota AS id,
+            cn.numero_nota AS invoiceNumber,
+            cn.serie AS series,
+            cn.chave_acesso AS accessKey,
+            cn.data_emissao AS emissionDate,
+            cn.data_entrada AS entryDate,
+            f.cnpj AS supplierCnpj,
+            f.razao_social AS supplierName,
+            cn.valor_frete AS totalFreight,
+            cn.valor_seguro AS totalInsurance,
+            cn.valor_outras_despesas AS totalOtherExpenses,
+            cn.valor_total AS totalNoteValue,
+            COUNT(ci.id_item_nota) AS itemsCount,
+            SUM(COALESCE(ci.valor_ibs, 0)) AS totalIBS,
+            SUM(COALESCE(ci.valor_cbs, 0)) AS totalCBS,
+            SUM(COALESCE(ci.impostos_taxas, 0)) AS totalTaxes,
+            cn.status_nota AS status
+        FROM compras_notas cn
+        LEFT JOIN fornecedores f ON cn.id_fornecedor = f.id_fornecedor
+        LEFT JOIN compras_itens ci ON cn.id_nota = ci.id_nota
+        WHERE 1=1
+    `;
+
+    const params: any[] = [];
+
+    // Adiciona filtros conforme necessário
+    if (supplierCnpj) {
+        query += ' AND f.cnpj LIKE ?';
+        params.push(`%${supplierCnpj}%`);
+    }
+
+    if (invoiceNumber) {
+        query += ' AND cn.numero_nota LIKE ?';
+        params.push(`%${invoiceNumber}%`);
+    }
+
+    if (startDate) {
+        query += ' AND cn.data_entrada >= ?';
+        params.push(startDate);
+    }
+
+    if (endDate) {
+        query += ' AND cn.data_entrada <= ?';
+        params.push(endDate);
+    }
+
+    query += ' GROUP BY cn.id_nota ORDER BY cn.data_entrada DESC';
+
+    const [rows]: any = await pool.execute(query, params);
+
+    res.json(rows);
+}));
+
+/**
+ * GET /api/stock-entry/:id
+ * Busca detalhes completos de uma nota fiscal incluindo todos os itens
+ */
+app.get('/api/stock-entry/:id', asyncHandler(async (req, res) => {
+    const { id } = req.params;
+
+    // Busca os dados da nota
+    const [noteRows]: any = await pool.execute(`
+        SELECT 
+            cn.id_nota AS id,
+            cn.numero_nota AS invoiceNumber,
+            cn.serie AS series,
+            cn.chave_acesso AS accessKey,
+            cn.data_emissao AS emissionDate,
+            cn.data_entrada AS entryDate,
+            cn.data_recebimento AS receivementDate,
+            f.cnpj AS supplierCnpj,
+            f.razao_social AS supplierName,
+            cn.valor_frete AS totalFreight,
+            cn.valor_seguro AS totalInsurance,
+            cn.valor_outras_despesas AS totalOtherExpenses,
+            cn.valor_total AS totalNoteValue,
+            cn.status_nota AS status
+        FROM compras_notas cn
+        LEFT JOIN fornecedores f ON cn.id_fornecedor = f.id_fornecedor
+        WHERE cn.id_nota = ?
+    `, [id]);
+
+    if (!noteRows || noteRows.length === 0) {
+        return res.status(404).json({ error: 'Nota fiscal não encontrada' });
+    }
+
+    const note = noteRows[0];
+
+    // Busca os itens da nota
+    const [itemRows]: any = await pool.execute(`
+        SELECT 
+            ci.id_item_nota AS id,
+            p.codigo_interno AS codigoInterno,
+            p.id_produto,
+            ci.sku_fornecedor_original AS skuFornecedor,
+            ci.quantidade AS quantidadeRecebida,
+            ci.unidade_xml AS unidadeXml,
+            p.unidade AS unidade,
+            ci.preco_unitario_custo AS custoUnitario,
+            ci.valor_total_item AS valorTotalItem,
+            ci.impostos_taxas AS impostosTaxas,
+            ci.valor_ibs AS ibs,
+            ci.valor_cbs AS cbs,
+            ci.valor_imposto_seletivo AS impostoSeletivo,
+            ci.ncm AS ncm,
+            ci.cfop AS cfop,
+            p.cest AS cest
+        FROM compras_itens ci
+        LEFT JOIN produtos p ON ci.id_produto = p.id_produto
+        WHERE ci.id_nota = ?
+        ORDER BY ci.id_item_nota
+    `, [id]);
+
+    // Combina tudo na resposta
+    res.json({
+        ...note,
+        items: itemRows
+    });
+}));
+
+/**
  * POST /api/stock-entry
  * Consolida a entrada de NF no banco de dados usando as tabelas compras_notas e compras_itens
  * Cria registros em: compras_notas, compras_itens, estoque_movimentos, e atualiza estoque_atual
  */
 app.post('/api/stock-entry', asyncHandler(async (req, res) => {
-    const { invoiceNumber, accessKey, entryDate, supplierCnpj, supplierName, totalFreight, totalIpi, totalOtherExpenses, totalNoteValue, items } = req.body;
+    const { invoiceNumber, accessKey, entryDate, supplierCnpj, supplierName, totalFreight, totalInsurance, totalOtherExpenses, totalNoteValue, items } = req.body;
 
     // ✨ DEBUG: Log do que chegou do frontend
     console.log('[BACKEND] POST /api/stock-entry recebido');
@@ -772,16 +902,25 @@ app.post('/api/stock-entry', asyncHandler(async (req, res) => {
 
         // 2️⃣ Inserir Nota de Compra na tabela compras_notas
         const [notaResult]: any = await connection.execute(
-            `INSERT INTO compras_notas (chave_acesso, numero_nota, id_fornecedor, data_emissao, valor_total, status_nota)
-             VALUES (?, ?, ?, ?, ?, 'PROCESSADA')`,
-            [accessKey, invoiceNumber, id_fornecedor, entryDate || new Date(), totalNoteValue || 0]
+            `INSERT INTO compras_notas (chave_acesso, numero_nota, id_fornecedor, data_emissao, valor_total, valor_frete, valor_seguro, valor_outras_despesas, status_nota)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PROCESSADA')`,
+            [
+                accessKey, 
+                invoiceNumber, 
+                id_fornecedor, 
+                entryDate || new Date(), 
+                totalNoteValue || 0,
+                totalFreight || 0,
+                totalInsurance || 0,
+                totalOtherExpenses || 0
+            ]
         );
 
         const id_nota = notaResult.insertId;
 
         // 3️⃣ Processar cada item
         for (const item of items) {
-            const { codigoInterno, skuFornecedor, quantidadeRecebida, unidade, custoUnitario } = item;
+            const { codigoInterno, skuFornecedor, quantidadeRecebida, unidade, custoUnitario, ncm, cfop } = item;
 
             // Obter id_produto pelo código interno
             const [products]: any = await connection.execute(
@@ -799,9 +938,9 @@ app.post('/api/stock-entry', asyncHandler(async (req, res) => {
 
             // 3a. Inserir item na tabela compras_itens
             await connection.execute(
-                `INSERT INTO compras_itens (id_nota, id_produto, sku_fornecedor_original, quantidade, preco_unitario_custo, valor_total_item, unidade_xml)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                [id_nota, id_produto, skuFornecedor || '', quantidadeRecebida, custoUnitario, custoTotal, unidade]
+                `INSERT INTO compras_itens (id_nota, id_produto, sku_fornecedor_original, quantidade, preco_unitario_custo, valor_total_item, unidade_xml, ncm, cfop)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [id_nota, id_produto, skuFornecedor || '', quantidadeRecebida, custoUnitario, custoTotal, unidade, ncm || '', cfop || '']
             );
 
             // 3b. Inserir movimentação em estoque_movimentos (rastreamento)

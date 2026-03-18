@@ -35,7 +35,7 @@ const tagMap: Record<TypographyVariant, keyof JSX.IntrinsicElements> = {
   h5: "h5",
   h6: "h6",
   p: "p",
-  pMuted: "pMuted",
+  pMuted: "p",
   small: "small",
   strong: "strong",
   em: "em",

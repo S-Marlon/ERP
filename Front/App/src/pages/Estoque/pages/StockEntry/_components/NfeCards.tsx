@@ -83,7 +83,7 @@ const NfeCards: React.FC<NfeCardsProps> = ({
         <FlexGridContainer layout="grid" template="1fr" gap="20px">
             
             {/* 1. Identificação e Emitente (Cards Lado a Lado) */}
-            <FlexGridContainer layout="grid" template="1.5fr 1fr 1fr" gap="20px">
+            <FlexGridContainer layout="grid" template="1fr 1fr 1fr" gap="20px">
                 
                 {/* Identificação da NF */}
                 <Card variant="default" padding="20px">
@@ -115,28 +115,29 @@ const NfeCards: React.FC<NfeCardsProps> = ({
                              </div>
                         )}
                     <div style={{ marginTop: 15 }}>
+                        <FlexGridContainer layout="grid" template="1fr 1fr" gap="10px">
                         <FormControl label="CNPJ" value={emitente.cnpj} readOnlyDisplay />
-                        <FormControl 
-                            label="Razão Social" 
-                            value={emitente.nome} 
-                            readOnlyDisplay 
-                            style={{ marginTop: 10 }}
-                        />
-                        <FormControl 
-                            label="Nome Fantasia" 
-                            value={emitente.nomeFantasia || emitente.nome} 
-                            readOnlyDisplay 
-                            style={{ marginTop: 10 }}
-                        />
-
                          <FormControl 
     label="Sigla" 
     // Priorizamos a sigla que veio do banco de dados (estado local)
     // Se não houver, ele pode mostrar um placeholder ou vazio
     value={sigla || emitente.sigla || "Buscando..."} 
     readOnlyDisplay 
-    style={{ marginTop: 10 }}
 />
+
+                        </FlexGridContainer>
+                        <FormControl 
+                            label="Razão Social" 
+                            value={emitente.nome} 
+                            readOnlyDisplay 
+                        />
+                        <FormControl 
+                            label="Nome Fantasia" 
+                            value={emitente.nomeFantasia || emitente.nome} 
+                            readOnlyDisplay 
+                        />
+
+                        
                        
                     </div>
                 </Card>

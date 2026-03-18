@@ -292,7 +292,7 @@ export const submitStockEntry = async (payload: {
     supplierCnpj: string;
     supplierName: string;
     totalFreight: number;
-    totalIpi: number;
+    totalInsurance: number;
     totalOtherExpenses: number;
     totalNoteValue: number;
     items: {
@@ -301,6 +301,8 @@ export const submitStockEntry = async (payload: {
         quantidadeRecebida: number;
         unidade: string;
         custoUnitario: number;
+        ncm?: string;
+        cfop?: string;
     }[];
 }) => {
     const response = await fetch(`${apiBase}/stock-entry`, {
@@ -308,6 +310,43 @@ export const submitStockEntry = async (payload: {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
     });
+
+    if (!response.ok) {
+        const err = await response.text();
+        throw new Error(err);
+    }
+    return await response.json();
+};
+
+/**
+ * Busca todas as notas fiscais registradas
+ */
+export const fetchStockEntryNotes = async (filters?: {
+    supplierCnpj?: string;
+    invoiceNumber?: string;
+    startDate?: string;
+    endDate?: string;
+}) => {
+    const params = new URLSearchParams();
+    if (filters?.supplierCnpj) params.append('supplierCnpj', filters.supplierCnpj);
+    if (filters?.invoiceNumber) params.append('invoiceNumber', filters.invoiceNumber);
+    if (filters?.startDate) params.append('startDate', filters.startDate);
+    if (filters?.endDate) params.append('endDate', filters.endDate);
+
+    const response = await fetch(`${apiBase}/stock-entry?${params.toString()}`);
+
+    if (!response.ok) {
+        const err = await response.text();
+        throw new Error(err);
+    }
+    return await response.json();
+};
+
+/**
+ * Busca detalhes e itens de uma nota fiscal específica
+ */
+export const fetchStockEntryDetails = async (noteId: string | number) => {
+    const response = await fetch(`${apiBase}/stock-entry/${noteId}`);
 
     if (!response.ok) {
         const err = await response.text();

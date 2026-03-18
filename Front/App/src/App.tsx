@@ -32,6 +32,7 @@ import StockLabelingForm from './pages/Estoque/pages/StockLabelingForm/StockLabe
 import { FinalizarVenda} from "./pages/PDV/pages/FinalizarVenda";
 import { PDV } from './pages/PDV/PDV';
 import { HubVendas } from './pages/PDV/HubVendas';
+import Notas from './pages/Estoque/pages/notas/Notas';
 
 function App() {
 
@@ -119,6 +120,7 @@ function App() {
               <Route path="/Estoque" element={<Estoque />} />
               <Route path="/Estoque/consulta" element={<StockInventory/>} />
               <Route path="/Estoque/gerenciamento" element={<StockEntryForm/>} />
+              <Route path="/Estoque/notas" element={<Notas />} />
               <Route path="/Estoque/operacoes" element={<StockAdjustmentForm/>} />
               <Route path="/Estoque/etiquetagem" element={<StockLabelingForm/>} />
 
