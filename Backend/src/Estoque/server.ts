@@ -56,112 +56,262 @@ function gerarHashCNPJ(cnpj: string): string {
 
 // --- ROTAS DE PRODUTOS E CATEGORIAS ---
 
+// Função otimizada para buscar todos os descendentes de uma categoria
+async function getAllCategoryIdsRecursive(categoryName: string, connection: any): Promise<number[]> {
+    try {
+        // Query otimizada: busca categoria e descendentes em DUAS camadas (suficiente para maioria)
+        const [rows]: any = await connection.execute(`
+            SELECT c.id_categoria FROM categorias c
+            WHERE c.nome_categoria = ?
+            OR c.id_categoria_pai = (
+                SELECT id_categoria FROM categorias WHERE nome_categoria = ? LIMIT 1
+            )
+            OR c.id_categoria_pai IN (
+                SELECT id_categoria FROM categorias 
+                WHERE id_categoria_pai = (
+                    SELECT id_categoria FROM categorias WHERE nome_categoria = ? LIMIT 1
+                )
+            )
+        `, [categoryName, categoryName, categoryName]);
+        
+        return rows.length === 0 ? [] : rows.map((r: any) => r.id_categoria);
+    } catch (error) {
+        console.error('Erro ao buscar hierarquia de categorias:', error);
+        return [];
+    }
+}
+
 /**
- * Rota 1: GET /api/products?query=<termo> (Implementa searchProducts)
- * Busca produtos internos por ID, nome ou SKU.
+ * Rota: GET /api/products
+ * Busca otimizada com paginação e filtros avançados
+ * Query params: query, category, page, limit, minPrice, maxPrice, minStock, status, brand
  */
 app.get('/api/products', asyncHandler(async (req, res) => {
     const query = req.query.query as string;
+    const category = req.query.category as string;
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(50, parseInt(req.query.limit as string) || 20); // Max 50, default 20
+    const minPrice = parseFloat(req.query.minPrice as string) || 0;
+    const maxPrice = parseFloat(req.query.maxPrice as string) || 999999;
+    const minStock = parseInt(req.query.minStock as string) || -1;
+    const maxStock = parseInt(req.query.maxStock as string) || 999999;
+    const status = (req.query.status as string) || '';
+    const brand = (req.query.brand as string) || '';
+    
+    const offset = (page - 1) * limit;
     const isSearchEmpty = !query || query.trim() === '';
     const searchTerm = isSearchEmpty ? '%' : `%${query}%`;
 
-    const [rows]: any = await pool.execute(
-    `
-    SELECT 
-        p.id_produto AS id, 
-        p.codigo_interno AS sku, 
-        p.codigo_barras AS barcode,
-        p.descricao AS name, 
-        p.status,
-        p.unidade AS unitOfMeasure,
-        p.ncm,
-        p.cest,
-        
-        -- Categorização e Marca
-        c.nome_categoria AS category, 
-        m.nome_marca AS brand,
+    let params: any[] = [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm];
+    let categoryFilter = '';
+    let filterClauses: string[] = [];
 
-        -- Precificação e Rentabilidade
-        p.preco_venda AS salePrice,
-        p.metodo_precificacao AS priceMethod,
-        p.markup_praticado AS markup,
-        COALESCE(e.valor_medio, 0) AS costPrice,
-        
-        -- Estoque com Alerta
-        COALESCE(e.quantidade, 0) AS currentStock,
-        p.estoque_minimo AS minStock,
+    // Filtro de categoria com hierarquia
+    if (category && category !== 'Todas') {
+        const categoryIds = await getAllCategoryIdsRecursive(category, pool);
+        if (categoryIds.length > 0) {
+            const placeholders = categoryIds.map(() => '?').join(',');
+            categoryFilter = ` AND c.id_categoria IN (${placeholders})`;
+            params.push(...categoryIds);
+        }
+    }
 
-        -- Dimensões e informações para e‑commerce
-        p.peso AS weight,
-        p.comprimento AS length,
-        p.altura AS height,
-        p.largura AS width,
-        p.seo_title AS seoTitle,
-        p.description_html AS descriptionHtml,
-        p.sync_ecommerce AS syncEcommerce,
-        p.imagem_url AS pictureUrl,
+    // Filtros avançados
+    if (minPrice > 0) {
+        filterClauses.push('p.preco_venda >= ?');
+        params.push(minPrice);
+    }
+    if (maxPrice < 999999) {
+        filterClauses.push('p.preco_venda <= ?');
+        params.push(maxPrice);
+    }
+    if (minStock >= 0) {
+        filterClauses.push('COALESCE(e.quantidade, 0) >= ?');
+        params.push(minStock);
+    }
+    if (maxStock < 999999) {
+        filterClauses.push('COALESCE(e.quantidade, 0) <= ?');
+        params.push(maxStock);
+    }
+    if (status && status !== 'Todos') {
+        filterClauses.push('p.status = ?');
+        params.push(status);
+    }
+    if (brand && brand !== 'Todos') {
+        filterClauses.push('m.nome_marca = ?');
+        params.push(brand);
+    }
 
-        -- Relacionamento com Fornecedores
-        -- ATENÇÃO: A vírgula foi removida daqui vvv
-        GROUP_CONCAT(DISTINCT f.nome_fantasia SEPARATOR ', ') AS suppliers
-        
-    FROM produtos AS p
-    LEFT JOIN marcas m ON p.id_marca = m.id_marca
-    LEFT JOIN categorias c ON p.id_categoria = c.id_categoria  
-    LEFT JOIN estoque_atual e ON p.id_produto = e.id_produto
-    LEFT JOIN produto_fornecedor pf ON p.id_produto = pf.id_produto
-    LEFT JOIN fornecedores f ON pf.id_fornecedor = f.id_fornecedor
-    WHERE 
-        (? = '%' 
-         OR p.codigo_interno LIKE ? 
-         OR p.codigo_barras LIKE ? 
-         OR p.descricao LIKE ? 
-         OR pf.sku_fornecedor LIKE ?)
-    GROUP BY p.id_produto
-    ORDER BY p.descricao ASC
-    LIMIT 100
-    `,
-    [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm]
-);
+    const filterString = filterClauses.length > 0 ? ' AND ' + filterClauses.join(' AND ') : '';
 
-    // Opcional: Tratamento de dados antes de enviar ao front
+    // Query otimizada: colunas reduzidas, sem GROUP_CONCAT
+    const fullQuery = `
+        SELECT 
+            p.id_produto AS id, 
+            p.codigo_interno AS sku, 
+            p.codigo_barras AS barcode,
+            p.descricao AS name, 
+            p.status,
+            p.unidade AS unitOfMeasure,
+            c.nome_categoria AS category, 
+            m.nome_marca AS brand,
+            p.preco_venda AS salePrice,
+            COALESCE(e.valor_medio, 0) AS costPrice,
+            COALESCE(e.quantidade, 0) AS currentStock,
+            p.estoque_minimo AS minStock,
+            p.imagem_url AS pictureUrl
+        FROM produtos AS p
+        LEFT JOIN marcas m ON p.id_marca = m.id_marca
+        LEFT JOIN categorias c ON p.id_categoria = c.id_categoria  
+        LEFT JOIN estoque_atual e ON p.id_produto = e.id_produto
+        WHERE (? = '%' 
+             OR p.codigo_interno LIKE ? 
+             OR p.codigo_barras LIKE ? 
+             OR p.descricao LIKE ? 
+             OR p.codigo_barras LIKE ?)
+             ${categoryFilter}
+             ${filterString}
+        GROUP BY p.id_produto
+        ORDER BY p.descricao ASC
+        LIMIT ? OFFSET ?
+    `;
+
+    // Contar total para paginação: usar params sem LIMIT/OFFSET para count
+    const countParams = [...params];
+
+    const countQuery = `
+        SELECT COUNT(DISTINCT p.id_produto) as total
+        FROM produtos AS p
+        LEFT JOIN marcas m ON p.id_marca = m.id_marca
+        LEFT JOIN categorias c ON p.id_categoria = c.id_categoria  
+        LEFT JOIN estoque_atual e ON p.id_produto = e.id_produto
+        WHERE (? = '%' 
+             OR p.codigo_interno LIKE ? 
+             OR p.codigo_barras LIKE ? 
+             OR p.descricao LIKE ? 
+             OR p.codigo_barras LIKE ?)
+             ${categoryFilter}
+             ${filterString}
+    `;
+
+    const [countRows]: any = await pool.execute(countQuery, countParams);
+    const total = countRows[0].total;
+    const totalPages = Math.ceil(total / limit);
+
+    // Executar query com paginação
+    params.push(limit, offset);
+    const [rows]: any = await pool.execute(fullQuery, params);
+
     const formattedRows = rows.map((row: any) => ({
-    ...row,
-    isStockLow: row.currentStock <= row.minStock,
-    suppliersList: row.suppliers ? row.suppliers.split(', ') : []
-}));
+        ...row,
+        isStockLow: row.currentStock <= row.minStock
+    }));
 
-    return res.json(formattedRows);
+    return res.json({
+        data: formattedRows,
+        pagination: {
+            page,
+            limit,
+            total,
+            totalPages,
+            hasNextPage: page < totalPages,
+            hasPrevPage: page > 1
+        }
+    });
 }));
 
 
 /**
  * Rota: GET /api/categories?type=parts|services
- * Retorna a lista de nomes de categorias únicas baseada no tipo de item.
+ * Retorna a lista de APENAS categorias PAI (sem subcategorias)
  */
 app.get('/api/categories', asyncHandler(async (req, res) => {
-    const type = req.query.type as string; // 'parts' ou 'services'
-
-    let query = '';
-    
-        // Busca categorias que possuem produtos vinculados
-        query = `
-            SELECT DISTINCT c.nome_categoria 
-            FROM categorias c
-            WHERE c.id_categoria_pai IS NULL
-            ORDER BY c.nome_categoria ASC
-        `;
-   
+    // Busca APENAS categorias pai (id_categoria_pai IS NULL ou 0)
+    const query = `
+        SELECT DISTINCT c.nome_categoria 
+        FROM categorias c
+        LEFT JOIN produtos p ON c.id_categoria = p.id_categoria
+        WHERE c.id_categoria_pai IS NULL OR c.id_categoria_pai = 0
+        ORDER BY c.nome_categoria ASC
+    `;
 
     try {
         const [rows]: any = await pool.execute(query);
         const categories = rows.map((row: any) => row.nome_categoria);
-        return res.json(categories);
+        
+        // Sempre adiciona "Todas" como primeira opção
+        return res.json(['Todas', ...categories]);
     } catch (error) {
         console.error("Erro ao buscar categorias:", error);
         // Retorna categorias padrão para não travar o PDV caso a tabela esteja vazia
-        const defaults = type === 'parts' ? ['Hidráulica', 'Pneumática'] : ['Prensagem'];
-        return res.json(defaults);
+        return res.json(['Todas', 'Hidráulica', 'Pneumática']);
+    }
+}));
+
+/**
+ * Rota: GET /api/brands
+ * Retorna a lista de marcas disponíveis para filtro
+ */
+app.get('/api/brands', asyncHandler(async (req, res) => {
+    const query = `
+        SELECT DISTINCT m.nome_marca 
+        FROM marcas m
+        INNER JOIN produtos p ON m.id_marca = p.id_marca
+        WHERE m.nome_marca IS NOT NULL AND m.nome_marca != ''
+        ORDER BY m.nome_marca ASC
+    `;
+
+    try {
+        const [rows]: any = await pool.execute(query);
+        const brands = rows.map((row: any) => row.nome_marca).filter((b: string) => b);
+        return res.json(['Todos', ...brands]);
+    } catch (error) {
+        console.error("Erro ao buscar marcas:", error);
+        return res.json(['Todos']);
+    }
+}));
+
+/**
+ * Rota: GET /api/statuses
+ * Retorna os status únicos de produtos disponíveis para filtro
+ */
+app.get('/api/statuses', asyncHandler(async (req, res) => {
+    const query = `
+        SELECT DISTINCT p.status 
+        FROM produtos p
+        WHERE p.status IS NOT NULL AND p.status != ''
+        ORDER BY p.status ASC
+    `;
+
+    try {
+        const [rows]: any = await pool.execute(query);
+        const statuses = rows.map((row: any) => row.status).filter((s: string) => s);
+        return res.json(['Todos', ...statuses]);
+    } catch (error) {
+        console.error("Erro ao buscar status:", error);
+        return res.json(['Todos', 'Ativo', 'Inativo']);
+    }
+}));
+
+/**
+ * Rota: GET /api/units
+ * Retorna as unidades de medida disponíveis para filtro
+ */
+app.get('/api/units', asyncHandler(async (req, res) => {
+    const query = `
+        SELECT DISTINCT p.unidade 
+        FROM produtos p
+        WHERE p.unidade IS NOT NULL AND p.unidade != ''
+        ORDER BY p.unidade ASC
+    `;
+
+    try {
+        const [rows]: any = await pool.execute(query);
+        const units = rows.map((row: any) => row.unidade).filter((u: string) => u);
+        return res.json(units);
+    } catch (error) {
+        console.error("Erro ao buscar unidades:", error);
+        return res.json(['un', 'MT', 'LT', 'KG']);
     }
 }));
 

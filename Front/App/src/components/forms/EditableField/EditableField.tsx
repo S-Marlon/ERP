@@ -5,8 +5,9 @@ interface EditableFieldProps {
   label: string;
   isDirty: boolean;
   originalValue: any;
-showOriginalValue?: boolean; // <-- NOVA PROPRIEDADE  onRevert: () => void;
-  showLock?: boolean; // Define se este campo terá o cadeado
+  showOriginalValue?: boolean;
+  onRevert: () => void;
+  showLock?: boolean;
   children: React.ReactElement;
 }
 

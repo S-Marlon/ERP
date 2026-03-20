@@ -13,7 +13,6 @@ import EcommerceGallery from '../../components/ui/ImageGallery/EcommerceGallery'
 import ImageDisplay from '../../components/ui/ImageGallery/ImageDysplay';
 import Badge from '../../components/ui/Badge/Badge';
 import EditableField from '../../components/forms/EditableField/EditableField';
-import UniversalInventory from '../../components/Layout/UniversalInventory/UniversalInventory';
 
 type PDVStep = 'SELECAO' | 'PAGAMENTO';
 
@@ -83,6 +82,7 @@ export const PDV: React.FC = () => {
 
   const [onlyInStock, setOnlyInStock] = useState(true);
   const [onlyActive, setOnlyActive] = useState(true);
+  const [sortOrder, setSortOrder] = useState('');
 
   // Paginação
   const [itemsPerPage, setItemsPerPage] = useState(20);
@@ -138,7 +138,6 @@ export const PDV: React.FC = () => {
     setCliente(identificadorCliente || "Consumidor Final");
     setMostrarModalCliente(false);
   };
-
 
   /* ===== CALCULATED STATE (Memoized) ===== */
   const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -207,102 +206,120 @@ export const PDV: React.FC = () => {
     setCurrentPage(1);
   };
 
-  /* ===== ADD TO CART (DEVE VIR ANTES DE PROCESSBARCODE) ===== */
-  
-  const addToCart = useCallback((item: SaleItem) => {
-    if (item.type === 'part' && item.id) {
-      validateProductStockPrice(item.id as number).then(validation => {
-        if (validation) {
-          if (validation.stock <= 0) {
-            alert(`Atenção: ${item.name} está sem estoque!`);
-            return;
-          }
-          setCart(prev => {
-            const existing = prev.find(i => i.id === item.id);
-            if (existing) return prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
-            return [...prev, { ...item, stock: validation.stock, price: validation.price, quantity: 1 }];
-          });
+  useEffect(() => {
+    const loadCategories = async () => {
+      setLoadingCategories(true);
+      try {
+        // Busca as categorias baseado na aba ativa
+        const type = activeTab === 'parts' ? 'parts' : 'services';
+        const data = await getPdvCategories(type);
+
+        // Sempre adiciona "Todas" como a primeira opção
+        setDynamicCategories([...data]);
+      } catch (e) {
+        console.error('Erro ao carregar categorias:', e);
+        setDynamicCategories(['Todas', 'Erro ao carregar']);
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+
+    loadCategories();
+  }, [activeTab]); // Recarrega sempre que mudar entre Peças e Serviços
+
+  // Carregar opções de filtros (brands, statuses, units) - uma única vez
+  useEffect(() => {
+    const loadFilterOptions = async () => {
+      try {
+        // Carregar marcas
+        const brandsResponse = await fetch('http://localhost:3001/api/brands');
+        if (brandsResponse.ok) {
+          const brands = await brandsResponse.json();
+          setBrandOptions(brands || ['Todos']);
         }
-      });
-    } else {
-      setCart(prev => {
-        const existing = prev.find(i => i.id === item.id);
-        if (existing) return prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
-        return [...prev, { ...item, quantity: 1 }];
-      });
-    }
+
+        // Carregar status
+        const statusResponse = await fetch('http://localhost:3001/api/statuses');
+        if (statusResponse.ok) {
+          const statuses = await statusResponse.json();
+          setStatusOptions(statuses || ['Todos', 'Ativo', 'Inativo']);
+        }
+
+        // Carregar unidades
+        const unitsResponse = await fetch('http://localhost:3001/api/units');
+        if (unitsResponse.ok) {
+          const units = await unitsResponse.json();
+          setUnitOptions(units || []);
+        }
+      } catch (e) {
+        console.error('Erro ao carregar opções de filtros:', e);
+      }
+    };
+
+    loadFilterOptions();
   }, []);
 
-  // --- BUSCA POR CÓDIGO DE BARRAS NO BANCO ---
-  const processBarcode = useCallback(async (code: string) => {
-    if (!code || code.length < 3) return;
-    const cleanCode = code.trim();
+  // ===== FILTROS LOCAIS AVANÇADOS - Processamento 100% Client-side =====
 
-    try {
-      const response = await getPdvProducts({ searchTerm: cleanCode, limit: 1 });
-      if (response?.data?.length > 0) {
-        const p = response.data[0];
-        const isMatch = p.barcode === cleanCode || p.sku === cleanCode;
+  // Mão de obra calculada dinamicamente
+  const calculatedLabor = useMemo(() => {
+    if (osData.laborType === 'percent') {
+      return itemsSubtotal * (osData.laborValue / 100);
+    }
+    if (osData.laborType === 'service') {
+      const service = MOCK_SERVICES.find(s => s.id === osData.selectedServiceId);
+      return service ? service.price : 0;
+    }
+    return osData.laborValue; // fixed
+  }, [itemsSubtotal, osData.laborType, osData.laborValue, osData.selectedServiceId]);
 
-        if (isMatch) {
-          addToCart({
-            id: p.id,
-            name: p.name,
-            price: Number(p.salePrice) || 0,
-            type: 'part',
-            sku: p.sku,
-            barcode: p.barcode,
-            stock: Number(p.currentStock) || 0,
-            unitOfMeasure: p.unitOfMeasure,
-            category: p.category,
-            status: p.status,
-            pictureUrl: p.pictureUrl,
-          });
+  // Total geral (itens + mão de obra)
+  const total = useMemo(() => itemsSubtotal + calculatedLabor, [itemsSubtotal, calculatedLabor]);
+
+  /* ===== UNIFIED HANDLERS ===== */
+  const updateQuantity = (id: string | number, value: number | string) => {
+    setCart(prev => prev.map(item => {
+      if (item.id === id) {
+        const canFractionate = ['MT', 'LT', 'KG', 'M', 'L'].includes(item.unitOfMeasure?.toUpperCase() || '');
+
+        let newQty: number;
+        if (typeof value === 'string') {
+          newQty = parseFloat(value.replace(',', '.')) || 0;
+        } else {
+          newQty = item.quantity + value;
         }
+
+        let clampedQty = Math.max(0, newQty);
+        if (!canFractionate) {
+          clampedQty = Math.floor(clampedQty);
+        }
+
+        if (item.type === 'part' && item.stock && clampedQty > item.stock) {
+          alert("Quantidade excede o estoque disponível!");
+          return item;
+        }
+
+        return { ...item, quantity: Number(clampedQty.toFixed(2)) };
       }
-    } catch (error) {
-      console.error('Erro ao bipar:', error);
-    }
-  }, [addToCart]);
-
-
-
-  
-
-  // Hook para captar leitura de código de barras
-  useEffect(() => {
-  let barcodeAccumulator = '';
-  let lastKeyTime = Date.now();
-
-  const handleKeyDown = (e: KeyboardEvent) => {
-    const currentTime = Date.now();
-    const timeSinceLastKey = currentTime - lastKeyTime;
-    lastKeyTime = currentTime;
-
-    if (timeSinceLastKey > 100) {
-      barcodeAccumulator = '';
-    }
-
-    if (e.key === 'Enter') {
-      if (barcodeAccumulator.length > 3) {
-        e.preventDefault();
-        processBarcode(barcodeAccumulator); // Dispara a busca no banco
-        barcodeAccumulator = '';
-      }
-      return;
-    }
-
-    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
-      barcodeAccumulator += e.key;
-    }
+      return item;
+    }));
   };
 
-  window.addEventListener('keydown', handleKeyDown);
-  return () => window.removeEventListener('keydown', handleKeyDown);
-}, [processBarcode]); // Essencial para pegar a versão atualizada da busca
+  const removeItem = (id: string | number) => {
+    setCart(prev => prev.filter(item => item.id !== id));
+  };
 
+  const handleResetFilters = () => {
+    setMinPrice('0');
+    setMaxPrice('999999');
+    setMinStock('');
+    setStatus('Todos');
+    setBrand('Todos');
+    setSelectedCategory('Todas');
+    setSearchTerm('');
+    setCurrentPage(1);
+  };
 
- 
 
 
   useEffect(() => {
@@ -358,124 +375,30 @@ export const PDV: React.FC = () => {
     loadFilterOptions();
   }, []);
 
-
-
-
-  // Definição das colunas específica para este contexto (Peças)
-  const productColumns = [
-   {
-  header: 'Codificação',
-  key: 'sku',
-  render: (item: any) => (
-    <div style={{ display: 'flex', flexDirection: 'column', fontSize: '11px' }}>
-      <span title="SKU"><strong>SKU:</strong> {item.sku || 'N/A'}</span>
-      <span title="Barcode" style={{ color: '#666' }}><strong>EAN:</strong> {item.barcode || 'N/A'}</span>
-    </div>
-  ),
-  textAlign: 'left' as const
-},
-    {
-      header: 'Status',
-      key: 'status',
-      render: (item: any) => (
-        <Badge color={item.status === 'Ativo' ? 'success' : 'danger'}>
-          {item.status}
-        </Badge>
-      ),
-      textAlign: 'center' as const
-    },
-    {
-      header: 'Fotos',
-      key: 'pictureUrl',
-      render: (item: any) => <ImageDisplay src={item.pictureUrl} size="40px" rounded="50%" />
-    },
-    {
-      header: 'Produto',
-      key: 'name',
-      render: (item: any) =>
-        <div className={styles.partPrimary}>
-          <strong>{highlightText(item.name, searchTerm)}</strong>
-          {'sku' in item && <code>{item.category}</code>}
-        </div>
-
-    },
-    {
-      header: 'Estoque (UoM)',
-      key: 'stock',
-      render: (item: any) => (
-        <div>
-          {Number(item.stock).toLocaleString('pt-BR')}
-          {item.unitOfMeasure && <span> {item.unitOfMeasure}</span>}
-        </div>
-      )
-    },
-    {
-      header: 'Localização',
-      key: 'location',
-      render: (item: any) => item.location || '-'
-    },
-    {
-      header: 'Preço',
-  key: 'price',
-  render: (item: any) => (
-    <span className={styles.price}>
-      {/* O Number() aqui é uma camada extra de segurança */}
-      {money.format(Number(item.price) || 0)}
-    </span>
-  ),
-  textAlign: 'right' as const
-    },
-    {
-      header: 'Ações',
-      key: 'actions',
-      render: (item: any) => (
-        <div>
-   <button 
-    className={styles.compactAddBtn} 
-    onClick={() => setSelectedPart(item)} // Abre o modal de detalhes do produto
-  >
-    <span>?</span>
-  </button>
-  <button 
-    className={styles.compactAddBtn} 
-    onClick={() => addToCart(item)} // Use a função 'addToCart' que você já criou
-  >
-    <span>+</span>
-  </button>
-  </div>
-),
-      textAlign: 'center' as const
-    }
-  ];
-
-
-
-  // 1. Crie um estado para a ordenação
-  const [sortOrder, setSortOrder] = useState('');
-
-  // ===== FILTROS LOCAIS AVANÇADOS - Processamento 100% Client-side =====
+  const confirmarCliente = () => {
+    setCliente(identificadorCliente || "Consumidor Final");
+    setMostrarModalCliente(false);
+  };
   const filteredData: SaleItem[] = useMemo(() => {
     let data: SaleItem[] = [];
 
     // 1. POPULAR OS DADOS INICIAIS (do backend se houver, senão do cache)
-    // Dentro do filteredData (useMemo):
-if (activeTab === 'parts') {
-  data = products.map(p => ({
-    id: p.id,
-    name: p.name,
-    price: Number(p.salePrice) || 0,
-    brand: p.brand || '',
-    category: p.category,
-    type: 'part' as const,
-    stock: Number(p.currentStock) || 0,
-    sku: p.sku,         // <-- Certifique-se que p.sku existe no seu Model 'Product'
-    barcode: p.barcode, // <-- Se o banco envia como gtin, use p.gtin aqui
-    unitOfMeasure: p.unitOfMeasure,
-    status: p.status,
-    pictureUrl: p.pictureUrl,
-  })) as SaleItem[];
-}
-else if (activeTab === 'services') {
+    if (activeTab === 'parts') {
+      data = products.map(p => ({
+        id: p.id,
+        name: p.name,
+        price: Number(p.salePrice) || 0,
+        brand: p.brand || '',
+        category: p.category,
+        type: 'part' as const,
+        stock: Number(p.currentStock) || 0, // Aproveite e garanta o estoque também
+        sku: p.sku,
+        barcode: p.barcode,
+        unitOfMeasure: p.unitOfMeasure,
+        status: p.status,
+        pictureUrl: p.pictureUrl,
+      })) as SaleItem[];
+    } else if (activeTab === 'services') {
       data = MOCK_SERVICES as SaleItem[];
     }
 
@@ -609,6 +532,54 @@ else if (activeTab === 'services') {
   useEffect(() => {
     setCurrentPage(1);
   }, [debouncedSearchTerm, selectedCategory, minPrice, maxPrice, minStock, status, brand]);
+
+  const addToCart = useCallback((item: SaleItem) => {
+    // Validar estoque em tempo real antes de adicionar
+    if (item.type === 'part' && item.id) {
+      validateProductStockPrice(item.id as number).then(validation => {
+        if (validation) {
+          // Se houver validação, atualiza com dados reais
+          const updatedItem = {
+            ...item,
+            stock: validation.stock,
+            price: validation.price
+          };
+
+          // Verifica se há estoque antes de adicionar
+          if (validation.stock <= 0) {
+            alert(`Atenção: ${item.name} está sem estoque no momento!`);
+            return;
+          }
+
+          setCart(prev => {
+            const existing = prev.find(i => i.id === updatedItem.id);
+            if (existing) {
+              return prev.map(i => i.id === updatedItem.id ? { ...i, quantity: i.quantity + 1 } : i);
+            }
+            return [...prev, { ...updatedItem, quantity: 1 }];
+          });
+        } else {
+          // Fallback: adiciona mesmo sem validação
+          setCart(prev => {
+            const existing = prev.find(i => i.id === item.id);
+            if (existing) {
+              return prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
+            }
+            return [...prev, { ...item, quantity: 1 }];
+          });
+        }
+      });
+    } else {
+      // Serviços não precisam validação
+      setCart(prev => {
+        const existing = prev.find(i => i.id === item.id);
+        if (existing) {
+          return prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
+        }
+        return [...prev, { ...item, quantity: 1 }];
+      });
+    }
+  }, []);
 
 
   return (
@@ -981,7 +952,7 @@ else if (activeTab === 'services') {
           data={filteredData}
           columns={productColumns}
           displayMode={displayMode}
-          onAdd={(item) => addToCart(item)}
+          onAction={(item) => addToCart(item)}
           moneyFormatter={(v) => money.format(v)}
         />
 

@@ -1,0 +1,555 @@
+:root {
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --surface: #ffffff;
+  --background: #f8fafc;
+  --border: #e2e8f0;
+  --text-main: #1e293b;
+  --text-muted: #64748b;
+  --danger: #ef4444;
+  --success: #22c55e;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+}
+
+/* --- CONTAINER PRINCIPAL --- */
+.tableSection {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.scrollableTableContainer {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: auto;
+  min-height: 0;
+  position: relative;
+  order: 2;
+}
+
+/* --- TOOLBAR --- */
+.productToolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  background: var(--surface);
+  border-radius: 8px 8px 0 0;
+  border-bottom: 2px solid var(--border);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  gap: 1rem;
+  flex: 0 0 auto;
+  order: 1;
+  flex-wrap: wrap;
+}
+
+.infoCount {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 0 0 auto;
+}
+
+.actionsGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+}
+
+.btnSync {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-main);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btnSync:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #cbd5e0;
+}
+
+/* --- SELECTS MODERNOS --- */
+.modernSelect {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-main);
+  font-size: 0.875rem;
+  outline: none;
+  cursor: pointer;
+}
+
+.modernSelect:focus {
+  border-color: var(--primary);
+  ring: 2px solid rgba(37, 99, 235, 0.1);
+}
+
+/* --- ESTILIZAÇÃO DA TABELA --- */
+.partsTable {
+  width: 100%;
+  border-collapse: collapse; /* Importante para bordas alinhadas */
+  table-layout: auto;
+}
+
+/* Header Fixo (Sticky) */
+.partsTable thead th {
+  position: sticky;
+  top: 0;
+  background: #ececec; /* Cor de fundo levemente diferente */
+  z-index: 2;
+  padding: 0.5rem;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 2px solid var(--border);
+  box-shadow: 0 1px 0 var(--border); /* Linha visual extra */
+}
+
+.partsTable tbody td {
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.875rem;
+  color: var(--text-main);
+}
+
+.partsTable tbody tr:hover {
+  background-color: #f1f5f9;
+}
+
+.lowStock {
+  background-color: #fff1f2 !important;
+}
+
+.lowStock td {
+  color: var(--danger) !important;
+}
+
+/* --- CARDS --- */
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1.5rem;
+  padding: 4px;
+}
+
+.productCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.productCard:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+}
+
+/* --- PAGINAÇÃO --- */
+.paginationFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  background: var(--surface);
+  border-radius: 0 0 8px 8px;
+  border-top: 2px solid var(--border);
+  margin-top: auto;
+  flex: 0 0 auto;
+  order: 3;
+}
+.pageInfo {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pageInfo strong {
+  color: var(--text-main);
+  font-weight: 600;
+}
+
+.paginationControls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+}
+.btnPage {
+  height: 38px;
+  padding: 0 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-main);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btnPage:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.btnPage:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pageInput {
+  width: 45px;
+  height: 38px;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin: 0 4px;
+}
+
+/* --- LOADING SPINNER --- */
+.loaderInline {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(0,0,0,0.1);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+
+/* --- ALTERNÂNCIA DE CORES (Zebra Striping) --- */
+.partsTable tbody tr:nth-child(even) {
+  background-color: #f6f6f6; /* Cor muito sutil para o par */
+}
+
+.partsTable tbody tr:nth-child(odd) {
+  background-color: #ffffff; /* Cor branca para o ímpar */
+}
+
+/* Efeito de Hover nas Linhas */
+.partsTable tbody tr:hover {
+  background-color: #f1f5f9 !important; /* Cor de destaque ao passar o mouse */
+  transition: background-color 0.15s ease;
+}
+
+/* Ajuste para o Estado de Estoque Baixo (Prioridade sobre a Zebra) */
+.lowStock {
+  background-color: #fff1f2 !important; 
+}
+
+/* --- PERSONALIZAÇÃO DO SCROLLBAR (O Toque Profissional) --- */
+.scrollableTableContainer::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollableTableContainer::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollableTableContainer::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+.scrollableTableContainer::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+
+/* --- BOTÕES DE MODO (📋 Lista, 🗂️ Cards) --- */
+.modeBtn {
+  padding: 6px 12px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #64748b;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.modeBtnActive {
+  background: #eff6ff; /* Azul clarinho */
+  color: #2563eb; /* Azul primário */
+  border-color: #bfdbfe;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.1);
+} 
+
+/* Container da lista compacta */
+.compactList {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+}
+
+/* Cada linha da lista compacta */
+.compactItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.2s;
+}
+
+.compactItem:hover {
+  background-color: #f8fafc;
+}
+
+/* Lado Esquerdo: Identificação */
+.compactMainInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.compactSku {
+  font-family: 'Monaco', monospace;
+  font-size: 0.7rem;
+  background: #f1f5f9;
+  color: #64748b;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+
+.compactTextGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.compactName {
+  font-size: 0.85rem;
+  color: #1e293b;
+  line-height: 1.2;
+}
+
+.compactCategoryBadge {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+/* Lado Direito: Métricas e Ação */
+.compactMetrics {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.compactMetricItem {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.compactMetricItem .label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: #94a3b8;
+  letter-spacing: 0.025em;
+}
+
+.compactMetricItem .value {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.compactPrice {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.lowStockText {
+  color: #ef4444 !important;
+}
+
+/* Botão de Adição Minimalista */
+.compactAddBtn {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: bold;
+}
+
+.compactAddBtn:hover {
+  background: #2563eb;
+  color: white;
+  border-color: #2563eb;
+  transform: scale(1.05);
+}
+
+
+/* --- GRID DE CARDS --- */
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1.5rem;
+  padding: 1rem;
+}
+
+/* --- O CARD --- */
+.productCard {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  overflow: hidden; /* Importante para a imagem não vazar o border-radius */
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.productCard:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.15);
+  border-color: #3b82f6;
+}
+
+/* --- CONTAINER DA IMAGEM --- */
+.productImageContainer {
+  width: 100%;
+  height: 160px;
+  background-color: #f8fafc;
+  overflow: hidden;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.productImage {
+  width: 100%;
+  height: 100%;
+  object-fit: contain; /* Ou 'cover' se suas fotos forem padronizadas */
+  transition: transform 0.3s ease;
+  padding: 10px; /* Respiro para o produto */
+}
+
+.productCard:hover .productImage {
+  transform: scale(1.08);
+}
+
+/* --- CONTEÚDO DO CARD --- */
+.cardContent {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.cardCategory {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.cardTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 1rem 0;
+  line-height: 1.4;
+  height: 2.8em; /* Garante que títulos longos não quebrem o layout */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* --- FOOTER DO CARD --- */
+.cardFooter {
+  margin-top: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.priceContainer {
+  display: flex;
+  flex-direction: column;
+}
+
+.priceLabel {
+  font-size: 0.65rem;
+  color: #64748b;
+}
+
+.priceValue {
+  font-size: 1.15rem;
+  color: #2563eb;
+  font-weight: 800;
+}
+
+/* --- BOTÃO DE ADIÇÃO --- */
+.cardAddBtn {
+  background: #2563eb;
+  color: white;
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  font-size: 1.2rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.3);
+}
+
+.cardAddBtn:hover {
+  background: #1d4ed8;
+  transform: rotate(90deg); /* Efeito divertido no hover */
+}
+
+/* --- BADGE DE ESTOQUE --- */
+.stockBadgeDanger {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: #ef4444;
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 20px;
+  z-index: 5;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}

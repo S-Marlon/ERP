@@ -36,6 +36,7 @@
   min-width: 0; 
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
+  background-color: #F5F5F5;
 }
 
 /* 3. Estágio 2: Ajuste a proporção */
@@ -138,17 +139,25 @@
   grid-template-columns: 1fr 2fr;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem;
+  padding: 0.5rem;
   gap: 1rem;
 
 }
 
 .filterBar {
-  display: flex;
+  display: grid;
+  /* 1fr para os chips (flexível) e auto para os switches (fixo) */
+  grid-template-columns: 1fr 250px; 
+  align-items: center; /* Alinha por baixo para ficar alinhado com os switches */
   gap: 1rem;
-  align-items: center;
-  justify-content: space-between;
+  width: 100%;
+  /* CRUCIAL: impede que o grid cresça além da tela */
+  min-width: 0; 
+}
 
+/* Container que envolve o EditableField das categorias */
+.filterBar > *:first-child {
+  min-width: 0; /* Permite que o EditableField e seus filhos encolham */
 }
 
 .searchContainer {
@@ -287,10 +296,7 @@
 
 /* --- BOTÕES --- */
 .btnAddToCart {
-  background: var(--primary);
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
+  padding: 3px 0.5rem;
   border-radius: 6px;
   cursor: pointer;
   font-weight: 500;
@@ -420,12 +426,12 @@
 }
 
 .tabButton {
-  padding: 1rem 2rem;
+  padding: 0.5rem 1rem;
   border: none;
   background: none;
   cursor: pointer;
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: 0.8rem;
   color: var(--text-muted);
   border-bottom: 3px solid transparent;
   transition: all 0.2s;
@@ -1356,9 +1362,26 @@ input::-webkit-inner-spin-button {
 
 
 
+.categoryChips {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  
+  width: 100%;           
+  overflow-x: auto;      /* Scroll horizontal ativo */
+  white-space: nowrap;   /* Mantém tudo em uma linha */
+  padding: 4px 0 8px 0;  /* Espaço para o shadow do chip active */
+  
+  /* Esconde a scrollbar para um visual clean */
+  scrollbar-width: none; 
+}
 
+.categoryChips::-webkit-scrollbar {
+  display: none;
+}
 
 .chip {
+  flex-shrink: 0; /* CRUCIAL: impede que o botão se esprema para caber na tela */
   padding: 6px 14px;
   border-radius: 20px;
   border: 1px solid #d1d5db;
@@ -1370,9 +1393,360 @@ input::-webkit-inner-spin-button {
 }
 
 .chipActive {
-  background: #3b82f6; /* Azul do seu sistema */
+  background: #3b82f6;
   color: white;
   border-color: #2563eb;
   font-weight: 600;
   box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+}
+
+/* ===== DISPLAY MODES - LISTA ===== */
+.tableContainer {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  background: white;
+  border-radius: 8px;
+  margin: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.productsTable {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+.productsTable thead th {
+  background: #f1f5f9;
+  padding: 12px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #64748b;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.productsTable tbody tr {
+  border-bottom: 1px solid #e2e8f0;
+  transition: background-color 0.2s;
+}
+
+.productsTable tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+.productsTable td {
+  padding: 12px;
+  font-size: 14px;
+}
+
+.btnAdd {
+  padding: 6px 12px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+  min-width: 40px;
+}
+
+.btnAdd:hover:not(:disabled) {
+  background: #1d4ed8;
+  transform: scale(1.05);
+}
+
+.btnAdd:disabled {
+  background: #cbd5e0;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* ===== DISPLAY MODES - CARDS ===== */
+.cardsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  padding: 16px;
+  background: white;
+  border-radius: 8px;
+  margin: 16px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.productCard {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+  transition: all 0.3s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.productCard:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-4px);
+}
+
+.cardImage {
+  height: 150px;
+  background: #f1f5f9;
+  overflow: hidden;
+  position: relative;
+}
+
+.cardImage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.outOfStockOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.cardContent {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cardBrand {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.cardName {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 8px 0;
+  cursor: pointer;
+  transition: color 0.2s;
+  min-height: 40px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cardName:hover {
+  color: #2563eb;
+}
+
+.cardFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-top: 10px;
+}
+
+.cardPrice {
+  font-size: 16px;
+  font-weight: 700;
+  color: #10b981;
+}
+
+/* ===== DISPLAY MODES - SIMPLIFICADO ===== */
+.denseList {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  background: white;
+  border-radius: 8px;
+  margin: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.denseListItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  transition: background-color 0.2s;
+}
+
+.denseListItem:hover {
+  background-color: #f8fafc;
+}
+
+.denseItemInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.denseItemInfo strong {
+  display: block;
+  font-size: 14px;
+  color: #1e293b;
+  cursor: pointer;
+  transition: color 0.2s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.denseItemInfo strong:hover {
+  color: #2563eb;
+}
+
+.denseItemInfo small {
+  display: block;
+  font-size: 12px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.denseItemPrice {
+  width: 100px;
+  text-align: right;
+  font-weight: 700;
+  color: #10b981;
+  margin-right: 16px;
+}
+
+.denseItemStock {
+  width: 80px;
+  text-align: right;
+  font-size: 12px;
+  color: #64748b;
+  margin-right: 12px;
+}
+
+.btnAddDense {
+  padding: 4px 8px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+  min-width: 32px;
+}
+
+.btnAddDense:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.btnAddDense:disabled {
+  background: #cbd5e0;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* ===== PAGINATION FOOTER ===== */
+.paginationFooter {
+  padding: 12px 16px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #64748b;
+  margin: 0 16px 16px 16px;
+  border-radius: 8px;
+}
+
+.footerInfo {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.footerControls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.footerControls button {
+  padding: 4px 8px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: #2563eb;
+  transition: all 0.2s;
+}
+
+.footerControls button:hover:not(:disabled) {
+  background: #2563eb;
+  color: white;
+  border-color: #2563eb;
+}
+
+.footerControls button:disabled {
+  color: #cbd5e0;
+  cursor: not-allowed;
+  background: #f1f5f9;
+  border-color: #cbd5e0;
+}
+
+.pageInput {
+  width: 50px;
+  padding: 4px 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.pageInput:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+/* ===== DISPLAY MODE BUTTONS ===== */
+.modeButton {
+  padding: 6px 12px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e0;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: #1e293b;
+  transition: all 0.2s;
+}
+
+.modeButton:hover {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+}
+
+.modeButtonActive {
+  background: #2563eb;
+  color: white;
+  border-color: #2563eb;
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.3);
+}
+
+.modeButtonActive:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
 }

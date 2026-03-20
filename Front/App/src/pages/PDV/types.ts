@@ -32,10 +32,32 @@ export interface AutoPart extends SaleItem {
 
 export type PaymentMethod = 'CASH' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'PIX';
 
+export type DisplayMode = 'cards' | 'lista' | 'simplificado';
+
 export interface SaleSummary {
   subtotal: number;
   taxes: number;
   total: number;
+}
+
+// Cache local de produtos com informações básicas
+export interface ProductBasic {
+  id: number;
+  sku: string;
+  name: string;
+  category: string;
+  categoryParentId?: number;
+  brand?: string;
+  location?: string;
+  pictureUrl?: string;
+}
+
+// Hierarquia de categorias para navegação
+export interface CategoryNode {
+  id: number;
+  name: string;
+  parentId?: number;
+  children: CategoryNode[];
 }
 
 
