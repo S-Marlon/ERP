@@ -26,6 +26,8 @@ export interface ProductFilters {
     maxStock?: number;
     status?: string;
     brand?: string;
+    onlyInStock?: boolean; // Adicione isso
+    onlyActive?: boolean;  // Adicione isso
 }
 
 /**
@@ -70,21 +72,51 @@ export async function getAllBasicProducts(): Promise<ProductBasic[]> {
 export async function getPdvProducts(filters: ProductFilters): Promise<ProductsResponse> {
     const params = new URLSearchParams();
     
+    // 1. Mapeamento de searchTerm para 'query' (Como seu backend espera)
     if (filters.searchTerm) params.append('query', filters.searchTerm);
-    if (filters.category) params.append('category', filters.category);
-    if (filters.page) params.append('page', filters.page.toString());
-    if (filters.limit) params.append('limit', filters.limit.toString());
-    if (filters.minPrice !== undefined && filters.minPrice > 0) params.append('minPrice', filters.minPrice.toString());
-    if (filters.maxPrice !== undefined && filters.maxPrice < 999999) params.append('maxPrice', filters.maxPrice.toString());
-    if (filters.minStock !== undefined && filters.minStock >= 0) params.append('minStock', filters.minStock.toString());
-    if (filters.maxStock !== undefined && filters.maxStock < 999999) params.append('maxStock', filters.maxStock.toString());
+    if (filters.category && filters.category !== 'Todas') params.append('category', filters.category);
+    
+    // 2. Paginação
+    params.append('page', (filters.page || 1).toString());
+    params.append('limit', (filters.limit || 20).toString());
+    
+    // 3. Preços (Removida a trava do > 0 para permitir busca de produtos gratuitos ou base 0)
+    if (filters.minPrice !== undefined) params.append('minPrice', filters.minPrice.toString());
+    if (filters.maxPrice !== undefined) params.append('maxPrice', filters.maxPrice.toString());
+    
+    // 4. Estoque
+    if (filters.minStock !== undefined) params.append('minStock', filters.minStock.toString());
+    
+    // 5. Status e Marca
     if (filters.status && filters.status !== 'Todos') params.append('status', filters.status);
     if (filters.brand && filters.brand !== 'Todos') params.append('brand', filters.brand);
-    
+
+
+    if (filters.onlyActive === true) {
+    // Se o seu backend já usa o campo 'status', force 'Ativo' quando o switch estiver ligado
+    params.append('status', 'Ativo');
+} else {
+    // Se estiver desligado (false), talvez você queira mandar 'Todos' ou nem mandar o parâmetro
+    // params.append('status', 'Todos'); 
+}
+
+if (filters.onlyInStock === true) {
+    // Se o backend não entende 'onlyInStock', tente enviar minStock=1
+    params.append('minStock', '1');
+}
+
     const url = `${apiBase}/products?${params.toString()}`;
+    
+    // Debug amigável para você ver no console do navegador a URL exata sendo chamada
+    console.log('Chamando API PDV:', url);
+
     const res = await fetch(url);
     
-    if (!res.ok) throw new Error('Erro ao carregar produtos do PDV');
+    if (!res.ok) {
+        // Tenta ler o erro do corpo da resposta se disponível
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Erro ao carregar produtos do PDV');
+    }
     
     return res.json();
 }

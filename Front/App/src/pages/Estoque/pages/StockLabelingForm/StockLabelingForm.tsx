@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { searchProducts } from '../../api/EtiquetaApi';
 import FlexGridContainer from '../../../../components/Layout/FlexGridContainer/FlexGridContainer';
 
+import { generatePRN, LabelData } from '../../utils/labelGenerator';
+
 interface ProductFromDB {
   id: number;
   sku: string;
@@ -13,17 +15,11 @@ interface ProductFromDB {
   status: string;
 }
 
-interface LabelItem {
+// ✨ Note que LabelItem agora estende LabelData para manter compatibilidade total
+interface LabelItem extends LabelData {
   id: number;
-  name: string;
-  sku: string;
-  price: number;
   isPromo: boolean;
-  quantity: number;
   size: string;
-  unit: string;
-  batch?: string;
-  expiryDate?: string;
 }
 
 const StockLabelingForm: React.FC = () => {
@@ -41,20 +37,33 @@ const StockLabelingForm: React.FC = () => {
   const [expiryDate, setExpiryDate] = useState("");
   const [selectedSize, setSelectedSize] = useState("105x27");
 
+  const [unit, setUnit] = useState("UN");
+
   // --- Estado da Fila ---
   const [queue, setQueue] = useState<LabelItem[]>([]);
 
-  // --- Busca com Debounce ---
+  // 1. Ajuste no useEffect (Removi a trava do !selectedProduct)
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
-      if (searchTerm.length >= 3 && !selectedProduct) { 
+      // 💡 IMPORTANTE: Removi o "&& !selectedProduct" daqui
+      if (searchTerm.length >= 3) {
         setIsLoading(true);
         try {
-          const data = await searchProducts(searchTerm);
-          setSearchResults(data);
+          setIsLoading(true);
+          const response = await searchProducts(searchTerm); // 1. Busca primeiro
+
+          // 2. Extrai os produtos (tratando se vem em .data ou direto)
+          const products = Array.isArray(response) ? response : response.data;
+
+          // 3. LOG DE TESTE: Vamos ver o que o banco está mandando de verdade!
+          if (products && products.length > 0) {
+            console.log("🔍 PRIMEIRO PRODUTO DO BANCO:", products[0]);
+          }
+
+          setSearchResults(products || []);
           setIsDropdownOpen(true);
         } catch (error) {
-          console.error("Erro na busca:", error);
+          console.error("❌ Erro na busca:", error);
         } finally {
           setIsLoading(false);
         }
@@ -65,14 +74,19 @@ const StockLabelingForm: React.FC = () => {
     }, 300);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm, selectedProduct]);
+  }, [searchTerm]); // 👈 Mantenha apenas o searchTerm aqui
 
-  // Seleção do produto no Dropdown
+
+  // 2. Ajuste na seleção (Para não travar a busca futura)
   const handleSelectProduct = (product: ProductFromDB) => {
     setSelectedProduct(product);
     setSearchTerm(product.name);
-    setIsDropdownOpen(false);
+    setUnit(product.unitOfMeasure || "UN");
+    setSearchResults([]); // ✨ Limpa os resultados antigos
+    setIsDropdownOpen(false); // ✨ Fecha o dropdown
   };
+
+
 
   // Sanitização para Elgin
   const sanitize = (text: string): string => {
@@ -84,71 +98,55 @@ const StockLabelingForm: React.FC = () => {
       .toUpperCase();
   };
 
-  // Adição à Fila
-  const addToQueue = () => {
-    if (!selectedProduct) {
-      alert("⚠️ Selecione um produto antes de adicionar.");
-      return;
-    }
 
-    const newItem: LabelItem = {
-      id: Date.now(),
-      name: selectedProduct.name,
-      sku: selectedProduct.sku,
-      price: Number(selectedProduct.salePrice),
-      isPromo: isPromo,
-      quantity: quantity,
-      size: selectedSize,
-      unit: selectedProduct.unitOfMeasure,
-      batch: batch,
-      expiryDate: expiryDate
-    };
+  // ✨ Adição à Fila com todos os campos vinculados
+  const addToQueue = () => {
+    if (!selectedProduct) return alert("⚠️ Selecione um produto.");
+
+  // Usamos Number() e um fallback (|| 0) para nunca dar NaN
+  const precoFinal = Number(selectedProduct.salePrice || 0);
+
+  const newItem: LabelItem = {
+    id: Date.now(),
+    name: selectedProduct.name,
+    sku: selectedProduct.sku,
+    price: precoFinal, 
+    isPromo: isPromo,
+    quantity: quantity,
+    size: selectedSize,
+    unit: unit,
+    batch: batch,
+    expiryDate: expiryDate
+  };
 
     setQueue(prev => [...prev, newItem]);
-
-    // Reset de campos
+  
+  // Reset
+    // Reset parcial
     setSelectedProduct(null);
     setSearchTerm("");
     setBatch("");
     setExpiryDate("");
-    setIsPromo(false);
     setQuantity(1);
   };
+
 
   const removeFromQueue = (id: number) => {
     setQueue(queue.filter(item => item.id !== id));
   };
 
-  const generateFinalPrn = () => {
+  // ✨ Chama o Gerador Modular
+  const handlePrint = () => {
     if (queue.length === 0) return alert("Fila vazia!");
-
-    let prnContent = 'I8,1,001\nq819\nO\nJF\nWN\nZT\nQ216,25\n';
-
-    queue.forEach((item) => {
-      for (let i = 0; i < item.quantity; i++) {
-        prnContent += "N\n";
-        // Coordenadas baseadas no seu modelo de mangueira
-        prnContent += `A774,177,2,2,1,1,N,"${sanitize(item.name)}"\n`;
-        const labelPreco = item.isPromo ? `PROMO: R$ ${item.price.toFixed(2)}` : `R$ ${item.price.toFixed(2)}`;
-        prnContent += `A552,132,2,5,1,1,N,"${labelPreco}"\n`;
-        prnContent += `A579,52,2,1,2,2,N,"COD: ${sanitize(item.sku)}"\n`;
-        prnContent += "P1\n";
-      }
-    });
-
-    const blob = new Blob([prnContent], { type: 'text/plain;charset=windows-1252' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `FILA_ELGIN_${new Date().getTime()}.prn`;
-    link.click();
+    generatePRN(queue, selectedSize);
   };
 
   const clearQueue = () => {
-  if (queue.length === 0) return;
-  if (window.confirm("⚠️ Deseja realmente limpar toda a fila de impressão?")) {
-    setQueue([]);
-  }
-};
+    if (window.confirm("⚠️ Limpar toda a fila?")) setQueue([]);
+  };
+
+  // Helper visual para o preview (mantido localmente apenas para a tela)
+  const sanitizeSimple = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
 
   return (
     <div className="container">
@@ -309,14 +307,14 @@ const StockLabelingForm: React.FC = () => {
       `}</style>
 
       <div className="wrapper">
-       <header className="header-full" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+        <header className="header-full" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1>🏷️ Sistema de Rotulagem</h1>
-          <div style={{display: 'flex', gap: '10px'}}>
+          <div style={{ display: 'flex', gap: '10px' }}>
             {queue.length > 0 && (
               <button className="btn-clear" onClick={clearQueue}>🗑️ Limpar Tudo</button>
             )}
-            <button className="btn-generate" onClick={generateFinalPrn} disabled={queue.length === 0} 
-                    style={{backgroundColor: queue.length === 0 ? '#ccc' : '#27ae60'}}>
+            <button className="btn-generate" onClick={handlePrint} disabled={queue.length === 0}
+              style={{ backgroundColor: queue.length === 0 ? '#ccc' : '#27ae60' }}>
               💾 Baixar .PRN ({queue.length})
             </button>
           </div>
@@ -325,80 +323,85 @@ const StockLabelingForm: React.FC = () => {
         {/* Formulário lateral */}
         <aside className="config-panel">
 
-<div className="form-group">
-  <label>🔍 Buscar Produto (Nome ou SKU)</label>
-  
-      <div className="search-container">
-        <input 
-          type="text" 
-          placeholder="Digite nome ou SKU (mín. 3 letras)..." 
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          onFocus={() => searchTerm.length >= 3 && setIsDropdownOpen(true)}
-        />
-        
-        {isLoading && <div className="loading-indicator">Buscando... ⏳</div>}
+          <div className="form-group">
+            <label>🔍 Buscar Produto (Nome ou SKU)</label>
 
-        {isDropdownOpen && searchResults.length > 0 && (
-  <div className="search-results">
-    {searchResults.map((p: ProductFromDB) => (
-      <div 
-        key={p.id} 
-        className="result-item" 
-        onClick={() => handleSelectProduct(p)}
-        style={{ opacity: p.status === 'inativo' ? 0.5 : 1 }}
-      >
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <strong>{p.name}</strong>
-            <span style={{ fontSize: '0.8rem', color: '#27ae60', fontWeight: 'bold' }}>
-              R$ {Number(p.salePrice).toFixed(2)}
-            </span>
-          </div>
-          <div style={{ display: 'flex', gap: '15px', marginTop: '4px' }}>
-            <small>📦 SKU: {p.sku}</small>
-            <small>🏷️ {p.category}</small>
-            <small style={{ color: p.currentStock <= 0 ? 'red' : 'inherit' }}>
-              Estoque: {p.currentStock} {p.unitOfMeasure}
-            </small>
-          </div>
-        </div>
-      </div>
-    ))}
-  </div>
-)}
-      </div>
-    
-</div>
+            <div className="search-container">
+              <input
+                type="text"
+                placeholder="Digite nome ou SKU (mín. 3 letras)..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onFocus={() => searchTerm.length >= 3 && setIsDropdownOpen(true)}
+              />
 
-<div className="section-title">➕ Configurar Item</div>
-          
-          
+              {isLoading && <div className="loading-indicator">Buscando... ⏳</div>}
+
+              {isDropdownOpen && searchResults.length > 0 && (
+                <div className="search-results">
+                  {searchResults.map((p: ProductFromDB) => (
+                    <div
+                      key={p.id}
+                      className="result-item"
+                      onClick={() => handleSelectProduct(p)}
+                      style={{ opacity: p.status === 'inativo' ? 0.5 : 1 }}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <strong>{p.name}</strong>
+                          <span style={{ fontSize: '0.8rem', color: '#27ae60', fontWeight: 'bold' }}>
+                            R$ {Number(p.salePrice || 0).toFixed(2)}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '15px', marginTop: '4px' }}>
+                          <small>📦 SKU: {p.sku}</small>
+                          <small>🏷️ {p.category}</small>
+                          <small style={{ color: p.currentStock <= 0 ? 'red' : 'inherit' }}>
+                            Estoque: {p.currentStock} {p.unitOfMeasure}
+                          </small>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+          </div>
+
+          <div className="section-title">➕ Configurar Item</div>
+
+
           <FlexGridContainer layout='grid' template='1fr 1fr' >
             <div>
               <label>🔢 Quantidade de Cópias</label>
-              <input type="number" defaultValue="1" min="1" />
+              <input
+                type="number"
+                value={quantity} // ✨ Vinculado ao estado
+                onChange={(e) => setQuantity(Number(e.target.value))}
+                min="1"
+              />
             </div>
 
-          <div>
+            <div>
               <label>📏 Tamanho</label>
               <select value={selectedSize} onChange={(e) => setSelectedSize(e.target.value)}>
                 <option value="105x27">105 x 27 mm</option>
                 <option value="60x40">60 x 40 mm</option>
               </select>
-              </div>
-            </FlexGridContainer>
+            </div>
+          </FlexGridContainer>
 
-         <div className="form-group">
-             <label style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer'}}>
-               <input type="checkbox" checked={isPromo} onChange={e => setIsPromo(e.target.checked)} />
-               🔥 Etiqueta de Promoção
-             </label>
+          <div className="form-group">
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+              <input type="checkbox" checked={isPromo} onChange={e => setIsPromo(e.target.checked)} />
+              🔥 Etiqueta de Promoção
+            </label>
           </div>
           {/* CAMPOS FUTUROS (Escondidos por padrão) */}
           <details className="advanced-settings">
             <summary>⚙️ Campos Avançados (Lote, Validade...)</summary>
-            
+
             <div className="form-group">
               <label>📅 Data de Validade</label>
               <input type="date" />
@@ -419,49 +422,49 @@ const StockLabelingForm: React.FC = () => {
             </div>
           </details>
 
-         <button 
-  className="btn-add" 
-  onClick={addToQueue}
-  disabled={!selectedProduct}
-  style={{
-    opacity: !selectedProduct ? 0.5 : 1,
-    cursor: !selectedProduct ? 'not-allowed' : 'pointer',
-    backgroundColor: !selectedProduct ? '#95a5a6' : '#3498db'
-  }}
->
-  📥 Incluir na Pilha
-</button>
+          <button
+            className="btn-add"
+            onClick={addToQueue}
+            disabled={!selectedProduct}
+            style={{
+              opacity: !selectedProduct ? 0.5 : 1,
+              cursor: !selectedProduct ? 'not-allowed' : 'pointer',
+              backgroundColor: !selectedProduct ? '#95a5a6' : '#3498db'
+            }}
+          >
+            📥 Incluir na Pilha
+          </button>
         </aside>
 
         {/* Área Principal */}
         <main className="main-content">
-          
+
           {/* Lista em Tabela */}
-          <section className="queue-list" style={{background: 'white', padding: '20px', borderRadius: '10px'}}>
+          <section className="queue-list" style={{ background: 'white', padding: '20px', borderRadius: '10px' }}>
             <div className="section-title">📋 Itens na Fila (Aguardando Impressão)</div>
             {queue.length === 0 ? (
-              <p style={{textAlign: 'center', color: '#888'}}>A fila está vazia.</p>
+              <p style={{ textAlign: 'center', color: '#888' }}>A fila está vazia.</p>
             ) : (
-              <table style={{width: '100%', borderCollapse: 'collapse'}}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{borderBottom: '1px solid #eee'}}>
-                    <th style={{textAlign: 'left', padding: '10px'}}>Produto</th>
-                    <th style={{textAlign: 'left', padding: '10px'}}>Preço</th>
-                    <th style={{padding: '10px'}}>Qtd</th>
-                    <th style={{padding: '10px'}}>Ação</th>
+                  <tr style={{ borderBottom: '1px solid #eee' }}>
+                    <th style={{ textAlign: 'left', padding: '10px' }}>Produto</th>
+                    <th style={{ textAlign: 'left', padding: '10px' }}>Preço</th>
+                    <th style={{ padding: '10px' }}>Qtd</th>
+                    <th style={{ padding: '10px' }}>Ação</th>
                   </tr>
                 </thead>
                 <tbody>
                   {queue.map(item => (
-                    <tr key={item.id} style={{borderBottom: '1px solid #f9f9f9'}}>
-                      <td style={{padding: '10px'}}>
-                        <strong>{item.name}</strong><br/>
+                    <tr key={item.id} style={{ borderBottom: '1px solid #f9f9f9' }}>
+                      <td style={{ padding: '10px' }}>
+                        <strong>{item.name}</strong><br />
                         <small>{item.sku}</small>
                       </td>
-                        <td style={{padding: '10px'}}>R$ {item.price.toFixed(2)}</td>
-                      <td style={{textAlign: 'center'}}>{item.quantity}x</td>
-                      <td style={{textAlign: 'center'}}>
-                        <button onClick={() => removeFromQueue(item.id)} style={{background: 'none', border: 'none', cursor: 'pointer'}}>❌</button>
+                      <td style={{ padding: '10px' }}>R$ {item.price.toFixed(2)}</td>
+                      <td style={{ textAlign: 'center' }}>{item.quantity}x</td>
+                      <td style={{ textAlign: 'center' }}>
+                        <button onClick={() => removeFromQueue(item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>❌</button>
                       </td>
                     </tr>
                   ))}
@@ -470,44 +473,44 @@ const StockLabelingForm: React.FC = () => {
             )}
           </section>
 
-          
+
         </main>
         <aside>
-            
-{/* Preview Visual da Fita de Impressão */}
+
+          {/* Preview Visual da Fita de Impressão */}
           <div className="section-title">🎞️ Visualização da Fita (Preview)</div>
           <section className="preview-scroll">
-            {queue.length === 0 && <div style={{color: '#aaa'}}>Aguardando itens...</div>}
+            {queue.length === 0 && <div style={{ color: '#aaa' }}>Aguardando itens...</div>}
             {queue.map((item, index) => (
               <div key={item.id} className="label-sticker">
-    {/* Indicador de Ordem no Rolo */}
-    <div style={{position: 'absolute', left: '-30px', color: '#fff', fontSize: '12px', fontWeight: 'bold'}}>{index + 1}º</div>
+                {/* Indicador de Ordem no Rolo */}
+                <div style={{ position: 'absolute', left: '-30px', color: '#fff', fontSize: '12px', fontWeight: 'bold' }}>{index + 1}º</div>
 
-    {/* TAG de Promoção (Opcional) */}
-    {item.isPromo && <div className="promo-badge">OFERTA</div>}
+                {/* TAG de Promoção (Opcional) */}
+                {item.isPromo && <div className="promo-badge">OFERTA</div>}
 
-    {/* LINHA 1: Nome do Produto */}
-    <div className="label-row-1">{sanitize(item.name)}</div>
+                {/* LINHA 1: Nome do Produto */}
+                <div className="label-row-1">{sanitize(item.name)}</div>
 
-    {/* LINHA 2: Preço em Destaque (60% do peso visual) */}
-    <div className="label-row-2">
-      <span className="label-price-symbol">R$</span>
-      <span className="label-price-value">
-        {item.price.toFixed(2).replace('.', ',')}
-      </span>
-    </div>
+                {/* LINHA 2: Preço em Destaque (60% do peso visual) */}
+                <div className="label-row-2">
+                  <span className="label-price-symbol">R$</span>
+                  <span className="label-price-value">
+                    {item.price.toFixed(2).replace('.', ',')}
+                  </span>
+                </div>
 
-    {/* LINHA 3: SKU / Detalhes Logísticos */}
-    <div className="label-row-3">
-      <strong>COD:</strong> {item.sku} {item.unit ? `| UN: ${item.unit}` : ''}
-    </div>
+                {/* LINHA 3: SKU / Detalhes Logísticos */}
+                <div className="label-row-3">
+                  <strong>COD:</strong> {item.sku} {item.unit ? `| UN: ${item.unit}` : ''}
+                </div>
 
-    {/* LINHA 4: Código de Barras Simulado */}
-    <div className="label-row-4">
-      <div className="barcode-sim"></div>
-      <div style={{fontSize: '8px', textAlign: 'center', letterSpacing: '2px'}}>{item.sku.replace(/\D/g, '') || '789123456789'}</div>
-    </div>
-  </div>
+                {/* LINHA 4: Código de Barras Simulado */}
+                <div className="label-row-4">
+                  <div className="barcode-sim"></div>
+                  <div style={{ fontSize: '8px', textAlign: 'center', letterSpacing: '2px' }}>{item.sku.replace(/\D/g, '') || '789123456789'}</div>
+                </div>
+              </div>
             ))}
           </section>
 

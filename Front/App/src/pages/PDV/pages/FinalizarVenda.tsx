@@ -3,43 +3,142 @@ import './FinalizarVenda.css';
 import Badge from '../../../components/ui/Badge/Badge';
 import Button from '../../../components/ui/Button/Button';
 import Fieldset from '../../../components/ui/Fieldset/Fieldset';
-import FlexGridContainer from '../../../components/Layout/FlexGridContainer/FlexGridContainer';
+import {imprimirExtratoElgin} from '../../../utils/printService';
+import { salesService, SalePayload } from '../services/salesService';
+import Swal from 'sweetalert2';
+// import {ItemVenda} from '../../../utils/printService'
 
-interface Pagamento {
-    metodo: string;
-    valor: number;
-    parcelas?: number;
-    status: PaymentStatus; // Status individual por linha
+
+
+
+export interface ItemVenda {
+    id: string | number;
+    name: string;
+    quantity: number;
+    salePrice: number;
+    costPrice?: number;
+    price: number;     // ADICIONE ESTA LINHA para satisfazer o erro
 }
 
-type MetodoPagamento = 'Dinheiro 💵' | 'PIX 💠' | 'Cartão Crédito 💳' | 'Cartão Débito 🏦' | 'Crediário 🎫';
+export type PaymentMethodType = 
+  | 'money' 
+  | 'credit_card' 
+  | 'debit_card' 
+  | 'pix' 
+  | 'bank_transfer' 
+  | 'store_credit'; // O seu 'Crediário'
 
-type PaymentStatus = 'Pendente' | 'Processando' | 'Pago' | 'Falha' | 'Cancelado' | 'Reembolsado';
+  export const PAYMENT_METHOD_DETAILS: Record<PaymentMethodType, { label: string; icon: string }> = {
+    money: { 
+        label: 'Dinheiro', 
+        icon: '💵' 
+    },
+    pix: { 
+        label: 'PIX', 
+        icon: '💠' 
+    },
+    credit_card: { 
+        label: 'Cartão Crédito', 
+        icon: '💳' 
+    },
+    debit_card: { 
+        label: 'Cartão Débito', 
+        icon: '🏦' 
+    },
+    store_credit: { 
+        label: 'Crediário', 
+        icon: '🎫' 
+    },
+    bank_transfer: { 
+        label: 'Transferência', 
+        icon: '🏛️' 
+    }
+};
+
+// 1. Defina o tipo técnico (Seguro e sem acentos)
+export type PaymentStatus = 'pending' | 'processing' | 'paid' | 'failed' | 'cancelled' | 'refunded';
+
+// 2. Crie um mapeamento de tradução (Dicionário)
+export const STATUS_LABELS: Record<PaymentStatus, string> = {
+    pending: 'Pendente',
+    processing: 'Processando',
+    paid: 'Pago',
+    failed: 'Falha',
+    cancelled: 'Cancelado',
+    refunded: 'Reembolsado'
+};
+
+export interface Pagamento {
+    id: string;               // UUID para controle de lista (key no React)
+    metodo: PaymentMethodType; // Tipagem estrita em vez de string genérica
+    valor: number;            // Valor bruto
+    valorLiquido?: number;    // Valor descontando taxas (útil para o financeiro)
+    taxaAplicada?: number;    // % ou valor fixo da taxa da maquininha
+    parcelas: number;         // Padrão 1
+    status: PaymentStatus;
+    
+    // Metadados para Cartão/PIX
+    detalhes?: {
+        bandeira?: string;    // Visa, Master, etc.
+        authCode?: string;    // Código de autorização da maquininha/TEF
+        nsu?: string;         // Número sequencial único
+        chavePix?: string;    // ID da transação PIX
+    };
+
+    createdAt: Date;          // Timestamp do recebimento
+    updatedAt?: Date;         // Para quando um status muda (ex: de pendente para pago)
+}
+
+
 
 interface FinalizarVendaProps {
     onBack: () => void;
     total: number;
     cliente: string;
-
+itens: ItemVenda[]; // <-- Adicione esta linha
 }
 
-export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, cliente }) => {
+export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, cliente, itens }) => {
+
+    const [isEnviando, setIsEnviando] = useState(false);
     const [descontoValor, setDescontoValor] = useState(0); // O valor digitado no input
     const [tipoDesconto, setTipoDesconto] = useState<'real' | 'porcent'>('real');
     const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
     const [statusPagamento, setStatusPagamento] = useState<PaymentStatus>('Pendente');
-    const [metodoSelecionado, setMetodoSelecionado] = useState<MetodoPagamento | null>(null);
+const [metodoSelecionado, setMetodoSelecionado] = useState<PaymentMethodType | null>(null);
     const [valorInput, setValorInput] = useState(0);
     const [parcelasInput, setParcelasInput] = useState(1);
 
 
 
+    // Mapeamento de Cores para o Badge de Status
+const STATUS_COLORS: Record<PaymentStatus, "warning" | "info" | "success" | "error" | "secondary"> = {
+    pending: 'warning',
+    processing: 'info',
+    paid: 'success',
+    failed: 'error',
+    cancelled: 'secondary',
+    refunded: 'error'
+};
+
+// Mapeamento para o Select (Exibição Amigável)
+const STATUS_OPTIONS = [
+    { value: 'pending', label: '⏳ Pendente' },
+    { value: 'processing', label: '🔄 Processando' },
+    { value: 'paid', label: '✅ Pago' },
+    { value: 'failed', label: '❌ Falha' },
+    { value: 'cancelled', label: '🚫 Cancelado' },
+];
+
     // cliente e total já vêm do pai via props (comentário duplicado eliminado)
 
     // Cálculos de Totais
-    const totalPago = pagamentos
-        .filter(p => p.status === 'Pago' || p.status === 'Processando')
-        .reduce((acc, p) => acc + p.valor, 0);
+ const totalPago = pagamentos
+    .filter(p => p.status === 'paid' || p.status === 'processing')
+    .reduce((acc, p) => acc + p.valor, 0);
+
+
+
     const [showChangeDetails, setShowChangeDetails] = useState(false);
 
     // Cálculo do desconto real aplicado ao total
@@ -82,28 +181,140 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
         }
     };
 
-    // --- REGRA DE NEGÓCIO: PARCELAMENTO ---
-    const renderParcelamento = () => {
-        if (!metodoSelecionado?.includes('Cartão')) return null;
-        const opcoes = [];
-        for (let i = 1; i <= 12; i++) {
-            const valorParcela = valorInput / i;
-            const juros = i > 4 ? " (c/ juros)" : " (s/ juros)";
-            opcoes.push(
-                <option key={i} value={i}>
-                    {i}x de R$ {valorParcela.toFixed(2)} {juros}
-                </option>
-            );
-        }
-        return (
-            <div className="parcelas-select">
-                <label>Parcelas:</label>
-                <select value={parcelasInput} onChange={(e) => setParcelasInput(Number(e.target.value))}>
-                    {opcoes}
-                </select>
-            </div>
-        );
+
+
+const handleFinalizarVenda = async () => {
+    if (isEnviando) return;
+    setIsEnviando(true);
+
+    // 1. Cálculos de métricas (Snapshots)
+    const totalCusto = itens.reduce((acc, item) => acc + ((item.costPrice || 0) * item.quantity), 0);
+    const lucroNominal = totalLiquido - totalCusto;
+    const percentualLucro = totalLiquido > 0 ? (lucroNominal / totalLiquido) * 100 : 0;
+
+    console.log("📊 Métricas da Venda:", { totalCusto, lucroNominal, percentualLucro });
+
+    // 2. Montagem do Payload completo para o BI (Business Intelligence)
+    const vendaCompleta: SalePayload = {
+        data: new Date().toISOString(),
+        clienteNome: cliente || "CONSUMIDOR",
+        totalBruto: total,
+        totalDesconto: descontoCalculado,
+        totalLiquido: totalLiquido,
+        totalCusto: totalCusto,
+        lucroNominal: lucroNominal,
+        percentualLucro: Number(percentualLucro.toFixed(2)),
+        itens: itens.map(item => ({
+            productId: item.id,
+            nome: item.name,
+            quantidade: item.quantity,
+            precoVenda: item.salePrice,
+            precoCusto: item.costPrice || 0, // GARANTE O CUSTO ATUAL
+            subtotal: item.quantity * item.salePrice,
+            lucroUnitario: item.salePrice - (item.costPrice || 0)
+        })),
+        pagamentos: pagamentos
+            .filter(p => p.status === 'Pago' || p.status === 'Processando')
+            .map(p => ({
+                metodo: p.metodo,
+                valor: p.valor,
+                parcelas: p.parcelas || 1
+            }))
     };
+
+
+    console.log("🚀 Payload Final da Venda:", vendaCompleta);
+    console.table(vendaCompleta.itens); // Isso mostra os itens em uma tabela linda no console!
+
+    // // 🔥 DISPARA O LOADING DO SWAL IMEDIATAMENTE
+    // Swal.fire({
+    //     title: 'Processando Venda',
+    //     text: 'Aguarde um momento...',
+    //     allowOutsideClick: false,
+    //     showConfirmButton: false,
+    //     didOpen: () => {
+    //         Swal.showLoading();
+    //     }
+    // });
+
+     // 4. Impressão Física
+        imprimirExtratoElgin({
+            cliente: vendaCompleta.clienteNome,
+            itens: itens,
+            total: totalLiquido,
+            pagamentos: vendaCompleta.pagamentos,
+            troco: troco
+        });
+
+    // try {
+
+    //     console.log("⏳ Enviando...");
+    //     // 3. Persistência no Banco de Dados
+    //     await salesService.saveVenda(vendaCompleta);
+
+    //     // ✅ RESPOSTA DE SUCESSO
+    // await Swal.fire({
+    //     icon: 'success',
+    //     title: 'Venda Finalizada!',
+    //     text: `O valor de R$ ${totalLiquido.toFixed(2)} foi registrado. <br> Imprimindo Cupom Fiscal...`,
+    //     confirmButtonColor: '#28a745',
+    //     timer: 3000
+    // });
+
+    //     // 4. Impressão Física
+    //     imprimirExtratoElgin({
+    //         cliente: vendaCompleta.clienteNome,
+    //         itens: itens,
+    //         total: totalLiquido,
+    //         pagamentos: vendaCompleta.pagamentos,
+    //         troco: troco
+    //     });
+
+    //     alert("Venda finalizada com sucesso! Estoque atualizado e métricas registradas.");
+    //     onBack(); 
+    // } catch (error: any) {
+    //     // ❌ RESPOSTA DE ERRO
+    // Swal.fire({
+    //     icon: 'error',
+    //     title: 'Erro ao salvar',
+    //     text: error.message || 'Servidor offline ou falha na rede.',
+    //     confirmButtonColor: '#d33'
+    // });
+
+    // } finally {
+    //     setIsEnviando(false);
+    // }
+};
+
+
+
+   // --- RENDERIZAÇÃO DO PARCELAMENTO ATUALIZADA ---
+  const renderParcelamento = () => {
+    if (metodoSelecionado !== 'credit_card') return null;
+    
+    const opcoes = [];
+    for (let i = 1; i <= 12; i++) {
+        const valorParcela = valorInput / i;
+        opcoes.push(
+            <option key={i} value={i}>
+                {i}x de R$ {valorParcela.toFixed(2)} {i > 4 ? '(c/ juros)' : '(s/ juros)'}
+            </option>
+        );
+    }
+
+    return (
+        <div className="parcelas-group">
+            <label>Parcelamento:</label>
+            <select 
+                value={parcelasInput} 
+                onChange={(e) => setParcelasInput(Number(e.target.value))}
+                className="select-parcelas"
+            >
+                {opcoes}
+            </select>
+        </div>
+    );
+};
 
     // --- REGRA DE NEGÓCIO: CALCULADORA DE TROCO ---
     const calcularNotasTroco = (valor: number) => {
@@ -148,20 +359,21 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
     };
 
     const adicionarPagamento = () => {
-        // Adicione a verificação !metodoSelecionado
         if (valorInput <= 0 || !metodoSelecionado) return;
 
-        setPagamentos([...pagamentos, {
+        const novoPagamento: Pagamento = {
+            id: crypto.randomUUID(), // Melhor que index
             metodo: metodoSelecionado,
             valor: valorInput,
-            status: 'Pendente', // Adicionei o status que faltava no seu objeto
-            // Use ?. para evitar o erro "can't access property includes"
-            parcelas: metodoSelecionado?.includes('Cartão') ? parcelasInput : undefined
-        }]);
+            parcelas: metodoSelecionado === 'credit_card' ? parcelasInput : 1,
+            status: 'paid', // Como é PDV físico, geralmente cai como Pago direto
+            createdAt: new Date(),
+        };
 
+        setPagamentos([...pagamentos, novoPagamento]);
         setValorInput(0);
         setParcelasInput(1);
-        setMetodoSelecionado(null); // Resetar após adicionar libera a trava para o próximo
+        setMetodoSelecionado(null);
     };
 
     const removerPagamento = (index: number) => {
@@ -245,8 +457,7 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
                      {/* Guia de Passos */}
        
 
-                <div className={`payment-section ${metodoSelecionado ? 'method-selected' : 'method-picking'}`}>
-
+<div className={`payment-section ${metodoSelecionado ? 'method-selected' : ''}`}>
 
                     
 
@@ -259,17 +470,17 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
                         </div>
 
                         <div className="method-grid">
-                            {['Dinheiro 💵', 'PIX 💠', 'Cartão Crédito 💳', 'Cartão Débito 🏦', 'Crediário 🎫'].map(m => (
-                                <button
-                                    key={m}
-                                    // Se algo já foi selecionado e não é este botão, ele fica desativado
-                                    disabled={metodoSelecionado !== null && metodoSelecionado !== m} className={metodoSelecionado === m ? 'active' : ''}
-                                    onClick={() => setMetodoSelecionado(m)}
-
-                                >
-                                    {m}
-                                </button>
-                            ))}
+                            {Object.entries(PAYMENT_METHOD_DETAILS).map(([key, info]) => (
+        <button
+            key={key}
+            // Verifica se o método selecionado é igual à chave técnica
+            disabled={metodoSelecionado !== null && metodoSelecionado !== key} 
+            className={metodoSelecionado === key ? 'active' : ''}
+            onClick={() => setMetodoSelecionado(key as PaymentMethodType)}
+        >
+            {info.icon} {info.label}
+        </button>
+    ))}
                         </div>
                     </section>
 
@@ -277,8 +488,10 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
                     <section className={`payment-details ${!metodoSelecionado ? 'section-locked' : ''} ${passoEmFoco === 2 ? 'step-highlight' : ''}`}>
 
                         <h4>
-                             {metodoSelecionado ? 'Pagamento: ' + metodoSelecionado : '(Selecione um método)'}
-                        </h4>
+    {metodoSelecionado 
+        ? `Pagamento: ${PAYMENT_METHOD_DETAILS[metodoSelecionado].label}` 
+        : '(Selecione um método)'}
+</h4>
 
 
                         {metodoSelecionado && (
@@ -325,61 +538,74 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
                 {
                     pagamentos.length > 0 && (
                         
-                        <Fieldset variant='card' >
- {pagamentos.length > 0 && (
-                                        <div className="payment-summary">
+                      
+<Fieldset variant='card'>
+    {pagamentos.length > 0 && (
+        <div className="payment-summary">
+            <span>
+                {`Pagamento${pagamentos.length > 1 ? 's' : ''} ${pagamentos.length === 1 ? 'Adicionado' : 'Adicionados'} (${pagamentos.length})`}
+            </span>
+            <Badge color="success">
+                Valor PAGO: R$ {totalPago.toFixed(2)}
+            </Badge>
+        </div>
+    )}
 
-                                            <span>
-                                            {`Pagamento${pagamentos.length > 1 ? 's' : ''} ${pagamentos.length === 1 ? 'Adicionado' : 'Adicionados'} (${pagamentos.length})  `}
-                                            </span>
-                                            <Badge color="success">Valor PAGO: R$ 
-                                            {totalPago.toFixed(2)} </Badge>
-                                             
-                                        </div>
-                                    )}
+    <ul className="payment-history">
+        {pagamentos.map((p, i) => {
+            // Busca ícone e label amigável no dicionário global
+            const infoMetodo = PAYMENT_METHOD_DETAILS[p.metodo];
+            const isCanceladoOuFalha = p.status === 'cancelled' || p.status === 'failed';
 
-                            <ul className="payment-history">
-                                {pagamentos.map((p, i) => {
-                                    const isCanceladoOuFalha = p.status === 'Cancelado' || p.status === 'Falha';
+            return (
+                <li key={p.id || i} className={isCanceladoOuFalha ? 'payment-row-disabled' : ''}>
+                    <div className="payment-main-info">
+                        <span>{infoMetodo?.icon} <strong>{infoMetodo?.label}</strong></span>
+                        <div className="payment-info">
+                            <strong>R$ {p.valor.toFixed(2)}</strong>
+                            <span className="payment-subtext">
+                                {p.metodo === 'credit_card' ? ` (${p.parcelas}x)` : ' (À vista)'}
+                            </span>
+                        </div>
+                    </div>
 
-                                    return (
-                                        <li key={p.id || i} className={isCanceladoOuFalha ? 'payment-row-disabled' : ''}>
-                                            {p.metodo}:
-                                            <div className="payment-info">
-                                                <strong>R$ {p.valor.toFixed(2)}</strong>
-                                            </div>
-                                                <span className="payment-subtext">
-                                                    {p.parcelas ? ` (${p.parcelas}x)` : ' (À vista)'}
-                                                </span>
+                    <div className="status-workflow-wrapper">
+                        <select
+    className={`select-status-inline status-select-${p.status}`}
+    value={p.status}
+    onChange={(e) => alterarStatusPagamento(i, e.target.value as PaymentStatus)}
+>
+    <option value="pending">⏳ Pendente</option>
+    <option value="processing">🔄 Processando</option>
+    <option value="paid">✅ Pago</option>
+    <option value="failed">❌ Falha</option>
+    <option value="cancelled">🚫 Cancelado</option>
+</select>
 
-                                            <div className="status-workflow-wrapper">
-                                                <select
-                                                    className={`select-status-inline status-select-${p.status}`}
-                                                    value={p.status}
-                                                    onChange={(e) => alterarStatusPagamento(i, e.target.value as PaymentStatus)}
-                                                >
-                                                    <option value="Pendente">⏳ Pendente</option>
-                                                    <option value="Processando">🔄 Processando</option>
-                                                    <option value="Pago">✅ Pago</option>
-                                                    <option value="Falha">❌ Falha</option>
-                                                    <option value="Cancelado">🚫 Cancelado</option>
-                                                </select>
-
-                                                {/* Regra: Só permite remover se ainda estiver Pendente e não for Cartão/Pix enviado */}
-                                                {p.status === 'Pendente' ? (
-                                                    <button className="btn-remove-line" onClick={() => removerPagamento(i)}>✕</button>
-                                                ) : (
-                                                    <button className="btn-lock-line" disabled title="Não é possível excluir um pagamento processado">🔒</button>
-                                                )}
-                                            </div>
-                                        </li>
-                                    );
-                                })}
-                            </ul>
-
-                                   
-
-                        </Fieldset>
+                        {/* Regra de remoção: Agora checa contra o valor técnico 'pending' */}
+                        {p.status === 'pending' ? (
+                            <button 
+                                className="btn-remove-line" 
+                                onClick={() => removerPagamento(i)}
+                                title="Remover pagamento"
+                            >
+                                ✕
+                            </button>
+                        ) : (
+                            <button 
+                                className="btn-lock-line" 
+                                disabled 
+                                title="Não é possível excluir um pagamento processado ou finalizado"
+                            >
+                                🔒
+                            </button>
+                        )}
+                    </div>
+                </li>
+            );
+        })}
+    </ul>
+</Fieldset>
                     )
                 }
 
@@ -465,9 +691,9 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
                 <button
                     className="btn-confirm-sale"
                     disabled={totalPago < totalLiquido}
-                    onClick={() => alert("Venda Finalizada com Sucesso!")}
-                >
-                    {precisaBloquear ? "AGUARDANDO GERENTE" : "CONCLUIR VENDA (F5)"}
+onClick={handleFinalizarVenda}                >
+
+                    {precisaBloquear ? "AGUARDANDO GERENTE" : "CONCLUIR VENDA .(F5)"}
                 </button>
             </div>
 

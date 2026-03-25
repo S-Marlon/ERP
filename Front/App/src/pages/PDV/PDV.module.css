@@ -1750,3 +1750,58 @@ input::-webkit-inner-spin-button {
   background: #1d4ed8;
   border-color: #1d4ed8;
 }
+
+
+
+
+
+
+
+/* Container do item quando tem desconto */
+.cartItemDiscounted {
+    border-left: 4px solid var(--success) !important;
+    background: #2d3a4f !important; /* Um azul levemente mais claro que o surface para destacar */
+}
+
+/* Preço antigo riscado (Acima do preço atual) */
+.oldPrice {
+    text-decoration: line-through;
+    color: #94a3b8; /* text-muted do tema dark */
+    font-size: 0.75rem;
+    display: block;
+    line-height: 1;
+}
+
+/* Preço com destaque positivo */
+.priceHighlight {
+    color: var(--success) !important;
+    font-weight: bold;
+}
+
+/* Botão de porcentagem ativo */
+.btnDiscountActive {
+    background-color: var(--success) !important;
+    color: white !important;
+    border: none;
+    font-weight: bold;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+}
+
+.priceContainer {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+
+
+.swal2-deny {
+    order: 1; /* Move o botão de remover para a esquerda se desejar */
+}
+
+/* Preço antigo riscado */
+.originalPriceLabel {
+    text-decoration: line-through;
+    color: #2dabff;
+    font-size: 0.75rem;
+    display: block;
+}

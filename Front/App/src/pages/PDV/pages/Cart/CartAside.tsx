@@ -1,5 +1,6 @@
 import React from 'react';
 import styles from '../../PDV.module.css';
+import Swal from 'sweetalert2';
 
 import { CartItem } from '../../types';
 
@@ -17,6 +18,7 @@ interface CartAsideProps {
     removeItem: (id: string | number) => void;
     onFinalizar: () => void; // Callback para quando o usuário clicar em "Finalizar Venda"
     onBack: () => void; // Callback para quando o usuário clicar em "Cancelar Pagamento"
+    applyIndividualDiscount: (id: string | number, newPrice: number) => void; // <-- ADICIONE ESTA LINHA
 }
 
 export const CartAside: React.FC<CartAsideProps> = ({
@@ -31,12 +33,63 @@ export const CartAside: React.FC<CartAsideProps> = ({
     removeItem,
     onFinalizar,
     onBack, // Callback para quando o usuário clicar em "Cancelar Pagamento"
+    applyIndividualDiscount
 }) => {
 
-    // subtotal calculado no pai e recebido via props
-    // const itemsSubtotal = props.itemsSubtotal; // não mais necessário
 
-    // Lista de unidades que permitem venda fracionada (decimais)
+
+ const handleIndividualDiscount = async (item: CartItem) => {
+    const precoOriginal = item.originalPrice || item.price;
+    const temDesconto = item.price < precoOriginal;
+
+    const result = await Swal.fire({
+        title: 'Aplicar Desconto',
+        html: `
+            <div style="text-align: left; background: #334155; padding: 15px; border-radius: 8px; color: white; margin-bottom: 10px;">
+                <p style="margin: 0"><strong>Produto:</strong> ${item.name}</p>
+                <p style="margin: 5px 0 0 0; font-size: 0.9rem; color: #cbd5e0;">
+                    Preço Base: ${money.format(precoOriginal)}
+                </p>
+            </div>
+            <label style="display:block; text-align: left; margin-bottom: 5px; color: #333;">Novo Preço Unitário (R$):</label>
+        `,
+        input: 'number',
+        inputValue: item.price,
+        inputAttributes: {
+            step: '0.01',
+            min: '0.01'
+        },
+        showCancelButton: true,
+        cancelButtonText: 'Cancelar',
+        
+        // BOTÃO DE RESET (Aparece apenas se já houver desconto)
+        showDenyButton: temDesconto,
+        denyButtonText: 'Remover Desconto',
+        denyButtonColor: '#64748b',
+
+        confirmButtonText: 'Aplicar',
+        confirmButtonColor: '#10b981',
+        
+        inputValidator: (value) => {
+            if (!value || Number(value) <= 0) return 'Insira um valor válido!';
+            if (Number(value) > precoOriginal) return 'O preço com desconto não pode ser maior que o original!';
+            return null;
+        }
+    });
+
+    // 1. Lógica para REMOVER DESCONTO (Reset)
+    if (result.isDenied) {
+        applyIndividualDiscount(item.id, precoOriginal);
+        return; // Encerra aqui
+    }
+
+    // 2. Lógica para APLICAR NOVO VALOR
+    if (result.isConfirmed && result.value) {
+        const novoPreco = Number(result.value);
+        applyIndividualDiscount(item.id, novoPreco);
+    }
+};
+
     const FRACTIONABLE_UNITS = ['MT', 'LT', 'KG', 'M', 'L'];
 
     return (
@@ -62,6 +115,11 @@ export const CartAside: React.FC<CartAsideProps> = ({
                     </div>
                 ) : (
                     cart.map((item) => {
+
+                       const precoOriginal = item.originalPrice || item.price;
+                const temDesconto = item.price < precoOriginal;
+                const porcentagemOff = ((1 - item.price / precoOriginal) * 100).toFixed(0);
+
                         // Verifica se este item específico pode ser fracionado
                         const canFractionate = FRACTIONABLE_UNITS.includes(
                             item.unitOfMeasure?.toUpperCase() || ''
@@ -74,8 +132,8 @@ export const CartAside: React.FC<CartAsideProps> = ({
                         const hasStock = stock > 0;
 
                         return (
-                            <div key={item.id} className={styles.cartItem}>
-                                {/* 1. Cabeçalho do Item: Nome e Código */}
+<div key={item.id} className={`${styles.cartItem} ${temDesconto ? styles.cartItemDiscounted : ''}`}>
+                                    {/* 1. Cabeçalho do Item: Nome e Código */}
                                 <div className={styles.cartItemHeader}>
                                     <div className={styles.mainInfo}>
                                         <strong className={styles.itemName}>{item.name}</strong>
@@ -109,13 +167,28 @@ export const CartAside: React.FC<CartAsideProps> = ({
                                 {/* 3. Rodapé do Item: Ações e Subtotal */}
                                 <div className={styles.cartActions}>
 
+                                    <div className={styles.priceColumn}>
+                                {temDesconto && (
+                                    <span className={styles.originalPriceLabel}>{money.format(precoOriginal)} </span>
+                                    
+                                )}
+                                {/* <span className={`${styles.unitPrice} ${temDesconto ? styles.priceGreen : ''}`}>
+                                    {money.format(item.price)}
+                                </span> */}
+                            </div>
+
 
                                     <span className={styles.unitPrice}>
                                         {money.format(item.price)} <small>/ {item.unitOfMeasure || 'un'}</small>
                                     </span>
-                                    <button className={styles.btnDiscount} title="Aplicar Desconto">
-                                        %
-                                    </button>
+                                    
+                                    <button 
+                                className={`${styles.btnDiscount} ${temDesconto ? styles.btnDiscountActive : ''}`} 
+                                onClick={() => handleIndividualDiscount(item)}
+                                title="Aplicar Desconto"
+                            >
+                                {temDesconto ? `${porcentagemOff}%` : '%'}
+                            </button>
 
 
 
@@ -200,7 +273,7 @@ export const CartAside: React.FC<CartAsideProps> = ({
                 {/* Bloco de Destaque: Total Geral */}
                 <div className={styles.btnFooteSection}>
 
-                   
+
 
                     <button
                         className={styles.btnCheckout}
@@ -214,12 +287,12 @@ export const CartAside: React.FC<CartAsideProps> = ({
                     }
 
                     {cart.length > 0 || total > 0 ? (
-                    <button
-                        className={styles.btnCancelSale}
-                        onClick={onBack}
-                    >
-                        CANCELAR PAGAMENTO
-                    </button>
+                        <button
+                            className={styles.btnCancelSale}
+                            onClick={onBack}
+                        >
+                            CANCELAR PAGAMENTO
+                        </button>
                     ) : null}
 
                 </div>

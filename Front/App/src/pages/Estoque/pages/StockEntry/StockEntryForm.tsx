@@ -10,6 +10,7 @@ import { ActionPopover } from '../../../../components/ui/Popover/ActionPopover';
 import NfeCards from './_components/NfeCards';
 import { checkExistingMappings, checkSupplier, createSupplier, submitStockEntry } from '../../api/productsApi';
 import FormControl from '../../../../components/ui/FormControl/FormControl';
+import { useLabelPrint } from '../../hooks/useLabelPrint';
 
 
 interface ProductEntry extends ProdutoNF {
@@ -131,6 +132,7 @@ const StockEntryForm: React.FC = () => {
 
 
 
+    const { printLabels } = useLabelPrint();
 
 
 
@@ -152,36 +154,34 @@ const StockEntryForm: React.FC = () => {
     const performMappingSync = async (cnpjToUse: string, xmlToUse: NfeData) => {
         try {
             console.log('\n=== INICIANDO performMappingSync ===');
-            console.log('CNPJ:', cnpjToUse);
 
-            // 🔑 Primeiro, gera o hash do CNPJ (mesmo que o backend faz)
+            // 1. Limpa o CNPJ (apenas números) para enviar ao backend
             const cnpjLimpo = cnpjToUse.replace(/\D/g, '');
-            const encoder = new TextEncoder();
-            const hashBuffer = await window.crypto.subtle.digest('SHA-256', encoder.encode(cnpjLimpo));
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            const cnpjHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 4).toUpperCase();
-            console.log('CNPJ Hash gerado no frontend:', cnpjHash);
 
+            // 2. Pega os SKUs originais que vieram do XML (sem hashes ou barras)
             const skus = xmlToUse.items.map(i => i.sku);
-            console.log('SKUs enviados para o backend:', skus);
+            console.log('Buscando mapeamentos para CNPJ:', cnpjLimpo, 'e SKUs:', skus);
 
-            const existingMappings = await checkExistingMappings(cnpjToUse, skus);
-            console.log('Mappings retornados do backend:', existingMappings);
-            console.log('Total de mappings encontrados:', existingMappings.length);
+            // 3. Chama a API (certifique-se que o backend agora recebe { supplierCnpj, skus })
+            const existingMappings = await checkExistingMappings(cnpjLimpo, skus);
 
-            // 🔑 Cria um Map para lookup O(1) usando sku_fornecedor como chave
-            const mappingsBySkuFornecedor = new Map(
+            if (!Array.isArray(existingMappings)) {
+                console.log('Nenhum mapeamento encontrado ou erro no retorno.');
+                setItems(xmlToUse.items);
+                return;
+            }
+
+            // 4. Cria um Map para busca rápida (chave é o SKU do fornecedor)
+            const mappingsBySku = new Map(
                 existingMappings.map((m: any) => [m.sku_fornecedor, m])
             );
-            console.log('Map de mappings criado com chaves:', Array.from(mappingsBySkuFornecedor.keys()));
 
+            // 5. Reconcilia os itens do XML com o que existe no Banco
             const reconciledItems = xmlToUse.items.map((item: any) => {
-                // ✅ Formata o SKU do item com o hash (igual ao backend)
-                const formattedSkuForLookup = `${item.sku}/${cnpjHash}`;
-                const mapping = mappingsBySkuFornecedor.get(formattedSkuForLookup);
-                console.log(`Processando item SKU: "${item.sku}" -> Formatado: "${formattedSkuForLookup}" -> Encontrado:`, mapping ? 'SIM ✅' : 'NÃO ❌');
+                const mapping = mappingsBySku.get(item.sku);
+
                 if (mapping) {
-                    console.log(`  └─ Mapeado para: ${mapping.codigo_interno} (${mapping.descricao})`);
+                    console.log(`✅ Item ${item.sku} mapeado para ${mapping.codigo_interno}`);
                     return {
                         ...item,
                         isMapped: true,
@@ -195,24 +195,18 @@ const StockEntryForm: React.FC = () => {
                         },
                     };
                 }
-                console.log(`  └─ Nenhum mapeamento encontrado`);
                 return { ...item, isMapped: false };
             });
 
-            // Atualiza itens e seleção
+            // 6. Atualiza o estado
             setItems(reconciledItems);
-            setSelectedPendingIds(new Set(reconciledItems.filter((i: any) => !i.isConfirmed).map((i: any) => i.tempId)));
-            setSelectedConfirmedIds(new Set());
+            setSelectedPendingIds(new Set(reconciledItems.map(i => i.tempId)));
 
-            const mapeadosCount = reconciledItems.filter((i: any) => i.isMapped).length;
-            alert(`XML importado! ${reconciledItems.length} itens carregados (${mapeadosCount} sincronizados automaticamente).`);
+            const mapeadosCount = reconciledItems.filter(i => i.isMapped).length;
+            console.log(`Sincronização concluída: ${mapeadosCount} itens auto-mapeados.`);
 
-            // limpa pendentes
-            setPendingXmlData(null);
-            setPendingSkus(null);
         } catch (err) {
             console.error('Erro ao sincronizar mapeamentos:', err);
-            alert('Erro ao sincronizar mapeamentos: ' + (err instanceof Error ? err.message : 'Erro desconhecido'));
         }
     };
 
@@ -702,6 +696,25 @@ const StockEntryForm: React.FC = () => {
             const confirmDivergence = window.confirm(`ATENÇÃO: ${divergentItems.length} divergência(s). Confirmar entrada dos itens recebidos (${totalItems.toFixed(2)} unidades)?`);
             if (!confirmDivergence) return;
         }
+
+        // 1. Criamos a lista de etiquetas baseada nos itens da nota
+if (window.confirm(`Deseja imprimir etiquetas para os ${items.length} itens desta entrada?`)) {
+    // Transformamos seus itens da nota no formato que o LabelGenerator entende
+    const labelsToPrint = items
+        .filter(item => item.isConfirmed)
+        .map(item => ({
+            name:  item.descricao, // Use o nome interno mapeado
+            sku: item.mappedId || item.sku,    // SKU interno
+            price: item.valorProdutos || 0,        // Preço de venda (se tiver no objeto)
+            quantity: item.quantityReceived,   // Quantidade que entrou
+            unit: item.unidadeMedida
+        }));
+
+    if (labelsToPrint.length > 0) {
+        printLabels(labelsToPrint, 'standard'); 
+    }
+}
+        
 
         try {
             // Monta o payload conforme esperado pelo backend

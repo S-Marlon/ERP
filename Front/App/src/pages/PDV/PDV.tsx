@@ -3,10 +3,18 @@ import { useParams } from 'react-router-dom';
 import styles from './PDV.module.css';
 import { SaleItem, CartItem, DisplayMode, ProductBasic } from './types';
 import { Product } from '../Estoque/pages/StockInventory/types/Stock_Products';
-import { getPdvProducts, getPdvCategories, ProductFilters, ProductsResponse, getAllBasicProducts, validateProductStockPrice } from './services/pdvService';
+// No topo do PDV.tsx
+import {
+  getPdvProducts,
+  getPdvCategories,
+  validateProductStockPrice,
+  // ADICIONE ESTAS LINHAS ABAIXO:
+  getPdvBrands,
+  getPdvStatuses,
+  getAllBasicProducts
+} from './services/pdvService';
 import { useDebounce } from './hooks/useDebounce';
 import { CartAside } from './pages/Cart/CartAside';
-import Button from '../../components/ui/Button/Button';
 import { FinalizarVenda } from './pages/FinalizarVenda';
 import Switch from '../../components/ui/Switch';
 import EcommerceGallery from '../../components/ui/ImageGallery/EcommerceGallery';
@@ -32,9 +40,6 @@ const MOCK_SERVICES: SaleItem[] = [
 
 export const PDV: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-
-
-
 
   const [dynamicCategories, setDynamicCategories] = useState<string[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
@@ -93,7 +98,6 @@ export const PDV: React.FC = () => {
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
 
 
-
   // OS-specific data
   const [osData, setOsData] = useState({
     equipment: '',
@@ -105,6 +109,9 @@ export const PDV: React.FC = () => {
     laborValue: 0,
     selectedServiceId: ''
   });
+
+
+
 
   // Initialize on mount
   useEffect(() => {
@@ -205,29 +212,60 @@ export const PDV: React.FC = () => {
     setSelectedCategory('Todas');
     setSearchTerm('');
     setCurrentPage(1);
+    setOnlyInStock(true);
+    setOnlyActive(true);
   };
 
   /* ===== ADD TO CART (DEVE VIR ANTES DE PROCESSBARCODE) ===== */
-  
-  const addToCart = useCallback((item: SaleItem) => {
+
+  const addToCart = useCallback(async (item: SaleItem) => {
     if (item.type === 'part' && item.id) {
-      validateProductStockPrice(item.id as number).then(validation => {
-        if (validation) {
-          if (validation.stock <= 0) {
-            alert(`Atenção: ${item.name} está sem estoque!`);
-            return;
-          }
-          setCart(prev => {
-            const existing = prev.find(i => i.id === item.id);
-            if (existing) return prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
-            return [...prev, { ...item, stock: validation.stock, price: validation.price, quantity: 1 }];
-          });
+      try {
+        const validation = await validateProductStockPrice(item.id as number);
+
+        if (!validation) return;
+
+        if (validation.stock <= 0) {
+          alert(`Atenção: ${item.name} está sem estoque!`);
+          return;
         }
-      });
+
+        setCart(prev => {
+          const existing = prev.find(i => i.id === item.id);
+
+          if (existing) {
+            return prev.map(i =>
+              i.id === item.id
+                ? { ...i, quantity: i.quantity + 1 }
+                : i
+            );
+          }
+
+          return [
+            ...prev,
+            {
+              ...item,
+              stock: validation.stock,
+              price: item.price,
+              quantity: 1
+            }
+          ];
+        });
+      } catch (err) {
+        console.error('Erro ao validar produto:', err);
+      }
     } else {
       setCart(prev => {
         const existing = prev.find(i => i.id === item.id);
-        if (existing) return prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
+
+        if (existing) {
+          return prev.map(i =>
+            i.id === item.id
+              ? { ...i, quantity: i.quantity + 1 }
+              : i
+          );
+        }
+
         return [...prev, { ...item, quantity: 1 }];
       });
     }
@@ -267,42 +305,42 @@ export const PDV: React.FC = () => {
 
 
 
-  
+
 
   // Hook para captar leitura de código de barras
   useEffect(() => {
-  let barcodeAccumulator = '';
-  let lastKeyTime = Date.now();
+    let barcodeAccumulator = '';
+    let lastKeyTime = Date.now();
 
-  const handleKeyDown = (e: KeyboardEvent) => {
-    const currentTime = Date.now();
-    const timeSinceLastKey = currentTime - lastKeyTime;
-    lastKeyTime = currentTime;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const currentTime = Date.now();
+      const timeSinceLastKey = currentTime - lastKeyTime;
+      lastKeyTime = currentTime;
 
-    if (timeSinceLastKey > 100) {
-      barcodeAccumulator = '';
-    }
-
-    if (e.key === 'Enter') {
-      if (barcodeAccumulator.length > 3) {
-        e.preventDefault();
-        processBarcode(barcodeAccumulator); // Dispara a busca no banco
+      if (timeSinceLastKey > 100) {
         barcodeAccumulator = '';
       }
-      return;
-    }
 
-    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
-      barcodeAccumulator += e.key;
-    }
-  };
+      if (e.key === 'Enter') {
+        if (barcodeAccumulator.length > 3) {
+          e.preventDefault();
+          processBarcode(barcodeAccumulator); // Dispara a busca no banco
+          barcodeAccumulator = '';
+        }
+        return;
+      }
 
-  window.addEventListener('keydown', handleKeyDown);
-  return () => window.removeEventListener('keydown', handleKeyDown);
-}, [processBarcode]); // Essencial para pegar a versão atualizada da busca
+      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
+        barcodeAccumulator += e.key;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [processBarcode]); // Essencial para pegar a versão atualizada da busca
 
 
- 
+
 
 
   useEffect(() => {
@@ -330,28 +368,26 @@ export const PDV: React.FC = () => {
   useEffect(() => {
     const loadFilterOptions = async () => {
       try {
-        // Carregar marcas
-        const brandsResponse = await fetch('http://localhost:3001/api/brands');
-        if (brandsResponse.ok) {
-          const brands = await brandsResponse.json();
-          setBrandOptions(brands || ['Todos']);
+        // Executa as duas buscas ao mesmo tempo para performance
+        const [brands, statuses] = await Promise.all([
+          getPdvBrands(),
+          getPdvStatuses()
+        ]);
+
+        // Atualiza os estados apenas se houver retorno
+        if (brands && brands.length > 0) {
+          setBrandOptions(['Todos', ...brands]);
         }
 
-        // Carregar status
-        const statusResponse = await fetch('http://localhost:3001/api/statuses');
-        if (statusResponse.ok) {
-          const statuses = await statusResponse.json();
-          setStatusOptions(statuses || ['Todos', 'Ativo', 'Inativo']);
+        if (statuses && statuses.length > 0) {
+          setStatusOptions(['Todos', ...statuses]);
         }
 
-        // Carregar unidades
-        const unitsResponse = await fetch('http://localhost:3001/api/units');
-        if (unitsResponse.ok) {
-          const units = await unitsResponse.json();
-          setUnitOptions(units || []);
-        }
       } catch (e) {
-        console.error('Erro ao carregar opções de filtros:', e);
+        console.error('Erro ao carregar opções de filtros no componente:', e);
+        // Fallback em caso de erro para não travar a UI
+        setBrandOptions(['Todos']);
+        setStatusOptions(['Todos', 'Ativo', 'Inativo']);
       }
     };
 
@@ -359,21 +395,34 @@ export const PDV: React.FC = () => {
   }, []);
 
 
-
+ const applyIndividualDiscount = (id: string | number, newPrice: number) => {
+    setCart(prevCart => prevCart.map(item => {
+        if (item.id === id) {
+            return {
+                ...item,
+                // Se for o preço original (reset), limpamos o originalPrice, 
+                // senão, guardamos o preço antigo para referência futura.
+                originalPrice: item.originalPrice || item.price, 
+                price: newPrice
+            };
+        }
+        return item;
+    }));
+};
 
   // Definição das colunas específica para este contexto (Peças)
   const productColumns = [
-   {
-  header: 'Codificação',
-  key: 'sku',
-  render: (item: any) => (
-    <div style={{ display: 'flex', flexDirection: 'column', fontSize: '11px' }}>
-      <span title="SKU"><strong>SKU:</strong> {item.sku || 'N/A'}</span>
-      <span title="Barcode" style={{ color: '#666' }}><strong>EAN:</strong> {item.barcode || 'N/A'}</span>
-    </div>
-  ),
-  textAlign: 'left' as const
-},
+    {
+      header: 'Codificação',
+      key: 'sku',
+      render: (item: any) => (
+        <div style={{ display: 'flex', flexDirection: 'column', fontSize: '11px' }}>
+          <span title="SKU"><strong>SKU:</strong> {item.sku || 'N/A'}</span>
+          <span title="Barcode" style={{ color: '#666' }}><strong>EAN:</strong> {item.barcode || 'N/A'}</span>
+        </div>
+      ),
+      textAlign: 'left' as const
+    },
     {
       header: 'Status',
       key: 'status',
@@ -416,34 +465,34 @@ export const PDV: React.FC = () => {
     },
     {
       header: 'Preço',
-  key: 'price',
-  render: (item: any) => (
-    <span className={styles.price}>
-      {/* O Number() aqui é uma camada extra de segurança */}
-      {money.format(Number(item.price) || 0)}
-    </span>
-  ),
-  textAlign: 'right' as const
+      key: 'price',
+      render: (item: any) => (
+        <span className={styles.price}>
+          {/* O Number() aqui é uma camada extra de segurança */}
+          {money.format(Number(item.price) || 0)}
+        </span>
+      ),
+      textAlign: 'right' as const
     },
     {
       header: 'Ações',
       key: 'actions',
       render: (item: any) => (
         <div>
-   <button 
-    className={styles.compactAddBtn} 
-    onClick={() => setSelectedPart(item)} // Abre o modal de detalhes do produto
-  >
-    <span>?</span>
-  </button>
-  <button 
-    className={styles.compactAddBtn} 
-    onClick={() => addToCart(item)} // Use a função 'addToCart' que você já criou
-  >
-    <span>+</span>
-  </button>
-  </div>
-),
+          <button
+            className={styles.compactAddBtn}
+            onClick={() => setSelectedPart(item)} // Abre o modal de detalhes do produto
+          >
+            <span>?</span>
+          </button>
+          <button
+            className={styles.compactAddBtn}
+            onClick={() => addToCart(item)} // Use a função 'addToCart' que você já criou
+          >
+            <span>+</span>
+          </button>
+        </div>
+      ),
       textAlign: 'center' as const
     }
   ];
@@ -454,108 +503,95 @@ export const PDV: React.FC = () => {
   const [sortOrder, setSortOrder] = useState('');
 
   // ===== FILTROS LOCAIS AVANÇADOS - Processamento 100% Client-side =====
-  const filteredData: SaleItem[] = useMemo(() => {
-    let data: SaleItem[] = [];
+  // 1. Simplifique o filteredData (ele apenas formata, não filtra mais)
+  const formattedData = useMemo(() => {
+    return products.map(p => ({
+      ...p,
+      price: Number(p.salePrice) || 0,
+      stock: Number(p.currentStock) || 0,
+      type: 'part' as const,
+    }));
+  }, [products]);
 
-    // 1. POPULAR OS DADOS INICIAIS (do backend se houver, senão do cache)
-    // Dentro do filteredData (useMemo):
-if (activeTab === 'parts') {
-  data = products.map(p => ({
-    id: p.id,
-    name: p.name,
-    price: Number(p.salePrice) || 0,
-    brand: p.brand || '',
-    category: p.category,
-    type: 'part' as const,
-    stock: Number(p.currentStock) || 0,
-    sku: p.sku,         // <-- Certifique-se que p.sku existe no seu Model 'Product'
-    barcode: p.barcode, // <-- Se o banco envia como gtin, use p.gtin aqui
-    unitOfMeasure: p.unitOfMeasure,
-    status: p.status,
-    pictureUrl: p.pictureUrl,
-  })) as SaleItem[];
-}
-else if (activeTab === 'services') {
-      data = MOCK_SERVICES as SaleItem[];
-    }
 
-    // 2. FILTRO DE ITENS ATIVOS
-    if (onlyActive) {
-      data = data.filter(item => item.status === 'Ativo');
-    }
+  const filters = useMemo(() => ({
+    searchTerm: debouncedSearchTerm || undefined,
+    category: selectedCategory !== 'Todas' ? selectedCategory : undefined,
+    page: currentPage,
+    limit: itemsPerPage,
+    minPrice: minPrice ? parseFloat(minPrice) : undefined,
+    maxPrice: maxPrice ? parseFloat(maxPrice) : undefined,
+    minStock: minStock ? parseInt(minStock) : undefined,
+    status: status !== 'Todos' ? status : undefined,
+    brand: brand !== 'Todos' ? brand : undefined,
+    sort: sortOrder || undefined,
+    onlyInStock,
+    onlyActive
+  }), [
+    debouncedSearchTerm,
+    selectedCategory,
+    currentPage,
+    itemsPerPage,
+    minPrice,
+    maxPrice,
+    minStock,
+    status,
+    brand,
+    sortOrder,
+    onlyInStock,
+    onlyActive
+  ]);
 
-    // 3. FILTRO DE ESTOQUE
-    if (onlyInStock && activeTab === 'parts') {
-      data = data.filter(item => (item.stock || 0) > 0);
-    }
 
-    // 4. FILTRO POR MÍNIMO DE ESTOQUE
-    if (minStock !== '' && activeTab === 'parts') {
-      const min = parseInt(minStock);
-      data = data.filter(item => (item.stock || 0) >= min);
-    }
+  // 1. Unifique em um único useEffect de busca
+  useEffect(() => {
+    if (activeTab !== 'parts') return;
 
-    // 5. FILTRO DE FAIXA DE PREÇO
-    const minPriceNum = parseFloat(minPrice) || 0;
-    const maxPriceNum = parseFloat(maxPrice) || 999999;
-    if (minPriceNum > 0 || maxPriceNum < 999999) {
-      data = data.filter(item => item.price >= minPriceNum && item.price <= maxPriceNum);
-    }
+    let isMounted = true;
+    setLoadingProducts(true);
 
-    // 6. FILTRO DE MARCA
-    if (brand !== 'Todos' && brand !== '') {
-      data = data.filter(item => item.brand?.toLowerCase() === brand.toLowerCase());
-    }
+    const fetchData = async () => {
+      try {
+        const response = await getPdvProducts(filters);
 
-    // 7. FILTRO DE STATUS
-    if (status !== 'Todos' && status !== '') {
-      data = data.filter(item => item.status === status);
-    }
+        if (!isMounted) return;
 
-    // 8. FILTRO DE TERMO DE BUSCA (Nome, SKU, Código de Barras)
-    if (searchTerm.trim() !== '') {
-      const search = searchTerm.toLowerCase();
-      data = data.filter(item =>
-        item.name.toLowerCase().includes(search) ||
-        item.sku?.toLowerCase().includes(search) ||
-        item.barcode?.toLowerCase().includes(search)
-      );
-    }
-
-    // 9. ORDENAÇÃO FINAL
-    const sorted = [...data].sort((a, b) => {
-      switch (sortOrder) {
-        case 'name_asc':
-          return a.name.localeCompare(b.name, 'pt-BR');
-        case 'name_desc':
-          return b.name.localeCompare(a.name, 'pt-BR');
-        case 'price_asc':
-          return a.price - b.price;
-        case 'price_desc':
-          return b.price - a.price;
-        case 'stock_asc':
-          return (a.stock || 0) - (b.stock || 0);
-        case 'stock_desc':
-          return (b.stock || 0) - (a.stock || 0);
-        default:
-          return 0;
+        setPdvResponse(response);
+        setProducts(response.data || []);
+      } catch (err) {
+        console.error(err);
+        if (isMounted) setProducts([]);
+      } finally {
+        if (isMounted) setLoadingProducts(false);
       }
-    });
+    };
 
-    return sorted;
-  }, [searchTerm, activeTab, products, sortOrder, onlyInStock, onlyActive, minStock, minPrice, maxPrice, brand, status]);
+    fetchData();
 
+    return () => {
+      isMounted = false;
+    };
+  }, [filters, activeTab]);
 
   const highlightText = (text: string, highlight: string) => {
     if (!highlight.trim()) return text;
 
-    // Escapa caracteres especiais e cria uma Regex global e insensível a maiúsculas
-    const regex = new RegExp(`(${highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    const escaped = highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${escaped})`, 'gi');
+
     const parts = text.split(regex);
+    const lowerHighlight = highlight.toLowerCase();
 
     return parts.map((part, i) =>
-      regex.test(part) ? (
-        <mark key={i} style={{ backgroundColor: '#ffeb3b', padding: '2px', borderRadius: '2px' }}>
+      part.toLowerCase() === lowerHighlight ? (
+        <mark
+          key={i}
+          style={{
+            backgroundColor: '#ffeb3b',
+            padding: '2px',
+            borderRadius: '2px'
+          }}
+        >
           {part}
         </mark>
       ) : (
@@ -565,51 +601,19 @@ else if (activeTab === 'services') {
   };
 
 
-  /* ===== DATA FETCHING ===== */
-
-
-  useEffect(() => {
-    setSelectedCategory('Todas');
-    setSearchTerm('');
-    setCurrentPage(1);
-  }, [activeTab]);
-
-  // Fetch products com debounce no search
-  useEffect(() => {
-    if (activeTab === 'parts') {
-      setLoadingProducts(true);
-
-      const filters: ProductFilters = {
-        searchTerm: debouncedSearchTerm || undefined,
-        category: selectedCategory !== 'Todas' ? selectedCategory : undefined,
-        page: currentPage,
-        limit: itemsPerPage,
-        minPrice: minPrice ? parseFloat(minPrice) : undefined,
-        maxPrice: maxPrice ? parseFloat(maxPrice) : undefined,
-        minStock: minStock ? parseInt(minStock) : undefined,
-        status: status !== 'Todos' ? status : undefined,
-        brand: brand !== 'Todos' ? brand : undefined
-      };
-
-      getPdvProducts(filters)
-        .then((data) => {
-          setPdvResponse(data);
-          setProducts(data.data);
-          setLoadingProducts(false);
-        })
-        .catch((error) => {
-          console.error('Erro ao carregar produtos:', error);
-          setProducts([]);
-          setLoadingProducts(false);
-        });
-    }
-  }, [debouncedSearchTerm, activeTab, selectedCategory, currentPage, minPrice, maxPrice, minStock, status, brand, itemsPerPage]);
-
-  // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearchTerm, selectedCategory, minPrice, maxPrice, minStock, status, brand]);
-
+  }, [
+    debouncedSearchTerm,
+    selectedCategory,
+    minPrice,
+    maxPrice,
+    minStock,
+    status,
+    brand,
+    onlyInStock,
+    onlyActive
+  ]);
 
   return (
     <div className={`${styles.PDVcontainer} ${estagio === 'PAGAMENTO' ? styles.checkoutActive : ''}`}>
@@ -802,28 +806,7 @@ else if (activeTab === 'services') {
 
 
 
-                  {/* Filtro: Ordenação */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: '500', color: '#555' }}>⇅ Ordenar Por</label>
-                    <select
-                      value={sortOrder}
-                      onChange={(e) => setSortOrder(e.target.value)}
-                      style={{
-                        padding: '8px',
-                        border: '1px solid #ccc',
-                        borderRadius: '4px',
-                        fontSize: '12px',
-                        backgroundColor: 'white',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <option value="">Padrão (A-Z)</option>
-                      <option value="name_asc">Nome: A-Z</option>
-                      <option value="name_desc">Nome: Z-A</option>
-                      <option value="price_asc">Preço: Menor</option>
-                      <option value="price_desc">Preço: Maior</option>
-                    </select>
-                  </div>
+                  
 
                   {/* Filtro: Unidade de Medida (Opcional) */}
                   {unitOptions.length > 0 && (
@@ -970,6 +953,30 @@ else if (activeTab === 'services') {
                 </div>
               </EditableField>
 
+              
+
+            {/* Filtro: Ordenação */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: '500', color: '#555' }}>⇅ Ordenar Por</label>
+                    <select
+                      value={sortOrder}
+                      onChange={(e) => setSortOrder(e.target.value)}
+                      style={{
+                        padding: '8px',
+                        border: '1px solid #ccc',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        backgroundColor: 'white',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="">Padrão (A-Z)</option>
+                      <option value="name_asc">Nome: A-Z</option>
+                      <option value="name_desc">Nome: Z-A</option>
+                      <option value="price_asc">Preço: Menor</option>
+                      <option value="price_desc">Preço: Maior</option>
+                    </select>
+                  </div>
             </div>
 
           </div>
@@ -978,13 +985,38 @@ else if (activeTab === 'services') {
 
         {/* A TABELA GENÉRICA */}
         <UniversalInventory
-          data={filteredData}
+          data={formattedData}
           columns={productColumns}
+          loading={loadingProducts}
           displayMode={displayMode}
-          onAdd={(item) => addToCart(item)}
-          moneyFormatter={(v) => money.format(v)}
-        />
+          setDisplayMode={setDisplayMode} // Agora o modo de exibição é controlado aqui
+          sortOrder={sortOrder}
 
+          // Paginação vinda do pdvResponse do seu useEffect
+          pagination={{
+            totalItems: pdvResponse?.pagination?.total || 0,
+            currentPage: currentPage,
+            itemsPerPage: itemsPerPage,
+            totalPages: Math.ceil((pdvResponse?.pagination?.total || 0) / itemsPerPage)
+          }}
+
+          // Callbacks que atualizam os estados do Pai
+          onPageChange={(page) => setCurrentPage(page)}
+          onItemsPerPageChange={(limit) => {
+            setItemsPerPage(limit);
+            setCurrentPage(1);
+          }}
+          onSortChange={(sort) => {
+            setSortOrder(sort);
+            setCurrentPage(1);
+          }}
+          onRefresh={() => {
+            // Força a atualização disparando o useEffect que depende de filters
+            setCurrentPage(prev => prev);
+          }}
+          onAction={addToCart} // Integração direta com sua função de carrinho
+          moneyFormatter={(val) => money.format(val)}
+        />
         {activeTab === 'os' ? (
           <>
 
@@ -1119,6 +1151,7 @@ else if (activeTab === 'services') {
         removeItem={removeItem}
         onFinalizar={() => setEstagio('PAGAMENTO')}
         onBack={() => setEstagio('SELECAO')}
+        applyIndividualDiscount={applyIndividualDiscount}
 
       />
 
@@ -1129,6 +1162,8 @@ else if (activeTab === 'services') {
 
           total={total}
           cliente={cliente}
+          itens={cart}
+
         />
       </aside>
 

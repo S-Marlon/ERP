@@ -6,7 +6,7 @@ import Badge from '../../components/ui/Badge/Badge';
 // Mock de dados para visualização
 const MOCK_VENDAS: Venda[] = [
   { id: 1, cliente: "João Silva", vendedor: "Carlos", itens: ["Camiseta Polo", "Calça Jeans", "Cinto"], valorTotal: 250.00, ultimaAlteracao: "2 min", status: 'disponivel' },
-  { id: 2, cliente: "Maria Oliveira", vendedor: "Ana", itens: ["Tênis Esportivo", "Meias"], valorTotal: 480.90, ultimaAlteracao: "5 min", status: 'editando', editadoPor: "Marcos" },
+  { id: 2, cliente: "Maria Oliveira", vendedor: "Ana", itens: ["Tênis Esportivo", "Meias"], valorTotal: 480.90, ultimaAlteracao: "5 min", status: 'editando', editadoPor: "Marlon" },
   { id: 3, cliente: "Consumidor Final", vendedor: "Carlos", itens: ["Boné"], valorTotal: 55.00, ultimaAlteracao: "15 min", status: 'pagamento' },
 ];
 
