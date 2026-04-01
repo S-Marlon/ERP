@@ -1,7 +1,7 @@
 const apiBase = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:3001/api';
 
 export const getProductById = async (id: number) => {
-  const response = await fetch(`${apiBase}/produtos/${id}`);
+  const response = await fetch(`${apiBase}/produtos/${id}`); // ⚠️ "produtos"
   if (!response.ok) throw new Error('Erro ao buscar produto');
   return response.json();
 };

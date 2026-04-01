@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import './FinalizarVenda.css';
 import Badge from '../../../components/ui/Badge/Badge';
 import Button from '../../../components/ui/Button/Button';
 import Fieldset from '../../../components/ui/Fieldset/Fieldset';
-import {imprimirExtratoElgin} from '../../../utils/printService';
+import { imprimirExtratoElgin } from '../../../utils/printService';
 import { salesService, SalePayload } from '../services/salesService';
 import Swal from 'sweetalert2';
 // import {ItemVenda} from '../../../utils/printService'
@@ -20,38 +20,38 @@ export interface ItemVenda {
     price: number;     // ADICIONE ESTA LINHA para satisfazer o erro
 }
 
-export type PaymentMethodType = 
-  | 'money' 
-  | 'credit_card' 
-  | 'debit_card' 
-  | 'pix' 
-  | 'bank_transfer' 
-  | 'store_credit'; // O seu 'Crediário'
+export type PaymentMethodType =
+    | 'money'
+    | 'credit_card'
+    | 'debit_card'
+    | 'pix'
+    | 'bank_transfer'
+    | 'store_credit'; // O seu 'Crediário'
 
-  export const PAYMENT_METHOD_DETAILS: Record<PaymentMethodType, { label: string; icon: string }> = {
-    money: { 
-        label: 'Dinheiro', 
-        icon: '💵' 
+export const PAYMENT_METHOD_DETAILS: Record<PaymentMethodType, { label: string; icon: string }> = {
+    money: {
+        label: 'Dinheiro',
+        icon: '💵'
     },
-    pix: { 
-        label: 'PIX', 
-        icon: '💠' 
+    pix: {
+        label: 'PIX',
+        icon: '💠'
     },
-    credit_card: { 
-        label: 'Cartão Crédito', 
-        icon: '💳' 
+    credit_card: {
+        label: 'Cartão Crédito',
+        icon: '💳'
     },
-    debit_card: { 
-        label: 'Cartão Débito', 
-        icon: '🏦' 
+    debit_card: {
+        label: 'Cartão Débito',
+        icon: '🏦'
     },
-    store_credit: { 
-        label: 'Crediário', 
-        icon: '🎫' 
+    store_credit: {
+        label: 'Crediário',
+        icon: '🎫'
     },
-    bank_transfer: { 
-        label: 'Transferência', 
-        icon: '🏛️' 
+    bank_transfer: {
+        label: 'Transferência',
+        icon: '🏛️'
     }
 };
 
@@ -76,7 +76,7 @@ export interface Pagamento {
     taxaAplicada?: number;    // % ou valor fixo da taxa da maquininha
     parcelas: number;         // Padrão 1
     status: PaymentStatus;
-    
+
     // Metadados para Cartão/PIX
     detalhes?: {
         bandeira?: string;    // Visa, Master, etc.
@@ -95,7 +95,7 @@ interface FinalizarVendaProps {
     onBack: () => void;
     total: number;
     cliente: string;
-itens: ItemVenda[]; // <-- Adicione esta linha
+    itens: ItemVenda[]; // <-- Adicione esta linha
 }
 
 export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, cliente, itens }) => {
@@ -104,38 +104,37 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
     const [descontoValor, setDescontoValor] = useState(0); // O valor digitado no input
     const [tipoDesconto, setTipoDesconto] = useState<'real' | 'porcent'>('real');
     const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
-    const [statusPagamento, setStatusPagamento] = useState<PaymentStatus>('Pendente');
-const [metodoSelecionado, setMetodoSelecionado] = useState<PaymentMethodType | null>(null);
-    const [valorInput, setValorInput] = useState(0);
+    const [metodoSelecionado, setMetodoSelecionado] = useState<PaymentMethodType | null>(null);
+    const [valorInput, setValorInput] = useState<string>(''); // string agora
     const [parcelasInput, setParcelasInput] = useState(1);
 
 
 
     // Mapeamento de Cores para o Badge de Status
-const STATUS_COLORS: Record<PaymentStatus, "warning" | "info" | "success" | "error" | "secondary"> = {
-    pending: 'warning',
-    processing: 'info',
-    paid: 'success',
-    failed: 'error',
-    cancelled: 'secondary',
-    refunded: 'error'
-};
+    const STATUS_COLORS: Record<PaymentStatus, "warning" | "info" | "success" | "error" | "secondary"> = {
+        pending: 'warning',
+        processing: 'info',
+        paid: 'success',
+        failed: 'error',
+        cancelled: 'secondary',
+        refunded: 'error'
+    };
 
-// Mapeamento para o Select (Exibição Amigável)
-const STATUS_OPTIONS = [
-    { value: 'pending', label: '⏳ Pendente' },
-    { value: 'processing', label: '🔄 Processando' },
-    { value: 'paid', label: '✅ Pago' },
-    { value: 'failed', label: '❌ Falha' },
-    { value: 'cancelled', label: '🚫 Cancelado' },
-];
+    // Mapeamento para o Select (Exibição Amigável)
+    const STATUS_OPTIONS = [
+        { value: 'pending', label: '⏳ Pendente' },
+        { value: 'processing', label: '🔄 Processando' },
+        { value: 'paid', label: '✅ Pago' },
+        { value: 'failed', label: '❌ Falha' },
+        { value: 'cancelled', label: '🚫 Cancelado' },
+    ];
 
     // cliente e total já vêm do pai via props (comentário duplicado eliminado)
 
     // Cálculos de Totais
- const totalPago = pagamentos
-    .filter(p => p.status === 'paid' || p.status === 'processing')
-    .reduce((acc, p) => acc + p.valor, 0);
+    const totalPago: number = pagamentos
+        .filter(p => p.status === 'paid' || p.status === 'processing')
+        .reduce((acc, p) => acc + (Number(p.valor) || 0), 0);
 
 
 
@@ -147,9 +146,11 @@ const STATUS_OPTIONS = [
         : descontoValor;
 
     const totalLiquido = total - descontoCalculado;
-    const saldoRestante = Math.max(0, Number((totalLiquido - totalPago).toFixed(2)));
-    const troco = totalPago > totalLiquido ? totalPago - totalLiquido : 0;
+    const totalPagoNum = Number(totalPago) || 0;
+    const totalLiquidoNum = Number(totalLiquido) || 0;
 
+    const saldoRestante = Math.max(0, parseFloat((totalLiquidoNum - totalPagoNum).toFixed(2)));
+    const troco = Number(totalPago) > totalLiquido ? Number(totalPago) - totalLiquido : 0;
     const [showDiscount, setShowDiscount] = useState(false);
     // Estados para a Trava
     const [autorizado, setAutorizado] = useState(false);
@@ -183,61 +184,63 @@ const STATUS_OPTIONS = [
 
 
 
-const handleFinalizarVenda = async () => {
-    if (isEnviando) return;
-    setIsEnviando(true);
+    const handleFinalizarVenda = async () => {
+        if (isEnviando) return;
+        setIsEnviando(true);
 
-    // 1. Cálculos de métricas (Snapshots)
-    const totalCusto = itens.reduce((acc, item) => acc + ((item.costPrice || 0) * item.quantity), 0);
-    const lucroNominal = totalLiquido - totalCusto;
-    const percentualLucro = totalLiquido > 0 ? (lucroNominal / totalLiquido) * 100 : 0;
+        // 1. Cálculos de métricas (Snapshots)
+        const totalCusto = itens.reduce((acc, item) => acc + ((item.costPrice || 0) * item.quantity), 0);
+        const lucroNominal = totalLiquido - totalCusto;
+        const percentualLucro = totalLiquido > 0 ? (lucroNominal / totalLiquido) * 100 : 0;
 
-    console.log("📊 Métricas da Venda:", { totalCusto, lucroNominal, percentualLucro });
+        console.log("📊 Métricas da Venda:", { totalCusto, lucroNominal, percentualLucro });
 
-    // 2. Montagem do Payload completo para o BI (Business Intelligence)
-    const vendaCompleta: SalePayload = {
-        data: new Date().toISOString(),
-        clienteNome: cliente || "CONSUMIDOR",
-        totalBruto: total,
-        totalDesconto: descontoCalculado,
-        totalLiquido: totalLiquido,
-        totalCusto: totalCusto,
-        lucroNominal: lucroNominal,
-        percentualLucro: Number(percentualLucro.toFixed(2)),
-        itens: itens.map(item => ({
-            productId: item.id,
-            nome: item.name,
-            quantidade: item.quantity,
-            precoVenda: item.salePrice,
-            precoCusto: item.costPrice || 0, // GARANTE O CUSTO ATUAL
-            subtotal: item.quantity * item.salePrice,
-            lucroUnitario: item.salePrice - (item.costPrice || 0)
-        })),
-        pagamentos: pagamentos
-            .filter(p => p.status === 'Pago' || p.status === 'Processando')
-            .map(p => ({
-                metodo: p.metodo,
-                valor: p.valor,
-                parcelas: p.parcelas || 1
-            }))
-    };
+        // 2. Montagem do Payload completo para o BI (Business Intelligence)
+        const vendaCompleta: SalePayload = {
+            data: new Date().toISOString(),
+            clienteNome: cliente || "CONSUMIDOR",
+            totalBruto: total,
+            totalDesconto: descontoCalculado,
+            totalLiquido: totalLiquido,
+            totalCusto: totalCusto,
+            lucroNominal: lucroNominal,
+            percentualLucro: Number(percentualLucro.toFixed(2)),
+            itens: itens.map(item => ({
+                productId: item.id,
+                nome: item.name,
+                quantidade: item.quantity,
+                precoVenda: item.salePrice,
+                precoCusto: item.costPrice || 0, // GARANTE O CUSTO ATUAL
+                subtotal: item.quantity * item.salePrice,
+                lucroUnitario: item.salePrice - (item.costPrice || 0)
+            })),
+            pagamentos: pagamentos
+                .filter(p => p.status === 'Pago' || p.status === 'Processando')
+                .map(p => ({
+                    metodo: p.metodo,
+                    valor: p.valor,
+                    parcelas: p.parcelas || 1
+                }))
+        };
 
 
-    console.log("🚀 Payload Final da Venda:", vendaCompleta);
-    console.table(vendaCompleta.itens); // Isso mostra os itens em uma tabela linda no console!
+        console.log("🚀 Payload Final da Venda:", vendaCompleta);
+        console.table(vendaCompleta.itens); // Isso mostra os itens em uma tabela linda no console!
 
-    // // 🔥 DISPARA O LOADING DO SWAL IMEDIATAMENTE
-    // Swal.fire({
-    //     title: 'Processando Venda',
-    //     text: 'Aguarde um momento...',
-    //     allowOutsideClick: false,
-    //     showConfirmButton: false,
-    //     didOpen: () => {
-    //         Swal.showLoading();
-    //     }
-    // });
 
-     // 4. Impressão Física
+
+        // // 🔥 DISPARA O LOADING DO SWAL IMEDIATAMENTE
+        // Swal.fire({
+        //     title: 'Processando Venda',
+        //     text: 'Aguarde um momento...',
+        //     allowOutsideClick: false,
+        //     showConfirmButton: false,
+        //     didOpen: () => {
+        //         Swal.showLoading();
+        //     }
+        // });
+
+        // 4. Impressão Física
         imprimirExtratoElgin({
             cliente: vendaCompleta.clienteNome,
             itens: itens,
@@ -246,75 +249,110 @@ const handleFinalizarVenda = async () => {
             troco: troco
         });
 
-    // try {
+        // try {
 
-    //     console.log("⏳ Enviando...");
-    //     // 3. Persistência no Banco de Dados
-    //     await salesService.saveVenda(vendaCompleta);
+        //     console.log("⏳ Enviando...");
+        //     // 3. Persistência no Banco de Dados
+        //     await salesService.saveVenda(vendaCompleta);
 
-    //     // ✅ RESPOSTA DE SUCESSO
-    // await Swal.fire({
-    //     icon: 'success',
-    //     title: 'Venda Finalizada!',
-    //     text: `O valor de R$ ${totalLiquido.toFixed(2)} foi registrado. <br> Imprimindo Cupom Fiscal...`,
-    //     confirmButtonColor: '#28a745',
-    //     timer: 3000
-    // });
+        //     // ✅ RESPOSTA DE SUCESSO
+        // await Swal.fire({
+        //     icon: 'success',
+        //     title: 'Venda Finalizada!',
+        //     text: `O valor de R$ ${totalLiquido.toFixed(2)} foi registrado. <br> Imprimindo Cupom Fiscal...`,
+        //     confirmButtonColor: '#28a745',
+        //     timer: 3000
+        // });
 
-    //     // 4. Impressão Física
-    //     imprimirExtratoElgin({
-    //         cliente: vendaCompleta.clienteNome,
-    //         itens: itens,
-    //         total: totalLiquido,
-    //         pagamentos: vendaCompleta.pagamentos,
-    //         troco: troco
-    //     });
+        //     // 4. Impressão Física
+        //     imprimirExtratoElgin({
+        //         cliente: vendaCompleta.clienteNome,
+        //         itens: itens,
+        //         total: totalLiquido,
+        //         pagamentos: vendaCompleta.pagamentos,
+        //         troco: troco
+        //     });
 
-    //     alert("Venda finalizada com sucesso! Estoque atualizado e métricas registradas.");
-    //     onBack(); 
-    // } catch (error: any) {
-    //     // ❌ RESPOSTA DE ERRO
-    // Swal.fire({
-    //     icon: 'error',
-    //     title: 'Erro ao salvar',
-    //     text: error.message || 'Servidor offline ou falha na rede.',
-    //     confirmButtonColor: '#d33'
-    // });
+        //     alert("Venda finalizada com sucesso! Estoque atualizado e métricas registradas.");
+        //     onBack(); 
+        // } catch (error: any) {
+        //     // ❌ RESPOSTA DE ERRO
+        // Swal.fire({
+        //     icon: 'error',
+        //     title: 'Erro ao salvar',
+        //     text: error.message || 'Servidor offline ou falha na rede.',
+        //     confirmButtonColor: '#d33'
+        // });
 
-    // } finally {
-    //     setIsEnviando(false);
-    // }
-};
+        // } finally {
+        //     setIsEnviando(false);
+        // }
+    };
 
 
 
-   // --- RENDERIZAÇÃO DO PARCELAMENTO ATUALIZADA ---
-  const renderParcelamento = () => {
-    if (metodoSelecionado !== 'credit_card') return null;
-    
-    const opcoes = [];
-    for (let i = 1; i <= 12; i++) {
-        const valorParcela = valorInput / i;
-        opcoes.push(
-            <option key={i} value={i}>
-                {i}x de R$ {valorParcela.toFixed(2)} {i > 4 ? '(c/ juros)' : '(s/ juros)'}
-            </option>
-        );
+
+
+    // Estado para controlar se o usuário já interagiu
+const valorInputRef = useRef<HTMLInputElement>(null);
+
+// Estado para controlar se o usuário já interagiu
+const [usuarioInteragiu, setUsuarioInteragiu] = useState(false);
+
+// Inicializa o valor do input com o saldo
+useEffect(() => {
+    if (metodoSelecionado && !usuarioInteragiu) {
+        setValorInput(saldoRestante.toFixed(2));
     }
+}, [metodoSelecionado, saldoRestante, usuarioInteragiu]);
 
-    return (
-        <div className="parcelas-group">
-            <label>Parcelamento:</label>
-            <select 
-                value={parcelasInput} 
-                onChange={(e) => setParcelasInput(Number(e.target.value))}
-                className="select-parcelas"
-            >
-                {opcoes}
-            </select>
-        </div>
-    );
-};
+// Foca o input quando o usuário pressiona qualquer tecla
+useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+        if (valorInputRef.current && !usuarioInteragiu) {
+            valorInputRef.current.focus();
+        }
+    };
+
+    document.addEventListener('keydown', handleKeyPress);
+    return () => {
+        document.removeEventListener('keydown', handleKeyPress);
+    };
+}, [usuarioInteragiu]);
+
+    // Função para setar valor via botão de saldo
+    const inserirValorBotao = (valor: number) => {
+        setValorInput(valor.toFixed(2));
+        setUsuarioInteragiu(true);
+    };
+
+    // --- RENDERIZAÇÃO DO PARCELAMENTO ATUALIZADA ---
+    const renderParcelamento = () => {
+        if (metodoSelecionado !== 'credit_card') return null;
+
+        const opcoes = [];
+        for (let i = 1; i <= 12; i++) {
+            const valorParcela = valorInput / i;
+            opcoes.push(
+                <option key={i} value={i}>
+                    {i}x de R$ {valorParcela.toFixed(2)} {i > 4 ? '(c/ juros)' : '(s/ juros)'}
+                </option>
+            );
+        }
+
+        return (
+            <div className="parcelas-group">
+                <label>Parcelamento:</label>
+                <select
+                    value={parcelasInput}
+                    onChange={(e) => setParcelasInput(Number(e.target.value))}
+                    className="select-parcelas"
+                >
+                    {opcoes}
+                </select>
+            </div>
+        );
+    };
 
     // --- REGRA DE NEGÓCIO: CALCULADORA DE TROCO ---
     const calcularNotasTroco = (valor: number) => {
@@ -359,19 +397,20 @@ const handleFinalizarVenda = async () => {
     };
 
     const adicionarPagamento = () => {
-        if (valorInput <= 0 || !metodoSelecionado) return;
+        const valorNumerico = parseFloat(valorInput.replace(',', '.')) || 0;
+        if (valorNumerico <= 0 || !metodoSelecionado) return;
 
         const novoPagamento: Pagamento = {
-            id: crypto.randomUUID(), // Melhor que index
+            id: crypto.randomUUID(),
             metodo: metodoSelecionado,
-            valor: valorInput,
+            valor: parseFloat(valorInput.replace(',', '.')) || 0, // <-- aqui
             parcelas: metodoSelecionado === 'credit_card' ? parcelasInput : 1,
-            status: 'paid', // Como é PDV físico, geralmente cai como Pago direto
+            status: 'pending',
             createdAt: new Date(),
         };
 
         setPagamentos([...pagamentos, novoPagamento]);
-        setValorInput(0);
+        setValorInput(''); // string, não número
         setParcelasInput(1);
         setMetodoSelecionado(null);
     };
@@ -412,41 +451,41 @@ const handleFinalizarVenda = async () => {
                 {/* <strong>Cliente: {cliente}</strong>
 
 
-                <p>
-                    VALOR TOTAL: <strong>R$ {total.toFixed(2)}</strong>
-                </p>
-                <p>
-                    VALOR Pago: <strong>R$ {pagamentos.reduce((sum, p) => sum + p.valor, 0).toFixed(2)}</strong>
-                </p> */}
-       <div className="payment-steps-guide">
-    <span 
-        className={etapaAtual === 1 ? 'step-active' : 'step-done'}
-        onMouseEnter={() => setPassoEmFoco(1)}
-        onMouseLeave={() => setPassoEmFoco(null)}
-    >
-        {etapaAtual > 1 ? '✅' : '1.'} Escolha o método
-    </span>
+                    <p>
+                        VALOR TOTAL: <strong>R$ {total.toFixed(2)}</strong>
+                    </p>
+                    <p>
+                        VALOR Pago: <strong>R$ {pagamentos.reduce((sum, p) => sum + p.valor, 0).toFixed(2)}</strong>
+                    </p> */}
+                <div className="payment-steps-guide">
+                    <span
+                        className={etapaAtual === 1 ? 'step-active' : 'step-done'}
+                        onMouseEnter={() => setPassoEmFoco(1)}
+                        onMouseLeave={() => setPassoEmFoco(null)}
+                    >
+                        {etapaAtual > 1 ? '✅' : '1.'} Escolha o método
+                    </span>
 
-    <span className="step-arrow">→</span>
+                    <span className="step-arrow">→</span>
 
-    <span 
-        className={etapaAtual === 2 ? 'step-active' : (etapaAtual > 2 ? 'step-done' : 'step-pending')}
-        onMouseEnter={() => setPassoEmFoco(2)}
-        onMouseLeave={() => setPassoEmFoco(null)}
-    >
-        {etapaAtual > 2 ? '✅' : '2.'} Insira o valor
-    </span>
+                    <span
+                        className={etapaAtual === 2 ? 'step-active' : (etapaAtual > 2 ? 'step-done' : 'step-pending')}
+                        onMouseEnter={() => setPassoEmFoco(2)}
+                        onMouseLeave={() => setPassoEmFoco(null)}
+                    >
+                        {etapaAtual > 2 ? '✅' : '2.'} Insira o valor
+                    </span>
 
-    <span className="step-arrow">→</span>
+                    <span className="step-arrow">→</span>
 
-    <span 
-        className={etapaAtual === 3 ? 'step-active' : 'step-pending'}
-        onMouseEnter={() => setPassoEmFoco(3)}
-        onMouseLeave={() => setPassoEmFoco(null)}
-    >
-        3. Adicione o pagamento
-    </span>
-</div>
+                    <span
+                        className={etapaAtual === 3 ? 'step-active' : 'step-pending'}
+                        onMouseEnter={() => setPassoEmFoco(3)}
+                        onMouseLeave={() => setPassoEmFoco(null)}
+                    >
+                        3. Adicione o pagamento
+                    </span>
+                </div>
             </div>
 
             <div className="checkout-body">
@@ -454,164 +493,216 @@ const handleFinalizarVenda = async () => {
                 <div className="checkout-container">
 
 
-                     {/* Guia de Passos */}
-       
-
-<div className={`payment-section ${metodoSelecionado ? 'method-selected' : ''}`}>
-
-                    
-
-
-                    <section className={`payment-methods ${metodoSelecionado ? 'section-locked' : ''} ${passoEmFoco === 1 ? 'step-highlight' : ''}`}>
+                    {/* Guia de Passos */}
+                    <section
+                        className={`payment-methods ${metodoSelecionado ? 'section-locked' : ''} ${passoEmFoco === 1 ? 'step-highlight' : ''}`}
+                    >
                         <div className="payment-methods-header">
                             <h4>Métodos de Pagamento</h4>
-                            {/* Botão para destravar a seleção */}
-
                         </div>
 
                         <div className="method-grid">
                             {Object.entries(PAYMENT_METHOD_DETAILS).map(([key, info]) => (
-        <button
-            key={key}
-            // Verifica se o método selecionado é igual à chave técnica
-            disabled={metodoSelecionado !== null && metodoSelecionado !== key} 
-            className={metodoSelecionado === key ? 'active' : ''}
-            onClick={() => setMetodoSelecionado(key as PaymentMethodType)}
-        >
-            {info.icon} {info.label}
-        </button>
-    ))}
+                                <div
+                                    key={key}
+                                    className={`method-card ${metodoSelecionado === key ? 'selected' : ''} ${metodoSelecionado && metodoSelecionado !== key ? 'disabled' : ''}`}
+                                    onClick={() => !metodoSelecionado || metodoSelecionado === key ? setMetodoSelecionado(key as PaymentMethodType) : null}
+                                >
+                                    <div className="icon">{info.icon}</div>
+                                    <div className="label">{info.label}</div>
+                                </div>
+                            ))}
                         </div>
                     </section>
 
-
-                    <section className={`payment-details ${!metodoSelecionado ? 'section-locked' : ''} ${passoEmFoco === 2 ? 'step-highlight' : ''}`}>
-
-                        <h4>
-    {metodoSelecionado 
-        ? `Pagamento: ${PAYMENT_METHOD_DETAILS[metodoSelecionado].label}` 
-        : '(Selecione um método)'}
-</h4>
-
-
-                        {metodoSelecionado && (
-                            <button
-                                className="btn-change-method"
-                                onClick={() => {
-                                    setMetodoSelecionado(null); // Destrava a seção de métodos
-                                    setValorInput(0);           // Zera o valor (O "IF" que você queria)
-                                }}
-                            >
-                                🔄 Trocar Método
-                            </button>
-                        )}
-
-
-                        <div className="add-payment">
+                    <div className={`payment-section `}>
 
 
 
-                            <div className="input-group"> {/* Adicionei uma classe aqui */}
 
-                                <button className='btn-add-saldo' onClick={() => setValorInput(saldoRestante)} disabled={!metodoSelecionado}>Saldo Restante Total →</button>
 
-                                <input
-                                    type="number"
-                                    value={valorInput || ''}
-                                    onChange={(e) => setValorInput(Number(e.target.value))}
-                                    disabled={!metodoSelecionado}
 
-                                    placeholder={`Valor à Pagar`}
-                                />
+                        <section className={`payment-details ${!metodoSelecionado ? 'section-locked' : ''} ${passoEmFoco === 2 ? 'step-highlight' : ''}`}>
+
+                            <h4>
+                                {metodoSelecionado
+                                    ? `Pagamento: ${PAYMENT_METHOD_DETAILS[metodoSelecionado].label}`
+                                    : '(Selecione um método)'}
+
+                                {metodoSelecionado && (
+                                    <button
+                                        className="btn-change-method"
+                                        onClick={() => {
+                                            setMetodoSelecionado(null); // Destrava a seção de métodos
+                                            setValorInput('');           // Zera o valor
+                                        }}
+                                    >
+                                        🔄 Trocar Método de Pagamento
+                                    </button>
+                                )}
+                            </h4>
+
+                            <div className="add-payment">
+
+                                <div className="input-group">
+                                    <div>
+
+                                        <button
+                                            className='btn-add-saldo'
+                                            onClick={() => inserirValorBotao(saldoRestante)}
+                                            disabled={!metodoSelecionado}
+                                        >Saldo Restante Total →</button>
+                                        <button
+                                            className='btn-add-saldo'
+                                            onClick={() => inserirValorBotao(saldoRestante / 2)}
+                                            disabled={!metodoSelecionado}
+                                        >50% do Saldo →</button>
+
+                                        {renderParcelamento()}
+                                    </div>
+
+                                    <div className="input-with-keypad">
+
+                                        <input
+                                            ref={valorInputRef}
+                                            type="text"
+                                            value={valorInput}
+                                            onFocus={() => {
+                                                if (!usuarioInteragiu) {
+                                                    setValorInput(''); // Limpa só no primeiro foco
+                                                    setUsuarioInteragiu(true);
+                                                }
+                                            }}
+                                            onChange={(e) => {
+                                                const valor = e.target.value;
+                                                if (/^[0-9]*[.,]?[0-9]*$/.test(valor)) {
+                                                    setValorInput(valor.replace(',', '.'));
+                                                    setUsuarioInteragiu(true);
+                                                }
+                                            }}
+                                            disabled={!metodoSelecionado}
+                                            placeholder="0.00"
+                                        />
+
+                                        <div className="keypad">
+                                            {['7', '8', '9', '4', '5', '6', '1', '2', '3', '0', '.'].map((key) => (
+                                                <button
+                                                    key={key}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setValorInput(prev => (usuarioInteragiu ? prev : '') + key);
+                                                        setUsuarioInteragiu(true);
+                                                    }}
+                                                    disabled={!metodoSelecionado}
+                                                >
+                                                    {key}
+                                                </button>
+                                            ))}
+
+                                            {/* Botão Limpar */}
+                                            <button
+                                                type="button"
+                                                onClick={() => setValorInput('')}
+                                                disabled={!metodoSelecionado}
+                                            >
+                                                C
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
                             </div>
+                        </section>
 
-                            {renderParcelamento()}
-                        </div>
-                    </section>
-                </div>
-
-                {/* Direita: PAGAMENTOS */}
-
-                <Button onClick={adicionarPagamento} color='primary' className={`btn-add-payment ${valorInput ? '' : 'btn-disabled'} ${passoEmFoco === 3 ? 'step-highlight-btn' : ''}`}>Adicionar ↓ (Enter)</Button>
+                        <Button onClick={adicionarPagamento} color='primary' className={`btn-add-payment ${valorInput ? '' : 'btn-disabled'} ${passoEmFoco === 3 ? 'step-highlight-btn' : ''}`}>Adicionar → (Enter)</Button>
 
 
-                {
-                    pagamentos.length > 0 && (
-                        
-                      
-<Fieldset variant='card'>
-    {pagamentos.length > 0 && (
-        <div className="payment-summary">
-            <span>
-                {`Pagamento${pagamentos.length > 1 ? 's' : ''} ${pagamentos.length === 1 ? 'Adicionado' : 'Adicionados'} (${pagamentos.length})`}
+                        {
+                            pagamentos.length > 0 && (
+
+
+                                <Fieldset variant='card' >
+                                    {pagamentos.length > 0 && (
+                                        <div className="payment-summary">
+                                            <span>
+                                                {`Pagamento${pagamentos.length > 1 ? 's' : ''} ${pagamentos.length === 1 ? 'Adicionado' : 'Adicionados'} (${pagamentos.length})`}
+                                            </span>
+                                            <Badge color="success">
+                                                Valor PAGO: R$ {totalPago.toFixed(2)}
+                                            </Badge>
+                                        </div>
+                                    )}
+
+                                    <ul className="payment-history">
+  {pagamentos.map((p, i) => {
+    const infoMetodo = PAYMENT_METHOD_DETAILS[p.metodo];
+    const isCanceladoOuFalha = p.status === 'cancelled' || p.status === 'failed';
+
+    return (
+      <li key={p.id || i} className={isCanceladoOuFalha ? 'payment-row-disabled' : ''}>
+        {/* Número da linha à esquerda */}
+        <span className="line-number">{i + 1} {infoMetodo?.icon}</span>
+
+        <div className="payment-main-info">
+           <strong>{infoMetodo?.label}</strong>
+          <div className="payment-info">
+            <strong>R$ {(Number(p.valor) || 0).toFixed(2)}</strong>
+            <span className="payment-subtext">
+              {p.metodo === 'credit_card' ? ` (${p.parcelas}x)` : ' (À vista)'}
             </span>
-            <Badge color="success">
-                Valor PAGO: R$ {totalPago.toFixed(2)}
-            </Badge>
+          </div>
         </div>
-    )}
 
-    <ul className="payment-history">
-        {pagamentos.map((p, i) => {
-            // Busca ícone e label amigável no dicionário global
-            const infoMetodo = PAYMENT_METHOD_DETAILS[p.metodo];
-            const isCanceladoOuFalha = p.status === 'cancelled' || p.status === 'failed';
+        <div className="status-workflow-wrapper">
+          <select
+            className={`select-status-inline status-select-${p.status}`}
+            value={p.status}
+            onChange={(e) => alterarStatusPagamento(i, e.target.value as PaymentStatus)}
+          >
+            <option value="pending">⏳ Pendente</option>
+            <option value="processing">🔄 Processando</option>
+            <option value="paid">✅ Pago</option>
+            <option value="failed">❌ Falha</option>
+            <option value="cancelled">🚫 Cancelado</option>
+          </select>
 
-            return (
-                <li key={p.id || i} className={isCanceladoOuFalha ? 'payment-row-disabled' : ''}>
-                    <div className="payment-main-info">
-                        <span>{infoMetodo?.icon} <strong>{infoMetodo?.label}</strong></span>
-                        <div className="payment-info">
-                            <strong>R$ {p.valor.toFixed(2)}</strong>
-                            <span className="payment-subtext">
-                                {p.metodo === 'credit_card' ? ` (${p.parcelas}x)` : ' (À vista)'}
-                            </span>
-                        </div>
+          {p.status === 'pending' ? (
+            <button
+              className="btn-remove-line"
+              onClick={() => removerPagamento(i)}
+              title="Remover pagamento"
+            >
+              ✕
+            </button>
+          ) : (
+            <button
+              className="btn-lock-line"
+              disabled
+              title="Não é possível excluir um pagamento processado ou finalizado"
+            >
+              🔒
+            </button>
+          )}
+        </div>
+      </li>
+    );
+  })}
+</ul>
+                                </Fieldset>
+                            )
+                        }
                     </div>
 
-                    <div className="status-workflow-wrapper">
-                        <select
-    className={`select-status-inline status-select-${p.status}`}
-    value={p.status}
-    onChange={(e) => alterarStatusPagamento(i, e.target.value as PaymentStatus)}
->
-    <option value="pending">⏳ Pendente</option>
-    <option value="processing">🔄 Processando</option>
-    <option value="paid">✅ Pago</option>
-    <option value="failed">❌ Falha</option>
-    <option value="cancelled">🚫 Cancelado</option>
-</select>
+                    {/* Direita: PAGAMENTOS */}
 
-                        {/* Regra de remoção: Agora checa contra o valor técnico 'pending' */}
-                        {p.status === 'pending' ? (
-                            <button 
-                                className="btn-remove-line" 
-                                onClick={() => removerPagamento(i)}
-                                title="Remover pagamento"
-                            >
-                                ✕
-                            </button>
-                        ) : (
-                            <button 
-                                className="btn-lock-line" 
-                                disabled 
-                                title="Não é possível excluir um pagamento processado ou finalizado"
-                            >
-                                🔒
-                            </button>
-                        )}
-                    </div>
-                </li>
-            );
-        })}
-    </ul>
-</Fieldset>
-                    )
-                }
+                    {/* <Button onClick={adicionarPagamento} color='primary' className={`btn-add-payment ${valorInput ? '' : 'btn-disabled'} ${passoEmFoco === 3 ? 'step-highlight-btn' : ''}`}>Adicionar ↓ (Enter)</Button> */}
 
 
+
+
+
+                </div>
             </div>
-        </div>
 
 
             <div className="checkout-footer">
@@ -620,6 +711,23 @@ const handleFinalizarVenda = async () => {
 
 
                 <section className="totals-panel">
+
+                    <div className="action-buttons-grid">
+                        <button className="action-card" title="Abrir calculadora para cálculos rápidos">
+                            🧮
+                            <span>Calculadora</span>
+                        </button>
+
+                        <button className="action-card" title="Imprimir ou enviar comprovante por e-mail/WhatsApp">
+                            📄
+                            <span>Comprovante</span>
+                        </button>
+
+                        <button className="action-card" title="Adicionar observações ao pedido, ex: sem açúcar, embalar para presente">
+                            ✏️
+                            <span>Observações</span>
+                        </button>
+                    </div>
 
                     <div className="status-box">
                         <div className={`status-item ${saldoRestante > 0 ? 'pending' : 'paid'}`}>
@@ -691,14 +799,14 @@ const handleFinalizarVenda = async () => {
                 <button
                     className="btn-confirm-sale"
                     disabled={totalPago < totalLiquido}
-onClick={handleFinalizarVenda}                >
+                    onClick={handleFinalizarVenda}                >
 
                     {precisaBloquear ? "AGUARDANDO GERENTE" : "CONCLUIR VENDA .(F5)"}
                 </button>
             </div>
 
 
-         </div>
+        </div>
 
 
     );

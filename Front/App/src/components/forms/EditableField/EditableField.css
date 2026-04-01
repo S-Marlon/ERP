@@ -34,7 +34,7 @@
 .inputDefault {
   flex: 1; /* Ocupa todo o meio */
   border: none !important; /* Remove a borda própria para usar a do wrapper */
-  padding: 8px 12px;
+  padding: 4px 8px;
   outline: none;
   font-size: 14px;
   background-color: #fff;
@@ -59,7 +59,7 @@
   cursor: pointer;
   color: #6b7280;
   transition: all 0.2s;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .groupButton:hover {

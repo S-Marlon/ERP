@@ -6,11 +6,11 @@ export const usePricing = (initialCost = 0, initialUnits = 1, initialMarkup = 1)
     costPrice: initialCost,
     unitsPerPackage: initialUnits || 1,
     markup: initialMarkup,
-    salePrice: (initialCost / (initialUnits || 1)) * initialMarkup,
+    salePrice: ((initialUnits || 1) ? initialCost / initialUnits : initialCost) * initialMarkup,
     margin: (initialMarkup - 1) * 100,
   });
 
-  // Função para injetar os dados que vêm da API (SQL)
+  // Função para injetar os dados que vêm da API (SQL) ou da NF
   const setAllValues = useCallback((data: { 
     costPrice: number, 
     markup: number, 
@@ -20,14 +20,14 @@ export const usePricing = (initialCost = 0, initialUnits = 1, initialMarkup = 1)
     const cost = Number(data.costPrice) || 0;
     const units = Number(data.unitsPerPackage) || 1;
     const markup = Number(data.markup) || 1;
-    const uCost = cost / units;
+    const unitCost = units > 0 ? cost / units : cost;
 
     setValues({
       costPrice: cost,
       unitsPerPackage: units,
       markup: markup,
       margin: (markup - 1) * 100,
-      salePrice: Number(data.salePrice) || (uCost * markup)
+      salePrice: Number(data.salePrice) || unitCost * markup
     });
   }, []);
 
@@ -37,30 +37,40 @@ export const usePricing = (initialCost = 0, initialUnits = 1, initialMarkup = 1)
 
     setValues(prev => {
       const updated = { ...prev, [field]: val };
-      
-      // Cálculo do Custo Unitário atualizado dentro do estado
-      const currentCost = field === 'costPrice' ? val : prev.costPrice;
-      const currentUnits = field === 'unitsPerPackage' ? (val || 1) : prev.unitsPerPackage;
-      const unitCost = currentCost / currentUnits;
 
-     if (field === 'margin') {
-  const newMarkup = 1 + (val / 100);
-  updated.markup = Number(newMarkup.toFixed(4)); // Limita casas decimais
-  updated.salePrice = unitCost * newMarkup;
-}
-      else if (field === 'markup') {
-        updated.margin = (val - 1) * 100;
-        updated.salePrice = unitCost * val;
-      } 
-      else if (field === 'salePrice') {
-        if (unitCost > 0) {
-          updated.markup = val / unitCost;
-          updated.margin = (updated.markup - 1) * 100;
+      // Calcula o custo unitário de forma segura
+      const currentUnits = prev.unitsPerPackage || 1;
+      const currentCost = prev.costPrice || 0;
+      const unitCost = currentUnits > 0 ? currentCost / currentUnits : currentCost;
+
+      switch (field) {
+        case 'margin': {
+          const newMarkup = 1 + (val / 100);
+          updated.markup = Number(newMarkup.toFixed(4));
+          updated.salePrice = unitCost * newMarkup;
+          break;
         }
-      }
-      else if (field === 'costPrice' || field === 'unitsPerPackage') {
-        // Se mudar o custo ou a qtd, mantém o markup e atualiza a venda
-        updated.salePrice = unitCost * prev.markup;
+        case 'markup': {
+          updated.margin = (val - 1) * 100;
+          updated.salePrice = unitCost * val;
+          break;
+        }
+        case 'salePrice': {
+          if (unitCost > 0) {
+            updated.markup = val / unitCost;
+            updated.margin = (updated.markup - 1) * 100;
+          }
+          break;
+        }
+        case 'costPrice':
+        case 'unitsPerPackage': {
+          // Mantém markup e recalcula o preço de venda
+          const units = field === 'unitsPerPackage' ? (val || 1) : prev.unitsPerPackage || 1;
+          const cost = field === 'costPrice' ? val : prev.costPrice || 0;
+          const safeUnitCost = units > 0 ? cost / units : cost;
+          updated.salePrice = safeUnitCost * prev.markup;
+          break;
+        }
       }
 
       return updated;
@@ -71,9 +81,9 @@ export const usePricing = (initialCost = 0, initialUnits = 1, initialMarkup = 1)
     values, 
     handleFieldChange, 
     setAllValues,
-    // Aqui está o segredo: exportamos a função handleFieldChange 
-    // com o "apelido" de updatePrices
     updatePrices: handleFieldChange, 
-    unitCost: values.costPrice / (values.unitsPerPackage || 1)
+    unitCost: (values.unitsPerPackage || 1) > 0 
+      ? values.costPrice / values.unitsPerPackage 
+      : values.costPrice
   };
 };

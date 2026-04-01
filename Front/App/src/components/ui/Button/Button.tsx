@@ -25,7 +25,7 @@ const Button: React.FC<ButtonProps> = ({
    disabled,
    active = false, // Inclua a prop e defina um valor padrão
    fontsize = '14px',
-   padding = '8px 10x',
+   padding = '8px 10px',
    children,
    ...props
 }) => {

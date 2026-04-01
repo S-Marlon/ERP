@@ -3,7 +3,10 @@ import { Product } from './types/Stock_Products';
 
 
 // Importe a função da API
-import { getProducts } from "./service/productService";
+import {
+    getPdvProducts,
+    getProductById
+} from "./service/productService";
 
 // import { ProductContext } from "../../../context/ProductContext";
 import ProductDetails from "./_components/ProductDetails";
@@ -29,34 +32,49 @@ const StockInventory: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
+    const [response, setResponse] = useState<ProductsResponse | null>(null);
+
+
+    // 1. Novos Estados para suportar o UniversalInventory
+    const [displayMode, setDisplayMode] = useState<'lista' | 'cards' | 'compact'>('lista');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [sortOrder, setSortOrder] = useState<string>('name_asc');
+    const [itemsPerPage, setItemsPerPage] = useState(20);
+
+    const startIndex = (currentPage - 1) * itemsPerPage;
+
+    const highlightText = (text: string, highlight: string) => {
+        if (!highlight.trim()) return text;
+
+        // Escapa caracteres especiais e cria uma Regex global e insensível a maiúsculas
+        const regex = new RegExp(`(${highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+        const parts = text.split(regex);
+
+        return parts.map((part, i) =>
+            regex.test(part) ? (
+                <mark key={i} style={{ backgroundColor: '#ffeb3b', padding: '2px', borderRadius: '2px' }}>
+                    {part}
+                </mark>
+            ) : (
+                part
+            )
+        );
+    };
 
     
-  const highlightText = (text: string, highlight: string) => {
-    if (!highlight.trim()) return text;
-
-    // Escapa caracteres especiais e cria uma Regex global e insensível a maiúsculas
-    const regex = new RegExp(`(${highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-    const parts = text.split(regex);
-
-    return parts.map((part, i) =>
-      regex.test(part) ? (
-        <mark key={i} style={{ backgroundColor: '#ffeb3b', padding: '2px', borderRadius: '2px' }}>
-          {part}
-        </mark>
-      ) : (
-        part
-      )
-    );
-  };
 
 
-  // 2. Funções de Auxílio e Formatação
+    // 2. Funções de Auxílio e Formatação
     const formatCurrency = (value: number): string => {
-        return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        if (value == null) return 'R$ 0,00';
+        return value.toLocaleString('pt-BR', {
+            style: 'currency',
+            currency: 'BRL'
+        });
     };
 
 
-  
+
 
 
     const columns = [
@@ -84,46 +102,63 @@ const StockInventory: React.FC = () => {
                 />
             )
         },
-        { header: 'Produto & Marca & Categoria', key: 'name', render: (item: Product) => (
-             <div >
-                      <strong style={styles.partPrimaryStrong}>{highlightText(item.name, searchTerm)}</strong>
-                      {'sku' in item && <code style={styles.partPrimaryCode}>{item.category}</code>}
-                    </div>
-        ) },
-        { header: 'Marca', key: 'brand' },
+        {
+            header: 'Produto & Marca & Categoria', key: 'name', render: (item: Product) => (
+                <div >
+                    <strong style={styles.partPrimaryStrong}>{highlightText(item.name, searchTerm)}</strong>
+                    {'sku' in item && <code style={styles.partPrimaryCode}>{item.category}</code>}
+                </div>
+            )
+        },
         {
             header: 'Estoque',
             key: 'stock',
-            render: (item: Product) => (
-                <span style={item.currentStock <= 5 ? { color: 'red', fontWeight: 'bold' } : {}}>
-                    {item.currentStock} un
-                </span>
-            )
+            render: (item: Product) => {
+
+                const min = item.minStock ?? 0;
+                const max = item.maxStock ?? 0;
+                const current = item.currentStock ?? 0;
+
+                let style = styles.stockOk;
+
+                if (current <= min) {
+    style = styles.stockCritical;
+} else if (current <= min * 2) {
+    style = styles.stockWarning;
+} else {
+    style = styles.stockOk;
+}
+
+                return <span style={style}>
+  {current} un <br/>
+  <small style={{ marginLeft: 4, opacity: 0.6 }}>
+    (min: {min})
+  </small>
+</span>
+            }
         },
         {
             header: 'Custo Médio',
             key: 'costPrice',
-            render: (item: Product) => {
-               <span>  
-                {item.costPrice}
-</span>
+            render: (item: any) => ( // Use any ou uma interface estendida aqui
+                <span>{formatCurrency(item.costPrice)}</span>
+            )
 
-            }
+
         },
         {
             header: 'Preço',
-            key: 'price',
+            key: 'salePrice',
             render: (item: Product) => {
-<span>  
-                {item.salePrice}
-</span>
+                console.log(item.salePrice);
+                return <span>{formatCurrency(item.salePrice)}</span>
             }
         },
-        {
-            header: 'Fornecedor',
-            key: 'supplier',
-            render: (item: Product) => item.suppliers || 'N/A'
-        },
+        // {
+        //     header: 'Fornecedor',
+        //     key: 'supplier',
+        //     render: (item: Product) => item.suppliers || 'N/A'
+        // },
         {
             header: 'Ações',
             key: 'actions',
@@ -135,16 +170,29 @@ const StockInventory: React.FC = () => {
         }
     ];
 
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, filterCategory, sortOrder]);
 
 
-// 4. Busca de Dados
+
+    // 4. Busca de Dados
     useEffect(() => {
         const fetchProductsData = async () => {
             setIsLoading(true);
             setError(null);
+
             try {
-                const data = await getProducts(searchTerm);
-                setProducts(Array.isArray(data) ? data : []);
+                const res = await getPdvProducts({
+                    searchTerm,
+                    page: currentPage,
+                    category: filterCategory !== 'Todos' ? filterCategory : undefined,
+                    limit: itemsPerPage,
+                    sort: sortOrder // 👈 FALTA ISSO
+                });
+
+                setResponse(res);
+                setProducts(res.data || []);
             } catch (err) {
                 setError("Erro ao carregar lista de produtos.");
             } finally {
@@ -152,24 +200,42 @@ const StockInventory: React.FC = () => {
             }
         };
 
-        const delayDebounceFn = setTimeout(() => fetchProductsData(), 300);
-        return () => clearTimeout(delayDebounceFn);
-    }, [searchTerm]);
+        fetchProductsData();
+    }, [searchTerm, currentPage, itemsPerPage, filterCategory, sortOrder]);
 
-    // 5. Filtragem Local (Categoria)
-    const filteredProducts = products.filter(product => {
-        return filterCategory === 'Todos' || product.category === filterCategory;
-    });
+   const compatibleData = products.map(product => {
+    const min = product.minStock ?? 0;
+    const current = product.currentStock ?? 0;
+
+    let rowClass = '';
+    if (current <= min) {
+        rowClass = 'stockCritical'; // vermelho
+    } else if (current <= min * 1.5) {
+        rowClass = 'stockWarning'; // amarelo
+    } else {
+        rowClass = 'stockOk'; // verde
+    }
+
+    return {
+        ...product,
+        price: product.salePrice,
+        stock: product.currentStock,
+        imageUrl: product.pictureUrl,
+        rowClass,      // 🔹 linha recebe a classe calculada
+    };
+});
 
     const categories = Array.from(new Set(products.map(p => p.category)));
 
     const handleSelectProduct = async (product: Product) => {
-        try {
-            const detailed = await getProductById(product.id);
-            setSelectedProduct(detailed);
-        } catch (err) {
-            setSelectedProduct(product);
-        }
+        setSelectedProduct(product); // mostra rápido
+
+        const detailed = await getProductById(product.id);
+
+        setSelectedProduct(prev => ({
+            ...prev,
+            ...detailed
+        }));
     };
 
 
@@ -216,13 +282,34 @@ const StockInventory: React.FC = () => {
 
                             <div style={styles.inventoryPanel}>
                                 {/* O UniversalInventory agora cuida da busca, paginação e filtros de ordenação */}
-                                <UniversalInventory<Product>
-                                              data={filteredProducts}
+                                <UniversalInventory
+                                    data={compatibleData}
                                     columns={columns}
-                                    displayMode="lista"
-                                    moneyFormatter={formatCurrency}
-                                    onAdd={handleSelectProduct} // Se quiser que o "+" selecione o produto
+                                    loading={isLoading}
+                                    displayMode={displayMode}
+                                    setDisplayMode={setDisplayMode}
 
+                                    // Configuração de Paginação (Obrigatória no seu componente anterior)
+                                    pagination={{
+                                        totalItems: response?.pagination?.total || 0,
+                                        currentPage: currentPage,
+                                        itemsPerPage: itemsPerPage,
+                                        totalPages: response?.pagination?.totalPages || 1
+                                    }}
+
+                                    // Handlers
+                                    onPageChange={(page) => setCurrentPage(page)}
+                                    onItemsPerPageChange={(limit) => {
+                                        setItemsPerPage(limit);
+                                        setCurrentPage(1);
+                                    }}
+                                    onRefresh={() => {
+                                        setCurrentPage(prev => prev); // força re-render/useEffect
+                                    }}
+                                    onAction={handleSelectProduct}
+                                    moneyFormatter={formatCurrency}
+                                    sortOrder={sortOrder}
+                                    onSortChange={setSortOrder} // Ou (newSort) => setSortOrder(newSort)
                                 />
                             </div>
 
@@ -234,7 +321,9 @@ const StockInventory: React.FC = () => {
                 <div style={styles.detailsColumn}>
                     <ProductDetails
                         product={selectedProduct}
-                        onEdit={(p) => alert(`Editando ${p.name}`)}
+                        onSave={async () => {
+                            await fetchProductsData();
+                        }}
                     />
                 </div>
             </div>
@@ -416,7 +505,7 @@ const styles: { [key: string]: React.CSSProperties } = {
         display: 'block',
         fontSize: '0.95rem',
     },
-    partPrimaryCode: { 
+    partPrimaryCode: {
         fontSize: '0.75rem',
         background: '#f1f5f9',
         padding: '2px 4px',

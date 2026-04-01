@@ -4,7 +4,7 @@ import './Fieldset.css';
 export type FieldsetVariant = 'standard' | 'card' | 'highlight' | 'basic';
 
 export interface FieldsetProps extends React.FieldsetHTMLAttributes<HTMLFieldSetElement> {
-  legend: string | React.ReactNode;
+  legend?: string | React.ReactNode;
   variant?: FieldsetVariant;
   children: React.ReactNode;
   /** Se true, a legenda fica dentro do container como um cabeçalho. */

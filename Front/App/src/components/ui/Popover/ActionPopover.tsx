@@ -14,7 +14,7 @@ interface ActionPopoverProps {
 }
 
 export const ActionPopover = ({ 
-  triggerLabel = "Ações", 
+  triggerLabel = "", 
   triggerIcon = "⚙️", 
   actions 
 }: ActionPopoverProps) => {

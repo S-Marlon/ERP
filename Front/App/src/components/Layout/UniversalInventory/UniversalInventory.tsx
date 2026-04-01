@@ -112,16 +112,16 @@ const UniversalInventory = <T extends {
               </tr>
             </thead>
             <tbody>
-              {data.map((item) => (
-                <tr key={item.id} className={item.stock <= 5 ? styles.lowStock : ''}>
-                  {columns.map((col, idx) => (
-                    <td key={idx} style={{ textAlign: col.textAlign || 'left' }}>
-                      {col.render ? col.render(item) : (item as any)[col.key]}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
+  {data.map((item) => (
+    <tr key={item.id} className={(item as any).rowClass ? styles[(item as any).rowClass] : ''}>
+      {columns.map((col, idx) => (
+        <td key={idx} style={{ textAlign: col.textAlign || 'left' }}>
+          {col.render ? col.render(item) : (item as any)[col.key]}
+        </td>
+      ))}
+    </tr>
+  ))}
+</tbody>
           </table>
         )}
 

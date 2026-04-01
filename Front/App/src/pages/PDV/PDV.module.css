@@ -41,17 +41,21 @@
 
 /* 3. Estágio 2: Ajuste a proporção */
 .checkoutActive .mainContent {
-  flex: 1; /* Encolhe bem a parte da esquerda */
-  opacity: 0.5;
-  filter: grayscale(0.8);
+  flex: 0;
+  width: 0;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  overflow: hidden; /* Impede que o conteúdo "vaze" enquanto encolhe */
   pointer-events: none;
+  transition: all 0.5s ease; /* Para o efeito ser suave */
 }
 
 /* 4. Ajuste o Carrinho (CartAside) para não sumir */
 /* Se o seu CartAside for um componente, garanta que ele tenha uma classe que possamos manipular */
 .checkoutActive .cartAside {
   /* Opcional: encolhe o carrinho também */
-  flex: 1;
+  flex: 0.5;
 }
 
 /* 5. Sidebar de Pagamento - O SEGREDO ESTÁ AQUI */
@@ -145,9 +149,6 @@
 }
 
 .filterBar {
-  display: grid;
-  /* 1fr para os chips (flexível) e auto para os switches (fixo) */
-  grid-template-columns: 1fr 250px; 
   align-items: center; /* Alinha por baixo para ficar alinhado com os switches */
   gap: 1rem;
   width: 100%;
@@ -248,7 +249,6 @@
 .cartItemInfo {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 0.5rem;
   font-size: 12pt;
 }
 
@@ -313,6 +313,7 @@
 }
 
 .btnCheckout, .btnCancelSale  {
+    flex: 1; /* 🔥 faz expandir */
   color: white;
   border: none;
   padding: 1rem;
@@ -416,6 +417,11 @@
 
 /* PDV.module.css - Adições */
 
+.navContainer{
+  display: grid;
+  grid-template-columns: 1fr ;
+}
+
 .tabsContainer {
   display: flex;
   gap: 1rem;
@@ -508,180 +514,7 @@
 
 /* osStyles.module.css */
 
-.osSection {
-  background-color: #f8f9fa;
-  padding: 2rem;
-  border-radius: 8px;
-  max-width: 900px;
-  margin: 0 auto;
-}
 
-.osForm {
-  background: #ffffff;
-  padding: 1.5rem;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-}
-
-.osForm h2 {
-  margin-bottom: 1.5rem;
-  color: #1a202c;
-  font-size: 1.5rem;
-  border-bottom: 2px solid #e2e8f0;
-  padding-bottom: 0.5rem;
-}
-
-.osForm h4 {
-  margin: 1.5rem 0 1rem 0;
-  color: #2d3748;
-  font-size: 1.1rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-/* Grupos de Inputs em Linha */
-.inputGroupRow {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1.5rem;
-  margin-bottom: 1.5rem;
-}
-
-.inputField {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.inputField label {
-  font-weight: 600;
-  font-size: 0.9rem;
-  color: #4a5568;
-}
-
-.inputField input,
-.inputField select {
-  padding: 0.75rem;
-  border: 1px solid #cbd5e0;
-  border-radius: 6px;
-  font-size: 1rem;
-  transition: border-color 0.2s;
-}
-
-.inputField input:focus,
-.inputField select:focus {
-  outline: none;
-  border-color: #3182ce;
-  box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
-}
-
-/* Container de Especificações de Prensagem */
-.specsContainer {
-  background-color: #f7fafc;
-  padding: 1.25rem;
-  border-radius: 8px;
-  border-left: 4px solid #3182ce;
-  margin-bottom: 2rem;
-}
-
-/* Seção de Mão de Obra e Prensagem */
-.laborContainer {
-  background-color: #fffaf0;
-  padding: 1.5rem;
-  border-radius: 10px;
-  border: 1px solid #feebc8;
-}
-
-.laborTypeSelector {
-  display: flex;
-  gap: 0.5rem;
-  margin: 1rem 0;
-  flex-wrap: wrap;
-}
-
-.laborTypeSelector button {
-  padding: 0.6rem 1rem;
-  border: 1px solid #e2e8f0;
-  background: white;
-  border-radius: 20px;
-  cursor: pointer;
-  font-size: 0.85rem;
-  transition: all 0.2s;
-}
-
-.laborTypeSelector button.activeType {
-  background-color: #3182ce;
-  color: white;
-  border-color: #3182ce;
-}
-
-.laborInputWrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  margin-top: 1rem;
-}
-
-.inputWithIcon {
-  display: flex;
-  max-width: 300px;
-}
-
-.currencyBadge {
-  background: #edf2f7;
-  padding: 0.75rem;
-  border: 1px solid #cbd5e0;
-  border-right: none;
-  border-radius: 6px 0 0 6px;
-  color: #4a5568;
-  font-weight: bold;
-}
-
-.inputWithIcon input {
-  flex: 1;
-  border-radius: 0 6px 6px 0;
-  padding: 0.75rem;
-  border: 1px solid #cbd5e0;
-}
-
-.infoHelper {
-  font-size: 0.8rem;
-  color: #718096;
-  font-style: italic;
-}
-
-.laborPreview {
-  margin-top: 1.25rem;
-  font-size: 1.1rem;
-  color: #2d3748;
-}
-
-.laborPreview strong {
-  color: #2f855a;
-  font-size: 1.3rem;
-}
-
-/* Botão de Navegação Inferior */
-.osInstructions {
-  margin-top: 2rem;
-  display: flex;
-  justify-content: flex-start;
-}
-
-.btnTabSwitch {
-  background: transparent;
-  color: #3182ce;
-  border: 1px dashed #3182ce;
-  padding: 0.8rem 1.5rem;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: background 0.2s;
-}
-
-.btnTabSwitch:hover {
-  background: rgba(49, 130, 206, 0.05);
-}
 
 .fullSelect {
   width: 100%;
@@ -702,28 +535,13 @@
   color: #666;
 }
 
-.unitPrice small {
-  color: #999;
-}
-
 .lowStock {
   color: #d32f2f;
   font-weight: bold;
 }
 
-/* 3. Rodapé: Ações e Subtotal */
-.cartActions {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  margin-top: 4px;
-}
 
-.controlsGroup {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
+
 
 .quantityInput {
   width: 50px;
@@ -785,27 +603,6 @@
   /* Verde para o valor final */
 }
 
-/* --- AJUSTE DO ITEM DO CARRINHO (Tema Escuro Condizente) --- */
-
-.cartItem {
-  padding: 1rem;
-  background: #334155;
-  /* Cor de superfície do seu cartAside */
-  border-radius: 8px;
-  margin-bottom: 0.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  border: 1px solid transparent;
-  transition: border-color 0.2s;
-}
-
-.cartItem:hover {
-  border-color: #475569;
-}
-
-
-
 .mainInfo {
   display: flex;
   flex-direction: column;
@@ -827,15 +624,6 @@
   color: #94a3b8;
 }
 
-/* 3. Rodapé: Ações e Subtotal */
-.cartActions {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  margin-top: 6px;
-  padding-top: 8px;
-  border-top: 1px solid #475569;
-}
 
 
 
@@ -1074,14 +862,17 @@
 /* ITEM DO CARRINHO - Refatorado e Consolidado */
 .cartItem {
   background: var(--cart-surface);
-  padding: 0.5rem;
+  padding: 0.4rem;
   border-radius: 8px;
   margin-bottom: 0.2rem;
   display: flex;
   flex-direction: column;
-  gap: 1px;
   border: 1px solid transparent;
   transition: all 0.2s; 
+}
+
+.cartItemItenzero {
+  background: #553333;
 }
 
 .cartItem:hover {
@@ -1122,9 +913,13 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 4px;
-  padding-top: 8px;
   border-top: 1px solid var(--cart-border);
+}
+
+.controlsGroup{
+  display: flex;
+  gap: 3px;
+  align-items: center;
 }
 
 /* CONTROLES DE QUANTIDADE (Stepper) */
@@ -1753,7 +1548,12 @@ input::-webkit-inner-spin-button {
 
 
 
-
+.gridWrapper{
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  background-color: #fff;
+  
+}
 
 
 
@@ -1805,3 +1605,46 @@ input::-webkit-inner-spin-button {
     font-size: 0.75rem;
     display: block;
 }
+
+
+
+/* Container principal */
+.lastScan {
+  background: #0f172a;
+  color: #fff;
+  padding: 10px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  /* Apenas slide, sem opacity */
+  transform: translateY(20px);
+  animation: slideInUp 0.4s ease forwards;
+}
+
+@keyframes slideInUp {
+  0% { transform: translateY(20px); }
+  100% { transform: translateY(0); }
+}
+
+/* Conteúdo interno */
+.lastScanContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Pop/fade sequencial dos filhos */
+@keyframes popIn {
+  0% { opacity: 0; transform: scale(0.5); }
+  70% { opacity: 1; transform: scale(1.2); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.lastScanContent > * {
+  opacity: 0; /* inicia invisível */
+  animation: popIn 0.3s forwards;
+}
+
+.lastScanContent .check { animation-delay: 0s; }
+.lastScanContent .imageWrapper,
+.lastScanContent .info { animation-delay: 0.01s; }
+.lastScanContent .meta { animation-delay: 0.1s; }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Product } from '../types/Stock_Products';
 import EditableField from '../../../../../components/forms/EditableField/EditableField';
 import { styles } from './producDetails';
@@ -14,7 +14,6 @@ interface ProductDetailsProps {
 }
 
 const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onSave, onClose }) => {
-
 
 
   const [formData, setFormData] = useState<Product | null>(null);
@@ -37,27 +36,36 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onSave, onClos
     unitsPerPackage: "Itens por Embalagem",
   };
 
-  const hasChanges = JSON.stringify(formData) !== JSON.stringify(product);
 
-const handlePricingChange = (updatedPrices: any) => {
+const handlePricingChange = useCallback((updatedPrices: any) => {
   setFormData(prev => {
     if (!prev) return null;
+
+    const hasChanged = 
+      prev.costPrice !== updatedPrices.costPrice ||
+      prev.salePrice !== updatedPrices.salePrice ||
+      prev.markup !== updatedPrices.markup ||
+      prev.unitsPerPackage !== updatedPrices.unitsPerPackage ||
+      prev.priceMethod !== updatedPrices.priceMethod; // ⭐ NOVO
+
+    if (!hasChanged) return prev;
+
     return {
       ...prev,
-      // Mapeia o que vem do calculador para o objeto de formulário do pai
       costPrice: updatedPrices.costPrice,
       salePrice: updatedPrices.salePrice,
       markup: updatedPrices.markup,
-      unitsPerPackage: updatedPrices.unitsPerPackage
+      unitsPerPackage: updatedPrices.unitsPerPackage,
+      priceMethod: updatedPrices.priceMethod // ⭐ ESSENCIAL
     };
   });
-};
+}, []);
 
   useEffect(() => {
-    if (product) setFormData({ ...product });
-    else setFormData(null);
-    setImageList(product?.pictureUrl ? product.pictureUrl.split(',').filter(Boolean) : []);
-  }, [product]);
+  if (!product) return;
+
+  setFormData(prev => prev ?? { ...product });
+}, [product]);
 
 
 
@@ -81,6 +89,9 @@ const handlePricingChange = (updatedPrices: any) => {
     return changes as Partial<Product>;
   };
 
+const hasChanges = formData
+  ? Object.keys(getChangedFields(product, formData)).length > 0
+  : false;
 
   // Exemplo de como você usaria no seu componente pai:
   const [urlError, setUrlError] = useState(false); // Estado para o aviso de erro
@@ -113,8 +124,19 @@ const handlePricingChange = (updatedPrices: any) => {
   }, [showUrlManager]);
 
 
-  const [imageList, setImageList] = useState<string[]>(formData?.pictureUrl ? formData.pictureUrl.split(',').filter(Boolean) : []);
-  const [currentUrl, setCurrentUrl] = useState('');
+const [imageList, setImageList] = useState<string[]>([]);  const [currentUrl, setCurrentUrl] = useState('');
+
+useEffect(() => {
+  if (product?.pictureUrl) {
+    setImageList(product.pictureUrl.split(',').filter(Boolean));
+  } else {
+    setImageList([]);
+  }
+}, [product]);
+
+
+
+  const [isSaving, setIsSaving] = useState(false);
 
   // 2. Lógica para Adicionar a URL atual à lista de imagens
   const handleAddImage = () => {
@@ -142,7 +164,15 @@ const handlePricingChange = (updatedPrices: any) => {
     };
   };
 
+const calculateMarkup = (sale: number, cost: number) => {
+  if (cost <= 0 || sale <= 0) return 0;
+  return parseFloat((sale / cost).toFixed(2));
+};
 
+const calculateSale = (cost: number, markup: number) => {
+  if (cost <= 0 || markup <= 0) return 0;
+  return parseFloat((cost * markup).toFixed(2));
+};
   
 
 const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -207,67 +237,66 @@ const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   };
 
   // Adicione o 'async' aqui na declaração da função
-  const handleSaveClick = async () => {
-    // Verificação de segurança: precisamos do ID para o service saber quem atualizar
-    if (!product?.id || !formData) {
-      Swal.fire('Erro', 'Produto sem identificação válida.', 'error');
-      return;
-    }
+const handleSaveClick = async () => {
+  if (!product?.id || !formData) {
+    Swal.fire('Erro', 'Produto sem identificação válida.', 'error');
+    return;
+  }
 
-    const changes = getChangedFields(product, formData);
-    const keys = Object.keys(changes);
+  const changes = getChangedFields(product, formData);
+  const keys = Object.keys(changes);
 
-    if (keys.length === 0) return;
+  if (keys.length === 0) return;
 
-    let changesHtml = `
+  let changesHtml = `
     <div style="text-align: left; font-size: 14px; max-height: 300px; overflow-y: auto; padding: 10px; border: 1px solid #edf2f7; border-radius: 8px; background: #f8fafc;">
+  `;
+  
+  keys.forEach(key => {
+    changesHtml += `
+      <div style="margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
+        <strong style="color: #2563eb; font-size: 12px; text-transform: uppercase;">${fieldLabels[key] || key}:</strong><br/>
+        <span style="color: #94a3b8; text-decoration: line-through; font-size: 13px;">De: ${product[key as keyof Product] ?? '(vazio)'}</span><br/>
+        <span style="color: #059669; font-weight: 600; font-size: 15px;">Para: ${changes[key as keyof Product]}</span>
+      </div>
     `;
-    keys.forEach(key => {
-      changesHtml += `
-        <div style="margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
-          <strong style="color: #2563eb; font-size: 12px; text-transform: uppercase;">${fieldLabels[key] || key}:</strong><br/>
-          <span style="color: #94a3b8; text-decoration: line-through; font-size: 13px;">De: ${product[key as keyof Product] ?? '(vazio)'}</span><br/>
-          <span style="color: #059669; font-weight: 600; font-size: 15px;">Para: ${changes[key as keyof Product]}</span>
-        </div>
-      `;
+  });
+  
+  changesHtml += `</div>`;
+
+  const result = await Swal.fire({
+    title: 'Confirmar Alterações?',
+    html: changesHtml,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Sim, salvar!',
+    cancelButtonText: 'Revisar',
+    confirmButtonColor: '#2563eb',
+    cancelButtonColor: '#94a3b8',
+    showLoaderOnConfirm: true,
+    preConfirm: async () => {
+      try {
+        return await updateProduct(product.id!, changes);
+      } catch (error) {
+        Swal.showValidationMessage(`Erro no servidor: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      }
+    },
+    allowOutsideClick: () => !Swal.isLoading(),
+    reverseButtons: true
+  });
+
+  if (result.isConfirmed) {
+    onSave?.(result.value);
+    Swal.fire({
+      title: 'Sucesso!',
+      text: 'Produto atualizado com sucesso.',
+      icon: 'success',
+      timer: 1500,
+      showConfirmButton: false
     });
-    changesHtml += `</div>`;
+  }
+};
 
-    const result = await Swal.fire({
-      title: 'Confirmar Alterações?',
-      html: changesHtml,
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonText: 'Sim, salvar!',
-      cancelButtonText: 'Revisar',
-      confirmButtonColor: '#2563eb',
-      cancelButtonColor: '#94a3b8',
-      showLoaderOnConfirm: true,
-      preConfirm: async () => {
-        try {
-          // Envia para o service e retorna o resultado para o 'result.value'
-          return await updateProduct(product.id!, changes);
-        } catch (error: unknown) {
-          Swal.showValidationMessage(`Erro no servidor: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
-        }
-      },
-      allowOutsideClick: () => !Swal.isLoading(),
-      reverseButtons: true
-    });
-
-    if (result.isConfirmed) {
-      // result.value contém o produto atualizado retornado pelo backend
-      onSave?.(result.value);
-
-      Swal.fire({
-        title: 'Sucesso!',
-        text: 'Produto atualizado com sucesso.',
-        icon: 'success',
-        timer: 1500,
-        showConfirmButton: false
-      });
-    }
-  };
 
   if (!formData) {
     return (
@@ -456,7 +485,7 @@ const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
                                     }
                                     const filtered = updatedImages.filter(Boolean);
                                     setImageList(filtered);
-                                    setFormData({ ...formData, pictureUrl: filtered.join(',') });
+setFormData(prev => prev ? { ...prev, pictureUrl: filtered.join(',') } : prev);
                                   }}
                                 />
                                 {url && (
@@ -611,8 +640,9 @@ const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
 
          
 
-{activeTab === 'financeiro' && (
+{activeTab === 'financeiro' && formData?.id && (
   <PricingCalculator 
+    key={formData.id} // <--- CRUCIAL: Força o componente a reiniciar do zero
     productId={formData.id} 
     onChange={handlePricingChange} 
   />
@@ -1061,3 +1091,6 @@ const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
 
 
 export default ProductDetails;
+
+
+// Pricing PricingCalculator, está apenas funcionando o modo manual:

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import styles from './PDV.module.css';
 import { SaleItem, CartItem, DisplayMode, ProductBasic } from './types';
@@ -22,10 +22,17 @@ import ImageDisplay from '../../components/ui/ImageGallery/ImageDysplay';
 import Badge from '../../components/ui/Badge/Badge';
 import EditableField from '../../components/forms/EditableField/EditableField';
 import UniversalInventory from '../../components/Layout/UniversalInventory/UniversalInventory';
+import OSPanel from './services/OSPanel';
+import Button from '../../components/ui/Button/Button';
+import FlexGridContainer from '../../components/Layout/FlexGridContainer/FlexGridContainer';
+
+
 
 type PDVStep = 'SELECAO' | 'PAGAMENTO';
 
 // Observação: CartItem e SaleItem agora são definidos em types.ts
+
+
 
 const MOCK_SERVICES: SaleItem[] = [
   { id: 's1', name: 'Prensagem de Mangueira 1 Trama (R1)', category: 'Hidráulica', price: 20.00, type: 'service' },
@@ -71,6 +78,30 @@ export const PDV: React.FC = () => {
   const [pdvResponse, setPdvResponse] = useState<ProductsResponse | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
 
+  const [osItems, setOsItems] = useState<CartItem[]>([]);
+  const [osServices, setOsServices] = useState<SaleItem[]>([]);
+
+  const addToOS = (item: SaleItem) => {
+    if (item.type === 'service') {
+      setOsServices(prev => [...prev, item]);
+      return;
+    }
+
+    setOsItems(prev => {
+      const existing = prev.find(i => i.id === item.id);
+
+      if (existing) {
+        return prev.map(i =>
+          i.id === item.id
+            ? { ...i, quantity: i.quantity + 1 }
+            : i
+        );
+      }
+
+      return [...prev, { ...item, quantity: 1 }];
+    });
+  };
+
   // Categoria selecionada
   const [selectedCategory, setSelectedCategory] = useState<string>('Todas');
 
@@ -96,7 +127,16 @@ export const PDV: React.FC = () => {
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+  const handleChangeMode = (mode: "lista" | "cards" | "compact") => {
+    if (mode === "lista" || mode === "cards") {
+      setDisplayMode(mode);
+    }
+  };
 
+  const searchRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    searchRef.current?.focus();
+  }, [cart.length, mostrarModalCliente === false]);
 
   // OS-specific data
   const [osData, setOsData] = useState({
@@ -111,6 +151,22 @@ export const PDV: React.FC = () => {
   });
 
 
+  // mapear suas categorias para o formato que o react-select espera
+  const options = [
+    { value: 'Todas', label: 'Todas' },
+    ...dynamicCategories.map(cat => ({ value: cat, label: cat }))
+  ];
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && mostrarModalCliente) {
+        setMostrarModalCliente(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mostrarModalCliente]);
 
 
   // Initialize on mount
@@ -167,6 +223,12 @@ export const PDV: React.FC = () => {
     return osData.laborValue; // fixed
   }, [itemsSubtotal, osData.laborType, osData.laborValue, osData.selectedServiceId]);
 
+  const osTotal = useMemo(() => {
+    const itemsTotal = osItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
+    const servicesTotal = osServices.reduce((acc, s) => acc + s.price, 0);
+
+    return itemsTotal + servicesTotal + calculatedLabor;
+  }, [osItems, osServices, calculatedLabor]);
   // Total geral (itens + mão de obra)
   const total = useMemo(() => itemsSubtotal + calculatedLabor, [itemsSubtotal, calculatedLabor]);
 
@@ -203,6 +265,18 @@ export const PDV: React.FC = () => {
     setCart(prev => prev.filter(item => item.id !== id));
   };
 
+  type LastScanItem = {
+    id: number;
+    name: string;
+    price: number;
+    sku?: string;
+    quantity: number;
+    img?: string;
+  };
+
+  const [lastScan, setLastScan] = useState<LastScanItem | null>(null);
+
+
   const handleResetFilters = () => {
     setMinPrice('0');
     setMaxPrice('999999');
@@ -218,7 +292,11 @@ export const PDV: React.FC = () => {
 
   /* ===== ADD TO CART (DEVE VIR ANTES DE PROCESSBARCODE) ===== */
 
+
+
   const addToCart = useCallback(async (item: SaleItem) => {
+
+
     if (item.type === 'part' && item.id) {
       try {
         const validation = await validateProductStockPrice(item.id as number);
@@ -239,6 +317,8 @@ export const PDV: React.FC = () => {
                 ? { ...i, quantity: i.quantity + 1 }
                 : i
             );
+
+
           }
 
           return [
@@ -251,6 +331,20 @@ export const PDV: React.FC = () => {
             }
           ];
         });
+
+
+        setLastScan({
+          id: Date.now(),
+          name: item.name,
+          price: item.price,
+          sku: item.sku,
+          quantity: 1,
+          img: item.pictureUrl,
+        });
+
+
+
+
       } catch (err) {
         console.error('Erro ao validar produto:', err);
       }
@@ -270,6 +364,26 @@ export const PDV: React.FC = () => {
       });
     }
   }, []);
+
+
+
+const beep = () => {
+  const ctx = new AudioContext();
+  const oscillator = ctx.createOscillator();
+  oscillator.type = 'sine'; // Tipo de onda: sine, square, sawtooth,triangle
+  oscillator.frequency.value = 1500; // Hz
+  oscillator.connect(ctx.destination); 
+  oscillator.start();
+  oscillator.stop(ctx.currentTime + 0.02); // dura 0.1s
+};
+
+
+useEffect(() => {
+  if (lastScan) {
+    beep(); // toca beep
+  }
+}, [lastScan]);
+
 
   // --- BUSCA POR CÓDIGO DE BARRAS NO BANCO ---
   const processBarcode = useCallback(async (code: string) => {
@@ -342,6 +456,20 @@ export const PDV: React.FC = () => {
 
 
 
+  const quickCategories = dynamicCategories.slice(0, 2);
+
+
+  useEffect(() => {
+    if (searchTerm.length < 3) return;
+
+    const match = dynamicCategories.find(cat =>
+      searchTerm.toLowerCase().includes(cat.toLowerCase())
+    );
+
+    if (match) {
+      setSelectedCategory(match);
+    }
+  }, [searchTerm]);
 
   useEffect(() => {
     const loadCategories = async () => {
@@ -395,20 +523,20 @@ export const PDV: React.FC = () => {
   }, []);
 
 
- const applyIndividualDiscount = (id: string | number, newPrice: number) => {
+  const applyIndividualDiscount = (id: string | number, newPrice: number) => {
     setCart(prevCart => prevCart.map(item => {
-        if (item.id === id) {
-            return {
-                ...item,
-                // Se for o preço original (reset), limpamos o originalPrice, 
-                // senão, guardamos o preço antigo para referência futura.
-                originalPrice: item.originalPrice || item.price, 
-                price: newPrice
-            };
-        }
-        return item;
+      if (item.id === id) {
+        return {
+          ...item,
+          // Se for o preço original (reset), limpamos o originalPrice, 
+          // senão, guardamos o preço antigo para referência futura.
+          originalPrice: item.originalPrice || item.price,
+          price: newPrice
+        };
+      }
+      return item;
     }));
-};
+  };
 
   // Definição das colunas específica para este contexto (Peças)
   const productColumns = [
@@ -479,18 +607,16 @@ export const PDV: React.FC = () => {
       key: 'actions',
       render: (item: any) => (
         <div>
-          <button
-            className={styles.compactAddBtn}
+          <Button variant='secondary'
             onClick={() => setSelectedPart(item)} // Abre o modal de detalhes do produto
           >
             <span>?</span>
-          </button>
-          <button
-            className={styles.compactAddBtn}
+          </Button>
+          <Button variant='primary'
             onClick={() => addToCart(item)} // Use a função 'addToCart' que você já criou
           >
             <span>+</span>
-          </button>
+          </Button>
         </div>
       ),
       textAlign: 'center' as const
@@ -648,17 +774,17 @@ export const PDV: React.FC = () => {
         {estagio === 'PAGAMENTO' && <div className={styles.lockOverlay} onClick={() => setEstagio('SELECAO')} />}
 
 
+        <nav className={styles.navContainer}>
+          <div className={styles.tabsContainer}>
+            <button className={`${styles.tabButton} ${activeTab === 'parts' ? styles.tabButtonActive : ''}`} onClick={() => setActiveTab('parts')}>📦 Peças</button>
+            <button className={`${styles.tabButton} ${activeTab === 'os' ? styles.tabButtonActive : ''}`} onClick={() => setActiveTab('os')}>📋 Gerar OS</button>
+          </div>
 
-        <nav className={styles.tabsContainer}>
-          <button className={`${styles.tabButton} ${activeTab === 'parts' ? styles.tabButtonActive : ''}`} onClick={() => setActiveTab('parts')}>📦 Peças</button>
-          <button className={`${styles.tabButton} ${activeTab === 'services' ? styles.tabButtonActive : ''}`} onClick={() => setActiveTab('services')}>🛠️ Serviços</button>
-          <button className={`${styles.tabButton} ${activeTab === 'os' ? styles.tabButtonActive : ''}`} onClick={() => setActiveTab('os')}>📋 Gerar OS</button>
+
         </nav>
+        <div style={{ border: '1px solid #ececec', borderRadius: '0px 0px 8px 8px', padding: '8px', marginBottom: '8px', backgroundColor: '#999' }}>
 
-        {/* FILTRO AVANÇADO - COMPLETO E DETALHADO */}
-        {activeTab === 'parts' && (
 
-          <div style={{ border: '1px solid #ececec', borderRadius: '0px 0px 8px 8px', padding: '8px', marginBottom: '8px', backgroundColor: '#eee' }}>
 
             {/* CABEÇALHO DA SANFONA - O GATILHO */}
             <div
@@ -694,7 +820,14 @@ export const PDV: React.FC = () => {
               >
                 ✕ Limpar Todos
               </button>
+
+
             </div>
+
+
+
+
+
 
             {/* CONTEÚDO QUE SE OCULTA */}
             {isFiltersOpen && (
@@ -806,7 +939,7 @@ export const PDV: React.FC = () => {
 
 
 
-                  
+
 
                   {/* Filtro: Unidade de Medida (Opcional) */}
                   {unitOptions.length > 0 && (
@@ -862,125 +995,185 @@ export const PDV: React.FC = () => {
 
 
 
-        )}
-
-        <header className={styles.topHeader} style={{ position: 'relative' }}>
-          <div className={styles.searchSection}>
-            <EditableField
-              label="Busca de Itens"
-              showLock={false}
-              isDirty={searchTerm !== ''}
-              showOriginalValue={false}
-              originalValue="" // Adicionei para não dar erro de prop obrigatória
-              onRevert={() => setSearchTerm('')}
-            >
-              <input
-                className={styles.mainInput}
-                placeholder={`Buscar ${activeTab === 'parts' ? 'peças...' : 'serviços...'}`}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                disabled={activeTab === 'os'}
-              />
-            </EditableField>
-          </div>
-
-          <div className={styles.filterBar}>
-            <EditableField
-              label="Ordenar por categoria"
-              showLock={false}
-              isDirty={selectedCategory !== 'Todas'}
-              showOriginalValue={false}
-              originalValue="Todas"
-              onRevert={() => setSelectedCategory('Todas')}
-            >
 
 
 
-              <div className={styles.categoryChips}>
-                {loadingCategories ? (
-                  <span> <span className={styles.loaderInline}> </span>  Carregando...</span>
-                ) : (
-                  dynamicCategories.map(cat => (
-                    <button
-                      key={cat}
-                      className={`${styles.chip} ${selectedCategory === cat ? styles.chipActive : ''}`}
-                      onClick={() => setSelectedCategory(cat)}
-                    >
-                      {cat}
-                    </button>
-                  ))
-                )}
-              </div>
-
-
-            </EditableField>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
 
 
 
-              {/* Filtro: Estoque */}
+        <div className={styles.gridWrapper}>
+
+
+
+          <header className={styles.topHeader} style={{ position: 'relative' }}>
+
+
+            <div className={styles.searchSection}>
               <EditableField
-                label="Com estoque"
+                label="Busca de Itens"
                 showLock={false}
-                isDirty={!onlyInStock}
+                isDirty={searchTerm !== ''}
                 showOriginalValue={false}
-                originalValue={true}
-                onRevert={() => setOnlyInStock(true)}
+
+                originalValue="" // Adicionei para não dar erro de prop obrigatória
+                onRevert={() => setSearchTerm('')}
               >
-                <div className={styles.stockToggle}>
-                  <Switch
-                    checked={onlyInStock}
-                    // Forçamos a inversão baseada no valor atual
-                    onChange={() => setOnlyInStock(prev => !prev)}
-                  />
-                </div>
+                <input
+                  className={styles.mainInput}
+                  ref={searchRef}
+                  type="text"
+                  placeholder={`Buscar ${activeTab === 'parts' ? 'peças...' : 'serviços...'}`}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  disabled={activeTab === 'os'}
+                />
               </EditableField>
-
-              {/* Filtro: Ativos */}
-              <EditableField
-                label="Ativos"
-                showLock={false}
-                isDirty={!onlyActive}
-                showOriginalValue={false}
-                originalValue={true}
-                onRevert={() => setOnlyActive(true)}
-              >
-                <div className={styles.stockToggle}>
-                  <Switch
-                    checked={onlyActive}
-                    onChange={() => setOnlyActive(prev => !prev)}
-                  />
-                </div>
-              </EditableField>
-
-              
-
-            {/* Filtro: Ordenação */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: '500', color: '#555' }}>⇅ Ordenar Por</label>
-                    <select
-                      value={sortOrder}
-                      onChange={(e) => setSortOrder(e.target.value)}
-                      style={{
-                        padding: '8px',
-                        border: '1px solid #ccc',
-                        borderRadius: '4px',
-                        fontSize: '12px',
-                        backgroundColor: 'white',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <option value="">Padrão (A-Z)</option>
-                      <option value="name_asc">Nome: A-Z</option>
-                      <option value="name_desc">Nome: Z-A</option>
-                      <option value="price_asc">Preço: Menor</option>
-                      <option value="price_desc">Preço: Maior</option>
-                    </select>
-                  </div>
             </div>
 
+            <div className={styles.filterBar}>
+              <EditableField
+                label="Ordenar por categoria"
+                showLock={false}
+                isDirty={selectedCategory !== 'Todas'}
+                showOriginalValue={false}
+                originalValue="Todas"
+                onRevert={() => setSelectedCategory('Todas')}
+              >
+
+
+
+                <div className={styles.categoryWrapper}>
+                  {/* SELECT COM BUSCA */}
+                  <select
+                    value={options.find(option => option.value === selectedCategory)}
+                    onChange={(option) => setSelectedCategory(option.value)}
+                    options={options}
+                    className={styles.categorySelect}
+                    classNamePrefix="react-select"
+                    isSearchable={true} // habilita a barra de pesquisa
+                  />
+
+                  {/* CHIPS RÁPIDOS */}
+                  <div className={styles.quickChips}>
+                    {quickCategories.map(cat => (
+                      <button
+                        key={cat}
+                        className={`${styles.chip} ${selectedCategory === cat ? styles.chipActive : ''}`}
+                        onClick={() => setSelectedCategory(cat)}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+
+              </EditableField>
+              
+
+            </div>
+
+
+
+
+          </header>
+
+
+           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr',alignItems: 'center', gap: '8px' }}>
+
+            {/* Filtro: Estoque */}
+            <EditableField
+              label="Com estoque"
+              showLock={false}
+              isDirty={!onlyInStock}
+              showOriginalValue={false}
+              originalValue={true}
+              onRevert={() => setOnlyInStock(true)}
+            >
+              <div className={styles.stockToggle}>
+                <Switch
+                  checked={onlyInStock}
+                  // Forçamos a inversão baseada no valor atual
+                  onChange={() => setOnlyInStock(prev => !prev)}
+                />
+              </div>
+            </EditableField>
+
+            {/* Filtro: Ativos */}
+            <EditableField
+              label="Ativos"
+              showLock={false}
+              isDirty={!onlyActive}
+              showOriginalValue={false}
+              originalValue={true}
+              onRevert={() => setOnlyActive(true)}
+            >
+              <div className={styles.stockToggle}>
+                <Switch
+                  checked={onlyActive}
+                  onChange={() => setOnlyActive(prev => !prev)}
+                />
+              </div>
+            </EditableField>
+
+
+
+            {/* Filtro: Ordenação */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '12px', fontWeight: '500', color: '#555' }}>⇅ Ordenar Por</label>
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+                style={{
+                  padding: '8px',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  backgroundColor: 'white',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="">Padrão (A-Z)</option>
+                <option value="name_asc">Nome: A-Z</option>
+                <option value="name_desc">Nome: Z-A</option>
+                <option value="price_asc">Preço: Menor</option>
+                <option value="price_desc">Preço: Maior</option>
+              </select>
+            </div>
           </div>
-        </header>
+
+
+
+
+           
+
+        </div>
+{lastScan && (
+  <div key={lastScan.id} className={styles.lastScan}>
+    <div className={styles.lastScanContent}>
+      <span className={styles.check}>✔</span>
+
+      {lastScan.img && (
+        <ImageDisplay
+          src={lastScan.img}
+          className={styles.ImageDisplay}
+          size="40px"
+          rounded="6px"
+        />
+      )}
+
+      <div className={styles.info}>
+        <strong>{lastScan.name}</strong>
+        <small>{lastScan.sku || 'Sem código'}</small>
+      </div>
+
+      <div className={styles.meta}>
+        <span>x{lastScan.quantity}</span>
+        <strong>{money.format(lastScan.price)}</strong>
+      </div>
+    </div>
+  </div>
+)}
 
 
         {/* A TABELA GENÉRICA */}
@@ -1017,125 +1210,20 @@ export const PDV: React.FC = () => {
           onAction={addToCart} // Integração direta com sua função de carrinho
           moneyFormatter={(val) => money.format(val)}
         />
-        {activeTab === 'os' ? (
-          <>
-
-
-            <section className={styles.osSection}>
-              <div className={styles.osForm}>
-                <h2>Configuração da Montagem Hidráulica</h2>
-
-                {/* Identificação da Máquina */}
-                <div className={styles.inputGroupRow}>
-                  <div className={styles.inputField}>
-                    <label>Equipamento / Frota</label>
-                    <input
-                      placeholder="Ex: Escavadeira PC200 / Lote 04"
-                      value={osData.equipment}
-                      onChange={e => setOsData({ ...osData, equipment: e.target.value })}
-                    />
-                  </div>
-                  <div className={styles.inputField}>
-                    <label>Local de Aplicação</label>
-                    <input
-                      placeholder="Ex: Comando Central / Lança"
-                      value={osData.application}
-                      onChange={e => setOsData({ ...osData, application: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                {/* Especificações da Mangueira (Prensagem) */}
-                <div className={styles.specsContainer}>
-                  <h4>Especificações de Prensagem</h4>
-                  <div className={styles.inputGroupRow}>
-                    <div className={styles.inputField}>
-                      <label>Bitola (Pol/Dash)</label>
-                      <select
-                        value={osData.gauge}
-                        onChange={e => setOsData({ ...osData, gauge: e.target.value })}
-                      >
-                        <option value="">Selecione...</option>
-                        <option value="1/4">1/4" (-04)</option>
-                        <option value="3/8">3/8" (-06)</option>
-                        <option value="1/2">1/2" (-08)</option>
-                        <option value="3/4">3/4" (-12)</option>
-                        <option value="1">1" (-16)</option>
-                      </select>
-                    </div>
-                    <div className={styles.inputField}>
-                      <label>Nº de Tramas/Reforço</label>
-                      <select
-                        value={osData.layers}
-                        onChange={e => setOsData({ ...osData, layers: e.target.value })}
-                      >
-                        <option value="1">1 Trama (R1)</option>
-                        <option value="2">2 Tramas (R2)</option>
-                        <option value="4">4 Espirais (4SH/4SP)</option>
-                        <option value="6">6 Espirais (R13/R15)</option>
-                      </select>
-                    </div>
-                    <div className={styles.inputField}>
-                      <label>Medida Final (mm)</label>
-                      <input
-                        type="number"
-                        placeholder="Ex: 1250"
-                        value={osData.finalLength}
-                        onChange={e => setOsData({ ...osData, finalLength: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className={styles.laborContainer}>
-                  <label>Serviço de Prensagem</label>
-                  <div className={styles.laborTypeSelector}>
-                    <button
-                      className={osData.laborType === 'per_point' ? styles.activeType : ''}
-                      onClick={() => setOsData({ ...osData, laborType: 'per_point' })}
-                    >R$ Por Terminal</button>
-                    <button
-                      className={osData.laborType === 'fixed' ? styles.activeType : ''}
-                      onClick={() => setOsData({ ...osData, laborType: 'fixed' })}
-                    >Valor Fixo Montagem</button>
-                    <button
-                      className={osData.laborType === 'table' ? styles.activeType : ''}
-                      onClick={() => setOsData({ ...osData, laborType: 'table' })}
-                    >📋 Tabela por Bitola</button>
-                  </div>
-
-                  <div className={styles.laborInputWrapper}>
-                    <div className={styles.inputWithIcon}>
-                      <span className={styles.currencyBadge}>R$</span>
-                      <input
-                        type="number"
-                        placeholder="Custo da prensagem"
-                        value={osData.laborValue}
-                        onChange={e => setOsData({ ...osData, laborValue: parseFloat(e.target.value) || 0 })}
-                      />
-                    </div>
-                    {osData.laborType === 'per_point' && (
-                      <span className={styles.infoHelper}>* Multiplicado pelo número de terminais adicionados.</span>
-                    )}
-                  </div>
-
-                  <p className={styles.laborPreview}>
-                    Subtotal do serviço: <strong>{money.format(calculatedLabor)}</strong>
-                  </p>
-                </div>
-
-                <div className={styles.osInstructions}>
-                  <button className={styles.btnTabSwitch} onClick={() => setActiveTab('parts')}>
-                    ← Adicionar Mangueira e Terminais (Peças)
-                  </button>
-                </div>
-              </div>
-            </section>
-          </>
-        ) : (
-          <span></span>
-
-
+        {activeTab === 'os' && (
+          <OSPanel
+            osItems={osItems}
+            setOsItems={setOsItems}
+            osServices={osServices}
+            setOsServices={handleChangeMode}
+            osData={osData}
+            setOsData={setOsData}
+            osTotal={osTotal}
+            calculatedLabor={calculatedLabor}
+            money={money}
+            setCart={setCart}
+            setActiveTab={setActiveTab}
+          />
         )}
 
       </main>
@@ -1151,6 +1239,7 @@ export const PDV: React.FC = () => {
         removeItem={removeItem}
         onFinalizar={() => setEstagio('PAGAMENTO')}
         onBack={() => setEstagio('SELECAO')}
+        estagio={estagio}
         applyIndividualDiscount={applyIndividualDiscount}
 
       />

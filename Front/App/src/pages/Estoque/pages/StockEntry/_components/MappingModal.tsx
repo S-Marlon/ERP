@@ -7,6 +7,10 @@ import Badge from "../../../../../components/ui/Badge/Badge";
 import Button from "../../../../../components/ui/Button/Button";
 import { ProdutoNF } from "../../../utils/nfeParser";
 import FlexGridContainer from "../../../../../components/Layout/FlexGridContainer/FlexGridContainer";
+import EcommerceGallery from "../../../../../components/ui/ImageGallery/EcommerceGallery";
+import UrlManager from "../../../../../components/forms/UrlManager/UrlManager"
+import PricingCalculator from "../../../../../components/Layout/PricingCalculator/PricingCalculator";
+import StockDecomposition from "./StockDecomposition";
 /* ======================================================
    INTERFACES (Alinhadas com o novo Parser)
 ====================================================== */
@@ -33,6 +37,8 @@ interface ProdutoPersistencia extends ProdutoNF {
     Preço_Final_de_Venda?: number;
     individualUnit: string;
     unitsPerPackage?: number | null; // ✅ Alinha com estado inicial
+    pictureUrl?: string;
+    // pictureUrls: string[]
 
 }
 
@@ -116,7 +122,7 @@ const modalStyles: { [key: string]: React.CSSProperties } = {
         borderRadius: '8px',
         width: 'fit-content',
     },
-   
+
     searchSection: {
         backgroundColor: '#f8fafc',
         padding: '16px',
@@ -190,7 +196,8 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
         Margem_Lucro: 0,
         Preço_Final_de_Venda: 0,
         individualUnit: "",
-        unitsPerPackage: null
+        unitsPerPackage: null,
+        pictureUrl: "" // ✅ ADICIONE ISSO
     });
 
     // const [products, setProducts] = useState<ProductEntry[]>(() =>
@@ -207,6 +214,11 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
     // Se tiver GTIN, o padrão é ser ESPECÍFICO (false). Se não, GENÉRICO (true).
 
 
+
+const [imageList, setImageList] = useState<string[]>([]);
+    const [showUrlManager, setShowUrlManager] = useState<boolean>(false);
+
+
     // Estados necessários no seu componente pai
     const [categoriaPrefixo, setCategoriaPrefixo] = useState(""); // Ex: "MH"
     const [referencia, setReferencia] = useState(""); // Ex: "R1AT-04"
@@ -214,6 +226,9 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
 
     const [ProdutoVinculado, setProdutoVinculado] = useState<object | null>(null); // Aqui vai morar o "9AC5"
 
+const [decomposition, setDecomposition] = useState<DecompositionData>({
+  mode: "NONE"
+});
 
     const [isGeneric, setIsGeneric] = useState("");
 
@@ -267,16 +282,16 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
     };
 
     const handleSelectExisting = (prod: any) => {
-    setProdutoVinculado(prod);
-    
-    // Opcional: Preencher os campos de input com os dados do produto selecionado
-    // setNewProductId(prod.codigo_interno || prod.CodInterno);
-    // setNewProductName(prod.descricao || prod.name);
-    // setNewGtin(prod.codigo_barras || prod.gtin || "");
-    
-    setShowDropdown(false);
-    setSearchTerm("");
-};
+        setProdutoVinculado(prod);
+
+        // Opcional: Preencher os campos de input com os dados do produto selecionado
+        // setNewProductId(prod.codigo_interno || prod.CodInterno);
+        // setNewProductName(prod.descricao || prod.name);
+        // setNewGtin(prod.codigo_barras || prod.gtin || "");
+
+        setShowDropdown(false);
+        setSearchTerm("");
+    };
 
 
 
@@ -322,6 +337,12 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
             });
         }
     }, [supplierCnpj]);
+
+    useEffect(() => {
+        if (produtoPersistencia.pictureUrl) {
+            setImageList(produtoPersistencia.pictureUrl.split(","));
+        }
+    }, []);
 
     /* ======================================================
     CÁLCULO FISCAL CENTRALIZADO (CRÍTICO)
@@ -384,7 +405,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
 
 
     useEffect(() => {
-        if ( ProdutoVinculado != null) {
+        if (ProdutoVinculado != null) {
             setNewProductId((ProdutoVinculado as any).codigo_interno);
             setNewProductCategory((ProdutoVinculado as any).categoria);
         }
@@ -447,7 +468,8 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
             Margem_Lucro: newMargin,
             Preço_Final_de_Venda: newSalePrice,
             individualUnit: individualUnit || "",
-            unitsPerPackage: unitsPerPackage ?? null
+            unitsPerPackage: unitsPerPackage ?? null,
+            pictureUrl: produtoPersistencia.pictureUrl || ""
         };
 
         setIsSaving(true);
@@ -775,126 +797,113 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
         setNewProductId(item.sku);
     }
 
-    /* ======================================================
-   CONTEÚDO DO MODAL (ESTRUTURA DE GRID)
-====================================================== */
-
     return (
         <div style={modalStyles.overlay}>
             <div style={modalStyles.modal}>
 
                 <header style={modalStyles.headerContainer}>
-    {/* Linha Superior: Título e Alternador de Tipo */}
-    <div style={modalStyles.topRow}>
-        <h3 style={modalStyles.title}>Mapeamento de Novo Produto</h3>
-        
-        <div style={modalStyles.tabsWrapper}>
-            <button
-                onClick={() => setIsGeneric(true)}
-            >
-                📦 Genérico
-            </button>
-            <button
-                onClick={() => setIsGeneric(false)}
-            >
-                🏷️ Marca-Específico
-            </button>
-        </div>
-    </div>
+                    {/* Linha Superior: Título e Alternador de Tipo */}
+                    <div style={modalStyles.topRow}>
+                        <h3 style={modalStyles.title}>Mapeamento de Novo Produto</h3>
 
-    {/* Seção de Busca */}
-    <div style={modalStyles.searchSection}>
-        <fieldset style={modalStyles.fieldset}>
-            <legend style={modalStyles.legend}>
-                <span>🔍</span> Relacionar com Produto Existente
-            </legend>
 
-            <div style={{ position: 'relative' }}>
-                <FormControl
-                    value={searchTerm}
-                    placeholder="Pesquisar por Nome, ID ou GTIN..."
-                    onChange={(e) => handleSearch(e.target.value)}
-                    // Adicione um estilo interno ao seu FormControl se puder
-                />
+                        <fieldset style={modalStyles.fieldset}>
+                            <legend style={modalStyles.legend}>
+                                <span>🔍</span> Relacionar com Produto Existente
+                            </legend>
 
-                {isLoading && (
-                    <div style={{ position: 'absolute', right: '12px', top: '10px' }}>
-                        <small style={{ color: '#64748b' }}>Buscando...</small>
+                            <div style={{ position: 'relative' }}>
+                                <FormControl
+                                    value={searchTerm}
+                                    placeholder="Pesquisar por Nome, ID ou GTIN..."
+                                    onChange={(e) => handleSearch(e.target.value)}
+                                // Adicione um estilo interno ao seu FormControl se puder
+                                />
+
+                                {isLoading && (
+                                    <div style={{ position: 'absolute', right: '12px', top: '10px' }}>
+                                        <small style={{ color: '#64748b' }}>Buscando...</small>
+                                    </div>
+                                )}
+
+                                {showDropdown && searchResults.length > 0 && (
+                                    <ul style={{
+                                        position: 'absolute',
+                                        top: 'calc(100% + 5px)',
+                                        left: 0,
+                                        right: 0,
+                                        backgroundColor: 'white',
+                                        border: '1px solid #e2e8f0',
+                                        borderRadius: '8px',
+                                        zIndex: 1000,
+                                        maxHeight: '280px',
+                                        overflowY: 'auto',
+                                        listStyle: 'none',
+                                        padding: '4px',
+                                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                                    }}>
+                                        {searchResults.map((prod) => (
+                                            <li
+                                                key={prod.CodInterno}
+                                                onClick={() => handleSelectExisting(prod)}
+                                                style={{
+                                                    padding: '12px',
+                                                    cursor: 'pointer',
+                                                    borderRadius: '6px',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    transition: 'background 0.2s',
+                                                }}
+                                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+                                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                                            >
+                                                <span style={{ fontWeight: 600, color: '#1e293b', fontSize: '0.9rem' }}>
+                                                    {prod.codigo_interno} - {prod.descricao}
+                                                </span>
+                                                <small style={{ color: '#64748b', marginTop: '2px' }}>
+                                                    EAN: {prod.codigo_barras || 'N/A'} • Categoria: {prod.id_categoria || 'Geral'}
+                                                </small>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
+                        </fieldset>
+                        {/* Seção de Busca */}
+                        <div style={modalStyles.searchSection}>
+
+
+                            {/* Status do Vínculo */}
+                            <div style={modalStyles.badgeContainer}>
+                                {ProdutoVinculado ? (
+                                    <>
+                                        <Badge color="success">
+                                            ✅ Vinculado: {(ProdutoVinculado as any).descricao}
+                                        </Badge>
+                                        <button
+                                            onClick={() => setProdutoVinculado(null)}
+                                            style={modalStyles.removeLinkBtn}
+                                            onMouseEnter={(e) => (e.currentTarget.style.background = '#fee2e2')}
+                                            onMouseLeave={(e) => (e.currentTarget.style.background = '#fef2f2')}
+                                        >
+                                            Remover vínculo
+                                        </button>
+                                    </>
+                                ) : (
+                                    <Badge color="warning">
+                                        ⚠️ Aguardando seleção ou novo cadastro
+                                    </Badge>
+                                )}
+
+                                {inconsistencyError && (
+                                    <Badge color="danger">🚨 {inconsistencyError}</Badge>
+                                )}
+                            </div>
+                        </div>
                     </div>
-                )}
 
-                {showDropdown && searchResults.length > 0 && (
-                    <ul style={{
-                        position: 'absolute',
-                        top: 'calc(100% + 5px)',
-                        left: 0,
-                        right: 0,
-                        backgroundColor: 'white',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                        zIndex: 1000,
-                        maxHeight: '280px',
-                        overflowY: 'auto',
-                        listStyle: 'none',
-                        padding: '4px',
-                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-                    }}>
-                        {searchResults.map((prod) => (
-                            <li
-                                key={prod.CodInterno}
-                                onClick={() => handleSelectExisting(prod)}
-                                style={{
-                                    padding: '12px',
-                                    cursor: 'pointer',
-                                    borderRadius: '6px',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    transition: 'background 0.2s',
-                                }}
-                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
-                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                            >
-                                <span style={{ fontWeight: 600, color: '#1e293b', fontSize: '0.9rem' }}>
-                                    {prod.codigo_interno} - {prod.descricao}
-                                </span>
-                                <small style={{ color: '#64748b', marginTop: '2px' }}>
-                                    EAN: {prod.codigo_barras || 'N/A'} • Categoria: {prod.id_categoria || 'Geral'}
-                                </small>
-                            </li>
-                        ))}
-                    </ul>
-                )}
-            </div>
-        </fieldset>
 
-        {/* Status do Vínculo */}
-        <div style={modalStyles.badgeContainer}>
-            {ProdutoVinculado ? (
-                <>
-                    <Badge color="success">
-                        ✅ Vinculado: {(ProdutoVinculado as any).descricao}
-                    </Badge>
-                    <button 
-                        onClick={() => setProdutoVinculado(null)} 
-                        style={modalStyles.removeLinkBtn}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = '#fee2e2')}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = '#fef2f2')}
-                    >
-                        Remover vínculo
-                    </button>
-                </>
-            ) : (
-                <Badge color="warning">
-                    ⚠️ Aguardando seleção ou novo cadastro
-                </Badge>
-            )}
-            
-            {inconsistencyError && (
-                <Badge color="danger">🚨 {inconsistencyError}</Badge>
-            )}
-        </div>
-    </div>
-</header>
+                </header>
 
                 <div style={modalStyles.contentGrid}>
 
@@ -980,18 +989,34 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
                     </aside>
 
 
-                    {/* COLUNA 3: CATEGORIA */}
+                    {/* COLUNA 2: CATEGORIA */}
                     <aside style={{ ...modalStyles.sectionColumn, backgroundColor: '#f8fafc', borderRight: 'none', width: '350px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '20px' }}>
                             <div style={{ padding: '6px', background: '#e0f2fe', borderRadius: '6px', color: '#0284c7' }}>🌳</div>
                             <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#1e293b' }}>Classificação</h4>
                         </div>
 
+                        
+
+
+<StockDecomposition
+  value={decomposition}
+  onChange={setDecomposition}
+  nfQuantity={item.quantidade}
+/>
+
+
                         <CategoryTree
                             selectedCategoryId={newProductCategory}
                             onSelectCategory={setNewProductCategory}
                             onCategoryNameChange={setSelectedCategoryShortName}
                         />
+
+                        <div>
+                            <h4>Afcionar Tags</h4>
+
+                            
+                        </div>
                     </aside>
                     {/* COLUNA 2: CADASTRO DO PRODUTO (SISTEMA) */}
                     <main style={modalStyles.sectionColumn}>
@@ -1181,6 +1206,8 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
                             <FormControl label="CEST" readOnlyDisplay value={item.cest || "---"} />
                         </div>
 
+                     
+
                         {/* ✅ DESCRIÇÃO DETALHADA (COM ESTADO) */}
                         <FormControl
                             label="Descrição Detalhada / Observações:"
@@ -1232,6 +1259,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
                                 <div><strong>Cód Interno:</strong> {produtoPersistencia.CodInterno}</div>
                                 <div><strong>Cód Fornecedor:</strong> {produtoPersistencia.sku}</div>
                                 <div><strong>Nome:</strong> {produtoPersistencia.name}</div>
+                                <div><strong>pictureUrl:</strong> {produtoPersistencia.pictureUrl}</div>
                                 <div><strong>Categoria:</strong> {produtoPersistencia.Categorias}</div>
                                 <div><strong>Marca:</strong> {produtoPersistencia.Marca || '—'}</div>
                                 <div><strong>Preço:</strong> R$ {produtoPersistencia.Preço_Final_de_Venda?.toFixed(2)}</div>
@@ -1244,14 +1272,59 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
 
                     {/* COLUNA 4: margem e preço de venda */}
 
+                     <div>
+                         <EcommerceGallery
+  images={imageList}
+  onValidationError={() => console.log('falha')}
+/>
 
+                        <UrlManager
+                            imageList={imageList}
+                            setImageList={setImageList}
+                            formData={produtoPersistencia}
+                            setFormData={setProdutoPersistencia}
+                            show={showUrlManager}
+                            setShow={setShowUrlManager}
+                            styles={{
+                                label: { fontSize: "12px", fontWeight: 600 },
+                                input: {
+                                    border: "1px solid #d1d5db",
+                                    borderRadius: "6px",
+                                    padding: "4px 8px"
+                                }
+                            }}
+                        />
+
+                        <PricingCalculator
+  initialData={{
+    costPrice: item.valorCustoReal,
+    salePrice: item.valorUnitario,
+    unitsPerPackage: unitsPerPackage || 1
+  }}
+  onChange={(data) => {
+    setNewMargin((data.markup - 1) * 100);
+    setNewSalePrice(data.salePrice);
+
+    setProdutoPersistencia(prev => ({
+      ...prev,
+      Margem_Lucro: (data.markup - 1) * 100,
+      Preço_Final_de_Venda: data.salePrice,
+      unitsPerPackage: data.unitsPerPackage
+    }));
+  }}
+/>
+
+                        
+                     </div>
+
+{/* 
                     <aside style={{ ...modalStyles.sectionColumn, backgroundColor: '#f8fafc', borderRight: 'none', width: '350px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '20px' }}>
                             <div style={{ padding: '6px', background: '#e0f2fe', borderRadius: '6px', color: '#02c71cff' }}>🌳</div>
                             <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#1e293b' }}>Precificação Unitária</h4>
                         </div>
 
-                        {/* Simulador Principal: Unidade */}
+                        {/* Simulador Principal: Unidade 
                         <div style={{ background: '#fff', padding: '16px', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
                             <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '12px', textTransform: 'uppercase' }}>
                                 Venda por Unidade (Ex: Metro/Peça)
@@ -1353,7 +1426,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
                                 </div>
                             </div>
 
-                            {/* NOTA DINÂMICA: Projeção do Conjunto */}
+                            {/* NOTA DINÂMICA: Projeção do Conjunto *
                             <div style={{ marginTop: '15px', padding: '12px', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fef3c7' }}>
                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
                                     <span style={{ fontSize: '1.1rem' }}>💡</span>
@@ -1375,7 +1448,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
                             </div>
                         </div>
 
-                    </aside>
+                    </aside> */}
                 </div>
 
                 <footer style={modalStyles.footer}>

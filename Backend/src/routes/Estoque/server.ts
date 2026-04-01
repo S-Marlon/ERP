@@ -219,7 +219,7 @@ app.get('/api/products', asyncHandler(async (req, res) => {
     const query = (req.query.query as string) || '';
     const category = (req.query.category as string) || '';
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const limit = Math.min(50, parseInt(req.query.limit as string) || 20);
+    const limit = Math.min(1000, parseInt(req.query.limit as string) || 20);
     const offset = (page - 1) * limit;
 
     // Filtros Avançados
@@ -228,6 +228,13 @@ app.get('/api/products', asyncHandler(async (req, res) => {
     const minStock = parseInt(req.query.minStock as string) || -1;
     const status = (req.query.status as string) || '';
     const brand = (req.query.brand as string) || '';
+    const sort = (req.query.sort as string) || 'name_asc';
+
+let orderBy = 'p.descricao ASC';
+
+if (sort === 'price_desc') orderBy = 'p.preco_venda DESC';
+if (sort === 'price_asc') orderBy = 'p.preco_venda ASC';
+if (sort === 'stock_desc') orderBy = 'currentStock DESC';
 
     // 2. Preparação do Termo de Busca (Exatamente 4 interrogações no WHERE)
     const isSearchEmpty = query.trim() === '';
@@ -303,7 +310,7 @@ app.get('/api/products', asyncHandler(async (req, res) => {
             OR p.descricao LIKE ?)
         ${categoryFilter}
         ${filterString}
-        ORDER BY p.descricao ASC
+        ORDER BY ${orderBy}
         LIMIT ? OFFSET ?
     `;
 
@@ -942,14 +949,14 @@ app.get('/api/stock-entry', asyncHandler(async (req, res) => {
 
     let query = `
         SELECT 
-            cn.id_compra AS id, -- Ajustado para sua nova tabela 'compras'
+            id_nota  AS id, -- Ajustado para sua nova tabela 'compras'
             cn.numero_nota AS invoiceNumber,
             cn.chave_acesso AS accessKey,
             cn.data_emissao AS emissionDate,
             f.cnpj AS supplierCnpj,
             f.razao_social AS supplierName,
             cn.valor_total AS totalNoteValue,
-            cn.status
+            status_nota
         FROM compras cn
         LEFT JOIN fornecedores f ON cn.id_fornecedor = f.id_fornecedor
         WHERE 1=1
@@ -991,7 +998,7 @@ app.get('/api/stock-entry/:id', asyncHandler(async (req, res) => {
             cn.valor_outras_despesas AS totalOtherExpenses,
             cn.valor_total AS totalNoteValue,
             cn.status_nota AS status
-        FROM compras_notas cn
+        FROM compras cn
         LEFT JOIN fornecedores f ON cn.id_fornecedor = f.id_fornecedor
         WHERE cn.id_nota = ?
     `, [id]);
@@ -1047,17 +1054,30 @@ app.post('/api/stock-entry', asyncHandler(async (req, res) => {
         await connection.beginTransaction();
 
         // 1. Localizar Fornecedor
-        const [suppliers]: any = await connection.execute('SELECT id_fornecedor FROM fornecedores WHERE cnpj = ?', [supplierCnpj]);
+       const cleanCnpj = (supplierCnpj || '').replace(/\D/g, '');
+
+const [suppliers]: any = await connection.execute(
+  'SELECT id_fornecedor FROM fornecedores WHERE cnpj = ?',
+  [cleanCnpj]
+);
+
         if (suppliers.length === 0) throw new Error('Fornecedor não cadastrado.');
         const id_fornecedor = suppliers[0].id_fornecedor;
 
         // 2. Inserir Nota (Tabela: compras)
         const [notaResult]: any = await connection.execute(
-            `INSERT INTO compras (chave_acesso, numero_nota, id_fornecedor, data_emissao, valor_total, status)
-             VALUES (?, ?, ?, ?, ?, 'RECEBIDO')`,
+            `INSERT INTO compras (
+  chave_acesso,
+  numero_nota,
+  id_fornecedor,
+  data_emissao,
+  valor_total,
+  status_nota
+)
+VALUES (?, ?, ?, ?, ?, 'PROCESSADA')`,
             [accessKey, invoiceNumber, id_fornecedor, entryDate || new Date(), totalNoteValue || 0]
         );
-        const id_compra = notaResult.insertId;
+        const id_nota = notaResult.insertId;
 
         // 3. Processar Itens
         for (const item of items) {
@@ -1070,23 +1090,29 @@ app.post('/api/stock-entry', asyncHandler(async (req, res) => {
             // Inserir Item (Tabela: compras_itens)
             // A TRIGGER do banco vai detectar esse INSERT e atualizar o estoque e o custo médio automaticamente!
             await connection.execute(
-                `INSERT INTO compras_itens (id_compra, id_produto, quantidade, custo_unitario, subtotal)
-                 VALUES (?, ?, ?, ?, ?)`,
-                [id_compra, id_p, item.quantidadeRecebida, item.custoUnitario, (item.quantidadeRecebida * item.custoUnitario)]
+                `INSERT INTO compras_itens (
+  id_nota,
+  id_produto,
+  quantidade,
+  preco_unitario_custo,
+  valor_total_item
+)
+VALUES (?, ?, ?, ?, ?)`,
+                [id_nota, id_p, item.quantidadeRecebida, item.custoUnitario, (item.quantidadeRecebida * item.custoUnitario)]
             );
         }
 
         // LOGO APÓS INSERIR A COMPRA E OS ITENS:
     // 4. Gerar o Contas a Pagar (Dentro da Transação!)
-    await connection.execute(
-        `INSERT INTO contas_pagar (id_compra, id_fornecedor, valor_nominal, data_vencimento, status) 
-         VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 30 DAY), 'PENDENTE')`,
-        [
-            id_compra, 
-            id_fornecedor, 
-            totalNoteValue 
-        ]
-    );
+    // await connection.execute(
+    //     `INSERT INTO contas_pagar (id_compra, id_fornecedor, valor_nominal, data_vencimento, status) 
+    //      VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 30 DAY), 'PENDENTE')`,
+    //     [
+    //         id_compra, 
+    //         id_fornecedor, 
+    //         totalNoteValue 
+    //     ]
+    // );
 
         await connection.commit();
         res.status(201).json({ success: true, message: "Nota consolidada e estoque atualizado via Trigger." });
@@ -1225,7 +1251,7 @@ app.get('/api/produtos/:id', asyncHandler(async (req, res) => {
           p.*, 
           c.nome_categoria AS category, 
           m.nome_marca AS brand,
-          COALESCE(e.valor_medio, 0) AS costPrice,
+          p.preco_custo_novo AS costPrice,
           COALESCE(e.quantidade, 0) AS currentStock,
           GROUP_CONCAT(DISTINCT f.nome_fantasia SEPARATOR ', ') AS suppliers
       FROM produtos AS p
@@ -1246,29 +1272,56 @@ app.get('/api/produtos/:id', asyncHandler(async (req, res) => {
 
 
 
-app.put('/api/produtos/:id', asyncHandler(async (req: Request, res: Response) => {
+app.put('/api/products/:id', asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
-    const updates = { ...req.body };
+    const updates: any = { ...req.body };
 
-    // 1. Tratamento de Estoque (Tabela estoque_saldos)
-    const newStock = updates.currentStock !== undefined ? updates.currentStock : null;
-    if (newStock !== null) {
+    // 1. Verificação correta
+    const [rows]: any = await pool.execute(
+        'SELECT id_produto FROM produtos WHERE id_produto = ?', 
+        [id]
+    );
+
+    if (!rows || rows.length === 0) {
+        return res.status(404).json({ message: "Produto não encontrado" });
+    }
+
+    // 2. Tratamento de estoque
+    if (updates.currentStock !== undefined) {
         await pool.execute(
-            `INSERT INTO estoque_saldos (id_produto, quantidade, valor_medio)
-             VALUES (?, ?, 0)
+            `INSERT INTO estoque_saldos (id_produto, quantidade)
+             VALUES (?, ?)
              ON DUPLICATE KEY UPDATE quantidade = ?`,
-            [id, newStock, newStock]
+            [id, updates.currentStock, updates.currentStock]
         );
     }
-    delete updates.currentStock; // Remove para não dar erro no loop da tabela produtos
+    delete updates.currentStock;
 
-    // 2. Mapeamento de campos do React para o MySQL
+    // 🚨 3. REGRA DO MARKUP (ESSENCIAL)
+    if (updates.priceMethod === 'MARKUP') {
+        // Nunca aceitar preço manual nesse modo
+        delete updates.salePrice;
+    }
+
+    if (updates.priceMethod === 'MANUAL') {
+        // No modo manual, o preço vem do frontend
+        updates.preco_venda_manual = updates.salePrice;
+          updates.preco_venda_manual = updates.salePrice;
+    }
+
+    delete updates.salePrice;
+
+    // 4. Normalização de status
+    if (updates.status) {
+        updates.status = updates.status === 'ACTIVE' ? 'Ativo' : 'Inativo';
+    }
+
+    // 5. Mapeamento
     const fieldMap: Record<string, string> = {
         name: 'descricao',
         sku: 'codigo_interno',
         barcode: 'codigo_barras',
         unitOfMeasure: 'unidade',
-        salePrice: 'preco_venda',
         priceMethod: 'metodo_precificacao',
         markup: 'markup_praticado',
         status: 'status',
@@ -1282,27 +1335,33 @@ app.put('/api/produtos/:id', asyncHandler(async (req: Request, res: Response) =>
         seoTitle: 'seo_title',
         descriptionHtml: 'description_html',
         syncEcommerce: 'sync_ecommerce',
-        pictureUrl: 'imagem_url'
+        pictureUrl: 'imagem_url',
+        preco_venda_manual: 'preco_venda_manual'
     };
 
     const columns: string[] = [];
     const values: any[] = [];
 
     Object.keys(updates).forEach((key) => {
-        if (fieldMap[key] !== undefined) {
+        if (fieldMap[key]) {
             columns.push(`${fieldMap[key]} = ?`);
             values.push(updates[key]);
         }
     });
 
-    // 3. Execução da atualização principal
-    if (columns.length > 0) {
-        values.push(id);
-        const sql = `UPDATE produtos SET ${columns.join(', ')} WHERE id_produto = ?`;
-        await pool.execute(sql, values);
+    // 6. Proteção contra update vazio
+    if (columns.length === 0) {
+        return res.status(400).json({ message: 'Nenhum campo válido para atualizar' });
     }
 
-    // 4. Busca o registro atualizado para retorno (Sync com nomes do Banco)
+    values.push(id);
+
+    await pool.execute(
+        `UPDATE produtos SET ${columns.join(', ')} WHERE id_produto = ?`,
+        values
+    );
+
+    // 7. Retorno
     const [updatedRows]: any = await pool.execute(`
       SELECT 
           p.id_produto AS id, 
@@ -1311,37 +1370,18 @@ app.put('/api/produtos/:id', asyncHandler(async (req: Request, res: Response) =>
           p.descricao AS name, 
           p.status,
           p.unidade AS unitOfMeasure,
-          p.ncm, p.cest,
-          p.peso AS weight,
-          p.comprimento AS length,
-          p.altura AS height,
-          p.largura AS width,
-          p.seo_title AS seoTitle,
-          p.description_html AS descriptionHtml,
-          p.sync_ecommerce AS syncEcommerce,
-          p.imagem_url AS pictureUrl,
-          c.nome_categoria AS category, 
-          m.nome_marca AS brand,
           p.preco_venda AS salePrice,
-          p.preco_custo AS preco_custo_oficial,
-          p.preco_custo_novo AS preco_custo_nf,
+          p.preco_venda_manual,
+          p.preco_custo,
           p.metodo_precificacao AS priceMethod,
           p.markup_praticado AS markup,
-          COALESCE(e.valor_medio, 0) AS costPrice,
-          COALESCE(e.quantidade, 0) AS currentStock,
-          p.estoque_minimo AS minStock,
-          GROUP_CONCAT(DISTINCT f.nome_fantasia SEPARATOR ', ') AS suppliers
-      FROM produtos AS p
-      LEFT JOIN marcas m ON p.id_marca = m.id_marca
-      LEFT JOIN categorias c ON p.id_categoria = c.id_categoria  
-      LEFT JOIN estoque_saldos e ON p.id_produto = e.id_produto -- Corrigido
-      LEFT JOIN produtos_fornecedores pf ON p.id_produto = pf.id_produto -- Corrigido
-      LEFT JOIN fornecedores f ON pf.id_fornecedor = f.id_fornecedor
+          COALESCE(e.quantidade, 0) AS currentStock
+      FROM produtos p
+      LEFT JOIN estoque_saldos e ON p.id_produto = e.id_produto
       WHERE p.id_produto = ?
-      GROUP BY p.id_produto
     `, [id]);
 
-    res.json(updatedRows[0] || { success: true });
+    res.json(updatedRows[0]);
 }));
 
 
@@ -1441,7 +1481,7 @@ app.post('/api/sales', asyncHandler(async (req, res) => {
 
             // 2b. Inserir Item da Venda
             await connection.execute(
-                `INSERT INTO vendas_itens (id_venda, id_produto, quantidade, preco_unitario, custo_unitario, subtotal) 
+                `INSERT INTO vendas_itens (id_venda, id_produto, quantidade, preco_unitario, preco_unitario_custo , valor_total_item ) 
                  VALUES (?, ?, ?, ?, ?, ?)`,
                 [idVenda, idProduto, quantidade, precoUnitario, custoAtual, (quantidade * precoUnitario)]
             );

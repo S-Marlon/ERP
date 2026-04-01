@@ -2,96 +2,132 @@
 
 const NFE_NS = 'http://www.portalfiscal.inf.br/nfe';
 
-// --- Interfaces ---
 export interface ProdutoNF {
     // --- IDENTIFICAÇÃO E RASTREABILIDADE ---
     sku: string;             // cProd (Seu SKU ou do fornecedor)
-    gtin: string;               // cEAN (Obrigatório: EAN-13 ou "SEM GTIN")
-    descricao: string;          // xProd
-    ncm: string;                // NCM (8 dígitos)
-    cest?: string;              // CEST (Obrigatório se houver Substituição Tributária)
-    cfop: string;               // CFOP (Define a operação: venda, devolução, etc)
-    unidadeMedida: string;      // uCom (UN, KG, PC, MT)
-    
+    gtin: string;            // cEAN (Obrigatório: EAN-13 ou "SEM GTIN")
+    descricao: string;       // xProd
+    ncm: string;             // NCM (8 dígitos)
+    cest?: string;           // CEST (Obrigatório se houver Substituição Tributária)
+    cfop: string;            // CFOP (Define a operação: venda, devolução, etc)
+    unidadeMedida: string;   // uCom (UN, KG, PC, MT)
+
     // --- QUANTIDADES E VALORES UNITÁRIOS ---
-    quantidade: number;         // qCom (Usar number para cálculos precisos)
-    valorUnitario: number;      // vUnCom (Valor do item antes de impostos/frete)
-    
-    // --- COMPONENTES DO VALOR TOTAL (Para chegar no Custo Real) ---
-    valorProdutos: number;      // vProd (Qtd * Valor Unitário)
+    quantidade: number;      // qCom
+    valorUnitario: number;   // vUnCom
+
+    // --- COMPONENTES DO VALOR TOTAL ---
+    valorProdutos: number;      // vProd
     valorDesconto: number;      // vDesc
-    valorOutrasDespesas: number;// vOutro (Seguro, taxas extras)
-    valorFrete: number;         // vFrete (Rateado para o item)
-    
-    // --- TRIBUTAÇÃO TRADICIONAL ---
+    valorOutrasDespesas: number;// vOutro
+    valorFrete: number;         // vFrete
+
+    // --- TRIBUTAÇÃO ---
     valorIcms: number;          // vICMS
     valorIpi: number;           // vIPI
-    valorIcmsST: number;        // vICMSST (Fundamental para quem revende)
-    valorPis: number;           // vBC
-    valorCofins: number;        // vBC
-   
-    
-    // --- REFORMA TRIBUTÁRIA (Essencial em 2026) ---
-    valorIBS?: number;          // Imposto sobre Bens e Serviços (Estadual/Municipal)
-    valorCBS?: number;          // Contribuição sobre Bens e Serviços (Federal)
-    valorImpostoSeletivo?: number; // "Imposto do Pecado" (se aplicável ao item)
+    valorIcmsST: number;        // vICMSST
+    valorPis: number;           // vPIS
+    valorCofins: number;        // vCOFINS
+    valorIBS?: number;          // Reforma 2026: estadual/municipal
+    valorCBS?: number;          // Reforma 2026: federal
+    valorImpostoSeletivo?: number; // Se aplicável ao item
 
     // --- RESULTADOS CALCULADOS ---
-    valorTotalItem: number;     // vNF (Valor final que o item soma no total da nota)
-    valorCustoReal: number;     // Cálculo: (vProd + vIPI + vICMSST + vOutro + vFrete - vDesc) / Qtd
-    
-    // --- METADADOS ---
-    origem: number;             // Origem da mercadoria (0: Nacional, 1: Importada, etc)
-    valorTotalTributos: number; // vTotTrib (Lei do Imposto na Nota)
+    valorTotalItem: number;     // vNF
+    valorCustoReal: number;     // (vProd + vIPI + vICMSST + vOutro + vFrete - vDesc) / qtd
 
+    // --- METADADOS ---
+    origem: number;             // 0: Nacional, 1: Importada
+    valorTotalTributos: number; // vTotTrib (Lei do imposto)
+
+    // --- CAMPOS OPCIONAIS DO XML ---
+    valorII?: number;           // Imposto de importação
+    valorISSQN?: number;        // ISSQN (serviços)
+    cProdANP?: string;          // Combustíveis
+    xPed?: string;              // Número do pedido
+    nItemPed?: string;          // Item do pedido
 }
 
+// --- INTERFACE DA NOTA FISCAL ---
+
 export interface NfeDataFromXML {
-    // --- IDENTIFICAÇÃO DA NOTA ---
     chaveAcesso: string;        // chNFe (44 dígitos)
     numero: string;             // nNF
-    serie: string;              // ✨ ADICIONADO: Importante para unicidade
+    serie: string;              // Série
     dataEmissao: string;        // dhEmi (ISO 8601)
-    tipoOperacao: '0' | '1';    // ✨ 0: Entrada, 1: Saída
+    tipoOperacao: '0' | '1';    // 0: Entrada, 1: Saída
 
-    // --- ENVOLVIDOS ---
     emitente: {
         cnpj: string;
-        nome: string;           // xNome
-        nomeFantasia?: string;  // xFant
+        nome: string;
+        nomeFantasia?: string;
         uf: string;
-        ie: string;             // ✨ Inscrição Estadual (Essencial para crédito de imposto)
+        ie: string;
     };
     destinatario: {
         cnpjCpf: string;
         nome: string;
-        uf: string;             // ✨ ADICIONADO: Para calcular diferencial de alíquota
+        uf: string;
     };
 
-    // --- TOTAIS FINANCEIROS (Valores em number para cálculos) ---
-    valorTotalProdutos: number; // vProd (Soma bruta dos itens)
+    valorTotalProdutos: number; // vProd
     valorTotalFrete: number;    // vFrete
     valorTotalSeguro: number;   // vSeg
     valorTotalIpi: number;      // vIPI
     valorOutrasDespesas: number;// vOutro
     valorTotalDesconto: number; // vDesc
-    valorTotalNf: number;       // vNF (Valor final do boleto/pagamento)
+    valorTotalNf: number;       // vNF
 
-    // --- TOTAIS TRIBUTÁRIOS (Transição 2026) ---
     valorTotalIcms: number;     // vICMS
     valorTotalIcmsST: number;   // vICMSST
-    valorTotalIBS?: number;     // ✨ Novo: Imposto sobre Bens e Serviços
-    valorTotalCBS?: number;     // ✨ Novo: Contribuição sobre Bens e Serviços
-    valorTotalTributos: number; // vTotTrib (Lei do Imposto na Nota)
+    valorTotalIBS?: number;     // Reforma 2026
+    valorTotalCBS?: number;     // Reforma 2026
+    valorTotalTributos: number; // vTotTrib
+    valorTotalPIS: number;      // vPIS
+    valorTotalCOFINS: number;   // vCOFINS
 
-    // ✨ ADICIONE ESTES DOIS CAMPOS ABAIXO:
-    valorTotalPIS: number;    
-    valorTotalCOFINS: number;
-
-    // --- CONTEÚDO ---
-    xmlBruto: string;           // String original para auditoria ou reprocessamento
-    produtos: ProdutoNF[];      // Lista usando a interface anterior
+    xmlBruto: string;           // XML original
+    produtos: ProdutoNF[];      // Lista de produtos
 }
+
+// =========================
+// INTERFACES COMPLETAS DO BANCO
+// =========================
+
+export interface ProdutoCompleto extends ProdutoNF {
+    codigoInterno?: string;        // Código interno do ERP
+    codigoBarras?: string;         // Código de barras principal
+    imagemUrl?: string;            // URL principal da imagem
+    imagens?: string[];            // Array de imagens
+    tipoProduto?: 'COMERCIAL' | 'GENERICO' | 'KIT' | 'SERVICO';
+    unidadesPorPacote?: number;
+    peso?: number;
+    comprimento?: number;
+    altura?: number;
+    largura?: number;
+    idMarca?: number;
+    idCategoria?: number;
+    seoTitle?: string;
+    descriptionHtml?: string;
+    syncEcommerce?: boolean;
+    precoCustoNovo?: number;
+    estoqueAtual?: number;
+    estoqueMinimo?: number;
+    precoVenda?: number;
+    precoPromocional?: number;
+    fornecedorPrincipal?: string;
+}
+
+export interface ProdutoComFornecedor extends ProdutoCompleto {
+    idFornecedor?: number;
+    skuFornecedor?: string;
+    eanFornecedor?: string;
+    descricaoFornecedor?: string;
+    fatorConversao?: number;
+    ultimoCusto?: number;
+    fornecedores?: ProdutoComFornecedor[]; // Para múltiplos fornecedores
+}
+
 // =========================
 // Utils
 // =========================

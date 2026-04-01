@@ -105,7 +105,6 @@
 
 .btn-add-saldo {
   width: 100%; /* Garante que o botão também preencha sua metade */
-  height: 100%; /* Opcional: para alinhar a altura com o input */
   background: #f1f5f9;
   border: 1px solid var(--border-color);
   padding: 0.5rem;
@@ -124,24 +123,24 @@
 
 
 /* --- HISTÓRICO DE PAGAMENTOS --- */
+
+/* --- HISTÓRICO DE PAGAMENTOS --- */
 .payment-history {
   list-style: none;
-  padding: 0;
+  margin: 0;
+  padding: 0.2rem; /* Pequeno padding geral */
   display: flex;
   flex-direction: column;
-  
-  /* Adicione estas linhas: */
-  max-height: 250px; /* Ou o valor que melhor couber no seu layout */
-  overflow-y: auto; 
-  padding-right: 5px; /* Espaço para a barra não cobrir o conteúdo */
-  border: 1px solid var(--border-color); /* Borda externa única */
+  max-height: 250px; /* Ajuste conforme seu layout */
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: #fafafa;
 }
 
-/* Opcional: Deixe a barra de rolagem bonita e fina em vez de escondê-la totalmente, 
-   para o usuário saber que pode rolar */
+/* Barra de rolagem fina e sutil */
 .payment-history::-webkit-scrollbar {
   width: 6px;
-  display: block; /* Vamos mostrar apenas aqui */
 }
 
 .payment-history::-webkit-scrollbar-thumb {
@@ -149,25 +148,141 @@
   border-radius: 10px;
 }
 
+/* --- LINHAS INDIVIDUAIS --- */
 .payment-history li {
-  display: grid;
-  grid-template-columns: 1.5fr 1fr 1fr 1fr ; /* Descrição à esquerda, valor à direita */
-  align-items: center;
+  display: flex;
   justify-content: space-between;
-  padding: 0.4rem;
-  background: #fff;
-  
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  gap: 1rem;
+  font-size: 0.95rem;
+  transition: background 0.2s;
+  border-radius: 6px;
 }
 
-
-/* --- ALTERNÂNCIA DE CORES (EFEITO ZEBRA) --- */
+/* Efeito zebra */
 .payment-history li:nth-child(odd) {
-    background-color: #ffffff; /* Linha ímpar branca */
+  background-color: #ffffff;
 }
 
 .payment-history li:nth-child(even) {
-    background-color: #efefef; /* Linha par levemente cinza */
+  background-color: #f5f5f5;
 }
+
+/* Desabilitado ou falha */
+.payment-history li.payment-row-disabled {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+/* --- INFORMAÇÕES PRINCIPAIS --- */
+.payment-main-info {
+  display: flex;
+  flex-direction: column;
+  flex: 2;
+}
+
+.payment-main-info span {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.payment-info {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  margin-top: 0.2rem;
+}
+
+.payment-subtext {
+  font-size: 0.8rem;
+  color: #555;
+}
+
+/* --- STATUS E AÇÕES --- */
+.status-workflow-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.select-status-inline {
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+/* Cores de status */
+.status-select-pending {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.status-select-processing {
+  background-color: #d1ecf1;
+  color: #0c5460;
+}
+
+.status-select-paid {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-select-failed {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.status-select-cancelled {
+  background-color: #e2e3e5;
+  color: #6c757d;
+}
+
+/* Botões de ação */
+.btn-remove-line,
+.btn-lock-line {
+  padding: 0.2rem 0.4rem;
+  font-size: 0.9rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-remove-line {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.btn-remove-line:hover {
+  background-color: #f5c6cb;
+}
+
+.btn-lock-line {
+  background-color: #e2e3e5;
+  color: #6c757d;
+  cursor: not-allowed;
+}
+
+/* Responsividade */
+@media (max-width: 600px) {
+  .payment-history li {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.3rem;
+  }
+  .status-workflow-wrapper {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 0.5rem;
+  }
+}
+
+/* --- HISTÓRICO DE PAGAMENTOS --- */
+
 
 /* --- SISTEMA DE DESCONTO (SANFONA) --- */
 .accordion-trigger {
@@ -463,16 +578,8 @@
   align-items: stretch; 
   padding: 0px;
   transition: grid-template-columns 0.5s cubic-bezier(0.4, 0, 0.2, 1); /* Transição suave */
-}
+    grid-template-columns: 5fr 1fr 5fr ; 
 
-/* ESTADO 1: Escolhendo o método (Métodos largos, Detalhes estreitos) */
-.method-picking {
-    grid-template-columns: 1fr 1fr; 
-}
-
-/* ESTADO 2: Método escolhido (Métodos encolhem, Detalhes expandem) */
-.method-selected {
-    grid-template-columns: 0.6fr 1fr; /* O 0.6fr que você sugeriu, com foco no Detalhes */
 }
 
 
@@ -491,11 +598,10 @@
 .payment-methods, .payment-details {
   display: flex;
   flex-direction: column;
-  height: 100%; /* Isso força o fundo branco/colorido a ir até o final da linha do grid */
   background: var(--bg-card); /* ou sua cor de fundo */
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  padding: 2px 10px;
+  padding: 10px 10px;
 } 
 
 /* As duas colunas principais */
@@ -503,6 +609,8 @@
  margin: 10px 0px;      /* Remove o espaço externo */
   padding: 0;     /* Remove o espaço interno */
   line-height: 1.2; /* Ajusta a altura da linha para o texto não ocupar mais espaço que o necessário */
+  display: flex;
+  justify-content: space-between;
 } 
 
 
@@ -523,6 +631,7 @@
 
 /* Estilo do botão de cadeado/alterar */
 .btn-change-method {
+  color: #000;
     background: #e2e8f0;
     border: none;
     padding: 5px 10px;
@@ -607,4 +716,154 @@
     background: #eee;
     align-items: center;
     justify-content: space-between;
+}
+
+
+/* Container do input + teclado */
+.input-with-keypad {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 300px; /* Ajuste conforme a tela do PDV */
+  margin: 0 auto;
+}
+
+/* Input principal */
+.input-with-keypad input {
+  font-size: 1.5rem;
+  padding: 10px;
+  text-align: right; /* Valor alinhado à direita */
+  border: 2px solid #ccc;
+  border-radius: 6px;
+  outline: none;
+}
+
+/* Teclado virtual */
+.keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); /* 3 colunas */
+  gap: 8px;
+}
+
+/* Botões do teclado */
+.keypad button {
+  padding: 15px;
+  font-size: 1.3rem;
+  border: none;
+  border-radius: 6px;
+  background-color: #f0f0f0;
+  color: #1e293b;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+/* Botões especiais: limpar e confirmar */
+.keypad button:last-child {
+   background-color: #f44336;
+  color: white;
+}
+
+
+
+/* Efeito hover e clique */
+.keypad button:hover:not(:disabled) {
+  background-color: #ddd;
+}
+
+.keypad button:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+/* Botões desabilitados */
+.keypad button:disabled {
+  background-color: #e0e0e0;
+  cursor: not-allowed;
+}
+
+
+
+
+
+
+
+
+
+
+.method-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.method-card {
+  background: #f5f5f5;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.method-card .icon {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.method-card .label {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.method-card:hover {
+  border-color: #999;
+  background: #eaeaea;
+}
+
+.method-card.selected {
+  border-color: #28a745;
+  background: #d4edda;
+}
+
+.method-card.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+
+
+
+
+.action-buttons-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.action-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: #f5f5f5;
+  color: #000;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.action-card span {
+  margin-top: 8px;
+  font-weight: 500;
+}
+
+.action-card:hover {
+  border-color: #999;
+  background: #eaeaea;
 }

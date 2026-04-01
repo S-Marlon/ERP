@@ -539,8 +539,12 @@ const StockEntryForm: React.FC = () => {
                             />
                         )}
                     </th>
-                    <th style={styles.tableTh}>Mapeamento</th>
-                    <th style={{ ...styles.tableTh, width: '60px' }}><Badge color='paper'>EAN </Badge> & <Badge color='poco'>SKU Forn.</Badge></th>
+                    {/* <th style={styles.tableTh}>Mapeamento</th> */}
+                    <th style={{ ...styles.tableTh, width: '60px' }}>
+                        <Badge color="success"  >Cod Interno</Badge> 
+                        <Badge color='paper'>EAN </Badge> & 
+                        <Badge color='poco'>SKU Forn.</Badge>
+                        </th>
                     <th style={{ ...styles.tableTh, width: '500px' }}>Produto (NF)</th>
                     <th style={{ ...styles.tableTh, width: '80px' }}>Preço Unitário (NF)</th>
                     <th style={{ ...styles.tableTh, width: '50px' }}>Qtd. NF</th>
@@ -578,14 +582,41 @@ const StockEntryForm: React.FC = () => {
         const rowBorderLeft = isSelected ? '4px solid #3b82f6' : 'none';
         const rowPaddingLeft = isSelected ? '8px' : '12px';
 
+        // Dentro da sua função de renderizar a linha, antes do return:
+const isMapped = item.isMapped === true;
+
+
+
+// 3. Lógica de Hierarquia de Cores: Selecionado > Mapeado > Zebrado Comum
+let finalBackgroundColor;
+
+if (isSelected) {
+    finalBackgroundColor = '#dbeafe'; // Azul (Selecionado)
+} else if (isMapped) {
+    finalBackgroundColor = isEvenRow ? '#f0fdf46b' : '#dcfce771'; // Verde (Mapeado - alterna tom)
+} else {
+    finalBackgroundColor = isEvenRow ? '#ffffff' : '#f9fafb'; // Neutro (Padrão - alterna tom)
+}
+
+// 4. Lógica de Borda (Esquerda e Direita)
+const finalBorderLeft = isSelected 
+    ? '6px solid #3b82f6'                   // Azul se selecionado
+    : (isMapped ? '6px solid #10b981' : 'none'); // Verde se mapeado
+
+const finalBorderRight = isSelected 
+    ? '6px solid #3b82f6'                   // Azul se selecionado
+    : (isMapped ? '6px solid #10b981' : 'none'); // Verde se mapeado
+
         return (
-            <tr key={item.tempId} style={{
-                ...styles.tableRow,
-                backgroundColor: rowBackgroundColor,
-                borderLeft: rowBorderLeft,
-                transition: 'all 0.2s ease-in-out',
-                cursor: 'pointer',
-            }}>
+           <tr key={item.tempId} style={{
+        ...styles.tableRow,
+        backgroundColor: finalBackgroundColor,
+        borderLeft: finalBorderLeft,   // Lado esquerdo
+        borderRight: finalBorderRight, // Lado direito (adicionado)
+        transition: 'all 0.2s ease-in-out',
+        cursor: 'pointer',
+        opacity: isMapped ? 1 : 0.9, 
+    }}>
                 <td style={{ ...styles.tableCell, textAlign: 'center' }}>
                     <input
                         type="checkbox"
@@ -595,7 +626,7 @@ const StockEntryForm: React.FC = () => {
                     />
                     {item.tempId}
                 </td>
-                <td style={styles.tableCell}>
+                {/* <td style={styles.tableCell}>
                     {item.isMapped ? (
                         <Badge color="success"  >Cod Interno: {item.mappedId}</Badge>
                     ) : (
@@ -603,9 +634,15 @@ const StockEntryForm: React.FC = () => {
                             🔗 Mapear
                         </Button>
                     )}
-                </td>
+                </td> */}
 
-                <td style={styles.tableCell}> <Badge color='paper'> {item.gtin || '-'}</Badge>  <br /> <Badge color='poco'>{item.sku}</Badge> </td>
+                <td style={styles.tableCell}>    {item.isMapped ? (
+                        <Badge color="success"  >{item.mappedId}</Badge>
+                    ) : (
+                        <Button onClick={() => openMappingModal(item)} variant='warning' fontsize='11px' padding='5px' >
+                            🔗 Mapear
+                        </Button>
+                    )} <Badge color='paper'> {item.gtin || '-'}</Badge>  <br /> <Badge color='poco'>{item.sku}</Badge> </td>
                 <td style={{ ...styles.tableCell, fontWeight: 500 }}>{item.descricao} <br /> {item.category && item.category !== '' ? (
                     <span style={{
                         padding: '3px 8px',
@@ -670,7 +707,7 @@ const StockEntryForm: React.FC = () => {
                             fontWeight: 600,
                         }}
                     >
-                        {item.isConfirmed ? 'Desmarcar' : 'Conferir'}
+                        {item.isConfirmed ? 'Desmarcar' : '->'}
                     </button>
                     {!item.isConfirmed && (
 
@@ -950,6 +987,9 @@ if (window.confirm(`Deseja imprimir etiquetas para os ${items.length} itens dest
                         </p>
                     </div>
 
+                    <Button variant='secondary'>
+                      🖨️ Imprimir etiquetas para os itens Conferidos
+                    </Button>
                     <button onClick={handleConfirmEntry} style={styles.confirmButton} disabled={items.length === 0 || hasUnmappedItems || hasPendingItems}>
                         {items.length === 0 ? '🚫 Importe o XML' : hasPendingItems ? '🚫 Finalize a conferência' : hasUnmappedItems ? '🚫 Mapeie os itens' : '✅ Confirmar Entrada e Atualizar Estoque'}
                     </button>

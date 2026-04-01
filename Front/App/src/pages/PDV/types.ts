@@ -1,6 +1,8 @@
 // Representa um item na venda - unificado para parts, services e combos
 export interface CartItem extends SaleItem {
   quantity: number;
+  type: 'part' | 'os'; // 👈 NOVO
+  osData?: any; // 👈 guarda estrutura completa
 }
 
 // Item original da lista (antes de entrar no carrinho)

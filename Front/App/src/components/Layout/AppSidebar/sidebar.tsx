@@ -2,11 +2,17 @@
 
 import './Sidebar.css';
 import reactLogo from '../../../assets/react.svg'
-import img from '../../../assets/pic/icons8-binóculos-50.png'
-import img2 from '../../../assets/pic/icons8-cancelar-50.png'
-import img3 from '../../../assets/pic/icons8-configurações-50.png'
-import img4 from '../../../assets/pic/icons8-suporte-50.png'
-import { Link } from "react-router-dom";
+import Home from '../../../assets/pic/icons8-casa-48.png'
+import clientes from '../../../assets/pic/icons8-grupo-de-negócios-50.png'
+import Vendas from '../../../assets/pic/icons8-caixa-registradora-48.png'
+import Produtos from '../../../assets/pic/icons8-novo-50.png'
+
+import Estoque from '../../../assets/pic/icons8-empilhamento-50.png'
+import Servico from '../../../assets/pic/icons8-trabalhador-da-construção-50.png'
+import Obras from '../../../assets/pic/icons8-guindaste-50.png'
+
+import { Link } from "react-router-dom"
+
 
 
 interface SidebarProps {
@@ -30,47 +36,63 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
 
           <Link to="/">
         <li>
-            <img src={reactLogo}  className="react" alt="React logo" />
+            <img src={Home}  className="react" alt="Home" title='Home'/>
             {isOpen && <span >Home</span>}
         </li>
           </Link>
 
+
+
             <Link to="/clientes">
           <li>
-           <img src={reactLogo}  className="react" alt="React logo" />
+           <img src={clientes}  className="react" alt="Clientes" title='Clientes' />
             {isOpen && <span >clientes</span>}
           </li>
           </Link>
+
+
+
             <Link to="/produtos">
           <li>
-          <img src={img2}  className="react" alt="React logo" />
-            {isOpen && <span >produtos</span>}
+          <img src={Produtos}  className="react"  alt="Produtos" title='Produtos'  />
+            {isOpen && <span >Produtos</span>}
           </li>
           </Link>
+
+
+
             <Link to="/vendas">
           <li>
-            <img src={img3}  className="react" alt="React logo" />
-            {isOpen && <span >vendas</span>}
+            <img src={Vendas}  className="react" alt="Vendas"  title='Vendas'/>
+            {isOpen && <span >Vendas</span>}
             </li>
             </Link>
+
+
              <Link to="/Estoque">
           <li>
-            <img src={img}  className="react" alt="React logo" />
+            <img src={Estoque}  className="react" alt="Estoque" title='Estoque' />
             {isOpen && <span >Estoque</span>}
             </li>
             </Link>
+
+
             <Link to="/Servicos">
           <li>
-            <img src={img4}  className="react" alt="React logo" />
-            {isOpen && <span >Servicos</span>}
+            <img src={Servico}  className="react" alt="Servico"  title='Servico'/>
+            {isOpen && <span >Servico</span>}
             </li>
             </Link>
+
+
             <Link to="/Obras">
           <li>
-            <img src={img4}  className="react" alt="React logo" />
+            <img src={Obras}  className="react" alt="Obras" title='Obras'/>
             {isOpen && <span >Obras</span>}
             </li>
             </Link>
+
+
       </ul>
     </div>
   );
