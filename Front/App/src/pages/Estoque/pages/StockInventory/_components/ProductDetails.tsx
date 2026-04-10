@@ -6,6 +6,7 @@ import Swal from 'sweetalert2';
 import { updateProduct } from '../service/productService';
 import EcommerceGallery from '../../../../../components/ui/ImageGallery/EcommerceGallery';
 import PricingCalculator from '../../../../../components/Layout/PricingCalculator/PricingCalculator';
+import { getFornecedoresByProduto, FornecedorProduto } from '../service/produtoFornecedorService';
 
 interface ProductDetailsProps {
   product?: Product | null;
@@ -37,35 +38,38 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onSave, onClos
   };
 
 
-const handlePricingChange = useCallback((updatedPrices: any) => {
-  setFormData(prev => {
-    if (!prev) return null;
+  const handlePricingChange = useCallback((updatedPrices: any) => {
+    setFormData(prev => {
+      if (!prev) return null;
 
-    const hasChanged = 
-      prev.costPrice !== updatedPrices.costPrice ||
-      prev.salePrice !== updatedPrices.salePrice ||
-      prev.markup !== updatedPrices.markup ||
-      prev.unitsPerPackage !== updatedPrices.unitsPerPackage ||
-      prev.priceMethod !== updatedPrices.priceMethod; // ⭐ NOVO
+      const hasChanged =
+        prev.costPrice !== updatedPrices.costPrice ||
+        prev.salePrice !== updatedPrices.salePrice ||
+        prev.markup !== updatedPrices.markup ||
+        prev.unitsPerPackage !== updatedPrices.unitsPerPackage ||
+        prev.priceMethod !== updatedPrices.priceMethod; // ⭐ NOVO
 
-    if (!hasChanged) return prev;
+      if (!hasChanged) return prev;
 
-    return {
-      ...prev,
-      costPrice: updatedPrices.costPrice,
-      salePrice: updatedPrices.salePrice,
-      markup: updatedPrices.markup,
-      unitsPerPackage: updatedPrices.unitsPerPackage,
-      priceMethod: updatedPrices.priceMethod // ⭐ ESSENCIAL
-    };
-  });
-}, []);
+      return {
+        ...prev,
+        costPrice: updatedPrices.costPrice,
+        salePrice: updatedPrices.salePrice,
+        markup: updatedPrices.markup,
+        unitsPerPackage: updatedPrices.unitsPerPackage,
+        priceMethod: updatedPrices.priceMethod // ⭐ ESSENCIAL
+      };
+    });
+  }, []);
 
   useEffect(() => {
-  if (!product) return;
+    if (!product) {
+      setFormData(null);
+      return;
+    }
 
-  setFormData(prev => prev ?? { ...product });
-}, [product]);
+    setFormData({ ...product });
+  }, [product]);
 
 
 
@@ -89,9 +93,9 @@ const handlePricingChange = useCallback((updatedPrices: any) => {
     return changes as Partial<Product>;
   };
 
-const hasChanges = formData
-  ? Object.keys(getChangedFields(product, formData)).length > 0
-  : false;
+  const hasChanges = formData
+    ? Object.keys(getChangedFields(product, formData)).length > 0
+    : false;
 
   // Exemplo de como você usaria no seu componente pai:
   const [urlError, setUrlError] = useState(false); // Estado para o aviso de erro
@@ -124,15 +128,15 @@ const hasChanges = formData
   }, [showUrlManager]);
 
 
-const [imageList, setImageList] = useState<string[]>([]);  const [currentUrl, setCurrentUrl] = useState('');
+  const [imageList, setImageList] = useState<string[]>([]); const [currentUrl, setCurrentUrl] = useState('');
 
-useEffect(() => {
-  if (product?.pictureUrl) {
-    setImageList(product.pictureUrl.split(',').filter(Boolean));
-  } else {
-    setImageList([]);
-  }
-}, [product]);
+  useEffect(() => {
+    if (product?.pictureUrl) {
+      setImageList(product.pictureUrl.split(',').filter(Boolean));
+    } else {
+      setImageList([]);
+    }
+  }, [product]);
 
 
 
@@ -164,62 +168,62 @@ useEffect(() => {
     };
   };
 
-const calculateMarkup = (sale: number, cost: number) => {
-  if (cost <= 0 || sale <= 0) return 0;
-  return parseFloat((sale / cost).toFixed(2));
-};
+  const calculateMarkup = (sale: number, cost: number) => {
+    if (cost <= 0 || sale <= 0) return 0;
+    return parseFloat((sale / cost).toFixed(2));
+  };
 
-const calculateSale = (cost: number, markup: number) => {
-  if (cost <= 0 || markup <= 0) return 0;
-  return parseFloat((cost * markup).toFixed(2));
-};
-  
+  const calculateSale = (cost: number, markup: number) => {
+    if (cost <= 0 || markup <= 0) return 0;
+    return parseFloat((cost * markup).toFixed(2));
+  };
 
-const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-  const { name, value, type } = e.target;
-  
-  // Tratamento para números para evitar o "zero" quando apaga o campo
-  const numValue = type === 'number' ? (value === '' ? 0 : parseFloat(value)) : value;
 
-  setFormData(prev => {
-    if (!prev) return null;
-    const updated = { ...prev, [name]: numValue };
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
 
-    const cost = name === 'costPrice' ? (numValue as number) : (prev.costPrice || 0);
-    const markup = name === 'markup' ? (numValue as number) : (prev.markup || 0);
-    const sale = name === 'salePrice' ? (numValue as number) : (prev.salePrice || 0);
+    // Tratamento para números para evitar o "zero" quando apaga o campo
+    const numValue = type === 'number' ? (value === '' ? 0 : parseFloat(value)) : value;
 
-    // LÓGICA: SE ALTERAR O MÉTODO DE PRECIFICAÇÃO
-    if (name === 'priceMethod') {
-      if (numValue === 'MARKUP' && cost > 0) {
-        // Ao mudar para Markup, calcula o multiplicador atual baseado no preço que já existe
-        updated.markup = parseFloat((sale / cost).toFixed(2));
-      }
-    }
+    setFormData(prev => {
+      if (!prev) return null;
+      const updated = { ...prev, [name]: numValue };
 
-    // LÓGICA: MÉTODO MARKUP (O Markup manda no Preço de Venda)
-    if (updated.priceMethod === 'MARKUP') {
-      if (name === 'markup' || name === 'costPrice') {
-        // Venda = Custo * Markup (Ex: 10 * 1.5 = 15)
-        updated.salePrice = parseFloat((cost * markup).toFixed(2));
-      }
-    } 
-    
-    // LÓGICA: MÉTODO MANUAL (O Preço de Venda manda no Markup)
-    else if (updated.priceMethod === 'MANUAL') {
-      if (name === 'salePrice' || name === 'costPrice') {
-        // Markup = Venda / Custo (Ex: 15 / 10 = 1.5)
-        if (cost > 0) {
+      const cost = name === 'costPrice' ? (numValue as number) : (prev.costPrice || 0);
+      const markup = name === 'markup' ? (numValue as number) : (prev.markup || 0);
+      const sale = name === 'salePrice' ? (numValue as number) : (prev.salePrice || 0);
+
+      // LÓGICA: SE ALTERAR O MÉTODO DE PRECIFICAÇÃO
+      if (name === 'priceMethod') {
+        if (numValue === 'MARKUP' && cost > 0) {
+          // Ao mudar para Markup, calcula o multiplicador atual baseado no preço que já existe
           updated.markup = parseFloat((sale / cost).toFixed(2));
-        } else {
-          updated.markup = 0;
         }
       }
-    }
 
-    return updated;
-  });
-};
+      // LÓGICA: MÉTODO MARKUP (O Markup manda no Preço de Venda)
+      if (updated.priceMethod === 'MARKUP') {
+        if (name === 'markup' || name === 'costPrice') {
+          // Venda = Custo * Markup (Ex: 10 * 1.5 = 15)
+          updated.salePrice = parseFloat((cost * markup).toFixed(2));
+        }
+      }
+
+      // LÓGICA: MÉTODO MANUAL (O Preço de Venda manda no Markup)
+      else if (updated.priceMethod === 'MANUAL') {
+        if (name === 'salePrice' || name === 'costPrice') {
+          // Markup = Venda / Custo (Ex: 15 / 10 = 1.5)
+          if (cost > 0) {
+            updated.markup = parseFloat((sale / cost).toFixed(2));
+          } else {
+            updated.markup = 0;
+          }
+        }
+      }
+
+      return updated;
+    });
+  };
 
   const handleReset = () => {
     if (product) {
@@ -236,66 +240,91 @@ const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
     });
   };
 
+  const [fornecedoresProduto, setFornecedoresProduto] = useState<FornecedorProduto[]>([]);
+  const [fornecedorSelecionado, setFornecedorSelecionado] = useState<FornecedorProduto | null>(null);
+  const [loadingFornecedores, setLoadingFornecedores] = useState(false);
+
+
+  useEffect(() => {
+    if (!product?.id) return;
+
+    setLoadingFornecedores(true);
+
+    getFornecedoresByProduto(product.id)
+      .then((data) => {
+        setFornecedoresProduto(data);
+        setFornecedorSelecionado(data[0] || null);
+      })
+      .finally(() => setLoadingFornecedores(false));
+
+  }, [product?.id]);
+
   // Adicione o 'async' aqui na declaração da função
-const handleSaveClick = async () => {
-  if (!product?.id || !formData) {
-    Swal.fire('Erro', 'Produto sem identificação válida.', 'error');
-    return;
-  }
+  const handleSaveClick = async () => {
+    if (!product?.id || !formData) {
+      Swal.fire('Erro', 'Produto sem identificação válida.', 'error');
+      return;
+    }
 
-  const changes = getChangedFields(product, formData);
-  const keys = Object.keys(changes);
+    const changes = getChangedFields(product, formData);
+    const keys = Object.keys(changes);
 
-  if (keys.length === 0) return;
+    if (keys.length === 0) return;
 
-  let changesHtml = `
+    setIsSaving(true);
+    try {
+
+      let changesHtml = `
     <div style="text-align: left; font-size: 14px; max-height: 300px; overflow-y: auto; padding: 10px; border: 1px solid #edf2f7; border-radius: 8px; background: #f8fafc;">
   `;
-  
-  keys.forEach(key => {
-    changesHtml += `
+
+      keys.forEach(key => {
+        changesHtml += `
       <div style="margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
         <strong style="color: #2563eb; font-size: 12px; text-transform: uppercase;">${fieldLabels[key] || key}:</strong><br/>
         <span style="color: #94a3b8; text-decoration: line-through; font-size: 13px;">De: ${product[key as keyof Product] ?? '(vazio)'}</span><br/>
         <span style="color: #059669; font-weight: 600; font-size: 15px;">Para: ${changes[key as keyof Product]}</span>
       </div>
     `;
-  });
-  
-  changesHtml += `</div>`;
+      });
 
-  const result = await Swal.fire({
-    title: 'Confirmar Alterações?',
-    html: changesHtml,
-    icon: 'question',
-    showCancelButton: true,
-    confirmButtonText: 'Sim, salvar!',
-    cancelButtonText: 'Revisar',
-    confirmButtonColor: '#2563eb',
-    cancelButtonColor: '#94a3b8',
-    showLoaderOnConfirm: true,
-    preConfirm: async () => {
-      try {
-        return await updateProduct(product.id!, changes);
-      } catch (error) {
-        Swal.showValidationMessage(`Erro no servidor: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      changesHtml += `</div>`;
+
+      const result = await Swal.fire({
+        title: 'Confirmar Alterações?',
+        html: changesHtml,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, salvar!',
+        cancelButtonText: 'Revisar',
+        confirmButtonColor: '#2563eb',
+        cancelButtonColor: '#94a3b8',
+        showLoaderOnConfirm: true,
+        preConfirm: async () => {
+          try {
+            return await updateProduct(product.id!, changes);
+          } catch (error) {
+            Swal.showValidationMessage(`Erro no servidor: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+          }
+        },
+        allowOutsideClick: () => !Swal.isLoading(),
+        reverseButtons: true
+      });
+
+      if (result.isConfirmed) {
+        onSave?.(result.value);
+        Swal.fire({
+          title: 'Sucesso!',
+          text: 'Produto atualizado com sucesso.',
+          icon: 'success',
+          timer: 1500,
+          showConfirmButton: false
+        });
       }
-    },
-    allowOutsideClick: () => !Swal.isLoading(),
-    reverseButtons: true
-  });
-
-  if (result.isConfirmed) {
-    onSave?.(result.value);
-    Swal.fire({
-      title: 'Sucesso!',
-      text: 'Produto atualizado com sucesso.',
-      icon: 'success',
-      timer: 1500,
-      showConfirmButton: false
-    });
-  }
-};
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
 
   if (!formData) {
@@ -485,7 +514,7 @@ const handleSaveClick = async () => {
                                     }
                                     const filtered = updatedImages.filter(Boolean);
                                     setImageList(filtered);
-setFormData(prev => prev ? { ...prev, pictureUrl: filtered.join(',') } : prev);
+                                    setFormData(prev => prev ? { ...prev, pictureUrl: filtered.join(',') } : prev);
                                   }}
                                 />
                                 {url && (
@@ -638,15 +667,15 @@ setFormData(prev => prev ? { ...prev, pictureUrl: filtered.join(',') } : prev);
             <button style={{ ...styles.tabButton, ... (activeTab === 'fornecedor' ? styles.tabButtonActive : {}) }} onClick={() => setActiveTab('fornecedor')}>👨‍💼 Fornecedor</button>
           </nav>
 
-         
 
-{activeTab === 'financeiro' && formData?.id && (
-  <PricingCalculator 
-    key={formData.id} // <--- CRUCIAL: Força o componente a reiniciar do zero
-    productId={formData.id} 
-    onChange={handlePricingChange} 
-  />
-)}
+
+          {activeTab === 'financeiro' && formData?.id && (
+            <PricingCalculator
+              key={formData.id} // <--- CRUCIAL: Força o componente a reiniciar do zero
+              productId={formData.id}
+              onChange={handlePricingChange}
+            />
+          )}
 
           {activeTab === 'estoque' && (
             <>
@@ -961,106 +990,143 @@ setFormData(prev => prev ? { ...prev, pictureUrl: filtered.join(',') } : prev);
               <div style={styles.section}>
                 <h3 style={styles.sectionTitle}>🏭 Relacionamento com Fornecedor</h3>
 
-                <div style={styles.grid}>
-                  {/* Seleção do Fornecedor Principal */}
-                  <div style={styles.inputGroup}>
-                    <EditableField
-                      label="Fornecedor Principal"
-                      isDirty={formData.id_fornecedor !== product?.id_fornecedor}
-                      originalValue={product?.nome_fantasia}
-                      onRevert={() => revertField('id_fornecedor')}
-                    >
-                      <select
-                        name="id_fornecedor"
-                        value={formData.id_fornecedor || ''}
-                        onChange={handleChange}
-                        style={styles.input}
-                      >
-                        <option value="">Selecione um fornecedor...</option>
-                        {/* Aqui você deve mapear o array de fornecedores vindo do seu banco */}
-                        {/* {listFornecedores.map(f => (
-                <option key={f.id} value={f.id}>{f.nome_fantasia}</option>
-              ))} */}
-                      </select>
-                    </EditableField>
-                  </div>
+                {/* SELECT FORNECEDOR */}
+                <div style={styles.inputGroup}>
+                  <label style={styles.label}>Fornecedor</label>
 
-                  {/* Código do Produto no Fornecedor (SKU do Fornecedor) */}
-                  <div style={styles.inputGroup}>
-                    <EditableField
-                      label="SKU no Fornecedor"
-                      isDirty={formData.supplierProductCode !== product?.supplierProductCode}
-                      originalValue={product?.supplierProductCode}
-                      onRevert={() => revertField('supplierProductCode')}
-                    >
-                      <input
-                        type="text"
-                        name="supplierProductCode"
-                        placeholder="Ex: REF-1234"
-                        value={formData.supplierProductCode || ''}
-                        onChange={handleChange}
-                        style={styles.input}
-                      />
-                    </EditableField>
-                    <small style={{ fontSize: '10px', color: '#6b7280' }}>Útil para conferência de XML de compra</small>
-                  </div>
+                  <select
+                    value={fornecedorSelecionado?.id_fornecedor || ''}
+                    onChange={(e) => {
+                      const fornecedor = fornecedoresProduto.find(
+                        f => f.id_fornecedor === Number(e.target.value)
+                      );
+                      setFornecedorSelecionado(fornecedor || null);
+                    }}
+                    style={styles.input}
+                  >
+                    <option value="">Selecione um fornecedor...</option>
+
+                    {fornecedoresProduto.map(f => (
+                      <option key={f.id_fornecedor} value={f.id_fornecedor}>
+                        {f.nome_fantasia}
+                        {f.fator_conversao ? ` - Fator: ${f.fator_conversao}` : ''}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
+                {/* GRID DE DADOS */}
                 <div style={{ ...styles.grid, marginTop: '15px' }}>
-                  {/* Fator de Conversão */}
+                   {/* SKU FORNECEDOR */}
                   <div style={styles.inputGroup}>
-                    <EditableField
-                      label="Fator de Conversão"
-                      isDirty={formData.conversionFactor !== product?.conversionFactor}
-                      originalValue={product?.conversionFactor}
-                      onRevert={() => revertField('conversionFactor')}
-                    >
-                      <input
-                        type="number"
-                        name="conversionFactor"
-                        placeholder="Ex: 12 (se comprar caixa c/ 12)"
-                        value={formData.conversionFactor || 1}
-                        onChange={handleChange}
-                        style={styles.input}
-                      />
-                    </EditableField>
-                    <small style={{ fontSize: '10px', color: '#6b7280' }}>Qtde por embalagem de compra</small>
+                    <label style={styles.label}>SKU no Fornecedor</label>
+                    <input
+                      type="text"
+                      value={fornecedorSelecionado?.sku_fornecedor || ''}
+                      readOnly
+                      style={{ ...styles.input  }}
+                    />
+                    <small style={{ fontSize: '10px', color: '#6b7280' }}>
+                      Útil para conferência de XML de compra
+                    </small>
                   </div>
 
-                  {/* Prazo de Entrega Estimado */}
+
+                  {/* FATOR CONVERSÃO */}
                   <div style={styles.inputGroup}>
-                    <EditableField
-                      label="Lead Time (Dias)"
-                      isDirty={formData.leadTime !== product?.leadTime}
-                      originalValue={product?.leadTime}
-                      onRevert={() => revertField('leadTime')}
-                    >
-                      <input
-                        type="number"
-                        name="leadTime"
-                        value={formData.leadTime || 0}
-                        onChange={handleChange}
-                        style={styles.input}
-                      />
-                    </EditableField>
-                    <small style={{ fontSize: '10px', color: '#6b7280' }}>Dias para o produto chegar após o pedido</small>
+                    <label style={styles.label}>Fator de Conversão</label>
+                    <input
+                      type="number"
+                      value={fornecedorSelecionado?.fator_conversao || 1}
+                      readOnly
+                      style={{ ...styles.input}}
+                    />
+                    <small style={{ fontSize: '10px', color: '#6b7280' }}>
+                      Qtde por embalagem de compra
+                    </small>
+                  </div>
+                  
+                 
+                  {/* LEAD TIME */}
+                  <div style={styles.inputGroup}>
+                    <label style={styles.label}>Lead Time (Dias)</label>
+                    <input
+                      type="number"
+                      value={fornecedorSelecionado?.lead_time_dias || 0}
+                      readOnly
+                      style={{ ...styles.input}}
+                    />
+                    <small style={{ fontSize: '10px', color: '#6b7280' }}>
+                      Dias para o produto chegar após o pedido
+                    </small>
                   </div>
                 </div>
 
-                {/* Histórico de Compras (Informativo) */}
-                <div style={{
-                  marginTop: '20px',
-                  padding: '12px',
-                  backgroundColor: '#f8fafc',
-                  borderRadius: '8px',
-                  border: '1px solid #e2e8f0'
-                }}>
-                  <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#475569' }}>📊 Última Negociação</h4>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                    <span><strong>Data:</strong> {product?.data_ultima_compra || 'Nenhuma compra'}</span>
-                    <span><strong>Preço NF:</strong> R$ {product?.ultimo_custo || '0,00'}</span>
-                    <span><strong>Qtd Comprada:</strong> {product?.ultima_qtd_comprada || 0}</span>
+                 
+
+                  
+
+
+                {/* ÚLTIMA NEGOCIAÇÃO */}
+                <div
+                  style={{
+                    marginTop: '20px',
+                    padding: '12px',
+                    backgroundColor: '#f8fafc',
+                    color: '#334155',
+                    borderRadius: '8px',
+                    border: '1px solid #e2e8f0'
+                  }}
+                >
+                  <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#475569' }}>
+                    📊 Última Negociação
+                  </h4>
+
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      fontSize: '12px'
+                    }}
+                  >
+                    <span>
+                      <strong>Data:</strong>{' '}
+                      {fornecedorSelecionado?.ultima_data_compra || 'Nenhuma compra'}
+                    </span>
+
+                    <span>
+                      <strong>Preço NF:</strong>{' '}
+                      R${' '}
+                      {fornecedorSelecionado?.ultimo_preco
+                        ? fornecedorSelecionado.ultimo_preco.toFixed(2)
+                        : '0,00'}
+                    </span>
+
+                    <span>
+                      <strong>Qtd Comprada:</strong>{' '}
+                      {fornecedorSelecionado?.ultima_quantidade || 0}
+                    </span>
                   </div>
+
+                  {/* INDICADOR VISUAL */}
+                  <span>
+  <strong>NF:</strong>{' '}
+  {fornecedorSelecionado?.chave_acesso || '—'}
+</span>
+
+<span>
+  <strong>NF:</strong>{' '}
+  {fornecedorSelecionado?.chave_acesso
+    ? fornecedorSelecionado.chave_acesso.slice(-10)
+    : '—'}
+</span>
+                  {fornecedorSelecionado?.ultima_data_compra && (
+                    <div style={{ marginTop: '6px' }}>
+                      <small style={{ color: '#16a34a', fontSize: '11px' }}>
+                        ✔ Compra registrada para este fornecedor
+                      </small>
+                    </div>
+                  )}
                 </div>
               </div>
             </>
@@ -1076,10 +1142,14 @@ setFormData(prev => prev ? { ...prev, pictureUrl: filtered.join(',') } : prev);
           )}
           <button
             onClick={handleSaveClick}
-            style={{ ...styles.btnSave, opacity: hasChanges ? 1 : 0.5, cursor: hasChanges ? 'pointer' : 'not-allowed' }}
-            disabled={!hasChanges}
+            style={{
+              ...styles.btnSave,
+              opacity: hasChanges && !isSaving ? 1 : 0.5,
+              cursor: hasChanges && !isSaving ? 'pointer' : 'not-allowed'
+            }}
+            disabled={!hasChanges || isSaving}
           >
-            Salvar Alterações
+            {isSaving ? 'Salvando...' : 'Salvar Alterações'}
           </button>
         </div>
       </aside>
@@ -1094,3 +1164,4 @@ export default ProductDetails;
 
 
 // Pricing PricingCalculator, está apenas funcionando o modo manual:
+

@@ -149,10 +149,9 @@ const StockInventory: React.FC = () => {
         {
             header: 'Preço',
             key: 'salePrice',
-            render: (item: Product) => {
-                console.log(item.salePrice);
-                return <span>{formatCurrency(item.salePrice)}</span>
-            }
+            render: (item: Product) => (
+                <span>{formatCurrency(item.salePrice)}</span>
+            )
         },
         // {
         //     header: 'Fornecedor',
@@ -175,33 +174,32 @@ const StockInventory: React.FC = () => {
     }, [searchTerm, filterCategory, sortOrder]);
 
 
-
     // 4. Busca de Dados
-    useEffect(() => {
-        const fetchProductsData = async () => {
-            setIsLoading(true);
-            setError(null);
+    const fetchProductsData = React.useCallback(async () => {
+        setIsLoading(true);
+        setError(null);
 
-            try {
-                const res = await getPdvProducts({
-                    searchTerm,
-                    page: currentPage,
-                    category: filterCategory !== 'Todos' ? filterCategory : undefined,
-                    limit: itemsPerPage,
-                    sort: sortOrder // 👈 FALTA ISSO
-                });
+        try {
+            const res = await getPdvProducts({
+                searchTerm,
+                page: currentPage,
+                category: filterCategory !== 'Todos' ? filterCategory : undefined,
+                limit: itemsPerPage,
+                sort: sortOrder
+            });
 
-                setResponse(res);
-                setProducts(res.data || []);
-            } catch (err) {
-                setError("Erro ao carregar lista de produtos.");
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        fetchProductsData();
+            setResponse(res);
+            setProducts(res.data || []);
+        } catch (err) {
+            setError("Erro ao carregar lista de produtos.");
+        } finally {
+            setIsLoading(false);
+        }
     }, [searchTerm, currentPage, itemsPerPage, filterCategory, sortOrder]);
+
+    useEffect(() => {
+        fetchProductsData();
+    }, [fetchProductsData]);
 
    const compatibleData = products.map(product => {
     const min = product.minStock ?? 0;
@@ -222,20 +220,23 @@ const StockInventory: React.FC = () => {
         stock: product.currentStock,
         imageUrl: product.pictureUrl,
         rowClass,      // 🔹 linha recebe a classe calculada
+        isSelected: selectedProduct?.id === product.id,
     };
 });
 
     const categories = Array.from(new Set(products.map(p => p.category)));
 
     const handleSelectProduct = async (product: Product) => {
-        setSelectedProduct(product); // mostra rápido
+        // evita manter dados antigos enquanto o novo ainda carrega
+        setSelectedProduct(null);
 
-        const detailed = await getProductById(product.id);
-
-        setSelectedProduct(prev => ({
-            ...prev,
-            ...detailed
-        }));
+        try {
+            const detailed = await getProductById(product.id);
+            setSelectedProduct({ ...product, ...detailed });
+        } catch (error) {
+            setSelectedProduct(product);
+            setError('Erro ao carregar detalhes do produto.');
+        }
     };
 
 

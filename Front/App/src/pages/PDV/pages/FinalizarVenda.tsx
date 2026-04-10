@@ -17,7 +17,7 @@ export interface ItemVenda {
     quantity: number;
     salePrice: number;
     costPrice?: number;
-    price: number;     // ADICIONE ESTA LINHA para satisfazer o erro
+    unidade?: string; // 👈 ADICIONE ISSO
 }
 
 export type PaymentMethodType =
@@ -109,7 +109,6 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
     const [parcelasInput, setParcelasInput] = useState(1);
 
 
-
     // Mapeamento de Cores para o Badge de Status
     const STATUS_COLORS: Record<PaymentStatus, "warning" | "info" | "success" | "error" | "secondary"> = {
         pending: 'warning',
@@ -182,6 +181,9 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
         }
     };
 
+  
+
+
 
 
     const handleFinalizarVenda = async () => {
@@ -195,33 +197,54 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
 
         console.log("📊 Métricas da Venda:", { totalCusto, lucroNominal, percentualLucro });
 
+        // 🔹 Formatar itens para impressão
+const itensParaImpressao = itens.map(item => ({
+    codigo: String(item.id),
+    name: item.name,
+    quantity: item.quantity,
+    price: item.salePrice,
+    desconto: 0,
+    unidade: item.unidade || 'UN' // 👈 AQUI
+}));
+
+// 🔹 Formatar pagamentos para impressão
+const pagamentosParaImpressao = pagamentos
+    .filter(p => p.status === 'paid' || p.status === 'processing')
+    .map(p => ({
+        metodo: PAYMENT_METHOD_DETAILS[p.metodo].label,
+        valor: p.valor,
+        parcelas: p.parcelas // 👈 ESSENCIAL
+    }));
+
+// 🔹 Gerar número da venda
+const numeroVenda = Date.now().toString();
+
+
         // 2. Montagem do Payload completo para o BI (Business Intelligence)
         const vendaCompleta: SalePayload = {
-            data: new Date().toISOString(),
-            clienteNome: cliente || "CONSUMIDOR",
-            totalBruto: total,
-            totalDesconto: descontoCalculado,
-            totalLiquido: totalLiquido,
-            totalCusto: totalCusto,
-            lucroNominal: lucroNominal,
-            percentualLucro: Number(percentualLucro.toFixed(2)),
-            itens: itens.map(item => ({
-                productId: item.id,
-                nome: item.name,
-                quantidade: item.quantity,
-                precoVenda: item.salePrice,
-                precoCusto: item.costPrice || 0, // GARANTE O CUSTO ATUAL
-                subtotal: item.quantity * item.salePrice,
-                lucroUnitario: item.salePrice - (item.costPrice || 0)
-            })),
-            pagamentos: pagamentos
-                .filter(p => p.status === 'Pago' || p.status === 'Processando')
-                .map(p => ({
-                    metodo: p.metodo,
-                    valor: p.valor,
-                    parcelas: p.parcelas || 1
-                }))
-        };
+    data: new Date().toISOString(),
+    clienteNome: cliente || "CONSUMIDOR",
+    totalBruto: total,
+    totalDesconto: descontoCalculado,
+    totalLiquido: totalLiquido,
+    totalCusto: totalCusto,
+    lucroNominal: lucroNominal,
+    percentualLucro: Number(percentualLucro.toFixed(2)),
+    itens: itens.map(item => ({
+        productId: item.id,
+        nome: item.name,
+        quantidade: item.quantity,
+        precoVenda: item.salePrice,
+        precoCusto: item.costPrice || 0,
+        subtotal: item.quantity * item.salePrice,
+        lucroUnitario: item.salePrice - (item.costPrice || 0)
+    })),
+    pagamentos: pagamentosParaImpressao.map(p => ({
+        metodo: p.metodo,
+        valor: p.valor,
+        parcelas: p.parcelas || 1 // 👈 mantém parcelas reais
+    }))
+};
 
 
         console.log("🚀 Payload Final da Venda:", vendaCompleta);
@@ -241,13 +264,15 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
         // });
 
         // 4. Impressão Física
-        imprimirExtratoElgin({
-            cliente: vendaCompleta.clienteNome,
-            itens: itens,
-            total: totalLiquido,
-            pagamentos: vendaCompleta.pagamentos,
-            troco: troco
-        });
+imprimirExtratoElgin({
+    cliente: vendaCompleta.clienteNome,
+    cpf: "",
+    numero: numeroVenda,
+    itens: itensParaImpressao,
+    total: totalLiquido,
+    pagamentos: pagamentosParaImpressao,
+    troco: troco
+});
 
         // try {
 

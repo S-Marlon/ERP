@@ -21,6 +21,8 @@ const NovoProdutoForm: React.FC<NovoProdutoFormProps> = ({ isOpen, onClose, onSa
     });
 
     const [skuExists, setSkuExists] = useState(false); // Esse é o hook que causou a diferença
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [formError, setFormError] = useState('');
 
     // NOVO: Estado para controlar a visibilidade do formulário de fornecedor
     const [showFornecedor, setShowFornecedor] = useState(false);
@@ -62,10 +64,31 @@ const NovoProdutoForm: React.FC<NovoProdutoFormProps> = ({ isOpen, onClose, onSa
     };
 
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        onSave(formData);
-        onClose();
+
+        if (skuExists) {
+            setFormError('SKU já existe. Altere para continuar.');
+            return;
+        }
+
+        if (!formData.descricao.trim() || !formData.codigo_interno.trim()) {
+            setFormError('Descrição e SKU são obrigatórios.');
+            return;
+        }
+
+        setFormError('');
+        setIsSubmitting(true);
+
+        try {
+            await onSave(formData);
+            onClose();
+        } catch (error) {
+            setFormError('Falha ao criar o produto. Tente novamente.');
+            console.error(error);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
 
@@ -199,16 +222,29 @@ const NovoProdutoForm: React.FC<NovoProdutoFormProps> = ({ isOpen, onClose, onSa
 
 
 
+                            {formError && (
+                                <div style={{ color: '#dc2626', marginBottom: '12px', fontSize: '0.9rem' }}>
+                                    {formError}
+                                </div>
+                            )}
+
                             <div style={modalStyles.footer}>
                                 <button
                                     type="button"
                                     onClick={() => setShowFornecedor(!showFornecedor)} // Inverte o valor atual
                                     style={modalStyles.secondaryBtn}
+                                    disabled={isSubmitting}
                                 >
                                     {showFornecedor ? 'Fechar Fornecedor' : '+ novo Fornecedor'}
                                 </button>
-                                <button type="button" onClick={onClose} style={modalStyles.cancelBtn}>Cancelar</button>
-                                <button type="submit" style={modalStyles.saveBtn}>Salvar Produto</button>
+                                <button type="button" onClick={onClose} style={modalStyles.cancelBtn} disabled={isSubmitting}>Cancelar</button>
+                                <button
+                                    type="submit"
+                                    style={modalStyles.saveBtn}
+                                    disabled={isSubmitting || skuExists || !formData.descricao.trim() || !formData.codigo_interno.trim()}
+                                >
+                                    {isSubmitting ? 'Salvando...' : 'Salvar Produto'}
+                                </button>
                             </div>
                         </form>
                     </div>

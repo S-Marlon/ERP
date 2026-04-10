@@ -1,7 +1,7 @@
 // backend/src/server.ts
 import express, { Request, Response, NextFunction } from 'express'; // Importado Request e Response
 import cors from 'cors';
-import pool from '../db.config'; // Importa a conexão com o banco (deve ser um Pool do mysql2/promise)
+import pool from '../routes/Estoque/db.config'; // Importa a conexão com o banco (deve ser um Pool do mysql2/promise)
 import bodyParser from 'body-parser';
 
 const app = express();

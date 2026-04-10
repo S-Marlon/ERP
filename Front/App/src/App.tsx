@@ -33,6 +33,7 @@ import { FinalizarVenda} from "./pages/PDV/pages/FinalizarVenda";
 import { PDV } from './pages/PDV/PDV';
 import { HubVendas } from './pages/PDV/HubVendas';
 import Notas from './pages/Estoque/pages/notas/Notas';
+import ProductForm from './pages/ProductForm';
 
 function App() {
 
@@ -115,8 +116,8 @@ function App() {
               <Route path="/vendas/pdv" element={<PDV/>} />
               <Route path="/vendas/pdv/finalizar" element={ <FinalizarVenda  onBack={() => {}}/>  } />
 
-              
-              <Route path="/produtos" element={<Produtos text='Produtos'/>} />
+
+              <Route path="/produtos" element={<ProductForm />} />
               <Route path="/Estoque" element={<Estoque />} />
               <Route path="/Estoque/consulta" element={<StockInventory/>} />
               <Route path="/Estoque/gerenciamento" element={<StockEntryForm/>} />

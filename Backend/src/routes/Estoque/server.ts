@@ -1626,3 +1626,75 @@ app.get('/api/financial/report', asyncHandler(async (req, res) => {
         }
     });
 }));
+
+
+
+
+
+// Rota: lista fornecedores de um produto pelo id do produto
+app.get('/api/products/:id/fornecedores', asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  if (!id) {
+    return res.status(400).json({ error: 'ID do produto é obrigatório' });
+  }
+
+  
+const query = `
+  SELECT 
+      f.id_fornecedor,
+      f.nome_fantasia,
+      pf.sku_fornecedor,
+      pf.fator_conversao,
+
+      c.chave_acesso,
+      c.data_emissao AS ultima_data_compra,
+      ci.preco_unitario_custo AS ultimo_preco,
+      ci.quantidade AS ultima_quantidade
+
+  FROM produtos_fornecedores pf
+
+  JOIN fornecedores f 
+    ON f.id_fornecedor = pf.id_fornecedor
+
+  LEFT JOIN compras c 
+    ON c.id_fornecedor = f.id_fornecedor
+
+  LEFT JOIN compras_itens ci 
+    ON ci.id_nota = c.id_nota
+    AND ci.id_produto = pf.id_produto
+
+  WHERE pf.id_produto = ?
+
+  AND (
+    c.data_emissao IS NULL OR
+    c.data_emissao = (
+      SELECT MAX(c2.data_emissao)
+      FROM compras c2
+      JOIN compras_itens ci2 ON ci2.id_nota = c2.id_nota
+      WHERE 
+        c2.id_fornecedor = f.id_fornecedor
+        AND ci2.id_produto = pf.id_produto
+    )
+  )
+
+  ORDER BY f.nome_fantasia ASC
+`;
+ 
+  const [rows]: any = await pool.execute(query, [id]);
+
+ const formatted = rows.map((r: any) => ({
+  id_fornecedor: r.id_fornecedor,
+  nome_fantasia: r.nome_fantasia,
+
+  sku_fornecedor: r.sku_fornecedor,
+  fator_conversao: Number(r.fator_conversao),
+
+  chave_acesso: r.chave_acesso || null,
+  ultima_data_compra: r.ultima_data_compra || null,
+  ultimo_preco: r.ultimo_preco ? Number(r.ultimo_preco) : null,
+  ultima_quantidade: r.ultima_quantidade ? Number(r.ultima_quantidade) : 0
+}));
+
+  res.json(formatted);
+}));

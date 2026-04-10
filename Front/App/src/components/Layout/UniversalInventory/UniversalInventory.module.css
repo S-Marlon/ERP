@@ -133,6 +133,10 @@
   background-color: #f1f5f9;
 }
 
+.selectedRow {
+  background-color: #e0f2fe !important;
+}
+
 .lowStock {
   background-color: #fff1f2 !important;
 }

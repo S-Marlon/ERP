@@ -151,7 +151,7 @@ const StockLabelingForm: React.FC = () => {
   return (
     <div className="container">
       <style>{`
-        .container { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; display: flex; justify-content: center; min-height: 100vh; color:black}
+        .container { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; display: flex; justify-content: flex-start; min-height: 100vh; color:black}
         .wrapper {width: 100%; display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 20px; }
         .header-full { grid-column: 1 / -1; background: #fff; padding: 5px 5px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; }
         

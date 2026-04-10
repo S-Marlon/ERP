@@ -96,13 +96,31 @@ const UniversalInventory = <T extends {
             ))}
           </select>
 
-        
+          <select
+            className={styles.modernSelect}
+            value={sortOrder}
+            onChange={(e) => onSortChange(e.target.value)}
+            style={{ marginLeft: '10px' }}
+          >
+            <option value="name_asc">Nome A → Z</option>
+            <option value="name_desc">Nome Z → A</option>
+            <option value="price_asc">Preço ↑</option>
+            <option value="price_desc">Preço ↓</option>
+            <option value="stock_asc">Estoque ↑</option>
+            <option value="stock_desc">Estoque ↓</option>
+          </select>
         </div>
       </div>
 
       {/* 2. ÁREA DE CONTEÚDO (Otimizada) */}
       <div className={styles.scrollableTableContainer} style={{ opacity: loading ? 0.6 : 1, transition: 'opacity 0.2s' }}>
-        {displayMode === 'lista' && (
+        {data.length === 0 && !loading && (
+          <div className={styles.emptyState} style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
+            Nenhum item encontrado.
+          </div>
+        )}
+
+        {displayMode === 'lista' && data.length > 0 && (
           <table className={styles.partsTable}>
             <thead>
               <tr>
@@ -112,20 +130,26 @@ const UniversalInventory = <T extends {
               </tr>
             </thead>
             <tbody>
-  {data.map((item) => (
-    <tr key={item.id} className={(item as any).rowClass ? styles[(item as any).rowClass] : ''}>
-      {columns.map((col, idx) => (
-        <td key={idx} style={{ textAlign: col.textAlign || 'left' }}>
-          {col.render ? col.render(item) : (item as any)[col.key]}
-        </td>
-      ))}
-    </tr>
-  ))}
-</tbody>
+              {data.map((item) => {
+                const rowClasses = [];
+                if ((item as any).rowClass) rowClasses.push(styles[(item as any).rowClass]);
+                if ((item as any).isSelected) rowClasses.push(styles.selectedRow);
+
+                return (
+                  <tr key={item.id} className={rowClasses.join(' ')}>
+                    {columns.map((col, idx) => (
+                      <td key={idx} style={{ textAlign: col.textAlign || 'left' }}>
+                        {col.render ? col.render(item) : (item as any)[col.key]}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
           </table>
         )}
 
-        {displayMode === 'cards' && (
+        {displayMode === 'cards' && data.length > 0 && (
           <div className={styles.cardGrid}>
             {data.map((product) => (
               <div key={product.id} className={styles.productCard}>
@@ -143,7 +167,7 @@ const UniversalInventory = <T extends {
           </div>
         )}
 
-        {displayMode === 'compact' && (
+        {displayMode === 'compact' && data.length > 0 && (
           <div className={styles.compactList}>
             {data.map((product) => (
               <div key={product.id} className={styles.compactItem}>

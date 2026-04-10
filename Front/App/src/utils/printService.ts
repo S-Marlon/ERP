@@ -1,21 +1,30 @@
 // utils/printService.ts
 
 interface ItemVenda {
+  codigo?: string;
   name: string;
   quantity: number;
   price: number;
+  desconto?: number;
+  unidade?: string; // 👈 NOVO
 }
 
 interface ImpressaoDados {
   cliente: string;
-  itens: ItemVenda[]; // Nova lista de itens
+  cpf?: string;
+  itens: ItemVenda[];
   total: number;
-  pagamentos: { metodo: string; valor: number }[];
+pagamentos: { metodo: string; valor: number; parcelas?: number }[];
   troco: number;
+  numero: string;
 }
 
 export const imprimirExtratoElgin = (dados: ImpressaoDados) => {
 const printWindow = window.open('', '_blank', 'width=350,height=600');
+
+const CNPJ = "61.225.297/0001-88";
+const CEL = "(11) 99995-5005";
+const END = "Rua Otávio Passos, 274 - Alvinópolis - Atibaia/SP";
 
 if (!printWindow) {
     alert("O bloqueador de pop-ups impediu a impressão!");
@@ -70,11 +79,28 @@ const conteudo = `
         
         .tabela-itens { width: 100%; border-collapse: collapse; margin-top: 5px; }
         .tabela-itens th { text-align: left; border-bottom: 1px solid #000; font-size: 10px; }
-        .tabela-itens td { padding: 2px 0; vertical-align: top; }
+        .tabela-itens th,
+.tabela-itens td {
+    padding: 2px 3px; /* 2px vertical, 3px horizontal */
+    vertical-align: top;
+}
         
-        .col-qtd { width: 15%; }
-        .col-desc { width: 50%; word-wrap: break-word; }
-        .col-total { width: 35%; text-align: right; }
+        .tabela-itens th.col-total {
+  text-align: right;
+}
+        
+         .col-qtd {
+  text-align: center;
+}
+        .col-desc {
+  width: 50%;
+  word-break: keep-all;       /* NÃO quebra palavra no meio */
+  white-space: normal;        /* permite quebra só em espaços */
+}
+        .col-total {
+  text-align: right;
+  white-space: nowrap;
+}
 
         .footer { margin-top: 15px; font-size: 9px; }
         .cut-area { height: 15mm; } /* Espaço para o corte manual ou automático */
@@ -90,35 +116,70 @@ const conteudo = `
     
     <div class="text-center bold" style="font-size: 16px;">ATIMANG</div>
     <div class="text-center">MANUTENCAO E PECAS HIDRAULICAS</div>
+
+    <div class="text-center">${CNPJ}</div> - <div class="text-center">${CEL}</div> 
+    <div class="text-center">${END}</div>
+
     <div class="hr"></div>
 
-    <div class="text-center bold" style="letter-spacing: 2px;">EXTRATO DE VENDA</div>
+    <div class="text-center bold" style="letter-spacing: 2px;">EXTRATO DE VENDA Nº ${dados.numero}</div>
     <div class="text-center">${new Date().toLocaleDateString()} - ${new Date().toLocaleTimeString()}</div>
     
     <div class="hr"></div>
     <div class="flex">
-        <span class="bold">CLIENTE:</span>
-        <span>${dados.cliente.toUpperCase()}</span>
-    </div>
+    <span class="bold">CLIENTE:</span>
+    <span>${dados.cliente.toUpperCase()}</span>
+</div>
+
+${dados.cpf ? `
+<div class="flex">
+    <span class="bold">CPF:</span>
+    <span>${dados.cpf}</span>
+</div>
+` : ''}
     <div class="hr"></div>
     
     <table class="tabela-itens">
         <thead>
-            <tr class="bold">
-                <th class="col-qtd">QTD</th>
-                <th class="col-desc">DESCRICAO</th>
-                <th class="col-total">TOTAL</th>
-            </tr>
-        </thead>
-        <tbody>
-            ${dados.itens.map(item => `
-                <tr>
-                    <td class="col-qtd">${item.quantity.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                    <td class="col-desc">${item.name.toUpperCase()}</td>
-                    <td class="col-total">${(item.quantity * item.price).toLocaleString('pt-BR', { minimumStyle: 'currency', currency: 'BRL' })}</td>
-                </tr>
-            `).join('')}
-        </tbody>
+    <tr class="bold">
+        <th class="col-qtd">COD</th>
+        <th class="col-desc">DESCRICAO</th>
+        <th class="col-qtd">UoM</th>
+        <th class="col-total">VALOR</th>
+        <th class="col-qtd">QTD</th>
+        <th class="col-total">TOTAL</th>
+    </tr>
+</thead>
+       <tbody>
+${dados.itens.map(item => {
+  const desconto = item.desconto || 0;
+  const totalItem = (item.quantity * item.price) - desconto;
+
+  return `
+    <tr>
+        <td class="col-qtd">${item.codigo || '-'}</td>
+        <td class="col-desc">${item.name.toUpperCase()}</td>
+        <td class="col-qtd">${item.unidade}</td>
+        
+        <td class="col-total">
+        ${item.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+        
+        ${desconto > 0 ? `
+            <br>
+            <span style="font-size:9px;">
+            Desc: -${desconto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            </span>
+            ` : ''}
+            </td>
+            <td class="col-qtd">${item.quantity}</td>
+
+        <td class="col-total">
+            R$${totalItem}
+        </td>
+    </tr>
+  `;
+}).join('')}
+</tbody>
     </table>
 
     <div class="hr" style="border-bottom-style: solid;"></div>
@@ -126,8 +187,11 @@ const conteudo = `
     <div class="bold">PAGAMENTOS:</div>
     ${dados.pagamentos.map(p => `
         <div class="flex">
-            <span>> ${p.metodo.toUpperCase()}</span>
-            <span>${p.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            <span>
+  > ${p.metodo.toUpperCase()}
+  ${p.parcelas && p.parcelas > 1 ? ` (${p.parcelas}x)` : ''}
+</span>
+            <span>${p.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
         </div>
     `).join('')}
 
@@ -160,12 +224,10 @@ const conteudo = `
     <div class="cut-area"></div>
 
     <script>
-        window.onload = function() {
-            setTimeout(() => {
-                window.print();
-                window.close();
-            }, 300);
-        };
+       window.onload = function() {
+  window.print();
+  setTimeout(() => window.close(), 500);
+};
     </script>
 </body>
 </html>
@@ -183,3 +245,55 @@ const conteudo = `
   printWindow.focus();
   
 };
+
+
+
+
+
+
+
+
+
+
+// import QRCode from 'qrcode';
+
+// export const imprimirExtratoElgin = async (dados: ImpressaoDados) => {
+//   const printWindow = window.open('', '_blank', 'width=350,height=600');
+//   if (!printWindow) { alert("Bloqueador de pop-ups!"); return; }
+
+//   // Gerar QR Code como imagem base64
+//   const urlCupom = `https://meusistema.com/nota/${dados.numero}`;
+//   const qrCodeBase64 = await QRCode.toDataURL(urlCupom);
+
+//   const conteudo = `
+//   <!DOCTYPE html>
+//   <html>
+//   <head>
+//   <style>
+//     /* ...seu CSS existente... */
+//     .qr-code { text-align: center; margin-top: 5px; }
+//   </style>
+//   </head>
+//   <body>
+//     <!-- ...conteúdo do extrato... -->
+
+//     <div class="qr-code">
+//       <img src="${qrCodeBase64}" width="80" height="80" />
+//       <div style="font-size: 8px;">Acesse seu cupom online</div>
+//     </div>
+
+//     <script>
+//        window.onload = function() {
+//          window.print();
+//          setTimeout(() => window.close(), 500);
+//        };
+//     </script>
+//   </body>
+//   </html>
+//   `;
+
+//   printWindow.document.open();
+//   printWindow.document.write(conteudo);
+//   printWindow.document.close();
+//   printWindow.focus();
+// };

@@ -58,7 +58,8 @@ export const styles: { [key: string]: React.CSSProperties } = {
   inputGroup: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '4px'
+    gap: '4px',
+    color: '#4b5563',
   },
   label: {
     fontSize: '12px',
