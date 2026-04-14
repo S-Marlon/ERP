@@ -8,7 +8,7 @@ import { salesService, SalePayload } from '../services/salesService';
 import Swal from 'sweetalert2';
 // import {ItemVenda} from '../../../utils/printService'
 
-
+import Draggable from 'react-draggable';
 
 
 export interface ItemVenda {
@@ -26,7 +26,7 @@ export type PaymentMethodType =
     | 'debit_card'
     | 'pix'
     | 'bank_transfer'
-    | 'store_credit'; // O seu 'Crediário'
+    | 'store_credit'; // 'Crediário'
 
 export const PAYMENT_METHOD_DETAILS: Record<PaymentMethodType, { label: string; icon: string }> = {
     money: {
@@ -107,6 +107,59 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, c
     const [metodoSelecionado, setMetodoSelecionado] = useState<PaymentMethodType | null>(null);
     const [valorInput, setValorInput] = useState<string>(''); // string agora
     const [parcelasInput, setParcelasInput] = useState(1);
+
+    const [activeModal, setActiveModal] = useState(null); // 'calc', 'obs', 'desc', etc.
+    // Controle da Janela Flutuante da Calculadora
+const [calcVisible, setCalcVisible] = useState(false);
+// Se quiser outras janelas futuramente, pode usar o openWindows que você citou
+
+    const FloatingCalc = ({ onClose }) => {
+  return (
+    <Draggable handle=".window-header">
+      <div style={{
+        position: 'absolute',
+        width: '300px',
+        backgroundColor: '#fff',
+        border: '1px solid #ccc',
+        boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
+        zIndex: 1000
+      }}>
+        {/* O 'handle' é onde o usuário clica para arrastar */}
+        <div className="window-header" style={{ 
+          cursor: 'move', 
+          background: '#2c3e50', 
+          color: '#fff', 
+          padding: '10px',
+          display: 'flex',
+          justifyContent: 'space-between'
+        }}>
+          <span>🧮 Calculadora</span>
+          <button onClick={onClose} style={{ background: 'red', border: 'none', color: 'white' }}>X</button>
+        </div>
+        
+        <div className="window-body" style={{ padding: '20px' }}>
+          {/* Lógica da sua calculadora aqui */}
+          <input type="number" style={{ width: '100%' }} />
+          <div className="grid-teclado">
+            {/* ...botões numéricos... */}
+          </div>
+        </div>
+      </div>
+    </Draggable>
+  );
+};
+
+const [openWindows, setOpenWindows] = useState([]);
+
+const toggleWindow = (id) => {
+  if (openWindows.includes(id)) {
+    setOpenWindows(openWindows.filter(w => w !== id));
+  } else {
+    setOpenWindows([...openWindows, id]);
+  }
+};
+
+  const closeModal = () => setActiveModal(null);
 
 
     // Mapeamento de Cores para o Badge de Status
@@ -274,44 +327,33 @@ imprimirExtratoElgin({
     troco: troco
 });
 
-        // try {
+        try {
+            console.log("⏳ Enviando...");
+            // 3. Persistência no Banco de Dados
+            await salesService.saveVenda(vendaCompleta);
 
-        //     console.log("⏳ Enviando...");
-        //     // 3. Persistência no Banco de Dados
-        //     await salesService.saveVenda(vendaCompleta);
+            // ✅ RESPOSTA DE SUCESSO
+            await Swal.fire({
+                icon: 'success',
+                title: 'Venda Finalizada!',
+                text: `O valor de R$ ${totalLiquido.toFixed(2)} foi registrado com sucesso!`,
+                confirmButtonColor: '#28a745',
+                timer: 3000
+            });
 
-        //     // ✅ RESPOSTA DE SUCESSO
-        // await Swal.fire({
-        //     icon: 'success',
-        //     title: 'Venda Finalizada!',
-        //     text: `O valor de R$ ${totalLiquido.toFixed(2)} foi registrado. <br> Imprimindo Cupom Fiscal...`,
-        //     confirmButtonColor: '#28a745',
-        //     timer: 3000
-        // });
-
-        //     // 4. Impressão Física
-        //     imprimirExtratoElgin({
-        //         cliente: vendaCompleta.clienteNome,
-        //         itens: itens,
-        //         total: totalLiquido,
-        //         pagamentos: vendaCompleta.pagamentos,
-        //         troco: troco
-        //     });
-
-        //     alert("Venda finalizada com sucesso! Estoque atualizado e métricas registradas.");
-        //     onBack(); 
-        // } catch (error: any) {
-        //     // ❌ RESPOSTA DE ERRO
-        // Swal.fire({
-        //     icon: 'error',
-        //     title: 'Erro ao salvar',
-        //     text: error.message || 'Servidor offline ou falha na rede.',
-        //     confirmButtonColor: '#d33'
-        // });
-
-        // } finally {
-        //     setIsEnviando(false);
-        // }
+            // Limpar carrinho e voltar
+            onBack(); 
+        } catch (error: any) {
+            // ❌ RESPOSTA DE ERRO
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro ao salvar',
+                text: error.message || 'Servidor offline ou falha na rede.',
+                confirmButtonColor: '#d33'
+            });
+        } finally {
+            setIsEnviando(false);
+        }
     };
 
 
@@ -522,9 +564,9 @@ useEffect(() => {
                     <section
                         className={`payment-methods ${metodoSelecionado ? 'section-locked' : ''} ${passoEmFoco === 1 ? 'step-highlight' : ''}`}
                     >
-                        <div className="payment-methods-header">
+                        {/* <div className="payment-methods-header">
                             <h4>Métodos de Pagamento</h4>
-                        </div>
+                        </div> */}
 
                         <div className="method-grid">
                             {Object.entries(PAYMENT_METHOD_DETAILS).map(([key, info]) => (
@@ -738,20 +780,175 @@ useEffect(() => {
                 <section className="totals-panel">
 
                     <div className="action-buttons-grid">
-                        <button className="action-card" title="Abrir calculadora para cálculos rápidos">
-                            🧮
-                            <span>Calculadora</span>
-                        </button>
+                       <button 
+                        className="action-card" 
+                        title="Abrir calculadora" 
+                        onClick={() => setCalcVisible(!calcVisible)}
+                    >
+                        🧮
+                        <span>Calculadora</span>
+                    </button>
 
-                        <button className="action-card" title="Imprimir ou enviar comprovante por e-mail/WhatsApp">
+                        <button className="action-card" title="Imprimir ou enviar comprovante por e-mail/WhatsApp" onClick={() => setActiveModal('comprovante')}>
                             📄
                             <span>Comprovante</span>
                         </button>
 
-                        <button className="action-card" title="Adicionar observações ao pedido, ex: sem açúcar, embalar para presente">
+                         <button className="action-card" title="Aplicar cupom de desconto ou código promocional" onClick={() => setActiveModal('cupom')}>
+                            🎟️
+                            <span>Cupom</span>
+                        </button>
+
+                        <button className="action-card" title="Adicionar observações ao pedido, ex: sem açúcar, embalar para presente" onClick={() => setActiveModal('obs')}>
                             ✏️
                             <span>Observações</span>
                         </button>
+
+                        {/* <button className="action-card" title="Dividir conta ou pagamento entre clientes">
+                            🍽️
+                            <span>Dividir Conta</span>
+                        </button> */}
+
+                        {/* <button className="action-card" title="Aplicar desconto ou acréscimo de última hora no total da venda">
+                            🏷️
+                            <span>Desconto/Acréscimo</span>
+                        </button> */}
+
+                        <button className="action-card" title="Consultar ou adicionar cliente para CPF na nota ou fidelidade" onClick={() => setActiveModal('cliente')}>
+                            👤
+                            <span>Cliente / Fidelidade</span>
+                        </button>
+
+                        <button className="action-card" title="Configurações avançadas, como ativar modo de emergência ou contato do suporte" onClick={() => setActiveModal('config')}>
+                            ⚙️
+                            <span>Configurações</span>
+                        </button>
+
+
+
+
+{/* Lógica de Renderização do Modal */}
+    {/* JANELA FLUTUANTE - Renderizar aqui no final para ficar sobre tudo */}
+        {calcVisible && (
+            <Draggable handle=".window-header" bounds="parent">
+                <div className="floating-window" style={{ 
+                    position: 'absolute', 
+                    top: '100px', 
+                    left: '100px', 
+                    zIndex: 9999,
+                    width: '280px',
+                    background: 'white',
+                    boxShadow: '0 8px 20px rgba(0,0,0,0.3)',
+                    borderRadius: '8px',
+                    border: '1px solid #ccc'
+                }}>
+                    <div className="window-header" style={{
+                        background: '#2c3e50',
+                        color: 'white',
+                        padding: '10px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        cursor: 'move',
+                        borderTopLeftRadius: '8px',
+                        borderTopRightRadius: '8px'
+                    }}>
+                        <span>🧮 Calculadora</span>
+                        <button 
+                            onClick={() => setCalcVisible(false)}
+                            style={{ background: '#e74c3c', border: 'none', color: 'white', cursor: 'pointer', borderRadius: '4px', padding: '0 5px' }}
+                        >
+                            X
+                        </button>
+                    </div>
+                    <div className="window-body" style={{ padding: '15px' }}>
+                        {/* Aqui você pode inserir seu componente de calculadora real */}
+                        <input type="text" className="calc-display" style={{ width: '100%', fontSize: '20px', textAlign: 'right', marginBottom: '10px' }} value="0" readOnly />
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '5px' }}>
+                            {['7','8','9','/','4','5','6','*','1','2','3','-','0','.','=','+'].map(btn => (
+                                <button key={btn} style={{ padding: '10px' }}>{btn}</button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </Draggable>
+        )}
+
+     {activeModal && (
+    <div className="modal-overlay" onClick={closeModal}>
+        {/* onClick no overlay fecha o modal, stopPropagation no content impede fechar ao clicar dentro */}
+        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            
+            {/* --- TELA: COMPROVANTE --- */}
+            {activeModal === 'comprovante' && (
+                <div className="modal-body">
+                    <h3>📄 Opções de Comprovante</h3>
+                    <div className="options-vertical">
+                        <button onClick={() => { /* sua função de imprimir */ }}>🖨️ Reimprimir Último</button>
+                        <button>📧 Enviar por E-mail</button>
+                        <button>💬 Enviar via WhatsApp</button>
+                    </div>
+                </div>
+            )}
+
+            {/* --- TELA: CUPOM --- */}
+            {activeModal === 'cupom' && (
+                <div className="modal-body">
+                    <h3>🎟️ Aplicar Cupom</h3>
+                    <input type="text" placeholder="Digite o código do cupom..." autoFocus />
+                    <div className="modal-footer">
+                        <button className="btn-confirm">Validar Cupom</button>
+                    </div>
+                </div>
+            )}
+
+            {/* --- TELA: OBSERVAÇÕES --- */}
+            {activeModal === 'obs' && (
+                <div className="modal-body">
+                    <h3>✏️ Observações do Pedido</h3>
+                    <textarea 
+                        rows={5} 
+                        placeholder="Ex: Sem cebola, embrulhar para presente..."
+                        style={{ width: '100%', padding: '10px' }}
+                    />
+                    <div className="modal-footer">
+                        <button className="btn-confirm" onClick={closeModal}>Salvar Notas</button>
+                    </div>
+                </div>
+            )}
+
+            {/* --- TELA: CLIENTE --- */}
+            {activeModal === 'cliente' && (
+                <div className="modal-body">
+                    <h3>👤 Identificar Cliente</h3>
+                    <div className="input-row">
+                        <input type="text" placeholder="CPF ou Nome do cliente..." autoFocus />
+                        <button>🔍 Buscar</button>
+                    </div>
+                    <div className="fidelidade-info">
+                        <p>Pontos acumulados: <strong>150 pts</strong></p>
+                    </div>
+                </div>
+            )}
+
+            {/* --- TELA: CONFIGURAÇÕES --- */}
+            {activeModal === 'config' && (
+                <div className="modal-body">
+                    <h3>⚙️ Configurações Rápidas</h3>
+                    <div className="config-list">
+                        <label><input type="checkbox" /> Impressão Automática</label>
+                        <label><input type="checkbox" /> Som de confirmação</label>
+                        <hr />
+                        <button className="btn-danger">Suporte Técnico</button>
+                    </div>
+                </div>
+            )}
+
+            <button className="btn-close-modal" onClick={closeModal}>Fechar [Esc]</button>
+        </div>
+    </div>
+)}
+
+
                     </div>
 
                     <div className="status-box">

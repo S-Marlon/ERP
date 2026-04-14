@@ -229,6 +229,8 @@ app.get('/api/products', asyncHandler(async (req, res) => {
     const status = (req.query.status as string) || '';
     const brand = (req.query.brand as string) || '';
     const sort = (req.query.sort as string) || 'name_asc';
+    const onlyInStock = req.query.onlyInStock === 'true';
+    const onlyActive = req.query.onlyActive === 'true';
 
 let orderBy = 'p.descricao ASC';
 
@@ -261,6 +263,8 @@ if (sort === 'stock_desc') orderBy = 'currentStock DESC';
     if (minStock >= 0) { filterClauses.push('COALESCE(es.quantidade, 0) >= ?'); params.push(minStock); }
     if (status && status !== 'Todos') { filterClauses.push('p.status = ?'); params.push(status); }
     if (brand && brand !== 'Todos') { filterClauses.push('m.nome_marca = ?'); params.push(brand); }
+    if (onlyInStock) { filterClauses.push('COALESCE(es.quantidade, 0) > 0'); }
+    if (onlyActive) { filterClauses.push('p.status = ?'); params.push('Ativo'); }
 
     const filterString = filterClauses.length > 0 ? ' AND ' + filterClauses.join(' AND ') : '';
 
@@ -335,6 +339,53 @@ if (sort === 'stock_desc') orderBy = 'currentStock DESC';
     });
 }));
 
+/**
+ * Rota: GET /api/products/:id
+ * Retorna detalhes de um produto específico por ID
+ */
+app.get('/api/products/:id', asyncHandler(async (req, res) => {
+    const id = parseInt(req.params.id);
+    
+    if (isNaN(id)) {
+        return res.status(400).json({ error: 'Invalid product ID' });
+    }
+
+    const query = `
+        SELECT 
+            p.id_produto AS id, 
+            p.codigo_interno AS sku, 
+            p.codigo_barras AS barcode,
+            p.descricao AS name, 
+            p.status,
+            p.unidade AS unitOfMeasure,
+            c.nome_categoria AS category, 
+            m.nome_marca AS brand,
+            p.preco_venda AS salePrice,
+            p.preco_custo AS costPrice,
+            COALESCE(es.quantidade, 0) AS currentStock,
+            p.estoque_minimo AS minStock,
+            p.imagem_url AS pictureUrl
+        FROM produtos AS p
+        LEFT JOIN marcas m ON p.id_marca = m.id_marca
+        LEFT JOIN categorias c ON p.id_categoria = c.id_categoria  
+        LEFT JOIN estoque_saldos es ON p.id_produto = es.id_produto
+        WHERE p.id_produto = ?
+    `;
+
+    const [rows]: any = await pool.execute(query, [id]);
+    
+    if (rows.length === 0) {
+        return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const product = rows[0];
+    return res.json({
+        data: {
+            ...product,
+            isStockLow: product.currentStock <= product.minStock
+        }
+    });
+}));
 
 /**
  * Rota: GET /api/categories?type=parts|services
@@ -627,6 +678,143 @@ app.post('/api/stock/entries', asyncHandler(async (req, res) => {
         await connection.rollback();
         console.error('Erro ao processar entrada de NF:', error);
         res.status(500).json({ error: 'Erro ao salvar entrada de estoque.', details: error.message });
+    } finally {
+        connection.release();
+    }
+}));
+
+
+/**
+ * Rota: POST /api/sales
+ * Registra uma nova venda com avaliação de saldo do estoque
+ */
+app.post('/api/sales', asyncHandler(async (req, res) => {
+    const connection = await pool.getConnection();
+    
+    try {
+        const {
+            data,
+            clienteNome,
+            totalBruto,
+            totalDesconto,
+            totalLiquido,
+            totalCusto,
+            lucroNominal,
+            percentualLucro,
+            itens,
+            pagamentos
+        } = req.body;
+
+        // Validações básicas
+        if (!itens || itens.length === 0) {
+            return res.status(400).json({ error: 'Nenhum item na venda' });
+        }
+
+        if (totalLiquido <= 0) {
+            return res.status(400).json({ error: 'Valor total deve ser positivo' });
+        }
+
+        await connection.beginTransaction();
+
+        // 1. Inserir cabeçalho da venda (vendas table)
+        const [vendaResult]: any = await connection.execute(
+            `INSERT INTO vendas (
+                data_venda, 
+                cliente_nome, 
+                total_bruto, 
+                total_desconto, 
+                total_liquido, 
+                total_custo,
+                lucro_nominal,
+                percentual_lucro,
+                status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Concluída')`,
+            [
+                new Date(data),
+                clienteNome || 'CONSUMIDOR',
+                totalBruto,
+                totalDesconto,
+                totalLiquido,
+                totalCusto,
+                lucroNominal,
+                percentualLucro
+            ]
+        ) as [ResultSetHeader, any[]];
+
+        const idVenda = vendaResult.insertId;
+
+        // 2. Inserir itens da venda (vendas_itens table)
+        for (const item of itens) {
+            // Verificar se o estoque existe e reduzir
+            const [estoqueRows]: any = await connection.execute(
+                `SELECT quantidade FROM estoque_saldos WHERE id_produto = ?`,
+                [item.productId]
+            );
+
+            if (estoqueRows.length > 0) {
+                const estoqueBefore = estoqueRows[0].quantidade;
+                const estoqueDepo = estoqueBefore - item.quantidade;
+
+                if (estoqueDepo < 0) {
+                    throw new Error(`Estoque insuficiente para produto ID ${item.productId}`);
+                }
+
+                // Atualizar o saldo do estoque
+                await connection.execute(
+                    `UPDATE estoque_saldos SET quantidade = ? WHERE id_produto = ?`,
+                    [estoqueDepo, item.productId]
+                );
+            }
+
+            // Inserir o item da venda
+            await connection.execute(
+                `INSERT INTO vendas_itens (
+                    id_venda, 
+                    id_produto, 
+                    quantidade, 
+                    preco_venda, 
+                    preco_custo,
+                    subtotal,
+                    lucro_unitario
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    idVenda,
+                    item.productId,
+                    item.quantidade,
+                    item.precoVenda,
+                    item.precoCusto,
+                    item.subtotal,
+                    item.lucroUnitario
+                ]
+            );
+        }
+
+        // 3. Registrar pagamentos (se houver tabela de pagamentos)
+        if (pagamentos && pagamentos.length > 0) {
+            for (const pag of pagamentos) {
+                await connection.execute(
+                    `INSERT INTO pagamentos (id_venda, metodo, valor, parcelas, status)
+                     VALUES (?, ?, ?, ?, 'Pago')`,
+                    [idVenda, pag.metodo, pag.valor, pag.parcelas || 1]
+                );
+            }
+        }
+
+        await connection.commit();
+
+        return res.status(201).json({
+            success: true,
+            id: idVenda,
+            message: 'Venda registrada com sucesso'
+        });
+
+    } catch (error: any) {
+        await connection.rollback();
+        console.error('Erro ao registrar venda:', error);
+        res.status(500).json({
+            error: 'Erro ao registrar venda',
+            details: error.message
+        });
     } finally {
         connection.release();
     }

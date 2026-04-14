@@ -30,7 +30,8 @@ import StockAdjustmentForm from './pages/Estoque/pages/StockAdjustment/StockAdju
 import StockInventory from './pages/Estoque/pages/StockInventory/StockInventory';
 import StockLabelingForm from './pages/Estoque/pages/StockLabelingForm/StockLabelingForm';
 import { FinalizarVenda} from "./pages/PDV/pages/FinalizarVenda";
-import { PDV } from './pages/PDV/PDV';
+import PDVContent from './pages/PDV/PDV';
+
 import { HubVendas } from './pages/PDV/HubVendas';
 import Notas from './pages/Estoque/pages/notas/Notas';
 import ProductForm from './pages/ProductForm';
@@ -113,7 +114,7 @@ function App() {
 
 
               <Route path="/vendas" element={<HubVendas />} />
-              <Route path="/vendas/pdv" element={<PDV/>} />
+              <Route path="/vendas/pdv" element={<PDVContent/>} />
               <Route path="/vendas/pdv/finalizar" element={ <FinalizarVenda  onBack={() => {}}/>  } />
 
 

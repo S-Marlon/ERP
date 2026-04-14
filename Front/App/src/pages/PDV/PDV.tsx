@@ -1,164 +1,123 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import styles from './PDV.module.css';
-import { SaleItem, CartItem, DisplayMode, ProductBasic } from './types';
+import { SaleItem } from './types/cart.types';
 import { Product } from '../Estoque/pages/StockInventory/types/Stock_Products';
-// No topo do PDV.tsx
 import {
   getPdvProducts,
   getPdvCategories,
-  validateProductStockPrice,
-  // ADICIONE ESTAS LINHAS ABAIXO:
   getPdvBrands,
-  getPdvStatuses,
-  getAllBasicProducts
-} from './services/pdvService';
+  getPdvStatuses
+} from './services/api/products';
 import { useDebounce } from './hooks/useDebounce';
 import { CartAside } from './pages/Cart/CartAside';
 import { FinalizarVenda } from './pages/FinalizarVenda';
+import { PDVProvider, usePDV } from './contexts/PDVContext';
 import Switch from '../../components/ui/Switch';
 import EcommerceGallery from '../../components/ui/ImageGallery/EcommerceGallery';
 import ImageDisplay from '../../components/ui/ImageGallery/ImageDysplay';
 import Badge from '../../components/ui/Badge/Badge';
 import EditableField from '../../components/forms/EditableField/EditableField';
 import UniversalInventory from '../../components/Layout/UniversalInventory/UniversalInventory';
-import OSPanel from './services/OSPanel';
+import OSPanel from './components/OSPanel';
 import Button from '../../components/ui/Button/Button';
-import FlexGridContainer from '../../components/Layout/FlexGridContainer/FlexGridContainer';
+import { calculateLabor } from './utils/calculations';
 
+// Type definitions
+type DisplayMode = 'lista' | 'cards' | 'compact';
 
-
-type PDVStep = 'SELECAO' | 'PAGAMENTO';
-
-// Observação: CartItem e SaleItem agora são definidos em types.ts
-
-
-
-const MOCK_SERVICES: SaleItem[] = [
-  { id: 's1', name: 'Prensagem de Mangueira 1 Trama (R1)', category: 'Hidráulica', price: 20.00, type: 'service' },
-  { id: 's2', name: 'Prensagem de Mangueira 2 Tramas (R2) bitolas 1/4" até 5/8" ', category: 'Hidráulica', price: 30.00, type: 'service' },
-  { id: 's22', name: 'Prensagem de Mangueira 2 Tramas (R2) bitolas 3/4" até 1.1/4" ', category: 'Hidráulica', price: 40.00, type: 'service' },
-  { id: 's23', name: 'Prensagem de Mangueira 2 Tramas (R2) bitolas 1.1/2" e 2" ', category: 'Hidráulica', price: 45.00, type: 'service' },
-  { id: 's3', name: 'Prensagem de Mangueira 4 Tramas (R12/R13)', category: 'Alta Pressão', price: 30.00, type: 'service' },
-  { id: 's4', name: 'Corte e Montagem de Terminais', category: 'Manutenção', price: 20.00, type: 'service' },
-  { id: 's5', name: 'Teste de Estanqueidade e Pressão', category: 'Qualidade', price: 10.00, type: 'service' },
-  { id: 's6', name: 'Limpeza Interna de Mangueira (Projétil)', category: 'Manutenção', price: 0.00, type: 'service' },
-];
-
-export const PDV: React.FC = () => {
+const PDVContent: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  
+  // Get all context state
+  const {
+    // Cart
+    cart,
+    addToCart,
+    updateQuantity,
+    removeItem,
+    applyIndividualDiscount,
+    // PDV State
+    estagio,
+    setEstagio,
+    cliente,
+    identificadorCliente,
+    setIdentificadorCliente,
+    mostrarModalCliente,
+    setMostrarModalCliente,
+    confirmarCliente,
+    osItems,
+    setOsItems,
+    osServices,
+    setOsServices,
+    osData,
+    setOsData,
+    // Filters from context
+    searchTerm,
+    setSearchTerm,
+    selectedCategory,
+    setSelectedCategory,
+    minPrice,
+    setMinPrice,
+    maxPrice,
+    setMaxPrice,
+    minStock,
+    setMinStock,
+    status,
+    setStatus,
+    brand,
+    setBrand,
+    sortOrder,
+    setSortOrder,
+    onlyInStock,
+    setOnlyInStock,
+    onlyActive,
+    setOnlyActive,
+    currentPage,
+    setCurrentPage,
+    itemsPerPage,
+    setItemsPerPage,
+    handleResetFilters
+  } = usePDV();
 
-  const [dynamicCategories, setDynamicCategories] = useState<string[]>([]);
-  const [loadingCategories, setLoadingCategories] = useState(false);
-
-
-  /* ===== CENTRALIZED STATE FOR SYNC ===== */
-  // Core sale state
-  const [estagio, setEstagio] = useState<PDVStep>('SELECAO');
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [cliente, setCliente] = useState('');
-  const [mostrarModalCliente, setMostrarModalCliente] = useState(false);
-  const [identificadorCliente, setIdentificadorCliente] = useState("");
-
-  // Display Mode: cards | lista | simplificado
-  const [displayMode, setDisplayMode] = useState<DisplayMode>('lista');
-
-  // Cache local de produtos (carregado uma única vez)
-  const [productCache, setProductCache] = useState<ProductBasic[]>([]);
-  const [cacheLoading, setCacheLoading] = useState(false);
-
-  // UI state
+  // Local UI state (not in context)
   const [activeTab, setActiveTab] = useState<'parts' | 'services' | 'os'>('parts');
+  const [displayMode, setDisplayMode] = useState<DisplayMode>('lista');
   const [selectedPart, setSelectedPart] = useState<SaleItem | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
 
-  // Product data
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loadingProducts, setLoadingProducts] = useState(false);
-  const [pdvResponse, setPdvResponse] = useState<ProductsResponse | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-
-  const [osItems, setOsItems] = useState<CartItem[]>([]);
-  const [osServices, setOsServices] = useState<SaleItem[]>([]);
-
-  const addToOS = (item: SaleItem) => {
-    if (item.type === 'service') {
-      setOsServices(prev => [...prev, item]);
-      return;
-    }
-
-    setOsItems(prev => {
-      const existing = prev.find(i => i.id === item.id);
-
-      if (existing) {
-        return prev.map(i =>
-          i.id === item.id
-            ? { ...i, quantity: i.quantity + 1 }
-            : i
-        );
-      }
-
-      return [...prev, { ...item, quantity: 1 }];
-    });
-  };
-
-  // Categoria selecionada
-  const [selectedCategory, setSelectedCategory] = useState<string>('Todas');
-
-  // Filtros avançados
-  const [minPrice, setMinPrice] = useState('0');
-  const [maxPrice, setMaxPrice] = useState('999999');
-  const [minStock, setMinStock] = useState('');
-  const [status, setStatus] = useState('Todos');
-  const [brand, setBrand] = useState('Todos');
-
-  // Opções dinamicamente carregadas dos filtros
-  const [brandOptions, setBrandOptions] = useState<string[]>(['Todos']);
-  const [statusOptions, setStatusOptions] = useState<string[]>(['Todos', 'Ativo', 'Inativo']);
-  const [unitOptions, setUnitOptions] = useState<string[]>([]);
-
-  const [onlyInStock, setOnlyInStock] = useState(true);
-  const [onlyActive, setOnlyActive] = useState(true);
-
-  // Paginação
-  const [itemsPerPage, setItemsPerPage] = useState(20);
-
-  // Debounce no search
+  // Debounce search from context
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
-  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
-  const handleChangeMode = (mode: "lista" | "cards" | "compact") => {
-    if (mode === "lista" || mode === "cards") {
-      setDisplayMode(mode);
-    }
+  // Type for last scanned item
+  type LastScanItem = {
+    id: number;
+    name: string;
+    price: number;
+    sku?: string;
+    quantity: number;
+    img?: string;
   };
 
+  // Local product/category data
+  const [dynamicCategories, setDynamicCategories] = useState<string[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [pdvResponse, setPdvResponse] = useState<{ data: Product[]; pagination: { total: number } } | null>(null);
+  const [brandOptions, setBrandOptions] = useState<string[]>(['Todos']);
+  const [statusOptions, setStatusOptions] = useState<string[]>(['Todos', 'Ativo', 'Inativo']);
+  const [lastScan, setLastScan] = useState<LastScanItem | null>(null);
+
   const searchRef = useRef<HTMLInputElement>(null);
+  
+  // Focus on search when mount or when cart modal closes
   useEffect(() => {
     searchRef.current?.focus();
-  }, [cart.length, mostrarModalCliente === false]);
+  }, [cart.length, mostrarModalCliente]);
 
-  // OS-specific data
-  const [osData, setOsData] = useState({
-    equipment: '',
-    application: '',
-    gauge: '',
-    layers: '',
-    finalLength: '',
-    laborType: 'fixed' as 'fixed' | 'percent' | 'service' | 'per_point' | 'table',
-    laborValue: 0,
-    selectedServiceId: ''
-  });
-
-
-  // mapear suas categorias para o formato que o react-select espera
-  const options = [
-    { value: 'Todas', label: 'Todas' },
-    ...dynamicCategories.map(cat => ({ value: cat, label: cat }))
-  ];
-
+  // useEffect for key escape on modal
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && mostrarModalCliente) {
         setMostrarModalCliente(false);
       }
@@ -166,42 +125,20 @@ export const PDV: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mostrarModalCliente]);
-
+  }, [mostrarModalCliente, setMostrarModalCliente]);
 
   // Initialize on mount
   useEffect(() => {
     if (id) {
       // Editar venda existente - aqui você buscaria do back se tiver
-      setCliente('Cliente #' + id);
+      // setCliente('Cliente #' + id);
     } else {
       setMostrarModalCliente(true);
     }
-  }, [id]);
+  }, [id, setMostrarModalCliente]);
 
   // ===== CARREGA CACHE LOCAL DE PRODUTOS (Uma única vez) =====
-  useEffect(() => {
-    const loadCache = async () => {
-      setCacheLoading(true);
-      try {
-        const basicProducts = await getAllBasicProducts();
-        setProductCache(basicProducts);
-      } catch (error) {
-        console.error('Erro ao carregar cache de produtos:', error);
-        setProductCache([]);
-      } finally {
-        setCacheLoading(false);
-      }
-    };
-
-    loadCache();
-  }, []); // Executa uma única vez no mount
-
-  const confirmarCliente = () => {
-    setCliente(identificadorCliente || "Consumidor Final");
-    setMostrarModalCliente(false);
-  };
-
+  // This is kept for compatibility but not required by new hooks
 
   /* ===== CALCULATED STATE (Memoized) ===== */
   const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -213,179 +150,38 @@ export const PDV: React.FC = () => {
 
   // Mão de obra calculada dinamicamente
   const calculatedLabor = useMemo(() => {
-    if (osData.laborType === 'percent') {
-      return itemsSubtotal * (osData.laborValue / 100);
-    }
-    if (osData.laborType === 'service') {
-      const service = MOCK_SERVICES.find(s => s.id === osData.selectedServiceId);
-      return service ? service.price : 0;
-    }
-    return osData.laborValue; // fixed
-  }, [itemsSubtotal, osData.laborType, osData.laborValue, osData.selectedServiceId]);
+    return calculateLabor(osData, itemsSubtotal);
+  }, [osData, itemsSubtotal]);
 
   const osTotal = useMemo(() => {
     const itemsTotal = osItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
     const servicesTotal = osServices.reduce((acc, s) => acc + s.price, 0);
-
     return itemsTotal + servicesTotal + calculatedLabor;
   }, [osItems, osServices, calculatedLabor]);
+
   // Total geral (itens + mão de obra)
   const total = useMemo(() => itemsSubtotal + calculatedLabor, [itemsSubtotal, calculatedLabor]);
 
-  /* ===== UNIFIED HANDLERS ===== */
-  const updateQuantity = (id: string | number, value: number | string) => {
-    setCart(prev => prev.map(item => {
-      if (item.id === id) {
-        const canFractionate = ['MT', 'LT', 'KG', 'M', 'L'].includes(item.unitOfMeasure?.toUpperCase() || '');
-
-        let newQty: number;
-        if (typeof value === 'string') {
-          newQty = parseFloat(value.replace(',', '.')) || 0;
-        } else {
-          newQty = item.quantity + value;
-        }
-
-        let clampedQty = Math.max(0, newQty);
-        if (!canFractionate) {
-          clampedQty = Math.floor(clampedQty);
-        }
-
-        if (item.type === 'part' && item.stock && clampedQty > item.stock) {
-          alert("Quantidade excede o estoque disponível!");
-          return item;
-        }
-
-        return { ...item, quantity: Number(clampedQty.toFixed(2)) };
-      }
-      return item;
-    }));
+  // Beep sound for barcode scanning
+  const beep = () => {
+    const ctx = new AudioContext();
+    const oscillator = ctx.createOscillator();
+    oscillator.type = 'sine';
+    oscillator.frequency.value = 1500; // Hz
+    oscillator.connect(ctx.destination); 
+    oscillator.start();
+    oscillator.stop(ctx.currentTime + 0.02); // dura 0.02s
   };
 
-  const removeItem = (id: string | number) => {
-    setCart(prev => prev.filter(item => item.id !== id));
-  };
-
-  type LastScanItem = {
-    id: number;
-    name: string;
-    price: number;
-    sku?: string;
-    quantity: number;
-    img?: string;
-  };
-
-  const [lastScan, setLastScan] = useState<LastScanItem | null>(null);
-
-
-  const handleResetFilters = () => {
-    setMinPrice('0');
-    setMaxPrice('999999');
-    setMinStock('');
-    setStatus('Todos');
-    setBrand('Todos');
-    setSelectedCategory('Todas');
-    setSearchTerm('');
-    setCurrentPage(1);
-    setOnlyInStock(true);
-    setOnlyActive(true);
-  };
-
-  /* ===== ADD TO CART (DEVE VIR ANTES DE PROCESSBARCODE) ===== */
-
-
-
-  const addToCart = useCallback(async (item: SaleItem) => {
-
-
-    if (item.type === 'part' && item.id) {
-      try {
-        const validation = await validateProductStockPrice(item.id as number);
-
-        if (!validation) return;
-
-        if (validation.stock <= 0) {
-          alert(`Atenção: ${item.name} está sem estoque!`);
-          return;
-        }
-
-        setCart(prev => {
-          const existing = prev.find(i => i.id === item.id);
-
-          if (existing) {
-            return prev.map(i =>
-              i.id === item.id
-                ? { ...i, quantity: i.quantity + 1 }
-                : i
-            );
-
-
-          }
-
-          return [
-            ...prev,
-            {
-              ...item,
-              stock: validation.stock,
-              price: item.price,
-              quantity: 1
-            }
-          ];
-        });
-
-
-        setLastScan({
-          id: Date.now(),
-          name: item.name,
-          price: item.price,
-          sku: item.sku,
-          quantity: 1,
-          img: item.pictureUrl,
-        });
-
-
-
-
-      } catch (err) {
-        console.error('Erro ao validar produto:', err);
-      }
-    } else {
-      setCart(prev => {
-        const existing = prev.find(i => i.id === item.id);
-
-        if (existing) {
-          return prev.map(i =>
-            i.id === item.id
-              ? { ...i, quantity: i.quantity + 1 }
-              : i
-          );
-        }
-
-        return [...prev, { ...item, quantity: 1 }];
-      });
+  // Trigger beep when item is scanned
+  useEffect(() => {
+    if (lastScan) {
+      beep();
     }
-  }, []);
+  }, [lastScan]);
 
 
-
-const beep = () => {
-  const ctx = new AudioContext();
-  const oscillator = ctx.createOscillator();
-  oscillator.type = 'sine'; // Tipo de onda: sine, square, sawtooth,triangle
-  oscillator.frequency.value = 1500; // Hz
-  oscillator.connect(ctx.destination); 
-  oscillator.start();
-  oscillator.stop(ctx.currentTime + 0.02); // dura 0.1s
-};
-
-
-useEffect(() => {
-  if (lastScan) {
-    beep(); // toca beep
-  }
-}, [lastScan]);
-
-
-  // --- BUSCA POR CÓDIGO DE BARRAS NO BANCO ---
+  // Process barcode scan - useCallback to ensure addToCart reference is stable
   const processBarcode = useCallback(async (code: string) => {
     if (!code || code.length < 3) return;
     const cleanCode = code.trim();
@@ -401,7 +197,8 @@ useEffect(() => {
             id: p.id,
             name: p.name,
             price: Number(p.salePrice) || 0,
-            type: 'part',
+            costPrice: Number(p.costPrice) || 0,
+            type: 'product',
             sku: p.sku,
             barcode: p.barcode,
             stock: Number(p.currentStock) || 0,
@@ -410,12 +207,21 @@ useEffect(() => {
             status: p.status,
             pictureUrl: p.pictureUrl,
           });
+
+          setLastScan({
+            id: Date.now(),
+            name: p.name,
+            price: Number(p.salePrice) || 0,
+            sku: p.sku,
+            quantity: 1,
+            img: p.pictureUrl,
+          });
         }
       }
     } catch (error) {
       console.error('Erro ao bipar:', error);
     }
-  }, [addToCart]);
+  }, [addToCart, setLastScan]);
 
 
 
@@ -431,19 +237,22 @@ useEffect(() => {
       const timeSinceLastKey = currentTime - lastKeyTime;
       lastKeyTime = currentTime;
 
+      // Reset accumulator if no key in more than 100ms
       if (timeSinceLastKey > 100) {
         barcodeAccumulator = '';
       }
 
+      // Process when Enter is pressed
       if (e.key === 'Enter') {
         if (barcodeAccumulator.length > 3) {
           e.preventDefault();
-          processBarcode(barcodeAccumulator); // Dispara a busca no banco
+          processBarcode(barcodeAccumulator);
           barcodeAccumulator = '';
         }
         return;
       }
 
+      // Accumulate printable characters
       if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
         barcodeAccumulator += e.key;
       }
@@ -451,10 +260,18 @@ useEffect(() => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [processBarcode]); // Essencial para pegar a versão atualizada da busca
+  }, [processBarcode]);
 
 
 
+
+  // Format categories for select dropdown
+  const categoryOptions = [
+    { value: 'Todas', label: 'Todas' },
+    ...dynamicCategories
+      .filter(cat => cat !== 'Todas') // Remove duplicates of 'Todas'
+      .map(cat => ({ value: cat, label: cat }))
+  ];
 
   const quickCategories = dynamicCategories.slice(0, 2);
 
@@ -469,11 +286,10 @@ useEffect(() => {
     if (match) {
       setSelectedCategory(match);
     }
-  }, [searchTerm]);
+  }, [searchTerm, dynamicCategories, setSelectedCategory]);
 
   useEffect(() => {
     const loadCategories = async () => {
-      setLoadingCategories(true);
       try {
         // Busca as categorias baseado na aba ativa
         const type = activeTab === 'parts' ? 'parts' : 'services';
@@ -484,59 +300,45 @@ useEffect(() => {
       } catch (e) {
         console.error('Erro ao carregar categorias:', e);
         setDynamicCategories(['Todas', 'Erro ao carregar']);
-      } finally {
-        setLoadingCategories(false);
       }
     };
 
     loadCategories();
-  }, [activeTab]); // Recarrega sempre que mudar entre Peças e Serviços
+  }, [activeTab, setDynamicCategories]);
 
-  // Carregar opções de filtros (brands, statuses, units) - uma única vez
+  // All filter options loading
   useEffect(() => {
     const loadFilterOptions = async () => {
       try {
-        // Executa as duas buscas ao mesmo tempo para performance
+        // Execute both queries in parallel for performance
         const [brands, statuses] = await Promise.all([
           getPdvBrands(),
           getPdvStatuses()
         ]);
 
-        // Atualiza os estados apenas se houver retorno
+        // Update states only if there's return data
         if (brands && brands.length > 0) {
-          setBrandOptions(['Todos', ...brands]);
+          // Filter out 'Todos' if it already exists, then add it to front
+          const uniqueBrands = brands.filter(b => b !== 'Todos');
+          setBrandOptions(['Todos', ...uniqueBrands]);
         }
 
         if (statuses && statuses.length > 0) {
-          setStatusOptions(['Todos', ...statuses]);
+          // Filter out 'Todos' if it already exists, then add it to front
+          const uniqueStatuses = statuses.filter(s => s !== 'Todos');
+          setStatusOptions(['Todos', ...uniqueStatuses]);
         }
 
       } catch (e) {
         console.error('Erro ao carregar opções de filtros no componente:', e);
-        // Fallback em caso de erro para não travar a UI
+        // Fallback in case of error
         setBrandOptions(['Todos']);
         setStatusOptions(['Todos', 'Ativo', 'Inativo']);
       }
     };
 
     loadFilterOptions();
-  }, []);
-
-
-  const applyIndividualDiscount = (id: string | number, newPrice: number) => {
-    setCart(prevCart => prevCart.map(item => {
-      if (item.id === id) {
-        return {
-          ...item,
-          // Se for o preço original (reset), limpamos o originalPrice, 
-          // senão, guardamos o preço antigo para referência futura.
-          originalPrice: item.originalPrice || item.price,
-          price: newPrice
-        };
-      }
-      return item;
-    }));
-  };
+  }, [setBrandOptions, setStatusOptions]);
 
   // Definição das colunas específica para este contexto (Peças)
   const productColumns = [
@@ -623,13 +425,8 @@ useEffect(() => {
     }
   ];
 
-
-
-  // 1. Crie um estado para a ordenação
-  const [sortOrder, setSortOrder] = useState('');
-
-  // ===== FILTROS LOCAIS AVANÇADOS - Processamento 100% Client-side =====
-  // 1. Simplifique o filteredData (ele apenas formata, não filtra mais)
+  // ===== FILTROS - Construindo objeto de filtros para API =====
+  // Format products for display
   const formattedData = useMemo(() => {
     return products.map(p => ({
       ...p,
@@ -639,7 +436,7 @@ useEffect(() => {
     }));
   }, [products]);
 
-
+  // Build filters object for API
   const filters = useMemo(() => ({
     searchTerm: debouncedSearchTerm || undefined,
     category: selectedCategory !== 'Todas' ? selectedCategory : undefined,
@@ -669,9 +466,11 @@ useEffect(() => {
   ]);
 
 
-  // 1. Unifique em um único useEffect de busca
+  // 1. Unified single fetch effect
   useEffect(() => {
-    if (activeTab !== 'parts') return;
+    if (activeTab !== 'parts') {
+      return;
+    }
 
     let isMounted = true;
     setLoadingProducts(true);
@@ -683,9 +482,9 @@ useEffect(() => {
         if (!isMounted) return;
 
         setPdvResponse(response);
-        setProducts(response.data || []);
+        setProducts(response?.data || []);
       } catch (err) {
-        console.error(err);
+        console.error('PDV: Error fetching products:', err);
         if (isMounted) setProducts([]);
       } finally {
         if (isMounted) setLoadingProducts(false);
@@ -697,7 +496,7 @@ useEffect(() => {
     return () => {
       isMounted = false;
     };
-  }, [filters, activeTab]);
+  }, [filters, activeTab, setLoadingProducts, setPdvResponse, setProducts]);
 
   const highlightText = (text: string, highlight: string) => {
     if (!highlight.trim()) return text;
@@ -727,6 +526,7 @@ useEffect(() => {
   };
 
 
+  // Update page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [
@@ -738,7 +538,8 @@ useEffect(() => {
     status,
     brand,
     onlyInStock,
-    onlyActive
+    onlyActive,
+    setCurrentPage
   ]);
 
   return (
@@ -941,7 +742,8 @@ useEffect(() => {
 
 
 
-                  {/* Filtro: Unidade de Medida (Opcional) */}
+                  {/* Filtro: Unidade de Medida (Opcional) - Comentado por enquanto */}
+                  {/* 
                   {unitOptions.length > 0 && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <label style={{ fontSize: '12px', fontWeight: '500', color: '#555' }}>⚖️ Unidade</label>
@@ -956,12 +758,13 @@ useEffect(() => {
                         }}
                       >
                         <option value="">Todas as unidades</option>
-                        {unitOptions.map(opt => (
+                        {unitOptions.map((opt: string) => (
                           <option key={opt} value={opt}>{opt}</option>
                         ))}
                       </select>
                     </div>
                   )}
+                  */}
                 </div>
 
                 {/* Indicador de Filtros Ativados */}
@@ -1045,13 +848,16 @@ useEffect(() => {
                 <div className={styles.categoryWrapper}>
                   {/* SELECT COM BUSCA */}
                   <select
-                    value={options.find(option => option.value === selectedCategory)}
-                    onChange={(option) => setSelectedCategory(option.value)}
-                    options={options}
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
                     className={styles.categorySelect}
-                    classNamePrefix="react-select"
-                    isSearchable={true} // habilita a barra de pesquisa
-                  />
+                  >
+                    {categoryOptions.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
 
                   {/* CHIPS RÁPIDOS */}
                   <div className={styles.quickChips}>
@@ -1093,8 +899,7 @@ useEffect(() => {
               <div className={styles.stockToggle}>
                 <Switch
                   checked={onlyInStock}
-                  // Forçamos a inversão baseada no valor atual
-                  onChange={() => setOnlyInStock(prev => !prev)}
+                  onChange={() => setOnlyInStock(!onlyInStock)}
                 />
               </div>
             </EditableField>
@@ -1111,7 +916,7 @@ useEffect(() => {
               <div className={styles.stockToggle}>
                 <Switch
                   checked={onlyActive}
-                  onChange={() => setOnlyActive(prev => !prev)}
+                  onChange={() => setOnlyActive(!onlyActive)}
                 />
               </div>
             </EditableField>
@@ -1156,7 +961,6 @@ useEffect(() => {
       {lastScan.img && (
         <ImageDisplay
           src={lastScan.img}
-          className={styles.ImageDisplay}
           size="40px"
           rounded="6px"
         />
@@ -1205,7 +1009,7 @@ useEffect(() => {
           }}
           onRefresh={() => {
             // Força a atualização disparando o useEffect que depende de filters
-            setCurrentPage(prev => prev);
+            setCurrentPage(1);
           }}
           onAction={addToCart} // Integração direta com sua função de carrinho
           moneyFormatter={(val) => money.format(val)}
@@ -1215,14 +1019,12 @@ useEffect(() => {
             osItems={osItems}
             setOsItems={setOsItems}
             osServices={osServices}
-            setOsServices={handleChangeMode}
+            setOsServices={setOsServices}
             osData={osData}
             setOsData={setOsData}
             osTotal={osTotal}
             calculatedLabor={calculatedLabor}
             money={money}
-            setCart={setCart}
-            setActiveTab={setActiveTab}
           />
         )}
 
@@ -1300,3 +1102,14 @@ useEffect(() => {
     </div>
   );
 };
+
+// Wrapper component that provides context
+const PDV: React.FC = () => {
+  return (
+    <PDVProvider>
+      <PDVContent />
+    </PDVProvider>
+  );
+};
+
+export default PDV;
