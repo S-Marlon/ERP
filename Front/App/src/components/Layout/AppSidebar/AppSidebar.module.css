@@ -1,0 +1,304 @@
+
+/* ===================== */
+/* SIDEBAR */
+/* ===================== */
+
+.sidebar {
+  grid-area: sidebar;
+  height: 100%;
+
+  background: linear-gradient(
+    180deg,
+    #B23B3B 5%,
+    #843B3B 20%,
+    #281313 80%,
+    #0A0A0A 100%
+  );
+
+  /* background: linear-gradient(0deg, #0A0A0A 0%, #B23B3B 80%);
+  background: #281313;
+#331616 */
+  display: flex;
+  flex-direction: column;
+
+  width: var(--sidebar-width);
+  transition: width 0.25s ease;
+
+  overflow-x: hidden;
+  overflow-y: auto;
+
+  border-right: 1px solid rgba(255,255,255,0.08);
+}
+
+.sidebar:not(.open) {
+  width: 80px;
+}
+
+/* ===================== */
+/* TOGGLE */
+/* ===================== */
+
+.toggle {
+  margin: 10px;
+  background: transparent;
+  border: none;
+
+  color: rgba(255,255,255,0.85);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+/* ===================== */
+/* PROFILE */
+/* ===================== */
+
+.profile {
+  padding: 10px;
+  margin: 5px;
+
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+
+  border-radius: 8px;
+
+  display: flex;
+  flex-direction: column;
+
+  color: #fff;
+
+  transition: all 0.2s ease;
+}
+
+.profileMini {
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.role {
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+
+/* ===================== */
+/* SECTION TITLE */
+/* ===================== */
+
+.sectionTitle {
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.75);
+
+  padding: 6px 10px;
+
+  display: flex;
+  align-items: center;
+}
+
+.sidebar:not(.open) .sectionTitle {
+  justify-content: center;
+
+  width: 34px;
+  height: 34px;
+
+  margin: 8px auto;
+
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+
+  border-radius: 6px;
+
+  font-size: 14px;
+  color: #fff;
+}
+
+/* ===================== */
+/* ITEM */
+/* ===================== */
+
+.menuItem {
+  display: flex;
+  align-items: center;
+
+  width: 100%;
+  min-width: 0;
+
+  position: relative;
+
+  border-radius: 8px;
+}
+
+/* ACTIVE */
+.active {
+  background: rgba(255, 255, 255, 0.12);
+  border-left: 3px solid #FFD1D1;
+}
+
+/* ===================== */
+/* LINK */
+/* ===================== */
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  flex: 1;
+  min-width: 0;
+
+  padding: 10px;
+
+  color: rgba(255,255,255,0.85);
+  text-decoration: none;
+
+  border-radius: 8px;
+
+  transition: background 0.2s ease;
+}
+
+.sidebar:not(.open) .link {
+  justify-content: center;
+}
+
+.link:hover {
+  background: rgba(255,255,255,0.08);
+}
+
+.icon {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+
+  filter: brightness(1.1);
+}
+
+/* ===================== */
+/* ACTIONS */
+/* ===================== */
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  padding-right: 8px;
+}
+
+.starBtn,
+.arrowBtn {
+  background: transparent;
+  border: none;
+
+  cursor: pointer;
+
+  opacity: 0.75;
+
+  width: 26px;
+  height: 26px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 6px;
+
+  color: rgba(255,255,255,0.85);
+
+  transition: all 0.2s ease;
+}
+
+.starBtn {
+  color: #FFD36E;
+}
+
+.starBtn:hover,
+.arrowBtn:hover {
+  opacity: 1;
+  background: rgba(255,255,255,0.1);
+}
+
+/* ===================== */
+/* SUBMENU */
+/* ===================== */
+
+.submenu {
+  display: flex;
+  flex-direction: column;
+
+  margin: 6px 8px 0 8px;
+
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.08);
+
+  border-radius: 8px;
+
+  overflow: hidden;
+
+  max-height: 0;
+  opacity: 0;
+
+  transition: all 0.25s ease;
+}
+
+.submenuOpen {
+  max-height: 500px;
+  opacity: 1;
+  padding: 6px;
+}
+
+.sublink {
+  padding: 6px 8px;
+
+  font-size: 0.78rem;
+
+  color: rgba(255,255,255,0.75);
+
+  text-decoration: none;
+
+  border-radius: 6px;
+
+  border-left: 2px solid transparent;
+
+  transition: all 0.2s ease;
+}
+
+.sublink:hover {
+  background: rgba(255,255,255,0.08);
+  border-left: 2px solid #FFD1D1;
+}
+
+/* ===================== */
+/* CONFIG */
+/* ===================== */
+
+.sectionBottom {
+  margin-top: auto;
+  padding: 10px;
+}
+
+.sectionBottom .link {
+  width: 100%;
+}
+
+/* ===================== */
+/* POPUP */
+/* ===================== */
+
+.configPopover {
+  position: absolute;
+  bottom: 60px;
+  left: 10px;
+
+  background: rgba(0,0,0,0.6);
+  border: 1px solid rgba(255,255,255,0.12);
+
+  border-radius: 8px;
+  padding: 10px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  min-width: 160px;
+
+  box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+}

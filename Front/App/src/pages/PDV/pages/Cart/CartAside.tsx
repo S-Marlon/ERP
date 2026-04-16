@@ -101,14 +101,7 @@ export const CartAside: React.FC<CartAsideProps> = ({
 
                 <h2>{activeTab === 'os' ? 'Resumo OS' : 'Carrinho'} ({cart.length} itens) </h2>
 
-                {/* TOPO: IDENTIFICAÇÃO */}
-                <div>
-
-                    <h4>{cliente}</h4>
-
-                    <span>CPF/CNPJ: 000.000.000-00</span>
-                </div>
-
+               
             </header>
 
             <div className={styles.cartList}>

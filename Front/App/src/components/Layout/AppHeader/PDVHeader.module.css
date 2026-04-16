@@ -1,0 +1,193 @@
+:root {
+  /* Cores Base */
+  --color-vintage-red: #b23b3b;   /* Vermelho tijolo clássico/vintage */
+  --color-vivid-red: #e60000;
+  --color-bordeaux: #4e0e0e;
+  --color-dark-wine: #1a0404;
+  --color-black: #000000;
+  --color-surface: #0f0f0f;
+  --color-dark-accent: #2b0505;   /* O "preto" que na verdade é um bordeaux quase preto */
+  
+  /* Gradientes Prontos */
+  --grad-main: linear-gradient(180deg, var(--color-vivid-red) 20%, var(--color-black) 100%);
+  --grad-vintage: linear-gradient(180deg, var(--color-vivid-red) 0%, var(--color-bordeaux) 40%, var(--color-black) 100%);
+  --grad-sidebar: linear-gradient(to bottom, var(--color-bordeaux), var(--color-black));
+  
+  /* Texto e UI */
+  --text-primary: #ffffff;
+  --text-muted: rgba(255, 255, 255, 0.6);
+  --border-subtle: rgba(230, 0, 0, 0.2);
+
+
+  /* TEXTO SOBRE FUNDO CLARO (Branco/Cinza Gelo) */
+  --text-main: #2b0505;        /* Um "quase preto" levemente puxado para o seu bordeaux */
+  --text-secondary: #5a4d4d;   /* Cinza quente para textos de menor importância */
+  --text-muted: #9a8a8a;       /* Para legendas e placeholders */
+  
+  /* TEXTO SOBRE OS DEGRADÊS (Header/Sidebar) */
+  --text-on-dark: #ffffff;     /* Branco puro para máximo contraste no degradê */
+  --text-on-dark-muted: rgba(255, 255, 255, 0.7); /* Para itens de menu não ativos */
+
+  /* DESTAQUES DE TEXTO */
+  --text-accent: var(--color-vintage-red); /* Para links ou palavras-chave */
+
+
+
+
+
+
+   /* Superfícies Principais */
+  --bg-dark-primary: #050505;    /* Preto quase absoluto para profundidade */
+  --bg-dark-secondary: #121212;  /* Cinza muito escuro para cards e tabelas */
+  --bg-dark-tertiary: #1a0404;   /* Um bordeaux "asfaltado" para áreas de hover */
+
+  /* Textos no Modo Dark */
+  --text-dark-main: #e0e0e0;     /* Cinza claro (melhor que branco puro para não ofuscar) */
+  --text-dark-muted: #888888;    /* Para textos secundários */
+  --text-dark-vivid: #ff4d4d;    /* Um vermelho levemente mais claro para leitura sobre preto */
+
+  /* Gradientes Dark */
+  /* O seu degradê vivo + preto brilha muito mais aqui */
+  --grad-dark-header: linear-gradient(180deg, var(--color-bordeaux) 0%, var(--color-black) 100%);
+  --grad-active-item: linear-gradient(90deg, rgba(230, 0, 0, 0.2) 0%, transparent 100%);
+
+  /* Bordas */
+  --border-dark: #2a2a2a;
+}
+
+
+.pdvHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0 12px;
+  height: 50px;
+
+background: var(--color-vintage-red);
+  color: var(--text-on-red); /* Agora a leitura fica perfeita */
+
+  font-family: Arial, Helvetica, sans-serif;
+
+  border-bottom: 2px solid #22c55e;
+}
+
+/* LEFT */
+.left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.title {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.status {
+  font-size: 0.7rem;
+  background: #00c54899;
+  color: #e0ffe8;
+  padding: 3px 6px;
+  border-radius: 6px;
+}
+
+/* CENTER */
+.center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.lastScan {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  background: rgba(255, 255, 255, 0.06);
+  padding: 4px 10px;
+  border-radius: 8px;
+
+  font-size: 0.85rem;
+}
+
+.check {
+  color: #22c55e;
+  font-weight: bold;
+}
+
+.price {
+  color: #22c55e;
+  font-weight: bold;
+}
+
+.empty {
+  font-size: 0.8rem;
+  opacity: 0.6;
+}
+
+/* RIGHT */
+.right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* BLOCO ERP (NOVO) */
+.block {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+  text-align: right;
+}
+
+.label {
+  font-size: 0.65rem;
+  padding-bottom: 2px;
+  opacity: 0.6;
+  text-align: left;
+}
+
+.value {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.clientWrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* “HR vertical” */
+.divider {
+  width: 1px;
+  height: 30px;
+
+  background: rgba(255, 255, 255, 0.25); /* 50% feel suave */
+  border-radius: 2px;
+
+  opacity: 0.5;
+}
+
+/* BOTÃO */
+.btn {
+  background: #1f2937;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: white;
+
+  padding: 5px 8px;
+  border-radius: 6px;
+
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: #374151;
+}
+
+.clock {
+  font-size: 0.8rem;
+  opacity: 0.9;
+}
+

@@ -1,0 +1,47 @@
+.header {
+  grid-area: header;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  height: 50px;
+  padding: 0 12px;
+
+  background: #1f2937;
+  color: white;
+}
+
+/* esquerda */
+.left h1 {
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+/* centro */
+.center input {
+  width: 300px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: none;
+  outline: none;
+}
+
+/* direita */
+.right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.iconBtn {
+  background: transparent;
+  border: none;
+  color: white;
+  cursor: pointer;
+}
+
+.user {
+  background: rgba(255,255,255,0.1);
+  padding: 4px 10px;
+  border-radius: 6px;
+}

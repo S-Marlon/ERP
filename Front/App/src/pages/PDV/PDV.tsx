@@ -810,7 +810,6 @@ const PDVContent: React.FC = () => {
 
           <header className={styles.topHeader} style={{ position: 'relative' }}>
 
-
             <div className={styles.searchSection}>
               <EditableField
                 label="Busca de Itens"
@@ -875,7 +874,7 @@ const PDVContent: React.FC = () => {
 
 
               </EditableField>
-              
+
 
             </div>
 

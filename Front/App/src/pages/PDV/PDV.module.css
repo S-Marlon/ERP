@@ -143,15 +143,14 @@
   grid-template-columns: 1fr 2fr;
   justify-content: space-between;
   align-items: center;
-  padding: 0.5rem;
+  padding: 0.2rem;
   gap: 1rem;
 
 }
 
 .filterBar {
   align-items: center; /* Alinha por baixo para ficar alinhado com os switches */
-  gap: 1rem;
-  width: 100%;
+  gap: 0.5rem;
   /* CRUCIAL: impede que o grid cresça além da tela */
   min-width: 0; 
 }
@@ -1171,8 +1170,41 @@ input::-webkit-inner-spin-button {
   scrollbar-width: none; 
 }
 
+
 .categoryChips::-webkit-scrollbar {
   display: none;
+}
+
+.quickChips {
+  display: flex;
+  gap: 8px;
+
+  /* 🔥 comportamento horizontal */
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-wrap: nowrap;
+
+  /* suavidade no mobile */
+  -webkit-overflow-scrolling: touch;
+
+  /* evita quebra de linha */
+  white-space: nowrap;
+
+  padding-bottom: 4px;
+}
+
+/* cada chip não pode encolher */
+.chip {
+  flex: 0 0 auto;
+}
+
+.quickChips::-webkit-scrollbar {
+  height: 6px;
+}
+
+.quickChips::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
 }
 
 .chip {
@@ -1194,6 +1226,9 @@ input::-webkit-inner-spin-button {
   font-weight: 600;
   box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
 }
+
+
+
 
 /* ===== DISPLAY MODES - LISTA ===== */
 .tableContainer {
@@ -1648,3 +1683,15 @@ input::-webkit-inner-spin-button {
 .lastScanContent .imageWrapper,
 .lastScanContent .info { animation-delay: 0.01s; }
 .lastScanContent .meta { animation-delay: 0.1s; }
+
+
+
+
+
+
+
+
+
+
+
+
