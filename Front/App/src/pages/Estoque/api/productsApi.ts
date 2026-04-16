@@ -321,13 +321,31 @@ export const submitStockEntry = async (payload: {
 /**
  * Busca todas as notas fiscais registradas
  */
-export const fetchStockEntryNotes = async (filters?: {
-    supplierCnpj?: string;
-    invoiceNumber?: string;
-    startDate?: string;
-    endDate?: string;
-}) => {
+export type StockEntryNote = {
+    id: number;
+    invoiceNumber: string;
+    accessKey: string;
+    emissionDate?: string;
+    entryDate: string;
+    supplierCnpj: string;
+    supplierName: string;
+    totalNoteValue: number;
+    status?: string;
+    itemsCount: number;
+    // Para detalhes, inclui items
+    items?: StockEntryItem[];
+};
+
+export const fetchStockEntryNotes = async (
+    filters?: {
+        supplierCnpj?: string;
+        invoiceNumber?: string;
+        startDate?: string;
+        endDate?: string;
+    }
+): Promise<StockEntryNote[]> => {
     const params = new URLSearchParams();
+
     if (filters?.supplierCnpj) params.append('supplierCnpj', filters.supplierCnpj);
     if (filters?.invoiceNumber) params.append('invoiceNumber', filters.invoiceNumber);
     if (filters?.startDate) params.append('startDate', filters.startDate);
@@ -339,18 +357,22 @@ export const fetchStockEntryNotes = async (filters?: {
         const err = await response.text();
         throw new Error(err);
     }
-    return await response.json();
+
+    const data: StockEntryNote[] = await response.json();
+    return data;
 };
 
 /**
  * Busca detalhes e itens de uma nota fiscal específica
  */
-export const fetchStockEntryDetails = async (noteId: string | number) => {
+export const fetchStockEntryDetails = async (noteId: string | number): Promise<StockEntryNote> => {
     const response = await fetch(`${apiBase}/stock-entry/${noteId}`);
 
     if (!response.ok) {
         const err = await response.text();
         throw new Error(err);
     }
-    return await response.json();
+
+    const data: StockEntryNote = await response.json();
+    return data;
 };

@@ -1136,17 +1136,20 @@ app.get('/api/stock-entry', asyncHandler(async (req, res) => {
     const { supplierCnpj, invoiceNumber, startDate, endDate } = req.query;
 
     let query = `
-        SELECT 
-            id_nota  AS id, -- Ajustado para sua nova tabela 'compras'
+        SELECT
+            cn.id_nota AS id,
             cn.numero_nota AS invoiceNumber,
             cn.chave_acesso AS accessKey,
-            cn.data_emissao AS emissionDate,
+            DATE_FORMAT(cn.data_emissao, '%Y-%m-%dT%H:%i:%s.000Z') AS emissionDate,
+            DATE_FORMAT(cn.data_entrada, '%Y-%m-%dT%H:%i:%s.000Z') AS entryDate,
             f.cnpj AS supplierCnpj,
             f.razao_social AS supplierName,
             cn.valor_total AS totalNoteValue,
-            status_nota
+            cn.status_nota AS status,
+            COUNT(ci.id_item_nota) AS itemsCount
         FROM compras cn
         LEFT JOIN fornecedores f ON cn.id_fornecedor = f.id_fornecedor
+        LEFT JOIN compras_itens ci ON cn.id_nota = ci.id_nota
         WHERE 1=1
     `;
 
@@ -1156,31 +1159,44 @@ app.get('/api/stock-entry', asyncHandler(async (req, res) => {
     if (startDate) { query += ' AND cn.data_emissao >= ?'; params.push(startDate); }
     if (endDate) { query += ' AND cn.data_emissao <= ?'; params.push(endDate); }
 
-    query += ' ORDER BY cn.data_emissao DESC';
+    query += ' GROUP BY cn.id_nota ORDER BY cn.data_emissao DESC';
 
     const [rows]: any = await pool.execute(query, params);
-    res.json(rows);
+
+    // Garantir que itemsCount seja number
+    const formattedRows = rows.map((row: any) => ({
+        ...row,
+        itemsCount: Number(row.itemsCount || 0),
+        totalNoteValue: Number(row.totalNoteValue || 0)
+    }));
+
+    res.json(formattedRows);
 }));
 
 /**
  * GET /api/stock-entry/:id
  * Busca detalhes completos de uma nota fiscal incluindo todos os itens
  */
+
 app.get('/api/stock-entry/:id', asyncHandler(async (req, res) => {
     const { id } = req.params;
 
-    // Busca os dados da nota
+    // 1. NOTA
     const [noteRows]: any = await pool.execute(`
         SELECT 
             cn.id_nota AS id,
             cn.numero_nota AS invoiceNumber,
             cn.serie AS series,
             cn.chave_acesso AS accessKey,
-            cn.data_emissao AS emissionDate,
-            cn.data_entrada AS entryDate,
-            cn.data_recebimento AS receivementDate,
+
+            -- datas normalizadas (ISO 8601)
+            DATE_FORMAT(cn.data_emissao, '%Y-%m-%dT%H:%i:%s.000Z') AS emissionDate,
+            DATE_FORMAT(cn.data_entrada, '%Y-%m-%dT%H:%i:%s.000Z') AS entryDate,
+            DATE_FORMAT(cn.data_recebimento, '%Y-%m-%dT%H:%i:%s.000Z') AS receivementDate,
+
             f.cnpj AS supplierCnpj,
             f.razao_social AS supplierName,
+
             cn.valor_frete AS totalFreight,
             cn.valor_seguro AS totalInsurance,
             cn.valor_outras_despesas AS totalOtherExpenses,
@@ -1191,44 +1207,48 @@ app.get('/api/stock-entry/:id', asyncHandler(async (req, res) => {
         WHERE cn.id_nota = ?
     `, [id]);
 
-    if (!noteRows || noteRows.length === 0) {
+    if (!noteRows?.length) {
         return res.status(404).json({ error: 'Nota fiscal não encontrada' });
     }
 
     const note = noteRows[0];
 
-    // Busca os itens da nota
-    const [itemRows]: any = await pool.execute(`
+    // 2. ITENS (garantido)
+    const [itemRowsRaw]: any = await pool.execute(`
         SELECT 
             ci.id_item_nota AS id,
             p.codigo_interno AS codigoInterno,
-            p.id_produto,
             ci.sku_fornecedor_original AS skuFornecedor,
             ci.quantidade AS quantidadeRecebida,
             ci.unidade_xml AS unidadeXml,
             p.unidade AS unidade,
             ci.preco_unitario_custo AS custoUnitario,
             ci.valor_total_item AS valorTotalItem,
-            ci.impostos_taxas AS impostosTaxas,
-            ci.valor_ibs AS ibs,
-            ci.valor_cbs AS cbs,
-            ci.valor_imposto_seletivo AS impostoSeletivo,
-            ci.ncm AS ncm,
-            ci.cfop AS cfop,
-            p.cest AS cest
+            ci.ncm,
+            ci.cfop
         FROM compras_itens ci
-        LEFT JOIN produtos p ON ci.id_produto = p.id_produto
+        LEFT JOIN produtos p ON p.id_produto = ci.id_produto
         WHERE ci.id_nota = ?
         ORDER BY ci.id_item_nota
     `, [id]);
 
-    // Combina tudo na resposta
-    res.json({
-        ...note,
-        items: itemRows
-    });
-}));
+    // 3. NORMALIZAÇÃO (evita bug silencioso)
+    const items = Array.isArray(itemRowsRaw) ? itemRowsRaw : [];
 
+    // 4. CAST DE SEGURANÇA (evita string vindo do MySQL)
+    const response = {
+        ...note,
+        totalNoteValue: Number(note.totalNoteValue || 0),
+        totalFreight: Number(note.totalFreight || 0),
+        totalInsurance: Number(note.totalInsurance || 0),
+        totalOtherExpenses: Number(note.totalOtherExpenses || 0),
+
+        items,
+        itemsCount: items.length
+    };
+
+    res.json(response);
+}));
 /**
  * POST /api/stock-entry
  * Consolida a entrada de NF no banco de dados usando as tabelas compras_notas e compras_itens

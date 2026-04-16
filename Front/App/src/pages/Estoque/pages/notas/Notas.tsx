@@ -42,7 +42,7 @@ interface StockEntryNote {
     totalOtherExpenses?: number;
     totalNoteValue: number;
     items?: StockEntryItem[];
-    itemsCount?: number;
+    itemsCount: number;
     status?: string;
 }
 
@@ -58,13 +58,14 @@ const formatCnpj = (cnpj?: string): string => {
     return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
 };
 
-const formatDate = (dateString: string): string => {
-    try {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('pt-BR');
-    } catch {
-        return dateString;
-    }
+const formatDate = (dateString?: string): string => {
+    if (!dateString) return '';
+
+    const date = new Date(dateString);
+
+    if (isNaN(date.getTime())) return '';
+
+    return date.toLocaleDateString('pt-BR');
 };
 
 const Notas: React.FC = () => {
@@ -85,24 +86,27 @@ const Notas: React.FC = () => {
         loadNotes();
     }, []);
 
-    const loadNotes = async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const data = await fetchStockEntryNotes({
-                supplierCnpj: filterSupplier || undefined,
-                invoiceNumber: filterInvoice || undefined,
-                startDate: filterStartDate || undefined,
-                endDate: filterEndDate || undefined,
-            });
-            setNotes(Array.isArray(data) ? data : data.data || data.notas || []);
-        } catch (err) {
-            console.error('Erro ao buscar notas:', err);
-            setError(err instanceof Error ? err.message : 'Erro ao buscar notas');
-        } finally {
-            setLoading(false);
-        }
-    };
+   const loadNotes = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+        const result = await fetchStockEntryNotes({
+            supplierCnpj: filterSupplier || undefined,
+            invoiceNumber: filterInvoice || undefined,
+            startDate: filterStartDate || undefined,
+            endDate: filterEndDate || undefined,
+        });
+
+        setNotes(result);
+
+    } catch (err) {
+        console.error('Erro ao buscar notas:', err);
+        setError(err instanceof Error ? err.message : 'Erro ao buscar notas');
+    } finally {
+        setLoading(false);
+    }
+};
 
     const handleViewDetails = async (note: StockEntryNote) => {
         try {
@@ -140,6 +144,10 @@ const Notas: React.FC = () => {
         } as React.CSSProperties,
         header: {
             marginBottom: '30px',
+            display: 'flex',
+            flexDirection: 'row' as const,
+            alignItems: 'center',
+            justifyContent: 'space-between',
         } as React.CSSProperties,
         title: {
             fontSize: '2rem',
@@ -233,6 +241,7 @@ const Notas: React.FC = () => {
         <div style={styles.container}>
             <div style={styles.header}>
                 <h1 style={styles.title}>📋 Notas Fiscais Registradas</h1>
+
                 <Typography variant="pMuted" style={{ margin: 0 }}>
                     Visualize e gerencie todas as notas de entrada de mercadorias
                 </Typography>
@@ -329,14 +338,14 @@ const Notas: React.FC = () => {
                                     }}
                                 >
                                     <td style={styles.td}>
-                                        <strong>{note.invoiceNumber.replace('NF ', '')}</strong>
+                                        <strong>{(note.invoiceNumber ?? '').replace('NF ', '')}</strong>
                                     </td>
                                     <td style={styles.td}>{formatDate(note.entryDate)}</td>
                                     <td style={styles.td}>{note.supplierName}</td>
                                     <td style={styles.td}>{formatCnpj(note.supplierCnpj)}</td>
                                     <td style={styles.td}>
                                         <Badge color="info">
-                                            {note.itemsCount || note.items?.length || 0} itens
+                                            {note.itemsCount || 0} itens
                                         </Badge>
                                     </td>
                                     <td style={styles.td}>
