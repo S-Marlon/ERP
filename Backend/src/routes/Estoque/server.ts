@@ -2,9 +2,10 @@
 
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import pool from './db.config'; // Assume que é um Pool do mysql2/promise
+import pool from './db.config'; // Configuração do banco de dados MySQL
 import { ResultSetHeader } from 'mysql2';
 import crypto from 'crypto';
+import { processStockMovement, STOCK_ORIGINS, recalculateStockForProduct, getCurrentStock } from '../../services/stock/stock.service';
 
 const app = express();
 app.use(cors());
@@ -882,6 +883,181 @@ app.get('/api/categories/tree', async (req: Request, res: Response) => {
 });
 
 
+/**
+ * GET /api/stock/recalculate/:productId
+ * Endpoint de teste: compara saldo calculado do ledger vs saldo atual do cache
+ */
+app.get('/api/stock/recalculate/:productId', asyncHandler(async (req, res) => {
+    const productId = parseInt(req.params.productId);
+
+    if (!productId || productId <= 0) {
+        return res.status(400).json({ error: 'ID do produto inválido' });
+    }
+
+    try {
+        // 🔄 Calcular saldo baseado no ledger
+        const saldoLedger = await recalculateStockForProduct(productId);
+
+        // 📊 Obter saldo atual do cache (trigger)
+        const saldoCache = await getCurrentStock(productId);
+
+        // ⚖️ Calcular diferenças
+        const diferenca = {
+            quantidade: saldoLedger.quantidade - saldoCache.quantidade,
+            valorMedio: saldoLedger.valorMedio - saldoCache.valorMedio
+        };
+
+        // 📋 Verificar se está consistente
+        const tolerancia = 0.0001; // Tolerância para arredondamento
+        const consistente = Math.abs(diferenca.quantidade) < tolerancia &&
+                           Math.abs(diferenca.valorMedio) < tolerancia;
+
+        const resultado = {
+            produto: productId,
+            timestamp: new Date().toISOString(),
+            saldoLedger, // Calculado do ledger
+            saldoCache,  // Do cache (trigger)
+            diferenca,
+            consistente,
+            movimentosProcessados: saldoLedger.movimentosProcessados,
+            recomendacao: consistente
+                ? '✅ Saldos consistentes - seguro remover trigger'
+                : '⚠️ Saldos divergentes - investigar antes de remover trigger'
+        };
+
+        // 📜 Log detalhado
+        console.log('[STOCK_RECALCULATE_TEST]', JSON.stringify(resultado));
+
+        res.json(resultado);
+
+    } catch (error: any) {
+        console.error('[STOCK_RECALCULATE_ERROR]', {
+            produto: productId,
+            error: error.message
+        });
+        res.status(500).json({
+            error: 'Erro ao recalcular estoque',
+            produto: productId,
+            detalhes: error.message
+        });
+    }
+}));
+
+/**
+ * GET /api/stock/audit-all
+ * Auditoria completa de estoque: compara ledger vs cache para todos os produtos
+ */
+app.get('/api/stock/audit-all', asyncHandler(async (req, res) => {
+    try {
+        // 🔍 Buscar todos os produtos ativos
+        const [products]: any = await pool.execute(
+            `SELECT id_produto FROM produtos WHERE status = 'Ativo' ORDER BY id_produto`
+        );
+
+        const detalhes: any[] = [];
+        let totalProdutos = 0;
+        let produtosOk = 0;
+        let produtosErro = 0;
+        let driftMax = 0;
+
+        // 📊 Processar cada produto
+        for (const product of products) {
+            const productId = product.id_produto;
+            totalProdutos++;
+
+            try {
+                // 🔄 Calcular saldo do ledger
+                const saldoLedger = await recalculateStockForProduct(productId);
+
+                // 📊 Obter saldo do cache
+                const saldoCache = await getCurrentStock(productId);
+
+                // ⚖️ Calcular diferenças
+                const diferenca = {
+                    quantidade: saldoLedger.quantidade - saldoCache.quantidade,
+                    valorMedio: saldoLedger.valorMedio - saldoCache.valorMedio
+                };
+
+                // 📏 Calcular drift máximo (maior diferença absoluta)
+                const driftAtual = Math.max(
+                    Math.abs(diferenca.quantidade),
+                    Math.abs(diferenca.valorMedio)
+                );
+                driftMax = Math.max(driftMax, driftAtual);
+
+                // ✅ Verificar consistência (tolerância para arredondamento)
+                const tolerancia = 0.0001;
+                const consistente = Math.abs(diferenca.quantidade) < tolerancia &&
+                                   Math.abs(diferenca.valorMedio) < tolerancia;
+
+                if (consistente) {
+                    produtosOk++;
+                } else {
+                    produtosErro++;
+                }
+
+                detalhes.push({
+                    produto: productId,
+                    saldoLedger: {
+                        quantidade: Number(saldoLedger.quantidade.toFixed(4)),
+                        valorMedio: Number(saldoLedger.valorMedio.toFixed(4))
+                    },
+                    saldoCache: {
+                        quantidade: Number(saldoCache.quantidade.toFixed(4)),
+                        valorMedio: Number(saldoCache.valorMedio.toFixed(4))
+                    },
+                    diferenca: {
+                        quantidade: Number(diferenca.quantidade.toFixed(4)),
+                        valorMedio: Number(diferenca.valorMedio.toFixed(4))
+                    }
+                });
+
+            } catch (error: any) {
+                console.error(`[STOCK_AUDIT_ERROR] Produto ${productId}:`, error.message);
+                produtosErro++;
+
+                // Adicionar entrada de erro nos detalhes
+                detalhes.push({
+                    produto: productId,
+                    saldoLedger: { quantidade: 0, valorMedio: 0 },
+                    saldoCache: { quantidade: 0, valorMedio: 0 },
+                    diferenca: { quantidade: 0, valorMedio: 0 },
+                    erro: error.message
+                });
+            }
+        }
+
+        // 📋 Relatório final
+        const relatorio = {
+            total: totalProdutos,
+            ok: produtosOk,
+            erro: produtosErro,
+            driftMax: Number(driftMax.toFixed(4)),
+            timestamp: new Date().toISOString(),
+            detalhes
+        };
+
+        // 📜 Log do resumo
+        console.log('[STOCK_AUDIT_ALL]', JSON.stringify({
+            total: totalProdutos,
+            ok: produtosOk,
+            erro: produtosErro,
+            driftMax: relatorio.driftMax,
+            timestamp: relatorio.timestamp
+        }));
+
+        res.json(relatorio);
+
+    } catch (error: any) {
+        console.error('[STOCK_AUDIT_ALL_ERROR]', error.message);
+        res.status(500).json({
+            error: 'Erro na auditoria completa de estoque',
+            detalhes: error.message
+        });
+    }
+}));
+
+
 app.listen(PORT, () => {
     console.log(`Servidor rodando em http://localhost:${PORT}`);
 });
@@ -1156,10 +1332,10 @@ app.get('/api/stock-entry', asyncHandler(async (req, res) => {
     const params: any[] = [];
     if (supplierCnpj) { query += ' AND f.cnpj LIKE ?'; params.push(`%${supplierCnpj}%`); }
     if (invoiceNumber) { query += ' AND cn.numero_nota LIKE ?'; params.push(`%${invoiceNumber}%`); }
-    if (startDate) { query += ' AND cn.data_emissao >= ?'; params.push(startDate); }
-    if (endDate) { query += ' AND cn.data_emissao <= ?'; params.push(endDate); }
+    if (startDate) { query += ' AND cn.data_entrada >= ?'; params.push(startDate); }
+    if (endDate) { query += ' AND cn.data_entrada <= ?'; params.push(endDate); }
 
-    query += ' GROUP BY cn.id_nota ORDER BY cn.data_emissao DESC';
+    query += ' GROUP BY cn.id_nota ORDER BY cn.data_entrada DESC';
 
     const [rows]: any = await pool.execute(query, params);
 
@@ -1255,75 +1431,166 @@ app.get('/api/stock-entry/:id', asyncHandler(async (req, res) => {
  * Cria registros em: compras_notas, compras_itens, estoque_movimentos, e atualiza estoque_atual
  */
 app.post('/api/stock-entry', asyncHandler(async (req, res) => {
-    const { invoiceNumber, accessKey, entryDate, supplierCnpj, items, totalNoteValue } = req.body;
+    const {
+        invoiceNumber,
+        accessKey,
+        entryDate,
+        supplierCnpj,
+        items = [],
+        totalNoteValue = 0,
+        totalFreight = 0,
+        totalInsurance = 0,
+        totalOtherExpenses = 0,
+    } = req.body;
 
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
 
         // 1. Localizar Fornecedor
-       const cleanCnpj = (supplierCnpj || '').replace(/\D/g, '');
-
-const [suppliers]: any = await connection.execute(
-  'SELECT id_fornecedor FROM fornecedores WHERE cnpj = ?',
-  [cleanCnpj]
-);
+        const cleanCnpj = (supplierCnpj || '').replace(/\D/g, '');
+        const [suppliers]: any = await connection.execute(
+            'SELECT id_fornecedor FROM fornecedores WHERE cnpj = ?',
+            [cleanCnpj]
+        );
 
         if (suppliers.length === 0) throw new Error('Fornecedor não cadastrado.');
         const id_fornecedor = suppliers[0].id_fornecedor;
 
-        // 2. Inserir Nota (Tabela: compras)
+        const entryTimestamp = entryDate ? new Date(entryDate) : new Date();
+        if (isNaN(entryTimestamp.getTime())) {
+            throw new Error('entryDate inválida. Envie ISO 8601 válido.');
+        }
+
+        // 2. Inserir Nota fiscal imutável (Tabela: compras)
         const [notaResult]: any = await connection.execute(
             `INSERT INTO compras (
-  chave_acesso,
-  numero_nota,
-  id_fornecedor,
-  data_emissao,
-  valor_total,
-  status_nota
-)
-VALUES (?, ?, ?, ?, ?, 'PROCESSADA')`,
-            [accessKey, invoiceNumber, id_fornecedor, entryDate || new Date(), totalNoteValue || 0]
+                chave_acesso,
+                numero_nota,
+                id_fornecedor,
+                data_emissao,
+                data_entrada,
+                valor_total,
+                valor_frete,
+                valor_seguro,
+                valor_outras_despesas,
+                status_nota
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PROCESSADA')`,
+            [
+                accessKey,
+                invoiceNumber,
+                id_fornecedor,
+                entryTimestamp,
+                entryTimestamp,
+                totalNoteValue,
+                totalFreight,
+                totalInsurance,
+                totalOtherExpenses,
+            ]
         );
         const id_nota = notaResult.insertId;
 
-        // 3. Processar Itens
+        // 3. Criar recebimento versionado para a nota
+        const [receiptResult]: any = await connection.execute(
+            `INSERT INTO recebimentos (
+                id_nota,
+                version,
+                status,
+                criado_por,
+                observacoes
+            ) VALUES (?, 1, 'PROCESSADO', 'API_IMPORT', 'Recebimento inicial importado automaticamente')`,
+            [id_nota]
+        );
+        const id_recebimento = receiptResult.insertId;
+
+        // 4. Processar itens e gerar eventos de estoque
         for (const item of items) {
-            // Buscamos o ID interno do produto pelo SKU enviado pelo front
-            const [products]: any = await connection.execute('SELECT id_produto FROM produtos WHERE codigo_interno = ?', [item.codigoInterno]);
-            if (products.length === 0) continue; 
+            const [products]: any = await connection.execute(
+                'SELECT id_produto FROM produtos WHERE codigo_interno = ?',
+                [item.codigoInterno]
+            );
 
-            const id_p = products[0].id_produto;
+            const id_p = products.length > 0 ? products[0].id_produto : null;
 
-            // Inserir Item (Tabela: compras_itens)
-            // A TRIGGER do banco vai detectar esse INSERT e atualizar o estoque e o custo médio automaticamente!
             await connection.execute(
                 `INSERT INTO compras_itens (
-  id_nota,
-  id_produto,
-  quantidade,
-  preco_unitario_custo,
-  valor_total_item
-)
-VALUES (?, ?, ?, ?, ?)`,
-                [id_nota, id_p, item.quantidadeRecebida, item.custoUnitario, (item.quantidadeRecebida * item.custoUnitario)]
+                    id_nota,
+                    id_produto,
+                    sku_fornecedor_original,
+                    quantidade,
+                    unidade_xml,
+                    preco_unitario_custo,
+                    valor_total_item,
+                    ncm,
+                    cfop
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    id_nota,
+                    id_p,
+                    item.skuFornecedor,
+                    item.quantidadeRecebida,
+                    item.unidade,
+                    item.custoUnitario,
+                    item.quantidadeRecebida * item.custoUnitario,
+                    item.ncm || null,
+                    item.cfop || null,
+                ]
             );
+
+            await connection.execute(
+                `INSERT INTO recebimento_itens (
+                    id_recebimento,
+                    id_produto,
+                    sku_fornecedor_original,
+                    ncm,
+                    cfop,
+                    unidade_xml,
+                    quantidade,
+                    preco_unitario_custo,
+                    valor_total_item
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    id_recebimento,
+                    id_p,
+                    item.skuFornecedor,
+                    item.ncm || null,
+                    item.cfop || null,
+                    item.unidade,
+                    item.quantidadeRecebida,
+                    item.custoUnitario,
+                    item.quantidadeRecebida * item.custoUnitario,
+                ]
+            );
+
+            if (id_p) {
+                // Usar o serviço central de movimentação de estoque
+                await processStockMovement({
+                    idProduto: id_p,
+                    tipo: 'ENTRADA',
+                    quantidade: item.quantidadeRecebida,
+                    valorUnitario: item.custoUnitario,
+                    origem: STOCK_ORIGINS.RECEBIMENTO, // Padronizado para ledger
+                    idOrigem: id_recebimento, // Vincula ao recebimento versionado
+                    idRecebimento: id_recebimento, // Integração futura
+                    idFornecedor: id_fornecedor,
+                    referenciaAuditavel: `NF ${invoiceNumber} - Item ${item.skuFornecedor}`,
+                    metadata: {
+                        numeroNF: invoiceNumber,
+                        skuFornecedor: item.skuFornecedor,
+                        ncm: item.ncm,
+                        cfop: item.cfop
+                    }
+                });
+            }
         }
 
-        // LOGO APÓS INSERIR A COMPRA E OS ITENS:
-    // 4. Gerar o Contas a Pagar (Dentro da Transação!)
-    // await connection.execute(
-    //     `INSERT INTO contas_pagar (id_compra, id_fornecedor, valor_nominal, data_vencimento, status) 
-    //      VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 30 DAY), 'PENDENTE')`,
-    //     [
-    //         id_compra, 
-    //         id_fornecedor, 
-    //         totalNoteValue 
-    //     ]
-    // );
-
         await connection.commit();
-        res.status(201).json({ success: true, message: "Nota consolidada e estoque atualizado via Trigger." });
+        res.status(201).json({
+            success: true,
+            message: 'Nota consolidada com recebimento versionado e evento de estoque criado.',
+            id_nota,
+            id_recebimento,
+        });
     } catch (error: any) {
         await connection.rollback();
         res.status(500).json({ error: error.message });
@@ -1694,19 +1961,23 @@ app.post('/api/sales', asyncHandler(async (req, res) => {
                 [idVenda, idProduto, quantidade, precoUnitario, custoAtual, (quantidade * precoUnitario)]
             );
 
-            // 2c. Registrar a SAÍDA no Histórico (estoque_movimentos)
-            await connection.execute(
-                `INSERT INTO estoque_movimentos (id_produto, tipo, origem, id_origem, quantidade, valor_unitario, valor_total) 
-                 VALUES (?, 'SAIDA', 'VENDA', ?, ?, ?, ?)`,
-                [idProduto, idVenda, quantidade, precoUnitario, (quantidade * precoUnitario)]
-            );
+            // 2c. Registrar a SAÍDA no Ledger (estoque_movimentacoes)
+            // Usar o serviço central - a trigger atualizará estoque_saldos automaticamente
+            await processStockMovement({
+                idProduto: idProduto,
+                tipo: 'SAIDA',
+                quantidade: quantidade, // Será negada automaticamente no serviço
+                valorUnitario: precoUnitario,
+                origem: STOCK_ORIGINS.VENDA,
+                idOrigem: idVenda,
+                referenciaAuditavel: `Venda ${idVenda} - Produto ${idProduto}`,
+                metadata: {
+                    idCliente,
+                    formaPagamento
+                }
+            });
 
-            // 2d. Atualizar o Saldo Real (estoque_saldos)
-            // Aqui apenas subtraímos a quantidade. O custo médio não muda na saída.
-            await connection.execute(
-                "UPDATE estoque_saldos SET quantidade = quantidade - ? WHERE id_produto = ?",
-                [quantidade, idProduto]
-            );
+            // Nota: Removido UPDATE direto em estoque_saldos - agora via trigger do ledger
         }
 
 

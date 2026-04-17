@@ -285,6 +285,43 @@ export const checkExistingMappings = async (supplierCnpj: string, skus: string[]
  * Consolida a entrada de NF no banco de dados
  * Cria registros de NF, itens, movimentações e atualiza estoque
  */
+export interface StockEntryItem {
+    id?: string | number;
+    codigoInterno: string;
+    skuFornecedor: string;
+    quantidadeRecebida: number;
+    unidade: string;
+    custoUnitario: number;
+    impostos?: {
+        ipi?: number;
+        icmsST?: number;
+        ibs?: number;
+        cbs?: number;
+    };
+    ncm?: string;
+    cest?: string;
+}
+
+export interface StockEntryNote {
+    id: number;
+    invoiceNumber: string;
+    accessKey: string;
+    emissionDate?: string;
+    entryDate: string;
+    supplierCnpj: string;
+    supplierName: string;
+    totalFreight?: number;
+    totalInsurance?: number;
+    totalIBS?: number;
+    totalCBS?: number;
+    totalTaxes?: number;
+    totalOtherExpenses?: number;
+    totalNoteValue: number;
+    status?: string;
+    itemsCount: number;
+    items?: StockEntryItem[];
+}
+
 export const submitStockEntry = async (payload: {
     invoiceNumber: string;
     accessKey: string;
@@ -321,21 +358,6 @@ export const submitStockEntry = async (payload: {
 /**
  * Busca todas as notas fiscais registradas
  */
-export type StockEntryNote = {
-    id: number;
-    invoiceNumber: string;
-    accessKey: string;
-    emissionDate?: string;
-    entryDate: string;
-    supplierCnpj: string;
-    supplierName: string;
-    totalNoteValue: number;
-    status?: string;
-    itemsCount: number;
-    // Para detalhes, inclui items
-    items?: StockEntryItem[];
-};
-
 export const fetchStockEntryNotes = async (
     filters?: {
         supplierCnpj?: string;

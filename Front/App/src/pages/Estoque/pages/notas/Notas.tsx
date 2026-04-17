@@ -3,48 +3,14 @@ import Typography from '../../../../components/ui/Typography/Typography';
 import Badge from '../../../../components/ui/Badge/Badge';
 import Button from '../../../../components/ui/Button/Button';
 import FormControl from '../../../../components/ui/FormControl/FormControl';
-import { fetchStockEntryNotes, fetchStockEntryDetails } from '../../api/productsApi';
+import {
+    fetchStockEntryNotes,
+    fetchStockEntryDetails,
+    StockEntryNote,
+} from '../../api/productsApi';
 import NotasDetailModal from './components/NotasDetailModal';
 import NotasStats from './components/NotasStats';
 import NotasExport from './components/NotasExport';
-
-interface StockEntryItem {
-    id?: string;
-    codigoInterno: string;
-    skuFornecedor: string;
-    quantidadeRecebida: number;
-    unidade: string;
-    custoUnitario: number;
-    impostos?: {
-        ipi?: number;
-        icmsST?: number;
-        ibs?: number;
-        cbs?: number;
-    };
-    ncm?: string;
-    cest?: string;
-}
-
-interface StockEntryNote {
-    id: string | number;
-    invoiceNumber: string;
-    series?: string;
-    accessKey: string;
-    emissionDate?: string;
-    entryDate: string;
-    supplierCnpj: string;
-    supplierName: string;
-    totalFreight?: number;
-    totalInsurance?: number;
-    totalIBS?: number;
-    totalCBS?: number;
-    totalTaxes?: number;
-    totalOtherExpenses?: number;
-    totalNoteValue: number;
-    items?: StockEntryItem[];
-    itemsCount: number;
-    status?: string;
-}
 
 const formatCurrency = (value: number | undefined): string => {
     if (value === undefined || value === null || isNaN(value)) return 'R$ 0,00';

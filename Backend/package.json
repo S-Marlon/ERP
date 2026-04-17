@@ -1,29 +1,32 @@
 {
-    "name":  "backend",
-    "version":  "1.0.0",
-    "main":  "index.js",
-    "scripts":  {
-                    "start":  "ts-node src/server.ts",
-                    "start-estoque":  "ts-node src/routes/Estoque/server.ts",
-                    "test":  "echo \"Error: no test specified\" \u0026\u0026 exit 1"
-                },
-    "keywords":  [
-
-                 ],
-    "author":  "",
-    "license":  "ISC",
-    "description":  "",
-    "dependencies":  {
-                         "cors":  "^2.8.5",
-                         "dotenv":  "^17.2.3",
-                         "express":  "^5.1.0",
-                         "mysql2":  "^3.15.2"
-                     },
-    "devDependencies":  {
-                            "@types/cors":  "^2.8.19",
-                            "@types/express":  "^5.0.3",
-                            "@types/mysql":  "^2.15.27",
-                            "ts-node":  "^10.9.2",
-                            "typescript":  "^5.9.3"
-                        }
+    "name": "backend",
+    "version": "1.0.0",
+    "main": "index.js",
+    "scripts": {
+        "start": "ts-node src/server.ts",
+        "start-estoque": "ts-node src/routes/Estoque/server.ts",
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "test-stock-edge-cases": "ts-node src/tests/stock-edge-cases.test.ts",
+        "audit-stock": "ts-node src/tests/stock-audit.ts",
+        "create-trigger": "node src/tests/create-trigger.js",
+        "cleanup-test-data": "node src/tests/cleanup-test-data.js"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "description": "",
+    "dependencies": {
+        "cors": "^2.8.5",
+        "dotenv": "^17.2.3",
+        "express": "^5.1.0",
+        "mysql2": "^3.15.2",
+        "node-fetch": "^2.7.0"
+    },
+    "devDependencies": {
+        "@types/cors": "^2.8.19",
+        "@types/express": "^5.0.3",
+        "@types/mysql": "^2.15.27",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.9.3"
+    }
 }

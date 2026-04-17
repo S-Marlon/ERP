@@ -1,5 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import pool from '../routes/Estoque/db.config';
+import { processStockMovement, STOCK_ORIGINS } from '../services/stock/stock.service';
 
 const router = express.Router();
 
@@ -37,12 +38,22 @@ router.post('/sales', asyncHandler(async (req, res) => {
         [idVenda, idProduto, quantidade, precoUnitario, custoAtual, quantidade * precoUnitario]
       );
 
-      await connection.execute(
-        `INSERT INTO estoque_movimentos (id_produto, tipo, origem, id_origem, quantidade, valor_unitario, valor_total) VALUES (?, 'SAIDA', 'VENDA', ?, ?, ?, ?)`,
-        [idProduto, idVenda, quantidade, precoUnitario, quantidade * precoUnitario]
-      );
+      // Registrar a SAÃDA no Ledger usando o serviÃ§o central
+      await processStockMovement({
+        idProduto: idProduto,
+        tipo: 'SAIDA',
+        quantidade: quantidade,
+        valorUnitario: precoUnitario,
+        origem: 'VENDA',
+        idOrigem: idVenda,
+        referenciaAuditavel: `Venda ${idVenda} - Produto ${idProduto}`,
+        metadata: {
+          idCliente,
+          formaPagamento
+        }
+      });
 
-      await connection.execute('UPDATE estoque_saldos SET quantidade = quantidade - ? WHERE id_produto = ?', [quantidade, idProduto]);
+      // Nota: Removido UPDATE direto em estoque_saldos - agora via trigger do ledger
     }
 
     const statusInicial = (formaPagamento === 'DINHEIRO') ? 'PAGO' : 'PENDENTE';
@@ -65,11 +76,11 @@ router.post('/sales', asyncHandler(async (req, res) => {
 }));
 
 router.get('/orders', asyncHandler(async (_req, res) => {
-  res.json({ message: 'Rota de Pedidos em construção.' });
+  res.json({ message: 'Rota de Pedidos em construï¿½ï¿½o.' });
 }));
 
 router.get('/quotes', asyncHandler(async (_req, res) => {
-  res.json({ message: 'Rota de Orçamentos em construção.' });
+  res.json({ message: 'Rota de Orï¿½amentos em construï¿½ï¿½o.' });
 }));
 
 router.get('/customers', asyncHandler(async (_req, res) => {
