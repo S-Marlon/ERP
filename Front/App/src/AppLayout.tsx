@@ -32,7 +32,7 @@ import StockLabelingForm from './pages/Estoque/pages/StockLabelingForm/StockLabe
 import { FinalizarVenda} from "./pages/PDV/pages/FinalizarVenda";
 import PDVContent from './pages/PDV/PDV';
 
-import { HubVendas } from './pages/PDV/HubVendas';
+import  HubVendas  from './pages/PDV/HubVendas';
 import Notas from './pages/Estoque/pages/notas/Notas';
 import ProductForm from './pages/ProductForm';
 

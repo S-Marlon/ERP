@@ -14,10 +14,12 @@
   --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
 }
 
+
 /* 1. Ajuste o Container para garantir que ele ocupe a tela toda */
 .PDVcontainer {
   display: flex;
-  width: 100%; /* usa 100% para evitar overflow causado por scrollbar */
+  width: 100%;
+  /* usa 100% para evitar overflow causado por scrollbar */
   max-width: 100vw;
   height: 100vh;
   background-color: var(--background);
@@ -30,10 +32,10 @@
 
 /* 2. Unifique o mainContent (Remova as duas definições anteriores e use esta) */
 .mainContent {
-  flex: 1; 
+  flex: 1;
   display: flex;
   flex-direction: column;
-  min-width: 0; 
+  min-width: 0;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   background-color: #F5F5F5;
@@ -46,9 +48,11 @@
   margin: 0;
   padding: 0;
   opacity: 0;
-  overflow: hidden; /* Impede que o conteúdo "vaze" enquanto encolhe */
+  overflow: hidden;
+  /* Impede que o conteúdo "vaze" enquanto encolhe */
   pointer-events: none;
-  transition: all 0.5s ease; /* Para o efeito ser suave */
+  transition: all 0.5s ease;
+  /* Para o efeito ser suave */
 }
 
 /* 4. Ajuste o Carrinho (CartAside) para não sumir */
@@ -60,7 +64,8 @@
 
 /* 5. Sidebar de Pagamento - O SEGREDO ESTÁ AQUI */
 .paymentSidebar {
-  flex: 0 0 0; /* inicia colapsada dentro do flex container */
+  flex: 0 0 0;
+  /* inicia colapsada dentro do flex container */
   height: 100%;
   background: white;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -71,35 +76,30 @@
 
 /* Quando ativa, ela "empurra" os outros componentes */
 .checkoutActive .paymentSidebar {
-  flex: 1 1 0 ; /* largura fixa durante o pagamento */
+  flex: 1 1 0;
+  /* largura fixa durante o pagamento */
   border-left: 1px solid var(--border);
 }
 
 /* Ajuste no CartAside para ele também se adaptar se necessário */
-.checkoutActive :global(.CartAside_container_class) { 
+.checkoutActive :global(.CartAside_container_class) {
   /* Se o seu carrinho for um componente separado, você pode diminuir ele aqui também */
-  flex: 0.2; 
+  flex: 0.2;
 }
 
 .lockOverlay {
   position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.1);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.1);
   z-index: 10;
   cursor: pointer;
 }
 
-  
 
 
-
-.sidebarHeader {
-  padding: 1.5rem;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
 
 .filterContent {
   padding: 1.5rem;
@@ -108,24 +108,6 @@
   gap: 1.5rem;
 }
 
-.filterGroup {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.filterGroup label {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
-.filterGroup select {
-  padding: 0.6rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: white;
-}
 
 .checkboxGroup {
   display: flex;
@@ -149,22 +131,19 @@
 }
 
 .filterBar {
-  align-items: center; /* Alinha por baixo para ficar alinhado com os switches */
+  align-items: center;
+  /* Alinha por baixo para ficar alinhado com os switches */
   gap: 0.5rem;
   /* CRUCIAL: impede que o grid cresça além da tela */
-  min-width: 0; 
+  min-width: 0;
 }
 
 /* Container que envolve o EditableField das categorias */
-.filterBar > *:first-child {
-  min-width: 0; /* Permite que o EditableField e seus filhos encolham */
+.filterBar>*:first-child {
+  min-width: 0;
+  /* Permite que o EditableField e seus filhos encolham */
 }
 
-.searchContainer {
-  display: flex;
-  gap: 1rem;
-  max-width: 900px;
-}
 
 .mainInput {
   flex: 1;
@@ -241,22 +220,6 @@
   font-weight: bold;
 }
 
-.lowStock {
-  background-color: #fffaf0;
-}
-
-.cartItemInfo {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12pt;
-}
-
-.cartItemActions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
 .qtyStepper {
   display: flex;
   align-items: center;
@@ -305,14 +268,16 @@
   background: var(--primary-hover);
 }
 
-.btnFooteSection{
+.btnFooteSection {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.btnCheckout, .btnCancelSale  {
-    flex: 1; /* 🔥 faz expandir */
+.btnCheckout,
+.btnCancelSale {
+  flex: 1;
+  /* 🔥 faz expandir */
   color: white;
   border: none;
   padding: 1rem;
@@ -320,10 +285,11 @@
   font-weight: bold;
   font-size: 1rem;
   cursor: pointer;
-  transition: transform 0.1s;}
+  transition: transform 0.1s;
+}
 
 .btnCancelSale {
- background: var(--danger);
+  background: var(--danger);
 }
 
 .btnCheckout {
@@ -372,10 +338,14 @@
 }
 
 .separator {
- border: 0;           /* Remove a borda padrão do navegador */
-  height: 1px;         /* Define a espessura da linha */
-  background-color: #ffffff7c; /* A cor que você desejar (ex: Azul) */
-  margin: 20px 0;      /* Espaçamento opcional */
+  border: 0;
+  /* Remove a borda padrão do navegador */
+  height: 1px;
+  /* Define a espessura da linha */
+  background-color: #ffffff7c;
+  /* A cor que você desejar (ex: Azul) */
+  margin: 20px 0;
+  /* Espaçamento opcional */
 }
 
 .detailGrid {
@@ -416,18 +386,258 @@
 
 /* PDV.module.css - Adições */
 
-.navContainer{
-  display: grid;
-  grid-template-columns: 1fr ;
+/* --- CONTAINER PRINCIPAL E LAYOUT --- */
+.navContainer {
+  width: 100%;
+  background: #fff;
+  border-bottom: 1px solid #eee;
 }
 
 .tabsContainer {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0rem;
+  padding-right: 0.6rem;
+  background: var(--surface, #fff);
   gap: 1rem;
-  /* margin-bottom: 1.5rem; */
-  border-bottom: 2px solid var(--border);
-  padding: 0 2rem;
-  background: var(--surface);
+}
+
+/* --- GRUPO DE TABS (ESQUERDA) --- */
+.tabGroup {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.tabButton {
+  padding: 0.5rem 1rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+  border-bottom: 2px solid transparent;
+}
+
+.tabButtonActive {
+  color: #228be6;
+  border-bottom-color: #228be6;
+}
+
+/* --- GRUPO DE AÇÕES (DIREITA) --- */
+.filterActions {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.filterToggleButton {
+  background: #fdfdfd;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #495057;
+  transition: all 0.2s ease;
+
+  min-width: 120px;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.filterToggleButton:hover {
+  background: #e9ecef;
+  border-color: #dee2e6;
+}
+
+/* Estados Dinâmicos do Botão de Filtro */
+.activeFilter {
+  background: #e7f5ff;
+  border-color: #74c0fc;
+  color: #1971c2;
+}
+
+.hasFiltersHighlight {
+  border-left: 3px solid #228be6 !important;
+  border-bottom: 3px solid #228be6 !important;
+  color: #228be6;
+  font-weight: 600;
+}
+
+.clearFiltersButton {
+  background: none;
+  border: none;
+  color: #fa5252;
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.clearFiltersButton:hover {
+  color: #e03131;
+}
+
+/* --- SEÇÃO COLAPSÁVEL DE FILTROS --- */
+/* Ajuste no Painel colapsável para não sobrepor */
+.collapsibleFilterContent {
+  margin-top: 0.5rem;
+  background: #ffffff;
+  border: 1px solid #ECECEC;
+  padding: 0.5rem;
+  border-radius: 0px 0px 8px 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  animation: slideDown 0.2s ease;
+}
+
+/* Estilo para os Chips dentro do filtro */
+.quickChipsInside {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.miniChip {
+  padding: 4px 8px;
+  font-size: 11px;
+  border-radius: 4px;
+  border: 1px solid #eee;
+  background: #fff;
+  cursor: pointer;
+}
+
+.miniChipActive {
+  background: #228be6;
+  color: #fff;
+  border-color: #228be6;
+}
+
+.filterGrid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr;
+  gap: 2rem;
+  background-color: #F1F3F5;
+  padding: 1rem;
+
+}
+
+.filterColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filterLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+  color: #888;
+}
+
+.filterColumn select,
+.filterColumn input {
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.inputRange {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* --- BARRA DE BUSCA E ESTOQUE RÁPIDO --- */
+.searchMainWrapper {
+  padding: 0.5rem;
+  background: #fff;
+}
+
+.searchContainer {
+  display: flex;
+  align-items: center;
+  /* gap: 1rem; Espaçamento entre os 3 blocos
+   */
+  align-items: space-between;
+  width: 100%;
+}
+
+.inputWrapper {
+  flex: 1;
+  /* A busca estica para ocupar o máximo de espaço */
+  position: relative;
+}
+
+.mainSearchInput {
+  width: 90%;
+  padding: 12px 40px 12px 16px;
+  font-size: 15px;
+  border: 2px solid #eee;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.mainSearchInput:focus {
+  border-color: #228be6;
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(34, 139, 230, 0.1);
+}
+
+.clearSearch {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #eee;
+  border: none;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  font-size: 10px;
+  color: #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Toggle de Estoque Rápido */
+.quickStockToggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: #f8f9fa;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.toggleLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: #495057;
+}
+
+/* --- UTILITÁRIOS --- */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .tabButton {
@@ -447,15 +657,6 @@
   border-bottom-color: var(--primary);
 }
 
-/* Badge para diferenciar Serviço de Peça no Carrinho */
-.typeBadge {
-  font-size: 0.65rem;
-  text-transform: uppercase;
-  padding: 2px 6px;
-  border-radius: 4px;
-  margin-bottom: 4px;
-  display: inline-block;
-}
 
 .badgeService {
   background: #818cf8;
@@ -508,218 +709,7 @@
   font-size: 0.9rem;
   color: #666;
 }
-
-
-
-/* osStyles.module.css */
-
-
-
-.fullSelect {
-  width: 100%;
-  padding: 0.75rem;
-  border-radius: 6px;
-  border: 1px solid #cbd5e0;
-}
-
-
-
-
-
-/* 2. Detalhes Secundários (Preço un. e Estoque) */
-.itemSecondaryDetails {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.85rem;
-  color: #666;
-}
-
-.lowStock {
-  color: #d32f2f;
-  font-weight: bold;
-}
-
-
-
-
-.quantityInput {
-  width: 50px;
-  height: 36px;
-  text-align: center;
-  border: none;
-  border-left: 1px solid #ccc;
-  border-right: 1px solid #ccc;
-  font-weight: bold;
-}
-
-/* Botões de Ação */
-.btnRemove,
-.btnDiscount {
-  border: none;
-  background: none;
-  cursor: pointer;
-  padding: 6px;
-  border-radius: 4px;
-  transition: 0.2s;
-}
-
-.btnRemove {
-  color: #ff5252;
-}
-
-.btnRemove:hover {
-  background: #ffebee;
-}
-
-.btnDiscount {
-  background: #e3f2fd;
-  color: #1976d2;
-  font-weight: bold;
-  width: 36px;
-  height: 36px;
-}
-
-.btnDiscount:hover {
-  background: #bbdefb;
-}
-
-/* Subtotal */
-.itemSubtotal {
-  text-align: right;
-  display: flex;
-  flex-direction: column;
-}
-
-.itemSubtotal .label {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  color: #999;
-}
-
-.itemSubtotal strong {
-  font-size: 1.15rem;
-  color: #2e7d32;
-  /* Verde para o valor final */
-}
-
-.mainInfo {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-
-
-
-/* 2. Detalhes Secundários (Preço un. e Estoque) */
-.itemSecondaryDetails {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.8rem;
-  color: #cbd5e0;
-}
-
-.unitPrice small {
-  color: #94a3b8;
-}
-
-
-
-
-.quantityInput {
-  width: 45px;
-  height: 32px;
-  text-align: center;
-  border: none;
-  background: transparent;
-  color: white;
-  font-weight: bold;
-  font-size: 0.9rem;
-  border-left: 1px solid #475569;
-  border-right: 1px solid #475569;
-}
-
-/* Remove as setas padrão do input number */
-.quantityInput::-webkit-inner-spin-button,
-.quantityInput::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-/* Botões Extras */
-.btnRemove,
-.btnDiscount {
-  border: none;
-  background: #1e293b;
-  color: #94a3b8;
-  cursor: pointer;
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-}
-
-.btnRemove:hover {
-  background: var(--danger);
-  color: white;
-}
-
-.btnDiscount:hover {
-  background: var(--primary);
-  color: white;
-}
-
-/* Subtotal */
-.itemSubtotal {
-  text-align: right;
-  display: flex;
-  flex-direction: column;
-}
-
-.itemSubtotal .label {
-  font-size: 0.65rem;
-  text-transform: uppercase;
-  color: #94a3b8;
-  letter-spacing: 0.05em;
-}
-
-.itemSubtotal strong {
-  font-size: 1.1rem;
-  color: var(--success);
-  /* Usa o verde definido nas variáveis */
-}
-
-
-
-
-
 /* PDV.module.css */
-
-:root {
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
-  --success: #10b981;
-  --danger: #ef4444;
-  --warning: #f59e0b;
-  --background: #f8fafc;
-  --surface: #ffffff;
-  --text-main: #1e293b;
-  --text-muted: #64748b;
-  --border: #e2e8f0;
-  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  /* Cores específicas para o Carrinho (Dark Theme) */
-  --cart-bg: #1e293b;
-  --cart-surface: #334155;
-  --cart-border: #475569;
-  --cart-input-bg: #0f172a;
-}
-
-
-
-
 
 .sidebarHeader {
   padding: 1.5rem;
@@ -729,12 +719,6 @@
   align-items: center;
 }
 
-.filterContent {
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
 
 .filterGroup {
   display: flex;
@@ -755,24 +739,6 @@
   background: white;
 }
 
-
-
-
-.searchContainer {
-  display: flex;
-  gap: 1rem;
-  max-width: 900px;
-}
-
-.mainInput {
-  flex: 1;
-  padding: 0.75rem 1rem;
-  border: 2px solid var(--border);
-  border-radius: 8px;
-  font-size: 1rem;
-  transition: border-color 0.2s;
-}
-
 .mainInput:focus {
   outline: none;
   border-color: var(--primary);
@@ -783,254 +749,6 @@
   overflow-y: auto;
 }
 
-.partsTable {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  background: var(--surface);
-  border-radius: 8px;
-  box-shadow: var(--shadow);
-}
-
-.partsTable th {
-  background: #f1f5f9;
-  padding: 1rem;
-  text-align: left;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.partsTable td {
-  padding: 1rem;
-  border-bottom: 1px solid var(--border);
-}
-
-/* --- CARRINHO (SIDEBAR DIREITA) --- */
-.cartAside {
-  /* base size via flex instead of width to allow shrink when checkout opens */
-  flex: 0 0 550px;
-  background: var(--cart-bg);
-  color: white;
-  display: flex;
-  flex-direction: column;
-  box-shadow: -4px 0 15px #1e293b26;
-}
-
-.cartHeader {
-  display: flex;
-  padding: 0.3rem 1rem;
-  border-bottom: 1px solid var(--cart-border);
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: baseline;
-}
-
-.cartHeader :first-child {
-  margin: 5px;
-}
-
-.cartHeader div {
- display: flex;
- flex: 1;
-  flex-direction:column;
-  width: 100%;
-  justify-content: space-between;
-  align-items: end;
-
-
-}
-
-.clientInfo {
-  display: flex;
-  flex-direction: row;
-  gap: 1rem;
-  justify-content: space-between;
-  gap: 4px;
-  background: var(--cart-surface);
-}
-
-
-
-.cartList {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0.5rem;
-}
-
-/* ITEM DO CARRINHO - Refatorado e Consolidado */
-.cartItem {
-  background: var(--cart-surface);
-  padding: 0.4rem;
-  border-radius: 8px;
-  margin-bottom: 0.2rem;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid transparent;
-  transition: all 0.2s; 
-}
-
-.cartItemItenzero {
-  background: #553333;
-}
-
-.cartItem:hover {
-  border-color: var(--cart-border);
-  transform: scale(1.01);
-  filter: brightness(1.2);
-
-}
-
-.cartItemHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.itemName {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: #f8fafc;
-  text-transform: uppercase;
-}
-
-.skuText {
-  font-size: 0.75rem;
-  color: #94a3b8;
-  display: block;
-}
-
-.itemSecondaryDetails {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.85rem;
-  color: #cbd5e0;
-}
-
-.cartActions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-top: 1px solid var(--cart-border);
-}
-
-.controlsGroup{
-  display: flex;
-  gap: 3px;
-  align-items: center;
-}
-
-/* CONTROLES DE QUANTIDADE (Stepper) */
-.quantitySelector {
-  display: flex;
-  align-items: center;
-  background: var(--cart-input-bg);
-  border-radius: 6px;
-  border: 1px solid var(--cart-border);
-  overflow: hidden;
-}
-
-.quantitySelector button {
-  width: 34px;
-  height: 34px;
-  border: none;
-  background: transparent;
-  color: white;
-  cursor: pointer;
-  font-size: 1.2rem;
-  transition: background 0.2s;
-}
-
-.quantitySelector button:hover:not(:disabled) {
-  background: var(--primary);
-}
-
-.quantitySelector button:disabled {
-  color: #475569;
-  cursor: not-allowed;
-}
-
-.quantityInput {
-  width: 50px;
-  height: 34px;
-  text-align: center;
-  border: none;
-  background: transparent;
-  color: white;
-  font-weight: bold;
-  border-left: 1px solid var(--cart-border);
-  border-right: 1px solid var(--cart-border);
-}
-
-
-
-
-.btnRemove,
-.btnDiscount {
-  width: 24px;
-  height: 18px;
-  border-radius: 4px;
-  font-size: 0.7rem;
-  border: none;
-  background: var(--cart-bg);
-  color: #94a3b8;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-}
-
-.btnDiscount {
-   width: 32px;
-  height: 32px;
-  border-radius: 6px;
-}
-
-
-.btnRemove:hover {
-  background: var(--danger);
-  color: white;
-}
-
-.btnDiscount:hover {
-  background: var(--primary);
-  color: white;
-}
-
-/* SUBTOTAL ITEM */
-.itemSubtotal {
-  text-align: right;
-  display: flex;
-  flex-direction: column;
-}
-
-.itemSubtotal .label {
-  font-size: 0.65rem;
-  color: #ccd4df;
-  text-transform: uppercase;
-}
-
-.itemSubtotal strong {
-  font-size: 1.15rem;
-  color: var(--success);
-}
-
-/* --- FOOTER DO CARRINHO --- */
-.cartFooter {
-  padding: 1.5rem;
-  background: var(--cart-input-bg);
-  display: flex;
-  flex-direction: column;
-}
-
-.totalContainer {
-  display: flex;
-  justify-content: space-between;
-  font-size: 1.5rem;
-  font-weight: 800;
-}
 
 /* --- COMPONENTES AUXILIARES (Badges, Modais, etc) --- */
 .typeBadge {
@@ -1052,17 +770,9 @@
 }
 
 
-/* Remove setas do input number */
-input::-webkit-outer-spin-button,
-input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
 
 
-
-
-.summaryDetails{
+.summaryDetails {
   display: flex;
   flex-direction: row;
   gap: 1rem;
@@ -1070,7 +780,7 @@ input::-webkit-inner-spin-button {
   gap: 0.25rem;
 }
 
-.summaryColumn{
+.summaryColumn {
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -1078,19 +788,13 @@ input::-webkit-inner-spin-button {
   gap: 0.25rem;
 }
 
-.totalInfo{
+.totalInfo {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   font-size: large;
-  font-weight: 700  ;
+  font-weight: 700;
 }
-
-.totalInfo strong{
-  color: var(--success);
-  font-size: larger;
-}
-
 
 
 
@@ -1150,8 +854,13 @@ input::-webkit-inner-spin-button {
 }
 
 @keyframes rotation {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 
@@ -1160,14 +869,17 @@ input::-webkit-inner-spin-button {
   display: flex;
   flex-direction: row;
   gap: 8px;
-  
-  width: 100%;           
-  overflow-x: auto;      /* Scroll horizontal ativo */
-  white-space: nowrap;   /* Mantém tudo em uma linha */
-  padding: 4px 0 8px 0;  /* Espaço para o shadow do chip active */
-  
+
+  width: 100%;
+  overflow-x: auto;
+  /* Scroll horizontal ativo */
+  white-space: nowrap;
+  /* Mantém tudo em uma linha */
+  padding: 4px 0 8px 0;
+  /* Espaço para o shadow do chip active */
+
   /* Esconde a scrollbar para um visual clean */
-  scrollbar-width: none; 
+  scrollbar-width: none;
 }
 
 
@@ -1208,7 +920,8 @@ input::-webkit-inner-spin-button {
 }
 
 .chip {
-  flex-shrink: 0; /* CRUCIAL: impede que o botão se esprema para caber na tela */
+  flex-shrink: 0;
+  /* CRUCIAL: impede que o botão se esprema para caber na tela */
   padding: 6px 14px;
   border-radius: 20px;
   border: 1px solid #d1d5db;
@@ -1483,19 +1196,7 @@ input::-webkit-inner-spin-button {
   opacity: 0.6;
 }
 
-/* ===== PAGINATION FOOTER ===== */
-.paginationFooter {
-  padding: 12px 16px;
-  background: #f8fafc;
-  border-top: 1px solid #e2e8f0;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 12px;
-  color: #64748b;
-  margin: 0 16px 16px 16px;
-  border-radius: 8px;
-}
+
 
 .footerInfo {
   font-size: 12px;
@@ -1550,99 +1251,6 @@ input::-webkit-inner-spin-button {
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
 }
 
-/* ===== DISPLAY MODE BUTTONS ===== */
-.modeButton {
-  padding: 6px 12px;
-  background: #f1f5f9;
-  border: 1px solid #cbd5e0;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-  color: #1e293b;
-  transition: all 0.2s;
-}
-
-.modeButton:hover {
-  background: #e2e8f0;
-  border-color: #94a3b8;
-}
-
-.modeButtonActive {
-  background: #2563eb;
-  color: white;
-  border-color: #2563eb;
-  font-weight: 600;
-  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.3);
-}
-
-.modeButtonActive:hover {
-  background: #1d4ed8;
-  border-color: #1d4ed8;
-}
-
-
-
-.gridWrapper{
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  background-color: #fff;
-  
-}
-
-
-
-/* Container do item quando tem desconto */
-.cartItemDiscounted {
-    border-left: 4px solid var(--success) !important;
-    background: #2d3a4f !important; /* Um azul levemente mais claro que o surface para destacar */
-}
-
-/* Preço antigo riscado (Acima do preço atual) */
-.oldPrice {
-    text-decoration: line-through;
-    color: #94a3b8; /* text-muted do tema dark */
-    font-size: 0.75rem;
-    display: block;
-    line-height: 1;
-}
-
-/* Preço com destaque positivo */
-.priceHighlight {
-    color: var(--success) !important;
-    font-weight: bold;
-}
-
-/* Botão de porcentagem ativo */
-.btnDiscountActive {
-    background-color: var(--success) !important;
-    color: white !important;
-    border: none;
-    font-weight: bold;
-    box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
-}
-
-.priceContainer {
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-}
-
-
-.swal2-deny {
-    order: 1; /* Move o botão de remover para a esquerda se desejar */
-}
-
-/* Preço antigo riscado */
-.originalPriceLabel {
-    text-decoration: line-through;
-    color: #2dabff;
-    font-size: 0.75rem;
-    display: block;
-}
-
-
-
 /* Container principal */
 .lastScan {
   background: #0f172a;
@@ -1656,8 +1264,13 @@ input::-webkit-inner-spin-button {
 }
 
 @keyframes slideInUp {
-  0% { transform: translateY(20px); }
-  100% { transform: translateY(0); }
+  0% {
+    transform: translateY(20px);
+  }
+
+  100% {
+    transform: translateY(0);
+  }
 }
 
 /* Conteúdo interno */
@@ -1669,29 +1282,80 @@ input::-webkit-inner-spin-button {
 
 /* Pop/fade sequencial dos filhos */
 @keyframes popIn {
-  0% { opacity: 0; transform: scale(0.5); }
-  70% { opacity: 1; transform: scale(1.2); }
-  100% { opacity: 1; transform: scale(1); }
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+
+  70% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
-.lastScanContent > * {
-  opacity: 0; /* inicia invisível */
+.lastScanContent>* {
+  opacity: 0;
+  /* inicia invisível */
   animation: popIn 0.3s forwards;
 }
 
-.lastScanContent .check { animation-delay: 0s; }
+.lastScanContent .check {
+  animation-delay: 0s;
+}
+
 .lastScanContent .imageWrapper,
-.lastScanContent .info { animation-delay: 0.01s; }
-.lastScanContent .meta { animation-delay: 0.1s; }
+.lastScanContent .info {
+  animation-delay: 0.01s;
+}
+
+.lastScanContent .meta {
+  animation-delay: 0.1s;
+}
 
 
+.stockCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 
+.stockMain {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0px 17px;
 
+  font-weight: 600;
+  color: #1f2937;
+  /* cinza escuro moderno */
+}
 
+.stockValue {
+  font-size: 0.95rem;
+}
 
+.stockUnit {
+  font-size: 0.75rem;
+  color: #6b7280;
+  /* cinza mais suave */
+  background: #f3f4f6;
+  padding: 1px 6px;
+  border-radius: 6px;
+}
 
+.stockLocation {
+  font-size: 0.75rem;
+  color: #9ca3af;
 
-
-
-
-
+  /* destaque leve */
+  background: #fafafa;
+  padding: 2px 6px;
+  border-radius: 4px;
+  align-items: center;
+  text-align: center;
+}

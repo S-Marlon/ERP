@@ -19,16 +19,19 @@ import ImageDisplay from '../../components/ui/ImageGallery/ImageDysplay';
 import Badge from '../../components/ui/Badge/Badge';
 import EditableField from '../../components/forms/EditableField/EditableField';
 import UniversalInventory from '../../components/Layout/UniversalInventory/UniversalInventory';
-import OSPanel from './components/OSPanel';
+import OSPanelAdapter from './components/OSPanelAdapter';
 import Button from '../../components/ui/Button/Button';
 import { calculateLabor } from './utils/calculations';
+import OSListPage from './pages/OSList/OSListPage';
+import OSPanelRefactored from './components/OSPanelAdapter';
 
 // Type definitions
 type DisplayMode = 'lista' | 'cards' | 'compact';
+type Screen = 'pdv' | 'os-list' | 'os-create';
 
 const PDVContent: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  
+
   // Get all context state
   const {
     // Cart
@@ -81,7 +84,9 @@ const PDVContent: React.FC = () => {
   } = usePDV();
 
   // Local UI state (not in context)
-  const [activeTab, setActiveTab] = useState<'parts' | 'services' | 'os'>('parts');
+
+  const [screen, setScreen] = useState<Screen>('pdv');
+
   const [displayMode, setDisplayMode] = useState<DisplayMode>('lista');
   const [selectedPart, setSelectedPart] = useState<SaleItem | null>(null);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
@@ -109,7 +114,10 @@ const PDVContent: React.FC = () => {
   const [lastScan, setLastScan] = useState<LastScanItem | null>(null);
 
   const searchRef = useRef<HTMLInputElement>(null);
-  
+
+
+  const hasActiveFilters = minPrice !== '0' || maxPrice !== '999999' || minStock !== '' || brand !== 'Todos' || status !== 'Todos' || sortOrder !== '';
+
   // Focus on search when mount or when cart modal closes
   useEffect(() => {
     searchRef.current?.focus();
@@ -168,7 +176,7 @@ const PDVContent: React.FC = () => {
     const oscillator = ctx.createOscillator();
     oscillator.type = 'sine';
     oscillator.frequency.value = 1500; // Hz
-    oscillator.connect(ctx.destination); 
+    oscillator.connect(ctx.destination);
     oscillator.start();
     oscillator.stop(ctx.currentTime + 0.02); // dura 0.02s
   };
@@ -292,7 +300,7 @@ const PDVContent: React.FC = () => {
     const loadCategories = async () => {
       try {
         // Busca as categorias baseado na aba ativa
-        const type = activeTab === 'parts' ? 'parts' : 'services';
+       
         const data = await getPdvCategories(type);
 
         // Sempre adiciona "Todas" como a primeira opção
@@ -304,7 +312,7 @@ const PDVContent: React.FC = () => {
     };
 
     loadCategories();
-  }, [activeTab, setDynamicCategories]);
+  }, [ setDynamicCategories]);
 
   // All filter options loading
   useEffect(() => {
@@ -343,7 +351,7 @@ const PDVContent: React.FC = () => {
   // Definição das colunas específica para este contexto (Peças)
   const productColumns = [
     {
-      header: 'Codificação',
+      header: 'Codificação-SKU',
       key: 'sku',
       render: (item: any) => (
         <div style={{ display: 'flex', flexDirection: 'column', fontSize: '11px' }}>
@@ -381,18 +389,23 @@ const PDVContent: React.FC = () => {
     {
       header: 'Estoque (UoM)',
       key: 'stock',
-      render: (item: any) => (
-        <div>
-          {Number(item.stock).toLocaleString('pt-BR')}
-          {item.unitOfMeasure && <span> {item.unitOfMeasure}</span>}
-        </div>
-      )
+      render: (item: any) => {
+        const stock = Number(item.stock || 0).toLocaleString('pt-BR');
+        const unit = item.unitOfMeasure;
+        const location = item.location || '-';
+
+        return (
+          <div className={styles.stockCell}>
+            <div className={styles.stockMain}>
+              <span className={styles.stockValue}>{stock}</span>
+              {unit && <span className={styles.stockUnit}>{unit}</span>}
+            </div>
+            <div className={styles.stockLocation}>{location}</div>
+          </div>
+        );
+      }
     },
-    {
-      header: 'Localização',
-      key: 'location',
-      render: (item: any) => item.location || '-'
-    },
+
     {
       header: 'Preço',
       key: 'price',
@@ -409,12 +422,12 @@ const PDVContent: React.FC = () => {
       key: 'actions',
       render: (item: any) => (
         <div>
-          <Button variant='secondary'
+          <Button variant='secondary' style={{ padding: '5px' }}
             onClick={() => setSelectedPart(item)} // Abre o modal de detalhes do produto
           >
             <span>?</span>
           </Button>
-          <Button variant='primary'
+          <Button variant='primary' style={{ padding: '5px' }}
             onClick={() => addToCart(item)} // Use a função 'addToCart' que você já criou
           >
             <span>+</span>
@@ -468,7 +481,7 @@ const PDVContent: React.FC = () => {
 
   // 1. Unified single fetch effect
   useEffect(() => {
-    if (activeTab !== 'parts') {
+    if (screen !== 'pdv') {
       return;
     }
 
@@ -496,7 +509,7 @@ const PDVContent: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [filters, activeTab, setLoadingProducts, setPdvResponse, setProducts]);
+  }, [filters, screen, setLoadingProducts, setPdvResponse, setProducts]);
 
   const highlightText = (text: string, highlight: string) => {
     if (!highlight.trim()) return text;
@@ -575,384 +588,122 @@ const PDVContent: React.FC = () => {
         {estagio === 'PAGAMENTO' && <div className={styles.lockOverlay} onClick={() => setEstagio('SELECAO')} />}
 
 
+        {/* 1. NAVEGAÇÃO DE ABAS */}
         <nav className={styles.navContainer}>
           <div className={styles.tabsContainer}>
-            <button className={`${styles.tabButton} ${activeTab === 'parts' ? styles.tabButtonActive : ''}`} onClick={() => setActiveTab('parts')}>📦 Peças</button>
-            <button className={`${styles.tabButton} ${activeTab === 'os' ? styles.tabButtonActive : ''}`} onClick={() => setActiveTab('os')}>📋 Gerar OS</button>
-          </div>
-
-
-        </nav>
-        <div style={{ border: '1px solid #ececec', borderRadius: '0px 0px 8px 8px', padding: '8px', marginBottom: '8px', backgroundColor: '#999' }}>
-
-
-
-            {/* CABEÇALHO DA SANFONA - O GATILHO */}
-            <div
-              onClick={() => setIsFiltersOpen(!isFiltersOpen)} // Abre/Fecha ao clicar na barra
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                cursor: 'pointer',
-                userSelect: 'none'
-              }}
-            >
-              <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: '#333', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span>{isFiltersOpen ? '▼' : '▶'}</span> 🔍 Filtros Avançados
-              </h3>
-
-              {/* Botão de Limpar (Sempre visível ou apenas quando aberto, você escolhe) */}
+            <div className={styles.tabGroup}>
               <button
-                onClick={(e) => {
-                  e.stopPropagation(); // IMPORTANTE: Impede que o clique no botão feche a sanfona
-                  handleResetFilters();
-                }}
-                style={{
-                  padding: '6px 12px',
-                  fontSize: '12px',
-                  backgroundColor: '#6c757d',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontWeight: '500'
-                }}
+                className={`${styles.tabButton} ${screen === 'pdv' ? styles.tabButtonActive : ''}`}
+                onClick={() => setScreen('pdv')}
               >
-                ✕ Limpar Todos
+                📦 Peças
               </button>
 
-
+              <button
+                className={`${styles.tabButton} ${screen === 'os-list' ? styles.tabButtonActive : ''}`}
+                onClick={() => setScreen('os-list')}
+              >
+                📋 OS
+              </button>
             </div>
+            {/* Botão de Filtros Avançados (Agora aqui na direita) */}
+            <div className={styles.filterActions}>
+              {hasActiveFilters && (
+                <button className={styles.clearFiltersButton} onClick={handleResetFilters}>
+                  Limpar
+                </button>
+              )}
+
+              {screen === 'pdv' && (
+                <button
+                  className={`
+          ${styles.filterToggleButton} 
+          ${isFiltersOpen ? styles.activeFilter : ''} 
+          ${hasActiveFilters ? styles.hasFiltersHighlight : ''}
+        `}
+                  onClick={() => setIsFiltersOpen(!isFiltersOpen)}
+                >
+                  <span>{isFiltersOpen ? '▼' : '▶'}</span> 🔍 Filtros
+                </button>
+              )}
+            </div>
+          </div>
+        </nav>
+
+{screen === 'pdv' && (          <>
 
 
+            {/* 2. BARRA DE FERRAMENTAS (Busca + Estoque + Gatilho de Filtros) */}
+            <div className={styles.searchMainWrapper}>
+              <div className={styles.searchContainer}>
+                {/* Campo de Busca Principal */}
+                <div className={styles.inputWrapper}>
+                  <input
+                    className={styles.mainSearchInput}
+                    ref={searchRef}
+                    type="text"
+                    placeholder={`Pesquisar em ${screen === 'pdv' ? 'Peças' : 'Serviços'}...`}
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                  {searchTerm && (
+                    <button onClick={() => setSearchTerm('')} className={styles.clearSearch}>✕</button>
+                  )}
+                </div>
+
+                {/* Toggle de Estoque Rápido */}
+                <div className={styles.quickStockToggle}>
+                  <span className={styles.toggleLabel}>Em estoque</span>
+                  <Switch checked={onlyInStock} onChange={() => setOnlyInStock(!onlyInStock)} />
+                </div>
 
 
+              </div>
 
-
-            {/* CONTEÚDO QUE SE OCULTA */}
-            {isFiltersOpen && (
-              <div style={{
-                marginTop: '16px',
-                paddingTop: '16px',
-                borderTop: '1px solid #f3f4f6',
-                transition: 'all 0.3s ease' // Transição suave (opcional)
-              }}>
-                {/* COLOQUE SEUS INPUTS DE FILTRO AQUI DENTRO */}
-                {/* Grid de Filtros - Responsivo */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                  gap: '12px'
-                }}>
-                  {/* Filtro: Faixa de Preço */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: '500', color: '#555' }}>💰 Faixa de Preço</label>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <input
-                        type="number"
-                        placeholder="Min"
-                        value={minPrice}
-                        onChange={(e) => setMinPrice(e.target.value)}
-                        style={{
-                          flex: 1,
-                          padding: '8px',
-                          border: '1px solid #ccc',
-                          borderRadius: '4px',
-                          fontSize: '12px'
-                        }}
-                      />
-                      <span style={{ fontSize: '12px', color: '#999' }}>—</span>
-                      <input
-                        type="number"
-                        placeholder="Max"
-                        value={maxPrice}
-                        onChange={(e) => setMaxPrice(e.target.value)}
-                        style={{
-                          flex: 1,
-                          padding: '8px',
-                          border: '1px solid #ccc',
-                          borderRadius: '4px',
-                          fontSize: '12px'
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Filtro: Estoque Mínimo */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: '500', color: '#555' }}>📦 Estoque Mínimo</label>
-                    <input
-                      type="number"
-                      placeholder="Qty mínima"
-                      value={minStock}
-                      onChange={(e) => setMinStock(e.target.value)}
-                      style={{
-                        padding: '8px',
-                        border: '1px solid #ccc',
-                        borderRadius: '4px',
-                        fontSize: '12px'
-                      }}
-                    />
-                  </div>
-
-                  {/* Filtro: Marca */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: '500', color: '#555' }}>🏷️ Marca</label>
-                    <select
-                      value={brand}
-                      onChange={(e) => setBrand(e.target.value)}
-                      style={{
-                        padding: '8px',
-                        border: '1px solid #ccc',
-                        borderRadius: '4px',
-                        fontSize: '12px',
-                        backgroundColor: 'white',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {brandOptions.map(opt => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Filtro: Status */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: '500', color: '#555' }}>✓ Status</label>
-                    <select
-                      value={status}
-                      onChange={(e) => setStatus(e.target.value)}
-                      style={{
-                        padding: '8px',
-                        border: '1px solid #ccc',
-                        borderRadius: '4px',
-                        fontSize: '12px',
-                        backgroundColor: 'white',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {statusOptions.map(opt => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  </div>
-
-
-
-
-
-                  {/* Filtro: Unidade de Medida (Opcional) - Comentado por enquanto */}
-                  {/* 
-                  {unitOptions.length > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '12px', fontWeight: '500', color: '#555' }}>⚖️ Unidade</label>
-                      <select
-                        style={{
-                          padding: '8px',
-                          border: '1px solid #ccc',
-                          borderRadius: '4px',
-                          fontSize: '12px',
-                          backgroundColor: 'white',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <option value="">Todas as unidades</option>
-                        {unitOptions.map((opt: string) => (
-                          <option key={opt} value={opt}>{opt}</option>
+              {/* 3. PAINEL DE FILTROS (Aparece logo abaixo da barra de busca) */}
+              {isFiltersOpen && (
+                <div className={styles.w}>
+                  <div className={styles.filterGrid}>
+                    <div className={styles.filterColumn}>
+                      <label className={styles.filterLabel}>📂 Categoria</label>
+                      <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
+                        {categoryOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                      </select>
+                      <div className={styles.quickChipsInside}>
+                        {quickCategories.map(cat => (
+                          <button key={cat} onClick={() => setSelectedCategory(cat)}
+                            className={`${styles.miniChip} ${selectedCategory === cat ? styles.miniChipActive : ''}`}>
+                            {cat}
+                          </button>
                         ))}
+                      </div>
+                    </div>
+
+                    <div className={styles.filterColumn}>
+                      <label className={styles.filterLabel}>💰 Preço e Marca</label>
+                      <div className={styles.inputRange}>
+                        <input type="number" placeholder="Min" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} />
+                        <input type="number" placeholder="Max" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} />
+                      </div>
+                      <select value={brand} onChange={(e) => setBrand(e.target.value)} style={{ marginTop: '8px' }}>
+                        {brandOptions.map(opt => <option key={opt}>{opt}</option>)}
                       </select>
                     </div>
-                  )}
-                  */}
-                </div>
 
-                {/* Indicador de Filtros Ativados */}
-                {(minPrice !== '0' || maxPrice !== '999999' || minStock !== '' || brand !== 'Todos' || status !== 'Todos' || sortOrder !== '') && (
-                  <div style={{
-                    marginTop: '12px',
-                    padding: '8px 12px',
-                    backgroundColor: '#e7f3ff',
-                    border: '1px solid #91d5ff',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    color: '#0050b3'
-                  }}>
-                    ✓ {[
-                      minPrice !== '0' && `Preço min: R$ ${minPrice}`,
-                      maxPrice !== '999999' && `Preço max: R$ ${maxPrice}`,
-                      minStock !== '' && `Estoque min: ${minStock}`,
-                      brand !== 'Todos' && `Marca: ${brand}`,
-                      status !== 'Todos' && `Status: ${status}`,
-                      sortOrder !== '' && `Ordenação: ${sortOrder === 'name_asc' ? 'A-Z' :
-                        sortOrder === 'name_desc' ? 'Z-A' :
-                          sortOrder === 'price_asc' ? 'Preço menor' :
-                            sortOrder === 'price_desc' ? 'Preço maior' : sortOrder
-                      }`
-                    ].filter(Boolean).join(' | ')}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-
-
-
-
-
-
-
-
-        <div className={styles.gridWrapper}>
-
-
-
-          <header className={styles.topHeader} style={{ position: 'relative' }}>
-
-            <div className={styles.searchSection}>
-              <EditableField
-                label="Busca de Itens"
-                showLock={false}
-                isDirty={searchTerm !== ''}
-                showOriginalValue={false}
-
-                originalValue="" // Adicionei para não dar erro de prop obrigatória
-                onRevert={() => setSearchTerm('')}
-              >
-                <input
-                  className={styles.mainInput}
-                  ref={searchRef}
-                  type="text"
-                  placeholder={`Buscar ${activeTab === 'parts' ? 'peças...' : 'serviços...'}`}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  disabled={activeTab === 'os'}
-                />
-              </EditableField>
-            </div>
-
-            <div className={styles.filterBar}>
-              <EditableField
-                label="Ordenar por categoria"
-                showLock={false}
-                isDirty={selectedCategory !== 'Todas'}
-                showOriginalValue={false}
-                originalValue="Todas"
-                onRevert={() => setSelectedCategory('Todas')}
-              >
-
-
-
-                <div className={styles.categoryWrapper}>
-                  {/* SELECT COM BUSCA */}
-                  <select
-                    value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
-                    className={styles.categorySelect}
-                  >
-                    {categoryOptions.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-
-                  {/* CHIPS RÁPIDOS */}
-                  <div className={styles.quickChips}>
-                    {quickCategories.map(cat => (
-                      <button
-                        key={cat}
-                        className={`${styles.chip} ${selectedCategory === cat ? styles.chipActive : ''}`}
-                        onClick={() => setSelectedCategory(cat)}
-                      >
-                        {cat}
-                      </button>
-                    ))}
+                    <div className={styles.filterColumn}>
+                      <label className={styles.filterLabel}>⚙️ Visibilidade</label>
+                      <div className={styles.toggleRow}>
+                        <span>Somente Ativos</span>
+                        <Switch checked={onlyActive} onChange={() => setOnlyActive(!onlyActive)} />
+                      </div>
+                    </div>
                   </div>
                 </div>
-
-
-              </EditableField>
-
-
+              )}
             </div>
 
-
-
-
-          </header>
-
-
-           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr',alignItems: 'center', gap: '8px' }}>
-
-            {/* Filtro: Estoque */}
-            <EditableField
-              label="Com estoque"
-              showLock={false}
-              isDirty={!onlyInStock}
-              showOriginalValue={false}
-              originalValue={true}
-              onRevert={() => setOnlyInStock(true)}
-            >
-              <div className={styles.stockToggle}>
-                <Switch
-                  checked={onlyInStock}
-                  onChange={() => setOnlyInStock(!onlyInStock)}
-                />
-              </div>
-            </EditableField>
-
-            {/* Filtro: Ativos */}
-            <EditableField
-              label="Ativos"
-              showLock={false}
-              isDirty={!onlyActive}
-              showOriginalValue={false}
-              originalValue={true}
-              onRevert={() => setOnlyActive(true)}
-            >
-              <div className={styles.stockToggle}>
-                <Switch
-                  checked={onlyActive}
-                  onChange={() => setOnlyActive(!onlyActive)}
-                />
-              </div>
-            </EditableField>
-
-
-
-            {/* Filtro: Ordenação */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: '12px', fontWeight: '500', color: '#555' }}>⇅ Ordenar Por</label>
-              <select
-                value={sortOrder}
-                onChange={(e) => setSortOrder(e.target.value)}
-                style={{
-                  padding: '8px',
-                  border: '1px solid #ccc',
-                  borderRadius: '4px',
-                  fontSize: '12px',
-                  backgroundColor: 'white',
-                  cursor: 'pointer'
-                }}
-              >
-                <option value="">Padrão (A-Z)</option>
-                <option value="name_asc">Nome: A-Z</option>
-                <option value="name_desc">Nome: Z-A</option>
-                <option value="price_asc">Preço: Menor</option>
-                <option value="price_desc">Preço: Maior</option>
-              </select>
-            </div>
-          </div>
-
-
-
-
-           
-
-        </div>
-{lastScan && (
+          </>)}
+        {/* {lastScan && (
   <div key={lastScan.id} className={styles.lastScan}>
     <div className={styles.lastScanContent}>
       <span className={styles.check}>✔</span>
@@ -976,53 +727,63 @@ const PDVContent: React.FC = () => {
       </div>
     </div>
   </div>
-)}
+)} */}
 
 
         {/* A TABELA GENÉRICA */}
-        <UniversalInventory
-          data={formattedData}
-          columns={productColumns}
-          loading={loadingProducts}
-          displayMode={displayMode}
-          setDisplayMode={setDisplayMode} // Agora o modo de exibição é controlado aqui
-          sortOrder={sortOrder}
+{screen === 'pdv' && (
+          <>
+            <UniversalInventory
+              data={formattedData}
+              columns={productColumns}
+              loading={loadingProducts}
+              displayMode={displayMode}
+              setDisplayMode={setDisplayMode} // Agora o modo de exibição é controlado aqui
+              sortOrder={sortOrder}
 
-          // Paginação vinda do pdvResponse do seu useEffect
-          pagination={{
-            totalItems: pdvResponse?.pagination?.total || 0,
-            currentPage: currentPage,
-            itemsPerPage: itemsPerPage,
-            totalPages: Math.ceil((pdvResponse?.pagination?.total || 0) / itemsPerPage)
-          }}
+              // Paginação vinda do pdvResponse do seu useEffect
+              pagination={{
+                totalItems: pdvResponse?.pagination?.total || 0,
+                currentPage: currentPage,
+                itemsPerPage: itemsPerPage,
+                totalPages: Math.ceil((pdvResponse?.pagination?.total || 0) / itemsPerPage)
+              }}
 
-          // Callbacks que atualizam os estados do Pai
-          onPageChange={(page) => setCurrentPage(page)}
-          onItemsPerPageChange={(limit) => {
-            setItemsPerPage(limit);
-            setCurrentPage(1);
-          }}
-          onSortChange={(sort) => {
-            setSortOrder(sort);
-            setCurrentPage(1);
-          }}
-          onRefresh={() => {
-            // Força a atualização disparando o useEffect que depende de filters
-            setCurrentPage(1);
-          }}
-          onAction={addToCart} // Integração direta com sua função de carrinho
-          moneyFormatter={(val) => money.format(val)}
-        />
-        {activeTab === 'os' && (
-          <OSPanel
-            osItems={osItems}
-            setOsItems={setOsItems}
-            osServices={osServices}
-            setOsServices={setOsServices}
-            osData={osData}
-            setOsData={setOsData}
-            osTotal={osTotal}
-            calculatedLabor={calculatedLabor}
+              // Callbacks que atualizam os estados do Pai
+              onPageChange={(page) => setCurrentPage(page)}
+              onItemsPerPageChange={(limit) => {
+                setItemsPerPage(limit);
+                setCurrentPage(1);
+              }}
+              onSortChange={(sort) => {
+                setSortOrder(sort);
+                setCurrentPage(1);
+              }}
+              onRefresh={() => {
+                // Força a atualização disparando o useEffect que depende de filters
+                setCurrentPage(1);
+              }}
+              onAction={addToCart} // Integração direta com sua função de carrinho
+              moneyFormatter={(val) => money.format(val)}
+            />
+
+          </>)}
+
+        {screen === 'os-list' && (
+         <OSListPage
+  onCreateOS={() => setScreen('os-create')}
+  onBack={() => setScreen('pdv')}
+/>
+        )}
+
+{screen === 'os-create' && (
+            <OSPanelRefactored
+            // customerId={clienteId}
+            onSubmit={(osItem) => {
+              addToCart(osItem);
+              setActiveScreen('pdv');
+            }}
+            onCancel={() => setActiveScreen('os-list')}
             money={money}
           />
         )}
@@ -1032,7 +793,7 @@ const PDVContent: React.FC = () => {
         cart={cart}
         cliente={cliente}
         itemsSubtotal={itemsSubtotal}
-        activeTab={activeTab}
+        activeTab={screen}
         calculatedLabor={calculatedLabor}
         total={total}
         money={money}

@@ -1,5 +1,5 @@
 import React from 'react';
-import styles from '../../PDV.module.css';
+import styles from './CartAside.module.css';
 import Swal from 'sweetalert2';
 
 import { CartItem } from '../../types';
@@ -38,8 +38,46 @@ export const CartAside: React.FC<CartAsideProps> = ({
     applyIndividualDiscount
 }) => {
 
+    const osItems = cart.filter(i => i.type === 'os');
+    const normalItems = cart.filter(i => i.type !== 'os');
 
+    const mockOSList = [
+        {
+            id: 'os-001',
+            number: 'OS-000123',
+            equipment: 'Prensa hidráulica',
+            total: 1500,
+            status: 'Em andamento'
+        },
+        {
+            id: 'os-002',
+            number: 'OS-000124',
+            equipment: 'Mangueira alta pressão',
+            total: 890,
+            status: 'Aguardando pagamento'
+        }
+    ];
 
+    const handleRemove = async (item: CartItem) => {
+        const result = await Swal.fire({
+            title: 'Remover item?',
+            html: `
+      <div style="text-align:left">
+        <strong>${item.name}</strong><br/>
+        <small>Essa ação não pode ser desfeita</small>
+      </div>
+    `,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Remover',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#ef4444'
+        });
+
+        if (result.isConfirmed) {
+            removeItem(item.id);
+        }
+    };
 
     const handleIndividualDiscount = async (item: CartItem) => {
         const precoOriginal = item.originalPrice || item.price;
@@ -98,11 +136,56 @@ export const CartAside: React.FC<CartAsideProps> = ({
     return (
         <aside className={styles.cartAside}>
             <header className={styles.cartHeader}>
+  <h2>Carrinho ({cart.length})</h2>
 
-                <h2>{activeTab === 'os' ? 'Resumo OS' : 'Carrinho'} ({cart.length} itens) </h2>
+  <div className={styles.headerActions}>
+    <button title="Gerar PDF">🧾</button>
+    <button title="Imprimir">🖨️</button>
+    <button title="Exportar">📤</button>
+    <button title="Compartilhar">📲</button>
+    <button title="Limpar carrinho" className={styles.danger}>🗑️</button>
+  </div>
+</header>
+            {/* 🔥 ORDEM DE SERVIÇO ATIVA */}
+            {osItems.length > 0 && (
+                <div className={styles.osHighlight}>
+                    <div className={styles.osHighlightHeader}>
+                        <span>🛠️ Ordem de Serviço vinculada</span>
+                    </div>
 
-               
-            </header>
+                    {osItems.map(os => (
+                        <div key={os.id} className={styles.osHighlightItem}>
+                            <div>
+                                <strong>{os.name}</strong>
+                                <small>{os.description || 'Serviço técnico'}</small>
+                            </div>
+
+                            <div className={styles.osHighlightRight}>
+                                <strong>{money.format(os.price)}</strong>
+                                <button onClick={() => removeItem(os.id)}>✕</button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {osItems.length === 0 && (
+                <div className={styles.osHighlightMock}>
+                    {mockOSList.map(os => (
+                        <div key={os.id} className={styles.osHighlightItem}>
+                            <div>
+                                <strong>{os.number}</strong> - <small>{os.status}</small>
+                                <small> {os.equipment}</small>
+                            </div>
+
+                            <div className={styles.osHighlightRight}>
+                                <strong>{money.format(os.total)}</strong>
+                                <button title='visualizar OS'>👁️</button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
 
             <div className={styles.cartList}>
                 {cart.length === 0 ? (
@@ -110,11 +193,13 @@ export const CartAside: React.FC<CartAsideProps> = ({
                         <p>Seu carrinho está vazio</p>
                     </div>
                 ) : (
-                    cart.map((item) => {
+                    cart.map((item, index) => {
 
                         const precoOriginal = item.originalPrice || item.price;
                         const temDesconto = item.price < precoOriginal;
                         const porcentagemOff = ((1 - item.price / precoOriginal) * 100).toFixed(0);
+
+
 
                         // Verifica se este item específico pode ser fracionado
                         const canFractionate = FRACTIONABLE_UNITS.includes(
@@ -128,19 +213,30 @@ export const CartAside: React.FC<CartAsideProps> = ({
                         const hasStock = stock > 0;
 
                         return (
-                            <div key={item.id} className={`${styles.cartItem} ${temDesconto ? styles.cartItemDiscounted : ''} ${item.quantity == 0 && (
-                                styles.cartItemItenzero
-
-                            )}`}>
+                            <div key={item.id} className={`${styles.cartItem} ${temDesconto ? styles.cartItemDiscounted : ''} ${item.quantity === 0 ? styles.cartItemItenzero : ''}`}>
                                 {/* 1. Cabeçalho do Item: Nome e Código */}
                                 <div className={styles.cartItemHeader}>
+
+                                    <div className={styles.itemIndex}>
+                                        {index + 1}
+                                    </div>
+
                                     <div className={styles.mainInfo}>
                                         <strong className={styles.itemName}>{item.name}</strong>
                                     </div>
+
+                                    <button
+                                            className={`${styles.btnDiscount} ${temDesconto ? styles.btnDiscountActive : ''}`}
+                                            // onClick={() => setSelectedPart(item)}
+                                            title="Ver Detalhes"
+                                        >
+                                            ?
+                                        </button>
+
                                     {item.quantity == 0 && (
                                         <button
                                             className={styles.btnRemove}
-                                            onClick={() => removeItem(item.id)}
+                                            onClick={() => handleRemove(item)}
                                             title="Remover item"
                                         >
                                             ✕
@@ -192,13 +288,17 @@ export const CartAside: React.FC<CartAsideProps> = ({
                                         >
                                             {temDesconto ? `${porcentagemOff}%` : '%'}
                                         </button>
-                                        <button
-                                            className={`${styles.btnDiscount} ${temDesconto ? styles.btnDiscountActive : ''}`}
-                                            // onClick={() => setSelectedPart(item)}
-                                            title="Ver Detalhes"
-                                        >
-                                            ?
-                                        </button>
+
+                                        {activeTab === 'os' && (
+                                            <button
+                                                className={`${styles.btnDiscount} ${temDesconto ? styles.btnDiscountActive : ''}`}
+                                                // onClick={() => setSelectedPart(item)}
+                                                title="Adicionar à Ordem de Serviço"
+                                            >
+                                                🛠️
+                                            </button>
+                                        )}
+
                                     </div>
 
 
@@ -246,7 +346,7 @@ export const CartAside: React.FC<CartAsideProps> = ({
                 )}
 
                 {/* Exibição da Mão de Obra se houver valor calculado */}
-                {calculatedLabor > 0 && (
+                {calculatedLabor > -1 && (
                     <div className={`${styles.cartItem} ${styles.laborRow}`}>
                         <div className={styles.cartItemInfo}>
                             <strong>Mão de Obra / Taxa de Prensagem</strong>
@@ -257,24 +357,34 @@ export const CartAside: React.FC<CartAsideProps> = ({
             </div>
 
             <footer className={styles.cartFooter}>
-                <div className={styles.summaryDetails}>
-                    <div className={styles.summaryColumn}>
+                <div className={styles.summaryBox}>
 
-                        <div >
-                            <span>Subtotal Itens: </span>
-                            <span>{money.format(itemsSubtotal)}</span>
-                        </div>
 
-                        <div >
-                            <span>Mão de Obra: </span>
-                            <span>{money.format(calculatedLabor)}</span>
-                        </div>
+
+                    <div className={styles.summaryRow}>
+                        <span>Produtos</span>
+                        <strong>{money.format(calculatedLabor)}</strong>
                     </div>
 
-                    <div className={styles.totalInfo}>
-                        <small>Valor Total Carrinho</small>
-                        <strong>R$ {total.toFixed(2)}</strong>
+                    <div className={styles.summaryRow}>
+                        <span>Serviços</span>
+                        <strong>{money.format(calculatedLabor)}</strong>
                     </div>
+
+                    <div className={styles.summaryRow}>
+                        <span>Mão de obra</span>
+                        <strong>{money.format(calculatedLabor)}</strong>
+                    </div>
+
+
+
+                    <div className={styles.summaryDivider} />
+
+                    <div className={styles.totalRow}>
+                        <span>Total</span>
+                        <strong>{money.format(total)}</strong>
+                    </div>
+
                 </div>
 
 
@@ -282,6 +392,7 @@ export const CartAside: React.FC<CartAsideProps> = ({
 
                 {/* Bloco de Destaque: Total Geral */}
                 <div className={styles.btnFooteSection}>
+
 
                     <button
                         className={
@@ -296,6 +407,8 @@ export const CartAside: React.FC<CartAsideProps> = ({
                             ? 'CANCELAR PAGAMENTO'
                             : 'FINALIZAR VENDA (F2)'}
                     </button>
+
+
 
 
                     {/* O botão de cancelar só aparece se houver itens no carrinho ou pagamentos realizados */

@@ -74,18 +74,26 @@ const UniversalInventory = <T extends {
         </div>
 
         <div className={styles.actionsGroup}>
-          {(['lista', 'cards', 'compact'] as const).map(mode => (
-            <button 
-              key={mode}
-              className={`${styles.modeBtn} ${displayMode === mode ? styles.modeBtnActive : ''}`}
-              onClick={() => setDisplayMode(mode)}
-            >
-              {mode === 'lista' ? '📋 Lista' : mode === 'cards' ? '🗂️ Cards' : '📄 Compacto'}
-            </button>
-          ))}
-        </div>
+    {(['lista', 'cards', 'compact'] as const).map(mode => (
+      <button 
+        key={mode}
+        className={`${styles.modeBtn} ${displayMode === mode ? styles.modeBtnActive : ''}`}
+        onClick={() => setDisplayMode(mode)}
+      >
+        {mode === 'lista' ? '📋' : mode === 'cards' ? '🗂️' : '📄'} 
+        <span className={styles.btnText}>
+          {mode === 'lista' ? 'Lista' : mode === 'cards' ? 'Cards' : 'Compacto'}
+        </span>
+      </button>
+    ))}
+  </div>
 
         <div className={styles.actionsGroup}>
+
+<div>
+
+          <label style={{ fontSize: '12px', fontWeight: '500', color: '#555' }}>Quantidade:</label>
+
           <select 
             className={styles.modernSelect} 
             value={itemsPerPage} 
@@ -95,7 +103,12 @@ const UniversalInventory = <T extends {
               <option key={val} value={val}>{val} por página</option>
             ))}
           </select>
+</div>
 
+
+<div>
+
+          <label style={{ fontSize: '12px', fontWeight: '500', color: '#555' }}>⇅ Ordenar Por:</label>
           <select
             className={styles.modernSelect}
             value={sortOrder}
@@ -109,6 +122,7 @@ const UniversalInventory = <T extends {
             <option value="stock_asc">Estoque ↑</option>
             <option value="stock_desc">Estoque ↓</option>
           </select>
+</div>
         </div>
       </div>
 

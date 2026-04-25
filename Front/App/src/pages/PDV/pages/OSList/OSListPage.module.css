@@ -1,0 +1,555 @@
+.osListRoot {
+  display: flex;
+  min-height: 100vh;
+  background: #181c24;
+  color: #f3f3f3;
+  font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+.sidebar {
+  width: 220px;
+  background: #1e2230;
+  padding: 32px 16px 16px 16px;
+  border-right: 1px solid #23273a;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.backButton {
+  background: none;
+  color: #aaa;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  margin-bottom: 24px;
+  transition: color 0.2s;
+}
+.backButton:hover {
+  color: #fff;
+}
+
+.sidebarStats h4 {
+  margin: 0 0 8px 0;
+  font-size: 1.1rem;
+  color: #b0b0b0;
+}
+.sidebarStats ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 0.98rem;
+}
+.sidebarStats li {
+  margin-bottom: 6px;
+  color: #e0e0e0;
+}
+
+.mainPanel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0 0 0 0;
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #22263a;
+  padding: 24px 32px 16px 32px;
+  border-bottom: 1px solid #23273a;
+}
+.topBar h2 {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 600;
+  color: #fff;
+}
+.createButton {
+  background: #2e7dff;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 18px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.createButton:hover {
+  background: #1a5dcc;
+}
+
+.filtersBar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: #23273a;
+  padding: 16px 32px;
+  border-bottom: 1px solid #23273a;
+}
+.searchInput {
+  background: #181c24;
+  color: #f3f3f3;
+  border: 1px solid #2e3448;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 1rem;
+  width: 220px;
+}
+.statusSelect {
+  background: #181c24;
+  color: #f3f3f3;
+  border: 1px solid #2e3448;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 1rem;
+}
+.dateInput {
+  background: #181c24;
+  color: #f3f3f3;
+  border: 1px solid #2e3448;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 1rem;
+  width: 140px;
+}
+.dateRangeSep {
+  color: #aaa;
+  font-size: 1.1rem;
+  margin: 0 4px;
+}
+
+.listSection {
+  flex: 1;
+  padding: 32px;
+  background: #181c24;
+  min-height: 0;
+  overflow-y: auto;
+}
+.listGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 24px;
+}
+.osCard {
+  background: #23273a;
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.10);
+  padding: 20px 20px 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: box-shadow 0.2s, background 0.2s;
+  border: 1px solid #23273a;
+}
+.osCard:hover {
+  background: #262b3d;
+  box-shadow: 0 4px 24px rgba(46,125,255,0.10);
+  border: 1px solid #2e7dff33;
+}
+.osCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.osNumber {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #2e7dff;
+}
+.statusBadge {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  margin-left: 8px;
+}
+.statusDraft {
+  background: #444851;
+  color: #b0b0b0;
+}
+.statusInProgress {
+  background: #1a4fff;
+  color: #fff;
+}
+.statusWaitingPayment {
+  background: #ff9800;
+  color: #fff;
+}
+.statusPartiallyPaid {
+  background: #ffe066;
+  color: #333;
+}
+.statusCompleted {
+  background: #2ecc40;
+  color: #fff;
+}
+.statusCancelled {
+  background: #e53935;
+  color: #fff;
+}
+.osCardBody {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 16px;
+  font-size: 1rem;
+  color: #e0e0e0;
+}
+.osCardActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.actionButton {
+  background: #23273a;
+  color: #b0b0b0;
+  border: 1px solid #2e3448;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border 0.15s;
+}
+.actionButton:hover {
+  background: #2e7dff;
+  color: #fff;
+  border: 1px solid #2e7dff;
+}
+.emptyState {
+  color: #aaa;
+  text-align: center;
+  font-size: 1.1rem;
+  margin-top: 40px;
+}
+
+
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #0f1115;
+  color: #e6e6e6;
+  padding: 16px;
+  gap: 16px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* HEADER */
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.headerTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.headerLeft {
+  display: flex;
+  flex-direction: column;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.subtitle {
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.headerRight {
+  display: flex;
+  gap: 10px;
+}
+
+/* FILTROS */
+.filterBar {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  background: #1a1d23;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.04);
+}
+
+.filterGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filterLabel {
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.searchInput {
+  background: #111318;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #fff;
+  min-width: 220px;
+}
+
+.filterSelect {
+  background: #111318;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  padding: 8px;
+  color: #fff;
+}
+
+/* VIEW MODE */
+.viewModeButtons {
+  display: flex;
+  gap: 6px;
+}
+
+.modeBtn {
+  background: #1f242d;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #ccc;
+}
+
+.modeBtnActive {
+  background: #3b82f6;
+  color: #fff;
+}
+
+/* STATS */
+.statsBar {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.statCard {
+  flex: 1;
+  min-width: 160px;
+  background: #1a1d23;
+  border-radius: 10px;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,0.04);
+}
+
+.statLabel {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.statValue {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* CONTENT */
+.contentArea {
+  flex: 1;
+  overflow: auto;
+}
+
+/* EMPTY */
+.emptyState {
+  text-align: center;
+  margin-top: 40px;
+  color: #9ca3af;
+}
+
+/* TABLE */
+.tableWrapper {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table thead {
+  background: #1a1d23;
+}
+
+.table th {
+  text-align: left;
+  padding: 10px;
+  color: #9ca3af;
+  font-weight: 500;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.tableRow {
+  transition: 0.15s;
+}
+
+.tableRow:hover {
+  background: rgba(255,255,255,0.03);
+}
+
+.table td {
+  padding: 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+/* CELLS */
+.osNumber {
+  font-weight: 600;
+}
+
+.customerName {
+  color: #ddd;
+}
+
+.statusCell {
+}
+
+.date {
+  color: #9ca3af;
+}
+
+.amount {
+  font-weight: 500;
+}
+
+/* ACTIONS */
+.actionsCell {
+}
+
+.actionButtons {
+  display: flex;
+  gap: 6px;
+}
+
+.actionBtn {
+  background: #1f242d;
+  border: none;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #ccc;
+  font-size: 12px;
+}
+
+.actionBtn:hover {
+  background: #2a2f38;
+}
+
+.actionBtnDanger {
+  background: #3b1f1f;
+  color: #f87171;
+}
+
+.actionBtnDanger:hover {
+  background: #4a2525;
+}
+
+/* CARDS */
+.cardsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.card {
+  background: #1a1d23;
+  border-radius: 12px;
+  padding: 14px;
+  border: 1px solid rgba(255,255,255,0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: 0.2s;
+}
+
+.card:hover {
+  border-color: rgba(255,255,255,0.08);
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cardTitleSection {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cardTitle {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.cardDate {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+/* BODY */
+.cardBody {
+  font-size: 13px;
+}
+
+.cardCustomer {
+}
+
+.cardDescription {
+  color: #9ca3af;
+}
+
+/* FINANCE */
+.cardFinancial {
+  background: #12151b;
+  padding: 8px;
+  border-radius: 8px;
+}
+
+.finRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+/* ACTIONS */
+.cardActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cardActionBtn {
+  flex: 1;
+  background: #1f242d;
+  border: none;
+  padding: 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #ddd;
+  font-size: 12px;
+}
+
+.cardActionBtn:hover {
+  background: #2a2f38;
+}
+
+.cardActionBtnDanger {
+  background: #3b1f1f;
+  color: #f87171;
+}
