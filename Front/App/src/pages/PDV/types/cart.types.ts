@@ -4,8 +4,9 @@
  * ItemType: Tipagem unificada para o tipo de item no carrinho
  * 'product' = Produto do catálogo
  * 'service' = Serviço do catálogo
+ * 'os' = Ordem de Serviço (conjunto de itens + serviços + mão de obra)
  */
-export type ItemType = 'product' | 'service';
+export type ItemType = 'product' | 'service' | 'os';
 
 export interface SaleItem {
   id: string | number;
