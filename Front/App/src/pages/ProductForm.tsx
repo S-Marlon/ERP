@@ -1,3 +1,5 @@
+// MODELO DE BASE PARA MELHORAR A INSERÇÂO DE PRODUTOS
+
 import React, { useEffect, useState } from 'react'
 
 type MetodoPrecificacao = 'MARKUP' | 'MANUAL'

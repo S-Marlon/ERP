@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import styles from './PDV.module.css';
-import { SaleItem } from './types/cart.types';
+import { SaleItem, Product as PDVProduct } from './types';
 import { Product } from '../Estoque/pages/StockInventory/types/Stock_Products';
 import {
   getPdvProducts,
@@ -19,7 +19,6 @@ import ImageDisplay from '../../components/ui/ImageGallery/ImageDysplay';
 import Badge from '../../components/ui/Badge/Badge';
 import EditableField from '../../components/forms/EditableField/EditableField';
 import UniversalInventory from '../../components/Layout/UniversalInventory/UniversalInventory';
-import OSPanelAdapter from './components/OSPanelAdapter';
 import Button from '../../components/ui/Button/Button';
 import { calculateLabor } from './utils/calculations';
 import OSListPage from './pages/OSList/OSListPage';
@@ -606,6 +605,28 @@ const PDVContent: React.FC = () => {
                 📋 OS
               </button>
             </div>
+
+            {screen === 'pdv' && (
+              <>
+                📦 Catálogo de Peças
+                           <p className={styles.subtitle}>
+                  
+                  Selecione peças para venda ou adicione serviços e itens para OS
+                           </p>
+                           </>
+
+              ) }
+
+              {screen === 'os-list' && (
+                <>
+                📋 Ordens de Serviço
+                <p className={styles.subtitle}>
+                 Gerenciamento de OS e manutenção'
+                </p>
+                </>
+              )}
+
+            
             {/* Botão de Filtros Avançados (Agora aqui na direita) */}
             <div className={styles.filterActions}>
               {hasActiveFilters && (
@@ -625,6 +646,25 @@ const PDVContent: React.FC = () => {
                 >
                   <span>{isFiltersOpen ? '▼' : '▶'}</span> 🔍 Filtros
                 </button>
+              )}
+
+              {screen === 'os-list' && (
+                <div className={styles.headerRight}>
+            <Button
+              variant="primary"
+              onClick={''}
+              style={{ gap: '8px', padding: '10px 20px' }}
+            >
+              ⭐ Nova OS
+            </Button>
+            <Button
+                variant="secondary"
+                onClick={''}
+                style={{ padding: '10px 20px' }}
+              >
+                ← Voltar
+              </Button>
+          </div>
               )}
             </div>
           </div>

@@ -224,33 +224,7 @@ const OSListPage: React.FC<OSListPageProps> = ({
 
   return (
     <div className={styles.container}>
-      {/* HEADER */}
-      <header className={styles.header}>
-        <div className={styles.headerTop}>
-          <div className={styles.headerLeft}>
-            <h1 className={styles.title}>📋 Ordens de Serviço</h1>
-            <p className={styles.subtitle}>Gerenciamento de OS e manutenção</p>
-          </div>
-          <div className={styles.headerRight}>
-            <Button
-              variant="primary"
-              onClick={handleCreateOS}
-              style={{ gap: '8px', padding: '10px 20px' }}
-            >
-              ⭐ Nova OS
-            </Button>
-            {onBack && (
-              <Button
-                variant="secondary"
-                onClick={onBack}
-                style={{ padding: '10px 20px' }}
-              >
-                ← Voltar
-              </Button>
-            )}
-          </div>
-        </div>
-      </header>
+    
 
       {/* FILTROS */}
       <div className={styles.filterBar}>
