@@ -6,6 +6,8 @@ import Fieldset from '../../../components/ui/Fieldset/Fieldset';
 import { imprimirExtratoElgin } from '../../../utils/printService';
 import { salesService, SalePayload } from '../services/salesService';
 import Swal from 'sweetalert2';
+import { isCartItemOS } from '../types/cart.types';
+import { VendaPayload, VendaItem, OrdemServicoVenda, VendaPagamento, PaymentSource } from '../types/sale.types';
 // import {ItemVenda} from '../../../utils/printService'
 
 import Draggable from 'react-draggable';
@@ -243,89 +245,124 @@ const toggleWindow = (id) => {
         if (isEnviando) return;
         setIsEnviando(true);
 
+        // ✅ NOVO: Separar items normais de OS
+        // TODO: Atualizar interface para aceitar CartItem[] em vez de ItemVenda[]
+        const itemsNormais: ItemVenda[] = [];
+        const osItens: any[] = [];
+        
+        // Se itens incluir OS (CartItem com type='os'), separar
+        if (Array.isArray(itens)) {
+          itens.forEach((item: any) => {
+            if (isCartItemOS(item)) {
+              osItens.push(item);
+            } else {
+              itemsNormais.push(item);
+            }
+          });
+        }
+
         // 1. Cálculos de métricas (Snapshots)
-        const totalCusto = itens.reduce((acc, item) => acc + ((item.costPrice || 0) * item.quantity), 0);
+        const totalCusto = itemsNormais.reduce((acc, item) => acc + ((item.costPrice || 0) * item.quantity), 0);
         const lucroNominal = totalLiquido - totalCusto;
         const percentualLucro = totalLiquido > 0 ? (lucroNominal / totalLiquido) * 100 : 0;
 
         console.log("📊 Métricas da Venda:", { totalCusto, lucroNominal, percentualLucro });
 
-        // 🔹 Formatar itens para impressão
-const itensParaImpressao = itens.map(item => ({
-    codigo: String(item.id),
-    name: item.name,
-    quantity: item.quantity,
-    price: item.salePrice,
-    desconto: 0,
-    unidade: item.unidade || 'UN' // 👈 AQUI
-}));
+        // 🔹 Formatar itens normais para impressão
+        const itensParaImpressao = itemsNormais.map(item => ({
+            codigo: String(item.id),
+            name: item.name,
+            quantity: item.quantity,
+            price: item.salePrice,
+            desconto: 0,
+            unidade: item.unidade || 'UN'
+        }));
 
-// 🔹 Formatar pagamentos para impressão
-const pagamentosParaImpressao = pagamentos
-    .filter(p => p.status === 'paid' || p.status === 'processing')
-    .map(p => ({
-        metodo: PAYMENT_METHOD_DETAILS[p.metodo].label,
-        valor: p.valor,
-        parcelas: p.parcelas // 👈 ESSENCIAL
-    }));
+        // 🔹 Formatar pagamentos para impressão
+        const pagamentosParaImpressao = pagamentos
+            .filter(p => p.status === 'paid' || p.status === 'processing')
+            .map(p => ({
+                metodo: PAYMENT_METHOD_DETAILS[p.metodo].label,
+                valor: p.valor,
+                parcelas: p.parcelas
+            }));
 
-// 🔹 Gerar número da venda
-const numeroVenda = Date.now().toString();
+        // 🔹 Gerar número da venda
+        const numeroVenda = Date.now().toString();
 
+        // ✅ NOVO: Criar pagamentos com source tracking
+        const pagamentosComSource: VendaPagamento[] = pagamentos.map((p, idx) => ({
+          id: p.id || `payment-${idx}`,
+          metodo: p.metodo,
+          valor: p.valor,
+          parcelas: p.parcelas,
+          source: osItens.length > 0 && idx >= itemsNormais.length ? 'os' : 'sale',
+          saleId: numeroVenda,
+          osId: osItens[0]?.osData?.osNumber // TODO: Melhorar para múltiplas OS
+        }));
 
-        // 2. Montagem do Payload completo para o BI (Business Intelligence)
-        const vendaCompleta: SalePayload = {
-    data: new Date().toISOString(),
-    clienteNome: cliente || "CONSUMIDOR",
-    totalBruto: total,
-    totalDesconto: descontoCalculado,
-    totalLiquido: totalLiquido,
-    totalCusto: totalCusto,
-    lucroNominal: lucroNominal,
-    percentualLucro: Number(percentualLucro.toFixed(2)),
-    itens: itens.map(item => ({
-        productId: item.id,
-        nome: item.name,
-        quantidade: item.quantity,
-        precoVenda: item.salePrice,
-        precoCusto: item.costPrice || 0,
-        subtotal: item.quantity * item.salePrice,
-        lucroUnitario: item.salePrice - (item.costPrice || 0)
-    })),
-    pagamentos: pagamentosParaImpressao.map(p => ({
-        metodo: p.metodo,
-        valor: p.valor,
-        parcelas: p.parcelas || 1 // 👈 mantém parcelas reais
-    }))
-};
+        // ✅ NOVO: Construir array de ordensServico
+        const ordensServico: OrdemServicoVenda[] = osItens.map(osItem => ({
+          osNumber: osItem.osData?.osNumber || '',
+          equipment: osItem.osData?.equipment || '',
+          gauge: osItem.osData?.gauge || '',
+          layers: osItem.osData?.layers || '2',
+          finalLength: osItem.osData?.finalLength || 0,
+          laborType: osItem.osData?.laborType || 'fixed',
+          laborValue: osItem.osData?.laborValue || 0,
+          items: osItem.osData?.items || [],
+          services: osItem.osData?.services || [],
+          productsTotal: osItem.osData?.productsTotal || 0,
+          servicesTotal: osItem.osData?.servicesTotal || 0,
+          laborTotal: osItem.osData?.laborTotal || 0,
+          total: osItem.osData?.total || 0,
+          paid: osItem.osData?.paid || 0,
+          remaining: osItem.osData?.remaining || 0
+        }));
 
+        // 2. Montagem do Payload completo com suporte a OS e source tracking
+        const vendaCompleta: VendaPayload = {
+            data: new Date(),
+            clienteNome: cliente || "CONSUMIDOR",
+            totalBruto: total,
+            totalDesconto: descontoCalculado,
+            totalLiquido: totalLiquido,
+            totalCusto: totalCusto,
+            lucroNominal: lucroNominal,
+            percentualLucro: Number(percentualLucro.toFixed(2)),
+            
+            // ✅ NOVO: Items normais (produtos/serviços)
+            itens: itemsNormais.map(item => ({
+                type: 'produto' as const,
+                productId: typeof item.id === 'string' ? parseInt(item.id) : item.id,
+                nome: item.name,
+                quantidade: item.quantity,
+                precoVenda: item.salePrice,
+                precoCusto: item.costPrice || 0,
+                subtotal: item.quantity * item.salePrice,
+                lucroUnitario: item.salePrice - (item.costPrice || 0)
+            })),
+            
+            // ✅ NOVO: Ordens de Serviço separadas
+            ordensServico: ordensServico.length > 0 ? ordensServico : undefined,
+            
+            // ✅ NOVO: Pagamentos com source tracking
+            pagamentos: pagamentosComSource
+        };
 
         console.log("🚀 Payload Final da Venda:", vendaCompleta);
-        console.table(vendaCompleta.itens); // Isso mostra os itens em uma tabela linda no console!
-
-
-
-        // // 🔥 DISPARA O LOADING DO SWAL IMEDIATAMENTE
-        // Swal.fire({
-        //     title: 'Processando Venda',
-        //     text: 'Aguarde um momento...',
-        //     allowOutsideClick: false,
-        //     showConfirmButton: false,
-        //     didOpen: () => {
-        //         Swal.showLoading();
-        //     }
-        // });
+        console.table(vendaCompleta.itens);
 
         // 4. Impressão Física
-imprimirExtratoElgin({
-    cliente: vendaCompleta.clienteNome,
-    cpf: "",
-    numero: numeroVenda,
-    itens: itensParaImpressao,
-    total: totalLiquido,
-    pagamentos: pagamentosParaImpressao,
-    troco: troco
-});
+        imprimirExtratoElgin({
+            cliente: vendaCompleta.clienteNome,
+            cpf: "",
+            numero: numeroVenda,
+            itens: itensParaImpressao,
+            total: totalLiquido,
+            pagamentos: pagamentosParaImpressao,
+            troco: troco
+        });
 
         try {
             console.log("⏳ Enviando...");

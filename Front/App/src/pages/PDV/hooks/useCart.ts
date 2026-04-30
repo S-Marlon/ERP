@@ -1,6 +1,7 @@
 // hooks/useCart.ts
 import { useState, useEffect, useCallback } from 'react';
-import { CartItem, SaleItem } from '../types/cart.types';
+import { CartItem, SaleItem, isCartItemOS } from '../types/cart.types';
+import Swal from 'sweetalert2';
 
 export const useCart = () => {
   const [cart, setCart] = useState<CartItem[]>(() => {
@@ -70,6 +71,12 @@ export const useCart = () => {
   const updateQuantity = useCallback((id: string | number, value: number | string) => {
     setCart(prev => prev.map(item => {
       if (item.id === id) {
+        // ✅ NOVO: Proteger OS contra edição de quantidade
+        if (isCartItemOS(item)) {
+          console.warn('⚠️ Não é permitido alterar quantidade de Ordem de Serviço');
+          return item; // Retorna imutável
+        }
+
         const canFractionate = ['MT', 'LT', 'KG', 'M', 'L'].includes(item.unitOfMeasure?.toUpperCase() || '');
         let newQty: number;
         if (typeof value === 'string') {
@@ -98,6 +105,17 @@ export const useCart = () => {
   const applyIndividualDiscount = useCallback((id: string | number, newPrice: number) => {
     setCart(prevCart => prevCart.map(item => {
       if (item.id === id) {
+        // ✅ NOVO: Proteger OS contra aplicação de desconto
+        if (isCartItemOS(item)) {
+          Swal.fire({
+            icon: 'error',
+            title: 'Operação inválida',
+            text: 'Não é permitido aplicar desconto em Ordens de Serviço',
+            timer: 2000
+          });
+          return item; // Retorna imutável
+        }
+
         return {
           ...item,
           originalPrice: item.originalPrice || item.price,

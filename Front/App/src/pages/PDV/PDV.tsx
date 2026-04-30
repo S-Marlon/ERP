@@ -23,7 +23,7 @@ import OSPanelAdapter from './components/OSPanelAdapter';
 import Button from '../../components/ui/Button/Button';
 import { calculateLabor } from './utils/calculations';
 import OSListPage from './pages/OSList/OSListPage';
-import OSPanelRefactored from './components/OSPanelAdapter';
+import OSPanel from './components/OSPanel';
 
 // Type definitions
 type DisplayMode = 'lista' | 'cards' | 'compact';
@@ -777,7 +777,7 @@ const PDVContent: React.FC = () => {
         )}
 
 {screen === 'os-create' && (
-            <OSPanelRefactored
+            <OSPanel
             // customerId={clienteId}
             onSubmit={(osItem) => {
               addToCart(osItem);

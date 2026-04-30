@@ -22,12 +22,18 @@ interface CartAsideProps {
     estagio: 'SELECAO' | 'PAGAMENTO';
 }
 
+type CartAction =
+  | 'print'
+  | 'pdf'
+  | 'export'
+  | 'share'
+  | 'clear';
+
 export const CartAside: React.FC<CartAsideProps> = ({
     cart,
     cliente,
     itemsSubtotal,
     activeTab,
-    calculatedLabor,
     total,
     money,
     updateQuantity,
@@ -78,6 +84,8 @@ export const CartAside: React.FC<CartAsideProps> = ({
             removeItem(item.id);
         }
     };
+
+    
 
     const handleIndividualDiscount = async (item: CartItem) => {
         const precoOriginal = item.originalPrice || item.price;
@@ -131,6 +139,106 @@ export const CartAside: React.FC<CartAsideProps> = ({
         }
     };
 
+    const handleCartAction = async (action: CartAction) => {
+  switch (action) {
+    case 'print':
+      handlePrint();
+      break;
+
+    case 'pdf':
+      handleGeneratePDF();
+      break;
+
+    case 'export':
+      handleExportJSON();
+      break;
+
+    case 'share':
+      handleShare();
+      break;
+
+    case 'clear':
+      await handleClearCart();
+      break;
+  }
+};
+
+const handlePrint = () => {
+  window.print();
+};
+
+const handleGeneratePDF = () => {
+  Swal.fire({
+    icon: 'info',
+    title: 'Em desenvolvimento',
+    text: 'Geração de PDF será implementada em breve'
+  });
+};
+
+const handleExportJSON = () => {
+  const data = {
+    cliente,
+    cart,
+    total,
+    createdAt: new Date().toISOString()
+  };
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], {
+    type: 'application/json'
+  });
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `cart-${Date.now()}.json`;
+  a.click();
+
+  URL.revokeObjectURL(url);
+};
+
+const handleShare = async () => {
+  const text = `Pedido de ${cliente}\nTotal: ${money.format(total)}`;
+
+  if (navigator.share) {
+    await navigator.share({
+      title: 'Carrinho',
+      text
+    });
+  } else {
+    await navigator.clipboard.writeText(text);
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Copiado!',
+      text: 'Resumo copiado para área de transferência',
+      timer: 1500
+    });
+  }
+};
+
+const handleClearCart = async () => {
+  const result = await Swal.fire({
+    icon: 'warning',
+    title: 'Limpar carrinho?',
+    text: 'Todos os itens serão removidos',
+    showCancelButton: true,
+    confirmButtonText: 'Limpar',
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#ef4444'
+  });
+
+  if (result.isConfirmed) {
+    cart.forEach(item => removeItem(item.id));
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Carrinho limpo',
+      timer: 1200,
+      showConfirmButton: false
+    });
+  }
+};  
+
     const FRACTIONABLE_UNITS = ['MT', 'LT', 'KG', 'M', 'L'];
 
     return (
@@ -139,53 +247,119 @@ export const CartAside: React.FC<CartAsideProps> = ({
   <h2>Carrinho ({cart.length})</h2>
 
   <div className={styles.headerActions}>
-    <button title="Gerar PDF">🧾</button>
-    <button title="Imprimir">🖨️</button>
-    <button title="Exportar">📤</button>
-    <button title="Compartilhar">📲</button>
-    <button title="Limpar carrinho" className={styles.danger}>🗑️</button>
-  </div>
+  <button onClick={() => handleCartAction('pdf')} title="Gerar PDF" disabled>🧾</button>
+  <button onClick={() => handleCartAction('print')} title="Imprimir">🖨️</button>
+  <button onClick={() => handleCartAction('export')} title="Exportar">📤</button>
+  <button onClick={() => handleCartAction('share')} title="Compartilhar">📲</button>
+  <button
+    onClick={() => handleCartAction('clear')}
+    title="Limpar carrinho"
+    className={styles.danger}
+  >
+    🗑️
+  </button>
+</div>
 </header>
             {/* 🔥 ORDEM DE SERVIÇO ATIVA */}
             {osItems.length > 0 && (
                 <div className={styles.osHighlight}>
                     <div className={styles.osHighlightHeader}>
-                        <span>🛠️ Ordem de Serviço vinculada</span>
+                        <span>🛠️ Ordem de Serviço ({osItems.length})</span>
                     </div>
 
-                    {osItems.map(os => (
-                        <div key={os.id} className={styles.osHighlightItem}>
-                            <div>
-                                <strong>{os.name}</strong>
-                                <small>{os.description || 'Serviço técnico'}</small>
-                            </div>
+                   {osItems.map(os => {
+  const osDetails = os.osData || {};
+  const itemsCount = osDetails.items?.length || 0;
+  const servicesCount = osDetails.services?.length || 0;
 
-                            <div className={styles.osHighlightRight}>
-                                <strong>{money.format(os.price)}</strong>
-                                <button onClick={() => removeItem(os.id)}>✕</button>
-                            </div>
-                        </div>
-                    ))}
+  const isPaid = os.price <= 0;
+
+  return (
+    <div
+      key={os.id}
+      className={styles.osHighlightItem}
+      title={`OS: ${osDetails.osNumber || 'N/A'}`}
+    >
+      <div className={styles.osItemContent}>
+        <div>
+          <strong>{os.name}</strong>
+
+          <small>
+            {itemsCount} itens • {servicesCount} serviços
+          </small>
+
+          <div style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>
+            {osDetails.osNumber && <>Ref: {osDetails.osNumber}</>}
+          </div>
+
+          {/* ✅ STATUS */}
+          {isPaid && (
+            <div style={{ fontSize: '11px', color: '#10b981', marginTop: '2px' }}>
+              ✔ Quitada
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className={styles.osItemRight}>
+        <div className={styles.osBreakdown}>
+          {osDetails.productsTotal !== undefined && (
+            <div style={{ fontSize: '11px', color: '#999' }}>
+              Produtos: {money.format(osDetails.productsTotal)}
+            </div>
+          )}
+
+          {osDetails.laborTotal > 0 && (
+            <div style={{ fontSize: '11px', color: '#999' }}>
+              MO: {money.format(osDetails.laborTotal)}
+            </div>
+          )}
+        </div>
+
+        <strong style={{ fontSize: '14px', marginTop: '4px' }}>
+          {money.format(os.price)}
+        </strong>
+      </div>
+
+      {/* ✅ AÇÕES */}
+      <div className={styles.osItemActions}>
+        {/* 👁️ VISUALIZAR */}
+        <button
+          className={styles.osActionBtn}
+          onClick={() => onViewOS?.(os)}
+          title="Visualizar OS"
+        >
+          👁️
+        </button>
+
+        {/* ✏️ EDITAR */}
+        <button
+          className={styles.osActionBtn}
+          onClick={() => {
+            removeItem(os.id);
+            onEditOS?.(os);
+          }}
+          title="Editar OS"
+        >
+          ✏️
+        </button>
+
+        {/* ❌ REMOVER */}
+        <button
+          className={styles.osActionBtnDanger}
+          onClick={() => removeItem(os.id)}
+          title="Remover OS"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+  );
+})}
                 </div>
             )}
 
-            {osItems.length === 0 && (
-                <div className={styles.osHighlightMock}>
-                    {mockOSList.map(os => (
-                        <div key={os.id} className={styles.osHighlightItem}>
-                            <div>
-                                <strong>{os.number}</strong> - <small>{os.status}</small>
-                                <small> {os.equipment}</small>
-                            </div>
-
-                            <div className={styles.osHighlightRight}>
-                                <strong>{money.format(os.total)}</strong>
-                                <button title='visualizar OS'>👁️</button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
+           
 
             <div className={styles.cartList}>
                 {cart.length === 0 ? (
@@ -346,34 +520,28 @@ export const CartAside: React.FC<CartAsideProps> = ({
                 )}
 
                 {/* Exibição da Mão de Obra se houver valor calculado */}
-                {calculatedLabor > -1 && (
-                    <div className={`${styles.cartItem} ${styles.laborRow}`}>
-                        <div className={styles.cartItemInfo}>
-                            <strong>Mão de Obra / Taxa de Prensagem</strong>
-                            <span>{money.format(calculatedLabor)}</span>
-                        </div>
-                    </div>
-                )}
+             
             </div>
 
             <footer className={styles.cartFooter}>
                 <div className={styles.summaryBox}>
 
+{}
 
 
                     <div className={styles.summaryRow}>
                         <span>Produtos</span>
-                        <strong>{money.format(calculatedLabor)}</strong>
+                        <strong>0</strong>
                     </div>
 
                     <div className={styles.summaryRow}>
                         <span>Serviços</span>
-                        <strong>{money.format(calculatedLabor)}</strong>
+                        <strong>0</strong>
                     </div>
 
                     <div className={styles.summaryRow}>
                         <span>Mão de obra</span>
-                        <strong>{money.format(calculatedLabor)}</strong>
+                        <strong>0</strong>
                     </div>
 
 

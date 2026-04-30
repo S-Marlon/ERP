@@ -1,7 +1,9 @@
 import React, { useCallback, useMemo } from 'react';
 import type { CartItem } from '../../types/cart.types';
+import { createCartItemOS } from '../../types/cart.types';
 import { useOrderService } from '../../../../hooks/useOrderService';
 import { getOSSummary } from '../../../../utils/os-helpers';
+import Swal from 'sweetalert2';
 
 import OSForm from './OSForm';
 import OSItemList from './OSItemList';
@@ -71,25 +73,47 @@ const OSPanelRefactored: React.FC<OSPanelRefactoredProps> = ({
       return;
     }
 
+    // ✅ NOVO: Validar se remaining > 0
+    const paid = os.totalAmount - os.totalAmount; // Assumindo que quando cria, paid = 0
+    const remaining = os.totalAmount;
+    
+    if (remaining <= 0) {
+      await Swal.fire({
+    icon: 'info',
+    title: 'OS já quitada',
+    text: 'Esta OS já está paga e será adicionada ao carrinho apenas para registro.',
+    timer: 2000,
+  });
+      return;
+    }
+
     const summary = getOSSummary(os);
 
-    const osItem: CartItem = {
-      id: os.id,
-      name: summary,
-      price: os.totalAmount,
-      quantity: 1,
-      type: 'os',
-      osData: {
-        osId: os.id,
-        osNumber: os.number,
-        montagens: os.montagens,
-        items: os.items,
-        services: os.services,
-        config: os.config,
-        labor: os.labor,
-        total: os.totalAmount,
-      },
-    };
+    // ✅ NOVO: Usar factory function createCartItemOS
+    const osItem = createCartItemOS({
+      osNumber: os.number,
+      equipment: os.config.equipment,
+      application: os.config.application || '',
+      gauge: os.config.gauge,
+      layers: os.config.layers || '2',
+      finalLength: os.config.finalLength,
+      laborType: os.labor?.type || 'fixed',
+      laborValue: os.labor?.value || 0,
+      customerName: '', // Pode ser buscado do contexto
+      technician: '',
+      status: 'draft',
+      title: summary,
+      notes: '',
+      items: os.items,
+      services: os.services,
+      productsTotal: os.items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+      servicesTotal: os.services.reduce((sum, svc) => sum + svc.price * svc.quantity, 0),
+      laborTotal: os.labor?.value || 0,
+      total: os.totalAmount,
+      paid: 0,
+      remaining: remaining,
+      payments: []
+    });
 
     onSubmit(osItem);
   }, [isValid, os, onSubmit]);
