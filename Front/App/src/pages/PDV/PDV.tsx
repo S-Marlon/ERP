@@ -114,6 +114,14 @@ const PDVContent: React.FC = () => {
 
   const searchRef = useRef<HTMLInputElement>(null);
 
+  const handleNewOS = () => {
+    setScreen('os-create');
+  };
+
+  const handleBack = () => {
+    setScreen('pdv');
+  };
+
 
   const hasActiveFilters = minPrice !== '0' || maxPrice !== '999999' || minStock !== '' || brand !== 'Todos' || status !== 'Todos' || sortOrder !== '';
 
@@ -652,14 +660,14 @@ const PDVContent: React.FC = () => {
                 <div className={styles.headerRight}>
             <Button
               variant="primary"
-              onClick={''}
+              onClick={handleNewOS}
               style={{ gap: '8px', padding: '10px 20px' }}
             >
               ⭐ Nova OS
             </Button>
             <Button
                 variant="secondary"
-                onClick={''}
+                onClick={handleBack}
                 style={{ padding: '10px 20px' }}
               >
                 ← Voltar
