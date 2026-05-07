@@ -268,13 +268,23 @@ const [decomposition, setDecomposition] = useState<DecompositionData>({
 
     const handleSearch = async (term: string) => {
         setSearchTerm(term);
+        console.log('MappingModal: searching term ->', term);
 
-        if (term.length > 2) {
+        // Dispara a busca a partir de 2 caracteres (API aceita >=2)
+        if (term && term.length >= 2) {
             setIsLoading(true);
-            const resultados = await buscarProdutosExistentes(term);
-            setSearchResults(resultados);
-            setShowDropdown(true);
-            setIsLoading(false);
+            try {
+                const resultados = await buscarProdutosExistentes(term);
+                console.log('MappingModal: resultados ->', resultados);
+                setSearchResults(resultados || []);
+                setShowDropdown((resultados || []).length > 0);
+            } catch (err) {
+                console.error('Erro em buscarProdutosExistentes:', err);
+                setSearchResults([]);
+                setShowDropdown(false);
+            } finally {
+                setIsLoading(false);
+            }
         } else {
             setSearchResults([]);
             setShowDropdown(false);
@@ -813,7 +823,9 @@ const [decomposition, setDecomposition] = useState<DecompositionData>({
                             </legend>
 
                             <div style={{ position: 'relative' }}>
+                            
                                 <FormControl
+                                    label="Buscar Produto"
                                     value={searchTerm}
                                     placeholder="Pesquisar por Nome, ID ou GTIN..."
                                     onChange={(e) => handleSearch(e.target.value)}

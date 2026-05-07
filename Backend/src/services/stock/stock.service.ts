@@ -38,6 +38,8 @@ export interface StockMovementData {
   idFornecedor?: number;
   referenciaAuditavel?: string;
   metadata?: Record<string, any>; // JSON para dados extras
+  allowInactive?: boolean; // quando true, permite movimentar mesmo com produto inativo
+  connection?: any; // optional transactional connection to avoid cross-connection locks
   idRecebimento?: number; // Integração futura com recebimentos
   useManualStockUpdate?: boolean; // 🆕 Flag para testar cálculo manual
 }
@@ -126,10 +128,12 @@ export async function processStockMovement(data: StockMovementData): Promise<num
     throw new Error('Origem é obrigatória');
   }
 
-  // 🔎 Validar produto
-  const isValidProduct = await validateProductForStock(data.idProduto);
-  if (!isValidProduct) {
-    throw new Error('Produto inválido ou inativo');
+  // 🔎 Validar produto (pode ser ignorado para entradas/imports quando allowInactive=true)
+  if (!data.allowInactive) {
+    const isValidProduct = await validateProductForStock(data.idProduto);
+    if (!isValidProduct) {
+      throw new Error('Produto inválido ou inativo');
+    }
   }
 
   // 🔢 SEMPRE quantidade positiva
@@ -140,20 +144,25 @@ export async function processStockMovement(data: StockMovementData): Promise<num
     ? quantidadeFinal * data.valorUnitario
     : null;
 
-  // 🧠 Validação de estoque para saída
+  // 🧠 Validação de estoque para saída (use conexão transacional quando disponível)
   if (data.tipo === 'SAIDA') {
-    const stock = await getCurrentStock(data.idProduto);
+    const exec = data.connection ? data.connection.execute.bind(data.connection) : pool.execute.bind(pool);
+    const [rows]: any = await exec(
+      `SELECT quantidade, valor_medio FROM estoque_saldos WHERE id_produto = ?`,
+      [data.idProduto]
+    );
 
-    if (stock.quantidade < quantidadeFinal) {
+    const stockQty = rows.length ? Number(rows[0].quantidade) : 0;
+    if (stockQty < quantidadeFinal) {
       throw new Error(
-        `Estoque insuficiente. Atual: ${stock.quantidade}, solicitado: ${quantidadeFinal}`
+        `Estoque insuficiente. Atual: ${stockQty}, solicitado: ${quantidadeFinal}`
       );
     }
   }
 
   // 🆔 Preparação para idempotência futura (ledger profissional)
   // ⚠️ NÃO usar event_id ainda (coluna pode não existir no banco atual)
-  const eventId = randomUUID();
+  let eventId = randomUUID();
 
   // 📜 Log estruturado e auditável
   console.log('[STOCK_LEDGER]', JSON.stringify({
@@ -173,33 +182,57 @@ export async function processStockMovement(data: StockMovementData): Promise<num
   }));
 
   // 💾 Inserção no ledger com event_id para garantir idempotência
-  const [result]: any = await pool.execute(
-    `INSERT INTO estoque_movimentacoes (
-      event_id,
-      id_produto,
-      id_fornecedor,
-      tipo,
-      origem,
-      id_origem,
-      quantidade,
-      valor_unitario,
-      valor_total,
-      referencia_auditavel,
-      data_movimento
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-    [
-      eventId,
-      data.idProduto,
-      data.idFornecedor || null,
-      data.tipo,
-      data.origem,
-      data.idOrigem || null,
-      quantidadeFinal,
-      data.valorUnitario || null,
-      valorTotal,
-      data.referenciaAuditavel || null,
-    ]
-  );
+  const exec = data.connection ? data.connection.execute.bind(data.connection) : pool.execute.bind(pool);
+
+  // Tentativa segura para evitar Duplicate entry '' para event_id
+  let result: any;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      // Garantir eventId não vazio
+      if (!eventId || String(eventId).trim() === '') eventId = randomUUID();
+
+      // Log informativo antes do INSERT
+      console.log('[STOCK_LEDGER][INSERT]', { eventId, id_produto: data.idProduto, quantidade: quantidadeFinal });
+      [result] = await exec(
+        `INSERT INTO estoque_movimentacoes (
+          event_id,
+          id_produto,
+          id_fornecedor,
+          tipo,
+          origem,
+          id_origem,
+          quantidade,
+          valor_unitario,
+          valor_total,
+          referencia_auditavel,
+          data_movimento
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+        [
+          eventId,
+          data.idProduto,
+          data.idFornecedor || null,
+          data.tipo,
+          data.origem,
+          data.idOrigem || null,
+          quantidadeFinal,
+          data.valorUnitario || null,
+          valorTotal,
+          data.referenciaAuditavel || null,
+        ]
+      );
+      break; // sucesso
+    } catch (err: any) {
+      // Se duplicata no event_id (inclui casos com ''), gerar novo uuid e tentar novamente
+      const msg = String(err && err.message ? err.message : err);
+      if (msg.includes('Duplicate entry') && (msg.includes('event_id') || msg.includes("idx_estoque_movimentacoes_event_id") || msg.includes("Duplicate entry ''"))) {
+        console.warn('[WARN] Duplicate event_id detected (or empty), regenerating and retrying', { message: msg });
+        eventId = randomUUID();
+        continue;
+      }
+      // Re-throw outros erros
+      throw err;
+    }
+  }
 
   // 🧪 Teste de cálculo manual (preparação para remoção da trigger)
   if (data.useManualStockUpdate) {

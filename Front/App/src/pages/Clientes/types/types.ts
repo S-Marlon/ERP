@@ -1,18 +1,36 @@
-export interface Cliente {
-  id_cliente?: number;
-  nome_razao: string;
-  cpf_cnpj: string;
-  tipo_cliente: string;
-}
+/**
+ * ARQUIVO LEGADO - USE cliente.types.ts PARA NOVOS DESENVOLVIMENTOS
+ * 
+ * Este arquivo mantém compatibilidade com código antigo
+ * Todos os novos tipos devem ser adicionados em cliente.types.ts
+ */
 
-export interface PrecoEspecial {
-  id_regra?: number;
-  id_cliente: number;
-  id_produto: number;
-  descricao_produto?: string; // Para exibir na lista
-  preco_custo: number; // Para validação
-  preco_venda_padrao: number;
-  tipo_desconto: 'VALOR_FIXO' | 'PERCENTUAL';
-  valor: number;
-  data_validade?: string;
-}
+// Re-exportar tipos do novo arquivo para compatibilidade
+export type {
+  Cliente,
+  ClienteInput,
+  ClienteUpdate,
+  ClienteContato,
+  ClienteEmail,
+  ClientePrecoEspecial,
+  ContaReceber,
+  Venda,
+  VendaItem,
+  ClienteComDetalhes,
+  ResumoFinanceiro,
+  ResumoVendas,
+  ApiResponse,
+  ApiListResponse,
+  ClienteState,
+  ClienteAction,
+  TipoCliente,
+  StatusCredito,
+  StatusCliente,
+  TipoContato,
+  TipoEmail,
+  TipoDesconto,
+  StatusConta,
+  OrigemVenda,
+} from './cliente.types';
+
+export { default as ClienteTypes } from './cliente.types';

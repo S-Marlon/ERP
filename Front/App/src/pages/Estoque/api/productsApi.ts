@@ -398,3 +398,13 @@ export const fetchStockEntryDetails = async (noteId: string | number): Promise<S
     const data: StockEntryNote = await response.json();
     return data;
 };
+
+// Lista fornecedores para popular selects
+export const getSuppliers = async () => {
+    const response = await fetch(`${apiBase}/suppliers`);
+    if (!response.ok) {
+        const err = await response.text();
+        throw new Error(err || 'Erro ao buscar fornecedores');
+    }
+    return await response.json();
+};

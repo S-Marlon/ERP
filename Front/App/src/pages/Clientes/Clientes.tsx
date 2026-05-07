@@ -1,192 +1,268 @@
+/**
+ * PÁGINA CLIENTES
+ * Orquestrador principal do módulo de gestão de clientes
+ * Refatorado com arquitetura profissional em camadas
+ */
+
 import React, { useState, useEffect } from 'react';
 import './Clientes.css';
-import { Cliente, PrecoEspecial } from './types/types'; // Ajuste o caminho se necessário
-import { clienteService } from './services/clienteService';
+import { clienteService } from '../../services/clienteService';
+import { useCliente } from '../../hooks/useCliente';
+import { ClientHeader } from './components/ClientHeader';
+import CadastroTab from './components/tabs/CadastroTab';
+import ContatosTab from './components/tabs/ContatosTab';
+import FinanceiroTab from './components/tabs/FinanceiroTab';
+import HistoricoTab from './components/tabs/HistoricoTab';
+import PrecosTab from './components/tabs/PrecosTab';
+import type { Cliente, ResumoVendas } from '../../types/cliente.types';
 
 const Clientes = () => {
+  // =========================================================================
+  // STATE
+  // =========================================================================
 
- const [clientes, setClientes] = useState<Cliente[]>([]);
-  
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [activeTab, setActiveTab] = useState<'cadastro' | 'contatos' | 'financeiro' | 'historico' | 'precos'>('cadastro');
+  const [usuarioLoading, setUsuarioLoading] = useState(false);
+  const [ultimaCompra, setUltimaCompra] = useState<Date | undefined>();
+  const [ticketMedio, setTicketMedio] = useState<number | undefined>();
 
+  // Hook principal
+  const {
+    state,
+    cliente,
+    loading,
+    error,
+    carregarCliente,
+    atualizarCliente,
+    salvarCliente,
+    novoCliente,
+    limparErro,
+    carregarVendas,
+  } = useCliente();
+
+  // =========================================================================
+  // EFEITOS
+  // =========================================================================
+
+  // Carrega lista de clientes ao montar
   useEffect(() => {
-    carregarClientes();
+    carregarListaClientes();
   }, []);
 
-  const carregarClientes = async () => {
-    const dados = await clienteService.listarTodos();
-    setClientes(dados);
+  // Carrega resumo de vendas quando cliente muda
+  useEffect(() => {
+    if (cliente?.id_cliente) {
+      carregarResumoVendas();
+    }
+  }, [cliente?.id_cliente]);
+
+  // =========================================================================
+  // HANDLERS
+  // =========================================================================
+
+  const carregarListaClientes = async () => {
+    try {
+      setUsuarioLoading(true);
+      const dados = await clienteService.listarTodos();
+      setClientes(dados);
+    } catch (err) {
+      console.error('Erro ao carregar clientes:', err);
+    } finally {
+      setUsuarioLoading(false);
+    }
   };
 
-  const handleSalvar = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await clienteService.salvar(clienteSel);
-    setClienteSel({ nome_razao: '', cpf_cnpj: '', tipo_cliente: 'CONSUMIDOR' });
-    carregarClientes();
+  const carregarResumoVendas = async () => {
+    const resumo = await carregarVendas();
+    if (resumo) {
+      setUltimaCompra(resumo.ultima_venda);
+      setTicketMedio(resumo.ticket_medio);
+    }
   };
 
-  const [clienteSel, setClienteSel] = useState<Partial<Cliente>>({
-  nome_razao: '',
-  cpf_cnpj: '',
-  tipo_cliente: 'CONSUMIDOR',
-  
-  endereco: '',
-  bairro: '',
-  cidade: '',
-  estado: '',
-  cep: '',
-  limite_credito: 0,
-  dia_vencimento: 10,
-  status_credito: 'ANALISE'
-});
+  const handleSelecionarCliente = async (c: Cliente) => {
+    await carregarCliente(c.id_cliente);
+    setActiveTab('cadastro');
+  };
 
-// Adicione estes dois estados para os campos multivalorados
-const [contatos, setContatos] = useState([{ tipo: 'CELULAR', numero: '', nome_referencia: '' }]);
-const [emails, setEmails] = useState([{ tipo: 'PESSOAL', email: '' }]);
+  const handleNovoCliente = () => {
+    novoCliente();
+    setActiveTab('cadastro');
+    setUltimaCompra(undefined);
+    setTicketMedio(undefined);
+  };
 
-// Função para adicionar novo campo de telefone na tela
-const adicionarCampoContato = () => {
-  setContatos([...contatos, { tipo: 'CELULAR', numero: '', nome_referencia: '' }]);
-};
+  const handleAcaoBotao = (acao: 'pagar' | 'bloquear' | 'desbloquear' | 'novo') => {
+    switch (acao) {
+      case 'pagar':
+        setActiveTab('financeiro');
+        break;
+      case 'bloquear':
+        if (cliente) {
+          atualizarCliente({ status_cliente: 'BLOQUEADO' });
+        }
+        break;
+      case 'desbloquear':
+        if (cliente) {
+          atualizarCliente({ status_cliente: 'ATIVO' });
+        }
+        break;
+      case 'novo':
+        handleNovoCliente();
+        break;
+    }
+  };
 
-// Função para adicionar novo campo de email na tela
-const adicionarCampoEmail = () => {
-  setEmails([...emails, { tipo: 'PESSOAL', email: '' }]);
-};
+  // =========================================================================
+  // RENDER
+  // =========================================================================
 
   return (
-    <div className="container-erp">
+    <div className="container-clientes">
+      {/* SIDEBAR: LISTA DE CLIENTES */}
       <aside className="sidebar-clientes">
         <div className="sidebar-header">
           <h3>Clientes</h3>
-          <button className="btn-novo" onClick={() => setClienteSel({ nome_razao: '', cpf_cnpj: '', tipo_cliente: 'CONSUMIDOR' })}>
-            + Novo
+          <button className="btn-novo" onClick={handleNovoCliente} title="Criar novo cliente">
+            ➕
           </button>
-
-          
         </div>
+
+        <div className="search-clientes">
+          <input
+            type="text"
+            placeholder="🔍 Buscar cliente..."
+            disabled
+            title="Busca será implementada em versão posterior"
+          />
+        </div>
+
         <ul className="lista-clientes">
-          {clientes.map(c => (
-            <li 
-              key={c.id_cliente} 
-              className={clienteSel?.id_cliente === c.id_cliente ? 'active' : ''}
-              onClick={() => setClienteSel(c)}
+          {clientes.map((c) => (
+            <li
+              key={c.id_cliente}
+              className={cliente?.id_cliente === c.id_cliente ? 'active' : ''}
+              onClick={() => handleSelecionarCliente(c)}
+              role="button"
+              tabIndex={0}
             >
-              <strong>{c.nome_razao}</strong>
-              <span>{c.cpf_cnpj}</span>
+              <div className="cliente-item-info">
+                <strong>{c.nome_razao}</strong>
+                <span className="cliente-doc">{c.cpf_cnpj}</span>
+                {c.cidade && <span className="cliente-local">{c.cidade}</span>}
+              </div>
             </li>
           ))}
         </ul>
+
+        {usuarioLoading && <div className="loading-indicator">Carregando...</div>}
+        {clientes.length === 0 && !usuarioLoading && (
+          <div className="empty-state">Nenhum cliente cadastrado</div>
+        )}
       </aside>
 
+      {/* MAIN: PAINEL DE CLIENTE */}
       <main className="painel-cliente">
-        
+        {/* ERROR DISPLAY */}
+        {error && (
+          <div className="error-banner">
+            <div className="error-content">
+              <span className="error-icon">❌</span>
+              <span>{error}</span>
+              <button className="error-close" onClick={limparErro}>
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
 
-        <section className="card-cadastro">
-  <div className="header-form">
-    <h2>{clienteSel.id_cliente ? `Ficha de: ${clienteSel.nome_razao}` : 'Novo Cadastro de Cliente'}</h2>
-    <span className={`status-badge ${clienteSel.status_credito}`}>{clienteSel.status_credito}</span>
-  </div>
+        {/* CLIENTE HEADER */}
+        {cliente ? (
+          <>
+            <ClientHeader
+              cliente={cliente}
+              ultimaCompra={ultimaCompra}
+              ticketMedio={ticketMedio}
+              onAcao={handleAcaoBotao}
+              loading={loading}
+            />
 
-  <form onSubmit={handleSalvar} className="form-completo">
-    {/* SEÇÃO 1: DADOS BÁSICOS */}
-    <div className="form-section">
-      <h3><i className="fas fa-user"></i> Identificação</h3>
-      <div className="form-grid">
-        <div className="input-group span-2">
-          <label>Nome Completo / Razão Social</label>
-          <input type="text" value={clienteSel.nome_razao} onChange={e => setClienteSel({...clienteSel, nome_razao: e.target.value})} required />
-        </div>
-        <div className="input-group">
-          <label>CPF / CNPJ</label>
-          <input type="text" value={clienteSel.cpf_cnpj} onChange={e => setClienteSel({...clienteSel, cpf_cnpj: e.target.value})} />
-        </div>
-        <div className="input-group">
-          <label>Tipo</label>
-          <select value={clienteSel.tipo_cliente} onChange={e => setClienteSel({...clienteSel, tipo_cliente: e.target.value})}>
-            <option value="CONSUMIDOR">Consumidor</option>
-            <option value="SERRALHERIA">Serralheria</option>
-            <option value="OFICINA">Oficina</option>
-          </select>
-        </div>
-        
-      </div>
-    </div>
+            {/* ABAS */}
+            <div className="client-tabs">
+              <div className="tabs-header">
+                <button
+                  className={`tab-button ${activeTab === 'cadastro' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('cadastro')}
+                >
+                  📋 Cadastro
+                </button>
+                <button
+                  className={`tab-button ${activeTab === 'contatos' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('contatos')}
+                >
+                  📞 Contatos
+                </button>
+                <button
+                  className={`tab-button ${activeTab === 'financeiro' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('financeiro')}
+                >
+                  💰 Financeiro
+                </button>
+                <button
+                  className={`tab-button ${activeTab === 'historico' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('historico')}
+                >
+                  📊 Histórico
+                </button>
+                <button
+                  className={`tab-button ${activeTab === 'precos' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('precos')}
+                >
+                  🏷️ Preços
+                </button>
+              </div>
 
-    {/* SEÇÃO 2: ENDEREÇO (Para cobrança) */}
-    <div className="form-section">
-      <h3><i className="fas fa-map-marker-alt"></i> Endereço de Cobrança</h3>
-      <div className="form-grid">
-        <div className="input-group">
-          <label>CEP</label>
-          <input type="text" value={clienteSel.cep} onChange={e => setClienteSel({...clienteSel, cep: e.target.value})} />
-        </div>
-        <div className="input-group span-2">
-          <label>Logradouro (Rua, Av, Número)</label>
-          <input type="text" value={clienteSel.endereco} onChange={e => setClienteSel({...clienteSel, endereco: e.target.value})} />
-        </div>
-        <div className="input-group">
-          <label>Bairro</label>
-          <input type="text" value={clienteSel.bairro} onChange={e => setClienteSel({...clienteSel, bairro: e.target.value})} />
-        </div>
-        <div className="input-group">
-          <label>Cidade</label>
-          <input type="text" value={clienteSel.cidade} onChange={e => setClienteSel({...clienteSel, cidade: e.target.value})} />
-        </div>
-        <div className="input-group">
-          <label>UF</label>
-          <input type="text" maxLength={2} value={clienteSel.estado} onChange={e => setClienteSel({...clienteSel, estado: e.target.value.toUpperCase()})} />
-        </div>
-      </div>
-    </div>
+              <div className="tabs-content">
+                {activeTab === 'cadastro' && (
+                  <CadastroTab cliente={cliente} onSave={salvarCliente} />
+                )}
 
-    <div className="form-section">
-  <h3>Contatos para Cobrança</h3>
-  {contatos.map((contato, index) => (
-    <div key={index} className="grid-contato">
-      <select value={contato.tipo}>
-        <option value="WHATSAPP">WhatsApp</option>
-        <option value="CELULAR">Celular</option>
-      </select>
-      <input type="text" value={contato.numero} placeholder="(00) 00000-0000" />
-      <input type="text" value={contato.nome_referencia} placeholder="Falar com..." />
-    </div>
-  ))}
-  <button type="button" onClick={adicionarCampoContato}>+ Adicionar Telefone</button>
-</div>
+                {activeTab === 'contatos' && (
+                  <ContatosTab cliente={cliente} />
+                )}
 
-    {/* SEÇÃO 3: FINANCEIRO E CRÉDITO */}
-    <div className="form-section financeiro">
-      <h3><i className="fas fa-wallet"></i> Parâmetros de Crédito (Carnê)</h3>
-      <div className="form-grid">
-        <div className="input-group">
-          <label>Limite de Crédito (R$)</label>
-          <input type="number" step="0.01" value={clienteSel.limite_credito} onChange={e => setClienteSel({...clienteSel, limite_credito: Number(e.target.value)})} />
-        </div>
-        <div className="input-group">
-          <label>Dia de Vencimento</label>
-          <input type="number" min="1" max="28" value={clienteSel.dia_vencimento} onChange={e => setClienteSel({...clienteSel, dia_vencimento: Number(e.target.value)})} />
-        </div>
-        <div className="input-group">
-          <label>Status do Crédito</label>
-          <select value={clienteSel.status_credito} onChange={e => setClienteSel({...clienteSel, status_credito: e.target.value as any})}>
-            <option value="ANALISE">Em Análise</option>
-            <option value="LIBERADO">Liberado para Compras</option>
-            <option value="BLOQUEADO">Bloqueado / Inadimplente</option>
-          </select>
-        </div>
-      </div>
-    </div>
+                {activeTab === 'financeiro' && (
+                  <FinanceiroTab cliente={cliente} />
+                )}
 
-    <div className="form-actions">
-      <button type="submit" className="btn-save">💾 Salvar Ficha do Cliente</button>
-    </div>
-  </form>
-</section>
+                {activeTab === 'historico' && (
+                  <HistoricoTab cliente={cliente} />
+                )}
+
+                {activeTab === 'precos' && (
+                  <PrecosTab cliente={cliente} />
+                )}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="empty-container">
+            <div className="empty-state-large">
+              <h2>👋 Bem-vindo ao Módulo de Clientes</h2>
+              <p>Selecione um cliente na lista ou crie um novo para começar</p>
+              <button className="btn-primary-large" onClick={handleNovoCliente}>
+                ➕ Novo Cliente
+              </button>
+            </div>
+          </div>
+        )}
       </main>
     </div>
-    )
+  );
 };
 
 export default Clientes;
+
 
 

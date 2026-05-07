@@ -44,6 +44,24 @@ app.get('/check-db', asyncHandler(async (req, res) => {
     res.status(200).json({ status: 'OK', message: 'ssssConexão com o Banco de Dados bem-sucedida!' });
 }));
 
+// Endpoint: Lista fornecedores (GET) — usado pelo frontend para popular selects
+app.get('/api/suppliers', asyncHandler(async (req, res) => {
+    try {
+        const [rows]: any = await pool.execute(
+            `SELECT id_fornecedor, razao_social, nome_fantasia, cnpj, sigla FROM fornecedores ORDER BY razao_social ASC`
+        );
+
+        if (!Array.isArray(rows)) {
+            return res.status(500).json({ error: 'Formato inesperado de fornecedores' });
+        }
+
+        return res.json(rows);
+    } catch (error: any) {
+        console.error('Erro ao listar fornecedores:', error);
+        return res.status(500).json({ error: 'Erro ao listar fornecedores' });
+    }
+}));
+
 
 function gerarHashCNPJ(cnpj: string): string {
     const cnpjLimpo = cnpj.replace(/\D/g, '');
@@ -344,6 +362,45 @@ if (sort === 'stock_desc') orderBy = 'currentStock DESC';
  * Rota: GET /api/products/:id
  * Retorna detalhes de um produto específico por ID
  */
+// Colocamos a rota de busca antes da rota de detalhe para evitar conflito com ':id'
+app.get('/api/products/search', asyncHandler(async (req, res) => {
+    console.log('/api/products/search (early) - query:', req.query);
+    const rawTerm = req.query.term;
+    const term = Array.isArray(rawTerm) ? rawTerm[0] : rawTerm;
+
+    if (!term || String(term).trim() === '') {
+        return res.json([]);
+    }
+
+    const query = `
+        SELECT 
+            id_produto,
+            codigo_interno, 
+            codigo_barras, 
+            descricao, 
+            unidade, 
+            preco_venda, 
+            id_marca, 
+            id_categoria
+        FROM produtos 
+        WHERE codigo_interno LIKE ? 
+           OR descricao LIKE ? 
+           OR codigo_barras = ?
+        LIMIT 10
+    `;
+
+    const searchPattern = `%${String(term)}%`;
+
+    try {
+        const [rows]: any = await pool.execute(query, [searchPattern, searchPattern, String(term)]);
+        console.log('/api/products/search (early) - rows length:', Array.isArray(rows) ? rows.length : 0);
+        return res.json(rows);
+    } catch (err) {
+        console.error('/api/products/search (early) - error:', err);
+        return res.status(500).json({ error: 'Erro interno ao buscar produtos' });
+    }
+}));
+
 app.get('/api/products/:id', asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id);
     
@@ -617,6 +674,35 @@ app.post('/api/products/createNewProduct', asyncHandler(async (req, res) => {
     }
 }));
 
+// Ativa um produto (muda status para 'Ativo') — uso útil para correção rápida em ambiente de testes
+app.post('/api/products/:id/activate', asyncHandler(async (req, res) => {
+    const id = Number(req.params.id);
+    if (!id || isNaN(id)) return res.status(400).json({ error: 'ID inválido' });
+
+    const connection = await pool.getConnection();
+    try {
+        const [result]: any = await connection.execute(
+            `UPDATE produtos SET status = 'Ativo' WHERE id_produto = ?`,
+            [id]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Produto não encontrado' });
+        }
+
+        // Garantir que exista um registro em estoque_saldos
+        await connection.execute(
+            `INSERT INTO estoque_saldos (id_produto, quantidade, valor_medio)
+             SELECT ?, 0, 0 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM estoque_saldos WHERE id_produto = ?)` ,
+            [id, id]
+        );
+
+        res.json({ success: true, message: 'Produto ativado' });
+    } finally {
+        connection.release();
+    }
+}));
+
 
 /**
  * Rota: POST /api/stock/entries
@@ -689,137 +775,137 @@ app.post('/api/stock/entries', asyncHandler(async (req, res) => {
  * Rota: POST /api/sales
  * Registra uma nova venda com avaliação de saldo do estoque
  */
-app.post('/api/sales', asyncHandler(async (req, res) => {
-    const connection = await pool.getConnection();
+// app.post('/api/sales', asyncHandler(async (req, res) => {
+//     const connection = await pool.getConnection();
     
-    try {
-        const {
-            data,
-            clienteNome,
-            totalBruto,
-            totalDesconto,
-            totalLiquido,
-            totalCusto,
-            lucroNominal,
-            percentualLucro,
-            itens,
-            pagamentos
-        } = req.body;
+//     try {
+//         const {
+//             data,
+//             clienteNome,
+//             totalBruto,
+//             totalDesconto,
+//             totalLiquido,
+//             totalCusto,
+//             lucroNominal,
+//             percentualLucro,
+//             itens,
+//             pagamentos
+//         } = req.body;
 
-        // Validações básicas
-        if (!itens || itens.length === 0) {
-            return res.status(400).json({ error: 'Nenhum item na venda' });
-        }
+//         // Validações básicas
+//         if (!itens || itens.length === 0) {
+//             return res.status(400).json({ error: 'Nenhum item na venda' });
+//         }
 
-        if (totalLiquido <= 0) {
-            return res.status(400).json({ error: 'Valor total deve ser positivo' });
-        }
+//         if (totalLiquido <= 0) {
+//             return res.status(400).json({ error: 'Valor total deve ser positivo' });
+//         }
 
-        await connection.beginTransaction();
+//         await connection.beginTransaction();
 
-        // 1. Inserir cabeçalho da venda (vendas table)
-        const [vendaResult]: any = await connection.execute(
-            `INSERT INTO vendas (
-                data_venda, 
-                cliente_nome, 
-                total_bruto, 
-                total_desconto, 
-                total_liquido, 
-                total_custo,
-                lucro_nominal,
-                percentual_lucro,
-                status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Concluída')`,
-            [
-                new Date(data),
-                clienteNome || 'CONSUMIDOR',
-                totalBruto,
-                totalDesconto,
-                totalLiquido,
-                totalCusto,
-                lucroNominal,
-                percentualLucro
-            ]
-        ) as [ResultSetHeader, any[]];
+//         // 1. Inserir cabeçalho da venda (vendas table)
+//         const [vendaResult]: any = await connection.execute(
+//             `INSERT INTO vendas (
+//                 data_venda, 
+//                 cliente_nome, 
+//                 total_bruto, 
+//                 total_desconto, 
+//                 total_liquido, 
+//                 total_custo,
+//                 lucro_nominal,
+//                 percentual_lucro,
+//                 status
+//             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Concluída')`,
+//             [
+//                 new Date(data),
+//                 clienteNome || 'CONSUMIDOR',
+//                 totalBruto,
+//                 totalDesconto,
+//                 totalLiquido,
+//                 totalCusto,
+//                 lucroNominal,
+//                 percentualLucro
+//             ]
+//         ) as [ResultSetHeader, any[]];
 
-        const idVenda = vendaResult.insertId;
+//         const idVenda = vendaResult.insertId;
 
-        // 2. Inserir itens da venda (vendas_itens table)
-        for (const item of itens) {
-            // Verificar se o estoque existe e reduzir
-            const [estoqueRows]: any = await connection.execute(
-                `SELECT quantidade FROM estoque_saldos WHERE id_produto = ?`,
-                [item.productId]
-            );
+//         // 2. Inserir itens da venda (vendas_itens table)
+//         for (const item of itens) {
+//             // Verificar se o estoque existe e reduzir
+//             const [estoqueRows]: any = await connection.execute(
+//                 `SELECT quantidade FROM estoque_saldos WHERE id_produto = ?`,
+//                 [item.productId]
+//             );
 
-            if (estoqueRows.length > 0) {
-                const estoqueBefore = estoqueRows[0].quantidade;
-                const estoqueDepo = estoqueBefore - item.quantidade;
+//             if (estoqueRows.length > 0) {
+//                 const estoqueBefore = estoqueRows[0].quantidade;
+//                 const estoqueDepo = estoqueBefore - item.quantidade;
 
-                if (estoqueDepo < 0) {
-                    throw new Error(`Estoque insuficiente para produto ID ${item.productId}`);
-                }
+//                 if (estoqueDepo < 0) {
+//                     throw new Error(`Estoque insuficiente para produto ID ${item.productId}`);
+//                 }
 
-                // Atualizar o saldo do estoque
-                await connection.execute(
-                    `UPDATE estoque_saldos SET quantidade = ? WHERE id_produto = ?`,
-                    [estoqueDepo, item.productId]
-                );
-            }
+//                 // Atualizar o saldo do estoque
+//                 await connection.execute(
+//                     `UPDATE estoque_saldos SET quantidade = ? WHERE id_produto = ?`,
+//                     [estoqueDepo, item.productId]
+//                 );
+//             }
 
-            // Inserir o item da venda
-            await connection.execute(
-                `INSERT INTO vendas_itens (
-                    id_venda, 
-                    id_produto, 
-                    quantidade, 
-                    preco_venda, 
-                    preco_custo,
-                    subtotal,
-                    lucro_unitario
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                [
-                    idVenda,
-                    item.productId,
-                    item.quantidade,
-                    item.precoVenda,
-                    item.precoCusto,
-                    item.subtotal,
-                    item.lucroUnitario
-                ]
-            );
-        }
+//             // Inserir o item da venda
+//             await connection.execute(
+//                 `INSERT INTO vendas_itens (
+//                     id_venda, 
+//                     id_produto, 
+//                     quantidade, 
+//                     preco_venda, 
+//                     preco_custo,
+//                     subtotal,
+//                     lucro_unitario
+//                 ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+//                 [
+//                     idVenda,
+//                     item.productId,
+//                     item.quantidade,
+//                     item.precoVenda,
+//                     item.precoCusto,
+//                     item.subtotal,
+//                     item.lucroUnitario
+//                 ]
+//             );
+//         }
 
-        // 3. Registrar pagamentos (se houver tabela de pagamentos)
-        if (pagamentos && pagamentos.length > 0) {
-            for (const pag of pagamentos) {
-                await connection.execute(
-                    `INSERT INTO pagamentos (id_venda, metodo, valor, parcelas, status)
-                     VALUES (?, ?, ?, ?, 'Pago')`,
-                    [idVenda, pag.metodo, pag.valor, pag.parcelas || 1]
-                );
-            }
-        }
+//         // 3. Registrar pagamentos (se houver tabela de pagamentos)
+//         if (pagamentos && pagamentos.length > 0) {
+//             for (const pag of pagamentos) {
+//                 await connection.execute(
+//                     `INSERT INTO pagamentos (id_venda, metodo, valor, parcelas, status)
+//                      VALUES (?, ?, ?, ?, 'Pago')`,
+//                     [idVenda, pag.metodo, pag.valor, pag.parcelas || 1]
+//                 );
+//             }
+//         }
 
-        await connection.commit();
+//         await connection.commit();
 
-        return res.status(201).json({
-            success: true,
-            id: idVenda,
-            message: 'Venda registrada com sucesso'
-        });
+//         return res.status(201).json({
+//             success: true,
+//             id: idVenda,
+//             message: 'Venda registrada com sucesso'
+//         });
 
-    } catch (error: any) {
-        await connection.rollback();
-        console.error('Erro ao registrar venda:', error);
-        res.status(500).json({
-            error: 'Erro ao registrar venda',
-            details: error.message
-        });
-    } finally {
-        connection.release();
-    }
-}));
+//     } catch (error: any) {
+//         await connection.rollback();
+//         console.error('Erro ao registrar venda:', error);
+//         res.status(500).json({
+//             error: 'Erro ao registrar venda',
+//             details: error.message
+//         });
+//     } finally {
+//         connection.release();
+//     }
+// }));
 
 
 // --- Middleware de Tratamento de Erros (Final) ---
@@ -1505,12 +1591,37 @@ app.post('/api/stock-entry', asyncHandler(async (req, res) => {
 
         // 4. Processar itens e gerar eventos de estoque
         for (const item of items) {
-            const [products]: any = await connection.execute(
-                'SELECT id_produto FROM produtos WHERE codigo_interno = ?',
-                [item.codigoInterno]
-            );
+            // Aceita `codigoInterno` que pode ser o `codigo_interno` (string) ou o `id_produto` (numérico)
+            const candidate = item.codigoInterno;
+            let productRows: any = [];
 
-            const id_p = products.length > 0 ? products[0].id_produto : null;
+            if (candidate && String(candidate).match(/^\d+$/)) {
+                // Pode ser id numérico
+                [productRows] = await connection.execute(
+                    'SELECT id_produto, status, codigo_interno FROM produtos WHERE id_produto = ?',
+                    [Number(candidate)]
+                );
+            }
+
+            if (!productRows.length) {
+                [productRows] = await connection.execute(
+                    'SELECT id_produto, status, codigo_interno FROM produtos WHERE codigo_interno = ?',
+                    [String(candidate)]
+                );
+            }
+
+            const id_p = productRows.length > 0 ? productRows[0].id_produto : null;
+            const productStatus = productRows.length > 0 ? productRows[0].status : null;
+
+            // Se produto não for localizado, apenas logamos e seguimos inserindo o item
+            if (!id_p) {
+                console.warn(`[WARN] Produto não localizado para codigoInterno='${item.codigoInterno}'. Inserindo item sem vínculo de produto.`);
+            }
+
+            // Se produto estiver inativo, logamos mas permitimos a entrada (movimentação aceita com allowInactive)
+            if (productStatus && productStatus.toLowerCase() !== 'ativo') {
+                console.warn(`[WARN] Produto encontrado mas com status='${productStatus}' para codigoInterno='${item.codigoInterno}'. Permitindo entrada.`);
+            }
 
             await connection.execute(
                 `INSERT INTO compras_itens (
@@ -1573,6 +1684,8 @@ app.post('/api/stock-entry', asyncHandler(async (req, res) => {
                     idOrigem: id_recebimento, // Vincula ao recebimento versionado
                     idRecebimento: id_recebimento, // Integração futura
                     idFornecedor: id_fornecedor,
+                    allowInactive: true,
+                    connection, // use transactional connection to avoid lock waits
                     referenciaAuditavel: `NF ${invoiceNumber} - Item ${item.skuFornecedor}`,
                     metadata: {
                         numeroNF: invoiceNumber,
@@ -1604,9 +1717,16 @@ app.post('/api/stock-entry', asyncHandler(async (req, res) => {
 
 
 app.get('/api/products/search', asyncHandler(async (req, res) => {
-    const { term } = req.query;
+    console.log('/api/products/search hit - query:', req.query);
 
-    if (!term) return res.json([]);
+    // Normaliza o parâmetro 'term' (pode vir como string[] se repetido)
+    const rawTerm = req.query.term;
+    const term = Array.isArray(rawTerm) ? rawTerm[0] : rawTerm;
+
+    if (!term) {
+        console.log('/api/products/search - term ausente, retornando []');
+        return res.json([]);
+    }
 
     // Query ajustada para as colunas reais da sua tabela `produtos`
     // Também buscamos o nome da marca fazendo um JOIN simples se desejar, 
@@ -1628,15 +1748,21 @@ app.get('/api/products/search', asyncHandler(async (req, res) => {
         LIMIT 10
     `;
 
-    const searchPattern = `%${term}%`;
+    const searchPattern = `%${String(term)}%`;
 
-    const [rows]: any = await pool.execute(query, [
-        searchPattern, // codigo_interno
-        searchPattern, // descricao
-        term           // codigo_barras (exato)
-    ]);
+    try {
+        const [rows]: any = await pool.execute(query, [
+            searchPattern, // codigo_interno
+            searchPattern, // descricao
+            String(term)   // codigo_barras (exato)
+        ]);
 
-    res.json(rows);
+        console.log('/api/products/search - rows length:', Array.isArray(rows) ? rows.length : 0);
+        res.json(rows);
+    } catch (err) {
+        console.error('/api/products/search - erro ao executar query:', err);
+        res.status(500).json({ error: 'Erro interno ao buscar produtos' });
+    }
 }));
 
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
@@ -1970,6 +2096,7 @@ app.post('/api/sales', asyncHandler(async (req, res) => {
                 valorUnitario: precoUnitario,
                 origem: STOCK_ORIGINS.VENDA,
                 idOrigem: idVenda,
+                connection, // ensure ledger insert uses same transaction
                 referenciaAuditavel: `Venda ${idVenda} - Produto ${idProduto}`,
                 metadata: {
                     idCliente,

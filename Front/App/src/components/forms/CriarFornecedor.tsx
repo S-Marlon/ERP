@@ -1,9 +1,11 @@
-import React, { useState, ChangeEvent, FormEvent } from 'react';
+import React, { useState, ChangeEvent, FormEvent, useEffect } from 'react';
 import './CriarFornecedor.css';
 import FormControl from '../../components/ui/FormControl/FormControl';
+import { createSupplier } from '../../pages/Estoque/api/productsApi';
 
 interface CriarFornecedorProps {
-    onClose: () => void;
+  onClose: () => void;
+  onCreated?: (supplier: any) => void;
 }
 
 interface SupplierData {
@@ -18,7 +20,7 @@ interface Feedback {
   type: 'success' | 'error' | '';
 }
 
-const CriarFornecedor: React.FC<CriarFornecedorProps> = ({ onClose }) => {
+const CriarFornecedor: React.FC<CriarFornecedorProps> = ({ onClose, onCreated }) => {
   const [formData, setFormData] = useState<SupplierData>({
     cnpj: '',
     name: '',
@@ -34,31 +36,54 @@ const CriarFornecedor: React.FC<CriarFornecedorProps> = ({ onClose }) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // Gera um hash SHA-256 do CNPJ e retorna hex string
+  async function gerarHashCNPJ(cnpj: string): Promise<string> {
+    const cnpjLimpo = cnpj.replace(/\D/g, '');
+    const msgUint8 = new TextEncoder().encode(cnpjLimpo);
+    const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgUint8);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  // Atualiza a siglaGerada automaticamente quando o CNPJ estiver completo
+  useEffect(() => {
+    const cnpj = formData.cnpj || '';
+    if (cnpj.replace(/\D/g, '').length >= 14) {
+      let mounted = true;
+      gerarHashCNPJ(cnpj).then(hash => {
+        if (!mounted) return;
+        const sigla = hash.substring(0, 4).toUpperCase();
+        setFormData(prev => ({ ...prev, siglaGerada: sigla }));
+      }).catch(err => {
+        console.error('Erro ao gerar sigla:', err);
+      });
+      return () => { mounted = false };
+    } else {
+      // Limpa a sigla enquanto CNPJ incompleto
+      setFormData(prev => ({ ...prev, siglaGerada: '' }));
+    }
+  }, [formData.cnpj]);
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setFeedback({ message: '', type: '' });
 
     try {
-      const response = await fetch('/api/suppliers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+      const data = await createSupplier({
+        cnpj: formData.cnpj,
+        name: formData.name,
+        nomeFantasia: formData.nomeFantasia,
+        siglaGerada: formData.siglaGerada
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setFeedback({ message: 'Fornecedor cadastrado com sucesso!', type: 'success' });
-        setFormData({ cnpj: '', name: '', nomeFantasia: '', siglaGerada: '' });
-      } else {
-        setFeedback({ 
-          message: data.error || 'Erro ao processar requisição', 
-          type: 'error' 
-        });
-      }
-    } catch (err) {
-      setFeedback({ message: 'Erro ao conectar com o servidor', type: 'error' });
+      setFeedback({ message: 'Fornecedor cadastrado com sucesso!', type: 'success' });
+      setFormData({ cnpj: '', name: '', nomeFantasia: '', siglaGerada: '' });
+      if (typeof onCreated === 'function') onCreated(data);
+      onClose();
+    } catch (err: any) {
+      const message = err?.message || String(err) || 'Erro ao conectar com o servidor';
+      setFeedback({ message, type: 'error' });
     } finally {
       setLoading(false);
     }

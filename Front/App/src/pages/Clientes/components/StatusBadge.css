@@ -1,0 +1,56 @@
+/* StatusBadge.css */
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 1rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.status-badge.status-success {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.status-badge.status-danger {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.status-badge.status-warning {
+  background-color: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+}
+
+.status-badge.size-sm {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+.status-badge.size-md {
+  padding: 0.4rem 1rem;
+  font-size: 0.875rem;
+}
+
+.status-badge.size-lg {
+  padding: 0.6rem 1.5rem;
+  font-size: 1rem;
+}
+
+.status-icon {
+  font-size: 1.2em;
+  line-height: 1;
+}
+
+.status-label {
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}

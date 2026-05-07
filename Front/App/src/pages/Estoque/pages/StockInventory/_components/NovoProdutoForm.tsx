@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { searchProducts } from "../../../api/productsApi";
+import React, { useState, useEffect } from "react";
+import { searchProducts, createNewProduct, getSuppliers, saveProductMapping } from "../../../api/productsApi";
 import CriarFornecedor from "../../../../../components/forms/CriarFornecedor";
 
 interface NovoProdutoFormProps {
@@ -13,6 +13,8 @@ const NovoProdutoForm: React.FC<NovoProdutoFormProps> = ({ isOpen, onClose, onSa
     const [formData, setFormData] = useState({
         codigo_interno: "",
         codigo_barras: "",
+        id_fornecedor: "",
+        sku_fornecedor: "",
         descricao: "",
         unidade: "UN",
         preco_venda: 0,
@@ -20,6 +22,9 @@ const NovoProdutoForm: React.FC<NovoProdutoFormProps> = ({ isOpen, onClose, onSa
         status: "Ativo" as "Ativo" | "Inativo",
     });
 
+    const [fornecedores, setFornecedores] = useState<any[]>([]);
+    const [debouncing, setDebouncing] = useState(false);
+    const [skuMessage, setSkuMessage] = useState('');
     const [skuExists, setSkuExists] = useState(false); // Esse é o hook que causou a diferença
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formError, setFormError] = useState('');
@@ -44,6 +49,11 @@ const NovoProdutoForm: React.FC<NovoProdutoFormProps> = ({ isOpen, onClose, onSa
                 newData[name] = Number(value);
             }
 
+            // Conversão para id de fornecedor
+            if (name === 'id_fornecedor') {
+                newData[name] = value === '' ? '' : Number(value);
+            }
+
             return newData;
         });
     };
@@ -53,15 +63,52 @@ const NovoProdutoForm: React.FC<NovoProdutoFormProps> = ({ isOpen, onClose, onSa
         if (formData.codigo_interno.length > 2) {
             try {
                 const results = await searchProducts(formData.codigo_interno);
+                // A API pode retornar { data: [...] } ou um array
+                const list = Array.isArray(results) ? results : (results && results.data) ? results.data : [];
                 // Verifica se algum resultado tem o SKU exato
-                const exists = results.some((p: any) => p.sku === formData.codigo_interno);
+                const exists = list.some((p: any) => String(p.sku) === String(formData.codigo_interno));
                 setSkuExists(exists);
-                if (exists) alert("⚠️ Este SKU/EAN já está cadastrado!");
+                if (exists) {
+                    setSkuMessage('⚠️ Este SKU/EAN já está cadastrado!');
+                } else {
+                    setSkuMessage('');
+                }
             } catch (e) {
                 console.error("Erro ao validar SKU");
             }
         }
     };
+
+    // Busca fornecedores quando o modal abre
+    useEffect(() => {
+        if (!isOpen) return;
+        let mounted = true;
+
+        getSuppliers()
+            .then((data: any) => {
+                const list = Array.isArray(data) ? data : (data && data.data) ? data.data : [];
+                if (mounted) setFornecedores(list);
+            })
+            .catch(err => console.error('Erro ao carregar fornecedores', err));
+
+        return () => { mounted = false };
+    }, [isOpen]);
+
+    // Debounce automático da validação de SKU enquanto o usuário digita
+    useEffect(() => {
+        if (!formData.codigo_interno || formData.codigo_interno.length < 3) {
+            setSkuExists(false);
+            return;
+        }
+
+        setDebouncing(true);
+        const t = setTimeout(() => {
+            handleBlurSku();
+            setDebouncing(false);
+        }, 600);
+
+        return () => clearTimeout(t);
+    }, [formData.codigo_interno]);
 
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -81,7 +128,53 @@ const NovoProdutoForm: React.FC<NovoProdutoFormProps> = ({ isOpen, onClose, onSa
         setIsSubmitting(true);
 
         try {
-            await onSave(formData);
+                // Se o pai forneceu onSave, usa-o; caso contrário, faz a chamada direta à API
+                if (typeof onSave === 'function') {
+                    await onSave(formData);
+                } else {
+                    const created = await createNewProduct({
+                        sku: String(formData.codigo_interno),
+                        name: String(formData.descricao),
+                        unit: String(formData.unidade),
+                        salePrice: Number(formData.preco_venda) || 0,
+                        categoryId: (formData as any).id_categoria,
+                        barcode: String(formData.codigo_barras || '')
+                    });
+
+                    // Se usuário selecionou fornecedor + sku no fornecedor, tenta criar vínculo
+                    try {
+                        const supplierId = (formData as any).id_fornecedor;
+                        const skuFornecedor = (formData as any).sku_fornecedor;
+
+                        if (supplierId && skuFornecedor) {
+                            const supplier = fornecedores.find(f => (f.id_fornecedor || f.id) === supplierId);
+                            const supplierCnpj = supplier ? (supplier.cnpj || '') : '';
+
+                            const original = {
+                                sku: skuFornecedor,
+                                gtin: formData.codigo_barras || null,
+                                descricao: formData.descricao || null,
+                                valorUnitario: Number(formData.preco_venda) || 0
+                            };
+
+                            const mapped = {
+                                CodInterno: created?.sku || formData.codigo_interno,
+                                name: formData.descricao,
+                                Categorias: (formData as any).id_categoria || null,
+                                unitsPerPackage: 1,
+                                Preço_Final_de_Venda: Number(formData.preco_venda) || 0
+                            };
+
+                            if (supplierCnpj) {
+                                await saveProductMapping({ original, mapped, supplierCnpj });
+                            }
+                        }
+                    } catch (mapErr) {
+                        console.error('Erro ao criar vínculo produto↔fornecedor:', mapErr);
+                        // não bloquear o fluxo de criação do produto
+                        setFormError('Produto criado, mas falha ao vincular fornecedor. Verifique os logs.');
+                    }
+                }
             onClose();
         } catch (error) {
             setFormError('Falha ao criar o produto. Tente novamente.');
@@ -109,7 +202,7 @@ const NovoProdutoForm: React.FC<NovoProdutoFormProps> = ({ isOpen, onClose, onSa
         transform: showFornecedor ? `translateX(${730 / 2}px)` : 'translateX(0)',
     }}>
                         {/* Wrapper relativo para permitir o posicionamento do formulário lateral */}
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
 
                     {/* COMPONENTE CRIAR FORNECEDOR COM ANIMAÇÃO */}
                     <div style={{
@@ -118,7 +211,11 @@ const NovoProdutoForm: React.FC<NovoProdutoFormProps> = ({ isOpen, onClose, onSa
             opacity: showFornecedor ? 1 : 0,
             visibility: showFornecedor ? 'visible' : 'hidden',
         }}>
-                        <CriarFornecedor onClose={() => setShowFornecedor(false)} />
+                        <CriarFornecedor onClose={() => setShowFornecedor(false)} onCreated={(supplier: any) => {
+                            // Atualiza lista local e seleciona o fornecedor criado
+                            setFornecedores(prev => [...prev, supplier]);
+                            setFormData(prev => ({ ...prev, id_fornecedor: supplier.id_fornecedor || supplier.id || '' }));
+                        }} />
                     </div>
 
                     {/* MODAL PRINCIPAL */}
@@ -136,9 +233,9 @@ const NovoProdutoForm: React.FC<NovoProdutoFormProps> = ({ isOpen, onClose, onSa
                                     <label style={modalStyles.label}>Fornecedor Principal</label>
                                     <select name="id_fornecedor" style={modalStyles.input} onChange={handleChange}>
                                         <option value="">Selecione um fornecedor...</option>
-                                        {/* {fornecedores.map(f => (
-                <option key={f.id} value={f.id}>{f.nome_fantasia || f.razao_social}</option>
-            ))} */}
+                                        {fornecedores.map((f: any) => (
+                                            <option key={f.id_fornecedor || f.id} value={f.id_fornecedor || f.id}>{f.nome_fantasia || f.razao_social || f.name}</option>
+                                        ))}
                                     </select>
                                 </div>
                                 <div style={modalStyles.field}>
@@ -148,7 +245,7 @@ const NovoProdutoForm: React.FC<NovoProdutoFormProps> = ({ isOpen, onClose, onSa
                                         style={modalStyles.input}
                                         onChange={handleChange}
                                         placeholder="Código na nota fiscal"
-                                        value={formData.codigo_interno}
+                                        value={(formData as any).sku_fornecedor}
                                     />
                                 </div>
                             </div>
@@ -181,6 +278,9 @@ const NovoProdutoForm: React.FC<NovoProdutoFormProps> = ({ isOpen, onClose, onSa
                                         onChange={handleChange}
                                         placeholder="Gerado pelo EAN ou manual"
                                     />
+                                    {skuMessage && (
+                                        <div style={{ color: '#b45309', marginTop: '6px', fontSize: '0.9rem' }}>{skuMessage}</div>
+                                    )}
                                 </div>
                             </div>
 

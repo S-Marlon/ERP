@@ -164,7 +164,229 @@ export const CartAside: React.FC<CartAsideProps> = ({
 };
 
 const handlePrint = () => {
-  window.print();
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) return;
+
+  const oxbloodRed = '#731717';
+
+  // 🔹 CONFIGURAÇÕES (ajuste conforme seu sistema)
+  const logoUrl = 'https://via.placeholder.com/150x60?text=LOGO'; // troque pela sua logo
+  const formaPagamento = 'PIX'; // ou vindo de state
+  const descontoGeral = 0; // se tiver desconto total
+
+  const renderRows = (items: CartItem[]) =>
+    items.map(item => {
+      const original = item.originalPrice || item.price;
+      const hasDiscount = item.price < original;
+
+      return `
+        <tr>
+          <td>
+            ${item.name}
+            ${hasDiscount ? `<div style="font-size:10px;color:#999;">De: ${money.format(original)}</div>` : ''}
+          </td>
+          <td style="text-align:center;">${item.quantity}</td>
+          <td style="text-align:right;">${money.format(item.price)}</td>
+          <td style="text-align:right;">${money.format(item.price * item.quantity)}</td>
+        </tr>
+      `;
+    }).join('');
+
+  const produtos = cart.filter(i => i.type !== 'service');
+  const servicos = cart.filter(i => i.type === 'service');
+
+  const subtotal = cart.reduce((acc, item) => {
+  const original = item.originalPrice ?? item.price;
+  return acc + (original * item.quantity);
+}, 0);
+
+const totalComDesconto = cart.reduce((acc, item) => {
+  return acc + (item.price * item.quantity);
+}, 0);
+
+const descontoTotal = subtotal - totalComDesconto;
+
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Venda - ${cliente}</title>
+        <style>
+          @media print {
+            body { -webkit-print-color-adjust: exact; }
+          }
+
+          body {
+            font-family: Arial, sans-serif;
+            padding: 30px;
+            color: #333;
+          }
+
+          .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px solid ${oxbloodRed};
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+          }
+
+          .logo {
+            height: 50px;
+          }
+
+          .header h1 {
+            margin: 0;
+            color: ${oxbloodRed};
+          }
+
+          .info {
+            margin-bottom: 20px;
+            font-size: 13px;
+          }
+
+          h3 {
+            background: ${oxbloodRed};
+            color: #fff;
+            padding: 6px;
+            font-size: 14px;
+          }
+
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+          }
+
+          th, td {
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+            font-size: 13px;
+          }
+
+          th {
+            text-transform: uppercase;
+            font-size: 11px;
+          }
+
+          .summary {
+            margin-top: 25px;
+            width: 300px;
+            margin-left: auto;
+          }
+
+          .summary div {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+          }
+
+          .total {
+            font-size: 18px;
+            font-weight: bold;
+            color: ${oxbloodRed};
+            border-top: 2px solid ${oxbloodRed};
+            padding-top: 5px;
+          }
+
+          .footer {
+            margin-top: 40px;
+            font-size: 10px;
+            text-align: center;
+            color: #777;
+          }
+        </style>
+      </head>
+
+      <body>
+
+        <div class="header">
+          <img src="${logoUrl}" class="logo"/>
+          <div style="text-align:right;">
+            <h1>Venda</h1>
+            <div style="font-size:12px;">
+              ${new Date().toLocaleDateString('pt-BR')}
+            </div>
+          </div>
+        </div>
+
+        <div class="info">
+          <div><strong>Cliente:</strong> ${cliente}</div>
+          <div style="margin-top:10px;">
+  <strong>Forma de pagamento:</strong>
+  <span style="
+    display:inline-block;
+    border-bottom:1px dashed #000;
+    width:200px;
+    margin-left:10px;
+  "></span>
+</div>
+        </div>
+
+        ${produtos.length > 0 ? `
+          <h3>Produtos</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Descrição</th>
+                <th>Qtd</th>
+                <th>Unitário</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>${renderRows(produtos)}</tbody>
+          </table>
+        ` : ''}
+
+        ${servicos.length > 0 ? `
+          <h3>Serviços</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Descrição</th>
+                <th>Qtd</th>
+                <th>Unitário</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>${renderRows(servicos)}</tbody>
+          </table>
+        ` : ''}
+
+        <div class="summary">
+  <div>
+    <span>Subtotal:</span>
+    <span>${money.format(subtotal)}</span>
+  </div>
+
+  ${descontoTotal > 0 ? `
+  <div>
+    <span>Descontos:</span>
+    <span style="color:#16a34a;">- ${money.format(descontoTotal)}</span>
+  </div>
+  ` : ''}
+
+  <div class="total">
+    <span>Total:</span>
+    <span>${money.format(totalComDesconto)}</span>
+  </div>
+</div>
+
+        <div class="footer">
+          Documento gerado automaticamente pelo sistema
+        </div>
+
+        <script>
+          window.onload = () => {
+            window.print();
+            setTimeout(() => window.close(), 300);
+          };
+        </script>
+
+      </body>
+    </html>
+  `);
+
+  printWindow.document.close();
 };
 
 const handleGeneratePDF = () => {

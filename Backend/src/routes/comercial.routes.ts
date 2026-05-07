@@ -51,7 +51,7 @@ router.post('/sales', asyncHandler(async (req, res) => {
           idCliente,
           formaPagamento
         }
-      });
+      , connection });
 
       // Nota: Removido UPDATE direto em estoque_saldos - agora via trigger do ledger
     }
