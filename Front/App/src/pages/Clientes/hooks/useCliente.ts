@@ -5,7 +5,8 @@
  */
 
 import { useReducer, useCallback, useMemo } from 'react';
-import { clienteService } from '../services/clienteService';
+// Modo mock: dados em memória para testes locais
+import { useRef } from 'react';
 import type {
   Cliente,
   ClienteUpdate,
@@ -213,34 +214,104 @@ export interface UseClienteReturn {
 /**
  * Hook principal para gerenciar cliente
  */
-export const useCliente = (): UseClienteReturn => {
   const [state, dispatch] = useReducer(clienteReducer, INITIAL_STATE);
+
+  // MOCK: lista de clientes em memória
+  const clientesMock = useRef<Cliente[]>([
+    {
+      id_cliente: 1,
+      nome_razao: 'Cliente Exemplo A',
+      cpf_cnpj: '123.456.789-00',
+      tipo_cliente: 'CONSUMIDOR',
+      endereco: 'Rua das Flores, 123',
+      bairro: 'Centro',
+      cidade: 'São Paulo',
+      estado: 'SP',
+      cep: '01000-000',
+      limite_credito: 1000,
+      dia_vencimento: 10,
+      status_credito: 'LIBERADO',
+      status_cliente: 'ATIVO',
+      saldo_devedor_atual: 0,
+      observacoes: 'Cliente de teste',
+      criado_em: new Date(),
+    },
+    {
+      id_cliente: 2,
+      nome_razao: 'Cliente Exemplo B',
+      cpf_cnpj: '98.765.432/0001-11',
+      tipo_cliente: 'SERRALHERIA',
+      endereco: 'Av. Brasil, 456',
+      bairro: 'Jardins',
+      cidade: 'Rio de Janeiro',
+      estado: 'RJ',
+      cep: '20000-000',
+      limite_credito: 500,
+      dia_vencimento: 5,
+      status_credito: 'ANALISE',
+      status_cliente: 'ATIVO',
+      saldo_devedor_atual: 120,
+      observacoes: '',
+      criado_em: new Date(),
+    },
+    {
+      id_cliente: 3,
+      nome_razao: 'Loja Demo',
+      cpf_cnpj: '111.222.333-44',
+      tipo_cliente: 'OFICINA',
+      endereco: 'Rua Teste, 789',
+      bairro: 'Industrial',
+      cidade: 'Belo Horizonte',
+      estado: 'MG',
+      cep: '30000-000',
+      limite_credito: 0,
+      dia_vencimento: 20,
+      status_credito: 'BLOQUEADO',
+      status_cliente: 'BLOQUEADO',
+      saldo_devedor_atual: 300,
+      observacoes: 'Bloqueado por atraso',
+      criado_em: new Date(),
+    },
+  ]);
+
+  // MOCK: contatos, emails, preços especiais em memória
+  const contatosMock = useRef<Record<number, ClienteContato[]>>({
+    1: [
+      { id_contato: 1, id_cliente: 1, tipo: 'CELULAR', numero: '(11) 99999-0001', nome_referencia: 'João' },
+    ],
+    2: [
+      { id_contato: 2, id_cliente: 2, tipo: 'FIXO', numero: '(21) 2222-3333', nome_referencia: 'Maria' },
+    ],
+    3: [],
+  });
+  const emailsMock = useRef<Record<number, ClienteEmail[]>>({
+    1: [
+      { id_email: 1, id_cliente: 1, email: 'exemploA@email.com', tipo: 'PESSOAL' },
+    ],
+    2: [],
+    3: [],
+  });
+  const precosMock = useRef<Record<number, ClientePrecoEspecial[]>>({
+    1: [],
+    2: [],
+    3: [],
+  });
 
   // =========================================================================
   // CLIENTE
   // =========================================================================
 
+  // Carrega cliente do mock
   const carregarCliente = useCallback(async (id: number) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
-      const cliente = await clienteService.obter(id);
+      const cliente = clientesMock.current.find((c) => c.id_cliente === id) || null;
       dispatch({ type: 'SET_CLIENTE', payload: cliente });
-
-      // Carregar relacionados
-      const [contatos, emails, precos] = await Promise.all([
-        clienteService.obterContatos(id),
-        clienteService.obterEmails(id),
-        clienteService.obterPrecosEspeciais(id),
-      ]);
-
-      dispatch({ type: 'SET_CONTATOS', payload: contatos });
-      dispatch({ type: 'SET_EMAILS', payload: emails });
-      dispatch({ type: 'SET_PRECOS_ESPECIAIS', payload: precos });
+      dispatch({ type: 'SET_CONTATOS', payload: contatosMock.current[id] || [] });
+      dispatch({ type: 'SET_EMAILS', payload: emailsMock.current[id] || [] });
+      dispatch({ type: 'SET_PRECOS_ESPECIAIS', payload: precosMock.current[id] || [] });
     } catch (err) {
-      dispatch({
-        type: 'SET_ERROR',
-        payload: err instanceof Error ? err.message : 'Erro ao carregar cliente',
-      });
+      dispatch({ type: 'SET_ERROR', payload: 'Erro ao carregar cliente (mock)' });
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
@@ -250,34 +321,59 @@ export const useCliente = (): UseClienteReturn => {
     dispatch({ type: 'UPDATE_CLIENTE', payload: dados });
   }, []);
 
+  // Salva cliente no mock
   const salvarCliente = useCallback(async (): Promise<Cliente | null> => {
     if (!state.cliente) {
       dispatch({ type: 'SET_ERROR', payload: 'Nenhum cliente carregado' });
       return null;
     }
-
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
-      const resultado = await clienteService.atualizar(
-        state.cliente.id_cliente,
-        state.cliente as ClienteUpdate
-      );
-      dispatch({ type: 'SET_CLIENTE', payload: resultado });
+      let cliente = state.cliente;
+      if (cliente.id_cliente) {
+        // Atualiza existente
+        const idx = clientesMock.current.findIndex((c) => c.id_cliente === cliente.id_cliente);
+        if (idx !== -1) clientesMock.current[idx] = { ...cliente };
+      } else {
+        // Cria novo
+        const novoId = Math.max(...clientesMock.current.map((c) => c.id_cliente), 0) + 1;
+        cliente = { ...cliente, id_cliente: novoId, criado_em: new Date() } as Cliente;
+        clientesMock.current.push(cliente);
+      }
+      dispatch({ type: 'SET_CLIENTE', payload: cliente });
       dispatch({ type: 'MARK_SAVED' });
-      return resultado;
+      return cliente;
     } catch (err) {
-      dispatch({
-        type: 'SET_ERROR',
-        payload: err instanceof Error ? err.message : 'Erro ao salvar cliente',
-      });
+      dispatch({ type: 'SET_ERROR', payload: 'Erro ao salvar cliente (mock)' });
       return null;
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
   }, [state.cliente]);
 
+  // Novo cliente mock
   const novoCliente = useCallback(() => {
-    dispatch({ type: 'RESET' });
+    dispatch({ type: 'SET_CLIENTE', payload: {
+      id_cliente: 0,
+      nome_razao: '',
+      cpf_cnpj: '',
+      tipo_cliente: 'CONSUMIDOR',
+      endereco: '',
+      bairro: '',
+      cidade: '',
+      estado: '',
+      cep: '',
+      limite_credito: 0,
+      dia_vencimento: 1,
+      status_credito: 'LIBERADO',
+      status_cliente: 'ATIVO',
+      saldo_devedor_atual: 0,
+      observacoes: '',
+      criado_em: new Date(),
+    } });
+    dispatch({ type: 'SET_CONTATOS', payload: [] });
+    dispatch({ type: 'SET_EMAILS', payload: [] });
+    dispatch({ type: 'SET_PRECOS_ESPECIAIS', payload: [] });
   }, []);
 
   const limparErro = useCallback(() => {

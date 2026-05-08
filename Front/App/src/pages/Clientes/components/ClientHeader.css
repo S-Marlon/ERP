@@ -1,253 +1,537 @@
-/* ClientHeader.css */
+  /* ================= BASE HEADER ================= */
 
-.client-header {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  padding: 2rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border-radius: 8px;
-  margin-bottom: 2rem;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-}
+  
 
-/* SEÇÃO TOP - IDENTIFICAÇÃO */
-.header-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 2rem;
-}
+  /* ================= TOP AREA ================= */
 
-.client-info {
-  flex: 1;
-}
+ 
 
-.client-nome {
-  margin: 0;
-  font-size: 2rem;
-  font-weight: 700;
-  margin-bottom: 0.5rem;
-}
-
-.client-doc {
-  margin: 0;
-  font-size: 0.95rem;
-  opacity: 0.9;
-}
-
-.client-localizacao {
-  margin: 0.5rem 0 0 0;
-  font-size: 0.9rem;
-  opacity: 0.8;
-}
-
-.header-status {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  align-items: flex-end;
-}
-
-.alerta-excedido {
-  background-color: rgba(255, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #ffcccc;
-}
-
-/* SEÇÃO MÉTRICAS */
-.header-metricas {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1.5rem;
-}
-
-.metrica-card {
-  background: rgba(255, 255, 255, 0.15);
-  padding: 1rem;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(10px);
-  transition: all 0.3s ease;
-}
-
-.metrica-card:hover {
-  background: rgba(255, 255, 255, 0.25);
-  transform: translateY(-2px);
-}
-
-.metrica-card label {
-  display: block;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  opacity: 0.8;
-  margin-bottom: 0.5rem;
-}
-
-.metrica-card .valor {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #fff;
-}
-
-.metrica-card.alerta {
-  background: rgba(255, 100, 100, 0.2);
-  border-color: rgba(255, 100, 100, 0.5);
-}
-
-.metrica-card small {
-  display: block;
-  font-size: 0.7rem;
-  margin-top: 0.5rem;
-  opacity: 0.9;
-}
-
-.metrica-card .warning {
-  color: #ffeb3b;
-}
-
-/* SEÇÃO AÇÕES */
-.header-acoes {
-  display: flex;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-.btn {
-  padding: 0.6rem 1.2rem;
-  border: none;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn.btn-primary {
-  background-color: #28a745;
-  color: white;
-}
-
-.btn.btn-primary:hover:not(:disabled) {
-  background-color: #218838;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
-}
-
-.btn.btn-danger {
-  background-color: #dc3545;
-  color: white;
-}
-
-.btn.btn-danger:hover:not(:disabled) {
-  background-color: #c82333;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
-}
-
-.btn.btn-success {
-  background-color: #20c997;
-  color: white;
-}
-
-.btn.btn-success:hover:not(:disabled) {
-  background-color: #1aa179;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(32, 201, 151, 0.3);
-}
-
-.btn.btn-outline {
-  background-color: transparent;
-  color: white;
-  border: 2px solid white;
-}
-
-.btn.btn-outline:hover:not(:disabled) {
-  background-color: rgba(255, 255, 255, 0.1);
-  transform: translateY(-1px);
-}
-
-/* ALERTAS */
-.alert-box {
-  padding: 1rem;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  border-left: 4px solid;
-}
-
-.alert-danger {
-  background-color: rgba(220, 53, 69, 0.2);
-  border-left-color: #dc3545;
-  color: #ffcccc;
-}
-
-.alert-warning {
-  background-color: rgba(255, 193, 7, 0.2);
-  border-left-color: #ffc107;
-  color: #fff8dc;
-}
-
-.alert-info {
-  background-color: rgba(23, 162, 184, 0.2);
-  border-left-color: #17a2b8;
-  color: #b0e0e6;
-}
-
-/* RESPONSIVO */
-@media (max-width: 768px) {
-  .client-header {
-    padding: 1.5rem;
+  .client-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
   }
 
-  .header-top {
+  .client-info h1 {
+    margin: 0;
+    font-size: 1.7rem;
+    font-weight: 700;
+  }
+
+  .name-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .client-name {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .meta-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+
+    font-size: 0.75rem;
+    opacity: 0.8;
+  }
+
+  .location {
+    font-size: 0.85rem;
+    opacity: 0.75;
+  }
+
+  .doc {
+    font-family: monospace;
+    opacity: 0.9;
+  }
+
+  /* ================= STATUS ================= */
+
+  .header-status {
+    display: flex;
     flex-direction: column;
+    gap: 0.5rem;
+    align-items: flex-end;
+  }
+
+  /* ================= RISK ================= */
+
+  .risk-badge,
+  .risk-pill {
+    font-size: 0.75rem;
+    font-weight: 600;
+
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+
+    backdrop-filter: blur(10px);
+    white-space: nowrap;
+  }
+
+  .risk-badge.ok,
+  .risk-pill.ok {
+    background: rgba(255,255,255,0.15);
+  }
+
+  .risk-badge.medio,
+  .risk-pill.medio {
+    background: rgba(255,193,7,0.25);
+  }
+
+  .risk-badge.alto,
+  .risk-pill.alto {
+    background: rgba(220,53,69,0.3);
+  }
+
+  .risk-pill {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.1rem;
+  }
+
+  .risk-text {
+    font-weight: 600;
+  }
+
+  .risk-percent {
+    font-size: 0.65rem;
+    opacity: 0.8;
+  }
+
+  /* ================= ALERTS ================= */
+
+  .alert {
+    padding: 0.9rem 1rem;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    backdrop-filter: blur(10px);
+  }
+
+  .alert.alto {
+    background: rgba(220,53,69,0.25);
+    border-left: 4px solid #ff4d4d;
+  }
+
+  .alert.medio {
+    background: rgba(255,193,7,0.25);
+    border-left: 4px solid #ffc107;
+  }
+
+  /* ================= METRICS LAYOUT ================= */
+
+  .header-metrics {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
     gap: 1rem;
   }
 
-  .client-nome {
-    font-size: 1.5rem;
+
+  /* ================= METRIC CARD BASE ================= */
+
+
+
+
+
+  
+
+  /* ================= METRIC VARIANTS ================= */
+
+
+  .metric .secondary {
+    background: rgba(255, 0, 0, 0.08);
   }
 
-  .header-status {
-    align-items: flex-start;
+
+  /* cards internos */
+  .metric {
+    padding: 0.8rem;
+    border-radius: 10px;
+
+    background: rgba(255,255,255,0.08);
   }
 
-  .header-metricas {
-    grid-template-columns: 1fr 1fr;
+  .metric span {
+     text-transform: uppercase;
+    letter-spacing: 0.8px;
+    display: block;
+
+    font-size: 0.7rem;
+    opacity: 0.7;
+    text-transform: uppercase;
   }
 
-  .header-acoes {
+  .metric strong {
+    display: block;
+    margin-top: 0.3rem;
+
+    font-size: 1.1rem;
+  }
+
+  /* destaque */
+  .metric.highlight {
+    border: 1px solid rgba(0, 255, 68, 0.342);
+  }
+
+  /* risco */
+  .metric.danger strong {
+    color: #ff6b6b;
+  }
+
+  .metric small {
+    display: block;
+    margin-top: 0.2rem;
+
+    font-size: 0.72rem;
+    opacity: 0.7;
+  }
+
+
+
+  /* PROGRESS */
+  .progress-bar {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    transition: width 0.3s ease;
+    background: rgb(12, 100, 18);
+
+  }
+
+  .progress-fill .ok {
+    background: #4caf50;
+  }
+
+  .progress-fill .warning {
+    background: #ffb300;
+  }
+
+  .progress-fill .danger {
+    background: #ef5350;
+  }
+
+  /* ================= ACTIONS ================= */
+
+
+ 
+
+  .btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+  }
+
+  .btn.primary { background: rgba(40,167,69,0.8); }
+  .btn.danger { background: rgba(220,53,69,0.8); }
+  .btn.success { background: rgba(32,201,151,0.8); }
+
+  .btn.outline {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.5);
+  }
+
+  /* ================= UTILITIES ================= */
+
+  .chip {
+    font-size: 0.65rem;
+    padding: 0.2rem 0.5rem;
+
+    border-radius: 999px;
+    background: rgba(255,255,255,0.15);
+  }
+
+
+  /* topo */
+  .finance-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .finance-header span {
+    font-size: 0.8rem;
+    opacity: 0.75;
+  }
+
+  .finance-header strong {
+    font-size: 1rem;
+  }
+
+  /* métricas */
+  .finance-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.8rem;
+  }
+
+  
+
+
+  /* ... seus estilos base ... */
+
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start; /* Alinha pelo topo para não esticar */
+  gap: 2rem;
+}
+
+.client-main-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-width: 300px;
+}
+
+.client-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: rgba(255,255,255,0.2);
+}
+
+.finance-section {
+  display: flex;
+  gap: 1rem;
+  flex-shrink: 0; /* Impede que a parte financeira esmague */
+}
+
+/* Ajuste das métricas laterais para ficarem verticais ao lado do card */
+.side-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  min-width: 140px;
+}
+
+/* Responsividade Básica */
+@media (max-width: 900px) {
+  .header-top {
     flex-direction: column;
   }
-
-  .btn {
+  .finance-section {
     width: 100%;
-    text-align: center;
+    flex-direction: column;
   }
 }
 
-@media (max-width: 480px) {
-  .header-metricas {
-    grid-template-columns: 1fr;
-  }
 
-  .client-nome {
-    font-size: 1.25rem;
-  }
 
-  .metrica-card .valor {
-    font-size: 1.25rem;
+
+
+/* ================= ESTRUTURA PRINCIPAL ================= */
+.client-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  background: linear-gradient(135deg, #4b6cb7 0%, #182848 100%);
+  color: #fff;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+
+
+/* ================= SEÇÃO ESQUERDA (CLIENTE) ================= */
+.client-main-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between; /* Empurra as ações para o rodapé do bloco */
+  gap: 1.2rem;
+}
+
+.name-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.client-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  object-fit: cover;
+}
+
+.client-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.client-name {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.client-badges {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+/* Grid de Detalhes (O pulo do gato para ocupar espaço) */
+.client-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+}
+
+
+
+
+/* ================= AÇÕES ================= */
+
+
+.actions-divider {
+  width: 1px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 0 0.25rem;
+}
+
+.btn {
+    padding: 0.4rem 0.8rem; /* Botões levemente menores verticalmente */
+
+  border-radius: 10px;
+  border: none;
+ font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  font-size: 0.8rem;
+  height: 32px; /* Altura fixa para consistência */
+}
+
+.btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.btn.primary { background: #3b82f6; }
+.btn.danger  { background: #ef4444; }
+.btn.success { background: #10b981; }
+.btn.outline { border: 1px solid rgba(255,255,255,0.3); background: transparent; }
+
+/* ================= SEÇÃO DIREITA (FINANCEIRO) ================= */
+.finance-section {
+  display: flex;
+  gap: 1rem;
+  min-width: 450px;
+}
+
+.finance-card {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  
+  
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  
+  border-radius: 14px;
+  
+  background: rgba(0, 0, 0, 0.2);
+
+
+  backdrop-filter: blur(10px);
+}
+
+
+  
+  /* ... manter os estilos de progress-fill e metrics anteriores ... */
+
+@media (max-width: 1100px) {
+  .header-top { flex-direction: column; }
+  .finance-section { min-width: 100%; }
+}
+
+
+/* Container que agrupa info e botões na base */
+.client-footer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end; /* Alinha os botões e textos pela base */
+  gap: 1.5rem;
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Detalhes dispostos horizontalmente */
+.client-details-horizontal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem; /* Espaço generoso entre os blocos de informação */
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: fit-content;
+}
+
+.detail-item span {
+  font-size: 0.60rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.5;
+}
+
+.detail-item strong {
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Ações mais compactas para não "comer" espaço */
+.header-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-shrink: 0; /* Impede os botões de esmagarem */
+}
+
+
+
+/* Ajuste Responsivo */
+@media (max-width: 1200px) {
+  .client-footer-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .client-details-horizontal {
+    gap: 1rem;
   }
 }

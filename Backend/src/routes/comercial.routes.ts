@@ -84,8 +84,20 @@ router.get('/quotes', asyncHandler(async (_req, res) => {
 }));
 
 router.get('/customers', asyncHandler(async (_req, res) => {
-  const [rows]: any = await pool.execute('SELECT id_cliente, nome FROM clientes LIMIT 100');
-  res.json({ data: rows });
+  // Retorna campos compatíveis com frontend (nome_razao, cpf_cnpj, cidade)
+  const [rows]: any = await pool.execute(
+    'SELECT id_cliente, nome_razao, cpf_cnpj, cidade FROM clientes LIMIT 200'
+  );
+  // Responde com array diretamente para compatibilidade
+  res.json(rows);
+}));
+
+// Compatibilidade: rota mais tradicional `/clientes` usada por código legado
+router.get('/clientes', asyncHandler(async (_req, res) => {
+  const [rows]: any = await pool.execute(
+    'SELECT id_cliente, nome_razao, cpf_cnpj, cidade FROM clientes LIMIT 200'
+  );
+  res.json(rows);
 }));
 
 router.get('/vendors', asyncHandler(async (_req, res) => {

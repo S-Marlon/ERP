@@ -1,14 +1,8 @@
-/**
- * COMPONENTE: ContatosTab
- */
-
 import React, { useState } from 'react';
 import type {
   ClienteContato,
   ClienteEmail,
 } from '../../../../types/cliente.types';
-
-import type { UseClienteReturn } from '../../../../hooks/useCliente';
 
 import {
   maskPhone,
@@ -19,24 +13,28 @@ import {
 import './ContatosTab.css';
 
 interface ContatosTabProps {
-  hook: UseClienteReturn;
+  clienteId: number;
+
+  contatos: ClienteContato[];
+  emails: ClienteEmail[];
+
+  setContatos: React.Dispatch<React.SetStateAction<ClienteContato[]>>;
+  setEmails: React.Dispatch<React.SetStateAction<ClienteEmail[]>>;
+
+  loading?: boolean;
 }
 
-const ContatosTab: React.FC<ContatosTabProps> = ({ hook }) => {
-  const {
-    cliente,
-    contatos,
-    emails,
-    loading,
-    adicionarContato,
-    removerContato,
-    adicionarEmail,
-    removerEmail,
-  } = hook;
-
-  // =========================================================================
-  // STATE
-  // =========================================================================
+const ContatosTab: React.FC<ContatosTabProps> = ({
+  clienteId,
+  contatos,
+  emails,
+  setContatos,
+  setEmails,
+  loading = false,
+}) => {
+  // =========================================================
+  // STATE LOCAL
+  // =========================================================
 
   const [novoContato, setNovoContato] = useState<Partial<ClienteContato>>({
     tipo: 'CELULAR',
@@ -51,11 +49,11 @@ const ContatosTab: React.FC<ContatosTabProps> = ({ hook }) => {
 
   const [erros, setErros] = useState<Record<string, string>>({});
 
-  // =========================================================================
-  // HANDLERS - CONTATO
-  // =========================================================================
+  // =========================================================
+  // CONTATO
+  // =========================================================
 
-  const handleAdicionarContato = async () => {
+  const handleAdicionarContato = () => {
     const novosErros: Record<string, string> = {};
 
     if (!novoContato.numero?.trim()) {
@@ -69,10 +67,15 @@ const ContatosTab: React.FC<ContatosTabProps> = ({ hook }) => {
       return;
     }
 
-    await adicionarContato({
-      ...novoContato,
-      id_cliente: cliente?.id_cliente!,
-    } as ClienteContato);
+    const contato: ClienteContato = {
+      id_contato: Date.now(),
+      id_cliente: clienteId,
+      tipo: novoContato.tipo || 'CELULAR',
+      numero: novoContato.numero!,
+      nome_referencia: novoContato.nome_referencia,
+    };
+
+    setContatos((prev) => [...prev, contato]);
 
     setNovoContato({
       tipo: 'CELULAR',
@@ -83,17 +86,19 @@ const ContatosTab: React.FC<ContatosTabProps> = ({ hook }) => {
     setErros({});
   };
 
-  const handleRemoverContato = async (id: number) => {
+  const handleRemoverContato = (id: number) => {
     if (window.confirm('Remover contato?')) {
-      await removerContato(id);
+      setContatos((prev) =>
+        prev.filter((c) => c.id_contato !== id)
+      );
     }
   };
 
-  // =========================================================================
-  // HANDLERS - EMAIL
-  // =========================================================================
+  // =========================================================
+  // EMAIL
+  // =========================================================
 
-  const handleAdicionarEmail = async () => {
+  const handleAdicionarEmail = () => {
     const novosErros: Record<string, string> = {};
 
     if (!novoEmail.email?.trim()) {
@@ -107,10 +112,14 @@ const ContatosTab: React.FC<ContatosTabProps> = ({ hook }) => {
       return;
     }
 
-    await adicionarEmail({
-      ...novoEmail,
-      id_cliente: cliente?.id_cliente!,
-    } as ClienteEmail);
+    const email: ClienteEmail = {
+      id_email: Date.now(),
+      id_cliente: clienteId,
+      email: novoEmail.email!,
+      tipo: novoEmail.tipo || 'PESSOAL',
+    };
+
+    setEmails((prev) => [...prev, email]);
 
     setNovoEmail({
       email: '',
@@ -120,19 +129,21 @@ const ContatosTab: React.FC<ContatosTabProps> = ({ hook }) => {
     setErros({});
   };
 
-  const handleRemoverEmail = async (id: number) => {
+  const handleRemoverEmail = (id: number) => {
     if (window.confirm('Remover email?')) {
-      await removerEmail(id);
+      setEmails((prev) =>
+        prev.filter((e) => e.id_email !== id)
+      );
     }
   };
 
-  // =========================================================================
+  // =========================================================
   // RENDER
-  // =========================================================================
+  // =========================================================
 
   return (
     <div className="contatos-tab">
-      
+
       {/* TELEFONES */}
       <div className="contatos-section">
         <h3>📱 Telefones</h3>
@@ -212,6 +223,7 @@ const ContatosTab: React.FC<ContatosTabProps> = ({ hook }) => {
 
         {erros.email && <span>{erros.email}</span>}
       </div>
+
     </div>
   );
 };

@@ -294,3 +294,13 @@ export const getIconStatus = (status_credito: string): string => {
       return '❓';
   }
 };
+
+
+export function diasDesdeUltimaCompra(data: Date | string): number {
+  const hoje = new Date();
+  const ultima = new Date(data);
+
+  const diffMs = hoje.getTime() - ultima.getTime();
+
+  return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+}

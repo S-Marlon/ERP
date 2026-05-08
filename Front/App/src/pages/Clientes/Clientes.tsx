@@ -1,235 +1,326 @@
-/**
- * PÁGINA CLIENTES
- * Orquestrador principal do módulo de gestão de clientes
- * Refatorado com arquitetura profissional em camadas
- */
-
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import './Clientes.css';
-import { clienteService } from '../../services/clienteService';
-import { useCliente } from '../../hooks/useCliente';
+
 import { ClientHeader } from './components/ClientHeader';
-import CadastroTab from './components/tabs/CadastroTab';
-import ContatosTab from './components/tabs/ContatosTab';
+
+import GeralTab from './components/tabs/GeralTab';
 import FinanceiroTab from './components/tabs/FinanceiroTab';
 import HistoricoTab from './components/tabs/HistoricoTab';
 import PrecosTab from './components/tabs/PrecosTab';
-import type { Cliente, ResumoVendas } from '../../types/cliente.types';
+
+
+import {
+  ClassificacaoCliente,
+  PotencialCliente,
+  SegmentoCliente,
+  StatusCliente,
+  StatusCredito,
+  TipoCliente,
+  type Cliente,
+} from '../../types/cliente.types';
+
+type TabType =
+  | 'geral'
+  | 'financeiro'
+  | 'historico'
+  | 'precos';
+
+// =========================================================
+// MOCK
+// =========================================================
+
+const MOCK_CLIENTES: Cliente[] = [
+  {
+    id_cliente: 1,
+
+    // Tipo
+    tipo_cliente: TipoCliente.PESSOA_FISICA,
+
+    // CRM
+    segmento: SegmentoCliente.PRESTADOR_SERVICO,
+    classificacao: ClassificacaoCliente.B,
+    potencial: PotencialCliente.MEDIO,
+
+    // Dados principais
+    nome_razao: 'João Carlos da Silva',
+    cpf_cnpj: '123.456.789-00',
+
+    // Contato
+    telefone_principal: '(11) 99999-1111',
+    whatsapp: '(11) 99999-1111',
+
+    // Endereço
+    endereco: {
+      logradouro: 'Rua das Palmeiras',
+      numero: '120',
+      complemento: 'Apto 32',
+      bairro: 'Centro',
+      cidade: 'São Paulo',
+      estado: 'SP',
+      cep: '01000-000',
+      pais: 'Brasil',
+    },
+
+    // Crédito
+    limite_credito: 5000,
+    dia_vencimento: 10,
+    status_credito: StatusCredito.LIBERADO,
+
+    // Financeiro
+    saldo_devedor_atual: 1250,
+    dias_atraso: 0,
+    score_credito: 820,
+    score_comercial: 740,
+
+    // Status
+    status_cliente: StatusCliente.ATIVO,
+
+    // Compras
+    ultima_compra: '2026-05-01T10:30:00Z',
+
+    // Marketing
+    aceita_marketing: true,
+    consentimento_dados_em: '2025-10-10T09:00:00Z',
+
+    // Auditoria
+    criado_em: '2025-01-05T12:00:00Z',
+    atualizado_em: '2026-05-01T12:00:00Z',
+  },
+
+  {
+    id_cliente: 2,
+
+    // Tipo
+    tipo_cliente: TipoCliente.PESSOA_JURIDICA,
+
+    // CRM
+    segmento: SegmentoCliente.OFICINA,
+    classificacao: ClassificacaoCliente.A,
+    potencial: PotencialCliente.ESTRATEGICO,
+
+    // Dados principais
+    nome_razao: 'Auto Center Prime LTDA',
+    nome_fantasia: 'Auto Center Prime',
+
+    cpf_cnpj: '12.345.678/0001-99',
+
+    inscricao_estadual: '123.456.789.000',
+    inscricao_municipal: '99887766',
+
+    // Contato
+    telefone_principal: '(11) 4002-8922',
+    whatsapp: '(11) 98888-2222',
+
+    // Endereço
+    endereco: {
+      logradouro: 'Avenida dos Mecânicos',
+      numero: '1500',
+      bairro: 'Distrito Industrial',
+      cidade: 'São Paulo',
+      estado: 'SP',
+      cep: '01310-200',
+      pais: 'Brasil',
+    },
+
+    // Crédito
+    limite_credito: 30000,
+    dia_vencimento: 15,
+    status_credito: StatusCredito.LIBERADO,
+
+    // Financeiro
+    saldo_devedor_atual: 8400,
+    dias_atraso: 2,
+    score_credito: 690,
+    score_comercial: 920,
+
+    // Status
+    status_cliente: StatusCliente.ATIVO,
+
+    // Compras
+    ultima_compra: '2026-05-03T15:45:00Z',
+
+    // Marketing
+    aceita_marketing: true,
+    consentimento_dados_em: '2024-07-15T08:00:00Z',
+
+    // Auditoria
+    criado_em: '2024-07-15T08:00:00Z',
+    atualizado_em: '2026-05-03T16:00:00Z',
+  },
+];
+
+// =========================================================
 
 const Clientes = () => {
-  // =========================================================================
-  // STATE
-  // =========================================================================
-
   const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [activeTab, setActiveTab] = useState<'cadastro' | 'contatos' | 'financeiro' | 'historico' | 'precos'>('cadastro');
-  const [usuarioLoading, setUsuarioLoading] = useState(false);
+  const [cliente, setCliente] = useState<Cliente | null>(null);
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState<TabType>('geral');
+
+  const [loading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const [ultimaCompra, setUltimaCompra] = useState<Date | undefined>();
   const [ticketMedio, setTicketMedio] = useState<number | undefined>();
 
-  // Hook principal
-  const {
-    state,
-    cliente,
-    loading,
-    error,
-    carregarCliente,
-    atualizarCliente,
-    salvarCliente,
-    novoCliente,
-    limparErro,
-    carregarVendas,
-  } = useCliente();
+  const [contatos, setContatos] = useState<any[]>([]);
+  const [emails, setEmails] = useState<any[]>([]);
 
-  // =========================================================================
-  // EFEITOS
-  // =========================================================================
-
-  // Carrega lista de clientes ao montar
   useEffect(() => {
-    carregarListaClientes();
+    setClientes(MOCK_CLIENTES);
   }, []);
 
-  // Carrega resumo de vendas quando cliente muda
-  useEffect(() => {
-    if (cliente?.id_cliente) {
-      carregarResumoVendas();
-    }
-  }, [cliente?.id_cliente]);
+  const clientesFiltrados = useMemo(() => {
+    const q = searchTerm.toLowerCase();
+    return clientes.filter((c) =>
+      c.nome_razao.toLowerCase().includes(q) ||
+      c.cpf_cnpj.toLowerCase().includes(q) ||
+      (c.endereco?.cidade || '').toLowerCase().includes(q)
+    );
+  }, [clientes, searchTerm]);
 
-  // =========================================================================
-  // HANDLERS
-  // =========================================================================
+  const handleSelecionarCliente = useCallback((c: Cliente) => {
+    setCliente(c);
+    setActiveTab('geral');
 
-  const carregarListaClientes = async () => {
-    try {
-      setUsuarioLoading(true);
-      const dados = await clienteService.listarTodos();
-      setClientes(dados);
-    } catch (err) {
-      console.error('Erro ao carregar clientes:', err);
-    } finally {
-      setUsuarioLoading(false);
-    }
+    setUltimaCompra(new Date());
+    setTicketMedio(320);
+  }, []);
+
+ const handleNovoCliente = useCallback(() => {
+  const novo: Cliente = {
+    id_cliente: Date.now(),
+
+    tipo_cliente: TipoCliente.PESSOA_FISICA,
+
+    segmento: SegmentoCliente.CONSUMIDOR_FINAL,
+
+    classificacao: ClassificacaoCliente.C,
+    potencial: PotencialCliente.BAIXO,
+
+    nome_razao: 'Novo Cliente',
+    cpf_cnpj: '',
+
+    telefone_principal: '',
+    whatsapp: '',
+
+    endereco: {
+      logradouro: '',
+      numero: '',
+      bairro: '',
+      cidade: '',
+      estado: '',
+      cep: '',
+      pais: 'Brasil',
+    },
+
+    limite_credito: 0,
+    dia_vencimento: 10,
+
+    status_credito: StatusCredito.LIBERADO,
+    status_cliente: StatusCliente.ATIVO,
+
+    saldo_devedor_atual: 0,
+
+    score_credito: 0,
+    score_comercial: 0,
+
+    aceita_marketing: false,
+
+    criado_em: new Date().toISOString(),
   };
 
-  const carregarResumoVendas = async () => {
-    const resumo = await carregarVendas();
-    if (resumo) {
-      setUltimaCompra(resumo.ultima_venda);
-      setTicketMedio(resumo.ticket_medio);
-    }
-  };
+  setClientes((prev) => [novo, ...prev]);
+  setCliente(novo);
 
-  const handleSelecionarCliente = async (c: Cliente) => {
-    await carregarCliente(c.id_cliente);
-    setActiveTab('cadastro');
-  };
+  setActiveTab('geral');
+}, []);
 
-  const handleNovoCliente = () => {
-    novoCliente();
-    setActiveTab('cadastro');
-    setUltimaCompra(undefined);
-    setTicketMedio(undefined);
-  };
-
-  const handleAcaoBotao = (acao: 'pagar' | 'bloquear' | 'desbloquear' | 'novo') => {
-    switch (acao) {
-      case 'pagar':
-        setActiveTab('financeiro');
-        break;
-      case 'bloquear':
-        if (cliente) {
-          atualizarCliente({ status_cliente: 'BLOQUEADO' });
-        }
-        break;
-      case 'desbloquear':
-        if (cliente) {
-          atualizarCliente({ status_cliente: 'ATIVO' });
-        }
-        break;
-      case 'novo':
-        handleNovoCliente();
-        break;
-    }
-  };
-
-  // =========================================================================
-  // RENDER
-  // =========================================================================
+  const salvarCliente = useCallback((dados: Cliente) => {
+    setClientes((prev) =>
+      prev.map((c) =>
+        c.id_cliente === dados.id_cliente ? dados : c
+      )
+    );
+    setCliente(dados);
+  }, []);
 
   return (
     <div className="container-clientes">
-      {/* SIDEBAR: LISTA DE CLIENTES */}
+
+      {/* SIDEBAR */}
       <aside className="sidebar-clientes">
         <div className="sidebar-header">
           <h3>Clientes</h3>
-          <button className="btn-novo" onClick={handleNovoCliente} title="Criar novo cliente">
-            ➕
-          </button>
+          <button className="btn-novo" onClick={handleNovoCliente}>+</button>
         </div>
 
         <div className="search-clientes">
           <input
-            type="text"
-            placeholder="🔍 Buscar cliente..."
-            disabled
-            title="Busca será implementada em versão posterior"
+            placeholder="Buscar cliente..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
 
         <ul className="lista-clientes">
-          {clientes.map((c) => (
+          {clientesFiltrados.map((c) => (
             <li
               key={c.id_cliente}
               className={cliente?.id_cliente === c.id_cliente ? 'active' : ''}
               onClick={() => handleSelecionarCliente(c)}
-              role="button"
-              tabIndex={0}
             >
-              <div className="cliente-item-info">
-                <strong>{c.nome_razao}</strong>
-                <span className="cliente-doc">{c.cpf_cnpj}</span>
-                {c.cidade && <span className="cliente-local">{c.cidade}</span>}
-              </div>
+              <strong>{c.nome_razao}</strong>
+              <div>{c.cpf_cnpj}</div>
+              <small>
+  {c.endereco.cidade} - {c.endereco.estado}
+</small>
             </li>
           ))}
         </ul>
-
-        {usuarioLoading && <div className="loading-indicator">Carregando...</div>}
-        {clientes.length === 0 && !usuarioLoading && (
-          <div className="empty-state">Nenhum cliente cadastrado</div>
-        )}
       </aside>
 
-      {/* MAIN: PAINEL DE CLIENTE */}
+      {/* MAIN */}
       <main className="painel-cliente">
-        {/* ERROR DISPLAY */}
-        {error && (
-          <div className="error-banner">
-            <div className="error-content">
-              <span className="error-icon">❌</span>
-              <span>{error}</span>
-              <button className="error-close" onClick={limparErro}>
-                ✕
-              </button>
-            </div>
-          </div>
-        )}
 
-        {/* CLIENTE HEADER */}
         {cliente ? (
           <>
             <ClientHeader
               cliente={cliente}
               ultimaCompra={ultimaCompra}
               ticketMedio={ticketMedio}
-              onAcao={handleAcaoBotao}
+              onAcao={() => {}}
               loading={loading}
             />
 
-            {/* ABAS */}
             <div className="client-tabs">
+
+              {/* TABS */}
               <div className="tabs-header">
-                <button
-                  className={`tab-button ${activeTab === 'cadastro' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('cadastro')}
-                >
-                  📋 Cadastro
-                </button>
-                <button
-                  className={`tab-button ${activeTab === 'contatos' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('contatos')}
-                >
-                  📞 Contatos
-                </button>
-                <button
-                  className={`tab-button ${activeTab === 'financeiro' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('financeiro')}
-                >
-                  💰 Financeiro
-                </button>
-                <button
-                  className={`tab-button ${activeTab === 'historico' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('historico')}
-                >
-                  📊 Histórico
-                </button>
-                <button
-                  className={`tab-button ${activeTab === 'precos' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('precos')}
-                >
-                  🏷️ Preços
-                </button>
+                {(['geral','financeiro','historico','precos'] as TabType[]).map(tab => (
+                  <button
+                    key={tab}
+                    className={`tab-button ${activeTab === tab ? 'active' : ''}`}
+                    onClick={() => setActiveTab(tab)}
+                  >
+                    {tab}
+                  </button>
+                ))}
               </div>
 
+              {/* CONTENT */}
               <div className="tabs-content">
-                {activeTab === 'cadastro' && (
-                  <CadastroTab cliente={cliente} onSave={salvarCliente} />
-                )}
 
-                {activeTab === 'contatos' && (
-                  <ContatosTab cliente={cliente} />
+                {activeTab === 'geral' && (
+                  <GeralTab
+                    cliente={cliente}
+                    contatos={contatos}
+                    emails={emails}
+                    setContatos={setContatos}
+                    setEmails={setEmails}
+                    onSave={salvarCliente}
+                  />
                 )}
 
                 {activeTab === 'financeiro' && (
@@ -243,26 +334,19 @@ const Clientes = () => {
                 {activeTab === 'precos' && (
                   <PrecosTab cliente={cliente} />
                 )}
+
               </div>
             </div>
           </>
         ) : (
           <div className="empty-container">
-            <div className="empty-state-large">
-              <h2>👋 Bem-vindo ao Módulo de Clientes</h2>
-              <p>Selecione um cliente na lista ou crie um novo para começar</p>
-              <button className="btn-primary-large" onClick={handleNovoCliente}>
-                ➕ Novo Cliente
-              </button>
-            </div>
+            <h2>Selecione um cliente</h2>
           </div>
         )}
+
       </main>
     </div>
   );
 };
 
-export default Clientes;
-
-
-
+export default Clientes;  

@@ -62,6 +62,35 @@ app.get('/api/suppliers', asyncHandler(async (req, res) => {
     }
 }));
 
+    // Compatibilidade: expõe lista de clientes para front que chama /api/comercial/customers ou /api/clientes
+    app.get('/api/comercial/customers', asyncHandler(async (_req, res) => {
+        try {
+            console.log('[HTTP] GET /api/comercial/customers - query DB');
+            const [rows]: any = await pool.execute(
+                'SELECT id_cliente, nome_razao, cpf_cnpj, cidade FROM clientes LIMIT 200'
+            );
+            console.log(`[HTTP] /api/comercial/customers -> rows=${Array.isArray(rows) ? rows.length : 0}`);
+            return res.json(rows || []);
+        } catch (error: any) {
+            console.error('Erro ao listar clientes (compat):', error);
+            return res.status(500).json({ error: 'Erro ao listar clientes' });
+        }
+    }));
+
+    app.get('/api/clientes', asyncHandler(async (_req, res) => {
+        try {
+            console.log('[HTTP] GET /api/clientes - query DB');
+            const [rows]: any = await pool.execute(
+                'SELECT id_cliente, nome_razao, cpf_cnpj, cidade FROM clientes LIMIT 200'
+            );
+            console.log(`[HTTP] /api/clientes -> rows=${Array.isArray(rows) ? rows.length : 0}`);
+            return res.json(rows || []);
+        } catch (error: any) {
+            console.error('Erro ao listar clientes (compat):', error);
+            return res.status(500).json({ error: 'Erro ao listar clientes' });
+        }
+    }));
+
 
 function gerarHashCNPJ(cnpj: string): string {
     const cnpjLimpo = cnpj.replace(/\D/g, '');

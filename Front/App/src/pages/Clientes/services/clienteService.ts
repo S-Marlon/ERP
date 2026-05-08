@@ -1,6 +1,7 @@
 /**
  * SERVIÇO DE CLIENTES
- * API client com tratamento robusto de erros e tipagem forte
+ * Mock profissional com persistência local
+ * Preparado para futura troca por API real
  */
 
 import type {
@@ -18,346 +19,433 @@ import type {
   VendaItem,
   ResumoFinanceiro,
   ResumoVendas,
-  ApiResponse,
-  ApiListResponse,
 } from '../types/cliente.types';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
-const CLIENTES_ENDPOINT = `${API_URL}/clientes`;
+import { clientesMock } from '../database/clientes.mock';
 
-/**
- * Classe para centralizar requisições de cliente
- */
+// ======================================================================
+// STORAGE
+// ======================================================================
+
+const STORAGE_KEY = 'mock_clientes';
+
+// ======================================================================
+// MOCK BASE
+// ======================================================================
+
+// ======================================================================
+// DELAY MOCK
+// ======================================================================
+
+const delay = (ms = 400) =>
+  new Promise((resolve) =>
+    setTimeout(resolve, ms)
+  );
+
+// ======================================================================
+// SERVICE
+// ======================================================================
+
 class ClienteServiceClass {
-  /**
-   * Trata erros de rede e API
-   */
-  private async handleResponse<T>(response: Response): Promise<T> {
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: response.statusText }));
+  private clientes: Cliente[] = [];
+
+  constructor() {
+    this.loadStorage();
+  }
+
+  // ====================================================================
+  // STORAGE
+  // ====================================================================
+
+  private loadStorage() {
+    const data = localStorage.getItem(
+      STORAGE_KEY
+    );
+
+    if (data) {
+      this.clientes = JSON.parse(data);
+    } else {
+      this.clientes = clientesMock; // Usa os dados mockados importados
+
+      this.saveStorage();
+    }
+  }
+
+  private saveStorage() {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(this.clientes)
+    );
+  }
+
+  // ====================================================================
+  // CLIENTES
+  // ====================================================================
+
+  async listar(): Promise<Cliente[]> {
+    await delay();
+
+    return [...this.clientes];
+  }
+
+  async listarTodos(): Promise<Cliente[]> {
+    return this.listar();
+  }
+
+  async obter(id: number): Promise<Cliente> {
+    await delay();
+
+    const cliente = this.clientes.find(
+      (c) => c.id_cliente === id
+    );
+
+    if (!cliente) {
       throw new Error(
-        errorData?.message || errorData?.error || `Erro ${response.status}: ${response.statusText}`
+        'Cliente não encontrado'
       );
     }
 
-    try {
-      const data = await response.json();
-      return data.data || data;
-    } catch {
-      throw new Error('Resposta do servidor inválida');
+    return cliente;
+  }
+
+  async criar(
+    dados: ClienteInput
+  ): Promise<Cliente> {
+    await delay();
+
+    const novoCliente: Cliente = {
+      id_cliente: Date.now(),
+
+      status_cliente: 'ATIVO',
+
+      ...dados,
+    };
+
+    this.clientes.unshift(novoCliente);
+
+    this.saveStorage();
+
+    return novoCliente;
+  }
+
+  async atualizar(
+    id: number,
+    dados: ClienteUpdate
+  ): Promise<Cliente> {
+    await delay();
+
+    const index = this.clientes.findIndex(
+      (c) => c.id_cliente === id
+    );
+
+    if (index === -1) {
+      throw new Error(
+        'Cliente não encontrado'
+      );
     }
+
+    this.clientes[index] = {
+      ...this.clientes[index],
+      ...dados,
+    };
+
+    this.saveStorage();
+
+    return this.clientes[index];
   }
 
-  /**
-   * Faz requisição GET
-   */
-  private async get<T>(url: string): Promise<T> {
-    try {
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      return this.handleResponse<T>(response);
-    } catch (error) {
-      console.error(`GET ${url}:`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Faz requisição POST
-   */
-  private async post<T>(url: string, body: unknown): Promise<T> {
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      return this.handleResponse<T>(response);
-    } catch (error) {
-      console.error(`POST ${url}:`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Faz requisição PUT
-   */
-  private async put<T>(url: string, body: unknown): Promise<T> {
-    try {
-      const response = await fetch(url, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      return this.handleResponse<T>(response);
-    } catch (error) {
-      console.error(`PUT ${url}:`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Faz requisição DELETE
-   */
-  private async delete<T>(url: string): Promise<T> {
-    try {
-      const response = await fetch(url, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      return this.handleResponse<T>(response);
-    } catch (error) {
-      console.error(`DELETE ${url}:`, error);
-      throw error;
-    }
-  }
-
-  // =========================================================================
-  // CLIENTE - OPERAÇÕES BÁSICAS
-  // =========================================================================
-
-  /**
-   * Lista todos os clientes
-   */
-  async listarTodos(): Promise<Cliente[]> {
-    return this.get<Cliente[]>(CLIENTES_ENDPOINT);
-  }
-
-  /**
-   * Obtém um cliente específico
-   */
-  async obter(id: number): Promise<Cliente> {
-    return this.get<Cliente>(`${CLIENTES_ENDPOINT}/${id}`);
-  }
-
-  /**
-   * Cria um novo cliente
-   */
-  async criar(dados: ClienteInput): Promise<Cliente> {
-    return this.post<Cliente>(CLIENTES_ENDPOINT, dados);
-  }
-
-  /**
-   * Atualiza um cliente (PUT completo)
-   */
-  async atualizar(id: number, dados: ClienteUpdate): Promise<Cliente> {
-    return this.put<Cliente>(`${CLIENTES_ENDPOINT}/${id}`, dados);
-  }
-
-  /**
-   * Deleta um cliente
-   */
   async deletar(id: number): Promise<void> {
-    await this.delete<void>(`${CLIENTES_ENDPOINT}/${id}`);
+    await delay();
+
+    this.clientes = this.clientes.filter(
+      (c) => c.id_cliente !== id
+    );
+
+    this.saveStorage();
   }
 
-  /**
-   * Salva cliente (cria ou atualiza automaticamente)
-   * Método legado para compatibilidade
-   */
-  async salvar(cliente: Partial<Cliente>): Promise<Cliente> {
+  async salvar(
+    cliente: Partial<Cliente>
+  ): Promise<Cliente> {
     if (cliente.id_cliente) {
-      return this.atualizar(cliente.id_cliente, cliente as ClienteUpdate);
-    } else {
-      return this.criar(cliente as ClienteInput);
+      return this.atualizar(
+        cliente.id_cliente,
+        cliente as ClienteUpdate
+      );
     }
+
+    return this.criar(
+      cliente as ClienteInput
+    );
   }
 
-  /**
-   * Excluir cliente (alias para compatibilidade)
-   */
   async excluir(id: number): Promise<void> {
     return this.deletar(id);
   }
 
-  // =========================================================================
+  // ====================================================================
   // CONTATOS
-  // =========================================================================
+  // ====================================================================
 
-  /**
-   * Lista contatos de um cliente
-   */
-  async obterContatos(id_cliente: number): Promise<ClienteContato[]> {
-    return this.get<ClienteContato[]>(`${CLIENTES_ENDPOINT}/${id_cliente}/contatos`);
+  async obterContatos(
+    id_cliente: number
+  ): Promise<ClienteContato[]> {
+    await delay();
+
+    return [
+      {
+        id_contato: 1,
+        nome: 'Carlos Silva',
+        telefone: '(11) 99999-9999',
+        cargo: 'Comprador',
+      },
+    ] as ClienteContato[];
   }
 
-  /**
-   * Adiciona contato
-   */
-  async adicionarContato(id_cliente: number, dados: ClienteContatoInput): Promise<ClienteContato> {
-    return this.post<ClienteContato>(`${CLIENTES_ENDPOINT}/${id_cliente}/contatos`, dados);
+  async adicionarContato(
+    id_cliente: number,
+    dados: ClienteContatoInput
+  ): Promise<ClienteContato> {
+    await delay();
+
+    return {
+      id_contato: Date.now(),
+      ...dados,
+    } as ClienteContato;
   }
 
-  /**
-   * Atualiza contato
-   */
   async atualizarContato(
     id_cliente: number,
     id_contato: number,
     dados: Partial<ClienteContatoInput>
   ): Promise<ClienteContato> {
-    return this.put<ClienteContato>(
-      `${CLIENTES_ENDPOINT}/${id_cliente}/contatos/${id_contato}`,
-      dados
-    );
+    await delay();
+
+    return {
+      id_contato,
+      ...dados,
+    } as ClienteContato;
   }
 
-  /**
-   * Remove contato
-   */
-  async removerContato(id_cliente: number, id_contato: number): Promise<void> {
-    await this.delete<void>(`${CLIENTES_ENDPOINT}/${id_cliente}/contatos/${id_contato}`);
+  async removerContato(
+    id_cliente: number,
+    id_contato: number
+  ): Promise<void> {
+    await delay();
   }
 
-  // =========================================================================
+  // ====================================================================
   // EMAILS
-  // =========================================================================
+  // ====================================================================
 
-  /**
-   * Lista emails de um cliente
-   */
-  async obterEmails(id_cliente: number): Promise<ClienteEmail[]> {
-    return this.get<ClienteEmail[]>(`${CLIENTES_ENDPOINT}/${id_cliente}/emails`);
+  async obterEmails(
+    id_cliente: number
+  ): Promise<ClienteEmail[]> {
+    await delay();
+
+    return [
+      {
+        id_email: 1,
+        email: 'financeiro@empresa.com',
+      },
+    ] as ClienteEmail[];
   }
 
-  /**
-   * Adiciona email
-   */
-  async adicionarEmail(id_cliente: number, dados: ClienteEmailInput): Promise<ClienteEmail> {
-    return this.post<ClienteEmail>(`${CLIENTES_ENDPOINT}/${id_cliente}/emails`, dados);
+  async adicionarEmail(
+    id_cliente: number,
+    dados: ClienteEmailInput
+  ): Promise<ClienteEmail> {
+    await delay();
+
+    return {
+      id_email: Date.now(),
+      ...dados,
+    } as ClienteEmail;
   }
 
-  /**
-   * Atualiza email
-   */
   async atualizarEmail(
     id_cliente: number,
     id_email: number,
     dados: Partial<ClienteEmailInput>
   ): Promise<ClienteEmail> {
-    return this.put<ClienteEmail>(`${CLIENTES_ENDPOINT}/${id_cliente}/emails/${id_email}`, dados);
+    await delay();
+
+    return {
+      id_email,
+      ...dados,
+    } as ClienteEmail;
   }
 
-  /**
-   * Remove email
-   */
-  async removerEmail(id_cliente: number, id_email: number): Promise<void> {
-    await this.delete<void>(`${CLIENTES_ENDPOINT}/${id_cliente}/emails/${id_email}`);
+  async removerEmail(
+    id_cliente: number,
+    id_email: number
+  ): Promise<void> {
+    await delay();
   }
 
-  // =========================================================================
+  // ====================================================================
   // PREÇOS ESPECIAIS
-  // =========================================================================
+  // ====================================================================
 
-  /**
-   * Lista preços especiais de um cliente
-   */
-  async obterPrecosEspeciais(id_cliente: number): Promise<ClientePrecoEspecial[]> {
-    return this.get<ClientePrecoEspecial[]>(`${CLIENTES_ENDPOINT}/${id_cliente}/precos-especiais`);
+  async obterPrecosEspeciais(
+    id_cliente: number
+  ): Promise<ClientePrecoEspecial[]> {
+    await delay();
+
+    return [
+      {
+        id_regra: 1,
+        produto: 'Cimento CP2',
+        preco_especial: 39.9,
+      },
+    ] as ClientePrecoEspecial[];
   }
 
-  /**
-   * Adiciona preço especial
-   */
   async adicionarPrecoEspecial(
     id_cliente: number,
     dados: ClientePrecoEspecialInput
   ): Promise<ClientePrecoEspecial> {
-    return this.post<ClientePrecoEspecial>(
-      `${CLIENTES_ENDPOINT}/${id_cliente}/precos-especiais`,
-      dados
-    );
+    await delay();
+
+    return {
+      id_regra: Date.now(),
+      ...dados,
+    } as ClientePrecoEspecial;
   }
 
-  /**
-   * Atualiza preço especial
-   */
   async atualizarPrecoEspecial(
     id_cliente: number,
     id_regra: number,
     dados: Partial<ClientePrecoEspecialInput>
   ): Promise<ClientePrecoEspecial> {
-    return this.put<ClientePrecoEspecial>(
-      `${CLIENTES_ENDPOINT}/${id_cliente}/precos-especiais/${id_regra}`,
-      dados
-    );
+    await delay();
+
+    return {
+      id_regra,
+      ...dados,
+    } as ClientePrecoEspecial;
   }
 
-  /**
-   * Remove preço especial
-   */
-  async removerPrecoEspecial(id_cliente: number, id_regra: number): Promise<void> {
-    await this.delete<void>(
-      `${CLIENTES_ENDPOINT}/${id_cliente}/precos-especiais/${id_regra}`
-    );
+  async removerPrecoEspecial(
+    id_cliente: number,
+    id_regra: number
+  ): Promise<void> {
+    await delay();
   }
 
-  // =========================================================================
+  // ====================================================================
   // FINANCEIRO
-  // =========================================================================
+  // ====================================================================
 
-  /**
-   * Obtém resumo financeiro do cliente
-   */
-  async obterFinanceiro(id_cliente: number): Promise<ResumoFinanceiro> {
-    return this.get<ResumoFinanceiro>(`${CLIENTES_ENDPOINT}/${id_cliente}/financeiro`);
+  async obterFinanceiro(
+    id_cliente: number
+  ): Promise<ResumoFinanceiro> {
+    await delay();
+
+    return {
+      total_aberto: 3500,
+      total_pago: 12000,
+      total_vencido: 800,
+    } as ResumoFinanceiro;
   }
 
-  /**
-   * Lista contas a receber do cliente
-   */
-  async obterContas(id_cliente: number): Promise<ContaReceber[]> {
-    return this.get<ContaReceber[]>(`${CLIENTES_ENDPOINT}/${id_cliente}/contas-receber`);
+  async obterContas(
+    id_cliente: number
+  ): Promise<ContaReceber[]> {
+    await delay();
+
+    return [
+      {
+        id_conta: 1,
+        valor: 1250,
+        status: 'PENDENTE',
+      },
+    ] as ContaReceber[];
   }
 
-  /**
-   * Registra pagamento de conta
-   */
   async registrarPagamento(
     id_cliente: number,
     id_conta: number,
     data_pagamento: Date
   ): Promise<ContaReceber> {
-    return this.post<ContaReceber>(
-      `${CLIENTES_ENDPOINT}/${id_cliente}/contas-receber/${id_conta}/pagamento`,
-      { data_pagamento }
-    );
+    await delay();
+
+    return {
+      id_conta,
+      status: 'PAGO',
+    } as ContaReceber;
   }
 
-  // =========================================================================
-  // HISTÓRICO DE VENDAS
-  // =========================================================================
+  // ====================================================================
+  // VENDAS
+  // ====================================================================
 
-  /**
-   * Obtém resumo de vendas do cliente
-   */
-  async obterResumoVendas(id_cliente: number): Promise<ResumoVendas> {
-    return this.get<ResumoVendas>(`${CLIENTES_ENDPOINT}/${id_cliente}/vendas/resumo`);
+  async obterResumoVendas(
+    id_cliente: number
+  ): Promise<ResumoVendas> {
+    await delay();
+
+    return {
+      total_vendas: 15,
+      valor_total: 25000,
+      ticket_medio: 1666,
+      ultima_venda: new Date().toISOString(), // Garante que seja uma string no formato ISO
+    };
   }
 
-  /**
-   * Lista vendas do cliente
-   */
-  async obterVendas(id_cliente: number): Promise<Venda[]> {
-    return this.get<Venda[]>(`${CLIENTES_ENDPOINT}/${id_cliente}/vendas`);
+  async obterVendas(
+    id_cliente: number
+  ): Promise<Venda[]> {
+    await delay();
+
+    return [
+      {
+        id_venda: 1,
+        valor_total: 1200,
+        data: '2026-05-01',
+      },
+
+      {
+        id_venda: 2,
+        valor_total: 850,
+        data: '2026-04-15',
+      },
+    ] as Venda[];
   }
 
-  /**
-   * Obtém detalhes de uma venda específica
-   */
-  async obterVenda(id_cliente: number, id_venda: number): Promise<Venda> {
-    return this.get<Venda>(`${CLIENTES_ENDPOINT}/${id_cliente}/vendas/${id_venda}`);
+  async obterVenda(
+    id_cliente: number,
+    id_venda: number
+  ): Promise<Venda> {
+    await delay();
+
+    return {
+      id_venda,
+      valor_total: 1200,
+      data: '2026-05-01',
+    } as Venda;
   }
 
-  /**
-   * Obtém itens de uma venda
-   */
-  async obterItensVenda(id_cliente: number, id_venda: number): Promise<VendaItem[]> {
-    return this.get<VendaItem[]>(`${CLIENTES_ENDPOINT}/${id_cliente}/vendas/${id_venda}/itens`);
+  async obterItensVenda(
+    id_cliente: number,
+    id_venda: number
+  ): Promise<VendaItem[]> {
+    await delay();
+
+    return [
+      {
+        id_item: 1,
+        descricao: 'Cimento CP2',
+        quantidade: 20,
+        valor_unitario: 39.9,
+      },
+    ] as VendaItem[];
   }
 }
 
-// Singleton
-export const clienteService = new ClienteServiceClass();
+// ======================================================================
+// EXPORT
+// ======================================================================
+
+export const clienteService =
+  new ClienteServiceClass();

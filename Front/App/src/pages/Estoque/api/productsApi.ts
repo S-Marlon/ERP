@@ -274,7 +274,7 @@ export const createSupplier = async (payload: { cnpj: string; name: string, nome
 };
 
 export const checkExistingMappings = async (supplierCnpj: string, skus: string[]) => {
-    const response = await fetch('http://localhost:3001/api/products/check-mappings', {
+    const response = await fetch(`${apiBase}/products/check-mappings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ supplierCnpj, skus })

@@ -15,7 +15,7 @@ import type {
   ClienteFormData,
 } from '../types/cliente.types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:3001/api';
 
 class ClienteServiceClass {
   /**
@@ -23,7 +23,7 @@ class ClienteServiceClass {
    */
   async obter(id: number): Promise<Cliente> {
     try {
-      const response = await fetch(`${API_BASE_URL}/clientes/${id}`);
+      const response = await fetch(`${API_BASE_URL}/comercial/customers/${id}`);
       if (!response.ok) throw new Error(`Cliente ${id} não encontrado`);
       const data = await response.json();
       return data.data || data;
@@ -38,8 +38,19 @@ class ClienteServiceClass {
    */
   async listarTodos(): Promise<Cliente[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/clientes`);
-      if (!response.ok) throw new Error('Erro ao listar clientes');
+      const primaryUrl = `${API_BASE_URL}/comercial/customers`;
+      let response = await fetch(primaryUrl);
+      if (!response.ok) {
+        console.warn(`GET ${primaryUrl} falhou: ${response.status} ${response.statusText}`);
+        // Tenta endpoint legado `/clientes` por compatibilidade
+        const fallbackUrl = `${API_BASE_URL}/clientes`;
+        response = await fetch(fallbackUrl);
+        if (!response.ok) {
+          const text = await response.text().catch(() => '');
+          throw new Error(`Falha ao listar clientes (prim:${primaryUrl} status=${response.status}). Resposta: ${text}`);
+        }
+      }
+
       const data = await response.json();
       return Array.isArray(data) ? data : data.data || [];
     } catch (error) {
@@ -53,7 +64,7 @@ class ClienteServiceClass {
    */
   async criar(dados: ClienteFormData): Promise<Cliente> {
     try {
-      const response = await fetch(`${API_BASE_URL}/clientes`, {
+      const response = await fetch(`${API_BASE_URL}/comercial/customers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(dados),
@@ -72,7 +83,7 @@ class ClienteServiceClass {
    */
   async atualizar(id: number, dados: ClienteFormData): Promise<Cliente> {
     try {
-      const response = await fetch(`${API_BASE_URL}/clientes/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/comercial/customers/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(dados),
@@ -91,7 +102,7 @@ class ClienteServiceClass {
    */
   async excluir(id: number): Promise<void> {
     try {
-      const response = await fetch(`${API_BASE_URL}/clientes/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/comercial/customers/${id}`, {
         method: 'DELETE',
       });
       if (!response.ok) throw new Error('Erro ao deletar cliente');
@@ -106,7 +117,7 @@ class ClienteServiceClass {
    */
   async obterFinanceiro(id: number): Promise<FinanceiroSummary> {
     try {
-      const response = await fetch(`${API_BASE_URL}/clientes/${id}/financeiro`);
+      const response = await fetch(`${API_BASE_URL}/comercial/customers/${id}/financeiro`);
       if (!response.ok) throw new Error('Erro ao carregar dados financeiros');
       const data = await response.json();
       return data.data || data;
@@ -121,7 +132,7 @@ class ClienteServiceClass {
    */
   async obterVendas(id: number): Promise<Venda[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/clientes/${id}/vendas`);
+      const response = await fetch(`${API_BASE_URL}/comercial/customers/${id}/vendas`);
       if (!response.ok) throw new Error('Erro ao carregar vendas');
       const data = await response.json();
       return Array.isArray(data) ? data : data.data || [];
@@ -136,7 +147,7 @@ class ClienteServiceClass {
    */
   async obterContatos(id: number): Promise<ClienteContato[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/clientes/${id}/contatos`);
+      const response = await fetch(`${API_BASE_URL}/comercial/customers/${id}/contatos`);
       if (!response.ok) throw new Error('Erro ao carregar contatos');
       const data = await response.json();
       return Array.isArray(data) ? data : data.data || [];
@@ -151,7 +162,7 @@ class ClienteServiceClass {
    */
   async obterPrecosEspeciais(id: number): Promise<ClientePrecoEspecial[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/clientes/${id}/precos-especiais`);
+      const response = await fetch(`${API_BASE_URL}/comercial/customers/${id}/precos-especiais`);
       if (!response.ok) throw new Error('Erro ao carregar preços especiais');
       const data = await response.json();
       return Array.isArray(data) ? data : data.data || [];
