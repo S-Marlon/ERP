@@ -291,3 +291,93 @@ Table cliente_perfil_agregado {
 
   updated_at datetime
 }
+
+
+Sua estrutura está muito bem encaminhada e demonstra uma maturidade de sistema ERP/CRM profissional. A separação das tabelas de banco de dados (especialmente `cliente_eventos` e `cliente_perfil_agregado`) vai facilitar muito a escalabilidade e a performance.
+
+Para que seu sistema fique "à prova de balas", notei alguns pontos que podem ser ajustados ou adicionados em ambos os lados (TypeScript e Banco de Dados):
+
+---
+
+### 1. No Banco de Dados (DBML)
+
+**A. Soft Delete:**
+Sua interface TS tem `deletado_em`, mas as tabelas do banco não possuem a coluna `deleted_at`.
+
+* **Sugestão:** Adicione `deleted_at datetime` na tabela `clientes` e possivelmente em `cliente_contatos` e `emails`.
+
+**B. Unicidade e Indexação:**
+
+* A coluna `cpf_cnpj` na tabela `clientes` deve ser `unique`.
+* A coluna `email` na tabela `cliente_emails` também deve ser `unique`.
+
+**C. Relacionamento de Usuários (Auditoria):**
+Suas interfaces TS mencionam `criado_por` e `atualizado_por` (IDs numéricos). No banco, as tabelas de auditoria só têm as datas.
+
+* **Sugestão:** Adicione `created_by int` e `updated_by int` nas tabelas principais para manter o vínculo com a tabela de usuários do sistema.
+
+**D. Tabela de Preços Especiais:**
+Você tem `id_produto`, mas se o seu sistema crescer, você pode querer dar desconto para uma **Categoria** inteira ou uma **Marca**.
+
+* **Sugestão:** Adicionar `id_categoria int [null]` e `id_marca int [null]` na tabela `cliente_precos_especiais`.
+
+---
+
+### 2. Nas Interfaces TypeScript
+
+**A. Sincronia com o Banco (Campos Faltantes):**
+Faltam alguns campos na interface `Cliente` que você criou no banco:
+
+* `cliente_documentos`: Não há interface para isso no TS.
+* `cliente_tags`: Você criou a tabela, mas a interface `ClienteCompleto` não tem um array de `tags`.
+
+**B. Tipagem do Payload de Eventos:**
+A tabela `cliente_eventos` tem um campo `payload json`. No TS, seria bom definir isso como um tipo flexível ou genérico para evitar o uso de `any`.
+
+```typescript
+export interface ClienteEvento extends Auditoria {
+  id: number;
+  tipo: string;
+  payload: Record<string, unknown>; // Mais seguro que any
+}
+
+```
+
+---
+
+### 3. O que pode estar faltando (Regras de Negócio)
+
+Aqui estão três pontos que costumam "aparecer" depois que o sistema entra em produção:
+
+1. **Hierarquia de Clientes (Matriz e Filial):**
+* Se um cliente for uma grande rede, ele pode ter várias filiais.
+* **Sugestão:** Adicionar `id_cliente_pai int` na tabela `clientes` para criar essa árvore.
+
+
+2. **Configurações de Faturamento:**
+* Faltam campos como: "Exige Nota Fiscal Eletrônica?", "Consumidor Final ou Revenda?" (importante para cálculo de ST/IPI), "Isento de ICMS?".
+* **Sugestão:** Criar uma interface/tabela `ClienteFiscal` ou expandir a `Cliente`.
+
+
+3. **Gestão de Limite de Crédito Temporário:**
+* Muitas vezes você quer aumentar o limite de um cliente apenas para uma venda específica ou por um mês. Sua estrutura atual é estática.
+* **Sugestão:** Um campo `limite_temporario_validade` na tabela de crédito.
+
+
+
+---
+
+### Resumo da Estrutura Recomendada (Visual)
+
+### Sugestão de Organização de Arquivos
+
+Como o código TS ficou grande, siga o conselho do comentário 17 que você mesmo postou:
+
+1. `base.types.ts` (Auditoria, Endereco, Enums comuns)
+2. `cliente.types.ts` (A interface `Cliente` core)
+3. `financeiro.types.ts` (Contas, Crédito, Preços)
+4. `analytics.types.ts` (Insights, Métricas, Perfil)
+
+**Conclusão:** O design está excelente. Se você adicionar o **Soft Delete** no banco e a **Hierarquia (Matriz/Filial)**, terá um modelo capaz de atender desde pequenas empresas até operações complexas de atacado.
+
+Você pretende implementar a lógica de cálculo do `cliente_perfil_agregado` via *Triggers* no banco ou via *Worker* no backend?

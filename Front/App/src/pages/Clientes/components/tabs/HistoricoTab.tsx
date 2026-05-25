@@ -1,6 +1,8 @@
+// frontend/src/components/clientes/tabs/HistoricoTab.tsx
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { Venda, VendaItem } from '../../../../types/cliente.types';
-import { clienteService } from '../../../../services/clienteService';
+import { getVendasCliente } from '../../services/ClienteApi';
 import { formatCurrency, formatDate } from '../../../../utils/validators';
 import '../styles/HistoricoTab.css';
 
@@ -10,7 +12,6 @@ interface HistoricoTabProps {
 
 interface VendaComItens extends Venda {
   itens?: VendaItem[];
-  expandido?: boolean;
 }
 
 interface EstatisticasVenda {
@@ -25,14 +26,76 @@ export const HistoricoTab: React.FC<HistoricoTabProps> = ({ cliente }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandidos, setExpandidos] = useState<Set<number>>(new Set());
+
   const [estatisticas, setEstatisticas] = useState<EstatisticasVenda>({
     totalVendas: 0,
     valorTotal: 0,
     ticketMedio: 0,
   });
+
   const [filtroData, setFiltroData] = useState<{ de?: string; ate?: string }>({});
 
-  // Carregar dados de vendas
+  const carregarVendas = useCallback(async () => {
+    if (!cliente?.id_cliente) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // 🔥 chama backend correto
+      const response = await getVendasCliente(cliente.id_cliente);
+
+      const vendasProcessadas: VendaComItens[] = response.map((venda: any) => ({
+        id_venda: venda.id_venda,
+        data: venda.data_venda,
+        valor_total: Number(venda.valor_total || 0),
+        metodo_pagamento: venda.forma_pagamento || 'Não informado',
+      }));
+
+      let filtradas = vendasProcessadas;
+
+      // filtro por data
+      if (filtroData.de || filtroData.ate) {
+        filtradas = filtradas.filter(v => {
+          const dataVenda = new Date(v.data).toISOString().split('T')[0];
+          if (filtroData.de && dataVenda < filtroData.de) return false;
+          if (filtroData.ate && dataVenda > filtroData.ate) return false;
+          return true;
+        });
+      }
+
+      setVendas(filtradas);
+
+      // estatísticas
+      if (filtradas.length > 0) {
+        const valorTotal = filtradas.reduce((acc, v) => acc + v.valor_total, 0);
+
+        const ultimaCompra = new Date(
+          Math.max(...filtradas.map(v => new Date(v.data).getTime()))
+        );
+
+        setEstatisticas({
+          totalVendas: filtradas.length,
+          valorTotal,
+          ticketMedio: valorTotal / filtradas.length,
+          ultimaCompra,
+        });
+      } else {
+        setEstatisticas({
+          totalVendas: 0,
+          valorTotal: 0,
+          ticketMedio: 0,
+          ultimaCompra: undefined,
+        });
+      }
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao carregar histórico');
+    } finally {
+      setLoading(false);
+    }
+  }, [cliente?.id_cliente, filtroData.de, filtroData.ate]);
+
   useEffect(() => {
     if (!cliente?.id_cliente) {
       setVendas([]);
@@ -41,75 +104,18 @@ export const HistoricoTab: React.FC<HistoricoTabProps> = ({ cliente }) => {
     }
 
     carregarVendas();
-  }, [cliente?.id_cliente, filtroData]);
+  }, [cliente?.id_cliente, carregarVendas]);
 
-  const carregarVendas = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  const toggleExpand = (vendaId: number) => {
+    const novo = new Set(expandidos);
 
-      const response = await clienteService.obterVendas(cliente!.id_cliente);
-      
-      // Processar vendas
-      const vendasProcessadas = response.map(venda => ({
-        ...venda,
-        expandido: false,
-      }));
-
-      setVendas(vendasProcessadas);
-
-      // Calcular estatísticas
-      if (vendasProcessadas.length > 0) {
-        const valorTotal = vendasProcessadas.reduce((acc, v) => acc + v.valor_total, 0);
-        const ultimaCompra = new Date(Math.max(...vendasProcessadas.map(v => new Date(v.data).getTime())));
-
-        setEstatisticas({
-          totalVendas: vendasProcessadas.length,
-          valorTotal,
-          ticketMedio: valorTotal / vendasProcessadas.length,
-          ultimaCompra,
-        });
-      } else {
-        setEstatisticas({ totalVendas: 0, valorTotal: 0, ticketMedio: 0 });
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erro ao carregar histórico de vendas';
-      setError(message);
-      console.error('Erro ao carregar vendas:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [cliente?.id_cliente]);
-
-  const toggleExpand = async (vendaId: number, venda: VendaComItens) => {
-    const novoExpandidos = new Set(expandidos);
-    
-    if (novoExpandidos.has(vendaId)) {
-      // Se já está expandido, apenas fechar
-      novoExpandidos.delete(vendaId);
+    if (novo.has(vendaId)) {
+      novo.delete(vendaId);
     } else {
-      // Se não está expandido, carregar itens e expandir
-      if (!venda.itens) {
-        try {
-          // Aqui você chamaria a API para carregar os itens da venda
-          // const itens = await clienteService.obterItensVenda(vendaId);
-          
-          // Para demo, vamos usar dados locais
-          const vendaAtualizada = {
-            ...venda,
-            itens: [], // Substitua com dados reais
-          };
-          
-          setVendas(vendas.map(v => v.id_venda === vendaId ? vendaAtualizada : v));
-        } catch (err) {
-          console.error('Erro ao carregar itens da venda:', err);
-          return;
-        }
-      }
-      novoExpandidos.add(vendaId);
+      novo.add(vendaId);
     }
-    
-    setExpandidos(novoExpandidos);
+
+    setExpandidos(novo);
   };
 
   const aplicarFiltro = (de?: string, ate?: string) => {
@@ -128,7 +134,8 @@ export const HistoricoTab: React.FC<HistoricoTabProps> = ({ cliente }) => {
 
   return (
     <div className="historico-tab">
-      {/* Estatísticas */}
+
+      {/* ESTATÍSTICAS */}
       <div className="vendas-statistics">
         <div className="stat-card">
           <div className="stat-label">Total de Vendas</div>
@@ -153,141 +160,70 @@ export const HistoricoTab: React.FC<HistoricoTabProps> = ({ cliente }) => {
         </div>
       </div>
 
-      {/* Filtros */}
+      {/* FILTROS */}
       <div className="filtros-vendas">
         <h4>Filtrar por Data</h4>
-        <div className="filtro-group">
-          <div className="filtro-item">
-            <label htmlFor="filtro-de">De:</label>
-            <input
-              id="filtro-de"
-              type="date"
-              value={filtroData.de || ''}
-              onChange={(e) => aplicarFiltro(e.target.value, filtroData.ate)}
-            />
-          </div>
 
-          <div className="filtro-item">
-            <label htmlFor="filtro-ate">Até:</label>
-            <input
-              id="filtro-ate"
-              type="date"
-              value={filtroData.ate || ''}
-              onChange={(e) => aplicarFiltro(filtroData.de, e.target.value)}
-            />
-          </div>
+        <input
+          type="date"
+          value={filtroData.de || ''}
+          onChange={(e) => aplicarFiltro(e.target.value, filtroData.ate)}
+        />
 
-          {(filtroData.de || filtroData.ate) && (
-            <button
-              className="btn-limpar-filtro"
-              onClick={() => aplicarFiltro(undefined, undefined)}
-            >
-              Limpar Filtro
-            </button>
-          )}
-        </div>
+        <input
+          type="date"
+          value={filtroData.ate || ''}
+          onChange={(e) => aplicarFiltro(filtroData.de, e.target.value)}
+        />
+
+        {(filtroData.de || filtroData.ate) && (
+          <button onClick={() => aplicarFiltro(undefined, undefined)}>
+            Limpar
+          </button>
+        )}
       </div>
 
-      {/* Mensagem de Erro */}
+      {/* ERRO */}
       {error && (
         <div className="error-banner">
-          <span>⚠️ {error}</span>
-          <button onClick={() => setError(null)}>✕</button>
+          {error}
         </div>
       )}
 
-      {/* Tabela de Vendas */}
+      {/* TABELA */}
       <div className="vendas-section">
         <h3>Histórico de Vendas</h3>
 
         {loading ? (
-          <div className="loading-state">
-            <p>Carregando histórico...</p>
-          </div>
+          <p>Carregando...</p>
         ) : vendas.length === 0 ? (
-          <div className="empty-state">
-            <p>Nenhuma venda registrada</p>
-          </div>
+          <p>Nenhuma venda registrada</p>
         ) : (
-          <div className="vendas-table-wrapper">
-            <table className="vendas-table">
-              <thead>
-                <tr>
-                  <th style={{ width: '40px' }}></th>
-                  <th>Venda ID</th>
-                  <th>Data</th>
-                  <th>Valor Total</th>
-                  <th>Método Pagamento</th>
-                </tr>
-              </thead>
-              <tbody>
-                {vendas.map((venda) => (
-                  <React.Fragment key={venda.id_venda}>
-                    <tr
-                      className="venda-row"
-                      onClick={() => toggleExpand(venda.id_venda, venda)}
-                    >
-                      <td className="expand-cell">
-                        <button
-                          className={`btn-expand ${expandidos.has(venda.id_venda) ? 'expandido' : ''}`}
-                          title="Expandir/Recolher itens"
-                        >
-                          ▶
-                        </button>
-                      </td>
-                      <td className="id-venda">{venda.id_venda}</td>
-                      <td className="data">{formatDate(venda.data)}</td>
-                      <td className="valor">{formatCurrency(venda.valor_total)}</td>
-                      <td className="metodo">
-                        <span className="badge-metodo">{venda.metodo_pagamento}</span>
-                      </td>
-                    </tr>
+          <table className="vendas-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>ID</th>
+                <th>Data</th>
+                <th>Valor</th>
+                <th>Pagamento</th>
+              </tr>
+            </thead>
 
-                    {/* Linha Expandida com Itens */}
-                    {expandidos.has(venda.id_venda) && (
-                      <tr className="venda-detalhes">
-                        <td colSpan={5}>
-                          <div className="detalhes-content">
-                            <h5>Itens da Venda</h5>
-                            {venda.itens && venda.itens.length > 0 ? (
-                              <table className="itens-table">
-                                <thead>
-                                  <tr>
-                                    <th>Produto</th>
-                                    <th>Quantidade</th>
-                                    <th>Valor Unitário</th>
-                                    <th>Subtotal</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {venda.itens.map((item, idx) => (
-                                    <tr key={idx}>
-                                      <td className="produto">{item.id_produto}</td>
-                                      <td className="quantidade">{item.quantidade}</td>
-                                      <td className="valor-unitario">
-                                        {formatCurrency(item.valor_unitario)}
-                                      </td>
-                                      <td className="subtotal">
-                                        {formatCurrency(item.quantidade * item.valor_unitario)}
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            ) : (
-                              <div className="empty-itens">
-                                <p>Nenhum item registrado para esta venda</p>
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
+            <tbody>
+              {vendas.map(venda => (
+                <React.Fragment key={venda.id_venda}>
+                  <tr onClick={() => toggleExpand(venda.id_venda)}>
+                    <td>{expandidos.has(venda.id_venda) ? '▼' : '▶'}</td>
+                    <td>{venda.id_venda}</td>
+                    <td>{formatDate(venda.data)}</td>
+                    <td>{formatCurrency(venda.valor_total)}</td>
+                    <td>{venda.metodo_pagamento}</td>
+                  </tr>
+                </React.Fragment>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
     </div>

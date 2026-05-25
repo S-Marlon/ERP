@@ -1,7 +1,9 @@
+// frontend/src/components/clientes/tabs/PrecosTab.tsx
+
 import React, { useEffect, useState, useCallback } from 'react';
 import Swal from 'sweetalert2';
 import { ClientePrecoEspecial } from '../../../../types/cliente.types';
-import { clienteService } from '../../../../services/clienteService';
+import { getPrecosEspeciais } from '../../services/ClienteApi'; // Usando a API que mapeamos antes
 import { formatCurrency, formatDate } from '../../../../utils/validators';
 import '../styles/PrecosTab.css';
 
@@ -13,7 +15,7 @@ interface PrecoFormData {
   id_produto: number;
   tipo_desconto: 'VALOR_FIXO' | 'PERCENTUAL';
   valor: number;
-  data_validade: string;
+  data_fim: string; // Alinhado com o banco ('data_fim')
 }
 
 type TipoDescontoType = 'VALOR_FIXO' | 'PERCENTUAL';
@@ -24,30 +26,24 @@ export const PrecosTab: React.FC<PrecosTabProps> = ({ cliente }) => {
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [salvando, setSalvando] = useState(false); 
   const [formData, setFormData] = useState<PrecoFormData>({
     id_produto: 0,
     tipo_desconto: 'VALOR_FIXO',
     valor: 0,
-    data_validade: '',
+    data_fim: '',
   });
   const [deletando, setDeletando] = useState<number | null>(null);
 
-  // Carregar preços especiais
-  useEffect(() => {
-    if (!cliente?.id_cliente) {
-      setPrecos([]);
-      return;
-    }
-
-    carregarPrecos();
-  }, [cliente?.id_cliente]);
-
   const carregarPrecos = useCallback(async () => {
+    if (!cliente?.id_cliente) return;
+    
     try {
       setLoading(true);
       setError(null);
 
-      const response = await clienteService.obterPrecosEspeciais(cliente!.id_cliente);
+      // Chamada real mapeada do nosso arquivo clienteApi
+      const response = await getPrecosEspeciais(cliente.id_cliente);
       setPrecos(response || []);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao carregar preços especiais';
@@ -58,23 +54,39 @@ export const PrecosTab: React.FC<PrecosTabProps> = ({ cliente }) => {
     }
   }, [cliente?.id_cliente]);
 
+  useEffect(() => {
+    if (!cliente?.id_cliente) {
+      setPrecos([]);
+      return;
+    }
+    carregarPrecos();
+  }, [cliente?.id_cliente, carregarPrecos]);
+
   const handleNovoPreco = () => {
     setFormData({
       id_produto: 0,
       tipo_desconto: 'VALOR_FIXO',
       valor: 0,
-      data_validade: '',
+      data_fim: '',
     });
     setEditingId(null);
     setShowForm(true);
   };
 
   const handleEditar = (preco: ClientePrecoEspecial) => {
+    // Tratamento seguro de string de data sem sofrer com desvios de fuso horário UTC
+    let dataFormatada = '';
+    if (preco.data_fim) {
+      dataFormatada = typeof preco.data_fim === 'string' 
+        ? preco.data_fim.split('T')[0] 
+        : new Date(preco.data_fim).toISOString().split('T')[0];
+    }
+
     setFormData({
       id_produto: preco.id_produto,
       tipo_desconto: preco.tipo_desconto as TipoDescontoType,
       valor: preco.valor,
-      data_validade: new Date(preco.data_validade).toISOString().split('T')[0],
+      data_fim: dataFormatada,
     });
     setEditingId(preco.id);
     setShowForm(true);
@@ -87,20 +99,23 @@ export const PrecosTab: React.FC<PrecosTabProps> = ({ cliente }) => {
       id_produto: 0,
       tipo_desconto: 'VALOR_FIXO',
       valor: 0,
-      data_validade: '',
+      data_fim: '',
     });
   };
 
   const validarForm = (): string | null => {
     if (formData.id_produto <= 0) return 'Selecione um produto';
     if (formData.valor <= 0) return 'O valor deve ser maior que 0';
-    if (!formData.data_validade) return 'Selecione uma data de validade';
+    if (formData.tipo_desconto === 'PERCENTUAL' && formData.valor > 100) return 'O percentual não pode ser maior que 100%';
+    if (!formData.data_fim) return 'Selecione uma data de validade';
 
-    const dataValidade = new Date(formData.data_validade);
+    const parts = formData.data_fim.split('-');
+    const dataValidade = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
 
-    if (dataValidade < hoje) return 'A data de validade deve ser no futuro';
+    if (dataValidade < hoje) return 'A data de validade não pode ser retroativa';
 
     return null;
   };
@@ -113,14 +128,17 @@ export const PrecosTab: React.FC<PrecosTabProps> = ({ cliente }) => {
     }
 
     try {
-      // Aqui você chamaria a API para salvar o preço
-      // if (editingId) {
-      //   await clienteService.atualizarPrecoEspecial(editingId, formData);
-      // } else {
-      //   await clienteService.criarPrecoEspecial(cliente!.id_cliente, formData);
-      // }
+      setSalvando(true);
 
-      Swal.fire({
+      // OBS: Caso ainda vá criar estes métodos no clienteApi/Services,
+      // eles devem apontar para POST /:id/precos-especiais e PUT /precos-especiais/:id
+      if (editingId) {
+        // Exemplo fictício de escrita: await clienteService.atualizarPrecoEspecial(editingId, formData);
+      } else {
+        // Exemplo fictício de escrita: await clienteService.criarPrecoEspecial(cliente!.id_cliente, formData);
+      }
+
+      await Swal.fire({
         title: 'Sucesso!',
         text: editingId ? 'Preço atualizado com sucesso' : 'Preço adicionado com sucesso',
         icon: 'success',
@@ -130,7 +148,10 @@ export const PrecosTab: React.FC<PrecosTabProps> = ({ cliente }) => {
       handleFecharForm();
       carregarPrecos();
     } catch (err) {
-      Swal.fire('Erro', 'Erro ao salvar preço', 'error');
+      const message = err instanceof Error ? err.message : 'Erro ao salvar preço';
+      Swal.fire('Erro', message, 'error');
+    } finally {
+      setSalvando(false);
     }
   };
 
@@ -147,13 +168,14 @@ export const PrecosTab: React.FC<PrecosTabProps> = ({ cliente }) => {
       if (result.isConfirmed) {
         try {
           setDeletando(id);
-          // Aqui você chamaria a API para deletar o preço
-          // await clienteService.deletarPrecoEspecial(id);
+          
+          // Exemplo fictício de exclusão: await clienteService.deletarPrecoEspecial(id);
 
-          setPrecos(precos.filter(p => p.id !== id));
+          setPrecos(prevPrecos => prevPrecos.filter(p => p.id !== id));
           Swal.fire('Deletado!', 'Preço removido com sucesso', 'success');
         } catch (err) {
-          Swal.fire('Erro', 'Erro ao remover preço', 'error');
+          const message = err instanceof Error ? err.message : 'Erro ao remover preço';
+          Swal.fire('Erro', message, 'error');
         } finally {
           setDeletando(null);
         }
@@ -177,15 +199,13 @@ export const PrecosTab: React.FC<PrecosTabProps> = ({ cliente }) => {
 
   return (
     <div className="precos-tab">
-      {/* Header com Botão */}
       <div className="precos-header">
-        <h3>Preços Especiais</h3>
+        <h3>Preços Especiais Customizados</h3>
         <button className="btn-novo-preco" onClick={handleNovoPreco}>
           + Novo Preço
         </button>
       </div>
 
-      {/* Mensagem de Erro */}
       {error && (
         <div className="error-banner">
           <span>⚠️ {error}</span>
@@ -193,23 +213,23 @@ export const PrecosTab: React.FC<PrecosTabProps> = ({ cliente }) => {
         </div>
       )}
 
-      {/* Tabela de Preços */}
       {loading ? (
         <div className="loading-state">
           <p>Carregando preços especiais...</p>
         </div>
       ) : precos.length === 0 ? (
         <div className="empty-state">
-          <p>Nenhum preço especial registrado</p>
+          <p>Nenhum preço especial registrado para este cliente.</p>
         </div>
       ) : (
         <div className="precos-table-wrapper">
           <table className="precos-table">
             <thead>
               <tr>
-                <th>Produto ID</th>
+                <th>Produto</th>
                 <th>Tipo de Desconto</th>
-                <th>Valor</th>
+                <th>Desconto Aplicado</th>
+                <th>Preço Final calculado</th>
                 <th>Válido Até</th>
                 <th>Status</th>
                 <th>Ações</th>
@@ -217,13 +237,17 @@ export const PrecosTab: React.FC<PrecosTabProps> = ({ cliente }) => {
             </thead>
             <tbody>
               {precos.map((preco) => {
-                const agora = new Date();
-                const validade = new Date(preco.data_validade);
-                const ativo = validade >= agora;
+                // O status_preco já vem calculado perfeitamente pelo Query do backend (ATIVO, INATIVO, EXPIRADO)
+                const statusDoBanco = (preco as any).status_preco || 'ATIVO';
+                const nomeProduto = (preco as any).nome_produto || `ID: ${preco.id_produto}`;
+                const precoFinal = (preco as any).preco_final;
 
                 return (
-                  <tr key={preco.id} className={`preco-row ${ativo ? 'ativo' : 'expirado'}`}>
-                    <td className="id-produto">{preco.id_produto}</td>
+                  <tr key={preco.id} className={`preco-row ${statusDoBanco.toLowerCase()}`}>
+                    <td className="id-produto">
+                      <strong>{nomeProduto}</strong>
+                      {(preco as any).codigo_barras && <span className="sub-txt">{(preco as any).codigo_barras}</span>}
+                    </td>
                     <td className="tipo-desconto">
                       <span className="badge-tipo">
                         {preco.tipo_desconto === 'PERCENTUAL' ? 'Percentual' : 'Valor Fixo'}
@@ -232,12 +256,15 @@ export const PrecosTab: React.FC<PrecosTabProps> = ({ cliente }) => {
                     <td className="valor">
                       {formatoDesconto(preco.tipo_desconto, preco.valor)}
                     </td>
+                    <td className="preco-final">
+                      {precoFinal ? formatCurrency(precoFinal) : '---'}
+                    </td>
                     <td className="data-validade">
-                      {formatDate(preco.data_validade)}
+                      {formatDate(preco.data_fim)}
                     </td>
                     <td className="status">
-                      <span className={`status-badge ${ativo ? 'ativo' : 'expirado'}`}>
-                        {ativo ? '✓ Ativo' : '✕ Expirado'}
+                      <span className={`status-badge ${statusDoBanco.toLowerCase()}`}>
+                        {statusDoBanco === 'ATIVO' ? '✓ Ativo' : statusDoBanco === 'EXPIRADO' ? '✕ Expirado' : '🛑 Inativo'}
                       </span>
                     </td>
                     <td className="acoes">
@@ -254,7 +281,7 @@ export const PrecosTab: React.FC<PrecosTabProps> = ({ cliente }) => {
                         disabled={deletando === preco.id}
                         title="Deletar"
                       >
-                        {deletando === preco.id ? 'Deletando...' : 'Deletar'}
+                        {deletando === preco.id ? '...' : 'Deletar'}
                       </button>
                     </td>
                   </tr>
@@ -270,7 +297,7 @@ export const PrecosTab: React.FC<PrecosTabProps> = ({ cliente }) => {
         <div className="modal-overlay" onClick={handleFecharForm}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>{editingId ? 'Editar Preço' : 'Novo Preço Especial'}</h3>
+              <h3>{editingId ? 'Editar Preço Especial' : 'Novo Preço Especial'}</h3>
               <button className="btn-close" onClick={handleFecharForm}>✕</button>
             </div>
 
@@ -281,9 +308,10 @@ export const PrecosTab: React.FC<PrecosTabProps> = ({ cliente }) => {
                   id="id-produto"
                   type="number"
                   min="1"
-                  value={formData.id_produto}
+                  disabled={!!editingId} 
+                  value={formData.id_produto || ''}
                   onChange={(e) => setFormData({ ...formData, id_produto: parseInt(e.target.value) || 0 })}
-                  placeholder="Ex: 1"
+                  placeholder="Ex: 42"
                 />
               </div>
 
@@ -294,7 +322,7 @@ export const PrecosTab: React.FC<PrecosTabProps> = ({ cliente }) => {
                   value={formData.tipo_desconto}
                   onChange={(e) => setFormData({ ...formData, tipo_desconto: e.target.value as TipoDescontoType })}
                 >
-                  <option value="VALOR_FIXO">Valor Fixo</option>
+                  <option value="VALOR_FIXO">Valor Fixo Abatido</option>
                   <option value="PERCENTUAL">Percentual (%)</option>
                 </select>
               </div>
@@ -307,32 +335,31 @@ export const PrecosTab: React.FC<PrecosTabProps> = ({ cliente }) => {
                   id="valor"
                   type="number"
                   min="0"
-                  step={formData.tipo_desconto === 'PERCENTUAL' ? '0.01' : '0.01'}
-                  max={formData.tipo_desconto === 'PERCENTUAL' ? '100' : undefined}
-                  value={formData.valor}
+                  step="0.01"
+                  value={formData.valor || ''}
                   onChange={(e) => setFormData({ ...formData, valor: parseFloat(e.target.value) || 0 })}
                   placeholder="0"
                 />
               </div>
 
               <div className="form-group">
-                <label htmlFor="data-validade">Data de Validade:</label>
+                <label htmlFor="data-fim">Data de Validade Final:</label>
                 <input
-                  id="data-validade"
+                  id="data-fim"
                   type="date"
-                  value={formData.data_validade}
-                  onChange={(e) => setFormData({ ...formData, data_validade: e.target.value })}
+                  value={formData.data_fim}
+                  onChange={(e) => setFormData({ ...formData, data_fim: e.target.value })}
                   min={new Date().toISOString().split('T')[0]}
                 />
               </div>
             </div>
 
             <div className="modal-footer">
-              <button className="btn-cancel" onClick={handleFecharForm}>
+              <button className="btn-cancel" onClick={handleFecharForm} disabled={salvando}>
                 Cancelar
               </button>
-              <button className="btn-confirm" onClick={handleSalvar}>
-                {editingId ? 'Atualizar' : 'Adicionar'}
+              <button className="btn-confirm" onClick={handleSalvar} disabled={salvando}>
+                {salvando ? 'Salvando...' : editingId ? 'Atualizar' : 'Adicionar'}
               </button>
             </div>
           </div>

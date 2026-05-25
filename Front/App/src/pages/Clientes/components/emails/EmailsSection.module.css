@@ -1,0 +1,145 @@
+.card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px;
+  border: 1px solid #eee;
+}
+
+.title {
+  font-size: 16px;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ROW */
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+}
+
+.view {
+  flex: 1;
+}
+
+.main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.email {
+  font-size: 14px;
+  font-weight: 500;
+  color: #222;
+}
+
+/* META */
+.meta {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+/* BADGES */
+.badge {
+  font-size: 11px;
+  background: #eee;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.badgePrimary {
+  font-size: 11px;
+  background: #e6f0ff;
+  color: #1a56db;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.badgeVerified {
+  font-size: 11px;
+  background: #e7f7ea;
+  color: #1a7f37;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+/* ACTIONS */
+.actions button {
+  background: #ffecec;
+  border: none;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #c00;
+}
+
+.actions button:hover {
+  background: #ffd6d6;
+}
+
+/* FORM */
+.form {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #eee;
+}
+
+.form h4 {
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.input,
+.select {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  align-items: center;
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.addBtn {
+  width: 100%;
+  margin-top: 8px;
+  background: #1a7f37;
+  color: #fff;
+  border: none;
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.addBtn:hover {
+  background: #166c2f;
+}
+
+.emptyState {
+  font-size: 13px;
+  color: #888;
+}

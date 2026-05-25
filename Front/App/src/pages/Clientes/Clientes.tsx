@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import './Clientes.css';
 
 import { ClientHeader } from './components/ClientHeader';
@@ -8,282 +8,349 @@ import FinanceiroTab from './components/tabs/FinanceiroTab';
 import HistoricoTab from './components/tabs/HistoricoTab';
 import PrecosTab from './components/tabs/PrecosTab';
 
+import type {
+  ClienteAggregate,
+} from './types/cliente.aggregate';
+
+import type {
+  ClienteEntity,
+} from './types/cliente.entity';
+
+import type {
+  ClienteContatoEntity,
+  ClienteEmailEntity,
+} from './types/cliente.entity';
 
 import {
-  ClassificacaoCliente,
-  PotencialCliente,
-  SegmentoCliente,
-  StatusCliente,
-  StatusCredito,
-  TipoCliente,
-  type Cliente,
-} from '../../types/cliente.types';
+  getClientes,
+  getClienteById,
+} from './services/ClienteApi';
 
-type TabType =
-  | 'geral'
-  | 'financeiro'
-  | 'historico'
-  | 'precos';
+import { ModalNovoCliente } from './components/ModalNovoCliente';
 
-// =========================================================
-// MOCK
-// =========================================================
+type TabType = 'geral' | 'financeiro' | 'historico' | 'precos';
 
-const MOCK_CLIENTES: Cliente[] = [
-  {
-    id_cliente: 1,
 
-    // Tipo
-    tipo_cliente: TipoCliente.PESSOA_FISICA,
-
-    // CRM
-    segmento: SegmentoCliente.PRESTADOR_SERVICO,
-    classificacao: ClassificacaoCliente.B,
-    potencial: PotencialCliente.MEDIO,
-
-    // Dados principais
-    nome_razao: 'João Carlos da Silva',
-    cpf_cnpj: '123.456.789-00',
-
-    // Contato
-    telefone_principal: '(11) 99999-1111',
-    whatsapp: '(11) 99999-1111',
-
-    // Endereço
-    endereco: {
-      logradouro: 'Rua das Palmeiras',
-      numero: '120',
-      complemento: 'Apto 32',
-      bairro: 'Centro',
-      cidade: 'São Paulo',
-      estado: 'SP',
-      cep: '01000-000',
-      pais: 'Brasil',
-    },
-
-    // Crédito
-    limite_credito: 5000,
-    dia_vencimento: 10,
-    status_credito: StatusCredito.LIBERADO,
-
-    // Financeiro
-    saldo_devedor_atual: 1250,
-    dias_atraso: 0,
-    score_credito: 820,
-    score_comercial: 740,
-
-    // Status
-    status_cliente: StatusCliente.ATIVO,
-
-    // Compras
-    ultima_compra: '2026-05-01T10:30:00Z',
-
-    // Marketing
-    aceita_marketing: true,
-    consentimento_dados_em: '2025-10-10T09:00:00Z',
-
-    // Auditoria
-    criado_em: '2025-01-05T12:00:00Z',
-    atualizado_em: '2026-05-01T12:00:00Z',
-  },
-
-  {
-    id_cliente: 2,
-
-    // Tipo
-    tipo_cliente: TipoCliente.PESSOA_JURIDICA,
-
-    // CRM
-    segmento: SegmentoCliente.OFICINA,
-    classificacao: ClassificacaoCliente.A,
-    potencial: PotencialCliente.ESTRATEGICO,
-
-    // Dados principais
-    nome_razao: 'Auto Center Prime LTDA',
-    nome_fantasia: 'Auto Center Prime',
-
-    cpf_cnpj: '12.345.678/0001-99',
-
-    inscricao_estadual: '123.456.789.000',
-    inscricao_municipal: '99887766',
-
-    // Contato
-    telefone_principal: '(11) 4002-8922',
-    whatsapp: '(11) 98888-2222',
-
-    // Endereço
-    endereco: {
-      logradouro: 'Avenida dos Mecânicos',
-      numero: '1500',
-      bairro: 'Distrito Industrial',
-      cidade: 'São Paulo',
-      estado: 'SP',
-      cep: '01310-200',
-      pais: 'Brasil',
-    },
-
-    // Crédito
-    limite_credito: 30000,
-    dia_vencimento: 15,
-    status_credito: StatusCredito.LIBERADO,
-
-    // Financeiro
-    saldo_devedor_atual: 8400,
-    dias_atraso: 2,
-    score_credito: 690,
-    score_comercial: 920,
-
-    // Status
-    status_cliente: StatusCliente.ATIVO,
-
-    // Compras
-    ultima_compra: '2026-05-03T15:45:00Z',
-
-    // Marketing
-    aceita_marketing: true,
-    consentimento_dados_em: '2024-07-15T08:00:00Z',
-
-    // Auditoria
-    criado_em: '2024-07-15T08:00:00Z',
-    atualizado_em: '2026-05-03T16:00:00Z',
-  },
-];
-
-// =========================================================
 
 const Clientes = () => {
-  const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [cliente, setCliente] = useState<Cliente | null>(null);
+  // =========================
+  // STATES
+  // =========================
 
-  const [searchTerm, setSearchTerm] = useState('');
+  const [clientes, setClientes] =
+  useState<ClienteEntity[]>([]);
+
+const [cliente, setCliente] =
+  useState<ClienteAggregate | null>(null);
+
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
+
   const [activeTab, setActiveTab] = useState<TabType>('geral');
-
-  const [loading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const [ultimaCompra, setUltimaCompra] = useState<Date | undefined>();
   const [ticketMedio, setTicketMedio] = useState<number | undefined>();
 
-  const [contatos, setContatos] = useState<any[]>([]);
-  const [emails, setEmails] = useState<any[]>([]);
+  const [contatos, setContatos] =
+  useState<ClienteContatoEntity[]>([]);
 
-  useEffect(() => {
-    setClientes(MOCK_CLIENTES);
-  }, []);
+const [emails, setEmails] =
+  useState<ClienteEmailEntity[]>([]);
 
-  const clientesFiltrados = useMemo(() => {
-    const q = searchTerm.toLowerCase();
-    return clientes.filter((c) =>
-      c.nome_razao.toLowerCase().includes(q) ||
-      c.cpf_cnpj.toLowerCase().includes(q) ||
-      (c.endereco?.cidade || '').toLowerCase().includes(q)
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+
+  // =========================
+  // AUXILIAR
+  // =========================
+
+  const atualizarClienteAtivoCompleto = (
+  novoCliente: ClienteAggregate | null
+) => {
+  setCliente(novoCliente);
+
+  if (novoCliente) {
+    setContatos(
+      novoCliente.contatos || []
     );
-  }, [clientes, searchTerm]);
 
-  const handleSelecionarCliente = useCallback((c: Cliente) => {
-    setCliente(c);
-    setActiveTab('geral');
+    setEmails(
+      novoCliente.emails || []
+    );
+  } else {
+    setContatos([]);
+    setEmails([]);
+  }
+};
 
-    setUltimaCompra(new Date());
-    setTicketMedio(320);
-  }, []);
+const getEnderecoPrincipal = (
+  cliente: ClienteAggregate | ClienteEntity
+) => {
+  return cliente.enderecos?.find(
+    (e) => e.principal
+  );
+};
 
- const handleNovoCliente = useCallback(() => {
-  const novo: Cliente = {
-    id_cliente: Date.now(),
 
-    tipo_cliente: TipoCliente.PESSOA_FISICA,
+  // =========================
+  // CARREGAR CLIENTES
+  // =========================
 
-    segmento: SegmentoCliente.CONSUMIDOR_FINAL,
+  const carregarClientes = async () => {
+    setLoading(true);
 
-    classificacao: ClassificacaoCliente.C,
-    potencial: PotencialCliente.BAIXO,
+    try {
+      const dados = await getClientes();
 
-    nome_razao: 'Novo Cliente',
-    cpf_cnpj: '',
+      setClientes(dados);
 
-    telefone_principal: '',
-    whatsapp: '',
+    if (dados.length > 0) {
+  const clienteCompleto = await getClienteById(
+    dados[0].id_cliente
+  );
 
-    endereco: {
-      logradouro: '',
-      numero: '',
-      bairro: '',
-      cidade: '',
-      estado: '',
-      cep: '',
-      pais: 'Brasil',
-    },
+  atualizarClienteAtivoCompleto(clienteCompleto);
+} else {
+        atualizarClienteAtivoCompleto(null);
+      }
+    } catch (error) {
+      console.error(
+        'Erro ao carregar clientes:',
+        error
+      );
 
-    limite_credito: 0,
-    dia_vencimento: 10,
-
-    status_credito: StatusCredito.LIBERADO,
-    status_cliente: StatusCliente.ATIVO,
-
-    saldo_devedor_atual: 0,
-
-    score_credito: 0,
-    score_comercial: 0,
-
-    aceita_marketing: false,
-
-    criado_em: new Date().toISOString(),
+      setClientes([]);
+      atualizarClienteAtivoCompleto(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  setClientes((prev) => [novo, ...prev]);
-  setCliente(novo);
-
-  setActiveTab('geral');
-}, []);
-
-  const salvarCliente = useCallback((dados: Cliente) => {
-    setClientes((prev) =>
-      prev.map((c) =>
-        c.id_cliente === dados.id_cliente ? dados : c
-      )
-    );
-    setCliente(dados);
+  useEffect(() => {
+    carregarClientes();
   }, []);
+
+  // =========================
+  // FILTRO
+  // =========================
+
+  const clientesFiltrados = useMemo(() => {
+    const termo = searchTerm.toLowerCase();
+
+    return clientes.filter((c) => {
+      return (
+        c.nome_razao?.toLowerCase().includes(termo) ||
+        c.cpf_cnpj?.includes(termo)
+      );
+    });
+  }, [clientes, searchTerm]);
+
+  // =========================
+  // SELECIONAR CLIENTE
+  // =========================
+
+  const handleSelecionarCliente = async (
+  c: ClienteEntity
+  ) => {
+    setLoading(true);
+
+    try {
+      const clienteCompleto =
+        await getClienteById(c.id_cliente);
+
+      atualizarClienteAtivoCompleto(
+        clienteCompleto
+      );
+    } catch (error) {
+      console.error(
+        'Erro ao carregar cliente:',
+        error
+      );
+
+      atualizarClienteAtivoCompleto(c);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // =========================
+  // NOVO CLIENTE
+  // =========================
+
+  const handleNovoCliente = useCallback(() => {
+    setIsModalOpen(true);
+  }, []);
+
+  // =========================
+  // SALVAR NOVO CLIENTE
+  // =========================
+
+  const handleSalvarNovoClienteDoModal =
+    useCallback(
+      async (dadosDoFormulario: Cliente) => {
+        setLoading(true);
+
+        try {
+          const { id_cliente, ...clienteParaEnviar } =
+            dadosDoFormulario;
+
+          const response = await fetch(
+            'http://localhost:3001/api/clientes',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type':
+                  'application/json',
+              },
+              body: JSON.stringify(
+                clienteParaEnviar
+              ),
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error(
+              `Erro ao salvar cliente: ${response.status}`
+            );
+          }
+
+          const clienteSalvoNoBanco: Cliente =
+            await response.json();
+
+          setClientes((prev) => [
+            clienteSalvoNoBanco,
+            ...prev,
+          ]);
+
+          atualizarClienteAtivoCompleto(
+            clienteSalvoNoBanco
+          );
+
+          setActiveTab('geral');
+
+          setIsModalOpen(false);
+        } catch (error) {
+          console.error(
+            'Erro ao salvar cliente:',
+            error
+          );
+
+          alert(
+            'Não foi possível salvar o cliente.'
+          );
+        } finally {
+          setLoading(false);
+        }
+      },
+      []
+    );
+
+  // =========================
+  // SALVAR CLIENTE
+  // =========================
+
+  const salvarCliente = useCallback(
+  (
+    dados: ClienteAggregate
+  ) => {
+     const clienteAtualizado: ClienteAggregate = {
+  ...dados,
+  contatos,
+  emails,
+};
+
+      setClientes((prev) =>
+        prev.map((c) =>
+          c.id_cliente === dados.id_cliente
+            ? clienteAtualizado
+            : c
+        )
+      );
+
+      atualizarClienteAtivoCompleto(
+        clienteAtualizado as Cliente
+      );
+    },
+    [contatos, emails]
+  );
+
+  // =========================
+  // RENDER
+  // =========================
 
   return (
     <div className="container-clientes">
-
       {/* SIDEBAR */}
       <aside className="sidebar-clientes">
         <div className="sidebar-header">
           <h3>Clientes</h3>
-          <button className="btn-novo" onClick={handleNovoCliente}>+</button>
+
+          <button
+            className="btn-novo"
+            onClick={handleNovoCliente}
+          >
+            +
+          </button>
         </div>
 
+        {/* SEARCH */}
         <div className="search-clientes">
           <input
             placeholder="Buscar cliente..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) =>
+              setSearchTerm(e.target.value)
+            }
           />
+
+          <button
+            onClick={carregarClientes}
+            disabled={loading}
+          >
+            {loading ? '...' : 'reload'}
+          </button>
         </div>
 
+        {/* LISTA */}
         <ul className="lista-clientes">
-          {clientesFiltrados.map((c) => (
-            <li
-              key={c.id_cliente}
-              className={cliente?.id_cliente === c.id_cliente ? 'active' : ''}
-              onClick={() => handleSelecionarCliente(c)}
-            >
-              <strong>{c.nome_razao}</strong>
-              <div>{c.cpf_cnpj}</div>
-              <small>
-  {c.endereco.cidade} - {c.endereco.estado}
-</small>
+          {clientesFiltrados.length === 0 &&
+          !loading ? (
+            <li className="sem-resultados">
+              Nenhum cliente encontrado
             </li>
-          ))}
+          ) : (
+            clientesFiltrados.map((c) => (
+              <li
+                key={c.id_cliente}
+                className={
+                  cliente?.id_cliente ===
+                  c.id_cliente
+                    ? 'active'
+                    : ''
+                }
+                onClick={() =>
+                  handleSelecionarCliente(c)
+                }
+              >
+                <strong>
+                  {c.nome_razao}
+                </strong>
+
+                <div>{c.cpf_cnpj}</div>
+<small>
+  {getEnderecoPrincipal(c)?.cidade ||
+    'Cidade não informadas'}
+  {' - '}
+  {getEnderecoPrincipal(c)?.estado ||
+    'UF'}
+</small>
+              </li>
+            ))
+          )}
         </ul>
       </aside>
 
       {/* MAIN */}
       <main className="painel-cliente">
-
         {cliente ? (
           <>
             <ClientHeader
@@ -295,23 +362,34 @@ const Clientes = () => {
             />
 
             <div className="client-tabs">
-
               {/* TABS */}
               <div className="tabs-header">
-                {(['geral','financeiro','historico','precos'] as TabType[]).map(tab => (
+                {(
+                  [
+                    'geral',
+                    'financeiro',
+                    'historico',
+                    'precos',
+                  ] as TabType[]
+                ).map((tab) => (
                   <button
                     key={tab}
-                    className={`tab-button ${activeTab === tab ? 'active' : ''}`}
-                    onClick={() => setActiveTab(tab)}
+                    className={`tab-button ${
+                      activeTab === tab
+                        ? 'active'
+                        : ''
+                    }`}
+                    onClick={() =>
+                      setActiveTab(tab)
+                    }
                   >
-                    {tab}
+                    {tab.toUpperCase()}
                   </button>
                 ))}
               </div>
 
-              {/* CONTENT */}
+              {/* CONTEÚDO */}
               <div className="tabs-content">
-
                 {activeTab === 'geral' && (
                   <GeralTab
                     cliente={cliente}
@@ -323,30 +401,49 @@ const Clientes = () => {
                   />
                 )}
 
-                {activeTab === 'financeiro' && (
-                  <FinanceiroTab cliente={cliente} />
+                {activeTab ===
+                  'financeiro' && (
+                  <FinanceiroTab
+                    cliente={cliente}
+                  />
                 )}
 
-                {activeTab === 'historico' && (
-                  <HistoricoTab cliente={cliente} />
+                {activeTab ===
+                  'historico' && (
+                  <HistoricoTab
+                    cliente={cliente}
+                  />
                 )}
 
                 {activeTab === 'precos' && (
-                  <PrecosTab cliente={cliente} />
+                  <PrecosTab
+                    cliente={cliente}
+                  />
                 )}
-
               </div>
             </div>
           </>
         ) : (
           <div className="empty-container">
-            <h2>Selecione um cliente</h2>
+            <h2>
+              Selecione um cliente
+            </h2>
           </div>
         )}
-
       </main>
+
+      {/* MODAL */}
+      <ModalNovoCliente
+        isOpen={isModalOpen}
+        onClose={() =>
+          setIsModalOpen(false)
+        }
+        onSave={
+          handleSalvarNovoClienteDoModal
+        }
+      />
     </div>
   );
 };
 
-export default Clientes;  
+export default Clientes;

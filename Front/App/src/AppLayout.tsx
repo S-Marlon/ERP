@@ -35,6 +35,7 @@ import PDVContent from './pages/PDV/PDV';
 import  HubVendas  from './pages/PDV/HubVendas';
 import Notas from './pages/Estoque/pages/notas/Notas';
 import ProductForm from './pages/ProductForm';
+import Fornecedores from "./pages/Fornecedores/Fornecedores";
 
 function AppLayout() {
   const location = useLocation();
@@ -82,7 +83,9 @@ const isPDV = location.pathname.startsWith("/vendas/pdv");
         <Routes>
           <Route path="/" element={<Dashboard text='Dashboard'/>} />
           <Route path="/clientes" element={<Clientes title={''} children={undefined} />} />
-          <Route path="/clientes/novo" element={<CadastroCliente />} />
+          <Route path="/fornecedores" element={<Fornecedores title={''} children={undefined}/>} /> 
+
+          <Route path="/clientes/novo" element={<CadastroCliente />} /> 
           <Route path="/contratos/novo" element={<CadastroContrato />} />
           <Route path="/pocos/novo" element={<RelatorioPoco />} />
 

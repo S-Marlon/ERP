@@ -1,749 +1,787 @@
-  import React, { useEffect, useMemo, useState } from 'react';
-  import styles from './GeralTab.module.css';
+import React, { useEffect, useMemo, useState } from 'react';
+import styles from './GeralTab.module.css';
 
-  import type {
-    Cliente,
-    ClienteContato,
-    ClienteEmail,
-    ClienteFormData,
-  } from '../../../../types/cliente.types';
+import type {
+  Cliente,
+  ClienteContato,
+  ClienteEmail,
+  ClienteFormData,
+} from '../../../../types/cliente.types';
 
-  import {
-    ClassificacaoCliente,
-    PotencialCliente,
-    SegmentoCliente,
-    StatusCredito,
-    TipoCliente,
-    TipoContato,
-  } from '../../../../types/cliente.types';
+import {
+  ClassificacaoCliente,
+  PotencialCliente,
+  StatusCredito,
+  StatusCliente,
+  TipoCliente,
+  TipoContato,
+} from '../../../../types/cliente.types';
 
-  import {
-    maskCPF,
-    maskCNPJ,
-    maskCEP,
-    maskPhone,
-    validaEmail,
-    validaTelefone,
-  } from '../../../../utils/validators';
+import {
+  maskCPF,
+  maskCNPJ,
+  maskCEP,
+  maskPhone,
+  validaEmail,
+  validaTelefone,
+} from '../../../../utils/validators';
+import ContatosSection from '../contatos/ContatosSection';
+import EmailsSection from '../emails/EmailsSection';
+import EnderecosSection from '../enderecos/EnderecosSection';
 
-  interface GeralTabProps {
-    cliente: Cliente;
-    contatos: ClienteContato[];
-    emails: ClienteEmail[];
-    setContatos: React.Dispatch<React.SetStateAction<ClienteContato[]>>;
-    setEmails: React.Dispatch<React.SetStateAction<ClienteEmail[]>>;
-    onSave: (dados: ClienteFormData) => Promise<Cliente | null>;
-  }
+interface GeralTabProps {
+  cliente: Cliente;
+  contatos: ClienteContato[];
+  emails: ClienteEmail[];
+  setContatos: React.Dispatch<React.SetStateAction<ClienteContato[]>>;
+  setEmails: React.Dispatch<React.SetStateAction<ClienteEmail[]>>;
+  onSave: (dados: ClienteFormData) => Promise<Cliente | null>;
+}
 
-  const GeralTab: React.FC<GeralTabProps> = ({
-    cliente,
-    contatos,
-    emails,
-    setContatos,
-    setEmails,
-    onSave,
-  }) => {
+// Interface estendida unificada para normalizar as propriedades vindas do MySQL
+interface DBContato extends ClienteContato {
+  id_contato?: number;
+  numero?: string;
+}
 
-    // =====================================================
-    // STATE PRINCIPAL
-    // =====================================================
+const GeralTab: React.FC<GeralTabProps> = ({
+  cliente,
+  contatos = [],
+  emails = [],
+  setContatos,
+  setEmails,
+  onSave,
+}) => {
+  // =====================================================
+  // STATE PRINCIPAL
+  // =====================================================
+  const [formData, setFormData] = useState<Partial<Cliente>>({});
+  const [loading, setLoading] = useState(false);
+  const [editingContactId, setEditingContactId] = useState<string | number | null>(null);
+  const [tempContato, setTempContato] = useState<ClienteContato | null>(null);
 
-    const [formData, setFormData] = useState<Partial<Cliente>>({});
-    const [loading, setLoading] = useState(false);
-    const [editingContactId, setEditingContactId] = useState<number | null>(null);
-const [tempContato, setTempContato] = useState<any | null>(null);
+  const [isAddingContato, setIsAddingContato] = useState(false);
 
-const addContato = () => {
-  if (!validaTelefone(contatoForm.telefone)) return;
 
-  const newContact = {
-    id: Date.now(),
-    id_cliente: cliente.id_cliente,
-    telefone: maskPhone(contatoForm.telefone),
+
+  const enderecoPadrao = useMemo(() => ({
+    logradouro: '',
+    numero: '',
+    complemento: '',
+    bairro: '',
+    cidade: '',
+    estado: '',
+    cep: '',
+    pais: 'Brasil',
+    referencia: ''
+  }), []);
+
+  const [contatoForm, setContatoForm] = useState({
+    nome: '',
+    telefone: '',
+    cargo: '',
     tipo: 'GERAL',
-    principal: false,
     whatsapp: false,
-    referencia: '',
-    criado_em: new Date().toISOString(),
+    principal: false,
+  });
+
+  // =====================================================
+  // SYNC E DIRTY CHECK (Expandido para segurança de dados)
+  // =====================================================
+  useEffect(() => {
+    if (cliente) {
+      setFormData({
+        ...cliente,
+
+        endereco: cliente.endereco || { ...enderecoPadrao },
+
+        enderecos:
+          cliente.enderecos?.length
+            ? cliente.enderecos
+            : cliente.endereco
+              ? [
+                {
+                  ...cliente.endereco,
+                  tipo: 'FISCAL',
+                  principal: true,
+                },
+              ]
+              : [],
+      });
+    }
+  }, [cliente, enderecoPadrao]);
+
+  const isDirty = useMemo(() => {
+    if (!cliente || !formData.id_cliente) return false;
+
+    return (
+      formData.nome_razao !== cliente.nome_razao ||
+      formData.nome_fantasia !== cliente.nome_fantasia ||
+      formData.cpf_cnpj !== cliente.cpf_cnpj ||
+      formData.tipo_cliente !== cliente.tipo_cliente ||
+      formData.segmento !== cliente.segmento ||
+      formData.status_cliente !== cliente.status_cliente ||
+      formData.classificacao !== cliente.classificacao ||
+      formData.potencial !== cliente.potencial ||
+      formData.limite_credito !== cliente.limite_credito ||
+      formData.dia_vencimento !== cliente.dia_vencimento ||
+      formData.status_credito !== cliente.status_credito ||
+      formData.endereco?.cep !== cliente.endereco?.cep ||
+      formData.endereco?.logradouro !== cliente.endereco?.logradouro ||
+      formData.endereco?.numero !== cliente.endereco?.numero
+    );
+  }, [formData, cliente]);
+
+  // =====================================================
+  // MANIPULADORES DE CAMPOS
+  // =====================================================
+  const updateField = <K extends keyof Cliente>(field: K, value: Cliente[K]) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  setContatos(prev => [...prev, newContact]);
+  const updateEndereco = (field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      endereco: {
+        ...enderecoPadrao,
+        ...prev.endereco,
+        [field]: value,
+      }
+    }));
+  };
 
-  // entra em modo edição automaticamente
-  setEditingContactId(newContact.id);
-  setTempContato(newContact);
+  const mascaraDocumento = (value: string) => {
+    const n = value.replace(/\D/g, '');
+    return n.length <= 11 ? maskCPF(value) : maskCNPJ(value);
+  };
 
-  setContatoForm({
-    telefone: '',
+  // =====================================================
+  // LÓGICA DE CONTATOS (Normalizada com Fallbacks do MySQL)
+  // ===================================================== 
+
+  const [emailForm, setEmailForm] = useState({
+    email: '',
     tipo: 'GERAL',
     principal: false,
-    whatsapp: false,
-    referencia: '',
   });
-};
 
-const startEdit = (c: any) => {
-  setEditingContactId(c.id);
-  setTempContato({ ...c });
-};
 
-const saveEdit = () => {
-  setContatos(prev =>
-    prev.map(c =>
-      c.id === editingContactId ? tempContato : c
-    )
-  );
+  const [enderecoForm, setEnderecoForm] = useState({
+    logradouro: '',
+    numero: '',
+    complemento: '',
+    bairro: '',
+    cidade: '',
+    estado: '',
+    cep: '',
+    pais: 'Brasil',
+    referencia: '',
+    tipo: 'ENTREGA',
+  });
 
-  setEditingContactId(null);
-  setTempContato(null);
-};
+  const [isAddingEndereco, setIsAddingEndereco] = useState(false);
 
-const cancelEdit = () => {
-  setEditingContactId(null);
-  setTempContato(null);
-};
+  const addEndereco = () => {
+    const novo = {
+      ...enderecoForm,
+      id: Date.now(),
+    };
 
-    // contatos form
-    const [contatoForm, setContatoForm] = useState({
-      telefone: '',
-      tipo: 'GERAL',
-      principal: false,
-      whatsapp: false,
+    setFormData(prev => ({
+      ...prev,
+      enderecos: [...(prev.enderecos || []), novo],
+    }));
+
+    setEnderecoForm({
+      logradouro: '',
+      numero: '',
+      complemento: '',
+      bairro: '',
+      cidade: '',
+      estado: '',
+      cep: '',
+      pais: 'Brasil',
       referencia: '',
+      tipo: 'ENTREGA',
     });
 
-    // email form
-    const [emailForm, setEmailForm] = useState({
-      email: '',
-      tipo: 'GERAL',
+    setIsAddingEndereco(false);
+  };
+
+  const removeEndereco = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      enderecos: (prev.enderecos || []).filter((_, i) => i !== index),
+    }));
+  };
+
+  // =====================================================
+  // LÓGICA DE CONTATOS (Normalizada com Fallbacks do MySQL)
+  // =====================================================
+  const addContato = () => {
+    setContatos(prev => [
+      ...prev,
+      {
+        ...contatoForm,
+        id: Date.now(), // temporário
+      },
+    ]);
+
+    setContatoForm({
+      nome: '',
+      telefone: '',
+      cargo: '',
+      tipo_telefone: 'CELULAR',
+      whatsapp: false,
       principal: false,
     });
 
-    // =====================================================
-    // SYNC
-    // =====================================================
+    setIsAddingContato(false);
+  };
 
-    useEffect(() => {
-      setFormData(cliente);
-    }, [cliente]);
+  const startEditContato = (c: Contato) => {
+    setEditingContactId(c.id || c.id_contato);
+    setTempContato({ ...c });
+  };
 
-    const isDirty = useMemo(
-      () => JSON.stringify(formData) !== JSON.stringify(cliente),
-      [formData, cliente]
+
+  const saveEditContato = () => {
+    setContatos(prev =>
+      prev.map(c => {
+        const idOriginal = c.id ?? c.id_contato;
+        const idEdit = tempContato?.id ?? tempContato?.id_contato;
+
+        if (idOriginal === idEdit) {
+          return tempContato!;
+        }
+
+        return c;
+      })
     );
 
-    // =====================================================
-    // HELPERS
-    // =====================================================
+    setEditingContactId(null);
+    setTempContato(null);
+  };
 
-    const updateField = <K extends keyof Cliente>(field: K, value: Cliente[K]) => {
-      setFormData(prev => ({ ...prev, [field]: value }));
-    };
 
-    const updateEndereco = (field: string, value: string) => {
-      setFormData(prev => ({
-        ...prev,
-        endereco: {
-          ...prev.endereco!,
-          [field]: value,
-        },
-      }));
-    };
+  // =====================================================
+  // LÓGICA DE EMAILS
+  // =====================================================
 
-    const mascaraDocumento = (value: string) => {
-      const n = value.replace(/\D/g, '');
-      return n.length <= 11 ? maskCPF(value) : maskCNPJ(value);
-    };
+  const [isAddingEmail, setIsAddingEmail] = useState(false);
 
-    // =====================================================
-    // CONTATOS
-    // =====================================================
 
-   
 
-    const removeContato = (id: number) => {
-      setContatos(prev => prev.filter(c => c.id !== id));
-    };
 
-    // =====================================================
-    // EMAILS
-    // =====================================================
+  const addEmail = () => {
+    if (!validaEmail(emailForm.email)) {
+      alert('E-mail inválido.');
+      return;
+    }
 
-    const addEmail = () => {
-      if (!validaEmail(emailForm.email)) return;
+    setEmails(prev => {
+      let lista = [...prev];
 
-      setEmails(prev => [
-        ...prev,
+      if (emailForm.principal) {
+        lista = lista.map(e => ({ ...e, principal: false }));
+      }
+
+      return [
+        ...lista,
         {
           id: Date.now(),
-          id_cliente: cliente.id_cliente,
           email: emailForm.email,
-          tipo: emailForm.tipo as TipoContato,
+          tipo: emailForm.tipo || 'GERAL',
           principal: emailForm.principal,
-          criado_em: new Date().toISOString(),
+          verificado: false,
         },
-      ]);
-
-      setEmailForm({
-        email: '',
-        tipo: 'GERAL',
-        principal: false,
-      });
-    };
-
-    const removeEmail = (id: number) => {
-      setEmails(prev => prev.filter(e => e.id !== id));
-    };
+      ];
+    });
 
 
 
-    const EmailItem = ({
-  email,
-  setEmails,
-  removeEmail,
-}: any) => {
-  const [editMode, setEditMode] = React.useState(false);
+    setIsAddingEmail(false); // 👈 fecha form após salvar
+  };
 
-  const update = (field: string, value: any) => {
-    setEmails((prev: any[]) =>
-      prev.map((item) =>
-        item.id === email.id
-          ? { ...item, [field]: value }
-          : item
-      )
-    );
+  const removeEmail = (index: number) => {
+    setEmails(prev => prev.filter((_, i) => i !== index));
+  };
+
+
+
+  // =====================================================
+  // SALVAMENTO UNIFICADO
+  // =====================================================
+  const handleSave = async () => {
+    if (!formData.nome_razao?.trim()) {
+      alert("O campo Razão Social / Nome Completo é obrigatório.");
+      return;
+    }
+    if (!formData.cpf_cnpj?.trim()) {
+      alert("O campo CPF / CNPJ é obrigatório.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const payload: ClienteFormData = {
+        ...(formData as Cliente),
+        contatos: contatos.map(c => ({
+          ...c,
+          telefone: c.telefone || (c as DBContato).numero // Normalização garantida pro Backend
+        })),
+        emails
+      };
+      await onSave(payload);
+    } catch (err) {
+      console.error('Erro ao salvar formulário principal:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className={styles.row}>
+    <div className={styles.container}>
+      <div className={styles.grid}>
 
-      <div className={styles.rowContent}>
+        {/* COLUNA ESQUERDA: CADASTROS E MESTRES */}
+        <div className={styles.col}>
 
-        {!editMode ? (
-          <>
-            {/* VIEW MODE */}
-            <div className={styles.rowMain}>
-              <span className={styles.rowText}>
-                {email.email}
-              </span>
+          {/* 1. IDENTIFICAÇÃO E PERFIL */}
+          <section className={styles.card}>
 
-              <div className={styles.badges}>
-                {email.principal && (
-                  <span className={styles.badgePrimary}>
-                    Principal
-                  </span>
-                )}
-                <span className={styles.badgeType}>
-                  {email.tipo}
-                </span>
+            <h3 className={styles.title}>👤 Identificação e Perfil</h3>
+
+            <div className={styles.grid3}>
+              <div className={styles.inputWrapper}>
+                <label className={styles.fieldLabel}>
+                  Tipo
+                </label>
+
+                ```
+                <select
+                  className={styles.select}
+                  value={formData.tipo_cliente || ''}
+                  onChange={(e) =>
+                    updateField(
+                      'tipo_cliente',
+                      e.target.value as TipoCliente
+                    )
+                  }
+                >
+                  <option value={TipoCliente.PESSOA_FISICA}>
+                    👤 Pessoa Física
+                  </option>
+
+                  <option value={TipoCliente.PESSOA_JURIDICA}>
+                    🏢 Pessoa Jurídica
+                  </option>
+                </select>
+                ```
+
+              </div>
+
+              <div className={styles.inputWrapper}>
+                <label className={styles.fieldLabel}>
+                  Segmento
+                </label>
+
+                ```
+                <select
+                  className={styles.select}
+                  value={formData.segmento || ''}
+                  onChange={(e) =>
+                    updateField('segmento', e.target.value)
+                  }
+                >
+                  <option value="">
+                    Selecione
+                  </option>
+
+                  <option value="VAREJO">
+                    🛒 Varejo
+                  </option>
+
+                  <option value="DISTRIBUIDOR">
+                    📦 Distribuidor
+                  </option>
+
+                  <option value="INDUSTRIA">
+                    🏭 Indústria
+                  </option>
+
+                  <option value="SERVICOS">
+                    🧰 Serviços
+                  </option>
+
+                  <option value="ATACADO">
+                    🚚 Atacado
+                  </option>
+                </select>
+                ```
+
+              </div>
+
+              <div className={styles.inputWrapper}>
+                <label className={styles.fieldLabel}>
+                  Status
+                </label>
+
+                ```
+                <select
+                  className={styles.select}
+                  value={formData.status_cliente || ''}
+                  onChange={(e) =>
+                    updateField(
+                      'status_cliente',
+                      e.target.value as StatusCliente
+                    )
+                  }
+                >
+                  <option value={StatusCliente.ATIVO}>
+                    🟢 Ativo
+                  </option>
+
+                  <option value={StatusCliente.INATIVO}>
+                    ⚫ Inativo
+                  </option>
+
+                  <option value={StatusCliente.BLOQUEADO}>
+                    🔴 Bloqueado
+                  </option>
+                </select>
+                ```
+
               </div>
             </div>
 
-            <button
-              className={styles.editBtn}
-              onClick={() => setEditMode(true)}
-            >
-              Editar
-            </button>
-          </>
-        ) : (
-          <>
-            {/* EDIT MODE */}
-            <input
-              className={styles.inputInline}
-              value={email.email}
-              onChange={(e) =>
-                update('email', e.target.value)
-              }
-            />
 
-            <select
-              className={styles.selectInline}
-              value={email.tipo}
-              onChange={(e) =>
-                update('tipo', e.target.value)
-              }
-            >
-              <option value="GERAL">Geral</option>
-              <option value="COMERCIAL">Comercial</option>
-              <option value="FINANCEIRO">Financeiro</option>
-            </select>
-
-            <label>
+            <div className={styles.inputWrapper}>
+              <label className={styles.fieldLabel}>Razão Social / Nome Completo *</label>
               <input
-                type="checkbox"
-                checked={email.principal}
-                onChange={(e) =>
-                  update('principal', e.target.checked)
-                }
+                className={styles.input}
+                value={formData.nome_razao || ''}
+                onChange={e => updateField('nome_razao', e.target.value)}
+                placeholder="Razão Social ou Nome Completo"
               />
-              Principal
-            </label>
+            </div>
 
-            <button
-              className={styles.saveBtn}
-              onClick={() => setEditMode(false)}
-            >
-              OK
-            </button>
-          </>
-        )}
+            {formData.tipo_cliente === TipoCliente.PESSOA_JURIDICA && (
+              <div className={styles.inputWrapper}>
+                <label className={styles.fieldLabel}>Nome Fantasia</label>
+                <input
+                  className={styles.input}
+                  value={formData.nome_fantasia || ''}
+                  onChange={e => updateField('nome_fantasia', e.target.value)}
+                  placeholder="Nome Fantasia da Empresa"
+                />
+              </div>
+            )}
 
+            <div className={styles.grid2}>
+              <div className={styles.inputWrapper}>
+                <label className={styles.fieldLabel}>CPF / CNPJ *</label>
+                <input
+                  className={styles.input}
+                  value={formData.cpf_cnpj || ''}
+                  onChange={e => updateField('cpf_cnpj', mascaraDocumento(e.target.value))}
+                  placeholder="Documento oficial"
+                />
+              </div>
+
+            </div>
+
+
+{formData.tipo_cliente === TipoCliente.PESSOA_JURIDICA && (
+  <div className={styles.grid2}>
+    <div className={styles.inputWrapper}>
+      <label className={styles.fieldLabel}>
+        Inscrição Estadual
+      </label>
+
+      <input
+        className={styles.input}
+        value={formData.inscricao_estadual || ''}
+        onChange={e =>
+          updateField('inscricao_estadual', e.target.value)
+        }
+        placeholder="IE"
+      />
+    </div>
+
+    <div className={styles.inputWrapper}>
+      <label className={styles.fieldLabel}>
+        Inscrição Municipal
+      </label>
+
+      <input
+        className={styles.input}
+        value={formData.inscricao_municipal || ''}
+        onChange={e =>
+          updateField('inscricao_municipal', e.target.value)
+        }
+        placeholder="IM"
+      />
+    </div>
+  </div>
+)}
+
+<div className={styles.inputWrapper}>
+  <label className={styles.fieldLabel}>
+    Observações
+  </label>
+
+  <textarea
+    className={styles.textarea}
+    value={formData.observacoes || ''}
+    onChange={e =>
+      updateField('observacoes', e.target.value)
+    }
+    placeholder="Informações rápidas do cliente..."
+  />
+</div>
+
+
+<div className={styles.badges}>
+  <span className={styles.badgeA}>
+    Classe {formData.classificacao}
+  </span>
+
+  <span className={styles.badgeCredito}>
+    {formData.status_credito}
+  </span>
+</div>
+
+<div className={styles.inputWrapper}>
+  <label className={styles.fieldLabel}>
+    Cliente desde
+  </label>
+
+  <input
+    className={styles.input}
+    readOnly
+    value={
+      formData.criado_em
+        ? new Date(formData.criado_em).toLocaleDateString()
+        : ''
+    }
+  />
+</div>
+
+<div className={styles.inputWrapper}>
+  <label className={styles.fieldLabel}>
+    Última compra
+  </label>
+
+  <input
+    className={styles.input}
+    readOnly
+    value={
+      formData.ultima_compra
+        ? new Date(formData.ultima_compra).toLocaleDateString()
+        : 'Sem compras'
+    }
+  />
+</div>
+
+<label className={styles.checkbox}>
+  <input
+    type="checkbox"
+    checked={!!formData.aceita_marketing}
+    onChange={e =>
+      updateField(
+        'aceita_marketing',
+        e.target.checked
+      )
+    }
+  />
+
+  Aceita comunicações e marketing
+</label>
+
+// Fiscal
+inscricao_estadual?: string;
+inscricao_municipal?: string;
+indicador_ie?: 'CONTRIBUINTE' | 'ISENTO' | 'NAO_CONTRIBUINTE';
+
+// Jurídico
+suframa?: string;
+
+// Pessoa Física
+rg?: string;
+orgao_emissor?: string;
+data_nascimento?: string;
+
+// Empresa
+data_fundacao?: string;
+
+<select>
+  <option>Contribuinte ICMS</option>
+  <option>Isento</option>
+  <option>Não contribuinte</option>
+</select>
+
+
+          </section>
+
+
+
+
+          {/* 3. ENDEREÇO PRINCIPAL */}
+<EnderecosSection
+            enderecos={formData.enderecos || []}
+            setEnderecos={(updater) =>
+  setFormData(prev => ({
+    ...prev,
+    enderecos:
+      typeof updater === 'function'
+        ? updater(prev.enderecos || [])
+        : updater,
+  }))
+}
+            enderecoForm={enderecoForm}
+            setEnderecoForm={setEnderecoForm}
+            addEndereco={addEndereco}
+            removeEndereco={removeEndereco}
+            maskCEP={maskCEP}
+            isAddingEndereco={isAddingEndereco}
+            setIsAddingEndereco={setIsAddingEndereco}
+          />
+
+
+          {/* 4. CONFIGURAÇÕES COMERCIAIS E FINANCEIRAS */}
+          <section className={styles.card}>
+            <h3 className={styles.title}>📈 Classificação Comercial & Crédito</h3>
+            <div className={styles.grid2}>
+              <div className={styles.inputWrapper}>
+                <label className={styles.fieldLabel}>Classificação ABC</label>
+                <select
+                  className={styles.select}
+                  value={formData.classificacao || ''}
+                  onChange={e => updateField('classificacao', e.target.value as ClassificacaoCliente)}
+                >
+                  <option value="">Não Definida</option>
+                  <option value={ClassificacaoCliente.A}>Classe A (Alto Valor)</option>
+                  <option value={ClassificacaoCliente.B}>Classe B (Médio Valor)</option>
+                  <option value={ClassificacaoCliente.C}>Classe C (Baixo Valor)</option>
+                </select>
+              </div>
+
+              <div className={styles.inputWrapper}>
+                <label className={styles.fieldLabel}>Potencial do Cliente</label>
+                <select
+                  className={styles.select}
+                  value={formData.potencial || ''}
+                  onChange={e => updateField('potencial', e.target.value as PotencialCliente)}
+                >
+                  <option value="">Não Definido</option>
+                  <option value={PotencialCliente.BAIXO}>Baixo</option>
+                  <option value={PotencialCliente.MEDIO}>Médio</option>
+                  <option value={PotencialCliente.ALTO}>Alto</option>
+                  <option value={PotencialCliente.ESTRATEGICO}>Estratégico</option>
+                </select>
+              </div>
+            </div>
+
+            <div className={styles.grid2} style={{ marginTop: '12px' }}>
+              <div className={styles.inputWrapper}>
+                <label className={styles.fieldLabel}>Limite de Crédito (R$)</label>
+                <input
+                  className={styles.input}
+                  type="number"
+                  value={formData.limite_credito ?? 0}
+                  onChange={e => updateField('limite_credito', Number(e.target.value))}
+                />
+              </div>
+
+              <div className={styles.inputWrapper}>
+                <label className={styles.fieldLabel}>Melhor Dia Vencimento</label>
+                <input
+                  className={styles.input}
+                  type="number"
+                  min={1}
+                  max={31}
+                  value={formData.dia_vencimento ?? 1}
+                  onChange={e => updateField('dia_vencimento', Number(e.target.value))}
+                />
+              </div>
+            </div>
+
+            <div className={styles.grid2}>
+              <div className={styles.inputWrapper}>
+                <label className={styles.fieldLabel}>Status de Risco de Crédito</label>
+                <select
+                  className={styles.select}
+                  value={formData.status_credito || ''}
+                  onChange={e => updateField('status_credito', e.target.value as StatusCredito)}
+                >
+                  <option value={StatusCredito.ANALISE}>Análise</option>
+                  <option value={StatusCredito.APROVADO}>Aprovado</option>
+                  <option value={StatusCredito.RECUSADO}>Recusado</option>
+                  <option value={StatusCredito.SUSPENSO}>Suspenso</option>
+                </select>
+              </div>
+
+              <div className={styles.inputWrapper}>
+                <label className={styles.fieldLabel}>Saldo Devedor Atual</label>
+                <input
+                  className={styles.input}
+                  type="number"
+                  value={formData.saldo_devedor_atual ?? 1}
+                  style={{ backgroundColor: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' }}
+                />
+              </div>
+            </div>
+          </section>
+        </div>
+
+        {/* COLUNA DIREITA: RELACIONAMENTOS (CONTATOS E EMAILS ADICIONAIS) */}
+        <div className={styles.col}>
+
+          <ContatosSection
+            contatos={contatos}
+            setContatos={setContatos}
+            editingContactId={editingContactId}
+            setEditingContactId={setEditingContactId}
+            tempContato={tempContato}
+            setTempContato={setTempContato}
+            contatoForm={contatoForm}
+            setContatoForm={setContatoForm}
+            addContato={addContato}
+            startEditContato={startEditContato}
+            saveEditContato={saveEditContato}
+            isAddingContato={isAddingContato}
+            setIsAddingContato={setIsAddingContato}
+            maskPhone={maskPhone}
+          />
+
+          {/* SESSÃO: CANAIS DE EMAIL */}
+          <EmailsSection
+            emails={emails}
+            setEmails={setEmails}
+            emailForm={emailForm}
+            setEmailForm={setEmailForm}
+            addEmail={addEmail}
+            removeEmail={removeEmail}
+            validaEmail={validaEmail}
+            isAddingEmail={isAddingEmail}
+            setIsAddingEmail={setIsAddingEmail}
+          />
+
+
+        </div>
       </div>
 
-      {/* DELETE */}
-      <button
-        className={styles.removeBtn}
-        onClick={() => removeEmail(email.id)}
-      >
-        ✕
-      </button>
+      {/* BARRA DE BOTÕES GLOBAL */}
+      <div className={styles.actionsBar}>
+        {isDirty && <span className={styles.warning}>⚠️ Há modificações pendentes de salvamento neste cliente.</span>}
+        <button className={styles.saveBtn} onClick={handleSave} disabled={loading}>
+          {loading ? 'Sincronizando Banco...' : '💾 Gravar Alterações'}
+        </button>
+      </div>
+
     </div>
   );
 };
 
-    
-
-    // =====================================================
-    // SAVE
-    // =====================================================
-
-    const handleSave = async () => {
-      setLoading(true);
-      try {
-        await onSave(formData as ClienteFormData);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    // =====================================================
-    // UI HELPERS
-    // =====================================================
-
-    const renderSelectOptions = (EnumObj: any, labelFn?: (v: string) => string) =>
-      Object.values(EnumObj).map((v) => (
-        <option key={v} value={v}>
-          {labelFn ? labelFn(v) : v}
-        </option>
-      ));
-
-    // =====================================================
-    // RENDER BLOCKS
-    // =====================================================
-
-    const DadosBasicos = () => (
-      <section className={styles.card}>
-        <h3 className={styles.title}>👤 Dados básicos</h3>
-
-        <div className={styles.grid2}>
-          <select
-            className={styles.select}
-            value={formData.tipo_cliente || ''}
-            onChange={e => updateField('tipo_cliente', e.target.value as any)}
-          >
-            {renderSelectOptions(TipoCliente)}
-          </select>
-
-          <select
-            className={styles.select}
-            value={formData.segmento || ''}
-            onChange={e => updateField('segmento', e.target.value as any)}
-          >
-            {renderSelectOptions(SegmentoCliente)}
-          </select>
-        </div>
-
-        <input
-          className={styles.input}
-          value={formData.nome_razao || ''}
-          onChange={e => updateField('nome_razao', e.target.value)}
-          placeholder="Nome / Razão Social"
-        />
-
-        {formData.tipo_cliente === TipoCliente.PESSOA_JURIDICA && (
-          <input
-            className={styles.input}
-            value={formData.nome_fantasia || ''}
-            onChange={e => updateField('nome_fantasia', e.target.value)}
-            placeholder="Nome Fantasia"
-          />
-        )}
-
-        <input
-          className={styles.input}
-          value={formData.cpf_cnpj || ''}
-          onChange={e => updateField('cpf_cnpj', mascaraDocumento(e.target.value))}
-          placeholder="CPF / CNPJ"
-        />
-      </section>
-    );
-
-    const Endereco = () => (
-      <section className={styles.card}>
-        <h3 className={styles.title}>📍 Endereço</h3>
-
-        <input
-          className={styles.input}
-          value={formData.endereco?.logradouro || ''}
-          onChange={e => updateEndereco('logradouro', e.target.value)}
-          placeholder="Logradouro"
-        />
-
-        <div className={styles.grid3}>
-          <input
-            className={styles.input}
-            value={formData.endereco?.numero || ''}
-            onChange={e => updateEndereco('numero', e.target.value)}
-            placeholder="Número"
-          />
-
-          <input
-            className={styles.input}
-            value={formData.endereco?.bairro || ''}
-            onChange={e => updateEndereco('bairro', e.target.value)}
-            placeholder="Bairro"
-          />
-
-          <input
-            className={styles.input}
-            value={formData.endereco?.cep || ''}
-            onChange={e => updateEndereco('cep', maskCEP(e.target.value))}
-            placeholder="CEP"
-          />
-        </div>
-
-        <div className={styles.grid2}>
-          <input
-            className={styles.input}
-            value={formData.endereco?.cidade || ''}
-            onChange={e => updateEndereco('cidade', e.target.value)}
-            placeholder="Cidade"
-          />
-
-          <input
-            className={styles.input}
-            value={formData.endereco?.estado || ''}
-            onChange={e => updateEndereco('estado', e.target.value.toUpperCase())}
-            placeholder="UF"
-            maxLength={2}
-          />
-        </div>
-      </section>
-    );
-
-   const Financeiro = () => (
-  <section className={styles.card}>
-    <h3 className={styles.title}>💳 Crédito</h3>
-
-    <div className={styles.grid2}>
-      <input
-        className={styles.input}
-        type="number"
-        value={formData.limite_credito || 0}
-        onChange={(e) =>
-          updateField(
-            'limite_credito' as any,
-            Number(e.target.value)
-          )
-        }
-        placeholder="Limite de crédito"
-      />
-
-      <input
-        className={styles.input}
-        type="number"
-        value={formData.dia_vencimento || 1}
-        onChange={(e) =>
-          updateField(
-            'dia_vencimento' as any,
-            Number(e.target.value)
-          )
-        }
-        placeholder="Dia vencimento"
-      />
-    </div>
-
-    <select
-      className={styles.select}
-      value={formData.status_credito || ''}
-      onChange={(e) =>
-        updateField(
-          'status_credito' as any,
-          e.target.value
-        )
-      }
-    >
-      {Object.values(StatusCredito).map((status) => (
-        <option key={status} value={status}>
-          {status}
-        </option>
-      ))}
-    </select>
-
-    <input
-      className={styles.input}
-      type="number"
-      value={formData.saldo_devedor_atual || 0}
-      onChange={(e) =>
-        updateField(
-          'saldo_devedor_atual' as any,
-          Number(e.target.value)
-        )
-      }
-      placeholder="Saldo devedor atual"
-    />
-  </section>
-);
-
-    // =====================================================
-    // RETURN
-    // =====================================================
-
-    return (
-      <div className={styles.container}>
-
-        <div className={styles.grid}>
-
-          <div className={styles.col}>
-            <DadosBasicos />
-            <Endereco />
-            <Financeiro />
-
-            {/* você pode continuar separando Crédito / CRM igual acima */}
-          </div>
-
-         <div className={styles.col}>
-
-  {/* CONTATOS */}
-  <section className={styles.card}>
-  <h3 className={styles.title}>📞 Contatos</h3>
-
-  <div className={styles.list}>
-
-    {contatos.map(c => {
-      const isEditing = editingContactId === c.id;
-      const data = isEditing ? tempContato : c;
-
-      return (
-        <div key={c.id} className={styles.row}>
-
-          <div className={styles.rowContent}>
-
-            {/* TELEFONE */}
-            <div className={styles.rowMain}>
-              <span className={styles.rowText}>{c.telefone}</span>
-
-              {c.principal && (
-                <span className={styles.badgePrimary}>Principal</span>
-              )}
-
-              {c.whatsapp && (
-                <span className={styles.badgeWhatsapp}>WhatsApp</span>
-              )}
-            </div>
-
-            {/* MODO EDIÇÃO */}
-            {isEditing ? (
-              <>
-                {/* TIPO */}
-                <select
-                  className={styles.selectInline}
-                  value={data.tipo}
-                  onChange={(e) =>
-                    setTempContato({
-                      ...data,
-                      tipo: e.target.value,
-                    })
-                  }
-                >
-                  <option value="GERAL">Geral</option>
-                  <option value="COMERCIAL">Comercial</option>
-                  <option value="FINANCEIRO">Financeiro</option>
-                </select>
-
-                {/* REFERÊNCIA */}
-                <input
-                  className={styles.inputInline}
-                  value={data.referencia || ''}
-                  onChange={(e) =>
-                    setTempContato({
-                      ...data,
-                      referencia: e.target.value,
-                    })
-                  }
-                  placeholder="Referência"
-                />
-
-                {/* FLAGS */}
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={data.principal || false}
-                    onChange={(e) =>
-                      setTempContato({
-                        ...data,
-                        principal: e.target.checked,
-                      })
-                    }
-                  />
-                  Principal
-                </label>
-
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={data.whatsapp || false}
-                    onChange={(e) =>
-                      setTempContato({
-                        ...data,
-                        whatsapp: e.target.checked,
-                      })
-                    }
-                  />
-                  WhatsApp
-                </label>
-
-                {/* ACTIONS */}
-                <div className={styles.editActions}>
-                  <button onClick={saveEdit}>Salvar</button>
-                  <button onClick={cancelEdit}>Cancelar</button>
-                </div>
-
-              </>
-            ) : (
-              /* MODO VISUAL */
-              <div className={styles.rowMeta}>
-                <small>{c.tipo}</small>
-                {c.referencia && <small>• {c.referencia}</small>}
-              </div>
-            )}
-
-          </div>
-
-          {/* AÇÕES */}
-          <div className={styles.actions}>
-
-            {!isEditing && (
-              <button onClick={() => startEdit(c)}>
-                Editar
-              </button>
-            )}
-
-            <button
-              className={styles.removeBtn}
-              onClick={() =>
-                setContatos(prev =>
-                  prev.filter(item => item.id !== c.id)
-                )
-              }
-            >
-              ✕
-            </button>
-
-          </div>
-
-        </div>
-      );
-    })}
-
-  </div>
-
-  {/* ADD CONTATO */}
-  <div className={styles.formBlock}>
-    <input
-      className={styles.input}
-      value={contatoForm.telefone}
-      onChange={e =>
-        setContatoForm({
-          ...contatoForm,
-          telefone: maskPhone(e.target.value),
-        })
-      }
-      placeholder="Telefone"
-    />
-
-    <button className={styles.addBtn} onClick={addContato}>
-      +
-    </button>
-  </div>
-</section>
-
-  {/* EMAILS (mantido simples) */}
-  <section className={styles.card}>
-  <h3 className={styles.title}>📧 Emails</h3>
-
-  {/* LISTA */}
-  <div className={styles.list}>
-    {emails.map((e) => (
-      <EmailItem
-        key={e.id}
-        email={e}
-        setEmails={setEmails}
-        removeEmail={removeEmail}
-      />
-    ))}
-  </div>
-
-  {/* ADD EMAIL */}
-  <div className={styles.formBlock}>
-    <input
-      className={styles.input}
-      value={emailForm.email}
-      onChange={(ev) =>
-        setEmailForm({ ...emailForm, email: ev.target.value })
-      }
-      placeholder="Email"
-    />
-
-    <select
-      className={styles.select}
-      value={emailForm.tipo}
-      onChange={(e) =>
-        setEmailForm({
-          ...emailForm,
-          tipo: e.target.value as any,
-        })
-      }
-    >
-      <option value="GERAL">Geral</option>
-      <option value="COMERCIAL">Comercial</option>
-      <option value="FINANCEIRO">Financeiro</option>
-    </select>
-
-    <label className={styles.checkboxInline}>
-      <input
-        type="checkbox"
-        checked={emailForm.principal}
-        onChange={(e) =>
-          setEmailForm({
-            ...emailForm,
-            principal: e.target.checked,
-          })
-        }
-      />
-      Principal
-    </label>
-
-    <button className={styles.addBtn} onClick={addEmail}>
-      +
-    </button>
-  </div>
-</section>
-
-</div>
-        </div>
-
-        <div className={styles.actionsBar}>
-          {isDirty && <span className={styles.warning}>⚠️ Alterações não salvas</span>}
-
-          <button className={styles.saveBtn} onClick={handleSave} disabled={loading}>
-            {loading ? 'Salvando...' : 'Salvar alterações'}
-          </button>
-        </div>
-
-      </div>
-    );
-  };
-
-  export default GeralTab;
+export default GeralTab;

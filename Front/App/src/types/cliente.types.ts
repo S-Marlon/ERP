@@ -14,10 +14,12 @@ export type Money = number;
 // ENUMS
 // ======================================================================
 
+// Alinhado com o ENUM('PF', 'PJ') do Banco
 export enum TipoCliente {
-  PESSOA_FISICA = 'PESSOA_FISICA',
-  PESSOA_JURIDICA = 'PESSOA_JURIDICA',
+  PESSOA_FISICA = 'PF',
+  PESSOA_JURIDICA = 'PJ',
 }
+
 
 export enum StatusCredito {
   LIBERADO = 'LIBERADO',
@@ -48,12 +50,6 @@ export enum MetodoPagamento {
   TRANSFERENCIA = 'TRANSFERENCIA',
 }
 
-export enum TipoContato {
-  GERAL = 'GERAL',
-  FINANCEIRO = 'FINANCEIRO',
-  COMPRAS = 'COMPRAS',
-  COMERCIAL = 'COMERCIAL',
-}
 
 // ======================================================================
 // CRM / ANALYTICS
@@ -120,14 +116,30 @@ export interface Auditoria {
   deletado_em?: ISODateString;
 }
 
+export enum TipoEndereco {
+  FISCAL = 'FISCAL',
+  ENTREGA = 'ENTREGA',
+  COBRANCA = 'COBRANCA',
+  FILIAL = 'FILIAL',
+}
+
 export interface Endereco {
+  id?: number;
+
+  tipo: TipoEndereco;
+
+  principal?: boolean;
+
   logradouro: string;
   numero?: string;
   complemento?: string;
+
   bairro: string;
   cidade: string;
   estado: string;
+
   cep: string;
+
   pais?: string;
   referencia?: string;
 }
@@ -135,6 +147,26 @@ export interface Endereco {
 // ======================================================================
 // INTERFACE PRINCIPAL CLIENTE
 // ======================================================================
+
+
+export interface Cliente {
+  id_cliente: number;
+
+  nome_razao: string;
+  nome_fantasia?: string;
+
+  cpf_cnpj: string;
+
+  tipo_cliente: TipoCliente;
+
+  status_cliente: StatusCliente;
+
+  aceita_marketing: boolean;
+
+  created_at: ISODateString;
+  updated_at?: ISODateString;
+}
+
 
 export interface Cliente extends Auditoria {
   id_cliente: number;
@@ -158,8 +190,11 @@ export interface Cliente extends Auditoria {
   telefone_principal?: string;
   whatsapp?: string;
 
-  // Endereço principal
-  endereco: Endereco;
+  // Endereço principal legado
+endereco?: Endereco;
+
+// Novo modelo
+enderecos?: Endereco[];
 
   // Crédito
   limite_credito: Money;
@@ -187,6 +222,20 @@ export interface Cliente extends Auditoria {
   aceita_marketing?: boolean;
   consentimento_dados_em?: ISODateString;
 
+
+
+
+
+  rg?: string;
+
+
+  indicador_ie?: IndicadorIE;
+
+  email_principal?: string;
+
+
+
+
   // Observações
 }
 
@@ -199,15 +248,29 @@ export interface ClienteContato extends Auditoria {
   id_cliente: number;
 
   nome: string;
+
   telefone: string;
 
   cargo?: string;
-  tipo?: TipoContato;
+
+  tipo_contato?: TipoContatoCliente;
+
+  tipo_telefone?: TipoTelefone;
+
+  principal?: boolean;
+
+  whatsapp?: boolean;
 }
 
 // ======================================================================
 // EMAILS
 // ======================================================================
+
+export enum TipoEmail {
+  PESSOAL = 'PESSOAL',
+  FINANCEIRO = 'FINANCEIRO',
+  COMERCIAL = 'COMERCIAL',
+}
 
 export interface ClienteEmail extends Auditoria {
   id: number;
@@ -218,7 +281,7 @@ export interface ClienteEmail extends Auditoria {
   principal: boolean;
   verificado?: boolean;
 
-  tipo?: TipoContato;
+tipo?: TipoEmail;
 }
 
 // ======================================================================
@@ -434,7 +497,8 @@ export interface ClienteFormData {
   telefone_principal?: string;
   whatsapp?: string;
 
-  endereco?: Partial<Endereco>;
+endereco?: Partial<Endereco>;
+enderecos?: Partial<Endereco>[];
 
   limite_credito?: Money;
   dia_vencimento?: number;
@@ -507,6 +571,24 @@ export enum PrioridadeObservacao {
   MEDIA = 'MEDIA',
   ALTA = 'ALTA',
   URGENTE = 'URGENTE',
+}
+
+
+
+
+export enum TipoContatoCliente {
+  GERAL = 'GERAL',
+  FINANCEIRO = 'FINANCEIRO',
+  COMPRAS = 'COMPRAS',
+  COMERCIAL = 'COMERCIAL',
+}
+
+
+export enum TipoTelefone {
+  CELULAR = 'CELULAR',
+  FIXO = 'FIXO',
+  WHATSAPP = 'WHATSAPP',
+  RECADO = 'RECADO',
 }
 
 
