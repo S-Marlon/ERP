@@ -704,6 +704,25 @@ const PDVContent: React.FC = () => {
                   <span className={styles.toggleLabel}>Em estoque</span>
                   <Switch checked={onlyInStock} onChange={() => setOnlyInStock(!onlyInStock)} />
                 </div>
+                
+                
+              <div className={styles.setores}>
+
+                <div className={styles.setor}>
+                  <span>CommercialSector :</span>
+                  <div className={styles.quickChips}>
+                    {['Todos','🔧 Oficina ', '🚜 Agrícola ', '🏭 Indústria', '⚙️ Hidráulica', ' 🌾 Irrigação'].map(setor => (
+                      <button key={setor} onClick={() => setSelectedCategory(setor)}
+                        className={`${styles.miniChip} ${selectedCategory === setor ? styles.miniChipActive : ''}`}>
+                        {setor}
+                      </button>
+                    ))}
+                  </div>
+
+                </div>
+
+
+              </div>
 
 
               </div>

@@ -6,32 +6,22 @@ import {
 export interface ClienteEntity {
   id_cliente: number;
 
+  tipo_cliente:
+    | 'PESSOA_FISICA'
+    | 'PESSOA_JURIDICA';
+
   nome_razao: string;
-  nome_fantasia?: string;
 
-  cpf_cnpj?: string;
+  nome_fantasia?: string | null;
 
-  inscricao_estadual?: string;
-  inscricao_municipal?: string;
+  cpf_cnpj: string;
 
-  tipo_cliente: TipoCliente;
+  status_cliente: string;
 
-  segmento?: string;
+  cidade?: string | null;
+  estado?: string | null;
 
-  status_cliente: StatusCliente;
-  motivo_status?: string;
-
-  aceita_marketing: boolean;
-
-  consentimento_dados_em?: string;
-
-  ultima_compra?: string;
-
-  criado_em: string;
-
-  created_at: string;
-  updated_at?: string;
-
-  deleted_at?: string;
+  email?: string | null;
+  telefone?: string | null;
 }
 

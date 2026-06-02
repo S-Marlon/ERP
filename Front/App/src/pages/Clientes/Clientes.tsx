@@ -82,13 +82,6 @@ const [emails, setEmails] =
   }
 };
 
-const getEnderecoPrincipal = (
-  cliente: ClienteAggregate | ClienteEntity
-) => {
-  return cliente.enderecos?.find(
-    (e) => e.principal
-  );
-};
 
 
   // =========================
@@ -166,7 +159,9 @@ const getEnderecoPrincipal = (
         error
       );
 
-      atualizarClienteAtivoCompleto(c);
+      atualizarClienteAtivoCompleto(
+  c as ClienteAggregate
+);
     } finally {
       setLoading(false);
     }
@@ -312,41 +307,41 @@ const getEnderecoPrincipal = (
 
         {/* LISTA */}
         <ul className="lista-clientes">
-          {clientesFiltrados.length === 0 &&
-          !loading ? (
-            <li className="sem-resultados">
-              Nenhum cliente encontrado
-            </li>
-          ) : (
-            clientesFiltrados.map((c) => (
-              <li
-                key={c.id_cliente}
-                className={
-                  cliente?.id_cliente ===
-                  c.id_cliente
-                    ? 'active'
-                    : ''
-                }
-                onClick={() =>
-                  handleSelecionarCliente(c)
-                }
-              >
-                <strong>
-                  {c.nome_razao}
-                </strong>
+  {clientesFiltrados.length === 0 &&
+  !loading ? (
+    <li className="sem-resultados">
+      Nenhum cliente encontrado
+    </li>
+  ) : (
+    clientesFiltrados.map((c) => (
+      <li
+        key={c.id_cliente}
+        className={
+          cliente?.id_cliente ===
+          c.id_cliente
+            ? 'active'
+            : ''
+        }
+        onClick={() =>
+          handleSelecionarCliente(c)
+        }
+      >
+        <strong>
+          {c.nome_razao}
+        </strong>
 
-                <div>{c.cpf_cnpj}</div>
-<small>
-  {getEnderecoPrincipal(c)?.cidade ||
-    'Cidade não informadas'}
-  {' - '}
-  {getEnderecoPrincipal(c)?.estado ||
-    'UF'}
-</small>
-              </li>
-            ))
-          )}
-        </ul>
+        <div>{c.cpf_cnpj}</div>
+
+        <small>
+          {c.cidade ||
+            'Cidade não informada'}
+          {' - '}
+          {c.estado || 'UF'}
+        </small>
+      </li>
+    ))
+  )}
+</ul>
       </aside>
 
       {/* MAIN */}

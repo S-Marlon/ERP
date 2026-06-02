@@ -9,10 +9,21 @@ import { processStockMovement, STOCK_ORIGINS, recalculateStockForProduct, getCur
 
 import clientesRoutes from '../Clientes/cliente.routes';
 
+import lojaClientesHistoricoRoutes
+from '../Loja/loja_clientes_historico.routes';
+
+
+
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use('/api/clientes', clientesRoutes);
+
+
+app.use(
+  '/api/loja',
+  lojaClientesHistoricoRoutes
+);
 
 const PORT = 3001;
 

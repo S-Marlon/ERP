@@ -348,297 +348,183 @@ const GeralTab: React.FC<GeralTabProps> = ({
         <div className={styles.col}>
 
           {/* 1. IDENTIFICAÇÃO E PERFIL */}
-          <section className={styles.card}>
+      <section className={styles.card}>
+  <h3 className={styles.title}>👤 Identificação e Perfil</h3>
 
-            <h3 className={styles.title}>👤 Identificação e Perfil</h3>
-
-            <div className={styles.grid3}>
-              <div className={styles.inputWrapper}>
-                <label className={styles.fieldLabel}>
-                  Tipo
-                </label>
-
-                ```
-                <select
-                  className={styles.select}
-                  value={formData.tipo_cliente || ''}
-                  onChange={(e) =>
-                    updateField(
-                      'tipo_cliente',
-                      e.target.value as TipoCliente
-                    )
-                  }
-                >
-                  <option value={TipoCliente.PESSOA_FISICA}>
-                    👤 Pessoa Física
-                  </option>
-
-                  <option value={TipoCliente.PESSOA_JURIDICA}>
-                    🏢 Pessoa Jurídica
-                  </option>
-                </select>
-                ```
-
-              </div>
-
-              <div className={styles.inputWrapper}>
-                <label className={styles.fieldLabel}>
-                  Segmento
-                </label>
-
-                ```
-                <select
-                  className={styles.select}
-                  value={formData.segmento || ''}
-                  onChange={(e) =>
-                    updateField('segmento', e.target.value)
-                  }
-                >
-                  <option value="">
-                    Selecione
-                  </option>
-
-                  <option value="VAREJO">
-                    🛒 Varejo
-                  </option>
-
-                  <option value="DISTRIBUIDOR">
-                    📦 Distribuidor
-                  </option>
-
-                  <option value="INDUSTRIA">
-                    🏭 Indústria
-                  </option>
-
-                  <option value="SERVICOS">
-                    🧰 Serviços
-                  </option>
-
-                  <option value="ATACADO">
-                    🚚 Atacado
-                  </option>
-                </select>
-                ```
-
-              </div>
-
-              <div className={styles.inputWrapper}>
-                <label className={styles.fieldLabel}>
-                  Status
-                </label>
-
-                ```
-                <select
-                  className={styles.select}
-                  value={formData.status_cliente || ''}
-                  onChange={(e) =>
-                    updateField(
-                      'status_cliente',
-                      e.target.value as StatusCliente
-                    )
-                  }
-                >
-                  <option value={StatusCliente.ATIVO}>
-                    🟢 Ativo
-                  </option>
-
-                  <option value={StatusCliente.INATIVO}>
-                    ⚫ Inativo
-                  </option>
-
-                  <option value={StatusCliente.BLOQUEADO}>
-                    🔴 Bloqueado
-                  </option>
-                </select>
-                ```
-
-              </div>
-            </div>
-
-
-            <div className={styles.inputWrapper}>
-              <label className={styles.fieldLabel}>Razão Social / Nome Completo *</label>
-              <input
-                className={styles.input}
-                value={formData.nome_razao || ''}
-                onChange={e => updateField('nome_razao', e.target.value)}
-                placeholder="Razão Social ou Nome Completo"
-              />
-            </div>
-
-            {formData.tipo_cliente === TipoCliente.PESSOA_JURIDICA && (
-              <div className={styles.inputWrapper}>
-                <label className={styles.fieldLabel}>Nome Fantasia</label>
-                <input
-                  className={styles.input}
-                  value={formData.nome_fantasia || ''}
-                  onChange={e => updateField('nome_fantasia', e.target.value)}
-                  placeholder="Nome Fantasia da Empresa"
-                />
-              </div>
-            )}
-
-            <div className={styles.grid2}>
-              <div className={styles.inputWrapper}>
-                <label className={styles.fieldLabel}>CPF / CNPJ *</label>
-                <input
-                  className={styles.input}
-                  value={formData.cpf_cnpj || ''}
-                  onChange={e => updateField('cpf_cnpj', mascaraDocumento(e.target.value))}
-                  placeholder="Documento oficial"
-                />
-              </div>
-
-            </div>
-
-
-{formData.tipo_cliente === TipoCliente.PESSOA_JURIDICA && (
-  <div className={styles.grid2}>
+  {/* =========================
+      RESUMO GERAL
+  ========================= */}
+  <div className={styles.grid3}>
     <div className={styles.inputWrapper}>
-      <label className={styles.fieldLabel}>
-        Inscrição Estadual
-      </label>
-
-      <input
-        className={styles.input}
-        value={formData.inscricao_estadual || ''}
-        onChange={e =>
-          updateField('inscricao_estadual', e.target.value)
-        }
-        placeholder="IE"
-      />
+      <label className={styles.fieldLabel}>Tipo de Cliente</label>
+      <div className={styles.readonlyValue}>
+        {formData.tipo_cliente === 'PESSOA_FISICA'
+          ? '👤 Pessoa Física'
+          : '🏢 Pessoa Jurídica'}
+      </div>
     </div>
 
     <div className={styles.inputWrapper}>
-      <label className={styles.fieldLabel}>
-        Inscrição Municipal
-      </label>
+      <label className={styles.fieldLabel}>Status</label>
+      <div className={styles.readonlyValue}>
+        {formData.status_cliente === StatusCliente.ATIVO
+          ? '🟢 Ativo'
+          : formData.status_cliente === StatusCliente.INATIVO
+          ? '⚫ Inativo'
+          : '🔴 Bloqueado'}
+      </div>
+    </div>
 
-      <input
-        className={styles.input}
-        value={formData.inscricao_municipal || ''}
-        onChange={e =>
-          updateField('inscricao_municipal', e.target.value)
-        }
-        placeholder="IM"
-      />
+    <div className={styles.inputWrapper}>
+      <label className={styles.fieldLabel}>Segmento</label>
+      <div className={styles.readonlyValue}>
+        {formData.segmento || 'Não informado'}
+      </div>
     </div>
   </div>
-)}
 
-<div className={styles.inputWrapper}>
-  <label className={styles.fieldLabel}>
-    Observações
-  </label>
+  {/* =========================
+      IDENTIDADE PRINCIPAL
+  ========================= */}
+  <div className={styles.grid3}>
+    <div className={styles.inputWrapper}>
+      <label className={styles.fieldLabel}>
+        {formData.tipo_cliente === 'PESSOA_FISICA'
+          ? 'Nome Completo'
+          : 'Razão Social'}
+      </label>
+      <div className={styles.readonlyValue}>
+        {formData.nome_razao || formData.razao_social || '-'}
+      </div>
+    </div>
 
-  <textarea
-    className={styles.textarea}
-    value={formData.observacoes || ''}
-    onChange={e =>
-      updateField('observacoes', e.target.value)
-    }
-    placeholder="Informações rápidas do cliente..."
-  />
-</div>
+    <div className={styles.inputWrapper}>
+      <label className={styles.fieldLabel}>Código Cliente</label>
+      <div className={styles.readonlyValue}>
+        {formData.id_cliente || '-'}
+      </div>
+    </div>
 
+    <div className={styles.inputWrapper}>
+      <label className={styles.fieldLabel}>
+        {formData.tipo_cliente === 'PESSOA_FISICA' ? 'CPF' : 'CNPJ'}
+      </label>
+      <div className={styles.readonlyValue}>
+        {formData.cpf_cnpj || '-'}
+      </div>
+    </div>
+  </div>
 
-<div className={styles.badges}>
-  <span className={styles.badgeA}>
-    Classe {formData.classificacao}
-  </span>
+  {/* =========================
+      PF - DADOS PESSOAIS
+  ========================= */}
+  {formData.tipo_cliente === 'PESSOA_FISICA' && (
+    <div className={styles.grid3}>
+      <div className={styles.inputWrapper}>
+        <label className={styles.fieldLabel}>RG</label>
+        <div className={styles.readonlyValue}>
+          {formData.rg_ie || '-'}
+        </div>
+      </div>
 
-  <span className={styles.badgeCredito}>
-    {formData.status_credito}
-  </span>
-</div>
+      <div className={styles.inputWrapper}>
+        <label className={styles.fieldLabel}>Data de Nascimento</label>
+        <div className={styles.readonlyValue}>
+          {formData.data_nascimento
+            ? new Date(formData.data_nascimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' })
+            : '-'}
+        </div>
+      </div>
 
-<div className={styles.inputWrapper}>
-  <label className={styles.fieldLabel}>
-    Cliente desde
-  </label>
+      <div className={styles.inputWrapper}>
+        <label className={styles.fieldLabel}>Gênero</label>
+        <div className={styles.readonlyValue}>
+          {formData.genero || '-'}
+        </div>
+      </div>
+    </div>
+  )}
 
-  <input
-    className={styles.input}
-    readOnly
-    value={
-      formData.criado_em
-        ? new Date(formData.criado_em).toLocaleDateString()
-        : ''
-    }
-  />
-</div>
+  {/* =========================
+      PJ - DADOS EMPRESARIAIS E FISCAIS
+  ========================= */}
+  {formData.tipo_cliente === 'PESSOA_JURIDICA' && (
+    <>
+      <div className={styles.grid3}>
+        <div className={styles.inputWrapper}>
+          <label className={styles.fieldLabel}>Nome Fantasia</label>
+          <div className={styles.readonlyValue}>
+            {formData.nome_fantasia || '-'}
+          </div>
+        </div>
 
-<div className={styles.inputWrapper}>
-  <label className={styles.fieldLabel}>
-    Última compra
-  </label>
+      
 
-  <input
-    className={styles.input}
-    readOnly
-    value={
-      formData.ultima_compra
-        ? new Date(formData.ultima_compra).toLocaleDateString()
-        : 'Sem compras'
-    }
-  />
-</div>
+      <div className={styles.grid3}>
+        <div className={styles.inputWrapper}>
+          <label className={styles.fieldLabel}>Última Atualização</label>
+          <div className={styles.readonlyValue}>
+            {formData.updated_at
+              ? new Date(formData.updated_at).toLocaleDateString('pt-BR')
+              : '-'}
+          </div>
+        </div>
 
-<label className={styles.checkbox}>
-  <input
-    type="checkbox"
-    checked={!!formData.aceita_marketing}
-    onChange={e =>
-      updateField(
-        'aceita_marketing',
-        e.target.checked
-      )
-    }
-  />
+          <div className={styles.inputWrapper}>
+          <label className={styles.fieldLabel}>Inscrição Estadual</label>
+          <div className={styles.readonlyValue}>
+            {formData.inscricao_estadual || formData.rg_ie || '-'}
+          </div>
+        </div>
 
-  Aceita comunicações e marketing
-</label>
+        <div className={styles.inputWrapper}>
+          <label className={styles.fieldLabel}>Inscrição Municipal</label>
+          <div className={styles.readonlyValue}>
+            {formData.inscricao_municipal || '-'}
+          </div>
+        </div>
+      </div>
+      </div>
+    </>
+  )}
 
-// Fiscal
-inscricao_estadual?: string;
-inscricao_municipal?: string;
-indicador_ie?: 'CONTRIBUINTE' | 'ISENTO' | 'NAO_CONTRIBUINTE';
+  {/* =========================
+      RELACIONAMENTO
+  ========================= */}
+  <div className={styles.grid2}>
+    <div className={styles.inputWrapper}>
+      <label className={styles.fieldLabel}>Marketing</label>
+      <div className={styles.readonlyValue}>
+        {formData.aceita_marketing
+          ? '✅ Aceita comunicações'
+          : '❌ Não aceita'}
+      </div>
+    </div>
 
-// Jurídico
-suframa?: string;
-
-// Pessoa Física
-rg?: string;
-orgao_emissor?: string;
-data_nascimento?: string;
-
-// Empresa
-data_fundacao?: string;
-
-<select>
-  <option>Contribuinte ICMS</option>
-  <option>Isento</option>
-  <option>Não contribuinte</option>
-</select>
-
-
-          </section>
+    <div className={styles.inputWrapper}>
+      <label className={styles.fieldLabel}>Contribuinte ICMS</label>
+      <div className={styles.readonlyValue}>
+        {formData.contribuinte_icms || 'Não informado'}
+      </div>
+    </div>
+  </div>
+</section>
 
 
 
 
           {/* 3. ENDEREÇO PRINCIPAL */}
-<EnderecosSection
+          <EnderecosSection
             enderecos={formData.enderecos || []}
             setEnderecos={(updater) =>
-  setFormData(prev => ({
-    ...prev,
-    enderecos:
-      typeof updater === 'function'
-        ? updater(prev.enderecos || [])
-        : updater,
-  }))
-}
+              setFormData(prev => ({
+                ...prev,
+                enderecos:
+                  typeof updater === 'function'
+                    ? updater(prev.enderecos || [])
+                    : updater,
+              }))
+            }
             enderecoForm={enderecoForm}
             setEnderecoForm={setEnderecoForm}
             addEndereco={addEndereco}
@@ -649,90 +535,19 @@ data_fundacao?: string;
           />
 
 
-          {/* 4. CONFIGURAÇÕES COMERCIAIS E FINANCEIRAS */}
-          <section className={styles.card}>
-            <h3 className={styles.title}>📈 Classificação Comercial & Crédito</h3>
-            <div className={styles.grid2}>
-              <div className={styles.inputWrapper}>
-                <label className={styles.fieldLabel}>Classificação ABC</label>
-                <select
-                  className={styles.select}
-                  value={formData.classificacao || ''}
-                  onChange={e => updateField('classificacao', e.target.value as ClassificacaoCliente)}
-                >
-                  <option value="">Não Definida</option>
-                  <option value={ClassificacaoCliente.A}>Classe A (Alto Valor)</option>
-                  <option value={ClassificacaoCliente.B}>Classe B (Médio Valor)</option>
-                  <option value={ClassificacaoCliente.C}>Classe C (Baixo Valor)</option>
-                </select>
-              </div>
+          {/* 4. Historico de Eventos */}
 
-              <div className={styles.inputWrapper}>
-                <label className={styles.fieldLabel}>Potencial do Cliente</label>
-                <select
-                  className={styles.select}
-                  value={formData.potencial || ''}
-                  onChange={e => updateField('potencial', e.target.value as PotencialCliente)}
-                >
-                  <option value="">Não Definido</option>
-                  <option value={PotencialCliente.BAIXO}>Baixo</option>
-                  <option value={PotencialCliente.MEDIO}>Médio</option>
-                  <option value={PotencialCliente.ALTO}>Alto</option>
-                  <option value={PotencialCliente.ESTRATEGICO}>Estratégico</option>
-                </select>
-              </div>
-            </div>
+          <div className={styles.card}>
+            <h3 className={styles.title}> 📜 Historico de Eventos</h3>
 
-            <div className={styles.grid2} style={{ marginTop: '12px' }}>
-              <div className={styles.inputWrapper}>
-                <label className={styles.fieldLabel}>Limite de Crédito (R$)</label>
-                <input
-                  className={styles.input}
-                  type="number"
-                  value={formData.limite_credito ?? 0}
-                  onChange={e => updateField('limite_credito', Number(e.target.value))}
-                />
-              </div>
+          </div>
 
-              <div className={styles.inputWrapper}>
-                <label className={styles.fieldLabel}>Melhor Dia Vencimento</label>
-                <input
-                  className={styles.input}
-                  type="number"
-                  min={1}
-                  max={31}
-                  value={formData.dia_vencimento ?? 1}
-                  onChange={e => updateField('dia_vencimento', Number(e.target.value))}
-                />
-              </div>
-            </div>
+          {/* 5. Documentos e Anexos */}
 
-            <div className={styles.grid2}>
-              <div className={styles.inputWrapper}>
-                <label className={styles.fieldLabel}>Status de Risco de Crédito</label>
-                <select
-                  className={styles.select}
-                  value={formData.status_credito || ''}
-                  onChange={e => updateField('status_credito', e.target.value as StatusCredito)}
-                >
-                  <option value={StatusCredito.ANALISE}>Análise</option>
-                  <option value={StatusCredito.APROVADO}>Aprovado</option>
-                  <option value={StatusCredito.RECUSADO}>Recusado</option>
-                  <option value={StatusCredito.SUSPENSO}>Suspenso</option>
-                </select>
-              </div>
+          <div className={styles.card}>
+            <h3 className={styles.title}>📄 Documentos e Anexos</h3>
 
-              <div className={styles.inputWrapper}>
-                <label className={styles.fieldLabel}>Saldo Devedor Atual</label>
-                <input
-                  className={styles.input}
-                  type="number"
-                  value={formData.saldo_devedor_atual ?? 1}
-                  style={{ backgroundColor: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' }}
-                />
-              </div>
-            </div>
-          </section>
+          </div>
         </div>
 
         {/* COLUNA DIREITA: RELACIONAMENTOS (CONTATOS E EMAILS ADICIONAIS) */}

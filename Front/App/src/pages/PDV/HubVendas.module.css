@@ -24,17 +24,21 @@
 
 .headerLeft {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
 }
 
 .title {
-  font-size: 20px;
+  font-size: 28px;
   font-weight: 600;
 }
 
 .subtitle {
-  font-size: 13px;
+  font-size: 12px;
   color: #9ca3af;
+  font-style: italic;
+
 }
 
 .headerRight {
@@ -245,18 +249,18 @@
 /* ================= CARDS ================= */
 .cardsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 12px;
 }
 
 .card {
   background: #1a1d23;
   border-radius: 12px;
-  padding: 14px;
+  padding: 12px;
   border: 1px solid rgba(255,255,255,0.05);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   transition: 0.2s;
 }
 
@@ -265,12 +269,7 @@
   transform: translateY(-1px);
 }
 
-/* HEADER */
-.cardHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
+
 
 .cardTitleSection {
   display: flex;
@@ -278,15 +277,9 @@
   gap: 4px;
 }
 
-.cardTitle {
-  font-size: 15px;
-  font-weight: 600;
-}
 
-.cardDate {
-  font-size: 12px;
-  color: #9ca3af;
-}
+
+
 
 /* BODY */
 .cardBody {
@@ -348,22 +341,38 @@
   border: 1px solid rgba(239, 68, 68, 0.15);
 }
 
-.progressContainer {
-  margin-top: 8px;
-  padding: 8px;
+
+
+
+
+/* ================= FINANCIAL & PROGRESS UNIFIED (COMPACT) ================= */
+.cardFinancialCompact {
   background: #12151b;
+  padding: 8px 10px;
   border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  margin-top: auto;
 }
 
-.progressLabel {
+.finProgressLabel {
   display: flex;
   justify-content: space-between;
-  font-size: 12px;
-  color: #9ca3af;
-  margin-bottom: 6px;
+  font-size: 11px; /* Um pouco menor para caber os valores lado a lado */
 }
 
-.progressBar {
+.finProgressLeft {
+  color: #10b981; /* Verde do Pago */
+}
+
+.finProgressRight {
+  color: #f59e0b; /* Laranja do A receber */
+}
+
+.finProgressBar {
   width: 100%;
   height: 6px;
   background: #2a2f38;
@@ -371,8 +380,217 @@
   overflow: hidden;
 }
 
-.progressFill {
+.finProgressFill {
   height: 100%;
-  background: linear-gradient(90deg, #3b82f6, #10b981);
+  background: #10b981; /* Sólido verde para combinar com o texto "pago" */
   transition: width 0.3s ease;
+}
+
+.finTotalRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #9ca3af;
+  border-top: 1px solid rgba(255, 255, 255, 0.03);
+  padding-top: 4px;
+  margin-top: 2px;
+}
+
+.finTotalRow strong {
+  color: #e6e6e6;
+}
+
+
+/* ================= CARD HEADER MODERNO E COMPACTO ================= */
+.cardHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 4px; /* Espaçamento mínimo entre a linha 1 e a linha 2 */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03); /* Linha sutil divisória opcional */
+  padding-bottom: 6px;
+}
+
+/* Linha 1: Cliente à esquerda, Tempo à direita */
+.cardHeaderTopRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.cardTitle {
+  font-size: 14px; /* Levemente reduzido para evitar quebras agressivas */
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; /* Se o nome do cliente for gigante, não quebra o card */
+  flex: 1;
+}
+
+.cardDate {
+  font-size: 11px;
+  color: #9ca3af;
+  white-space: nowrap; /* Garante que o tempo fique sempre em uma linha só */
+  margin-top: 2px;
+}
+
+/* Linha 2: Vendedor e Badges lado a lado */
+.cardHeaderMetaRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap; /* Caso a tela diminua muito, eles quebram elegantemente */
+}
+
+
+
+.cardCustomer span {
+  color: #9ca3af; /* Deixa o texto "Vendedor:" mais discreto que o nome dele */
+}
+
+.cardBadges {
+  display: flex;
+  gap: 4px;
+}
+
+
+
+
+
+/* card body: */
+
+/* ================= CARD BODY (MINI SEÇÃO DE ITENS) ================= */
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+/* Topo da seção do corpo */
+.bodyHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.bodyTitle {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6b7280; /* Texto mais discreto estilo "label" */
+  font-weight: 600;
+}
+
+.itemCountBadge {
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #9ca3af;
+}
+
+/* Lista de Itens */
+.itemList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.itemRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #ddd;
+}
+
+.itemBullet {
+  color: #3b82f6; /* Bullet azul sutil para dar guia visual */
+  font-weight: bold;
+}
+
+.itemName {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+/* Linha indicativa de "ver mais" */
+.itemMoreRow {
+  font-size: 11px;
+  color: #9ca3af;
+  font-style: italic;
+  padding-left: 12px;
+}
+
+/* Rodapé do corpo: Informações Extras (ex: Condição de pagamento) */
+.bodyFooterInfo {
+  display: flex;
+  gap: 4px;
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 4px 6px;
+  border-radius: 4px;
+  border: 1px dashed rgba(255, 255, 255, 0.04);
+  align-self: flex-start; /* Não estica horizontalmente se não precisar */
+}
+
+.infoLabel {
+  color: #9ca3af;
+}
+
+.infoValue {
+  color: #e6e6e6;
+  font-weight: 500;
+}
+
+
+/* Vendedor em estado normal (você já tem essa) */
+.cardCustomer {
+  font-size: 11px;
+  color: #ddd;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cardCustomer span {
+  color: #9ca3af;
+}
+
+/* NOVO: Quando o card estiver sendo editado por outro */
+.cardCustomerLocked {
+  color: #f59e0b; /* Cor de alerta/atenção (laranja) */
+  background: rgba(245, 158, 11, 0.1); /* Um fundo sutil de alerta */
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(245, 158, 11, 0.15);
+}
+
+.cardCustomerLocked span {
+  color: #fcd34d; /* Label do "Editando:" um pouco mais clara */
+}
+
+.cardCustomerLocked strong {
+  color: #fff; /* Nome de quem edita em destaque */
+}
+
+.lockIcon {
+  font-size: 11px;
+  animation: pulse 2s infinite; /* Efeito opcional para chamar atenção sutilmente */
+}
+
+/* Animação simples de pulso para o cadeado */
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
 }

@@ -232,14 +232,14 @@ const HubVendas: React.FC<HubVendasProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<'all' | VendaType>('all');
   const [viewMode, setViewMode] = useState<'list' | 'cards'>('cards');
-  
+
 
   /**
    * HANDLERS (com fallback real)
    */
   const handleCreate = () => {
     onCreateVenda?.();
-  window.location.href = 'vendas/pdv';
+    window.location.href = 'vendas/pdv';
   };
 
   const handleOpen = (id: number) => {
@@ -302,8 +302,43 @@ const HubVendas: React.FC<HubVendasProps> = ({
 
           <div className={styles.headerLeft}>
             <h1 className={styles.title}>💰 Hub de Vendas</h1>
-            <p className={styles.subtitle}>Gerenciamento de vendas PDV e OS</p>
+            <p className={styles.subtitle}>
+
+            Gerenciamento de vendas PDV e OS
+            </p>
           </div>
+
+          
+
+      <div className={styles.statsBar}>
+
+        <div className={styles.statCard}>
+          <span className={styles.statLabel}>Vendas</span>
+          <strong className={styles.statValue}>{stats.total}</strong>
+        </div>
+
+        <div className={styles.statCard}>
+          <span className={styles.statLabel}>Valor Total</span>
+          <strong className={styles.statValue}>
+            {money.format(stats.totalValue)}
+          </strong>
+        </div>
+
+        <div className={styles.statCard}>
+          <span className={styles.statLabel}>Pago</span>
+          <strong className={styles.statValue} style={{ color: '#10b981' }}>
+            {money.format(stats.paid)}
+          </strong>
+        </div>
+
+        <div className={styles.statCard}>
+          <span className={styles.statLabel}>A Receber</span>
+          <strong className={styles.statValue} style={{ color: '#f59e0b' }}>
+            {money.format(stats.remaining)}
+          </strong>
+        </div>
+
+      </div>
 
           <div className={styles.headerRight}>
             <Button variant="primary" onClick={handleCreate}>
@@ -365,169 +400,170 @@ const HubVendas: React.FC<HubVendasProps> = ({
 
       </div>
 
-      {/* STATS BAR (AGORA CORRETO) */}
-      <div className={styles.statsBar}>
-
-        <div className={styles.statCard}>
-          <span className={styles.statLabel}>Vendas</span>
-          <strong className={styles.statValue}>{stats.total}</strong>
-        </div>
-
-        <div className={styles.statCard}>
-          <span className={styles.statLabel}>Valor Total</span>
-          <strong className={styles.statValue}>
-            {money.format(stats.totalValue)}
-          </strong>
-        </div>
-
-        <div className={styles.statCard}>
-          <span className={styles.statLabel}>Pago</span>
-          <strong className={styles.statValue} style={{ color: '#10b981' }}>
-            {money.format(stats.paid)}
-          </strong>
-        </div>
-
-        <div className={styles.statCard}>
-          <span className={styles.statLabel}>A Receber</span>
-          <strong className={styles.statValue} style={{ color: '#f59e0b' }}>
-            {money.format(stats.remaining)}
-          </strong>
-        </div>
-
-      </div>
+      
 
       {/* CONTENT */}
       <main className={styles.contentArea}>
 
         {filteredVendas.length === 0 ? (
-  <div className={styles.emptyState}>
-    Nenhuma venda encontrada
-  </div>
-) : viewMode === 'cards' ? (
+          <div className={styles.emptyState}>
+            Nenhuma venda encontrada
+          </div>
+        ) : viewMode === 'cards' ? (
 
-  <div className={styles.cardsGrid}>
-    {filteredVendas.map(v => {
-      const minutes = getMinutesAgo(v.ultimaAlteracao);
+          <div className={styles.cardsGrid}>
+            {filteredVendas.map(v => {
+              const minutes = getMinutesAgo(v.ultimaAlteracao);
 
-      return (
-        <div key={v.id} className={styles.card}>
+              return (
+                <div key={v.id} className={styles.card}>
 
-  {/* HEADER */}
-  <div className={styles.cardHeader}>
-    <div className={styles.cardTitleSection}>
-      <h3 className={styles.cardTitle}>
-        {v.cliente}
-      </h3>
+                  {/* HEADER REORGANIZADO E COMPACTO */}
+                  <div className={styles.cardHeader}>
+                    <div className={styles.cardHeaderTopRow}>
+                      <h3 className={styles.cardTitle} title={v.cliente}>
+                        {v.cliente}
+                      </h3>
+                      <small className={styles.cardDate}>
+                        {getMinutesAgo(v.ultimaAlteracao)} min atrás
+                      </small>
+                    </div>
 
-      <div style={{ display: 'flex', gap: 6 }}>
-        <Badge color={getVendaStatusColor(v.status)}>
-          {getStatusLabel(v.status)}
-        </Badge>
+                    <div className={styles.cardHeaderMetaRow}>
+                      {/* Linha do Vendedor dinâmica baseada no Lock State */}
+                      <p className={`${styles.cardCustomer} ${v.status === 'editando' ? styles.cardCustomerLocked : ''}`}>
+                        {v.status === 'editando' ? (
+                          <>
+                            <span className={styles.lockIcon}>🔒</span>
+                            <span>:</span> <strong>{v.editadoPor}</strong>
+                          </>
+                        ) : (
+                          <>
+                            <span>Vendedor:</span> {v.vendedor}
+                          </>
+                        )}
+                      </p>
 
-        <Badge>
-          {getTypeLabel(v.type)}
-        </Badge>
-      </div>
-    </div>
+                      Origens:
+OS #123
+Orçamento #55
+PDV
 
-    <small className={styles.cardDate}>
-      {getMinutesAgo(v.ultimaAlteracao)} min atrás
-    </small>
-  </div>
+                      <div className={styles.cardBadges}>
+                        <Badge color={getVendaStatusColor(v.status)}>
+                          {getStatusLabel(v.status)}
+                        </Badge>
+                        <Badge>
+                          {getTypeLabel(v.type)}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
 
-  {/* BODY */}
-  <div className={styles.cardBody}>
-    <p className={styles.cardCustomer}>
-      <strong>Vendedor:</strong> {v.vendedor}
-    </p>
+                  {/* CORPO DO CARD - MINI SEÇÃO DE ITENS E CONTEXTO */}
+                  <div className={styles.cardBody}>
 
-    <p className={styles.cardDescription}>
-      <strong>Itens:</strong> {v.itens.slice(0, 3).join(', ')}
-      {v.itens.length > 3 && '...'}
-    </p>
-  </div>
+                    {/* Cabeçalho da seção de itens com badge contador */}
+                    <div className={styles.bodyHeader}>
+                      <span className={styles.bodyTitle}>Resumo dos Itens</span>
+                      <span className={styles.itemCountBadge}>
+                        {v.itens.length} {v.itens.length === 1 ? 'item' : 'itens'}
+                      </span>
+                    </div>
 
-  {/* FINANCEIRO */}
-  <div className={styles.cardFinancial}>
+                    {/* Mini lista estilizada (máximo 3) */}
+                    <ul className={styles.itemList}>
+                      {v.itens.slice(0, 3).map((item: string, idx: number) => (
+                        <li key={idx} className={styles.itemRow} title={item}>
+                          <span className={styles.itemBullet}>•</span>
+                          <span className={styles.itemName}>{item}</span>
+                        </li>
+                      ))}
+                      {v.itens.length > 3 && (
+                        <li className={styles.itemMoreRow}>
+                          e mais {v.itens.length - 3} {v.itens.length - 3 === 1 ? 'item...' : 'itens...'}
+                        </li>
+                      )}
+                    </ul>
 
-    <div className={styles.finRow}>
-      <span>Total</span>
-      <strong>{money.format(v.valorTotal)}</strong>
-    </div>
+                    {/* Informação extra esquecida: Contexto Comercial (ex: Forma de Pgto) */}
+                    {v.formaPagamento && (
+                      <div className={styles.bodyFooterInfo}>
+                        <span className={styles.infoLabel}>Condição:</span>
+                        <span className={styles.infoValue}>{v.formaPagamento}</span>
+                      </div>
+                    )}
 
-    <div className={styles.finRow}>
-      <span>Estimado pago</span>
-      <strong style={{ color: '#10b981' }}>
-        {money.format(v.valorTotal * 0.6)}
-      </strong>
-    </div>
+                  </div>
 
-    <div className={styles.finRow}>
-      <span>A receber</span>
-      <strong style={{ color: '#f59e0b' }}>
-        {money.format(v.valorTotal * 0.4)}
-      </strong>
-    </div>
+                  {/* BLOCO FINANCEIRO INTEGRADO E COMPACTO */}
+                  <div className={styles.cardFinancialCompact}>
 
-  </div>
+                    {/* Valores do Progresso nas Extremidades */}
+                    <div className={styles.finProgressLabel}>
+                      <span className={styles.finProgressLeft}>
+                        <strong>60%</strong> Pago ({money.format(v.valorTotal * 0.6)})
+                      </span>
+                      <span className={styles.finProgressRight}>
+                        A receber ({money.format(v.valorTotal * 0.4)})
+                      </span>
+                    </div>
 
-  {/* PROGRESSO */}
-  <div className={styles.progressContainer}>
-    <div className={styles.progressLabel}>
-      <span>Pagamento</span>
-      <span>60%</span>
-    </div>
+                    {/* Barra de Progresso */}
+                    <div className={styles.finProgressBar}>
+                      <div
+                        className={styles.finProgressFill}
+                        style={{ width: '60%' }}
+                      />
+                    </div>
 
-    <div className={styles.progressBar}>
-      <div
-        className={styles.progressFill}
-        style={{ width: '60%' }}
-      />
-    </div>
-  </div>
+                    {/* Linha Fina do Total */}
+                    <div className={styles.finTotalRow}>
+                      <span>Total</span>
+                      <strong>{money.format(v.valorTotal)}</strong>
+                    </div>
 
-  {/* LOCK STATE */}
-  {v.status === 'editando' && (
-    <div className={styles.cardWarning}>
-      🔒 Em edição por {v.editadoPor}
-    </div>
-  )}
+                  </div>
 
-  {/* ACTIONS */}
-  <div className={styles.cardActions}>
-    <button
-      className={styles.cardActionBtn}
-      onClick={() => handleOpen(v.id)}
-    >
-      👁️ Abrir
-    </button>
 
-    <button
-      className={styles.cardActionBtn}
-      onClick={() => handleEdit(v.id)}
-    >
-      ✏️ Editar
-    </button>
+status: {v.status}
 
-    <button
-      className={styles.cardActionBtn}
-      onClick={() => handleCollectClick(v.id)}
-    >
-      💰 Cobrar
-    </button>
-  </div>
 
-</div>
-      );
-    })}
-  </div>
+                  {/* ACTIONS */}
+                  <div className={styles.cardActions}>
+                    <button
+                      className={styles.cardActionBtn}
+                      onClick={() => handleOpen(v.id)}
+                    >
+                      👁️ Abrir
+                    </button>
 
-) : (
+                    <button
+                      className={styles.cardActionBtn}
+                      onClick={() => handleEdit(v.id)}
+                    >
+                      ✏️ Editar
+                    </button>
+
+                    <button
+                      className={styles.cardActionBtn}
+                      onClick={() => handleCollectClick(v.id)}
+                    >
+                      💰 Cobrar
+                    </button>
+                  </div>
+
+                </div>
+              );
+            })}
+          </div>
+
+        ) : (
 
           <div className={styles.tableWrapper}>
             <table className={styles.table}>
               <thead>
-                 <tr>
+                <tr>
                   <th>#</th>
                   <th>Cliente</th>
                   <th>Status</th>
@@ -540,109 +576,109 @@ const HubVendas: React.FC<HubVendasProps> = ({
               </thead>
 
               <tbody>
-  {filteredVendas.map(v => {
-    const paid = v.valorTotal * 0.6; // mock consistente
-    const remaining = v.valorTotal - paid;
+                {filteredVendas.map(v => {
+                  const paid = v.valorTotal * 0.6; // mock consistente
+                  const remaining = v.valorTotal - paid;
 
-    return (
-      <tr key={v.id} className={styles.tableRow}>
-        
-        {/* ID */}
-        <td className={styles.osNumber}>
-          <strong>V-{String(v.id).padStart(4, '0')}</strong>
-        </td>
+                  return (
+                    <tr key={v.id} className={styles.tableRow}>
 
-        {/* Cliente */}
-        <td className={styles.customerName}>
-          {v.cliente}
-        </td>
+                      {/* ID */}
+                      <td className={styles.osNumber}>
+                        <strong>V-{String(v.id).padStart(4, '0')}</strong>
+                      </td>
 
-        {/* Status */}
-        <td className={styles.statusCell}>
-          <Badge>
-            {getStatusLabel(v.status)}
-          </Badge>
-        </td>
+                      {/* Cliente */}
+                      <td className={styles.customerName}>
+                        {v.cliente}
+                      </td>
 
-        {/* Data */}
-        <td className={styles.date}>
-          {v.ultimaAlteracao.toLocaleDateString('pt-BR')}
-        </td>
+                      {/* Status */}
+                      <td className={styles.statusCell}>
+                        <Badge>
+                          {getStatusLabel(v.status)}
+                        </Badge>
+                      </td>
 
-        {/* Total */}
-        <td className={styles.amount}>
-          {money.format(v.valorTotal)}
-        </td>
+                      {/* Data */}
+                      <td className={styles.date}>
+                        {v.ultimaAlteracao.toLocaleDateString('pt-BR')}
+                      </td>
 
-        {/* Pago */}
-        <td
-          className={styles.amount}
-          style={{ color: paid > 0 ? '#10b981' : '#999' }}
-        >
-          {money.format(paid)}
-        </td>
+                      {/* Total */}
+                      <td className={styles.amount}>
+                        {money.format(v.valorTotal)}
+                      </td>
 
-        {/* Restante */}
-        <td
-          className={styles.amount}
-          style={{ color: remaining > 0 ? '#f59e0b' : '#10b981' }}
-        >
-          {money.format(remaining)}
-        </td>
+                      {/* Pago */}
+                      <td
+                        className={styles.amount}
+                        style={{ color: paid > 0 ? '#10b981' : '#999' }}
+                      >
+                        {money.format(paid)}
+                      </td>
 
-        {/* Ações */}
-        <td className={styles.actionsCell}>
-          <div className={styles.actionButtons}>
+                      {/* Restante */}
+                      <td
+                        className={styles.amount}
+                        style={{ color: remaining > 0 ? '#f59e0b' : '#10b981' }}
+                      >
+                        {money.format(remaining)}
+                      </td>
 
-            <button
-              className={styles.actionBtn}
-              title="Visualizar"
-              onClick={() => handleOpen(v.id)}
-            >
-              👁️
-            </button>
+                      {/* Ações */}
+                      <td className={styles.actionsCell}>
+                        <div className={styles.actionButtons}>
 
-            <button
-              className={styles.actionBtn}
-              title="Editar"
-              onClick={() => handleEdit(v.id)}
-            >
-              ✏️
-            </button>
+                          <button
+                            className={styles.actionBtn}
+                            title="Visualizar"
+                            onClick={() => handleOpen(v.id)}
+                          >
+                            👁️
+                          </button>
 
-            <button
-              className={styles.actionBtn}
-              title="Cobrança"
-              onClick={() => handleCollectClick(v.id)}
-            >
-              💰
-            </button>
+                          <button
+                            className={styles.actionBtn}
+                            title="Editar"
+                            onClick={() => handleEdit(v.id)}
+                          >
+                            ✏️
+                          </button>
 
-            <button
-              className={styles.actionBtn}
-              title="Duplicar venda"
-              onClick={() => console.log('Duplicar', v.id)}
-            >
-              📄
-            </button>
+                          <button
+                            className={styles.actionBtn}
+                            title="Cobrança"
+                            onClick={() => handleCollectClick(v.id)}
+                          >
+                            💰
+                          </button>
 
-            {v.status !== 'editando' && (
-              <button
-                className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
-                title="Cancelar"
-                onClick={() => console.log('Cancelar', v.id)}
-              >
-                🗑️
-              </button>
-            )}
+                          <button
+                            className={styles.actionBtn}
+                            title="Duplicar venda"
+                            onClick={() => console.log('Duplicar', v.id)}
+                          >
+                            📄
+                          </button>
 
-          </div>
-        </td>
+                          {v.status !== 'editando' && (
+                            <button
+                              className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
+                              title="Cancelar"
+                              onClick={() => console.log('Cancelar', v.id)}
+                            >
+                              🗑️
+                            </button>
+                          )}
 
-      </tr>
-    );
-  })}
-</tbody>
+                        </div>
+                      </td>
+
+                    </tr>
+                  );
+                })}
+              </tbody>
             </table>
           </div>
 
