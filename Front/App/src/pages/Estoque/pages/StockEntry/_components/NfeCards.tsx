@@ -1,217 +1,241 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import FormControl from '../../../../../components/ui/FormControl/FormControl';
 import Typography from '../../../../../components/ui/Typography/Typography';
 import FlexGridContainer from '../../../../../components/Layout/FlexGridContainer/FlexGridContainer';
 import Card from '../../../../../components/ui/Card/Card';
 import Badge from '../../../../../components/ui/Badge/Badge';
+import Button from '../../../../../components/ui/Button/Button'; 
 import { buscarSiglaNoBanco } from '../../../api/productsApi';
 
-// --- Interface Atualizada conforme o novo nfeParser.ts ---
+import styles from './NfeCards.module.css';
+import { NfeDataFromXML } from '../../../utils/nfeParser';
+
 interface NfeCardsProps {
-    data: {
-        chaveAcesso: string;
-        numero: string;
-        serie: string;
-        dataEmissao: string;
-        emitente: {
-            cnpj: string;
-            nome: string;
-            nomeFantasia?: string;
-        };
-        totais: {
-            valorTotalProdutos: number;
-            valorTotalIpi: number;
-            valorTotalFrete: number;
-            valorOutrasDespesas: number;
-            valorTotalDesconto: number;
-            valorTotalIcms: number;
-            valorTotalIcmsST: number;
-            valorTotalIBS?: number; // Reforma 2026
-            valorTotalCBS?: number; // Reforma 2026
-            valorTotalNf: number;
-            valorTotalTributos: number;
-        };
-    };
+    data: NfeDataFromXML;
     supplierStatus: {
-        exists: boolean | null;
         isChecking: boolean;
+        exists: boolean | null;
     };
     actions: {
         onCreateSupplier: () => void;
-        formatCurrency: (value: number) => string;
     };
-    styles: any;
 }
 
+const formatarDataBR = (dataString?: string) => {
+    if (!dataString) return '-';
+    try {
+        const data = new Date(dataString);
+        return data.toLocaleDateString('pt-BR');
+    } catch {
+        return dataString.split('T')[0].split('-').reverse().join('/');
+    }
+};
 
+const formatarChaveAcesso = (chave: string) => {
+    return chave.replace(/(.{4})/g, '$1 ').trim();
+};
+
+// Helper para formatar moeda (R$)
+const formatarMoeda = (valor?: number) => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor || 0);
+};
 
 const NfeCards: React.FC<NfeCardsProps> = ({
     data,
     supplierStatus,
     actions,
-    styles,
 }) => {
-    const { formatCurrency } = actions;
-    const { totais, emitente } = data;
-
-        const [sigla, setSigla] = useState(""); // Aqui vai morar o "9AC5"
-
-
-
-        useEffect(() => {
-            if (emitente.cnpj) {
-                buscarSiglaNoBanco(emitente.cnpj).then(siglaRecebida => {
-                    console.log("Sigla recebida via POST:", siglaRecebida);
-                    setSigla(siglaRecebida);
-                });
-            }
-        }, [emitente.cnpj]);
+    const { emitente } = data;
+    const [sigla, setSigla] = useState("");
     
+    // Estados dos Modais
+    const [isNfDetailsOpen, setIsNfDetailsOpen] = useState(false);
+    const [isSupplierDetailsOpen, setIsSupplierDetailsOpen] = useState(false);
+    const [isLogisticsDetailsOpen, setIsLogisticsDetailsOpen] = useState(false); // 🟢 Novo estado
 
-    const siglaGerada = useMemo(() => {
-    if (!emitente?.nomeFantasia) return "";
-
-    return emitente.nomeFantasia
-        .normalize("NFD")                // Decompõe caracteres acentuados (ex: á -> a + ´)
-        .replace(/[\u0300-\u036f]/g, "") // Remove os acentos
-        .replace(/[^a-zA-Z0-9]/g, "")    // Remove tudo que não for letra ou número (caracteres especiais e espaços)
-        .substring(0, 10)                // Garante o máximo de 10 caracteres
-        .toUpperCase();                  // Padroniza em maiúsculas
-}, [emitente?.nomeFantasia]);
+    useEffect(() => {
+        if (emitente.cnpj) {
+            buscarSiglaNoBanco(emitente.cnpj).then(siglaRecebida => {
+                setSigla(siglaRecebida);
+            });
+        }
+    }, [emitente.cnpj]);
 
     return (
-        <FlexGridContainer layout="grid" template="1fr" gap="20px">
+        <FlexGridContainer layout="grid" template="1fr" gap="20px" className={styles.gridContainer}>
             
-            {/* 1. Identificação e Emitente (Cards Lado a Lado) */}
-            <FlexGridContainer layout="grid" template="1fr 1fr 1fr" gap="20px">
+            <FlexGridContainer layout="grid" template="3fr 3fr 2fr" gap="20px">
                 
-                {/* Identificação da NF */}
+                {/* CARD 1: Identificação da NF */}
                 <Card variant="default" padding="20px">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
+                    <div className={styles.headerCard}>
                         <Typography variant="h2">1. Identificação da NF</Typography>
-                        
+                        <button className={styles.infoIconButton} onClick={() => setIsNfDetailsOpen(true)} title="Ver detalhes da nota">ℹ️</button>
                     </div>
-
-                    <FlexGridContainer layout="grid" template="1fr 1fr 2fr" gap="10px">
+                    <FlexGridContainer layout="grid" template="1fr 1fr 1fr" gap="10px">
                         <FormControl label="Número" value={data.numero} readOnlyDisplay />
                         <FormControl label="Série" value={data.serie} readOnlyDisplay />
-                        <FormControl label="Emissão" value={new Date(data.dataEmissao).toLocaleDateString('pt-BR')} readOnlyDisplay />
+                        <FormControl label="Data de Emissão" value={formatarDataBR(data.dataEmissao)} readOnlyDisplay />
                     </FlexGridContainer>
-                    
-                    <div style={{ marginTop: 10 }}>
+                    <div className={styles.formGroupInline}>
                         <FormControl label="Chave de Acesso" value={data.chaveAcesso} readOnlyDisplay />
                     </div>
+                   
                 </Card>
 
-                {/* Emitente */}
+                {/* CARD 2: Emitente */}
                 <Card variant="default" padding="20px">
-                    <Typography variant="h2">2. Fornecedor (Emitente)</Typography>
-                    {supplierStatus.isChecking && <Badge color="paper">Verificando...</Badge>}
+                    <div className={styles.headerCard}>
+                        <Typography variant="h2">2. Fornecedor (Emitente)</Typography>
+                        <button className={styles.infoIconButton} onClick={() => setIsSupplierDetailsOpen(true)} title="Ver detalhes do fornecedor">ℹ️</button>
+                    </div>
+                    <div className={styles.badgeContainer}>
+                        {supplierStatus.isChecking && <Badge color="paper">Verificando...</Badge>}
                         {supplierStatus.exists === true && <Badge color="success">Fornecedor Ativo</Badge>}
                         {supplierStatus.exists === false && (
-                             <div style={{ display: 'flex', gap: 8 }}>
+                            <>
                                 <Badge color="warning">Não Cadastrado</Badge>
-                                <button onClick={actions.onCreateSupplier} style={styles.miniButton}>Criar</button>
-                             </div>
+                                <button className={styles.createButton} onClick={actions.onCreateSupplier}>Criar</button>
+                            </>
                         )}
-                    <div style={{ marginTop: 15 }}>
-                        <FlexGridContainer layout="grid" template="1fr 1fr" gap="10px">
+                    </div>
+                    <FlexGridContainer layout="grid" template="1fr 1fr" gap="10px">
                         <FormControl label="CNPJ" value={emitente.cnpj} readOnlyDisplay />
-                         <FormControl 
-    label="Sigla" 
-    // Priorizamos a sigla que veio do banco de dados (estado local)
-    // Se não houver, ele pode mostrar um placeholder ou vazio
-    value={sigla || emitente.sigla || "Buscando..."} 
+<FormControl 
+    label="Nome Fantasia" 
+    value={emitente.nomeFantasia || "Não Informado"} 
     readOnlyDisplay 
 />
+                    </FlexGridContainer>
+                    <FormControl label="Razão Social" value={emitente.nome} readOnlyDisplay />
+                </Card>
 
-                        </FlexGridContainer>
+                {/* CARD 3: Dados de Logística e Volumes */}
+                <Card variant="default" padding="20px">
+                    <div className={styles.headerCard}>
+                        <Typography variant="h2">3. Logística de Entrega</Typography>
+                        {/* 🟢 Adicionado botão de informação para o Card 3 */}
+                        <button 
+                            className={styles.infoIconButton} 
+                            onClick={() => setIsLogisticsDetailsOpen(true)}
+                            title="Ver resumo financeiro e tributário"
+                        >
+                            ℹ️
+                        </button>
+                    </div>
+                    <FlexGridContainer layout="grid" template="1fr 1fr" gap="10px">
                         <FormControl 
-                            label="Razão Social" 
-                            value={emitente.nome} 
+                            label="Qtd Volumes" 
+                            value={data.quantidadeVolumes !== undefined ? String(data.quantidadeVolumes) : "Não Informado"} 
                             readOnlyDisplay 
                         />
                         <FormControl 
-                            label="Nome Fantasia" 
-                            value={emitente.nomeFantasia || emitente.nome} 
+                            label="Peso Bruto (KG)" 
+                            value={data.pesoBruto !== undefined ? `${data.pesoBruto} kg` : "Não Informado"} 
                             readOnlyDisplay 
                         />
-
-                        
-                       
+                    </FlexGridContainer>
+                    <div className={styles.formGroupInline} style={{ marginTop: '10px' }}>
+                        <FormControl 
+                            label="Valor Total da Nota" 
+                            value={formatarMoeda(data.valorTotalNf)} 
+                            readOnlyDisplay 
+                        />
                     </div>
                 </Card>
-            
 
-            {/* 3. Totais Fiscais (Incluso Reforma 2026) */}
-            <Card variant="default" padding="20px">
-                <Typography variant="h2">3. Resumo Financeiro e Tributário</Typography>
+            </FlexGridContainer>
 
-                <FlexGridContainer layout="grid" template="1fr 1fr 1.2fr" gap="30px" style={{ marginTop: 20 }}>
-                    {/* Coluna 1: Base e Comerciais */}
-                    <div>
-                        <p style={styles.summaryItem}>
-                            <span style={styles.summaryLabel}>Total Produtos:</span>
-                            <span style={styles.summaryValue}>{formatCurrency(totais.valorTotalProdutos)}</span>
-                        </p>
-                        <p style={styles.summaryItem}>
-                            <span style={styles.summaryLabel}>Frete (+) :</span>
-                            <span style={styles.summaryValue}>{formatCurrency(totais.valorTotalFrete)}</span>
-                        </p>
-                        <p style={styles.summaryItem}>
-                            <span style={styles.summaryLabel}>Desconto (-) :</span>
-                            <span style={{...styles.summaryValue, color: '#10b981'}}>{formatCurrency(totais.valorTotalDesconto)}</span>
-                        </p>
-                        <p style={styles.summaryItem}>
-                            <span style={styles.summaryLabel}>Outras Despesas:</span>
-                            <span style={styles.summaryValue}>{formatCurrency(totais.valorOutrasDespesas)}</span>
-                        </p>
-                    </div>
-
-                    {/* Coluna 2: Impostos (Transição 2026) */}
-                    <div style={{ borderLeft: '1px solid #eee', paddingLeft: 20 }}>
-                        <p style={styles.summaryItem}>
-                            <span style={styles.summaryLabel}>IPI:</span>
-                            <span style={styles.summaryValue}>{formatCurrency(totais.valorTotalIpi)}</span>
-                        </p>
-                        <p style={styles.summaryItem}>
-                            <span style={styles.summaryLabel}>ICMS + ST:</span>
-                            <span style={styles.summaryValue}>{formatCurrency(totais.valorTotalIcms + totais.valorTotalIcmsST)}</span>
-                        </p>
-                        {/* Se houver valores de IBS/CBS (Reforma), exibe-os */}
-                        {(totais.valorTotalIBS || totais.valorTotalCBS) && (
-                            <div style={{ marginTop: 10, paddingTop: 5, borderTop: '1px dashed #ddd' }}>
-                                <p style={styles.summaryItem}>
-                                    <span style={styles.summaryLabel}>IBS (Novo):</span>
-                                    <span style={styles.summaryValue}>{formatCurrency(totais.valorTotalIBS || 0)}</span>
-                                </p>
-                                <p style={styles.summaryItem}>
-                                    <span style={styles.summaryLabel}>CBS (Novo):</span>
-                                    <span style={styles.summaryValue}>{formatCurrency(totais.valorTotalCBS || 0)}</span>
-                                </p>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Coluna 3: Totais Finais */}
-                    <div style={styles.totalsBox}>
-                        <div style={{ textAlign: 'right' }}>
-                            <Typography variant="small" style={{ color: '#6b7280' }}>Total Tributos (Lei 12.741)</Typography>
-                            <Typography variant="h3" style={{ color: '#7c3aed', marginBottom: 15 }}>
-                                {formatCurrency(totais.valorTotalTributos)}
-                            </Typography>
-                            
-                            <div style={{ borderTop: '2px solid #e5e7eb', paddingTop: 10 }}>
-                                <Typography variant="small" style={{ fontWeight: 700 }}>VALOR TOTAL DA NOTA</Typography>
-                                <Typography variant="h1" style={{ color: '#dc2626', fontSize: '1.8rem' }}>
-                                    {formatCurrency(totais.valorTotalNf)}
-                                </Typography>
-                            </div>
+            {/* ================= MODAL: DETALHES DA NF ================= */}
+            {isNfDetailsOpen && (
+                <div className={styles.modalBackdrop}>
+                    <div className={styles.modalContent}>
+                        <h3 className={styles.modalTitle}>📄 Detalhes Técnicos da NF-e</h3>
+                        <p className={styles.modalSubtitle}>Dados de validação fiscal do arquivo XML importado.</p>
+                        <div className={styles.modalDetailsGrid}>
+                            <div className={styles.detailRow}><strong>Chave de Acesso:</strong> <span style={{ fontFamily: 'monospace' }}>{formatarChaveAcesso(data.chaveAcesso)}</span></div>
+                            <div className={styles.detailRow}><strong>Número:</strong> <span>{data.numero}</span></div>
+                            <div className={styles.detailRow}><strong>Série:</strong> <span>{data.serie}</span></div>
+                            <div className={styles.detailRow}><strong>Data Emissão:</strong> <span>{formatarDataBR(data.dataEmissao)}</span></div>
+                            <div className={styles.detailRow}><strong>Modelo Fiscal:</strong> <span>55 (Nota Fiscal Eletrônica)</span></div>
+                            <div className={styles.detailRow}><strong>Ambiente:</strong> <span>1 (Produção)</span></div>
+                            <div className={styles.detailRow}><strong>Status SEFAZ:</strong> <span className={styles.textGreen}>100 - Autorizado o uso da NF-e</span></div>
+                        </div>
+                        <div className={styles.modalActions}>
+                            <Button variant='secondary' onClick={() => setIsNfDetailsOpen(false)}>Fechar</Button>
                         </div>
                     </div>
-                </FlexGridContainer>
-            </Card>
-            </FlexGridContainer>
+                </div>
+            )}
+
+            {/* ================= MODAL: DETALHES DO FORNECEDOR ================= */}
+            {isSupplierDetailsOpen && (
+                <div className={styles.modalBackdrop}>
+                    <div className={styles.modalContent}>
+                        <h3 className={styles.modalTitle}>🏢 Dados Completos do Emitente</h3>
+                        <p className={styles.modalSubtitle}>Informações cadastrais extraídas do documento.</p>
+                        <div className={styles.modalDetailsGrid}>
+                            <div className={styles.detailRow}><strong>Razão Social:</strong> <span>{emitente.nome}</span></div>
+                            <div className={styles.detailRow}><strong>Nome Fantasia:</strong> <span>{emitente.nomeFantasia || '-'}</span></div>
+                            <div className={styles.detailRow}><strong>CNPJ:</strong> <span>{emitente.cnpj}</span></div>
+                            <div className={styles.detailRow}><strong>Inscrição Estadual:</strong> <span>{emitente.ie || '-'}</span></div>
+                            <div className={styles.detailRow}><strong>Endereço:</strong> <span>{`${emitente.logradouro || ''}, ${emitente.numeroEnd || ''}`}</span></div>
+                            <div className={styles.detailRow}><strong>Bairro:</strong> <span>{emitente.bairro || '-'}</span></div>
+                            <div className={styles.detailRow}><strong>Cidade/UF:</strong> <span>{`${emitente.municipio || '-'} / ${emitente.uf || '-'}`}</span></div>
+                        </div>
+                        <div className={styles.modalActions}>
+                            <Button variant='secondary' onClick={() => setIsSupplierDetailsOpen(false)}>Fechar</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ================= 🟢 MODAL NOVO: RESUMO FINANCEIRO E LOGÍSTICO ================= */}
+            {isLogisticsDetailsOpen && (
+                <div className={styles.modalBackdrop}>
+                    <div className={styles.modalContent} style={{ maxWidth: '600px' }}>
+                        <h3 className={styles.modalTitle}>💰 Totais e Composição de Valores</h3>
+                        <p className={styles.modalSubtitle}>Apurado de despesas e tributos retidos no XML.</p>
+                        
+                        <div className={styles.modalDetailsGrid}>
+                            {/* Bloco de Valores da Mercadoria */}
+                            <div className={styles.detailRow}><strong>Valor dos Produtos:</strong> <span>{formatarMoeda(data.valorTotalProdutos)}</span></div>
+                            <div className={styles.detailRow}><strong>(+) Valor do Frete:</strong> <span>{formatarMoeda(data.valorTotalFrete)}</span></div>
+                            <div className={styles.detailRow}><strong>(+) Valor do Seguro:</strong> <span>{formatarMoeda(data.valorTotalSeguro)}</span></div>
+                            <div className={styles.detailRow}><strong>(+) Outras Despesas:</strong> <span>{formatarMoeda(data.valorOutrasDespesas)}</span></div>
+                            <div className={styles.detailRow}><strong>(-) Desconto Total:</strong> <span className={styles.textGreen}>({formatarMoeda(data.valorTotalDesconto)})</span></div>
+                            
+                            <hr style={{ border: '0', borderTop: '1px solid #eee', margin: '10px 0' }} />
+                            
+                            {/* Bloco Fiscal Tradicional */}
+                            <div className={styles.detailRow}><strong>ICMS Próprio:</strong> <span>{formatarMoeda(data.valorTotalIcms)}</span></div>
+                            <div className={styles.detailRow}><strong>ICMS ST (Subst. Tributária):</strong> <span>{formatarMoeda(data.valorTotalIcmsST)}</span></div>
+                            <div className={styles.detailRow}><strong>IPI (IPI Comercial):</strong> <span>{formatarMoeda(data.valorTotalIpi)}</span></div>
+                            
+                            {/* Bloco Reforma Tributária */}
+                            {data.valorTotalIBS !== undefined && (
+                                <div className={styles.detailRow}><strong>IBS Total (Reforma 2026):</strong> <span>{formatarMoeda(data.valorTotalIBS)}</span></div>
+                            )}
+                            {data.valorTotalCBS !== undefined && (
+                                <div className={styles.detailRow}><strong>CBS Total (Reforma 2026):</strong> <span>{formatarMoeda(data.valorTotalCBS)}</span></div>
+                            )}
+                            
+                            <hr style={{ border: '0', borderTop: '2px solid #ccc', margin: '10px 0' }} />
+                            
+                            {/* Totalizador Geral */}
+                            <div className={styles.detailRow} style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
+                                <span>VALOR LÍQUIDO DA NOTA:</span> 
+                                <span className={styles.textBlue}>{formatarMoeda(data.valorTotalNf)}</span>
+                            </div>
+                        </div>
+
+                        <div className={styles.modalActions} style={{ marginTop: '20px' }}>
+                            <Button variant='secondary' onClick={() => setIsLogisticsDetailsOpen(false)}>Fechar</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
         </FlexGridContainer>
     );
 };

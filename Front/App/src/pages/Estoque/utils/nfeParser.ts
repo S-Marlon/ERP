@@ -1,94 +1,9 @@
 // utils/nfeParser.ts
 
+import { NfeDataFromXML, ProdutoNF } from "../types/NF-e";
+
 const NFE_NS = 'http://www.portalfiscal.inf.br/nfe';
 
-export interface ProdutoNF {
-    // --- IDENTIFICAÇÃO E RASTREABILIDADE ---
-    sku: string;             // cProd (Seu SKU ou do fornecedor)
-    gtin: string;            // cEAN (Obrigatório: EAN-13 ou "SEM GTIN")
-    descricao: string;       // xProd
-    ncm: string;             // NCM (8 dígitos)
-    cest?: string;           // CEST (Obrigatório se houver Substituição Tributária)
-    cfop: string;            // CFOP (Define a operação: venda, devolução, etc)
-    unidadeMedida: string;   // uCom (UN, KG, PC, MT)
-
-    // --- QUANTIDADES E VALORES UNITÁRIOS ---
-    quantidade: number;      // qCom
-    valorUnitario: number;   // vUnCom
-
-    // --- COMPONENTES DO VALOR TOTAL ---
-    valorProdutos: number;      // vProd
-    valorDesconto: number;      // vDesc
-    valorOutrasDespesas: number;// vOutro
-    valorFrete: number;         // vFrete
-
-    // --- TRIBUTAÇÃO ---
-    valorIcms: number;          // vICMS
-    valorIpi: number;           // vIPI
-    valorIcmsST: number;        // vICMSST
-    valorPis: number;           // vPIS
-    valorCofins: number;        // vCOFINS
-    valorIBS?: number;          // Reforma 2026: estadual/municipal
-    valorCBS?: number;          // Reforma 2026: federal
-    valorImpostoSeletivo?: number; // Se aplicável ao item
-
-    // --- RESULTADOS CALCULADOS ---
-    valorTotalItem: number;     // vNF
-    valorCustoReal: number;     // (vProd + vIPI + vICMSST + vOutro + vFrete - vDesc) / qtd
-
-    // --- METADADOS ---
-    origem: number;             // 0: Nacional, 1: Importada
-    valorTotalTributos: number; // vTotTrib (Lei do imposto)
-
-    // --- CAMPOS OPCIONAIS DO XML ---
-    valorII?: number;           // Imposto de importação
-    valorISSQN?: number;        // ISSQN (serviços)
-    cProdANP?: string;          // Combustíveis
-    xPed?: string;              // Número do pedido
-    nItemPed?: string;          // Item do pedido
-}
-
-// --- INTERFACE DA NOTA FISCAL ---
-
-export interface NfeDataFromXML {
-    chaveAcesso: string;        // chNFe (44 dígitos)
-    numero: string;             // nNF
-    serie: string;              // Série
-    dataEmissao: string;        // dhEmi (ISO 8601)
-    tipoOperacao: '0' | '1';    // 0: Entrada, 1: Saída
-
-    emitente: {
-        cnpj: string;
-        nome: string;
-        nomeFantasia?: string;
-        uf: string;
-        ie: string;
-    };
-    destinatario: {
-        cnpjCpf: string;
-        nome: string;
-        uf: string;
-    };
-
-    valorTotalProdutos: number; // vProd
-    valorTotalFrete: number;    // vFrete
-    valorTotalSeguro: number;   // vSeg
-    valorTotalIpi: number;      // vIPI
-    valorOutrasDespesas: number;// vOutro
-    valorTotalDesconto: number; // vDesc
-    valorTotalNf: number;       // vNF
-
-    valorTotalIcms: number;     // vICMS
-    valorTotalIcmsST: number;   // vICMSST
-    valorTotalIBS?: number;     // Reforma 2026
-    valorTotalCBS?: number;     // Reforma 2026
-    valorTotalTributos: number; // vTotTrib
-    valorTotalPIS: number;      // vPIS
-    valorTotalCOFINS: number;   // vCOFINS
-
-    xmlBruto: string;           // XML original
-    produtos: ProdutoNF[];      // Lista de produtos
-}
 
 // =========================
 // INTERFACES COMPLETAS DO BANCO
@@ -181,6 +96,10 @@ export const parseNfeXmlToData = (xmlString: string): NfeDataFromXML => {
             throw new Error('Produto ou imposto não encontrado em <det>.');
         }
 
+        // 🔴 CAPTURA DO NÚMERO DO ITEM (<det nItem="X">)
+        const nItemAttr = det.getAttribute('nItem');
+        const nItem = nItemAttr ? parseInt(nItemAttr, 10) : undefined;
+
         // --- ICMS ---
         let valorIcms = 0;
         let valorIcmsST = 0;
@@ -203,13 +122,13 @@ export const parseNfeXmlToData = (xmlString: string): NfeDataFromXML => {
 
 
         // --- PIS / COFINS com fallback de segurança ---
-    const pisNode = imposto.getElementsByTagNameNS(NFE_NS, 'PIS')[0];
-    const pisSubNode = pisNode?.querySelector('PISAliq, PISOutr, PISNT, PISSN') as Element | undefined;
-    const valorPis = parseFloat(getTagValue(pisSubNode, 'vPIS'));
+        const pisNode = imposto.getElementsByTagNameNS(NFE_NS, 'PIS')[0];
+        const pisSubNode = pisNode?.querySelector('PISAliq, PISOutr, PISNT, PISSN') as Element | undefined;
+        const valorPis = parseFloat(getTagValue(pisSubNode, 'vPIS'));
 
-    const cofinsNode = imposto.getElementsByTagNameNS(NFE_NS, 'COFINS')[0];
-    const cofinsSubNode = cofinsNode?.querySelector('COFINSAliq, COFINSOutr, COFINSNT, COFINSSN') as Element | undefined;
-    const valorCofins = parseFloat(getTagValue(cofinsSubNode, 'vCOFINS'));
+        const cofinsNode = imposto.getElementsByTagNameNS(NFE_NS, 'COFINS')[0];
+        const cofinsSubNode = cofinsNode?.querySelector('COFINSAliq, COFINSOutr, COFINSNT, COFINSSN') as Element | undefined;
+        const valorCofins = parseFloat(getTagValue(cofinsSubNode, 'vCOFINS'));
 
         // --- Reforma Tributária ---
         const valorIBS = parseFloat(getTagValue(imposto, 'vIBS'));
@@ -235,17 +154,15 @@ export const parseNfeXmlToData = (xmlString: string): NfeDataFromXML => {
 
         const valorTotalItem = custoTotalItem;
 
-        const origem = icmsNode
-            ? parseInt(getTagValue(icmsNode, 'orig') || '0')
-            : 0;
+        const origem = icmsNode 
+    ? getTagValue(icmsNode, 'orig') || '0'
+    : '0';
 
         const gtinRaw = getTagValue(prod, 'cEAN');
         const gtin = gtinRaw === 'SEM GTIN' ? '' : gtinRaw;
 
-        // const chNFe = xmlDoc.getElementsByTagNameNS(NFE_NS, 'chNFe')[0]?.textContent || 
-        //       infNFe.getAttribute('Id')?.replace('NFe', '') || '';
-
         return {
+            nItem, // 🔴 Propriedade adicionada ao retorno do mapeamento do produto
             sku: getTagValue(prod, 'cProd'),
             gtin,
             descricao: getTagValue(prod, 'xProd'),
@@ -277,7 +194,7 @@ export const parseNfeXmlToData = (xmlString: string): NfeDataFromXML => {
             valorTotalItem,
             valorCustoReal,
 
-            origem,
+            origem, // string ('0', '1', '2', etc.)
             valorTotalTributos: parseFloat(getTagValue(imposto, 'vTotTrib'))
         };
     });
@@ -293,7 +210,7 @@ export const parseNfeXmlToData = (xmlString: string): NfeDataFromXML => {
         chaveAcesso: xmlDoc.getElementsByTagNameNS(NFE_NS, 'chNFe')[0]?.textContent || 
                  infNFe.getAttribute('Id')?.replace('NFe', '') || '',
     
-    numero: getTagValue(ide, 'nNF'),
+        numero: getTagValue(ide, 'nNF'),
         serie: getTagValue(ide, 'serie'),
         dataEmissao: getTagValue(ide, 'dhEmi'),
         tipoOperacao: getTagValue(ide, 'tpNF') as '0' | '1',
@@ -333,8 +250,8 @@ export const parseNfeXmlToData = (xmlString: string): NfeDataFromXML => {
         valorTotalIcms: parseFloat(getTagValue(totalICMS, 'vICMS')),
         valorTotalIcmsST: parseFloat(getTagValue(totalICMS, 'vICMSST')),
         valorTotalTributos: parseFloat(getTagValue(totalICMS, 'vTotTrib')),
-        valorTotalPIS: parseFloat(getTagValue(totalICMS, 'vPIS')),     // Adicionado
-    valorTotalCOFINS: parseFloat(getTagValue(totalICMS, 'vCOFINS')), // Adicionado
+        valorTotalPIS: parseFloat(getTagValue(totalICMS, 'vPIS')),
+        valorTotalCOFINS: parseFloat(getTagValue(totalICMS, 'vCOFINS')),
 
         xmlBruto: xmlString,
         produtos
