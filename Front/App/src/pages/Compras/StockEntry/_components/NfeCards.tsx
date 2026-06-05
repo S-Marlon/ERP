@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import FormControl from '../../../../../components/ui/FormControl/FormControl';
-import Typography from '../../../../../components/ui/Typography/Typography';
-import FlexGridContainer from '../../../../../components/Layout/FlexGridContainer/FlexGridContainer';
-import Card from '../../../../../components/ui/Card/Card';
-import Badge from '../../../../../components/ui/Badge/Badge';
-import Button from '../../../../../components/ui/Button/Button'; 
-import { buscarSiglaNoBanco } from '../../../api/productsApi';
+import { buscarSiglaNoBanco } from '../../api/productsApi';
 
 import styles from './NfeCards.module.css';
-import { NfeDataFromXML } from '../../../utils/nfeParser';
+import { NfeDataFromXML } from '../../utils/nfeParser';
+import FlexGridContainer from '../../../../components/Layout/FlexGridContainer/FlexGridContainer';
+import Card from '../../../../components/ui/Card/Card';
+import Typography from '../../../../components/ui/Typography/Typography';
+import FormControl from '../../../../components/ui/FormControl/FormControl';
+import Badge from '../../../../components/ui/Badge/Badge';
+import Button from '../../../../components/ui/Button/Button';
 
 interface NfeCardsProps {
     data: NfeDataFromXML;
@@ -47,7 +47,7 @@ const NfeCards: React.FC<NfeCardsProps> = ({
 }) => {
     const { emitente } = data;
     const [sigla, setSigla] = useState("");
-    
+
     // Estados dos Modais
     const [isNfDetailsOpen, setIsNfDetailsOpen] = useState(false);
     const [isSupplierDetailsOpen, setIsSupplierDetailsOpen] = useState(false);
@@ -63,9 +63,9 @@ const NfeCards: React.FC<NfeCardsProps> = ({
 
     return (
         <FlexGridContainer layout="grid" template="1fr" gap="20px" className={styles.gridContainer}>
-            
+
             <FlexGridContainer layout="grid" template="3fr 3fr 2fr" gap="20px">
-                
+
                 {/* CARD 1: Identificação da NF */}
                 <Card variant="default" padding="20px">
                     <div className={styles.headerCard}>
@@ -80,7 +80,7 @@ const NfeCards: React.FC<NfeCardsProps> = ({
                     <div className={styles.formGroupInline}>
                         <FormControl label="Chave de Acesso" value={data.chaveAcesso} readOnlyDisplay />
                     </div>
-                   
+
                 </Card>
 
                 {/* CARD 2: Emitente */}
@@ -89,25 +89,26 @@ const NfeCards: React.FC<NfeCardsProps> = ({
                         <Typography variant="h2">2. Fornecedor (Emitente)</Typography>
                         <button className={styles.infoIconButton} onClick={() => setIsSupplierDetailsOpen(true)} title="Ver detalhes do fornecedor">ℹ️</button>
                     </div>
-                    <div className={styles.badgeContainer}>
-                        {supplierStatus.isChecking && <Badge color="paper">Verificando...</Badge>}
-                        {supplierStatus.exists === true && <Badge color="success">Fornecedor Ativo</Badge>}
-                        {supplierStatus.exists === false && (
-                            <>
-                                <Badge color="warning">Não Cadastrado</Badge>
-                                <button className={styles.createButton} onClick={actions.onCreateSupplier}>Criar</button>
-                            </>
-                        )}
-                    </div>
+
                     <FlexGridContainer layout="grid" template="1fr 1fr" gap="10px">
                         <FormControl label="CNPJ" value={emitente.cnpj} readOnlyDisplay />
-<FormControl 
-    label="Nome Fantasia" 
-    value={emitente.nomeFantasia || "Não Informado"} 
-    readOnlyDisplay 
-/>
-                    </FlexGridContainer>
+                        <div className={styles.badgeContainer}>
+                            {supplierStatus.isChecking && <Badge color="paper">Verificando...</Badge>}
+                            {supplierStatus.exists === true && <Badge color="success">Fornecedor Ativo</Badge>}
+                            {supplierStatus.exists === false && (
+                                <>
+                                    <Badge color="warning">Não Cadastrado</Badge>
+                                    <button className={styles.createButton} onClick={actions.onCreateSupplier}>Criar</button>
+                                </>
+                            )}
+                        </div>
+                        <FormControl
+                            label="Nome Fantasia"
+                            value={emitente.nomeFantasia || "Não Informado"}
+                            readOnlyDisplay
+                        />
                     <FormControl label="Razão Social" value={emitente.nome} readOnlyDisplay />
+                    </FlexGridContainer>
                 </Card>
 
                 {/* CARD 3: Dados de Logística e Volumes */}
@@ -115,8 +116,8 @@ const NfeCards: React.FC<NfeCardsProps> = ({
                     <div className={styles.headerCard}>
                         <Typography variant="h2">3. Logística de Entrega</Typography>
                         {/* 🟢 Adicionado botão de informação para o Card 3 */}
-                        <button 
-                            className={styles.infoIconButton} 
+                        <button
+                            className={styles.infoIconButton}
                             onClick={() => setIsLogisticsDetailsOpen(true)}
                             title="Ver resumo financeiro e tributário"
                         >
@@ -124,22 +125,22 @@ const NfeCards: React.FC<NfeCardsProps> = ({
                         </button>
                     </div>
                     <FlexGridContainer layout="grid" template="1fr 1fr" gap="10px">
-                        <FormControl 
-                            label="Qtd Volumes" 
-                            value={data.quantidadeVolumes !== undefined ? String(data.quantidadeVolumes) : "Não Informado"} 
-                            readOnlyDisplay 
+                        <FormControl
+                            label="Qtd Volumes"
+                            value={data.quantidadeVolumes !== undefined ? String(data.quantidadeVolumes) : "Não Informado"}
+                            readOnlyDisplay
                         />
-                        <FormControl 
-                            label="Peso Bruto (KG)" 
-                            value={data.pesoBruto !== undefined ? `${data.pesoBruto} kg` : "Não Informado"} 
-                            readOnlyDisplay 
+                        <FormControl
+                            label="Peso Bruto (KG)"
+                            value={data.pesoBruto !== undefined ? `${data.pesoBruto} kg` : "Não Informado"}
+                            readOnlyDisplay
                         />
                     </FlexGridContainer>
                     <div className={styles.formGroupInline} style={{ marginTop: '10px' }}>
-                        <FormControl 
-                            label="Valor Total da Nota" 
-                            value={formatarMoeda(data.valorTotalNf)} 
-                            readOnlyDisplay 
+                        <FormControl
+                            label="Valor Total da Nota"
+                            value={formatarMoeda(data.valorTotalNf)}
+                            readOnlyDisplay
                         />
                     </div>
                 </Card>
@@ -196,7 +197,7 @@ const NfeCards: React.FC<NfeCardsProps> = ({
                     <div className={styles.modalContent} style={{ maxWidth: '600px' }}>
                         <h3 className={styles.modalTitle}>💰 Totais e Composição de Valores</h3>
                         <p className={styles.modalSubtitle}>Apurado de despesas e tributos retidos no XML.</p>
-                        
+
                         <div className={styles.modalDetailsGrid}>
                             {/* Bloco de Valores da Mercadoria */}
                             <div className={styles.detailRow}><strong>Valor dos Produtos:</strong> <span>{formatarMoeda(data.valorTotalProdutos)}</span></div>
@@ -204,14 +205,14 @@ const NfeCards: React.FC<NfeCardsProps> = ({
                             <div className={styles.detailRow}><strong>(+) Valor do Seguro:</strong> <span>{formatarMoeda(data.valorTotalSeguro)}</span></div>
                             <div className={styles.detailRow}><strong>(+) Outras Despesas:</strong> <span>{formatarMoeda(data.valorOutrasDespesas)}</span></div>
                             <div className={styles.detailRow}><strong>(-) Desconto Total:</strong> <span className={styles.textGreen}>({formatarMoeda(data.valorTotalDesconto)})</span></div>
-                            
+
                             <hr style={{ border: '0', borderTop: '1px solid #eee', margin: '10px 0' }} />
-                            
+
                             {/* Bloco Fiscal Tradicional */}
                             <div className={styles.detailRow}><strong>ICMS Próprio:</strong> <span>{formatarMoeda(data.valorTotalIcms)}</span></div>
                             <div className={styles.detailRow}><strong>ICMS ST (Subst. Tributária):</strong> <span>{formatarMoeda(data.valorTotalIcmsST)}</span></div>
                             <div className={styles.detailRow}><strong>IPI (IPI Comercial):</strong> <span>{formatarMoeda(data.valorTotalIpi)}</span></div>
-                            
+
                             {/* Bloco Reforma Tributária */}
                             {data.valorTotalIBS !== undefined && (
                                 <div className={styles.detailRow}><strong>IBS Total (Reforma 2026):</strong> <span>{formatarMoeda(data.valorTotalIBS)}</span></div>
@@ -219,12 +220,12 @@ const NfeCards: React.FC<NfeCardsProps> = ({
                             {data.valorTotalCBS !== undefined && (
                                 <div className={styles.detailRow}><strong>CBS Total (Reforma 2026):</strong> <span>{formatarMoeda(data.valorTotalCBS)}</span></div>
                             )}
-                            
+
                             <hr style={{ border: '0', borderTop: '2px solid #ccc', margin: '10px 0' }} />
-                            
+
                             {/* Totalizador Geral */}
                             <div className={styles.detailRow} style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
-                                <span>VALOR LÍQUIDO DA NOTA:</span> 
+                                <span>VALOR LÍQUIDO DA NOTA:</span>
                                 <span className={styles.textBlue}>{formatarMoeda(data.valorTotalNf)}</span>
                             </div>
                         </div>

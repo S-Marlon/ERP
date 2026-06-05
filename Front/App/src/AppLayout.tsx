@@ -25,7 +25,6 @@ import { ProductProvider } from './context/NewProductContext';
 import CadastroCliente from './components/forms/specific/CadastroCliente/CadastroCliente'; 
 import CadastroContrato from './components/forms/specific/CadastroContrato/CadastroContrato';
 import RelatorioPoco from './components/forms/specific/CadastroRelatorio/CadastroRelatorio'; // Usado para "Novo Poço"
-import StockEntryForm from './pages/Estoque/pages/StockEntry/StockEntryForm';
 import StockAdjustmentForm from './pages/Estoque/pages/StockAdjustment/StockAdjustmentForm';
 import StockInventory from './pages/Estoque/pages/StockInventory/StockInventory';
 import StockLabelingForm from './pages/Estoque/pages/StockLabelingForm/StockLabelingForm';
@@ -36,6 +35,8 @@ import  HubVendas  from './pages/PDV/HubVendas';
 import Notas from './pages/Estoque/pages/notas/Notas';
 import ProductForm from './pages/ProductForm';
 import Fornecedores from "./pages/Fornecedores/Fornecedores";
+import ComprasDashboard from "./pages/Compras/ComprasDashboard";
+import StockEntryForm from "./pages/Compras/StockEntry/StockEntryForm";
 
 function AppLayout() {
   const location = useLocation();
@@ -100,6 +101,12 @@ const isPDV = location.pathname.startsWith("/vendas/pdv");
           <Route path="/estoque/notas" element={<Notas />} />
           <Route path="/estoque/operacoes" element={<StockAdjustmentForm/>} />
           <Route path="/estoque/etiquetagem" element={<StockLabelingForm/>} />
+
+
+
+          <Route path="/compras" element={<ComprasDashboard/>} />
+          <Route path="/compras/entrada-nfe" element={<StockEntryForm/>} />
+
 
           <Route path="/obras" element={<ObrasModule />} />
           <Route path="*" element={<h2>404 | Página Não Encontrada</h2>} />

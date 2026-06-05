@@ -3,14 +3,12 @@ import pool from '../Estoque/db.config';
 
 const router = Router();
 
-export default router;
-
 /*
 |--------------------------------------------------------------------------
-| GET HISTÓRICO DO CLIENTE (LOJA)
+| GET HISTÓRICO DA PESSOA (LOJA)
 |--------------------------------------------------------------------------
 |
-| Retorna timeline comercial/operacional do cliente
+| Retorna a timeline comercial/operacional da pessoa (Cliente/Fornecedor/etc)
 |
 */
 
@@ -18,18 +16,15 @@ router.get('/ping', (_req: Request, res: Response) => {
   return res.send('🟢 API LOJA OK - ROTA ATIVA');
 });
 
-
-router.get('/:id_cliente/historico', async (req: Request, res: Response) => {
-
+router.get('/:id_pessoa/historico', async (req: Request, res: Response) => {
   try {
-
-    const { id_cliente } = req.params;
+    const { id_pessoa } = req.params;
 
     const [rows]: any = await pool.query(`
       SELECT
         h.id,
         h.tenant_id,
-        h.id_cliente,
+        h.id_cliente, -- Mantido conforme estrutura física da tabela do módulo de loja
         h.tipo,
         h.origem,
         h.canal,
@@ -46,12 +41,12 @@ router.get('/:id_cliente/historico', async (req: Request, res: Response) => {
       WHERE h.id_cliente = ?
         AND h.deleted_at IS NULL
       ORDER BY h.created_at DESC
-    `, [id_cliente]);
+    `, [id_pessoa]);
 
     const historico = rows.map((item: any) => ({
       id: item.id,
       tenant_id: item.tenant_id,
-      id_cliente: item.id_cliente,
+      id_pessoa: item.id_cliente, // Mapeado para o novo padrão de saída do objeto
       tipo: item.tipo,
       origem: item.origem,
       canal: item.canal,
@@ -63,8 +58,8 @@ router.get('/:id_cliente/historico', async (req: Request, res: Response) => {
       descricao: item.descricao,
       valor: item.valor ? Number(item.valor) : null,
       metadata: typeof item.metadata === 'string'
-  ? JSON.parse(item.metadata)
-  : item.metadata ?? null,
+        ? JSON.parse(item.metadata)
+        : item.metadata ?? null,
       criado_por: item.criado_por,
       created_at: item.created_at,
       updated_at: item.updated_at
@@ -72,16 +67,17 @@ router.get('/:id_cliente/historico', async (req: Request, res: Response) => {
 
     return res.json(historico);
 
-   } catch (error: any) {
+  } catch (error: any) {
+    console.error('Erro ao buscar histórico da pessoa:', error);
 
-  console.error('Erro ao buscar histórico:', error);
-
-  return res.status(500).json({
-    error: 'Erro ao buscar histórico do cliente',
-    message: error?.message,
-    stack: process.env.NODE_ENV === 'development'
-      ? error?.stack
-      : undefined
-  });
-}
+    return res.status(500).json({
+      error: 'Erro ao buscar histórico da pessoa',
+      message: error?.message,
+      stack: process.env.NODE_ENV === 'development'
+        ? error?.stack
+        : undefined
+    });
+  }
 });
+
+export default router;

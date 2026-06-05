@@ -1,27 +1,23 @@
-
-import type { ClienteEntity } from '../types/cliente.entity';
+import type { ClienteEntity } from '../types/cliente.entity'; // Dica: mude o nome desse arquivo para pessoa.entity futuramente
 import type { ClienteAggregate } from '../types/cliente.aggregate';
 
 /*
 |--------------------------------------------------------------------------
-| BASE URL
+| BASE URL (Atualizado para o modelo generalizado de pessoas)
 |--------------------------------------------------------------------------
 */
-
-const API_BASE_URL = 'http://localhost:3001/api/clientes';
+const API_BASE_URL = 'http://localhost:3001/api/pessoas';
 
 /*
 |--------------------------------------------------------------------------
-| CLIENTES (LISTA - ENTITY)
+| PESSOAS / CLIENTES (LISTA)
 |--------------------------------------------------------------------------
-| Retorna dados simples da tabela clientes
 */
-
 export const getClientes = async (): Promise<ClienteEntity[]> => {
   const response = await fetch(API_BASE_URL);
 
   if (!response.ok) {
-    throw new Error(`Erro ao buscar clientes (${response.status})`);
+    throw new Error(`Erro ao buscar pessoas (${response.status})`);
   }
 
   return response.json();
@@ -29,18 +25,16 @@ export const getClientes = async (): Promise<ClienteEntity[]> => {
 
 /*
 |--------------------------------------------------------------------------
-| CLIENTE POR ID (AGGREGATE)
+| PESSOA POR ID (COMPLETO)
 |--------------------------------------------------------------------------
-| Retorna cliente completo (CRM + financeiro + contatos + emails etc)
 */
-
 export const getClienteById = async (
-  id: number
+  id_pessoa: number
 ): Promise<ClienteAggregate> => {
-  const response = await fetch(`${API_BASE_URL}/${id}`);
+  const response = await fetch(`${API_BASE_URL}/${id_pessoa}`);
 
   if (!response.ok) {
-    throw new Error(`Erro ao buscar cliente (${response.status})`);
+    throw new Error(`Erro ao buscar dados da pessoa (${response.status})`);
   }
 
   return response.json();
@@ -51,29 +45,24 @@ export const getClienteById = async (
 | PREÇOS ESPECIAIS
 |--------------------------------------------------------------------------
 */
-
 export interface ClientePrecoEspecialEntity {
   id: number;
-  id_cliente: number;
+  id_pessoa: number; // Atualizado de id_cliente
   id_produto: number;
-
   tipo_desconto: 'VALOR_FIXO' | 'PERCENTUAL';
   valor: number;
-
   preco_final?: number;
   percentual_desconto?: number;
-
   ativo: boolean;
-
   data_inicio?: string;
   data_fim?: string;
 }
 
 export const getPrecosEspeciais = async (
-  id: number
+  id_pessoa: number
 ): Promise<ClientePrecoEspecialEntity[]> => {
   const response = await fetch(
-    `${API_BASE_URL}/${id}/precos-especiais`
+    `${API_BASE_URL}/${id_pessoa}/precos-especiais`
   );
 
   if (!response.ok) {
@@ -90,20 +79,14 @@ export const getPrecosEspeciais = async (
 | ABA GERAL (DTO LIMPO)
 |--------------------------------------------------------------------------
 */
-
 export interface ClienteGeralDTO {
   nome_razao: string;
   nome_fantasia?: string;
-
   cpf_cnpj?: string;
-
   telefone_principal?: string;
   whatsapp?: string;
-
   segmento?: string;
-
-  status_cliente?: string;
-
+  status?: string; // Atualizado: era status_cliente
   endereco?: {
     logradouro?: string;
     cidade?: string;
@@ -112,15 +95,15 @@ export interface ClienteGeralDTO {
 }
 
 export const getClienteGeral = async (
-  idCliente: number
+  id_pessoa: number
 ): Promise<ClienteGeralDTO> => {
   const response = await fetch(
-    `${API_BASE_URL}/${idCliente}/geral`
+    `${API_BASE_URL}/${id_pessoa}/geral`
   );
 
   if (!response.ok) {
     throw new Error(
-      `Erro ao carregar dados gerais do cliente (${response.status})`
+      `Erro ao carregar dados gerais (${response.status})`
     );
   }
 
@@ -128,11 +111,11 @@ export const getClienteGeral = async (
 };
 
 export const updateClienteGeral = async (
-  idCliente: number,
+  id_pessoa: number,
   dados: ClienteGeralDTO
 ): Promise<ClienteAggregate> => {
   const response = await fetch(
-    `${API_BASE_URL}/${idCliente}/geral`,
+    `${API_BASE_URL}/${id_pessoa}/geral`,
     {
       method: 'PUT',
       headers: {
@@ -144,7 +127,7 @@ export const updateClienteGeral = async (
 
   if (!response.ok) {
     throw new Error(
-      `Erro ao salvar dados gerais do cliente (${response.status})`
+      `Erro ao salvar dados gerais (${response.status})`
     );
   }
 
@@ -156,7 +139,6 @@ export const updateClienteGeral = async (
 | VENDAS
 |--------------------------------------------------------------------------
 */
-
 export interface VendaDTO {
   id_venda: number;
   data: string;
@@ -165,10 +147,10 @@ export interface VendaDTO {
 }
 
 export const getVendasCliente = async (
-  id: number
+  id_pessoa: number
 ): Promise<VendaDTO[]> => {
   const response = await fetch(
-    `${API_BASE_URL}/${id}/vendas`
+    `${API_BASE_URL}/${id_pessoa}/vendas`
   );
 
   if (!response.ok) {
@@ -185,10 +167,9 @@ export const getVendasCliente = async (
 | HISTÓRICO (TIMELINE CRM)
 |--------------------------------------------------------------------------
 */
-
 export interface ClienteEventoDTO {
   id: number;
-  id_cliente: number;
+  id_pessoa: number; // Atualizado de id_cliente
 
   tipo: string;
   origem?: string;
@@ -197,9 +178,7 @@ export interface ClienteEventoDTO {
   referencia_id?: number;
 
   valor?: number;
-
   payload?: Record<string, any>;
-
   data_evento: string;
 }
 
@@ -211,12 +190,17 @@ export interface HistoricoResponseDTO {
 }
 
 export const getHistoricoCliente = async (
-  id: number,
+  id_pessoa: number,
   page = 1,
   limit = 50
 ): Promise<HistoricoResponseDTO> => {
+  // Trava de segurança no front-end para impedir requisições inválidas de gerarem "undefined" na URL
+  if (!id_pessoa || String(id_pessoa) === 'undefined') {
+    return { data: [], total: 0, page, limit };
+  }
+
   const response = await fetch(
-    `${API_BASE_URL}/${id}/historico?page=${page}&limit=${limit}`
+    `${API_BASE_URL}/${id_pessoa}/historico?page=${page}&limit=${limit}`
   );
 
   if (!response.ok) {

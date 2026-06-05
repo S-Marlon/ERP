@@ -1,17 +1,17 @@
 import React, { useState, useMemo } from 'react';
-import Button from '../../../../components/ui/Button/Button';
-import FlexGridContainer from '../../../../components/Layout/FlexGridContainer/FlexGridContainer';
 import MappingModal, { MappingPayload } from './_components/ProductMappingModal';
-import { parseNfeXmlToData } from '../../utils/nfeParser';
-import Badge from '../../../../components/ui/Badge/Badge';
+import { parseNfeXmlToData } from '../utils/nfeParser';
 import NfeCards from './_components/NfeCards';
-import { checkExistingMappings, checkSupplier, createSupplier } from '../../api/productsApi';
-import Card from '../../../../components/ui/Card/Card';
-import { ItemsConference } from './ItemsConference';
-import { useLabelPrint } from '../../hooks/useLabelPrint';
 
+// 🟢 Importação da Nova API do Módulo de Compras/Fornecedores
+import { createSupplier, checkSupplier } from '../api/comprasApi';
+
+import { ItemsConference } from './ItemsConference';
 import './StockEntry.css';
-import { NfeDataFromXML, ProdutoNF } from '../../types/NF-e';
+import { NfeDataFromXML, ProdutoNF } from '../types/NF-e';
+import FlexGridContainer from '../../../components/Layout/FlexGridContainer/FlexGridContainer';
+import Badge from '../../../components/ui/Badge/Badge';
+import Card from '../../../components/ui/Card/Card';
 
 interface ProductEntry extends ProdutoNF {
     tempId: number;
@@ -20,7 +20,7 @@ interface ProductEntry extends ProdutoNF {
     isConfirmed: boolean;
     category?: string;
     mappedData?: any;
-    receivedQuantity: number; // Sincronizado com a tabela de conferência
+    receivedQuantity: number; 
     difference: number;
 }
 
@@ -57,7 +57,7 @@ const mapNfeDataToEntryForm = (xmlData: NfeDataFromXML): NfeData => {
         isConfirmed: false,
         category: '',
         mappedData: undefined,
-        receivedQuantity: produto.quantidade || 0, // Alinhado com o nfeParser
+        receivedQuantity: produto.quantidade || 0,
         difference: 0,
     }));
 
@@ -107,15 +107,12 @@ const StockEntryForm: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [itemToMap, setItemToMap] = useState<any>(null);
 
-    // Subtotal original vindo do XML dos produtos
     const subtotal = useMemo(() => items.reduce((sum, item) => sum + (item.valorProdutos || 0), 0), [items]);
 
-    // Custo real recalculado dinamicamente com base nas quantidades físicas recebidas
     const adjustedPhysicalSubtotal = useMemo(() => {
         return items.reduce((sum, item) => sum + (item.receivedQuantity * (item.valorCustoReal || item.valorUnitario || 0)), 0);
     }, [items]);
 
-    // Cole logo abaixo do "adjustedPhysicalSubtotal"
     const hasUnmappedItems = useMemo(() => items.some(i => !i.mappedId), [items]);
     const hasUnconfirmedItems = useMemo(() => items.some(i => !i.isConfirmed), [items]);
     const isSubmitDisabled = items.length === 0 || hasUnmappedItems || hasUnconfirmedItems;
@@ -124,9 +121,12 @@ const StockEntryForm: React.FC = () => {
         try {
             const cnpjLimpo = cnpjToUse.replace(/\D/g, '');
             const skus = xmlToUse.items.map(i => i.sku);
-            const existingMappings = await checkExistingMappings(cnpjLimpo, skus);
+            
+            // ⚠️ TODO: Integrar com a nova API de checagem de mapeamentos
+            // const existingMappings = await checkExistingMappings(cnpjLimpo, skus);
+            const existingMappings: any[] = []; 
 
-            if (!Array.isArray(existingMappings)) {
+            if (!Array.isArray(existingMappings) || existingMappings.length === 0) {
                 setItems(xmlToUse.items);
                 return;
             }
@@ -171,6 +171,7 @@ const StockEntryForm: React.FC = () => {
 
                 const xmlData = mapNfeDataToEntryForm(rawXmlData);
                 const formattedSupplierCnpj = formatCnpj(xmlData.supplierCnpj);
+                const cnpjLimpo = xmlData.supplierCnpj.replace(/\D/g, '');
 
                 setSupplierCnpj(formattedSupplierCnpj);
                 setInvoiceNumber(xmlData.invoiceNumber);
@@ -187,9 +188,11 @@ const StockEntryForm: React.FC = () => {
                 setEntryDate(xmlData.entryDate);
 
                 setIsSupplierChecking(true);
-                const supplierCheck = await checkSupplier(formattedSupplierCnpj);
+                
+                // 🟢 Uso real da API para verificar a existência do fornecedor no módulo de pessoas/compras
+                const supplierCheck = await checkSupplier(cnpjLimpo);
 
-                if (!supplierCheck.exists) {
+                if (!supplierCheck || !supplierCheck.exists) {
                     setSupplierExists(false);
                     setSupplierToCreate({
                         cnpj: formattedSupplierCnpj,
@@ -205,40 +208,75 @@ const StockEntryForm: React.FC = () => {
                 }
 
                 setSupplierExists(true);
+                // Ajusta os nomes locais caso o cadastro no banco esteja mais atualizado que o XML
                 setSupplier(supplierCheck.supplier?.name || xmlData.supplier);
+                setSupplierFantasyName(supplierCheck.supplier?.fantasyName || xmlData.supplierFantasyName);
+                
+                // Dispara o fluxo de amarração/sincronização de SKUs
                 await performMappingSync(formattedSupplierCnpj, xmlData);
 
             } catch (error) {
-                alert(`Erro: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+                console.error(error);
+                alert(`Erro: ${error instanceof Error ? error.message : 'Erro desconhecido ao ler XML / Checar Fornecedor'}`);
             } finally {
                 setIsSupplierChecking(false);
+                event.target.value = '';
             }
         };
         reader.readAsText(file);
     };
 
-    const handleCreateSupplierSubmit = async () => {
-        if (!supplierToCreate) return;
-        setSupplierCreationLoading(true);
-        try {
-            await createSupplier({
-                cnpj: supplierToCreate.cnpj.replace(/\D/g, ''),
-                name: supplierCreationName,
-                fantasyName: supplierCreationFantasyName
-            });
-            setSupplierExists(true);
-            setIsSupplierModalOpen(false);
-            if (pendingXmlData) {
-                await performMappingSync(supplierToCreate.cnpj, pendingXmlData);
-            }
-        } catch (err) {
-            alert('Erro ao cadastrar fornecedor.');
-        } finally {
-            setSupplierCreationLoading(false);
-        }
+    const handleCancelSupplierCreation = () => {
+        setIsSupplierModalOpen(false);
+        setSupplierExists(null);
+        setSupplierToCreate(null);
+        setPendingXmlData(null);
+        
+        setSupplierCnpj('');
+        setInvoiceNumber('');
+        setSupplier('');
+        setSupplierFantasyName('');
+        setAccessKey('');
+        setTotalFreight(0);
+        setTotalIpi(0);
+        setTotalOtherExpenses(0);
+        setTotalNoteValue(0);
+        setTotalIcmsST(0);
+        setTotalIBS(undefined);
+        setTotalCBS(undefined);
+        setEntryDate('');
+        setItems([]);
     };
 
-    // 🟢 MANIPULADORES DA TABELA DE CONFERÊNCIA
+    const handleCreateSupplierSubmit = async () => {
+    if (!supplierToCreate) return;
+    
+    setSupplierCreationLoading(true);
+    try {
+        await createSupplier({
+            cnpj: supplierToCreate.cnpj.replace(/\D/g, ''),
+            name: supplierCreationName,
+            fantasyName: supplierCreationFantasyName
+        });
+
+        setSupplierExists(true);
+        setIsSupplierModalOpen(false);
+        
+        if (pendingXmlData) {
+            await performMappingSync(supplierToCreate.cnpj, pendingXmlData);
+        }
+        
+        alert('Fornecedor cadastrado com sucesso!');
+    } catch (err: any) { // 🟢 Mudamos para 'any' para capturar a propriedade .message
+        console.error('Erro detalhado ao cadastrar fornecedor:', err);
+        
+        // 🔍 Agora o alert vai mostrar o motivo real do erro!
+        alert(`Falha ao cadastrar o fornecedor.\nMotivo: ${err.message || 'Erro desconhecido'}`);
+    } finally {
+        setSupplierCreationLoading(false);
+    }
+};
+
     const handleConfirmItems = (ids: number[]) => {
         setItems(prev => prev.map(item => ids.includes(item.tempId) ? { ...item, isConfirmed: true } : item));
     };
@@ -356,28 +394,26 @@ const StockEntryForm: React.FC = () => {
                     )}
 
                     {items.length > 0 && (
-    <div className="section-wrapper content-card-table">
-        <ItemsConference
-            items={items.map((i, index) => ({
-                ...i,
-                nItem: i.nItem || index + 1, // 🟢 Garante que se o nItem for undefined, ele use a posição atual (1, 2, 3...)
-                confirmed: i.isConfirmed 
-            }))}
-            onConfirmItems={handleConfirmItems}
-            onUnconfirmItems={handleUnconfirmItems}
-            onMapProducts={handleOpenMappingFromTable}
-            onRemoveItems={handleRemoveItemsFromConference}
-            onToggleItem={handleToggleSingleItem}
-            onQuantityChange={handleQuantityReceivedChange} 
-        />
-    </div>
-)}
+                        <div className="section-wrapper content-card-table">
+                            <ItemsConference
+                                items={items.map((i, index) => ({
+                                    ...i,
+                                    nItem: i.nItem || index + 1,
+                                    confirmed: i.isConfirmed 
+                                }))}
+                                onConfirmItems={handleConfirmItems}
+                                onUnconfirmItems={handleUnconfirmItems}
+                                onMapProducts={handleOpenMappingFromTable}
+                                onRemoveItems={handleRemoveItemsFromConference}
+                                onToggleItem={handleToggleSingleItem}
+                                onQuantityChange={handleQuantityReceivedChange} 
+                            />
+                        </div>
+                    )}
                 </div>
 
                 {/* COLUNA DIREITA: PAINEL DE CONTROLE DE RESUMO */}
                 <div className="side-control-panel">
-
-                    {/* Alertas de Divergência */}
                     {items.filter(i => i.difference !== 0).length > 0 ? (
                         <div className="alert-box error">
                             <h3 className="alert-title">
@@ -490,6 +526,7 @@ const StockEntryForm: React.FC = () => {
                 <div className="modal-backdrop">
                     <div className="modal-content">
                         <h3 className="modal-title">Criar Fornecedor</h3>
+                        <button type="button" onClick={() => console.log('Navegar para enriquecimento detalhado')}>Enriquecer Cadastro</button>
                         <p className="modal-subtitle">O parceiro deste XML não existe no banco de dados.</p>
                         <div className="modal-form-grid">
                             <div className="form-group">
@@ -506,7 +543,9 @@ const StockEntryForm: React.FC = () => {
                             </div>
                         </div>
                         <div className="modal-actions">
-                            <Button variant='secondary' onClick={() => setIsSupplierModalOpen(false)}>Cancelar</Button>
+                            <button type="button" className="btn-modal-cancel" onClick={handleCancelSupplierCreation}>
+                                Cancelar
+                            </button>
                             <button className="btn-modal-save" onClick={handleCreateSupplierSubmit} disabled={supplierCreationLoading}>
                                 {supplierCreationLoading ? 'Salvando...' : 'Salvar Fornecedor'}
                             </button>

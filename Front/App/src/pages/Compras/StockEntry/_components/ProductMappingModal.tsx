@@ -1,10 +1,10 @@
 import { useEffect, useState, useRef } from "react";
-import FormControl from "../../../../../components/ui/FormControl/FormControl";
-import Button from "../../../../../components/ui/Button/Button";
-import { ProdutoNF } from "../../../utils/nfeParser";
+import { ProdutoNF } from "../../utils/nfeParser";
 import "./ProductMappingModal.css";
-import FlexGridContainer from "../../../../../components/Layout/FlexGridContainer/FlexGridContainer";
 import StepSalesConfig from "./StepSalesConfig";
+import FlexGridContainer from "../../../../components/Layout/FlexGridContainer/FlexGridContainer";
+import FormControl from "../../../../components/ui/FormControl/FormControl";
+import Button from "../../../../components/ui/Button/Button";
 
 interface ProductEntry extends ProdutoNF {
     tempId: number;

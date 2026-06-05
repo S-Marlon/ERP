@@ -1,0 +1,187 @@
+/* ==========================================================================
+   ESTRUTURA GERAL E COMPACTAÇÃO DE ESPAÇO
+   ========================================================================== */
+.gridContainer {
+    width: 100%;
+}
+
+/* Força os FlexGridContainers internos a usarem menos espaço */
+.gridContainer :global(.ui-flex-grid) { /* Ou a classe gerada pelo seu FlexGridContainer */
+    gap: 8px !important; /* Diminui o espaçamento vertical/horizontal entre os campos */
+}
+
+/* Hack de Estilo para Compactar o FormControl 
+   Procura as labels e inputs/displays dentro deste módulo e reduz o tamanho
+*/
+.gridContainer label {
+    font-size: 0.7rem !important;      /* Label bem pequena estilo NF (Série, Número, etc) */
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 2px !important;     /* Cola a label no valor */
+}
+
+/* Alvo no texto/input do FormControl em modo ReadOnly */
+.gridContainer [readonly], 
+.gridContainer div[class*="display"], 
+.gridContainer div[class*="value"] { 
+    font-size: 0.85rem !important;     /* Diminui o tamanho do texto do valor */
+    padding: 4px 8px !important;       /* Reduz drasticamente o padding interno do campo */
+    min-height: auto !important;       /* Remove alturas mínimas exageradas */
+    background-color: #f8fafc !important; 
+    border-radius: 4px;
+}
+
+.headerCard {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;               /* Reduzido de 16px para 12px */
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 4px;               /* Reduzido de 8px para 4px */
+}
+
+.headerCard h2 {
+    font-size: 0.95rem !important;     /* Deixa o título do Card menor e mais técnico */
+    font-weight: 700;
+    margin: 0;
+}
+
+.formGroupInline {
+    margin-top: 6px;                  /* Reduzido de 12px para 6px */
+    width: 100%;
+}
+
+/* Container do Badge de Status de Fornecedores */
+.badgeContainer {
+    display: flex;
+    align-items: center;               /* Centraliza com o input ao lado */
+    gap: 6px;
+    height: 100%;                      /* Força a alinhar no meio do grid */
+    padding-top: 16px;                 /* Compensa a falta da label para alinhar por baixo */
+}
+
+/* ==========================================================================
+   ELEMENTOS DE INTERAÇÃO (BOTOES E ICONES)
+   ========================================================================== */
+.infoIconButton {
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    font-size: 0.8rem;                 /* Ícone menor */
+    cursor: pointer;
+    padding: 2px 6px;                  /* Botão mais discreto */
+    border-radius: 4px;
+    transition: all 0.15s ease-in-out;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.infoIconButton:hover {
+    background-color: #e2e8f0;
+    border-color: #94a3b8;
+}
+
+.createButton {
+    background-color: #2563eb;
+    color: #ffffff;
+    border: none;
+    padding: 3px 8px;                  /* Mais compacto */
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    cursor: pointer;
+}
+
+/* ==========================================================================
+   MODAIS (Inspirados na Estética de Nota Impressa / DANFE)
+   ========================================================================== */
+.modalBackdrop {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(15, 23, 42, 0.3);
+    backdrop-filter: blur(2px);
+    z-index: 9999;
+}
+
+.modalContent {
+    width: 520px;
+    padding: 20px;                     /* Reduzido de 24px */
+    border-radius: 6px;
+    background-color: #ffffff;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    border: 1px solid #94a3b8;
+}
+
+.modalTitle {
+    margin: 0 0 4px 0;
+    color: #0f172a;
+    font-size: 1.15rem;                /* Reduzido de 1.25rem */
+    font-weight: 700;
+}
+
+.modalSubtitle {
+    color: #64748b;
+    font-size: 0.8rem;
+    margin: 0 0 16px 0;
+}
+
+.modalDetailsGrid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;                          /* Reduzido de 10px */
+    background-color: #fafafa;
+    padding: 12px;                     /* Reduzido de 16px */
+    border-radius: 4px;
+    border: 1px dashed #cbd5e1;
+}
+
+.detailRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;                 /* Reduzido de 0.85rem */
+    color: #334155;
+    border-bottom: 1px dashed #e2e8f0;
+    padding-bottom: 4px;
+}
+
+.detailRow:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.detailRow strong {
+    color: #475569;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+}
+
+.detailRow span {
+    text-align: right;
+    max-width: 65%;
+    word-break: break-all;
+    font-weight: 500;
+    color: #0f172a;
+}
+
+.textGreen {
+    color: #16a34a !important;
+    font-weight: 700 !important;
+}
+
+.textBlue {
+    color: #2563eb !important;
+    font-weight: 700 !important;
+}
+
+.modalActions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 16px;                  /* Reduzido de 20px */
+}

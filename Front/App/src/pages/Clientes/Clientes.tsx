@@ -8,262 +8,180 @@ import FinanceiroTab from './components/tabs/FinanceiroTab';
 import HistoricoTab from './components/tabs/HistoricoTab';
 import PrecosTab from './components/tabs/PrecosTab';
 
-import type {
-  ClienteAggregate,
-} from './types/cliente.aggregate';
+import type { ClienteAggregate } from './types/cliente.aggregate';
+import type { ClienteEntity } from './types/cliente.entity';
+import type { ClienteContatoEntity, ClienteEmailEntity } from './types/cliente.entity';
 
-import type {
-  ClienteEntity,
-} from './types/cliente.entity';
-
-import type {
-  ClienteContatoEntity,
-  ClienteEmailEntity,
-} from './types/cliente.entity';
-
-import {
-  getClientes,
-  getClienteById,
-} from './services/ClienteApi';
-
+import { getClientes, getClienteById } from './services/ClienteApi';
 import { ModalNovoCliente } from './components/ModalNovoCliente';
 
 type TabType = 'geral' | 'financeiro' | 'historico' | 'precos';
-
-
 
 const Clientes = () => {
   // =========================
   // STATES
   // =========================
-
-  const [clientes, setClientes] =
-  useState<ClienteEntity[]>([]);
-
-const [cliente, setCliente] =
-  useState<ClienteAggregate | null>(null);
+  const [pessoas, setPessoas] = useState<any[]>([]); // Alterado de clientes para pessoas
+  const [pessoaAtiva, setPessoaAtiva] = useState<any | null>(null); // Alterado de cliente para pessoaAtiva
 
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
-
   const [activeTab, setActiveTab] = useState<TabType>('geral');
 
   const [ultimaCompra, setUltimaCompra] = useState<Date | undefined>();
   const [ticketMedio, setTicketMedio] = useState<number | undefined>();
 
-  const [contatos, setContatos] =
-  useState<ClienteContatoEntity[]>([]);
-
-const [emails, setEmails] =
-  useState<ClienteEmailEntity[]>([]);
-
+  const [contatos, setContatos] = useState<ClienteContatoEntity[]>([]);
+  const [emails, setEmails] = useState<ClienteEmailEntity[]>([]);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
 
   // =========================
   // AUXILIAR
   // =========================
+  const atualizarPessoaAtivaCompleta = (novaPessoa: any | null) => {
+    setPessoaAtiva(novaPessoa);
 
-  const atualizarClienteAtivoCompleto = (
-  novoCliente: ClienteAggregate | null
-) => {
-  setCliente(novoCliente);
-
-  if (novoCliente) {
-    setContatos(
-      novoCliente.contatos || []
-    );
-
-    setEmails(
-      novoCliente.emails || []
-    );
-  } else {
-    setContatos([]);
-    setEmails([]);
-  }
-};
-
-
+    if (novaPessoa) {
+      setContatos(novaPessoa.contatos || []);
+      setEmails(novaPessoa.emails || []);
+    } else {
+      setContatos([]);
+      setEmails([]);
+    }
+  };
 
   // =========================
-  // CARREGAR CLIENTES
+  // CARREGAR PESSOAS
   // =========================
-
-  const carregarClientes = async () => {
+  const carregarPessoas = async () => {
     setLoading(true);
-
     try {
-      const dados = await getClientes();
+      const dados = await getClientes(); // Busca a lista do backend
+      setPessoas(dados);
 
-      setClientes(dados);
-
-    if (dados.length > 0) {
-  const clienteCompleto = await getClienteById(
-    dados[0].id_cliente
-  );
-
-  atualizarClienteAtivoCompleto(clienteCompleto);
-} else {
-        atualizarClienteAtivoCompleto(null);
+      if (dados && dados.length > 0) {
+        // CORREÇÃO CRÍTICA: Alterado de id_cliente para id_pessoa
+        const idParaBuscar = dados[0].id_pessoa;
+        
+        if (idParaBuscar && String(idParaBuscar) !== 'undefined') {
+          const pessoaCompleta = await getClienteById(idParaBuscar);
+          atualizarPessoaAtivaCompleta(pessoaCompleta);
+        }
+      } else {
+        atualizarPessoaAtivaCompleta(null);
       }
     } catch (error) {
-      console.error(
-        'Erro ao carregar clientes:',
-        error
-      );
-
-      setClientes([]);
-      atualizarClienteAtivoCompleto(null);
+      console.error('Erro ao carregar pessoas:', error);
+      setPessoas([]);
+      atualizarPessoaAtivaCompleta(null);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    carregarClientes();
+    carregarPessoas();
   }, []);
 
   // =========================
   // FILTRO
   // =========================
-
-  const clientesFiltrados = useMemo(() => {
+  const pessoasFiltradas = useMemo(() => {
     const termo = searchTerm.toLowerCase();
-
-    return clientes.filter((c) => {
+    return pessoas.filter((p) => {
       return (
-        c.nome_razao?.toLowerCase().includes(termo) ||
-        c.cpf_cnpj?.includes(termo)
+        p.nome_razao?.toLowerCase().includes(termo) ||
+        p.cpf_cnpj?.includes(termo)
       );
     });
-  }, [clientes, searchTerm]);
+  }, [pessoas, searchTerm]);
 
   // =========================
-  // SELECIONAR CLIENTE
+  // SELECIONAR PESSOA
   // =========================
+  const handleSelecionarPessoa = async (p: any) => {
+    // Bloqueio preventivo se o ID for inválido
+    if (!p.id_pessoa || String(p.id_pessoa) === 'undefined') {
+      console.warn('Tentativa de selecionar uma pessoa com ID inválido.');
+      return;
+    }
 
-  const handleSelecionarCliente = async (
-  c: ClienteEntity
-  ) => {
     setLoading(true);
-
     try {
-      const clienteCompleto =
-        await getClienteById(c.id_cliente);
-
-      atualizarClienteAtivoCompleto(
-        clienteCompleto
-      );
+      const pessoaCompleta = await getClienteById(p.id_pessoa); // CORREÇÃO: Alterado para id_pessoa
+      atualizarPessoaAtivaCompleta(pessoaCompleta);
     } catch (error) {
-      console.error(
-        'Erro ao carregar cliente:',
-        error
-      );
-
-      atualizarClienteAtivoCompleto(
-  c as ClienteAggregate
-);
+      console.error('Erro ao carregar dados detalhados da pessoa:', error);
+      atualizarPessoaAtivaCompleta(p);
     } finally {
       setLoading(false);
     }
   };
 
   // =========================
-  // NOVO CLIENTE
+  // NOVO CADASTRO
   // =========================
-
   const handleNovoCliente = useCallback(() => {
     setIsModalOpen(true);
   }, []);
 
   // =========================
-  // SALVAR NOVO CLIENTE
+  // SALVAR NOVO CADASTRO (POST)
   // =========================
+  const handleSalvarNovoClienteDoModal = useCallback(
+    async (dadosDoFormulario: any) => {
+      setLoading(true);
+      try {
+        // CORREÇÃO: Removendo id_pessoa (antigo id_cliente) auto-incremental antes de enviar
+        const { id_pessoa, id_cliente, ...dadosParaEnviar } = dadosDoFormulario;
 
-  const handleSalvarNovoClienteDoModal =
-    useCallback(
-      async (dadosDoFormulario: Cliente) => {
-        setLoading(true);
+        const response = await fetch('http://localhost:3001/api/pessoas', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(dadosParaEnviar),
+        });
 
-        try {
-          const { id_cliente, ...clienteParaEnviar } =
-            dadosDoFormulario;
-
-          const response = await fetch(
-            'http://localhost:3001/api/clientes',
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type':
-                  'application/json',
-              },
-              body: JSON.stringify(
-                clienteParaEnviar
-              ),
-            }
-          );
-
-          if (!response.ok) {
-            throw new Error(
-              `Erro ao salvar cliente: ${response.status}`
-            );
-          }
-
-          const clienteSalvoNoBanco: Cliente =
-            await response.json();
-
-          setClientes((prev) => [
-            clienteSalvoNoBanco,
-            ...prev,
-          ]);
-
-          atualizarClienteAtivoCompleto(
-            clienteSalvoNoBanco
-          );
-
-          setActiveTab('geral');
-
-          setIsModalOpen(false);
-        } catch (error) {
-          console.error(
-            'Erro ao salvar cliente:',
-            error
-          );
-
-          alert(
-            'Não foi possível salvar o cliente.'
-          );
-        } finally {
-          setLoading(false);
+        if (!response.ok) {
+          throw new Error(`Erro ao salvar: ${response.status}`);
         }
-      },
-      []
-    );
+
+        const pessoaSalva: any = await response.json();
+
+        setPessoas((prev) => [pessoaSalva, ...prev]);
+        atualizarPessoaAtivaCompleta(pessoaSalva);
+        setActiveTab('geral');
+        setIsModalOpen(false);
+      } catch (error) {
+        console.error('Erro ao salvar nova pessoa:', error);
+        alert('Não foi possível realizar o cadastro.');
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
 
   // =========================
-  // SALVAR CLIENTE
+  // ATUALIZAR CADASTRO (PUT)
   // =========================
-
   const salvarCliente = useCallback(
-  (
-    dados: ClienteAggregate
-  ) => {
-     const clienteAtualizado: ClienteAggregate = {
-  ...dados,
-  contatos,
-  emails,
-};
+    (dados: any) => {
+      const pessoaAtualizada = {
+        ...dados,
+        contatos,
+        emails,
+      };
 
-      setClientes((prev) =>
-        prev.map((c) =>
-          c.id_cliente === dados.id_cliente
-            ? clienteAtualizado
-            : c
+      setPessoas((prev) =>
+        prev.map((p) =>
+          // CORREÇÃO: Comparação usando id_pessoa
+          p.id_pessoa === dados.id_pessoa ? pessoaAtualizada : p
         )
       );
 
-      atualizarClienteAtivoCompleto(
-        clienteAtualizado as Cliente
-      );
+      atualizarPessoaAtivaCompleta(pessoaAtualizada);
     },
     [contatos, emails]
   );
@@ -271,18 +189,13 @@ const [emails, setEmails] =
   // =========================
   // RENDER
   // =========================
-
   return (
     <div className="container-clientes">
       {/* SIDEBAR */}
       <aside className="sidebar-clientes">
         <div className="sidebar-header">
-          <h3>Clientes</h3>
-
-          <button
-            className="btn-novo"
-            onClick={handleNovoCliente}
-          >
+          <h3>Pessoas</h3>
+          <button className="btn-novo" onClick={handleNovoCliente}>
             +
           </button>
         </div>
@@ -290,66 +203,45 @@ const [emails, setEmails] =
         {/* SEARCH */}
         <div className="search-clientes">
           <input
-            placeholder="Buscar cliente..."
+            placeholder="Buscar por nome ou documento..."
             value={searchTerm}
-            onChange={(e) =>
-              setSearchTerm(e.target.value)
-            }
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
-
-          <button
-            onClick={carregarClientes}
-            disabled={loading}
-          >
+          <button onClick={carregarPessoas} disabled={loading}>
             {loading ? '...' : 'reload'}
           </button>
         </div>
 
         {/* LISTA */}
         <ul className="lista-clientes">
-  {clientesFiltrados.length === 0 &&
-  !loading ? (
-    <li className="sem-resultados">
-      Nenhum cliente encontrado
-    </li>
-  ) : (
-    clientesFiltrados.map((c) => (
-      <li
-        key={c.id_cliente}
-        className={
-          cliente?.id_cliente ===
-          c.id_cliente
-            ? 'active'
-            : ''
-        }
-        onClick={() =>
-          handleSelecionarCliente(c)
-        }
-      >
-        <strong>
-          {c.nome_razao}
-        </strong>
-
-        <div>{c.cpf_cnpj}</div>
-
-        <small>
-          {c.cidade ||
-            'Cidade não informada'}
-          {' - '}
-          {c.estado || 'UF'}
-        </small>
-      </li>
-    ))
-  )}
-</ul>
+          {pessoasFiltradas.length === 0 && !loading ? (
+            <li className="sem-resultados">Nenhum registro encontrado</li>
+          ) : (
+            pessoasFiltradas.map((p) => (
+              <li
+                key={p.id_pessoa} // CORREÇÃO: key apontando para id_pessoa
+                className={pessoaAtiva?.id_pessoa === p.id_pessoa ? 'active' : ''} // CORREÇÃO: classe active verificando id_pessoa
+                onClick={() => handleSelecionarPessoa(p)}
+              >
+                <strong>{p.nome_razao}</strong>
+                <div>{p.cpf_cnpj}</div>
+                <small>
+                  {p.cidade || 'Cidade não informada'}
+                  {' - '}
+                  {p.estado || 'UF'}
+                </small>
+              </li>
+            ))
+          )}
+        </ul>
       </aside>
 
-      {/* MAIN */}
+      {/* MAIN PANEL */}
       <main className="painel-cliente">
-        {cliente ? (
+        {pessoaAtiva ? (
           <>
             <ClientHeader
-              cliente={cliente}
+              cliente={pessoaAtiva}
               ultimaCompra={ultimaCompra}
               ticketMedio={ticketMedio}
               onAcao={() => {}}
@@ -357,37 +249,24 @@ const [emails, setEmails] =
             />
 
             <div className="client-tabs">
-              {/* TABS */}
+              {/* TABS HEADER */}
               <div className="tabs-header">
-                {(
-                  [
-                    'geral',
-                    'financeiro',
-                    'historico',
-                    'precos',
-                  ] as TabType[]
-                ).map((tab) => (
+                {(['geral', 'financeiro', 'historico', 'precos'] as TabType[]).map((tab) => (
                   <button
                     key={tab}
-                    className={`tab-button ${
-                      activeTab === tab
-                        ? 'active'
-                        : ''
-                    }`}
-                    onClick={() =>
-                      setActiveTab(tab)
-                    }
+                    className={`tab-button ${activeTab === tab ? 'active' : ''}`}
+                    onClick={() => setActiveTab(tab)}
                   >
                     {tab.toUpperCase()}
                   </button>
                 ))}
               </div>
 
-              {/* CONTEÚDO */}
+              {/* TABS CONTENT */}
               <div className="tabs-content">
                 {activeTab === 'geral' && (
                   <GeralTab
-                    cliente={cliente}
+                    cliente={pessoaAtiva}
                     contatos={contatos}
                     emails={emails}
                     setContatos={setContatos}
@@ -396,33 +275,23 @@ const [emails, setEmails] =
                   />
                 )}
 
-                {activeTab ===
-                  'financeiro' && (
-                  <FinanceiroTab
-                    cliente={cliente}
-                  />
+                {activeTab === 'financeiro' && (
+                  <FinanceiroTab cliente={pessoaAtiva} />
                 )}
 
-                {activeTab ===
-                  'historico' && (
-                  <HistoricoTab
-                    cliente={cliente}
-                  />
+                {activeTab === 'historico' && (
+                  <HistoricoTab cliente={pessoaAtiva} />
                 )}
 
                 {activeTab === 'precos' && (
-                  <PrecosTab
-                    cliente={cliente}
-                  />
+                  <PrecosTab cliente={pessoaAtiva} />
                 )}
               </div>
             </div>
           </>
         ) : (
           <div className="empty-container">
-            <h2>
-              Selecione um cliente
-            </h2>
+            <h2>Selecione um registro para visualizar</h2>
           </div>
         )}
       </main>
@@ -430,12 +299,8 @@ const [emails, setEmails] =
       {/* MODAL */}
       <ModalNovoCliente
         isOpen={isModalOpen}
-        onClose={() =>
-          setIsModalOpen(false)
-        }
-        onSave={
-          handleSalvarNovoClienteDoModal
-        }
+        onClose={() => setIsModalOpen(false)}
+        onSave={handleSalvarNovoClienteDoModal}
       />
     </div>
   );

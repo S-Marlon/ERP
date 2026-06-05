@@ -1,7 +1,7 @@
 import React from "react";
 import "./Card.css";
 
-type CardVariant = "default" | "panel" | "highlight";
+type CardVariant = "default" | "panel" | "highlight" | "nfe";
 
 interface CardProps {
   variant?: CardVariant;
