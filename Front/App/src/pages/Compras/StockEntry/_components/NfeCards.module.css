@@ -5,11 +5,6 @@
     width: 100%;
 }
 
-/* Força os FlexGridContainers internos a usarem menos espaço */
-.gridContainer :global(.ui-flex-grid) { /* Ou a classe gerada pelo seu FlexGridContainer */
-    gap: 8px !important; /* Diminui o espaçamento vertical/horizontal entre os campos */
-}
-
 /* Hack de Estilo para Compactar o FormControl 
    Procura as labels e inputs/displays dentro deste módulo e reduz o tamanho
 */
@@ -54,10 +49,7 @@
 /* Container do Badge de Status de Fornecedores */
 .badgeContainer {
     display: flex;
-    align-items: center;               /* Centraliza com o input ao lado */
     gap: 6px;
-    height: 100%;                      /* Força a alinhar no meio do grid */
-    padding-top: 16px;                 /* Compensa a falta da label para alinhar por baixo */
 }
 
 /* ==========================================================================
@@ -108,7 +100,7 @@
 }
 
 .modalContent {
-    width: 520px;
+    width: 620px;
     padding: 20px;                     /* Reduzido de 24px */
     border-radius: 6px;
     background-color: #ffffff;

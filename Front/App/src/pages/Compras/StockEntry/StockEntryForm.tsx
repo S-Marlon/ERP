@@ -333,22 +333,32 @@ const StockEntryForm: React.FC = () => {
         <div className="stock-entry-container">
             {/* CABEÇALHO DA PÁGINA */}
             <div className="page-header">
-                <FlexGridContainer layout='grid' template='1fr 1fr 1fr' gap='20px'>
+                <FlexGridContainer layout='grid' template='1fr 1fr  1fr' gap='20px'>
                     <h1 className="page-title">📥 Entrada de Mercadorias (Registro de NF-e)</h1>
 
-                    <Card padding="8px">
-                        <div className="badge-stepper">
-                            <Badge color={accessKey ? "success" : "paper"}>XML Importado</Badge>
-                            <span className="stepper-arrow">&rarr;</span>
-                            <Badge color={supplierExists ? "success" : "paper"}>Fornecedor OK</Badge>
-                            <span className="stepper-arrow">&rarr;</span>
-                            <Badge color="paper">{items.length} Itens</Badge>
-                            <span className="stepper-arrow">&rarr;</span>
-                            <Badge color={items.some(i => i.difference !== 0) ? "warning" : "success"}>
-                                {items.filter(i => i.difference !== 0).length} Divergências
-                            </Badge>
-                        </div>
-                    </Card>
+                   <div>
+                    <div className="stats">
+                        <Badge color="warning">
+                            pendentes: 
+                            {items.length} {items.length === 1 ? 'item' : 'itens'} 
+                        </Badge>
+
+                        <Badge color={"success"}>
+                            conferidos: {items.filter(i => i.isConfirmed).length}
+                        </Badge>
+
+                            <Badge color={"danger"}>
+                            divergências: {items.filter(i => i.difference !== 0).length}
+                        </Badge>
+
+                            <Badge color={"poco"}>
+                            sem vínculo: {items.filter(i => !i.mappedId).length}
+                        </Badge>
+                    </div>
+
+                    
+
+                   </div>
 
                     <div className="upload-action-wrapper">
                         <input type="file" style={{ display: 'none' }} accept=".xml" id="xml-upload" onChange={handleXmlUpload} />
@@ -394,7 +404,7 @@ const StockEntryForm: React.FC = () => {
                     )}
 
                     {items.length > 0 && (
-                        <div className="section-wrapper content-card-table">
+                        <div className="section-wrapper">
                             <ItemsConference
                                 items={items.map((i, index) => ({
                                     ...i,

@@ -62,12 +62,12 @@ const NfeCards: React.FC<NfeCardsProps> = ({
     }, [emitente.cnpj]);
 
     return (
-        <FlexGridContainer layout="grid" template="1fr" gap="20px" className={styles.gridContainer}>
+        <FlexGridContainer layout="grid" template="1fr" className={styles.gridContainer}>
 
-            <FlexGridContainer layout="grid" template="3fr 3fr 2fr" gap="20px">
+            <FlexGridContainer layout="grid" template="3fr 3fr 2fr" >
 
                 {/* CARD 1: Identificação da NF */}
-                <Card variant="default" padding="20px">
+                <Card variant="nfe-card" padding="14px">
                     <div className={styles.headerCard}>
                         <Typography variant="h2">1. Identificação da NF</Typography>
                         <button className={styles.infoIconButton} onClick={() => setIsNfDetailsOpen(true)} title="Ver detalhes da nota">ℹ️</button>
@@ -84,14 +84,9 @@ const NfeCards: React.FC<NfeCardsProps> = ({
                 </Card>
 
                 {/* CARD 2: Emitente */}
-                <Card variant="default" padding="20px">
+                <Card variant="nfe-card" padding="14px">
                     <div className={styles.headerCard}>
                         <Typography variant="h2">2. Fornecedor (Emitente)</Typography>
-                        <button className={styles.infoIconButton} onClick={() => setIsSupplierDetailsOpen(true)} title="Ver detalhes do fornecedor">ℹ️</button>
-                    </div>
-
-                    <FlexGridContainer layout="grid" template="1fr 1fr" gap="10px">
-                        <FormControl label="CNPJ" value={emitente.cnpj} readOnlyDisplay />
                         <div className={styles.badgeContainer}>
                             {supplierStatus.isChecking && <Badge color="paper">Verificando...</Badge>}
                             {supplierStatus.exists === true && <Badge color="success">Fornecedor Ativo</Badge>}
@@ -102,6 +97,12 @@ const NfeCards: React.FC<NfeCardsProps> = ({
                                 </>
                             )}
                         </div>
+                        <button className={styles.infoIconButton} onClick={() => setIsSupplierDetailsOpen(true)} title="Ver detalhes do fornecedor">ℹ️</button>
+                    </div>
+
+                    <FlexGridContainer layout="grid" template="1fr 1fr" gap="10px">
+                        <FormControl label="CNPJ" value={emitente.cnpj} readOnlyDisplay />
+                        
                         <FormControl
                             label="Nome Fantasia"
                             value={emitente.nomeFantasia || "Não Informado"}
@@ -112,7 +113,7 @@ const NfeCards: React.FC<NfeCardsProps> = ({
                 </Card>
 
                 {/* CARD 3: Dados de Logística e Volumes */}
-                <Card variant="default" padding="20px">
+                <Card variant="nfe-card" padding="14px">
                     <div className={styles.headerCard}>
                         <Typography variant="h2">3. Logística de Entrega</Typography>
                         {/* 🟢 Adicionado botão de informação para o Card 3 */}
@@ -144,6 +145,7 @@ const NfeCards: React.FC<NfeCardsProps> = ({
                         />
                     </div>
                 </Card>
+                
 
             </FlexGridContainer>
 

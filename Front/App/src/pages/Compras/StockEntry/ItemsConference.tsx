@@ -83,31 +83,21 @@ export const ItemsConference: React.FC<Props> = ({
 
     return (
         <div className={styles.container}>
+            <div className={styles.header}>
             <h2 className={styles.title}>
                 4. Conferência de Itens ({items.length})
             </h2>
 
-            {/* Indicadores */}
+            {/* Indicadoresa
             <div className={styles.statsGrid}>
                 <Stat title="Pendentes" value={pendingItems.length} color="#f59e0b" />
                 <Stat title="Conferidos" value={confirmedItems.length} color="#10b981" />
                 <Stat title="Divergências" value={divergentItems.length} color="#ef4444" />
                 <Stat title="Sem Vínculo" value={unmappedItems.length} color="#6366f1" />
-            </div>
+            </div> */}
 
-            {/* Filtros e Ações em Lote */}
-            <div className={styles.filterContainer}>
-                <div className={hasSelection ? styles.bulkActions : styles.bulkActionsDisabled}>
-                    <strong>
-                        {hasSelection ? `${selected.size} selecionado(s)` : 'Nenhum item selecionado'}
-                    </strong>
-                    <button disabled={!hasSelection} onClick={() => { onConfirmItems(selectedIds); setSelected(new Set()); }}>Conferir</button>
-                    <button disabled={!hasSelection} onClick={() => { onUnconfirmItems(selectedIds); setSelected(new Set()); }}>Desfazer</button>
-                    <button disabled={!hasSelection} onClick={() => onMapProducts(selectedIds)}>Vincular</button>
-                    <button disabled={!hasSelection} onClick={() => { onRemoveItems(selectedIds); setSelected(new Set()); }}>Remover</button>
-                </div>
 
-                <div className={styles.filterGroup}>
+             <div className={styles.filterGroup}>
                     <FilterButton active={filter === 'all'} onClick={() => setFilter('all')}>
                         Todos ({items.length})
                     </FilterButton>
@@ -126,6 +116,31 @@ export const ItemsConference: React.FC<Props> = ({
                 </div>
             </div>
 
+
+            {/* Filtros e Ações em Lote */}
+            <div className={styles.filterContainer}>
+                <div className={hasSelection ? styles.bulkActions : styles.bulkActionsDisabled}>
+                    <strong>
+                        {hasSelection ? `${selected.size} selecionado(s)` : 'Nenhum item selecionado'}
+                    </strong>
+                    <button style={{color:'black'}} disabled={!hasSelection} onClick={() => { onConfirmItems(selectedIds); setSelected(new Set()); }}>Conferir</button>
+                    <button style={{color:'black'}}disabled={!hasSelection} onClick={() => { onUnconfirmItems(selectedIds); setSelected(new Set()); }}>Desfazer</button>
+                    <button style={{color:'black'}}disabled={!hasSelection} onClick={() => onMapProducts(selectedIds)}>Vincular</button>
+                    <button style={{color:'black'}}disabled={!hasSelection} onClick={() => { onRemoveItems(selectedIds); setSelected(new Set()); }}>Remover</button>
+                </div>
+
+              
+                <span style={{ fontSize: '0.875rem', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '4px' ,}}>
+
+Checkagem turbo ⚡
+                </span>
+
+                <span style={{ fontSize: '0.875rem', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '4px' , }}>
+                <input type='checkbox' title='Checkagem turbo: Funcionalidade futura: Ao marcar, o sistema pode aplicar regras de conferência automática. podendo ser: ao dobbleclick no status item é marcado como conferido.'/>   {/* Funcionalidade futura: Ao marcar, o sistema pode aplicar regras de conferência automática. podendo ser: ao dobbleclick no status item é marcado como conferido. e ou  */}
+                </span>
+
+            </div>
+
             {/* Tabela de Conferência */}
             <div className={styles.tableResponsive}>
                 <table className={styles.table}>
@@ -138,17 +153,17 @@ export const ItemsConference: React.FC<Props> = ({
                                     onChange={toggleSelectAll}
                                 />
                             </th>
-                            <th style={{ width: '40px' }}>Item</th> {/* ⬅️ Nova coluna ideal */}
+                            <th >Item</th> {/* ⬅️ Nova coluna ideal */}
                             <th>Cod. Interno</th>
-                            <th>SKU / EAN</th>
-                            <th style={{ width: '280px' }}>Produto</th>
+                            <th style={{ width: '200px' }}>SKU / EAN</th>
+                            <th style={{ width: '200px' }}>Produto</th>
                             <th>UOM</th>
                             <th>Custo Unit.</th>
                             <th>Qtd (NF)</th>
-                            <th style={{ width: '140px' }}>QTD Recebido</th>
+                            <th >QTD Recebido</th>
                             <th>Dif.</th>
                             <th>Total Item</th>
-                            <th >status</th>
+                            <th style={{ width: '10px' }}>status</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -205,7 +220,7 @@ export const ItemsConference: React.FC<Props> = ({
                 )}
             </td>
 
-            <td>{item.sku} / {item.gtin}</td>
+             <td>{/*{item.sku} /  */} {item.gtin}</td>
             <td>
                 <div className={styles.productDesc}>{item.descricao}</div>
             </td>
