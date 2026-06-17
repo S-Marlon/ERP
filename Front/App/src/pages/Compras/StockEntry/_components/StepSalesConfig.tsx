@@ -1,23 +1,37 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
-export default function StepSalesConfig() {
-  // Dados simulados do produto vindo da NF
-  const item = { custo: 50.00 }; // R$ 50,00 o rolo, por exemplo
-  const wholeUnit = "RL"; // Unidade padrão da NF
+interface SalesMode {
+  id: number;
+  name: string;
+  unit: string;
+  conversion: number;
+  markup: number;
+  price: number;
+  active: boolean;
+  isDefault?: boolean;
+}
 
-  // Iniciamos a lista apenas com a embalagem padrão da NF
-  const [salesModes, setSalesModes] = useState([
-    {
-      id: 1,
-      name: `Embalagem Padrão NF (${wholeUnit})`,
-      unit: wholeUnit,
-      conversion: 1, // Sempre 1 para o principal
-      markup: 50,
-      price: 75.00,
-      active: true,
-      isDefault: true // Marcador para sabermos que este é o principal
-    }
-  ]);
+interface StepSalesConfigProps {
+  item: { custo?: number; unidadeMedida?: string };
+  initialModes?: SalesMode[];
+  onChange?: (modes: SalesMode[]) => void;
+}
+
+export default function StepSalesConfig({ item, initialModes, onChange }: StepSalesConfigProps) {
+  const baseUnit = item?.unidadeMedida || 'UN';
+
+  const defaultMode: SalesMode = {
+    id: 1,
+    name: `Embalagem Padrão NF (${baseUnit})`,
+    unit: baseUnit,
+    conversion: 1,
+    markup: 50,
+    price: Number(((item?.custo || 0) * 1.5).toFixed(2)),
+    active: true,
+    isDefault: true,
+  };
+
+  const [salesModes, setSalesModes] = useState<SalesMode[]>(initialModes && initialModes.length ? initialModes : [defaultMode]);
 
   // Função para adicionar um novo fracionamento em branco
   const addFractionedMode = () => {
@@ -27,10 +41,10 @@ export default function StepSalesConfig() {
       {
         id: newId,
         name: `Fracionamento #${prev.length}`,
-        unit: "MT", // Sugere Metro por padrão
-        conversion: 100, // Fator divisor padrão inicial
+        unit: 'MT',
+        conversion: 100,
         markup: 50,
-        price: (item.custo / 100) * 1.5, // Preço base calculado com 50% markup
+        price: Number(((item?.custo || 0) / 100 * 1.5).toFixed(2)),
         active: true,
         isDefault: false
       }
@@ -52,6 +66,11 @@ export default function StepSalesConfig() {
       return filtered;
     });
   };
+
+  // Propagate changes to parent when salesModes change
+  useEffect(() => {
+    if (onChange) onChange(salesModes);
+  }, [salesModes]);
 
   // Função para atualizar os campos
   const updateMode = (id, field, value) => {
@@ -80,16 +99,16 @@ export default function StepSalesConfig() {
         if (mode.id !== id) return mode;
         
         const updated = { ...mode, [field]: value };
-        const baseCost = item.custo || 0;
+        const baseCost = item?.custo || 0;
         const proportionalCost = baseCost / (updated.conversion || 1);
 
         // Recalcula o Preço se o Markup ou Conversão mudarem
         if (field === 'markup' || field === 'conversion') {
-          updated.price = proportionalCost * (1 + Number(updated.markup) / 100);
+          updated.price = Number((proportionalCost * (1 + Number(updated.markup) / 100)).toFixed(2));
         }
         // Recalcula o Markup se o Preço mudar
         if (field === 'price') {
-          updated.markup = proportionalCost > 0 ? ((Number(value) - proportionalCost) / proportionalCost) * 100 : 0;
+          updated.markup = proportionalCost > 0 ? Number((((Number(value) - proportionalCost) / proportionalCost) * 100).toFixed(2)) : 0;
         }
 
         return updated;

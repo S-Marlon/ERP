@@ -38,7 +38,7 @@ router.post('/api/compras/notas-fiscais/itens/mapear', async (req, res) => {
                 productData.sku, 
                 itemNota.ean_fornecedor || null, 
                 productData.descricao, 
-                salesUnits[0]?.unit || 'UN'
+                salesUnits[0]?.unit || '-'
             ]);
 
             targetProductId = newProduct.insertId;

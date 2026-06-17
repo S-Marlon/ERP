@@ -13,16 +13,10 @@ import FlexGridContainer from '../../../components/Layout/FlexGridContainer/Flex
 import Badge from '../../../components/ui/Badge/Badge';
 import Card from '../../../components/ui/Card/Card';
 
-interface ProductEntry extends ProdutoNF {
-    tempId: number;
-    isMapped: boolean;
-    mappedId?: string;
-    isConfirmed: boolean;
-    category?: string;
-    mappedData?: any;
-    receivedQuantity: number; 
-    difference: number;
-}
+import type { Item, Group, Atributo } from '../types';
+import ItemsConferenceNEW from './ItemsConference.NEW';
+
+
 
 type NfeData = Omit<NfeDataFromXML, 'produtos'> & {
     invoiceNumber: string;
@@ -50,16 +44,15 @@ const formatCnpj = (cnpj?: string): string => {
 };
 
 const mapNfeDataToEntryForm = (xmlData: NfeDataFromXML): NfeData => {
-    const items: ProductEntry[] = xmlData.produtos.map((produto, index) => ({
-        ...produto,
-        tempId: index + 1,
-        isMapped: false,
-        isConfirmed: false,
-        category: '',
-        mappedData: undefined,
-        receivedQuantity: produto.quantidade || 0,
-        difference: 0,
-    }));
+   const items: Item[] = xmlData.produtos.map((produto, index) => ({
+    ...produto,
+    tempId: index + 1,
+    receivedQuantity: produto.quantidade || 0,
+    confirmed: false,
+    difference: 0,
+    grupoId: null,
+    atributosCustomizados: [],
+}));
 
     const dataFicticia = new Date().toISOString().substring(0, 10);
 
@@ -94,7 +87,7 @@ const StockEntryForm: React.FC = () => {
     const [supplierExists, setSupplierExists] = useState<boolean | null>(null);
     const [pendingXmlData, setPendingXmlData] = useState<NfeData | null>(null);
     const [entryDate, setEntryDate] = useState('');
-    const [items, setItems] = useState<ProductEntry[]>([]);
+    const [items, setItems] = useState<Item[]>([]);
     const [accessKey, setAccessKey] = useState('');
     const [totalFreight, setTotalFreight] = useState(0);
     const [totalIpi, setTotalIpi] = useState(0);
@@ -303,6 +296,21 @@ const StockEntryForm: React.FC = () => {
         }
     };
 
+    // Assign a group to multiple items (called by ItemsConference)
+    const handleAssignGroupToItems = (ids: number[], groupData: { mode: 'LINK' | 'CREATE'; grupoId?: string; nomeGrupo?: string; variacao: string }) => {
+        const groupName = groupData.mode === 'LINK' ? (groupData.grupoId || '') : (groupData.nomeGrupo || '');
+        const variation = groupData.variacao || '';
+        setItems(prev => prev.map(item => ids.includes(item.tempId) ? ({ ...item, grupo: groupName, grupoVariacao: variation }) : item));
+    };
+
+    const handleUnassignGroup = (grupoNome: string) => {
+        setItems(prev => prev.map(item => item.grupo === grupoNome ? ({ ...item, grupo: undefined, grupoVariacao: undefined }) : item));
+    };
+
+    const handleUnassignItem = (itemId: number) => {
+        setItems(prev => prev.map(item => item.tempId === itemId ? ({ ...item, grupo: undefined, grupoVariacao: undefined }) : item));
+    };
+
     const handleQuantityReceivedChange = (id: number, newQty: number) => {
         setItems(prev => prev.map(item => {
             if (item.tempId === id) {
@@ -417,6 +425,9 @@ const StockEntryForm: React.FC = () => {
                                 onRemoveItems={handleRemoveItemsFromConference}
                                 onToggleItem={handleToggleSingleItem}
                                 onQuantityChange={handleQuantityReceivedChange} 
+                                onAssignGroupToItems={handleAssignGroupToItems}
+                                onUnassignGroup={handleUnassignGroup}
+                                onUnassignItem={handleUnassignItem}
                             />
                         </div>
                     )}

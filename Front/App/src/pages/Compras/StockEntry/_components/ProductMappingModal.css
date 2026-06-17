@@ -49,6 +49,8 @@
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+  position: relative;
+  z-index: 2;
 }
 
 .modal-header .header-titles {
@@ -311,6 +313,8 @@ input:disabled, select:disabled {
   justify-content: flex-end;
   align-items: center;
   gap: 8px;
+  z-index: 2;
+  flex: 0 0 auto;
 }
 
 /* Redução sutil nos botões globais do footer para casar com o layout slim */

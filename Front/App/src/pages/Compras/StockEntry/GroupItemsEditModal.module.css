@@ -1,0 +1,312 @@
+:local {
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --neutral-dark: #1e293b;
+  --neutral-light: #f8fafc;
+  --text-secondary: #64748b;
+  --border-color: #e2e8f0;
+  --radius-md: 8px;
+}
+
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.container {
+  background-color: #ffffff;
+  width: 95%;
+  max-width: 880px; /* Reduzido de forma estável já que temos menos colunas */
+  max-height: 85vh;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slideUp 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  background-color: #ffffff;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.header h3 {
+  margin: 0 0 2px 0;
+  font-size: 1.25rem;
+  color: var(--neutral-dark);
+  font-weight: 700;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.subtitle strong {
+  color: var(--primary);
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  font-size: 1.75rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.body {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex: 1;
+  gap: 1rem;
+}
+
+.warningBox {
+  background-color: #fffbeb;
+  color: #78350f;
+  border: 1px solid #fde68a;
+  padding: 16px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* ===================================================================
+   MATRIZ / TABELA OPERACIONAL
+   =================================================================== */
+.tableWrapper {
+  overflow-x: auto;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  max-height: 55vh;
+  flex: 1;
+}
+
+.matrixTable {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.matrixTable th {
+  background-color: var(--neutral-light);
+  color: #475569;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 14px;
+  border-bottom: 2px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.attrTitleText {
+  color: var(--neutral-dark);
+  font-weight: 800;
+}
+
+.starBadge {
+  background-color: #fef3c7;
+  color: #d97706;
+  font-size: 0.7rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  border: 1px solid #fde68a;
+  margin-left: 4px;
+}
+
+.matrixTable td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+}
+
+.matrixTable tbody tr:hover td {
+  background-color: #f8fafc;
+}
+
+/* Célula do Produto */
+.productCell {
+  width: 55%; /* Dá maior prioridade de espaço para a leitura dos nomes */
+}
+
+.desc {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+  margin-bottom: 0.25rem;
+  max-width: 440px;
+}
+
+/* Box do Nome Gerado */
+.generatedNameWrapper {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #0f172a;
+  background-color: #f1f5f9;
+  padding: 0.3rem 0.5rem;
+  border-radius: 4px;
+  border-left: 3px solid #2563eb; /* Borda azul destacando o resultado real */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 440px;
+}
+
+.previewLabel {
+  font-size: 0.7rem;
+  color: var(--primary);
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-right: 2px;
+}
+
+.qtyBadge {
+  font-size: 0.75rem;
+  color: #334155;
+  background-color: #e2e8f0;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Input Único da Linha */
+.tableInput {
+  width: 100%;
+  padding: 7px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--neutral-dark);
+  box-sizing: border-box;
+  outline: none;
+}
+
+/* Foco e preenchimento diferenciado para a Key */
+.tableInputPrincipal {
+  border-color: #cbd5e1;
+  background-color: #ffffff;
+}
+
+.tableInputPrincipal:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  background-color: #ffffff;
+}
+
+/* ===================================================================
+   BOTÕES DO RODAPÉ
+   =================================================================== */
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 1rem;
+}
+
+.btnCancel {
+  background-color: #ffffff;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  padding: 0.6rem 1.25rem;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.btnCancel:hover {
+  background-color: var(--neutral-light);
+}
+
+.btnSave {
+  background-color: var(--primary);
+  color: #ffffff;
+  border: none;
+  padding: 0.6rem 1.25rem;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.btnSave:hover:not(:disabled) {
+  background-color: var(--primary-hover);
+}
+
+.btnSave:disabled {
+  background-color: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+
+/* Botão "X" de desvincular item dentro da linha da tabela */
+.removeItemBtn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 1.35rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+  border-radius: 4px;
+  transition: all 0.1s ease;
+}
+
+.removeItemBtn:hover {
+  background-color: #fee2e2;
+  color: #ef4444;
+}
+
+/* Box amigável caso o usuário remova todos os itens e a lista zere */
+.emptyItemsBox {
+  background-color: #f8fafc;
+  color: #64748b;
+  border: 1px dashed #cbd5e1;
+  padding: 32px;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
