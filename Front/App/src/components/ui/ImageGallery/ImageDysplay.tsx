@@ -15,9 +15,14 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
   const [hasError, setHasError] = useState(false);
 
   // Se não houver URL, já marcamos como erro para não exibir nada quebrado
-  useEffect(() => {
-    if (!src) setHasError(true);
-  }, [src]);
+ // Sincroniza o estado de erro sempre que a URL (src) mudar
+useEffect(() => {
+  if (!src) {
+    setHasError(true);
+  } else {
+    setHasError(false); // 👈 ISSO AQUI SALVA O DIA! Limpa o erro se uma URL nova chegar
+  }
+}, [src]);
 
   // Bloqueia o scroll do corpo quando o modal está aberto
   useEffect(() => {
@@ -109,7 +114,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
           {!hasError && src ? (
             <img 
               src={src} 
-              alt="Thumbnail" 
+              alt="" 
               className="img-thumb"
               onError={() => setHasError(true)} // Se a URL quebrar, vira placeholder
             />

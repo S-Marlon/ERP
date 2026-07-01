@@ -207,26 +207,26 @@ export const checkSupplier = async (supplierCnpj: string) => {
 
 
 // services/supplierService.ts
-export async function buscarSiglaNoBanco(cnpj: string): Promise<string> {
-    if (!cnpj) return "";
+// export async function buscarSiglaNoBanco(cnpj: string): Promise<string> {
+//     if (!cnpj) return "";
 
-    // IMPORTANTE: Não use .replace(/\D/g, '') aqui! 
-    // O CNPJ deve ir como '71.636.179/0001-16'
+//     // IMPORTANTE: Não use .replace(/\D/g, '') aqui! 
+//     // O CNPJ deve ir como '71.636.179/0001-16'
     
-    try {
-        const response = await fetch(`${apiBase}/suppliers/get-sigla`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cnpj: cnpj }) 
-        });
+//     try {
+//         const response = await fetch(`${apiBase}/suppliers/get-sigla`, {
+//             method: 'POST',
+//             headers: { 'Content-Type': 'application/json' },
+//             body: JSON.stringify({ cnpj: cnpj }) 
+//         });
 
-        const data = await response.json();
-        return data.sigla || "";
-    } catch (error) {
-        console.error("Erro na busca:", error);
-        return "";
-    }
-}
+//         const data = await response.json();
+//         return data.sigla || "";
+//     } catch (error) {
+//         console.error("Erro na busca:", error);
+//         return "";
+//     }
+// }
 
 export async function buscarProdutosExistentes(termo: string): Promise<any[]> {
     if (!termo || termo.length < 2) return [];

@@ -117,7 +117,6 @@ const renderSelectedCliente = (cliente: Cliente, handleClear: () => void, isLoad
 const renderClienteResult = (cliente: Cliente, isSelected: boolean, handleSelect: (c: Cliente) => void) => (
     <ResultItem
         key={cliente.id_cliente} // Usamos a PK do DB
-        key={cliente.id} // Usamos a PK do DB
         onClick={() => handleSelect(cliente)}
         selected={isSelected}
     >

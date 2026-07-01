@@ -1,7 +1,8 @@
+// types/NF-e.ts
 
 export interface ProdutoNF {
     // --- IDENTIFICAÇÃO E RASTREABILIDADE ---
-    nItem?: number;          // 🔴 nItem (Número sequencial do item na NF-e)
+    nItem?: number;          // nItem (Número sequencial do item na NF-e)
     sku: string;             // cProd (Seu SKU ou do fornecedor)
     gtin?: string;            // cEAN (Obrigatório: EAN-13 ou "SEM GTIN")
     descricao: string;       // xProd
@@ -46,7 +47,31 @@ export interface ProdutoNF {
     nItemPed?: string;          // Item do pedido
 }
 
-// --- INTERFACE DA NOTA FISCAL ---
+// --- SUB-INTERFACES AUXILIARES ---
+
+export interface TransportadoraNF {
+    cnpjCpf?: string;  // CNPJ ou CPF da transportadora
+    nome?: string;     // xNome (Razão Social)
+    ie?: string;       // Inscrição Estadual
+    endereco?: string; // xEnder
+    municipio?: string;// xMun
+    uf?: string;       // UF
+}
+
+export interface VolumesNF {
+    quantidade?: number;   // qVol (Para conferência física)
+    especie?: string;      // esp (Ex: "CAIXA", "PALLET")
+    pesoLiquido?: number;  // pesoL
+    pesoBruto?: number;    // pesoB (Para conferência física)
+}
+
+export interface FreteNF {
+    modalidade: string;             // modFrete (0=CIF, 1=FOB, 9=Sem Frete, etc)
+    transportadora?: TransportadoraNF;
+    volumes?: VolumesNF;
+}
+
+// --- INTERFACE PRINCIPAL DA NOTA FISCAL ---
 
 export interface NfeDataFromXML {
     chaveAcesso: string;        // chNFe (44 dígitos)
@@ -57,25 +82,30 @@ export interface NfeDataFromXML {
     situacao?: string;          // Autorizada / Cancelada
 
     emitente: {
-    cnpj: string;
-    nome: string;
-    nomeFantasia?: string;
-    uf: string;
-    ie: string;
-    logradouro?: string;
-    numeroEnd?: string;
-    bairro?: string;
-    municipio?: string;
-    cep?: string;        // 🔮 Para o futuro
-    fone?: string;       // 🔮 Para o futuro
-    crt?: '1' | '2' | '3'; // 🔮 Para o futuro
-};
+        cnpj: string;
+        nome: string;
+        nomeFantasia?: string;
+        uf: string;
+        ie: string;
+        logradouro?: string;
+        numeroEnd?: string;
+        bairro?: string;
+        municipio?: string;
+        cep?: string;        
+        fone?: string;       
+        crt?: '1' | '2' | '3'; 
+    };
+
     destinatario: {
         cnpjCpf: string;
         nome: string;
         uf: string;
     };
 
+    // 🚚 Dados Consolidados de Logística e Frete
+    frete: FreteNF;
+
+    // --- TOTAIS DA NOTA ---
     valorTotalProdutos: number; // vProd
     valorTotalFrete: number;    // vFrete
     valorTotalSeguro?: number;   // vSeg
@@ -84,6 +114,7 @@ export interface NfeDataFromXML {
     valorTotalDesconto?: number; // vDesc
     valorTotalNf: number;       // vNF
 
+    // --- TOTAIS DE TRIBUTOS ---
     valorTotalIcms?: number;     // vICMS
     valorTotalIcmsST?: number;   // vICMSST
     valorTotalIBS?: number;     // Reforma 2026
@@ -91,13 +122,6 @@ export interface NfeDataFromXML {
     valorTotalTributos?: number; // vTotTrib
     valorTotalPIS?: number;      // vPIS
     valorTotalCOFINS?: number;   // vCOFINS
-
-    quantidadeVolumes?: number; // 🟢 Adicionado (Para conferência física)
-    pesoBruto?: number;         // 🟢 Adicionado (Para conferência física)
-
-    modalidadeFrete?: string; // modFrete 🔮
-especieVolumes?: string;  // esp 🔮
-pesoLiquido?: number;     // pesoL 🔮
 
     xmlBruto: string;           // XML original
     produtos: ProdutoNF[];      // Lista de produtos

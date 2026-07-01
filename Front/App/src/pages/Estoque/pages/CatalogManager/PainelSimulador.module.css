@@ -1,0 +1,178 @@
+/* Layout Principal do Painel */
+.dadMainHeaderPanel {
+  
+  background-color: red;
+display: flex;
+  flex-direction: column; /* Se os elementos forem empilhados verticalmente */
+  align-items: stretch;   /* Isso força os filhos a ocuparem 100% da largura */
+}
+/* Layout Principal do Painel */
+.mainHeaderPanel {
+  display: flex;
+  gap: 10px;
+  padding-top: 20px;
+}
+
+.leftColumn,
+.rightColumn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0; /* Evita quebra de layout com conteúdos longos */
+}
+
+/* Cards de Visualização (Previews) */
+.previewCardDark,
+.previewCard {
+  padding: 8px;
+  border-radius: 6px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.previewCardDark span,
+.previewCard span {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+/* Card Dark (Nome Comercial) */
+.previewCardDark {
+  background-color: #262626;
+  color: #ffffff;
+  border: 1px solid #141414;
+}
+
+.previewCardDark div {
+  font-size: 1.15rem;
+  font-weight: 600;
+  font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Card Light (SKU Base Gerado) */
+.previewCard {
+  background-color: #f6ffed;
+  border: 1px solid #b7eb8f;
+  color: #141414;
+}
+
+.previewCard span {
+  color: #52c41a;
+}
+
+.codigoSkuReal {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #389e0d;
+}
+
+/* Seção do Template Anatômico */
+.templateCard {
+  background-color: #ffffff;
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  padding: 16px;
+}
+
+.cardSectionTitle {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #595959;
+  margin-bottom: 10px;
+}
+
+.templateInput {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  transition: all 0.2s ease;
+  margin-bottom: 12px;
+}
+
+.templateInput:focus {
+  border-color: #fa8c16;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(250, 140, 22, 0.15);
+}
+
+.templateTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.templateTags code {
+  background-color: #f5f5f5;
+  color: #000000;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  border: 1px solid #d9d9d9;
+  font-family: 'SFMono-Regular', Consolas, monospace;
+}
+
+/* Seção do Simulador Inteligente (Sandbox) */
+.sandboxSku {
+  background-color: #ffffff;
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  padding: 16px;
+  flex-grow: 1;
+}
+
+.sandboxSku h4 {
+  margin: 0 0 14px 0;
+  font-size: 0.9rem;
+  color: #262626;
+  font-weight: 600;
+}
+
+/* Grid Dinâmico para Inputs do Simulador */
+.sandboxGridInputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.sandboxInputControl {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sandboxInputControl label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #595959;
+}
+
+.sandboxInputControl input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+}
+
+.sandboxInputControl input:focus {
+  border-color: #fa8c16;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(250, 140, 22, 0.15);
+}
+
+/* Responsividade para telas menores */
+@media (max-width: 992px) {
+  .mainHeaderPanel {
+    flex-direction: column;
+    gap: 16px;
+  }
+}

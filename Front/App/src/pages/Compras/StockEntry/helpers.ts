@@ -37,7 +37,7 @@ export function hasAttributeOverride(item: Item): boolean {
  * Gera nome de exibição para item (baseado em grupo + atributos)
  */
 export function generateItemDisplayName(item: Item, group?: Group | null): string {
-  if (!group) return 'Aguardando vínculo';
+  if (!group) return 'Sem Grupo';
 
   // Se tem customizado, usa eles. Se não, idealmente pegaria os valores preenchidos no item.
   const atributos = item.atributosCustomizados?.length

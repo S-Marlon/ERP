@@ -13,6 +13,7 @@ import {
 } from './types';
 
 import { generateItemDisplayName, getBorderColorFromGroupId, hasAttributeOverride, generateGroupId } from './helpers';
+import FlexGridContainer from '../../../components/Layout/FlexGridContainer/FlexGridContainer';
 
 // ➕ Definição das colunas que permitem ordenação
 type SortKey = 'nItem' | 'ncm' | 'descricao' | 'grupoId' | 'unidadeMedida';
@@ -61,11 +62,12 @@ export const ItemsConference: React.FC<Props> = ({
     setLocalGroups(initialGroups || []);
   }, [initialGroups]);
 
-
+const [currentSecondaryInput, setCurrentSecondaryInput] = useState('');
+const [tempSecondaryEans, setTempSecondaryEans] = useState([]);
 
   const [isEanModalOpen, setIsEanModalOpen] = useState(false);
-const [selectedItemForEan, setSelectedItemForEan] = useState<Item | null>(null);
-const [tempEanInput, setTempEanInput] = useState('');
+  const [selectedItemForEan, setSelectedItemForEan] = useState<Item | null>(null);
+  const [tempEanInput, setTempEanInput] = useState('');
 
   const [filter, setFilter] = useState<FilterType>('all');
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -156,39 +158,45 @@ const [tempEanInput, setTempEanInput] = useState('');
     return itemsResult;
   }, [filter, localItems, pendingItems, confirmedItems, divergentItems, unmappedItems, sortKey, sortDirection, groupsById]);
 
-const handleOpenEanModal = (item: Item) => {
-  setSelectedItemForEan(item);
-  setTempEanInput(item.gtin || '');
-  setIsEanModalOpen(true);
-};
+  const handleOpenEanModal = (item: Item) => {
+    setSelectedItemForEan(item);
+    setTempEanInput(item.gtin || '');
+    setIsEanModalOpen(true);
+  };
 
-const handleSaveEan = () => {
-  if (!selectedItemForEan) return;
-  
-  // Atualiza o EAN no estado local dos itens
-  setLocalItems(prev =>
-    prev.map(it =>
-      it.tempId === selectedItemForEan.tempId
-        ? { ...it, gtin: tempEanInput.trim() }
-        : it
-    )
-  );
+  const handleSaveEan = () => {
+    if (!selectedItemForEan) return;
 
-  // Opcional: Se você tiver um callback vindo do backend/props, chame-o aqui
-  // onUpdateItemEan?.(selectedItemForEan.tempId, tempEanInput.trim());
+    // Atualiza o EAN no estado local dos itens
+    setLocalItems(prev =>
+      prev.map(it =>
+        it.tempId === selectedItemForEan.tempId
+          ? { ...it, gtin: tempEanInput.trim() }
+          : it
+      )
+    );
 
-  setIsEanModalOpen(false);
-  setSelectedItemForEan(null);
-};
+    // Opcional: Se você tiver um callback vindo do backend/props, chame-o aqui
+    // onUpdateItemEan?.(selectedItemForEan.tempId, tempEanInput.trim());
 
-
+    setIsEanModalOpen(false);
+    setSelectedItemForEan(null);
+  };
 
 
-  // Handler para disparar a inversão ou troca de coluna ordenada
+
+
+  /// Handler para disparar a inversão, troca ou reset da coluna ordenada
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
-      // Se clicou na mesma coluna, inverte a ordem
-      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+      if (sortDirection === 'asc') {
+        // 1º para o 2º clique: muda de ASC para DESC
+        setSortDirection('desc');
+      } else if (sortDirection === 'desc') {
+        // 2º para o 3º clique: Volta para o estado neutro (remove a ordenação)
+        setSortKey(null);
+        setSortDirection(null);
+      }
     } else {
       // Se clicou em uma coluna nova, define como ascendente
       setSortKey(key);
@@ -196,10 +204,14 @@ const handleSaveEan = () => {
     }
   };
 
-  // Pequeno auxiliar visual para os cabeçalhos das colunas
+  // Auxiliar visual para os cabeçalhos das colunas (incluindo estado neutro)
   const renderSortIndicator = (key: SortKey) => {
-    if (sortKey !== key) return ' ⇅';
-    return sortDirection === 'asc' ? ' 🔼' : ' 🔽';
+    // Se não for a coluna selecionada OU se a direção for nula, mostra o indicador neutro
+    if (sortKey !== key || !sortDirection) {
+      return ' ⇅';
+    }
+
+    return sortDirection === 'asc' ? ' ▲' : ' ▼';
   };
 
   // ===================================================================
@@ -212,7 +224,7 @@ const handleSaveEan = () => {
         it.tempId === itemId
           ? { ...it, grupoId: groupId, atributosCustomizados: undefined }
           : it
-    ));
+      ));
     onAssignGroupToItem?.(itemId, groupId);
   }, [onAssignGroupToItem]);
 
@@ -223,7 +235,7 @@ const handleSaveEan = () => {
         it.tempId === itemId
           ? { ...it, grupoId: groupData.id, atributosCustomizados: undefined }
           : it
-    ));
+      ));
     onCreateAndAssignGroup?.(itemId, groupData);
   }, [onCreateAndAssignGroup]);
 
@@ -280,10 +292,14 @@ const handleSaveEan = () => {
   };
 
   const handleQuantityChange = (itemId: number, newQty: number) => {
-    const qty = Math.max(0, newQty);
+    // Garante que o valor fique estritamente entre 0 e 999
+    const qty = Math.min(999, Math.max(0, newQty));
+
+    // Agora todo o resto do código usará o valor já travado corretamente
     setLocalItems(prev =>
       prev.map(it => (it.tempId === itemId ? { ...it, receivedQuantity: qty } : it))
     );
+
     onQuantityChange?.(itemId, qty);
   };
 
@@ -398,33 +414,32 @@ const handleSaveEan = () => {
     <div className={styles.container}>
       <div className={styles.header}>
         <h2 className={styles.title}>4. Conferência de Itens ({localItems.length})</h2>
-        <div className={styles.headerActions}>
-          <button
-            type="button"
-            className={styles.manageGroupsBtn}
-            onClick={() => setIsManageModalOpen(true)}
-          >
-            ⚙️ Gerenciar Grupos ({localGroups.length})
-          </button>
-        </div>
 
-        <div className={styles.filterGroup}>
-          <FilterButton active={filter === 'all'} onClick={() => setFilter('all')}>
-            Todos ({localItems.length})
-          </FilterButton>
-          <FilterButton active={filter === 'pending'} onClick={() => setFilter('pending')}>
-            Pendentes ({pendingItems.length})
-          </FilterButton>
-          <FilterButton active={filter === 'confirmed'} onClick={() => setFilter('confirmed')}>
-            Conferidos ({confirmedItems.length})
-          </FilterButton>
-          <FilterButton active={filter === 'divergent'} onClick={() => setFilter('divergent')}>
-            Divergências ({divergentItems.length})
-          </FilterButton>
-          <FilterButton active={filter === 'unmapped'} onClick={() => setFilter('unmapped')}>
-            Sem Vínculo ({unmappedItems.length})
-          </FilterButton>
-        </div>
+
+        <FlexGridContainer layout='flex'>
+
+          <div className={styles.headerActions}>
+            <button
+              type="button"
+              className={styles.manageGroupsBtn}
+              onClick={() => setIsManageModalOpen(true)}
+            >
+              ⚙️ Gerenciar Grupos ({localGroups.length})
+            </button>
+          </div>
+
+
+
+          <div className={styles.turboContainer}>
+            <span className={styles.turboLabel}>Checkagem turbo ⚡</span>
+            <input
+              type="checkbox"
+              className={styles.turboCheck}
+              title="Checkagem turbo automática por duplo clique."
+            />
+          </div>
+
+        </FlexGridContainer>
       </div>
 
       {/* BATCH ASSIGN MODAL */}
@@ -501,7 +516,7 @@ const handleSaveEan = () => {
                       <h5>Modo de Criação Coletiva</h5>
                       <p>Você está gerando uma nova grade para estes {selected.size} produtos de uma vez só.</p>
                     </div>
-                    
+
                     <div className={styles.formGroup}>
                       <label htmlFor="batchNewGroupNameInput">Nome do Novo Grupo</label>
                       <input
@@ -571,63 +586,75 @@ const handleSaveEan = () => {
           </button>
         </div>
 
-        <div className={styles.turboContainer}>
-          <span className={styles.turboLabel}>Checkagem turbo ⚡</span>
-          <input
-            type="checkbox"
-            className={styles.turboCheck}
-            title="Checkagem turbo automática por duplo clique."
-          />
+        <div className={styles.filterGroup}>
+          <FilterButton active={filter === 'all'} onClick={() => setFilter('all')}>
+            Todos ({localItems.length})
+          </FilterButton>
+          <FilterButton active={filter === 'pending'} onClick={() => setFilter('pending')}>
+            Pendentes ({pendingItems.length})
+          </FilterButton>
+          <FilterButton active={filter === 'confirmed'} onClick={() => setFilter('confirmed')}>
+            Conferidos ({confirmedItems.length})
+          </FilterButton>
+          <FilterButton active={filter === 'divergent'} onClick={() => setFilter('divergent')}>
+            Divergências ({divergentItems.length})
+          </FilterButton>
+          <FilterButton active={filter === 'unmapped'} onClick={() => setFilter('unmapped')}>
+            Sem Vínculo ({unmappedItems.length})
+          </FilterButton>
         </div>
       </div>
 
       {/* TABELA PRINCIPAL ORDENÁVEL */}
       <div className={styles.tableResponsive}>
         <table className={styles.table}>
-          <thead>
-            <tr>
-              {/* 1. Ordenação por Nro Item */}
-              <th >
-                <input
-                  type="checkbox"
-                  checked={filteredAndSortedItems.length > 0 && selected.size === filteredAndSortedItems.length}
-                  onChange={toggleSelectAll}
-                  onClick={e => e.stopPropagation()} // impede disparar a ordenação ao clicar no checkbox geral
-                />
-                <span>Item{renderSortIndicator('nItem')}</span>
-              </th>
-              <th>Cod. Interno</th>
-              <th>SKU</th>
-              
-              {/* 2. Ordenação por NCM */}
-              <th className={styles.sortableHeader} onClick={() => handleSort('ncm')}>
-                NCM{renderSortIndicator('ncm')}
-              </th>
-              <th>EAN</th>
-              
-              {/* 3. Ordenação por Produto / Descrição */}
-              <th style={{ width: '320px' }} className={styles.sortableHeader} onClick={() => handleSort('descricao')}>
-                Produto / Nome no Estoque{renderSortIndicator('descricao')}
-              </th>
-              
-              {/* 4. Ordenação por Grupo Estrutural */}
-              <th className={styles.sortableHeader} onClick={() => handleSort('grupoId')}>
-                Grupo{renderSortIndicator('grupoId')}
-              </th>
-              
-              {/* 5. Ordenação por UOM (Unidade de Medida) */}
-              <th className={styles.sortableHeader} onClick={() => handleSort('unidadeMedida')}>
-                UOM{renderSortIndicator('unidadeMedida')}
-              </th>
-              
-              <th>Custo Unit.</th>
-              <th>Qtd (NF)</th>
-              <th>QTD Recebido</th>
-              <th>Dif.</th>
-              <th>Total Item</th>
-              <th>Status</th>
-            </tr>
-          </thead>
+          {/* Substitua o bloco correspondente do seu <thead> por este: */}
+          <tr>
+            {/* 1. Ordenação por Nro Item (Removido o caractere solto na tag th) */}
+            <th className={styles.sortableHeader} onClick={() => handleSort('nItem')}>
+              <input
+                type="checkbox"
+                checked={filteredAndSortedItems.length > 0 && selected.size === filteredAndSortedItems.length}
+                onChange={toggleSelectAll}
+                onClick={e => e.stopPropagation()} // impede disparar a ordenação ao clicar no checkbox geral
+              />
+              <span>{renderSortIndicator('nItem')}</span>
+            </th>
+
+            <th>Cod. Interno</th>
+            <th title='Cod. Fornecedor (cProd)'><span title='Cod. Fornecedor (cProd)'></span>Cod. Forn.</th>
+
+            {/* 2. Ordenação por NCM */}
+            <th className={styles.sortableHeader} onClick={() => handleSort('ncm')}>
+              NCM{renderSortIndicator('ncm')}
+            </th>
+
+            {/* Ajustado o tipo SortKey se quiser habilitar ordenação por EAN no futuro */}
+            <th>EAN </th>
+
+            {/* 3. Ordenação por Produto / Descrição */}
+            <th style={{ width: '320px' }} className={styles.sortableHeader} onClick={() => handleSort('descricao')}>
+              Produto / Nome no Estoque{renderSortIndicator('descricao')}
+            </th>
+
+            {/* 4. Ordenação por Grupo Estrutural */}
+            <th className={styles.sortableHeader} onClick={() => handleSort('grupoId')}>
+              Grupo{renderSortIndicator('grupoId')}
+            </th>
+
+            {/* 5. Ordenação por UOM (Unidade de Medida) */}
+            <th className={styles.sortableHeader} onClick={() => handleSort('unidadeMedida')}>
+              UOM{renderSortIndicator('unidadeMedida')}
+            </th>
+
+            <th>Custo Unit.</th>
+            <th>Frete</th>
+            <th>Qtd (NF)</th>
+            <th>QTD Recebido</th>
+            <th>Dif.</th>
+            <th>Total Item</th>
+            <th>Status</th>
+          </tr>
           <tbody>
             {filteredAndSortedItems.map(item => {
               const quantityNF = item.quantidade || 0;
@@ -645,46 +672,59 @@ const handleSaveEan = () => {
               return (
                 <tr
                   key={item.tempId}
-                  className={`${item.confirmed ? styles.rowConfirmed : ''} ${item.grupoId ? styles.rowWithGroup : ''}`}
                 >
+                  {/* SUBSTITUA O CONTEÚDO DA SUA TD DA PRIMEIRA COLUNA POR ESTE: */}
                   <td
                     className={styles.tdItemCell}
-                    style={item.grupoId ? { borderLeft: `0px solid ${borderColor}` } : undefined}
+                    style={item.grupoId ? { borderLeft: `4px solid ${borderColor}` } : undefined} // Opcional: aumentei para 4px para destacar a cor do grupo se houver
                   >
-                    <input
-                      type="checkbox"
-                      checked={selected.has(item.tempId)}
-                      onChange={() => toggleSelection(item.tempId)}
-                    />
-                    <span className={styles.boldIndex}>{item.nItem || '-'}</span>
+                    <div className={styles.tdItemInner}> {/* <--- ADICIONADO ESTE CONTAINER INTERNO */}
+                      <input
+                        type="checkbox"
+                        checked={selected.has(item.tempId)}
+                        onChange={() => toggleSelection(item.tempId)}
+                      />
+                      <span className={styles.boldIndex}>{item.nItem || '-'}</span>
+                    </div>
                   </td>
 
                   <td>
                     {item.mappedId ? (
-                      <span className={styles.internalCodeBadge}>{item.mappedId}</span>
+                      <span className={styles.internalCodeBadge}>{item.mappedId || '-'}</span>
                     ) : (
                       <button
                         type="button"
                         className={styles.linkButton}
                         onClick={() => onMapProducts?.([item.tempId])}
                       >
-                        🔗 Vincular Produto
+                        🔗 Vincular <br /> Produto
                       </button>
                     )}
                   </td>
                   <td>{item.sku || '-'}</td>
-                  <td>{item.ncm || '-'}</td>
                   <td>
-  {item.gtin || (
-    <button 
-      type="button" 
-      className={styles.linkButton} // reaproveitando classe existente ou crie uma nova
-      onClick={() => handleOpenEanModal(item)}
-    >
-      ⚡ Bipar EAN
-    </button>
-  )}
-</td>
+                     <span
+                        className={`${styles.stockName} ${item.confirmed ? styles.stockNameConfirmed : ''}`}
+                        style={{fontStyle: 'italic', fontSize:'9pt'}}
+                      >
+
+                    {item.ncm || '-'}
+                      </span>
+                    
+                    </td>
+
+                  <td>
+                    {item.gtin || (
+                      <button
+                        type="button"
+                        className={styles.linkButton} // reaproveitando classe existente ou crie uma nova
+                        onClick={() => handleOpenEanModal(item)}
+                      >
+                        EAN
+                      </button>
+                    )}
+                  </td>
+
                   <td className={styles.productAndStockCell}>
                     <div className={styles.productLine} title={item.descricao}>
                       <div className={styles.productDesc}>{item.descricao}</div>
@@ -699,6 +739,8 @@ const handleSaveEan = () => {
                       </span>
                     </div>
                   </td>
+
+
                   <td>
                     {item.grupoId && group ? (
                       <button
@@ -706,7 +748,7 @@ const handleSaveEan = () => {
                         className={styles.editGroupBtn}
                         onClick={() => handleOpenGroupModal(item)}
                       >
-                        ✏️ Editar Vínculo
+                        ✏️ Editar
                       </button>
                     ) : (
                       <button
@@ -714,17 +756,30 @@ const handleSaveEan = () => {
                         className={styles.addGroupBtn}
                         onClick={() => handleOpenGroupModal(item)}
                       >
-                        ➕ Adicionar Grupo
+                        ➕ Grupo
                       </button>
                     )}
                   </td>
+
+
                   <td>
                     <span className={styles.uomBadge}>{item.unidadeMedida || '-'}</span>
                   </td>
+
+
+
+
                   <td>{formatCurrency(unitCost)}</td>
+
+                  <td>
+                    R$ ***,**
+                  </td>
+
                   <td>
                     <strong>{quantityNF}</strong>
                   </td>
+
+
                   <td>
                     <div className={styles.quantitySelector}>
                       <button
@@ -737,6 +792,8 @@ const handleSaveEan = () => {
                       <input
                         type="number"
                         className={styles.quantityInput}
+                        min={0}
+                        max={999}
                         value={item.receivedQuantity}
                         onChange={e => handleQuantityChange(item.tempId, parseInt(e.target.value, 10) || 0)}
                       />
@@ -775,8 +832,8 @@ const handleSaveEan = () => {
                       item.confirmed
                         ? 'Item conferido'
                         : isDivergent
-                        ? 'Divergência detectada'
-                        : 'Aguardando conferência'
+                          ? 'Divergência detectada'
+                          : 'Aguardando conferência'
                     }
                   >
                     <span className={`${styles.statusIcon} ${isDivergent ? styles.iconDivergent : ''}`}>
@@ -798,7 +855,7 @@ const handleSaveEan = () => {
         groups={localGroups}
         onSaveGroupMapping={handleSaveGroupMapping}
       />
-      
+
       <ManageGroupsModal
         isOpen={isManageModalOpen}
         onClose={() => setIsManageModalOpen(false)}
@@ -817,7 +874,7 @@ const handleSaveEan = () => {
           );
         }}
       />
-      
+
       <GroupEditModal
         isOpen={isGroupEditModalOpen}
         onClose={() => setIsGroupEditModalOpen(false)}
@@ -841,78 +898,175 @@ const handleSaveEan = () => {
       {/* =================================================================== */}
       {/* MODAL DE BIPAGEM / EDIÇÃO DE EAN */}
       {/* =================================================================== */}
-      {isEanModalOpen && selectedItemForEan && (
-        <div className={styles.batchModalOverlay}>
-          <div className={styles.batchModalContainer} style={{ maxWidth: '450px' }}>
-            <div className={styles.batchHeader}>
-              <h3 className={styles.batchTitle}>Bipar / Inserir Código EAN</h3>
-            </div>
-            
-            <div style={{ padding: '16px 0' }}>
-              <p style={{ marginBottom: '8px', fontSize: '14px', color: '#555' }}>
-                <strong>Produto:</strong> {selectedItemForEan.descricao}
-              </p>
-              
-              <div className={styles.formGroup}>
-                <label htmlFor="eanInput">Código de Barras (GTIN/EAN)</label>
-                <input
-                  id="eanInput"
-                  type="text"
-                  autoFocus
-                  className={styles.inputFull}
-                  value={tempEanInput}
-                  onChange={e => setTempEanInput(e.target.value)}
-                  placeholder="Aponte o leitor ou digite o EAN"
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      handleSaveEan();
-                    }
-                  }}
-                />
+     {isEanModalOpen && selectedItemForEan && (
+  <div className={styles.batchModalOverlay}>
+    <div className={styles.batchModalContainer} style={{ maxWidth: '480px' }}>
+      
+      {/* Cabeçalho */}
+      <div className={styles.batchHeader}>
+        <h3 className={styles.batchTitle}>Gerenciar Códigos de Barras</h3>
+      </div>
+
+      <div style={{ padding: '16px 0' }}>
+        {/* Informações do Produto */}
+        <p style={{ marginBottom: '16px', fontSize: '14px', color: '#333' }}>
+          <strong>Produto:</strong> {selectedItemForEan.descricao}
+        </p>
+
+        {/* --- SEÇÃO 1: EAN PRINCIPAL (VENDA) --- */}
+        <div className={styles.formGroup} style={{ marginBottom: '20px' }}>
+          <label htmlFor="eanInput" style={{ fontWeight: 'bold', color: '#2c3e50', display: 'block', marginBottom: '4px' }}>
+            EAN Principal (Código de Venda) <span style={{ color: '#e74c3c' }}>*</span>
+          </label>
+          <button>
+            SEM GTIN
+          </button>
+          <span style={{ fontSize: '11px', color: '#7f8c8d', display: 'block', marginBottom: '6px' }}>
+            Utilizado no caixa/PDV para registrar a venda.
+          </span>
+          <input
+            id="eanInput"
+            type="text"
+            autoFocus
+            className={styles.inputFull}
+            style={{ borderColor: '#3498db', borderWidth: '2px' }} // Destaque visual
+            value={tempEanInput}
+            onChange={e => setTempEanInput(e.target.value)}
+            placeholder="Bipe o código principal de venda"
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                // O enter aqui pode focar o próximo campo ou salvar direto se preferir
+              }
+            }}
+          />
+        </div>
+
+        <hr style={{ border: '0', borderTop: '1px solid #eee', margin: '20px 0' }} />
+
+        {/* --- SEÇÃO 2: CÓDIGOS SECUNDÁRIOS (CONFERÊNCIA) --- */}
+        <div className={styles.formGroup}>
+          <label htmlFor="secondaryEanInput" style={{ fontWeight: 'bold', color: '#555', display: 'block', marginBottom: '4px' }}>
+            Códigos Secundários (Conferência / Interno / QR Code)
+          </label>
+          <span style={{ fontSize: '11px', color: '#7f8c8d', display: 'block', marginBottom: '6px' }}>
+            Códigos adicionais do fornecedor. Não serão usados no PDV de venda.
+          </span>
+          
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input
+              id="secondaryEanInput"
+              type="text"
+              className={styles.inputFull}
+              style={{ flex: 1 }}
+              value={currentSecondaryInput || ''}
+              onChange={e => setCurrentSecondaryInput(e.target.value)}
+              placeholder="Bipe ou digite o código de conferência"
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  // Função para adicionar à lista local (ex: handleAddSecondary())
+                  if (currentSecondaryInput.trim()) {
+                    setTempSecondaryEans([...tempSecondaryEans, currentSecondaryInput.trim()]);
+                    setCurrentSecondaryInput('');
+                  }
+                }
+              }}
+            />
+            <button 
+              type="button"
+              className={styles.btnPrimary}
+              style={{ padding: '0 16px', height: 'auto' }}
+              onClick={() => {
+                if (currentSecondaryInput?.trim()) {
+                  setTempSecondaryEans([...tempSecondaryEans, currentSecondaryInput.trim()]);
+                  setCurrentSecondaryInput('');
+                }
+              }}
+            >
+              +
+            </button>
+          </div>
+
+          {/* Lista de códigos secundários adicionados */}
+          {tempSecondaryEans && tempSecondaryEans.length > 0 && (
+            <div style={{ marginTop: '12px', background: '#f8f9fa', padding: '10px', borderRadius: '6px', maxHeight: '100px', overflowY: 'auto' }}>
+              <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#7f8c8d', display: 'block', marginBottom: '6px' }}>
+                Códigos Vinculados:
+              </span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {tempSecondaryEans.map((code, index) => (
+                  <div 
+                    key={index} 
+                    style={{ 
+                      display: 'inline-flex', 
+                      alignItems: 'center', 
+                      background: '#e2e8f0', 
+                      padding: '4px 8px', 
+                      borderRadius: '4px', 
+                      fontSize: '12px',
+                      color: '#4a5568'
+                    }}
+                  >
+                    <span>{code}</span>
+                    <button
+                      type="button"
+                      style={{ marginLeft: '6px', border: 'none', background: 'none', color: '#e74c3c', cursor: 'pointer', fontWeight: 'bold' }}
+                      onClick={() => setTempSecondaryEans(tempSecondaryEans.filter((_, i) => i !== index))}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
-
-            <div className={styles.batchActions}>
-              <button 
-                type="button" 
-                className={styles.btnNeutral} 
-                onClick={() => {
-                  setIsEanModalOpen(false);
-                  setSelectedItemForEan(null);
-                }}
-              >
-                Cancelar
-              </button>
-              <button 
-                type="button" 
-                className={styles.btnPrimary} 
-                onClick={handleSaveEan}
-              >
-                Salvar Código
-              </button>
-            </div>
-          </div>
+          )}
         </div>
-      )}
+      </div>
+
+      {/* Ações */}
+      <div className={styles.batchActions}>
+        <button
+          type="button"
+          className={styles.btnNeutral}
+          onClick={() => {
+            setIsEanModalOpen(false);
+            setSelectedItemForEan(null);
+            if(setCurrentSecondaryInput) setCurrentSecondaryInput('');
+          }}
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          className={styles.btnPrimary}
+          onClick={() => handleSaveEan(tempEanInput, tempSecondaryEans)}
+        >
+          Salvar Códigos
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
     </div>
-      /**
- * FUNÇÃO: Gerenciamento e Bipagem de EAN (GTIN)
- * * 🔍 CENÁRIO 1: Produto SEM GTIN no cadastro e na NF-e
- * -> Ação: Exibe o botão "⚡ Bipar EAN".
- * -> Comportamento: Abre o modal, dá auto-focus no input, aguarda o bipe e salva o GTIN no item.
- * * 📄 CENÁRIO 2: Produto JÁ TEM GTIN vindo da NF-e (ou já cadastrado)
- * -> Ação: Não exibe o botão de bipar.
- * -> Comportamento: Exibe o código EAN formatado textualmente na célula (bloqueado para edição direta ali).
- * * ⚡ CENÁRIO 3: Se o produto JÁ TEM GTIN e for BIPADO globalmente (Leitura Rápida)
- * -> Ação: Executa uma função de "Foco/Scroll" ou "Checkagem Turbo".
- * -> Comportamento: O sistema rola a tela até o produto, aplica um efeito visual (blink/highlight) 
- * e incrementa +1 automaticamente na "Qtd Recebido" (Checkagem Turbo).
- */
+    /**
+* FUNÇÃO: Gerenciamento e Bipagem de EAN (GTIN)
+* * 🔍 CENÁRIO 1: Produto SEM GTIN no cadastro e na NF-e
+* -> Ação: Exibe o botão "⚡ Bipar EAN".
+* -> Comportamento: Abre o modal, dá auto-focus no input, aguarda o bipe e salva o GTIN no item.
+* * 📄 CENÁRIO 2: Produto JÁ TEM GTIN vindo da NF-e (ou já cadastrado)
+* -> Ação: Não exibe o botão de bipar.
+* -> Comportamento: Exibe o código EAN formatado textualmente na célula (bloqueado para edição direta ali).
+* * ⚡ CENÁRIO 3: Se o produto JÁ TEM GTIN e for BIPADO globalmente (Leitura Rápida)
+* -> Ação: Executa uma função de "Foco/Scroll" ou "Checkagem Turbo".
+* -> Comportamento: O sistema rola a tela até o produto, aplica um efeito visual (blink/highlight) 
+* e incrementa +1 automaticamente na "Qtd Recebido" (Checkagem Turbo).
+*/
 
 
 
-    
+
   );
 };
 

@@ -39,6 +39,7 @@ const PricingCalculator: React.FC<Props> = ({ productId, initialData, onChange }
   } = usePricing();
 
   const lastNotified = useRef("");
+  const initializedRef = useRef(false);
 
   // Wrapper para capturar alterações e atualizar o modo
   const handleChange = (field: keyof typeof values, value: number) => {
@@ -48,53 +49,58 @@ const PricingCalculator: React.FC<Props> = ({ productId, initialData, onChange }
     else if (field === 'markup' || field === 'margin') setMode('MARKUP');
   };
 
-  const initializedRef = useRef(false);
-
+  // Carrega os dados APENAS 1 VEZ na montagem do componente
   useEffect(() => {
-    if (initializedRef.current) return;
-    let isMounted = true;
+  if (initializedRef.current) return;
+  let isMounted = true;
 
-    const load = async () => {
-      try {
-        setLoading(true);
+  const load = async () => {
+    try {
+      setLoading(true);
 
-        // 🟢 MODO NF: inicializa com dados da nota fiscal
-        if (initialData) {
-          setAllValues({
-            costPrice: Number(initialData.costPrice || 0), // total da NF
-            markup: Number(initialData.markup || 1),
-            unitsPerPackage: Number(initialData.unitsPerPackage || 1), // para custo unitário
-            salePrice: Number(initialData.salePrice || 0),
-          });
-          initializedRef.current = true;
-          return;
-        }
+      // 🟢 MODO NF: inicializa com dados da nota fiscal
+      if (initialData) {
+        // GAMBIARRA: Se não houver costPrice, usa o salePrice como custo inicial
+        const custoDefinido = Number(initialData.costPrice) || Number(initialData.salePrice || 0);
 
-        // 🔵 MODO Produto: busca no cadastro
-        if (productId) {
-          const data = await getProductById(Number(productId));
-          if (isMounted && data) {
-            setAllValues({
-              costPrice: Number(data.costPrice || 0),               // total do cadastro
-              markup: Number(data.markup_praticado || data.markup || 1),
-              unitsPerPackage: Number(data.unitsPerPackage || 1),   // para custo unitário
-              salePrice: Number(data.preco_venda || 0),
-            });
-            setMode(data.priceMethod || 'MARKUP');
-            initializedRef.current = true;
-          }
-        }
-
-      } catch (err) {
-        console.error("Erro ao carregar precificação:", err);
-      } finally {
-        if (isMounted) setLoading(false);
+        setAllValues({
+          costPrice: custoDefinido, 
+          markup: Number(initialData.markup || 1),
+          unitsPerPackage: Number(initialData.unitsPerPackage || 1),
+          salePrice: Number(initialData.salePrice || 0),
+        });
+        initializedRef.current = true;
+        return;
       }
-    };
 
-    load();
-    return () => { isMounted = false; };
-  }, [productId, initialData, setAllValues]);
+      // 🔵 MODO Produto: busca no cadastro (Mesma lógica de contingência)
+      if (productId) {
+        const data = await getProductById(Number(productId));
+        if (isMounted && data) {
+          // GAMBIARRA: Se o custo no cadastro for 0, puxa o preço de venda cadastrado para ser o custo temporário
+          const custoDefinido = Number(data.costPrice) || Number(data.preco_venda || 0);
+
+          setAllValues({
+            costPrice: custoDefinido,
+            markup: Number(data.markup_praticado || data.markup || 1),
+            unitsPerPackage: Number(data.unitsPerPackage || 1),
+            salePrice: Number(data.preco_venda || 0),
+          });
+          setMode(data.priceMethod || 'MARKUP');
+          initializedRef.current = true;
+        }
+      }
+
+    } catch (err) {
+      console.error("Erro ao carregar precificação:", err);
+    } finally {
+      if (isMounted) setLoading(false);
+    }
+  };
+
+  load();
+  return () => { isMounted = false; };
+}, [productId, initialData, setAllValues]);
 
   // Envia dados atualizados para o pai
   useEffect(() => {
@@ -139,15 +145,14 @@ const PricingCalculator: React.FC<Props> = ({ productId, initialData, onChange }
         </div>
 
         <div className="field">
-          <label style={labelStyle}>Custo da NF (Total)</label>
-          <input 
-            type="number" 
-            value={values.costPrice} 
-            onChange={(e) => handleChange('costPrice', Number(e.target.value))}
-            style={{ ...inputStyle, backgroundColor: '#f1f5f9', cursor: 'not-allowed' }}
-            disabled
-          />
-        </div>
+  <label style={labelStyle}>Custo da NF (Total - Improvisado)</label>
+  <input 
+    type="number" 
+    value={values.costPrice} // Puxa o valor clonado na inicialização
+    disabled // Evita qualquer digitação acidental
+    style={{ ...inputStyle, backgroundColor: '#f1f5f9', cursor: 'not-allowed' }}
+  />
+</div>
       </div>
 
       <hr style={{ border: '0', borderTop: '1px solid #e2e8f0', margin: '15px 0' }} />
@@ -197,23 +202,6 @@ const PricingCalculator: React.FC<Props> = ({ productId, initialData, onChange }
 
       {values.unitsPerPackage > 1 && (
         <div style={{ marginTop: '10px', padding: '10px', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fef3c7', fontSize: '0.75rem' }}>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                                    <span style={{ fontSize: '1.1rem' }}>💡</span>
-                                    <div style={{ fontSize: '0.7rem', color: '#92400e', lineHeight: '1.4' }}>
-                                        <p style={{ margin: '0 0 4px 0', fontWeight: 'bold', textTransform: 'uppercase' }}>
-                                            Projeção para o Conjunto  un):
-                                        </p>
-                                        <p style={{ margin: 0 }}>
-                                            • Valor total do pacote: <strong>R$ </strong>
-                                        </p>
-                                        <p style={{ margin: 0 }}>
-                                            • Lucro total no pacote: <strong>R$ </strong>
-                                        </p>
-                                        <p style={{ margin: '4px 0 0 0', fontStyle: 'italic', fontSize: '0.65rem', borderTop: '1px solid #fde68a', paddingTop: '4px' }}>
-                                            O cálculo considera o custo real processado com impostos da NF.
-                                        </p>
-                                    </div>
-                                </div>
           <p style={{ margin: 0, color: '#92400e' }}>
             💡 Venda total da embalagem ({values.unitsPerPackage} un): 
             <strong> R$ {(values.salePrice * values.unitsPerPackage).toFixed(2)}</strong>
@@ -224,7 +212,6 @@ const PricingCalculator: React.FC<Props> = ({ productId, initialData, onChange }
   );
 };
 
-// Estilos rápidos para o exemplo
 const labelStyle: React.CSSProperties = { display: 'block', fontSize: '0.7rem', fontWeight: 600, color: '#475569', marginBottom: '4px' };
 const inputStyle: React.CSSProperties = { width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' };
 const rowStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '4px' };

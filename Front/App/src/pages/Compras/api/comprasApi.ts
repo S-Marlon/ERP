@@ -1,5 +1,7 @@
 const API_BASE_URL = 'http://localhost:3001/api'; // Ajuste para a URL do seu backend
 
+// --- INTERFACES DE SOLICITAÇÃO E RESPOSTA ---
+
 // Interface para quando o back-end encontrar o fornecedor
 export interface FornecedorQueryResponse {
     exists: boolean;
@@ -9,6 +11,31 @@ export interface FornecedorQueryResponse {
         fantasyName: string;
     };
 }
+
+// 🟢 Novas interfaces para o processamento de itens do XML (Passo 2)
+export interface ProcessarItemXMLPayload {
+    tenant_id: number;
+    id_fornecedor: number;
+    cProd: string;
+    cEAN?: string | null;
+    xProd?: string | null;
+}
+
+export interface ProcessarItemXMLResponse {
+    status: 'VINCULO_DIRETO_ENCONTRADO' | 'VINCULO_EAN_RESOLVIDO' | 'PRODUTO_INEDITO';
+    message: string;
+    id_item?: number;
+    proximo_passo: string;
+    dados_sugeridos?: {
+        cProd: string;
+        cEAN: string | null;
+        xProd: string | null;
+    };
+}
+
+// ==========================================
+// MÓDULO DE FORNECEDORES (Passo 1)
+// ==========================================
 
 /**
  * 1. CHECA SE O FORNECEDOR EXISTE (Apenas consulta)
@@ -53,6 +80,32 @@ export const createSupplier = async (supplierData: { cnpj: string; name: string;
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || 'Erro interno no servidor de cadastro.');
+    }
+
+    return response.json();
+};
+
+// ==========================================
+// MÓDULO DE ITENS / XML (Passo 2)
+// ==========================================
+
+/**
+ * 🟢 3. PROCESSA UM ITEM DO XML (Loop dos Itens)
+ * Executa a verificação de baixo para cima (Código do Fornecedor -> EAN) 
+ * e cria novos vínculos de forma resiliente mantendo o histórico se necessário.
+ */
+export const processItemXML = async (data: ProcessarItemXMLPayload): Promise<ProcessarItemXMLResponse> => {
+    const response = await fetch(`${API_BASE_URL}/compras/itens/processar-xml`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Erro ao processar item do XML no servidor.');
     }
 
     return response.json();

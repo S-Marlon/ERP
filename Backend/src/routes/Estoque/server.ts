@@ -10,17 +10,27 @@ import { processStockMovement, STOCK_ORIGINS, recalculateStockForProduct, getCur
 import clientesRoutes from '../Clientes/cliente.routes';
 import comprasRoutes from '../Compras/routes/compras.routes';
 
+
 import lojaClientesHistoricoRoutes
 from '../Loja/loja_clientes_historico.routes';
+import estoqueRoutes from './routes/estoque.routes';
 
 
 
 const app = express();
-app.use(cors());
+
+app.use(cors({
+  origin: 'http://localhost:5173', // Origem do seu Vite
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
+}));
+
 app.use(express.json());
 app.use('/api/pessoas', clientesRoutes);
 
 app.use('/api/compras', comprasRoutes);
+
+app.use('/api/estoque', estoqueRoutes )
 
 
 app.use(
@@ -1416,24 +1426,24 @@ app.post('/api/suppliers', asyncHandler(async (req, res) => {
     }
 }));
 
-// Endpoint: Busca sigla pelo CNPJ
-app.post('/api/suppliers/get-sigla', asyncHandler(async (req, res) => {
-    const { cnpj } = req.body; 
-    if (!cnpj) return res.status(400).json({ error: 'CNPJ é obrigatório' });
+// // Endpoint: Busca sigla pelo CNPJ
+// app.post('/api/suppliers/get-sigla', asyncHandler(async (req, res) => {
+//     const { cnpj } = req.body; 
+//     if (!cnpj) return res.status(400).json({ error: 'CNPJ é obrigatório' });
 
-    const cleanCnpj = sanitizeCNPJ(cnpj);
+//     const cleanCnpj = sanitizeCNPJ(cnpj);
 
-    const [rows]: any = await pool.execute(
-        'SELECT sigla FROM fornecedores WHERE cnpj = ?',
-        [cleanCnpj]
-    );
+//     const [rows]: any = await pool.execute(
+//         'SELECT sigla FROM fornecedores WHERE cnpj = ?',
+//         [cleanCnpj]
+//     );
 
-    if (rows.length === 0) {
-        return res.status(404).json({ sigla: "", error: "Não encontrado" });
-    }
+//     if (rows.length === 0) {
+//         return res.status(404).json({ sigla: "", error: "Não encontrado" });
+//     }
 
-    res.json({ sigla: rows[0].sigla });
-}));
+//     res.json({ sigla: rows[0].sigla });
+// }));
 
 /**
  * GET /api/stock-entry

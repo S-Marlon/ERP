@@ -82,6 +82,11 @@ export const parseNfeXmlToData = (xmlString: string): NfeDataFromXML => {
         .getElementsByTagNameNS(NFE_NS, 'total')[0]
         ?.getElementsByTagNameNS(NFE_NS, 'ICMSTot')[0];
 
+    // 🚚 Captura da tag de Transporte
+    const transp = infNFe.getElementsByTagNameNS(NFE_NS, 'transp')[0];
+    const transporta = transp?.getElementsByTagNameNS(NFE_NS, 'transporta')[0];
+    const vol = transp?.getElementsByTagNameNS(NFE_NS, 'vol')[0];
+
     // =========================
     // Produtos
     // =========================
@@ -149,8 +154,7 @@ export const parseNfeXmlToData = (xmlString: string): NfeDataFromXML => {
             valorFrete -
             valorDesconto;
 
-        const valorCustoReal =
-            quantidade > 0 ? custoTotalItem / quantidade : 0;
+        const valorCustoReal = quantidade > 0 ? custoTotalItem / quantidade : 0;
 
         const valorTotalItem = custoTotalItem;
 
@@ -199,16 +203,59 @@ export const parseNfeXmlToData = (xmlString: string): NfeDataFromXML => {
         };
     });
 
-    // =========================
-    // Retorno Final
-    // =========================
+   
+    // =================================================================
+    // Retorno Final (Modificado com tratamento de logs e variáveis)
+    // =================================================================
 
     const razaoSocial = getTagValue(emit, 'xNome');
     const nomeFantasiaRaw = getTagValue(emit, 'xFant');
 
+    // 🔬 DIAGNÓSTICO DE FRETE NO TERMINAL (Executado antes do return)
+    console.log("=== 🔍 DIAGNÓSTICO DE FRETE XML ===");
+    console.log("Nó <transp> encontrado?", !!transp);
+    console.log("Nó <vol> encontrado?", !!vol);
+    if (vol) {
+        console.log("Conteúdo bruto <qVol>:", vol.getElementsByTagNameNS(NFE_NS, 'qVol')[0]?.textContent);
+        console.log("Conteúdo bruto <pesoB>:", vol.getElementsByTagNameNS(NFE_NS, 'pesoB')[0]?.textContent);
+    }
+
+    const freteFinal = {
+        modalidade: transp?.getElementsByTagNameNS(NFE_NS, 'modFrete')[0]?.textContent || '9', 
+        
+        transportadora: transporta ? {
+            cnpjCpf: transporta.getElementsByTagNameNS(NFE_NS, 'CNPJ')[0]?.textContent || transporta.getElementsByTagNameNS(NFE_NS, 'CPF')[0]?.textContent || undefined,
+            nome: transporta.getElementsByTagNameNS(NFE_NS, 'xNome')[0]?.textContent || undefined,
+            ie: transporta.getElementsByTagNameNS(NFE_NS, 'IE')[0]?.textContent || undefined,
+            endereco: transporta.getElementsByTagNameNS(NFE_NS, 'xEnder')[0]?.textContent || undefined,
+            municipio: transporta.getElementsByTagNameNS(NFE_NS, 'xMun')[0]?.textContent || undefined,
+            uf: transporta.getElementsByTagNameNS(NFE_NS, 'UF')[0]?.textContent || undefined,
+        } : undefined,
+
+        volumes: vol ? {
+            quantidade: vol.getElementsByTagNameNS(NFE_NS, 'qVol')[0]?.textContent?.trim() 
+                ? Number(vol.getElementsByTagNameNS(NFE_NS, 'qVol')[0].textContent!.trim()) 
+                : undefined,
+            
+            especie: vol.getElementsByTagNameNS(NFE_NS, 'esp')[0]?.textContent?.trim() || undefined,
+            
+            pesoLiquido: vol.getElementsByTagNameNS(NFE_NS, 'pesoL')[0]?.textContent?.trim() 
+                ? Number(vol.getElementsByTagNameNS(NFE_NS, 'pesoL')[0].textContent!.trim()) 
+                : undefined,
+            
+            pesoBruto: vol.getElementsByTagNameNS(NFE_NS, 'pesoB')[0]?.textContent?.trim() 
+                ? Number(vol.getElementsByTagNameNS(NFE_NS, 'pesoB')[0].textContent!.trim()) 
+                : undefined
+        } : undefined
+    };
+
+    console.log("Objeto frete final processado:", freteFinal);
+    console.log("====================================");
+
+    // Agora sim, retornamos o objeto limpo para o TypeScript
     return {
         chaveAcesso: xmlDoc.getElementsByTagNameNS(NFE_NS, 'chNFe')[0]?.textContent || 
-                 infNFe.getAttribute('Id')?.replace('NFe', '') || '',
+                     infNFe.getAttribute('Id')?.replace('NFe', '') || '',
     
         numero: getTagValue(ide, 'nNF'),
         serie: getTagValue(ide, 'serie'),
@@ -230,14 +277,16 @@ export const parseNfeXmlToData = (xmlString: string): NfeDataFromXML => {
         },
 
         destinatario: {
-            cnpjCpf:
-                getTagValue(dest, 'CNPJ') || getTagValue(dest, 'CPF'),
+            cnpjCpf: getTagValue(dest, 'CNPJ') || getTagValue(dest, 'CPF'),
             nome: getTagValue(dest, 'xNome'),
             uf: getTagValue(
                 dest.getElementsByTagNameNS(NFE_NS, 'enderDest')[0],
                 'UF'
             )
         },
+
+        // Atribui a constante que criamos e inspecionamos lá em cima
+        frete: freteFinal,
 
         valorTotalProdutos: parseFloat(getTagValue(totalICMS, 'vProd')),
         valorTotalFrete: parseFloat(getTagValue(totalICMS, 'vFrete')),

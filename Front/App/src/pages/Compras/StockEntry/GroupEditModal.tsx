@@ -2,6 +2,13 @@ import React, { useEffect, useState } from 'react';
 import styles from './GroupEditModal.module.css';
 import { Group, GroupAttribute } from './types';
 
+// Nota: Certifique-se de que sua interface 'GroupAttribute' em './types' contenha:
+// nome: string;
+// ordem: number;
+// obrigatorio: boolean;
+// geraVariacao: boolean;
+// compoeSku: boolean;
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
@@ -26,15 +33,14 @@ export const GroupEditModal: React.FC<Props> = ({
   }, [isOpen, grupo]);
 
   const handleAddAtributo = () => {
-    // Trava de segurança para não passar de 5 características
-    if (atributos.length >= 5) return;
-
     setAtributos(prev => [
       ...prev,
       { 
         nome: '', 
-        principal: prev.length === 0, // Se for o primeiro, já nasce como principal
-        ordem: prev.length + 1 
+        ordem: prev.length + 1,
+        obrigatorio: false,
+        geraVariacao: false,
+        compoeSku: false
       },
     ]);
   };
@@ -42,12 +48,19 @@ export const GroupEditModal: React.FC<Props> = ({
   const handleRemoveAtributo = (index: number) => {
     setAtributos(prev => {
       const filtered = prev.filter((_, i) => i !== index);
-      // Se removeu o atributo que era principal, define o primeiro da lista restante como principal
-      if (prev[index]?.principal && filtered.length > 0) {
-        filtered[0].principal = true;
-      }
       // Reordena os itens restantes
       return filtered.map((attr, i) => ({ ...attr, ordem: i + 1 }));
+    });
+  };
+
+  const handleToggleCheckbox = (index: number, key: 'obrigatorio' | 'geraVariacao' | 'compoeSku') => {
+    setAtributos(prev => {
+      const copy = [...prev];
+      copy[index] = {
+        ...copy[index],
+        [key]: !copy[index][key],
+      };
+      return copy;
     });
   };
 
@@ -60,15 +73,6 @@ export const GroupEditModal: React.FC<Props> = ({
       };
       return copy;
     });
-  };
-
-  const handleSetPrincipal = (indexToSet: number) => {
-    setAtributos(prev =>
-      prev.map((attr, idx) => ({
-        ...attr,
-        principal: idx === indexToSet,
-      }))
-    );
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -90,14 +94,11 @@ export const GroupEditModal: React.FC<Props> = ({
       .filter(a => a.nome?.trim())
       .map((a, i) => ({
         nome: a.nome.trim().toUpperCase(),
-        principal: !!a.principal,
         ordem: i + 1,
+        obrigatorio: !!a.obrigatorio,
+        geraVariacao: !!a.geraVariacao,
+        compoeSku: !!a.compoeSku,
       }));
-
-    // Se houver atributos mas nenhum marcado como principal por algum motivo, força o primeiro
-    if (cleanAttributes.length > 0 && !cleanAttributes.some(a => a.principal)) {
-      cleanAttributes[0].principal = true;
-    }
 
     onSave({
       id: grupo.id,
@@ -123,13 +124,13 @@ export const GroupEditModal: React.FC<Props> = ({
         <form className={styles.body} onSubmit={handleSubmit}>
           {/* NOME DO GRUPO */}
           <div className={styles.field}>
-            <label htmlFor="groupNameEdit">Nome do Grupo</label>
+            <label htmlFor="groupNameEdit">Nome do Grupo (Ex: Série 6200, Correias em V)</label>
             <input
               id="groupNameEdit"
               className={styles.textInput}
               value={nome}
               onChange={e => setNome(e.target.value)}
-              placeholder="Ex: AMANCO TEE"
+              placeholder="Ex: SÉRIE 6200"
             />
           </div>
 
@@ -137,47 +138,68 @@ export const GroupEditModal: React.FC<Props> = ({
           <div className={styles.field}>
             <div className={styles.fieldHeader}>
               <label>
-                Atributos / Características 
-                <span className={`${styles.counterBadge} ${atributos.length >= 5 ? styles.counterLimit : ''}`}>
-                  ({atributos.length} de 5)
+                Atributos e Regras Técnicas
+                <span className={styles.counterBadge}>
+                  ({atributos.length} cadastrados)
                 </span>
               </label>
               <button
                 type="button"
                 onClick={handleAddAtributo}
                 className={styles.addBtn}
-                disabled={atributos.length >= 5}
-                title={atributos.length >= 5 ? "Limite máximo de 5 atributos atingido" : "Adicionar novo atributo"}
+                title="Adicionar novo atributo"
               >
-                {atributos.length >= 5 ? '🛑 Limite Atingido' : '➕ Novo Atributo'}
+                ➕ Novo Atributo
               </button>
             </div>
 
             <div className={styles.list}>
               {atributos.length === 0 ? (
                 <div className={styles.emptyAttributes}>
-                  Nenhum atributo cadastrado. Itens vinculados usarão apenas o nome do grupo.
+                  Nenhum atributo cadastrado. Adicione campos como MARCA, MODELO, BLINDAGEM, etc.
                 </div>
               ) : (
                 atributos.map((attr, index) => (
                   <div key={index} className={styles.row}>
+                    {/* Nome do Atributo */}
                     <input
                       className={styles.textInput}
-                      placeholder="Nome do campo (ex: COR, BITOLA, VOLTAGEM)"
+                      placeholder="Ex: BLINDAGEM, MEDIDA EXTERNA"
                       value={attr.nome}
                       onChange={e => handleChangeAtributoName(index, e.target.value)}
                     />
 
-                    <label className={styles.radioLabel}>
+                    {/* Checkbox: Obrigatório */}
+                    <label className={styles.checkboxLabel} title="O lojista é obrigado a preencher este campo?">
                       <input
-                        type="radio"
-                        name="principalAttributeEdit"
-                        checked={!!attr.principal}
-                        onChange={() => handleSetPrincipal(index)}
+                        type="checkbox"
+                        checked={!!attr.obrigatorio}
+                        onChange={() => handleToggleCheckbox(index, 'obrigatorio')}
                       />
-                      <span>Principal</span>
+                      <span>Obrigatório</span>
                     </label>
 
+                    {/* Checkbox: Gera Variação */}
+                    <label className={styles.checkboxLabel} title="Gera variações comerciais/físicas no estoque?">
+                      <input
+                        type="checkbox"
+                        checked={!!attr.geraVariacao}
+                        onChange={() => handleToggleCheckbox(index, 'geraVariacao')}
+                      />
+                      <span>Gera Var.</span>
+                    </label>
+
+                    {/* Checkbox: Compõe SKU */}
+                    <label className={styles.checkboxLabel} title="Este campo fará parte da string final do SKU dinâmico?">
+                      <input
+                        type="checkbox"
+                        checked={!!attr.compoeSku}
+                        onChange={() => handleToggleCheckbox(index, 'compoeSku')}
+                      />
+                      <span>Compõe SKU</span>
+                    </label>
+
+                    {/* Botão Remover */}
                     <button
                       type="button"
                       onClick={() => handleRemoveAtributo(index)}
