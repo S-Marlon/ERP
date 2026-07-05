@@ -13,7 +13,9 @@ import comprasRoutes from '../Compras/routes/compras.routes';
 
 import lojaClientesHistoricoRoutes
 from '../Loja/loja_clientes_historico.routes';
-import estoqueRoutes from './routes/estoque.routes';
+import catalogoRoutes from '../Catalogo/catalogo.routes';
+
+
 
 
 
@@ -30,7 +32,13 @@ app.use('/api/pessoas', clientesRoutes);
 
 app.use('/api/compras', comprasRoutes);
 
-app.use('/api/estoque', estoqueRoutes )
+app.use('/api/estoque', (req,res) =>{
+    console.log('Rota /api/estoque acessada');
+    res.json({ message: 'Rota /api/estoque acessada com sucesso!' });
+} );
+
+app.use('/api/catalogo', catalogoRoutes );
+
 
 
 app.use(

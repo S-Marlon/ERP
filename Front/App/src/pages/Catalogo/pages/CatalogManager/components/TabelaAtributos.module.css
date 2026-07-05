@@ -1,0 +1,293 @@
+/* ==========================================================================
+   CONTAINER & CABEÇALHO (Otimizado para 3 Colunas)
+   ========================================================================== */
+.tabelaAtributosWrapper {
+  background: #ffffff;
+  padding: 12px; /* Reduzido de 20px para maximizar a área da tabela */
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.tabelaHeaderRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center; /* Alinhado ao centro para ficar mais compacto */
+  margin-bottom: 12px;
+  gap: 8px;
+}
+
+.tabelaTitulo {
+  font-size: 14px; /* Reduzido para não quebrar em telas menores */
+  font-weight: 600;
+  color: #262626;
+  display: block;
+  white-space: nowrap;
+}
+
+.tabelaSubtitulo {
+  font-size: 11px; /* Reduzido */
+  color: #8c8c8c;
+  margin: 2px 0 0 0;
+}
+
+.btnVincularAtributo {
+  background: #ffffff;
+  border: 1px solid #d9d9d9;
+  color: #1890ff;
+  padding: 4px 10px; /* Mais compacto */
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btnVincularAtributo:hover {
+  color: #40a9ff;
+  border-color: #40a9ff;
+  background: #fbfbfb;
+}
+
+/* ==========================================================================
+   TABELA ESTRUTURAL COMPACTA
+   ========================================================================== */
+.modernTable {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 12px; /* Reduzido de 13px para o layout de 3 colunas */
+  table-layout: fixed; /* Garante que as colunas respeitem os limites */
+}
+
+/* Definição de larguras máximas implícitas para evitar esmagamento */
+.modernTable th:nth-child(1) { width: 45%; } /* Nome do atributo */
+.modernTable th:nth-child(2) { width: 35%; } /* Tipo / Estado */
+.modernTable th:nth-child(3) { width: 20%; } /* Ações */
+
+.modernTable th {
+  background: #fafafa;
+  color: #595959;
+  font-weight: 600;
+  padding: 8px 6px; /* Mais compacto */
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.modernTable td {
+  padding: 6px 6px; /* Mais compacto */
+  border-bottom: 1px solid #f0f0f0;
+  color: #262626;
+  vertical-align: middle;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* Linhas com Estados Alternativos */
+.linhaAtributoClicavel {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.linhaAtributoClicavel:hover {
+  background: #fafafa;
+}
+
+.linhaAtributoExpandida {
+  background: #f5f5f5 !important;
+}
+
+.linhaAtributoPendente {
+  background: #fffbe6 !important;
+  animation: pulsePendente 2s infinite ease-in-out;
+}
+
+@keyframes pulsePendente {
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+/* ==========================================================================
+   INPUTS & FORMULÁRIOS INLINE
+   ========================================================================== */
+.cellFlexRow {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 4px;
+}
+
+.inlineTableInput {
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 4px 6px;
+  font-size: 12px;
+  border-radius: 4px;
+  color: #262626;
+  transition: all 0.2s;
+  text-overflow: ellipsis;
+}
+
+.inlineTableInput:hover:not(:disabled) {
+  border-color: #d9d9d9;
+  background: #ffffff;
+}
+
+.inlineTableInput:focus:not(:disabled) {
+  border-color: #40a9ff;
+  background: #ffffff;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+.inlineTableInput:disabled {
+  color: #262626;
+  font-weight: 500;
+  cursor: not-allowed;
+}
+
+.tableBlockSelect {
+  width: 100%;
+  border: 1px solid #d9d9d9;
+  background: #ffffff;
+  padding: 2px 4px;
+  font-size: 12px;
+  border-radius: 4px;
+  color: #262626;
+  outline: none;
+}
+
+.tableBlockSelect:disabled {
+  background: #f5f5f5;
+  color: #bfbfbf;
+  cursor: not-allowed;
+  border-color: #d9d9d9;
+}
+
+.tableInputNumberCentered {
+  width: 42px;
+  text-align: center;
+  border: 1px solid #d9d9d9;
+  background: #ffffff;
+  padding: 2px;
+  font-size: 12px;
+  border-radius: 4px;
+}
+
+/* ==========================================================================
+   BADGES DE STATUS / ORIGEM
+   ========================================================================== */
+.statusBadgeBase {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 500;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.statusMuted {
+  background: #f0f0f0;
+  color: #595959;
+  border: 1px solid #d9d9d9;
+}
+
+.statusDanger {
+  background: #fff1f0;
+  color: #cf1322;
+  border: 1px solid #ffa39e;
+}
+
+/* ==========================================================================
+   BOTÕES DE AÇÃO EXTERNOS
+   ========================================================================== */
+.tableActionsContainer {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.btnTableToggleExpand {
+  background: #ffffff;
+  border: 1px solid #d9d9d9;
+  color: #595959;
+  padding: 2px 6px;
+  font-size: 11px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btnTableDelete {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.btnTableDelete:hover:not(:disabled) {
+  background: #fff1f0;
+}
+
+/* ==========================================================================
+   PAINEL EXPANDIDO (Responsivo para colunas estreitas)
+   ========================================================================== */
+.linhaPainelExpandido td {
+  padding: 0 !important;
+}
+
+.painelExpandidoConteudo {
+  padding: 12px;
+  border-left: 4px solid #1890ff;
+  background: #fafafa;
+}
+
+.painelExpandidoConteudo h4 {
+  margin: 0 0 8px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #262626;
+}
+
+/* Mudança chave: Mudamos de 3 colunas para 1 coluna vertical por padrão 
+   quando expandido dentro da tabela para não esmagar os campos */
+.painelExpandidoGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.flexColumnGap4 {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.flexColumnGap4 label {
+  font-size: 11px;
+  font-weight: 500;
+  color: #595959;
+}
+
+.configSubInput,
+.configSubSelect,
+.configSubTextarea {
+  width: 100%;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 11px;
+  color: #262626;
+  background: #ffffff;
+}
+
+.configSubTextarea {
+  resize: vertical;
+  height: 40px;
+  min-height: 40px;
+}

@@ -37,8 +37,10 @@ import ProductForm from './pages/ProductForm';
 import Fornecedores from "./pages/Fornecedores/Fornecedores";
 import ComprasDashboard from "./pages/Compras/ComprasDashboard";
 import StockEntryForm from "./pages/Compras/StockEntry/StockEntryForm";
-import { CatalogManager } from "./pages/Estoque/pages/CatalogManager/CatalogManager";
-import { CategoryManager } from "./pages/Estoque/pages/CategoryManager/CategoryManager";
+import { CatalogManager } from "./pages/Catalogo/pages/CatalogManager";
+import { CategoryManager } from "./pages/Catalogo/pages/CategoryManager/CategoryManager";
+import { GlobalAttributeManager } from "./pages/Catalogo/pages/GlobalAttributeManager/GlobalAttributeManager";
+import { FamilyManager } from "./pages/Catalogo/pages/CatalogManager/FamilyManager";
 
 function AppLayout() {
   const location = useLocation();
@@ -105,8 +107,13 @@ const isPDV = location.pathname.startsWith("/vendas/pdv");
           <Route path="/estoque/notas" element={<Notas />} />
           <Route path="/estoque/operacoes" element={<StockAdjustmentForm/>} />
           <Route path="/estoque/etiquetagem" element={<StockLabelingForm/>} />
-          <Route path="/estoque/grupos" element={<CatalogManager/>} />
-          <Route path="/estoque/categorias" element={<CategoryManager/>} />
+
+
+
+          <Route path="/catalogo" element={<CatalogManager/>} />
+          <Route path="/catalogo/familias" element={<FamilyManager/>} />
+          <Route path="/catalogo/categorias" element={<CategoryManager/>} />
+          <Route path="/catalogo/atributos" element={<GlobalAttributeManager/>} />
 
 
 

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { AtributoConfig } from './CatalogManager.types';
+import React, { useState, useEffect } from 'react';
+import { AtributoConfig } from '../CatalogManager.types';
 
 interface ModalVinculoAtributosProps {
   isModalAberto: boolean;
@@ -20,6 +20,14 @@ export const ModalVinculoAtributos: React.FC<ModalVinculoAtributosProps> = ({
 }) => {
   const [novoNome, setNovoNome] = useState('');
   const [novoTipo, setNovoTipo] = useState<'texto' | 'numero' | 'opcoes'>('texto');
+
+  // Reseta os campos de criação quando o modal fecha
+  useEffect(() => {
+    if (!isModalAberto) {
+      setNovoNome('');
+      setNovoTipo('texto');
+    }
+  }, [isModalAberto]);
 
   if (!isModalAberto) return null;
 
@@ -45,6 +53,15 @@ export const ModalVinculoAtributos: React.FC<ModalVinculoAtributosProps> = ({
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleCriarInedito();
+    }
+  };
+
+  const isBotaoCriarDesabilitado = !novoNome.trim();
+
   return (
     <div 
       className="modal-overlay" 
@@ -52,8 +69,8 @@ export const ModalVinculoAtributos: React.FC<ModalVinculoAtributosProps> = ({
       style={{
         position: 'fixed',
         top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.45)', // Backdrop escurecido moderno (Slate 900)
-        backdropFilter: 'blur(8px)', // Desfoque de fundo mais elegante
+        backgroundColor: 'rgba(15, 23, 42, 0.45)',
+        backdropFilter: 'blur(8px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -68,10 +85,10 @@ export const ModalVinculoAtributos: React.FC<ModalVinculoAtributosProps> = ({
         style={{
           backgroundColor: '#ffffff',
           width: '100%',
-          maxWidth: '480px', // Trava estrita de largura
-          borderRadius: '12px', // Cantos levemente mais suaves
+          maxWidth: '480px',
+          borderRadius: '12px',
           padding: '24px',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', // Sombra premium suave
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
           display: 'flex',
           flexDirection: 'column',
           boxSizing: 'border-box'
@@ -177,6 +194,7 @@ export const ModalVinculoAtributos: React.FC<ModalVinculoAtributosProps> = ({
               placeholder="Ex: Espessura da Camada" 
               value={novoNome}
               onChange={e => setNovoNome(e.target.value)}
+              onKeyDown={handleKeyDown}
               style={{ 
                 flex: 1,
                 height: '36px',
@@ -216,22 +234,27 @@ export const ModalVinculoAtributos: React.FC<ModalVinculoAtributosProps> = ({
             
             <button 
               type="button"
-              onClick={handleCriarInedito} 
+              onClick={handleCriarInedito}
+              disabled={isBotaoCriarDesabilitado}
               style={{ 
-                backgroundColor: brandColor, 
-                color: '#ffffff', 
+                backgroundColor: isBotaoCriarDesabilitado ? '#e2e8f0' : brandColor, 
+                color: isBotaoCriarDesabilitado ? '#94a3b8' : '#ffffff', 
                 height: '36px', 
                 fontSize: '13px', 
                 padding: '0 16px',
                 border: 'none',
                 borderRadius: '6px',
-                cursor: 'pointer',
+                cursor: isBotaoCriarDesabilitado ? 'not-allowed' : 'pointer',
                 fontWeight: 600,
                 boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                transition: 'opacity 0.15s'
+                transition: 'all 0.15s'
               }}
-              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
-              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+              onMouseEnter={(e) => {
+                if (!isBotaoCriarDesabilitado) e.currentTarget.style.opacity = '0.9';
+              }}
+              onMouseLeave={(e) => {
+                if (!isBotaoCriarDesabilitado) e.currentTarget.style.opacity = '1';
+              }}
             >
               Criar
             </button>
