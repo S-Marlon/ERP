@@ -1,331 +1,269 @@
 import React, { useState } from 'react';
-
-import styles from './NfeCards.module.css';
+import { 
+  Card, 
+  Row, 
+  Col, 
+  Typography, 
+  Badge, 
+  Button, 
+  Space, 
+  Modal, 
+  Descriptions, 
+  InputNumber, 
+  Select,
+  Tooltip
+} from 'antd';
+import { 
+  InfoCircleOutlined, 
+  PlusOutlined, 
+  CarOutlined, 
+  ShopOutlined, 
+  FileTextOutlined,
+  DollarOutlined
+} from '@ant-design/icons';
 import { NfeDataFromXML } from '../../types/NF-e';
-import FlexGridContainer from '../../../../components/Layout/FlexGridContainer/FlexGridContainer';
-import Card from '../../../../components/ui/Card/Card';
-import Typography from '../../../../components/ui/Typography/Typography';
-import FormControl from '../../../../components/ui/FormControl/FormControl';
-import Badge from '../../../../components/ui/Badge/Badge';
-import Button from '../../../../components/ui/Button/Button';
 
 interface NfeCardsProps {
-    data: NfeDataFromXML;
-    supplierStatus: {
-        isChecking: boolean;
-        exists: boolean | null;
-    };
-    actions: {
-        onCreateSupplier: () => void;
-    };
+  data: NfeDataFromXML;
+  supplierStatus: {
+    isChecking: boolean;
+    exists: boolean | null;
+  };
+  actions: {
+    onCreateSupplier: () => void;
+  };
 }
 
+const { Text, Title } = Typography;
+
 const formatarDataBR = (dataString?: string) => {
-    if (!dataString) return '-';
-    try {
-        const data = new Date(dataString);
-        return data.toLocaleDateString('pt-BR');
-    } catch {
-        return dataString.split('T')[0].split('-').reverse().join('/');
-    }
+  if (!dataString) return '-';
+  try {
+    const data = new Date(dataString);
+    return data.toLocaleDateString('pt-BR');
+  } catch {
+    return dataString.split('T')[0].split('-').reverse().join('/');
+  }
 };
 
 const formatarChaveAcesso = (chave: string) => {
-    return chave.replace(/(.{4})/g, '$1 ').trim();
+  return chave.replace(/(.{4})/g, '$1 ').trim();
 };
 
-// Helper para formatar moeda (R$)
 const formatarMoeda = (valor?: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor || 0);
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor || 0);
 };
 
-// Helper para traduzir a modalidade de frete da SEFAZ
 const traduzirModalidadeFrete = (mod?: string) => {
-    switch (mod) {
-        case '0': return '0 - Contratação por conta do Remetente (CIF)';
-        case '1': return '1 - Contratação por conta do Destinatário (FOB)';
-        case '2': return '2 - Contratação por conta de Terceiros';
-        case '3': return '3 - Transporte Próprio por conta do Remetente';
-        case '4': return '4 - Transporte Próprio por conta do Destinatário';
-        case '9': return '9 - Sem Ocorrência de Transporte';
-        default: return 'Não Informado';
-    }
+  switch (mod) {
+    case '0': return '0 - CIF (Remetente)';
+    case '1': return '1 - FOB (Destinatário)';
+    case '2': return '2 - Terceiros';
+    case '3': return '3 - Próprio Remetente';
+    case '4': return '4 - Próprio Destinatário';
+    case '9': return '9 - Sem Frete';
+    default: return 'Não Informado';
+  }
 };
 
-const NfeCards: React.FC<NfeCardsProps> = ({
-    data,
-    supplierStatus,
-    actions,
-}) => {
-    const { emitente } = data;
+const NfeCards: React.FC<NfeCardsProps> = ({ data, supplierStatus, actions }) => {
+  const { emitente } = data;
 
-    // Estados dos Modais
-    const [isNfDetailsOpen, setIsNfDetailsOpen] = useState(false);
-    const [isSupplierDetailsOpen, setIsSupplierDetailsOpen] = useState(false);
-    const [isLogisticsDetailsOpen, setIsLogisticsDetailsOpen] = useState(false);
+  // Modais Controlados pelo AntD
+  const [isNfDetailsOpen, setIsNfDetailsOpen] = useState(false);
+  const [isSupplierDetailsOpen, setIsSupplierDetailsOpen] = useState(false);
+  const [isLogisticsDetailsOpen, setIsLogisticsDetailsOpen] = useState(false);
 
-    return (
-        <FlexGridContainer layout="grid" template="1fr" className={styles.gridContainer}>
-
-            <FlexGridContainer layout="grid" template="3fr 4fr 4fr" >
-
-                {/* CARD 1: Identificação da NF */}
-                <Card variant="nfe-card" padding="14px">
-                    <div className={styles.headerCard}>
-                        <Typography variant="h2">1. Identificação da NF</Typography>
-                        <button className={styles.infoIconButton} onClick={() => setIsNfDetailsOpen(true)} title="Ver detalhes da nota">ℹ️</button>
-                    </div>
-                    <FlexGridContainer layout="grid" template="1fr 1fr 1fr" gap="10px">
-                        <FormControl label="Número" value={data.numero} readOnlyDisplay />
-                        <FormControl label="Série" value={data.serie} readOnlyDisplay />
-                        <FormControl label="Data de Emissão" value={formatarDataBR(data.dataEmissao)} readOnlyDisplay />
-                    </FlexGridContainer>
-                    <div className={styles.formGroupInline}>
-                        <FormControl label="Chave de Acesso" value={data.chaveAcesso} readOnlyDisplay />
-                    </div>
-
-                </Card>
-
-                {/* CARD 2: Emitente */}
-                <Card variant="nfe-card" padding="14px">
-                    <div className={styles.headerCard}>
-                        <Typography variant="h2">2. Fornecedor (Emitente)</Typography>
-                        <div className={styles.badgeContainer}>
-                            {supplierStatus.isChecking && <Badge color="paper">Verificando...</Badge>}
-                            {supplierStatus.exists === true && <Badge color="success">Fornecedor Ativo</Badge>}
-                            {supplierStatus.exists === false && (
-                                <>
-                                    <Badge color="warning">Não Cadastrado</Badge>
-                                    <button className={styles.createButton} onClick={actions.onCreateSupplier}>Criar</button>
-                                </>
-                            )}
-                        </div>
-                        <button className={styles.infoIconButton} onClick={() => setIsSupplierDetailsOpen(true)} title="Ver detalhes do fornecedor">ℹ️</button>
-                    </div>
-
-                    <FlexGridContainer layout="grid" template="1fr 1fr" gap="10px">
-                        <FormControl label="CNPJ" value={emitente.cnpj} readOnlyDisplay />
-
-                        <FormControl
-                            label="Nome Fantasia"
-                            value={emitente.nomeFantasia || "Não Informado"}
-                            readOnlyDisplay
-                        />
-                    </FlexGridContainer>
-                    <FlexGridContainer layout="grid" template="1fr" gap="10px">
-                        <FormControl label="Razão Social" value={emitente.nome} readOnlyDisplay />
-
-                    </FlexGridContainer>
-
-                </Card>
-
-                {/* CARD 3: Dados de Logística e Volumes */}
-               <Card variant="nfe-card" padding="14px">
-    <div className={styles.headerCard}>
-        <Typography variant="h2">3. Logística de Entrega e Rateio de Frete</Typography>
-        <button
-            className={styles.infoIconButton}
-            onClick={() => setIsLogisticsDetailsOpen(true)}
-            title="Ver resumo logístico, financeiro e tributário"
-        >
-            ℹ️
-        </button>
-    </div>
-
-    {/* 📦 SEÇÃO 1: CONFERÊNCIA FÍSICA (Grid de 3 Colunas para encaixar a Espécie) */}
-    <FlexGridContainer layout="grid" template="1fr 1fr 1fr" gap="10px">
-        <FormControl
-            label="Qtd Volumes"
-            value={data?.frete?.volumes?.quantidade !== undefined ? String(data.frete.volumes.quantidade) : "Não Informado"}
-            readOnlyDisplay
-        />
-        <FormControl
-            label="Espécie dos Vols."
-            value={data?.frete?.volumes?.especie || "Não Informado"}
-            readOnlyDisplay
-        />
-        <FormControl
-            label="Peso Bruto (KG)"
-            value={data?.frete?.volumes?.pesoBruto ? `${data.frete.volumes.pesoBruto} kg` : "Não Informado"}
-            readOnlyDisplay
-        />
-    </FlexGridContainer>
-
-    {/* 🚚 SEÇÃO 2: DADOS DE TRANSPORTE E MODALIDADE */}
-    <FlexGridContainer layout="grid" template="1fr" gap="10px" style={{ marginTop: '5px' }}>
-        <FormControl
-            label="Transportadora"
-            value={data?.frete?.transportadora?.nome || "Não Informada no XML"}
-            readOnlyDisplay
-        />
-        <FormControl
-            label="Modalidade do Frete (XML)"
-            value={traduzirModalidadeFrete(data?.frete?.modalidade)}
-            readOnlyDisplay
-        />
-    </FlexGridContainer>
-
-    {/* 💵 SEÇÃO 3: INPUTS PARA INSERÇÃO MANUAL NO ERP */}
-    <FlexGridContainer layout="grid" template="1fr 1fr" gap="10px" style={{ marginTop: '10px' }}>
-        <div>
-            <label style={{ fontSize: '14px', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>
-                Valor do Frete (R$)
-            </label>
-            <input
-                type="number"
-                placeholder="0,00"
-                style={{ padding: '8px', width: '100%', boxSizing: 'border-box' }}
-            />
-        </div>
-
-        <div>
-            <label style={{ fontSize: '14px', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>
-                Método de Rateio
-            </label>
-            <select style={{ padding: '8px', width: '100%', boxSizing: 'border-box', backgroundColor: '#fff' }}>
-                <option value="VALOR">Proporcional por Valor</option>
-                <option value="PESO">Proporcional por Peso (Cadastro)</option>
-                <option value="IGUAL">Divisão Igualitária por Item</option>
-                <option value="MANUAL">Digitação Manual por Item</option>
-            </select>
-        </div>
-    </FlexGridContainer>
-</Card>
-
-            </FlexGridContainer>
-
-            {/* ================= MODAL: DETALHES DA NF ================= */}
-            {isNfDetailsOpen && (
-                <div className={styles.modalBackdrop}>
-                    <div className={styles.modalContent}>
-                        <h3 className={styles.modalTitle}>📄 Detalhes Técnicos da NF-e</h3>
-                        <p className={styles.modalSubtitle}>Dados de validação fiscal do arquivo XML importado.</p>
-                        <div className={styles.modalDetailsGrid}>
-                            <div className={styles.detailRow}><strong>Chave de Acesso:</strong> <span style={{ fontFamily: 'monospace' }}>{formatarChaveAcesso(data.chaveAcesso)}</span></div>
-                            <div className={styles.detailRow}><strong>Número:</strong> <span>{data.numero}</span></div>
-                            <div className={styles.detailRow}><strong>Série:</strong> <span>{data.serie}</span></div>
-                            <div className={styles.detailRow}><strong>Data Emissão:</strong> <span>{formatarDataBR(data.dataEmissao)}</span></div>
-                            <div className={styles.detailRow}><strong>Modelo Fiscal:</strong> <span>55 (Nota Fiscal Eletrônica)</span></div>
-                            <div className={styles.detailRow}><strong>Ambiente:</strong> <span>1 (Produção)</span></div>
-                            <div className={styles.detailRow}><strong>Status SEFAZ:</strong> <span className={styles.textGreen}>100 - Autorizado o uso da NF-e</span></div>
-                        </div>
-                        <div className={styles.modalActions}>
-                            <Button variant='secondary' onClick={() => setIsNfDetailsOpen(false)}>Fechar</Button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ================= MODAL: DETALHES DO FORNECEDOR ================= */}
-            {isSupplierDetailsOpen && (
-                <div className={styles.modalBackdrop}>
-                    <div className={styles.modalContent}>
-                        <h3 className={styles.modalTitle}>🏢 Dados Completos do Emitente</h3>
-                        <p className={styles.modalSubtitle}>Informações cadastrais extraídas do documento.</p>
-                        <div className={styles.modalDetailsGrid}>
-                            <div className={styles.detailRow}><strong>Razão Social:</strong> <span>{emitente.nome}</span></div>
-                            <div className={styles.detailRow}><strong>Nome Fantasia:</strong> <span>{emitente.nomeFantasia || '-'}</span></div>
-                            <div className={styles.detailRow}><strong>CNPJ:</strong> <span>{emitente.cnpj}</span></div>
-                            <div className={styles.detailRow}><strong>Inscrição Estadual:</strong> <span>{emitente.ie || '-'}</span></div>
-                            <div className={styles.detailRow}><strong>Endereço:</strong> <span>{`${emitente.logradouro || ''}, ${emitente.numeroEnd || ''}`}</span></div>
-                            <div className={styles.detailRow}><strong>Bairro:</strong> <span>{emitente.bairro || '-'}</span></div>
-                            <div className={styles.detailRow}><strong>Cidade/UF:</strong> <span>{`${emitente.municipio || '-'} / ${emitente.uf || '-'}`}</span></div>
-                        </div>
-                        <div className={styles.modalActions}>
-                            <Button variant='secondary' onClick={() => setIsSupplierDetailsOpen(false)}>Fechar</Button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ================= MODAL: RESUMO FINANCEIRO E LOGÍSTICO ================= */}
-            {isLogisticsDetailsOpen && (
-    <div className={styles.modalBackdrop}>
-        <div className={styles.modalContent} style={{ maxWidth: '650px' }}>
-            <h3 className={styles.modalTitle}>💰 Totais e Composição de Valores</h3>
-            <p className={styles.modalSubtitle}>Apurado de despesas, logística e tributos retidos no XML.</p>
-
-            {/* 🚚 Bloco de Logística e Frete Integrado perfeitamente no Modal */}
-            <div className="modal-resumo-frete" style={{ padding: '10px 0', borderBottom: '1px solid #eee', marginBottom: '15px' }}>
-                <Typography variant="h3" style={{ marginBottom: '10px', paddingBottom: '5px', fontSize: '1rem', fontWeight: 'bold' }}>
-                    🚚 Detalhes de Logística e Frete
-                </Typography>
-
-                <FlexGridContainer layout="grid" template="1fr 1fr" gap="15px">
-                    {/* Coluna 1: Dados da Empresa de Transporte */}
-                    <div>
-                        <Typography variant="body2" style={{ fontWeight: 'bold', fontSize: '12px', color: '#666' }}>Dados do Transportador</Typography>
-                        <p style={{ margin: '4px 0', fontSize: '13px' }}>
-                            <strong>Razão Social:</strong> {data?.frete?.transportadora?.nome || "N/A"}
-                        </p>
-                        <p style={{ margin: '4px 0', fontSize: '13px' }}>
-                            <strong>CNPJ/CPF:</strong> {data?.frete?.transportadora?.cnpjCpf || "N/A"}
-                        </p>
-                        <p style={{ margin: '4px 0', fontSize: '13px' }}>
-                            <strong>Inscrição Estadual:</strong> {data?.frete?.transportadora?.ie || "N/A"}
-                        </p>
-                        <p style={{ margin: '4px 0', fontSize: '13px' }}>
-                            <strong>Endereço:</strong> {data?.frete?.transportadora?.endereco || "N/A"} 
-                            {data?.frete?.transportadora?.municipio ? ` - ${data.frete.transportadora.municipio}/${data.frete.transportadora.uf}` : ""}
-                        </p>
-                    </div>
-
-                    {/* Coluna 2: Totais e Pesos */}
-                    <div>
-                        <Typography variant="body2" style={{ fontWeight: 'bold', fontSize: '12px', color: '#666' }}>Pesos Declarados</Typography>
-                        <p style={{ margin: '4px 0', fontSize: '13px' }}>
-                            <strong>Peso Bruto Total:</strong> {data?.frete?.volumes?.pesoBruto ? `${data.frete.volumes.pesoBruto} kg` : "N/A"}
-                        </p>
-                        <p style={{ margin: '4px 0', fontSize: '13px' }}>
-                            <strong>Peso Líquido Total:</strong> {data?.frete?.volumes?.pesoLiquido ? `${data.frete.volumes.pesoLiquido} kg` : "N/A"}
-                        </p>
-                        <p style={{ margin: '4px 0', fontSize: '13px' }}>
-                            <strong>Espécie dos Vols:</strong> {data?.frete?.volumes?.especie || "N/A"}
-                        </p>
-                    </div>
-                </FlexGridContainer>
+  return (
+    <div>
+      <Row gutter={[16, 16]}>
+        
+        {/* CARD 1: Identificação da NF */}
+        <Col xs={24} md={8}>
+          <Card 
+            title={<Space><FileTextOutlined /><span>1. Identificação da NF</span></Space>}
+            size="small"
+            style={{ height: '100%' }}
+            extra={
+              <Tooltip title="Ver detalhes técnicos da nota">
+                <Button type="text" icon={<InfoCircleOutlined />} onClick={() => setIsNfDetailsOpen(true)} />
+              </Tooltip>
+            }
+          >
+            <div style={{ background: '#fafafa', padding: '8px', borderRadius: '4px', border: '1px solid #f0f0f0' }}>
+              <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Chave de Acesso</Text>
+              <Text copyable style={{ fontSize: 13, fontFamily: 'monospace' }}>{data.chaveAcesso}</Text>
             </div>
+            <Descriptions column={1} layout="horizontal" size="small" bordered style={{ marginBottom: 12 }}>
+              <Descriptions.Item label="Número">{data.numero}</Descriptions.Item>
+              <Descriptions.Item label="Série">{data.serie}</Descriptions.Item>
+              <Descriptions.Item label="Emissão">{formatarDataBR(data.dataEmissao)}</Descriptions.Item>
+            </Descriptions>
+          </Card>
+        </Col>
 
-            {/* 💵 Composição dos Valores Financeiros */}
-            <div className={styles.modalDetailsGrid}>
-                <div className={styles.detailRow}><strong>Valor dos Produtos:</strong> <span>{formatarMoeda(data?.totais?.valorTotalProdutos ?? data?.valorTotalProdutos)}</span></div>
-                <div className={styles.detailRow}><strong>(+) Valor do Frete:</strong> <span>{formatarMoeda(data?.totais?.valorTotalFrete ?? data?.valorTotalFrete)}</span></div>
-                <div className={styles.detailRow}><strong>(+) Valor do Seguro:</strong> <span>{formatarMoeda(data?.totais?.valorTotalSeguro ?? data?.valorTotalSeguro)}</span></div>
-                <div className={styles.detailRow}><strong>(+) Outras Despesas:</strong> <span>{formatarMoeda(data?.totais?.valorOutrasDespesas ?? data?.valorOutrasDespesas)}</span></div>
-                <div className={styles.detailRow}><strong>(-) Desconto Total:</strong> <span className={styles.textGreen}>({formatarMoeda(data?.totais?.valorTotalDesconto ?? data?.valorTotalDesconto)})</span></div>
-
-                <hr style={{ border: '0', borderTop: '1px solid #eee', margin: '10px 0' }} />
-
-                <div className={styles.detailRow}><strong>ICMS Próprio:</strong> <span>{formatarMoeda(data?.totais?.valorTotalIcms ?? data?.valorTotalIcms)}</span></div>
-                <div className={styles.detailRow}><strong>ICMS ST (Subst. Tributária):</strong> <span>{formatarMoeda(data?.totais?.valorTotalIcmsST ?? data?.valorTotalIcmsST)}</span></div>
-                <div className={styles.detailRow}><strong>IPI (IPI Comercial):</strong> <span>{formatarMoeda(data?.totais?.valorTotalIpi ?? data?.valorTotalIpi)}</span></div>
-
-                {(data?.totais?.valorTotalIBS ?? data?.valorTotalIBS) !== undefined && (
-                    <div className={styles.detailRow}><strong>IBS Total (Reforma 2026):</strong> <span>{formatarMoeda(data?.totais?.valorTotalIBS ?? data?.valorTotalIBS)}</span></div>
+        {/* CARD 2: Fornecedor (Emitente) */}
+        <Col xs={24} md={8}>
+          <Card 
+            title={<Space><ShopOutlined /><span>2. Fornecedor (Emitente)</span></Space>}
+            size="small"
+            style={{ height: '100%' }}
+            extra={
+              <Space>
+                {supplierStatus.isChecking && <Badge status="processing" text="Verificando..." />}
+                {supplierStatus.exists === true && <Badge status="success" text="Ativo" />}
+                {supplierStatus.exists === false && (
+                  <Space size={4}>
+                    <Badge status="warning" text="Não Cadastrado" />
+                    <Button type="primary" size="small" icon={<PlusOutlined />} onClick={actions.onCreateSupplier}>Criar</Button>
+                  </Space>
                 )}
-                {(data?.totais?.valorTotalCBS ?? data?.valorTotalCBS) !== undefined && (
-                    <div className={styles.detailRow}><strong>CBS Total (Reforma 2026):</strong> <span>{formatarMoeda(data?.totais?.valorTotalCBS ?? data?.valorTotalCBS)}</span></div>
-                )}
+                <Tooltip title="Ver dados do fornecedor">
+                  <Button type="text" icon={<InfoCircleOutlined />} onClick={() => setIsSupplierDetailsOpen(true)} />
+                </Tooltip>
+              </Space>
+            }
+          >
+            <Descriptions column={1} layout="horizontal" size="small" bordered>
+              <Descriptions.Item label="CNPJ">{emitente.cnpj}</Descriptions.Item>
+              <Descriptions.Item label="Fantasia" labelStyle={{ whiteSpace: 'nowrap' }}>
+                <Text ellipsis style={{ maxWidth: 140 }}>{emitente.nomeFantasia || "Não Informado"}</Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="Razão Social">
+                <Text ellipsis style={{ maxWidth: 140 }}>{emitente.nome}</Text>
+              </Descriptions.Item>
+            </Descriptions>
+          </Card>
+        </Col>
 
-                <hr style={{ border: '0', borderTop: '2px solid #ccc', margin: '10px 0' }} />
+        {/* CARD 3: Dados de Logística e Frete */}
+        <Col xs={24} md={8}>
+          <Card 
+            title={<Space><CarOutlined /><span>3. Logística e Rateio de Frete</span></Space>}
+            size="small"
+            style={{ height: '100%' }}
+            extra={
+              <Tooltip title="Ver composição e tributos">
+                <Button type="text" icon={<InfoCircleOutlined />} onClick={() => setIsLogisticsDetailsOpen(true)} />
+              </Tooltip>
+            }
+          >
+            <Text type="secondary" style={{ fontSize: 12 }}>Transportadora: </Text>
+            <Text strong block ellipsis style={{ marginBottom: 4 }}>{data?.frete?.transportadora?.nome || "Não Informada"}</Text>
 
-                <div className={styles.detailRow} style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
-                    <span>VALOR LÍQUIDO DA NOTA:</span>
-                    <span className={styles.textBlue}>{formatarMoeda(data?.totais?.valorTotalNf ?? data?.valorTotalNf)}</span>
-                </div>
-            </div>
 
-            <div className={styles.modalActions} style={{ marginTop: '20px' }}>
-                <Button variant='secondary' onClick={() => setIsLogisticsDetailsOpen(false)}>Fechar</Button>
-            </div>
-        </div>
-    </div>
-)}
+            <Descriptions column={3} size="small" layout="vertical" bordered style={{ marginBottom: 12 }}>
+              <Descriptions.Item label="Volumes">{data?.frete?.volumes?.quantidade ?? '-'}</Descriptions.Item>
+              <Descriptions.Item label="Espécie">{data?.frete?.volumes?.especie || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Peso Bruto">{data?.frete?.volumes?.pesoBruto ? `${data.frete.volumes.pesoBruto} kg` : '-'}</Descriptions.Item>
+            </Descriptions>
 
             
+            <Text type="secondary" style={{ fontSize: 12 }}>Modalidade do Frete (XML): </Text>
+            <Text strong block style={{ marginBottom: 12 }}>{traduzirModalidadeFrete(data?.frete?.modalidade)}</Text>
 
-        </FlexGridContainer>
-    );
+            <Row gutter={8}>
+              <Col span={12}>
+                <Text strong style={{ fontSize: 12 }}>Valor do Frete (R$)</Text>
+                <InputNumber 
+                  style={{ width: '100%', marginTop: 4 }} 
+                  placeholder="0,00" 
+                  min={0} 
+                  stringMode
+                />
+              </Col>
+              <Col span={12}>
+                <Text strong style={{ fontSize: 12 }}>Método de Rateio</Text>
+                <Select defaultValue="VALOR" style={{ width: '100%', marginTop: 4 }}>
+                  <Select.Option value="VALOR">Proporcional por Valor</Select.Option>
+                  <Select.Option value="PESO">Proporcional por Peso</Select.Option>
+                  <Select.Option value="IGUAL">Divisão Igualitária</Select.Option>
+                  <Select.Option value="MANUAL">Digitação Manual</Select.Option>
+                </Select>
+              </Col>
+            </Row>
+          </Card>
+        </Col>
+      </Row>
+
+      {/* ================= MODAL: DETALHES DA NF ================= */}
+      <Modal
+        title="📄 Detalhes Técnicos da NF-e"
+        open={isNfDetailsOpen}
+        onCancel={() => setIsNfDetailsOpen(false)}
+        footer={[<Button key="close" onClick={() => setIsNfDetailsOpen(false)}>Fechar</Button>]}
+      >
+        <Descriptions column={1} bordered style={{ marginTop: 16 }}>
+          <Descriptions.Item label="Chave de Acesso"><Text style={{ fontFamily: 'monospace' }}>{formatarChaveAcesso(data.chaveAcesso)}</Text></Descriptions.Item>
+          <Descriptions.Item label="Número">{data.numero}</Descriptions.Item>
+          <Descriptions.Item label="Série">{data.serie}</Descriptions.Item>
+          <Descriptions.Item label="Data Emissão">{formatarDataBR(data.dataEmissao)}</Descriptions.Item>
+          <Descriptions.Item label="Modelo Fiscal">55 (Nota Fiscal Eletrônica)</Descriptions.Item>
+          <Descriptions.Item label="Ambiente">1 (Produção)</Descriptions.Item>
+          <Descriptions.Item label="Status SEFAZ"><Text type="success" strong>100 - Autorizado o uso da NF-e</Text></Descriptions.Item>
+        </Descriptions>
+      </Modal>
+
+      {/* ================= MODAL: DETALHES DO FORNECEDOR ================= */}
+      <Modal
+        title="🏢 Dados Completos do Emitente"
+        open={isSupplierDetailsOpen}
+        onCancel={() => setIsSupplierDetailsOpen(false)}
+        footer={[<Button key="close" onClick={() => setIsSupplierDetailsOpen(false)}>Fechar</Button>]}
+      >
+        <Descriptions column={1} bordered style={{ marginTop: 16 }}>
+          <Descriptions.Item label="Razão Social">{emitente.nome}</Descriptions.Item>
+          <Descriptions.Item label="Nome Fantasia">{emitente.nomeFantasia || '-'}</Descriptions.Item>
+          <Descriptions.Item label="CNPJ">{emitente.cnpj}</Descriptions.Item>
+          <Descriptions.Item label="Inscrição Estadual">{emitente.ie || '-'}</Descriptions.Item>
+          <Descriptions.Item label="Endereço">{`${emitente.logradouro || ''}, ${emitente.numeroEnd || ''}`}</Descriptions.Item>
+          <Descriptions.Item label="Bairro">{emitente.bairro || '-'}</Descriptions.Item>
+          <Descriptions.Item label="Cidade/UF">{`${emitente.municipio || '-'} / ${emitente.uf || '-'}`}</Descriptions.Item>
+        </Descriptions>
+      </Modal>
+
+      {/* ================= MODAL: RESUMO FINANCEIRO E LOGÍSTICO ================= */}
+      <Modal
+        title={<Space><DollarOutlined style={{ color: '#1890ff' }} /><span>Totais e Composição de Valores</span></Space>}
+        open={isLogisticsDetailsOpen}
+        onCancel={() => setIsLogisticsDetailsOpen(false)}
+        width={600}
+        footer={[<Button key="close" onClick={() => setIsLogisticsDetailsOpen(false)}>Fechar</Button>]}
+      >
+        <Title level={5} style={{ marginTop: 16 }}><CarOutlined /> Detalhes de Logística e Frete</Title>
+        <Descriptions column={2} bordered size="small" style={{ marginBottom: 20 }}>
+          <Descriptions.Item label="Transportador" span={2}>{data?.frete?.transportadora?.nome || "N/A"}</Descriptions.Item>
+          <Descriptions.Item label="CNPJ/CPF">{data?.frete?.transportadora?.cnpjCpf || "N/A"}</Descriptions.Item>
+          <Descriptions.Item label="Inscrição Estadual">{data?.frete?.transportadora?.ie || "N/A"}</Descriptions.Item>
+          <Descriptions.Item label="Peso Bruto Total">{data?.frete?.volumes?.pesoBruto ? `${data.frete.volumes.pesoBruto} kg` : "N/A"}</Descriptions.Item>
+          <Descriptions.Item label="Peso Líquido Total">{data?.frete?.volumes?.pesoLiquido ? `${data.frete.volumes.pesoLiquido} kg` : "N/A"}</Descriptions.Item>
+        </Descriptions>
+
+        <Title level={5}><DollarOutlined /> Composição de Custos</Title>
+        <Descriptions column={1} bordered size="small">
+          <Descriptions.Item label="Valor dos Produtos">{formatarMoeda(data?.totais?.valorTotalProdutos ?? data?.valorTotalProdutos)}</Descriptions.Item>
+          <Descriptions.Item label="(+) Valor do Frete">{formatarMoeda(data?.totais?.valorTotalFrete ?? data?.valorTotalFrete)}</Descriptions.Item>
+          <Descriptions.Item label="(+) Valor do Seguro">{formatarMoeda(data?.totais?.valorTotalSeguro ?? data?.valorTotalSeguro)}</Descriptions.Item>
+          <Descriptions.Item label="(+) Outras Despesas">{formatarMoeda(data?.totais?.valorOutrasDespesas ?? data?.valorOutrasDespesas)}</Descriptions.Item>
+          <Descriptions.Item label="(-) Desconto Total"><Text type="success">({formatarMoeda(data?.totais?.valorTotalDesconto ?? data?.valorTotalDesconto)})</Text></Descriptions.Item>
+          <Descriptions.Item label="ICMS Próprio">{formatarMoeda(data?.totais?.valorTotalIcms ?? data?.valorTotalIcms)}</Descriptions.Item>
+          <Descriptions.Item label="ICMS ST">{formatarMoeda(data?.totais?.valorTotalIcmsST ?? data?.valorTotalIcmsST)}</Descriptions.Item>
+          <Descriptions.Item label="IPI Comercial">{formatarMoeda(data?.totais?.valorTotalIpi ?? data?.valorTotalIpi)}</Descriptions.Item>
+          
+          {(data?.totais?.valorTotalIBS ?? data?.valorTotalIBS) !== undefined && (
+            <Descriptions.Item label="IBS Total (Reforma)">{formatarMoeda(data?.totais?.valorTotalIBS ?? data?.valorTotalIBS)}</Descriptions.Item>
+          )}
+          {(data?.totais?.valorTotalCBS ?? data?.valorTotalCBS) !== undefined && (
+            <Descriptions.Item label="CBS Total (Reforma)">{formatarMoeda(data?.totais?.valorTotalCBS ?? data?.valorTotalCBS)}</Descriptions.Item>
+          )}
+          
+          <Descriptions.Item label={<Text strong>VALOR LÍQUIDO DA NOTA</Text>}>
+            <Text type="primary" strong style={{ fontSize: 16 }}>{formatarMoeda(data?.totais?.valorTotalNf ?? data?.valorTotalNf)}</Text>
+          </Descriptions.Item>
+        </Descriptions>
+      </Modal>
+    </div>
+  );
 };
 
 export default NfeCards;

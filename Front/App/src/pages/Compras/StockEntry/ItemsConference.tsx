@@ -1,5 +1,36 @@
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
-import styles from './ItemsConference.module.css';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { 
+  Table, 
+  Button, 
+  Checkbox, 
+  Radio, 
+  Space, 
+  Typography, 
+  Modal, 
+  Input, 
+  Select, 
+  InputNumber, 
+  Tag, 
+  Tooltip, 
+  Row, 
+  Col,
+  Divider,
+  Alert
+} from 'antd';
+import { 
+  SettingOutlined, 
+  ThunderboltOutlined, 
+  CheckOutlined, 
+  UndoOutlined, 
+  LinkOutlined, 
+  DeleteOutlined, 
+  FolderAddOutlined,
+  EditOutlined,
+  PlusOutlined,
+  InfoCircleOutlined
+} from '@ant-design/icons';
+import type { ColumnsType } from 'antd/es/table';
+
 import { GroupMappingModal } from './GroupMappingModal';
 import ManageGroupsModal from './ManageGroupsModal';
 import GroupEditModal from './GroupEditModal';
@@ -13,11 +44,6 @@ import {
 } from './types';
 
 import { generateItemDisplayName, getBorderColorFromGroupId, hasAttributeOverride, generateGroupId } from './helpers';
-import FlexGridContainer from '../../../components/Layout/FlexGridContainer/FlexGridContainer';
-
-// ➕ Definição das colunas que permitem ordenação
-type SortKey = 'nItem' | 'ncm' | 'descricao' | 'grupoId' | 'unidadeMedida';
-type SortDirection = 'asc' | 'desc';
 
 interface Props {
   items?: Item[];
@@ -36,6 +62,8 @@ interface Props {
   onBatchSaveItemsAttributes?: (updatedItems: { tempId: number; atributosCustomizados: ItemAttribute[] }[]) => void;
 }
 
+const { Text, Title } = Typography;
+
 export const ItemsConference: React.FC<Props> = ({
   items: initialItems,
   groups: initialGroups,
@@ -53,48 +81,31 @@ export const ItemsConference: React.FC<Props> = ({
 }) => {
   const [localItems, setLocalItems] = useState<Item[]>(initialItems || []);
   const [localGroups, setLocalGroups] = useState<Group[]>(initialGroups || []);
-
-  useEffect(() => {
-    setLocalItems(initialItems || []);
-  }, [initialItems]);
-
-  useEffect(() => {
-    setLocalGroups(initialGroups || []);
-  }, [initialGroups]);
-
-const [currentSecondaryInput, setCurrentSecondaryInput] = useState('');
-const [tempSecondaryEans, setTempSecondaryEans] = useState([]);
-
-  const [isEanModalOpen, setIsEanModalOpen] = useState(false);
-  const [selectedItemForEan, setSelectedItemForEan] = useState<Item | null>(null);
-  const [tempEanInput, setTempEanInput] = useState('');
-
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [filter, setFilter] = useState<FilterType>('all');
-  const [selected, setSelected] = useState<Set<number>>(new Set());
+
+  // Modais
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [selectedItemForGroup, setSelectedItemForGroup] = useState<Item | null>(null);
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [isBatchAssignOpen, setIsBatchAssignOpen] = useState(false);
   const [isGroupEditModalOpen, setIsGroupEditModalOpen] = useState(false);
   const [groupBeingEdited, setGroupBeingEdited] = useState<Group | null>(null);
+  const [isItemsEditOpen, setIsItemsEditOpen] = useState(false);
+  const [grupoSelecionadoParaItens, setGrupoSelecionadoParaItens] = useState<Group | null>(null);
 
+  // Estados Lote AntD
   const [batchAssignMode, setBatchAssignMode] = useState<'LINK' | 'CREATE'>('LINK');
   const [batchSelectedGroupId, setBatchSelectedGroupId] = useState<string>('');
   const [batchNewGroupName, setBatchNewGroupName] = useState<string>('');
 
-  const [isItemsEditOpen, setIsItemsEditOpen] = useState(false);
-  const [grupoSelecionadoParaItens, setGrupoSelecionadoParaItens] = useState<Group | null>(null);
+  useEffect(() => { setLocalItems(initialItems || []); }, [initialItems]);
+  useEffect(() => { setLocalGroups(initialGroups || []); }, [initialGroups]);
 
-  // 📦 NOVOS ESTADOS: Controladores de ordenação da tabela
-  const [sortKey, setSortKey] = useState<SortKey | null>('nItem'); // Padrão: Ordenar por Item sequencial
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
-
-  // Mapas otimizados
+  // Mapas de performance
   const groupsById = useMemo(() => {
     const map = new Map<string, Group>();
-    for (const g of localGroups) {
-      map.set(g.id, g);
-    }
+    for (const g of localGroups) map.set(g.id, g);
     return map;
   }, [localGroups]);
 
@@ -110,159 +121,94 @@ const [tempSecondaryEans, setTempSecondaryEans] = useState([]);
     return map;
   }, [localItems]);
 
-  // Filtros de Itens
   const pendingItems = useMemo(() => localItems.filter(i => !i.confirmed), [localItems]);
   const confirmedItems = useMemo(() => localItems.filter(i => i.confirmed), [localItems]);
   const divergentItems = useMemo(() => localItems.filter(i => (i.difference ?? 0) !== 0), [localItems]);
   const unmappedItems = useMemo(() => localItems.filter(i => !i.mappedId), [localItems]);
 
-  // 🔄 LÓGICA DE ORDENAÇÃO E FILTRAGEM ACUMULADA
-  const filteredAndSortedItems = useMemo(() => {
-    // 1. Aplica o filtro de status primeiro
-    let itemsResult: Item[] = [];
+  // Filtragem reativa baseada nas abas
+  const filteredItems = useMemo(() => {
     switch (filter) {
-      case 'pending': itemsResult = [...pendingItems]; break;
-      case 'confirmed': itemsResult = [...confirmedItems]; break;
-      case 'divergent': itemsResult = [...divergentItems]; break;
-      case 'unmapped': itemsResult = [...unmappedItems]; break;
-      default: itemsResult = [...localItems]; break;
+      case 'pending': return pendingItems;
+      case 'confirmed': return confirmedItems;
+      case 'divergent': return divergentItems;
+      case 'unmapped': return unmappedItems;
+      default: return localItems;
     }
+  }, [filter, localItems, pendingItems, confirmedItems, divergentItems, unmappedItems]);
 
-    // 2. Se houver uma chave de ordenação selecionada, ordena a lista resultante
-    if (sortKey) {
-      itemsResult.sort((a, b) => {
-        let valA: string | number = '';
-        let valB: string | number = '';
+  const formatCurrency = (val: number) =>
+    val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-        // Tratamento customizado para campos específicos
-        if (sortKey === 'grupoId') {
-          // Ordena pelo nome textual do grupo associado, não pela Hash do ID
-          valA = a.grupoId ? (groupsById.get(a.grupoId)?.nome || '') : '';
-          valB = b.grupoId ? (groupsById.get(b.grupoId)?.nome || '') : '';
-        } else if (sortKey === 'nItem') {
-          // Garante ordenação numérica pura para o ID/Linha do Item
-          valA = Number(a.nItem || a.tempId || 0);
-          valB = Number(b.nItem || b.tempId || 0);
-        } else {
-          // Fallback para strings padrões (NCM, Descrição, UOM)
-          valA = (a[sortKey] as string || '').toString().trim().toUpperCase();
-          valB = (b[sortKey] as string || '').toString().trim().toUpperCase();
-        }
-
-        if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
-        if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
-        return 0;
-      });
-    }
-
-    return itemsResult;
-  }, [filter, localItems, pendingItems, confirmedItems, divergentItems, unmappedItems, sortKey, sortDirection, groupsById]);
-
-  const handleOpenEanModal = (item: Item) => {
-    setSelectedItemForEan(item);
-    setTempEanInput(item.gtin || '');
-    setIsEanModalOpen(true);
-  };
-
-  const handleSaveEan = () => {
-    if (!selectedItemForEan) return;
-
-    // Atualiza o EAN no estado local dos itens
-    setLocalItems(prev =>
-      prev.map(it =>
-        it.tempId === selectedItemForEan.tempId
-          ? { ...it, gtin: tempEanInput.trim() }
-          : it
-      )
-    );
-
-    // Opcional: Se você tiver um callback vindo do backend/props, chame-o aqui
-    // onUpdateItemEan?.(selectedItemForEan.tempId, tempEanInput.trim());
-
-    setIsEanModalOpen(false);
-    setSelectedItemForEan(null);
-  };
-
-
-
-
-  /// Handler para disparar a inversão, troca ou reset da coluna ordenada
-  const handleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      if (sortDirection === 'asc') {
-        // 1º para o 2º clique: muda de ASC para DESC
-        setSortDirection('desc');
-      } else if (sortDirection === 'desc') {
-        // 2º para o 3º clique: Volta para o estado neutro (remove a ordenação)
-        setSortKey(null);
-        setSortDirection(null);
-      }
-    } else {
-      // Se clicou em uma coluna nova, define como ascendente
-      setSortKey(key);
-      setSortDirection('asc');
-    }
-  };
-
-  // Auxiliar visual para os cabeçalhos das colunas (incluindo estado neutro)
-  const renderSortIndicator = (key: SortKey) => {
-    // Se não for a coluna selecionada OU se a direção for nula, mostra o indicador neutro
-    if (sortKey !== key || !sortDirection) {
-      return ' ⇅';
-    }
-
-    return sortDirection === 'asc' ? ' ▲' : ' ▼';
-  };
-
-  // ===================================================================
-  // FUNÇÕES PRINCIPAIS E CALLBACKS
-  // ===================================================================
-
+  // Callbacks internos ajustados
   const assignGroupToItem = useCallback((itemId: number, groupId: string) => {
-    setLocalItems(prev =>
-      prev.map(it =>
-        it.tempId === itemId
-          ? { ...it, grupoId: groupId, atributosCustomizados: undefined }
-          : it
-      ));
+    setLocalItems(prev => prev.map(it => it.tempId === itemId ? { ...it, grupoId: groupId, atributosCustomizados: undefined } : it));
     onAssignGroupToItem?.(itemId, groupId);
   }, [onAssignGroupToItem]);
 
   const createGroupAndAssign = useCallback((itemId: number, groupData: Group) => {
     setLocalGroups(prev => [...prev, groupData]);
-    setLocalItems(prev =>
-      prev.map(it =>
-        it.tempId === itemId
-          ? { ...it, grupoId: groupData.id, atributosCustomizados: undefined }
-          : it
-      ));
+    setLocalItems(prev => prev.map(it => it.tempId === itemId ? { ...it, grupoId: groupData.id, atributosCustomizados: undefined } : it));
     onCreateAndAssignGroup?.(itemId, groupData);
   }, [onCreateAndAssignGroup]);
 
+  const handleOpenGroupModal = (item: Item) => {
+    setSelectedItemForGroup(item);
+    setIsGroupModalOpen(true);
+  };
+
+  const handleSaveGroupMapping = (payload: GroupMappingPayload) => {
+    if (!selectedItemForGroup) return;
+    if (payload.isNewGroup && payload.groupData) {
+      createGroupAndAssign(selectedItemForGroup.tempId, payload.groupData as Group);
+    } else if (!payload.isNewGroup) {
+      assignGroupToItem(selectedItemForGroup.tempId, payload.groupId);
+    }
+    if (payload.itemAttributesOverride) {
+      applyItemAttributeOverride(selectedItemForGroup.tempId, payload.itemAttributesOverride);
+    }
+    setIsGroupModalOpen(false);
+  };
+
+  const handleLocalBatchSubmit = () => {
+    const selectedIdsNumbers = selectedRowKeys.map(k => Number(k));
+    if (batchAssignMode === 'LINK') {
+      if (!batchSelectedGroupId) return Modal.error({ title: 'Aviso', content: 'Selecione um grupo existente.' });
+      selectedIdsNumbers.forEach(id => assignGroupToItem(id, batchSelectedGroupId));
+      onBatchAssignGroup?.(selectedIdsNumbers, batchSelectedGroupId);
+    } else {
+      if (!batchNewGroupName.trim()) return Modal.error({ title: 'Aviso', content: 'Informe o nome do novo grupo.' });
+      const newGroup: Group = { id: generateGroupId(), nome: batchNewGroupName.trim().toUpperCase(), atributos: [] };
+      setLocalGroups(prev => [...prev, newGroup]);
+      selectedIdsNumbers.forEach(id => assignGroupToItem(id, newGroup.id));
+      onBatchAssignGroup?.(selectedIdsNumbers, newGroup.id);
+    }
+    setSelectedRowKeys([]);
+    setIsBatchAssignOpen(false);
+  };
+
+  const handleQuantityChange = (itemId: number, newQty: number) => {
+    const qty = Math.min(999, Math.max(0, newQty));
+    setLocalItems(prev => prev.map(it => (it.tempId === itemId ? { ...it, receivedQuantity: qty } : it)));
+    onQuantityChange?.(itemId, qty);
+  };
+
+  const applyItemAttributeOverride = useCallback((itemId: number, atributos: ItemAttribute[]) => {
+    setLocalItems(prev => prev.map(it => it.tempId === itemId ? { ...it, atributosCustomizados: atributos } : it));
+    onApplyItemAttributeOverride?.(itemId, atributos);
+  }, [onApplyItemAttributeOverride]);
+
   const updateGroup = useCallback((groupId: string, patch: Partial<Group>) => {
-    setLocalGroups(prev =>
-      prev.map(g => (g.id === groupId ? { ...g, ...patch } : g))
-    );
+    setLocalGroups(prev => prev.map(g => (g.id === groupId ? { ...g, ...patch } : g)));
     onUpdateGroup?.(groupId, patch);
   }, [onUpdateGroup]);
 
-  const applyItemAttributeOverride = useCallback(
-    (itemId: number, atributos: ItemAttribute[]) => {
-      setLocalItems(prev =>
-        prev.map(it =>
-          it.tempId === itemId
-            ? { ...it, atributosCustomizados: atributos }
-            : it
-        )
-      );
-      onApplyItemAttributeOverride?.(itemId, atributos);
-    },
-    [onApplyItemAttributeOverride]
-  );
-
-  // ===================================================================
-  // HANDLERS DE UI E EVENTOS
-  // ===================================================================
+  const handleEditGroup = (groupId: string) => {
+    const group = groupsById.get(groupId);
+    if (!group) return;
+    setGroupBeingEdited(group);
+    setIsGroupEditModalOpen(true);
+  };
 
   const handleEditGroupItems = (groupId: string) => {
     const grupoFound = groupsById.get(groupId);
@@ -272,814 +218,273 @@ const [tempSecondaryEans, setTempSecondaryEans] = useState([]);
     }
   };
 
-  const handleSaveItemsAttributes = (
-    updatedItems: { tempId: number; atributosCustomizados: ItemAttribute[] }[]
-  ) => {
-    setLocalItems(prevItems =>
-      prevItems.map(item => {
-        const updateData = updatedItems.find(u => u.tempId === item.tempId);
-        if (updateData) {
-          return {
-            ...item,
-            atributosCustomizados: updateData.atributosCustomizados,
-            confirmed: true,
-          };
-        }
-        return item;
-      })
-    );
-    onBatchSaveItemsAttributes?.(updatedItems);
-  };
-
-  const handleQuantityChange = (itemId: number, newQty: number) => {
-    // Garante que o valor fique estritamente entre 0 e 999
-    const qty = Math.min(999, Math.max(0, newQty));
-
-    // Agora todo o resto do código usará o valor já travado corretamente
-    setLocalItems(prev =>
-      prev.map(it => (it.tempId === itemId ? { ...it, receivedQuantity: qty } : it))
-    );
-
-    onQuantityChange?.(itemId, qty);
-  };
-
-  const toggleSelection = (id: number) => {
-    const next = new Set(selected);
-    next.has(id) ? next.delete(id) : next.add(id);
-    setSelected(next);
-  };
-
-  const toggleSelectAll = () => {
-    if (selected.size === filteredAndSortedItems.length) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(filteredAndSortedItems.map(i => i.tempId)));
-    }
-  };
-
-  const selectedIds = useMemo(() => [...selected], [selected]);
-  const hasSelection = selected.size > 0;
-
-  const openBatchAssign = useCallback(() => {
-    if (!hasSelection) return;
-    setBatchAssignMode('LINK');
-    setBatchSelectedGroupId('');
-    setBatchNewGroupName('');
-    setIsBatchAssignOpen(true);
-  }, [hasSelection]);
-
-  const handleLocalBatchSubmit = () => {
-    const selectedItems = filteredAndSortedItems.filter(i => selected.has(i.tempId));
-
-    if (batchAssignMode === 'LINK') {
-      if (!batchSelectedGroupId) {
-        alert('Por favor, selecione um grupo existente.');
-        return;
-      }
-      const targetGroup = groupsById.get(batchSelectedGroupId);
-      if (!targetGroup) {
-        alert('Grupo não encontrado.');
-        return;
-      }
-
-      for (const item of selectedItems) {
-        assignGroupToItem(item.tempId, batchSelectedGroupId);
-      }
-      onBatchAssignGroup?.(selectedItems.map(it => it.tempId), batchSelectedGroupId);
-    } else if (batchAssignMode === 'CREATE') {
-      if (!batchNewGroupName.trim()) {
-        alert('Por favor, informe o nome do novo grupo.');
-        return;
-      }
-
-      const newGroup: Group = {
-        id: generateGroupId(),
-        nome: batchNewGroupName.trim().toUpperCase(),
-        atributos: [],
-      };
-
-      setLocalGroups(prev => [...prev, newGroup]);
-
-      for (const item of selectedItems) {
-        assignGroupToItem(item.tempId, newGroup.id);
-      }
-      onBatchAssignGroup?.(selectedItems.map(it => it.tempId), newGroup.id);
-    }
-
-    setSelected(new Set());
-    setIsBatchAssignOpen(false);
-  };
-
-  const handleOpenGroupModal = (item: Item) => {
-    setSelectedItemForGroup(item);
-    setIsGroupModalOpen(true);
-  };
-
-  const handleSaveGroupMapping = (payload: GroupMappingPayload) => {
-    if (!selectedItemForGroup) return;
-
-    if (payload.isNewGroup && payload.groupData) {
-      createGroupAndAssign(selectedItemForGroup.tempId, payload.groupData as Group);
-    } else if (!payload.isNewGroup) {
-      assignGroupToItem(selectedItemForGroup.tempId, payload.groupId);
-    }
-
-    if (payload.itemAttributesOverride) {
-      applyItemAttributeOverride(selectedItemForGroup.tempId, payload.itemAttributesOverride);
-    }
-
-    setIsGroupModalOpen(false);
-  };
-
-  const handleEditGroup = (groupId: string) => {
-    const group = groupsById.get(groupId);
-    if (!group) return;
-    setGroupBeingEdited(group);
-    setIsGroupEditModalOpen(true);
-  };
-
   const handleSaveGroupEdit = (groupData: Group) => {
-    updateGroup(groupData.id, {
-      nome: groupData.nome,
-      atributos: groupData.atributos,
-    });
+    updateGroup(groupData.id, { nome: groupData.nome, atributos: groupData.atributos });
     setIsGroupEditModalOpen(false);
     setGroupBeingEdited(null);
   };
 
-  const formatCurrency = (val: number) =>
-    val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const handleSaveItemsAttributes = (updatedItems: { tempId: number; atributosCustomizados: ItemAttribute[] }[]) => {
+    setLocalItems(prevItems => prevItems.map(item => {
+      const updateData = updatedItems.find(u => u.tempId === item.tempId);
+      return updateData ? { ...item, atributosCustomizados: updateData.atributosCustomizados, confirmed: true } : item;
+    }));
+    onBatchSaveItemsAttributes?.(updatedItems);
+  };
+
+  // 📋 DEFINIÇÃO DE COLUNAS DA ANT DESIGN TABLE
+  const columns: ColumnsType<Item> = [
+    {
+      title: 'Item',
+      dataIndex: 'nItem',
+      key: 'nItem',
+      sorter: (a, b) => Number(a.nItem || a.tempId || 0) - Number(b.nItem || b.tempId || 0),
+      render: (text, record) => {
+        const borderColor = record.grupoId ? getBorderColorFromGroupId(record.grupoId) : 'transparent';
+        return (
+          <div style={{ borderLeft: `4px solid ${borderColor}`, paddingLeft: 8, fontWeight: 'bold' }}>
+            {text || record.tempId}
+          </div>
+        );
+      }
+    },
+    {
+      title: 'Cod. Interno',
+      dataIndex: 'mappedId',
+      key: 'mappedId',
+      render: (text, record) => text ? (
+        <Tag color="blue">{text}</Tag>
+      ) : (
+        <Button size="small" type="link" icon={<LinkOutlined />} onClick={() => onMapProducts?.([record.tempId])}>
+          Vincular
+        </Button>
+      )
+    },
+    { title: 'Cod. Forn.', dataIndex: 'sku', key: 'sku' },
+    { title: 'NCM', dataIndex: 'ncm', key: 'ncm', sorter: (a, b) => (a.ncm || '').localeCompare(b.ncm || '') },
+    {
+      title: 'Produto / Nome no Estoque',
+      dataIndex: 'descricao',
+      key: 'descricao',
+      width: 320,
+      sorter: (a, b) => (a.descricao || '').localeCompare(b.descricao || ''),
+      render: (_, record) => {
+        const group = record.grupoId ? groupsById.get(record.grupoId) : null;
+        const displayName = generateItemDisplayName(record, group);
+        const hasOverride = hasAttributeOverride(record);
+        return (
+          <Space direction="vertical" size={0}>
+            <Text strong style={{ fontSize: 13 }}>{record.descricao}</Text>
+            <Text type="secondary" style={{ fontSize: 12, fontStyle: 'italic' }}>
+              {displayName} {hasOverride && <Tooltip title="Sobrescrita Ativa">⚡</Tooltip>}
+            </Text>
+          </Space>
+        );
+      }
+    },
+    {
+      title: 'Grupo',
+      dataIndex: 'grupoId',
+      key: 'grupoId',
+      sorter: (a, b) => {
+        const nameA = a.grupoId ? (groupsById.get(a.grupoId)?.nome || '') : '';
+        const nameB = b.grupoId ? (groupsById.get(b.grupoId)?.nome || '') : '';
+        return nameA.localeCompare(nameB);
+      },
+      render: (grupoId, record) => grupoId && groupsById.has(grupoId) ? (
+        <Button size="small" icon={<EditOutlined />} onClick={() => handleOpenGroupModal(record)}>Editar</Button>
+      ) : (
+        <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={() => handleOpenGroupModal(record)}>Grupo</Button>
+      )
+    },
+    { title: 'UOM', dataIndex: 'unidadeMedida', key: 'unidadeMedida', render: (text) => <Tag>{text || '-'}</Tag> },
+    { title: 'Custo Unit.', dataIndex: 'valorUnitario', key: 'valorUnitario', render: (val) => formatCurrency(val || 0) },
+    {
+      title: 'Qtd (NF)',
+      dataIndex: 'quantidade',
+      key: 'quantidade',
+      render: (val) => <strong>{val || 0}</strong>
+    },
+    {
+      title: 'Qtd Recebido',
+      dataIndex: 'receivedQuantity',
+      key: 'receivedQuantity',
+      render: (val, record) => (
+        <InputNumber
+          min={0}
+          max={999}
+          size="small"
+          value={val}
+          onChange={(v) => handleQuantityChange(record.tempId, Number(v || 0))}
+          style={{ width: 70 }}
+        />
+      )
+    },
+    {
+      title: 'Dif.',
+      key: 'difference',
+      render: (_, record) => {
+        const quantityNF = record.quantidade || 0;
+        const diff = typeof record.difference === 'number' ? record.difference : quantityNF - record.receivedQuantity;
+        if (diff === 0) return <Text type="success">0</Text>;
+        return diff > 0 ? <Text type="danger">-{diff}</Text> : <Text type="success">+{Math.abs(diff)}</Text>;
+      }
+    },
+    {
+      title: 'Total Item',
+      key: 'totalItem',
+      render: (_, record) => formatCurrency((record.valorUnitario || 0) * record.receivedQuantity)
+    },
+    {
+      title: 'Status',
+      key: 'status',
+      align: 'center',
+      render: (_, record) => {
+        const quantityNF = record.quantidade || 0;
+        const diff = typeof record.difference === 'number' ? record.difference : quantityNF - record.receivedQuantity;
+        if (record.confirmed) return <Tooltip title="Item conferido">✅</Tooltip>;
+        if (diff !== 0) return <Tooltip title="Divergência detectada">⚠️</Tooltip>;
+        return <Tooltip title="Aguardando conferência">⏳</Tooltip>;
+      }
+    }
+  ];
 
   return (
-    <div className={styles.container}>
-      <div className={styles.header}>
-        <h2 className={styles.title}>4. Conferência de Itens ({localItems.length})</h2>
-
-
-        <FlexGridContainer layout='flex'>
-
-          <div className={styles.headerActions}>
-            <button
-              type="button"
-              className={styles.manageGroupsBtn}
-              onClick={() => setIsManageModalOpen(true)}
-            >
-              ⚙️ Gerenciar Grupos ({localGroups.length})
-            </button>
-          </div>
-
-
-
-          <div className={styles.turboContainer}>
-            <span className={styles.turboLabel}>Checkagem turbo ⚡</span>
-            <input
-              type="checkbox"
-              className={styles.turboCheck}
-              title="Checkagem turbo automática por duplo clique."
-            />
-          </div>
-
-        </FlexGridContainer>
-      </div>
-
-      {/* BATCH ASSIGN MODAL */}
-      {isBatchAssignOpen && (
-        <div className={styles.batchModalOverlay}>
-          <div className={styles.batchModalContainer}>
-            <div className={styles.batchHeader}>
-              <h3 className={styles.batchTitle}>Definir Grupo em Lote</h3>
-              <span className={styles.batchCountBadge}>{selected.size} itens selecionados</span>
-            </div>
-
-            <div className={styles.batchBodyGrid}>
-              <div className={styles.leftColumn}>
-                <div className={styles.selectedItemsPreview}>
-                  <div className={styles.previewHeader}>
-                    <span>Itens da NF que serão alterados</span>
-                  </div>
-                  <ul className={styles.selectedItemsList}>
-                    {filteredAndSortedItems
-                      .filter(i => selected.has(i.tempId))
-                      .map(si => (
-                        <li key={si.tempId} className={styles.selectedItemRow}>
-                          <span className={styles.previewIndex}>{si.nItem || si.tempId}.</span>
-                          <span className={styles.previewDesc} title={si.descricao}>
-                            {si.descricao}
-                          </span>
-                        </li>
-                      ))}
-                  </ul>
-                </div>
-              </div>
-
-              <div className={styles.rightColumn}>
-                <div className={styles.modeSwitchContainer}>
-                  <button
-                    type="button"
-                    className={`${styles.switchBtn} ${batchAssignMode === 'LINK' ? styles.switchBtnActive : ''}`}
-                    onClick={() => setBatchAssignMode('LINK')}
-                  >
-                    Vincular a Existente
-                  </button>
-                  <button
-                    type="button"
-                    className={`${styles.switchBtn} ${batchAssignMode === 'CREATE' ? styles.switchBtnActive : ''}`}
-                    onClick={() => setBatchAssignMode('CREATE')}
-                  >
-                    Criar Novo Grupo
-                  </button>
-                </div>
-
-                {batchAssignMode === 'LINK' ? (
-                  <div className={styles.formGroup}>
-                    <label htmlFor="batchSelectGroup">Escolha o Grupo Existente</label>
-                    <select
-                      id="batchSelectGroup"
-                      value={batchSelectedGroupId}
-                      onChange={e => setBatchSelectedGroupId(e.target.value)}
-                      className={styles.selectFull}
-                    >
-                      <option value="">-- selecione um grupo cadastrado --</option>
-                      {localGroups.map(g => (
-                        <option key={g.id} value={g.id}>
-                          {g.nome} ({itemsByGroupId.get(g.id)?.length || 0} itens vinculados)
-                        </option>
-                      ))}
-                    </select>
-                    <p className={styles.inputHelpText}>
-                      Os itens selecionados herdarão o esquema de atributos deste grupo.
-                    </p>
-                  </div>
-                ) : (
-                  <div className={styles.creativeGroupCard}>
-                    <div className={styles.cardHeaderNotice}>
-                      <h5>Modo de Criação Coletiva</h5>
-                      <p>Você está gerando uma nova grade para estes {selected.size} produtos de uma vez só.</p>
-                    </div>
-
-                    <div className={styles.formGroup}>
-                      <label htmlFor="batchNewGroupNameInput">Nome do Novo Grupo</label>
-                      <input
-                        id="batchNewGroupNameInput"
-                        value={batchNewGroupName}
-                        onChange={e => setBatchNewGroupName(e.target.value)}
-                        className={styles.inputFull}
-                        placeholder="Ex: AMANCO TEE MARROM"
-                      />
-                    </div>
-                    <p className={styles.cardHelpText}>
-                      ⚠️ <strong>Nota:</strong> O esquema de características específicas deve ser ajustado individualmente.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className={styles.batchActions}>
-              <button className={styles.btnNeutral} onClick={() => setIsBatchAssignOpen(false)}>
-                Cancelar
-              </button>
-              <button className={styles.btnPrimary} onClick={handleLocalBatchSubmit}>
-                Aplicar em Lote
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* FILTROS E AÇÕES EM LOTE */}
-      <div className={styles.filterContainer}>
-        <div className={hasSelection ? styles.bulkActions : styles.bulkActionsDisabled}>
-          <strong>{hasSelection ? `${selected.size} selecionado(s)` : 'Nenhum item selecionado'}</strong>
-          <button
-            disabled={!hasSelection}
-            onClick={() => {
-              onConfirmItems?.(selectedIds);
-              setSelected(new Set());
-            }}
-          >
-            Conferir
-          </button>
-          <button
-            disabled={!hasSelection}
-            onClick={() => {
-              onUnconfirmItems?.(selectedIds);
-              setSelected(new Set());
-            }}
-          >
-            Desfazer
-          </button>
-          <button disabled={!hasSelection} onClick={() => onMapProducts?.(selectedIds)}>
-            Vincular
-          </button>
-          <button
-            disabled={!hasSelection}
-            onClick={() => {
-              onRemoveItems?.(selectedIds);
-              setSelected(new Set());
-            }}
-          >
-            Remover
-          </button>
-          <button disabled={!hasSelection} onClick={openBatchAssign}>
-            Definir Grupo em Lote
-          </button>
-        </div>
-
-        <div className={styles.filterGroup}>
-          <FilterButton active={filter === 'all'} onClick={() => setFilter('all')}>
-            Todos ({localItems.length})
-          </FilterButton>
-          <FilterButton active={filter === 'pending'} onClick={() => setFilter('pending')}>
-            Pendentes ({pendingItems.length})
-          </FilterButton>
-          <FilterButton active={filter === 'confirmed'} onClick={() => setFilter('confirmed')}>
-            Conferidos ({confirmedItems.length})
-          </FilterButton>
-          <FilterButton active={filter === 'divergent'} onClick={() => setFilter('divergent')}>
-            Divergências ({divergentItems.length})
-          </FilterButton>
-          <FilterButton active={filter === 'unmapped'} onClick={() => setFilter('unmapped')}>
-            Sem Vínculo ({unmappedItems.length})
-          </FilterButton>
-        </div>
-      </div>
-
-      {/* TABELA PRINCIPAL ORDENÁVEL */}
-      <div className={styles.tableResponsive}>
-        <table className={styles.table}>
-          {/* Substitua o bloco correspondente do seu <thead> por este: */}
-          <tr>
-            {/* 1. Ordenação por Nro Item (Removido o caractere solto na tag th) */}
-            <th className={styles.sortableHeader} onClick={() => handleSort('nItem')}>
-              <input
-                type="checkbox"
-                checked={filteredAndSortedItems.length > 0 && selected.size === filteredAndSortedItems.length}
-                onChange={toggleSelectAll}
-                onClick={e => e.stopPropagation()} // impede disparar a ordenação ao clicar no checkbox geral
-              />
-              <span>{renderSortIndicator('nItem')}</span>
-            </th>
-
-            <th>Cod. Interno</th>
-            <th title='Cod. Fornecedor (cProd)'><span title='Cod. Fornecedor (cProd)'></span>Cod. Forn.</th>
-
-            {/* 2. Ordenação por NCM */}
-            <th className={styles.sortableHeader} onClick={() => handleSort('ncm')}>
-              NCM{renderSortIndicator('ncm')}
-            </th>
-
-            {/* Ajustado o tipo SortKey se quiser habilitar ordenação por EAN no futuro */}
-            <th>EAN </th>
-
-            {/* 3. Ordenação por Produto / Descrição */}
-            <th style={{ width: '320px' }} className={styles.sortableHeader} onClick={() => handleSort('descricao')}>
-              Produto / Nome no Estoque{renderSortIndicator('descricao')}
-            </th>
-
-            {/* 4. Ordenação por Grupo Estrutural */}
-            <th className={styles.sortableHeader} onClick={() => handleSort('grupoId')}>
-              Grupo{renderSortIndicator('grupoId')}
-            </th>
-
-            {/* 5. Ordenação por UOM (Unidade de Medida) */}
-            <th className={styles.sortableHeader} onClick={() => handleSort('unidadeMedida')}>
-              UOM{renderSortIndicator('unidadeMedida')}
-            </th>
-
-            <th>Custo Unit.</th>
-            <th>Frete</th>
-            <th>Qtd (NF)</th>
-            <th>QTD Recebido</th>
-            <th>Dif.</th>
-            <th>Total Item</th>
-            <th>Status</th>
-          </tr>
-          <tbody>
-            {filteredAndSortedItems.map(item => {
-              const quantityNF = item.quantidade || 0;
-              const currentDifference =
-                typeof item.difference === 'number' ? item.difference : quantityNF - item.receivedQuantity;
-              const isDivergent = currentDifference !== 0;
-              const unitCost = item.valorUnitario || 0;
-              const totalItem = unitCost * item.receivedQuantity;
-
-              const group = item.grupoId ? groupsById.get(item.grupoId) : null;
-              const displayName = generateItemDisplayName(item, group);
-              const borderColor = item.grupoId ? getBorderColorFromGroupId(item.grupoId) : undefined;
-              const hasOverride = hasAttributeOverride(item);
-
-              return (
-                <tr
-                  key={item.tempId}
-                >
-                  {/* SUBSTITUA O CONTEÚDO DA SUA TD DA PRIMEIRA COLUNA POR ESTE: */}
-                  <td
-                    className={styles.tdItemCell}
-                    style={item.grupoId ? { borderLeft: `4px solid ${borderColor}` } : undefined} // Opcional: aumentei para 4px para destacar a cor do grupo se houver
-                  >
-                    <div className={styles.tdItemInner}> {/* <--- ADICIONADO ESTE CONTAINER INTERNO */}
-                      <input
-                        type="checkbox"
-                        checked={selected.has(item.tempId)}
-                        onChange={() => toggleSelection(item.tempId)}
-                      />
-                      <span className={styles.boldIndex}>{item.nItem || '-'}</span>
-                    </div>
-                  </td>
-
-                  <td>
-                    {item.mappedId ? (
-                      <span className={styles.internalCodeBadge}>{item.mappedId || '-'}</span>
-                    ) : (
-                      <button
-                        type="button"
-                        className={styles.linkButton}
-                        onClick={() => onMapProducts?.([item.tempId])}
-                      >
-                        🔗 Vincular <br /> Produto
-                      </button>
-                    )}
-                  </td>
-                  <td>{item.sku || '-'}</td>
-                  <td>
-                     <span
-                        className={`${styles.stockName} ${item.confirmed ? styles.stockNameConfirmed : ''}`}
-                        style={{fontStyle: 'italic', fontSize:'9pt'}}
-                      >
-
-                    {item.ncm || '-'}
-                      </span>
-                    
-                    </td>
-
-                  <td>
-                    {item.gtin || (
-                      <button
-                        type="button"
-                        className={styles.linkButton} // reaproveitando classe existente ou crie uma nova
-                        onClick={() => handleOpenEanModal(item)}
-                      >
-                        EAN
-                      </button>
-                    )}
-                  </td>
-
-                  <td className={styles.productAndStockCell}>
-                    <div className={styles.productLine} title={item.descricao}>
-                      <div className={styles.productDesc}>{item.descricao}</div>
-                    </div>
-                    <div className={styles.stockLine}>
-                      <span
-                        className={`${styles.stockName} ${item.confirmed ? styles.stockNameConfirmed : ''}`}
-                        style={hasOverride ? { fontStyle: 'italic' } : undefined}
-                      >
-                        {displayName}
-                        {hasOverride && ' ⚡'}
-                      </span>
-                    </div>
-                  </td>
-
-
-                  <td>
-                    {item.grupoId && group ? (
-                      <button
-                        type="button"
-                        className={styles.editGroupBtn}
-                        onClick={() => handleOpenGroupModal(item)}
-                      >
-                        ✏️ Editar
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className={styles.addGroupBtn}
-                        onClick={() => handleOpenGroupModal(item)}
-                      >
-                        ➕ Grupo
-                      </button>
-                    )}
-                  </td>
-
-
-                  <td>
-                    <span className={styles.uomBadge}>{item.unidadeMedida || '-'}</span>
-                  </td>
-
-
-
-
-                  <td>{formatCurrency(unitCost)}</td>
-
-                  <td>
-                    R$ ***,**
-                  </td>
-
-                  <td>
-                    <strong>{quantityNF}</strong>
-                  </td>
-
-
-                  <td>
-                    <div className={styles.quantitySelector}>
-                      <button
-                        type="button"
-                        className={styles.quantityButton}
-                        onClick={() => handleQuantityChange(item.tempId, item.receivedQuantity - 1)}
-                      >
-                        -
-                      </button>
-                      <input
-                        type="number"
-                        className={styles.quantityInput}
-                        min={0}
-                        max={999}
-                        value={item.receivedQuantity}
-                        onChange={e => handleQuantityChange(item.tempId, parseInt(e.target.value, 10) || 0)}
-                      />
-                      <button
-                        type="button"
-                        className={styles.quantityButton}
-                        onClick={() => handleQuantityChange(item.tempId, item.receivedQuantity + 1)}
-                      >
-                        +
-                      </button>
-                    </div>
-                  </td>
-                  <td>
-                    <span
-                      className={
-                        isDivergent
-                          ? currentDifference > 0
-                            ? styles.textDanger
-                            : styles.textSuccess
-                          : styles.textSuccess
-                      }
-                    >
-                      {isDivergent
-                        ? currentDifference > 0
-                          ? `-${currentDifference}`
-                          : `+${Math.abs(currentDifference)}`
-                        : '0'}
-                    </span>
-                  </td>
-                  <td>
-                    <strong>{formatCurrency(totalItem)}</strong>
-                  </td>
-                  <td
-                    className={styles.tdStatus}
-                    title={
-                      item.confirmed
-                        ? 'Item conferido'
-                        : isDivergent
-                          ? 'Divergência detectada'
-                          : 'Aguardando conferência'
-                    }
-                  >
-                    <span className={`${styles.statusIcon} ${isDivergent ? styles.iconDivergent : ''}`}>
-                      {item.confirmed ? '✅' : isDivergent ? '⚠️' : '⏳'}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* MODALS RENDER ZONE */}
-      <GroupMappingModal
-        isOpen={isGroupModalOpen}
-        onClose={() => setIsGroupModalOpen(false)}
-        item={selectedItemForGroup}
-        groups={localGroups}
-        onSaveGroupMapping={handleSaveGroupMapping}
-      />
-
-      <ManageGroupsModal
-        isOpen={isManageModalOpen}
-        onClose={() => setIsManageModalOpen(false)}
-        groups={localGroups}
-        items={localItems}
-        onEditGroup={handleEditGroup}
-        onEditGroupItems={handleEditGroupItems}
-        onDeleteGroup={(groupId: string) => {
-          setLocalGroups(prev => prev.filter(g => g.id !== groupId));
-          setLocalItems(prev =>
-            prev.map(it =>
-              it.grupoId === groupId
-                ? { ...it, grupoId: undefined, atributosCustomizados: undefined }
-                : it
-            )
-          );
-        }}
-      />
-
-      <GroupEditModal
-        isOpen={isGroupEditModalOpen}
-        onClose={() => setIsGroupEditModalOpen(false)}
-        grupo={groupBeingEdited}
-        onSave={handleSaveGroupEdit}
-      />
-
-      <GroupItemsEditModal
-        isOpen={isItemsEditOpen}
-        onClose={() => {
-          setIsItemsEditOpen(false);
-          setGrupoSelecionadoParaItens(null);
-        }}
-        grupo={grupoSelecionadoParaItens}
-        items={localItems}
-        onSaveItemsAttributes={handleSaveItemsAttributes}
-      />
-
-
-
-      {/* =================================================================== */}
-      {/* MODAL DE BIPAGEM / EDIÇÃO DE EAN */}
-      {/* =================================================================== */}
-     {isEanModalOpen && selectedItemForEan && (
-  <div className={styles.batchModalOverlay}>
-    <div className={styles.batchModalContainer} style={{ maxWidth: '480px' }}>
+    <div style={{ background: '#fff', padding: 20, borderRadius: 8 }}>
       
-      {/* Cabeçalho */}
-      <div className={styles.batchHeader}>
-        <h3 className={styles.batchTitle}>Gerenciar Códigos de Barras</h3>
+      {/* HEADER CONTROL AREA */}
+      <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
+        <Col>
+          <Title level={4} style={{ margin: 0 }}>4. Conferência de Itens ({localItems.length})</Title>
+        </Col>
+        <Col>
+          <Space>
+            <Button icon={<SettingOutlined />} onClick={() => setIsManageModalOpen(true)}>
+              Gerenciar Grupos ({localGroups.length})
+            </Button>
+            <Space style={{ background: '#f5f5f5', padding: '4px 12px', borderRadius: 6, border: '1px solid #d9d9d9' }}>
+              <Text size="small"><ThunderboltOutlined style={{ color: '#faad14' }} /> Checkagem turbo</Text>
+              <Checkbox title="Checkagem turbo automática por duplo clique." />
+            </Space>
+          </Space>
+        </Col>
+      </Row>
+
+      {/* FILTROS E AÇÕES COLETIVAS */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+        <Space wrap style={{ background: '#fafafa', padding: 12, borderRadius: 6, border: '1px solid #f0f0f0', justifyContent: 'space-between' }}>
+          <Space wrap>
+            <Text strong>{selectedRowKeys.length > 0 ? `${selectedRowKeys.length} selecionado(s)` : 'Nenhum item selecionado'}</Text>
+            <Button size="small" type="primary" icon={<CheckOutlined />} disabled={selectedRowKeys.length === 0} onClick={() => { onConfirmItems?.(selectedRowKeys.map(Number)); setSelectedRowKeys([]); }}>Conferir</Button>
+            <Button size="small" icon={<UndoOutlined />} disabled={selectedRowKeys.length === 0} onClick={() => { onUnconfirmItems?.(selectedRowKeys.map(Number)); setSelectedRowKeys([]); }}>Desfazer</Button>
+            <Button size="small" icon={<LinkOutlined />} disabled={selectedRowKeys.length === 0} onClick={() => onMapProducts?.(selectedRowKeys.map(Number))}>Vincular</Button>
+            <Button size="small" danger icon={<DeleteOutlined />} disabled={selectedRowKeys.length === 0} onClick={() => { onRemoveItems?.(selectedRowKeys.map(Number)); setSelectedRowKeys([]); }}>Remover</Button>
+            <Button size="small" icon={<FolderAddOutlined />} disabled={selectedRowKeys.length === 0} onClick={() => setIsBatchAssignOpen(true)}>Definir Grupo em Lote</Button>
+          </Space>
+
+          <Radio.Group value={filter} onChange={(e) => setFilter(e.target.value)} size="small">
+            <Radio.Button value="all">Todos ({localItems.length})</Radio.Button>
+            <Radio.Button value="pending">Pendentes ({pendingItems.length})</Radio.Button>
+            <Radio.Button value="confirmed">Conferidos ({confirmedItems.length})</Radio.Button>
+            <Radio.Button value="divergent">Divergências ({divergentItems.length})</Radio.Button>
+            <Radio.Button value="unmapped">Sem Vínculo ({unmappedItems.length})</Radio.Button>
+          </Radio.Group>
+        </Space>
       </div>
 
-      <div style={{ padding: '16px 0' }}>
-        {/* Informações do Produto */}
-        <p style={{ marginBottom: '16px', fontSize: '14px', color: '#333' }}>
-          <strong>Produto:</strong> {selectedItemForEan.descricao}
-        </p>
+      {/* DATA TABLE */}
+      <Table
+        rowSelection={{
+          selectedRowKeys,
+          onChange: (keys) => setSelectedRowKeys(keys),
+        }}
+        columns={columns}
+        dataSource={filteredItems}
+        rowKey="tempId"
+        size="small"
+        bordered
+        pagination={{ pageSize: 10, showSizeChanger: true }}
+      />
 
-        {/* --- SEÇÃO 1: EAN PRINCIPAL (VENDA) --- */}
-        <div className={styles.formGroup} style={{ marginBottom: '20px' }}>
-          <label htmlFor="eanInput" style={{ fontWeight: 'bold', color: '#2c3e50', display: 'block', marginBottom: '4px' }}>
-            EAN Principal (Código de Venda) <span style={{ color: '#e74c3c' }}>*</span>
-          </label>
-          <button>
-            SEM GTIN
-          </button>
-          <span style={{ fontSize: '11px', color: '#7f8c8d', display: 'block', marginBottom: '6px' }}>
-            Utilizado no caixa/PDV para registrar a venda.
-          </span>
-          <input
-            id="eanInput"
-            type="text"
-            autoFocus
-            className={styles.inputFull}
-            style={{ borderColor: '#3498db', borderWidth: '2px' }} // Destaque visual
-            value={tempEanInput}
-            onChange={e => setTempEanInput(e.target.value)}
-            placeholder="Bipe o código principal de venda"
-            onKeyDown={e => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                // O enter aqui pode focar o próximo campo ou salvar direto se preferir
-              }
-            }}
-          />
-        </div>
-
-        <hr style={{ border: '0', borderTop: '1px solid #eee', margin: '20px 0' }} />
-
-        {/* --- SEÇÃO 2: CÓDIGOS SECUNDÁRIOS (CONFERÊNCIA) --- */}
-        <div className={styles.formGroup}>
-          <label htmlFor="secondaryEanInput" style={{ fontWeight: 'bold', color: '#555', display: 'block', marginBottom: '4px' }}>
-            Códigos Secundários (Conferência / Interno / QR Code)
-          </label>
-          <span style={{ fontSize: '11px', color: '#7f8c8d', display: 'block', marginBottom: '6px' }}>
-            Códigos adicionais do fornecedor. Não serão usados no PDV de venda.
-          </span>
-          
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <input
-              id="secondaryEanInput"
-              type="text"
-              className={styles.inputFull}
-              style={{ flex: 1 }}
-              value={currentSecondaryInput || ''}
-              onChange={e => setCurrentSecondaryInput(e.target.value)}
-              placeholder="Bipe ou digite o código de conferência"
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  // Função para adicionar à lista local (ex: handleAddSecondary())
-                  if (currentSecondaryInput.trim()) {
-                    setTempSecondaryEans([...tempSecondaryEans, currentSecondaryInput.trim()]);
-                    setCurrentSecondaryInput('');
-                  }
-                }
-              }}
-            />
-            <button 
-              type="button"
-              className={styles.btnPrimary}
-              style={{ padding: '0 16px', height: 'auto' }}
-              onClick={() => {
-                if (currentSecondaryInput?.trim()) {
-                  setTempSecondaryEans([...tempSecondaryEans, currentSecondaryInput.trim()]);
-                  setCurrentSecondaryInput('');
-                }
-              }}
-            >
-              +
-            </button>
-          </div>
-
-          {/* Lista de códigos secundários adicionados */}
-          {tempSecondaryEans && tempSecondaryEans.length > 0 && (
-            <div style={{ marginTop: '12px', background: '#f8f9fa', padding: '10px', borderRadius: '6px', maxHeight: '100px', overflowY: 'auto' }}>
-              <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#7f8c8d', display: 'block', marginBottom: '6px' }}>
-                Códigos Vinculados:
-              </span>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {tempSecondaryEans.map((code, index) => (
-                  <div 
-                    key={index} 
-                    style={{ 
-                      display: 'inline-flex', 
-                      alignItems: 'center', 
-                      background: '#e2e8f0', 
-                      padding: '4px 8px', 
-                      borderRadius: '4px', 
-                      fontSize: '12px',
-                      color: '#4a5568'
-                    }}
-                  >
-                    <span>{code}</span>
-                    <button
-                      type="button"
-                      style={{ marginLeft: '6px', border: 'none', background: 'none', color: '#e74c3c', cursor: 'pointer', fontWeight: 'bold' }}
-                      onClick={() => setTempSecondaryEans(tempSecondaryEans.filter((_, i) => i !== index))}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
+      {/* ================= MODAL: DEFINIR GRUPO EM LOTE ================= */}
+      <Modal
+        title="Definir Grupo em Lote"
+        open={isBatchAssignOpen}
+        onCancel={() => setIsBatchAssignOpen(false)}
+        onOk={handleLocalBatchSubmit}
+        width={700}
+        okText="Aplicar em Lote"
+        cancelText="Cancelar"
+      >
+        <Alert 
+          message={`Você está alterando múltiplos itens de uma vez.`} 
+          description={`${selectedRowKeys.length} produtos herdarão a parametrização selecionada.`}
+          type="info" 
+          showIcon 
+          style={{ marginTop: 12, marginBottom: 16 }}
+        />
+        <Row gutter={16}>
+          <Col span={10}>
+            <Text strong block style={{ marginBottom: 6 }}>Itens a serem alterados:</Text>
+            <div style={{ maxHeight: 200, overflowY: 'auto', border: '1px solid #d9d9d9', padding: 8, borderRadius: 4, background: '#fafafa' }}>
+              {filteredItems.filter(i => selectedRowKeys.includes(i.tempId)).map(si => (
+                <div key={si.tempId} style={{ padding: '2px 0', fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <Text type="secondary">{si.nItem || si.tempId}.</Text> {si.descricao}
+                </div>
+              ))}
             </div>
-          )}
-        </div>
-      </div>
+          </Col>
+          <Col span={14}>
+            <Radio.Group 
+              value={batchAssignMode} 
+              onChange={e => setBatchAssignMode(e.target.value)} 
+              optionType="button" 
+              style={{ width: '100%', marginBottom: 16 }}
+            >
+              <Radio.Button value="LINK" style={{ width: '50%', textAlign: 'center' }}>Vincular a Existente</Radio.Button>
+              <Radio.Button value="CREATE" style={{ width: '50%', textAlign: 'center' }}>Criar Novo Grupo</Radio.Button>
+            </Radio.Group>
 
-      {/* Ações */}
-      <div className={styles.batchActions}>
-        <button
-          type="button"
-          className={styles.btnNeutral}
-          onClick={() => {
-            setIsEanModalOpen(false);
-            setSelectedItemForEan(null);
-            if(setCurrentSecondaryInput) setCurrentSecondaryInput('');
-          }}
-        >
-          Cancelar
-        </button>
-        <button
-          type="button"
-          className={styles.btnPrimary}
-          onClick={() => handleSaveEan(tempEanInput, tempSecondaryEans)}
-        >
-          Salvar Códigos
-        </button>
-      </div>
+            {batchAssignMode === 'LINK' ? (
+              <div>
+                <Text block style={{ marginBottom: 4 }}>Escolha o Grupo Existente</Text>
+                <Select
+                  style={{ width: '100%' }}
+                  placeholder="Selecione um grupo cadastrado"
+                  value={batchSelectedGroupId || undefined}
+                  onChange={val => setBatchSelectedGroupId(val)}
+                >
+                  {localGroups.map(g => (
+                    <Select.Option key={g.id} value={g.id}>
+                      {g.nome} ({itemsByGroupId.get(g.id)?.length || 0} vinculados)
+                    </Select.Option>
+                  ))}
+                </Select>
+              </div>
+            ) : (
+              <div>
+                <Text block style={{ marginBottom: 4 }}>Nome do Novo Grupo</Text>
+                <Input 
+                  placeholder="Ex: AMANCO TEE MARROM" 
+                  value={batchNewGroupName}
+                  onChange={e => setBatchNewGroupName(e.target.value)}
+                />
+                <Text type="secondary" style={{ fontSize: 11, marginTop: 4, display: 'block' }}>
+                  ⚠️ O esquema de características específicas deverá ser configurado posteriormente.
+                </Text>
+              </div>
+            )}
+          </Col>
+        </Row>
+      </Modal>
+
+      {/* ZONE: EXISTING MODALS CONTROL */}
+      <GroupMappingModal isOpen={isGroupModalOpen} onClose={() => setIsGroupModalOpen(false)} item={selectedItemForGroup} groups={localGroups} onSaveGroupMapping={handleSaveGroupMapping} />
+      <ManageGroupsModal isOpen={isManageModalOpen} onClose={() => setIsManageModalOpen(false)} groups={localGroups} items={localItems} onEditGroup={handleEditGroup} onEditGroupItems={handleEditGroupItems} onDeleteGroup={(groupId: string) => { setLocalGroups(prev => prev.filter(g => g.id !== groupId)); setLocalItems(prev => prev.map(it => it.grupoId === groupId ? { ...it, grupoId: undefined, atributosCustomizados: undefined } : it)); }} />
+      <GroupEditModal isOpen={isGroupEditModalOpen} onClose={() => setIsGroupEditModalOpen(false)} grupo={groupBeingEdited} onSave={handleSaveGroupEdit} />
+      <GroupItemsEditModal isOpen={isItemsEditOpen} onClose={() => { setIsItemsEditOpen(false); setGrupoSelecionadoParaItens(null); }} grupo={grupoSelecionadoParaItens} items={localItems} onSaveItemsAttributes={handleSaveItemsAttributes} />
     </div>
-  </div>
-)}
-
-    </div>
-    /**
-* FUNÇÃO: Gerenciamento e Bipagem de EAN (GTIN)
-* * 🔍 CENÁRIO 1: Produto SEM GTIN no cadastro e na NF-e
-* -> Ação: Exibe o botão "⚡ Bipar EAN".
-* -> Comportamento: Abre o modal, dá auto-focus no input, aguarda o bipe e salva o GTIN no item.
-* * 📄 CENÁRIO 2: Produto JÁ TEM GTIN vindo da NF-e (ou já cadastrado)
-* -> Ação: Não exibe o botão de bipar.
-* -> Comportamento: Exibe o código EAN formatado textualmente na célula (bloqueado para edição direta ali).
-* * ⚡ CENÁRIO 3: Se o produto JÁ TEM GTIN e for BIPADO globalmente (Leitura Rápida)
-* -> Ação: Executa uma função de "Foco/Scroll" ou "Checkagem Turbo".
-* -> Comportamento: O sistema rola a tela até o produto, aplica um efeito visual (blink/highlight) 
-* e incrementa +1 automaticamente na "Qtd Recebido" (Checkagem Turbo).
-*/
-
-
-
-
   );
 };
-
-interface FilterButtonProps {
-  active: boolean;
-  children: React.ReactNode;
-  onClick: () => void;
-}
-
-const FilterButton: React.FC<FilterButtonProps> = ({ active, children, onClick }) => (
-  <button onClick={onClick} className={active ? styles.filterButtonActive : styles.filterButton}>
-    {children}
-  </button>
-);
 
 export default ItemsConference;

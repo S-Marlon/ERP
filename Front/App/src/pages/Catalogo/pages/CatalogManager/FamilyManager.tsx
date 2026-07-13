@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { TreeSelect } from 'antd';
+import { TreeSelect, Select, Input } from 'antd'; // 🌟 Centralizado componentes do Antd aqui
 import styles from './FamilyManager.module.css';
-import { Grupo, AtributoConfig, Categoria } from './CatalogManager.types'; // Garantindo import de Categoria
+import { Grupo, AtributoConfig, Categoria } from './CatalogManager.types';
 import { gerarPreviewSku, gerarPreviewNome } from './CatalogManager.helpers';
 import { SidebarFamilias } from './components/SidebarFamilias';
 import { PainelSimulador } from './components/PainelSimulador';
@@ -39,7 +39,7 @@ const useCatalogState = () => {
   const [abaAtiva, setAbaAtiva] = useState<'variantes' | 'informativos'>('variantes');
   const [isSimuladorAberto, setIsSimuladorAberto] = useState(false);
   const [atributoPendenteEdicao, setAtributoPendenteEdicao] = useState<any | null>(null);
-  const [atributosGlobaisDisponiveis, setAtributosGlobaisDisponiveis] = useState<any[]>([]); // Inicializador seguro
+  const [atributosGlobaisDisponiveis, setAtributosGlobaisDisponiveis] = useState<any[]>([]);
 
   const grupoSelecionado = useMemo(() => {
     return grupos.find(g => g.id === grupoSelecionadoId) || null;
@@ -57,7 +57,6 @@ const useCatalogState = () => {
     const atributoAtual = grupoSelecionado.atributos.find(attr => String(attr.id) === String(atributoId));
     if (!atributoAtual) return;
 
-    // Mapeia o nome interno para um termo amigável na mensagem
     const nomesEscopo = { dna: 'DNA (Fixo do SKU)', grade: 'Grade (Variador de SKU)', ficha: 'Ficha Técnica' };
 
     const resultado = await Swal.fire({
@@ -78,7 +77,6 @@ const useCatalogState = () => {
         const atributosAtualizados = g.atributos.map(attr => {
           if (String(attr.id) !== String(atributoId)) return attr;
 
-          // Cria o clone modificando as regras base automáticas de engenharia de SKU
           const atributoModificado = { ...attr, classificacao: novoEscopo };
 
           if (novoEscopo === 'dna') {
@@ -90,7 +88,7 @@ const useCatalogState = () => {
             }
           }
           else if (novoEscopo === 'grade') {
-            atributoModificado.compoeSku = false; // Grade altera o sufixo/filho, não a receita do pai
+            atributoModificado.compoeSku = false;
             atributoModificado.geraVariacao = true;
             atributoModificado.obrigatorio = true;
             atributoModificado.ordemSku = 0;
@@ -148,7 +146,6 @@ const useCatalogState = () => {
 
             const novoAtributo = { ...attr, [campo]: valor };
 
-            // Corrigido: Substituído 'especificacao' pelo ENUM real 'ficha'
             if (campo === 'classificacao') {
               if (valor === 'dna') {
                 novoAtributo.compoeSku = true;
@@ -289,7 +286,7 @@ const useCatalogState = () => {
             id: String(attr.id),
             nome: attr.nome,
             tipoDado: attr.tipoDado || 'texto',
-            classificacao: attr.compoeSku ? 'dna' : 'ficha', // Corrigido para 'ficha'
+            classificacao: attr.compoeSku ? 'dna' : 'ficha',
             separadorSufixo: attr.separadorSufixo || 'nenhum',
             sufixo: attr.sufixo || '',
             obrigatorio: true,
@@ -368,7 +365,7 @@ const useCatalogState = () => {
 
     const compoeSku = tabelaAlvoModal === 'dna';
     const geraVariacao = tabelaAlvoModal === 'grade';
-    const classificacao = tabelaAlvoModal || 'ficha'; // Corrigido para 'ficha'
+    const classificacao = tabelaAlvoModal || 'ficha';
 
     const estruturaCompletaAtributo: AtributoConfig = {
       id: novoAttr.id || `temp-${Date.now()}`,
@@ -411,7 +408,6 @@ const useCatalogState = () => {
       };
 
       const res = await createGroup(payloadVazio, 1);
-      // Corrigido de res.id_grupo para res.id seguindo o padrão unificado da API
       if (res.success && res.id) {
         await carregarDados();
         setGrupoSelecionadoId(res.id);
@@ -456,25 +452,25 @@ const useCatalogState = () => {
     handleSelecionarGrupo, handleAtualizarGrupoDireto, handleAtualizarAtributoDireto,
     handleAdicionarAtributoAoGrupo, handleInputChange, handleCriarGrupo, handleSalvarGrupoNoBanco,
     handleAbrirModal, tabelaAlvoModal, atributoPendenteEdicao, handleMudarCategoriaComConfirmacao, brandColor,
-    handleMoverAtributoDeEscopo // 🌟 ADICIONE ISSO AQUI
+    handleMoverAtributoDeEscopo
   };
 };
 
 export const FamilyManager: React.FC = () => {
   const {
-    grupoSelecionado, grupos, categorias, valoresTeste, abaAtiva, previewSkuSimulado,
+    grupoSelecionado, grupos, categorias, valoresTeste, previewSkuSimulado,
     previewNomeSimulado, grupoImage, loading, error, isModalAberto, atributosGlobaisDisponiveis,
-    setIsModalAberto, setAbaAtiva, handleSelecionarGrupo, handleAtualizarGrupoDireto,
+    setIsModalAberto, handleSelecionarGrupo, handleAtualizarGrupoDireto,
     handleAtualizarAtributoDireto, atributoPendenteEdicao, handleAdicionarAtributoAoGrupo,
     handleInputChange, handleCriarGrupo, handleSalvarGrupoNoBanco, handleAbrirModal,
     tabelaAlvoModal, handleMudarCategoriaComConfirmacao, brandColor,
-    handleMoverAtributoDeEscopo // 🌟 RECUPERE ISSO AQUI
+    handleMoverAtributoDeEscopo
   } = useCatalogState();
+
   const dadosArvoreAntd = useMemo(() => {
     return construirArvoreAntd(categorias);
   }, [categorias]);
 
-  // Filtros corrigidos para bater com o Enum string do Banco ('ficha')
   const atributosDNA = useMemo(() => {
     return grupoSelecionado ? grupoSelecionado.atributos.filter(attr => attr.classificacao === 'dna') : [];
   }, [grupoSelecionado]);
@@ -512,7 +508,7 @@ export const FamilyManager: React.FC = () => {
         <div className={styles.errorBanner}>
           <div><strong>⚠️ Falha de Integração:</strong> {error}</div>
           <Button onClick={() => window.location.reload()} style={{ backgroundColor: '#ff4d4f', color: '#fff', padding: '4px 12px', fontSize: '12px' }}>
-            🔄 Recarregar Tela
+            :arrows_counterclockwise: Recarregar Tela
           </Button>
         </div>
       )}
@@ -522,7 +518,7 @@ export const FamilyManager: React.FC = () => {
           familias={grupos}
           familiaSelecionadaId={grupoSelecionado?.id || null}
           onSelecionarFamilia={handleSelecionarGrupo}
-          onDeletarFamilia={() => { }} // Vinculado via lista interna se necessário
+          onDeletarFamilia={() => { }}
         />
 
         <main className={styles.contentArea}>
@@ -537,47 +533,56 @@ export const FamilyManager: React.FC = () => {
 
                 <div className={styles.formLayout}>
                   <div className={styles.inputsGrid}>
+                    
+                    {/* Antd Input - Nome */}
                     <div className={styles.inputWrapper}>
                       <label>Nome Padrão do Grupo</label>
-                      <input
-                        type="text"
+                      <Input
+                        size="large"
                         value={grupoSelecionado.nome}
                         onChange={e => handleAtualizarGrupoDireto('nome', e.target.value)}
-                        className={styles.modernInput}
+                        placeholder="Ex: Parafusos Sextavados"
                       />
                     </div>
 
-                    
-
+                    {/* Antd Select - UoM */}
                     <div className={styles.inputWrapper}>
                       <label>Unidade de Medida Padrão (UoM)</label>
-                      <select
+                      <Select
+                        size="large"
+                        style={{ width: '100%' }}
                         value={grupoSelecionado.unidadeMedidaBase || 'PC'}
-                        className={styles.modernSelect}
-                        onChange={e => handleAtualizarGrupoDireto('unidadeMedidaBase', e.target.value)}
-                      >
-                        <option value="PC">PC - Peça</option>
-                        <option value="UN">UN - Unidade</option>
-                        <option value="MM">MM - Milímetro</option>
-                        <option value="MT">MT - Metro</option>
-                      </select>
+                        onChange={valor => handleAtualizarGrupoDireto('unidadeMedidaBase', valor)}
+                        options={[
+                          { value: 'PC', label: 'PC - Peça' },
+                          { value: 'UN', label: 'UN - Unidade' },
+                          { value: 'MM', label: 'MM - Milímetro' },
+                          { value: 'MT', label: 'MT - Metro' },
+                        ]}
+                      />
                     </div>
 
+                    {/* Antd Select - Tipo Item */}
                     <div className={styles.inputWrapper}>
                       <label>Tipo de Item (Inventário)</label>
-                      <select
+                      <Select
+                        size="large"
+                        style={{ width: '100%' }}
                         value={grupoSelecionado.tipoItem || 'PA'}
-                        className={styles.modernSelect}
-                        onChange={e => handleAtualizarGrupoDireto('tipoItem', e.target.value)}
-                      >
-                        <option value="PA">Produto Acabado</option>
-                        <option value="MP">Matéria-Prima</option>
-                        <option value="KT">Kit / Combo</option>
-                      </select>
+                        onChange={valor => handleAtualizarGrupoDireto('tipoItem', valor)}
+                        options={[
+                          { value: 'PA', label: 'Produto Acabado' },
+                          { value: 'MP', label: 'Matéria-Prima' },
+                          { value: 'KT', label: 'Kit / Combo' },
+                        ]}
+                      />
                     </div>
-                  <div className={styles.inputWrapper}>
+
+                    {/* Antd TreeSelect - Categoria Global */}
+                    <div className={styles.inputWrapper}>
                       <label>Categoria Global</label>
                       <TreeSelect
+                        size="large"
                         style={{ width: '100%' }}
                         value={grupoSelecionado?.categoriaPai ? String(grupoSelecionado.categoriaPai) : undefined}
                         onChange={(valor) => handleMudarCategoriaComConfirmacao(valor)}
@@ -591,24 +596,15 @@ export const FamilyManager: React.FC = () => {
                     </div>
                   </div>
 
-
-
-
                   {/* MEDIA BLOC */}
                   <div className={styles.mediaPanel}>
                     <ImageDisplay size='80px' src={grupoImage || undefined} />
-                    <input
-                      type='text'
+                    <Input
                       placeholder='URL da imagem...'
                       value={grupoImage}
                       onChange={handleInputChange}
-                      className={styles.modernInput}
                     />
                   </div>
-
-                  
-
-                  
                 </div>
               </section>
 
@@ -635,52 +631,51 @@ export const FamilyManager: React.FC = () => {
               />
 
               {/* MATRIZ DE ATRIBUTOS */}
-              {/* 🎛️ NOVA MATRIZ DE ATRIBUTOS (SEM ABAS - TUDO EXPOSTO) */}
-<div className={styles.attributesMatrixThreeColumns}>
-  
-  {/* COLUNA 1: DNA */}
-  <div className={styles.cardMatrixColumn} style={{ borderTop: '3px solid #1d39c4' }}>
-    <TabelaAtributos
-      titulo="🧬 Atributos de DNA"
-      tipo="dna"
-      mostrarExpansao={true}
-      atributoPendenteEdicao={atributoPendenteEdicao}
-      onAtualizarAtributo={handleAtualizarAtributoDireto}
-      onMoverEscopo={handleMoverAtributoDeEscopo}
-      onAbrirModal={handleAbrirModal}
-      atributos={atributosDNA}
-    />
-  </div>
+              <div className={styles.attributesMatrixThreeColumns}>
+                
+                {/* COLUNA 1: DNA */}
+                <div className={styles.cardMatrixColumn} style={{ borderTop: '3px solid #1d39c4' }}>
+                  <TabelaAtributos
+                    titulo="🧬 Atributos de DNA"
+                    tipo="dna"
+                    mostrarExpansao={true}
+                    atributoPendenteEdicao={atributoPendenteEdicao}
+                    onAtualizarAtributo={handleAtualizarAtributoDireto}
+                    onMoverEscopo={handleMoverAtributoDeEscopo}
+                    onAbrirModal={handleAbrirModal}
+                    atributos={atributosDNA}
+                  />
+                </div>
 
-  {/* COLUNA 2: GRADE */}
-  <div className={styles.cardMatrixColumn} style={{ borderTop: '3px solid #389e0d' }}>
-    <TabelaAtributos
-      titulo="🏁 Grade de Variações"
-      tipo="grade"
-      mostrarExpansao={true} /* Habilitado se quiser regras de SKU para filhos */
-      atributoPendenteEdicao={atributoPendenteEdicao}
-      onAtualizarAtributo={handleAtualizarAtributoDireto}
-      onMoverEscopo={handleMoverAtributoDeEscopo}
-      onAbrirModal={handleAbrirModal}
-      atributos={atributosVariacao}
-    />
-  </div>
+                {/* COLUNA 2: GRADE */}
+                <div className={styles.cardMatrixColumn} style={{ borderTop: '3px solid #389e0d' }}>
+                  <TabelaAtributos
+                    titulo="🏁 Grade de Variações"
+                    tipo="grade"
+                    mostrarExpansao={true}
+                    atributoPendenteEdicao={atributoPendenteEdicao}
+                    onAtualizarAtributo={handleAtualizarAtributoDireto}
+                    onMoverEscopo={handleMoverAtributoDeEscopo}
+                    onAbrirModal={handleAbrirModal}
+                    atributos={atributosVariacao}
+                  />
+                </div>
 
-  {/* COLUNA 3: FICHA TÉCNICA */}
-  <div className={styles.cardMatrixColumn} style={{ borderTop: '3px solid #d46b08' }}>
-    <TabelaAtributos
-      titulo="📋 Ficha Técnica comercial"
-      tipo="ficha"
-      mostrarExpansao={false} /* Ficha técnica não precisa de Ordem de SKU ou regras de sufixo */
-      atributoPendenteEdicao={atributoPendenteEdicao}
-      onAtualizarAtributo={handleAtualizarAtributoDireto}
-      onMoverEscopo={handleMoverAtributoDeEscopo}
-      onAbrirModal={handleAbrirModal}
-      atributos={atributosFichaTecnica}
-    />
-  </div>
+                {/* COLUNA 3: FICHA TÉCNICA */}
+                <div className={styles.cardMatrixColumn} style={{ borderTop: '3px solid #d46b08' }}>
+                  <TabelaAtributos
+                    titulo="📋 Ficha Técnica comercial"
+                    tipo="ficha"
+                    mostrarExpansao={false}
+                    atributoPendenteEdicao={atributoPendenteEdicao}
+                    onAtualizarAtributo={handleAtualizarAtributoDireto}
+                    onMoverEscopo={handleMoverAtributoDeEscopo}
+                    onAbrirModal={handleAbrirModal}
+                    atributos={atributosFichaTecnica}
+                  />
+                </div>
 
-</div>
+              </div>
             </>
           ) : (
             <div className={`${styles.card} ${styles.emptyState}`}>
@@ -693,7 +688,7 @@ export const FamilyManager: React.FC = () => {
       <ModalVinculoAtributos
         isModalAberto={isModalAberto}
         setIsModalAberto={setIsModalAberto}
-        destinoModal={tabelaAlvoModal || 'ficha'} // Atualizado fallback para 'ficha'
+        destinoModal={tabelaAlvoModal || 'ficha'}
         atributosGlobaisDisponiveis={atributosGlobaisDisponiveis}
         handleAdicionarAtributoAoGrupo={handleAdicionarAtributoAoGrupo}
         brandColor={brandColor}

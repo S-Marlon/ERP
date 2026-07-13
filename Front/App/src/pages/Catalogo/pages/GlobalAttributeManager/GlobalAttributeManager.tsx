@@ -173,7 +173,7 @@ export const GlobalAttributeManager: React.FC = () => {
 
     try {
       await updateAtributoGlobal(formEdicao.id, formEdicao, 1);
-      Swal.fire('Atualizado!', 'Atributo atualizado com sucesso.', 'success');
+      Swal.fire('Atualizado!', 'Atributo updated com sucesso.', 'success');
       setIdAtributoEmEdicao(null);
       setFormEdicao(null);
       carregarDadosDoBanco();
@@ -243,7 +243,7 @@ export const GlobalAttributeManager: React.FC = () => {
           </p>
         </div>
         
-        {/* BOTÕES DE DISPARO DOS MODAIS (MELHORIA VISUAL!) */}
+        {/* BOTÕES DE DISPARO DOS MODAIS */}
         <div style={{ display: 'flex', gap: '12px' }}>
           <Button type="default" onClick={() => setIsModalGrupoOpen(true)} style={{ borderColor: '#212b36', color: '#212b36', fontWeight: 600 }}>
             📁 Criar Grupo Semântico
@@ -346,7 +346,8 @@ export const GlobalAttributeManager: React.FC = () => {
                           <Input size="small" placeholder="Sufixo" value={formEdicao.sufixo || ''} disabled={!!formEdicao.unidadeId} onChange={e => setFormEdicao({...formEdicao, sufixo: e.target.value || undefined})} />
                         </td>
                         <td style={{ padding: '8px' }}>
-                          <Checkbox checked={formEdicao.obrigatorioPadrao} onChange={e => setFormEdicao({...formEdicao, lodrigatorioPadrao: e.target.checked})}>Obrigatorio</Checkbox>
+                          {/* Bug fixado: lodrigatorioPadrao -> obrigatorioPadrao */}
+                          <Checkbox checked={formEdicao.obrigatorioPadrao} onChange={e => setFormEdicao({...formEdicao, obrigatorioPadrao: e.target.checked})}>Obrigatorio</Checkbox>
                           <Checkbox checked={formEdicao.pesquisavel} onChange={e => setFormEdicao({...formEdicao, pesquisavel: e.target.checked})}>Pesquisável</Checkbox>
                           {formEdicao.tipo === 'lista' && (
                             <Input size="small" placeholder="Opções" value={formEdicao.valoresSugeridos || ''} onChange={e => setFormEdicao({...formEdicao, valoresSugeridos: e.target.value})} style={{ marginTop: '4px' }} />
@@ -483,7 +484,7 @@ export const GlobalAttributeManager: React.FC = () => {
             <Input placeholder="Ex: HP, RPM, BAR" disabled={!!unidadeSelecionada} style={{ borderColor: '#b25e00' }} />
           </Form.Item>
 
-          {/* RENDERIZAÇÃO CONDICIONAL BASEADA NO TIPO DE DADO SELECIONADO NO MODAL */}
+          {/* RENDERIZAÇÃO CONDICIONAL BASEADA NO TIPO DE DADO */}
           {tipoAtributoSelecionado === 'lista' && (
             <Form.Item name="valoresSugeridos" label="Opções da Lista (Separadas por vírgula)" rules={[{ required: true, message: 'Insira ao menos uma opção!' }]}>
               <Input placeholder="Ex: 10mm, 20mm, 30mm" style={{ borderColor: '#0050b3' }} />

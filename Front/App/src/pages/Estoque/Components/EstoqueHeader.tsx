@@ -12,7 +12,7 @@ const EstoqueHeader: React.FC<ProductHeaderProps> = ({  onAddProduct }) => {
     return (
         <div className="product-header" >
             
-            <Typography  variant='h1Alt'>Dashboard de estoque</Typography>
+            <Typography  variant='h1Alt'>Dashboard de estoque : </Typography>
             <div style={{color:'black'}}>
           
             <Button variant='warning' onClick={onAddProduct}><a href='/Estoque/consulta'>Cadastro e Gerenciamento de Produtos</a></Button>

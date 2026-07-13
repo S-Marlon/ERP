@@ -41,6 +41,10 @@ import { CatalogManager } from "./pages/Catalogo/pages/CatalogManager";
 import { CategoryManager } from "./pages/Catalogo/pages/CategoryManager/CategoryManager";
 import { GlobalAttributeManager } from "./pages/Catalogo/pages/GlobalAttributeManager/GlobalAttributeManager";
 import { FamilyManager } from "./pages/Catalogo/pages/CatalogManager/FamilyManager";
+import CatalogSku from "./pages/Catalogo/pages/CatalogSkus/CatalogSku";
+import FornecedoresList from "./pages/Compras/FornecedoresList/FornecedoresList";
+import RelatoriosPage from "./pages/Estoque/Relatorios/Relatorios";
+import RelatorioPocoPage from "./pages/Estoque/Relatorios/RelatorioPocoPage";
 
 function AppLayout() {
   const location = useLocation();
@@ -87,7 +91,10 @@ const isPDV = location.pathname.startsWith("/vendas/pdv");
       <Panel isDarkMode={isDarkMode}>
         <Routes>
           <Route path="/" element={<Dashboard text='Dashboard'/>} />
+
           <Route path="/clientes" element={<Clientes title={''} children={undefined} />} />
+
+
           <Route path="/fornecedores" element={<Fornecedores title={''} children={undefined}/>} /> 
 
           <Route path="/clientes/novo" element={<CadastroCliente />} /> 
@@ -114,12 +121,19 @@ const isPDV = location.pathname.startsWith("/vendas/pdv");
           <Route path="/catalogo/familias" element={<FamilyManager/>} />
           <Route path="/catalogo/categorias" element={<CategoryManager/>} />
           <Route path="/catalogo/atributos" element={<GlobalAttributeManager/>} />
+          <Route path="/catalogo/gerenciador" element={<CatalogSku/>} />
+
 
 
 
           <Route path="/compras" element={<ComprasDashboard/>} />
           <Route path="/compras/entrada-nfe" element={<StockEntryForm/>} />
+          <Route path="/compras/fornecedores" element={<FornecedoresList/>} />
 
+
+
+ <Route path="/relatorios" element={<RelatoriosPage/>} />
+          <Route path="/relatorios/poco" element={<RelatorioPocoPage/>} />
 
           <Route path="/obras" element={<ObrasModule />} />
           <Route path="*" element={<h2>404 | Página Não Encontrada</h2>} />

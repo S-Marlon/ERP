@@ -23,6 +23,14 @@ export const CatalogManager: React.FC = () => {
   // ⚡ Módulos Ativos do Sistema
   const modulosOperacionais = [
     {
+      titulo: 'Gerenciador de Catálogo',
+      descricao: 'Painel de controle central para manutenção de SKUs, atributos e regras de negócio.',
+      rota: '/catalogo/gerenciador',
+      icone: <AppstoreOutlined />,
+      status: 'EM DESENVOLVIMENTO',
+      detalhes: 'Tabelas: comercial_itens, comercial_skus'
+    },
+    {
       titulo: 'Famílias de Itens',
       descricao: 'Estruturas de engenharia mestre, herança de atributos e templates de SKU por tipo de item.',
       rota: '/catalogo/familias',

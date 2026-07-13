@@ -11,6 +11,8 @@ import Obras from "../../../assets/pic/icons8-guindaste-50.png";
 import Config from "../../../assets/pic/icons8-guindaste-50.png";
 import Fornecedores from "../../../assets/pic/icons8-mover-por-carrinho-50.png";
 import Compras from "../../../assets/pic/icons8-carrinho-de-mão-50.png";
+import Catalogo from "../../../assets/pic/icons8-vender-50.png";
+
 
 interface SidebarProps {
   isOpen: boolean;
@@ -39,8 +41,10 @@ const AppSidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
     { to: "/", label: "Home", icon: Home, roles: ["admin", "operador"] },
     { to: "/clientes", label: "Clientes", icon: Clientes, roles: ["admin"] },
     { to: "/produtos", label: "Produtos", icon: Produtos, roles: ["admin"] },
+    { to: "/catalogo", label: "Catalogo", icon: Catalogo, roles: ["admin"] },
     {to: "/compras", label: "Compras", icon: Compras, roles: ["admin"]},
     { to: "/vendas", label: "Vendas", icon: Vendas, roles: ["admin", "operador"] },
+    { to: "/relatorios", label: "Relatórios", icon: Vendas, roles: ["admin", "operador"] },
     {
       to: "/estoque",
       label: "Estoque",

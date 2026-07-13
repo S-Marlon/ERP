@@ -1,0 +1,199 @@
+  <Space direction="vertical" size="large" style={{ width: "30%" }}>
+    <div style={{ padding: '0 8px' }}>
+        <h3 style={{ marginBottom: 4 }}>Avaliação Comercial & Risco</h3>
+        <p style={{ color: '#8c8c8c', fontSize: '13px', marginBottom: 0 }}>
+            Fatores técnicos, operacionais e de perfil do cliente para cálculo do contrato.
+        </p>
+    </div>
+
+    {/* ================= CATEGORIA 1: PERFIL DO CLIENTE & COMERCIAL ================= */}
+    <div style={{ borderLeft: '3px solid #1890ff', paddingLeft: 8, fontWeight: 'bold', fontSize: '14px', marginBottom: -8 }}>
+        👤 Perfil Comercial do Cliente
+    </div>
+
+    {/* Poder Aquisitivo e Propensão */}
+    <Card title="💰 Perfil Financeiro e Propensão" size="small" hoverable>
+        <p style={{ marginBottom: 8, fontSize: '12px', color: '#595959' }}>
+            Nível financeiro e interesse/facilidade em fechar a assinatura:
+        </p>
+        <Select
+            placeholder="Selecione o perfil"
+            style={{ width: '100%' }}
+            options={[
+                { value: 0.9, label: 'Alto / Muito propenso (Fecha rápido, valoriza paz de espírito)' },
+                { value: 1.0, label: 'Médio / Analisando propostas' },
+                { value: 1.2, label: 'Baixo / Focado apenas em preço baixo' },
+            ]}
+        />
+    </Card>
+
+    {/* Tipo de Cliente (Comercial vs Residencial) */}
+    <Card title="🏢 Tipo de Atividade (Urgência)" size="small" hoverable>
+        <p style={{ marginBottom: 8, fontSize: '12px', color: '#595959' }}>
+            O cliente é um comércio/indústria ou residencial/chácara?
+        </p>
+        <Select
+            placeholder="Selecione a atividade"
+            style={{ width: '100%' }}
+            options={[
+                { value: 1.3, label: 'Comerciante / Indústria (Não pode parar, SLA de urgência alto)' },
+                { value: 1.0, label: 'Não Comercial / Residencial ou Chácara (SLA flexível)' },
+            ]}
+        />
+    </Card>
+
+    {/* Infraestrutura Externa (Água da Rua) */}
+    <Card title="🛣️ Dependência do Poço (Água da Rua)" size="small" hoverable>
+        <p style={{ marginBottom: 8, fontSize: '12px', color: '#595959' }}>
+            Existe abastecimento da concessionária pública disponível na rua?
+        </p>
+        <Select
+            placeholder="Possui água da rua?"
+            style={{ width: '100%' }}
+            options={[
+                { value: 1.4, label: 'Não tem água na rua (Dependência 100% do poço - Risco Crítico)' },
+                { value: 1.0, label: 'Sim, possui água na rua (Poço é usado para economizar)' },
+            ]}
+        />
+    </Card>
+
+    {/* ================= CATEGORIA 2: DADOS TÉCNICOS E OPERACIONAIS ================= */}
+    <div style={{ borderLeft: '3px solid #52c41a', paddingLeft: 8, fontWeight: 'bold', fontSize: '14px', marginBottom: -8, marginTop: 8 }}>
+        ⚙️ Parâmetros Técnicos do Poço
+    </div>
+
+    {/* Profundidade e Potência */}
+    <Card title="📐 Dimensionamento (Profundidade e Bomba)" size="small" hoverable>
+        <p style={{ marginBottom: 8, fontSize: '12px', color: '#595959' }}>
+            Profundidade total e potência/marca instalada da bomba:
+        </p>
+        <Select
+            placeholder="Selecione o porte do poço"
+            style={{ width: '100%' }}
+            options={[
+                { value: 1.0, label: 'Pequeno (Até 60m / Bomba Premium subdimensionada)' },
+                { value: 1.25, label: 'Médio (60m a 150m / Potência padrão)' },
+                { value: 1.6, label: 'Grande/Complexo (Mais de 150m / Içamento pesado / Bomba barata)' },
+            ]}
+        />
+    </Card>
+
+    {/* Idade do Sistema */}
+    <Card title="⏳ Idade do Poço e Equipamentos" size="small" hoverable>
+        <p style={{ marginBottom: 8, fontSize: '12px', color: '#595959' }}>
+            Tempo de vida útil restante estimada do conjunto:
+        </p>
+        <Select
+            placeholder="Selecione a idade"
+            style={{ width: '100%' }}
+            options={[
+                { value: 1.0, label: 'Novo / Recém-perfurado (Garantia de fábrica)' },
+                { value: 1.3, label: 'Intermediário (Uso regular, sem revisões recentes)' },
+                { value: 1.7, label: 'Antigo (Risco alto de falha catastrófica iminente)' },
+            ]}
+        />
+    </Card>
+
+    {/* Regime de Trabalho (Volume, Horas e Start/Stop) */}
+    <Card title="🔄 Regime de Trabalho e Desgaste" size="small" hoverable>
+        <p style={{ marginBottom: 8, fontSize: '12px', color: '#595959' }}>
+            Volume extraído, horas ativas e frequência de partidas (Start/Stop):
+        </p>
+        <Select
+            placeholder="Selecione o regime de uso"
+            style={{ width: '100%' }}
+            options={[
+                { value: 1.0, label: 'Baixo (Chácara / Poucos acionamentos por dia / Reservatório grande)' },
+                { value: 1.3, label: 'Moderado (Condomínio pequeno / Uso diário controlado)' },
+                { value: 1.8, label: 'Intenso (Condomínio grande / Start-Stop frequente / Sem reservatório)' },
+            ]}
+        />
+    </Card>
+
+    {/* ================= CATEGORIA 3: FATORES AMBIENTAIS EXTERNOS ================= */}
+    <div style={{ borderLeft: '3px solid #faad14', paddingLeft: 8, fontWeight: 'bold', fontSize: '14px', marginBottom: -8, marginTop: 8 }}>
+        🌍 Riscos Ambientais e Logística
+    </div>
+
+    {/* Estabilidade Elétrica */}
+    <Card title="⚡ Estabilidade Elétrica" size="small" hoverable>
+        <p style={{ marginBottom: 8, fontSize: '12px', color: '#595959' }}>
+            Histórico de quedas, picos de energia, raios e proteção do quadro:
+        </p>
+        <Select
+            placeholder="Selecione o nível de risco elétrico"
+            style={{ width: '100%' }}
+            options={[
+                { value: 1.0, label: 'Excelente (Rede estável + Proteção SPDA/Quadro Térmico)' },
+                { value: 1.3, label: 'Moderado (Oscilações raras, possui quadro protetor básico)' },
+                { value: 1.6, label: 'Crítico (Picos frequentes / Sem proteção contra queima)' },
+            ]}
+        />
+    </Card>
+
+    {/* Qualidade da Água */}
+    <Card title="💧 Qualidade da Água (Hidroquímica)" size="small" hoverable>
+        <p style={{ marginBottom: 8, fontSize: '12px', color: '#595959' }}>
+            Presença de Ferro, Manganês, Calcário (Incrustações):
+        </p>
+        <Select
+            placeholder="Selecione a agressividade da água"
+            style={{ width: '100%' }}
+            options={[
+                { value: 1.0, label: 'Água Limpa / Mineral (Baixo desgaste)' },
+                { value: 1.3, label: 'Presença Moderada (Exige limpezas químicas anuais)' },
+                { value: 1.7, label: 'Altamente Incrustante (Risco extremo de travar a bomba)' },
+            ]}
+        />
+    </Card>
+
+    {/* Nível da Água */}
+    <Card title="📉 Nível Dinâmico (Risco de Seca)" size="small" hoverable>
+        <p style={{ marginBottom: 8, fontSize: '12px', color: '#595959' }}>
+            Comportamento do lençol freático em épocas de estiagem:
+        </p>
+        <Select
+            placeholder="Selecione o risco do lençol freático"
+            style={{ width: '100%' }}
+            options={[
+                { value: 1.0, label: 'Estável (Nível dinâmico seguro o ano todo)' },
+                { value: 1.4, label: 'Sazonal (Nível abaixa na seca, risco de trabalhar a seco)' },
+            ]}
+        />
+    </Card>
+
+    {/* Acessibilidade ao Poço */}
+    <Card title="🏗️ Acessibilidade e Logística" size="small" hoverable>
+        <p style={{ marginBottom: 8, fontSize: '12px', color: '#595959' }}>
+            Facilidade para entrar com caminhão/guindaste de manutenção corretiva:
+        </p>
+        <Select
+            placeholder="Como é o acesso ao local?"
+            style={{ width: '100%' }}
+            options={[
+                { value: 1.0, label: 'Fácil (Área aberta / Local plano)' },
+                { value: 1.3, label: 'Médio (Espaço confinado, acessível apenas manualmente)' },
+                { value: 1.6, label: 'Difícil (Sob lajes, garagens subterrâneas - custo triplicado)' },
+            ]}
+        />
+    </Card>
+
+    {/* ================= RESUMO FINAL DA PRECIFICAÇÃO ================= */}
+    <Card title="📊 Resumo dos Fatores Calculados" size="small" style={{ background: '#fafafa', border: '1px dashed #d9d9d9', marginTop: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#595959' }}>Multiplicador Comercial:</span>
+                <strong style={{ color: '#1890ff' }}>x 1.10</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#595959' }}>Multiplicador Técnico:</span>
+                <strong style={{ color: '#faad14' }}>x 1.35</strong>
+            </div>
+            <hr style={{ border: 'none', borderTop: '1px solid #f0f0f0', margin: '4px 0' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Impacto no Preço Base:</span>
+                <strong style={{ fontSize: '16px', color: '#ff4d4f' }}>+ 48.5%</strong>
+            </div>
+        </div>
+    </Card>
+</Space>
