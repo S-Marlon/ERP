@@ -45,6 +45,7 @@ import CatalogSku from "./pages/Catalogo/pages/CatalogSkus/CatalogSku";
 import FornecedoresList from "./pages/Compras/FornecedoresList/FornecedoresList";
 import RelatoriosPage from "./pages/Estoque/Relatorios/Relatorios";
 import RelatorioPocoPage from "./pages/Estoque/Relatorios/RelatorioPocoPage";
+import { IndustrialLandingPage } from "./pages/Dashboard/IndustrialLandingPage";
 
 function AppLayout() {
   const location = useLocation();
@@ -90,7 +91,7 @@ const isPDV = location.pathname.startsWith("/vendas/pdv");
       
       <Panel isDarkMode={isDarkMode}>
         <Routes>
-          <Route path="/" element={<Dashboard text='Dashboard'/>} />
+          <Route path="/" element={<IndustrialLandingPage />} />
 
           <Route path="/clientes" element={<Clientes title={''} children={undefined} />} />
 

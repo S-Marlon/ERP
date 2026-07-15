@@ -1,4 +1,11 @@
-import { IAtributoGlobal, CreateAttributePayload, UpdateAttributePayload, GenericAttributeAPIResponse, UnidadeAPIResponse, GrupoVisualAPIResponse } from './GlobalAttributeManager.types';
+import { 
+  IAtributoGlobal, 
+  CreateAttributePayload, 
+  UpdateAttributePayload, 
+  GenericAttributeAPIResponse, 
+  UnidadeAPIResponse, 
+  GrupoVisualAPIResponse 
+} from './GlobalAttributeManager.types';
 
 // Centraliza a base apontando para o novo módulo criado no backend
 const API_BASE_URL = 'http://localhost:3001/api/catalogo';
@@ -16,14 +23,13 @@ const handleResponse = async <T>(response: Response, defaultError: string): Prom
 };
 
 // =========================================================================
-// 🧬 AUXILIARES: GRUPOS VISUAIS E UNIDADES DE MEDIDA
+// 📁 CRUD: GRUPOS VISUAIS (AGRUPADORES DA TELA ESQUERDA)
 // =========================================================================
 
 /**
- * 📁 Listar Grupos de Atributos (Agrupadores da tela esquerda)
+ * 🔍 Listar Grupos de Atributos
  */
 export const getGruposAtributos = async (tenantId: number): Promise<GrupoVisualAPIResponse[]> => {
-  // 🔄 CORRIGIDO: Agora usa a URL base correta apontando para /grupos
   const response = await fetch(`${API_BASE_URL}/grupos?tenant_id=${tenantId}`, {
     method: 'GET',
     headers: DEFAULT_HEADERS,
@@ -37,6 +43,57 @@ export const getGruposAtributos = async (tenantId: number): Promise<GrupoVisualA
     descricao: grupo.descricao
   }));
 };
+
+/**
+ * ➕ Criar novo Grupo Semântico
+ */
+export const createGrupoAtributo = async (data: { nome: string; descricao?: string }, tenantId: number = 1): Promise<any> => {
+  const response = await fetch(`${API_BASE_URL}/grupos`, {
+    method: 'POST',
+    headers: {
+      ...DEFAULT_HEADERS,
+      'x-tenant-id': String(tenantId),
+    },
+    body: JSON.stringify(data),
+  });
+
+  return handleResponse<any>(response, 'Erro ao criar o grupo semântico.');
+};
+
+/**
+ * ✏️ Atualizar Grupo Semântico
+ */
+export const updateGrupoAtributo = async (idGrupo: string, data: { nome: string; descricao?: string }, tenantId: number = 1): Promise<any> => {
+  const response = await fetch(`${API_BASE_URL}/grupos/${idGrupo}`, {
+    method: 'PUT',
+    headers: {
+      ...DEFAULT_HEADERS,
+      'x-tenant-id': String(tenantId),
+    },
+    body: JSON.stringify(data),
+  });
+
+  return handleResponse<any>(response, 'Erro ao atualizar o grupo semântico.');
+};
+
+/**
+ * 🗑️ Deletar Grupo Semântico
+ */
+export const deleteGrupoAtributo = async (idGrupo: string, tenantId: number = 1): Promise<any> => {
+  const response = await fetch(`${API_BASE_URL}/grupos/${idGrupo}`, {
+    method: 'DELETE',
+    headers: {
+      ...DEFAULT_HEADERS,
+      'x-tenant-id': String(tenantId),
+    },
+  });
+
+  return handleResponse<any>(response, 'Erro ao remover o grupo semântico.');
+};
+
+// =========================================================================
+// 📏 AUXILIARES: UNIDADES DE MEDIDA
+// =========================================================================
 
 /**
  * 📏 Listar Dicionário de Unidades Globais (ex: mm, pol, bar)
@@ -64,33 +121,29 @@ export const getUnidadesMedida = async (tenantId: number = 1): Promise<UnidadeAP
 /**
  * 🔍 Listar todos os atributos cadastrados no pool global
  */
-/**
- * 🔍 Listar todos os atributos cadastrados no pool global
- */
 export const getAtributosGlobais = async (tenantId: number): Promise<IAtributoGlobal[]> => {
   const response = await fetch(`${API_BASE_URL}/atributos-globais`, {
     method: 'GET',
     headers: {
       ...DEFAULT_HEADERS,
-      'x-tenant-id': String(tenantId), // 🎯 Alinhado com o que o seu backend espera
+      'x-tenant-id': String(tenantId),
     },
   });
   
   const dadosDoBanco = await handleResponse<any[]>(response, 'Erro ao carregar os atributos globais.');
   
-  // Como o backend JÁ FORMATA o objeto em camelCase, o map só precisa repassar ou ajustar pequenas tipagens
   return dadosDoBanco.map((attr: any) => ({
     id: attr.id,
-    grupoId: attr.grupoId || '', // 🔄 Lendo a propriedade correta vinda do backend
+    grupoId: attr.grupoId || attr.grupo_id || '',
+    unidadeId: attr.unidadeId || attr.unidade_id || undefined,
     nome: attr.nome,
     codigo: attr.codigo,
     tipo: attr.tipo,
-    escopoPadrao: attr.escopoPadrao, // 🔄 Lendo a propriedade correta vinda do backend
-    unidadeId: attr.unidadeId || undefined, // 🔄 Lendo a propriedade correta vinda do backend
+    escopoPadrao: attr.escopoPadrao,
     sufixo: attr.sufixo,
     obrigatorioPadrao: attr.obrigatorioPadrao,
     pesquisavel: attr.pesquisavel,
-    valoresSugeridos: attr.valoresSugeridos // 🔄 Lendo a propriedade correta vinda do backend
+    valoresSugeridos: attr.valoresSugeridos
   }));
 };
 
@@ -127,7 +180,7 @@ export const updateAtributoGlobal = async (idAtributo: string, data: UpdateAttri
 };
 
 /**
- * 🗑️ Excluir Atributo Global (Soft Delete)
+ * 🗑️ Excluir Atributo Global (Soft Delete / Hard Delete dependendo da Constraint)
  */
 export const deleteAtributoGlobal = async (idAtributo: string, tenantId: number = 1): Promise<GenericAttributeAPIResponse> => {
   const response = await fetch(`${API_BASE_URL}/atributos-globais/${idAtributo}`, {

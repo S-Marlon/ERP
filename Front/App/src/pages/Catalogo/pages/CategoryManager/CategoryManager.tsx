@@ -1,285 +1,459 @@
-  import React, { useState, useMemo, useEffect } from 'react';
-  import { Categoria, AtributoHerdavel, CreateCategoryPayload, UpdateCategoryPayload } from './CategoryManager.types';
-  import { getCategories, createCategory, updateCategory, deleteCategory, getAtributosGlobais } from './categoryService'; 
-  import Button from '../../../../components/ui/Button/Button';
+import React, { useState, useMemo, useEffect } from 'react';
+import {
+  Layout,
+  Tree,
+  Button,
+  Collapse,
+  Row,
+  Col,
+  Input,
+  Select,
+  Checkbox,
+  Table,
+  Space,
+  Spin,
+  Card,
+  Tag,
+  message,
+  Modal,
+  Tooltip
+} from 'antd';
+import {
+  PlusOutlined,
+  DeleteOutlined,
+  SaveOutlined,
+  SettingOutlined,
+  PartitionOutlined,
+  DashboardOutlined,
+  DeploymentUnitOutlined,
+  CloseOutlined,
+  ThunderboltOutlined,
+  InfoCircleOutlined
+} from '@ant-design/icons';
+import { Categoria, AtributoHerdavel, CreateCategoryPayload, UpdateCategoryPayload } from './CategoryManager.types';
+import { 
+  getCategories, 
+  createCategory, 
+  updateCategory, 
+  deleteCategory, 
+  getAtributosGlobais, 
+  getGruposAtributos,
+  getUnidadesMedida // Certifique-se de exportar esta função no seu categoryService
+} from './categoryService';
 
-  const tenantIdGlobal = 1; 
+const { Sider, Content } = Layout;
 
-  interface AtributoGlobalOpc {
-    id: string;
-    nome: string;
-    tipo: string;
-    unidade_medida?: string; // Mapeado para o sufixo visual
-    valores_sugeridos?: string; // Mapeado para os exemplos
-  }
+const tenantIdGlobal = 1;
 
-  const useCategoryState = () => {
-    const [categorias, setCategorias] = useState<Categoria[]>([]);
-    const [categoriaSelecionadaId, setCategoriaSelecionadaId] = useState<string | null>(null);
-    const [atributosGlobais, setAtributosGlobais] = useState<AtributoGlobalOpc[]>([]);
-    
-    const [loading, setLoading] = useState<boolean>(true);
-    const [saving, setSaving] = useState<boolean>(false);
+interface AtributoGlobalOpc {
+  id: string;
+  nome: string;
+  tipo: string;
+  grupo_id?: number;
+  unidade_id?: number;
+  sufixo?: string;
+  valores_sugeridos?: string;
+}
 
-    // 🔄 1. CARREGAR DADOS DO SERVIDOR (GET)
-    const carregarCategoriasDoServidor = async () => {
-      setLoading(true);
-      try {
-        const dados = await getCategories(tenantIdGlobal);
-        setCategorias(dados);
-        
-        const attrsGlobais = await getAtributosGlobais(tenantIdGlobal);
-        setAtributosGlobais(attrsGlobais);
-        
-        if (dados.length > 0 && !categoriaSelecionadaId) {
-          setCategoriaSelecionadaId(dados[0].id);
-        }
-      } catch (err: any) {
-        console.error(err);
-        alert(`🚨 Falha de Conexão: ${err.message || 'Não foi possível carregar as categorias.'}`);
-      } finally {
-        setLoading(false);
-      }
-    };
+interface GrupoAtributoBanco {
+  id: number;
+  nome: string;
+  descricao?: string;
+}
 
-    useEffect(() => {
-      carregarCategoriasDoServidor();
-    }, []);
+interface UnidadeMedidaBanco {
+  id: number;
+  nome: string;
+  simbolo: string;
+}
 
-    const categoriaSelecionada = useMemo(() => {
-      return categorias.find(c => c.id === categoriaSelecionadaId) || null;
-    }, [categorias, categoriaSelecionadaId]);
+const useCategoryState = () => {
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [categoriaSelecionadaId, setCategoriaSelecionadaId] = useState<string | null>(null);
+  const [atributosGlobais, setAtributosGlobais] = useState<AtributoGlobalOpc[]>([]);
+  const [gruposDisponiveis, setGruposDisponiveis] = useState<GrupoAtributoBanco[]>([]);
+  const [unidadesMedida, setUnidadesMedida] = useState<UnidadeMedidaBanco[]>([]);
 
-    // 💾 2. SALVAR ALTERAÇÕES NO SERVIDOR
-    const handleSalvarNoServidor = async () => {
-      if (!categoriaSelecionada) return;
-      setSaving(true);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [saving, setSaving] = useState<boolean>(false);
 
-      try {
-        const isNovaCategoria = categoriaSelecionada.id.startsWith('temp-');
+  const [grupoSelecionadoLote, setGrupoSelecionadoLote] = useState<string>('');
+  const [mostrarCriarRapido, setMostrarCriarRapido] = useState<boolean>(false);
+  const [novoAttrRapido, setNovoAttrRapido] = useState({
+    nome: '',
+    tipo: 'texto',
+    grupo_id: undefined as number | undefined,
+    unidade_id: undefined as number | undefined
+  });
 
-        // 🛡️ Filtra atributos que ainda não tiveram uma seleção global válida realizada
-        // Dentro do handleSalvarNoServidor, antes de chamar a API:
-const atributosLimpos = (categoriaSelecionada.atributosHeranca || [])
-  .filter(attr => !String(attr.id).startsWith('h-'))
-  .map(attr => ({
-    atributo_id: Number(attr.id), // ID original de atributos_comercial
-    escopo_comercial: attr.escopoComercial || 'ficha', // 'dna', 'grade' ou 'ficha'
-    obrigatorio: attr.obrigatorio ? 1 : 0,
-    pesquisavel: attr.pesquisavel ? 1 : 0,
-    herdar: attr.herdar ? 1 : 0,
-    sobrescreve: attr.sobrescreve ? 1 : 0,
-    ordem: attr.ordem || 0
-  }));
+  const carregarCategoriasDoServidor = async () => {
+    setLoading(true);
+    try {
+      const dados = await getCategories(tenantIdGlobal);
+      setCategorias(dados);
 
-        if (isNovaCategoria) {
-          const payloadCreate: CreateCategoryPayload = {
-            nome: categoriaSelecionada.nome,
-            parentId: categoriaSelecionada.parentId,
-            percentualMargemSugerida: categoriaSelecionada.percentualMargemSugerida,
-            modoExibicao: categoriaSelecionada.modoExibicao,
-            descricao: categoriaSelecionada.descricao,
-            atributosHeranca: atributosLimpos,
-          };
+      const attrsGlobais = await getAtributosGlobais(tenantIdGlobal);
+      setAtributosGlobais(attrsGlobais as any);
 
-          const resposta = await createCategory(payloadCreate, tenantIdGlobal);
-          alert('🟢 Categoria criada com sucesso!');
-          await carregarCategoriasDoServidor();
-          if (resposta.id) setCategoriaSelecionadaId(resposta.id);
+      const dadosGrupos = await getGruposAtributos(tenantIdGlobal);
+      setGruposDisponiveis(dadosGrupos);
 
-        } else {
-          const payloadUpdate: UpdateCategoryPayload = {
-            nome: categoriaSelecionada.nome,
-            parentId: categoriaSelecionada.parentId,
-            ativa: categoriaSelecionada.ativa,
-            percentualMargemSugerida: categoriaSelecionada.percentualMargemSugerida,
-            modoExibicao: categoriaSelecionada.modoExibicao,
-            descricao: categoriaSelecionada.descricao,
-            atributosHeranca: atributosLimpos,
-          };
-
-          await updateCategory(categoriaSelecionada.id, payloadUpdate, tenantIdGlobal);
-          alert('🟢 Alterações salvas com sucesso!');
-          await carregarCategoriasDoServidor();
-        }
-      } catch (err: any) {
-        console.error(err);
-        alert(`❌ Erro ao Salvar: ${err.message || 'O servidor rejeitou as modificações.'}`);
-      } finally {
-        setSaving(false);
-      }
-    };
-
-    // 🗑️ 3. REMOVER CATEGORIA DO SERVIDOR (DELETE)
-    const handleDeletarNoServidor = async (idCategoria: string) => {
-      const temFilhas = categorias.some(c => c.parentId === idCategoria);
-      if (temFilhas) {
-        alert('❌ Não é possível excluir uma categoria que possui subcategorias vinculadas. Reorganize a árvore primeiro.');
-        return;
+      // Busca as unidades do banco de dados para popular o formulário
+      if (typeof getUnidadesMedida === 'function') {
+        const dadosUnidades = await getUnidadesMedida(tenantIdGlobal);
+        setUnidadesMedida(dadosUnidades);
       }
 
-      if (!window.confirm('⚠️ Tem certeza que deseja deletar permanentemente esta categoria do sistema?')) {
-        return;
+      if (dados.length > 0 && !categoriaSelecionadaId) {
+        setCategoriaSelecionadaId(dados[0].id);
       }
+    } catch (err: any) {
+      console.error(err);
+      message.error(`🚨 Falha de Conexão: ${err.message || 'Não foi possível carregar as categorias.'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      setSaving(true);
-      try {
-        await deleteCategory(idCategoria, tenantIdGlobal);
-        alert('🗑️ Categoria removida com sucesso!');
-        setCategoriaSelecionadaId(null);
-        await carregarCategoriasDoServidor();
-      } catch (err: any) {
-        console.error(err);
-        alert(`❌ Erro ao Excluir: ${err.message || 'Erro ao processar exclusão no servidor.'}`);
-      } finally {
-        setSaving(false);
+  useEffect(() => {
+    carregarCategoriasDoServidor();
+  }, []);
+
+ 
+
+  const categoriaSelecionada = useMemo(() => {
+    return categorias.find(c => c.id === categoriaSelecionadaId) || null;
+  }, [categorias, categoriaSelecionadaId]);
+
+  
+
+  const handleAssociarGrupoEmLote = (grupoId: string | number) => {
+    if (!grupoId || !categoriaSelecionadaId) return;
+
+    const grupoEncontrado = gruposDisponiveis.find(g => String(g.id) === String(grupoId));
+    const nomeGrupo = grupoEncontrado ? grupoEncontrado.nome : `ID ${grupoId}`;
+
+    // Filtra atributos do grupo que o usuário selecionou
+    const attrsDoGrupo = atributosGlobais.filter(a => String(a.grupo_id) === String(grupoId));
+    const attrsJaVinculados = categoriaSelecionada?.atributosHeranca || [];
+    const novosVinculos: AtributoHerdavel[] = [];
+
+    attrsDoGrupo.forEach(attrGlobal => {
+      const jaExiste = attrsJaVinculados.some(a => String(a.id) === String(attrGlobal.id));
+      if (!jaExiste) {
+        const unidadeObj = unidadesMedida.find(u => u.id === attrGlobal.unidade_id);
+        novosVinculos.push({
+          id: String(attrGlobal.id),
+          nome: attrGlobal.nome,
+          tipoDado: attrGlobal.tipo as any,
+          sufixo: unidadeObj?.simbolo || attrGlobal.sufixo || '',
+          escopoComercial: 'ficha',
+          pesquisavel: true,
+          obrigatorio: false,
+          herdar: true,
+          sobrescreve: false, // Por padrão não sobrescreve herança
+          ordem: attrsJaVinculados.length + novosVinculos.length + 1
+        } as any);
       }
-    };
+    });
 
-    // --- MUTAÇÕES LOCAIS DE ESTADO ---
-    const handleAtualizarCategoria = (campo: keyof Categoria, valor: any) => {
-      setCategorias(prev => prev.map(c => {
-        if (c.id !== categoriaSelecionadaId) return c;
-        if (campo === 'nome') return { ...c, nome: valor, slug: gerarSlug(valor) };
-        return { ...c, [campo]: valor };
-      }));
-    };
+    if (novosVinculos.length === 0) {
+      message.warning(`Todos os atributos do grupo "${nomeGrupo}" já estão associados.`);
+      return;
+    }
 
-    const handleAtualizarSubCampo = (bloco: 'seo' | 'integracoes', campo: string, valor: string) => {
-      setCategorias(prev => prev.map(c => {
-        if (c.id !== categoriaSelecionadaId) return c;
-        return { ...c, [bloco]: { ...(c[bloco] || {}), [campo]: valor } };
-      }));
-    };
+    setCategorias(prev => prev.map(c => {
+      if (c.id !== categoriaSelecionadaId) return c;
+      return { ...c, atributosHeranca: [...(c.atributosHeranca || []), ...novosVinculos] };
+    }));
 
-    const handleAtualizarAtributoHerdado = (atributoId: string, campo: keyof AtributoHerdavel, valor: any) => {
-      setCategorias(prev => prev.map(c => {
-        if (c.id !== categoriaSelecionadaId) return c;
-        return {
-          ...c,
-          atributosHeranca: (c.atributosHeranca || []).map(attr => attr.id === atributoId ? { ...attr, [campo]: valor } : attr)
-        };
-      }));
-    };
+    setGrupoSelecionadoLote('');
+    message.success(`🟢 ${novosVinculos.length} atributos do grupo "${nomeGrupo}" vinculados!`);
+  };
 
-    // 💡 Modificado: Agora injeta todas as propriedades estáticas do Atributo Global selecionado
-    const handleMudarAtributoSelecionado = (idTemporario: string, idRealDoAtributoGlobal: string) => {
-      const attrGlobal = atributosGlobais.find(a => String(a.id) === String(idRealDoAtributoGlobal));
-      if (!attrGlobal) return;
+  
+  
+  const handleCriarEAssociarAtributoRapido = async () => {
+    if (!novoAttrRapido.nome.trim()) return message.error('Insira o nome do atributo.');
+    setSaving(true);
 
-      setCategorias(prev => prev.map(c => {
-        if (c.id !== categoriaSelecionadaId) return c;
-        return {
-          ...c,
-          atributosHeranca: (c.atributosHeranca || []).map(attr => 
-            attr.id === idTemporario 
-              ? { 
-                  ...attr, 
-                  id: String(attrGlobal.id), 
-                  nome: attrGlobal.nome, 
-                  tipoDado: attrGlobal.tipo as any,
-                  sufixo: attrGlobal.unidade_medida || '',
-                  exemplos: attrGlobal.valores_sugeridos || ''
-                } 
-              : attr
-          )
-        };
-      }));
-    };
+    try {
+      const idMockadoNovoGlobal = `g-${Date.now()}`;
+      const unidadeSelecionada = unidadesMedida.find(u => u.id === novoAttrRapido.unidade_id);
 
-    const handleAdicionarAtributo = () => {
-      if (!categoriaSelecionadaId) return;
-      const novoAttr: AtributoHerdavel = {
-        id: `h-${Date.now()}`, 
-        nome: '', 
-        tipoDado: 'texto',
+      const novoAtributoCriado: AtributoGlobalOpc = {
+        id: idMockadoNovoGlobal,
+        nome: novoAttrRapido.nome,
+        tipo: novoAttrRapido.tipo,
+        grupo_id: novoAttrRapido.grupo_id,
+        unidade_id: novoAttrRapido.unidade_id,
+        sufixo: unidadeSelecionada?.simbolo || ''
+      };
+
+      setAtributosGlobais(prev => [...prev, novoAtributoCriado]);
+
+      const novoVinculo: AtributoHerdavel = {
+        id: idMockadoNovoGlobal,
+        nome: novoAttrRapido.nome,
+        tipoDado: novoAttrRapido.tipo as any,
+        sufixo: unidadeSelecionada?.simbolo || '',
+        escopoComercial: 'ficha',
+        pesquisavel: true,
         obrigatorio: false,
         herdar: true,
+        sobrescreve: false,
         ordem: (categoriaSelecionada?.atributosHeranca?.length || 0) + 1,
-        exemplos: '',
-        sufixo: ''
+        exemplos: ''
       };
-      setCategorias(prev => prev.map(c => c.id === categoriaSelecionadaId ? { ...c, atributosHeranca: [...(c.atributosHeranca || []), novoAttr] } : c));
-    };
 
-    const handleRemoverAtributoLocal = (atributoId: string) => {
       setCategorias(prev => prev.map(c => {
         if (c.id !== categoriaSelecionadaId) return c;
-        return {
-          ...c,
-          atributosHeranca: (c.atributosHeranca || []).filter(attr => attr.id !== atributoId)
-        };
+        return { ...c, atributosHeranca: [...(c.atributosHeranca || []), novoVinculo] };
       }));
-    };
 
-    const handleAdicionarCategoriaNova = () => {
-      const nova: Categoria = {
-        id: `temp-${Date.now()}`, 
-        tenant_id: tenantIdGlobal,
-        nome: 'Nova Categoria',
-        slug: 'nova-categoria',
-        ativa: true,
-        ordem: categorias.length + 1,
-        percentualMargemSugerida: 30,
-        modoExibicao: 'grade',
-        parentId: null,
-        descricao: '',
-        atributosHeranca: [],
-        seo: { tags: '', metaTitle: '', metaDescription: '' },
-        integracoes: { erpId: '', vtexId: '', mercadolivreId: '' }
+      setNovoAttrRapido({ nome: '', tipo: 'texto', grupo_id: undefined, unidade_id: undefined });
+      setMostrarCriarRapido(false);
+      message.success('🟢 Atributo criado globalmente e vinculado à categoria!');
+    } catch (err) {
+      message.error('Erro ao criar atributo sob demanda.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSalvarNoServidor = async () => {
+    if (!categoriaSelecionada) return;
+    setSaving(true);
+
+    try {
+      const isNovaCategoria = categoriaSelecionada.id.startsWith('temp-');
+
+      const payloadBase = {
+        nome: categoriaSelecionada.nome,
+        parentId: categoriaSelecionada.parentId,
+        ativa: categoriaSelecionada.ativa,
+        percentualMargemSugerida: categoriaSelecionada.percentualMargemSugerida,
+        modoExibicao: categoriaSelecionada.modoExibicao,
+        descricao: categoriaSelecionada.descricao,
+        atributosHeranca: categoriaSelecionada.atributosHeranca,
+        seo: categoriaSelecionada.seo,
+        integracoes: categoriaSelecionada.integracoes
       };
-      setCategorias(prev => [...prev, nova]);
-      setCategoriaSelecionadaId(nova.id);
-    };
 
-    return {
-      categorias,
-      categoriaSelecionada,
-      categoriaSelecionadaId,
-      atributosGlobais, 
-      loading,
-      saving,
-      handleAtualizarCategoria,
-      handleAtualizarSubCampo,
-      handleAtualizarAtributoHerdado,
-      handleMudarAtributoSelecionado, 
-      handleAdicionarAtributo,
-      handleRemoverAtributoLocal,
-      handleAdicionarCategoriaNova,
-      handleSalvarNoServidor,
-      handleDeletarNoServidor,
-      setCategoriaSelecionadaId
-    };
+      if (isNovaCategoria) {
+        const resposta = await createCategory(payloadBase as any, tenantIdGlobal);
+        message.success('🟢 Categoria criada com sucesso!');
+        await carregarCategoriasDoServidor();
+        if (resposta.id) setCategoriaSelecionadaId(resposta.id);
+      } else {
+        await updateCategory(categoriaSelecionada.id, payloadBase as any, tenantIdGlobal);
+        message.success('🟢 Alterações salvas com sucesso!');
+        await carregarCategoriasDoServidor();
+      }
+    } catch (err: any) {
+      console.error(err);
+      message.error(`❌ Erro ao Salvar: ${err.message || 'O servidor rejeitou as modificações.'}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
-  // --- FUNÇÕES AUXILIARES ---
-  const gerarSlug = (texto: string): string => {
-    return texto
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') 
-      .replace(/[^\w\s-]/g, '')      
-      .replace(/\s+/g, '-')          
-      .replace(/-+/g, '-');          
+  const handleDeletarNoServidor = async (idCategoria: string) => {
+    const temFilhas = categorias.some(c => c.parentId === idCategoria);
+    if (temFilhas) {
+      message.error('❌ Não é possível excluir uma categoria que possui subcategorias vinculadas.');
+      return;
+    }
+
+    Modal.confirm({
+      title: '⚠️ Tem certeza que deseja deletar permanentemente esta categoria?',
+      content: 'Esta ação não poderá ser desfeita.',
+      okText: 'Sim, Deletar',
+      okType: 'danger',
+      cancelText: 'Cancelar',
+      onOk: async () => {
+        setSaving(true);
+        try {
+          await deleteCategory(idCategoria, tenantIdGlobal);
+          message.success('🗑️ Categoria removida com sucesso!');
+          setCategoriaSelecionadaId(null);
+          await carregarCategoriasDoServidor();
+        } catch (err: any) {
+          console.error(err);
+          message.error(`❌ Erro ao Excluir: ${err.message || 'Erro ao processar exclusão.'}`);
+        } finally {
+          setSaving(false);
+        }
+      }
+    });
   };
 
-  const verificarSePaiInativo = (idPai: string | null, listaCategorias: Categoria[]): boolean => {
-    if (!idPai) return false;
-    const pai = listaCategorias.find(c => c.id === idPai);
-    if (!pai) return false;
-    if (!pai.ativa) return true;
-    return verificarSePaiInativo(pai.parentId, listaCategorias);
-  };
-
-  const obterAtributosTudo = (idCategoriaAtual: string | null, listaCategorias: Categoria[]): any[] => {
-  if (!idCategoriaAtual) return [];
   
+
+  const handleAtualizarCategoria = (campo: keyof Categoria, valor: any) => {
+    setCategorias(prev => prev.map(c => {
+      if (c.id !== categoriaSelecionadaId) return c;
+      if (campo === 'nome') return { ...c, nome: valor, slug: gerarSlug(valor) };
+      return { ...c, [campo]: valor };
+    }));
+  };
+
+  const handleAtualizarSubCampo = (bloco: 'seo' | 'integracoes', campo: string, valor: string) => {
+    setCategorias(prev => prev.map(c => {
+      if (c.id !== categoriaSelecionadaId) return c;
+      return { ...c, [bloco]: { ...(c[bloco] || {}), [campo]: valor } };
+    }));
+  };
+
+  const handleAtualizarAtributoHerdado = (atributoId: string, campo: keyof AtributoHerdavel, valor: any) => {
+    setCategorias(prev => prev.map(c => {
+      if (c.id !== categoriaSelecionadaId) return c;
+      return {
+        ...c,
+        atributosHeranca: (c.atributosHeranca || []).map(attr => attr.id === atributoId ? { ...attr, [campo]: valor } : attr)
+      };
+    }));
+  };
+
+  const handleMudarControleHeranca = (atributoId: string, campo: 'bloqueado' | 'retransmitir' | 'sobrescreve', valor: boolean) => {
+    setCategorias(prev => prev.map(c => {
+      if (c.id !== categoriaSelecionadaId) return c;
+
+      const listaAtual = c.atributosHeranca || [];
+      const existeLocal = listaAtual.some(a => a.id === atributoId);
+
+      if (!existeLocal) {
+        const novoVinculoCustomizado: AtributoHerdavel = {
+          id: atributoId,
+          nome: '',
+          tipoDado: 'texto',
+          escopoComercial: 'ficha',
+          pesquisavel: true,
+          obrigatorio: false,
+          herdar: true,
+          sobrescreve: false,
+          ordem: listaAtual.length + 1,
+          [campo]: valor
+        };
+        return { ...c, atributosHeranca: [...listaAtual, novoVinculoCustomizado] };
+      }
+
+      return {
+        ...c,
+        atributosHeranca: listaAtual.map(attr => attr.id === atributoId ? { ...attr, [campo]: valor } : attr)
+      };
+    }));
+  };
+
+  const handleMudarAtributoSelecionado = (idTemporario: string, idRealDoAtributoGlobal: string) => {
+    const attrGlobal = atributosGlobais.find(a => String(a.id) === String(idRealDoAtributoGlobal));
+    if (!attrGlobal) return;
+
+    const unidadeObj = unidadesMedida.find(u => u.id === attrGlobal.unidade_id);
+
+    setCategorias(prev => prev.map(c => {
+      if (c.id !== categoriaSelecionadaId) return c;
+      return {
+        ...c,
+        atributosHeranca: (c.atributosHeranca || []).map(attr =>
+          attr.id === idTemporario
+            ? {
+                ...attr,
+                id: String(attrGlobal.id),
+                nome: attrGlobal.nome,
+                tipoDado: attrGlobal.tipo as any,
+                sufixo: unidadeObj?.simbolo || attrGlobal.sufixo || '',
+                exemplos: attrGlobal.valores_sugeridos || '',
+                escopoComercial: 'ficha',
+                pesquisavel: true,
+                herdar: true,
+                sobrescreve: false
+              }
+            : attr
+        )
+      };
+    }));
+  };
+
+  const handleAdicionarAtributo = () => {
+    if (!categoriaSelecionadaId) return;
+    const novoAttr: AtributoHerdavel = {
+      id: `h-${Date.now()}`,
+      nome: '',
+      tipoDado: 'texto',
+      escopoComercial: 'ficha',
+      pesquisavel: true,
+      obrigatorio: false,
+      herdar: true,
+      sobrescreve: false,
+      ordem: (categoriaSelecionada?.atributosHeranca?.length || 0) + 1,
+      exemplos: '',
+      sufixo: ''
+    };
+    setCategorias(prev => prev.map(c => c.id === categoriaSelecionadaId ? { ...c, atributosHeranca: [...(c.atributosHeranca || []), novoAttr] } : c));
+  };
+
+  const handleRemoverAtributoLocal = (atributoId: string) => {
+    setCategorias(prev => prev.map(c => {
+      if (c.id !== categoriaSelecionadaId) return c;
+      return { ...c, atributosHeranca: (c.atributosHeranca || []).filter(attr => attr.id !== atributoId) };
+    }));
+  };
+
+  const handleAdicionarCategoriaNova = () => {
+    const nova: Categoria = {
+      id: `temp-${Date.now()}`,
+      tenantId: tenantIdGlobal,
+      nome: 'Nova Categoria',
+      slug: 'nova-categoria',
+      ativa: true,
+      ordem: categorias.length + 1,
+      percentualMargemSugerida: 30,
+      modoExibicao: 'grade',
+      parentId: null,
+      descricao: '',
+      atributosHeranca: [],
+      seo: { tags: '', metaTitle: '', metaDescription: '' },
+      integracoes: { erpId: '', vtexId: '', mercadolivreId: '' }
+    };
+    setCategorias(prev => [...prev, nova]);
+    setCategoriaSelecionadaId(nova.id);
+  };
+
+  return {
+    categorias, categoriaSelecionada, categoriaSelecionadaId, atributosGlobais, loading, saving,
+    gruposDisponiveis, unidadesMedida, grupoSelecionadoLote, setGrupoSelecionadoLote, mostrarCriarRapido, setMostrarCriarRapido,
+    novoAttrRapido, setNovoAttrRapido, handleAssociarGrupoEmLote, handleCriarEAssociarAtributoRapido,
+    handleAtualizarCategoria, handleAtualizarSubCampo, handleAtualizarAtributoHerdado, handleMudarControleHeranca,
+    handleMudarAtributoSelecionado, handleAdicionarAtributo, handleRemoverAtributoLocal, handleAdicionarCategoriaNova,
+    handleSalvarNoServidor, handleDeletarNoServidor, setCategoriaSelecionadaId, 
+  };
+};
+
+const gerarSlug = (texto: string): string => {
+  return texto
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+};
+
+const verificarSePaiInativo = (idPai: string | null, listaCategorias: Categoria[]): boolean => {
+  if (!idPai) return false;
+  const pai = listaCategorias.find(c => c.id === idPai);
+  if (!pai) return false;
+  if (!pai.ativa) return true;
+  return verificarSePaiInativo(pai.parentId, listaCategorias);
+};
+
+const obterAtributosTudo = (idCategoriaAtual: string | null, listaCategorias: Categoria[]): any[] => {
+  if (!idCategoriaAtual) return [];
+
   let resultado: any[] = [];
   let categoriaAtual = listaCategorias.find(c => c.id === idCategoriaAtual);
   const visitados = new Set<string>();
-  
-  // Guardamos as configurações customizadas que a categoria ALVO (idCategoriaAtual) 
-  // fez sobre os atributos herdados (se ela bloqueou ou mudou retransmissão)
   const configuracoesLocaisAlvo = categoriaAtual?.atributosHeranca || [];
 
   while (categoriaAtual && !visitados.has(categoriaAtual.id)) {
@@ -287,534 +461,684 @@ const atributosLimpos = (categoriaSelecionada.atributosHeranca || [])
     const deCima = categoriaAtual.id !== idCategoriaAtual;
 
     if (categoriaAtual.atributosHeranca && Array.isArray(categoriaAtual.atributosHeranca)) {
-      
-      // Se veio de cima, só avalia se o pai original marcou como 'herdar = true'
       const attrsFiltrados = categoriaAtual.atributosHeranca.filter(attr => !deCima || attr.herdar);
 
       const attrsFormatados = attrsFiltrados.map(attr => {
-        // Se o atributo vem de cima, precisamos ver se a categoria atual (alvo) 
-        // tem uma regra customizada para ele (Bloqueado ou Retransmitir)
         const customizacaoLocal = configuracoesLocaisAlvo.find(l => l.id === attr.id);
-        
         return {
           ...attr,
           deCima,
           origem: categoriaAtual!.nome,
-          // Se houver customização local, respeita ela. Senão, adota o padrão.
           bloqueado: customizacaoLocal ? !!customizacaoLocal.bloqueado : false,
-          retransmitir: customizacaoLocal ? customizacaoLocal.retransmitir !== false : true
+          retransmitir: customizacaoLocal ? customizacaoLocal.retransmitir !== false : true,
+          sobrescreve: customizacaoLocal ? !!customizacaoLocal.sobrescreve : false,
+          // Caso sobrescreva, assumimos os valores locais em vez dos herdados
+          escopoComercial: (customizacaoLocal && customizacaoLocal.sobrescreve) ? customizacaoLocal.escopoComercial : attr.escopoComercial,
+          obrigatorio: (customizacaoLocal && customizacaoLocal.sobrescreve) ? customizacaoLocal.obrigatorio : attr.obrigatorio,
         };
       });
 
-      // Se estamos avaliando um PAI intermediário (deCima === true), 
-      // precisamos checar se ELE permitiu a retransmissão para os nós abaixo dele
       const attrsPermitidos = attrsFormatados.filter(attr => {
-        if (!deCima) return true; // Se é nativo da categoria alvo, passa reto.
-        
-        // Se algum pai no meio do caminho barrou a retransmissão, ele morre aqui
+        if (!deCima) return true;
         return attr.retransmitir !== false && !attr.bloqueado;
       });
 
       resultado = [...attrsPermitidos, ...resultado];
     }
 
-    categoriaAtual = categoriaAtual.parentId 
-      ? listaCategorias.find(c => c.id === categoriaAtual!.parentId) 
+    categoriaAtual = categoriaAtual.parentId
+      ? listaCategorias.find(c => c.id === categoriaAtual!.parentId)
       : undefined;
   }
 
-  // Remove duplicatas priorizando o nó mais próximo (sobreposição)
   const mapeadoPorId: Record<string, any> = {};
   resultado.forEach(attr => {
-    // Se o atributo já foi mapeado por um nó mais abaixo (filho), o do pai não sobrescreve
     if (!mapeadoPorId[attr.id]) {
       mapeadoPorId[attr.id] = attr;
     }
   });
 
-  // Filtra de vez os atributos que a categoria alvo marcou explicitamente como BLOQUEADO
   return Object.values(mapeadoPorId)
     .filter((attr: any) => !attr.bloqueado)
-    .sort((a, b) => a.ordem - b.ordem);
+    .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
 };
 
-  export const CategoryManager: React.FC = () => {
-    const {
-      categorias,
-      categoriaSelecionada,
-      categoriaSelecionadaId,
-      atributosGlobais, 
-      loading,
-      saving,
-      handleAtualizarCategoria,
-      handleAtualizarSubCampo,
-      handleAtualizarAtributoHerdado,
-      handleMudarAtributoSelecionado, 
-      handleAdicionarAtributo,
-      handleRemoverAtributoLocal,
-      handleAdicionarCategoriaNova,
-      handleSalvarNoServidor,
-      handleDeletarNoServidor,
-      setCategoriaSelecionadaId
-    } = useCategoryState();
+export const CategoryManager: React.FC = () => {
+  const state = useCategoryState();
+  const [abasAbertas, setAbasAbertas] = useState<string[]>(['estrutura', 'atributos']);
 
-    const [abasAbertas, setAbasAbertas] = useState<Record<string, boolean>>({
-      estrutura: true,
-      mapeamento: false,
-      comercial: false,
-      atributos: true
-    });
+  const todosAtributosCalculados = useMemo(() => {
+    return obterAtributosTudo(state.categoriaSelecionadaId, state.categorias);
+  }, [state.categoriaSelecionadaId, state.categorias]);
 
-    const toggleAbas = (aba: string) => {
-      setAbasAbertas(prev => ({ ...prev, [aba]: !prev[aba] }));
-    };
-
-    const todosAtributosCalculados = useMemo(() => {
-      return obterAtributosTudo(categoriaSelecionadaId, categorias);
-    }, [categoriaSelecionadaId, categorias]);
-
-    const renderTreeNodes = (parentId: string | null, level = 0) => {
-      const filhas = categorias.filter(c => c.parentId === parentId);
-
-      return filhas.map(cat => {
-        const isSelected = categoriaSelecionada?.id === cat.id;
-        const desativadaPorCascata = !cat.ativa || verificarSePaiInativo(cat.parentId, categorias);
-
-        return (
-          <div key={cat.id} style={{ display: 'flex', flexDirection: 'column' }}>
-            <div 
-              className={`tree-node ${isSelected ? 'active' : ''}`}
-              style={{ 
-                paddingLeft: `${Math.max(12, level * 20)}px`,
-                opacity: desativadaPorCascata ? 0.45 : 1,
-                cursor: 'pointer'
-              }}
-              onClick={() => setCategoriaSelecionadaId(cat.id)}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexGrow: 1 }}>
-                <span style={{ fontWeight: isSelected ? 700 : 500, fontSize: '13px', color: isSelected ? '#0050b3' : '#212b36' }}>
-                  {level > 0 ? '↳ ' : ''}{cat.nome}
-                </span>
-                {desativadaPorCascata && (
-                  <span style={{ fontSize: '9px', background: '#ea580c', color: '#fff', padding: '1px 4px', borderRadius: '3px' }}>
-                    Inativo
-                  </span>
-                )}
-              </div>
-            </div>
-            {renderTreeNodes(cat.id, level + 1)}
-          </div>
-        );
+  const buildTreeData = (parentId: string | null): any[] => {
+    return state.categorias
+      .filter(c => c.parentId === parentId)
+      .map(cat => {
+        const desativadaPorCascata = !cat.ativa || verificarSePaiInativo(cat.parentId, state.categorias);
+        return {
+          title: (
+            <Space>
+              <span style={{ fontWeight: state.categoriaSelecionadaId === cat.id ? 700 : 400 }}>
+                {cat.nome}
+              </span>
+              {desativadaPorCascata && <Tag color="warning" style={{ fontSize: '10px' }}>Inativo</Tag>}
+            </Space>
+          ),
+          key: cat.id,
+          children: buildTreeData(cat.id)
+        };
       });
-    };
+  };
 
-    if (loading) {
-      return (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontFamily: 'sans-serif', color: '#637381' }}>
-          🔄 Carregando árvore de categorias do servidor...
-        </div>
-      );
-    }
+  const treeData = useMemo(() => buildTreeData(null), [state.categorias, state.categoriaSelecionadaId]);
 
+  if (state.loading) {
     return (
-      <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', backgroundColor: '#f4f6f8', minHeight: '100vh', padding: '0' }}>
-        
-        <style>{`
-          .cat-workspace { display: grid; grid-template-columns: 340px 1fr; min-height: 100vh; }
-          .cat-sidebar { background: #ffffff; border-right: 1px solid #e1e4e8; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
-          .cat-main { padding: 24px; display: flex; flex-direction: column; gap: 12px; max-width: 1400px; width: 100%; box-sizing: border-box; }
-          .tree-node { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid #f4f6f8; border-left: 3px solid transparent; transition: all 0.15s; }
-          .tree-node:hover { background: #f8fafc; }
-          .tree-node.active { border-left-color: #0050b3; background: #f0f7ff; }
-          .accordion-card { background: #ffffff; border: 1px solid #e1e4e8; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.02); margin-bottom: 12px; }
-          .accordion-header { background: #ffffff; padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; transition: background 0.1s; }
-          .accordion-header:hover { background: #f8fafc; }
-          .accordion-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #212b36; display: flex; align-items: center; gap: 8px; }
-          .accordion-content { padding: 10px; border-top: 1px solid #f4f6f8; background: #fff; }
-          .accordion-arrow { font-size: 12px; color: #637381; transition: transform 0.2s; }
-          .accordion-arrow.open { transform: rotate(180deg); }
-          .cat-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
-          .cat-table th { background: #f8fafc; color: #454f5b; padding: 12px 10px; font-weight: 600; border-bottom: 2px solid #e1e4e8; }
-          .cat-table td { padding: 10px; border-bottom: 1px solid #f4f6f8; vertical-align: middle; }
-          .cat-input { height: 32px; border: 1px solid #c4cbd4; border-radius: 3px; padding: 0 8px; font-size: 13px; color: #212b36; width: 100%; box-sizing: border-box; background: #fff; }
-          .cat-input:focus { border-color: #0050b3; outline: none; }
-          .cat-select { height: 32px; border: 1px solid #c4cbd4; border-radius: 3px; padding: 0 4px; font-size: 13px; width: 100%; background: #fff; box-sizing: border-box; }
-          .toggle-active { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
-          .btn-del-attr { background: transparent; border: none; color: #ef4444; cursor: pointer; font-size: 14px; font-weight: bold; padding: 4px 8px; borderRadius: 4px; }
-          .btn-del-attr:hover { background: #fee2e2; }
-        `}</style>
-
-        <div className="cat-workspace">
-          <aside className="cat-sidebar">
-            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#111213' }}>🌿 Matriz de Taxonomia</h3>
-            <Button onClick={handleAdicionarCategoriaNova} style={{ backgroundColor: '#0050b3', color: '#fff', fontSize: '12px', height: '32px' }}>
-              + Nova Categoria
-            </Button>
-            <div style={{ display: 'flex', flexDirection: 'column', marginTop: '8px', border: '1px solid #e1e4e8', borderRadius: '4px', overflow: 'hidden' }}>
-              {renderTreeNodes(null)}
-            </div>
-          </aside>
-
-          <main className="cat-main">
-            {categoriaSelecionada ? (
-              <>
-                {/* ACORDEÃO 1: CONFIGURAÇÃO ESTRUTURAL */}
-                <div className="accordion-card">
-                  <div className="accordion-header" onClick={() => toggleAbas('estrutura')}>
-                    <div className="accordion-title">📌 Configuração Estrutural da Categoria</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                      <label className="toggle-active" style={{ color: categoriaSelecionada.ativa ? '#15803d' : '#ea580c' }} onClick={e => e.stopPropagation()}>
-                        <input type="checkbox" checked={categoriaSelecionada.ativa} onChange={e => handleAtualizarCategoria('ativa', e.target.checked)} />
-                        {categoriaSelecionada.ativa ? '🟢 Ativa' : '🔴 Inativa'}
-                      </label>
-                      <span className={`accordion-arrow ${abasAbertas.estrutura ? 'open' : ''}`}>▼</span>
-                    </div>
-                  </div>
-                  
-                  {abasAbertas.estrutura && (
-                    <div className="accordion-content">
-                      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.2fr 1.1fr', gap: '16px', marginBottom: '16px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <label style={{ fontSize: '11px', fontWeight: 500, color: '#454f5b' }}>Nome da Categoria</label>
-                          <input type="text" className="cat-input" value={categoriaSelecionada.nome} onChange={e => handleAtualizarCategoria('nome', e.target.value)} />
-                        </div>
-                        
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <label style={{ fontSize: '11px', fontWeight: 500, color: '#454f5b' }}>URL Amigável (Slug Catálogo)</label>
-                          <input type="text" className="cat-input" style={{ background: '#f8fafc', color: '#475569', fontFamily: 'monospace' }} value={categoriaSelecionada.slug} onChange={e => handleAtualizarCategoria('slug', e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-'))} />
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <label style={{ fontSize: '11px', fontWeight: 500, color: '#454f5b' }}>Nível / Categoria Pai</label>
-                          <select 
-                            className="cat-select"
-                            value={categoriaSelecionada.parentId || ''} 
-                            onChange={(e) => handleAtualizarCategoria('parentId', e.target.value || null)}
-                            style={{ height: '36px', fontSize: '13px' }}
-                          >
-                            <option value="">Nível Raiz 🌍</option>
-                            {categorias
-                              .filter(c => c.id !== categoriaSelecionada.id)
-                              .map(opc => (
-                                <option key={opc.id} value={opc.id}>
-                                  🔹 {opc.nome}
-                                </option>
-                              ))
-                            }
-                          </select>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ fontSize: '11px', fontWeight: 500, color: '#454f5b' }}>Descrição de Escopo Técnico</label>
-                        <input type="text" className="cat-input" value={categoriaSelecionada.descricao || ''} onChange={e => handleAtualizarCategoria('descricao', e.target.value)} />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* ACORDEÃO 2: MAPEAMENTO DE INTEGRAÇÕES */}
-                <div className="accordion-card" style={{ borderLeft: '4px solid #6366f1' }}>
-                  <div className="accordion-header" onClick={() => toggleAbas('mapeamento')}>
-                    <div className="accordion-title" style={{ color: '#4f46e5' }}>🔀 Mapeamento de Ecossistema (De/Para de IDs)</div>
-                    <span className={`accordion-arrow ${abasAbertas.mapeamento ? 'open' : ''}`}>▼</span>
-                  </div>
-                  
-                  {abasAbertas.mapeamento && (
-                    <div className="accordion-content">
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: '#f8fafc', padding: '12px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
-                          <label style={{ fontSize: '11px', fontWeight: 700, color: '#334155' }}>📦 CÓDIGO ERP CENTRAL</label>
-                          <input type="text" className="cat-input" placeholder="Ex: CAT-9921" value={categoriaSelecionada.integracoes?.erpId || ''} onChange={e => handleAtualizarSubCampo('integracoes', 'erpId', e.target.value)} style={{ fontFamily: 'monospace' }} />
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: '#f0fdf4', padding: '12px', borderRadius: '4px', border: '1px solid #bbf7d0' }}>
-                          <label style={{ fontSize: '11px', fontWeight: 700, color: '#166534' }}>🛒 ID CATEGORIA VTEX</label>
-                          <input type="text" className="cat-input" placeholder="Ex: 402" value={categoriaSelecionada.integracoes?.vtexId || ''} onChange={e => handleAtualizarSubCampo('integracoes', 'vtexId', e.target.value)} style={{ fontFamily: 'monospace' }} />
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: '#fffbeb', padding: '12px', borderRadius: '4px', border: '1px solid #fef3c7' }}>
-                          <label style={{ fontSize: '11px', fontWeight: 700, color: '#92400e' }}>💛 ID MERCADO LIVRE</label>
-                          <input type="text" className="cat-input" placeholder="Ex: MLB1054" value={categoriaSelecionada.integracoes?.mercadolivreId || ''} onChange={e => handleAtualizarSubCampo('integracoes', 'mercadolivreId', e.target.value)} style={{ fontFamily: 'monospace' }} />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* ACORDEÃO 3: INTELIGÊNCIA COMERCIAL */}
-                <div className="accordion-card" style={{ borderLeft: '4px solid #0050b3' }}>
-                  <div className="accordion-header" onClick={() => toggleAbas('comercial')}>
-                    <div className="accordion-title">💼 Inteligência Comercial & Layout</div>
-                    <span className={`accordion-arrow ${abasAbertas.comercial ? 'open' : ''}`}>▼</span>
-                  </div>
-                  
-                  {abasAbertas.comercial && (
-                    <div className="accordion-content">
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 2fr', gap: '16px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <label style={{ fontSize: '11px', fontWeight: 500, color: '#454f5b' }}>Margem Sugerida Base (%)</label>
-                          <input type="number" className="cat-input" value={categoriaSelecionada.percentualMargemSugerida || 0} onChange={e => handleAtualizarCategoria('percentualMargemSugerida', Number(e.target.value))} />
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <label style={{ fontSize: '11px', fontWeight: 500, color: '#454f5b' }}>Modo de Exibição Padrão</label>
-                          <select className="cat-select" value={categoriaSelecionada.modoExibicao} onChange={e => handleAtualizarCategoria('modoExibicao', e.target.value)}>
-                            <option value="grade">Grade de Produtos (Filtros Laterais)</option>
-                            <option value="lista">Lista Técnico (Comparativo)</option>
-                            <option value="carrossel">Carrossel Compacto (Vitrine)</option>
-                          </select>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <label style={{ fontSize: '11px', fontWeight: 500, color: '#454f5b' }}>Tags Indexadoras SEO</label>
-                          <input type="text" className="cat-input" value={categoriaSelecionada.seo?.tags || ''} onChange={e => handleAtualizarSubCampo('seo', 'tags', e.target.value)} placeholder="ex: motor, eletrico" />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* ACORDEÃO 4: MATRIZ DE ATRIBUTOS */}
-                <div className="accordion-card">
-                  <div className="accordion-header" onClick={() => toggleAbas('atributos')}>
-                    <div className="accordion-title">🧬 Matriz Técnico Consolidada (Atributos de Produto)</div>
-                    <div onClick={e => e.stopPropagation()}>
-                      <Button onClick={handleAdicionarAtributo} style={{ backgroundColor: '#fff', border: '1px solid #c4cbd4', color: '#0050b3', height: '26px', fontSize: '11px', fontWeight: 600 }}>
-                        + Associar Atributo Global
-                      </Button>
-                    </div>
-                  </div>
-                  
-                      <table className="cat-table">
-    <thead>
-      <tr>
-        <th style={{ width: '20%' }}>Atributo & Governança (DNA)</th>
-        <th style={{ width: '12%' }}>Tipo de Dado</th>
-        <th style={{ width: '15%' }}>Escopo / Destino</th>
-        <th style={{ width: '12%' }}>Uso no Catálogo</th>
-        <th style={{ width: '10%' }}>Obrigatório</th>
-        <th style={{ width: '16%' }}>Origem / Árvore</th>
-        <th style={{ width: '13%' }}>Exemplos / Sufixo</th>
-        <th style={{ width: '2%' }}></th>
-      </tr>
-    </thead>
-    <tbody>
-      {todosAtributosCalculados.map(attr => {
-        const ehLinhaFalsaLocal = String(attr.id).startsWith('h-');
-
-        const atributosDisponiveisCombo = atributosGlobais.filter(g => 
-          !(categoriaSelecionada.atributosHeranca || []).some(a => String(a.id) === String(g.id))
-        );
-
-        return (
-          <tr key={attr.id} style={{ backgroundColor: attr.deCima ? '#f8fafc' : 'transparent' }}>
-            
-            {/* 1. NOME & DNA (GOVERNANÇA) */}
-            <td>
-              {attr.deCima ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '8px' }}>
-                  <span style={{ fontWeight: 600, color: '#475569' }}>{attr.nome}</span>
-                  <span style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase' }}>
-                    🧬 {attr.dna || 'Técnico'}
-                  </span>
-                </div>
-              ) : ehLinhaFalsaLocal ? (
-                <select 
-                  className="cat-select" 
-                  style={{ borderColor: '#0050b3', fontWeight: 600 }}
-                  value="" 
-                  onChange={e => handleMudarAtributoSelecionado(attr.id, e.target.value)}
-                >
-                  <option value="" disabled>-- Escolha um Atributo Global --</option>
-                  {atributosDisponiveisCombo.map(g => (
-                    <option key={g.id} value={g.id}>{g.nome}</option>
-                  ))}
-                </select>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '8px' }}>
-                  <span style={{ fontWeight: 600, color: '#212b36' }}>{attr.nome}</span>
-                  <span style={{ fontSize: '10px', color: '#637381', textTransform: 'uppercase' }}>
-                    🧬 {attr.dna || 'Técnico'}
-                  </span>
-                </div>
-              )}
-            </td>
-
-            {/* 2. TIPO DO DADO */}
-            <td>
-              <select className="cat-select" value={attr.tipoDado} disabled={true} style={{ color: '#64748b', background: '#f8fafc' }}>
-                <option value="texto">Texto Livre</option>
-                <option value="numero">Numérico</option>
-                <option value="decimal">Decimal</option>
-                <option value="boolean">Booleano</option>
-                <option value="lista">Lista (Dropdown)</option>
-              </select>
-            </td>
-
-            {/* 3. ESCOPO DE APLICAÇÃO (PRODUTO VS SKU) */}
-            <td>
-              <select 
-                className="cat-select" 
-                value={attr.escopo || 'produto'} 
-                disabled={attr.deCima}
-                onChange={e => handleAtualizarAtributoHerdado(attr.id, 'escopo', e.target.value)}
-                style={{ color: attr.deCima ? '#64748b' : '#212b36' }}
-              >
-                <option value="produto">📦 Nível Produto (Pai)</option>
-                <option value="sku">🔲 Nível SKU (Variante)</option>
-              </select>
-            </td>
-
-            {/* 4. EXIBIÇÃO NO FRONTEND (GRADE VS FICHA) */}
-            <td>
-              <select 
-                className="cat-select" 
-                value={attr.comportamentoFront || 'ficha'} 
-                disabled={attr.deCima}
-                onChange={e => handleAtualizarAtributoHerdado(attr.id, 'comportamentoFront', e.target.value)}
-                style={{ color: attr.deCima ? '#64748b' : '#212b36', fontWeight: attr.comportamentoFront === 'grade' ? 600 : 400 }}
-              >
-                <option value="ficha">📄 Ficha Técnica Only</option>
-                <option value="grade">⚡ Seletor de Grade (SKU)</option>
-                <option value="filtro">🔍 Filtro Lateral Only</option>
-                <option value="ambos">✨ Filtro + Ficha</option>
-              </select>
-            </td>
-
-            {/* 5. OBRIGATÓRIO */}
-            <td>
-              <select 
-                className="cat-select" 
-                value={attr.obrigatorio ? 'sim' : 'nao'} 
-                disabled={attr.deCima} 
-                onChange={e => handleAtualizarAtributoHerdado(attr.id, 'obrigatorio', e.target.value === 'sim')} 
-                style={{ color: attr.deCima ? '#64748b' : '#212b36' }}
-              >
-                <option value="sim">🔴 Sim</option>
-                <option value="nao">⚪ Não</option>
-              </select>
-            </td>
-
-            {/* 6. ORIGEM / GOVERNANÇA DA ÁRVORE */}
-          {/* 6. ORIGEM / GOVERNANÇA DA ÁRVORE */}
-<td>
-  {attr.deCima ? (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-      <span style={{ padding: '3px 8px', background: '#e2e8f0', color: '#475569', borderRadius: '4px', fontSize: '11px', fontWeight: 600, display: 'inline-block' }}>
-        ↳ Herdado de: {attr.origem}
-      </span>
-      
-      {/* CONTROLES DE HERANÇA PARA O FILHO DECIDIR */}
-      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-        <label style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', color: '#ef4444' }}>
-          <input 
-            type="checkbox" 
-            checked={!!attr.bloqueado} 
-            onChange={e => handleMudarControleHeranca(attr.id, 'bloqueado', e.target.checked)} 
-          />
-          Excluir desta Cat.
-        </label>
-
-        <label style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', color: '#2563eb' }}>
-          <input 
-            type="checkbox" 
-            checked={attr.retransmitir !== false} 
-            onChange={e => handleMudarControleHeranca(attr.id, 'retransmitir', e.target.checked)} 
-          />
-          Passar p/ Subcategorias
-        </label>
-      </div>
-    </div>
-  ) : ehLinhaFalsaLocal ? (
-    <span style={{ padding: '3px 8px', background: '#fef3c7', color: '#d97706', borderRadius: '4px', fontSize: '11px', fontWeight: 600, display: 'inline-block' }}>
-      ⏳ Aguardando...
-    </span>
-  ) : (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-      <span style={{ padding: '3px 8px', background: '#dcfce7', color: '#15803d', borderRadius: '4px', fontSize: '11px', fontWeight: 600, display: 'inline-block' }}>
-        📍 Nativo desta Cat.
-      </span>
-      <label style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', color: '#475569' }}>
-        <input 
-          type="checkbox" 
-          checked={attr.herdar} 
-          onChange={e => handleAtualizarAtributoHerdado(attr.id, 'herdar', e.target.checked)} 
-        />
-        Propagar para filhos
-      </label>
-    </div>
-  )}
-</td>
-
-            {/* 7. EXEMPLOS & SUFIXO */}
-            <td>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <input 
-                  type="text" 
-                  className="cat-input" 
-                  value={attr.exemplos ? `Ex: ${attr.exemplos}` : '-'} 
-                  disabled={true} 
-                  style={{ color: '#64748b', background: '#f8fafc', fontSize: '11px' }} 
-                />
-                {attr.sufixo && (
-                  <span style={{ fontSize: '10px', color: '#0050b3', fontFamily: 'monospace', paddingLeft: '4px' }}>
-                    Sufixo: {attr.sufixo}
-                  </span>
-                )}
-              </div>
-            </td>
-
-            {/* 8. REMOVER VÍNCULO */}
-            <td style={{ textAlign: 'center' }}>
-              {!attr.deCima && (
-                <button 
-                  type="button" 
-                  className="btn-del-attr" 
-                  onClick={() => handleRemoverAtributoLocal(attr.id)}
-                  title="Remover associação"
-                >
-                  ✕
-                </button>
-              )}
-            </td>
-
-          </tr>
-        );
-      })}
-    </tbody>
-  </table>
-                </div>
-                
-                {/* SEÇÃO DE AÇÕES DO RODAPÉ */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
-                  <div>
-                    {!categoriaSelecionada.id.startsWith('temp-') && (
-                      <Button 
-                        onClick={() => handleDeletarNoServidor(categoriaSelecionada.id)}
-                        disabled={saving}
-                        style={{ backgroundColor: '#ef4444', color: '#fff', fontSize: '12px' }}
-                      >
-                        Excluir Categoria
-                      </Button>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <Button 
-                      onClick={handleSalvarNoServidor} 
-                      disabled={saving} 
-                      style={{ backgroundColor: '#16a34a', color: '#fff', fontWeight: 600, fontSize: '13px' }}
-                    >
-                      {saving ? '⏳ Gravando...' : '💾 Salvar Alterações'}
-                    </Button>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px', border: '2px dashed #c4cbd4', borderRadius: '6px', color: '#637381' }}>
-                Seleciona uma categoria ao lado para ver as propriedades técnicos.
-              </div>
-            )}
-          </main>
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', gap: '12px' }}>
+        <Spin size="large" />
+        <span>Carregando taxonomia técnica...</span>
       </div>
     );
-  };
+  }
+
+  const columns = [
+    {
+      title: 'Atributo & Governança (DNA)',
+      dataIndex: 'nome',
+      key: 'nome',
+      width: '25%',
+      render: (_: any, attr: any) => {
+        const ehLinhaFalsaLocal = String(attr.id).startsWith('h-');
+        const atributosDisponiveisCombo = state.atributosGlobais.filter(g =>
+          !(state.categoriaSelecionada?.atributosHeranca || []).some(a => String(a.id) === String(g.id))
+        );
+
+        if (attr.deCima) {
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontWeight: 600, color: '#475569' }}>{attr.nome}</span>
+              <span style={{ fontSize: '10px', color: '#94a3b8' }}>🧬 HERDADO</span>
+            </div>
+          );
+        }
+
+        if (ehLinhaFalsaLocal) {
+          return (
+            <Select
+              style={{ width: '100%' }}
+              placeholder="-- Escolha um Atributo Global --"
+              value=""
+              onChange={val => state.handleMudarAtributoSelecionado(attr.id, val)}
+            >
+              {atributosDisponiveisCombo.map(g => {
+                const grupoObj = state.gruposDisponiveis.find(gr => gr.id === g.grupo_id);
+                return (
+                  <Select.Option key={g.id} value={g.id}>
+                    {g.nome} {grupoObj ? `(${grupoObj.nome})` : ''}
+                  </Select.Option>
+                );
+              })}
+            </Select>
+          );
+        }
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontWeight: 600 }}>{attr.nome}</span>
+            <span style={{ fontSize: '10px', color: '#637381' }}>🧬 TÉCNICO</span>
+          </div>
+        );
+      }
+    },
+    {
+      title: 'Tipo de Dado',
+      dataIndex: 'tipoDado',
+      key: 'tipoDado',
+      width: '12%',
+      render: (tipoDado: string) => (
+        <Select value={tipoDado} disabled style={{ width: '100%' }}>
+          <Select.Option value="texto">Texto Livre</Select.Option>
+          <Select.Option value="numero">Numérico</Select.Option>
+          <Select.Option value="decimal">Decimal</Select.Option>
+          <Select.Option value="boolean">Booleano</Select.Option>
+          <Select.Option value="lista">Lista (Dropdown)</Select.Option>
+        </Select>
+      )
+    },
+    {
+      title: 'Escopo Comercial',
+      dataIndex: 'escopoComercial',
+      key: 'escopoComercial',
+      width: '15%',
+      render: (escopo: string, attr: any) => {
+        // Bloqueia edição se for herdado, a não ser que tenha ativado "Sobrescrever"
+        const desabilitado = attr.deCima && !attr.sobrescreve;
+        return (
+          <Select
+            value={escopo || 'ficha'}
+            disabled={desabilitado}
+            style={{ width: '100%' }}
+            onChange={val => state.handleAtualizarAtributoHerdado(attr.id, 'escopoComercial', val)}
+          >
+            <Select.Option value="ficha">📄 Ficha Técnica Only</Select.Option>
+            <Select.Option value="grade">⚡ Seletor de Grade</Select.Option>
+            <Select.Option value="dna">🧬 Característica DNA</Select.Option>
+          </Select>
+        );
+      }
+    },
+    {
+      title: 'Obrigatório',
+      dataIndex: 'obrigatorio',
+      key: 'obrigatorio',
+      width: '10%',
+      render: (obrig: boolean, attr: any) => {
+        const desabilitado = attr.deCima && !attr.sobrescreve;
+        return (
+          <Select
+            value={obrig ? 'sim' : 'nao'}
+            disabled={desabilitado}
+            style={{ width: '100%' }}
+            onChange={val => state.handleAtualizarAtributoHerdado(attr.id, 'obrigatorio', val === 'sim')}
+          >
+            <Select.Option value="sim">🔴 Sim</Select.Option>
+            <Select.Option value="nao">⚪ Não</Select.Option>
+          </Select>
+        );
+      }
+    },
+    {
+      title: 'Ajuste Fino / Herança',
+      key: 'governanca',
+      width: '26%',
+      render: (_: any, attr: any) => {
+        const ehLinhaFalsaLocal = String(attr.id).startsWith('h-');
+
+        if (attr.deCima) {
+          return (
+            <Space direction="vertical" size={1}>
+              <Tag color="default">↳ {attr.origem}</Tag>
+              <Space wrap size={4}>
+                <Checkbox 
+                  checked={!!attr.bloqueado} 
+                  onChange={e => state.handleMudarControleHeranca(attr.id, 'bloqueado', e.target.checked)}
+                >
+                  <span style={{ color: '#ef4444', fontSize: '10px' }}>Bloquear</span>
+                </Checkbox>
+                <Checkbox 
+                  checked={attr.retransmitir !== false} 
+                  onChange={e => state.handleMudarControleHeranca(attr.id, 'retransmitir', e.target.checked)}
+                >
+                  <span style={{ color: '#2563eb', fontSize: '10px' }}>Propagar</span>
+                </Checkbox>
+                <Checkbox 
+                  checked={!!attr.sobrescreve} 
+                  onChange={e => state.handleMudarControleHeranca(attr.id, 'sobrescreve', e.target.checked)}
+                >
+                  <Tooltip title="Permite alterar Escopo e Obrigatoriedade nesta categoria filha sem herdar as regras do pai">
+                    <span style={{ color: '#db2777', fontSize: '10px', cursor: 'pointer' }}>Sobrescrever <InfoCircleOutlined size={8} /></span>
+                  </Tooltip>
+                </Checkbox>
+              </Space>
+            </Space>
+          );
+        }
+
+        if (ehLinhaFalsaLocal) {
+          return <Tag color="warning">⏳ Aguardando...</Tag>;
+        }
+
+        return (
+          <Space direction="vertical" size={2}>
+            <Tag color="success">📍 Nativo</Tag>
+            <Checkbox 
+              checked={attr.herdar !== false} 
+              onChange={e => state.handleAtualizarAtributoHerdado(attr.id, 'herdar', e.target.checked)}
+            >
+              <span style={{ color: '#475569', fontSize: '10px' }}>Propagar para filhos</span>
+            </Checkbox>
+          </Space>
+        );
+      }
+    },
+    {
+      title: 'Unid.',
+      dataIndex: 'sufixo',
+      key: 'sufixo',
+      width: '8%',
+      render: (sufixo: string) => (
+        <span style={{ fontSize: '12px', color: '#0050b3', fontFamily: 'monospace', fontWeight: 600 }}>
+          {sufixo ? `${sufixo}` : '-'}
+        </span>
+      )
+    },
+    {
+      title: '',
+      key: 'acoes',
+      width: '4%',
+      render: (_: any, attr: any) => !attr.deCima && (
+        <Button
+          type="text"
+          danger
+          icon={<CloseOutlined />}
+          onClick={() => state.handleRemoverAtributoLocal(attr.id)}
+        />
+      )
+    }
+  ];
+
+   const getGrupoColorStyle = (grupoId: string | number) => {
+  if (!grupoId) return { bg: '#f1f5f9', border: '#cbd5e1', text: '#64748b', name: 'Avulso' };
+  
+  // Lista de cores elegantes e suaves (Pastel) para diferenciar os grupos
+  const cores = [
+    { bg: '#eff6ff', border: '#bfdbfe', text: '#1d4ed8' }, // Azul
+    { bg: '#f0fdf4', border: '#bbf7d0', text: '#15803d' }, // Verde
+    { bg: '#fdf2f8', border: '#fbcfe8', text: '#be185d' }, // Rosa
+    { bg: '#faf5ff', border: '#e9d5ff', text: '#7e22ce' }, // Roxo
+    { bg: '#fffbeb', border: '#fef3c7', text: '#b45309' }, // Âmbar
+    { bg: '#f0fdfa', border: '#99f6e4', text: '#0f766e' }, // Teal
+  ];
+
+  const index = Math.abs(String(grupoId).split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % cores.length;
+  return { ...cores[index], name: 'Grupo' };
+};
+
+  return (
+    <Layout style={{ minHeight: '100vh', background: '#f4f6f8' }}>
+      
+      {/* LATERAL ESQUERDA: ÁRVORE TAXONOMIA */}
+      <Sider width={340} theme="light" style={{ padding: '16px', borderRight: '1px solid #e1e4e8' }}>
+        <Space direction="vertical" style={{ width: '100%' }} size={12}>
+          <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>🌿 Matriz de Taxonomia</h3>
+          <Button
+            type="primary"
+            block
+            icon={<PlusOutlined />}
+            onClick={state.handleAdicionarCategoriaNova}
+            style={{ backgroundColor: '#0050b3' }}
+          >
+            Nova Categoria
+          </Button>
+          <div style={{ border: '1px solid #e1e4e8', borderRadius: '4px', padding: '8px', maxHeight: 'calc(100vh - 120px)', overflowY: 'auto' }}>
+            <Tree
+              treeData={treeData}
+              selectedKeys={state.categoriaSelecionadaId ? [state.categoriaSelecionadaId] : []}
+              onSelect={(keys) => keys.length > 0 && state.setCategoriaSelecionadaId(keys[0] as string)}
+              defaultExpandAll
+            />
+          </div>
+        </Space>
+      </Sider>
+
+      {/* ÁREA CENTRAL DE TRABALHO */}
+      <Content style={{ padding: '24px', maxWidth: '1400px', width: '100%' }}>
+        {state.categoriaSelecionada ? (
+          <Space direction="vertical" style={{ width: '100%' }} size={16}>
+
+            <Collapse
+              activeKey={abasAbertas}
+              onChange={(keys) => setAbasAbertas(keys as string[])}
+              expandIconPosition="end"
+            >
+              {/* ABA 1: ESTRUTURAL */}
+              <Collapse.Panel
+                header={
+                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '95%', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 600 }}><SettingOutlined /> CONFIGURAÇÃO ESTRUTURAL DA CATEGORIA</span>
+                    <div onClick={e => e.stopPropagation()}>
+                      <Checkbox
+                        checked={state.categoriaSelecionada.ativa}
+                        onChange={e => state.handleAtualizarCategoria('ativa', e.target.checked)}
+                      >
+                        {state.categoriaSelecionada.ativa ? '🟢 Ativa' : '🔴 Inativa'}
+                      </Checkbox>
+                    </div>
+                  </div>
+                }
+                key="estrutura"
+              >
+                <Row gutter={[16, 16]}>
+                  <Col span={8}>
+                    <label style={{ fontSize: '11px', fontWeight: 500 }}>Nome da Categoria</label>
+                    <Input value={state.categoriaSelecionada.nome} onChange={e => state.handleAtualizarCategoria('nome', e.target.value)} />
+                  </Col>
+                  <Col span={8}>
+                    <label style={{ fontSize: '11px', fontWeight: 500 }}>URL Amigável (Slug Catálogo)</label>
+                    <Input value={state.categoriaSelecionada.slug} onChange={e => state.handleAtualizarCategoria('slug', e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-'))} style={{ fontFamily: 'monospace' }} />
+                  </Col>
+                  <Col span={8}>
+                    <label style={{ fontSize: '11px', fontWeight: 500 }}>Nível / Categoria Pai</label>
+                    <Select
+                      style={{ width: '100%' }}
+                      value={state.categoriaSelecionada.parentId || ''}
+                      onChange={val => state.handleAtualizarCategoria('parentId', val || null)}
+                    >
+                      <Select.Option value="">Root / Raiz 🌍</Select.Option>
+                      {state.categorias.filter(c => c.id !== state.categoriaSelecionada?.id).map(opc => (
+                        <Select.Option key={opc.id} value={opc.id}>🔹 {opc.nome}</Select.Option>
+                      ))}
+                    </Select>
+                  </Col>
+                  <Col span={24}>
+                    <label style={{ fontSize: '11px', fontWeight: 500 }}>Descrição de Escopo Técnico</label>
+                    <Input value={state.categoriaSelecionada.descricao || ''} onChange={e => state.handleAtualizarCategoria('descricao', e.target.value)} />
+                  </Col>
+                </Row>
+              </Collapse.Panel>
+
+              {/* ABA 2: MAPEAMENTO DE INTEGRAÇÕES */}
+              <Collapse.Panel
+                header={<span style={{ fontWeight: 600, color: '#4f46e5' }}><PartitionOutlined /> MAPEAMENTO DE ECOSSISTEMA (DE/PARA DE IDS)</span>}
+                key="mapeamento"
+              >
+                <Row gutter={[16, 16]}>
+                  <Col span={8}>
+                    <Card size="small" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                      <label style={{ fontSize: '11px', fontWeight: 700, color: '#334155' }}>📦 CÓDIGO ERP CENTRAL</label>
+                      <Input placeholder="Ex: CAT-9921" value={state.categoriaSelecionada.integracoes?.erpId || ''} onChange={e => state.handleAtualizarSubCampo('integracoes', 'erpId', e.target.value)} style={{ fontFamily: 'monospace', marginTop: 4 }} />
+                    </Card>
+                  </Col>
+                  <Col span={8}>
+                    <Card size="small" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                      <label style={{ fontSize: '11px', fontWeight: 700, color: '#166534' }}>🛒 ID CATEGORIA VTEX</label>
+                      <Input placeholder="Ex: 402" value={state.categoriaSelecionada.integracoes?.vtexId || ''} onChange={e => state.handleAtualizarSubCampo('integracoes', 'vtexId', e.target.value)} style={{ fontFamily: 'monospace', marginTop: 4 }} />
+                    </Card>
+                  </Col>
+                  <Col span={8}>
+                    <Card size="small" style={{ background: '#fffbeb', border: '1px solid #fef3c7' }}>
+                      <label style={{ fontSize: '11px', fontWeight: 700, color: '#92400e' }}>💛 ID MERCADO LIVRE</label>
+                      <Input placeholder="Ex: MLB1054" value={state.categoriaSelecionada.integracoes?.mercadolivreId || ''} onChange={e => state.handleAtualizarSubCampo('integracoes', 'mercadolivreId', e.target.value)} style={{ fontFamily: 'monospace', marginTop: 4 }} />
+                    </Card>
+                  </Col>
+                </Row>
+              </Collapse.Panel>
+
+              {/* ABA 3: INTELIGÊNCIA COMERCIAL */}
+              <Collapse.Panel
+                header={<span style={{ fontWeight: 600 }}><DashboardOutlined /> INTELIGÊNCIA COMERCIAL & LAYOUT</span>}
+                key="comercial"
+              >
+                <Row gutter={[16, 16]}>
+                  <Col span={6}>
+                    <label style={{ fontSize: '11px', fontWeight: 500 }}>Margem Sugerida Base (%)</label>
+                    <Input type="number" value={state.categoriaSelecionada.percentualMargemSugerida || 0} onChange={e => state.handleAtualizarCategoria('percentualMargemSugerida', Number(e.target.value))} />
+                  </Col>
+                  <Col span={9}>
+                    <label style={{ fontSize: '11px', fontWeight: 500 }}>Modo de Exibição Padrão</label>
+                    <Select style={{ width: '100%' }} value={state.categoriaSelecionada.modoExibicao} onChange={val => state.handleAtualizarCategoria('modoExibicao', val)}>
+                      <Select.Option value="grade">Grade de Produtos (Filtros Laterais)</Select.Option>
+                      <Select.Option value="lista">Lista Técnico (Comparativo)</Select.Option>
+                      <Select.Option value="carrossel">Carrossel Compacto (Vitrine)</Select.Option>
+                    </Select>
+                  </Col>
+                  <Col span={9}>
+                    <label style={{ fontSize: '11px', fontWeight: 500 }}>Tags Indexadoras SEO</label>
+                    <Input placeholder="ex: motor, eletrico" value={state.categoriaSelecionada.seo?.tags || ''} onChange={e => state.handleAtualizarSubCampo('seo', 'tags', e.target.value)} />
+                  </Col>
+                </Row>
+              </Collapse.Panel>
+
+              {/* ABA 4: MATRIZ DE ATRIBUTOS COM OPERAÇÃO EM LOTE + INLINE */}
+            {/* ABA 4: MATRIZ DE ATRIBUTOS COM OPERAÇÃO EM LOTE + INLINE */}
+<Collapse.Panel
+  header={
+    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+      {/* Título Principal */}
+      <span style={{ fontWeight: 600, fontSize: '14px', display: 'flex', alignItems: 'center', gap: 6, color: '#1e293b' }}>
+        <DeploymentUnitOutlined style={{ color: '#0f766e' }} /> 🧬 MATRIZ TÉCNICA CONSOLIDADA (ATRIBUTOS)
+      </span>
+
+      {/* Ações Rápidas do Cabeçalho */}
+      <div onClick={e => e.stopPropagation()}>
+        <Space size="small" wrap>
+          {/* Seletor de Grupo em Lote */}
+          <Space style={{ background: '#f8fafc', padding: '3px 10px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+            <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b' }}>📦 Incluir Grupo:</span>
+            <Select
+              size="small"
+              style={{ width: 180 }}
+              placeholder="Escolha o Grupo..."
+              showSearch
+              optionFilterProp="children"
+              value={state.grupoSelecionadoLote || undefined}
+              onChange={(grupoId) => state.handleAssociarGrupoEmLote(grupoId)}
+              allowClear
+            >
+              {state.gruposDisponiveis?.map((g) => (
+                <Select.Option key={g.id} value={g.id}>
+                  {g.nome}
+                </Select.Option>
+              ))}
+            </Select>
+          </Space>
+
+          {/* Botão Criar Inline */}
+          <Button
+            size="small"
+            type={state.mostrarCriarRapido ? 'primary' : 'dashed'}
+            danger={!state.mostrarCriarRapido}
+            icon={<ThunderboltOutlined />}
+            onClick={() => state.setMostrarCriarRapido(!state.mostrarCriarRapido)}
+            style={{ borderRadius: '6px' }}
+          >
+            {state.mostrarCriarRapido ? 'Fechar Cadastro' : 'Criar Inline'}
+          </Button>
+
+          {/* Botão Seleção Individual */}
+          <Button
+            size="small"
+            type="primary"
+            ghost
+            icon={<PlusOutlined />}
+            onClick={state.handleAdicionarAtributo}
+            style={{ borderRadius: '6px' }}
+          >
+            Seleção Individual
+          </Button>
+        </Space>
+      </div>
+    </div>
+  }
+  key="atributos"
+>
+  {/* FORMULÁRIO EXPRESS: CRIAÇÃO INLINE COM SELEÇÃO DE GRUPO DO BANCO */}
+  {state.mostrarCriarRapido && (
+    <Card
+      size="small"
+      title={
+        <span style={{ fontSize: '12px', fontWeight: 600, color: '#db2777' }}>
+          ✨ Cadastro Rápido de Atributo Global Core
+        </span>
+      }
+      style={{ marginBottom: 16, background: '#fff1f2', borderColor: '#fecdd3', borderRadius: '8px' }}
+    >
+      <Row gutter={[12, 12]} align="bottom">
+        <Col xs={24} sm={12} md={6}>
+          <label style={{ fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: 4, color: '#475569' }}>
+            Nome Global
+          </label>
+          <Input
+            size="small"
+            placeholder="Ex: Espessura de Bobina"
+            value={state.novoAttrRapido.nome}
+            onChange={e => state.setNovoAttrRapido(p => ({ ...p, nome: e.target.value }))}
+            style={{ borderRadius: '4px' }}
+          />
+        </Col>
+
+        <Col xs={12} sm={6} md={4}>
+          <label style={{ fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: 4, color: '#475569' }}>
+            Tipo
+          </label>
+          <Select
+            size="small"
+            style={{ width: '100%' }}
+            value={state.novoAttrRapido.tipo}
+            onChange={val => state.setNovoAttrRapido(p => ({ ...p, tipo: val }))}
+          >
+            <Select.Option value="texto">Texto</Select.Option>
+            <Select.Option value="numero">Número</Select.Option>
+            <Select.Option value="decimal">Decimal</Select.Option>
+            <Select.Option value="boolean">Booleano</Select.Option>
+            <Select.Option value="lista">Lista</Select.Option>
+          </Select>
+        </Col>
+
+        <Col xs={12} sm={6} md={5}>
+          <label style={{ fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: 4, color: '#475569' }}>
+            Grupo Comercial
+          </label>
+          <Select
+            size="small"
+            style={{ width: '100%' }}
+            placeholder="Defina o Grupo"
+            value={state.novoAttrRapido.grupo_id}
+            onChange={val => state.setNovoAttrRapido(p => ({ ...p, grupo_id: val }))}
+          >
+            {state.gruposDisponiveis.map(g => (
+              <Select.Option key={g.id} value={g.id}>{g.nome}</Select.Option>
+            ))}
+          </Select>
+        </Col>
+
+        <Col xs={24} sm={12} md={5}>
+          <label style={{ fontSize: '11px', fontWeight: 600, display: 'block', marginBottom: 4, color: '#475569' }}>
+            Unidade de Medida
+          </label>
+          <Select
+            size="small"
+            style={{ width: '100%' }}
+            placeholder="Símbolo (BAR, mm...)"
+            value={state.novoAttrRapido.unidade_id}
+            onChange={val => state.setNovoAttrRapido(p => ({ ...p, unidade_id: val }))}
+            allowClear
+          >
+            {state.unidadesMedida.map(u => (
+              <Select.Option key={u.id} value={u.id}>{u.nome} ({u.simbolo})</Select.Option>
+            ))}
+          </Select>
+        </Col>
+
+        <Col xs={24} sm={12} md={4}>
+          <Button
+            size="small"
+            type="primary"
+            block
+            style={{ background: '#db2777', borderColor: '#db2777', fontWeight: 500, borderRadius: '4px' }}
+            onClick={state.handleCriarEAssociarAtributoRapido}
+          >
+            🚀 Injetar Vínculo
+          </Button>
+        </Col>
+      </Row>
+    </Card>
+  )}
+
+  <Table
+    dataSource={todosAtributosCalculados}
+    columns={[
+      // 🎨 COLUNA DE IDENTIFICAÇÃO VISUAL DO GRUPO (Adicionada)
+      {
+        title: 'Origem / Grupo',
+        dataIndex: 'grupo_id',
+        key: 'grupo_id',
+        width: 180,
+        render: (grupoId, record) => {
+          const colorMeta = getGrupoColorStyle(grupoId);
+          // Procura o nome amigável do grupo na lista disponível
+          const nomeGrupo = state.gruposDisponiveis?.find(g => g.id === grupoId)?.nome || 'Atributo Avulso';
+          
+          return (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '2px 8px',
+                borderRadius: '4px',
+                fontSize: '11px',
+                fontWeight: 600,
+                backgroundColor: colorMeta.bg,
+                border: `1px solid ${colorMeta.border}`,
+                color: colorMeta.text,
+                maxWidth: '100%',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}
+              title={nomeGrupo}
+            >
+              <span style={{ 
+                width: 6, 
+                height: 6, 
+                borderRadius: '50%', 
+                backgroundColor: colorMeta.text,
+                display: 'inline-block' 
+              }} />
+              {nomeGrupo}
+            </span>
+          );
+        }
+      },
+      // Insira as outras colunas existentes (columns) abaixo dela:
+      ...columns
+    ]}
+    rowKey="id"
+    pagination={false}
+    size="small"
+    bordered
+    // 🎨 Estilização da linha para aplicar borda colorida no mesmo grupo
+    rowClassName={(record) => {
+      const colorMeta = getGrupoColorStyle(record.grupo_id);
+      return record.grupo_id ? 'linha-com-grupo' : '';
+    }}
+    onRow={(record) => {
+      const colorMeta = getGrupoColorStyle(record.grupo_id);
+      return {
+        style: record.grupo_id ? {
+          borderLeft: `4px solid ${colorMeta.text}`, // Destaque visual na borda esquerda da linha
+        } : {}
+      };
+    }}
+  />
+</Collapse.Panel>
+            </Collapse>
+
+            {/* RODAPÉ DO CONTROLADOR */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+              <div>
+                {!state.categoriaSelecionada.id.startsWith('temp-') && (
+                  <Button
+                    type="primary"
+                    danger
+                    icon={<DeleteOutlined />}
+                    disabled={state.saving}
+                    onClick={() => state.handleDeletarNoServidor(state.categoriaSelecionada!.id)}
+                  >
+                    Excluir Categoria
+                  </Button>
+                )}
+              </div>
+              <Button
+                type="primary"
+                size="large"
+                icon={<SaveOutlined />}
+                style={{ background: '#16a34a' }}
+                loading={state.saving}
+                onClick={state.handleSalvarNoServidor}
+              >
+                Salvar Alterações
+              </Button>
+            </div>
+          </Space>
+        ) : (
+          <div style={{ padding: '60px', textAlign: 'center', border: '2px dashed #cbd5e1', borderRadius: '6px', background: '#fff' }}>
+            Selecione uma categoria ao lado para ver e configurar as propriedades técnicas.
+          </div>
+        )}
+      </Content>
+    </Layout>
+  );
+};

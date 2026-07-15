@@ -1,4 +1,11 @@
-import { Grupo, AtributoConfig } from './CatalogManager.types';
+import { 
+  Grupo, 
+  AtributoConfig, 
+  CategoriaAPIResponse, 
+  CreateGroupPayload, 
+  UpdateGroupPayload, 
+  GenericGroupAPIResponse 
+} from './CatalogManager.types';
 
 // Centralizado para facilitar manutenção
 const API_BASE_URL = 'http://localhost:3001/api/catalogo';
@@ -21,7 +28,7 @@ export const getCategorias = async (tenantId: number = 1): Promise<CategoriaAPIR
 
   const dados = await handleResponse<any[]>(response, 'Erro ao carregar as categorias.');
 
-  return dados.map((cat: any) => ({
+  return dados.map((cat: any): CategoriaAPIResponse => ({
     id: String(cat.id),
     nome: cat.nome || 'Categoria Sem Nome',
     paiId: cat.categoria_pai_id ? String(cat.categoria_pai_id) : null
@@ -29,7 +36,6 @@ export const getCategorias = async (tenantId: number = 1): Promise<CategoriaAPIR
 };
 
 export const getGroups = async (tenantId: number = 1): Promise<Grupo[]> => {
-  // Bate na rota mapeada para o backend de famílias
   const response = await fetch(`${API_BASE_URL}/cadastros/grupos?tenant_id=${tenantId}`, {
     method: 'GET',
     headers: DEFAULT_HEADERS,
@@ -40,51 +46,53 @@ export const getGroups = async (tenantId: number = 1): Promise<Grupo[]> => {
   return familias.map((fam: any): Grupo => ({
     id: String(fam.id),
     nome: fam.nome || 'Família Sem Nome',
-    categoriaPai: fam.categoriaPai ? String(fam.categoriaPai) : '',
-    categoriaPaiNome: fam.categoriaPaiNome || '', 
+    // Mapeia `categoria_id` vindo do DB para a propriedade `categoriaPai` do Front
+    categoriaPai: fam.categoria_id ? String(fam.categoria_id) : '',
+    categoriaPaiNome: fam.categoria_pai_nome || fam.categoriaPaiNome || '', 
     descricao: fam.descricao || '',
-    status: fam.status === 'inativo' ? 'inativo' : 'ativo',
-    unidadeMedidaBase: fam.unidadeMedidaBase || 'PC',
-    separadorSku: fam.separadorSku || '-',
+    // Alinhado ao enum rígido em caixa alta do banco de dados
+    status: fam.status === 'INATIVO' ? 'INATIVO' : 'ATIVO',
+    unidadeMedidaBase: fam.unidade_base || fam.unidadeMedidaBase || 'PC',
+    separadorSku: fam.separador_sku || fam.separadorSku || '-',
     cor: fam.cor || '#0050b3',
     imagem: fam.imagem || '',
     
-    // Tratando propriedades antigas que não existem no banco para não quebrar o Front
-    tipoItem: 'MR', 
-    ncmPadrao: '',
-    cestPadrao: '',
-    siglaSku: '',
-    templateSku: '{SIGLA}{SEPARADOR}{VARIAÇÃO}',
-    templateNomeComercial: fam.templateNome || '{GRUPO}',
-    descricaoComercialPadrao: '',
-    observacoesPadrao: '',
+    // Tratando propriedades lógicas do Frontend para compatibilidade com a UI
+    tipoItem: fam.tipoItem || 'PA', 
+    ncmPadrao: fam.ncmPadrao || '',
+    cestPadrao: fam.cestPadrao || '',
+    siglaSku: fam.siglaSku || '',
+    templateSku: fam.templateSku || '{SIGLA}{SEPARADOR}{VARIAÇÃO}',
+    templateNomeComercial: fam.template_nome || fam.templateNomeComercial || '{GRUPO}',
+    descricaoComercialPadrao: fam.descricaoComercialPadrao || '',
+    observacoesPadrao: fam.observacoesPadrao || '',
     
+    // Varre e formata a lista de atributos vinculados (core_entidades / JSON)
     atributos: Array.isArray(fam.atributos) 
       ? fam.atributos.map((attr: any): AtributoConfig => ({
           id: String(attr.id),
           nome: attr.nome || '',
-          classificacao: attr.classificacao || 'ficha', // Alinhado com 'dna' | 'grade' | 'ficha' do banco
-          tipoDado: attr.tipoDado || 'texto',
+          codigo: attr.codigo || '',
+          classificacao: attr.classificacao || attr.escopo_comercial || 'ficha', 
+          tipoDado: attr.tipoDado || attr.tipo || 'texto',
           opcoesValidas: Array.isArray(attr.opcoesValidas) ? attr.opcoesValidas : [],
           separadorSufixo: attr.separadorSufixo || 'nenhum',
           sufixo: attr.sufixo || '',
           obrigatorio: Boolean(attr.obrigatorio),
           geraVariacao: Boolean(attr.geraVariacao),
           compoeSku: Boolean(attr.compoeSku),
-          ordemSku: Number(attr.ordemSku || 0),
-          exemplos: '',
-          valorHerdadoDoGrupo: Boolean(attr.valorHerdadoDoGrupo),
-          valorPadraoGrupo: '',
-          estaSendoUtilizado: false,
-          origem: 'customizado',
-          tipo: 'livre'
+          ordemSku: Number(attr.ordemSku || attr.ordem || 0),
+          exemplos: attr.exemplos || '',
+          valorHerdadoDoGrupo: Boolean(attr.valorHerdadoDoGrupo || attr.herdar),
+          valorPadraoGrupo: attr.valorPadraoGrupo || '',
+          estaSendoUtilizado: Boolean(attr.estaSendoUtilizado),
+          origem: attr.origem || 'customizado'
         }))
       : []
   }));
 };
 
 export const createGroup = async (data: CreateGroupPayload, tenantId: number = 1): Promise<GenericGroupAPIResponse> => {
-  // Ajustado: Passando o tenant_id na URL para bater com o req.query.tenant_id do back
   const response = await fetch(`${API_BASE_URL}/cadastros/grupos?tenant_id=${tenantId}`, {
     method: 'POST',
     headers: DEFAULT_HEADERS,
@@ -116,4 +124,31 @@ export const getAtributosDaCategoria = async (idCategoria: string, tenantId: num
     headers: DEFAULT_HEADERS,
   });
   return handleResponse<any[]>(response, 'Erro ao carregar os atributos da categoria.');
+};
+
+export const getAtributosGlobais = async (tenantId: number = 1): Promise<AtributoConfig[]> => {
+  const response = await fetch(`${API_BASE_URL}/cadastros/atributos?tenant_id=${tenantId}`, {
+    method: 'GET',
+    headers: DEFAULT_HEADERS,
+  });
+
+  const dados = await handleResponse<any[]>(response, 'Erro ao carregar o pool de atributos.');
+
+  return dados.map((attr: any): AtributoConfig => ({
+    id: String(attr.id),
+    nome: attr.nome || '',
+    codigo: attr.codigo || '',
+    classificacao: attr.classificacao || 'ficha',
+    tipoDado: attr.tipoDado || 'texto',
+    opcoesValidas: Array.isArray(attr.opcoesValidas) ? attr.opcoesValidas : [],
+    separadorSufixo: 'nenhum',
+    sufixo: attr.sufixo || '',
+    obrigatorio: Boolean(attr.obrigatorio),
+    geraVariacao: false,
+    compoeSku: false,
+    ordemSku: 0,
+    exemplos: '',
+    valorHerdadoDoGrupo: false,
+    origem: 'global'
+  }));
 };

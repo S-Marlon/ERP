@@ -1,12 +1,11 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { TreeSelect, Select, Input } from 'antd'; // 🌟 Centralizado componentes do Antd aqui
-import styles from './FamilyManager.module.css';
-import { Grupo, AtributoConfig, Categoria } from './CatalogManager.types';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { TreeSelect, Select, Input, Row, Col, Card, Typography, Space, Button, Alert, Tooltip, Table, Tag, Empty, Badge } from 'antd';
+import { EditOutlined, ArrowRightOutlined, PlusOutlined, SearchOutlined, ShoppingCartOutlined, ThunderboltOutlined, FolderOpenOutlined } from '@ant-design/icons';
+import type { ColumnsType } from 'antd/es/table';
+
+import { Grupo, AtributoConfig, Categoria, AtributoPendente, ModalDestino } from './CatalogManager.types';
 import { gerarPreviewSku, gerarPreviewNome } from './CatalogManager.helpers';
-import { SidebarFamilias } from './components/SidebarFamilias';
 import { PainelSimulador } from './components/PainelSimulador';
-import { TabelaAtributos } from './components/TabelaAtributos';
-import Button from '../../../../components/ui/Button/Button';
 import ImageDisplay from '../../../../components/ui/ImageGallery/ImageDysplay';
 
 // Importações dos métodos da API oficiais corrigidos
@@ -14,8 +13,16 @@ import { getGroups, createGroup, updateGroup, getCategorias, getAtributosDaCateg
 import { ModalVinculoAtributos } from './components/ModalVinculoAtributos';
 import Swal from 'sweetalert2';
 
+const { Title, Text } = Typography;
+
+type CategoriaTreeNode = {
+  value: string;
+  title: string;
+  children?: CategoriaTreeNode[];
+};
+
 // 🌳 Versão blindada contra tipos numéricos/strings do banco
-const construirArvoreAntd = (lista: any[], paiId: string | null = null) => {
+const construirArvoreAntd = (lista: Categoria[], paiId: string | null = null): CategoriaTreeNode[] => {
   return lista
     .filter(cat => {
       if (!cat.paiId && !paiId) return true;
@@ -28,6 +35,21 @@ const construirArvoreAntd = (lista: any[], paiId: string | null = null) => {
     }));
 };
 
+type AtributoHerdado = Partial<AtributoConfig> & {
+  obrigatorio?: boolean;
+  compoeSku?: boolean;
+  separadorSufixo?: string;
+  sufixo?: string;
+  exemplos?: string;
+};
+
+interface ItemAssociado {
+  id: string;
+  sku: string;
+  nome: string;
+  ativo: boolean;
+}
+
 const useCatalogState = () => {
   const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -38,16 +60,29 @@ const useCatalogState = () => {
   const [grupoImage, setGrupoImage] = useState<string>('');
   const [abaAtiva, setAbaAtiva] = useState<'variantes' | 'informativos'>('variantes');
   const [isSimuladorAberto, setIsSimuladorAberto] = useState(false);
-  const [atributoPendenteEdicao, setAtributoPendenteEdicao] = useState<any | null>(null);
-  const [atributosGlobaisDisponiveis, setAtributosGlobaisDisponiveis] = useState<any[]>([]);
+  const [atributoPendenteEdicao, setAtributoPendenteEdicao] = useState<AtributoPendente | null>(null);
+  const [atributosGlobaisDisponiveis] = useState<AtributoConfig[]>([]);
+
+  // Estados de pesquisa para as colunas laterais
+  const [pesquisaFamilia, setPesquisaFamilia] = useState('');
+  const [pesquisaItem, setPesquisaItem] = useState('');
+
+  // Mock ou estado de itens vinculados para a terceira coluna
+  const [itensMockados, setItensMockados] = useState<Record<string, ItemAssociado[]>>({
+    "1": [
+      { id: '101', sku: 'PAR-SEX-M8-45', nome: 'Parafuso Sextavado M8 x 45mm', ativo: true },
+      { id: '102', sku: 'PAR-SEX-M8-50', nome: 'Parafuso Sextavado M8 x 50mm', ativo: true },
+      { id: '103', sku: 'PAR-SEX-M10-60', nome: 'Parafuso Sextavado M10 x 60mm', ativo: false },
+    ]
+  });
 
   const grupoSelecionado = useMemo(() => {
     return grupos.find(g => g.id === grupoSelecionadoId) || null;
   }, [grupos, grupoSelecionadoId]);
 
-  const brandColor = grupoSelecionado?.cor || '#0050b3';
+  const brandColor = grupoSelecionado?.cor || '#1677ff';
 
-  const handleAtualizarGrupoDireto = (campo: keyof Grupo, valor: any) => {
+  const handleAtualizarGrupoDireto = <K extends keyof Grupo>(campo: K, valor: Grupo[K]) => {
     setGrupos(prev => prev.map(g => g.id === grupoSelecionadoId ? { ...g, [campo]: valor } : g));
   };
 
@@ -64,7 +99,7 @@ const useCatalogState = () => {
       text: `Deseja alterar o comportamento do atributo "${atributoAtual.nome}"? Isso reconfigurará as regras de geração de SKU.`,
       icon: 'info',
       showCancelButton: true,
-      confirmButtonColor: grupoSelecionado.cor || '#0050b3',
+      confirmButtonColor: brandColor,
       cancelButtonColor: '#637381',
       confirmButtonText: 'Sim, mover!',
       cancelButtonText: 'Cancelar'
@@ -116,7 +151,7 @@ const useCatalogState = () => {
     }
   };
 
-  const handleAtualizarAtributoDireto = async (atributoId: string, campo: keyof AtributoConfig, valor: any) => {
+  const handleAtualizarAtributoDireto = async <K extends keyof AtributoConfig>(atributoId: string, campo: K, valor: AtributoConfig[K]) => {
     if (!grupoSelecionado) return;
 
     const atributoAtual = grupoSelecionado.atributos.find(attr => String(attr.id) === String(atributoId));
@@ -188,14 +223,14 @@ const useCatalogState = () => {
   };
 
   const [isModalAberto, setIsModalAberto] = useState(false);
-  const [tabelaAlvoModal, setTabelaAlvoModal] = useState<'dna' | 'grade' | 'ficha' | null>(null);
+  const [tabelaAlvoModal, setTabelaAlvoModal] = useState<ModalDestino | null>(null);
 
-  const handleAbrirModal = (tipo: 'dna' | 'grade' | 'ficha') => {
+  const handleAbrirModal = (tipo: ModalDestino) => {
     setTabelaAlvoModal(tipo);
     setIsModalAberto(true);
   };
 
-  const carregarDados = async () => {
+  const carregarDados = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -210,17 +245,18 @@ const useCatalogState = () => {
       if (dadosDoServidor.length > 0 && !grupoSelecionadoId) {
         setGrupoSelecionadoId(dadosDoServidor[0].id);
       }
-    } catch (err: any) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
       console.error("Erro ao buscar dados iniciais:", err);
-      setError(err.message || 'Falha na conexão com o servidor de estoque.');
+      setError(message || 'Falha na conexão com o servidor de estoque.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [grupoSelecionadoId]);
 
   useEffect(() => {
     carregarDados();
-  }, []);
+  }, [carregarDados]);
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setGrupoImage(event.target.value);
@@ -278,30 +314,32 @@ const useCatalogState = () => {
     if (resultadoAlterar.isConfirmed) {
       try {
         setLoading(true);
-        const atributosHerdados = await getAtributosDaCategoria(novaCategoriaId, 1);
+        const atributosHerdados = await getAtributosDaCategoria(novaCategoriaId, 1) as AtributoHerdado[];
 
         const novosAtributosObrigatorios: AtributoConfig[] = atributosHerdados
-          .filter((attr: any) => Boolean(attr.obrigatorio))
-          .map((attr: any) => ({
-            id: String(attr.id),
-            nome: attr.nome,
-            tipoDado: attr.tipoDado || 'texto',
-            classificacao: attr.compoeSku ? 'dna' : 'ficha',
-            separadorSufixo: attr.separadorSufixo || 'nenhum',
-            sufixo: attr.sufixo || '',
-            obrigatorio: true,
-            geraVariacao: Boolean(attr.geraVariacao),
-            compoeSku: Boolean(attr.compoeSku),
-            ordemSku: 0,
-            exemplos: attr.exemplos || '',
-            valorHerdadoDoGrupo: false
-          }));
+          .filter(attr => Boolean(attr.obrigatorio))
+          .map(attr => {
+            const item = attr;
+            return {
+              id: String(item.id || ''),
+              nome: item.nome || 'Atributo',
+              tipoDado: item.tipoDado || 'texto',
+              classificacao: item.compoeSku ? 'dna' : 'ficha',
+              separadorSufixo: item.separadorSufixo || 'nenhum',
+              sufixo: item.sufixo || '',
+              obrigatorio: true,
+              geraVariacao: Boolean(item.geraVariacao),
+              compoeSku: Boolean(item.compoeSku),
+              ordemSku: 0,
+              exemplos: item.exemplos || '',
+              valorHerdadoDoGrupo: false
+            };
+          });
 
         setGrupos(prev => prev.map(g => {
-          if (g.id !== grupoSelecionadoId) return g;
-          const atributosAtuaisFiltrados = g.atributos.filter(
-            bancoAttr => !novosAtributosObrigatorios.some(novo => String(novo.id) === String(bancoAttr.id))
-          );
+          if (String(g.id) !== String(grupoSelecionadoId)) return g;
+
+          const atributosAtuaisFiltrados = g.atributos.filter(attr => !attr.valorHerdadoDoGrupo);
 
           return {
             ...g,
@@ -319,9 +357,10 @@ const useCatalogState = () => {
           showConfirmButton: false
         });
 
-      } catch (err: any) {
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
         console.error("Erro ao herdar atributos da categoria:", err);
-        Swal.fire('Erro', 'Não foi possível buscar os atributos desta categoria.', 'error');
+        Swal.fire('Erro', message || 'Não foi possível buscar os atributos desta categoria.', 'error');
       } finally {
         setLoading(false);
       }
@@ -359,7 +398,7 @@ const useCatalogState = () => {
 
     const oAtributoJaExiste = grupoSelecionado.atributos.some(a => a.nome.toLowerCase() === novoAttr.nome?.toLowerCase());
     if (oAtributoJaExiste) {
-      alert("Este atributo já está associado a este grupo.");
+      Swal.fire('Aviso', 'Este atributo já está associado a este grupo.', 'warning');
       return;
     }
 
@@ -402,7 +441,7 @@ const useCatalogState = () => {
         unidadeMedidaBase: 'PC',
         templateNome: '{GRUPO}',
         separadorSku: '-',
-        cor: '#0050b3',
+        cor: '#1677ff',
         imagem: '',
         atributos: []
       };
@@ -412,8 +451,9 @@ const useCatalogState = () => {
         await carregarDados();
         setGrupoSelecionadoId(res.id);
       }
-    } catch (err: any) {
-      alert(`Erro ao criar grupo: ${err.message}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      Swal.fire('Erro', `Erro ao criar grupo: ${message}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -427,7 +467,7 @@ const useCatalogState = () => {
       const dadosParaSalvar = { ...grupoSelecionado, imagem: grupoImage };
 
       await updateGroup(grupoSelecionado.id, dadosParaSalvar, 1);
-      alert(`Estrutura relacional do grupo "${grupoSelecionado.nome}" salva com sucesso!`);
+      Swal.fire('Sucesso', `Estrutura relacional do grupo "${grupoSelecionado.nome}" salva com sucesso!`, 'success');
 
       await carregarDados();
 
@@ -437,13 +477,34 @@ const useCatalogState = () => {
           : g
       ));
 
-    } catch (err: any) {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
       console.error("Erro ao salvar grupo:", err);
-      alert(`Erro ao salvar alterações: ${err.message}`);
+      Swal.fire('Erro', `Erro ao salvar alterações: ${message}`, 'error');
     } finally {
       setLoading(false);
     }
   };
+
+  // Filtragem das Famílias Ativas na Sidebar esquerda
+  const familiasFiltradas = useMemo(() => {
+    if (!pesquisaFamilia) return grupos;
+    return grupos.filter(g => 
+      g.nome.toLowerCase().includes(pesquisaFamilia.toLowerCase()) ||
+      (g.categoriaPaiNome && g.categoriaPaiNome.toLowerCase().includes(pesquisaFamilia.toLowerCase()))
+    );
+  }, [grupos, pesquisaFamilia]);
+
+  // Listar itens associados dinamicamente baseado na família
+  const itensDoGrupoAtivo = useMemo(() => {
+    if (!grupoSelecionado) return [];
+    const lista = itensMockados[grupoSelecionado.id] || [];
+    if (!pesquisaItem) return lista;
+    return lista.filter(item => 
+      item.sku.toLowerCase().includes(pesquisaItem.toLowerCase()) || 
+      item.nome.toLowerCase().includes(pesquisaItem.toLowerCase())
+    );
+  }, [itensMockados, grupoSelecionado, pesquisaItem]);
 
   return {
     grupos, categorias, grupoSelecionado, valoresTeste, setValoresTeste, isModalAberto, abaAtiva,
@@ -452,19 +513,21 @@ const useCatalogState = () => {
     handleSelecionarGrupo, handleAtualizarGrupoDireto, handleAtualizarAtributoDireto,
     handleAdicionarAtributoAoGrupo, handleInputChange, handleCriarGrupo, handleSalvarGrupoNoBanco,
     handleAbrirModal, tabelaAlvoModal, atributoPendenteEdicao, handleMudarCategoriaComConfirmacao, brandColor,
-    handleMoverAtributoDeEscopo
+    handleMoverAtributoDeEscopo, itensDoGrupoAtivo, pesquisaItem, setPesquisaItem, familiasFiltradas,
+    pesquisaFamilia, setPesquisaFamilia
   };
 };
 
 export const FamilyManager: React.FC = () => {
   const {
-    grupoSelecionado, grupos, categorias, valoresTeste, previewSkuSimulado,
+    grupoSelecionado, categorias, valoresTeste, previewSkuSimulado,
     previewNomeSimulado, grupoImage, loading, error, isModalAberto, atributosGlobaisDisponiveis,
-    setIsModalAberto, handleSelecionarGrupo, handleAtualizarGrupoDireto,
-    handleAtualizarAtributoDireto, atributoPendenteEdicao, handleAdicionarAtributoAoGrupo,
+    setValoresTeste, setIsModalAberto, handleSelecionarGrupo, handleAtualizarGrupoDireto,
+    handleAtualizarAtributoDireto, handleAdicionarAtributoAoGrupo,
     handleInputChange, handleCriarGrupo, handleSalvarGrupoNoBanco, handleAbrirModal,
     tabelaAlvoModal, handleMudarCategoriaComConfirmacao, brandColor,
-    handleMoverAtributoDeEscopo
+    handleMoverAtributoDeEscopo, itensDoGrupoAtivo, pesquisaItem, setPesquisaItem,
+    familiasFiltradas, pesquisaFamilia, setPesquisaFamilia
   } = useCatalogState();
 
   const dadosArvoreAntd = useMemo(() => {
@@ -484,131 +547,242 @@ export const FamilyManager: React.FC = () => {
   }, [grupoSelecionado]);
 
   return (
-    <div className={styles.container} style={{ '--brand-color': brandColor } as React.CSSProperties}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', padding: '24px 32px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
+      
+      {/* Header unificado estilo SaaS */}
+      <Card bordered={false} style={{ marginBottom: 24, borderRadius: 12, boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)' }}>
+        <Row align="middle" justify="space-between" gutter={[16, 16]}>
+          <Col>
+            <Space direction="vertical" size={2}>
+              <Title level={3} style={{ margin: 0, fontWeight: 700, letterSpacing: '-0.02em' }}>Parâmetros de Catálogo</Title>
+              <Space size={8}>
+                <Badge status={loading ? "processing" : "success"} />
+                <Text type="secondary" style={{ fontSize: '13px' }}>
+                  {loading ? 'Sincronizando com o banco...' : 'Banco de dados sincronizado e pronto'}
+                </Text>
+              </Space>
+            </Space>
+          </Col>
 
-      {/* BARRA DE AÇÕES CRUD SUPERIOR */}
-      <div className={styles.crudBar}>
-        <div className={styles.titleArea}>
-          <h2>Gerenciador de Catálogo de Grupos</h2>
-          <span className={`${styles.statusIndicator} ${loading ? styles.statusSync : styles.statusConnected}`}>
-            {loading ? '🔄 Sincronizando com o banco...' : '🟢 Banco de dados conectado'}
-          </span>
-        </div>
-        <div className={styles.actionButtons}>
-          <Button onClick={handleCriarGrupo} variant="secondary" disabled={loading}>＋ Criar Novo Grupo</Button>
-          {grupoSelecionado && (
-            <Button onClick={handleSalvarGrupoNoBanco} disabled={loading} className={styles.btnSave}>
-              {loading ? 'Salvando...' : '💾 Salvar Alterações'}
-            </Button>
-          )}
-        </div>
-      </div>
+          <Col>
+            <Space size={12}>
+              <Button type="default" size="large" onClick={handleCriarGrupo} loading={loading} icon={<PlusOutlined />} style={{ borderRadius: 8, fontWeight: 500 }}>
+                Nova Família
+              </Button>
+              {grupoSelecionado && (
+                <Button type="primary" size="large" onClick={handleSalvarGrupoNoBanco} loading={loading} style={{ backgroundColor: brandColor, borderColor: brandColor, borderRadius: 8, fontWeight: 500 }}>
+                  Salvar Alterações
+                </Button>
+              )}
+            </Space>
+          </Col>
+        </Row>
+      </Card>
 
       {error && (
-        <div className={styles.errorBanner}>
-          <div><strong>⚠️ Falha de Integração:</strong> {error}</div>
-          <Button onClick={() => window.location.reload()} style={{ backgroundColor: '#ff4d4f', color: '#fff', padding: '4px 12px', fontSize: '12px' }}>
-            :arrows_counterclockwise: Recarregar Tela
-          </Button>
-        </div>
+        <Alert
+          type="error"
+          showIcon
+          message="Falha de Sincronização"
+          description={error}
+          style={{ marginBottom: 24, borderRadius: 8 }}
+          action={
+            <Button size="small" danger onClick={() => window.location.reload()}>
+              Recarregar
+            </Button>
+          }
+        />
       )}
 
-      <div className={styles.workspace}>
-        <SidebarFamilias
-          familias={grupos}
-          familiaSelecionadaId={grupoSelecionado?.id || null}
-          onSelecionarFamilia={handleSelecionarGrupo}
-          onDeletarFamilia={() => { }}
-        />
+      <Row gutter={[24, 24]}>
+        {/* Coluna 1: Famílias Ativas (Idêntica estruturalmente à Coluna de Itens) */}
+        <Col xs={24} md={6} lg={5}>
+          <Card 
+            title={
+              <Space size={8}>
+                <FolderOpenOutlined style={{ color: brandColor }} />
+                <span style={{ fontWeight: 700, fontSize: '14px' }}>Famílias Ativas</span>
+              </Space>
+            }
+            style={{ borderRadius: 12, boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)' }}
+            headStyle={{ borderBottom: '1px solid #f1f5f9' }}
+            bodyStyle={{ padding: '16px' }}
+          >
+            <Space direction="vertical" size={16} style={{ width: '100%' }}>
+              <Input
+                prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
+                placeholder="Filtrar famílias..."
+                value={pesquisaFamilia}
+                onChange={e => setPesquisaFamilia(e.target.value)}
+                allowClear
+                style={{ borderRadius: 6 }}
+              />
 
-        <main className={styles.contentArea}>
+              <div style={{ maxHeight: '420px', overflowY: 'auto', paddingRight: '4px' }}>
+                {familiasFiltradas.length > 0 ? (
+                  <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                    {familiasFiltradas.map(fam => {
+                      const estaSelecionado = fam.id === grupoSelecionado?.id;
+                      return (
+                        <div 
+                          key={fam.id} 
+                          onClick={() => handleSelecionarGrupo(fam.id)}
+                          style={{ 
+                            padding: '12px', 
+                            backgroundColor: estaSelecionado ? '#f0f7ff' : '#f8fafc', 
+                            borderRadius: '8px', 
+                            border: estaSelecionado ? `1px solid ${brandColor}` : '1px solid #e2e8f0',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                            <span style={{ fontWeight: 700, fontSize: '13px', color: estaSelecionado ? brandColor : '#0f172a' }}>
+                              {fam.nome}
+                            </span>
+                            <Badge 
+                              count={fam.atributos?.length || 0} 
+                              showZero 
+                              style={{ 
+                                backgroundColor: estaSelecionado ? brandColor : '#94a3b8',
+                                fontSize: '10px' 
+                              }} 
+                            />
+                          </div>
+                          {fam.categoriaPaiNome && (
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>
+                              {fam.categoriaPaiNome}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </Space>
+                ) : (
+                  <Empty 
+                    image={Empty.PRESENTED_IMAGE_SIMPLE} 
+                    description={<span style={{ fontSize: '12px', color: '#94a3b8' }}>Nenhuma família encontrada</span>} 
+                  />
+                )}
+              </div>
+
+              <Button 
+                type="dashed" 
+                block 
+                icon={<PlusOutlined />} 
+                style={{ borderColor: brandColor, color: brandColor, borderRadius: 8 }}
+                onClick={handleCriarGrupo}
+              >
+                Nova Família
+              </Button>
+            </Space>
+          </Card>
+        </Col>
+
+        {/* Coluna 2: Configuração Central */}
+        <Col xs={24} md={18} lg={14}>
           {grupoSelecionado ? (
-            <>
-              {/* CONFIGURAÇÕES BÁSICAS */}
-              <section className={styles.card} style={{ borderTop: `3px solid var(--brand-color)` }}>
-                <div className={styles.cardHeader}>
-                  <span className={styles.cardTitle}>📌 Configurações Estruturais do Grupo</span>
-                  <span className={styles.cardSubtitle}>Grupo ID: #{grupoSelecionado.id}</span>
-                </div>
+            <Space direction="vertical" size={24} style={{ width: '100%' }}>
+              
+              {/* Configurações Estruturais */}
+              <Card
+                title="Configurações de Identidade"
+                headStyle={{ borderBottom: '1px solid #f1f5f9', fontWeight: 600, fontSize: '15px' }}
+                bodyStyle={{ padding: 24 }}
+                style={{ borderRadius: 12, borderTop: `4px solid ${brandColor}`, boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)' }}
+              >
+                <Row gutter={[24, 24]}>
+                  <Col xs={24} xl={16}>
+                    <Row gutter={[16, 16]}>
+                      <Col xs={24} sm={12}>
+                        <Space direction="vertical" size={6} style={{ width: '100%' }}>
+                          <Text strong style={{ color: '#475569', fontSize: '13px' }}>Nome da Família</Text>
+                          <Input
+                            size="large"
+                            style={{ borderRadius: 6 }}
+                            value={grupoSelecionado.nome}
+                            onChange={e => handleAtualizarGrupoDireto('nome', e.target.value)}
+                            placeholder="Ex: Parafusos Sextavados"
+                          />
+                        </Space>
+                      </Col>
 
-                <div className={styles.formLayout}>
-                  <div className={styles.inputsGrid}>
-                    
-                    {/* Antd Input - Nome */}
-                    <div className={styles.inputWrapper}>
-                      <label>Nome Padrão do Grupo</label>
-                      <Input
-                        size="large"
-                        value={grupoSelecionado.nome}
-                        onChange={e => handleAtualizarGrupoDireto('nome', e.target.value)}
-                        placeholder="Ex: Parafusos Sextavados"
-                      />
-                    </div>
+                      <Col xs={24} sm={12}>
+                        <Space direction="vertical" size={6} style={{ width: '100%' }}>
+                          <Text strong style={{ color: '#475569', fontSize: '13px' }}>Tipo de Inventário (SPED)</Text>
+                          <Select
+                            size="large"
+                            style={{ width: '100%' }}
+                            value={grupoSelecionado.tipoItem || 'PA'}
+                            onChange={valor => handleAtualizarGrupoDireto('tipoItem', valor)}
+                            options={[
+                              { value: 'PA', label: 'Produto Acabado' },
+                              { value: 'MP', label: 'Matéria-Prima' },
+                              { value: 'KT', label: 'Kit / Combo' },
+                            ]}
+                          />
+                        </Space>
+                      </Col>
 
-                    {/* Antd Select - UoM */}
-                    <div className={styles.inputWrapper}>
-                      <label>Unidade de Medida Padrão (UoM)</label>
-                      <Select
-                        size="large"
-                        style={{ width: '100%' }}
-                        value={grupoSelecionado.unidadeMedidaBase || 'PC'}
-                        onChange={valor => handleAtualizarGrupoDireto('unidadeMedidaBase', valor)}
-                        options={[
-                          { value: 'PC', label: 'PC - Peça' },
-                          { value: 'UN', label: 'UN - Unidade' },
-                          { value: 'MM', label: 'MM - Milímetro' },
-                          { value: 'MT', label: 'MT - Metro' },
-                        ]}
-                      />
-                    </div>
+                      <Col xs={24} sm={12}>
+                        <Space direction="vertical" size={6} style={{ width: '100%' }}>
+                          <Text strong style={{ color: '#475569', fontSize: '13px' }}>Unidade de Medida</Text>
+                          <Select
+                            size="large"
+                            style={{ width: '100%' }}
+                            value={grupoSelecionado.unidadeMedidaBase || 'PC'}
+                            onChange={valor => handleAtualizarGrupoDireto('unidadeMedidaBase', valor)}
+                            options={[
+                              { value: 'PC', label: 'PC - Peça' },
+                              { value: 'UN', label: 'UN - Unidade' },
+                              { value: 'MM', label: 'MM - Milímetro' },
+                              { value: 'MT', label: 'MT - Metro' },
+                            ]}
+                          />
+                        </Space>
+                      </Col>
 
-                    {/* Antd Select - Tipo Item */}
-                    <div className={styles.inputWrapper}>
-                      <label>Tipo de Item (Inventário)</label>
-                      <Select
-                        size="large"
-                        style={{ width: '100%' }}
-                        value={grupoSelecionado.tipoItem || 'PA'}
-                        onChange={valor => handleAtualizarGrupoDireto('tipoItem', valor)}
-                        options={[
-                          { value: 'PA', label: 'Produto Acabado' },
-                          { value: 'MP', label: 'Matéria-Prima' },
-                          { value: 'KT', label: 'Kit / Combo' },
-                        ]}
-                      />
-                    </div>
+                      <Col xs={24} sm={12}>
+                        <Space direction="vertical" size={6} style={{ width: '100%' }}>
+                          <Text strong style={{ color: '#475569', fontSize: '13px' }}>Categoria de Vínculo</Text>
+                          <TreeSelect
+                            size="large"
+                            style={{ width: '100%' }}
+                            value={grupoSelecionado?.categoriaPai ? String(grupoSelecionado.categoriaPai) : undefined}
+                            onChange={handleMudarCategoriaComConfirmacao}
+                            treeData={dadosArvoreAntd}
+                            dropdownStyle={{ maxHeight: 300, overflow: 'auto' }}
+                            placeholder="Vincular à árvore global..."
+                            showSearch
+                            treeNodeFilterProp="title"
+                            allowClear
+                          />
+                        </Space>
+                      </Col>
+                    </Row>
+                  </Col>
 
-                    {/* Antd TreeSelect - Categoria Global */}
-                    <div className={styles.inputWrapper}>
-                      <label>Categoria Global</label>
-                      <TreeSelect
-                        size="large"
-                        style={{ width: '100%' }}
-                        value={grupoSelecionado?.categoriaPai ? String(grupoSelecionado.categoriaPai) : undefined}
-                        onChange={(valor) => handleMudarCategoriaComConfirmacao(valor)}
-                        treeData={dadosArvoreAntd}
-                        dropdownStyle={{ maxHeight: 400, overflow: 'auto' }}
-                        placeholder="-- Selecione uma Categoria --"
-                        showSearch
-                        treeNodeFilterProp="title"
-                        allowClear
-                      />
-                    </div>
-                  </div>
+                  {/* Upload/Imagem */}
+                  <Col xs={24} xl={8}>
+                    <Card type="inner" bodyStyle={{ padding: 16 }} style={{ borderRadius: 8, backgroundColor: '#f8fafc', border: '1px dashed #cbd5e1' }}>
+                      <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                        <Text strong style={{ color: '#475569', fontSize: '13px' }}>Imagem de Capa</Text>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
+                          <ImageDisplay size="80px" src={grupoImage || undefined} style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid #e2e8f0' }} />
+                          <Input
+                            placeholder="URL absoluta do ícone/imagem"
+                            value={grupoImage}
+                            onChange={handleInputChange}
+                            style={{ borderRadius: 6 }}
+                          />
+                        </div>
+                      </Space>
+                    </Card>
+                  </Col>
+                </Row>
+              </Card>
 
-                  {/* MEDIA BLOC */}
-                  <div className={styles.mediaPanel}>
-                    <ImageDisplay size='80px' src={grupoImage || undefined} />
-                    <Input
-                      placeholder='URL da imagem...'
-                      value={grupoImage}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                </div>
-              </section>
-
-              {/* PAINEL SIMULADOR */}
+              {/* Painel do Simulador de SKU */}
               <PainelSimulador
                 grupoSelecionado={grupoSelecionado}
                 valoresTeste={valoresTeste}
@@ -623,67 +797,184 @@ export const FamilyManager: React.FC = () => {
                     return novoEstado;
                   });
                 }}
-                onAtualizarTemplateComercial={(valor) => handleAtualizarGrupoDireto('templateNomeComercial', valor)}
-                onAtualizarTemplateSku={(valor) => handleAtualizarGrupoDireto('templateSku', valor)}
-                onAtualizarSiglaSku={(valor) => handleAtualizarGrupoDireto('siglaSku', valor)}
-                onAtualizarSeparadorSku={(valor) => handleAtualizarGrupoDireto('separadorSku', valor)}
+                onAtualizarTemplateComercial={valor => handleAtualizarGrupoDireto('templateNomeComercial', valor)}
+                onAtualizarTemplateSku={valor => handleAtualizarGrupoDireto('templateSku', valor)}
+                onAtualizarSiglaSku={valor => handleAtualizarGrupoDireto('siglaSku', valor)}
+                onAtualizarSeparadorSku={valor => handleAtualizarGrupoDireto('separadorSku', valor)}
                 onAtualizarOrdemSku={(atributoId, novaOrdem) => handleAtualizarAtributoDireto(atributoId, 'ordemSku', novaOrdem)}
               />
 
-              {/* MATRIZ DE ATRIBUTOS */}
-              <div className={styles.attributesMatrixThreeColumns}>
-                
-                {/* COLUNA 1: DNA */}
-                <div className={styles.cardMatrixColumn} style={{ borderTop: '3px solid #1d39c4' }}>
-                  <TabelaAtributos
-                    titulo="🧬 Atributos de DNA"
-                    tipo="dna"
-                    mostrarExpansao={true}
-                    atributoPendenteEdicao={atributoPendenteEdicao}
-                    onAtualizarAtributo={handleAtualizarAtributoDireto}
-                    onMoverEscopo={handleMoverAtributoDeEscopo}
-                    onAbrirModal={handleAbrirModal}
-                    atributos={atributosDNA}
-                  />
-                </div>
+              {/* Grid de Atributos e Especificações */}
+              <Row gutter={[16, 16]}>
+                {[
+                  { title: 'Atributos de DNA', tipo: 'dna', exp: true, dados: atributosDNA },
+                  { title: 'Grade de Variações', tipo: 'grade', exp: true, dados: atributosVariacao },
+                  { title: 'Ficha Técnica Comercial', tipo: 'ficha', exp: false, dados: atributosFichaTecnica }
+                ].map((tab) => {
+                  
+                  const columns: ColumnsType<AtributoConfig> = [
+                    {
+                      title: 'Nome',
+                      dataIndex: 'nome',
+                      key: 'nome',
+                      ellipsis: true,
+                      render: (text) => <span style={{ fontWeight: 600, color: '#1e293b' }}>{text}</span>,
+                    },
+                    {
+                      title: 'Tipo',
+                      dataIndex: 'tipoDado',
+                      key: 'tipoDado',
+                      width: 90,
+                      render: (tipo) => <Tag color="blue" style={{ fontSize: '10px', borderRadius: 4 }}>{String(tipo).toUpperCase() || 'TEXTO'}</Tag>,
+                    },
+                    {
+                      title: 'Ações',
+                      key: 'acoes',
+                      width: 80,
+                      align: 'right',
+                      render: (_, record) => (
+                        <Space size={2}>
+                          <Tooltip title="Configurações">
+                            <Button 
+                              type="text" 
+                              size="small" 
+                              icon={<EditOutlined style={{ color: '#475569' }} />} 
+                              onClick={() => handleAbrirModal(tab.tipo as ModalDestino)}
+                            />
+                          </Tooltip>
 
-                {/* COLUNA 2: GRADE */}
-                <div className={styles.cardMatrixColumn} style={{ borderTop: '3px solid #389e0d' }}>
-                  <TabelaAtributos
-                    titulo="🏁 Grade de Variações"
-                    tipo="grade"
-                    mostrarExpansao={true}
-                    atributoPendenteEdicao={atributoPendenteEdicao}
-                    onAtualizarAtributo={handleAtualizarAtributoDireto}
-                    onMoverEscopo={handleMoverAtributoDeEscopo}
-                    onAbrirModal={handleAbrirModal}
-                    atributos={atributosVariacao}
-                  />
-                </div>
+                          {tab.exp && (
+                            <Tooltip title="Inverter escopo">
+                              <Button 
+                                type="text" 
+                                size="small" 
+                                icon={<ArrowRightOutlined style={{ color: brandColor }} />} 
+                                onClick={() => handleMoverAtributoDeEscopo(record.id, tab.tipo === 'dna' ? 'grade' : 'dna')}
+                              />
+                            </Tooltip>
+                          )}
+                        </Space>
+                      ),
+                    },
+                  ];
 
-                {/* COLUNA 3: FICHA TÉCNICA */}
-                <div className={styles.cardMatrixColumn} style={{ borderTop: '3px solid #d46b08' }}>
-                  <TabelaAtributos
-                    titulo="📋 Ficha Técnica comercial"
-                    tipo="ficha"
-                    mostrarExpansao={false}
-                    atributoPendenteEdicao={atributoPendenteEdicao}
-                    onAtualizarAtributo={handleAtualizarAtributoDireto}
-                    onMoverEscopo={handleMoverAtributoDeEscopo}
-                    onAbrirModal={handleAbrirModal}
-                    atributos={atributosFichaTecnica}
-                  />
-                </div>
-
-              </div>
-            </>
+                  return (
+                    <Col xs={24} xl={8} key={tab.tipo}>
+                      <Card 
+                        title={<span style={{ fontSize: '14px', fontWeight: 600 }}>{tab.title}</span>} 
+                        headStyle={{ borderBottom: '1px solid #f1f5f9', minHeight: '48px' }} 
+                        bodyStyle={{ padding: 0 }}
+                        style={{ borderRadius: 10, overflow: 'hidden', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}
+                        extra={
+                          <Tooltip title={`Vincular Atributo`}>
+                            <Button
+                              type="link"
+                              size="small"
+                              icon={<PlusOutlined />}
+                              style={{ color: brandColor, display: 'flex', alignItems: 'center' }}
+                              onClick={() => handleAbrirModal(tab.tipo as ModalDestino)}
+                            />
+                          </Tooltip>
+                        }
+                      >
+                        <Table
+                          size="small"
+                          dataSource={tab.dados}
+                          columns={columns}
+                          rowKey="id"
+                          pagination={false}
+                          locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={<span style={{ fontSize: '12px', color: '#94a3b8' }}>Vazio</span>} /> }}
+                          style={{ minHeight: 180 }}
+                        />
+                      </Card>
+                    </Col>
+                  );
+                })}
+              </Row>
+            </Space>
           ) : (
-            <div className={`${styles.card} ${styles.emptyState}`}>
-              Nenhuma família selecionada ou cadastrada.
-            </div>
+            <Card style={{ borderRadius: 12, textAlign: 'center', padding: '40px 0' }}>
+              <Empty description="Selecione ou crie uma família na barra lateral para começar a configurar." />
+            </Card>
           )}
-        </main>
-      </div>
+        </Col>
+
+        {/* Coluna 3: Gerenciamento Ativo de SKUs Vinculados */}
+        <Col xs={24} md={24} lg={5}>
+          <Card 
+            title={
+              <Space size={8}>
+                <ShoppingCartOutlined style={{ color: brandColor }} />
+                <span style={{ fontWeight: 700, fontSize: '14px' }}>Itens da Família</span>
+              </Space>
+            }
+            style={{ borderRadius: 12, boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)' }}
+            headStyle={{ borderBottom: '1px solid #f1f5f9' }}
+            bodyStyle={{ padding: '16px' }}
+          >
+            {grupoSelecionado ? (
+              <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                <Input
+                  prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
+                  placeholder="Filtrar SKU ou nome..."
+                  value={pesquisaItem}
+                  onChange={e => setPesquisaItem(e.target.value)}
+                  allowClear
+                  style={{ borderRadius: 6 }}
+                />
+
+                <div style={{ maxHeight: '420px', overflowY: 'auto', paddingRight: '4px' }}>
+                  {itensDoGrupoAtivo.length > 0 ? (
+                    <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                      {itensDoGrupoAtivo.map(item => (
+                        <div 
+                          key={item.id} 
+                          style={{ 
+                            padding: '12px', 
+                            backgroundColor: '#f8fafc', 
+                            borderRadius: '8px', 
+                            border: '1px solid #e2e8f0',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                            <span style={{ fontWeight: 700, fontSize: '12px', color: '#0f172a', fontFamily: 'monospace' }}>
+                              {item.sku}
+                            </span>
+                            <Tag color={item.ativo ? 'success' : 'default'} style={{ fontSize: '9px', borderRadius: '4px', margin: 0 }}>
+                              {item.ativo ? 'Ativo' : 'Inativo'}
+                            </Tag>
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#64748b', lineHeight: '1.4' }}>
+                            {item.nome}
+                          </div>
+                        </div>
+                      ))}
+                    </Space>
+                  ) : (
+                    <Empty 
+                      image={Empty.PRESENTED_IMAGE_SIMPLE} 
+                      description={<span style={{ fontSize: '12px', color: '#94a3b8' }}>Nenhum SKU encontrado</span>} 
+                    />
+                  )}
+                </div>
+
+                <Button 
+                  type="dashed" 
+                  block 
+                  icon={<ThunderboltOutlined />} 
+                  style={{ borderColor: brandColor, color: brandColor, borderRadius: 8 }}
+                  onClick={() => Swal.fire('Novo Item', 'Geração de novos SKUs com base nos atributos do DNA e Grade.', 'info')}
+                >
+                  Gerar Variação SKU
+                </Button>
+              </Space>
+            ) : (
+              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Sem família ativa" />
+            )}
+          </Card>
+        </Col>
+      </Row>
 
       <ModalVinculoAtributos
         isModalAberto={isModalAberto}

@@ -2,17 +2,17 @@ import { Request, Response } from 'express';
 import pool from '../../Estoque/db.config';
 
 /**
- * 🔌 [READ] Buscar Categorias (Trazendo os atributos vinculados aninhados)
+ * 🔌 [READ] Buscar Categorias (Trazendo os atributos vinculados aninhados com governança)
  */
 export const getCategoriasSelect = async (req: Request, res: Response) => {
   const rawTenantId = req.query.tenant_id || req.headers['x-tenant-id'] || 1;
   const tenantId = Number(rawTenantId);
 
   try {
-    // 1. Busca todas as categorias
+    // 1. Busca todas as categorias (Ajustado de created_at/updated_at para criado_em/alterado_em se houver, ou omitido se não houver na tabela comercial_categorias)
     const queryCategorias = `
       SELECT id, tenant_id, categoria_pai_id, nome, slug, ativa, ordem, 
-             descricao, margem_sugerida, modo_exibicao, created_at, updated_at
+             descricao, margem_sugerida, modo_exibicao
       FROM comercial_categorias
       WHERE tenant_id = ?
       ORDER BY ordem ASC
@@ -22,10 +22,11 @@ export const getCategoriasSelect = async (req: Request, res: Response) => {
 
     if (categorias.length === 0) return res.json([]);
 
-    // 2. Busca TODOS os vínculos de atributos
-    // 🛡️ CORREÇÃO: Tabela corrigida de 'atributos_comercial_entidades' para 'atributos_core_entidades'
+    // 2. Busca TODOS os vínculos de atributos (Garantindo a exatidão das colunas do seu DESCRIBE)
     const queryAtributos = `
-      SELECT ae.id_entidade, a.id, a.nome, a.tipo, ae.obrigatorio, ae.herdar, ae.ordem
+      SELECT ae.id_entidade, a.id, a.nome, a.tipo, ae.obrigatorio, ae.herdar, 
+             ae.ordem, ae.bloqueado, ae.retransmitir, ae.sobrescreve, ae.exemplos,
+             a.sufixo, a.escopo_padrao
       FROM atributos_core_entidades ae
       INNER JOIN atributos_comercial a ON a.id = ae.atributo_id AND a.tenant_id = ae.tenant_id
       WHERE ae.tenant_id = ? AND ae.tipo_entidade = 'categoria' AND ae.ativo = 1
@@ -41,9 +42,15 @@ export const getCategoriasSelect = async (req: Request, res: Response) => {
           id: String(attr.id),
           nome: attr.nome,
           tipoDado: attr.tipo,
+          sufixo: attr.sufixo || undefined,
+          escopoComercial: attr.escopo_padrao || 'ficha',
           obrigatorio: Boolean(attr.obrigatorio),
           herdar: Boolean(attr.herdar),
-          ordem: Number(attr.ordem)
+          ordem: Number(attr.ordem),
+          bloqueado: Boolean(attr.bloqueado),
+          retransmitir: Boolean(attr.retransmitir),
+          sobrescreve: Boolean(attr.sobrescreve),
+          exemplos: attr.exemplos || ''
         }));
 
       return {
@@ -64,7 +71,7 @@ export const getCategoriasSelect = async (req: Request, res: Response) => {
 };
 
 /**
- * 🟢 [CREATE] Categoria + Vínculo de Atributos
+ * 🟢 [CREATE] Categoria + Vínculo de Atributos (Com suporte à Governança)
  */
 export const createCategoria = async (req: Request, res: Response) => {
   const connection = await pool.getConnection();
@@ -107,13 +114,13 @@ export const createCategoria = async (req: Request, res: Response) => {
     
     const novaCategoriaId = (result as any).insertId;
 
-    // 2. Insere os Vínculos na Tabela Pivô
-    // 🛡️ CORREÇÃO: Tabela corrigida para 'atributos_core_entidades'
+    // 2. Insere os Vínculos na Tabela Pivô (Incluindo os novos campos de Governança)
     if (Array.isArray(atributos_vinculados) && atributos_vinculados.length > 0) {
       const queryPivot = `
         INSERT INTO atributos_core_entidades 
-          (tenant_id, tipo_entidade, id_entidade, atributo_id, obrigatorio, herdar, ordem, ativo)
-        VALUES (?, 'categoria', ?, ?, ?, ?, ?, 1)
+          (tenant_id, tipo_entidade, id_entidade, atributo_id, obrigatorio, herdar, ordem, 
+           bloqueado, retransmitir, sobrescreve, exemplos, ativo)
+        VALUES (?, 'categoria', ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
       `;
       for (const attr of atributos_vinculados) {
         const vAtributoId = attr.atributo_id || attr.id;
@@ -125,7 +132,11 @@ export const createCategoria = async (req: Request, res: Response) => {
           Number(vAtributoId), 
           attr.obrigatorio ? 1 : 0, 
           attr.herdar ? 1 : 0, 
-          attr.ordem || 0
+          attr.ordem || 0,
+          attr.bloqueado ? 1 : 0,
+          attr.retransmitir ? 1 : 0,
+          attr.sobrescreve ? 1 : 0,
+          attr.exemplos || ''
         ]);
       }
     }
@@ -142,7 +153,7 @@ export const createCategoria = async (req: Request, res: Response) => {
 };
 
 /**
- * 🟡 [UPDATE] Categoria + Atualização Dinâmica de Atributos
+ * 🟡 [UPDATE] Categoria + Atualização Dinâmica de Atributos (Com suporte à Governança)
  */
 export const updateCategoria = async (req: Request, res: Response) => {
   const connection = await pool.getConnection();
@@ -183,8 +194,7 @@ export const updateCategoria = async (req: Request, res: Response) => {
       await connection.execute(queryUpdateCat, params);
     }
 
-    // 2. Sincronização dos Atributos (Pivô)
-    // 🛡️ CORREÇÃO: Tabela corrigida para 'atributos_core_entidades'
+    // 2. Sincronização dos Atributos (Pivô) com os novos campos de Governança
     if (atributos_vinculados !== undefined) {
       await connection.execute(
         `DELETE FROM atributos_core_entidades WHERE id_entidade = ? AND tipo_entidade = 'categoria' AND tenant_id = ?`,
@@ -194,8 +204,9 @@ export const updateCategoria = async (req: Request, res: Response) => {
       if (Array.isArray(atributos_vinculados) && atributos_vinculados.length > 0) {
         const queryPivot = `
           INSERT INTO atributos_core_entidades 
-            (tenant_id, tipo_entidade, id_entidade, atributo_id, obrigatorio, herdar, ordem, ativo)
-          VALUES (?, 'categoria', ?, ?, ?, ?, ?, 1)
+            (tenant_id, tipo_entidade, id_entidade, atributo_id, obrigatorio, herdar, ordem, 
+             bloqueado, retransmitir, sobrescreve, exemplos, ativo)
+          VALUES (?, 'categoria', ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
         `;
         
         for (const attr of atributos_vinculados) {
@@ -212,7 +223,11 @@ export const updateCategoria = async (req: Request, res: Response) => {
             Number(vAtributoId), 
             attr.obrigatorio ? 1 : 0, 
             attr.herdar ? 1 : 0, 
-            attr.ordem || 0
+            attr.ordem || 0,
+            attr.bloqueado ? 1 : 0,
+            attr.retransmitir ? 1 : 0,
+            attr.sobrescreve ? 1 : 0,
+            attr.exemplos || ''
           ]);
         }
       }
@@ -291,19 +306,19 @@ export const updateCategoriesOrder = async (req: Request, res: Response) => {
 };
 
 /**
- * 🧠 [ATRIBUTOS POR CATEGORIA]
+ * 🧠 [ATRIBUTOS POR CATEGORIA] (Trazendo o status de Governança)
  */
 export const getAtributosByCategoria = async (req: Request, res: Response) => {
   try {
     const { idCategoria } = req.params;
     const tenant_id = Number(req.query.tenant_id || 1);
 
-    // 🛡️ CORREÇÃO: Tabela corrigida para 'atributos_core_entidades'
     const query = `
       SELECT 
         a.id AS id, a.nome AS nome, a.tipo AS tipo, a.unidade_id AS unidadeId,
         ae.obrigatorio AS obrigatorio, ae.herdar AS herdar,
-        ae.sobrescreve AS sobrescreve, ae.ordem AS ordem
+        ae.sobrescreve AS sobrescreve, ae.bloqueado AS bloqueado, 
+        ae.retransmitir AS retransmitir, ae.exemplos AS exemplos, ae.ordem AS ordem
       FROM atributos_core_entidades ae
       INNER JOIN atributos_comercial a
         ON a.id = ae.atributo_id AND a.tenant_id = ae.tenant_id
@@ -318,7 +333,9 @@ export const getAtributosByCategoria = async (req: Request, res: Response) => {
       id: String(attr.id),
       obrigatorio: Boolean(attr.obrigatorio),
       herdar: Boolean(attr.herdar),
-      sobrescreve: Boolean(attr.sobrescreve)
+      sobrescreve: Boolean(attr.sobrescreve),
+      bloqueado: Boolean(attr.bloqueado),
+      retransmitir: Boolean(attr.retransmitir)
     }));
 
     return res.json(result);
@@ -332,7 +349,6 @@ export const getAtributosGlobais = async (req: Request, res: Response) => {
   try {
     const tenant_id = Number(req.query.tenant_id || 1);
     
-    // 🛡️ CORREÇÃO: Pegando o array correto retornado pelo mysql2 ([rows])
     const [atributos] = await pool.execute(
       'SELECT id, nome, tipo FROM atributos_comercial WHERE tenant_id = ?',
       [tenant_id]

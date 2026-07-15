@@ -360,10 +360,11 @@ const handleClearAllFilters = () => {
   return (
     <div style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
 
-<Button
 
 
       <Breadcrumb style={{ marginBottom: '16px' }}>
+
+        <Breadcrumb.Item  onClick={() => window.history.back()}>Voltar</Breadcrumb.Item>
         <Breadcrumb.Item>Catálogo</Breadcrumb.Item>
         <Breadcrumb.Item>Gerenciador de Catálogo</Breadcrumb.Item>
       </Breadcrumb>
