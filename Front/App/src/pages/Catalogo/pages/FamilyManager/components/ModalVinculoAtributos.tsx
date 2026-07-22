@@ -26,7 +26,7 @@ export const ModalVinculoAtributos: React.FC<ModalVinculoAtributosProps> = ({
   const [novoTipo, setNovoTipo] = useState<'texto' | 'numero' | 'opcoes'>('texto');
   const [pesquisaTermo, setPesquisaTermo] = useState('');
 
-  // Notificações nativas do Antd para feedback de criação
+  // Notificações nativas do Antd v5 para feedback de criação
   const { message } = App.useApp();
 
   // Limpa os campos de criação quando o modal fecha

@@ -32,7 +32,7 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
                         <input className="form-input" value={fantasyName} onChange={(e) => setFantasyName(e.target.value)} />
                     </div>
                     <div className="form-group">
-                        <label className="form-label">CNPJ</label>
+                        <label className="form-label">CNPaaJ</label>
                         <input className="form-input read-only" value={cnpj} readOnly />
                     </div>
                 </div>

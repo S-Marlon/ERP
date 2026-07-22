@@ -18,8 +18,8 @@ export const gerarPreviewNome = (
 ): string => {
   if (!grupo) return '';
   
-  let template = grupo.templateNomeComercial || '{GRUPO}';
-  template = template.replace(/{GRUPO}/g, grupo.nome || '');
+  let template = grupo.templateNomeComercial || '{FAMILIA}';
+  template = template.replace(/{FAMILIA}/g, grupo.nome || '');
   
   if (grupo.atributos && grupo.atributos.length > 0) {
     grupo.atributos.forEach(attr => {
@@ -71,4 +71,33 @@ export const gerarPreviewSku = (
     .replace(/{VARIAÇÃO}/g, variacaoCompilada);
 
   return templateSku;
+};
+
+// 🌳 Versão blindada contra tipos numéricos/strings do banco
+export const construirArvoreAntd = (lista: Categoria[], paiId: string | null = null): CategoriaTreeNode[] => {
+  return lista
+    .filter(cat => {
+      if (!cat.paiId && !paiId) return true;
+      return String(cat.paiId) === String(paiId);
+    })
+    .map(cat => ({
+      value: String(cat.id),
+      title: `${cat.nome} (ID #${cat.id})`,
+      children: construirArvoreAntd(lista, cat.id)
+    }));
+};
+
+
+// ⚠️ Campos que NÃO persistem no banco (Mapeamento/Constante utilitária)
+export const CAMPOS_NAO_INTEGRADOS = {
+  familia: [
+    'tipoItem', 
+    'ncmPadrao', 
+    'cestPadrao', 
+    'siglaSku', 
+    'templateSku', 
+    'descricaoComercialPadrao', 
+    'observacoesPadrao'
+  ],
+  atributo: ['opcoesValidas', 'valorPadraoGrupo', 'estaSendoUtilizado', 'origem']
 };

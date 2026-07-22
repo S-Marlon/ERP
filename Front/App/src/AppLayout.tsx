@@ -40,7 +40,7 @@ import StockEntryForm from "./pages/Compras/StockEntry/StockEntryForm";
 import { CatalogManager } from "./pages/Catalogo/pages/CatalogManager";
 import { CategoryManager } from "./pages/Catalogo/pages/CategoryManager/CategoryManager";
 import { GlobalAttributeManager } from "./pages/Catalogo/pages/GlobalAttributeManager/GlobalAttributeManager";
-import { FamilyManager } from "./pages/Catalogo/pages/CatalogManager/FamilyManager";
+import { FamilyManager } from "./pages/Catalogo/pages/FamilyManager/FamilyManager";
 import CatalogSku from "./pages/Catalogo/pages/CatalogSkus/CatalogSku";
 import FornecedoresList from "./pages/Compras/FornecedoresList/FornecedoresList";
 import RelatoriosPage from "./pages/Estoque/Relatorios/Relatorios";
@@ -91,12 +91,12 @@ const isPDV = location.pathname.startsWith("/vendas/pdv");
       
       <Panel isDarkMode={isDarkMode}>
         <Routes>
-          <Route path="/" element={<IndustrialLandingPage />} />
+          <Route path="/" element={<Dashboard text={"Pagina inicial"} />} />
 
-          <Route path="/clientes" element={<Clientes title={''} children={undefined} />} />
+          <Route path="/clientes" element={<Clientes />} />
 
 
-          <Route path="/fornecedores" element={<Fornecedores title={''} children={undefined}/>} /> 
+          <Route path="/fornecedores" element={<Fornecedores/>} /> 
 
           <Route path="/clientes/novo" element={<CadastroCliente />} /> 
           <Route path="/contratos/novo" element={<CadastroContrato />} />

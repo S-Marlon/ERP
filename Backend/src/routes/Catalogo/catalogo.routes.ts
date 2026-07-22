@@ -92,10 +92,10 @@ router.post('/cadastros/familias', createFamilia);
 router.put('/cadastros/familias/:idFamilia', updateFamilia);
 router.delete('/cadastros/familias/:idFamilia', deleteFamilia);
 
-// ALIAS LEGADO: Mantido para que o frontend que consome "/cadastros/grupos" não pare de funcionar
-router.get('/cadastros/grupos', getFamilias);
-router.post('/cadastros/grupos', createFamilia);
-router.put('/cadastros/grupos/:idGrupo', updateFamilia);
-router.delete('/cadastros/grupos/:idGrupo', deleteFamilia);
+// // ALIAS LEGADO: Mantido para que o frontend que consome "/cadastros/grupos" não pare de funcionar
+//  router.get('/cadastros/grupos', getFamilias);
+// router.post('/cadastros/grupos', createFamilia);
+// router.put('/cadastros/grupos/:idGrupo', updateFamilia);
+// router.delete('/cadastros/grupos/:idGrupo', deleteFamilia);
 
 export default router;

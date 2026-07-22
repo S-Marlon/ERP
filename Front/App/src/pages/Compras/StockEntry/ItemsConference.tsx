@@ -403,7 +403,7 @@ export const ItemsConference: React.FC<Props> = ({
         rowKey="tempId"
         size="small"
         bordered
-        pagination={{ pageSize: 10, showSizeChanger: true }}
+        pagination={{ pageSize: 50, showSizeChanger: true }}
       />
 
       {/* ================= MODAL: DEFINIR GRUPO EM LOTE ================= */}

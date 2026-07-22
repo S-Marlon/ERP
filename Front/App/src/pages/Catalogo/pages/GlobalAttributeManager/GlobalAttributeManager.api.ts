@@ -30,7 +30,8 @@ const handleResponse = async <T>(response: Response, defaultError: string): Prom
  * 🔍 Listar Grupos de Atributos
  */
 export const getGruposAtributos = async (tenantId: number): Promise<GrupoVisualAPIResponse[]> => {
-  const response = await fetch(`${API_BASE_URL}/grupos?tenant_id=${tenantId}`, {
+  // 🟢 Corrigido de '/grupos' para '/atributos-grupos'
+  const response = await fetch(`${API_BASE_URL}/atributos-grupos?tenant_id=${tenantId}`, {
     method: 'GET',
     headers: DEFAULT_HEADERS,
   });
@@ -48,7 +49,8 @@ export const getGruposAtributos = async (tenantId: number): Promise<GrupoVisualA
  * ➕ Criar novo Grupo Semântico
  */
 export const createGrupoAtributo = async (data: { nome: string; descricao?: string }, tenantId: number = 1): Promise<any> => {
-  const response = await fetch(`${API_BASE_URL}/grupos`, {
+  // 🟢 Corrigido de '/grupos' para '/atributos-grupos'
+  const response = await fetch(`${API_BASE_URL}/atributos-grupos`, {
     method: 'POST',
     headers: {
       ...DEFAULT_HEADERS,
@@ -64,7 +66,8 @@ export const createGrupoAtributo = async (data: { nome: string; descricao?: stri
  * ✏️ Atualizar Grupo Semântico
  */
 export const updateGrupoAtributo = async (idGrupo: string, data: { nome: string; descricao?: string }, tenantId: number = 1): Promise<any> => {
-  const response = await fetch(`${API_BASE_URL}/grupos/${idGrupo}`, {
+  // 🟢 Corrigido de '/grupos/:id' para '/atributos-grupos/:id'
+  const response = await fetch(`${API_BASE_URL}/atributos-grupos/${idGrupo}`, {
     method: 'PUT',
     headers: {
       ...DEFAULT_HEADERS,
@@ -80,7 +83,8 @@ export const updateGrupoAtributo = async (idGrupo: string, data: { nome: string;
  * 🗑️ Deletar Grupo Semântico
  */
 export const deleteGrupoAtributo = async (idGrupo: string, tenantId: number = 1): Promise<any> => {
-  const response = await fetch(`${API_BASE_URL}/grupos/${idGrupo}`, {
+  // 🟢 Corrigido de '/grupos/:id' para '/atributos-grupos/:id'
+  const response = await fetch(`${API_BASE_URL}/atributos-grupos/${idGrupo}`, {
     method: 'DELETE',
     headers: {
       ...DEFAULT_HEADERS,
@@ -90,7 +94,6 @@ export const deleteGrupoAtributo = async (idGrupo: string, tenantId: number = 1)
 
   return handleResponse<any>(response, 'Erro ao remover o grupo semântico.');
 };
-
 // =========================================================================
 // 📏 AUXILIARES: UNIDADES DE MEDIDA
 // =========================================================================

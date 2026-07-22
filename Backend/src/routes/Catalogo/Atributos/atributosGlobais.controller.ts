@@ -319,5 +319,3 @@ export async function createAtributoGlobalRapido(req: Request, res: Response): P
     connection.release();
   }
 }
-
-
