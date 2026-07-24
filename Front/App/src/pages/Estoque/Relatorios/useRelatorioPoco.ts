@@ -354,6 +354,273 @@ export function useRelatorioPoco() {
   }
 };
 
+
+
+
+
+const handlePrintBlank = () => {
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) {
+    message.warning("Por favor, permita pop-ups para visualizar o relatório.");
+    return;
+  }
+
+  // Gera linhas vazias padrão para as tabelas
+  const emptyRowsPerf = Array(3).fill('<tr><td style="height: 24px;"></td><td></td><td></td></tr>').join('');
+  const emptyRowsRev = Array(3).fill('<tr><td style="height: 24px;"></td><td></td><td></td><td></td></tr>').join('');
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+      <meta charset="UTF-8">
+      <title>Relatório Técnico de Poço - Em Branco</title>
+      <style>
+        * { box-sizing: border-box; }
+        body { 
+          font-family: 'Segoe UI', Helvetica, Arial, sans-serif; 
+          margin: 0; 
+          padding: 12px; 
+          color: #2D3748; 
+          font-size: 12px; 
+          line-height: 1.4; 
+          background-color: #fff;
+        }
+        
+        /* Topo Elegante estilo corporativo */
+        .header { 
+          display: flex; 
+          justify-content: space-between; 
+          align-items: center; 
+          border-bottom: 2px solid #004d54; 
+          padding-bottom: 12px; 
+          margin-bottom: 20px; 
+        }
+        .header-title h1 { 
+          margin: 0; 
+          color: #004d54; 
+          font-size: 18px; 
+          font-weight: 700; 
+          letter-spacing: 0.5px;
+        }
+        .header-title p { margin: 4px 0 0 0; color: #718096; font-size: 10px; }
+        .header-meta { text-align: right; color: #4A5568; font-size: 10px; }
+
+        /* Box de Seções */
+        .section { 
+          background: #ffffff; 
+          border: 1px solid #E2E8F0; 
+          padding: 8px; 
+          margin-bottom: 10px; 
+          border-radius: 6px; 
+          box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+        }
+        .section-title { 
+          font-weight: 700; 
+          color: #004d54; 
+          border-bottom: 1px solid #E2E8F0; 
+          padding-bottom: 5px; 
+          margin-bottom: 10px; 
+          text-transform: uppercase; 
+          font-size: 12px; 
+          letter-spacing: 0.7px; 
+        }
+
+        /* Grid System limpo */
+        .grid { display: flex; flex-wrap: wrap; margin: 0 -8px; }
+        .col-2 { width: 16.666%; padding: 0 8px; margin-bottom: 10px; }
+        .col-3 { width: 25%; padding: 0 8px; margin-bottom: 10px; }
+        .col-4 { width: 33.333%; padding: 0 8px; margin-bottom: 10px; }
+        .col-6 { width: 50%; padding: 0 8px; margin-bottom: 10px; }
+        .col-8 { width: 66.666%; padding: 0 8px; margin-bottom: 10px; }
+        .col-12 { width: 100%; padding: 0 8px; margin-bottom: 10px; }
+        
+        .label { font-weight: 600; color: #718096; text-transform: uppercase; font-size: 9px; margin-bottom: 2px; }
+        .value { font-size: 11.5px; color: #1A202C; font-weight: 700; min-height: 18px; border-bottom: 1px dashed #CBD5E0; }
+
+        /* Tabelas Zebradas com Design Moderno */
+        table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 10.5px; }
+        table, th, td { border: 1px solid #E2E8F0; }
+        th { background-color: #f4f7f9; color: #004d54; padding: 7px 10px; text-align: left; font-weight: 600; text-transform: uppercase; font-size: 9px; }
+        td { padding: 7px 10px; color: #2D3748; }
+        tr:nth-child(even) { background-color: #f8fafc; }
+
+        /* Matriz de Ocorrências e Checkboxes para Impressão */
+        .checkbox-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+        .checkbox-table td { padding: 6px 10px; border: 1px solid #E2E8F0; }
+        .checkbox-box {
+          display: inline-block;
+          width: 12px;
+          height: 12px;
+          border: 1px solid #4A5568;
+          margin-right: 4px;
+          vertical-align: middle;
+        }
+
+        /* Assinaturas na parte inferior */
+        .footer-signatures { margin-top: 50px; display: flex; justify-content: space-between; page-break-inside: avoid; }
+        .sig-box { text-align: center; width: 45%; border-top: 1px solid #A0AEC0; padding-top: 6px; font-size: 11px; color: #1A202C; font-weight: 500; }
+        .sig-box span { color: #718096; font-size: 9px; display: block; margin-top: 2px; }
+
+        @media print {
+          body { padding: 0; margin: 0; }
+          .section { page-break-inside: avoid; box-shadow: none; }
+          th { background-color: #f4f7f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          tr:nth-child(even) { background-color: #f8fafc !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div class="header-title">
+          <h1>RELATÓRIO TÉCNICO DE POÇO ARTESIANO</h1>
+          <p>Especificações Estruturais, Bombeamento e Parâmetros Hidrodinâmicos</p>
+        </div>
+        <div class="header-meta">
+          <strong>Data de Emissão:</strong> ____/____/________<br>
+          <strong>Status do Documento:</strong> Formulário de Campo
+        </div>
+      </div>
+
+      <!-- 1. DADOS DO CLIENTE -->
+      <div class="section">
+        <div class="section-title">Identificação do Cliente / Proprietário</div>
+        <div class="grid">
+          <div class="col-6"><div class="label">Nome / Razão Social</div><div class="value"></div></div>
+          <div class="col-3"><div class="label">CPF / CNPJ</div><div class="value"></div></div>
+          <div class="col-3"><div class="label">Contato Telefônico</div><div class="value"></div></div>
+          <div class="col-6"><div class="label">Endereço da Propriedade</div><div class="value"></div></div>
+          <div class="col-2"><div class="label">Bairro</div><div class="value"></div></div>
+          <div class="col-2"><div class="label">CEP</div><div class="value"></div></div>
+          <div class="col-2"><div class="label">Cidade / UF</div><div class="value"></div></div>
+        </div>
+      </div>
+
+      <!-- 2. DADOS DA OBRA E GEOLOGIA -->
+      <div class="section">
+        <div class="section-title">Dados Cronológicos e Dados Geológicos Básicos</div>
+        <div class="grid">
+          <div class="col-3"><div class="label">Coordenadas Geográficas (GPS)</div><div class="value"></div></div>
+          <div class="col-3"><div class="label">Profundidade Final</div><div class="value"></div></div>
+          <div class="col-3"><div class="label">Diâmetro Nominal Interno</div><div class="value"></div></div>
+          <div class="col-3"><div class="label">Vazão Estimada (Perfuração)</div><div class="value"></div></div>
+        </div>
+      </div>
+
+      <!-- 3. PERFIL E ESTRUTURA -->
+      <div class="section">
+        <div class="section-title">Perfil Estrutural e Construtivo do Poço</div>
+        <div class="grid">
+          <div class="col-2"><div class="label">Data de Início</div><div class="value"></div></div>
+          <div class="col-2"><div class="label">Data de Conclusão</div><div class="value"></div></div>
+          <div class="col-2"><div class="label">Período de Garantia</div><div class="value"></div></div>
+          <div class="col-3"><div class="label">Término da Garantia</div><div class="value"></div></div>
+          <div class="col-3"><div class="label">Formação / Solo Predominante</div><div class="value"></div></div>
+
+          <div class="col-6">
+            <div class="label" style="margin-bottom: 6px;">Etapas de Perfuração e Diâmetros</div>
+            <table>
+              <thead>
+                <tr><th>De (m)</th><th>Até (m)</th><th>Diâmetro Nominal</th></tr>
+              </thead>
+              <tbody>
+                ${emptyRowsPerf}
+              </tbody>
+            </table>
+          </div>
+          <div class="col-6">
+            <div class="label" style="margin-bottom: 6px;">Coluna de Revestimento / Isolação</div>
+            <table>
+              <thead>
+                <tr><th>De (m)</th><th>Até (m)</th><th>Diâmetro</th><th>Especificação Material</th></tr>
+              </thead>
+              <tbody>
+                ${emptyRowsRev}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. SISTEMA DE BOMBEAMENTO -->
+      <div class="section">
+        <div class="section-title">Conjunto Motobomba e Componentes Adutores</div>
+        <div class="grid">
+          <div class="col-3"><div class="label">Fabricante/Marca da Bomba</div><div class="value"></div></div>
+          <div class="col-3"><div class="label">Motor (Modelo/Potência)</div><div class="value"></div></div>
+          <div class="col-3"><div class="label">Modelo do Bombeador</div><div class="value"></div></div>
+          <div class="col-3"><div class="label">Data de Instalação</div><div class="value"></div></div>
+          
+          <div class="col-3"><div class="label">Tubulação Edutora</div><div class="value"></div></div>
+          <div class="col-3"><div class="label">Profundidade da Bomba</div><div class="value"></div></div>
+          <div class="col-2"><div class="label">Cabo Elétrico</div><div class="value"></div></div>
+          <div class="col-2"><div class="label">Vazão Regulada</div><div class="value"></div></div>
+          <div class="col-2"><div class="label">Cavalete de Saída</div><div class="value"></div></div>
+        </div>
+      </div>
+
+      <!-- 5. DIAGNÓSTICO TÉCNICO E MANUTENÇÃO -->
+      <div class="section">
+        <div class="section-title">Matriz de Anomalias e Plano Analítico de Manutenção</div>
+        
+        <table class="checkbox-table">
+          <tr>
+            <td><span class="label">Queda de Vazão Crítica:</span></td>
+            <td><span class="checkbox-box"></span> Sim &nbsp; <span class="checkbox-box"></span> Não</td>
+            <td><span class="label">Presença de Ferro/Manganês:</span></td>
+            <td><span class="checkbox-box"></span> Sim &nbsp; <span class="checkbox-box"></span> Não</td>
+            <td><span class="label">Água Turva / Areia Fina:</span></td>
+            <td><span class="checkbox-box"></span> Sim &nbsp; <span class="checkbox-box"></span> Não</td>
+          </tr>
+          <tr>
+            <td><span class="label">Instabilidade na Rede Elétrica:</span></td>
+            <td><span class="checkbox-box"></span> Sim &nbsp; <span class="checkbox-box"></span> Não</td>
+            <td><span class="label">Risco Infiltração Superficial:</span></td>
+            <td><span class="checkbox-box"></span> Sim &nbsp; <span class="checkbox-box"></span> Não</td>
+            <td><span class="label">Superaquecimento da Motobomba:</span></td>
+            <td><span class="checkbox-box"></span> Sim &nbsp; <span class="checkbox-box"></span> Não</td>
+          </tr>
+        </table>
+
+        <div class="grid">
+          <div class="col-2"><div class="label">Nível Estático (NE)</div><div class="value"></div></div>
+          <div class="col-2"><div class="label">Nível Dinâmico (ND)</div><div class="value"></div></div>
+          <div class="col-4"><div class="label">Leitura de Amperagem Atual</div><div class="value"></div></div>
+          <div class="col-4"><div class="label">Resistência de Isolamento (Megômetro)</div><div class="value"></div></div>
+          
+          <div class="col-12" style="margin-top: 8px;">
+            <div class="label">Diretrizes Preventivas Estipuladas / Observações</div>
+            <div class="value" style="height: 50px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ASSINATURAS -->
+      <div class="footer-signatures">
+        <div class="sig-box">
+          Responsável Técnico
+          <span>CREA / CFT / Visto de Fiscalização</span>
+        </div>
+        <div class="sig-box">
+          Assinatura do Proprietário
+          <span>Termo de Recebimento e Conformidade Técnica</span>
+        </div>
+      </div>
+
+      <script>
+        window.addEventListener('DOMContentLoaded', () => {
+          setTimeout(() => {
+            window.print();
+          }, 300);
+        });
+      </script>
+    </body>
+    </html>
+  `);
+
+  printWindow.document.close();
+};
+
   // NOME CORRIGIDO AQUI: handleExportXML
   const handleExportXML = () => {
     const obtenerValor = (valor: any) => (valor === undefined || valor === null ? '' : valor);
@@ -539,6 +806,7 @@ export function useRelatorioPoco() {
     garantiaMeses,
     handleValuesChange,
     handlePrint,
+    handlePrintBlank,
     handleExportXML,
     handleImportXML
   };

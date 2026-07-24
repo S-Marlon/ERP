@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-// Como está no seu código (Isso vai quebrar porque handlePrint precisa do estado que está lá dentro)
 import { useRelatorioPoco } from "./useRelatorioPoco";
 import {
     Form,
@@ -73,6 +72,7 @@ export default function RelatorioPocoPage() {
         garantiaMeses,
         handleValuesChange,
         handlePrint,
+        handlePrintBlank,
         handleExportXML,
         handleImportXML
     } = useRelatorioPoco();
@@ -145,6 +145,11 @@ export default function RelatorioPocoPage() {
                     </Space>
 
                     <Space size="small">
+
+   <Button icon={<SaveOutlined />} onClick={handlePrintBlank}>
+                            Imprimir em Branco
+                        </Button>
+
                         {/* IMPORTAR: O Hook já gerencia o arquivo internamente */}
                         <Upload
                             beforeUpload={(file) => {
@@ -156,6 +161,8 @@ export default function RelatorioPocoPage() {
                         >
                             <Button icon={<UploadOutlined />}>Importar XML</Button>
                         </Upload>
+
+                     
 
                         {/* EXPORTAR: Não precisa passar 'form.getFieldsValue()', a função já usa o formData interno */}
                         <Button icon={<DownloadOutlined />} onClick={handleExportXML}>

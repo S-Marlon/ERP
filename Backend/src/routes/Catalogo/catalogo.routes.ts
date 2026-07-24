@@ -11,7 +11,7 @@ import {
   deleteAtributoGlobal
 } from './Atributos/atributosGlobais.controller';
 
-// 📂 Controller de Grupos de Atributos Semânticos (Ex: Características Físicas)
+// 📂 Controller de Grupos de Atributos Semânticos
 import { 
   getGruposAtributos, 
   createGrupoAtributo, 
@@ -32,7 +32,7 @@ import {
   getAtributosByCategoria
 } from './Categorias/categorias';
 
-// 📦 Controller de Famílias de Itens (Antigo controller "grupos" agora refatorado para Famílias)
+// 📦 Controller de Famílias de Itens
 import { 
   createFamilia, 
   deleteFamilia, 
@@ -40,16 +40,20 @@ import {
   updateFamilia 
 } from './Familias/familias.controller';
 
+// 🏷️ Controller de Produtos do Catálogo
+import {
+  getProdutos,
+  updateProduto,
+  saveProdutosLote
+} from './Produtos/produtos.controller';
+
 const router = Router();
 
 // =========================================================================
 // 🧬 POOL DE ATRIBUTOS GLOBAIS (Dicionário de Especificações)
 // =========================================================================
-// Rotas de consumo dos Atributos Globais (Termos Disponíveis no ERP)
 router.get('/atributos-globais', getAtributosGlobais);
 router.post('/atributos-globais', createAtributoGlobal);
-
-// Padrão de cadastros exigido pelo frontend para o seletor global de termos
 router.get('/cadastros/atributos', getAtributosGlobais); 
 router.get('/cadastros/atributos-globais', getAtributosGlobais);
 router.post('/cadastros/atributos-globais/rapido', createAtributoGlobalRapido);
@@ -63,8 +67,6 @@ router.get('/atributos-grupos', getGruposAtributos);
 router.post('/atributos-grupos', createGrupoAtributo);
 router.put('/atributos-grupos/:idGrupo', updateGrupoAtributo);
 router.delete('/atributos-grupos/:idGrupo', deleteGrupoAtributo);
-
-// Alias para retrocompatibilidade do front-end
 router.get('/cadastros/atributos-grupos', getGruposAtributos);
 
 // =========================================================================
@@ -86,16 +88,16 @@ router.get('/cadastros/categorias/:idCategoria/atributos', getAtributosByCategor
 // =========================================================================
 // 📦 ROTAS DE FAMÍLIAS DE PRODUTOS
 // =========================================================================
-// Endpoints oficiais usando o nome correto "familias"
 router.get('/cadastros/familias', getFamilias);
 router.post('/cadastros/familias', createFamilia);
 router.put('/cadastros/familias/:idFamilia', updateFamilia);
 router.delete('/cadastros/familias/:idFamilia', deleteFamilia);
 
-// // ALIAS LEGADO: Mantido para que o frontend que consome "/cadastros/grupos" não pare de funcionar
-//  router.get('/cadastros/grupos', getFamilias);
-// router.post('/cadastros/grupos', createFamilia);
-// router.put('/cadastros/grupos/:idGrupo', updateFamilia);
-// router.delete('/cadastros/grupos/:idGrupo', deleteFamilia);
+// =========================================================================
+// 🏷️ ROTAS DE PRODUTOS E CATÁLOGO
+// =========================================================================
+router.get('/produtos', getProdutos);
+router.put('/produtos/:idItem', updateProduto);
+router.post('/produtos/lote', saveProdutosLote);
 
 export default router;

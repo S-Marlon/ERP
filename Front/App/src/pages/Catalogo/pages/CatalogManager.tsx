@@ -53,6 +53,12 @@ export const CatalogManager: React.FC = () => {
       icone: <SettingOutlined />,
       status: 'PRONTO',
       detalhes: 'Tabelas: atributos_comercial'
+    },
+    {
+    titulo: 'Marcas',
+      descricao: 'Gerenciamento de marcas próprias e de terceiros, com regras de visibilidade e herança.',
+      rota: '/catalogo/marcas',
+      icone: <SettingOutlined />,
     }
   ];
 

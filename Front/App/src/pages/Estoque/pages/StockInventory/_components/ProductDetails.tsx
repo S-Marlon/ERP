@@ -590,9 +590,8 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onSave, onClos
                       isDirty={formData.category !== product?.category}
                       originalValue={product?.category}
                       onRevert={() => revertField('category')}
-                      // style={{ width: '100%', maxWidth: '100%' }}
                     >
-                      <select name="category" value={formData.category || ''} onChange={handleChange} style={styles.input} style={{ ...styles.input, width: '100%', minWidth: 0 }}>
+                      <select name="category" value={formData.category || ''} onChange={handleChange} style={styles.input} >
                         <option value="">Selecione...</option>
                         <option value={formData.category || ''}>{formData.category || 'Selecione...'}</option>
                       </select>
@@ -604,7 +603,6 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onSave, onClos
                       originalValue={product?.brand}
                       showLock={true}
                       onRevert={() => revertField('brand')}
-                      // style={{ width: '100%', maxWidth: '100%' }}
                     >
                       <select name="brand" value={formData.brand || ''} onChange={handleChange} style={styles.input} >
                         <option value="">Selecione...</option>

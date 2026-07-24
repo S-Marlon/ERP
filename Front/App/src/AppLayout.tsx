@@ -46,6 +46,9 @@ import FornecedoresList from "./pages/Compras/FornecedoresList/FornecedoresList"
 import RelatoriosPage from "./pages/Estoque/Relatorios/Relatorios";
 import RelatorioPocoPage from "./pages/Estoque/Relatorios/RelatorioPocoPage";
 import { IndustrialLandingPage } from "./pages/Dashboard/IndustrialLandingPage";
+import { ParceirosDashboard } from "./pages/Catalogo/Parceiros/ParceirosDashboard";
+import FuncionariosPage from "./pages/Catalogo/Parceiros/FuncionariosPage";
+import { MarcasPage } from "./pages/Catalogo/pages/MarcasPage";
 
 function AppLayout() {
   const location = useLocation();
@@ -95,8 +98,11 @@ const isPDV = location.pathname.startsWith("/vendas/pdv");
 
           <Route path="/clientes" element={<Clientes />} />
 
+          <Route path="/parceiros" element={<ParceirosDashboard />} />
+          <Route path="/parceiros/fornecedores" element={<FornecedoresList/>} />
+          <Route path="/parceiros/clientes" element={<Clientes/>} />
+          <Route path="/parceiros/funcionarios" element={<FuncionariosPage/>} />
 
-          <Route path="/fornecedores" element={<Fornecedores/>} /> 
 
           <Route path="/clientes/novo" element={<CadastroCliente />} /> 
           <Route path="/contratos/novo" element={<CadastroContrato />} />
@@ -123,6 +129,7 @@ const isPDV = location.pathname.startsWith("/vendas/pdv");
           <Route path="/catalogo/categorias" element={<CategoryManager/>} />
           <Route path="/catalogo/atributos" element={<GlobalAttributeManager/>} />
           <Route path="/catalogo/gerenciador" element={<CatalogSku/>} />
+          <Route path="/catalogo/marcas" element={<MarcasPage/>} />
 
 
 

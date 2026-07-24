@@ -39,7 +39,7 @@ const AppSidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
 
   const menu: MenuItem[] = [
     { to: "/", label: "Home", icon: Home, roles: ["admin", "operador"] },
-    { to: "/clientes", label: "Clientes", icon: Clientes, roles: ["admin"] },
+    { to: "/parceiros", label: "Parceiros", icon: Clientes, roles: ["admin"] },
     { to: "/produtos", label: "Produtos", icon: Produtos, roles: ["admin"] },
     { to: "/catalogo", label: "Catalogo", icon: Catalogo, roles: ["admin"] },
     {to: "/compras", label: "Compras", icon: Compras, roles: ["admin"]},
@@ -57,7 +57,6 @@ const AppSidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
       ],
     },
     { to: "/obras", label: "Obras", icon: Obras, roles: ["admin"] },
-    { to: "/fornecedores", label: "Fornecedores", icon: Fornecedores , roles: ["admin"] },
   ];
 
   /* ===================== */
