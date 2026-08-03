@@ -1,19 +1,13 @@
-import './App.css'
-import './forms.css'
 import { BrowserRouter } from "react-router-dom";
 import { UIProvider } from './context/UIContext';
-
-
 import AppLayout from './AppLayout';
 
-function App() {
+export default function App() {
   return (
-     <UIProvider>
-    <BrowserRouter>
-      <AppLayout />
-    </BrowserRouter>
-  </UIProvider>
+    <UIProvider>
+      <BrowserRouter>
+        <AppLayout />
+      </BrowserRouter>
+    </UIProvider>
   );
 }
-
-export default App

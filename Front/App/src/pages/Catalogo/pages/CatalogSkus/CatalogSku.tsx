@@ -16,8 +16,9 @@ import {
   Select,
   Radio,
   message,
-  Image,
-  Avatar
+  Avatar,
+  Modal,
+  Upload
 } from 'antd';
 import { 
   AppstoreOutlined, 
@@ -35,7 +36,9 @@ import {
   UnorderedListOutlined,
   ReloadOutlined,
   PictureOutlined,
-  ImportOutlined
+  ImportOutlined,
+  CodeOutlined,
+  UploadOutlined
 } from '@ant-design/icons';
 
 import type { ColumnsType } from 'antd/es/table';
@@ -46,6 +49,7 @@ import ProductDetailsDrawer from './ProductDetailsDrawer';
 import CreateProductModal from './CreateProductModal'; 
 
 const { Title, Text } = Typography;
+const { TextArea } = Input;
 
 type FilterType = 'all' | 'activeSkus' | 'noStock' | 'criticalStock';
 
@@ -66,21 +70,21 @@ export default function CatalogSku() {
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
   const [selectedStructure, setSelectedStructure] = useState<string | undefined>(undefined);
 
+  // ESTADOS DO MODAL JSON
+  const [isJsonModalVisible, setIsJsonModalVisible] = useState(false);
+  const [jsonInput, setJsonInput] = useState('');
+  const [parsedJsonPreview, setParsedJsonPreview] = useState<ItemParentType[]>([]);
+
   // Rascunho / Lote
   const [creationBatch, setCreationBatch] = useState<ItemParentType[]>([]);
   const [showBatchPanel, setShowBatchPanel] = useState(false);
 
-  // Helper para determinar se o item pertence a uma Família ou é Solto/Individual
-// Helper preciso para determinar se o registro é uma Família Mestre
-const checkIsFamily = (record: ItemParentType): boolean => {
-  const isFamKey = String(record.id_item).startsWith('FAM-');
-  const hasMultipleSkus = (record.skus || []).length > 1;
+  const checkIsFamily = (record: ItemParentType): boolean => {
+    const isFamKey = String(record.id_item).startsWith('FAM-');
+    const hasMultipleSkus = (record.skus || []).length > 1;
+    return isFamKey || hasMultipleSkus;
+  };
 
-  // Se tem a chave de família ou tem múltiplos SKUs agrupados dentro dele
-  return isFamKey || hasMultipleSkus;
-};
-
-  // 1. CARREGAR DADOS DO SERVIÇO DE API
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
@@ -97,7 +101,6 @@ const checkIsFamily = (record: ItemParentType): boolean => {
     fetchProducts();
   }, [fetchProducts]);
 
-  // 2. SALVAR ATUALIZAÇÃO VIA API
   const handleUpdateProduct = async (idItem: string | number, updatedFields: any) => {
     try {
       await updateProduto(idItem, updatedFields);
@@ -109,7 +112,6 @@ const checkIsFamily = (record: ItemParentType): boolean => {
     }
   };
 
-  // 3. ENFILEIRAR ITEM LOCALMENTE NO RASCUNHO
   const handleSaveProduct = async (payload: any) => {
     const tempId = Date.now();
     const novoItemPai: ItemParentType = {
@@ -142,7 +144,93 @@ const checkIsFamily = (record: ItemParentType): boolean => {
     message.info('Item adicionado à fila de criação.');
   };
 
-  // 4. DISPARAR GRAVAÇÃO EM LOTE VIA API
+  const handleJsonInputChange = (val: string) => {
+    setJsonInput(val);
+    if (!val.trim()) {
+      setParsedJsonPreview([]);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(val);
+      const itemsArray = Array.isArray(parsed) ? parsed : [parsed];
+
+      const validatedItems: ItemParentType[] = itemsArray.map((item: any, idx: number) => {
+        const tempId = item.id_item || Date.now() + idx;
+        const mainSku = item.sku || `SKU-AUTO-${tempId}`;
+
+        const innerSkus: SkuChildType[] = Array.isArray(item.skus) && item.skus.length > 0
+          ? item.skus.map((s: any, sIdx: number) => ({
+              key: s.key || `${tempId}-${sIdx}`,
+              id_item: tempId,
+              sku: s.sku || `${mainSku}-${sIdx + 1}`,
+              variacao: s.variacao || 'Padrão',
+              marca: s.marca || item.marca || 'Própria',
+              estoque: Number(s.estoque ?? item.estoque ?? 0),
+              preco_venda: Number(s.preco_venda ?? item.preco_venda ?? 0),
+              custo_gerencial: Number(s.custo_gerencial ?? item.custo_gerencial ?? 0),
+              status: s.status || 'ATIVO',
+              imagem_url: s.imagem_url || item.imagem_url
+            }))
+          : [
+              {
+                key: `${tempId}-0`,
+                id_item: tempId,
+                sku: mainSku,
+                variacao: item.variacao || 'Principal',
+                marca: item.marca || 'Própria',
+                estoque: Number(item.estoque ?? 0),
+                preco_venda: Number(item.preco_venda ?? item.preco ?? 0),
+                custo_gerencial: Number(item.custo_gerencial ?? item.custo ?? 0),
+                status: 'ATIVO',
+                imagem_url: item.imagem_url
+              }
+            ];
+
+        return {
+          key: String(tempId),
+          id_item: tempId,
+          sku: mainSku,
+          nome_item: item.nome_item || item.nome || 'Produto Sem Nome',
+          tipo_recurso: item.tipo_recurso || 'PRODUTO',
+          status: item.status || 'ATIVO',
+          familia_id: item.familia_id || null,
+          categoria_id: item.categoria_id || null,
+          skus: innerSkus
+        };
+      });
+
+      setParsedJsonPreview(validatedItems);
+    } catch (e) {
+      setParsedJsonPreview([]);
+    }
+  };
+
+  const handleFileUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      handleJsonInputChange(content);
+    };
+    reader.readAsText(file);
+    return false;
+  };
+
+  const handleImportJsonToBatch = () => {
+    if (parsedJsonPreview.length === 0) {
+      message.error('Cole ou envie um JSON válido primeiro!');
+      return;
+    }
+
+    setCreationBatch(prev => [...parsedJsonPreview, ...prev]);
+    setShowBatchPanel(true);
+    message.success(`${parsedJsonPreview.length} item(ns) adicionado(s) à fila de criação!`);
+    
+    setIsJsonModalVisible(false);
+    setJsonInput('');
+    setParsedJsonPreview([]);
+  };
+
   const handleConfirmEntireBatch = async () => {
     setModalLoading(true);
     try {
@@ -167,223 +255,175 @@ const checkIsFamily = (record: ItemParentType): boolean => {
     setExpandedRowKeys(isExpanded ? expandedRowKeys.filter(k => k !== rowKey) : [...expandedRowKeys, rowKey]);
   };
 
-  // COLUNAS DA TABELA MESTRE
- const parentColumns: ColumnsType<ItemParentType> = [
-  {
-    title: 'Estrutura / Variações',
-    key: 'estrutura_variacoes',
-    width: '180px',
-    render: (_, record) => {
-      const isFamily = checkIsFamily(record);
-      const skus: SkuChildType[] = record.skus || [];
-
-      return (
-        <Space size="small" wrap>
-          {isFamily ? (
-            <>
-              <Tag color="purple" icon={<ClusterOutlined />}>
-                Família
-              </Tag>
-              <Tag color="blue">
-                {skus.length} {skus.length === 1 ? 'variação' : 'variações'}
-              </Tag>
-            </>
-          ) : (
-            <Tag color="default" icon={<UserOutlined />}>
-              Individual
-            </Tag>
-          )}
-        </Space>
-      );
+  const parentColumns: ColumnsType<ItemParentType> = [
+    {
+      title: 'SKU Master',
+      dataIndex: 'sku',
+      key: 'sku',
+      render: (text) => <Text code style={{ fontSize: '13px', fontWeight: 'bold' }}>{text}</Text>,
     },
-  },
-  {
-    title: 'SKU Master',
-    dataIndex: 'sku',
-    key: 'sku',
-    render: (text) => <Text code style={{ fontSize: '13px', fontWeight: 'bold' }}>{text}</Text>,
-  },
- 
-  
-
-
-{
-  title: 'Imagem',
-  key: 'imagem',
-  width: '70px',
-  render: (_, record) => {
-    const imgSrc = record.skus?.[0]?.imagem_url;
-
-    return (
-      <Avatar
-        shape="square"
-        size={48}
-        src={imgSrc}
-        icon={<PictureOutlined style={{ color: '#bfbfbf' }} />} // Ícone cinza quando não tem imagem
-        style={{
-          backgroundColor: '#f5f5f5', // Fundo cinza suave
-          border: '1px solid #d9d9d9',
-          borderRadius: '6px',
-        }}
-      />
-    );
-  },
-},
-
-
-
-
-  {
-    title: 'Nome do Produto',
-    dataIndex: 'nome_item',
-    key: 'nome_item',
-    render: (text) => <Text strong>{text}</Text>,
-  },
-  {
-    title: 'Categoria',
-    key: 'categoria',
-    render: (_, record) => {
-      return <Text>{record.categoria_id ? `Categoria ${record.categoria_id}` : '-'}</Text>;
-    }
-  },
-  {
-    title: 'Marca',
-    key: 'marca',
-    render: (_, record) => {
-      const skus = record.skus || [];
-      if (skus.length === 0) return <Text type="secondary">-</Text>;
-
-      // Extrai marcas únicas e remove valores vazios
-      const marcasUnicas = Array.from(new Set(skus.map(s => s.marca).filter(Boolean)));
-
-      if (marcasUnicas.length === 0) return <Text type="secondary">-</Text>;
-      
-      // Retorna as marcas separadas por vírgula (ex: "Nike, Adidas" ou apenas "Puma")
-      return <Text>{marcasUnicas.join(', ')}</Text>;
-    },
-  },
-  
-  {
-    title: 'Custo Gerencial',
-    key: 'precoCustoMedio',
-    render: (_, record) => {
-      const skus = record.skus || [];
-      if (skus.length === 0) return 'R$ 0,00';
-
-      const custos = skus.map(s => s.custo_gerencial || 0);
-      const minCusto = Math.min(...custos);
-      const maxCusto = Math.max(...custos);
-
-      // Se o menor for igual ao maior (ou se for individual), mostra apenas um valor
-      if (minCusto === maxCusto) {
-        return `R$ ${minCusto.toFixed(2)}`;
-      }
-
-      // Se houver variação de custo
-      return `(R$ ${minCusto.toFixed(2)}) - (R$ ${maxCusto.toFixed(2)})`;
-    },
-  },
-  {
-    title: 'Preço Venda',
-    key: 'precoVendaMedio',
-    render: (_, record) => {
-      const skus = record.skus || [];
-      if (skus.length === 0) return 'R$ 0,00';
-
-      const precios = skus.map(s => s.preco_venda || 0);
-      const minPreco = Math.min(...precios);
-      const maxPreco = Math.max(...precios);
-
-      // Se o menor for igual ao maior (ou se for individual), mostra apenas um valor
-      if (minPreco === maxPreco) {
-        return `R$ ${minPreco.toFixed(2)}`;
-      }
-
-      // Se houver variação de preço
-      return `(R$ ${minPreco.toFixed(2)}) - (R$ ${maxPreco.toFixed(2)})`;
-    },
-  },
-
-  {
-    title: 'Estoque Total',
-    key: 'estoqueTotal',
-    render: (_, record) => {
-      const isFamily = checkIsFamily(record);
-      const skus = record.skus || [];
-      const total = skus.reduce((acc, sku) => acc + (sku.estoque || 0), 0);
-
-      if (!isFamily && skus.length > 0) {
-        const estoque = skus[0].estoque;
+    {
+      title: 'Imagem',
+      key: 'imagem',
+      width: '0px',
+      render: (_, record) => {
+        const imgSrc = record.skus?.[0]?.imagem_url;
         return (
-          <Text strong style={{ color: estoque === 0 ? '#cf1322' : 'inherit' }}>
-            {estoque} {estoque === 0 && '(Esgotado)'}
-          </Text>
+          <Avatar
+            shape="square"
+            size={48}
+            src={imgSrc}
+            icon={<PictureOutlined style={{ color: '#bfbfbf' }} />}
+            style={{ backgroundColor: '#f5f5f5', border: '1px solid #d9d9d9', borderRadius: '6px' }}
+          />
         );
-      }
-
-      return <Text strong>{total}</Text>;
+      },
     },
-  },
-  {
-    title: 'Status',
-    key: 'statusGeral',
-    render: (_, record) => {
-      const skus = record.skus || [];
-      const hasAtivo = skus.some(sku => sku.status === 'ATIVO');
-      const hasSemEstoque = skus.some(sku => sku.status === 'Sem Estoque');
+    {
+      title: 'Estrutura',
+      key: 'estrutura_variacoes',
+      width: '100px',
+      render: (_, record) => {
+        const isFamily = checkIsFamily(record);
+        const skus: SkuChildType[] = record.skus || [];
 
-      if (hasAtivo) return <Tag color="green">Ativo</Tag>;
-      if (hasSemEstoque) return <Tag color="orange">Sem Estoque</Tag>;
-      return <Tag color="red">Inativo</Tag>;
+        return (
+          <Space size="small" wrap>
+            {isFamily ? (
+              <>
+                <Tag color="purple" icon={<ClusterOutlined />}>Família</Tag>
+                <Tag color="blue">{skus.length} {skus.length === 1 ? 'variação' : 'variações'}</Tag>
+              </>
+            ) : (
+              <Tag color="default" icon={<UserOutlined />}>Individual</Tag>
+            )}
+          </Space>
+        );
+      },
     },
-  },
-  {
-    title: 'Ações',
-    key: 'action',
-    width: '150px',
-    render: (_, record) => {
-      const isFamily = checkIsFamily(record);
-      const isExpanded = expandedRowKeys.includes(record.key);
-      const hasSkus = (record.skus || []).length > 0;
+    {
+      title: 'Nome do Produto',
+      dataIndex: 'nome_item',
+      key: 'nome_item',
+      render: (text) => <Text strong>{text}</Text>,
+    },
+    {
+      title: 'Categoria',
+      key: 'categoria',
+      render: (_, record) => <Text>{record.categoria_id ? `Categoria ${record.categoria_id}` : '-'}</Text>
+    },
+    {
+      title: 'Marca',
+      key: 'marca',
+      render: (_, record) => {
+        const skus = record.skus || [];
+        if (skus.length === 0) return <Text type="secondary">-</Text>;
+        const marcasUnicas = Array.from(new Set(skus.map(s => s.marca).filter(Boolean)));
+        if (marcasUnicas.length === 0) return <Text type="secondary">-</Text>;
+        return <Text>{marcasUnicas.join(', ')}</Text>;
+      },
+    },
+    {
+      title: 'Custo Gerencial',
+      key: 'precoCustoMedio',
+      render: (_, record) => {
+        const skus = record.skus || [];
+        if (skus.length === 0) return 'R$ 0,00';
+        const custos = skus.map(s => s.custo_gerencial || 0);
+        const minCusto = Math.min(...custos);
+        const maxCusto = Math.max(...custos);
 
-      return (
-        <Space size="middle">
-          {isFamily && (
+        if (minCusto === maxCusto) return `R$ ${minCusto.toFixed(2)}`;
+        return <span style={{ fontSize: 'calc(1em - 1pt)' }}>{`R$ ${minCusto.toFixed(2)} - R$ ${maxCusto.toFixed(2)}`}</span>;
+      },
+    },
+    {
+      title: 'Preço Venda',
+      key: 'precoVendaMedio',
+      render: (_, record) => {
+        const skus = record.skus || [];
+        if (skus.length === 0) return 'R$ 0,00';
+        const precos = skus.map(s => s.preco_venda || 0);
+        const minPreco = Math.min(...precos);
+        const maxPreco = Math.max(...precos);
+
+        if (minPreco === maxPreco) return `R$ ${minPreco.toFixed(2)}`;
+        return <span style={{ fontSize: 'calc(1em - 1pt)' }}>{`R$ ${minPreco.toFixed(2)} - R$ ${maxPreco.toFixed(2)}`}</span>;
+      },
+    },
+    {
+      title: 'Estoque Total',
+      key: 'estoqueTotal',
+      render: (_, record) => {
+        const isFamily = checkIsFamily(record);
+        const skus = record.skus || [];
+        const total = skus.reduce((acc, sku) => acc + (sku.estoque || 0), 0);
+
+        if (!isFamily && skus.length > 0) {
+          const estoque = skus[0].estoque;
+          return <Text strong style={{ color: estoque === 0 ? '#cf1322' : 'inherit' }}>{estoque} {estoque === 0 && '(Esgotado)'}</Text>;
+        }
+        return <Text strong>{total}</Text>;
+      },
+    },
+    {
+      title: 'Status',
+      key: 'statusGeral',
+      render: (_, record) => {
+        const skus = record.skus || [];
+        const hasAtivo = skus.some(sku => sku.status === 'ATIVO');
+        const hasSemEstoque = skus.some(sku => sku.status === 'Sem Estoque');
+
+        if (hasAtivo) return <Tag color="green">Ativo</Tag>;
+        if (hasSemEstoque) return <Tag color="orange">Sem Estoque</Tag>;
+        return <Tag color="red">Inativo</Tag>;
+      },
+    },
+    {
+      title: 'Ações',
+      key: 'action',
+      width: '150px',
+      render: (_, record) => {
+        const isFamily = checkIsFamily(record);
+        const isExpanded = expandedRowKeys.includes(record.key);
+        const hasSkus = (record.skus || []).length > 0;
+
+        return (
+          <Space size="middle">
             <Button 
-              type="default" 
-              size="small"
-              icon={isExpanded ? <DownOutlined /> : <RightOutlined />}
-              onClick={() => toggleExpand(record.key)}
-              disabled={!hasSkus}
+              type="primary" 
+              size="small" 
+              onClick={() => {
+                setSelectedProduct(record);
+                setIsDrawerVisible(true);
+              }}
             >
-              {isExpanded ? 'Fechar' : 'Ver SKUs'}
+              Editar
             </Button>
-          )}
+            {isFamily && (
+              <Button 
+                type="default" 
+                size="small"
+                icon={isExpanded ? <DownOutlined /> : <RightOutlined />}
+                onClick={() => toggleExpand(record.key)}
+                disabled={!hasSkus}
+              >
+                {isExpanded ? 'Fechar' : 'Ver SKUs'}
+              </Button>
+            )}
+          </Space>
+        );
+      },
+    }
+  ];
 
-          <Button 
-            type="link" 
-            size="small" 
-            onClick={() => {
-              setSelectedProduct(record);
-              setIsDrawerVisible(true);
-            }}
-          >
-            Editar
-          </Button>
-        </Space>
-      );
-    },
-  }
-];
-
-  // SUBTABELA DE SKUS
   const expandedRowRender = (parentRecord: ItemParentType) => {
     const childColumns: ColumnsType<SkuChildType> = [
       { title: 'Código SKU', dataIndex: 'sku', key: 'sku' },
       { title: 'Produto', dataIndex: 'nome_item', key: 'nome_item' },
       { title: 'Especificação', dataIndex: 'variacao', key: 'variacao' },
       { title: 'Marca', dataIndex: 'marca', key: 'marca' },
-      { title: 'Preço Venda', dataIndex: 'preco_venda', key: 'preco_venda', render: (v) => `R$ ${v.toFixed(2)}` },
+      { title: 'Preço Venda', dataIndex: 'preco_venda', key: 'preco_venda', render: (v) => `R$ ${(v || 0).toFixed(2)}` },
       { 
         title: 'Estoque', 
         dataIndex: 'estoque', 
@@ -395,49 +435,55 @@ const checkIsFamily = (record: ItemParentType): boolean => {
         )
       }
     ];
-    return <Table columns={childColumns} dataSource={parentRecord.skus} pagination={false} size="small" bordered />;
+    return <Table columns={childColumns} dataSource={parentRecord.skus} pagination={false} size="small" bordered rowKey="key" />;
   };
 
-  // FILTRAGEM LOCAL
-  // FILTRAGEM LOCAL
-const filteredData = React.useMemo(() => {
-  return products.filter(item => {
-    // 1. Busca textual (Nome ou SKU)
-    const matchesSearch = 
-      item.nome_item?.toLowerCase().includes(searchText.toLowerCase()) ||
-      item.sku?.toLowerCase().includes(searchText.toLowerCase());
-    
-    if (!matchesSearch) return false;
+  const filteredData = React.useMemo(() => {
+    return products.filter(item => {
+      const matchesSearch = 
+        item.nome_item?.toLowerCase().includes(searchText.toLowerCase()) ||
+        item.sku?.toLowerCase().includes(searchText.toLowerCase());
+      
+      if (!matchesSearch) return false;
 
-    const skus = item.skus || [];
+      const skus = item.skus || [];
 
-    // 2. Filtro de estoque
-    if (selectedFilter === 'noStock' && !skus.some(sku => sku.estoque === 0)) return false;
-    if (selectedFilter === 'criticalStock' && !skus.some(sku => sku.estoque > 0 && sku.estoque <= 5)) return false;
-    if (selectedFilter === 'activeSkus' && !skus.some(sku => sku.estoque > 0)) return false;
+      if (selectedFilter === 'noStock' && !skus.some(sku => sku.estoque === 0)) return false;
+      if (selectedFilter === 'criticalStock' && !skus.some(sku => sku.estoque > 0 && sku.estoque <= 5)) return false;
+      if (selectedFilter === 'activeSkus' && !skus.some(sku => sku.estoque > 0)) return false;
 
-    // 3. Filtros Select
-    if (selectedSupplier && !skus.some(sku => sku.marca?.toLowerCase() === selectedSupplier.toLowerCase())) return false;
-    if (selectedCategory && String(item.categoria_id) !== selectedCategory) return false;
+      if (selectedSupplier && !skus.some(sku => sku.marca?.toLowerCase() === selectedSupplier.toLowerCase())) return false;
+      if (selectedCategory && String(item.categoria_id) !== selectedCategory) return false;
 
-    // 4. Estrutura (Família vs Individual)
-    const isFamily = checkIsFamily(item);
+      const isFamily = checkIsFamily(item);
+      if (selectedStructure === 'familia' && !isFamily) return false;
+      if (selectedStructure === 'individual' && isFamily) return false;
 
-    if (selectedStructure === 'familia' && !isFamily) return false;
-    if (selectedStructure === 'individual' && isFamily) return false;
-
-    return true;
-  });
-}, [products, searchText, selectedFilter, selectedSupplier, selectedCategory, selectedStructure]);
+      return true;
+    });
+  }, [products, searchText, selectedFilter, selectedSupplier, selectedCategory, selectedStructure]);
 
   const handleClearAllFilters = () => {
-  setSelectedFilter('all');
-  setSelectedSupplier(undefined);
-  setSelectedCategory(undefined);
-  setSelectedStructure(undefined);
-  setSearchText('');
-  setExpandedRowKeys([]); // 👈 Adicione isso para evitar travamentos de renderização
-};
+    setSelectedFilter('all');
+    setSelectedSupplier(undefined);
+    setSelectedCategory(undefined);
+    setSelectedStructure(undefined);
+    setSearchText('');
+    setExpandedRowKeys([]);
+  };
+
+  const sampleJsonTemplate = `[
+    {
+      "sku": "MANG-38-GAT",
+      "nome_item": "Mangueira Hidráulica 3/8",
+      "categoria_id": 7,
+      "marca": "Gates",
+      "preco_venda": 145.00,
+      "custo_gerencial": 85.00,
+      "estoque": 20,
+      "variacao": "Bitola 3/8 - 100M"
+    }
+  ]`;
 
   return (
     <div style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
@@ -456,8 +502,13 @@ const filteredData = React.useMemo(() => {
         </Col>
         <Col>
           <Space size="middle">
-            <Button type="default" icon={<ImportOutlined />} onClick={() => message.info('Funcionalidade de importação ainda não implementada.')}>
-              importar Json
+            <Button 
+              type="default" 
+              icon={<ImportOutlined />} 
+              onClick={() => setIsJsonModalVisible(true)}
+              style={{ borderColor: '#722ed1', color: '#722ed1' }}
+            >
+              Importar JSON
             </Button>
             <Button icon={<ReloadOutlined />} onClick={fetchProducts} loading={loading}>
               Atualizar
@@ -479,7 +530,6 @@ const filteredData = React.useMemo(() => {
         </Col>
       </Row>
 
-      {/* PAINEL DE BATCH */}
       {showBatchPanel && creationBatch.length > 0 && (
         <Card 
           title="📋 Itens Aguardando Confirmação" 
@@ -525,7 +575,6 @@ const filteredData = React.useMemo(() => {
         </Card>
       )}
 
-      {/* KPI CARDS */}
       <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
         <Col xs={24} sm={12} md={6}>
           <Card hoverable bodyStyle={{ padding: '16px' }} onClick={() => setSelectedFilter('all')}>
@@ -549,7 +598,6 @@ const filteredData = React.useMemo(() => {
         </Col>
       </Row>
 
-      {/* LISTAGEM */}
       <Card 
         bordered={false} 
         title="📦 Catálogo Definitivo"
@@ -561,7 +609,7 @@ const filteredData = React.useMemo(() => {
           )
         }
       >
-        <Row style={{ marginBottom: '16px' }} gutter={[12, 12]} align="middle">
+        <Row style={{ marginBottom: '12px' }} gutter={[12, 12]} align="middle">
           <Col xs={24} sm={24} md={6}>
             <Input 
               placeholder="Buscar por Nome ou SKU..." 
@@ -579,7 +627,7 @@ const filteredData = React.useMemo(() => {
               onChange={(e) => {
                 const val = e.target.value;
                 setSelectedStructure(val === 'all_structures' ? undefined : val);
-                setExpandedRowKeys([]); // 👈 LIMPE AS LINHAS EXPANDIDAS AQUI
+                setExpandedRowKeys([]);
               }}
               style={{ width: '100%', display: 'flex' }}
             >
@@ -610,23 +658,160 @@ const filteredData = React.useMemo(() => {
           </Col>
         </Row>
 
+        {(searchText || selectedStructure || selectedCategory || selectedSupplier || (selectedFilter && selectedFilter !== 'all')) && (
+          <div style={{ marginBottom: '16px', display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+            <span style={{ fontSize: '12px', color: '#8c8c8c' }}>Filtros ativos:</span>
+            
+            {searchText && (
+              <Tag closable onClose={() => setSearchText('')}>
+                Busca: {searchText}
+              </Tag>
+            )}
+
+            {selectedStructure && (
+              <Tag closable onClose={() => setSelectedStructure(undefined)}>
+                Estrutura: {selectedStructure === 'familia' ? 'Famílias' : 'Individuais'}
+              </Tag>
+            )}
+
+            {selectedCategory && (
+              <Tag closable onClose={() => setSelectedCategory(undefined)}>
+                Categoria: {selectedCategory === '7' ? 'Mangueiras (Cat 7)' : selectedCategory === '6' ? 'Correias (Cat 6)' : selectedCategory}
+              </Tag>
+            )}
+
+            {selectedSupplier && (
+              <Tag closable onClose={() => setSelectedSupplier(undefined)}>
+                Fornecedor: {selectedSupplier}
+              </Tag>
+            )}
+
+            {selectedFilter && selectedFilter !== 'all' && (
+              <Tag closable onClose={() => setSelectedFilter('all')}>
+                Filtro: {selectedFilter}
+              </Tag>
+            )}
+          </div>
+        )}
+
         <Table 
-  rowKey={(record) => record.key || `${record.id_item}-${record.sku}`} // 👈 Garante uma chave 100% única
-  columns={parentColumns} 
-  dataSource={filteredData} 
-  loading={loading}
-  pagination={{ pageSize: 10 }}
-  expandable={{
-    expandedRowRender,
-    expandedRowKeys,
-    onExpandedRowsChange: (keys) => setExpandedRowKeys(keys),
-    showExpandColumn: false,
-  }}
-/>
+          rowKey={(record) => record.key || `${record.id_item}-${record.sku}`}
+          columns={parentColumns} 
+          dataSource={filteredData} 
+          loading={loading}
+          pagination={{ pageSize: 10 }}
+          expandable={{
+            expandedRowRender,
+            expandedRowKeys,
+            onExpandedRowsChange: (keys) => setExpandedRowKeys(keys),
+            showExpandColumn: false,
+          }}
+        />
       </Card>
 
+      <Modal
+        title={
+          <Space>
+            <CodeOutlined style={{ color: '#722ed1' }} />
+            <span>Importação / Criação Rápida via JSON</span>
+          </Space>
+        }
+        open={isJsonModalVisible}
+        onCancel={() => {
+          setIsJsonModalVisible(false);
+          setJsonInput('');
+          setParsedJsonPreview([]);
+        }}
+        width={750}
+        footer={[
+          <Button key="cancel" onClick={() => setIsJsonModalVisible(false)}>
+            Cancelar
+          </Button>,
+          <Button
+            key="submit"
+            type="primary"
+            icon={<ImportOutlined />}
+            disabled={parsedJsonPreview.length === 0}
+            onClick={handleImportJsonToBatch}
+            style={{ background: '#722ed1', borderColor: '#722ed1' }}
+          >
+            Adicionar à Fila {parsedJsonPreview.length > 0 ? `(${parsedJsonPreview.length} item(ns))` : ''}
+          </Button>
+        ]}
+      >
+        <Alert
+          message="Formato Aceito do JSON"
+          description="Você pode colar um único objeto ou uma lista [ ] de objetos. Os itens importados irão diretamente para a Fila de Criação antes da gravação final no banco de dados."
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+
+        <Row gutter={12} style={{ marginBottom: 12 }}>
+          <Col span={18}>
+            <Upload beforeUpload={handleFileUpload} showUploadList={false} accept=".json">
+              <Button icon={<UploadOutlined />}>Carregar arquivo .json</Button>
+            </Upload>
+          </Col>
+          <Col span={6} style={{ textAlign: 'right' }}>
+            <Button
+              type="link"
+              size="small"
+              onClick={() => handleJsonInputChange(sampleJsonTemplate)}
+            >
+              Usar Exemplo
+            </Button>
+          </Col>
+        </Row>
+
+        <TextArea
+          rows={7}
+          placeholder="Cole seu código JSON aqui..."
+          value={jsonInput}
+          onChange={(e) => handleJsonInputChange(e.target.value)}
+          style={{ fontFamily: 'monospace', fontSize: '12px' }}
+        />
+
+        {parsedJsonPreview.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <Text strong>Pré-visualização dos Itens Interpretados ({parsedJsonPreview.length}):</Text>
+            <Table
+              size="small"
+              pagination={false}
+              dataSource={parsedJsonPreview}
+              rowKey="key"
+              style={{ marginTop: 8 }}
+              columns={[
+                { title: 'SKU Master', dataIndex: 'sku', render: (t) => <Text code>{t}</Text> },
+                { title: 'Nome', dataIndex: 'nome_item' },
+                { title: 'Preço Venda', key: 'preco', render: (_, r) => `R$ ${(r.skus[0]?.preco_venda || 0).toFixed(2)}` },
+                { title: 'Estoque', key: 'estoque', render: (_, r) => r.skus[0]?.estoque || 0 }
+              ]}
+            />
+          </div>
+        )}
+      </Modal>
+
       <CreateProductModal open={isModalVisible} onClose={() => setIsModalVisible(false)} onSave={handleSaveProduct} loading={modalLoading} />
-      <ProductDetailsDrawer visible={isDrawerVisible} product={selectedProduct} onClose={() => setIsDrawerVisible(false)} onSave={handleUpdateProduct} />
+      <ProductDetailsDrawer open={isDrawerVisible} product={selectedProduct} onClose={() => setIsDrawerVisible(false)} onSave={handleUpdateProduct} />
     </div>
   );
 }
+
+
+
+/**
+ * TODO: CORREÇÃO PENDENTE - Identificação de Famílias com Apenas 1 SKU
+ * 
+ * Problema: Atualmente, se uma família tiver apenas 1 SKU cadastrado, 
+ * a interface pode interpretá-la incorretamente como um produto individual.
+ * 
+ * Solução Definitiva (Backend):
+ * Solicitar à equipe de backend que inclua uma propriedade explícita no objeto pai, 
+ * como `tipo_recurso: 'FAMILIA'` ou `is_familia: true`, para que a tela não dependa 
+ * apenas da contagem do array de SKUs ou de prefixos no ID.
+ * 
+ * Solução Temporária (Frontend):
+ * Garantir que a função checkIsFamily valide a presença da estrutura de SKUs 
+ * ou o tipo do recurso retornado pela API.
+ */

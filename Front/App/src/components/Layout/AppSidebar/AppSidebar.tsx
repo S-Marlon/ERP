@@ -1,93 +1,40 @@
-import { Link, useLocation } from "react-router-dom";
-import { useState, useEffect, useRef } from "react";
-import styles from "./AppSidebar.module.css";
+import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { Menu, Button, Popover, Flex, Typography } from "antd";
+import type { MenuProps } from "antd";
+import { 
+  LeftOutlined, 
+  RightOutlined, 
+  SettingOutlined, 
+  UserOutlined, 
+  ShopOutlined, 
+  SlidersOutlined, 
+  LogoutOutlined,
+  HomeOutlined,
+  TeamOutlined,
+  ShoppingOutlined,
+  AppstoreOutlined,
+  ShoppingCartOutlined,
+  ShopTwoTone,
+  FileTextOutlined,
+  InboxOutlined,
+  ToolOutlined,
+  BellOutlined,
+  QuestionCircleOutlined
+} from "@ant-design/icons";
 
-import Home from "../../../assets/pic/icons8-casa-48.png";
-import Clientes from "../../../assets/pic/icons8-grupo-de-negócios-50.png";
-import Vendas from "../../../assets/pic/icons8-caixa-registradora-48.png";
-import Produtos from "../../../assets/pic/icons8-novo-50.png";
-import Estoque from "../../../assets/pic/icons8-empilhamento-50.png";
-import Obras from "../../../assets/pic/icons8-guindaste-50.png";
-import Config from "../../../assets/pic/icons8-guindaste-50.png";
-import Fornecedores from "../../../assets/pic/icons8-mover-por-carrinho-50.png";
-import Compras from "../../../assets/pic/icons8-carrinho-de-mão-50.png";
-import Catalogo from "../../../assets/pic/icons8-vender-50.png";
-
+const { Text } = Typography;
 
 interface SidebarProps {
   isOpen: boolean;
   toggleSidebar: () => void;
 }
 
-interface MenuItem {
-  to: string;
-  label: string;
-  icon: string;
-  roles?: string[];
-  children?: { to: string; label: string }[];
-}
-
-const AppSidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
+export default function AppSidebar({ isOpen, toggleSidebar }: SidebarProps) {
+  const navigate = useNavigate();
   const location = useLocation();
-  const role = "admin";
 
-  const [openMenus, setOpenMenus] = useState<string[]>([]);
-  const [favorites, setFavorites] = useState<MenuItem[]>([]);
-  const [openConfig, setOpenConfig] = useState(false);
-
-  const configRef = useRef<HTMLDivElement>(null);
-
-  const menu: MenuItem[] = [
-    { to: "/", label: "Home", icon: Home, roles: ["admin", "operador"] },
-    { to: "/parceiros", label: "Parceiros", icon: Clientes, roles: ["admin"] },
-    { to: "/produtos", label: "Produtos", icon: Produtos, roles: ["admin"] },
-    { to: "/catalogo", label: "Catalogo", icon: Catalogo, roles: ["admin"] },
-    {to: "/compras", label: "Compras", icon: Compras, roles: ["admin"]},
-    { to: "/vendas", label: "Vendas", icon: Vendas, roles: ["admin", "operador"] },
-    { to: "/relatorios", label: "Relatórios", icon: Vendas, roles: ["admin", "operador"] },
-    {
-      to: "/estoque",
-      label: "Estoque",
-      icon: Estoque,
-      children: [
-        { to: "/estoque/consulta", label: "Consulta" },
-        { to: "/estoque/notas", label: "Notas" },
-        { to: "/estoque/operacoes", label: "Operações" },
-        { to: "/estoque/etiquetagem", label: "Etiquetagem" },
-      ],
-    },
-    { to: "/obras", label: "Obras", icon: Obras, roles: ["admin"] },
-  ];
-
-  /* ===================== */
-  /* MENU TOGGLE */
-  /* ===================== */
-
-  const toggleMenu = (path: string) => {
-    setOpenMenus((prev) =>
-      prev.includes(path)
-        ? prev.filter((m) => m !== path)
-        : [...prev, path]
-    );
-  };
-
-  /* ===================== */
-  /* AUTO OPEN SUBMENU */
-  /* ===================== */
-
-  useEffect(() => {
-    menu.forEach((item) => {
-      if (item.children?.some((sub) => location.pathname.startsWith(sub.to))) {
-        setOpenMenus((prev) =>
-          prev.includes(item.to) ? prev : [...prev, item.to]
-        );
-      }
-    });
-  }, [location.pathname]);
-
-  /* ===================== */
-  /* FAVORITES */
-  /* ===================== */
+  const [favorites, setFavorites] = useState<string[]>([]);
 
   useEffect(() => {
     const saved = localStorage.getItem("favorites");
@@ -98,158 +45,219 @@ const AppSidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
     localStorage.setItem("favorites", JSON.stringify(favorites));
   }, [favorites]);
 
-  const toggleFavorite = (item: MenuItem) => {
-    setFavorites((prev) =>
-      prev.some((f) => f.to === item.to)
-        ? prev.filter((f) => f.to !== item.to)
-        : [...prev, item]
-    );
+  const getSelectedKey = () => {
+    return location.pathname;
   };
 
-  const isFavorite = (item: MenuItem) =>
-    favorites.some((f) => f.to === item.to);
+  const getOpenKey = () => {
+    if (location.pathname.startsWith('/estoque')) return ['/estoque'];
+    return [];
+  };
 
-  const isActive = (path: string) =>
-    location.pathname.startsWith(path);
+  const items: MenuProps['items'] = [
+    {
+      key: '/',
+      icon: <HomeOutlined />,
+      label: 'Dashboard',
+    },
+    {
+      key: '/parceiros',
+      icon: <TeamOutlined />,
+      label: 'Parceiros',
+    },
+    {
+      key: '/produtos',
+      icon: <ShoppingOutlined />,
+      label: 'Produtos',
+    },
+    {
+      key: '/catalogo',
+      icon: <AppstoreOutlined />,
+      label: 'Catálogo',
+    },
+    {
+      key: '/compras',
+      icon: <ShoppingCartOutlined />,
+      label: 'Compras',
+    },
+    {
+      key: '/vendas',
+      icon: <ShopTwoTone />,
+      label: 'Vendas',
+    },
+    {
+      key: '/relatorios',
+      icon: <FileTextOutlined />,
+      label: 'Relatórios',
+    },
+    {
+      key: '/estoque',
+      icon: <InboxOutlined />,
+      label: 'Estoque',
+      children: [
+        { key: '/estoque/consulta', label: 'Consulta de Saldo' },
+        { key: '/estoque/notas', label: 'Notas Fiscais' },
+        { key: '/estoque/operacoes', label: 'Movimentações' },
+        { key: '/estoque/etiquetagem', label: 'Etiquetagem' },
+      ],
+    },
+    {
+      key: '/obras',
+      icon: <ToolOutlined />,
+      label: 'Obras / Projetos',
+    },
+  ];
 
-  /* ===================== */
-  /* OUTSIDE CLICK */
-  /* ===================== */
+  const handleMenuClick: MenuProps['onClick'] = (e) => {
+    navigate(e.key);
+  };
 
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (configRef.current && !configRef.current.contains(e.target as Node)) {
-        setOpenConfig(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+const configContent = (
+    <Flex vertical gap={4} style={{ width: 220, padding: 4 }}>
+      <Button type="text" icon={<UserOutlined />} style={{ justifyContent: 'flex-start' }}>
+        Meu Perfil
+      </Button>
+      <Button type="text" icon={<ShopOutlined />} style={{ justifyContent: 'flex-start' }}>
+        Dados da Empresa
+      </Button>
+      <Button type="text" icon={<SlidersOutlined />} style={{ justifyContent: 'flex-start' }}>
+        Preferências do Sistema
+      </Button>
+      <Button type="text" icon={<BellOutlined />} style={{ justifyContent: 'flex-start' }}>
+        Notificações
+      </Button>
+      <Button type="text" icon={<QuestionCircleOutlined />} style={{ justifyContent: 'flex-start' }}>
+        Ajuda e Suporte
+      </Button>
+      
+      <div style={{ height: 1, background: 'rgba(0, 0, 0, 0.06)', margin: '6px 0' }} />
+      
+      <Button type="text" danger icon={<LogoutOutlined />} style={{ justifyContent: 'flex-start' }}>
+        Encerrar Sessão
+      </Button>
+    </Flex>
+  );
 
   return (
-    <aside className={`${styles.sidebar} ${isOpen ? styles.open : ""}`}>
-
-      {/* TOGGLE */}
-      <button className={styles.toggle} onClick={toggleSidebar}>
-        {isOpen ? "<<" : ">>"}
-      </button>
-
-      {/* PROFILE */}
-      <div className={`${styles.profile} ${!isOpen ? styles.profileMini : ""}`}>
-        {isOpen ? (
-          <>
-            👤 
-            <span className={styles.role}>{role}</span>
-          </>
-        ) : (
-          <span title="Admin">👤</span>
+    <Flex 
+      vertical 
+      justify="space-between" 
+      style={{ 
+        height: '100%', 
+        color: '#fff',
+        overflow: 'hidden', 
+        background: 'linear-gradient(180deg, #9c2e2e 0%, #712626 35%, #1e0d0d 85%, #0f0606 100%)' 
+      }}
+    >
+      
+      {/* HEADER / LOGO & TOGGLE */}
+      <Flex 
+        align="center" 
+        justify={isOpen ? "space-between" : "center"} 
+        style={{ padding: '12px 16px', minHeight: 50, borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}
+      >
+        {isOpen && (
+          <Flex align="center" gap={8}>
+            <div style={{ background: '#1677ff', color: '#fff', fontWeight: 'bold', padding: '2px 8px', borderRadius: 4 }}>ERP</div>
+            <Text strong style={{ color: '#fff', whiteSpace: 'nowrap' }}>Core System</Text>
+          </Flex>
         )}
-      </div>
+        <Button 
+          type="text" 
+          style={{ color: '#fff' }}
+          icon={isOpen ? <LeftOutlined /> : <RightOutlined />} 
+          onClick={toggleSidebar} 
+        />
+      </Flex>
 
-      {/* MODULES */}
-      <div className={styles.section}>
-        <span className={styles.sectionTitle}>
-          {isOpen ? "📦 Módulos" : "📦"}
-        </span>
-
-        {menu
-          .filter((item) => item.roles?.includes(role) || !item.roles)
-          .map((item) => {
-            const isOpenMenu = openMenus.includes(item.to);
-
-            return (
-              <div key={item.to}>
-
-                {/* 🔥 ROW COMPLETA (LINK + ACTIONS DENTRO) */}
-                <div
-                  className={`${styles.menuItem} ${
-                    isActive(item.to) ? styles.activeRow : ""
-                  }`}
-                >
-
-                  <Link
-                    to={item.to}
-                    title={item.label}
-                    className={styles.link}
-                  >
-                    <img src={item.icon} className={styles.icon} />
-                    {isOpen && <span>{item.label}</span>}
-                  </Link>
-
-                  {/* ACTIONS SEM BUG DE LAYOUT */}
-                  <div className={styles.actions}>
- {item.children && (
-                      <button
-                        className={styles.arrowBtn}
-                        onClick={() => toggleMenu(item.to)}
-                        title="Expandir"
-                      >
-                        {isOpenMenu ? "▾" : "▸"}
-                      </button>
-                    )}
-
-
-                    {isOpen && (
-                    <button
-                      className={styles.starBtn}
-                      onClick={() => toggleFavorite(item)}
-                      title="Favoritar"
-                    >
-                      {isFavorite(item) ? "★" : "☆"}
-                    </button>
-                    )}
-
-                   
-
-                  </div>
-
-                </div>
-
-                {/* SUBMENU */}
-                {item.children && (
-                  <div
-                    className={`${styles.submenu} ${
-                      isOpenMenu ? styles.submenuOpen : ""
-                    }`}
-                  >
-                    {item.children.map((sub) => (
-                      <Link
-                        key={sub.to}
-                        to={sub.to}
-                        title={sub.label}
-                        className={styles.sublink}
-                      >
-                        {sub.label}
-                      </Link>
-                    ))}
-                  </div>
-                )}
-
-              </div>
-            );
-          })}
-      </div>
-
-      {/* CONFIG */}
-      <div className={styles.sectionBottom} ref={configRef}>
-        <button className={styles.link} onClick={() => setOpenConfig((p) => !p)}>
-          <img src={Config} className={styles.icon} />
-          {isOpen && <span>Configurações</span>}
-        </button>
-
-        {openConfig && (
-          <div className={styles.configPopover}>
-            <button>👤 Perfil</button>
-            <button>🏢 Empresa</button>
-            <button>⚙ Preferências</button>
-            <button>🚪 Sair</button>
+      {/* NAVIGATION MENU */}
+      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+        {isOpen && (
+          <div style={{ padding: '12px 16px 4px 16px' }}>
+            <Text style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.5px', color: 'rgba(255, 255, 255, 0.6)' }}>
+              MENU PRINCIPAL
+            </Text>
           </div>
         )}
+        
+        {/* Usando theme="dark" e background transparente para o gradiente aparecer no menu */}
+        <Menu
+          theme="dark"
+          mode="inline"
+          selectedKeys={[getSelectedKey()]}
+          defaultOpenKeys={getOpenKey()}
+          items={items}
+          onClick={handleMenuClick}
+          style={{ borderRight: 0, background: 'transparent' }}
+          inlineCollapsed={!isOpen}
+        />
       </div>
 
-    </aside>
-  );
-};
+      {/* FOOTER / CONFIGURAÇÕES */}
+      <div style={{ padding: '12px', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+        <Popover content={configContent} trigger="click" placement="rightBottom">
+          <Button 
+            type="text" 
+            icon={<SettingOutlined />} 
+            style={{ width: '100%', color: '#fff', justifyContent: isOpen ? 'flex-start' : 'center' }}
+          >
+            {isOpen && <span style={{ marginLeft: 8 }}>Configurações</span>}
+          </Button>
+        </Popover>
+      </div>
 
-export default AppSidebar;
+    </Flex>
+  );
+}
+
+
+// 1. Botões Recomendados para Adicionar
+// Central de Notificações / Alertas (para ver avisos do sistema, estoque baixo, notas pendentes)
+
+// Ajuda / Documentação / Suporte (essencial para abrir chamados ou ver manuais)
+
+// Versão / Sobre o Sistema (para auditoria e suporte técnico)
+
+// 2. O que deve ter em cada tela/funcionalidade
+// 👤 Meu Perfil
+// Funcionalidades:
+
+// Alteração de dados cadastrais (Nome, E-mail, Telefone, Foto de perfil).
+
+// Alteração de senha de acesso.
+
+// Visualização do cargo/perfil atual (ex: Administrador) e permissões vinculadas.
+
+// 🏢 Dados da Empresa
+// Funcionalidades:
+
+// Informações fiscais e cadastrais (Razão Social, CNPJ, Inscrição Estadual/Municipal).
+
+// Endereço completo e contatos comerciais.
+
+// Upload do logotipo da empresa (usado em relatórios e impressões de notas/orçamentos).
+
+// ⚙️ Preferências do Sistema
+// Funcionalidades:
+
+// Alternância de tema (Claro / Escuro).
+
+// Configurações regionais (formato de data, moeda padrão - R$, número de casas decimais para valores e quantidades).
+
+// Preferências de notificações sonoras ou visuais.
+
+// 🔔 Central de Notificações (Novo)
+// Funcionalidades:
+
+// Lista de alertas recentes (ex: "Produto X atingiu o estoque mínimo", "Nota fiscal autorizada", "Nova venda realizada").
+
+// Botão de "Marcar todas como lidas".
+
+// ❓ Ajuda e Suporte (Novo)
+// Funcionalidades:
+
+// Links rápidos para a documentação ou base de conhecimento.
+
+// Canal de contato com o suporte técnico (E-mail, WhatsApp ou abertura de ticket).
+
+// Exibição da Versão atual do ERP (ex: v2.4.1).

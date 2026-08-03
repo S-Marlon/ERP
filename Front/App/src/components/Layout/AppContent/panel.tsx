@@ -1,8 +1,8 @@
-// src/components/Sidebar.tsx
-import './Panel.css';
+// src/components/Layout/AppContent/panel.tsx (ou o caminho do seu arquivo Panel)
 import { ReactNode } from "react";
-import { colors, darkColors } from '../../../styles/colors';
+import { Layout } from "antd";
 
+const { Content } = Layout;
 
 interface PanelProps {
     children: ReactNode;
@@ -10,11 +10,17 @@ interface PanelProps {
 }
 
 export default function Panel({ children, isDarkMode }: PanelProps) {
-  const themeColors = isDarkMode ? darkColors : colors;
   
   return (
-    <main  className="page-layout" style={{ overflowY: 'auto', backgroundColor: isDarkMode ? themeColors.background : themeColors.background,}}>
+    <Content 
+      style={{
+        overflowY: 'auto',
+        height: 'calc(100vh - 50vh)', // Subtrai a altura do Header para o scroll ficar contido
+        padding: '4px 4px',
+        background: isDarkMode ? '#1f1f1f' : '#f0f2f5', // Muda a cor de fundo baseado no tema
+      }}
+    >
       {children}
-    </main>
+    </Content>
   );
 }

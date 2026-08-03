@@ -1,6 +1,6 @@
 import React from "react";
 import { useLocation } from "react-router-dom";
-import { Input, Badge, Tooltip, Avatar } from "antd";
+import { Input, Badge, Tooltip, Avatar, } from "antd";
 import { 
   SearchOutlined, 
   BellOutlined, 
@@ -81,9 +81,11 @@ const AppHeader: React.FC<AppHeaderProps> = ({ title, onThemeToggle, isDarkMode 
             style={{ backgroundColor: "#1890ff", marginRight: "8px" }}
           >
             {getUserInitials(safeUser.name)}
-          </Avatar>
-          <span className={styles.userName}>{safeUser.name}</span>
+          </Avatar> 
+          <span className={styles.userName}>{safeUser.role}</span> - <span className={styles.userName}>{safeUser.name}</span>
         </div>
+
+        
 
       </div>
 

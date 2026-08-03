@@ -19,7 +19,7 @@ export const UIProvider = ({ children }: any) => {
   const [notifications, setNotifications] = useState(3);
 
   const [user] = useState<User>({
-    name: "João",
+    name: "Joãoaa",
     role: "admin",
   });
 

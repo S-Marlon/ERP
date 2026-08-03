@@ -446,9 +446,7 @@ const OSPanel: React.FC<OSPanelRefactoredProps> = ({
 
         <div class="info-grid">
           <div class="info-item"><b>Cliente:</b> ${data.customerName}</div>
-          <div class="info-item"><b>Técnico:</b> ${data.technician}</div>
-          <div class="info-item"><b>Equipamento:</b> ${data.equipment}</div>
-          <div class="info-item"><b>Bitola:</b> ${data.gauge}</div>
+  
         </div>
 
         ${osItems.length > 0 ? `
@@ -494,7 +492,7 @@ const OSPanel: React.FC<OSPanelRefactoredProps> = ({
         </div>
 
         <div class="footer">
-          Documento impresso via Sistema de Gestão Interno.
+          Documento impresso via Sistema de Gestão Interno - ATIMANG.
         </div>
 
         <script>
@@ -829,12 +827,7 @@ const OSPanel: React.FC<OSPanelRefactoredProps> = ({
             className={styles.inputField}
           />
 
-          <input
-            placeholder="Bitola"
-            value={osData.gauge}
-            onChange={e => setOsData({ gauge: e.target.value })}
-            className={styles.inputField}
-          />
+          
         </section>
 
         {/* NOTAS */}
