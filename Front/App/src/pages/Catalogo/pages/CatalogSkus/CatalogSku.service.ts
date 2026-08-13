@@ -98,21 +98,35 @@ export const getProdutos = async (tenantId: number = 1): Promise<ItemParentType[
  * 🔄 PUT /produtos/:id_item
  * Atualiza um produto existente no catálogo
  */
+
 export const updateProduto = async (
   idItem: number | string, 
   payload: UpdateProdutoPayload, 
   tenantId: number = 1
 ): Promise<GenericProductAPIResponse> => {
-  const response = await fetch(`${API_BASE_URL}/produtos/${idItem}?tenant_id=${tenantId}`, {
+  const url = `${API_BASE_URL}/produtos/${idItem}?tenant_id=${tenantId}`;
+  
+  const bodyData = {
+    tenant_id: tenantId,
+    ...payload
+  };
+
+  console.log("📤 [API REQUEST] URL:", url);
+  console.log("📤 [API REQUEST] Body enviado:", bodyData);
+
+  const response = await fetch(url, {
     method: 'PUT',
     headers: DEFAULT_HEADERS,
-    body: JSON.stringify({
-      tenant_id: tenantId,
-      ...payload
-    }),
+    body: JSON.stringify(bodyData),
   });
 
-  return handleResponse<GenericProductAPIResponse>(response, 'Erro ao atualizar produto.');
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    console.error("❌ [API ERROR 400 DETALHADO]:", errorData); // <-- ADICIONE ESTE LOG AQUI
+    throw new Error(errorData.error || errorData.message || 'Erro ao atualizar produto.');
+  }
+
+  return response.json();
 };
 
 /**
@@ -120,7 +134,7 @@ export const updateProduto = async (
  * Grava em lote a fila/rascunho de novos produtos criados
  */
 export const saveProdutosLote = async (
-  itens: CreateProdutoPayload[], 
+  produtos: CreateProdutoPayload[], 
   tenantId: number = 1
 ): Promise<GenericProductAPIResponse> => {
   const response = await fetch(`${API_BASE_URL}/produtos/lote?tenant_id=${tenantId}`, {
@@ -128,7 +142,7 @@ export const saveProdutosLote = async (
     headers: DEFAULT_HEADERS,
     body: JSON.stringify({ 
       tenant_id: tenantId, 
-      itens 
+      produtos // Ajustado de 'itens' para 'produtos' casando com o back-end
     }),
   });
 

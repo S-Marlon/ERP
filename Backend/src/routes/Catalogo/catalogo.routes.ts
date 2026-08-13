@@ -100,4 +100,5 @@ router.get('/produtos', getProdutos);
 router.put('/produtos/:idItem', updateProduto);
 router.post('/produtos/lote', saveProdutosLote);
 
+
 export default router;

@@ -11,7 +11,7 @@ export interface SkuChildType {
   estoque: number;
   preco_venda: number;
   custo_gerencial: number;
-  status: 'ATIVO' | 'INATIVO' | 'Sem Estoque';
+  status: 'ATIVO' | 'INATIVO' | 'Esgotado'; // Adicionado 'Esgotado' para refletir o status correto
 }
 
 export interface ItemParentType {
@@ -23,6 +23,7 @@ export interface ItemParentType {
   tipo_recurso: string; // Ex: 'PRODUTO', 'INSUMO'
   status: 'ATIVO' | 'INATIVO';
   categoria_id: number | null;
+  categoria?: string | null;
   familia_id: number | null;
   id_marca?: number | null;
   skus: SkuChildType[];

@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import pool from '../../Estoque/db.config';
 
+
+
 /**
  * 🔌 [READ] GET /produtos
  * Retorna itens_core com os dados comerciais prontos para o CatalogSku.service.ts
@@ -111,10 +113,238 @@ export const getProdutos = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * 🔄 [UPDATE] PUT /produtos/:id_item
+ * Atualiza um produto ou variação existente no catálogo
+ */
 export const updateProduto = async (req: Request, res: Response) => {
-  return res.status(501).json({ message: 'Endpoint de atualização em implementação.' });
+  const { id_item } = req.params;
+  const rawTenantId = req.query.tenant_id || req.headers['x-tenant-id'] || req.body.tenant_id || 1;
+  const tenantId = Number(rawTenantId);
+  const payload = req.body;
+
+  if (!id_item) {
+    return res.status(400).json({ error: 'ID do item não informado para atualização.' });
+  }
+
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    // 1. Atualiza os dados básicos em itens_core (caso tenham sido enviados)
+    const updateCoreFields: string[] = [];
+    const updateCoreValues: any[] = [];
+
+    if (payload.sku !== undefined) {
+      updateCoreFields.push('sku = ?');
+      updateCoreValues.push(payload.sku);
+    }
+    if (payload.nome_item !== undefined || payload.nome !== undefined) {
+      updateCoreFields.push('nome_item = ?');
+      updateCoreValues.push(payload.nome_item || payload.nome);
+    }
+    if (payload.status !== undefined) {
+      updateCoreFields.push('status = ?');
+      updateCoreValues.push(payload.status);
+    }
+    if (payload.variacao !== undefined || payload.descricao_variacao !== undefined) {
+      updateCoreFields.push('descricao_variacao = ?');
+      updateCoreValues.push(payload.descricao_variacao || payload.variacao);
+    }
+
+    if (updateCoreFields.length > 0) {
+      updateCoreValues.push(id_item, tenantId);
+      await connection.execute(
+        `UPDATE itens_core SET ${updateCoreFields.join(', ')} WHERE id_item = ? AND tenant_id = ?`,
+        updateCoreValues
+      );
+    }
+
+    // 2. Atualiza os dados comerciais em comercial_produtos_dados
+    const updateComercialFields: string[] = [];
+    const updateComercialValues: any[] = [];
+
+    if (payload.categoria_id !== undefined) {
+      updateComercialFields.push('categoria_id = ?');
+      updateComercialValues.push(payload.categoria_id ? Number(payload.categoria_id) : null);
+    }
+    if (payload.familia_id !== undefined) {
+      updateComercialFields.push('familia_id = ?');
+      updateComercialValues.push(payload.familia_id ? Number(payload.familia_id) : null);
+    }
+    if (payload.id_marca !== undefined) {
+      updateComercialFields.push('id_marca = ?');
+      updateComercialValues.push(payload.id_marca ? Number(payload.id_marca) : null);
+    }
+    if (payload.custo_gerencial !== undefined) {
+      updateComercialFields.push('custo_gerencial = ?');
+      updateComercialValues.push(Number(payload.custo_gerencial));
+    }
+    if (payload.preco_venda !== undefined) {
+      updateComercialFields.push('preco_venda = ?');
+      updateComercialValues.push(Number(payload.preco_venda));
+    }
+
+    if (updateComercialFields.length > 0) {
+      updateComercialValues.push(id_item, tenantId);
+      
+      // Verifica se já existe registro comercial para este id_item
+      const [rows]: any = await connection.execute(
+        `SELECT id_item FROM comercial_produtos_dados WHERE id_item = ? AND tenant_id = ?`,
+        [id_item, tenantId]
+      );
+
+      if (rows.length > 0) {
+        await connection.execute(
+          `UPDATE comercial_produtos_dados SET ${updateComercialFields.join(', ')} WHERE id_item = ? AND tenant_id = ?`,
+          updateComercialValues
+        );
+      } else {
+        // Se não existir, faz um INSERT preventivo
+        await connection.execute(
+          `INSERT INTO comercial_produtos_dados (id_item, tenant_id, categoria_id, familia_id, id_marca, custo_gerencial, preco_venda) 
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [
+            id_item,
+            tenantId,
+            payload.categoria_id ? Number(payload.categoria_id) : null,
+            payload.familia_id ? Number(payload.familia_id) : null,
+            payload.id_marca ? Number(payload.id_marca) : null,
+            Number(payload.custo_gerencial || 0),
+            Number(payload.preco_venda || 0)
+          ]
+        );
+      }
+    }
+
+    await connection.commit();
+    connection.release();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Produto atualizado com sucesso!'
+    });
+
+  } catch (error: any) {
+    await connection.rollback();
+    connection.release();
+    console.error('Erro ao atualizar produto:', error);
+    return res.status(500).json({ error: 'Erro ao atualizar produto.', details: error.message });
+  }
 };
 
+/**
+ * 💾 [CREATE/BATCH] POST /produtos/lote
+ * Grava um lote de produtos (pais/famílias e suas variações) enviado pela tela CatalogSku
+ */
 export const saveProdutosLote = async (req: Request, res: Response) => {
-  return res.status(501).json({ message: 'Endpoint de gravação em lote em implementação.' });
+  const rawTenantId = req.query.tenant_id || req.headers['x-tenant-id'] || req.body.tenant_id || 1;
+  const tenantId = Number(rawTenantId);
+  const itensLote = req.body.produtos || req.body; // Aceita tanto array direto quanto objeto envelopado
+
+  if (!Array.isArray(itensLote) || itensLote.length === 0) {
+    return res.status(400).json({ error: 'Nenhum produto enviado no lote.' });
+  }
+
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const idsCriados: any[] = [];
+
+    for (const itemPai of itensLote) {
+      const categoriaId = itemPai.categoria_id ? Number(itemPai.categoria_id) : null;
+      const familiaId = itemPai.familia_id ? Number(itemPai.familia_id) : null;
+      const idMarca = itemPai.id_marca ? Number(itemPai.id_marca) : null;
+      const skusLista = itemPai.skus || [];
+
+      // Se o lote veio estruturado com múltiplas variações (skus)
+      if (skusLista.length > 0) {
+        for (const skuFilho of skusLista) {
+          // 1. Insere o SKU filho na itens_core
+          const [resultCore] = await connection.execute(
+            `INSERT INTO itens_core (tenant_id, sku, nome_item, tipo_recurso, status, descricao_variacao) 
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [
+              tenantId,
+              skuFilho.sku,
+              itemPai.nome_item || skuFilho.variacao,
+              itemPai.tipo_recurso || 'PRODUTO',
+              skuFilho.status || 'ATIVO',
+              skuFilho.variacao || null
+            ]
+          );
+
+          const novoIdItem = (resultCore as any).insertId;
+
+          // 2. Insere os dados comerciais correspondentes
+          await connection.execute(
+            `INSERT INTO comercial_produtos_dados (id_item, tenant_id, categoria_id, familia_id, id_marca, custo_gerencial, preco_venda, exibir_no_pdv, pode_vender_sem_estoque) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, 1, 0)`,
+            [
+              novoIdItem,
+              tenantId,
+              categoriaId,
+              familiaId,
+              idMarca,
+              Number(skuFilho.custo_gerencial || 0),
+              Number(skuFilho.preco_venda || 0)
+            ]
+          );
+
+          idsCriados.push(novoIdItem);
+        }
+      } else {
+        // Produto isolado sem array de SKUs complexo
+        const [resultCore] = await connection.execute(
+          `INSERT INTO itens_core (tenant_id, sku, nome_item, tipo_recurso, status, descricao_variacao) 
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            tenantId,
+            itemPai.sku,
+            itemPai.nome_item,
+            itemPai.tipo_recurso || 'PRODUTO',
+            itemPai.status || 'ATIVO',
+            itemPai.variacao || null
+          ]
+        );
+
+        const novoIdItem = (resultCore as any).insertId;
+
+        await connection.execute(
+          `INSERT INTO comercial_produtos_dados (id_item, tenant_id, categoria_id, familia_id, id_marca, custo_gerencial, preco_venda, exibir_no_pdv, pode_vender_sem_estoque) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, 1, 0)`,
+          [
+            novoIdItem,
+            tenantId,
+            categoriaId,
+            familiaId,
+            idMarca,
+            Number(itemPai.custo_gerencial || 0),
+            Number(itemPai.preco_venda || 0)
+          ]
+        );
+
+        idsCriados.push(novoIdItem);
+      }
+    }
+
+    await connection.commit();
+    connection.release();
+
+    return res.status(201).json({
+      success: true,
+      message: `Lote processado com sucesso! ${idsCriados.length} itens gravados.`,
+      ids: idsCriados
+    });
+
+  } catch (error: any) {
+    await connection.rollback();
+    connection.release();
+    console.error('Erro na gravação do lote de produtos:', error);
+    return res.status(500).json({ error: 'Erro ao salvar lote de produtos.', details: error.message });
+  }
 };
+

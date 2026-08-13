@@ -37,13 +37,13 @@ const { Text, Title } = Typography;
 const { Option } = Select;
 
 interface ProductDetailsDrawerProps {
-  visible: boolean;
+  open: boolean;
   product: any | null;
   onClose: () => void;
-  onSave: (id: string, updatedFields: any) => Promise<void>;
+  onSave: (id: string | number, updatedFields: any) => Promise<void>;
 }
 
-export default function ProductDetailsDrawer({ visible, product, onClose, onSave }: ProductDetailsDrawerProps) {
+export default function ProductDetailsDrawer({ open, product, onClose, onSave }: ProductDetailsDrawerProps) {
   const [form] = Form.useForm();
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('financeiro');
@@ -53,23 +53,24 @@ export default function ProductDetailsDrawer({ visible, product, onClose, onSave
   const [maxStock, setMaxStock] = useState(0);
   const [fileList, setFileList] = useState<any[]>([]);
 
-  // Regra de negócio: Identifica se o item possui SKUs filhos ou grade vinculada
+  // Identifica se o item possui SKUs filhos ou grade vinculada
   const isFamilyProduct = product?.skus && product.skus.length > 0;
 
   useEffect(() => {
     if (product) {
-      const estoqueCalculado = product.skus?.reduce((acc: number, sku: any) => acc + sku.estoque, 0) || 0;
+      const estoqueCalculado = product.skus?.reduce((acc: number, sku: any) => acc + (sku.estoque || 0), 0) || 0;
+      const skuPrincipal = product.skus?.[0];
       
       form.setFieldsValue({
-        nomeItem: product.nomeItem,
-        codItem: product.codItem,
-        status: product.status !== 'Inativo',
+        nomeItem: product.nome_item || product.nomeItem,
+        codItem: product.sku || product.codItem,
+        status: product.status !== 'Inativo' && product.status !== 'INATIVO',
         estoqueMinimo: product.estoqueMinimo || 10,
         estoqueMaximo: product.estoqueMaximo || 100,
         estoqueAtual: estoqueCalculado,
         ncm: product.ncm || '',
         cest: product.cest || '',
-        marca: product.marca || '',
+        marca: skuPrincipal?.marca || product.marca || '',
         unidadeMedida: product.unidadeMedida || 'UN',
         descricaoCurta: product.descricaoCurta || '',
         descricaoLonga: product.descricaoLonga || '',
@@ -78,22 +79,23 @@ export default function ProductDetailsDrawer({ visible, product, onClose, onSave
         larguraCm: product.larguraCm || 0,
         comprimentoCm: product.comprimentoCm || 0,
         fornecedorPadraoId: product.fornecedorPadraoId || '',
-        codigoBarrasEan: product.codigoBarrasEan || '',
+        codigoBarrasEan: skuPrincipal?.sku || product.codigoBarrasEan || '',
       });
 
       setCurrentStock(estoqueCalculado);
       setMinStock(product.estoqueMinimo || 10);
       setMaxStock(product.estoqueMaximo || 100);
 
-      if (product.imagens) {
-        setFileList(product.imagens.map((url: string, index: number) => ({
+      const imagensSrc = skuPrincipal?.imagem_url || product.urlImagem || product.imagens;
+      if (Array.isArray(imagensSrc)) {
+        setFileList(imagensSrc.map((url: string, index: number) => ({
           uid: `-${index}`,
           name: `imagem-${index}.png`,
           status: 'done',
           url: url,
         })));
-      } else if (product.urlImagem) {
-        const urls = product.urlImagem.split(',').filter(Boolean);
+      } else if (typeof imagensSrc === 'string' && imagensSrc.trim() !== '') {
+        const urls = imagensSrc.split(',').filter(Boolean);
         setFileList(urls.map((url: string, index: number) => ({
           uid: `-${index}`,
           name: `imagem-${index}.png`,
@@ -106,7 +108,7 @@ export default function ProductDetailsDrawer({ visible, product, onClose, onSave
     }
   }, [product, form]);
 
-  const handleSubmit = async () => {
+ const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
       setIsSaving(true);
@@ -115,23 +117,43 @@ export default function ProductDetailsDrawer({ visible, product, onClose, onSave
         .map(file => file.url || file.response?.url || '')
         .filter(Boolean);
 
+      // Garante que se o formulário não capturou algum campo base, usamos o product original de fallback
       const payload = {
-        ...values,
-        status: values.status ? 'Ativo' : 'Inativo',
+        nome_item: values.nomeItem || product?.nome_item,
+        sku: values.codItem || product?.sku,
+        status: values.status ? 'ATIVO' : 'INATIVO',
+        estoque_minimo: values.estoqueMinimo ?? product?.estoque_minimo ?? 10,
+        estoque_maximo: values.estoqueMaximo ?? product?.estoque_maximo ?? 100,
+        ncm: values.ncm || product?.ncm || '',
+        cest: values.cest || product?.cest || '',
+        marca: values.marca || product?.marca || '',
+        unidade_medida: values.unidadeMedida || product?.unidade_medida || 'UN',
+        descricao_curta: values.descricaoCurta || product?.descricao_curta || '',
+        descricao_longa: values.descricaoLonga || product?.descricao_longa || '',
+        peso_kg: values.pesoKg ?? product?.peso_kg ?? 0,
+        altura_cm: values.alturaCm ?? product?.altura_cm ?? 0,
+        largura_cm: values.larguraCm ?? product?.largura_cm ?? 0,
+        comprimento_cm: values.comprimentoCm ?? product?.comprimento_cm ?? 0,
+        fornecedor_padrao_id: values.fornecedorPadraoId || product?.fornecedor_padrao_id || null,
         imagens: urlsImagens,
-        urlImagem: urlsImagens.join(',')
+        url_imagem: urlsImagens.join(',')
       };
 
-      await onSave(product.key || product.id, payload);
-      message.success('Produto atualizado com sucesso!');
-      onClose();
+      const itemId = product?.id_item || product?.id || product?.key;
+
+      if (!itemId) {
+        message.error('Erro crítico: ID do produto não identificado.');
+        setIsSaving(false);
+        return;
+      }
+
+      await onSave(itemId, payload);
     } catch (error) {
       console.error('Validação falhou:', error);
     } finally {
       setIsSaving(false);
     }
   };
-
   const handleUploadChange = ({ fileList: newFileList }: any) => {
     setFileList(newFileList);
   };
@@ -292,12 +314,12 @@ export default function ProductDetailsDrawer({ visible, product, onClose, onSave
               <Tag color="default" icon={<UserOutlined />}>INDIVIDUAL</Tag>
             )}
           </Space>
-          <Text type="secondary">{isFamilyProduct ? "Código do SKU Pai: " : "Código do Item: "} <Text code>{product?.codItem || 'N/A'}</Text></Text>
+          <Text type="secondary">{isFamilyProduct ? "Código do SKU Pai: " : "Código do Item: "} <Text code>{product?.sku || product?.codItem || 'N/A'}</Text></Text>
         </Space>
       }
       width={680}
       onClose={onClose}
-      open={visible}
+      open={open}
       extra={
         <Space>
           <Button onClick={onClose} icon={<RollbackOutlined />}>Cancelar</Button>
@@ -307,7 +329,6 @@ export default function ProductDetailsDrawer({ visible, product, onClose, onSave
         </Space>
       }
     >
-      {/* Banner contextual de topo avisando o impacto da edição */}
       {isFamilyProduct ? (
         <Alert
           message={<span style={{ fontWeight: 600, color: '#391085' }}>Modo de Edição de Família</span>}
@@ -335,7 +356,6 @@ export default function ProductDetailsDrawer({ visible, product, onClose, onSave
           if (changedValues.estoqueMaximo !== undefined) setMaxStock(changedValues.estoqueMaximo);
         }}
       >
-        {/* 1. Painel Superior de Visibilidade */}
         <Row gutter={16} align="middle" style={{ marginBottom: 16, padding: '12px', background: '#f5f5f5', borderRadius: '8px' }}>
           <Col span={12}>
             <Form.Item name="status" label="Status Comercial" valuePropName="checked" style={{ margin: 0 }}>
@@ -349,7 +369,6 @@ export default function ProductDetailsDrawer({ visible, product, onClose, onSave
           </Col>
         </Row>
 
-        {/* 2. Upload de Imagens no TOPO */}
         <div style={{ background: '#fafafa', padding: '16px 16px 4px 16px', borderRadius: '8px', marginBottom: 20, border: '1px dashed #d9d9d9' }}>
           <Form.Item label={<span style={{ fontWeight: 500 }}><PictureOutlined /> Galeria de Fotos (Identificação Rápida)</span>}>
             <Upload
@@ -376,7 +395,6 @@ export default function ProductDetailsDrawer({ visible, product, onClose, onSave
           </Form.Item>
         </div>
 
-        {/* 3. Informações Primárias de Identificação */}
         <Row gutter={16}>
           <Col span={24}>
             <Form.Item name="nomeItem" label={isFamilyProduct ? "Nome Comercial da Família (Mestre)" : "Nome de Catálogo / Comercial"} rules={[{ required: true, message: 'Insira a descrição do produto!' }]}>
@@ -388,10 +406,7 @@ export default function ProductDetailsDrawer({ visible, product, onClose, onSave
         <Row gutter={16} style={{ marginBottom: 16 }}>
           <Col span={12}>
             <Form.Item name="marca" label="Marca ou Fabricante">
-              <Select placeholder="Selecione...">
-                <Option value="propria">Marca Própria</Option>
-                <Option value="parceiro">Fornecedor Homologado</Option>
-              </Select>
+              <Input placeholder="Ex: Própria / Gates" />
             </Form.Item>
           </Col>
           <Col span={12}>
@@ -407,7 +422,6 @@ export default function ProductDetailsDrawer({ visible, product, onClose, onSave
           </Col>
         </Row>
 
-        {/* 4. Abas Avançadas parametrizadas */}
         <Tabs activeKey={activeTab} onChange={(key) => setActiveTab(key)} items={tabItems} />
       </Form>
     </Drawer>

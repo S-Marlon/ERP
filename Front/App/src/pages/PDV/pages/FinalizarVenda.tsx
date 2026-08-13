@@ -1062,6 +1062,14 @@ useEffect(() => {
 
                     {precisaBloquear ? "AGUARDANDO GERENTE" : "CONCLUIR VENDA .(F5)"}
                 </button>
+                 <button
+                    className="btn-SendSale"
+                    disabled={totalPago < totalLiquido}
+                    onClick={handleFinalizarVenda}>
+
+                    Enviar NF-e (F6)
+                    
+                </button>
             </div>
 
 

@@ -144,7 +144,7 @@ const OSPanelRefactored: React.FC<OSPanelRefactoredProps> = ({
       </span>
 
       <span className={styles.osName}>
-        {os.config.equipment || 'Nova Ordem de Serviço'}
+        {os.config.equipment || 'Nova Ordem dasdasde Serviço'}
       </span>
     </div>
 

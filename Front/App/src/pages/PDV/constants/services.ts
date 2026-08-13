@@ -62,6 +62,13 @@ export const SERVICE_CATALOG: ServiceItem[] = [
     price: 120.0,
     category: 'Mão de obra',
   },
+   {
+    id: 'svc-visita-campo',
+    name: 'Mão de obra em campo',
+    description: 'Serviço Realizado.',
+    price: 5600.0,
+    category: 'Mão de obra',
+  },
   {
     id: 'svc-identificacao-tag',
     name: 'Identificação por Tag',

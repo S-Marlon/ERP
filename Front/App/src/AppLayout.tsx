@@ -46,6 +46,7 @@ import { ParceirosDashboard } from "./pages/Catalogo/Parceiros/ParceirosDashboar
 import FuncionariosPage from "./pages/Catalogo/Parceiros/FuncionariosPage";
 import { MarcasPage } from "./pages/Catalogo/pages/MarcasPage";
 import Pedidos from "./pages/Clientes/Pedidos";
+import ListaComprasExport from "./pages/Compras/ListaComprasExport";
 
 const { Sider, Header } = Layout;
 
@@ -139,6 +140,7 @@ export default function AppLayout() {
             <Route path="/catalogo/gerenciador" element={<CatalogSku />} />
             <Route path="/catalogo/marcas" element={<MarcasPage />} />
             <Route path="/compras" element={<ComprasDashboard />} />
+            <Route path="/compras/ListaCompras" element={<ListaComprasExport />} />
             <Route path="/compras/entrada-nfe" element={<StockEntryForm />} />
             <Route path="/compras/fornecedores" element={<FornecedoresList />} />
             <Route path="/relatorios" element={<RelatoriosPage />} />
