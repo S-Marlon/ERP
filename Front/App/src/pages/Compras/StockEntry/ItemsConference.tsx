@@ -283,7 +283,7 @@ export const ItemsConference: React.FC<Props> = ({
       }
     },
     {
-      title: 'Grupo',
+      title: 'Familia',
       dataIndex: 'grupoId',
       key: 'grupoId',
       sorter: (a, b) => {
@@ -294,7 +294,7 @@ export const ItemsConference: React.FC<Props> = ({
       render: (grupoId, record) => grupoId && groupsById.has(grupoId) ? (
         <Button size="small" icon={<EditOutlined />} onClick={() => handleOpenGroupModal(record)}>Editar</Button>
       ) : (
-        <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={() => handleOpenGroupModal(record)}>Grupo</Button>
+        <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={() => handleOpenGroupModal(record)}>Familia</Button>
       )
     },
     { title: 'UOM', dataIndex: 'unidadeMedida', key: 'unidadeMedida', render: (text) => <Tag>{text || '-'}</Tag> },
@@ -350,17 +350,17 @@ export const ItemsConference: React.FC<Props> = ({
   ];
 
   return (
-    <div style={{ background: '#fff', padding: 20, borderRadius: 8 }}>
+    <div style={{ background: '#fff', padding: 0, borderRadius: 8 }}>
       
       {/* HEADER CONTROL AREA */}
-      <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
+      <Row justify="space-between" align="middle" style={{ marginBottom: 12 }}>
         <Col>
           <Title level={4} style={{ margin: 0 }}>4. Conferência de Itens ({localItems.length})</Title>
         </Col>
         <Col>
           <Space>
             <Button icon={<SettingOutlined />} onClick={() => setIsManageModalOpen(true)}>
-              Gerenciar Grupos ({localGroups.length})
+              Gerenciar Familias ({localGroups.length})
             </Button>
             <Space style={{ background: '#f5f5f5', padding: '4px 12px', borderRadius: 6, border: '1px solid #d9d9d9' }}>
               <Text size="small"><ThunderboltOutlined style={{ color: '#faad14' }} /> Checkagem turbo</Text>
@@ -371,10 +371,10 @@ export const ItemsConference: React.FC<Props> = ({
       </Row>
 
       {/* FILTROS E AÇÕES COLETIVAS */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
-        <Space wrap style={{ background: '#fafafa', padding: 12, borderRadius: 6, border: '1px solid #f0f0f0', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+        <Space wrap style={{ background: '#fafafa', padding: 6, borderRadius: 6, border: '1px solid #f0f0f0', justifyContent: 'space-between' }}>
           <Space wrap>
-            <Text strong>{selectedRowKeys.length > 0 ? `${selectedRowKeys.length} selecionado(s)` : 'Nenhum item selecionado'}</Text>
+            <Text strong>{selectedRowKeys.length > 0 ? `${selectedRowKeys.length} selecionado(s)` : `${selectedRowKeys.length} selecionado(s)`}</Text>
             <Button size="small" type="primary" icon={<CheckOutlined />} disabled={selectedRowKeys.length === 0} onClick={() => { onConfirmItems?.(selectedRowKeys.map(Number)); setSelectedRowKeys([]); }}>Conferir</Button>
             <Button size="small" icon={<UndoOutlined />} disabled={selectedRowKeys.length === 0} onClick={() => { onUnconfirmItems?.(selectedRowKeys.map(Number)); setSelectedRowKeys([]); }}>Desfazer</Button>
             <Button size="small" icon={<LinkOutlined />} disabled={selectedRowKeys.length === 0} onClick={() => onMapProducts?.(selectedRowKeys.map(Number))}>Vincular</Button>

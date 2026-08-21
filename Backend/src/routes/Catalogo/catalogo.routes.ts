@@ -43,8 +43,9 @@ import {
 // 🏷️ Controller de Produtos do Catálogo
 import {
   getProdutos,
+  searchProdutos,
   updateProduto,
-  saveProdutosLote
+  createProdutosLote
 } from './Produtos/produtos.controller';
 
 const router = Router();
@@ -96,9 +97,10 @@ router.delete('/cadastros/familias/:idFamilia', deleteFamilia);
 // =========================================================================
 // 🏷️ ROTAS DE PRODUTOS E CATÁLOGO
 // =========================================================================
+router.get('/produtos/search', searchProdutos);
 router.get('/produtos', getProdutos);
-router.put('/produtos/:idItem', updateProduto);
-router.post('/produtos/lote', saveProdutosLote);
+router.post('/produtos/lote', createProdutosLote);
+router.put('/produtos/:id_item', updateProduto);
 
 
 export default router;

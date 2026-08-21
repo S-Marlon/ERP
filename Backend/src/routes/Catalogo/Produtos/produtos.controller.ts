@@ -4,8 +4,84 @@ import pool from '../../Estoque/db.config';
 
 
 /**
+ * 📍 [READ] GET /produtos/search
+ * Busca de itens usando as tabelas novas do ERP: itens_core + comercial_produtos_dados
+ */
+export const searchProdutos = async (req: Request, res: Response) => {
+  const rawTenantId = req.query.tenant_id || req.headers['x-tenant-id'] || 1;
+  const tenantId = Number(rawTenantId);
+  const term = String(req.query.term || req.query.q || '').trim();
+
+  if (!term) {
+    return res.json([]);
+  }
+
+  const searchPattern = `%${term}%`;
+
+  try {
+    const query = `
+      SELECT
+        ic.id_item AS id,
+        ic.sku,
+        ic.nome_item AS name,
+        ic.status,
+        ic.descricao_variacao,
+        COALESCE(um.sigla, '') AS unitOfMeasure,
+        COALESCE(cpd.preco_venda, 0) AS salePrice,
+        COALESCE(cf.nome, '') AS category,
+        NULL AS barcode,
+        0 AS currentStock,
+        0 AS minStock,
+        NULL AS pictureUrl
+      FROM itens_core ic
+      LEFT JOIN comercial_produtos_dados cpd
+        ON ic.id_item = cpd.id_item AND ic.tenant_id = cpd.tenant_id
+      LEFT JOIN comercial_familias cf
+        ON cpd.familia_id = cf.id AND cpd.tenant_id = cf.tenant_id
+      LEFT JOIN itens_unidades_medida um
+        ON ic.id_unidade = um.id_unidade AND ic.tenant_id = um.tenant_id
+      WHERE ic.tenant_id = ?
+        AND (
+          ic.sku LIKE ?
+          OR ic.nome_item LIKE ?
+          OR ic.descricao_variacao LIKE ?
+          OR COALESCE(cpd.sku_customizado, '') LIKE ?
+        )
+      ORDER BY ic.nome_item ASC
+      LIMIT 10
+    `;
+
+    const [rows] = await pool.execute(query, [
+      tenantId,
+      searchPattern,
+      searchPattern,
+      searchPattern,
+      searchPattern,
+    ]);
+
+    return res.json((rows as any[]).map((row: any) => ({
+      id: Number(row.id),
+      sku: row.sku || '',
+      barcode: row.barcode || '',
+      name: row.name || row.nome_item || 'Produto',
+      category: row.category || '',
+      unitOfMeasure: row.unitOfMeasure || '',
+      salePrice: Number(row.salePrice || 0),
+      currentStock: Number(row.currentStock || 0),
+      minStock: Number(row.minStock || 0),
+      status: row.status || 'ATIVO',
+      pictureUrl: row.pictureUrl || null,
+    })));
+  } catch (error: any) {
+    console.error('Erro ao buscar produtos no catálogo novo:', error);
+    return res.status(500).json({ error: 'Erro ao buscar produtos.', details: error.message });
+  }
+};
+
+/**
  * 🔌 [READ] GET /produtos
- * Retorna itens_core com os dados comerciais prontos para o CatalogSku.service.ts
+ * Retorna array plano de SKUs individuais com dados comerciais
+ * Para busca em formulário de etiquetas, a estrutura é simplificada
  */
 export const getProdutos = async (req: Request, res: Response) => {
   const rawTenantId = req.query.tenant_id || req.headers['x-tenant-id'] || 1;
@@ -26,14 +102,17 @@ export const getProdutos = async (req: Request, res: Response) => {
         cpd.id_marca,
         cpd.custo_gerencial,
         cpd.preco_venda,
-        fam.nome AS nome_familia
+        fam.nome AS nome_familia,
+        COALESCE(um.sigla, '') AS unidade
       FROM itens_core ic
       LEFT JOIN comercial_produtos_dados cpd 
         ON ic.id_item = cpd.id_item AND ic.tenant_id = cpd.tenant_id
       LEFT JOIN comercial_familias fam 
         ON cpd.familia_id = fam.id AND cpd.tenant_id = fam.tenant_id
+      LEFT JOIN itens_unidades_medida um
+        ON ic.id_unidade = um.id_unidade AND ic.tenant_id = um.tenant_id
       WHERE ic.tenant_id = ?
-      ORDER BY cpd.familia_id ASC, ic.id_item ASC
+      ORDER BY ic.nome_item ASC
     `;
 
     const [rows] = await pool.execute(query, [tenantId]);
@@ -43,69 +122,47 @@ export const getProdutos = async (req: Request, res: Response) => {
       return res.json([]);
     }
 
-    const mapaFamilias = new Map<number, any>();
-    const produtosIndividuais: any[] = [];
+    // Retorna um array plano de SKUs individuais com dados comerciais
+    const skus = itens.map((item: any) => {
+      const nomeItem = item.nome_item || item.name || 'Produto sem nome';
+      const nomeFamilia = item.nome_familia || item.category || '';
+      const unidade = item.unidade || item.unitOfMeasure || '';
+      const preco = Number(item.preco_venda ?? item.salePrice ?? 0);
+      const custo = Number(item.custo_gerencial ?? 0);
+      const estoque = Number(item.estoque ?? item.currentStock ?? 0);
+      const status = String(item.status || 'ATIVO').toUpperCase();
 
-    for (const item of itens) {
-      const idItem = Number(item.id_item);
-      const familiaId = item.familia_id ? Number(item.familia_id) : null;
-
-      // SKU Filho (Entra na sub-tabela expandida)
-      const skuFilho = {
-        key: `sku-${idItem}`,
-        id_item: idItem,
+      return {
+        id: Number(item.id_item),
+        id_item: Number(item.id_item),
+        tenant_id: Number(item.tenant_id || tenantId),
         sku: item.sku || '',
-        variacao: item.descricao_variacao || item.nome_item || 'Principal',
-        marca: item.id_marca ? String(item.id_marca) : 'Própria',
-        estoque: 0,
-        preco_venda: Number(item.preco_venda || 0),
-        custo_gerencial: Number(item.custo_gerencial || 0),
-        status: String(item.status || 'ATIVO').toUpperCase()
+        name: nomeItem,
+        nome_item: nomeItem,
+        barcode: '',
+        category: nomeFamilia,
+        categoria: nomeFamilia,
+        categoria_id: item.categoria_id ?? null,
+        familia_id: item.familia_id ?? null,
+        id_marca: item.id_marca ?? null,
+        unitOfMeasure: unidade,
+        unidade,
+        salePrice: preco,
+        preco_venda: preco,
+        custo_gerencial: custo,
+        currentStock: estoque,
+        estoque,
+        minStock: 0,
+        status,
+        tipo_recurso: item.tipo_recurso || 'PRODUTO',
+        pictureUrl: null,
+        variacao: item.descricao_variacao || item.variacao || '',
+        descricao_variacao: item.descricao_variacao || item.variacao || '',
+        marca: item.marca || 'Própria',
       };
+    });
 
-      if (familiaId) {
-        if (mapaFamilias.has(familiaId)) {
-          // Já existe o Pai da Família -> Adiciona mais este SKU
-          mapaFamilias.get(familiaId).skus.push(skuFilho);
-        } else {
-          // Cria o Registro Pai da Família
-          mapaFamilias.set(familiaId, {
-            key: `fam-${familiaId}`,
-            id_item: `FAM-${familiaId}`,
-            tenant_id: Number(item.tenant_id || tenantId),
-            sku: `FAM-${familiaId}`,
-            nome_item: item.nome_familia || `Família #${familiaId}`, // Puxa "Motobombas" da comercial_familias
-            tipo_recurso: 'PRODUTO',
-            status: 'ATIVO',
-            categoria_id: item.categoria_id ? Number(item.categoria_id) : null,
-            familia_id: familiaId,
-            id_marca: item.id_marca ? Number(item.id_marca) : null,
-            skus: [skuFilho]
-          });
-        }
-      } else {
-        // Produto sem família vinculada (Ex: Óleo Lubrificante)
-        produtosIndividuais.push({
-          key: `prod-${idItem}`,
-          id_item: idItem,
-          tenant_id: Number(item.tenant_id || tenantId),
-          sku: item.sku || '',
-          nome_item: item.nome_item || 'Produto Solto',
-          tipo_recurso: item.tipo_recurso || 'PRODUTO',
-          status: String(item.status || 'ATIVO').toUpperCase(),
-          categoria_id: item.categoria_id ? Number(item.categoria_id) : null,
-          familia_id: null,
-          id_marca: item.id_marca ? Number(item.id_marca) : null,
-          skus: [skuFilho]
-        });
-      }
-    }
-
-    // Retorna as famílias agrupadas junto dos produtos sem família
-    return res.json([
-      ...Array.from(mapaFamilias.values()),
-      ...produtosIndividuais
-    ]);
+    return res.json(skus);
 
   } catch (error) {
     console.error('Erro ao agrupar produtos do catálogo:', error);
@@ -117,13 +174,82 @@ export const getProdutos = async (req: Request, res: Response) => {
  * 🔄 [UPDATE] PUT /produtos/:id_item
  * Atualiza um produto ou variação existente no catálogo
  */
+export const createProdutosLote = async (req: Request, res: Response) => {
+  const rawTenantId = req.query.tenant_id || req.headers['x-tenant-id'] || req.body.tenant_id || 1;
+  const tenantId = Number(rawTenantId);
+  const produtos = Array.isArray(req.body?.produtos) ? req.body.produtos : [];
+
+  if (!produtos.length) {
+    return res.status(400).json({ error: 'Nenhum produto informado para o lote.' });
+  }
+
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const created: Array<{ id_item: number; sku: string }> = [];
+
+    for (const item of produtos) {
+      const itemRecord = item ?? {};
+      const itemRows = Array.isArray(itemRecord.skus) && itemRecord.skus.length > 0 ? itemRecord.skus : [itemRecord];
+
+      for (const skuRow of itemRows) {
+        const sku = String(skuRow?.sku ?? itemRecord.sku ?? `SKU-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`).trim();
+        const nomeItem = String(skuRow?.nome_item ?? itemRecord.nome_item ?? itemRecord.nome ?? 'Produto sem nome').trim();
+        const variacao = String(skuRow?.variacao ?? itemRecord.variacao ?? 'Único').trim();
+        const tipoRecurso = String(skuRow?.tipo_recurso ?? itemRecord.tipo_recurso ?? 'PRODUTO').toUpperCase();
+        const status = String(skuRow?.status ?? itemRecord.status ?? 'ATIVO').toUpperCase();
+        const categoriaId = skuRow?.categoria_id ?? itemRecord.categoria_id;
+        const familiaId = skuRow?.familia_id ?? itemRecord.familia_id;
+        const idMarca = skuRow?.id_marca ?? itemRecord.id_marca;
+        const precoVenda = Number(skuRow?.preco_venda ?? itemRecord.preco_venda ?? itemRecord.preco ?? 0);
+        const custoGerencial = Number(skuRow?.custo_gerencial ?? itemRecord.custo_gerencial ?? itemRecord.custo ?? 0);
+
+        const [result] = await connection.execute(
+          `INSERT INTO itens_core (tenant_id, sku, nome_item, tipo_recurso, status, descricao_variacao)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [tenantId, sku || `SKU-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, nomeItem || 'Produto sem nome', tipoRecurso, status, variacao || 'Único']
+        );
+
+        const insertId = (result as any).insertId;
+
+        await connection.execute(
+          `INSERT INTO comercial_produtos_dados (tenant_id, id_item, categoria_id, familia_id, id_marca, custo_gerencial, preco_venda)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [tenantId, insertId, categoriaId ? Number(categoriaId) : null, familiaId ? Number(familiaId) : null, idMarca ? Number(idMarca) : null, custoGerencial, precoVenda]
+        );
+
+        created.push({ id_item: insertId, sku });
+      }
+    }
+
+    await connection.commit();
+    return res.status(201).json({
+      success: true,
+      message: `${created.length} produto(s) cadastrados no lote com sucesso.`,
+      data: created,
+    });
+  } catch (error: any) {
+    await connection.rollback();
+    console.error('Erro ao salvar lote de produtos no catálogo:', error);
+    return res.status(500).json({
+      error: 'Erro ao salvar lote de produtos no catálogo.',
+      details: error.message,
+    });
+  } finally {
+    connection.release();
+  }
+};
+
 export const updateProduto = async (req: Request, res: Response) => {
-  const { id_item } = req.params;
+  const rawId = req.params.id_item ?? req.params.idItem;
+  const idItem = Number(rawId);
   const rawTenantId = req.query.tenant_id || req.headers['x-tenant-id'] || req.body.tenant_id || 1;
   const tenantId = Number(rawTenantId);
   const payload = req.body;
 
-  if (!id_item) {
+  if (rawId === undefined || rawId === null || rawId === '' || !Number.isFinite(idItem) || idItem <= 0) {
     return res.status(400).json({ error: 'ID do item não informado para atualização.' });
   }
 
@@ -154,7 +280,7 @@ export const updateProduto = async (req: Request, res: Response) => {
     }
 
     if (updateCoreFields.length > 0) {
-      updateCoreValues.push(id_item, tenantId);
+      updateCoreValues.push(idItem, tenantId);
       await connection.execute(
         `UPDATE itens_core SET ${updateCoreFields.join(', ')} WHERE id_item = ? AND tenant_id = ?`,
         updateCoreValues
@@ -187,164 +313,25 @@ export const updateProduto = async (req: Request, res: Response) => {
     }
 
     if (updateComercialFields.length > 0) {
-      updateComercialValues.push(id_item, tenantId);
-      
-      // Verifica se já existe registro comercial para este id_item
-      const [rows]: any = await connection.execute(
-        `SELECT id_item FROM comercial_produtos_dados WHERE id_item = ? AND tenant_id = ?`,
-        [id_item, tenantId]
+      updateComercialValues.push(idItem, tenantId);
+      await connection.execute(
+        `UPDATE comercial_produtos_dados SET ${updateComercialFields.join(', ')} WHERE id_item = ? AND tenant_id = ?`,
+        updateComercialValues
       );
-
-      if (rows.length > 0) {
-        await connection.execute(
-          `UPDATE comercial_produtos_dados SET ${updateComercialFields.join(', ')} WHERE id_item = ? AND tenant_id = ?`,
-          updateComercialValues
-        );
-      } else {
-        // Se não existir, faz um INSERT preventivo
-        await connection.execute(
-          `INSERT INTO comercial_produtos_dados (id_item, tenant_id, categoria_id, familia_id, id_marca, custo_gerencial, preco_venda) 
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [
-            id_item,
-            tenantId,
-            payload.categoria_id ? Number(payload.categoria_id) : null,
-            payload.familia_id ? Number(payload.familia_id) : null,
-            payload.id_marca ? Number(payload.id_marca) : null,
-            Number(payload.custo_gerencial || 0),
-            Number(payload.preco_venda || 0)
-          ]
-        );
-      }
     }
 
     await connection.commit();
-    connection.release();
 
-    return res.status(200).json({
+    return res.json({
       success: true,
-      message: 'Produto atualizado com sucesso!'
+      message: 'Produto atualizado com sucesso.',
+      id_item: idItem,
     });
-
   } catch (error: any) {
     await connection.rollback();
-    connection.release();
     console.error('Erro ao atualizar produto:', error);
     return res.status(500).json({ error: 'Erro ao atualizar produto.', details: error.message });
+  } finally {
+    await connection.release();
   }
 };
-
-/**
- * 💾 [CREATE/BATCH] POST /produtos/lote
- * Grava um lote de produtos (pais/famílias e suas variações) enviado pela tela CatalogSku
- */
-export const saveProdutosLote = async (req: Request, res: Response) => {
-  const rawTenantId = req.query.tenant_id || req.headers['x-tenant-id'] || req.body.tenant_id || 1;
-  const tenantId = Number(rawTenantId);
-  const itensLote = req.body.produtos || req.body; // Aceita tanto array direto quanto objeto envelopado
-
-  if (!Array.isArray(itensLote) || itensLote.length === 0) {
-    return res.status(400).json({ error: 'Nenhum produto enviado no lote.' });
-  }
-
-  const connection = await pool.getConnection();
-
-  try {
-    await connection.beginTransaction();
-
-    const idsCriados: any[] = [];
-
-    for (const itemPai of itensLote) {
-      const categoriaId = itemPai.categoria_id ? Number(itemPai.categoria_id) : null;
-      const familiaId = itemPai.familia_id ? Number(itemPai.familia_id) : null;
-      const idMarca = itemPai.id_marca ? Number(itemPai.id_marca) : null;
-      const skusLista = itemPai.skus || [];
-
-      // Se o lote veio estruturado com múltiplas variações (skus)
-      if (skusLista.length > 0) {
-        for (const skuFilho of skusLista) {
-          // 1. Insere o SKU filho na itens_core
-          const [resultCore] = await connection.execute(
-            `INSERT INTO itens_core (tenant_id, sku, nome_item, tipo_recurso, status, descricao_variacao) 
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [
-              tenantId,
-              skuFilho.sku,
-              itemPai.nome_item || skuFilho.variacao,
-              itemPai.tipo_recurso || 'PRODUTO',
-              skuFilho.status || 'ATIVO',
-              skuFilho.variacao || null
-            ]
-          );
-
-          const novoIdItem = (resultCore as any).insertId;
-
-          // 2. Insere os dados comerciais correspondentes
-          await connection.execute(
-            `INSERT INTO comercial_produtos_dados (id_item, tenant_id, categoria_id, familia_id, id_marca, custo_gerencial, preco_venda, exibir_no_pdv, pode_vender_sem_estoque) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, 1, 0)`,
-            [
-              novoIdItem,
-              tenantId,
-              categoriaId,
-              familiaId,
-              idMarca,
-              Number(skuFilho.custo_gerencial || 0),
-              Number(skuFilho.preco_venda || 0)
-            ]
-          );
-
-          idsCriados.push(novoIdItem);
-        }
-      } else {
-        // Produto isolado sem array de SKUs complexo
-        const [resultCore] = await connection.execute(
-          `INSERT INTO itens_core (tenant_id, sku, nome_item, tipo_recurso, status, descricao_variacao) 
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [
-            tenantId,
-            itemPai.sku,
-            itemPai.nome_item,
-            itemPai.tipo_recurso || 'PRODUTO',
-            itemPai.status || 'ATIVO',
-            itemPai.variacao || null
-          ]
-        );
-
-        const novoIdItem = (resultCore as any).insertId;
-
-        await connection.execute(
-          `INSERT INTO comercial_produtos_dados (id_item, tenant_id, categoria_id, familia_id, id_marca, custo_gerencial, preco_venda, exibir_no_pdv, pode_vender_sem_estoque) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, 1, 0)`,
-          [
-            novoIdItem,
-            tenantId,
-            categoriaId,
-            familiaId,
-            idMarca,
-            Number(itemPai.custo_gerencial || 0),
-            Number(itemPai.preco_venda || 0)
-          ]
-        );
-
-        idsCriados.push(novoIdItem);
-      }
-    }
-
-    await connection.commit();
-    connection.release();
-
-    return res.status(201).json({
-      success: true,
-      message: `Lote processado com sucesso! ${idsCriados.length} itens gravados.`,
-      ids: idsCriados
-    });
-
-  } catch (error: any) {
-    await connection.rollback();
-    connection.release();
-    console.error('Erro na gravação do lote de produtos:', error);
-    return res.status(500).json({ error: 'Erro ao salvar lote de produtos.', details: error.message });
-  }
-};
-

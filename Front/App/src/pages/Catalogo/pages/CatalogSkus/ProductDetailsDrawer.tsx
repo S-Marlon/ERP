@@ -62,29 +62,29 @@ export default function ProductDetailsDrawer({ open, product, onClose, onSave }:
       const skuPrincipal = product.skus?.[0];
       
       form.setFieldsValue({
-        nomeItem: product.nome_item || product.nomeItem,
-        codItem: product.sku || product.codItem,
-        status: product.status !== 'Inativo' && product.status !== 'INATIVO',
-        estoqueMinimo: product.estoqueMinimo || 10,
-        estoqueMaximo: product.estoqueMaximo || 100,
+        nomeItem: product.nome_item || product.nomeItem || undefined,
+        codItem: product.sku || product.codItem || undefined,
+        status: product.status ? String(product.status).toUpperCase() !== 'INATIVO' : false,
+        estoqueMinimo: product.estoqueMinimo ?? undefined,
+        estoqueMaximo: product.estoqueMaximo ?? undefined,
         estoqueAtual: estoqueCalculado,
-        ncm: product.ncm || '',
-        cest: product.cest || '',
-        marca: skuPrincipal?.marca || product.marca || '',
-        unidadeMedida: product.unidadeMedida || 'UN',
-        descricaoCurta: product.descricaoCurta || '',
-        descricaoLonga: product.descricaoLonga || '',
-        pesoKg: product.pesoKg || 0,
-        alturaCm: product.alturaCm || 0,
-        larguraCm: product.larguraCm || 0,
-        comprimentoCm: product.comprimentoCm || 0,
-        fornecedorPadraoId: product.fornecedorPadraoId || '',
-        codigoBarrasEan: skuPrincipal?.sku || product.codigoBarrasEan || '',
+        ncm: product.ncm ?? undefined,
+        cest: product.cest ?? undefined,
+        marca: skuPrincipal?.marca || product.marca || undefined,
+        unidadeMedida: product.unidadeMedida ?? undefined,
+        descricaoCurta: product.descricaoCurta ?? undefined,
+        descricaoLonga: product.descricaoLonga ?? undefined,
+        pesoKg: product.pesoKg ?? undefined,
+        alturaCm: product.alturaCm ?? undefined,
+        larguraCm: product.larguraCm ?? undefined,
+        comprimentoCm: product.comprimentoCm ?? undefined,
+        fornecedorPadraoId: product.fornecedorPadraoId ?? undefined,
+        codigoBarrasEan: skuPrincipal?.sku || product.codigoBarrasEan || undefined,
       });
 
       setCurrentStock(estoqueCalculado);
-      setMinStock(product.estoqueMinimo || 10);
-      setMaxStock(product.estoqueMaximo || 100);
+      setMinStock(Number(product.estoqueMinimo ?? 0));
+      setMaxStock(Number(product.estoqueMaximo ?? 0));
 
       const imagensSrc = skuPrincipal?.imagem_url || product.urlImagem || product.imagens;
       if (Array.isArray(imagensSrc)) {
@@ -119,30 +119,40 @@ export default function ProductDetailsDrawer({ open, product, onClose, onSave }:
 
       // Garante que se o formulário não capturou algum campo base, usamos o product original de fallback
       const payload = {
-        nome_item: values.nomeItem || product?.nome_item,
-        sku: values.codItem || product?.sku,
+        nome_item: values.nomeItem ?? product?.nome_item ?? null,
+        sku: values.codItem ?? product?.sku ?? null,
         status: values.status ? 'ATIVO' : 'INATIVO',
-        estoque_minimo: values.estoqueMinimo ?? product?.estoque_minimo ?? 10,
-        estoque_maximo: values.estoqueMaximo ?? product?.estoque_maximo ?? 100,
-        ncm: values.ncm || product?.ncm || '',
-        cest: values.cest || product?.cest || '',
-        marca: values.marca || product?.marca || '',
-        unidade_medida: values.unidadeMedida || product?.unidade_medida || 'UN',
-        descricao_curta: values.descricaoCurta || product?.descricao_curta || '',
-        descricao_longa: values.descricaoLonga || product?.descricao_longa || '',
-        peso_kg: values.pesoKg ?? product?.peso_kg ?? 0,
-        altura_cm: values.alturaCm ?? product?.altura_cm ?? 0,
-        largura_cm: values.larguraCm ?? product?.largura_cm ?? 0,
-        comprimento_cm: values.comprimentoCm ?? product?.comprimento_cm ?? 0,
-        fornecedor_padrao_id: values.fornecedorPadraoId || product?.fornecedor_padrao_id || null,
+        estoque_minimo: values.estoqueMinimo ?? product?.estoque_minimo ?? null,
+        estoque_maximo: values.estoqueMaximo ?? product?.estoque_maximo ?? null,
+        ncm: values.ncm ?? product?.ncm ?? null,
+        cest: values.cest ?? product?.cest ?? null,
+        marca: values.marca ?? product?.marca ?? null,
+        unidade_medida: values.unidadeMedida ?? product?.unidade_medida ?? null,
+        descricao_curta: values.descricaoCurta ?? product?.descricao_curta ?? null,
+        descricao_longa: values.descricaoLonga ?? product?.descricao_longa ?? null,
+        peso_kg: values.pesoKg ?? product?.peso_kg ?? null,
+        altura_cm: values.alturaCm ?? product?.altura_cm ?? null,
+        largura_cm: values.larguraCm ?? product?.largura_cm ?? null,
+        comprimento_cm: values.comprimentoCm ?? product?.comprimento_cm ?? null,
+        fornecedor_padrao_id: values.fornecedorPadraoId ?? product?.fornecedor_padrao_id ?? null,
         imagens: urlsImagens,
         url_imagem: urlsImagens.join(',')
       };
 
-      const itemId = product?.id_item || product?.id || product?.key;
+      const rawItemId = product?.id_item ?? product?.id ?? product?.key;
+      const itemId = Number(rawItemId);
 
-      if (!itemId) {
-        message.error('Erro crítico: ID do produto não identificado.');
+      if (
+        rawItemId === undefined ||
+        rawItemId === null ||
+        rawItemId === '' ||
+        !Number.isFinite(itemId) ||
+        itemId <= 0 ||
+        String(rawItemId).startsWith('FAM-') ||
+        String(rawItemId).startsWith('fam-') ||
+        String(rawItemId).startsWith('prod-')
+      ) {
+        message.error('Erro crítico: ID do produto não identificado ou inválido para edição.');
         setIsSaving(false);
         return;
       }
@@ -174,7 +184,7 @@ export default function ProductDetailsDrawer({ open, product, onClose, onSave }:
             style={{ marginBottom: 16 }}
           />
           <div style={{ padding: '16px', background: '#fafafa', borderRadius: '8px', textAlign: 'center', color: '#8c8c8c' }}>
-            [PricingCalculator Component - Integrado]
+            Dados financeiros serão exibidos quando disponíveis no banco.
           </div>
         </div>
       )
@@ -219,22 +229,22 @@ export default function ProductDetailsDrawer({ open, product, onClose, onSave }:
           <Row gutter={12}>
             <Col span={6}>
               <Form.Item name="pesoKg" label="Peso (Kg)">
-                <InputNumber style={{ width: '100%' }} min={0} step={0.01} placeholder="0.00" />
+                <InputNumber style={{ width: '100%' }} min={0} step={0.01} placeholder="" />
               </Form.Item>
             </Col>
             <Col span={6}>
               <Form.Item name="comprimentoCm" label="Comprimento (cm)">
-                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" />
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="" />
               </Form.Item>
             </Col>
             <Col span={6}>
               <Form.Item name="larguraCm" label="Largura (cm)">
-                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" />
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="" />
               </Form.Item>
             </Col>
             <Col span={6}>
               <Form.Item name="alturaCm" label="Altura (cm)">
-                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" />
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="" />
               </Form.Item>
             </Col>
           </Row>
@@ -247,11 +257,11 @@ export default function ProductDetailsDrawer({ open, product, onClose, onSave }:
       children: (
         <Space direction="vertical" style={{ width: '100%' }} size="middle">
           <Form.Item name="descricaoCurta" label="Chamada / Descrição Comercial Curta">
-            <Input placeholder="Texto breve focado em conversão e SEO" maxLength={150} showCount />
+            <Input maxLength={150} showCount />
           </Form.Item>
 
           <Form.Item name="descricaoLonga" label="Ficha Técnica Completa">
-            <Input.TextArea rows={4} placeholder="Especificações detalhadas, composição e cuidados com o produto..." />
+            <Input.TextArea rows={4} />
           </Form.Item>
         </Space>
       )
@@ -263,12 +273,12 @@ export default function ProductDetailsDrawer({ open, product, onClose, onSave }:
         <Row gutter={16}>
           <Col span={12}>
             <Form.Item name="ncm" label="NCM (Classificação Fiscal)">
-              <Input placeholder="Ex: 6109.10.00" />
+              <Input />
             </Form.Item>
           </Col>
           <Col span={12}>
             <Form.Item name="cest" label="CEST">
-              <Input placeholder="Ex: 21.011.00" />
+              <Input />
             </Form.Item>
           </Col>
           <Col span={24}>
@@ -277,7 +287,7 @@ export default function ProductDetailsDrawer({ open, product, onClose, onSave }:
               label="Código de Barras EAN / GTIN"
               tooltip={isFamilyProduct ? "Produtos com variação devem ter o EAN gerenciado diretamente nas configurações internas de cada SKU filho." : undefined}
             >
-              <Input placeholder="7890000000000" disabled={isFamilyProduct} />
+              <Input disabled={isFamilyProduct} />
             </Form.Item>
           </Col>
         </Row>
@@ -289,14 +299,8 @@ export default function ProductDetailsDrawer({ open, product, onClose, onSave }:
       children: (
         <Space direction="vertical" style={{ width: '100%' }}>
           <Form.Item name="fornecedorPadraoId" label="Fornecedor Homologado Preferencial">
-            <Select placeholder="Vincular fornecedor padrão...">
-              <Option value="101">Distribuidora Global de Ferro e Aço S.A.</Option>
-              <Option value="102">FORNECEDOR GENERICO - COMPRAS SPOT</Option>
-            </Select>
+            <Select placeholder="Selecione o fornecedor" allowClear />
           </Form.Item>
-          <div style={{ padding: '16px', background: '#fafafa', borderRadius: '8px', textAlign: 'center', color: '#8c8c8c' }}>
-            O histórico de ordens de compra anteriores ligadas a este item será consolidado aqui.
-          </div>
         </Space>
       )
     }
@@ -364,7 +368,7 @@ export default function ProductDetailsDrawer({ open, product, onClose, onSave }:
           </Col>
           <Col span={12} style={{ textAlign: 'right' }}>
             <Tag color={currentStock <= minStock ? 'orange' : 'blue'} style={{ fontSize: '13px', padding: '4px 10px', borderRadius: '4px' }}>
-              <AppstoreOutlined /> {isFamilyProduct ? 'Estoque Total da Grade: ' : 'Total em Estoque: '} {currentStock} {form.getFieldValue('unidadeMedida') || 'UN'}
+              <AppstoreOutlined /> {isFamilyProduct ? 'Estoque Total da Grade: ' : 'Total em Estoque: '} {currentStock}{form.getFieldValue('unidadeMedida') ? ` ${form.getFieldValue('unidadeMedida')}` : ''}
             </Tag>
           </Col>
         </Row>
@@ -398,7 +402,7 @@ export default function ProductDetailsDrawer({ open, product, onClose, onSave }:
         <Row gutter={16}>
           <Col span={24}>
             <Form.Item name="nomeItem" label={isFamilyProduct ? "Nome Comercial da Família (Mestre)" : "Nome de Catálogo / Comercial"} rules={[{ required: true, message: 'Insira a descrição do produto!' }]}>
-              <Input placeholder="Ex: Camiseta Oversized Malha Fria" />
+              <Input />
             </Form.Item>
           </Col>
         </Row>
@@ -406,18 +410,12 @@ export default function ProductDetailsDrawer({ open, product, onClose, onSave }:
         <Row gutter={16} style={{ marginBottom: 16 }}>
           <Col span={12}>
             <Form.Item name="marca" label="Marca ou Fabricante">
-              <Input placeholder="Ex: Própria / Gates" />
+              <Input />
             </Form.Item>
           </Col>
           <Col span={12}>
             <Form.Item name="unidadeMedida" label="Unidade de Medida">
-              <Select>
-                <Option value="UN">UN (Unidade)</Option>
-                <Option value="CX">CX (Caixa)</Option>
-                <Option value="KG">KG (Quilo)</Option>
-                <Option value="M">M (Metro)</Option>
-                <Option value="PCT">PCT (Pacote)</Option>
-              </Select>
+              <Select allowClear placeholder="Selecione a unidade" />
             </Form.Item>
           </Col>
         </Row>

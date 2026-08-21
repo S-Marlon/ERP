@@ -63,10 +63,10 @@ const StockEntryForm: React.FC = () => {
   };
 
   return (
-    <div style={{ padding: '24px', background: '#f5f5f5', minHeight: '100vh' }}>
+    <div style={{ padding: '12px', background: '#f5f5f5', minHeight: '100vh' }}>
       
       {/* 1. CABEÇALHO DA PÁGINA */}
-      <Card style={{ marginBottom: 24, borderRadius: 8 }} bordered={false}>
+      <Card style={{ marginBottom: 8, borderRadius: 8 }} bordered={false}>
         <Row justify="space-between" align="middle" gutter={[16, 16]}>
           <Col xs={24} md={12}>
             <Title level={3} style={{ margin: 0 }}>
@@ -95,10 +95,10 @@ const StockEntryForm: React.FC = () => {
 
       {/* 2. LAYOUT DO WORKSPACE */}
       <Spin spinning={isProcessingItems} tip="Analisando e vinculando itens com o banco...">
-        <Row gutter={[24, 24]}>
+        <Row gutter={[16, 16]}>
           
           {/* COLUNA ESQUERDA - FLUXO PRINCIPAL */}
-          <Col xs={24} lg={18}>
+          <Col xs={24} lg={19}>
             <Space direction="vertical" size={24} style={{ width: '100%' }}>
               {financials.accessKey && (
                 <NfeCards
@@ -148,7 +148,7 @@ const StockEntryForm: React.FC = () => {
           </Col>
 
           {/* COLUNA DIREITA - ALERTAS E RESUMO FINANCEIRO */}
-          <Col xs={24} lg={6}>
+          <Col xs={24} lg={5}>
             <Space direction="vertical" size={24} style={{ width: '100%', sticky: 'top', top: 24 }}>
               
               {/* Painel de Alertas de Divergência */}

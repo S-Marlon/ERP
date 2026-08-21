@@ -23,6 +23,7 @@ import type {
   ClienteState,
   ClienteAction,
 } from '../types/cliente.types';
+import { clienteService } from '../services/clienteService';
 
 /**
  * Reducer para gerenciar estado do cliente
@@ -214,6 +215,7 @@ export interface UseClienteReturn {
 /**
  * Hook principal para gerenciar cliente
  */
+export function useCliente(): UseClienteReturn {
   const [state, dispatch] = useReducer(clienteReducer, INITIAL_STATE);
 
   // MOCK: lista de clientes em memória

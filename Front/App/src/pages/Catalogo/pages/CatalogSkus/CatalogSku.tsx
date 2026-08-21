@@ -38,7 +38,8 @@ import {
   PictureOutlined,
   ImportOutlined,
   CodeOutlined,
-  UploadOutlined
+  UploadOutlined,
+  PrinterOutlined
 } from '@ant-design/icons';
 
 import type { ColumnsType } from 'antd/es/table';
@@ -47,11 +48,16 @@ import { ItemParentType, SkuChildType } from './CatalogSku.types';
 import { getProdutos, updateProduto, saveProdutosLote } from './CatalogSku.service';
 import ProductDetailsDrawer from './ProductDetailsDrawer';
 import CreateProductModal from './CreateProductModal'; 
+import { generatePRN, type LabelData } from '../../../Estoque/utils/labelGenerator';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 
 type FilterType = 'all' | 'activeSkus' | 'noStock' | 'criticalStock';
+
+type QuickPrintItem = LabelData & {
+  id: string;
+};
 
 export default function CatalogSku() {
   const [products, setProducts] = useState<ItemParentType[]>([]);
@@ -78,13 +84,19 @@ export default function CatalogSku() {
   const [creationBatch, setCreationBatch] = useState<ItemParentType[]>([]);
   const [showBatchPanel, setShowBatchPanel] = useState(false);
 
+  // Impressão Rápida
+  const [quickPrintQueue, setQuickPrintQueue] = useState<QuickPrintItem[]>([]);
+  const [quickPrintSize, setQuickPrintSize] = useState<'105x27' | '60x40'>('105x27');
+
   const checkIsFamily = (record: ItemParentType): boolean => {
-    const isFamKey = String(record.id_item).startsWith('FAM-') || String(record.sku).startsWith('FAM-');
-    const hasFamiliaId = record.familia_id !== null && record.familia_id !== undefined;
-    const isTipoFamilia = record.tipo_recurso === 'FAMILIA';
+    const isFamKey = String(record.id_item).startsWith('FAM-') || String(record.sku || '').startsWith('FAM-');
+    const familyId = Number(record.familia_id ?? 0);
+    const hasFamiliaId = familyId > 0;
+    const hasFamilyName = !!record.categoria && String(record.categoria).trim().length > 0 && String(record.categoria).trim() !== String(record.nome_item || '').trim();
+    const isTipoFamilia = String(record.tipo_recurso || '').toUpperCase() === 'FAMILIA';
     const hasMultipleSkus = (record.skus || []).length > 1;
 
-    return isFamKey || hasFamiliaId || isTipoFamilia || hasMultipleSkus;
+    return isFamKey || hasFamiliaId || hasFamilyName || isTipoFamilia || hasMultipleSkus;
   };
 
   const fetchProducts = useCallback(async () => {
@@ -92,8 +104,9 @@ export default function CatalogSku() {
     try {
       const data = await getProdutos();
       setProducts(data);
-    } catch (error: any) {
-      message.error(error.message || 'Falha ao carregar os produtos do servidor.');
+    } catch (error: unknown) {
+      const messageText = error instanceof Error ? error.message : 'Falha ao carregar os produtos do servidor.';
+      message.error(messageText);
     } finally {
       setLoading(false);
     }
@@ -103,47 +116,59 @@ export default function CatalogSku() {
     fetchProducts();
   }, [fetchProducts]);
 
- const handleUpdateProduct = async (idItem: string | number, updatedFields: any) => {
+ const handleUpdateProduct = async (idItem: string | number, updatedFields: Record<string, unknown>) => {
     try {
-      // 🛡️ Garante fallback seguro capturando o ID do produto selecionado atual caso venha vazio
-      const targetId = idItem || selectedProduct?.id_item || selectedProduct?.id || selectedProduct?.key;
+      const rawTargetId = idItem ?? selectedProduct?.id_item ?? selectedProduct?.key;
+      const normalizedTargetId = Number(rawTargetId);
 
-      if (!targetId) {
-        message.error('ID do item não informado para atualização.');
+      if (
+        rawTargetId === undefined ||
+        rawTargetId === null ||
+        rawTargetId === '' ||
+        !Number.isFinite(normalizedTargetId) ||
+        normalizedTargetId <= 0 ||
+        String(rawTargetId).startsWith('FAM-') ||
+        String(rawTargetId).startsWith('fam-') ||
+        String(rawTargetId).startsWith('prod-')
+      ) {
+        message.error('ID do item não informado ou inválido para atualização.');
         return;
       }
 
-      await updateProduto(targetId, updatedFields);
+      await updateProduto(normalizedTargetId, updatedFields);
       message.success('Produto atualizado com sucesso!');
       setIsDrawerVisible(false);
       fetchProducts();
-    } catch (error: any) {
-      message.error(error.message || 'Erro ao salvar alterações no servidor.');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao salvar alterações no servidor.';
+      message.error(errorMessage);
     }
   };
 
-  const handleSaveProduct = async (payload: any) => {
+  const handleSaveProduct = async (payload: Record<string, unknown>) => {
     const tempId = Date.now();
+    const payloadRecord = payload as Record<string, unknown>;
     const novoItemPai: ItemParentType = {
       key: String(tempId),
       id_item: tempId,
-      sku: payload.sku || payload.codItem,
-      nome_item: payload.nome || payload.nome_item,
-      tipo_recurso: payload.isFamilia ? 'FAMILIA' : 'PRODUTO',
+      tenant_id: 1,
+      sku: String(payloadRecord.sku ?? payloadRecord.codItem ?? ''),
+      nome_item: String(payloadRecord.nome ?? payloadRecord.nome_item ?? 'Produto sem nome'),
+      tipo_recurso: payloadRecord.isFamilia ? 'FAMILIA' : 'PRODUTO',
       status: 'ATIVO',
-      familia_id: payload.familia_id || null,
-      categoria_id: payload.categoria_id || null,
-      categoria: payload.categoria || null,
+      familia_id: Number(payloadRecord.familia_id ?? 0) || null,
+      categoria_id: Number(payloadRecord.categoria_id ?? 0) || null,
+      categoria: payloadRecord.categoria ? String(payloadRecord.categoria) : null,
       skus: [
         {
           key: `${tempId}-0`,
           id_item: tempId,
-          sku: payload.sku || payload.codItem,
+          sku: String(payloadRecord.sku ?? payloadRecord.codItem ?? ''),
           variacao: 'Principal',
-          marca: payload.marca || 'Própria',
-          estoque: payload.estoque_inicial || 0,
-          preco_venda: payload.financeiro?.preco_venda || 0,
-          custo_gerencial: payload.financeiro?.custo_gerencial || 0,
+          marca: payloadRecord.marca ? String(payloadRecord.marca) : 'Própria',
+          estoque: Number(payloadRecord.estoque_inicial ?? 0),
+          preco_venda: Number((payloadRecord.financeiro as Record<string, unknown> | undefined)?.preco_venda ?? 0),
+          custo_gerencial: Number((payloadRecord.financeiro as Record<string, unknown> | undefined)?.custo_gerencial ?? 0),
           status: 'ATIVO'
         }
       ]
@@ -166,53 +191,58 @@ export default function CatalogSku() {
       const parsed = JSON.parse(val);
       const itemsArray = Array.isArray(parsed) ? parsed : [parsed];
 
-      const validatedItems: ItemParentType[] = itemsArray.map((item: any, idx: number) => {
-        const tempId = item.id_item || Date.now() + idx;
-        const mainSku = item.sku || `SKU-AUTO-${tempId}`;
+      const validatedItems: ItemParentType[] = itemsArray.map((item: unknown, idx: number) => {
+        const itemRecord = item as Record<string, unknown>;
+        const tempId = Number(itemRecord.id_item ?? Date.now() + idx);
+        const mainSku = String(itemRecord.sku ?? `SKU-AUTO-${tempId}`);
 
-        const innerSkus: SkuChildType[] = Array.isArray(item.skus) && item.skus.length > 0
-          ? item.skus.map((s: any, sIdx: number) => ({
-              key: s.key || `${tempId}-${sIdx}`,
-              id_item: tempId,
-              sku: s.sku || `${mainSku}-${sIdx + 1}`,
-              variacao: s.variacao || 'Padrão',
-              marca: s.marca || item.marca || 'Própria',
-              estoque: Number(s.estoque ?? item.estoque ?? 0),
-              preco_venda: Number(s.preco_venda ?? item.preco_venda ?? 0),
-              custo_gerencial: Number(s.custo_gerencial ?? item.custo_gerencial ?? 0),
-              status: s.status || 'ATIVO',
-              imagem_url: s.imagem_url || item.imagem_url
-            }))
+        const innerSkus: SkuChildType[] = Array.isArray(itemRecord.skus) && (itemRecord.skus as unknown[]).length > 0
+          ? (itemRecord.skus as unknown[]).map((skuItem: unknown, sIdx: number) => {
+              const skuRecord = skuItem as Record<string, unknown>;
+              return {
+                key: String(skuRecord.key ?? `${tempId}-${sIdx}`),
+                id_item: tempId,
+                sku: String(skuRecord.sku ?? `${mainSku}-${sIdx + 1}`),
+                variacao: String(skuRecord.variacao ?? 'Padrão'),
+                marca: skuRecord.marca ? String(skuRecord.marca) : String(itemRecord.marca ?? 'Própria'),
+                estoque: Number(skuRecord.estoque ?? itemRecord.estoque ?? 0),
+                preco_venda: Number(skuRecord.preco_venda ?? itemRecord.preco_venda ?? itemRecord.preco ?? 0),
+                custo_gerencial: Number(skuRecord.custo_gerencial ?? itemRecord.custo_gerencial ?? itemRecord.custo ?? 0),
+                status: String(skuRecord.status ?? 'ATIVO') as SkuChildType['status'],
+                imagem_url: skuRecord.imagem_url ? String(skuRecord.imagem_url) : (typeof itemRecord.imagem_url === 'string' ? String(itemRecord.imagem_url) : null)
+              };
+            })
           : [
               {
                 key: `${tempId}-0`,
                 id_item: tempId,
                 sku: mainSku,
-                variacao: item.variacao || 'Principal',
-                marca: item.marca || 'Própria',
-                estoque: Number(item.estoque ?? 0),
-                preco_venda: Number(item.preco_venda ?? item.preco ?? 0),
-                custo_gerencial: Number(item.custo_gerencial ?? item.custo ?? 0),
-                status: 'ATIVO',
-                imagem_url: item.imagem_url
+                variacao: String(itemRecord.variacao ?? 'Principal'),
+                marca: itemRecord.marca ? String(itemRecord.marca) : 'Própria',
+                estoque: Number(itemRecord.estoque ?? 0),
+                preco_venda: Number(itemRecord.preco_venda ?? itemRecord.preco ?? 0),
+                custo_gerencial: Number(itemRecord.custo_gerencial ?? itemRecord.custo ?? 0),
+                status: 'ATIVO' as SkuChildType['status'],
+                imagem_url: typeof itemRecord.imagem_url === 'string' ? String(itemRecord.imagem_url) : null
               }
             ];
 
         return {
           key: String(tempId),
           id_item: tempId,
+          tenant_id: 1,
           sku: mainSku,
-          nome_item: item.nome_item || item.nome || 'Produto Sem Nome',
-          tipo_recurso: item.tipo_recurso || 'PRODUTO',
-          status: item.status || 'ATIVO',
-          familia_id: item.familia_id || null,
-          categoria_id: item.categoria_id || null,
+          nome_item: String(itemRecord.nome_item ?? itemRecord.nome ?? 'Produto Sem Nome'),
+          tipo_recurso: String(itemRecord.tipo_recurso ?? 'PRODUTO'),
+          status: String(itemRecord.status ?? 'ATIVO') as ItemParentType['status'],
+          familia_id: Number(itemRecord.familia_id ?? 0) || null,
+          categoria_id: Number(itemRecord.categoria_id ?? 0) || null,
           skus: innerSkus
         };
       });
 
       setParsedJsonPreview(validatedItems);
-    } catch (e) {
+    } catch {
       setParsedJsonPreview([]);
     }
   };
@@ -245,13 +275,23 @@ export default function CatalogSku() {
   const handleConfirmEntireBatch = async () => {
     setModalLoading(true);
     try {
+      console.log('📤 [BATCH INSERT] Payload sendo enviado ao backend:', JSON.stringify(creationBatch, null, 2));
+      console.log('📤 [BATCH INSERT] Detalhando os SKUs de cada item:');
+      creationBatch.forEach((item, idx) => {
+        console.log(`  Item ${idx}: ${item.nome_item} (SKU: ${item.sku})`);
+        item.skus.forEach((sku, skuIdx) => {
+          console.log(`    SKU ${skuIdx}: preco_venda=${sku.preco_venda}, custo_gerencial=${sku.custo_gerencial}`);
+        });
+      });
+      
       await saveProdutosLote(creationBatch);
       message.success(`${creationBatch.length} produtos salvos com sucesso no banco!`);
       setCreationBatch([]);
       setShowBatchPanel(false);
       fetchProducts();
-    } catch (error: any) {
-      message.error(error.message || 'Erro ao persistir o lote no banco de dados.');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao persistir o lote no banco de dados.';
+      message.error(errorMessage);
     } finally {
       setModalLoading(false);
     }
@@ -259,6 +299,77 @@ export default function CatalogSku() {
 
   const removeItemFromBatch = (key: string) => {
     setCreationBatch(prev => prev.filter(item => item.key !== key));
+  };
+
+  const addToQuickPrintQueue = (record: ItemParentType) => {
+    const sourceSkus = record.skus?.length ? record.skus : [
+      {
+        key: String(record.key || record.id_item),
+        id_item: record.id_item,
+        sku: record.sku,
+        variacao: 'Principal',
+        marca: 'Própria',
+        estoque: 0,
+        preco_venda: 0,
+        custo_gerencial: 0,
+        status: record.status,
+        imagem_url: null,
+      } as SkuChildType
+    ];
+
+    const nextItems = sourceSkus.map((sku, index) => {
+      const displayName = record.familia_id
+        ? `${record.nome_item}${sku.variacao && sku.variacao !== 'Principal' ? ` - ${sku.variacao}` : ''}`
+        : record.nome_item;
+
+      return {
+        id: `${record.id_item}-${sku.id_item ?? record.id_item}-${sku.sku ?? record.sku}-${index}`,
+        name: displayName,
+        sku: String(sku.sku || record.sku || 'SEM-SKU'),
+        price: Number(sku.preco_venda ?? 0),
+        quantity: 1,
+        unit: 'UN',
+        isPromo: false,
+        batch: '',
+        expiryDate: '',
+        gtin: String(sku.sku || record.sku || 'SEM-SKU'),
+      } satisfies QuickPrintItem;
+    });
+
+    setQuickPrintQueue(prev => {
+      const ids = new Set(prev.map(item => item.id));
+      const merged = [...prev];
+
+      nextItems.forEach((item) => {
+        if (!ids.has(item.id)) {
+          merged.push(item);
+          ids.add(item.id);
+        }
+      });
+
+      return merged;
+    });
+
+    message.success(`${nextItems.length} item(ns) adicionado(s) à fila de impressão rápida.`);
+  };
+
+  const removeFromQuickPrintQueue = (id: string) => {
+    setQuickPrintQueue(prev => prev.filter(item => item.id !== id));
+  };
+
+  const handlePrintQuickQueue = () => {
+    if (quickPrintQueue.length === 0) {
+      message.warning('A fila de impressão rápida está vazia.');
+      return;
+    }
+
+    generatePRN(quickPrintQueue, quickPrintSize);
+    message.success(`Arquivo .PRN gerado com ${quickPrintQueue.length} etiqueta(s).`);
+  };
+
+  const clearQuickPrintQueue = () => {
+    setQuickPrintQueue([]);
+    message.info('Fila de impressão rápida limpa.');
   };
 
   const parentColumns: ColumnsType<ItemParentType> = React.useMemo(() => [
@@ -382,11 +493,9 @@ export default function CatalogSku() {
       title: 'Estoque (UoM)',
       key: 'estoqueTotal',
       render: (_, record) => {
-        const isFamily = checkIsFamily(record);
         const skus = record.skus || [];
         const total = skus.reduce((acc, sku) => acc + (sku.estoque || 0), 0);
 
-        
         return <Text strong>{total} (UN)</Text>;
       },
     },
@@ -403,36 +512,98 @@ export default function CatalogSku() {
         return <Tag color="red">Inativo</Tag>;
       },
     },
-   {
+    {
       title: 'Ações',
       key: 'action',
-      width: '120px',
+      width: '180px',
       render: (_, record) => {
         return (
-          <Space size="middle">
-           <Button 
-  type="primary" 
-  size="small" 
-  onClick={() => {
-    console.log("🚀 [DEBUG TABELA] Botão Editar clicado para o record:", record);
-    setSelectedProduct(record);
-    setIsDrawerVisible(true);
-  }}
->
-  Editar
-</Button>
+          <Space size="small">
+            <Button 
+              type="default"
+              size="small"
+              icon={<PrinterOutlined />}
+              onClick={() => addToQuickPrintQueue(record)}
+            >
+              Imprimir
+            </Button>
+            <Button 
+              type="primary" 
+              size="small" 
+              onClick={() => {
+                setSelectedProduct(record);
+                setIsDrawerVisible(true);
+              }}
+            >
+              Editar
+            </Button>
           </Space>
         );
       },
     }
   ], []);
 
+  const groupedProducts = React.useMemo(() => {
+    const map = new Map<string, ItemParentType>();
+
+    products.forEach((item) => {
+      const groupKey = item.familia_id ? `family-${item.familia_id}` : `single-${item.id_item}`;
+      const familyName = item.familia_id ? (item.categoria || item.nome_item || 'Família') : item.nome_item;
+
+      if (!map.has(groupKey)) {
+        map.set(groupKey, {
+          key: groupKey,
+          id_item: item.id_item,
+          tenant_id: item.tenant_id,
+          sku: item.familia_id ? `FAM-${item.familia_id}` : item.sku,
+          nome_item: familyName,
+          tipo_recurso: item.familia_id ? 'FAMILIA' : item.tipo_recurso,
+          status: item.status,
+          categoria_id: item.categoria_id,
+          categoria: item.categoria,
+          familia_id: item.familia_id,
+          skus: [],
+        });
+      }
+
+      const parent = map.get(groupKey)!;
+      const candidateChild: SkuChildType = {
+        key: String(item.id_item),
+        id_item: item.id_item,
+        sku: item.sku,
+        variacao: item.skus?.[0]?.variacao || 'Principal',
+        marca: item.skus?.[0]?.marca || 'Própria',
+        estoque: item.skus?.[0]?.estoque ?? 0,
+        preco_venda: item.skus?.[0]?.preco_venda ?? 0,
+        custo_gerencial: item.skus?.[0]?.custo_gerencial ?? 0,
+        status: item.skus?.[0]?.status ?? item.status,
+        imagem_url: item.skus?.[0]?.imagem_url ?? null,
+      };
+
+      const alreadyExists = parent.skus.some((sku) => {
+        const matchesId = String(sku.id_item) === String(candidateChild.id_item);
+        const matchesSku = String(sku.sku || '').trim() === String(candidateChild.sku || '').trim();
+        return matchesId || matchesSku;
+      });
+
+      if (!alreadyExists) {
+        parent.skus.push(candidateChild);
+      }
+    });
+
+    return Array.from(map.values()).filter((parent) => {
+      const isFamilyRoot = Boolean(parent.familia_id) || parent.tipo_recurso === 'FAMILIA';
+      return isFamilyRoot ? parent.skus.length > 0 : true;
+    });
+  }, [products]);
+
   const filteredData = React.useMemo(() => {
-    return products.filter(item => {
-      const matchesSearch = 
+    return groupedProducts.filter(item => {
+      const matchesSearch =
         item.nome_item?.toLowerCase().includes(searchText.toLowerCase()) ||
-        item.sku?.toLowerCase().includes(searchText.toLowerCase());
-      
+        item.sku?.toLowerCase().includes(searchText.toLowerCase()) ||
+        item.skus.some(sku => sku.sku.toLowerCase().includes(searchText.toLowerCase()));
+
       if (!matchesSearch) return false;
 
       const skus = item.skus || [];
@@ -450,7 +621,7 @@ export default function CatalogSku() {
 
       return true;
     });
-  }, [products, searchText, selectedFilter, selectedSupplier, selectedCategory, selectedStructure]);
+  }, [groupedProducts, searchText, selectedFilter, selectedSupplier, selectedCategory, selectedStructure]);
 
   const handleClearAllFilters = () => {
     setSelectedFilter('all');
@@ -585,6 +756,57 @@ export default function CatalogSku() {
           </Card>
         </Col>
       </Row>
+
+      <Card
+        title="🖨️ Impressão Rápida"
+        style={{ marginBottom: 18, border: '1px solid #d9d9d9' }}
+        extra={
+          <Space>
+            <Select
+              value={quickPrintSize}
+              onChange={(value) => setQuickPrintSize(value)}
+              options={[
+                { value: '105x27', label: '105x27 mm' },
+                { value: '60x40', label: '60x40 mm' },
+              ]}
+              style={{ width: 120 }}
+            />
+            <Button type="primary" icon={<PrinterOutlined />} onClick={handlePrintQuickQueue} disabled={quickPrintQueue.length === 0}>
+              Imprimir ({quickPrintQueue.length})
+            </Button>
+            <Button danger type="text" onClic k={clearQuickPrintQueue} disabled={quickPrintQueue.length === 0}>
+              Limpar
+            </Button>
+          </Space>
+        }
+      >
+        {quickPrintQueue.length === 0 ? (
+          <Text type="secondary">Selecione itens da tabela para criar uma fila de impressão rápida.</Text>
+        ) : (
+          <Table
+            size="small"
+            pagination={false}
+            dataSource={quickPrintQueue}
+            rowKey="id"
+            columns={[
+              { title: 'Produto', dataIndex: 'name', key: 'name' },
+              { title: 'SKU', dataIndex: 'sku', key: 'sku', render: (value) => <Text code>{value}</Text> },
+              { title: 'Preço', dataIndex: 'price', key: 'price', render: (value) => `R$ ${Number(value || 0).toFixed(2)}` },
+              { title: 'Qtd.', dataIndex: 'quantity', key: 'quantity', width: 70 },
+              {
+                title: 'Ações',
+                key: 'remove',
+                width: 90,
+                render: (_, record) => (
+                  <Button type="text" danger size="small" onClick={() => removeFromQuickPrintQueue(record.id)}>
+                    Remover
+                  </Button>
+                ),
+              },
+            ]}
+          />
+        )}
+      </Card>
 
       <Card 
         bordered={false} 

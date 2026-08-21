@@ -90,7 +90,7 @@ const NfeCards: React.FC<NfeCardsProps> = ({ data, supplierStatus, actions }) =>
               </Tooltip>
             }
           >
-            <div style={{ background: '#fafafa', padding: '8px', borderRadius: '4px', border: '1px solid #f0f0f0' }}>
+            <div style={{ background: '#fafafa', padding: 'px', borderRadius: '4px', border: '1px solid #f0f0f0' }}>
               <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Chave de Acesso</Text>
               <Text copyable style={{ fontSize: 13, fontFamily: 'monospace' }}>{data.chaveAcesso}</Text>
             </div>

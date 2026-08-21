@@ -1207,11 +1207,49 @@ app.get('/api/stock/audit-all', asyncHandler(async (req, res) => {
     }
 }));
 
+import os from 'os';
 
-app.listen(PORT, () => {
-    console.log(`Servidor rodando em http://localhost:${PORT}`);
-});
+// Função para buscar o IP Público/Externo atual da internet
+async function getPublicIP(): Promise<string> {
+    try {
+        const response = await fetch('https://api.ipify.org?format=json');
+        const data: any = await response.json();
+        return data.ip;
+    } catch (error) {
+        return 'Não foi possível detectar (sem internet)';
+    }
+}
 
+async function iniciarServidor() {
+    console.log(`\n🔍 Verificando IP externo da rede atual...`);
+    const ipPublico = await getPublicIP();
+
+    console.log(`\n==================================================`);
+    console.log(`🌐 SEU IP PÚBLICO ATUAL É: [ ${ipPublico} ]`);
+    console.log(`==================================================\n`);
+
+    try {
+        console.log(`⏳ Tentando conectar ao banco de dados remoto...`);
+        
+        // COLOQUE AQUI A SUA FUNÇÃO DE CONEXÃO COM O BANCO
+        // Exemplo: await pool.connect(); ou await mongoose.connect(...);
+
+        app.listen(PORT, () => {
+            console.log(`✅ Servidor rodando com sucesso em http://localhost:${PORT}`);
+            console.log(`✅ Conexão com o banco estabelecida!`);
+        });
+
+    } catch (error: any) {
+        console.error(`\n❌ FALHA NA CONEXÃO COM O BANCO DE DADOS!`);
+        console.error(`> O banco recusou a conexão deste IP: ${ipPublico}`);
+        console.error(`> Copie este IP [ ${ipPublico} ] e adicione na sua hospedagem.`);
+        console.error(`> Detalhes do erro:`, error?.message || error);
+        
+        process.exit(1);
+    }
+}
+
+iniciarServidor();
 
 
 // lembrar de : se houver mapped.CodInterno registrado no sistema, deve ser realizado um update (vinculo) ao invés de insert 
