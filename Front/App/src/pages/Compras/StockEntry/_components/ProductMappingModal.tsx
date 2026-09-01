@@ -1,10 +1,32 @@
-import { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
+import { 
+  Modal, 
+  Button, 
+  Steps, 
+  Input, 
+  Card, 
+  Space, 
+  Typography, 
+  Divider, 
+  Row, 
+  Col, 
+  Tag,
+  Tooltip
+} from "antd";
+import { 
+  LinkOutlined, 
+  FileAddOutlined, 
+  ReloadOutlined, 
+  CheckCircleOutlined, 
+  ArrowLeftOutlined, 
+  ArrowRightOutlined,
+  LockOutlined,
+  UnlockOutlined
+} from "@ant-design/icons";
 import { ProdutoNF } from "../../types/NF-e";
-import "./ProductMappingModal.css";
 import StepSalesConfig from "./StepSalesConfig";
-import FlexGridContainer from "../../../../components/Layout/FlexGridContainer/FlexGridContainer";
-import FormControl from "../../../../components/ui/FormControl/FormControl";
-import Button from "../../../../components/ui/Button/Button";
+
+const { Title, Text } = Typography;
 
 interface ProductEntry extends ProdutoNF {
     tempId: number;
@@ -32,7 +54,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
     onMap,
     onClose,
 }) => {
-    const [step, setStep] = useState(1);
+    const [step, setStep] = useState(0);
 
     // Identidade do Produto (Painel Esquerdo)
     const [draftDesc, setDraftDesc] = useState(item.descricao || "");
@@ -40,32 +62,19 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
     const [draftBrand, setDraftBrand] = useState("");
     const [draftCategory, setDraftCategory] = useState("");
     const [draftNcm, setDraftNcm] = useState(item.ncm || "");
+    const [draftCst, setDraftCst] = useState("");
+
+    // Estados de bloqueio de segurança (Cadeados)
+    const [isDescEditable, setIsDescEditable] = useState(false);
+    const [isSkuEditable, setIsSkuEditable] = useState(false);
+    const [isNcmEditable, setIsNcmEditable] = useState(false);
 
     // Etapa 1: Destino
-    const [step1Mode, setStep1Mode] = useState<"EXISTING" | "EXISTING_PARENT" | "NEW_PARENT" | "DRAFT" | null>(null);
+    const [step1Mode, setStep1Mode] = useState<"EXISTING_DIRECT" | "DRAFT" | null>(null);
     const [existingSearch, setExistingSearch] = useState("");
     const [selectedExisting, setSelectedExisting] = useState<any | null>(null);
 
-    // Sub-fluxos internos do Produto Simples ("EXISTING")
-    const [isDirectLink, setIsDirectLink] = useState(true);
-    const [shouldCreateGrade, setShouldCreateGrade] = useState(false);
-    const [isLinkToExistingParent, setIsLinkToExistingParent] = useState(false);
-
-    // Estrutura de criação de NOVA grade / Pasta Automática
-    const [gradeParentName, setGradeParentName] = useState("");
-    const [oldProductVariantName, setOldProductVariantName] = useState("");
-    const [newProductVariantName, setNewProductVariantName] = useState("");
-
-    // Caso o produto selecionado na busca principal JÁ TENHA grade active
-    const [selectedVariantId, setSelectedVariantId] = useState("");
-    const [newVariantName, setNewVariantName] = useState("");
-    const [newVariantSku, setNewVariantSku] = useState("");
-
-    // Rota da Aba Primária "Inserir em Pasta Existente" OU do Sub-fluxo de Vínculo com Pasta
-    const [parentSearch, setParentSearch] = useState("");
-    const [selectedExistingParent, setSelectedExistingParent] = useState<any | null>(null);
-
-    // Etapa 2: Comercialização & Precificação (preservamos estados antigos como fallback)
+    // Etapa 2: Comercialização & Precificação
     const [salesMode, setSalesMode] = useState<"WHOLE_ONLY" | "FRACIONADO_ONLY" | "BOTH" | null>(null);
     const [wholeUnit, setWholeUnit] = useState(item.unidadeMedida || "UN");
     const [wholeMarkup, setWholeMarkup] = useState<number>(60);
@@ -75,60 +84,34 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
     const [fracMarkup, setFracMarkup] = useState<number>(60);
     const [fracPrice, setFracPrice] = useState<number>(0);
 
-    const searchInputRef = useRef<HTMLInputElement>(null);
+    const searchInputRef = useRef<any>(null);
     const [unitsFromStep, setUnitsFromStep] = useState<SalesUnit[]>([]);
 
-    // FUNÇÃO PARA CANCELAR TUDO E VOLTAR AO ESTADO INICIAL
     const handleResetAll = () => {
         setStep1Mode(null);
         setExistingSearch("");
         setSelectedExisting(null);
-        setIsDirectLink(true);
-        setShouldCreateGrade(false);
-        setIsLinkToExistingParent(false);
-        setGradeParentName("");
-        setOldProductVariantName("");
-        setNewProductVariantName("");
-        setSelectedVariantId("");
-        setNewVariantName("");
-        setNewVariantSku("");
-        setParentSearch("");
-        setSelectedExistingParent(null);
-        setStep(1);
+        setIsDescEditable(false);
+        setIsSkuEditable(false);
+        setIsNcmEditable(false);
+        setStep(0);
     };
 
-    // Sincroniza apenas quando o produto selecionado na busca muda de verdade
     useEffect(() => {
-        if (selectedExisting) {
-            if (!selectedExisting.temGrade) {
-                if (!gradeParentName) setGradeParentName(`Família - ${selectedExisting.descricao}`);
-                setIsDirectLink(true);
-                setShouldCreateGrade(false);
-                setIsLinkToExistingParent(false);
-            } else {
-                setShouldCreateGrade(false);
-                setIsLinkToExistingParent(false);
-            }
-            setSelectedVariantId("");
-            setNewVariantName("");
-        }
-    }, [selectedExisting]);
-
-    // Autofocus inteligente
-    useEffect(() => {
-        if ((step1Mode === "EXISTING" || step1Mode === "EXISTING_PARENT") && searchInputRef.current) {
+        if (step1Mode && searchInputRef.current) {
             searchInputRef.current.focus();
         }
     }, [step1Mode]);
 
-    // Sincronização inicial de dados da NF
     useEffect(() => {
         setDraftDesc(item.descricao || "");
         setDraftSku(item.sku || "");
         setDraftNcm(item.ncm || "");
+        setIsDescEditable(false);
+        setIsSkuEditable(false);
+        setIsNcmEditable(false);
     }, [item]);
 
-    // Regras de arredondamento comercial
     const applyCommercialRounding = (value: number) => {
         const base = Math.floor(value);
         const cents = value - base;
@@ -138,55 +121,30 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
     };
 
     useEffect(() => {
-        const cost = item.custo || 0;
+        const cost = item.custo || item.valorUnitario || 0;
         const rawPrice = cost * (1 + wholeMarkup / 100);
         setWholePrice(Number(applyCommercialRounding(rawPrice).toFixed(2)));
-    }, [wholeMarkup, item.custo]);
+    }, [wholeMarkup, item.custo, item.valorUnitario]);
 
     useEffect(() => {
-        const costWhole = item.custo || 0;
+        const costWhole = item.custo || item.valorUnitario || 0;
         const costFrac = fracConversion > 0 ? costWhole / fracConversion : 0;
         const rawFracPrice = costFrac * (1 + fracMarkup / 100);
         setFracPrice(Number(applyCommercialRounding(rawFracPrice).toFixed(2)));
-    }, [fracConversion, fracMarkup, item.custo]);
+    }, [fracConversion, fracMarkup, item.custo, item.valorUnitario]);
 
-    // Validador de Passos (Avançar)
     const canProceedToNextStep = () => {
-        if (step === 1) {
+        if (step === 0) {
+            if (step1Mode === "EXISTING_DIRECT") {
+                return selectedExisting !== null;
+            }
             if (step1Mode === "DRAFT") {
                 return draftDesc.trim() !== "" && draftNcm.trim() !== "";
             }
-
-            if (step1Mode === "EXISTING") {
-                if (!selectedExisting) return false;
-
-                if (selectedExisting.temGrade) {
-                    if (!selectedVariantId) return false;
-                    if (selectedVariantId === "NEW_VARIANT" && !newVariantName.trim()) return false;
-                    return true;
-                }
-                return isDirectLink;
-            }
-
-            if (step1Mode === "EXISTING_PARENT") {
-                return selectedExistingParent !== null && newProductVariantName.trim() !== "";
-            }
-
-            if (step1Mode === "NEW_PARENT") {
-                if (selectedExisting) {
-                    return (
-                        gradeParentName.trim() !== "" &&
-                        oldProductVariantName.trim() !== "" &&
-                        newProductVariantName.trim() !== ""
-                    );
-                }
-                return gradeParentName.trim() !== "" && newProductVariantName.trim() !== "";
-            }
-
             return false;
         }
 
-        if (step === 2) {
+        if (step === 1) {
             if (!salesMode) return false;
             if ((salesMode === "FRACIONADO_ONLY" || salesMode === "BOTH") && (!fracUnit || !fracConversion)) return false;
             return true;
@@ -195,27 +153,26 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
     };
 
     const handleConfirm = () => {
-        // Prefer payload produced by StepSalesConfig when available
         const unitsPayload: SalesUnit[] = unitsFromStep && unitsFromStep.length ? unitsFromStep : [];
 
-        if (!unitsPayload.length) {
+        if (step1Mode !== "EXISTING_DIRECT" && !unitsPayload.length) {
+            const baseCost = item.custo || item.valorUnitario || 0;
             if (salesMode === "WHOLE_ONLY" || salesMode === "BOTH") {
                 unitsPayload.push({
                     type: "WHOLE",
                     unit: wholeUnit,
                     conversion: 1,
-                    cost: item.custo || 0,
+                    cost: baseCost,
                     markup: wholeMarkup,
                     price: wholePrice
                 });
             }
-
             if (salesMode === "FRACIONADO_ONLY" || salesMode === "BOTH") {
                 unitsPayload.push({
                     type: "FRAC",
                     unit: fracUnit,
                     conversion: fracConversion,
-                    cost: fracConversion > 0 ? (item.custo || 0) / fracConversion : 0,
+                    cost: fracConversion > 0 ? baseCost / fracConversion : 0,
                     markup: fracMarkup,
                     price: fracPrice
                 });
@@ -225,25 +182,11 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
         const payload = {
             mode: step1Mode,
             existingProductId: selectedExisting?.id || null,
-            existingParentId: selectedExistingParent?.id || null,
             supplierLinkData: {
                 sku_fornecedor: item.sku || "",
                 ean_fornecedor: item.codigoBarras || null,
                 descricao_fornecedor: item.descricao
             },
-            gradeSetup: (selectedExisting && step1Mode === "NEW_PARENT") ? {
-                isExistingParent: false,
-                parentName: gradeParentName,
-                oldProductVariant: oldProductVariantName,
-                newProductVariant: newProductVariantName
-            } : null,
-            newParentSetup: (step1Mode === "NEW_PARENT" && !selectedExisting) ? {
-                parentName: gradeParentName,
-                newProductVariant: newProductVariantName
-            } : null,
-            parentLinkSetup: step1Mode === "EXISTING_PARENT" ? {
-                newProductVariant: newProductVariantName
-            } : null,
             salesUnits: unitsPayload,
         };
 
@@ -251,325 +194,320 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
     };
 
     return (
-        <div className="modal-overlay">
-            <div className="modal-container">
-
-                <header className="modal-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '16px' }}>
-                    <div className="header-titles" style={{ width: '100%' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                            <div>
-                                <h3 style={{ margin: 0 }}>Mapeamento de Produto</h3>
-                                <small style={{ display: 'block', color: '#64748b', marginTop: '4px', marginBottom: '8px' }}>
-                                    <strong>Item da NF:</strong> {item.descricao}
-                                </small>
-                            </div>
-
-                            {/* BOTÃO RESETAR TUDO */}
-                            {step1Mode && (
-                                <button
-                                    onClick={handleResetAll}
-                                    style={{
-                                        background: '#fef2f2',
-                                        border: '1px solid #fca5a5',
-                                        color: '#dc2626',
-                                        padding: '6px 12px',
-                                        borderRadius: '6px',
-                                        fontSize: '0.75rem',
-                                        fontWeight: 600,
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '4px',
-                                        transition: 'all 0.2s'
-                                    }}
-                                    onMouseEnter={(e) => { e.currentTarget.style.background = '#fee2e2'; }}
-                                    onMouseLeave={(e) => { e.currentTarget.style.background = '#fef2f2'; }}
-                                    title="Limpa todas as seleções e volta para o estado inicial"
-                                >
-                                    🔄 Resetar Seleção
-                                </button>
-                            )}
-                        </div>
-
-                        <div style={{ 
-                            marginTop: '10px', 
-                            padding: '10px 14px', 
-                            borderRadius: '6px', 
-                            fontSize: '0.85rem', 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '6px',
-                            transition: 'all 0.3s ease',
-                            background: !step1Mode ? '#f1f5f9' 
-                                      : step1Mode === 'DRAFT' ? '#eff6ff' 
-                                      : step1Mode === 'EXISTING' ? '#f0fdf4' 
-                                      : step1Mode === 'NEW_PARENT' ? '#faf5ff' 
-                                      : '#fff7ed',
-                            border: !step1Mode ? '1px solid #cbd5e1' 
-                                  : step1Mode === 'DRAFT' ? '1px solid #bfdbfe' 
-                                  : step1Mode === 'EXISTING' ? '1px solid #bbf7d0' 
-                                  : step1Mode === 'NEW_PARENT' ? '1px solid #e9d5ff' 
-                                  : '1px solid #ffedd5',
-                            color: !step1Mode ? '#475569' 
-                                 : step1Mode === 'DRAFT' ? '#1e40af' 
-                                 : step1Mode === 'EXISTING' ? '#166534' 
-                                 : step1Mode === 'NEW_PARENT' ? '#6b21a8' 
-                                 : '#c2410c'
-                        }}>
-                            {!step1Mode && (
-                                <span>💡 <strong>Aguardando definição:</strong> Escolha uma opção abaixo para processar este item da nota.</span>
-                            )}
-                            {step1Mode === "DRAFT" && (
-                                <span>🧾 <strong>Modo Rascunho:</strong> Criando um <strong>Novo Produto Isolado</strong> e independente no estoque.</span>
-                            )}
-                            {step1Mode === "EXISTING" && (
-                                <span>
-                                    🔗 <strong>Vinculando ao Produto:</strong>{' '}
-                                    {selectedExisting ? (
-                                        <strong style={{ textTransform: 'uppercase', color: '#14532d', background: '#dcfce7', padding: '2px 6px', borderRadius: '4px' }}>
-                                            {selectedExisting.descricao}
-                                        </strong>
-                                    ) : (
-                                        <em style={{ color: '#64748b' }}>Selecione o produto alvo na lista abaixo...</em>
-                                    )}
-                                </span>
-                            )}
-                            {step1Mode === "NEW_PARENT" && (
-                                <span>
-                                    ✨ <strong>Criando Nova Pasta Estrutural:</strong>{' '}
-                                    {gradeParentName.trim() ? (
-                                        <strong style={{ textTransform: 'uppercase', color: '#581c87', background: '#f3e8ff', padding: '2px 6px', borderRadius: '4px' }}>
-                                            {gradeParentName}
-                                        </strong>
-                                    ) : (
-                                        <em style={{ color: '#c084fc' }}>[Digite o nome da pasta organizadora abaixo]</em>
-                                    )}
-                                    {selectedExisting && <span style={{ color: '#15803d', fontWeight: 600 }}> + Agrupando Produto Antigo</span>}
-                                </span>
-                            )}
-                            {step1Mode === "EXISTING_PARENT" && (
-                                <span>
-                                    📁 <strong>Inserindo na Pasta Existente:</strong>{' '}
-                                    {selectedExistingParent ? (
-                                        <strong style={{ textTransform: 'uppercase', color: '#7c2d12', background: '#ffedd5', padding: '2px 6px', borderRadius: '4px' }}>
-                                            {selectedExistingParent.descricao}
-                                        </strong>
-                                    ) : (
-                                        <em style={{ color: '#fb923c' }}>Selecione a pasta alvo na busca abaixo...</em>
-                                    )}
-                                </span>
-                            )}
-                        </div>
+        <Modal
+            open={true}
+            onCancel={onClose}
+            width={900}
+            footer={null}
+            destroyOnClose
+            title={
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingRight: '20px' }}>
+                    <div>
+                        <Title level={4} style={{ margin: 0 }}>Mapeamento de Produto</Title>
+                        <Text type="secondary" style={{ fontSize: '13px' }}>
+                            Gerenciamento de item recebido por Nota Fiscal
+                        </Text>
                     </div>
-                </header>
-
-                {/* Stepper fixo dentro do header visualmente — mantido aqui para acessibilidade */}
-                <div style={{ padding: '10px 24px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                    <div className="stepper-container">
-                        <div className={`step-item ${step === 1 ? "active" : ""} ${step > 1 ? "completed" : ""}`}>
-                            <div className="step-number">1</div>
-                            <span className="step-label">Destino</span>
-                        </div>
-                        <div className="step-line"></div>
-                        <div className={`step-item ${step === 2 ? "active" : ""}`}>
-                            <div className="step-number">2</div>
-                            <span className="step-label">Comercialização & Precificação</span>
-                        </div>
-                    </div>
+                    {step1Mode && (
+                        <Button 
+                            size="small" 
+                            danger 
+                            icon={<ReloadOutlined />} 
+                            onClick={handleResetAll}
+                        >
+                            Resetar Seleção
+                        </Button>
+                    )}
                 </div>
+            }
+        >
+            {/* Stepper Fixo Estável */}
+            <div style={{ marginBottom: 16, paddingTop: 4 }}>
+                <Steps
+                    current={step1Mode === "EXISTING_DIRECT" ? 0 : step}
+                    size="small"
+                    items={[
+                        { title: 'Destino & Vínculo' },
+                        { title: 'Comercialização & Precificação' },
+                    ]}
+                />
+            </div>
 
-                <div className="modal-body">
-                    {/* PAINEL ESQUERDO: REFERÊNCIAS */}
-                    <div className="panel-left">
-                        <h4>📄 Dados da NF (Referência)</h4>
-                        <FormControl label="Descrição na Nota" value={item.descricao} readOnlyDisplay />
-                        <FlexGridContainer layout="grid" template='repeat(2, 1fr)'>
-                            <FormControl label="Qtd Nota" value={item.quantidade} readOnlyDisplay />
-                            <FormControl label="Un. Nota" value={item.unidadeMedida} readOnlyDisplay />
-                        </FlexGridContainer>
-                        <FormControl label="Custo Unitário NF" value={item.valorUnitario} readOnlyDisplay />
-                        <FormControl label="Valor total itens" value={item.valorTotalItem} readOnlyDisplay />
+            <Divider style={{ margin: '12px 0' }} />
 
+            {/* Layout Estável de 2 Colunas */}
+            <Row gutter={24} align="top">
+                {/* Coluna Esquerda: Âncora Fixa de Referência */}
+                <Col span={10}>
+                    <Card 
+                        size="small" 
+                        title="📄 Dados da NF (Referência)" 
+                        style={{ backgroundColor: '#fafafa', height: '100%', minHeight: '380px' }}
+                    >
+                        <Space direction="vertical" size={14} style={{ width: '100%' }}>
+                            <div>
+                                <Text type="secondary" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Descrição na Nota</Text>
+                                <div style={{ fontWeight: 600, color: '#1f1f1f', wordBreak: 'break-word' }}>{item.descricao}</div>
+                            </div>
+                            <Row gutter={8}>
+                                <Col span={12}>
+                                    <Text type="secondary" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Qtd Nota</Text>
+                                    <div style={{ fontWeight: 600 }}>{item.quantidade}</div>
+                                </Col>
+                                <Col span={12}>
+                                    <Text type="secondary" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Un. Nota</Text>
+                                    <div style={{ fontWeight: 600 }}>{item.unidadeMedida}</div>
+                                </Col>
+                            </Row>
+                            <div>
+                                <Text type="secondary" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Custo Unitário NF</Text>
+                                <div style={{ fontWeight: 600, color: '#d4380d' }}>R$ {(item.valorUnitario || 0).toFixed(2)}</div>
+                            </div>
+                            <div>
+                                <Text type="secondary" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Valor Total do Item</Text>
+                                <div style={{ fontWeight: 600 }}>R$ {(item.valorTotalItem || 0).toFixed(2)}</div>
+                            </div>
+                        </Space>
+                    </Card>
+                </Col>
 
-                    
-                    </div>
-
-                    {/* PAINEL DIREITO: INTERAÇÃO */}
-                    <div className="panel-right">
-                        {step === 1 && (
-                            <div className="step-content">
-                                <h4>O que deseja fazer com este item?</h4>
-
-                                <div className="button-group" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '16px' }}>
-                                    <button
-                                        className={step1Mode === "EXISTING" ? "active" : ""}
-                                        onClick={() => setStep1Mode("EXISTING")}
-                                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', padding: '10px', height: 'auto' }}
-                                    >
-                                        <span style={{ fontWeight: '600', marginBottom: '2px' }}>🔗 Vincular a Produto</span>
-                                        <small style={{ fontSize: '0.72rem', opacity: 0.8 }}>Item simples ou grade ativa.</small>
-                                    </button>
-
+                {/* Coluna Direita: Conteúdo Dinâmico */}
+                <Col span={14}>
+                    <div style={{ minHeight: '380px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                        <div>
+                            {step === 0 && (
+                                <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                                    <Text strong>O que deseja fazer com este item?</Text>
                                     
-
-                                    <button
-                                        className={step1Mode === "DRAFT" ? "active" : ""}
-                                        onClick={() => { setStep1Mode("DRAFT"); setSelectedExisting(null); }}
-                                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', padding: '10px', height: 'auto' }}
-                                    >
-                                        <span style={{ fontWeight: '600', marginBottom: '2px' }}>🧾 Rascunho Rápido</span>
-                                        <small style={{ fontSize: '0.72rem', opacity: 0.8 }}>Criar produto simples isolado.</small>
-                                    </button>
-                                </div>
-
-                                {step1Mode === "EXISTING" && (
-                                    <div style={{ marginTop: 16 }} className="search-section">
-                                        <FormControl
-                                            ref={searchInputRef}
-                                            label="Buscar por Nome, Código ou Cód. Barras"
-                                            value={existingSearch}
-                                            placeholder="Digite o nome do produto..."
-                                            onChange={(e) => setExistingSearch(e.target.value)}
-                                        />
-
-                                        <div className="results-list" style={{ marginTop: 12, maxHeight: '140px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
-                                            <div
-                                                className={`product-item ${selectedExisting?.id === 2 ? 'selected' : ''}`}
-                                                onClick={() => setSelectedExisting({ id: 2, descricao: "Luva de Raspa Soldador Zanel", temGrade: false })}
-                                                style={{ padding: '8px', cursor: 'pointer', background: selectedExisting?.id === 2 ? '#eff6ff' : 'transparent' }}
+                                    <Row gutter={10}>
+                                        <Col span={12}>
+                                            <Card 
+                                                hoverable 
+                                                size="small" 
+                                                onClick={() => setStep1Mode("EXISTING_DIRECT")}
+                                                style={{ 
+                                                    borderColor: step1Mode === "EXISTING_DIRECT" ? '#1677ff' : '#d9d9d9',
+                                                    backgroundColor: step1Mode === "EXISTING_DIRECT" ? '#e6f4ff' : '#ffffff',
+                                                    cursor: 'pointer'
+                                                }}
                                             >
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                                                    <strong>Luva de Raspa Soldador Zanel</strong>
-                                                    <span style={{ color: '#64748b', fontSize: '0.75rem', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>📦 Simples</span>
+                                                <Space direction="vertical" size={2}>
+                                                    <Text strong><LinkOutlined /> Apenas Vincular</Text>
+                                                    <Text type="secondary" style={{ fontSize: '11px' }}>Soma estoque direto (Sem precificação).</Text>
+                                                </Space>
+                                            </Card>
+                                        </Col>
+                                        <Col span={12}>
+                                            <Card 
+                                                hoverable 
+                                                size="small" 
+                                                onClick={() => { setStep1Mode("DRAFT"); setSelectedExisting(null); }}
+                                                style={{ 
+                                                    borderColor: step1Mode === "DRAFT" ? '#1677ff' : '#d9d9d9',
+                                                    backgroundColor: step1Mode === "DRAFT" ? '#e6f4ff' : '#ffffff',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                <Space direction="vertical" size={2}>
+                                                    <Text strong><FileAddOutlined /> Novo Produto</Text>
+                                                    <Text type="secondary" style={{ fontSize: '11px' }}>Criar do zero com precificação.</Text>
+                                                </Space>
+                                            </Card>
+                                        </Col>
+                                    </Row>
+
+                                    {step1Mode === "EXISTING_DIRECT" && (
+                                        <div style={{ marginTop: 8 }}>
+                                            <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: '12px' }}>Buscar produto existente no estoque</Text>
+                                            <Input
+                                                ref={searchInputRef}
+                                                placeholder="Digite o nome do produto..."
+                                                value={existingSearch}
+                                                onChange={(e) => setExistingSearch(e.target.value)}
+                                                style={{ marginBottom: 8 }}
+                                            />
+                                            <div style={{ maxHeight: '160px', overflowY: 'auto', border: '1px solid #d9d9d9', borderRadius: '6px', padding: '4px' }}>
+                                                <div 
+                                                    onClick={() => setSelectedExisting({ id: 2, descricao: "Luva de Raspa Soldador Zanel" })}
+                                                    style={{ 
+                                                        padding: '8px', 
+                                                        cursor: 'pointer', 
+                                                        borderRadius: '4px',
+                                                        backgroundColor: selectedExisting?.id === 2 ? '#e6f4ff' : 'transparent',
+                                                        display: 'flex',
+                                                        justifyContent: 'space-between',
+                                                        alignItems: 'center'
+                                                    }}
+                                                >
+                                                    <Text strong={selectedExisting?.id === 2}>Luva de Raspa Soldador Zanel</Text>
+                                                    <Tag color="default">Simples</Tag>
                                                 </div>
                                             </div>
                                         </div>
+                                    )}
 
-                                                                                              <span style={{ fontSize: '0.9rem' }}>🔗 <strong>Apenas Vincular:</strong> Mesmo item físico mas fornecedor diferente, somará estoque diretamente.</span>
+                                    {step1Mode === "DRAFT" && (
+                                        <Space direction="vertical" size={6} style={{ width: '100%' }}>
+                                            <Text strong style={{ fontSize: '12px', color: '#1677ff' }}>📝 Identidade do Produto</Text>
+                                            
+                                            {/* Descrição com Cadeado de Segurança */}
+                                            <div>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <Text type="secondary" style={{ fontSize: '11px' }}>Descrição p/ Sistema</Text>
+                                                    <Tooltip title={isDescEditable ? "Bloquear edição" : "Desbloquear para editar"}>
+                                                        <Button 
+                                                            type="text" 
+                                                            size="small" 
+                                                            icon={isDescEditable ? <UnlockOutlined style={{ color: '#faad14' }} /> : <LockOutlined style={{ color: '#8c8c8c' }} />}
+                                                            onClick={() => setIsDescEditable(!isDescEditable)}
+                                                        />
+                                                    </Tooltip>
+                                                </div>
+                                                <Input 
+                                                    value={draftDesc} 
+                                                    disabled={!isDescEditable} 
+                                                    onChange={(e) => setDraftDesc(e.target.value)} 
+                                                    size="small" 
+                                                />
+                                            </div>
 
-                                                SE FOR associado, não terá a parte de Comercialização & Precificação
+                                            {/* SKU com Cadeado de Segurança */}
+                                            <div>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <Text type="secondary" style={{ fontSize: '11px' }}>SKU / Código Interno</Text>
+                                                    <Tooltip title={isSkuEditable ? "Bloquear edição" : "Desbloquear para editar"}>
+                                                        <Button 
+                                                            type="text" 
+                                                            size="small" 
+                                                            icon={isSkuEditable ? <UnlockOutlined style={{ color: '#faad14' }} /> : <LockOutlined style={{ color: '#8c8c8c' }} />}
+                                                            onClick={() => setIsSkuEditable(!isSkuEditable)}
+                                                        />
+                                                    </Tooltip>
+                                                </div>
+                                                <Input 
+                                                    value={draftSku} 
+                                                    disabled={!isSkuEditable} 
+                                                    onChange={(e) => setDraftSku(e.target.value)} 
+                                                    size="small" 
+                                                />
+                                            </div>
 
+                                            <Row gutter={8}>
+                                                <Col span={8}>
+                                                    <Text type="secondary" style={{ fontSize: '10px' }}>Marca</Text>
+                                                    <Input placeholder="Opcional" value={draftBrand} onChange={(e) => setDraftBrand(e.target.value)} size="small" />
+                                                </Col>
+                                                <Col span={8}>
+                                                    <Text type="secondary" style={{ fontSize: '10px' }}>Categoria</Text>
+                                                    <Input placeholder="Opcional" value={draftCategory} onChange={(e) => setDraftCategory(e.target.value)} size="small" />
+                                                </Col>
+                                                <Col span={8}>
+                                                    <Text type="secondary" style={{ fontSize: '10px' }}>Grupo</Text>
+                                                    <Input placeholder="Opcional" value={draftCategory} onChange={(e) => setDraftCategory(e.target.value)} size="small" />
+                                                </Col>
+                                            </Row>
 
-                              
-                                    </div>
-                                )}
-                                {step1Mode === "DRAFT" && (
-                                        <div className="product-id-block" style={{ marginTop: '16px' }}>
-                            <div className="product-id-title">📝 Identidade do Produto (Ajustável)</div>
-                            <FormControl label="Descrição p/ Sistema" value={draftDesc} onChange={(e) => setDraftDesc(e.target.value)} />
-                            <FormControl label="SKU / Código Interno" value={draftSku} onChange={(e) => setDraftSku(e.target.value)} />
-                            <FlexGridContainer layout="grid" template='repeat(3, 1fr)'>
-                                <FormControl label="Marca" value={draftBrand} placeholder="Opcional" onChange={(e) => setDraftBrand(e.target.value)} />
-                                <FormControl label="Categoria" value={draftCategory} placeholder="Opcional" onChange={(e) => setDraftCategory(e.target.value)} />
-                                <FormControl label="Grupo" value={draftCategory} placeholder="Opcional" onChange={(e) => setDraftCategory(e.target.value)} />
-                            </FlexGridContainer>
-                            <FormControl label="NCM (Obrigatório para Venda)" value={draftNcm} required={step1Mode === "DRAFT"} onChange={(e) => setDraftNcm(e.target.value)} />
-                            <FormControl label="CST (Obrigatório para Venda)" value={draftNcm} required={step1Mode === "DRAFT"} onChange={(e) => setDraftNcm(e.target.value)} />
-                                
+                                            <Row gutter={8}>
+                                                <Col span={12}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                        <Text type="secondary" style={{ fontSize: '10px' }}>NCM (Obrigatório)</Text>
+                                                        <Tooltip title={isNcmEditable ? "Bloquear edição" : "Desbloquear para editar"}>
+                                                            <Button 
+                                                                type="text" 
+                                                                size="small" 
+                                                                style={{ height: '18px', padding: 0 }}
+                                                                icon={isNcmEditable ? <UnlockOutlined style={{ color: '#faad14', fontSize: '12px' }} /> : <LockOutlined style={{ color: '#8c8c8c', fontSize: '12px' }} />}
+                                                                onClick={() => setIsNcmEditable(!isNcmEditable)}
+                                                            />
+                                                        </Tooltip>
+                                                    </div>
+                                                    <Input 
+                                                        value={draftNcm} 
+                                                        disabled={!isNcmEditable} 
+                                                        onChange={(e) => setDraftNcm(e.target.value)} 
+                                                        size="small" 
+                                                    />
+                                                </Col>
+                                                <Col span={12}>
+                                                    <Text type="secondary" style={{ fontSize: '10px' }}>CST (Obrigatório)</Text>
+                                                    <Input value={draftCst} onChange={(e) => setDraftCst(e.target.value)} size="small" />
+                                                </Col>
+                                            </Row>
+                                        </Space>
+                                    )}
+                                </Space>
+                            )}
+
+                            {step === 1 && step1Mode !== "EXISTING_DIRECT" && (
+                                <StepSalesConfig
+                                    item={{ custo: item.valorUnitario, unidadeMedida: item.unidadeMedida }}
+                                    onChange={(modes: any[]) => {
+                                        const units = modes.map(m => ({
+                                            type: m.conversion === 1 ? 'WHOLE' : 'FRAC',
+                                            unit: m.unit,
+                                            conversion: m.conversion,
+                                            cost: m.conversion === 1 ? (item.custo || item.valorUnitario || 0) : ((item.custo || item.valorUnitario || 0) / m.conversion),
+                                            markup: m.markup,
+                                            price: m.price,
+                                        } as SalesUnit));
+                                        setUnitsFromStep(units);
+
+                                        const hasWhole = units.some(u => u.conversion === 1);
+                                        const hasFrac = units.some(u => u.conversion !== 1);
+                                        setSalesMode(hasWhole && hasFrac ? 'BOTH' : hasWhole ? 'WHOLE_ONLY' : 'FRACIONADO_ONLY');
+                                    }}
+                                />
+                            )}
                         </div>
-                                )}
-
-                                {(step1Mode === "NEW_PARENT" || step1Mode === "EXISTING_PARENT") && (
-                                    <div style={{ marginTop: 16 }} className="search-section">
-                                        <div className="grade-setup-container" style={{ padding: '14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-
-                                            {selectedExisting ? (
-                                                <>
-                                                    <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '12px', borderRadius: '6px', marginBottom: '14px', fontSize: '0.85rem', color: '#166534' }}>
-                                                        ⚙️ <strong>Transformando em Grade:</strong> Você está criando uma nova pasta para agrupar o produto antigo (<strong>{selectedExisting.descricao}</strong>) e este item da nota como variações.
-                                                    </div>
-
-                                                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '8px' }}>CRIANDO NOVA PASTA</span>
-                                                    <div style={{ marginBottom: '14px' }}>
-                                                        <FormControl
-                                                            label="Nome da Nova Pasta Organizadora (Nome Mãe)"
-                                                            placeholder="Ex: Luvas de Raspa Cano Longo"
-                                                            value={gradeParentName}
-                                                            onChange={(e) => setGradeParentName(e.target.value)}
-                                                        />
-                                                    </div>
-
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', borderTop: '1px solid #e2e8f0', paddingTop: '14px' }}>
-                                                        <FormControl
-                                                            label="Variação do Produto Antigo"
-                                                            placeholder="Ex: Tam M"
-                                                            value={oldProductVariantName}
-                                                            onChange={(e) => setOldProductVariantName(e.target.value)}
-                                                        />
-                                                        <FormControl
-                                                            label="Variação deste Item da Nota"
-                                                            placeholder="Ex: Tam G"
-                                                            value={newProductVariantName}
-                                                            onChange={(e) => setNewProductVariantName(e.target.value)}
-                                                        />
-                                                    </div>
-                                                </>
-                                            ) : (
-                                                <>
-                                                 a
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {step === 2 && (
-                            <StepSalesConfig
-                                item={{ custo: item.valorUnitario, unidadeMedida: item.unidadeMedida }}
-                                onChange={(modes) => {
-                                    // map modes to SalesUnit shape for confirm
-                                    const units = modes.map(m => ({
-                                        type: m.conversion === 1 ? 'WHOLE' : 'FRAC',
-                                        unit: m.unit,
-                                        conversion: m.conversion,
-                                        cost: m.conversion === 1 ? (item.custo || 0) : ((item.custo || 0) / m.conversion),
-                                        markup: m.markup,
-                                        price: m.price,
-                                    } as SalesUnit));
-                                    setUnitsFromStep(units);
-
-                                    // derive simple salesMode for existing validations
-                                    const hasWhole = units.some(u => u.conversion === 1);
-                                    const hasFrac = units.some(u => u.conversion !== 1);
-                                    setSalesMode(hasWhole && hasFrac ? 'BOTH' : hasWhole ? 'WHOLE_ONLY' : 'FRACIONADO_ONLY');
-                                }}
-                            />
-                        )}
                     </div>
-                </div>
+                </Col>
+            </Row>
 
-                <div className="modal-footer">
-                    <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-                    {step === 2 && (
-                        <Button variant="secondary" onClick={() => setStep(1)}>Voltar</Button>
+            <Divider style={{ margin: '16px 0 12px 0' }} />
+
+            {/* Rodapé Fixo */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Button onClick={onClose}>Cancelar</Button>
+                
+                <Space>
+                    {step === 1 && (
+                        <Button icon={<ArrowLeftOutlined />} onClick={() => setStep(0)}>
+                            Voltar
+                        </Button>
                     )}
-                    {step === 1 ? (
-                        <span title={!canProceedToNextStep() ? "Preencha todos os campos obrigatórios para avançar" : ""}>
-                            <Button 
-                                variant="primary" 
-                                disabled={!canProceedToNextStep()} 
-                                onClick={() => setStep(2)}
-                            >
-                                Avançar
-                            </Button>
-                        </span>
+                    
+                    {step1Mode === "EXISTING_DIRECT" ? (
+                        <Button
+                            type="primary"
+                            style={{ backgroundColor: '#52c41a' }}
+                            icon={<CheckCircleOutlined />}
+                            disabled={!canProceedToNextStep()}
+                            onClick={handleConfirm}
+                        >
+                            Confirmar Vínculo Direto
+                        </Button>
+                    ) : step === 0 ? (
+                        <Button
+                            type="primary"
+                            disabled={!canProceedToNextStep()}
+                            onClick={() => setStep(1)}
+                        >
+                            Avançar <ArrowRightOutlined />
+                        </Button>
                     ) : (
-                        <span title={!canProceedToNextStep() ? "Preencha todos os campos obrigatórios para confirmar" : ""}>
-                            <Button
-                                variant="success"
-                                disabled={!canProceedToNextStep()}
-                                onClick={handleConfirm}
-                            >
-                                Confirmar Mapeamento
-                            </Button>
-                        </span>
+                        <Button
+                            type="primary"
+                            style={{ backgroundColor: '#52c41a' }}
+                            icon={<CheckCircleOutlined />}
+                            disabled={!canProceedToNextStep()}
+                            onClick={handleConfirm}
+                        >
+                            Confirmar Mapeamento
+                        </Button>
                     )}
-                </div>
-
+                </Space>
             </div>
-        </div>
+        </Modal>
     );
 };
 

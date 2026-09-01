@@ -47,6 +47,8 @@ import FuncionariosPage from "./pages/Catalogo/Parceiros/FuncionariosPage";
 import { MarcasPage } from "./pages/Catalogo/pages/MarcasPage";
 import Pedidos from "./pages/Clientes/Pedidos";
 import ListaComprasExport from "./pages/Compras/ListaComprasExport";
+import { LeitorXML } from "./pages/Compras/StockEntry/xml/LeitorXML";
+import EmissaoFaturado from "./pages/Compras/EmissaoFaturado";
 
 const { Sider, Header } = Layout;
 
@@ -143,10 +145,14 @@ export default function AppLayout() {
             <Route path="/compras/ListaCompras" element={<ListaComprasExport />} />
             <Route path="/compras/entrada-nfe" element={<StockEntryForm />} />
             <Route path="/compras/fornecedores" element={<FornecedoresList />} />
+            <Route path="/compras/Faturamento" element={<EmissaoFaturado/>} />
             <Route path="/relatorios" element={<RelatoriosPage />} />
             <Route path="/relatorios/poco" element={<RelatorioPocoPage />} />
             <Route path="/obras" element={<ObrasModule />} />
             <Route path="*" element={<h2>404 | Página Não Encontrada</h2>} />
+
+            <Route path="/compras/xml" element={< LeitorXML/>} />
+
           </Routes>
         </Panel>
       </Layout>

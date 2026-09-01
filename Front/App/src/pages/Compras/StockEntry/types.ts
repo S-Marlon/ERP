@@ -1,13 +1,28 @@
 import { ProdutoNF } from '../types/NF-e';
 
 /**
- * ID padronizado de acordo com a estratégia do Backend (BigInt como number ou string)
+ * ID padronizado de acordo com a estratégia do Backend
  */
 type ID = number;
 
 /**
- * Contrato base para a definição de um atributo no sistema
- * Espelha a tabela: atributos_comercial
+ * Interface para Fornecedores (para usar no SupplierModal e no Hook)
+ */
+export interface Supplier {
+  id: ID;
+  tenantId: ID;
+  name: string;
+  fantasyName: string;
+  cnpj: string;
+  stateRegistration?: string; // IE Capturada
+  address?: string;          // Endereço completo
+  cityStateZip?: string;     // Cidade/UF/CEP
+  phone?: string;            // Telefone
+  email?:string;
+}
+
+/**
+ * Contrato base para a definição de um atributo
  */
 export interface BaseAtributo {
   idAtributo: ID;
@@ -16,32 +31,20 @@ export interface BaseAtributo {
   tipo: 'texto' | 'numero' | 'decimal' | 'boolean' | 'lista' | 'data';
 }
 
-/**
- * Atributo vinculado à Família (Regras do Molde/DNA)
- * Espelha a tabela: atributos_core_entidades
- */
 export interface FamiliaAtributo extends BaseAtributo {
-  geraVariacao: boolean;      // Se gera variações de grade (gera_variacao)
-  compoeSku: boolean;         // Se entra no código SKU (compoe_sku)
-  obrigatorio: boolean;       // Se é obrigatório preencher
-  pesquisavel: boolean;       // Se entra na busca
-  ordem: number;              // Sequência de exibição
-  escopoComercial: 'dna' | 'grade' | 'ficha'; // escopo_comercial
+  geraVariacao: boolean;
+  compoeSku: boolean;
+  obrigatorio: boolean;
+  pesquisavel: boolean;
+  ordem: number;
+  escopoComercial: 'dna' | 'grade' | 'ficha';
 }
 
-/**
- * O valor real que o item/produto assumiu
- * Espelha a tabela: atributos_comercial_valores
- */
 export interface ItemAtributo extends BaseAtributo {
-  idValor?: ID;               // Pode não existir se for um valor novo digitado na hora
-  valor: string;              // Valor armazenado convertido para string na interface
+  idValor?: ID;
+  valor: string;
 }
 
-/**
- * Família de Produtos (Ficha técnica conceitual)
- * Espelha a tabela: comercial_familias
- */
 export interface Familia {
   id: ID;
   tenantId: ID;
@@ -49,37 +52,45 @@ export interface Familia {
   descricao?: string | null;
   categoriaId?: ID | null;
   idMarca?: ID | null;
-  templateSku?: string;       // Ex: {SIGLA}-{VARIACAO}
-  templateNome?: string;      // Ex: {GRUPO}
+  templateSku?: string;
+  templateNome?: string;
   siglaSku?: string;
-  unidadeBase?: string;       // Ex: PC, UN, KG
-  atributos: FamiliaAtributo[]; 
+  unidadeBase?: string;
+  atributos: FamiliaAtributo[];
 }
 
 /**
- * Item flutuante da NF-e em processo de recebimento/conferência
- * Relacionado com: compras_core_nota_itens e itens_core
+ * Item da NF-e em conferência
  */
 export interface Item extends ProdutoNF {
-  tempId: number;               // ID temporário de tela (controle do React/Vue)
-  receivedQuantity: number;     // Qtd física conferida no bipe
-  confirmed: boolean;
-  mappedId?: ID;                // id_item real do itens_core se já existir
-  difference: number;           // Qtd Nota vs Qtd Recebida
-  familiaId?: ID | null;        // id da comercial_familias associado
-  atributosCustomizados?: ItemAtributo[]; // Valores capturados no recebimento para gerar o hash_variacao
+  tempId: number;
+  receivedQuantity: number;
+  isConfirmed: boolean; // Renomeado de 'confirmed' para manter consistência com o hook
+  isMapped?: boolean;   // Adicionado para controle visual de status
+  mappingStatus?: 'PRODUTO_INEDITO' | 'VINCULO_DIRETO_ENCONTRADO' | 'ERRO_PROCESSAMENTO' | string;
+  mappedId?: ID | null;
+  difference: number;
+  familiaId?: ID | null;
+  grupo?: string | null; // Adicionado para suporte ao handleAssignGroupToItems
+  grupoVariacao?: string | null;
+  atributosCustomizados?: ItemAtributo[];
 }
 
 /**
- * Payload para o back-end processar o vínculo ou criação da Família/SKU
+ * Payload para o mapeamento de produtos e criação de novas famílias
  */
+export interface MappingPayload {
+  internalCode: ID;
+  categoryName: string;
+  familyId?: ID;
+  attributes: ItemAtributo[];
+}
+
 export interface FamiliaMappingPayload {
-  familiaId: ID | 'NEW';          // 'NEW' indica intenção de criação
+  familiaId: ID | 'NEW';
   isNewFamilia: boolean;
-  // Se for nova, envia os dados da família sem o ID numérico do banco
-  familiaData?: Omit<Familia, 'id'> & { id?: ID }; 
-  // Atributos escolhidos para ESTE item da NF que vão gerar o hash_variacao do SKU
-  itemAttributesOverride?: ItemAtributo[]; 
+  familiaData?: Omit<Familia, 'id'> & { id?: ID };
+  itemAttributesOverride?: ItemAtributo[];
 }
 
 export type FamiliaMap = Record<string, Familia>;

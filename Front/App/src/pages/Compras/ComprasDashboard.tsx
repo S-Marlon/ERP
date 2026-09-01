@@ -44,6 +44,10 @@ export default function ComprasDashboard() {
     navigate('/compras/fornecedores'); 
   };
 
+   const handleFaturar = () => {
+    navigate('/compras/Faturamento'); 
+  };
+
   const handleCriarRequisicao = () => {
     setIsModalOpen(true);
   };
@@ -177,6 +181,20 @@ export default function ComprasDashboard() {
             <Paragraph>Visualize parceiros ativos, analise documentos fiscais e realize novos cadastros de PJ/PF.</Paragraph>
             <Button type="default" icon={<TeamOutlined />} onClick={handleGerenciarFornecedores} block>
               Gerenciar Fornecedores
+            </Button>
+          </Card>
+        </Col>
+
+         {/* Card 3: Visão de Fornecedores */}
+        <Col xs={24} md={8}>
+          <Card 
+            title={<span><TeamOutlined /> Cadastro Master de Fornecedores</span>} 
+            bordered={false}
+            style={{ borderLeft: '6px solid #52c41a', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', height: '100%' }}
+          >
+            <Paragraph> ... </Paragraph>
+            <Button type="default" icon={<TeamOutlined />} onClick={handleFaturar} block>
+              EMITIR BOLETO FATURADO
             </Button>
           </Card>
         </Col>

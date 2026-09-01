@@ -74,6 +74,11 @@ export interface FreteNF {
 // --- INTERFACE PRINCIPAL DA NOTA FISCAL ---
 
 export interface NfeDataFromXML {
+    naturezaOperacao: string;
+    destinoOperacao(destinoOperacao: any): import("react").ReactNode;
+    finalidade(finalidade: any): import("react").ReactNode;
+    presencaComprador(presencaComprador: any): import("react").ReactNode;
+    totais: any;
     chaveAcesso: string;        // chNFe (44 dígitos)
     numero: string;             // nNF
     serie: string;              // Série
@@ -82,6 +87,20 @@ export interface NfeDataFromXML {
     situacao?: string;          // Autorizada / Cancelada
 
     emitente: {
+        cpf: string;
+        iest: string;
+        im: string;
+        cnae: string;
+        iSufEmit: string;
+        xLgr: string | undefined;
+        nro: string | undefined;
+        complemento: any;
+        xCpl: any;
+        xBairro: string | undefined;
+        xMun: string | undefined;
+        cMun: string;
+        xPais: string;
+        cPais: string;
         cnpj: string;
         nome: string;
         nomeFantasia?: string;

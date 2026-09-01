@@ -1,12 +1,12 @@
 import { useState, useMemo } from 'react';
-import { parseNfeXmlToData } from '../utils/nfeParser';
+import { parseNfeXmlToData } from '../utils/nfeParser'; // ou a sua nova rota modular de parsing
 import { 
     createSupplier, 
     checkSupplier, 
     processItemXML, 
     type ProcessarItemXMLResponse 
-} from '../api/comprasApi'; // Ajuste o path do seu arquivo de API
-import type { Item, MappingPayload } from './types'; // Ajuste os paths conforme seu projeto
+} from '../api/comprasApi';
+import type { Item, MappingPayload } from './types';
 
 interface FinancialTotals {
     invoiceNumber: string;
@@ -48,16 +48,28 @@ const formatCnpj = (cnpj?: string): string => {
 };
 
 export const useStockEntry = (tenantId: number = 1) => {
-    // Estados Financeiros e de Itens
+    // Estados Financeiros, de Itens e do XML Bruto para os blocos modulares
     const [financials, setFinancials] = useState<FinancialTotals>(INITIAL_FINANCIALS);
     const [items, setItems] = useState<Item[]>([]);
     const [frete, setFrete] = useState<any | null>(null);
+    const [rawXmlString, setRawXmlString] = useState<string | null>(null);
+
+    const [isConferenceModalOpen, setIsConferenceModalOpen] = useState(false);
     
     // Estados do Fornecedor
     const [supplierExists, setSupplierExists] = useState<boolean | null>(null);
     const [isSupplierChecking, setIsSupplierChecking] = useState(false);
     const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
-    const [supplierToCreate, setSupplierToCreate] = useState<{ cnpj: string; name: string, fantasyName: string } | null>(null);
+    const [supplierToCreate, setSupplierToCreate] = useState<{ 
+        cnpj: string; 
+        name: string; 
+        fantasyName: string;
+        stateRegistration?: string;
+        address?: string;
+        cityStateZip?: string;
+        phone?: string;
+    } | null>(null);
+    
     const [supplierCreationName, setSupplierCreationName] = useState('');
     const [supplierCreationFantasyName, setSupplierCreationFantasyName] = useState('');
     const [supplierCreationLoading, setSupplierCreationLoading] = useState(false);
@@ -67,7 +79,7 @@ export const useStockEntry = (tenantId: number = 1) => {
     const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
     const [itemToMap, setItemToMap] = useState<any>(null);
     const [isProcessingItems, setIsProcessingItems] = useState(false);
-
+    
     // --- CÁLCULOS E MEMOS ---
     const subtotal = useMemo(() => items.reduce((sum, item) => sum + (item.valorProdutos || 0), 0), [items]);
 
@@ -75,57 +87,52 @@ export const useStockEntry = (tenantId: number = 1) => {
         return items.reduce((sum, item) => sum + (item.receivedQuantity * (item.valorCustoReal || item.valorUnitario || 0)), 0);
     }, [items]);
 
-    // O item precisa de mapeamento manual se o status retornado pela API for 'PRODUTO_INEDITO' ou não tiver mappedId
     const hasUnmappedItems = useMemo(() => items.some(i => !i.mappedId || i.mappingStatus === 'PRODUTO_INEDITO'), [items]);
     const hasUnconfirmedItems = useMemo(() => items.some(i => !i.isConfirmed), [items]);
     const isSubmitDisabled = items.length === 0 || hasUnmappedItems || hasUnconfirmedItems || isProcessingItems;
 
-    // --- 🟢 SINCRONIZAÇÃO E PROCESSAMENTO DE ITENS COM A NOVA API ---
+    // --- SINCRONIZAÇÃO E PROCESSAMENTO DE ITENS ---
     const performMappingSync = async (idFornecedor: number, itemsToUse: Item[]) => {
-    setIsProcessingItems(true);
-    try {
-        const processedItems: Item[] = [];
+        setIsProcessingItems(true);
+        try {
+            const processedItems: Item[] = [];
 
-        // 🟢 Correção: Processa um item por vez de forma sequencial
-        for (const item of itemsToUse) {
-            try {
-                const apiResult: ProcessarItemXMLResponse = await processItemXML({
-    tenant_id: tenantId,
-    id_fornecedor: idFornecedor,
-    // 🟢 Garante que se um for undefined, ele tenta buscar as outras propriedades alternativas do XML
-    cProd: String(item.sku || item.codigo || item.cProd || '').trim(), 
-    cEAN: item.gtin || item.cEAN || null,
-    xProd: item.descricao || item.xProd || null
-});
+            for (const item of itemsToUse) {
+                try {
+                    const apiResult: ProcessarItemXMLResponse = await processItemXML({
+                        tenant_id: tenantId,
+                        id_fornecedor: idFornecedor,
+                        cProd: String(item.sku || item.codigo || item.cProd || '').trim(), 
+                        cEAN: item.gtin || item.cEAN || null,
+                        xProd: item.descricao || item.xProd || null
+                    });
 
-                // Mescla as informações no estado do item
-                processedItems.push({
-                    ...item,
-                    mappingStatus: apiResult.status,
-                    mappedId: apiResult.id_item || null,
-                    isMapped: apiResult.status !== 'PRODUTO_INEDITO',
-                    isConfirmed: apiResult.status !== 'PRODUTO_INEDITO' 
-                });
-            } catch (err) {
-                console.error(`Erro ao processar item individual ${item.codigo || item.sku}:`, err);
-                processedItems.push({ 
-                    ...item, 
-                    mappingStatus: 'ERRO_PROCESSAMENTO', 
-                    isMapped: false, 
-                    isConfirmed: false 
-                });
+                    processedItems.push({
+                        ...item,
+                        mappingStatus: apiResult.status,
+                        mappedId: apiResult.id_item || null,
+                        isMapped: apiResult.status !== 'PRODUTO_INEDITO',
+                        isConfirmed: apiResult.status !== 'PRODUTO_INEDITO' 
+                    });
+                } catch (err) {
+                    console.error(`Erro ao processar item individual ${item.codigo || item.sku}:`, err);
+                    processedItems.push({ 
+                        ...item, 
+                        mappingStatus: 'ERRO_PROCESSAMENTO', 
+                        isMapped: false, 
+                        isConfirmed: false 
+                    });
+                }
             }
-        }
 
-        // Atualiza o estado uma única vez ao final do laço
-        setItems(processedItems);
-    } catch (err) {
-        console.error('Erro crítico na esteira de processamento de itens:', err);
-        alert('Houve um erro ao cruzar os itens do XML com o banco de dados.');
-    } finally {
-        setIsProcessingItems(false);
-    }
-};
+            setItems(processedItems);
+        } catch (err) {
+            console.error('Erro crítico na esteira de processamento de itens:', err);
+            alert('Houve um erro ao cruzar os itens do XML com o banco de dados.');
+        } finally {
+            setIsProcessingItems(false);
+        }
+    };
 
     // --- ENTRADA DO ARQUIVO XML ---
     const handleXmlUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -136,6 +143,8 @@ export const useStockEntry = (tenantId: number = 1) => {
         reader.onload = async (e) => {
             try {
                 const xmlContent = e.target?.result as string;
+                setRawXmlString(xmlContent); // Armazena a string bruta para os parsers modulares (ex: 03-emiParser)
+
                 const rawXmlData = parseNfeXmlToData(xmlContent);
                 if (!rawXmlData) throw new Error('Falha ao extrair dados do XML.');
 
@@ -154,46 +163,57 @@ export const useStockEntry = (tenantId: number = 1) => {
                 }));
 
                 setFinancials({
-    supplierCnpj: formattedCnpj,
-    invoiceNumber: `NF ${rawXmlData.numero}`,
-    supplier: rawXmlData.emitente.nome,
-    supplierFantasyName: rawXmlData.emitente.nomeFantasy || rawXmlData.emitente.nome,
-    accessKey: rawXmlData.chaveAcesso,
-    entryDate: dataFicticia,
-    totalFreight: rawXmlData.valorTotalFrete,
-    totalIpi: rawXmlData.valorTotalIpi,
-    totalOtherExpenses: rawXmlData.valorOutrasDespesas,
-    totalNoteValue: rawXmlData.valorTotalNf,
-    totalIcmsST: rawXmlData.valorTotalIcmsST,
-    totalIBS: rawXmlData.valorTotalIBS,
-    totalCBS: rawXmlData.valorTotalCBS,
-});
+                    supplierCnpj: formattedCnpj,
+                    invoiceNumber: `NF ${rawXmlData.numero}`,
+                    supplier: rawXmlData.emitente.nome,
+                    supplierFantasyName: rawXmlData.emitente.nomeFantasy || rawXmlData.emitente.nome,
+                    accessKey: rawXmlData.chaveAcesso,
+                    entryDate: dataFicticia,
+                    totalFreight: rawXmlData.valorTotalFrete,
+                    totalIpi: rawXmlData.valorTotalIpi,
+                    totalOtherExpenses: rawXmlData.valorOutrasDespesas,
+                    totalNoteValue: rawXmlData.valorTotalNf,
+                    totalIcmsST: rawXmlData.valorTotalIcmsST,
+                    totalIBS: rawXmlData.valorTotalIBS,
+                    totalCBS: rawXmlData.valorTotalCBS,
+                });
 
-// 🎯 ADICIONE ESTA LINHA BEM AQUI PARA GUARDAR O FRETE:
-setFrete(rawXmlData.frete);
+                setFrete(rawXmlData.frete);
 
                 setIsSupplierChecking(true);
-                // Passo 1: Dispara a consulta para a sua nova rota de verificação de fornecedor
                 const supplierCheck = await checkSupplier(cnpjLimpo, tenantId);
 
                 if (!supplierCheck || !supplierCheck.exists || !supplierCheck.supplier) {
+                    const emitente = rawXmlData.emitente;
+
+                    const enderecoCompleto = emitente.endereco 
+                        ? `${emitente.endereco.xLgr || ''}, ${emitente.endereco.nro || ''} - ${emitente.endereco.xBairro || ''}`.trim()
+                        : '';
+
+                    const municipioUfCep = emitente.endereco 
+                        ? `${emitente.endereco.xMun || ''} - ${emitente.endereco.UF || ''}, ${emitente.endereco.CEP || ''}`.trim()
+                        : '';
+                    
                     setSupplierExists(false);
                     setSupplierToCreate({
                         cnpj: formattedCnpj,
-                        name: rawXmlData.emitente.nome,
-                        fantasyName: rawXmlData.emitente.nomeFantasy || rawXmlData.emitente.nome
+                        name: emitente.nome,
+                        fantasyName: emitente.nomeFantasy || emitente.nome,
+                        stateRegistration: emitente.ie || '',
+                        address: enderecoCompleto,
+                        cityStateZip: municipioUfCep,
+                        phone: emitente.endereco?.fone || ''
                     });
+
                     setSupplierCreationName(rawXmlData.emitente.nome);
                     setSupplierCreationFantasyName(rawXmlData.emitente.nomeFantasy || rawXmlData.emitente.nome);
                     
-                    // Retém os itens em memória para processar só depois do cadastro do fornecedor
                     setPendingXmlData({ items: mappedItems });
                     setItems(mappedItems);
                     setIsSupplierModalOpen(true);
                     return;
                 }
 
-                // Caso o fornecedor exista, atualiza os dados da tela e segue para o Passo 2 (Itens)
                 setSupplierExists(true);
                 setFinancials(prev => ({
                     ...prev,
@@ -201,7 +221,6 @@ setFrete(rawXmlData.frete);
                     supplierFantasyName: supplierCheck.supplier?.fantasyName || prev.supplierFantasyName
                 }));
                 
-                // Dispara o processamento com o ID numérico real vindo do banco
                 await performMappingSync(supplierCheck.supplier.id, mappedItems);
 
             } catch (error) {
@@ -216,30 +235,33 @@ setFrete(rawXmlData.frete);
     };
 
     const handleCancelSupplierCreation = () => {
-    setIsSupplierModalOpen(false);
-    setSupplierExists(null);
-    setSupplierToCreate(null);
-    setPendingXmlData(null);
-    setFinancials(INITIAL_FINANCIALS);
-    setItems([]);
-    setFrete(null); // 🎯 Zera o frete no cancelamento
-};
+        setIsSupplierModalOpen(false);
+        setSupplierExists(null);
+        setSupplierToCreate(null);
+        setPendingXmlData(null);
+        setFinancials(INITIAL_FINANCIALS);
+        setItems([]);
+        setFrete(null);
+        setRawXmlString(null);
+    };
 
     const handleCreateSupplierSubmit = async () => {
         if (!supplierToCreate) return;
         setSupplierCreationLoading(true);
         try {
-            // Cadastra o fornecedor na API
             const response = await createSupplier({
                 cnpj: supplierToCreate.cnpj,
                 name: supplierCreationName,
-                fantasyName: supplierCreationFantasyName
+                fantasyName: supplierCreationFantasyName,
+                stateRegistration: supplierToCreate.stateRegistration,
+                address: supplierToCreate.address,
+                cityStateZip: supplierToCreate.cityStateZip,
+                phone: supplierToCreate.phone,
             }, tenantId);
 
             setSupplierExists(true);
             setIsSupplierModalOpen(false);
 
-            // Resgata o ID gerado pelo banco para o novo fornecedor
             const novoFornecedorId = response.id || response.supplier?.id;
 
             if (pendingXmlData && novoFornecedorId) {
@@ -276,11 +298,11 @@ setFrete(rawXmlData.frete);
         setItems(p => p.map(i => i.tempId === itemToMap?.tempId ? {
             ...i,
             isMapped: true,
-            mappingStatus: 'VINCULO_DIRETO_ENCONTRADO', // Força a normalização após o vínculo manual
+            mappingStatus: 'VINCULO_DIRETO_ENCONTRADO',
             mappedId: payload.internalCode,
             category: payload.categoryName,
             mappedData: payload,
-            isConfirmed: true // Pré-confirma já que o usuário acabou de vincular manualmente
+            isConfirmed: true
         } : i));
         setIsMappingModalOpen(false);
         setItemToMap(null);
@@ -296,15 +318,40 @@ setFrete(rawXmlData.frete);
     };
 
     return {
-        financials, items, subtotal, adjustedPhysicalSubtotal, isSubmitDisabled,
-        frete, // 🎯 EXPORTE O ESTADO DE FRETE AQUI
-        supplierExists, isSupplierChecking, isSupplierModalOpen, supplierCreationLoading,
-        supplierCreationName, supplierCreationFantasyName, supplierToCreate,
-        isMappingModalOpen, itemToMap, isProcessingItems,
-        setSupplierCreationName, setSupplierCreationFantasyName,
-        handleXmlUpload, handleCancelSupplierCreation, handleCreateSupplierSubmit,
-        handleConfirmItems, handleUnconfirmItems, handleToggleSingleItem,
-        handleRemoveItemsFromConference, handleOpenMappingFromTable, handleModalMapSuccess,
-        handleQuantityReceivedChange, handleAssignGroupToItems, setIsMappingModalOpen, setItemToMap
+        financials, 
+        items, 
+        subtotal, 
+        adjustedPhysicalSubtotal, 
+        isSubmitDisabled,
+        frete,
+        rawXmlString, // Exposto para que o componente principal acesse os blocos modulares (ex: parseEmitNFe)
+        supplierExists, 
+        isSupplierChecking, 
+        isSupplierModalOpen, 
+        supplierCreationLoading,
+        supplierCreationName, 
+        supplierCreationFantasyName, 
+        supplierToCreate,
+        isMappingModalOpen, 
+        itemToMap, 
+        isProcessingItems,
+        setSupplierCreationName, 
+        setSupplierCreationFantasyName,
+        handleXmlUpload, 
+        handleCancelSupplierCreation, 
+        handleCreateSupplierSubmit,
+        handleConfirmItems, 
+        handleUnconfirmItems, 
+        handleToggleSingleItem,
+        handleRemoveItemsFromConference, 
+        handleOpenMappingFromTable, 
+        handleModalMapSuccess,
+        handleQuantityReceivedChange, 
+        handleAssignGroupToItems, 
+        setIsMappingModalOpen, 
+        setItemToMap,
+        isConferenceModalOpen, 
+        setIsSupplierModalOpen,
+        setIsConferenceModalOpen,
     };
 };
