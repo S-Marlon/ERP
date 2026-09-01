@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import styles from './GroupItemsEditModal.module.css';
-import { Item, Group, ItemAttribute } from './types';
+import { Item, Group, ItemAttribute } from '../types';
 
 interface Props {
   isOpen: boolean;

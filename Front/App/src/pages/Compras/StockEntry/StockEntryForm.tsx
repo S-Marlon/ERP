@@ -30,9 +30,9 @@ import {
   CarOutlined,
   InfoCircleOutlined
 } from '@ant-design/icons';
-import MappingModal from './_components/ProductMappingModal';
-import NfeCards from './_components/NfeCards';
-import { ItemsConference } from './ItemsConference';
+import MappingModal from './nfeCards/ProductMappingModal';
+import NfeCards from './nfeCards/NfeCards';
+import { ItemsConference } from './ItemsConference/ItemsConference';
 import { SupplierModal } from './SupplierModal';
 import PhysicalConferenceTable from './PhysicalConferenceTable';
 

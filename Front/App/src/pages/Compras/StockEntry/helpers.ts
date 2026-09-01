@@ -33,6 +33,10 @@ export function hasAttributeOverride(item: Item): boolean {
   return !!item.atributosCustomizados && item.atributosCustomizados.length > 0;
 }
 
+export function generateFamiliaId(item: Item): string {
+  return `familia_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+}
+
 /**
  * Gera nome de exibição para item (baseado em grupo + atributos)
  */

@@ -33,8 +33,11 @@ DollarOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 
-import { GroupMappingModal } from './GroupMappingModal';
-import ManageGroupsModal from './ManageGroupsModal';
+// Substitua o import antigo de ManageGroupsModal por:
+import ManageFamiliasModal from './ModalManageFamilias'; // ou './ManageFamiliasModal' se renomeou o arquivo
+import { ModalFamiliaMapping } from './ModalFamiliaMapping';
+
+import ManageGroupsModal from './ModalManageFamilias';
 import GroupEditModal from './GroupEditModal';
 import GroupItemsEditModal from './GroupItemsEditModal';
 import {
@@ -43,10 +46,9 @@ Group,
 ItemAttribute,
 GroupMappingPayload,
 FilterType,
-} from './types';
+} from '../types';
 
-import { generateItemDisplayName, hasAttributeOverride, generateGroupId } from './helpers';
-import { ItemNFeData } from './xml/utils/05-detParser';
+import { generateItemDisplayName, hasAttributeOverride, generateGroupId } from '../helpers';
 
 interface Props {
 items?: Item[];
@@ -397,7 +399,7 @@ dataIndex: 'descricao',
 key: 'descricao',
 width: 400,
 render: (_, record) => {
-const group = record.grupoId ? groupsById.get(record.grupoId) : null;
+const group = record.grupo ? groupsById.get(record.grupoId) : null;
 
 return (
 <Space direction="vertical" size={2}>
@@ -607,7 +609,7 @@ return (
 <Col>
 <Space>
 <Button icon={<SettingOutlined />} onClick={() => setIsManageModalOpen(true)}>
-Gerenciar Famílias ({localGroups.length})
+  Gerenciar Famílias ({localGroups.length})
 </Button>
 <Space style={{ background: '#f5f5f5', padding: '4px 12px', borderRadius: 6, border: '1px solid #d9d9d9' }}>
 <Text style={{ fontSize: 12 }}><ThunderboltOutlined style={{ color: '#faad14' }} /> Checkagem turbo</Text>
@@ -1065,8 +1067,79 @@ onChange={e => setBatchNewGroupName(e.target.value)}
 </Row>
 </Modal>
 
-{/* MODAIS COMPLEMENTARES */}
-<GroupMappingModal isOpen={isGroupModalOpen} onClose={() => setIsGroupModalOpen(false)} item={selectedItemForGroup} groups={localGroups} onSaveGroupMapping={handleSaveGroupMapping} />
+{/* ======================================================== */}
+      {/* 🧩 RENDERIZAÇÃO DOS MODAIS (COLOQUE ISSO ANTES DO ÚLTIMO DIV) */}
+      {/* ======================================================== */}
+
+      {/* 1. Modal de Mapeamento de Família por Item */}
+      {selectedItemForGroup && (
+        <ModalFamiliaMapping
+          isOpen={isGroupModalOpen}
+          onClose={() => setIsGroupModalOpen(false)}
+          item={selectedItemForGroup}
+          groups={localGroups}
+          onSave={handleSaveGroupMapping}
+        />
+      )}
+
+      {/* 2. Modal de Gerenciamento Geral de Famílias */}
+      <ManageFamiliasModal
+        isOpen={isManageModalOpen}
+        onClose={() => setIsManageModalOpen(false)}
+        familias={localGroups}
+        items={localItems}
+        onCreateFamilia={() => setIsManageModalOpen(false)}
+        onEditFamilia={handleEditGroup}
+        onEditFamiliaItems={handleEditGroupItems}
+        onDeleteFamilia={(id) => {
+          setLocalGroups(prev => prev.filter(g => g.id !== id));
+        }}
+      />
+
+      {/* 3. Modal de Edição de Estrutura da Família */}
+      {groupBeingEdited && (
+        <GroupEditModal
+          isOpen={isGroupEditModalOpen}
+          onClose={() => {
+            setIsGroupEditModalOpen(false);
+            setGroupBeingEdited(null);
+          }}
+          group={groupBeingEdited}
+          onSave={handleSaveGroupEdit}
+        />
+      )}
+
+      {/* 4. Modal de Preenchimento da Grade de Itens */}
+      {grupoSelecionadoParaItens && (
+        <GroupItemsEditModal
+          isOpen={isItemsEditOpen}
+          onClose={() => {
+            setIsItemsEditOpen(false);
+            setGrupoSelecionadoParaItens(null);
+          }}
+          group={grupoSelecionadoParaItens}
+          items={itemsByGroupId.get(grupoSelecionadoParaItens.id) || []}
+          onSave={handleSaveItemsAttributes}
+        />
+      )}
+
+      {/* 5. Modal de Inserção de Código de Barras */}
+      <Modal
+        title="Inserir Código de Barras Manual"
+        open={barcodeModalVisible}
+        onOk={handleSaveCustomGtin}
+        onCancel={() => setBarcodeModalVisible(false)}
+        okText="Salvar"
+        cancelText="Cancelar"
+      >
+        <p>Informe o GTIN/Código de barras correto para o item:</p>
+        <Input
+          placeholder="Ex: 7891020304050"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          autoFocus
+        />
+      </Modal>
 <ManageGroupsModal isOpen={isManageModalOpen} onClose={() => setIsManageModalOpen(false)} groups={localGroups} items={localItems} onEditGroup={handleEditGroup} onEditGroupItems={handleEditGroupItems} onDeleteGroup={(groupId: string) => { setLocalGroups(prev => prev.filter(g => g.id !== groupId)); setLocalItems(prev => prev.map(it => it.grupoId === groupId ? { ...it, grupoId: undefined, atributosCustomizados: undefined } : it)); }} />
 <GroupEditModal isOpen={isGroupEditModalOpen} onClose={() => setIsGroupEditModalOpen(false)} grupo={groupBeingEdited} onSave={handleSaveGroupEdit} />
 <GroupItemsEditModal isOpen={isItemsEditOpen} onClose={() => { setIsItemsEditOpen(false); setGrupoSelecionadoParaItens(null); }} grupo={grupoSelecionadoParaItens} items={localItems} onSaveItemsAttributes={handleSaveItemsAttributes} />

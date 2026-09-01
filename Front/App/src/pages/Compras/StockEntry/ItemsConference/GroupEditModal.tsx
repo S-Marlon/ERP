@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import styles from './GroupEditModal.module.css';
-import { Group, GroupAttribute } from './types';
+import { Group, GroupAttribute } from '../types';
 
 // Nota: Certifique-se de que sua interface 'GroupAttribute' em './types' contenha:
 // nome: string;
