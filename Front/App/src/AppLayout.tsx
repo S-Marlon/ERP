@@ -10,7 +10,6 @@ import Panel from './components/Layout/AppContent/panel';
 
 // Páginas Principais
 import Dashboard from "./pages/Dashboard/Dashboard";
-import Clientes from "./pages/Clientes/Clientes";
 import Estoque from "./pages/Estoque/Estoque";
 import { ObrasModule } from './pages/Obras/ObrasModule';
 
@@ -42,13 +41,18 @@ import FornecedoresList from "./pages/Compras/FornecedoresList/FornecedoresList"
 import RelatoriosPage from "./pages/Estoque/Relatorios/Relatorios";
 import RelatorioPocoPage from "./pages/Estoque/Relatorios/RelatorioPocoPage";
 import { IndustrialLandingPage } from "./pages/Dashboard/IndustrialLandingPage";
-import { ParceirosDashboard } from "./pages/Catalogo/Parceiros/ParceirosDashboard";
-import FuncionariosPage from "./pages/Catalogo/Parceiros/FuncionariosPage";
-import { MarcasPage } from "./pages/Catalogo/pages/MarcasPage";
+
+import { ParceirosDashboard } from "./pages/Parceiros/ParceirosDashboard";
+import FuncionariosPage from "./pages/Parceiros/FuncionariosPage";
+
+import { MarcasPage } from "./pages/Catalogo/pages/MarcasManager/MarcasPage";
 import Pedidos from "./pages/Clientes/Pedidos";
 import ListaComprasExport from "./pages/Compras/ListaComprasExport";
 import { LeitorXML } from "./pages/Compras/StockEntry/xml/LeitorXML";
 import EmissaoFaturado from "./pages/Compras/EmissaoFaturado";
+import { FinanceiroContasReceber } from "./pages/Financeiro/FinanceiroContasReceber";
+import { VendasFaturamento } from "./pages/Financeiro/VendasFaturamento";
+import Clientes from "./pages/Parceiros/Clientes";
 
 const { Sider, Header } = Layout;
 
@@ -117,11 +121,16 @@ export default function AppLayout() {
           <Routes>
             <Route path="/" element={<Dashboard text={"Pagina inicial"} />} />
             <Route path="/pedidos" element={<Pedidos />} />
-            <Route path="/clientes" element={<Clientes />} />
+
+            <Route path="/financeiro" element={<FinanceiroContasReceber />} />
+            <Route path="/financeiro/faturamento" element={<VendasFaturamento />} />
+
             <Route path="/parceiros" element={<ParceirosDashboard />} />
+
             <Route path="/parceiros/fornecedores" element={<FornecedoresList />} />
             <Route path="/parceiros/clientes" element={<Clientes />} />
             <Route path="/parceiros/funcionarios" element={<FuncionariosPage />} />
+
             <Route path="/clientes/novo" element={<CadastroCliente />} /> 
             <Route path="/contratos/novo" element={<CadastroContrato />} />
             <Route path="/pocos/novo" element={<RelatorioPoco />} />

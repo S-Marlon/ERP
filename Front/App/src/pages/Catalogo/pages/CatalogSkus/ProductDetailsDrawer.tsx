@@ -29,7 +29,6 @@ import {
   PlusOutlined,
   AppstoreOutlined,
   PictureOutlined,
-  ClusterOutlined,
   UserOutlined
 } from '@ant-design/icons';
 
@@ -53,40 +52,34 @@ export default function ProductDetailsDrawer({ open, product, onClose, onSave }:
   const [maxStock, setMaxStock] = useState(0);
   const [fileList, setFileList] = useState<any[]>([]);
 
-  // Identifica se o item possui SKUs filhos ou grade vinculada
-  const isFamilyProduct = product?.skus && product.skus.length > 0;
-
   useEffect(() => {
     if (product) {
-      const estoqueCalculado = product.skus?.reduce((acc: number, sku: any) => acc + (sku.estoque || 0), 0) || 0;
-      const skuPrincipal = product.skus?.[0];
-      
       form.setFieldsValue({
         nomeItem: product.nome_item || product.nomeItem || undefined,
         codItem: product.sku || product.codItem || undefined,
         status: product.status ? String(product.status).toUpperCase() !== 'INATIVO' : false,
-        estoqueMinimo: product.estoqueMinimo ?? undefined,
-        estoqueMaximo: product.estoqueMaximo ?? undefined,
-        estoqueAtual: estoqueCalculado,
+        estoqueMinimo: product.estoqueMinimo ?? product.estoque_minimo ?? undefined,
+        estoqueMaximo: product.estoqueMaximo ?? product.estoque_maximo ?? undefined,
+        estoqueAtual: product.estoque || product.estoque_atual || 0,
         ncm: product.ncm ?? undefined,
         cest: product.cest ?? undefined,
-        marca: skuPrincipal?.marca || product.marca || undefined,
-        unidadeMedida: product.unidadeMedida ?? undefined,
-        descricaoCurta: product.descricaoCurta ?? undefined,
-        descricaoLonga: product.descricaoLonga ?? undefined,
-        pesoKg: product.pesoKg ?? undefined,
-        alturaCm: product.alturaCm ?? undefined,
-        larguraCm: product.larguraCm ?? undefined,
-        comprimentoCm: product.comprimentoCm ?? undefined,
-        fornecedorPadraoId: product.fornecedorPadraoId ?? undefined,
-        codigoBarrasEan: skuPrincipal?.sku || product.codigoBarrasEan || undefined,
+        marca: product.marca || undefined,
+        unidadeMedida: product.unidadeMedida ?? product.unidade_medida ?? undefined,
+        descricaoCurta: product.descricaoCurta ?? product.descricao_curta ?? undefined,
+        descricaoLonga: product.descricaoLonga ?? product.descricao_longa ?? undefined,
+        pesoKg: product.pesoKg ?? product.peso_kg ?? undefined,
+        alturaCm: product.alturaCm ?? product.altura_cm ?? undefined,
+        larguraCm: product.larguraCm ?? product.largura_cm ?? undefined,
+        comprimentoCm: product.comprimentoCm ?? product.comprimento_cm ?? undefined,
+        fornecedorPadraoId: product.fornecedorPadraoId ?? product.fornecedor_padrao_id ?? undefined,
+        codigoBarrasEan: product.codigoBarrasEan || product.codigo_barras_ean || product.sku || undefined,
       });
 
-      setCurrentStock(estoqueCalculado);
-      setMinStock(Number(product.estoqueMinimo ?? 0));
-      setMaxStock(Number(product.estoqueMaximo ?? 0));
+      setCurrentStock(product.estoque || product.estoque_atual || 0);
+      setMinStock(Number(product.estoqueMinimo ?? product.estoque_minimo ?? 0));
+      setMaxStock(Number(product.estoqueMaximo ?? product.estoque_maximo ?? 0));
 
-      const imagensSrc = skuPrincipal?.imagem_url || product.urlImagem || product.imagens;
+      const imagensSrc = product.urlImagem || product.url_imagem || product.imagens;
       if (Array.isArray(imagensSrc)) {
         setFileList(imagensSrc.map((url: string, index: number) => ({
           uid: `-${index}`,
@@ -108,7 +101,7 @@ export default function ProductDetailsDrawer({ open, product, onClose, onSave }:
     }
   }, [product, form]);
 
- const handleSubmit = async () => {
+  const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
       setIsSaving(true);
@@ -117,7 +110,6 @@ export default function ProductDetailsDrawer({ open, product, onClose, onSave }:
         .map(file => file.url || file.response?.url || '')
         .filter(Boolean);
 
-      // Garante que se o formulário não capturou algum campo base, usamos o product original de fallback
       const payload = {
         nome_item: values.nomeItem ?? product?.nome_item ?? null,
         sku: values.codItem ?? product?.sku ?? null,
@@ -147,10 +139,7 @@ export default function ProductDetailsDrawer({ open, product, onClose, onSave }:
         rawItemId === null ||
         rawItemId === '' ||
         !Number.isFinite(itemId) ||
-        itemId <= 0 ||
-        String(rawItemId).startsWith('FAM-') ||
-        String(rawItemId).startsWith('fam-') ||
-        String(rawItemId).startsWith('prod-')
+        itemId <= 0
       ) {
         message.error('Erro crítico: ID do produto não identificado ou inválido para edição.');
         setIsSaving(false);
@@ -158,12 +147,14 @@ export default function ProductDetailsDrawer({ open, product, onClose, onSave }:
       }
 
       await onSave(itemId, payload);
+      onClose();
     } catch (error) {
       console.error('Validação falhou:', error);
     } finally {
       setIsSaving(false);
     }
   };
+
   const handleUploadChange = ({ fileList: newFileList }: any) => {
     setFileList(newFileList);
   };
@@ -175,10 +166,8 @@ export default function ProductDetailsDrawer({ open, product, onClose, onSave }:
       children: (
         <div>
           <Alert 
-            message={isFamilyProduct ? "Calculadora de Herança de Preço (Família)" : "Calculadora Spot & Margens de Lucro"} 
-            description={isFamilyProduct 
-              ? "As margens configuradas aqui servirão como base padrão (markup mestre) para os SKUs filhos vinculados." 
-              : "Defina os custos e margens diretas para este produto individual."}
+            message="Calculadora Spot & Margens de Lucro" 
+            description="Defina os custos e margens diretas para este produto individual."
             type="info" 
             showIcon 
             style={{ marginBottom: 16 }}
@@ -206,10 +195,7 @@ export default function ProductDetailsDrawer({ open, product, onClose, onSave }:
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item 
-                name="estoqueAtual" 
-                label={isFamilyProduct ? "Estoque Consol. (Grade)" : "Estoque Atual (Individual)"}
-              >
+              <Form.Item name="estoqueAtual" label="Estoque Atual (Individual)">
                 <InputNumber style={{ width: '100%' }} disabled />
               </Form.Item>
             </Col>
@@ -229,22 +215,22 @@ export default function ProductDetailsDrawer({ open, product, onClose, onSave }:
           <Row gutter={12}>
             <Col span={6}>
               <Form.Item name="pesoKg" label="Peso (Kg)">
-                <InputNumber style={{ width: '100%' }} min={0} step={0.01} placeholder="" />
+                <InputNumber style={{ width: '100%' }} min={0} step={0.01} />
               </Form.Item>
             </Col>
             <Col span={6}>
               <Form.Item name="comprimentoCm" label="Comprimento (cm)">
-                <InputNumber style={{ width: '100%' }} min={0} placeholder="" />
+                <InputNumber style={{ width: '100%' }} min={0} />
               </Form.Item>
             </Col>
             <Col span={6}>
               <Form.Item name="larguraCm" label="Largura (cm)">
-                <InputNumber style={{ width: '100%' }} min={0} placeholder="" />
+                <InputNumber style={{ width: '100%' }} min={0} />
               </Form.Item>
             </Col>
             <Col span={6}>
               <Form.Item name="alturaCm" label="Altura (cm)">
-                <InputNumber style={{ width: '100%' }} min={0} placeholder="" />
+                <InputNumber style={{ width: '100%' }} min={0} />
               </Form.Item>
             </Col>
           </Row>
@@ -282,12 +268,8 @@ export default function ProductDetailsDrawer({ open, product, onClose, onSave }:
             </Form.Item>
           </Col>
           <Col span={24}>
-            <Form.Item 
-              name="codigoBarrasEan" 
-              label="Código de Barras EAN / GTIN"
-              tooltip={isFamilyProduct ? "Produtos com variação devem ter o EAN gerenciado diretamente nas configurações internas de cada SKU filho." : undefined}
-            >
-              <Input disabled={isFamilyProduct} />
+            <Form.Item name="codigoBarrasEan" label="Código de Barras EAN / GTIN">
+              <Input />
             </Form.Item>
           </Col>
         </Row>
@@ -312,16 +294,12 @@ export default function ProductDetailsDrawer({ open, product, onClose, onSave }:
         <Space direction="vertical" size={1} style={{ width: '100%' }}>
           <Space align="center" size={8}>
             <Title level={4} style={{ margin: 0 }}>Ficha Cadastral do Produto</Title>
-            {isFamilyProduct ? (
-              <Tag color="purple" icon={<ClusterOutlined />} style={{ fontWeight: 'bold' }}>FAMÍLIA / GRADE</Tag>
-            ) : (
-              <Tag color="default" icon={<UserOutlined />}>INDIVIDUAL</Tag>
-            )}
+            <Tag color="default" icon={<UserOutlined />}>INDIVIDUAL</Tag>
           </Space>
-          <Text type="secondary">{isFamilyProduct ? "Código do SKU Pai: " : "Código do Item: "} <Text code>{product?.sku || product?.codItem || 'N/A'}</Text></Text>
+          <Text type="secondary">ID do Sistema: <Text code>{product?.id_item || product?.id || 'N/A'}</Text></Text>
         </Space>
       }
-      width={680}
+      width={800}
       onClose={onClose}
       open={open}
       extra={
@@ -333,25 +311,6 @@ export default function ProductDetailsDrawer({ open, product, onClose, onSave }:
         </Space>
       }
     >
-      {isFamilyProduct ? (
-        <Alert
-          message={<span style={{ fontWeight: 600, color: '#391085' }}>Modo de Edição de Família</span>}
-          description={`Você está editando o registro pai. Alterações em Nome, Imagens e Campos Fiscais se aplicarão por efeito cascata aos ${product.skus.length} SKUs da grade.`}
-          type="success"
-          showIcon
-          icon={<ClusterOutlined style={{ color: '#722ed1' }} />}
-          style={{ marginBottom: 16, backgroundColor: '#f9f0ff', borderColor: '#d3adf7' }}
-        />
-      ) : (
-        <Alert
-          message="Modo de Edição Individual"
-          description="Este item é um produto simples sem variações de tamanho, cor ou sabor. As alterações afetarão unicamente este SKU."
-          type="info"
-          showIcon
-          style={{ marginBottom: 16 }}
-        />
-      )}
-
       <Form 
         form={form} 
         layout="vertical"
@@ -368,7 +327,7 @@ export default function ProductDetailsDrawer({ open, product, onClose, onSave }:
           </Col>
           <Col span={12} style={{ textAlign: 'right' }}>
             <Tag color={currentStock <= minStock ? 'orange' : 'blue'} style={{ fontSize: '13px', padding: '4px 10px', borderRadius: '4px' }}>
-              <AppstoreOutlined /> {isFamilyProduct ? 'Estoque Total da Grade: ' : 'Total em Estoque: '} {currentStock}{form.getFieldValue('unidadeMedida') ? ` ${form.getFieldValue('unidadeMedida')}` : ''}
+              <AppstoreOutlined /> Total em Estoque: {currentStock}{form.getFieldValue('unidadeMedida') ? ` ${form.getFieldValue('unidadeMedida')}` : ''}
             </Tag>
           </Col>
         </Row>
@@ -400,8 +359,13 @@ export default function ProductDetailsDrawer({ open, product, onClose, onSave }:
         </div>
 
         <Row gutter={16}>
-          <Col span={24}>
-            <Form.Item name="nomeItem" label={isFamilyProduct ? "Nome Comercial da Família (Mestre)" : "Nome de Catálogo / Comercial"} rules={[{ required: true, message: 'Insira a descrição do produto!' }]}>
+          <Col span={16}>
+            <Form.Item name="nomeItem" label="Nome de Catálogo / Comercial" rules={[{ required: true, message: 'Insira a descrição do produto!' }]}>
+              <Input />
+            </Form.Item>
+          </Col>
+          <Col span={8}>
+            <Form.Item name="codItem" label="Código SKU" rules={[{ required: true, message: 'Insira o SKU!' }]}>
               <Input />
             </Form.Item>
           </Col>
@@ -415,7 +379,13 @@ export default function ProductDetailsDrawer({ open, product, onClose, onSave }:
           </Col>
           <Col span={12}>
             <Form.Item name="unidadeMedida" label="Unidade de Medida">
-              <Select allowClear placeholder="Selecione a unidade" />
+              <Select placeholder="Selecione a unidade" allowClear>
+                <Option value="UN">UN (Unidade)</Option>
+                <Option value="KG">KG (Quilograma)</Option>
+                <Option value="PC">PÇ (Peça)</Option>
+                <Option value="CX">CX (Caixa)</Option>
+                <Option value="PCT">PCT (Pacote)</Option>
+              </Select>
             </Form.Item>
           </Col>
         </Row>

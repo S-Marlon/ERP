@@ -1,6 +1,6 @@
 // backend/src/modules/Catalogo/routes/catalogo.routes.ts
 
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 
 // 🧬 Controller de Atributos Globais (Dicionário do ERP)
 import {
@@ -48,7 +48,30 @@ import {
   createProdutosLote
 } from './Produtos/produtos.controller';
 
+// 🟡 Controller Comercial de Produtos (Vínculo de Família e Atributos)
+import {
+  updateProdutoFamiliaEAtributos,
+  testarRotaProduto
+} from './Produtos/comercialProdutoController'
+
+// 🏷️ Controller de Marcas Comerciais
+import {
+  getMarcas,
+  createMarca
+} from './Marcas/comercialMarcas.controller';
+
 const router = Router();
+
+// =========================================================================
+// 🧪 ROTA DE TESTE DA RAIZ DO MÓDULO CATÁLOGO
+// =========================================================================
+router.get('/', (req: Request, res: Response) => {
+  return res.json({ 
+    success: true, 
+    message: 'Módulo Catálogo está online e operando com sucesso! 🚀',
+    timestamp: new Date().toISOString()
+  });
+});
 
 // =========================================================================
 // 🧬 POOL DE ATRIBUTOS GLOBAIS (Dicionário de Especificações)
@@ -101,6 +124,37 @@ router.get('/produtos/search', searchProdutos);
 router.get('/produtos', getProdutos);
 router.post('/produtos/lote', createProdutosLote);
 router.put('/produtos/:id_item', updateProduto);
+
+// =========================================================================
+// 🟡 ROTAS COMERCIAIS DE PRODUTOS (Família e Atributos Customizados)
+// =========================================================================
+router.get('/cadastros/produtos/familia/teste', testarRotaProduto);
+router.put('/cadastros/produtos/familia', updateProdutoFamiliaEAtributos);
+
+
+
+// =========================================================================
+// 🧪 ROTA DE TESTE DA RAIZ DO MÓDULO CATÁLOGO
+// =========================================================================
+router.get('/parceiros', (req: Request, res: Response) => {
+  return res.json({ 
+    success: true, 
+    message: 'Módulo parcero está online e operando com sucesso! 🚀',
+    timestamp: new Date().toISOString()
+  });
+});
+
+
+// =========================================================================
+// 🏷️ ROTAS DE MARCAS COMERCIAIS (PIM)
+// =========================================================================
+// =========================================================================
+// 🏷️ ROTAS DE MARCAS COMERCIAIS (PIM)
+// =========================================================================
+router.get('/marcas', getMarcas);
+router.post('/marcas', createMarca);
+router.get('/cadastros/marcas', getMarcas);
+router.post('/cadastros/marcas', createMarca); // 👈 Adicione esta linha aqui
 
 
 export default router;

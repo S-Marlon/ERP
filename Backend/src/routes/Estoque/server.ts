@@ -1225,7 +1225,6 @@ async function iniciarServidor() {
     const ipPublico = await getPublicIP();
 
     console.log(`\n==================================================`);
-    console.log(`🌐 SEU IP PÚBLICO ATUAL É: [ ${ipPublico} ]`);
     console.log(`==================================================\n`);
 
     try {

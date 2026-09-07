@@ -20,7 +20,8 @@ import {
   InboxOutlined,
   ToolOutlined,
   BellOutlined,
-  QuestionCircleOutlined
+  QuestionCircleOutlined,
+  DollarOutlined
 } from "@ant-design/icons";
 
 const { Text } = Typography;
@@ -64,6 +65,11 @@ export default function AppSidebar({ isOpen, toggleSidebar }: SidebarProps) {
       key: '/parceiros',
       icon: <TeamOutlined />,
       label: 'Parceiros',
+    },
+     {
+      key: '/financeiro',
+      icon: <DollarOutlined />,
+      label: 'Financeiro',
     },
     {
       key: '/produtos',

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, Space, Typography, Input, Select, Row, Col, InputNumber, Tag, Button, Empty } from 'antd';
+import { Card, Space, Typography, Input, Select, Row, Col, InputNumber, Tag, Button, Empty, Collapse } from 'antd';
 import { Grupo as Familia } from '../CatalogManager.types';
 import { obterDicionarioOpcoes } from '../CatalogManager.helpers';
 
@@ -29,7 +29,6 @@ export const PainelSimulador: React.FC<PainelSimuladorProps> = ({
   previewNomeSimulado,
   previewSkuSimulado,
 }) => {
-  // Estado para armazenar os IDs dos atributos adicionados à simulação
   const [atributosAdicionados, setAtributosAdicionados] = useState<string[]>(() => {
     return grupoSelecionado.atributos
       .filter(attr => valoresTeste[attr.nome] || attr.estaSendoUtilizado)
@@ -45,7 +44,6 @@ export const PainelSimulador: React.FC<PainelSimuladorProps> = ({
     onAtualizarTemplateComercial(`${templateAtual}${token}`);
   };
 
-  // Função para adicionar o atributo selecionado na lista visível
   const handleAdicionarAtributoLista = () => {
     if (atributoSelecionadoParaAdicionar && !atributosAdicionados.includes(atributoSelecionadoParaAdicionar)) {
       setAtributosAdicionados([...atributosAdicionados, atributoSelecionadoParaAdicionar]);
@@ -53,12 +51,10 @@ export const PainelSimulador: React.FC<PainelSimuladorProps> = ({
     }
   };
 
-  // Filtra a lista completa para o Select (apenas os que NÃO foram adicionados ainda)
   const atributosDisponiveisParaAdicionar = grupoSelecionado.atributos.filter(
     attr => !atributosAdicionados.includes(String(attr.id))
   );
 
-  // Lista de atributos que serão renderizados na tela
   const atributosVisiveis = grupoSelecionado.atributos.filter(attr => {
     const estaAdicionado = atributosAdicionados.includes(String(attr.id));
     const bateNome = attr.nome.toLowerCase().includes(buscaNome.toLowerCase());
@@ -77,9 +73,9 @@ export const PainelSimulador: React.FC<PainelSimuladorProps> = ({
       }}
       style={{ borderRadius: 8, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }} 
     >
-      <Row gutter={[12, 12]}>
-        {/* Painel Esquerdo: Nome Comercial */}
-        <Col xs={24} lg={8}>
+      <Row gutter={[8, 8]}>
+        {/* Painel Esquerdo: Nome Comercial (Metade da tela: span={12}) */}
+        <Col xs={24} lg={12}>
           <Card 
             type="inner" 
             title="Nome Comercial" 
@@ -144,8 +140,8 @@ export const PainelSimulador: React.FC<PainelSimuladorProps> = ({
           </Card>
         </Col>
 
-        {/* Painel Central: Composição de SKU */}
-        <Col xs={24} lg={8}>
+        {/* Painel Direito: Estrutura do SKU (A outra metade: span={12}) */}
+        <Col xs={24} lg={12}>
           <Card 
             type="inner" 
             title="Estrutura do SKU" 
@@ -217,159 +213,161 @@ export const PainelSimulador: React.FC<PainelSimuladorProps> = ({
           </Card>
         </Col>
 
-        {/* Painel Inferior: Valores de Teste dos Atributos Selecionados */}
-        <Col xs={24} lg={8}>
-          <Card 
-            type="inner" 
-            title="Valores de Simulação (Atributos)" 
-            size="small" 
-            styles={{ body: { padding: 8 } }}
-            style={{ borderRadius: 6, height: '100%' }}
-          >
-            {/* Barra de Adicionar Atributo Oculto para a Lista */}
-            <Row gutter={4} style={{ marginBottom: 10, paddingBottom: 10, borderBottom: '1px dashed #e2e8f0' }}>
-              <Col span={18}>
-                <Select
-                  size="small"
-                  showSearch
-                  style={{ width: '100%' }}
-                  placeholder="Selecionar atributo para adicionar..."
-                  optionFilterProp="label"
-                  value={atributoSelecionadoParaAdicionar}
-                  onChange={value => setAtributoSelecionadoParaAdicionar(value)}
-                  options={atributosDisponiveisParaAdicionar.map(attr => ({
-                    value: String(attr.id),
-                    label: `${attr.nome} (${attr.classificacao.toUpperCase()})`
-                  }))}
-                />
-              </Col>
-              <Col span={6}>
-                <Button 
-                  type="primary" 
-                  size="small" 
-                  style={{ width: '100%', fontSize: '11px' }}
-                  disabled={!atributoSelecionadoParaAdicionar}
-                  onClick={handleAdicionarAtributoLista}
-                >
-                  + Add
-                </Button>
-              </Col>
-            </Row>
+        {/* Painel Inferior: Valores de Simulação (Retraído por padrão, largura total) */}
+        <Col xs={24} lg={24}>
+          <Collapse
+            size="small"
+            items={[
+              {
+                key: '1',
+                label: <span style={{ fontSize: '12px', fontWeight: 600 }}>Valores de Simulação (Atributos Ativos)</span>,
+                children: (
+                  <div style={{ padding: 0 }}>
+                    <Row gutter={4} style={{ marginBottom: 10, paddingBottom: 10, borderBottom: '1px dashed #e2e8f0' }}>
+                      <Col span={18}>
+                        <Select
+                          size="small"
+                          showSearch
+                          style={{ width: '100%' }}
+                          placeholder="Selecionar atributo para adicionar..."
+                          optionFilterProp="label"
+                          value={atributoSelecionadoParaAdicionar}
+                          onChange={value => setAtributoSelecionadoParaAdicionar(value)}
+                          options={atributosDisponiveisParaAdicionar.map(attr => ({
+                            value: String(attr.id),
+                            label: `${attr.nome} (${attr.classificacao.toUpperCase()})`
+                          }))}
+                        />
+                      </Col>
+                      <Col span={6}>
+                        <Button 
+                          type="primary" 
+                          size="small" 
+                          style={{ width: '100%', fontSize: '11px' }}
+                          disabled={!atributoSelecionadoParaAdicionar}
+                          onClick={handleAdicionarAtributoLista}
+                        >
+                          + Add
+                        </Button>
+                      </Col>
+                    </Row>
 
-            {/* Seção de Filtros */}
-            <Row gutter={[6, 6]} style={{ marginBottom: 10 }}>
-              <Col xs={14}>
-                <Input
-                  size="small"
-                  placeholder="Filtrar adicionados por nome..."
-                  value={buscaNome}
-                  onChange={e => setBuscaNome(e.target.value)}
-                  allowClear
-                />
-              </Col>
-              <Col xs={10}>
-                <Select
-                  size="small"
-                  style={{ width: '100%' }}
-                  value={filtroClassificacao}
-                  onChange={value => setFiltroClassificacao(value)}
-                  options={[
-                    { value: 'todos', label: 'Todos' },
-                    { value: 'grade', label: 'Grade' },
-                    { value: 'dna', label: 'DNA' },
-                    { value: 'ficha', label: 'Ficha' },
-                  ]}
-                />
-              </Col>
-            </Row>
+                    <Row gutter={[6, 6]} style={{ marginBottom: 10 }}>
+                      <Col xs={14}>
+                        <Input
+                          size="small"
+                          placeholder="Filtrar adicionados por nome..."
+                          value={buscaNome}
+                          onChange={e => setBuscaNome(e.target.value)}
+                          allowClear
+                        />
+                      </Col>
+                      <Col xs={10}>
+                        <Select
+                          size="small"
+                          style={{ width: '100%' }}
+                          value={filtroClassificacao}
+                          onChange={value => setFiltroClassificacao(value)}
+                          options={[
+                            { value: 'todos', label: 'Todos' },
+                            { value: 'grade', label: 'Grade' },
+                            { value: 'dna', label: 'DNA' },
+                            { value: 'ficha', label: 'Ficha' },
+                          ]}
+                        />
+                      </Col>
+                    </Row>
 
-            {/* Lista de Atributos Adicionados Filtrados */}
-            <Row gutter={[8, 8]} style={{ maxHeight: 210, overflowY: 'auto', paddingRight: 4 }}>
-              {atributosVisiveis.length === 0 ? (
-                <Col span={24}>
-                  <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Nenhum atributo adicionado" style={{ margin: '16px 0' }} />
-                </Col>
-              ) : (
-                atributosVisiveis.map(attr => {
-                  const dicionario = obterDicionarioOpcoes(attr.exemplos);
-                  const identificadorInput = attr.nome;
-                  const valorAtual = valoresTeste[identificadorInput] || '';
-                  const isDisabled = attr.estaSendoUtilizado || attr.origem === 'categoria';
+                    <Row gutter={[8, 8]} style={{ maxHeight: 210, overflowY: 'auto', paddingRight: 4 }}>
+                      {atributosVisiveis.length === 0 ? (
+                        <Col span={24}>
+                          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Nenhum atributo adicionado" style={{ margin: '16px 0' }} />
+                        </Col>
+                      ) : (
+                        atributosVisiveis.map(attr => {
+                          const dicionario = obterDicionarioOpcoes(attr.exemplos);
+                          const identificadorInput = attr.nome;
+                          const valorAtual = valoresTeste[identificadorInput] || '';
+                          const isDisabled = attr.estaSendoUtilizado || attr.origem === 'categoria';
 
-                  const coresMapeamento: Record<string, string> = {
-                    grade: 'green',
-                    dna: 'blue',
-                  };
+                          const coresMapeamento: Record<string, string> = {
+                            grade: 'green',
+                            dna: 'blue',
+                          };
 
-                  return (
-                    <Col xs={24} key={attr.id}>
-                      <div style={{ 
-                        padding: '6px 10px', 
-                        borderRadius: 6, 
-                        border: '1px solid #f1f5f9', 
-                        background: '#f8fafc' 
-                      }}>
-                        <Row gutter={[4, 4]} align="middle">
-                          <Col span={24} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                            <Typography.Text strong style={{ fontSize: '11px', color: '#334155' }}>
-                              {attr.nome}
-                            </Typography.Text>
-                            <Space size={4}>
-                              <Tag 
-                                color={coresMapeamento[attr.classificacao] || 'default'} 
-                                style={{ margin: 0, fontSize: '9px', height: '16px', display: 'flex', alignItems: 'center', borderRadius: 4, padding: '0 4px' }}
-                              >
-                                {attr.classificacao === 'ficha' ? 'Ficha' : attr.classificacao.toUpperCase()}
-                              </Tag>
-                              {!isDisabled && (
-                                <Typography.Link 
-                                  style={{ color: '#ff4d4f', fontSize: '11px', marginLeft: 4 }}
-                                  onClick={() => setAtributosAdicionados(atributosAdicionados.filter(id => id !== String(attr.id)))}
-                                >
-                                  ×
-                                </Typography.Link>
-                              )}
-                            </Space>
-                          </Col>
+                          return (
+                            <Col xs={24} key={attr.id}>
+                              <div style={{ 
+                                padding: '6px 10px', 
+                                borderRadius: 6, 
+                                border: '1px solid #f1f5f9', 
+                                background: '#f8fafc' 
+                              }}>
+                                <Row gutter={[4, 4]} align="middle">
+                                  <Col span={24} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                                    <Typography.Text strong style={{ fontSize: '11px', color: '#334155' }}>
+                                      {attr.nome}
+                                    </Typography.Text>
+                                    <Space size={4}>
+                                      <Tag 
+                                        color={coresMapeamento[attr.classificacao] || 'default'} 
+                                        style={{ margin: 0, fontSize: '9px', height: '16px', display: 'flex', alignItems: 'center', borderRadius: 4, padding: '0 4px' }}
+                                      >
+                                        {attr.classificacao === 'ficha' ? 'Ficha' : attr.classificacao.toUpperCase()}
+                                      </Tag>
+                                      {!isDisabled && (
+                                        <Typography.Link 
+                                          style={{ color: '#ff4d4f', fontSize: '11px', marginLeft: 4 }}
+                                          onClick={() => setAtributosAdicionados(atributosAdicionados.filter(id => id !== String(attr.id)))}
+                                        >
+                                          ×
+                                        </Typography.Link>
+                                      )}
+                                    </Space>
+                                  </Col>
 
-                          <Col span={14}>
-                            <Input
-                              size="small"
-                              value={valorAtual}
-                              onChange={e => onMudancaValorTeste(identificadorInput, e.target.value)}
-                              placeholder="Valor simulação..."
-                              list={`list-${identificadorInput}`}
-                              disabled={isDisabled}
-                              style={{ fontSize: '11px' }}
-                            />
-                            <datalist id={`list-${identificadorInput}`}>
-                              {dicionario.map((d, idx) => (
-                                <option key={idx} value={d.value || d.label} />
-                              ))}
-                            </datalist>
-                          </Col>
+                                  <Col span={14}>
+                                    <Input
+                                      size="small"
+                                      value={valorAtual}
+                                      onChange={e => onMudancaValorTeste(identificadorInput, e.target.value)}
+                                      placeholder="Valor simulação..."
+                                      list={`list-${identificadorInput}`}
+                                      disabled={isDisabled}
+                                      style={{ fontSize: '11px' }}
+                                    />
+                                    <datalist id={`list-${identificadorInput}`}>
+                                      {dicionario.map((d, idx) => (
+                                        <option key={idx} value={d.value || d.label} />
+                                      ))}
+                                    </datalist>
+                                  </Col>
 
-                          <Col span={10} style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 2 }}>
-                            <Typography.Text type="secondary" style={{ fontSize: '10px', whiteSpace: 'nowrap' }}>
-                              Ord:
-                            </Typography.Text>
-                            <InputNumber
-                              size="small"
-                              min={0}
-                              value={attr.ordemSku || 0}
-                              onChange={value => onAtualizarOrdemSku?.(String(attr.id), Number(value) || 0)}
-                              style={{ width: '100%', maxWidth: 45, fontSize: '11px' }}
-                              disabled={!onAtualizarOrdemSku}
-                            />
-                          </Col>
-                        </Row>
-                      </div>
-                    </Col>
-                  );
-                })
-              )}
-            </Row>
-          </Card>
+                                  <Col span={10} style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 2 }}>
+                                    <Typography.Text type="secondary" style={{ fontSize: '10px', whiteSpace: 'nowrap' }}>
+                                      Ord:
+                                    </Typography.Text>
+                                    <InputNumber
+                                      size="small"
+                                      min={0}
+                                      value={attr.ordemSku || 0}
+                                      onChange={value => onAtualizarOrdemSku?.(String(attr.id), Number(value) || 0)}
+                                      style={{ width: '100%', maxWidth: 45, fontSize: '11px' }}
+                                      disabled={!onAtualizarOrdemSku}
+                                    />
+                                  </Col>
+                                </Row>
+                              </div>
+                            </Col>
+                          );
+                        })
+                      )}
+                    </Row>
+                  </div>
+                )
+              }
+            ]}
+          />
         </Col>
       </Row>
     </Card>

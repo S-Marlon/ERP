@@ -30,7 +30,7 @@ import {
   CarOutlined,
   InfoCircleOutlined
 } from '@ant-design/icons';
-import MappingModal from './nfeCards/ProductMappingModal';
+import MappingModal from './ItemsConference/ProductMappingModal';
 import NfeCards from './nfeCards/NfeCards';
 import { ItemsConference } from './ItemsConference/ItemsConference';
 import { SupplierModal } from './SupplierModal';
@@ -48,6 +48,7 @@ const StockEntryForm: React.FC = () => {
   const [isProcessingItems, setIsProcessingItems] = useState<boolean>(false);
 
   // Estados de Modais
+  
   const [isMappingModalOpen, setIsMappingModalOpen] = useState<boolean>(false);
   const [itemToMap, setItemToMap] = useState<any>(null);
   const [isConferenceModalOpen, setIsConferenceModalOpen] = useState<boolean>(false);
@@ -276,6 +277,11 @@ const StockEntryForm: React.FC = () => {
     message.info("Item removido da conferência.");
   };
 
+  const handleReceberTotalDoFilho = (valorCalculado: number) => {
+    console.log("O valor recebido do filho é:", valorCalculado);
+    // Faça o que precisar com o valor aqui (ex: salvar em um estado do pai)
+  };
+
   const handleQuantityChange = (tempId: string, newReceivedQty: number) => {
     setItems(prev => prev.map(item => {
       if (item.tempId === tempId) {
@@ -293,7 +299,7 @@ const StockEntryForm: React.FC = () => {
   const totalDivergences = useMemo(() => items.filter(i => i.difference !== 0).length, [items]);
   const totalConfirmed = useMemo(() => items.filter(i => i.isConfirmed).length, [items]);
   const totalPhysicalItems = useMemo(() => items.reduce((acc, it) => acc + (it.receivedQuantity || 0), 0), [items]);
-  const adjustedPhysicalSubtotal = useMemo(() => items.reduce((acc, it) => acc + ((it.receivedQuantity || 0) * (it.valorUnitario || 0)) + (it.v || 0), 0), [items]);
+  const adjustedPhysicalSubtotal = useMemo(() => items.reduce((acc, it) =>  ((it.receivedQuantity || 0) * (it.valorUnitario || 0)) , 0), [items]);
 
   const progressPercent = useMemo(() => {
     if (items.length === 0) return 0;
@@ -437,7 +443,7 @@ body { font-family: Arial, sans-serif; font-size: 11px; color: #000; margin: 0; 
       <Spin spinning={isProcessingItems} tip="Analisando e vinculando itens com o banco...">
         <Row gutter={[16, 16]}>
           <Col xs={24} lg={19}>
-            <Space direction="vertical" size={24} style={{ width: '100%' }}>
+            <Space direction="vertical" size={12} style={{ width: '100%' }}>
               {parsedNfe?.chaveAcesso && (
                 <NfeCards
                   data={parsedNfe}
@@ -748,7 +754,9 @@ body { font-family: Arial, sans-serif; font-size: 11px; color: #000; margin: 0; 
 
                 <Statistic
                   title={<Text strong style={{ fontSize: 13 }}>Custo Ajustado Total</Text>}
-                  value={adjustedPhysicalSubtotal > 0 ? adjustedPhysicalSubtotal : parseFloat(parsedNfe?.totais?.icmsTot?.vNF || '0')}
+                  // value={adjustedPhysicalSubtotal > 0 ? adjustedPhysicalSubtotal : parseFloat(parsedNfe?.totais?.icmsTot?.vNF || '0')}
+                  value={parseFloat(parsedNfe?.totais?.icmsTot?.vNF || '0')}
+                  value={parseFloat(parsedNfe?.totais?.icmsTot?.vNF || '0')}
                   precision={2}
                   prefix="R$"
                   valueStyle={{ color: '#52c41a', fontWeight: 'bold', fontSize: 22 }}

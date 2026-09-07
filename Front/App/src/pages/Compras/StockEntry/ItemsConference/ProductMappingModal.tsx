@@ -1,30 +1,33 @@
 import React, { useEffect, useState, useRef } from "react";
 import { 
-  Modal, 
-  Button, 
-  Steps, 
-  Input, 
-  Card, 
-  Space, 
-  Typography, 
-  Divider, 
-  Row, 
-  Col, 
-  Tag,
-  Tooltip
+    Modal, 
+    Button, 
+    Steps, 
+    Input, 
+    Card, 
+    Space, 
+    Typography, 
+    Divider, 
+    Row, 
+    Col, 
+    Tag,
+    Tooltip,
+    Progress
 } from "antd";
 import { 
-  LinkOutlined, 
-  FileAddOutlined, 
-  ReloadOutlined, 
-  CheckCircleOutlined, 
-  ArrowLeftOutlined, 
-  ArrowRightOutlined,
-  LockOutlined,
-  UnlockOutlined
+    LinkOutlined, 
+    FileAddOutlined, 
+    ReloadOutlined, 
+    CheckCircleOutlined, 
+    ArrowLeftOutlined, 
+    ArrowRightOutlined,
+    LockOutlined,
+    UnlockOutlined,
+    UnorderedListOutlined
 } from "@ant-design/icons";
 import { ProdutoNF } from "../../types/NF-e";
-import StepSalesConfig from "./StepSalesConfig";
+import StepSalesConfig from "../nfeCards/StepSalesConfig";
+
 
 const { Title, Text } = Typography;
 
@@ -34,9 +37,9 @@ interface ProductEntry extends ProdutoNF {
 }
 
 interface MappingModalProps {
-    item: ProductEntry;
+    items: ProductEntry[]; // Fila de itens a serem mapeados
     supplierCnpj: string;
-    onMap: (tempId: number, data: any) => void;
+    onMap: (tempId: number, data: any) => void; // Mapeia um item individualmente por vez
     onClose: () => void;
 }
 
@@ -50,18 +53,23 @@ interface SalesUnit {
 }
 
 const ProductMappingModal: React.FC<MappingModalProps> = ({
-    item,
+    items = [],
     onMap,
     onClose,
 }) => {
+    // Índice atual na fila de lote
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const isBatch = items.length > 1;
+    const currentItem = items[currentIndex] || {};
+
     const [step, setStep] = useState(0);
 
-    // Identidade do Produto (Painel Esquerdo)
-    const [draftDesc, setDraftDesc] = useState(item.descricao || "");
-    const [draftSku, setDraftSku] = useState(item.sku || "");
+    // Identidade do Produto (Painel Esquerdo - resetado a cada item da fila)
+    const [draftDesc, setDraftDesc] = useState(currentItem.descricao || "");
+    const [draftSku, setDraftSku] = useState(currentItem.sku || "");
     const [draftBrand, setDraftBrand] = useState("");
     const [draftCategory, setDraftCategory] = useState("");
-    const [draftNcm, setDraftNcm] = useState(item.ncm || "");
+    const [draftNcm, setDraftNcm] = useState(currentItem.ncm || "");
     const [draftCst, setDraftCst] = useState("");
 
     // Estados de bloqueio de segurança (Cadeados)
@@ -76,7 +84,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
 
     // Etapa 2: Comercialização & Precificação
     const [salesMode, setSalesMode] = useState<"WHOLE_ONLY" | "FRACIONADO_ONLY" | "BOTH" | null>(null);
-    const [wholeUnit, setWholeUnit] = useState(item.unidadeMedida || "UN");
+    const [wholeUnit, setWholeUnit] = useState(currentItem.unidadeMedida || "UN");
     const [wholeMarkup, setWholeMarkup] = useState<number>(60);
     const [wholePrice, setWholePrice] = useState<number>(0);
     const [fracUnit, setFracUnit] = useState("MT");
@@ -87,7 +95,26 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
     const searchInputRef = useRef<any>(null);
     const [unitsFromStep, setUnitsFromStep] = useState<SalesUnit[]>([]);
 
-    const handleResetAll = () => {
+    // Sincroniza os dados do item atual sempre que o currentIndex mudar (avanço da fila)
+    useEffect(() => {
+        if (currentItem) {
+            setDraftDesc(currentItem.descricao || "");
+            setDraftSku(currentItem.sku || "");
+            setDraftNcm(currentItem.ncm || "");
+            setWholeUnit(currentItem.unidadeMedida || "UN");
+            setStep1Mode(null);
+            setSelectedExisting(null);
+            setExistingSearch("");
+            setIsDescEditable(false);
+            setIsSkuEditable(false);
+            setIsNcmEditable(false);
+            setStep(0);
+            setUnitsFromStep([]);
+            setSalesMode(null);
+        }
+    }, [currentIndex, currentItem]);
+
+    const handleResetCurrent = () => {
         setStep1Mode(null);
         setExistingSearch("");
         setSelectedExisting(null);
@@ -103,15 +130,6 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
         }
     }, [step1Mode]);
 
-    useEffect(() => {
-        setDraftDesc(item.descricao || "");
-        setDraftSku(item.sku || "");
-        setDraftNcm(item.ncm || "");
-        setIsDescEditable(false);
-        setIsSkuEditable(false);
-        setIsNcmEditable(false);
-    }, [item]);
-
     const applyCommercialRounding = (value: number) => {
         const base = Math.floor(value);
         const cents = value - base;
@@ -121,17 +139,17 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
     };
 
     useEffect(() => {
-        const cost = item.custo || item.valorUnitario || 0;
+        const cost = currentItem.custo || currentItem.valorUnitario || 0;
         const rawPrice = cost * (1 + wholeMarkup / 100);
         setWholePrice(Number(applyCommercialRounding(rawPrice).toFixed(2)));
-    }, [wholeMarkup, item.custo, item.valorUnitario]);
+    }, [wholeMarkup, currentItem.custo, currentItem.valorUnitario]);
 
     useEffect(() => {
-        const costWhole = item.custo || item.valorUnitario || 0;
+        const costWhole = currentItem.custo || currentItem.valorUnitario || 0;
         const costFrac = fracConversion > 0 ? costWhole / fracConversion : 0;
         const rawFracPrice = costFrac * (1 + fracMarkup / 100);
         setFracPrice(Number(applyCommercialRounding(rawFracPrice).toFixed(2)));
-    }, [fracConversion, fracMarkup, item.custo, item.valorUnitario]);
+    }, [fracConversion, fracMarkup, currentItem.custo, currentItem.valorUnitario]);
 
     const canProceedToNextStep = () => {
         if (step === 0) {
@@ -152,11 +170,11 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
         return true;
     };
 
-    const handleConfirm = () => {
+    const handleConfirmItem = () => {
         const unitsPayload: SalesUnit[] = unitsFromStep && unitsFromStep.length ? unitsFromStep : [];
 
         if (step1Mode !== "EXISTING_DIRECT" && !unitsPayload.length) {
-            const baseCost = item.custo || item.valorUnitario || 0;
+            const baseCost = currentItem.custo || currentItem.valorUnitario || 0;
             if (salesMode === "WHOLE_ONLY" || salesMode === "BOTH") {
                 unitsPayload.push({
                     type: "WHOLE",
@@ -183,15 +201,33 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
             mode: step1Mode,
             existingProductId: selectedExisting?.id || null,
             supplierLinkData: {
-                sku_fornecedor: item.sku || "",
-                ean_fornecedor: item.codigoBarras || null,
-                descricao_fornecedor: item.descricao
+                sku_fornecedor: currentItem.sku || "",
+                ean_fornecedor: currentItem.codigoBarras || null,
+                descricao_fornecedor: currentItem.descricao
             },
             salesUnits: unitsPayload,
+            draftIdentity: step1Mode === "DRAFT" ? {
+                descricao: draftDesc,
+                sku: draftSku,
+                marca: draftBrand,
+                categoria: draftCategory,
+                ncm: draftNcm,
+                cst: draftCst
+            } : null
         };
 
-        onMap(item.tempId, payload);
+        // Envia o mapeamento do item atual da fila
+        onMap(currentItem.tempId, payload);
+
+        // Avança na fila ou fecha se for o último
+        if (currentIndex < items.length - 1) {
+            setCurrentIndex(prev => prev + 1);
+        } else {
+            onClose(); // Fila concluída
+        }
     };
+
+    const progressPercent = Math.round(((currentIndex) / items.length) * 100);
 
     return (
         <Modal
@@ -203,9 +239,14 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
             title={
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingRight: '20px' }}>
                     <div>
-                        <Title level={4} style={{ margin: 0 }}>Mapeamento de Produto</Title>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Title level={4} style={{ margin: 0 }}>
+                                {isBatch ? `Mapeamento em Fila (${currentIndex + 1} de ${items.length})` : 'Mapeamento de Produto'}
+                            </Title>
+                            {isBatch && <Tag color="processing"><UnorderedListOutlined /> Fila Ativa</Tag>}
+                        </div>
                         <Text type="secondary" style={{ fontSize: '13px' }}>
-                            Gerenciamento de item recebido por Nota Fiscal
+                            {isBatch ? 'Processe cada item sequencialmente para agilizar a entrada' : 'Gerenciamento de item recebasdasdido por Nota Fiscal'}
                         </Text>
                     </div>
                     {step1Mode && (
@@ -213,14 +254,21 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
                             size="small" 
                             danger 
                             icon={<ReloadOutlined />} 
-                            onClick={handleResetAll}
+                            onClick={handleResetCurrent}
                         >
-                            Resetar Seleção
+                            Resetar Item Atual
                         </Button>
                     )}
                 </div>
             }
         >
+            {/* Barra de Progresso da Fila (Apenas se for lote) */}
+            {isBatch && (
+                <div style={{ marginBottom: 12 }}>
+                    <Progress percent={progressPercent} status="active" size="small" />
+                </div>
+            )}
+
             {/* Stepper Fixo Estável */}
             <div style={{ marginBottom: 16, paddingTop: 4 }}>
                 <Steps
@@ -237,35 +285,35 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
 
             {/* Layout Estável de 2 Colunas */}
             <Row gutter={24} align="top">
-                {/* Coluna Esquerda: Âncora Fixa de Referência */}
+                {/* Coluna Esquerda: Dados do Item Atual da Fila */}
                 <Col span={10}>
                     <Card 
                         size="small" 
-                        title="📄 Dados da NF (Referência)" 
+                        title={`📄 Item Atual na Fila (${currentIndex + 1}/${items.length})`} 
                         style={{ backgroundColor: '#fafafa', height: '100%', minHeight: '380px' }}
                     >
                         <Space direction="vertical" size={14} style={{ width: '100%' }}>
                             <div>
                                 <Text type="secondary" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Descrição na Nota</Text>
-                                <div style={{ fontWeight: 600, color: '#1f1f1f', wordBreak: 'break-word' }}>{item.descricao}</div>
+                                <div style={{ fontWeight: 600, color: '#1f1f1f', wordBreak: 'break-word' }}>{currentItem.descricao}</div>
                             </div>
                             <Row gutter={8}>
                                 <Col span={12}>
                                     <Text type="secondary" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Qtd Nota</Text>
-                                    <div style={{ fontWeight: 600 }}>{item.quantidade}</div>
+                                    <div style={{ fontWeight: 600 }}>{currentItem.quantidade}</div>
                                 </Col>
                                 <Col span={12}>
                                     <Text type="secondary" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Un. Nota</Text>
-                                    <div style={{ fontWeight: 600 }}>{item.unidadeMedida}</div>
+                                    <div style={{ fontWeight: 600 }}>{currentItem.unidadeMedida}</div>
                                 </Col>
                             </Row>
                             <div>
                                 <Text type="secondary" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Custo Unitário NF</Text>
-                                <div style={{ fontWeight: 600, color: '#d4380d' }}>R$ {(item.valorUnitario || 0).toFixed(2)}</div>
+                                <div style={{ fontWeight: 600, color: '#d4380d' }}>R$ {(currentItem.valorUnitario || 0).toFixed(2)}</div>
                             </div>
                             <div>
                                 <Text type="secondary" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Valor Total do Item</Text>
-                                <div style={{ fontWeight: 600 }}>R$ {(item.valorTotalItem || 0).toFixed(2)}</div>
+                                <div style={{ fontWeight: 600 }}>R$ {(currentItem.valorTotalItem || 0).toFixed(2)}</div>
                             </div>
                         </Space>
                     </Card>
@@ -350,7 +398,6 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
                                         <Space direction="vertical" size={6} style={{ width: '100%' }}>
                                             <Text strong style={{ fontSize: '12px', color: '#1677ff' }}>📝 Identidade do Produto</Text>
                                             
-                                            {/* Descrição com Cadeado de Segurança */}
                                             <div>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                     <Text type="secondary" style={{ fontSize: '11px' }}>Descrição p/ Sistema</Text>
@@ -371,7 +418,6 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
                                                 />
                                             </div>
 
-                                            {/* SKU com Cadeado de Segurança */}
                                             <div>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                     <Text type="secondary" style={{ fontSize: '11px' }}>SKU / Código Interno</Text>
@@ -402,7 +448,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
                                                     <Input placeholder="Opcional" value={draftCategory} onChange={(e) => setDraftCategory(e.target.value)} size="small" />
                                                 </Col>
                                                 <Col span={8}>
-                                                    <Text type="secondary" style={{ fontSize: '10px' }}>Grupo</Text>
+                                                    <Text type="secondary" style={{ fontSize: '10px' }}>Familia</Text>
                                                     <Input placeholder="Opcional" value={draftCategory} onChange={(e) => setDraftCategory(e.target.value)} size="small" />
                                                 </Col>
                                             </Row>
@@ -429,7 +475,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
                                                     />
                                                 </Col>
                                                 <Col span={12}>
-                                                    <Text type="secondary" style={{ fontSize: '10px' }}>CST (Obrigatório)</Text>
+                                                    <Text type="secondary" style={{ fontSize: '10px' }}>CST / CSOSN</Text>
                                                     <Input value={draftCst} onChange={(e) => setDraftCst(e.target.value)} size="small" />
                                                 </Col>
                                             </Row>
@@ -440,13 +486,13 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
 
                             {step === 1 && step1Mode !== "EXISTING_DIRECT" && (
                                 <StepSalesConfig
-                                    item={{ custo: item.valorUnitario, unidadeMedida: item.unidadeMedida }}
+                                    item={{ custo: currentItem.valorUnitario, unidadeMedida: currentItem.unidadeMedida }}
                                     onChange={(modes: any[]) => {
                                         const units = modes.map(m => ({
                                             type: m.conversion === 1 ? 'WHOLE' : 'FRAC',
                                             unit: m.unit,
                                             conversion: m.conversion,
-                                            cost: m.conversion === 1 ? (item.custo || item.valorUnitario || 0) : ((item.custo || item.valorUnitario || 0) / m.conversion),
+                                            cost: m.conversion === 1 ? (currentItem.custo || currentItem.valorUnitario || 0) : ((currentItem.custo || currentItem.valorUnitario || 0) / m.conversion),
                                             markup: m.markup,
                                             price: m.price,
                                         } as SalesUnit));
@@ -467,7 +513,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
 
             {/* Rodapé Fixo */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Button onClick={onClose}>Cancelar</Button>
+                <Button onClick={onClose}>Cancelar Fila</Button>
                 
                 <Space>
                     {step === 1 && (
@@ -482,9 +528,9 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
                             style={{ backgroundColor: '#52c41a' }}
                             icon={<CheckCircleOutlined />}
                             disabled={!canProceedToNextStep()}
-                            onClick={handleConfirm}
+                            onClick={handleConfirmItem}
                         >
-                            Confirmar Vínculo Direto
+                            {currentIndex < items.length - 1 ? 'Vincular e Próximo Item ➔' : 'Vincular Último Item'}
                         </Button>
                     ) : step === 0 ? (
                         <Button
@@ -500,9 +546,9 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
                             style={{ backgroundColor: '#52c41a' }}
                             icon={<CheckCircleOutlined />}
                             disabled={!canProceedToNextStep()}
-                            onClick={handleConfirm}
+                            onClick={handleConfirmItem}
                         >
-                            Confirmar Mapeamento
+                            {currentIndex < items.length - 1 ? 'Salvar e Próximo Item ➔' : 'Salvar e Finalizar Fila'}
                         </Button>
                     )}
                 </Space>

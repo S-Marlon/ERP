@@ -150,7 +150,7 @@ const NfeCards: React.FC<NfeCardsProps> = ({ data, supplierStatus, actions }) =>
 
       <Row gutter={[16, 16]}>
         {/* CARD 1: Identificação da NF */}
-        <Col xs={24} md={7}>
+        <Col xs={24} md={8}>
           <Card 
             title={<Space><FileTextOutlined /><span>1. Identificação da NF</span></Space>}
             size="small"
@@ -161,17 +161,16 @@ const NfeCards: React.FC<NfeCardsProps> = ({ data, supplierStatus, actions }) =>
               </Tooltip>
             }
           >
-            <div style={{ background: '#fafafa', padding: '4px 8px', borderRadius: '4px', border: '1px solid #f0f0f0', marginBottom: 8 }}>
+            <div style={{ background: '#fafafa', padding: '4px 8px', borderRadius: '4px', }}>
               <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Chave de Acesso</Text>
-              <Text copyable style={{ fontSize: 12, fontFamily: 'monospace' }}>{data.chaveAcesso}</Text>
+              <Text copyable style={{ fontSize: 16, fontFamily: 'monospace' }}>{data.chaveAcesso}</Text>
             </div>
-            <Descriptions column={2} layout="horizontal" size="small" bordered style={{ marginBottom: 12 }}>
-              <Descriptions.Item label="Número">{data.numero}</Descriptions.Item>
-              <Descriptions.Item label="Série">{data.serie}</Descriptions.Item>
+            <Descriptions column={3} layout="horizontal" size="small" bordered style={{ marginBottom: 8 }}>
+              <Descriptions.Item label="Número" style={{ fontSize: 12, fontFamily: 'monospace' }}>{data.numero}</Descriptions.Item>
+              <Descriptions.Item label="Série" style={{ fontSize: 13, fontFamily: 'monospace' }}>{data.serie}</Descriptions.Item>
+              <Descriptions.Item label="Emissão" style={{ fontSize: 12, fontFamily: 'monospace' }}>{formatarDataBR(data.dataEmissao)}</Descriptions.Item>
             </Descriptions>
-            <Descriptions column={1} layout="horizontal" size="small" bordered style={{ marginBottom: 12 }}>
-              <Descriptions.Item label="Emissão">{formatarDataBR(data.dataEmissao)}</Descriptions.Item>
-            </Descriptions>
+           
           </Card>
         </Col>
 
@@ -210,7 +209,7 @@ const NfeCards: React.FC<NfeCardsProps> = ({ data, supplierStatus, actions }) =>
         </Col>
 
         {/* CARD 3: Dados de Logística e Frete */}
-        <Col xs={24} md={9}>
+        <Col xs={24} md={8}>
           <Card 
             title={<Space><CarOutlined /><span>3. Logística e Frete</span></Space>}
             size="small"
@@ -221,7 +220,7 @@ const NfeCards: React.FC<NfeCardsProps> = ({ data, supplierStatus, actions }) =>
               </Tooltip>
             }
           >
-            <Descriptions column={1} size="small" bordered style={{ marginBottom: 10 }}>
+            <Descriptions column={1} size="small" bordered >
               <Descriptions.Item label="Transportadora">
                 <Text ellipsis style={{ maxWidth: 180, display: 'inline-block' }}>
                   {data?.transp?.transporta?.xNome || "Não Informada"}
@@ -235,7 +234,6 @@ const NfeCards: React.FC<NfeCardsProps> = ({ data, supplierStatus, actions }) =>
               </Descriptions.Item>
             </Descriptions>
 
-            <Divider style={{ margin: '8px 0' }} />
 
             {/* <Row gutter={8}>
               <Col span={12}>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Row,
   Col,
@@ -29,76 +29,30 @@ import {
   SearchOutlined,
   MoreOutlined,
   EditOutlined,
-  EyeOutlined,
-  DeleteOutlined,
+  ShoppingOutlined,
   ExportOutlined,
   AppstoreOutlined,
   UnorderedListOutlined,
   UploadOutlined,
   GlobalOutlined,
   CheckCircleOutlined,
-  StopOutlined,
-  ShoppingOutlined
+  StopOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
+
+// 🌐 Importando o service e os tipos de marcas
+import { 
+  getMarcas, 
+  createMarca, 
+  Marca, 
+  CreateMarcaPayload 
+} from './services/comercialMarcas.service'; // Ajuste o caminho conforme a estrutura do seu projeto
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 const { TextArea } = Input;
 
-// --- Interface da Marca ---
-interface Marca {
-  key: string;
-  codigo: string;
-  nome: string;
-  logoUrl?: string;
-  site?: string;
-  qtdProdutos: number;
-  status: 'Ativo' | 'Inativo';
-  descricao?: string;
-}
-
-// --- Dados Mockados ---
-const mockMarcas: Marca[] = [
-  {
-    key: '1',
-    codigo: 'MRC-001',
-    nome: 'Nike',
-    site: 'https://www.nike.com',
-    qtdProdutos: 142,
-    status: 'Ativo',
-    descricao: 'Artigos esportivos, calçados e vestuário de alta performance.',
-  },
-  {
-    key: '2',
-    codigo: 'MRC-002',
-    nome: 'Adidas',
-    site: 'https://www.adidas.com',
-    qtdProdutos: 98,
-    status: 'Ativo',
-    descricao: 'Roupas e calçados esportivos casuais e profissionais.',
-  },
-  {
-    key: '3',
-    codigo: 'MRC-003',
-    nome: 'Puma',
-    site: 'https://www.puma.com',
-    qtdProdutos: 45,
-    status: 'Ativo',
-    descricao: 'Vestuário e acessórios para esportes e estilo de vida.',
-  },
-  {
-    key: '4',
-    codigo: 'MRC-004',
-    nome: 'Under Armour',
-    site: 'https://www.underarmour.com',
-    qtdProdutos: 0,
-    status: 'Inativo',
-    descricao: 'Roupas de treino e compressão.',
-  },
-];
-
-// --- Estilos Consistentes com o ERP ---
+// --- Estilos Consistentes ---
 const styles = {
   container: {
     padding: '24px',
@@ -130,20 +84,33 @@ const styles = {
 };
 
 export const MarcasPage: React.FC = () => {
+  const [marcas, setMarcas] = useState<Marca[]>([]);
+  const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [confirmLoading, setConfirmLoading] = useState(false);
   const [form] = Form.useForm();
 
-  // Filtragem
-  const filteredData = mockMarcas.filter((item) => {
-    const matchesSearch =
-      item.nome.toLowerCase().includes(searchText.toLowerCase()) ||
-      item.codigo.toLowerCase().includes(searchText.toLowerCase());
-    const matchesStatus = statusFilter ? item.status === statusFilter : true;
-    return matchesSearch && matchesStatus;
-  });
+  const tenantId = 1; // Você pode puxar do seu contexto de autenticação/tenant atual
+
+  // 🔄 Buscar marcas do backend
+  const carregarMarcas = useCallback(async () => {
+    try {
+      setLoading(true);
+      const dados = await getMarcas(tenantId, searchText, statusFilter || '');
+      setMarcas(dados);
+    } catch (error: any) {
+      message.error(error.message || 'Erro ao carregar marcas.');
+    } finally {
+      setLoading(false);
+    }
+  }, [searchText, statusFilter]);
+
+  useEffect(() => {
+    carregarMarcas();
+  }, [carregarMarcas]);
 
   // Menu de ações da linha/card
   const getActionMenuItems = (record: Marca): MenuProps['items'] => [
@@ -165,11 +132,14 @@ export const MarcasPage: React.FC = () => {
       label: record.status === 'Ativo' ? 'Inativar' : 'Ativar',
       icon: record.status === 'Ativo' ? <StopOutlined /> : <CheckCircleOutlined />,
       danger: record.status === 'Ativo',
-      onClick: () => message.warning(`Status de ${record.nome} alterado`),
+      onClick: () => {
+        // Futuramente mapear para update se necessário
+        message.info(`Alteração de status rápida pendente de rota dedicada.`);
+      },
     },
   ];
 
-  // Colunas da Tabela (Modo Tabela)
+  // Colunas da Tabela
   const columns: ColumnsType<Marca> = [
     {
       title: 'Marca',
@@ -182,10 +152,10 @@ export const MarcasPage: React.FC = () => {
             {record.nome.charAt(0)}
           </Avatar>
           <div>
-            <Text bold>{record.nome}</Text>
+            <Text strong>{record.nome}</Text>
             <div>
               <Text type="secondary" style={{ fontSize: '12px' }}>
-                {record.codigo}
+                {record.codigo || 'Sem código ERP'}
               </Text>
             </div>
           </div>
@@ -196,11 +166,11 @@ export const MarcasPage: React.FC = () => {
       title: 'Website',
       dataIndex: 'site',
       key: 'site',
-      render: (site?: string) =>
+      render: (site?: string | null) =>
         site ? (
           <a href={site} target="_blank" rel="noreferrer">
             <GlobalOutlined style={{ marginRight: 6 }} />
-            {site.replace('https://', '')}
+            {site.replace('https://', '').replace('http://', '')}
           </a>
         ) : (
           <Text type="secondary">-</Text>
@@ -210,8 +180,8 @@ export const MarcasPage: React.FC = () => {
       title: 'Produtos Atrelados',
       dataIndex: 'qtdProdutos',
       key: 'qtdProdutos',
-      sorter: (a, b) => a.qtdProdutos - b.qtdProdutos,
-      render: (qtd: number) => (
+      sorter: (a, b) => (a.qtdProdutos || 0) - (b.qtdProdutos || 0),
+      render: (qtd: number = 0) => (
         <Tag color={qtd > 0 ? 'blue' : 'default'}>{qtd} produtos</Tag>
       ),
     },
@@ -236,11 +206,29 @@ export const MarcasPage: React.FC = () => {
     },
   ];
 
+  // Submissão do cadastro na API
   const handleCreateSubmit = () => {
-    form.validateFields().then(() => {
-      message.success('Marca cadastrada com sucesso!');
-      setIsModalVisible(false);
-      form.resetFields();
+    form.validateFields().then(async (values) => {
+      try {
+        setConfirmLoading(true);
+        const payload: CreateMarcaPayload = {
+          nome: values.nome,
+          site: values.site || null,
+          status: values.status ? 'Ativo' : 'Inativo',
+          descricao: values.descricao || null,
+          logoUrl: values.logoUrl || null,
+        };
+
+        await createMarca(payload, tenantId);
+        message.success('Marca cadastrada com sucesso!');
+        setIsModalVisible(false);
+        form.resetFields();
+        carregarMarcas(); // Recarrega a listagem do backend
+      } catch (error: any) {
+        message.error(error.message || 'Erro ao cadastrar marca.');
+      } finally {
+        setConfirmLoading(false);
+      }
     });
   };
 
@@ -279,39 +267,39 @@ export const MarcasPage: React.FC = () => {
         </Row>
       </Card>
 
-      {/* Estatísticas */}
+      {/* Estatísticas Dinâmicas */}
       <Row gutter={[16, 16]} style={{ marginBottom: '20px' }}>
         <Col xs={12} sm={8}>
-          <Card style={styles.statCard} bodyStyle={{ padding: '16px 24px' }}>
+          <Card style={styles.statCard} styles={{ body: { padding: '16px 24px' } }}>
             <Statistic
               title="Marcas Cadastradas"
-              value={mockMarcas.length}
+              value={marcas.length}
               prefix={<TagsOutlined style={{ color: '#722ed1', marginRight: 8 }} />}
             />
           </Card>
         </Col>
         <Col xs={12} sm={8}>
-          <Card style={styles.statCard} bodyStyle={{ padding: '16px 24px' }}>
+          <Card style={styles.statCard} styles={{ body: { padding: '16px 24px' } }}>
             <Statistic
               title="Marcas Ativas"
-              value={mockMarcas.filter((m) => m.status === 'Ativo').length}
+              value={marcas.filter((m) => m.status === 'Ativo').length}
               valueStyle={{ color: '#3f8600' }}
             />
           </Card>
         </Col>
         <Col xs={12} sm={8}>
-          <Card style={styles.statCard} bodyStyle={{ padding: '16px 24px' }}>
+          <Card style={styles.statCard} styles={{ body: { padding: '16px 24px' } }}>
             <Statistic
               title="Produtos Vinculados"
-              value={mockMarcas.reduce((acc, m) => acc + m.qtdProdutos, 0)}
+              value={marcas.reduce((acc, m) => acc + (m.qtdProdutos || 0), 0)}
               prefix={<ShoppingOutlined style={{ color: '#1890ff', marginRight: 8 }} />}
             />
           </Card>
         </Col>
       </Row>
 
-      {/* Filtros e Alternador de Modos (Grid vs Tabela) */}
-      <Card style={styles.filterCard} bodyStyle={{ padding: '16px' }}>
+      {/* Filtros e Alternador */}
+      <Card style={styles.filterCard} styles={{ body: { padding: '16px' } }}>
         <Row gutter={[16, 16]} align="middle" justify="space-between">
           <Col xs={24} sm={16} md={12}>
             <Space style={{ width: '100%' }}>
@@ -326,7 +314,8 @@ export const MarcasPage: React.FC = () => {
                 style={{ width: 140 }}
                 placeholder="Status"
                 allowClear
-                onChange={(val) => setStatusFilter(val)}
+                value={statusFilter}
+                onChange={(val) => setStatusFilter(val || null)}
               >
                 <Option value="Ativo">Ativos</Option>
                 <Option value="Inativo">Inativos</Option>
@@ -347,27 +336,27 @@ export const MarcasPage: React.FC = () => {
         </Row>
       </Card>
 
-      {/* Conteúdo: Modo Cards (Grid) */}
+      {/* Conteúdo: Grid ou Tabela */}
       {viewMode === 'grid' ? (
         <Row gutter={[16, 16]}>
-          {filteredData.map((marca) => (
-            <Col xs={24} sm={12} md={8} lg={6} key={marca.key}>
+          {marcas.map((marca) => (
+            <Col xs={24} sm={12} md={8} lg={6} key={marca.id}>
               <Card
                 hoverable
                 style={styles.gridCard}
                 actions={[
                   <Tooltip title="Ver Produtos" key="products">
-                    <ShoppingOutlined key="products" />
+                    <ShoppingOutlined onClick={() => message.info(`Produtos da marca ${marca.nome}`)} />
                   </Tooltip>,
                   <Tooltip title="Editar" key="edit">
-                    <EditOutlined key="edit" />
+                    <EditOutlined onClick={() => message.info(`Editando ${marca.nome}`)} />
                   </Tooltip>,
                   <Dropdown menu={{ items: getActionMenuItems(marca) }} trigger={['click']} key="more">
                     <MoreOutlined />
                   </Dropdown>,
                 ]}
               >
-                <Space align="start" justify="space-between" style={{ width: '100%' }}>
+                <Space align="start" style={{ width: '100%', justifyContent: 'space-between' }}>
                   <Avatar size={48} style={{ backgroundColor: '#722ed1' }}>
                     {marca.nome.charAt(0)}
                   </Avatar>
@@ -378,7 +367,7 @@ export const MarcasPage: React.FC = () => {
 
                 <div style={{ marginTop: 12 }}>
                   <Text type="secondary" style={{ fontSize: '12px' }}>
-                    {marca.codigo}
+                    {marca.codigo || 'Sem código'}
                   </Text>
                   <Title level={4} style={{ margin: 0 }}>
                     {marca.nome}
@@ -395,7 +384,7 @@ export const MarcasPage: React.FC = () => {
                 <div style={{ marginTop: 12, borderTop: '1px solid #f0f0f0', paddingTop: 8 }}>
                   <Text type="secondary" style={{ fontSize: '12px' }}>
                     <ShoppingOutlined style={{ marginRight: 4 }} />
-                    {marca.qtdProdutos} produtos vinculados
+                    {marca.qtdProdutos || 0} produtos vinculados
                   </Text>
                 </div>
               </Card>
@@ -403,9 +392,14 @@ export const MarcasPage: React.FC = () => {
           ))}
         </Row>
       ) : (
-        /* Conteúdo: Modo Tabela */
-        <Card style={styles.tableCard} bodyStyle={{ padding: 0 }}>
-          <Table columns={columns} dataSource={filteredData} pagination={{ pageSize: 10 }} />
+        <Card style={styles.tableCard} styles={{ body: { padding: 0 } }}>
+          <Table 
+            columns={columns} 
+            dataSource={marcas} 
+            rowKey="id"
+            loading={loading}
+            pagination={{ pageSize: 10 }} 
+          />
         </Card>
       )}
 
@@ -414,6 +408,7 @@ export const MarcasPage: React.FC = () => {
         title="Cadastrar Nova Marca"
         open={isModalVisible}
         onOk={handleCreateSubmit}
+        confirmLoading={confirmLoading}
         onCancel={() => setIsModalVisible(false)}
         okText="Salvar Marca"
         cancelText="Cancelar"
@@ -435,7 +430,7 @@ export const MarcasPage: React.FC = () => {
             </Col>
             <Col span={10}>
               <Form.Item name="status" label="Status" valuePropName="checked" initialValue={true}>
-                <Switch checkedChildren="Ativo" unCheckedChildren="Inativo" defaultChecked />
+                <Switch checkedChildren="Ativo" unCheckedChildren="Inativo" />
               </Form.Item>
             </Col>
           </Row>

@@ -84,9 +84,8 @@ export const getProdutos = async (tenantId: number = 1): Promise<ItemParentType[
 
 /**
  * 🔄 PUT /produtos/:id_item
- * Atualiza um produto existente no catálogo
+ * Atualiza um produto existente no catálogo (suporta envio de null para limpar campos como familia_id)
  */
-
 export const updateProduto = async (
   idItem: number | string, 
   payload: UpdateProdutoPayload, 
@@ -110,8 +109,8 @@ export const updateProduto = async (
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    console.error("❌ [API ERROR 400 DETALHADO]:", errorData); // <-- ADICIONE ESTE LOG AQUI
-    throw new Error(errorData.error || errorData.message || 'Erro ao atualizar produto.');
+    console.error("❌ [API ERROR 400 DETALHADO]:", errorData);
+    throw new Error(String(errorData.error ?? errorData.message ?? 'Erro ao atualizar produto.'));
   }
 
   return response.json();
