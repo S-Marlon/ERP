@@ -1,4 +1,4 @@
-import { AtributoConfig, Grupo } from './CatalogManager.types';
+import { AtributoConfig, Familia, Grupo, Categoria, CategoriaTreeNode } from './CatalogManager.types';
 
 export const obterDicionarioOpcoes = (exemplosString: string) => {
   const lista = exemplosString ? exemplosString.split(',').map(o => o.trim()).filter(Boolean) : [];
@@ -12,68 +12,114 @@ export const obterDicionarioOpcoes = (exemplosString: string) => {
   });
 };
 
+// Helper seguro para substituir todas as ocorrências sem erro de TS
+const substituirGlobal = (texto: string, busca: string, substituto: string): string => {
+  if (!texto) return '';
+  return texto.split(busca).join(substituto);
+};
+
 export const gerarPreviewNome = (
   grupo: Grupo | null, 
-  valoresTeste: Record<string, string>
+  valoresTesteOrItem: Record<string, any>
 ): string => {
   if (!grupo) return '';
   
   let template = grupo.templateNomeComercial || '{FAMILIA}';
-  template = template.replace(/{FAMILIA}/g, grupo.nome || '');
+  template = substituirGlobal(template, '{FAMILIA}', grupo.nome || '');
+  template = substituirGlobal(template, '[FAMILIA]', grupo.nome || '');
   
-  if (grupo.atributos && grupo.atributos.length > 0) {
+  // 🔍 Tenta extrair valores de várias fontes possíveis para evitar objeto vazio {}
+  const dictValores = 
+    valoresTesteOrItem?.valoresAtributos || 
+    valoresTesteOrItem?.atributos || 
+    valoresTesteOrItem?.valores || 
+    valoresTesteOrItem || {};
+
+  const chavesParaSubstituir = new Set<string>();
+  
+  if (grupo.atributos && Array.isArray(grupo.atributos)) {
     grupo.atributos.forEach(attr => {
-      const regex = new RegExp(`{${attr.nome}}`, 'g');
-      
-      // Engenharia de Herança: Se o grupo amarra o valor, o preview renderiza o valor padrão do grupo
-      const valorSubstituto = attr.valorHerdadoDoGrupo 
-        ? (attr.valorPadraoGrupo || `[${attr.nome}]`)
-        : (valoresTeste[attr.nome] || `[${attr.nome}]`); 
-        
-      template = template.replace(regex, valorSubstituto);
+      if (attr.nome) chavesParaSubstituir.add(attr.nome);
+      if (attr.id !== undefined && attr.id !== null) chavesParaSubstituir.add(String(attr.id));
+      if (attr.codigo) chavesParaSubstituir.add(attr.codigo);
     });
   }
+
+  Object.keys(dictValores).forEach(k => chavesParaSubstituir.add(k));
+
+  chavesParaSubstituir.forEach(chave => {
+    const valorEncontrado = 
+      dictValores[chave] ?? 
+      dictValores[chave.toLowerCase()] ?? 
+      dictValores[chave.toUpperCase()];
+
+    const valorSubstituto = (valorEncontrado !== null && valorEncontrado !== undefined && String(valorEncontrado).trim() !== '')
+      ? String(valorEncontrado)
+      : `[${chave}]`;
+
+    template = substituirGlobal(template, `{${chave}}`, valorSubstituto);
+    template = substituirGlobal(template, `[${chave}]`, valorSubstituto);
+  });
   
   return template;
 };
 
 export const gerarPreviewSku = (
-  grupo: Grupo | null,
-  atributosDoSku: AtributoConfig[],
-  valoresTeste: Record<string, string>
+  familia: Familia | null, 
+  atributosDoSku: any[], 
+  valoresTesteOrItem: Record<string, any>
 ): string => {
-  if (!grupo) return 'AGUARDANDO_GRUPO';
+  if (!familia) return "";
+  let resultado = familia?.templateSku || "";
+  if (!resultado) return "";
 
-  const sigla = (grupo.siglaSku || '').toUpperCase();
-  const separador = grupo.separadorSku || '-';
-  
-  const partesAtributos = atributosDoSku.map(attr => {
-    // Se herdado rigidamente, pega o default estático do grupo, senão a entrada simulada
-    const valorDigitado = attr.valorHerdadoDoGrupo ? attr.valorPadraoGrupo : valoresTeste[attr.nome]; 
-    
-    if (!valorDigitado) {
-      return `[${attr.nome.toUpperCase()}]`;
-    }
+  const siglaValor = familia?.siglaSku || "";
+  resultado = substituirGlobal(resultado, '{Sigla}', siglaValor);
+  resultado = substituirGlobal(resultado, '[Sigla]', siglaValor);
 
-    const dicionario = obterDicionarioOpcoes(attr.exemplos);
-    const correspondencia = dicionario.find(d => d.label.toUpperCase() === valorDigitado.trim().toUpperCase());
-    const valorFinal = correspondencia ? correspondencia.value : valorDigitado;
-    
-    return valorFinal.trim().toUpperCase().replace(/\s+/g, '');
+  const dictValores = 
+    valoresTesteOrItem?.valoresAtributos || 
+    valoresTesteOrItem?.atributos || 
+    valoresTesteOrItem?.valores || 
+    valoresTesteOrItem || {};
+
+  const chavesParaSubstituir = new Set<string>();
+
+  if (familia.atributos && Array.isArray(familia.atributos)) {
+    familia.atributos.forEach(attr => {
+      if (attr.nome) chavesParaSubstituir.add(attr.nome);
+      if (attr.id !== undefined && attr.id !== null) chavesParaSubstituir.add(String(attr.id));
+      if (attr.codigo) chavesParaSubstituir.add(attr.codigo);
+    });
+  }
+
+  if (atributosDoSku && Array.isArray(atributosDoSku)) {
+    atributosDoSku.forEach(attr => {
+      if (attr.nome) chavesParaSubstituir.add(attr.nome);
+      if (attr.id !== undefined && attr.id !== null) chavesParaSubstituir.add(String(attr.id));
+      if (attr.codigo) chavesParaSubstituir.add(attr.codigo);
+    });
+  }
+
+  Object.keys(dictValores).forEach(k => chavesParaSubstituir.add(k));
+
+  chavesParaSubstituir.forEach(chave => {
+    const valorEncontrado = 
+      dictValores[chave] ?? 
+      dictValores[chave.toLowerCase()] ?? 
+      dictValores[chave.toUpperCase()];
+
+    const valorSubstituto = (valorEncontrado !== null && valorEncontrado !== undefined && String(valorEncontrado).trim() !== '')
+      ? String(valorEncontrado)
+      : `[${chave}]`;
+
+    resultado = substituirGlobal(resultado, `{${chave}}`, valorSubstituto);
+    resultado = substituirGlobal(resultado, `[${chave}]`, valorSubstituto);
   });
 
-  const variacaoCompilada = partesAtributos.join(separador);
-  let templateSku = grupo.templateSku || '{SIGLA}{SEPARADOR}{VARIAÇÃO}';
-  
-  templateSku = templateSku
-    .replace(/{SIGLA}/g, sigla)
-    .replace(/{SEPARADOR}/g, separador)
-    .replace(/{VARIAÇÃO}/g, variacaoCompilada);
-
-  return templateSku;
+  return resultado;
 };
 
-// 🌳 Versão blindada contra tipos numéricos/strings do banco
 export const construirArvoreAntd = (lista: Categoria[], paiId: string | null = null): CategoriaTreeNode[] => {
   return lista
     .filter(cat => {
@@ -87,8 +133,6 @@ export const construirArvoreAntd = (lista: Categoria[], paiId: string | null = n
     }));
 };
 
-
-// ⚠️ Campos que NÃO persistem no banco (Mapeamento/Constante utilitária)
 export const CAMPOS_NAO_INTEGRADOS = {
   familia: [
     'tipoItem', 

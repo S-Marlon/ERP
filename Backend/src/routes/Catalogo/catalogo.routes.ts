@@ -37,6 +37,7 @@ import {
   createFamilia, 
   deleteFamilia, 
   getFamilias, 
+  getProdutosPorFamilia, 
   updateFamilia 
 } from './Familias/familias.controller';
 
@@ -116,6 +117,7 @@ router.get('/cadastros/familias', getFamilias);
 router.post('/cadastros/familias', createFamilia);
 router.put('/cadastros/familias/:idFamilia', updateFamilia);
 router.delete('/cadastros/familias/:idFamilia', deleteFamilia);
+router.get('/cadastros/familias/:idFamilia/produtos', getProdutosPorFamilia);
 
 // =========================================================================
 // 🏷️ ROTAS DE PRODUTOS E CATÁLOGO

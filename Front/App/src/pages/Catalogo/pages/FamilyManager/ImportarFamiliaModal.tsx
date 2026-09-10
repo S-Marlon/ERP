@@ -59,7 +59,7 @@ export const ImportarFamiliaModal: React.FC<ImportarFamiliaModalProps> = ({
         siglaSku: dados.siglaSku,
         separadorSku: dados.separadorSku || '-',
         templateNomeComercial: dados.templateNomeComercial || '{FAMILIA}',
-        templateSku: dados.templateSku || '{SIGLA}{SEPARADOR}{VARIAÇÃO}',
+        templateSku: dados.templateSku || '{SIGLA}{S}{VARIAÇÃO}',
         atributos: Array.isArray(dados.atributos) ? dados.atributos : [],
       };
 

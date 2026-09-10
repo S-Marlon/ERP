@@ -1,3 +1,5 @@
+// familias.controller.ts
+
 import { Request, Response } from 'express';
 import pool from '../../Estoque/db.config'; 
 
@@ -167,7 +169,7 @@ export const createFamilia = async (req: Request, res: Response) => {
       cestPadrao || null,
       separadorSku || '-',
       siglaSku || null,
-      templateSku || '{SIGLA}{SEPARADOR}{VARIACAO}',
+      templateSku || '{SIGLA}{S}{VARIACAO}',
       unidadeMedidaBase || 'PC',
       templateNomeComercial || '{FAMILIA}',
       descricaoComercialPadrao || null,
@@ -365,7 +367,7 @@ export const getFamilias = async (req: Request, res: Response) => {
         ncmPadrao: f.ncmPadrao || '',
         cestPadrao: f.cestPadrao || '',
         siglaSku: f.siglaSku || '',
-        templateSku: f.templateSku || '{SIGLA}{SEPARADOR}{VARIACAO}',
+        templateSku: f.templateSku || '{SIGLA}{S}{VARIACAO}',
         descricaoComercialPadrao: f.descricaoComercialPadrao || '',
         observacoesPadrao: f.observacoesPadrao || '',
         atributos: Array.from(mapaAtributos.values())
@@ -376,5 +378,73 @@ export const getFamilias = async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Erro ao buscar familias relacionais:', error);
     return res.status(500).json({ error: 'Erro interno ao buscar grupos' });
+  }
+};
+
+
+// 🔌 [READ] Buscar Produtos da Família unindo Comercial e Core (Itens do Fornecedor)
+export const getProdutosPorFamilia = async (req: Request, res: Response) => {
+  const { idFamilia } = req.params;
+  const rawTenantId = req.query.tenant_id || req.headers['x-tenant-id'] || 1;
+  const tenantId = Number(rawTenantId);
+
+  if (!idFamilia) {
+    return res.status(400).json({ error: 'O ID da família é obrigatório nos parâmetros.' });
+  }
+
+  try {
+    const queryProdutos = `
+      SELECT 
+        p.id_item AS idItem,
+        p.sku_customizado AS skuCustomizado,
+        p.categoria_id AS categoriaId,
+        p.familia_id AS familiaId,
+        p.custo_gerencial AS custoGerencial,
+        p.id_marca AS idMarca,
+        p.preco_venda AS precoVenda,
+        p.margem_lucro AS margemLucro,
+        p.exibir_no_pdv AS exibirNoPdv,
+        p.pode_vender_sem_estoque AS podeVenderSemEstoque,
+        p.nome_comercial AS nomeComercial,
+        p.descricao_comercial AS descricaoComercial,
+        i.sku AS skuGlobal,
+        i.nome_item AS nomeItemGlobal,
+        i.tipo_recurso AS tipoRecurso,
+        i.status AS statusItem,
+        i.descricao_variacao AS variacao
+      FROM comercial_produtos_dados p
+      INNER JOIN itens_core i 
+        ON p.id_item = i.id_item AND p.tenant_id = i.tenant_id
+      WHERE p.tenant_id = ? AND p.familia_id = ?
+      ORDER BY i.nome_item ASC
+    `;
+
+    const [produtosRows] = await pool.execute(queryProdutos, [tenantId, idFamilia]);
+    const produtos = produtosRows as any[];
+
+    if (produtos.length === 0) {
+      return res.json([]);
+    }
+
+    const resultadoFinal = produtos.map(prod => ({
+      ...prod,
+      idItem: String(prod.idItem),
+      categoriaId: prod.categoriaId ? String(prod.categoriaId) : null,
+      familiaId: prod.familiaId ? String(prod.familiaId) : null,
+      idMarca: prod.idMarca ? String(prod.idMarca) : null,
+      custoGerencial: prod.custoGerencial !== null ? Number(prod.custoGerencial) : 0,
+      precoVenda: prod.precoVenda !== null ? Number(prod.precoVenda) : 0,
+      margemLucro: prod.margemLucro !== null ? Number(prod.margemLucro) : 0,
+      exibirNoPdv: prod.exibirNoPdv === 1 || prod.exibirNoPdv === true,
+      podeVenderSemEstoque: prod.podeVenderSemEstoque === 1 || prod.podeVenderSemEstoque === true,
+      // Mapeamento dinâmico do nome seguindo sua regra de herança
+      nome_item: prod.nomeComercial || prod.nomeItemGlobal,
+      variacao: prod.variacao || 'Principal'
+    }));
+
+    return res.json(resultadoFinal);
+  } catch (error) {
+    console.error('Erro ao buscar produtos por família:', error);
+    return res.status(500).json({ error: 'Erro interno ao buscar produtos da família.' });
   }
 };

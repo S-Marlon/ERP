@@ -28,8 +28,8 @@ export interface AtributoConfig {
   ordemSku: number;
   exemplos: string;
 
-  valorHerdadoDoGrupo: boolean;
-  valorPadraoGrupo?: string;
+  valorHerdadoDaFamilia: boolean;
+  valorPadraoFamilia?: string;
 
   pesquisavel?: boolean;
   bloqueado?: boolean;
@@ -39,7 +39,7 @@ export interface AtributoConfig {
   origem?: 'categoria' | 'global' | 'customizado' | 'herdados' | 'locais'; 
 }
 
-export interface Grupo {
+export interface Familia {
   id: string;
   nome: string;
   categoriaPai: string;
@@ -68,6 +68,9 @@ export interface Grupo {
   atributos: AtributoConfig[];
 }
 
+// Alias mantido caso alguma parte legada do código utilize 'Grupo'
+export type Grupo = Familia;
+
 export type TipoAba = 'estrutural' | 'variantes' | 'informativos';
 
 export const ATRIBUTO_INITIAL_STATE: Omit<AtributoConfig, 'id'> = {
@@ -82,8 +85,8 @@ export const ATRIBUTO_INITIAL_STATE: Omit<AtributoConfig, 'id'> = {
   ordemSku: 0,
   exemplos: '',
   opcoesValidas: [],
-  valorHerdadoDoGrupo: false,
-  valorPadraoGrupo: ''
+  valorHerdadoDaFamilia: false,
+  valorPadraoFamilia: ''
 };
 
 export interface Categoria {

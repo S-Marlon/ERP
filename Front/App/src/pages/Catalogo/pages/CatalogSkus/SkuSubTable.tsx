@@ -17,12 +17,13 @@ interface SkuRow {
   [key: string]: any; 
 }
 
-// 🗂️ SCHEMA CENTRALIZADO DE CAMPOS (Escalável para dezenas de campos)
+// 🗂️ SCHEMA CENTRALIZADO DE CAMPOS (Adicionado 'variacao' na aba Geral)
 const ERP_FIELDS_SCHEMA = [
   {
     tabKey: 'geral',
     tabLabel: 'Geral',
     fields: [
+      { name: 'variacao', label: 'Nome da Variação (Ex: Azul / G)', type: 'text' },
       { name: 'marca', label: 'Marca / Fabricante', type: 'text' },
       { name: 'status', label: 'Status Ativo', type: 'boolean' },
     ]
@@ -223,7 +224,7 @@ export const SkuSubTable: React.FC<SkuSubTableProps> = ({ parentItem, onMoveSkus
         style={{ background: '#fff', borderRadius: 6 }}
       />
 
-      {/* 🚀 MODAL HÍBRIDO REFINADO COM UX/UI MODERNA E ABAS VINCULADAS */}
+      {/* 🚀 MODAL HÍBRIDO REFINADO COM ABAS VINCULADAS E EDIÇÃO DE VARIAÇÃO */}
       <Modal
         title={
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingRight: 24 }}>
@@ -249,7 +250,7 @@ export const SkuSubTable: React.FC<SkuSubTableProps> = ({ parentItem, onMoveSkus
         cancelText="Cancelar"
       >
         <p style={{ color: '#666', marginBottom: 14, fontSize: '13px' }}>
-          Utilize o aplicador rápido no topo para alterações em massa, ou navegue pelas abas nos cartões abaixo para ajustes cirúrgicos.
+          Utilize o aplicador rápido no topo para alterações em massa, ou ajuste a <b>Variação</b> e outros atributos diretamente nos cartões abaixo.
         </p>
 
         {/* 📦 PAINEL DE APLICAÇÃO EM LOTE RÁPIDO */}
@@ -280,7 +281,6 @@ export const SkuSubTable: React.FC<SkuSubTableProps> = ({ parentItem, onMoveSkus
         <div style={{ maxHeight: '440px', overflowY: 'auto', paddingRight: 6 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
             {editingItems.map((item, index) => {
-              // Define qual aba este card específico deve mostrar
               const activeKey = isTabsLinked ? globalActiveTab : (itemActiveTabs[index] || 'geral');
 
               return (
@@ -307,9 +307,9 @@ export const SkuSubTable: React.FC<SkuSubTableProps> = ({ parentItem, onMoveSkus
                     activeKey={activeKey}
                     onChange={(key) => {
                       if (isTabsLinked) {
-                        setGlobalActiveTab(key); // Se vinculado, muda de todos
+                        setGlobalActiveTab(key);
                       } else {
-                        setItemActiveTabs(prev => ({ ...prev, [index]: key })); // Se livre, muda só deste
+                        setItemActiveTabs(prev => ({ ...prev, [index]: key }));
                       }
                     }}
                     items={ERP_FIELDS_SCHEMA.map(section => ({
@@ -318,7 +318,7 @@ export const SkuSubTable: React.FC<SkuSubTableProps> = ({ parentItem, onMoveSkus
                       children: (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px 16px', padding: '6px 2px' }}>
                           {section.fields.map(field => (
-                            <div key={field.name}>
+                            <div key={field.name} style={field.name === 'variacao' ? { gridColumn: 'span 2' } : {}}>
                               <label style={{ fontSize: '11px', fontWeight: 500, color: '#595959', display: 'block', marginBottom: 4 }}>
                                 {field.label}:
                               </label>

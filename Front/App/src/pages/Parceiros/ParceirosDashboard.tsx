@@ -9,7 +9,8 @@ import {
   Badge, 
   Space, 
   Breadcrumb, 
-  Tooltip 
+  Tooltip, 
+  Tag
 } from 'antd';
 import { 
   UserOutlined, 
@@ -118,6 +119,7 @@ export const ParceirosDashboard: React.FC = () => {
               <div style={{ ...styles.iconWrapper, backgroundColor: '#e6f7ff', color: '#1890ff' }}>
                 <UserOutlined />
               </div>
+                <Tag>Funcional</Tag>
               <Title level={4}>Clientes</Title>
               <Paragraph type="secondary">
                 Base de clientes ativos, histórico de compras, crédito e contatos.
@@ -141,6 +143,8 @@ export const ParceirosDashboard: React.FC = () => {
               <div style={{ ...styles.iconWrapper, backgroundColor: '#f6ffed', color: '#52c41a' }}>
                 <ShopOutlined />
               </div>
+                <Tag>Disuncional</Tag>
+
               <Title level={4}>Fornecedores</Title>
               <Paragraph type="secondary">
                 Gestão de compras, parceiros de insumos, serviços e cotações.
@@ -164,6 +168,8 @@ export const ParceirosDashboard: React.FC = () => {
               <div style={{ ...styles.iconWrapper, backgroundColor: '#fff7e6', color: '#fa8c16' }}>
                 <IdcardOutlined />
               </div>
+                <Tag>Disuncional</Tag>
+
               <Title level={4}>Funcionários</Title>
               <Paragraph type="secondary">
                 Quadro de colaboradores, dados contratuais e cargos internos.

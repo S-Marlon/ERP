@@ -65,7 +65,7 @@ export const getGroups = async (tenantId: number = 1): Promise<Grupo[]> => {
     cestPadrao: fam.cestPadrao || '',
     siglaSku: fam.siglaSku || '',
     separadorSku: fam.separadorSku || '-',
-    templateSku: fam.templateSku || '{SIGLA}{SEPARADOR}{VARIACAO}',
+    templateSku: fam.templateSku || '{SIGLA}{S}{VARIACAO}',
     templateNomeComercial: fam.templateNomeComercial || '{FAMILIA}',
     descricaoComercialPadrao: fam.descricaoComercialPadrao || '',
     observacoesPadrao: fam.observacoesPadrao || '',
@@ -173,10 +173,28 @@ export const getAtributosGlobais = async (tenantId: number = 1): Promise<Atribut
   }));
 };
 
+
 export const getItensDoGrupo = async (grupoId: string, tenantId: number = 1): Promise<ItemAssociado[]> => {
-  const response = await fetch(`${API_BASE_URL}/cadastros/familias/${grupoId}/itens?tenant_id=${tenantId}`, {
+  const response = await fetch(`${API_BASE_URL}/cadastros/familias/${grupoId}/produtos?tenant_id=${tenantId}`, {
     method: 'GET',
     headers: DEFAULT_HEADERS,
   });
-  return handleResponse<ItemAssociado[]>(response, 'Erro ao carregar itens associados.');
+
+  const dados = await handleResponse<any[]>(response, 'Erro ao carregar itens associados.');
+
+  // Mapeamento compatível com a interface ItemAssociado do front-end
+  return dados.map((item: any): ItemAssociado => ({
+    idItem: String(item.idItem),
+    sku: item.skuCustomizado || item.skuGlobal || '',
+    nomeItem: item.nomeComercial || item.nomeItemGlobal || 'Produto Sem Nome',
+    tipoRecurso: item.tipoRecurso || 'PRODUTO',
+    status: item.statusItem || 'ATIVO',
+    precoVenda: Number(item.precoVenda || 0),
+    custoGerencial: Number(item.custoGerencial || 0),
+    margemLucro: Number(item.margemLucro || 0),
+    exibirNoPdv: Boolean(item.exibirNoPdv),
+    podeVenderSemEstoque: Boolean(item.podeVenderSemEstoque),
+    descricaoComercial: item.descricaoComercial || ''
+  }));
 };
+

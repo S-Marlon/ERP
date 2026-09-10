@@ -35,7 +35,11 @@ import StockEntryForm from "./pages/Compras/StockEntry/StockEntryForm";
 import { CatalogManager } from "./pages/Catalogo/pages/CatalogManager";
 import { CategoryManager } from "./pages/Catalogo/pages/CategoryManager/CategoryManager";
 import { GlobalAttributeManager } from "./pages/Catalogo/pages/GlobalAttributeManager/GlobalAttributeManager";
+
+
 import { FamilyManager } from "./pages/Catalogo/pages/FamilyManager/FamilyManager";
+
+
 import CatalogSku from "./pages/Catalogo/pages/CatalogSkus/CatalogSku";
 import FornecedoresList from "./pages/Compras/FornecedoresList/FornecedoresList";
 import RelatoriosPage from "./pages/Estoque/Relatorios/Relatorios";
@@ -53,6 +57,7 @@ import EmissaoFaturado from "./pages/Compras/EmissaoFaturado";
 import { FinanceiroContasReceber } from "./pages/Financeiro/FinanceiroContasReceber";
 import { VendasFaturamento } from "./pages/Financeiro/VendasFaturamento";
 import Clientes from "./pages/Parceiros/Clientes";
+import FamilyManagementPanel from "./pages/Catalogo/pages/FamilyManager/FamilyManagementPanel";
 
 const { Sider, Header } = Layout;
 
@@ -146,6 +151,7 @@ export default function AppLayout() {
             <Route path="/estoque/etiquetagem" element={<StockLabelingForm />} />
             <Route path="/catalogo" element={<CatalogManager />} />
             <Route path="/catalogo/familias" element={<FamilyManager />} />
+            <Route path="/catalogo/familias/test" element={<FamilyManagementPanel />} />
             <Route path="/catalogo/categorias" element={<CategoryManager />} />
             <Route path="/catalogo/atributos" element={<GlobalAttributeManager />} />
             <Route path="/catalogo/gerenciador" element={<CatalogSku />} />
@@ -159,6 +165,7 @@ export default function AppLayout() {
             <Route path="/relatorios/poco" element={<RelatorioPocoPage />} />
             <Route path="/obras" element={<ObrasModule />} />
             <Route path="*" element={<h2>404 | Página Não Encontrada</h2>} />
+
 
             <Route path="/compras/xml" element={< LeitorXML/>} />
 

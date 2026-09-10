@@ -1,11 +1,11 @@
+// produtos.controller.ts
+
 import { Request, Response } from 'express';
 import pool from '../../Estoque/db.config';
 
-
-
 /**
  * 📍 [READ] GET /produtos/search
- * Busca de itens usando as tabelas novas do ERP: itens_core + comercial_produtos_dados
+ * Busca de itens priorizando dados comerciais e incluindo marcas
  */
 export const searchProdutos = async (req: Request, res: Response) => {
   const rawTenantId = req.query.tenant_id || req.headers['x-tenant-id'] || 1;
@@ -22,13 +22,17 @@ export const searchProdutos = async (req: Request, res: Response) => {
     const query = `
       SELECT
         ic.id_item AS id,
-        ic.sku,
-        ic.nome_item AS name,
+        COALESCE(NULLIF(TRIM(cpd.sku_customizado), ''), ic.sku) AS sku,
+        -- REGRA DE PRIORIDADE DO NOME: 
+        -- 1º Tenta o comercial_produtos_dados.nome_comercial (se não for vazio/null)
+        -- 2º Se estiver vazio ou null, pega o itens_core.nome_item
+        COALESCE(NULLIF(TRIM(cpd.nome_comercial), ''), ic.nome_item) AS name,
         ic.status,
         ic.descricao_variacao,
         COALESCE(um.sigla, '') AS unitOfMeasure,
         COALESCE(cpd.preco_venda, 0) AS salePrice,
         COALESCE(cf.nome, '') AS category,
+        COALESCE(cm.nome, '') AS brand,
         NULL AS barcode,
         0 AS currentStock,
         0 AS minStock,
@@ -38,21 +42,27 @@ export const searchProdutos = async (req: Request, res: Response) => {
         ON ic.id_item = cpd.id_item AND ic.tenant_id = cpd.tenant_id
       LEFT JOIN comercial_familias cf
         ON cpd.familia_id = cf.id AND cpd.tenant_id = cf.tenant_id
+      LEFT JOIN comercial_marcas cm
+        ON cpd.id_marca = cm.id AND cpd.tenant_id = cm.tenant_id
       LEFT JOIN itens_unidades_medida um
         ON ic.id_unidade = um.id_unidade AND ic.tenant_id = um.tenant_id
       WHERE ic.tenant_id = ?
         AND (
           ic.sku LIKE ?
+          OR COALESCE(NULLIF(TRIM(cpd.sku_customizado), ''), '') LIKE ?
           OR ic.nome_item LIKE ?
+          OR COALESCE(NULLIF(TRIM(cpd.nome_comercial), ''), '') LIKE ?
           OR ic.descricao_variacao LIKE ?
-          OR COALESCE(cpd.sku_customizado, '') LIKE ?
+          OR cm.nome LIKE ?
         )
-      ORDER BY ic.nome_item ASC
+      ORDER BY COALESCE(NULLIF(TRIM(cpd.nome_comercial), ''), ic.nome_item) ASC
       LIMIT 10
     `;
 
     const [rows] = await pool.execute(query, [
       tenantId,
+      searchPattern,
+      searchPattern,
       searchPattern,
       searchPattern,
       searchPattern,
@@ -63,7 +73,7 @@ export const searchProdutos = async (req: Request, res: Response) => {
       id: Number(row.id),
       sku: row.sku || '',
       barcode: row.barcode || '',
-      name: row.name || row.nome_item || 'Produto',
+      name: row.name || 'Produto',
       category: row.category || '',
       unitOfMeasure: row.unitOfMeasure || '',
       salePrice: Number(row.salePrice || 0),
@@ -71,6 +81,8 @@ export const searchProdutos = async (req: Request, res: Response) => {
       minStock: Number(row.minStock || 0),
       status: row.status || 'ATIVO',
       pictureUrl: row.pictureUrl || null,
+      variacao: row.descricao_variacao || 'Principal',
+      marca: row.brand || ''
     })));
   } catch (error: any) {
     console.error('Erro ao buscar produtos no catálogo novo:', error);
@@ -80,8 +92,7 @@ export const searchProdutos = async (req: Request, res: Response) => {
 
 /**
  * 🔌 [READ] GET /produtos
- * Retorna array plano de SKUs individuais com dados comerciais
- * Para busca em formulário de etiquetas, a estrutura é simplificada
+ * Retorna array unificado aplicando precedência comercial e dados de marca
  */
 export const getProdutos = async (req: Request, res: Response) => {
   const rawTenantId = req.query.tenant_id || req.headers['x-tenant-id'] || 1;
@@ -92,8 +103,12 @@ export const getProdutos = async (req: Request, res: Response) => {
       SELECT 
         ic.id_item,
         ic.tenant_id,
-        ic.sku,
-        ic.nome_item,
+        ic.sku AS sku_core,
+        cpd.sku_customizado,
+        COALESCE(NULLIF(TRIM(cpd.sku_customizado), ''), ic.sku) AS sku,
+        ic.nome_item AS nome_core,
+        cpd.nome_comercial,
+        COALESCE(NULLIF(TRIM(cpd.nome_comercial), ''), ic.nome_item) AS nome_item,
         ic.tipo_recurso,
         ic.status,
         ic.descricao_variacao,
@@ -102,17 +117,23 @@ export const getProdutos = async (req: Request, res: Response) => {
         cpd.id_marca,
         cpd.custo_gerencial,
         cpd.preco_venda,
+        cat.nome AS nome_categoria,  -- Adicionado
         fam.nome AS nome_familia,
+        COALESCE(mar.nome, 'Própria') AS nome_marca,
         COALESCE(um.sigla, '') AS unidade
       FROM itens_core ic
       LEFT JOIN comercial_produtos_dados cpd 
         ON ic.id_item = cpd.id_item AND ic.tenant_id = cpd.tenant_id
+      LEFT JOIN comercial_categorias cat 
+        ON cpd.categoria_id = cat.id AND cpd.tenant_id = cat.tenant_id  -- Adicionado
       LEFT JOIN comercial_familias fam 
         ON cpd.familia_id = fam.id AND cpd.tenant_id = fam.tenant_id
+      LEFT JOIN comercial_marcas mar 
+        ON cpd.id_marca = mar.id AND cpd.tenant_id = mar.tenant_id
       LEFT JOIN itens_unidades_medida um
         ON ic.id_unidade = um.id_unidade AND ic.tenant_id = um.tenant_id
       WHERE ic.tenant_id = ?
-      ORDER BY ic.nome_item ASC
+      ORDER BY COALESCE(NULLIF(TRIM(cpd.nome_comercial), ''), ic.nome_item) ASC
     `;
 
     const [rows] = await pool.execute(query, [tenantId]);
@@ -122,27 +143,33 @@ export const getProdutos = async (req: Request, res: Response) => {
       return res.json([]);
     }
 
-    // Retorna um array plano de SKUs individuais com dados comerciais
     const skus = itens.map((item: any) => {
-      const nomeItem = item.nome_item || item.name || 'Produto sem nome';
-      const nomeFamilia = item.nome_familia || item.category || '';
-      const unidade = item.unidade || item.unitOfMeasure || '';
-      const preco = Number(item.preco_venda ?? item.salePrice ?? 0);
+      const nomeItem = item.nome_comercial || item.nome_item || 'Produto sem nome';
+      const skuFinal = item.sku_customizado || item.sku || '';
+      const nomeFamilia = item.nome_familia || '';
+      const nomeMarca = item.nome_marca || '';
+      const unidade = item.unidade || '';
+      const preco = Number(item.preco_venda ?? 0);
       const custo = Number(item.custo_gerencial ?? 0);
-      const estoque = Number(item.estoque ?? item.currentStock ?? 0);
       const status = String(item.status || 'ATIVO').toUpperCase();
+      const nomeCategoria = item.nome_categoria || '';
 
       return {
         id: Number(item.id_item),
         id_item: Number(item.id_item),
         tenant_id: Number(item.tenant_id || tenantId),
-        sku: item.sku || '',
+        sku: skuFinal,
+        sku_customizado: item.sku_customizado || '',
+        sku_core: item.sku_core || '',
         name: nomeItem,
         nome_item: nomeItem,
+        nome_comercial: item.nome_comercial || '',
         barcode: '',
-        category: nomeFamilia,
-        categoria: nomeFamilia,
+        category: nomeCategoria,
+        categoria: nomeCategoria,
         categoria_id: item.categoria_id ?? null,
+        family: nomeFamilia,              // Nova propriedade para a Família
+        familia: nomeFamilia,             // Nova propriedade para a Família
         familia_id: item.familia_id ?? null,
         id_marca: item.id_marca ?? null,
         unitOfMeasure: unidade,
@@ -150,15 +177,15 @@ export const getProdutos = async (req: Request, res: Response) => {
         salePrice: preco,
         preco_venda: preco,
         custo_gerencial: custo,
-        currentStock: estoque,
-        estoque,
+        currentStock: 0,
+        estoque: 0,
         minStock: 0,
         status,
         tipo_recurso: item.tipo_recurso || 'PRODUTO',
         pictureUrl: null,
-        variacao: item.descricao_variacao || item.variacao || '',
-        descricao_variacao: item.descricao_variacao || item.variacao || '',
-        marca: item.marca || 'Própria',
+        variacao: item.descricao_variacao || 'Principal',
+        descricao_variacao: item.descricao_variacao || 'Principal',
+        marca: nomeMarca,
       };
     });
 
@@ -171,8 +198,8 @@ export const getProdutos = async (req: Request, res: Response) => {
 };
 
 /**
- * 🔄 [UPDATE] PUT /produtos/:id_item
- * Atualiza um produto ou variação existente no catálogo
+ * 📦 [CREATE] POST /produtos/lote
+ * Cadastra lote de itens core e dados comerciais associados com suporte a marcas
  */
 export const createProdutosLote = async (req: Request, res: Response) => {
   const rawTenantId = req.query.tenant_id || req.headers['x-tenant-id'] || req.body.tenant_id || 1;
@@ -187,7 +214,6 @@ export const createProdutosLote = async (req: Request, res: Response) => {
 
   try {
     await connection.beginTransaction();
-
     const created: Array<{ id_item: number; sku: string }> = [];
 
     for (const item of produtos) {
@@ -195,32 +221,37 @@ export const createProdutosLote = async (req: Request, res: Response) => {
       const itemRows = Array.isArray(itemRecord.skus) && itemRecord.skus.length > 0 ? itemRecord.skus : [itemRecord];
 
       for (const skuRow of itemRows) {
-        const sku = String(skuRow?.sku ?? itemRecord.sku ?? `SKU-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`).trim();
-        const nomeItem = String(skuRow?.nome_item ?? itemRecord.nome_item ?? itemRecord.nome ?? 'Produto sem nome').trim();
-        const variacao = String(skuRow?.variacao ?? itemRecord.variacao ?? 'Único').trim();
+        const skuCore = String(skuRow?.sku ?? itemRecord.sku ?? `SKU-${Date.now()}`).trim();
+        const skuCustom = skuRow?.sku_customizado ? String(skuRow.sku_customizado).trim() : null;
+        
+        const nomeCore = String(skuRow?.nome_item ?? skuRow?.name ?? skuRow?.nome ?? itemRecord.nome_item ?? itemRecord.name ?? itemRecord.nome ?? 'Produto sem nome').trim();
+        const nomeComerc = skuRow?.nome_comercial ?? skuRow?.name ?? skuRow?.nome ?? itemRecord.nome_comercial ?? itemRecord.name ?? null;
+        const nomeComercial = nomeComerc ? String(nomeComerc).trim() : null;
+
+        const variacao = String(skuRow?.variacao ?? itemRecord.variacao ?? 'Principal').trim();
         const tipoRecurso = String(skuRow?.tipo_recurso ?? itemRecord.tipo_recurso ?? 'PRODUTO').toUpperCase();
         const status = String(skuRow?.status ?? itemRecord.status ?? 'ATIVO').toUpperCase();
         const categoriaId = skuRow?.categoria_id ?? itemRecord.categoria_id;
         const familiaId = skuRow?.familia_id ?? itemRecord.familia_id;
         const idMarca = skuRow?.id_marca ?? itemRecord.id_marca;
-        const precoVenda = Number(skuRow?.preco_venda ?? itemRecord.preco_venda ?? itemRecord.preco ?? 0);
-        const custoGerencial = Number(skuRow?.custo_gerencial ?? itemRecord.custo_gerencial ?? itemRecord.custo ?? 0);
+        const precoVenda = Number(skuRow?.preco_venda ?? skuRow?.salePrice ?? itemRecord.preco ?? 0);
+        const custoGerencial = Number(skuRow?.custo_gerencial ?? skuRow?.custo ?? itemRecord.custo ?? 0);
 
         const [result] = await connection.execute(
           `INSERT INTO itens_core (tenant_id, sku, nome_item, tipo_recurso, status, descricao_variacao)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [tenantId, sku || `SKU-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, nomeItem || 'Produto sem nome', tipoRecurso, status, variacao || 'Único']
+            VALUES (?, ?, ?, ?, ?, ?)`,
+          [tenantId, skuCore, nomeCore, tipoRecurso, status, variacao]
         );
 
         const insertId = (result as any).insertId;
 
         await connection.execute(
-          `INSERT INTO comercial_produtos_dados (tenant_id, id_item, categoria_id, familia_id, id_marca, custo_gerencial, preco_venda)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [tenantId, insertId, categoriaId ? Number(categoriaId) : null, familiaId ? Number(familiaId) : null, idMarca ? Number(idMarca) : null, custoGerencial, precoVenda]
+          `INSERT INTO comercial_produtos_dados (tenant_id, id_item, sku_customizado, nome_comercial, categoria_id, familia_id, id_marca, custo_gerencial, preco_venda)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [tenantId, insertId, skuCustom, nomeComercial, categoriaId ? Number(categoriaId) : null, familiaId ? Number(familiaId) : null, idMarca ? Number(idMarca) : null, custoGerencial, precoVenda]
         );
 
-        created.push({ id_item: insertId, sku });
+        created.push({ id_item: insertId, sku: skuCustom || skuCore });
       }
     }
 
@@ -233,15 +264,16 @@ export const createProdutosLote = async (req: Request, res: Response) => {
   } catch (error: any) {
     await connection.rollback();
     console.error('Erro ao salvar lote de produtos no catálogo:', error);
-    return res.status(500).json({
-      error: 'Erro ao salvar lote de produtos no catálogo.',
-      details: error.message,
-    });
+    return res.status(500).json({ error: 'Erro ao salvar lote de produtos no catálogo.', details: error.message });
   } finally {
     connection.release();
   }
 };
 
+/**
+ * 🔄 [UPDATE] PUT /produtos/:id_item
+ * Atualiza produto unificado com suporte a marcas e aliases comerciais
+ */
 export const updateProduto = async (req: Request, res: Response) => {
   const rawId = req.params.id_item ?? req.params.idItem;
   const idItem = Number(rawId);
@@ -258,17 +290,17 @@ export const updateProduto = async (req: Request, res: Response) => {
   try {
     await connection.beginTransaction();
 
-    // 1. Atualiza os dados básicos em itens_core (caso tenham sido enviados)
     const updateCoreFields: string[] = [];
     const updateCoreValues: any[] = [];
 
-    if (payload.sku !== undefined) {
-      updateCoreFields.push('sku = ?');
-      updateCoreValues.push(payload.sku);
-    }
-    if (payload.nome_item !== undefined || payload.nome !== undefined) {
+    const coreName = payload.nome_core ?? payload.nome_item;
+    if (coreName !== undefined) {
       updateCoreFields.push('nome_item = ?');
-      updateCoreValues.push(payload.nome_item || payload.nome);
+      updateCoreValues.push(coreName);
+    }
+    if (payload.sku_core !== undefined) {
+      updateCoreFields.push('sku = ?');
+      updateCoreValues.push(payload.sku_core);
     }
     if (payload.status !== undefined) {
       updateCoreFields.push('status = ?');
@@ -287,38 +319,46 @@ export const updateProduto = async (req: Request, res: Response) => {
       );
     }
 
-    // 2. Atualiza os dados comerciais em comercial_produtos_dados
-    const updateComercialFields: string[] = [];
-    const updateComercialValues: any[] = [];
+    const skuCustomizado = payload.sku_customizado !== undefined ? (payload.sku_customizado ? String(payload.sku_customizado).trim() : null) : undefined;
+    const rawNomeComercial = payload.nome_comercial ?? payload.name ?? payload.nome;
+    const nomeComercial = rawNomeComercial !== undefined ? (rawNomeComercial ? String(rawNomeComercial).trim() : null) : undefined;
 
-    if (payload.categoria_id !== undefined) {
-      updateComercialFields.push('categoria_id = ?');
-      updateComercialValues.push(payload.categoria_id ? Number(payload.categoria_id) : null);
-    }
-    if (payload.familia_id !== undefined) {
-      updateComercialFields.push('familia_id = ?');
-      updateComercialValues.push(payload.familia_id ? Number(payload.familia_id) : null);
-    }
-    if (payload.id_marca !== undefined) {
-      updateComercialFields.push('id_marca = ?');
-      updateComercialValues.push(payload.id_marca ? Number(payload.id_marca) : null);
-    }
-    if (payload.custo_gerencial !== undefined) {
-      updateComercialFields.push('custo_gerencial = ?');
-      updateComercialValues.push(Number(payload.custo_gerencial));
-    }
-    if (payload.preco_venda !== undefined) {
-      updateComercialFields.push('preco_venda = ?');
-      updateComercialValues.push(Number(payload.preco_venda));
-    }
+    const categoriaId = payload.categoria_id !== undefined ? (payload.categoria_id ? Number(payload.categoria_id) : null) : undefined;
+    const familiaId = payload.familia_id !== undefined ? (payload.familia_id ? Number(payload.familia_id) : null) : undefined;
+    const idMarca = payload.id_marca !== undefined ? (payload.id_marca ? Number(payload.id_marca) : null) : undefined;
+    const custoGerencial = payload.custo_gerencial !== undefined ? Number(payload.custo_gerencial) : undefined;
+    const precoVenda = payload.preco_venda ?? payload.salePrice !== undefined ? Number(payload.preco_venda ?? payload.salePrice) : undefined;
 
-    if (updateComercialFields.length > 0) {
-      updateComercialValues.push(idItem, tenantId);
-      await connection.execute(
-        `UPDATE comercial_produtos_dados SET ${updateComercialFields.join(', ')} WHERE id_item = ? AND tenant_id = ?`,
-        updateComercialValues
-      );
-    }
+    await connection.execute(
+      `INSERT INTO comercial_produtos_dados 
+        (id_item, tenant_id, sku_customizado, nome_comercial, categoria_id, familia_id, id_marca, custo_gerencial, preco_venda)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE 
+          sku_customizado = COALESCE(?, sku_customizado),
+          nome_comercial = COALESCE(?, nome_comercial),
+          categoria_id = COALESCE(?, categoria_id),
+          familia_id = COALESCE(?, familia_id),
+          id_marca = COALESCE(?, id_marca),
+          custo_gerencial = COALESCE(?, custo_gerencial),
+          preco_venda = COALESCE(?, preco_venda)`,
+      [
+        idItem, tenantId, 
+        skuCustomizado ?? null, 
+        nomeComercial ?? null, 
+        categoriaId ?? null, 
+        familiaId ?? null, 
+        idMarca ?? null, 
+        custoGerencial ?? 0, 
+        precoVenda ?? 0,
+        skuCustomizado ?? null, 
+        nomeComercial ?? null, 
+        categoriaId ?? null, 
+        familiaId ?? null, 
+        idMarca ?? null, 
+        custoGerencial ?? 0, 
+        precoVenda ?? 0
+      ]
+    );
 
     await connection.commit();
 
@@ -332,6 +372,6 @@ export const updateProduto = async (req: Request, res: Response) => {
     console.error('Erro ao atualizar produto:', error);
     return res.status(500).json({ error: 'Erro ao atualizar produto.', details: error.message });
   } finally {
-    await connection.release();
+    connection.release();
   }
 };
