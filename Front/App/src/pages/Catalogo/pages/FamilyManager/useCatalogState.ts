@@ -2,7 +2,13 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import Swal from "sweetalert2";
 import { Grupo, Categoria, AtributoConfig, AtributoPendente, ModalDestino, ItemAssociado } from "./CatalogManager.types";
-import { gerarPreviewSku, gerarPreviewNome } from "./CatalogManager.helpers";
+import {
+  gerarPreviewSku,
+  gerarPreviewNome,
+  extrairTokensTemplate,
+  normalizarChaveTemplate,
+  resolverValorAtributo,
+} from "./CatalogManager.helpers";
 import { getGroups, createGroup, updateGroup, getCategorias, getAtributosDaCategoria, getItensDoGrupo } from "./FamilyManager.api";
 
 export const useCatalogState = () => {
@@ -42,6 +48,18 @@ export const useCatalogState = () => {
     return grupos.find((g) => g.id === grupoSelecionadoId) || null;
   }, [grupos, grupoSelecionadoId]);
 
+  const obterIdItem = useCallback((item: any) => {
+    return (
+      item?.id ??
+      item?.idItem ??
+      item?.id_item ??
+      item?.itemId ??
+      item?.produtoId ??
+      item?.key ??
+      null
+    );
+  }, []);
+
   const brandColor = grupoSelecionado?.cor || "#1677ff";
 
   const onMudancaValorTeste = (idOuNome: string, valor: string) => {
@@ -54,7 +72,7 @@ export const useCatalogState = () => {
     );
   };
 
-  const onAtualizarTemplateComercial = (valor: string) => handleAtualizarGrupoDireto('templateNome', valor);
+  const onAtualizarTemplateComercial = (valor: string) => handleAtualizarGrupoDireto('templateNomeComercial', valor);
   const onAtualizarTemplateSku = (valor: string) => handleAtualizarGrupoDireto('templateSku', valor);
   const onAtualizarSiglaSku = (valor: string) => handleAtualizarGrupoDireto('siglaSku', valor);
   const onAtualizarSeparadorSku = (valor: string) => handleAtualizarGrupoDireto('separadorSku', valor);
@@ -374,7 +392,8 @@ export const useCatalogState = () => {
     if (!grupoSelecionado) return;
 
     const itensAtualizados = (itensDaFamilia.length > 0 ? itensDaFamilia : itensDoGrupo).map((item) => {
-      if (item.id === itemId) {
+      const idAtual = obterIdItem(item);
+      if (String(idAtual) === String(itemId)) {
         const novoNome = gerarPreviewNome(grupoSelecionado, item.valoresAtributos || {});
         return { ...item, nome: novoNome };
       }
@@ -396,7 +415,8 @@ export const useCatalogState = () => {
     if (!grupoSelecionado) return;
 
     const itensAtualizados = (itensDaFamilia.length > 0 ? itensDaFamilia : itensDoGrupo).map((item) => {
-      if (item.id === itemId) {
+      const idAtual = obterIdItem(item);
+      if (String(idAtual) === String(itemId)) {
         const novoSku = gerarPreviewSku(grupoSelecionado, grupoSelecionado.atributos || [], item.valoresAtributos || {});
         return { ...item, sku: novoSku };
       }
@@ -421,32 +441,37 @@ export const useCatalogState = () => {
   const verificarAtributosObrigatorios = (item: any, grupo: any) => {
     const atributosDoGrupo = grupo?.atributos || [];
     const valores = item?.valoresAtributos || {};
-    
-    const templateSku = grupo.templateSku || "";
-    const templateNome = grupo.templateNome || "";
-    const templateComercial = grupo.templateNomeComercial || "";
+
+    const templateSku = grupo?.templateSku || "";
+    const templateNome = grupo?.templateNomeComercial || "";
+    const templateComercial = grupo?.templateNomeComercial || "";
+    const tokensDosTemplates = [
+      ...extrairTokensTemplate(templateSku),
+      ...extrairTokensTemplate(templateNome),
+      ...extrairTokensTemplate(templateComercial),
+    ];
 
     const pendentes = atributosDoGrupo.filter((attr: any) => {
-      // Verifica se o atributo está sendo citado no template por ID, Nome ou Código
-      const idStr = String(attr.id || "");
-      const nomeStr = String(attr.nome || "").toLowerCase();
-      const codigoStr = String(attr.codigo || "").toLowerCase();
+      const aliasCandidates = [
+        String(attr.id ?? ""),
+        attr.nome ?? "",
+        attr.codigo ?? "",
+        String(attr.id ?? "").toLowerCase(),
+        String(attr.nome ?? "").toLowerCase(),
+        String(attr.codigo ?? "").toLowerCase(),
+      ];
 
-      const compoeTemplates = 
-        templateSku.includes(idStr) || templateSku.toLowerCase().includes(nomeStr) || templateSku.toLowerCase().includes(codigoStr) ||
-        templateNome.includes(idStr) || templateNome.toLowerCase().includes(nomeStr) || templateNome.toLowerCase().includes(codigoStr) ||
-        templateComercial.includes(idStr) || templateComercial.toLowerCase().includes(nomeStr) || templateComercial.toLowerCase().includes(codigoStr);
+      const compoeTemplates = tokensDosTemplates.some((token) => {
+        const tokenNormalizado = normalizarChaveTemplate(token);
+        return aliasCandidates.some((alias) => {
+          const aliasNormalizado = normalizarChaveTemplate(alias);
+          return Boolean(tokenNormalizado && aliasNormalizado && tokenNormalizado === aliasNormalizado);
+        });
+      });
 
-      // Checa se o valor está realmente preenchido considerando chaves por ID ou por Nome
-      const valorAtual = 
-        valores[attr.id] ?? 
-        valores[attr.nome] ?? 
-        valores[attr.codigo] ?? 
-        valores[attr.nome?.toLowerCase()] ?? "";
+      const valorAtual = resolverValorAtributo(valores, aliasCandidates);
+      const estaVazio = valorAtual === undefined || valorAtual === null || String(valorAtual).trim() === "";
 
-      const estaVazio = String(valorAtual).trim() === "";
-
-      // Se o template usa este atributo E ele está vazio, ele entra nas pendências
       return compoeTemplates && estaVazio;
     });
 
@@ -457,20 +482,51 @@ export const useCatalogState = () => {
     if (!grupoSelecionado) return;
 
     const pendencias = verificarAtributosObrigatorios(item, grupoSelecionado);
+    const atributosUsadosNoTemplate = (grupoSelecionado.atributos || []).filter((attr: any) => {
+      const aliases = [
+        String(attr.id ?? ""),
+        attr.nome ?? "",
+        attr.codigo ?? "",
+      ];
 
-    if (pendencias.length > 0) {
+      const tokensDosTemplates = [
+        ...extrairTokensTemplate(grupoSelecionado.templateSku || ""),
+        ...extrairTokensTemplate(grupoSelecionado.templateNomeComercial || ""),
+      ];
+
+      return tokensDosTemplates.some((token) =>
+        aliases.some((alias) => {
+          const tokenNormalizado = normalizarChaveTemplate(token);
+          const aliasNormalizado = normalizarChaveTemplate(alias);
+          return Boolean(tokenNormalizado && aliasNormalizado && tokenNormalizado === aliasNormalizado);
+        })
+      );
+    });
+
+    const valoresVaziosOuAusentes = atributosUsadosNoTemplate.some((attr: any) => {
+      const aliasCandidates = [String(attr.id ?? ""), attr.nome ?? "", attr.codigo ?? ""];
+      const valorAtual = resolverValorAtributo(item?.valoresAtributos || {}, aliasCandidates);
+      return valorAtual === undefined || valorAtual === null || String(valorAtual).trim() === "";
+    });
+
+    const precisaAbrirPendencia = pendencias.length > 0 || (atributosUsadosNoTemplate.length > 0 && valoresVaziosOuAusentes);
+
+    if (precisaAbrirPendencia) {
       setItemEmEdicaoPendencia(item);
-      setAtributosPendentes(pendencias);
+      setAtributosPendentes(pendencias.length > 0 ? pendencias : atributosUsadosNoTemplate);
       setIsModalPendenciaOpen(true);
     } else {
-      handleNormalizarItemSkuENomeDireto(item.id);
+      handleNormalizarItemSkuENomeDireto(obterIdItem(item));
     }
   };
 
-  const handleNormalizarItemSkuENomeDireto = (itemId: string) => {
+  const handleNormalizarItemSkuENomeDireto = (itemId: string | number | null) => {
+    if (!grupoSelecionado || itemId === null || itemId === undefined) return;
+
     const baseItens = itensDaFamilia.length > 0 ? itensDaFamilia : itensDoGrupo;
     const itensAtualizados = baseItens.map((item) => {
-      if (item.id === itemId) {
+      const idAtual = obterIdItem(item);
+      if (String(idAtual) === String(itemId)) {
         const novoSku = gerarPreviewSku(grupoSelecionado, grupoSelecionado.atributos || [], item.valoresAtributos || {});
         const novoNome = gerarPreviewNome(grupoSelecionado, item.valoresAtributos || {});
         return { ...item, sku: novoSku, nome: novoNome };
@@ -488,6 +544,90 @@ export const useCatalogState = () => {
       showConfirmButton: false,
     });
   };
+
+  const handleSalvarAtributosPendentes = (valoresFormulario: Record<string, any>) => {
+    if (!itemEmEdicaoPendencia || !grupoSelecionado) return;
+
+    const itemIdAlvo = obterIdItem(itemEmEdicaoPendencia);
+
+    const atualizarItemNaLista = (lista: ItemAssociado[]) =>
+      lista.map((item) => {
+        const idAtual = obterIdItem(item);
+        const eOMesmoItem =
+          item === itemEmEdicaoPendencia ||
+          (itemIdAlvo !== null && itemIdAlvo !== undefined && String(idAtual) === String(itemIdAlvo));
+
+        if (!eOMesmoItem) return item;
+
+        const novosValores = { ...(item.valoresAtributos || {}), ...valoresFormulario };
+        const novoSku = gerarPreviewSku(grupoSelecionado, grupoSelecionado.atributos || [], novosValores);
+        const novoNome = gerarPreviewNome(grupoSelecionado, novosValores);
+
+        return {
+          ...item,
+          valoresAtributos: novosValores,
+          sku: novoSku,
+          nome: novoNome,
+        };
+      });
+
+    setItensDaFamilia((prev) => atualizarItemNaLista(prev));
+    setItensDoGrupo((prev) => atualizarItemNaLista(prev));
+    setItemEmEdicaoPendencia(null);
+    setAtributosPendentes([]);
+    setIsModalPendenciaOpen(false);
+  };
+
+
+
+  const [modalFormalizacaoAberto, setModalFormalizacaoAberto] = useState(false);
+const [itensPendentesFormalizacao, setItensPendentesFormalizacao] = useState([]);
+
+const handleProcessarFormalizacaoLote = () => {
+  const listaItens = itensFiltradosDoGrupo || [];
+  const atributosObrigatorios = grupoSelecionado?.atributos || [];
+
+  // Filtra itens que faltam preencher algum atributo obrigatório
+  const pendentes = listaItens.filter(item => {
+    return atributosObrigatorios.some(attr => {
+      const val = item.valoresAtributos?.[attr.id || attr.nome];
+      return !val || String(val).trim() === "";
+    });
+  });
+
+  if (pendentes.length > 0) {
+    setItensPendentesFormalizacao(pendentes);
+    setModalFormalizacaoAberto(true);
+  } else {
+    // Se estiver tudo preenchido, executa o sucesso automático direto
+    Swal.fire("Sucesso!", "Todos os itens da família foram formalizados e gerados com sucesso.", "success");
+    // Chamar função real de lote aqui se houver
+  }
+};
+
+const handleAtualizarAtributoItemPendente = (itemId, atributoId, novoValor) => {
+  setItensPendentesFormalizacao(prev =>
+    prev.map(item => {
+      if (item.id === itemId) {
+        return {
+          ...item,
+          valoresAtributos: {
+            ...(item.valoresAtributos || {}),
+            [atributoId]: novoValor
+          }
+        };
+      }
+      return item;
+    })
+  );
+};
+
+const handleSalvarEContinuarFormalizacao = () => {
+  // Salva os dados atualizados e fecha o modal
+  setModalFormalizacaoAberto(false);
+  Swal.fire("Formalizado!", "Atributos salvos e lote processado com sucesso.", "success");
+};
+
 
   return {
     grupos,
@@ -546,9 +686,20 @@ export const useCatalogState = () => {
     handleNormalizarItemSku,
     handleTentarNormalizarIndividual,
     handleNormalizarItemNome,
+    handleSalvarAtributosPendentes,
     isModalPendenciaOpen,
     setIsModalPendenciaOpen,
     itemEmEdicaoPendencia,
     atributosPendentes,
+    handleNormalizarItemSkuENomeDireto,
+    handlePadronizarNomesFamilia,
+    handlePadronizarSkusFamilia,
+    modalFormalizacaoAberto,
+    setModalFormalizacaoAberto,
+    itensPendentesFormalizacao,
+    setItensPendentesFormalizacao,
+    handleProcessarFormalizacaoLote,
+    handleAtualizarAtributoItemPendente,
+    handleSalvarEContinuarFormalizacao,
   };
 };

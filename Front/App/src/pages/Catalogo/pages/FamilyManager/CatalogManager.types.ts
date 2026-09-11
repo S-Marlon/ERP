@@ -151,8 +151,12 @@ export type CategoriaTreeNode = {
 };
 
 export interface ItemAssociado {
-  id: string;
-  sku: string;
-  nome: string;
-  ativo: boolean;
+  valoresAtributos?: Record<string, any>;
+  id?: string | number;
+  idItem?: string | number;
+  nome?: string;
+  nomeItem?: string;
+  sku?: string;
+  ativo?: boolean;
+  [key: string]: any;
 }

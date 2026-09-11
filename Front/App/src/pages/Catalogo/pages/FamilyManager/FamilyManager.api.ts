@@ -183,18 +183,27 @@ export const getItensDoGrupo = async (grupoId: string, tenantId: number = 1): Pr
   const dados = await handleResponse<any[]>(response, 'Erro ao carregar itens associados.');
 
   // Mapeamento compatível com a interface ItemAssociado do front-end
-  return dados.map((item: any): ItemAssociado => ({
-    idItem: String(item.idItem),
-    sku: item.skuCustomizado || item.skuGlobal || '',
-    nomeItem: item.nomeComercial || item.nomeItemGlobal || 'Produto Sem Nome',
-    tipoRecurso: item.tipoRecurso || 'PRODUTO',
-    status: item.statusItem || 'ATIVO',
-    precoVenda: Number(item.precoVenda || 0),
-    custoGerencial: Number(item.custoGerencial || 0),
-    margemLucro: Number(item.margemLucro || 0),
-    exibirNoPdv: Boolean(item.exibirNoPdv),
-    podeVenderSemEstoque: Boolean(item.podeVenderSemEstoque),
-    descricaoComercial: item.descricaoComercial || ''
-  }));
+  return dados.map((item: any): ItemAssociado => {
+    const idItem = String(item.id ?? item.idItem ?? item.id_item ?? '');
+    const nomeProduto = item.nomeComercial || item.nomeItem || item.nomeItemGlobal || item.nome || 'Produto Sem Nome';
+    const skuProduto = item.skuCustomizado || item.skuGlobal || item.sku || '';
+
+    return {
+      id: idItem,
+      idItem: idItem,
+      sku: skuProduto,
+      nome: nomeProduto,
+      nomeItem: nomeProduto,
+      valoresAtributos: item.valoresAtributos || {},
+      tipoRecurso: item.tipoRecurso || 'PRODUTO',
+      status: item.statusItem || 'ATIVO',
+      precoVenda: Number(item.precoVenda || 0),
+      custoGerencial: Number(item.custoGerencial || 0),
+      margemLucro: Number(item.margemLucro || 0),
+      exibirNoPdv: Boolean(item.exibirNoPdv),
+      podeVenderSemEstoque: Boolean(item.podeVenderSemEstoque),
+      descricaoComercial: item.descricaoComercial || ''
+    };
+  });
 };
 
