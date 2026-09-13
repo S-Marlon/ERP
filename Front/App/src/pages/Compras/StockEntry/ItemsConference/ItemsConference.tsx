@@ -562,7 +562,7 @@ export const ItemsConference: React.FC<Props> = ({
     {
       title: 'Composição',
       key: 'costComposition',
-      width: 95,
+      width: 150,
       render: (_, record: any) => {
         const prodData = record.prod || record;
         const quantidade = Number(prodData.qCom || record.quantidade || 1);
@@ -571,8 +571,11 @@ export const ItemsConference: React.FC<Props> = ({
 
         const imposto = record.imposto || {};
 
-        const freightVal = Number(prodData.vFrete || record.freightAdded || 0);
-        const freightUnit = quantidade > 0 ? freightVal / quantidade : 0;
+        const freightOriginal = Number(record.freightOriginal ?? prodData.vFrete ?? 0);
+        const freightDistributed = Number(record.freightDistributed || 0);
+        const freightVal = Number(record.freightAdded ?? (freightDistributed || freightOriginal));
+        const quantidadeSegura = quantidade > 0 ? quantidade : 1;
+        const freightUnit = freightVal / quantidadeSegura;
 
         const ipiVal = Number(imposto.ipi?.vIPI || prodData.vIPI || 0);
         const ipiUnit = quantidade > 0 ? ipiVal / quantidade : 0;
@@ -589,12 +592,20 @@ export const ItemsConference: React.FC<Props> = ({
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-              <span style={{ color: '#8c8c8c' }}>Frete:</span>
-              {freightUnit > 0 ? (
-                <Text type="success" style={{ fontSize: 11 }}>+{formatCurrency(freightUnit)}</Text>
+              <span style={{ color: '#8c8c8c' }}>Frete original:</span>
+              <Text style={{ fontSize: 11 }}>{formatCurrency(freightOriginal / quantidadeSegura)}</Text>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+              <span style={{ color: '#8c8c8c' }}>Frete distribuído:</span>
+              {freightDistributed > 0 ? (
+                <Text type="success" style={{ fontSize: 11 }}>+{formatCurrency(freightDistributed / quantidadeSegura)}</Text>
               ) : (
                 <Text type="secondary" style={{ fontSize: 10 }}>—</Text>
               )}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+              <span style={{ color: '#8c8c8c' }}>Frete considerado:</span>
+              <Text strong style={{ fontSize: 11 }}>{formatCurrency(freightUnit)}</Text>
             </div>
 
             {ipiUnit > 0 && (
@@ -626,9 +637,9 @@ export const ItemsConference: React.FC<Props> = ({
         const valorProd = Number(prodData.vProd || 0);
         const unitBase = nfQty > 0 ? valorProd / nfQty : 0;
 
-        const freightUnit = (Number(prodData.vFrete || record.freightAdded || 0)) / nfQty;
+        const freightUnit = Number(record.freightAdded ?? record.freightDistributed ?? prodData.vFrete ?? 0) / nfQty;
         const ipiUnit = (Number(imposto.ipi?.vIPI || prodData.vIPI || 0)) / nfQty;
-        const stUnit = (Number(imposto.icmsSt?.vICMSST || imposto.vBCST || prodData.vST || 0)) / nfQty;
+        const stUnit = (Number(imposto.icmsSt?.vICMSST || imposto.ICMSST?.vICMSST || imposto.icms?.vICMSST || imposto.vBCST || prodData.vST || 0)) / nfQty;
 
         const finalUnitCost = unitBase + freightUnit + ipiUnit;
 
@@ -785,7 +796,7 @@ export const ItemsConference: React.FC<Props> = ({
               const totalNfAmount = valorProd;
 
               // Captura dos totais da linha
-              const freightVal = Number(prodData.vFrete || record.freightAdded || 0);
+              const freightVal = Number(record.freightAdded ?? record.freightDistributed ?? prodData.vFrete ?? 0);
               const ipiVal = Number(imposto.ipi?.vIPI || prodData.vIPI || 0);
 
               const stObj = imposto.icmsSt || imposto.ICMSST || imposto.icms || {};
@@ -955,14 +966,16 @@ export const ItemsConference: React.FC<Props> = ({
           const totalProd = Number(prod.vProd || 0);
           const unitBase = qtd > 0 ? totalProd / qtd : 0;
 
-          const freightPortion = Number(prod.vFrete || itemForDetails.freightAdded || 0);
+            const freightOriginal = Number(itemForDetails.freightOriginal ?? prod.vFrete ?? 0);
+            const freightDistributed = Number(itemForDetails.freightDistributed || 0);
+            const freightPortion = Number(itemForDetails.freightAdded ?? (freightDistributed || freightOriginal));
           const freightUnit = qtd > 0 ? freightPortion / qtd : 0;
 
           const ipiObj = imposto.ipi?.IPITrib || imposto.ipi || {};
           const ipiPortion = Number(ipiObj.vIPI || prod.vIPI || 0);
           const ipiUnit = qtd > 0 ? ipiPortion / qtd : 0;
 
-          const stObj = imposto.icmsSt || imposto.ICMSST || {};
+          const stObj = imposto.icmsSt || imposto.ICMSST || imposto.icms || {};
           const stPortion = Number(stObj.vICMSST || stObj.VICMSST || imposto.vBCST || prod.vST || 0);
           const stUnit = qtd > 0 ? stPortion / qtd : 0;
 
@@ -1050,6 +1063,12 @@ export const ItemsConference: React.FC<Props> = ({
                 </Descriptions.Item>
                 <Descriptions.Item label="Frete Alocado ao Item">
                   {Number(freightPortion).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </Descriptions.Item>
+                <Descriptions.Item label="Frete Original (XML)">
+                  {freightOriginal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </Descriptions.Item>
+                <Descriptions.Item label="Frete Distribuído">
+                  {freightDistributed.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                 </Descriptions.Item>
                 <Descriptions.Item label="IPI (Trib / Enq)">
                   {Number(ipiPortion).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} <Text type="secondary">(CST: {ipiObj.CST || 'N/A'} | Alíq: {ipiObj.pIPI ? `${ipiObj.pIPI}%` : '0%'})</Text>

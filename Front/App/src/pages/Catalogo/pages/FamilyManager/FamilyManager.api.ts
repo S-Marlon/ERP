@@ -207,3 +207,24 @@ export const getItensDoGrupo = async (grupoId: string, tenantId: number = 1): Pr
   });
 };
 
+export const getDiagnosticoFormalizacao = async (familiaId: string, tenantId: number = 1): Promise<any> => {
+  const response = await fetch(`${API_BASE_URL}/cadastros/familias/${familiaId}/formalizacao?tenant_id=${tenantId}`, {
+    method: 'GET',
+    headers: DEFAULT_HEADERS,
+  });
+  return handleResponse<any>(response, 'Erro ao diagnosticar a formalização da família.');
+};
+
+export const formalizarItensDaFamilia = async (
+  familiaId: string,
+  itens: Array<{ idItem: string | number; atributos: Record<string, any> }>,
+  tenantId: number = 1
+): Promise<any> => {
+  const response = await fetch(`${API_BASE_URL}/cadastros/familias/${familiaId}/formalizacao?tenant_id=${tenantId}`, {
+    method: 'POST',
+    headers: DEFAULT_HEADERS,
+    body: JSON.stringify({ itens }),
+  });
+  return handleResponse<any>(response, 'Erro ao formalizar os itens da família.');
+};
+

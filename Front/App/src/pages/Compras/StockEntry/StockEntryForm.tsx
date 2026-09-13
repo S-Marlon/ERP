@@ -38,6 +38,8 @@ import PhysicalConferenceTable from './PhysicalConferenceTable';
 
 // Importando o parser completo modularizado
 import { parseNfeComplete, NfeDataFromXML } from './xml/utils/nfeParser';
+import { reconcileFreight } from './freightReconciliation';
+import { reconcileFinancial } from './financialReconciliation';
 
 const { Title, Text } = Typography;
 
@@ -58,7 +60,6 @@ const StockEntryForm: React.FC = () => {
   // Estado para o Modal de Distribuição de Frete
   const [isFreightModalOpen, setIsFreightModalOpen] = useState<boolean>(false);
   const [freightDistributionMode, setFreightDistributionMode] = useState<string>('proportional_value');
-  const [freightDistributedStatus, setFreightDistributedStatus] = useState<boolean>(false);
 
   // Estados temporários para criação de fornecedor
   const [supplierCreationName, setSupplierCreationName] = useState<string>('');
@@ -77,39 +78,31 @@ const StockEntryForm: React.FC = () => {
 
   // Valor total da NF-e extraído do XML
   const nfeTotalValue = useMemo(() => {
-    return parsedNfe?.totais?.vNF ? parseFloat(parsedNfe.totais.vNF) : 0;
+    return Number(parsedNfe?.totais?.icmsTot?.vNF || 0) || 0;
   }, [parsedNfe]);
 
   // Valor do Frete extraído do XML
   const nfeFreightValue = useMemo(() => {
-    return parsedNfe?.totais?.icmsTot?.vFrete ? parseFloat(parsedNfe.totais.icmsTot.vFrete) : 0;
+    return Number(parsedNfe?.totais?.icmsTot?.vFrete || 0) || 0;
   }, [parsedNfe]);
 
-  // Soma do total dos produtos presentes no XML/Tabela
-  // Soma do total dos produtos presentes na tabela/itens atuais
-  const calculatedItemsTotal = useMemo(() => {
-    return items.reduce((acc, item) => {
-      // Prioriza o valorTotal calculado com os acréscimos, ou faz o fallback seguro
-      const itemTotal = item.valorTotal || ((item.quantidade || 0) * (item.valorUnitario || 0));
-      return acc + itemTotal;
-    }, 0);
-  }, [items]);
+  const freightReconciliation = useMemo(() => {
+    return reconcileFreight(nfeFreightValue, items);
+  }, [nfeFreightValue, items]);
 
-  const nfeProdTotal = useMemo(() => {
-    return parsedNfe?.totais?.icmsTot?.vProd ? parseFloat(parsedNfe.totais.icmsTot.vProd) : nfeTotalValue;
-  }, [parsedNfe, nfeTotalValue]);
-
-  // Cálculo da diferença absoluta
-  const financialDifference = useMemo(() => {
-    return Math.abs(nfeProdTotal - calculatedItemsTotal);
-  }, [nfeProdTotal, calculatedItemsTotal]);
-
-  // Margem de tolerância de até 2% sobre o valor esperado da nota
-  const isWithinTolerance = useMemo(() => {
-    if (nfeProdTotal <= 0) return true;
-    const toleranceLimit = nfeProdTotal * 0.02; // 2% de margem
-    return financialDifference <= toleranceLimit || financialDifference < 0.05;
-  }, [nfeProdTotal, financialDifference]);
+  const financialReconciliation = useMemo(() => {
+    const totals = parsedNfe?.totais?.icmsTot;
+    return reconcileFinancial({
+      produtos: totals?.vProd,
+      frete: totals?.vFrete,
+      seguro: totals?.vSeg,
+      outrasDespesas: totals?.vOutro,
+      desconto: totals?.vDesc,
+      ipi: totals?.vIPI,
+      icmsSt: totals?.vICMSST,
+      total: totals?.vNF,
+    }, items);
+  }, [parsedNfe, items]);
 
 
 
@@ -148,8 +141,8 @@ const StockEntryForm: React.FC = () => {
               const ipiObj = item.imposto?.ipi?.IPITrib || item.imposto?.IPI?.ipitrib || item.imposto?.ipi || {};
               const vIpiItem = parseFloat(ipiObj.vIPI || ipiObj.VIPI || '0') || 0;
 
-              const stObj = item.imposto?.icmsSt || item.imposto?.ICMSST || {};
-              const vStItem = parseFloat(stObj.vICMSST || stObj.VICMSST || item.imposto?.vBCST || '0') || 0;
+              const icmsObj = item.imposto?.icms || {};
+              const vStItem = Number(icmsObj.vICMSST || icmsObj.vBCST || 0) || 0;
 
               const totalAcrescimosItem = freightItem + otherExpenses + insuranceItem + vIpiItem + vStItem;
 
@@ -159,8 +152,7 @@ const StockEntryForm: React.FC = () => {
               // Custo unitário efetivo já rateando os acréscimos
               const effectiveUnitCost = qtdXml > 0 ? valorTotalRealItem / qtdXml : vlrUnit;
 
-              const icmsObj = item.imposto?.icms || item.imposto?.ICMS || {};
-              const vIcmsItem = parseFloat(icmsObj.vICMS || icmsObj.VICMS || '0') || 0;
+              const vIcmsItem = Number(icmsObj.vICMS || 0) || 0;
 
               const totalTaxes = vIcmsItem + vIpiItem + freightItem + otherExpenses;
 
@@ -177,7 +169,15 @@ const StockEntryForm: React.FC = () => {
                 valorUnitario: Number(effectiveUnitCost.toFixed(4)),
                 valorBaseUnitario: Number(baseUnitCalculated.toFixed(4)), // 👈 Restaurado com fallback seguro para nunca zerar
                 valorTotal: valorTotalRealItem,
+                valorProdutos: vlrProd,
+                freightOriginal: freightItem,
+                freightDistributed: 0,
                 freightAdded: freightItem,
+                seguro: insuranceItem,
+                outrasDespesas: otherExpenses,
+                desconto: parseFloat(item.prod.vDesc || '0') || 0,
+                ipi: vIpiItem,
+                icmsSt: vStItem,
                 prod: {
                   ...item.prod,
                   qCom: String(qtdXml),
@@ -197,7 +197,6 @@ const StockEntryForm: React.FC = () => {
 
 
             setItems(initialItems);
-            setFreightDistributedStatus(false);
             if (parsed.emitente?.nome) {
               setSupplierCreationName(parsed.emitente.nome);
               setSupplierCreationFantasyName(parsed.emitente.nomeFantasia || '');
@@ -222,14 +221,18 @@ const StockEntryForm: React.FC = () => {
 
   // Função para aplicar a distribuição de frete nos itens
   const handleApplyFreightDistribution = () => {
-    const totalItens = calculatedItemsTotal;
+    const totalItens = items.reduce((total, item) => {
+      const freteConsiderado = Number(item.freightAdded) || 0;
+      return total + Math.max(0, (Number(item.valorTotal) || 0) - freteConsiderado);
+    }, 0);
     if (totalItens <= 0) {
       message.error("Não há valor nos itens para ratear o frete.");
       return;
     }
 
     setItems(prevItems => prevItems.map(item => {
-      const itemProdTotal = item.valorTotal || ((item.quantidade || 0) * (item.valorUnitario || 0));
+      const freteAtual = Number(item.freightAdded) || 0;
+      const itemProdTotal = Math.max(0, (Number(item.valorTotal) || 0) - freteAtual);
       let freightPortion = 0;
 
       if (freightDistributionMode === 'proportional_value') {
@@ -243,15 +246,18 @@ const StockEntryForm: React.FC = () => {
         freightPortion = prevItems.length > 0 ? nfeFreightValue / prevItems.length : 0;
       }
 
-      const newUnitCost = (item.valorUnitario || 0) + (freightPortion / (item.quantidade || 1));
+      const quantidade = Number(item.quantidade) || 1;
+      const novoValorTotal = itemProdTotal + freightPortion;
+      const newUnitCost = novoValorTotal / quantidade;
       return {
         ...item,
         valorUnitario: Number(newUnitCost.toFixed(4)),
-        freightAdded: freightPortion
+        valorTotal: Number(novoValorTotal.toFixed(2)),
+        freightDistributed: Number(freightPortion.toFixed(2)),
+        freightAdded: Number(freightPortion.toFixed(2)),
       };
     }));
 
-    setFreightDistributedStatus(true);
     setIsFreightModalOpen(false);
     message.success("Frete distribuído com sucesso entre os custos unitários dos itens!");
   };
@@ -299,8 +305,6 @@ const StockEntryForm: React.FC = () => {
   const totalDivergences = useMemo(() => items.filter(i => i.difference !== 0).length, [items]);
   const totalConfirmed = useMemo(() => items.filter(i => i.isConfirmed).length, [items]);
   const totalPhysicalItems = useMemo(() => items.reduce((acc, it) => acc + (it.receivedQuantity || 0), 0), [items]);
-  const adjustedPhysicalSubtotal = useMemo(() => items.reduce((acc, it) =>  ((it.receivedQuantity || 0) * (it.valorUnitario || 0)) , 0), [items]);
-
   const progressPercent = useMemo(() => {
     if (items.length === 0) return 0;
     return Math.round((totalConfirmed / items.length) * 100);
@@ -503,92 +507,51 @@ body { font-family: Arial, sans-serif; font-size: 11px; color: #000; margin: 0; 
 
             
              {/* Alerta 1: Validação Financeira */}
-             {(() => {
-               const currentTotalNf = parsedNfe?.totais?.vNF || parsedNfe?.totais?.icmsTot?.vNF || 0;
-               const numericTotalNf = parseFloat(String(currentTotalNf)) || 0;
-
-               // Define o total de produtos de forma segura
-               const subtotalCalculado = adjustedPhysicalSubtotal > 0 
-                 ? adjustedPhysicalSubtotal 
-                 : calculatedItemsTotal || numericTotalNf;
-
-               // Cálculo matematicamente seguro e direto da diferença e da porcentagem
-               const realDifference = Math.abs(subtotalCalculado - numericTotalNf);
-               const diffPercentage = numericTotalNf > 0 
-                 ? (realDifference / numericTotalNf) * 100 
-                 : 0;
-
-               if (numericTotalNf > 0 || items.length > 0) {
-                 return isWithinTolerance ? (
-                   <Alert
-                     type="success"
-                     showIcon
-                     message={realDifference > 0 ? "Valores Correspondem (Com Ajuste de Arredondamento)" : "Valores Financeiros Correspondem"}
-                     description={
-                       <div>
-                         <span>{realDifference > 0 ? "Diferença de centavos aceita pela margem de tolerância." : "O total está dentro da margem aceitável."}</span>
-                         <div style={{ fontSize: '12px', color: '#595959', marginTop: 4 }}>
-                           Calculado: R$ {subtotalCalculado.toFixed(2)} | NF: R$ {numericTotalNf.toFixed(2)} <br />
-                           Variação: R$ {realDifference.toFixed(2)} ({diffPercentage.toFixed(2)}%)
-                         </div>
-                       </div>
-                     }
-                   />
-                 ) : (
-                   <Alert
-                     type="warning"
-                     showIcon
-                     message="Divergência Financeira Detectada"
-                     description={
-                       <div>
-                         <span>A diferença entre os valores ultrapassou o limite de tolerância estabelecido.</span>
-                         <div style={{ fontSize: '12px', marginTop: 4 }}>
-                           <strong>Calculado (Itens):</strong> R$ {subtotalCalculado.toFixed(2)} <br />
-                           <strong>Esperado (NF-e):</strong> R$ {numericTotalNf.toFixed(2)} <br />
-                           <strong>Diferença:</strong> R$ {realDifference.toFixed(2)} ({diffPercentage.toFixed(2)}% de desvio)
-                         </div>
-                       </div>
-                     }
-                   />
-                 );
-               }
-
-               return (
-                 <Alert
-                   type="info"
-                   showIcon
-                   message="Aguardando XML"
-                   description="Importe um XML para validar os valores financeiros."
-                 />
-               );
-             })()}
+             {items.length > 0 || nfeTotalValue > 0 ? (
+               <Alert
+                 type={financialReconciliation.matches ? "success" : "error"}
+                 showIcon
+                 message={financialReconciliation.matches ? "Valores Financeiros Correspondem" : "Divergência Financeira Detectada"}
+                 description={
+                   <div style={{ fontSize: '12px' }}>
+                     <div>Produtos: NF R$ {financialReconciliation.note.produtos.toFixed(2)} | Itens R$ {financialReconciliation.items.produtos.toFixed(2)}</div>
+                     <div>Frete: NF R$ {financialReconciliation.note.frete.toFixed(2)} | Itens R$ {financialReconciliation.items.frete.toFixed(2)}</div>
+                     <div>IPI: NF R$ {financialReconciliation.note.ipi.toFixed(2)} | Itens R$ {financialReconciliation.items.ipi.toFixed(2)}</div>
+                     <div>ICMS-ST: NF R$ {financialReconciliation.note.icmsSt.toFixed(2)} | Itens R$ {financialReconciliation.items.icmsSt.toFixed(2)}</div>
+                     <div>Total: NF R$ {financialReconciliation.note.total.toFixed(2)} | Itens R$ {financialReconciliation.items.total.toFixed(2)}</div>
+                     <strong>Diferença total: R$ {financialReconciliation.totalDifference.toFixed(2)}</strong>
+                   </div>
+                 }
+               />
+             ) : (
+               <Alert
+                 type="info"
+                 showIcon
+                 message="Aguardando XML"
+                 description="Importe um XML para validar os valores financeiros."
+               />
+             )}
 
              {/* Alerta 3: Distribuição de Frete */}
-             {nfeFreightValue > 0 ? (
-               freightDistributedStatus ? (
-                 <Alert
-                   type="success"
-                   showIcon
-                   message="Frete Distribuído"
-                   description={`O valor de R$ ${nfeFreightValue.toFixed(2)} foi rateado entre os itens.`}
-                 />
-               ) : (
-                 <Alert
-                   type="warning"
-                   showIcon
-                   message="Frete Identificado"
-                   description={
-                     <div>
-                       <span>Esta NF-e possui frete de <strong>R$ {nfeFreightValue.toFixed(2)}</strong>.</span>
-                       <div style={{ marginTop: 6 }}>
-                         <Button size="small" type="primary" ghost icon={<CarOutlined />} onClick={() => setIsFreightModalOpen(true)}>
-                           Configurar Rateio
-                         </Button>
-                       </div>
-                     </div>
-                   }
-                 />
-               )
+             {(nfeFreightValue > 0 || freightReconciliation.itemsTotal > 0) ? (
+               <Alert
+                 type={freightReconciliation.matches ? "success" : "error"}
+                 showIcon
+                 message={freightReconciliation.matches ? "Frete conciliado" : "Divergência de frete"}
+                 description={
+                   <div>
+                     <div>Frete da NF-e: <strong>R$ {freightReconciliation.noteTotal.toFixed(2)}</strong></div>
+                     <div>Frete considerado nos itens: <strong>R$ {freightReconciliation.itemsTotal.toFixed(2)}</strong></div>
+                     <div>Diferença: <strong>R$ {freightReconciliation.difference.toFixed(2)}</strong></div>
+
+                     {!freightReconciliation.matches && (
+                       <Button size="small" type="primary" ghost icon={<CarOutlined />} onClick={() => setIsFreightModalOpen(true)} style={{ marginTop: 6 }}>
+                         Configurar Rateio
+                       </Button>
+                     )}
+                   </div>
+                 }
+               />
              ) : null}
 
              {/* Alerta 4: Validade e Lotes (Inspeção Qualitativa) */}
@@ -754,7 +717,6 @@ body { font-family: Arial, sans-serif; font-size: 11px; color: #000; margin: 0; 
 
                 <Statistic
                   title={<Text strong style={{ fontSize: 13 }}>Custo Ajustado Total</Text>}
-                  // value={adjustedPhysicalSubtotal > 0 ? adjustedPhysicalSubtotal : parseFloat(parsedNfe?.totais?.icmsTot?.vNF || '0')}
                   value={parseFloat(parsedNfe?.totais?.icmsTot?.vNF || '0')}
                   value={parseFloat(parsedNfe?.totais?.icmsTot?.vNF || '0')}
                   precision={2}

@@ -74,6 +74,16 @@ export interface Item extends ProdutoNF {
   grupo?: string | null; // Adicionado para suporte ao handleAssignGroupToItems
   grupoVariacao?: string | null;
   atributosCustomizados?: ItemAtributo[];
+  freightOriginal?: number;
+  freightDistributed?: number;
+  freightAdded?: number;
+  valorTotal?: number;
+  valorProdutos?: number;
+  seguro?: number;
+  outrasDespesas?: number;
+  desconto?: number;
+  ipi?: number;
+  icmsSt?: number;
 }
 
 /**

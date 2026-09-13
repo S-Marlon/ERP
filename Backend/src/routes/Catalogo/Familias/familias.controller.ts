@@ -3,6 +3,172 @@
 import { Request, Response } from 'express';
 import pool from '../../Estoque/db.config'; 
 
+type DbConnection = Awaited<ReturnType<typeof pool.getConnection>>;
+
+const normalizarToken = (valor: unknown): string => String(valor ?? '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^a-zA-Z0-9]/g, '')
+  .toLowerCase();
+
+const extrairTokens = (template: string): string[] => Array.from(new Set(
+  (template || '').match(/\{([^}]+)\}|\[([^\]]+)\]/g)?.map(token =>
+    token.replace(/^[\[{]/, '').replace(/[\]}]$/, '').trim()
+  ) || []
+));
+
+const resolverValor = (valores: Record<string, any>, aliases: unknown[]): any => {
+  for (const alias of aliases) {
+    const chave = String(alias ?? '').trim();
+    if (!chave) continue;
+    const direta = valores[chave];
+    if (direta !== undefined && direta !== null && String(direta).trim() !== '') return direta;
+    const chaveEncontrada = Object.keys(valores).find(item => normalizarToken(item) === normalizarToken(chave));
+    if (chaveEncontrada && valores[chaveEncontrada] !== undefined && valores[chaveEncontrada] !== null) {
+      return valores[chaveEncontrada];
+    }
+  }
+  return undefined;
+};
+
+const obterValorAtributo = (valor: any): any => {
+  if (!valor) return undefined;
+  if (valor.valor_texto !== null && valor.valor_texto !== undefined) return valor.valor_texto;
+  if (valor.valor_numero !== null && valor.valor_numero !== undefined) return valor.valor_numero;
+  if (valor.valor_decimal !== null && valor.valor_decimal !== undefined) return valor.valor_decimal;
+  if (valor.valor_data !== null && valor.valor_data !== undefined) return valor.valor_data;
+  if (valor.valor_boolean !== null && valor.valor_boolean !== undefined) return valor.valor_boolean;
+  return valor.valor_opcao ?? valor.codigo_opcao;
+};
+
+const estaVazio = (valor: any): boolean => valor === undefined || valor === null || String(valor).trim() === '';
+
+const montarTextoTemplate = (
+  template: string,
+  familia: any,
+  atributos: any[],
+  valores: Record<string, any>,
+  variacao = ''
+): string => (template || '').replace(/\{([^}]+)\}|\[([^\]]+)\]/g, (_token, chaveBrace, chaveColchete) => {
+  const token = String(chaveBrace || chaveColchete || '').trim();
+  const tokenNormalizado = normalizarToken(token);
+  const reservados: Record<string, any> = {
+    familia: familia.nome,
+    grupo: familia.nome,
+    sigla: familia.siglaSku,
+    s: familia.separadorSku,
+    separador: familia.separadorSku,
+    variacao
+  };
+  if (Object.prototype.hasOwnProperty.call(reservados, tokenNormalizado)) {
+    return String(reservados[tokenNormalizado] ?? '');
+  }
+
+  const atributo = atributos.find(attr => [attr.id, attr.nome, attr.codigo]
+    .some(alias => normalizarToken(alias) === tokenNormalizado));
+  if (!atributo) return `[${token}]`;
+  const valor = resolverValor(valores, [atributo.id, atributo.nome, atributo.codigo, token]);
+  return estaVazio(valor) ? `[${token}]` : String(valor);
+});
+
+const carregarContextoFormalizacao = async (connection: DbConnection, familiaId: string, tenantId: number) => {
+  const [familiaRows] = await connection.execute(`
+    SELECT f.id, f.nome, f.categoria_id AS categoriaId, f.sigla_sku AS siglaSku,
+           f.separador_sku AS separadorSku, f.template_sku AS templateSku,
+           f.template_nome AS templateNomeComercial
+    FROM comercial_familias f
+    WHERE f.id = ? AND f.tenant_id = ?
+    LIMIT 1
+  `, [familiaId, tenantId]);
+  const familia = (familiaRows as any[])[0];
+  if (!familia) return null;
+
+  const [atributoRows] = await connection.execute(`
+    SELECT core.id_entidade, core.tipo_entidade, a.id, a.nome, a.codigo,
+           core.escopo_comercial AS classificacao, a.tipo AS tipoDado,
+           core.obrigatorio, core.compoe_sku AS compoeSku,
+           core.gera_variacao AS geraVariacao, core.valor_padrao_grupo AS valorPadraoGrupo,
+           core.ordem AS ordemSku
+    FROM atributos_core_entidades core
+    INNER JOIN atributos_comercial a
+      ON a.id = core.atributo_id AND a.tenant_id = core.tenant_id
+    WHERE core.tenant_id = ? AND core.ativo = 1
+      AND ((core.tipo_entidade = 'familia' AND core.id_entidade = ?)
+        OR (core.tipo_entidade = 'categoria' AND core.id_entidade = ?))
+    ORDER BY core.ordem ASC, a.nome ASC
+  `, [tenantId, familia.id, familia.categoriaId]);
+
+  const atributosPorId = new Map<string, any>();
+  for (const atributo of atributoRows as any[]) {
+    const chave = String(atributo.id);
+    const anterior = atributosPorId.get(chave);
+    if (!anterior || atributo.tipo_entidade === 'familia') {
+      atributosPorId.set(chave, {
+        id: String(atributo.id),
+        nome: atributo.nome,
+        codigo: atributo.codigo || '',
+        classificacao: atributo.classificacao || 'ficha',
+        tipoDado: atributo.tipoDado,
+        obrigatorio: Boolean(atributo.obrigatorio),
+        compoeSku: Boolean(atributo.compoeSku),
+        geraVariacao: Boolean(atributo.geraVariacao),
+        valorPadraoGrupo: atributo.valorPadraoGrupo || '',
+        ordemSku: Number(atributo.ordemSku || 0),
+        origem: atributo.tipo_entidade === 'categoria' ? 'herdados' : 'locais'
+      });
+    }
+  }
+
+  return { familia, atributos: Array.from(atributosPorId.values()) };
+};
+
+const carregarItensComValores = async (connection: DbConnection, familiaId: string, tenantId: number) => {
+  const [rows] = await connection.execute(`
+    SELECT p.id_item AS idItem, p.sku_customizado AS skuCustomizado,
+           p.nome_comercial AS nomeComercial, p.descricao_comercial AS descricaoComercial,
+           p.custo_gerencial AS custoGerencial, p.preco_venda AS precoVenda,
+           p.margem_lucro AS margemLucro, p.exibir_no_pdv AS exibirNoPdv,
+           p.pode_vender_sem_estoque AS podeVenderSemEstoque,
+           i.sku AS skuGlobal, i.nome_item AS nomeItemGlobal,
+           i.tipo_recurso AS tipoRecurso, i.status AS statusItem,
+           i.descricao_variacao AS variacao, av.atributo_id,
+           av.valor_texto, av.valor_numero, av.valor_decimal, av.valor_data,
+           av.valor_boolean, av.opcao_id, ao.valor AS valor_opcao,
+           ao.codigo AS codigo_opcao
+    FROM comercial_produtos_dados p
+    INNER JOIN itens_core i ON i.id_item = p.id_item AND i.tenant_id = p.tenant_id
+    LEFT JOIN atributos_comercial_valores av
+      ON av.id_entidade = p.id_item AND av.tipo_entidade = 'produto' AND av.tenant_id = p.tenant_id
+    LEFT JOIN atributos_comercial_opcoes ao ON ao.id = av.opcao_id
+    WHERE p.tenant_id = ? AND p.familia_id = ?
+    ORDER BY i.nome_item ASC
+  `, [tenantId, familiaId]);
+
+  const itens = new Map<string, any>();
+  for (const row of rows as any[]) {
+    const id = String(row.idItem);
+    if (!itens.has(id)) {
+      itens.set(id, {
+        id,
+        idItem: id,
+        sku: row.skuCustomizado || row.skuGlobal || '',
+        skuGlobal: row.skuGlobal || '',
+        nome: row.nomeComercial || row.nomeItemGlobal || 'Produto sem nome',
+        nomeItem: row.nomeComercial || row.nomeItemGlobal || 'Produto sem nome',
+        nomeComercial: row.nomeComercial || '',
+        descricaoComercial: row.descricaoComercial || '',
+        tipoRecurso: row.tipoRecurso || 'PRODUTO',
+        status: row.statusItem || 'ATIVO',
+        valoresAtributos: {},
+        variacao: row.variacao || 'Principal'
+      });
+    }
+    if (row.atributo_id !== null && row.atributo_id !== undefined) {
+      itens.get(id).valoresAtributos[String(row.atributo_id)] = obterValorAtributo(row);
+    }
+  }
+  return Array.from(itens.values());
+};
 
 
 // 🟡 [UPDATE] Atualizar Família com Persistência Completa de Todos os Campos na Pivot e Mestre
@@ -378,6 +544,200 @@ export const getFamilias = async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Erro ao buscar familias relacionais:', error);
     return res.status(500).json({ error: 'Erro interno ao buscar grupos' });
+  }
+};
+
+// 🔎 Diagnóstico completo da formalização: atributos efetivos, valores e pendências por item.
+export const getDiagnosticoFormalizacao = async (req: Request, res: Response) => {
+  const { idFamilia } = req.params;
+  const tenantId = Number(req.query.tenant_id || req.headers['x-tenant-id'] || 1);
+  const connection = await pool.getConnection();
+
+  try {
+    const contexto = await carregarContextoFormalizacao(connection, idFamilia, tenantId);
+    if (!contexto) return res.status(404).json({ error: 'Família não encontrada.' });
+
+    const itens = await carregarItensComValores(connection, idFamilia, tenantId);
+    const tokens = [
+      ...extrairTokens(contexto.familia.templateSku),
+      ...extrairTokens(contexto.familia.templateNomeComercial)
+    ];
+    const atributos = contexto.atributos.map(attr => {
+      const usadoNoSku = extrairTokens(contexto.familia.templateSku)
+        .some(token => [attr.id, attr.nome, attr.codigo].some(alias => normalizarToken(alias) === normalizarToken(token)));
+      const usadoNoNome = extrairTokens(contexto.familia.templateNomeComercial)
+        .some(token => [attr.id, attr.nome, attr.codigo].some(alias => normalizarToken(alias) === normalizarToken(token)));
+      return { ...attr, usadoNoSku, usadoNoNome, usadoNoTemplate: usadoNoSku || usadoNoNome };
+    });
+
+    const itensDiagnostico = itens.map(item => {
+      const valores = { ...item.valoresAtributos };
+      for (const attr of atributos) {
+        if (estaVazio(valores[attr.id]) && !estaVazio(attr.valorPadraoGrupo)) {
+          valores[attr.id] = attr.valorPadraoGrupo;
+        }
+      }
+      const atributosPendentes = atributos
+        .filter(attr => attr.usadoNoTemplate && estaVazio(resolverValor(valores, [attr.id, attr.nome, attr.codigo])))
+        .map(attr => ({
+          atributoId: attr.id,
+          nome: attr.nome,
+          codigo: attr.codigo,
+          motivo: 'Atributo usado no template sem valor para este item'
+        }));
+      const skuCalculado = atributosPendentes.length === 0
+        ? montarTextoTemplate(contexto.familia.templateSku, contexto.familia, atributos, valores, item.variacao)
+        : null;
+      const nomeCalculado = atributosPendentes.length === 0
+        ? montarTextoTemplate(contexto.familia.templateNomeComercial, contexto.familia, atributos, valores, item.variacao)
+        : null;
+
+      return {
+        ...item,
+        valoresAtributos: valores,
+        atributosPendentes,
+        statusFormalizacao: atributosPendentes.length > 0 ? 'PENDENTE' : 'PRONTO',
+        skuCalculado,
+        nomeCalculado,
+        podeFormalizar: atributosPendentes.length === 0
+      };
+    });
+
+    return res.json({
+      familia: {
+        id: String(contexto.familia.id),
+        nome: contexto.familia.nome,
+        templateSku: contexto.familia.templateSku || '',
+        templateNomeComercial: contexto.familia.templateNomeComercial || '',
+        siglaSku: contexto.familia.siglaSku || '',
+        separadorSku: contexto.familia.separadorSku || '-'
+      },
+      atributosFamilia: atributos,
+      tokensTemplate: tokens,
+      itens: itensDiagnostico,
+      resumo: {
+        totalItens: itensDiagnostico.length,
+        itensProntos: itensDiagnostico.filter(item => item.podeFormalizar).length,
+        itensPendentes: itensDiagnostico.filter(item => !item.podeFormalizar).length
+      }
+    });
+  } catch (error) {
+    console.error('Erro ao diagnosticar formalização:', error);
+    return res.status(500).json({ error: 'Erro interno ao diagnosticar os itens da família.' });
+  } finally {
+    connection.release();
+  }
+};
+
+// ✅ Formalização transacional por id_item, sem depender do SKU anterior.
+export const formalizarItensFamilia = async (req: Request, res: Response) => {
+  const { idFamilia } = req.params;
+  const tenantId = Number(req.query.tenant_id || req.headers['x-tenant-id'] || 1);
+  const itensRecebidos = Array.isArray(req.body?.itens) ? req.body.itens : [];
+  const connection = await pool.getConnection();
+
+  try {
+    if (itensRecebidos.length === 0) {
+      return res.status(400).json({ error: 'Informe ao menos um item para formalização.' });
+    }
+
+    const contexto = await carregarContextoFormalizacao(connection, idFamilia, tenantId);
+    if (!contexto) return res.status(404).json({ error: 'Família não encontrada.' });
+
+    await connection.beginTransaction();
+    const resultados: any[] = [];
+
+    for (const entrada of itensRecebidos) {
+      const idItem = String(entrada?.idItem ?? entrada?.id ?? '');
+      if (!idItem) throw new Error('Cada item precisa informar idItem.');
+
+      const [itemRows] = await connection.execute(`
+        SELECT i.id_item AS idItem, i.descricao_variacao AS variacao
+        FROM itens_core i
+        INNER JOIN comercial_produtos_dados p
+          ON p.id_item = i.id_item AND p.tenant_id = i.tenant_id
+        WHERE i.id_item = ? AND i.tenant_id = ? AND p.familia_id = ?
+        LIMIT 1
+      `, [idItem, tenantId, idFamilia]);
+      if ((itemRows as any[]).length === 0) {
+        throw new Error(`O item ${idItem} não pertence à família informada.`);
+      }
+
+      const [valorRows] = await connection.execute(`
+         SELECT av.atributo_id, av.valor_texto, av.valor_numero, av.valor_decimal, av.valor_data,
+           av.valor_boolean, av.opcao_id, ao.valor AS valor_opcao, ao.codigo AS codigo_opcao
+        FROM atributos_comercial_valores av
+        LEFT JOIN atributos_comercial_opcoes ao ON ao.id = av.opcao_id
+        WHERE av.tenant_id = ? AND av.tipo_entidade = 'produto' AND av.id_entidade = ?
+      `, [tenantId, idItem]);
+      const valores: Record<string, any> = {};
+      for (const row of valorRows as any[]) valores[String(row.atributo_id)] = obterValorAtributo(row);
+
+      const valoresEntrada = entrada.atributos && typeof entrada.atributos === 'object' ? entrada.atributos : {};
+      for (const attr of contexto.atributos) {
+        const valorRecebido = resolverValor(valoresEntrada, [attr.id, attr.nome, attr.codigo]);
+        if (!estaVazio(valorRecebido)) valores[attr.id] = valorRecebido;
+      }
+
+      const atributosUsados = contexto.atributos.filter(attr =>
+        [...extrairTokens(contexto.familia.templateSku), ...extrairTokens(contexto.familia.templateNomeComercial)]
+          .some(token => [attr.id, attr.nome, attr.codigo].some(alias => normalizarToken(alias) === normalizarToken(token)))
+      );
+      const pendentes = atributosUsados.filter(attr => estaVazio(resolverValor(valores, [attr.id, attr.nome, attr.codigo])));
+      if (pendentes.length > 0) {
+        throw new Error(`O item ${idItem} possui atributos pendentes: ${pendentes.map(attr => attr.nome).join(', ')}.`);
+      }
+
+      for (const attr of contexto.atributos) {
+        const valor = resolverValor(valores, [attr.id, attr.nome, attr.codigo]);
+        if (estaVazio(valor)) continue;
+        const [existente] = await connection.execute(
+          `SELECT id FROM atributos_comercial_valores
+           WHERE tenant_id = ? AND tipo_entidade = 'produto' AND id_entidade = ? AND atributo_id = ? LIMIT 1`,
+          [tenantId, idItem, attr.id]
+        );
+        if ((existente as any[]).length > 0) {
+          await connection.execute(
+            `UPDATE atributos_comercial_valores SET valor_texto = ?, valor_numero = NULL,
+             valor_decimal = NULL, valor_data = NULL, valor_boolean = NULL, opcao_id = NULL
+             WHERE id = ?`, [String(valor), (existente as any[])[0].id]
+          );
+        } else {
+          await connection.execute(
+            `INSERT INTO atributos_comercial_valores
+             (tenant_id, atributo_id, tipo_entidade, id_entidade, valor_texto)
+             VALUES (?, ?, 'produto', ?, ?)`, [tenantId, attr.id, idItem, String(valor)]
+          );
+        }
+      }
+
+      const variacao = (itemRows as any[])[0].variacao || 'Principal';
+      const novoSku = montarTextoTemplate(contexto.familia.templateSku, contexto.familia, contexto.atributos, valores, variacao);
+      const novoNome = montarTextoTemplate(contexto.familia.templateNomeComercial, contexto.familia, contexto.atributos, valores, variacao);
+      if (novoSku.includes('[') || novoNome.includes('[')) throw new Error(`Não foi possível resolver o template do item ${idItem}.`);
+
+      const [skuRows] = await connection.execute(
+        `SELECT id_item FROM itens_core WHERE tenant_id = ? AND sku = ? AND id_item <> ? LIMIT 1`,
+        [tenantId, novoSku, idItem]
+      );
+      if ((skuRows as any[]).length > 0) throw new Error(`O SKU ${novoSku} já está sendo usado por outro item.`);
+
+      await connection.execute(`UPDATE itens_core SET sku = ?, nome_item = ? WHERE id_item = ? AND tenant_id = ?`,
+        [novoSku, novoNome, idItem, tenantId]);
+      await connection.execute(`UPDATE comercial_produtos_dados SET sku_customizado = ?, nome_comercial = ?
+        WHERE id_item = ? AND tenant_id = ?`, [novoSku, novoNome, idItem, tenantId]);
+      resultados.push({ idItem, sku: novoSku, nome: novoNome, status: 'FORMALIZADO' });
+    }
+
+    await connection.commit();
+    return res.json({ success: true, itens: resultados, message: 'Itens formalizados com sucesso.' });
+  } catch (error) {
+    await connection.rollback();
+    const message = error instanceof Error ? error.message : 'Erro interno ao formalizar os itens.';
+    console.error('Erro ao formalizar itens da família:', error);
+    return res.status(message.startsWith('O item') || message.startsWith('O SKU') ? 400 : 500).json({ error: message });
+  } finally {
+    connection.release();
   }
 };
 

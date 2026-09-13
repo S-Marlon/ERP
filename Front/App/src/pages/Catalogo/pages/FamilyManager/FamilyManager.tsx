@@ -43,9 +43,11 @@ import {
 
 // Componentes externos
 import { PainelSimulador } from "./components/PainelSimulador";
+import { ModalVinculoAtributos } from "./components/ModalVinculoAtributos";
 import ImageDisplay from "../../../../components/ui/ImageGallery/ImageDysplay";
 import { ImportarFamiliaModal } from "./ImportarFamiliaModal";
 import { AttributeGuideModal } from "./guide/AttributeGuideModal";
+import { FamiliaIdentidadeCard } from "./FamiliaIdentidadeCard";
 
 const { Title, Text } = Typography;
 
@@ -55,6 +57,7 @@ export const FamilyManager: React.FC = () => {
 
   const {
     grupoSelecionado,
+    atributosGlobaisDisponiveis,
     categorias,
     previewSkuSimulado,
     previewNomeSimulado,
@@ -67,6 +70,7 @@ export const FamilyManager: React.FC = () => {
     handleCriarGrupo,
     handleSalvarGrupoNoBanco,
     handleAbrirModal,
+    handleAdicionarAtributoAoGrupo,
     tabelaAlvoModal,
     brandColor,
     itensFiltradosDoGrupo,
@@ -105,6 +109,12 @@ export const FamilyManager: React.FC = () => {
     handleNormalizarItemSku,
     handleNormalizarItemNome,
     handleSalvarAtributosPendentes,
+    handleEditarAtributosItem,
+    handleAtualizarAtributoItemEditado,
+    handleSalvarAtributosItem,
+    isModalAtributosItemOpen,
+    setIsModalAtributosItemOpen,
+    itemEmEdicaoAtributos,
     itemEmEdicaoPendencia,
     modalFormalizacaoAberto,
     setModalFormalizacaoAberto,
@@ -439,188 +449,12 @@ export const FamilyManager: React.FC = () => {
               <Row gutter={[8, 8]}>
                 {/* 1. Identidade da Família */}
                 <Col xs={24} lg={10}>
-                  <Card
-                    title={
-                      <Space size={6}>
-                        <span
-                          style={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: "50%",
-                            background: brandColor || "#1677ff",
-                            display: "inline-block",
-                          }}
-                        />
-                        <span
-                          style={{
-                            fontSize: "13px",
-                            fontWeight: 600,
-                            color: "#1e293b",
-                          }}
-                        >
-                          Identidade da Família
-                        </span>
-                      </Space>
-                    }
-                    size="small"
-                    style={{
-                      borderRadius: 10,
-                      border: "1px solid #e2e8f0",
-                      boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.01)",
-                      height: "100%",
-                    }}
-                    styles={{
-                      header: {
-                        borderBottom: "1px solid #f1f5f9",
-                        minHeight: "38px",
-                        background: "#f8fafc",
-                        borderRadius: "10px 10px 0 0",
-                        padding: "0 10px",
-                      },
-                      body: { padding: "12px" },
-                    }}
-                    extra={
-                      <Tooltip title="Editar Identidade">
-                        <Button
-                          type="text"
-                          size="small"
-                          icon={
-                            <EditOutlined
-                              style={{
-                                fontSize: "12px",
-                                color: brandColor || "#1677ff",
-                              }}
-                            />
-                          }
-                          onClick={() =>
-                            handleAbrirModal && handleAbrirModal("dna")
-                          }
-                        />
-                      </Tooltip>
-                    }
-                  >
-                    <Space direction="vertical" size={10} style={{ width: "100%" }}>
-                      <Space size={10} align="center">
-                        <ImageDisplay
-                          size="40px"
-                          src={grupoImage || undefined}
-                          style={{
-                            borderRadius: 8,
-                            overflow: "hidden",
-                            border: "1px solid #e2e8f0",
-                            background: "#fff",
-                          }}
-                        />
-                        <div>
-                          <Text
-                            style={{
-                              color: "#94a3b8",
-                              fontSize: "10px",
-                              display: "block",
-                              fontWeight: 600,
-                            }}
-                          >
-                            NOME DA FAMÍLIA
-                          </Text>
-                          <Text
-                            style={{
-                              color: "#0f172a",
-                              fontSize: "13px",
-                              fontWeight: 700,
-                            }}
-                          >
-                            {grupoSelecionado?.nome || "Sem nome"}
-                          </Text>
-                        </div>
-                      </Space>
-
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "1fr 1fr",
-                          gap: "8px",
-                          paddingTop: "6px",
-                          borderTop: "1px solid #f1f5f9",
-                        }}
-                      >
-                        <div>
-                          <Text
-                            style={{
-                              color: "#94a3b8",
-                              fontSize: "10px",
-                              display: "block",
-                              fontWeight: 600,
-                            }}
-                          >
-                            UNIDADE BASE
-                          </Text>
-                          <Tag style={{ margin: 0, fontSize: "11px", fontWeight: 600 }}>
-                            {grupoSelecionado?.unidadeMedidaBase || "PC"}
-                          </Tag>
-                        </div>
-                        <div>
-                          <Text
-                            style={{
-                              color: "#94a3b8",
-                              fontSize: "10px",
-                              display: "block",
-                              fontWeight: 600,
-                            }}
-                          >
-                            TIPO SPED
-                          </Text>
-                          <Tag
-                            color="blue"
-                            style={{ margin: 0, fontSize: "11px", fontWeight: 600 }}
-                          >
-                            {grupoSelecionado?.tipoItem || "PA"}
-                          </Tag>
-                        </div>
-                        <div>
-                          <Text
-                            style={{
-                              color: "#94a3b8",
-                              fontSize: "10px",
-                              display: "block",
-                              fontWeight: 600,
-                            }}
-                          >
-                            NCM PADRÃO
-                          </Text>
-                          <Text
-                            style={{
-                              color: "#334155",
-                              fontSize: "11px",
-                              fontFamily: "monospace",
-                            }}
-                          >
-                            {grupoSelecionado?.ncmPadrao || "Não informado"}
-                          </Text>
-                        </div>
-                        <div>
-                          <Text
-                            style={{
-                              color: "#94a3b8",
-                              fontSize: "10px",
-                              display: "block",
-                              fontWeight: 600,
-                            }}
-                          >
-                            CEST PADRÃO
-                          </Text>
-                          <Text
-                            style={{
-                              color: "#334155",
-                              fontSize: "11px",
-                              fontFamily: "monospace",
-                            }}
-                          >
-                            {grupoSelecionado?.cestPadrao || "Não informado"}
-                          </Text>
-                        </div>
-                      </div>
-                    </Space>
-                  </Card>
+                  <FamiliaIdentidadeCard 
+    grupoSelecionado={grupoSelecionado}
+    grupoImage={grupoImage}
+    brandColor={brandColor}
+    handleAbrirModal={handleAbrirModal}
+  />
                 </Col>
 
                 {/* 2. Painel do Simulador Unificado */}
@@ -1065,15 +899,16 @@ export const FamilyManager: React.FC = () => {
               {(itensFiltradosDoGrupo ?? []).map((item) => {
                 const skuEsperado = typeof gerarPreviewSku === 'function' ? gerarPreviewSku(grupoSelecionado, grupoSelecionado.atributos || [], item.valoresAtributos || {}) : item.sku;
                 
-                const nomeProcessado = typeof gerarPreviewNome === 'function' ? gerarPreviewNome(grupoSelecionado, item.valoresAtributos || {}) : item.nome;
+                const nomeProcessado = item.nomeCalculado || (typeof gerarPreviewNome === 'function' ? gerarPreviewNome(grupoSelecionado, item.valoresAtributos || {}) : item.nome);
                 const nomeEsperado = nomeProcessado && !nomeProcessado.includes('[') ? nomeProcessado : item.nome;
 
                 // Verificação de Atributos Ausentes / Faltantes
-                const atributosObrigatorios = grupoSelecionado?.atributos || [];
-                const possuiAtributosFaltantes = atributosObrigatorios.some((attr) => {
-                  const valor = item.valoresAtributos?.[attr.id || attr.nome];
-                  return !valor || String(valor).trim() === "";
-                });
+                const possuiAtributosFaltantes = Array.isArray(item.atributosPendentes)
+                  ? item.atributosPendentes.length > 0
+                  : (grupoSelecionado?.atributos || []).some((attr) => {
+                      const valor = item.valoresAtributos?.[attr.id || attr.nome];
+                      return !valor || String(valor).trim() === "";
+                    });
 
                 const divergenciaSku = Boolean(skuEsperado && item.sku !== skuEsperado);
                 const divergenciaNome = Boolean(nomeEsperado && item.nome !== nomeEsperado);
@@ -1171,11 +1006,7 @@ export const FamilyManager: React.FC = () => {
                               padding: 0,
                             }}
                             onClick={() => {
-                              if (typeof handleEditarAtributosItem === 'function') {
-                                handleEditarAtributosItem(item);
-                              } else {
-                                Swal.fire("Editar Atributos", `Abrir configuração de atributos para o SKU: ${item.sku}`, "info");
-                              }
+                              handleEditarAtributosItem(item);
                             }}
                           />
                         </Tooltip>
@@ -1370,6 +1201,35 @@ export const FamilyManager: React.FC = () => {
         </Form>
       </Modal>
 
+      <Modal
+        title={`Editar atributos: ${itemEmEdicaoAtributos?.sku || "item"}`}
+        open={isModalAtributosItemOpen}
+        onCancel={() => setIsModalAtributosItemOpen(false)}
+        onOk={handleSalvarAtributosItem}
+        okText="Salvar atributos"
+        cancelText="Cancelar"
+        destroyOnClose
+      >
+        <Alert
+          type="info"
+          showIcon
+          message="Alteração individual"
+          description="Os valores serão aplicados somente ao item selecionado. O SKU e o nome serão recalculados após o salvamento."
+          style={{ marginBottom: 16 }}
+        />
+        <Form layout="vertical">
+          {(grupoSelecionado?.atributos || []).map((attr) => (
+            <Form.Item key={attr.id} label={attr.nome}>
+              <Input
+                value={String(itemEmEdicaoAtributos?.valoresAtributos?.[attr.id] ?? "")}
+                placeholder={`Informe ${attr.nome}`}
+                onChange={(event) => handleAtualizarAtributoItemEditado(attr.id, event.target.value)}
+              />
+            </Form.Item>
+          ))}
+        </Form>
+      </Modal>
+
       {/* Modal Modular Único para preenchimento de Atributos Pendentes em Lote */}
 <Modal
   title={
@@ -1450,6 +1310,15 @@ export const FamilyManager: React.FC = () => {
         visible={isModalOpen}
         onClose={handleCloseGuideModal}
         defaultTab={guideTab}
+      />
+
+      <ModalVinculoAtributos
+        isModalAberto={isModalAberto}
+        setIsModalAberto={setIsModalAberto}
+        destinoModal={tabelaAlvoModal || "ficha"}
+        atributosGlobaisDisponiveis={atributosGlobaisDisponiveis}
+        handleAdicionarAtributoAoGrupo={handleAdicionarAtributoAoGrupo}
+        brandColor={brandColor}
       />
     </div>
   );

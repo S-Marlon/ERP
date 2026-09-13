@@ -162,16 +162,29 @@ export const SkuSubTable: React.FC<SkuSubTableProps> = ({ parentItem, onMoveSkus
           </span>
           <Space size="small">
             <Button 
-              type="primary" 
-              size="small" 
-              icon={<SwapOutlined />}
-              onClick={() => {
-                const selectedItems = skus.filter(s => selectedRowKeys.includes(String(s.sku || s.id_item)));
-                onMoveSkus?.(selectedItems, 'move');
-              }}
-            >
-              Mover para outra Família
-            </Button>
+  type="primary" 
+  size="small" 
+  icon={<SwapOutlined />}
+  onClick={() => {
+    const selectedItems = skus.filter(s => 
+      selectedRowKeys.includes(String(s.sku ?? s.id_item))
+    );
+
+    if (selectedItems.length === 0) {
+      message.warning('Nenhum item válido selecionado para mover.');
+      return;
+    }
+
+    // Chama a função recebida via props
+    if (onMoveSkus) {
+      onMoveSkus(selectedItems, 'move');
+    } else {
+      message.info('Ação de mover acionada, mas a função onMoveSkus não foi passada.');
+    }
+  }}
+>
+  Mover para outra Família
+</Button>
 
             <Button 
               type="primary"

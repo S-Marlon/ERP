@@ -38,6 +38,8 @@ import {
   deleteFamilia, 
   getFamilias, 
   getProdutosPorFamilia, 
+  getDiagnosticoFormalizacao,
+  formalizarItensFamilia,
   updateFamilia 
 } from './Familias/familias.controller';
 
@@ -117,6 +119,8 @@ router.get('/cadastros/familias', getFamilias);
 router.post('/cadastros/familias', createFamilia);
 router.put('/cadastros/familias/:idFamilia', updateFamilia);
 router.delete('/cadastros/familias/:idFamilia', deleteFamilia);
+router.get('/cadastros/familias/:idFamilia/formalizacao', getDiagnosticoFormalizacao);
+router.post('/cadastros/familias/:idFamilia/formalizacao', formalizarItensFamilia);
 router.get('/cadastros/familias/:idFamilia/produtos', getProdutosPorFamilia);
 
 // =========================================================================

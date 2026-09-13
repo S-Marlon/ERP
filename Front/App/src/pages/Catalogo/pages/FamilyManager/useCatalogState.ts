@@ -9,13 +9,32 @@ import {
   normalizarChaveTemplate,
   resolverValorAtributo,
 } from "./CatalogManager.helpers";
-import { getGroups, createGroup, updateGroup, getCategorias, getAtributosDaCategoria, getItensDoGrupo } from "./FamilyManager.api";
+import {
+  getGroups,
+  createGroup,
+  updateGroup,
+  getCategorias,
+  getAtributosDaCategoria,
+  getAtributosGlobais,
+  getDiagnosticoFormalizacao,
+  formalizarItensDaFamilia,
+} from "./FamilyManager.api";
+
+type ItemFormalizacao = ItemAssociado & {
+  id: string;
+  idItem: string;
+  atributosPendentes?: Array<{ atributoId: string; nome: string; codigo?: string; motivo: string }>;
+  podeFormalizar?: boolean;
+  skuCalculado?: string | null;
+  nomeCalculado?: string | null;
+};
 
 export const useCatalogState = () => {
   const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [itensDoGrupo, setItensDoGrupo] = useState<ItemAssociado[]>([]);
   const [itensDaFamilia, setItensDaFamilia] = useState<ItemAssociado[]>([]);
+  const [atributosGlobaisDisponiveis, setAtributosGlobaisDisponiveis] = useState<AtributoConfig[]>([]);
   
   const [valoresTeste, setValoresTeste] = useState<Record<string, string>>({});
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -92,9 +111,14 @@ export const useCatalogState = () => {
     setLoading(true);
     setError(null);
     try {
-      const [dadosGrupos, dadosCategorias] = await Promise.all([getGroups(1), getCategorias(1)]);
+      const [dadosGrupos, dadosCategorias, dadosAtributos] = await Promise.all([
+        getGroups(1),
+        getCategorias(1),
+        getAtributosGlobais(1),
+      ]);
       setGrupos(dadosGrupos);
       setCategorias(dadosCategorias);
+      setAtributosGlobaisDisponiveis(dadosAtributos);
 
       if (dadosGrupos.length > 0 && !grupoSelecionadoId) {
         setGrupoSelecionadoId(dadosGrupos[0].id);
@@ -114,7 +138,8 @@ export const useCatalogState = () => {
   const carregarItensDoGrupo = useCallback(async (grupoId: string) => {
     setLoadingItens(true);
     try {
-      const itens = await getItensDoGrupo(grupoId, 1);
+      const diagnostico = await getDiagnosticoFormalizacao(grupoId, 1);
+      const itens = diagnostico.itens || [];
       setItensDoGrupo(itens);
       setItensDaFamilia(itens);
     } catch (err) {
@@ -146,6 +171,48 @@ export const useCatalogState = () => {
   };
 
   const handleCloseGuideModal = () => setIsModalOpen(false);
+  const handleAbrirModal = (tipo: ModalDestino) => {
+    setTabelaAlvoModal(tipo);
+    setIsModalAberto(true);
+  };
+
+  const handleAdicionarAtributoAoGrupo = (atributo: Partial<AtributoConfig>) => {
+    if (!grupoSelecionado || !atributo.nome) return;
+    const existe = grupoSelecionado.atributos.some((item) =>
+      (atributo.id && String(item.id) === String(atributo.id)) ||
+      item.nome.trim().toLowerCase() === atributo.nome?.trim().toLowerCase()
+    );
+    if (existe) {
+      Swal.fire("Atenção", `O atributo "${atributo.nome}" já está vinculado à família.`, "info");
+      return;
+    }
+
+    const tipoDadoRecebido = String(atributo.tipoDado || 'texto');
+    const novoAtributo: AtributoConfig = {
+      id: String(atributo.id || `novo-${Date.now()}`),
+      nome: atributo.nome.trim(),
+      codigo: atributo.codigo || '',
+      classificacao: atributo.classificacao || tabelaAlvoModal || 'ficha',
+      tipoDado: tipoDadoRecebido === 'opcoes' ? 'lista' : (tipoDadoRecebido as AtributoConfig['tipoDado']),
+      opcoesValidas: atributo.opcoesValidas || [],
+      separadorSufixo: atributo.separadorSufixo || 'nenhum',
+      sufixo: atributo.sufixo || '',
+      obrigatorio: Boolean(atributo.obrigatorio),
+      geraVariacao: Boolean(atributo.geraVariacao),
+      compoeSku: Boolean(atributo.compoeSku),
+      ordemSku: Number(atributo.ordemSku || 0),
+      exemplos: atributo.exemplos || '',
+      valorHerdadoDaFamilia: Boolean(atributo.valorHerdadoDaFamilia),
+      valorPadraoFamilia: atributo.valorPadraoFamilia || '',
+      pesquisavel: atributo.pesquisavel !== false,
+      bloqueado: Boolean(atributo.bloqueado),
+      retransmitir: atributo.retransmitir !== false,
+      origem: atributo.origem || 'locais',
+    };
+
+    handleAtualizarGrupoDireto('atributos', [...grupoSelecionado.atributos, novoAtributo]);
+    setIsModalAberto(false);
+  };
 
   const handleMudarCategoriaComConfirmacao = async (novaCategoriaId: string | undefined) => {
     if (!grupoSelecionado) return;
@@ -311,6 +378,8 @@ export const useCatalogState = () => {
   const handleSalvarGrupoNoBanco = async () => {
     if (!grupoSelecionado) return;
     try {
+      setLoading(true);
+      await updateGroup(grupoSelecionado.id, grupoSelecionado, 1);
       Swal.fire({
         title: "Sucesso!",
         text: "Alterações da família salvas com sucesso.",
@@ -320,6 +389,8 @@ export const useCatalogState = () => {
       });
     } catch (error) {
       Swal.fire("Erro", "Não foi possível salvar as alterações.", "error");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -388,8 +459,9 @@ export const useCatalogState = () => {
     Swal.fire("Importado por IA! 🎉", "A nova família foi estruturada com sucesso.", "success");
   };
 
-  const handleNormalizarItemNome = (itemId: string) => {
+  const handleNormalizarItemNome = (itemOuId: any) => {
     if (!grupoSelecionado) return;
+    const itemId = obterIdItem(itemOuId) ?? itemOuId;
 
     const itensAtualizados = (itensDaFamilia.length > 0 ? itensDaFamilia : itensDoGrupo).map((item) => {
       const idAtual = obterIdItem(item);
@@ -411,8 +483,9 @@ export const useCatalogState = () => {
     });
   };
 
-  const handleNormalizarItemSku = (itemId: string) => {
+  const handleNormalizarItemSku = (itemOuId: any) => {
     if (!grupoSelecionado) return;
+    const itemId = obterIdItem(itemOuId) ?? itemOuId;
 
     const itensAtualizados = (itensDaFamilia.length > 0 ? itensDaFamilia : itensDoGrupo).map((item) => {
       const idAtual = obterIdItem(item);
@@ -437,6 +510,8 @@ export const useCatalogState = () => {
   const [isModalPendenciaOpen, setIsModalPendenciaOpen] = useState(false);
   const [itemEmEdicaoPendencia, setItemEmEdicaoPendencia] = useState<any>(null);
   const [atributosPendentes, setAtributosPendentes] = useState<any[]>([]);
+  const [isModalAtributosItemOpen, setIsModalAtributosItemOpen] = useState(false);
+  const [itemEmEdicaoAtributos, setItemEmEdicaoAtributos] = useState<ItemFormalizacao | null>(null);
 
   const verificarAtributosObrigatorios = (item: any, grupo: any) => {
     const atributosDoGrupo = grupo?.atributos || [];
@@ -545,10 +620,25 @@ export const useCatalogState = () => {
     });
   };
 
-  const handleSalvarAtributosPendentes = (valoresFormulario: Record<string, any>) => {
+  const handleSalvarAtributosPendentes = async (valoresFormulario: Record<string, any>) => {
     if (!itemEmEdicaoPendencia || !grupoSelecionado) return;
 
     const itemIdAlvo = obterIdItem(itemEmEdicaoPendencia);
+    const valoresAtualizados = {
+      ...(itemEmEdicaoPendencia.valoresAtributos || {}),
+      ...valoresFormulario,
+    };
+
+    try {
+      await formalizarItensDaFamilia(grupoSelecionado.id, [{
+        idItem: String(itemIdAlvo),
+        atributos: valoresAtualizados,
+      }]);
+      await carregarItensDoGrupo(grupoSelecionado.id);
+    } catch (error) {
+      Swal.fire("Erro", error instanceof Error ? error.message : "Não foi possível formalizar o item.", "error");
+      return;
+    }
 
     const atualizarItemNaLista = (lista: ItemAssociado[]) =>
       lista.map((item) => {
@@ -559,7 +649,7 @@ export const useCatalogState = () => {
 
         if (!eOMesmoItem) return item;
 
-        const novosValores = { ...(item.valoresAtributos || {}), ...valoresFormulario };
+        const novosValores = valoresAtualizados;
         const novoSku = gerarPreviewSku(grupoSelecionado, grupoSelecionado.atributos || [], novosValores);
         const novoNome = gerarPreviewNome(grupoSelecionado, novosValores);
 
@@ -578,34 +668,64 @@ export const useCatalogState = () => {
     setIsModalPendenciaOpen(false);
   };
 
+  const handleEditarAtributosItem = (item: ItemAssociado) => {
+    setItemEmEdicaoAtributos(item as ItemFormalizacao);
+    setIsModalAtributosItemOpen(true);
+  };
+
+  const handleAtualizarAtributoItemEditado = (atributoId: string, valor: string) => {
+    setItemEmEdicaoAtributos((itemAtual) => itemAtual ? {
+      ...itemAtual,
+      valoresAtributos: {
+        ...(itemAtual.valoresAtributos || {}),
+        [atributoId]: valor,
+      },
+    } : itemAtual);
+  };
+
+  const handleSalvarAtributosItem = async () => {
+    if (!grupoSelecionado || !itemEmEdicaoAtributos) return;
+    try {
+      await formalizarItensDaFamilia(grupoSelecionado.id, [{
+        idItem: itemEmEdicaoAtributos.idItem || itemEmEdicaoAtributos.id,
+        atributos: itemEmEdicaoAtributos.valoresAtributos || {},
+      }]);
+      await carregarItensDoGrupo(grupoSelecionado.id);
+      setIsModalAtributosItemOpen(false);
+      setItemEmEdicaoAtributos(null);
+      Swal.fire("Sucesso", "Atributos do item atualizados com sucesso.", "success");
+    } catch (error) {
+      Swal.fire("Erro", error instanceof Error ? error.message : "Não foi possível atualizar os atributos do item.", "error");
+    }
+  };
+
 
 
   const [modalFormalizacaoAberto, setModalFormalizacaoAberto] = useState(false);
-const [itensPendentesFormalizacao, setItensPendentesFormalizacao] = useState([]);
+const [itensPendentesFormalizacao, setItensPendentesFormalizacao] = useState<ItemFormalizacao[]>([]);
 
-const handleProcessarFormalizacaoLote = () => {
-  const listaItens = itensFiltradosDoGrupo || [];
-  const atributosObrigatorios = grupoSelecionado?.atributos || [];
-
-  // Filtra itens que faltam preencher algum atributo obrigatório
-  const pendentes = listaItens.filter(item => {
-    return atributosObrigatorios.some(attr => {
-      const val = item.valoresAtributos?.[attr.id || attr.nome];
-      return !val || String(val).trim() === "";
-    });
-  });
+const handleProcessarFormalizacaoLote = async () => {
+  if (!grupoSelecionado) return;
+  const diagnostico = await getDiagnosticoFormalizacao(grupoSelecionado.id, 1);
+  const listaItens = diagnostico.itens || [];
+  setItensDoGrupo(listaItens);
+  setItensDaFamilia(listaItens);
+  const pendentes = listaItens.filter((item: ItemFormalizacao) => !item.podeFormalizar);
 
   if (pendentes.length > 0) {
     setItensPendentesFormalizacao(pendentes);
     setModalFormalizacaoAberto(true);
   } else {
-    // Se estiver tudo preenchido, executa o sucesso automático direto
+    await formalizarItensDaFamilia(
+      grupoSelecionado.id,
+      listaItens.map((item: ItemFormalizacao) => ({ idItem: item.idItem || item.id, atributos: item.valoresAtributos || {} }))
+    );
+    await carregarItensDoGrupo(grupoSelecionado.id);
     Swal.fire("Sucesso!", "Todos os itens da família foram formalizados e gerados com sucesso.", "success");
-    // Chamar função real de lote aqui se houver
   }
 };
 
-const handleAtualizarAtributoItemPendente = (itemId, atributoId, novoValor) => {
+const handleAtualizarAtributoItemPendente = (itemId: string | number, atributoId: string, novoValor: string) => {
   setItensPendentesFormalizacao(prev =>
     prev.map(item => {
       if (item.id === itemId) {
@@ -622,10 +742,23 @@ const handleAtualizarAtributoItemPendente = (itemId, atributoId, novoValor) => {
   );
 };
 
-const handleSalvarEContinuarFormalizacao = () => {
-  // Salva os dados atualizados e fecha o modal
-  setModalFormalizacaoAberto(false);
-  Swal.fire("Formalizado!", "Atributos salvos e lote processado com sucesso.", "success");
+const handleSalvarEContinuarFormalizacao = async () => {
+  if (!grupoSelecionado) return;
+  try {
+    await formalizarItensDaFamilia(
+      grupoSelecionado.id,
+      itensPendentesFormalizacao.map(item => ({
+        idItem: item.idItem || item.id,
+        atributos: item.valoresAtributos || {}
+      }))
+    );
+    await carregarItensDoGrupo(grupoSelecionado.id);
+    setModalFormalizacaoAberto(false);
+    setItensPendentesFormalizacao([]);
+    Swal.fire("Formalizado!", "Atributos salvos e lote processado com sucesso.", "success");
+  } catch (error) {
+    Swal.fire("Erro", error instanceof Error ? error.message : "Não foi possível formalizar os itens.", "error");
+  }
 };
 
 
@@ -633,6 +766,8 @@ const handleSalvarEContinuarFormalizacao = () => {
     grupos,
     categorias,
     grupoSelecionado,
+    setGrupoSelecionadoId,
+    atributosGlobaisDisponiveis,
     setValoresTeste,
     isModalAberto,
     abaAtiva,
@@ -669,6 +804,8 @@ const handleSalvarEContinuarFormalizacao = () => {
     guideTab,
     setGuideTab,
     handleOpenGuideModal,
+      handleAbrirModal,
+      handleAdicionarAtributoAoGrupo,
     handleCloseGuideModal,
     valoresTeste,
     onMudancaValorTeste,
@@ -687,6 +824,12 @@ const handleSalvarEContinuarFormalizacao = () => {
     handleTentarNormalizarIndividual,
     handleNormalizarItemNome,
     handleSalvarAtributosPendentes,
+    handleEditarAtributosItem,
+    handleAtualizarAtributoItemEditado,
+    handleSalvarAtributosItem,
+    isModalAtributosItemOpen,
+    setIsModalAtributosItemOpen,
+    itemEmEdicaoAtributos,
     isModalPendenciaOpen,
     setIsModalPendenciaOpen,
     itemEmEdicaoPendencia,
