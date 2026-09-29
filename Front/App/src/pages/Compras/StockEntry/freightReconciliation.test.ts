@@ -28,6 +28,7 @@ export const runFreightReconciliationTests = (): void => {
   assert(
     reconcileFreight(10, [
       { freightOriginal: 2, freightDistributed: 8, freightAdded: 8 },
+      { freightOriginal: 8, freightDistributed: 2, freightAdded: 2 },
     ]).matches,
     'Rateio manual posterior deveria ser usado como frete considerado.'
   );

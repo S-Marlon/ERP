@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { checkSupplier, createSupplier } from '../../Compras/FornecedoresList/fornecedores.api'
 import {
 Typography,
@@ -14,6 +15,7 @@ Statistic,
 Tooltip,
 Modal,
 Radio,
+Table,
 message
 } from 'antd';
 import {
@@ -24,7 +26,7 @@ SettingOutlined,
 BugFilled,
 CodeFilled
 } from '@ant-design/icons';
-import MappingModal from './ItemsConference/ProductMappingModal';
+import MappingModal, { MappingPayload, getMappedId } from './ItemsConference/ProductMappingModal';
 import NfeCards from './nfeCards/NfeCards';
 import { ItemsConference } from './ItemsConference/ItemsConference';
 import { SupplierModal } from './SupplierModal';
@@ -32,8 +34,12 @@ import PhysicalConferenceTable from './PhysicalConferenceTable';
 import { parseNfeComplete, NfeDataFromXML } from './xml/utils/nfeParser';
 import { reconcileFreight } from './freightReconciliation';
 import { reconcileFinancial } from './financialReconciliation';
+import { distributeFreight, FreightMode, FREIGHT_MODE_LABELS } from './freightDistribution';
+import { TipoRecurso, TIPO_RECURSO_PADRAO, getTipoRecursoConfig } from './tipoRecurso';
+import { applyConfirmation, applyItemEdit, ItemId, MSG_SEM_CODIGO_INTERNO } from './conferencia';
 import { StockEntryHeader } from './StockEntryHeader';
-import { sincronizarLoteXMLCompleto } from '../api/comprasApi';
+import { sincronizarLoteXMLCompleto, buscarEstadoLote } from '../api/comprasApi';
+import { restaurarItensDoStaging, lerFreteAdicionalSalvo } from './stagingRestore';
 
 interface ItemConferencia {
 tempId: string;
@@ -55,6 +61,49 @@ tipoEntrada?: string; // Ex: 'COMPRA_NORMAL', 'BONIFICACAO'
 }
 
 const { Title, Text } = Typography;
+
+// Monta o item no formato esperado por /compras/lotes/sincronizar-xml (upsert por item_nfe_seq)
+const buildStagingItem = (item: any) => ({
+  nItem: item.nItem,
+  cProd: item.sku,
+  cEan: item.ean,
+  xProd: item.descricao,
+  ncm: item.ncm,
+  cest: item.prod?.CEST || null,
+  uCom: item.unidade,
+  quantidade: item.quantidade,
+  receivedQuantity: item.receivedQuantity,
+  difference: item.difference ?? 0,
+  isConfirmed: item.isConfirmed ? 1 : 0,
+  gtinManual: item.customGtin || null,
+  valorUnitario: item.valorUnitario,
+  valorBaseUnitario: item.valorBaseUnitario,
+  valorTotal: item.valorTotal,
+  valorProdutos: item.valorProdutos,
+  freightOriginal: item.freightOriginal,
+  freightDistributed: item.freightDistributed,
+  freightAdded: item.freightAdded,
+  seguro: item.seguro,
+  outrasDespesas: item.outrasDespesas,
+  desconto: item.desconto,
+  ipi: item.ipi,
+  icmsSt: item.icmsSt,
+  // Envia os objetos JSON completos do XML para salvar nas colunas JSON/JSONB do banco
+  prodJson: item.prod,
+  impostoJson: item.imposto,
+  // Dados de mapeamento (ProductMappingModal)
+  produtoIdSistema: item.produtoIdSistema || null,
+  skuSistema: item.skuSistema || null,
+  skuSugerido: item.skuSugerido || null,
+  nomeItemSugerido: item.nomeItemSugerido || null,
+  familia: item.familia || null,
+  tipoEntrada: item.tipoEntrada || 'COMPRA_NORMAL',
+  tipoRecurso: item.tipoRecurso || TIPO_RECURSO_PADRAO,
+  mapeamento: item.mapeamento || null
+});
+
+const FRETE_ADICIONAL_INICIAL = { valor: 0, metodo: 'Correios - PAC', observacao: '' };
+
 const StockEntryForm: React.FC = () => {
 
 // Função para limpar os dados da tela e reiniciar a importação
@@ -62,6 +111,8 @@ const onReset = () => {
 setRawXmlString('');
 setItems([]);
 setLoteId(null);
+setAppliedFreightMode('original');
+setFreteAdicionalInfo(FRETE_ADICIONAL_INICIAL);
 setStagingError(null);
 message.info("Tela limpa. Você pode importar um novo arquivo XML.");
 };
@@ -92,7 +143,13 @@ const [isTotalDetailsModalOpen, setIsTotalDetailsModalOpen] = useState<boolean>(
 
 // Estado para o Modal de Distribuição de Frete
 const [isFreightModalOpen, setIsFreightModalOpen] = useState<boolean>(false);
-const [freightDistributionMode, setFreightDistributionMode] = useState<string>('proportional_value');
+// Modo de rateio aplicado nos itens e o modo em edição no modal (só vira aplicado ao confirmar)
+const [appliedFreightMode, setAppliedFreightMode] = useState<FreightMode>('original');
+const [freightDistributionMode, setFreightDistributionMode] = useState<FreightMode>('original');
+
+// Estado para controlar o frete adicional (pago por fora / Correios / Carreto)
+const [freteAdicionalInfo, setFreteAdicionalInfo] = useState(FRETE_ADICIONAL_INICIAL);
+
 
 // Estados temporários para criação de fornecedor
 const [supplierCreationName, setSupplierCreationName] = useState<string>('');
@@ -126,6 +183,65 @@ return item;
 message.success(`Item ${itemToMap.sku} mapeado com sucesso!`);
 setIsMappingModalOpen(false);
 setItemToMap(null);
+};
+
+// Grava os itens alterados na staging (upsert por item_nfe_seq no backend)
+const persistItemsToStaging = async (
+itemsToSave: any[],
+freteAdicional: typeof freteAdicionalInfo = freteAdicionalInfo,
+modoRateio: FreightMode = appliedFreightMode
+) => {
+if (!loteId || itemsToSave.length === 0) return;
+try {
+await sincronizarLoteXMLCompleto({
+tenant_id: 1,
+lote_importacao_id: loteId,
+// O frete adicional vai para o lote: o pente-fino da Staging compara com o total dos itens
+frete_adicional: { ...freteAdicional, modo_rateio: modoRateio },
+itens: itemsToSave.map(buildStagingItem)
+});
+} catch (err: any) {
+console.error('Erro ao salvar itens na staging:', err);
+message.error('Erro ao salvar itens na staging: ' + err.message);
+}
+};
+
+// Aplica uma alteração nos itens: todo item alterado volta para pendente de conferência
+const commitItemEdit = (
+ids: ItemId[],
+patch: (item: any) => Record<string, unknown> | null,
+{ persist = true }: { persist?: boolean } = {}
+) => {
+const result = applyItemEdit(items, ids, patch);
+if (result.changed.length === 0) return result;
+setItems(result.items);
+if (persist) persistItemsToStaging(result.changed);
+if (result.reopened > 0) {
+message.info(`${result.reopened} item(ns) alterado(s) voltou(aram) para pendente de conferência.`);
+}
+return result;
+};
+
+// Recebe o mapeamento confirmado no ProductMappingModal, guarda no item e persiste na staging
+const handleItemMapped = (tempId: string | number, mapping: MappingPayload) => {
+const target = items.find(i => i.tempId === tempId || i.nItem === tempId);
+if (!target) return;
+
+if (!loteId) {
+message.warning('Lote de staging ainda não criado: o mapeamento ficou apenas na tela.');
+}
+
+commitItemEdit([target.tempId], item => ({
+mapeamento: mapping,
+produtoIdSistema: mapping.mode === 'EXISTING_DIRECT' ? mapping.existingProductId : null,
+skuSistema: mapping.existingProduct?.sku || null,
+skuSugerido: mapping.draftIdentity?.sku_interno || null,
+// Vinculado: herda o tipo do item do catálogo; novo: o tipo escolhido no modal
+tipoRecurso: mapping.existingProduct?.tipo_recurso || mapping.draftIdentity?.tipo_recurso || item.tipoRecurso || TIPO_RECURSO_PADRAO,
+nomeItemSugerido: mapping.draftIdentity?.nome_interno || null,
+mappedId: getMappedId(mapping),
+isMapped: true
+}));
 };
 
 const handleProcessarXml = async (parsedNfeData) => {
@@ -182,8 +298,9 @@ return Number(parsedNfe?.totais?.icmsTot?.vFrete || 0) || 0;
 }, [parsedNfe]);
 
 const freightReconciliation = useMemo(() => {
-return reconcileFreight(nfeFreightValue, items);
-}, [nfeFreightValue, items]);
+// Itens carregam frete da NF + frete adicional, então a referência é a soma dos dois
+return reconcileFreight(nfeFreightValue + (Number(freteAdicionalInfo.valor) || 0), items);
+}, [nfeFreightValue, freteAdicionalInfo, items]);
 
 const financialReconciliation = useMemo(() => {
 const totals = parsedNfe?.totais?.icmsTot;
@@ -196,19 +313,15 @@ desconto: totals?.vDesc,
 ipi: totals?.vIPI,
 icmsSt: totals?.vICMSST,
 total: totals?.vNF,
-}, items);
+// A conferência financeira é contra a NF: desconta o frete adicional embutido nos itens
+}, items.map(item => ({ ...item, freightAdded: (Number(item.freightAdded) || 0) - (Number(item.freightExtra) || 0) })));
 }, [parsedNfe, items]);
 
 // Função para lidar com o upload do arquivo XML
 // Função para lidar com o upload do arquivo XML atualizada
-const handleXmlUpload = (event: React.ChangeEvent<HTMLInputElement> | { target: { files: File[] } }) => {
-const file = event.target.files?.[0];
-if (!file) return;
-
+// Carrega a NF a partir do conteúdo do XML (upload de arquivo ou retomada de um lote da Staging)
+const processarXmlConteudo = async (content: string) => {
 setIsProcessingItems(true);
-const reader = new FileReader();
-reader.onload = async (e) => {
-const content = e.target?.result as string;
 if (content) {
 setRawXmlString(content); // Salva o XML cru em string para download/visualização futura
 try {
@@ -256,8 +369,11 @@ const vIpiItem = parseFloat(ipiObj.vIPI || ipiObj.VIPI || '0') || 0;
 const icmsObj = item.imposto?.icms || {};
 const vStItem = Number(icmsObj.vICMSST || icmsObj.vBCST || 0) || 0;
 
+const discountItem = parseFloat(item.prod.vDesc || '0') || 0;
+
 const totalAcrescimosItem = freightItem + otherExpenses + insuranceItem + vIpiItem + vStItem;
-const valorTotalRealItem = vlrProd + totalAcrescimosItem;
+// Mesma composição do vNF: produtos - desconto + acréscimos
+const valorTotalRealItem = vlrProd - discountItem + totalAcrescimosItem;
 const effectiveUnitCost = qtdXml > 0 ? valorTotalRealItem / qtdXml : vlrUnit;
 
 return {
@@ -279,7 +395,7 @@ freightDistributed: 0,
 freightAdded: freightItem,
 seguro: insuranceItem,
 outrasDespesas: otherExpenses,
-desconto: parseFloat(item.prod.vDesc || '0') || 0,
+desconto: discountItem,
 ipi: vIpiItem,
 icmsSt: vStItem,
 prod: {
@@ -294,49 +410,59 @@ totalTaxes: totalAcrescimosItem
 },
 difference: 0,
 isConfirmed: false,
+tipoRecurso: TIPO_RECURSO_PADRAO,
 };
 });
 
+// Retomada: se a NF já tem lote na staging, recupera o que foi feito (mapeamento, conferência, frete...)
+let itensDaNota: any[] = initialItems;
+let freteDaNota = FRETE_ADICIONAL_INICIAL;
+let modoFreteDaNota: FreightMode = 'original';
+let podeSincronizar = true;
+
+try {
+const estado = await buscarEstadoLote({ chave: parsed.chaveAcesso });
+if (estado.lote && ['IMPORTADO', 'DESCARTADO'].includes(estado.lote.status)) {
 setItems(initialItems);
+setAppliedFreightMode('original');
+setFreteAdicionalInfo(FRETE_ADICIONAL_INICIAL);
+setLoteId(null);
+message.error(`Esta NF já está ${estado.lote.status} na Staging (lote #${estado.lote.id}) e não pode mais ser alterada.`);
+setIsProcessingItems(false);
+return;
+}
+if (estado.lote && estado.itens.length > 0) {
+const restauracao = restaurarItensDoStaging(initialItems, estado.itens);
+const freteSalvo = lerFreteAdicionalSalvo(estado.lote.frete_adicional);
+if (freteSalvo) {
+freteDaNota = { valor: freteSalvo.valor, metodo: freteSalvo.metodo || FRETE_ADICIONAL_INICIAL.metodo, observacao: freteSalvo.observacao };
+modoFreteDaNota = freteSalvo.modo_rateio || 'original';
+}
+const freteNota = parseFloat(parsed.totais?.icmsTot?.vFrete || '0') || 0;
+itensDaNota = distributeFreight(restauracao.items, modoFreteDaNota, freteNota, Number(freteDaNota.valor) || 0);
+if (restauracao.restaurados > 0) {
+message.info(`Conferência retomada do lote #${estado.lote.id}: ${restauracao.mapeados} item(ns) mapeado(s), ${restauracao.conferidos} conferido(s).`);
+}
+}
+} catch (err: any) {
+// Sem o estado salvo não sincroniza: evitaria sobrescrever a conferência já feita com dados zerados
+podeSincronizar = false;
+console.error('Erro ao buscar estado salvo da NF:', err);
+message.warning('Não foi possível recuperar o estado salvo desta NF. Nada será gravado na Staging até recarregar o XML.');
+}
+
+setItems(itensDaNota);
+setAppliedFreightMode(modoFreteDaNota);
+setFreteAdicionalInfo(freteDaNota);
 
 // ==========================================
 // SINCRONIZAÇÃO COMPLETA: XML Bruto + JSON + Itens
 // ==========================================
 const tenantId = 1;
 
-const payloadItens = initialItems.map((item) => ({
-  nItem: item.nItem,
-  cProd: item.sku,
-  cEan: item.ean,
-  xProd: item.descricao,
-  ncm: item.ncm,
-  cest: item.prod?.CEST || null,
-  uCom: item.unidade,
-  quantidade: item.quantidade,
-  receivedQuantity: item.receivedQuantity,
-  valorUnitario: item.valorUnitario,
-  valorBaseUnitario: item.valorBaseUnitario,
-  valorTotal: item.valorTotal,
-  valorProdutos: item.valorProdutos,
-  freightOriginal: item.freightOriginal,
-  freightDistributed: item.freightDistributed,
-  freightAdded: item.freightAdded,
-  seguro: item.seguro,
-  outrasDespesas: item.outrasDespesas,
-  desconto: item.desconto,
-  ipi: item.ipi,
-  icmsSt: item.icmsSt,
-  // Envia os objetos JSON completos do XML para salvar nas colunas JSON/JSONB do banco
-  prodJson: item.prod,
-  impostoJson: item.imposto,
-  // Dados de mapeamento se houver
-  produtoIdSistema: item.produtoIdSistema || null,
-  skuSistema: item.skuSistema || null,
-  familia: item.familia || null,
-  tipoEntrada: item.tipoEntrada || 'COMPRA_NORMAL'
-}));
+const payloadItens = itensDaNota.map(buildStagingItem);
 
-try {
+if (podeSincronizar) try {
 // Chamada da API unificada que envia o XML cru e o objeto JSON de dados
 const respostaLote = await sincronizarLoteXMLCompleto({
 tenant_id: tenantId,
@@ -344,7 +470,9 @@ chave_acesso: parsed.chaveAcesso,
 numero_nf: parsed.numero,
 cnpj_fornecedor: parsed.emitente?.cnpj || '',
 xml_conteudo: content, // <-- Aqui vai o XML inteiro em LONGTEXT
-lote_importacao_id: loteId, // Se o seu controller aceitar ou esperar
+// Carga completa: o backend acha o lote pela chave de acesso e remove linhas que não existem no XML
+sincronizacao_completa: true,
+frete_adicional: { ...freteDaNota, modo_rateio: modoFreteDaNota },
 dados_nota_fiscal: {
 emitente: parsed.emitente,
 totais: parsed.totais,
@@ -381,20 +509,39 @@ setItems([]);
 }
 setIsProcessingItems(false);
 };
+
+const handleXmlUpload = (event: React.ChangeEvent<HTMLInputElement> | { target: { files: File[] } }) => {
+const file = event.target.files?.[0];
+if (!file) return;
+const reader = new FileReader();
+reader.onload = (e) => { processarXmlConteudo(e.target?.result as string); };
 reader.readAsText(file);
 };
+
+// Retomada vinda da tela de Staging: /compras/entrada-nfe?lote=ID
+const [searchParams] = useSearchParams();
+const loteRetomado = useRef<string | null>(null);
+useEffect(() => {
+const loteParam = searchParams.get('lote');
+if (!loteParam || loteRetomado.current === loteParam) return;
+loteRetomado.current = loteParam;
+
+buscarEstadoLote({ loteId: Number(loteParam) })
+.then(estado => {
+if (!estado.lote?.xml_conteudo) {
+message.error(`Lote #${loteParam} não tem o XML salvo para retomar a conferência.`);
+return;
+}
+processarXmlConteudo(estado.lote.xml_conteudo);
+})
+.catch(err => message.error('Erro ao retomar o lote: ' + err.message));
+}, [searchParams]);
 
 const beforeUpload = (file: File) => {
 handleXmlUpload({ target: { files: [file] } });
 return false;
 };
 
-// Estado para controlar o frete adicional (pago por fora / Correios / Carreto)
-const [freteAdicionalInfo, setFreteAdicionalInfo] = useState({
-valor: 0,
-metodo: 'Correios - PAC',
-observacao: ''
-});
 
 // Valor total do frete (XML + Frete Adicional informando pelo usuário)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -406,68 +553,72 @@ return xmlFreight + additionalFreight;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////q
 
 
-// Função para aplicar a distribuição de frete nos itens
+// Custo ajustado da entrada: total da NF (vNF) + frete adicional pago por fora
+const custoAjustadoTotal = useMemo(() => {
+const valorNota = parseFloat(parsedNfe?.totais?.icmsTot?.vNF || '0') || 0;
+const freteAdicional = Number(freteAdicionalInfo?.valor) || 0;
+return valorNota + freteAdicional;
+}, [parsedNfe, freteAdicionalInfo]);
+
+// Recalcula frete e custo de todos os itens (sempre a partir do vFrete original do XML, então é reversível)
+const applyFreight = (
+mode: FreightMode,
+freteInfo: typeof freteAdicionalInfo = freteAdicionalInfo,
+baseItems: any[] = items
+) => {
+const recalculated = distributeFreight(baseItems, mode, nfeFreightValue, Number(freteInfo.valor) || 0);
+setItems(recalculated);
+setAppliedFreightMode(mode);
+persistItemsToStaging(recalculated, freteInfo, mode);
+};
+
+const handleOpenFreightModal = () => {
+setFreightDistributionMode(appliedFreightMode);
+setIsFreightModalOpen(true);
+};
+
 const handleApplyFreightDistribution = () => {
-const totalItens = items.reduce((total, item) => {
-const freteConsiderado = Number(item.freightAdded) || 0;
-return total + Math.max(0, (Number(item.valorTotal) || 0) - freteConsiderado);
-}, 0);
-if (totalItens <= 0) {
-message.error("Não há valor nos itens para ratear o frete.");
-return;
-}
-
-setItems(prevItems => prevItems.map(item => {
-const freteAtual = Number(item.freightAdded) || 0;
-const itemProdTotal = Math.max(0, (Number(item.valorTotal) || 0) - freteAtual);
-let freightPortion = 0;
-
-if (freightDistributionMode === 'proportional_value') {
-const proportion = itemProdTotal / totalItens;
-freightPortion = nfeFreightValue * proportion;
-} else if (freightDistributionMode === 'proportional_quantity') {
-const totalQty = prevItems.reduce((acc, i) => acc + (i.quantidade || 0), 0);
-const proportion = totalQty > 0 ? (item.quantidade || 0) / totalQty : 0;
-freightPortion = nfeFreightValue * proportion;
-} else if (freightDistributionMode === 'equal') {
-freightPortion = prevItems.length > 0 ? nfeFreightValue / prevItems.length : 0;
-}
-
-const quantidade = Number(item.quantidade) || 1;
-const novoValorTotal = itemProdTotal + freightPortion;
-const newUnitCost = novoValorTotal / quantidade;
-return {
-...item,
-valorUnitario: Number(newUnitCost.toFixed(4)),
-valorTotal: Number(novoValorTotal.toFixed(2)),
-freightDistributed: Number(freightPortion.toFixed(2)),
-freightAdded: Number(freightPortion.toFixed(2)),
-};
-}));
-
+applyFreight(freightDistributionMode);
 setIsFreightModalOpen(false);
-message.success("Frete distribuído com sucesso entre os custos unitários dos itens!");
+message.success(`Frete aplicado nos custos: ${FREIGHT_MODE_LABELS[freightDistributionMode]}.`);
 };
 
-// Manipuladores de Ações dos Itens
-const handleToggleItemConfirmation = (tempId: string) => {
-setItems(prev => prev.map(item =>
-item.tempId === tempId ? { ...item, isConfirmed: !item.isConfirmed } : item
-));
+// Prévia do modo selecionado no modal, sem alterar os itens
+const freightPreview = useMemo(() => {
+if (!isFreightModalOpen) return [];
+return distributeFreight(items, freightDistributionMode, nfeFreightValue, Number(freteAdicionalInfo.valor) || 0);
+}, [isFreightModalOpen, items, freightDistributionMode, nfeFreightValue, freteAdicionalInfo]);
+
+// Conferência: só itens com código interno vinculado podem ser conferidos
+const setItemsConfirmation = (ids: ItemId[], confirmed: boolean) => {
+const result = applyConfirmation(items, ids, confirmed);
+if (result.blocked > 0) {
+message.warning(`${result.blocked} item(ns) sem código interno não foi(ram) conferido(s). ${MSG_SEM_CODIGO_INTERNO}`);
+}
+if (result.changed.length === 0) return;
+setItems(result.items);
+persistItemsToStaging(result.changed);
+if (confirmed) message.success(`${result.changed.length} item(ns) conferido(s).`);
 };
 
-const handleConfirmAllItems = () => {
-setItems(prev => prev.map(item => ({ ...item, isConfirmed: true })));
-message.success("Todos os itens foram marcados como conferidos.");
+const handleConfirmItems = (ids: ItemId[]) => setItemsConfirmation(ids, true);
+const handleUnconfirmItems = (ids: ItemId[]) => setItemsConfirmation(ids, false);
+
+// GTIN informado manualmente (item sem código de barras no XML)
+const handleChangeGtin = (tempId: ItemId, gtin: string) => {
+const valor = gtin.trim();
+const result = commitItemEdit([tempId], item => (item.customGtin === valor ? null : { customGtin: valor }));
+if (result.changed.length > 0) message.success('Código de barras vinculado ao item.');
 };
 
-const handleUnconfirmAllItems = () => {
-setItems(prev => prev.map(item => ({ ...item, isConfirmed: false })));
-};
-
-const handleRemoveItem = (tempId: string) => {
-setItems(prev => prev.filter(item => item.tempId !== tempId));
-message.info("Item removido da conferência.");
+// Itens não saem da NF: o operador só reclassifica o tipo de entrada (ex.: produto de limpeza -> CONSUMO)
+const handleChangeTipoRecurso = (ids: (string | number)[], tipo: TipoRecurso) => {
+const result = commitItemEdit(ids, item =>
+(item.tipoRecurso || TIPO_RECURSO_PADRAO) === tipo ? null : { tipoRecurso: tipo }
+);
+if (result.changed.length > 0) {
+message.success(`${result.changed.length} item(ns) marcado(s) como ${getTipoRecursoConfig(tipo).label}.`);
+}
 };
 
 const handleReceberTotalDoFilho = (valorCalculado: number) => {
@@ -475,28 +626,26 @@ console.log("O valor recebido do filho é:", valorCalculado);
 // Faça o que precisar com o valor aqui (ex: salvar em um estado do pai)
 };
 
-// Quando alterar a quantidade ou status de um item na conferência física/tabela:
-const handleQuantityChange = async (tempId: string, newReceivedQty: number, stagingItemId?: number) => {
-setItems(prev => prev.map(item => {
-if (item.tempId === tempId) {
-const diff = newReceivedQty - item.quantidade;
-return { ...item, receivedQuantity: newReceivedQty, difference: diff };
-}
-return item;
-}));
+// Quantidade recebida: altera o item (desfaz a conferência) e grava na staging com debounce,
+// já que o InputNumber dispara a cada tecla
+const quantityPersistTimers = useRef<Map<ItemId, ReturnType<typeof setTimeout>>>(new Map());
 
-// Sincroniza com o Backend (Staging Table) se houver o ID do banco
-if (stagingItemId) {
-try {
-await fetch(`http://localhost:3001/api/produtos/itens/staging/${stagingItemId}/status`, {
-method: 'PATCH',
-headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({ quantidade: newReceivedQty }) // ou status correspondente
-});
-} catch (err) {
-console.error("Erro ao atualizar item na staging do banco:", err);
-}
-}
+const handleQuantityChange = (tempId: ItemId, newReceivedQty: number) => {
+const result = commitItemEdit([tempId], item =>
+Number(item.receivedQuantity) === newReceivedQty
+? null
+: { receivedQuantity: newReceivedQty, difference: newReceivedQty - (Number(item.quantidade) || 0) },
+{ persist: false }
+);
+const alterado = result.changed[0];
+if (!alterado) return;
+
+const timers = quantityPersistTimers.current;
+clearTimeout(timers.get(tempId));
+timers.set(tempId, setTimeout(() => {
+timers.delete(tempId);
+persistItemsToStaging([alterado]);
+}, 600));
 };
 
 const totalDivergences = useMemo(() => items.filter(i => i.difference !== 0).length, [items]);
@@ -583,6 +732,7 @@ onReset={onReset}
 
 {parsedNfe?.chaveAcesso && (
 <NfeCards
+key={parsedNfe.chaveAcesso}
 data={parsedNfe}
 supplierStatus={supplierStatus}
 actions={{ 
@@ -595,9 +745,8 @@ valorTotalFrete={totalFreightCombined}
 // 2. Recebemos o frete atualizado aqui no pai para a conferência
 onUpdateFreteAdicional={(novosDados) => {
 setFreteAdicionalInfo(novosDados);
-
-// Aqui você já recebe no pai e pode realizar a conferência/recalcule necessário:
-console.log("Frete recebido no pai para conferência:", novosDados);
+// Reaplica o modo atual para incorporar o novo frete adicional nos custos
+applyFreight(appliedFreightMode, novosDados);
 message.success(`Frete adicional atualizado: R$ ${novosDados.valor.toFixed(2)} (${novosDados.metodo})`);
 }}/>)}
 
@@ -605,12 +754,14 @@ message.success(`Frete adicional atualizado: R$ ${novosDados.valor.toFixed(2)} (
 <Card bordered={false} style={{ borderRadius: 8 }}>
 <ItemsConference
 items={items.map((i, index) => ({ ...i, nItem: i.nItem || index + 1, confirmed: i.isConfirmed, isConfirmed: i.isConfirmed }))}
-onConfirmItems={handleConfirmAllItems}
-onUnconfirmItems={handleUnconfirmAllItems}
+onConfirmItems={handleConfirmItems}
+onUnconfirmItems={handleUnconfirmItems}
 onMapProducts={(item) => { setItemToMap(item); setIsMappingModalOpen(true); }}
-onRemoveItems={handleRemoveItem}
-onToggleItem={(tempId) => handleToggleItemConfirmation(tempId)}
-onQuantityChange={(tempId, qty) => handleQuantityChange(tempId, qty)}
+onItemMapped={handleItemMapped}
+onChangeTipoRecurso={handleChangeTipoRecurso}
+onToggleItem={(tempId, confirmed) => setItemsConfirmation([tempId], confirmed)}
+onQuantityChange={handleQuantityChange}
+onChangeGtin={handleChangeGtin}
 onAssignGroupToItems={() => { }}
 onUnassignGroup={() => { }}
 onUnassignItem={() => { }}
@@ -710,13 +861,7 @@ description="Importe um XML para validar os valores financeiros."
 {/* Alerta 3: Distribuição de Frete */}
 {(nfeFreightValue > 0 || freightReconciliation.itemsTotal > 0 || (freteAdicionalInfo?.valor || 0) > 0) ? (
 <Alert
-type={
-// Se houver frete adicional, a lógica de match pode precisar considerar se ele foi rateado ou somado
-// Aqui mantemos a regra existente ou ajustamos para comparar com o frete total combinado
-freightReconciliation.matches && ((freteAdicionalInfo?.valor || 0) === 0 || freightReconciliation.itemsTotal >= (nfeFreightValue + (freteAdicionalInfo?.valor || 0)))
-? "success" 
-: "error"
-}
+type={freightReconciliation.matches ? "success" : "error"}
 showIcon
 message={
 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingRight: 24 }}>
@@ -733,7 +878,7 @@ description={
 type="text"
 size="small"
 icon={<SettingOutlined />}
-onClick={() => setIsFreightModalOpen(true)}
+onClick={handleOpenFreightModal}
 style={{
 position: 'absolute',
 top: -26,
@@ -746,8 +891,13 @@ color: 'rgba(0, 0, 0, 0.45)'
 {/* Conteúdo compacto com a linha de Frete Adicional inclusa */}
 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+<span style={{ color: '#8c8c8c' }}>Modo de rateio:</span>
+<strong>{FREIGHT_MODE_LABELS[appliedFreightMode]}</strong>
+</div>
+
+<div style={{ display: 'flex', justifyContent: 'space-between' }}>
 <span style={{ color: '#8c8c8c' }}>Frete da NF-e:</span>
-<strong>R$ {freightReconciliation.noteTotal.toFixed(2)}</strong>
+<strong>R$ {nfeFreightValue.toFixed(2)}</strong>
 </div>
 
 {/* Linha dinâmica do Frete Adicional (só aparece se houver valor > 0) */}
@@ -768,9 +918,7 @@ color: 'rgba(0, 0, 0, 0.45)'
 <strong style={{ 
 color: freightReconciliation.matches ? '#52c41a' : '#ff4d4f' 
 }}>
-R$ {Math.abs(
-(freightReconciliation.noteTotal + (Number(freteAdicionalInfo?.valor) || 0)) - freightReconciliation.itemsTotal
-).toFixed(2)}
+R$ {freightReconciliation.difference.toFixed(2)}
 </strong>
 </div>
 </div>
@@ -935,12 +1083,17 @@ R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDig
 
 <Statistic
 title={<Text strong style={{ fontSize: 13 }}>Custo Ajustado Total</Text>}
-value={parseFloat(parsedNfe?.totais?.icmsTot?.vNF || '0')}
-value={parseFloat(parsedNfe?.totais?.icmsTot?.vNF || '0')}
+value={custoAjustadoTotal}
 precision={2}
 prefix="R$"
 valueStyle={{ color: '#52c41a', fontWeight: 'bold', fontSize: 22 }}
 />
+{Number(freteAdicionalInfo?.valor) > 0 && (
+<Text type="secondary" style={{ fontSize: 11 }}>
+Nota R$ {(parseFloat(parsedNfe?.totais?.icmsTot?.vNF || '0') || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+{' '}+ frete adicional R$ {Number(freteAdicionalInfo.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+</Text>
+)}
 
 <Button
 type="primary"
@@ -986,15 +1139,18 @@ title="🚚 Configurar Distribuição de Frete"
 open={isFreightModalOpen}
 onCancel={() => setIsFreightModalOpen(false)}
 onOk={handleApplyFreightDistribution}
-okText="Aplicar Rateio no Custo"
+okText="Aplicar no Custo"
 cancelText="Cancelar"
-width={540}
+width={760}
 >
-<p style={{ marginBottom: 8 }}>
-Valor total do frete informado na NF-e: <strong>R$ {nfeFreightValue.toFixed(2)}</strong>
-</p>
+<div style={{ display: 'flex', gap: 16, marginBottom: 8, fontSize: 13 }}>
+<span>Frete NF-e: <strong>R$ {nfeFreightValue.toFixed(2)}</strong></span>
+<span>Frete adicional: <strong>R$ {(Number(freteAdicionalInfo.valor) || 0).toFixed(2)}</strong></span>
+<span>Total: <strong>R$ {totalFreightCombined.toFixed(2)}</strong></span>
+</div>
 <p style={{ color: '#595959', fontSize: 13, marginBottom: 16 }}>
-Escolha abaixo o critério de rateio para incorporar o frete proporcionalmente aos custos unitários dos produtos:
+Escolha o critério de rateio. Você pode alternar entre os modos a qualquer momento, inclusive voltar ao valor original do XML.
+Modo aplicado agora: <strong>{FREIGHT_MODE_LABELS[appliedFreightMode]}</strong>.
 </p>
 
 <Radio.Group
@@ -1005,9 +1161,9 @@ style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}
 
 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', background: '#fafafa', padding: '10px 12px', borderRadius: 6, border: '1px solid #f0f0f0' }}>
 <Radio value="original" style={{ flex: 1 }}>
-<Text strong>Valor Original</Text>
+<Text strong>Valor Original (XML)</Text>
 </Radio>
-<Tooltip title="Itens de maior valor financeiro recebem uma fatia proporcionalmente maior do frete. É o método padrão e mais recomendado para contabilidade.">
+<Tooltip title="Cada item mantém o frete (vFrete) destacado no XML pelo fornecedor. Se houver frete adicional, ele é rateado proporcionalmente ao valor dos itens.">
 <InfoCircleOutlined style={{ color: '#1890ff', fontSize: 16, cursor: 'pointer', marginTop: 3 }} />
 </Tooltip>
 </div>
@@ -1039,6 +1195,32 @@ style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}
 </Tooltip>
 </div>
 </Radio.Group>
+
+<Divider style={{ margin: '16px 0 8px' }} />
+<Text strong style={{ fontSize: 12 }}>Prévia do modo selecionado</Text>
+<Table
+size="small"
+rowKey="tempId"
+pagination={false}
+scroll={{ y: 240 }}
+style={{ marginTop: 8 }}
+dataSource={freightPreview.map(preview => ({
+...preview,
+freteAtual: Number(items.find(i => i.tempId === preview.tempId)?.freightAdded) || 0,
+}))}
+columns={[
+{ title: 'Item', dataIndex: 'descricao', ellipsis: true },
+{ title: 'Frete XML', dataIndex: 'freightOriginal', width: 90, align: 'right', render: (v: number) => `R$ ${(Number(v) || 0).toFixed(2)}` },
+{ title: 'Frete atual', dataIndex: 'freteAtual', width: 90, align: 'right', render: (v: number) => `R$ ${v.toFixed(2)}` },
+{
+title: 'Frete novo', dataIndex: 'freightAdded', width: 90, align: 'right',
+render: (v: number, row: any) => (
+<span style={{ color: Math.abs(v - row.freteAtual) > 0.005 ? '#1677ff' : undefined, fontWeight: 600 }}>R$ {v.toFixed(2)}</span>
+)
+},
+{ title: 'Custo unit. novo', dataIndex: 'valorUnitario', width: 110, align: 'right', render: (v: number) => `R$ ${(Number(v) || 0).toFixed(4)}` },
+]}
+/>
 </Modal>
 
 <Modal
@@ -1056,8 +1238,8 @@ destroyOnClose
 >
 <PhysicalConferenceTable
 items={items}
-onConfirmItems={handleConfirmAllItems}
-onUnconfirmItems={handleUnconfirmAllItems}
+onConfirmItems={handleConfirmItems}
+onUnconfirmItems={handleUnconfirmItems}
 onQuantityChange={handleQuantityChange}
 />
 </Modal>
@@ -1154,6 +1336,10 @@ item_nfe_seq: item.nItem || idx + 1,
 mapeamento_sistema: {
 produto_id_sistema: item.produtoIdSistema || null,
 sku_sistema: item.skuSistema || null,
+tipo_recurso: item.tipoRecurso || TIPO_RECURSO_PADRAO,
+sku_sugerido: item.skuSugerido || null,
+nome_item_sugerido: item.nomeItemSugerido || null,
+mapeamento_json: item.mapeamento || null,
 familia: item.familia || null,
 tipo_entrada: item.tipoEntrada || "COMPRA_NORMAL"
 },

@@ -13,7 +13,10 @@ import {
   Tag,
   Tooltip,
   Progress,
-  Select
+  Select,
+  Spin,
+  Empty,
+  InputNumber
 } from "antd";
 import { 
   LinkOutlined, 
@@ -24,23 +27,75 @@ import {
   ArrowRightOutlined,
   LockOutlined,
   UnlockOutlined,
-  UnorderedListOutlined,
-  WarningOutlined
+  UnorderedListOutlined
 } from "@ant-design/icons";
-import { ProdutoNF } from "../../types/NF-e";
+import { TIPOS_RECURSO, TIPO_RECURSO_PADRAO, getTipoRecursoConfig } from "../tipoRecurso";
+import { buscarItensCatalogo, ItemCatalogoBusca } from "../../api/comprasApi";
+import ProductCommercialSalesConfig from "../../../Catalogo/pages/ProductPricingModule/ProductCommercialSalesConfig";
+import type { SalvarConfigPayload } from "../../../Catalogo/pages/ProductPricingModule/configVendas.api";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
 
-interface ProductEntry extends ProdutoNF {
-  tempId: number;
+// Formato real dos itens montados no StockEntryForm (initialItems)
+interface ProductEntry {
+  tempId: string | number;
+  nItem?: string | number;
+  sku?: string;
+  ean?: string;
+  descricao?: string;
   ncm?: string;
+  unidade?: string;
+  quantidade?: number;
+  valorUnitario?: number;      // custo unitário efetivo (com frete/IPI/ST)
+  valorBaseUnitario?: number;  // custo unitário da nota (vProd / qCom)
+  valorTotal?: number;
+  ipi?: number;
+  tipoRecurso?: string;
+  prod?: { CFOP?: string; [key: string]: unknown };
 }
+
+export interface MappingPayload {
+  mode: "EXISTING_DIRECT" | "DRAFT" | null;
+  existingProductId: number | null;
+  existingProduct: { sku: string; nome: string; tipo_recurso: string } | null;
+  supplierLinkData: {
+    sku_fornecedor: string;
+    ean_fornecedor: string | null;
+    descricao_fornecedor: string;
+  };
+  salesUnits: SalesUnit[];
+  // Como a unidade da NF vira estoque: 1 unidade_compra = fator x unidade_base
+  conversaoCompra: {
+    unidade_compra: string;
+    unidade_base: string;
+    fator: number;
+  };
+  // Item novo: unidades de venda e faixas de preço (gravadas na aprovação da Staging)
+  configVendas: SalvarConfigPayload | null;
+  draftIdentity: {
+    tipo_recurso: string;
+    nome_comercial: string;
+    nome_interno: string;
+    sku_interno: string;
+    sku_comercial: string;
+    id_unidade: number | undefined;
+    custo_unitario_base: number;
+    unidade_xml: string | undefined;
+  } | null;
+}
+
+// Identificador exibido no pai: ID do produto vinculado ou, para item novo, o SKU customizado
+// (o ID real é gerado por AUTO_INCREMENT quando o item for criado no banco)
+export const getMappedId = (mapping: MappingPayload): number | string | null =>
+  mapping.mode === "EXISTING_DIRECT"
+    ? mapping.existingProduct?.sku || mapping.existingProductId
+    : mapping.draftIdentity?.sku_interno || null;
 
 interface MappingModalProps {
   items: ProductEntry[];
   supplierCnpj: string;
-  onMap: (tempId: number, data: any) => void;
+  onMap: (tempId: string | number, data: MappingPayload) => void;
   onClose: () => void;
 }
 
@@ -53,6 +108,8 @@ interface SalesUnit {
   price: number;
 }
 
+const EMPTY_ITEM: ProductEntry = { tempId: "" };
+
 const ProductMappingModal: React.FC<MappingModalProps> = ({
   items = [],
   onMap,
@@ -60,12 +117,12 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const isBatch = items.length > 1;
-  const currentItem = items[currentIndex] || {};
+  const currentItem: ProductEntry = items[currentIndex] ?? EMPTY_ITEM;
 
   const [step, setStep] = useState(0);
 
   // Identidade do Recurso (`itens_core`)
-  const [draftTipoRecurso, setDraftTipoRecurso] = useState<string>("PRODUTO");
+  const [draftTipoRecurso, setDraftTipoRecurso] = useState<string>(currentItem.tipoRecurso || TIPO_RECURSO_PADRAO);
   const [draftCommercialName, setDraftCommercialName] = useState(currentItem.descricao || "");
   const [draftInternalName, setDraftInternalName] = useState(currentItem.descricao || "");
   const [draftInternalSku, setDraftInternalSku] = useState(currentItem.sku || "");
@@ -79,17 +136,15 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
   // Etapa 1: Destino
   const [step1Mode, setStep1Mode] = useState<"EXISTING_DIRECT" | "DRAFT" | null>(null);
   const [existingSearch, setExistingSearch] = useState("");
-  const [selectedExisting, setSelectedExisting] = useState<any | null>(null);
+  const [selectedExisting, setSelectedExisting] = useState<ItemCatalogoBusca | null>(null);
+  const [searchResults, setSearchResults] = useState<ItemCatalogoBusca[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
-  // Etapa 2: Comercialização & Precificação
-  const [salesMode, setSalesMode] = useState<"WHOLE_ONLY" | "FRACIONADO_ONLY" | "BOTH" | null>(null);
-  const [wholeUnit, setWholeUnit] = useState(currentItem.unidadeMedida || "UN");
-  const [wholeMarkup, setWholeMarkup] = useState<number>(60);
-  const [wholePrice, setWholePrice] = useState<number>(0);
-  const [fracUnit, setFracUnit] = useState("MT");
-  const [fracConversion, setFracConversion] = useState<number>(100);
-  const [fracMarkup, setFracMarkup] = useState<number>(60);
-  const [fracPrice, setFracPrice] = useState<number>(0);
+  // Conversão de compra: unidade da NF -> unidade base de estoque
+  const [convUnidadeBase, setConvUnidadeBase] = useState<string>(currentItem.unidade || "UN");
+  const [convFator, setConvFator] = useState<number>(1);
+  const [configVendasRascunho, setConfigVendasRascunho] = useState<SalvarConfigPayload | null>(null);
 
   const searchInputRef = useRef<any>(null);
   const [unitsFromStep, setUnitsFromStep] = useState<SalesUnit[]>([]);
@@ -101,17 +156,19 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
       setDraftInternalName(currentItem.descricao || "");
       setDraftInternalSku(currentItem.sku || "");
       setDraftCommercialSku("");
-      setDraftTipoRecurso("PRODUTO");
+      setDraftTipoRecurso(currentItem.tipoRecurso || TIPO_RECURSO_PADRAO);
       setDraftUnidade(1);
-      setWholeUnit(currentItem.unidadeMedida || "UN");
       setStep1Mode(null);
       setSelectedExisting(null);
       setExistingSearch("");
+      setSearchResults([]);
+      setConvUnidadeBase((currentItem.unidade || "UN").toUpperCase());
+      setConvFator(1);
+      setConfigVendasRascunho(null);
       setIsInternalNameEditable(false);
       setIsInternalSkuEditable(false);
       setStep(0);
       setUnitsFromStep([]);
-      setSalesMode(null);
     }
   }, [currentIndex, currentItem]);
 
@@ -130,26 +187,39 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
     }
   }, [step1Mode]);
 
-  const applyCommercialRounding = (value: number) => {
-    const base = Math.floor(value);
-    const cents = value - base;
-    if (cents < 0.5) return base + 0.5;
-    if (cents < 0.9) return base + 0.9;
-    return base + 0.99;
-  };
-
   useEffect(() => {
-    const cost = currentItem.custo || currentItem.valorUnitario || 0;
-    const rawPrice = cost * (1 + wholeMarkup / 100);
-    setWholePrice(Number(applyCommercialRounding(rawPrice).toFixed(2)));
-  }, [wholeMarkup, currentItem.custo, currentItem.valorUnitario]);
+    if (step1Mode !== "EXISTING_DIRECT") return;
+    const termo = existingSearch.trim();
+    if (termo.length < 2) {
+      setSearchResults([]);
+      setSearchError(null);
+      setIsSearching(false);
+      return;
+    }
 
-  useEffect(() => {
-    const costWhole = currentItem.custo || currentItem.valorUnitario || 0;
-    const costFrac = fracConversion > 0 ? costWhole / fracConversion : 0;
-    const rawFracPrice = costFrac * (1 + fracMarkup / 100);
-    setFracPrice(Number(applyCommercialRounding(rawFracPrice).toFixed(2)));
-  }, [fracConversion, fracMarkup, currentItem.custo, currentItem.valorUnitario]);
+    const controller = new AbortController();
+    setIsSearching(true);
+    const timer = setTimeout(() => {
+      buscarItensCatalogo(termo, 1, controller.signal)
+        .then(resultados => {
+          setSearchResults(resultados);
+          setSearchError(null);
+        })
+        .catch(err => {
+          if (err.name === "AbortError") return;
+          setSearchResults([]);
+          setSearchError(err.message || "Erro ao buscar itens.");
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setIsSearching(false);
+        });
+    }, 300);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [existingSearch, step1Mode]);
 
   const canProceedToNextStep = () => {
     if (step === 0) {
@@ -168,7 +238,9 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
     }
 
     if (step === 1) {
-      // Como o módulo está desativado no step 1, permitimos avançar se escolheu DRAFT ou EXISTING
+      // Conversão de compra válida; item novo precisa da configuração de vendas montada
+      if (!(convFator > 0) || !convUnidadeBase.trim()) return false;
+      if (step1Mode === "DRAFT") return configVendasRascunho !== null;
       return true;
     }
     return true;
@@ -177,26 +249,37 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
   const handleConfirmItem = () => {
     const unitsPayload: SalesUnit[] = unitsFromStep && unitsFromStep.length ? unitsFromStep : [];
 
-    const baseCost = currentItem.custo || currentItem.valorUnitario || 0;
+    const baseCost = currentItem.valorUnitario || 0;
 
-    const payload = {
+    const payload: MappingPayload = {
       mode: step1Mode,
-      existingProductId: selectedExisting?.id || null,
+      existingProductId: step1Mode === "EXISTING_DIRECT" ? selectedExisting?.id ?? null : null,
+      existingProduct: step1Mode === "EXISTING_DIRECT" && selectedExisting ? {
+        sku: selectedExisting.sku,
+        nome: selectedExisting.name,
+        tipo_recurso: selectedExisting.tipoRecurso
+      } : null,
       supplierLinkData: {
         sku_fornecedor: currentItem.sku || "",
-        ean_fornecedor: currentItem.codigoBarras || null,
-        descricao_fornecedor: currentItem.descricao
+        ean_fornecedor: currentItem.ean || null,
+        descricao_fornecedor: currentItem.descricao || ""
       },
       salesUnits: unitsPayload,
+      conversaoCompra: {
+        unidade_compra: (currentItem.unidade || "UN").toUpperCase(),
+        unidade_base: convUnidadeBase.trim().toUpperCase(),
+        fator: convFator
+      },
+      configVendas: step1Mode === "DRAFT" ? configVendasRascunho : null,
       draftIdentity: step1Mode === "DRAFT" ? {
         tipo_recurso: draftTipoRecurso,
-        nome_comercial: draftCommercialName,
-        nome_interno: draftInternalName,
-        sku_interno: draftInternalSku,
-        sku_comercial: draftCommercialSku,
+        nome_comercial: draftCommercialName.trim(),
+        nome_interno: draftInternalName.trim(),
+        sku_interno: draftInternalSku.trim(),
+        sku_comercial: draftCommercialSku.trim(),
         id_unidade: draftUnidade,
         custo_unitario_base: baseCost,
-        unidade_xml: currentItem.unidadeMedida
+        unidade_xml: currentItem.unidade
       } : null
     };
 
@@ -234,7 +317,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
 
           <div style={{ marginBottom: 16, paddingTop: 4 }}>
             <Steps
-              current={step1Mode === "EXISTING_DIRECT" ? 0 : step}
+              current={step}
               size="small"
               items={[
                 { title: 'Destino & Vínculo' },
@@ -286,18 +369,18 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
                 </Col>
                 <Col span={12}>
                   <Text type="secondary" style={{ fontSize: '10px', textTransform: 'uppercase' }}>CFOP</Text>
-                  <div style={{ fontSize: '11px', fontWeight: 500, color: '#595959' }}>{currentItem.cfop || '—'}</div>
+                  <div style={{ fontSize: '11px', fontWeight: 500, color: '#595959' }}>{currentItem.prod?.CFOP || '—'}</div>
                 </Col>
               </Row>
 
               <Row gutter={8}>
                 <Col span={12}>
                   <Text type="secondary" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Qtd Nota</Text>
-                  <div style={{ fontWeight: 600, fontSize: '12px' }}>{currentItem.quantidade} {currentItem.unidadeMedida}</div>
+                  <div style={{ fontWeight: 600, fontSize: '12px' }}>{currentItem.quantidade} {currentItem.unidade}</div>
                 </Col>
                 <Col span={12}>
                   <Text type="secondary" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Valor Total Item</Text>
-                  <div style={{ fontWeight: 600, fontSize: '12px' }}>R$ {(currentItem.valorTotalItem || 0).toFixed(2)}</div>
+                  <div style={{ fontWeight: 600, fontSize: '12px' }}>R$ {(currentItem.valorTotal || 0).toFixed(2)}</div>
                 </Col>
               </Row>
 
@@ -306,12 +389,12 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
                   <span style={{ color: '#8c8c8c' }}>Custo Nota:</span>
-                  <span>R$ {(currentItem.valorUnitario || 0).toFixed(2)}</span>
+                  <span>R$ {(currentItem.valorBaseUnitario || 0).toFixed(2)}</span>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
                   <span style={{ color: '#8c8c8c' }}>IPI (Unit.):</span>
-                  <span>R$ {((currentItem.valorIpi || 0) / (currentItem.quantidade || 1)).toFixed(2)}</span>
+                  <span>R$ {((currentItem.ipi || 0) / (currentItem.quantidade || 1)).toFixed(2)}</span>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', borderTop: '1px dashed #e8e8e8', paddingTop: 4, marginTop: 2 }}>
@@ -371,30 +454,65 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
 
                   {step1Mode === "EXISTING_DIRECT" && (
                     <div style={{ marginTop: 8 }}>
-                      <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: '12px' }}>Buscar produto existente no estoque</Text>
+                      <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: '12px' }}>Buscar item existente no catálogo</Text>
                       <Input
                         ref={searchInputRef}
-                        placeholder="Digite o nome do produto..."
+                        placeholder="SKU, nome, variação ou marca (mín. 2 caracteres)"
                         value={existingSearch}
                         onChange={(e) => setExistingSearch(e.target.value)}
+                        allowClear
                         style={{ marginBottom: 8 }}
                       />
-                      <div style={{ maxHeight: '160px', overflowY: 'auto', border: '1px solid #d9d9d9', borderRadius: '6px', padding: '4px' }}>
-                        <div 
-                          onClick={() => setSelectedExisting({ id: 2, descricao: "Luva de Raspa Soldador Zanel" })}
-                          style={{ 
-                            padding: '8px', 
-                            cursor: 'pointer', 
-                            borderRadius: '4px',
-                            backgroundColor: selectedExisting?.id === 2 ? '#e6f4ff' : 'transparent',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center'
-                          }}
-                        >
-                          <Text strong={selectedExisting?.id === 2}>Luva de Raspa Soldador Zanel</Text>
-                          <Tag color="default">Simples</Tag>
-                        </div>
+                      <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #d9d9d9', borderRadius: '6px', padding: '4px', minHeight: 60 }}>
+                        {isSearching ? (
+                          <div style={{ textAlign: 'center', padding: 16 }}><Spin size="small" /></div>
+                        ) : searchError ? (
+                          <Text type="danger" style={{ fontSize: 12, padding: 8, display: 'block' }}>{searchError}</Text>
+                        ) : searchResults.length === 0 ? (
+                          <Empty
+                            image={Empty.PRESENTED_IMAGE_SIMPLE}
+                            description={existingSearch.trim().length < 2 ? "Digite para buscar no catálogo" : "Nenhum item encontrado"}
+                            style={{ margin: '8px 0' }}
+                          />
+                        ) : (
+                          searchResults.map(result => {
+                            const isSelected = selectedExisting?.id === result.id;
+                            const tipo = getTipoRecursoConfig(result.tipoRecurso);
+                            return (
+                              <div
+                                key={result.id}
+                                onClick={() => {
+                                  setSelectedExisting(result);
+                                  setConvUnidadeBase((result.unitOfMeasure || currentItem.unidade || "UN").toUpperCase());
+                                }}
+                                style={{
+                                  padding: '6px 8px',
+                                  cursor: 'pointer',
+                                  borderRadius: '4px',
+                                  backgroundColor: isSelected ? '#e6f4ff' : 'transparent',
+                                  border: isSelected ? '1px solid #91caff' : '1px solid transparent',
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  gap: 8
+                                }}
+                              >
+                                <div style={{ minWidth: 0 }}>
+                                  <Text strong={isSelected} style={{ fontSize: 12, display: 'block' }} ellipsis>{result.name}</Text>
+                                  <Text type="secondary" style={{ fontSize: 11 }}>
+                                    {result.sku}
+                                    {result.variacao && result.variacao !== 'Principal' ? ` · ${result.variacao}` : ''}
+                                    {result.marca ? ` · ${result.marca}` : ''}
+                                  </Text>
+                                </div>
+                                <Space size={4}>
+                                  {result.status !== 'ATIVO' && <Tag color="red">{result.status}</Tag>}
+                                  <Tag color={tipo.color} style={{ margin: 0 }}>{tipo.short}</Tag>
+                                </Space>
+                              </div>
+                            );
+                          })
+                        )}
                       </div>
                     </div>
                   )}
@@ -455,11 +573,9 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
                               size="small" 
                               style={{ width: '100%', marginTop: 2 }}
                             >
-                              <Option value="PRODUTO">Produto / Revenda</Option>
-                              <Option value="ATIVO">Ativo / Imobilizado</Option>
-                              <Option value="CONSUMO">Consumo Interno</Option>
-                              <Option value="INSUMO">Insumo / Matéria-Prima</Option>
-                              <Option value="SERVICO">Serviço</Option>
+                              {TIPOS_RECURSO.map(t => (
+                                <Option key={t.value} value={t.value}>{t.label}</Option>
+                              ))}
                             </Select>
                           </div>
                         </Col>
@@ -467,7 +583,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
                           <div style={{ padding: '8px 10px', backgroundColor: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: '6px' }}>
                             <Text strong style={{ fontSize: '11px', color: '#52c41a' }}>Unidade (XML) 🔒</Text>
                             <Input 
-                              value={currentItem.unidadeMedida || ''} 
+                              value={currentItem.unidade || ''} 
                               disabled 
                               size="small" 
                               style={{ marginTop: 2 }}
@@ -479,7 +595,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
                           <div style={{ padding: '8px 10px', backgroundColor: '#fffbe6', border: '1px solid #ffe58f', borderRadius: '6px' }}>
                             <Text strong style={{ fontSize: '11px', color: '#d4b106' }}>Custo Unit. (NF) 🔒</Text>
                             <Input 
-                              value={`R$ ${(currentItem.custo || currentItem.valorUnitario || 0).toFixed(2)}`} 
+                              value={`R$ ${(currentItem.valorUnitario || 0).toFixed(2)}`} 
                               disabled 
                               size="small" 
                               style={{ marginTop: 2 }}
@@ -520,24 +636,75 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
                       </Row>
                     </Space>
                   )}
+
                 </Space>
               )}
 
-              {step === 1 && step1Mode !== "EXISTING_DIRECT" && (
-                <Card 
-                  size="small" 
-                  style={{ background: '#4b5563', color: 'white', border: 'none', borderRadius: '6px' }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <WarningOutlined style={{ color: '#faad14' }} />
-                    <Text strong style={{ color: 'white', fontSize: '12px' }}>
-                      Módulo de Precificação Momentaneamente Desabilitado
-                    </Text>
-                  </div>
-                  <Text style={{ color: '#e5e7eb', fontSize: '11px' }}>
-                    Módulo inativo para agilizar o processo de inserção de nota e testes. Os preços de venda e margens serão calculados posteriormente.
-                  </Text>
-                </Card>
+              {step === 1 && (
+                <Space direction="vertical" size={10} style={{ width: '100%' }}>
+                    <div style={{ padding: '8px 10px', backgroundColor: '#f9f0ff', border: '1px solid #d3adf7', borderRadius: '6px' }}>
+                      <Text strong style={{ fontSize: '11px', color: '#722ed1' }}>Conversão de Compra (NF → Estoque) *</Text>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                        <Text style={{ fontSize: 12 }}>1 <b>{(currentItem.unidade || 'UN').toUpperCase()}</b> na nota =</Text>
+                        <InputNumber
+                          size="small"
+                          min={0.000001}
+                          value={convFator}
+                          onChange={(v) => setConvFator(Number(v) || 0)}
+                          style={{ width: 90 }}
+                        />
+                        {step1Mode === "EXISTING_DIRECT" && selectedExisting?.unitOfMeasure ? (
+                          <Tag color="purple" style={{ margin: 0 }}>{convUnidadeBase}</Tag>
+                        ) : (
+                          <Input
+                            size="small"
+                            value={convUnidadeBase}
+                            maxLength={10}
+                            onChange={(e) => setConvUnidadeBase(e.target.value.toUpperCase())}
+                            style={{ width: 70 }}
+                            placeholder="UN"
+                          />
+                        )}
+                        <Text type="secondary" style={{ fontSize: 11 }}>
+                          (unidade base de estoque{step1Mode === "EXISTING_DIRECT" && selectedExisting?.unitOfMeasure ? ' do item' : ''})
+                        </Text>
+                      </div>
+                      {convFator > 0 && (
+                        <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 4 }}>
+                          Esta nota: {currentItem.quantidade || 0} {(currentItem.unidade || 'UN').toUpperCase()} → <b>{Number(((currentItem.quantidade || 0) * convFator).toFixed(4))} {convUnidadeBase || '?'}</b> no estoque
+                          {' '}· custo por {convUnidadeBase || '?'}: R$ {((currentItem.valorUnitario || 0) / convFator).toFixed(4)}
+                        </Text>
+                      )}
+                    </div>
+
+                  {step1Mode === "DRAFT" ? (
+                    <ProductCommercialSalesConfig
+                      rascunho={{
+                        unidadeBase: convUnidadeBase,
+                        unidadeCompra: (currentItem.unidade || "UN").toUpperCase(),
+                        fatorCompra: convFator,
+                        custoUnidadeCompra: (currentItem.valorUnitario || 0),
+                        nomeItem: draftInternalName
+                      }}
+                      onRascunhoChange={setConfigVendasRascunho}
+                    />
+                  ) : (
+                    <Card size="small" style={{ borderRadius: 6 }}>
+                      <Space direction="vertical" size={4}>
+                        <Text strong style={{ fontSize: 12 }}>
+                          🔗 {selectedExisting?.name} <Text type="secondary" style={{ fontSize: 11 }}>({selectedExisting?.sku})</Text>
+                        </Text>
+                        <Text style={{ fontSize: 12 }}>
+                          Custo desta entrada por {convUnidadeBase || '?'}: <b>R$ {convFator > 0 ? ((currentItem.valorUnitario || 0) / convFator).toFixed(4) : '—'}</b>
+                        </Text>
+                        <Text type="secondary" style={{ fontSize: 11 }}>
+                          O preço de venda deste item segue o custo gerencial já configurado. Se esta entrada mudar o custo,
+                          o item fica sinalizado como defasado e o gestor decide se atualiza o preço.
+                        </Text>
+                      </Space>
+                    </Card>
+                  )}
+                </Space>
               )}
             </div>
           </div>
@@ -556,17 +723,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
             </Button>
           )}
 
-          {step1Mode === "EXISTING_DIRECT" ? (
-            <Button
-              type="primary"
-              style={{ backgroundColor: '#52c41a' }}
-              icon={<CheckCircleOutlined />}
-              disabled={!canProceedToNextStep()}
-              onClick={handleConfirmItem}
-            >
-              {currentIndex < items.length - 1 ? 'Vincular e Próximo Item ➔' : 'Vincular Último Item'}
-            </Button>
-          ) : step === 0 ? (
+          {step === 0 ? (
             <Button
               type="primary"
               disabled={!canProceedToNextStep()}
@@ -582,7 +739,9 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
               disabled={!canProceedToNextStep()}
               onClick={handleConfirmItem}
             >
-              {currentIndex < items.length - 1 ? 'Salvar e Próximo Item ➔' : 'Salvar e Finalizar Fila'}
+              {step1Mode === "EXISTING_DIRECT"
+                ? (currentIndex < items.length - 1 ? 'Vincular e Próximo Item ➔' : 'Vincular Último Item')
+                : (currentIndex < items.length - 1 ? 'Salvar e Próximo Item ➔' : 'Salvar e Finalizar Fila')}
             </Button>
           )}
         </Space>

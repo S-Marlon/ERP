@@ -1,98 +1,196 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Table, 
-  Tag, 
-  Button, 
-  Space, 
-  Typography, 
-  Popconfirm, 
-  message, 
-  Tooltip, 
-  Badge, 
-  Card, 
-  Row, 
-  Col, 
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Table,
+  Tag,
+  Button,
+  Space,
+  Typography,
+  Popconfirm,
+  message,
+  Tooltip,
+  Badge,
+  Card,
+  Row,
+  Col,
   Statistic,
   Modal,
   Divider,
   Input,
-  Select
+  Select,
+  Alert,
+  Spin,
+  Switch,
+  Progress
 } from 'antd';
-import { 
-  CloudServerOutlined, 
-  ReloadOutlined, 
-  CheckCircleOutlined, 
-  ArrowRightOutlined, 
+import {
+  CloudServerOutlined,
+  ReloadOutlined,
+  CheckCircleOutlined,
+  ArrowRightOutlined,
   DeleteOutlined,
   InboxOutlined,
   EyeOutlined,
   SearchOutlined,
-  FileTextOutlined 
+  FileTextOutlined,
+  SafetyCertificateOutlined,
+  AimOutlined,
+  UndoOutlined
 } from '@ant-design/icons';
+import { getTipoRecursoConfig } from '../../../Compras/StockEntry/tipoRecurso';
 
 const { Text, Title } = Typography;
 const { Search } = Input;
 
+const API_BASE = 'http://localhost:3001/api/compras';
+
+type StatusLote = 'RASCUNHO' | 'PRONTO_PARA_APROVACAO' | 'IMPORTADO' | 'DESCARTADO' | 'ERRO';
+
 interface StagingLote {
   id: number;
   chaveAcesso: string;
+  numeroNf: string | null;
   emitenteNome: string;
   cnpjEmitente: string;
+  valorTotalNf: number;
   totalItens: number;
+  totalConferidos: number;
+  totalSemVinculo: number;
   totalDivergencias: number;
-  status: 'RASCUNHO' | 'PROCESSANDO' | 'ERRO' | 'PRONTO_PARA_APROVACAO';
+  status: StatusLote;
   dataCriacao: string;
   erroMensagem?: string | null;
+}
+
+interface Verificacao {
+  codigo: string;
+  mensagem: string;
+  itens?: string[];
+}
+
+interface AnalisePenteFino {
+  aprovavel: boolean;
+  bloqueios: Verificacao[];
+  avisos: Verificacao[];
+  resumo: { totalItens: number; conferidos: number; novos: number; vinculados: number; valorItens: number; valorNota: number };
 }
 
 interface StockEntryStagingViewProps {
   onSelectLote?: (loteId: number, itens: any[]) => void;
 }
 
+const LOTE_FINALIZADO: StatusLote[] = ['IMPORTADO', 'DESCARTADO'];
+
+const lerMapeamento = (record: any): Record<string, any> => {
+  if (!record.mapeamento_json) return {};
+  try {
+    return typeof record.mapeamento_json === 'string' ? JSON.parse(record.mapeamento_json) : record.mapeamento_json;
+  } catch {
+    return {};
+  }
+};
+
+// Preferência do modo foco guardada no navegador (conveniência; pode não estar disponível)
+const FOCO_STORAGE_KEY = 'staging.revisao.modoFoco';
+const lerPreferenciaFoco = (): boolean => {
+  try {
+    return localStorage.getItem(FOCO_STORAGE_KEY) !== 'false';
+  } catch {
+    return true;
+  }
+};
+
+const formatCurrency = (value: number) =>
+  Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
 export const StockEntryStagingView: React.FC<StockEntryStagingViewProps> = ({ onSelectLote }) => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [lotes, setLotes] = useState<StagingLote[]>([]);
-  const [lotesFiltrados, setLotesFiltrados] = useState<StagingLote[]>([]);
   const [filtroStatus, setFiltroStatus] = useState<string>('TODOS');
   const [termoBusca, setTermoBusca] = useState<string>('');
 
-  // Estados para o Modal de Cabeçalho / Dados da NF
+  // Modal de Cabeçalho / Dados da NF
   const [modalCabecalhoVisible, setModalCabecalhoVisible] = useState(false);
   const [dadosCabecalhoLote, setDadosCabecalhoLote] = useState<any>(null);
   const [loadingCabecalho, setLoadingCabecalho] = useState(false);
 
-  // Estados para controle do Modal de visualização dos itens
+  // Modal de revisão (itens + pente-fino + aprovação)
   const [modalVisible, setModalVisible] = useState(false);
   const [loteSelecionadoId, setLoteSelecionadoId] = useState<number | null>(null);
   const [itensLoteModal, setItensLoteModal] = useState<any[]>([]);
   const [loadingItens, setLoadingItens] = useState(false);
+  const [analise, setAnalise] = useState<AnalisePenteFino | null>(null);
+  const [loadingAnalise, setLoadingAnalise] = useState(false);
+  const [aprovando, setAprovando] = useState(false);
+
+  // Revisão item a item (modo foco): ids dos itens já revisados neste lote
+  const [modoFoco, setModoFoco] = useState<boolean>(lerPreferenciaFoco);
+  const [revisados, setRevisados] = useState<Set<number>>(new Set());
 
   const tenantId = 1;
+
+  const loteSelecionado = useMemo(
+    () => lotes.find(l => l.id === loteSelecionadoId) || null,
+    [lotes, loteSelecionadoId]
+  );
+
+  const lotesFiltrados = useMemo(() => {
+    let resultado = lotes;
+    if (filtroStatus !== 'TODOS') {
+      resultado = resultado.filter(l => l.status === filtroStatus);
+    }
+    if (termoBusca.trim() !== '') {
+      const termo = termoBusca.toLowerCase();
+      resultado = resultado.filter(l =>
+        l.emitenteNome.toLowerCase().includes(termo) ||
+        l.chaveAcesso.toLowerCase().includes(termo) ||
+        String(l.numeroNf || '').includes(termo) ||
+        String(l.id).includes(termo)
+      );
+    }
+    return resultado;
+  }, [filtroStatus, termoBusca, lotes]);
 
   const carregarItensDoLote = async (loteId: number) => {
     setLoadingItens(true);
     try {
-      const response = await fetch(`http://localhost:3001/api/compras/lotes/${loteId}/itens?tenant_id=${tenantId}`);
+      const response = await fetch(`${API_BASE}/lotes/${loteId}/itens?tenant_id=${tenantId}`);
       const data = await response.json();
-
-      if (data.success) {
-        setItensLoteModal(data.itens || []);
-        return data.itens || [];
-      }
-      return [];
+      const itens = data.success ? data.itens || [] : [];
+      setItensLoteModal(itens);
+      return itens;
     } catch (error) {
-      console.error("Erro ao carregar itens:", error);
-      message.error("Erro ao carregar itens detalhados do lote.");
+      console.error('Erro ao carregar itens:', error);
+      message.error('Erro ao carregar itens detalhados do lote.');
       return [];
     } finally {
       setLoadingItens(false);
     }
   };
 
-  const abrirModalItens = async (loteId: number) => {
+  const carregarAnalise = async (loteId: number) => {
+    setLoadingAnalise(true);
+    try {
+      const response = await fetch(`${API_BASE}/lotes/${loteId}/analise?tenant_id=${tenantId}`);
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || 'Erro ao analisar o lote.');
+      setAnalise(data.analise);
+    } catch (error: any) {
+      console.error('Erro no pente-fino:', error);
+      setAnalise(null);
+      message.error(error.message || 'Erro ao executar o pente-fino do lote.');
+    } finally {
+      setLoadingAnalise(false);
+    }
+  };
+
+  const abrirRevisao = async (loteId: number) => {
+    if (loteId !== loteSelecionadoId) setRevisados(new Set());
     setLoteSelecionadoId(loteId);
+    setAnalise(null);
     setModalVisible(true);
-    await carregarItensDoLote(loteId);
+    await Promise.all([carregarItensDoLote(loteId), carregarAnalise(loteId)]);
   };
 
   const abrirModalCabecalho = async (loteId: number) => {
@@ -100,16 +198,16 @@ export const StockEntryStagingView: React.FC<StockEntryStagingViewProps> = ({ on
     setModalCabecalhoVisible(true);
     setLoadingCabecalho(true);
     try {
-      const response = await fetch(`http://localhost:3001/api/compras/lotes/#${loteId}?tenant_id=${tenantId}`);
+      const response = await fetch(`${API_BASE}/lotes/${loteId}?tenant_id=${tenantId}`);
       const data = await response.json();
       if (data.success) {
         setDadosCabecalhoLote(data.lote || {});
       } else {
-        message.error("Erro ao carregar dados do cabeçalho do lote.");
+        message.error(data.error || 'Erro ao carregar dados do cabeçalho do lote.');
       }
     } catch (error) {
-      console.error("Erro ao buscar cabeçalho:", error);
-      message.error("Erro de conexão ao buscar detalhes do lote.");
+      console.error('Erro ao buscar cabeçalho:', error);
+      message.error('Erro de conexão ao buscar detalhes do lote.');
     } finally {
       setLoadingCabecalho(false);
     }
@@ -118,29 +216,24 @@ export const StockEntryStagingView: React.FC<StockEntryStagingViewProps> = ({ on
   const fetchStagingLotes = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:3001/api/compras/lotes?tenant_id=${tenantId}`);
+      const response = await fetch(`${API_BASE}/lotes?tenant_id=${tenantId}`);
 
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
-        throw new Error("O servidor retornou uma resposta inválida (HTML em vez de JSON). Verifique a rota no backend.");
+        throw new Error('O servidor retornou uma resposta inválida (HTML em vez de JSON). Verifique a rota no backend.');
       }
 
       const data = await response.json();
 
       if (response.ok && data.success) {
-        const formattedLotes = (data.lotes || []).map((lote: any) => ({
-          id: lote.id,
+        setLotes((data.lotes || []).map((lote: any) => ({
+          ...lote,
           chaveAcesso: lote.chaveAcesso || '',
           emitenteNome: lote.emitenteNome || 'Fornecedor não identificado',
           cnpjEmitente: lote.cnpjEmitente || '',
-          totalItens: lote.totalItens || 0,
-          totalDivergencias: lote.totalDivergencias || 0,
           status: lote.status || 'RASCUNHO',
           dataCriacao: lote.dataCriacao ? new Date(lote.dataCriacao).toLocaleString() : '-',
-          erroMensagem: lote.erroMensagem || null
-        }));
-        setLotes(formattedLotes);
-        setLotesFiltrados(formattedLotes);
+        })));
       } else {
         throw new Error(data.error || 'Erro ao carregar lotes.');
       }
@@ -156,83 +249,105 @@ export const StockEntryStagingView: React.FC<StockEntryStagingViewProps> = ({ on
     fetchStagingLotes();
   }, []);
 
-  // Filtragem de Lotes
-  useEffect(() => {
-    let resultado = lotes;
-    if (filtroStatus !== 'TODOS') {
-      resultado = resultado.filter(l => l.status === filtroStatus);
-    }
-    if (termoBusca.trim() !== '') {
-      const termo = termoBusca.toLowerCase();
-      resultado = resultado.filter(l => 
-        l.emitenteNome.toLowerCase().includes(termo) || 
-        l.chaveAcesso.toLowerCase().includes(termo) ||
-        String(l.id).includes(termo)
-      );
-    }
-    setLotesFiltrados(resultado);
-  }, [filtroStatus, termoBusca, lotes]);
-
   const handleAprovarLote = async (id: number) => {
+    setAprovando(true);
     try {
-      const response = await fetch(`http://localhost:3001/api/compras/lotes/${id}/aprovar`, {
+      const response = await fetch(`${API_BASE}/lotes/${id}/aprovar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tenant_id: tenantId })
       });
-
       const data = await response.json();
 
       if (response.ok && data.success) {
-        message.success(`Lote #${id} aprovado e integrado ao estoque oficial com sucesso!`);
+        message.success(data.message || `Lote #${id} aprovado e integrado ao estoque.`);
+        setModalVisible(false);
         fetchStagingLotes();
-      } else {
-        throw new Error(data.error || 'Erro ao aprovar o lote.');
+        return;
       }
+      // 422: o pente-fino do servidor encontrou pendências (estado mudou desde a análise)
+      if (data.analise) setAnalise(data.analise);
+      throw new Error(data.error || 'Erro ao aprovar o lote.');
     } catch (error: any) {
       console.error('Erro ao aprovar lote:', error);
       message.error(error.message || 'Erro ao comunicar com o servidor para aprovação.');
+    } finally {
+      setAprovando(false);
     }
   };
 
-  const handleDeclinarLote = async (id: number) => {
+  const handleDescartarLote = async (id: number) => {
     try {
-      const response = await fetch(`http://localhost:3001/api/compras/lotes/${id}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenant_id: tenantId })
-      });
-
+      const response = await fetch(`${API_BASE}/lotes/${id}?tenant_id=${tenantId}`, { method: 'DELETE' });
       const data = await response.json();
 
       if (response.ok && data.success) {
-        setLotes(prev => prev.filter(l => l.id !== id));
-        message.info(`Lote #${id} declinado e descartado com sucesso.`);
+        message.info(`Lote #${id} descartado.`);
+        fetchStagingLotes();
       } else {
         throw new Error(data.error || 'Erro ao descartar o lote.');
       }
     } catch (error: any) {
       console.error('Erro ao descartar lote:', error);
-      message.error(error.message || 'Erro ao comunicar com o servidor para exclusão.');
+      message.error(error.message || 'Erro ao comunicar com o servidor para descarte.');
     }
   };
 
+  // Retoma a conferência na tela de entrada (ela recarrega o XML salvo e restaura o estado da staging)
   const handleReanalisar = async (id: number) => {
-    message.loading({ content: `Carregando dados do Lote #${id}...`, key: 'reanalise' });
-    const itens = await carregarItensDoLote(id);
-    message.success({ content: `Redirecionando para reanálise do Lote #${id}...`, key: 'reanalise', duration: 2 });
-
     if (onSelectLote) {
+      const itens = await carregarItensDoLote(id);
       onSelectLote(id, itens);
+      return;
+    }
+    navigate(`/compras/entrada-nfe?lote=${id}`);
+  };
+
+  const alternarModoFoco = (ativo: boolean) => {
+    setModoFoco(ativo);
+    try {
+      localStorage.setItem(FOCO_STORAGE_KEY, String(ativo));
+    } catch {
+      // sem storage: a preferência vale só nesta sessão
     }
   };
+
+  const marcarRevisado = (id: number, revisado: boolean) => {
+    setRevisados(prev => {
+      const next = new Set(prev);
+      if (revisado) next.add(id); else next.delete(id);
+      return next;
+    });
+  };
+
+  const marcarTodosRevisados = () => setRevisados(new Set(itensLoteModal.map(i => i.id)));
+
+  // Próximo item a revisar (o primeiro ainda não revisado)
+  const itemAtualId = useMemo(
+    () => itensLoteModal.find(i => !revisados.has(i.id))?.id ?? null,
+    [itensLoteModal, revisados]
+  );
+
+  // Modo foco: itens já revisados + o item atual; os seguintes aparecem conforme a revisão avança
+  const itensVisiveis = useMemo(() => {
+    if (!modoFoco) return itensLoteModal;
+    const indiceAtual = itensLoteModal.findIndex(i => i.id === itemAtualId);
+    return indiceAtual === -1 ? itensLoteModal : itensLoteModal.slice(0, indiceAtual + 1);
+  }, [modoFoco, itensLoteModal, itemAtualId]);
+
+  const totalRevisados = itensLoteModal.filter(i => revisados.has(i.id)).length;
+  const revisaoCompleta = itensLoteModal.length > 0 && totalRevisados === itensLoteModal.length;
 
   const renderStatusTag = (status: string) => {
     switch (status) {
       case 'RASCUNHO':
-        return <Tag color="warning">Rascunho</Tag>;
+        return <Tag color="warning">Em conferência</Tag>;
       case 'PRONTO_PARA_APROVACAO':
-        return <Tag color="success">Pronto p/ Aprovação</Tag>;
+        return <Tag color="processing">Pronto p/ Aprovação</Tag>;
+      case 'IMPORTADO':
+        return <Tag color="success" icon={<CheckCircleOutlined />}>Importado</Tag>;
+      case 'DESCARTADO':
+        return <Tag color="default">Descartado</Tag>;
       case 'ERRO':
         return <Tag color="error">Erro de Staging</Tag>;
       default:
@@ -242,165 +357,141 @@ export const StockEntryStagingView: React.FC<StockEntryStagingViewProps> = ({ on
 
   const itemColumns = [
     {
-      title: '1. Dados Originais da NF (XML)',
+      title: 'Item da NF (XML)',
       key: 'origem_nf',
-      width: '25%',
+      width: '28%',
       render: (_: any, record: any) => (
         <Space direction="vertical" size={2}>
           <Space size={4}>
-            <Tag color="default" style={{ fontSize: 10 }}>Seq #{record.item_nfe_seq || '1'}</Tag>
+            <Tag color="default" style={{ fontSize: 10 }}>Seq #{record.item_nfe_seq || '-'}</Tag>
             <Text code style={{ fontSize: 11 }}>Cód: {record.codigo_fornecedor || '-'}</Text>
           </Space>
           <Text strong style={{ fontSize: 12 }}>{record.nome_fornecedor || 'Item sem descrição no XML'}</Text>
-          
-        </Space>
-      )
-    }, {
-      title: '1. Dados  (XML)',
-      key: 'origem_nf',
-      width: '17%',
-      render: (_: any, record: any) => (
-        <Space direction="vertical" size={2}>
-          
-          <Space size={8} style={{ fontSize: 11 }} orientation='vertical'>
-            <Text type="secondary">NCM: {record.ncm_original || '-'}</Text>
-            <Text type="secondary">Qtd NF: <b>{record.quantidade || 0} {record.unidade_original || ''}</b></Text>
-          </Space>
+          <Text type="secondary" style={{ fontSize: 11 }}>NCM: {record.ncm_original || '-'}</Text>
         </Space>
       )
     },
     {
-      title: '2. Conferência Física',
+      title: 'Conferência',
       key: 'conferencia',
-      width: '15%',
+      width: '16%',
       render: (_: any, record: any) => {
         const qtdNota = Number(record.quantidade || 0);
-        const qtdRec = Number(record.quantidade_recebida || qtdNota);
-        const divergencia = qtdNota !== qtdRec;
+        const qtdRec = Number(record.quantidade_recebida || 0);
+        const divergencia = Math.abs(qtdNota - qtdRec) > 0.0001;
+        const conferido = Number(record.is_confirmed) === 1;
         return (
-          <Space direction="vertical" size={0}>
-            <Text style={{ fontSize: 11 }}>Recebido:</Text>
+          <Space direction="vertical" size={2}>
+            <Text style={{ fontSize: 11 }}>NF: {qtdNota} {record.unidade_original || ''}</Text>
             <Text type={divergencia ? 'danger' : 'success'} style={{ fontSize: 13, fontWeight: 'bold' }}>
-              {qtdRec} {record.unidade_original || ''}
+              Rec.: {qtdRec} {record.unidade_original || ''}
             </Text>
-            {divergencia && <Tag color="error" style={{ fontSize: 9, marginTop: 2 }}>Divergente</Tag>}
-          </Space>
-        );
-      }
-    },
-    {
-      title: '3. Destino no Sistema (ERP)',
-      key: 'destino_sistema',
-      width: '10%',
-      render: (_: any, record: any) => {
-        const hasVinculo = Boolean(record.produto_id_sistema || record.sku_sistema);
-        return (
-          <Space direction="vertical" size={3}>
-            {hasVinculo ? (
-              <>
-                <Tag color="success" style={{ margin: 0, fontSize: 11 }}>
-                  🔗 Produto Vinculado (ID #{record.produto_id_sistema})
-                </Tag>
-                
-              </>
-            ) : (
-              <>
-                <Tag color="processing" style={{ margin: 0, fontSize: 11 }}>
-                  ✨ Criação de Novo Produto
-                </Tag>
-             
-              </>
-            )}
-            
-            <Space size={4} wrap style={{ marginTop: 2 }}>
-              {record.familia && <Tag style={{ fontSize: 9, margin: 0 }}>Família: {record.familia}</Tag>}
-              <Tag color="cyan" style={{ fontSize: 9, margin: 0 }}>Tipo: {record.tipo_entrada || 'COMPRA_NORMAL'}</Tag>
+            <Space size={4}>
+              {conferido ? <Tag color="success" style={{ margin: 0 }}>Conferido</Tag> : <Tag color="warning" style={{ margin: 0 }}>Pendente</Tag>}
+              {divergencia && <Tag color="error" style={{ margin: 0 }}>Divergente</Tag>}
             </Space>
           </Space>
         );
       }
     },
     {
-      title: '3. Destino no Sistema (ERP)',
+      title: 'Destino no Sistema',
       key: 'destino_sistema',
-      width: '12%',
+      width: '26%',
       render: (_: any, record: any) => {
-        const hasVinculo = Boolean(record.produto_id_sistema || record.sku_sistema);
+        const mapeamento = lerMapeamento(record);
+        const tipo = getTipoRecursoConfig(mapeamento.tipo_recurso || 'PRODUTO');
+        const vinculado = Boolean(record.produto_id_sistema);
+        const novo = !vinculado && Boolean(String(record.sku_sugerido || '').trim());
         return (
           <Space direction="vertical" size={3}>
-            {hasVinculo ? (
-              <>
-              
-                <Text strong style={{ fontSize: 12, color: '#0050b3' }}>
-                  SKU: {record.sku_sistema || 'N/D'}
-                </Text>
-              </>
+            {vinculado ? (
+              <Tag color="success" style={{ margin: 0, fontSize: 11 }}>🔗 Vinculado · #{record.produto_id_sistema}</Tag>
+            ) : novo ? (
+              <Tag color="processing" style={{ margin: 0, fontSize: 11 }}>✨ Novo item no catálogo</Tag>
             ) : (
-              <>
-                
-                <Text type="secondary" style={{ fontSize: 11 }}>
-                  SKU Sugerido: {record.sku_sugerido || record.codigo_fornecedor || 'Gerado auto'}
-                </Text>
-              </>
+              <Tag color="error" style={{ margin: 0, fontSize: 11 }}>Sem código interno</Tag>
             )}
-            
-            
+            <Text strong style={{ fontSize: 12, color: '#0050b3' }}>
+              {record.sku_sistema || record.sku_sugerido || '—'}
+            </Text>
+            {novo && record.nome_item_sugerido && (
+              <Text type="secondary" style={{ fontSize: 11 }}>{record.nome_item_sugerido}</Text>
+            )}
+            <Space size={4} wrap>
+              <Tag color={tipo.color} style={{ fontSize: 10, margin: 0 }}>{tipo.label}</Tag>
+              {mapeamento.gtin_manual && <Tag style={{ fontSize: 10, margin: 0 }}>GTIN: {mapeamento.gtin_manual}</Tag>}
+            </Space>
           </Space>
         );
       }
-    }, 
+    },
     {
-      title: '4. Custos Finais',
+      title: 'Custos',
       key: 'financeiro',
-      width: '22%',
+      width: '18%',
       render: (_: any, record: any) => (
         <Space direction="vertical" size={0} style={{ fontSize: 11 }}>
-          <Text type="secondary">Unit: R$ {Number(record.preco_custo_unitario || 0).toFixed(2)}</Text>
-          <Text type="secondary">Frete/Imp: R$ {(Number(record.frete_rateado || 0) + Number(record.ipi || 0) + Number(record.icms_st || 0)).toFixed(2)}</Text>
-          <Text strong style={{ color: '#3f8600', fontSize: 12, marginTop: 2 }}>
-            Total: R$ {Number(record.custo_total_final || 0).toFixed(2)}
-          </Text>
+          <Text type="secondary">Unit. NF: {formatCurrency(Number(record.preco_custo_unitario))}</Text>
+          <Text type="secondary">Frete: {formatCurrency(Number(record.frete_rateado))}</Text>
+          <Text strong style={{ fontSize: 12 }}>Unit. final: {formatCurrency(Number(record.custo_unitario_final))}</Text>
+          <Text strong style={{ color: '#3f8600', fontSize: 12 }}>Total: {formatCurrency(Number(record.valor_total_nfe))}</Text>
         </Space>
       )
     },
-     {
-      title: '',
-      key: 'financeiro',
-      width: '10%',
-      render: (_: any, record: any) => (
-        <Space direction="vertical" size={0} style={{ fontSize: 11 }}>
-          <Button> Aprovar
-            </Button>
-        </Space>
-      )
+    {
+      title: 'Revisão',
+      key: 'revisao',
+      width: '12%',
+      align: 'center' as const,
+      render: (_: any, record: any) => {
+        if (revisados.has(record.id)) {
+          return (
+            <Space direction="vertical" size={2} align="center">
+              <Tag color="success" icon={<CheckCircleOutlined />} style={{ margin: 0 }}>Revisado</Tag>
+              <Button type="link" size="small" icon={<UndoOutlined />} onClick={() => marcarRevisado(record.id, false)} style={{ padding: 0, fontSize: 11 }}>
+                Desfazer
+              </Button>
+            </Space>
+          );
+        }
+        const atual = record.id === itemAtualId;
+        return (
+          <Button
+            type={atual ? 'primary' : 'default'}
+            size="small"
+            icon={<CheckCircleOutlined />}
+            onClick={() => marcarRevisado(record.id, true)}
+          >
+            {atual && modoFoco ? 'Confirmar e próximo' : 'Confirmar'}
+          </Button>
+        );
+      }
     }
   ];
 
   const columns = [
     {
-      title: 'ID / Chave',
+      title: 'Lote / NF',
       dataIndex: 'chaveAcesso',
       key: 'chaveAcesso',
       render: (text: string, record: StagingLote) => (
         <Space direction="vertical" size={0}>
-          <div>
-
-
-          <Text strong style={{ color: '#1890ff' }}>Lote #{record.id}</Text>
-           <Button 
-            type="link" 
-            icon={<FileTextOutlined />} 
+          <Space size={6}>
+            <Text strong style={{ color: '#1890ff' }}>Lote #{record.id}</Text>
+            {record.numeroNf && <Tag style={{ margin: 0 }}>NF {record.numeroNf}</Tag>}
+          </Space>
+          <Button
+            type="link"
+            icon={<FileTextOutlined />}
             onClick={() => abrirModalCabecalho(record.id)}
             style={{ padding: 0, height: 'auto', fontSize: '12px' }}
           >
             Dados da NF (Cabeçalho)
           </Button>
-          </div>
           <Text type="secondary" style={{ fontSize: 11, fontFamily: 'monospace' }}>
             {text ? `${text.substring(0, 20)}...${text.substring(text.length - 10)}` : '-'}
           </Text>
-           {/* Botão integrado para abrir o cabeçalho */}
-         
         </Space>
       )
     },
@@ -411,33 +502,29 @@ export const StockEntryStagingView: React.FC<StockEntryStagingViewProps> = ({ on
       render: (text: string, record: StagingLote) => (
         <Space direction="vertical" size={0}>
           <Text strong>{text || 'Não identificado'}</Text>
-          <Text type="secondary" style={{ fontSize: 11 }}>CNPJ: {record.cnpjEmitente}</Text>
+          <Text type="secondary" style={{ fontSize: 11 }}>CNPJ: {record.cnpjEmitente || '-'}</Text>
+          {record.valorTotalNf > 0 && <Text style={{ fontSize: 11 }}>Total NF: {formatCurrency(record.valorTotalNf)}</Text>}
         </Space>
       )
     },
     {
-      title: 'Métricas / Itens',
+      title: 'Itens',
       key: 'metricas',
       render: (_: any, record: StagingLote) => (
         <Space direction="vertical" size={4} align="start">
-          <Space size="middle">
-            <Tooltip title="Clique para ver os itens detalhados">
-              <Button 
-                type="link" 
-                icon={<EyeOutlined />} 
-                onClick={() => abrirModalItens(record.id)}
-                style={{ padding: 0 }}
-              >
-                <Badge count={record.totalItens} style={{ backgroundColor: '#108ee9', marginRight: 4 }} />
-                Ver Itens
-              </Button>
+          <Button type="link" icon={<EyeOutlined />} onClick={() => abrirRevisao(record.id)} style={{ padding: 0 }}>
+            <Badge count={record.totalItens} showZero style={{ backgroundColor: '#108ee9', marginRight: 4 }} />
+            Ver Itens
+          </Button>
+          <Space size={4} wrap>
+            <Tooltip title="Itens conferidos">
+              <Tag color={record.totalConferidos === record.totalItens && record.totalItens > 0 ? 'success' : 'warning'} style={{ margin: 0 }}>
+                {record.totalConferidos}/{record.totalItens} conferidos
+              </Tag>
             </Tooltip>
-            <Tooltip title="Divergências encontradas">
-              <Badge count={record.totalDivergencias} style={{ backgroundColor: record.totalDivergencias > 0 ? '#ff4d4f' : '#52c41a' }} />
-            </Tooltip>
+            {record.totalSemVinculo > 0 && <Tag color="error" style={{ margin: 0 }}>{record.totalSemVinculo} sem vínculo</Tag>}
+            {record.totalDivergencias > 0 && <Tag color="orange" style={{ margin: 0 }}>{record.totalDivergencias} divergente(s)</Tag>}
           </Space>
-
-         
         </Space>
       )
     },
@@ -466,61 +553,103 @@ export const StockEntryStagingView: React.FC<StockEntryStagingViewProps> = ({ on
       title: 'Ações Disponíveis',
       key: 'acoes',
       align: 'center' as const,
-      render: (_: any, record: StagingLote) => (
-        <Space size="small">
-          <Tooltip title="Retomar / Reanalisar na tela de conferência">
-            <Button 
-              type="primary" 
-              ghost 
-              size="small" 
-              icon={<ArrowRightOutlined />}
-              onClick={() => handleReanalisar(record.id)}
-            >
-              Reanalisar
-            </Button>
-          </Tooltip>
-
-          <Tooltip title="Aprovar e dar entrada oficial">
-            <Popconfirm
-              title="Aprovar Lote"
-              description="Tem certeza que deseja aprovar este lote e efetivar a entrada no estoque?"
-              onConfirm={() => handleAprovarLote(record.id)}
-              okText="Sim"
-              cancelText="Não"
-            >
-              <Button 
-                type="primary" 
-                size="small" 
-                icon={<CheckCircleOutlined />}
-                style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
+      render: (_: any, record: StagingLote) => {
+        const finalizado = LOTE_FINALIZADO.includes(record.status);
+        return (
+          <Space size="small">
+            <Tooltip title="Retomar a conferência na tela de entrada da NF">
+              <Button
+                type="primary"
+                ghost
+                size="small"
+                icon={<ArrowRightOutlined />}
+                disabled={finalizado}
+                onClick={() => handleReanalisar(record.id)}
               >
-                Aprovar
+                Reanalisar
               </Button>
-            </Popconfirm>
-          </Tooltip>
+            </Tooltip>
 
-          <Tooltip title="Declinar / Descartar rascunho">
-            <Popconfirm
-              title="Descartar Staging"
-              description="Atenção: Todos os dados salvos deste rascunho serão apagados permanentemente."
-              onConfirm={() => handleDeclinarLote(record.id)}
-              okText="Sim, excluir"
-              cancelText="Cancelar"
-              okButtonProps={{ danger: true }}
-            >
-              <Button 
-                danger 
-                size="small" 
-                icon={<DeleteOutlined />}
+            <Tooltip title="Revisar o pente-fino e dar entrada oficial no estoque">
+              <Button
+                type="primary"
+                size="small"
+                icon={<SafetyCertificateOutlined />}
+                disabled={finalizado}
+                onClick={() => abrirRevisao(record.id)}
+                style={finalizado ? undefined : { backgroundColor: '#52c41a', borderColor: '#52c41a' }}
               >
-                Declinar
+                Revisar e Aprovar
               </Button>
-            </Popconfirm>
-          </Tooltip>
-        </Space>
-      )
+            </Tooltip>
+
+            <Tooltip title="Descartar a NF (o histórico é mantido)">
+              <Popconfirm
+                title="Descartar lote"
+                description="O lote fica marcado como DESCARTADO e não poderá mais ser aprovado."
+                onConfirm={() => handleDescartarLote(record.id)}
+                okText="Sim, descartar"
+                cancelText="Cancelar"
+                okButtonProps={{ danger: true }}
+                disabled={finalizado}
+              >
+                <Button danger size="small" icon={<DeleteOutlined />} disabled={finalizado}>
+                  Descartar
+                </Button>
+              </Popconfirm>
+            </Tooltip>
+          </Space>
+        );
+      }
     }
   ];
+
+  const renderPenteFino = () => {
+    if (loadingAnalise) {
+      return <div style={{ textAlign: 'center', padding: 16 }}><Spin tip="Executando pente-fino..." /></div>;
+    }
+    if (!analise) return null;
+
+    const { resumo } = analise;
+    return (
+      <Space direction="vertical" size={8} style={{ width: '100%', marginBottom: 12 }}>
+        <Alert
+          type={analise.aprovavel ? 'success' : 'error'}
+          showIcon
+          message={analise.aprovavel ? 'Pente-fino aprovado: lote pronto para entrada no estoque' : 'Pente-fino com bloqueios: resolva antes de aprovar'}
+          description={
+            <Space size={16} wrap style={{ fontSize: 12 }}>
+              <span>{resumo.conferidos}/{resumo.totalItens} conferidos</span>
+              <span>{resumo.vinculados} vinculado(s)</span>
+              <span>{resumo.novos} novo(s) no catálogo</span>
+              <span>Itens: {formatCurrency(resumo.valorItens)}</span>
+              <span>NF + frete adicional: {formatCurrency(resumo.valorNota)}</span>
+            </Space>
+          }
+        />
+        {analise.bloqueios.map(b => (
+          <Alert
+            key={b.codigo}
+            type="error"
+            showIcon
+            message={b.mensagem}
+            description={b.itens?.length ? `Itens da NF: ${b.itens.join(', ')}` : undefined}
+          />
+        ))}
+        {analise.avisos.map(a => (
+          <Alert
+            key={a.codigo}
+            type="warning"
+            showIcon
+            message={a.mensagem}
+            description={a.itens?.length ? `Itens da NF: ${a.itens.join(', ')}` : undefined}
+          />
+        ))}
+      </Space>
+    );
+  };
+
+  const loteFinalizado = loteSelecionado ? LOTE_FINALIZADO.includes(loteSelecionado.status) : false;
 
   return (
     <div style={{ padding: 24, background: '#f0f2f5', minHeight: '100vh' }}>
@@ -532,18 +661,13 @@ export const StockEntryStagingView: React.FC<StockEntryStagingViewProps> = ({ on
               <div>
                 <Title level={3} style={{ margin: 0 }}>Gerenciamento de Lotes em Staging</Title>
                 <Text type="secondary">
-                  Visualize, reanalise, aprove ou descarte notas fiscais em rascunho e tabelas de staging.
+                  Revise o pente-fino das notas conferidas e dê a entrada definitiva no estoque.
                 </Text>
               </div>
             </Space>
           </Col>
           <Col>
-            <Button 
-              type="primary" 
-              icon={<ReloadOutlined />} 
-              onClick={fetchStagingLotes} 
-              loading={loading}
-            >
+            <Button type="primary" icon={<ReloadOutlined />} onClick={fetchStagingLotes} loading={loading}>
               Atualizar Dados
             </Button>
           </Col>
@@ -553,26 +677,26 @@ export const StockEntryStagingView: React.FC<StockEntryStagingViewProps> = ({ on
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col xs={24} sm={8}>
           <Card variant="borderless" style={{ borderRadius: 8 }}>
-            <Statistic 
-              title="Total de Lotes em Staging" 
-              value={lotes.length} 
-              prefix={<InboxOutlined />} 
+            <Statistic
+              title="Em conferência"
+              value={lotes.filter(l => l.status === 'RASCUNHO').length}
+              prefix={<InboxOutlined />}
             />
           </Card>
         </Col>
         <Col xs={24} sm={8}>
           <Card variant="borderless" style={{ borderRadius: 8 }}>
-            <Statistic 
-              title="Prontos para Aprovação" 
-              value={lotes.filter(l => l.status === 'PRONTO_PARA_APROVACAO').length} 
+            <Statistic
+              title="Prontos para Aprovação"
+              value={lotes.filter(l => l.status === 'PRONTO_PARA_APROVACAO').length}
             />
           </Card>
         </Col>
         <Col xs={24} sm={8}>
           <Card variant="borderless" style={{ borderRadius: 8 }}>
-            <Statistic 
-              title="Com Erro / Divergências" 
-              value={lotes.filter(l => l.status === 'ERRO' || l.totalDivergencias > 0).length} 
+            <Statistic
+              title="Importados"
+              value={lotes.filter(l => l.status === 'IMPORTADO').length}
             />
           </Card>
         </Col>
@@ -581,8 +705,8 @@ export const StockEntryStagingView: React.FC<StockEntryStagingViewProps> = ({ on
       <Card variant="borderless" style={{ borderRadius: 8, marginBottom: 16 }}>
         <Row gutter={16} align="middle">
           <Col xs={24} sm={12} md={8} style={{ marginBottom: 8 }}>
-            <Search 
-              placeholder="Buscar por fornecedor, ID ou chave..." 
+            <Search
+              placeholder="Buscar por fornecedor, NF, ID ou chave..."
               allowClear
               onChange={(e) => setTermoBusca(e.target.value)}
               prefix={<SearchOutlined />}
@@ -595,9 +719,10 @@ export const StockEntryStagingView: React.FC<StockEntryStagingViewProps> = ({ on
               style={{ width: '100%' }}
               options={[
                 { value: 'TODOS', label: 'Todos os Status' },
-                { value: 'RASCUNHO', label: 'Rascunho' },
+                { value: 'RASCUNHO', label: 'Em conferência' },
                 { value: 'PRONTO_PARA_APROVACAO', label: 'Pronto para Aprovação' },
-                { value: 'ERRO', label: 'Com Erro' }
+                { value: 'IMPORTADO', label: 'Importado' },
+                { value: 'DESCARTADO', label: 'Descartado' }
               ]}
             />
           </Col>
@@ -615,30 +740,88 @@ export const StockEntryStagingView: React.FC<StockEntryStagingViewProps> = ({ on
         />
       </Card>
 
-      {/* Modal para Visualizar os Itens do Lote */}
+      {/* Revisão do lote: pente-fino + itens + aprovação */}
       <Modal
-        title={`Itens do Lote de Importação #${loteSelecionadoId || ''}`}
+        title={`Revisão do Lote #${loteSelecionadoId || ''}${loteSelecionado?.numeroNf ? ` · NF ${loteSelecionado.numeroNf}` : ''}`}
         open={modalVisible}
         onCancel={() => setModalVisible(false)}
-        footer={[
-          <Button key="close" type="primary" onClick={() => setModalVisible(false)}>
-            Fechar
-          </Button>
-        ]}
         width={1200}
+        footer={[
+          <Button key="close" onClick={() => setModalVisible(false)}>
+            Fechar
+          </Button>,
+          <Button key="reanalisar" icon={<ReloadOutlined />} onClick={() => loteSelecionadoId && abrirRevisao(loteSelecionadoId)}>
+            Refazer pente-fino
+          </Button>,
+          !loteFinalizado && (
+            <Popconfirm
+              key="aprovar"
+              title="Dar entrada no estoque"
+              description={revisaoCompleta
+                ? 'Os itens entram no estoque e o lote fica IMPORTADO. Esta ação não pode ser desfeita pela tela.'
+                : `Você revisou ${totalRevisados} de ${itensLoteModal.length} itens. Aprovar mesmo assim? Os itens entram no estoque e o lote fica IMPORTADO.`}
+              onConfirm={() => loteSelecionadoId && handleAprovarLote(loteSelecionadoId)}
+              okText="Aprovar"
+              cancelText="Cancelar"
+              disabled={!analise?.aprovavel}
+            >
+              <Button
+                type="primary"
+                icon={<CheckCircleOutlined />}
+                loading={aprovando}
+                disabled={!analise?.aprovavel}
+                style={analise?.aprovavel ? { backgroundColor: '#52c41a', borderColor: '#52c41a' } : undefined}
+              >
+                Aprovar e Dar Entrada
+              </Button>
+            </Popconfirm>
+          )
+        ]}
       >
+        {renderPenteFino()}
         <Divider style={{ margin: '12px 0' }} />
+        <Row justify="space-between" align="middle" style={{ marginBottom: 8 }}>
+          <Col>
+            <Space size={8}>
+              <Switch checked={modoFoco} onChange={alternarModoFoco} size="small" />
+              <Text strong><AimOutlined /> Modo foco</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                {modoFoco ? 'Um item por vez: confirme para liberar o próximo.' : 'Todos os itens visíveis.'}
+              </Text>
+            </Space>
+          </Col>
+          <Col>
+            <Space size={12}>
+              <Progress
+                percent={itensLoteModal.length ? Math.round((totalRevisados / itensLoteModal.length) * 100) : 0}
+                size="small"
+                style={{ width: 160, margin: 0 }}
+                format={() => `${totalRevisados}/${itensLoteModal.length}`}
+              />
+              {!modoFoco && !revisaoCompleta && (
+                <Button size="small" onClick={marcarTodosRevisados}>Marcar todos como revisados</Button>
+              )}
+            </Space>
+          </Col>
+        </Row>
         <Table
-          dataSource={itensLoteModal}
+          dataSource={itensVisiveis}
           columns={itemColumns}
           rowKey="id"
           loading={loadingItens}
-          pagination={{ pageSize: 6 }}
+          pagination={modoFoco ? false : { pageSize: 6 }}
+          scroll={modoFoco ? { y: 420 } : undefined}
           size="small"
+          onRow={(record: any) => ({
+            style: record.id === itemAtualId ? { background: '#e6f4ff' } : undefined
+          })}
         />
+        {modoFoco && revisaoCompleta && (
+          <Alert type="success" showIcon style={{ marginTop: 8 }} message="Todos os itens foram revisados." />
+        )}
       </Modal>
 
-      {/* Modal para Visualizar o Cabeçalho e Dados da NF */}
+      {/* Cabeçalho e dados da NF */}
       <Modal
         title={`Cabeçalho e Informações da NF - Lote #${loteSelecionadoId || ''}`}
         open={modalCabecalhoVisible}
@@ -659,35 +842,45 @@ export const StockEntryStagingView: React.FC<StockEntryStagingViewProps> = ({ on
             <Row gutter={[16, 16]}>
               <Col span={12}>
                 <Text type="secondary">Número da NF:</Text>
-                <div><Text strong>{dadosCabecalhoLote.numero_nf || dadosCabecalhoLote.numeroNF || '-'}</Text></div>
+                <div><Text strong>{dadosCabecalhoLote.numero_nf || '-'}</Text></div>
               </Col>
               <Col span={12}>
                 <Text type="secondary">Série:</Text>
-                <div><Text strong>{dadosCabecalhoLote.serie || '-'}</Text></div>
+                <div><Text strong>{dadosCabecalhoLote.serie || dadosCabecalhoLote.dados_nota_fiscal?.serie || '-'}</Text></div>
               </Col>
               <Col span={24}>
                 <Text type="secondary">Chave de Acesso:</Text>
-                <div><Text code>{dadosCabecalhoLote.chave_acesso || dadosCabecalhoLote.chaveAcesso || '-'}</Text></div>
+                <div><Text code>{dadosCabecalhoLote.chave_acesso || '-'}</Text></div>
               </Col>
               <Col span={24}>
                 <Text type="secondary">Fornecedor (Emitente):</Text>
-                <div><Text strong>{dadosCabecalhoLote.razao_social_fornecedor || dadosCabecalhoLote.emitenteNome || '-'}</Text></div>
+                <div><Text strong>{dadosCabecalhoLote.emitente_nome || dadosCabecalhoLote.razao_social_fornecedor || '-'}</Text></div>
               </Col>
               <Col span={12}>
                 <Text type="secondary">CNPJ do Fornecedor:</Text>
-                <div><Text>{dadosCabecalhoLote.cnpj_fornecedor || dadosCabecalhoLote.cnpjEmitente || '-'}</Text></div>
+                <div><Text>{dadosCabecalhoLote.cnpj_fornecedor || '-'}</Text></div>
               </Col>
               <Col span={12}>
                 <Text type="secondary">Data de Emissão:</Text>
-                <div><Text>{dadosCabecalhoLote.data_emissao ? new Date(dadosCabecalhoLote.data_emissao).toLocaleString() : '-'}</Text></div>
+                <div>
+                  <Text>
+                    {dadosCabecalhoLote.data_emissao || dadosCabecalhoLote.dados_nota_fiscal?.dataEmissao
+                      ? new Date(dadosCabecalhoLote.data_emissao || dadosCabecalhoLote.dados_nota_fiscal.dataEmissao).toLocaleString()
+                      : '-'}
+                  </Text>
+                </div>
               </Col>
               <Col span={12}>
                 <Text type="secondary">Valor Total da NF:</Text>
-                <div><Text strong style={{ color: '#3f8600', fontSize: 15 }}>R$ {Number(dadosCabecalhoLote.valor_total_nf || 0).toFixed(2)}</Text></div>
+                <div>
+                  <Text strong style={{ color: '#3f8600', fontSize: 15 }}>
+                    {formatCurrency(Number(dadosCabecalhoLote.valor_total_nf_xml || dadosCabecalhoLote.valor_total_nf || 0))}
+                  </Text>
+                </div>
               </Col>
               <Col span={12}>
                 <Text type="secondary">Frete Adicional:</Text>
-                <div><Text>R$ {Number(dadosCabecalhoLote.frete_adicional_valor || 0).toFixed(2)} ({dadosCabecalhoLote.frete_adicional_metodo || 'N/D'})</Text></div>
+                <div><Text>{formatCurrency(Number(dadosCabecalhoLote.frete_adicional_valor || 0))} ({dadosCabecalhoLote.frete_adicional_metodo || 'N/D'})</Text></div>
               </Col>
             </Row>
 

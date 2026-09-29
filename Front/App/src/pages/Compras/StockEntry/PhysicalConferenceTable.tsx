@@ -19,12 +19,13 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { Item } from './types';
+import { hasCodigoInterno, MSG_SEM_CODIGO_INTERNO } from './conferencia';
 
 interface PhysicalConferenceModalTableProps {
   items?: Item[];
-  onConfirmItems?: (ids: number[]) => void;
-  onUnconfirmItems?: (ids: number[]) => void;
-  onQuantityChange?: (itemId: number, quantity: number) => void;
+  onConfirmItems?: (ids: (string | number)[]) => void;
+  onUnconfirmItems?: (ids: (string | number)[]) => void;
+  onQuantityChange?: (itemId: string | number, quantity: number) => void;
 }
 
 const { Text, Title } = Typography;
@@ -54,7 +55,7 @@ export const PhysicalConferenceTable: React.FC<PhysicalConferenceModalTableProps
     );
   }, [localItems, searchText]);
 
-  const handleLocalQuantityChange = (itemId: number, newQty: number) => {
+  const handleLocalQuantityChange = (itemId: string | number, newQty: number) => {
     const qty = Math.min(9999, Math.max(0, newQty));
     setLocalItems(prev => prev.map(it => (it.tempId === itemId ? { ...it, receivedQuantity: qty } : it)));
     onQuantityChange?.(itemId, qty);
@@ -156,7 +157,10 @@ export const PhysicalConferenceTable: React.FC<PhysicalConferenceModalTableProps
       width: 90,
       align: 'center',
       render: (_, record) => {
-        if (record.confirmed) return <Tag color="success" icon={<CheckOutlined />}>Conferido</Tag>;
+        if (record.isConfirmed) return <Tag color="success" icon={<CheckOutlined />}>Conferido</Tag>;
+        if (!hasCodigoInterno(record)) {
+          return <Tooltip title={MSG_SEM_CODIGO_INTERNO}><Tag color="warning">Sem vínculo</Tag></Tooltip>;
+        }
         return <Tag color="default">Pendente</Tag>;
       }
     }
@@ -177,7 +181,7 @@ export const PhysicalConferenceTable: React.FC<PhysicalConferenceModalTableProps
               disabled={selectedRowKeys.length === 0} 
               style={{ background: '#52c41a' }}
               onClick={() => { 
-                onConfirmItems?.(selectedRowKeys.map(Number)); 
+                onConfirmItems?.(selectedRowKeys as (string | number)[]); 
                 setSelectedRowKeys([]); 
               }}
             >
@@ -188,7 +192,7 @@ export const PhysicalConferenceTable: React.FC<PhysicalConferenceModalTableProps
               icon={<UndoOutlined />} 
               disabled={selectedRowKeys.length === 0} 
               onClick={() => { 
-                onUnconfirmItems?.(selectedRowKeys.map(Number)); 
+                onUnconfirmItems?.(selectedRowKeys as (string | number)[]); 
                 setSelectedRowKeys([]); 
               }}
             >

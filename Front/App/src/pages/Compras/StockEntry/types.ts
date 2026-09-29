@@ -68,7 +68,7 @@ export interface Item extends ProdutoNF {
   isConfirmed: boolean; // Renomeado de 'confirmed' para manter consistência com o hook
   isMapped?: boolean;   // Adicionado para controle visual de status
   mappingStatus?: 'PRODUTO_INEDITO' | 'VINCULO_DIRETO_ENCONTRADO' | 'ERRO_PROCESSAMENTO' | string;
-  mappedId?: ID | null;
+  mappedId?: ID | string | null; // ID do produto vinculado ou SKU customizado (item novo)
   difference: number;
   familiaId?: ID | null;
   grupo?: string | null; // Adicionado para suporte ao handleAssignGroupToItems

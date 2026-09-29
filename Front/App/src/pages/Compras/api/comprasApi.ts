@@ -80,6 +80,39 @@ export const createSupplier = async (supplierData: { cnpj: string; name: string;
 /**
  * 3. PROCESSA E SALVA ITEM DO XML NA STAGING (Com suporte a XML Bruto e Lote)
  */
+/**
+ * BUSCA ITENS DO CATÁLOGO (itens_core) para vincular a um item da NF-e
+ */
+export interface ItemCatalogoBusca {
+    id: number;
+    sku: string;
+    name: string;
+    variacao: string;
+    marca: string;
+    category: string;
+    unitOfMeasure: string;
+    status: string;
+    tipoRecurso: string;
+}
+
+export const buscarItensCatalogo = async (
+    termo: string,
+    tenantId: number = 1,
+    signal?: AbortSignal
+): Promise<ItemCatalogoBusca[]> => {
+    const response = await fetch(
+        `${API_BASE_URL}/catalogo/produtos/search?tenant_id=${tenantId}&term=${encodeURIComponent(termo)}`,
+        { signal }
+    );
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Erro ao buscar itens do catálogo.');
+    }
+
+    return response.json();
+};
+
 export const processItemXML = async (data: ProcessarItemXMLPayload): Promise<ProcessarItemXMLResponse> => {
     const response = await fetch(`${API_BASE_URL}/compras/staging/processar-item`, {
         method: 'POST',
@@ -112,6 +145,26 @@ export const sincronizarLoteXMLCompleto = async (payloadData: any) => {
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || 'Erro ao sincronizar lote completo da NF-e.');
+    }
+
+    return response.json();
+};
+
+/**
+ * ESTADO SALVO DE UM LOTE (para retomar a conferência): por id do lote ou pela chave de acesso da NF
+ */
+export const buscarEstadoLote = async (
+    alvo: { loteId: number } | { chave: string },
+    tenantId: number = 1
+): Promise<{ lote: { id: number; status: string; chave_acesso: string; xml_conteudo: string | null; frete_adicional: unknown } | null; itens: any[] }> => {
+    const caminho = 'loteId' in alvo
+        ? `lotes/${alvo.loteId}/estado`
+        : `lotes/chave/${encodeURIComponent(alvo.chave)}/estado`;
+    const response = await fetch(`${API_BASE_URL}/compras/${caminho}?tenant_id=${tenantId}`);
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Erro ao buscar o estado salvo do lote.');
     }
 
     return response.json();

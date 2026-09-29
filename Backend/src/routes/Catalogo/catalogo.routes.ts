@@ -63,6 +63,7 @@ import {
   createMarca
 } from './Marcas/comercialMarcas.controller';
 import { getAtributosPorProduto } from './Atributos/atributos.controller';
+import { getConfigVendas, salvarConfigVendas, atualizarCustoGerencial, listarUnidadesItens } from './Vendas/configVendas.controller';
 
 const router = Router();
 
@@ -98,6 +99,12 @@ router.delete('/atributos-grupos/:idGrupo', deleteGrupoAtributo);
 router.get('/cadastros/atributos-grupos', getGruposAtributos);
 
 router.get('/:id_item/atributos', getAtributosPorProduto);
+
+// Configuração de vendas: unidades (fracionamento/atacado), faixas de preço e custo gerencial
+router.get('/itens-unidades', listarUnidadesItens);
+router.get('/itens/:idItem/config-vendas', getConfigVendas);
+router.put('/itens/:idItem/config-vendas', salvarConfigVendas);
+router.post('/itens/:idItem/custo-gerencial', atualizarCustoGerencial);
 
 // =========================================================================
 // 📏 DICIONÁRIO DE UNIDADES DE MEDIDA

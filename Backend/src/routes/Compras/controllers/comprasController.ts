@@ -153,12 +153,15 @@ return res.status(500).json({ error: 'Erro ao atualizar item.', details: error.m
 // Exemplo de controller otimizado para receber os itens em lote
 export const sincronizarItensLoteXML = async (req: Request, res: Response) => {
   try {
-    let { tenant_id, lote_importacao_id, chave_acesso, numero_nf, cnpj_fornecedor, xml_conteudo, dados_nota_fiscal, itens } = req.body;
+    let { tenant_id, lote_importacao_id, chave_acesso, numero_nf, cnpj_fornecedor, xml_conteudo, dados_nota_fiscal, itens, frete_adicional, sincronizacao_completa } = req.body;
     const tenant = tenant_id || 1;
 
-    if (!Array.isArray(itens) || itens.length === 0) {
-      return res.status(400).json({ error: 'Lista de itens vazia.' });
+    if (!Array.isArray(itens)) {
+      return res.status(400).json({ error: 'Lista de itens inválida.' });
     }
+
+    // Carga completa do XML: o lote é sempre resolvido pela chave de acesso (nunca por um id que veio da tela)
+    if (sincronizacao_completa) lote_importacao_id = null;
 
     // Se o lote_importacao_id não veio no body, tentamos descobrir ou criar pelo lote/chave
     if (!lote_importacao_id && chave_acesso) {
@@ -191,6 +194,43 @@ export const sincronizarItensLoteXML = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'O ID do lote de importação não foi fornecido nem pôde ser gerado.' });
     }
 
+    // Lote já aprovado ou descartado na tela de Staging não aceita mais alterações
+    const [loteAtual]: any = await db.execute(
+      `SELECT status FROM importacoes_lotes WHERE id = ? AND tenant_id = ?`,
+      [lote_importacao_id, tenant]
+    );
+    if (['IMPORTADO', 'DESCARTADO'].includes(loteAtual[0]?.status)) {
+      return res.status(409).json({ success: false, error: `Esta NF já está ${loteAtual[0].status} na Staging e não pode mais ser alterada.`, lote_importacao_id });
+    }
+
+    // Carga completa: atualiza o cabeçalho do lote (lotes antigos foram criados sem esses dados)
+    if (sincronizacao_completa) {
+      await db.execute(
+        `UPDATE importacoes_lotes
+         SET numero_nf = COALESCE(?, numero_nf),
+             cnpj_fornecedor = COALESCE(?, cnpj_fornecedor),
+             xml_conteudo = COALESCE(?, xml_conteudo),
+             dados_nota_fiscal = COALESCE(?, dados_nota_fiscal)
+         WHERE id = ? AND tenant_id = ?`,
+        [numero_nf || null, cnpj_fornecedor || null, xml_conteudo || null,
+         dados_nota_fiscal ? JSON.stringify(dados_nota_fiscal) : null, lote_importacao_id, tenant]
+      );
+    }
+
+    const emitenteNome = dados_nota_fiscal?.emitente?.nome || null;
+    if (emitenteNome) {
+      await db.execute(
+        `UPDATE importacoes_lotes SET razao_social_fornecedor = COALESCE(razao_social_fornecedor, ?) WHERE id = ? AND tenant_id = ?`,
+        [emitenteNome, lote_importacao_id, tenant]
+      );
+    }
+    if (frete_adicional) {
+      await db.execute(
+        `UPDATE importacoes_lotes SET frete_adicional = ?, frete_adicional_valor = ?, frete_adicional_metodo = ? WHERE id = ? AND tenant_id = ?`,
+        [JSON.stringify(frete_adicional), Number(frete_adicional.valor) || 0, frete_adicional.metodo || null, lote_importacao_id, tenant]
+      );
+    }
+
     // 🧹 AUTOLIMPEZA: Remove qualquer duplicidade anterior gerada por bugs passados neste lote
     await db.execute(
       `DELETE s1 FROM importacao_produtos_staging s1
@@ -207,16 +247,36 @@ export const sincronizarItensLoteXML = async (req: Request, res: Response) => {
       const { 
         nItem, cProd, cEan, xProd, ncm, cest, uCom, 
         quantidade, receivedQuantity, valorUnitario, 
-        valorTotal, freightDistributed, ipi, icmsSt,
-        produtoIdSistema, skuSistema, tipoEntrada 
+        valorTotal, freightAdded, freightDistributed, ipi, icmsSt,
+        produtoIdSistema, skuSistema, tipoEntrada,
+        skuSugerido, nomeItemSugerido, mapeamento, tipoRecurso,
+        difference, isConfirmed, gtinManual
       } = item;
 
+      // Item vindo do ProductMappingModal: os campos de mapeamento passam a valer como enviados (inclusive null)
+      const temMapeamento = mapeamento ? 1 : 0;
+
+      // mapeamento_json = payload do modal (ou o já salvo) + tipo_recurso do item (PRODUTO, CONSUMO, ATIVO...)
+      const montarMapeamentoJson = (salvo: string | null): string | null => {
+        let base: Record<string, unknown> = {};
+        if (mapeamento) {
+          base = { ...mapeamento };
+        } else if (salvo) {
+          try { base = JSON.parse(salvo) || {}; } catch { base = {}; }
+        }
+        if (tipoRecurso) base.tipo_recurso = tipoRecurso;
+        if (gtinManual) base.gtin_manual = gtinManual;
+        return Object.keys(base).length > 0 ? JSON.stringify(base) : null;
+      };
+
       const sequenciaItem = String(nItem || '1');
+      // Frete efetivamente embutido no custo do item (vFrete do XML ou rateio + frete adicional)
+      const freteItem = freightAdded ?? freightDistributed ?? 0;
       const custoTotalFinalCalc = (quantidade || 0) * (valorUnitario || 0);
 
       // Verifica se o item já existe baseado estritamente na sequência da NF-e (item_nfe_seq)
       const [existente]: any = await db.execute(
-        `SELECT id FROM importacao_produtos_staging 
+        `SELECT id, mapeamento_json FROM importacao_produtos_staging 
          WHERE tenant_id = ? AND lote_importacao_id = ? AND item_nfe_seq = ? LIMIT 1`,
         [tenant, lote_importacao_id, sequenciaItem]
       );
@@ -232,6 +292,9 @@ export const sincronizarItensLoteXML = async (req: Request, res: Response) => {
                cest_original = ?, 
                unidade_original = ?, 
                quantidade = ?, 
+               quantidade_recebida = COALESCE(?, quantidade_recebida),
+               divergencia = COALESCE(?, divergencia),
+               is_confirmed = COALESCE(?, is_confirmed),
                preco_custo_unitario = ?,
                valor_total_nfe = ?,
                frete_rateado = ?,
@@ -239,9 +302,12 @@ export const sincronizarItensLoteXML = async (req: Request, res: Response) => {
                icms_st = ?,
                custo_unitario_final = ?,
                custo_total_final = ?,
-               produto_id_sistema = COALESCE(?, produto_id_sistema),
+               produto_id_sistema = IF(?, ?, COALESCE(?, produto_id_sistema)),
                sku_sistema = COALESCE(?, sku_sistema),
-               tipo_entrada = COALESCE(?, tipo_entrada)
+               tipo_entrada = COALESCE(?, tipo_entrada),
+               sku_sugerido = IF(?, ?, sku_sugerido),
+               nome_item_sugerido = IF(?, ?, nome_item_sugerido),
+               mapeamento_json = ?
            WHERE id = ?`,
           [
             cProd || null,
@@ -251,16 +317,22 @@ export const sincronizarItensLoteXML = async (req: Request, res: Response) => {
             cest || null,
             uCom || null,
             quantidade || 0,
+            receivedQuantity ?? null,
+            difference ?? null,
+            isConfirmed ?? null,
             valorUnitario || 0,
             valorTotal || 0,
-            freightDistributed || 0,
+            freteItem || 0,
             ipi || 0,
             icmsSt || 0,
             valorUnitario || 0,
             custoTotalFinalCalc || 0,
-            produtoIdSistema || null,
+            temMapeamento, produtoIdSistema || null, produtoIdSistema || null,
             skuSistema || null,
             tipoEntrada || 'COMPRA_NORMAL',
+            temMapeamento, skuSugerido || null,
+            temMapeamento, nomeItemSugerido || null,
+            montarMapeamentoJson(existente[0].mapeamento_json),
             existente[0].id
           ]
         );
@@ -268,8 +340,8 @@ export const sincronizarItensLoteXML = async (req: Request, res: Response) => {
         // Insere apenas se realmente não existir
         await db.execute(
           `INSERT INTO importacao_produtos_staging 
-          (tenant_id, lote_importacao_id, item_nfe_seq, codigo_fornecedor, nome_fornecedor, ncm_original, ean, cest_original, unidade_original, quantidade, quantidade_recebida, preco_custo_unitario, valor_total_nfe, frete_rateado, ipi, icms_st, custo_unitario_final, custo_total_final, produto_id_sistema, sku_sistema, tipo_entrada, status, criado_em) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDENTE', NOW())`,
+          (tenant_id, lote_importacao_id, item_nfe_seq, codigo_fornecedor, nome_fornecedor, ncm_original, ean, cest_original, unidade_original, quantidade, quantidade_recebida, preco_custo_unitario, valor_total_nfe, frete_rateado, ipi, icms_st, custo_unitario_final, custo_total_final, produto_id_sistema, sku_sistema, tipo_entrada, sku_sugerido, nome_item_sugerido, mapeamento_json, status, criado_em) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDENTE', NOW())`,
           [
             tenant, 
             lote_importacao_id, 
@@ -284,20 +356,36 @@ export const sincronizarItensLoteXML = async (req: Request, res: Response) => {
             receivedQuantity || quantidade || 0,
             valorUnitario || 0,
             valorTotal || 0,
-            freightDistributed || 0,
+            freteItem || 0,
             ipi || 0,
             icmsSt || 0,
             valorUnitario || 0,
             custoTotalFinalCalc || 0,
             produtoIdSistema || null,
             skuSistema || null,
-            tipoEntrada || 'COMPRA_NORMAL'
+            tipoEntrada || 'COMPRA_NORMAL',
+            skuSugerido || null,
+            nomeItemSugerido || null,
+            montarMapeamentoJson(null)
           ]
         );
       }
     }
 
-    return res.status(200).json({ success: true, message: 'Lote sincronizado com sucesso!', lote_importacao_id });
+    // Carga completa: remove linhas órfãs (sequências que não existem no XML, ex.: lotes antigos sem item_nfe_seq)
+    let removidos = 0;
+    if (sincronizacao_completa && itens.length > 0) {
+      const sequencias = itens.map((item: any) => String(item.nItem || '1'));
+      const [resultado]: any = await db.execute(
+        `DELETE FROM importacao_produtos_staging
+         WHERE lote_importacao_id = ? AND tenant_id = ?
+           AND item_nfe_seq NOT IN (${sequencias.map(() => '?').join(',')})`,
+        [lote_importacao_id, tenant, ...sequencias]
+      );
+      removidos = resultado.affectedRows || 0;
+    }
+
+    return res.status(200).json({ success: true, message: 'Lote sincronizado com sucesso!', lote_importacao_id, removidos });
   } catch (error: any) {
     console.error("Erro na sincronização em lote:", error);
     return res.status(500).json({ success: false, error: error.message });
@@ -309,33 +397,50 @@ try {
 const tenant_id = req.query.tenant_id || 1;
 
 const query = `
-SELECT 
-l.id, 
-l.chave_acesso, 
+SELECT
+l.id,
+l.chave_acesso,
 l.numero_nf,
-l.cnpj_fornecedor, 
-l.status, 
+l.cnpj_fornecedor,
+l.status,
 l.created_at,
-(SELECT COUNT(*) FROM importacao_produtos_staging p WHERE p.lote_importacao_id = l.id) AS total_itens,
-(SELECT COUNT(*) FROM importacao_produtos_staging p WHERE p.lote_importacao_id = l.id AND p.status = 'ERRO_VALIDACAO') AS total_divergencias
+COALESCE(NULLIF(l.razao_social_fornecedor, ''), JSON_UNQUOTE(JSON_EXTRACT(l.dados_nota_fiscal, '$.emitente.nome'))) AS emitente_nome,
+CAST(JSON_UNQUOTE(JSON_EXTRACT(l.dados_nota_fiscal, '$.totais.icmsTot.vNF')) AS DECIMAL(15,2)) AS valor_total_nf,
+COUNT(p.id) AS total_itens,
+COALESCE(SUM(p.is_confirmed = 1), 0) AS total_conferidos,
+COALESCE(SUM(p.produto_id_sistema IS NULL AND COALESCE(TRIM(p.sku_sugerido), '') = ''), 0) AS total_sem_vinculo,
+COALESCE(SUM(ABS(COALESCE(p.quantidade_recebida, 0) - COALESCE(p.quantidade, 0)) > 0.0001), 0) AS total_divergencias
 FROM importacoes_lotes l
+LEFT JOIN importacao_produtos_staging p ON p.lote_importacao_id = l.id AND p.tenant_id = l.tenant_id
 WHERE l.tenant_id = ?
+GROUP BY l.id
 ORDER BY l.created_at DESC
 `;
 
 const [rows]: any = await db.execute(query, [tenant_id]);
 
-const lotesFormatados = rows.map((lote: any) => ({
+const lotesFormatados = rows.map((lote: any) => {
+const totalItens = Number(lote.total_itens);
+const conferidos = Number(lote.total_conferidos);
+const semVinculo = Number(lote.total_sem_vinculo);
+// Indicativo para a lista; a validação completa é o pente-fino (/lotes/:id/analise)
+const pronto = lote.status === 'RASCUNHO' && totalItens > 0 && conferidos === totalItens && semVinculo === 0;
+return {
 id: lote.id,
 chaveAcesso: lote.chave_acesso,
-emitenteNome: `Fornecedoar CNPJ: ${lote.emitenteNome}`,
+numeroNf: lote.numero_nf,
+emitenteNome: lote.emitente_nome || 'Fornecedor não identificado',
 cnpjEmitente: lote.cnpj_fornecedor,
-totalItens: Number(lote.total_itens),
+valorTotalNf: Number(lote.valor_total_nf) || 0,
+totalItens,
+totalConferidos: conferidos,
+totalSemVinculo: semVinculo,
 totalDivergencias: Number(lote.total_divergencias),
-status: lote.status === 'RASCUNHO' ? 'RASCUNHO' : 'PRONTO_PARA_APROVACAO',
+status: pronto ? 'PRONTO_PARA_APROVACAO' : lote.status,
 dataCriacao: lote.created_at,
 erroMensagem: null
-}));
+};
+});
 
 return res.json({
 success: true,
@@ -356,25 +461,10 @@ const { loteId } = req.params;
 const tenant_id = req.query.tenant_id || 1;
 
 const query = `
-SELECT 
-id,
-codigo_fornecedor,
-nome_fornecedor,
-ncm_original,
-cest_original,
-unidade_original,
-quantidade,
-preco_custo_unitario,
-sku_sugerido,
-nome_item_sugerido,
-preco_venda_sugerido,
-margem_lucro_calculada,
-status,
-motivo_alerta,
-criado_em
-FROM importacao_produtos_staging 
-WHERE lote_importacao_id = ? AND tenant_id = ? 
-ORDER BY id ASC
+SELECT *
+FROM importacao_produtos_staging
+WHERE lote_importacao_id = ? AND tenant_id = ?
+ORDER BY CAST(item_nfe_seq AS UNSIGNED), id
 `;
 
 const [itens]: any = await db.execute(query, [loteId, tenant_id]);

@@ -19,12 +19,10 @@ export const reconcileFreight = (
   items: FreightItemLike[]
 ): FreightReconciliation => {
   const noteTotal = roundCents(Number(noteFreight) || 0);
+  // freightAdded é o frete efetivamente embutido no custo do item (após qualquer rateio)
   const itemsTotal = roundCents(items.reduce((total, item) => {
-    const distributed = Number(item.freightDistributed) || 0;
-    const considered = distributed > 0
-      ? distributed
-      : Number(item.freightAdded ?? item.freightOriginal ?? 0) || 0;
-    return total + (Number(considered) || 0);
+    const considered = Number(item.freightAdded ?? item.freightOriginal ?? 0) || 0;
+    return total + considered;
   }, 0));
   const difference = roundCents(Math.abs(noteTotal - itemsTotal));
 

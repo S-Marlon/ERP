@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Card, 
   Row, 
@@ -139,7 +139,7 @@ const NfeCards: React.FC<NfeCardsProps> = ({ data, supplierStatus, actions, fret
   const [isInfAdicDetailsOpen, setIsInfAdicDetailsOpen] = useState(false);
 
 const [isEditingFreteAdicional, setIsEditingFreteAdicional] = useState(false);
-const [valorFreteAdicional, setValorFreteAdicional] = useState(0); // Começa zerado ou com o valor salvo do banco/estado global
+const [valorFreteAdicional, setValorFreteAdicional] = useState(freteAdicionalData?.valor || 0);
 
   const destinatario = (data as any).destinatario || {};
   const cobranca = (data as any).cobranca || { fatura: {}, duplicatas: [] };
@@ -151,6 +151,14 @@ const [valorFreteAdicional, setValorFreteAdicional] = useState(0); // Começa ze
   // Valores locais que serão sincronizados ou enviados ao pai
   const [metodoFreteAdicional, setMetodoFreteAdicional] = useState(freteAdicionalData?.metodo || 'Correios');
   const [obsFreteAdicional, setObsFreteAdicional] = useState(freteAdicionalData?.observacao || '');
+
+  // Acompanha o valor do pai (ex.: frete restaurado ao retomar um lote), exceto durante a edição
+  useEffect(() => {
+    if (isEditingFreteAdicional || !freteAdicionalData) return;
+    setValorFreteAdicional(freteAdicionalData.valor || 0);
+    setMetodoFreteAdicional(freteAdicionalData.metodo || 'Correios');
+    setObsFreteAdicional(freteAdicionalData.observacao || '');
+  }, [freteAdicionalData, isEditingFreteAdicional]);
 
 
 

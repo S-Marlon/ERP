@@ -7,6 +7,7 @@ import {
     listarLotesStaging, // <-- Importado do controller
     listarItensDoLoteStaging
 } from './controllers/comprasController';
+import { getCabecalhoLote, analisarLote, aprovarLote, descartarLote, getEstadoLote } from './controllers/stagingLoteController';
 
 const router = Router();
 
@@ -34,5 +35,14 @@ router.get('/lotes/:loteId/staging', getLoteStaging);
 router.patch('/itens/staging/:id/status', atualizarStatusItemStaging);
 
 router.get('/lotes/:loteId/itens', listarItensDoLoteStaging);
+
+// Tela de Staging: pente-fino e entrada definitiva no estoque
+router.get('/lotes/:loteId/analise', analisarLote);
+// Retomada da conferência (tela de entrada): por id do lote ou pela chave de acesso da NF
+router.get('/lotes/chave/:chave/estado', getEstadoLote);
+router.get('/lotes/:loteId/estado', getEstadoLote);
+router.post('/lotes/:loteId/aprovar', aprovarLote);
+router.get('/lotes/:loteId', getCabecalhoLote);
+router.delete('/lotes/:loteId', descartarLote);
 
 export default router;

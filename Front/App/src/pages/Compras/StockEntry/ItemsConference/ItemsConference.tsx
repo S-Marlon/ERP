@@ -15,7 +15,9 @@ Col,
 InputNumber,
 Alert,
 Descriptions,
-Statistic
+Statistic,
+Dropdown,
+message
 } from 'antd';
 import {
 SettingOutlined,
@@ -23,7 +25,7 @@ ThunderboltOutlined,
 CheckOutlined,
 UndoOutlined,
 LinkOutlined,
-DeleteOutlined,
+SwapOutlined,
 FolderAddOutlined,
 PlusOutlined,
 InfoCircleOutlined,
@@ -41,7 +43,9 @@ ItemAttribute,
 FilterType,
 } from '../types';
 
-import ProductMappingModal from './ProductMappingModal';
+import ProductMappingModal, { MappingPayload, getMappedId } from './ProductMappingModal';
+import { TIPOS_RECURSO, TIPO_RECURSO_PADRAO, TipoRecurso, getTipoRecursoConfig } from '../tipoRecurso';
+import { hasCodigoInterno, MSG_SEM_CODIGO_INTERNO } from '../conferencia';
 import {  generateGroupId } from '../helpers';
 import ManageFamiliasModal from './ModalManageFamilias';
 
@@ -51,7 +55,9 @@ groups?: Group[];
 onConfirmItems?: (ids: string[] | number[]) => void;
 onUnconfirmItems?: (ids: string[] | number[]) => void;
 onMapProducts?: (ids: string[] | number[]) => void;
-onRemoveItems?: (ids: string[] | number[]) => void;
+onItemMapped?: (tempId: string | number, mapping: MappingPayload) => void;
+// Itens nunca saem da NF: apenas mudam de tipo de entrada (produto, consumo, ativo...)
+onChangeTipoRecurso?: (ids: (string | number)[], tipo: TipoRecurso) => void;
 onAssignGroupToItem?: (itemId: string | number, groupId: string) => void;
 onCreateAndAssignGroup?: (itemId: string | number, groupData: Group) => void;
 onUpdateGroup?: (groupId: string, groupData: Partial<Group>) => void;
@@ -59,8 +65,9 @@ onUnassignGroupFromItem?: (itemId: string | number) => void;
 onApplyItemAttributeOverride?: (itemId: string | number, atributos: ItemAttribute[]) => void;
 onBatchAssignGroup?: (itemIds: (string | number)[], groupId: string) => void;
 onBatchSaveItemsAttributes?: (updatedItems: { tempId: string | number; atributosCustomizados: ItemAttribute[] }[]) => void;
-onQuantityChange?: (tempId: string, newReceivedQty: number) => void;
-onToggleItem?: (tempId: string, confirmed: boolean) => void;
+onQuantityChange?: (tempId: string | number, newReceivedQty: number) => void;
+onToggleItem?: (tempId: string | number, confirmed: boolean) => void;
+onChangeGtin?: (tempId: string | number, gtin: string) => void;
 onSendTotal?: (total: number) => void;
 }
 
@@ -72,7 +79,8 @@ groups: initialGroups,
 onConfirmItems,
 onUnconfirmItems,
 onMapProducts,
-onRemoveItems,
+onItemMapped,
+onChangeTipoRecurso,
 onAssignGroupToItem,
 onCreateAndAssignGroup,
 onUpdateGroup,
@@ -81,6 +89,7 @@ onBatchAssignGroup,
 onBatchSaveItemsAttributes,
 onQuantityChange,
 onToggleItem,
+onChangeGtin,
 onSendTotal,
 }) => {
 const [localItems, setLocalItems] = useState<Item[]>(initialItems || []);
@@ -128,20 +137,8 @@ message.warning("Digite ou bipa um código de barras válido.");
 return;
 }
 
-// Identificador único do produto (ex: cProd ou chave do item)
-const targetId = selectedItemForBarcode.prod?.cProd || selectedItemForBarcode.cProd;
-
-setItems((prevItems: any[]) =>
-prevItems.map((item) => {
-const currentId = item.prod?.cProd || item.cProd;
-if (currentId === targetId) {
-return { ...item, customGtin: inputValue.trim() };
-}
-return item;
-})
-);
-
-message.success("Código de barras vinculado com sucesso!");
+// O pai guarda o GTIN no item, grava na staging e desfaz a conferência
+onChangeGtin?.(selectedItemForBarcode.tempId, inputValue.trim());
 setBarcodeModalVisible(false);
 };
 
@@ -177,6 +174,8 @@ const ipiVal = Number(imposto.ipi?.vIPI || prodData.vIPI || 0);
 const stObj = imposto.icmsSt || imposto.ICMSST || imposto.icms || {};
 const stVal = Number(stObj.vICMSST || stObj.VICMSST || stObj.vST || imposto.vBCST || prodData.vST || 0);
 
+// valorTotal vem calculado do pai (produtos - desconto + acréscimos + frete aplicado)
+if (record.valorTotal !== undefined) return acc + Number(record.valorTotal || 0);
 return acc + valorProd + freightVal + ipiVal + stVal;
 }, 0);
 }, [localItems]);
@@ -227,8 +226,7 @@ val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 // Função para validar se o item possui os dados preenchidos necessários para ser conferido
 const isItemValidForConference = (record: Item): boolean => {
 const hasQuantity = (record.receivedQuantity ?? record.quantidade ?? 0) >= 0;
-// Adicione outras validações se necessário, ex: record.grupoId, record.mappedId, etc.
-return hasQuantity;
+return hasQuantity && hasCodigoInterno(record);
 };
 
 // Callbacks internos ajustados
@@ -330,14 +328,14 @@ setIsMappingModalOpen(true);
 };
 
 // Função executada quando o mapeamento de um item da fila é confirmado
-const handleConfirmMappingItem = (tempId: number | string, mappingData: any) => {
-// Aqui você chama a função que veio das props do pai (ex: onMapProducts ou salva no backend)
-console.log("Mapeando item:", tempId, mappingData);
+const handleConfirmMappingItem = (tempId: number | string, mappingData: MappingPayload) => {
+// Repassa ao pai (StockEntryForm), que guarda o mapeamento nos items e persiste na staging
+onItemMapped?.(tempId, mappingData);
 
-// Atualiza o estado local para marcar o item como vinculado/mapeado se desejar
+// Reflexo imediato na tabela local (o pai também devolve mappedId nos items)
 setLocalItems(prev => prev.map(item => {
 if (item.tempId === tempId || item.nItem === tempId) {
-return { ...item, mappedId: mappingData.existingProductId || 'NOVO_SKU' };
+return { ...item, mappedId: getMappedId(mappingData), isMapped: true };
 }
 return item;
 }));
@@ -382,18 +380,8 @@ const isSelected = selectedRowKeys.includes(record.tempId);
 
 const isConf = record.isConfirmed || record.confirmed;
 const diff = record.difference || 0;
-const tipoRecurso = record.tipo_recurso || record.tipoRecurso || 'PRODUTO';
-
-// Configuração visual simplificada para cada tipo de recurso
-const tipoConfig: Record<string, { label: string; color: string }> = {
-PRODUTO: { label: 'Prod.', color: 'blue' },
-ATIVO: { label: 'Ativo', color: 'purple' },
-CONSUMO: { label: 'Consumo', color: 'orange' },
-INSUMO: { label: 'Insumo', color: 'green' },
-SERVICO: { label: 'Serviço', color: 'default' },
-};
-
-const currentTag = tipoConfig[tipoRecurso] || { label: tipoRecurso, color: 'default' };
+const tipoRecurso = record.tipoRecurso || record.tipo_recurso || TIPO_RECURSO_PADRAO;
+const currentTag = getTipoRecursoConfig(tipoRecurso);
 return (
 <Space size={8} align="center">
 <Checkbox
@@ -410,11 +398,20 @@ setSelectedRowKeys(selectedRowKeys.filter(key => key !== record.tempId));
 {record.nItem || record.tempId}
 </span>
 
-<Tooltip title={`Tipo: ${tipoRecurso}`}>
-<Tag color={currentTag.color} style={{ margin: 0, fontSize: '10px', padding: '0 4px' }}>
-{currentTag.label}
+<Dropdown
+trigger={['click']}
+menu={{
+selectedKeys: [tipoRecurso],
+items: TIPOS_RECURSO.map(t => ({ key: t.value, label: t.label })),
+onClick: ({ key }) => onChangeTipoRecurso?.([record.tempId], key as TipoRecurso),
+}}
+>
+<Tooltip title={`Tipo de entrada: ${currentTag.label} (clique para alterar)`}>
+<Tag color={currentTag.color} style={{ margin: 0, fontSize: '10px', padding: '0 4px', cursor: 'pointer' }}>
+{currentTag.short}
 </Tag>
 </Tooltip>
+</Dropdown>
 </Space>
 );
 }
@@ -534,7 +531,7 @@ return (
 size="small"
 min={0}
 value={receivedQty}
-onChange={(newVal) => newVal !== null && onQuantityChange?.(String(record.tempId), newVal)}
+onChange={(newVal) => newVal !== null && onQuantityChange?.(record.tempId, newVal)}
 style={{ width: 55 }}
 />
 </div>
@@ -641,7 +638,10 @@ const unitBase = nfQty > 0 ? valorProd / nfQty : 0;
 const freightUnit = Number(record.freightAdded ?? record.freightDistributed ?? prodData.vFrete ?? 0) / nfQty;
 const ipiUnit = (Number(imposto.ipi?.vIPI || prodData.vIPI || 0)) / nfQty;
 const stUnit = (Number(imposto.icmsSt?.vICMSST || imposto.ICMSST?.vICMSST || imposto.icms?.vICMSST || imposto.vBCST || prodData.vST || 0)) / nfQty;
-const finalUnitCost = unitBase + freightUnit + ipiUnit;
+// valorUnitario vem calculado do pai; o cálculo local fica só como fallback
+const finalUnitCost = record.valorUnitario !== undefined
+? Number(record.valorUnitario || 0)
+: unitBase + freightUnit + ipiUnit + stUnit;
 const activeQty = record.receivedQuantity ?? nfQty;
 const totalItemAmount = finalUnitCost * activeQty;
 
@@ -668,28 +668,14 @@ render: (_, record) => {
 const isConf = record.isConfirmed || record.confirmed;
 const diff = record.difference || 0;
 
+const podeConferir = isItemValidForConference(record);
+
 const handleToggleConference = (newConfirmedState: boolean) => {
-if (newConfirmedState && !isItemValidForConference(record)) {
-message.warning("Preencha os dados obrigatórios do item antes de conferir.");
+if (newConfirmedState && !podeConferir) {
+message.warning(MSG_SEM_CODIGO_INTERNO);
 return;
 }
-
-// 1. Atualiza o estado local do item
-setLocalItems(prev => prev.map(item => {
-if (item.tempId === record.tempId || item.nItem === record.nItem) {
-const updatedItem = { ...item, isConfirmed: newConfirmedState, confirmed: newConfirmedState };
-
-// 2. Se foi marcado como conferido, já envia o objeto atualizado para o pai imediatamente
-if (newConfirmedState) {
-onSaveConference?.([updatedItem]); // Ou envia a lista/item individual conforme sua prop
-}
-return updatedItem;
-}
-return item;
-}));
-
-// Chama a prop original se ela existir
-onToggleItem?.(String(record.tempId), newConfirmedState);
+onToggleItem?.(record.tempId, newConfirmedState);
 };
 
 return (
@@ -705,11 +691,12 @@ onClick={() => handleToggleConference(false)}
 />
 </Tooltip>
 ) : (
-<Tooltip title="Marcar como conferido e enviar ao pai">
+<Tooltip title={podeConferir ? 'Marcar como conferido' : MSG_SEM_CODIGO_INTERNO}>
 <Button
 type="text"
 size="small"
-icon={<PaperClipOutlined style={{ color: diff !== 0 ? '#faad14' : '#bfbfbf' }} />}
+disabled={!podeConferir}
+icon={<PaperClipOutlined style={{ color: !podeConferir ? '#d9d9d9' : diff !== 0 ? '#faad14' : '#bfbfbf' }} />}
 onClick={() => handleToggleConference(true)}
 />
 </Tooltip>
@@ -767,7 +754,16 @@ onClick={() => handleOpenMappingModal(selectedRowKeys)}
 >
 Vincular Selecionados
 </Button>
-<Button size="small" danger icon={<DeleteOutlined />} disabled={selectedRowKeys.length === 0} onClick={() => { onRemoveItems?.(selectedRowKeys); setSelectedRowKeys([]); }}>Remover</Button>
+<Dropdown
+trigger={['click']}
+disabled={selectedRowKeys.length === 0}
+menu={{
+items: TIPOS_RECURSO.map(t => ({ key: t.value, label: t.label })),
+onClick: ({ key }) => { onChangeTipoRecurso?.(selectedRowKeys as (string | number)[], key as TipoRecurso); setSelectedRowKeys([]); },
+}}
+>
+<Button size="small" icon={<SwapOutlined />} disabled={selectedRowKeys.length === 0}>Tipo de Entrada</Button>
+</Dropdown>
 <Button
 size="small"
 icon={<FolderAddOutlined />}
@@ -1218,24 +1214,6 @@ onDeleteFamilia={(id) => {
 setLocalGroups(prev => prev.filter(g => g.id !== id));
 }}
 />
-
-{/* 5. Modal de Inserção de Código de Barras */}
-<Modal
-title="Inserir Código de Barras Manual"
-open={barcodeModalVisible}
-onOk={handleSaveCustomGtin}
-onCancel={() => setBarcodeModalVisible(false)}
-okText="Salvar"
-cancelText="Cancelar"
->
-<p>Informe o GTIN/Código de barras correto para o item:</p>
-<Input
-placeholder="Ex: 7891020304050"
-value={inputValue}
-onChange={(e) => setInputValue(e.target.value)}
-autoFocus
-/>
-</Modal>
 
 {/* ================= MODAL DE MAPEAMENTO EM FILA ================= */}
 {isMappingModalOpen && (

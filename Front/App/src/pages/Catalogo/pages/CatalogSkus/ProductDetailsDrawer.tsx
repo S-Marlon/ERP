@@ -423,7 +423,7 @@ export default function ProductDetailsDrawer({
            */}
          
 
-          <ProductCommercialSalesConfig/>
+          <ProductCommercialSalesConfig idItem={Number(product?.id_item ?? product?.id) || undefined} />
 
           
         </Space>
@@ -660,7 +660,7 @@ export default function ProductDetailsDrawer({
             }}
           /> */}
 
-          <ProductCommercialSalesConfig/>
+          <ProductCommercialSalesConfig idItem={Number(product?.id_item ?? product?.id) || undefined} />
         </div>
       </Modal>
 

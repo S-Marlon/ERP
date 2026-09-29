@@ -1,0 +1,67 @@
+import { avaliarPenteFino, calcularCustoMedio, lerConversaoCompra, StagingItemRow } from './penteFino';
+
+const assert = (condition: boolean, message: string): void => {
+  if (!condition) throw new Error(message);
+};
+
+const item = (patch: Partial<StagingItemRow>): StagingItemRow => ({
+  id: 1,
+  item_nfe_seq: '1',
+  codigo_fornecedor: 'F1',
+  nome_fornecedor: 'Item',
+  quantidade: 10,
+  quantidade_recebida: 10,
+  custo_unitario_final: 5,
+  preco_custo_unitario: 5,
+  valor_total_nfe: 50,
+  produto_id_sistema: 7,
+  sku_sugerido: null,
+  nome_item_sugerido: null,
+  is_confirmed: 1,
+  mapeamento_json: null,
+  ...patch,
+});
+
+const lote = { id: 1, status: 'RASCUNHO', valor_total_nf_xml: 50, frete_adicional_valor: 0 };
+const ctx = { idsItensExistentes: new Set([7]), skusExistentes: new Set(['JA-EXISTE']), fornecedorCadastrado: true };
+
+export const runPenteFinoTests = (): void => {
+  assert(avaliarPenteFino(lote, [item({})], ctx).aprovavel, 'Item vinculado e conferido deveria ser aprovável.');
+
+  const naoConferido = avaliarPenteFino(lote, [item({ is_confirmed: 0 })], ctx);
+  assert(!naoConferido.aprovavel && naoConferido.bloqueios[0].codigo === 'ITEM_NAO_CONFERIDO', 'Item não conferido deveria bloquear.');
+
+  const semVinculo = avaliarPenteFino(lote, [item({ produto_id_sistema: null })], ctx);
+  assert(semVinculo.bloqueios.some(b => b.codigo === 'ITEM_SEM_VINCULO'), 'Item sem vínculo nem SKU deveria bloquear.');
+
+  const novoOk = avaliarPenteFino(lote, [item({ produto_id_sistema: null, sku_sugerido: 'NOVO-1', nome_item_sugerido: 'Novo' })], ctx);
+  assert(novoOk.aprovavel && novoOk.resumo.novos === 1, 'Item novo com SKU e nome deveria ser aprovável.');
+
+  const skuRepetido = avaliarPenteFino(lote, [item({ produto_id_sistema: null, sku_sugerido: 'ja-existe', nome_item_sugerido: 'X' })], ctx);
+  assert(skuRepetido.bloqueios.some(b => b.codigo === 'SKU_JA_EXISTE'), 'SKU já existente no catálogo deveria bloquear.');
+
+  const importado = avaliarPenteFino({ ...lote, status: 'IMPORTADO' }, [item({})], ctx);
+  assert(importado.bloqueios.some(b => b.codigo === 'LOTE_FINALIZADO'), 'Lote importado não pode ser aprovado de novo.');
+
+  const divergente = avaliarPenteFino(lote, [item({ quantidade_recebida: 8 })], ctx);
+  assert(divergente.aprovavel && divergente.avisos.some(a => a.codigo === 'DIVERGENCIA_QUANTIDADE'), 'Divergência deveria ser aviso, não bloqueio.');
+
+  const conv = (fator: unknown) => item({ mapeamento_json: JSON.stringify({ conversaoCompra: { unidade_compra: 'CX', unidade_base: 'UN', fator } }) });
+  assert(avaliarPenteFino(lote, [conv(0)], ctx).bloqueios.some(b => b.codigo === 'FATOR_INVALIDO'), 'Fator zero deveria bloquear.');
+  const convertido = avaliarPenteFino(lote, [conv(50)], ctx);
+  assert(convertido.aprovavel && convertido.avisos.some(a => a.codigo === 'CONVERSAO_UNIDADE'), 'Fator 50 deveria ser aprovável com aviso de conversão.');
+  assert(lerConversaoCompra(item({ unidade_original: 'pc' })).fator === 1, 'Sem conversão no mapeamento, o fator padrão é 1.');
+
+  const novoComConfig = (fatorConfig: number) => item({
+    produto_id_sistema: null, sku_sugerido: 'NOVO-CX', nome_item_sugerido: 'Novo',
+    mapeamento_json: JSON.stringify({
+      conversaoCompra: { unidade_compra: 'CX', unidade_base: 'UN', fator: 50 },
+      configVendas: { unidades: [{ sigla: 'UN', fator: 1, is_base: true }, { sigla: 'CX', fator: fatorConfig, is_base: false }], faixas: [] },
+    }),
+  });
+  assert(avaliarPenteFino(lote, [novoComConfig(50)], ctx).aprovavel, 'Configuração coerente com a conversão deveria passar.');
+  assert(avaliarPenteFino(lote, [novoComConfig(20)], ctx).bloqueios.some(b => b.codigo === 'CONFIG_VENDAS_INCOERENTE'), 'Fator da configuração diferente da conversão deveria bloquear.');
+
+  assert(calcularCustoMedio(10, 5, 10, 7) === 6, 'Custo médio de 10@5 + 10@7 deveria ser 6.');
+  assert(calcularCustoMedio(0, 0, 4, 9) === 9, 'Sem saldo anterior, o custo médio é o custo da entrada.');
+};

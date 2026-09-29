@@ -58,7 +58,7 @@ import Clientes from "./pages/Parceiros/Clientes";
 import FamilyManagementPanel from "./pages/Catalogo/pages/FamilyManager/FamilyManagementPanel";
 import EcommerceScreen from "./pages/Ecommerce/EcommerceScreen";
 import ProductPricingModule from "./pages/Catalogo/pages/ProductPricingModule/ProductPricingModule";
-import { StagingManagementModal, StockEntryStagingView } from "./pages/Catalogo/pages/StagingManagement/StockEntryStagingView";
+import { StockEntryStagingView } from "./pages/Catalogo/pages/StagingManagement/StockEntryStagingView";
 
 const { Sider, Header } = Layout;
 

@@ -28,6 +28,7 @@ export const searchProdutos = async (req: Request, res: Response) => {
         -- 2º Se estiver vazio ou null, pega o itens_core.nome_item
         COALESCE(NULLIF(TRIM(cpd.nome_comercial), ''), ic.nome_item) AS name,
         ic.status,
+        ic.tipo_recurso,
         ic.descricao_variacao,
         COALESCE(um.sigla, '') AS unitOfMeasure,
         COALESCE(cpd.preco_venda, 0) AS salePrice,
@@ -82,7 +83,8 @@ export const searchProdutos = async (req: Request, res: Response) => {
       status: row.status || 'ATIVO',
       pictureUrl: row.pictureUrl || null,
       variacao: row.descricao_variacao || 'Principal',
-      marca: row.brand || ''
+      marca: row.brand || '',
+      tipoRecurso: row.tipo_recurso || 'PRODUTO'
     })));
   } catch (error: any) {
     console.error('Erro ao buscar produtos no catálogo novo:', error);

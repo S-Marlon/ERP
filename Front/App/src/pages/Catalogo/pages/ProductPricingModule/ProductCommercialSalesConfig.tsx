@@ -1,6 +1,5 @@
 import {
 Card,
-Form,
 Input,
 InputNumber,
 Select,
@@ -16,7 +15,9 @@ Tabs,
 Tag,
 Alert,
 Switch,
-Radio
+Radio,
+Spin,
+Empty
 } from 'antd';
 import {
 AppstoreAddOutlined,
@@ -30,74 +31,61 @@ EditOutlined,
 RightOutlined,
 LockOutlined
 } from '@ant-design/icons';
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import {
+atualizarCustoGerencial,
+buscarItens,
+carregarConfigVendas,
+salvarConfigVendas,
+ConfigVendasApi,
+CustosApi,
+ItemBusca,
+SalvarConfigPayload
+} from './configVendas.api';
+import {
+configParaEstado,
+estadoParaPayload,
+sincronizarRascunho,
+RascunhoVendas,
+SaleUnitConfig,
+TierRuleRecord
+} from './configVendas.mapper';
 
 const { Title, Text, Paragraph } = Typography;
 
-interface SaleUnitConfig {
-unitKey: string;          
-unitName: string;         
-enabled: boolean;         
-allowWholesale: boolean;  
-conversionFactor: number; 
-retailMarkup: number;     
+interface ProductCommercialSalesConfigProps {
+// Item do catálogo (itens_core.id_item). Sem ele, o componente mostra a busca de produto.
+idItem?: number;
+// Modo rascunho: item ainda não existe (mapeamento da NF). Nada é gravado aqui; a configuração
+// é devolvida por onRascunhoChange e aplicada na aprovação da Staging.
+rascunho?: RascunhoVendas & { nomeItem?: string };
+onRascunhoChange?: (payload: SalvarConfigPayload) => void;
 }
 
-interface TierRuleRecord {
-key: string;
-unitKey: string;          
-tierType: 'retail' | 'wholesale'; 
-minQuantity: number;
-maxQuantity: number | 'INF';
-markupOrDiscount: number;
-unitPrice: number;
-}
+const formatBRL = (v: number | null | undefined) =>
+Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 4 });
 
-interface ProductMock {
-id: string;
-name: string;
-category: string;
-baseUnit: string;
-purchaseCost: number;     
-allowedUnits: SaleUnitConfig[];
-}
+export const ProductCommercialSalesConfig: React.FC<ProductCommercialSalesConfigProps> = ({ idItem, rascunho, onRascunhoChange }) => {
+const modoRascunho = Boolean(rascunho);
 
-const productsMock: ProductMock[] = [
-{
-id: '1',
-name: 'Corda Náutica Polipropileno 10mm (Rolo de 150m)',
-category: 'Cordas & Fios',
-baseUnit: 'Metro (MT)',
-purchaseCost: 0.15,
-allowedUnits: [
-{ unitKey: 'MT', unitName: 'Metro (Fracionado)', enabled: true, allowWholesale: true, conversionFactor: 1, retailMarkup: 2.2 },
-{ unitKey: 'RL', unitName: 'Rolo Fechado (150m)', enabled: true, allowWholesale: true, conversionFactor: 150, retailMarkup: 1.8 },
-],
-},
-{
-id: '2',
-name: 'Parafuso Sextavado 1/4',
-category: 'Ferragens',
-baseUnit: 'Unidade (UN)',
-purchaseCost: 0.50,
-allowedUnits: [
-{ unitKey: 'UN', unitName: 'Unidade Avulsa', enabled: true, allowWholesale: false, conversionFactor: 1, retailMarkup: 2.5 },
-{ unitKey: 'CX', unitName: 'Caixa Master (50 un)', enabled: true, allowWholesale: true, conversionFactor: 50, retailMarkup: 2.0 },
-],
-},
-];
+// Item carregado do banco e situação do custo (defasagem frente às últimas NFs)
+const [selectedItem, setSelectedItem] = useState<ConfigVendasApi['item'] | null>(null);
+const [custos, setCustos] = useState<CustosApi | null>(null);
+const [defasagemIgnorada, setDefasagemIgnorada] = useState(false);
+const [loadingConfig, setLoadingConfig] = useState(false);
+const [saving, setSaving] = useState(false);
+const [itemOptions, setItemOptions] = useState<ItemBusca[]>([]);
+const [searchingItems, setSearchingItems] = useState(false);
+const searchAbort = useRef<AbortController | null>(null);
 
-export const ProductCommercialSalesConfig: React.FC = () => {
-const [form] = Form.useForm();
+// Custo gerencial (por unidade base): referência do preço de venda
+const [purchaseCost, setPurchaseCost] = useState<number>(0);
+const [unitsConfig, setUnitsConfig] = useState<SaleUnitConfig[]>([]);
 
-const [selectedProduct, setSelectedProduct] = useState<ProductMock>(productsMock[0]);
-const [purchaseCost, setPurchaseCost] = useState<number>(productsMock[0].purchaseCost);
-const [unitsConfig, setUnitsConfig] = useState<SaleUnitConfig[]>(productsMock[0].allowedUnits);
+const [simUnitKey, setSimUnitKey] = useState<string>('');
+const [simQuantity, setSimQuantity] = useState<number>(1);
 
-const [simUnitKey, setSimUnitKey] = useState<string>('MT');
-const [simQuantity, setSimQuantity] = useState<number>(5);
-
-const [activeTabKey, setActiveTabKey] = useState<string>('MT');
+const [activeTabKey, setActiveTabKey] = useState<string>('');
 const [isPayloadModalVisible, setIsPayloadModalVisible] = useState<boolean>(false);
 
 const [isUnitModalVisible, setIsUnitModalVisible] = useState<boolean>(false);
@@ -110,15 +98,113 @@ const [formConversionFactor, setFormConversionFactor] = useState<number>(150);
 const [formRetailMarkup, setFormRetailMarkup] = useState<number>(1.8);
 const [formAllowWholesale, setFormAllowWholesale] = useState<boolean>(true);
 const [formEnabled, setFormEnabled] = useState<boolean>(true);
+const [formGtin, setFormGtin] = useState<string>('');
 
-const [tierRules, setTierRules] = useState<TierRuleRecord[]>([
-{ key: '1', unitKey: 'MT', tierType: 'retail', minQuantity: 0, maxQuantity: 3, markupOrDiscount: 2.2, unitPrice: 0.15 * 2.2 },
-{ key: '2', unitKey: 'MT', tierType: 'wholesale', minQuantity: 4, maxQuantity: 10, markupOrDiscount: 1.8, unitPrice: 0.15 * 1.8 },
-{ key: '3', unitKey: 'MT', tierType: 'wholesale', minQuantity: 11, maxQuantity: 'INF', markupOrDiscount: 2.0, unitPrice: 0.15 * 2.0 },
+const [tierRules, setTierRules] = useState<TierRuleRecord[]>([]);
 
-{ key: '4', unitKey: 'RL', tierType: 'retail', minQuantity: 0, maxQuantity: 2, markupOrDiscount: 1.8, unitPrice: (0.15 * 150) * 1.8 },
-{ key: '5', unitKey: 'RL', tierType: 'wholesale', minQuantity: 3, maxQuantity: 'INF', markupOrDiscount: 1.4, unitPrice: (0.15 * 150) * 1.4 },
-]);
+const baseUnit = useMemo(() => unitsConfig.find(u => u.isBase) || null, [unitsConfig]);
+const baseLabel = baseUnit ? baseUnit.unitKey : (selectedItem?.sigla_base || 'base');
+const precoVarejoBase = baseUnit ? (tierRules.find(t => t.unitKey === baseUnit.unitKey)?.unitPrice ?? 0) : 0;
+// Unidade em edição/criação é a base? (fator travado em 1)
+const formIsBase = modalMode === 'edit'
+? Boolean(unitsConfig.find(u => u.unitKey === editingUnitKey)?.isBase)
+: !baseUnit;
+
+const aplicarConfig = (config: ConfigVendasApi) => {
+const estado = configParaEstado(config);
+setSelectedItem(config.item);
+setCustos(config.custos);
+setDefasagemIgnorada(false);
+setPurchaseCost(estado.custo);
+setUnitsConfig(estado.units);
+setTierRules(estado.tiers);
+const primeira = estado.units.find(u => u.isBase) || estado.units[0];
+setActiveTabKey(primeira?.unitKey || '');
+setSimUnitKey(primeira?.unitKey || '');
+};
+
+const carregarItem = async (id: number) => {
+setLoadingConfig(true);
+try {
+aplicarConfig(await carregarConfigVendas(id));
+} catch (err: any) {
+message.error(err.message || 'Erro ao carregar a configuração de vendas.');
+} finally {
+setLoadingConfig(false);
+}
+};
+
+useEffect(() => {
+if (idItem) carregarItem(idItem);
+}, [idItem]);
+
+// Rascunho: unidade base, unidade da NF (com fator) e custo base sempre coerentes com a conversão de compra
+useEffect(() => {
+if (!rascunho) return;
+const sincronizado = sincronizarRascunho(unitsConfig, tierRules, rascunho);
+setUnitsConfig(sincronizado.units);
+setTierRules(sincronizado.tiers);
+setPurchaseCost(sincronizado.custo);
+if (!sincronizado.units.some(u => u.unitKey === activeTabKey)) {
+setActiveTabKey(sincronizado.units[0]?.unitKey || '');
+setSimUnitKey(sincronizado.units[0]?.unitKey || '');
+}
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, [rascunho?.unidadeBase, rascunho?.unidadeCompra, rascunho?.fatorCompra, rascunho?.custoUnidadeCompra]);
+
+useEffect(() => {
+if (modoRascunho && unitsConfig.length > 0) {
+onRascunhoChange?.(estadoParaPayload(unitsConfig, tierRules, purchaseCost));
+}
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, [modoRascunho, unitsConfig, tierRules, purchaseCost]);
+
+const handleSearchItems = (termo: string) => {
+searchAbort.current?.abort();
+if (termo.trim().length < 2) {
+setItemOptions([]);
+return;
+}
+const controller = new AbortController();
+searchAbort.current = controller;
+setSearchingItems(true);
+buscarItens(termo.trim(), 1, controller.signal)
+.then(setItemOptions)
+.catch(err => { if (err.name !== 'AbortError') message.error(err.message); })
+.finally(() => { if (!controller.signal.aborted) setSearchingItems(false); });
+};
+
+const handleSalvar = async () => {
+if (!selectedItem) return;
+if (!baseUnit) {
+message.warning('Defina a unidade base do item (botão "Novo") antes de salvar.');
+return;
+}
+setSaving(true);
+try {
+aplicarConfig(await salvarConfigVendas(selectedItem.id_item, estadoParaPayload(unitsConfig, tierRules, purchaseCost)));
+message.success('Configuração de vendas salva.');
+} catch (err: any) {
+message.error(err.message || 'Erro ao salvar a configuração de vendas.');
+} finally {
+setSaving(false);
+}
+};
+
+// Decisão do gestor diante da defasagem: atualiza o custo gerencial e recalcula as faixas (markup mantido)
+const handleAtualizarCusto = async (novoCusto: number) => {
+if (!selectedItem) return;
+setSaving(true);
+try {
+const resp = await atualizarCustoGerencial(selectedItem.id_item, novoCusto);
+aplicarConfig(resp);
+message.success(resp.message || 'Custo atualizado.');
+} catch (err: any) {
+message.error(err.message || 'Erro ao atualizar o custo.');
+} finally {
+setSaving(false);
+}
+};
 
 const enabledUnitsForSimulation = useMemo(() => unitsConfig.filter(u => u.enabled), [unitsConfig]);
 
@@ -172,6 +258,7 @@ setFormConversionFactor(150);
 setFormRetailMarkup(1.8);
 setFormAllowWholesale(true);
 setFormEnabled(true);
+setFormGtin('');
 setIsUnitModalVisible(true);
 };
 
@@ -184,6 +271,7 @@ setFormConversionFactor(unit.conversionFactor);
 setFormRetailMarkup(unit.retailMarkup);
 setFormAllowWholesale(unit.allowWholesale);
 setFormEnabled(unit.enabled);
+setFormGtin(unit.gtin || '');
 setIsUnitModalVisible(true);
 };
 
@@ -199,13 +287,18 @@ message.error('Já existe uma unidade com esta sigla cadastrada!');
 return;
 }
 
+// A primeira unidade do item vira a base (fator 1); as demais são embalagens/frações sobre ela
+const fatorNovo = formIsBase ? 1 : formConversionFactor;
 const customUnit: SaleUnitConfig = {
 unitKey: formUnitKey.toUpperCase(),
 unitName: formUnitName,
 enabled: formEnabled,
 allowWholesale: formAllowWholesale,
-conversionFactor: formConversionFactor,
+conversionFactor: fatorNovo,
 retailMarkup: formRetailMarkup,
+isBase: formIsBase,
+gtin: formGtin,
+padraoPdv: formIsBase,
 };
 
 setUnitsConfig([...unitsConfig, customUnit]);
@@ -219,7 +312,7 @@ tierType: 'retail' as const,
 minQuantity: 0,
 maxQuantity: 'INF' as const,
 markupOrDiscount: formRetailMarkup,
-unitPrice: (purchaseCost * formConversionFactor) * formRetailMarkup,
+unitPrice: (purchaseCost * fatorNovo) * formRetailMarkup,
 }
 ];
 
@@ -232,10 +325,11 @@ if (u.unitKey === editingUnitKey) {
 return {
 ...u,
 unitName: formUnitName,
-conversionFactor: formConversionFactor,
+conversionFactor: u.isBase ? 1 : formConversionFactor,
 retailMarkup: formRetailMarkup,
 allowWholesale: formAllowWholesale,
 enabled: formEnabled,
+gtin: formGtin,
 };
 }
 return u;
@@ -246,7 +340,7 @@ if (tier.unitKey === editingUnitKey && tier.minQuantity === 0) {
 return {
 ...tier,
 markupOrDiscount: formRetailMarkup,
-unitPrice: (purchaseCost * formConversionFactor) * formRetailMarkup,
+unitPrice: (purchaseCost * (formIsBase ? 1 : formConversionFactor)) * formRetailMarkup,
 };
 }
 return tier;
@@ -258,29 +352,8 @@ message.success('Unidade atualizada com sucesso!');
 setIsUnitModalVisible(false);
 };
 
-const handleProductChange = (productId: string) => {
-const prod = productsMock.find((p) => p.id === productId);
-if (prod) {
-setSelectedProduct(prod);
-setPurchaseCost(prod.purchaseCost);
-setUnitsConfig(prod.allowedUnits);
-
-const defaultTiers: TierRuleRecord[] = prod.allowedUnits.map((u, index) => ({
-key: String(Date.now() + index),
-unitKey: u.unitKey,
-tierType: 'retail',
-minQuantity: 0,
-maxQuantity: 'INF',
-markupOrDiscount: u.retailMarkup,
-unitPrice: (prod.purchaseCost * u.conversionFactor) * u.retailMarkup,
-}));
-setTierRules(defaultTiers);
-if (prod.allowedUnits.length > 0) {
-setSimUnitKey(prod.allowedUnits[0].unitKey);
-setActiveTabKey(prod.allowedUnits[0].unitKey);
-}
-form.setFieldsValue({ baseUnit: prod.baseUnit });
-}
+const handleProductChange = (id: number) => {
+carregarItem(id);
 };
 
 const handleCostChange = (val: number | null) => {
@@ -450,13 +523,11 @@ matchedRule
 }, [simUnitKey, simQuantity, tierRules, unitsConfig]);
 
 const generatePayloadJSON = () => {
+if (!selectedItem) return '{}';
 return JSON.stringify({
-productId: selectedProduct.id,
-productName: selectedProduct.name,
-baseUnit: selectedProduct.baseUnit,
-purchaseCost: purchaseCost,
-unitsConfiguration: unitsConfig,
-chainedPricingTiers: tierRules
+id_item: selectedItem.id_item,
+sku: selectedItem.sku,
+...estadoParaPayload(unitsConfig, tierRules, purchaseCost)
 }, null, 2);
 };
 
@@ -473,24 +544,42 @@ bodyStyle={{ padding: '4px' }}
 <Col xs={24} md={8}>
 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
 <Text type="secondary" style={{ fontSize: 11, fontWeight: 500 }}>Produto /as SKU</Text>
+{modoRascunho ? (
+<div>
+<Text strong>{rascunho?.nomeItem || 'Novo item'}</Text>{' '}
+<Tag color="processing" style={{ margin: 0 }}>Rascunho: gravado na aprovação da Staging</Tag>
+</div>
+) : (
 <Select
 style={{ width: '100%' }}
 size="medium"
-value={selectedProduct.id}
+placeholder="Buscar produto por SKU ou nome..."
+value={selectedItem?.id_item}
 onChange={handleProductChange}
-options={productsMock.map((p) => ({ value: p.id, label: `${p.category}: ${p.name}` }))}
-optionFilterProp="label"
+onSearch={handleSearchItems}
+filterOption={false}
 showSearch
+disabled={Boolean(idItem)}
+loading={searchingItems || loadingConfig}
+notFoundContent={searchingItems ? <Spin size="small" /> : 'Digite ao menos 2 caracteres'}
+options={[
+...(selectedItem && !itemOptions.some(o => o.id === selectedItem.id_item)
+? [{ value: selectedItem.id_item, label: `${selectedItem.sku} · ${selectedItem.nome}` }]
+: []),
+...itemOptions.map(o => ({ value: o.id, label: `${o.sku} · ${o.name}` }))
+]}
 />
+)}
 </div>
 
 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-<Text type="secondary" style={{fontSize: 11,  fontWeight: 500 }}>Custo Base ({selectedProduct.baseUnit})</Text>
+<Text type="secondary" style={{fontSize: 11,  fontWeight: 500 }}>Custo Base ({baseLabel})</Text>
 <InputNumber
 size="medium"
 prefix={<DollarOutlined style={{ color: '#bfbfbf' }} />}
 value={purchaseCost}
-precision={2}
+precision={4}
+disabled={modoRascunho}
 onChange={handleCostChange}
 />
 </div>  
@@ -504,7 +593,7 @@ onChange={handleCostChange}
 
 <Col xs={24} sm={12} md={24}>
 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-<Text type="secondary" style={{ fontSize: 13, fontWeight: 500 }}>Custo Base ({selectedProduct.baseUnit})</Text>
+<Text type="secondary" style={{ fontSize: 13, fontWeight: 500 }}>Custo Base ({baseLabel})</Text>
 <InputNumber
 style={{ width: '100%' }}
 size="large"
@@ -518,13 +607,14 @@ onChange={handleCostChange}
 
 <Col xs={24} sm={12} md={24}>
 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-<Text type="secondary" style={{ fontSize: 13, fontWeight: 500 }}>Preço de Venda ({selectedProduct.baseUnit})</Text>
+<Text type="secondary" style={{ fontSize: 13, fontWeight: 500 }}>Preço de Venda ({baseLabel})</Text>
 <InputNumber
 style={{ width: '100%' }}
 size="large"
 prefix={<DollarOutlined style={{ color: '#52c41a' }} />}
-value={0}
+value={precoVarejoBase}
 precision={2}
+disabled
 />
 </div>
 </Col>
@@ -546,12 +636,13 @@ gap: 6
 
 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
 
-<Text type="secondary" style={{ fontSize: 11, fontWeight: 500 }}>Preço de Venda ({selectedProduct.baseUnit})</Text>
+<Text type="secondary" style={{ fontSize: 11, fontWeight: 500 }}>Preço de Venda ({baseLabel})</Text>
 <InputNumber
 size="medium"
 prefix={<DollarOutlined style={{ color: '#52c41a' }} />}
-value={0}
+value={precoVarejoBase}
 precision={2}
+disabled
 />
 </div>
 
@@ -595,7 +686,7 @@ gap: 6
 <Button size="small" icon={<CodeOutlined />} onClick={() => setIsPayloadModalVisible(true)}>
 Visualizar JSON Payload
 </Button>
-<Button type="primary" size="small" icon={<AppstoreAddOutlined />} onClick={() => message.success('Corrente comercial salva com sucesso!')}>
+<Button type="primary" size="small" icon={<AppstoreAddOutlined />} onClick={handleSalvar} loading={saving} disabled={!selectedItem || modoRascunho}>
 Salvar Configuração
 </Button>
 </Space>
@@ -611,6 +702,60 @@ Salvar Configuração
 </Row>
 </Card>
 
+{custos?.defasado && !defasagemIgnorada && (
+<Alert
+type="warning"
+showIcon
+style={{ margin: '6px 0' }}
+message={custos.custoGerencial ? 'Custo desatualizado pelas últimas entradas de NF' : 'Item sem custo gerencial definido'}
+description={
+<Space size={16} wrap style={{ fontSize: 12 }}>
+<span>Custo gerencial (preço atual): <b>{custos.custoGerencial ? formatBRL(custos.custoGerencial) : '—'}</b></span>
+{custos.ultimoCusto !== null && (
+<span>Último custo (NF): <b>{formatBRL(custos.ultimoCusto)}</b>{custos.variacaoUltimoPct !== null ? ` (${custos.variacaoUltimoPct > 0 ? '+' : ''}${custos.variacaoUltimoPct}%)` : ''}</span>
+)}
+{custos.custoMedio !== null && (
+<span>Custo médio: <b>{formatBRL(custos.custoMedio)}</b>{custos.variacaoMedioPct !== null ? ` (${custos.variacaoMedioPct > 0 ? '+' : ''}${custos.variacaoMedioPct}%)` : ''}</span>
+)}
+</Space>
+}
+action={
+<Space direction="vertical" size={4}>
+{custos.ultimoCusto !== null && (
+<Button size="small" type="primary" loading={saving} onClick={() => handleAtualizarCusto(custos.ultimoCusto as number)}>
+Usar último custo
+</Button>
+)}
+{custos.custoMedio !== null && (
+<Button size="small" loading={saving} onClick={() => handleAtualizarCusto(custos.custoMedio as number)}>
+Usar custo médio
+</Button>
+)}
+<Button size="small" type="text" onClick={() => setDefasagemIgnorada(true)}>
+Manter defasado
+</Button>
+</Space>
+}
+/>
+)}
+
+{!selectedItem && !modoRascunho ? (
+<div style={{ padding: 32, background: '#fafafa', borderRadius: 6, marginTop: 6 }}>
+<Spin spinning={loadingConfig}>
+<Empty description="Selecione um produto do catálogo para configurar unidades de venda e preços." />
+</Spin>
+</div>
+) : (
+<Spin spinning={loadingConfig}>
+{!baseUnit && (
+<Alert
+type="info"
+showIcon
+style={{ margin: '6px 0' }}
+message="Item sem unidade base"
+description='Cadastre a unidade base de estoque (ex: UN, MT, KG) pelo botão "Novo". As demais unidades (caixa, rolo...) são definidas como múltiplos dela.'
+/>
+)}
 {/* SEÇÃO PRINCIPAL */}
 <div style={{ borderRadius: 6 }}>
 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
@@ -755,7 +900,11 @@ Editar Parâmetros
 </table>
 </div>
 
-<Tag color="blue" style={{ margin: 0, padding: '2px 8px' }}>Margem: {activeUnitDef.margin ?? '54.5%'}</Tag>
+<Tag color="blue" style={{ margin: 0, padding: '2px 8px' }}>Margem: {(() => {
+const custoUnidade = purchaseCost * activeUnitDef.conversionFactor;
+const precoVarejo = tierRules.find(t => t.unitKey === activeUnitDef.unitKey)?.unitPrice ?? 0;
+return precoVarejo > 0 ? `${(((precoVarejo - custoUnidade) / precoVarejo) * 100).toFixed(1)}%` : '—';
+})()}</Tag>
 <Tag color="green" style={{ margin: 0, padding: '2px 8px' }}>Varejo ({activeUnitDef.unitKey}): R$ {((tierRules.find(t => t.unitKey === activeUnitDef.unitKey)?.unitPrice) ?? 0).toFixed(2)}</Tag>
 </Space>
 </div>
@@ -972,11 +1121,11 @@ transition: 'all 0.3s'
 </Col>
 </Row>
 </div>
-
-
+</Spin>
+)}
 
 <Modal
-title={modalMode === 'create' ? 'Adicionar Fracionamento' : `Editar Unidade: ${formUnitKey}`}
+title={modalMode === 'create' ? (formIsBase ? 'Definir Unidade Base' : 'Adicionar Fracionamento') : `Editar Unidade: ${formUnitKey}`}
 open={isUnitModalVisible}
 onOk={handleSaveUnit}
 onCancel={() => setIsUnitModalVisible(false)}
@@ -1011,13 +1160,25 @@ onChange={(e) => setFormUnitName(e.target.value)}
 />
 </div>
 <div>
-<Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>Fator de Conversão para Base:</Text>
+<Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
+{formIsBase ? 'Unidade base de estoque (fator fixo 1):' : `Fator de Conversão (1 ${formUnitKey || 'unidade'} = X ${baseLabel}):`}
+</Text>
 <InputNumber
 style={{ width: '100%' }}
 min={0.001}
 step={1}
-value={formConversionFactor}
+value={formIsBase ? 1 : formConversionFactor}
+disabled={formIsBase || (modoRascunho && formUnitKey === rascunho?.unidadeCompra.toUpperCase())}
 onChange={(v) => setFormConversionFactor(v ?? 1)}
+/>
+</div>
+<div>
+<Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>GTIN / Código de barras desta embalagem (opcional):</Text>
+<Input
+placeholder="Ex: 7891020304050"
+value={formGtin}
+maxLength={14}
+onChange={(e) => setFormGtin(e.target.value.replace(/\D/g, ''))}
 />
 </div>
 <div>
