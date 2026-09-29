@@ -1,1325 +1,1560 @@
 // FamilyManager.tsx
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import {
-  TreeSelect,
-  Input,
-  Row,
-  Col,
-  Card,
-  Typography,
-  Space,
-  Button,
-  Alert,
-  Tooltip,
-  Table,
-  Tag,
-  Empty,
-  Badge,
-  Form,
-  Modal,
+Input,
+Row,
+Col,
+Card,
+Typography,
+Space,
+Button,
+Alert,
+Tooltip,
+Table,
+Tag,
+Empty,
+Badge,
+Form,
+Modal,
+Radio,
+Divider,
+List,
 } from "antd";
 import {
-  EditOutlined,
-  PlusOutlined,
-  FolderOpenOutlined,
-  ShoppingCartOutlined,
-  SearchOutlined,
-  ThunderboltOutlined,
-  InfoCircleOutlined,
-  DeleteOutlined,
-  SettingOutlined,
+PlusOutlined,
+ThunderboltOutlined,
+InfoCircleOutlined,
+DeleteOutlined,
+AppstoreOutlined,
+FileTextOutlined,
+TagOutlined,  
+UndoOutlined,
+SaveOutlined,
+CheckCircleOutlined,
+ExclamationCircleOutlined,
 } from "@ant-design/icons";
 import Swal from "sweetalert2";
+
+import { updateFamilia } from './FamilyManager.api'; // Ajuste o caminho do import conforme seu projeto
 
 // Hook desacoplado
 import { useCatalogState } from "./useCatalogState";
 
 // Importações dos helpers
 import {
-  gerarPreviewSku,
-  gerarPreviewNome,
-  construirArvoreAntd,
+gerarPreviewSku,
+gerarPreviewNome,
+construirArvoreAntd,
 } from "./CatalogManager.helpers";
 
 // Componentes externos
 import { PainelSimulador } from "./components/PainelSimulador";
 import { ModalVinculoAtributos } from "./components/ModalVinculoAtributos";
-import ImageDisplay from "../../../../components/ui/ImageGallery/ImageDysplay";
 import { ImportarFamiliaModal } from "./ImportarFamiliaModal";
 import { AttributeGuideModal } from "./guide/AttributeGuideModal";
 import { FamiliaIdentidadeCard } from "./FamiliaIdentidadeCard";
+import ListaFamiliasAtivas from "./ListaFamiliasAtivas";
+import ItensFamiliaCard from "./ItensFamiliaCard";
+import { AtributosCard } from "./AtributosCard";
+import Paragraph from "antd/es/typography/Paragraph";
 
 const { Title, Text } = Typography;
 
 export const FamilyManager: React.FC = () => {
-  // Instância do formulário do Ant Design para o Modal de Pendências
-  const [formPendencia] = Form.useForm();
+// Instância do formulário do Ant Design para o Modal de Pendências
+const [formPendencia] = Form.useForm();
 
-  const {
-    grupoSelecionado,
-    atributosGlobaisDisponiveis,
-    categorias,
-    previewSkuSimulado,
-    previewNomeSimulado,
-    grupoImage,
-    loading,
-    error,
-    isModalAberto,
-    setIsModalAberto,
-    handleSelecionarGrupo,
-    handleCriarGrupo,
-    handleSalvarGrupoNoBanco,
-    handleAbrirModal,
-    handleAdicionarAtributoAoGrupo,
-    tabelaAlvoModal,
-    brandColor,
-    itensFiltradosDoGrupo,
-    pesquisaItem,
-    setPesquisaItem,
-    familiasFiltradas,
-    pesquisaFamilia,
-    setPesquisaFamilia,
-    familiasAgrupadas,
-    categoriaFiltroId,
-    setCategoriaFiltroId,
-    setIsImportModalOpen,
-    isImportModalOpen,
-    isModalOpen,
-    setIsModalOpen,
-    guideTab,
-    handleCloseGuideModal,
-    valoresTeste,
-    onMudancaValorTeste,
-    onAtualizarTemplateComercial,
-    onAtualizarTemplateSku,
-    onAtualizarSiglaSku,
-    onAtualizarSeparadorSku,
-    onAtualizarOrdemSku,
-    itensDaFamilia,
-    carregandoItens,
-    setItensDaFamilia,
-    setGrupoSelecionadoId,
-    handlePadronizarNomesFamilia,
-    handlePadronizarSkusFamilia,
-    isModalPendenciaOpen,
-    setIsModalPendenciaOpen,
-    atributosPendentes,
-    // Funções e estados de normalização individual adicionados aqui:
-    handleTentarNormalizarIndividual,
-    handleNormalizarItemSku,
-    handleNormalizarItemNome,
-    handleSalvarAtributosPendentes,
-    handleEditarAtributosItem,
-    handleAtualizarAtributoItemEditado,
-    handleSalvarAtributosItem,
-    isModalAtributosItemOpen,
-    setIsModalAtributosItemOpen,
-    itemEmEdicaoAtributos,
-    itemEmEdicaoPendencia,
-    modalFormalizacaoAberto,
-    setModalFormalizacaoAberto,
-    itensPendentesFormalizacao,
-    setItensPendentesFormalizacao,
-    handleProcessarFormalizacaoLote,
-    handleAtualizarAtributoItemPendente,
-    handleSalvarEContinuarFormalizacao,
-  } = useCatalogState();
+const catalogState = useCatalogState();
+const [isModalRevisaoOpen, setIsModalRevisaoOpen] = useState<boolean>(false);
 
-  const dadosArvoreAntd = useMemo(() => {
-    return construirArvoreAntd(categorias);
-  }, [categorias]);
+// 🛡️ ESTADO LOCAL INDEPENDENTE (Garante autonomia total à página)
+const [familiaSelecionadaLocal, setFamiliaSelecionadaLocal] = useState<any>(null);
+const [familiaOriginal, setFamiliaOriginal] = useState<any>(null);
+const [temAlteracoes, setTemAlteracoes] = useState<boolean>(false);
+const snapshotRef = useRef<string>("");
+const isFamilyCompliant = true
 
+const {
+grupoSelecionado: familiaSelecionadaHook,
+setGrupoSelecionado: setFamiliaSelecionadaHook,
+atributosGlobaisDisponiveis,
+categorias,
+previewSkuSimulado,
+previewNomeSimulado,
+grupoImage,
+loading,
+error,
+isModalAberto,
+setIsModalAberto,
+handleSelecionarGrupo: handleSelecionarFamilia,
+handleCriarGrupo: handleCriarFamilia,
+handleAbrirModal,
+handleAdicionarAtributoAoGrupo: handleAdicionarAtributoÀFamilia,
+tabelaAlvoModal,
+brandColor,
+itensFiltradosDoGrupo: itensFiltradosDaFamilia,
+pesquisaItem,
+setPesquisaItem,
+familiasFiltradas,
+pesquisaFamilia,
+setPesquisaFamilia,
+familiasAgrupadas,
+categoriaFiltroId,
+setCategoriaFiltroId,
+setIsImportModalOpen,
+isImportModalOpen,
+isModalOpen,
+setIsModalOpen,
+guideTab,
+handleCloseGuideModal,
+valoresTeste,
+onMudancaValorTeste,
+onAtualizarTemplateComercial,
+onAtualizarTemplateSku,
+onAtualizarSiglaSku,
+onAtualizarSeparadorSku,
+onAtualizarOrdemSku,
+itensDaFamilia,
+carregandoItens,
+setGrupoSelecionadoId: setFamiliaSelecionadaId,
+handlePadronizarNomesFamilia,
+handlePadronizarSkusFamilia,
+isModalPendenciaOpen,
+setIsModalPendenciaOpen,
+atributosPendentes,
+handleTentarNormalizarIndividual,
+handleNormalizarItemSku,
+handleNormalizarItemNome,
+handleSalvarAtributosPendentes,
+handleEditarAtributosItem,
+handleAtualizarAtributoItemEditado,
+handleSalvarAtributosItem,
+isModalAtributosItemOpen,
+setIsModalAtributosItemOpen,
+itemEmEdicaoAtributos,
+itemEmEdicaoPendencia,
+modalFormalizacaoAberto,
+setModalFormalizacaoAberto,
+itensPendentesFormalizacao,
+handleProcessarFormalizacaoLote,
+handleAtualizarAtributoItemPendente,
+handleSalvarEContinuarFormalizacao,
+marcaComportamento,
+setMarcaComportamento,
+atributosComMarcaInjetada, // <--- Adicione esta linha na desestruturação
+handleAtualizarIdentidadeFamilia,
+handleNovaFamiliaImportada 
+} = catalogState;
+
+// Sincroniza os dados que vêm de fora para o estado local independente
+useEffect(() => {
+if (familiaSelecionadaHook) {
+setFamiliaSelecionadaLocal(familiaSelecionadaHook);
+}
+}, [familiaSelecionadaHook]);
+
+// Função centralizada e segura para atualizar a família selecionada
+const setFamiliaSelecionada = (updater: any) => {
+if (typeof setFamiliaSelecionadaLocal === 'function') {
+setFamiliaSelecionadaLocal(updater);
+}
+if (typeof setFamiliaSelecionadaHook === 'function') {
+setFamiliaSelecionadaHook(updater);
+}
+};
+
+// Função para mapear campos alterados de forma legível
+const calcularAlteracoesPendentes = () => {
+if (!familiaOriginal || !familiaSelecionadaLocal) return [];
+
+const alteracoes: { campo: string; antes: any; depois: any; chave: string }[] = [];
+
+// Mapeamento de chaves técnicas para nomes amigáveis na UI
+const labelsCampos: Record<string, string> = {
+nome: "Nome da Família",
+codigo: "Código da Família",
+categoriaId: "Categoria",
+templateNomeComercial: "Template Comercial (Nome)",
+templateSku: "Template de SKU",
+siglaSku: "Sigla do SKU",
+separadorSku: "Separador de SKU",
+imagem: "Imagem da Família",
+ordemSku: "Ordem de SKU",
+marcaComportamento: "Comportamento da Marca",
+unidadeBase: "Unidade Base",
+tipoItem: "Tipo SPED",
+ncmPadrao: "NCM Padrão",
+cestPadrao: "CEST Padrão",
+margemMinima: "Margem Mínima",
+margemMaxima: "Margem Máxima",
+markupPadrao: "Markup Padrão",
+estoqueMinimo: "Estoque Mínimo",
+loteMinimo: "Lote Mínimo",
+curvaAbc: "Curva ABC",
+comportamentoMarca: "Comportamento da Marca (Identidade)",
+prioridadeExposicao: "Prioridade de Exposição",
+};
+
+// Compara campos diretos da família
+const chavesParaComparar = Object.keys(labelsCampos);
+chavesParaComparar.forEach((chave) => {
+const valorOriginal = familiaOriginal[chave];
+const valorAtual = chave === 'marcaComportamento' ? marcaComportamento : familiaSelecionadaLocal[chave];
+
+if (valorOriginal !== valorAtual) {
+alteracoes.push({
+chave,
+campo: labelsCampos[chave] || chave,
+antes: valorOriginal ?? "(vazio)",
+depois: valorAtual ?? "(vazio)",
+});
+}
+});
+
+// Compara atributos de forma inteligente e detalhada
+const attrsOriginais = familiaOriginal.atributos || [];
+const attrsAtuais = familiaSelecionadaLocal.atributos || [];
+
+
+
+
+// Compara se houve alteração na quantidade ou nos itens da lista
+if (JSON.stringify(attrsOriginais) !== JSON.stringify(attrsAtuais)) {
+const idsOriginais = attrsOriginais.map((a: any) => String(a.id));
+const idsAtuais = attrsAtuais.map((a: any) => String(a.id));
+
+// Identifica por ID ou Nome os adicionados e removidos
+const adicionados = attrsAtuais.filter((a: any) => !idsOriginais.includes(String(a.id)));
+const removidos = attrsOriginais.filter((a: any) => !idsAtuais.includes(String(a.id)));
+
+// Se houve adição de novos atributos
+adicionados.forEach((attr: any) => {
+alteracoes.push({
+chave: `atributo_adicionado_${attr.id}`,
+campo: `Atributo Adicionado`,
+antes: `—`,
+depois: `"${attr.nome}" (${attr.classificacao || 'ficha'} - ${attr.origem || 'local'})`,
+});
+});
+
+// Se houve remoção de atributos
+removidos.forEach((attr: any) => {
+alteracoes.push({
+chave: `atributo_removido_${attr.id}`,
+campo: `Atributo Removido`,
+antes: `"${attr.nome}"`,
+depois: `—`,
+});
+});
+
+// Verifica modificações internas em atributos que já existiam em ambos
+attrsAtuais.forEach((attrAtual: any) => {
+const attrOriginal = attrsOriginais.find((a: any) => String(a.id) === String(attrAtual.id));
+
+if (attrOriginal && JSON.stringify(attrOriginal) !== JSON.stringify(attrAtual)) {
+// Se mudou a classificação (ex: ficha para grade)
+if (attrOriginal.classificacao !== attrAtual.classificacao) {
+alteracoes.push({
+chave: `atributo_classificacao_${attrAtual.id}`,
+campo: `Atributo: ${attrAtual.nome} (Classificação)`,
+antes: attrOriginal.classificacao,
+depois: attrAtual.classificacao,
+});
+}
+// Se mudou obrigatoriedade, sufixo ou outras configs importantes
+if (attrOriginal.obrigatorio !== attrAtual.obrigatorio) {
+alteracoes.push({
+chave: `atributo_obrigatorio_${attrAtual.id}`,
+campo: `Atributo: ${attrAtual.nome} (Obrigatório)`,
+antes: attrOriginal.obrigatorio ? 'Sim' : 'Não',
+depois: attrAtual.obrigatorio ? 'Sim' : 'Não',
+});
+}
+}
+});
+}
+
+return alteracoes;
+};
+
+// Sempre que a família selecionada mudar de fato ou for recarregada, atualizamos a snapshot de referência original
+useEffect(() => {
+if (familiaSelecionadaLocal) {
+const snapshot = JSON.stringify({
+...familiaSelecionadaLocal,
+marcaComportamento,
+});
+// Apenas atualiza a origem se mudou de família (ID diferente)
+if (!familiaOriginal || familiaOriginal.id !== familiaSelecionadaLocal.id) {
+setFamiliaOriginal(familiaSelecionadaLocal);
+snapshotRef.current = snapshot;
+setTemAlteracoes(false);
+} else {
+// Se for a mesma família, checa se houve alteração comparando com o snapshot atual
+const atualString = JSON.stringify({
+...familiaSelecionadaLocal,
+marcaComportamento,
+});
+setTemAlteracoes(atualString !== snapshotRef.current);
+}
+} else {
+setFamiliaOriginal(null);
+setTemAlteracoes(false);
+}
+}, [familiaSelecionadaLocal, marcaComportamento]);
+
+// Função para desfazer alterações e retornar ao estado original salvo
+const handleDesfazerAlteracoes = () => {
+if (familiaOriginal) {
+setIsModalRevisaoOpen(true);
+}
+};
+
+// Função para confirmar o reset global pelo modal
+const confirmarDesfazerTudo = () => {
+Swal.fire({
+title: "Desfazer todas as alterações?",
+text: "Todas as modificações não salvas nesta família serão descartadas.",
+icon: "warning",
+showCancelButton: true,
+confirmButtonColor: "#d33",
+cancelButtonColor: "#64748b",
+confirmButtonText: "Sim, desfazer tudo!",
+cancelButtonText: "Cancelar",
+}).then((result) => {
+if (result.isConfirmed && familiaOriginal) {
+setFamiliaSelecionada(JSON.parse(JSON.stringify(familiaOriginal)));
+
+if (familiaOriginal.marcaComportamento && typeof setMarcaComportamento === 'function') {
+setMarcaComportamento(familiaOriginal.marcaComportamento);
+}
+
+snapshotRef.current = JSON.stringify({
+...familiaOriginal,
+marcaComportamento: familiaOriginal.marcaComportamento,
+});
+
+setTemAlteracoes(false);
+setIsModalRevisaoOpen(false);
+
+Swal.fire({
+title: "Desfeito!",
+text: "Família revertida para o último estado salvo.",
+icon: "success",
+timer: 1500,
+showConfirmButton: false,
+});
+}
+});
+};
+
+// Wrapper para salvar que envia para o banco e limpa o estado de "sujo" (temAlteracoes = false)
+// Wrapper para salvar que envia para o banco e limpa o estado de "sujo" (temAlteracoes = false)
+const handleSalvarFamiliaNoBanco = async () => {
+if (!familiaSelecionadaLocal?.id) {
+Swal.fire("Atenção", "Nenhuma família selecionada para salvar.", "warning");
+return;
+}
+
+try {
+// 1. Prepara o payload completo mapeando todos os campos editáveis da família
+const payloadAtualizacao = {
+nome: familiaSelecionadaLocal.nome,
+descricao: familiaSelecionadaLocal.descricao,
+status: familiaSelecionadaLocal.status,
+// 🛠️ Ajustado para garantir que a categoria seja enviada corretamente para o backend
+categoriaPai: familiaSelecionadaLocal.categoriaId || familiaSelecionadaLocal.categoria_id,
+idMarca: familiaSelecionadaLocal.idMarca || familiaSelecionadaLocal.id_marca,
+comportamentoMarca: marcaComportamento, // Salva o comportamento atual injetado
+
+// Dados fiscais e sped
+ncmPadrao: familiaSelecionadaLocal.ncmPadrao,
+cestPadrao: familiaSelecionadaLocal.cestPadrao,
+tipoItem: familiaSelecionadaLocal.tipoItem,
+unidadeMedidaBase: familiaSelecionadaLocal.unidadeMedidaBase || familiaSelecionadaLocal.unidadeBase,
+
+// Templates de SKU e Nomes
+templateNomeComercial: familiaSelecionadaLocal.templateNomeComercial || familiaSelecionadaLocal.template_nome,
+templateSku: familiaSelecionadaLocal.templateSku || familiaSelecionadaLocal.template_sku,
+siglaSku: familiaSelecionadaLocal.siglaSku || familiaSelecionadaLocal.sigla_sku,
+separadorSku: familiaSelecionadaLocal.separadorSku || familiaSelecionadaLocal.separador_sku,
+
+// Identidade visual e extras
+cor: familiaSelecionadaLocal.cor,
+imagem: familiaSelecionadaLocal.imagem,
+
+// Atributos relacionais
+atributos: familiaSelecionadaLocal.atributos || [], 
+};
+
+const tenantId = 1; 
+
+// 2. Chama a API real de atualização
+await updateFamilia(String(familiaSelecionadaLocal.id), payloadAtualizacao, tenantId);
+
+// 3. Se houver função de salvamento vinda do hook, executa também
+if (typeof hookSalvarFamilia === 'function') {
+await hookSalvarFamilia();
+}
+
+// 4. Atualiza o snapshot de referência original com o estado atual salvo
+const novoSnapshot = JSON.stringify({
+...familiaSelecionadaLocal,
+marcaComportamento,
+});
+
+snapshotRef.current = novoSnapshot;
+setFamiliaOriginal(JSON.parse(JSON.stringify(familiaSelecionadaLocal)));
+setTemAlteracoes(false);
+
+// 5. Feedback visual de sucesso
+Swal.fire({
+title: "Sucesso!",
+text: "Família salva e sincronizada com o banco de dados.",
+icon: "success",
+timer: 1500,
+showConfirmButton: false,
+});
+
+} catch (error: any) {
+console.error("Erro ao salvar família no banco:", error);
+Swal.fire({
+title: "Erro ao salvar",
+text: error.response?.data?.error || error.message || "Não foi possível persistir as alterações.",
+icon: "error",
+});
+}
+};
+
+const dadosArvoreAntd = useMemo(() => {
+return construirArvoreAntd(categorias);
+}, [categorias]);
+
+// 🛡️ Mantém os atributos puros isolados para as tabelas visuais
+  const atributosPuros = useMemo(() => {
+    const lista = familiaSelecionadaLocal?.atributos || [];
+    return lista.filter((attr: any) => attr.codigo !== 'MARCA' && attr.nome?.toLowerCase() !== 'marca');
+  }, [familiaSelecionadaLocal?.atributos]);
+
+  // ✅ As tabelas mostram estritamente os atributos puros, sem injetar a marca visualmente
   const atributosDNA = useMemo(() => {
-    return grupoSelecionado
-      ? grupoSelecionado.atributos.filter((attr) => attr.classificacao === "dna")
-      : [];
-  }, [grupoSelecionado]);
+    return atributosPuros.filter((attr: any) => (attr.classificacao || attr.escopo_padrao) === "dna");
+  }, [atributosPuros]);
 
   const atributosVariacao = useMemo(() => {
-    return grupoSelecionado
-      ? grupoSelecionado.atributos.filter((attr) => attr.classificacao === "grade")
-      : [];
-  }, [grupoSelecionado]);
+    return atributosPuros.filter((attr: any) => (attr.classificacao || attr.escopo_padrao) === "grade");
+  }, [atributosPuros]);
 
   const atributosFichaTecnica = useMemo(() => {
-    return grupoSelecionado
-      ? grupoSelecionado.atributos.filter((attr) => attr.classificacao === "ficha")
-      : [];
-  }, [grupoSelecionado]);
+    return atributosPuros.filter((attr: any) => (attr.classificacao || attr.escopo_padrao) === "ficha");
+  }, [atributosPuros]);
 
-  const handleNovaFamiliaImportada = (novaFamilia: any) => {
-    if (novaFamilia?.id) {
-      setGrupoSelecionadoId(novaFamilia.id);
-    }
-  };
+// 🏷️ Cria o objeto virtual fixo da Marca
+const atributoMarcaVirtual = useMemo(() => ({
+id: 'atributo-marca-virtual',
+nome: 'Marca',
+codigo: 'MARCA',
+classificacao: marcaComportamento || 'ficha',
+origem: 'sistema',
+bloqueado: true,
+isMarcaSistema: true,
+}), [marcaComportamento]);
 
-  const handleExcluirAtributo = (tipo: string, record: any) => {
-    Swal.fire({
-      title: "Excluir Atributo?",
-      text: `Deseja remover o atributo "${record.nome}"?`,
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#d33",
-      cancelButtonColor: "#637381",
-      confirmButtonText: "Sim, excluir!",
-    }).then((result) => {
-      if (result.isConfirmed) {
-        Swal.fire("Excluído!", "Atributo removido com sucesso.", "success");
+
+
+
+
+
+const handleExcluirAtributo = (tipo: string, record: any) => {
+// 🛡️ Verifica se existem itens na família e se algum deles possui valor preenchido para este atributo
+const itensComValor = (itensDaFamilia || []).filter((item: any) => {
+const valor = item.valoresAtributos?.[record.id] || item.valoresAtributos?.[record.nome];
+return valor !== undefined && valor !== null && String(valor).trim() !== "";
+});
+
+if (itensComValor.length > 0) {
+// ❌ Bloqueia a exclusão e orienta a movimentação
+Swal.fire({
+title: "Ação Bloqueada!",
+html: `O atributo <b>"${record.nome}"</b> possui valores preenchidos em <b>${itensComValor.length}</b> item(ns).<br><br>Por segurança, atributos com valores atribuídos não podem ser apagados, apenas <b>movidos</b> de categoria (ex: de Ficha para DNA/Grade).`,
+icon: "warning",
+confirmButtonText: "Entendido",
+confirmButtonColor: brandColor || "#1677ff",
+});
+return;
+}
+
+// ✅ Se nenhum item possui valor, prossegue com a remoção normal da lista local
+Swal.fire({
+title: "Excluir Atributo?",
+text: `Deseja remover o atributo "${record.nome}"?`,
+icon: "warning",
+showCancelButton: true,
+confirmButtonColor: "#d33",
+cancelButtonColor: "#637381",
+confirmButtonText: "Sim, excluir!",
+cancelButtonText: "Cancelar",
+}).then((result) => {
+if (result.isConfirmed) {
+if (typeof setFamiliaSelecionada === 'function') {
+setFamiliaSelecionada((prev: any) => ({
+...prev,
+atributos: (prev.atributos || []).filter((a: any) => String(a.id) !== String(record.id)),
+}));
+}
+
+Swal.fire({
+title: "Excluído!",
+text: "Atributo removido com sucesso.",
+icon: "success",
+timer: 1500,
+showConfirmButton: false,
+});
+}
+});
+};
+
+
+
+return (
+<div
+style={{
+backgroundColor: "#f8fafc",
+padding: "4px 6px",
+fontFamily:
+'-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+}}
+>
+{/* Header unificado estilo SaaS */}
+<Card
+bordered={false}
+style={{
+marginBottom: 6,
+borderRadius: 6,
+boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)",
+}}
+>
+<Row align="middle" justify="space-between" gutter={[2, 2]}>
+<Col span={4}>
+<Space direction="vertical" >
+<Tooltip
+title={
+<Space >
+<Badge status={loading ? "processing" : "success"} />
+<Text type="secondary" style={{ fontSize: "12px" }}>
+{loading
+? "Sincronizando com o banco..."
+: temAlteracoes
+? "Existem alterações pendentes não salvas"
+: "Banco de dados sincronizado e pronto"}
+</Text>
+</Space>
+}
+>
+<Title
+level={3}
+style={{ margin: 0, fontWeight: 600, letterSpacing: "-0.08em" }}
+>
+Gerenciamento de Família PIM
+</Title>
+</Tooltip>
+</Space>
+<Space  style={{ marginTop: 4 }}>
+{/* <Tag color="processing">
+Família: {familiaSelecionadaLocal?.nome || "Nenhuma"}
+</Tag> */}
+{temAlteracoes && (
+<Tag color="warning" icon={<InfoCircleOutlined />}>
+Alterações não salvas
+</Tag>
+)}
+</Space>
+</Col>
+
+<Col span={12}>
+ {/* 0. verificações */}
+  {!isFamilyCompliant ? (
+    <Card 
+      style={{ backgroundColor: '#fff2f0', borderColor: '#ffccc7', marginBottom: 4   }}
+      size='small'
+      title={
+        <Space>
+          <ExclamationCircleOutlined style={{ color: '#ff4d4f', fontSize: 20 }} />
+          <span style={{ color: '#cf1322', fontWeight: 'bold' }}>
+            Família Bloqueada por Inconsistência Cadastral
+          </span>
+        </Space>
       }
-    });
-  };
-
-  return (
-    <div
-      style={{
-        backgroundColor: "#f8fafc",
-        padding: "8px 12px",
-        fontFamily:
-          '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-      }}
     >
-      {/* Header unificado estilo SaaS */}
-      <Card
-        bordered={false}
-        style={{
-          marginBottom: 8,
-          borderRadius: 10,
-          boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)",
-        }}
-      >
-        <Row align="middle" justify="space-between" gutter={[8, 8]}>
-          <Col>
-            <Space direction="vertical" size={1}>
-              <Tooltip
-                title={
-                  <Space size={8}>
-                    <Badge status={loading ? "processing" : "success"} />
-                    <Text type="secondary" style={{ fontSize: "13px" }}>
-                      {loading
-                        ? "Sincronizando com o banco..."
-                        : "Banco de dados sincronizado e pronto"}
-                    </Text>
-                  </Space>
-                }
-              >
-                <Title
-                  level={3}
-                  style={{ margin: 0, fontWeight: 760, letterSpacing: "-0.02em" }}
-                >
-                  Gerenciamento de Família PIM
-                </Title>
-              </Tooltip>
+      <Paragraph>
+        Esta família de itens foi temporariamente <strong>bloqueada e retirada de publicação</strong> nos canais de venda (Marketplaces e E-commerce) porque a sua estrutura atual violou as regras de governança e integridade do PIM.
+      </Paragraph>
+      <Divider style={{ margin: '12px 0' }} />
+      <Title level={5} style={{ color: '#cf1322', marginBottom: 8 }}>
+        Pendências que precisam ser resolvidas para desbloquear a família:
+      </Title>
+      {/* <List
+        size="small"
+        dataSource={complianceErrors}
+        renderItem={(item) => (
+          <List.Item>
+            <Space>
+              <Badge status="error" />
+              <Text type="danger">{item}</Text>
             </Space>
-            <Tag color="processing" style={{ marginTop: 4 }}>
-              Família: {grupoSelecionado?.nome || "Nenhuma"}
-            </Tag>
-          </Col>
-
-          <Col>
-            <Space size={8}>
-              <Button
-                type="primary"
-                ghost
-                onClick={() => setIsImportModalOpen(true)}
-                style={{ fontWeight: 600 }}
-              >
-                ✨ Importar Família por IA
-              </Button>
-
-              <Button type="default" onClick={handlePadronizarNomesFamilia}>
-                Padronizar Nomes da Família
-              </Button>
-
-              <Button type="default" onClick={handlePadronizarSkusFamilia}>
-                Padronizar SKUs da Família
-              </Button>
-            </Space>
-          </Col>
-
-          <Col>
-            <Space size={12}>
-              <Button
-                type="default"
-                size="large"
-                onClick={handleCriarGrupo}
-                loading={loading}
-                icon={<PlusOutlined />}
-                style={{ borderRadius: 8, fontWeight: 500 }}
-              >
-                Nova Família
-              </Button>
-              {grupoSelecionado && (
-                <Button
-                  type="primary"
-                  size="large"
-                  onClick={handleSalvarGrupoNoBanco}
-                  loading={loading}
-                  style={{
-                    backgroundColor: brandColor,
-                    borderColor: brandColor,
-                    borderRadius: 8,
-                    fontWeight: 500,
-                  }}
-                >
-                  Salvar Alterações
-                </Button>
-              )}
-            </Space>
-          </Col>
-        </Row>
-      </Card>
-
-      {error && (
-        <Alert
-          type="error"
-          showIcon
-          message="Falha de Sincronização"
-          description={error}
-          style={{ marginBottom: 24, borderRadius: 8 }}
-          action={
-            <Button size="small" danger onClick={() => window.location.reload()}>
-              Recarregar
-            </Button>
-          }
-        />
-      )}
-
-      <Row gutter={[12, 12]}>
-        {/* Coluna 1: Famílias Ativas */}
-        <Col xs={24} md={6} lg={4}>
-          <Card
-            title={
-              <Space size={8}>
-                <FolderOpenOutlined style={{ color: brandColor }} />
-                <span style={{ fontWeight: 700, fontSize: "14px" }}>
-                  Famílias Ativas
-                </span>
-              </Space>
-            }
-            style={{
-              borderRadius: 12,
-              boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)",
-            }}
-            styles={{
-              header: { borderBottom: "1px solid #f1f5f9" },
-              body: { padding: "12px" },
-            }}
-          >
-            <Space direction="vertical" size={12} style={{ width: "100%" }}>
-              <div style={{ width: "100%" }}>
-                <span
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: 600,
-                    color: "#64748b",
-                    display: "block",
-                    marginBottom: "4px",
-                  }}
-                >
-                  Filtrar por Categoria:
-                </span>
-                <TreeSelect
-                  style={{ width: "100%" }}
-                  value={categoriaFiltroId}
-                  onChange={(val) => setCategoriaFiltroId(val)}
-                  treeData={[
-                    { value: "TODAS", title: "📂 Todas as Categorias" },
-                    ...(dadosArvoreAntd || []),
-                  ]}
-                  placeholder="Selecionar Categoria..."
-                  treeDefaultExpandAll={false}
-                  allowClear
-                  showSearch
-                  treeNodeFilterProp="title"
-                />
-              </div>
-
-              <Input.Search
-                placeholder="Buscar família..."
-                value={pesquisaFamilia}
-                onChange={(e) => setPesquisaFamilia(e.target.value)}
-                allowClear
-                enterButton={false}
-                style={{ borderRadius: 6 }}
-              />
-
-              <hr
-                style={{
-                  border: "none",
-                  borderTop: "1px solid #f1f5f9",
-                  margin: "4px 0",
-                }}
-              />
-
-              <div
-                style={{
-                  maxHeight: "380px",
-                  overflowY: "auto",
-                  paddingRight: "4px",
-                }}
-              >
-                {familiasFiltradas.length > 0 ? (
-                  <Space direction="vertical" size={16} style={{ width: "100%" }}>
-                    {Object.entries(familiasAgrupadas).map(
-                      ([categoria, listaFamilias]) => (
-                        <div key={categoria}>
-                          <div
-                            style={{
-                              fontSize: "10px",
-                              fontWeight: 700,
-                              color: "#94a3b8",
-                              textTransform: "uppercase",
-                              marginBottom: "6px",
-                              letterSpacing: "0.5px",
-                            }}
-                          >
-                            {categoria} ({listaFamilias.length})
-                          </div>
-
-                          <Space
-                            direction="vertical"
-                            size={6}
-                            style={{ width: "100%" }}
-                          >
-                            {listaFamilias.map((fam) => {
-                              const estaSelecionado = fam.id === grupoSelecionado?.id;
-                              return (
-                                <div
-                                  key={fam.id} // <--- A chave DEVE ficar aqui no elemento raiz do loop
-                                  onClick={() => handleSelecionarGrupo(fam.id)}
-                                  style={{
-                                    padding: "10px 12px",
-                                    backgroundColor: estaSelecionado ? "#f0f7ff" : "#f8fafc",
-                                    borderRadius: "8px",
-                                    border: estaSelecionado ? `1px solid ${brandColor}` : "1px solid #e2e8f0",
-                                    cursor: "pointer",
-                                    transition: "all 0.2s",
-                                  }}
-                                >
-                                 <span style={{ fontWeight: 600, fontSize: "12px", color: "#1e293b", display: "block" }}>
-    {fam.nome}
-  </span>
-  {fam.codigo && (
-    <span style={{ fontSize: "10px", color: "#64748b", fontFamily: "monospace" }}>
-      Código: {fam.codigo}
-    </span>
-  )}
-                                </div>
-                              );
-                            })}
-                          </Space>
-                        </div>
-                      ),
-                    )}
-                  </Space>
-                ) : (
-                  <Empty
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                    description={
-                      <span style={{ fontSize: "12px" }}>
-                        Nenhuma família encontrada
-                      </span>
-                    }
-                  />
-                )}
-              </div>
-
-              <Button
-                type="dashed"
-                block
-                icon={<PlusOutlined />}
-                style={{
-                  borderColor: brandColor,
-                  color: brandColor,
-                  borderRadius: 8,
-                  marginTop: "4px",
-                }}
-                onClick={handleCriarGrupo}
-              >
-                Nova Família
-              </Button>
-            </Space>
-          </Card>
-        </Col>
-
-        {/* Coluna 2: Configuração Central */}
-        <Col xs={24} md={18} lg={15}>
-          {grupoSelecionado ? (
-            <Space direction="vertical" size={8} style={{ width: "100%" }}>
-              <Row gutter={[8, 8]}>
-                {/* 1. Identidade da Família */}
-                <Col xs={24} lg={10}>
-                  <FamiliaIdentidadeCard 
-    grupoSelecionado={grupoSelecionado}
-    grupoImage={grupoImage}
-    brandColor={brandColor}
-    handleAbrirModal={handleAbrirModal}
-  />
-                </Col>
-
-                {/* 2. Painel do Simulador Unificado */}
-                <Col xs={24} lg={14}>
-                  <PainelSimulador
-                    familiaSelecionada={grupoSelecionado}
-                    valoresTeste={valoresTeste}
-                    onMudancaValorTeste={onMudancaValorTeste}
-                    onAtualizarTemplateComercial={onAtualizarTemplateComercial}
-                    onAtualizarTemplateSku={onAtualizarTemplateSku}
-                    onAtualizarSiglaSku={onAtualizarSiglaSku}
-                    onAtualizarSeparadorSku={onAtualizarSeparadorSku}
-                    onAtualizarOrdemSku={onAtualizarOrdemSku}
-                    previewNomeSimulado={previewNomeSimulado}
-                    previewSkuSimulado={previewSkuSimulado}
-                    brandColor={brandColor}
-                    itensDaFamilia={itensDaFamilia}
-                    carregandoItens={carregandoItens}
-                  />
-                </Col>
-              </Row>
-
-           <Row gutter={[16, 16]} align="stretch">
-  {/* Tabelas de Atributos */}
-  <Col span={24}>
-    <Row gutter={[16, 16]} align="stretch">
-      
-      {/* Atributos DNA */}
-      <Col xs={24} lg={8}>
-        <Card
-          style={{
-            height: "100%",
-            borderRadius: 10,
-            border: "1px solid #e2e8f0",
-            boxShadow: "0 1px 2px 0 rgba(0,0,0,0.01)",
-            display: "flex",
-            flexDirection: "column",
-          }}
-          styles={{
-            header: {
-              borderBottom: "1px solid #f1f5f9",
-              minHeight: "38px",
-              background: "#f8fafc",
-              borderRadius: "10px 10px 0 0",
-              padding: "0 12px",
-            },
-            body: {
-              padding: 0,
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-            },
-          }}
-          title={
-            <span
-              style={{
-                fontSize: "12px",
-                fontWeight: 600,
-                color: "#1e293b",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-              }}
-            >
-              <Tooltip title="Atributos DNA compõem o SKU do item.">
-                <InfoCircleOutlined
-                  style={{ fontSize: "11px", color: "#64748b" }}
-                />
-              </Tooltip>
-              <span
-                style={{
-                  width: "5px",
-                  height: "5px",
-                  borderRadius: "50%",
-                  background: brandColor || "#1677ff",
-                }}
-              ></span>
-              Atributos DNA
-            </span>
-          }
-          extra={
-            <Button
-              type="text"
-              size="small"
-              icon={<PlusOutlined style={{ fontSize: "11px" }} />}
-              style={{
-                color: brandColor,
-                fontWeight: 600,
-                height: 24,
-                width: 24,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-              onClick={() => handleAbrirModal("dna")}
-            />
-          }
-        >
-          <Table
-            size="small"
-            dataSource={atributosDNA}
-            columns={[
-              {
-                title: "Nome",
-                dataIndex: "nome",
-                key: "nome",
-                render: (text: string) => (
-                  <span
-                    style={{
-                      fontWeight: 500,
-                      color: "#334155",
-                      fontSize: "12px",
-                    }}
-                  >
-                    {text}
-                  </span>
-                ),
-              },
-              {
-                title: "Ações",
-                key: "acoes",
-                width: 60,
-                align: "right" as const,
-                render: (_: any, record: any) => (
-                  <Button
-                    type="text"
-                    size="small"
-                    icon={
-                      <DeleteOutlined
-                        style={{ color: "#64748b", fontSize: "12px" }}
-                      />
-                    }
-                    onClick={() =>
-                      handleExcluirAtributo("dna", record)
-                    }
-                  />
-                ),
-              },
-            ]}
-            rowKey="id"
-            pagination={false}
-            locale={{
-              emptyText: (
-                <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description={
-                    <span style={{ fontSize: "11px", color: "#94a3b8" }}>
-                      Nenhum atributo DNA
-                    </span>
-                  }
-                />
-              ),
-            }}
-          />
-        </Card>
-      </Col>
-
-      {/* Atributos Variação (Grade) */}
-      <Col xs={24} lg={8}>
-        <Card
-          style={{
-            height: "100%",
-            borderRadius: 10,
-            border: "1px solid #e2e8f0",
-            boxShadow: "0 1px 2px 0 rgba(0,0,0,0.01)",
-            display: "flex",
-            flexDirection: "column",
-          }}
-          styles={{
-            header: {
-              borderBottom: "1px solid #f1f5f9",
-              minHeight: "38px",
-              background: "#f8fafc",
-              borderRadius: "10px 10px 0 0",
-              padding: "0 12px",
-            },
-            body: {
-              padding: 0,
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-            },
-          }}
-          title={
-            <span
-              style={{
-                fontSize: "12px",
-                fontWeight: 600,
-                color: "#1e293b",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-              }}
-            >
-              <span
-                style={{
-                  width: "5px",
-                  height: "5px",
-                  borderRadius: "50%",
-                  background: "#9333ea",
-                }}
-              ></span>
-              Atributos de Variação (Grade)
-            </span>
-          }
-          extra={
-            <Button
-              type="text"
-              size="small"
-              icon={<PlusOutlined style={{ fontSize: "11px" }} />}
-              style={{
-                color: "#9333ea",
-                fontWeight: 600,
-                height: 24,
-                width: 24,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-              onClick={() => handleAbrirModal("grade")}
-            />
-          }
-        >
-          <Table
-            size="small"
-            dataSource={atributosVariacao}
-            columns={[
-              {
-                title: "Nome",
-                dataIndex: "nome",
-                key: "nome",
-                render: (text: string) => (
-                  <span
-                    style={{
-                      fontWeight: 500,
-                      color: "#334155",
-                      fontSize: "12px",
-                    }}
-                  >
-                    {text}
-                  </span>
-                ),
-              },
-            ]}
-            rowKey="id"
-            pagination={false}
-            locale={{
-              emptyText: (
-                <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description={
-                    <span style={{ fontSize: "11px", color: "#94a3b8" }}>
-                      Nenhum atributo de variação
-                    </span>
-                  }
-                />
-              ),
-            }}
-          />
-        </Card>
-      </Col>
-
-      {/* Atributos Ficha Técnica */}
-      <Col xs={24} lg={8}>
-        <Card
-          style={{
-            height: "100%",
-            borderRadius: 10,
-            border: "1px solid #e2e8f0",
-            boxShadow: "0 1px 2px 0 rgba(0,0,0,0.01)",
-            display: "flex",
-            flexDirection: "column",
-          }}
-          styles={{
-            header: {
-              borderBottom: "1px solid #f1f5f9",
-              minHeight: "38px",
-              background: "#f8fafc",
-              borderRadius: "10px 10px 0 0",
-              padding: "0 12px",
-            },
-            body: {
-              padding: 0,
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-            },
-          }}
-          title={
-            <span
-              style={{
-                fontSize: "12px",
-                fontWeight: 600,
-                color: "#1e293b",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-              }}
-            >
-              <span
-                style={{
-                  width: "5px",
-                  height: "5px",
-                  borderRadius: "50%",
-                  background: "#0891b2",
-                }}
-              ></span>
-              Atributos de Ficha Técnica
-            </span>
-          }
-          extra={
-            <Button
-              type="text"
-              size="small"
-              icon={<PlusOutlined style={{ fontSize: "11px" }} />}
-              style={{
-                color: "#0891b2",
-                fontWeight: 600,
-                height: 24,
-                width: 24,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-              onClick={() => handleAbrirModal("ficha")}
-            />
-          }
-        >
-          <Table
-            size="small"
-            dataSource={atributosFichaTecnica}
-            columns={[
-              {
-                title: "Nome",
-                dataIndex: "nome",
-                key: "nome",
-                render: (text: string) => (
-                  <span
-                    style={{
-                      fontWeight: 500,
-                      color: "#334155",
-                      fontSize: "12px",
-                    }}
-                  >
-                    {text}
-                  </span>
-                ),
-              },
-            ]}
-            rowKey="id"
-            pagination={false}
-            locale={{
-              emptyText: (
-                <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description={
-                    <span style={{ fontSize: "11px", color: "#94a3b8" }}>
-                      Nenhum atributo de ficha técnica
-                    </span>
-                  }
-                />
-              ),
-            }}
-          />
-        </Card>
-      </Col>
-
-    </Row>
-  </Col>
-</Row>
-            </Space>
-          ) : (
-            <Card
-              style={{
-                borderRadius: 10,
-                textAlign: "center",
-                padding: "60px 0",
-                border: "1px dashed #cbd5e1",
-                background: "#fafafa",
-              }}
-            >
-              <Empty
-                description={
-                  <span style={{ color: "#64748b", fontSize: "12px" }}>
-                    Selecione ou crie uma família na barra lateral para começar a configurar.
-                  </span>
-                }
-              />
-            </Card>
-          )}
-        </Col>
-
-
-   {/* Coluna 3: Itens da Família */}
-<Col xs={24} md={18} lg={5}>
-  <Card
-    title={
-      <Space size={8}>
-        <ShoppingCartOutlined style={{ color: brandColor || "#1677ff" }} />
-        <span style={{ fontWeight: 700, fontSize: "14px" }}>
-          Itens da Família
-        </span>
+          </List.Item>
+        )}
+      /> */}
+      <div style={{ marginTop: 16 }}>
+        <Text type="secondary">
+          Nota arquitetural: Os atributos antigos não foram apagados; eles foram movidos automaticamente para a ficha técnica dos SKUs afetados. Reative os atributos de DNA/Grade necessários acima para restaurar o funcionamento desta família.
+        </Text>
+      </div>
+    </Card>
+  ) : (
+    <Card 
+      style={{ backgroundColor: '#f6ffed', borderColor: '#b7eb8f', marginBottom: 0 }}
+      size="small"
+    >
+      <Space>
+        <CheckCircleOutlined style={{ color: '#52c41a',
+        }} />
+        <div>
+          <Text strong style={{ color: '#389e0d' }}>Família em Conformidade Técnica e Comercial</Text>
+          <br />
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Todos os atributos de DNA, grade e obrigatoriedade estão preenchidos corretamente. Os SKUs filhos estão aptos para exportação.
+          </Text>
+        </div>
       </Space>
-    }
-    style={{
-      borderRadius: 10,
-      boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)",
-      height: "100%",
-    }}
-    styles={{
-      header: {
-        borderBottom: "1px solid #f1f5f9",
-        background: "#f8fafc",
-        borderRadius: "10px 10px 0 0",
-        minHeight: "38px",
-        padding: "0 12px",
-      },
-      body: { padding: "12px" },
-    }}
-  >
-    {grupoSelecionado ? (
-      <Space direction="vertical" size={12} style={{ width: "100%" }}>
-        <Input
-          size="small"
-          prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
-          placeholder="Filtrar SKU ou nome..."
-          value={pesquisaItem}
-          onChange={(e) => setPesquisaItem(e.target.value)}
-          allowClear
-          style={{ borderRadius: 6 }}
-        />
+    </Card>
+  )}
 
-        <div
-          style={{
-            maxHeight: "360px",
-            overflowY: "auto",
-            paddingRight: "6px",
-          }}
-        >
-          {(itensFiltradosDoGrupo ?? []).length > 0 ? (
-            <Space direction="vertical" size={10} style={{ width: "100%" }}>
-              {(itensFiltradosDoGrupo ?? []).map((item) => {
-                const skuEsperado = typeof gerarPreviewSku === 'function' ? gerarPreviewSku(grupoSelecionado, grupoSelecionado.atributos || [], item.valoresAtributos || {}) : item.sku;
-                
-                const nomeProcessado = item.nomeCalculado || (typeof gerarPreviewNome === 'function' ? gerarPreviewNome(grupoSelecionado, item.valoresAtributos || {}) : item.nome);
-                const nomeEsperado = nomeProcessado && !nomeProcessado.includes('[') ? nomeProcessado : item.nome;
 
-                // Verificação de Atributos Ausentes / Faltantes
-                const possuiAtributosFaltantes = Array.isArray(item.atributosPendentes)
-                  ? item.atributosPendentes.length > 0
-                  : (grupoSelecionado?.atributos || []).some((attr) => {
-                      const valor = item.valoresAtributos?.[attr.id || attr.nome];
-                      return !valor || String(valor).trim() === "";
-                    });
 
-                const divergenciaSku = Boolean(skuEsperado && item.sku !== skuEsperado);
-                const divergenciaNome = Boolean(nomeEsperado && item.nome !== nomeEsperado);
+{/* <Space size={8}>
+<Button
+type="primary"
+ghost
+onClick={() => setIsImportModalOpen(true)}
+style={{ fontWeight: 600 }}
+>
+✨ Importar Família por IA
+</Button>
+</Space> */}
 
-                let tipoDivergencia = null;
-                if (possuiAtributosFaltantes) {
-                  tipoDivergencia = "Atributos não formalizados";
-                } else if (divergenciaSku && divergenciaNome) {
-                  tipoDivergencia = "SKU e Nome divergentes";
-                } else if (divergenciaSku) {
-                  tipoDivergencia = "SKU divergente";
-                } else if (divergenciaNome) {
-                  tipoDivergencia = "Nome divergente";
-                }
 
-                const temAlerta = Boolean(tipoDivergencia);
+</Col>
 
-                return (
-                  <div
-                    key={item.id}
-                    style={{
-                      padding: "12px",
-                      backgroundColor: temAlerta ? "#fffbeb" : "#ffffff",
-                      borderRadius: "8px",
-                      border: `1px solid ${temAlerta ? "#fde68a" : "#e2e8f0"}`,
-                      boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.02)",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "8px",
-                      position: "relative",
-                      overflow: "hidden",
-                    }}
-                  >
-                    {/* Barra lateral indicadora de status (Vermelho/Amarelo se pendente, Verde se OK) */}
-                    <div
-                      style={{
-                        position: "absolute",
-                        left: 0,
-                        top: 0,
-                        bottom: 0,
-                        width: "4px",
-                        backgroundColor: possuiAtributosFaltantes ? "#ef4444" : (temAlerta ? "#d97706" : "#22c55e"),
-                      }}
-                    />
+<Col span={7}>
 
-                    {/* Cabeçalho do Item: SKU, Tag de Alerta e Engrenagem */}
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        paddingLeft: "6px",
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontWeight: 700,
-                          fontSize: "12px",
-                          color: "#0f172a",
-                          fontFamily: "monospace",
-                        }}
-                      >
-                        {item.sku}
-                      </span>
+<Button
+type="primary"
+ghost
+onClick={() => setIsImportModalOpen(true)}
+style={{ fontWeight: 600 }}
+>
+✨ Importar Família por IA
+</Button> 
+<Button
+type="default"
+onClick={handleCriarFamilia}
+loading={loading}
+icon={<PlusOutlined />}
+style={{ borderRadius: 8, fontWeight: 500 }}
+>
+Nova Família
+</Button>
 
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                        {temAlerta && (
-                          <span
-                            style={{
-                              fontSize: "10px",
-                              backgroundColor: possuiAtributosFaltantes ? "#fee2e2" : "#fef3c7",
-                              color: possuiAtributosFaltantes ? "#991b1b" : "#b45309",
-                              padding: "1px 6px",
-                              borderRadius: "4px",
-                              fontWeight: 600,
-                              border: `1px solid ${possuiAtributosFaltantes ? "#fca5a5" : "#fcd34d"}`,
-                            }}
-                          >
-                            {tipoDivergencia}
-                          </span>
-                        )}
+{familiaSelecionadaLocal && (
+<>
+{/* 🔍 NOVO BOTÃO DE DEBUG */}
+<Button
+type="dashed"
+icon={<InfoCircleOutlined />}
+onClick={() => {
+const payloadDebug = {
+original: familiaOriginal,
+atualLocal: familiaSelecionadaLocal,
+marcaComportamentoAtual: marcaComportamento,
+alteracoesCalculadas: calcularAlteracoesPendentes(),
+snapshotRef: snapshotRef.current ? JSON.parse(snapshotRef.current) : null
+};
+console.table(calcularAlteracoesPendentes());
+console.log("📦 PAYLOAD DEBUG COMPLETO:", payloadDebug);
 
-                        {/* Engrenagem para alterar atributos do item */}
-                        <Tooltip title="Alterar atributos do item">
-                          <Button
-                            type="text"
-                            size="small"
-                            icon={<SettingOutlined style={{ fontSize: "13px", color: "#64748b" }} />}
-                            style={{
-                              height: 22,
-                              width: 22,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              padding: 0,
-                            }}
-                            onClick={() => {
-                              handleEditarAtributosItem(item);
-                            }}
-                          />
-                        </Tooltip>
-                      </div>
-                    </div>
+Swal.fire({
+title: "🔍 Debug de Payload",
+html: `<pre style="text-align: left; font-size: 10px; max-height: 300px; overflow: auto; background: #1e293b; color: #38bdf8; padding: 10px; border-radius: 6px;">${JSON.stringify(payloadDebug, null, 2)}</pre>`,
+width: 700,
+confirmButtonText: "Fechar"
+});
+}}
+style={{ borderRadius: 8, fontWeight: 500 }}
+>
+Debug Payload
+</Button>
 
-                    {/* Nome do Produto */}
-                    <div style={{ paddingLeft: "6px", display: "flex", flexDirection: "column", gap: "2px" }}>
-                      <span
-                        style={{
-                          fontSize: "11.5px",
-                          color: "#334155",
-                          lineHeight: "1.4",
-                          fontWeight: 500,
-                        }}
-                      >
-                        Prod: {item.nome || item.nomeItem || item.nomeComercial || "Produto sem nome"}
-                      </span>
-                    </div>
+<Tooltip title="Desfaz as alterações feitas e retorna ao último estado salvo no banco">
+<Button
+type="default"
+disabled={!temAlteracoes}
+icon={<UndoOutlined />}
+onClick={handleDesfazerAlteracoes}
+style={{ borderRadius: 8, fontWeight: 500 }}
+>
+Desfazer Alterações
+</Button>
+</Tooltip>
 
-                    {/* Botões de Ação na base do Card do Item (se houver divergência de nome/SKU e atributos estiverem preenchidos) */}
-                    {temAlerta && !possuiAtributosFaltantes && (
-                      <div
-                        style={{
-                          marginTop: "4px",
-                          paddingTop: "8px",
-                          borderTop: "1px dashed #fde68a",
-                          display: "grid",
-                          gridTemplateColumns: "repeat(3, 1fr)",
-                          gap: "4px",
-                        }}
-                      >
-                        <Button
-                          size="small"
-                          type="default"
-                          style={{
-                            fontSize: "10px",
-                            padding: "0 2px",
-                            height: "24px",
-                            color: "#b45309",
-                            borderColor: "#fcd34d",
-                            backgroundColor: "#fff",
-                          }}
-                          onClick={() => handleNormalizarItemNome(item)}
-                        >
-                          Corrigir Nome
-                        </Button>
+<Tooltip title={temAlteracoes ? "Clique para salvar as alterações pendentes" : "Nenhuma alteração pendente para salvar"}>
+<Button
+type="primary"
+disabled={!temAlteracoes}
+onClick={handleSalvarFamiliaNoBanco}
+loading={loading}
+icon={<SaveOutlined />}
+style={{
+backgroundColor: temAlteracoes ? brandColor : undefined,
+borderColor: temAlteracoes ? brandColor : undefined,
+borderRadius: 8,
+fontWeight: 500,
+}}
+>
+Salvar Alterações
+</Button>
+</Tooltip>
+</>
+)}
+</Col>
+</Row>
+</Card>
 
-                        <Button
-                          size="small"
-                          type="default"
-                          style={{
-                            fontSize: "10px",
-                            padding: "0 2px",
-                            height: "24px",
-                            color: "#b45309",
-                            borderColor: "#fcd34d",
-                            backgroundColor: "#fff",
-                          }}
-                          onClick={() => handleNormalizarItemSku(item)}
-                        >
-                          Corrigir SKU
-                        </Button>
+{error && (
+<Alert
+type="error"
+showIcon
+message="Falha de Sincronização"
+description={error}
+style={{ marginBottom: 24, borderRadius: 8 }}
+action={
+<Button size="small" danger onClick={() => window.location.reload()}>
+Recarregar
+</Button>
+}
+/>
+)}
 
-                        <Button
-                          size="small"
-                          type="primary"
-                          style={{
-                            fontSize: "10px",
-                            padding: "0 2px",
-                            height: "24px",
-                            backgroundColor: "#d97706",
-                            borderColor: "#d97706",
-                          }}
-                          onClick={() => handleTentarNormalizarIndividual(item)}
-                        >
-                          Padronizar Ambos
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </Space>
+<Row gutter={[8, 8]}>
+{/* Coluna 1: Famílias Ativas */}
+<ListaFamiliasAtivas
+brandColor={brandColor}
+categoriaFiltroId={categoriaFiltroId}
+setCategoriaFiltroId={setCategoriaFiltroId}
+dadosArvoreAntd={dadosArvoreAntd}
+pesquisaFamilia={pesquisaFamilia}
+setPesquisaFamilia={setPesquisaFamilia}
+familiasFiltradas={familiasFiltradas}
+familiasAgrupadas={familiasAgrupadas}
+grupoSelecionado={familiaSelecionadaLocal}
+temAlteracoes={temAlteracoes}
+handleSelecionarGrupo={handleSelecionarFamilia}
+handleCriarGrupo={handleCriarFamilia}
+/>
+
+{/* Coluna 2: Configuração Central */}
+<Col xs={24} md={18} lg={16}>
+{familiaSelecionadaLocal ? (
+<Space direction="vertical" style={{ width: "100%" }}>
+<Row gutter={[4, 4]}>
+
+ 
+{/* 1. Identidade da Família */}
+<Col xs={24} lg={24}>
+<FamiliaIdentidadeCard 
+grupoSelecionado={familiaSelecionadaLocal}
+grupoImage={grupoImage}
+brandColor={brandColor}
+onSalvarIdentidade={(valores) => {
+// Usa a função dedicada ou garante que os atributos atuais não sejam perdidos
+if (typeof handleAtualizarIdentidadeFamilia === 'function') {
+handleAtualizarIdentidadeFamilia(valores);
+} else if (typeof setFamiliaSelecionada === 'function') {
+setFamiliaSelecionada((prev: any) => ({ 
+...prev, 
+...valores,
+atributos: prev.atributos || [] // 🛡️ Protege os atributos contra sumiço
+}));
+}
+}}
+/>
+</Col>
+
+{/* <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+<div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+<span style={{ fontSize: "12px", fontWeight: 600, color: "#1e293b" }}>
+Comportamento da Marca nesta Família:
+</span>
+<Tooltip title="Define onde a marca atua: se é apenas Ficha Técnica, parte do DNA, ou Grade.">
+<InfoCircleOutlined style={{ fontSize: "12px", color: "#64748b", cursor: "pointer" }} />
+</Tooltip>
+</div>
+
+<div style={{ width: "350px", maxWidth: "100%" }}>
+
+<Radio.Group
+buttonStyle="solid"
+value={marcaComportamento}
+onChange={(e) => {
+const novoComportamento = e.target.value;
+if (typeof setMarcaComportamento === 'function') {
+setMarcaComportamento(novoComportamento);
+}
+// Força o gatilho de alterações pendentes na família local
+setTemAlteracoes(true);
+}}
+style={{ width: '100%', display: 'flex' }}
+size="small"
+>
+<Radio.Button value="dna" style={{ flex: 1, textAlign: 'center', fontSize: '11px' }}>
+<TagOutlined style={{ marginRight: '4px' }} /> DNA
+</Radio.Button>
+<Radio.Button value="grade" style={{ flex: 1, textAlign: 'center', fontSize: '11px' }}>
+<AppstoreOutlined style={{ marginRight: '4px' }} /> Grade (SKU)
+</Radio.Button>
+<Radio.Button value="ficha" style={{ flex: 1, textAlign: 'center', fontSize: '11px' }}>
+<FileTextOutlined style={{ marginRight: '4px' }} /> Ficha
+</Radio.Button>
+</Radio.Group>
+
+</div>
+</div>
+
+
+<div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", width: "100%" }}>
+        
+      
+
+      
+        <div style={{ 
+          padding: "10px", 
+          borderRadius: "8px", 
+          border: marcaComportamento === "grade" ? "1px solid #1890ff" : "1px dashed #cbd5e1",
+          background: marcaComportamento === "grade" ? "#e6f7ff" : "#f8fafc",
+          transition: "all 0.3s ease",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          textAlign: "center"
+        }}>
+          <span style={{ fontSize: "11px", fontWeight: 600, color: marcaComportamento === "grade" ? "#096dd9" : "#64748b", marginBottom: "4px" }}>
+            Posição: Grade (SKU)
+          </span>
+          {marcaComportamento === "grade" ? (
+            <div style={{ display: "flex", alignItems: "center", gap: "4px", color: "#1890ff", fontSize: "12px", fontWeight: 600 }}>
+              <AppstoreOutlined /> Marca ativa aqui
+            </div>
           ) : (
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description={
-                <span style={{ fontSize: "11px", color: "#94a3b8" }}>
-                  Nenhum SKU encontrado
-                </span>
-              }
-            />
+            <span style={{ fontSize: "11px", color: "#94a3b8" }}>Inativo</span>
           )}
         </div>
 
-        {/* Botões de Ação em Lote na base do Card */}
-        <Space direction="vertical" size={8} style={{ width: "100%", marginTop: "4px" }}>
-          <Button
-            type="dashed"
-            size="small"
-            block
-            icon={<ThunderboltOutlined />}
-            style={{
-              borderColor: brandColor,
-              color: brandColor,
-              borderRadius: 6,
-              height: "30px",
-            }}
-            onClick={handleProcessarFormalizacaoLote}
-          >
-            Formalizar / Gerar Lote SKU
-          </Button>
-
-          <Button
-            type="default"
-            size="small"
-            block
-            onClick={handlePadronizarNomesFamilia}
-            style={{ height: "28px" }}
-          >
-            Padronizar Nomes da Família (Lote)
-          </Button>
-
-          <Button
-            type="default"
-            size="small"
-            block
-            onClick={handlePadronizarSkusFamilia}
-            style={{ height: "28px" }}
-          >
-            Padronizar SKUs da Família (Lote)
-          </Button>
-        </Space>
-      </Space>
-    ) : (
-      <Empty
-        image={Empty.PRESENTED_IMAGE_SIMPLE}
-        description={
-          <span style={{ fontSize: "11px", color: "#94a3b8" }}>
-            Selecione uma família para ver os itens
+       
+        <div style={{ 
+          padding: "10px", 
+          borderRadius: "8px", 
+          border: marcaComportamento === "ficha" ? "1px solid #1890ff" : "1px dashed #cbd5e1",
+          background: marcaComportamento === "ficha" ? "#e6f7ff" : "#f8fafc",
+          transition: "all 0.3s ease",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          textAlign: "center"
+        }}>
+          <span style={{ fontSize: "11px", fontWeight: 600, color: marcaComportamento === "ficha" ? "#096dd9" : "#64748b", marginBottom: "4px" }}>
+            Posição: Ficha
           </span>
-        }
-      />
-    )}
-  </Card>
+          {marcaComportamento === "ficha" ? (
+            <div style={{ display: "flex", alignItems: "center", gap: "4px", color: "#1890ff", fontSize: "12px", fontWeight: 600 }}>
+              <FileTextOutlined /> Marca ativa aqui
+            </div>
+          ) : (
+            <span style={{ fontSize: "11px", color: "#94a3b8" }}>Inativo</span>
+          )}
+        </div>
+
+      </div> */}
+
+
+{/* 2. Painel do Simulador Unificado */}
+<Col xs={24} lg={24}>
+<PainelSimulador
+familiaSelecionada={familiaSelecionadaLocal}
+valoresTeste={valoresTeste}
+onMudancaValorTeste={onMudancaValorTeste}
+onAtualizarTemplateComercial={onAtualizarTemplateComercial}
+onAtualizarTemplateSku={onAtualizarTemplateSku}
+onAtualizarSiglaSku={onAtualizarSiglaSku}
+onAtualizarSeparadorSku={onAtualizarSeparadorSku}
+onAtualizarOrdemSku={onAtualizarOrdemSku}
+previewNomeSimulado={previewNomeSimulado}
+previewSkuSimulado={previewSkuSimulado}
+brandColor={brandColor} 
+itensDaFamilia={itensDaFamilia}
+carregandoItens={carregandoItens}
+/>
+
+ 
+
+
+</Col>
+</Row>
+
+<Row gutter={[8, 8]} align="stretch">
+{/* 🎛️ CONFIGURAÇÃO DO COMPORTAMENTO DA MARCA */}
+<Col span={24}>
+<Card
+size="small"
+style={{
+marginBottom: 16,
+borderRadius: 10,
+border: "1px solid #e2e8f0",
+background: "#f8fafc",
+}}
+styles={{ body: { padding: "8px 12px" } }}
+>
+
+
+</Card>
+
+
+
+
+
+
 </Col>
 
 
-      </Row>
 
-      {/* Modais auxiliares */}
-      <ImportarFamiliaModal
-        visible={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
-        onImportarSucesso={handleNovaFamiliaImportada}
-      />
 
-      <Modal
-        title="⚠️ Atributos Pendentes para Normalização"
-        open={isModalPendenciaOpen}
-        onCancel={() => setIsModalPendenciaOpen(false)}
-        onOk={() => {
-          formPendencia.validateFields().then((values) => {
-            handleSalvarAtributosPendentes(values);
-            Swal.fire("Sucesso!", "Atributos preenchidos e item normalizado.", "success");
-          });
-        }}
-        okText="Salvar e Normalizar"
-        cancelText="Cancelar"
-      >
-        <Alert
-          message="Atenção"
-          description="Existem atributos obrigatórios utilizados no template de SKU ou Nome que estão sem valor para este item. Preencha-os abaixo para prosseguir:"
-          type="warning"
-          showIcon
-          style={{ marginBottom: 16 }}
-        />
 
-        <Form form={formPendencia} layout="vertical">
-          {(atributosPendentes ?? []).map((attr) => (
-            <Form.Item
-              key={attr.id}
-              name={attr.id}
-              label={attr.nome || attr.label}
-              rules={[{ required: true, message: `O campo ${attr.nome || attr.label} é obrigatório!` }]}
-              initialValue={itemEmEdicaoPendencia?.valoresAtributos?.[attr.id] || ""}
-            >
-              <Input placeholder={`Digite o valor para ${attr.nome || attr.label}...`} />
-            </Form.Item>
-          ))}
-        </Form>
-      </Modal>
+{/* Tabelas de Atributos */}
+<Col span={24}>
+<Row gutter={[16, 16]} align="stretch">
+{/* Atributos DNA */}
+{/* Atributos DNA */}
 
-      <Modal
-        title={`Editar atributos: ${itemEmEdicaoAtributos?.sku || "item"}`}
-        open={isModalAtributosItemOpen}
-        onCancel={() => setIsModalAtributosItemOpen(false)}
-        onOk={handleSalvarAtributosItem}
-        okText="Salvar atributos"
-        cancelText="Cancelar"
-        destroyOnClose
-      >
-        <Alert
-          type="info"
-          showIcon
-          message="Alteração individual"
-          description="Os valores serão aplicados somente ao item selecionado. O SKU e o nome serão recalculados após o salvamento."
-          style={{ marginBottom: 16 }}
-        />
-        <Form layout="vertical">
-          {(grupoSelecionado?.atributos || []).map((attr) => (
-            <Form.Item key={attr.id} label={attr.nome}>
-              <Input
-                value={String(itemEmEdicaoAtributos?.valoresAtributos?.[attr.id] ?? "")}
-                placeholder={`Informe ${attr.nome}`}
-                onChange={(event) => handleAtualizarAtributoItemEditado(attr.id, event.target.value)}
-              />
-            </Form.Item>
-          ))}
-        </Form>
-      </Modal>
+{/* <AtributosCard
+titulo="Atributos DNA"
+cor={brandColor || "#1677ff"}
+dataSource={atributosDNA}
+onOpenModal={() => handleAbrirModal("dna")}
+onDelete={(record) => handleExcluirAtributo("dna", record)}
+onMover={(record, novaClassificacao) => {
+// 🛡️ Atualiza tanto a lista local da família quanto dispara a mudança de estado
+setFamiliaSelecionada((prev: any) => {
+const novosAtributos = (prev.atributos || atributosComMarcaInjetada || []).map((a: any) => 
+String(a.id) === String(record.id) ? { ...a, classificacao: novaClassificacao } : a
+);
+return {
+...prev,
+atributos: novosAtributos
+};
+});
+}}
+tooltipText="Atributos DNA compõem o esqueleto ou identidade fixa do SKU do item."
+onInfoClick={() => setIsModalOpen(true)}
+emptyText="Nenhum atributo DNA"
+showDelete={true}
+/> */}
 
-      {/* Modal Modular Único para preenchimento de Atributos Pendentes em Lote */}
-<Modal
-  title={
-    <Space>
-      <ThunderboltOutlined style={{ color: brandColor || "#1677ff" }} />
-      <span>Formalização de Itens - Atributos Pendentes</span>
-    </Space>
-  }
-  open={modalFormalizacaoAberto}
-  onCancel={() => setModalFormalizacaoAberto(false)}
-  onOk={handleSalvarEContinuarFormalizacao}
-  okText="Salvar e Concluir Lote"
-  cancelText="Cancelar"
-  width={650}
-  destroyOnClose
+{/* Atributos Variação (Grade) */}
+<AtributosCard
+titulo="Atributos de Variação (Grade)"
+cor="#9333ea"
+dataSource={atributosVariacao}
+onOpenModal={() => handleAbrirModal("grade")}
+onDelete={(record) => handleExcluirAtributo("grade", record)}
+onMover={(record, novaClassificacao) => {
+setFamiliaSelecionada((prev: any) => {
+const novosAtributos = (prev.atributos || atributosComMarcaInjetada || []).map((a: any) => 
+String(a.id) === String(record.id) ? { ...a, classificacao: novaClassificacao } : a
+);
+return {
+...prev,
+atributos: novosAtributos
+};
+});
+}}
+tooltipText="Atributos que geram quebra de estoque e variações de SKU (ex: Blindagem, Marca em Grade)."
+emptyText="Nenhum atributo de variação"
+showDelete={true}
+/>
+
+{/* Atributos Ficha Técnica */}
+<AtributosCard
+titulo="Atributos de Ficha Técnica"
+cor="#0891b2"
+dataSource={atributosFichaTecnica}
+onOpenModal={() => handleAbrirModal("ficha")}
+onDelete={(record) => handleExcluirAtributo("ficha", record)}
+onMover={(record, novaClassificacao) => {
+setFamiliaSelecionada((prev: any) => {
+const novosAtributos = (prev.atributos || atributosComMarcaInjetada || []).map((a: any) => 
+String(a.id) === String(record.id) ? { ...a, classificacao: novaClassificacao } : a
+);
+return {
+...prev,
+atributos: novosAtributos
+};
+});
+}}
+tooltipText="Atributos descritivos de apoio que não alteram o SKU principal."
+emptyText="Nenhum atributo de ficha técnica"
+showDelete={true}
+/>
+</Row>
+</Col>
+
+
+ <Col xs={24} lg={10}>
+
+  <Card 
+  title="Diagnóstico de Conformidade e Regras de Bloqueio da Família" 
+  bordered={false} 
+  style={{ marginBottom: 24 }}
 >
-  <div style={{ marginBottom: "12px", fontSize: "13px", color: "#64748b" }}>
-    Identificamos itens na família <strong>{grupoSelecionado?.nome}</strong> que possuem atributos obrigatórios não preenchidos. Por favor, ajuste abaixo para concluir a formalização:
-  </div>
+  <Row gutter={[16, 16]} >
+    {/* 1. Ausência de Atributos de Variação */}
+    <Col xs={24} lg={6} > 
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8  ,}}>
+        <Text strong style={{ color: '#cf1322' }} >
+          1. Ausência de Atributos de Variação (Grade/DNA)
+        </Text>
+        <Text type="secondary" style={{fontSize: '11px'}}>
+          <strong>Erro detectado:</strong> O administrador removeu todos os atributos que serviam como base de grade (ex: Medida, Voltagem, Blindagem), deixando a família sem eixo diferenciador.
+        </Text>
+        <Text style={{fontSize: '11px'}}>
+          <strong>Comportamento do PIM:</strong> Família bloqueada. Proíbe novos SKUs filhos. SKUs existentes entram em quarentena e os valores antigos são convertidos automaticamente para a ficha técnica estática.
+        </Text>
+      </div>
+    </Col>
 
-  <div style={{ maxHeight: "400px", overflowY: "auto", paddingRight: "4px" }}>
-    <Space direction="vertical" size={12} style={{ width: "100%" }}>
-      {(itensPendentesFormalizacao || []).map((item, index) => (
-        <div
-          key={item.id || index}
-          style={{
-            padding: "12px",
-            backgroundColor: "#f8fafc",
-            borderRadius: "8px",
-            border: "1px solid #e2e8f0",
-            display: "flex",
-            flexDirection: "column",
-            gap: "8px",
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontWeight: 700, fontSize: "12px", color: "#0f172a", fontFamily: "monospace" }}>
-              SKU: {item.sku || `Item #${index + 1}`}
-            </span>
-            <span style={{ fontSize: "11px", color: "#ef4444", fontWeight: 600 }}>
-              Atributos incompletos
-            </span>
-          </div>
+    {/* 2. Falta de Atributos Obrigatórios */}
+    <Col xs={24} lg={6}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <Text strong style={{ color: '#cf1322' }}>
+          2. Falta de Atributos Obrigatórios de Negócio
+        </Text>
+        <Text type="secondary" style={{fontSize: '11px'}}>
+          <strong>Erro detectado:</strong> Um atributo considerado crítico pela categoria macro (ex: Marca, NCM, Unidade de Medida) foi desvinculado das regras da família.
+        </Text>
+        <Text style={{fontSize: '11px'}}>
+          <strong>Comportamento do PIM:</strong> Família inativada por inconsistência cadastral. Gatilho de despublicação em cascata: todos os SKUs filhos são removidos imediatamente dos Marketplaces e E-commerce.
+        </Text>
+      </div>
+    </Col>
 
-          <span style={{ fontSize: "11.5px", color: "#334155", fontWeight: 500 }}>
-            {item.nome}
-          </span>
+    {/* 3. SKUs Gêmeos */}
+    <Col xs={24} lg={6}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <Text strong style={{ color: '#cf1322' }}>
+          3. SKUs Gêmeos ou Conflito de Grade
+        </Text>
+        <Text type="secondary" style={{fontSize: '11px'}}>
+          <strong>Erro detectado:</strong> Após uma alteração estrutural, múltiplos SKUs filhos ficaram idênticos comercialmente por perderem a diferenciação da grade.
+        </Text>
+        <Text style={{fontSize: '11px'}}>
+          <strong>Comportamento do PIM:</strong> Família bloqueada para novas edições até que o operador revise, funda os itens duplicados ou reative um atributo diferenciador.
+        </Text>
+      </div>
+    </Col>
 
-          {/* Renderização dinâmica dos campos/atributos exigidos pela família para este item */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px", marginTop: "4px" }}>
-            {(grupoSelecionado?.atributos || []).map((attr) => {
-              const valorAtual = item.valoresAtributos?.[attr.id || attr.nome] || "";
-              return (
-                <div key={attr.id || attr.nome} style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                  <label style={{ fontSize: "10.5px", fontWeight: 600, color: "#475569" }}>
-                    {attr.nome}:
-                  </label>
-                  <Input
-                    size="small"
-                    placeholder={`Preencher ${attr.nome}`}
-                    defaultValue={valorAtual}
-                    onChange={(e) => {
-                      // Atualiza de forma reativa no estado temporário do item pendente
-                      handleAtualizarAtributoItemPendente(item.id, attr.id || attr.nome, e.target.value);
-                    }}
-                  />
-                </div>
-              );
-            })}
-          </div>
+    {/* 4. Família Órfã */}
+    <Col xs={24} lg={6}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <Text strong style={{ color: '#cf1322' }}>
+          4. Família Órfã de Categoria Pai
+        </Text>
+        <Text type="secondary" style={{fontSize: '11px'}}>
+          <strong>Erro detectado:</strong> A subcategoria ou categoria pai que fornecia o DNA estrutural foi excluída, desativada ou movida incorretamente.
+        </Text>
+        <Text style={{fontSize: '11px'}}>
+          <strong>Comportamento do PIM:</strong> Família isolada em "Modo Rascunho Forçado". Nenhuma alteração pode ser salva até que seja remapeada para uma categoria pai válida.
+        </Text>
+      </div>
+    </Col>
+
+
+
+  </Row>
+  
+</Card>
+
+    </Col>
+
+
+
+  <Col xs={24} lg={14}>
+  <Card title="Guia de Referência: O que a Família Herda, Exige e Controla" bordered={false} style={{ marginBottom: 2 }}>
+      <Space direction="vertical" size={2} style={{ width: '100%' }}>
+        <div>
+          <Text strong style={{ color: '#1890ff', fontSize: 16 }}>1. O que a Família HERDA da Categoria / Subcategoria Pai</Text>
+          <List
+            size="small"
+            dataSource={[
+              "DNA Estrutural Macro: O material base, norma construtiva ou série técnica (ex: Aço Galvanizado, Série 6200, SAE 100 R2).",
+              "Atributos Globais de Negócio: Regras macro de conformidade, exigências fiscais básicas e restrições do segmento industrial."
+            ]}
+            renderItem={(item) => (
+              <List.Item style={{ border: 'none', padding: '4px 0' }}>
+                <Space>
+                  <Badge status="processing" />
+                  <Text>{item}</Text>
+                </Space>
+              </List.Item>
+            )}
+          />
         </div>
-      ))}
-    </Space>
-  </div>
+
+        <Divider style={{ margin: '4px 0' }} />
+
+        <div>
+          <Text strong style={{ color: '#fa8c16', fontSize: 16 }}>2. O que a Família EXIGE Obrigatoriamente dos SKUs Filhos (O Escopo Rígido)</Text>
+          <List
+            size="small"
+            dataSource={[
+              "Atributos de Grade / Variação: Eixos comerciais obrigatórios para gerar os filhos (ex: Medidas dimensionais, Diâmetros, Bitolas, Voltagem).",
+              "Atributos de Ficha Técnica Críticos: Especificações que nenhum SKU pode nascer sem preencher (ex: Blindagem, Folga Radial, Pressão Máxima, Norma).",
+              "Atributos de Identificação Comercial: Marca, Part Number / Código do Fabricante e Unidade de Medida."
+            ]}
+            renderItem={(item) => (
+              <List.Item style={{ border: 'none', padding: '4px 0' }}>
+                <Space>
+                  <Badge status="warning" />
+                  <Text>{item}</Text>
+                </Space>
+              </List.Item>
+            )}
+          />
+        </div>
+
+        <Divider style={{ margin: '4px 0' }} />
+
+        <div>
+          <Text strong style={{ color: '#52c41a', fontSize: 16 }}>3. Comportamento e Regras de Propagação</Text>
+          <List
+            size="small"
+            dataSource={[
+              "Herança Automática: Tudo o que é definido na Família desce em cascata para os SKUs filhos instantaneamente.",
+              "Fallback de Segurança (Despromoção): Se um atributo deixa de ser obrigatório na Família, o valor preenchido nos filhos não é apagado; ele migra automaticamente para a Ficha Técnica estática do SKU.",
+              "Bloqueio de Publicação: SKUs criados sem os atributos obrigatórios exigidos pela família ficam impedidos de ser exportados para os Marketplaces e E-commerce."
+            ]}
+            renderItem={(item) => (
+              <List.Item style={{ border: 'none', padding: '4px 0' }}>
+                <Space>
+                  <Badge status="success" />
+                  <Text>{item}</Text>
+                </Space>
+              </List.Item>
+            )}
+          />
+        </div>
+      </Space>
+    </Card>
+    </Col>
+
+</Row>
+</Space>
+) : (
+<Card
+style={{
+borderRadius: 10,
+textAlign: "center",
+padding: "60px 0",
+border: "1px dashed #cbd5e1",
+background: "#fafafa",
+}}
+>
+<Empty
+description={
+<span style={{ color: "#64748b", fontSize: "12px" }}>
+Selecione ou crie uma família na barra lateral para começar a configurar.
+</span>
+}
+/>
+</Card>
+)}
+</Col>
+
+{/* Coluna 3: Itens da Família */}
+<ItensFamiliaCard
+brandColor={brandColor}
+grupoSelecionado={familiaSelecionadaLocal}
+pesquisaItem={pesquisaItem}
+setPesquisaItem={setPesquisaItem}
+itensFiltradosDoGrupo={itensFiltradosDaFamilia}
+temAlteracoes={temAlteracoes}
+gerarPreviewSku={gerarPreviewSku}
+gerarPreviewNome={gerarPreviewNome}
+handleEditarAtributosItem={handleEditarAtributosItem}
+handleNormalizarItemNome={handleNormalizarItemNome}
+handleNormalizarItemSku={handleNormalizarItemSku}
+handleTentarNormalizarIndividual={handleTentarNormalizarIndividual}
+handleProcessarFormalizacaoLote={handleProcessarFormalizacaoLote}
+handlePadronizarNomesFamilia={handlePadronizarNomesFamilia}
+handlePadronizarSkusFamilia={handlePadronizarSkusFamilia}
+/>
+</Row>
+
+{/* Modais auxiliares */}
+<ImportarFamiliaModal
+visible={isImportModalOpen}
+onClose={() => setIsImportModalOpen(false)}
+onImportarSucesso={handleNovaFamiliaImportada}
+/>
+
+<Modal
+title="⚠️ Atributos Pendentes para Normalização"
+open={isModalPendenciaOpen}
+onCancel={() => setIsModalPendenciaOpen(false)}
+onOk={() => {
+formPendencia.validateFields().then((values) => {
+handleSalvarAtributosPendentes(values);
+Swal.fire("Sucesso!", "Atributos preenchidos e item normalizado.", "success");
+});
+}}
+okText="Salvar e Normalizar"
+cancelText="Cancelar"
+>
+<Alert
+message="Atenção"
+description="Existem atributos obrigatórios utilizados no template de SKU ou Nome que estão sem valor para este item. Preencha-os abaixo para prosseguir:"
+type="warning"
+showIcon
+style={{ marginBottom: 16 }}
+/>
+
+<Form form={formPendencia} layout="vertical">
+{(atributosPendentes ?? []).map((attr) => (
+<Form.Item
+key={attr.id}
+name={attr.id}
+label={attr.nome || attr.label}
+rules={[{ required: true, message: `O campo ${attr.nome || attr.label} é obrigatório!` }]}
+initialValue={itemEmEdicaoPendencia?.valoresAtributos?.[attr.id] || ""}
+>
+<Input placeholder={`Digite o valor para ${attr.nome || attr.label}...`} />
+</Form.Item>
+))}
+</Form>
 </Modal>
 
-      <AttributeGuideModal
-        visible={isModalOpen}
-        onClose={handleCloseGuideModal}
-        defaultTab={guideTab}
-      />
+<Modal
+title={`Editar atributos: ${itemEmEdicaoAtributos?.sku || "item"}`}
+open={isModalAtributosItemOpen}
+onCancel={() => setIsModalAtributosItemOpen(false)}
+onOk={handleSalvarAtributosItem}
+okText="Salvar atributos"
+cancelText="Cancelar"
+destroyOnClose
+>
+<Alert
+type="info"
+showIcon
+message="Alteração individual"
+description="Os valores serão aplicados somente ao item selecionado. O SKU e o nome serão recalculados após o salvamento."
+style={{ marginBottom: 16 }}
+/>
+<Form layout="vertical">
+{(atributosComMarcaInjetada?.length > 0 ? atributosComMarcaInjetada : familiaSelecionadaLocal?.atributos || []).map((attr: any) => (
+<Form.Item key={attr.id} label={attr.nome}>
+<Input
+value={String(itemEmEdicaoAtributos?.valoresAtributos?.[attr.id] ?? "")}
+placeholder={`Informe ${attr.nome}`}
+onChange={(event) => handleAtualizarAtributoItemEditado(attr.id, event.target.value)}
+/>
+</Form.Item>
+))}
+</Form>
+</Modal>
 
-      <ModalVinculoAtributos
-        isModalAberto={isModalAberto}
-        setIsModalAberto={setIsModalAberto}
-        destinoModal={tabelaAlvoModal || "ficha"}
-        atributosGlobaisDisponiveis={atributosGlobaisDisponiveis}
-        handleAdicionarAtributoAoGrupo={handleAdicionarAtributoAoGrupo}
-        brandColor={brandColor}
-      />
-    </div>
-  );
+<Modal
+title={
+<Space>
+<ThunderboltOutlined style={{ color: brandColor || "#1677ff" }} />
+<span>Formalização de Itens - Atributos Pendentes</span>
+</Space>
+}
+open={modalFormalizacaoAberto}
+onCancel={() => setModalFormalizacaoAberto(false)}
+onOk={handleSalvarEContinuarFormalizacao}
+okText="Salvar e Concluir Lote"
+cancelText="Cancelar"
+width={650}
+destroyOnClose
+>
+<div style={{ marginBottom: "12px", fontSize: "13px", color: "#64748b" }}>
+Identificamos itens na família <strong>{familiaSelecionadaLocal?.nome}</strong> que possuem atributos obrigatórios não preenchidos. Por favor, ajuste abaixo para concluir a formalização:
+</div>
+
+<div style={{ maxHeight: "400px", overflowY: "auto", paddingRight: "4px" }}>
+<Space direction="vertical" size={12} style={{ width: "100%" }}>
+{(itensPendentesFormalizacao || []).map((item, index) => (
+<div
+key={item.id || index}
+style={{
+padding: "12px",
+backgroundColor: "#f8fafc",
+borderRadius: "8px",
+border: "1px solid #e2e8f0",
+display: "flex",
+flexDirection: "column",
+gap: "8px",
+}}
+>
+<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+<span style={{ fontWeight: 700, fontSize: "12px", color: "#0f172a", fontFamily: "monospace" }}>
+SKU: {item.sku || `Item #${index + 1}`}
+</span>
+<span style={{ fontSize: "11px", color: "#ef4444", fontWeight: 600 }}>
+Atributos incompletos
+</span>
+</div>
+
+<span style={{ fontSize: "11.5px", color: "#334155", fontWeight: 500 }}>
+{item.nome}
+</span>
+
+<div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px", marginTop: "4px" }}>
+{(atributosComMarcaInjetada?.length > 0 ? atributosComMarcaInjetada : familiaSelecionadaLocal?.atributos || []).map((attr: any) => {
+const valorAtual = item.valoresAtributos?.[attr.id || attr.nome] || "";
+return (
+<div key={attr.id || attr.nome} style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+<label style={{ fontSize: "10.5px", fontWeight: 600, color: "#475569" }}>
+{attr.nome}:
+</label>
+<Input
+size="small"
+placeholder={`Preencher ${attr.nome}`}
+defaultValue={valorAtual}
+onChange={(e) => {
+handleAtualizarAtributoItemPendente(item.id, attr.id || attr.nome, e.target.value);
+}}
+/>
+</div>
+);
+})}
+</div>
+</div>
+))}
+</Space>
+</div>
+</Modal>
+
+<AttributeGuideModal
+visible={isModalOpen}
+onClose={handleCloseGuideModal}
+defaultTab={guideTab}
+/>
+
+<ModalVinculoAtributos
+isModalAberto={isModalAberto}
+setIsModalAberto={setIsModalAberto}
+destinoModal={tabelaAlvoModal || "ficha"}
+atributosGlobaisDisponiveis={atributosGlobaisDisponiveis}
+handleAdicionarAtributoAoGrupo={handleAdicionarAtributoÀFamilia}
+brandColor={brandColor}
+/>
+
+<Modal
+title={
+<Space>
+<UndoOutlined style={{ color: brandColor || "#1677ff" }} />
+<span>Revisão de Alterações Pendentes</span>
+</Space>
+}>
+  <Card title="Guia de Referência: O que a Família Herda, Exige e Controla" bordered={false} style={{ marginBottom: 24 }}>
+    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+      <div>
+        <Text strong style={{ color: '#1890ff', fontSize: 16 }}>1. O que a Família HERDA da Categoria / Subcategoria Pai</Text>
+        <List
+          size="small"
+          dataSource={[
+            "DNA Estrutural Macro: O material base, norma construtiva ou série técnica (ex: Aço Galvanizado, Série 6200, SAE 100 R2).",
+            "Atributos Globais de Negócio: Regras macro de conformidade, exigências fiscais básicas e restrições do segmento industrial."
+          ]}
+          renderItem={(item) => (
+            <List.Item style={{ border: 'none', padding: '4px 0' }}>
+              <Space>
+                <Badge status="processing" />
+                <Text>{item}</Text>
+              </Space>
+            </List.Item>
+          )}
+        />
+      </div>
+
+      <Divider style={{ margin: '4px 0' }} />
+
+      <div>
+        <Text strong style={{ color: '#fa8c16', fontSize: 16 }}>2. O que a Família EXIGE Obrigatoriamente dos SKUs Filhos (O Escopo Rígido)</Text>
+        <List
+          size="small"
+          dataSource={[
+            "Atributos de Grade / Variação: Eixos comerciais obrigatórios para gerar os filhos (ex: Medidas dimensionais, Diâmetros, Bitolas, Voltagem).",
+            "Atributos de Ficha Técnica Críticos: Especificações que nenhum SKU pode nascer sem preencher (ex: Blindagem, Folga Radial, Pressão Máxima, Norma).",
+            "Atributos de Identificação Comercial: Marca, Part Number / Código do Fabricante e Unidade de Medida."
+          ]}
+          renderItem={(item) => (
+            <List.Item style={{ border: 'none', padding: '4px 0' }}>
+              <Space>
+                <Badge status="warning" />
+                <Text>{item}</Text>
+              </Space>
+            </List.Item>
+          )}
+        />
+      </div>
+
+      <Divider style={{ margin: '4px 0' }} />
+
+      <div>
+        <Text strong style={{ color: '#52c41a', fontSize: 16 }}>3. Comportamento e Regras de Propagação</Text>
+        <List
+          size="small"
+          dataSource={[
+            "Herança Automática: Tudo o que é definido na Família desce em cascata para os SKUs filhos instantaneamente.",
+            "Fallback de Segurança (Despromoção): Se um atributo deixa de ser obrigatório na Família, o valor preenchido nos filhos não é apagado; ele migra automaticamente para a Ficha Técnica estática do SKU.",
+            "Bloqueio de Publicação: SKUs criados sem os atributos obrigatórios exigidos pela família ficam impedidos de ser exportados para os Marketplaces e E-commerce."
+          ]}
+          renderItem={(item) => (
+            <List.Item style={{ border: 'none', padding: '4px 0' }}>
+              <Space>
+                <Badge status="success" />
+                <Text>{item}</Text>
+              </Space>
+            </List.Item>
+          )}
+        />
+      </div>
+    </Space>
+  </Card>
+</Modal>
+
+{/* 🔍 MODAL DE REVISÃO E DESFAZIMENTO DE ALTERAÇÕES */}
+<Modal
+title={
+<Space>
+<UndoOutlined style={{ color: brandColor || "#1677ff" }} />
+<span>Revisão de Alterações Pendentes</span>
+</Space>
+}
+open={isModalRevisaoOpen}
+onCancel={() => setIsModalRevisaoOpen(false)}
+width={750}
+footer={[
+<Button key="fechar" onClick={() => setIsModalRevisaoOpen(false)}>
+Continuar Editando
+</Button>,
+<Button
+key="desfazer"
+danger
+type="primary"
+icon={<UndoOutlined />}
+onClick={confirmarDesfazerTudo}
+>
+Desfazer Todas as Alterações
+</Button>,
+]}
+>
+<Alert
+message="Auditoria de Modificações Locais"
+description="Abaixo estão listados todos os campos que foram modificados e ainda não foram salvos no banco de dados."
+type="info"
+showIcon
+style={{ marginBottom: 16 }}
+/>
+
+<Table
+dataSource={calcularAlteracoesPendentes()}
+rowKey="chave"
+pagination={false}
+size="small"
+columns={[
+{
+title: "Campo Modificado",
+dataIndex: "campo",
+key: "campo",
+render: (text) => <Text strong style={{ color: "#1e293b" }}>{text}</Text>,
+},
+{
+title: "Valor Original (Salvo)",
+dataIndex: "antes",
+key: "antes",
+render: (val) => <Tag color="default">{String(val)}</Tag>,
+},
+{
+title: "Valor Atual (Pendente)",
+dataIndex: "depois",
+key: "depois",
+render: (val, record) => {
+if (record.chave === 'imagem' && val && val !== "(vazio)") {
+return <img src={val} alt="Preview" style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4 }} />;
+}
+return <Tag color="warning">{String(val)}</Tag>;
+},
+},
+{
+title: "Ação",
+key: "acao",
+align: "center" as const,
+width: 100,
+render: (_, record) => (
+<Button
+type="link"
+size="small"
+danger
+icon={<UndoOutlined />}
+onClick={() => {
+if (record.chave === 'marcaComportamento') {
+if (typeof setMarcaComportamento === 'function') {
+setMarcaComportamento(familiaOriginal.marcaComportamento);
+}
+} else {
+if (typeof setFamiliaSelecionada === 'function') {
+setFamiliaSelecionada((prev: any) => ({
+...prev,
+[record.chave]: familiaOriginal[record.chave],
+}));
+} else {
+console.error("A função setFamiliaSelecionada não está disponível no escopo.");
+}
+}
+
+Swal.fire({
+title: "Campo Revertido",
+text: `O campo "${record.campo}" voltou ao original.`,
+icon: "success",
+timer: 1200,
+showConfirmButton: false,
+});
+}}
+>
+Reverter
+</Button>
+),
+},
+]}
+locale={{
+emptyText: <Empty description="Nenhuma alteração pendente" />,
+}}
+/>
+</Modal>
+
+
+</div>
+);
 };

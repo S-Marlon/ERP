@@ -1,5 +1,5 @@
 // ==========================================
-// FAMILY MANAGER - SERVIÇO DE API
+// FAMILY MANAGER - SERVIÇO DE API (REVISADO)
 // ==========================================
 
 import { 
@@ -34,76 +34,94 @@ export const getCategorias = async (tenantId: number = 1): Promise<CategoriaAPIR
   return dados.map((cat: any): CategoriaAPIResponse => ({
     id: String(cat.id),
     nome: cat.nome || 'Categoria Sem Nome',
-    paiId: cat.categoria_pai_id ? String(cat.categoria_pai_id) : null
+    paiId: (cat.categoria_pai_id || cat.categoriaPaiId) ? String(cat.categoria_pai_id || cat.categoriaPaiId) : null
   }));
 };
 
 /**
- * 🔄 GET Famílias / Grupos de Produtos com Atributos (Integração Total com BD)
+ * 🔄 GET Famílias de Produtos com Atributos (Integração Total com BD)
  */
-export const getGroups = async (tenantId: number = 1): Promise<Grupo[]> => {
+export const getFamilies = async (tenantId: number = 1): Promise<Grupo[]> => {
   const response = await fetch(`${API_BASE_URL}/cadastros/familias?tenant_id=${tenantId}`, {
     method: 'GET',
     headers: DEFAULT_HEADERS,
   });
 
-  const familias = await handleResponse<any[]>(response, 'Erro ao carregar as famílias/grupos.');
+  const familias = await handleResponse<any[]>(response, 'Erro ao carregar as famílias.');
 
   return familias.map((fam: any): Grupo => ({
     id: String(fam.id),
     nome: fam.nome || 'Família Sem Nome',
-    // Mapeamento correto vindo do controller
-    categoriaPai: fam.categoriaPai ? String(fam.categoriaPai) : '',
-    categoriaPaiNome: fam.categoriaPaiNome || '', 
+    categoriaPai: fam.categoriaPai ? String(fam.categoriaPai) : (fam.categoria_id ? String(fam.categoria_id) : ''),
+    categoriaPaiNome: fam.categoriaPaiNome || fam.categoria_pai_nome || '', 
     descricao: fam.descricao || '',
-    status: String(fam.status).toUpperCase() === 'INATIVO' ? 'INATIVO' : 'ATIVO',
-    
-    // Todos os campos operacionais 100% integrados
-    unidadeMedidaBase: fam.unidadeMedidaBase || 'PC',
-    tipoItem: fam.tipoItem || 'PA', 
-    ncmPadrao: fam.ncmPadrao || '',
-    cestPadrao: fam.cestPadrao || '',
-    siglaSku: fam.siglaSku || '',
-    separadorSku: fam.separadorSku || '-',
-    templateSku: fam.templateSku || '{SIGLA}{S}{VARIACAO}',
-    templateNomeComercial: fam.templateNomeComercial || '{FAMILIA}',
-    descricaoComercialPadrao: fam.descricaoComercialPadrao || '',
-    observacoesPadrao: fam.observacoesPadrao || '',
+    status: String(fam.status || 'ATIVO').toUpperCase() === 'INATIVO' ? 'INATIVO' : 'ATIVO',
+
+    unidadeMedidaBase: fam.unidadeMedidaBase || fam.unidade_base || 'PC',
+    tipoItem: fam.tipoItem || fam.tipo_item || 'PA', 
+    ncmPadrao: fam.ncmPadrao || fam.ncm_padrao || '',
+    cestPadrao: fam.cestPadrao || fam.cest_padrao || '',
+    siglaSku: fam.siglaSku || fam.sigla_sku || '',
+    separadorSku: fam.separadorSku || fam.separador_sku || '-',
+    templateSku: fam.templateSku || fam.template_sku || '{SIGLA}{S}{VARIACAO}',
+    templateNomeComercial: fam.templateNomeComercial || fam.template_nome || '{FAMILIA}',
+    descricaoComercialPadrao: fam.descricaoComercialPadrao || fam.descricao_comercial_padrao || '',
+    observacoesPadrao: fam.observacoesPadrao || fam.observacoes_padrao || '',
     cor: fam.cor || '#0050b3',
     imagem: fam.imagem || '',
     
-    // Mapeamento correto dos atributos vinculados (Herança + Locais)
+    // Suporte a marca e comportamento com fallbacks
+    idMarca: fam.idMarca || fam.id_marca || '',
+    marcaComportamento: fam.marcaComportamento || fam.comportamento_marca || fam.comportamentoMarca || 'ficha',
+
     atributos: Array.isArray(fam.atributos) 
       ? fam.atributos.map((attr: any): AtributoConfig => ({
           id: String(attr.id),
           nome: attr.nome || '',
           codigo: attr.codigo || '',
           classificacao: attr.classificacao || 'ficha', 
-          tipoDado: attr.tipoDado || 'texto',
+          tipoDado: attr.tipoDado || attr.tipo_dado || 'texto',
           opcoesValidas: Array.isArray(attr.opcoes) ? attr.opcoes : (Array.isArray(attr.opcoesValidas) ? attr.opcoesValidas : []),
-          separadorSufixo: attr.separadorSufixo || 'nenhum',
+          separadorSufixo: attr.separadorSufixo || attr.separador_sufixo || 'nenhum',
           sufixo: attr.sufixo || '',
           obrigatorio: Boolean(attr.obrigatorio),
-          geraVariacao: Boolean(attr.geraVariacao),
-          compoeSku: Boolean(attr.compoeSku),
-          ordemSku: Number(attr.ordemSku || 0),
+          geraVariacao: Boolean(attr.geraVariacao ?? attr.gera_variacao),
+          compoeSku: Boolean(attr.compoeSku ?? attr.compoe_sku),
+          ordemSku: Number(attr.ordemSku || attr.ordem_sku || 0),
           exemplos: attr.exemplos || '',
-          valorHerdadoDoGrupo: Boolean(attr.valorHerdadoDoGrupo),
-          valorPadraoGrupo: attr.valorPadraoGrupo || '',
+          valorHerdadoDaFamilia: Boolean(attr.valorHerdadoDaFamilia ?? attr.valorHerdadoDoGrupo ?? attr.valor_herdado),
+          valorPadraoFamilia: attr.valorPadraoFamilia || attr.valorPadraoGrupo || attr.valor_padrao || '',
           pesquisavel: Boolean(attr.pesquisavel),
           bloqueado: Boolean(attr.bloqueado),
           retransmitir: Boolean(attr.retransmitir),
-          estaSendoUtilizado: Boolean(attr.estaSendoUtilizado),
+          estaSendoUtilizado: Boolean(attr.estaSendoUtilizado ?? attr.esta_sendo_utilizado),
           origem: attr.origem || 'locais'
         }))
       : []
   }));
 };
 
-// Aliases para chamadas de Família
-export const getFamilias = getGroups;
+export const getGroups = getFamilies;
 
-export const createFamilia = async (data: CreateFamiliaPayload, tenantId: number = 1): Promise<GenericFamiliaAPIResponse> => {
+// ==========================================
+// FUNÇÕES DE ESCRITA (CREATE, UPDATE, DELETE)
+// ==========================================
+
+export const createFamilia = async (
+  arg1: CreateFamiliaPayload | number, 
+  arg2: number | CreateFamiliaPayload = 1
+): Promise<GenericFamiliaAPIResponse> => {
+  let data: CreateFamiliaPayload;
+  let tenantId: number;
+
+  if (typeof arg1 === 'number') {
+    tenantId = arg1;
+    data = arg2 as CreateFamiliaPayload;
+  } else {
+    data = arg1;
+    tenantId = typeof arg2 === 'number' ? arg2 : 1;
+  }
+
   const response = await fetch(`${API_BASE_URL}/cadastros/familias?tenant_id=${tenantId}`, {
     method: 'POST',
     headers: DEFAULT_HEADERS,
@@ -133,10 +151,18 @@ export const deleteFamilia = async (idFamilia: string, tenantId: number = 1): Pr
   return handleResponse<GenericFamiliaAPIResponse>(response, 'Erro ao excluir família.');
 };
 
-// Aliases para compatibilidade legada do Front-end
+// Aliases globais em inglês e português para compatibilidade total
+export const createFamily = createFamilia;
+export const updateFamily = updateFamilia;
+export const deleteFamily = deleteFamilia;
+
 export const createGroup = createFamilia;
 export const updateGroup = updateFamilia;
 export const deleteGroup = deleteFamilia;
+
+// ==========================================
+// ATRIBUTOS E PRODUTOS
+// ==========================================
 
 export const getAtributosDaCategoria = async (idCategoria: string, tenantId: number = 1): Promise<any[]> => {
   const response = await fetch(`${API_BASE_URL}/cadastros/categorias/${idCategoria}/atributos?tenant_id=${tenantId}`, {
@@ -159,7 +185,7 @@ export const getAtributosGlobais = async (tenantId: number = 1): Promise<Atribut
     nome: attr.nome || '',
     codigo: attr.codigo || '',
     classificacao: attr.classificacao || 'ficha',
-    tipoDado: attr.tipoDado || 'texto',
+    tipoDado: attr.tipoDado || attr.tipo_dado || 'texto',
     opcoesValidas: Array.isArray(attr.opcoes) ? attr.opcoes : [],
     separadorSufixo: 'nenhum',
     sufixo: attr.sufixo || '',
@@ -168,25 +194,24 @@ export const getAtributosGlobais = async (tenantId: number = 1): Promise<Atribut
     compoeSku: false,
     ordemSku: 0,
     exemplos: '',
-    valorHerdadoDoGrupo: false,
+    valorHerdadoDaFamilia: false,
+    valorPadraoFamilia: '',
     origem: 'global'
   }));
 };
 
-
-export const getItensDoGrupo = async (grupoId: string, tenantId: number = 1): Promise<ItemAssociado[]> => {
-  const response = await fetch(`${API_BASE_URL}/cadastros/familias/${grupoId}/produtos?tenant_id=${tenantId}`, {
+export const getItensDaFamilia = async (familiaId: string, tenantId: number = 1): Promise<ItemAssociado[]> => {
+  const response = await fetch(`${API_BASE_URL}/cadastros/familias/${familiaId}/produtos?tenant_id=${tenantId}`, {
     method: 'GET',
     headers: DEFAULT_HEADERS,
   });
 
   const dados = await handleResponse<any[]>(response, 'Erro ao carregar itens associados.');
 
-  // Mapeamento compatível com a interface ItemAssociado do front-end
   return dados.map((item: any): ItemAssociado => {
     const idItem = String(item.id ?? item.idItem ?? item.id_item ?? '');
-    const nomeProduto = item.nomeComercial || item.nomeItem || item.nomeItemGlobal || item.nome || 'Produto Sem Nome';
-    const skuProduto = item.skuCustomizado || item.skuGlobal || item.sku || '';
+    const nomeProduto = item.nomeComercial || item.nome_comercial || item.nomeItem || item.nomeItemGlobal || item.nome || 'Produto Sem Nome';
+    const skuProduto = item.skuCustomizado || item.sku_customizado || item.skuGlobal || item.sku || '';
 
     return {
       id: idItem,
@@ -194,18 +219,20 @@ export const getItensDoGrupo = async (grupoId: string, tenantId: number = 1): Pr
       sku: skuProduto,
       nome: nomeProduto,
       nomeItem: nomeProduto,
-      valoresAtributos: item.valoresAtributos || {},
-      tipoRecurso: item.tipoRecurso || 'PRODUTO',
-      status: item.statusItem || 'ATIVO',
-      precoVenda: Number(item.precoVenda || 0),
-      custoGerencial: Number(item.custoGerencial || 0),
-      margemLucro: Number(item.margemLucro || 0),
-      exibirNoPdv: Boolean(item.exibirNoPdv),
-      podeVenderSemEstoque: Boolean(item.podeVenderSemEstoque),
-      descricaoComercial: item.descricaoComercial || ''
+      valoresAtributos: item.valoresAtributos || item.valores_atributos || {},
+      tipoRecurso: item.tipoRecurso || item.tipo_recurso || 'PRODUTO',
+      status: item.statusItem || item.status_item || 'ATIVO',
+      precoVenda: Number(item.precoVenda || item.preco_venda || 0),
+      custoGerencial: Number(item.custoGerencial || item.custo_gerencial || 0),
+      margemLucro: Number(item.margemLucro || item.margem_lucro || 0),
+      exibirNoPdv: Boolean(item.exibirNoPdv ?? item.exibir_no_pdv),
+      podeVenderSemEstoque: Boolean(item.podeVenderSemEstoque ?? item.pode_vender_sem_estoque),
+      descricaoComercial: item.descricaoComercial || item.descricao_comercial || ''
     };
   });
 };
+
+export const getItensDoGrupo = getItensDaFamilia;
 
 export const getDiagnosticoFormalizacao = async (familiaId: string, tenantId: number = 1): Promise<any> => {
   const response = await fetch(`${API_BASE_URL}/cadastros/familias/${familiaId}/formalizacao?tenant_id=${tenantId}`, {
@@ -227,4 +254,3 @@ export const formalizarItensDaFamilia = async (
   });
   return handleResponse<any>(response, 'Erro ao formalizar os itens da família.');
 };
-

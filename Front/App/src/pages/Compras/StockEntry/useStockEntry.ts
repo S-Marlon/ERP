@@ -1,5 +1,8 @@
 import { useState, useMemo } from 'react';
-import { parseNfeXmlToData } from '../utils/nfeParser'; // ou a sua nova rota modular de parsing
+import { parseNfeXmlToData } from '../utils/nfeParser'; 
+import { parseNfeComplete, NfeDataFromXML } from './xml/utils/nfeParser';
+import { reconcileFreight } from './freightReconciliation';
+import { reconcileFinancial } from './financialReconciliation';
 import { 
     createSupplier, 
     checkSupplier, 
@@ -48,13 +51,17 @@ const formatCnpj = (cnpj?: string): string => {
 };
 
 export const useStockEntry = (tenantId: number = 1) => {
-    // Estados Financeiros, de Itens e do XML Bruto para os blocos modulares
+    // Estados Financeiros, de Itens e do XML Bruto
     const [financials, setFinancials] = useState<FinancialTotals>(INITIAL_FINANCIALS);
     const [items, setItems] = useState<Item[]>([]);
     const [frete, setFrete] = useState<any | null>(null);
     const [rawXmlString, setRawXmlString] = useState<string | null>(null);
 
+    // Estados de Modais
     const [isConferenceModalOpen, setIsConferenceModalOpen] = useState(false);
+    const [isTotalDetailsModalOpen, setIsTotalDetailsModalOpen] = useState(false);
+    const [isFreightModalOpen, setIsFreightModalOpen] = useState(false);
+    const [freightDistributionMode, setFreightDistributionMode] = useState<string>('proportional_value');
     
     // Estados do Fornecedor
     const [supplierExists, setSupplierExists] = useState<boolean | null>(null);
@@ -80,12 +87,58 @@ export const useStockEntry = (tenantId: number = 1) => {
     const [itemToMap, setItemToMap] = useState<any>(null);
     const [isProcessingItems, setIsProcessingItems] = useState(false);
     
+    // --- PARSING E RECONCILIAÇÃO AVANÇADA ---
+    const parsedNfe = useMemo<NfeDataFromXML | null>(() => {
+        if (!rawXmlString) return null;
+        try {
+            return parseNfeComplete(rawXmlString);
+        } catch (error) {
+            console.error("Erro ao parsear a NF-e do XML:", error);
+            return null;
+        }
+    }, [rawXmlString]);
+
+    const nfeTotalValue = useMemo(() => {
+        return Number(parsedNfe?.totais?.icmsTot?.vNF || 0) || 0;
+    }, [parsedNfe]);
+
+    const nfeFreightValue = useMemo(() => {
+        return Number(parsedNfe?.totais?.icmsTot?.vFrete || 0) || 0;
+    }, [parsedNfe]);
+
+    const freightReconciliation = useMemo(() => {
+        return reconcileFreight(nfeFreightValue, items);
+    }, [nfeFreightValue, items]);
+
+    const financialReconciliation = useMemo(() => {
+        const totals = parsedNfe?.totais?.icmsTot;
+        return reconcileFinancial({
+            produtos: totals?.vProd,
+            frete: totals?.vFrete,
+            seguro: totals?.vSeg,
+            outrasDespesas: totals?.vOutro,
+            desconto: totals?.vDesc,
+            ipi: totals?.vIPI,
+            icmsSt: totals?.vICMSST,
+            total: totals?.vNF,
+        }, items);
+    }, [parsedNfe, items]);
+
     // --- CÁLCULOS E MEMOS ---
     const subtotal = useMemo(() => items.reduce((sum, item) => sum + (item.valorProdutos || 0), 0), [items]);
 
     const adjustedPhysicalSubtotal = useMemo(() => {
-        return items.reduce((sum, item) => sum + (item.receivedQuantity * (item.valorCustoReal || item.valorUnitario || 0)), 0);
+        return items.reduce((sum, item) => sum + ((item.receivedQuantity || 0) * (item.valorCustoReal || item.valorUnitario || 0)), 0);
     }, [items]);
+
+    const totalDivergences = useMemo(() => items.filter(i => i.difference !== 0).length, [items]);
+    const totalConfirmed = useMemo(() => items.filter(i => i.isConfirmed).length, [items]);
+    const totalPhysicalItems = useMemo(() => items.reduce((acc, it) => acc + (it.receivedQuantity || 0), 0), [items]);
+    
+    const progressPercent = useMemo(() => {
+        if (items.length === 0) return 0;
+        return Math.round((totalConfirmed / items.length) * 100);
+    }, [items.length, totalConfirmed]);
 
     const hasUnmappedItems = useMemo(() => items.some(i => !i.mappedId || i.mappingStatus === 'PRODUTO_INEDITO'), [items]);
     const hasUnconfirmedItems = useMemo(() => items.some(i => !i.isConfirmed), [items]);
@@ -135,79 +188,133 @@ export const useStockEntry = (tenantId: number = 1) => {
     };
 
     // --- ENTRADA DO ARQUIVO XML ---
-    const handleXmlUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleXmlUpload = (event: React.ChangeEvent<HTMLInputElement> | { target: { files: File[] | FileList } }) => {
         const file = event.target.files?.[0];
         if (!file) return;
 
+        setIsProcessingItems(true);
         const reader = new FileReader();
         reader.onload = async (e) => {
             try {
                 const xmlContent = e.target?.result as string;
-                setRawXmlString(xmlContent); // Armazena a string bruta para os parsers modulares (ex: 03-emiParser)
+                if (!xmlContent) return;
+                
+                setRawXmlString(xmlContent);
 
+                // Executa os parsers (Compatível com ambas abordagens para garantir robustez)
                 const rawXmlData = parseNfeXmlToData(xmlContent);
-                if (!rawXmlData) throw new Error('Falha ao extrair dados do XML.');
+                const parsedComplete = parseNfeComplete(xmlContent);
 
-                const formattedCnpj = formatCnpj(rawXmlData.emitente.cnpj);
-                const cnpjLimpo = rawXmlData.emitente.cnpj.replace(/\D/g, '');
+                if (!rawXmlData && !parsedComplete) throw new Error('Falha ao extrair dados do XML.');
+
+                const emitenteData = parsedComplete?.emitente || rawXmlData?.emitente;
+                const numeroNf = parsedComplete?.numero || rawXmlData?.numero;
+                const chaveAcesso = parsedComplete?.chaveAcesso || rawXmlData?.chaveAcesso;
+                
+                const formattedCnpj = formatCnpj(emitenteData.cnpj);
+                const cnpjLimpo = emitenteData.cnpj.replace(/\D/g, '');
                 const dataFicticia = new Date().toISOString().substring(0, 10);
 
-                const mappedItems: Item[] = rawXmlData.produtos.map((produto: any, index: number) => ({
-                    ...produto,
-                    tempId: index + 1,
-                    receivedQuantity: produto.quantidade || 0,
-                    isConfirmed: false,
-                    difference: 0,
-                    grupoId: null,
-                    atributosCustomizados: [],
-                }));
+                // Processamento detalhado dos produtos
+                const rawProdutos = parsedComplete?.produtos || rawXmlData?.produtos || [];
+                const mappedItems: Item[] = rawProdutos.map((item: any, index: number) => {
+                    const prodRef = item.prod || item; // Suporta formato modular completo ou simples
+                    const qtdXml = parseFloat(prodRef.qCom || prodRef.quantidade) || 0;
+                    const vlrUnit = parseFloat(prodRef.vUnCom || prodRef.valorUnitario) || 0;
+                    const vlrProd = parseFloat(prodRef.vProd || prodRef.valorProdutos) || (qtdXml * vlrUnit);
+
+                    const baseUnitCalculated = qtdXml > 0 ? vlrProd / qtdXml : vlrUnit;
+                    const freightItem = parseFloat(prodRef.vFrete || '0') || 0;
+                    const otherExpenses = parseFloat(prodRef.vOutro || '0') || 0;
+                    const insuranceItem = parseFloat(prodRef.vSeg || '0') || 0;
+
+                    const ipiObj = item.imposto?.ipi?.IPITrib || item.imposto?.IPI?.ipitrib || item.imposto?.ipi || {};
+                    const vIpiItem = parseFloat(ipiObj.vIPI || ipiObj.VIPI || '0') || 0;
+
+                    const icmsObj = item.imposto?.icms || {};
+                    const vStItem = Number(icmsObj.vICMSST || icmsObj.vBCST || 0) || 0;
+                    const totalAcrescimosItem = freightItem + otherExpenses + insuranceItem + vIpiItem + vStItem;
+                    const valorTotalRealItem = vlrProd + totalAcrescimosItem;
+                    const effectiveUnitCost = qtdXml > 0 ? valorTotalRealItem / qtdXml : vlrUnit;
+
+                    return {
+                        ...item,
+                        tempId: index + 1,
+                        nItem: item.nItem || String(index + 1),
+                        sku: prodRef.cProd || prodRef.sku,
+                        ean: prodRef.cEAN || prodRef.gtin,
+                        descricao: prodRef.xProd || prodRef.descricao,
+                        ncm: prodRef.NCM || prodRef.ncm,
+                        unidade: prodRef.uCom || prodRef.unidade,
+                        quantidade: qtdXml,
+                        receivedQuantity: qtdXml,
+                        valorUnitario: Number(effectiveUnitCost.toFixed(4)),
+                        valorBaseUnitario: Number(baseUnitCalculated.toFixed(4)),
+                        valorTotal: valorTotalRealItem,
+                        valorProdutos: vlrProd,
+                        freightOriginal: freightItem,
+                        freightDistributed: 0,
+                        freightAdded: freightItem,
+                        seguro: insuranceItem,
+                        outrasDespesas: otherExpenses,
+                        desconto: parseFloat(prodRef.vDesc || '0') || 0,
+                        ipi: vIpiItem,
+                        icmsSt: vStItem,
+                        difference: 0,
+                        isConfirmed: false,
+                        grupoId: null,
+                        atributosCustomizados: [],
+                    };
+                });
+
+                const totaisIcsm = parsedComplete?.totais?.icmsTot || {};
 
                 setFinancials({
                     supplierCnpj: formattedCnpj,
-                    invoiceNumber: `NF ${rawXmlData.numero}`,
-                    supplier: rawXmlData.emitente.nome,
-                    supplierFantasyName: rawXmlData.emitente.nomeFantasy || rawXmlData.emitente.nome,
-                    accessKey: rawXmlData.chaveAcesso,
+                    invoiceNumber: `NF ${numeroNf}`,
+                    supplier: emitenteData.nome,
+                    supplierFantasyName: emitenteData.nomeFantasy || emitenteData.nomeFantasia || emitenteData.nome,
+                    accessKey: chaveAcesso,
                     entryDate: dataFicticia,
-                    totalFreight: rawXmlData.valorTotalFrete,
-                    totalIpi: rawXmlData.valorTotalIpi,
-                    totalOtherExpenses: rawXmlData.valorOutrasDespesas,
-                    totalNoteValue: rawXmlData.valorTotalNf,
-                    totalIcmsST: rawXmlData.valorTotalIcmsST,
-                    totalIBS: rawXmlData.valorTotalIBS,
-                    totalCBS: rawXmlData.valorTotalCBS,
+                    totalFreight: Number(totaisIcsm.vFrete || rawXmlData?.valorTotalFrete || 0),
+                    totalIpi: Number(totaisIcsm.vIPI || rawXmlData?.valorTotalIpi || 0),
+                    totalOtherExpenses: Number(totaisIcsm.vOutro || rawXmlData?.valorOutrasDespesas || 0),
+                    totalNoteValue: Number(totaisIcsm.vNF || rawXmlData?.valorTotalNf || 0),
+                    totalIcmsST: Number(totaisIcsm.vICMSST || rawXmlData?.valorTotalIcmsST || 0),
+                    totalIBS: rawXmlData?.valorTotalIBS,
+                    totalCBS: rawXmlData?.valorTotalCBS,
                 });
 
-                setFrete(rawXmlData.frete);
+                setFrete(rawXmlData?.frete || null);
+                if (emitenteData?.nome) {
+                    setSupplierCreationName(emitenteData.nome);
+                    setSupplierCreationFantasyName(emitenteData.nomeFantasy || emitenteData.nomeFantasia || '');
+                }
 
                 setIsSupplierChecking(true);
                 const supplierCheck = await checkSupplier(cnpjLimpo, tenantId);
 
                 if (!supplierCheck || !supplierCheck.exists || !supplierCheck.supplier) {
-                    const emitente = rawXmlData.emitente;
-
-                    const enderecoCompleto = emitente.endereco 
-                        ? `${emitente.endereco.xLgr || ''}, ${emitente.endereco.nro || ''} - ${emitente.endereco.xBairro || ''}`.trim()
+                    const endereco = emitenteData.endereco;
+                    const enderecoCompleto = endereco 
+                        ? `${endereco.xLgr || ''}, ${endereco.nro || ''} - ${endereco.xBairro || ''}`.trim()
                         : '';
 
-                    const municipioUfCep = emitente.endereco 
-                        ? `${emitente.endereco.xMun || ''} - ${emitente.endereco.UF || ''}, ${emitente.endereco.CEP || ''}`.trim()
+                    const municipioUfCep = endereco 
+                        ? `${endereco.xMun || ''} - ${endereco.UF || ''}, ${endereco.CEP || ''}`.trim()
                         : '';
                     
                     setSupplierExists(false);
                     setSupplierToCreate({
                         cnpj: formattedCnpj,
-                        name: emitente.nome,
-                        fantasyName: emitente.nomeFantasy || emitente.nome,
-                        stateRegistration: emitente.ie || '',
+                        name: emitenteData.nome,
+                        fantasyName: emitenteData.nomeFantasy || emitenteData.nomeFantasia || emitenteData.nome,
+                        stateRegistration: emitenteData.ie || '',
                         address: enderecoCompleto,
                         cityStateZip: municipioUfCep,
-                        phone: emitente.endereco?.fone || ''
+                        phone: endereco?.fone || ''
                     });
 
-                    setSupplierCreationName(rawXmlData.emitente.nome);
-                    setSupplierCreationFantasyName(rawXmlData.emitente.nomeFantasy || rawXmlData.emitente.nome);
-                    
                     setPendingXmlData({ items: mappedItems });
                     setItems(mappedItems);
                     setIsSupplierModalOpen(true);
@@ -228,10 +335,104 @@ export const useStockEntry = (tenantId: number = 1) => {
                 alert(`Erro: ${error instanceof Error ? error.message : 'Erro desconhecido ao ler XML'}`);
             } finally {
                 setIsSupplierChecking(false);
-                event.target.value = '';
+                if ('target' in event && 'value' in event.target) {
+                    (event.target as HTMLInputElement).value = '';
+                }
             }
         };
         reader.readAsText(file);
+    };
+
+    // --- AÇÕES DE FRETE ---
+    const handleApplyFreightDistribution = () => {
+        const totalItens = items.reduce((total, item) => {
+            const freteConsiderado = Number(item.freightAdded) || 0;
+            return total + Math.max(0, (Number(item.valorTotal) || 0) - freteConsiderado);
+        }, 0);
+        
+        if (totalItens <= 0) {
+            alert("Não há valor nos itens para ratear o frete.");
+            return;
+        }
+
+        setItems(prevItems => prevItems.map(item => {
+            const freteAtual = Number(item.freightAdded) || 0;
+            const itemProdTotal = Math.max(0, (Number(item.valorTotal) || 0) - freteAtual);
+            let freightPortion = 0;
+
+            if (freightDistributionMode === 'proportional_value') {
+                const proportion = itemProdTotal / totalItens;
+                freightPortion = nfeFreightValue * proportion;
+            } else if (freightDistributionMode === 'proportional_quantity') {
+                const totalQty = prevItems.reduce((acc, i) => acc + (i.quantidade || 0), 0);
+                const proportion = totalQty > 0 ? (item.quantidade || 0) / totalQty : 0;
+                freightPortion = nfeFreightValue * proportion;
+            } else if (freightDistributionMode === 'equal') {
+                freightPortion = prevItems.length > 0 ? nfeFreightValue / prevItems.length : 0;
+            }
+
+            const quantidade = Number(item.quantidade) || 1;
+            const novoValorTotal = itemProdTotal + freightPortion;
+            const newUnitCost = novoValorTotal / quantidade;
+            return {
+                ...item,
+                valorUnitario: Number(newUnitCost.toFixed(4)),
+                valorTotal: Number(novoValorTotal.toFixed(2)),
+                freightDistributed: Number(freightPortion.toFixed(2)),
+                freightAdded: Number(freightPortion.toFixed(2)),
+            };
+        }));
+
+        setIsFreightModalOpen(false);
+    };
+
+    // --- IMPRESSÃO DANFE SIMPLIFICADO ---
+    const handlePrintDanfeHtml = () => {
+        const printWindow = window.open('', '_blank', 'width=900,height=800');
+        if (!printWindow) {
+            alert('Permita pop-ups no navegador para gerar a impressão.');
+            return;
+        }
+
+        const htmlContent = `
+        <!DOCTYPE html>
+        <html lang="pt-BR">
+        <head>
+        <meta charset="UTF-8">
+        <title>DANFE Simplificado - NF-e ${parsedNfe?.chaveAcesso || financials.accessKey || ''}</title>
+        <style>
+        body { font-family: Arial, sans-serif; font-size: 11px; color: #000; margin: 0; padding: 10px; background: #fff; }
+        .container { width: 100%; max-width: 800px; margin: 0 auto; border: 1px solid #000; padding: 8px; }
+        .flex { display: flex; justify-content: space-between; }
+        .box { border: 1px solid #000; padding: 5px; margin-bottom: 6px; }
+        .text-right { text-align: right; }
+        .bold { font-weight: bold; }
+        </style>
+        </head>
+        <body>
+        <div class="container">
+        <div class="box">
+        <div class="flex">
+        <div>
+        <span class="bold" style="font-size: 14px;">${parsedNfe?.emitente?.nome || financials.supplier || 'Emitente não informado'}</span><br>
+        <span>CNPJ: ${parsedNfe?.emitente?.cnpj || financials.supplierCnpj || '-'} | Fantasia: ${parsedNfe?.emitente?.nomeFantasia || financials.supplierFantasyName || '-'}</span><br>
+        <span>NF-e Nº: ${parsedNfe?.numero || financials.invoiceNumber || '-'}</span>
+        </div>
+        <div class="text-right">
+        <span class="bold" style="font-size: 13px;">DANFE SIMPLIFICADO</span><br>
+        <span>Entrada de Mercadorias</span><br>
+        <span style="font-size: 9px;">Chave: ${parsedNfe?.chaveAcesso || financials.accessKey || '-'}</span>
+        </div>
+        </div>
+        </div>
+        </div>
+        </body>
+        </html>
+        `;
+
+        printWindow.document.open();
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
     };
 
     const handleCancelSupplierCreation = () => {
@@ -275,11 +476,14 @@ export const useStockEntry = (tenantId: number = 1) => {
         }
     };
 
-    // --- DEMAIS ACOES DA TABELA ---
+    // --- GERENCIAMENTO DE ITENS DA TABELA ---
     const handleConfirmItems = (ids: number[]) => setItems(p => p.map(i => ids.includes(i.tempId) ? { ...i, isConfirmed: true } : i));
     const handleUnconfirmItems = (ids: number[]) => setItems(p => p.map(i => ids.includes(i.tempId) ? { ...i, isConfirmed: false } : i));
     const handleToggleSingleItem = (id: number) => setItems(p => p.map(i => i.tempId === id ? { ...i, isConfirmed: !i.isConfirmed } : i));
     
+    const handleConfirmAllItems = () => setItems(p => p.map(item => ({ ...item, isConfirmed: true })));
+    const handleUnconfirmAllItems = () => setItems(p => p.map(item => ({ ...item, isConfirmed: false })));
+
     const handleRemoveItemsFromConference = (ids: number[]) => {
         if (window.confirm('Remover itens selecionados?')) {
             setItems(p => p.filter(i => !ids.includes(i.tempId)));
@@ -309,13 +513,31 @@ export const useStockEntry = (tenantId: number = 1) => {
     };
 
     const handleQuantityReceivedChange = (id: number, newQty: number) => {
-        setItems(p => p.map(i => i.tempId === id ? { ...i, receivedQuantity: newQty, difference: (i.quantidade || 0) - newQty } : i));
+        setItems(p => p.map(i => i.tempId === id ? { 
+            ...i, 
+            receivedQuantity: newQty, 
+            difference: newQty - (i.quantidade || 0) 
+        } : i));
     };
 
     const handleAssignGroupToItems = (ids: number[], groupData: any) => {
         const groupName = groupData.mode === 'LINK' ? groupData.grupoId : groupData.nomeGrupo;
         setItems(p => p.map(i => ids.includes(i.tempId) ? { ...i, grupo: groupName, grupoVariacao: groupData.variacao } : i));
     };
+
+    const beforeUpload = (file: File) => {
+    const isXml = file.type === 'text/xml' || file.name.endsWith('.xml');
+    if (!isXml) {
+        alert('Apenas arquivos XML são permitidos!');
+        return false;
+    }
+    handleXmlUpload({ target: { files: [file] } } as unknown as React.ChangeEvent<HTMLInputElement>);
+    return false;
+};
+
+
+
+// Inclua no objeto `return { ..., beforeUpload }`
 
     return {
         financials, 
@@ -324,7 +546,16 @@ export const useStockEntry = (tenantId: number = 1) => {
         adjustedPhysicalSubtotal, 
         isSubmitDisabled,
         frete,
-        rawXmlString, // Exposto para que o componente principal acesse os blocos modulares (ex: parseEmitNFe)
+        rawXmlString, 
+        parsedNfe,
+        nfeTotalValue,
+        nfeFreightValue,
+        freightReconciliation,
+        financialReconciliation,
+        totalDivergences,
+        totalConfirmed,
+        totalPhysicalItems,
+        progressPercent,
         supplierExists, 
         isSupplierChecking, 
         isSupplierModalOpen, 
@@ -335,6 +566,13 @@ export const useStockEntry = (tenantId: number = 1) => {
         isMappingModalOpen, 
         itemToMap, 
         isProcessingItems,
+        isConferenceModalOpen,
+        isTotalDetailsModalOpen,
+        isFreightModalOpen,
+        freightDistributionMode,
+        setFreightDistributionMode,
+        setIsFreightModalOpen,
+        setIsTotalDetailsModalOpen,
         setSupplierCreationName, 
         setSupplierCreationFantasyName,
         handleXmlUpload, 
@@ -343,15 +581,20 @@ export const useStockEntry = (tenantId: number = 1) => {
         handleConfirmItems, 
         handleUnconfirmItems, 
         handleToggleSingleItem,
+        handleConfirmAllItems,
+        handleUnconfirmAllItems,
         handleRemoveItemsFromConference, 
         handleOpenMappingFromTable, 
         handleModalMapSuccess,
         handleQuantityReceivedChange, 
         handleAssignGroupToItems, 
+        handleApplyFreightDistribution,
+        handlePrintDanfeHtml,
         setIsMappingModalOpen, 
         setItemToMap,
-        isConferenceModalOpen, 
         setIsSupplierModalOpen,
         setIsConferenceModalOpen,
+        beforeUpload,
+        
     };
-};
+};  

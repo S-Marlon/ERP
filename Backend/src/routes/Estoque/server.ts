@@ -8,7 +8,7 @@ import crypto from 'crypto';
 import { processStockMovement, STOCK_ORIGINS, recalculateStockForProduct, getCurrentStock } from '../../services/stock/stock.service';
 
 import clientesRoutes from '../Clientes/cliente.routes';
-import comprasRoutes from '../Compras/routes/compras.routes';
+import comprasRoutes from '../Compras/compras.routes';
 
 
 import lojaClientesHistoricoRoutes

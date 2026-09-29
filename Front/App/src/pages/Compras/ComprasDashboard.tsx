@@ -25,7 +25,8 @@ import {
   CarOutlined,
   PlusOutlined,
   FileSyncOutlined,
-  SafetyCertificateOutlined
+  SafetyCertificateOutlined,
+  DiffOutlined
 } from '@ant-design/icons';
 
 const { Title, Text, Paragraph } = Typography;
@@ -38,6 +39,10 @@ export default function ComprasDashboard() {
   // 🔌 Ações Prontas
   const handleNovaNFe = () => {
     navigate('/compras/entrada-nfe');
+  };
+
+   const handlestagings = () => {
+    navigate('/stagings');
   };
 
   const handleGerenciarFornecedores = () => {
@@ -167,6 +172,20 @@ export default function ComprasDashboard() {
             <Paragraph>Inicie a esteira de suprimentos importando o arquivo XML diretamente da NF-e do fornecedor.</Paragraph>
             <Button type="primary" icon={<FileTextOutlined />} onClick={handleNovaNFe} block>
               Dar Entrada em NF-e (XML)
+            </Button>
+          </Card>
+        </Col>
+
+          {/* Card 2: Entrada de Nota */}
+        <Col xs={24} md={8}>
+          <Card 
+            title={<span><FileTextOutlined /> Conferir Stagins</span>} 
+            bordered={false}
+            style={{ borderLeft: '6px solid #dcff16', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', height: '100%' }}
+          >
+            <Paragraph>verifique estagios de conferencia e aprove para completar a entrada mo sistema.</Paragraph>
+            <Button type="warning" icon={<DiffOutlined />} onClick={handlestagings} block>
+              Conferir stagings
             </Button>
           </Card>
         </Col>

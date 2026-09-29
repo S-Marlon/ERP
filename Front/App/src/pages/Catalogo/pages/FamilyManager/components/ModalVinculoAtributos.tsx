@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Modal, Input, Select, Button, List, Tag, Typography, Space, App } from 'antd';
-import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Modal, Input, Select, Button, List, Tag, Typography, Space, App, Tooltip } from 'antd';
+import { PlusOutlined, SearchOutlined, FileTextOutlined, NumberOutlined, UnorderedListOutlined, CheckCircleOutlined, FilterOutlined } from '@ant-design/icons';
 import { AtributoConfig, ModalDestino } from '../CatalogManager.types';
 
 const { Text, Paragraph } = Typography;
@@ -10,60 +10,121 @@ interface ModalVinculoAtributosProps {
   setIsModalAberto: (aberto: boolean) => void;
   destinoModal: ModalDestino;
   atributosGlobaisDisponiveis: AtributoConfig[];
-  handleAdicionarAtributoAoGrupo: (atributo: Partial<AtributoConfig>) => void;
+  atributosAtuaisNoGrupo?: AtributoConfig[];
+  handleAdicionarAtributoAoGrupo: (atributo: Partial<AtributoConfig>) => void | Promise<void>;
   brandColor?: string;
 }
+
+const DESTINO_CONFIG = {
+  dna: { color: 'blue', label: '🧬 DNA' },
+  grade: { color: 'orange', label: '📏 GRADE' },
+  ficha: { color: 'default', label: '📋 FICHA TÉCNICA' },
+} as const;
+
+const TIPO_DADO_CONFIG: Record<string, { label: string; icon: React.ReactNode }> = {
+  texto: { label: 'Texto', icon: <FileTextOutlined /> },
+  numero: { label: 'Número', icon: <NumberOutlined /> },
+  opcoes: { label: 'Lista de Opções', icon: <UnorderedListOutlined /> },
+};
 
 export const ModalVinculoAtributos: React.FC<ModalVinculoAtributosProps> = ({
   isModalAberto,
   setIsModalAberto,
   destinoModal,
   atributosGlobaisDisponiveis,
+  atributosAtuaisNoGrupo = [],
   handleAdicionarAtributoAoGrupo,
-  brandColor = '#1677ff'
+  brandColor = '#1677ff',
 }) => {
   const [novoNome, setNovoNome] = useState('');
   const [novoTipo, setNovoTipo] = useState<'texto' | 'numero' | 'opcoes'>('texto');
   const [pesquisaTermo, setPesquisaTermo] = useState('');
+  const [filtroTipo, setFiltroTipo] = useState<string>('todos'); // Novo estado para o filtro de tipo
+  const [carregandoId, setCarregandoId] = useState<string | null>(null);
+  const [criandoInedito, setCriandoInedito] = useState(false);
 
-  // Notificações nativas do Antd v5 para feedback de criação
+  const inputIneditoRef = useRef<any>(null);
   const { message } = App.useApp();
 
-  // Limpa os campos de criação quando o modal fecha
+  // Reseta os campos e estados ao fechar o modal
   useEffect(() => {
     if (!isModalAberto) {
       setNovoNome('');
       setNovoTipo('texto');
       setPesquisaTermo('');
+      setFiltroTipo('todos');
+      setCarregandoId(null);
+      setCriandoInedito(false);
     }
   }, [isModalAberto]);
 
-  const renderTagDestino = () => {
-    switch (destinoModal) {
-      case 'dna':
-        return <Tag color="blue" style={{ fontWeight: 600, margin: 0 }}>🧬 DNA</Tag>;
-      case 'grade':
-        return <Tag color="orange" style={{ fontWeight: 600, margin: 0 }}>📏 GRADE</Tag>;
-      default:
-        return <Tag color="default" style={{ fontWeight: 600, margin: 0 }}>📋 FICHA TÉCNICA</Tag>;
+  // Set de IDs e Nomes já presentes no grupo atual para consulta rápida
+  const idsVinculadosSet = useMemo(() => {
+    return new Set(atributosAtuaisNoGrupo.map((attr) => attr.id));
+  }, [atributosAtuaisNoGrupo]);
+
+  const nomesVinculadosSet = useMemo(() => {
+    return new Set(atributosAtuaisNoGrupo.map((attr) => attr.nome.trim().toLowerCase()));
+  }, [atributosAtuaisNoGrupo]);
+
+  // Filtro otimizado (busca por texto + filtro por tipo de dado)
+  const atributosFiltrados = useMemo(() => {
+    const termoLimpo = pesquisaTermo.trim().toLowerCase();
+
+    return atributosGlobaisDisponiveis.filter((attr) => {
+      const correspondeTexto = !termoLimpo || attr.nome.toLowerCase().includes(termoLimpo);
+      const correspondeTipo = filtroTipo === 'todos' || attr.tipoDado === filtroTipo;
+      return correspondeTexto && correspondeTipo;
+    });
+  }, [atributosGlobaisDisponiveis, pesquisaTermo, filtroTipo]);
+
+  const handleVincular = async (attr: AtributoConfig) => {
+    try {
+      setCarregandoId(attr.id);
+      await handleAdicionarAtributoAoGrupo(attr);
+      message.success(`Atributo "${attr.nome}" vinculado com sucesso!`);
+    } catch {
+      message.error('Erro ao vincular atributo.');
+    } finally {
+      setCarregandoId(null);
     }
   };
 
-  const handleCriarInedito = () => {
-    if (novoNome.trim()) {
-      handleAdicionarAtributoAoGrupo({ 
-        nome: novoNome.trim(), 
+  const handleCriarInedito = async () => {
+    const nomeFormatado = novoNome.trim();
+    if (!nomeFormatado) return;
+
+    if (nomesVinculadosSet.has(nomeFormatado.toLowerCase())) {
+      message.warning(`O atributo "${nomeFormatado}" já está adicionado neste grupo!`);
+      return;
+    }
+
+    try {
+      setCriandoInedito(true);
+      await handleAdicionarAtributoAoGrupo({
+        nome: nomeFormatado,
         tipoDado: novoTipo,
-        classificacao: destinoModal
+        classificacao: destinoModal,
       });
-      message.success(`Atributo "${novoNome.trim()}" criado com sucesso!`);
+
+      message.success(`Atributo "${nomeFormatado}" criado e vinculado com sucesso!`);
       setNovoNome('');
+      inputIneditoRef.current?.focus();
+    } catch {
+      message.error('Erro ao criar atributo inédito.');
+    } finally {
+      setCriandoInedito(false);
     }
   };
 
-  const atributosFiltrados = atributosGlobaisDisponiveis.filter(attr =>
-    attr.nome.toLowerCase().includes(pesquisaTermo.toLowerCase())
-  );
+  const renderTagDestino = () => {
+    const config = DESTINO_CONFIG[destinoModal] || DESTINO_CONFIG.ficha;
+    return (
+      <Tag color={config.color} style={{ fontWeight: 600, margin: 0 }}>
+        {config.label}
+      </Tag>
+    );
+  };
 
   return (
     <Modal
@@ -82,65 +143,99 @@ export const ModalVinculoAtributos: React.FC<ModalVinculoAtributosProps> = ({
       onCancel={() => setIsModalAberto(false)}
       footer={[
         <Button key="back" onClick={() => setIsModalAberto(false)}>
-          Cancelar e Fechar
-        </Button>
+          Fechar
+        </Button>,
       ]}
-      width={500}
+      width={520}
       centered
       destroyOnClose
     >
       <Space direction="vertical" size="middle" style={{ width: '100%', marginTop: '16px' }}>
         
-        {/* LISTA DE ATRIBUTOS E BUSCA */}
+        {/* LISTA DE ATRIBUTOS, BUSCA E FILTRO DE TIPO */}
         <Space direction="vertical" size="small" style={{ width: '100%' }}>
           <Text strong style={{ fontSize: '11px', color: '#475569' }}>
-            TERMOS DISPONÍVEIS NO ERP
+            TERMOS DISPONÍVEIS NO ERP ({atributosFiltrados.length})
           </Text>
           
-          <Input 
-            placeholder="Buscar termo no dicionário..." 
-            prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-            value={pesquisaTermo}
-            onChange={e => setPesquisaTermo(e.target.value)}
-            allowClear
-          />
+          {/* Barra de Busca + Seletor de Filtro por Tipo */}
+          <Space.Compact style={{ width: '100%' }}>
+            <Input
+              placeholder="Buscar termo no dicionário..."
+              prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
+              value={pesquisaTermo}
+              onChange={(e) => setPesquisaTermo(e.target.value)}
+              allowClear
+            />
+            <Select
+              value={filtroTipo}
+              onChange={(value) => setFiltroTipo(value)}
+              style={{ width: '130px' }}
+              suffixIcon={<FilterOutlined style={{ fontSize: '11px', color: '#8c8c8c' }} />}
+              options={[
+                { value: 'todos', label: 'Todos tipos' },
+                { value: 'texto', label: 'Texto' },
+                { value: 'numero', label: 'Número' },
+                { value: 'opcoes', label: 'Lista' },
+              ]}
+            />
+          </Space.Compact>
 
-          <div style={{ 
-            maxHeight: '180px', 
-            overflowY: 'auto', 
-            border: '1px solid #f0f0f0', 
-            borderRadius: '8px',
-            backgroundColor: '#fafafa',
-            padding: '4px 8px'
-          }}>
+          <div
+            style={{
+              maxHeight: '200px',
+              overflowY: 'auto',
+              border: '1px solid #f0f0f0',
+              borderRadius: '8px',
+              backgroundColor: '#fafafa',
+              padding: '4px 8px',
+            }}
+          >
             <List
               dataSource={atributosFiltrados}
-              locale={{ emptyText: 'Nenhum termo disponível encontrado.' }}
-              renderItem={attr => (
-                <List.Item
-                  key={attr.id}
-                  style={{ padding: '8px 4px' }}
-                  actions={[
-                    <Button 
-                      type="text" 
-                      size="small" 
-                      onClick={() => handleAdicionarAtributoAoGrupo(attr)}
-                      style={{ color: brandColor, fontWeight: 600 }}
-                    >
-                      ＋ Vincular
-                    </Button>
-                  ]}
-                >
-                  <List.Item.Meta
-                    title={<Text strong style={{ fontSize: '13px' }}>{attr.nome}</Text>}
-                    description={
-                      <Text type="secondary" style={{ fontSize: '11px' }}>
-                        {attr.tipoDado === 'opcoes' ? '📋 Lista de Opções' : attr.tipoDado === 'numero' ? '🔢 Número' : '🔤 Texto'}
-                      </Text>
-                    }
-                  />
-                </List.Item>
-              )}
+              locale={{ emptyText: 'Nenhum termo disponível encontrado para este filtro.' }}
+              renderItem={(attr) => {
+                const jaVinculado = idsVinculadosSet.has(attr.id);
+                const tipoInfo = TIPO_DADO_CONFIG[attr.tipoDado] || TIPO_DADO_CONFIG.texto;
+                const estaCarregando = carregandoId === attr.id;
+
+                return (
+                  <List.Item
+                    key={attr.id}
+                    style={{ padding: '8px 4px', opacity: jaVinculado ? 0.6 : 1 }}
+                    actions={[
+                      jaVinculado ? (
+                        <Tooltip title="Este atributo já está vinculado a este grupo">
+                          <Tag icon={<CheckCircleOutlined />} color="success" style={{ margin: 0 }}>
+                            Vinculado
+                          </Tag>
+                        </Tooltip>
+                      ) : (
+                        <Button
+                          key="vincular"
+                          type="text"
+                          size="small"
+                          loading={estaCarregando}
+                          onClick={() => handleVincular(attr)}
+                          style={{ color: brandColor, fontWeight: 600 }}
+                        >
+                          ＋ Vincular
+                        </Button>
+                      ),
+                    ]}
+                  >
+                    <List.Item.Meta
+                      title={<Text strong style={{ fontSize: '13px' }}>{attr.nome}</Text>}
+                      description={
+                        <Space size={4} style={{ fontSize: '11px', color: '#8c8c8c' }}>
+                          {tipoInfo.icon}
+                          <span>{tipoInfo.label}</span>
+                        </Space>
+                      }
+                    />
+                  </List.Item>
+                );
+              }}
             />
           </div>
         </Space>
@@ -152,15 +247,16 @@ export const ModalVinculoAtributos: React.FC<ModalVinculoAtributosProps> = ({
           </Text>
           
           <Space.Compact style={{ width: '100%' }}>
-            <Input 
-              placeholder="Ex: Espessura da Camada" 
+            <Input
+              ref={inputIneditoRef}
+              placeholder="Ex: Espessura da Camada"
               value={novoNome}
-              onChange={e => setNovoNome(e.target.value)}
+              onChange={(e) => setNovoNome(e.target.value)}
               onPressEnter={handleCriarInedito}
             />
             <Select
               value={novoTipo}
-              onChange={value => setNovoTipo(value)}
+              onChange={(value) => setNovoTipo(value)}
               style={{ width: '110px' }}
               options={[
                 { value: 'texto', label: 'Texto' },
@@ -168,9 +264,10 @@ export const ModalVinculoAtributos: React.FC<ModalVinculoAtributosProps> = ({
                 { value: 'opcoes', label: 'Lista' },
               ]}
             />
-            <Button 
-              type="primary" 
+            <Button
+              type="primary"
               icon={<PlusOutlined />}
+              loading={criandoInedito}
               onClick={handleCriarInedito}
               disabled={!novoNome.trim()}
               style={{ backgroundColor: novoNome.trim() ? brandColor : undefined }}

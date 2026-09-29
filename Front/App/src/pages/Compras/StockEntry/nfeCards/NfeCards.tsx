@@ -9,11 +9,14 @@ import {
   Space, 
   Modal, 
   Descriptions, 
-  InputNumber, 
-  Select,
   Tooltip,
   Table,
-  Divider
+  Divider,
+  Alert,
+  InputNumber,
+  Input,
+  Select,
+  Statistic
 } from 'antd';
 import { 
   InfoCircleOutlined, 
@@ -24,9 +27,12 @@ import {
   DollarOutlined,
   CreditCardOutlined,
   CommentOutlined,
-  UserOutlined
+  UserOutlined,
+  WarningOutlined,
+  CheckOutlined,
+  EditOutlined
 } from '@ant-design/icons';
-import { NfeDataFromXML } from './utils/nfeParser';
+import { NfeDataFromXML } from '../../utils/nfeParser';
 
 interface NfeCardsProps {
   data: NfeDataFromXML;
@@ -36,7 +42,14 @@ interface NfeCardsProps {
   };
   actions: {
     onCreateSupplier: () => void;
+  };// NOVAS PROPS PARA O PAI ENXERGAR OS DADOS DO FRETE ADICIONAL
+  freteAdicionalData?: {
+    valor: number;
+    metodo: string;
+    observacao: string;
   };
+  onUpdateFreteAdicional?: (dados: { valor: number; metodo: string; observacao: string }) => void;
+  valorTotalFrete: number;
 }
 
 const { Text, Title } = Typography;
@@ -110,9 +123,14 @@ const traduzirPresencaComprador = (indPres?: string) => {
   }
 };
 
-const NfeCards: React.FC<NfeCardsProps> = ({ data, supplierStatus, actions }) => {
-  const { emitente } = data;
+const nfStatus = {
+  isChecking: false,
+  isRegular: false // Força como falso para o alerta aparecer sempre
+};
 
+const NfeCards: React.FC<NfeCardsProps> = ({ data, supplierStatus, actions, freteAdicionalData, valorTotalFrete, onUpdateFreteAdicional }) => {
+
+  const { emitente } = data;
   const [isNfDetailsOpen, setIsNfDetailsOpen] = useState(false);
   const [isSupplierDetailsOpen, setIsSupplierDetailsOpen] = useState(false);
   const [isLogisticsDetailsOpen, setIsLogisticsDetailsOpen] = useState(false);
@@ -120,15 +138,311 @@ const NfeCards: React.FC<NfeCardsProps> = ({ data, supplierStatus, actions }) =>
   const [isCobrDetailsOpen, setIsCobrDetailsOpen] = useState(false);
   const [isInfAdicDetailsOpen, setIsInfAdicDetailsOpen] = useState(false);
 
+const [isEditingFreteAdicional, setIsEditingFreteAdicional] = useState(false);
+const [valorFreteAdicional, setValorFreteAdicional] = useState(0); // Começa zerado ou com o valor salvo do banco/estado global
+
   const destinatario = (data as any).destinatario || {};
   const cobranca = (data as any).cobranca || { fatura: {}, duplicatas: [] };
   const infAdic = (data as any).informacoesAdicionais || { infCpl: 'Nenhuma informação complementar informada.', infAdFisco: 'Sem observações do fisco.' };
 
   const primeiroVolume = data?.transp?.vol?.[0];
 
+  
+  // Valores locais que serão sincronizados ou enviados ao pai
+  const [metodoFreteAdicional, setMetodoFreteAdicional] = useState(freteAdicionalData?.metodo || 'Correios');
+  const [obsFreteAdicional, setObsFreteAdicional] = useState(freteAdicionalData?.observacao || '');
+
+
+
+  const handleSalvarFreteAdicional = () => {
+    setIsEditingFreteAdicional(false);
+    // Notifica o componente pai com os novos dados estruturados
+    if (onUpdateFreteAdicional) {
+      onUpdateFreteAdicional({
+        valor: valorFreteAdicional,
+        metodo: metodoFreteAdicional,
+        observacao: obsFreteAdicional
+      });
+    }
+  };
+
+
+  // Lógica de estilo dinâmico para o Card do Fornecedor baseada no status
+  const getSupplierCardStyle = () => {
+    if (supplierStatus.exists === false) {
+      return {
+        height: '100%',
+        border: '1px solid #ff4d4f',
+        backgroundColor: '#fff1f0', // Fundo avermelhado bem sutil
+      };
+    }
+    if (supplierStatus.exists === true) {
+      return {
+        height: '100%',
+        border: '1px solid #b7eb8f',
+        backgroundColor: '#f6ffed', // Fundo esverdeado bem sutil
+      };
+    }
+    return { height: '100%' };
+  };
+
   return (
     <div>
-      {/* Atalhos Rápidos para Novas Seções */}
+     
+
+      <Row gutter={[6, 6]}>
+        {/* CARD 1: Identificação da NF */}
+        {/* CARD 1: Identificação da NF */}
+<Col xs={24} md={8}>
+  <Card 
+    title={<Space><FileTextOutlined /><span>1. Identificação da NF</span></Space>}
+    size="small"
+    style={{ 
+      height: '100%', 
+      // Exemplo de destaque visual se a NF não estiver autorizada (ajuste a variável de condição conforme seu código)
+      ...(nfStatus?.isRegular === false ? { borderColor: '#ff4d4f', backgroundColor: '#fff2f0' } : {}) 
+    }}
+    extra={
+      <Space>
+        {nfStatus?.isChecking && <Badge status="processing" text="Verificando Sefaz..." />}
+        {nfStatus?.isRegular === true && <Badge status="success" text="Autorizada" />}
+        {nfStatus?.isRegular === false && <Badge status="error" text="Irregular / Cancelada" />}
+        <Tooltip title="Ver detalhes técnicos da nota">
+          <Button type="text" icon={<InfoCircleOutlined />} onClick={() => setIsNfDetailsOpen(true)} />
+        </Tooltip>
+      </Space>
+    }
+  >
+    {/* Alerta Fiscal / Sefaz integrado no Card 1 */}
+    {nfStatus?.isRegular === false && (
+      <Alert
+        message="Alerta Fiscal / Sefaz"
+        description="A NF-e não consta como autorizada, foi cancelada ou possui irregularidades na Sefaz."
+        type="error"
+        showIcon
+        icon={<WarningOutlined />}
+        style={{ marginBottom: 8, padding: '4px 8px', fontSize: 11 }}
+      />
+    )}
+
+    <div style={{ background: '#fafafa', padding: '2px 4px', borderRadius: '4px' }}>
+      <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Chave de Acesso</Text>
+      <Text copyable style={{ fontSize: 14, fontFamily: 'monospace' }}>
+        {data.chaveAcesso ? data.chaveAcesso.replace(/(\d{4})(?=\d)/g, '$1 ') : ''}
+      </Text>
+    </div>
+    
+    <Descriptions column={3} layout="horizontal" size="small" bordered style={{ marginBottom: 8, marginTop: 8 }}>
+      <Descriptions.Item label="Número" style={{ fontSize: 12, fontFamily: 'monospace' }}>{data.numero}</Descriptions.Item>
+      <Descriptions.Item label="Série" style={{ fontSize: 13, fontFamily: 'monospace' }}>{data.serie}</Descriptions.Item>
+      <Descriptions.Item label="Formato da NF" style={{ fontSize: 12, fontFamily: 'monospace' }}>{data.mo}</Descriptions.Item>
+      <Descriptions.Item label="Emissão" style={{ fontSize: 12, fontFamily: 'monospace' }}>{formatarDataBR(data.dataEmissao)}</Descriptions.Item>
+    </Descriptions>
+  </Card>
+</Col>
+
+
+        {/* CARD 2: Fornecedor (Emitente) com Alerta Visual */}
+        <Col xs={24} md={8}>
+          <Card 
+            title={
+              <Space>
+                <ShopOutlined />
+                <span>2. Fornecedor (Emitente)</span>
+              </Space>
+            }
+            size="small"
+            style={getSupplierCardStyle()}
+            extra={
+              <Space>
+                {supplierStatus.isChecking && <Badge status="processing" text="Verificando..." />}
+                {supplierStatus.exists === true && <Badge status="success" text="Cadastrado" />}
+                {supplierStatus.exists === false && (
+                  <Space size={4}>
+                    <Badge status="error" text="Não Cadastrado" />
+                    <Button type="primary" danger size="small" icon={<PlusOutlined />} onClick={actions.onCreateSupplier}>
+                      Cadastrar
+                    </Button>
+                  </Space>
+                )}
+                <Tooltip title="Ver dados do fornecedor">
+                  <Button type="text" icon={<InfoCircleOutlined />} onClick={() => setIsSupplierDetailsOpen(true)} />
+                </Tooltip>
+              </Space>
+            }
+          >
+            {supplierStatus.exists === false && (
+              <Alert
+                message="Fornecedor ausente no sistema!"
+                description="Cadastre-o antes de prosseguir com a entrada."
+                type="error"
+                showIcon
+                icon={<WarningOutlined />}
+                style={{ marginBottom: 8, padding: '4px 8px', fontSize: 11 }}
+              />
+            )}
+
+            <Descriptions column={1} layout="horizontal" size="small" bordered>
+              <Descriptions.Item label="CNPJ">
+  {emitente?.cnpj 
+    ? emitente.cnpj.replace(/\D/g, '').replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5') 
+    : '-'}
+</Descriptions.Item>
+              <Descriptions.Item label="Fantasia" labelStyle={{ whiteSpace: 'nowrap' }}>
+                <Text ellipsis >{emitente.nomeFantasia || "Não Informado"}</Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="Razão Social">
+                <Text ellipsis>{emitente.nome}</Text>
+              </Descriptions.Item>
+            </Descriptions>
+          </Card>
+        </Col>
+
+        {/* CARD 3: Dados de Logística e Frete */}
+        <Col xs={24} md={8}>
+          <Card 
+            title={<Space><CarOutlined /><span>3. Logística e Frete</span></Space>}
+            size="small"
+            style={{ height: '100%' }}
+            extra={
+              <Tooltip title="Ver composição e tributos">
+                <Button type="text" icon={<InfoCircleOutlined />} onClick={() => setIsLogisticsDetailsOpen(true)} />
+              </Tooltip>
+            }
+          >
+            <Descriptions column={1} size="small" bordered>
+              <Descriptions.Item label="Transportadora">
+                <Tooltip title={data?.transp?.transporta?.xNome || "Não Informada"}>
+                  <Text ellipsis style={{ maxWidth: 260, display: 'inline-block' }}>
+                    {data?.transp?.transporta?.xNome || "Não Informada"}
+                  </Text>
+                </Tooltip>
+              </Descriptions.Item>
+              <Descriptions.Item label="Modalidade">
+                {traduzirModalidadeFrete(data?.transp?.modFrete)}
+              </Descriptions.Item>
+              <Descriptions.Item label="Volumes / Peso">
+                {`${primeiroVolume?.qVol ?? 0} vol(s) | ${primeiroVolume?.pesoB ? `${primeiroVolume.pesoB} kg` : 'Peso não inf.'}`}
+              </Descriptions.Item>
+              
+           
+            </Descriptions>
+            
+
+            <Descriptions column={3} layout="vertical" size="small" bordered style={{ marginBottom: 8, marginTop: 8 }}>
+               {/* Valor do Frete original (Nota Fiscal) */}
+              <Descriptions.Item label="Valor Frete (NF)">
+                <Text>
+                  {Number(data?.totais?.vFrete || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </Text>
+                
+              </Descriptions.Item>
+
+             
+                
+
+              {/* Frete Adicional com Detalhamento e Edição */}
+              <Descriptions.Item 
+  label={
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: 8 }}>
+      <span>Frete Adicional</span>
+      {!isEditingFreteAdicional && (
+        <Button 
+          type="text" 
+          size="small" 
+          icon={<EditOutlined />} 
+          onClick={() => setIsEditingFreteAdicional(true)} 
+          title="Editar frete pago à parte"
+          style={{ padding: 0, height: 'auto' }}
+        />
+      )}
+    </div>
+  }
+>
+                <div style={{ width: '100%' }}>
+                  {isEditingFreteAdicional ? (
+                    <Space direction="vertical" size="small" style={{ width: '100%', padding: '4px 0' }}>
+                      <InputNumber
+                        size="small"
+                        value={valorFreteAdicional}
+                        onChange={(val) => setValorFreteAdicional(val || 0)}
+                        formatter={(value) => `R$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
+                        parser={(value) => value.replace(/\R\$\s?|\./g, '').replace(',', '.')}
+                        style={{ width: '100%' }}
+                        placeholder="Valor R$"
+                      />
+                      <Select
+                        size="small"
+                        value={metodoFreteAdicional}
+                        onChange={(val) => setMetodoFreteAdicional(val)}
+                        style={{ width: '100%' }}
+                        options={[
+                          { value: 'Correios - PAC', label: 'Correios - PAC' },
+                          { value: 'Correios - SEDEX', label: 'Correios - SEDEX' },
+                          { value: 'Carreto / Moto-boy', label: 'Carreto / Moto-boy' },
+                          { value: 'Transportadora Direto', label: 'Transportadora Direto' },
+                          { value: 'Outros', label: 'Outros' }
+                        ]}
+                      />
+                      <Input
+                        size="small"
+                        placeholder="Obs / Código de Rastreio"
+                        value={obsFreteAdicional}
+                        onChange={(e) => setObsFreteAdicional(e.target.value)}
+                      />
+                      <Button 
+                        type="primary" 
+                        size="small" 
+                        icon={<CheckOutlined />} 
+                        onClick={handleSalvarFreteAdicional}
+                        block
+                      >
+                        Salvar Frete Adicional
+                      </Button>
+                    </Space>
+                  ) : (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                      <div>
+                        <Text strong type={valorFreteAdicional > 0 ? "warning" : "secondary"} style={{ display: 'block' }}>
+                          {Number(valorFreteAdicional || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </Text>
+                        {valorFreteAdicional > 0 && (
+                          <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 2 }}>
+                            <div><strong>Método:</strong> {metodoFreteAdicional}</div>
+                            {obsFreteAdicional && <div><strong>Obs:</strong> {obsFreteAdicional}</div>}
+                          </div>
+                        )}
+                      </div>
+                      
+                    </div>
+                  )}
+                </div>
+              </Descriptions.Item>
+
+
+
+
+               <Descriptions.Item label="Valor Total do Frete">
+             
+                
+
+       <Text>
+                  {Number(valorTotalFrete || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </Text>
+
+              </Descriptions.Item>
+
+
+
+
+
+
+            </Descriptions>
+          </Card>
+        </Col>
+      </Row>
+
+       {/* Atalhos Rápidos para Novas Seções */}
       <Row gutter={[16, 16]}>
         <Col span={24}>
           <Card size="small" style={{ background: '#fcfcfc', border: '1px dashed #d9d9d9' }}>
@@ -148,119 +462,6 @@ const NfeCards: React.FC<NfeCardsProps> = ({ data, supplierStatus, actions }) =>
         </Col>
       </Row>
 
-      <Row gutter={[16, 16]}>
-        {/* CARD 1: Identificação da NF */}
-        <Col xs={24} md={8}>
-          <Card 
-            title={<Space><FileTextOutlined /><span>1. Identificação da NF</span></Space>}
-            size="small"
-            style={{ height: '100%' }}
-            extra={
-              <Tooltip title="Ver detalhes técnicos da nota">
-                <Button type="text" icon={<InfoCircleOutlined />} onClick={() => setIsNfDetailsOpen(true)} />
-              </Tooltip>
-            }
-          >
-            <div style={{ background: '#fafafa', padding: '4px 8px', borderRadius: '4px', }}>
-              <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Chave de Acesso</Text>
-              <Text copyable style={{ fontSize: 16, fontFamily: 'monospace' }}>{data.chaveAcesso}</Text>
-            </div>
-            <Descriptions column={3} layout="horizontal" size="small" bordered style={{ marginBottom: 8 }}>
-              <Descriptions.Item label="Número" style={{ fontSize: 12, fontFamily: 'monospace' }}>{data.numero}</Descriptions.Item>
-              <Descriptions.Item label="Série" style={{ fontSize: 13, fontFamily: 'monospace' }}>{data.serie}</Descriptions.Item>
-              <Descriptions.Item label="Emissão" style={{ fontSize: 12, fontFamily: 'monospace' }}>{formatarDataBR(data.dataEmissao)}</Descriptions.Item>
-            </Descriptions>
-           
-          </Card>
-        </Col>
-
-        {/* CARD 2: Fornecedor (Emitente) */}
-        <Col xs={24} md={8}>
-          <Card 
-            title={<Space><ShopOutlined /><span>2. Fornecedor (Emitente)</span></Space>}
-            size="small"
-            style={{ height: '100%' }}
-            extra={
-              <Space>
-                {supplierStatus.isChecking && <Badge status="processing" text="Verificando..." />}
-                {supplierStatus.exists === true && <Badge status="success" text="Ativo" />}
-                {supplierStatus.exists === false && (
-                  <Space size={4}>
-                    <Badge status="warning" text="Não Cadastrado" />
-                    <Button type="primary" size="small" icon={<PlusOutlined />} onClick={actions.onCreateSupplier}>Criar</Button>
-                  </Space>
-                )}
-                <Tooltip title="Ver dados do fornecedor">
-                  <Button type="text" icon={<InfoCircleOutlined />} onClick={() => setIsSupplierDetailsOpen(true)} />
-                </Tooltip>
-              </Space>
-            }
-          >
-            <Descriptions column={1} layout="horizontal" size="small" bordered>
-              <Descriptions.Item label="CNPJ">{emitente.cnpj}</Descriptions.Item>
-              <Descriptions.Item label="Fantasia" labelStyle={{ whiteSpace: 'nowrap' }}>
-                <Text ellipsis style={{ maxWidth: 140 }}>{emitente.nomeFantasia || "Não Informado"}</Text>
-              </Descriptions.Item>
-              <Descriptions.Item label="Razão Social">
-                <Text ellipsis style={{ maxWidth: 140 }}>{emitente.nome}</Text>
-              </Descriptions.Item>
-            </Descriptions>
-          </Card>
-        </Col>
-
-        {/* CARD 3: Dados de Logística e Frete */}
-        <Col xs={24} md={8}>
-          <Card 
-            title={<Space><CarOutlined /><span>3. Logística e Frete</span></Space>}
-            size="small"
-            style={{ height: '100%' }}
-            extra={
-              <Tooltip title="Ver composição e tributos">
-                <Button type="text" icon={<InfoCircleOutlined />} onClick={() => setIsLogisticsDetailsOpen(true)} />
-              </Tooltip>
-            }
-          >
-            <Descriptions column={1} size="small" bordered >
-              <Descriptions.Item label="Transportadora">
-                <Text ellipsis style={{ maxWidth: 180, display: 'inline-block' }}>
-                  {data?.transp?.transporta?.xNome || "Não Informada"}
-                </Text>
-              </Descriptions.Item>
-              <Descriptions.Item label="Modalidade">
-                {traduzirModalidadeFrete(data?.transp?.modFrete)}
-              </Descriptions.Item>
-              <Descriptions.Item label="Volumes / Peso">
-                {`${primeiroVolume?.qVol ?? 0} vol(s) | ${primeiroVolume?.pesoB ? `${primeiroVolume.pesoB} kg` : 'Peso não inf.'}`}
-              </Descriptions.Item>
-            </Descriptions>
-
-
-            {/* <Row gutter={8}>
-              <Col span={12}>
-                <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>Valor do Frete (R$)</Text>
-                <InputNumber 
-                  style={{ width: '100%' }} 
-                  placeholder="0,00" 
-                  min={0} 
-                  size="small" 
-                  stringMode 
-                  value={(data as any)?.totais?.vFrete || data?.transp?.retTransp?.vServ || '0'} 
-                />
-              </Col>
-              <Col span={12}>
-                <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>Método de Rateio</Text>
-                <Select defaultValue="VALOR" style={{ width: '100%' }} size="small">
-                  <Select.Option value="VALOR">Proporcional por Valor</Select.Option>
-                  <Select.Option value="PESO">Proporcional por Peso</Select.Option>
-                  <Select.Option value="IGUAL">Divisão Igualitária</Select.Option>
-                  <Select.Option value="MANUAL">Digitação Manual</Select.Option>
-                </Select>
-              </Col>
-            </Row> */}
-          </Card>
-        </Col>
-      </Row>
-
       {/* MODAL 1: Identificação */}
       <Modal
         title="📄 Detalhes Técnicos e Identificação da NF-e (Grupo <ide>)"
@@ -273,7 +474,7 @@ const NfeCards: React.FC<NfeCardsProps> = ({ data, supplierStatus, actions }) =>
           <Descriptions.Item label="Chave de Acesso" span={2}>
             <Text style={{ fontFamily: 'monospace', fontSize: 12 }}>{formatarChaveAcesso(data.chaveAcesso)}</Text>
           </Descriptions.Item>
-          <Descriptions.Item label="Modelo (mod)">55 (NF-e)</Descriptions.Item>
+          <Descriptions.Item style={{background: 'red'}} label="Modelo (mod)">55 (NF-e)**</Descriptions.Item>
           <Descriptions.Item label="Série (serie)">{data.serie || '-'}</Descriptions.Item>
           <Descriptions.Item label="Número da NF (nNF)">{data.numero}</Descriptions.Item>
           <Descriptions.Item label="Código da UF (cUF)">{data.chaveAcesso ? data.chaveAcesso.substring(0, 2) : '-'}</Descriptions.Item>
@@ -283,9 +484,9 @@ const NfeCards: React.FC<NfeCardsProps> = ({ data, supplierStatus, actions }) =>
           <Descriptions.Item label="Destino da Operação (idDest)">{traduzirDestinoOperacao(data.destinoOperacao)}</Descriptions.Item>
           <Descriptions.Item label="Finalidade (finNFe)">{traduzirFinalidade(data.finalidade)}</Descriptions.Item>
           <Descriptions.Item label="Presença do Comprador (indPres)">{traduzirPresencaComprador(data.presencaComprador)}</Descriptions.Item>
-          <Descriptions.Item label="Tipo de Emissão (tpEmis)">1 - Emissão normal</Descriptions.Item>
-          <Descriptions.Item label="Processo de Emissão (procEmi)">0 - Emissão de NF-e com aplicativo do contribuinte</Descriptions.Item>
-          <Descriptions.Item label="Status SEFAZ" span={2}><Text type="success" strong>100 - Autorizado o uso da NF-e</Text></Descriptions.Item>
+          <Descriptions.Item style={{background: 'red'}} label="Tipo de Emissão (tpEmis)">1 - Emissão normal</Descriptions.Item>
+          <Descriptions.Item style={{background: 'red'}}  label="Processo de Emissão (procEmi)">0 - Emissão de NF-e com aplicativo do contribuinte</Descriptions.Item>
+          <Descriptions.Item style={{background: 'red'}}  label="Status SEFAZ" span={2}><Text type="success" strong>100 - Autorizado o uso da NF-e</Text></Descriptions.Item>
         </Descriptions>
       </Modal>
 
@@ -344,8 +545,6 @@ const NfeCards: React.FC<NfeCardsProps> = ({ data, supplierStatus, actions }) =>
       </Modal>
 
       {/* MODAL 4: Destinatário */}
-      {/* MODAL 4: Destinatário */}
-     {/* MODAL 4: Destinatário */}
       <Modal
         title="🎯 Dados do Destinatário da Nota (Grupo <dest>)"
         open={isDestDetailsOpen}
@@ -354,10 +553,9 @@ const NfeCards: React.FC<NfeCardsProps> = ({ data, supplierStatus, actions }) =>
       >
         <Descriptions column={1} bordered style={{ marginTop: 16 }} size="small">
           <Descriptions.Item label="Razão Social">{destinatario.xNome || destinatario.nome || 'Não Informado'}</Descriptions.Item>
-     <Descriptions.Item label="CNPJ / CPF">
-<Descriptions.Item label="CNPJ / CPF">
-  {destinatario.cnpjOrCpfOrEstrangeiro || destinatario.CNPJ || destinatario.CPF || '-'}
-</Descriptions.Item></Descriptions.Item>
+          <Descriptions.Item label="CNPJ / CPF">
+            {destinatario.cnpjOrCpfOrEstrangeiro || destinatario.CNPJ || destinatario.CPF || '-'}
+          </Descriptions.Item>
           <Descriptions.Item label="Inscrição Estadual">{destinatario.IE || destinatario.ie || '-'}</Descriptions.Item>
           <Descriptions.Item label="Endereço">
             {`${destinatario.enderDest?.xLgr || destinatario.logradouro || ''}, ${destinatario.enderDest?.nro || destinatario.numeroEnd || ''}`}
@@ -373,7 +571,6 @@ const NfeCards: React.FC<NfeCardsProps> = ({ data, supplierStatus, actions }) =>
       </Modal>
 
       {/* MODAL 5: Cobrança e Duplicatas */}
-    {/* MODAL 5: Cobrança e Duplicatas */}
       <Modal
         title="💳 Cobrança, Fatura e Duplicatas (Grupo <cobr>)"
         open={isCobrDetailsOpen}
@@ -392,7 +589,7 @@ const NfeCards: React.FC<NfeCardsProps> = ({ data, supplierStatus, actions }) =>
           <Title level={5}>Parcelas / Duplicatas</Title>
           <Table
             dataSource={cobranca.dup || cobranca.duplicatas || []}
-            rowKey={(record: any, index) => index.toString()}
+            rowKey={(_: any, index?: number) => index?.toString() || '0'}
             pagination={false}
             size="small"
             bordered

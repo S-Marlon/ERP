@@ -5,6 +5,7 @@ import fiscalRoutes from './fiscal.routes';
 import financeiroRoutes from './financeiro.routes';
 import catalogoRoutes from './Catalogo/catalogo.routes';
 import parceirosRoutes from './Parceiros/parceiros.routes';
+import comprasRoutes from './Compras/compras.routes'
 import { Router, Request, Response } from 'express';
 
 
@@ -20,5 +21,6 @@ router.use('/fiscal', fiscalRoutes);
 router.use('/financeiro', financeiroRoutes);
 router.use('/catalogo', catalogoRoutes);
 router.use('/parceiros', parceirosRoutes); // Adicione esta linha para incluir as rotas de parceiros
+router.use('/compras' , comprasRoutes)
 
 export default router;

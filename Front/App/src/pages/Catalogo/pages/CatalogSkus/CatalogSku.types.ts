@@ -25,6 +25,7 @@ export interface ItemParentType {
   status: 'ATIVO' | 'INATIVO';
   categoria_id: number | null;
   categoria?: string | null;
+  familia?: string | null;
   familia_id: number | null;
   id_marca?: number | null;
   skus: SkuChildType[];

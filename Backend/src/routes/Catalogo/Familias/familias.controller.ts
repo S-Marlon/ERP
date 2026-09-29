@@ -58,7 +58,8 @@ const montarTextoTemplate = (
     sigla: familia.siglaSku,
     s: familia.separadorSku,
     separador: familia.separadorSku,
-    variacao
+    variacao,
+    marca: familia.nomeMarca || ''
   };
   if (Object.prototype.hasOwnProperty.call(reservados, tokenNormalizado)) {
     return String(reservados[tokenNormalizado] ?? '');
@@ -75,7 +76,8 @@ const carregarContextoFormalizacao = async (connection: DbConnection, familiaId:
   const [familiaRows] = await connection.execute(`
     SELECT f.id, f.nome, f.categoria_id AS categoriaId, f.sigla_sku AS siglaSku,
            f.separador_sku AS separadorSku, f.template_sku AS templateSku,
-           f.template_nome AS templateNomeComercial
+           f.template_nome AS templateNomeComercial,
+           f.id_marca AS idMarca, f.comportamento_marca AS comportamentoMarca
     FROM comercial_familias f
     WHERE f.id = ? AND f.tenant_id = ?
     LIMIT 1
@@ -94,7 +96,7 @@ const carregarContextoFormalizacao = async (connection: DbConnection, familiaId:
       ON a.id = core.atributo_id AND a.tenant_id = core.tenant_id
     WHERE core.tenant_id = ? AND core.ativo = 1
       AND ((core.tipo_entidade = 'familia' AND core.id_entidade = ?)
-        OR (core.tipo_entidade = 'categoria' AND core.id_entidade = ?))
+       OR (core.tipo_entidade = 'categoria' AND core.id_entidade = ?))
     ORDER BY core.ordem ASC, a.nome ASC
   `, [tenantId, familia.id, familia.categoriaId]);
 
@@ -170,15 +172,15 @@ const carregarItensComValores = async (connection: DbConnection, familiaId: stri
   return Array.from(itens.values());
 };
 
-
-// 🟡 [UPDATE] Atualizar Família com Persistência Completa de Todos os Campos na Pivot e Mestre
+// 🟡 [UPDATE] Atualizar Família com Persistência Completa
 export const updateFamilia = async (req: Request, res: Response) => {
   const { idFamilia } = req.params;
   const tenantId = Number(req.query.tenant_id || 1);
   const {
     nome, categoriaPai, descricao, status, tipoItem, ncmPadrao, cestPadrao,
     unidadeMedidaBase, templateNomeComercial, separadorSku, siglaSku, templateSku,
-    descricaoComercialPadrao, observacoesPadrao, cor, imagem, atributos
+    descricaoComercialPadrao, observacoesPadrao, cor, imagem, atributos,
+    idMarca, comportamentoMarca
   } = req.body;
 
   const connection = await pool.getConnection();
@@ -186,13 +188,17 @@ export const updateFamilia = async (req: Request, res: Response) => {
   try {
     await connection.beginTransaction();
 
-    const categoriaIdFinal = (categoriaPai && String(categoriaPai).trim() !== '') ? Number(categoriaPai) : null;
+    const cleanVal = (val: any) => (val !== undefined && val !== null && String(val).trim() !== '') ? val : null;
 
-    // PASSO 1: Atualizar dados mestres completos
+    const categoriaIdFinal = cleanVal(categoriaPai) ? Number(categoriaPai) : null;
+    const idMarcaFinal = cleanVal(idMarca) ? Number(idMarca) : null;
+
     const queryFamilia = `
       UPDATE comercial_familias SET
         nome = COALESCE(?, nome),
-        categoria_id = ?,
+        categoria_id = COALESCE(?, categoria_id),
+        id_marca = COALESCE(?, id_marca),
+        comportamento_marca = COALESCE(?, comportamento_marca),
         descricao = COALESCE(?, descricao),
         status = COALESCE(?, status),
         tipo_item = COALESCE(?, tipo_item),
@@ -211,34 +217,34 @@ export const updateFamilia = async (req: Request, res: Response) => {
     `;
 
     await connection.execute(queryFamilia, [
-      nome || null,
+      cleanVal(nome),
       categoriaIdFinal,
-      descricao || null,
-      status ? String(status).toUpperCase() : 'ATIVO',
-      tipoItem || 'PA',
-      ncmPadrao || null,
-      cestPadrao || null,
-      unidadeMedidaBase || null,
-      templateNomeComercial || null,
-      separadorSku || null,
-      siglaSku || null,
-      templateSku || null,
-      descricaoComercialPadrao || null,
-      observacoesPadrao || null,
-      cor || null,
-      imagem || null,
+      idMarcaFinal,
+      cleanVal(comportamentoMarca),
+      cleanVal(descricao),
+      status ? String(status).toUpperCase() : null,
+      cleanVal(tipoItem),
+      cleanVal(ncmPadrao),
+      cleanVal(cestPadrao),
+      cleanVal(unidadeMedidaBase),
+      cleanVal(templateNomeComercial),
+      cleanVal(separadorSku),
+      cleanVal(siglaSku),
+      cleanVal(templateSku),
+      cleanVal(descricaoComercialPadrao),
+      cleanVal(observacoesPadrao),
+      cleanVal(cor),
+      cleanVal(imagem),
       idFamilia,
       tenantId
     ]);
 
-    // PASSO 2: Limpar os vínculos antigos na pivot para evitar órfãos
     await connection.execute(
       `DELETE FROM atributos_core_entidades 
        WHERE tenant_id = ? AND tipo_entidade = 'familia' AND id_entidade = ?`,
       [tenantId, idFamilia]
     );
 
-    // PASSO 3: Mapear e vincular os atributos com suas novas regras de SKU
     if (Array.isArray(atributos) && atributos.length > 0) {
       const [grupoRows] = await connection.execute(
         'SELECT id FROM atributos_comercial_grupos WHERE tenant_id = ? LIMIT 1',
@@ -256,15 +262,14 @@ export const updateFamilia = async (req: Request, res: Response) => {
 
           const [insAttr] = await connection.execute(`
             INSERT INTO atributos_comercial 
-              (tenant_id, grupo_id, nome, codigo, tipo, sufixo, ativo)
-            VALUES (?, ?, ?, ?, ?, ?, 1)
+            (tenant_id, grupo_id, nome, codigo, tipo, ativo)
+            VALUES (?, ?, ?, ?, ?, 1)
           `, [
             tenantId,
             grupoIdPadrao,
             attr.nome,
             codigoGerado,
-            tipoMapeado,
-            attr.sufixo || null
+            tipoMapeado
           ]);
           idAtributoFinal = (insAttr as any).insertId;
         } else {
@@ -275,7 +280,7 @@ export const updateFamilia = async (req: Request, res: Response) => {
 
         await connection.execute(`
           INSERT INTO atributos_core_entidades
-            (tenant_id, tipo_entidade, id_entidade, atributo_id, escopo_comercial, obrigatorio, pesquisavel, ordem, exemplos, compoe_sku, gera_variacao, separador_sufixo, valor_padrao_grupo, herdar, ativo)
+          (tenant_id, tipo_entidade, id_entidade, atributo_id, escopo_comercial, obrigatorio, pesquisavel, ordem, exemplos, compoe_sku, gera_variacao, separador_sufixo, valor_padrao_grupo, herdar, ativo)
           VALUES (?, 'familia', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
         `, [
           tenantId,
@@ -285,11 +290,11 @@ export const updateFamilia = async (req: Request, res: Response) => {
           attr.obrigatorio ? 1 : 0,
           attr.pesquisavel !== undefined ? (attr.pesquisavel ? 1 : 0) : 1,
           Number(attr.ordemSku || 0),
-          attr.exemplos || null,
+          cleanVal(attr.exemplos),
           attr.compoeSku ? 1 : 0,
           attr.geraVariacao ? 1 : 0,
           attr.separadorSufixo || 'nenhum',
-          attr.valorPadraoGrupo || null,
+          cleanVal(attr.valorPadraoGrupo),
           attr.valorHerdadoDoGrupo ? 1 : 0
         ]);
       }
@@ -307,27 +312,32 @@ export const updateFamilia = async (req: Request, res: Response) => {
   }
 };
 
-// 🟢 [CREATE] Criar uma Nova Família com os novos campos padrão
+// 🟢 [CREATE] Criar Família
 export const createFamilia = async (req: Request, res: Response) => {
   const tenantId = Number(req.query.tenant_id || 1);
   const { 
     nome, categoriaPai, descricao, tipoItem, ncmPadrao, cestPadrao,
     unidadeMedidaBase, templateNomeComercial, separadorSku, siglaSku, templateSku,
-    descricaoComercialPadrao, observacoesPadrao, cor, imagem 
+    descricaoComercialPadrao, observacoesPadrao, cor, imagem,
+    idMarca, comportamentoMarca 
   } = req.body;
 
   try {
     const categoriaIdFinal = (categoriaPai && String(categoriaPai).trim() !== '') ? Number(categoriaPai) : null;
+    const marcaIdFinal = (idMarca && !isNaN(Number(idMarca))) ? Number(idMarca) : 1;
+    const comportamentoFinal = comportamentoMarca || 'ficha';
 
     const query = `
       INSERT INTO comercial_familias 
-        (tenant_id, categoria_id, nome, descricao, status, tipo_item, ncm_padrao, cest_padrao, separador_sku, sigla_sku, template_sku, unidade_base, template_nome, descricao_comercial_padrao, observacoes_padrao, cor, imagem, ordem)
-      VALUES (?, ?, ?, ?, 'ATIVO', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+      (tenant_id, categoria_id, id_marca, comportamento_marca, nome, descricao, status, tipo_item, ncm_padrao, cest_padrao, separador_sku, sigla_sku, template_sku, unidade_base, template_nome, descricao_comercial_padrao, observacoes_padrao, cor, imagem, ordem)
+      VALUES (?, ?, ?, ?, ?, ?, 'ATIVO', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
     `;
 
     const [result] = await pool.execute(query, [
       tenantId,
       categoriaIdFinal,
+      marcaIdFinal,
+      comportamentoFinal,
       nome || 'Nova Família de Produtos',
       descricao || null,
       tipoItem || 'PA',
@@ -357,7 +367,7 @@ export const createFamilia = async (req: Request, res: Response) => {
   }
 };
 
-// 🔴 [DELETE] Excluir uma Família limpando dependências na pivot
+// 🔴 [DELETE] Excluir Família
 export const deleteFamilia = async (req: Request, res: Response) => {
   const { idFamilia } = req.params;
   const tenantId = Number(req.query.tenant_id || 1);
@@ -392,14 +402,12 @@ export const deleteFamilia = async (req: Request, res: Response) => {
   }
 };
 
-
-// 🔌 [READ] Buscar Famílias + Atributos Locais + Herdados da Categoria Pai + Opções
+// 🔌 [READ] Buscar Famílias
 export const getFamilias = async (req: Request, res: Response) => {
   const rawTenantId = req.query.tenant_id || req.headers['x-tenant-id'] || 1;
   const tenantId = Number(rawTenantId);
 
   try {
-    // 1. Buscar Famílias
     const queryFamilias = `
       SELECT 
         f.id AS id, 
@@ -419,7 +427,8 @@ export const getFamilias = async (req: Request, res: Response) => {
         f.descricao_comercial_padrao AS descricaoComercialPadrao,
         f.observacoes_padrao AS observacoesPadrao,
         f.cor, 
-        f.imagem
+        f.imagem,
+        f.comportamento_marca AS comportamentoMarca
       FROM comercial_familias f
       LEFT JOIN comercial_categorias c 
         ON f.categoria_id = c.id AND f.tenant_id = c.tenant_id
@@ -434,7 +443,6 @@ export const getFamilias = async (req: Request, res: Response) => {
       return res.json([]);
     }
 
-    // 2. Buscar Atributos Locais (da Família) e Herdados (da Categoria) em uma única consulta
     const queryAtributos = `
       SELECT 
         core.id_entidade,
@@ -444,7 +452,6 @@ export const getFamilias = async (req: Request, res: Response) => {
         a.codigo AS codigo,
         core.escopo_comercial AS classificacao,
         a.tipo AS tipoDado,
-        a.sufixo,
         core.separador_sufixo AS separadorSufixo,
         core.obrigatorio,
         core.gera_variacao AS geraVariacao,
@@ -468,7 +475,6 @@ export const getFamilias = async (req: Request, res: Response) => {
     const [atributosRows] = await pool.execute(queryAtributos, [tenantId]);
     const todosAtributos = atributosRows as any[];
 
-    // 3. Buscar Opções para Atributos do tipo 'lista'
     const queryOpcoes = `
       SELECT id, atributo_id, valor, codigo, ordem 
       FROM atributos_comercial_opcoes 
@@ -478,21 +484,17 @@ export const getFamilias = async (req: Request, res: Response) => {
     const [opcoesRows] = await pool.execute(queryOpcoes, [tenantId]);
     const todasOpcoes = opcoesRows as any[];
 
-    // 4. Montar estrutura final combinando Herança e Opções
     const resultadoFinal = familias.map(f => {
-      // Atributos diretos da família
       const locais = todosAtributos.filter(
         attr => attr.tipo_entidade === 'familia' && String(attr.id_entidade) === String(f.id)
       );
 
-      // Atributos herdados da categoria pai
       const herdados = f.categoriaPai 
         ? todosAtributos.filter(
             attr => attr.tipo_entidade === 'categoria' && String(attr.id_entidade) === String(f.categoriaPai)
           )
         : [];
 
-      // Unifica garantindo que se o atributo existir na família, ele se sobrepõe ao da categoria
       const mapaAtributos = new Map();
 
       [...herdados, ...locais].forEach(attr => {
@@ -507,7 +509,7 @@ export const getFamilias = async (req: Request, res: Response) => {
           classificacao: attr.classificacao || 'ficha',
           tipoDado: attr.tipoDado === 'lista' ? 'opcoes' : (attr.tipoDado === 'decimal' || attr.tipoDado === 'numero' ? 'numero' : 'texto'),
           separadorSufixo: attr.separadorSufixo || 'nenhum',
-          sufixo: attr.sufixo || '',
+          sufixo: '',
           obrigatorio: attr.obrigatorio === 1 || attr.obrigatorio === true,
           geraVariacao: attr.geraVariacao === 1 || attr.geraVariacao === true,
           compoeSku: attr.compoeSku === 1 || attr.compoeSku === true,
@@ -536,6 +538,7 @@ export const getFamilias = async (req: Request, res: Response) => {
         templateSku: f.templateSku || '{SIGLA}{S}{VARIACAO}',
         descricaoComercialPadrao: f.descricaoComercialPadrao || '',
         observacoesPadrao: f.observacoesPadrao || '',
+        comportamentoMarca: f.comportamentoMarca || 'ficha',
         atributos: Array.from(mapaAtributos.values())
       };
     });
@@ -547,7 +550,7 @@ export const getFamilias = async (req: Request, res: Response) => {
   }
 };
 
-// 🔎 Diagnóstico completo da formalização: atributos efetivos, valores e pendências por item.
+// 🔎 Diagnóstico
 export const getDiagnosticoFormalizacao = async (req: Request, res: Response) => {
   const { idFamilia } = req.params;
   const tenantId = Number(req.query.tenant_id || req.headers['x-tenant-id'] || 1);
@@ -629,7 +632,7 @@ export const getDiagnosticoFormalizacao = async (req: Request, res: Response) =>
   }
 };
 
-// ✅ Formalização transacional por id_item, sem depender do SKU anterior.
+// ✅ Formalização transacional
 export const formalizarItensFamilia = async (req: Request, res: Response) => {
   const { idFamilia } = req.params;
   const tenantId = Number(req.query.tenant_id || req.headers['x-tenant-id'] || 1);
@@ -664,8 +667,8 @@ export const formalizarItensFamilia = async (req: Request, res: Response) => {
       }
 
       const [valorRows] = await connection.execute(`
-         SELECT av.atributo_id, av.valor_texto, av.valor_numero, av.valor_decimal, av.valor_data,
-           av.valor_boolean, av.opcao_id, ao.valor AS valor_opcao, ao.codigo AS codigo_opcao
+        SELECT av.atributo_id, av.valor_texto, av.valor_numero, av.valor_decimal, av.valor_data,
+               av.valor_boolean, av.opcao_id, ao.valor AS valor_opcao, ao.codigo AS codigo_opcao
         FROM atributos_comercial_valores av
         LEFT JOIN atributos_comercial_opcoes ao ON ao.id = av.opcao_id
         WHERE av.tenant_id = ? AND av.tipo_entidade = 'produto' AND av.id_entidade = ?
@@ -691,11 +694,13 @@ export const formalizarItensFamilia = async (req: Request, res: Response) => {
       for (const attr of contexto.atributos) {
         const valor = resolverValor(valores, [attr.id, attr.nome, attr.codigo]);
         if (estaVazio(valor)) continue;
+
         const [existente] = await connection.execute(
           `SELECT id FROM atributos_comercial_valores
            WHERE tenant_id = ? AND tipo_entidade = 'produto' AND id_entidade = ? AND atributo_id = ? LIMIT 1`,
           [tenantId, idItem, attr.id]
         );
+
         if ((existente as any[]).length > 0) {
           await connection.execute(
             `UPDATE atributos_comercial_valores SET valor_texto = ?, valor_numero = NULL,
@@ -741,8 +746,7 @@ export const formalizarItensFamilia = async (req: Request, res: Response) => {
   }
 };
 
-
-// 🔌 [READ] Buscar Produtos da Família unindo Comercial e Core (Itens do Fornecedor)
+// 🔌 [READ] Buscar Produtos da Família
 export const getProdutosPorFamilia = async (req: Request, res: Response) => {
   const { idFamilia } = req.params;
   const rawTenantId = req.query.tenant_id || req.headers['x-tenant-id'] || 1;
@@ -797,7 +801,6 @@ export const getProdutosPorFamilia = async (req: Request, res: Response) => {
       margemLucro: prod.margemLucro !== null ? Number(prod.margemLucro) : 0,
       exibirNoPdv: prod.exibirNoPdv === 1 || prod.exibirNoPdv === true,
       podeVenderSemEstoque: prod.podeVenderSemEstoque === 1 || prod.podeVenderSemEstoque === true,
-      // Mapeamento dinâmico do nome seguindo sua regra de herança
       nome_item: prod.nomeComercial || prod.nomeItemGlobal,
       variacao: prod.variacao || 'Principal'
     }));

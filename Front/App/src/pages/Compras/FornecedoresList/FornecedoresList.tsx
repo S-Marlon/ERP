@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { 
   Layout, 
   Input, 
@@ -17,7 +17,6 @@ import {
   Form, 
   Radio, 
   Select, 
-  message,
   Divider,
   Empty,
   Space,
@@ -37,110 +36,33 @@ import {
   SafetyCertificateOutlined,
   InfoCircleOutlined
 } from '@ant-design/icons';
+import { useFornecedores } from './useFornecedores'; // Ajuste o caminho se necessário
 
 const { Sider, Content } = Layout;
 const { Title, Text } = Typography;
 
-interface FornecedorAggregate {
-  id_pessoa: number;
-  tipo_pessoa: 'PF' | 'PJ';
-  nome_razao: string;
-  nome_fantasia?: string;
-  documento: string;
-  status: 'ATIVO' | 'INATIVO';
-  email: string;
-  telefone: string;
-  cidade: string;
-  estado: string;
-  inscricao_estadual?: string;
-}
-
 export default function Fornecedores() {
   const [form] = Form.useForm();
-  
-  const [loading, setLoading] = useState<boolean>(false);
-  const [searchTerm, setSearchTerm] = useState<string>('');
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [tipoPessoaModal, setTipoPessoaModal] = useState<'PJ' | 'PF'>('PJ');
 
-  const [fornecedores, setFornecedores] = useState<FornecedorAggregate[]>([
-    {
-      id_pessoa: 101,
-      tipo_pessoa: 'PJ',
-      nome_razao: 'Distribuidora Global de Ferro e Aço S.A.',
-      nome_fantasia: 'Global Metais',
-      documento: '12.345.678/0001-99',
-      status: 'ATIVO',
-      email: 'compras@globalferro.com.br',
-      telefone: '(11) 4002-8922',
-      cidade: 'Guarulhos',
-      estado: 'SP',
-      inscricao_estadual: '111.222.333.444'
-    },
-    {
-      id_pessoa: 102,
-      tipo_pessoa: 'PJ',
-      nome_razao: 'FORNECEDOR GENERICO - COMPRAS SPOT',
-      nome_fantasia: 'Mercado Livre / Varejo',
-      documento: '99.999.999/0001-99',
-      status: 'ATIVO',
-      email: 'compras.spot@suaempresa.com',
-      telefone: '(11) 99999-9999',
-      cidade: 'Interna',
-      estado: 'SP'
-    },
-    {
-      id_pessoa: 103,
-      tipo_pessoa: 'PF',
-      nome_razao: 'Carlos Eduardo Santos (Freteiro Autônomo)',
-      documento: '333.444.555-66',
-      status: 'ATIVO',
-      email: 'cadu.fretes@gmail.com',
-      telefone: '(47) 99122-3344',
-      cidade: 'Joinville',
-      estado: 'SC'
+  const {
+    loading,
+    searchTerm,
+    setSearchTerm,
+    fornecedorAtivo,
+    setFornecedorAtivo,
+    fornecedoresFiltrados,
+    fetchFornecedores,
+    handleCreateFornecedor
+  } = useFornecedores(1); // Passe o tenantId ativo se houver contexto
+
+  const onSubmitForm = async (values: any) => {
+    const success = await handleCreateFornecedor(values);
+    if (success) {
+      setIsModalOpen(false);
+      form.resetFields();
     }
-  ]);
-
-  const [fornecedorAtivo, setFornecedorAtivo] = useState<FornecedorAggregate | null>(fornecedores[0]);
-
-  const fornecedoresFiltrados = useMemo(() => {
-    const termo = searchTerm.toLowerCase();
-    return AcademicFilter(fornecedores, termo);
-  }, [fornecedores, searchTerm]);
-
-  function AcademicFilter(list: FornecedorAggregate[], term: string) {
-    return list.filter(f => 
-      f.nome_razao.toLowerCase().includes(term) || 
-      f.documento.includes(term)
-    );
-  }
-
-  const handleReload = () => {
-    setLoading(true);
-    setTimeout(() => { setLoading(false); message.info('Lista sincronizada com core_pessoas.'); }, 500);
-  };
-
-  const handleCreateFornecedor = (values: any) => {
-    const novo: FornecedorAggregate = {
-      id_pessoa: Math.floor(Math.random() * 900) + 200,
-      tipo_pessoa: values.tipo_pessoa,
-      nome_razao: values.tipo_pessoa === 'PJ' ? values.razao_social : values.nome_pf,
-      nome_fantasia: values.nome_fantasia,
-      documento: values.tipo_pessoa === 'PJ' ? values.cnpj : values.cpf,
-      status: 'ATIVO',
-      email: values.email,
-      telefone: values.telefone,
-      cidade: values.cidade || 'Não informada',
-      estado: values.estado || 'UF',
-      inscricao_estadual: values.inscricao_estadual
-    };
-
-    setFornecedores([novo, ...fornecedores]);
-    setFornecedorAtivo(novo);
-    setIsModalOpen(false);
-    form.resetFields();
-    message.success('Fornecedor registrado no banco!');
   };
 
   return (
@@ -161,7 +83,7 @@ export default function Fornecedores() {
           onChange={(e) => setSearchTerm(e.target.value)}
           style={{ marginBottom: '16px' }}
           allowClear
-          addonAfter={<Button type="text" size="small" icon={<ReloadOutlined />} onClick={handleReload} loading={loading} />}
+          addonAfter={<Button type="text" size="small" icon={<ReloadOutlined />} onClick={fetchFornecedores} loading={loading} />}
         />
 
         <div style={{ overflowY: 'auto', height: 'calc(100vh - 140px)' }}>
@@ -321,10 +243,11 @@ export default function Fornecedores() {
         okText="Confirmar Cadastro"
         cancelText="Voltar"
         destroyOnClose
+        confirmLoading={loading}
       >
         <Divider style={{ margin: '12px 0' }} />
         
-        <Form form={form} layout="vertical" initialValues={{ tipo_pessoa: 'PJ' }} onFinish={handleCreateFornecedor}>
+        <Form form={form} layout="vertical" initialValues={{ tipo_pessoa: 'PJ' }} onFinish={onSubmitForm}>
           
           <Form.Item name="tipo_pessoa" label="Modelo de Entidade Jurídica">
             <Radio.Group onChange={(e) => setTipoPessoaModal(e.target.value)} buttonStyle="solid">
@@ -386,69 +309,65 @@ export default function Fornecedores() {
 
           <Divider orientation="left" style={{ fontSize: '11px', color: '#bfbfbf' }}>Canais de Contato & Localidade</Divider>
 
-          <Divider orientation="left" style={{ fontSize: '11px', color: '#bfbfbf' }}>Canais de Contato & Localidade</Divider>
-
-<Row gutter={16}>
-  <Col span={12}>
-    <Form.Item 
-      name="email" 
-      label="E-mail Principal" 
-      dependencies={['telefone']}
-      rules={[
-        { type: 'email', message: 'Insira um e-mail válido' },
-        ({ getFieldValue }) => ({
-          validator(_, value) {
-            if (value || getFieldValue('telefone')) {
-              return Promise.resolve();
-            }
-            return Promise.reject(new Error('Preencha ao menos o E-mail ou o Telefone!'));
-          },
-        }),
-      ]}
-    >
-      <Input placeholder="contato@fornecedor.com" />
-    </Form.Item>
-  </Col>
-  
-  <Col span={12}>
-    <Form.Item 
-      name="telefone" 
-      label="Telefone / WhatsApp" 
-      dependencies={['email']}
-      rules={[
-        ({ getFieldValue }) => ({
-          validator(_, value) {
-            if (value || getFieldValue('email')) {
-              return Promise.resolve();
-            }
-            return Promise.reject(new Error('Preencha ao menos o Telefone ou o E-mail!'));
-          },
-        }),
-      ]}
-    >
-      <Input placeholder="(00) 00000-0000" />
-    </Form.Item>
-  </Col>
-  
-  <Col span={16}>
-    <Form.Item name="cidade" label="Cidade">
-      <Input placeholder="Ex: Campinas" />
-    </Form.Item>
-  </Col>
-  
-  <Col span={8}>
-    <Form.Item name="estado" label="UF">
-      <Select placeholder="UF">
-        <Select.Option value="SP">SP</Select.Option>
-        <Select.Option value="RJ">RJ</Select.Option>
-        <Select.Option value="MG">MG</Select.Option>
-        <Select.Option value="SC">SC</Select.Option>
-      </Select>
-    </Form.Item>
-  </Col>
-</Row>
-
-
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item 
+                name="email" 
+                label="E-mail Principal" 
+                dependencies={['telefone']}
+                rules={[
+                  { type: 'email', message: 'Insira um e-mail válido' },
+                  ({ getFieldValue }) => ({
+                    validator(_, value) {
+                      if (value || getFieldValue('telefone')) {
+                        return Promise.resolve();
+                      }
+                      return Promise.reject(new Error('Preencha ao menos o E-mail ou o Telefone!'));
+                    },
+                  }),
+                ]}
+              >
+                <Input placeholder="contato@fornecedor.com" />
+              </Form.Item>
+            </Col>
+            
+            <Col span={12}>
+              <Form.Item 
+                name="telefone" 
+                label="Telefone / WhatsApp" 
+                dependencies={['email']}
+                rules={[
+                  ({ getFieldValue }) => ({
+                    validator(_, value) {
+                      if (value || getFieldValue('email')) {
+                        return Promise.resolve();
+                      }
+                      return Promise.reject(new Error('Preencha ao menos o Telefone ou o E-mail!'));
+                    },
+                  }),
+                ]}
+              >
+                <Input placeholder="(00) 00000-0000" />
+              </Form.Item>
+            </Col>
+            
+            <Col span={16}>
+              <Form.Item name="cidade" label="Cidade">
+                <Input placeholder="Ex: Campinas" />
+              </Form.Item>
+            </Col>
+            
+            <Col span={8}>
+              <Form.Item name="estado" label="UF">
+                <Select placeholder="UF">
+                  <Select.Option value="SP">SP</Select.Option>
+                  <Select.Option value="RJ">RJ</Select.Option>
+                  <Select.Option value="MG">MG</Select.Option>
+                  <Select.Option value="SC">SC</Select.Option>
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
 
         </Form>
       </Modal>

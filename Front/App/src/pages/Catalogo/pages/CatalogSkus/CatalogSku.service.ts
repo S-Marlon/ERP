@@ -75,6 +75,7 @@ export const getProdutos = async (tenantId: number = 1): Promise<ItemParentType[
       status: itemStatus === 'INATIVO' ? 'INATIVO' : 'ATIVO',
       categoria_id: item.categoria_id ? toNumber(item.categoria_id, 0) || null : null,
       categoria: categoriaNome || null,
+      familia: item.familia || item.nome_familia || null,
       familia_id: item.familia_id ? toNumber(item.familia_id, 0) || null : null,
       id_marca: item.id_marca ? toNumber(item.id_marca, 0) || null : null,
       skus: skusMapeados,
@@ -115,6 +116,23 @@ export const updateProduto = async (
 
   return response.json();
 };
+
+
+/**
+ * 🧬 GET /produtos/:id_item/atributos
+ * Busca os atributos comerciais de um produto específico separados por Ficha, DNA e Grade
+ */
+export const getAtributosProduto = async (idItem: number | string, tenantId: number = 1) => {
+  const response = await fetch(`${API_BASE_URL}/produtos/${idItem}/atributos?tenant_id=${tenantId}`, {
+    method: 'GET',
+    headers: DEFAULT_HEADERS,
+  });
+
+  return handleResponse<any>(response, 'Erro ao carregar os atributos do produto.');
+};
+
+
+
 
 /**
  * 🔄 POST /produtos/lote

@@ -143,7 +143,7 @@ export const ParceirosDashboard: React.FC = () => {
               <div style={{ ...styles.iconWrapper, backgroundColor: '#f6ffed', color: '#52c41a' }}>
                 <ShopOutlined />
               </div>
-                <Tag>Disuncional</Tag>
+                <Tag>Funcional</Tag>
 
               <Title level={4}>Fornecedores</Title>
               <Paragraph type="secondary">

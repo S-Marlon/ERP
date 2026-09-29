@@ -71,6 +71,12 @@ export default function AppSidebar({ isOpen, toggleSidebar }: SidebarProps) {
       icon: <DollarOutlined />,
       label: 'Financeiro',
     },
+      {
+      key: '/ecommerce',
+      icon: <ShopOutlined />,
+      label: 'E-commerce',
+    },
+    
     {
       key: '/produtos',
       icon: <ShoppingOutlined />,

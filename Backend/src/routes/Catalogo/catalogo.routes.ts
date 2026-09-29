@@ -62,6 +62,7 @@ import {
   getMarcas,
   createMarca
 } from './Marcas/comercialMarcas.controller';
+import { getAtributosPorProduto } from './Atributos/atributos.controller';
 
 const router = Router();
 
@@ -95,6 +96,8 @@ router.post('/atributos-grupos', createGrupoAtributo);
 router.put('/atributos-grupos/:idGrupo', updateGrupoAtributo);
 router.delete('/atributos-grupos/:idGrupo', deleteGrupoAtributo);
 router.get('/cadastros/atributos-grupos', getGruposAtributos);
+
+router.get('/:id_item/atributos', getAtributosPorProduto);
 
 // =========================================================================
 // 📏 DICIONÁRIO DE UNIDADES DE MEDIDA

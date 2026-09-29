@@ -2,14 +2,14 @@ import { Request, Response } from 'express';
 import pool from '../../Estoque/db.config';
 
 /**
- * 🔌 [READ] Buscar Categorias (Trazendo os atributos vinculados aninhados com governança)
+ * 🔌 [READ] Buscar Categorias (Trazendo os atributos vinculados com governança, sufixo e unidade contextuais)
  */
 export const getCategoriasSelect = async (req: Request, res: Response) => {
   const rawTenantId = req.query.tenant_id || req.headers['x-tenant-id'] || 1;
   const tenantId = Number(rawTenantId);
 
   try {
-    // 1. Busca todas as categorias (Ajustado de created_at/updated_at para criado_em/alterado_em se houver, ou omitido se não houver na tabela comercial_categorias)
+    // 1. Busca todas as categorias
     const queryCategorias = `
       SELECT id, tenant_id, categoria_pai_id, nome, slug, ativa, ordem, 
              descricao, margem_sugerida, modo_exibicao
@@ -22,13 +22,14 @@ export const getCategoriasSelect = async (req: Request, res: Response) => {
 
     if (categorias.length === 0) return res.json([]);
 
-    // 2. Busca TODOS os vínculos de atributos (Garantindo a exatidão das colunas do seu DESCRIBE)
+    // 2. Busca TODOS os vínculos de atributos (Trazendo sufixo e unidade da tabela pivô)
     const queryAtributos = `
       SELECT ae.id_entidade, a.id, a.nome, a.tipo, ae.obrigatorio, ae.herdar, 
              ae.ordem, ae.bloqueado, ae.retransmitir, ae.sobrescreve, ae.exemplos,
-             a.sufixo, a.escopo_padrao
+             ae.formato_sufixo, ae.unidade_id, u.simbolo AS unidade_simbolo
       FROM atributos_core_entidades ae
       INNER JOIN atributos_comercial a ON a.id = ae.atributo_id AND a.tenant_id = ae.tenant_id
+      LEFT JOIN atributos_comercial_unidades u ON ae.unidade_id = u.id
       WHERE ae.tenant_id = ? AND ae.tipo_entidade = 'categoria' AND ae.ativo = 1
     `;
     const [attrRows] = await pool.execute(queryAtributos, [tenantId]);
@@ -42,8 +43,9 @@ export const getCategoriasSelect = async (req: Request, res: Response) => {
           id: String(attr.id),
           nome: attr.nome,
           tipoDado: attr.tipo,
-          sufixo: attr.sufixo || undefined,
-          escopoComercial: attr.escopo_padrao || 'ficha',
+          sufixo: attr.formato_sufixo || attr.unidade_simbolo || undefined,
+          unidade_id: attr.unidade_id ? String(attr.unidade_id) : null,
+          escopoComercial: attr.escopo_comercial || 'ficha',
           obrigatorio: Boolean(attr.obrigatorio),
           herdar: Boolean(attr.herdar),
           ordem: Number(attr.ordem),
@@ -71,7 +73,7 @@ export const getCategoriasSelect = async (req: Request, res: Response) => {
 };
 
 /**
- * 🟢 [CREATE] Categoria + Vínculo de Atributos (Com suporte à Governança)
+ * 🟢 [CREATE] Categoria + Vínculo de Atributos (Com suporte a Sufixo, Unidade e Governança)
  */
 export const createCategoria = async (req: Request, res: Response) => {
   const connection = await pool.getConnection();
@@ -111,16 +113,16 @@ export const createCategoria = async (req: Request, res: Response) => {
     const [result] = await connection.execute(queryCategoria, [
       vTenantId, vPai, vNome, slug, vMargem, vModo, vDescricao
     ]);
-    
+
     const novaCategoriaId = (result as any).insertId;
 
-    // 2. Insere os Vínculos na Tabela Pivô (Incluindo os novos campos de Governança)
+    // 2. Insere os Vínculos na Tabela Pivô (Com suporte a unidade e sufixo contextuais)
     if (Array.isArray(atributos_vinculados) && atributos_vinculados.length > 0) {
       const queryPivot = `
         INSERT INTO atributos_core_entidades 
-          (tenant_id, tipo_entidade, id_entidade, atributo_id, obrigatorio, herdar, ordem, 
-           bloqueado, retransmitir, sobrescreve, exemplos, ativo)
-        VALUES (?, 'categoria', ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+          (tenant_id, tipo_entidade, id_entidade, atributo_id, unidade_id, formato_sufixo, 
+           obrigatorio, herdar, ordem, bloqueado, retransmitir, sobrescreve, exemplos, ativo)
+        VALUES (?, 'categoria', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
       `;
       for (const attr of atributos_vinculados) {
         const vAtributoId = attr.atributo_id || attr.id;
@@ -129,7 +131,9 @@ export const createCategoria = async (req: Request, res: Response) => {
         await connection.execute(queryPivot, [
           vTenantId, 
           novaCategoriaId, 
-          Number(vAtributoId), 
+          Number(vAtributoId),
+          attr.unidade_id ? Number(attr.unidade_id) : null,
+          attr.formato_sufixo || null,
           attr.obrigatorio ? 1 : 0, 
           attr.herdar ? 1 : 0, 
           attr.ordem || 0,
@@ -153,7 +157,7 @@ export const createCategoria = async (req: Request, res: Response) => {
 };
 
 /**
- * 🟡 [UPDATE] Categoria + Atualização Dinâmica de Atributos (Com suporte à Governança)
+ * 🟡 [UPDATE] Categoria + Atualização Dinâmica de Atributos
  */
 export const updateCategoria = async (req: Request, res: Response) => {
   const connection = await pool.getConnection();
@@ -164,7 +168,7 @@ export const updateCategoria = async (req: Request, res: Response) => {
 
     await connection.beginTransaction();
 
-    // 1. Construção dinâmica segura
+    // 1. Construção dinâmica segura dos dados da categoria
     const fields: string[] = [];
     const params: any[] = [];
     const allowedFields = ['nome', 'categoria_pai_id', 'ativa', 'margem_sugerida', 'modo_exibicao', 'descricao'];
@@ -194,7 +198,7 @@ export const updateCategoria = async (req: Request, res: Response) => {
       await connection.execute(queryUpdateCat, params);
     }
 
-    // 2. Sincronização dos Atributos (Pivô) com os novos campos de Governança
+    // 2. Sincronização dos Atributos na Pivô
     if (atributos_vinculados !== undefined) {
       await connection.execute(
         `DELETE FROM atributos_core_entidades WHERE id_entidade = ? AND tipo_entidade = 'categoria' AND tenant_id = ?`,
@@ -204,9 +208,9 @@ export const updateCategoria = async (req: Request, res: Response) => {
       if (Array.isArray(atributos_vinculados) && atributos_vinculados.length > 0) {
         const queryPivot = `
           INSERT INTO atributos_core_entidades 
-            (tenant_id, tipo_entidade, id_entidade, atributo_id, obrigatorio, herdar, ordem, 
-             bloqueado, retransmitir, sobrescreve, exemplos, ativo)
-          VALUES (?, 'categoria', ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+            (tenant_id, tipo_entidade, id_entidade, atributo_id, unidade_id, formato_sufixo, 
+             obrigatorio, herdar, ordem, bloqueado, retransmitir, sobrescreve, exemplos, ativo)
+          VALUES (?, 'categoria', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
         `;
         
         for (const attr of atributos_vinculados) {
@@ -220,7 +224,9 @@ export const updateCategoria = async (req: Request, res: Response) => {
           await connection.execute(queryPivot, [
             tenantId, 
             idCategoria, 
-            Number(vAtributoId), 
+            Number(vAtributoId),
+            attr.unidade_id ? Number(attr.unidade_id) : null,
+            attr.formato_sufixo || null,
             attr.obrigatorio ? 1 : 0, 
             attr.herdar ? 1 : 0, 
             attr.ordem || 0,
@@ -306,7 +312,7 @@ export const updateCategoriesOrder = async (req: Request, res: Response) => {
 };
 
 /**
- * 🧠 [ATRIBUTOS POR CATEGORIA] (Trazendo o status de Governança)
+ * 🧠 [ATRIBUTOS POR CATEGORIA] (Trazendo o sufixo e unidade contextuais)
  */
 export const getAtributosByCategoria = async (req: Request, res: Response) => {
   try {
@@ -315,13 +321,15 @@ export const getAtributosByCategoria = async (req: Request, res: Response) => {
 
     const query = `
       SELECT 
-        a.id AS id, a.nome AS nome, a.tipo AS tipo, a.unidade_id AS unidadeId,
+        a.id AS id, a.nome AS nome, a.tipo AS tipo, 
+        ae.unidade_id AS unidadeId, u.simbolo AS unidade_simbolo, ae.formato_sufixo,
         ae.obrigatorio AS obrigatorio, ae.herdar AS herdar,
         ae.sobrescreve AS sobrescreve, ae.bloqueado AS bloqueado, 
         ae.retransmitir AS retransmitir, ae.exemplos AS exemplos, ae.ordem AS ordem
       FROM atributos_core_entidades ae
       INNER JOIN atributos_comercial a
         ON a.id = ae.atributo_id AND a.tenant_id = ae.tenant_id
+      LEFT JOIN atributos_comercial_unidades u ON ae.unidade_id = u.id
       WHERE ae.id_entidade = ? AND ae.tipo_entidade = 'categoria'
         AND ae.tenant_id = ? AND ae.ativo = 1
       ORDER BY ae.ordem ASC
@@ -331,6 +339,8 @@ export const getAtributosByCategoria = async (req: Request, res: Response) => {
     const result = (rows as any[]).map(attr => ({
       ...attr,
       id: String(attr.id),
+      unidadeId: attr.unidadeId ? String(attr.unidadeId) : null,
+      sufixo: attr.formato_sufixo || attr.unidade_simbolo || null,
       obrigatorio: Boolean(attr.obrigatorio),
       herdar: Boolean(attr.herdar),
       sobrescreve: Boolean(attr.sobrescreve),
@@ -348,7 +358,7 @@ export const getAtributosByCategoria = async (req: Request, res: Response) => {
 export const getAtributosGlobais = async (req: Request, res: Response) => {
   try {
     const tenant_id = Number(req.query.tenant_id || 1);
-    
+
     const [atributos] = await pool.execute(
       'SELECT id, nome, tipo FROM atributos_comercial WHERE tenant_id = ?',
       [tenant_id]

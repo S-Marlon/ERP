@@ -28,8 +28,6 @@ import { FinalizarVenda } from "./pages/PDV/pages/FinalizarVenda";
 import PDVContent from './pages/PDV/PDV';
 import HubVendas from './pages/PDV/HubVendas';
 import Notas from './pages/Estoque/pages/notas/Notas';
-import ProductForm from './pages/ProductForm';
-import Fornecedores from "./pages/Fornecedores/Fornecedores";
 import ComprasDashboard from "./pages/Compras/ComprasDashboard";
 import StockEntryForm from "./pages/Compras/StockEntry/StockEntryForm";
 import { CatalogManager } from "./pages/Catalogo/pages/CatalogManager";
@@ -58,6 +56,9 @@ import { FinanceiroContasReceber } from "./pages/Financeiro/FinanceiroContasRece
 import { VendasFaturamento } from "./pages/Financeiro/VendasFaturamento";
 import Clientes from "./pages/Parceiros/Clientes";
 import FamilyManagementPanel from "./pages/Catalogo/pages/FamilyManager/FamilyManagementPanel";
+import EcommerceScreen from "./pages/Ecommerce/EcommerceScreen";
+import ProductPricingModule from "./pages/Catalogo/pages/ProductPricingModule/ProductPricingModule";
+import { StagingManagementModal, StockEntryStagingView } from "./pages/Catalogo/pages/StagingManagement/StockEntryStagingView";
 
 const { Sider, Header } = Layout;
 
@@ -142,7 +143,6 @@ export default function AppLayout() {
             <Route path="/vendas" element={<HubVendas />} />
             <Route path="/vendas/pdv" element={<PDVContent />} />
             <Route path="/vendas/pdv/finalizar" element={<FinalizarVenda onBack={() => {}} />} />
-            <Route path="/produtos" element={<ProductForm />} />
             <Route path="/estoque" element={<Estoque />} />
             <Route path="/estoque/consulta" element={<StockInventory />} />
             <Route path="/estoque/gerenciamento" element={<StockEntryForm />} />
@@ -156,6 +156,7 @@ export default function AppLayout() {
             <Route path="/catalogo/atributos" element={<GlobalAttributeManager />} />
             <Route path="/catalogo/gerenciador" element={<CatalogSku />} />
             <Route path="/catalogo/marcas" element={<MarcasPage />} />
+            <Route path="/catalogo/preco" element={<ProductPricingModule/>} />
             <Route path="/compras" element={<ComprasDashboard />} />
             <Route path="/compras/ListaCompras" element={<ListaComprasExport />} />
             <Route path="/compras/entrada-nfe" element={<StockEntryForm />} />
@@ -164,6 +165,13 @@ export default function AppLayout() {
             <Route path="/relatorios" element={<RelatoriosPage />} />
             <Route path="/relatorios/poco" element={<RelatorioPocoPage />} />
             <Route path="/obras" element={<ObrasModule />} />
+
+            <Route path="/stagings" element={<StockEntryStagingView/>} />
+
+            
+
+          <Route path="/ecommerce" element={<EcommerceScreen />} />
+
             <Route path="*" element={<h2>404 | Página Não Encontrada</h2>} />
 
 

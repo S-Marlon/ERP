@@ -1,23 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Col, Space, Button, Tooltip, Typography, Tag, Modal, Form, Input, Select, Tabs } from 'antd';
-import { EditOutlined, DollarOutlined, FileTextOutlined, InfoCircleOutlined, InboxOutlined } from '@ant-design/icons';
+import { Card, Space, Button, Tooltip, Typography, Tag, Modal, Form, Input, Select, Tabs, message, Radio } from 'antd';
+import { EditOutlined, DollarOutlined, FileTextOutlined, InfoCircleOutlined, InboxOutlined, PictureOutlined, ShopOutlined, ShareAltOutlined, SafetyCertificateOutlined, CodeSandboxOutlined, AppstoreOutlined, TagOutlined } from '@ant-design/icons';
 import ImageDisplay from '../../../../components/ui/ImageGallery/ImageDysplay';
 
 const { Text } = Typography;
 
 interface FamiliaIdentidadeCardProps {
   grupoSelecionado?: {
+    id?: string | number;
     nome?: string;
-    unidadeMedidaBase?: string;
+    descricao?: string;
+    status?: string;
     tipoItem?: string;
     ncmPadrao?: string;
     cestPadrao?: string;
+    unidadeBase?: string;
+    cor?: string;
+    imagem?: string;
+    idMarca?: string | number;
     margemMinima?: number | string;
     margemMaxima?: number | string;
     markupPadrao?: number | string;
     estoqueMinimo?: number | string;
     loteMinimo?: number | string;
     curvaAbc?: string;
+    comportamentoMarca?: string;
+    prioridadeExposicao?: string;
+    // Novo campo para o DNA Estrutural Macro
+    dnaEstruturalMacro?: string;
   };
   grupoImage?: string;
   brandColor?: string;
@@ -31,28 +41,35 @@ export const FamiliaIdentidadeCard: React.FC<FamiliaIdentidadeCardProps> = ({
   onSalvarIdentidade,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('1');
   const [form] = Form.useForm();
 
-  // Atualiza os campos do formulário sempre que o grupo selecionado mudar
   useEffect(() => {
-    if (grupoSelecionado) {
+    if (grupoSelecionado && isModalOpen) {
       form.setFieldsValue({
         nome: grupoSelecionado.nome,
-        unidadeMedidaBase: grupoSelecionado.unidadeMedidaBase,
+        unidadeBase: grupoSelecionado.unidadeBase,
         tipoItem: grupoSelecionado.tipoItem,
         ncmPadrao: grupoSelecionado.ncmPadrao,
         cestPadrao: grupoSelecionado.cestPadrao,
+        imagem: grupoSelecionado.imagem || grupoImage,
+        cor: grupoSelecionado.cor || brandColor,
+        idMarca: grupoSelecionado.idMarca,
         margemMinima: grupoSelecionado.margemMinima,
         margemMaxima: grupoSelecionado.margemMaxima,
         markupPadrao: grupoSelecionado.markupPadrao,
         estoqueMinimo: grupoSelecionado.estoqueMinimo,
         loteMinimo: grupoSelecionado.loteMinimo,
         curvaAbc: grupoSelecionado.curvaAbc,
+        comportamentoMarca: grupoSelecionado.comportamentoMarca,
+        prioridadeExposicao: grupoSelecionado.prioridadeExposicao,
+        dnaEstruturalMacro: grupoSelecionado.dnaEstruturalMacro,
       });
     }
-  }, [grupoSelecionado, form]);
+  }, [grupoSelecionado, grupoImage, brandColor, form, isModalOpen]);
 
   const handleAbrirModalLocal = () => {
+    setActiveTab('1');
     setIsModalOpen(true);
   };
 
@@ -60,199 +77,339 @@ export const FamiliaIdentidadeCard: React.FC<FamiliaIdentidadeCardProps> = ({
     setIsModalOpen(false);
   };
 
-  const handleSalvar = () => {
-    form.validateFields().then((values) => {
+  const handleSalvar = async () => {
+    try {
+      const values = await form.validateFields();
       if (onSalvarIdentidade) {
-        onSalvarIdentidade(values);
+        onSalvarIdentidade({
+          id: grupoSelecionado?.id,
+          ...values,
+        });
       }
       setIsModalOpen(false);
-    }).catch((info) => {
-      console.log('Validate Failed:', info);
-    });
+    } catch (error: any) {
+      console.error('DETALHE DO ERRO DE VALIDAÇÃO:', error);
+      const errorFields = error?.errorFields;
+      if (errorFields && errorFields.length > 0) {
+        const primeiroCampoComErro = errorFields[0].name[0];
+        if (['nome', 'imagem', 'unidadeBase', 'tipoItem', 'dnaEstruturalMacro'].includes(primeiroCampoComErro)) {
+          setActiveTab('1');
+        } else if (['comportamentoMarca', 'prioridadeExposicao'].includes(primeiroCampoComErro)) {
+          setActiveTab('2');
+        } else if (['ncmPadrao', 'cestPadrao'].includes(primeiroCampoComErro)) {
+          setActiveTab('3');
+        } else if (['margemMinima', 'margemMaxima', 'markupPadrao'].includes(primeiroCampoComErro)) {
+          setActiveTab('4');
+        } else if (['estoqueMinimo', 'loteMinimo', 'curvaAbc'].includes(primeiroCampoComErro)) {
+          setActiveTab('5');
+        }
+      }
+      message.error('Por favor, verifique os campos obrigatórios nas abas.');
+    }
   };
+
+  const accentColor = grupoSelecionado?.cor || brandColor || "#618c3f";
+
+  function setMarcaComportamento(novoComportamento: any) {
+    throw new Error('Function not implemented.');
+  }
+
+  function setTemAlteracoes(arg0: boolean) {
+    throw new Error('Function not implemented.');
+  }
 
   return (
     <>
-        <Card
-          title={
-            <Space size={6}>
-              <span
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: brandColor || "#1677ff",
-                  display: "inline-block",
-                }}
-              />
-              <span
-                style={{
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  color: "#1e293b",
-                }}
-              >
-                Identidade da Família
-              </span>
-            </Space>
-          }
-          size="small"
-          style={{
-            borderRadius: 10,
-            border: "1px solid #e2e8f0",
-            boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.01)",
-            height: "100%",
-          }}
-          styles={{
-            header: {
-              borderBottom: "1px solid #f1f5f9",
-              minHeight: "38px",
-              background: "#f8fafc",
-              borderRadius: "10px 10px 0 0",
-              padding: "0 10px",
-            },
-            body: { padding: "12px" },
-          }}
-          extra={
-            <Tooltip title="Editar Identidade e Regras">
-              <Button
-                type="text"
-                size="small"
-                icon={
-                  <EditOutlined
-                    style={{
-                      fontSize: "12px",
-                      color: brandColor || "#1677ff",
-                    }}
-                  />
-                }
-                onClick={handleAbrirModalLocal}
-              />
-            </Tooltip>
-          }
-        >
-          <Space direction="vertical" size={10} style={{ width: "100%" }}>
-            <Space size={10} align="center">
-              <ImageDisplay
-                size="40px"
-                src={grupoImage || undefined}
-                style={{
-                  borderRadius: 8,
-                  overflow: "hidden",
-                  border: "1px solid #e2e8f0",
-                  background: "#fff",
-                }}
-              />
-              <div>
-                <Text
-                  style={{
-                    color: "#94a3b8",
-                    fontSize: "10px",
-                    display: "block",
-                    fontWeight: 600,
-                  }}
-                >
-                  NOME DA FAMÍLIA
-                </Text>
-                <Text
-                  style={{
-                    color: "#0f172a",
-                    fontSize: "13px",
-                    fontWeight: 700,
-                  }}
-                >
-                  {grupoSelecionado?.nome || "Sem nome"}
-                </Text>
-              </div>
-            </Space>
-
-            <div
+      <Card
+        title={
+          <Space size={8}>
+            <span
               style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "8px",
-                paddingTop: "6px",
-                borderTop: "1px solid #f1f5f9",
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                background: accentColor,
+                display: "inline-block",
+                boxShadow: `0 0 0 2px ${accentColor}25`
               }}
+            />
+            <span style={{ fontSize: "13px", fontWeight: 700, color: "#1e293b" }}>
+              Identidade & Herança da Família
+            </span>
+          </Space>
+        }
+        size="small"
+        style={{
+          borderRadius: 12,
+          border: "1px solid #e2e8f0",
+          boxShadow: "0 2px 4px 0 rgba(0, 0, 0, 0.02)",
+          height: "100%",
+        }}
+        styles={{
+          header: {
+            borderBottom: "1px solid #f1f5f9",
+            minHeight: "40px",
+            background: "#f8fafc",
+            borderRadius: "12px 12px 0 0",
+            padding: "0 14px",
+          },
+          body: { padding: "14px" },
+        }}
+        extra={
+          <Tooltip title="Editar Identidade e Regras">
+            <Button
+              type="text"
+              size="small"
+              icon={<EditOutlined style={{ fontSize: "13px", color: accentColor }} />}
+              onClick={handleAbrirModalLocal}
+              style={{ fontWeight: 600 }}
             >
-              <div>
-                <Text
-                  style={{
-                    color: "#94a3b8",
-                    fontSize: "10px",
-                    display: "block",
-                    fontWeight: 600,
-                  }}
-                >
-                  UNIDADE BASE
+              Editar
+            </Button>
+          </Tooltip>
+        }
+      >
+        <Space direction="vertical" size={12} style={{ width: "100%" }}>
+          {/* Cabeçalho Principal com Imagem e Nome */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '6px', borderRadius: '8px', border: '1px solid #f1f5f9' }}>
+            <ImageDisplay
+              size="44px"
+              src={grupoSelecionado?.imagem || grupoImage || undefined}
+              style={{
+                borderRadius: 8,
+                overflow: "hidden",
+                border: "1px solid #e2e8f0",
+                background: "#fff",
+                flexShrink: 0
+              }}
+            />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <Text style={{ color: "#64748b", fontSize: "10px", display: "block", fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Família Ativa
+              </Text>
+              <Text style={{ color: "#0f172a", fontSize: "14px", fontWeight: 800, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {grupoSelecionado?.nome || "Sem nome definido"}
+              </Text>
+            </div>
+            <Tooltip title="Propagação Automática em Cascata Ativa para os SKUs Filhos">
+              <Tag icon={<ShareAltOutlined />} color="success" style={{ margin: 0, fontSize: '10px', fontWeight: 600 }}>
+                Herança Ativa
+              </Tag>
+            </Tooltip>
+
+             {/* DESTAQUE: DNA Estrutural Macro (Exigência 1 do Guia) */}
+          <div style={{ background: '#f0fdf4', padding: '10px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+              <Space size={4}>
+                <CodeSandboxOutlined style={{ color: '#16a34a', fontSize: '12px' }} />
+                <Text style={{ color: '#166534', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase' }}>
+                  DNA Estrutural Macro (Herdado do Pai)
                 </Text>
-                <Tag style={{ margin: 0, fontSize: "11px", fontWeight: 600 }}>
-                  {grupoSelecionado?.unidadeMedidaBase || "PC"}
-                </Tag>
-              </div>
-              <div>
-                <Text
-                  style={{
-                    color: "#94a3b8",
-                    fontSize: "10px",
-                    display: "block",
-                    fontWeight: 600,
-                  }}
-                >
-                  TIPO SPED
-                </Text>
-                <Tag
-                  color="blue"
-                  style={{ margin: 0, fontSize: "11px", fontWeight: 600 }}
-                >
-                  {grupoSelecionado?.tipoItem || "PA"}
-                </Tag>
-              </div>
-              <div>
-                <Text
-                  style={{
-                    color: "#94a3b8",
-                    fontSize: "10px",
-                    display: "block",
-                    fontWeight: 600,
-                  }}
-                >
-                  NCM PADRÃO
-                </Text>
-                <Text
-                  style={{
-                    color: "#334155",
-                    fontSize: "11px",
-                    fontFamily: "monospace",
-                  }}
-                >
-                  {grupoSelecionado?.ncmPadrao || "Não informado"}
-                </Text>
-              </div>
-              <div>
-                <Text
-                  style={{
-                    color: "#94a3b8",
-                    fontSize: "10px",
-                    display: "block",
-                    fontWeight: 600,
-                  }}
-                >
-                  ESTOQUE MÍN.
-                </Text>
-                <Text
-                  style={{
-                    color: "#334155",
-                    fontSize: "11px",
-                    fontWeight: 600,
-                  }}
-                >
-                  {grupoSelecionado?.estoqueMinimo || "Não def."}
-                </Text>
+              </Space>
+              <Tag color="green" style={{ fontSize: '9px', margin: 0, border: 'none' }}>Norma / Série</Tag>
+            </div>
+            <Text style={{ color: '#14532d', fontSize: '12px', fontWeight: 700, display: 'block' }}>
+              {grupoSelecionado?.dnaEstruturalMacro || "Ex: Aço Galvanizado / Série 6200 (Não definido)"}
+            </Text>
+          </div>
+          </div>
+
+
+          {/* Grid de Atributos Chave Organizados por Blocos Visuais */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5 , 1fr)", gap: "8px" }}>
+
+
+            
+             {/* Bloco Estrutural / Identificação */}
+            <div style={{ background: '#fff', padding: '8px', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
+              <Text style={{ color: "#94a3b8", fontSize: "9px", display: "block", fontWeight: 700, textTransform: 'uppercase' }}>
+                Marca
+              </Text>
+              <Text style={{ color: "#1e293b", fontSize: "12px", fontWeight: 700 }}>
+                {grupoSelecionado?.unidadeBase || "Sem Marca"}
+              </Text>
+            </div>
+
+             {/* Bloco Estrutural / Identificação */}
+            <div style={{ background: '#fff', padding: '8px', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
+              <Text style={{ color: "#94a3b8", fontSize: "9px", display: "block", fontWeight: 700, textTransform: 'uppercase' }}>
+                Part Number
+              </Text>
+              <Text style={{ color: "#1e293b", fontSize: "12px", fontWeight: 700 }}>
+                {grupoSelecionado?.unidadeBase || "Sem Marca"}
+              </Text>
+            </div>
+
+            {/* Bloco Estrutural / Identificação */}
+            <div style={{ background: '#fff', padding: '8px', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
+              <Text style={{ color: "#94a3b8", fontSize: "9px", display: "block", fontWeight: 700, textTransform: 'uppercase' }}>
+                Unidade Base
+              </Text>
+              <Text style={{ color: "#1e293b", fontSize: "12px", fontWeight: 700 }}>
+                {grupoSelecionado?.unidadeBase || "PC"}
+              </Text>
+            </div>
+
+            <div style={{ background: '#fff', padding: '8px', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
+              <Text style={{ color: "#94a3b8", fontSize: "9px", display: "block", fontWeight: 700, textTransform: 'uppercase' }}>
+                Tipo SPED
+              </Text>
+              <Tag color="blue" style={{ margin: 0, fontSize: "10px", fontWeight: 700, border: 'none' }}>
+                {grupoSelecionado?.tipoItem || "PA"}
+              </Tag>
+            </div>
+
+            <div style={{ background: '#fff', padding: '8px', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
+              <Text style={{ color: "#94a3b8", fontSize: "9px", display: "block", fontWeight: 700, textTransform: 'uppercase' }}>
+                NCM Padrão
+              </Text>
+              <Text style={{ color: "#334155", fontSize: "11px", fontFamily: "monospace", fontWeight: 600 }}>
+                {grupoSelecionado?.ncmPadrao || "Não informado"}
+              </Text>
+            </div>
+
+            {/* Bloco Comercial / Margens */}
+            <div style={{ background: '#fff', padding: '8px', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
+              <Text style={{ color: "#94a3b8", fontSize: "9px", display: "block", fontWeight: 700, textTransform: 'uppercase' }}>
+                Margem Mín / Máx
+              </Text>
+              <Text style={{ color: "#1e293b", fontSize: "11px", fontWeight: 700 }}>
+                {grupoSelecionado?.margemMinima ? `${grupoSelecionado.margemMinima}%` : "-"} / {grupoSelecionado?.margemMaxima ? `${grupoSelecionado.margemMaxima}%` : "-"}
+              </Text>
+            </div>
+
+            <div style={{ background: '#fff', padding: '8px', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
+              <Text style={{ color: "#94a3b8", fontSize: "9px", display: "block", fontWeight: 700, textTransform: 'uppercase' }}>
+                Markup Padrão
+              </Text>
+              <Text style={{ color: "#0284c7", fontSize: "11px", fontWeight: 700 }}>
+                {grupoSelecionado?.markupPadrao ? `${grupoSelecionado.markupPadrao}x` : "-"}
+              </Text>
+            </div>
+
+            {/* Bloco Logístico / Estoque */}
+            <div style={{ background: '#fff', padding: '8px', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
+              <Text style={{ color: "#94a3b8", fontSize: "9px", display: "block", fontWeight: 700, textTransform: 'uppercase' }}>
+                Estoque Mín.
+              </Text>
+              <Text style={{ color: "#1e293b", fontSize: "11px", fontWeight: 700 }}>
+                {grupoSelecionado?.estoqueMinimo || "Não def."}
+              </Text>
+            </div>
+
+            {/* Rodapé do Card com Status de Governança */}
+            <div style={{ background: '#fff', padding: '8px', borderRadius: '6px', border: '1px solid #f1f5f9', gridColumn: 'span 2' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <Text style={{ color: "#94a3b8", fontSize: "9px", display: "block", fontWeight: 700, textTransform: 'uppercase' }}>
+                    Curva ABC / Classificação
+                  </Text>
+                  <Text style={{ color: "#1e293b", fontSize: "11px", fontWeight: 700 }}>
+                    {grupoSelecionado?.curvaAbc ? `Curva ${grupoSelecionado.curvaAbc}` : "Não definida"}
+                  </Text>
+                </div>
+                <Tooltip title="Governança ativa: SKUs sem atributos obrigatórios exigidos pela família bloqueiam exportação para Marketplaces.">
+                  <Tag icon={<SafetyCertificateOutlined />} color="warning" style={{ margin: 0, fontSize: '10px' }}>
+                    Bloqueio de Marketplaces Ativo
+                  </Tag>
+                </Tooltip>
               </div>
             </div>
-          </Space>
-        </Card>
+
+          </div>
+
+          {/* PREPARAÇÃO FUTURA: Aviso/Indicação visual dos Escopos Rígidos (Grades e Ficha Técnica dos Filhos) */}
+          <div style={{ background: '#f8fafc', padding: '8px 10px', borderRadius: '6px', border: '1px dashed #cbd5e1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Space size={6}>
+              <AppstoreOutlined style={{ color: '#64748b', fontSize: '12px' }} />
+             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+             <span style={{ fontSize: "12px", fontWeight: 600, color: "#1e293b" }}>
+             Comportamento da Marca nesta Família:
+             </span>
+             <Tooltip title="Define onde a marca atua: se é apenas Ficha Técnica, parte do DNA, ou Grade.">
+             <InfoCircleOutlined style={{ fontSize: "12px", color: "#64748b", cursor: "pointer" }} />
+             </Tooltip>
+             </div>
+             
+             <div style={{ width: "350px", maxWidth: "100%" }}>
+             
+             <Radio.Group
+             buttonStyle="solid"
+             value={'marcaComportamento'}
+             onChange={(e) => {
+             const novoComportamento = e.target.value;
+             if (typeof setMarcaComportamento === 'function') {
+             setMarcaComportamento(novoComportamento);
+             }
+             // Força o gatilho de alterações pendentes na família local
+             setTemAlteracoes(true);
+             }}
+             style={{ width: '100%', display: 'flex' }}
+             size="small"
+             >
+             <Radio.Button value="dna" style={{ flex: 1, textAlign: 'center', fontSize: '11px' }}>
+             <TagOutlined style={{ marginRight: '4px' }} /> DNA
+             </Radio.Button>
+             <Radio.Button value="grade" style={{ flex: 1, textAlign: 'center', fontSize: '11px' }}>
+             <AppstoreOutlined style={{ marginRight: '4px' }} /> Grade (SKU)
+             </Radio.Button>
+             <Radio.Button value="ficha" style={{ flex: 1, textAlign: 'center', fontSize: '11px' }}>
+             <FileTextOutlined style={{ marginRight: '4px' }} /> Ficha
+             </Radio.Button>
+             </Radio.Group>
+             
+             </div>
+             </div>
+             
+             
+             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", width: "100%" }}>
+                     
+                   
+             
+                     {/* Bloco do Meio */}
+                     <div style={{ 
+                       padding: "10px", 
+                       borderRadius: "8px", 
+                      
+                       transition: "all 0.3s ease",
+                       display: "flex",
+                       flexDirection: "column",
+                       alignItems: "center",
+                       justifyContent: "center",
+                       textAlign: "center"
+                     }}>
+                       <span style={{ fontSize: "11px", fontWeight: 600, marginBottom: "4px" }}>
+                         Posição: Grade (SKU)
+                       </span>
+                    
+                     </div>
+             
+                     {/* Bloco da Direita */}
+                     <div style={{ 
+                       padding: "10px", 
+                       borderRadius: "8px", 
+                     
+                       transition: "all 0.3s ease",
+                       display: "flex",
+                       flexDirection: "column",
+                       alignItems: "center",
+                       justifyContent: "center",
+                       textAlign: "center"
+                     }}>
+                       <span style={{ fontSize: "11px", fontWeight: 600, marginBottom: "4px" }}>
+                         Posição: Ficha
+                       </span>
+                       
+                     </div>
+             
+                   </div>
+            </Space>
+            <Tag style={{ fontSize: '9px', margin: 0, color: '#64748b', background: '#f1f5f9', border: 'none' }}>Pronto p/ Expansão</Tag>
+          </div>
+
+        </Space>
+      </Card>
 
       {/* Modal de Edição Avançada da Família por Abas */}
       <Modal
@@ -262,19 +419,21 @@ export const FamiliaIdentidadeCard: React.FC<FamiliaIdentidadeCardProps> = ({
         onCancel={handleFecharModal}
         okText="Salvar Alterações"
         cancelText="Cancelar"
-        width={600}
+        width={720}
         destroyOnClose
       >
         <Form form={form} layout="vertical" style={{ marginTop: '12px' }}>
           <Tabs
-            defaultActiveKey="1"
+            activeKey={activeTab}
+            onChange={setActiveTab}
+            destroyInactiveTabPane={false}
             items={[
               {
                 key: '1',
                 label: (
                   <span>
                     <InfoCircleOutlined />
-                    Identidade
+                    Identidade & DNA
                   </span>
                 ),
                 children: (
@@ -284,11 +443,23 @@ export const FamiliaIdentidadeCard: React.FC<FamiliaIdentidadeCardProps> = ({
                       label="Nome da Família"
                       rules={[{ required: true, message: 'Por favor, insira o nome da família!' }]}
                     >
-                      <Input placeholder="Ex: Camiseta Básica" />
+                      <Input placeholder="Ex: Rolamento Rígido de Esferas" />
+                    </Form.Item>
+
+                    <Form.Item 
+                      name="dnaEstruturalMacro" 
+                      label="DNA Estrutural Macro (Herdado do Pai)"
+                      tooltip="Material base, norma construtiva ou série técnica que desce em cascata."
+                    >
+                      <Input placeholder="Ex: Aço Galvanizado, Série 6200, SAE 100 R2" />
+                    </Form.Item>
+
+                    <Form.Item name="imagem" label="URL da Imagem da Família">
+                      <Input placeholder="https://..." prefix={<PictureOutlined />} />
                     </Form.Item>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      <Form.Item name="unidadeMedidaBase" label="Unidade Base">
+                      <Form.Item name="unidadeBase" label="Unidade Base">
                         <Input placeholder="Ex: PC, KG, UN" />
                       </Form.Item>
 
@@ -311,6 +482,46 @@ export const FamiliaIdentidadeCard: React.FC<FamiliaIdentidadeCardProps> = ({
                 key: '2',
                 label: (
                   <span>
+                    <ShopOutlined />
+                    Comportamento da Marca
+                  </span>
+                ),
+                children: (
+                  <div style={{ paddingTop: '8px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <Form.Item name="comportamentoMarca" label="Papel Estratégico da Marca">
+                        <Select
+                          placeholder="Selecione o comportamento"
+                          options={[
+                            { value: 'core', label: 'Core / Carro-Chefe' },
+                            { value: 'premium', label: 'Premium / Autoridade' },
+                            { value: 'volume', label: 'Volume / Entrada' },
+                            { value: 'sazonal', label: 'Sazonal / Campanha' },
+                          ]}
+                        />
+                      </Form.Item>
+
+                      <Form.Item name="prioridadeExposicao" label="Prioridade de Exposição">
+                        <Select
+                          placeholder="Selecione a prioridade"
+                          options={[
+                            { value: 'alta', label: 'Alta (Destaque principal)' },
+                            { value: 'media', label: 'Média (Padrão)' },
+                            { value: 'baixa', label: 'Baixa (Cauda longa)' },
+                          ]}
+                        />
+                      </Form.Item>
+                    </div>
+                    <Text type="secondary" style={{ fontSize: '11px' }}>
+                      * Alinha o comportamento comercial desta família de acordo com as diretrizes da marca.
+                    </Text>
+                  </div>
+                ),
+              },
+              {
+                key: '3',
+                label: (
+                  <span>
                     <FileTextOutlined />
                     Fiscal
                   </span>
@@ -327,13 +538,13 @@ export const FamiliaIdentidadeCard: React.FC<FamiliaIdentidadeCardProps> = ({
                       </Form.Item>
                     </div>
                     <Text type="secondary" style={{ fontSize: '11px' }}>
-                      * Esses valores serão herdados por padrão para os SKUs filhos gerados nesta família.
+                      * Regras fiscais e exigências básicas herdadas em cascata para os SKUs filhos.
                     </Text>
                   </div>
                 ),
               },
               {
-                key: '3',
+                key: '4',
                 label: (
                   <span>
                     <DollarOutlined />
@@ -359,7 +570,7 @@ export const FamiliaIdentidadeCard: React.FC<FamiliaIdentidadeCardProps> = ({
                 ),
               },
               {
-                key: '4',
+                key: '5',
                 label: (
                   <span>
                     <InboxOutlined />

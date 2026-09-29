@@ -1,8 +1,7 @@
-const API_BASE_URL = 'http://localhost:3001/api'; // Ajuste para a URL do seu backend
+const API_BASE_URL = 'http://localhost:3001/api'; // Mudado para a raiz da API para facilitar o roteamento
 
 // --- INTERFACES DE SOLICITAÇÃO E RESPOSTA ---
 
-// Interface para quando o back-end encontrar o fornecedor
 export interface FornecedorQueryResponse {
     exists: boolean;
     supplier?: {
@@ -12,59 +11,48 @@ export interface FornecedorQueryResponse {
     };
 }
 
-// 🟢 Novas interfaces para o processamento de itens do XML (Passo 2)
 export interface ProcessarItemXMLPayload {
     tenant_id: number;
-    id_fornecedor: number;
+    lote_importacao_id?: number;
+    chave_acesso?: string;
+    numero_nf?: string;
+    cnpj_fornecedor?: string;
+    xml_conteudo?: string;       // <-- NOVO: XML em texto bruto
+    dados_nota_fiscal?: object;  // <-- NOVO: JSON do cabeçalho/emitente/totais
     cProd: string;
     cEAN?: string | null;
     xProd?: string | null;
+    ncm?: string | null;
+    cest?: string | null;
+    uCom?: string | null;
+    quantidade: number;
+    preco_custo_unitario: number;
 }
 
 export interface ProcessarItemXMLResponse {
-    status: 'VINCULO_DIRETO_ENCONTRADO' | 'VINCULO_EAN_RESOLVIDO' | 'PRODUTO_INEDITO';
+    success: boolean;
+    lote_importacao_id: number;
     message: string;
-    id_item?: number;
-    proximo_passo: string;
-    dados_sugeridos?: {
-        cProd: string;
-        cEAN: string | null;
-        xProd: string | null;
-    };
 }
 
 // ==========================================
-// MÓDULO DE FORNECEDORES (Passo 1)
+// MÓDULO DE FORNECEDORES
 // ==========================================
 
-/**
- * 1. CHECA SE O FORNECEDOR EXISTE (Apenas consulta)
- * Envia o CNPJ para o back-end verificar se já está no banco de dados.
- */
-export const checkSupplier = async (cnpj: string, tenantId: number = 1): Promise<FornecedorQueryResponse> => {
-    const cnpjLimpo = cnpj.replace(/\D/g, '');
+export const checkSupplier = async (cnpj: string, tenantId: number) => {
+    const response = await fetch(`${API_BASE_URL}/parceiros/fornecedores/verificar?tenant_id=${tenantId}&cnpj=${cnpj}`);
+    const contentType = response.headers.get("content-type");
     
-    const response = await fetch(`${API_BASE_URL}/compras/fornecedores/verificar?tenant_id=${tenantId}&cnpj=${cnpjLimpo}`, {
-        method: 'GET',
-        headers: {
-            'Content-Type': 'application/json',
-        }
-    });
-
-    if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao verificar fornecedor no servidor.');
+    if (!contentType || !contentType.includes("application/json")) {
+        throw new Error(`Erro na API (${response.status}): Rota de verificação de fornecedores não encontrada.`);
     }
 
-    return response.json(); // Retorna { exists: true, supplier: {...} } OU { exists: false }
+    return await response.json();
 };
 
-/**
- * 2. CADASTRA O FORNECEDOR (Chamado apenas de dentro do seu modal)
- * Executado quando o usuário clica no botão "Salvar Fornecedor" do modal que se abriu.
- */
 export const createSupplier = async (supplierData: { cnpj: string; name: string; fantasyName: string }, tenantId: number = 1): Promise<any> => {
-    const response = await fetch(`${API_BASE_URL}/compras/fornecedores`, {
+    // CORRIGIDO: Usando a URL correta a partir da base /api
+    const response = await fetch(`${API_BASE_URL}/parceiros/fornecedores`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -86,16 +74,14 @@ export const createSupplier = async (supplierData: { cnpj: string; name: string;
 };
 
 // ==========================================
-// MÓDULO DE ITENS / XML (Passo 2)
+// MÓDULO DE ITENS / XML & LOTES (Staging)
 // ==========================================
 
 /**
- * 🟢 3. PROCESSA UM ITEM DO XML (Loop dos Itens)
- * Executa a verificação de baixo para cima (Código do Fornecedor -> EAN) 
- * e cria novos vínculos de forma resiliente mantendo o histórico se necessário.
+ * 3. PROCESSA E SALVA ITEM DO XML NA STAGING (Com suporte a XML Bruto e Lote)
  */
 export const processItemXML = async (data: ProcessarItemXMLPayload): Promise<ProcessarItemXMLResponse> => {
-    const response = await fetch(`${API_BASE_URL}/compras/itens/processar-xml`, {
+    const response = await fetch(`${API_BASE_URL}/compras/staging/processar-item`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -106,6 +92,66 @@ export const processItemXML = async (data: ProcessarItemXMLPayload): Promise<Pro
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || 'Erro ao processar item do XML no servidor.');
+    }
+
+    return response.json();
+};
+
+/**
+ * 4. SINCRONIZAÇÃO EM LOTE DE ITENS DA NF-E (Envia o XML e todos os produtos de uma vez)
+ */
+export const sincronizarLoteXMLCompleto = async (payloadData: any) => {
+    const response = await fetch(`${API_BASE_URL}/compras/lotes/sincronizar-xml`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payloadData),
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Erro ao sincronizar lote completo da NF-e.');
+    }
+
+    return response.json();
+};
+
+/**
+ * 5. BUSCA OS DADOS DE UM LOTE NA STAGING E SEUS ITENS
+ */
+export const getLoteStaging = async (loteId: number, tenantId: number = 1) => {
+    const response = await fetch(`${API_BASE_URL}/compras/staging/lote/${loteId}?tenant_id=${tenantId}`);
+    
+    if (!response.ok) {
+        throw new Error('Erro ao carregar dados do lote de staging.');
+    }
+
+    return response.json();
+};
+
+/**
+ * 6. CONFIRMA O ESTOQUE E FINALIZA O LOTE (Baixa definitiva no ERP)
+ */
+export const confirmarEstoqueLoteAPI = async (payloadFinal: {
+    lote_importacao_id: number;
+    tenant_id: number;
+    chave_acesso: string;
+    resumo_conferencia: object;
+    frete_adicional: object;
+    itens: Array<any>;
+}) => {
+    const response = await fetch(`${API_BASE_URL}/compras/staging/confirmar-estoque`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payloadFinal),
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Erro ao confirmar entrada no estoque oficial.');
     }
 
     return response.json();

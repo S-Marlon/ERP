@@ -1,257 +1,519 @@
 import { Request, Response } from 'express';
-import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
-import pool from '../../Estoque/db.config';
+import db from '../../Estoque/db.config';
 
-// --- INTERFACES DE RETORNO DO BANCO (Tipagem TypeScript) ---
+// 1. Processar e salvar item do XML na Staging (usando importacoes_lotes e importacao_produtos_staging)
+export const processarItemXML = async (req: Request, res: Response) => {
+try {
+const { 
+tenant_id, 
+lote_importacao_id, 
+chave_acesso, 
+numero_nf, 
+cnpj_fornecedor, 
+xml_conteudo,        // <-- NOVO: Recebe o XML bruto se enviado
+dados_nota_fiscal,   // <-- NOVO: Objeto JSON opcional
+cProd, 
+xProd, 
+ncm, 
+cest,
+uCom, 
+quantidade, 
+preco_custo_unitario 
+} = req.body;
 
-interface FornecedorRow extends RowDataPacket {
-    id_pessoa: number;
-    razao_social: string;
-    nome_fantasia: string | null;
+let activeLoteId = lote_importacao_id;
+const tenant = tenant_id || 1;
+
+// Cria ou recupera o lote de importação (Cabeçalho)
+if (!activeLoteId) {
+const [lotesExistentes]: any = await db.execute(
+`SELECT id FROM importacoes_lotes WHERE chave_acesso = ? LIMIT 1`,
+[chave_acesso]
+);
+
+if (lotesExistentes.length > 0) {
+activeLoteId = lotesExistentes[0].id;
+} else {
+// ADAPTADO: Agora insere também o xml_conteudo (LONGTEXT) e dados_nota_fiscal (JSON) se fornecidos
+const [result]: any = await db.execute(
+`INSERT INTO importacoes_lotes 
+(tenant_id, chave_acesso, numero_nf, cnpj_fornecedor, xml_conteudo, dados_nota_fiscal, status, created_at) 
+VALUES (?, ?, ?, ?, ?, ?, 'RASCUNHO', NOW())`,
+[
+tenant, 
+chave_acesso, 
+numero_nf || null, 
+cnpj_fornecedor || null, 
+xml_conteudo || null, 
+dados_nota_fiscal ? JSON.stringify(dados_nota_fiscal) : null
+]
+);
+activeLoteId = result.insertId; 
+}
 }
 
-interface ItemFornecedorRow extends RowDataPacket {
-    id_item: number;
+// Insere o item bruto na staging respeitando os nomes reais das colunas da tabela
+await db.execute(
+`INSERT INTO importacao_produtos_staging 
+(tenant_id, lote_importacao_id, codigo_fornecedor, nome_fornecedor, ncm_original, cest_original, unidade_original, quantidade, preco_custo_unitario, status, criado_em) 
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDENTE', NOW())`,
+[
+tenant, 
+activeLoteId, 
+cProd || null, 
+xProd || null, 
+ncm || null, 
+cest || null, 
+uCom || null, 
+quantidade || 0, 
+preco_custo_unitario || 0
+]
+);
+
+return res.status(200).json({
+success: true,
+lote_importacao_id: activeLoteId,
+message: 'Item processado e salvo na staging com sucesso!'
+});
+
+} catch (error: any) {
+console.error("❌ Erro ao processar item do XML na staging:", error);
+return res.status(500).json({
+success: false,
+error: error.message || 'Erro interno ao salvar item na staging.'
+});
+}
+};
+
+// 2. Buscar os dados do Lote e todos os itens da Staging
+export const getLoteStaging = async (req: Request, res: Response): Promise<Response> => {
+try {
+const { loteId } = req.params;
+const tenant_id = req.query.tenant_id || 1;
+
+const [lotes]: any = await db.execute(
+`SELECT * FROM importacoes_lotes WHERE id = ? AND tenant_id = ?`,
+[loteId, tenant_id]
+);
+
+if (lotes.length === 0) {
+return res.status(404).json({ error: 'Lote de importação não encontrado.' });
 }
 
-interface ItemCodigoBarrasRow extends RowDataPacket {
-    id_item: number;
+const [itens]: any = await db.execute(
+`SELECT * FROM importacao_produtos_staging WHERE lote_importacao_id = ? AND tenant_id = ? ORDER BY id ASC`,
+[loteId, tenant_id]
+);
+
+return res.status(200).json({
+success: true,
+lote: lotes[0],
+itens,
+total_itens: itens.length
+});
+
+} catch (error: any) {
+console.error('Erro ao buscar dados do lote na staging:', error);
+return res.status(500).json({ error: 'Erro ao carregar rascunho de staging.', details: error.message });
+}
+};
+
+// 3. Atualizar o status de um item individual na staging
+export const atualizarStatusItemStaging = async (req: Request, res: Response): Promise<Response> => {
+try {
+const { id } = req.params; 
+const { status, motivo_alerta, preco_venda_sugerido, familia_id, categoria_id } = req.body;
+
+const statusPermitidos = ['PENDENTE', 'ERRO_VALIDACAO', 'APROVADO', 'REJEITADO', 'IMPORTADO'];
+if (status && !statusPermitidos.includes(status)) {
+return res.status(400).json({ error: 'Status inválido.' });
 }
 
-// ==========================================
-// PASSO 1: MÓDULO DE FORNECEDORES
-// ==========================================
+await db.execute(
+`UPDATE importacao_produtos_staging 
+SET status = COALESCE(?, status),
+motivo_alerta = COALESCE(?, motivo_alerta),
+preco_venda_sugerido = COALESCE(?, preco_venda_sugerido),
+familia_id = COALESCE(?, familia_id),
+categoria_id = COALESCE(?, categoria_id),
+analisado_em = NOW()
+WHERE id = ?`,
+[status || null, motivo_alerta || null, preco_venda_sugerido || null, familia_id || null, categoria_id || null, id]
+);
 
-export async function verificarFornecedor(req: Request, res: Response): Promise<Response> {
-    const tenant_id = req.query.tenant_id as string | undefined;
-    const cnpj = req.query.cnpj as string | undefined;
+return res.status(200).json({ success: true, message: 'Item de staging atualizado com sucesso.' });
 
-    if (!tenant_id || !cnpj) {
-        return res.status(400).json({ error: "Parâmetros tenant_id e cnpj são obrigatórios." });
+} catch (error: any) {
+console.error('Erro ao atualizar item da staging:', error);
+return res.status(500).json({ error: 'Erro ao atualizar item.', details: error.message });
+}
+};
+
+
+// Exemplo de controller otimizado para receber os itens em lote
+export const sincronizarItensLoteXML = async (req: Request, res: Response) => {
+  try {
+    let { tenant_id, lote_importacao_id, chave_acesso, numero_nf, cnpj_fornecedor, xml_conteudo, dados_nota_fiscal, itens } = req.body;
+    const tenant = tenant_id || 1;
+
+    if (!Array.isArray(itens) || itens.length === 0) {
+      return res.status(400).json({ error: 'Lista de itens vazia.' });
     }
 
-    const cnpjLimpo = cnpj.replace(/\D/g, '');
+    // Se o lote_importacao_id não veio no body, tentamos descobrir ou criar pelo lote/chave
+    if (!lote_importacao_id && chave_acesso) {
+      const [loteExistente]: any = await db.execute(
+        `SELECT id FROM importacoes_lotes WHERE chave_acesso = ? AND tenant_id = ? LIMIT 1`,
+        [chave_acesso, tenant]
+      );
 
-    try {
-        const [rows] = await pool.execute<FornecedorRow[]>(`
-            SELECT 
-                c.id_pessoa, 
-                pj.razao_social, 
-                pj.nome_fantasia 
-            FROM pessoas_core c
-            INNER JOIN pessoas_pj pj ON c.id_pessoa = pj.id_cliente
-            WHERE c.tenant_id = ? 
-              AND pj.cnpj = ? 
-              AND c.deleted_at IS NULL
-            LIMIT 1
-        `, [Number(tenant_id), cnpjLimpo]);
-
-        if (rows.length > 0) {
-            const fornecedorEncontrado = rows[0];
-            return res.status(200).json({
-                exists: true,
-                supplier: {
-                    id: fornecedorEncontrado.id_pessoa,
-                    name: fornecedorEncontrado.razao_social,       
-                    fantasyName: fornecedorEncontrado.nome_fantasia || fornecedorEncontrado.razao_social
-                }
-            });
-        }
-
-        return res.status(200).json({ exists: false });
-
-    } catch (error) {
-        console.error("Erro ao checar fornecedor no banco de dados:", error);
-        return res.status(500).json({ error: "Erro interno ao consultar fornecedor." });
+      if (loteExistente.length > 0) {
+        lote_importacao_id = loteExistente[0].id;
+      } else {
+        const [resultLote]: any = await db.execute(
+          `INSERT INTO importacoes_lotes 
+          (tenant_id, chave_acesso, numero_nf, cnpj_fornecedor, xml_conteudo, dados_nota_fiscal, status, created_at) 
+          VALUES (?, ?, ?, ?, ?, ?, 'RASCUNHO', NOW())`,
+          [
+            tenant, 
+            chave_acesso, 
+            numero_nf || null, 
+            cnpj_fornecedor || null,
+            xml_conteudo || null,
+            dados_nota_fiscal ? JSON.stringify(dados_nota_fiscal) : null
+          ]
+        );
+        lote_importacao_id = resultLote.insertId;
+      }
     }
+
+    if (!lote_importacao_id) {
+      return res.status(400).json({ success: false, error: 'O ID do lote de importação não foi fornecido nem pôde ser gerado.' });
+    }
+
+    // 🧹 AUTOLIMPEZA: Remove qualquer duplicidade anterior gerada por bugs passados neste lote
+    await db.execute(
+      `DELETE s1 FROM importacao_produtos_staging s1
+       INNER JOIN importacao_produtos_staging s2 
+       ON s1.lote_importacao_id = s2.lote_importacao_id 
+       AND s1.item_nfe_seq = s2.item_nfe_seq
+       AND s1.id < s2.id
+       WHERE s1.lote_importacao_id = ? AND s1.tenant_id = ?`,
+      [lote_importacao_id, tenant]
+    );
+
+    // Processa os itens em loop assíncrono controlado
+    for (const item of itens) {
+      const { 
+        nItem, cProd, cEan, xProd, ncm, cest, uCom, 
+        quantidade, receivedQuantity, valorUnitario, 
+        valorTotal, freightDistributed, ipi, icmsSt,
+        produtoIdSistema, skuSistema, tipoEntrada 
+      } = item;
+
+      const sequenciaItem = String(nItem || '1');
+      const custoTotalFinalCalc = (quantidade || 0) * (valorUnitario || 0);
+
+      // Verifica se o item já existe baseado estritamente na sequência da NF-e (item_nfe_seq)
+      const [existente]: any = await db.execute(
+        `SELECT id FROM importacao_produtos_staging 
+         WHERE tenant_id = ? AND lote_importacao_id = ? AND item_nfe_seq = ? LIMIT 1`,
+        [tenant, lote_importacao_id, sequenciaItem]
+      );
+
+      if (existente.length > 0) {
+        // Atualiza o item existente sem criar novos registros
+        await db.execute(
+          `UPDATE importacao_produtos_staging 
+           SET codigo_fornecedor = ?,
+               nome_fornecedor = ?, 
+               ncm_original = ?, 
+               ean = ?,
+               cest_original = ?, 
+               unidade_original = ?, 
+               quantidade = ?, 
+               preco_custo_unitario = ?,
+               valor_total_nfe = ?,
+               frete_rateado = ?,
+               ipi = ?,
+               icms_st = ?,
+               custo_unitario_final = ?,
+               custo_total_final = ?,
+               produto_id_sistema = COALESCE(?, produto_id_sistema),
+               sku_sistema = COALESCE(?, sku_sistema),
+               tipo_entrada = COALESCE(?, tipo_entrada)
+           WHERE id = ?`,
+          [
+            cProd || null,
+            xProd || null,
+            ncm || null,
+            cEan || null,
+            cest || null,
+            uCom || null,
+            quantidade || 0,
+            valorUnitario || 0,
+            valorTotal || 0,
+            freightDistributed || 0,
+            ipi || 0,
+            icmsSt || 0,
+            valorUnitario || 0,
+            custoTotalFinalCalc || 0,
+            produtoIdSistema || null,
+            skuSistema || null,
+            tipoEntrada || 'COMPRA_NORMAL',
+            existente[0].id
+          ]
+        );
+      } else {
+        // Insere apenas se realmente não existir
+        await db.execute(
+          `INSERT INTO importacao_produtos_staging 
+          (tenant_id, lote_importacao_id, item_nfe_seq, codigo_fornecedor, nome_fornecedor, ncm_original, ean, cest_original, unidade_original, quantidade, quantidade_recebida, preco_custo_unitario, valor_total_nfe, frete_rateado, ipi, icms_st, custo_unitario_final, custo_total_final, produto_id_sistema, sku_sistema, tipo_entrada, status, criado_em) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDENTE', NOW())`,
+          [
+            tenant, 
+            lote_importacao_id, 
+            sequenciaItem,
+            cProd || null, 
+            xProd || null, 
+            ncm || null, 
+            cEan || null,
+            cest || null, 
+            uCom || null, 
+            quantidade || 0, 
+            receivedQuantity || quantidade || 0,
+            valorUnitario || 0,
+            valorTotal || 0,
+            freightDistributed || 0,
+            ipi || 0,
+            icmsSt || 0,
+            valorUnitario || 0,
+            custoTotalFinalCalc || 0,
+            produtoIdSistema || null,
+            skuSistema || null,
+            tipoEntrada || 'COMPRA_NORMAL'
+          ]
+        );
+      }
+    }
+
+    return res.status(200).json({ success: true, message: 'Lote sincronizado com sucesso!', lote_importacao_id });
+  } catch (error: any) {
+    console.error("Erro na sincronização em lote:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+export const listarLotesStaging = async (req: Request, res: Response): Promise<Response> => {
+try {
+const tenant_id = req.query.tenant_id || 1;
+
+const query = `
+SELECT 
+l.id, 
+l.chave_acesso, 
+l.numero_nf,
+l.cnpj_fornecedor, 
+l.status, 
+l.created_at,
+(SELECT COUNT(*) FROM importacao_produtos_staging p WHERE p.lote_importacao_id = l.id) AS total_itens,
+(SELECT COUNT(*) FROM importacao_produtos_staging p WHERE p.lote_importacao_id = l.id AND p.status = 'ERRO_VALIDACAO') AS total_divergencias
+FROM importacoes_lotes l
+WHERE l.tenant_id = ?
+ORDER BY l.created_at DESC
+`;
+
+const [rows]: any = await db.execute(query, [tenant_id]);
+
+const lotesFormatados = rows.map((lote: any) => ({
+id: lote.id,
+chaveAcesso: lote.chave_acesso,
+emitenteNome: `Fornecedoar CNPJ: ${lote.emitenteNome}`,
+cnpjEmitente: lote.cnpj_fornecedor,
+totalItens: Number(lote.total_itens),
+totalDivergencias: Number(lote.total_divergencias),
+status: lote.status === 'RASCUNHO' ? 'RASCUNHO' : 'PRONTO_PARA_APROVACAO',
+dataCriacao: lote.created_at,
+erroMensagem: null
+}));
+
+return res.json({
+success: true,
+lotes: lotesFormatados
+});
+
+} catch (error: unknown) {
+const err = error as Error;
+console.error("Erro ao buscar lotes:", err);
+return res.status(500).json({ success: false, error: err.message });
+}
+};
+
+// Listar todos os itens de staging de um lote específico
+export const listarItensDoLoteStaging = async (req: Request, res: Response): Promise<Response> => {
+try {
+const { loteId } = req.params;
+const tenant_id = req.query.tenant_id || 1;
+
+const query = `
+SELECT 
+id,
+codigo_fornecedor,
+nome_fornecedor,
+ncm_original,
+cest_original,
+unidade_original,
+quantidade,
+preco_custo_unitario,
+sku_sugerido,
+nome_item_sugerido,
+preco_venda_sugerido,
+margem_lucro_calculada,
+status,
+motivo_alerta,
+criado_em
+FROM importacao_produtos_staging 
+WHERE lote_importacao_id = ? AND tenant_id = ? 
+ORDER BY id ASC
+`;
+
+const [itens]: any = await db.execute(query, [loteId, tenant_id]);
+
+return res.status(200).json({
+success: true,
+total: itens.length,
+itens
+});
+
+} catch (error: unknown) {
+const err = error as Error;
+console.error("Erro ao buscar itens do lote:", err);
+return res.status(500).json({ success: false, error: err.message });
+}
+};
+
+
+
+export const confirmarEstoqueLote = async (req: Request, res: Response): Promise<Response> => {
+const connection: any = await db.getConnection(); // Obtém conexão para transação
+
+try {
+const {
+lote_importacao_id,
+tenant_id,
+chave_acesso,
+resumo_conferencia,
+frete_adicional,
+itens
+} = req.body;
+
+const tenant = tenant_id || 1;
+
+if (!lote_importacao_id) {
+return res.status(400).json({ success: false, error: 'ID do lote de importação não informado.' });
 }
 
-export async function criarFornecedor(req: Request, res: Response): Promise<Response> {
-    const { tenant_id, cnpj, nome_razao, nome_fantasia } = req.body;
+// Inicia a transação
+await connection.beginTransaction();
 
-    if (!tenant_id || !cnpj || !nome_razao) {
-        return res.status(400).json({ error: "Campos obrigatórios ausentes: tenant_id, cnpj e nome_razao." });
-    }
+// 1. Atualiza o cabeçalho do lote para FINALIZADO e salva os JSONs de resumo e frete final
+await connection.execute(
+`UPDATE importacoes_lotes 
+SET status = 'FINALIZADO', 
+    resumo_conferencia = ?,
+    frete_adicional = ?,
+    updated_at = NOW()
+WHERE id = ? AND tenant_id = ?`,
+[
+  resumo_conferencia ? JSON.stringify(resumo_conferencia) : null,
+  frete_adicional ? JSON.stringify(frete_adicional) : null,
+  lote_importacao_id, 
+  tenant
+]
+);
 
-    const cnpjLimpo = cnpj.replace(/\D/g, '');
-    const connection = await pool.getConnection();
+// 2. Processa cada item enviado na conferência e mapeamento
+for (const item of itens) {
+const {
+item_nfe_seq,
+produto_id_sistema,
+sku_sistema,
+tipo_entrada,
+conferencia_fisica,
+custos_fiscais_e_rateio
+} = item;
 
-    try {
-        await connection.beginTransaction();
+// Atualiza o item correspondente na staging
+await connection.execute(
+`UPDATE importacao_produtos_staging 
+SET sku_sugerido = COALESCE(?, sku_sugerido),
+status = 'IMPORTADO',
+quantidade = COALESCE(?, quantidade),
+preco_custo_unitario = COALESCE(?, preco_custo_unitario),
+analisado_em = NOW()
+WHERE lote_importacao_id = ? AND tenant_id = ? AND (id = ? OR codigo_fornecedor = ?)`,
+[
+sku_sistema || null,
+conferencia_fisica?.quantidade_recebida ?? null,
+custos_fiscais_e_rateio?.custo_unitario_final ?? null,
+lote_importacao_id,
+tenant,
+item_nfe_seq || null,
+item.codigo_fornecedor || null
+]
+);
 
-        const [coreResult] = await connection.execute<ResultSetHeader>(`
-            INSERT INTO pessoas_core (tenant_id, tipo_pessoa, status, created_at)
-            VALUES (?, 'PJ', 'ATIVO', NOW())
-        `, [Number(tenant_id)]);
+// 3. EFETIVAÇÃO NO ESTOQUE OFICIAL DO ERP
+if (produto_id_sistema && conferencia_fisica?.quantidade_recebida > 0) {
 
-        const novoIdPessoa = coreResult.insertId;
+await connection.execute(
+`UPDATE produtos 
+SET saldo_atual = COALESCE(saldo_atual, 0) + ?,
+preco_custo = COALESCE(?, preco_custo),
+updated_at = NOW()
+WHERE id = ? AND tenant_id = ?`,
+[
+conferencia_fisica.quantidade_recebida,
+custos_fiscais_e_rateio?.custo_unitario_final || 0,
+produto_id_sistema,
+tenant
+]
+);
 
-        await connection.execute(`
-            INSERT INTO pessoas_pj (id_cliente, razao_social, nome_fantasia, cnpj, tenant_id, created_at)
-            VALUES (?, ?, ?, ?, ?, NOW())
-        `, [novoIdPessoa, nome_razao, nome_fantasia || nome_razao, cnpjLimpo, Number(tenant_id)]);
-
-        const ID_PAPEL_FORNECEDOR = 2;
-        await connection.execute(`
-            INSERT INTO pessoas_papeis_atribuido (tenant_id, id_cliente, id_cliente_papel, created_at)
-            VALUES (?, ?, ?, NOW())
-        `, [Number(tenant_id), novoIdPessoa, ID_PAPEL_FORNECEDOR]);
-
-        await connection.commit();
-
-        return res.status(201).json({
-            success: true,
-            message: "Fornecedor cadastrado com sucesso!",
-            supplier: {
-                id: novoIdPessoa,
-                name: nome_razao,
-                fantasyName: nome_fantasia || nome_razao
-            }
-        });
-
-    } catch (error) {
-        await connection.rollback();
-        console.error("Erro crítico ao cadastrar fornecedor:", error);
-        return res.status(500).json({ error: "Erro interno do servidor ao salvar o fornecedor." });
-    } finally {
-        connection.release();
-    }
+await connection.execute(
+`INSERT INTO estoque_movimentos (tenant_id, produto_id, tipo_movimento, quantidade, custo_unitario, documento_origem, criado_em)
+VALUES (?, ?, 'ENTRADA_NOTA_FISCAL', ?, ?, ?, NOW())`,
+[
+tenant,
+produto_id_sistema,
+conferencia_fisica.quantidade_recebida,
+custos_fiscais_e_rateio?.custo_unitario_final || 0,
+`NF-${chave_acesso || lote_importacao_id}`
+]
+);
+}
 }
 
-// ==========================================
-// PASSO 2: PROCESSAMENTO DOS ITENS DO XML
-// ==========================================
+// Confirma todas as operações no banco
+await connection.commit();
+connection.release();
 
-export async function processarItemXML(req: Request, res: Response): Promise<Response> {
-    const { tenant_id, id_fornecedor, cProd, cEAN, xProd } = req.body;
+return res.status(200).json({
+success: true,
+message: 'Entrada de estoque e fechamento do lote realizados com sucesso!',
+lote_id: lote_importacao_id
+});
 
-    // Validação de entrada das tags do <prod> do XML
-    if (!tenant_id || !id_fornecedor || !cProd) {
-        return res.status(400).json({ error: "Parâmetros obrigatórios ausentes: tenant_id, id_fornecedor ou cProd." });
-    }
-
-    const connection = await pool.getConnection();
-
-    try {
-        await connection.beginTransaction();
-
-        // -------------------------------------------------------------------------
-        // PASSO 2.1: Busca por Vínculo Direto Existente
-        // -------------------------------------------------------------------------
-       const [vinculoFornRows] = await connection.execute<any[]>(`
-            SELECT 
-                vf.id_item,
-                ic.sku AS sku_interno
-            FROM itens_fornecedores vf
-            INNER JOIN itens_core ic ON vf.id_item = ic.id_item
-            WHERE vf.tenant_id = ? 
-              AND vf.id_fornecedor = ? 
-              AND vf.codigo_fornecedor = ?
-            LIMIT 1
-        `, [Number(tenant_id), Number(id_fornecedor), String(cProd)]);
-
-        if (vinculoFornRows.length > 0) {
-            const idItemEncontrado = vinculoFornRows[0].id_item;
-            const skuInterno = vinculoFornRows[0].sku_interno;
-            
-            console.log(`[XML] Vínculo Direto: Item ${idItemEncontrado} (SKU: ${skuInterno}) identificado para o Fornecedor ${id_fornecedor}`);
-
-            await connection.commit();
-            return res.status(200).json({
-                status: "VINCULO_DIRETO_ENCONTRADO",
-                message: `Produto identificado com sucesso.`,
-                id_item: idItemEncontrado,
-                codigo_interno: skuInterno, // 👈 Agora o Frontend recebe o seu SKU (ex: 'INT-100')
-                proximo_passo: "Passo 3 (Atualização de Estoque e Custos)"
-            });
-        }
-
-        // -------------------------------------------------------------------------
-        // PASSO 2.2: Busca por Código de Barras (EAN / GTIN)
-        // -------------------------------------------------------------------------
-        const eanValido = cEAN && String(cEAN).trim() !== "" && String(cEAN).toUpperCase() !== "SEM GTIN";
-
-        if (eanValido) {
-            const [eanRows] = await connection.execute<ItemCodigoBarrasRow[]>(`
-                SELECT id_item 
-                FROM itens_core 
-                WHERE tenant_id = ? 
-                  AND sku = ? 
-                LIMIT 1
-            `, [Number(tenant_id), String(cEAN)]);
-
-            if (eanRows.length > 0) {
-                const idItemPorEAN = eanRows[0].id_item;
-
-                // Cria o vínculo automático para acelerar as próximas compras
-                await connection.execute(`
-                    INSERT INTO itens_fornecedores 
-                        (tenant_id, id_item, id_fornecedor, codigo_fornecedor, descricao_fornecedor, created_at)
-                    VALUES (?, ?, ?, ?, ?, NOW())
-                `, [Number(tenant_id), idItemPorEAN, Number(id_fornecedor), String(cProd), xProd || null]);
-
-                console.log(`[XML] Vínculo via EAN: Item ${idItemPorEAN} localizado pelo código de barras (${cEAN}). Novo código de fornecedor (${cProd}) associado.`);
-
-                await connection.commit();
-                return res.status(200).json({
-                    status: "VINCULO_EAN_RESOLVIDO",
-                    message: `Produto localizado pelo Código de Barras EAN (${cEAN}). O sistema criou o vínculo automático com o código do fornecedor (${cProd}).`,
-                    id_item: idItemPorEAN,
-                    proximo_passo: "Passo 3 (Atualização de Estoque e Custos)"
-                });
-            }
-        }
-
-        // -------------------------------------------------------------------------
-        // PASSO 2.3: Busca por SKU de Controle Interno
-        // -------------------------------------------------------------------------
-        const [skuRows] = await connection.execute<ItemCodigoBarrasRow[]>(`
-            SELECT id_item 
-            FROM itens_core 
-            WHERE tenant_id = ? 
-              AND sku = ? 
-            LIMIT 1
-        `, [Number(tenant_id), String(cProd)]);
-
-        if (skuRows.length > 0) {
-            const idItemPorSKU = skuRows[0].id_item;
-
-            // Se o cProd do fornecedor coincidir com o SEU SKU interno, cria o vínculo pivô
-            await connection.execute(`
-                INSERT INTO itens_fornecedores 
-                    (tenant_id, id_item, id_fornecedor, codigo_fornecedor, descricao_fornecedor, created_at)
-                VALUES (?, ?, ?, ?, ?, NOW())
-            `, [Number(tenant_id), idItemPorSKU, Number(id_fornecedor), String(cProd), xProd || null]);
-
-            console.log(`[XML] Vínculo via SKU Interno: Item ${idItemPorSKU} localizado pelo SKU (${cProd}). Novo vínculo de fornecedor criado.`);
-
-            await connection.commit();
-            return res.status(200).json({
-                status: "VINCULO_SKU_CONVERTIDO",
-                message: `Produto localizado pelo SKU de controle interno (${cProd}). Vínculo com o fornecedor criado automaticamente.`,
-                id_item: idItemPorSKU,
-                proximo_passo: "Passo 3 (Atualização de Estoque e Custos)"
-            });
-        }
-
-        // -------------------------------------------------------------------------
-        // PASSO 2.4: Produto Realmente Inédito no Sistema
-        // -------------------------------------------------------------------------
-        console.log(`[XML] Produto Inédito: Código do Fornecedor [${cProd}] - Descrição: [${xProd}] não localizado.`);
-        
-        await connection.commit(); 
-        return res.status(200).json({
-            status: "PRODUTO_INEDITO",
-            message: "Este item não pôde ser identificado por nenhum critério automático. Por favor, faça o mapeamento ou cadastre o novo produto.",
-            dados_sugeridos: { cProd, cEAN, xProd },
-            proximo_passo: "Passo 2.4 (Interface de conciliação / Cadastro Manual)"
-        });
-
-    } catch (error) {
-        await connection.rollback();
-        console.error("Erro crítico no processamento do item do XML:", error);
-        return res.status(500).json({ error: "Erro interno ao processar validação do item." });
-    } finally {
-        connection.release();
-    }
+} catch (error: any) {
+if (connection) {
+await connection.rollback();
+connection.release();
 }
+
+console.error("❌ Erro ao confirmar estoque do lote:", error);
+return res.status(500).json({
+success: false,
+error: error.message || 'Erro interno ao finalizar entrada de estoque.'
+});
+}
+};
