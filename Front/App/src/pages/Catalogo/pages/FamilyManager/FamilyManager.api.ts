@@ -83,6 +83,7 @@ export const getFamilies = async (tenantId: number = 1): Promise<Grupo[]> => {
     
     // Suporte a marca e comportamento com fallbacks
     idMarca: fam.idMarca || fam.id_marca || '',
+    nomeMarca: fam.nomeMarca || '',
     marcaComportamento: fam.marcaComportamento || fam.comportamento_marca || fam.comportamentoMarca || 'ficha',
 
     atributos: Array.isArray(fam.atributos) 
@@ -166,6 +167,17 @@ export const deleteFamilia = async (idFamilia: string, tenantId: number = 1): Pr
 export const createFamily = createFamilia;
 export const updateFamily = updateFamilia;
 export const deleteFamily = deleteFamilia;
+
+// Marcas do cadastro ("Sem Marca" fica de fora: vale como ausência de marca)
+export const getMarcasCatalogo = async (tenantId: number = 1): Promise<Array<{ id: string; nome: string }>> => {
+  const response = await fetch(`${API_BASE_URL}/marcas?tenant_id=${tenantId}`, { method: 'GET', headers: DEFAULT_HEADERS });
+  const dados = await handleResponse<any>(response, 'Erro ao carregar as marcas.');
+  const lista: any[] = Array.isArray(dados) ? dados : Array.isArray(dados?.data) ? dados.data : [];
+  return lista
+    .filter(m => String(m.nome || '').trim().toLowerCase() !== 'sem marca')
+    .map(m => ({ id: String(m.id), nome: String(m.nome) }))
+    .sort((a, b) => a.nome.localeCompare(b.nome));
+};
 
 export const createGroup = createFamilia;
 export const updateGroup = updateFamilia;

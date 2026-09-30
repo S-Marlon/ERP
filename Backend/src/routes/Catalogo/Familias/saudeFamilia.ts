@@ -20,6 +20,7 @@ export interface FamiliaParaSaude {
   templateNomeComercial?: string | null;
   siglaSku?: string | null;
   comportamentoMarca?: string | null;
+  nomeMarca?: string | null;
 }
 
 export interface Problema {
@@ -82,6 +83,15 @@ export const avaliarSaudeFamilia = (familia: FamiliaParaSaude, atributos: Atribu
       codigo: 'TOKEN_DESCONHECIDO',
       mensagem: `O template usa atributos que não existem na família: ${desconhecidos.map(t => `{${t}}`).join(', ')}.`,
     });
+  }
+
+  // Marca como DNA: a família precisa de uma marca real ("Sem Marca" não serve)
+  const nomeMarcaNorm = normalizarToken(familia.nomeMarca);
+  if (familia.comportamentoMarca === 'dna' && (nomeMarcaNorm === '' || nomeMarcaNorm === 'semmarca')) {
+    bloqueios.push({ codigo: 'MARCA_DNA_SEM_VALOR', mensagem: 'A marca é DNA desta família, mas a família não tem marca definida.' });
+  }
+  if (marcaEhGrade && !tokensSku.some(t => normalizarToken(t) === 'marca')) {
+    avisos.push({ codigo: 'MARCA_FORA_DO_CODIGO', mensagem: 'A marca gera variação, mas {MARCA} não está no template do código: itens que só diferem na marca teriam o mesmo SKU.' });
   }
 
   const usaSigla = [...tokensSku, ...tokensNome].some(t => normalizarToken(t) === 'sigla');

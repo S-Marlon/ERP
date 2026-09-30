@@ -19,6 +19,7 @@ Modal,
 Radio,
 Divider,
 List,
+Select,
 } from "antd";
 import {
 PlusOutlined,
@@ -35,7 +36,7 @@ ExclamationCircleOutlined,
 } from "@ant-design/icons";
 import Swal from "sweetalert2";
 
-import { updateFamilia, deleteFamilia } from './FamilyManager.api';
+import { updateFamilia, deleteFamilia, getMarcasCatalogo } from './FamilyManager.api';
 import { STATUS_FAMILIA_CONFIG } from './CatalogManager.types'; // Ajuste o caminho do import conforme seu projeto
 
 // Hook desacoplado
@@ -154,6 +155,37 @@ if (familiaSelecionadaHook) {
 setFamiliaSelecionadaLocal(familiaSelecionadaHook);
 }
 }, [familiaSelecionadaHook]);
+
+// Marcas do cadastro (para a marca da família e a marca de cada item)
+const [marcasCatalogo, setMarcasCatalogo] = useState<Array<{ id: string; nome: string }>>([]);
+useEffect(() => {
+getMarcasCatalogo(1).then(setMarcasCatalogo).catch(() => setMarcasCatalogo([]));
+}, []);
+
+// Campo "Marca" do item: com marca DNA vale a da família (somente leitura)
+const renderCampoMarcaItem = (valor: any, onChange: (v: string) => void, size: "small" | "middle" = "middle") => {
+if (marcaComportamento === "dna") {
+return (
+<Tooltip title="A marca é DNA desta família: todos os itens recebem a marca da família.">
+<Select size={size} disabled value={familiaSelecionadaLocal?.nomeMarca || undefined} placeholder="Defina a marca da família" style={{ width: "100%" }} />
+</Tooltip>
+);
+}
+return (
+<Select
+size={size}
+showSearch
+allowClear
+style={{ width: "100%" }}
+placeholder="Selecione a marca"
+value={valor ? String(valor) : undefined}
+onChange={(v) => onChange(v ?? "")}
+options={marcasCatalogo.map(m => ({ value: m.nome, label: m.nome }))}
+optionFilterProp="label"
+/>
+);
+};
+const ehCampoMarca = (attr: any) => attr?.isMarcaSistema || attr?.id === "atributo-marca-virtual";
 
 // Função centralizada e segura para atualizar a família selecionada
 const setFamiliaSelecionada = (updater: any) => {
@@ -916,6 +948,32 @@ size="small"
 </div>
 </div>
 
+<div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+<span style={{ fontSize: "12px", fontWeight: 600, color: "#1e293b" }}>Marca da família:</span>
+<Select
+size="small"
+showSearch
+allowClear
+style={{ width: 220 }}
+placeholder={marcaComportamento === "dna" ? "Obrigatória (marca é DNA)" : "Opcional"}
+status={marcaComportamento === "dna" && !familiaSelecionadaLocal?.nomeMarca ? "error" : undefined}
+value={familiaSelecionadaLocal?.idMarca && familiaSelecionadaLocal?.nomeMarca ? String(familiaSelecionadaLocal.idMarca) : undefined}
+onChange={(v) => {
+const marca = marcasCatalogo.find(m => m.id === v);
+// Sem marca = "Sem Marca" (id 1, padrão do banco)
+setFamiliaSelecionada((prev: any) => ({ ...prev, idMarca: marca ? marca.id : "1", nomeMarca: marca ? marca.nome : "" }));
+setTemAlteracoes(true);
+}}
+options={marcasCatalogo.map(m => ({ value: m.id, label: m.nome }))}
+optionFilterProp="label"
+/>
+<span style={{ fontSize: "11px", color: "#64748b" }}>
+{marcaComportamento === "dna" && "Todos os itens recebem esta marca; ela identifica a família."}
+{marcaComportamento === "grade" && "Cada item tem a sua marca (ex.: Ebara x Schneider); use {MARCA} no template do código."}
+{marcaComportamento === "ficha" && "Cada item pode ter a sua marca; esta vale quando o item não tiver."}
+</span>
+</div>
+
 
 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", width: "100%" }}>
         
@@ -1269,10 +1327,12 @@ style={{ marginBottom: 16 }}
 key={attr.id}
 name={attr.id}
 label={attr.nome || attr.label}
-rules={[{ required: true, message: `O campo ${attr.nome || attr.label} é obrigatório!` }]}
-initialValue={itemEmEdicaoPendencia?.valoresAtributos?.[attr.id] || ""}
+rules={[{ required: !(ehCampoMarca(attr) && marcaComportamento === "dna"), message: `O campo ${attr.nome || attr.label} é obrigatório!` }]}
+initialValue={itemEmEdicaoPendencia?.valoresAtributos?.[attr.id] || undefined}
 >
-<Input placeholder={`Digite o valor para ${attr.nome || attr.label}...`} />
+{ehCampoMarca(attr)
+? renderCampoMarcaItem(undefined, () => undefined)
+: <Input placeholder={`Digite o valor para ${attr.nome || attr.label}...`} />}
 </Form.Item>
 ))}
 </Form>
@@ -1297,11 +1357,15 @@ style={{ marginBottom: 16 }}
 <Form layout="vertical">
 {(atributosComMarcaInjetada?.length > 0 ? atributosComMarcaInjetada : familiaSelecionadaLocal?.atributos || []).map((attr: any) => (
 <Form.Item key={attr.id} label={attr.nome}>
+{ehCampoMarca(attr)
+? renderCampoMarcaItem(itemEmEdicaoAtributos?.valoresAtributos?.[attr.id], (v) => handleAtualizarAtributoItemEditado(attr.id, v))
+: (
 <Input
 value={String(itemEmEdicaoAtributos?.valoresAtributos?.[attr.id] ?? "")}
 placeholder={`Informe ${attr.nome}`}
 onChange={(event) => handleAtualizarAtributoItemEditado(attr.id, event.target.value)}
 />
+)}
 </Form.Item>
 ))}
 </Form>
@@ -1362,6 +1426,9 @@ return (
 <label style={{ fontSize: "10.5px", fontWeight: 600, color: "#475569" }}>
 {attr.nome}:
 </label>
+{ehCampoMarca(attr)
+? renderCampoMarcaItem(valorAtual, (v) => handleAtualizarAtributoItemPendente(item.id, attr.id, v), "small")
+: (
 <Input
 size="small"
 placeholder={`Preencher ${attr.nome}`}
@@ -1370,6 +1437,7 @@ onChange={(e) => {
 handleAtualizarAtributoItemPendente(item.id, attr.id || attr.nome, e.target.value);
 }}
 />
+)}
 </div>
 );
 })}

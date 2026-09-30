@@ -70,6 +70,7 @@ export interface Familia {
 
   // Parâmetros comerciais/estoque da família
   idMarca?: string;
+  nomeMarca?: string; // marca da família ('' = sem marca)
   marcaComportamento?: string; // papel da marca na família: ficha, dna ou grade
   margemMinima?: number | null;
   margemMaxima?: number | null;

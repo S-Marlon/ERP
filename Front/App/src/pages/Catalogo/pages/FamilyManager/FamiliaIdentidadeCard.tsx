@@ -18,6 +18,7 @@ interface FamiliaIdentidadeCardProps {
     cor?: string;
     imagem?: string;
     idMarca?: string | number;
+    nomeMarca?: string;
     margemMinima?: number | string;
     margemMaxima?: number | string;
     markupPadrao?: number | string;
@@ -235,7 +236,7 @@ export const FamiliaIdentidadeCard: React.FC<FamiliaIdentidadeCardProps> = ({
                 Marca
               </Text>
               <Text style={{ color: "#1e293b", fontSize: "12px", fontWeight: 700 }}>
-                {grupoSelecionado?.unidadeBase || "Sem Marca"}
+                {grupoSelecionado?.nomeMarca || "Sem Marca"}
               </Text>
             </div>
 
@@ -506,17 +507,6 @@ export const FamiliaIdentidadeCard: React.FC<FamiliaIdentidadeCardProps> = ({
                 children: (
                   <div style={{ paddingTop: '8px' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      <Form.Item name="comportamentoMarca" label="Papel Estratégico da Marca">
-                        <Select
-                          placeholder="Selecione o comportamento"
-                          options={[
-                            { value: 'core', label: 'Core / Carro-Chefe' },
-                            { value: 'premium', label: 'Premium / Autoridade' },
-                            { value: 'volume', label: 'Volume / Entrada' },
-                            { value: 'sazonal', label: 'Sazonal / Campanha' },
-                          ]}
-                        />
-                      </Form.Item>
 
                       <Form.Item name="prioridadeExposicao" label="Prioridade de Exposição">
                         <Select

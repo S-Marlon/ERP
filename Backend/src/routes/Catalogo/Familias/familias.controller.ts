@@ -4,6 +4,7 @@ import { Request, Response } from 'express';
 import pool from '../../Estoque/db.config';
 import { carregarOpcoes, converterValorAtributo, gravarValorAtributo, OpcaoAtributo } from '../Atributos/valoresAtributo';
 import { AtributoEfetivo, avaliarSaudeFamilia, mesclarAtributos, statusAposSaude } from './saudeFamilia';
+import { CHAVE_MARCA, marcaEfetiva, marcaReal, MarcaCadastro, papelMarca, pendenciaMarca, resolverMarcaInformada } from './marcaFamilia';
 import { atributosEfetivosDaCategoria, carregarArvore, carregarAtributosDaCategoria, carregarVinculosCategorias } from '../Categorias/herancaCategorias';
 
 // Atributos efetivos da família (categoria + próprios) para avaliar a saúde
@@ -79,7 +80,7 @@ const montarTextoTemplate = (
     s: familia.separadorSku,
     separador: familia.separadorSku,
     variacao,
-    marca: familia.nomeMarca || ''
+    marca: valores[CHAVE_MARCA] ?? ''
   };
   if (Object.prototype.hasOwnProperty.call(reservados, tokenNormalizado)) {
     return String(reservados[tokenNormalizado] ?? '');
@@ -97,8 +98,9 @@ const carregarContextoFormalizacao = async (connection: DbConnection, familiaId:
     SELECT f.id, f.nome, f.categoria_id AS categoriaId, f.sigla_sku AS siglaSku,
            f.separador_sku AS separadorSku, f.template_sku AS templateSku,
            f.template_nome AS templateNomeComercial,
-           f.id_marca AS idMarca, f.comportamento_marca AS comportamentoMarca
+           f.id_marca AS idMarca, f.comportamento_marca AS comportamentoMarca, mar.nome AS nomeMarca
     FROM comercial_familias f
+    LEFT JOIN comercial_marcas mar ON mar.id = f.id_marca AND mar.tenant_id = f.tenant_id
     WHERE f.id = ? AND f.tenant_id = ?
     LIMIT 1
   `, [familiaId, tenantId]);
@@ -144,7 +146,10 @@ const carregarContextoFormalizacao = async (connection: DbConnection, familiaId:
 
   const atributos = Array.from(atributosPorId.values());
   const opcoes = await carregarOpcoes(connection as any, tenantId, atributos.map(a => a.id));
-  return { familia, atributos, opcoes };
+  const [marcaRows] = await connection.execute(`SELECT id, nome FROM comercial_marcas WHERE tenant_id = ?`, [tenantId]);
+  const marcas: MarcaCadastro[] = (marcaRows as any[]).map(m => ({ id: Number(m.id), nome: String(m.nome) }));
+  familia.papelMarca = papelMarca(familia.comportamentoMarca);
+  return { familia, atributos, opcoes, marcas };
 };
 
 // Atributos que o item precisa ter preenchidos: os usados nos templates e os obrigatórios
@@ -179,12 +184,13 @@ const carregarItensComValores = async (connection: DbConnection, familiaId: stri
            p.pode_vender_sem_estoque AS podeVenderSemEstoque,
            i.sku AS skuGlobal, i.nome_item AS nomeItemGlobal,
            i.tipo_recurso AS tipoRecurso, i.status AS statusItem,
-           i.descricao_variacao AS variacao, av.atributo_id,
+           i.descricao_variacao AS variacao, p.id_marca AS idMarca, mi.nome AS nomeMarca, av.atributo_id,
            av.valor_texto, av.valor_numero, av.valor_decimal, av.valor_data,
            av.valor_boolean, av.opcao_id, ao.valor AS valor_opcao,
            ao.codigo AS codigo_opcao
     FROM comercial_produtos_dados p
     INNER JOIN itens_core i ON i.id_item = p.id_item AND i.tenant_id = p.tenant_id
+    LEFT JOIN comercial_marcas mi ON mi.id = p.id_marca AND mi.tenant_id = p.tenant_id
     LEFT JOIN atributos_comercial_valores av
       ON av.id_entidade = p.id_item AND av.tipo_entidade = 'produto' AND av.tenant_id = p.tenant_id
     LEFT JOIN atributos_comercial_opcoes ao ON ao.id = av.opcao_id
@@ -207,7 +213,10 @@ const carregarItensComValores = async (connection: DbConnection, familiaId: stri
         descricaoComercial: row.descricaoComercial || '',
         tipoRecurso: row.tipoRecurso || 'PRODUTO',
         status: row.statusItem || 'ATIVO',
-        valoresAtributos: {},
+        // Marca própria do item (a tela edita como o "atributo" Marca)
+        valoresAtributos: marcaReal(row.nomeMarca) ? { [CHAVE_MARCA]: row.nomeMarca } : {},
+        idMarca: row.idMarca ? String(row.idMarca) : null,
+        marca: marcaReal(row.nomeMarca) ? row.nomeMarca : '',
         variacao: row.variacao || 'Principal'
       });
     }
@@ -370,9 +379,11 @@ export const updateFamilia = async (req: Request, res: Response) => {
 
     // 3. Saúde da família: ATIVA só se atender às regras mínimas; senão fica BLOQUEADA com os motivos
     const [[familiaAtual]] = await connection.execute(
-      `SELECT status, categoria_id, template_sku AS templateSku, template_nome AS templateNomeComercial,
-              sigla_sku AS siglaSku, comportamento_marca AS comportamentoMarca
-       FROM comercial_familias WHERE id = ? AND tenant_id = ?`,
+      `SELECT f.status, f.categoria_id, f.template_sku AS templateSku, f.template_nome AS templateNomeComercial,
+              f.sigla_sku AS siglaSku, f.comportamento_marca AS comportamentoMarca, mar.nome AS nomeMarca
+       FROM comercial_familias f
+       LEFT JOIN comercial_marcas mar ON mar.id = f.id_marca AND mar.tenant_id = f.tenant_id
+       WHERE f.id = ? AND f.tenant_id = ?`,
       [idFamilia, tenantId]
     ) as any;
     const efetivos = await carregarAtributosEfetivos(connection, tenantId, idFamilia, familiaAtual.categoria_id);
@@ -414,7 +425,7 @@ export const createFamilia = async (req: Request, res: Response) => {
   try {
     const categoriaIdFinal = (categoriaPai && String(categoriaPai).trim() !== '') ? Number(categoriaPai) : null;
     const marcaIdFinal = (idMarca && !isNaN(Number(idMarca))) ? Number(idMarca) : 1;
-    const comportamentoFinal = comportamentoMarca || 'ficha';
+    const comportamentoFinal = papelMarca(comportamentoMarca);
 
     const query = `
       INSERT INTO comercial_familias 
@@ -533,6 +544,7 @@ export const getFamilias = async (req: Request, res: Response) => {
         f.imagem,
         f.comportamento_marca AS comportamentoMarca,
         f.id_marca AS idMarca,
+        mar.nome AS nomeMarca,
         f.margem_minima AS margemMinima,
         f.margem_maxima AS margemMaxima,
         f.markup_padrao AS markupPadrao,
@@ -542,8 +554,9 @@ export const getFamilias = async (req: Request, res: Response) => {
         f.prioridade_exposicao AS prioridadeExposicao,
         (SELECT COUNT(*) FROM comercial_produtos_dados p WHERE p.tenant_id = f.tenant_id AND p.familia_id = f.id) AS totalItens
       FROM comercial_familias f
-      LEFT JOIN comercial_categorias c 
+      LEFT JOIN comercial_categorias c
         ON f.categoria_id = c.id AND f.tenant_id = c.tenant_id
+      LEFT JOIN comercial_marcas mar ON mar.id = f.id_marca AND mar.tenant_id = f.tenant_id
       WHERE f.tenant_id = ?
       ORDER BY f.nome ASC
     `;
@@ -649,6 +662,7 @@ export const getFamilias = async (req: Request, res: Response) => {
         categoriaPaiNome: f.categoriaPaiNome || '',
         status: STATUS_FAMILIA.includes(String(f.status).toUpperCase()) ? String(f.status).toUpperCase() : 'RASCUNHO',
         idMarca: f.idMarca ? String(f.idMarca) : '',
+        nomeMarca: marcaReal(f.nomeMarca) ? f.nomeMarca : '',
         margemMinima: f.margemMinima !== null ? Number(f.margemMinima) : null,
         margemMaxima: f.margemMaxima !== null ? Number(f.margemMaxima) : null,
         markupPadrao: f.markupPadrao !== null ? Number(f.markupPadrao) : null,
@@ -704,12 +718,18 @@ export const getDiagnosticoFormalizacao = async (req: Request, res: Response) =>
           valores[attr.id] = attr.valorPadraoGrupo;
         }
       }
-      const atributosPendentes = pendenciasDoItem(atributos, valores, tokens, contexto.opcoes);
+      const atributosPendentes: any[] = pendenciasDoItem(atributos, valores, tokens, contexto.opcoes);
+      const familia = contexto.familia;
+      const usaMarca = tokens.some(t => t.toLowerCase().replace(/[^a-z]/g, '') === 'marca');
+      const pendMarca = pendenciaMarca(familia.papelMarca, familia.nomeMarca, item.marca, usaMarca);
+      if (pendMarca) atributosPendentes.push(pendMarca);
+      // Para montar código/nome vale a marca efetiva pelo papel; a devolvida para edição é a do item
+      const valoresCalculo = { ...valores, [CHAVE_MARCA]: marcaEfetiva(familia.papelMarca, familia.nomeMarca, item.marca) };
       const skuCalculado = atributosPendentes.length === 0
-        ? montarTextoTemplate(contexto.familia.templateSku, contexto.familia, atributos, valores, item.variacao)
+        ? montarTextoTemplate(contexto.familia.templateSku, contexto.familia, atributos, valoresCalculo, item.variacao)
         : null;
       const nomeCalculado = atributosPendentes.length === 0
-        ? montarTextoTemplate(contexto.familia.templateNomeComercial, contexto.familia, atributos, valores, item.variacao)
+        ? montarTextoTemplate(contexto.familia.templateNomeComercial, contexto.familia, atributos, valoresCalculo, item.variacao)
         : null;
 
       return {
@@ -730,8 +750,11 @@ export const getDiagnosticoFormalizacao = async (req: Request, res: Response) =>
         templateSku: contexto.familia.templateSku || '',
         templateNomeComercial: contexto.familia.templateNomeComercial || '',
         siglaSku: contexto.familia.siglaSku || '',
-        separadorSku: contexto.familia.separadorSku || '-'
+        separadorSku: contexto.familia.separadorSku || '-',
+        papelMarca: contexto.familia.papelMarca,
+        marca: marcaReal(contexto.familia.nomeMarca) ? contexto.familia.nomeMarca : ''
       },
+      marcas: contexto.marcas.filter(m => marcaReal(m.nome)),
       atributosFamilia: atributos,
       tokensTemplate: tokens,
       itens: itensDiagnostico,
@@ -772,10 +795,11 @@ export const formalizarItensFamilia = async (req: Request, res: Response) => {
       if (!idItem) throw new Error('Cada item precisa informar idItem.');
 
       const [itemRows] = await connection.execute(`
-        SELECT i.id_item AS idItem, i.descricao_variacao AS variacao
+        SELECT i.id_item AS idItem, i.descricao_variacao AS variacao, p.id_marca AS idMarca, mi.nome AS nomeMarca
         FROM itens_core i
         INNER JOIN comercial_produtos_dados p
           ON p.id_item = i.id_item AND p.tenant_id = i.tenant_id
+        LEFT JOIN comercial_marcas mi ON mi.id = p.id_marca AND mi.tenant_id = p.tenant_id
         WHERE i.id_item = ? AND i.tenant_id = ? AND p.familia_id = ?
         LIMIT 1
       `, [idItem, tenantId, idFamilia]);
@@ -805,7 +829,26 @@ export const formalizarItensFamilia = async (req: Request, res: Response) => {
       }
 
       const tokensTemplate = [...extrairTokens(contexto.familia.templateSku), ...extrairTokens(contexto.familia.templateNomeComercial)];
-      const pendentes = pendenciasDoItem(contexto.atributos, valores, tokensTemplate, contexto.opcoes);
+      const pendentes: any[] = pendenciasDoItem(contexto.atributos, valores, tokensTemplate, contexto.opcoes);
+
+      // Marca: DNA usa a da família; ficha/grade usam a informada na tela ou a atual do item
+      const familia = contexto.familia;
+      const itemAtual = (itemRows as any[])[0];
+      const marcaInformada = resolverMarcaInformada(
+        valoresEntrada[CHAVE_MARCA] ?? valoresEntrada.MARCA ?? valoresEntrada.marca, contexto.marcas);
+      if (!marcaInformada.ok) throw new Error(`O item ${idItem}: ${marcaInformada.erro}`);
+      let idMarcaItem: number | null = itemAtual.idMarca ? Number(itemAtual.idMarca) : null;
+      let nomeMarcaItem: string = itemAtual.nomeMarca || '';
+      if (familia.papelMarca === 'dna') {
+        if (marcaReal(familia.nomeMarca)) { idMarcaItem = Number(familia.idMarca); nomeMarcaItem = familia.nomeMarca; }
+      } else if (marcaInformada.marca) {
+        idMarcaItem = marcaInformada.marca.id;
+        nomeMarcaItem = marcaInformada.marca.nome;
+      }
+      const usaMarca = tokensTemplate.some(t => t.toLowerCase().replace(/[^a-z]/g, '') === 'marca');
+      const pendMarca = pendenciaMarca(familia.papelMarca, familia.nomeMarca, nomeMarcaItem, usaMarca);
+      if (pendMarca) pendentes.push(pendMarca);
+      valores[CHAVE_MARCA] = marcaEfetiva(familia.papelMarca, familia.nomeMarca, nomeMarcaItem);
       if (pendentes.length > 0) {
         throw new Error(`O item ${idItem} possui atributos pendentes: ${pendentes.map(p => `${p.nome} (${p.motivo})`).join(', ')}.`);
       }
@@ -832,9 +875,9 @@ export const formalizarItensFamilia = async (req: Request, res: Response) => {
       );
       if ((skuRows as any[]).length > 0) throw new Error(`O SKU ${novoSku} já está sendo usado por outro item.`);
 
-      await connection.execute(`UPDATE comercial_produtos_dados SET sku_customizado = ?, nome_comercial = ?
-        WHERE id_item = ? AND tenant_id = ?`, [novoSku, novoNome, idItem, tenantId]);
-      resultados.push({ idItem, sku: novoSku, nome: novoNome, status: 'FORMALIZADO' });
+      await connection.execute(`UPDATE comercial_produtos_dados SET sku_customizado = ?, nome_comercial = ?, id_marca = ?
+        WHERE id_item = ? AND tenant_id = ?`, [novoSku, novoNome, idMarcaItem, idItem, tenantId]);
+      resultados.push({ idItem, sku: novoSku, nome: novoNome, marca: nomeMarcaItem, status: 'FORMALIZADO' });
     }
 
     await connection.commit();

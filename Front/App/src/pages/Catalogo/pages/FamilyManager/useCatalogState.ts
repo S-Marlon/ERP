@@ -615,6 +615,12 @@ const valorAtual = resolverValorAtributo(item?.valoresAtributos || {}, aliasCand
 return valorAtual === undefined || valorAtual === null || String(valorAtual).trim() === "";
 });
 
+// Marca pendente (papel grade/DNA ou {MARCA} no template) vem do diagnóstico do backend
+const pendenciaMarca = (item?.atributosPendentes || []).some((p: any) => p?.atributoId === 'atributo-marca-virtual');
+if (pendenciaMarca && !pendencias.some((p: any) => p?.id === 'atributo-marca-virtual')) {
+pendencias.push({ id: 'atributo-marca-virtual', nome: 'Marca', codigo: 'MARCA', isMarcaSistema: true } as any);
+}
+
 const precisaAbrirPendencia = pendencias.length > 0 || (atributosUsadosNoTemplate.length > 0 && valoresVaziosOuAusentes);
 
 if (precisaAbrirPendencia) {
