@@ -15,6 +15,13 @@ export interface IAtributoGlobal {
   obrigatorioPadrao: boolean;
   pesquisavel: boolean;
   valoresSugeridos?: string;
+  // Ajuda exibida ao operador (coluna descricao)
+  ajudaContextual?: string;
+  // Uso real (vem do backend): itens com valor e vínculos com família/categoria
+  opcoes?: Array<{ id: string; valor: string; codigo: string; emUso: boolean }>;
+  qtdItens?: number;
+  qtdVinculos?: number;
+  emUso?: boolean;
 }
 
 export interface CreateAttributePayload extends Omit<IAtributoGlobal, 'id'> {}

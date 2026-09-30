@@ -3,13 +3,7 @@
 import { Router, Request, Response } from 'express';
 
 // 🧬 Controller de Atributos Globais (Dicionário do ERP)
-import {
-  getAtributosGlobais,
-  createAtributoGlobal,
-  createAtributoGlobalRapido, 
-  updateAtributoGlobal,
-  deleteAtributoGlobal
-} from './Atributos/atributosGlobais.controller';
+import { getAtributosGlobais, createAtributoGlobal, createAtributoGlobalRapido, updateAtributoGlobal, deleteAtributoGlobal, mesclarAtributos } from './Atributos/atributosGlobais.controller';
 
 // 📂 Controller de Grupos de Atributos Semânticos
 import { 
@@ -64,6 +58,7 @@ import {
 } from './Marcas/comercialMarcas.controller';
 import { getAtributosPorProduto } from './Atributos/atributos.controller';
 import { getConfigVendas, salvarConfigVendas, atualizarCustoGerencial, listarUnidadesItens } from './Vendas/configVendas.controller';
+import { getProdutoDetalhe, updateProdutoParcial, adicionarAnexo, removerAnexo, definirImagemPrincipal, getFichaTecnica, salvarFichaTecnica } from './Produtos/produtoDetalhe.controller';
 
 const router = Router();
 
@@ -88,6 +83,8 @@ router.get('/cadastros/atributos-globais', getAtributosGlobais);
 router.post('/cadastros/atributos-globais/rapido', createAtributoGlobalRapido);
 router.put('/atributos-globais/:idAtributo', updateAtributoGlobal);
 router.delete('/atributos-globais/:idAtributo', deleteAtributoGlobal);
+// Junta atributos duplicados (valores, vínculos e templates vão para o destino)
+router.post('/atributos-globais/:idAtributo/mesclar', mesclarAtributos);
 
 // =========================================================================
 // 📁 GRUPOS DE ATRIBUTOS SEMÂNTICOS
@@ -139,7 +136,16 @@ router.get('/cadastros/familias/:idFamilia/produtos', getProdutosPorFamilia);
 router.get('/produtos/search', searchProdutos);
 router.get('/produtos', getProdutos);
 router.post('/produtos/lote', createProdutosLote);
-router.put('/produtos/:id_item', updateProduto);
+// Atualização parcial (campo ausente mantém, null limpa); substitui o updateProduto antigo, que zerava custo/preço
+router.put('/produtos/:id_item', updateProdutoParcial);
+router.get('/produtos/:id_item/detalhe', getProdutoDetalhe);
+// Ficha técnica (atributos da categoria + família com os valores do item)
+router.get('/produtos/:id_item/ficha-tecnica', getFichaTecnica);
+router.put('/produtos/:id_item/ficha-tecnica', salvarFichaTecnica);
+// Anexos (links de imagens/documentos em itens_anexos)
+router.post('/produtos/:id_item/anexos', adicionarAnexo);
+router.delete('/produtos/:id_item/anexos/:id_anexo', removerAnexo);
+router.put('/produtos/:id_item/anexos/:id_anexo/principal', definirImagemPrincipal);
 
 // =========================================================================
 // 🟡 ROTAS COMERCIAIS DE PRODUTOS (Família e Atributos Customizados)

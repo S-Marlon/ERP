@@ -28,7 +28,7 @@ export const getAtributosPorProduto = async (req: Request, res: Response) => {
         ac.id AS atributo_id,
         ac.nome AS atributo_nome, 
         ac.tipo AS atributo_tipo, 
-        ac.sufixo, 
+        (SELECT u.simbolo FROM atributos_comercial_unidades u WHERE u.id = ac.unidade_id) AS sufixo, 
         COALESCE(ace.escopo_comercial, ac.escopo_padrao) AS escopo, 
         ace.gera_variacao,
         COALESCE(

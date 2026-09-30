@@ -6,7 +6,7 @@ import {
 import {
   PlusOutlined, FolderAddOutlined, EditOutlined,
   DeleteOutlined, SearchOutlined, CheckOutlined, CloseOutlined,
-  InfoCircleOutlined, WarningOutlined, RobotOutlined // 🚀 [NOVO] Ícone para IA
+  InfoCircleOutlined, WarningOutlined, RobotOutlined, MergeCellsOutlined // 🚀 [NOVO] Ícone para IA
 } from '@ant-design/icons';
 import Swal from 'sweetalert2';
 import {
@@ -18,7 +18,8 @@ import {
   deleteAtributoGlobal,
   createGrupoAtributo,
   updateGrupoAtributo,
-  deleteGrupoAtributo
+  deleteGrupoAtributo,
+  mesclarAtributoGlobal
 } from './GlobalAttributeManager.api';
 import {
   IAtributoGlobal,
@@ -275,7 +276,8 @@ export const GlobalAttributeManager: React.FC<GlobalAttributeManagerProps> = ({ 
       ...record,
       ordemExibicao: (record as any).ordemExibicao || 0,
       tipoComponenteUI: (record as any).tipoComponenteUI || 'input',
-      ajudaContextual: (record as any).ajudaContextual || ''
+      ajudaContextual: record.ajudaContextual || '',
+      valoresSugeridos: (record.opcoes || []).map(o => o.valor)
     });
     setIdAtributoEmEdicao(record.id);
   };
@@ -312,7 +314,41 @@ export const GlobalAttributeManager: React.FC<GlobalAttributeManagerProps> = ({ 
       setIdAtributoEmEdicao(null);
       carregarDadosDoBanco();
     } catch (err: any) {
-      console.error(err);
+      if (err?.errorFields) return; // validação do formulário: o antd já destaca os campos
+      Swal.fire('Não foi possível salvar', err?.message || 'Erro ao atualizar o atributo.', 'error');
+    }
+  };
+
+  // Junta um atributo duplicado em outro do mesmo tipo (valores, vínculos e templates vão para o destino)
+  const handleMesclarAtributo = async (origem: IAtributoGlobal) => {
+    const candidatos = atributos.filter(a => a.id !== origem.id && a.tipo === origem.tipo);
+    if (candidatos.length === 0) {
+      Swal.fire('Sem destino', `Não há outro atributo do tipo "${origem.tipo}" para mesclar.`, 'info');
+      return;
+    }
+    const inputOptions = Object.fromEntries(
+      candidatos
+        .sort((a, b) => a.nome.localeCompare(b.nome))
+        .map(a => [a.id, `${a.nome} (${a.codigo})${a.emUso ? ` · ${a.qtdItens || 0} itens` : ''}`])
+    );
+    const { value: destinoId } = await Swal.fire({
+      title: `Mesclar "${origem.nome}" em...`,
+      html: `<p style="text-align:left;font-size:13px">Os valores de <b>${origem.qtdItens || 0}</b> item(ns), os <b>${origem.qtdVinculos || 0}</b> vínculo(s) com família/categoria e os templates que citam este atributo passam para o destino. Depois, <b>"${origem.nome}"</b> sai do dicionário.<br><br>Se um item já tiver valor no destino, o valor do destino é mantido.</p>`,
+      input: 'select',
+      inputOptions,
+      inputPlaceholder: 'Escolha o atributo de destino',
+      showCancelButton: true,
+      confirmButtonText: 'Mesclar',
+      cancelButtonText: 'Cancelar',
+      inputValidator: (v) => (!v ? 'Escolha o atributo de destino' : undefined),
+    });
+    if (!destinoId) return;
+    try {
+      const resp = await mesclarAtributoGlobal(origem.id, String(destinoId), tenantId);
+      Swal.fire('Mesclado!', resp.message, 'success');
+      carregarDadosDoBanco();
+    } catch (err: any) {
+      Swal.fire('Não foi possível mesclar', err?.message || 'Erro ao mesclar os atributos.', 'error');
     }
   };
 
@@ -428,7 +464,11 @@ export const GlobalAttributeManager: React.FC<GlobalAttributeManagerProps> = ({ 
                   <InfoCircleOutlined style={{ color: '#1890ff', fontSize: 12 }} />
                 </Tooltip>
               )}
-              {estaEmUso && <Tag color="warning" style={{ fontSize: 10, lineHeight: '14px', fontWeight: 'bold' }}>EM USO ATIVO</Tag>}
+              {estaEmUso && (
+                <Tooltip title={`${record.qtdItens || 0} item(ns) com valor · ${record.qtdVinculos || 0} vínculo(s) com família/categoria`}>
+                  <Tag color="warning" style={{ fontSize: 10, lineHeight: '14px', fontWeight: 'bold' }}>EM USO ATIVO</Tag>
+                </Tooltip>
+              )}
             </Space>
             <div style={{ fontSize: '11px', color: '#919eab', fontFamily: 'monospace' }}>{record.codigo}</div>
             {dataAlteracao && (
@@ -556,6 +596,16 @@ export const GlobalAttributeManager: React.FC<GlobalAttributeManagerProps> = ({ 
                 <Checkbox>Pesquisável</Checkbox>
               </Form.Item>
 
+              {record.tipo === 'lista' && (
+                <Form.Item name="valoresSugeridos" style={{ margin: 0, width: 220 }}>
+                  <Select
+                    size="small"
+                    mode="tags"
+                    placeholder="Opções da lista (Enter para adicionar)"
+                    tokenSeparators={[',']}
+                  />
+                </Form.Item>
+              )}
               <Form.Item name="unidadeId" style={{ margin: 0, width: 140 }}>
                 <Select size="small" placeholder="Unidade (FK)" allowClear>
                   {unidades.map(u => (
@@ -573,7 +623,7 @@ export const GlobalAttributeManager: React.FC<GlobalAttributeManagerProps> = ({ 
           );
         }
 
-        const opcoes = (record as any).opcoesLista || [];
+        const opcoes = record.opcoes || [];
         const possuiOpcoes = opcoes.length > 0;
 
         return (
@@ -581,8 +631,8 @@ export const GlobalAttributeManager: React.FC<GlobalAttributeManagerProps> = ({ 
             {possuiOpcoes ? (
               <div style={{ maxWidth: 220 }}>
                 {opcoes.map((op: any) => (
-                  <Tooltip key={op.codigo || op.chave} title={`Código do Banco: ${op.codigo || op.chave}`}>
-                    <Tag color="cyan" style={{ marginBottom: 2, fontSize: 10 }}>{op.valor}</Tag>
+                  <Tooltip key={op.id || op.codigo} title={`Código: ${op.codigo}${op.emUso ? ' · em uso por itens (não pode sair da lista)' : ''}`}>
+                    <Tag color={op.emUso ? 'blue' : 'cyan'} style={{ marginBottom: 2, fontSize: 10 }}>{op.valor}{op.emUso ? ' •' : ''}</Tag>
                   </Tooltip>
                 ))}
               </div>
@@ -616,7 +666,8 @@ export const GlobalAttributeManager: React.FC<GlobalAttributeManagerProps> = ({ 
         return (
           <Space>
             <Tooltip title="Editar Atributo"><Button type="text" icon={<EditOutlined />} onClick={() => startInlineEdit(record)} /></Tooltip>
-            <Tooltip title={estaEmUso ? "🟥 Bloqueado: Atributo em uso ativo por produtos no catálogo" : "Excluir Atributo"}>
+            <Tooltip title="Mesclar em outro atributo (resolver duplicados)"><Button type="text" icon={<MergeCellsOutlined />} onClick={() => handleMesclarAtributo(record)} /></Tooltip>
+            <Tooltip title={estaEmUso ? "Em uso por itens ou famílias: mescle com outro atributo ou remova os vínculos antes" : "Excluir Atributo"}>
               <Button type="text" danger disabled={estaEmUso} icon={<DeleteOutlined />} onClick={() => handleDeletarAtributo(record)} />
             </Tooltip>
           </Space>

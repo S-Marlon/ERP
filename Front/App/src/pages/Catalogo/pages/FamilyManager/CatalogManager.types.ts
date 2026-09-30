@@ -46,7 +46,8 @@ export interface Familia {
   categoriaPaiNome: string;
   descricao: string;
   
-  status: 'ATIVO' | 'INATIVO'; 
+  // RASCUNHO: em estruturação (fora dos canais); BLOQUEADO_INCONSISTENCIA: regras mínimas não atendidas
+  status: StatusFamilia; 
   
   unidadeMedidaBase: string;
   
@@ -66,7 +67,35 @@ export interface Familia {
   imagem?: string;
 
   atributos: AtributoConfig[];
+
+  // Parâmetros comerciais/estoque da família
+  idMarca?: string;
+  marcaComportamento?: string; // papel da marca na família: ficha, dna ou grade
+  margemMinima?: number | null;
+  margemMaxima?: number | null;
+  markupPadrao?: number | null;
+  estoqueMinimo?: number | null;
+  loteMinimo?: number | null;
+  curvaAbc?: string | null;
+  prioridadeExposicao?: string | null;
+  totalItens?: number;
+  saude?: SaudeFamilia;
 }
+
+export interface SaudeFamilia {
+  saudavel: boolean;
+  bloqueios: Array<{ codigo: string; mensagem: string }>;
+  avisos: Array<{ codigo: string; mensagem: string }>;
+}
+
+export type StatusFamilia = 'ATIVO' | 'INATIVO' | 'RASCUNHO' | 'BLOQUEADO_INCONSISTENCIA';
+
+export const STATUS_FAMILIA_CONFIG: Record<StatusFamilia, { label: string; color: string }> = {
+  ATIVO: { label: 'Ativa', color: 'green' },
+  INATIVO: { label: 'Inativa', color: 'default' },
+  RASCUNHO: { label: 'Rascunho', color: 'gold' },
+  BLOQUEADO_INCONSISTENCIA: { label: 'Bloqueada (inconsistência)', color: 'red' },
+};
 
 // Alias mantido caso alguma parte legada do código utilize 'Grupo'
 export type Grupo = Familia;
@@ -115,7 +144,7 @@ export interface CreateFamiliaPayload {
   nome: string;
   categoriaPai?: string | number | null;
   descricao?: string;
-  status?: 'ATIVO' | 'INATIVO';
+  status?: StatusFamilia;
   tipoItem?: 'PA' | 'MP' | 'KT' | 'MR' | 'IN';
   ncmPadrao?: string;
   cestPadrao?: string;

@@ -73,7 +73,8 @@ export const restaurarItensDoStaging = <T extends { nItem?: string | number; qua
 
     const produtoId = linha.produto_id_sistema ? Number(linha.produto_id_sistema) : null;
     const skuSugerido = String(linha.sku_sugerido || '').trim() || null;
-    const mappedId = produtoId ? (linha.sku_sistema || produtoId) : skuSugerido;
+    // Após a aprovação, item novo tem produto_id_sistema mas o código exibido continua sendo o SKU criado
+    const mappedId = produtoId ? (linha.sku_sistema || skuSugerido || produtoId) : skuSugerido;
     if (mappedId) mapeados++;
 
     const quantidadeNota = Number(item.quantidade) || 0;

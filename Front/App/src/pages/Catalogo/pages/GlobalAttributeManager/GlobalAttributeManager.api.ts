@@ -146,7 +146,12 @@ export const getAtributosGlobais = async (tenantId: number): Promise<IAtributoGl
     sufixo: attr.sufixo,
     obrigatorioPadrao: attr.obrigatorioPadrao,
     pesquisavel: attr.pesquisavel,
-    valoresSugeridos: attr.valoresSugeridos
+    valoresSugeridos: attr.valoresSugeridos,
+    ajudaContextual: attr.descricao || undefined,
+    opcoes: Array.isArray(attr.opcoes) ? attr.opcoes : [],
+    qtdItens: Number(attr.qtdItens || 0),
+    qtdVinculos: Number(attr.qtdVinculos || 0),
+    emUso: Boolean(attr.emUso),
   }));
 };
 
@@ -180,6 +185,18 @@ export const updateAtributoGlobal = async (idAtributo: string, data: UpdateAttri
   });
 
   return handleResponse<GenericAttributeAPIResponse>(response, 'Erro ao atualizar o atributo global.');
+};
+
+/**
+ * 🔀 Mesclar atributo duplicado (origem) em outro (destino): valores, vínculos e templates vão para o destino
+ */
+export const mesclarAtributoGlobal = async (idOrigem: string, idDestino: string, tenantId: number = 1): Promise<GenericAttributeAPIResponse> => {
+  const response = await fetch(`${API_BASE_URL}/atributos-globais/${idOrigem}/mesclar`, {
+    method: 'POST',
+    headers: { ...DEFAULT_HEADERS, 'x-tenant-id': String(tenantId) },
+    body: JSON.stringify({ destinoId: idDestino }),
+  });
+  return handleResponse<GenericAttributeAPIResponse>(response, 'Erro ao mesclar os atributos.');
 };
 
 /**

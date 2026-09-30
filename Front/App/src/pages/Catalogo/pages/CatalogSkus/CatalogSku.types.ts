@@ -13,6 +13,9 @@ export interface SkuChildType {
   custo_gerencial: number;
   imagem_url?: string | null;
   status: 'ATIVO' | 'INATIVO' | 'Esgotado' | 'Sem Estoque';
+  // Gatekeeper: pode ir para o PDV/canais? (motivos quando não)
+  publicavel?: boolean;
+  motivos_publicacao?: string[];
 }
 
 export interface ItemParentType {

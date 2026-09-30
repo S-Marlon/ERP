@@ -46,6 +46,7 @@ FilterType,
 import ProductMappingModal, { MappingPayload, getMappedId } from './ProductMappingModal';
 import { TIPOS_RECURSO, TIPO_RECURSO_PADRAO, TipoRecurso, getTipoRecursoConfig } from '../tipoRecurso';
 import { hasCodigoInterno, MSG_SEM_CODIGO_INTERNO } from '../conferencia';
+import { gtinEfetivo, normalizarGtin, situacaoGtin, validarGtin } from '../gtin';
 import {  generateGroupId } from '../helpers';
 import ManageFamiliasModal from './ModalManageFamilias';
 
@@ -68,6 +69,8 @@ onBatchSaveItemsAttributes?: (updatedItems: { tempId: string | number; atributos
 onQuantityChange?: (tempId: string | number, newReceivedQty: number) => void;
 onToggleItem?: (tempId: string | number, confirmed: boolean) => void;
 onChangeGtin?: (tempId: string | number, gtin: string) => void;
+// NF já importada/descartada: tela apenas para consulta
+readOnly?: boolean;
 onSendTotal?: (total: number) => void;
 }
 
@@ -90,6 +93,7 @@ onBatchSaveItemsAttributes,
 onQuantityChange,
 onToggleItem,
 onChangeGtin,
+readOnly = false,
 onSendTotal,
 }) => {
 const [localItems, setLocalItems] = useState<Item[]>(initialItems || []);
@@ -125,20 +129,34 @@ setTotalReceivedAmountFinal(totalReceivedAmountFinal);
 const [inputValue, setInputValue] = useState('');
 // Abre o modal e guarda qual item está sendo editado
 const openBarcodeInputModal = (record: any) => {
+if (readOnly) return;
 setSelectedItemForBarcode(record);
-setInputValue('');
+// Já abre com o GTIN atual (manual ou do XML) para permitir correção
+setInputValue(gtinEfetivo(record.customGtin, (record.prod || record).cEAN) || '');
 setBarcodeModalVisible(true);
 };
 
 // Salva o código de barras no item correspondente no estado da tabela
 const handleSaveCustomGtin = () => {
-if (!inputValue.trim()) {
-message.warning("Digite ou bipa um código de barras válido.");
+const valor = normalizarGtin(inputValue);
+if (!valor) {
+// Campo vazio: remove a correção manual e volta a valer o GTIN do XML
+if (selectedItemForBarcode?.customGtin) {
+onChangeGtin?.(selectedItemForBarcode.tempId, '');
+setBarcodeModalVisible(false);
 return;
 }
+message.warning("Digite ou bipe um código de barras.");
+return;
+}
+if (!validarGtin(valor)) {
+message.error("GTIN inválido: confira os dígitos (tamanho 8, 12, 13 ou 14 e dígito verificador).");
+return;
+}
+setInputValue(valor);
 
 // O pai guarda o GTIN no item, grava na staging e desfaz a conferência
-onChangeGtin?.(selectedItemForBarcode.tempId, inputValue.trim());
+onChangeGtin?.(selectedItemForBarcode.tempId, valor);
 setBarcodeModalVisible(false);
 };
 
@@ -316,6 +334,7 @@ setIsGroupEditModalOpen(true);
 
 // Função para abrir o modal com um ou múltiplos itens (fila)
 const handleOpenMappingModal = (ids: (string | number)[]) => {
+if (readOnly) return;
 // Filtra os itens locais correspondentes aos IDs selecionados ou passados
 const itemsToProcess = localItems.filter(item =>
 ids.includes(item.tempId) || ids.includes(item.nItem as any)
@@ -400,6 +419,7 @@ setSelectedRowKeys(selectedRowKeys.filter(key => key !== record.tempId));
 
 <Dropdown
 trigger={['click']}
+disabled={readOnly}
 menu={{
 selectedKeys: [tipoRecurso],
 items: TIPOS_RECURSO.map(t => ({ key: t.value, label: t.label })),
@@ -424,7 +444,7 @@ key: 'mappedId',
 render: (text, record) => text ? (
 <Tag color="blue">{text}</Tag>
 ) : (
-<Button size="small" type="link" icon={<LinkOutlined />} onClick={() => handleOpenMappingModal([record.tempId])}>
+<Button size="small" type="link" icon={<LinkOutlined />} disabled={readOnly} onClick={() => handleOpenMappingModal([record.tempId])}>
 Vincular
 </Button>
 )
@@ -436,21 +456,16 @@ key: 'productInfo',
 width: 150,
 render: (_, record: any) => {
 const prodData = record.prod || record;
-const gtin = prodData.cEAN && prodData.cEAN !== 'SEM GTIN' ? prodData.cEAN : null;
-
-// Supondo que você possa ter salvo um gtin customizado no estado local ou no record
-const customGtin = record.customGtin || null;
+// GTIN efetivo: o informado manualmente tem prioridade sobre o do XML
+const gtin = gtinEfetivo(record.customGtin, prodData.cEAN);
+const origem = record.customGtin ? 'Manual' : 'XML';
+const situacao = situacaoGtin(gtin);
 
 return (
 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
 <Text type="secondary" style={{ fontSize: 10 }}>Cód: {prodData.cProd}</Text>
 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-
-{gtin ? (
-<Tag color="blue" style={{ fontSize: 10, margin: 0 }}>GTIN: {gtin}</Tag>
-) : customGtin ? (
-<Tag color="success" style={{ fontSize: 10, margin: 0 }}>GTIN (Manual): {customGtin}</Tag>
-) : (
+{situacao === 'AUSENTE' ? (
 <Tag
 color="warning"
 style={{ fontSize: 10, margin: 0, cursor: 'pointer' }}
@@ -458,6 +473,16 @@ onClick={() => openBarcodeInputModal(record)}
 >
 ⚠️ Sem GTIN (Clique para bipar)
 </Tag>
+) : (
+<Tooltip title={situacao === 'VALIDO' ? 'Clique para corrigir' : 'Dígito verificador não confere. Clique para corrigir.'}>
+<Tag
+color={situacao === 'INVALIDO' ? 'error' : origem === 'Manual' ? 'success' : 'blue'}
+style={{ fontSize: 10, margin: 0, cursor: 'pointer' }}
+onClick={() => openBarcodeInputModal(record)}
+>
+{situacao === 'INVALIDO' ? '❌ ' : ''}GTIN ({origem}): {gtin}
+</Tag>
+</Tooltip>
 )}
 </div>
 </div>
@@ -530,6 +555,7 @@ return (
 <InputNumber
 size="small"
 min={0}
+disabled={readOnly}
 value={receivedQty}
 onChange={(newVal) => newVal !== null && onQuantityChange?.(record.tempId, newVal)}
 style={{ width: 55 }}
@@ -671,6 +697,7 @@ const diff = record.difference || 0;
 const podeConferir = isItemValidForConference(record);
 
 const handleToggleConference = (newConfirmedState: boolean) => {
+if (readOnly) return;
 if (newConfirmedState && !podeConferir) {
 message.warning(MSG_SEM_CODIGO_INTERNO);
 return;
@@ -687,6 +714,7 @@ return (
 type="text"
 size="small"
 icon={<CheckOutlined style={{ color: '#52c41a' }} />}
+disabled={readOnly}
 onClick={() => handleToggleConference(false)}
 />
 </Tooltip>
@@ -695,7 +723,7 @@ onClick={() => handleToggleConference(false)}
 <Button
 type="text"
 size="small"
-disabled={!podeConferir}
+disabled={readOnly || !podeConferir}
 icon={<PaperClipOutlined style={{ color: !podeConferir ? '#d9d9d9' : diff !== 0 ? '#faad14' : '#bfbfbf' }} />}
 onClick={() => handleToggleConference(true)}
 />
@@ -744,30 +772,30 @@ Gerenciar Famílias ({localGroups.length})
 <Space wrap style={{ background: '#fafafa', padding: 6, borderRadius: 6, border: '1px solid #f0f0f0', justifyContent: 'space-between' }}>
 <Space wrap>
 <Text strong>{`${selectedRowKeys.length} selecionado(s)`}</Text>
-<Button size="small" type="primary" icon={<CheckOutlined />} disabled={selectedRowKeys.length === 0} onClick={() => { onConfirmItems?.(selectedRowKeys); setSelectedRowKeys([]); }}>Conferir</Button>
-<Button size="small" icon={<UndoOutlined />} disabled={selectedRowKeys.length === 0} onClick={() => { onUnconfirmItems?.(selectedRowKeys); setSelectedRowKeys([]); }}>Desfazer</Button>
+<Button size="small" type="primary" icon={<CheckOutlined />} disabled={readOnly || selectedRowKeys.length === 0} onClick={() => { onConfirmItems?.(selectedRowKeys); setSelectedRowKeys([]); }}>Conferir</Button>
+<Button size="small" icon={<UndoOutlined />} disabled={readOnly || selectedRowKeys.length === 0} onClick={() => { onUnconfirmItems?.(selectedRowKeys); setSelectedRowKeys([]); }}>Desfazer</Button>
 <Button
 size="small"
 icon={<LinkOutlined />}
-disabled={selectedRowKeys.length === 0}
+disabled={readOnly || selectedRowKeys.length === 0}
 onClick={() => handleOpenMappingModal(selectedRowKeys)}
 >
 Vincular Selecionados
 </Button>
 <Dropdown
 trigger={['click']}
-disabled={selectedRowKeys.length === 0}
+disabled={readOnly || selectedRowKeys.length === 0}
 menu={{
 items: TIPOS_RECURSO.map(t => ({ key: t.value, label: t.label })),
 onClick: ({ key }) => { onChangeTipoRecurso?.(selectedRowKeys as (string | number)[], key as TipoRecurso); setSelectedRowKeys([]); },
 }}
 >
-<Button size="small" icon={<SwapOutlined />} disabled={selectedRowKeys.length === 0}>Tipo de Entrada</Button>
+<Button size="small" icon={<SwapOutlined />} disabled={readOnly || selectedRowKeys.length === 0}>Tipo de Entrada</Button>
 </Dropdown>
 <Button
 size="small"
 icon={<FolderAddOutlined />}
-disabled={selectedRowKeys.length === 0}
+disabled={readOnly || selectedRowKeys.length === 0}
 onClick={() => setIsUnifiedFamiliaOpen(true)}
 >
 Definir Grupo em Lote

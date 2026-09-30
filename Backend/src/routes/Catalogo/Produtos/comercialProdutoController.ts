@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { carregarOpcoes, gravarValorAtributo } from '../Atributos/valoresAtributo';
 import pool from '../../Estoque/db.config';
 
 /**
@@ -45,8 +46,12 @@ export const updateProdutoFamiliaEAtributos = async (req: Request, res: Response
 
       // 1️⃣ Localiza o ID real do produto na `itens_core` usando o SKU informado pelo front
       const [checkItem] = await connection.execute(
-        `SELECT id_item FROM itens_core WHERE sku = ? AND tenant_id = ? LIMIT 1`,
-        [skuLimpo, tenantId]
+        // O front envia o SKU exibido (customizado ou, na falta dele, o raiz)
+        `SELECT ic.id_item FROM itens_core ic
+         LEFT JOIN comercial_produtos_dados cpd ON cpd.id_item = ic.id_item AND cpd.tenant_id = ic.tenant_id
+         WHERE ic.tenant_id = ? AND (cpd.sku_customizado = ? OR ic.sku = ?)
+         ORDER BY (cpd.sku_customizado = ?) DESC LIMIT 1`,
+        [tenantId, skuLimpo, skuLimpo, skuLimpo]
       );
 
       const itemFound = (checkItem as any[])[0];
@@ -88,7 +93,7 @@ export const updateProdutoFamiliaEAtributos = async (req: Request, res: Response
       if (Array.isArray(itemProc.atributos) && itemProc.atributos.length > 0) {
         for (const attrUser of itemProc.atributos) {
           const [attrRows] = await connection.execute(
-            `SELECT id FROM atributos_comercial WHERE tenant_id = ? AND UPPER(nome) = UPPER(?) LIMIT 1`,
+            `SELECT id, nome, tipo FROM atributos_comercial WHERE tenant_id = ? AND UPPER(nome) = UPPER(?) LIMIT 1`,
             [tenantId, attrUser.nome]
           );
 
@@ -98,27 +103,12 @@ export const updateProdutoFamiliaEAtributos = async (req: Request, res: Response
           const atributoId = attrFound.id;
           const valorFormatado = String(attrUser.valor).trim().toUpperCase();
 
-          const [valCheck] = await connection.execute(
-            `SELECT id FROM atributos_comercial_valores 
-             WHERE tenant_id = ? AND tipo_entidade = 'produto' AND id_entidade = ? AND atributo_id = ?`,
-            [tenantId, itemIdReal, atributoId]
+          // Valor gravado na coluna do tipo do atributo (número, decimal, opção...)
+          const opcoes = await carregarOpcoes(connection as any, tenantId, [atributoId]);
+          await gravarValorAtributo(
+            connection as any, tenantId, 'produto', itemIdReal,
+            { id: atributoId, nome: attrFound.nome, tipo: attrFound.tipo }, valorFormatado, opcoes.get(String(atributoId)) || []
           );
-
-          if ((valCheck as any[]).length > 0) {
-            await connection.execute(
-              `UPDATE atributos_comercial_valores 
-               SET valor_texto = ? 
-               WHERE tenant_id = ? AND tipo_entidade = 'produto' AND id_entidade = ? AND atributo_id = ?`,
-              [valorFormatado, tenantId, itemIdReal, atributoId]
-            );
-          } else {
-            await connection.execute(
-              `INSERT INTO atributos_comercial_valores 
-               (tenant_id, atributo_id, tipo_entidade, id_entidade, valor_texto) 
-               VALUES (?, ?, 'produto', ?, ?)`,
-              [tenantId, atributoId, itemIdReal, valorFormatado]
-            );
-          }
         }
       }
     }  // 👈 Fechamento correto do loop `for (const itemProc of itensParaProcessar)`

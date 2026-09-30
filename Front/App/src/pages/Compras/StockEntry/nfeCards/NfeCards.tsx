@@ -50,6 +50,7 @@ interface NfeCardsProps {
   };
   onUpdateFreteAdicional?: (dados: { valor: number; metodo: string; observacao: string }) => void;
   valorTotalFrete: number;
+  readOnly?: boolean;
 }
 
 const { Text, Title } = Typography;
@@ -128,7 +129,7 @@ const nfStatus = {
   isRegular: false // Força como falso para o alerta aparecer sempre
 };
 
-const NfeCards: React.FC<NfeCardsProps> = ({ data, supplierStatus, actions, freteAdicionalData, valorTotalFrete, onUpdateFreteAdicional }) => {
+const NfeCards: React.FC<NfeCardsProps> = ({ data, supplierStatus, actions, freteAdicionalData, valorTotalFrete, onUpdateFreteAdicional, readOnly = false }) => {
 
   const { emitente } = data;
   const [isNfDetailsOpen, setIsNfDetailsOpen] = useState(false);
@@ -354,7 +355,7 @@ const [valorFreteAdicional, setValorFreteAdicional] = useState(freteAdicionalDat
   label={
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: 8 }}>
       <span>Frete Adicional</span>
-      {!isEditingFreteAdicional && (
+      {!isEditingFreteAdicional && !readOnly && (
         <Button 
           type="text" 
           size="small" 

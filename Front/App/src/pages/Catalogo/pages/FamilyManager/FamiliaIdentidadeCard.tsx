@@ -26,8 +26,8 @@ interface FamiliaIdentidadeCardProps {
     curvaAbc?: string;
     comportamentoMarca?: string;
     prioridadeExposicao?: string;
-    // Novo campo para o DNA Estrutural Macro
-    dnaEstruturalMacro?: string;
+    unidadeMedidaBase?: string;
+    atributos?: Array<{ nome: string; classificacao?: string; valorPadraoFamilia?: string; valorPadraoGrupo?: string }>;
   };
   grupoImage?: string;
   brandColor?: string;
@@ -48,7 +48,8 @@ export const FamiliaIdentidadeCard: React.FC<FamiliaIdentidadeCardProps> = ({
     if (grupoSelecionado && isModalOpen) {
       form.setFieldsValue({
         nome: grupoSelecionado.nome,
-        unidadeBase: grupoSelecionado.unidadeBase,
+        status: grupoSelecionado.status,
+        unidadeBase: grupoSelecionado.unidadeMedidaBase ?? grupoSelecionado.unidadeBase,
         tipoItem: grupoSelecionado.tipoItem,
         ncmPadrao: grupoSelecionado.ncmPadrao,
         cestPadrao: grupoSelecionado.cestPadrao,
@@ -63,7 +64,6 @@ export const FamiliaIdentidadeCard: React.FC<FamiliaIdentidadeCardProps> = ({
         curvaAbc: grupoSelecionado.curvaAbc,
         comportamentoMarca: grupoSelecionado.comportamentoMarca,
         prioridadeExposicao: grupoSelecionado.prioridadeExposicao,
-        dnaEstruturalMacro: grupoSelecionado.dnaEstruturalMacro,
       });
     }
   }, [grupoSelecionado, grupoImage, brandColor, form, isModalOpen]);
@@ -84,6 +84,8 @@ export const FamiliaIdentidadeCard: React.FC<FamiliaIdentidadeCardProps> = ({
         onSalvarIdentidade({
           id: grupoSelecionado?.id,
           ...values,
+          // A família guarda a unidade em 'unidadeMedidaBase'
+          unidadeMedidaBase: values.unidadeBase,
         });
       }
       setIsModalOpen(false);
@@ -92,7 +94,7 @@ export const FamiliaIdentidadeCard: React.FC<FamiliaIdentidadeCardProps> = ({
       const errorFields = error?.errorFields;
       if (errorFields && errorFields.length > 0) {
         const primeiroCampoComErro = errorFields[0].name[0];
-        if (['nome', 'imagem', 'unidadeBase', 'tipoItem', 'dnaEstruturalMacro'].includes(primeiroCampoComErro)) {
+        if (['nome', 'status', 'imagem', 'unidadeBase', 'tipoItem'].includes(primeiroCampoComErro)) {
           setActiveTab('1');
         } else if (['comportamentoMarca', 'prioridadeExposicao'].includes(primeiroCampoComErro)) {
           setActiveTab('2');
@@ -209,7 +211,14 @@ export const FamiliaIdentidadeCard: React.FC<FamiliaIdentidadeCardProps> = ({
               <Tag color="green" style={{ fontSize: '9px', margin: 0, border: 'none' }}>Norma / Série</Tag>
             </div>
             <Text style={{ color: '#14532d', fontSize: '12px', fontWeight: 700, display: 'block' }}>
-              {grupoSelecionado?.dnaEstruturalMacro || "Ex: Aço Galvanizado / Série 6200 (Não definido)"}
+              {(() => {
+                // DNA = atributos de papel DNA com o valor fixo da família (ex: Material: NBR)
+                const dna = (grupoSelecionado?.atributos || []).filter(a => a.classificacao === 'dna');
+                if (dna.length === 0) return 'Nenhum atributo de DNA configurado';
+                return dna
+                  .map(a => `${a.nome}: ${a.valorPadraoFamilia || a.valorPadraoGrupo || '(sem valor fixo)'}`)
+                  .join(' · ');
+              })()}
             </Text>
           </div>
           </div>
@@ -446,13 +455,21 @@ export const FamiliaIdentidadeCard: React.FC<FamiliaIdentidadeCardProps> = ({
                       <Input placeholder="Ex: Rolamento Rígido de Esferas" />
                     </Form.Item>
 
-                    <Form.Item 
-                      name="dnaEstruturalMacro" 
-                      label="DNA Estrutural Macro (Herdado do Pai)"
-                      tooltip="Material base, norma construtiva ou série técnica que desce em cascata."
+                    <Form.Item
+                      name="status"
+                      label="Status da Família"
+                      tooltip="Rascunho: em estruturação, fora do PDV e dos canais. Bloqueada: definida pelo sistema quando faltam regras mínimas."
                     >
-                      <Input placeholder="Ex: Aço Galvanizado, Série 6200, SAE 100 R2" />
+                      <Select
+                        options={[
+                          { value: 'RASCUNHO', label: 'Rascunho (em estruturação)' },
+                          { value: 'ATIVO', label: 'Ativa' },
+                          { value: 'INATIVO', label: 'Inativa' },
+                          { value: 'BLOQUEADO_INCONSISTENCIA', label: 'Bloqueada por inconsistência', disabled: true },
+                        ]}
+                      />
                     </Form.Item>
+
 
                     <Form.Item name="imagem" label="URL da Imagem da Família">
                       <Input placeholder="https://..." prefix={<PictureOutlined />} />

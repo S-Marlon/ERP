@@ -33,6 +33,11 @@ export const runStagingRestoreTests = (): void => {
   assert(i2.tipoRecurso === 'CONSUMO' && i2.isConfirmed === false, 'Item sem código interno não pode voltar conferido.');
   assert(i3.receivedQuantity === undefined, 'Item sem linha na staging deveria ficar como veio do XML.');
 
+  const aprovado = restaurarItensDoStaging([{ nItem: '1', quantidade: 4 }], [
+    { item_nfe_seq: '1', quantidade_recebida: 4, is_confirmed: 1, produto_id_sistema: 45, sku_sistema: null, sku_sugerido: '000000114694B' },
+  ]);
+  assert((aprovado.items[0] as any).mappedId === '000000114694B', 'Item novo já aprovado deveria exibir o SKU criado, não o id.');
+
   const frete = lerFreteAdicionalSalvo('{"valor":"12.5","metodo":"PAC","observacao":"","modo_rateio":"equal"}');
   assert(frete?.valor === 12.5 && frete.modo_rateio === 'equal', 'Frete adicional salvo deveria ser lido com o modo de rateio.');
   assert(lerFreteAdicionalSalvo(null) === null, 'Sem frete salvo deveria retornar null.');

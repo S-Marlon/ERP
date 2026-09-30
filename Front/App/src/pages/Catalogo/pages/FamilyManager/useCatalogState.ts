@@ -268,16 +268,18 @@ try {
 setLoading(true);
 const atributosHerdados = await getAtributosDaCategoria(novaCategoriaId, 1);
 
+// Todos os efetivos da cadeia de categorias (o backend já aplica ajustes e bloqueios por ramo)
 const novosAtributosObrigatorios: AtributoConfig[] = atributosHerdados
-  .filter((attr) => Boolean(attr.obrigatorio))
   .map((attr) => ({
     id: String(attr.id || ""),
     nome: attr.nome || "Atributo",
     tipoDado: attr.tipoDado || "texto",
-    classificacao: attr.compoeSku ? "dna" : "ficha",
+    classificacao: attr.classificacao || "ficha",
     separadorSufixo: attr.separadorSufixo || "nenhum",
     sufixo: attr.sufixo || "",
-    obrigatorio: true,
+    obrigatorio: Boolean(attr.obrigatorio),
+    // Vem da categoria: exibido na família, mas não é gravado como atributo próprio
+    origem: "herdados",
     geraVariacao: Boolean(attr.geraVariacao),
     compoeSku: Boolean(attr.compoeSku),
     ordemSku: 0,
@@ -288,7 +290,8 @@ const novosAtributosObrigatorios: AtributoConfig[] = atributosHerdados
 setFamilias((prev) =>
   prev.map((g) => {
     if (String(g.id) !== String(familiaSelecionadaId)) return g;
-    const atributosFiltrados = g.atributos.filter((attr) => !attr.valorHerdadoDaFamilia);
+    // Troca de categoria: saem os herdados da categoria anterior, ficam os próprios da família
+    const atributosFiltrados = g.atributos.filter((attr) => attr.origem !== "herdados");
     return {
       ...g,
       categoriaPai: novaCategoriaId,

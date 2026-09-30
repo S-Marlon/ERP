@@ -63,6 +63,8 @@ export const getProdutos = async (tenantId: number = 1): Promise<ItemParentType[
       custo_gerencial: toNumber(item.custo_gerencial ?? 0, 0),
       status: estoque === 0 ? 'Esgotado' : (itemStatus === 'INATIVO' ? 'INATIVO' : 'ATIVO'),
       imagem_url: typeof item.imagem_url === 'string' ? item.imagem_url : null,
+      publicavel: item.publicavel !== false,
+      motivos_publicacao: Array.isArray(item.motivos_publicacao) ? item.motivos_publicacao as string[] : [],
     }];
 
     return {
@@ -117,6 +119,183 @@ export const updateProduto = async (
   return response.json();
 };
 
+
+/**
+ * 📄 GET /produtos/:id_item/detalhe
+ * Ficha completa do item (core, comercial, logística, fiscal, estoque, GTINs e fornecedores)
+ */
+export interface ProdutoDetalhe {
+  item: {
+    id_item: number;
+    sku_core: string;
+    nome_core: string;
+    tipo_recurso: string;
+    status: string;
+    descricao_variacao: string | null;
+    peso_liquido: number | null;
+    peso_bruto: number | null;
+    unidade_sigla: string | null;
+    unidade_descricao: string | null;
+    sku_customizado: string | null;
+    nome_comercial: string | null;
+    descricao_comercial: string | null;
+    categoria_id: number | null;
+    familia_id: number | null;
+    id_marca: number | null;
+    custo_gerencial: number | null;
+    preco_venda: number | null;
+    margem_lucro: number | null;
+    exibir_no_pdv: boolean;
+    pode_vender_sem_estoque: boolean;
+    altura_cm: number | null;
+    largura_cm: number | null;
+    comprimento_cm: number | null;
+    ncm: string | null;
+    cest: string | null;
+    origem_mercadoria: number | null;
+    cfop_padrao: string | null;
+    quantidade_atual: number;
+    custo_medio: number | null;
+    ultimo_custo: number | null;
+  };
+  movimentos: Array<{
+    id_movimento: number;
+    tipo_movimento: string;
+    origem: string;
+    documento_origem: string | null;
+    quantidade: number;
+    quantidade_documento: number | null;
+    unidade_documento: string | null;
+    fator_conversao: number;
+    custo_unitario: number;
+    saldo_posterior: number;
+    observacao: string | null;
+    created_at: string;
+  }>;
+  gtins: Array<{ sigla: string; gtin: string; nome_exibicao: string | null }>;
+  anexos: AnexoItem[];
+  // Gatekeeper: se o item pode ir para o PDV/canais e, se não, por quê
+  publicacao: { publicavel: boolean; motivos: string[] };
+  fornecedores: Array<{
+    id_fornecedor: number;
+    nome: string | null;
+    cnpj: string | null;
+    codigo_produto_fornecedor: string | null;
+    unidade_compra: string | null;
+    fator_compra: number;
+    preco_ultima_compra: number | null;
+    padrao: boolean;
+  }>;
+}
+
+/**
+ * Ficha técnica do item: atributos da categoria + família com os valores do item
+ */
+export interface AtributoFicha {
+  atributoId: number;
+  nome: string;
+  codigo: string | null;
+  tipo: 'texto' | 'numero' | 'decimal' | 'boolean' | 'lista' | 'data' | string;
+  papel: 'dna' | 'grade' | 'ficha' | string;
+  obrigatorio: boolean;
+  origem: 'categoria' | 'familia';
+  valorFixo: string | null;
+  valor: string | null;
+  opcoes: string[];
+}
+
+export interface FichaTecnica {
+  familia: { id: number; nome: string; status: string } | null;
+  categoria: { id: number; nome: string } | null;
+  atributos: AtributoFicha[];
+  estaticos: Array<{ atributoId: number; nome: string; codigo: string | null; tipo: string; valor: string | null }>;
+}
+
+export const getFichaTecnica = async (idItem: number, tenantId: number = 1): Promise<FichaTecnica> =>
+  handleResponse<FichaTecnica>(
+    await fetch(`${API_BASE_URL}/produtos/${idItem}/ficha-tecnica?tenant_id=${tenantId}`, { headers: DEFAULT_HEADERS }),
+    'Erro ao carregar a ficha técnica.'
+  );
+
+// valores: { [atributoId]: valor } — null/vazio remove o valor do item
+export const salvarFichaTecnica = async (idItem: number, valores: Record<number, unknown>, tenantId: number = 1): Promise<FichaTecnica> =>
+  handleResponse<FichaTecnica>(
+    await fetch(`${API_BASE_URL}/produtos/${idItem}/ficha-tecnica?tenant_id=${tenantId}`, {
+      method: 'PUT', headers: DEFAULT_HEADERS, body: JSON.stringify({ valores }),
+    }),
+    'Erro ao salvar a ficha técnica.'
+  );
+
+export type TipoAnexo ='IMAGEM_PRINCIPAL' | 'FOTO_GALERIA' | 'MANUAL_TECNICO' | 'CERTIFICADO' | 'FISPQ';
+
+export interface AnexoItem {
+  id_anexo: number;
+  tipo_anexo: TipoAnexo;
+  nome_arquivo: string;
+  url_anexo: string;
+  ordem: number;
+}
+
+// Anexos guardam só o link do arquivo hospedado (o serviço de upload virá depois, gravando a mesma URL)
+export const adicionarAnexo = async (idItem: number, url: string, tipo: TipoAnexo, nome?: string, tenantId: number = 1) =>
+  handleResponse<GenericProductAPIResponse>(
+    await fetch(`${API_BASE_URL}/produtos/${idItem}/anexos?tenant_id=${tenantId}`, {
+      method: 'POST', headers: DEFAULT_HEADERS, body: JSON.stringify({ url, tipo, nome }),
+    }),
+    'Erro ao adicionar o anexo.'
+  );
+
+export const removerAnexo = async (idItem: number, idAnexo: number, tenantId: number = 1) =>
+  handleResponse<GenericProductAPIResponse>(
+    await fetch(`${API_BASE_URL}/produtos/${idItem}/anexos/${idAnexo}?tenant_id=${tenantId}`, { method: 'DELETE', headers: DEFAULT_HEADERS }),
+    'Erro ao remover o anexo.'
+  );
+
+export const definirImagemPrincipal = async (idItem: number, idAnexo: number, tenantId: number = 1) =>
+  handleResponse<GenericProductAPIResponse>(
+    await fetch(`${API_BASE_URL}/produtos/${idItem}/anexos/${idAnexo}/principal?tenant_id=${tenantId}`, { method: 'PUT', headers: DEFAULT_HEADERS }),
+    'Erro ao definir a imagem principal.'
+  );
+
+export const getProdutoDetalhe = async (idItem: number, tenantId: number = 1): Promise<ProdutoDetalhe> => {
+  const response = await fetch(`${API_BASE_URL}/produtos/${idItem}/detalhe?tenant_id=${tenantId}`, { headers: DEFAULT_HEADERS });
+  const dados = await handleResponse<Partial<ProdutoDetalhe>>(response, 'Erro ao carregar a ficha do produto.');
+  if (!dados.item) throw new Error('A ficha do produto veio incompleta do servidor.');
+  // Listas sempre presentes: tolera backend desatualizado ou item sem dados em alguma seção
+  return {
+    item: dados.item,
+    movimentos: Array.isArray(dados.movimentos) ? dados.movimentos : [],
+    gtins: Array.isArray(dados.gtins) ? dados.gtins : [],
+    fornecedores: Array.isArray(dados.fornecedores) ? dados.fornecedores : [],
+    anexos: Array.isArray(dados.anexos) ? dados.anexos : [],
+    publicacao: dados.publicacao ?? { publicavel: true, motivos: [] },
+  };
+};
+
+export interface OpcaoCadastro {
+  value: number;
+  label: string;
+}
+
+/**
+ * Listas usadas nos selects da ficha (marcas, categorias e famílias)
+ */
+export const getListasCadastro = async (tenantId: number = 1) => {
+  const buscar = async (caminho: string) => {
+    const response = await fetch(`${API_BASE_URL}/${caminho}?tenant_id=${tenantId}`, { headers: DEFAULT_HEADERS });
+    return handleResponse<Record<string, unknown>[]>(response, `Erro ao carregar ${caminho}.`);
+  };
+  const [marcas, categorias, familias] = await Promise.all([
+    buscar('marcas'),
+    buscar('cadastros/categorias'),
+    buscar('cadastros/familias'),
+  ]);
+  const opcoes = (lista: Record<string, unknown>[]): OpcaoCadastro[] =>
+    lista
+      .map(r => ({ value: toNumber(r.id, 0), label: String(r.nome ?? '') }))
+      .filter(o => o.value > 0 && o.label);
+  return { marcas: opcoes(marcas), categorias: opcoes(categorias), familias: opcoes(familias) };
+};
 
 /**
  * 🧬 GET /produtos/:id_item/atributos

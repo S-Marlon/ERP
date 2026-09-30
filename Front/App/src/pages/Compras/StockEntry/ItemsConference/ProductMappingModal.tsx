@@ -33,6 +33,8 @@ import { TIPOS_RECURSO, TIPO_RECURSO_PADRAO, getTipoRecursoConfig } from "../tip
 import { buscarItensCatalogo, ItemCatalogoBusca } from "../../api/comprasApi";
 import ProductCommercialSalesConfig from "../../../Catalogo/pages/ProductPricingModule/ProductCommercialSalesConfig";
 import type { SalvarConfigPayload } from "../../../Catalogo/pages/ProductPricingModule/configVendas.api";
+import { getFamilies } from "../../../Catalogo/pages/FamilyManager/FamilyManager.api";
+import { STATUS_FAMILIA_CONFIG } from "../../../Catalogo/pages/FamilyManager/CatalogManager.types";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -75,6 +77,7 @@ export interface MappingPayload {
   configVendas: SalvarConfigPayload | null;
   draftIdentity: {
     tipo_recurso: string;
+    familia_id: number | null;
     nome_comercial: string;
     nome_interno: string;
     sku_interno: string;
@@ -123,6 +126,15 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
 
   // Identidade do Recurso (`itens_core`)
   const [draftTipoRecurso, setDraftTipoRecurso] = useState<string>(currentItem.tipoRecurso || TIPO_RECURSO_PADRAO);
+  // Família do item novo (opcional): já entra classificado no PIM
+  const [draftFamiliaId, setDraftFamiliaId] = useState<number | null>(null);
+  const [familias, setFamilias] = useState<Array<{ id: number; nome: string; status: string; categoria: string }>>([]);
+
+  useEffect(() => {
+    getFamilies()
+      .then(lista => setFamilias(lista.map(f => ({ id: Number(f.id), nome: f.nome, status: f.status, categoria: f.categoriaPaiNome || '' }))))
+      .catch(() => setFamilias([]));
+  }, []);
   const [draftCommercialName, setDraftCommercialName] = useState(currentItem.descricao || "");
   const [draftInternalName, setDraftInternalName] = useState(currentItem.descricao || "");
   const [draftInternalSku, setDraftInternalSku] = useState(currentItem.sku || "");
@@ -157,6 +169,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
       setDraftInternalSku(currentItem.sku || "");
       setDraftCommercialSku("");
       setDraftTipoRecurso(currentItem.tipoRecurso || TIPO_RECURSO_PADRAO);
+      setDraftFamiliaId(null);
       setDraftUnidade(1);
       setStep1Mode(null);
       setSelectedExisting(null);
@@ -273,6 +286,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
       configVendas: step1Mode === "DRAFT" ? configVendasRascunho : null,
       draftIdentity: step1Mode === "DRAFT" ? {
         tipo_recurso: draftTipoRecurso,
+        familia_id: draftFamiliaId,
         nome_comercial: draftCommercialName.trim(),
         nome_interno: draftInternalName.trim(),
         sku_interno: draftInternalSku.trim(),
@@ -604,6 +618,30 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({
                           </div>
                         </Col>
                       </Row>
+
+                      {/* Família (opcional): o item já entra classificado no PIM */}
+                      <div style={{ padding: '8px 10px', backgroundColor: '#f6f8ff', border: '1px solid #adc6ff', borderRadius: '6px' }}>
+                        <Text strong style={{ fontSize: '11px', color: '#1d39c4' }}>Família (opcional)</Text>
+                        <Select
+                          size="small"
+                          allowClear
+                          showSearch
+                          optionFilterProp="label"
+                          placeholder="Sem família (classificar depois)"
+                          style={{ width: '100%', marginTop: 2 }}
+                          value={draftFamiliaId ?? undefined}
+                          onChange={(v) => setDraftFamiliaId(v ?? null)}
+                          options={familias.map(f => ({
+                            value: f.id,
+                            label: `${f.nome}${f.categoria ? ` · ${f.categoria}` : ''}${f.status !== 'ATIVO' ? ` (${STATUS_FAMILIA_CONFIG[f.status as keyof typeof STATUS_FAMILIA_CONFIG]?.label || f.status})` : ''}`,
+                          }))}
+                        />
+                        {draftFamiliaId && familias.find(f => f.id === draftFamiliaId)?.status !== 'ATIVO' && (
+                          <Text type="warning" style={{ fontSize: 10, display: 'block', marginTop: 2 }}>
+                            Família não está ativa: o item entra no estoque, mas não é publicado até a família ser ativada.
+                          </Text>
+                        )}
+                      </div>
 
                       {/* LINHA 3: SKU Customizado (Gerado/Editável) */}
                       <Row gutter={8}>

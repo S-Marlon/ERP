@@ -2,9 +2,11 @@ import { Request, Response } from 'express';
 import db from '../../Estoque/db.config';
 import { obterOuCriarUnidade, gravarConfigVendas, FaixaPayload, UnidadePayload } from '../../Catalogo/Vendas/configVendas.controller';
 import { recalcularFaixas } from '../../Catalogo/Vendas/precificacao';
+import { validarGtin } from '../staging/gtin';
 import {
   avaliarPenteFino,
   calcularCustoMedio,
+  gtinDoItem,
   isItemNovo,
   lerConversaoCompra,
   lerMapeamento,
@@ -82,10 +84,25 @@ const montarContexto = async (conn: Conn, tenant: number, lote: any, itens: Stag
       [tenant, ...skus]
     );
     rows.forEach((r: any) => skusExistentes.add(String(r.sku).toUpperCase()));
+    const [customizados] = await conn.execute(
+      `SELECT sku_customizado FROM comercial_produtos_dados WHERE tenant_id = ? AND sku_customizado IN (${skus.map(() => '?').join(',')})`,
+      [tenant, ...skus]
+    );
+    customizados.forEach((r: any) => skusExistentes.add(String(r.sku_customizado).toUpperCase()));
+  }
+
+  const gtinsEmUso = new Map<string, number>();
+  const gtins = [...new Set(itens.map(gtinDoItem).filter((g): g is string => g !== null && validarGtin(g)))];
+  if (gtins.length > 0) {
+    const [rows] = await conn.execute(
+      `SELECT gtin, id_item FROM comercial_unidades_venda WHERE tenant_id = ? AND gtin IN (${gtins.map(() => '?').join(',')})`,
+      [tenant, ...gtins]
+    );
+    rows.forEach((r: any) => gtinsEmUso.set(String(r.gtin), Number(r.id_item)));
   }
 
   const idFornecedor = await buscarFornecedorId(conn, lote.cnpj_fornecedor, tenant);
-  const ctx: PenteFinoContexto = { idsItensExistentes, skusExistentes, fornecedorCadastrado: idFornecedor !== null };
+  const ctx: PenteFinoContexto = { idsItensExistentes, skusExistentes, fornecedorCadastrado: idFornecedor !== null, gtinsEmUso };
   return { ctx, idFornecedor };
 };
 
@@ -229,14 +246,31 @@ export const aprovarLote = async (req: Request, res: Response): Promise<Response
 
           // Item novo: o custo desta entrada já nasce como custo gerencial (base do preço de venda)
           const draft = mapeamento.draftIdentity || {};
+
+          // Família escolhida no mapeamento (ignorada se tiver sido excluída depois)
+          let familiaId: number | null = null;
+          let categoriaId: number | null = null;
+          if (draft.familia_id) {
+            const [famRows] = await connection.execute(
+              `SELECT id, categoria_id FROM comercial_familias WHERE id = ? AND tenant_id = ?`,
+              [draft.familia_id, tenant]
+            );
+            if (famRows[0]) {
+              familiaId = Number(famRows[0].id);
+              categoriaId = famRows[0].categoria_id ? Number(famRows[0].categoria_id) : null;
+            }
+          }
           await connection.execute(
-            `INSERT INTO comercial_produtos_dados (tenant_id, id_item, sku_customizado, nome_comercial, custo_gerencial)
-             VALUES (?, ?, ?, ?, ?)`,
+            `INSERT INTO comercial_produtos_dados (tenant_id, id_item, sku_customizado, nome_comercial, custo_gerencial, familia_id, categoria_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
             [
               tenant, idItem,
-              String(draft.sku_comercial || '').trim() || null,
+              // SKU raiz é a identidade (oculta); o customizado é o código que o operador vê e pode editar
+              String(draft.sku_comercial || '').trim() || sku,
               String(draft.nome_comercial || '').trim() || null,
-              custoUnitario > 0 ? custoUnitario.toFixed(4) : null
+              custoUnitario > 0 ? custoUnitario.toFixed(4) : null,
+              familiaId,
+              categoriaId
             ]
           );
 
@@ -266,6 +300,17 @@ export const aprovarLote = async (req: Request, res: Response): Promise<Response
         }
       }
 
+      // Dados fiscais da NF (NCM/CEST): preenche o item sem sobrescrever o que já foi cadastrado/corrigido
+      if (item.ncm_original || item.cest_original) {
+        await connection.execute(
+          `INSERT INTO itens_dados_fiscais (id_item, tenant_id, ncm, cest)
+           VALUES (?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE ncm = COALESCE(NULLIF(ncm, ''), VALUES(ncm)),
+                                   cest = COALESCE(NULLIF(cest, ''), VALUES(cest))`,
+          [idItem, tenant, item.ncm_original || null, item.cest_original || null]
+        );
+      }
+
       // Embalagem de compra diferente da base vira unidade derivada do item (ex: 1 CX = 50 UN)
       if (conversao.fator !== 1 && conversao.unidadeCompra !== conversao.unidadeBase) {
         const idUnidadeCompra = await obterOuCriarUnidade(connection, tenant, conversao.unidadeCompra);
@@ -275,6 +320,27 @@ export const aprovarLote = async (req: Request, res: Response): Promise<Response
            ON DUPLICATE KEY UPDATE fator_conversao = VALUES(fator_conversao)`,
           [tenant, idItem, idUnidadeCompra, conversao.fator]
         );
+      }
+
+      // GTIN válido (manual ou do XML) vai para a unidade de compra do item, se não estiver em outro item/unidade
+      const gtin = gtinDoItem(item);
+      if (gtin && validarGtin(gtin)) {
+        const idUnidadeCompra = await obterOuCriarUnidade(connection, tenant, conversao.unidadeCompra);
+        const [uso] = await connection.execute(
+          `SELECT id_item, id_unidade FROM comercial_unidades_venda WHERE tenant_id = ? AND gtin = ?`,
+          [tenant, gtin]
+        );
+        const usadoEmOutro = uso.some((u: any) => Number(u.id_item) !== idItem || Number(u.id_unidade) !== idUnidadeCompra);
+        if (!usadoEmOutro) {
+          const compraEhBase = conversao.unidadeCompra === conversao.unidadeBase ? 1 : 0;
+          await connection.execute(
+            `INSERT INTO comercial_unidades_venda
+             (tenant_id, id_item, id_unidade, gtin, permite_venda, permite_atacado, markup_varejo, padrao_pdv)
+             VALUES (?, ?, ?, ?, ?, 0, 1.8, ?)
+             ON DUPLICATE KEY UPDATE gtin = COALESCE(gtin, VALUES(gtin))`,
+            [tenant, idItem, idUnidadeCompra, gtin, compraEhBase, compraEhBase]
+          );
+        }
       }
 
       // 2. Movimento + saldo (entra a quantidade conferida, convertida para a unidade base)

@@ -50,6 +50,7 @@ RascunhoVendas,
 SaleUnitConfig,
 TierRuleRecord
 } from './configVendas.mapper';
+import { validarGtin } from '../../../Compras/StockEntry/gtin';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -278,6 +279,15 @@ setIsUnitModalVisible(true);
 const handleSaveUnit = () => {
 if (!formUnitKey || !formUnitName) {
 message.error('Preencha a sigla e o nome da unidade!');
+return;
+}
+if (formGtin && !validarGtin(formGtin)) {
+message.error('GTIN inválido: confira os dígitos (tamanho 8, 12, 13 ou 14 e dígito verificador).');
+return;
+}
+const gtinRepetido = unitsConfig.some(u => u.gtin && u.gtin === formGtin && u.unitKey !== editingUnitKey);
+if (formGtin && gtinRepetido) {
+message.error('Este GTIN já está em outra unidade deste item.');
 return;
 }
 

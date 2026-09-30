@@ -35,7 +35,8 @@ ExclamationCircleOutlined,
 } from "@ant-design/icons";
 import Swal from "sweetalert2";
 
-import { updateFamilia } from './FamilyManager.api'; // Ajuste o caminho do import conforme seu projeto
+import { updateFamilia, deleteFamilia } from './FamilyManager.api';
+import { STATUS_FAMILIA_CONFIG } from './CatalogManager.types'; // Ajuste o caminho do import conforme seu projeto
 
 // Hook desacoplado
 import { useCatalogState } from "./useCatalogState";
@@ -116,6 +117,7 @@ onAtualizarSeparadorSku,
 onAtualizarOrdemSku,
 itensDaFamilia,
 carregandoItens,
+carregarDadosIniciais,
 setGrupoSelecionadoId: setFamiliaSelecionadaId,
 handlePadronizarNomesFamilia,
 handlePadronizarSkusFamilia,
@@ -363,7 +365,8 @@ nome: familiaSelecionadaLocal.nome,
 descricao: familiaSelecionadaLocal.descricao,
 status: familiaSelecionadaLocal.status,
 // 🛠️ Ajustado para garantir que a categoria seja enviada corretamente para o backend
-categoriaPai: familiaSelecionadaLocal.categoriaId || familiaSelecionadaLocal.categoria_id,
+// A família guarda a categoria em 'categoriaPai' ('' = sem categoria, o backend limpa)
+categoriaPai: familiaSelecionadaLocal.categoriaPai ?? '',
 idMarca: familiaSelecionadaLocal.idMarca || familiaSelecionadaLocal.id_marca,
 comportamentoMarca: marcaComportamento, // Salva o comportamento atual injetado
 
@@ -371,7 +374,16 @@ comportamentoMarca: marcaComportamento, // Salva o comportamento atual injetado
 ncmPadrao: familiaSelecionadaLocal.ncmPadrao,
 cestPadrao: familiaSelecionadaLocal.cestPadrao,
 tipoItem: familiaSelecionadaLocal.tipoItem,
-unidadeMedidaBase: familiaSelecionadaLocal.unidadeMedidaBase || familiaSelecionadaLocal.unidadeBase,
+unidadeMedidaBase: familiaSelecionadaLocal.unidadeMedidaBase,
+
+// Parâmetros comerciais e de estoque
+margemMinima: familiaSelecionadaLocal.margemMinima ?? '',
+margemMaxima: familiaSelecionadaLocal.margemMaxima ?? '',
+markupPadrao: familiaSelecionadaLocal.markupPadrao ?? '',
+estoqueMinimo: familiaSelecionadaLocal.estoqueMinimo ?? '',
+loteMinimo: familiaSelecionadaLocal.loteMinimo ?? '',
+curvaAbc: familiaSelecionadaLocal.curvaAbc ?? '',
+prioridadeExposicao: familiaSelecionadaLocal.prioridadeExposicao ?? '',
 
 // Templates de SKU e Nomes
 templateNomeComercial: familiaSelecionadaLocal.templateNomeComercial || familiaSelecionadaLocal.template_nome,
@@ -383,14 +395,24 @@ separadorSku: familiaSelecionadaLocal.separadorSku || familiaSelecionadaLocal.se
 cor: familiaSelecionadaLocal.cor,
 imagem: familiaSelecionadaLocal.imagem,
 
-// Atributos relacionais
-atributos: familiaSelecionadaLocal.atributos || [], 
+// Só os atributos PRÓPRIOS da família: os herdados da categoria continuam vindo da categoria
+atributos: (familiaSelecionadaLocal.atributos || []).filter(
+  (attr: any) => (attr.origem ?? 'locais') === 'locais' && !attr.isMarcaSistema
+),
 };
 
 const tenantId = 1; 
 
 // 2. Chama a API real de atualização
-await updateFamilia(String(familiaSelecionadaLocal.id), payloadAtualizacao, tenantId);
+const resposta: any = await updateFamilia(String(familiaSelecionadaLocal.id), payloadAtualizacao, tenantId);
+
+// O backend recalcula a saúde: ATIVA com pendência vira BLOQUEADA (e volta a ATIVA quando corrigida)
+const familiaSalva = {
+...familiaSelecionadaLocal,
+status: resposta?.status ?? familiaSelecionadaLocal.status,
+saude: resposta?.saude ?? familiaSelecionadaLocal.saude,
+};
+setFamiliaSelecionada(familiaSalva);
 
 // 3. Se houver função de salvamento vinda do hook, executa também
 if (typeof hookSalvarFamilia === 'function') {
@@ -399,15 +421,23 @@ await hookSalvarFamilia();
 
 // 4. Atualiza o snapshot de referência original com o estado atual salvo
 const novoSnapshot = JSON.stringify({
-...familiaSelecionadaLocal,
+...familiaSalva,
 marcaComportamento,
 });
 
 snapshotRef.current = novoSnapshot;
-setFamiliaOriginal(JSON.parse(JSON.stringify(familiaSelecionadaLocal)));
+setFamiliaOriginal(JSON.parse(JSON.stringify(familiaSalva)));
 setTemAlteracoes(false);
 
-// 5. Feedback visual de sucesso
+// 5. Feedback: bloqueio mostra o que falta corrigir
+if (familiaSalva.status === "BLOQUEADO_INCONSISTENCIA") {
+Swal.fire({
+title: "Salva, mas BLOQUEADA",
+html: `A família não atende às regras mínimas para ficar ativa:<br><br>${(familiaSalva.saude?.bloqueios || [])
+.map((b: any) => `• ${b.mensagem}`).join("<br>")}`,
+icon: "warning",
+});
+} else {
 Swal.fire({
 title: "Sucesso!",
 text: "Família salva e sincronizada com o banco de dados.",
@@ -415,6 +445,7 @@ icon: "success",
 timer: 1500,
 showConfirmButton: false,
 });
+}
 
 } catch (error: any) {
 console.error("Erro ao salvar família no banco:", error);
@@ -465,6 +496,55 @@ isMarcaSistema: true,
 
 
 
+// Exclui a família (o backend recusa se houver itens vinculados)
+const handleExcluirFamilia = async () => {
+if (!familiaSelecionadaLocal?.id) return;
+const totalItens = Number(familiaSelecionadaLocal.totalItens || 0);
+if (totalItens > 0) {
+Swal.fire("Exclusão bloqueada", `A família possui ${totalItens} produto(s). Mova ou desagrupe os itens antes de excluir.`, "info");
+return;
+}
+const confirmacao = await Swal.fire({
+title: "Excluir família?",
+html: `A família <b>"${familiaSelecionadaLocal.nome}"</b> e a configuração de atributos dela serão removidas.`,
+icon: "warning",
+showCancelButton: true,
+confirmButtonColor: "#d33",
+confirmButtonText: "Sim, excluir",
+cancelButtonText: "Cancelar",
+});
+if (!confirmacao.isConfirmed) return;
+
+try {
+await deleteFamilia(String(familiaSelecionadaLocal.id), 1);
+setFamiliaSelecionadaId(null);
+setFamiliaSelecionadaLocal(null);
+setFamiliaOriginal(null);
+setTemAlteracoes(false);
+if (typeof carregarDadosIniciais === "function") await carregarDadosIniciais();
+Swal.fire({ title: "Excluída!", icon: "success", timer: 1300, showConfirmButton: false });
+} catch (error: any) {
+Swal.fire("Não foi possível excluir", error?.message || "Erro ao excluir a família.", "error");
+}
+};
+
+// Altera a configuração de um atributo próprio da família
+const alterarAtributoFamilia = (idAtributo: string | number, patch: Record<string, unknown>) => {
+setFamiliaSelecionada((prev: any) => ({
+...prev,
+atributos: (prev.atributos || []).map((a: any) => (String(a.id) === String(idAtributo) ? { ...a, ...patch } : a)),
+}));
+};
+
+// Muda o papel: grade gera variação; DNA é herdado pelos itens (valor fixo da família)
+const moverAtributo = (record: any, novoPapel: string) => {
+alterarAtributoFamilia(record.id, {
+classificacao: novoPapel,
+geraVariacao: novoPapel === "grade",
+valorHerdadoDaFamilia: novoPapel === "dna",
+});
+};
+
 const handleExcluirAtributo = (tipo: string, record: any) => {
 // 🛡️ Verifica se existem itens na família e se algum deles possui valor preenchido para este atributo
 const itensComValor = (itensDaFamilia || []).filter((item: any) => {
@@ -472,22 +552,12 @@ const valor = item.valoresAtributos?.[record.id] || item.valoresAtributos?.[reco
 return valor !== undefined && valor !== null && String(valor).trim() !== "";
 });
 
-if (itensComValor.length > 0) {
-// ❌ Bloqueia a exclusão e orienta a movimentação
-Swal.fire({
-title: "Ação Bloqueada!",
-html: `O atributo <b>"${record.nome}"</b> possui valores preenchidos em <b>${itensComValor.length}</b> item(ns).<br><br>Por segurança, atributos com valores atribuídos não podem ser apagados, apenas <b>movidos</b> de categoria (ex: de Ficha para DNA/Grade).`,
-icon: "warning",
-confirmButtonText: "Entendido",
-confirmButtonColor: brandColor || "#1677ff",
-});
-return;
-}
-
 // ✅ Se nenhum item possui valor, prossegue com a remoção normal da lista local
 Swal.fire({
-title: "Excluir Atributo?",
-text: `Deseja remover o atributo "${record.nome}"?`,
+title: "Remover atributo da família?",
+html: itensComValor.length > 0
+? `O atributo <b>"${record.nome}"</b> tem valor em <b>${itensComValor.length}</b> item(ns).<br><br>Ao remover, os valores <b>não são apagados</b>: continuam guardados nos itens como ficha técnica.`
+: `Deseja remover o atributo "${record.nome}" da família?`,
 icon: "warning",
 showCancelButton: true,
 confirmButtonColor: "#d33",
@@ -694,6 +764,22 @@ style={{ borderRadius: 8, fontWeight: 500 }}
 >
 Debug Payload
 </Button>
+
+<Tooltip
+title={Number(familiaSelecionadaLocal?.totalItens || 0) > 0
+? `A família tem ${familiaSelecionadaLocal?.totalItens} produto(s): mova-os antes de excluir`
+: "Excluir esta família"}
+>
+<Button
+danger
+disabled={!familiaSelecionadaLocal?.id || Number(familiaSelecionadaLocal?.totalItens || 0) > 0}
+icon={<DeleteOutlined />}
+onClick={handleExcluirFamilia}
+style={{ borderRadius: 8, fontWeight: 500 }}
+>
+Excluir Família
+</Button>
+</Tooltip>
 
 <Tooltip title="Desfaz as alterações feitas e retorna ao último estado salvo no banco">
 <Button
@@ -946,48 +1032,30 @@ styles={{ body: { padding: "8px 12px" } }}
 {/* Atributos DNA */}
 {/* Atributos DNA */}
 
-{/* <AtributosCard
+<AtributosCard
 titulo="Atributos DNA"
+papel="dna"
 cor={brandColor || "#1677ff"}
 dataSource={atributosDNA}
 onOpenModal={() => handleAbrirModal("dna")}
 onDelete={(record) => handleExcluirAtributo("dna", record)}
-onMover={(record, novaClassificacao) => {
-// 🛡️ Atualiza tanto a lista local da família quanto dispara a mudança de estado
-setFamiliaSelecionada((prev: any) => {
-const novosAtributos = (prev.atributos || atributosComMarcaInjetada || []).map((a: any) => 
-String(a.id) === String(record.id) ? { ...a, classificacao: novaClassificacao } : a
-);
-return {
-...prev,
-atributos: novosAtributos
-};
-});
-}}
-tooltipText="Atributos DNA compõem o esqueleto ou identidade fixa do SKU do item."
-onInfoClick={() => setIsModalOpen(true)}
+onMover={moverAtributo}
+onAlterar={(record, patch) => alterarAtributoFamilia(record.id, patch)}
+tooltipText="DNA: igual em todos os itens da família (ex: Material = NBR). O valor fixo é definido aqui."
 emptyText="Nenhum atributo DNA"
 showDelete={true}
-/> */}
+/>
 
 {/* Atributos Variação (Grade) */}
 <AtributosCard
 titulo="Atributos de Variação (Grade)"
+papel="grade"
 cor="#9333ea"
 dataSource={atributosVariacao}
 onOpenModal={() => handleAbrirModal("grade")}
 onDelete={(record) => handleExcluirAtributo("grade", record)}
-onMover={(record, novaClassificacao) => {
-setFamiliaSelecionada((prev: any) => {
-const novosAtributos = (prev.atributos || atributosComMarcaInjetada || []).map((a: any) => 
-String(a.id) === String(record.id) ? { ...a, classificacao: novaClassificacao } : a
-);
-return {
-...prev,
-atributos: novosAtributos
-};
-});
-}}
+onMover={moverAtributo}
+onAlterar={(record, patch) => alterarAtributoFamilia(record.id, patch)}
 tooltipText="Atributos que geram quebra de estoque e variações de SKU (ex: Blindagem, Marca em Grade)."
 emptyText="Nenhum atributo de variação"
 showDelete={true}
@@ -996,21 +1064,13 @@ showDelete={true}
 {/* Atributos Ficha Técnica */}
 <AtributosCard
 titulo="Atributos de Ficha Técnica"
+papel="ficha"
 cor="#0891b2"
 dataSource={atributosFichaTecnica}
 onOpenModal={() => handleAbrirModal("ficha")}
 onDelete={(record) => handleExcluirAtributo("ficha", record)}
-onMover={(record, novaClassificacao) => {
-setFamiliaSelecionada((prev: any) => {
-const novosAtributos = (prev.atributos || atributosComMarcaInjetada || []).map((a: any) => 
-String(a.id) === String(record.id) ? { ...a, classificacao: novaClassificacao } : a
-);
-return {
-...prev,
-atributos: novosAtributos
-};
-});
-}}
+onMover={moverAtributo}
+onAlterar={(record, patch) => alterarAtributoFamilia(record.id, patch)}
 tooltipText="Atributos descritivos de apoio que não alteram o SKU principal."
 emptyText="Nenhum atributo de ficha técnica"
 showDelete={true}
@@ -1026,71 +1086,37 @@ showDelete={true}
   bordered={false} 
   style={{ marginBottom: 24 }}
 >
-  <Row gutter={[16, 16]} >
-    {/* 1. Ausência de Atributos de Variação */}
-    <Col xs={24} lg={6} > 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8  ,}}>
-        <Text strong style={{ color: '#cf1322' }} >
-          1. Ausência de Atributos de Variação (Grade/DNA)
-        </Text>
-        <Text type="secondary" style={{fontSize: '11px'}}>
-          <strong>Erro detectado:</strong> O administrador removeu todos os atributos que serviam como base de grade (ex: Medida, Voltagem, Blindagem), deixando a família sem eixo diferenciador.
-        </Text>
-        <Text style={{fontSize: '11px'}}>
-          <strong>Comportamento do PIM:</strong> Família bloqueada. Proíbe novos SKUs filhos. SKUs existentes entram em quarentena e os valores antigos são convertidos automaticamente para a ficha técnica estática.
-        </Text>
-      </div>
-    </Col>
-
-    {/* 2. Falta de Atributos Obrigatórios */}
-    <Col xs={24} lg={6}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <Text strong style={{ color: '#cf1322' }}>
-          2. Falta de Atributos Obrigatórios de Negócio
-        </Text>
-        <Text type="secondary" style={{fontSize: '11px'}}>
-          <strong>Erro detectado:</strong> Um atributo considerado crítico pela categoria macro (ex: Marca, NCM, Unidade de Medida) foi desvinculado das regras da família.
-        </Text>
-        <Text style={{fontSize: '11px'}}>
-          <strong>Comportamento do PIM:</strong> Família inativada por inconsistência cadastral. Gatilho de despublicação em cascata: todos os SKUs filhos são removidos imediatamente dos Marketplaces e E-commerce.
-        </Text>
-      </div>
-    </Col>
-
-    {/* 3. SKUs Gêmeos */}
-    <Col xs={24} lg={6}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <Text strong style={{ color: '#cf1322' }}>
-          3. SKUs Gêmeos ou Conflito de Grade
-        </Text>
-        <Text type="secondary" style={{fontSize: '11px'}}>
-          <strong>Erro detectado:</strong> Após uma alteração estrutural, múltiplos SKUs filhos ficaram idênticos comercialmente por perderem a diferenciação da grade.
-        </Text>
-        <Text style={{fontSize: '11px'}}>
-          <strong>Comportamento do PIM:</strong> Família bloqueada para novas edições até que o operador revise, funda os itens duplicados ou reative um atributo diferenciador.
-        </Text>
-      </div>
-    </Col>
-
-    {/* 4. Família Órfã */}
-    <Col xs={24} lg={6}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <Text strong style={{ color: '#cf1322' }}>
-          4. Família Órfã de Categoria Pai
-        </Text>
-        <Text type="secondary" style={{fontSize: '11px'}}>
-          <strong>Erro detectado:</strong> A subcategoria ou categoria pai que fornecia o DNA estrutural foi excluída, desativada ou movida incorretamente.
-        </Text>
-        <Text style={{fontSize: '11px'}}>
-          <strong>Comportamento do PIM:</strong> Família isolada em "Modo Rascunho Forçado". Nenhuma alteração pode ser salva até que seja remapeada para uma categoria pai válida.
-        </Text>
-      </div>
-    </Col>
-
-
-
-  </Row>
-  
+  {(() => {
+const saude = familiaSelecionadaLocal?.saude;
+const status = familiaSelecionadaLocal?.status as keyof typeof STATUS_FAMILIA_CONFIG | undefined;
+const cfg = status ? STATUS_FAMILIA_CONFIG[status] : undefined;
+return (
+<Space direction="vertical" size={8} style={{ width: "100%" }}>
+<Space>
+<Text strong>Status:</Text>
+<Tag color={cfg?.color}>{cfg?.label || status || "—"}</Tag>
+{temAlteracoes && <Text type="secondary" style={{ fontSize: 11 }}>(recalculado ao salvar)</Text>}
+</Space>
+{!saude ? (
+<Text type="secondary">Salve a família para calcular o diagnóstico.</Text>
+) : saude.bloqueios.length === 0 && saude.avisos.length === 0 ? (
+<Alert type="success" showIcon message="A família atende a todas as regras mínimas." />
+) : (
+<>
+{saude.bloqueios.map((b: any) => (
+<Alert key={b.codigo} type="error" showIcon message={b.mensagem} />
+))}
+{saude.avisos.map((a: any) => (
+<Alert key={a.codigo} type="warning" showIcon message={a.mensagem} />
+))}
+</>
+)}
+<Text type="secondary" style={{ fontSize: 11 }}>
+Regras: ao menos um atributo de grade; DNA com valor fixo; template só com atributos da família; sigla definida se o template usa {"{SIGLA}"}.
+</Text>
+</Space>
+);
+})()}
 </Card>
 
     </Col>
@@ -1105,7 +1131,7 @@ showDelete={true}
           <List
             size="small"
             dataSource={[
-              "DNA Estrutural Macro: O material base, norma construtiva ou série técnica (ex: Aço Galvanizado, Série 6200, SAE 100 R2).",
+              "Quais atributos de DNA existem (ex: Material, Série, Norma). A família fixa o valor (ex: Retentores NBR → Material = NBR).",
               "Atributos Globais de Negócio: Regras macro de conformidade, exigências fiscais básicas e restrições do segmento industrial."
             ]}
             renderItem={(item) => (
@@ -1383,7 +1409,7 @@ title={
         <List
           size="small"
           dataSource={[
-            "DNA Estrutural Macro: O material base, norma construtiva ou série técnica (ex: Aço Galvanizado, Série 6200, SAE 100 R2).",
+            "Quais atributos de DNA existem (ex: Material, Série, Norma). A família fixa o valor (ex: Retentores NBR → Material = NBR).",
             "Atributos Globais de Negócio: Regras macro de conformidade, exigências fiscais básicas e restrições do segmento industrial."
           ]}
           renderItem={(item) => (

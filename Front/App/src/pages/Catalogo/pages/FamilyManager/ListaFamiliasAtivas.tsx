@@ -1,5 +1,6 @@
 import React from "react";
-import { Col, Card, Space, TreeSelect, Input, Empty, Button } from "antd";
+import { Col, Card, Space, TreeSelect, Input, Empty, Button, Tag } from "antd";
+import { STATUS_FAMILIA_CONFIG } from "./CatalogManager.types";
 import { FolderOpenOutlined, PlusOutlined } from "@ant-design/icons";
 import Swal from "sweetalert2";
 
@@ -8,6 +9,7 @@ interface Familia {
   id: string | number;
   nome: string;
   codigo?: string;
+  status?: string;
   categoria?: string;
 }
 
@@ -177,6 +179,14 @@ export default function ListaFamiliasAtivas({
                             >
                               <span style={{ fontWeight: 600, fontSize: "12px", color: "#1e293b", display: "block" }}>
                                 {fam.nome}
+                                {fam.status && fam.status !== 'ATIVO' && (
+                                  <Tag
+                                    color={STATUS_FAMILIA_CONFIG[fam.status as keyof typeof STATUS_FAMILIA_CONFIG]?.color}
+                                    style={{ marginLeft: 6, fontSize: 9, padding: '0 4px', lineHeight: '14px' }}
+                                  >
+                                    {STATUS_FAMILIA_CONFIG[fam.status as keyof typeof STATUS_FAMILIA_CONFIG]?.label || fam.status}
+                                  </Tag>
+                                )}
                               </span>
                               {fam.codigo && (
                                 <span style={{ fontSize: "10px", color: "#64748b", fontFamily: "monospace" }}>

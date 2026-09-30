@@ -62,6 +62,19 @@ export const runPenteFinoTests = (): void => {
   assert(avaliarPenteFino(lote, [novoComConfig(50)], ctx).aprovavel, 'Configuração coerente com a conversão deveria passar.');
   assert(avaliarPenteFino(lote, [novoComConfig(20)], ctx).bloqueios.some(b => b.codigo === 'CONFIG_VENDAS_INCOERENTE'), 'Fator da configuração diferente da conversão deveria bloquear.');
 
+  const temAviso = (it: StagingItemRow, codigo: string, contexto = ctx) =>
+    avaliarPenteFino(lote, [it], contexto).avisos.some(a => a.codigo === codigo);
+  assert(temAviso(item({ ean: '7891000315508' }), 'GTIN_INVALIDO'), 'GTIN com dígito errado deveria gerar aviso.');
+  assert(!temAviso(item({ ean: '7891000315507' }), 'GTIN_INVALIDO'), 'GTIN válido não deveria gerar aviso.');
+  assert(temAviso(item({ ean: 'SEM GTIN' }), 'SEM_GTIN'), 'Item sem GTIN deveria gerar aviso.');
+  assert(
+    !temAviso(item({ ean: 'SEM GTIN', mapeamento_json: JSON.stringify({ gtin_manual: '7891000315507' }) }), 'SEM_GTIN'),
+    'GTIN manual deveria cobrir o "SEM GTIN" do XML.'
+  );
+  const ctxGtin = { ...ctx, gtinsEmUso: new Map([['7891000315507', 99]]) };
+  assert(temAviso(item({ ean: '7891000315507' }), 'GTIN_EM_USO', ctxGtin), 'GTIN de outro item deveria gerar aviso.');
+  assert(!temAviso(item({ ean: '7891000315507', produto_id_sistema: 99 }), 'GTIN_EM_USO', { ...ctxGtin, idsItensExistentes: new Set([99]) }), 'GTIN do próprio item não é conflito.');
+
   assert(calcularCustoMedio(10, 5, 10, 7) === 6, 'Custo médio de 10@5 + 10@7 deveria ser 6.');
   assert(calcularCustoMedio(0, 0, 4, 9) === 9, 'Sem saldo anterior, o custo médio é o custo da entrada.');
 };

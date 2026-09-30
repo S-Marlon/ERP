@@ -1,5 +1,6 @@
 // Pente-fino do lote de staging: decide se a NF-e pode dar entrada definitiva no estoque.
 // Função pura (sem banco) para ser usada tanto na análise da tela quanto na aprovação.
+import { gtinEfetivo, isSemGtin, validarGtin } from './gtin';
 
 export interface StagingItemRow {
   id: number;
@@ -17,6 +18,9 @@ export interface StagingItemRow {
   is_confirmed: number | null;
   mapeamento_json: string | null;
   unidade_original?: string | null;
+  ean?: string | null; // cEAN do XML
+  ncm_original?: string | null;
+  cest_original?: string | null;
 }
 
 export interface LoteRow {
@@ -30,6 +34,7 @@ export interface PenteFinoContexto {
   idsItensExistentes: Set<number>;   // produto_id_sistema que existem em itens_core
   skusExistentes: Set<string>;       // SKUs já usados em itens_core (para itens novos)
   fornecedorCadastrado: boolean;
+  gtinsEmUso?: Map<string, number>; // GTIN -> id_item que já usa esse código
 }
 
 export interface Verificacao {
@@ -69,6 +74,10 @@ export const lerMapeamento = (item: StagingItemRow): Record<string, any> => {
 };
 
 export const isItemNovo = (item: StagingItemRow): boolean => !item.produto_id_sistema;
+
+// GTIN que será gravado no item (manual tem prioridade sobre o XML)
+export const gtinDoItem = (item: StagingItemRow): string | null =>
+  gtinEfetivo(lerMapeamento(item).gtin_manual, item.ean);
 
 export interface ConversaoCompra {
   unidadeCompra: string;  // unidade da NF (uCom)
@@ -136,6 +145,21 @@ export const avaliarPenteFino = (
       const compra = unidades.find(u => String(u.sigla).toUpperCase() === conv.unidadeCompra);
       return !compra || Math.abs(Number(compra.fator) - conv.fator) > 0.000001;
     });
+
+  coletar(avisos, 'GTIN_INVALIDO', 'Itens com GTIN inválido (dígito verificador): o código não será gravado. Corrija na conferência.',
+    i => {
+      const gtin = gtinDoItem(i);
+      return gtin !== null && !validarGtin(gtin);
+    });
+  coletar(avisos, 'GTIN_EM_USO', 'Itens com GTIN já usado por outro item do catálogo: o código não será gravado neste item.',
+    i => {
+      const gtin = gtinDoItem(i);
+      if (!gtin || !validarGtin(gtin) || !ctx.gtinsEmUso) return false;
+      const dono = ctx.gtinsEmUso.get(gtin);
+      return dono !== undefined && (isItemNovo(i) || dono !== Number(i.produto_id_sistema));
+    });
+  coletar(avisos, 'SEM_GTIN', 'Itens sem código de barras (XML "SEM GTIN" e nenhum informado).',
+    i => isSemGtin(lerMapeamento(i).gtin_manual) && isSemGtin(i.ean));
 
   coletar(avisos, 'CONVERSAO_UNIDADE', 'Itens com conversão de unidade: a quantidade da NF será multiplicada pelo fator no estoque.',
     i => lerConversaoCompra(i).fator > 0 && lerConversaoCompra(i).fator !== 1);

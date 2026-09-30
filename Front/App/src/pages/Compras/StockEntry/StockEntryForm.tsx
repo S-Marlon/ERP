@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { checkSupplier, createSupplier } from '../../Compras/FornecedoresList/fornecedores.api'
 import {
 Typography,
@@ -105,12 +105,17 @@ const buildStagingItem = (item: any) => ({
 const FRETE_ADICIONAL_INICIAL = { valor: 0, metodo: 'Correios - PAC', observacao: '' };
 
 const StockEntryForm: React.FC = () => {
+const navigate = useNavigate();
+// NF já importada/descartada na Staging: a tela abre só para consulta
+const [modoVisualizacao, setModoVisualizacao] = useState<{ loteId: number; status: string } | null>(null);
+const MSG_SOMENTE_LEITURA = 'NF já finalizada na Staging: modo visualização, nenhuma alteração é permitida.';
 
 // Função para limpar os dados da tela e reiniciar a importação
 const onReset = () => {
 setRawXmlString('');
 setItems([]);
 setLoteId(null);
+setModoVisualizacao(null);
 setAppliedFreightMode('original');
 setFreteAdicionalInfo(FRETE_ADICIONAL_INICIAL);
 setStagingError(null);
@@ -212,6 +217,10 @@ ids: ItemId[],
 patch: (item: any) => Record<string, unknown> | null,
 { persist = true }: { persist?: boolean } = {}
 ) => {
+if (modoVisualizacao) {
+message.warning(MSG_SOMENTE_LEITURA);
+return { items, changed: [], reopened: 0 };
+}
 const result = applyItemEdit(items, ids, patch);
 if (result.changed.length === 0) return result;
 setItems(result.items);
@@ -423,14 +432,24 @@ let podeSincronizar = true;
 try {
 const estado = await buscarEstadoLote({ chave: parsed.chaveAcesso });
 if (estado.lote && ['IMPORTADO', 'DESCARTADO'].includes(estado.lote.status)) {
-setItems(initialItems);
-setAppliedFreightMode('original');
-setFreteAdicionalInfo(FRETE_ADICIONAL_INICIAL);
+// NF finalizada: mostra exatamente como foi aprovada/descartada, sem permitir alterações
+const restauracao = restaurarItensDoStaging(initialItems, estado.itens);
+const freteSalvo = lerFreteAdicionalSalvo(estado.lote.frete_adicional);
+const freteVisual = freteSalvo
+? { valor: freteSalvo.valor, metodo: freteSalvo.metodo || FRETE_ADICIONAL_INICIAL.metodo, observacao: freteSalvo.observacao }
+: FRETE_ADICIONAL_INICIAL;
+const modoVisual: FreightMode = freteSalvo?.modo_rateio || 'original';
+const freteNota = parseFloat(parsed.totais?.icmsTot?.vFrete || '0') || 0;
+setItems(distributeFreight(restauracao.items, modoVisual, freteNota, Number(freteVisual.valor) || 0));
+setAppliedFreightMode(modoVisual);
+setFreteAdicionalInfo(freteVisual);
 setLoteId(null);
-message.error(`Esta NF já está ${estado.lote.status} na Staging (lote #${estado.lote.id}) e não pode mais ser alterada.`);
+setModoVisualizacao({ loteId: estado.lote.id, status: estado.lote.status });
+message.info(`NF ${estado.lote.status === 'IMPORTADO' ? 'já importada' : 'descartada'} (lote #${estado.lote.id}): aberta em modo visualização.`);
 setIsProcessingItems(false);
 return;
 }
+setModoVisualizacao(null);
 if (estado.lote && estado.itens.length > 0) {
 const restauracao = restaurarItensDoStaging(initialItems, estado.itens);
 const freteSalvo = lerFreteAdicionalSalvo(estado.lote.frete_adicional);
@@ -566,6 +585,10 @@ mode: FreightMode,
 freteInfo: typeof freteAdicionalInfo = freteAdicionalInfo,
 baseItems: any[] = items
 ) => {
+if (modoVisualizacao) {
+message.warning(MSG_SOMENTE_LEITURA);
+return;
+}
 const recalculated = distributeFreight(baseItems, mode, nfeFreightValue, Number(freteInfo.valor) || 0);
 setItems(recalculated);
 setAppliedFreightMode(mode);
@@ -573,6 +596,10 @@ persistItemsToStaging(recalculated, freteInfo, mode);
 };
 
 const handleOpenFreightModal = () => {
+if (modoVisualizacao) {
+message.info(MSG_SOMENTE_LEITURA);
+return;
+}
 setFreightDistributionMode(appliedFreightMode);
 setIsFreightModalOpen(true);
 };
@@ -591,6 +618,10 @@ return distributeFreight(items, freightDistributionMode, nfeFreightValue, Number
 
 // Conferência: só itens com código interno vinculado podem ser conferidos
 const setItemsConfirmation = (ids: ItemId[], confirmed: boolean) => {
+if (modoVisualizacao) {
+message.warning(MSG_SOMENTE_LEITURA);
+return;
+}
 const result = applyConfirmation(items, ids, confirmed);
 if (result.blocked > 0) {
 message.warning(`${result.blocked} item(ns) sem código interno não foi(ram) conferido(s). ${MSG_SEM_CODIGO_INTERNO}`);
@@ -730,9 +761,24 @@ onReset={onReset}
 <Space direction="vertical" size={8} style={{ width: '100%' }}>
 
 
+{modoVisualizacao && (
+<Alert
+type={modoVisualizacao.status === 'IMPORTADO' ? 'success' : 'warning'}
+showIcon
+message={`NF ${modoVisualizacao.status === 'IMPORTADO' ? 'já importada no estoque' : 'descartada'} · Lote #${modoVisualizacao.loteId}`}
+description="Modo visualização: os dados abaixo são os que foram registrados na Staging. Nenhuma alteração é permitida."
+action={
+<Button size="small" onClick={() => navigate('/stagings')}>
+Abrir na Staging
+</Button>
+}
+/>
+)}
+
 {parsedNfe?.chaveAcesso && (
 <NfeCards
 key={parsedNfe.chaveAcesso}
+readOnly={Boolean(modoVisualizacao)}
 data={parsedNfe}
 supplierStatus={supplierStatus}
 actions={{ 
@@ -762,6 +808,7 @@ onChangeTipoRecurso={handleChangeTipoRecurso}
 onToggleItem={(tempId, confirmed) => setItemsConfirmation([tempId], confirmed)}
 onQuantityChange={handleQuantityChange}
 onChangeGtin={handleChangeGtin}
+readOnly={Boolean(modoVisualizacao)}
 onAssignGroupToItems={() => { }}
 onUnassignGroup={() => { }}
 onUnassignItem={() => { }}
@@ -1101,7 +1148,7 @@ block
 size="large"
 icon={<CheckCircleOutlined />}
 style={{ marginTop: 16, height: 46, background: isSubmitDisabled ? undefined : '#52c41a', border: 'none' }}
-disabled={isSubmitDisabled}
+disabled={isSubmitDisabled || Boolean(modoVisualizacao)}
 onClick={() => setIsConferenceModalOpen(true)}
 >
 {items.length === 0 ? 'Aguardando XML...' : 'Confirmar Entrada e Estoque'}

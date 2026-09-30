@@ -35,12 +35,17 @@ export const mapBackendToCategoria = (backendData: any): Categoria => ({
   percentualMargemSugerida: backendData.margem_sugerida !== null ? Number(backendData.margem_sugerida) : null,
   modoExibicao: backendData.modo_exibicao || 'grade',
   ordem: Number(backendData.ordem || 0),
+  qtdFamilias: Number(backendData.qtd_familias || 0),
+  qtdProdutos: Number(backendData.qtd_produtos || 0),
   atributosHeranca: Array.isArray(backendData.atributosHeranca) 
     ? backendData.atributosHeranca.map((attr: any) => ({
         id: String(attr.id || attr.atributo_id),
         nome: attr.nome,
         tipoDado: attr.tipoDado || attr.tipo_dado || 'texto',
         sufixo: attr.sufixo,
+        formatoSufixo: attr.formatoSufixo || '',
+        unidadeSimbolo: attr.unidadeSimbolo || '',
+        unidade_id: attr.unidade_id ? String(attr.unidade_id) : null,
         escopoComercial: attr.escopoComercial || attr.escopo_comercial || 'ficha',
         obrigatorio: Boolean(attr.obrigatorio),
         pesquisavel: Boolean(attr.pesquisavel),
@@ -70,9 +75,12 @@ export const mapPayloadToBackend = (data: UpdateCategoryPayload) => {
 
   if (data.atributosHeranca !== undefined) {
     payload.atributos_vinculados = data.atributosHeranca
-      .filter(attr => attr.id && !String(attr.id).startsWith('h-') && attr.id !== 'null')
+      // Só atributos já cadastrados no dicionário (id numérico)
+      .filter(attr => /^\d+$/.test(String(attr.id)))
       .map(attr => ({
         atributo_id: Number(attr.id),
+        unidade_id: attr.unidade_id ? Number(attr.unidade_id) : null,
+        formato_sufixo: attr.formatoSufixo || '',
         escopo_comercial: attr.escopoComercial || 'ficha',
         obrigatorio: attr.obrigatorio ? 1 : 0,
         pesquisavel: attr.pesquisavel ? 1 : 0,

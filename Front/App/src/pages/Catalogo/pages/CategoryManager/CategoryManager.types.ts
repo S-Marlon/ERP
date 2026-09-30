@@ -5,7 +5,10 @@ export interface AtributoHerdavel {
   nome: string;
   tipoDado: 'texto' | 'numero' | 'decimal' | 'boolean' | 'lista' | 'data';
   sufixo?: string;
-  
+  // Sufixo gravado no vínculo (formato_sufixo); vazio = usa o símbolo da unidade do atributo
+  formatoSufixo?: string;
+  unidadeSimbolo?: string;
+  unidade_id?: string | null;
   // Vínculo vindo de 'atributos_core_entidades'
   escopoComercial: 'dna' | 'grade' | 'ficha'; 
   obrigatorio: boolean;
@@ -43,6 +46,9 @@ export interface Categoria {
     mercadolivreId?: string;
   };
   assets?: any;
+  // Uso real (vem do backend)
+  qtdFamilias?: number;
+  qtdProdutos?: number;
 }
 
 export interface CreateCategoryPayload {
@@ -74,4 +80,5 @@ export interface AtributoGlobalResponse {
   unidade_id?: number;
   sufixo?: string;
   valores_sugeridos?: string;
+  escopoPadrao?: 'dna' | 'grade' | 'ficha';
 }

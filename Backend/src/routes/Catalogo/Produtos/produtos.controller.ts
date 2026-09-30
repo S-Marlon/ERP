@@ -2,6 +2,7 @@
 
 import { Request, Response } from 'express';
 import pool from '../../Estoque/db.config';
+import { avaliarPublicacaoItens } from './publicacaoProdutos';
 
 /**
  * 📍 [READ] GET /produtos/search
@@ -122,7 +123,11 @@ export const getProdutos = async (req: Request, res: Response) => {
         cat.nome AS nome_categoria,  -- Adicionado
         fam.nome AS nome_familia,
         COALESCE(mar.nome, 'Própria') AS nome_marca,
-        COALESCE(um.sigla, '') AS unidade
+        COALESCE(um.sigla, '') AS unidade,
+        COALESCE(es.quantidade_atual, 0) AS estoque_atual,
+        (SELECT a.url_anexo FROM itens_anexos a
+          WHERE a.id_item = ic.id_item AND a.tenant_id = ic.tenant_id AND a.tipo_anexo = 'IMAGEM_PRINCIPAL'
+          ORDER BY a.ordem LIMIT 1) AS imagem_url
       FROM itens_core ic
       LEFT JOIN comercial_produtos_dados cpd 
         ON ic.id_item = cpd.id_item AND ic.tenant_id = cpd.tenant_id
@@ -134,6 +139,8 @@ export const getProdutos = async (req: Request, res: Response) => {
         ON cpd.id_marca = mar.id AND cpd.tenant_id = mar.tenant_id
       LEFT JOIN itens_unidades_medida um
         ON ic.id_unidade = um.id_unidade AND ic.tenant_id = um.tenant_id
+      LEFT JOIN estoque_saldos_itens es
+        ON es.id_item = ic.id_item AND es.tenant_id = ic.tenant_id
       WHERE ic.tenant_id = ?
       ORDER BY COALESCE(NULLIF(TRIM(cpd.nome_comercial), ''), ic.nome_item) ASC
     `;
@@ -144,6 +151,9 @@ export const getProdutos = async (req: Request, res: Response) => {
     if (itens.length === 0) {
       return res.json([]);
     }
+
+    // Gatekeeper: se o item pode ir para o PDV/canais e, se não, por quê
+    const publicacao = await avaliarPublicacaoItens(pool as any, tenantId);
 
     const skus = itens.map((item: any) => {
       const nomeItem = item.nome_comercial || item.nome_item || 'Produto sem nome';
@@ -179,12 +189,16 @@ export const getProdutos = async (req: Request, res: Response) => {
         salePrice: preco,
         preco_venda: preco,
         custo_gerencial: custo,
-        currentStock: 0,
-        estoque: 0,
+        currentStock: Number(item.estoque_atual) || 0,
+        estoque: Number(item.estoque_atual) || 0,
+        nome_core: item.nome_core || '',
         minStock: 0,
         status,
         tipo_recurso: item.tipo_recurso || 'PRODUTO',
-        pictureUrl: null,
+        publicavel: publicacao.get(Number(item.id_item))?.publicavel ?? true,
+        motivos_publicacao: publicacao.get(Number(item.id_item))?.motivos ?? [],
+        pictureUrl: item.imagem_url || null,
+        imagem_url: item.imagem_url || null,
         variacao: item.descricao_variacao || 'Principal',
         descricao_variacao: item.descricao_variacao || 'Principal',
         marca: nomeMarca,

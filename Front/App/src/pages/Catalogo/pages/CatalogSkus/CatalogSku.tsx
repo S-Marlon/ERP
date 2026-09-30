@@ -12,6 +12,7 @@ Typography,
 Row,
 Col,
 Statistic,
+Tooltip,
 Badge,
 Alert,
 Select,
@@ -71,7 +72,10 @@ export interface SkuChildType {
   grade?: Array<{ nome: string; valor: any; sufixo?: string }> | any;
 }
 
-type FilterType = 'all' | 'activeSkus' | 'noStock' | 'criticalStock';
+type FilterType = 'all' | 'activeSkus' | 'noStock' | 'criticalStock' | 'semFamilia' | 'naoPublicaveis';
+
+// Item fora de qualquer família (a classificar no PIM)
+const semFamilia = (p: ItemParentType) => !p.familia_id && String(p.tipo_recurso || '').toUpperCase() !== 'FAMILIA';
 
 type QuickPrintItem = LabelData & {
 id: string;
@@ -662,6 +666,8 @@ const groupedProducts = React.useMemo(() => {
       custo_gerencial: rawSkuData.custo_gerencial ?? 0,
       status: rawSkuData.status ?? item.status,
       imagem_url: rawSkuData.imagem_url ?? null,
+      publicavel: rawSkuData.publicavel,
+      motivos_publicacao: rawSkuData.motivos_publicacao,
       // 🚀 Repassa o DNA e a Grade vindos direto da nova query do backend
       dna: (item as any).dna || rawSkuData.dna || [],
       grade: (item as any).grade || rawSkuData.grade || [],
@@ -698,6 +704,8 @@ const skus = item.skus || [];
 if (selectedFilter === 'noStock' && !skus.some(sku => sku.estoque === 0)) return false;
 if (selectedFilter === 'criticalStock' && !skus.some(sku => sku.estoque > 0 && sku.estoque <= 5)) return false;
 if (selectedFilter === 'activeSkus' && !skus.some(sku => sku.estoque > 0)) return false;
+if (selectedFilter === 'semFamilia' && !semFamilia(item)) return false;
+if (selectedFilter === 'naoPublicaveis' && !skus.some(sku => sku.publicavel === false)) return false;
 
 if (selectedSupplier && !skus.some(sku => sku.marca?.toLowerCase() === selectedSupplier.toLowerCase())) return false;
 if (selectedCategory && String(item.categoria_id) !== selectedCategory) return false;
@@ -942,6 +950,20 @@ Remover
 <Card hoverable bodyStyle={{ padding: '16px' }} onClick={() => setSelectedFilter('criticalStock')}>
 <Statistic title="Estoque Crítico (≤ 5)" value={products.filter(p => p.skus?.some(s => s.estoque > 0 && s.estoque <= 5)).length} valueStyle={{ color: '#fa8c16' }} />
 </Card>
+</Col>
+<Col xs={24} sm={12} md={6}>
+<Tooltip title="Itens fora de qualquer família: selecione-os e use Mover para classificar em lote">
+<Card hoverable bodyStyle={{ padding: '16px' }} onClick={() => setSelectedFilter('semFamilia')}>
+<Statistic title="Sem Família" value={products.filter(semFamilia).length} valueStyle={{ color: '#722ed1' }} />
+</Card>
+</Tooltip>
+</Col>
+<Col xs={24} sm={12} md={6}>
+<Tooltip title="Itens que não podem ir ao PDV/canais (família em rascunho/bloqueada, inativo, obrigatório sem valor...)">
+<Card hoverable bodyStyle={{ padding: '16px' }} onClick={() => setSelectedFilter('naoPublicaveis')}>
+<Statistic title="Não Publicáveis" value={products.filter(p => p.skus?.some(s => s.publicavel === false)).length} valueStyle={{ color: '#d46b08' }} />
+</Card>
+</Tooltip>
 </Col>
 </Row>
 

@@ -55,7 +55,18 @@ export const getFamilies = async (tenantId: number = 1): Promise<Grupo[]> => {
     categoriaPai: fam.categoriaPai ? String(fam.categoriaPai) : (fam.categoria_id ? String(fam.categoria_id) : ''),
     categoriaPaiNome: fam.categoriaPaiNome || fam.categoria_pai_nome || '', 
     descricao: fam.descricao || '',
-    status: String(fam.status || 'ATIVO').toUpperCase() === 'INATIVO' ? 'INATIVO' : 'ATIVO',
+    status: (['ATIVO', 'INATIVO', 'RASCUNHO', 'BLOQUEADO_INCONSISTENCIA'].includes(String(fam.status || '').toUpperCase())
+      ? String(fam.status).toUpperCase()
+      : 'RASCUNHO') as Grupo['status'],
+    margemMinima: fam.margemMinima ?? null,
+    margemMaxima: fam.margemMaxima ?? null,
+    markupPadrao: fam.markupPadrao ?? null,
+    estoqueMinimo: fam.estoqueMinimo ?? null,
+    loteMinimo: fam.loteMinimo ?? null,
+    curvaAbc: fam.curvaAbc ?? null,
+    prioridadeExposicao: fam.prioridadeExposicao ?? null,
+    totalItens: Number(fam.totalItens || 0),
+    saude: fam.saude,
 
     unidadeMedidaBase: fam.unidadeMedidaBase || fam.unidade_base || 'PC',
     tipoItem: fam.tipoItem || fam.tipo_item || 'PA', 
