@@ -21,11 +21,23 @@ const DESTINO_CONFIG = {
   ficha: { color: 'default', label: '📋 FICHA TÉCNICA' },
 } as const;
 
-const TIPO_DADO_CONFIG: Record<string, { label: string; icon: React.ReactNode }> = {
+// Tipos do banco (atributos_comercial.tipo); "opcoes" é o nome antigo de "lista"
+type TipoDadoAtributo = 'texto' | 'numero' | 'decimal' | 'boolean' | 'lista' | 'data';
+const normalizarTipo = (tipo: unknown): TipoDadoAtributo => {
+  const t = String(tipo || '').toLowerCase();
+  if (t === 'opcoes') return 'lista';
+  return (['texto', 'numero', 'decimal', 'boolean', 'lista', 'data'].includes(t) ? t : 'texto') as TipoDadoAtributo;
+};
+
+const TIPO_DADO_CONFIG: Record<TipoDadoAtributo, { label: string; icon: React.ReactNode }> = {
   texto: { label: 'Texto', icon: <FileTextOutlined /> },
   numero: { label: 'Número', icon: <NumberOutlined /> },
-  opcoes: { label: 'Lista de Opções', icon: <UnorderedListOutlined /> },
+  decimal: { label: 'Decimal', icon: <NumberOutlined /> },
+  boolean: { label: 'Sim/Não', icon: <FileTextOutlined /> },
+  lista: { label: 'Lista de Opções', icon: <UnorderedListOutlined /> },
+  data: { label: 'Data', icon: <FileTextOutlined /> },
 };
+const OPCOES_TIPO = (Object.keys(TIPO_DADO_CONFIG) as TipoDadoAtributo[]).map(t => ({ value: t, label: TIPO_DADO_CONFIG[t].label }));
 
 export const ModalVinculoAtributos: React.FC<ModalVinculoAtributosProps> = ({
   isModalAberto,
@@ -37,7 +49,7 @@ export const ModalVinculoAtributos: React.FC<ModalVinculoAtributosProps> = ({
   brandColor = '#1677ff',
 }) => {
   const [novoNome, setNovoNome] = useState('');
-  const [novoTipo, setNovoTipo] = useState<'texto' | 'numero' | 'opcoes'>('texto');
+  const [novoTipo, setNovoTipo] = useState<TipoDadoAtributo>('texto');
   const [pesquisaTermo, setPesquisaTermo] = useState('');
   const [filtroTipo, setFiltroTipo] = useState<string>('todos'); // Novo estado para o filtro de tipo
   const [carregandoId, setCarregandoId] = useState<string | null>(null);
@@ -73,7 +85,7 @@ export const ModalVinculoAtributos: React.FC<ModalVinculoAtributosProps> = ({
 
     return atributosGlobaisDisponiveis.filter((attr) => {
       const correspondeTexto = !termoLimpo || attr.nome.toLowerCase().includes(termoLimpo);
-      const correspondeTipo = filtroTipo === 'todos' || attr.tipoDado === filtroTipo;
+      const correspondeTipo = filtroTipo === 'todos' || normalizarTipo(attr.tipoDado) === filtroTipo;
       return correspondeTexto && correspondeTipo;
     });
   }, [atributosGlobaisDisponiveis, pesquisaTermo, filtroTipo]);
@@ -172,12 +184,7 @@ export const ModalVinculoAtributos: React.FC<ModalVinculoAtributosProps> = ({
               onChange={(value) => setFiltroTipo(value)}
               style={{ width: '130px' }}
               suffixIcon={<FilterOutlined style={{ fontSize: '11px', color: '#8c8c8c' }} />}
-              options={[
-                { value: 'todos', label: 'Todos tipos' },
-                { value: 'texto', label: 'Texto' },
-                { value: 'numero', label: 'Número' },
-                { value: 'opcoes', label: 'Lista' },
-              ]}
+              options={[{ value: 'todos', label: 'Todos tipos' }, ...OPCOES_TIPO]}
             />
           </Space.Compact>
 
@@ -196,7 +203,7 @@ export const ModalVinculoAtributos: React.FC<ModalVinculoAtributosProps> = ({
               locale={{ emptyText: 'Nenhum termo disponível encontrado para este filtro.' }}
               renderItem={(attr) => {
                 const jaVinculado = idsVinculadosSet.has(attr.id);
-                const tipoInfo = TIPO_DADO_CONFIG[attr.tipoDado] || TIPO_DADO_CONFIG.texto;
+                const tipoInfo = TIPO_DADO_CONFIG[normalizarTipo(attr.tipoDado)];
                 const estaCarregando = carregandoId === attr.id;
 
                 return (
@@ -258,11 +265,8 @@ export const ModalVinculoAtributos: React.FC<ModalVinculoAtributosProps> = ({
               value={novoTipo}
               onChange={(value) => setNovoTipo(value)}
               style={{ width: '110px' }}
-              options={[
-                { value: 'texto', label: 'Texto' },
-                { value: 'numero', label: 'Número' },
-                { value: 'opcoes', label: 'Lista' },
-              ]}
+              // Lista precisa de opções: cadastre pelo Gerenciador de Atributos
+              options={OPCOES_TIPO.filter(o => o.value !== 'lista')}
             />
             <Button
               type="primary"

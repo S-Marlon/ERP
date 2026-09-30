@@ -49,7 +49,6 @@ export default function ListaFamiliasAtivas({
   handleCriarGrupo,
 }: ListaFamiliasAtivasProps) {
   return (
-    <Col xs={24} md={4} lg={4}>
       <Card
         title={
           <Space size={8}>
@@ -230,6 +229,5 @@ export default function ListaFamiliasAtivas({
           </Button>
         </Space>
       </Card>
-    </Col>
   );
 }

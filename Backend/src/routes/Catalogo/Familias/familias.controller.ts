@@ -633,7 +633,7 @@ export const getFamilias = async (req: Request, res: Response) => {
           nome: attr.nome,
           codigo: attr.codigo || '',
           classificacao: attr.classificacao || 'ficha',
-          tipoDado: attr.tipoDado === 'lista' ? 'opcoes' : (attr.tipoDado === 'decimal' || attr.tipoDado === 'numero' ? 'numero' : 'texto'),
+          tipoDado: attr.tipoDado || 'texto',
           separadorSufixo: attr.separadorSufixo || 'nenhum',
           sufixo: '',
           obrigatorio: attr.obrigatorio === 1 || attr.obrigatorio === true,

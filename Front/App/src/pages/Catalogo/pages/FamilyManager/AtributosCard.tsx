@@ -1,5 +1,5 @@
 import React from "react";
-import { Col, Card, Button, Table, Tooltip, Empty, Tag, Dropdown, MenuProps, Switch, InputNumber, Input, Select } from "antd";
+import { Col, Card, Button, Table, Tooltip, Empty, Tag, Dropdown, MenuProps, Switch, InputNumber, Input, Select, Space } from "antd";
 import { PlusOutlined, DeleteOutlined, InfoCircleOutlined, StarFilled, SwapOutlined } from "@ant-design/icons";
 
 export type PapelAtributo = "dna" | "grade" | "ficha";
@@ -112,9 +112,9 @@ export const AtributosCard: React.FC<AtributosCardProps> = ({
         }]
       : []),
     {
-      title: <Tooltip title="Entra no código (SKU) e no nome gerados pelo template, na posição indicada">No código</Tooltip>,
+      title: <Tooltip title="Entra no código (SKU) e no nome gerados pelo template, na posição indicada">código ?</Tooltip>,
       key: "codigo",
-      width: 92,
+      width: 90,
       render: (_: any, record: any) => {
         if (record.isMarcaSistema) return null;
         const bloqueado = somenteLeitura(record);
@@ -194,7 +194,7 @@ export const AtributosCard: React.FC<AtributosCardProps> = ({
   ];
 
   return (
-    <Col xs={24} xl={8}>
+    <div >
       <Card
         style={{
           height: "100%",
@@ -258,6 +258,6 @@ export const AtributosCard: React.FC<AtributosCardProps> = ({
         .linha-marca-sistema:hover > td { background-color: #f3e8ff !important; }
         .linha-herdada { background-color: #f8fafc !important; color: #64748b; }
       `}</style>
-    </Col>
+      </div>
   );
 };

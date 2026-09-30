@@ -208,7 +208,7 @@ export const getAtributosGlobais = async (tenantId: number = 1): Promise<Atribut
     nome: attr.nome || '',
     codigo: attr.codigo || '',
     classificacao: attr.classificacao || 'ficha',
-    tipoDado: attr.tipoDado || attr.tipo_dado || 'texto',
+    tipoDado: attr.tipoDado || attr.tipo_dado || attr.tipo || 'texto',
     opcoesValidas: Array.isArray(attr.opcoes) ? attr.opcoes : [],
     separadorSufixo: 'nenhum',
     sufixo: attr.sufixo || '',

@@ -97,6 +97,16 @@ prev.map((g) => (g.id === familiaSelecionadaId ? { ...g, [campo]: valor } : g))
 );
 };
 
+// Atualiza a família selecionada dentro da lista (aceita objeto ou função, como um setState).
+// Antes a tela recebia o setter do ID aqui: a primeira edição trocava o ID por um objeto e a família "sumia" do hook.
+const atualizarFamiliaSelecionada = useCallback((updater: any) => {
+setFamilias((prev) => prev.map((g) => {
+if (g.id !== familiaSelecionadaId) return g;
+const nova = typeof updater === "function" ? updater(g) : updater;
+return nova ? { ...nova, id: g.id } : g;
+}));
+}, [familiaSelecionadaId]);
+
 const onAtualizarTemplateComercial = (valor: string) => {
   handleAtualizarFamiliaDireto('templateNomeComercial', valor);
 };
@@ -827,7 +837,7 @@ setFamiliaSelecionadaId,
 
 // 🛡️ ALIASES DE COMPATIBILIDADE PARA O FamilyManager.tsx:
 grupoSelecionado: familiaSelecionada,
-setGrupoSelecionado: setFamiliaSelecionadaId,
+setGrupoSelecionado: atualizarFamiliaSelecionada,
 setGrupoSelecionadoId: setFamiliaSelecionadaId,
 grupoImage: familiaImage,
 handleCriarGrupo: handleCriarFamilia,

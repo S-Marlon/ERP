@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Space, Button, Tooltip, Typography, Tag, Modal, Form, Input, Select, Tabs, message, Radio } from 'antd';
-import { EditOutlined, DollarOutlined, FileTextOutlined, InfoCircleOutlined, InboxOutlined, PictureOutlined, ShopOutlined, ShareAltOutlined, SafetyCertificateOutlined, CodeSandboxOutlined, AppstoreOutlined, TagOutlined } from '@ant-design/icons';
+import { Card, Space, Button, Tooltip, Typography, Tag, Modal, Form, Input, Select, Tabs, message } from 'antd';
+import { EditOutlined, DollarOutlined, FileTextOutlined, InfoCircleOutlined, InboxOutlined, PictureOutlined, ShopOutlined, ShareAltOutlined, SafetyCertificateOutlined, CodeSandboxOutlined } from '@ant-design/icons';
 import ImageDisplay from '../../../../components/ui/ImageGallery/ImageDysplay';
+import { STATUS_FAMILIA_CONFIG } from './CatalogManager.types';
 
 const { Text } = Typography;
 
@@ -28,7 +29,10 @@ interface FamiliaIdentidadeCardProps {
     comportamentoMarca?: string;
     prioridadeExposicao?: string;
     unidadeMedidaBase?: string;
-    atributos?: Array<{ nome: string; classificacao?: string; valorPadraoFamilia?: string; valorPadraoGrupo?: string }>;
+    atributos?: Array<{ nome: string; classificacao?: string; valorPadraoFamilia?: string; valorPadraoGrupo?: string; origem?: string }>;
+    categoriaPaiNome?: string;
+    marcaComportamento?: string;
+    saude?: { bloqueios: Array<{ codigo: string; mensagem: string }>; avisos: Array<{ codigo: string; mensagem: string }> };
   };
   grupoImage?: string;
   brandColor?: string;
@@ -113,13 +117,6 @@ export const FamiliaIdentidadeCard: React.FC<FamiliaIdentidadeCardProps> = ({
 
   const accentColor = grupoSelecionado?.cor || brandColor || "#618c3f";
 
-  function setMarcaComportamento(novoComportamento: any) {
-    throw new Error('Function not implemented.');
-  }
-
-  function setTemAlteracoes(arg0: boolean) {
-    throw new Error('Function not implemented.');
-  }
 
   return (
     <>
@@ -194,11 +191,23 @@ export const FamiliaIdentidadeCard: React.FC<FamiliaIdentidadeCardProps> = ({
                 {grupoSelecionado?.nome || "Sem nome definido"}
               </Text>
             </div>
-            <Tooltip title="Propagação Automática em Cascata Ativa para os SKUs Filhos">
-              <Tag icon={<ShareAltOutlined />} color="success" style={{ margin: 0, fontSize: '10px', fontWeight: 600 }}>
-                Herança Ativa
-              </Tag>
-            </Tooltip>
+            {(() => {
+              // Herança real: categoria da família e quantos atributos vêm dela (cadeia de categorias)
+              const herdados = (grupoSelecionado?.atributos || []).filter(a => a.origem === 'herdados').length;
+              return grupoSelecionado?.categoriaPaiNome ? (
+                <Tooltip title={`${herdados} atributo(s) vêm da categoria "${grupoSelecionado.categoriaPaiNome}" e das categorias acima dela.`}>
+                  <Tag icon={<ShareAltOutlined />} color="success" style={{ margin: 0, fontSize: '10px', fontWeight: 600 }}>
+                    Herda de {grupoSelecionado.categoriaPaiNome}{herdados > 0 ? ` (${herdados})` : ''}
+                  </Tag>
+                </Tooltip>
+              ) : (
+                <Tooltip title="Sem categoria: a família não herda atributos. Vincule uma categoria para herdar DNA e ficha.">
+                  <Tag icon={<ShareAltOutlined />} style={{ margin: 0, fontSize: '10px', fontWeight: 600 }}>
+                    Sem categoria
+                  </Tag>
+                </Tooltip>
+              );
+            })()}
 
              {/* DESTAQUE: DNA Estrutural Macro (Exigência 1 do Guia) */}
           <div style={{ background: '#f0fdf4', padding: '10px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
@@ -233,22 +242,13 @@ export const FamiliaIdentidadeCard: React.FC<FamiliaIdentidadeCardProps> = ({
              {/* Bloco Estrutural / Identificação */}
             <div style={{ background: '#fff', padding: '8px', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
               <Text style={{ color: "#94a3b8", fontSize: "9px", display: "block", fontWeight: 700, textTransform: 'uppercase' }}>
-                Marca
+                Marca ({grupoSelecionado?.marcaComportamento || 'ficha'})
               </Text>
               <Text style={{ color: "#1e293b", fontSize: "12px", fontWeight: 700 }}>
                 {grupoSelecionado?.nomeMarca || "Sem Marca"}
               </Text>
             </div>
 
-             {/* Bloco Estrutural / Identificação */}
-            <div style={{ background: '#fff', padding: '8px', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
-              <Text style={{ color: "#94a3b8", fontSize: "9px", display: "block", fontWeight: 700, textTransform: 'uppercase' }}>
-                Part Number
-              </Text>
-              <Text style={{ color: "#1e293b", fontSize: "12px", fontWeight: 700 }}>
-                {grupoSelecionado?.unidadeBase || "Sem Marca"}
-              </Text>
-            </div>
 
             {/* Bloco Estrutural / Identificação */}
             <div style={{ background: '#fff', padding: '8px', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
@@ -318,105 +318,31 @@ export const FamiliaIdentidadeCard: React.FC<FamiliaIdentidadeCardProps> = ({
                     {grupoSelecionado?.curvaAbc ? `Curva ${grupoSelecionado.curvaAbc}` : "Não definida"}
                   </Text>
                 </div>
-                <Tooltip title="Governança ativa: SKUs sem atributos obrigatórios exigidos pela família bloqueiam exportação para Marketplaces.">
-                  <Tag icon={<SafetyCertificateOutlined />} color="warning" style={{ margin: 0, fontSize: '10px' }}>
-                    Bloqueio de Marketplaces Ativo
-                  </Tag>
-                </Tooltip>
+                {(() => {
+                  // Publicação real: só família ATIVA publica; bloqueios da saúde explicam o motivo
+                  const status = (grupoSelecionado?.status || 'RASCUNHO') as keyof typeof STATUS_FAMILIA_CONFIG;
+                  const bloqueios = grupoSelecionado?.saude?.bloqueios || [];
+                  const cfg = STATUS_FAMILIA_CONFIG[status] || STATUS_FAMILIA_CONFIG.RASCUNHO;
+                  const texto = status === 'ATIVO' ? 'Itens publicáveis'
+                    : status === 'BLOQUEADO_INCONSISTENCIA' ? `Bloqueada: ${bloqueios.length} pendência(s)`
+                    : `${cfg.label}: itens não publicam`;
+                  const ajuda = status === 'ATIVO'
+                    ? 'Família ativa: itens com atributos obrigatórios preenchidos podem ir para o PDV e canais.'
+                    : bloqueios.length > 0 ? bloqueios.map(b => `• ${b.mensagem}`).join('\n')
+                    : 'Itens desta família só publicam quando ela estiver ATIVA.';
+                  return (
+                    <Tooltip title={<span style={{ whiteSpace: 'pre-line' }}>{ajuda}</span>}>
+                      <Tag icon={<SafetyCertificateOutlined />} color={cfg.color} style={{ margin: 0, fontSize: '10px' }}>
+                        {texto}
+                      </Tag>
+                    </Tooltip>
+                  );
+                })()}
               </div>
             </div>
 
           </div>
 
-          {/* PREPARAÇÃO FUTURA: Aviso/Indicação visual dos Escopos Rígidos (Grades e Ficha Técnica dos Filhos) */}
-          <div style={{ background: '#f8fafc', padding: '8px 10px', borderRadius: '6px', border: '1px dashed #cbd5e1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Space size={6}>
-              <AppstoreOutlined style={{ color: '#64748b', fontSize: '12px' }} />
-             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
-             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-             <span style={{ fontSize: "12px", fontWeight: 600, color: "#1e293b" }}>
-             Comportamento da Marca nesta Família:
-             </span>
-             <Tooltip title="Define onde a marca atua: se é apenas Ficha Técnica, parte do DNA, ou Grade.">
-             <InfoCircleOutlined style={{ fontSize: "12px", color: "#64748b", cursor: "pointer" }} />
-             </Tooltip>
-             </div>
-             
-             <div style={{ width: "350px", maxWidth: "100%" }}>
-             
-             <Radio.Group
-             buttonStyle="solid"
-             value={'marcaComportamento'}
-             onChange={(e) => {
-             const novoComportamento = e.target.value;
-             if (typeof setMarcaComportamento === 'function') {
-             setMarcaComportamento(novoComportamento);
-             }
-             // Força o gatilho de alterações pendentes na família local
-             setTemAlteracoes(true);
-             }}
-             style={{ width: '100%', display: 'flex' }}
-             size="small"
-             >
-             <Radio.Button value="dna" style={{ flex: 1, textAlign: 'center', fontSize: '11px' }}>
-             <TagOutlined style={{ marginRight: '4px' }} /> DNA
-             </Radio.Button>
-             <Radio.Button value="grade" style={{ flex: 1, textAlign: 'center', fontSize: '11px' }}>
-             <AppstoreOutlined style={{ marginRight: '4px' }} /> Grade (SKU)
-             </Radio.Button>
-             <Radio.Button value="ficha" style={{ flex: 1, textAlign: 'center', fontSize: '11px' }}>
-             <FileTextOutlined style={{ marginRight: '4px' }} /> Ficha
-             </Radio.Button>
-             </Radio.Group>
-             
-             </div>
-             </div>
-             
-             
-             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", width: "100%" }}>
-                     
-                   
-             
-                     {/* Bloco do Meio */}
-                     <div style={{ 
-                       padding: "10px", 
-                       borderRadius: "8px", 
-                      
-                       transition: "all 0.3s ease",
-                       display: "flex",
-                       flexDirection: "column",
-                       alignItems: "center",
-                       justifyContent: "center",
-                       textAlign: "center"
-                     }}>
-                       <span style={{ fontSize: "11px", fontWeight: 600, marginBottom: "4px" }}>
-                         Posição: Grade (SKU)
-                       </span>
-                    
-                     </div>
-             
-                     {/* Bloco da Direita */}
-                     <div style={{ 
-                       padding: "10px", 
-                       borderRadius: "8px", 
-                     
-                       transition: "all 0.3s ease",
-                       display: "flex",
-                       flexDirection: "column",
-                       alignItems: "center",
-                       justifyContent: "center",
-                       textAlign: "center"
-                     }}>
-                       <span style={{ fontSize: "11px", fontWeight: 600, marginBottom: "4px" }}>
-                         Posição: Ficha
-                       </span>
-                       
-                     </div>
-             
-                   </div>
-            </Space>
-            <Tag style={{ fontSize: '9px', margin: 0, color: '#64748b', background: '#f1f5f9', border: 'none' }}>Pronto p/ Expansão</Tag>
-          </div>
 
         </Space>
       </Card>

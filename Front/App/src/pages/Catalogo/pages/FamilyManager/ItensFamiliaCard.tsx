@@ -68,7 +68,6 @@ export default function ItensFamiliaCard({
   handlePadronizarSkusFamilia,
 }: ItensFamiliaCardProps) {
   return (
-    <Col xs={24} md={18} lg={4}>
       <Card
         title={
           <Space size={6}>
@@ -445,6 +444,5 @@ export default function ItensFamiliaCard({
           />
         )}
       </Card>
-    </Col>
   );
 }

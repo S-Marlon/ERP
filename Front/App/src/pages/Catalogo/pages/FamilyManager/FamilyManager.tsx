@@ -30,6 +30,7 @@ AppstoreOutlined,
 FileTextOutlined,
 TagOutlined,  
 UndoOutlined,
+ReadOutlined,
 SaveOutlined,
 CheckCircleOutlined,
 ExclamationCircleOutlined,
@@ -61,6 +62,9 @@ import { AtributosCard } from "./AtributosCard";
 import Paragraph from "antd/es/typography/Paragraph";
 
 const { Title, Text } = Typography;
+
+// Ferramenta de desenvolvimento: mostra o payload local x salvo
+const MOSTRAR_DEBUG_PAYLOAD = false;
 
 export const FamilyManager: React.FC = () => {
 // Instância do formulário do Ant Design para o Modal de Pendências
@@ -106,7 +110,7 @@ setCategoriaFiltroId,
 setIsImportModalOpen,
 isImportModalOpen,
 isModalOpen,
-setIsModalOpen,
+handleOpenGuideModal,
 guideTab,
 handleCloseGuideModal,
 valoresTeste,
@@ -142,12 +146,16 @@ itensPendentesFormalizacao,
 handleProcessarFormalizacaoLote,
 handleAtualizarAtributoItemPendente,
 handleSalvarEContinuarFormalizacao,
-marcaComportamento,
-setMarcaComportamento,
 atributosComMarcaInjetada, // <--- Adicione esta linha na desestruturação
 handleAtualizarIdentidadeFamilia,
 handleNovaFamiliaImportada 
 } = catalogState;
+
+// Papel da marca (ficha, dna ou grade): lido e gravado na família selecionada
+const marcaComportamento: string = familiaSelecionadaLocal?.marcaComportamento || "ficha";
+const setMarcaComportamento = (papel: string) =>
+setFamiliaSelecionada((prev: any) => ({ ...prev, marcaComportamento: papel }));
+const [isGuiaOpen, setIsGuiaOpen] = useState(false);
 
 // Sincroniza os dados que vêm de fora para o estado local independente
 useEffect(() => {
@@ -512,16 +520,6 @@ return construirArvoreAntd(categorias);
     return atributosPuros.filter((attr: any) => (attr.classificacao || attr.escopo_padrao) === "ficha");
   }, [atributosPuros]);
 
-// 🏷️ Cria o objeto virtual fixo da Marca
-const atributoMarcaVirtual = useMemo(() => ({
-id: 'atributo-marca-virtual',
-nome: 'Marca',
-codigo: 'MARCA',
-classificacao: marcaComportamento || 'ficha',
-origem: 'sistema',
-bloqueado: true,
-isMarcaSistema: true,
-}), [marcaComportamento]);
 
 
 
@@ -673,7 +671,7 @@ Alterações não salvas
 </Space>
 </Col>
 
-<Col span={12}>
+<Col span={6}>
  {/* 0. verificações */}
   {!isFamilyCompliant ? (
     <Card 
@@ -714,22 +712,7 @@ Alterações não salvas
       </div>
     </Card>
   ) : (
-    <Card 
-      style={{ backgroundColor: '#f6ffed', borderColor: '#b7eb8f', marginBottom: 0 }}
-      size="small"
-    >
-      <Space>
-        <CheckCircleOutlined style={{ color: '#52c41a',
-        }} />
-        <div>
-          <Text strong style={{ color: '#389e0d' }}>Família em Conformidade Técnica e Comercial</Text>
-          <br />
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            Todos os atributos de DNA, grade e obrigatoriedade estão preenchidos corretamente. Os SKUs filhos estão aptos para exportação.
-          </Text>
-        </div>
-      </Space>
-    </Card>
+     ''
   )}
 
 
@@ -748,7 +731,7 @@ style={{ fontWeight: 600 }}
 
 </Col>
 
-<Col span={7}>
+<Col span={12}>
 
 <Button
 type="primary"
@@ -770,7 +753,8 @@ Nova Família
 
 {familiaSelecionadaLocal && (
 <>
-{/* 🔍 NOVO BOTÃO DE DEBUG */}
+{/* Botão de debug: escondido; troque MOSTRAR_DEBUG_PAYLOAD para true ao depurar */}
+{MOSTRAR_DEBUG_PAYLOAD && (
 <Button
 type="dashed"
 icon={<InfoCircleOutlined />}
@@ -796,6 +780,7 @@ style={{ borderRadius: 8, fontWeight: 500 }}
 >
 Debug Payload
 </Button>
+)}
 
 <Tooltip
 title={Number(familiaSelecionadaLocal?.totalItens || 0) > 0
@@ -864,6 +849,10 @@ Recarregar
 )}
 
 <Row gutter={[8, 8]}>
+
+      <Col xs={24} md={4} lg={4}>
+
+  
 {/* Coluna 1: Famílias Ativas */}
 <ListaFamiliasAtivas
 brandColor={brandColor}
@@ -880,13 +869,65 @@ handleSelecionarGrupo={handleSelecionarFamilia}
 handleCriarGrupo={handleCriarFamilia}
 />
 
+</Col>
+
+
 {/* Coluna 2: Configuração Central */}
-<Col xs={24} md={18} lg={16}>
+<Col xs={24} md={18} lg={13}>
 {familiaSelecionadaLocal ? (
 <Space direction="vertical" style={{ width: "100%" }}>
 <Row gutter={[4, 4]}>
 
  
+{/* 0. Papel da marca na família + guia de regras */}
+<Col xs={24} lg={24}>
+
+<Card size="small" style={{ borderRadius: 10, border: "1px solid #e2e8f0" }} styles={{ body: { padding: "8px 12px" } }}>
+<div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+<Space size={6}>
+<Text strong style={{ fontSize: 12 }}>Marca nesta família:</Text>
+<Tooltip title="DNA: a marca identifica a família (todos os itens têm a mesma). Grade: a marca diferencia os itens (ex.: Ebara x Schneider). Ficha: só informação.">
+<InfoCircleOutlined style={{ fontSize: 12, color: "#64748b" }} />
+</Tooltip>
+</Space>
+<Radio.Group
+buttonStyle="solid"
+size="small"
+value={marcaComportamento}
+onChange={(e) => setMarcaComportamento(e.target.value)}
+>
+<Radio.Button value="dna"><TagOutlined /> DNA</Radio.Button>
+<Radio.Button value="grade"><AppstoreOutlined /> Grade (SKU)</Radio.Button>
+<Radio.Button value="ficha"><FileTextOutlined /> Ficha</Radio.Button>
+</Radio.Group>
+<Select
+size="small"
+showSearch
+allowClear
+style={{ width: 200 }}
+placeholder={marcaComportamento === "dna" ? "Marca (obrigatória)" : "Marca da família (opcional)"}
+status={marcaComportamento === "dna" && !familiaSelecionadaLocal?.nomeMarca ? "error" : undefined}
+value={familiaSelecionadaLocal?.idMarca && familiaSelecionadaLocal?.nomeMarca ? String(familiaSelecionadaLocal.idMarca) : undefined}
+onChange={(v) => {
+const marca = marcasCatalogo.find(m => m.id === v);
+// Sem marca = "Sem Marca" (id 1, padrão do banco)
+setFamiliaSelecionada((prev: any) => ({ ...prev, idMarca: marca ? marca.id : "1", nomeMarca: marca ? marca.nome : "" }));
+}}
+options={marcasCatalogo.map(m => ({ value: m.id, label: m.nome }))}
+optionFilterProp="label"
+/>
+<Text type="secondary" style={{ fontSize: 11, flex: 1, minWidth: 200 }}>
+{marcaComportamento === "dna" && "Todos os itens recebem a marca da família."}
+{marcaComportamento === "grade" && "Cada item tem a sua marca; use {MARCA} no template do código."}
+{marcaComportamento === "ficha" && "Cada item pode ter a sua marca; a da família vale quando o item não tiver."}
+</Text>
+<Button size="small" icon={<ReadOutlined />} onClick={() => setIsGuiaOpen(true)}>
+Guia de Regras
+</Button>
+</div>
+</Card>
+</Col>
+
 {/* 1. Identidade da Família */}
 <Col xs={24} lg={24}>
 <FamiliaIdentidadeCard 
@@ -908,128 +949,7 @@ atributos: prev.atributos || [] // 🛡️ Protege os atributos contra sumiço
 />
 </Col>
 
-{/* <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
-<div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-<span style={{ fontSize: "12px", fontWeight: 600, color: "#1e293b" }}>
-Comportamento da Marca nesta Família:
-</span>
-<Tooltip title="Define onde a marca atua: se é apenas Ficha Técnica, parte do DNA, ou Grade.">
-<InfoCircleOutlined style={{ fontSize: "12px", color: "#64748b", cursor: "pointer" }} />
-</Tooltip>
-</div>
 
-<div style={{ width: "350px", maxWidth: "100%" }}>
-
-<Radio.Group
-buttonStyle="solid"
-value={marcaComportamento}
-onChange={(e) => {
-const novoComportamento = e.target.value;
-if (typeof setMarcaComportamento === 'function') {
-setMarcaComportamento(novoComportamento);
-}
-// Força o gatilho de alterações pendentes na família local
-setTemAlteracoes(true);
-}}
-style={{ width: '100%', display: 'flex' }}
-size="small"
->
-<Radio.Button value="dna" style={{ flex: 1, textAlign: 'center', fontSize: '11px' }}>
-<TagOutlined style={{ marginRight: '4px' }} /> DNA
-</Radio.Button>
-<Radio.Button value="grade" style={{ flex: 1, textAlign: 'center', fontSize: '11px' }}>
-<AppstoreOutlined style={{ marginRight: '4px' }} /> Grade (SKU)
-</Radio.Button>
-<Radio.Button value="ficha" style={{ flex: 1, textAlign: 'center', fontSize: '11px' }}>
-<FileTextOutlined style={{ marginRight: '4px' }} /> Ficha
-</Radio.Button>
-</Radio.Group>
-
-</div>
-</div>
-
-<div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-<span style={{ fontSize: "12px", fontWeight: 600, color: "#1e293b" }}>Marca da família:</span>
-<Select
-size="small"
-showSearch
-allowClear
-style={{ width: 220 }}
-placeholder={marcaComportamento === "dna" ? "Obrigatória (marca é DNA)" : "Opcional"}
-status={marcaComportamento === "dna" && !familiaSelecionadaLocal?.nomeMarca ? "error" : undefined}
-value={familiaSelecionadaLocal?.idMarca && familiaSelecionadaLocal?.nomeMarca ? String(familiaSelecionadaLocal.idMarca) : undefined}
-onChange={(v) => {
-const marca = marcasCatalogo.find(m => m.id === v);
-// Sem marca = "Sem Marca" (id 1, padrão do banco)
-setFamiliaSelecionada((prev: any) => ({ ...prev, idMarca: marca ? marca.id : "1", nomeMarca: marca ? marca.nome : "" }));
-setTemAlteracoes(true);
-}}
-options={marcasCatalogo.map(m => ({ value: m.id, label: m.nome }))}
-optionFilterProp="label"
-/>
-<span style={{ fontSize: "11px", color: "#64748b" }}>
-{marcaComportamento === "dna" && "Todos os itens recebem esta marca; ela identifica a família."}
-{marcaComportamento === "grade" && "Cada item tem a sua marca (ex.: Ebara x Schneider); use {MARCA} no template do código."}
-{marcaComportamento === "ficha" && "Cada item pode ter a sua marca; esta vale quando o item não tiver."}
-</span>
-</div>
-
-
-<div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", width: "100%" }}>
-        
-      
-
-      
-        <div style={{ 
-          padding: "10px", 
-          borderRadius: "8px", 
-          border: marcaComportamento === "grade" ? "1px solid #1890ff" : "1px dashed #cbd5e1",
-          background: marcaComportamento === "grade" ? "#e6f7ff" : "#f8fafc",
-          transition: "all 0.3s ease",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          textAlign: "center"
-        }}>
-          <span style={{ fontSize: "11px", fontWeight: 600, color: marcaComportamento === "grade" ? "#096dd9" : "#64748b", marginBottom: "4px" }}>
-            Posição: Grade (SKU)
-          </span>
-          {marcaComportamento === "grade" ? (
-            <div style={{ display: "flex", alignItems: "center", gap: "4px", color: "#1890ff", fontSize: "12px", fontWeight: 600 }}>
-              <AppstoreOutlined /> Marca ativa aqui
-            </div>
-          ) : (
-            <span style={{ fontSize: "11px", color: "#94a3b8" }}>Inativo</span>
-          )}
-        </div>
-
-       
-        <div style={{ 
-          padding: "10px", 
-          borderRadius: "8px", 
-          border: marcaComportamento === "ficha" ? "1px solid #1890ff" : "1px dashed #cbd5e1",
-          background: marcaComportamento === "ficha" ? "#e6f7ff" : "#f8fafc",
-          transition: "all 0.3s ease",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          textAlign: "center"
-        }}>
-          <span style={{ fontSize: "11px", fontWeight: 600, color: marcaComportamento === "ficha" ? "#096dd9" : "#64748b", marginBottom: "4px" }}>
-            Posição: Ficha
-          </span>
-          {marcaComportamento === "ficha" ? (
-            <div style={{ display: "flex", alignItems: "center", gap: "4px", color: "#1890ff", fontSize: "12px", fontWeight: 600 }}>
-              <FileTextOutlined /> Marca ativa aqui
-            </div>
-          ) : (
-            <span style={{ fontSize: "11px", color: "#94a3b8" }}>Inativo</span>
-          )}
-        </div>
-
-      </div> */}
 
 
 {/* 2. Painel do Simulador Unificado */}
@@ -1057,38 +977,16 @@ carregandoItens={carregandoItens}
 </Row>
 
 <Row gutter={[8, 8]} align="stretch">
-{/* 🎛️ CONFIGURAÇÃO DO COMPORTAMENTO DA MARCA */}
-<Col span={24}>
-<Card
-size="small"
-style={{
-marginBottom: 16,
-borderRadius: 10,
-border: "1px solid #e2e8f0",
-background: "#f8fafc",
-}}
-styles={{ body: { padding: "8px 12px" } }}
->
-
-
-</Card>
-
-
-
-
-
-
-</Col>
 
 
 
 
 
 {/* Tabelas de Atributos */}
-<Col span={24}>
-<Row gutter={[16, 16]} align="stretch">
-{/* Atributos DNA */}
-{/* Atributos DNA */}
+
+
+
+<Col span={10}>
 
 <AtributosCard
 titulo="Atributos DNA"
@@ -1099,10 +997,16 @@ onOpenModal={() => handleAbrirModal("dna")}
 onDelete={(record) => handleExcluirAtributo("dna", record)}
 onMover={moverAtributo}
 onAlterar={(record, patch) => alterarAtributoFamilia(record.id, patch)}
-tooltipText="DNA: igual em todos os itens da família (ex: Material = NBR). O valor fixo é definido aqui."
+tooltipText="DNA: igual em todos os itens da família (ex: Material = NBR). O valor fixo é definido aqui. Clique para ver o guia."
+onInfoClick={() => handleOpenGuideModal("dna")}
 emptyText="Nenhum atributo DNA"
 showDelete={true}
 />
+
+</Col>
+
+
+<Col span={7}>
 
 {/* Atributos Variação (Grade) */}
 <AtributosCard
@@ -1114,10 +1018,14 @@ onOpenModal={() => handleAbrirModal("grade")}
 onDelete={(record) => handleExcluirAtributo("grade", record)}
 onMover={moverAtributo}
 onAlterar={(record, patch) => alterarAtributoFamilia(record.id, patch)}
-tooltipText="Atributos que geram quebra de estoque e variações de SKU (ex: Blindagem, Marca em Grade)."
+tooltipText="Atributos que geram quebra de estoque e variações de SKU (ex: Blindagem, Marca em Grade). Clique para ver o guia."
+onInfoClick={() => handleOpenGuideModal("grade")}
 emptyText="Nenhum atributo de variação"
 showDelete={true}
 />
+
+</Col>
+<Col span={7}>
 
 {/* Atributos Ficha Técnica */}
 <AtributosCard
@@ -1129,17 +1037,42 @@ onOpenModal={() => handleAbrirModal("ficha")}
 onDelete={(record) => handleExcluirAtributo("ficha", record)}
 onMover={moverAtributo}
 onAlterar={(record, patch) => alterarAtributoFamilia(record.id, patch)}
-tooltipText="Atributos descritivos de apoio que não alteram o SKU principal."
+tooltipText="Atributos descritivos de apoio que não alteram o SKU principal. Clique para ver o guia."
+onInfoClick={() => handleOpenGuideModal("ficha")}
 emptyText="Nenhum atributo de ficha técnica"
 showDelete={true}
 />
-</Row>
 </Col>
 
 
- <Col xs={24} lg={10}>
 
-  <Card 
+</Row>
+</Space>
+) : (
+<Card
+style={{
+borderRadius: 10,
+textAlign: "center",
+padding: "60px 0",
+border: "1px dashed #cbd5e1",
+background: "#fafafa",
+}}
+>
+<Empty
+description={
+<span style={{ color: "#64748b", fontSize: "12px" }}>
+Selecione ou crie uma família na barra lateral para começar a configurar.
+</span>
+}
+/>
+</Card>
+)}
+</Col>
+
+    <Col xs={24} md={18} lg={7}>
+
+
+     <Card 
   title="Diagnóstico de Conformidade e Regras de Bloqueio da Família" 
   bordered={false} 
   style={{ marginBottom: 24 }}
@@ -1170,108 +1103,13 @@ return (
 </>
 )}
 <Text type="secondary" style={{ fontSize: 11 }}>
-Regras: ao menos um atributo de grade; DNA com valor fixo; template só com atributos da família; sigla definida se o template usa {"{SIGLA}"}.
+Regras: ao menos um atributo de grade (ou marca como grade); DNA com valor fixo; marca definida se ela é DNA; template só com atributos da família; sigla definida se o template usa {"{SIGLA}"}.
 </Text>
 </Space>
 );
 })()}
 </Card>
 
-    </Col>
-
-
-
-  <Col xs={24} lg={14}>
-  <Card title="Guia de Referência: O que a Família Herda, Exige e Controla" bordered={false} style={{ marginBottom: 2 }}>
-      <Space direction="vertical" size={2} style={{ width: '100%' }}>
-        <div>
-          <Text strong style={{ color: '#1890ff', fontSize: 16 }}>1. O que a Família HERDA da Categoria / Subcategoria Pai</Text>
-          <List
-            size="small"
-            dataSource={[
-              "Quais atributos de DNA existem (ex: Material, Série, Norma). A família fixa o valor (ex: Retentores NBR → Material = NBR).",
-              "Atributos Globais de Negócio: Regras macro de conformidade, exigências fiscais básicas e restrições do segmento industrial."
-            ]}
-            renderItem={(item) => (
-              <List.Item style={{ border: 'none', padding: '4px 0' }}>
-                <Space>
-                  <Badge status="processing" />
-                  <Text>{item}</Text>
-                </Space>
-              </List.Item>
-            )}
-          />
-        </div>
-
-        <Divider style={{ margin: '4px 0' }} />
-
-        <div>
-          <Text strong style={{ color: '#fa8c16', fontSize: 16 }}>2. O que a Família EXIGE Obrigatoriamente dos SKUs Filhos (O Escopo Rígido)</Text>
-          <List
-            size="small"
-            dataSource={[
-              "Atributos de Grade / Variação: Eixos comerciais obrigatórios para gerar os filhos (ex: Medidas dimensionais, Diâmetros, Bitolas, Voltagem).",
-              "Atributos de Ficha Técnica Críticos: Especificações que nenhum SKU pode nascer sem preencher (ex: Blindagem, Folga Radial, Pressão Máxima, Norma).",
-              "Atributos de Identificação Comercial: Marca, Part Number / Código do Fabricante e Unidade de Medida."
-            ]}
-            renderItem={(item) => (
-              <List.Item style={{ border: 'none', padding: '4px 0' }}>
-                <Space>
-                  <Badge status="warning" />
-                  <Text>{item}</Text>
-                </Space>
-              </List.Item>
-            )}
-          />
-        </div>
-
-        <Divider style={{ margin: '4px 0' }} />
-
-        <div>
-          <Text strong style={{ color: '#52c41a', fontSize: 16 }}>3. Comportamento e Regras de Propagação</Text>
-          <List
-            size="small"
-            dataSource={[
-              "Herança Automática: Tudo o que é definido na Família desce em cascata para os SKUs filhos instantaneamente.",
-              "Fallback de Segurança (Despromoção): Se um atributo deixa de ser obrigatório na Família, o valor preenchido nos filhos não é apagado; ele migra automaticamente para a Ficha Técnica estática do SKU.",
-              "Bloqueio de Publicação: SKUs criados sem os atributos obrigatórios exigidos pela família ficam impedidos de ser exportados para os Marketplaces e E-commerce."
-            ]}
-            renderItem={(item) => (
-              <List.Item style={{ border: 'none', padding: '4px 0' }}>
-                <Space>
-                  <Badge status="success" />
-                  <Text>{item}</Text>
-                </Space>
-              </List.Item>
-            )}
-          />
-        </div>
-      </Space>
-    </Card>
-    </Col>
-
-</Row>
-</Space>
-) : (
-<Card
-style={{
-borderRadius: 10,
-textAlign: "center",
-padding: "60px 0",
-border: "1px dashed #cbd5e1",
-background: "#fafafa",
-}}
->
-<Empty
-description={
-<span style={{ color: "#64748b", fontSize: "12px" }}>
-Selecione ou crie uma família na barra lateral para começar a configurar.
-</span>
-}
-/>
-</Card>
-)}
-</Col>
 
 {/* Coluna 3: Itens da Família */}
 <ItensFamiliaCard
@@ -1291,6 +1129,9 @@ handleProcessarFormalizacaoLote={handleProcessarFormalizacaoLote}
 handlePadronizarNomesFamilia={handlePadronizarNomesFamilia}
 handlePadronizarSkusFamilia={handlePadronizarSkusFamilia}
 />
+
+</Col>
+
 </Row>
 
 {/* Modais auxiliares */}
@@ -1466,11 +1307,16 @@ brandColor={brandColor}
 <Modal
 title={
 <Space>
-<UndoOutlined style={{ color: brandColor || "#1677ff" }} />
-<span>Revisão de Alterações Pendentes</span>
+<ReadOutlined style={{ color: brandColor || "#1677ff" }} />
+<span>Guia de Referência: O que a Família Herda, Exige e Controla</span>
 </Space>
-}>
-  <Card title="Guia de Referência: O que a Família Herda, Exige e Controla" bordered={false} style={{ marginBottom: 24 }}>
+}
+open={isGuiaOpen}
+onCancel={() => setIsGuiaOpen(false)}
+footer={<Button type="primary" onClick={() => setIsGuiaOpen(false)}>Fechar</Button>}
+width={760}
+>
+  <Card bordered={false} style={{ marginBottom: 0 }} styles={{ body: { padding: 0 } }}>
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
       <div>
         <Text strong style={{ color: '#1890ff', fontSize: 16 }}>1. O que a Família HERDA da Categoria / Subcategoria Pai</Text>
