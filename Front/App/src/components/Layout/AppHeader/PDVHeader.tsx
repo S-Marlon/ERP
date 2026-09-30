@@ -1,137 +1,57 @@
+// Cabeçalho do PDV: enxuto (a tela do PDV mostra cliente, busca e último item bipado).
 import { useEffect, useState } from "react";
+import { Tooltip } from "antd";
 import { darkColors, colors } from "../../../styles/colors";
+import { useUI } from "../../../context/UIContext";
+import { ListaTrabalhoBotao } from "../../../core/listaTrabalho/ListaTrabalhoBotao";
 import styles from "./PDVHeader.module.css";
-
-interface Cliente {
-  nome: string;
-  cnpj: string;
-}
 
 interface PDVHeaderProps {
   isDarkMode: boolean;
   onThemeToggle: () => void;
-  lastScan?: any;
-  operador?: string;
-  cliente?: Cliente;
 }
 
-const PDVHeader: React.FC<PDVHeaderProps> = ({
-  isDarkMode,
-  onThemeToggle,
-  lastScan,
-  operador = "Operador não definido",
-  cliente,
-}) => {
-  const [currentTime, setCurrentTime] = useState(new Date());
+const PDVHeader: React.FC<PDVHeaderProps> = ({ isDarkMode, onThemeToggle }) => {
+  const { user } = useUI();
+  const [agora, setAgora] = useState(new Date());
 
-  
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-
+    const timer = setInterval(() => setAgora(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
   const themeColors = isDarkMode ? darkColors : colors;
-  const notifications = 5; // Vem do contexto depois
 
   return (
-    <header
-      className={styles.pdvHeader}
-      style={{ borderBottomColor: themeColors.primary }}
-    >
-      {/* LEFT - SISTEMA */}
+    <header className={styles.pdvHeader} style={{ borderBottomColor: themeColors.primary }}>
       <div className={styles.left}>
         <span className={styles.title}>🛒 PDV</span>
-
-  <div className={styles.divider} />
-
-        <span className={styles.status}>● CAIXA ABERTO</span>
-        
-      </div>
-
-      {/* CENTER - LAST SCAN */}
-      <div className={styles.center}>
-        {lastScan ? (
-          <div className={styles.lastScan}>
-            <span className={styles.check}>✔</span>
-            <strong>{lastScan.name}</strong>
-            <span>x{lastScan.quantity}</span>
-            <span className={styles.price}>
-              R$ {Number(lastScan.price).toFixed(2)}
-            </span>
-          </div>
-        ) : (
-          <span className={styles.empty}>Aguardando leitura...</span>
-        )}
-      </div>
-
-      {/* RIGHT - CONTEXTO OPERACIONAL */}
-      <div className={styles.right}>
-
-       <div className={styles.clientWrapper}>
-  <div className={styles.divider} />
-
-
-  {/* CLIENTE */}
-  <div className={styles.block}>
-    <span className={styles.label}>Cliente</span>
-    <span className={styles.value}>
-      {cliente?.nome ?? "Consumidor"}
-    </span>
-  </div>
-
-  <div className={styles.divider} />
-
-  {/* CNPJ */}
-  <div className={styles.block}>
-    <span className={styles.label}>CNPJ</span>
-    <span className={styles.value}>
-      {cliente?.cnpj ?? "—"}
-    </span>
-  </div>
-
-  <div className={styles.divider} />
-
-</div>
-
-        {/* AÇÕES */}
-        <button onClick={onThemeToggle} className={styles.btn}>
-          {isDarkMode ? "🌙" : "☀️"}
-        </button>
-
-       <button
-  className={styles.btn}
-  title="Marcar item para revisão ou ação futura"
-  // onClick={handleAddToQueue}
->
-  🏷️
-</button>
-
-{/* ITEMS MARCADOS
-----------------------
-⚠ Produto A → estoque baixo
-🧾 Produto B → revisar preço
-📦 Produto C → comprar reposição
-🏷 Produto D → etiqueta incorreta */}
-
-        <span className={styles.clock}>
-          {currentTime.toLocaleTimeString("pt-BR")}
+        <div className={styles.divider} />
+        <span className={styles.empty}>
+          {agora.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" })}
         </span>
-  <div className={styles.divider} />
+      </div>
 
-        {/* USUÁRIO */}
-        {/* OPERADOR */}
+      <div className={styles.center}>
+        <span className={styles.empty}>F2 finalizar · F3 buscar · F4 cliente</span>
+      </div>
+
+      <div className={styles.right}>
+        <ListaTrabalhoBotao />
+
+        <Tooltip title={isDarkMode ? "Modo claro" : "Modo escuro"}>
+          <button onClick={onThemeToggle} className={styles.btn}>
+            {isDarkMode ? "🌙" : "☀️"}
+          </button>
+        </Tooltip>
+
+        <span className={styles.clock}>{agora.toLocaleTimeString("pt-BR")}</span>
+        <div className={styles.divider} />
+
         <div className={styles.block}>
           <span className={styles.label}>Operador</span>
-          <span className={styles.value}>{operador}</span>
+          <span className={styles.value}>{user?.name || "Operador"}</span>
         </div>
-
-         {/* NOTIFICAÇÕES */}
-                 <button className={styles.iconBtn}>
-                  🔔 {notifications}
-                </button>
       </div>
     </header>
   );

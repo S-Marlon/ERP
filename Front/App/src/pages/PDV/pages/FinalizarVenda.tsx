@@ -108,10 +108,12 @@ interface FinalizarVendaProps {
     onVendaConcluida?: () => void;
     total: number;
     cliente: string;
+    // Cliente do cadastro (null = consumidor final)
+    clienteId?: number | null;
     itens: ItemVenda[]; // <-- Adicione esta linha
 }
 
-export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, onVendaConcluida, total, cliente, itens }) => {
+export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, onVendaConcluida, total, cliente, clienteId, itens }) => {
 
     const [isEnviando, setIsEnviando] = useState(false);
     const [descontoValor, setDescontoValor] = useState(0); // O valor digitado no input
@@ -270,6 +272,7 @@ const toggleWindow = (id) => {
         const pagamentosValidos = pagamentos.filter(p => p.status === 'paid' || p.status === 'processing');
         const payload: VendaPdvPayload = {
             clienteNome: cliente || 'CONSUMIDOR',
+            idCliente: clienteId ?? null,
             descontoGeral: Number(descontoCalculado.toFixed(2)),
             itens: itensCarrinho.map(item => ({
                 idItem: Number(item.id),

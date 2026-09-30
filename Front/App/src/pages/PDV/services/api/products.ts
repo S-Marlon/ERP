@@ -118,6 +118,43 @@ export const getPdvBrands = async (): Promise<string[]> => {
 
 export const getPdvStatuses = async (): Promise<string[]> => ['Ativo', 'Inativo'];
 
+// Clientes do cadastro (papel CLIENTE/CONSUMIDOR) por nome, razão social, CPF ou CNPJ
+export interface ClienteBusca {
+  id: number;
+  tipo: string;
+  nome: string;
+  razaoSocial: string | null;
+  documento: string;
+}
+
+export const buscarClientesPdv = async (busca: string): Promise<ClienteBusca[]> => {
+  try {
+    const response = await fetch(`${PDV_URL}/clientes?busca=${encodeURIComponent(busca)}`);
+    if (!response.ok) return [];
+    return await response.json();
+  } catch {
+    return [];
+  }
+};
+
+// Árvore de categorias do catálogo novo (para o filtro do PDV)
+export interface CategoriaNo { value: string; title: string; children: CategoriaNo[] }
+
+export const getArvoreCategoriasPdv = async (): Promise<CategoriaNo[]> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/catalogo/cadastros/categorias?tenant_id=1`);
+    if (!response.ok) return [];
+    const lista: any[] = await response.json();
+    const ativas = lista.filter(c => c.ativa !== false);
+    const montar = (pai: string | null): CategoriaNo[] => ativas
+      .filter(c => (c.categoria_pai_id ? String(c.categoria_pai_id) : null) === pai)
+      .map(c => ({ value: String(c.id), title: c.nome, children: montar(String(c.id)) }));
+    return montar(null);
+  } catch {
+    return [];
+  }
+};
+
 export const getAllBasicProducts = async (): Promise<any[]> => {
   try {
     const response = await fetch(`${PDV_URL}/itens?limit=500`);

@@ -1,28 +1,19 @@
-import React, { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Menu, Button, Popover, Flex, Typography } from "antd";
 import type { MenuProps } from "antd";
-import { 
-  LeftOutlined, 
-  RightOutlined, 
-  SettingOutlined, 
-  UserOutlined, 
-  ShopOutlined, 
-  SlidersOutlined, 
+import {
+  LeftOutlined,
+  RightOutlined,
+  SettingOutlined,
+  UserOutlined,
+  ShopOutlined,
+  SlidersOutlined,
   LogoutOutlined,
-  HomeOutlined,
-  TeamOutlined,
-  ShoppingOutlined,
-  AppstoreOutlined,
-  ShoppingCartOutlined,
-  ShopTwoTone,
-  FileTextOutlined,
-  InboxOutlined,
-  ToolOutlined,
   BellOutlined,
   QuestionCircleOutlined,
-  DollarOutlined
 } from "@ant-design/icons";
+import { ItemMenu, MENU_PRINCIPAL, itemDaRota } from "../menuRotas";
 
 const { Text } = Typography;
 
@@ -31,146 +22,66 @@ interface SidebarProps {
   toggleSidebar: () => void;
 }
 
+const paraItensAntd = (itens: ItemMenu[]): MenuProps['items'] =>
+  itens.map(i => ({
+    key: i.key,
+    icon: i.icon,
+    label: i.label,
+    children: i.children ? paraItensAntd(i.children) : undefined,
+  }));
+
 export default function AppSidebar({ isOpen, toggleSidebar }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [favorites, setFavorites] = useState<string[]>([]);
+  // Item e grupo da rota atual (sub-rotas também marcam o item certo)
+  const atual = useMemo(() => itemDaRota(location.pathname), [location.pathname]);
+  const grupoAtual = useMemo(
+    () => MENU_PRINCIPAL.find(g => g.children?.some(c => c.key === atual?.item.key))?.key,
+    [atual]
+  );
 
+  // Grupos abertos acompanham a navegação (sem fechar o que o usuário abriu)
+  const [abertos, setAbertos] = useState<string[]>(grupoAtual ? [grupoAtual] : []);
   useEffect(() => {
-    const saved = localStorage.getItem("favorites");
-    if (saved) setFavorites(JSON.parse(saved));
-  }, []);
+    if (grupoAtual) setAbertos(prev => (prev.includes(grupoAtual) ? prev : [...prev, grupoAtual]));
+  }, [grupoAtual]);
 
-  useEffect(() => {
-    localStorage.setItem("favorites", JSON.stringify(favorites));
-  }, [favorites]);
-
-  const getSelectedKey = () => {
-    return location.pathname;
-  };
-
-  const getOpenKey = () => {
-    if (location.pathname.startsWith('/estoque')) return ['/estoque'];
-    return [];
-  };
-
-  const items: MenuProps['items'] = [
-    {
-      key: '/',
-      icon: <HomeOutlined />,
-      label: 'Dashboard',
-    },
-    {
-      key: '/parceiros',
-      icon: <TeamOutlined />,
-      label: 'Parceiros',
-    },
-     {
-      key: '/financeiro',
-      icon: <DollarOutlined />,
-      label: 'Financeiro',
-    },
-      {
-      key: '/ecommerce',
-      icon: <ShopOutlined />,
-      label: 'E-commerce',
-    },
-    
-    {
-      key: '/produtos',
-      icon: <ShoppingOutlined />,
-      label: 'Produtos',
-    },
-    {
-      key: '/catalogo',
-      icon: <AppstoreOutlined />,
-      label: 'Catálogo',
-    },
-    {
-      key: '/compras',
-      icon: <ShoppingCartOutlined />,
-      label: 'Compras',
-    },
-    {
-      key: '/vendas',
-      icon: <ShopTwoTone />,
-      label: 'Vendas',
-      children: [
-        { key: '/vendas', label: 'Central de Vendas' },
-        { key: '/vendas/pdv', label: 'PDV' },
-        { key: '/vendas/do-dia', label: 'Vendas do Dia' },
-      ],
-    },
-    {
-      key: '/relatorios',
-      icon: <FileTextOutlined />,
-      label: 'Relatórios',
-    },
-    {
-      key: '/estoque',
-      icon: <InboxOutlined />,
-      label: 'Estoque',
-      children: [
-        { key: '/estoque/consulta', label: 'Consulta de Saldo' },
-        { key: '/estoque/notas', label: 'Notas Fiscais' },
-        { key: '/estoque/operacoes', label: 'Movimentações' },
-        { key: '/estoque/etiquetagem', label: 'Etiquetagem' },
-      ],
-    },
-    {
-      key: '/obras',
-      icon: <ToolOutlined />,
-      label: 'Obras / Projetos',
-    },
-  ];
+  const items = useMemo(() => paraItensAntd(MENU_PRINCIPAL), []);
 
   const handleMenuClick: MenuProps['onClick'] = (e) => {
-    navigate(e.key);
+    if (!e.key.startsWith('grp:')) navigate(e.key);
   };
 
-const configContent = (
+  // Configurações: telas ainda não implementadas (ficam desabilitadas até existirem)
+  const configContent = (
     <Flex vertical gap={4} style={{ width: 220, padding: 4 }}>
-      <Button type="text" icon={<UserOutlined />} style={{ justifyContent: 'flex-start' }}>
-        Meu Perfil
-      </Button>
-      <Button type="text" icon={<ShopOutlined />} style={{ justifyContent: 'flex-start' }}>
-        Dados da Empresa
-      </Button>
-      <Button type="text" icon={<SlidersOutlined />} style={{ justifyContent: 'flex-start' }}>
-        Preferências do Sistema
-      </Button>
-      <Button type="text" icon={<BellOutlined />} style={{ justifyContent: 'flex-start' }}>
-        Notificações
-      </Button>
-      <Button type="text" icon={<QuestionCircleOutlined />} style={{ justifyContent: 'flex-start' }}>
-        Ajuda e Suporte
-      </Button>
-      
+      <Button type="text" disabled icon={<UserOutlined />} style={{ justifyContent: 'flex-start' }}>Meu Perfil</Button>
+      <Button type="text" disabled icon={<ShopOutlined />} style={{ justifyContent: 'flex-start' }}>Dados da Empresa</Button>
+      <Button type="text" disabled icon={<SlidersOutlined />} style={{ justifyContent: 'flex-start' }}>Preferências do Sistema</Button>
+      <Button type="text" disabled icon={<BellOutlined />} style={{ justifyContent: 'flex-start' }}>Notificações</Button>
+      <Button type="text" disabled icon={<QuestionCircleOutlined />} style={{ justifyContent: 'flex-start' }}>Ajuda e Suporte</Button>
       <div style={{ height: 1, background: 'rgba(0, 0, 0, 0.06)', margin: '6px 0' }} />
-      
-      <Button type="text" danger icon={<LogoutOutlined />} style={{ justifyContent: 'flex-start' }}>
-        Encerrar Sessão
-      </Button>
+      <Button type="text" danger disabled icon={<LogoutOutlined />} style={{ justifyContent: 'flex-start' }}>Encerrar Sessão</Button>
+      <Text type="secondary" style={{ fontSize: 11, padding: '0 8px' }}>Em breve: estas telas ainda não existem.</Text>
     </Flex>
   );
 
   return (
-    <Flex 
-      vertical 
-      justify="space-between" 
-      style={{ 
-        height: '100%', 
+    <Flex
+      vertical
+      justify="space-between"
+      style={{
+        height: '100%',
         color: '#fff',
-        overflow: 'hidden', 
-        background: 'linear-gradient(180deg, #9c2e2e 0%, #712626 35%, #1e0d0d 85%, #0f0606 100%)' 
+        overflow: 'hidden',
+        background: 'linear-gradient(180deg, #9c2e2e 0%, #712626 35%, #1e0d0d 85%, #0f0606 100%)'
       }}
     >
-      
-      {/* HEADER / LOGO & TOGGLE */}
-      <Flex 
-        align="center" 
-        justify={isOpen ? "space-between" : "center"} 
+      {/* LOGO & TOGGLE */}
+      <Flex
+        align="center"
+        justify={isOpen ? "space-between" : "center"}
         style={{ padding: '12px 16px', minHeight: 50, borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}
       >
         {isOpen && (
@@ -179,15 +90,10 @@ const configContent = (
             <Text strong style={{ color: '#fff', whiteSpace: 'nowrap' }}>Core System</Text>
           </Flex>
         )}
-        <Button 
-          type="text" 
-          style={{ color: '#fff' }}
-          icon={isOpen ? <LeftOutlined /> : <RightOutlined />} 
-          onClick={toggleSidebar} 
-        />
+        <Button type="text" style={{ color: '#fff' }} icon={isOpen ? <LeftOutlined /> : <RightOutlined />} onClick={toggleSidebar} />
       </Flex>
 
-      {/* NAVIGATION MENU */}
+      {/* MENU */}
       <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
         {isOpen && (
           <div style={{ padding: '12px 16px 4px 16px' }}>
@@ -196,13 +102,12 @@ const configContent = (
             </Text>
           </div>
         )}
-        
-        {/* Usando theme="dark" e background transparente para o gradiente aparecer no menu */}
         <Menu
           theme="dark"
           mode="inline"
-          selectedKeys={[getSelectedKey()]}
-          defaultOpenKeys={getOpenKey()}
+          selectedKeys={atual ? [atual.item.key] : []}
+          openKeys={isOpen ? abertos : undefined}
+          onOpenChange={keys => setAbertos(keys as string[])}
           items={items}
           onClick={handleMenuClick}
           style={{ borderRight: 0, background: 'transparent' }}
@@ -210,71 +115,25 @@ const configContent = (
         />
       </div>
 
-      {/* FOOTER / CONFIGURAÇÕES */}
+      {/* CONFIGURAÇÕES */}
       <div style={{ padding: '12px', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
         <Popover content={configContent} trigger="click" placement="rightBottom">
-          <Button 
-            type="text" 
-            icon={<SettingOutlined />} 
+          <Button
+            type="text"
+            icon={<SettingOutlined />}
             style={{ width: '100%', color: '#fff', justifyContent: isOpen ? 'flex-start' : 'center' }}
           >
             {isOpen && <span style={{ marginLeft: 8 }}>Configurações</span>}
           </Button>
         </Popover>
       </div>
-
     </Flex>
   );
 }
 
-
-// 1. Botões Recomendados para Adicionar
-// Central de Notificações / Alertas (para ver avisos do sistema, estoque baixo, notas pendentes)
-
-// Ajuda / Documentação / Suporte (essencial para abrir chamados ou ver manuais)
-
-// Versão / Sobre o Sistema (para auditoria e suporte técnico)
-
-// 2. O que deve ter em cada tela/funcionalidade
-// 👤 Meu Perfil
-// Funcionalidades:
-
-// Alteração de dados cadastrais (Nome, E-mail, Telefone, Foto de perfil).
-
-// Alteração de senha de acesso.
-
-// Visualização do cargo/perfil atual (ex: Administrador) e permissões vinculadas.
-
-// 🏢 Dados da Empresa
-// Funcionalidades:
-
-// Informações fiscais e cadastrais (Razão Social, CNPJ, Inscrição Estadual/Municipal).
-
-// Endereço completo e contatos comerciais.
-
-// Upload do logotipo da empresa (usado em relatórios e impressões de notas/orçamentos).
-
-// ⚙️ Preferências do Sistema
-// Funcionalidades:
-
-// Alternância de tema (Claro / Escuro).
-
-// Configurações regionais (formato de data, moeda padrão - R$, número de casas decimais para valores e quantidades).
-
-// Preferências de notificações sonoras ou visuais.
-
-// 🔔 Central de Notificações (Novo)
-// Funcionalidades:
-
-// Lista de alertas recentes (ex: "Produto X atingiu o estoque mínimo", "Nota fiscal autorizada", "Nova venda realizada").
-
-// Botão de "Marcar todas como lidas".
-
-// ❓ Ajuda e Suporte (Novo)
-// Funcionalidades:
-
-// Links rápidos para a documentação ou base de conhecimento.
-
-// Canal de contato com o suporte técnico (E-mail, WhatsApp ou abertura de ticket).
-
-// Exibição da Versão atual do ERP (ex: v2.4.1).
+// Próximas telas de configuração (roteiro):
+// - Meu Perfil: dados, senha, cargo e permissões.
+// - Dados da Empresa: razão social, CNPJ, IE/IM, endereço, logotipo (usado nas impressões).
+// - Preferências: tema, formato de data/moeda, casas decimais, avisos sonoros.
+// - Central de Notificações: estoque mínimo, NF autorizada, vendas; "marcar todas como lidas".
+// - Ajuda e Suporte: documentação, contato, versão do ERP.

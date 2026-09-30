@@ -361,13 +361,7 @@ export const CartAside: React.FC<CartAsideProps> = ({
                                         ) : (
                                             <Tag style={{ margin: 0 }}>{item.unitOfMeasure}</Tag>
                                         )}
-                                        {atacado && <Tag color="green" style={{ margin: 0 }}>Atacado</Tag>}
                                         {item.precoManual && <Tag color="orange" style={{ margin: 0 }}>Preço manual</Tag>}
-                                        {proxima && (
-                                            <span style={{ fontSize: 11, color: '#0369a1' }}>
-                                                A partir de {Number(proxima.quantidadeMinima).toLocaleString('pt-BR')} {item.unitOfMeasure}: {money.format(proxima.precoUnitario)}
-                                            </span>
-                                        )}
                                     </div>
                                 )}
 
@@ -377,6 +371,23 @@ export const CartAside: React.FC<CartAsideProps> = ({
                                         <span className={styles.unitPrice}>
                                             {money.format(item.price)} <small>/ {item.unitOfMeasure || 'un'}</small>
                                         </span>
+                                        {/* Faixa de atacado: quanto falta e por quanto sai */}
+                                        {proxima && (
+                                            <Tooltip title={`Faltam ${Number(proxima.quantidadeMinima - item.quantity).toLocaleString('pt-BR')} ${item.unitOfMeasure || 'un'} para o preço de atacado`}>
+                                                <Tag
+                                                    color="orange"
+                                                    style={{ margin: '2px 0 0', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                                                    onClick={() => updateQuantity(item.id, proxima.quantidadeMinima)}
+                                                >
+                                                    Atacado {Number(proxima.quantidadeMinima).toLocaleString('pt-BR')}+ {item.unitOfMeasure || 'un'}: {money.format(proxima.precoUnitario)}
+                                                </Tag>
+                                            </Tooltip>
+                                        )}
+                                        {atacado && (
+                                            <Tag color="green" style={{ margin: '2px 0 0', fontSize: 11, fontWeight: 600 }}>
+                                                Preço de atacado aplicado
+                                            </Tag>
+                                        )}
                                     </div>
 
                                     <div className={styles.controlsGroup}>

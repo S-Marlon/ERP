@@ -29,6 +29,9 @@ export interface Product {
   podeVenderSemEstoque?: boolean;
   publicavel?: boolean;
   motivosPublicacao?: string[];
+  atacado?: { quantidadeMinima: number; preco: number } | null;
+  location?: string;
+  categoryId?: number | null;
 }
 
 export interface ProductBasic {

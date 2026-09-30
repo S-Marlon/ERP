@@ -1,7 +1,7 @@
 // contexts/PDVContext.tsx
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useCart } from '../hooks/useCart';
-import { usePDVState } from '../hooks/usePDVState';
+import { usePDVState, ClientePdv } from '../hooks/usePDVState';
 import { useFilters } from '../hooks/useFilters';
 import { useSalePreparation } from '../hooks/useSalePreparation';
 import { CartItem } from '../types/cart.types';
@@ -30,6 +30,9 @@ interface PDVContextType {
   setEstagio: (estagio: 'SELECAO' | 'PAGAMENTO') => void;
   cliente: string;
   setCliente: (cliente: string) => void;
+  clienteId: number | null;
+  clienteDocumento: string;
+  selecionarCliente: (c: ClientePdv | null) => void;
   identificadorCliente: string;
   setIdentificadorCliente: (id: string) => void;
   mostrarModalCliente: boolean;

@@ -23,7 +23,7 @@ export const SELECT_ITENS = `
          COALESCE(cpd.pode_vender_sem_estoque, 0) AS pode_vender_sem_estoque,
          COALESCE(f.categoria_id, cpd.categoria_id) AS categoria_id, cat.nome AS categoria_nome,
          mar.nome AS marca_nome,
-         COALESCE(es.quantidade_atual, 0) AS estoque_base, COALESCE(es.custo_medio, 0) AS custo_medio,
+         COALESCE(es.quantidade_atual, 0) AS estoque_base, COALESCE(es.custo_medio, 0) AS custo_medio, es.localizacao,
          (SELECT a.url_anexo FROM itens_anexos a
            WHERE a.id_item = ic.id_item AND a.tenant_id = ic.tenant_id AND a.tipo_anexo = 'IMAGEM_PRINCIPAL'
            ORDER BY a.ordem LIMIT 1) AS imagem_url
@@ -132,6 +132,7 @@ const montarProduto = (
     minStock: 0,
     isStockLow: estoqueBase <= 0,
     pictureUrl: item.imagem_url || null,
+    location: item.localizacao || '',
     // Modelo novo
     idUnidadeVenda: preco.unidade?.idUnidade ?? null,
     fatorConversao: fator,
@@ -139,6 +140,13 @@ const montarProduto = (
     unidadeBase: item.sigla_base || '',
     origemPreco: preco.origem,
     temAtacado: preco.temAtacado,
+    // Menor preço de atacado da unidade sugerida (ex.: 10+ por R$ 9,29)
+    atacado: (() => {
+      const f = faixas
+        .filter(x => x.idUnidade === preco.unidade?.idUnidade && x.tipoFaixa === 'ATACADO' && x.precoUnitario > 0)
+        .sort((a, b) => a.precoUnitario - b.precoUnitario)[0];
+      return f ? { quantidadeMinima: f.quantidadeMinima, preco: f.precoUnitario } : null;
+    })(),
     podeVenderSemEstoque: Boolean(Number(item.pode_vender_sem_estoque)),
     publicavel: publicacao?.publicavel ?? true,
     motivosPublicacao: publicacao?.motivos ?? [],
@@ -280,6 +288,77 @@ export const detalheItemPdv = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Erro ao carregar item do PDV:', error);
     return res.status(500).json({ error: 'Erro ao carregar item do PDV', details: error.message });
+  }
+};
+
+/**
+ * GET /api/vendas/pdv/etiquetas?ids=1,2,3 — dados de etiqueta (preço da unidade padrão do PDV, GTIN,
+ * menor preço de atacado dessa unidade e localização), no mesmo formato de produto do PDV.
+ */
+export const itensParaEtiqueta = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  try {
+    const ids = [...new Set(String(req.query.ids || '').split(',').map(Number).filter(n => Number.isInteger(n) && n > 0))].slice(0, 500);
+    if (ids.length === 0) return res.json({ data: [] });
+    const [rows] = await pool.execute(
+      `${SELECT_ITENS} WHERE ic.tenant_id = ? AND ic.id_item IN (${ids.map(() => '?').join(',')})`,
+      [tenant, ...ids]
+    );
+    const itens = rows as any[];
+    const precos = await carregarPrecos(pool as any, tenant, itens);
+    return res.json({
+      data: itens.map(item => {
+        const id = Number(item.id_item);
+        const faixas = precos.faixasPorItem.get(id) || [];
+        return montarProduto(item, precos.unidadesPorItem.get(id) || [], faixas, undefined);
+      }),
+    });
+  } catch (error: any) {
+    console.error('Erro ao carregar dados de etiqueta:', error);
+    return res.status(500).json({ error: 'Erro ao carregar dados de etiqueta', details: error.message });
+  }
+};
+
+/**
+ * GET /api/vendas/pdv/clientes?busca= — clientes (papel CLIENTE/CONSUMIDOR) por nome, razão social, fantasia, CPF ou CNPJ.
+ * Documento comparado só pelos dígitos (o cadastro tem CNPJ com e sem máscara).
+ */
+export const buscarClientesPdv = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  try {
+    const busca = String(req.query.busca || '').trim();
+    const digitos = busca.replace(/\D/g, '');
+    const params: any[] = [tenant];
+    let filtro = '';
+    if (busca) {
+      const termo = `%${busca}%`;
+      filtro = `AND (pf.nome LIKE ? OR pj.razao_social LIKE ? OR pj.nome_fantasia LIKE ?
+                ${digitos.length >= 3 ? `OR REPLACE(REPLACE(REPLACE(COALESCE(pf.cpf, pj.cnpj, ''), '.', ''), '-', ''), '/', '') LIKE ?` : ''})`;
+      params.push(termo, termo, termo);
+      if (digitos.length >= 3) params.push(`%${digitos}%`);
+    }
+    const [rows] = await pool.execute(
+      `SELECT DISTINCT c.id_pessoa, c.tipo_pessoa, pf.nome, pf.cpf, pj.razao_social, pj.nome_fantasia, pj.cnpj
+       FROM pessoas_core c
+       INNER JOIN pessoas_papeis_atribuido pa ON pa.id_cliente = c.id_pessoa
+       INNER JOIN pessoas_papeis_definicao pd ON pd.id_cliente_papel = pa.id_cliente_papel AND pd.codigo IN ('CLIENTE', 'CONSUMIDOR')
+       LEFT JOIN pessoas_pf pf ON pf.id_cliente = c.id_pessoa
+       LEFT JOIN pessoas_pj pj ON pj.id_cliente = c.id_pessoa
+       WHERE c.tenant_id = ? AND c.deleted_at IS NULL AND c.status = 'ATIVO' ${filtro}
+       ORDER BY COALESCE(pf.nome, pj.nome_fantasia, pj.razao_social)
+       LIMIT 20`,
+      params
+    );
+    return res.json((rows as any[]).map(r => ({
+      id: Number(r.id_pessoa),
+      tipo: r.tipo_pessoa,
+      nome: r.tipo_pessoa === 'PJ' ? (r.nome_fantasia || r.razao_social || '') : (r.nome || ''),
+      razaoSocial: r.razao_social || null,
+      documento: r.tipo_pessoa === 'PJ' ? (r.cnpj || '') : (r.cpf || ''),
+    })));
+  } catch (error: any) {
+    console.error('Erro ao buscar clientes do PDV:', error);
+    return res.status(500).json({ error: 'Erro ao buscar clientes', details: error.message });
   }
 };
 
