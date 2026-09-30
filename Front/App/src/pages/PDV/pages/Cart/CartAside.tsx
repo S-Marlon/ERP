@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import styles from './CartAside.module.css';
 import Swal from 'sweetalert2';
-import { Button, InputNumber, Tooltip, Modal, message } from 'antd';
+import { Button, InputNumber, Tooltip, Modal, message, Select, Tag } from 'antd';
 import { 
   PrinterOutlined, 
   ExportOutlined, 
@@ -14,6 +14,7 @@ import {
 } from '@ant-design/icons';
 
 import { CartItem } from '../../types';
+import { emAtacado, podeFracionar, proximaFaixa } from '../../utils/precoCarrinho';
 
 interface CartAsideProps {
     cart: CartItem[];
@@ -24,6 +25,7 @@ interface CartAsideProps {
     total: number;
     money: Intl.NumberFormat;
     updateQuantity: (id: string | number, value: number | string) => void;
+    changeUnit?: (id: string | number, idUnidade: number) => void;
     removeItem: (id: string | number) => void;
     onFinalizar: () => void;
     onBack: () => void;
@@ -43,6 +45,7 @@ export const CartAside: React.FC<CartAsideProps> = ({
     total,
     money,
     updateQuantity,
+    changeUnit,
     removeItem,
     onFinalizar,
     estagio,
@@ -309,11 +312,17 @@ export const CartAside: React.FC<CartAsideProps> = ({
                         const porcentagemOff = ((1 - item.price / precoOriginal) * 100).toFixed(0);
 
                         // 🔹 Verifica se o fracionamento está ativo para este item
-                        const isFractionated = !!fractionatedItems[item.id];
+                        const isFractionated = !!fractionatedItems[item.id] || podeFracionar(item.unitOfMeasure);
                         const currentStep = isFractionated ? 0.1 : 1;
 
                         const stock = item.stock ?? 0;
-                        const hasStock = stock > 0;
+                        const ehProduto = item.type !== 'service' && item.type !== 'os';
+                        const limitaEstoque = ehProduto && !item.podeVenderSemEstoque;
+
+                        // Unidade e faixa de preço (modelo novo)
+                        const unidade = item.unidades?.find(u => u.idUnidade === item.idUnidadeVenda);
+                        const atacado = unidade ? emAtacado(unidade, item.quantity) : false;
+                        const proxima = unidade && !item.precoManual ? proximaFaixa(unidade, item.quantity) : null;
 
                         return (
                             <div key={item.id} className={`${styles.cartItem} ${temDesconto ? styles.cartItemDiscounted : ''}`}>
@@ -329,12 +338,38 @@ export const CartAside: React.FC<CartAsideProps> = ({
 
                                 <div className={styles.itemSecondaryDetails}>
                                     <span className={styles.skuText}>Cód: {item.sku ?? item.id}</span>
-                                    {item.type === 'part' && (
+                                    {ehProduto && (
                                         <span className={`${styles.stockInfo} ${stock < 5 ? styles.lowStock : ''}`}>
-                                            Estoque: {stock}
+                                            Estoque: {Number(stock).toLocaleString('pt-BR')} {item.unitOfMeasure || ''}
                                         </span>
                                     )}
                                 </div>
+
+                                {ehProduto && (item.unidades?.length || 0) > 0 && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', margin: '4px 0' }}>
+                                        {(item.unidades?.length || 0) > 1 ? (
+                                            <Select
+                                                size="small"
+                                                style={{ minWidth: 140 }}
+                                                value={item.idUnidadeVenda ?? undefined}
+                                                onChange={(v: number) => changeUnit?.(item.id, v)}
+                                                options={item.unidades!.map(u => ({
+                                                    value: u.idUnidade,
+                                                    label: `${u.nomeExibicao && u.nomeExibicao !== u.sigla ? `${u.nomeExibicao} ` : ''}${u.sigla}${u.fator !== 1 ? ` (${u.fator})` : ''}`,
+                                                }))}
+                                            />
+                                        ) : (
+                                            <Tag style={{ margin: 0 }}>{item.unitOfMeasure}</Tag>
+                                        )}
+                                        {atacado && <Tag color="green" style={{ margin: 0 }}>Atacado</Tag>}
+                                        {item.precoManual && <Tag color="orange" style={{ margin: 0 }}>Preço manual</Tag>}
+                                        {proxima && (
+                                            <span style={{ fontSize: 11, color: '#0369a1' }}>
+                                                A partir de {Number(proxima.quantidadeMinima).toLocaleString('pt-BR')} {item.unitOfMeasure}: {money.format(proxima.precoUnitario)}
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
 
                                 <div className={styles.cartActions}>
                                     <div className={styles.priceColumn}>
@@ -369,7 +404,7 @@ export const CartAside: React.FC<CartAsideProps> = ({
                                             <InputNumber
                                                 size="small"
                                                 min={0}
-                                                max={hasStock && item.type === 'part' ? stock : undefined}
+                                                max={limitaEstoque ? stock : undefined}
                                                 step={currentStep}
                                                 value={item.quantity}
                                                 onChange={(val) => updateQuantity(item.id, val ?? 0)}

@@ -31,7 +31,13 @@ export interface SaleItem {
   publicavel?: boolean;
 }
 
+import type { UnidadeCarrinho } from '../utils/precoCarrinho';
+
 export interface CartItem extends SaleItem {
+  // Modelo novo: unidades de venda com faixas, preço de tabela vigente e se o preço foi alterado à mão
+  unidades?: UnidadeCarrinho[];
+  precoTabela?: number;
+  precoManual?: boolean;
   quantity: number;
   type: ItemType; // Agora unificado
   osData?: any;

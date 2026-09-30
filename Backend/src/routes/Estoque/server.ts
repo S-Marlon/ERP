@@ -14,7 +14,6 @@ import comprasRoutes from '../Compras/compras.routes';
 import lojaClientesHistoricoRoutes
 from '../Loja/loja_clientes_historico.routes';
 import catalogoRoutes from '../Catalogo/catalogo.routes';
-import vendasRoutes from '../Venda/vendas.routes';
 
 
 
@@ -39,7 +38,6 @@ app.use('/api/estoque', (req,res) =>{
 } );
 
 app.use('/api/catalogo', catalogoRoutes );
-app.use('/api/vendas', vendasRoutes);
 
 
 

@@ -6,6 +6,7 @@ import financeiroRoutes from './financeiro.routes';
 import catalogoRoutes from './Catalogo/catalogo.routes';
 import parceirosRoutes from './Parceiros/parceiros.routes';
 import comprasRoutes from './Compras/compras.routes'
+import vendasRoutes from './Venda/vendas.routes';
 import { Router, Request, Response } from 'express';
 
 
@@ -22,5 +23,7 @@ router.use('/financeiro', financeiroRoutes);
 router.use('/catalogo', catalogoRoutes);
 router.use('/parceiros', parceirosRoutes); // Adicione esta linha para incluir as rotas de parceiros
 router.use('/compras' , comprasRoutes)
+// PDV e vendas no modelo novo (itens_core)
+router.use('/vendas', vendasRoutes);
 
 export default router;

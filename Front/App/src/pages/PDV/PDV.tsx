@@ -38,6 +38,7 @@ const PDVContent: React.FC = () => {
     addToCart,
     updateQuantity,
     removeItem,
+    changeUnit,
     applyIndividualDiscount,
     clearCart,
     // PDV State
@@ -221,6 +222,7 @@ const PDVContent: React.FC = () => {
             barcode: p.barcode,
             stock: Number(p.currentStock) || 0,
             unitOfMeasure: p.unitOfMeasure,
+            idUnidadeVenda: p.idUnidadeVenda ?? null,
             category: p.category,
             status: p.status,
             pictureUrl: p.pictureUrl,
@@ -880,6 +882,7 @@ const PDVContent: React.FC = () => {
         total={total}
         money={money}
         updateQuantity={updateQuantity}
+        changeUnit={changeUnit}
         removeItem={removeItem}
         onFinalizar={() => setEstagio('PAGAMENTO')}
         onBack={() => setEstagio('SELECAO')}

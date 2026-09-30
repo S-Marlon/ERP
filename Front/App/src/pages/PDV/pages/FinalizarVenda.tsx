@@ -275,7 +275,8 @@ const toggleWindow = (id) => {
                 idItem: Number(item.id),
                 quantidade: Number(item.quantity),
                 idUnidade: item.idUnidadeVenda ?? null,
-                precoUnitario: Number(item.price ?? item.salePrice ?? 0),
+                // Sem desconto manual o servidor aplica a tabela (varejo/atacado) pela quantidade
+                precoUnitario: item.precoManual ? Number(item.price) : undefined,
             })),
             pagamentos: pagamentosValidos.map(p => ({
                 forma: FORMA_POR_METODO[p.metodo],

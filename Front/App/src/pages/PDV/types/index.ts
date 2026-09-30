@@ -10,6 +10,8 @@
  * - Reutilizáveis (Product, Category, etc)
  */
 
+import type { UnidadeCarrinho } from '../utils/precoCarrinho';
+
 // Re-export models
 export * from './models';
 
@@ -33,10 +35,19 @@ export interface SaleItem {
   compatibility?: string;
   location?: string;
   pictureUrl?: string;
+  // Modelo novo (itens_core)
+  barcode?: string;
+  idUnidadeVenda?: number | null;
+  fatorConversao?: number;
+  podeVenderSemEstoque?: boolean;
+  publicavel?: boolean;
 }
 
 export interface CartItem extends SaleItem {
   quantity: number;
+  unidades?: UnidadeCarrinho[];
+  precoTabela?: number;
+  precoManual?: boolean;
   type: ItemType;
   osData?: any;
   originalPrice?: number;

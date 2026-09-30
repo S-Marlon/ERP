@@ -20,6 +20,7 @@ interface PDVContextType {
   cart: CartItem[];
   addToCart: (item: CartItem) => Promise<void>;
   updateQuantity: (id: string | number, value: number | string) => void;
+  changeUnit: (id: string | number, idUnidade: number) => void;
   removeItem: (id: string | number) => void;
   applyIndividualDiscount: (id: string | number, newPrice: number) => void;
   clearCart: () => void;
