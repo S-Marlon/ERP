@@ -27,6 +27,7 @@ import StockLabelingForm from './pages/Estoque/pages/StockLabelingForm/StockLabe
 import { FinalizarVenda } from "./pages/PDV/pages/FinalizarVenda";
 import PDVContent from './pages/PDV/PDV';
 import HubVendas from './pages/PDV/HubVendas';
+import VendasDoDia from './pages/PDV/pages/VendasDoDia/VendasDoDia';
 import Notas from './pages/Estoque/pages/notas/Notas';
 import ComprasDashboard from "./pages/Compras/ComprasDashboard";
 import StockEntryForm from "./pages/Compras/StockEntry/StockEntryForm";
@@ -142,6 +143,7 @@ export default function AppLayout() {
             <Route path="/pocos/novo" element={<RelatorioPoco />} />
             <Route path="/vendas" element={<HubVendas />} />
             <Route path="/vendas/pdv" element={<PDVContent />} />
+            <Route path="/vendas/do-dia" element={<VendasDoDia />} />
             <Route path="/vendas/pdv/finalizar" element={<FinalizarVenda onBack={() => {}} />} />
             <Route path="/estoque" element={<Estoque />} />
             <Route path="/estoque/consulta" element={<StockInventory />} />

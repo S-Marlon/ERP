@@ -96,6 +96,11 @@ export default function AppSidebar({ isOpen, toggleSidebar }: SidebarProps) {
       key: '/vendas',
       icon: <ShopTwoTone />,
       label: 'Vendas',
+      children: [
+        { key: '/vendas', label: 'Central de Vendas' },
+        { key: '/vendas/pdv', label: 'PDV' },
+        { key: '/vendas/do-dia', label: 'Vendas do Dia' },
+      ],
     },
     {
       key: '/relatorios',

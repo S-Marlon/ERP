@@ -4,10 +4,9 @@ import Badge from '../../../components/ui/Badge/Badge';
 import Button from '../../../components/ui/Button/Button';
 import Fieldset from '../../../components/ui/Fieldset/Fieldset';
 import { imprimirExtratoElgin } from '../../../utils/printService';
-import { salesService, SalePayload } from '../services/salesService';
+import { salesService, VendaPdvPayload, FormaPagamentoPdv } from '../services/salesService';
 import Swal from 'sweetalert2';
 import { isCartItemOS } from '../types/cart.types';
-import { VendaPayload, VendaItem, OrdemServicoVenda, VendaPagamento, PaymentSource } from '../types/sale.types';
 // import {ItemVenda} from '../../../utils/printService'
 
 import Draggable from 'react-draggable';
@@ -57,6 +56,16 @@ export const PAYMENT_METHOD_DETAILS: Record<PaymentMethodType, { label: string; 
     }
 };
 
+// Forma de pagamento gravada no banco para cada método da tela
+const FORMA_POR_METODO: Record<PaymentMethodType, FormaPagamentoPdv> = {
+    money: 'DINHEIRO',
+    pix: 'PIX',
+    credit_card: 'CREDITO',
+    debit_card: 'DEBITO',
+    store_credit: 'PRAZO',
+    bank_transfer: 'TRANSFERENCIA',
+};
+
 // 1. Defina o tipo técnico (Seguro e sem acentos)
 export type PaymentStatus = 'pending' | 'processing' | 'paid' | 'failed' | 'cancelled' | 'refunded';
 
@@ -95,12 +104,14 @@ export interface Pagamento {
 
 interface FinalizarVendaProps {
     onBack: () => void;
+    // Venda gravada: o pai limpa o carrinho e volta para a seleção
+    onVendaConcluida?: () => void;
     total: number;
     cliente: string;
     itens: ItemVenda[]; // <-- Adicione esta linha
 }
 
-export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, total, cliente, itens }) => {
+export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, onVendaConcluida, total, cliente, itens }) => {
 
     const [isEnviando, setIsEnviando] = useState(false);
     const [descontoValor, setDescontoValor] = useState(0); // O valor digitado no input
@@ -243,148 +254,77 @@ const toggleWindow = (id) => {
 
     const handleFinalizarVenda = async () => {
         if (isEnviando) return;
-        setIsEnviando(true);
 
-        // ✅ NOVO: Separar items normais de OS
-        // TODO: Atualizar interface para aceitar CartItem[] em vez de ItemVenda[]
-        const itemsNormais: ItemVenda[] = [];
-        const osItens: any[] = [];
-        
-        // Se itens incluir OS (CartItem com type='os'), separar
-        if (Array.isArray(itens)) {
-          itens.forEach((item: any) => {
-            if (isCartItemOS(item)) {
-              osItens.push(item);
-            } else {
-              itemsNormais.push(item);
-            }
-          });
+        // OS e serviços ainda não são gravados pelo PDV do modelo novo
+        const itensCarrinho: any[] = Array.isArray(itens) ? itens : [];
+        const naoSuportados = itensCarrinho.filter(item => isCartItemOS(item) || item.type === 'service' || item.type === 'os');
+        if (naoSuportados.length > 0) {
+            Swal.fire({
+                icon: 'info',
+                title: 'Ainda não suportado',
+                text: 'Ordens de serviço e serviços ainda não são gravados pelo PDV novo. Remova-os do carrinho para finalizar a venda dos produtos.',
+            });
+            return;
         }
 
-        // 1. Cálculos de métricas (Snapshots)
-        const totalCusto = itemsNormais.reduce((acc, item) => acc + ((item.costPrice || 0) * item.quantity), 0);
-        const lucroNominal = totalLiquido - totalCusto;
-        const percentualLucro = totalLiquido > 0 ? (lucroNominal / totalLiquido) * 100 : 0;
-
-        console.log("📊 Métricas da Venda:", { totalCusto, lucroNominal, percentualLucro });
-
-        // 🔹 Formatar itens normais para impressão
-        const itensParaImpressao = itemsNormais.map(item => ({
-            codigo: String(item.id),
-            name: item.name,
-            quantity: item.quantity,
-            price: item.salePrice,
-            desconto: 0,
-            unidade: item.unidade || 'UN'
-        }));
-
-        // 🔹 Formatar pagamentos para impressão
-        const pagamentosParaImpressao = pagamentos
-            .filter(p => p.status === 'paid' || p.status === 'processing')
-            .map(p => ({
-                metodo: PAYMENT_METHOD_DETAILS[p.metodo].label,
-                valor: p.valor,
-                parcelas: p.parcelas
-            }));
-
-        // 🔹 Gerar número da venda
-        const numeroVenda = Date.now().toString();
-
-        // ✅ NOVO: Criar pagamentos com source tracking
-        const pagamentosComSource: VendaPagamento[] = pagamentos.map((p, idx) => ({
-          id: p.id || `payment-${idx}`,
-          metodo: p.metodo,
-          valor: p.valor,
-          parcelas: p.parcelas,
-          source: osItens.length > 0 && idx >= itemsNormais.length ? 'os' : 'sale',
-          saleId: numeroVenda,
-          osId: osItens[0]?.osData?.osNumber // TODO: Melhorar para múltiplas OS
-        }));
-
-        // ✅ NOVO: Construir array de ordensServico
-        const ordensServico: OrdemServicoVenda[] = osItens.map(osItem => ({
-          osNumber: osItem.osData?.osNumber || '',
-          equipment: osItem.osData?.equipment || '',
-          gauge: osItem.osData?.gauge || '',
-          layers: osItem.osData?.layers || '2',
-          finalLength: osItem.osData?.finalLength || 0,
-          laborType: osItem.osData?.laborType || 'fixed',
-          laborValue: osItem.osData?.laborValue || 0,
-          items: osItem.osData?.items || [],
-          services: osItem.osData?.services || [],
-          productsTotal: osItem.osData?.productsTotal || 0,
-          servicesTotal: osItem.osData?.servicesTotal || 0,
-          laborTotal: osItem.osData?.laborTotal || 0,
-          total: osItem.osData?.total || 0,
-          paid: osItem.osData?.paid || 0,
-          remaining: osItem.osData?.remaining || 0
-        }));
-
-        // 2. Montagem do Payload completo com suporte a OS e source tracking
-        const vendaCompleta: VendaPayload = {
-            data: new Date(),
-            clienteNome: cliente || "CONSUMIDOR",
-            totalBruto: total,
-            totalDesconto: descontoCalculado,
-            totalLiquido: totalLiquido,
-            totalCusto: totalCusto,
-            lucroNominal: lucroNominal,
-            percentualLucro: Number(percentualLucro.toFixed(2)),
-            
-            // ✅ NOVO: Items normais (produtos/serviços)
-            itens: itemsNormais.map(item => ({
-                type: 'produto' as const,
-                productId: typeof item.id === 'string' ? parseInt(item.id) : item.id,
-                nome: item.name,
-                quantidade: item.quantity,
-                precoVenda: item.salePrice,
-                precoCusto: item.costPrice || 0,
-                subtotal: item.quantity * item.salePrice,
-                lucroUnitario: item.salePrice - (item.costPrice || 0)
+        const pagamentosValidos = pagamentos.filter(p => p.status === 'paid' || p.status === 'processing');
+        const payload: VendaPdvPayload = {
+            clienteNome: cliente || 'CONSUMIDOR',
+            descontoGeral: Number(descontoCalculado.toFixed(2)),
+            itens: itensCarrinho.map(item => ({
+                idItem: Number(item.id),
+                quantidade: Number(item.quantity),
+                idUnidade: item.idUnidadeVenda ?? null,
+                precoUnitario: Number(item.price ?? item.salePrice ?? 0),
             })),
-            
-            // ✅ NOVO: Ordens de Serviço separadas
-            ordensServico: ordensServico.length > 0 ? ordensServico : undefined,
-            
-            // ✅ NOVO: Pagamentos com source tracking
-            pagamentos: pagamentosComSource
+            pagamentos: pagamentosValidos.map(p => ({
+                forma: FORMA_POR_METODO[p.metodo],
+                valor: Number(p.valor),
+                parcelas: p.parcelas,
+            })),
         };
 
-        console.log("🚀 Payload Final da Venda:", vendaCompleta);
-        console.table(vendaCompleta.itens);
-
-        // 4. Impressão Física
-        imprimirExtratoElgin({
-            cliente: vendaCompleta.clienteNome,
-            cpf: "",
-            numero: numeroVenda,
-            itens: itensParaImpressao,
-            total: totalLiquido,
-            pagamentos: pagamentosParaImpressao,
-            troco: troco
-        });
-
+        setIsEnviando(true);
         try {
-            console.log("⏳ Enviando...");
-            // 3. Persistência no Banco de Dados
-            await salesService.saveVenda(vendaCompleta);
+            const resposta = await salesService.saveVenda(payload);
 
-            // ✅ RESPOSTA DE SUCESSO
-            await Swal.fire({
-                icon: 'success',
-                title: 'Venda Finalizada!',
-                text: `O valor de R$ ${totalLiquido.toFixed(2)} foi registrado com sucesso!`,
-                confirmButtonColor: '#28a745',
-                timer: 3000
+            // Impressão só depois de gravada, com o número real da venda
+            imprimirExtratoElgin({
+                cliente: payload.clienteNome || 'CONSUMIDOR',
+                cpf: '',
+                numero: String(resposta.idVenda),
+                itens: itensCarrinho.map(item => ({
+                    codigo: String(item.sku || item.id),
+                    name: item.name,
+                    quantity: item.quantity,
+                    price: Number(item.price ?? item.salePrice ?? 0),
+                    desconto: 0,
+                    unidade: item.unitOfMeasure || item.unidade || 'UN',
+                })),
+                total: resposta.totalLiquido,
+                pagamentos: pagamentosValidos.map(p => ({
+                    metodo: PAYMENT_METHOD_DETAILS[p.metodo].label,
+                    valor: p.valor,
+                    parcelas: p.parcelas,
+                })),
+                troco: resposta.troco,
             });
 
-            // Limpar carrinho e voltar
-            onBack(); 
+            await Swal.fire({
+                icon: 'success',
+                title: `Venda ${resposta.idVenda} finalizada!`,
+                html: `Total: <b>R$ ${resposta.totalLiquido.toFixed(2)}</b>${resposta.troco > 0 ? `<br>Troco: <b>R$ ${resposta.troco.toFixed(2)}</b>` : ''}`,
+                confirmButtonColor: '#28a745',
+            });
+
+            setPagamentos([]);
+            setDescontoValor(0);
+            if (onVendaConcluida) onVendaConcluida();
+            else onBack();
         } catch (error: any) {
-            // ❌ RESPOSTA DE ERRO
             Swal.fire({
                 icon: 'error',
-                title: 'Erro ao salvar',
+                title: 'Venda não registrada',
                 text: error.message || 'Servidor offline ou falha na rede.',
                 confirmButtonColor: '#d33'
             });

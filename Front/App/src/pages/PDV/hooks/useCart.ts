@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { CartItem, SaleItem, isCartItemOS } from '../types/cart.types';
 import Swal from 'sweetalert2';
+import { getPdvProductDetail } from '../services/api/products';
 
 export const useCart = () => {
   const [cart, setCart] = useState<CartItem[]>(() => {
@@ -17,16 +18,28 @@ export const useCart = () => {
     if (item.type === 'product' && item.id) {
       // Buscar detalhes atualizados do servidor
       try {
-        const response = await fetch(`http://localhost:3001/api/products/${item.id}`);
-        if (!response.ok) {
-          alert(`Erro ao buscar detalhes do produto: ${item.name}`);
+        const productData = await getPdvProductDetail(item.id);
+        if (!productData) {
+          Swal.fire('Produto não encontrado', `Não foi possível carregar "${item.name}".`, 'error');
           return;
         }
-        const { data: productData } = await response.json();
 
-        if (!productData || productData.currentStock <= 0) {
-          alert(`Atenção: ${item.name} está sem estoque!`);
+        if (productData.currentStock <= 0 && !productData.podeVenderSemEstoque) {
+          Swal.fire('Sem estoque', `"${item.name}" está sem estoque.`, 'warning');
           return;
+        }
+
+        // Provisório: itens fora da regra de publicação só entram com confirmação
+        if (productData.publicavel === false) {
+          const { isConfirmed } = await Swal.fire({
+            icon: 'warning',
+            title: 'Item não publicável',
+            html: `"${item.name}" ainda não passa na regra de publicação:<br><small>${(productData.motivosPublicacao || []).join('<br>')}</small>`,
+            showCancelButton: true,
+            confirmButtonText: 'Adicionar mesmo assim',
+            cancelButtonText: 'Cancelar',
+          });
+          if (!isConfirmed) return;
         }
 
         setCart(prev => {
@@ -45,6 +58,11 @@ export const useCart = () => {
               stock: productData.currentStock,
               costPrice: productData.costPrice || 0,
               price: item.price || productData.salePrice,
+              unitOfMeasure: productData.unitOfMeasure || item.unitOfMeasure,
+              idUnidadeVenda: productData.idUnidadeVenda ?? null,
+              fatorConversao: productData.fatorConversao || 1,
+              podeVenderSemEstoque: productData.podeVenderSemEstoque,
+              publicavel: productData.publicavel,
               quantity: 1
             }
           ];

@@ -1,55 +1,77 @@
-const apiBase = 'http://localhost:3001/api';
+const apiBase = 'http://localhost:3001/api/vendas/pdv';
 
-export interface SaleItemPayload {
-    productId: number;
-    nome: string;
+// Venda no modelo novo: o backend recalcula o preço de tabela, baixa o estoque e valida os pagamentos
+export type FormaPagamentoPdv = 'DINHEIRO' | 'PIX' | 'DEBITO' | 'CREDITO' | 'PRAZO' | 'TRANSFERENCIA';
+
+export interface VendaPdvItemPayload {
+    idItem: number;
     quantidade: number;
-    precoVenda: number;
-    precoCusto: number; // Snapshot do custo no momento da venda
-    subtotal: number;
-    lucroUnitario: number;
+    idUnidade?: number | null;
+    precoUnitario?: number;   // preço praticado (com desconto individual)
 }
 
-export interface SalePayload {
-    data: string;
+export interface VendaPdvPayload {
+    clienteNome?: string;
+    idCliente?: number | null;
+    observacao?: string;
+    descontoGeral?: number;
+    itens: VendaPdvItemPayload[];
+    pagamentos: { forma: FormaPagamentoPdv; valor: number; parcelas?: number }[];
+}
+
+export interface VendaPdvResposta {
+    success: boolean;
+    idVenda: number;
+    totalBruto: number;
+    totalDesconto: number;
+    totalLiquido: number;
+    troco: number;
+}
+
+export interface VendaResumo {
+    idVenda: number;
+    status: 'CONCLUIDA' | 'CANCELADA';
     clienteNome: string;
     totalBruto: number;
     totalDesconto: number;
     totalLiquido: number;
     totalCusto: number;
-    lucroNominal: number;
-    percentualLucro: number;
-    itens: SaleItemPayload[];
-    pagamentos: {
-        metodo: string;
-        valor: number;
-        parcelas: number;
-    }[];
+    qtdItens: number;
+    formas: string[];
+    criadoEm: string;
+    canceladoEm?: string | null;
+    motivoCancelamento?: string | null;
 }
 
+const lerErro = async (response: Response, padrao: string) => {
+    const data = await response.json().catch(() => ({}));
+    return new Error(data.error || data.message || padrao);
+};
+
 export const salesService = {
-    /**
-     * Registra a venda no banco de dados
-     */
-    async saveVenda(venda: SalePayload): Promise<{ success: boolean; id?: number }> {
-        try {
-            const response = await fetch(`${apiBase}/sales`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(venda),
-            });
+    async saveVenda(venda: VendaPdvPayload): Promise<VendaPdvResposta> {
+        const response = await fetch(`${apiBase}/vendas`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(venda),
+        });
+        if (!response.ok) throw await lerErro(response, 'Erro ao registrar venda no servidor.');
+        return response.json();
+    },
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || 'Erro ao registrar venda no servidor.');
-            }
+    async listarVendas(data?: string): Promise<VendaResumo[]> {
+        const response = await fetch(`${apiBase}/vendas${data ? `?data=${data}` : ''}`);
+        if (!response.ok) throw await lerErro(response, 'Erro ao listar vendas.');
+        return response.json();
+    },
 
-            return await response.json();
-        } catch (error) {
-            console.error("Erro no salesService:", error);
-            throw error;
-        }
-    }
+    async cancelarVenda(idVenda: number, motivo: string): Promise<{ success: boolean }> {
+        const response = await fetch(`${apiBase}/vendas/${idVenda}/cancelar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ motivo }),
+        });
+        if (!response.ok) throw await lerErro(response, 'Erro ao cancelar a venda.');
+        return response.json();
+    },
 };

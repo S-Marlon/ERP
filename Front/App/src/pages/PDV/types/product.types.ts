@@ -19,6 +19,16 @@ export interface Product {
   cest?: string;
   suppliers?: string;
   supplierCode?: string;
+  // Modelo novo (itens_core) — vêm de /api/vendas/pdv
+  idUnidadeVenda?: number | null;
+  fatorConversao?: number;
+  estoqueBase?: number;
+  unidadeBase?: string;
+  origemPreco?: 'FAIXA' | 'CADASTRO' | 'SEM_PRECO';
+  temAtacado?: boolean;
+  podeVenderSemEstoque?: boolean;
+  publicavel?: boolean;
+  motivosPublicacao?: string[];
 }
 
 export interface ProductBasic {

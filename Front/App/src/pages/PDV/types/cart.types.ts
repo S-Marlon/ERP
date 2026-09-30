@@ -24,6 +24,11 @@ export interface SaleItem {
   compatibility?: string;
   location?: string;
   pictureUrl?: string;
+  barcode?: string;
+  idUnidadeVenda?: number | null;
+  fatorConversao?: number;
+  podeVenderSemEstoque?: boolean;
+  publicavel?: boolean;
 }
 
 export interface CartItem extends SaleItem {

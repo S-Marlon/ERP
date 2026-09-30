@@ -39,6 +39,7 @@ const PDVContent: React.FC = () => {
     updateQuantity,
     removeItem,
     applyIndividualDiscount,
+    clearCart,
     // PDV State
     estagio,
     setEstagio,
@@ -89,6 +90,8 @@ const PDVContent: React.FC = () => {
   const [displayMode, setDisplayMode] = useState<DisplayMode>('lista');
   const [selectedPart, setSelectedPart] = useState<SaleItem | null>(null);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+  // Provisório: mostrar também itens que ainda não passam na regra de publicação
+  const [mostrarNaoPublicaveis, setMostrarNaoPublicaveis] = useState(false);
 
   // Debounce search from context
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
@@ -202,7 +205,7 @@ const PDVContent: React.FC = () => {
     const cleanCode = code.trim();
 
     try {
-      const response = await getPdvProducts({ searchTerm: cleanCode, limit: 1 });
+      const response = await getPdvProducts({ searchTerm: cleanCode, limit: 1, incluirNaoPublicaveis: mostrarNaoPublicaveis });
       if (response?.data?.length > 0) {
         const p = response.data[0];
         const isMatch = p.barcode === cleanCode || p.sku === cleanCode;
@@ -236,7 +239,7 @@ const PDVContent: React.FC = () => {
     } catch (error) {
       console.error('Erro ao bipar:', error);
     }
-  }, [addToCart, setLastScan]);
+  }, [addToCart, setLastScan, mostrarNaoPublicaveis]);
 
 
 
@@ -390,6 +393,12 @@ const PDVContent: React.FC = () => {
         <div className={styles.partPrimary}>
           <strong>{highlightText(item.name, searchTerm)}</strong>
           {'sku' in item && <code>{item.category}</code>}
+          {item.publicavel === false && (
+            <span title={(item.motivosPublicacao || []).join('\n')}
+              style={{ display: 'inline-block', marginLeft: 6, padding: '0 6px', borderRadius: 8, fontSize: 10, fontWeight: 700, background: '#fef3c7', color: '#92400e' }}>
+              NÃO PUBLICÁVEL
+            </span>
+          )}
         </div>
 
     },
@@ -469,7 +478,8 @@ const PDVContent: React.FC = () => {
     brand: brand !== 'Todos' ? brand : undefined,
     sort: sortOrder || undefined,
     onlyInStock,
-    onlyActive
+    onlyActive,
+    incluirNaoPublicaveis: mostrarNaoPublicaveis
   }), [
     debouncedSearchTerm,
     selectedCategory,
@@ -482,7 +492,8 @@ const PDVContent: React.FC = () => {
     brand,
     sortOrder,
     onlyInStock,
-    onlyActive
+    onlyActive,
+    mostrarNaoPublicaveis
   ]);
 
 
@@ -704,6 +715,10 @@ const PDVContent: React.FC = () => {
                   <span className={styles.toggleLabel}>Em estoque</span>
                   <Switch checked={onlyInStock} onChange={() => setOnlyInStock(!onlyInStock)} />
                 </div>
+                <div className={styles.quickStockToggle} title="Provisório: inclui itens que ainda não passam na regra de publicação (ficha incompleta, família bloqueada...)">
+                  <span className={styles.toggleLabel}>Não publicáveis</span>
+                  <Switch checked={mostrarNaoPublicaveis} onChange={() => setMostrarNaoPublicaveis(!mostrarNaoPublicaveis)} />
+                </div>
                 
                 
               <div className={styles.setores}>
@@ -877,6 +892,7 @@ const PDVContent: React.FC = () => {
       <aside className={styles.paymentSidebar}>
         <FinalizarVenda
           onBack={() => setEstagio('SELECAO')}
+          onVendaConcluida={() => { clearCart(); setEstagio('SELECAO'); }}
 
           total={total}
           cliente={cliente}
