@@ -7,6 +7,7 @@ import catalogoRoutes from './Catalogo/catalogo.routes';
 import parceirosRoutes from './Parceiros/parceiros.routes';
 import comprasRoutes from './Compras/compras.routes'
 import vendasRoutes from './Venda/vendas.routes';
+import estoqueItensRoutes from './EstoqueItens/estoqueItens.routes';
 import { Router, Request, Response } from 'express';
 
 
@@ -16,6 +17,8 @@ router.get('/', (req: Request, res: Response) => {
   return res.json({ success: true, message: 'Teste isolado de parceiros funcionando!' });
 });
 
+// Estoque no modelo novo primeiro (saldos, movimentos, ajustes); rotas legadas depois
+router.use('/estoque', estoqueItensRoutes);
 router.use('/estoque', estoqueRoutes);
 router.use('/comercial', comercialRoutes);
 router.use('/fiscal', fiscalRoutes);

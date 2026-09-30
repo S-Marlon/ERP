@@ -21,9 +21,9 @@ import { ProductProvider } from './context/NewProductContext';
 import CadastroCliente from './components/forms/specific/CadastroCliente/CadastroCliente'; 
 import CadastroContrato from './components/forms/specific/CadastroContrato/CadastroContrato';
 import RelatorioPoco from './components/forms/specific/CadastroRelatorio/CadastroRelatorio';
-import StockAdjustmentForm from './pages/Estoque/pages/StockAdjustment/NotaFiscalManager';
-import StockInventory from './pages/Estoque/pages/StockInventory/StockInventory';
-import StockLabelingForm from './pages/Estoque/pages/StockLabelingForm/StockLabelingForm';
+import SaldoEstoque from './pages/Estoque/pages/SaldoEstoque/SaldoEstoque';
+import Movimentacoes from './pages/Estoque/pages/Movimentacoes/Movimentacoes';
+import Etiquetagem from './pages/Estoque/pages/Etiquetagem/Etiquetagem';
 import { FinalizarVenda } from "./pages/PDV/pages/FinalizarVenda";
 import PDVContent from './pages/PDV/PDV';
 import HubVendas from './pages/PDV/HubVendas';
@@ -146,11 +146,11 @@ export default function AppLayout() {
             <Route path="/vendas/do-dia" element={<VendasDoDia />} />
             <Route path="/vendas/pdv/finalizar" element={<FinalizarVenda onBack={() => {}} />} />
             <Route path="/estoque" element={<Estoque />} />
-            <Route path="/estoque/consulta" element={<StockInventory />} />
+            <Route path="/estoque/consulta" element={<SaldoEstoque />} />
             <Route path="/estoque/gerenciamento" element={<StockEntryForm />} />
             <Route path="/estoque/notas" element={<Notas />} />
-            <Route path="/estoque/operacoes" element={<StockAdjustmentForm />} />
-            <Route path="/estoque/etiquetagem" element={<StockLabelingForm />} />
+            <Route path="/estoque/operacoes" element={<Movimentacoes />} />
+            <Route path="/estoque/etiquetagem" element={<Etiquetagem />} />
             <Route path="/catalogo" element={<CatalogManager />} />
             <Route path="/catalogo/familias" element={<FamilyManager />} />
             <Route path="/catalogo/familias/test" element={<FamilyManagementPanel />} />
