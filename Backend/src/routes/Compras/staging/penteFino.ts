@@ -260,6 +260,15 @@ export const avaliarPenteFino = (
   };
 };
 
+// Custo médio após estornar uma entrada (tira do saldo o que entrou, pelo custo com que entrou).
+// Saldo zerado ou conta sem sentido (custo negativo) mantém o custo médio anterior.
+export const calcularCustoMedioEstorno = (saldoAnterior: number, custoMedioAnterior: number, quantidade: number, custoUnitario: number): number => {
+  const saldoPosterior = saldoAnterior - quantidade;
+  if (saldoPosterior <= 0.0000001) return custoMedioAnterior;
+  const resultado = (saldoAnterior * custoMedioAnterior - quantidade * custoUnitario) / saldoPosterior;
+  return resultado > 0 ? resultado : custoMedioAnterior;
+};
+
 // Custo médio ponderado após uma entrada
 export const calcularCustoMedio = (saldoAnterior: number, custoMedioAnterior: number, quantidade: number, custoUnitario: number): number => {
   const saldoPosterior = saldoAnterior + quantidade;

@@ -51,7 +51,7 @@ const carregarItens = async (conn: Conn, loteId: number, tenant: number, forUpda
 };
 
 // Fornecedor (pessoa com papel FORNECEDOR) pelo CNPJ da nota — mesma regra do verificarFornecedorPorCnpj
-const buscarFornecedorId = async (conn: Conn, cnpj: string | null, tenant: number): Promise<number | null> => {
+export const buscarFornecedorId = async (conn: Conn, cnpj: string | null, tenant: number): Promise<number | null> => {
   const digitos = String(cnpj || '').replace(/\D/g, '');
   if (!digitos) return null;
   const [rows] = await conn.execute(

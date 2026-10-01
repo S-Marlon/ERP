@@ -55,6 +55,11 @@ export interface ItemNota {
   custoEstoque: number | null;
   // Quanto entrou em cada depósito (VENDA, ALMOXARIFADO, PATRIMONIO)
   depositos: Array<{ deposito: string; quantidade: number }>;
+  // Sinais de entrada errada (custo fora do padrão, código em outro item, GTIN diferente)
+  alertas: Array<{ codigo: string; mensagem: string }>;
+  // Correções feitas depois da aprovação (vínculo/conversão)
+  correcoes?: number;
+  status?: string;
 }
 
 export interface DetalheNota {
@@ -74,7 +79,7 @@ export interface DetalheNota {
     outros: number; icms: number; nota: number; freteAdicional: number; freteAdicionalMetodo: string | null;
   };
   itens: ItemNota[];
-  resumo: { totalItens: number; conferidos: number; semVinculo: number };
+  resumo: { totalItens: number; conferidos: number; semVinculo: number; comAlerta?: number };
 }
 
 const lerErro = async (r: Response, padrao: string) => {
@@ -94,6 +99,43 @@ export const detalheNota = async (idLote: number): Promise<DetalheNota> => {
   const r = await fetch(`${API}/notas/${idLote}`);
   if (!r.ok) throw await lerErro(r, 'Erro ao carregar a nota.');
   return r.json();
+};
+
+export interface ResultadoCorrecao {
+  simulacao: boolean;
+  correcaoId: number | null;
+  message: string;
+  itemAnterior: { idItem: number; sku?: string; nome?: string; podeInativar: boolean; inativado: boolean };
+  itemNovo: { idItem: number; sku: string; nome?: string; tipoRecurso: string; unidadeBase: string };
+  fatorAnterior: number;
+  fatorNovo: number;
+  movimentos: Array<{ tipo: 'ENTRADA' | 'SAIDA'; idItem: number; sku?: string; deposito: string; quantidade: number; custoUnitario: number; saldoAnterior: number; saldoPosterior: number; custoMedio: number }>;
+  fornecedorVinculado: boolean;
+  gtinMovido: boolean;
+}
+
+// Correção de linha já aprovada: simular = mostra o que vai acontecer sem gravar
+export const corrigirLinhaNota = async (
+  idLote: number, idStaging: number,
+  dados: { idItemNovo: number; fator: number; motivo?: string; inativarAnterior?: boolean; simular?: boolean }
+): Promise<ResultadoCorrecao> => {
+  const r = await fetch(`${API}/notas/${idLote}/itens/${idStaging}/correcao`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dados),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (r.status === 404 && !d.error) throw new Error('O servidor não conhece esta função ainda: reinicie o backend (npm start).');
+  if (!r.ok) {
+    const erro: any = new Error(d.error || 'Erro ao corrigir a linha.');
+    erro.detalhes = d.detalhes;
+    throw erro;
+  }
+  return d;
+};
+
+export const listarCorrecoesNota = async (idLote: number) => {
+  const r = await fetch(`${API}/notas/${idLote}/correcoes`);
+  if (!r.ok) throw await lerErro(r, 'Erro ao carregar as correções.');
+  return (await r.json()).data as Array<{ id: number; idStaging: number; skuAnterior: string; skuNovo: string; fatorAnterior: number; fatorNovo: number; motivo: string; criadoEm: string }>;
 };
 
 export const descartarNota = async (idLote: number) => {

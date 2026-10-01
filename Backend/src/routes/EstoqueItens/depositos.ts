@@ -1,6 +1,6 @@
 // Estoque por depósito: VENDA (o PDV só enxerga este), ALMOXARIFADO (uso e consumo interno), PATRIMONIO (ativos).
 // Lançamento único de movimento: trava o saldo do item no depósito, grava o movimento e atualiza saldo e custo médio.
-import { calcularCustoMedio } from '../Compras/staging/penteFino';
+import { calcularCustoMedio, calcularCustoMedioEstorno } from '../Compras/staging/penteFino';
 
 export const DEPOSITOS = ['VENDA', 'ALMOXARIFADO', 'PATRIMONIO'] as const;
 export type Deposito = typeof DEPOSITOS[number];
@@ -57,6 +57,8 @@ export interface LancamentoEstoque {
   // Entrada recalcula o custo médio do depósito (compra, devolução); ajuste sem custo não altera
   recalcularCustoMedio?: boolean;
   registrarUltimoCusto?: boolean;
+  // Saída que desfaz uma entrada (correção de NF, unificação): tira o custo dela do custo médio
+  estornoDeEntrada?: boolean;
 }
 
 export const lancarMovimentoEstoque = async (conn: Conn, l: LancamentoEstoque) => {
@@ -71,7 +73,9 @@ export const lancarMovimentoEstoque = async (conn: Conn, l: LancamentoEstoque) =
   const saldoPosterior = l.tipo === 'ENTRADA' ? saldoAnterior + quantidade : saldoAnterior - quantidade;
   const custoMedio = l.tipo === 'ENTRADA' && l.recalcularCustoMedio !== false && l.custoUnitario > 0
     ? calcularCustoMedio(saldoAnterior, custoMedioAnterior, quantidade, l.custoUnitario)
-    : (custoMedioAnterior > 0 ? custoMedioAnterior : (l.tipo === 'ENTRADA' ? l.custoUnitario : 0));
+    : l.tipo === 'SAIDA' && l.estornoDeEntrada && l.custoUnitario > 0
+      ? calcularCustoMedioEstorno(saldoAnterior, custoMedioAnterior, quantidade, l.custoUnitario)
+      : (custoMedioAnterior > 0 ? custoMedioAnterior : (l.tipo === 'ENTRADA' ? l.custoUnitario : 0));
 
   const [mov] = await conn.execute(
     `INSERT INTO estoque_movimentos

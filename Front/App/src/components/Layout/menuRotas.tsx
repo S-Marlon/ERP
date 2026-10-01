@@ -27,6 +27,7 @@ export const MENU_PRINCIPAL: ItemMenu[] = [
     children: [
       { key: '/catalogo/gerenciador', label: 'Produtos (SKUs)' },
       { key: '/catalogo/pendencias', label: 'Pendências do PIM' },
+      { key: '/catalogo/duplicados', label: 'Itens duplicados' },
       { key: '/catalogo/familias', label: 'Famílias' },
       { key: '/catalogo/categorias', label: 'Categorias' },
       { key: '/catalogo/atributos', label: 'Atributos' },

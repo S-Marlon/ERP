@@ -2,6 +2,8 @@
 // Valor, emissão e emitente vêm do XML salvo (dados_nota_fiscal); as colunas do lote nem sempre estão preenchidas.
 import { Request, Response } from 'express';
 import db from '../../Estoque/db.config';
+import { alertasDaLinha, AlertaEntrada } from '../staging/auditoriaEntrada';
+import { validarGtin } from '../staging/gtin';
 
 const tenantDe = (req: Request) => Number(req.query.tenant_id || req.headers['x-tenant-id'] || 1);
 const n = (v: unknown) => Number(v) || 0;
@@ -108,6 +110,80 @@ export const listarNotasEntrada = async (req: Request, res: Response) => {
 };
 
 /**
+ * Auditoria das linhas já aprovadas: custo fora do padrão das outras compras do item, código do fornecedor
+ * que já entrou como outro item, GTIN da nota diferente do cadastrado no item.
+ */
+const auditarLinhas = async (tenant: number, loteId: number, cnpj: string | null, itens: any[]) => {
+  const resultado = new Map<number, AlertaEntrada[]>();
+  const aprovadas = itens.filter(i => i.produto_id_sistema && i.custo_estoque !== null);
+  if (aprovadas.length === 0) return resultado;
+  const idsItens = [...new Set(aprovadas.map(i => Number(i.produto_id_sistema)))];
+  const marcas = (lista: unknown[]) => lista.map(() => '?').join(',');
+
+  // Custos das outras entradas por NF de cada item (mais recentes primeiro)
+  const [custos]: any = await db.execute(
+    `SELECT id_item, custo_unitario FROM estoque_movimentos
+     WHERE tenant_id = ? AND origem = 'ENTRADA_NFE' AND id_origem <> ? AND custo_unitario > 0 AND id_item IN (${marcas(idsItens)})
+     ORDER BY created_at DESC`,
+    [tenant, loteId, ...idsItens]
+  );
+  const custosPorItem = new Map<number, number[]>();
+  for (const c of custos) {
+    const lista = custosPorItem.get(Number(c.id_item)) || [];
+    if (lista.length < 6) lista.push(n(c.custo_unitario));
+    custosPorItem.set(Number(c.id_item), lista);
+  }
+
+  // GTINs cadastrados nos itens
+  const [gtins]: any = await db.execute(
+    `SELECT id_item, gtin FROM comercial_unidades_venda
+     WHERE tenant_id = ? AND NULLIF(TRIM(gtin), '') IS NOT NULL AND id_item IN (${marcas(idsItens)})`,
+    [tenant, ...idsItens]
+  );
+  const gtinsPorItem = new Map<number, string[]>();
+  for (const g of gtins) gtinsPorItem.set(Number(g.id_item), [...(gtinsPorItem.get(Number(g.id_item)) || []), String(g.gtin)]);
+
+  // Mesmo código deste fornecedor que entrou como outro item em outras notas
+  const codigos = [...new Set(aprovadas.map(i => String(i.codigo_fornecedor || '').trim()).filter(Boolean))];
+  const itensPorCodigo = new Map<string, Map<number, string>>();
+  if (cnpj && codigos.length > 0) {
+    const [outros]: any = await db.execute(
+      `SELECT s.codigo_fornecedor, s.produto_id_sistema AS id_item,
+              COALESCE(NULLIF(TRIM(cpd.sku_customizado), ''), ic.sku) AS sku
+       FROM importacao_produtos_staging s
+       INNER JOIN importacoes_lotes l ON l.id = s.lote_importacao_id AND l.tenant_id = s.tenant_id
+       LEFT JOIN itens_core ic ON ic.id_item = s.produto_id_sistema AND ic.tenant_id = s.tenant_id
+       LEFT JOIN comercial_produtos_dados cpd ON cpd.id_item = s.produto_id_sistema AND cpd.tenant_id = s.tenant_id
+       WHERE s.tenant_id = ? AND l.cnpj_fornecedor = ? AND s.lote_importacao_id <> ? AND s.status = 'IMPORTADO'
+         AND s.produto_id_sistema IS NOT NULL AND s.codigo_fornecedor IN (${marcas(codigos)})`,
+      [tenant, cnpj, loteId, ...codigos]
+    );
+    for (const o of outros) {
+      const chave = String(o.codigo_fornecedor).trim();
+      if (!itensPorCodigo.has(chave)) itensPorCodigo.set(chave, new Map());
+      itensPorCodigo.get(chave)!.set(Number(o.id_item), o.sku || `#${o.id_item}`);
+    }
+  }
+
+  for (const i of aprovadas) {
+    const idItem = Number(i.produto_id_sistema);
+    let gtinManual: string | null = null;
+    try { gtinManual = JSON.parse(i.mapeamento_json || '{}')?.gtin_manual || null; } catch { /* sem mapeamento */ }
+    const gtinLinha = String(gtinManual || i.ean || '').replace(/\D/g, '');
+    const outros = itensPorCodigo.get(String(i.codigo_fornecedor || '').trim());
+    resultado.set(Number(i.id), alertasDaLinha({
+      custoEntrada: n(i.custo_estoque) || null,
+      custosAnteriores: custosPorItem.get(idItem) || [],
+      custoGerencial: i.custo_gerencial !== null && i.custo_gerencial !== undefined ? n(i.custo_gerencial) : null,
+      outrosItensMesmoCodigo: outros ? [...outros].filter(([id]) => id !== idItem).map(([, sku]) => sku) : [],
+      gtinLinha: gtinLinha && validarGtin(gtinLinha) ? gtinLinha : null,
+      gtinsDoItem: gtinsPorItem.get(idItem) || [],
+    }));
+  }
+  return resultado;
+};
+
+/**
  * GET /api/compras/notas/:loteId — cabeçalho, totais do XML, itens (com o item do catálogo vinculado)
  * e o que entrou no estoque (movimentos ENTRADA_NFE).
  */
@@ -128,7 +204,7 @@ export const detalheNotaEntrada = async (req: Request, res: Response) => {
       `SELECT p.id, p.item_nfe_seq, p.codigo_fornecedor, COALESCE(p.descricao_xml, p.nome_fornecedor) AS descricao_nf, p.ean,
               p.unidade_original, p.quantidade, p.quantidade_recebida, p.preco_custo_unitario, p.valor_total_nfe,
               p.frete_rateado, p.ipi, p.icms_st, p.custo_unitario_final, p.custo_total_final, p.tipo_entrada,
-              p.is_confirmed, p.status, p.produto_id_sistema,
+              p.is_confirmed, p.status, p.produto_id_sistema, p.mapeamento_json, cpd.custo_gerencial,
               COALESCE(NULLIF(TRIM(cpd.sku_customizado), ''), ic.sku, p.sku_sistema, p.sku_sugerido) AS sku_item,
               COALESCE(NULLIF(TRIM(cpd.nome_comercial), ''), ic.nome_item, p.nome_item_sugerido) AS nome_item,
               um.sigla AS unidade_base,
@@ -149,6 +225,27 @@ export const detalheNotaEntrada = async (req: Request, res: Response) => {
        ORDER BY p.item_nfe_seq, p.id`,
       [tenant, loteId, loteId, tenant]
     );
+
+    // Linhas corrigidas depois da aprovação: o estoque atual é o da última correção
+    const [correcoes]: any = await db.execute(
+      `SELECT staging_id, fator_novo, detalhes_json FROM importacao_correcoes
+       WHERE tenant_id = ? AND lote_importacao_id = ? ORDER BY id`,
+      [tenant, loteId]
+    );
+    const correcoesPorLinha = new Map<number, number>();
+    for (const c of correcoes) {
+      correcoesPorLinha.set(Number(c.staging_id), (correcoesPorLinha.get(Number(c.staging_id)) || 0) + 1);
+      let depois: any = null;
+      try { depois = JSON.parse(c.detalhes_json || '{}')?.depois; } catch { /* sem detalhes */ }
+      const linha = (itens as any[]).find(i => Number(i.id) === Number(c.staging_id));
+      if (!linha || !depois?.posicao?.length) continue;
+      linha.qtd_estoque = depois.posicao.reduce((a: number, p: any) => a + n(p.quantidade), 0);
+      linha.fator_conversao = n(c.fator_novo);
+      linha.custo_estoque = n(depois.posicao[0].custoUnitario);
+      linha.depositos = depois.posicao.map((p: any) => `${p.deposito}:${p.quantidade}`).join(',');
+    }
+
+    const alertas = await auditarLinhas(tenant, loteId, lote.cnpj_fornecedor, itens as any[]);
 
     const total = (itens as any[]).length;
     const conferidos = (itens as any[]).filter(i => Number(i.is_confirmed) === 1).length;
@@ -212,8 +309,11 @@ export const detalheNotaEntrada = async (req: Request, res: Response) => {
           const [deposito, q] = par.split(':');
           return { deposito, quantidade: n(q) };
         }),
+        alertas: alertas.get(Number(i.id)) || [],
+        correcoes: correcoesPorLinha.get(Number(i.id)) || 0,
+        status: i.status,
       })),
-      resumo: { totalItens: total, conferidos, semVinculo },
+      resumo: { totalItens: total, conferidos, semVinculo, comAlerta: [...alertas.values()].filter(a => a.length > 0).length },
     });
   } catch (error: any) {
     console.error('Erro ao carregar a nota de entrada:', error);

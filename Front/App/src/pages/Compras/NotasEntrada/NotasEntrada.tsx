@@ -1,14 +1,23 @@
 // Notas de entrada (modelo novo): registro das NF-e importadas, situação da conferência, itens e o que entrou no estoque.
 import React, { useEffect, useState } from 'react';
 import {
+  Alert,
   Button, Card, Col, Descriptions, Drawer, Dropdown, Input, Modal, Row, Select, Space, Statistic, Switch, Table, Tag, Tooltip, Typography, message,
 } from 'antd';
-import { CopyOutlined, DownloadOutlined, EyeOutlined, FileSearchOutlined, MoreOutlined, ReloadOutlined } from '@ant-design/icons';
+import { CopyOutlined, DownloadOutlined, EyeOutlined, FileSearchOutlined, MoreOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/icons';
+
+// Sinais de que a linha entrou errada (a correção do vínculo/conversão fica no detalhe da nota)
+const ROTULO_ALERTA: Record<string, string> = {
+  CUSTO_DESTOA: 'Custo fora do padrão',
+  CODIGO_EM_OUTRO_ITEM: 'Código já usado em outro item',
+  GTIN_DIVERGENTE: 'GTIN diferente do item',
+};
 import { useNavigate } from 'react-router-dom';
 import { Deposito, DEPOSITOS_ESTOQUE } from '../../Estoque/api/estoqueItensApi';
 import {
   descartarNota, detalheNota, DetalheNota, formatarCnpj, ItemNota, listarNotas, NotaEntrada, ResumoNotas, SITUACOES_NOTA,
 } from './notasEntradaApi';
+import ModalCorrigirLinha from './ModalCorrigirLinha';
 
 const money = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const qtd = (v: number) => Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 4 });
@@ -21,12 +30,15 @@ const hoje = () => new Date().toISOString().slice(0, 10);
 const DetalheNotaDrawer: React.FC<{ idLote: number | null; onClose: () => void; onAbrirEntrada: (id: number) => void }> = ({ idLote, onClose, onAbrirEntrada }) => {
   const [nota, setNota] = useState<DetalheNota | null>(null);
   const [carregando, setCarregando] = useState(false);
+  const [linhaCorrigir, setLinhaCorrigir] = useState<ItemNota | null>(null);
+  const navigate = useNavigate();
 
-  useEffect(() => {
+  const carregar = () => {
     if (!idLote) { setNota(null); return; }
     setCarregando(true);
     detalheNota(idLote).then(setNota).catch(e => message.error(e.message)).finally(() => setCarregando(false));
-  }, [idLote]);
+  };
+  useEffect(carregar, [idLote]);
 
   const t = nota?.totais;
   return (
@@ -76,6 +88,18 @@ const DetalheNotaDrawer: React.FC<{ idLote: number | null; onClose: () => void; 
             ))}
           </Row>
 
+          {(nota.resumo.comAlerta || 0) > 0 && (
+            <Alert
+              type="warning"
+              showIcon
+              message={`${nota.resumo.comAlerta} linha(s) com sinal de entrada errada`}
+              description="Passe o mouse nas tags laranja para ver o motivo (custo fora do padrão das outras compras, código do fornecedor já usado em outro item, GTIN diferente). Use Corrigir na linha para acertar vínculo ou conversão."
+              action={nota.itens.some(i => (i.alertas || []).some(a => a.codigo === 'CODIGO_EM_OUTRO_ITEM')) && (
+                <Button size="small" onClick={() => navigate('/catalogo/duplicados')}>Ver itens duplicados</Button>
+              )}
+            />
+          )}
+
           <Table<ItemNota>
             size="small"
             rowKey="idStaging"
@@ -115,6 +139,25 @@ const DetalheNotaDrawer: React.FC<{ idLote: number | null; onClose: () => void; 
                       {i.skuItem}
                       {i.tipoEntrada !== 'PRODUTO' && <Tag style={{ marginLeft: 6, fontSize: 10 }}>{i.tipoEntrada}</Tag>}
                     </div>
+                    <Space size={4} style={{ marginTop: 3 }} wrap>
+                      {(i.correcoes || 0) > 0 && (
+                        <Tooltip title="Vínculo ou conversão corrigidos depois da aprovação">
+                          <Tag color="purple" style={{ margin: 0, fontSize: 10 }}>corrigida{(i.correcoes || 0) > 1 ? ` (${i.correcoes}x)` : ''}</Tag>
+                        </Tooltip>
+                      )}
+                      {i.status === 'IMPORTADO' && i.idItem && (
+                        <Button size="small" type="link" style={{ padding: 0, height: 18, fontSize: 12 }} onClick={() => setLinhaCorrigir(i)}>
+                          Corrigir
+                        </Button>
+                      )}
+                    </Space>
+                    {(i.alertas || []).map(a => (
+                      <Tooltip key={a.codigo} title={a.mensagem}>
+                        <Tag color="orange" icon={<WarningOutlined />} style={{ marginTop: 3, fontSize: 10, whiteSpace: 'normal' }}>
+                          {ROTULO_ALERTA[a.codigo] || a.codigo}
+                        </Tag>
+                      </Tooltip>
+                    ))}
                   </div>
                 ) : <Tag color="red">Sem vínculo</Tag>),
               },
@@ -154,6 +197,15 @@ const DetalheNotaDrawer: React.FC<{ idLote: number | null; onClose: () => void; 
             ]}
           />
         </Space>
+      )}
+
+      {idLote && linhaCorrigir && (
+        <ModalCorrigirLinha
+          idLote={idLote}
+          linha={linhaCorrigir}
+          onClose={() => setLinhaCorrigir(null)}
+          onCorrigido={() => { setLinhaCorrigir(null); carregar(); }}
+        />
       )}
     </Drawer>
   );
