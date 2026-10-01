@@ -3,6 +3,13 @@ const API = 'http://localhost:3001/api/estoque';
 
 export type SituacaoSaldo = 'NEGATIVO' | 'ZERADO' | 'ABAIXO_MINIMO' | 'OK';
 export type TipoAjuste = 'ENTRADA' | 'SAIDA' | 'CONTAGEM';
+export type Deposito = 'VENDA' | 'ALMOXARIFADO' | 'PATRIMONIO';
+
+export const DEPOSITOS_ESTOQUE: Record<Deposito, { label: string; color: string; ajuda: string }> = {
+  VENDA: { label: 'Venda', color: 'green', ajuda: 'Estoque disponível no PDV' },
+  ALMOXARIFADO: { label: 'Almoxarifado', color: 'orange', ajuda: 'Uso e consumo interno (limpeza, EPI, graxa da oficina)' },
+  PATRIMONIO: { label: 'Patrimônio', color: 'purple', ajuda: 'Ativos da empresa (impressora, porta-pallet)' },
+};
 
 export interface SaldoItem {
   idItem: number;
@@ -26,6 +33,8 @@ export interface SaldoItem {
   sugestaoReposicao: number;
   situacao: SituacaoSaldo;
   ultimoMovimento: string | null;
+  deposito: Deposito;
+  outrosDepositos: Array<{ deposito: Deposito; rotulo: string; quantidade: number }>;
 }
 
 export interface ResumoSaldos {
@@ -43,6 +52,7 @@ export interface Movimento {
   sku: string;
   nome: string;
   unidade: string;
+  deposito: Deposito;
   tipo: 'ENTRADA' | 'SAIDA';
   origem: string;
   origemRotulo: string;
@@ -80,13 +90,13 @@ const qs = (filtros: Record<string, unknown>) => {
   return p.toString();
 };
 
-export const getSaldos = async (filtros: { busca?: string; categoria?: string; situacao?: string; page?: number; limit?: number }) => {
+export const getSaldos = async (filtros: { deposito?: Deposito; busca?: string; categoria?: string; situacao?: string; page?: number; limit?: number }) => {
   const r = await fetch(`${API}/saldos?${qs(filtros)}`);
   if (!r.ok) throw await lerErro(r, 'Erro ao carregar os saldos.');
   return r.json() as Promise<{ data: SaldoItem[]; resumo: ResumoSaldos; pagination: Paginacao }>;
 };
 
-export const getMovimentos = async (filtros: { idItem?: number; de?: string; ate?: string; origem?: string; tipo?: string; busca?: string; page?: number; limit?: number }) => {
+export const getMovimentos = async (filtros: { idItem?: number; deposito?: string; de?: string; ate?: string; origem?: string; tipo?: string; busca?: string; page?: number; limit?: number }) => {
   const r = await fetch(`${API}/movimentos?${qs(filtros)}`);
   if (!r.ok) throw await lerErro(r, 'Erro ao carregar as movimentações.');
   return r.json() as Promise<{ data: Movimento[]; pagination: Paginacao }>;
@@ -99,7 +109,7 @@ export interface AjusteItem {
   custoUnitario?: number | null;
 }
 
-export const lancarAjuste = async (payload: { origem: 'AJUSTE_MANUAL' | 'INVENTARIO'; motivo: string; itens: AjusteItem[] }) => {
+export const lancarAjuste = async (payload: { deposito?: Deposito; origem: 'AJUSTE_MANUAL' | 'INVENTARIO' | 'CONSUMO_INTERNO'; motivo: string; itens: AjusteItem[] }) => {
   const r = await fetch(`${API}/ajustes`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -111,7 +121,7 @@ export const lancarAjuste = async (payload: { origem: 'AJUSTE_MANUAL' | 'INVENTA
 
 export const salvarParametrosEstoque = async (
   idItem: number,
-  parametros: { estoqueMinimo?: number | null; estoqueMaximo?: number | null; localizacao?: string }
+  parametros: { deposito?: Deposito; estoqueMinimo?: number | null; estoqueMaximo?: number | null; localizacao?: string }
 ) => {
   const r = await fetch(`${API}/itens/${idItem}/parametros`, {
     method: 'PUT',
@@ -120,6 +130,16 @@ export const salvarParametrosEstoque = async (
   });
   if (!r.ok) throw await lerErro(r, 'Erro ao salvar os parâmetros.');
   return r.json();
+};
+
+export const transferirEstoque = async (payload: { de: Deposito; para: Deposito; motivo: string; itens: Array<{ idItem: number; quantidade: number }> }) => {
+  const r = await fetch(`${API}/transferencias`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) throw await lerErro(r, 'Erro ao transferir.');
+  return r.json() as Promise<{ lote: number; documento: string }>;
 };
 
 export const getCategoriasEstoque = async (): Promise<string[]> => {
@@ -144,4 +164,6 @@ export const ORIGENS_MOVIMENTO: Record<string, { label: string; color: string }>
   CANCELAMENTO_VENDA: { label: 'Cancelamento de venda', color: 'magenta' },
   AJUSTE_MANUAL: { label: 'Ajuste manual', color: 'gold' },
   INVENTARIO: { label: 'Inventário', color: 'cyan' },
+  CONSUMO_INTERNO: { label: 'Consumo interno', color: 'volcano' },
+  TRANSFERENCIA: { label: 'Transferência', color: 'geekblue' },
 };

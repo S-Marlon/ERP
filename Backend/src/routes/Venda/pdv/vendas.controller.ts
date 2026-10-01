@@ -70,7 +70,7 @@ export const registrarVenda = async (req: Request, res: Response) => {
     // Trava os saldos (ordem fixa de ids para evitar deadlock)
     const [saldoRows] = await connection.execute(
       `SELECT id_item, quantidade_atual, custo_medio FROM estoque_saldos_itens
-       WHERE tenant_id = ? AND id_item IN (${ids.map(() => '?').join(',')}) ORDER BY id_item FOR UPDATE`,
+       WHERE tenant_id = ? AND deposito = 'VENDA' AND id_item IN (${ids.map(() => '?').join(',')}) ORDER BY id_item FOR UPDATE`,
       [tenant, ...ids]
     );
     const saldos = new Map<number, number>();
@@ -134,10 +134,10 @@ export const registrarVenda = async (req: Request, res: Response) => {
 
       await connection.execute(
         `INSERT INTO estoque_movimentos
-           (tenant_id, id_item, tipo_movimento, origem, id_origem, id_origem_item, documento_origem, tipo_recurso,
+           (tenant_id, id_item, deposito, tipo_movimento, origem, id_origem, id_origem_item, documento_origem, tipo_recurso,
             quantidade, quantidade_documento, unidade_documento, fator_conversao,
             custo_unitario, custo_total, saldo_anterior, saldo_posterior, observacao)
-         VALUES (?, ?, 'SAIDA', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, 'VENDA', 'SAIDA', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           tenant, l.idItem, ORIGEM_VENDA, idVenda, idVendaItem, `VENDA ${idVenda}`, item.tipo_recurso || 'PRODUTO',
           f4(l.quantidadeBase), f4(l.quantidade), l.sigla, Number(l.fator).toFixed(6),
@@ -150,8 +150,8 @@ export const registrarVenda = async (req: Request, res: Response) => {
     // Saldo final por item (custo médio não muda na saída)
     for (const id of estoque.saidaPorItem.keys()) {
       await connection.execute(
-        `INSERT INTO estoque_saldos_itens (tenant_id, id_item, quantidade_atual, custo_medio)
-         VALUES (?, ?, ?, ?)
+        `INSERT INTO estoque_saldos_itens (tenant_id, id_item, deposito, quantidade_atual, custo_medio)
+         VALUES (?, ?, 'VENDA', ?, ?)
          ON DUPLICATE KEY UPDATE quantidade_atual = VALUES(quantidade_atual)`,
         [tenant, id, f4(saldos.get(id) || 0), f4(custos.get(id) || 0)]
       );
@@ -214,7 +214,7 @@ export const cancelarVenda = async (req: Request, res: Response) => {
       const qtd = Number(it.quantidade_base);
       const custo = Number(it.custo_unitario_base) || 0;
       const [[saldo]]: any = await connection.execute(
-        `SELECT quantidade_atual, custo_medio FROM estoque_saldos_itens WHERE tenant_id = ? AND id_item = ? FOR UPDATE`,
+        `SELECT quantidade_atual, custo_medio FROM estoque_saldos_itens WHERE tenant_id = ? AND id_item = ? AND deposito = 'VENDA' FOR UPDATE`,
         [tenant, it.id_item]
       );
       const saldoAnterior = Number(saldo?.quantidade_atual) || 0;
@@ -224,10 +224,10 @@ export const cancelarVenda = async (req: Request, res: Response) => {
 
       await connection.execute(
         `INSERT INTO estoque_movimentos
-           (tenant_id, id_item, tipo_movimento, origem, id_origem, id_origem_item, documento_origem, tipo_recurso,
+           (tenant_id, id_item, deposito, tipo_movimento, origem, id_origem, id_origem_item, documento_origem, tipo_recurso,
             quantidade, quantidade_documento, unidade_documento, fator_conversao,
             custo_unitario, custo_total, saldo_anterior, saldo_posterior, observacao)
-         VALUES (?, ?, 'ENTRADA', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, 'VENDA', 'ENTRADA', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           tenant, it.id_item, ORIGEM_CANCELAMENTO, idVenda, it.id_venda_item, `VENDA ${idVenda}`, it.tipo_recurso || 'PRODUTO',
           f4(qtd), f4(Number(it.quantidade)), it.unidade_sigla, Number(it.fator_conversao).toFixed(6),
@@ -236,8 +236,8 @@ export const cancelarVenda = async (req: Request, res: Response) => {
         ]
       );
       await connection.execute(
-        `INSERT INTO estoque_saldos_itens (tenant_id, id_item, quantidade_atual, custo_medio)
-         VALUES (?, ?, ?, ?)
+        `INSERT INTO estoque_saldos_itens (tenant_id, id_item, deposito, quantidade_atual, custo_medio)
+         VALUES (?, ?, 'VENDA', ?, ?)
          ON DUPLICATE KEY UPDATE quantidade_atual = VALUES(quantidade_atual), custo_medio = VALUES(custo_medio)`,
         [tenant, it.id_item, f4(saldoPosterior), f4(custoMedio)]
       );

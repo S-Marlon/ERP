@@ -37,8 +37,19 @@ export const runPenteFinoTests = (): void => {
   const novoOk = avaliarPenteFino(lote, [item({ produto_id_sistema: null, sku_sugerido: 'NOVO-1', nome_item_sugerido: 'Novo' })], ctx);
   assert(novoOk.aprovavel && novoOk.resumo.novos === 1, 'Item novo com SKU e nome deveria ser aprovável.');
 
-  const skuRepetido = avaliarPenteFino(lote, [item({ produto_id_sistema: null, sku_sugerido: 'ja-existe', nome_item_sugerido: 'X' })], ctx);
-  assert(skuRepetido.bloqueios.some(b => b.codigo === 'SKU_JA_EXISTE'), 'SKU já existente no catálogo deveria bloquear.');
+  const skuRepetido = avaliarPenteFino(lote, [item({ produto_id_sistema: null, sku_sugerido: 'LINHA-1', nome_item_sugerido: 'X',
+    mapeamento_json: JSON.stringify({ mode: 'DRAFT', draftIdentity: { sku_comercial: 'ja-existe' } }) })], ctx);
+  assert(skuRepetido.bloqueios.some(b => b.codigo === 'SKU_JA_EXISTE'), 'SKU customizado já existente no catálogo deveria bloquear.');
+  // A chave da linha (sku_sugerido) nunca vira SKU: sem SKU customizado, a sequência é gerada na aprovação
+  const soChave = avaliarPenteFino(lote, [item({ produto_id_sistema: null, sku_sugerido: 'JA-EXISTE', nome_item_sugerido: 'X' })], ctx);
+  assert(!soChave.bloqueios.some(b => b.codigo === 'SKU_JA_EXISTE') && soChave.aprovavel, 'Chave da linha não pode ser tratada como SKU.');
+
+  // SKU customizado: único entre os novos da nota e fora do formato das sequências
+  const novoCom = (seq: string, sku: string) => item({ item_nfe_seq: seq, produto_id_sistema: null, sku_sugerido: `LINHA-${seq}`, nome_item_sugerido: 'X',
+    mapeamento_json: JSON.stringify({ mode: 'DRAFT', draftIdentity: { sku_comercial: sku } }) });
+  assert(avaliarPenteFino(lote, [novoCom('1', 'ABC'), novoCom('2', 'abc')], ctx).bloqueios.some(b => b.codigo === 'SKU_REPETIDO_NA_NOTA'), 'Dois novos com o mesmo SKU deveriam bloquear.');
+  assert(avaliarPenteFino(lote, [novoCom('1', 'ABC'), novoCom('2', 'ABD')], ctx).aprovavel, 'SKUs diferentes são aprováveis.');
+  assert(avaliarPenteFino(lote, [novoCom('1', 'it-000045')], ctx).bloqueios.some(b => b.codigo === 'SKU_RESERVADO'), 'SKU no formato da sequência deveria bloquear.');
 
   const importado = avaliarPenteFino({ ...lote, status: 'IMPORTADO' }, [item({})], ctx);
   assert(importado.bloqueios.some(b => b.codigo === 'LOTE_FINALIZADO'), 'Lote importado não pode ser aprovado de novo.');

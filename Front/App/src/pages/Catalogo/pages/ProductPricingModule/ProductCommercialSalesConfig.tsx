@@ -7,28 +7,24 @@ Button,
 Row,
 Col,
 Space,
-Divider,
 Typography,
 Modal,
 message,
-Tabs,
 Tag,
 Alert,
 Switch,
 Radio,
 Spin,
-Empty
+Empty,
+Tooltip
 } from 'antd';
 import {
 AppstoreAddOutlined,
 DeleteOutlined,
 PlusOutlined,
-SettingOutlined,
 CalculatorOutlined,
-CodeOutlined,
 DollarOutlined,
 EditOutlined,
-RightOutlined,
 LockOutlined
 } from '@ant-design/icons';
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
@@ -52,7 +48,7 @@ TierRuleRecord
 } from './configVendas.mapper';
 import { validarGtin } from '../../../Compras/StockEntry/gtin';
 
-const { Title, Text, Paragraph } = Typography;
+const { Text } = Typography;
 
 interface ProductCommercialSalesConfigProps {
 // Item do catálogo (itens_core.id_item). Sem ele, o componente mostra a busca de produto.
@@ -87,7 +83,6 @@ const [simUnitKey, setSimUnitKey] = useState<string>('');
 const [simQuantity, setSimQuantity] = useState<number>(1);
 
 const [activeTabKey, setActiveTabKey] = useState<string>('');
-const [isPayloadModalVisible, setIsPayloadModalVisible] = useState<boolean>(false);
 
 const [isUnitModalVisible, setIsUnitModalVisible] = useState<boolean>(false);
 const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
@@ -532,37 +527,29 @@ matchedRule
 };
 }, [simUnitKey, simQuantity, tierRules, unitsConfig]);
 
-const generatePayloadJSON = () => {
-if (!selectedItem) return '{}';
-return JSON.stringify({
-id_item: selectedItem.id_item,
-sku: selectedItem.sku,
-...estadoParaPayload(unitsConfig, tierRules, purchaseCost)
-}, null, 2);
-};
 
 return (
 <div style={{ padding: 0, background: '#f5f7fa' }}>
 
-{/* CABEÇALHO UNIFICADO */}
-<Card 
-bordered={false} 
+{/* CABEÇALHO: produto, custo base (de onde vem) e resultado (preço e margens) */}
+<Card
+bordered={false}
 style={{ borderRadius: 12, boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)' }}
-bodyStyle={{ padding: '4px' }}
+bodyStyle={{ padding: '8px 10px' }}
 >
-<Row gutter={[2, 2]} align="middle">
-<Col xs={24} md={8}>
+<Row gutter={[10, 8]} align="middle">
+{!modoRascunho && (
+<Col xs={24} md={9}>
 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-<Text type="secondary" style={{ fontSize: 11, fontWeight: 500 }}>Produto /as SKU</Text>
+<Text type="secondary" style={{ fontSize: 11, fontWeight: 500 }}>Produto / SKU</Text>
 {modoRascunho ? (
 <div>
 <Text strong>{rascunho?.nomeItem || 'Novo item'}</Text>{' '}
-<Tag color="processing" style={{ margin: 0 }}>Rascunho: gravado na aprovação da Staging</Tag>
+<Tag color="processing" style={{ margin: 0 }}>Novo: gravado na aprovação da nota</Tag>
 </div>
 ) : (
 <Select
 style={{ width: '100%' }}
-size="medium"
 placeholder="Buscar produto por SKU ou nome..."
 value={selectedItem?.id_item}
 onChange={handleProductChange}
@@ -580,135 +567,59 @@ options={[
 ]}
 />
 )}
-</div>
-
-<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-<Text type="secondary" style={{fontSize: 11,  fontWeight: 500 }}>Custo Base ({baseLabel})</Text>
+<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+<Tooltip title={modoRascunho
+? 'Vem da nota: custo final (nota + IPI + frete/ST) ÷ fator de conversão. Para mudar, ajuste a conversão acima.'
+: 'Custo gerencial: a referência sobre a qual o markup calcula o preço de venda.'}>
+<Text type="secondary" style={{ fontSize: 11, fontWeight: 500, borderBottom: '1px dashed #d9d9d9', cursor: 'help' }}>
+Custo base por {baseLabel}
+</Text>
+</Tooltip>
+{modoRascunho ? (
+<Text strong style={{ fontSize: 14, color: '#d4380d' }}>{formatBRL(purchaseCost)}</Text>
+) : (
 <InputNumber
-size="medium"
 prefix={<DollarOutlined style={{ color: '#bfbfbf' }} />}
 value={purchaseCost}
 precision={4}
-disabled={modoRascunho}
 onChange={handleCostChange}
 />
-</div>  
-</Col>
-
-{/* <Col xs={24} sm={12} md={8}>
-
-
-<Space orientation='vertical'>
-
-
-<Col xs={24} sm={12} md={24}>
-<div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-<Text type="secondary" style={{ fontSize: 13, fontWeight: 500 }}>Custo Base ({baseLabel})</Text>
-<InputNumber
-style={{ width: '100%' }}
-size="large"
-prefix={<DollarOutlined style={{ color: '#bfbfbf' }} />}
-value={purchaseCost}
-precision={2}
-onChange={handleCostChange}
-/>
+)}
+</div>
 </div>
 </Col>
+)}
 
-<Col xs={24} sm={12} md={24}>
-<div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-<Text type="secondary" style={{ fontSize: 13, fontWeight: 500 }}>Preço de Venda ({baseLabel})</Text>
-<InputNumber
-style={{ width: '100%' }}
-size="large"
-prefix={<DollarOutlined style={{ color: '#52c41a' }} />}
-value={precoVarejoBase}
-precision={2}
-disabled
-/>
-</div>
-</Col>
-
-</Space>  
-</Col> */}
-
-<Col xs={24} md={9}>
-<Space orientation='vertical' style={{ 
-background: '#fafafa', 
-border: '1px solid #f0f0f0', 
-borderRadius: 8, 
-padding: '10px 16px', 
-display: 'flex', 
-flexDirection: 'column', 
-justifyContent: 'center',
-gap: 6
-}}>
-
+<Col xs={24} md={modoRascunho ? 24 : 8}>
+<div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 8, padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 4 }}>
 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-
-<Text type="secondary" style={{ fontSize: 11, fontWeight: 500 }}>Preço de Venda ({baseLabel})</Text>
-<InputNumber
-size="medium"
-prefix={<DollarOutlined style={{ color: '#52c41a' }} />}
-value={precoVarejoBase}
-precision={2}
-disabled
-/>
+<Text type="secondary" style={{ fontSize: 12 }}>Preço de varejo por {baseLabel}</Text>
+<Text strong style={{ color: '#3f8600', fontSize: 14 }}>{formatBRL(precoVarejoBase)}</Text>
 </div>
-
-
 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-
-
-
-<Text type="secondary" style={{ fontSize: 12 }}>Margem Média Geral</Text>
-<Text strong style={{ color: marginIntelligence.avgMargin < 20 ? '#faad14' : '#3f8600', fontSize: 14 }}>
+<Tooltip title="Média das margens (lucro ÷ preço) de todas as faixas das unidades ativas">
+<Text type="secondary" style={{ fontSize: 12 }}>Margem média</Text>
+</Tooltip>
+<Text strong style={{ color: marginIntelligence.avgMargin < 20 ? '#faad14' : '#3f8600', fontSize: 13 }}>
 {marginIntelligence.avgMargin.toFixed(1)}%
 </Text>
 </div>
-
 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-<Text type="secondary" style={{ fontSize: 12 }}>Amplitude (Min / Máx)</Text>
+<Text type="secondary" style={{ fontSize: 12 }}>Menor / maior margem</Text>
 <Text strong style={{ color: '#1890ff', fontSize: 12 }}>
 {marginIntelligence.lowestMargin.toFixed(0)}% / {marginIntelligence.highestMargin.toFixed(0)}%
 </Text>
 </div>
-</Space>
-
+</div>
 </Col>
 
-
-<Col xs={24} md={7}>
-<div style={{ 
-background: '#fafafa', 
-border: '1px solid #f0f0f0', 
-borderRadius: 8, 
-padding: '10px 16px', 
-display: 'flex', 
-flexDirection: 'column', 
-justifyContent: 'center',
-gap: 6
-}}>
-
-<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-
-<Space orientation='vertical'>
-<Button size="small" icon={<CodeOutlined />} onClick={() => setIsPayloadModalVisible(true)}>
-Visualizar JSON Payload
-</Button>
-<Button type="primary" size="small" icon={<AppstoreAddOutlined />} onClick={handleSalvar} loading={saving} disabled={!selectedItem || modoRascunho}>
+{!modoRascunho && (
+<Col xs={24} md={6} style={{ textAlign: 'right' }}>
+<Button type="primary" icon={<AppstoreAddOutlined />} onClick={handleSalvar} loading={saving} disabled={!selectedItem}>
 Salvar Configuração
 </Button>
-</Space>
-
-
-
-</div>
-</div>
 </Col>
-
-
-
+)}
 </Row>
 </Card>
 
@@ -766,78 +677,64 @@ message="Item sem unidade base"
 description='Cadastre a unidade base de estoque (ex: UN, MT, KG) pelo botão "Novo". As demais unidades (caixa, rolo...) são definidas como múltiplos dela.'
 />
 )}
-{/* SEÇÃO PRINCIPAL */}
-<div style={{ borderRadius: 6 }}>
-<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-{/* <Space>
-<SettingOutlined style={{ color: '#1890ff' }} />
-<Text strong>1. Unidades de Comercialização e Correntes de Preço</Text>
-</Space> */}
-</div>
+{/* SEÇÃO PRINCIPAL: lateral de unidades + barra da unidade ativa + painel de faixas (layout em L) */}
+<div style={{
+display: 'grid',
+gridTemplateColumns: 'minmax(170px, 210px) 1fr',
+gridTemplateRows: 'auto 1fr',
+gridTemplateAreas: '"lateral topo" "lateral painel"',
+border: '1px solid #e8e8e8',
+borderRadius: 8,
+overflow: 'hidden',
+background: '#fff',
+marginTop: 6,
+}}>
 
-<Row gutter={2}>
-{/* BARRA LATERAL ESQUERDA (Exibe ativas e inativas) */}
-<Col xs={24} md={7} lg={24}>
-<div style={{ background: '#fafafa', border: '1px solid #d9d9d9', borderRadius: 6, padding: '4px', display: 'flex', flexDirection: 'row', gap: 2, flexWrap: 'wrap' }}>
-<div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, width: '100%' }}>
-<Text type="secondary" strong style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-<CalculatorOutlined /> Unidades de Comercialização e Correntes de Preço
+{/* LATERAL: unidades de comercialização (cresce para baixo) */}
+<div style={{ gridArea: 'lateral', background: '#fafafa', borderRight: '1px solid #e8e8e8', display: 'flex', flexDirection: 'column' }}>
+<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', borderBottom: '1px solid #e8e8e8', minHeight: 44 }}>
+<Text strong style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+<CalculatorOutlined /> Unidades <Tag style={{ margin: 0, fontSize: 10 }}>{unitsConfig.length}</Tag>
 </Text>
-<Space size={6}>
-<Tag style={{ margin: 0 }}>{unitsConfig.length} total</Tag>
-<Button type="dashed" icon={<PlusOutlined />} onClick={handleOpenCreateUnitModal} size='small'>
-Novo
-</Button>
-</Space>
+<Button type="dashed" icon={<PlusOutlined />} onClick={handleOpenCreateUnitModal} size="small">Nova</Button>
 </div>
-
-<div style={{ display: 'flex', flexDirection: 'row', gap: 6, width: '100%', overflowX: 'auto', paddingBottom: 4 }}>
+<div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8, overflowY: 'auto' }}>
+{unitsConfig.length === 0 && <Text type="secondary" style={{ fontSize: 12 }}>Nenhuma unidade ainda.</Text>}
 {unitsConfig.map((unit) => {
 const factor = unit.conversionFactor;
 const unitCost = purchaseCost * factor;
 const unitRule = tierRules.find(t => t.unitKey === unit.unitKey);
 const unitPrice = unitRule ? unitRule.unitPrice : unitCost * unit.retailMarkup;
-const unitProfit = unitPrice - unitCost;
-const unitMarginPct = unitPrice > 0 ? (unitProfit / unitPrice) * 100 : 0;
-const isCurrentTab = activeTabKey === unit.unitKey;
-
+const unitMarginPct = unitPrice > 0 ? ((unitPrice - unitCost) / unitPrice) * 100 : 0;
+const ativa = activeTabKey === unit.unitKey;
 return (
-<div 
+<div
 key={unit.unitKey}
 onClick={() => setActiveTabKey(unit.unitKey)}
-style={{ 
-minWidth: 160,
-background: unit.enabled ? (isCurrentTab ? '#ffffff' : '#f6ffed') : '#f5f5f5', 
-border: isCurrentTab ? '2px solid #1890ff' : (unit.enabled ? '1px solid #b7eb8f' : '1px dashed #d9d9d9'), 
-borderRadius: 6, 
-padding: '6px 8px', 
-display: 'flex',
-flexDirection: 'column',
-gap: 4,
+style={{
+background: ativa ? '#ffffff' : unit.enabled ? '#f6ffed' : '#f5f5f5',
+border: ativa ? '2px solid #1677ff' : unit.enabled ? '1px solid #b7eb8f' : '1px dashed #d9d9d9',
+borderRadius: 6,
+padding: '6px 8px',
 cursor: 'pointer',
-transition: 'all 0.2s',
 opacity: unit.enabled ? 1 : 0.6,
-boxShadow: isCurrentTab ? '0 2px 8px rgba(24, 144, 255, 0.15)' : 'none'
+boxShadow: ativa ? '0 2px 8px rgba(22, 119, 255, 0.15)' : 'none',
+transition: 'all 0.2s',
 }}
 >
-<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-<Text strong style={{ color: unit.enabled ? (isCurrentTab ? '#096dd9' : '#262626') : '#8c8c8c', fontSize: 13 }}>
-{unit.unitName} ({unit.unitKey})
+<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4 }}>
+<Text strong ellipsis style={{ color: !unit.enabled ? '#8c8c8c' : ativa ? '#0958d9' : '#262626', fontSize: 13 }}>
+{unit.unitKey}{unit.unitName && unit.unitName !== unit.unitKey ? ` · ${unit.unitName}` : ''}
 </Text>
-{unit.enabled ? (
-isCurrentTab && <RightOutlined style={{ color: '#1890ff', fontSize: 12 }} />
-) : (
-<Tag color="default" style={{ margin: 0, fontSize: 10 }}>Inativo</Tag>
-)}
+{unit.isBase && <Tag color="purple" style={{ margin: 0, fontSize: 10 }}>base</Tag>}
+{!unit.enabled && <Tag style={{ margin: 0, fontSize: 10 }}>inativa</Tag>}
 </div>
-
-<div style={{ display: 'flex', justifyContent: 'space-between', color: '#8c8c8c', fontSize: 11 }}>
-<span>Fator: <b>{factor}x</b></span>
-{unit.enabled && <span>Margem: <b style={{ color: unitMarginPct < 15 ? '#ff4d4f' : '#52c41a' }}>{unitMarginPct.toFixed(1)}%</b></span>}
+<div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#8c8c8c', marginTop: 2 }}>
+<span>×{factor}</span>
+{unit.enabled && <span>margem <b style={{ color: unitMarginPct < 15 ? '#ff4d4f' : '#52c41a' }}>{unitMarginPct.toFixed(1)}%</b></span>}
 </div>
-
-<div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #f0f0f0', paddingTop: 3, marginTop: 2, fontSize: 11 }}>
-<span>Varejo:</span>
+<div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, borderTop: '1px solid #f0f0f0', paddingTop: 2, marginTop: 2 }}>
+<span>Varejo</span>
 <b style={{ color: unit.enabled ? '#3f8600' : '#8c8c8c' }}>R$ {unitPrice.toFixed(2)}</b>
 </div>
 </div>
@@ -845,89 +742,63 @@ isCurrentTab && <RightOutlined style={{ color: '#1890ff', fontSize: 12 }} />
 })}
 </div>
 </div>
-</Col>
 
-{/* CONTEÚDO À DIREITA */}
-<Col xs={24} md={17} lg={24} style={{ marginTop: 8 }}>
+{/* TOPO: cabeçalho da unidade ativa (emenda com a lateral) */}
+<div style={{ gridArea: 'topo', background: '#fafafa', borderBottom: '1px solid #e8e8e8', padding: '6px 12px', minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
 {!activeUnitDef ? (
-<div style={{ textAlign: 'center', padding: '24px', background: '#fafafa', borderRadius: 6 }}>
 <Text type="secondary">Selecione uma unidade ao lado.</Text>
+) : (() => {
+const custoUnidade = purchaseCost * activeUnitDef.conversionFactor;
+const precoVarejo = tierRules.find(t => t.unitKey === activeUnitDef.unitKey)?.unitPrice ?? 0;
+const margem = precoVarejo > 0 ? (((precoVarejo - custoUnidade) / precoVarejo) * 100).toFixed(1) + '%' : '—';
+const faixas = tierRules.filter(t => t.unitKey === activeUnitDef.unitKey).length;
+const chip = (rotulo: string, valor: React.ReactNode, cor?: string) => (
+<div style={{ lineHeight: 1.2 }}>
+<div style={{ fontSize: 10, color: '#8c8c8c' }}>{rotulo}</div>
+<div style={{ fontSize: 13, fontWeight: 600, color: cor }}>{valor}</div>
 </div>
-) : (
-<div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+);
+return (
+<>
+<Space size={8} align="center">
+<Text strong style={{ fontSize: 15 }}>{activeUnitDef.unitName} ({activeUnitDef.unitKey})</Text>
+{!activeUnitDef.enabled && <Tag color="warning" style={{ margin: 0 }}>inativa</Tag>}
+</Space>
+<Space size={18} wrap align="center">
+{chip(`Custo base (${baseLabel})`, `R$ ${purchaseCost.toFixed(2)}`)}
+{activeUnitDef.conversionFactor !== 1 && chip(`Custo ${activeUnitDef.unitKey} (×${activeUnitDef.conversionFactor})`, `R$ ${custoUnidade.toFixed(2)}`)}
+{chip('Varejo', `R$ ${precoVarejo.toFixed(2)}`, '#3f8600')}
+{chip('Margem', margem, '#1677ff')}
+{chip('Faixas', `${faixas} / 3`, '#722ed1')}
+<Button size="small" type="primary" ghost icon={<EditOutlined />} onClick={() => handleOpenEditUnitModal(activeUnitDef)}>
+Editar unidade
+</Button>
+</Space>
+</>
+);
+})()}
+</div>
 
-{/* Banner de Aviso caso a unidade esteja desativada */}
-{!activeUnitDef.enabled && (
+{/* PAINEL: faixas de preço (varejo e atacado) da unidade ativa */}
+<div style={{ gridArea: 'painel', padding: 10, minHeight: 180 }}>
+{activeUnitDef && !activeUnitDef.enabled && (
 <Alert
 type="warning"
 showIcon
 icon={<LockOutlined />}
-message="Método de Venda Bloqueado (Inativo)"
-description="Esta unidade de comercialização está desativada no momento e não aparece no PDV. Você ainda pode gerenciar os parâmetros abaixo ou reativá-la clicando em 'Editar Parâmetros'."
-action={
-<Button size="small" type="primary" onClick={() => handleOpenEditUnitModal(activeUnitDef)}>
-Reativar Unidade
-</Button>
-}
+style={{ marginBottom: 8 }}
+message="Unidade inativa: não aparece no PDV"
+action={<Button size="small" type="primary" onClick={() => handleOpenEditUnitModal(activeUnitDef)}>Reativar</Button>}
 />
 )}
-
-{/* Cabeçalho da Unidade Ativa */}
-<div style={{ background: '#fafafa', padding: '10px 14px', borderRadius: 8, border: '1px solid #f0f0f0', display: 'flex', flexDirection: 'column', gap: 8 }}>
-<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-<Space size={8} align="center">
-<Text strong style={{ fontSize: 15, color: '#262626' }}>
-{activeUnitDef.unitName} ({activeUnitDef.unitKey})
-</Text>
-</Space>
-
-<Button size="small" type="primary" ghost icon={<EditOutlined />} onClick={() => handleOpenEditUnitModal(activeUnitDef)}>
-Editar Parâmetros
-</Button>
-</div>
-
-<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, paddingTop: 6, borderTop: '1px solid #f0f0f0' }}>
-<Space size={4}>
-<Text type="secondary" style={{ fontSize: 12 }}>Corrente de Gomos:</Text>
-<Tag color="purple" style={{ margin: 0 }}>{tierRules.filter(t => t.unitKey === activeUnitDef.unitKey).length} / 3</Tag>
-</Space>
-
-<Space size={10} wrap align="center">
-<div style={{ background: '#ffffff', borderRadius: 6, border: '1px solid #e8e8e8', overflow: 'hidden', display: 'inline-block', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
-<table style={{ borderCollapse: 'collapse', fontSize: 11, textAlign: 'center' }}>
-<thead>
-<tr style={{ background: '#f5f5f5', borderBottom: '1px solid #e8e8e8', color: '#8c8c8c' }}>
-<th style={{ padding: '2px 6px', fontWeight: 500 }}>Custo 1x</th>
-<th style={{ padding: '2px 6px', fontWeight: 500 }}>Fator {activeUnitDef.conversionFactor}x</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style={{ padding: '3px 6px', color: '#595959' }}>R$ {purchaseCost.toFixed(2)}</td>
-<td style={{ padding: '3px 6px', color: '#3f8600', fontWeight: 'bold' }}>R$ {(purchaseCost * activeUnitDef.conversionFactor).toFixed(2)}</td>
-</tr>
-</tbody>
-</table>
-</div>
-
-<Tag color="blue" style={{ margin: 0, padding: '2px 8px' }}>Margem: {(() => {
-const custoUnidade = purchaseCost * activeUnitDef.conversionFactor;
-const precoVarejo = tierRules.find(t => t.unitKey === activeUnitDef.unitKey)?.unitPrice ?? 0;
-return precoVarejo > 0 ? `${(((precoVarejo - custoUnidade) / precoVarejo) * 100).toFixed(1)}%` : '—';
-})()}</Tag>
-<Tag color="green" style={{ margin: 0, padding: '2px 8px' }}>Varejo ({activeUnitDef.unitKey}): R$ {((tierRules.find(t => t.unitKey === activeUnitDef.unitKey)?.unitPrice) ?? 0).toFixed(2)}</Tag>
-</Space>
-</div>
-</div>
-
-{/* Listagem de Gomos */}
-<div style={{ opacity: activeUnitDef.enabled ? 1 : 0.65, pointerEvents: activeUnitDef.enabled ? 'auto' : 'none' }}>
-{tierRules.filter(t => t.unitKey === activeUnitDef.unitKey).length === 0 ? (
-<div style={{ textAlign: 'center', padding: '20px', background: '#fafafa', borderRadius: 6, border: '1px dashed #d9d9d9' }}>
-<Text type="secondary">Nenhum gomo configurado para esta unidade.</Text>
-</div>
-) : (
-<Row gutter={[6, 6]}>
+{activeUnitDef && (
+<div style={{
+display: 'grid',
+gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+gap: 8,
+opacity: activeUnitDef.enabled ? 1 : 0.65,
+pointerEvents: activeUnitDef.enabled ? 'auto' : 'none',
+}}>
 {tierRules.filter(t => t.unitKey === activeUnitDef.unitKey).map((rule, idx, unitRulesArr) => {
 const isFirstGomo = idx === 0;
 const isLastGomo = idx === unitRulesArr.length - 1;
@@ -935,7 +806,7 @@ const unitCost = purchaseCost * activeUnitDef.conversionFactor;
 const profit = rule.unitPrice - unitCost;
 
 return (
-<Col xs={24} sm={8} key={rule.key}>
+<div key={rule.key}>
 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
 <Tag color={rule.tierType === 'wholesale' ? 'orange' : 'cyan'} style={{ margin: 0, width: 'fit-content', padding: '0 4px', fontSize: 11 }}>
 {isFirstGomo ? 'Varejo' : `Atacado #${idx + 1}`}
@@ -1094,18 +965,16 @@ setTierRules(updated);
 </div>
 </div>
 </div>
-</Col>
+</div>
 );
 })}
 
 {tierRules.filter(t => t.unitKey === activeUnitDef.unitKey).length < 3 && (
-<Col xs={24} sm={8}>
 <div
 onClick={() => addTierRuleForUnit(String(activeUnitDef.unitKey))}
 style={{
 borderRadius: 6,
-height: '100%',
-minHeight: 110,
+minHeight: 150,
 display: 'flex',
 flexDirection: 'column',
 alignItems: 'center',
@@ -1114,22 +983,15 @@ background: '#fafafa',
 border: '1px dashed #d9d9d9',
 cursor: 'pointer',
 gap: 6,
-transition: 'all 0.3s'
 }}
 >
 <PlusOutlined style={{ fontSize: 18, color: '#8c8c8c' }} />
-<Text type="secondary" style={{ fontSize: 12 }}>Adicionar Gomo</Text>
-</div>
-</Col>
-)}
-</Row>
-)}
-</div>
-
+<Text type="secondary" style={{ fontSize: 12 }}>Adicionar faixa de atacado</Text>
 </div>
 )}
-</Col>
-</Row>
+</div>
+)}
+</div>
 </div>
 </Spin>
 )}
@@ -1205,28 +1067,6 @@ onChange={(v) => setFormRetailMarkup(v ?? 1.8)}
 </div>
 </Modal>
 
-<Modal
-title="Payload da Corrente de Preços (API / Banco de Dados)"
-open={isPayloadModalVisible}
-onOk={() => setIsPayloadModalVisible(false)}
-onCancel={() => setIsPayloadModalVisible(false)}
-footer={[
-<Button key="copy" type="primary" onClick={() => {
-navigator.clipboard.writeText(generatePayloadJSON());
-message.success('JSON copiado!');
-}}>
-Copiar JSON
-</Button>,
-<Button key="close" onClick={() => setIsPayloadModalVisible(false)}>
-Fechar
-</Button>
-]}
-width={700}
->
-<pre style={{ background: '#1e1e1e', color: '#d4d4d4', padding: 16, borderRadius: 6, maxHeight: 400, overflow: 'auto' }}>
-{generatePayloadJSON()}
-</pre>
-</Modal>
 </div>
 );
 };

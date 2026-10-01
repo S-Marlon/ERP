@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { useState } from "react";
 import { Layout } from "antd";
 
@@ -28,7 +28,7 @@ import { FinalizarVenda } from "./pages/PDV/pages/FinalizarVenda";
 import PDVContent from './pages/PDV/PDV';
 import HubVendas from './pages/PDV/HubVendas';
 import VendasDoDia from './pages/PDV/pages/VendasDoDia/VendasDoDia';
-import Notas from './pages/Estoque/pages/notas/Notas';
+import NotasEntrada from './pages/Compras/NotasEntrada/NotasEntrada';
 import ComprasDashboard from "./pages/Compras/ComprasDashboard";
 import StockEntryForm from "./pages/Compras/StockEntry/StockEntryForm";
 import { CatalogManager } from "./pages/Catalogo/pages/CatalogManager";
@@ -49,6 +49,7 @@ import { ParceirosDashboard } from "./pages/Parceiros/ParceirosDashboard";
 import FuncionariosPage from "./pages/Parceiros/FuncionariosPage";
 
 import { MarcasPage } from "./pages/Catalogo/pages/MarcasManager/MarcasPage";
+import PendenciasPim from "./pages/Catalogo/pages/PendenciasPim/PendenciasPim";
 import Pedidos from "./pages/Clientes/Pedidos";
 import ListaComprasExport from "./pages/Compras/ListaComprasExport";
 import { LeitorXML } from "./pages/Compras/StockEntry/xml/LeitorXML";
@@ -148,7 +149,9 @@ export default function AppLayout() {
             <Route path="/estoque" element={<Estoque />} />
             <Route path="/estoque/consulta" element={<SaldoEstoque />} />
             <Route path="/estoque/gerenciamento" element={<StockEntryForm />} />
-            <Route path="/estoque/notas" element={<Notas />} />
+            {/* Notas de entrada agora ficam em Compras (endereço antigo redireciona) */}
+            <Route path="/estoque/notas" element={<Navigate to="/compras/notas" replace />} />
+            <Route path="/compras/notas" element={<NotasEntrada />} />
             <Route path="/estoque/operacoes" element={<Movimentacoes />} />
             <Route path="/estoque/etiquetagem" element={<Etiquetagem />} />
             <Route path="/catalogo" element={<CatalogManager />} />
@@ -158,6 +161,7 @@ export default function AppLayout() {
             <Route path="/catalogo/atributos" element={<GlobalAttributeManager />} />
             <Route path="/catalogo/gerenciador" element={<CatalogSku />} />
             <Route path="/catalogo/marcas" element={<MarcasPage />} />
+            <Route path="/catalogo/pendencias" element={<PendenciasPim />} />
             <Route path="/catalogo/preco" element={<ProductPricingModule/>} />
             <Route path="/compras" element={<ComprasDashboard />} />
             <Route path="/compras/ListaCompras" element={<ListaComprasExport />} />

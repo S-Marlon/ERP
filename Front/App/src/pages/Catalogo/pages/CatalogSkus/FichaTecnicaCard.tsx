@@ -1,16 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Card, DatePicker, Empty, Input, InputNumber, Popconfirm, Select, Space, Spin, Switch, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { Alert, Button, Card, Empty, Popconfirm, Space, Spin, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { DeleteOutlined, SaveOutlined, UndoOutlined } from '@ant-design/icons';
-import dayjs from 'dayjs';
 import { AtributoFicha, FichaTecnica, getFichaTecnica, salvarFichaTecnica } from './CatalogSku.service';
+import CampoAtributo, { PAPEL_ATRIBUTO as PAPEL, ordenarPorPapel } from './CampoAtributo';
 
 const { Text } = Typography;
 
-const PAPEL: Record<string, { label: string; color: string; ordem: number }> = {
-  dna: { label: 'DNA', color: 'blue', ordem: 0 },
-  grade: { label: 'Grade', color: 'purple', ordem: 1 },
-  ficha: { label: 'Ficha', color: 'cyan', ordem: 2 },
-};
 
 interface FichaTecnicaCardProps {
   idItem: number;
@@ -53,7 +48,7 @@ export default function FichaTecnicaCard({ idItem, onSalvo }: FichaTecnicaCardPr
   };
 
   const atributos = useMemo(
-    () => [...(ficha?.atributos || [])].sort((x, y) => (PAPEL[x.papel]?.ordem ?? 9) - (PAPEL[y.papel]?.ordem ?? 9)),
+    () => ordenarPorPapel(ficha?.atributos || []),
     [ficha]
   );
   const pendentes = atributos.filter(a => a.obrigatorio && !a.valorFixo && (valorAtual(a) === null || String(valorAtual(a) ?? '').trim() === ''));
@@ -86,35 +81,7 @@ export default function FichaTecnicaCard({ idItem, onSalvo }: FichaTecnicaCardPr
     }
   };
 
-  const campo = (a: AtributoFicha) => {
-    const valor = valorAtual(a);
-    if (a.valorFixo) return <Text>{a.valorFixo} <Tag style={{ marginLeft: 4 }}>fixo da família</Tag></Text>;
-    const vazio = valor === null || valor === undefined || String(valor).trim() === '';
-    const status = a.obrigatorio && vazio ? 'warning' as const : undefined;
-    switch (a.tipo) {
-      case 'lista':
-        return (
-          <Select size="small" allowClear style={{ width: '100%' }} status={status} placeholder="Selecione"
-            value={vazio ? undefined : String(valor)} options={a.opcoes.map(o => ({ value: o, label: o }))}
-            onChange={v => alterar(a, v ?? null)} />
-        );
-      case 'numero':
-      case 'decimal':
-        return (
-          <InputNumber size="small" style={{ width: '100%' }} status={status} precision={a.tipo === 'numero' ? 0 : undefined}
-            value={vazio ? null : Number(valor)} onChange={v => alterar(a, v ?? null)} decimalSeparator="," />
-        );
-      case 'boolean':
-        return <Switch size="small" checked={String(valor) === 'Sim' || valor === true} onChange={v => alterar(a, v ? 'Sim' : 'Não')} />;
-      case 'data':
-        return (
-          <DatePicker size="small" format="DD/MM/YYYY" status={status} value={vazio ? null : dayjs(String(valor))}
-            onChange={d => alterar(a, d ? d.format('YYYY-MM-DD') : null)} />
-        );
-      default:
-        return <Input size="small" status={status} value={vazio ? '' : String(valor)} onChange={e => alterar(a, e.target.value)} />;
-    }
-  };
+  const campo = (a: AtributoFicha) => <CampoAtributo atributo={a} valor={valorAtual(a)} onChange={v => alterar(a, v)} />;
 
   return (
     <Spin spinning={loading || salvando}>

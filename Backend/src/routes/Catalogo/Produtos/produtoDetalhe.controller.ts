@@ -36,7 +36,7 @@ export const getProdutoDetalhe = async (req: Request, res: Response) => {
        LEFT JOIN comercial_marcas mar ON mar.id = cpd.id_marca AND mar.tenant_id = cpd.tenant_id
        LEFT JOIN itens_dados_logisticos log ON log.id_item = ic.id_item
        LEFT JOIN itens_dados_fiscais fis ON fis.id_item = ic.id_item
-       LEFT JOIN estoque_saldos_itens es ON es.id_item = ic.id_item AND es.tenant_id = ic.tenant_id
+       LEFT JOIN estoque_saldos_itens es ON es.id_item = ic.id_item AND es.tenant_id = ic.tenant_id AND es.deposito = 'VENDA'
        WHERE ic.id_item = ? AND ic.tenant_id = ?`,
       [idItem, tenant]
     );
@@ -431,19 +431,9 @@ const valorExibicao = (r: any): string | null => {
   return null;
 };
 
-const carregarFichaTecnica = async (conn: Conn, tenant: number, idItem: number) => {
-  const [[item]] = await conn.execute(
-    `SELECT ic.id_item, cpd.familia_id, f.nome AS familia_nome, f.status AS familia_status,
-            COALESCE(f.categoria_id, cpd.categoria_id) AS categoria_id, cat.nome AS categoria_nome
-     FROM itens_core ic
-     LEFT JOIN comercial_produtos_dados cpd ON cpd.id_item = ic.id_item AND cpd.tenant_id = ic.tenant_id
-     LEFT JOIN comercial_familias f ON f.id = cpd.familia_id AND f.tenant_id = ic.tenant_id
-     LEFT JOIN comercial_categorias cat ON cat.id = COALESCE(f.categoria_id, cpd.categoria_id)
-     WHERE ic.id_item = ? AND ic.tenant_id = ?`,
-    [idItem, tenant]
-  );
-  if (!item) return null;
-
+// Vínculos de atributos que valem para um item: herdados da cadeia de categorias (raiz -> categoria)
+// e os da família, que sobrescrevem
+const carregarVinculosEfetivos = async (conn: Conn, tenant: number, familiaId: number | null, categoriaId: number | null) => {
   const [vinculos] = await conn.execute(
     `SELECT core.tipo_entidade, core.atributo_id, core.escopo_comercial, core.obrigatorio, core.valor_padrao_grupo,
             core.ordem, a.nome, a.codigo, a.tipo
@@ -451,10 +441,9 @@ const carregarFichaTecnica = async (conn: Conn, tenant: number, idItem: number) 
      INNER JOIN atributos_comercial a ON a.id = core.atributo_id AND a.tenant_id = core.tenant_id
      WHERE core.tenant_id = ? AND core.ativo = 1 AND core.tipo_entidade = 'familia' AND core.id_entidade = ?
      ORDER BY core.ordem, a.nome`,
-    [tenant, item.familia_id ?? -1]
+    [tenant, familiaId ?? -1]
   );
-  // Herdados da cadeia de categorias (raiz -> categoria do item); o vínculo da família sobrescreve
-  const herdados = await carregarAtributosDaCategoria(conn, tenant, item.categoria_id);
+  const herdados = await carregarAtributosDaCategoria(conn, tenant, categoriaId);
   const efetivos = new Map<string, any>();
   for (const r of herdados) {
     efetivos.set(String(r.id), {
@@ -464,22 +453,14 @@ const carregarFichaTecnica = async (conn: Conn, tenant: number, idItem: number) 
     });
   }
   for (const v of vinculos) efetivos.set(String(v.atributo_id), { ...v, origem: 'familia' });
+  return efetivos;
+};
 
-  const [valores] = await conn.execute(
-    `SELECT v.atributo_id, v.valor_texto, v.valor_numero, v.valor_decimal, v.valor_data, v.valor_boolean,
-            o.valor AS opcao_valor, a.nome, a.codigo, a.tipo
-     FROM atributos_comercial_valores v
-     INNER JOIN atributos_comercial a ON a.id = v.atributo_id AND a.tenant_id = v.tenant_id
-     LEFT JOIN atributos_comercial_opcoes o ON o.id = v.opcao_id
-     WHERE v.tenant_id = ? AND v.tipo_entidade = 'produto' AND v.id_entidade = ?`,
-    [tenant, idItem]
-  );
-  const valorPorAtributo = new Map<string, string | null>();
-  for (const v of valores) valorPorAtributo.set(String(v.atributo_id), valorExibicao(v));
-
+const montarAtributosEfetivos = async (
+  conn: Conn, tenant: number, efetivos: Map<string, any>, valorPorAtributo: Map<string, string | null> = new Map()
+) => {
   const opcoes = await carregarOpcoes(conn, tenant, [...efetivos.keys()]);
-
-  const atributos = [...efetivos.values()].map(v => {
+  return [...efetivos.values()].map(v => {
     const papel = v.escopo_comercial || 'ficha';
     const valorFixo = papel === 'dna' && v.valor_padrao_grupo ? String(v.valor_padrao_grupo) : null;
     return {
@@ -496,6 +477,104 @@ const carregarFichaTecnica = async (conn: Conn, tenant: number, idItem: number) 
       opcoes: (opcoes.get(String(v.atributo_id)) || []).map(o => o.valor),
     };
   });
+};
+
+// Família (com a categoria dela) ou só categoria; a família manda na categoria (regra do PIM)
+const resolverClassificacao = async (conn: Conn, tenant: number, familiaId: unknown, categoriaId: unknown) => {
+  const idFamilia = Number(familiaId) > 0 ? Number(familiaId) : null;
+  if (idFamilia) {
+    const [[f]] = await conn.execute(
+      `SELECT f.id, f.nome, f.status, f.categoria_id, c.nome AS categoria_nome
+       FROM comercial_familias f
+       LEFT JOIN comercial_categorias c ON c.id = f.categoria_id
+       WHERE f.id = ? AND f.tenant_id = ?`,
+      [idFamilia, tenant]
+    );
+    if (f) {
+      return {
+        familia: { id: Number(f.id), nome: f.nome, status: f.status },
+        categoria: f.categoria_id ? { id: Number(f.categoria_id), nome: f.categoria_nome } : null,
+      };
+    }
+  }
+  const idCategoria = Number(categoriaId) > 0 ? Number(categoriaId) : null;
+  if (idCategoria) {
+    const [[c]] = await conn.execute(`SELECT id, nome FROM comercial_categorias WHERE id = ? AND tenant_id = ?`, [idCategoria, tenant]);
+    if (c) return { familia: null, categoria: { id: Number(c.id), nome: c.nome } };
+  }
+  return { familia: null, categoria: null };
+};
+
+/**
+ * GET /catalogo/atributos-para-item?familia_id=&categoria_id=
+ * Atributos que um item novo terá ao entrar na família (ou só na categoria): usado na entrada de NF
+ * para o operador preencher os valores já no cadastro, se quiser.
+ */
+export const getAtributosParaItem = async (req: Request, res: Response) => {
+  try {
+    const tenant = tenantDe(req);
+    const classificacao = await resolverClassificacao(pool as any, tenant, req.query.familia_id, req.query.categoria_id);
+    const efetivos = await carregarVinculosEfetivos(pool as any, tenant, classificacao.familia?.id ?? null, classificacao.categoria?.id ?? null);
+    const atributos = await montarAtributosEfetivos(pool as any, tenant, efetivos);
+    return res.json({ success: true, ...classificacao, atributos });
+  } catch (error: any) {
+    console.error('Erro ao carregar atributos para o item:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * Item novo (entrada de NF): grava os valores de atributos informados no mapeamento.
+ * Só os atributos que valem para a família/categoria do item; DNA com valor fixo e valores vazios são ignorados.
+ * Valor inválido para o tipo lança erro legível (`Atributo "X": ...`).
+ */
+export const gravarAtributosItemNovo = async (
+  conn: Conn, tenant: number, idItem: number, familiaId: number | null, categoriaId: number | null, valores: unknown
+) => {
+  if (!valores || typeof valores !== 'object') return 0;
+  const efetivos = await carregarVinculosEfetivos(conn, tenant, familiaId, categoriaId);
+  const opcoes = await carregarOpcoes(conn, tenant, [...efetivos.keys()]);
+  let gravados = 0;
+  for (const [id, valor] of Object.entries(valores as Record<string, unknown>)) {
+    const v = efetivos.get(String(id));
+    if (!v) continue;
+    if ((v.escopo_comercial || 'ficha') === 'dna' && v.valor_padrao_grupo) continue;
+    if (valor === null || valor === undefined || String(valor).trim() === '') continue;
+    await gravarValorAtributo(conn, tenant, 'produto', idItem,
+      { id: v.atributo_id, nome: v.nome, tipo: v.tipo }, valor, opcoes.get(String(v.atributo_id)) || []);
+    gravados++;
+  }
+  return gravados;
+};
+
+const carregarFichaTecnica = async (conn: Conn, tenant: number, idItem: number) => {
+  const [[item]] = await conn.execute(
+    `SELECT ic.id_item, cpd.familia_id, f.nome AS familia_nome, f.status AS familia_status,
+            COALESCE(f.categoria_id, cpd.categoria_id) AS categoria_id, cat.nome AS categoria_nome
+     FROM itens_core ic
+     LEFT JOIN comercial_produtos_dados cpd ON cpd.id_item = ic.id_item AND cpd.tenant_id = ic.tenant_id
+     LEFT JOIN comercial_familias f ON f.id = cpd.familia_id AND f.tenant_id = ic.tenant_id
+     LEFT JOIN comercial_categorias cat ON cat.id = COALESCE(f.categoria_id, cpd.categoria_id)
+     WHERE ic.id_item = ? AND ic.tenant_id = ?`,
+    [idItem, tenant]
+  );
+  if (!item) return null;
+
+  const efetivos = await carregarVinculosEfetivos(conn, tenant, item.familia_id, item.categoria_id);
+
+  const [valores] = await conn.execute(
+    `SELECT v.atributo_id, v.valor_texto, v.valor_numero, v.valor_decimal, v.valor_data, v.valor_boolean,
+            o.valor AS opcao_valor, a.nome, a.codigo, a.tipo
+     FROM atributos_comercial_valores v
+     INNER JOIN atributos_comercial a ON a.id = v.atributo_id AND a.tenant_id = v.tenant_id
+     LEFT JOIN atributos_comercial_opcoes o ON o.id = v.opcao_id
+     WHERE v.tenant_id = ? AND v.tipo_entidade = 'produto' AND v.id_entidade = ?`,
+    [tenant, idItem]
+  );
+  const valorPorAtributo = new Map<string, string | null>();
+  for (const v of valores) valorPorAtributo.set(String(v.atributo_id), valorExibicao(v));
+
+  const atributos = await montarAtributosEfetivos(conn, tenant, efetivos, valorPorAtributo);
 
   // Valores de atributos que não pertencem mais à família/categoria: preservados como ficha estática
   const estaticos = valores

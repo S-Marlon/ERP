@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
 Table,
 Button,
@@ -17,58 +17,53 @@ Alert,
 Descriptions,
 Statistic,
 Dropdown,
-message
+message,
+Badge,
+Progress
 } from 'antd';
 import {
-SettingOutlined,
-ThunderboltOutlined,
 CheckOutlined,
 UndoOutlined,
 LinkOutlined,
 SwapOutlined,
-FolderAddOutlined,
-PlusOutlined,
+ThunderboltFilled,
+ApartmentOutlined,
 InfoCircleOutlined,
 DollarOutlined,
 PaperClipOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-// Substitua o import antigo de ManageGroupsModal por:
-import { TableToolbar } from './TableToolbar';
-import { ModalFamiliaManager } from './ModalFamiliaManager';
-
 import {
 Item,
-ItemAttribute,
 FilterType,
 } from '../types';
 
-import ProductMappingModal, { MappingPayload, getMappedId } from './ProductMappingModal';
+import ProductMappingModal, { MappingPayload, getMappedId, SKU_A_GERAR } from './ProductMappingModal';
+import { DestinosEditor, DestinoLinha } from './DestinosEditor';
+import { ModalCadastroRapido, ModalClassificarLote } from './ModaisLote';
+import { carregarFamiliasECategorias, type ClassificacaoItem } from './ClassificacaoPim';
+import { ClassificacaoTag, type ClassificacaoCatalogo, type NomesCatalogo } from './ClassificacaoTag';
+import { linhaItemNovo, linhaSemVinculo } from '../edicaoLote';
+import { buscarClassificacaoItens } from '../../api/comprasApi';
 import { TIPOS_RECURSO, TIPO_RECURSO_PADRAO, TipoRecurso, getTipoRecursoConfig } from '../tipoRecurso';
 import { hasCodigoInterno, MSG_SEM_CODIGO_INTERNO } from '../conferencia';
 import { gtinEfetivo, normalizarGtin, situacaoGtin, validarGtin } from '../gtin';
-import {  generateGroupId } from '../helpers';
-import ManageFamiliasModal from './ModalManageFamilias';
 
 interface Props {
 items?: Item[];
-groups?: Group[];
-onConfirmItems?: (ids: string[] | number[]) => void;
-onUnconfirmItems?: (ids: string[] | number[]) => void;
-onMapProducts?: (ids: string[] | number[]) => void;
+onConfirmItems?: (ids: (string | number)[]) => void;
+onUnconfirmItems?: (ids: (string | number)[]) => void;
 onItemMapped?: (tempId: string | number, mapping: MappingPayload) => void;
 // Itens nunca saem da NF: apenas mudam de tipo de entrada (produto, consumo, ativo...)
 onChangeTipoRecurso?: (ids: (string | number)[], tipo: TipoRecurso) => void;
-onAssignGroupToItem?: (itemId: string | number, groupId: string) => void;
-onCreateAndAssignGroup?: (itemId: string | number, groupData: Group) => void;
-onUpdateGroup?: (groupId: string, groupData: Partial<Group>) => void;
-onUnassignGroupFromItem?: (itemId: string | number) => void;
-onApplyItemAttributeOverride?: (itemId: string | number, atributos: ItemAttribute[]) => void;
-onBatchAssignGroup?: (itemIds: (string | number)[], groupId: string) => void;
-onBatchSaveItemsAttributes?: (updatedItems: { tempId: string | number; atributosCustomizados: ItemAttribute[] }[]) => void;
 onQuantityChange?: (tempId: string | number, newReceivedQty: number) => void;
 onToggleItem?: (tempId: string | number, confirmed: boolean) => void;
 onChangeGtin?: (tempId: string | number, gtin: string) => void;
+// Destino no estoque (depósitos); null = padrão pelo tipo do item
+onChangeDestinos?: (tempId: string | number, destinos: DestinoLinha[] | null) => void;
+// Lote: cadastro rápido de itens novos e classificação no PIM
+onCadastroRapidoLote?: (linhas: any[], opcoes: { markup: number; classificacao: ClassificacaoItem }) => void;
+onClassificarLote?: (linhas: any[], classificacao: ClassificacaoItem, substituir?: boolean) => void;
 // NF já importada/descartada: tela apenas para consulta
 readOnly?: boolean;
 onSendTotal?: (total: number) => void;
@@ -78,53 +73,53 @@ const { Text, Title } = Typography;
 
 export const ItemsConference: React.FC<Props> = ({
 items: initialItems,
-groups: initialGroups,
 onConfirmItems,
 onUnconfirmItems,
-onMapProducts,
 onItemMapped,
 onChangeTipoRecurso,
-onAssignGroupToItem,
-onCreateAndAssignGroup,
-onUpdateGroup,
-onApplyItemAttributeOverride,
-onBatchAssignGroup,
-onBatchSaveItemsAttributes,
 onQuantityChange,
 onToggleItem,
 onChangeGtin,
+onChangeDestinos,
+onCadastroRapidoLote,
+onClassificarLote,
 readOnly = false,
 onSendTotal,
 }) => {
 const [localItems, setLocalItems] = useState<Item[]>(initialItems || []);
-const [localGroups, setLocalGroups] = useState<Group[]>(initialGroups || []);
 const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
 const [filter, setFilter] = useState<FilterType>('all');
+const [tipoFiltro, setTipoFiltro] = useState<string | null>(null);
+const [loteAberto, setLoteAberto] = useState<'cadastro' | 'classificar' | null>(null);
+const itensSelecionados = useMemo(() => localItems.filter(i => selectedRowKeys.includes(i.tempId as React.Key)), [localItems, selectedRowKeys]);
+// Classificação de uma linha só (clique na tag de família/categoria)
+const [linhaClassificar, setLinhaClassificar] = useState<any | null>(null);
 
-// Modais
-const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
-const [selectedItemForGroup, setSelectedItemForGroup] = useState<Item | null>(null);
-const [isManageModalOpen, setIsManageModalOpen] = useState(false);
-const [isBatchAssignOpen, setIsBatchAssignOpen] = useState(false);
-const [isGroupEditModalOpen, setIsGroupEditModalOpen] = useState(false);
-const [groupBeingEdited, setGroupBeingEdited] = useState<Group | null>(null);
-const [isItemsEditOpen, setIsItemsEditOpen] = useState(false);
-const [grupoSelecionadoParaItens, setGrupoSelecionadoParaItens] = useState<Group | null>(null);
+// Nomes de famílias/categorias (itens novos) e classificação atual dos itens já cadastrados (vínculos)
+const [nomesCatalogo, setNomesCatalogo] = useState<NomesCatalogo>({ familias: new Map(), categorias: new Map() });
+const [classificacaoCatalogo, setClassificacaoCatalogo] = useState<Record<string, ClassificacaoCatalogo>>({});
+useEffect(() => {
+carregarFamiliasECategorias()
+.then(r => setNomesCatalogo({
+familias: new Map(r.familias.map(f => [f.id, { nome: f.nome, status: f.status, categoriaId: f.categoriaId }])),
+categorias: new Map(r.categorias.map(c => [c.id, c.caminho])),
+}))
+.catch(() => { /* sem nomes: a tag mostra o id */ });
+}, []);
+const idsVinculados = useMemo(() => [...new Set(localItems
+.filter(i => !linhaItemNovo(i) && !linhaSemVinculo(i) && Number((i as any).produtoIdSistema) > 0)
+.map(i => Number((i as any).produtoIdSistema)))].sort((a, b) => a - b).join(','), [localItems]);
+useEffect(() => {
+if (!idsVinculados) return;
+let ativo = true;
+buscarClassificacaoItens(idsVinculados.split(',').map(Number))
+.then(r => { if (ativo) setClassificacaoCatalogo(r); })
+.catch(() => { /* sem classificação: a tag não aparece */ });
+return () => { ativo = false; };
+}, [idsVinculados]);
 
 const [barcodeModalVisible, setBarcodeModalVisible] = useState(false);
 const [selectedItemForBarcode, setSelectedItemForBarcode] = useState<any>(null);
-const [itemSelecionadoUnitario, setItemSelecionadoUnitario] = useState<Item | null>(null);
-
-// Substitua ou adicione junto aos seus modais:
-const [isUnifiedFamiliaOpen, setIsUnifiedFamiliaOpen] = useState(false);
-
-// 1. Cria o state no topo do componente filho
-const [totalReceivedAmountFinal, setTotalReceivedAmountFinal] = useState<number>(0);
-
-// 3. Atualiza o state e avisa o pai de forma segura usando o useEffect
-useEffect(() => {
-setTotalReceivedAmountFinal(totalReceivedAmountFinal);
-},);
 
 const [inputValue, setInputValue] = useState('');
 // Abre o modal e guarda qual item está sendo editado
@@ -164,21 +159,11 @@ setBarcodeModalVisible(false);
 const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
 const [itemsToMapQueue, setItemsToMapQueue] = useState<any[]>([]);
 
-// Adicione junto com os outros states do seu componente principal:
-const [grupos, setGrupos] = useState<any[]>([]); // Ou sua lista existente
-const [grupoSelecionado, setGrupoSelecionado] = useState<any>(null); // Ou seu state atual
-
 // Modal de Detalhes do Item (clique no 'i')
 const [isItemDetailsModalOpen, setIsItemDetailsModalOpen] = useState(false);
 const [itemForDetails, setItemForDetails] = useState<Item | null>(null);
 
-// Estados Lote AntD
-const [batchAssignMode, setBatchAssignMode] = useState<'LINK' | 'CREATE'>('LINK');
-const [batchSelectedGroupId, setBatchSelectedGroupId] = useState<string>('');
-const [batchNewGroupName, setBatchNewGroupName] = useState<string>('');
-
 useEffect(() => { setLocalItems(initialItems || []); }, [initialItems]);
-useEffect(() => { setLocalGroups(initialGroups || []); }, [initialGroups]);
 
 
 // Adicione este useMemo junto aos outros no topo do componente:
@@ -203,25 +188,6 @@ useEffect(() => {
 onSendTotal?.(calculatedTotalAmount);
 }, [calculatedTotalAmount, onSendTotal]);
 
-// Mapas de performance
-const groupsById = useMemo(() => {
-const map = new Map<string, Group>();
-for (const g of localGroups) map.set(g.id, g);
-return map;
-}, [localGroups]);
-
-const itemsByGroupId = useMemo(() => {
-const map = new Map<string, Item[]>();
-for (const item of localItems) {
-if (item.grupoId) {
-const list = map.get(item.grupoId) || [];
-list.push(item);
-map.set(item.grupoId, list);
-}
-}
-return map;
-}, [localItems]);
-
 const pendingItems = useMemo(() => localItems.filter(i => !i.isConfirmed && !i.confirmed), [localItems]);
 const confirmedItems = useMemo(() => localItems.filter(i => i.isConfirmed || i.confirmed), [localItems]);
 const divergentItems = useMemo(() => localItems.filter(i => (i.difference ?? 0) !== 0), [localItems]);
@@ -229,6 +195,7 @@ const unmappedItems = useMemo(() => localItems.filter(i => !i.mappedId && !i.sku
 
 // Filtragem reativa baseada nas abas
 const filteredItems = useMemo(() => {
+const porSituacao = (() => {
 switch (filter) {
 case 'pending': return pendingItems;
 case 'confirmed': return confirmedItems;
@@ -236,7 +203,30 @@ case 'divergent': return divergentItems;
 case 'unmapped': return unmappedItems;
 default: return localItems;
 }
-}, [filter, localItems, pendingItems, confirmedItems, divergentItems, unmappedItems]);
+})();
+return tipoFiltro ? porSituacao.filter(i => (i.tipoRecurso || TIPO_RECURSO_PADRAO) === tipoFiltro) : porSituacao;
+}, [filter, tipoFiltro, localItems, pendingItems, confirmedItems, divergentItems, unmappedItems]);
+
+// Tipos de entrada presentes na nota (venda, consumo, ativo...) com a quantidade de linhas
+const tiposNaNota = useMemo(() => {
+const contagem = new Map<string, number>();
+for (const i of localItems) {
+const t = i.tipoRecurso || TIPO_RECURSO_PADRAO;
+contagem.set(t, (contagem.get(t) || 0) + 1);
+}
+return TIPOS_RECURSO.filter(t => contagem.has(t.value)).map(t => ({ ...t, linhas: contagem.get(t.value) || 0 }));
+}, [localItems]);
+// SKU Customizado é único: itens novos da nota com o mesmo SKU (sem diferenciar maiúsculas)
+const skusRepetidos = useMemo(() => {
+const contagem = new Map<string, number>();
+for (const i of localItems) {
+if (!linhaItemNovo(i)) continue;
+const sku = String((i as any).mapeamento?.draftIdentity?.sku_comercial || '').trim().toUpperCase();
+if (sku) contagem.set(sku, (contagem.get(sku) || 0) + 1);
+}
+return new Set([...contagem].filter(([, n]) => n > 1).map(([sku]) => sku));
+}, [localItems]);
+const progressoConferencia = localItems.length > 0 ? Math.round((confirmedItems.length / localItems.length) * 100) : 0;
 
 const formatCurrency = (val: number) =>
 val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -247,89 +237,9 @@ const hasQuantity = (record.receivedQuantity ?? record.quantidade ?? 0) >= 0;
 return hasQuantity && hasCodigoInterno(record);
 };
 
-// Callbacks internos ajustados
-const assignGroupToItem = useCallback((itemId: string | number, groupId: string) => {
-setLocalItems(prev => prev.map(it => (it.tempId === itemId || it.nItem === itemId) ? { ...it, grupoId: groupId, atributosCustomizados: undefined } : it));
-onAssignGroupToItem?.(itemId, groupId);
-}, [onAssignGroupToItem]);
-
-const createGroupAndAssign = useCallback((itemId: string | number, groupData: Group) => {
-setLocalGroups(prev => [...prev, groupData]);
-setLocalItems(prev => prev.map(it => (it.tempId === itemId || it.nItem === itemId) ? { ...it, grupoId: groupData.id, atributosCustomizados: undefined } : it));
-onCreateAndAssignGroup?.(itemId, groupData);
-}, [onCreateAndAssignGroup]);
-
-const handleOpenGroupModal = (item: Item) => {
-setSelectedItemForGroup(item);
-setIsGroupModalOpen(true);
-};
-
 const handleOpenItemDetails = (item: Item) => {
 setItemForDetails(item);
 setIsItemDetailsModalOpen(true);
-};
-
-const handleBarcodeScan = (scannedCode: string) => {
-// Procura se o código escaneado bate com o cEAN do XML ou com o customGtin cadastrado anteriormente
-const foundIndex = items.findIndex(item => {
-const p = item.prod || item;
-return p.cEAN === scannedCode || item.customGtin === scannedCode;
-});
-
-if (foundIndex !== -1) {
-// Incrementa automaticamente a quantidade recebida ou destaca a linha na tela!
-message.success(`Item encontrado: ${items[foundIndex].prod?.xProd || 'Produto'}`);
-// Opcional: focar na linha ou incrementar a quantidade recebida
-} else {
-message.warning(`Nenhum produto encontrado com o código: ${scannedCode}`);
-}
-};
-
-const handleSaveGroupMapping = (payload: GroupMappingPayload) => {
-if (!selectedItemForGroup) return;
-const targetId = selectedItemForGroup.tempId;
-if (payload.isNewGroup && payload.groupData) {
-createGroupAndAssign(targetId, payload.groupData as Group);
-} else if (!payload.isNewGroup) {
-assignGroupToItem(targetId, payload.groupId);
-}
-if (payload.itemAttributesOverride) {
-applyItemAttributeOverride(targetId, payload.itemAttributesOverride);
-}
-setIsGroupModalOpen(false);
-};
-
-const handleLocalBatchSubmit = () => {
-if (batchAssignMode === 'LINK') {
-if (!batchSelectedGroupId) return Modal.error({ title: 'Aviso', content: 'Selecione um grupo existente.' });
-selectedRowKeys.forEach(id => assignGroupToItem(id, batchSelectedGroupId));
-onBatchAssignGroup?.(selectedRowKeys, batchSelectedGroupId);
-} else {
-if (!batchNewGroupName.trim()) return Modal.error({ title: 'Aviso', content: 'Informe o nome do novo grupo.' });
-const newGroup: Group = { id: generateGroupId(), nome: batchNewGroupName.trim().toUpperCase(), atributos: [] };
-setLocalGroups(prev => [...prev, newGroup]);
-selectedRowKeys.forEach(id => assignGroupToItem(id, newGroup.id));
-onBatchAssignGroup?.(selectedRowKeys, newGroup.id);
-}
-setSelectedRowKeys([]);
-setIsBatchAssignOpen(false);
-};
-
-const applyItemAttributeOverride = useCallback((itemId: string | number, atributos: ItemAttribute[]) => {
-setLocalItems(prev => prev.map(it => (it.tempId === itemId || it.nItem === itemId) ? { ...it, atributosCustomizados: atributos } : it));
-onApplyItemAttributeOverride?.(itemId, atributos);
-}, [onApplyItemAttributeOverride]);
-
-const updateGroup = useCallback((groupId: string, patch: Partial<Group>) => {
-setLocalGroups(prev => prev.map(g => (g.id === groupId ? { ...g, ...patch } : g)));
-onUpdateGroup?.(groupId, patch);
-}, [onUpdateGroup]);
-
-const handleEditGroup = (groupId: string) => {
-const group = groupsById.get(groupId);
-if (!group) return;
-setGroupBeingEdited(group);
-setIsGroupEditModalOpen(true);
 };
 
 // Função para abrir o modal com um ou múltiplos itens (fila)
@@ -358,14 +268,6 @@ return { ...item, mappedId: getMappedId(mappingData), isMapped: true };
 }
 return item;
 }));
-};
-
-const handleEditGroupItems = (groupId: string) => {
-const grupoFound = groupsById.get(groupId);
-if (grupoFound) {
-setGrupoSelecionadoParaItens(grupoFound);
-setIsItemsEditOpen(true);
-}
 };
 
 // 📋 DEFINIÇÃO DE COLUNAS
@@ -397,8 +299,6 @@ width: 80,
 render: (_, record) => {
 const isSelected = selectedRowKeys.includes(record.tempId);
 
-const isConf = record.isConfirmed || record.confirmed;
-const diff = record.difference || 0;
 const tipoRecurso = record.tipoRecurso || record.tipo_recurso || TIPO_RECURSO_PADRAO;
 const currentTag = getTipoRecursoConfig(tipoRecurso);
 return (
@@ -437,12 +337,22 @@ onClick: ({ key }) => onChangeTipoRecurso?.([record.tempId], key as TipoRecurso)
 }
 },
 {
-title: 'Cod. Interno',
-width: 100,
+title: 'SKU Customizado',
+width: 120,
 dataIndex: 'mappedId',
 key: 'mappedId',
 render: (text, record) => text ? (
-<Tag color="blue">{text}</Tag>
+text === SKU_A_GERAR ? (
+<Tooltip title="Item novo sem SKU Customizado digitado: recebe a sequência do banco na aprovação (ex.: IT-000123).">
+<Tag style={{ margin: 0, color: '#8c8c8c', borderStyle: 'dashed' }}>gerado na aprovação</Tag>
+</Tooltip>
+) : skusRepetidos.has(String(text).trim().toUpperCase()) && linhaItemNovo(record) ? (
+<Tooltip title="Outro item novo desta nota usa o mesmo SKU Customizado. O SKU é único: a aprovação fica bloqueada até mudar um deles.">
+<Tag color="red" style={{ margin: 0 }}>{text} · repetido</Tag>
+</Tooltip>
+) : (
+<Tag color="blue" style={{ margin: 0 }}>{text}</Tag>
+)
 ) : (
 <Button size="small" type="link" icon={<LinkOutlined />} disabled={readOnly} onClick={() => handleOpenMappingModal([record.tempId])}>
 Vincular
@@ -491,48 +401,45 @@ onClick={() => openBarcodeInputModal(record)}
 },
 
 {
-title: 'Produto / Familia',
+title: 'Produto / Destino',
 dataIndex: 'descricao',
 key: 'descricao',
 width: 400,
 render: (_, record) => {
-const group = record.grupoId ? groupsById.get(record.grupoId) : null;
-
+const recebida = Number(record.receivedQuantity ?? record.quantidade) || 0;
 return (
 <Space direction="vertical" size={2}>
 <Text strong style={{ fontSize: 13 }}>{record.nome || record.descricao}</Text>
-<Space size={4}>
-{group ? (
-<Tag
-color="cyan"
-style={{ cursor: 'pointer' }}
-onClick={() => {
-setItemSelecionadoUnitario(record);
-setIsUnifiedFamiliaOpen(true);
-}}
->
-Família: {group.nome}
+<ClassificacaoTag
+item={record}
+nomes={nomesCatalogo}
+catalogo={classificacaoCatalogo[String((record as any).produtoIdSistema)]}
+readOnly={readOnly}
+onEditar={() => setLinhaClassificar(record)}
+/>
+<Space size={4} wrap>
+<DestinosEditor
+destinos={record.destinos}
+recebida={recebida}
+unidade={record.unidade}
+tipoRecurso={record.tipoRecurso}
+readOnly={readOnly}
+onChange={(destinos) => onChangeDestinos?.(record.tempId, destinos)}
+/>
+{record.vinculoSugerido && (
+<Tooltip title={record.vinculoSugerido === 'FORNECEDOR'
+? 'Vínculo reconhecido pelo código deste fornecedor em notas anteriores. Confira antes de dar entrada.'
+: 'Vínculo reconhecido pelo código de barras (GTIN). Confira antes de dar entrada.'}>
+<Tag color="geekblue" style={{ margin: 0, fontSize: 10 }}>
+Sugerido ({record.vinculoSugerido === 'FORNECEDOR' ? 'cód. fornecedor' : 'GTIN'})
 </Tag>
-) : (
-<Button
-size="small"
-type="dashed"
-icon={<PlusOutlined />}
-onClick={() => {
-setItemSelecionadoUnitario(record);
-setIsUnifiedFamiliaOpen(true);
-}}
->
-Vincular Família
-</Button>
+</Tooltip>
 )}
 </Space>
 </Space>
 );
 }
 },
-
-{ title: 'UOM', width: 40, dataIndex: 'unidade', key: 'unidade', render: (text) => <Tag>{text || '-'}</Tag> },
 {
 title: 'Qtd. Conferência',
 key: 'quantitiesConference',
@@ -542,6 +449,7 @@ render: (_, record) => {
 const nfQty = record.quantidade || 0;
 const receivedQty = record.receivedQuantity !== undefined ? record.receivedQuantity : nfQty;
 const diff = record.difference ?? (receivedQty - nfQty);
+const UOM = record.unidade
 
 return (
 <div style={{ background: '#fcfcfc', padding: '1px 2px', borderRadius: 4, border: '1px solid #f0f0f0' }}>
@@ -572,6 +480,8 @@ style={{ width: 55 }}
 )}
 </div>
 </Space>
+
+<Tag>{ UOM || '-'}</Tag>
 </div>
 );
 }
@@ -686,10 +596,10 @@ return (
 }
 },
 {
-title: 'Ações / Status',
+title: 'Ações',
 key: 'status',
 align: 'center',
-width: 90,
+width: 50,
 render: (_, record) => {
 const isConf = record.isConfirmed || record.confirmed;
 const diff = record.difference || 0;
@@ -751,17 +661,41 @@ return (
 {/* HEADER CONTROL AREA */}
 <Row justify="space-between" align="middle" style={{ marginBottom: 6 }}>
 <Col>
-<Title level={4} style={{ margin: 0 }}>4. Conferência de Itens ({localItems.length})</Title>
+<Space size={10} wrap align="center">
+<Title level={4} style={{ margin: 0 }}>Conferência de Itens ({localItems.length})</Title>
+
+
+
+</Space>
 </Col>
 <Col>
 <Space>
-<Button icon={<SettingOutlined />} onClick={() => setIsManageModalOpen(true)}>
-Gerenciar Famílias ({localGroups.length})
-</Button>
 
-<Space style={{ background: '#f5f5f5', padding: '4px 12px', borderRadius: 6, border: '1px solid #d9d9d9' }}>
-<Text style={{ fontSize: 12 }}><ThunderboltOutlined style={{ color: '#faad14' }} /> Checkagem turbo</Text>
-<Checkbox />
+<Space orientation='horizontal' style={{ background: '#f5f5f5', padding: '4px 8px', borderRadius: 6, border: '1px solid #d9d9d9' }}>
+
+   <Col xs={24} xl={7}>
+                                
+                               
+                       
+                    </Col>
+    
+<Radio.Group value={filter} onChange={(e) => setFilter(e.target.value)} size="small">
+<Radio.Button value="all">Todos  <Space size="small">
+                                    <Badge count={(localItems.length)} showZero style={{ backgroundColor: '#bfbfbf' }} />
+                                </Space></Radio.Button>
+<Radio.Button value="pending">Pendentes  <Space size="small">
+                                    <Badge count={(pendingItems.length)} showZero style={{ backgroundColor: '#faad14' }} />
+                                </Space></Radio.Button>
+<Radio.Button value="confirmed">Conferidos  <Space size="small">
+                                    <Badge count={confirmedItems.length } showZero style={{ backgroundColor: '#52c41a' }} />
+                                </Space></Radio.Button>
+<Radio.Button value="divergent">Divergências   <Space size="small">
+                                    <Badge count={divergentItems.length} showZero style={{ backgroundColor: '#ff4d4f' }} />
+                                </Space></Radio.Button>
+{/* <Radio.Button value="unmapped">Sem Vínculo  <Space size="small">
+                                    <Badge count={unmappedItems.length} showZero style={{ backgroundColor: '#4f4f4f' }} />
+                                </Space></Radio.Button> */}
+</Radio.Group>
 </Space>
 </Space>
 </Col>
@@ -772,43 +706,77 @@ Gerenciar Famílias ({localGroups.length})
 <Space wrap style={{ background: '#fafafa', padding: 6, borderRadius: 6, border: '1px solid #f0f0f0', justifyContent: 'space-between' }}>
 <Space wrap>
 <Text strong>{`${selectedRowKeys.length} selecionado(s)`}</Text>
-<Button size="small" type="primary" icon={<CheckOutlined />} disabled={readOnly || selectedRowKeys.length === 0} onClick={() => { onConfirmItems?.(selectedRowKeys); setSelectedRowKeys([]); }}>Conferir</Button>
-<Button size="small" icon={<UndoOutlined />} disabled={readOnly || selectedRowKeys.length === 0} onClick={() => { onUnconfirmItems?.(selectedRowKeys); setSelectedRowKeys([]); }}>Desfazer</Button>
+<Button size="small" type="primary" icon={<CheckOutlined />} disabled={readOnly || selectedRowKeys.length === 0} onClick={() => { onConfirmItems?.(selectedRowKeys as (string | number)[]); setSelectedRowKeys([]); }}>Conferir</Button>
+<Button size="small" icon={<UndoOutlined />} disabled={readOnly || selectedRowKeys.length === 0} onClick={() => { onUnconfirmItems?.(selectedRowKeys as (string | number)[]); setSelectedRowKeys([]); }}>Desfazer</Button>
 <Button
 size="small"
 icon={<LinkOutlined />}
 disabled={readOnly || selectedRowKeys.length === 0}
-onClick={() => handleOpenMappingModal(selectedRowKeys)}
+onClick={() => handleOpenMappingModal(selectedRowKeys as (string | number)[])}
 >
 Vincular Selecionados
 </Button>
-<Dropdown
-trigger={['click']}
-disabled={readOnly || selectedRowKeys.length === 0}
-menu={{
-items: TIPOS_RECURSO.map(t => ({ key: t.value, label: t.label })),
-onClick: ({ key }) => { onChangeTipoRecurso?.(selectedRowKeys as (string | number)[], key as TipoRecurso); setSelectedRowKeys([]); },
-}}
->
-<Button size="small" icon={<SwapOutlined />} disabled={readOnly || selectedRowKeys.length === 0}>Tipo de Entrada</Button>
-</Dropdown>
-<Button
-size="small"
-icon={<FolderAddOutlined />}
-disabled={readOnly || selectedRowKeys.length === 0}
-onClick={() => setIsUnifiedFamiliaOpen(true)}
->
-Definir Grupo em Lote
-</Button>
+<Tooltip title="Linhas sem vínculo viram itens novos com os dados da nota e um markup único">
+<Button size="small" icon={<ThunderboltFilled />} disabled={readOnly || selectedRowKeys.length === 0} onClick={() => setLoteAberto('cadastro')}>Cadastro rápido</Button>
+</Tooltip>
+<Tooltip title="Família/categoria e, se quiser, valores de atributos nos itens novos selecionados">
+<Button size="small" icon={<ApartmentOutlined />} disabled={readOnly || selectedRowKeys.length === 0} onClick={() => setLoteAberto('classificar')}>Classificar</Button>
+</Tooltip>
+
+ <div style={{ width: 120, display: 'inline-block', verticalAlign: 'middle', marginLeft: 8 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: -2 }}>
+                                        <Text type="secondary" style={{ fontSize: 9 }}>Progresso</Text>
+                                        <Text strong style={{ fontSize: 9, color:  '#1890ff' }}>{progressoConferencia}%</Text>
+                                    </div>
+                                    <Progress percent={progressoConferencia} showInfo={false} strokeColor={ '#1890ff'} size="small" />
+                                </div>
 </Space>
 
-<Radio.Group value={filter} onChange={(e) => setFilter(e.target.value)} size="small">
+{/* <Radio.Group value={filter} onChange={(e) => setFilter(e.target.value)} size="small">
 <Radio.Button value="all">Todos ({localItems.length})</Radio.Button>
 <Radio.Button value="pending">Pendentes ({pendingItems.length})</Radio.Button>
 <Radio.Button value="confirmed">Conferidos ({confirmedItems.length})</Radio.Button>
 <Radio.Button value="divergent">Divergências ({divergentItems.length})</Radio.Button>
 <Radio.Button value="unmapped">Sem Vínculo ({unmappedItems.length})</Radio.Button>
-</Radio.Group>
+</Radio.Group> */}
+
+
+
+
+
+
+<Col>
+<Space size={10} wrap align="center">
+<Space size={4} wrap>
+{tiposNaNota.map(t => (
+<Tooltip key={t.value} title={tipoFiltro === t.value ? 'Clique para mostrar todos os tipos' : `Mostrar só ${t.label}`}>
+<Tag
+color={t.color}
+onClick={() => setTipoFiltro(tipoFiltro === t.value ? null : t.value)}
+style={{ margin: 0, cursor: 'pointer', fontWeight: tipoFiltro === t.value ? 700 : 400, outline: tipoFiltro === t.value ? '2px solid #1677ff' : undefined }}
+>
+{t.label}: {t.linhas}
+</Tag>
+</Tooltip>
+))}
+</Space>
+<Dropdown
+trigger={['click']}
+disabled={readOnly || selectedRowKeys.length === 0}
+menu={{
+items: TIPOS_RECURSO.map(t => ({
+key: t.value,
+label: <Space size={6}><Tag color={t.color} style={{ margin: 0, minWidth: 64, textAlign: 'center' }}>{t.short}</Tag>{t.label}</Space>,
+})),
+onClick: ({ key }) => { onChangeTipoRecurso?.(selectedRowKeys as (string | number)[], key as TipoRecurso); setSelectedRowKeys([]); },
+}}
+>
+<Tooltip title={selectedRowKeys.length === 0 ? 'Selecione linhas para mudar o tipo de entrada' : `Mudar o tipo de ${selectedRowKeys.length} linha(s): o destino no estoque acompanha o tipo`}>
+<Button size="small" icon={<SwapOutlined />} disabled={readOnly || selectedRowKeys.length === 0}>Tipo de entrada</Button>
+</Tooltip>
+</Dropdown>
+</Space>
+</Col>
 </Space>
 </div>
 
@@ -861,9 +829,6 @@ count: 0
 }
 );
 
-// 🎯 Total Final (Rec) calculado de forma direta e exata somando os blocos da nota:
-const totalReceivedAmountFinal = totals.totalNfAmount + totals.totalFrete + totals.totalEncargos + totals.totalIcmsSt;
-setTotalReceivedAmountFinal(totalReceivedAmountFinal);
 return (
 <Table.Summary fixed>
 <Table.Summary.Row style={{ backgroundColor: '#fafafa', fontWeight: 'bold' }}>
@@ -883,8 +848,6 @@ return (
 <Text type="secondary" style={{ fontSize: 11 }}>Soma da Seleção:</Text>
 </Table.Summary.Cell>
 
-{/* 5. UOM */}
-<Table.Summary.Cell index={4} />
 
 {/* 6. Qtd. Conferência (NF / Rec / Dif) */}
 <Table.Summary.Cell index={5} align="center">
@@ -932,6 +895,9 @@ Dif: {totals.diff > 0 ? `+${totals.diff}` : totals.diff}
 </div>
 </Table.Summary.Cell>
 
+
+
+
 {/* 9. Ações */}
 <Table.Summary.Cell index={8} />
 </Table.Summary.Row>
@@ -964,7 +930,7 @@ selectedItemForBarcode?.xProd ||
 </div>
 
 <div>
-<Text type="secondary">Código Interno / SKU Original:</Text>
+<Text type="secondary">Código do fornecedor (XML):</Text>
 <div>
 <Text>
 {selectedItemForBarcode?.dados_xml?.sku_original || 
@@ -1178,69 +1144,29 @@ valueStyle={{ fontSize: 16, fontWeight: 'bold', color: '#52c41a' }}
 })()}
 </Modal>
 
-{/* ================= MODAL UNIFICADO DE FAMÍLIA (LOTE OU UNITÁRIO) ================= */}
-<ModalFamiliaManager
-isOpen={isUnifiedFamiliaOpen}
-onClose={() => {
-setIsUnifiedFamiliaOpen(false);
-setItemSelecionadoUnitario(null); // Limpa ao fechar
-}}
-// Se houver item selecionado, vai pro modo unitário. Se não, olha se tem selectedRowKeys (lote).
-item={itemSelecionadoUnitario}
-selectedRowKeys={itemSelecionadoUnitario ? [] : selectedRowKeys}
-allItems={localItems}
-familias={localGroups}
-onSaveMapping={(payload) => {
-if (payload.isBatch) {
-// Lógica de Lote
-if (payload.isNewFamília && payload.familiaData) {
-setLocalGroups(prev => [...prev, payload.familiaData]);
-}
-selectedRowKeys.forEach(id => assignGroupToItem(id, payload.familiaId));
-onBatchAssignGroup?.(selectedRowKeys, payload.familiaId);
-setSelectedRowKeys([]);
-} else if (itemSelecionadoUnitario) {
-// Lógica Unitária
-const targetId = itemSelecionadoUnitario.tempId;
-if (payload.isNewFamília && payload.familiaData) {
-createGroupAndAssign(targetId, payload.familiaData as Group);
-} else {
-assignGroupToItem(targetId, payload.familiaId);
-}
-if (payload.itemAttributesOverride) {
-applyItemAttributeOverride(targetId, payload.itemAttributesOverride);
-}
-}
-
-// Fecha e limpa
-setIsUnifiedFamiliaOpen(false);
-setItemSelecionadoUnitario(null);
-}}
+{/* ================= AÇÕES EM LOTE ================= */}
+<ModalCadastroRapido
+open={loteAberto === 'cadastro'}
+itens={itensSelecionados}
+onClose={() => setLoteAberto(null)}
+onConfirmar={(linhas, opcoes) => { onCadastroRapidoLote?.(linhas, opcoes); setLoteAberto(null); setSelectedRowKeys([]); }}
 />
-{/* 🧩 RENDERIZAÇÃO DOS MODAIS (COLOQUE ISSO ANTES DO ÚLTIMO DIV) */}
-{/* 1. Modal de Mapeamento de Família por Item */}
-{selectedItemForGroup && (
-<TableToolbar
-isOpen={isGroupModalOpen}
-onClose={() => setIsGroupModalOpen(false)}
-item={selectedItemForGroup}
-groups={localGroups}
-onSave={handleSaveGroupMapping}
+<ModalClassificarLote
+open={loteAberto === 'classificar'}
+itens={itensSelecionados}
+onClose={() => setLoteAberto(null)}
+onConfirmar={(linhas, classificacao) => { onClassificarLote?.(linhas, classificacao); setLoteAberto(null); setSelectedRowKeys([]); }}
 />
-)}
-
-{/* 2. Modal de Gerenciamento Geral de Famílias */}
-<ManageFamiliasModal
-isOpen={isManageModalOpen}
-onClose={() => setIsManageModalOpen(false)}
-familias={localGroups}
-items={localItems}
-onCreateFamilia={() => setIsManageModalOpen(false)}
-onEditFamilia={handleEditGroup}
-onEditFamiliaItems={handleEditGroupItems}
-onDeleteFamilia={(id) => {
-setLocalGroups(prev => prev.filter(g => g.id !== id));
-}}
+<ModalClassificarLote
+open={Boolean(linhaClassificar)}
+itens={linhaClassificar ? [linhaClassificar] : []}
+inicial={linhaClassificar?.mapeamento?.draftIdentity ? {
+familiaId: linhaClassificar.mapeamento.draftIdentity.familia_id ?? null,
+categoriaId: linhaClassificar.mapeamento.draftIdentity.categoria_id ?? null,
+atributos: linhaClassificar.mapeamento.draftIdentity.atributos ?? null,
+} : null}
+onClose={() => setLinhaClassificar(null)}
+onConfirmar={(linhas, classificacao) => { onClassificarLote?.(linhas, classificacao, true); setLinhaClassificar(null); }}
 />
 
 {/* ================= MODAL DE MAPEAMENTO EM FILA ================= */}

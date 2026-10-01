@@ -1,6 +1,7 @@
 // Pente-fino do lote de staging: decide se a NF-e pode dar entrada definitiva no estoque.
 // Função pura (sem banco) para ser usada tanto na análise da tela quanto na aprovação.
 import { gtinEfetivo, isSemGtin, validarGtin } from './gtin';
+import { destinoIncompativel, lerDestinos, validarDestinos } from './destinos';
 
 export interface StagingItemRow {
   id: number;
@@ -32,7 +33,7 @@ export interface LoteRow {
 
 export interface PenteFinoContexto {
   idsItensExistentes: Set<number>;   // produto_id_sistema que existem em itens_core
-  skusExistentes: Set<string>;       // SKUs já usados em itens_core (para itens novos)
+  skusExistentes: Set<string>;       // SKUs já usados (raiz ou customizado) — comparados com o SKU customizado planejado
   fornecedorCadastrado: boolean;
   gtinsEmUso?: Map<string, number>; // GTIN -> id_item que já usa esse código
 }
@@ -74,6 +75,42 @@ export const lerMapeamento = (item: StagingItemRow): Record<string, any> => {
 };
 
 export const isItemNovo = (item: StagingItemRow): boolean => !item.produto_id_sistema;
+
+// ------------------------------------------------------------------ SKU do item novo
+// Raiz (itens_core.sku): sempre gerado pelo sistema, sequencial e oculto (IT-000123).
+// Customizado (o que o operador vê): o digitado no mapeamento; se vazio, código do fornecedor para itens de venda
+// e sequencial (CON-000045 / ATV-000012) para consumo e patrimônio.
+const TIPOS_FORA_DA_VENDA = ['CONSUMO', 'INSUMO', 'ATIVO'];
+
+export const tipoRecursoDoMapeamento = (item: StagingItemRow): string => {
+  const m = lerMapeamento(item);
+  return String(m.tipo_recurso || m.draftIdentity?.tipo_recurso || 'PRODUTO').toUpperCase();
+};
+
+export const skuCustomizadoPlanejado = (item: StagingItemRow): string | null => {
+  const draft = lerMapeamento(item).draftIdentity || {};
+  const digitado = texto(draft.sku_comercial);
+  if (digitado) return digitado;
+  // Vazio: sequência gerada na aprovação com o id do banco (IT-/CON-/ATV-000123).
+  // sku_interno/sku_sugerido são só a chave da linha na staging (LINHA-n) e nunca viram SKU.
+  return null;
+};
+
+// Formato das sequências geradas pelo sistema: digitado assim, colidiria com um código gerado depois
+export const skuNoFormatoReservado = (sku: string | null | undefined) => /^(IT|CON|ATV|TMP)-\d+$/i.test(String(sku || '').trim());
+
+export const prefixoSkuSequencial = (tipoRecurso: string): string => {
+  const t = String(tipoRecurso || '').toUpperCase();
+  if (t === 'CONSUMO' || t === 'INSUMO') return 'CON';
+  if (t === 'ATIVO') return 'ATV';
+  return 'IT';
+};
+
+export const skuSequencial = (prefixo: string, idItem: number): string => `${prefixo}-${String(idItem).padStart(6, '0')}`;
+
+// Destinos da linha (depósitos); para item vinculado o tipo vem do catálogo na aprovação
+export const destinosDoItem = (item: StagingItemRow, tipoRecurso?: string) =>
+  lerDestinos(lerMapeamento(item).destinos, num(item.quantidade_recebida), tipoRecurso || tipoRecursoDoMapeamento(item));
 
 // GTIN que será gravado no item (manual tem prioridade sobre o XML)
 export const gtinDoItem = (item: StagingItemRow): string | null =>
@@ -117,7 +154,7 @@ export const avaliarPenteFino = (
     bloqueios.push({ codigo: 'SEM_ITENS', mensagem: 'Lote sem itens na staging.' });
   }
 
-  coletar(bloqueios, 'ITEM_SEM_VINCULO', 'Itens sem código interno (vínculo ou SKU do novo item).',
+  coletar(bloqueios, 'ITEM_SEM_VINCULO', 'Itens sem vínculo (nem item do catálogo nem cadastro novo).',
     i => isItemNovo(i) && !texto(i.sku_sugerido));
   coletar(bloqueios, 'ITEM_NOVO_SEM_NOME', 'Itens novos sem nome interno definido.',
     i => isItemNovo(i) && !!texto(i.sku_sugerido) && !texto(i.nome_item_sugerido));
@@ -125,8 +162,29 @@ export const avaliarPenteFino = (
     i => Number(i.is_confirmed) !== 1);
   coletar(bloqueios, 'PRODUTO_INEXISTENTE', 'Itens vinculados a um produto que não existe mais no catálogo.',
     i => !isItemNovo(i) && !ctx.idsItensExistentes.has(Number(i.produto_id_sistema)));
-  coletar(bloqueios, 'SKU_JA_EXISTE', 'SKU do novo item já existe no catálogo (vincule ao existente ou altere o SKU).',
-    i => isItemNovo(i) && ctx.skusExistentes.has(texto(i.sku_sugerido).toUpperCase()));
+  coletar(bloqueios, 'SKU_JA_EXISTE', 'SKU customizado do novo item já existe no catálogo (vincule ao existente ou altere o SKU).',
+    i => {
+      const sku = isItemNovo(i) ? skuCustomizadoPlanejado(i) : null;
+      return !!sku && ctx.skusExistentes.has(sku.toUpperCase());
+    });
+  coletar(bloqueios, 'SKU_RESERVADO', 'SKU customizado no formato das sequências do sistema (IT-/CON-/ATV-000123): deixe vazio para gerar ou use outro código.',
+    i => isItemNovo(i) && skuNoFormatoReservado(skuCustomizadoPlanejado(i)));
+  // Itens novos diferentes (linhas diferentes) com o mesmo SKU customizado
+  const donoSku = new Map<string, string>();
+  coletar(bloqueios, 'SKU_REPETIDO_NA_NOTA', 'Itens novos diferentes com o mesmo SKU customizado nesta nota.',
+    i => {
+      const sku = isItemNovo(i) ? skuCustomizadoPlanejado(i) : null;
+      if (!sku) return false;
+      const chave = sku.toUpperCase();
+      const grupo = texto(i.sku_sugerido).toUpperCase();
+      if (!donoSku.has(chave)) { donoSku.set(chave, grupo); return false; }
+      return donoSku.get(chave) !== grupo;
+    });
+  coletar(bloqueios, 'DESTINO_INVALIDO', 'Divisão entre depósitos não confere com a quantidade recebida.',
+    i => validarDestinos(lerMapeamento(i).destinos, num(i.quantidade_recebida)) !== null);
+  coletar(bloqueios, 'DESTINO_INCOMPATIVEL', 'Destino não combina com o tipo de entrada (ex.: produto de venda inteiro no almoxarifado). Ajuste o destino ou o tipo.',
+    i => validarDestinos(lerMapeamento(i).destinos, num(i.quantidade_recebida)) === null
+      && destinoIncompativel(lerMapeamento(i).destinos, num(i.quantidade_recebida), tipoRecursoDoMapeamento(i)) !== null);
   coletar(bloqueios, 'CUSTO_INVALIDO', 'Itens recebidos com custo unitário zerado.',
     i => num(i.quantidade_recebida) > 0 && num(i.custo_unitario_final || i.preco_custo_unitario) <= 0);
 
@@ -167,6 +225,8 @@ export const avaliarPenteFino = (
     i => Math.abs(num(i.quantidade_recebida) - num(i.quantidade)) > 0.0001);
   coletar(avisos, 'QUANTIDADE_ZERO', 'Itens com quantidade recebida zero não geram movimento de estoque.',
     i => num(i.quantidade_recebida) <= 0);
+  coletar(avisos, 'FORA_DA_VENDA', 'Itens (ou parte deles) que entram no almoxarifado ou patrimônio: não ficam disponíveis no PDV.',
+    i => destinosDoItem(i).some(d => d.deposito !== 'VENDA'));
 
   const valorItens = itens.reduce((acc, i) => acc + num(i.valor_total_nfe), 0);
   const valorNota = num(lote.valor_total_nf_xml) + num(lote.frete_adicional_valor);

@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import pool from '../Estoque/db.config';
 import { carregarArvore } from '../Catalogo/Categorias/herancaCategorias';
 import { calcularAjuste, ErroAjuste, ORIGENS_AJUSTE, OrigemAjuste, situacaoSaldo, TipoAjuste } from './ajusteEstoque';
+import { Deposito, depositoOuPadrao, ehDeposito, lancarMovimentoEstoque, ROTULO_DEPOSITO } from './depositos';
 
 const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || req.body?.tenant_id || 1);
 const f4 = (v: number) => Number(v || 0).toFixed(4);
@@ -14,6 +15,8 @@ const ROTULO_ORIGEM: Record<string, string> = {
   CANCELAMENTO_VENDA: 'Cancelamento de venda',
   AJUSTE_MANUAL: 'Ajuste manual',
   INVENTARIO: 'Inventário',
+  CONSUMO_INTERNO: 'Consumo interno',
+  TRANSFERENCIA: 'Transferência',
 };
 
 const responderErro = (res: Response, error: any, padrao: string) => {
@@ -40,8 +43,10 @@ const idsCategoriaComFilhas = async (tenant: number, categoria: string): Promise
 
 /**
  * GET /api/estoque/saldos
- * busca, categoria (nome/id, com subcategorias), situacao (NEGATIVO|ZERADO|ABAIXO_MINIMO|OK|COM_SALDO), page, limit
- * Itens estocáveis (tudo menos SERVICO). Mínimo: o da família (enquanto não houver mínimo por item).
+ * deposito (VENDA padrão | ALMOXARIFADO | PATRIMONIO), busca, categoria (nome/id, com subcategorias),
+ * situacao (NEGATIVO|ZERADO|ABAIXO_MINIMO|OK|COM_SALDO), page, limit
+ * Mostra os itens com saldo naquele depósito e os que, pelo tipo, pertencem a ele (produto -> venda,
+ * consumo/insumo -> almoxarifado, ativo -> patrimônio). Mínimo: o do item; na venda, sem ele, o da família.
  */
 export const listarSaldos = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
@@ -51,8 +56,13 @@ export const listarSaldos = async (req: Request, res: Response) => {
     const situacao = String(req.query.situacao || '').trim().toUpperCase();
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 50));
+    const deposito = depositoOuPadrao(req.query.deposito);
+    const tiposDoDeposito = deposito === 'ALMOXARIFADO' ? `('CONSUMO', 'INSUMO')` : deposito === 'PATRIMONIO' ? `('ATIVO')` : null;
 
-    const where = [`ic.tenant_id = ?`, `ic.tipo_recurso <> 'SERVICO'`];
+    const where = [`ic.tenant_id = ?`, `ic.tipo_recurso <> 'SERVICO'`,
+      tiposDoDeposito
+        ? `(es.id_item IS NOT NULL OR ic.tipo_recurso IN ${tiposDoDeposito})`
+        : `(es.id_item IS NOT NULL OR ic.tipo_recurso NOT IN ('CONSUMO', 'INSUMO', 'ATIVO'))`];
     const params: any[] = [tenant];
     if (busca) {
       const termo = `%${busca}%`;
@@ -72,16 +82,18 @@ export const listarSaldos = async (req: Request, res: Response) => {
               um.sigla AS unidade, cat.nome AS categoria, f.nome AS familia, f.estoque_minimo AS minimo_familia,
               COALESCE(es.quantidade_atual, 0) AS quantidade, COALESCE(es.custo_medio, 0) AS custo_medio,
               es.ultimo_custo, es.updated_at, es.estoque_minimo, es.estoque_maximo, es.localizacao,
-              (SELECT MAX(m.created_at) FROM estoque_movimentos m WHERE m.tenant_id = ic.tenant_id AND m.id_item = ic.id_item) AS ultimo_movimento
+              (SELECT MAX(m.created_at) FROM estoque_movimentos m WHERE m.tenant_id = ic.tenant_id AND m.id_item = ic.id_item AND m.deposito = ?) AS ultimo_movimento,
+              (SELECT GROUP_CONCAT(CONCAT(o.deposito, ':', o.quantidade_atual)) FROM estoque_saldos_itens o
+                WHERE o.tenant_id = ic.tenant_id AND o.id_item = ic.id_item AND o.deposito <> ? AND o.quantidade_atual <> 0) AS outros_depositos
        FROM itens_core ic
        LEFT JOIN comercial_produtos_dados cpd ON cpd.id_item = ic.id_item AND cpd.tenant_id = ic.tenant_id
        LEFT JOIN comercial_familias f ON f.id = cpd.familia_id AND f.tenant_id = ic.tenant_id
        LEFT JOIN comercial_categorias cat ON cat.id = COALESCE(f.categoria_id, cpd.categoria_id) AND cat.tenant_id = ic.tenant_id
        LEFT JOIN itens_unidades_medida um ON um.id_unidade = ic.id_unidade
-       LEFT JOIN estoque_saldos_itens es ON es.id_item = ic.id_item AND es.tenant_id = ic.tenant_id
+       LEFT JOIN estoque_saldos_itens es ON es.id_item = ic.id_item AND es.tenant_id = ic.tenant_id AND es.deposito = ?
        WHERE ${where.join(' AND ')}
        ORDER BY COALESCE(NULLIF(TRIM(cpd.nome_comercial), ''), ic.nome_item)`,
-      params
+      [deposito, deposito, deposito, ...params]
     );
 
     const todos = (rows as any[]).map(r => {
@@ -90,7 +102,8 @@ export const listarSaldos = async (req: Request, res: Response) => {
       const custo = custoMedio > 0 ? custoMedio : n(r.custo_gerencial);
       // Mínimo do item; sem ele, o da família
       const minimoItem = r.estoque_minimo !== null ? n(r.estoque_minimo) : null;
-      const minimoFamilia = r.minimo_familia !== null ? n(r.minimo_familia) : null;
+      // O mínimo da família vale para o estoque de venda
+      const minimoFamilia = deposito === 'VENDA' && r.minimo_familia !== null ? n(r.minimo_familia) : null;
       const minimo = minimoItem ?? minimoFamilia;
       return {
         idItem: Number(r.id_item),
@@ -117,6 +130,12 @@ export const listarSaldos = async (req: Request, res: Response) => {
           : 0,
         situacao: situacaoSaldo(quantidade, minimo),
         ultimoMovimento: r.ultimo_movimento,
+        deposito,
+        // Saldo do mesmo item nos outros depósitos (ex.: graxa: 20 venda + 10 almoxarifado)
+        outrosDepositos: String(r.outros_depositos || '').split(',').filter(Boolean).map(par => {
+          const [dep, q] = par.split(':');
+          return { deposito: dep, rotulo: ROTULO_DEPOSITO[dep as Deposito] || dep, quantidade: n(q) };
+        }),
       };
     });
 
@@ -135,6 +154,7 @@ export const listarSaldos = async (req: Request, res: Response) => {
     const total = filtrados.length;
     return res.json({
       data: filtrados.slice((page - 1) * limit, page * limit),
+      deposito,
       resumo,
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
@@ -145,7 +165,7 @@ export const listarSaldos = async (req: Request, res: Response) => {
 
 /**
  * GET /api/estoque/movimentos
- * idItem, de, ate (AAAA-MM-DD), origem, tipo (ENTRADA|SAIDA), page, limit — extrato (mais recente primeiro)
+ * idItem, deposito, de, ate (AAAA-MM-DD), origem, tipo (ENTRADA|SAIDA), page, limit — extrato (mais recente primeiro)
  */
 export const listarMovimentos = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
@@ -154,6 +174,7 @@ export const listarMovimentos = async (req: Request, res: Response) => {
     const params: any[] = [tenant];
     const idItem = Number(req.query.idItem);
     if (idItem > 0) { where.push('m.id_item = ?'); params.push(idItem); }
+    if (ehDeposito(req.query.deposito)) { where.push('m.deposito = ?'); params.push(depositoOuPadrao(req.query.deposito)); }
     const data = (v: unknown) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? String(v) : null);
     const de = data(req.query.de);
     const ate = data(req.query.ate);
@@ -179,7 +200,7 @@ export const listarMovimentos = async (req: Request, res: Response) => {
        WHERE ${where.join(' AND ')}`;
     const [[{ total }]]: any = await pool.execute(`SELECT COUNT(*) AS total ${base}`, params);
     const [rows] = await pool.query(
-      `SELECT m.id_movimento, m.id_item, m.tipo_movimento, m.origem, m.id_origem, m.documento_origem,
+      `SELECT m.id_movimento, m.id_item, m.deposito, m.tipo_movimento, m.origem, m.id_origem, m.documento_origem,
               m.quantidade, m.quantidade_documento, m.unidade_documento, m.fator_conversao,
               m.custo_unitario, m.custo_total, m.saldo_anterior, m.saldo_posterior, m.observacao, m.created_at,
               COALESCE(NULLIF(TRIM(cpd.sku_customizado), ''), ic.sku) AS sku,
@@ -197,6 +218,7 @@ export const listarMovimentos = async (req: Request, res: Response) => {
         sku: r.sku,
         nome: r.nome,
         unidade: r.unidade || '',
+        deposito: r.deposito,
         tipo: r.tipo_movimento,
         origem: r.origem,
         origemRotulo: ROTULO_ORIGEM[r.origem] || r.origem,
@@ -221,13 +243,14 @@ export const listarMovimentos = async (req: Request, res: Response) => {
 };
 
 /**
- * PUT /api/estoque/itens/:idItem/parametros { estoqueMinimo?, estoqueMaximo?, localizacao? }
+ * PUT /api/estoque/itens/:idItem/parametros { deposito?, estoqueMinimo?, estoqueMaximo?, localizacao? }
  * Atualização parcial: campo ausente mantém; vazio/null limpa (mínimo volta a ser o da família).
  */
 export const salvarParametros = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
   const idItem = Number(req.params.idItem);
   const body = req.body || {};
+  const deposito = depositoOuPadrao(body.deposito);
   try {
     const numeroOuNulo = (v: unknown, campo: string) => {
       if (v === null || v === '') return null;
@@ -238,9 +261,9 @@ export const salvarParametros = async (req: Request, res: Response) => {
     const [[item]]: any = await pool.execute(
       `SELECT ic.id_item, ic.tipo_recurso, es.estoque_minimo, es.estoque_maximo, es.localizacao
        FROM itens_core ic
-       LEFT JOIN estoque_saldos_itens es ON es.id_item = ic.id_item AND es.tenant_id = ic.tenant_id
+       LEFT JOIN estoque_saldos_itens es ON es.id_item = ic.id_item AND es.tenant_id = ic.tenant_id AND es.deposito = ?
        WHERE ic.id_item = ? AND ic.tenant_id = ?`,
-      [idItem, tenant]
+      [deposito, idItem, tenant]
     );
     if (!item) throw new ErroAjuste('Item não encontrado.', 404);
     if (String(item.tipo_recurso).toUpperCase() === 'SERVICO') throw new ErroAjuste('Serviço não tem estoque.');
@@ -251,10 +274,10 @@ export const salvarParametros = async (req: Request, res: Response) => {
     if (minimo !== null && maximo !== null && maximo < minimo) throw new ErroAjuste('O estoque máximo não pode ser menor que o mínimo.');
 
     await pool.execute(
-      `INSERT INTO estoque_saldos_itens (tenant_id, id_item, quantidade_atual, custo_medio, estoque_minimo, estoque_maximo, localizacao)
-       VALUES (?, ?, 0, 0, ?, ?, ?)
+      `INSERT INTO estoque_saldos_itens (tenant_id, id_item, deposito, quantidade_atual, custo_medio, estoque_minimo, estoque_maximo, localizacao)
+       VALUES (?, ?, ?, 0, 0, ?, ?, ?)
        ON DUPLICATE KEY UPDATE estoque_minimo = VALUES(estoque_minimo), estoque_maximo = VALUES(estoque_maximo), localizacao = VALUES(localizacao)`,
-      [tenant, idItem, minimo !== null ? f4(minimo) : null, maximo !== null ? f4(maximo) : null, localizacao]
+      [tenant, idItem, deposito, minimo !== null ? f4(minimo) : null, maximo !== null ? f4(maximo) : null, localizacao]
     );
     return res.json({ success: true, estoqueMinimo: minimo, estoqueMaximo: maximo, localizacao: localizacao || '' });
   } catch (error: any) {
@@ -264,7 +287,7 @@ export const salvarParametros = async (req: Request, res: Response) => {
 
 /**
  * POST /api/estoque/ajustes
- * { origem: AJUSTE_MANUAL | INVENTARIO, motivo, itens: [{ idItem, tipo: ENTRADA|SAIDA|CONTAGEM, quantidade, custoUnitario? }] }
+ * { deposito?, origem: AJUSTE_MANUAL | INVENTARIO | CONSUMO_INTERNO, motivo, itens: [{ idItem, tipo: ENTRADA|SAIDA|CONTAGEM, quantidade, custoUnitario? }] }
  * Tudo numa transação; os movimentos do mesmo lançamento compartilham o id_origem (número do lote).
  */
 export const lancarAjustes = async (req: Request, res: Response) => {
@@ -272,10 +295,14 @@ export const lancarAjustes = async (req: Request, res: Response) => {
   const origem = String(req.body?.origem || 'AJUSTE_MANUAL').toUpperCase() as OrigemAjuste;
   const motivo = String(req.body?.motivo || '').trim();
   const itens = Array.isArray(req.body?.itens) ? req.body.itens : [];
+  const deposito = depositoOuPadrao(req.body?.deposito);
 
   const connection = await pool.getConnection();
   try {
     if (!ORIGENS_AJUSTE.includes(origem)) throw new ErroAjuste('Origem de ajuste inválida.');
+    if (origem === 'CONSUMO_INTERNO' && itens.some((i: any) => String(i.tipo).toUpperCase() !== 'SAIDA')) {
+      throw new ErroAjuste('Consumo interno é sempre uma saída.');
+    }
     if (!motivo) throw new ErroAjuste('Informe o motivo do ajuste.');
     if (itens.length === 0) throw new ErroAjuste('Nenhum item informado.');
 
@@ -312,14 +339,14 @@ export const lancarAjustes = async (req: Request, res: Response) => {
 
     const [saldoRows] = await connection.execute(
       `SELECT id_item, quantidade_atual, custo_medio FROM estoque_saldos_itens
-       WHERE tenant_id = ? AND id_item IN (${marcadores}) ORDER BY id_item FOR UPDATE`,
-      [tenant, ...ids]
+       WHERE tenant_id = ? AND deposito = ? AND id_item IN (${marcadores}) ORDER BY id_item FOR UPDATE`,
+      [tenant, deposito, ...ids]
     );
     const saldos = new Map((saldoRows as any[]).map(r => [Number(r.id_item), { quantidade: n(r.quantidade_atual), custoMedio: n(r.custo_medio) }]));
 
     // Número do lançamento: agrupa os movimentos deste ajuste/inventário
     const lote = Date.now();
-    const documento = `${origem === 'INVENTARIO' ? 'INVENTARIO' : 'AJUSTE'} ${lote}`;
+    const documento = `${origem === 'INVENTARIO' ? 'INVENTARIO' : origem === 'CONSUMO_INTERNO' ? 'CONSUMO' : 'AJUSTE'} ${lote}${deposito !== 'VENDA' ? ` ${deposito}` : ''}`;
     const resultados: any[] = [];
 
     for (const p of pedidos) {
@@ -333,11 +360,11 @@ export const lancarAjustes = async (req: Request, res: Response) => {
 
       await connection.execute(
         `INSERT INTO estoque_movimentos
-           (tenant_id, id_item, tipo_movimento, origem, id_origem, documento_origem, tipo_recurso,
+           (tenant_id, id_item, deposito, tipo_movimento, origem, id_origem, documento_origem, tipo_recurso,
             quantidade, fator_conversao, custo_unitario, custo_total, saldo_anterior, saldo_posterior, observacao)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`,
         [
-          tenant, p.idItem, r.tipoMovimento, origem, lote, documento, item.tipo_recurso || 'PRODUTO',
+          tenant, p.idItem, deposito, r.tipoMovimento, origem, lote, documento, item.tipo_recurso || 'PRODUTO',
           f4(r.quantidade), f4(r.custoUnitario), f4(r.custoUnitario * r.quantidade),
           f4(r.saldoAnterior), f4(r.saldoPosterior),
           `${p.tipo === 'CONTAGEM' ? `Contagem ${r.saldoPosterior}` : p.tipo === 'ENTRADA' ? 'Entrada' : 'Saída'}: ${motivo}`.slice(0, 255),
@@ -345,11 +372,11 @@ export const lancarAjustes = async (req: Request, res: Response) => {
       );
       const entradaComCusto = r.tipoMovimento === 'ENTRADA' && p.custoUnitario !== null && p.custoUnitario > 0;
       await connection.execute(
-        `INSERT INTO estoque_saldos_itens (tenant_id, id_item, quantidade_atual, custo_medio, ultimo_custo)
-         VALUES (?, ?, ?, ?, ?)
+        `INSERT INTO estoque_saldos_itens (tenant_id, id_item, deposito, quantidade_atual, custo_medio, ultimo_custo)
+         VALUES (?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE quantidade_atual = VALUES(quantidade_atual), custo_medio = VALUES(custo_medio)
                                  ${entradaComCusto ? ', ultimo_custo = VALUES(ultimo_custo)' : ''}`,
-        [tenant, p.idItem, f4(r.saldoPosterior), f4(r.custoMedioPosterior), entradaComCusto ? f4(r.custoUnitario) : null]
+        [tenant, p.idItem, deposito, f4(r.saldoPosterior), f4(r.custoMedioPosterior), entradaComCusto ? f4(r.custoUnitario) : null]
       );
       resultados.push({
         idItem: p.idItem, nome: item.nome, lancado: true, tipo: r.tipoMovimento,
@@ -362,6 +389,7 @@ export const lancarAjustes = async (req: Request, res: Response) => {
       success: true,
       lote,
       documento,
+      deposito,
       lancados: resultados.filter(r => r.lancado).length,
       semDiferenca: resultados.filter(r => !r.lancado).length,
       itens: resultados,
@@ -369,6 +397,84 @@ export const lancarAjustes = async (req: Request, res: Response) => {
   } catch (error: any) {
     await connection.rollback().catch(() => undefined);
     return responderErro(res, error, 'Erro ao lançar o ajuste de estoque.');
+  } finally {
+    connection.release();
+  }
+};
+
+/**
+ * POST /api/estoque/transferencias { de, para, motivo, itens: [{ idItem, quantidade }] }
+ * Move quantidade entre depósitos (ex.: 2 graxas da venda para o almoxarifado) pelo custo médio da origem.
+ * Não deixa a origem negativa.
+ */
+export const transferirEstoque = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const de = String(req.body?.de || '').toUpperCase();
+  const para = String(req.body?.para || '').toUpperCase();
+  const motivo = String(req.body?.motivo || '').trim();
+  const itens = Array.isArray(req.body?.itens) ? req.body.itens : [];
+
+  const connection = await pool.getConnection();
+  try {
+    if (!ehDeposito(de) || !ehDeposito(para)) throw new ErroAjuste('Depósito inválido.');
+    if (de === para) throw new ErroAjuste('Escolha depósitos diferentes.');
+    if (!motivo) throw new ErroAjuste('Informe o motivo da transferência.');
+    if (itens.length === 0) throw new ErroAjuste('Nenhum item informado.');
+    const pedidos = itens.map((i: any) => ({ idItem: Number(i.idItem), quantidade: Number(i.quantidade) }));
+    for (const p of pedidos) {
+      if (!Number.isInteger(p.idItem) || p.idItem <= 0) throw new ErroAjuste('Item inválido na transferência.');
+      if (!(p.quantidade > 0)) throw new ErroAjuste('Informe quantidades maiores que zero.');
+    }
+    const ids = [...new Set<number>(pedidos.map((p: any) => p.idItem))].sort((a, b) => a - b);
+    if (ids.length !== pedidos.length) throw new ErroAjuste('O mesmo item aparece mais de uma vez.');
+
+    await connection.beginTransaction();
+    const marcadores = ids.map(() => '?').join(',');
+    const [itemRows] = await connection.execute(
+      `SELECT ic.id_item, ic.tipo_recurso, COALESCE(NULLIF(TRIM(cpd.nome_comercial), ''), ic.nome_item) AS nome
+       FROM itens_core ic
+       LEFT JOIN comercial_produtos_dados cpd ON cpd.id_item = ic.id_item AND cpd.tenant_id = ic.tenant_id
+       WHERE ic.tenant_id = ? AND ic.id_item IN (${marcadores})`,
+      [tenant, ...ids]
+    );
+    const itensBanco = new Map((itemRows as any[]).map(r => [Number(r.id_item), r]));
+    const faltando = ids.filter(id => !itensBanco.has(id));
+    if (faltando.length > 0) throw new ErroAjuste(`Item não encontrado: ${faltando.join(', ')}.`, 404);
+
+    // Trava as duas pontas em ordem fixa (item, depósito) para evitar deadlock
+    const [origemRows] = await connection.execute(
+      `SELECT id_item, quantidade_atual, custo_medio FROM estoque_saldos_itens
+       WHERE tenant_id = ? AND deposito = ? AND id_item IN (${marcadores}) ORDER BY id_item FOR UPDATE`,
+      [tenant, de, ...ids]
+    );
+    const saldoOrigem = new Map((origemRows as any[]).map(r => [Number(r.id_item), { q: n(r.quantidade_atual), custo: n(r.custo_medio) }]));
+    const faltas = pedidos.filter((p: any) => (saldoOrigem.get(p.idItem)?.q || 0) + 1e-9 < p.quantidade);
+    if (faltas.length > 0) {
+      throw new ErroAjuste(`Saldo insuficiente em ${ROTULO_DEPOSITO[de as Deposito]}: ${faltas.map((f: any) =>
+        `${itensBanco.get(f.idItem).nome} (tem ${saldoOrigem.get(f.idItem)?.q || 0})`).join('; ')}.`);
+    }
+
+    const lote = Date.now();
+    const documento = `TRANSFERENCIA ${lote} ${de}>${para}`;
+    for (const p of pedidos) {
+      const item = itensBanco.get(p.idItem);
+      const custo = saldoOrigem.get(p.idItem)?.custo || 0;
+      const obs = `${ROTULO_DEPOSITO[de as Deposito]} → ${ROTULO_DEPOSITO[para as Deposito]}: ${motivo}`;
+      await lancarMovimentoEstoque(connection as any, {
+        tenant, idItem: p.idItem, deposito: de as Deposito, tipo: 'SAIDA', origem: 'TRANSFERENCIA', idOrigem: lote,
+        documento, tipoRecurso: item.tipo_recurso, quantidade: p.quantidade, custoUnitario: custo, observacao: obs,
+      });
+      await lancarMovimentoEstoque(connection as any, {
+        tenant, idItem: p.idItem, deposito: para as Deposito, tipo: 'ENTRADA', origem: 'TRANSFERENCIA', idOrigem: lote,
+        documento, tipoRecurso: item.tipo_recurso, quantidade: p.quantidade, custoUnitario: custo, observacao: obs,
+        recalcularCustoMedio: true,
+      });
+    }
+    await connection.commit();
+    return res.status(201).json({ success: true, lote, documento, itens: pedidos.length });
+  } catch (error: any) {
+    await connection.rollback().catch(() => undefined);
+    return responderErro(res, error, 'Erro ao transferir entre depósitos.');
   } finally {
     connection.release();
   }

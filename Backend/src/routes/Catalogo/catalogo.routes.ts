@@ -58,7 +58,8 @@ import {
 } from './Marcas/comercialMarcas.controller';
 import { getAtributosPorProduto } from './Atributos/atributos.controller';
 import { getConfigVendas, salvarConfigVendas, atualizarCustoGerencial, listarUnidadesItens } from './Vendas/configVendas.controller';
-import { getProdutoDetalhe, updateProdutoParcial, adicionarAnexo, removerAnexo, definirImagemPrincipal, getFichaTecnica, salvarFichaTecnica } from './Produtos/produtoDetalhe.controller';
+import { listarPendenciasPim } from './Produtos/pendencias.controller';
+import { getProdutoDetalhe, updateProdutoParcial, adicionarAnexo, removerAnexo, definirImagemPrincipal, getFichaTecnica, salvarFichaTecnica, getAtributosParaItem } from './Produtos/produtoDetalhe.controller';
 
 const router = Router();
 
@@ -141,6 +142,10 @@ router.put('/produtos/:id_item', updateProdutoParcial);
 router.get('/produtos/:id_item/detalhe', getProdutoDetalhe);
 // Ficha técnica (atributos da categoria + família com os valores do item)
 router.get('/produtos/:id_item/ficha-tecnica', getFichaTecnica);
+// Atributos de um item novo pela família/categoria (entrada de NF)
+router.get('/atributos-para-item', getAtributosParaItem);
+// Pendências do PIM (todos os itens com algo a resolver)
+router.get('/pendencias', listarPendenciasPim);
 router.put('/produtos/:id_item/ficha-tecnica', salvarFichaTecnica);
 // Anexos (links de imagens/documentos em itens_anexos)
 router.post('/produtos/:id_item/anexos', adicionarAnexo);

@@ -26,6 +26,7 @@ export const MENU_PRINCIPAL: ItemMenu[] = [
     key: 'grp:catalogo', icon: <AppstoreOutlined />, label: 'Catálogo',
     children: [
       { key: '/catalogo/gerenciador', label: 'Produtos (SKUs)' },
+      { key: '/catalogo/pendencias', label: 'Pendências do PIM' },
       { key: '/catalogo/familias', label: 'Famílias' },
       { key: '/catalogo/categorias', label: 'Categorias' },
       { key: '/catalogo/atributos', label: 'Atributos' },
@@ -39,7 +40,6 @@ export const MENU_PRINCIPAL: ItemMenu[] = [
       { key: '/estoque/consulta', label: 'Consulta de Saldo' },
       { key: '/estoque/operacoes', label: 'Movimentações' },
       { key: '/estoque/etiquetagem', label: 'Etiquetagem' },
-      { key: '/estoque/notas', label: 'Notas Fiscais' },
     ],
   },
   {
@@ -47,6 +47,7 @@ export const MENU_PRINCIPAL: ItemMenu[] = [
     children: [
       { key: '/compras', label: 'Painel de Compras' },
       { key: '/compras/entrada-nfe', label: 'Entrada de NF-e' },
+      { key: '/compras/notas', label: 'Notas de Entrada' },
       { key: '/stagings', label: 'Staging (Revisão de Lotes)' },
       { key: '/compras/ListaCompras', label: 'Lista de Compras' },
     ],

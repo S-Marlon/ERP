@@ -17,7 +17,10 @@ const paraAtributo = (r: any): AtributoEfetivo => ({
  * Situação de publicação de itens (todos do tenant ou só os ids informados).
  * Item sem família herda direto da categoria ("família virtual" do documento de arquitetura).
  */
-export const avaliarPublicacaoItens = async (conn: Conn, tenant: number, idsItens?: number[]): Promise<Map<number, Publicacao>> => {
+// gradeSemValor: atributos de grade (não obrigatórios) ainda vazios: não impedem a publicação, mas deixam SKUs iguais na grade
+export type PublicacaoItem = Publicacao & { gradeSemValor: string[] };
+
+export const avaliarPublicacaoItens = async (conn: Conn, tenant: number, idsItens?: number[]): Promise<Map<number, PublicacaoItem>> => {
   const filtro = idsItens && idsItens.length > 0 ? `AND ic.id_item IN (${idsItens.map(() => '?').join(',')})` : '';
   const [itens] = await conn.execute(
     `SELECT ic.id_item, ic.status AS status_item, COALESCE(cpd.exibir_no_pdv, 1) AS exibir_no_pdv,
@@ -28,7 +31,7 @@ export const avaliarPublicacaoItens = async (conn: Conn, tenant: number, idsIten
      WHERE ic.tenant_id = ? ${filtro}`,
     [tenant, ...(idsItens || [])]
   );
-  const resultado = new Map<number, Publicacao>();
+  const resultado = new Map<number, PublicacaoItem>();
   if (itens.length === 0) return resultado;
 
   const [vinculos] = await conn.execute(
@@ -77,13 +80,19 @@ export const avaliarPublicacaoItens = async (conn: Conn, tenant: number, idsIten
     const herdados = item.categoria_id ? herdadosDa(item.categoria_id) : [];
     const locais = item.familia_id ? porEntidade.get(`familia:${item.familia_id}`) || [] : [];
     const efetivos = mesclarAtributos(herdados, locais);
-    resultado.set(Number(item.id_item), avaliarPublicacao({
-      statusItem: item.status_item,
-      exibirNoPdv: Boolean(Number(item.exibir_no_pdv)),
-      statusFamilia: item.familia_id ? item.status_familia : null,
-      obrigatorios: efetivos.filter(a => a.obrigatorio),
-      atributosComValor: comValor.get(Number(item.id_item)) || new Set(),
-    }));
+    const preenchidos = comValor.get(Number(item.id_item)) || new Set<string>();
+    resultado.set(Number(item.id_item), {
+      ...avaliarPublicacao({
+        statusItem: item.status_item,
+        exibirNoPdv: Boolean(Number(item.exibir_no_pdv)),
+        statusFamilia: item.familia_id ? item.status_familia : null,
+        obrigatorios: efetivos.filter(a => a.obrigatorio),
+        atributosComValor: preenchidos,
+      }),
+      gradeSemValor: efetivos
+        .filter(a => a.classificacao === 'grade' && !a.obrigatorio && !preenchidos.has(String(a.id)))
+        .map(a => a.nome),
+    });
   }
   return resultado;
 };

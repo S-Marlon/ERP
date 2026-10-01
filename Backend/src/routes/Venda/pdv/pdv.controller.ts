@@ -33,7 +33,7 @@ export const SELECT_ITENS = `
   LEFT JOIN comercial_familias f ON f.id = cpd.familia_id AND f.tenant_id = ic.tenant_id
   LEFT JOIN comercial_categorias cat ON cat.id = COALESCE(f.categoria_id, cpd.categoria_id) AND cat.tenant_id = ic.tenant_id
   LEFT JOIN comercial_marcas mar ON mar.id = cpd.id_marca AND mar.tenant_id = ic.tenant_id
-  LEFT JOIN estoque_saldos_itens es ON es.id_item = ic.id_item AND es.tenant_id = ic.tenant_id`;
+  LEFT JOIN estoque_saldos_itens es ON es.id_item = ic.id_item AND es.tenant_id = ic.tenant_id AND es.deposito = 'VENDA'`;
 
 // Unidades de venda (e fator para a base) e faixas de preço dos itens
 export const carregarPrecos = async (conn: Conn, tenant: number, itens: any[]) => {

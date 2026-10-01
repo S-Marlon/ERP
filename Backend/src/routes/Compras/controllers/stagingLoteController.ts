@@ -3,6 +3,9 @@ import db from '../../Estoque/db.config';
 import { obterOuCriarUnidade, gravarConfigVendas, FaixaPayload, UnidadePayload } from '../../Catalogo/Vendas/configVendas.controller';
 import { recalcularFaixas } from '../../Catalogo/Vendas/precificacao';
 import { validarGtin } from '../staging/gtin';
+import { lancarMovimentoEstoque } from '../../EstoqueItens/depositos';
+import { gravarAtributosItemNovo } from '../../Catalogo/Produtos/produtoDetalhe.controller';
+import { destinosDoItem, prefixoSkuSequencial, skuCustomizadoPlanejado, skuSequencial } from '../staging/penteFino';
 import {
   avaliarPenteFino,
   calcularCustoMedio,
@@ -66,7 +69,7 @@ const buscarFornecedorId = async (conn: Conn, cnpj: string | null, tenant: numbe
 
 const montarContexto = async (conn: Conn, tenant: number, lote: any, itens: StagingItemRow[]) => {
   const ids = [...new Set(itens.filter(i => !isItemNovo(i)).map(i => Number(i.produto_id_sistema)))];
-  const skus = [...new Set(itens.filter(isItemNovo).map(i => String(i.sku_sugerido || '').trim()).filter(Boolean))];
+  const skus = [...new Set(itens.filter(isItemNovo).map(i => skuCustomizadoPlanejado(i)).filter((s): s is string => !!s))];
 
   const idsItensExistentes = new Set<number>();
   if (ids.length > 0) {
@@ -230,18 +233,21 @@ export const aprovarLote = async (req: Request, res: Response): Promise<Response
 
       // 1. Item do catálogo: vinculado ou criado agora a partir do mapeamento
       let idItem = item.produto_id_sistema ? Number(item.produto_id_sistema) : null;
+      let tipoDoItem = tipoRecurso;
       if (!idItem) {
         const sku = String(item.sku_sugerido).trim();
         idItem = itensCriadosPorSku.get(sku.toUpperCase()) ?? null;
 
         if (!idItem) {
           const idUnidadeBase = await obterOuCriarUnidade(connection, tenant, conversao.unidadeBase);
+          // SKU raiz: provisório único e, com o id, o sequencial definitivo (IT-000123)
           const [novo] = await connection.execute(
             `INSERT INTO itens_core (tenant_id, sku, nome_item, tipo_recurso, status, id_unidade)
              VALUES (?, ?, ?, ?, 'ATIVO', ?)`,
-            [tenant, sku, String(item.nome_item_sugerido).trim(), tipoRecurso, idUnidadeBase]
+            [tenant, `TMP-${loteId}-${item.id}`, String(item.nome_item_sugerido).trim(), tipoRecurso, idUnidadeBase]
           );
           idItem = Number(novo.insertId);
+          await connection.execute(`UPDATE itens_core SET sku = ? WHERE id_item = ?`, [skuSequencial('IT', idItem), idItem]);
           itensCriadosPorSku.set(sku.toUpperCase(), idItem);
 
           // Item novo: o custo desta entrada já nasce como custo gerencial (base do preço de venda)
@@ -250,29 +256,60 @@ export const aprovarLote = async (req: Request, res: Response): Promise<Response
           // Família escolhida no mapeamento (ignorada se tiver sido excluída depois)
           let familiaId: number | null = null;
           let categoriaId: number | null = null;
+          let marcaId: number | null = null;
           if (draft.familia_id) {
             const [famRows] = await connection.execute(
-              `SELECT id, categoria_id FROM comercial_familias WHERE id = ? AND tenant_id = ?`,
+              `SELECT f.id, f.categoria_id, f.comportamento_marca, f.id_marca, m.nome AS nome_marca
+               FROM comercial_familias f
+               LEFT JOIN comercial_marcas m ON m.id = f.id_marca AND m.tenant_id = f.tenant_id
+               WHERE f.id = ? AND f.tenant_id = ?`,
               [draft.familia_id, tenant]
             );
-            if (famRows[0]) {
-              familiaId = Number(famRows[0].id);
-              categoriaId = famRows[0].categoria_id ? Number(famRows[0].categoria_id) : null;
+            const fam = famRows[0];
+            if (fam) {
+              familiaId = Number(fam.id);
+              categoriaId = fam.categoria_id ? Number(fam.categoria_id) : null;
+              // Marca como DNA da família: o item já nasce com a marca da família
+              const marcaReal = fam.nome_marca && String(fam.nome_marca).trim().toLowerCase() !== 'sem marca';
+              if (fam.comportamento_marca === 'dna' && fam.id_marca && marcaReal) marcaId = Number(fam.id_marca);
             }
           }
+          // Sem família: categoria escolhida direto (a família, quando há, manda na categoria)
+          if (!familiaId && Number(draft.categoria_id) > 0) {
+            const [catRows] = await connection.execute(
+              `SELECT id FROM comercial_categorias WHERE id = ? AND tenant_id = ?`, [draft.categoria_id, tenant]
+            );
+            if (catRows[0]) categoriaId = Number(catRows[0].id);
+          }
+          // SKU customizado (o que o operador vê): digitado, código do fornecedor ou sequencial (consumo/patrimônio)
+          const skuCustomizado = skuCustomizadoPlanejado(item) || skuSequencial(prefixoSkuSequencial(tipoRecurso), idItem);
           await connection.execute(
-            `INSERT INTO comercial_produtos_dados (tenant_id, id_item, sku_customizado, nome_comercial, custo_gerencial, familia_id, categoria_id)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO comercial_produtos_dados (tenant_id, id_item, sku_customizado, nome_comercial, custo_gerencial, familia_id, categoria_id, id_marca)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               tenant, idItem,
-              // SKU raiz é a identidade (oculta); o customizado é o código que o operador vê e pode editar
-              String(draft.sku_comercial || '').trim() || sku,
+              skuCustomizado,
               String(draft.nome_comercial || '').trim() || null,
               custoUnitario > 0 ? custoUnitario.toFixed(4) : null,
               familiaId,
-              categoriaId
+              categoriaId,
+              marcaId
             ]
           );
+
+          // Valores de atributos preenchidos na entrada (opcional): só os que valem para a família/categoria
+          if (draft.atributos && (familiaId || categoriaId)) {
+            try {
+              await gravarAtributosItemNovo(connection, tenant, idItem, familiaId, categoriaId, draft.atributos);
+            } catch (e: any) {
+              if (String(e.message || '').startsWith('Atributo')) {
+                const erro: any = new Error(`Item "${String(item.nome_item_sugerido).trim()}": ${e.message}`);
+                erro.negocio = true;
+                throw erro;
+              }
+              throw e;
+            }
+          }
 
           // Configuração de vendas montada no mapeamento (rascunho): faixas recalculadas pelo custo final
           // desta aprovação (após frete/ajustes), mantendo os markups definidos
@@ -293,7 +330,8 @@ export const aprovarLote = async (req: Request, res: Response): Promise<Response
       } else {
         itensVinculados.add(idItem);
         // Item vinculado ainda sem unidade base: assume a unidade base informada no mapeamento
-        const [baseRows] = await connection.execute(`SELECT id_unidade FROM itens_core WHERE id_item = ?`, [idItem]);
+        const [baseRows] = await connection.execute(`SELECT id_unidade, tipo_recurso FROM itens_core WHERE id_item = ?`, [idItem]);
+        tipoDoItem = String(baseRows[0]?.tipo_recurso || tipoRecurso).toUpperCase();
         if (!baseRows[0]?.id_unidade) {
           const idUnidadeBase = await obterOuCriarUnidade(connection, tenant, conversao.unidadeBase);
           await connection.execute(`UPDATE itens_core SET id_unidade = ? WHERE id_item = ?`, [idUnidadeBase, idItem]);
@@ -343,42 +381,22 @@ export const aprovarLote = async (req: Request, res: Response): Promise<Response
         }
       }
 
-      // 2. Movimento + saldo (entra a quantidade conferida, convertida para a unidade base)
+      // 2. Movimento + saldo por depósito de destino (ex.: 20 VENDA + 10 ALMOXARIFADO), na unidade base,
+      //    todos pelo custo da nota (frete e IPI já rateados)
       if (quantidade > 0) {
-        const [saldoRows] = await connection.execute(
-          `SELECT quantidade_atual, custo_medio FROM estoque_saldos_itens
-           WHERE tenant_id = ? AND id_item = ? FOR UPDATE`,
-          [tenant, idItem]
-        );
-        const saldoAnterior = Number(saldoRows[0]?.quantidade_atual) || 0;
-        const custoMedioAnterior = Number(saldoRows[0]?.custo_medio) || 0;
-        const saldoPosterior = saldoAnterior + quantidade;
-        const custoMedio = calcularCustoMedio(saldoAnterior, custoMedioAnterior, quantidade, custoUnitario);
-
-        await connection.execute(
-          `INSERT INTO estoque_movimentos
-           (tenant_id, id_item, tipo_movimento, origem, id_origem, id_origem_item, documento_origem, tipo_recurso,
-            quantidade, quantidade_documento, unidade_documento, fator_conversao,
-            custo_unitario, custo_total, saldo_anterior, saldo_posterior, observacao)
-           VALUES (?, ?, 'ENTRADA', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            tenant, idItem, ORIGEM_NFE, loteId, item.id, lote.chave_acesso, tipoRecurso,
-            quantidade.toFixed(4), quantidadeDocumento.toFixed(4), conversao.unidadeCompra, conversao.fator.toFixed(6),
-            custoUnitario.toFixed(4), (quantidade * custoUnitario).toFixed(4),
-            saldoAnterior.toFixed(4), saldoPosterior.toFixed(4),
-            `NF ${lote.numero_nf || ''} item ${item.item_nfe_seq || ''}`.trim()
-          ]
-        );
-
-        await connection.execute(
-          `INSERT INTO estoque_saldos_itens (tenant_id, id_item, quantidade_atual, custo_medio, ultimo_custo)
-           VALUES (?, ?, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE quantidade_atual = VALUES(quantidade_atual),
-                                   custo_medio = VALUES(custo_medio),
-                                   ultimo_custo = VALUES(ultimo_custo)`,
-          [tenant, idItem, saldoPosterior.toFixed(4), custoMedio.toFixed(4), custoUnitario.toFixed(4)]
-        );
-        movimentos++;
+        for (const destino of destinosDoItem(item, tipoDoItem)) {
+          await lancarMovimentoEstoque(connection, {
+            tenant, idItem, deposito: destino.deposito, tipo: 'ENTRADA', origem: ORIGEM_NFE,
+            idOrigem: loteId, idOrigemItem: item.id, documento: lote.chave_acesso, tipoRecurso: tipoDoItem,
+            quantidade: destino.quantidade * conversao.fator,
+            quantidadeDocumento: destino.quantidade, unidadeDocumento: conversao.unidadeCompra, fatorConversao: conversao.fator,
+            custoUnitario,
+            observacao: `NF ${lote.numero_nf || ''} item ${item.item_nfe_seq || ''}`.trim(),
+            recalcularCustoMedio: true,
+            registrarUltimoCusto: true,
+          });
+          movimentos++;
+        }
       }
 
       // 3. Vínculo item x fornecedor (código do fornecedor e último preço)
@@ -398,9 +416,14 @@ export const aprovarLote = async (req: Request, res: Response): Promise<Response
       // 4. Item da staging finalizado
       await connection.execute(
         `UPDATE importacao_produtos_staging
-         SET status = 'IMPORTADO', produto_id_sistema = ?, analisado_em = NOW()
+         SET status = 'IMPORTADO', produto_id_sistema = ?, analisado_em = NOW(),
+             sku_sistema = COALESCE(NULLIF(sku_sistema, ''), (
+               SELECT COALESCE(NULLIF(cpd.sku_customizado, ''), ic.sku)
+               FROM itens_core ic
+               LEFT JOIN comercial_produtos_dados cpd ON cpd.id_item = ic.id_item AND cpd.tenant_id = ic.tenant_id
+               WHERE ic.id_item = ?))
          WHERE id = ?`,
-        [idItem, item.id]
+        [idItem, idItem, item.id]
       );
     }
 
@@ -412,7 +435,7 @@ export const aprovarLote = async (req: Request, res: Response): Promise<Response
         `SELECT COUNT(*) AS total
          FROM estoque_saldos_itens es
          LEFT JOIN comercial_produtos_dados cpd ON cpd.id_item = es.id_item AND cpd.tenant_id = es.tenant_id
-         WHERE es.tenant_id = ? AND es.id_item IN (${ids.map(() => '?').join(',')})
+         WHERE es.tenant_id = ? AND es.deposito = 'VENDA' AND es.id_item IN (${ids.map(() => '?').join(',')})
            AND (cpd.custo_gerencial IS NULL OR cpd.custo_gerencial <= 0
                 OR ABS(es.ultimo_custo - cpd.custo_gerencial) / cpd.custo_gerencial > 0.005)`,
         [tenant, ...ids]
@@ -438,6 +461,7 @@ export const aprovarLote = async (req: Request, res: Response): Promise<Response
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({ success: false, error: 'SKU ou GTIN de um item novo já existe no catálogo. Ajuste o mapeamento e tente de novo.' });
     }
+    if (error.negocio) return res.status(400).json({ success: false, error: error.message });
     console.error('Erro ao aprovar lote:', error);
     return res.status(500).json({ success: false, error: error.message });
   } finally {

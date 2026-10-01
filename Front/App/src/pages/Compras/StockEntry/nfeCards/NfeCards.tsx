@@ -15,8 +15,7 @@ import {
   Alert,
   InputNumber,
   Input,
-  Select,
-  Statistic
+  Select
 } from 'antd';
 import { 
   InfoCircleOutlined, 
@@ -29,10 +28,10 @@ import {
   CommentOutlined,
   UserOutlined,
   WarningOutlined,
-  CheckOutlined,
   EditOutlined
 } from '@ant-design/icons';
-import { NfeDataFromXML } from '../../utils/nfeParser';
+import { NfeDataFromXML } from '../xml/utils/nfeParser';
+import { situacaoDoProtocolo, traduzirAmbiente, traduzirModelo, traduzirProcessoEmissao, traduzirTipoEmissao } from '../xml/utils/10-protocoloParser';
 
 interface NfeCardsProps {
   data: NfeDataFromXML;
@@ -124,10 +123,6 @@ const traduzirPresencaComprador = (indPres?: string) => {
   }
 };
 
-const nfStatus = {
-  isChecking: false,
-  isRegular: false // Força como falso para o alerta aparecer sempre
-};
 
 const NfeCards: React.FC<NfeCardsProps> = ({ data, supplierStatus, actions, freteAdicionalData, valorTotalFrete, onUpdateFreteAdicional, readOnly = false }) => {
 
@@ -176,300 +171,199 @@ const [valorFreteAdicional, setValorFreteAdicional] = useState(freteAdicionalDat
   };
 
 
-  // Lógica de estilo dinâmico para o Card do Fornecedor baseada no status
-  const getSupplierCardStyle = () => {
-    if (supplierStatus.exists === false) {
-      return {
-        height: '100%',
-        border: '1px solid #ff4d4f',
-        backgroundColor: '#fff1f0', // Fundo avermelhado bem sutil
-      };
-    }
-    if (supplierStatus.exists === true) {
-      return {
-        height: '100%',
-        border: '1px solid #b7eb8f',
-        backgroundColor: '#f6ffed', // Fundo esverdeado bem sutil
-      };
-    }
-    return { height: '100%' };
+  const formatarCnpj = (v?: string) => {
+    const d = String(v || '').replace(/\D/g, '');
+    if (d.length === 14) return d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+    if (d.length === 11) return d.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
+    return v || '-';
   };
+  const moeda = (v?: number | string) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  // Linha "rótulo: valor" compacta (no lugar das tabelas com borda)
+  const Campo: React.FC<{ rotulo: string; children: React.ReactNode; title?: string }> = ({ rotulo, children, title }) => (
+    <div style={{ display: 'flex', gap: 6, fontSize: 12, lineHeight: '20px', minWidth: 0 }}>
+      <span style={{ color: '#8c8c8c', whiteSpace: 'nowrap' }}>{rotulo}</span>
+      <span title={title} style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{children}</span>
+    </div>
+  );
+
+  const cardStyle: React.CSSProperties = { height: '100%' };
+  const cardBody = { padding: '8px 12px' };
+  const tituloCard = (icone: React.ReactNode, texto: string) => (
+    <Space size={6} style={{ fontSize: 13 }}>{icone}<span>{texto}</span></Space>
+  );
+
+  const fornecedorBorda = supplierStatus.exists === false ? '#ff4d4f' : supplierStatus.exists === true ? '#b7eb8f' : undefined;
+  const situacaoNf = situacaoDoProtocolo(data.protocolo);
+  const homologacao = (data.protocolo?.tpAmb || data.ide?.tpAmb) === '2';
 
   return (
     <div>
-     
-
-      <Row gutter={[6, 6]}>
-        {/* CARD 1: Identificação da NF */}
-        {/* CARD 1: Identificação da NF */}
-<Col xs={24} md={8}>
-  <Card 
-    title={<Space><FileTextOutlined /><span>1. Identificação da NF</span></Space>}
-    size="small"
-    style={{ 
-      height: '100%', 
-      // Exemplo de destaque visual se a NF não estiver autorizada (ajuste a variável de condição conforme seu código)
-      ...(nfStatus?.isRegular === false ? { borderColor: '#ff4d4f', backgroundColor: '#fff2f0' } : {}) 
-    }}
-    extra={
-      <Space>
-        {nfStatus?.isChecking && <Badge status="processing" text="Verificando Sefaz..." />}
-        {nfStatus?.isRegular === true && <Badge status="success" text="Autorizada" />}
-        {nfStatus?.isRegular === false && <Badge status="error" text="Irregular / Cancelada" />}
-        <Tooltip title="Ver detalhes técnicos da nota">
-          <Button type="text" icon={<InfoCircleOutlined />} onClick={() => setIsNfDetailsOpen(true)} />
-        </Tooltip>
-      </Space>
-    }
-  >
-    {/* Alerta Fiscal / Sefaz integrado no Card 1 */}
-    {nfStatus?.isRegular === false && (
-      <Alert
-        message="Alerta Fiscal / Sefaz"
-        description="A NF-e não consta como autorizada, foi cancelada ou possui irregularidades na Sefaz."
-        type="error"
-        showIcon
-        icon={<WarningOutlined />}
-        style={{ marginBottom: 8, padding: '4px 8px', fontSize: 11 }}
-      />
-    )}
-
-    <div style={{ background: '#fafafa', padding: '2px 4px', borderRadius: '4px' }}>
-      <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Chave de Acesso</Text>
-      <Text copyable style={{ fontSize: 14, fontFamily: 'monospace' }}>
-        {data.chaveAcesso ? data.chaveAcesso.replace(/(\d{4})(?=\d)/g, '$1 ') : ''}
-      </Text>
-    </div>
-    
-    <Descriptions column={3} layout="horizontal" size="small" bordered style={{ marginBottom: 8, marginTop: 8 }}>
-      <Descriptions.Item label="Número" style={{ fontSize: 12, fontFamily: 'monospace' }}>{data.numero}</Descriptions.Item>
-      <Descriptions.Item label="Série" style={{ fontSize: 13, fontFamily: 'monospace' }}>{data.serie}</Descriptions.Item>
-      <Descriptions.Item label="Formato da NF" style={{ fontSize: 12, fontFamily: 'monospace' }}>{data.mo}</Descriptions.Item>
-      <Descriptions.Item label="Emissão" style={{ fontSize: 12, fontFamily: 'monospace' }}>{formatarDataBR(data.dataEmissao)}</Descriptions.Item>
-    </Descriptions>
-  </Card>
-</Col>
-
-
-        {/* CARD 2: Fornecedor (Emitente) com Alerta Visual */}
-        <Col xs={24} md={8}>
-          <Card 
-            title={
-              <Space>
-                <ShopOutlined />
-                <span>2. Fornecedor (Emitente)</span>
-              </Space>
-            }
+      <Row gutter={[8, 8]}>
+        {/* 1. Identificação da NF */}
+        <Col xs={24} lg={8}>
+          <Card
             size="small"
-            style={getSupplierCardStyle()}
+            style={{ ...cardStyle, borderColor: situacaoNf === 'AUTORIZADA' ? undefined : '#ff4d4f' }}
+            bodyStyle={cardBody}
+            title={tituloCard(<FileTextOutlined />, `NF-e ${data.numero || ''}`)}
             extra={
-              <Space>
-                {supplierStatus.isChecking && <Badge status="processing" text="Verificando..." />}
-                {supplierStatus.exists === true && <Badge status="success" text="Cadastrado" />}
-                {supplierStatus.exists === false && (
-                  <Space size={4}>
-                    <Badge status="error" text="Não Cadastrado" />
-                    <Button type="primary" danger size="small" icon={<PlusOutlined />} onClick={actions.onCreateSupplier}>
-                      Cadastrar
-                    </Button>
-                  </Space>
+              <Space size={4}>
+                {situacaoNf === 'AUTORIZADA' && (
+                  <Tooltip title={`Protocolo ${data.protocolo?.nProt} · ${data.protocolo?.xMotivo}. Cancelamento posterior só aparece consultando a SEFAZ.`}>
+                    <Badge status="success" text={<span style={{ fontSize: 12 }}>Autorizada</span>} />
+                  </Tooltip>
                 )}
-                <Tooltip title="Ver dados do fornecedor">
-                  <Button type="text" icon={<InfoCircleOutlined />} onClick={() => setIsSupplierDetailsOpen(true)} />
+                {situacaoNf === 'SEM_PROTOCOLO' && <Tooltip title="O XML não traz o protocolo de autorização (<protNFe>)."><Badge status="warning" text={<span style={{ fontSize: 12 }}>Sem protocolo</span>} /></Tooltip>}
+                {situacaoNf === 'NAO_AUTORIZADA' && <Tooltip title={data.protocolo?.xMotivo}><Badge status="error" text={<span style={{ fontSize: 12 }}>{data.protocolo?.cStat} - não autorizada</span>} /></Tooltip>}
+                <Tooltip title="Detalhes técnicos da nota">
+                  <Button type="text" size="small" icon={<InfoCircleOutlined />} onClick={() => setIsNfDetailsOpen(true)} />
                 </Tooltip>
               </Space>
             }
           >
-            {supplierStatus.exists === false && (
-              <Alert
-                message="Fornecedor ausente no sistema!"
-                description="Cadastre-o antes de prosseguir com a entrada."
-                type="error"
-                showIcon
-                icon={<WarningOutlined />}
-                style={{ marginBottom: 8, padding: '4px 8px', fontSize: 11 }}
-              />
+            {homologacao && (
+              <Alert type="warning" showIcon message="NF-e de homologação: sem valor fiscal" style={{ padding: '2px 8px', marginBottom: 6, fontSize: 12 }} />
             )}
-
-            <Descriptions column={1} layout="horizontal" size="small" bordered>
-              <Descriptions.Item label="CNPJ">
-  {emitente?.cnpj 
-    ? emitente.cnpj.replace(/\D/g, '').replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5') 
-    : '-'}
-</Descriptions.Item>
-              <Descriptions.Item label="Fantasia" labelStyle={{ whiteSpace: 'nowrap' }}>
-                <Text ellipsis >{emitente.nomeFantasia || "Não Informado"}</Text>
-              </Descriptions.Item>
-              <Descriptions.Item label="Razão Social">
-                <Text ellipsis>{emitente.nome}</Text>
-              </Descriptions.Item>
-            </Descriptions>
+            <Text copyable={{ text: data.chaveAcesso }} style={{ fontSize: 12, fontFamily: 'monospace', display: 'block', marginBottom: 4 }}>
+              {formatarChaveAcesso(data.chaveAcesso)}
+            </Text>
+            <Row gutter={12}>
+              <Col span={12}><Campo rotulo="Série">{data.serie || '-'}</Campo></Col>
+              <Col span={12}><Campo rotulo="Modelo">{traduzirModelo(data.ide?.mod)}</Campo></Col>
+              <Col span={12}><Campo rotulo="Emissão">{formatarDataBR(data.dataEmissao)}</Campo></Col>
+              <Col span={12}><Campo rotulo="Natureza" title={data.naturezaOperacao}>{data.naturezaOperacao || '-'}</Campo></Col>
+            </Row>
           </Card>
         </Col>
 
-        {/* CARD 3: Dados de Logística e Frete */}
-        <Col xs={24} md={8}>
-          <Card 
-            title={<Space><CarOutlined /><span>3. Logística e Frete</span></Space>}
+        {/* 2. Fornecedor (emitente) */}
+        <Col xs={24} lg={8}>
+          <Card
             size="small"
-            style={{ height: '100%' }}
+            style={{ ...cardStyle, borderColor: fornecedorBorda, background: supplierStatus.exists === false ? '#fff1f0' : undefined }}
+            bodyStyle={cardBody}
+            title={tituloCard(<ShopOutlined />, 'Fornecedor')}
             extra={
-              <Tooltip title="Ver composição e tributos">
-                <Button type="text" icon={<InfoCircleOutlined />} onClick={() => setIsLogisticsDetailsOpen(true)} />
+              <Space size={4}>
+                {supplierStatus.isChecking && <Badge status="processing" text={<span style={{ fontSize: 12 }}>Verificando...</span>} />}
+                {supplierStatus.exists === true && <Badge status="success" text={<span style={{ fontSize: 12 }}>Cadastrado</span>} />}
+                {supplierStatus.exists === false && (
+                  <Button type="primary" danger size="small" icon={<PlusOutlined />} onClick={actions.onCreateSupplier}>Cadastrar</Button>
+                )}
+                <Tooltip title="Ficha completa do fornecedor">
+                  <Button type="text" size="small" icon={<InfoCircleOutlined />} onClick={() => setIsSupplierDetailsOpen(true)} />
+                </Tooltip>
+              </Space>
+            }
+          >
+            <Tooltip title={emitente.nome}>
+              <Text strong ellipsis style={{ display: 'block', fontSize: 13 }}>{emitente.nome || '-'}</Text>
+            </Tooltip>
+            {emitente.nomeFantasia && emitente.nomeFantasia !== emitente.nome && (
+              <Text type="secondary" ellipsis style={{ display: 'block', fontSize: 12 }}>{emitente.nomeFantasia}</Text>
+            )}
+            <Row gutter={12} style={{ marginTop: 2 }}>
+              <Col span={13}><Campo rotulo="CNPJ">{formatarCnpj(emitente.cnpj)}</Campo></Col>
+              <Col span={11}><Campo rotulo="IE">{emitente.ie || 'Isento'}</Campo></Col>
+              <Col span={13}><Campo rotulo="Cidade" title={`${emitente.municipio || '-'} / ${emitente.uf || '-'}`}>{`${emitente.municipio || '-'} / ${emitente.uf || '-'}`}</Campo></Col>
+              <Col span={11}><Campo rotulo="Fone">{emitente.fone || '-'}</Campo></Col>
+            </Row>
+            {supplierStatus.exists === false && (
+              <Text type="danger" style={{ fontSize: 11, display: 'block', marginTop: 2 }}>
+                <WarningOutlined /> Fornecedor não cadastrado: cadastre antes de dar entrada.
+              </Text>
+            )}
+          </Card>
+        </Col>
+
+        {/* 3. Logística e frete */}
+        <Col xs={24} lg={8}>
+          <Card
+            size="small"
+            style={cardStyle}
+            bodyStyle={cardBody}
+            title={tituloCard(<CarOutlined />, 'Logística e frete')}
+            extra={
+              <Tooltip title="Transportadora e volumes">
+                <Button type="text" size="small" icon={<InfoCircleOutlined />} onClick={() => setIsLogisticsDetailsOpen(true)} />
               </Tooltip>
             }
           >
-            <Descriptions column={1} size="small" bordered>
-              <Descriptions.Item label="Transportadora">
-                <Tooltip title={data?.transp?.transporta?.xNome || "Não Informada"}>
-                  <Text ellipsis style={{ maxWidth: 260, display: 'inline-block' }}>
-                    {data?.transp?.transporta?.xNome || "Não Informada"}
-                  </Text>
-                </Tooltip>
-              </Descriptions.Item>
-              <Descriptions.Item label="Modalidade">
-                {traduzirModalidadeFrete(data?.transp?.modFrete)}
-              </Descriptions.Item>
-              <Descriptions.Item label="Volumes / Peso">
-                {`${primeiroVolume?.qVol ?? 0} vol(s) | ${primeiroVolume?.pesoB ? `${primeiroVolume.pesoB} kg` : 'Peso não inf.'}`}
-              </Descriptions.Item>
-              
-           
-            </Descriptions>
-            
+            <Campo rotulo="Transportadora" title={data?.transp?.transporta?.xNome}>{data?.transp?.transporta?.xNome || 'Não informada'}</Campo>
+            <Row gutter={12}>
+              <Col span={12}><Campo rotulo="Modalidade" title={traduzirModalidadeFrete(data?.transp?.modFrete)}>{traduzirModalidadeFrete(data?.transp?.modFrete)}</Campo></Col>
+              <Col span={12}><Campo rotulo="Volumes">{`${primeiroVolume?.qVol ?? 0} vol${primeiroVolume?.pesoB ? ` · ${primeiroVolume.pesoB} kg` : ''}`}</Campo></Col>
+            </Row>
 
-            <Descriptions column={3} layout="vertical" size="small" bordered style={{ marginBottom: 8, marginTop: 8 }}>
-               {/* Valor do Frete original (Nota Fiscal) */}
-              <Descriptions.Item label="Valor Frete (NF)">
-                <Text>
-                  {Number(data?.totais?.vFrete || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </Text>
-                
-              </Descriptions.Item>
-
-             
-                
-
-              {/* Frete Adicional com Detalhamento e Edição */}
-              <Descriptions.Item 
-  label={
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: 8 }}>
-      <span>Frete Adicional</span>
-      {!isEditingFreteAdicional && !readOnly && (
-        <Button 
-          type="text" 
-          size="small" 
-          icon={<EditOutlined />} 
-          onClick={() => setIsEditingFreteAdicional(true)} 
-          title="Editar frete pago à parte"
-          style={{ padding: 0, height: 'auto' }}
-        />
-      )}
-    </div>
-  }
->
-                <div style={{ width: '100%' }}>
-                  {isEditingFreteAdicional ? (
-                    <Space direction="vertical" size="small" style={{ width: '100%', padding: '4px 0' }}>
-                      <InputNumber
-                        size="small"
-                        value={valorFreteAdicional}
-                        onChange={(val) => setValorFreteAdicional(val || 0)}
-                        formatter={(value) => `R$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
-                        parser={(value) => value.replace(/\R\$\s?|\./g, '').replace(',', '.')}
-                        style={{ width: '100%' }}
-                        placeholder="Valor R$"
-                      />
-                      <Select
-                        size="small"
-                        value={metodoFreteAdicional}
-                        onChange={(val) => setMetodoFreteAdicional(val)}
-                        style={{ width: '100%' }}
-                        options={[
-                          { value: 'Correios - PAC', label: 'Correios - PAC' },
-                          { value: 'Correios - SEDEX', label: 'Correios - SEDEX' },
-                          { value: 'Carreto / Moto-boy', label: 'Carreto / Moto-boy' },
-                          { value: 'Transportadora Direto', label: 'Transportadora Direto' },
-                          { value: 'Outros', label: 'Outros' }
-                        ]}
-                      />
-                      <Input
-                        size="small"
-                        placeholder="Obs / Código de Rastreio"
-                        value={obsFreteAdicional}
-                        onChange={(e) => setObsFreteAdicional(e.target.value)}
-                      />
-                      <Button 
-                        type="primary" 
-                        size="small" 
-                        icon={<CheckOutlined />} 
-                        onClick={handleSalvarFreteAdicional}
-                        block
-                      >
-                        Salvar Frete Adicional
-                      </Button>
-                    </Space>
-                  ) : (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                      <div>
-                        <Text strong type={valorFreteAdicional > 0 ? "warning" : "secondary"} style={{ display: 'block' }}>
-                          {Number(valorFreteAdicional || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                        </Text>
-                        {valorFreteAdicional > 0 && (
-                          <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 2 }}>
-                            <div><strong>Método:</strong> {metodoFreteAdicional}</div>
-                            {obsFreteAdicional && <div><strong>Obs:</strong> {obsFreteAdicional}</div>}
-                          </div>
-                        )}
-                      </div>
-                      
-                    </div>
-                  )}
+            {/* Frete: da nota + pago à parte = total rateado nos itens */}
+            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+              {[
+                { rotulo: 'Frete NF', valor: moeda(data?.totais?.icmsTot?.vFrete) },
+                { rotulo: 'Adicional', valor: moeda(valorFreteAdicional), editavel: true },
+                { rotulo: 'Total', valor: moeda(valorTotalFrete), destaque: true },
+              ].map(b => (
+                <div key={b.rotulo} style={{ flex: 1, background: b.destaque ? '#f0f7ff' : '#fafafa', border: '1px solid #f0f0f0', borderRadius: 6, padding: '3px 8px' }}>
+                  <div style={{ fontSize: 11, color: '#8c8c8c', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    {b.rotulo}
+                    {b.editavel && !readOnly && (
+                      <Tooltip title="Frete pago à parte (Correios, carreto...)">
+                        <Button type="text" size="small" icon={<EditOutlined />} onClick={() => setIsEditingFreteAdicional(true)} style={{ height: 16, width: 16, padding: 0 }} />
+                      </Tooltip>
+                    )}
+                  </div>
+                  <div style={{ fontWeight: 600, fontSize: 13, color: b.editavel && valorFreteAdicional > 0 ? '#d48806' : b.destaque ? '#1677ff' : undefined }}>{b.valor}</div>
                 </div>
-              </Descriptions.Item>
-
-
-
-
-               <Descriptions.Item label="Valor Total do Frete">
-             
-                
-
-       <Text>
-                  {Number(valorTotalFrete || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </Text>
-
-              </Descriptions.Item>
-
-
-
-
-
-
-            </Descriptions>
+              ))}
+            </div>
+            {valorFreteAdicional > 0 && (
+              <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 2 }}>
+                Adicional: {metodoFreteAdicional}{obsFreteAdicional ? ` · ${obsFreteAdicional}` : ''}
+              </Text>
+            )}
           </Card>
         </Col>
       </Row>
 
-       {/* Atalhos Rápidos para Novas Seções */}
-      <Row gutter={[16, 16]}>
-        <Col span={24}>
-          <Card size="small" style={{ background: '#fcfcfc', border: '1px dashed #d9d9d9' }}>
-            <Space size="large" wrap>
-              <Text strong type="secondary">Blocos Adicionais da NF-e:</Text>
-              <Button size="small" icon={<UserOutlined />} onClick={() => setIsDestDetailsOpen(true)}>
-                Ver Destinatário ({destinatario.cnpj || 'Destino'})
-              </Button>
-              <Button size="small" icon={<CreditCardOutlined />} onClick={() => setIsCobrDetailsOpen(true)}>
-                Cobrança / Duplicatas ({cobranca.duplicatas?.length || 0} parcelas)
-              </Button>
-              <Button size="small" icon={<CommentOutlined />} onClick={() => setIsInfAdicDetailsOpen(true)}>
-                Informações Adicionais / Fisco
-              </Button>
-            </Space>
-          </Card>
-        </Col>
-      </Row>
+      {/* Outros blocos da NF-e */}
+      <Space size={4} wrap style={{ marginTop: 6 }}>
+        <Text type="secondary" style={{ fontSize: 12 }}>Mais da nota:</Text>
+        <Button size="small" type="text" icon={<UserOutlined />} onClick={() => setIsDestDetailsOpen(true)}>Destinatário</Button>
+        <Button size="small" type="text" icon={<CreditCardOutlined />} onClick={() => setIsCobrDetailsOpen(true)}>
+          Cobrança ({cobranca.duplicatas?.length || cobranca.dup?.length || 0} parcela(s))
+        </Button>
+        <Button size="small" type="text" icon={<CommentOutlined />} onClick={() => setIsInfAdicDetailsOpen(true)}>Informações adicionais</Button>
+      </Space>
+
+      {/* Edição do frete adicional */}
+      <Modal
+        title="Frete adicional (pago à parte)"
+        open={isEditingFreteAdicional}
+        onCancel={() => setIsEditingFreteAdicional(false)}
+        onOk={handleSalvarFreteAdicional}
+        okText="Salvar"
+        width={420}
+      >
+        <Space direction="vertical" size={10} style={{ width: '100%' }}>
+          <InputNumber
+            value={valorFreteAdicional}
+            onChange={(val) => setValorFreteAdicional(Number(val) || 0)}
+            min={0}
+            precision={2}
+            decimalSeparator=","
+            addonBefore="R$"
+            style={{ width: '100%' }}
+          />
+          <Select
+            value={metodoFreteAdicional}
+            onChange={(val) => setMetodoFreteAdicional(val)}
+            style={{ width: '100%' }}
+            options={['Correios - PAC', 'Correios - SEDEX', 'Carreto / Moto-boy', 'Transportadora Direto', 'Outros'].map(v => ({ value: v, label: v }))}
+          />
+          <Input placeholder="Observação / código de rastreio" value={obsFreteAdicional} onChange={(e) => setObsFreteAdicional(e.target.value)} />
+          <Text type="secondary" style={{ fontSize: 12 }}>O frete adicional é somado ao da nota e rateado no custo dos itens.</Text>
+        </Space>
+      </Modal>
 
       {/* MODAL 1: Identificação */}
       <Modal
@@ -479,23 +373,30 @@ const [valorFreteAdicional, setValorFreteAdicional] = useState(freteAdicionalDat
         width={700}
         footer={[<Button key="close" onClick={() => setIsNfDetailsOpen(false)}>Fechar</Button>]}
       >
-        <Descriptions column={2} bordered size="small" style={{ marginTop: 16 }}>
+        <Descriptions column={2} bordered size="small" style={{ marginTop: 12 }}>
           <Descriptions.Item label="Chave de Acesso" span={2}>
             <Text style={{ fontFamily: 'monospace', fontSize: 12 }}>{formatarChaveAcesso(data.chaveAcesso)}</Text>
           </Descriptions.Item>
-          <Descriptions.Item style={{background: 'red'}} label="Modelo (mod)">55 (NF-e)**</Descriptions.Item>
+          <Descriptions.Item label="Modelo (mod)">{traduzirModelo(data.ide?.mod)}</Descriptions.Item>
           <Descriptions.Item label="Série (serie)">{data.serie || '-'}</Descriptions.Item>
           <Descriptions.Item label="Número da NF (nNF)">{data.numero}</Descriptions.Item>
-          <Descriptions.Item label="Código da UF (cUF)">{data.chaveAcesso ? data.chaveAcesso.substring(0, 2) : '-'}</Descriptions.Item>
+          <Descriptions.Item label="Código da UF (cUF)">{data.ide?.cUF || (data.chaveAcesso ? data.chaveAcesso.substring(0, 2) : '-')}</Descriptions.Item>
           <Descriptions.Item label="Data/Hora Emissão (dhEmi)" span={2}>{formatarDataBR(data.dataEmissao)}</Descriptions.Item>
-          <Descriptions.Item label="Natureza da Operação (natOp)" span={2}>{data.naturezaOperacao || 'Venda de Mercadoria'}</Descriptions.Item>
+          <Descriptions.Item label="Natureza da Operação (natOp)" span={2}>{data.naturezaOperacao || '-'}</Descriptions.Item>
           <Descriptions.Item label="Tipo de Operação (tpNF)">{traduzirTipoOperacao(data.tipoOperacao)}</Descriptions.Item>
           <Descriptions.Item label="Destino da Operação (idDest)">{traduzirDestinoOperacao(data.destinoOperacao)}</Descriptions.Item>
           <Descriptions.Item label="Finalidade (finNFe)">{traduzirFinalidade(data.finalidade)}</Descriptions.Item>
           <Descriptions.Item label="Presença do Comprador (indPres)">{traduzirPresencaComprador(data.presencaComprador)}</Descriptions.Item>
-          <Descriptions.Item style={{background: 'red'}} label="Tipo de Emissão (tpEmis)">1 - Emissão normal</Descriptions.Item>
-          <Descriptions.Item style={{background: 'red'}}  label="Processo de Emissão (procEmi)">0 - Emissão de NF-e com aplicativo do contribuinte</Descriptions.Item>
-          <Descriptions.Item style={{background: 'red'}}  label="Status SEFAZ" span={2}><Text type="success" strong>100 - Autorizado o uso da NF-e</Text></Descriptions.Item>
+          <Descriptions.Item label="Tipo de Emissão (tpEmis)">{traduzirTipoEmissao(data.ide?.tpEmis)}</Descriptions.Item>
+          <Descriptions.Item label="Processo de Emissão (procEmi)">{traduzirProcessoEmissao(data.ide?.procEmi)}{data.ide?.verProc ? ` · versão ${data.ide.verProc}` : ''}</Descriptions.Item>
+          <Descriptions.Item label="Ambiente (tpAmb)">{traduzirAmbiente(data.protocolo?.tpAmb || data.ide?.tpAmb)}</Descriptions.Item>
+          <Descriptions.Item label="Protocolo (nProt)">{data.protocolo?.nProt || '-'}{data.protocolo?.dhRecbto ? ` · ${new Date(data.protocolo.dhRecbto).toLocaleString('pt-BR')}` : ''}</Descriptions.Item>
+          <Descriptions.Item label="Status SEFAZ (no XML)" span={2}>
+            {data.protocolo
+              ? <Text type={situacaoDoProtocolo(data.protocolo) === 'AUTORIZADA' ? 'success' : 'danger'} strong>{data.protocolo.cStat} - {data.protocolo.xMotivo}</Text>
+              : <Text type="warning" strong>XML sem protocolo de autorização (&lt;protNFe&gt;)</Text>}
+            <div style={{ fontSize: 11, color: '#8c8c8c' }}>Situação no momento da autorização. Cancelamento posterior só aparece consultando a SEFAZ.</div>
+          </Descriptions.Item>
         </Descriptions>
       </Modal>
 
@@ -508,7 +409,7 @@ const [valorFreteAdicional, setValorFreteAdicional] = useState(freteAdicionalDat
         footer={[<Button key="close" type="primary" onClick={() => setIsSupplierDetailsOpen(false)}>Fechar</Button>]}
       >
         <div style={{ maxHeight: '65vh', overflowY: 'auto', paddingRight: 4 }}>
-          <Divider orientation="left" style={{ margin: '12px 0 8px 0', fontSize: 13 }}>Identificação Cadastral</Divider>
+          <Divider titlePlacement="start" style={{ margin: '12px 0 8px 0', fontSize: 13 }}>Identificação Cadastral</Divider>
           <Descriptions column={2} bordered size="small">
             <Descriptions.Item label="Razão Social" span={2}>{emitente.nome || '-'}</Descriptions.Item>
             <Descriptions.Item label="Nome Fantasia" span={2}>{emitente.nomeFantasia || '-'}</Descriptions.Item>
@@ -520,7 +421,7 @@ const [valorFreteAdicional, setValorFreteAdicional] = useState(freteAdicionalDat
             <Descriptions.Item label="CNAE Fiscal">{emitente.cnae || '-'}</Descriptions.Item>
           </Descriptions>
 
-          <Divider orientation="left" style={{ margin: '16px 0 8px 0', fontSize: 13 }}>Endereço do Estabelecimento Emitente (enderEmit)</Divider>
+          <Divider titlePlacement="start" style={{ margin: '16px 0 8px 0', fontSize: 13 }}>Endereço do Estabelecimento Emitente (enderEmit)</Divider>
           <Descriptions column={2} bordered size="small">
             <Descriptions.Item label="Logradouro">{emitente.logradouro || '-'}</Descriptions.Item>
             <Descriptions.Item label="Número">{emitente.numeroEnd || '-'}</Descriptions.Item>

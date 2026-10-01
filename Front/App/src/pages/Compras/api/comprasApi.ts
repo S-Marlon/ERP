@@ -1,3 +1,4 @@
+import type { AtributoFicha } from '../../Catalogo/pages/CatalogSkus/CatalogSku.service';
 const API_BASE_URL = 'http://localhost:3001/api'; // Mudado para a raiz da API para facilitar o roteamento
 
 // --- INTERFACES DE SOLICITAÇÃO E RESPOSTA ---
@@ -147,6 +148,64 @@ export const sincronizarLoteXMLCompleto = async (payloadData: any) => {
         throw new Error(errorData.error || 'Erro ao sincronizar lote completo da NF-e.');
     }
 
+    return response.json();
+};
+
+/**
+ * RECONHECIMENTO AUTOMÁTICO: item do catálogo sugerido por código do fornecedor (notas anteriores) ou GTIN
+ */
+// 404 numa rota nova quase sempre é o backend rodando uma versão antiga (ts-node não recarrega sozinho)
+const MSG_ROTA_NOVA = 'O servidor não conhece esta função ainda: reinicie o backend (npm start) e tente de novo.';
+
+/**
+ * ATRIBUTOS QUE UM ITEM NOVO TERÁ pela família (que traz a categoria) ou só pela categoria
+ */
+export const getAtributosParaItem = async (
+    familiaId: number | null,
+    categoriaId: number | null,
+    tenantId: number = 1
+): Promise<{ familia: { id: number; nome: string; status: string } | null; categoria: { id: number; nome: string } | null; atributos: AtributoFicha[] }> => {
+    const qs = new URLSearchParams({ tenant_id: String(tenantId) });
+    if (familiaId) qs.set('familia_id', String(familiaId));
+    if (categoriaId) qs.set('categoria_id', String(categoriaId));
+    const response = await fetch(`${API_BASE_URL}/catalogo/atributos-para-item?${qs}`);
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 404) throw new Error(MSG_ROTA_NOVA);
+    if (!response.ok) throw new Error(data.error || 'Erro ao carregar os atributos da família/categoria.');
+    return data;
+};
+
+/**
+ * FAMÍLIA/CATEGORIA ATUAIS dos itens já cadastrados vinculados na nota
+ */
+export const buscarClassificacaoItens = async (
+    ids: number[],
+    tenantId: number = 1
+): Promise<Record<string, { familia: { id: number; nome: string; status: string } | null; categoria: { id: number; nome: string } | null }>> => {
+    if (ids.length === 0) return {};
+    const response = await fetch(`${API_BASE_URL}/compras/classificacao-itens?tenant_id=${tenantId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 404) throw new Error(MSG_ROTA_NOVA);
+    if (!response.ok) throw new Error(data.error || 'Erro ao carregar a classificação dos itens.');
+    return data.itens || {};
+};
+
+export const sugerirVinculos = async (
+    cnpj: string,
+    itens: Array<{ chave: string; codigo?: string; ean?: string }>,
+    tenantId: number = 1
+): Promise<{ fornecedorCadastrado: boolean; sugestoes: Record<string, any> }> => {
+    if (itens.length === 0) return { fornecedorCadastrado: false, sugestoes: {} };
+    const response = await fetch(`${API_BASE_URL}/compras/sugestoes-vinculo?tenant_id=${tenantId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cnpj, itens }),
+    });
+    if (!response.ok) throw new Error('Erro ao buscar sugestões de vínculo.');
     return response.json();
 };
 

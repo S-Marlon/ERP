@@ -26,7 +26,7 @@ SettingOutlined,
 BugFilled,
 CodeFilled
 } from '@ant-design/icons';
-import MappingModal, { MappingPayload, getMappedId } from './ItemsConference/ProductMappingModal';
+import { getMappedId, type MappingPayload } from './ItemsConference/ProductMappingModal';
 import NfeCards from './nfeCards/NfeCards';
 import { ItemsConference } from './ItemsConference/ItemsConference';
 import { SupplierModal } from './SupplierModal';
@@ -38,7 +38,11 @@ import { distributeFreight, FreightMode, FREIGHT_MODE_LABELS } from './freightDi
 import { TipoRecurso, TIPO_RECURSO_PADRAO, getTipoRecursoConfig } from './tipoRecurso';
 import { applyConfirmation, applyItemEdit, ItemId, MSG_SEM_CODIGO_INTERNO } from './conferencia';
 import { StockEntryHeader } from './StockEntryHeader';
-import { sincronizarLoteXMLCompleto, buscarEstadoLote } from '../api/comprasApi';
+import { sincronizarLoteXMLCompleto, buscarEstadoLote, sugerirVinculos } from '../api/comprasApi';
+import { aplicarSugestoes, chaveDaLinha } from './vinculoSugerido';
+import { DestinoLinha } from './depositos';
+import { aplicarClassificacao, mapeamentoRapido } from './edicaoLote';
+import type { ClassificacaoItem } from './ItemsConference/ClassificacaoPim';
 import { restaurarItensDoStaging, lerFreteAdicionalSalvo } from './stagingRestore';
 
 interface ItemConferencia {
@@ -99,7 +103,9 @@ const buildStagingItem = (item: any) => ({
   familia: item.familia || null,
   tipoEntrada: item.tipoEntrada || 'COMPRA_NORMAL',
   tipoRecurso: item.tipoRecurso || TIPO_RECURSO_PADRAO,
-  mapeamento: item.mapeamento || null
+  mapeamento: item.mapeamento || null,
+  // Depósitos de destino (null = padrão pelo tipo do item)
+  destinos: item.destinos ?? null
 });
 
 const FRETE_ADICIONAL_INICIAL = { valor: 0, metodo: 'Correios - PAC', observacao: '' };
@@ -140,8 +146,6 @@ const [isProcessingItems, setIsProcessingItems] = useState<boolean>(false);
 
 // Estados de Modais
 
-const [isMappingModalOpen, setIsMappingModalOpen] = useState<boolean>(false);
-const [itemToMap, setItemToMap] = useState<any>(null);
 const [isConferenceModalOpen, setIsConferenceModalOpen] = useState<boolean>(false);
 const [isSupplierModalOpen, setIsSupplierModalOpen] = useState<boolean>(false);
 const [isTotalDetailsModalOpen, setIsTotalDetailsModalOpen] = useState<boolean>(false);
@@ -162,33 +166,6 @@ const [supplierCreationFantasyName, setSupplierCreationFantasyName] = useState<s
 
 const [isPayloadModalOpen, setIsPayloadModalOpen] = useState<boolean>(false);
 
-
-const handleSaveProductMapping = (mappedProduct: { 
-produtoId: number; 
-skuSistema: string; 
-familia?: string;
-tipoEntrada?: string;
-}) => {
-if (!itemToMap) return;
-
-setItems(prevItems => prevItems.map(item => {
-if (item.tempId === itemToMap.tempId) {
-return {
-...item,
-produtoIdSistema: mappedProduct.produtoId,
-skuSistema: mappedProduct.skuSistema,
-familia: mappedProduct.familia || item.familia,
-tipoEntrada: mappedProduct.tipoEntrada || item.tipoEntrada || 'COMPRA_NORMAL',
-isMapped: true
-};
-}
-return item;
-}));
-
-message.success(`Item ${itemToMap.sku} mapeado com sucesso!`);
-setIsMappingModalOpen(false);
-setItemToMap(null);
-};
 
 // Grava os itens alterados na staging (upsert por item_nfe_seq no backend)
 const persistItemsToStaging = async (
@@ -240,7 +217,11 @@ if (!loteId) {
 message.warning('Lote de staging ainda não criado: o mapeamento ficou apenas na tela.');
 }
 
-commitItemEdit([target.tempId], item => ({
+commitItemEdit([target.tempId], item => patchDoMapeamento(item, mapping));
+};
+
+// Campos da linha que acompanham o mapeamento (modal, cadastro rápido ou classificação em lote)
+const patchDoMapeamento = (item: any, mapping: MappingPayload) => ({
 mapeamento: mapping,
 produtoIdSistema: mapping.mode === 'EXISTING_DIRECT' ? mapping.existingProductId : null,
 skuSistema: mapping.existingProduct?.sku || null,
@@ -249,8 +230,31 @@ skuSugerido: mapping.draftIdentity?.sku_interno || null,
 tipoRecurso: mapping.existingProduct?.tipo_recurso || mapping.draftIdentity?.tipo_recurso || item.tipoRecurso || TIPO_RECURSO_PADRAO,
 nomeItemSugerido: mapping.draftIdentity?.nome_interno || null,
 mappedId: getMappedId(mapping),
-isMapped: true
-}));
+isMapped: true,
+vinculoSugerido: null
+});
+
+// Lote: linhas sem vínculo viram itens novos com os dados da nota (uma única gravação na staging)
+const handleCadastroRapidoLote = (linhas: any[], opcoes: { markup: number; classificacao: ClassificacaoItem }) => {
+const ids = new Set(linhas.map(l => l.tempId));
+const result = commitItemEdit([...ids], item => (item.mapeamento || item.mappedId || item.produtoIdSistema)
+? null
+: patchDoMapeamento(item, mapeamentoRapido(item, opcoes)));
+if (result.changed.length > 0) message.success(`${result.changed.length} item(ns) novo(s) cadastrado(s) na nota. Confira e dê entrada.`);
+};
+
+// Lote: família/categoria (e valores de atributos) nos itens novos
+const handleClassificarLote = (linhas: any[], classificacao: ClassificacaoItem, substituir = false) => {
+const result = commitItemEdit(linhas.map(l => l.tempId), item => {
+const novo = aplicarClassificacao(item.mapeamento, classificacao, { substituir });
+return novo ? { mapeamento: novo } : null;
+});
+if (result.changed.length > 0) message.success(`${result.changed.length} item(ns) classificado(s).`);
+};
+
+// Destino da linha no estoque (depósitos). Um depósito só acompanha a quantidade recebida.
+const handleChangeDestinos = (tempId: ItemId, destinos: DestinoLinha[] | null) => {
+commitItemEdit([tempId], item => (JSON.stringify(item.destinos ?? null) === JSON.stringify(destinos) ? null : { destinos }));
 };
 
 const handleProcessarXml = async (parsedNfeData) => {
@@ -470,6 +474,24 @@ console.error('Erro ao buscar estado salvo da NF:', err);
 message.warning('Não foi possível recuperar o estado salvo desta NF. Nada será gravado na Staging até recarregar o XML.');
 }
 
+// Reconhecimento automático: linhas sem vínculo recebem o item sugerido (código do fornecedor ou GTIN)
+if (podeSincronizar) {
+try {
+const semVinculo = itensDaNota.filter(i => !i.mapeamento && !i.mappedId && !i.produtoIdSistema && !i.skuSugerido);
+const resposta = await sugerirVinculos(
+parsed.emitente?.cnpj || '',
+semVinculo.map(i => ({ chave: chaveDaLinha(i), codigo: i.sku, ean: i.ean }))
+);
+const aplicado = aplicarSugestoes(itensDaNota, resposta.sugestoes || {});
+if (aplicado.aplicadas > 0) {
+itensDaNota = aplicado.itens;
+message.info(`${aplicado.aplicadas} item(ns) reconhecido(s) automaticamente pelo código do fornecedor ou GTIN. Confira antes de dar entrada.`);
+}
+} catch (err) {
+console.warn('Sem sugestões de vínculo:', err);
+}
+}
+
 setItems(itensDaNota);
 setAppliedFreightMode(modoFreteDaNota);
 setFreteAdicionalInfo(freteDaNota);
@@ -645,7 +667,7 @@ if (result.changed.length > 0) message.success('Código de barras vinculado ao i
 // Itens não saem da NF: o operador só reclassifica o tipo de entrada (ex.: produto de limpeza -> CONSUMO)
 const handleChangeTipoRecurso = (ids: (string | number)[], tipo: TipoRecurso) => {
 const result = commitItemEdit(ids, item =>
-(item.tipoRecurso || TIPO_RECURSO_PADRAO) === tipo ? null : { tipoRecurso: tipo }
+(item.tipoRecurso || TIPO_RECURSO_PADRAO) === tipo ? null : { tipoRecurso: tipo, destinos: null }
 );
 if (result.changed.length > 0) {
 message.success(`${result.changed.length} item(ns) marcado(s) como ${getTipoRecursoConfig(tipo).label}.`);
@@ -662,12 +684,18 @@ console.log("O valor recebido do filho é:", valorCalculado);
 const quantityPersistTimers = useRef<Map<ItemId, ReturnType<typeof setTimeout>>>(new Map());
 
 const handleQuantityChange = (tempId: ItemId, newReceivedQty: number) => {
-const result = commitItemEdit([tempId], item =>
-Number(item.receivedQuantity) === newReceivedQty
-? null
-: { receivedQuantity: newReceivedQty, difference: newReceivedQty - (Number(item.quantidade) || 0) },
-{ persist: false }
-);
+const result = commitItemEdit([tempId], item => {
+if (Number(item.receivedQuantity) === newReceivedQty) return null;
+const patch: Record<string, unknown> = { receivedQuantity: newReceivedQty, difference: newReceivedQty - (Number(item.quantidade) || 0) };
+const usoInterno = Array.isArray(item.destinos) ? (item.destinos.find((d: DestinoLinha) => d.deposito === 'ALMOXARIFADO')?.quantidade || 0) : 0;
+if (usoInterno > 0 && newReceivedQty > usoInterno) {
+patch.destinos = [{ deposito: 'VENDA', quantidade: Number((newReceivedQty - usoInterno).toFixed(4)) }, { deposito: 'ALMOXARIFADO', quantidade: usoInterno }];
+} else if (Array.isArray(item.destinos) && item.destinos.length > 0) {
+patch.destinos = null;
+if (usoInterno > 0) message.warning('A quantidade ficou menor que a parte de uso interno: a linha voltou inteira para o depósito do tipo.');
+}
+return patch;
+}, { persist: false });
 const alterado = result.changed[0];
 if (!alterado) return;
 
@@ -802,16 +830,15 @@ message.success(`Frete adicional atualizado: R$ ${novosDados.valor.toFixed(2)} (
 items={items.map((i, index) => ({ ...i, nItem: i.nItem || index + 1, confirmed: i.isConfirmed, isConfirmed: i.isConfirmed }))}
 onConfirmItems={handleConfirmItems}
 onUnconfirmItems={handleUnconfirmItems}
-onMapProducts={(item) => { setItemToMap(item); setIsMappingModalOpen(true); }}
 onItemMapped={handleItemMapped}
 onChangeTipoRecurso={handleChangeTipoRecurso}
 onToggleItem={(tempId, confirmed) => setItemsConfirmation([tempId], confirmed)}
 onQuantityChange={handleQuantityChange}
 onChangeGtin={handleChangeGtin}
+onChangeDestinos={handleChangeDestinos}
+onCadastroRapidoLote={handleCadastroRapidoLote}
+onClassificarLote={handleClassificarLote}
 readOnly={Boolean(modoVisualizacao)}
-onAssignGroupToItems={() => { }}
-onUnassignGroup={() => { }}
-onUnassignItem={() => { }}
 />
 </Card>
 )}
@@ -1172,14 +1199,6 @@ onClick={() => setIsPayloadModalOpen(true)} // <--- ADICIONADO AQUI
 </Spin>
 
 {/* 3. MODAIS */}
-{isMappingModalOpen && itemToMap && (
-<MappingModal
-item={itemToMap}
-supplierCnpj={parsedNfe?.emitente.cnpj || ''}
-onClose={() => { setIsMappingModalOpen(false); setItemToMap(null); }}
-onMap={() => { }}
-/>
-)}
 
 <Modal
 title="🚚 Configurar Distribuição de Frete"

@@ -1,18 +1,19 @@
 // Consulta de saldo (modelo novo): saldos por item, extrato, ajuste avulso e inventário em lote.
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Button, Card, Col, Drawer, Dropdown, Input, InputNumber, Modal, Radio, Row, Select, Space, Statistic, Switch, Table, Tag, Tooltip, message,
+  Button, Card, Col, Drawer, Dropdown, Input, InputNumber, Modal, Radio, Row, Segmented, Select, Space, Statistic, Switch, Table, Tag, Tooltip, message,
 } from 'antd';
 import {
-  AuditOutlined, EnvironmentOutlined, HistoryOutlined, PlusSquareOutlined, ReloadOutlined, SettingOutlined, SlidersOutlined, UnorderedListOutlined,
+  AuditOutlined, EnvironmentOutlined, FireOutlined, HistoryOutlined, PlusSquareOutlined, ReloadOutlined, SettingOutlined, SlidersOutlined,
+  SwapOutlined, UnorderedListOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useListaTrabalho } from '../../../../core/listaTrabalho/ListaTrabalhoContext';
 import { ListaTrabalhoDrawer } from '../../../../core/listaTrabalho/ListaTrabalhoDrawer';
 import { TAGS_LISTA, TagLista } from '../../../../core/listaTrabalho/listaTrabalho';
 import {
-  AjusteItem, getCategoriasEstoque, getMovimentos, getSaldos, lancarAjuste, Movimento, ORIGENS_MOVIMENTO,
-  ResumoSaldos, ROTULO_SITUACAO, SaldoItem, salvarParametrosEstoque, TipoAjuste,
+  AjusteItem, Deposito, DEPOSITOS_ESTOQUE, getCategoriasEstoque, getMovimentos, getSaldos, lancarAjuste, Movimento, ORIGENS_MOVIMENTO,
+  ResumoSaldos, ROTULO_SITUACAO, SaldoItem, salvarParametrosEstoque, TipoAjuste, transferirEstoque,
 } from '../../api/estoqueItensApi';
 
 const money = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -50,6 +51,10 @@ const ExtratoItem: React.FC<{ item: SaldoItem | null; onClose: () => void }> = (
         columns={[
           { title: 'Data', dataIndex: 'criadoEm', width: 120, render: (v: string) => dataHora(v) },
           {
+            title: 'Depósito', dataIndex: 'deposito', width: 110,
+            render: (d: Deposito) => <Tag color={DEPOSITOS_ESTOQUE[d]?.color}>{DEPOSITOS_ESTOQUE[d]?.label || d}</Tag>,
+          },
+          {
             title: 'Origem', dataIndex: 'origem', width: 150,
             render: (o: string, m: Movimento) => (
               <Tooltip title={m.documento || ''}>
@@ -82,7 +87,9 @@ const SaldoEstoque: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [carregando, setCarregando] = useState(false);
   const [categorias, setCategorias] = useState<string[]>(['Todas']);
-  const [filtros, setFiltros] = useState({ busca: '', categoria: 'Todas', situacao: '', page: 1, limit: 50 });
+  const [filtros, setFiltros] = useState<{ deposito: Deposito; busca: string; categoria: string; situacao: string; page: number; limit: number }>(
+    { deposito: 'VENDA', busca: '', categoria: 'Todas', situacao: '', page: 1, limit: 50 });
+  const deposito = filtros.deposito;
   const [buscaDigitada, setBuscaDigitada] = useState('');
 
   const [itemExtrato, setItemExtrato] = useState<SaldoItem | null>(null);
@@ -134,6 +141,7 @@ const SaldoEstoque: React.FC = () => {
     setSalvando(true);
     try {
       await salvarParametrosEstoque(itemParametros.idItem, {
+        deposito,
         estoqueMinimo: parametros.minimo,
         estoqueMaximo: parametros.maximo,
         localizacao: parametros.localizacao,
@@ -185,6 +193,7 @@ const SaldoEstoque: React.FC = () => {
     setSalvando(true);
     try {
       const r = await lancarAjuste({
+        deposito,
         origem: 'AJUSTE_MANUAL',
         motivo: ajuste.motivo.trim(),
         itens: [{ idItem: itemAjuste.idItem, tipo: ajuste.tipo, quantidade: ajuste.quantidade, custoUnitario: ajuste.tipo === 'ENTRADA' ? ajuste.custo : null }],
@@ -194,6 +203,55 @@ const SaldoEstoque: React.FC = () => {
       carregar();
     } catch (e: any) {
       Modal.error({ title: 'Ajuste não lançado', content: e.message });
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  // Transferência entre depósitos e baixa de consumo interno (almoxarifado)
+  const [itemTransferir, setItemTransferir] = useState<SaldoItem | null>(null);
+  const [transf, setTransf] = useState<{ para: Deposito; quantidade: number | null; motivo: string }>({ para: 'ALMOXARIFADO', quantidade: null, motivo: '' });
+  const [itemConsumo, setItemConsumo] = useState<SaldoItem | null>(null);
+  const [consumo, setConsumo] = useState<{ quantidade: number | null; motivo: string }>({ quantidade: null, motivo: '' });
+
+  const abrirTransferencia = (i: SaldoItem) => {
+    setItemTransferir(i);
+    setTransf({ para: deposito === 'VENDA' ? 'ALMOXARIFADO' : 'VENDA', quantidade: null, motivo: '' });
+  };
+
+  const salvarTransferencia = async () => {
+    if (!itemTransferir) return;
+    if (!transf.quantidade || transf.quantidade <= 0) return message.warning('Informe a quantidade.');
+    if (transf.quantidade > itemTransferir.quantidade) return message.warning('Quantidade maior que o saldo deste depósito.');
+    if (!transf.motivo.trim()) return message.warning('Informe o motivo.');
+    setSalvando(true);
+    try {
+      await transferirEstoque({ de: deposito, para: transf.para, motivo: transf.motivo.trim(), itens: [{ idItem: itemTransferir.idItem, quantidade: transf.quantidade }] });
+      message.success(`Transferido para ${DEPOSITOS_ESTOQUE[transf.para].label}.`);
+      setItemTransferir(null);
+      carregar();
+    } catch (e: any) {
+      Modal.error({ title: 'Transferência não realizada', content: e.message });
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const salvarConsumo = async () => {
+    if (!itemConsumo) return;
+    if (!consumo.quantidade || consumo.quantidade <= 0) return message.warning('Informe a quantidade consumida.');
+    if (!consumo.motivo.trim()) return message.warning('Informe onde/para que foi usado.');
+    setSalvando(true);
+    try {
+      await lancarAjuste({
+        deposito: 'ALMOXARIFADO', origem: 'CONSUMO_INTERNO', motivo: consumo.motivo.trim(),
+        itens: [{ idItem: itemConsumo.idItem, tipo: 'SAIDA', quantidade: consumo.quantidade }],
+      });
+      message.success('Consumo interno registrado.');
+      setItemConsumo(null);
+      carregar();
+    } catch (e: any) {
+      Modal.error({ title: 'Consumo não registrado', content: e.message });
     } finally {
       setSalvando(false);
     }
@@ -217,7 +275,7 @@ const SaldoEstoque: React.FC = () => {
         if (!motivo.trim()) { message.warning('Informe o motivo.'); throw new Error('motivo'); }
         const payload: AjusteItem[] = idsContados.map(id => ({ idItem: id, tipo: 'CONTAGEM', quantidade: contagens[id] }));
         try {
-          const r = await lancarAjuste({ origem: 'INVENTARIO', motivo: motivo.trim(), itens: payload });
+          const r = await lancarAjuste({ deposito, origem: 'INVENTARIO', motivo: motivo.trim(), itens: payload });
           message.success(`Inventário aplicado: ${r.lancados} ajuste(s), ${r.semDiferenca} sem diferença.`);
           setContagens({});
           setModoInventario(false);
@@ -241,6 +299,13 @@ const SaldoEstoque: React.FC = () => {
               {[i.categoria, i.familia].filter(Boolean).join(' · ') || 'Sem categoria'}
               {(lista.itens.find(l => l.idItem === i.idItem)?.tags || []).map(t => (
                 <Tag key={t} color={TAGS_LISTA[t].color} style={{ marginLeft: 4, fontSize: 10, lineHeight: '14px' }}>{TAGS_LISTA[t].label}</Tag>
+              ))}
+              {(i.outrosDepositos || []).map(o => (
+                <Tooltip key={o.deposito} title={`Saldo deste item em ${o.rotulo}`}>
+                  <Tag color={DEPOSITOS_ESTOQUE[o.deposito]?.color} style={{ marginLeft: 4, fontSize: 10, lineHeight: '14px' }}>
+                    +{qtd(o.quantidade)} {o.rotulo}
+                  </Tag>
+                </Tooltip>
               ))}
             </div>
           </div>
@@ -309,7 +374,7 @@ const SaldoEstoque: React.FC = () => {
       });
     } else {
       base.push({
-        title: '', key: 'acoes', width: 140, fixed: 'right' as const,
+        title: '', key: 'acoes', width: 200, fixed: 'right' as const,
         render: (_: unknown, i: SaldoItem) => (
           <Space size={0}>
             <Dropdown menu={menuTags([i])} trigger={['click']}>
@@ -318,12 +383,21 @@ const SaldoEstoque: React.FC = () => {
             <Tooltip title="Mínimo, máximo e localização"><Button type="text" size="small" icon={<SettingOutlined />} onClick={() => abrirParametros(i)} /></Tooltip>
             <Tooltip title="Extrato"><Button type="text" size="small" icon={<HistoryOutlined />} onClick={() => setItemExtrato(i)} /></Tooltip>
             <Tooltip title="Ajustar saldo"><Button type="text" size="small" icon={<SlidersOutlined />} onClick={() => abrirAjuste(i)} /></Tooltip>
+            <Tooltip title="Transferir para outro depósito">
+              <Button type="text" size="small" icon={<SwapOutlined />} disabled={i.quantidade <= 0} onClick={() => abrirTransferencia(i)} />
+            </Tooltip>
+            {deposito === 'ALMOXARIFADO' && (
+              <Tooltip title="Registrar consumo interno (baixa do almoxarifado)">
+                <Button type="text" size="small" icon={<FireOutlined />} disabled={i.quantidade <= 0}
+                  onClick={() => { setItemConsumo(i); setConsumo({ quantidade: null, motivo: '' }); }} />
+              </Tooltip>
+            )}
           </Space>
         ),
       });
     }
     return base;
-  }, [modoInventario, contagens, lista.itens]);
+  }, [modoInventario, contagens, lista.itens, deposito]);
 
   const saldoPrevisto = itemAjuste && ajuste.quantidade !== null
     ? ajuste.tipo === 'ENTRADA' ? itemAjuste.quantidade + ajuste.quantidade
@@ -354,10 +428,19 @@ const SaldoEstoque: React.FC = () => {
           </Space>
         </div>
 
+        <Segmented
+          value={deposito}
+          onChange={v => { setFiltros(f => ({ ...f, deposito: v as Deposito, situacao: '', page: 1 })); setSelecionados([]); setContagens({}); }}
+          options={(Object.keys(DEPOSITOS_ESTOQUE) as Deposito[]).map(d => ({
+            value: d,
+            label: <Tooltip title={DEPOSITOS_ESTOQUE[d].ajuda}><span>{DEPOSITOS_ESTOQUE[d].label}</span></Tooltip>,
+          }))}
+        />
+
         {resumo && (
           <Row gutter={[12, 12]}>
             {[
-              { titulo: 'Valor em estoque', valor: money(resumo.valorTotal), situacao: '' },
+              { titulo: `Valor · ${DEPOSITOS_ESTOQUE[deposito].label}`, valor: money(resumo.valorTotal), situacao: '' },
               { titulo: 'Itens com saldo', valor: `${resumo.comSaldo} de ${resumo.itens}`, situacao: 'COM_SALDO' },
               { titulo: 'Zerados', valor: String(resumo.zerados), situacao: 'ZERADO' },
               { titulo: 'Negativos', valor: String(resumo.negativos), situacao: 'NEGATIVO' },
@@ -475,6 +558,63 @@ const SaldoEstoque: React.FC = () => {
                 onChange={e => setParametros(p => ({ ...p, localizacao: e.target.value.toUpperCase() }))} />
             </div>
             <span style={{ fontSize: 11, color: '#64748b' }}>Sem mínimo no item, vale o da família. Abaixo do mínimo, a reposição sugerida leva o saldo até o máximo.</span>
+          </Space>
+        )}
+      </Modal>
+
+      <Modal
+        open={!!itemTransferir}
+        title={itemTransferir ? `Transferir: ${itemTransferir.sku}` : ''}
+        onCancel={() => setItemTransferir(null)}
+        onOk={salvarTransferencia}
+        okText="Transferir"
+        confirmLoading={salvando}
+        destroyOnClose
+      >
+        {itemTransferir && (
+          <Space direction="vertical" style={{ width: '100%' }} size={12}>
+            <div style={{ fontSize: 13 }}>
+              {itemTransferir.nome}<br />
+              Em {DEPOSITOS_ESTOQUE[deposito].label}: <b>{qtd(itemTransferir.quantidade)} {itemTransferir.unidade}</b> · custo médio {money(itemTransferir.custoMedio)}
+            </div>
+            <Space wrap>
+              <div>
+                <div style={{ fontSize: 12, color: '#475569' }}>Para</div>
+                <Select style={{ width: 170 }} value={transf.para} onChange={v => setTransf(t => ({ ...t, para: v }))}
+                  options={(Object.keys(DEPOSITOS_ESTOQUE) as Deposito[]).filter(d => d !== deposito).map(d => ({ value: d, label: DEPOSITOS_ESTOQUE[d].label }))} />
+              </div>
+              <div>
+                <div style={{ fontSize: 12, color: '#475569' }}>Quantidade</div>
+                <InputNumber min={0} max={itemTransferir.quantidade} value={transf.quantidade}
+                  onChange={v => setTransf(t => ({ ...t, quantidade: v === null ? null : Number(v) }))} addonAfter={itemTransferir.unidade || undefined} />
+              </div>
+            </Space>
+            <Input.TextArea rows={2} placeholder="Motivo (obrigatório): ex.: separado para uso da oficina" value={transf.motivo}
+              onChange={e => setTransf(t => ({ ...t, motivo: e.target.value }))} />
+            <span style={{ fontSize: 11, color: '#64748b' }}>Vai pelo custo médio da origem. O depósito de venda é o único que aparece no PDV.</span>
+          </Space>
+        )}
+      </Modal>
+
+      <Modal
+        open={!!itemConsumo}
+        title={itemConsumo ? `Consumo interno: ${itemConsumo.sku}` : ''}
+        onCancel={() => setItemConsumo(null)}
+        onOk={salvarConsumo}
+        okText="Registrar consumo"
+        confirmLoading={salvando}
+        destroyOnClose
+      >
+        {itemConsumo && (
+          <Space direction="vertical" style={{ width: '100%' }} size={12}>
+            <div style={{ fontSize: 13 }}>
+              {itemConsumo.nome}<br />
+              No almoxarifado: <b>{qtd(itemConsumo.quantidade)} {itemConsumo.unidade}</b>
+            </div>
+            <InputNumber min={0} max={itemConsumo.quantidade} value={consumo.quantidade} placeholder="Quantidade usada"
+              onChange={v => setConsumo(c => ({ ...c, quantidade: v === null ? null : Number(v) }))} addonAfter={itemConsumo.unidade || undefined} />
+            <Input.TextArea rows={2} placeholder="Onde / para que foi usado (obrigatório)" value={consumo.motivo}
+              onChange={e => setConsumo(c => ({ ...c, motivo: e.target.value }))} />
           </Space>
         )}
       </Modal>

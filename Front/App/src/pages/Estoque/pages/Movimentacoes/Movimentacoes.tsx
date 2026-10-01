@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Card, Input, Select, Space, Table, Tag, Tooltip, message } from 'antd';
 import { ReloadOutlined } from '@ant-design/icons';
-import { getMovimentos, Movimento, ORIGENS_MOVIMENTO } from '../../api/estoqueItensApi';
+import { Deposito, DEPOSITOS_ESTOQUE, getMovimentos, Movimento, ORIGENS_MOVIMENTO } from '../../api/estoqueItensApi';
 
 const money = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const qtd = (v: number) => Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 4 });
@@ -14,12 +14,14 @@ const Movimentacoes: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [carregando, setCarregando] = useState(false);
   const [buscaDigitada, setBuscaDigitada] = useState('');
-  const [filtros, setFiltros] = useState({ de: diasAtras(30), ate: hoje(), origem: '', tipo: '', busca: '', page: 1, limit: 50 });
+  const [filtros, setFiltros] = useState<{ de: string; ate: string; deposito: Deposito | ''; origem: string; tipo: string; busca: string; page: number; limit: number }>(
+    { de: diasAtras(30), ate: hoje(), deposito: '', origem: '', tipo: '', busca: '', page: 1, limit: 50 });
 
   const carregar = async () => {
     setCarregando(true);
     try {
-      const r = await getMovimentos(filtros);
+      const { deposito, ...resto } = filtros;
+      const r = await getMovimentos({ ...resto, deposito: deposito || undefined });
       setDados(r.data);
       setTotal(r.pagination.total);
     } catch (e: any) {
@@ -49,6 +51,12 @@ const Movimentacoes: React.FC = () => {
             <span>até</span>
             <Input type="date" value={filtros.ate} min={filtros.de} onChange={e => setFiltros(f => ({ ...f, ate: e.target.value, page: 1 }))} style={{ width: 150 }} />
             <Select
+              style={{ width: 170 }}
+              value={filtros.deposito}
+              onChange={v => setFiltros(f => ({ ...f, deposito: v, page: 1 }))}
+              options={[{ value: '', label: 'Todos os depósitos' }, ...(Object.keys(DEPOSITOS_ESTOQUE) as Deposito[]).map(d => ({ value: d, label: DEPOSITOS_ESTOQUE[d].label }))]}
+            />
+            <Select
               style={{ width: 200 }}
               value={filtros.origem}
               onChange={v => setFiltros(f => ({ ...f, origem: v, page: 1 }))}
@@ -68,7 +76,7 @@ const Movimentacoes: React.FC = () => {
             size="small"
             loading={carregando}
             dataSource={dados}
-            scroll={{ x: 1100 }}
+            scroll={{ x: 1220 }}
             pagination={{
               current: filtros.page,
               pageSize: filtros.limit,
@@ -78,6 +86,10 @@ const Movimentacoes: React.FC = () => {
             }}
             columns={[
               { title: 'Data', dataIndex: 'criadoEm', width: 130, render: (v: string) => new Date(v).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) },
+              {
+                title: 'Depósito', dataIndex: 'deposito', width: 115,
+                render: (d: Deposito) => <Tag color={DEPOSITOS_ESTOQUE[d]?.color}>{DEPOSITOS_ESTOQUE[d]?.label || d}</Tag>,
+              },
               {
                 title: 'Item', key: 'item',
                 render: (_: unknown, m: Movimento) => (

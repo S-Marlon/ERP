@@ -8,6 +8,8 @@ import {
     listarItensDoLoteStaging
 } from './controllers/comprasController';
 import { getCabecalhoLote, analisarLote, aprovarLote, descartarLote, getEstadoLote } from './controllers/stagingLoteController';
+import { detalheNotaEntrada, listarNotasEntrada } from './controllers/notasEntrada.controller';
+import { classificacaoItens, sugerirVinculos } from './controllers/sugestoesVinculo.controller';
 
 const router = Router();
 
@@ -44,5 +46,14 @@ router.get('/lotes/:loteId/estado', getEstadoLote);
 router.post('/lotes/:loteId/aprovar', aprovarLote);
 router.get('/lotes/:loteId', getCabecalhoLote);
 router.delete('/lotes/:loteId', descartarLote);
+
+// Registro das notas de entrada (tela Notas de Entrada)
+router.get('/notas', listarNotasEntrada);
+router.get('/notas/:loteId', detalheNotaEntrada);
+
+// Reconhecimento automático: sugere o item do catálogo por código do fornecedor ou GTIN
+router.post('/sugestoes-vinculo', sugerirVinculos);
+// Família/categoria dos itens já cadastrados vinculados na nota
+router.post('/classificacao-itens', classificacaoItens);
 
 export default router;

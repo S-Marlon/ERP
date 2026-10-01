@@ -63,6 +63,17 @@ export interface Familia {
  * Item da NF-e em conferência
  */
 export interface Item extends ProdutoNF {
+  // Entrada no modelo novo
+  tipoRecurso?: string;
+  // Campos legados que ainda chegam em alguns formatos de item
+  confirmed?: boolean;
+  tipo_recurso?: string;
+  nome?: string;
+  ean?: string;
+  vItem?: number;
+  unidade?: string;
+  destinos?: Array<{ deposito: 'VENDA' | 'ALMOXARIFADO' | 'PATRIMONIO'; quantidade: number }> | null;
+  vinculoSugerido?: 'FORNECEDOR' | 'GTIN' | null;
   tempId: number;
   receivedQuantity: number;
   isConfirmed: boolean; // Renomeado de 'confirmed' para manter consistência com o hook

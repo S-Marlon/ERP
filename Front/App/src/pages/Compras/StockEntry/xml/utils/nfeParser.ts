@@ -6,6 +6,7 @@ import { parseCobrPagNFe, CobrPagNFeData } from './07-cobrPagParser';
 import { parseInfAdicNFe, InfAdicNFeData } from './09-infAdicParser';
 import { parseTotalNFe, TotalNFeData } from './08-totalParser';
 import { parseProdutosNFe, ItemNFeData } from './05-detParser'; // 👈 Importando o parser de produtos/det
+import { parseProtocoloNFe, ProtocoloNFeData } from './10-protocoloParser';
 
 export interface NfeDataFromXML {
     chaveAcesso: string;
@@ -39,6 +40,8 @@ export interface NfeDataFromXML {
         fone?: string;
     };
     ide: IdeNFeData;
+    // Protocolo de autorização (<protNFe>); null = XML sem autorização
+    protocolo: ProtocoloNFeData | null;
     transp: TranspNFeData | null;
     destinatario: CompleteDestAndLocationsData['dest'];
     retirada: CompleteDestAndLocationsData['retirada'];
@@ -101,6 +104,7 @@ export const parseNfeComplete = (xmlString: string): NfeDataFromXML => {
             fone: emitParsed.enderEmit.fone,
         },
         ide: ideParsed,
+        protocolo: parseProtocoloNFe(xmlString),
         transp: transpParsed,
         destinatario: destParsed.dest,
         retirada: destParsed.retirada,

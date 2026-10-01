@@ -1,43 +1,22 @@
-import React, { useEffect, useState, useRef } from "react";
-import { 
-  Modal, 
-  Button, 
-  Steps, 
-  Input, 
-  Card, 
-  Space, 
-  Typography, 
-  Divider, 
-  Row, 
-  Col, 
-  Tag,
-  Tooltip,
-  Progress,
-  Select,
-  Spin,
-  Empty,
-  InputNumber
+// Mapeamento de uma linha da NF (ou de uma fila de linhas): vincular a um item do catálogo ou cadastrar item novo,
+// e depois definir como a nota vira estoque (conversão), o custo base e, para item novo de venda, o preço.
+import React, { useEffect, useRef, useState } from "react";
+import {
+  Alert, Button, Col, Empty, Input, InputNumber, Modal, Progress, Row, Space, Spin, Steps, Tag, Tooltip, Typography,
 } from "antd";
-import { 
-  LinkOutlined, 
-  FileAddOutlined, 
-  ReloadOutlined, 
-  CheckCircleOutlined, 
-  ArrowLeftOutlined, 
-  ArrowRightOutlined,
-  LockOutlined,
-  UnlockOutlined,
-  UnorderedListOutlined
+import {
+  ArrowLeftOutlined, ArrowRightOutlined, CheckCircleFilled, CheckOutlined, FileAddOutlined, LinkOutlined,
+  LockOutlined, RollbackOutlined, SearchOutlined, StepForwardOutlined,
 } from "@ant-design/icons";
-import { TIPOS_RECURSO, TIPO_RECURSO_PADRAO, getTipoRecursoConfig } from "../tipoRecurso";
+import { TIPO_RECURSO_PADRAO, getTipoRecursoConfig } from "../tipoRecurso";
 import { buscarItensCatalogo, ItemCatalogoBusca } from "../../api/comprasApi";
 import ProductCommercialSalesConfig from "../../../Catalogo/pages/ProductPricingModule/ProductCommercialSalesConfig";
 import type { SalvarConfigPayload } from "../../../Catalogo/pages/ProductPricingModule/configVendas.api";
-import { getFamilies } from "../../../Catalogo/pages/FamilyManager/FamilyManager.api";
-import { STATUS_FAMILIA_CONFIG } from "../../../Catalogo/pages/FamilyManager/CatalogManager.types";
+import { ClassificacaoPim, ClassificacaoItem, CLASSIFICACAO_VAZIA } from "./ClassificacaoPim";
+import { classificacaoNoRascunho, foraDaVenda } from "../edicaoLote";
+import { DEPOSITOS, depositoPadraoDoTipo } from "../depositos";
 
-const { Title, Text } = Typography;
-const { Option } = Select;
+const { Text } = Typography;
 
 // Formato real dos itens montados no StockEntryForm (initialItems)
 interface ProductEntry {
@@ -54,6 +33,7 @@ interface ProductEntry {
   valorTotal?: number;
   ipi?: number;
   tipoRecurso?: string;
+  mapeamento?: MappingPayload | null;
   prod?: { CFOP?: string; [key: string]: unknown };
 }
 
@@ -78,8 +58,13 @@ export interface MappingPayload {
   draftIdentity: {
     tipo_recurso: string;
     familia_id: number | null;
+    // Sem família: categoria escolhida direto (com família, a categoria vem dela)
+    categoria_id?: number | null;
+    // Valores de atributos preenchidos na entrada (opcional); null = completar no editor de catálogo
+    atributos?: Record<number, unknown> | null;
     nome_comercial: string;
     nome_interno: string;
+    // Chave da linha na staging (LINHA-n): agrupa linhas do mesmo item novo; nunca vira SKU
     sku_interno: string;
     sku_comercial: string;
     id_unidade: number | undefined;
@@ -88,12 +73,15 @@ export interface MappingPayload {
   } | null;
 }
 
-// Identificador exibido no pai: ID do produto vinculado ou, para item novo, o SKU customizado
-// (o ID real é gerado por AUTO_INCREMENT quando o item for criado no banco)
+// Marca de item novo cujo SKU Customizado será a sequência gerada na aprovação (com o id do banco)
+export const SKU_A_GERAR = "(a gerar)";
+export const chaveDaLinhaNova = (nItem: unknown) => `LINHA-${nItem}`;
+
+// SKU Customizado exibido no pai: o do item vinculado ou, para item novo, o digitado (vazio = gerado na aprovação)
 export const getMappedId = (mapping: MappingPayload): number | string | null =>
   mapping.mode === "EXISTING_DIRECT"
     ? mapping.existingProduct?.sku || mapping.existingProductId
-    : mapping.draftIdentity?.sku_interno || null;
+    : mapping.mode === "DRAFT" ? (mapping.draftIdentity?.sku_comercial || SKU_A_GERAR) : null;
 
 interface MappingModalProps {
   items: ProductEntry[];
@@ -111,679 +99,482 @@ interface SalesUnit {
   price: number;
 }
 
-const EMPTY_ITEM: ProductEntry = { tempId: "" };
+type Modo = "EXISTING_DIRECT" | "DRAFT" | null;
 
-const ProductMappingModal: React.FC<MappingModalProps> = ({
-  items = [],
-  onMap,
-  onClose,
-}) => {
+const EMPTY_ITEM: ProductEntry = { tempId: "" };
+const brl = (v: number, casas = 2) =>
+  Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: casas });
+const qtd = (v: number) => Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 4 });
+
+const rotulo: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "#434343", display: "block", marginBottom: 4 };
+const ajuda: React.CSSProperties = { fontSize: 11, color: "#8c8c8c", display: "block", marginTop: 3 };
+const secao: React.CSSProperties = { border: "1px solid #f0f0f0", borderRadius: 8, padding: 12, background: "#fff" };
+
+const ProductMappingModal: React.FC<MappingModalProps> = ({ items = [], onMap, onClose }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const isBatch = items.length > 1;
+  const ultimo = currentIndex >= items.length - 1;
   const currentItem: ProductEntry = items[currentIndex] ?? EMPTY_ITEM;
+  const unidadeNf = (currentItem.unidade || "UN").toUpperCase();
+  const tipo = currentItem.tipoRecurso || TIPO_RECURSO_PADRAO;
+  const tipoCfg = getTipoRecursoConfig(tipo);
 
   const [step, setStep] = useState(0);
+  const [modo, setModo] = useState<Modo>(null);
 
-  // Identidade do Recurso (`itens_core`)
-  const [draftTipoRecurso, setDraftTipoRecurso] = useState<string>(currentItem.tipoRecurso || TIPO_RECURSO_PADRAO);
-  // Família do item novo (opcional): já entra classificado no PIM
-  const [draftFamiliaId, setDraftFamiliaId] = useState<number | null>(null);
-  const [familias, setFamilias] = useState<Array<{ id: number; nome: string; status: string; categoria: string }>>([]);
+  // Vincular a item existente
+  const [busca, setBusca] = useState("");
+  const [selecionado, setSelecionado] = useState<ItemCatalogoBusca | null>(null);
+  const [resultados, setResultados] = useState<ItemCatalogoBusca[]>([]);
+  const [buscando, setBuscando] = useState(false);
+  const [erroBusca, setErroBusca] = useState<string | null>(null);
+  const buscaRef = useRef<any>(null);
 
-  useEffect(() => {
-    getFamilies()
-      .then(lista => setFamilias(lista.map(f => ({ id: Number(f.id), nome: f.nome, status: f.status, categoria: f.categoriaPaiNome || '' }))))
-      .catch(() => setFamilias([]));
-  }, []);
-  const [draftCommercialName, setDraftCommercialName] = useState(currentItem.descricao || "");
-  const [draftInternalName, setDraftInternalName] = useState(currentItem.descricao || "");
-  const [draftInternalSku, setDraftInternalSku] = useState(currentItem.sku || "");
-  const [draftCommercialSku, setDraftCommercialSku] = useState("");
-  const [draftUnidade, setDraftUnidade] = useState<number | undefined>(1);
+  // Item novo
+  const [nome, setNome] = useState("");
+  const [nomeComercial, setNomeComercial] = useState("");
+  const [skuCustomizado, setSkuCustomizado] = useState("");
+  const [classificacao, setClassificacao] = useState<ClassificacaoItem>(CLASSIFICACAO_VAZIA);
 
-  // Estados de bloqueio de segurança (Cadeados) - Padrão bloqueado (false)
-  const [isInternalNameEditable, setIsInternalNameEditable] = useState(false);
-  const [isInternalSkuEditable, setIsInternalSkuEditable] = useState(false);
-
-  // Etapa 1: Destino
-  const [step1Mode, setStep1Mode] = useState<"EXISTING_DIRECT" | "DRAFT" | null>(null);
-  const [existingSearch, setExistingSearch] = useState("");
-  const [selectedExisting, setSelectedExisting] = useState<ItemCatalogoBusca | null>(null);
-  const [searchResults, setSearchResults] = useState<ItemCatalogoBusca[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
-
-  // Conversão de compra: unidade da NF -> unidade base de estoque
-  const [convUnidadeBase, setConvUnidadeBase] = useState<string>(currentItem.unidade || "UN");
+  // Conversão de compra (unidade da NF -> unidade base de estoque) e preço do item novo
+  const [convUnidadeBase, setConvUnidadeBase] = useState<string>(unidadeNf);
   const [convFator, setConvFator] = useState<number>(1);
-  const [configVendasRascunho, setConfigVendasRascunho] = useState<SalvarConfigPayload | null>(null);
+  const [configVendas, setConfigVendas] = useState<SalvarConfigPayload | null>(null);
 
-  const searchInputRef = useRef<any>(null);
-  const [unitsFromStep, setUnitsFromStep] = useState<SalesUnit[]>([]);
-
-  // Sincroniza os dados do item atual sempre que o currentIndex mudar
+  // Ao trocar de item da fila: começa do que já estava salvo na linha (reabrir para corrigir) ou do zero
   useEffect(() => {
-    if (currentItem) {
-      setDraftCommercialName(currentItem.descricao || "");
-      setDraftInternalName(currentItem.descricao || "");
-      setDraftInternalSku(currentItem.sku || "");
-      setDraftCommercialSku("");
-      setDraftTipoRecurso(currentItem.tipoRecurso || TIPO_RECURSO_PADRAO);
-      setDraftFamiliaId(null);
-      setDraftUnidade(1);
-      setStep1Mode(null);
-      setSelectedExisting(null);
-      setExistingSearch("");
-      setSearchResults([]);
-      setConvUnidadeBase((currentItem.unidade || "UN").toUpperCase());
-      setConvFator(1);
-      setConfigVendasRascunho(null);
-      setIsInternalNameEditable(false);
-      setIsInternalSkuEditable(false);
-      setStep(0);
-      setUnitsFromStep([]);
-    }
-  }, [currentIndex, currentItem]);
-
-  const handleResetCurrent = () => {
-    setStep1Mode(null);
-    setExistingSearch("");
-    setSelectedExisting(null);
-    setIsInternalNameEditable(false);
-    setIsInternalSkuEditable(false);
+    const m = currentItem.mapeamento;
+    const d = m?.mode === "DRAFT" ? m.draftIdentity : null;
     setStep(0);
-  };
+    setBusca("");
+    setResultados([]);
+    setConfigVendas(null);
+    setModo(m?.mode ?? null);
+    setSelecionado(m?.mode === "EXISTING_DIRECT" && m.existingProductId ? {
+      id: m.existingProductId,
+      sku: m.existingProduct?.sku || "",
+      name: m.existingProduct?.nome || "",
+      tipoRecurso: m.existingProduct?.tipo_recurso || tipo,
+      unitOfMeasure: m.conversaoCompra?.unidade_base || "",
+      variacao: "", marca: "", category: "", status: "ATIVO",
+    } : null);
+    // Nome do item = descrição da nota (travado); o nome comercial começa igual e é o que se edita
+    setNome(currentItem.descricao || d?.nome_interno || "");
+    setNomeComercial(d?.nome_comercial || currentItem.descricao || "");
+    setSkuCustomizado(d ? d.sku_comercial : (foraDaVenda(tipo) ? "" : currentItem.sku || ""));
+    setClassificacao(d ? {
+      familiaId: d.familia_id ?? null, categoriaId: d.categoria_id ?? null, atributos: d.atributos ?? null,
+    } : CLASSIFICACAO_VAZIA);
+    setConvUnidadeBase((m?.conversaoCompra?.unidade_base || unidadeNf).toUpperCase());
+    setConvFator(m?.conversaoCompra?.fator || 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex, currentItem.tempId]);
 
   useEffect(() => {
-    if (step1Mode && searchInputRef.current) {
-      searchInputRef.current.focus();
-    }
-  }, [step1Mode]);
+    if (modo === "EXISTING_DIRECT" && step === 0) setTimeout(() => buscaRef.current?.focus(), 50);
+  }, [modo, step]);
 
+  // Busca no catálogo com debounce
   useEffect(() => {
-    if (step1Mode !== "EXISTING_DIRECT") return;
-    const termo = existingSearch.trim();
-    if (termo.length < 2) {
-      setSearchResults([]);
-      setSearchError(null);
-      setIsSearching(false);
-      return;
-    }
-
+    if (modo !== "EXISTING_DIRECT") return;
+    const termo = busca.trim();
+    if (termo.length < 2) { setResultados([]); setErroBusca(null); setBuscando(false); return; }
     const controller = new AbortController();
-    setIsSearching(true);
+    setBuscando(true);
     const timer = setTimeout(() => {
       buscarItensCatalogo(termo, 1, controller.signal)
-        .then(resultados => {
-          setSearchResults(resultados);
-          setSearchError(null);
-        })
-        .catch(err => {
-          if (err.name === "AbortError") return;
-          setSearchResults([]);
-          setSearchError(err.message || "Erro ao buscar itens.");
-        })
-        .finally(() => {
-          if (!controller.signal.aborted) setIsSearching(false);
-        });
+        .then(r => { setResultados(r); setErroBusca(null); })
+        .catch(err => { if (err.name !== "AbortError") { setResultados([]); setErroBusca(err.message || "Erro ao buscar itens."); } })
+        .finally(() => { if (!controller.signal.aborted) setBuscando(false); });
     }, 300);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [busca, modo]);
 
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-    };
-  }, [existingSearch, step1Mode]);
+  const itemForaDaVenda = modo === "DRAFT" && foraDaVenda(tipo);
+  const unidadeBaseTravada = modo === "EXISTING_DIRECT" && Boolean(selecionado?.unitOfMeasure);
 
-  const canProceedToNextStep = () => {
-    if (step === 0) {
-      if (step1Mode === "EXISTING_DIRECT") {
-        return selectedExisting !== null;
-      }
-      if (step1Mode === "DRAFT") {
-        return (
-          draftCommercialName.trim() !== "" && 
-          draftInternalName.trim() !== "" && 
-          draftInternalSku.trim() !== "" && 
-          draftTipoRecurso !== ""
-        );
-      }
-      return false;
-    }
+  // Custo por unidade da NF (nota + IPI + frete/ST) e custo base por unidade de estoque
+  const custoNota = currentItem.valorBaseUnitario || 0;
+  const custoIpi = (currentItem.ipi || 0) / (currentItem.quantidade || 1);
+  const custoFinal = currentItem.valorUnitario || 0;
+  const custoOutros = Math.max(0, custoFinal - custoNota - custoIpi);
+  const custoBase = convFator > 0 ? custoFinal / convFator : 0;
+  const composicao = (
+    <div style={{ fontSize: 12 }}>
+      <div>Nota: {brl(custoNota, 4)}</div>
+      <div>IPI: {brl(custoIpi, 4)}</div>
+      <div>Frete/ST/outros rateados: {brl(custoOutros, 4)}</div>
+    </div>
+  );
 
-    if (step === 1) {
-      // Conversão de compra válida; item novo precisa da configuração de vendas montada
-      if (!(convFator > 0) || !convUnidadeBase.trim()) return false;
-      if (step1Mode === "DRAFT") return configVendasRascunho !== null;
-      return true;
-    }
-    return true;
+  // SKU Customizado é único: avisa na hora se já existe no catálogo ou se usa o formato das sequências do sistema
+  const [skuEmUso, setSkuEmUso] = useState<ItemCatalogoBusca | null>(null);
+  const skuDigitado = skuCustomizado.trim();
+  const skuReservado = /^(IT|CON|ATV|TMP)-\d+$/i.test(skuDigitado);
+  useEffect(() => {
+    setSkuEmUso(null);
+    if (modo !== "DRAFT" || skuDigitado.length < 2 || skuReservado) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      buscarItensCatalogo(skuDigitado, 1, controller.signal)
+        .then(r => setSkuEmUso(r.find(x => String(x.sku).trim().toUpperCase() === skuDigitado.toUpperCase()) || null))
+        .catch(() => { /* a aprovação confere de novo */ });
+    }, 400);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [skuDigitado, modo, skuReservado]);
+
+  const passo1Ok = modo === "EXISTING_DIRECT"
+    ? selecionado !== null
+    : modo === "DRAFT" ? nome.trim() !== "" && !skuReservado && !skuEmUso : false;
+  const passo2Ok = convFator > 0 && convUnidadeBase.trim() !== "" && (modo !== "DRAFT" || itemForaDaVenda || configVendas !== null);
+
+  const escolherModo = (m: Modo) => {
+    setModo(m);
+    if (m === "DRAFT") { setSelecionado(null); setConvUnidadeBase(unidadeNf); }
   };
 
-  const handleConfirmItem = () => {
-    const unitsPayload: SalesUnit[] = unitsFromStep && unitsFromStep.length ? unitsFromStep : [];
+  const escolherExistente = (r: ItemCatalogoBusca) => {
+    setSelecionado(r);
+    setConvUnidadeBase((r.unitOfMeasure || unidadeNf).toUpperCase());
+  };
 
-    const baseCost = currentItem.valorUnitario || 0;
+  const avancarFila = () => (ultimo ? onClose() : setCurrentIndex(i => i + 1));
 
+  const confirmar = () => {
     const payload: MappingPayload = {
-      mode: step1Mode,
-      existingProductId: step1Mode === "EXISTING_DIRECT" ? selectedExisting?.id ?? null : null,
-      existingProduct: step1Mode === "EXISTING_DIRECT" && selectedExisting ? {
-        sku: selectedExisting.sku,
-        nome: selectedExisting.name,
-        tipo_recurso: selectedExisting.tipoRecurso
-      } : null,
+      mode: modo,
+      existingProductId: modo === "EXISTING_DIRECT" ? selecionado?.id ?? null : null,
+      existingProduct: modo === "EXISTING_DIRECT" && selecionado
+        ? { sku: selecionado.sku, nome: selecionado.name, tipo_recurso: selecionado.tipoRecurso }
+        : null,
       supplierLinkData: {
         sku_fornecedor: currentItem.sku || "",
         ean_fornecedor: currentItem.ean || null,
-        descricao_fornecedor: currentItem.descricao || ""
+        descricao_fornecedor: currentItem.descricao || "",
       },
-      salesUnits: unitsPayload,
-      conversaoCompra: {
-        unidade_compra: (currentItem.unidade || "UN").toUpperCase(),
-        unidade_base: convUnidadeBase.trim().toUpperCase(),
-        fator: convFator
-      },
-      configVendas: step1Mode === "DRAFT" ? configVendasRascunho : null,
-      draftIdentity: step1Mode === "DRAFT" ? {
-        tipo_recurso: draftTipoRecurso,
-        familia_id: draftFamiliaId,
-        nome_comercial: draftCommercialName.trim(),
-        nome_interno: draftInternalName.trim(),
-        sku_interno: draftInternalSku.trim(),
-        sku_comercial: draftCommercialSku.trim(),
-        id_unidade: draftUnidade,
-        custo_unitario_base: baseCost,
-        unidade_xml: currentItem.unidade
-      } : null
+      salesUnits: [],
+      conversaoCompra: { unidade_compra: unidadeNf, unidade_base: convUnidadeBase.trim().toUpperCase(), fator: convFator },
+      configVendas: modo === "DRAFT" && !itemForaDaVenda ? configVendas : null,
+      draftIdentity: modo === "DRAFT" ? {
+        tipo_recurso: tipo,
+        ...classificacaoNoRascunho(classificacao),
+        nome_interno: nome.trim(),
+        nome_comercial: nomeComercial.trim() || nome.trim(),
+        sku_interno: chaveDaLinhaNova(currentItem.nItem ?? currentIndex + 1),
+        sku_comercial: skuCustomizado.trim(),
+        id_unidade: 1,
+        custo_unitario_base: custoFinal,
+        unidade_xml: currentItem.unidade,
+      } : null,
     };
-
     onMap(currentItem.tempId, payload);
-
-    if (currentIndex < items.length - 1) {
-      setCurrentIndex(prev => prev + 1);
-    } else {
-      onClose();
-    }
+    avancarFila();
   };
 
-  const progressPercent = Math.round(((currentIndex) / items.length) * 100);
+  // ---------------------------------------------------------------- partes da tela
 
-  return (
-    <Modal
-      open={true}
-      onCancel={onClose}
-      width={1200}
-      footer={null}
-      destroyOnClose
-      title={
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingRight: '20px' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Title level={4} style={{ margin: 0 }}>
-                {isBatch ? `Mapeamento em Fila (${currentIndex + 1} de ${items.length})` : 'Mapeamento de Produto'}
-              </Title>
-              {isBatch && <Tag color="processing"><UnorderedListOutlined /> Fila Ativa</Tag>}
-            </div>
-            <Text type="secondary" style={{ fontSize: '13px' }}>
-              {isBatch ? 'Processe cada item sequencialmente para agilizar a entrada' : 'Gerenciamento de item recebido por Nota Fiscal'}
-            </Text>
-          </div>
-
-          <div style={{ marginBottom: 16, paddingTop: 4 }}>
-            <Steps
-              current={step}
-              size="small"
-              items={[
-                { title: 'Destino & Vínculo' },
-                { title: 'Comercialização & Precificação' },
-              ]}
-            />
-          </div>
-
-          {step1Mode && (
-            <Button 
-              size="small" 
-              danger 
-              icon={<ReloadOutlined />} 
-              onClick={handleResetCurrent}
-            >
-              Resetar Item Atual
-            </Button>
-          )}
+  const cabecalhoItem = (
+    <div style={{ background: "#fafafa", border: "1px solid #f0f0f0", borderRadius: 8, padding: "10px 14px", display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+      <div style={{ flex: 1, minWidth: 260 }}>
+        <Text type="secondary" style={{ fontSize: 11 }}>Item {currentItem.nItem ?? currentIndex + 1} da nota</Text>
+        <div style={{ fontWeight: 600, fontSize: 14, lineHeight: 1.3 }}>{currentItem.descricao}</div>
+        <Space size={10} wrap style={{ fontSize: 11, color: "#8c8c8c", marginTop: 2 }}>
+          <span>Cód. forn.: <b style={{ color: "#595959" }}>{currentItem.sku || "—"}</b></span>
+          <span>GTIN: <b style={{ color: "#595959" }}>{currentItem.ean && currentItem.ean !== "SEM GTIN" ? currentItem.ean : "—"}</b></span>
+          <span>NCM: {currentItem.ncm || "—"}</span>
+          {currentItem.prod?.CFOP && <span>CFOP: {String(currentItem.prod.CFOP)}</span>}
+        </Space>
+      </div>
+      <div style={{ textAlign: "right" }}>
+        <Text type="secondary" style={{ fontSize: 11, display: "block" }}>Quantidade</Text>
+        <b style={{ fontSize: 15 }}>{qtd(currentItem.quantidade || 0)} {unidadeNf}</b>
+      </div>
+      <Tooltip title={composicao}>
+        <div style={{ textAlign: "right", cursor: "help" }}>
+          <Text type="secondary" style={{ fontSize: 11, display: "block", borderBottom: "1px dashed #d9d9d9" }}>Custo final / {unidadeNf}</Text>
+          <b style={{ fontSize: 15, color: "#d4380d" }}>{brl(custoFinal)}</b>
         </div>
-      }
-    >
-      {isBatch && (
-        <div style={{ marginBottom: 12 }}>
-          <Progress percent={progressPercent} status="active" size="small" />
+      </Tooltip>
+      <Tooltip title="Tipo de entrada da linha. Para mudar, use o botão 'Tipo de entrada' na conferência.">
+        <Tag color={tipoCfg.color} style={{ margin: 0, padding: "2px 10px", fontSize: 12 }}>{tipoCfg.label}</Tag>
+      </Tooltip>
+    </div>
+  );
+
+  const opcao = (m: Exclude<Modo, null>, icone: React.ReactNode, titulo: string, descricao: string) => {
+    const ativo = modo === m;
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => escolherModo(m)}
+        onKeyDown={e => { if (e.key === "Enter" || e.key === " ") escolherModo(m); }}
+        style={{
+          flex: 1, cursor: "pointer", borderRadius: 8, padding: "12px 14px", display: "flex", gap: 12, alignItems: "flex-start",
+          border: ativo ? "2px solid #1677ff" : "1px solid #d9d9d9", background: ativo ? "#f0f7ff" : "#fff", transition: "all .15s",
+        }}
+      >
+        <div style={{ fontSize: 22, color: ativo ? "#1677ff" : "#8c8c8c", lineHeight: 1 }}>{icone}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 600 }}>{titulo}</div>
+          <Text type="secondary" style={{ fontSize: 12 }}>{descricao}</Text>
+        </div>
+        {ativo && <CheckCircleFilled style={{ color: "#1677ff", fontSize: 16 }} />}
+      </div>
+    );
+  };
+
+  const linhaResultado = (r: ItemCatalogoBusca) => {
+    const ativo = selecionado?.id === r.id;
+    const t = getTipoRecursoConfig(r.tipoRecurso);
+    return (
+      <div
+        key={r.id}
+        onClick={() => escolherExistente(r)}
+        style={{
+          padding: "8px 10px", cursor: "pointer", borderRadius: 6, display: "flex", alignItems: "center", gap: 10,
+          background: ativo ? "#e6f4ff" : undefined, border: ativo ? "1px solid #91caff" : "1px solid transparent",
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Text strong={ativo} ellipsis style={{ display: "block", fontSize: 13 }}>{r.name}</Text>
+          <Text type="secondary" style={{ fontSize: 11 }}>
+            {r.sku}
+            {r.variacao && r.variacao !== "Principal" ? ` · ${r.variacao}` : ""}
+            {r.marca ? ` · ${r.marca}` : ""}
+            {r.category ? ` · ${r.category}` : ""}
+          </Text>
+        </div>
+        <Space size={4}>
+          {r.unitOfMeasure && <Tag style={{ margin: 0 }}>{r.unitOfMeasure}</Tag>}
+          {r.status !== "ATIVO" && <Tag color="red" style={{ margin: 0 }}>{r.status}</Tag>}
+          <Tag color={t.color} style={{ margin: 0 }}>{t.short}</Tag>
+          {ativo ? <CheckCircleFilled style={{ color: "#1677ff" }} /> : <span style={{ width: 14 }} />}
+        </Space>
+      </div>
+    );
+  };
+
+  const painelVincular = (
+    <div style={secao}>
+      <Input
+        ref={buscaRef}
+        size="large"
+        allowClear
+        prefix={<SearchOutlined style={{ color: "#bfbfbf" }} />}
+        placeholder="Buscar no catálogo por SKU, nome, variação ou marca"
+        value={busca}
+        onChange={e => setBusca(e.target.value)}
+      />
+      {selecionado && !resultados.some(r => r.id === selecionado.id) && (
+        <div style={{ marginTop: 8 }}>
+          <Text type="secondary" style={{ fontSize: 11 }}>Selecionado</Text>
+          {linhaResultado(selecionado)}
         </div>
       )}
+      <div style={{ maxHeight: 280, overflowY: "auto", marginTop: 8 }}>
+        {buscando ? (
+          <div style={{ textAlign: "center", padding: 24 }}><Spin /></div>
+        ) : erroBusca ? (
+          <Alert type="error" showIcon message={erroBusca} />
+        ) : resultados.length === 0 ? (
+          busca.trim().length >= 2
+            ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={<span>Nada encontrado. Se o item ainda não existe, <a onClick={() => escolherModo("DRAFT")}>cadastre como novo</a>.</span>} />
+            : !selecionado && <Text type="secondary" style={{ fontSize: 12, display: "block", padding: "12px 4px" }}>Digite ao menos 2 letras para buscar.</Text>
+        ) : (
+          resultados.map(linhaResultado)
+        )}
+      </div>
+    </div>
+  );
 
-      <Divider style={{ margin: '12px 0' }} />
-
-      <Row gutter={12} align="top">
-        <Col span={8}>
-          <Card 
-            size="small" 
-            title={`📄 Item Atual na Fila (${currentIndex + 1}/${items.length})`} 
-            style={{ backgroundColor: '#fafafa', height: '100%', minHeight: '420px' }}
-          >
-            <Space direction="vertical" size={10} style={{ width: '100%' }}>
-              <div>
-                <Text type="secondary" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Descrição na Nota</Text>
-                <div style={{ fontWeight: 600, color: '#1f1f1f', wordBreak: 'break-word', fontSize: '12px' }}>
-                  {currentItem.descricao}
-                </div>
-              </div>
-
-              <Row gutter={8}>
-                <Col span={12}>
-                  <Text type="secondary" style={{ fontSize: '10px', textTransform: 'uppercase' }}>NCM</Text>
-                  <div style={{ fontSize: '11px', fontWeight: 500, color: '#595959' }}>{currentItem.ncm || '—'}</div>
-                </Col>
-                <Col span={12}>
-                  <Text type="secondary" style={{ fontSize: '10px', textTransform: 'uppercase' }}>CFOP</Text>
-                  <div style={{ fontSize: '11px', fontWeight: 500, color: '#595959' }}>{currentItem.prod?.CFOP || '—'}</div>
-                </Col>
-              </Row>
-
-              <Row gutter={8}>
-                <Col span={12}>
-                  <Text type="secondary" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Qtd Nota</Text>
-                  <div style={{ fontWeight: 600, fontSize: '12px' }}>{currentItem.quantidade} {currentItem.unidade}</div>
-                </Col>
-                <Col span={12}>
-                  <Text type="secondary" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Valor Total Item</Text>
-                  <div style={{ fontWeight: 600, fontSize: '12px' }}>R$ {(currentItem.valorTotal || 0).toFixed(2)}</div>
-                </Col>
-              </Row>
-
-              <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                <Text type="secondary" style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 600 }}>Composição Financeira (Unitário)</Text>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                  <span style={{ color: '#8c8c8c' }}>Custo Nota:</span>
-                  <span>R$ {(currentItem.valorBaseUnitario || 0).toFixed(2)}</span>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                  <span style={{ color: '#8c8c8c' }}>IPI (Unit.):</span>
-                  <span>R$ {((currentItem.ipi || 0) / (currentItem.quantidade || 1)).toFixed(2)}</span>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', borderTop: '1px dashed #e8e8e8', paddingTop: 4, marginTop: 2 }}>
-                  <strong style={{ color: '#1f1f1f' }}>Custo Final Unitário:</strong>
-                  <strong style={{ color: '#d4380d' }}>
-                    R$ {(currentItem.valorUnitario || 0).toFixed(2)}
-                  </strong>
-                </div>
-              </div>
-            </Space>
-          </Card>
+  const painelNovo = (
+    <div style={secao}>
+      <Row gutter={[16, 12]}>
+        <Col span={14}>
+          <span style={rotulo}>Nome do item <Text type="secondary" style={{ fontWeight: 400, fontSize: 11 }}>(da nota)</Text></span>
+          <Tooltip title="Nome como veio na nota fiscal. Para o nome de exibição, edite o nome comercial.">
+            <Input value={nome} disabled prefix={<LockOutlined style={{ color: "#bfbfbf" }} />} />
+          </Tooltip>
         </Col>
-
-        <Col span={16}>
-          <div style={{ minHeight: '380px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              {step === 0 && (
-                <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                  <Text strong>O que deseja fazer com este item?</Text>
-
-                  <Row gutter={10}>
-                    <Col span={12}>
-                      <Card 
-                        hoverable 
-                        size="small" 
-                        onClick={() => setStep1Mode("EXISTING_DIRECT")}
-                        style={{ 
-                          borderColor: step1Mode === "EXISTING_DIRECT" ? '#1677ff' : '#d9d9d9',
-                          backgroundColor: step1Mode === "EXISTING_DIRECT" ? '#e6f4ff' : '#ffffff',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <Space direction="vertical" size={2}>
-                          <Text strong><LinkOutlined /> Apenas Vincular</Text>
-                          <Text type="secondary" style={{ fontSize: '11px' }}>Soma estoque direto (Sem precificação).</Text>
-                        </Space>
-                      </Card>
-                    </Col>
-                    <Col span={12}>
-                      <Card 
-                        hoverable 
-                        size="small" 
-                        onClick={() => { setStep1Mode("DRAFT"); setSelectedExisting(null); }}
-                        style={{ 
-                          borderColor: step1Mode === "DRAFT" ? '#1677ff' : '#d9d9d9',
-                          backgroundColor: step1Mode === "DRAFT" ? '#e6f4ff' : '#ffffff',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <Space direction="vertical" size={2}>
-                          <Text strong><FileAddOutlined /> Novo Recurso / Item</Text>
-                          <Text type="secondary" style={{ fontSize: '11px' }}>Criar do zero com precificação.</Text>
-                        </Space>
-                      </Card>
-                    </Col>
-                  </Row>
-
-                  {step1Mode === "EXISTING_DIRECT" && (
-                    <div style={{ marginTop: 8 }}>
-                      <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: '12px' }}>Buscar item existente no catálogo</Text>
-                      <Input
-                        ref={searchInputRef}
-                        placeholder="SKU, nome, variação ou marca (mín. 2 caracteres)"
-                        value={existingSearch}
-                        onChange={(e) => setExistingSearch(e.target.value)}
-                        allowClear
-                        style={{ marginBottom: 8 }}
-                      />
-                      <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #d9d9d9', borderRadius: '6px', padding: '4px', minHeight: 60 }}>
-                        {isSearching ? (
-                          <div style={{ textAlign: 'center', padding: 16 }}><Spin size="small" /></div>
-                        ) : searchError ? (
-                          <Text type="danger" style={{ fontSize: 12, padding: 8, display: 'block' }}>{searchError}</Text>
-                        ) : searchResults.length === 0 ? (
-                          <Empty
-                            image={Empty.PRESENTED_IMAGE_SIMPLE}
-                            description={existingSearch.trim().length < 2 ? "Digite para buscar no catálogo" : "Nenhum item encontrado"}
-                            style={{ margin: '8px 0' }}
-                          />
-                        ) : (
-                          searchResults.map(result => {
-                            const isSelected = selectedExisting?.id === result.id;
-                            const tipo = getTipoRecursoConfig(result.tipoRecurso);
-                            return (
-                              <div
-                                key={result.id}
-                                onClick={() => {
-                                  setSelectedExisting(result);
-                                  setConvUnidadeBase((result.unitOfMeasure || currentItem.unidade || "UN").toUpperCase());
-                                }}
-                                style={{
-                                  padding: '6px 8px',
-                                  cursor: 'pointer',
-                                  borderRadius: '4px',
-                                  backgroundColor: isSelected ? '#e6f4ff' : 'transparent',
-                                  border: isSelected ? '1px solid #91caff' : '1px solid transparent',
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center',
-                                  gap: 8
-                                }}
-                              >
-                                <div style={{ minWidth: 0 }}>
-                                  <Text strong={isSelected} style={{ fontSize: 12, display: 'block' }} ellipsis>{result.name}</Text>
-                                  <Text type="secondary" style={{ fontSize: 11 }}>
-                                    {result.sku}
-                                    {result.variacao && result.variacao !== 'Principal' ? ` · ${result.variacao}` : ''}
-                                    {result.marca ? ` · ${result.marca}` : ''}
-                                  </Text>
-                                </div>
-                                <Space size={4}>
-                                  {result.status !== 'ATIVO' && <Tag color="red">{result.status}</Tag>}
-                                  <Tag color={tipo.color} style={{ margin: 0 }}>{tipo.short}</Tag>
-                                </Space>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {step1Mode === "DRAFT" && (
-                    <Space direction="vertical" size={10} style={{ width: '100%' }}>
-                      <Text strong style={{ fontSize: '12px', color: '#1677ff' }}>
-                        📝 Identidade do Recurso (`itens_core` & Custo Base)
-                      </Text>
-
-                      {/* LINHA 1: Nome Interno x Nome Comercial */}
-                      <Row gutter={8}>
-                        <Col span={12}>
-                          <div style={{ padding: '8px 10px', backgroundColor: '#f0f5ff', border: '1px solid #1677ff', borderRadius: '6px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <Text strong style={{ fontSize: '11px', color: '#1677ff' }}>Nome Interno (XML) *</Text>
-                              <Tooltip title={isInternalNameEditable ? "Bloquear edição" : "Desbloquear para editar"}>
-                                <Button 
-                                  type="text" 
-                                  size="small" 
-                                  icon={isInternalNameEditable ? <UnlockOutlined style={{ color: '#faad14' }} /> : <LockOutlined style={{ color: '#8c8c8c' }} />}
-                                  onClick={() => setIsInternalNameEditable(!isInternalNameEditable)}
-                                />
-                              </Tooltip>
-                            </div>
-                            <Input 
-                              value={draftInternalName} 
-                              disabled={!isInternalNameEditable} 
-                              onChange={(e) => setDraftInternalName(e.target.value)} 
-                              size="small" 
-                              style={{ marginTop: 2 }}
-                              placeholder="Nome extraído da NF"
-                            />
-                          </div>
-                        </Col>
-                        <Col span={12}>
-                          <div style={{ padding: '8px 10px', backgroundColor: '#f5f5f5', border: '1px solid #d9d9d9', borderRadius: '6px' }}>
-                            <Text strong style={{ fontSize: '11px', color: '#595959' }}>Nome Comercial (Opcional)</Text>
-                            <Input 
-                              value={draftCommercialName} 
-                              onChange={(e) => setDraftCommercialName(e.target.value)} 
-                              size="small" 
-                              style={{ marginTop: 2 }}
-                              placeholder="Definido na revisão posterior"
-                            />
-                          </div>
-                        </Col>
-                      </Row>
-
-                      {/* LINHA 2: Tipo de Recurso e Unidade (Crua do XML) + Custo Base */}
-                      <Row gutter={8}>
-                        <Col span={8}>
-                          <div style={{ padding: '8px 10px', backgroundColor: '#f0f5ff', border: '1px solid #1677ff', borderRadius: '6px' }}>
-                            <Text strong style={{ fontSize: '11px', color: '#1677ff' }}>Tipo de Recurso *</Text>
-                            <Select 
-                              value={draftTipoRecurso} 
-                              onChange={setDraftTipoRecurso} 
-                              size="small" 
-                              style={{ width: '100%', marginTop: 2 }}
-                            >
-                              {TIPOS_RECURSO.map(t => (
-                                <Option key={t.value} value={t.value}>{t.label}</Option>
-                              ))}
-                            </Select>
-                          </div>
-                        </Col>
-                        <Col span={8}>
-                          <div style={{ padding: '8px 10px', backgroundColor: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: '6px' }}>
-                            <Text strong style={{ fontSize: '11px', color: '#52c41a' }}>Unidade (XML) 🔒</Text>
-                            <Input 
-                              value={currentItem.unidade || ''} 
-                              disabled 
-                              size="small" 
-                              style={{ marginTop: 2 }}
-                              placeholder="Ex: UN, PC, CX"
-                            />
-                          </div>
-                        </Col>
-                        <Col span={8}>
-                          <div style={{ padding: '8px 10px', backgroundColor: '#fffbe6', border: '1px solid #ffe58f', borderRadius: '6px' }}>
-                            <Text strong style={{ fontSize: '11px', color: '#d4b106' }}>Custo Unit. (NF) 🔒</Text>
-                            <Input 
-                              value={`R$ ${(currentItem.valorUnitario || 0).toFixed(2)}`} 
-                              disabled 
-                              size="small" 
-                              style={{ marginTop: 2 }}
-                              placeholder="R$ 0,00"
-                            />
-                          </div>
-                        </Col>
-                      </Row>
-
-                      {/* Família (opcional): o item já entra classificado no PIM */}
-                      <div style={{ padding: '8px 10px', backgroundColor: '#f6f8ff', border: '1px solid #adc6ff', borderRadius: '6px' }}>
-                        <Text strong style={{ fontSize: '11px', color: '#1d39c4' }}>Família (opcional)</Text>
-                        <Select
-                          size="small"
-                          allowClear
-                          showSearch
-                          optionFilterProp="label"
-                          placeholder="Sem família (classificar depois)"
-                          style={{ width: '100%', marginTop: 2 }}
-                          value={draftFamiliaId ?? undefined}
-                          onChange={(v) => setDraftFamiliaId(v ?? null)}
-                          options={familias.map(f => ({
-                            value: f.id,
-                            label: `${f.nome}${f.categoria ? ` · ${f.categoria}` : ''}${f.status !== 'ATIVO' ? ` (${STATUS_FAMILIA_CONFIG[f.status as keyof typeof STATUS_FAMILIA_CONFIG]?.label || f.status})` : ''}`,
-                          }))}
-                        />
-                        {draftFamiliaId && familias.find(f => f.id === draftFamiliaId)?.status !== 'ATIVO' && (
-                          <Text type="warning" style={{ fontSize: 10, display: 'block', marginTop: 2 }}>
-                            Família não está ativa: o item entra no estoque, mas não é publicado até a família ser ativada.
-                          </Text>
-                        )}
-                      </div>
-
-                      {/* LINHA 3: SKU Customizado (Gerado/Editável) */}
-                      <Row gutter={8}>
-                        <Col span={24}>
-                          <div style={{ padding: '8px 10px', backgroundColor: '#f0f5ff', border: '1px solid #1677ff', borderRadius: '6px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <Text strong style={{ fontSize: '11px', color: '#1677ff' }}>SKU Customizado *</Text>
-                              <Tooltip title={isInternalSkuEditable ? "Bloquear edição" : "Desbloquear para editar manualmente"}>
-                                <Button 
-                                  type="text" 
-                                  size="small" 
-                                  icon={isInternalSkuEditable ? <UnlockOutlined style={{ color: '#faad14' }} /> : <LockOutlined style={{ color: '#8c8c8c' }} />}
-                                  onClick={() => setIsInternalSkuEditable(!isInternalSkuEditable)}
-                                />
-                              </Tooltip>
-                            </div>
-                            <Input 
-                              value={draftInternalSku} 
-                              disabled={!isInternalSkuEditable} 
-                              onChange={(e) => setDraftInternalSku(e.target.value)} 
-                              size="small" 
-                              style={{ marginTop: 2 }}
-                              placeholder="Gerado automaticamente"
-                            />
-                            <Text type="secondary" style={{ fontSize: '10px', display: 'block', marginTop: 2 }}>
-                              Identificador único para o estoque core.
-                            </Text>
-                          </div>
-                        </Col>
-                      </Row>
-                    </Space>
-                  )}
-
-                </Space>
-              )}
-
-              {step === 1 && (
-                <Space direction="vertical" size={10} style={{ width: '100%' }}>
-                    <div style={{ padding: '8px 10px', backgroundColor: '#f9f0ff', border: '1px solid #d3adf7', borderRadius: '6px' }}>
-                      <Text strong style={{ fontSize: '11px', color: '#722ed1' }}>Conversão de Compra (NF → Estoque) *</Text>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
-                        <Text style={{ fontSize: 12 }}>1 <b>{(currentItem.unidade || 'UN').toUpperCase()}</b> na nota =</Text>
-                        <InputNumber
-                          size="small"
-                          min={0.000001}
-                          value={convFator}
-                          onChange={(v) => setConvFator(Number(v) || 0)}
-                          style={{ width: 90 }}
-                        />
-                        {step1Mode === "EXISTING_DIRECT" && selectedExisting?.unitOfMeasure ? (
-                          <Tag color="purple" style={{ margin: 0 }}>{convUnidadeBase}</Tag>
-                        ) : (
-                          <Input
-                            size="small"
-                            value={convUnidadeBase}
-                            maxLength={10}
-                            onChange={(e) => setConvUnidadeBase(e.target.value.toUpperCase())}
-                            style={{ width: 70 }}
-                            placeholder="UN"
-                          />
-                        )}
-                        <Text type="secondary" style={{ fontSize: 11 }}>
-                          (unidade base de estoque{step1Mode === "EXISTING_DIRECT" && selectedExisting?.unitOfMeasure ? ' do item' : ''})
-                        </Text>
-                      </div>
-                      {convFator > 0 && (
-                        <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 4 }}>
-                          Esta nota: {currentItem.quantidade || 0} {(currentItem.unidade || 'UN').toUpperCase()} → <b>{Number(((currentItem.quantidade || 0) * convFator).toFixed(4))} {convUnidadeBase || '?'}</b> no estoque
-                          {' '}· custo por {convUnidadeBase || '?'}: R$ {((currentItem.valorUnitario || 0) / convFator).toFixed(4)}
-                        </Text>
-                      )}
-                    </div>
-
-                  {step1Mode === "DRAFT" ? (
-                    <ProductCommercialSalesConfig
-                      rascunho={{
-                        unidadeBase: convUnidadeBase,
-                        unidadeCompra: (currentItem.unidade || "UN").toUpperCase(),
-                        fatorCompra: convFator,
-                        custoUnidadeCompra: (currentItem.valorUnitario || 0),
-                        nomeItem: draftInternalName
-                      }}
-                      onRascunhoChange={setConfigVendasRascunho}
-                    />
-                  ) : (
-                    <Card size="small" style={{ borderRadius: 6 }}>
-                      <Space direction="vertical" size={4}>
-                        <Text strong style={{ fontSize: 12 }}>
-                          🔗 {selectedExisting?.name} <Text type="secondary" style={{ fontSize: 11 }}>({selectedExisting?.sku})</Text>
-                        </Text>
-                        <Text style={{ fontSize: 12 }}>
-                          Custo desta entrada por {convUnidadeBase || '?'}: <b>R$ {convFator > 0 ? ((currentItem.valorUnitario || 0) / convFator).toFixed(4) : '—'}</b>
-                        </Text>
-                        <Text type="secondary" style={{ fontSize: 11 }}>
-                          O preço de venda deste item segue o custo gerencial já configurado. Se esta entrada mudar o custo,
-                          o item fica sinalizado como defasado e o gestor decide se atualiza o preço.
-                        </Text>
-                      </Space>
-                    </Card>
-                  )}
-                </Space>
-              )}
-            </div>
-          </div>
+        <Col span={10}>
+          <span style={rotulo}>Nome comercial <Text type="secondary" style={{ fontWeight: 400, fontSize: 11 }}>(opcional)</Text></span>
+          <Input value={nomeComercial} onChange={e => setNomeComercial(e.target.value)} placeholder="Igual ao nome do item" allowClear />
+          {nomeComercial !== nome && (
+            <a style={{ fontSize: 11 }} onClick={() => setNomeComercial(nome)}><RollbackOutlined /> igual ao nome da nota</a>
+          )}
+        </Col>
+        <Col span={14}>
+          <span style={rotulo}>SKU Customizado</span>
+          <Input
+            value={skuCustomizado}
+            onChange={e => setSkuCustomizado(e.target.value)}
+            status={skuReservado || skuEmUso ? "error" : undefined}
+            placeholder={`Vazio = sequência gerada na aprovação (${foraDaVenda(tipo) ? (String(tipo).toUpperCase() === "ATIVO" ? "ATV" : "CON") : "IT"}-000123)`}
+          />
+          {skuEmUso ? (
+            <span style={{ ...ajuda, color: "#cf1322" }}>
+              Já existe no catálogo: {skuEmUso.name}.{" "}
+              <a onClick={() => { setModo("EXISTING_DIRECT"); escolherExistente(skuEmUso); }}>Vincular a ele</a> ou use outro SKU.
+            </span>
+          ) : skuReservado ? (
+            <span style={{ ...ajuda, color: "#cf1322" }}>Formato reservado às sequências do sistema: deixe vazio para gerar ou use outro código.</span>
+          ) : (
+            <span style={ajuda}>Código que aparece no catálogo e no PDV (único). O código interno é a sequência do banco.</span>
+          )}
+        </Col>
+        <Col span={10}>
+          <span style={rotulo}>Vai para</span>
+          <Space size={6}>
+            <Tag color={tipoCfg.color} style={{ margin: 0 }}>{tipoCfg.label}</Tag>
+            <Tag color={DEPOSITOS[depositoPadraoDoTipo(tipo)].color} style={{ margin: 0 }}>{DEPOSITOS[depositoPadraoDoTipo(tipo)].label}</Tag>
+          </Space>
+          <span style={ajuda}>Tipo e destino são definidos na tabela da conferência.</span>
         </Col>
       </Row>
 
-      <Divider style={{ margin: '16px 0 12px 0' }} />
+      <div style={{ borderTop: "1px solid #f0f0f0", margin: "14px 0 10px" }} />
+      <span style={rotulo}>Classificação no catálogo <Text type="secondary" style={{ fontWeight: 400, fontSize: 11 }}>(opcional, dá para completar depois)</Text></span>
+      <ClassificacaoPim value={classificacao} onChange={setClassificacao} />
+    </div>
+  );
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Button onClick={onClose}>Cancelar Fila</Button>
+  const painelConversaoECusto = (
+    <Row gutter={8}>
+      <Col span={12}>
+        <div style={{ ...secao, height: "100%" }}>
+          <span style={rotulo}>Como a nota vira estoque</span>
+          <Space align="center" wrap>
+            <Text>1 <b>{unidadeNf}</b> =</Text>
+            <InputNumber min={0.000001} value={convFator} onChange={v => setConvFator(Number(v) || 0)} style={{ width: 100 }} />
+            {unidadeBaseTravada ? (
+              <Tooltip title="Unidade de estoque do item já cadastrado"><Tag color="purple" style={{ margin: 0, padding: "2px 10px" }}>{convUnidadeBase}</Tag></Tooltip>
+            ) : (
+              <Input value={convUnidadeBase} maxLength={10} onChange={e => setConvUnidadeBase(e.target.value.toUpperCase())} style={{ width: 80 }} placeholder="UN" />
+            )}
+          </Space>
+          <span style={ajuda}>
+            Esta nota: {qtd(currentItem.quantidade || 0)} {unidadeNf} → <b style={{ color: "#262626" }}>{qtd((currentItem.quantidade || 0) * convFator)} {convUnidadeBase || "?"}</b> no estoque
+          </span>
+        </div>
+      </Col>
+      <Col span={12}>
+        <div style={{ ...secao, height: "100%", background: "#fffdf5", borderColor: "#ffe7ba" }}>
+          <span style={rotulo}>Custo base por {convUnidadeBase || "?"}</span>
+          <div style={{ fontSize: 22, fontWeight: 700, color: "#d4380d", lineHeight: 1.2 }}>{brl(custoBase, 4)}</div>
+          <Tooltip title={composicao}>
+            <span style={{ ...ajuda, cursor: "help" }}>
+              Custo final {brl(custoFinal, 4)} / {unidadeNf}{convFator !== 1 ? ` ÷ ${qtd(convFator)}` : ""}
+              {" · "}{itemForaDaVenda ? "custo de entrada no estoque" : "o markup é aplicado sobre este valor"}
+            </span>
+          </Tooltip>
+        </div>
+      </Col>
+    </Row>
+  );
 
-        <Space>
-          {step === 1 && (
-            <Button icon={<ArrowLeftOutlined />} onClick={() => setStep(0)}>
-              Voltar
-            </Button>
+  const painelPreco = itemForaDaVenda ? (
+    <Alert
+      type="info"
+      showIcon
+      message="Fora da venda: não precisa de preço"
+      description={`Entra no ${DEPOSITOS[depositoPadraoDoTipo(tipo)].label} pelo custo da nota e não aparece no PDV. Se um dia for vendido, mude o tipo e configure o preço no editor de catálogo.`}
+    />
+  ) : modo === "DRAFT" ? (
+    <div style={secao}>
+      <span style={rotulo}>Preço de venda</span>
+      <ProductCommercialSalesConfig
+        rascunho={{ unidadeBase: convUnidadeBase, unidadeCompra: unidadeNf, fatorCompra: convFator, custoUnidadeCompra: custoFinal, nomeItem: nomeComercial.trim() || nome }}
+        onRascunhoChange={setConfigVendas}
+      />
+    </div>
+  ) : (
+    <Alert
+      type="success"
+      showIcon
+      icon={<LinkOutlined />}
+      message={<span>Vinculado a <b>{selecionado?.name}</b> <Text type="secondary">({selecionado?.sku})</Text></span>}
+      description="O preço continua o já configurado no item. Se esta entrada mudar o custo, o item fica sinalizado como custo defasado para revisão de preço."
+    />
+  );
+
+  // ---------------------------------------------------------------- modal
+
+  return (
+    <Modal
+      open
+      onCancel={onClose}
+      width={1100}
+      destroyOnClose
+      styles={{ body: { paddingTop: 2 } }}
+      title={
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingRight: 32, gap: 8 }}>
+          <span>{modo === "DRAFT" ? "Cadastrar item da nota" : modo === "EXISTING_DIRECT" ? "Vincular item da nota" : "Vincular ou cadastrar item da nota"}</span>
+          {isBatch && (
+            <Space size={8}>
+              <Text type="secondary" style={{ fontSize: 12, fontWeight: 400 }}>Item {currentIndex + 1} de {items.length}</Text>
+              <Progress percent={Math.round((currentIndex / items.length) * 100)} showInfo={false} size="small" style={{ width: 120, margin: 0 }} />
+            </Space>
           )}
+        </div>
+      }
+      footer={
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Space>
+            <Button onClick={onClose}>{isBatch ? "Fechar fila" : "Cancelar"}</Button>
+            {isBatch && !ultimo && (
+              <Tooltip title="Deixa esta linha como está e vai para a próxima">
+                <Button icon={<StepForwardOutlined />} onClick={() => setCurrentIndex(i => i + 1)}>Pular</Button>
+              </Tooltip>
+            )}
+          </Space>
+          <Space>
+            {step === 1 && <Button icon={<ArrowLeftOutlined />} onClick={() => setStep(0)}>Voltar</Button>}
+            {step === 0 ? (
+              <Button type="primary" disabled={!passo1Ok} onClick={() => setStep(1)}>
+                Próximo <ArrowRightOutlined />
+              </Button>
+            ) : (
+              <Button type="primary" icon={<CheckOutlined />} disabled={!passo2Ok} onClick={confirmar}>
+                {modo === "EXISTING_DIRECT" ? "Confirmar vínculo" : "Confirmar cadastro"}
+                {isBatch ? (ultimo ? " e finalizar" : " e ir ao próximo") : ""}
+              </Button>
+            )}
+          </Space>
+        </div>
+      }
+    >
+      <Space direction="vertical" size={12} style={{ width: "100%" }}>
+        {cabecalhoItem}
 
-          {step === 0 ? (
-            <Button
-              type="primary"
-              disabled={!canProceedToNextStep()}
-              onClick={() => setStep(1)}
-            >
-              Avançar <ArrowRightOutlined />
-            </Button>
-          ) : (
-            <Button
-              type="primary"
-              style={{ backgroundColor: '#52c41a' }}
-              icon={<CheckCircleOutlined />}
-              disabled={!canProceedToNextStep()}
-              onClick={handleConfirmItem}
-            >
-              {step1Mode === "EXISTING_DIRECT"
-                ? (currentIndex < items.length - 1 ? 'Vincular e Próximo Item ➔' : 'Vincular Último Item')
-                : (currentIndex < items.length - 1 ? 'Salvar e Próximo Item ➔' : 'Salvar e Finalizar Fila')}
-            </Button>
-          )}
-        </Space>
-      </div>
+        <Steps
+          size="small"
+          current={step}
+          onChange={s => { if (s === 0 || passo1Ok) setStep(s); }}
+          items={[
+            { title: modo === "EXISTING_DIRECT" ? "Item do catálogo" : modo === "DRAFT" ? "Dados do item" : "Vincular ou cadastrar" },
+            { title: itemForaDaVenda ? "Estoque e custo" : modo === "EXISTING_DIRECT" ? "Estoque e custo" : "Estoque, custo e preço", disabled: !passo1Ok },
+          ]}
+        />
+
+        {step === 0 && (
+          <>
+            <div style={{ display: "flex", gap: 12 }}>
+              {opcao("EXISTING_DIRECT", <LinkOutlined />, "Vincular a um item do catálogo", "O item já existe: esta entrada soma ao estoque dele.")}
+              {opcao("DRAFT", <FileAddOutlined />, "Cadastrar item novo", "O item é criado no catálogo quando a nota for aprovada.")}
+            </div>
+            {modo === "EXISTING_DIRECT" && painelVincular}
+            {modo === "DRAFT" && painelNovo}
+          </>
+        )}
+
+        {step === 1 && (
+          <>
+            {painelConversaoECusto}
+            {painelPreco}
+          </>
+        )}
+      </Space>
     </Modal>
   );
 };

@@ -3,7 +3,8 @@ import { calcularCustoMedio } from '../Compras/staging/penteFino';
 
 export type TipoAjuste = 'ENTRADA' | 'SAIDA' | 'CONTAGEM';
 
-export const ORIGENS_AJUSTE = ['AJUSTE_MANUAL', 'INVENTARIO'] as const;
+// CONSUMO_INTERNO: baixa de uso do almoxarifado (graxa da oficina, limpeza, EPI)
+export const ORIGENS_AJUSTE = ['AJUSTE_MANUAL', 'INVENTARIO', 'CONSUMO_INTERNO'] as const;
 export type OrigemAjuste = typeof ORIGENS_AJUSTE[number];
 
 export class ErroAjuste extends Error {

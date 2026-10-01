@@ -140,7 +140,7 @@ export const getProdutos = async (req: Request, res: Response) => {
       LEFT JOIN itens_unidades_medida um
         ON ic.id_unidade = um.id_unidade AND ic.tenant_id = um.tenant_id
       LEFT JOIN estoque_saldos_itens es
-        ON es.id_item = ic.id_item AND es.tenant_id = ic.tenant_id
+        ON es.id_item = ic.id_item AND es.tenant_id = ic.tenant_id AND es.deposito = 'VENDA'
       WHERE ic.tenant_id = ?
       ORDER BY COALESCE(NULLIF(TRIM(cpd.nome_comercial), ''), ic.nome_item) ASC
     `;

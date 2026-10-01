@@ -38,7 +38,7 @@ const carregarConfig = async (conn: Conn, tenant: number, idItem: number) => {
      FROM itens_core ic
      LEFT JOIN itens_unidades_medida um ON um.id_unidade = ic.id_unidade
      LEFT JOIN comercial_produtos_dados cpd ON cpd.id_item = ic.id_item AND cpd.tenant_id = ic.tenant_id
-     LEFT JOIN estoque_saldos_itens es ON es.id_item = ic.id_item AND es.tenant_id = ic.tenant_id
+     LEFT JOIN estoque_saldos_itens es ON es.id_item = ic.id_item AND es.tenant_id = ic.tenant_id AND es.deposito = 'VENDA'
      WHERE ic.id_item = ? AND ic.tenant_id = ?`,
     [idItem, tenant]
   );

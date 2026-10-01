@@ -105,7 +105,7 @@ export const StockEntryHeader: React.FC<StockEntryHeaderProps> = ({
                         </Space>
                     </Col>
 
-                    <Col xs={24} xl={8}>
+                    {/* <Col xs={24} xl={7}>
                         {itemsLength > 0 ? (
                             <Space size="large" align="center" wrap style={{ width: '100%', justifyContent: 'center' }}>
                                 <Space size="small">
@@ -133,9 +133,9 @@ export const StockEntryHeader: React.FC<StockEntryHeaderProps> = ({
                                 <Text type="secondary" style={{ fontSize: 12 }}>Importe um XML de NF-e para iniciar a conferência automática.</Text>
                             </div>
                         )}
-                    </Col>
+                    </Col> */}
 
-                    <Col xs={24} xl={9} style={{ textAlign: 'right' }}>
+                    <Col xs={24} xl={10} style={{ textAlign: 'right' }}>
                         <Space size="small" wrap style={{ justifyContent: 'flex-end' }}>
                             <Tooltip title="Escanear produto via código de barras">
                                 <Button icon={<BarcodeOutlined />} size="middle" disabled={!parsedNfe?.chaveAcesso}>

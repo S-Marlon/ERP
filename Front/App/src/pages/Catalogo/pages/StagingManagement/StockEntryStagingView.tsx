@@ -21,8 +21,10 @@ import {
   Alert,
   Spin,
   Switch,
-  Progress
+  Progress,
+  notification
 } from 'antd';
+import { getPendenciasPim } from '../PendenciasPim/pendenciasApi';
 import {
   CloudServerOutlined,
   ReloadOutlined,
@@ -249,6 +251,24 @@ export const StockEntryStagingView: React.FC<StockEntryStagingViewProps> = ({ on
     fetchStagingLotes();
   }, []);
 
+  // Itens da nota que entraram com cadastro incompleto no PIM: aviso com atalho para a tela de pendências
+  const avisarPendenciasDoLote = async (id: number) => {
+    try {
+      const r = await getPendenciasPim({ lote: id, tipo: 'TODOS', limit: 1 }, tenantId);
+      if (r.totalItensComPendencia === 0) return;
+      notification.warning({
+        message: `${r.totalItensComPendencia} item(ns) desta nota com pendências no catálogo`,
+        description: r.criticos > 0
+          ? `${r.criticos} crítico(s): ficam fora do PDV ou sem preço até completar o cadastro.`
+          : 'Cadastro incompleto (classificação, grade, código de barras...).',
+        duration: 0,
+        btn: <Button type="primary" size="small" onClick={() => { notification.destroy(); navigate(`/catalogo/pendencias?lote=${id}`); }}>Ver pendências</Button>,
+      });
+    } catch {
+      /* aviso opcional */
+    }
+  };
+
   const handleAprovarLote = async (id: number) => {
     setAprovando(true);
     try {
@@ -263,6 +283,7 @@ export const StockEntryStagingView: React.FC<StockEntryStagingViewProps> = ({ on
         message.success(data.message || `Lote #${id} aprovado e integrado ao estoque.`);
         setModalVisible(false);
         fetchStagingLotes();
+        avisarPendenciasDoLote(id);
         return;
       }
       // 422: o pente-fino do servidor encontrou pendências (estado mudou desde a análise)

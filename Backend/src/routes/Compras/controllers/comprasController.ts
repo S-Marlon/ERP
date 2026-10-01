@@ -250,7 +250,7 @@ export const sincronizarItensLoteXML = async (req: Request, res: Response) => {
         valorTotal, freightAdded, freightDistributed, ipi, icmsSt,
         produtoIdSistema, skuSistema, tipoEntrada,
         skuSugerido, nomeItemSugerido, mapeamento, tipoRecurso,
-        difference, isConfirmed, gtinManual
+        difference, isConfirmed, gtinManual, destinos
       } = item;
 
       // Item vindo do ProductMappingModal: os campos de mapeamento passam a valer como enviados (inclusive null)
@@ -266,6 +266,11 @@ export const sincronizarItensLoteXML = async (req: Request, res: Response) => {
         }
         if (tipoRecurso) base.tipo_recurso = tipoRecurso;
         if (gtinManual) base.gtin_manual = gtinManual;
+        // Depósitos de destino da linha (null/[] = padrão pelo tipo do item)
+        if (destinos !== undefined) {
+          if (Array.isArray(destinos) && destinos.length > 0) base.destinos = destinos;
+          else delete base.destinos;
+        }
         return Object.keys(base).length > 0 ? JSON.stringify(base) : null;
       };
 

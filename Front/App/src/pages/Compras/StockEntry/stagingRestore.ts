@@ -68,13 +68,21 @@ export const restaurarItensDoStaging = <T extends { nItem?: string | number; qua
     restaurados++;
 
     const json = lerJson(linha.mapeamento_json);
-    const { tipo_recurso, gtin_manual, ...payloadModal } = json;
+    const { tipo_recurso, gtin_manual, destinos, ...payloadModal } = json;
     const temMapeamento = Boolean(payloadModal.mode);
 
     const produtoId = linha.produto_id_sistema ? Number(linha.produto_id_sistema) : null;
     const skuSugerido = String(linha.sku_sugerido || '').trim() || null;
-    // Após a aprovação, item novo tem produto_id_sistema mas o código exibido continua sendo o SKU criado
-    const mappedId = produtoId ? (linha.sku_sistema || skuSugerido || produtoId) : skuSugerido;
+    // Chave da linha (LINHA-n) não é SKU: não aparece na tela
+    const chaveDeLinha = skuSugerido !== null && /^LINHA-/i.test(skuSugerido);
+    // Item novo ainda não aprovado: SKU Customizado digitado ou "a gerar" (sequência na aprovação)
+    const skuNovo = payloadModal.mode === 'DRAFT'
+      ? (String(payloadModal.draftIdentity?.sku_comercial || '').trim() || '(a gerar)')
+      : null;
+    // Após a aprovação, o código exibido é o SKU criado (sku_sistema); lotes antigos guardavam o SKU em sku_sugerido
+    const mappedId = produtoId
+      ? (linha.sku_sistema || (chaveDeLinha ? null : skuSugerido) || produtoId)
+      : (skuNovo || (chaveDeLinha ? null : skuSugerido));
     if (mappedId) mapeados++;
 
     const quantidadeNota = Number(item.quantidade) || 0;
@@ -91,6 +99,7 @@ export const restaurarItensDoStaging = <T extends { nItem?: string | number; qua
       isConfirmed,
       tipoRecurso: tipo_recurso || TIPO_RECURSO_PADRAO,
       customGtin: gtin_manual || undefined,
+      destinos: Array.isArray(destinos) && destinos.length > 0 ? destinos : null,
       produtoIdSistema: produtoId,
       skuSistema: linha.sku_sistema || null,
       skuSugerido,
