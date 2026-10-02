@@ -166,4 +166,8 @@ export const ORIGENS_MOVIMENTO: Record<string, { label: string; color: string }>
   INVENTARIO: { label: 'Inventário', color: 'cyan' },
   CONSUMO_INTERNO: { label: 'Consumo interno', color: 'volcano' },
   TRANSFERENCIA: { label: 'Transferência', color: 'geekblue' },
+  CORRECAO_NFE_ENTRADA: { label: 'Correção de NF (entrada)', color: 'lime' },
+  CORRECAO_NFE_ESTORNO: { label: 'Correção de NF (estorno)', color: 'orange' },
+  UNIFICACAO_ENTRADA: { label: 'Unificação (entrada)', color: 'lime' },
+  UNIFICACAO_SAIDA: { label: 'Unificação (saída)', color: 'orange' },
 };

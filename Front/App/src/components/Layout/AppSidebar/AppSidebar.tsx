@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Menu, Button, Popover, Flex, Typography } from "antd";
+import { Menu, Button, Popover, Flex, Typography, Tooltip, Badge } from "antd";
 import type { MenuProps } from "antd";
 import {
   LeftOutlined,
@@ -14,6 +14,7 @@ import {
   QuestionCircleOutlined,
 } from "@ant-design/icons";
 import { ItemMenu, MENU_PRINCIPAL, itemDaRota } from "../menuRotas";
+import { useNotificacoes } from "../../../core/notificacoes/NotificacoesContext";
 
 const { Text } = Typography;
 
@@ -22,12 +23,19 @@ interface SidebarProps {
   toggleSidebar: () => void;
 }
 
-const paraItensAntd = (itens: ItemMenu[]): MenuProps['items'] =>
+// Grupo com tela principal: duplo clique no nome abre o painel do módulo (um clique só abre/fecha o grupo)
+const paraItensAntd = (itens: ItemMenu[], abrirPainel: (rota: string) => void): MenuProps['items'] =>
   itens.map(i => ({
     key: i.key,
     icon: i.icon,
-    label: i.label,
-    children: i.children ? paraItensAntd(i.children) : undefined,
+    label: i.children && i.rota
+      ? (
+        <Tooltip title="Duplo clique: abrir o painel" placement="right" mouseEnterDelay={0.8}>
+          <span onDoubleClick={e => { e.stopPropagation(); abrirPainel(i.rota!); }} style={{ display: 'inline-block', width: '100%' }}>{i.label}</span>
+        </Tooltip>
+      )
+      : i.label,
+    children: i.children ? paraItensAntd(i.children, abrirPainel) : undefined,
   }));
 
 export default function AppSidebar({ isOpen, toggleSidebar }: SidebarProps) {
@@ -47,23 +55,29 @@ export default function AppSidebar({ isOpen, toggleSidebar }: SidebarProps) {
     if (grupoAtual) setAbertos(prev => (prev.includes(grupoAtual) ? prev : [...prev, grupoAtual]));
   }, [grupoAtual]);
 
-  const items = useMemo(() => paraItensAntd(MENU_PRINCIPAL), []);
+  const items = useMemo(() => paraItensAntd(MENU_PRINCIPAL, rota => navigate(rota)), [navigate]);
+  const { novas } = useNotificacoes();
+  const [configAberto, setConfigAberto] = useState(false);
+  const irPara = (rota: string) => { setConfigAberto(false); navigate(rota); };
 
   const handleMenuClick: MenuProps['onClick'] = (e) => {
     if (!e.key.startsWith('grp:')) navigate(e.key);
   };
 
-  // Configurações: telas ainda não implementadas (ficam desabilitadas até existirem)
+  // Configurações
   const configContent = (
-    <Flex vertical gap={4} style={{ width: 220, padding: 4 }}>
-      <Button type="text" disabled icon={<UserOutlined />} style={{ justifyContent: 'flex-start' }}>Meu Perfil</Button>
-      <Button type="text" disabled icon={<ShopOutlined />} style={{ justifyContent: 'flex-start' }}>Dados da Empresa</Button>
-      <Button type="text" disabled icon={<SlidersOutlined />} style={{ justifyContent: 'flex-start' }}>Preferências do Sistema</Button>
-      <Button type="text" disabled icon={<BellOutlined />} style={{ justifyContent: 'flex-start' }}>Notificações</Button>
-      <Button type="text" disabled icon={<QuestionCircleOutlined />} style={{ justifyContent: 'flex-start' }}>Ajuda e Suporte</Button>
+    <Flex vertical gap={4} style={{ width: 230, padding: 4 }}>
+      <Button type="text" icon={<UserOutlined />} style={{ justifyContent: 'flex-start' }} onClick={() => irPara('/configuracoes/perfil')}>Meu Perfil</Button>
+      <Button type="text" icon={<ShopOutlined />} style={{ justifyContent: 'flex-start' }} onClick={() => irPara('/configuracoes/empresa')}>Dados da Empresa</Button>
+      <Button type="text" icon={<SlidersOutlined />} style={{ justifyContent: 'flex-start' }} onClick={() => irPara('/configuracoes/preferencias')}>Preferências do Sistema</Button>
+      <Button type="text" icon={<BellOutlined />} style={{ justifyContent: 'flex-start' }} onClick={() => irPara('/configuracoes/notificacoes')}>
+        Notificações {novas.length > 0 && <Badge count={novas.length} size="small" style={{ marginLeft: 6 }} />}
+      </Button>
+      <Button type="text" icon={<QuestionCircleOutlined />} style={{ justifyContent: 'flex-start' }} onClick={() => irPara('/ajuda')}>Ajuda e Suporte</Button>
       <div style={{ height: 1, background: 'rgba(0, 0, 0, 0.06)', margin: '6px 0' }} />
-      <Button type="text" danger disabled icon={<LogoutOutlined />} style={{ justifyContent: 'flex-start' }}>Encerrar Sessão</Button>
-      <Text type="secondary" style={{ fontSize: 11, padding: '0 8px' }}>Em breve: estas telas ainda não existem.</Text>
+      <Tooltip title="O sistema ainda não tem login" placement="right">
+        <Button type="text" danger disabled icon={<LogoutOutlined />} style={{ justifyContent: 'flex-start' }}>Encerrar Sessão</Button>
+      </Tooltip>
     </Flex>
   );
 
@@ -117,7 +131,7 @@ export default function AppSidebar({ isOpen, toggleSidebar }: SidebarProps) {
 
       {/* CONFIGURAÇÕES */}
       <div style={{ padding: '12px', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-        <Popover content={configContent} trigger="click" placement="rightBottom">
+        <Popover content={configContent} trigger="click" placement="rightBottom" open={configAberto} onOpenChange={setConfigAberto}>
           <Button
             type="text"
             icon={<SettingOutlined />}
@@ -131,9 +145,3 @@ export default function AppSidebar({ isOpen, toggleSidebar }: SidebarProps) {
   );
 }
 
-// Próximas telas de configuração (roteiro):
-// - Meu Perfil: dados, senha, cargo e permissões.
-// - Dados da Empresa: razão social, CNPJ, IE/IM, endereço, logotipo (usado nas impressões).
-// - Preferências: tema, formato de data/moeda, casas decimais, avisos sonoros.
-// - Central de Notificações: estoque mínimo, NF autorizada, vendas; "marcar todas como lidas".
-// - Ajuda e Suporte: documentação, contato, versão do ERP.

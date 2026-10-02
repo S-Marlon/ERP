@@ -8,6 +8,7 @@ import {
 export interface ItemMenu {
   key: string;          // rota (folha) ou identificador do grupo (começa com "grp:")
   label: string;
+  rota?: string;        // grupo: tela principal do módulo (abre com duplo clique na barra lateral)
   icon?: React.ReactNode;
   children?: ItemMenu[];
 }
@@ -15,7 +16,7 @@ export interface ItemMenu {
 export const MENU_PRINCIPAL: ItemMenu[] = [
   { key: '/', icon: <HomeOutlined />, label: 'Dashboard' },
   {
-    key: 'grp:vendas', icon: <ShopTwoTone />, label: 'Vendas',
+    key: 'grp:vendas', icon: <ShopTwoTone />, label: 'Vendas', rota: '/vendas',
     children: [
       { key: '/vendas', label: 'Central de Vendas' },
       { key: '/vendas/pdv', label: 'PDV' },
@@ -23,7 +24,7 @@ export const MENU_PRINCIPAL: ItemMenu[] = [
     ],
   },
   {
-    key: 'grp:catalogo', icon: <AppstoreOutlined />, label: 'Catálogo',
+    key: 'grp:catalogo', icon: <AppstoreOutlined />, label: 'Catálogo', rota: '/catalogo',
     children: [
       { key: '/catalogo', label: 'Painel do catálogo' },
       { key: '/catalogo/gerenciador', label: 'Produtos (SKUs)' },
@@ -37,15 +38,16 @@ export const MENU_PRINCIPAL: ItemMenu[] = [
     ],
   },
   {
-    key: 'grp:estoque', icon: <InboxOutlined />, label: 'Estoque',
+    key: 'grp:estoque', icon: <InboxOutlined />, label: 'Estoque', rota: '/estoque',
     children: [
+      { key: '/estoque', label: 'Painel de Estoque' },
       { key: '/estoque/consulta', label: 'Consulta de Saldo' },
       { key: '/estoque/operacoes', label: 'Movimentações' },
       { key: '/estoque/etiquetagem', label: 'Etiquetagem' },
     ],
   },
   {
-    key: 'grp:compras', icon: <ShoppingCartOutlined />, label: 'Compras',
+    key: 'grp:compras', icon: <ShoppingCartOutlined />, label: 'Compras', rota: '/compras',
     children: [
       { key: '/compras', label: 'Painel de Compras' },
       { key: '/compras/entrada-nfe', label: 'Entrada de NF-e' },
@@ -55,7 +57,7 @@ export const MENU_PRINCIPAL: ItemMenu[] = [
     ],
   },
   {
-    key: 'grp:parceiros', icon: <TeamOutlined />, label: 'Parceiros',
+    key: 'grp:parceiros', icon: <TeamOutlined />, label: 'Parceiros', rota: '/parceiros',
     children: [
       { key: '/parceiros', label: 'Painel' },
       { key: '/parceiros/clientes', label: 'Clientes' },
@@ -64,7 +66,7 @@ export const MENU_PRINCIPAL: ItemMenu[] = [
     ],
   },
   {
-    key: 'grp:financeiro', icon: <DollarOutlined />, label: 'Financeiro',
+    key: 'grp:financeiro', icon: <DollarOutlined />, label: 'Financeiro', rota: '/financeiro',
     children: [
       { key: '/financeiro', label: 'Contas a Receber' },
       { key: '/financeiro/faturamento', label: 'Faturamento' },
@@ -75,12 +77,24 @@ export const MENU_PRINCIPAL: ItemMenu[] = [
   { key: '/obras', icon: <ToolOutlined />, label: 'Obras / Projetos' },
 ];
 
+// Telas de configuração (abertas pelo botão Configurações da barra lateral): entram no título e na busca
+export const MENU_CONFIGURACOES: ItemMenu = {
+  key: 'grp:configuracoes', label: 'Configurações',
+  children: [
+    { key: '/configuracoes/perfil', label: 'Meu Perfil' },
+    { key: '/configuracoes/empresa', label: 'Dados da Empresa' },
+    { key: '/configuracoes/preferencias', label: 'Preferências do Sistema' },
+    { key: '/configuracoes/notificacoes', label: 'Central de Notificações' },
+    { key: '/ajuda', label: 'Ajuda e Suporte' },
+  ],
+};
+
 const folhas = (itens: ItemMenu[], pai?: ItemMenu): Array<{ item: ItemMenu; pai?: ItemMenu }> =>
   itens.flatMap(i => (i.children ? folhas(i.children, i) : [{ item: i, pai }]));
 
 /** Item do menu que corresponde à rota atual (a rota mais longa que é prefixo do caminho). */
 export const itemDaRota = (pathname: string) => {
-  const candidatos = folhas(MENU_PRINCIPAL).filter(({ item }) =>
+  const candidatos = folhas([...MENU_PRINCIPAL, MENU_CONFIGURACOES]).filter(({ item }) =>
     item.key === pathname || (item.key !== '/' && pathname.startsWith(`${item.key}/`)));
   return candidatos.sort((a, b) => b.item.key.length - a.item.key.length)[0] || null;
 };

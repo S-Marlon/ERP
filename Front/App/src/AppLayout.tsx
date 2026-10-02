@@ -11,6 +11,7 @@ import Panel from './components/Layout/AppContent/panel';
 // Páginas Principais
 import Dashboard from "./pages/Dashboard/Dashboard";
 import Estoque from "./pages/Estoque/Estoque";
+import { AjudaSuporte, CentralNotificacoes, DadosDaEmpresa, MeuPerfil, PreferenciasSistema } from "./pages/Configuracoes/Configuracoes";
 import { ObrasModule } from './pages/Obras/ObrasModule';
 
 // Contexts
@@ -156,6 +157,11 @@ export default function AppLayout() {
             <Route path="/estoque/operacoes" element={<Movimentacoes />} />
             <Route path="/estoque/etiquetagem" element={<Etiquetagem />} />
             <Route path="/catalogo" element={<CatalogManager />} />
+            <Route path="/configuracoes/perfil" element={<MeuPerfil />} />
+            <Route path="/configuracoes/empresa" element={<DadosDaEmpresa />} />
+            <Route path="/configuracoes/preferencias" element={<PreferenciasSistema />} />
+            <Route path="/configuracoes/notificacoes" element={<CentralNotificacoes />} />
+            <Route path="/ajuda" element={<AjudaSuporte />} />
             <Route path="/catalogo/familias" element={<FamilyManager />} />
             <Route path="/catalogo/familias/test" element={<FamilyManagementPanel />} />
             <Route path="/catalogo/categorias" element={<CategoryManager />} />

@@ -17,6 +17,10 @@ const ROTULO_ORIGEM: Record<string, string> = {
   INVENTARIO: 'Inventário',
   CONSUMO_INTERNO: 'Consumo interno',
   TRANSFERENCIA: 'Transferência',
+  CORRECAO_NFE_ENTRADA: 'Correção de NF (entrada)',
+  CORRECAO_NFE_ESTORNO: 'Correção de NF (estorno)',
+  UNIFICACAO_ENTRADA: 'Unificação (entrada)',
+  UNIFICACAO_SAIDA: 'Unificação (saída)',
 };
 
 const responderErro = (res: Response, error: any, padrao: string) => {
