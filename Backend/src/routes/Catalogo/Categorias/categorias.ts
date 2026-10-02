@@ -400,3 +400,95 @@ export const getAtributosByCategoria = async (req: Request, res: Response) => {
     return res.status(500).json({ error: 'Erro ao buscar atributos', detail: error.message });
   }
 };
+
+/**
+ * GET /catalogo/cadastros/categorias/:idCategoria/uso
+ * O que está nesta categoria: famílias (com quantos itens têm), itens ligados direto (sem família)
+ * e quantos itens chegam pelas famílias. Base da lateral "Uso da categoria".
+ */
+export const getUsoCategoria = async (req: Request, res: Response) => {
+  try {
+    const tenantId = Number(req.query.tenant_id || 1);
+    const idCategoria = Number(req.params.idCategoria);
+    const [familias]: any = await pool.execute(
+      `SELECT f.id, f.nome, f.status,
+              (SELECT COUNT(*) FROM comercial_produtos_dados p WHERE p.familia_id = f.id AND p.tenant_id = f.tenant_id) AS qtd_itens
+       FROM comercial_familias f
+       WHERE f.tenant_id = ? AND f.categoria_id = ?
+       ORDER BY f.nome`,
+      [tenantId, idCategoria]
+    );
+    const [itens]: any = await pool.execute(
+      `SELECT ic.id_item, COALESCE(NULLIF(TRIM(p.sku_customizado), ''), ic.sku) AS sku,
+              COALESCE(NULLIF(TRIM(p.nome_comercial), ''), ic.nome_item) AS nome, ic.status
+       FROM comercial_produtos_dados p
+       INNER JOIN itens_core ic ON ic.id_item = p.id_item AND ic.tenant_id = p.tenant_id
+       WHERE p.tenant_id = ? AND p.categoria_id = ? AND p.familia_id IS NULL
+       ORDER BY nome
+       LIMIT 200`,
+      [tenantId, idCategoria]
+    );
+    return res.json({
+      familias: familias.map((f: any) => ({ id: Number(f.id), nome: f.nome, status: f.status, qtdItens: Number(f.qtd_itens) || 0 })),
+      itensDiretos: itens.map((i: any) => ({ idItem: Number(i.id_item), sku: i.sku, nome: i.nome, status: i.status })),
+      itensPelasFamilias: familias.reduce((a: number, f: any) => a + (Number(f.qtd_itens) || 0), 0),
+    });
+  } catch (error: any) {
+    console.error('Erro ao carregar o uso da categoria:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * POST /catalogo/cadastros/categorias/:idCategoria/itens  { ids: number[], acao: 'adicionar' | 'remover' }
+ * Liga (ou tira) itens direto na categoria. Item que está numa família é ignorado:
+ * a categoria dele vem da família (regra do PIM) — para mudar, mude a família.
+ */
+export const vincularItensCategoria = async (req: Request, res: Response) => {
+  const tenantId = Number(req.query.tenant_id || req.body?.tenant_id || 1);
+  const idCategoria = Number(req.params.idCategoria);
+  const acao = req.body?.acao === 'remover' ? 'remover' : 'adicionar';
+  const ids: number[] = [...new Set<number>((Array.isArray(req.body?.ids) ? req.body.ids : []).map(Number).filter((n: number) => n > 0))];
+  if (ids.length === 0) return res.status(400).json({ error: 'Nenhum item informado.' });
+
+  const connection: any = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [[cat]]: any = await connection.execute(`SELECT id FROM comercial_categorias WHERE id = ? AND tenant_id = ?`, [idCategoria, tenantId]);
+    if (!cat) { await connection.rollback(); return res.status(404).json({ error: 'Categoria não encontrada.' }); }
+
+    const [linhas]: any = await connection.execute(
+      `SELECT ic.id_item, COALESCE(NULLIF(TRIM(p.sku_customizado), ''), ic.sku) AS sku, p.familia_id, f.nome AS familia
+       FROM itens_core ic
+       LEFT JOIN comercial_produtos_dados p ON p.id_item = ic.id_item AND p.tenant_id = ic.tenant_id
+       LEFT JOIN comercial_familias f ON f.id = p.familia_id
+       WHERE ic.tenant_id = ? AND ic.id_item IN (${ids.map(() => '?').join(',')})`,
+      [tenantId, ...ids]
+    );
+    const ignorados = linhas.filter((l: any) => l.familia_id).map((l: any) => ({ idItem: Number(l.id_item), sku: l.sku, familia: l.familia }));
+    const livres = linhas.filter((l: any) => !l.familia_id).map((l: any) => Number(l.id_item));
+
+    for (const idItem of livres) {
+      if (acao === 'adicionar') {
+        await connection.execute(
+          `INSERT INTO comercial_produtos_dados (tenant_id, id_item, categoria_id) VALUES (?, ?, ?)
+           ON DUPLICATE KEY UPDATE categoria_id = VALUES(categoria_id)`,
+          [tenantId, idItem, idCategoria]
+        );
+      } else {
+        await connection.execute(
+          `UPDATE comercial_produtos_dados SET categoria_id = NULL WHERE tenant_id = ? AND id_item = ? AND categoria_id = ?`,
+          [tenantId, idItem, idCategoria]
+        );
+      }
+    }
+    await connection.commit();
+    return res.json({ success: true, alterados: livres.length, ignorados });
+  } catch (error: any) {
+    await connection.rollback();
+    console.error('Erro ao vincular itens à categoria:', error);
+    return res.status(500).json({ error: error.message });
+  } finally {
+    connection.release();
+  }
+};

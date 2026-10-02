@@ -1,4 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
+import { useSelecaoPlanilha } from './selecaoPlanilha';
+import { AvisoUnidadesNaoReconhecidas, ModalDefinirUnidade, normalizarSiglaNota, UnidadeNotaTag, useUnidadesEntrada } from './UnidadesEntrada';
 import {
 Table,
 Button,
@@ -40,7 +42,7 @@ FilterType,
 
 import ProductMappingModal, { MappingPayload, getMappedId, SKU_A_GERAR } from './ProductMappingModal';
 import { DestinosEditor, DestinoLinha } from './DestinosEditor';
-import { ModalCadastroRapido, ModalClassificarLote } from './ModaisLote';
+import { ModalCadastroRapido, ModalClassificarLote, type ValoresPorItem } from './ModaisLote';
 import { carregarFamiliasECategorias, type ClassificacaoItem } from './ClassificacaoPim';
 import { ClassificacaoTag, type ClassificacaoCatalogo, type NomesCatalogo } from './ClassificacaoTag';
 import { linhaItemNovo, linhaSemVinculo } from '../edicaoLote';
@@ -62,10 +64,12 @@ onChangeGtin?: (tempId: string | number, gtin: string) => void;
 // Destino no estoque (depósitos); null = padrão pelo tipo do item
 onChangeDestinos?: (tempId: string | number, destinos: DestinoLinha[] | null) => void;
 // Lote: cadastro rápido de itens novos e classificação no PIM
-onCadastroRapidoLote?: (linhas: any[], opcoes: { markup: number; classificacao: ClassificacaoItem }) => void;
-onClassificarLote?: (linhas: any[], classificacao: ClassificacaoItem, substituir?: boolean) => void;
+onCadastroRapidoLote?: (linhas: any[], opcoes: { markup: number; classificacao: ClassificacaoItem; porItem: ValoresPorItem | null }) => void;
+onClassificarLote?: (linhas: any[], classificacao: ClassificacaoItem, substituir?: boolean, porItem?: ValoresPorItem | null) => void;
 // NF já importada/descartada: tela apenas para consulta
 readOnly?: boolean;
+// CNPJ do emitente: as regras de unidade podem ser só deste fornecedor
+cnpjFornecedor?: string;
 onSendTotal?: (total: number) => void;
 }
 
@@ -85,6 +89,7 @@ onCadastroRapidoLote,
 onClassificarLote,
 readOnly = false,
 onSendTotal,
+cnpjFornecedor = '',
 }) => {
 const [localItems, setLocalItems] = useState<Item[]>(initialItems || []);
 const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
@@ -94,6 +99,8 @@ const [loteAberto, setLoteAberto] = useState<'cadastro' | 'classificar' | null>(
 const itensSelecionados = useMemo(() => localItems.filter(i => selectedRowKeys.includes(i.tempId as React.Key)), [localItems, selectedRowKeys]);
 // Classificação de uma linha só (clique na tag de família/categoria)
 const [linhaClassificar, setLinhaClassificar] = useState<any | null>(null);
+// Classificar → cadastro rápido: leva a família/categoria escolhida
+const [classificacaoParaCadastro, setClassificacaoParaCadastro] = useState<ClassificacaoItem | null>(null);
 
 // Nomes de famílias/categorias (itens novos) e classificação atual dos itens já cadastrados (vínculos)
 const [nomesCatalogo, setNomesCatalogo] = useState<NomesCatalogo>({ familias: new Map(), categorias: new Map() });
@@ -270,6 +277,15 @@ return item;
 }));
 };
 
+// Unidades da nota: tradução pelo dicionário (M → MT) e pergunta das siglas desconhecidas
+const siglasDaNota = useMemo(() => localItems.map((i: any) => normalizarSiglaNota(i.unidade || i.prod?.uCom)), [localItems]);
+const unidadesNota = useUnidadesEntrada(cnpjFornecedor, siglasDaNota);
+const [siglaDefinindo, setSiglaDefinindo] = useState<string | null>(null);
+
+// Seleção de linhas como planilha (clique, Ctrl, Shift, arrastar, Ctrl+A, Esc)
+const chavesVisiveis = useMemo(() => filteredItems.map(i => i.tempId as React.Key), [filteredItems]);
+const selecaoPlanilha = useSelecaoPlanilha(chavesVisiveis, selectedRowKeys, setSelectedRowKeys);
+
 // 📋 DEFINIÇÃO DE COLUNAS
 const columns: ColumnsType<Item> = [
 {
@@ -305,13 +321,7 @@ return (
 <Space size={8} align="center">
 <Checkbox
 checked={isSelected}
-onChange={(e) => {
-if (e.target.checked) {
-setSelectedRowKeys([...selectedRowKeys, record.tempId]);
-} else {
-setSelectedRowKeys(selectedRowKeys.filter(key => key !== record.tempId));
-}
-}}
+onChange={(e) => selecaoPlanilha.onCaixa(record.tempId, e)}
 />
 <span style={{ fontWeight: 'bold' }}>
 {record.nItem || record.tempId}
@@ -481,7 +491,7 @@ style={{ width: 55 }}
 </div>
 </Space>
 
-<Tag>{ UOM || '-'}</Tag>
+<UnidadeNotaTag sigla={UOM} resolucao={unidadesNota.resolucoes[normalizarSiglaNota(UOM)]} readOnly={readOnly} onDefinir={setSiglaDefinindo} />
 </div>
 );
 }
@@ -701,11 +711,15 @@ return (
 </Col>
 </Row>
 
+<AvisoUnidadesNaoReconhecidas siglas={unidadesNota.naoReconhecidas} readOnly={readOnly} onDefinir={setSiglaDefinindo} />
+
 {/* FILTROS E AÇÕES COLETIVAS */}
 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
 <Space wrap style={{ background: '#fafafa', padding: 6, borderRadius: 6, border: '1px solid #f0f0f0', justifyContent: 'space-between' }}>
 <Space wrap>
-<Text strong>{`${selectedRowKeys.length} selecionado(s)`}</Text>
+<Tooltip title={<span>Clique na linha: seleciona só ela<br />Ctrl + clique: inclui/tira a linha<br />Shift + clique: seleciona o intervalo<br />Clicar e arrastar: várias linhas seguidas<br />Ctrl+A: todas · Esc: limpa</span>}>
+<Text strong style={{ cursor: 'help' }}>{`${selectedRowKeys.length} selecionado(s)`}</Text>
+</Tooltip>
 <Button size="small" type="primary" icon={<CheckOutlined />} disabled={readOnly || selectedRowKeys.length === 0} onClick={() => { onConfirmItems?.(selectedRowKeys as (string | number)[]); setSelectedRowKeys([]); }}>Conferir</Button>
 <Button size="small" icon={<UndoOutlined />} disabled={readOnly || selectedRowKeys.length === 0} onClick={() => { onUnconfirmItems?.(selectedRowKeys as (string | number)[]); setSelectedRowKeys([]); }}>Desfazer</Button>
 <Button
@@ -781,12 +795,16 @@ onClick: ({ key }) => { onChangeTipoRecurso?.(selectedRowKeys as (string | numbe
 </div>
 
 {/* DATA TABLE */}
+<style>{`.conferencia-linha-selecionada > td { background: #e6f4ff !important; } .conferencia-tabela .ant-table-tbody > tr { cursor: default; }`}</style>
+<div className="conferencia-tabela" {...selecaoPlanilha.propsContainer}>
 <Table
 columns={columns}
 dataSource={filteredItems}
 rowKey="tempId"
 size="small"
 bordered
+onRow={(record) => selecaoPlanilha.propsLinha(record.tempId)}
+rowClassName={(record) => (selectedRowKeys.includes(record.tempId) ? 'conferencia-linha-selecionada' : '')}
 pagination={{ pageSize: 50, showSizeChanger: true }}
 summary={() => {
 if (filteredItems.length === 0) return null;
@@ -905,6 +923,7 @@ Dif: {totals.diff > 0 ? `+${totals.diff}` : totals.diff}
 );
 }}
 />
+</div>
 
 {/* ================= MODAL: DETALHES DE COMPOSIÇÃO DE CUSTO E TRIBUTOS ================= */}
 <Modal
@@ -1148,14 +1167,16 @@ valueStyle={{ fontSize: 16, fontWeight: 'bold', color: '#52c41a' }}
 <ModalCadastroRapido
 open={loteAberto === 'cadastro'}
 itens={itensSelecionados}
-onClose={() => setLoteAberto(null)}
-onConfirmar={(linhas, opcoes) => { onCadastroRapidoLote?.(linhas, opcoes); setLoteAberto(null); setSelectedRowKeys([]); }}
+classificacaoInicial={classificacaoParaCadastro}
+onClose={() => { setLoteAberto(null); setClassificacaoParaCadastro(null); }}
+onConfirmar={(linhas, opcoes) => { onCadastroRapidoLote?.(linhas, opcoes); setLoteAberto(null); setClassificacaoParaCadastro(null); setSelectedRowKeys([]); }}
 />
 <ModalClassificarLote
 open={loteAberto === 'classificar'}
 itens={itensSelecionados}
 onClose={() => setLoteAberto(null)}
-onConfirmar={(linhas, classificacao) => { onClassificarLote?.(linhas, classificacao); setLoteAberto(null); setSelectedRowKeys([]); }}
+onConfirmar={(linhas, classificacao, porItem) => { onClassificarLote?.(linhas, classificacao, false, porItem); setLoteAberto(null); setSelectedRowKeys([]); }}
+onCadastroRapido={c => { setClassificacaoParaCadastro(c); setLoteAberto('cadastro'); }}
 />
 <ModalClassificarLote
 open={Boolean(linhaClassificar)}
@@ -1167,6 +1188,16 @@ atributos: linhaClassificar.mapeamento.draftIdentity.atributos ?? null,
 } : null}
 onClose={() => setLinhaClassificar(null)}
 onConfirmar={(linhas, classificacao) => { onClassificarLote?.(linhas, classificacao, true); setLinhaClassificar(null); }}
+/>
+
+<ModalDefinirUnidade
+sigla={siglaDefinindo}
+cnpj={cnpjFornecedor}
+fornecedorCadastrado={unidadesNota.idFornecedor !== null}
+unidades={unidadesNota.unidades}
+atual={siglaDefinindo ? unidadesNota.resolucoes[siglaDefinindo] : undefined}
+onFechar={() => setSiglaDefinindo(null)}
+onSalvo={() => { setSiglaDefinindo(null); unidadesNota.recarregar(); }}
 />
 
 {/* ================= MODAL DE MAPEAMENTO EM FILA ================= */}

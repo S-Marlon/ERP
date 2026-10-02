@@ -36,6 +36,7 @@ CheckCircleOutlined,
 ExclamationCircleOutlined,
 } from "@ant-design/icons";
 import Swal from "sweetalert2";
+import { useSearchParams } from "react-router-dom";
 
 import { updateFamilia, deleteFamilia, getMarcasCatalogo } from './FamilyManager.api';
 import { STATUS_FAMILIA_CONFIG } from './CatalogManager.types'; // Ajuste o caminho do import conforme seu projeto
@@ -157,6 +158,16 @@ const setMarcaComportamento = (papel: string) =>
 setFamiliaSelecionada((prev: any) => ({ ...prev, marcaComportamento: papel }));
 const [isGuiaOpen, setIsGuiaOpen] = useState(false);
 
+// Link vindo da tela de categorias (?familia=ID): abre a família direto
+const [searchParams] = useSearchParams();
+const familiaDoLink = searchParams.get('familia');
+useEffect(() => {
+if (familiaDoLink && catalogState.familias.some((f: any) => String(f.id) === familiaDoLink)) {
+catalogState.handleSelecionarGrupo(familiaDoLink);
+}
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, [familiaDoLink, catalogState.familias.length]);
+
 // Sincroniza os dados que vêm de fora para o estado local independente
 useEffect(() => {
 if (familiaSelecionadaHook) {
@@ -215,7 +226,7 @@ const alteracoes: { campo: string; antes: any; depois: any; chave: string }[] = 
 const labelsCampos: Record<string, string> = {
 nome: "Nome da Família",
 codigo: "Código da Família",
-categoriaId: "Categoria",
+categoriaPai: "Categoria",
 templateNomeComercial: "Template Comercial (Nome)",
 templateSku: "Template de SKU",
 siglaSku: "Sigla do SKU",
@@ -243,12 +254,14 @@ chavesParaComparar.forEach((chave) => {
 const valorOriginal = familiaOriginal[chave];
 const valorAtual = chave === 'marcaComportamento' ? marcaComportamento : familiaSelecionadaLocal[chave];
 
-if (valorOriginal !== valorAtual) {
+if (String(valorOriginal ?? '') !== String(valorAtual ?? '')) {
+// Categoria: mostra o nome, não o id
+const ehCategoria = chave === 'categoriaPai';
 alteracoes.push({
 chave,
 campo: labelsCampos[chave] || chave,
-antes: valorOriginal ?? "(vazio)",
-depois: valorAtual ?? "(vazio)",
+antes: (ehCategoria ? familiaOriginal.categoriaPaiNome : valorOriginal) || "(vazio)",
+depois: (ehCategoria ? familiaSelecionadaLocal.categoriaPaiNome : valorAtual) || "(vazio)",
 });
 }
 });
@@ -934,6 +947,8 @@ Guia de Regras
 grupoSelecionado={familiaSelecionadaLocal}
 grupoImage={grupoImage}
 brandColor={brandColor}
+arvoreCategorias={dadosArvoreAntd}
+onMudarCategoria={catalogState.handleMudarCategoriaComConfirmacao}
 onSalvarIdentidade={(valores) => {
 // Usa a função dedicada ou garante que os atributos atuais não sejam perdidos
 if (typeof handleAtualizarIdentidadeFamilia === 'function') {
@@ -1128,6 +1143,7 @@ handleTentarNormalizarIndividual={handleTentarNormalizarIndividual}
 handleProcessarFormalizacaoLote={handleProcessarFormalizacaoLote}
 handlePadronizarNomesFamilia={handlePadronizarNomesFamilia}
 handlePadronizarSkusFamilia={handlePadronizarSkusFamilia}
+onItensAlterados={catalogState.recarregarItensDaFamilia}
 />
 
 </Col>

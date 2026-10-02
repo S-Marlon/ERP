@@ -860,6 +860,8 @@ loading,
 loadingItens,
 error,
 carregarDadosIniciais,
+// Recarrega só os itens da família aberta (não mexe nas edições não salvas da família)
+recarregarItensDaFamilia: () => { if (familiaSelecionada?.id) carregarItensDaFamilia(familiaSelecionada.id); },
 setIsSimuladorAberto,
 setIsModalAberto,
 setAbaAtiva,

@@ -8,6 +8,7 @@ import {
   InfoCircleOutlined, FileTextOutlined, SafetyCertificateOutlined, StopOutlined, UndoOutlined, BranchesOutlined
 } from '@ant-design/icons';
 import { Categoria, AtributoHerdavel } from './CategoryManager.types';
+import UsoCategoriaPainel from './UsoCategoriaPainel';
 import {
   getCategories, createCategory, updateCategory, deleteCategory, getAtributosGlobais, getGruposAtributos,
   getUnidadesMedida, createAtributoRapido
@@ -314,6 +315,8 @@ const useCategoryState = () => {
     handleAtualizarCategoria, handleAlterarAtributo, handleRemoverVinculoLocal, handleNaoUsarNesteRamo,
     handleAdicionarAtributos, handleCriarEAssociarAtributoRapido, handleSalvarNoServidor, handleDescartarAlteracoes,
     handleDeletarNoServidor, handleAdicionarCategoriaNova,
+    // Recarrega as contagens da árvore sem perder o que está em edição
+    recarregarContagens: () => carregarCategoriasDoServidor(alteradas),
   };
 };
 
@@ -487,14 +490,13 @@ export const CategoryManager: React.FC = () => {
   };
 
   const cadeia = cat ? cadeiaCategorias(state.categorias, cat.id) : [];
-  const subcategorias = cat ? state.categorias.filter(c => c.parentId === cat.id) : [];
   const alterada = cat ? state.alteradas.has(cat.id) : false;
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f8fafc' }}>
 
       {/* ÁRVORE */}
-      <Sider width={280} theme="light" style={{ padding: '16px 12px', borderRight: '1px solid #e2e8f0', background: '#ffffff' }}>
+      <Sider width={350} theme="light" style={{ padding: '16px 12px', borderRight: '1px solid #e2e8f0', background: '#ffffff' }}>
         <Space direction="vertical" style={{ width: '100%' }} size={12}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -726,33 +728,15 @@ export const CategoryManager: React.FC = () => {
 
       {/* LATERAL: USO DA CATEGORIA */}
       {cat && (
-        <Sider width={260} theme="light" style={{ padding: '16px 12px', borderLeft: '1px solid #e2e8f0', background: '#ffffff' }}>
+        <Sider width={400} theme="light" style={{ padding: '16px 12px', borderLeft: '1px solid #e2e8f0', background: '#ffffff' }}>
           <Space direction="vertical" style={{ width: '100%' }} size={12}>
-            <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Uso da categoria
-            </span>
-            <Card size="small" style={{ background: '#f8fafc' }}>
-              <Space direction="vertical" style={{ width: '100%' }} size={4}>
-                {[
-                  ['Subcategorias', subcategorias.length],
-                  ['Famílias', cat.qtdFamilias || 0],
-                  ['Produtos direto nela', cat.qtdProdutos || 0],
-                ].map(([rot, qtd]) => (
-                  <div key={rot as string} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                    <span style={{ color: '#64748b' }}>{rot}</span>
-                    <b>{qtd}</b>
-                  </div>
-                ))}
-              </Space>
-            </Card>
-            {subcategorias.length > 0 && (
-              <div>
-                {rotulo('Subcategorias')}
-                {subcategorias.map(s => (
-                  <Tag key={s.id} style={{ cursor: 'pointer', marginBottom: 4 }} onClick={() => state.setCategoriaSelecionadaId(s.id)}>{s.nome}</Tag>
-                ))}
-              </div>
-            )}
+            <UsoCategoriaPainel
+              categoria={cat}
+              categorias={state.categorias}
+              onSelecionar={id => state.setCategoriaSelecionadaId(id)}
+              onNovaSubcategoria={() => state.handleAdicionarCategoriaNova(cat.id)}
+              onAlterado={state.recarregarContagens}
+            />
             <Card size="small" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                 <SafetyCertificateOutlined style={{ fontSize: '14px', color: '#166534', marginTop: 2 }} />

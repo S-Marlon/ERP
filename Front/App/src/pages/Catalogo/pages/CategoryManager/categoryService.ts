@@ -222,3 +222,32 @@ export const getUnidadesMedida = async (tenantId = 1): Promise<UnidadeMedida[]> 
   if (!res.ok) throw new Error('Erro ao buscar unidades de medida');
   return res.json();
 };
+// ---------------------------------------------------------------- Uso da categoria (famílias e itens)
+export interface UsoCategoria {
+  familias: Array<{ id: number; nome: string; status: string; qtdItens: number }>;
+  itensDiretos: Array<{ idItem: number; sku: string; nome: string; status: string }>;
+  itensPelasFamilias: number;
+}
+
+const lerResposta = async (res: Response, padrao: string) => {
+  const d = await res.json().catch(() => ({}));
+  if (res.status === 404 && !d.error) throw new Error('O servidor não conhece esta função ainda: reinicie o backend (npm start).');
+  if (!res.ok) throw new Error(d.error || padrao);
+  return d;
+};
+
+export const getUsoCategoria = async (idCategoria: string, tenantId = 1): Promise<UsoCategoria> =>
+  lerResposta(await fetch(`${API_BASE_URL}/cadastros/categorias/${idCategoria}/uso?tenant_id=${tenantId}`), 'Erro ao carregar o uso da categoria.');
+
+// Família inteira para esta categoria (null = tirar da categoria). Os itens dela passam a herdar daqui.
+export const definirCategoriaDaFamilia = async (idFamilia: string | number, idCategoria: string | null, tenantId = 1) =>
+  lerResposta(await fetch(`${API_BASE_URL}/cadastros/familias/${idFamilia}?tenant_id=${tenantId}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ categoriaPai: idCategoria ?? '' }),
+  }), 'Erro ao mudar a categoria da família.');
+
+// Itens direto na categoria (itens de família são ignorados: a categoria vem da família)
+export const vincularItensCategoria = async (idCategoria: string, ids: number[], acao: 'adicionar' | 'remover', tenantId = 1):
+  Promise<{ alterados: number; ignorados: Array<{ idItem: number; sku: string; familia: string }> }> =>
+  lerResposta(await fetch(`${API_BASE_URL}/cadastros/categorias/${idCategoria}/itens?tenant_id=${tenantId}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids, acao }),
+  }), 'Erro ao vincular itens à categoria.');

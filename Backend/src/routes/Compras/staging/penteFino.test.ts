@@ -1,4 +1,5 @@
 import { avaliarPenteFino, calcularCustoMedio, lerConversaoCompra, StagingItemRow } from './penteFino';
+import { canonizar, criarResolvedor } from './unidadesEntrada';
 
 const assert = (condition: boolean, message: string): void => {
   if (!condition) throw new Error(message);
@@ -91,4 +92,19 @@ export const runPenteFinoTests = (): void => {
 
   assert(calcularCustoMedio(10, 5, 10, 7) === 6, 'Custo médio de 10@5 + 10@7 deveria ser 6.');
   assert(calcularCustoMedio(0, 0, 4, 9) === 9, 'Sem saldo anterior, o custo médio é o custo da entrada.');
+
+  // Unidades de entrada: sigla da nota precisa ser do cadastro ou ter equivalência
+  const unidades = criarResolvedor(['UN', 'MT'], [{ idFornecedor: null, siglaEntrada: 'M', siglaInterna: 'MT' }], null);
+  const ctxUn = { ...ctx, unidades };
+  const rM = avaliarPenteFino(lote, [item({ unidade_original: 'M' })], ctxUn);
+  assert(rM.aprovavel && rM.avisos.some(a => a.codigo === 'UNIDADE_TRADUZIDA'), 'M com regra geral deveria passar com aviso de tradução.');
+  const rKg = avaliarPenteFino(lote, [item({ unidade_original: 'KG' })], ctxUn);
+  assert(!rKg.aprovavel && rKg.bloqueios.some(b => b.codigo === 'UNIDADE_NAO_RECONHECIDA' && b.mensagem.includes('KG')), 'KG sem regra deveria bloquear.');
+  assert(avaliarPenteFino(lote, [item({ unidade_original: 'UN' })], ctxUn).avisos.every(a => a.codigo !== 'UNIDADE_TRADUZIDA'), 'UN do cadastro não é tradução.');
+  const convM = lerConversaoCompra(item({ unidade_original: 'M', mapeamento_json: JSON.stringify({ conversaoCompra: { unidade_compra: 'M', unidade_base: 'M', fator: 1 } }) }), canonizar(unidades));
+  assert(convM.unidadeCompra === 'MT' && convM.unidadeBase === 'MT' && convM.fator === 1, 'Conversão deveria usar MT nos dois lados.');
+  const novoCfg = item({ produto_id_sistema: null, sku_sugerido: 'NOVO', nome_item_sugerido: 'Mangueira', unidade_original: 'M',
+    mapeamento_json: JSON.stringify({ configVendas: { unidades: [{ sigla: 'M', fator: 1, is_base: true }] } }) });
+  assert(!avaliarPenteFino(lote, [novoCfg], ctxUn).bloqueios.some(b => b.codigo === 'CONFIG_VENDAS_INCOERENTE'), 'Config de vendas em M deveria bater com a base MT traduzida.');
+  assert(avaliarPenteFino(lote, [item({ unidade_original: 'KG' })], ctx).aprovavel, 'Sem dicionário no contexto não bloqueia (compatível).');
 };

@@ -11,6 +11,7 @@ import { getCabecalhoLote, analisarLote, aprovarLote, descartarLote, getEstadoLo
 import { detalheNotaEntrada, listarNotasEntrada } from './controllers/notasEntrada.controller';
 import { corrigirLinhaNota, listarCorrecoesNota } from './controllers/correcaoEntrada.controller';
 import { classificacaoItens, sugerirVinculos } from './controllers/sugestoesVinculo.controller';
+import { excluirEquivalencia, listarEquivalencias, resolverUnidadesEntrada, salvarEquivalencia } from './controllers/unidadesEntrada.controller';
 
 const router = Router();
 
@@ -59,5 +60,10 @@ router.get('/notas/:loteId/correcoes', listarCorrecoesNota);
 router.post('/sugestoes-vinculo', sugerirVinculos);
 // Família/categoria dos itens já cadastrados vinculados na nota
 router.post('/classificacao-itens', classificacaoItens);
+// Dicionário de unidades de entrada (sigla da NF -> unidade interna, geral ou por fornecedor)
+router.get('/unidades-entrada', resolverUnidadesEntrada);
+router.get('/unidades-equivalencias', listarEquivalencias);
+router.post('/unidades-equivalencias', salvarEquivalencia);
+router.delete('/unidades-equivalencias/:id', excluirEquivalencia);
 
 export default router;

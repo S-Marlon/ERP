@@ -2,6 +2,7 @@
 // Função pura (sem banco) para ser usada tanto na análise da tela quanto na aprovação.
 import { gtinEfetivo, isSemGtin, validarGtin } from './gtin';
 import { destinoIncompativel, lerDestinos, validarDestinos } from './destinos';
+import { canonizar, normalizarSigla, ResolvedorUnidade } from './unidadesEntrada';
 
 export interface StagingItemRow {
   id: number;
@@ -36,6 +37,7 @@ export interface PenteFinoContexto {
   skusExistentes: Set<string>;       // SKUs já usados (raiz ou customizado) — comparados com o SKU customizado planejado
   fornecedorCadastrado: boolean;
   gtinsEmUso?: Map<string, number>; // GTIN -> id_item que já usa esse código
+  unidades?: ResolvedorUnidade;     // sigla da NF -> unidade interna (dicionário de unidades de entrada)
 }
 
 export interface Verificacao {
@@ -122,14 +124,19 @@ export interface ConversaoCompra {
   fator: number;          // unidades base em 1 unidade da NF
 }
 
-// Conversão escolhida no mapeamento; sem ela, 1 unidade da NF = 1 unidade base
-export const lerConversaoCompra = (item: StagingItemRow): ConversaoCompra => {
+// Sigla da unidade como veio na nota (ou a escolhida no mapeamento), sem tradução
+export const siglaDaNota = (item: StagingItemRow): string =>
+  normalizarSigla(lerMapeamento(item).conversaoCompra?.unidade_compra || item.unidade_original || 'UN');
+
+// Conversão escolhida no mapeamento; sem ela, 1 unidade da NF = 1 unidade base.
+// `canon` traduz as siglas para a unidade interna (dicionário de unidades de entrada: M -> MT).
+export const lerConversaoCompra = (item: StagingItemRow, canon: (s: string) => string = normalizarSigla): ConversaoCompra => {
   const conv = lerMapeamento(item).conversaoCompra || {};
-  const unidadeCompra = String(conv.unidade_compra || item.unidade_original || 'UN').trim().toUpperCase();
+  const unidadeCompra = canon(siglaDaNota(item));
   const fatorInformado = conv.fator === undefined || conv.fator === null ? 1 : Number(conv.fator);
   return {
     unidadeCompra,
-    unidadeBase: String(conv.unidade_base || unidadeCompra).trim().toUpperCase(),
+    unidadeBase: conv.unidade_base ? canon(normalizarSigla(conv.unidade_base)) : unidadeCompra,
     fator: Number.isFinite(fatorInformado) ? fatorInformado : NaN,
   };
 };
@@ -141,6 +148,8 @@ export const avaliarPenteFino = (
 ): ResultadoPenteFino => {
   const bloqueios: Verificacao[] = [];
   const avisos: Verificacao[] = [];
+  const canon = canonizar(ctx.unidades);
+  const conversao = (i: StagingItemRow) => lerConversaoCompra(i, canon);
 
   const coletar = (lista: Verificacao[], codigo: string, mensagem: string, filtro: (i: StagingItemRow) => boolean) => {
     const afetados = itens.filter(filtro).map(seq);
@@ -189,18 +198,18 @@ export const avaliarPenteFino = (
     i => num(i.quantidade_recebida) > 0 && num(i.custo_unitario_final || i.preco_custo_unitario) <= 0);
 
   coletar(bloqueios, 'FATOR_INVALIDO', 'Itens com fator de conversão de compra inválido (precisa ser maior que zero).',
-    i => !(lerConversaoCompra(i).fator > 0));
+    i => !(conversao(i).fator > 0));
 
   coletar(bloqueios, 'CONFIG_VENDAS_INCOERENTE', 'Configuração de vendas do item novo não bate com a conversão de compra (unidade base ou fator).',
     i => {
       const config = lerMapeamento(i).configVendas;
       if (!isItemNovo(i) || !config || !Array.isArray(config.unidades) || config.unidades.length === 0) return false;
-      const conv = lerConversaoCompra(i);
+      const conv = conversao(i);
       const unidades = config.unidades as Array<{ sigla: string; fator: number; is_base: boolean }>;
       const base = unidades.find(u => u.is_base);
-      if (!base || String(base.sigla).toUpperCase() !== conv.unidadeBase) return true;
+      if (!base || canon(base.sigla) !== conv.unidadeBase) return true;
       if (conv.unidadeCompra === conv.unidadeBase) return false;
-      const compra = unidades.find(u => String(u.sigla).toUpperCase() === conv.unidadeCompra);
+      const compra = unidades.find(u => canon(u.sigla) === conv.unidadeCompra);
       return !compra || Math.abs(Number(compra.fator) - conv.fator) > 0.000001;
     });
 
@@ -220,7 +229,7 @@ export const avaliarPenteFino = (
     i => isSemGtin(lerMapeamento(i).gtin_manual) && isSemGtin(i.ean));
 
   coletar(avisos, 'CONVERSAO_UNIDADE', 'Itens com conversão de unidade: a quantidade da NF será multiplicada pelo fator no estoque.',
-    i => lerConversaoCompra(i).fator > 0 && lerConversaoCompra(i).fator !== 1);
+    i => conversao(i).fator > 0 && conversao(i).fator !== 1);
   coletar(avisos, 'DIVERGENCIA_QUANTIDADE', 'Quantidade recebida diferente da nota (entra a quantidade recebida).',
     i => Math.abs(num(i.quantidade_recebida) - num(i.quantidade)) > 0.0001);
   coletar(avisos, 'QUANTIDADE_ZERO', 'Itens com quantidade recebida zero não geram movimento de estoque.',
@@ -235,6 +244,24 @@ export const avaliarPenteFino = (
       codigo: 'TOTAL_DIVERGENTE',
       mensagem: `Soma dos custos dos itens (R$ ${valorItens.toFixed(2)}) difere do total da nota + frete adicional (R$ ${valorNota.toFixed(2)}).`,
     });
+  }
+
+  // Unidade da nota: precisa ser do cadastro ou ter equivalência no dicionário (senão cria unidades duplicadas: M, MT, MTS)
+  if (ctx.unidades) {
+    const resolver = ctx.unidades;
+    const naoReconhecidas = [...new Set(itens.map(siglaDaNota).filter(sg => resolver(sg).origem === null))];
+    if (naoReconhecidas.length > 0) {
+      coletar(bloqueios, 'UNIDADE_NAO_RECONHECIDA',
+        `Unidade da nota não reconhecida (${naoReconhecidas.join(', ')}): diga na conferência a qual unidade do cadastro ela equivale.`,
+        i => resolver(siglaDaNota(i)).origem === null);
+    }
+    const traduzidas = [...new Set(itens.map(siglaDaNota)
+      .filter(sg => { const r = resolver(sg); return r.origem !== null && r.siglaInterna !== sg; })
+      .map(sg => `${sg} → ${resolver(sg).siglaInterna}`))];
+    if (traduzidas.length > 0) {
+      coletar(avisos, 'UNIDADE_TRADUZIDA', `Unidades da nota traduzidas pelo dicionário (${traduzidas.join(', ')}).`,
+        i => { const r = resolver(siglaDaNota(i)); return r.origem !== null && r.siglaInterna !== siglaDaNota(i); });
+    }
   }
 
   // Sem o fornecedor cadastrado a entrada fica sem vínculo item x fornecedor (as próximas notas não reconhecem

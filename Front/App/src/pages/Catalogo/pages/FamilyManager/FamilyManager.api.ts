@@ -277,3 +277,15 @@ export const formalizarItensDaFamilia = async (
   });
   return handleResponse<any>(response, 'Erro ao formalizar os itens da família.');
 };
+// Incluir / tirar itens da família. Itens de outra família só mudam com mover = true.
+export const vincularItensFamilia = async (
+  idFamilia: string | number, ids: number[], acao: 'adicionar' | 'remover', mover = false, tenantId = 1
+): Promise<{ alterados: number; emOutraFamilia: Array<{ idItem: number; sku: string; familia: string }> }> => {
+  const response = await fetch(`${API_BASE_URL}/cadastros/familias/${idFamilia}/itens?tenant_id=${tenantId}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids, acao, mover }),
+  });
+  const dados = await response.json().catch(() => ({}));
+  if (response.status === 404 && !dados.error) throw new Error('Rota não encontrada: reinicie o backend.');
+  if (!response.ok) throw new Error(dados.error || 'Erro ao alterar os itens da família.');
+  return dados;
+};

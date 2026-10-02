@@ -23,7 +23,9 @@ import {
   createCategoria,
   updateCategoria,
   deleteCategoria,
-  getAtributosByCategoria
+  getAtributosByCategoria,
+  getUsoCategoria,
+  vincularItensCategoria,
 } from './Categorias/categorias';
 
 // 📦 Controller de Famílias de Itens
@@ -34,6 +36,7 @@ import {
   getProdutosPorFamilia, 
   getDiagnosticoFormalizacao,
   formalizarItensFamilia,
+  vincularItensFamilia,
   updateFamilia 
 } from './Familias/familias.controller';
 
@@ -117,6 +120,9 @@ router.get('/cadastros/unidades-medida', getUnidadesMedida);
 // 📂 ROTAS DE CATEGORIAS
 // =========================================================================
 router.get('/cadastros/categorias', getCategoriasSelect);
+// Famílias e itens de uma categoria (lateral "Uso da categoria")
+router.get('/cadastros/categorias/:idCategoria/uso', getUsoCategoria);
+router.post('/cadastros/categorias/:idCategoria/itens', vincularItensCategoria);
 router.post('/cadastros/categorias', createCategoria);
 router.put('/cadastros/categorias/:idCategoria', updateCategoria);
 router.delete('/cadastros/categorias/:idCategoria', deleteCategoria);
@@ -133,6 +139,8 @@ router.delete('/cadastros/familias/:idFamilia', deleteFamilia);
 router.get('/cadastros/familias/:idFamilia/formalizacao', getDiagnosticoFormalizacao);
 router.post('/cadastros/familias/:idFamilia/formalizacao', formalizarItensFamilia);
 router.get('/cadastros/familias/:idFamilia/produtos', getProdutosPorFamilia);
+// Incluir / tirar itens da família (tela de famílias)
+router.post('/cadastros/familias/:idFamilia/itens', vincularItensFamilia);
 
 // =========================================================================
 // 🏷️ ROTAS DE PRODUTOS E CATÁLOGO

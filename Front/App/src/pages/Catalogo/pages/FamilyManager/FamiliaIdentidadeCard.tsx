@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Space, Button, Tooltip, Typography, Tag, Modal, Form, Input, Select, Tabs, message } from 'antd';
+import { Card, Space, Button, Tooltip, Typography, Tag, Modal, Form, Input, Select, Tabs, TreeSelect, message } from 'antd';
+import type { TreeSelectProps } from 'antd';
 import { EditOutlined, DollarOutlined, FileTextOutlined, InfoCircleOutlined, InboxOutlined, PictureOutlined, ShopOutlined, ShareAltOutlined, SafetyCertificateOutlined, CodeSandboxOutlined } from '@ant-design/icons';
 import ImageDisplay from '../../../../components/ui/ImageGallery/ImageDysplay';
 import { STATUS_FAMILIA_CONFIG } from './CatalogManager.types';
@@ -30,6 +31,7 @@ interface FamiliaIdentidadeCardProps {
     prioridadeExposicao?: string;
     unidadeMedidaBase?: string;
     atributos?: Array<{ nome: string; classificacao?: string; valorPadraoFamilia?: string; valorPadraoGrupo?: string; origem?: string }>;
+    categoriaPai?: string | number;
     categoriaPaiNome?: string;
     marcaComportamento?: string;
     saude?: { bloqueios: Array<{ codigo: string; mensagem: string }>; avisos: Array<{ codigo: string; mensagem: string }> };
@@ -37,6 +39,9 @@ interface FamiliaIdentidadeCardProps {
   grupoImage?: string;
   brandColor?: string;
   onSalvarIdentidade?: (valores: any) => void; 
+  // Categoria da família (os itens herdam os atributos dela e das categorias acima)
+  arvoreCategorias?: TreeSelectProps["treeData"];
+  onMudarCategoria?: (idCategoria: string | undefined) => void;
 }
 
 export const FamiliaIdentidadeCard: React.FC<FamiliaIdentidadeCardProps> = ({
@@ -44,6 +49,8 @@ export const FamiliaIdentidadeCard: React.FC<FamiliaIdentidadeCardProps> = ({
   grupoImage,
   brandColor,
   onSalvarIdentidade,
+  arvoreCategorias,
+  onMudarCategoria,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('1');
@@ -191,21 +198,30 @@ export const FamiliaIdentidadeCard: React.FC<FamiliaIdentidadeCardProps> = ({
                 {grupoSelecionado?.nome || "Sem nome definido"}
               </Text>
             </div>
+            {/* Categoria da família: escolhida aqui (os itens herdam os atributos dela e das categorias acima) */}
             {(() => {
-              // Herança real: categoria da família e quantos atributos vêm dela (cadeia de categorias)
               const herdados = (grupoSelecionado?.atributos || []).filter(a => a.origem === 'herdados').length;
-              return grupoSelecionado?.categoriaPaiNome ? (
-                <Tooltip title={`${herdados} atributo(s) vêm da categoria "${grupoSelecionado.categoriaPaiNome}" e das categorias acima dela.`}>
-                  <Tag icon={<ShareAltOutlined />} color="success" style={{ margin: 0, fontSize: '10px', fontWeight: 600 }}>
-                    Herda de {grupoSelecionado.categoriaPaiNome}{herdados > 0 ? ` (${herdados})` : ''}
-                  </Tag>
-                </Tooltip>
-              ) : (
-                <Tooltip title="Sem categoria: a família não herda atributos. Vincule uma categoria para herdar DNA e ficha.">
-                  <Tag icon={<ShareAltOutlined />} style={{ margin: 0, fontSize: '10px', fontWeight: 600 }}>
-                    Sem categoria
-                  </Tag>
-                </Tooltip>
+              const valor = grupoSelecionado?.categoriaPai ? String(grupoSelecionado.categoriaPai) : undefined;
+              return (
+                <div style={{ width: 240, flexShrink: 0 }}>
+                  <Text style={{ color: valor ? '#16a34a' : '#d97706', fontSize: '10px', display: 'block', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <ShareAltOutlined /> Categoria{valor ? ` · herda ${herdados} atributo(s)` : ' · não herda atributos'}
+                  </Text>
+                  <TreeSelect
+                    size="small"
+                    style={{ width: '100%' }}
+                    value={valor}
+                    treeData={arvoreCategorias || []}
+                    placeholder="Escolher categoria..."
+                    allowClear
+                    showSearch
+                    treeNodeFilterProp="title"
+                    treeDefaultExpandAll
+                    disabled={!onMudarCategoria}
+                    status={valor ? undefined : 'warning'}
+                    onChange={(v) => onMudarCategoria?.(v ? String(v) : undefined)}
+                  />
+                </div>
               );
             })()}
 

@@ -958,3 +958,71 @@ export const getProdutosPorFamilia = async (req: Request, res: Response) => {
     return res.status(500).json({ error: 'Erro interno ao buscar produtos da família.' });
   }
 };
+/**
+ * POST /catalogo/cadastros/familias/:idFamilia/itens  { ids, acao: 'adicionar' | 'remover', mover? }
+ * Inclui ou tira itens da família (comercial_produtos_dados.familia_id).
+ * - adicionar: itens que já estão em outra família só mudam com mover = true (senão voltam em emOutraFamilia);
+ * - remover: o item fica sem família e passa a guardar a categoria da família (se não tinha a sua),
+ *   para não ficar sem classificação.
+ */
+export const vincularItensFamilia = async (req: Request, res: Response) => {
+  const tenantId = Number(req.query.tenant_id || req.body?.tenant_id || 1);
+  const idFamilia = Number(req.params.idFamilia);
+  const acao = req.body?.acao === 'remover' ? 'remover' : 'adicionar';
+  const mover = req.body?.mover === true;
+  const ids: number[] = [...new Set<number>((Array.isArray(req.body?.ids) ? req.body.ids : []).map(Number).filter((n: number) => n > 0))];
+  if (ids.length === 0) return res.status(400).json({ error: 'Nenhum item informado.' });
+
+  const connection: any = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [[familia]]: any = await connection.execute(
+      `SELECT id, categoria_id FROM comercial_familias WHERE id = ? AND tenant_id = ?`, [idFamilia, tenantId]
+    );
+    if (!familia) { await connection.rollback(); return res.status(404).json({ error: 'Família não encontrada.' }); }
+
+    const [linhas]: any = await connection.execute(
+      `SELECT ic.id_item, COALESCE(NULLIF(TRIM(p.sku_customizado), ''), ic.sku) AS sku, p.familia_id, f.nome AS familia
+       FROM itens_core ic
+       LEFT JOIN comercial_produtos_dados p ON p.id_item = ic.id_item AND p.tenant_id = ic.tenant_id
+       LEFT JOIN comercial_familias f ON f.id = p.familia_id
+       WHERE ic.tenant_id = ? AND ic.id_item IN (${ids.map(() => '?').join(',')})`,
+      [tenantId, ...ids]
+    );
+
+    let alterados = 0;
+    const emOutraFamilia: any[] = [];
+    for (const l of linhas) {
+      const idItem = Number(l.id_item);
+      if (acao === 'adicionar') {
+        if (Number(l.familia_id) === idFamilia) continue;
+        if (l.familia_id && !mover) {
+          emOutraFamilia.push({ idItem, sku: l.sku, familia: l.familia });
+          continue;
+        }
+        await connection.execute(
+          `INSERT INTO comercial_produtos_dados (tenant_id, id_item, familia_id) VALUES (?, ?, ?)
+           ON DUPLICATE KEY UPDATE familia_id = VALUES(familia_id)`,
+          [tenantId, idItem, idFamilia]
+        );
+        alterados++;
+      } else if (Number(l.familia_id) === idFamilia) {
+        await connection.execute(
+          `UPDATE comercial_produtos_dados
+              SET familia_id = NULL, categoria_id = COALESCE(categoria_id, ?)
+            WHERE tenant_id = ? AND id_item = ? AND familia_id = ?`,
+          [familia.categoria_id ?? null, tenantId, idItem, idFamilia]
+        );
+        alterados++;
+      }
+    }
+    await connection.commit();
+    return res.json({ success: true, alterados, emOutraFamilia });
+  } catch (error: any) {
+    await connection.rollback();
+    console.error('Erro ao vincular itens à família:', error);
+    return res.status(500).json({ error: error.message });
+  } finally {
+    connection.release();
+  }
+};

@@ -34,6 +34,7 @@ export const MENU_PRINCIPAL: ItemMenu[] = [
       { key: '/catalogo/categorias', label: 'Categorias' },
       { key: '/catalogo/atributos', label: 'Atributos' },
       { key: '/catalogo/marcas', label: 'Marcas' },
+      { key: '/catalogo/unidades', label: 'Unidades' },
       { key: '/catalogo/preco', label: 'Precificação' },
     ],
   },

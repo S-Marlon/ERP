@@ -45,6 +45,7 @@ import { aplicarSugestoes, chaveDaLinha } from './vinculoSugerido';
 import { DestinoLinha } from './depositos';
 import { aplicarClassificacao, mapeamentoRapido } from './edicaoLote';
 import type { ClassificacaoItem } from './ItemsConference/ClassificacaoPim';
+import type { ValoresPorItem } from './ItemsConference/ModaisLote';
 import { restaurarItensDoStaging, lerFreteAdicionalSalvo } from './stagingRestore';
 
 interface ItemConferencia {
@@ -271,18 +272,25 @@ vinculoSugerido: null
 });
 
 // Lote: linhas sem vínculo viram itens novos com os dados da nota (uma única gravação na staging)
-const handleCadastroRapidoLote = (linhas: any[], opcoes: { markup: number; classificacao: ClassificacaoItem }) => {
+const handleCadastroRapidoLote = (linhas: any[], opcoes: { markup: number; classificacao: ClassificacaoItem; porItem: ValoresPorItem | null }) => {
 const ids = new Set(linhas.map(l => l.tempId));
 const result = commitItemEdit([...ids], item => (item.mapeamento || item.mappedId || item.produtoIdSistema)
 ? null
-: patchDoMapeamento(item, mapeamentoRapido(item, opcoes)));
+: patchDoMapeamento(item, mapeamentoRapido(item, {
+markup: opcoes.markup,
+// Valores de atributos preenchidos linha a linha na tabela do modal
+classificacao: opcoes.porItem ? { ...opcoes.classificacao, atributos: opcoes.porItem[String(item.tempId)] || null } : opcoes.classificacao,
+})));
 if (result.changed.length > 0) message.success(`${result.changed.length} item(ns) novo(s) cadastrado(s) na nota. Confira e dê entrada.`);
 };
 
 // Lote: família/categoria (e valores de atributos) nos itens novos
-const handleClassificarLote = (linhas: any[], classificacao: ClassificacaoItem, substituir = false) => {
+const handleClassificarLote = (linhas: any[], classificacao: ClassificacaoItem, substituir = false, porItem: ValoresPorItem | null = null) => {
 const result = commitItemEdit(linhas.map(l => l.tempId), item => {
-const novo = aplicarClassificacao(item.mapeamento, classificacao, { substituir });
+// Tabela por item: cada linha recebe exatamente os valores dela (a tabela já começa com o que ela tinha)
+const novo = porItem
+? aplicarClassificacao(item.mapeamento, { ...classificacao, atributos: porItem[String(item.tempId)] || null }, { substituir: true })
+: aplicarClassificacao(item.mapeamento, classificacao, { substituir });
 return novo ? { mapeamento: novo } : null;
 });
 if (result.changed.length > 0) message.success(`${result.changed.length} item(ns) classificado(s).`);
@@ -866,6 +874,7 @@ onChangeDestinos={handleChangeDestinos}
 onCadastroRapidoLote={handleCadastroRapidoLote}
 onClassificarLote={handleClassificarLote}
 readOnly={Boolean(modoVisualizacao)}
+cnpjFornecedor={parsedNfe?.emitente?.cnpj || ''}
 />
 </Card>
 )}

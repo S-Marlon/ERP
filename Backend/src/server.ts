@@ -4,13 +4,18 @@ import routes from './routes';
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+// A entrada de NF envia o XML inteiro + os dados de cada item (nota grande passa de 1 MB; o padrão do Express é 100 KB)
+app.use(express.json({ limit: '20mb' }));
 
 app.use('/api', routes);
 
 app.get('/', (req, res) => res.json({ message: 'API ERP rodando!' }));
 
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err?.type === 'entity.too.large') {
+    console.error(`Requisição grande demais em ${req.method} ${req.originalUrl}: ${err.length} bytes (limite ${err.limit}).`);
+    return res.status(413).json({ error: `Dados grandes demais para o servidor (${Math.round(err.length / 1024)} KB). Aumente o limite em server.ts.` });
+  }
   console.error('Erro global:', err);
   res.status(err.status || 500).json({ error: err.message || 'Erro interno' });
 });

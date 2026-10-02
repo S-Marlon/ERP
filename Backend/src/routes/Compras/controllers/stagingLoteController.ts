@@ -6,6 +6,7 @@ import { validarGtin } from '../staging/gtin';
 import { lancarMovimentoEstoque } from '../../EstoqueItens/depositos';
 import { gravarAtributosItemNovo } from '../../Catalogo/Produtos/produtoDetalhe.controller';
 import { destinosDoItem, prefixoSkuSequencial, skuCustomizadoPlanejado, skuSequencial } from '../staging/penteFino';
+import { canonizar, carregarResolvedor } from '../staging/unidadesEntrada';
 import {
   avaliarPenteFino,
   calcularCustoMedio,
@@ -105,7 +106,8 @@ const montarContexto = async (conn: Conn, tenant: number, lote: any, itens: Stag
   }
 
   const idFornecedor = await buscarFornecedorId(conn, lote.cnpj_fornecedor, tenant);
-  const ctx: PenteFinoContexto = { idsItensExistentes, skusExistentes, fornecedorCadastrado: idFornecedor !== null, gtinsEmUso };
+  const unidades = await carregarResolvedor(conn, tenant, idFornecedor);
+  const ctx: PenteFinoContexto = { idsItensExistentes, skusExistentes, fornecedorCadastrado: idFornecedor !== null, gtinsEmUso, unidades };
   return { ctx, idFornecedor };
 };
 
@@ -223,7 +225,9 @@ export const aprovarLote = async (req: Request, res: Response): Promise<Response
     for (const item of itens) {
       const mapeamento = lerMapeamento(item);
       const tipoRecurso = String(mapeamento.tipo_recurso || 'PRODUTO').toUpperCase();
-      const conversao = lerConversaoCompra(item);
+      // Siglas já traduzidas para a unidade interna (dicionário de unidades de entrada: M -> MT)
+      const canon = canonizar(ctx.unidades);
+      const conversao = lerConversaoCompra(item, canon);
 
       // Quantidade e custo convertidos para a unidade base do item (saldo e custo médio sempre na base)
       const quantidadeDocumento = Number(item.quantidade_recebida) || 0;
@@ -315,12 +319,12 @@ export const aprovarLote = async (req: Request, res: Response): Promise<Response
           // desta aprovação (após frete/ajustes), mantendo os markups definidos
           const configVendas = mapeamento.configVendas;
           if (configVendas && Array.isArray(configVendas.unidades) && configVendas.unidades.length > 0) {
-            const unidadesVenda: UnidadePayload[] = configVendas.unidades;
+            const unidadesVenda: UnidadePayload[] = configVendas.unidades.map((u: UnidadePayload) => ({ ...u, sigla: canon(u.sigla) }));
             const fatorPorSigla = new Map<string, number>(
               unidadesVenda.map(u => [String(u.sigla).toUpperCase(), u.is_base ? 1 : Number(u.fator)])
             );
             const faixas = recalcularFaixas(
-              (configVendas.faixas || []).map((f: FaixaPayload) => ({ ...f, sigla: String(f.sigla).toUpperCase() })),
+              (configVendas.faixas || []).map((f: FaixaPayload) => ({ ...f, sigla: canon(f.sigla) })),
               custoUnitario,
               fatorPorSigla
             ) as FaixaPayload[];

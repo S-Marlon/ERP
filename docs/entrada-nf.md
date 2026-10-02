@@ -88,6 +88,14 @@ Item novo:
 - **Custo base** = custo final ÷ fator. É o custo de entrada no estoque e a base do markup.
 - **Frete**: o da nota (vFrete) + o **frete adicional** pago à parte (Correios, carreto), rateado nos itens pelo modo escolhido (original do XML, proporcional ao valor, à quantidade ou igual).
 
+**Unidade da nota (dicionário de unidades de entrada)** — cada fornecedor escreve a unidade do seu jeito (`M`, `MT`, `MTS`, `METRO`). A sigla da NF (`uCom`) é traduzida para a unidade interna, nesta ordem:
+
+1. regra **deste fornecedor** (ex.: para um fornecedor `M` = milheiro);
+2. sigla **igual** a uma unidade do cadastro (`itens_unidades_medida`);
+3. regra **geral** (ex.: `M` → `MT`).
+
+Sem nenhuma, a linha mostra a sigla em vermelho e a conferência pergunta *"O que é 'M' nesta nota?"* (unidade existente ou nova; só este fornecedor ou todos). A resposta grava em `itens_unidades_equivalencias` e vale para as próximas notas. Traduzida, a linha mostra `M → MT`. O dicionário só guarda **sinônimos**; embalagem que depende do produto (1 CX = 50 UN) continua no fator de conversão do item. Manutenção em **Catálogo › Unidades**.
+
 ### 3.3 Tipo de entrada e destino (depósito)
 
 | Tipo de entrada | Depósito | Observação |
@@ -156,8 +164,9 @@ Botão **Revisar e dar entrada** (habilita quando todas as linhas estão conferi
 | `FATOR_INVALIDO` | fator de conversão ≤ 0 |
 | `CONFIG_VENDAS_INCOERENTE` | preço do item novo não bate com a conversão |
 | `FORNECEDOR_NAO_CADASTRADO` | fornecedor da NF não cadastrado |
+| `UNIDADE_NAO_RECONHECIDA` | sigla da unidade da NF sem equivalência no cadastro/dicionário |
 
-**Avisos** (não impedem): `GTIN_INVALIDO`, `GTIN_EM_USO`, `SEM_GTIN`, `CONVERSAO_UNIDADE`, `DIVERGENCIA_QUANTIDADE`, `QUANTIDADE_ZERO`, `FORA_DA_VENDA`, `TOTAL_DIVERGENTE`.
+**Avisos** (não impedem): `GTIN_INVALIDO`, `GTIN_EM_USO`, `SEM_GTIN`, `CONVERSAO_UNIDADE`, `DIVERGENCIA_QUANTIDADE`, `QUANTIDADE_ZERO`, `FORA_DA_VENDA`, `TOTAL_DIVERGENTE`, `UNIDADE_TRADUZIDA` (ex.: M → MT).
 
 Regras em `Backend/src/routes/Compras/staging/penteFino.ts` (com testes). O mesmo pente-fino roda de novo dentro da aprovação.
 

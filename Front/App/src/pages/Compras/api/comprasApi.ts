@@ -301,3 +301,48 @@ export const confirmarEstoqueLoteAPI = async (payloadFinal: {
 
     return response.json();
 };
+// ---------------------------------------------------------------------------------------------
+// Dicionário de unidades de entrada (sigla da NF -> unidade interna, geral ou por fornecedor)
+// ---------------------------------------------------------------------------------------------
+export interface UnidadeCadastro { id: number; sigla: string; descricao: string }
+export interface ResolucaoUnidade { siglaNota: string; siglaInterna: string | null; origem: 'fornecedor' | 'cadastro' | 'geral' | null }
+export interface EquivalenciaUnidade {
+    id: number; siglaEntrada: string; idFornecedor: number | null; fornecedor: string | null;
+    siglaInterna: string; descricaoInterna: string;
+}
+
+const lerJsonUnidades = async <T,>(response: Response, erro: string): Promise<T> => {
+    const dados = await response.json().catch(() => ({}));
+    if (response.status === 404 && !dados.error) throw new Error('Rota não encontrada: reinicie o backend.');
+    if (!response.ok) throw new Error(dados.error || erro);
+    return dados as T;
+};
+
+export const resolverUnidadesEntrada = async (cnpj: string, siglas: string[], tenantId = 1) =>
+    lerJsonUnidades<{ idFornecedor: number | null; unidades: UnidadeCadastro[]; resolucoes: Record<string, ResolucaoUnidade> }>(
+        await fetch(`${API_BASE_URL}/compras/unidades-entrada?tenant_id=${tenantId}&cnpj=${encodeURIComponent(cnpj)}&siglas=${encodeURIComponent(siglas.join(','))}`),
+        'Erro ao consultar as unidades da nota.'
+    );
+
+export const listarEquivalenciasUnidade = async (tenantId = 1) =>
+    lerJsonUnidades<{ equivalencias: EquivalenciaUnidade[]; unidades: UnidadeCadastro[] }>(
+        await fetch(`${API_BASE_URL}/compras/unidades-equivalencias?tenant_id=${tenantId}`),
+        'Erro ao carregar o dicionário de unidades.'
+    );
+
+export const salvarEquivalenciaUnidade = async (dados: {
+    siglaEntrada: string; siglaInterna: string; descricaoInterna?: string;
+    escopo: 'fornecedor' | 'geral'; cnpj?: string; idFornecedor?: number | null;
+}, tenantId = 1) =>
+    lerJsonUnidades<{ success: boolean }>(
+        await fetch(`${API_BASE_URL}/compras/unidades-equivalencias?tenant_id=${tenantId}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dados),
+        }),
+        'Erro ao salvar a equivalência de unidade.'
+    );
+
+export const excluirEquivalenciaUnidade = async (id: number, tenantId = 1) =>
+    lerJsonUnidades<{ success: boolean }>(
+        await fetch(`${API_BASE_URL}/compras/unidades-equivalencias/${id}?tenant_id=${tenantId}`, { method: 'DELETE' }),
+        'Erro ao excluir a equivalência de unidade.'
+    );

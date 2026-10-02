@@ -52,6 +52,7 @@ import FuncionariosPage from "./pages/Parceiros/FuncionariosPage";
 import { MarcasPage } from "./pages/Catalogo/pages/MarcasManager/MarcasPage";
 import PendenciasPim from "./pages/Catalogo/pages/PendenciasPim/PendenciasPim";
 import ItensDuplicados from "./pages/Catalogo/pages/ItensDuplicados/ItensDuplicados";
+import UnidadesPage from "./pages/Catalogo/pages/Unidades/UnidadesPage";
 import Pedidos from "./pages/Clientes/Pedidos";
 import ListaComprasExport from "./pages/Compras/ListaComprasExport";
 import { LeitorXML } from "./pages/Compras/StockEntry/xml/LeitorXML";
@@ -168,6 +169,7 @@ export default function AppLayout() {
             <Route path="/catalogo/atributos" element={<GlobalAttributeManager />} />
             <Route path="/catalogo/gerenciador" element={<CatalogSku />} />
             <Route path="/catalogo/marcas" element={<MarcasPage />} />
+            <Route path="/catalogo/unidades" element={<UnidadesPage />} />
             <Route path="/catalogo/pendencias" element={<PendenciasPim />} />
             <Route path="/catalogo/duplicados" element={<ItensDuplicados />} />
             <Route path="/catalogo/preco" element={<ProductPricingModule/>} />
