@@ -18,7 +18,8 @@ const PendenciasPim: React.FC = () => {
 
   const [tipo, setTipo] = useState<'VENDA' | 'TODOS'>('VENDA');
   const [familiaId, setFamiliaId] = useState<number | null>(null);
-  const [codigo, setCodigo] = useState<string | null>(null);
+  // ?codigo=SEM_PRECO abre já filtrado (atalhos do painel do catálogo)
+  const [codigo, setCodigo] = useState<string | null>(params.get('codigo'));
   const [buscaDigitada, setBuscaDigitada] = useState('');
   const [busca, setBusca] = useState('');
   const [page, setPage] = useState(1);

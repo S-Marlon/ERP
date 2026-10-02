@@ -6,6 +6,7 @@ import { Request, Response } from 'express';
 import pool from '../../Estoque/db.config';
 import { lancarMovimentoEstoque, Deposito, ehDeposito } from '../../EstoqueItens/depositos';
 import { agruparDuplicados } from './duplicados';
+import { avaliarPublicacaoItens } from './publicacaoProdutos';
 
 const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || req.body?.tenant_id || 1);
 const n = (v: unknown) => Number(v) || 0;
@@ -21,7 +22,7 @@ const SELECT_ITEM = `
   SELECT ic.id_item, ic.status, UPPER(COALESCE(ic.tipo_recurso, 'PRODUTO')) AS tipo_recurso, ic.created_at,
          COALESCE(NULLIF(TRIM(cpd.sku_customizado), ''), ic.sku) AS sku,
          COALESCE(NULLIF(TRIM(cpd.nome_comercial), ''), ic.nome_item) AS nome,
-         um.sigla AS unidade_base, f.nome AS familia,
+         um.sigla AS unidade_base, f.nome AS familia, cpd.familia_id, cpd.id_marca, f.comportamento_marca,
          (SELECT COALESCE(SUM(s.quantidade_atual), 0) FROM estoque_saldos_itens s WHERE s.tenant_id = ic.tenant_id AND s.id_item = ic.id_item) AS saldo,
          (SELECT COUNT(*) FROM estoque_movimentos m WHERE m.tenant_id = ic.tenant_id AND m.id_item = ic.id_item) AS movimentos
   FROM itens_core ic
@@ -51,8 +52,43 @@ export const listarDuplicados = async (req: Request, res: Response) => {
        WHERE cfp.tenant_id = ? AND NULLIF(TRIM(cfp.codigo_produto_fornecedor), '') IS NOT NULL`,
       [tenant]
     );
+    // Assinatura da grade: valores dos atributos de grade do item (e a marca, quando a família usa a marca como grade).
+    // Itens da mesma família com grades diferentes são SKUs diferentes, não duplicados (ex.: balde x galão).
+    const ids = itens.map((i: any) => Number(i.id_item));
+    const publicacao = ids.length > 0 ? await avaliarPublicacaoItens(pool as any, tenant, ids) : new Map();
+    const valores = new Map<number, Map<string, string>>();
+    if (ids.length > 0) {
+      const [linhasValor]: any = await pool.execute(
+        `SELECT v.id_entidade, v.atributo_id,
+                COALESCE(o.valor, NULLIF(TRIM(v.valor_texto), ''), v.valor_numero, v.valor_decimal, v.valor_boolean, v.valor_data) AS valor
+         FROM atributos_comercial_valores v
+         LEFT JOIN atributos_comercial_opcoes o ON o.id = v.opcao_id
+         WHERE v.tenant_id = ? AND v.tipo_entidade = 'produto' AND v.id_entidade IN (${ids.map(() => '?').join(',')})`,
+        [tenant, ...ids]
+      );
+      for (const l of linhasValor) {
+        if (l.valor === null || l.valor === undefined) continue;
+        const id = Number(l.id_entidade);
+        if (!valores.has(id)) valores.set(id, new Map());
+        valores.get(id)!.set(String(l.atributo_id), String(l.valor).trim().toUpperCase());
+      }
+    }
+    const assinaturaGrade = (i: any): string | null => {
+      const id = Number(i.id_item);
+      const partes = (publicacao.get(id)?.atributosGrade || [])
+        .map((a: string) => (valores.get(id)?.has(a) ? `${a}=${valores.get(id)!.get(a)}` : null))
+        .filter(Boolean) as string[];
+      if (i.comportamento_marca === 'grade' && i.id_marca) partes.push(`marca=${i.id_marca}`);
+      return partes.length > 0 ? partes.sort().join(';') : null;
+    };
+
     const grupos = agruparDuplicados(
-      itens.map((i: any) => ({ idItem: Number(i.id_item), nome: String(i.nome || '') })),
+      itens.map((i: any) => ({
+        idItem: Number(i.id_item),
+        nome: String(i.nome || ''),
+        familiaId: i.familia_id ? Number(i.familia_id) : null,
+        assinaturaGrade: assinaturaGrade(i),
+      })),
       codigos.map((c: any) => ({ idFornecedor: Number(c.id_fornecedor), fornecedor: c.fornecedor, codigo: String(c.codigo), idItem: Number(c.id_item) }))
     );
     const porId = new Map<number, any>(itens.map((i: any) => [Number(i.id_item), itemParaResposta(i)]));

@@ -4,7 +4,19 @@
 export interface ItemParaDuplicidade {
   idItem: number;
   nome: string;
+  // Mesma família + grade preenchida e diferente = SKUs diferentes do mesmo produto (ex.: balde x galão)
+  familiaId?: number | null;
+  assinaturaGrade?: string | null;   // valores de grade (e marca, quando a marca é grade), vazio = sem grade
 }
+
+/** a e b se distinguem pela grade: mesma família e grades preenchidas e diferentes */
+export const distinguidosPelaGrade = (a: ItemParaDuplicidade, b: ItemParaDuplicidade) =>
+  Boolean(a.familiaId) && a.familiaId === b.familiaId
+  && Boolean(a.assinaturaGrade) && Boolean(b.assinaturaGrade) && a.assinaturaGrade !== b.assinaturaGrade;
+
+// Do grupo, ficam só os itens que têm ao menos um "par" que a grade não distingue
+const filtrarPelaGrade = (ids: number[], porId: Map<number, ItemParaDuplicidade>) => ids.filter(a =>
+  ids.some(b => b !== a && !distinguidosPelaGrade(porId.get(a)!, porId.get(b)!)));
 
 export interface CodigoFornecedorItem {
   idFornecedor: number;
@@ -38,6 +50,7 @@ export const normalizarNome = (nome: string): string =>
 export const agruparDuplicados = (itens: ItemParaDuplicidade[], codigos: CodigoFornecedorItem[]): GrupoDuplicados[] => {
   const grupos: GrupoDuplicados[] = [];
   const ativos = new Set(itens.map(i => i.idItem));
+  const porId = new Map(itens.map(i => [i.idItem, i]));
 
   // 1. Mesmo código do mesmo fornecedor em itens diferentes
   const porCodigo = new Map<string, { c: CodigoFornecedorItem; ids: Set<number> }>();
@@ -49,12 +62,13 @@ export const agruparDuplicados = (itens: ItemParaDuplicidade[], codigos: CodigoF
     porCodigo.get(chave)!.ids.add(c.idItem);
   }
   for (const [chave, { c, ids }] of porCodigo) {
-    if (ids.size > 1) {
+    const suspeitos = filtrarPelaGrade([...ids].sort((a, b) => a - b), porId);
+    if (suspeitos.length > 1) {
       grupos.push({
         chave: `forn:${chave}`,
         motivo: 'MESMO_CODIGO_FORNECEDOR',
-        descricao: `Código ${c.codigo} de ${c.fornecedor || `fornecedor #${c.idFornecedor}`} em ${ids.size} itens`,
-        idsItens: [...ids].sort((a, b) => a - b),
+        descricao: `Código ${c.codigo} de ${c.fornecedor || `fornecedor #${c.idFornecedor}`} em ${suspeitos.length} itens`,
+        idsItens: suspeitos,
       });
     }
   }
@@ -68,7 +82,7 @@ export const agruparDuplicados = (itens: ItemParaDuplicidade[], codigos: CodigoF
     porNome.set(chave, [...(porNome.get(chave) || []), i.idItem]);
   }
   for (const [chave, ids] of porNome) {
-    const ordenados = [...new Set(ids)].sort((a, b) => a - b);
+    const ordenados = filtrarPelaGrade([...new Set(ids)].sort((a, b) => a - b), porId);
     if (ordenados.length > 1 && !jaAgrupados.has(ordenados.join(','))) {
       grupos.push({ chave: `nome:${chave}`, motivo: 'NOME_IGUAL', descricao: `Nomes iguais: "${itens.find(i => i.idItem === ordenados[0])?.nome}"`, idsItens: ordenados });
     }

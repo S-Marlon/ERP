@@ -56,7 +56,7 @@ const ItensDuplicados: React.FC = () => {
           <div>
             <h2 style={{ margin: 0, fontSize: 18 }}>Itens duplicados</h2>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              Itens que parecem ser o mesmo produto. Escolha o que fica e junte o outro nele: estoque, vínculos de fornecedor e códigos de barras vão junto, e o duplicado é inativado.
+              Itens que parecem ser o mesmo produto. Escolha o que fica e junte o outro nele: estoque, vínculos de fornecedor e códigos de barras vão junto, e o duplicado é inativado. Variações do mesmo produto (ex.: balde e galão) não são duplicados: coloque-as na mesma família com a grade preenchida e elas saem desta lista.
             </Text>
           </div>
           <Space>

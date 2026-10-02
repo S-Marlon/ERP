@@ -67,7 +67,15 @@ export const checkSupplier = async (cnpj: string, tenantId: number) => {
 /**
  * 2. CADASTRA O FORNECEDOR
  */
-export const createSupplier = async (supplierData: { cnpj: string; name: string; fantasyName: string }, tenantId: number = 1): Promise<any> => {
+export const createSupplier = async (
+    supplierData: {
+        cnpj: string; name: string; fantasyName: string;
+        // Dados do XML (opcionais): IE, telefone e endereço
+        stateRegistration?: string; phone?: string;
+        endereco?: { logradouro?: string; numero?: string; complemento?: string; bairro?: string; cidade?: string; estado?: string; cep?: string };
+    },
+    tenantId: number = 1
+): Promise<any> => {
     const response = await fetch(API_BASE_URL, {
         method: 'POST',
         headers: {
@@ -77,13 +85,17 @@ export const createSupplier = async (supplierData: { cnpj: string; name: string;
             tenant_id: tenantId,
             cnpj: supplierData.cnpj.replace(/\D/g, ''),
             razao_social: supplierData.name,
-            nome_fantasia: supplierData.fantasyName
+            nome_fantasia: supplierData.fantasyName,
+            inscricao_estadual: supplierData.stateRegistration || null,
+            telefone: supplierData.phone || null,
+            enderecos: supplierData.endereco?.logradouro ? [supplierData.endereco] : [],
         }),
     });
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Erro interno no servidor de cadastro.');
+        if (response.status === 404) throw new Error('Rota de cadastro de fornecedor não encontrada: reinicie o backend (npm start).');
+        throw new Error(errorData.details ? `${errorData.error} (${errorData.details})` : (errorData.error || 'Erro interno no servidor de cadastro.'));
     }
 
     return response.json();

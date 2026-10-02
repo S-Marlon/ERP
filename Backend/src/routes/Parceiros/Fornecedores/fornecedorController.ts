@@ -40,11 +40,14 @@ export const verificarFornecedorPorCnpj = async (req: Request, res: Response) =>
 };
 
 // 🟢 [CREATE/FIND] Cadastrar ou Buscar Fornecedor pelo CNPJ (Ideal para o Leitor de XML)
+// Body: { cnpj, razao_social, nome_fantasia?, inscricao_estadual?, inscricao_municipal?, telefone?, enderecos?: [...] }
+// Pessoa já existente com o CNPJ (ex.: cadastrada como cliente) só recebe o papel de FORNECEDOR.
 export const obterOuCriarFornecedorPorCnpj = async (req: Request, res: Response) => {
   const tenantId = Number(req.query.tenant_id || req.body.tenant_id || 1);
-  const dados = req.body; 
+  const dados = req.body || {};
+  const cnpj = String(dados.cnpj || '').replace(/\D/g, '');
 
-  if (!dados.cnpj) {
+  if (!cnpj) {
     return res.status(400).json({ success: false, error: 'CNPJ do fornecedor é obrigatório.' });
   }
 
@@ -52,79 +55,100 @@ export const obterOuCriarFornecedorPorCnpj = async (req: Request, res: Response)
   try {
     await connection.beginTransaction();
 
-    // 1. Verifica se o fornecedor já existe na base para este tenant pelo CNPJ
-    const queryBusca = `
-      SELECT pj.id_cliente 
-      FROM pessoas_pj pj
-      INNER JOIN pessoas_core c ON c.id_pessoa = pj.id_cliente
-      WHERE pj.cnpj = ? AND c.tenant_id = ?
-      LIMIT 1
-    `;
-    const [rows]: [any[], any] = await connection.execute(queryBusca, [dados.cnpj, tenantId]);
+    const [[papel]]: any = await connection.execute(
+      `SELECT id_cliente_papel FROM pessoas_papeis_definicao WHERE codigo = 'FORNECEDOR' AND ativo = 1 ORDER BY tenant_id DESC LIMIT 1`
+    );
+    if (!papel) throw new Error('Papel FORNECEDOR não encontrado em pessoas_papeis_definicao.');
+    const idPapel = Number(papel.id_cliente_papel);
+
+    // 1. Pessoa com este CNPJ no tenant
+    const [rows]: [any[], any] = await connection.execute(
+      `SELECT pj.id_cliente, pj.inscricao_estadual
+       FROM pessoas_pj pj
+       INNER JOIN pessoas_core c ON c.id_pessoa = pj.id_cliente
+       WHERE pj.cnpj = ? AND c.tenant_id = ?
+       LIMIT 1`,
+      [cnpj, tenantId]
+    );
 
     let idPessoa: number;
+    let criado = false;
 
     if (rows.length > 0) {
-      idPessoa = rows[0].id_cliente;
+      idPessoa = Number(rows[0].id_cliente);
+      // Completa a IE se a pessoa ainda não tinha
+      if (!rows[0].inscricao_estadual && dados.inscricao_estadual) {
+        await connection.execute(`UPDATE pessoas_pj SET inscricao_estadual = ? WHERE id_cliente = ?`, [dados.inscricao_estadual, idPessoa]);
+      }
     } else {
-      // 2. Se não existe, cadastra do zero como PJ
-      const queryCore = `
-        INSERT INTO pessoas_core (tenant_id, tipo_pessoa, status, observacoes, created_at)
-        VALUES (?, 'PJ', 'ATIVO', 'Cadastrado automaticamente via importação de nota', NOW())
-      `;
-      const [resultCore]: any = await connection.execute(queryCore, [tenantId]);
-      idPessoa = resultCore.insertId;
+      // 2. Não existe: cadastra como PJ
+      const [resultCore]: any = await connection.execute(
+        `INSERT INTO pessoas_core (tenant_id, tipo_pessoa, status, observacoes, created_at)
+         VALUES (?, 'PJ', 'ATIVO', 'Cadastrado a partir da nota fiscal de entrada', NOW())`,
+        [tenantId]
+      );
+      idPessoa = Number(resultCore.insertId);
+      criado = true;
 
-      // Insere em pessoas_pj
-      const queryPJ = `
-        INSERT INTO pessoas_pj (
-          id_cliente, tenant_id, razao_social, nome_fantasia, cnpj, 
-          inscricao_estadual, inscricao_municipal, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
-      `;
-      await connection.execute(queryPJ, [
-        idPessoa,
-        tenantId,
-        dados.razao_social || 'Fornecedor Importado',
-        dados.nome_fantasia || dados.razao_social || 'Fornecedor',
-        dados.cnpj,
-        dados.inscricao_estadual || null,
-        dados.inscricao_municipal || null
-      ]);
+      await connection.execute(
+        `INSERT INTO pessoas_pj (id_cliente, tenant_id, razao_social, nome_fantasia, cnpj, inscricao_estadual, inscricao_municipal, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+        [
+          idPessoa, tenantId,
+          dados.razao_social || 'Fornecedor Importado',
+          dados.nome_fantasia || dados.razao_social || 'Fornecedor',
+          cnpj,
+          dados.inscricao_estadual || null,
+          dados.inscricao_municipal || null,
+        ]
+      );
 
-      // 3. Atribui o Papel de Fornecedor na tabela pivô (id_cliente_papel = 2)
-      const queryPapel = `
-        INSERT INTO pessoas_papeis_atribuido (tenant_id, id_cliente, id_cliente_papel, created_at)
-        VALUES (?, ?, 2, NOW())
-      `;
-      await connection.execute(queryPapel, [tenantId, idPessoa]);
-
-      // 4. Insere Endereços se vierem preenchidos no XML
-      if (dados.enderecos && Array.isArray(dados.enderecos)) {
+      // Endereço da nota
+      if (Array.isArray(dados.enderecos)) {
         for (const end of dados.enderecos) {
-          if (end.logradouro) {
-            const queryEnd = `
-              INSERT INTO pessoas_enderecos (
-                id_cliente, tenant_id, tipo, principal, logradouro, numero, complemento, bairro, cidade, estado, cep, pais, created_at
-              ) VALUES (?, ?, 'PRINCIPAL', 1, ?, ?, ?, ?, ?, ?, ?, 'Brasil', NOW())
-            `;
-            await connection.execute(queryEnd, [
-              idPessoa, tenantId, end.logradouro, end.numero || '', end.complemento || null,
-              end.bairro || '', end.cidade || '', end.estado || '', end.cep || ''
-            ]);
-          }
+          if (!end?.logradouro) continue;
+          await connection.execute(
+            `INSERT INTO pessoas_enderecos (id_cliente, tenant_id, tipo, principal, logradouro, numero, complemento, bairro, cidade, estado, cep, pais, created_at)
+             VALUES (?, ?, 'PRINCIPAL', 1, ?, ?, ?, ?, ?, ?, ?, 'Brasil', NOW())`,
+            [idPessoa, tenantId, end.logradouro, end.numero || '', end.complemento || null, end.bairro || '', end.cidade || '', end.estado || '', String(end.cep || '').replace(/\D/g, '')]
+          );
         }
       }
+
+      // Telefone da nota
+      const telefone = String(dados.telefone || '').trim();
+      if (telefone) {
+        await connection.execute(
+          `INSERT INTO pessoas_contatos (id_cliente, tenant_id, nome_contato, tipo, telefone, principal, whatsapp, nome_referencia, created_at)
+           VALUES (?, ?, '', 'FIXO', ?, 1, 0, 'Telefone da NF-e', NOW())`,
+          [idPessoa, tenantId, telefone.slice(0, 20)]
+        );
+      }
+    }
+
+    // 3. Papel de fornecedor (também para quem já existia como cliente, por exemplo)
+    const [[temPapel]]: any = await connection.execute(
+      `SELECT COUNT(*) AS total FROM pessoas_papeis_atribuido WHERE id_cliente = ? AND id_cliente_papel = ?`,
+      [idPessoa, idPapel]
+    );
+    const papelAtribuido = Number(temPapel.total) === 0;
+    if (papelAtribuido) {
+      await connection.execute(
+        `INSERT INTO pessoas_papeis_atribuido (tenant_id, id_cliente, id_cliente_papel, created_at) VALUES (?, ?, ?, NOW())`,
+        [tenantId, idPessoa, idPapel]
+      );
     }
 
     await connection.commit();
 
     return res.status(200).json({
       success: true,
-      message: rows.length > 0 ? 'Fornecedor já existente localizado com sucesso!' : 'Fornecedor cadastrado automaticamente com sucesso!',
-      id_pessoa: idPessoa
+      message: criado
+        ? 'Fornecedor cadastrado com sucesso.'
+        : papelAtribuido ? 'CNPJ já cadastrado: marcado como fornecedor.' : 'Fornecedor já estava cadastrado.',
+      id_pessoa: idPessoa,
+      criado,
     });
-
   } catch (error: any) {
     await connection.rollback();
     console.error('Erro ao processar fornecedor da nota:', error);
@@ -138,7 +162,6 @@ export const obterOuCriarFornecedorPorCnpj = async (req: Request, res: Response)
   }
 };
 
-// 🔌 [READ] Buscar Apenas Fornecedores
 export const getFornecedores = async (req: Request, res: Response) => {
   const tenantId = Number(req.query.tenant_id || req.headers['x-tenant-id'] || 1);
 

@@ -30,6 +30,8 @@ import NfeCards from './nfeCards/NfeCards';
 import { ItemsConference } from './ItemsConference/ItemsConference';
 import { SupplierModal } from './SupplierModal';
 import RevisaoFinalModal from './RevisaoFinalModal';
+import { gerarHtmlDanfe } from './danfe/gerarDanfe';
+import { imprimirHtml } from '../../../core/impressao/saida';
 import { getPendenciasPim } from '../../Catalogo/pages/PendenciasPim/pendenciasApi';
 import { parseNfeComplete, NfeDataFromXML } from './xml/utils/nfeParser';
 import { reconcileFreight } from './freightReconciliation';
@@ -163,6 +165,39 @@ const [freteAdicionalInfo, setFreteAdicionalInfo] = useState(FRETE_ADICIONAL_INI
 
 // Estados temporários para criação de fornecedor
 const [supplierCreationName, setSupplierCreationName] = useState<string>('');
+const [salvandoFornecedor, setSalvandoFornecedor] = useState<boolean>(false);
+
+// Cadastra o fornecedor da nota (dados do XML + nome de exibição) e confere de novo o status do card
+const handleSalvarFornecedor = async () => {
+const emit = parsedNfe?.emitente;
+if (!emit?.cnpj) { message.error('A nota não tem CNPJ do emitente.'); return; }
+setSalvandoFornecedor(true);
+try {
+const r = await createSupplier({
+cnpj: emit.cnpj,
+name: supplierCreationName || emit.nome || '',
+fantasyName: supplierCreationFantasyName.trim() || emit.nomeFantasia || emit.nome || '',
+stateRegistration: emit.ie,
+phone: emit.fone,
+endereco: {
+logradouro: emit.logradouro, numero: emit.numeroEnd, complemento: emit.complemento,
+bairro: emit.bairro, cidade: emit.municipio, estado: emit.uf, cep: emit.cep,
+},
+});
+const confere = await checkSupplier(emit.cnpj.replace(/\D/g, ''), 1);
+setSupplierStatus({ exists: Boolean(confere.exists), isChecking: false, supplier: confere.supplier });
+if (confere.exists) {
+message.success(r.message || 'Fornecedor cadastrado.');
+setIsSupplierModalOpen(false);
+} else {
+message.error('O cadastro foi feito, mas o fornecedor ainda não aparece como fornecedor. Confira o cadastro em Parceiros.');
+}
+} catch (e: any) {
+message.error(e.message || 'Erro ao cadastrar o fornecedor.');
+} finally {
+setSalvandoFornecedor(false);
+}
+};
 const [supplierCreationFantasyName, setSupplierCreationFantasyName] = useState<string>('');
 
 const [isPayloadModalOpen, setIsPayloadModalOpen] = useState<boolean>(false);
@@ -746,52 +781,15 @@ return Math.round((totalConfirmed / items.length) * 100);
 
 const isSubmitDisabled = items.length === 0 || totalConfirmed < items.length;
 
-const handlePrintDanfeHtml = () => {
-const printWindow = window.open('', '_blank', 'width=900,height=800');
-if (!printWindow) {
-alert('Permita pop-ups no navegador para gerar a impressão.');
-return;
+// DANFE montado do XML lido (todas as seções: emitente, chave com código de barras, destinatário,
+// duplicatas, impostos, transporte, produtos e dados adicionais), impresso sem abrir pop-up
+const handlePrintDanfeHtml = async () => {
+if (!parsedNfe) return;
+try {
+await imprimirHtml(gerarHtmlDanfe(parsedNfe));
+} catch (e: any) {
+message.error(e?.message || 'Não foi possível gerar o DANFE.');
 }
-
-const htmlContent = `
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<title>DANFE Simplificado - NF-e ${parsedNfe?.chaveAcesso || ''}</title>
-<style>
-body { font-family: Arial, sans-serif; font-size: 11px; color: #000; margin: 0; padding: 10px; background: #fff; }
-.container { width: 100%; max-width: 800px; margin: 0 auto; border: 1px solid #000; padding: 8px; }
-.flex { display: flex; justify-content: space-between; }
-.box { border: 1px solid #000; padding: 5px; margin-bottom: 6px; }
-.text-right { text-align: right; }
-.bold { font-weight: bold; }
-</style>
-</head>
-<body>
-<div class="container">
-<div class="box">
-<div class="flex">
-<div>
-<span class="bold" style="font-size: 14px;">${parsedNfe?.emitente.nome || 'Emitente não informado'}</span><br>
-<span>CNPJ: ${parsedNfe?.emitente.cnpj || '-'} | Fantasia: ${parsedNfe?.emitente.nomeFantasia || '-'}</span><br>
-<span>NF-e Nº: ${parsedNfe?.numero || '-'} | Emissão: ${parsedNfe?.dataEmissao || '-'}</span>
-</div>
-<div class="text-right">
-<span class="bold" style="font-size: 13px;">DANFE SIMPLIFICADO</span><br>
-<span>Entrada de Mercadorias</span><br>
-<span style="font-size: 9px;">Chave: ${parsedNfe?.chaveAcesso || '-'}</span>
-</div>
-</div>
-</div>
-</div>
-</body>
-</html>
-`;
-
-printWindow.document.open();
-printWindow.document.write(htmlContent);
-printWindow.document.close();
 };
 
 return (
@@ -1426,7 +1424,7 @@ custo_total_final: item.valorTotal
 
 <SupplierModal
 isOpen={isSupplierModalOpen}
-loading={false}
+loading={salvandoFornecedor}
 name={supplierCreationName}
 fantasyNameXml={parsedNfe?.emitente.nomeFantasia || ''}
 cnpj={parsedNfe?.emitente.cnpj || ''}
@@ -1437,7 +1435,7 @@ phone={parsedNfe?.emitente.fone}
 fantasyName={supplierCreationFantasyName}
 setFantasyName={setSupplierCreationFantasyName}
 onCancel={() => setIsSupplierModalOpen(false)}
-onSubmit={() => setIsSupplierModalOpen(false)}
+onSubmit={handleSalvarFornecedor}
 />
 </div>
 );

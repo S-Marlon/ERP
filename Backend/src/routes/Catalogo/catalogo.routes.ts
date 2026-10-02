@@ -59,6 +59,8 @@ import {
 import { getAtributosPorProduto } from './Atributos/atributos.controller';
 import { getConfigVendas, salvarConfigVendas, atualizarCustoGerencial, listarUnidadesItens } from './Vendas/configVendas.controller';
 import { listarPendenciasPim } from './Produtos/pendencias.controller';
+import { resumoCatalogo } from './Produtos/resumoCatalogo.controller';
+import { painelPrecos } from './Vendas/painelPrecos.controller';
 import { listarDuplicados, unificarItens } from './Produtos/unificacao.controller';
 import { getProdutoDetalhe, updateProdutoParcial, adicionarAnexo, removerAnexo, definirImagemPrincipal, getFichaTecnica, salvarFichaTecnica, getAtributosParaItem } from './Produtos/produtoDetalhe.controller';
 
@@ -147,6 +149,10 @@ router.get('/produtos/:id_item/ficha-tecnica', getFichaTecnica);
 router.get('/atributos-para-item', getAtributosParaItem);
 // Pendências do PIM (todos os itens com algo a resolver)
 router.get('/pendencias', listarPendenciasPim);
+// Resumo do catálogo (painel do PIM)
+router.get('/resumo', resumoCatalogo);
+// Painel de precificação (custo, preço, margem e situação dos itens de venda)
+router.get('/precos/painel', painelPrecos);
 // Itens duplicados: suspeitas e unificação de um item em outro
 router.get('/itens/duplicados', listarDuplicados);
 router.post('/itens/unificar', unificarItens);

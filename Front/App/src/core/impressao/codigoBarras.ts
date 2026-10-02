@@ -61,6 +61,20 @@ export const valoresCode128B = (texto: string): number[] => {
 export const codificarCode128 = (texto: string): string =>
   valoresCode128B(texto).map(v => larguraParaModulos(CODE128_PADROES[v])).join('');
 
+const START_C = 105;
+
+/** Valores Code 128-C (pares de dígitos): o padrão da chave de acesso da NF-e no DANFE. Exige quantidade par de dígitos. */
+export const valoresCode128C = (digitos: string): number[] => {
+  if (!/^\d+$/.test(digitos) || digitos.length % 2 !== 0) throw new Error('Code 128-C exige quantidade par de dígitos.');
+  const dados: number[] = [];
+  for (let i = 0; i < digitos.length; i += 2) dados.push(Number(digitos.slice(i, i + 2)));
+  const checksum = dados.reduce((acc, v, i) => acc + v * (i + 1), START_C) % 103;
+  return [START_C, ...dados, checksum, STOP];
+};
+
+export const codificarCode128C = (digitos: string): string =>
+  valoresCode128C(digitos).map(v => larguraParaModulos(CODE128_PADROES[v])).join('');
+
 // ---------------------------------------------------------------- escolha + SVG
 export interface CodigoBarras {
   tipo: 'EAN13' | 'CODE128';

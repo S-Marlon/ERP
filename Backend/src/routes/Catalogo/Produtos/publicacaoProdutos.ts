@@ -18,7 +18,8 @@ const paraAtributo = (r: any): AtributoEfetivo => ({
  * Item sem família herda direto da categoria ("família virtual" do documento de arquitetura).
  */
 // gradeSemValor: atributos de grade (não obrigatórios) ainda vazios: não impedem a publicação, mas deixam SKUs iguais na grade
-export type PublicacaoItem = Publicacao & { gradeSemValor: string[] };
+// atributosGrade: ids dos atributos de grade que valem para o item (família + herdados da categoria)
+export type PublicacaoItem = Publicacao & { gradeSemValor: string[]; atributosGrade: string[] };
 
 export const avaliarPublicacaoItens = async (conn: Conn, tenant: number, idsItens?: number[]): Promise<Map<number, PublicacaoItem>> => {
   const filtro = idsItens && idsItens.length > 0 ? `AND ic.id_item IN (${idsItens.map(() => '?').join(',')})` : '';
@@ -92,6 +93,7 @@ export const avaliarPublicacaoItens = async (conn: Conn, tenant: number, idsIten
       gradeSemValor: efetivos
         .filter(a => a.classificacao === 'grade' && !a.obrigatorio && !preenchidos.has(String(a.id)))
         .map(a => a.nome),
+      atributosGrade: efetivos.filter(a => a.classificacao === 'grade').map(a => String(a.id)),
     });
   }
   return resultado;

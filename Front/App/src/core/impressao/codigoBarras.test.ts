@@ -1,10 +1,16 @@
-import { CODE128_PADROES, codificarCode128, codificarEan13, eanValido, escolherCodigo, valoresCode128B } from './codigoBarras';
+import { CODE128_PADROES, codificarCode128, codificarEan13, eanValido, escolherCodigo, valoresCode128B , valoresCode128C, codificarCode128C} from './codigoBarras';
 
 const assert = (condition: boolean, message: string): void => {
   if (!condition) throw new Error(message);
 };
 
 export const runCodigoBarrasTests = (): void => {
+  // Code 128-C: pares de dígitos; checksum = (105 + 12*1 + 34*2) % 103 = 185 % 103 = 82
+  const c = valoresCode128C('1234');
+  if (c.join(',') !== '105,12,34,82,106') throw new Error(`Code128C: ${c.join(',')}`);
+  if (codificarCode128C('00').length !== 11 * 3 + 13) throw new Error('Code128C: largura em módulos');
+  let impar = false; try { valoresCode128C('123'); } catch { impar = true; }
+  if (!impar) throw new Error('Code128C deveria recusar quantidade ímpar');
   // Tabela Code 128: 107 símbolos distintos, cada um com 11 módulos (STOP com 13)
   assert(CODE128_PADROES.length === 107 && new Set(CODE128_PADROES).size === 107, 'Tabela Code 128 completa e sem repetição.');
   assert(CODE128_PADROES.slice(0, 106).every(p => p.length === 6 && p.split('').reduce((a, w) => a + Number(w), 0) === 11), 'Símbolos com 11 módulos.');

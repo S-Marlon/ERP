@@ -28,4 +28,24 @@ export const runDuplicadosTests = () => {
   const nome = grupos.find(g => g.motivo === 'NOME_IGUAL');
   assert(nome && nome.idsItens.join(',') === '1,2', 'nome igual normalizado');
   assert(grupos.length === 2, 'detergentes diferentes não viram suspeita');
+
+  // Mesma família com grade diferente (balde x galão): não é duplicado
+  const oleos = [
+    { idItem: 20, nome: '[NOVO] Hidraulico 68', familiaId: 9, assinaturaGrade: 'emb=BALDE 20L' },
+    { idItem: 21, nome: '[NOVO] Hidraulico 68', familiaId: 9, assinaturaGrade: 'emb=GALAO 3,6L' },
+  ];
+  assert(agruparDuplicados(oleos, []).length === 0, 'grade diferente na mesma família não é suspeita');
+  // Mesma grade ou sem grade preenchida: continua suspeito
+  assert(agruparDuplicados([oleos[0], { ...oleos[1], assinaturaGrade: 'emb=BALDE 20L' }], []).length === 1, 'mesma grade é suspeita');
+  assert(agruparDuplicados([oleos[0], { ...oleos[1], assinaturaGrade: null }], []).length === 1, 'grade vazia não distingue');
+  assert(agruparDuplicados([oleos[0], { ...oleos[1], familiaId: 10 }], []).length === 1, 'famílias diferentes não se distinguem pela grade');
+  // Três itens: o par distinguido sai, o terceiro (sem família) continua com os dois
+  const tres = agruparDuplicados([...oleos, { idItem: 22, nome: 'Hidraulico 68', familiaId: null, assinaturaGrade: null }], []);
+  assert(tres.length === 1 && tres[0].idsItens.join(',') === '20,21,22', 'terceiro item sem família continua suspeito com os dois');
+  // Mesmo código de fornecedor, grades diferentes na mesma família: não é suspeita
+  const cods = [
+    { idFornecedor: 10, fornecedor: 'X', codigo: 'H68', idItem: 20 },
+    { idFornecedor: 10, fornecedor: 'X', codigo: 'H68', idItem: 21 },
+  ];
+  assert(agruparDuplicados(oleos, cods).length === 0, 'código igual com grade diferente não é suspeita');
 };
