@@ -237,10 +237,12 @@ export const avaliarPenteFino = (
     });
   }
 
+  // Sem o fornecedor cadastrado a entrada fica sem vínculo item x fornecedor (as próximas notas não reconhecem
+  // os itens) e sem a quem atribuir a compra: bloqueia até cadastrar (botão Cadastrar no card do fornecedor)
   if (!ctx.fornecedorCadastrado) {
-    avisos.push({
+    bloqueios.push({
       codigo: 'FORNECEDOR_NAO_CADASTRADO',
-      mensagem: 'Fornecedor da NF não cadastrado: o vínculo item x fornecedor não será gravado.',
+      mensagem: 'Fornecedor da NF não cadastrado: cadastre-o (card do Fornecedor, botão Cadastrar) antes de dar entrada.',
     });
   }
 

@@ -194,6 +194,39 @@ export const buscarClassificacaoItens = async (
     return data.itens || {};
 };
 
+/**
+ * PENTE-FINO DO LOTE (bloqueios e avisos antes da entrada no estoque) e APROVAÇÃO (entrada definitiva)
+ */
+export interface VerificacaoLote { codigo: string; mensagem: string; itens?: string[] }
+export interface AnaliseLote {
+    aprovavel: boolean;
+    bloqueios: VerificacaoLote[];
+    avisos: VerificacaoLote[];
+    resumo: { totalItens: number; conferidos: number; novos: number; vinculados: number; valorItens: number; valorNota: number };
+}
+
+export const analisarLoteStaging = async (loteId: number, tenantId: number = 1): Promise<AnaliseLote> => {
+    const response = await fetch(`${API_BASE_URL}/compras/lotes/${loteId}/analise?tenant_id=${tenantId}`);
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Erro ao analisar o lote.');
+    return data.analise;
+};
+
+export const aprovarLoteStaging = async (loteId: number, tenantId: number = 1): Promise<{ message: string; analise?: AnaliseLote }> => {
+    const response = await fetch(`${API_BASE_URL}/compras/lotes/${loteId}/aprovar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenant_id: tenantId }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.success) {
+        const erro: any = new Error(data.error || 'Erro ao aprovar o lote.');
+        erro.analise = data.analise;
+        throw erro;
+    }
+    return data;
+};
+
 export const sugerirVinculos = async (
     cnpj: string,
     itens: Array<{ chave: string; codigo?: string; ean?: string }>,

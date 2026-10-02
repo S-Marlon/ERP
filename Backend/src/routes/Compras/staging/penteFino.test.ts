@@ -51,6 +51,9 @@ export const runPenteFinoTests = (): void => {
   assert(avaliarPenteFino(lote, [novoCom('1', 'ABC'), novoCom('2', 'ABD')], ctx).aprovavel, 'SKUs diferentes são aprováveis.');
   assert(avaliarPenteFino(lote, [novoCom('1', 'it-000045')], ctx).bloqueios.some(b => b.codigo === 'SKU_RESERVADO'), 'SKU no formato da sequência deveria bloquear.');
 
+  const semFornecedor = avaliarPenteFino(lote, [item({})], { ...ctx, fornecedorCadastrado: false });
+  assert(!semFornecedor.aprovavel && semFornecedor.bloqueios.some(b => b.codigo === 'FORNECEDOR_NAO_CADASTRADO'), 'Fornecedor não cadastrado deveria bloquear.');
+
   const importado = avaliarPenteFino({ ...lote, status: 'IMPORTADO' }, [item({})], ctx);
   assert(importado.bloqueios.some(b => b.codigo === 'LOTE_FINALIZADO'), 'Lote importado não pode ser aprovado de novo.');
 

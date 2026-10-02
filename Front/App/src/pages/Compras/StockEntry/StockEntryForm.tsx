@@ -16,21 +16,21 @@ Tooltip,
 Modal,
 Radio,
 Table,
-message
+message,
+notification
 } from 'antd';
 import {
 CheckCircleOutlined,
 DollarOutlined,
 InfoCircleOutlined,
-SettingOutlined,
-BugFilled,
-CodeFilled
+SettingOutlined
 } from '@ant-design/icons';
 import { getMappedId, type MappingPayload } from './ItemsConference/ProductMappingModal';
 import NfeCards from './nfeCards/NfeCards';
 import { ItemsConference } from './ItemsConference/ItemsConference';
 import { SupplierModal } from './SupplierModal';
-import PhysicalConferenceTable from './PhysicalConferenceTable';
+import RevisaoFinalModal from './RevisaoFinalModal';
+import { getPendenciasPim } from '../../Catalogo/pages/PendenciasPim/pendenciasApi';
 import { parseNfeComplete, NfeDataFromXML } from './xml/utils/nfeParser';
 import { reconcileFreight } from './freightReconciliation';
 import { reconcileFinancial } from './financialReconciliation';
@@ -38,7 +38,7 @@ import { distributeFreight, FreightMode, FREIGHT_MODE_LABELS } from './freightDi
 import { TipoRecurso, TIPO_RECURSO_PADRAO, getTipoRecursoConfig } from './tipoRecurso';
 import { applyConfirmation, applyItemEdit, ItemId, MSG_SEM_CODIGO_INTERNO } from './conferencia';
 import { StockEntryHeader } from './StockEntryHeader';
-import { sincronizarLoteXMLCompleto, buscarEstadoLote, sugerirVinculos } from '../api/comprasApi';
+import { sincronizarLoteXMLCompleto, buscarEstadoLote, sugerirVinculos, aprovarLoteStaging } from '../api/comprasApi';
 import { aplicarSugestoes, chaveDaLinha } from './vinculoSugerido';
 import { DestinoLinha } from './depositos';
 import { aplicarClassificacao, mapeamentoRapido } from './edicaoLote';
@@ -147,6 +147,7 @@ const [isProcessingItems, setIsProcessingItems] = useState<boolean>(false);
 // Estados de Modais
 
 const [isConferenceModalOpen, setIsConferenceModalOpen] = useState<boolean>(false);
+const [aprovando, setAprovando] = useState<boolean>(false);
 const [isSupplierModalOpen, setIsSupplierModalOpen] = useState<boolean>(false);
 const [isTotalDetailsModalOpen, setIsTotalDetailsModalOpen] = useState<boolean>(false);
 
@@ -674,6 +675,34 @@ message.success(`${result.changed.length} item(ns) marcado(s) como ${getTipoRecu
 }
 };
 
+// Aprovação da entrada (a mesma da tela de Staging): estoque, itens novos e vínculos de fornecedor
+const handleAprovarEntrada = async () => {
+if (!loteId) return;
+setAprovando(true);
+try {
+const r = await aprovarLoteStaging(loteId);
+message.success(r.message || 'Entrada aprovada.');
+setIsConferenceModalOpen(false);
+// Itens desta nota com cadastro incompleto no PIM: aviso com atalho
+try {
+const p = await getPendenciasPim({ lote: loteId, tipo: 'TODOS', limit: 1 });
+if (p.totalItensComPendencia > 0) {
+notification.warning({
+message: `${p.totalItensComPendencia} item(ns) desta nota com pendências no catálogo`,
+description: p.criticos > 0 ? `${p.criticos} crítico(s): ficam fora do PDV ou sem preço até completar o cadastro.` : 'Cadastro incompleto (classificação, grade, código de barras...).',
+duration: 0,
+btn: <Button type="primary" size="small" onClick={() => { notification.destroy(); navigate(`/catalogo/pendencias?lote=${loteId}`); }}>Ver pendências</Button>,
+});
+}
+} catch { /* aviso opcional */ }
+navigate('/compras/notas');
+} catch (e: any) {
+Modal.error({ title: 'Entrada não aprovada', content: e.message });
+} finally {
+setAprovando(false);
+}
+};
+
 const handleReceberTotalDoFilho = (valorCalculado: number) => {
 console.log("O valor recebido do filho é:", valorCalculado);
 // Faça o que precisar com o valor aqui (ex: salvar em um estado do pai)
@@ -1080,76 +1109,36 @@ valueStyle={{ fontSize: 16 }}
 <span>Produtos:</span>
 <span>R$ {parseFloat(parsedNfe.totais.icmsTot.vProd || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
 </div>
-{parseFloat(parsedNfe.totais.icmsTot.vFrete || '0') > 0 && (
-<div style={{ display: 'flex', justifyContent: 'space-between', color: '#1890ff' }}>
-<span>(+) Frete:</span>
-<span>R$ {parseFloat(parsedNfe.totais.icmsTot.vFrete).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-</div>
-)}
-
-<div style={{ display: 'flex', justifyContent: 'space-between', color: '#1890ff' }}>
-<span>(+) Seguro:</span>
-<span>R$ {parseFloat(parsedNfe.totais.icmsTot.vSeg || '0').toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-</div>
-
-
-{parseFloat(parsedNfe.totais.icmsTot.vSeg || '0') > 0 && (
-<div style={{ display: 'flex', justifyContent: 'space-between', color: '#1890ff' }}>
-<span>(+) Seguro:</span>
-<span>R$ {parseFloat(parsedNfe.totais.icmsTot.vFrete).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-</div>
-)}
-
-{parseFloat(parsedNfe.totais.icmsTot.vOutro || '0') > 0 && (
-<div style={{ display: 'flex', justifyContent: 'space-between', color: '#1890ff' }}>
-<span>(+) Outros:</span>
-<span>R$ {parseFloat(parsedNfe.totais.icmsTot.vFrete).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-
-</div>
-)}
-
-{parseFloat(parsedNfe.totais.icmsTot.vIPI || '0') > 0 && (
-<div style={{ display: 'flex', justifyContent: 'space-between', color: '#1890ff' }}>
-<span>(+) IPI:</span>
-<span>R$ {parseFloat(parsedNfe.totais.icmsTot.vIPI).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-
-</div>
-)}
-
-{parseFloat(parsedNfe.totais.icmsTot.vST || '0') > 0 && (
-<div style={{ display: 'flex', justifyContent: 'space-between', color: '#1890ff' }}>
-<span>(+) ICMS ST:</span>
-<span>R$ {parseFloat(parsedNfe.totais.icmsTot.vICMSST).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-
-</div>
-)}
-
-<div>
-<span>(=) Total:</span>
-
 {(() => {
-const icmsTot = parsedNfe?.totais?.icmsTot;
-
-// Converte cada string para número, usando 0 como padrão se estiver vazia
-const vProd = parseFloat(icmsTot?.vProd || '0') || 0;
-
-const vICMSST = parseFloat(icmsTot?.vICMSST || icmsTot?.vST || '0') || 0;
-const vIPI = parseFloat(icmsTot?.vIPI || '0') || 0;
-const vFrete = parseFloat(icmsTot?.vFrete || '0') || 0;
-const vSeg = parseFloat(icmsTot?.vSeg || '0') || 0;
-const vOutro = parseFloat(icmsTot?.vOutro || '0') || 0;
-
-// Soma matemática correta
-const total = vProd + vICMSST + vIPI + vFrete + vSeg + vOutro;
-
+// Composição do total da nota a partir do XML (cada linha só aparece se tiver valor)
+const t = parsedNfe.totais.icmsTot;
+const v = (x?: string) => parseFloat(x || '0') || 0;
+const st = v(t.vICMSST || t.vST);
+const linhas: Array<[string, number, string]> = [
+['(+) Frete', v(t.vFrete), '#1890ff'],
+['(+) Seguro', v(t.vSeg), '#1890ff'],
+['(+) Outras despesas', v(t.vOutro), '#1890ff'],
+['(+) IPI', v(t.vIPI), '#1890ff'],
+['(+) ICMS ST', st, '#1890ff'],
+['(−) Desconto', -v(t.vDesc), '#cf1322'],
+];
+const total = v(t.vProd) + v(t.vFrete) + v(t.vSeg) + v(t.vOutro) + v(t.vIPI) + st - v(t.vDesc);
+const fmt = (n: number) => Math.abs(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 return (
-<span>
-R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-</span>
+<>
+{linhas.filter(([, valor]) => Math.abs(valor) > 0.004).map(([rotulo, valor, cor]) => (
+<div key={rotulo} style={{ display: 'flex', justifyContent: 'space-between', color: cor }}>
+<span>{rotulo}:</span>
+<span>R$ {fmt(valor)}</span>
+</div>
+))}
+<div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, borderTop: '1px dashed #d9d9d9', marginTop: 4, paddingTop: 4 }}>
+<span>(=) Total:</span>
+<span>R$ {fmt(total)}</span>
+</div>
+</>
 );
 })()}
-
-</div>
 </div>
 )}
 
@@ -1175,22 +1164,24 @@ block
 size="large"
 icon={<CheckCircleOutlined />}
 style={{ marginTop: 16, height: 46, background: isSubmitDisabled ? undefined : '#52c41a', border: 'none' }}
-disabled={isSubmitDisabled || Boolean(modoVisualizacao)}
+disabled={isSubmitDisabled || Boolean(modoVisualizacao) || !loteId}
 onClick={() => setIsConferenceModalOpen(true)}
 >
-{items.length === 0 ? 'Aguardando XML...' : 'Confirmar Entrada e Estoque'}
+{items.length === 0 ? 'Aguardando XML...' : isSubmitDisabled ? `Confira todos os itens (${totalConfirmed}/${items.length})` : 'Revisar e dar entrada'}
 </Button>
 
+{/* Debug do payload da staging (desligado; para usar, descomente e importe BugFilled e CodeFilled de @ant-design/icons)
 <Button
 type="primary"
 block
 size="large"
 icon={<BugFilled/>}
 style={{ marginTop: 16, height: 46, background: 'black', border: 'none' }}
-onClick={() => setIsPayloadModalOpen(true)} // <--- ADICIONADO AQUI
+onClick={() => setIsPayloadModalOpen(true)}
 >
 <CodeFilled/> Debug
 </Button>
+*/}
 
 </Card>
 </Space>
@@ -1289,26 +1280,22 @@ render: (v: number, row: any) => (
 />
 </Modal>
 
-<Modal
-title="Conferência Física de Quantidades"
+<RevisaoFinalModal
 open={isConferenceModalOpen}
-onCancel={() => setIsConferenceModalOpen(false)}
-width={1280}
-footer={[
-<Button key="back" onClick={() => setIsConferenceModalOpen(false)}>Continuar depois</Button>,
-<Button key="submit" type="primary" style={{ background: '#52c41a' }} onClick={() => setIsConferenceModalOpen(false)}>
-Finalizar e Dar Entrada no Estoque
-</Button>
-]}
-destroyOnClose
->
-<PhysicalConferenceTable
+loteId={loteId}
 items={items}
-onConfirmItems={handleConfirmItems}
-onUnconfirmItems={handleUnconfirmItems}
-onQuantityChange={handleQuantityChange}
+nota={{
+numero: parsedNfe?.numero,
+serie: parsedNfe?.serie,
+fornecedor: parsedNfe?.emitente?.nomeFantasia || parsedNfe?.emitente?.nome,
+valorNota: parseFloat(parsedNfe?.totais?.icmsTot?.vNF || '0') || 0,
+freteAdicional: Number(freteAdicionalInfo?.valor) || 0,
+custoAjustado: custoAjustadoTotal,
+}}
+aprovando={aprovando}
+onClose={() => setIsConferenceModalOpen(false)}
+onAprovar={handleAprovarEntrada}
 />
-</Modal>
 
 <Modal
 title="📊 Detalhamento Completo de Totais e Tributos da NF-e"
