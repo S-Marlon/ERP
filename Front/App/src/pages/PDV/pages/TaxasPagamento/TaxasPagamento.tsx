@@ -25,9 +25,11 @@ const previa = (linhas: Linha[], formaRef: string, parcelasRef: number) => {
   const linha = (forma: string, n: number) => linhas.find(x => x.forma === forma && n >= x.parcelasDe && n <= x.parcelasAte);
   const taxa = (forma: string, n: number) => { const l = linha(forma, n); return l ? totalPct(l) : 0; };
   const fixa = (forma: string, n: number) => { const l = linha(forma, n); return l && l.tipoFixa === 'RS' ? Number(l.fixa) || 0 : 0; };
+  const parcelamento = (forma: string, n: number) => Number(linha(forma, n)?.percentual) || 0;
+  const venda = (forma: string, n: number) => { const l = linha(forma, n); return l && l.tipoFixa === 'PCT' ? Number(l.vendaPercentual) || 0 : 0; };
   const ref = taxa(formaRef, parcelasRef) / 100;
   const ajuste = (forma: string, n: number) => ((1 - ref) / (1 - taxa(forma, n) / 100) - 1) * 100;
-  return { ref: ref * 100, ajuste, taxa, fixa, fixaRef: fixa(formaRef, parcelasRef) };
+  return { ref: ref * 100, ajuste, taxa, fixa, parcelamento, venda, fixaRef: fixa(formaRef, parcelasRef) };
 };
 
 // Faixas de parcelas do crédito sem taxa cadastrada (contam como 0%)
@@ -139,8 +141,11 @@ const TaxasPagamento: React.FC = () => {
     const absorveTaxa = forma === 'CREDITO' && parcelas <= semJuros && ajusteBruto > 0.005;
     const ajuste = forma === 'CREDITO' && parcelas <= semJuros ? 0 : ajusteBruto;
     const cobrar = Math.round(precoTabela * (1 + ajuste / 100) * 100) / 100;
-    const taxaValor = Math.round((cobrar * prev.taxa(forma, parcelas) / 100 + prev.fixa(forma, parcelas)) * 100) / 100;
-    return { forma, parcelas, ajuste, absorveTaxa, cobrar, taxaValor, recebe: Math.round((cobrar - taxaValor) * 100) / 100 };
+    const r2 = (v: number) => Math.round(v * 100) / 100;
+    const taxaVenda = r2(cobrar * prev.venda(forma, parcelas) / 100 + prev.fixa(forma, parcelas));
+    const taxaParcelamento = r2(cobrar * prev.parcelamento(forma, parcelas) / 100);
+    const taxaValor = r2(taxaVenda + taxaParcelamento);
+    return { forma, parcelas, ajuste, absorveTaxa, cobrar, taxaVenda, taxaParcelamento, taxaValor, recebe: r2(cobrar - taxaValor) };
   };
   const descontoPix = -Math.min(0, prev.ajuste('PIX', 1));
   const ajusteDebito = prev.ajuste('DEBITO', 1);
@@ -209,11 +214,11 @@ const TaxasPagamento: React.FC = () => {
               ),
             }] : []),
             {
-              title: <Tooltip title="Taxa da faixa de parcelas (MDR / antecipação)">Taxa <InfoCircleOutlined /></Tooltip>, dataIndex: 'percentual', width: 110,
+              title: <Tooltip title="Taxa de parcelamento da faixa (no 1x costuma ser 0%)">Parcelamento <InfoCircleOutlined /></Tooltip>, dataIndex: 'percentual', width: 110,
               render: (v: number, l: Linha) => <InputNumber size="small" min={0} max={49.99} step={0.1} precision={2} decimalSeparator="," addonAfter="%" style={{ width: 100 }} value={v} onChange={x => alterar(l.chave, 'percentual', Number(x) || 0)} />,
             },
             {
-              title: <Tooltip title="Cobrada em toda venda, além da taxa da faixa: em % (ex.: 3,09%) ou em R$">Por venda <InfoCircleOutlined /></Tooltip>, key: 'fixa', width: 150,
+              title: <Tooltip title="Taxa de venda: cobrada em toda venda, além do parcelamento. Em % (ex.: 2,99%) ou em R$ fixo por venda">Taxa de venda <InfoCircleOutlined /></Tooltip>, key: 'fixa', width: 150,
               render: (_: unknown, l: Linha) => campoFixa(l),
             },
             {
@@ -276,8 +281,8 @@ const TaxasPagamento: React.FC = () => {
             extra={(
               <Space wrap>
                 <Space.Compact size="small">
-                  <InputNumber size="small" min={0} max={49.99} step={0.1} precision={2} decimalSeparator="," addonAfter="%" placeholder="Por venda"
-                    style={{ width: 120 }} value={vendaEmLote} onChange={v => setVendaEmLote(v)} />
+                  <InputNumber size="small" min={0} max={49.99} step={0.1} precision={2} decimalSeparator="," addonAfter="%" placeholder="Taxa de venda"
+                    style={{ width: 140 }} value={vendaEmLote} onChange={v => setVendaEmLote(v)} />
                   <Button size="small" disabled={vendaEmLote === null}
                     onClick={() => setLinhas(ls => ls.map(l => (['DEBITO', 'CREDITO'].includes(l.forma)
                       ? { ...l, tipoFixa: 'PCT', vendaPercentual: Number(vendaEmLote) || 0, fixa: 0 } : l)))}>
@@ -381,7 +386,14 @@ const TaxasPagamento: React.FC = () => {
                     ),
                   },
                   { title: 'Cobrar', dataIndex: 'cobrar', align: 'right' as const, render: (v: number, r) => <b style={{ color: corAjuste(r.ajuste) }}>{brl(v)}</b> },
-                  { title: 'Taxa', dataIndex: 'taxaValor', align: 'right' as const, render: (v: number) => (v ? <Text type="danger" style={{ fontSize: 12 }}>-{brl(v)}</Text> : <Text type="secondary">—</Text>) },
+                  {
+                    title: <Tooltip title="Taxa de venda (% ou R$ por venda)">T. venda</Tooltip>, dataIndex: 'taxaVenda', align: 'right' as const,
+                    render: (v: number) => (v ? <Text type="danger" style={{ fontSize: 12 }}>-{brl(v)}</Text> : <Text type="secondary">—</Text>),
+                  },
+                  {
+                    title: <Tooltip title="Taxa de parcelamento da faixa">T. parcel.</Tooltip>, dataIndex: 'taxaParcelamento', align: 'right' as const,
+                    render: (v: number) => (v ? <Text type="danger" style={{ fontSize: 12 }}>-{brl(v)}</Text> : <Text type="secondary">—</Text>),
+                  },
                   {
                     title: 'Recebe', dataIndex: 'recebe', align: 'right' as const,
                     render: (v: number, r) => <Text strong style={{ color: r.absorveTaxa ? LARANJA : undefined }}>{brl(v)}</Text>,
