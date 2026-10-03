@@ -9,9 +9,17 @@ const MontagemPdv = lazy(() => import('./hidraulica/montagens/MontagemPdv'));
 
 /** O que o PDV entrega a um botão de módulo (o módulo não acessa o carrinho de outro jeito). */
 export interface PdvExtensaoProps {
-  adicionarItens: (linhas: Array<{ idItem: number; nome: string; quantidade: number; idUnidade: number | null; unidadeBase?: boolean }>) => Promise<string[]>;
+  // Acrescenta (ou substitui) linhas no carrinho; precoFixo congela o preço da linha (ex.: preço combinado na OS)
+  adicionarItens: (
+    linhas: Array<{ idItem: number; nome: string; quantidade: number; idUnidade: number | null; unidadeBase?: boolean; precoFixo?: number }>,
+    opcoes?: { substituir?: boolean }
+  ) => Promise<string[]>;
   clienteId: number | null;
   cliente: string;
+  // Cliente do cadastro (ou só o nome, sem cadastro)
+  definirCliente: (c: { id: number; nome: string } | null, nomeLivre?: string) => void;
+  // Liga a venda a algo do módulo: os sinais dessa origem aparecem no pagamento e uma faixa avisa no PDV
+  vincularOrigem: (o: { origem: string; idOrigem: number; rotulo: string } | null) => void;
 }
 
 export interface ModuloFront {

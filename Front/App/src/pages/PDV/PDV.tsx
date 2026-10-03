@@ -102,11 +102,15 @@ const PDVContent: React.FC = () => {
   const { ativos: modulosAtivos } = useModulos();
   const botoesModulos = extensoesPdv(modulosAtivos);
 
+  // Venda ligada a algo de um módulo (ex.: entrega de OS): sinais dessa origem no pagamento
+  const [origemExterna, setOrigemExterna] = useState<{ origem: string; idOrigem: number; rotulo: string } | null>(null);
+
   const novaVenda = () => {
     // Aviso genérico para os módulos (ex.: descartar fichas de montagem de um carrinho que não virou venda)
     window.dispatchEvent(new Event('erp:venda-nova'));
     clearCart();
     setOrcamentoAtual(null);
+    setOrigemExterna(null);
     setEstagio('SELECAO');
     selecionarCliente(null);
     setMostrarModalCliente(true);
@@ -409,7 +413,20 @@ const PDVContent: React.FC = () => {
             <Space size={6}>
               {botoesModulos.map((Botao, i) => (
                 <Suspense key={i} fallback={null}>
-                  <Botao adicionarItens={linhas => carregarItens(linhas, { acrescentar: true })} clienteId={clienteId} cliente={cliente} />
+                  <Botao
+                    adicionarItens={(linhas, opcoes) => carregarItens(
+                      linhas.map(l => ({ ...l, ...(l.precoFixo !== undefined ? { precoFixo: l.precoFixo, precoTabelaFixa: l.precoFixo } : {}) })),
+                      { acrescentar: !opcoes?.substituir }
+                    )}
+                    clienteId={clienteId}
+                    cliente={cliente}
+                    definirCliente={(c, nomeLivre) => {
+                      if (c) selecionarCliente(c);
+                      else { selecionarCliente(null); if (nomeLivre && nomeLivre !== 'CONSUMIDOR') setCliente(nomeLivre); }
+                      setMostrarModalCliente(false);
+                    }}
+                    vincularOrigem={o => { setOrigemExterna(o); if (o) setOrcamentoAtual(null); }}
+                  />
                 </Suspense>
               ))}
               <Badge count={qtdSuspensas} size="small">
@@ -419,6 +436,10 @@ const PDVContent: React.FC = () => {
               <span style={{ fontSize: 11, color: '#94a3b8' }}>F2 finalizar · F3 buscar · F4 cliente</span>
             </Space>
           </div>
+          {origemExterna && (
+            <Alert type="info" showIcon style={{ padding: '2px 10px' }} message={origemExterna.rotulo}
+              action={<Button size="small" type="link" onClick={() => setOrigemExterna(null)}>desvincular</Button>} />
+          )}
           {orcamentoAtual && (
             <Alert type="info" showIcon style={{ padding: '2px 10px' }}
               message={<span>Vendendo o <b>orçamento Nº {orcamentoAtual.id}</b> · {orcamentoAtual.manterPreco ? 'preços do orçamento mantidos' : 'preços atuais do catálogo'}</span>}
@@ -513,6 +534,7 @@ const PDVContent: React.FC = () => {
           onVendaConcluida={novaVenda}
           idOrcamento={orcamentoAtual?.id ?? null}
           manterPrecoOrcamento={Boolean(orcamentoAtual?.manterPreco)}
+          adiantamentosOrigem={origemExterna ? { origem: origemExterna.origem, idOrigem: origemExterna.idOrigem } : null}
           total={total}
           cliente={cliente}
           clienteId={clienteId}

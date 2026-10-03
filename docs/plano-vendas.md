@@ -17,7 +17,7 @@ testes → telas → commit.
 | 3.5 | **Taxas dos meios de pagamento**: taxa por forma/parcelas, preço com a taxa embutida, desconto da forma sem autorização, acréscimo no parcelamento, margem líquida | `vendas_taxas_pagamento`; referência e sem juros em `vendas_configuracoes`; taxa em `vendas_pedidos_pagamentos` e `vendas_pedidos` | feito |
 | 4 | **Central de Vendas real**: faturamento, ticket médio, margem, formas, mais vendidos, a receber, caixa | — | feito |
 | 5 | **Orçamento e venda suspensa**: suspender/retomar, orçamento com validade e impressão, converter em venda | status, `validade`, `contato` e `id_orcamento` em `vendas_pedidos` | feito |
-| 6 | **OS de montagem de mangueira**: mão de obra + componentes, OS → venda (reaproveita `components/OrderService`) | itens de serviço, OS | |
+| 6 | **Módulo plugável Hidráulica · Montagens**: montagem na hora no PDV, OS com sinal e ficha técnica | `sistema_modulos`, `vendas_adiantamentos`, `modulo_hidraulica_montagens_*` | feito |
 | 7 | **Devolução parcial e troca** | | |
 | 8 | **NFC-e / NF-e de saída** (emissor a definir) | | |
 
@@ -68,6 +68,19 @@ testes → telas → commit.
 - **Telas**: no PDV, botões Suspender / Orçamento (contato, validade, observação, impressão A4) e a lista Suspensas /
   Orçamentos (retomar, vender, imprimir, excluir); faixa "vendendo o orçamento Nº X"; Vendas › Orçamentos.
 
+## Fase 6 — como ficou
+
+- **Núcleo**: venda de itens do tipo Serviço (sem estoque); adiantamentos (`/api/vendas/adiantamentos`, forma de pagamento
+  ADIANTAMENTO/"Sinal", Caixa › Receber sinal); módulos plugáveis (`sistema_modulos`, `GET|PUT /api/sistema/modulos`,
+  Configurações › Módulos). O núcleo não importa nada de módulo.
+- **Padrão de módulo**: tabelas `modulo_<area>_<assunto>_*`, código `AREA_ASSUNTO`, backend em `Backend/src/modulos/<area>/<assunto>`
+  (registro em `src/modulos/registro.ts`, rotas em `/api/modulos/...`, 403 quando desligado), front em `Front/App/src/modulos/...`
+  (registro em `registroModulos.tsx`: menu, rotas e botões no PDV). Avisos genéricos do PDV: `erp:venda-concluida` e `erp:venda-nova`.
+- **Hidráulica · Montagens** (`HIDRAULICA_MONTAGENS`): botão Montagem no PDV (mangueira em metros + terminais + capas,
+  prensagem só se o cliente trouxe material; ficha gravada com a venda; refazer pelo histórico do cliente) e
+  Vendas › Montagens (OS): etapas, mangueiras com ficha e materiais, itens avulsos, sinal, impressão A4, cancelamento
+  (devolve ou guarda o sinal) e entrega pelo PDV (preços da OS, sinal abatido, OS fica ENTREGUE com a venda).
+
 ## Critérios de pronto
 
 - **Fase 1:** abrir com R$ 100, vender R$ 50 em dinheiro, sangria de R$ 30 → fechamento espera R$ 120 em dinheiro e mostra a diferença contada.
@@ -76,5 +89,5 @@ testes → telas → commit.
 
 ## Observações
 
-- Os componentes de OS (`OSPanel`, `components/OrderService/*`, `LaborCalculator`, `OSListPage`) não estão em uso, mas foram mantidos para a fase 6.
+- Os componentes antigos de OS (`OSPanel`, `components/OrderService/*`, `LaborCalculator`, `OSListPage`) foram substituídos pelo módulo Hidráulica · Montagens e podem ser removidos.
 - A lista de OS e Financeiro › Faturamento ainda usam dados de exemplo (fase 6 e depois).
