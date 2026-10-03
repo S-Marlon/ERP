@@ -29,6 +29,8 @@ import { FinalizarVenda } from "./pages/PDV/pages/FinalizarVenda";
 import PDVContent from './pages/PDV/PDV';
 import HubVendas from './pages/PDV/HubVendas';
 import VendasDoDia from './pages/PDV/pages/VendasDoDia/VendasDoDia';
+import CaixasHistorico from './pages/PDV/pages/Caixas/CaixasHistorico';
+import { CaixaPaineis } from './pages/PDV/caixa/CaixaPainel';
 import NotasEntrada from './pages/Compras/NotasEntrada/NotasEntrada';
 import ComprasDashboard from "./pages/Compras/ComprasDashboard";
 import StockEntryForm from "./pages/Compras/StockEntry/StockEntryForm";
@@ -126,6 +128,8 @@ export default function AppLayout() {
             />
           )}
         </Header>
+        {/* Painéis do caixa fora do PDV (no PDV ficam no cabeçalho) */}
+        {!isPDV && <CaixaPaineis />}
         
         <Panel isDarkMode={isDarkMode}  
           >
@@ -148,6 +152,7 @@ export default function AppLayout() {
             <Route path="/vendas" element={<HubVendas />} />
             <Route path="/vendas/pdv" element={<PDVContent />} />
             <Route path="/vendas/do-dia" element={<VendasDoDia />} />
+            <Route path="/vendas/caixas" element={<CaixasHistorico />} />
             <Route path="/vendas/pdv/finalizar" element={<FinalizarVenda onBack={() => {}} />} />
             <Route path="/estoque" element={<Estoque />} />
             <Route path="/estoque/consulta" element={<SaldoEstoque />} />

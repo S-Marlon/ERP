@@ -7,6 +7,7 @@ import { imprimirExtratoElgin } from '../../../utils/printService';
 import { salesService, VendaPdvPayload, FormaPagamentoPdv } from '../services/salesService';
 import Swal from 'sweetalert2';
 import { isCartItemOS } from '../types/cart.types';
+import { caixaStore } from '../caixa/caixaStore';
 // import {ItemVenda} from '../../../utils/printService'
 
 import Draggable from 'react-draggable';
@@ -271,6 +272,7 @@ const toggleWindow = (id) => {
         setIsEnviando(true);
         try {
             const resposta = await salesService.saveVenda(payload);
+            caixaStore.recarregar();
 
             // Impressão só depois de gravada, com o número real da venda
             imprimirExtratoElgin({
@@ -306,6 +308,7 @@ const toggleWindow = (id) => {
             if (onVendaConcluida) onVendaConcluida();
             else onBack();
         } catch (error: any) {
+            if (/caixa/i.test(String(error?.message))) { caixaStore.recarregar(); caixaStore.mostrar('abrir'); }
             Swal.fire({
                 icon: 'error',
                 title: 'Venda não registrada',

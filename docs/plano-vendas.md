@@ -11,7 +11,7 @@ testes → telas → commit.
 | Fase | O quê | Banco | Situação |
 |---|---|---|---|
 | 0 | Limpeza: código morto do PDV, senha fixa de gerente e modal de cliente falso | — | feito |
-| 1 | **Caixa**: abertura com troco, sangria/suprimento, fechamento com conferência por forma; venda só com caixa aberto | `vendas_caixas`, `vendas_caixas_movimentos`, `vendas_caixas_fechamentos`; `id_caixa` e `operador` em `vendas_pedidos` | em andamento |
+| 1 | **Caixa**: abertura com troco, sangria/suprimento, fechamento com conferência por forma; venda só com caixa aberto | `vendas_caixas`, `vendas_caixas_movimentos`, `vendas_caixas_fechamentos`; `id_caixa` e `operador` em `vendas_pedidos` | feito |
 | 2 | **Prazo → contas a receber**: venda a prazo exige cliente, gera parcelas, limite de crédito, baixa (dinheiro entra no caixa) | `financeiro_contas_receber`, `financeiro_contas_receber_baixas`, limite de crédito | |
 | 3 | **Desconto e margem no servidor**: limite configurável, autorização registrada, aviso/bloqueio abaixo do custo | `vendas_configuracoes`; autorização em `vendas_pedidos` | |
 | 4 | **Central de Vendas real**: faturamento, ticket médio, margem, formas, mais vendidos, a receber, caixa | — | |
@@ -19,6 +19,15 @@ testes → telas → commit.
 | 6 | **OS de montagem de mangueira**: mão de obra + componentes, OS → venda (reaproveita `components/OrderService`) | itens de serviço, OS | |
 | 7 | **Devolução parcial e troca** | | |
 | 8 | **NFC-e / NF-e de saída** (emissor a definir) | | |
+
+## Fase 1 — como ficou
+
+- **Backend** (`Backend/src/routes/Venda/caixa`): `caixa.ts` (cálculo, com testes) e `caixa.controller.ts`.
+  Rotas em `/api/vendas`: `GET caixa/atual`, `POST caixa/abrir`, `POST caixa/movimentos` (SANGRIA/SUPRIMENTO),
+  `POST caixa/fechar`, `GET caixas`, `GET caixas/:id`.
+- Venda só com caixa aberto (`409 CAIXA_FECHADO`); cancelamento de venda de outro caixa lança `ESTORNO_VENDA` no caixa aberto.
+- **Telas**: indicador no cabeçalho do PDV (abre o resumo), abertura, sangria/suprimento, fechamento com contagem por
+  forma e comprovante; aviso de caixa fechado na venda; Vendas › Caixas (histórico e detalhe).
 
 ## Critérios de pronto
 

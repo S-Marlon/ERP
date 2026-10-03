@@ -1,3 +1,5 @@
+import { operadorAtual } from '../caixa/caixaApi';
+
 const apiBase = 'http://localhost:3001/api/vendas/pdv';
 
 // Venda no modelo novo: o backend recalcula o preço de tabela, baixa o estoque e valida os pagamentos
@@ -32,6 +34,8 @@ export interface VendaResumo {
     idVenda: number;
     status: 'CONCLUIDA' | 'CANCELADA';
     clienteNome: string;
+    operador?: string | null;
+    idCaixa?: number | null;
     totalBruto: number;
     totalDesconto: number;
     totalLiquido: number;
@@ -53,7 +57,7 @@ export const salesService = {
         const response = await fetch(`${apiBase}/vendas`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(venda),
+            body: JSON.stringify({ ...venda, operador: operadorAtual() }),
         });
         if (!response.ok) throw await lerErro(response, 'Erro ao registrar venda no servidor.');
         return response.json();
@@ -69,7 +73,7 @@ export const salesService = {
         const response = await fetch(`${apiBase}/vendas/${idVenda}/cancelar`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ motivo }),
+            body: JSON.stringify({ motivo, operador: operadorAtual() }),
         });
         if (!response.ok) throw await lerErro(response, 'Erro ao cancelar a venda.');
         return response.json();

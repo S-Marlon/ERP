@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { buscarClientesPdv, categoriasPdv, detalheItemPdv, itensParaEtiqueta, listarItensPdv, marcasPdv } from './pdv/pdv.controller';
 import { cancelarVenda, detalheVenda, listarVendas, registrarVenda } from './pdv/vendas.controller';
+import { abrirCaixa, caixaAtual, detalheCaixa, fecharCaixa, lancarMovimento, listarCaixas } from './caixa/caixa.controller';
 
 // Vendas no modelo novo (itens_core). Montado em /api/vendas
 const router = Router();
@@ -16,5 +17,13 @@ router.post('/pdv/vendas', registrarVenda);
 router.get('/pdv/vendas', listarVendas);
 router.get('/pdv/vendas/:idVenda', detalheVenda);
 router.post('/pdv/vendas/:idVenda/cancelar', cancelarVenda);
+
+// Caixa: abertura, sangria/suprimento, fechamento com conferência e histórico
+router.get('/caixa/atual', caixaAtual);
+router.post('/caixa/abrir', abrirCaixa);
+router.post('/caixa/movimentos', lancarMovimento);
+router.post('/caixa/fechar', fecharCaixa);
+router.get('/caixas', listarCaixas);
+router.get('/caixas/:idCaixa', detalheCaixa);
 
 export default router;

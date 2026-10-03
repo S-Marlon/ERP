@@ -5,6 +5,8 @@ import pool from '../../Estoque/db.config';
 import { calcularCustoMedio } from '../../Compras/staging/penteFino';
 import { carregarPrecos, SELECT_ITENS } from './pdv.controller';
 import { calcularLinha, conferirEstoque, ErroVenda, fecharVenda, LinhaPedido, validarPagamentos } from './vendaPdv';
+import { carregarCaixaAberto, operadorDe } from '../caixa/caixa.controller';
+import { estornoDaVenda } from '../caixa/caixa';
 
 const ORIGEM_VENDA = 'VENDA_PDV';
 const ORIGEM_CANCELAMENTO = 'CANCELAMENTO_VENDA';
@@ -42,6 +44,10 @@ export const registrarVenda = async (req: Request, res: Response) => {
     const ids = [...new Set(pedidos.map(p => p.idItem))].sort((a, b) => a - b);
 
     await connection.beginTransaction();
+
+    // Toda venda pertence ao caixa aberto (trava compartilhada: o fechamento espera as vendas em andamento)
+    const caixa = await carregarCaixaAberto(connection as any, tenant, 'LOCK IN SHARE MODE');
+    if (!caixa) throw new ErroVenda('Abra o caixa antes de vender.', 409, { codigo: 'CAIXA_FECHADO' });
 
     const [rows] = await connection.execute(
       `${SELECT_ITENS} WHERE ic.tenant_id = ? AND ic.id_item IN (${ids.map(() => '?').join(',')})`,
@@ -101,10 +107,10 @@ export const registrarVenda = async (req: Request, res: Response) => {
 
     const [cab] = await connection.execute(
       `INSERT INTO vendas_pedidos
-         (tenant_id, origem, status, id_cliente, cliente_nome, total_bruto, total_desconto, total_liquido, total_custo, observacao)
-       VALUES (?, 'PDV', 'CONCLUIDA', ?, ?, ?, ?, ?, ?, ?)`,
+         (tenant_id, origem, status, id_caixa, operador, id_cliente, cliente_nome, total_bruto, total_desconto, total_liquido, total_custo, observacao)
+       VALUES (?, 'PDV', 'CONCLUIDA', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        tenant, idCliente ? Number(idCliente) : null, String(clienteNome || '').trim().slice(0, 150) || 'CONSUMIDOR',
+        tenant, caixa.id_caixa, operadorDe(req), idCliente ? Number(idCliente) : null, String(clienteNome || '').trim().slice(0, 150) || 'CONSUMIDOR',
         f4(venda.totalBruto), f4(venda.totalDesconto), f4(venda.totalLiquido), f4(totalCusto),
         String(observacao || '').trim().slice(0, 255) || null,
       ]
@@ -195,11 +201,31 @@ export const cancelarVenda = async (req: Request, res: Response) => {
   try {
     await connection.beginTransaction();
     const [[venda]]: any = await connection.execute(
-      `SELECT id_venda, status FROM vendas_pedidos WHERE id_venda = ? AND tenant_id = ? FOR UPDATE`,
+      `SELECT id_venda, status, id_caixa FROM vendas_pedidos WHERE id_venda = ? AND tenant_id = ? FOR UPDATE`,
       [idVenda, tenant]
     );
     if (!venda) throw new ErroVenda('Venda não encontrada.', 404);
     if (venda.status !== 'CONCLUIDA') throw new ErroVenda(`A venda já está ${String(venda.status).toLowerCase()}.`, 409);
+
+    // Venda do caixa aberto: basta sair da soma. De outro caixa (já fechado): o dinheiro sai do caixa aberto.
+    const caixaAberto = await carregarCaixaAberto(connection as any, tenant, 'LOCK IN SHARE MODE');
+    const mesmoCaixa = caixaAberto && venda.id_caixa && Number(venda.id_caixa) === Number(caixaAberto.id_caixa);
+    if (!mesmoCaixa) {
+      const [pags]: any = await connection.execute(
+        `SELECT forma, valor, troco FROM vendas_pedidos_pagamentos WHERE id_venda = ? AND tenant_id = ?`, [idVenda, tenant]
+      );
+      const estornos = estornoDaVenda(pags.map((p: any) => ({ forma: p.forma, valor: Number(p.valor), troco: Number(p.troco) })));
+      if (estornos.length > 0 && !caixaAberto) {
+        throw new ErroVenda('Esta venda é de um caixa já fechado: abra o caixa para devolver o valor ao cliente.', 409, { codigo: 'CAIXA_FECHADO' });
+      }
+      for (const e of estornos) {
+        await connection.execute(
+          `INSERT INTO vendas_caixas_movimentos (tenant_id, id_caixa, tipo, forma, valor, id_origem, motivo, operador)
+           VALUES (?, ?, 'ESTORNO_VENDA', ?, ?, ?, ?, ?)`,
+          [tenant, caixaAberto.id_caixa, e.forma, f4(e.valor), idVenda, `Cancelamento da venda ${idVenda}: ${motivo}`.slice(0, 255), operadorDe(req)]
+        );
+      }
+    }
 
     const [itens]: any = await connection.execute(
       `SELECT vi.id_venda_item, vi.id_item, vi.quantidade, vi.quantidade_base, vi.unidade_sigla, vi.fator_conversao,
@@ -263,7 +289,7 @@ export const listarVendas = async (req: Request, res: Response) => {
   try {
     const data = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.data || '')) ? String(req.query.data) : null;
     const [rows] = await pool.execute(
-      `SELECT v.id_venda, v.status, v.cliente_nome, v.total_bruto, v.total_desconto, v.total_liquido, v.total_custo,
+      `SELECT v.id_venda, v.status, v.cliente_nome, v.operador, v.id_caixa, v.total_bruto, v.total_desconto, v.total_liquido, v.total_custo,
               v.created_at, v.cancelado_em, v.motivo_cancelamento,
               (SELECT COUNT(*) FROM vendas_pedidos_itens i WHERE i.id_venda = v.id_venda) AS qtd_itens,
               (SELECT GROUP_CONCAT(DISTINCT p.forma) FROM vendas_pedidos_pagamentos p WHERE p.id_venda = v.id_venda) AS formas
@@ -276,6 +302,8 @@ export const listarVendas = async (req: Request, res: Response) => {
       idVenda: Number(r.id_venda),
       status: r.status,
       clienteNome: r.cliente_nome,
+      operador: r.operador,
+      idCaixa: r.id_caixa ? Number(r.id_caixa) : null,
       totalBruto: Number(r.total_bruto),
       totalDesconto: Number(r.total_desconto),
       totalLiquido: Number(r.total_liquido),

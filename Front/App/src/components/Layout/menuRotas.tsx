@@ -21,6 +21,7 @@ export const MENU_PRINCIPAL: ItemMenu[] = [
       { key: '/vendas', label: 'Central de Vendas' },
       { key: '/vendas/pdv', label: 'PDV' },
       { key: '/vendas/do-dia', label: 'Vendas do Dia' },
+      { key: '/vendas/caixas', label: 'Caixas' },
     ],
   },
   {

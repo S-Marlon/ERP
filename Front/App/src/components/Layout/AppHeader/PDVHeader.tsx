@@ -2,9 +2,10 @@
 import { useEffect, useState } from "react";
 import { Tooltip } from "antd";
 import { darkColors, colors } from "../../../styles/colors";
-import { useUI } from "../../../context/UIContext";
 import { ListaTrabalhoBotao } from "../../../core/listaTrabalho/ListaTrabalhoBotao";
 import styles from "./PDVHeader.module.css";
+import { CaixaIndicador, CaixaPaineis } from "../../../pages/PDV/caixa/CaixaPainel";
+import { operadorAtual } from "../../../pages/PDV/caixa/caixaApi";
 
 interface PDVHeaderProps {
   isDarkMode: boolean;
@@ -12,7 +13,6 @@ interface PDVHeaderProps {
 }
 
 const PDVHeader: React.FC<PDVHeaderProps> = ({ isDarkMode, onThemeToggle }) => {
-  const { user } = useUI();
   const [agora, setAgora] = useState(new Date());
 
   useEffect(() => {
@@ -33,7 +33,8 @@ const PDVHeader: React.FC<PDVHeaderProps> = ({ isDarkMode, onThemeToggle }) => {
       </div>
 
       <div className={styles.center}>
-        <span className={styles.empty}>F2 finalizar · F3 buscar · F4 cliente</span>
+        <CaixaIndicador />
+        <span className={styles.empty} style={{ marginLeft: 10 }}>F2 finalizar · F3 buscar · F4 cliente</span>
       </div>
 
       <div className={styles.right}>
@@ -50,9 +51,10 @@ const PDVHeader: React.FC<PDVHeaderProps> = ({ isDarkMode, onThemeToggle }) => {
 
         <div className={styles.block}>
           <span className={styles.label}>Operador</span>
-          <span className={styles.value}>{user?.name || "Operador"}</span>
+          <span className={styles.value}>{operadorAtual()}</span>
         </div>
       </div>
+      <CaixaPaineis />
     </header>
   );
 };

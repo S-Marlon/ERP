@@ -20,6 +20,8 @@ import ImageDisplay from '../../components/ui/ImageGallery/ImageDysplay';
 import UniversalInventory from '../../components/Layout/UniversalInventory/UniversalInventory';
 import { ClientePdvModal, formatarDocumento } from './components/ClientePdvModal';
 import { ItemPdvDrawer } from './components/ItemPdvDrawer';
+import { AvisoCaixaFechado } from './caixa/CaixaPainel';
+import { caixaStore, useCaixa } from './caixa/caixaStore';
 
 type DisplayMode = 'lista' | 'cards' | 'compact';
 
@@ -143,12 +145,19 @@ const PDVContent: React.FC = () => {
     }
   }, [incluir, mostrarNaoPublicaveis, searchTerm]);
 
+  // Sem caixa aberto não se vende: F2/finalizar abrem o painel de abertura
+  const { caixa, carregado: caixaCarregado } = useCaixa();
+  const irParaPagamento = useCallback(() => {
+    if (caixaCarregado && !caixa) { caixaStore.mostrar('abrir'); return; }
+    setEstagio('PAGAMENTO');
+  }, [caixa, caixaCarregado]);
+
   useEffect(() => {
     let acumulado = '';
     let ultimaTecla = Date.now();
     const aoTeclar = (e: KeyboardEvent) => {
       // Atalhos
-      if (e.key === 'F2') { e.preventDefault(); if (cart.length > 0) setEstagio('PAGAMENTO'); return; }
+      if (e.key === 'F2') { e.preventDefault(); if (cart.length > 0) irParaPagamento(); return; }
       if (e.key === 'F3') { e.preventDefault(); buscaRef.current?.focus(); return; }
       if (e.key === 'F4') { e.preventDefault(); setMostrarModalCliente(true); return; }
       if (mostrarModalCliente) return;
@@ -165,7 +174,7 @@ const PDVContent: React.FC = () => {
     };
     window.addEventListener('keydown', aoTeclar);
     return () => window.removeEventListener('keydown', aoTeclar);
-  }, [processarCodigo, cart.length, mostrarModalCliente]);
+  }, [processarCodigo, cart.length, mostrarModalCliente, irParaPagamento]);
 
   const colunas = [
     {
@@ -258,6 +267,7 @@ const PDVContent: React.FC = () => {
 
       <main className={styles.mainContent}>
         {estagio === 'PAGAMENTO' && <div className={styles.lockOverlay} onClick={() => setEstagio('SELECAO')} />}
+        <AvisoCaixaFechado />
 
         {/* Cabeçalho: cliente + busca + filtros */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 10px', background: '#fff', borderBottom: '1px solid #e2e8f0' }}>
@@ -343,7 +353,7 @@ const PDVContent: React.FC = () => {
         updateQuantity={updateQuantity}
         changeUnit={changeUnit}
         removeItem={removeItem}
-        onFinalizar={() => setEstagio('PAGAMENTO')}
+        onFinalizar={irParaPagamento}
         onBack={() => setEstagio('SELECAO')}
         estagio={estagio}
         applyIndividualDiscount={applyIndividualDiscount}
