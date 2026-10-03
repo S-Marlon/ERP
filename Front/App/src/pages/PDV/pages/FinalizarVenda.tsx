@@ -10,6 +10,7 @@ import { isCartItemOS } from '../types/cart.types';
 import { caixaStore } from '../caixa/caixaStore';
 import { useSituacaoCliente } from '../../Financeiro/receber/receberApi';
 import { acrescimoParcelamento, ajusteDaForma, descontoDaForma, useTaxasVenda } from '../taxas/taxasVenda';
+import { useAdiantamentosAbertos } from '../services/adiantamentosApi';
 // import {ItemVenda} from '../../../utils/printService'
 
 import Draggable from 'react-draggable';
@@ -30,7 +31,8 @@ export type PaymentMethodType =
     | 'debit_card'
     | 'pix'
     | 'bank_transfer'
-    | 'store_credit'; // 'Crediário'
+    | 'store_credit' // 'Crediário'
+    | 'advance';     // sinal/adiantamento já recebido do cliente
 
 export const PAYMENT_METHOD_DETAILS: Record<PaymentMethodType, { label: string; icon: string }> = {
     money: {
@@ -56,6 +58,10 @@ export const PAYMENT_METHOD_DETAILS: Record<PaymentMethodType, { label: string; 
     bank_transfer: {
         label: 'Transferência',
         icon: '🏛️'
+    },
+    advance: {
+        label: 'Sinal',
+        icon: '🔖'
     }
 };
 
@@ -67,6 +73,7 @@ const FORMA_POR_METODO: Record<PaymentMethodType, FormaPagamentoPdv> = {
     debit_card: 'DEBITO',
     store_credit: 'PRAZO',
     bank_transfer: 'TRANSFERENCIA',
+    advance: 'ADIANTAMENTO',
 };
 
 // 1. Defina o tipo técnico (Seguro e sem acentos)
@@ -94,6 +101,8 @@ export interface Pagamento {
     primeiroVencimento?: string;
     // Crédito acima do sem juros: diferença de taxa repassada ao cliente (já somada em `valor`)
     acrescimo?: number;
+    // Sinal usado (forma ADIANTAMENTO)
+    idAdiantamento?: number;
     status: PaymentStatus;
 
     // Metadados para Cartão/PIX
@@ -121,10 +130,12 @@ interface FinalizarVendaProps {
     // Venda nascida de um orçamento (preços congelados quando manterPrecoOrcamento)
     idOrcamento?: number | null;
     manterPrecoOrcamento?: boolean;
+    // Sinais de uma origem (ex.: OS sendo entregue), além dos do cliente
+    adiantamentosOrigem?: { origem: string; idOrigem: number } | null;
     itens: ItemVenda[]; // <-- Adicione esta linha
 }
 
-export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, onVendaConcluida, total, cliente, clienteId, itens, idOrcamento, manterPrecoOrcamento }) => {
+export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, onVendaConcluida, total, cliente, clienteId, itens, idOrcamento, manterPrecoOrcamento, adiantamentosOrigem }) => {
 
     const [isEnviando, setIsEnviando] = useState(false);
     const [descontoValor, setDescontoValor] = useState(0); // O valor digitado no input
@@ -139,6 +150,14 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, onVendaC
     const situacaoCliente = useSituacaoCliente(clienteId);
     // Taxas da maquininha: desconto que cada forma permite e acréscimo do parcelamento
     const taxasVenda = useTaxasVenda();
+    // Sinais em aberto (do cliente e da origem), usados como forma de pagamento "Sinal"
+    const adiantamentos = useAdiantamentosAbertos(clienteId, adiantamentosOrigem);
+    const [adiantamentoEscolhido, setAdiantamentoEscolhido] = useState<number | null>(null);
+    const saldoAdiantamento = (id: number) => {
+        const a = adiantamentos.find(x => x.idAdiantamento === id);
+        const usado = pagamentos.filter(p => p.idAdiantamento === id).reduce((acc, p) => acc + Number(p.valor), 0);
+        return a ? Math.max(0, Math.round((a.saldo - usado) * 100) / 100) : 0;
+    };
 
     const [activeModal, setActiveModal] = useState(null); // 'calc', 'obs', 'desc', etc.
     // Controle da Janela Flutuante da Calculadora
@@ -315,6 +334,7 @@ const toggleWindow = (id) => {
                 valor: Number(p.valor),
                 parcelas: p.parcelas,
                 ...(p.metodo === 'store_credit' ? { intervaloDias: p.intervaloDias, primeiroVencimento: p.primeiroVencimento } : {}),
+                ...(p.idAdiantamento ? { idAdiantamento: p.idAdiantamento } : {}),
             })),
         };
 
@@ -420,6 +440,22 @@ useEffect(() => {
     // --- RENDERIZAÇÃO DO PARCELAMENTO ATUALIZADA ---
     const renderParcelamento = () => {
         if (metodoSelecionado === 'store_credit') return renderPrazo();
+        if (metodoSelecionado === 'advance') {
+            return (
+                <div className="parcelas-group" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <label>Qual sinal:</label>
+                    <select className="select-parcelas" value={adiantamentoEscolhido ?? ''}
+                        onChange={e => setAdiantamentoEscolhido(Number(e.target.value) || null)}>
+                        <option value="">Escolha...</option>
+                        {adiantamentos.map(a => (
+                            <option key={a.idAdiantamento} value={a.idAdiantamento}>
+                                Nº {a.idAdiantamento} · {new Date(a.criadoEm).toLocaleDateString('pt-BR')} · disponível R$ {saldoAdiantamento(a.idAdiantamento).toFixed(2)}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            );
+        }
         if (metodoSelecionado !== 'credit_card') return null;
 
         const opcoes = [];
@@ -528,6 +564,14 @@ useEffect(() => {
     const adicionarPagamento = () => {
         const valorNumerico = parseFloat(valorInput.replace(',', '.')) || 0;
         if (valorNumerico <= 0 || !metodoSelecionado) return;
+        if (metodoSelecionado === 'advance') {
+            if (!adiantamentoEscolhido) { Swal.fire({ icon: 'warning', title: 'Escolha o sinal', text: 'Selecione qual adiantamento usar.' }); return; }
+            const disponivel = saldoAdiantamento(adiantamentoEscolhido);
+            if (valorNumerico > disponivel + 0.004) {
+                Swal.fire({ icon: 'warning', title: 'Valor acima do sinal', text: `Este sinal tem R$ ${disponivel.toFixed(2)} disponível.` });
+                return;
+            }
+        }
         if (metodoSelecionado === 'store_credit' && !clienteId) {
             Swal.fire({ icon: 'warning', title: 'Cliente obrigatório', text: 'Para vender a prazo, identifique o cliente (F4).' });
             return;
@@ -540,6 +584,7 @@ useEffect(() => {
             metodo: metodoSelecionado,
             valor: Math.round((valorNumerico + acrescimo) * 100) / 100,
             ...(acrescimo > 0 ? { acrescimo } : {}),
+            ...(metodoSelecionado === 'advance' && adiantamentoEscolhido ? { idAdiantamento: adiantamentoEscolhido } : {}),
             parcelas: metodoSelecionado === 'credit_card' || metodoSelecionado === 'store_credit' ? parcelasInput : 1,
             ...(metodoSelecionado === 'store_credit' ? { intervaloDias: intervaloPrazo, primeiroVencimento: primeiroVencimento || undefined } : {}),
             status: 'pending',
@@ -620,7 +665,7 @@ useEffect(() => {
                         </div> */}
 
                         <div className="method-grid">
-                            {Object.entries(PAYMENT_METHOD_DETAILS).map(([key, info]) => (
+                            {Object.entries(PAYMENT_METHOD_DETAILS).filter(([key]) => key !== 'advance' || adiantamentos.length > 0).map(([key, info]) => (
                                 <div
                                     key={key}
                                     className={`method-card ${metodoSelecionado === key ? 'selected' : ''} ${metodoSelecionado && metodoSelecionado !== key ? 'disabled' : ''}`}
@@ -788,6 +833,7 @@ useEffect(() => {
             <strong>R$ {(Number(p.valor) || 0).toFixed(2)}</strong>
             <span className="payment-subtext">
               {p.metodo === 'credit_card' ? ` (${p.parcelas}x${p.acrescimo ? `, + R$ ${p.acrescimo.toFixed(2)} de acréscimo` : ''})`
+                : p.metodo === 'advance' ? ` (Nº ${p.idAdiantamento})`
                 : p.metodo === 'store_credit' ? ` (${p.parcelas}x a cada ${p.intervaloDias || 30} dias${p.primeiroVencimento ? `, 1ª em ${p.primeiroVencimento.split('-').reverse().join('/')}` : ''})`
                 : ' (À vista)'}
             </span>

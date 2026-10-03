@@ -1,11 +1,13 @@
 // Caixa do PDV: indicador no cabeçalho e os painéis (abrir, resumo, sangria/suprimento, fechar).
 // Os painéis ficam montados no cabeçalho do PDV; qualquer tela abre um deles por caixaStore.mostrar(...).
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Descriptions, Drawer, Empty, Input, InputNumber, Modal, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { Alert, Button, Descriptions, Drawer, Empty, Input, InputNumber, Modal, Select, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { MinusCircleOutlined, PlusCircleOutlined, PrinterOutlined, LockOutlined, UnlockOutlined } from '@ant-design/icons';
 import { caixaApi, FORMAS_SEM_CONFERENCIA, LinhaConferencia, operadorAtual, ResumoCaixa, ROTULO_FORMA, ROTULO_MOVIMENTO, Caixa } from './caixaApi';
 import { caixaStore, useCaixa } from './caixaStore';
 import { imprimirHtml } from '../../../core/impressao/saida';
+import { adiantamentosApi } from '../services/adiantamentosApi';
+import { buscarClientesPdv, ClienteBusca } from '../services/api/products';
 
 const { Text } = Typography;
 export const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -260,6 +262,52 @@ const ModalFechar: React.FC = () => {
   );
 };
 
+// Sinal / adiantamento avulso (entra no caixa e depois paga a venda do cliente)
+const ModalSinal: React.FC = () => {
+  const { painel } = useCaixa();
+  const aberto = painel === 'sinal';
+  const [opcoes, setOpcoes] = useState<ClienteBusca[]>([]);
+  const [cliente, setCliente] = useState<ClienteBusca | null>(null);
+  const [valor, setValor] = useState<number | null>(null);
+  const [forma, setForma] = useState('DINHEIRO');
+  const [observacao, setObservacao] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  useEffect(() => { if (aberto) { setCliente(null); setValor(null); setForma('DINHEIRO'); setObservacao(''); setOpcoes([]); } }, [aberto]);
+
+  const salvar = async () => {
+    setSalvando(true);
+    try {
+      const r = await adiantamentosApi.criar({ idCliente: cliente?.id ?? null, clienteNome: cliente?.nome, valor: Number(valor) || 0, forma, observacao });
+      message.success(`Sinal Nº ${r.idAdiantamento} recebido. Ele aparece como forma de pagamento "Sinal" na venda do cliente.`);
+      caixaStore.recarregar();
+      caixaStore.mostrar('resumo');
+    } catch (e) {
+      message.error(erroDe(e, 'Erro ao receber o sinal.'));
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <Modal open={aberto} title="Receber sinal (adiantamento)" okText="Receber" cancelText="Voltar" confirmLoading={salvando}
+      okButtonProps={{ disabled: !cliente || !(Number(valor) > 0) }} onOk={salvar} onCancel={() => caixaStore.mostrar('resumo')} destroyOnHidden width={440}>
+      <Space direction="vertical" style={{ width: '100%' }}>
+        <Text type="secondary" style={{ fontSize: 12 }}>O valor entra no caixa agora e fica guardado em nome do cliente para abater na venda.</Text>
+        <Select showSearch filterOption={false} placeholder="Cliente (nome, CPF ou CNPJ)" style={{ width: '100%' }}
+          onSearch={t => { if (t.trim().length >= 2) buscarClientesPdv(t).then(setOpcoes); }}
+          value={cliente?.id} onChange={id => setCliente(opcoes.find(o => o.id === id) || null)}
+          options={opcoes.map(o => ({ value: o.id, label: `${o.nome}${o.documento ? ` · ${o.documento}` : ''}` }))} />
+        <Space.Compact style={{ width: '100%' }}>
+          <Select value={forma} onChange={setForma} style={{ width: 150 }}
+            options={['DINHEIRO', 'PIX', 'DEBITO', 'CREDITO', 'TRANSFERENCIA'].map(f => ({ value: f, label: ROTULO_FORMA[f] }))} />
+          <InputNumber prefix="R$" min={0} precision={2} decimalSeparator="," style={{ width: '100%' }} value={valor} onChange={setValor} />
+        </Space.Compact>
+        <Input placeholder="Observação (ex.: sinal da encomenda de ...)" value={observacao} onChange={e => setObservacao(e.target.value)} maxLength={255} />
+      </Space>
+    </Modal>
+  );
+};
+
 const DrawerResumo: React.FC = () => {
   const { painel, caixa, resumo, carregando } = useCaixa();
   return (
@@ -267,6 +315,7 @@ const DrawerResumo: React.FC = () => {
       title={caixa ? `Caixa ${caixa.idCaixa} · ${caixa.operador}` : 'Caixa'}
       extra={caixa && (
         <Space>
+          <Button onClick={() => caixaStore.mostrar('sinal')}>Receber sinal</Button>
           <Button icon={<PlusCircleOutlined />} onClick={() => caixaStore.mostrar('SUPRIMENTO')}>Suprimento</Button>
           <Button icon={<MinusCircleOutlined />} onClick={() => caixaStore.mostrar('SANGRIA')}>Sangria</Button>
           <Button type="primary" danger icon={<LockOutlined />} onClick={() => caixaStore.mostrar('fechar')}>Fechar</Button>
@@ -310,6 +359,7 @@ export const CaixaPaineis: React.FC = () => (
     <ModalAbrir />
     <ModalMovimento />
     <ModalFechar />
+    <ModalSinal />
     <DrawerResumo />
   </>
 );

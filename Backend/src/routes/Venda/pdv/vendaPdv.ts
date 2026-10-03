@@ -1,7 +1,8 @@
 // Cálculo da venda do PDV (sem banco): preço por linha, rateio do desconto geral e pagamentos.
 import { FaixaPdv, faixaParaQuantidade, unidadePadraoPdv, UnidadeVendaPdv } from './precoPdv';
 
-export const FORMAS_PAGAMENTO = ['DINHEIRO', 'PIX', 'DEBITO', 'CREDITO', 'PRAZO', 'TRANSFERENCIA'] as const;
+// ADIANTAMENTO: sinal já recebido do cliente (vendas_adiantamentos), usado para pagar a venda
+export const FORMAS_PAGAMENTO = ['DINHEIRO', 'PIX', 'DEBITO', 'CREDITO', 'PRAZO', 'TRANSFERENCIA', 'ADIANTAMENTO'] as const;
 export type FormaPagamento = typeof FORMAS_PAGAMENTO[number];
 
 const centavos = (v: number) => Math.round(v * 100);

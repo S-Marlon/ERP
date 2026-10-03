@@ -55,7 +55,7 @@ export const calcularItensDoPedido = async (conn: ConnVenda, tenant: number, ite
   if (faltando.length > 0) throw new ErroVenda(`Item não encontrado: ${faltando.join(', ')}.`, 404);
   for (const item of itensBanco.values()) {
     if (String(item.status).toUpperCase() !== 'ATIVO') throw new ErroVenda(`"${item.nome_comercial || item.nome_item}" está inativo.`);
-    if (String(item.tipo_recurso).toUpperCase() !== 'PRODUTO') throw new ErroVenda(`"${item.nome_comercial || item.nome_item}" não é um produto de venda.`);
+    if (!['PRODUTO', 'SERVICO'].includes(String(item.tipo_recurso).toUpperCase())) throw new ErroVenda(`"${item.nome_comercial || item.nome_item}" não é um produto nem serviço de venda.`);
   }
 
   const precos = await carregarPrecos(conn as any, tenant, [...itensBanco.values()]);
@@ -126,11 +126,16 @@ export const registrarVenda = async (req: Request, res: Response) => {
     const venda = fecharVenda(linhas, Number(descontoGeral) || 0, Number(acrescimoGeral) || 0);
     const pagamentosOk = validarPagamentos(pagamentos, venda.totalLiquido);
 
+    // Serviço (ex.: prensagem avulsa) não tem estoque: só produtos travam saldo e geram movimento
+    const ehServico = (idItem: number) => String(itensBanco.get(idItem).tipo_recurso).toUpperCase() === 'SERVICO';
+    const idsEstoque = ids.filter(id => !ehServico(id));
+    const linhasEstoque = venda.linhas.filter(l => !ehServico(l.idItem));
+
     // Trava os saldos (ordem fixa de ids para evitar deadlock)
-    const [saldoRows] = await connection.execute(
+    const [saldoRows] = idsEstoque.length === 0 ? [[]] : await connection.execute(
       `SELECT id_item, quantidade_atual, custo_medio FROM estoque_saldos_itens
-       WHERE tenant_id = ? AND deposito = 'VENDA' AND id_item IN (${ids.map(() => '?').join(',')}) ORDER BY id_item FOR UPDATE`,
-      [tenant, ...ids]
+       WHERE tenant_id = ? AND deposito = 'VENDA' AND id_item IN (${idsEstoque.map(() => '?').join(',')}) ORDER BY id_item FOR UPDATE`,
+      [tenant, ...idsEstoque]
     );
     const saldos = new Map<number, number>();
     const custos = new Map<number, number>();
@@ -138,8 +143,8 @@ export const registrarVenda = async (req: Request, res: Response) => {
       saldos.set(Number(s.id_item), Number(s.quantidade_atual) || 0);
       custos.set(Number(s.id_item), Number(s.custo_medio) || 0);
     }
-    const podeSemEstoque = new Map(ids.map(id => [id, Boolean(Number(itensBanco.get(id).pode_vender_sem_estoque))]));
-    const estoque = conferirEstoque(venda.linhas, saldos, podeSemEstoque);
+    const podeSemEstoque = new Map(idsEstoque.map(id => [id, Boolean(Number(itensBanco.get(id).pode_vender_sem_estoque))]));
+    const estoque = conferirEstoque(linhasEstoque, saldos, podeSemEstoque);
     if (estoque.faltas.length > 0) {
       throw new ErroVenda(
         `Estoque insuficiente: ${estoque.faltas.map(f => {
@@ -156,6 +161,24 @@ export const registrarVenda = async (req: Request, res: Response) => {
       .filter((p: any) => String(p?.forma || '').toUpperCase() === 'PRAZO')
       .map((p: any) => ({ valor: Number(p.valor), parcelas: p.parcelas, intervaloDias: p.intervaloDias, primeiroVencimento: p.primeiroVencimento }));
     const parcelasPrazo = await planejarPrazo(connection as any, tenant, idCliente ? Number(idCliente) : null, String(clienteNome || '').trim(), prazos);
+
+    // Adiantamento (sinal): cada pagamento ADIANTAMENTO aponta para um sinal em aberto com saldo suficiente
+    const usosAdiantamento: Array<{ indice: number; id: number; valor: number }> = [];
+    for (const [indice, p] of pagamentosOk.entries()) {
+      if (p.forma !== 'ADIANTAMENTO') continue;
+      const idAdiantamento = Number((pagamentos as any[])[indice]?.idAdiantamento);
+      if (!idAdiantamento) throw new ErroVenda('Escolha qual adiantamento (sinal) usar no pagamento.');
+      const [[ad]]: any = await connection.execute(
+        `SELECT id_adiantamento, id_cliente, valor, valor_usado, status FROM vendas_adiantamentos WHERE id_adiantamento = ? AND tenant_id = ? FOR UPDATE`,
+        [idAdiantamento, tenant]
+      );
+      const jaUsadoNestaVenda = usosAdiantamento.filter(u => u.id === idAdiantamento).reduce((a, u) => a + u.valor, 0);
+      const saldo = ad ? Number(ad.valor) - Number(ad.valor_usado) - jaUsadoNestaVenda : 0;
+      if (!ad || ad.status !== 'ABERTO') throw new ErroVenda(`Adiantamento ${idAdiantamento} não está disponível.`, 409);
+      if (ad.id_cliente && idCliente && Number(ad.id_cliente) !== Number(idCliente)) throw new ErroVenda('O adiantamento é de outro cliente.', 409);
+      if (p.valor > saldo + 0.004) throw new ErroVenda(`O adiantamento ${idAdiantamento} tem só R$ ${saldo.toFixed(2)} disponível.`, 409);
+      usosAdiantamento.push({ indice, id: idAdiantamento, valor: p.valor });
+    }
 
     // Custo base: custo médio do estoque; sem ele, custo gerencial do cadastro
     const custoBase = (idItem: number) => {
@@ -228,6 +251,7 @@ export const registrarVenda = async (req: Request, res: Response) => {
         ]
       );
       const idVendaItem = Number((ins as any).insertId);
+      if (ehServico(l.idItem)) continue;
 
       const saldoAnterior = saldos.get(l.idItem) || 0;
       const saldoPosterior = saldoAnterior - l.quantidadeBase;
@@ -258,11 +282,20 @@ export const registrarVenda = async (req: Request, res: Response) => {
       );
     }
 
-    for (const p of taxas.linhas) {
+    for (const [indice, p] of taxas.linhas.entries()) {
+      const uso = usosAdiantamento.find(u => u.indice === indice);
       await connection.execute(
-        `INSERT INTO vendas_pedidos_pagamentos (tenant_id, id_venda, forma, valor, parcelas, troco, taxa_percentual, taxa_valor)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [tenant, idVenda, p.forma, f4(p.valor), p.parcelas, f4(p.troco), f4(p.taxaPercentual), f4(p.taxaValor)]
+        `INSERT INTO vendas_pedidos_pagamentos (tenant_id, id_venda, forma, valor, parcelas, troco, taxa_percentual, taxa_valor, id_adiantamento)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [tenant, idVenda, p.forma, f4(p.valor), p.parcelas, f4(p.troco), f4(p.taxaPercentual), f4(p.taxaValor), uso ? uso.id : null]
+      );
+    }
+    for (const u of usosAdiantamento) {
+      await connection.execute(
+        `UPDATE vendas_adiantamentos SET valor_usado = valor_usado + ?,
+                status = CASE WHEN valor_usado + ? >= valor - 0.004 THEN 'USADO' ELSE 'ABERTO' END
+         WHERE id_adiantamento = ?`,
+        [f4(u.valor), f4(u.valor), u.id]
       );
     }
 
@@ -341,7 +374,20 @@ export const cancelarVenda = async (req: Request, res: Response) => {
       [idVenda, tenant]
     );
 
+    // Adiantamentos usados na venda voltam a ficar disponíveis (o dinheiro continua no sinal)
+    const [usados]: any = await connection.execute(
+      `SELECT id_adiantamento, valor FROM vendas_pedidos_pagamentos WHERE id_venda = ? AND tenant_id = ? AND id_adiantamento IS NOT NULL`,
+      [idVenda, tenant]
+    );
+    for (const u of usados) {
+      await connection.execute(
+        `UPDATE vendas_adiantamentos SET valor_usado = GREATEST(0, valor_usado - ?), status = 'ABERTO' WHERE id_adiantamento = ?`,
+        [f4(Number(u.valor)), u.id_adiantamento]
+      );
+    }
+
     for (const it of itens) {
+      if (String(it.tipo_recurso).toUpperCase() === 'SERVICO') continue;
       const qtd = Number(it.quantidade_base);
       const custo = Number(it.custo_unitario_base) || 0;
       const [[saldo]]: any = await connection.execute(

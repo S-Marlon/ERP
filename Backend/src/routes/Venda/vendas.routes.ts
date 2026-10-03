@@ -5,6 +5,7 @@ import { abrirCaixa, caixaAtual, detalheCaixa, fecharCaixa, lancarMovimento, lis
 import { obterConfiguracoes, salvarConfiguracoes } from './regras/regrasVenda.controller';
 import { obterTaxas, salvarTaxas } from './taxas/taxas.controller';
 import { painelVendas } from './painel/painelVendas.controller';
+import { criarAdiantamento, devolverAdiantamentoRota, listarAdiantamentos } from './adiantamentos/adiantamentos.controller';
 import { detalhePedidoAberto, excluirPedidoAberto, listarPedidosAbertos, retomarPedidoAberto, salvarPedidoAberto } from './pdv/pedidosAbertos.controller';
 
 // Vendas no modelo novo (itens_core). Montado em /api/vendas
@@ -47,5 +48,10 @@ router.put('/taxas', salvarTaxas);
 
 // Central de Vendas (painel)
 router.get('/painel', painelVendas);
+
+// Adiantamentos (sinais) de clientes
+router.post('/adiantamentos', criarAdiantamento);
+router.get('/adiantamentos', listarAdiantamentos);
+router.post('/adiantamentos/:id/devolver', devolverAdiantamentoRota);
 
 export default router;

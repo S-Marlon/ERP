@@ -67,4 +67,12 @@ const comPrazo = calcularResumoCaixa(0, [{ forma: 'PRAZO', valor: 300, troco: 0 
 assert(!conferirFechamento(comPrazo.linhas, { PIX: 10 }).conferencia.some(l => l.forma === 'PRAZO'), 'prazo fora da conferência');
 assert(conferirFechamento(comPrazo.linhas, { PIX: 10 }).diferencaTotal === 0, 'sem diferença por causa do prazo');
 
+// Adiantamento entra; devolução sai; pagar com adiantamento não é contado nem estornado em dinheiro
+const comSinal = calcularResumoCaixa(0, [{ forma: 'ADIANTAMENTO', valor: 50, troco: 0 }], [
+  { tipo: 'ADIANTAMENTO', forma: 'DINHEIRO', valor: 50 }, { tipo: 'DEVOLUCAO_SINAL', forma: 'DINHEIRO', valor: 20 },
+]);
+assert(comSinal.dinheiroEsperado === 30, `sinal no caixa ${comSinal.dinheiroEsperado}`);
+assert(!conferirFechamento(comSinal.linhas, { DINHEIRO: 30 }).conferencia.some(l => l.forma === 'ADIANTAMENTO'), 'adiantamento fora da conferência');
+assert(estornoDaVenda([{ forma: 'ADIANTAMENTO', valor: 50, troco: 0 }]).length === 0, 'cancelar venda paga com sinal não tira dinheiro');
+
 console.log('caixa: ok');

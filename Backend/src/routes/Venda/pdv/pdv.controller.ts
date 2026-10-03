@@ -147,7 +147,8 @@ const montarProduto = (
         .sort((a, b) => a.precoUnitario - b.precoUnitario)[0];
       return f ? { quantidadeMinima: f.quantidadeMinima, preco: f.precoUnitario } : null;
     })(),
-    podeVenderSemEstoque: Boolean(Number(item.pode_vender_sem_estoque)),
+    podeVenderSemEstoque: Boolean(Number(item.pode_vender_sem_estoque)) || String(item.tipo_recurso).toUpperCase() === 'SERVICO',
+    tipoRecurso: String(item.tipo_recurso || 'PRODUTO').toUpperCase(),
     publicavel: publicacao?.publicavel ?? true,
     motivosPublicacao: publicacao?.motivos ?? [],
   };
@@ -175,7 +176,8 @@ export const listarItensPdv = async (req: Request, res: Response) => {
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 20));
 
-    const where: string[] = [`ic.tenant_id = ?`, `ic.tipo_recurso = 'PRODUTO'`];
+    // Produtos e serviços (ex.: prensagem avulsa); serviço não controla estoque
+    const where: string[] = [`ic.tenant_id = ?`, `ic.tipo_recurso IN ('PRODUTO', 'SERVICO')`];
     const params: any[] = [tenant];
 
     if (busca) {

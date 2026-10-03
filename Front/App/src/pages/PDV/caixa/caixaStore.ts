@@ -2,7 +2,7 @@
 import { useSyncExternalStore } from 'react';
 import { Caixa, caixaApi, ResumoCaixa } from './caixaApi';
 
-export type PainelCaixa = null | 'abrir' | 'resumo' | 'SANGRIA' | 'SUPRIMENTO' | 'fechar';
+export type PainelCaixa = null | 'abrir' | 'resumo' | 'SANGRIA' | 'SUPRIMENTO' | 'fechar' | 'sinal';
 
 interface EstadoCaixa {
   carregado: boolean;

@@ -3,11 +3,13 @@
 //                     - sangrias - estornos (de venda e de recebimento).
 // Cartão/PIX/prazo: só o que foi vendido (conferido contra a maquininha, o extrato e os títulos).
 
-export const TIPOS_MOVIMENTO_CAIXA = ['SUPRIMENTO', 'SANGRIA', 'ESTORNO_VENDA', 'RECEBIMENTO', 'ESTORNO_RECEBIMENTO'] as const;
+export const TIPOS_MOVIMENTO_CAIXA = ['SUPRIMENTO', 'SANGRIA', 'ESTORNO_VENDA', 'RECEBIMENTO', 'ESTORNO_RECEBIMENTO', 'ADIANTAMENTO', 'DEVOLUCAO_SINAL'] as const;
 export type TipoMovimentoCaixa = typeof TIPOS_MOVIMENTO_CAIXA[number];
 
 // Entram (+) ou saem (-) do caixa
-const SINAL: Record<TipoMovimentoCaixa, 1 | -1> = { SUPRIMENTO: 1, RECEBIMENTO: 1, SANGRIA: -1, ESTORNO_VENDA: -1, ESTORNO_RECEBIMENTO: -1 };
+const SINAL: Record<TipoMovimentoCaixa, 1 | -1> = {
+  SUPRIMENTO: 1, RECEBIMENTO: 1, ADIANTAMENTO: 1, SANGRIA: -1, ESTORNO_VENDA: -1, ESTORNO_RECEBIMENTO: -1, DEVOLUCAO_SINAL: -1,
+};
 
 // Formas que existem fisicamente no caixa (as demais são conferidas fora da gaveta)
 export const FORMA_DINHEIRO = 'DINHEIRO';
@@ -53,9 +55,9 @@ export const calcularResumoCaixa = (
     const l = linha(m.forma);
     const v = c(m.valor);
     if (m.tipo === 'SUPRIMENTO') l.suprimentos += v;
-    else if (m.tipo === 'RECEBIMENTO') l.recebimentos += v;
+    else if (m.tipo === 'RECEBIMENTO' || m.tipo === 'ADIANTAMENTO') l.recebimentos += v;
     else if (m.tipo === 'SANGRIA') l.sangrias += v;
-    else if (m.tipo === 'ESTORNO_VENDA' || m.tipo === 'ESTORNO_RECEBIMENTO') l.estornos += v;
+    else if (m.tipo === 'ESTORNO_VENDA' || m.tipo === 'ESTORNO_RECEBIMENTO' || m.tipo === 'DEVOLUCAO_SINAL') l.estornos += v;
   }
 
   const linhas = [...porForma.entries()]
@@ -93,7 +95,8 @@ export const validarMovimentoManual = (tipo: string, valor: number, dinheiroEspe
 };
 
 /** Conferência do fechamento: esperado x informado por forma (forma não informada conta como zero; prazo fica fora). */
-export const FORMAS_SEM_CONFERENCIA = ['PRAZO']; // vira contas a receber, não é contado no caixa
+// PRAZO vira contas a receber; ADIANTAMENTO já entrou no caixa quando o sinal foi recebido
+export const FORMAS_SEM_CONFERENCIA = ['PRAZO', 'ADIANTAMENTO'];
 
 export const conferirFechamento = (linhas: LinhaResumoCaixa[], informado: Record<string, number>) => {
   const formas = new Set([...linhas.map(l => l.forma), ...Object.keys(informado || {}).map(f => f.toUpperCase())]
@@ -119,7 +122,7 @@ export const estornoDaVenda = (pagamentos: PagamentoVendaCaixa[]) => {
   const porForma = new Map<string, number>();
   for (const p of pagamentos) {
     const forma = String(p.forma).toUpperCase();
-    if (forma === 'PRAZO') continue;
+    if (forma === 'PRAZO' || forma === 'ADIANTAMENTO') continue; // prazo: contas a receber; adiantamento: volta ao sinal
     porForma.set(forma, (porForma.get(forma) || 0) + c(p.valor) - c(p.troco));
   }
   return [...porForma.entries()].filter(([, v]) => v > 0).map(([forma, v]) => ({ forma, valor: r(v) }));

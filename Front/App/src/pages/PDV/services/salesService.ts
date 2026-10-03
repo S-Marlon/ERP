@@ -3,7 +3,7 @@ import { operadorAtual } from '../caixa/caixaApi';
 const apiBase = 'http://localhost:3001/api/vendas/pdv';
 
 // Venda no modelo novo: o backend recalcula o preço de tabela, baixa o estoque e valida os pagamentos
-export type FormaPagamentoPdv = 'DINHEIRO' | 'PIX' | 'DEBITO' | 'CREDITO' | 'PRAZO' | 'TRANSFERENCIA';
+export type FormaPagamentoPdv = 'DINHEIRO' | 'PIX' | 'DEBITO' | 'CREDITO' | 'PRAZO' | 'TRANSFERENCIA' | 'ADIANTAMENTO';
 
 export interface VendaPdvItemPayload {
     idItem: number;
@@ -23,7 +23,7 @@ export interface VendaPdvPayload {
     idOrcamento?: number;
     manterPrecoOrcamento?: boolean;
     itens: VendaPdvItemPayload[];
-    pagamentos: { forma: FormaPagamentoPdv; valor: number; parcelas?: number; intervaloDias?: number; primeiroVencimento?: string }[];
+    pagamentos: { forma: FormaPagamentoPdv; valor: number; parcelas?: number; intervaloDias?: number; primeiroVencimento?: string; idAdiantamento?: number }[];
 }
 
 export interface VendaPdvResposta {
