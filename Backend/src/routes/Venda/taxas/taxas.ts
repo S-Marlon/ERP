@@ -7,8 +7,9 @@ export interface TaxaPagamento {
   forma: string;
   parcelasDe: number;
   parcelasAte: number;
-  percentual: number; // 4.99 = 4,99%
-  fixa: number;       // R$ por transação
+  percentual: number;       // taxa da faixa: 4.99 = 4,99%
+  vendaPercentual?: number; // taxa % cobrada em toda venda além da faixa (ex.: 3,09%)
+  fixa: number;             // R$ por transação
 }
 
 export interface ConfigTaxas {
@@ -33,7 +34,10 @@ export const taxaPara = (taxas: TaxaPagamento[], forma: string, parcelas = 1): {
   const f = String(forma || '').toUpperCase();
   const n = Math.max(1, Math.floor(Number(parcelas) || 1));
   const t = taxas.find(x => x.forma === f && n >= x.parcelasDe && n <= x.parcelasAte);
-  return t ? { percentual: Number(t.percentual) || 0, fixa: Number(t.fixa) || 0 } : { percentual: 0, fixa: 0 };
+  // Taxa efetiva = taxa da faixa + taxa por venda (as duas incidem sobre o valor cobrado)
+  return t
+    ? { percentual: (Number(t.percentual) || 0) + (Number(t.vendaPercentual) || 0), fixa: Number(t.fixa) || 0 }
+    : { percentual: 0, fixa: 0 };
 };
 
 export const taxaReferencia = (cfg: ConfigTaxas) => taxaPara(cfg.taxas, cfg.formaReferencia, cfg.parcelasReferencia).percentual;
@@ -108,6 +112,7 @@ export const validarTaxas = (taxas: TaxaPagamento[]) => {
     if (!FORMAS.includes(t.forma)) throw new ErroTaxa(`Forma inválida: ${t.forma}.`);
     if (!(t.parcelasDe >= 1 && t.parcelasAte >= t.parcelasDe && t.parcelasAte <= 36)) throw new ErroTaxa(`Faixa de parcelas inválida em ${t.forma} (${t.parcelasDe} a ${t.parcelasAte}).`);
     if (!(t.percentual >= 0 && t.percentual < 50)) throw new ErroTaxa(`Taxa inválida em ${t.forma}: use de 0 a 50%.`);
+    if (!((t.vendaPercentual ?? 0) >= 0 && (t.percentual + (t.vendaPercentual ?? 0)) < 50)) throw new ErroTaxa(`Taxa por venda inválida em ${t.forma}: o total precisa ficar abaixo de 50%.`);
     if (!(t.fixa >= 0)) throw new ErroTaxa(`Taxa fixa inválida em ${t.forma}.`);
   }
   // Faixas da mesma forma não podem se sobrepor

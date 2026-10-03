@@ -56,6 +56,11 @@ assert(descontoEfetivoPct(cfg, 100, liquidoParaRegra(cfg, [{ forma: 'CREDITO', v
 assert(descontoEfetivoPct(cfg, 100, liquidoParaRegra(cfg, [{ forma: 'CREDITO', valor: 100, parcelas: 4, troco: 0 }])) > 2, '4x conta');
 assert(descontoEfetivoPct(cfg, 100, liquidoParaRegra(cfg, [{ forma: 'PIX', valor: 95, parcelas: 1, troco: 0 }])) === 0, 'pix pela regra');
 
+// Taxa por venda (%) soma com a da faixa: 3,09% + 2% = 5,09%
+const comVenda: ConfigTaxas = { ...cfg, taxas: [{ forma: 'CREDITO', parcelasDe: 1, parcelasAte: 12, percentual: 2, vendaPercentual: 3.09, fixa: 0 }] };
+assert(Math.abs(taxaPara(comVenda.taxas, 'CREDITO', 3).percentual - 5.09) < 1e-9, 'taxa por venda somada');
+assert(calcularTaxas(comVenda, [{ forma: 'CREDITO', valor: 100, parcelas: 1, troco: 0 }]).totalTaxas === 5.09, 'taxa total na venda');
+
 // Validação
 const falha = (fn: () => unknown, msg: string) => { try { fn(); } catch { return; } throw new Error(msg); };
 validarTaxas(cfg.taxas);

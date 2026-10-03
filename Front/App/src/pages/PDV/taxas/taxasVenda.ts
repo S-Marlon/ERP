@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 
 const API = 'http://localhost:3001/api/vendas/taxas';
 
-export interface TaxaPagamento { forma: string; parcelasDe: number; parcelasAte: number; percentual: number; fixa: number; observacao?: string | null }
+// percentual = taxa da faixa; vendaPercentual = taxa % de toda venda (ex.: 3,09%); fixa = R$ por venda
+export interface TaxaPagamento { forma: string; parcelasDe: number; parcelasAte: number; percentual: number; vendaPercentual?: number; fixa: number; observacao?: string | null }
 
 export interface ConfigTaxas {
   taxas: TaxaPagamento[];
@@ -19,7 +20,9 @@ export interface ConfigTaxas {
 export const taxaPara = (cfg: ConfigTaxas, forma: string, parcelas = 1) => {
   const n = Math.max(1, Math.floor(parcelas || 1));
   const t = cfg.taxas.find(x => x.forma === forma && n >= x.parcelasDe && n <= x.parcelasAte);
-  return t ? { percentual: Number(t.percentual) || 0, fixa: Number(t.fixa) || 0 } : { percentual: 0, fixa: 0 };
+  return t
+    ? { percentual: (Number(t.percentual) || 0) + (Number(t.vendaPercentual) || 0), fixa: Number(t.fixa) || 0 }
+    : { percentual: 0, fixa: 0 };
 };
 
 /** % sobre o preço de tabela: negativo = desconto permitido, positivo = acréscimo necessário. */

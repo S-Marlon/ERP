@@ -12,7 +12,7 @@ const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.hea
 
 export const carregarConfigTaxas = async (conn: Conn, tenant: number): Promise<ConfigTaxas> => {
   const [rows]: any = await conn.execute(
-    `SELECT forma, parcelas_de, parcelas_ate, taxa_percentual, taxa_fixa FROM vendas_taxas_pagamento
+    `SELECT forma, parcelas_de, parcelas_ate, taxa_percentual, taxa_venda_percentual, taxa_fixa, observacao FROM vendas_taxas_pagamento
      WHERE tenant_id = ? AND ativo = 1 ORDER BY forma, parcelas_de`, [tenant]
   );
   const [[cfg]]: any = await conn.execute(
@@ -22,7 +22,8 @@ export const carregarConfigTaxas = async (conn: Conn, tenant: number): Promise<C
   return {
     taxas: rows.map((r: any) => ({
       forma: String(r.forma), parcelasDe: Number(r.parcelas_de), parcelasAte: Number(r.parcelas_ate),
-      percentual: Number(r.taxa_percentual), fixa: Number(r.taxa_fixa),
+      percentual: Number(r.taxa_percentual), vendaPercentual: Number(r.taxa_venda_percentual) || 0, fixa: Number(r.taxa_fixa),
+      observacao: r.observacao || null,
     })),
     formaReferencia: String(cfg?.forma_referencia_preco || 'CREDITO'),
     parcelasReferencia: Number(cfg?.parcelas_referencia_preco) || 1,
@@ -75,6 +76,7 @@ export const salvarTaxas = async (req: Request, res: Response) => {
       parcelasDe: Math.floor(Number(t.parcelasDe) || 1),
       parcelasAte: Math.floor(Number(t.parcelasAte) || Number(t.parcelasDe) || 1),
       percentual: Number(t.percentual) || 0,
+      vendaPercentual: Number(t.vendaPercentual) || 0,
       fixa: Number(t.fixa) || 0,
       observacao: String(t.observacao || '').trim().slice(0, 100) || null,
     }));
@@ -88,9 +90,9 @@ export const salvarTaxas = async (req: Request, res: Response) => {
     await connection.execute(`DELETE FROM vendas_taxas_pagamento WHERE tenant_id = ?`, [tenant]);
     for (const t of taxas) {
       await connection.execute(
-        `INSERT INTO vendas_taxas_pagamento (tenant_id, forma, parcelas_de, parcelas_ate, taxa_percentual, taxa_fixa, observacao)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [tenant, t.forma, t.parcelasDe, t.parcelasAte, t.percentual.toFixed(4), t.fixa.toFixed(4), t.observacao]
+        `INSERT INTO vendas_taxas_pagamento (tenant_id, forma, parcelas_de, parcelas_ate, taxa_percentual, taxa_venda_percentual, taxa_fixa, observacao)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [tenant, t.forma, t.parcelasDe, t.parcelasAte, t.percentual.toFixed(4), (t.vendaPercentual || 0).toFixed(4), t.fixa.toFixed(4), t.observacao]
       );
     }
     await connection.execute(

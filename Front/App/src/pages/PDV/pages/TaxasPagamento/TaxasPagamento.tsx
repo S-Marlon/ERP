@@ -8,11 +8,16 @@ import { carregarTaxaPreco } from '../../../../core/precos/taxaPreco';
 
 const { Text, Title } = Typography;
 const FORMAS = ['DEBITO', 'CREDITO', 'PIX', 'DINHEIRO', 'TRANSFERENCIA', 'PRAZO'];
-type Linha = TaxaPagamento & { chave: number };
+// tipoFixa: como a taxa fixa por venda é informada (% vai para vendaPercentual, R$ para fixa)
+type Linha = TaxaPagamento & { chave: number; tipoFixa: 'PCT' | 'RS' };
+const totalPct = (l: TaxaPagamento) => (Number(l.percentual) || 0) + (Number(l.vendaPercentual) || 0);
 
 // Mesma conta do servidor, para a prévia enquanto edita
 const previa = (linhas: Linha[], formaRef: string, parcelasRef: number) => {
-  const taxa = (forma: string, n: number) => linhas.find(l => l.forma === forma && n >= l.parcelasDe && n <= l.parcelasAte)?.percentual || 0;
+  const taxa = (forma: string, n: number) => {
+    const l = linhas.find(x => x.forma === forma && n >= x.parcelasDe && n <= x.parcelasAte);
+    return l ? totalPct(l) : 0;
+  };
   const ref = taxa(formaRef, parcelasRef) / 100;
   const ajuste = (forma: string, n: number) => ((1 - ref) / (1 - taxa(forma, n) / 100) - 1) * 100;
   return { ref: ref * 100, ajuste };
@@ -28,10 +33,11 @@ const TaxasPagamento: React.FC = () => {
   const [temSenha, setTemSenha] = useState(false);
   const [senhaAtual, setSenhaAtual] = useState('');
   const [salvando, setSalvando] = useState(false);
+  const [vendaEmLote, setVendaEmLote] = useState<number | null>(null);
 
   const aplicar = (c: ConfigTaxas) => {
     setCfg(c);
-    setLinhas(c.taxas.map((t, i) => ({ ...t, chave: i + 1 })));
+    setLinhas(c.taxas.map((t, i) => ({ ...t, chave: i + 1, tipoFixa: Number(t.fixa) > 0 && !Number(t.vendaPercentual) ? 'RS' : 'PCT' })));
     setFormaRef(c.formaReferencia);
     setParcelasRef(c.parcelasReferencia);
     setSemJuros(c.parcelasSemJuros);
@@ -49,15 +55,17 @@ const TaxasPagamento: React.FC = () => {
   const adicionar = (forma = 'CREDITO') => {
     const daForma = linhas.filter(l => l.forma === forma);
     const de = daForma.length ? Math.max(...daForma.map(l => l.parcelasAte)) + 1 : 1;
-    setLinhas(ls => [...ls, { chave: Date.now(), forma, parcelasDe: de, parcelasAte: forma === 'CREDITO' ? de : 1, percentual: 0, fixa: 0, observacao: '' }]);
+    // Nova faixa herda a taxa por venda das outras linhas da mesma forma
+    const vendaPercentual = daForma[0]?.vendaPercentual || 0;
+    setLinhas(ls => [...ls, { chave: Date.now(), forma, parcelasDe: de, parcelasAte: forma === 'CREDITO' ? de : 1, percentual: 0, vendaPercentual, fixa: 0, observacao: '', tipoFixa: 'PCT' }]);
   };
 
   const sugestaoInicial = () => setLinhas([
-    { chave: 1, forma: 'DEBITO', parcelasDe: 1, parcelasAte: 1, percentual: 1.99, fixa: 0 },
-    { chave: 2, forma: 'CREDITO', parcelasDe: 1, parcelasAte: 1, percentual: 4.99, fixa: 0 },
-    { chave: 3, forma: 'CREDITO', parcelasDe: 2, parcelasAte: 6, percentual: 6.99, fixa: 0 },
-    { chave: 4, forma: 'CREDITO', parcelasDe: 7, parcelasAte: 12, percentual: 9.99, fixa: 0 },
-    { chave: 5, forma: 'PIX', parcelasDe: 1, parcelasAte: 1, percentual: 0, fixa: 0 },
+    { chave: 1, forma: 'DEBITO', parcelasDe: 1, parcelasAte: 1, percentual: 1.99, fixa: 0, tipoFixa: 'PCT' },
+    { chave: 2, forma: 'CREDITO', parcelasDe: 1, parcelasAte: 1, percentual: 4.99, fixa: 0, tipoFixa: 'PCT' },
+    { chave: 3, forma: 'CREDITO', parcelasDe: 2, parcelasAte: 6, percentual: 6.99, fixa: 0, tipoFixa: 'PCT' },
+    { chave: 4, forma: 'CREDITO', parcelasDe: 7, parcelasAte: 12, percentual: 9.99, fixa: 0, tipoFixa: 'PCT' },
+    { chave: 5, forma: 'PIX', parcelasDe: 1, parcelasAte: 1, percentual: 0, fixa: 0, tipoFixa: 'PCT' },
   ]);
 
   const prev = useMemo(() => previa(linhas, formaRef, parcelasRef), [linhas, formaRef, parcelasRef]);
@@ -66,7 +74,12 @@ const TaxasPagamento: React.FC = () => {
     setSalvando(true);
     try {
       const r = await taxasApi.salvar({
-        taxas: linhas.map(l => ({ forma: l.forma, parcelasDe: l.parcelasDe, parcelasAte: l.parcelasAte, percentual: l.percentual, fixa: l.fixa, observacao: l.observacao })),
+        taxas: linhas.map(l => ({
+          forma: l.forma, parcelasDe: l.parcelasDe, parcelasAte: l.parcelasAte, percentual: l.percentual,
+          vendaPercentual: l.tipoFixa === 'PCT' ? Number(l.vendaPercentual) || 0 : 0,
+          fixa: l.tipoFixa === 'RS' ? Number(l.fixa) || 0 : 0,
+          observacao: l.observacao,
+        })),
         formaReferencia: formaRef, parcelasReferencia: parcelasRef, parcelasSemJuros: semJuros, descontoFormaAutomatico: automatico,
         senhaAtual: senhaAtual || undefined,
       });
@@ -100,6 +113,15 @@ const TaxasPagamento: React.FC = () => {
           <Col xs={24} xl={15}>
             <Card size="small" title="Taxas" extra={<Space>
               {linhas.length === 0 && <Button size="small" onClick={sugestaoInicial}>Preencher exemplo</Button>}
+              <Space.Compact size="small">
+                <InputNumber size="small" min={0} max={49.99} step={0.1} precision={2} decimalSeparator="," addonAfter="%" placeholder="Por venda"
+                  style={{ width: 120 }} value={vendaEmLote} onChange={v => setVendaEmLote(v)} />
+                <Button size="small" disabled={vendaEmLote === null} title="Coloca esta taxa por venda (%) em todas as linhas de débito e crédito"
+                  onClick={() => setLinhas(ls => ls.map(l => (['DEBITO', 'CREDITO'].includes(l.forma)
+                    ? { ...l, tipoFixa: 'PCT', vendaPercentual: Number(vendaEmLote) || 0, fixa: 0 } : l)))}>
+                  Aplicar no débito e crédito
+                </Button>
+              </Space.Compact>
               <Button size="small" icon={<PlusOutlined />} onClick={() => adicionar('CREDITO')}>Faixa</Button>
             </Space>}>
               <Table<Linha>
@@ -125,12 +147,28 @@ const TaxasPagamento: React.FC = () => {
                     ),
                   },
                   {
-                    title: 'Taxa', dataIndex: 'percentual', width: 110,
+                    title: 'Taxa da faixa', dataIndex: 'percentual', width: 110,
                     render: (v: number, l) => <InputNumber size="small" min={0} max={49.99} step={0.1} precision={2} decimalSeparator="," addonAfter="%" value={v} onChange={x => alterar(l.chave, 'percentual', Number(x) || 0)} />,
                   },
                   {
-                    title: 'Fixa', dataIndex: 'fixa', width: 100,
-                    render: (v: number, l) => <InputNumber size="small" min={0} precision={2} decimalSeparator="," prefix="R$" value={v} onChange={x => alterar(l.chave, 'fixa', Number(x) || 0)} />,
+                    title: 'Fixa por venda', key: 'fixa', width: 160,
+                    render: (_, l) => (
+                      <Space.Compact size="small">
+                        <InputNumber size="small" min={0} max={l.tipoFixa === 'PCT' ? 49.99 : undefined} step={l.tipoFixa === 'PCT' ? 0.1 : 0.05}
+                          precision={2} decimalSeparator="," style={{ width: 90 }}
+                          value={l.tipoFixa === 'PCT' ? l.vendaPercentual || 0 : l.fixa}
+                          onChange={x => alterar(l.chave, l.tipoFixa === 'PCT' ? 'vendaPercentual' : 'fixa', Number(x) || 0)} />
+                        <Select size="small" value={l.tipoFixa} style={{ width: 62 }}
+                          onChange={(tipo: 'PCT' | 'RS') => setLinhas(ls => ls.map(x => (x.chave !== l.chave ? x : tipo === 'PCT'
+                            ? { ...x, tipoFixa: 'PCT', vendaPercentual: x.fixa || x.vendaPercentual || 0, fixa: 0 }
+                            : { ...x, tipoFixa: 'RS', fixa: x.vendaPercentual || x.fixa || 0, vendaPercentual: 0 })))}
+                          options={[{ value: 'PCT', label: '%' }, { value: 'RS', label: 'R$' }]} />
+                      </Space.Compact>
+                    ),
+                  },
+                  {
+                    title: 'Total', key: 'total', width: 90, align: 'right' as const,
+                    render: (_, l) => <b>{totalPct(l).toFixed(2)}%{l.tipoFixa === 'RS' && l.fixa > 0 ? ` + R$ ${l.fixa.toFixed(2)}` : ''}</b>,
                   },
                   {
                     title: 'Observação', dataIndex: 'observacao',
