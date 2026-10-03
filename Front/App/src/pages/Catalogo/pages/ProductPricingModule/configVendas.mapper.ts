@@ -24,12 +24,15 @@ export interface TierRuleRecord {
   unitPrice: number;
 }
 
+import { fatorTaxaPreco } from '../../../../core/precos/taxaPreco';
+
 export const MARKUP_PADRAO = 1.8;
 
 const arred2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
 
+// Markup líquido; o fator da taxa (Vendas › Taxas de pagamento) embute a taxa da maquininha no preço
 export const precoPorMarkup = (custoBase: number, fator: number, markup: number): number =>
-  arred2(custoBase * fator * markup);
+  arred2(custoBase * fator * markup * fatorTaxaPreco());
 
 export const custoReferencia = (config: ConfigVendasApi): number =>
   config.custos.custoGerencial ?? config.custos.ultimoCusto ?? config.custos.custoMedio ?? 0;

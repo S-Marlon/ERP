@@ -9,9 +9,11 @@ const arred = (valor: number, casas: number): number => {
   return Math.round((valor + Number.EPSILON) * f) / f;
 };
 
-// Preço de uma unidade de venda: custo da unidade base x fator da unidade x markup
-export const calcularPrecoUnidade = (custoBase: number, fator: number, markup: number): number =>
-  arred((Number(custoBase) || 0) * (Number(fator) || 0) * (Number(markup) || 0), 2);
+// Preço de uma unidade de venda: custo da unidade base x fator da unidade x markup x fator da taxa.
+// O markup é líquido; o fator da taxa (1 / (1 - taxa de referência), Vendas › Taxas de pagamento) embute
+// a taxa da maquininha para o preço render o markup depois de descontada a taxa.
+export const calcularPrecoUnidade = (custoBase: number, fator: number, markup: number, fatorTaxa = 1): number =>
+  arred((Number(custoBase) || 0) * (Number(fator) || 0) * (Number(markup) || 0) * (Number(fatorTaxa) || 1), 2);
 
 export interface Defasagem {
   defasado: boolean;
@@ -60,8 +62,12 @@ export interface FaixaPreco {
 }
 
 // Recalcula todas as faixas quando o custo gerencial muda (markup é mantido)
-export const recalcularFaixas = <T extends FaixaPreco>(faixas: T[], custoBase: number, fatorPorSigla: Map<string, number>): T[] =>
+export const recalcularFaixas = <T extends FaixaPreco>(faixas: T[], custoBase: number, fatorPorSigla: Map<string, number>, fatorTaxa = 1): T[] =>
   faixas.map(f => ({
     ...f,
-    preco_unitario: calcularPrecoUnidade(custoBase, fatorPorSigla.get(f.sigla) ?? 1, f.markup),
+    preco_unitario: calcularPrecoUnidade(custoBase, fatorPorSigla.get(f.sigla) ?? 1, f.markup, fatorTaxa),
   }));
+
+/** Margem líquida (%) do preço: o que sobra depois da taxa embutida e do custo. */
+export const margemLiquida = (preco: number, custo: number, taxaPercentual = 0): number | null =>
+  preco > 0 ? arred(((preco * (1 - taxaPercentual / 100) - custo) / preco) * 100, 2) : null;

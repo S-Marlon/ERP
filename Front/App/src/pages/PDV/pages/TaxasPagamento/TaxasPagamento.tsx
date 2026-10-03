@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Card, Col, Input, InputNumber, Row, Select, Space, Switch, Table, Tag, Typography, message } from 'antd';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { ConfigTaxas, invalidarTaxas, ROTULO_FORMA_TAXA, TaxaPagamento, taxasApi } from '../../taxas/taxasVenda';
+import { carregarTaxaPreco } from '../../../../core/precos/taxaPreco';
 
 const { Text, Title } = Typography;
 const FORMAS = ['DEBITO', 'CREDITO', 'PIX', 'DINHEIRO', 'TRANSFERENCIA', 'PRAZO'];
@@ -72,7 +73,8 @@ const TaxasPagamento: React.FC = () => {
       aplicar(r);
       setSenhaAtual('');
       invalidarTaxas();
-      message.success('Taxas salvas.');
+      carregarTaxaPreco();
+      message.success('Taxas salvas. Para atualizar os preços existentes, use Catálogo › Precificação › Preços com taxa.');
     } catch (e) {
       message.error(e instanceof Error ? e.message : 'Erro ao salvar as taxas.');
     } finally {

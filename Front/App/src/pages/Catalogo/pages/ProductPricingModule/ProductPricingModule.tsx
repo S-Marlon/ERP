@@ -4,6 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { Button, Card, Col, Drawer, Empty, Input, Row, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { DollarOutlined, EditOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
 import ProductCommercialSalesConfig from './ProductCommercialSalesConfig';
+import PrecosComTaxaModal from './PrecosComTaxaModal';
+import { carregarTaxaPreco, useTaxaPreco } from '../../../../core/precos/taxaPreco';
 
 const { Text, Title } = Typography;
 
@@ -56,6 +58,9 @@ export const ProductPricingModule: React.FC = () => {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(50);
   const [editando, setEditando] = useState<{ idItem?: number; titulo: string } | null>(null);
+  const [precosTaxa, setPrecosTaxa] = useState(false);
+  const taxaPreco = useTaxaPreco();
+  useEffect(() => { carregarTaxaPreco(); }, []);
 
   const carregar = async () => {
     setCarregando(true);
@@ -101,6 +106,9 @@ export const ProductPricingModule: React.FC = () => {
             <Text type="secondary">Custo, preço de varejo e margem de cada item de venda. Clique num item para ajustar unidades, faixas de atacado e custo.</Text>
           </div>
           <Space>
+            <Tooltip title={taxaPreco.percentual > 0 ? `O preço embute ${taxaPreco.percentual.toFixed(2)}% de taxa (Vendas › Taxas de pagamento)` : 'Nenhuma taxa embutida no preço'}>
+              <Button onClick={() => setPrecosTaxa(true)}>Preços com taxa{taxaPreco.percentual > 0 ? ` (${taxaPreco.percentual.toFixed(2)}%)` : ''}</Button>
+            </Tooltip>
             <Button icon={<ReloadOutlined />} onClick={carregar} loading={carregando}>Atualizar</Button>
             <Button type="primary" icon={<DollarOutlined />} onClick={() => setEditando({ titulo: 'Configurar preço' })}>Buscar produto</Button>
           </Space>
@@ -219,6 +227,7 @@ export const ProductPricingModule: React.FC = () => {
       >
         {editando && <ProductCommercialSalesConfig idItem={editando.idItem} />}
       </Drawer>
+      <PrecosComTaxaModal aberto={precosTaxa} onFechar={() => setPrecosTaxa(false)} onAplicado={carregar} />
     </div>
   );
 };

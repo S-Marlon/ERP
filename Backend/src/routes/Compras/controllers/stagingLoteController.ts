@@ -7,6 +7,7 @@ import { lancarMovimentoEstoque } from '../../EstoqueItens/depositos';
 import { gravarAtributosItemNovo } from '../../Catalogo/Produtos/produtoDetalhe.controller';
 import { destinosDoItem, prefixoSkuSequencial, skuCustomizadoPlanejado, skuSequencial } from '../staging/penteFino';
 import { canonizar, carregarResolvedor } from '../staging/unidadesEntrada';
+import { carregarTaxaPreco } from '../../Venda/taxas/taxas.controller';
 import {
   avaliarPenteFino,
   calcularCustoMedio,
@@ -326,7 +327,8 @@ export const aprovarLote = async (req: Request, res: Response): Promise<Response
             const faixas = recalcularFaixas(
               (configVendas.faixas || []).map((f: FaixaPayload) => ({ ...f, sigla: canon(f.sigla) })),
               custoUnitario,
-              fatorPorSigla
+              fatorPorSigla,
+              (await carregarTaxaPreco(connection, tenant)).fator
             ) as FaixaPayload[];
             await gravarConfigVendas(connection, tenant, idItem, unidadesVenda, faixas, custoUnitario > 0 ? custoUnitario : null);
           }

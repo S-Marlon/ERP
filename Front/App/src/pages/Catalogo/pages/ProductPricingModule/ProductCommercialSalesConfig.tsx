@@ -41,12 +41,14 @@ SalvarConfigPayload
 import {
 configParaEstado,
 estadoParaPayload,
+precoPorMarkup,
 sincronizarRascunho,
 RascunhoVendas,
 SaleUnitConfig,
 TierRuleRecord
 } from './configVendas.mapper';
 import { validarGtin } from '../../../Compras/StockEntry/gtin';
+import { lucroLiquido, margemLiquidaPct, markupPorPreco, useTaxaPreco } from '../../../../core/precos/taxaPreco';
 
 const { Text } = Typography;
 
@@ -77,6 +79,8 @@ const searchAbort = useRef<AbortController | null>(null);
 
 // Custo gerencial (por unidade base): referência do preço de venda
 const [purchaseCost, setPurchaseCost] = useState<number>(0);
+// Taxa da maquininha embutida no preço (Vendas › Taxas de pagamento): margens já descontam a taxa
+const taxaPreco = useTaxaPreco();
 const [unitsConfig, setUnitsConfig] = useState<SaleUnitConfig[]>([]);
 
 const [simUnitKey, setSimUnitKey] = useState<string>('');
@@ -218,8 +222,8 @@ if (!unitDef || !unitDef.enabled) return null;
 
 const unitCost = purchaseCost * unitDef.conversionFactor;
 const unitPrice = tier.unitPrice;
-const profitPerUnit = unitPrice - unitCost;
-const marginPercentage = unitPrice > 0 ? (profitPerUnit / unitPrice) * 100 : 0;
+const profitPerUnit = lucroLiquido(unitPrice, unitCost);
+const marginPercentage = margemLiquidaPct(unitPrice, unitCost);
 
 if (marginPercentage < lowestMargin) lowestMargin = marginPercentage;
 if (marginPercentage > highestMargin) highestMargin = marginPercentage;
@@ -243,7 +247,7 @@ avgMargin,
 lowestMargin: enrichedTiers.length > 0 ? lowestMargin : 0,
 highestMargin: enrichedTiers.length > 0 ? highestMargin : 0,
 };
-}, [tierRules, unitsConfig, purchaseCost]);
+}, [tierRules, unitsConfig, purchaseCost, taxaPreco.percentual]);
 
 const handleOpenCreateUnitModal = () => {
 setModalMode('create');
@@ -317,7 +321,7 @@ tierType: 'retail' as const,
 minQuantity: 0,
 maxQuantity: 'INF' as const,
 markupOrDiscount: formRetailMarkup,
-unitPrice: (purchaseCost * fatorNovo) * formRetailMarkup,
+unitPrice: precoPorMarkup(purchaseCost, fatorNovo, formRetailMarkup),
 }
 ];
 
@@ -345,7 +349,7 @@ if (tier.unitKey === editingUnitKey && tier.minQuantity === 0) {
 return {
 ...tier,
 markupOrDiscount: formRetailMarkup,
-unitPrice: (purchaseCost * (formIsBase ? 1 : formConversionFactor)) * formRetailMarkup,
+unitPrice: precoPorMarkup(purchaseCost, formIsBase ? 1 : formConversionFactor, formRetailMarkup),
 };
 }
 return tier;
@@ -409,7 +413,7 @@ tierType: 'wholesale',
 minQuantity: suggestedMin,
 maxQuantity: 'INF',
 markupOrDiscount: defaultMarkup,
-unitPrice: (purchaseCost * factor) * defaultMarkup,
+unitPrice: precoPorMarkup(purchaseCost, factor, defaultMarkup),
 };
 
 setTierRules([...updatedTierRules, newRule]);
@@ -704,8 +708,8 @@ marginTop: 6,
 const factor = unit.conversionFactor;
 const unitCost = purchaseCost * factor;
 const unitRule = tierRules.find(t => t.unitKey === unit.unitKey);
-const unitPrice = unitRule ? unitRule.unitPrice : unitCost * unit.retailMarkup;
-const unitMarginPct = unitPrice > 0 ? ((unitPrice - unitCost) / unitPrice) * 100 : 0;
+const unitPrice = unitRule ? unitRule.unitPrice : precoPorMarkup(purchaseCost, factor, unit.retailMarkup);
+const unitMarginPct = margemLiquidaPct(unitPrice, unitCost);
 const ativa = activeTabKey === unit.unitKey;
 return (
 <div
@@ -750,7 +754,7 @@ transition: 'all 0.2s',
 ) : (() => {
 const custoUnidade = purchaseCost * activeUnitDef.conversionFactor;
 const precoVarejo = tierRules.find(t => t.unitKey === activeUnitDef.unitKey)?.unitPrice ?? 0;
-const margem = precoVarejo > 0 ? (((precoVarejo - custoUnidade) / precoVarejo) * 100).toFixed(1) + '%' : '—';
+const margem = precoVarejo > 0 ? margemLiquidaPct(precoVarejo, custoUnidade).toFixed(1) + '%' : '—';
 const faixas = tierRules.filter(t => t.unitKey === activeUnitDef.unitKey).length;
 const chip = (rotulo: string, valor: React.ReactNode, cor?: string) => (
 <div style={{ lineHeight: 1.2 }}>
@@ -768,7 +772,7 @@ return (
 {chip(`Custo base (${baseLabel})`, `R$ ${purchaseCost.toFixed(2)}`)}
 {activeUnitDef.conversionFactor !== 1 && chip(`Custo ${activeUnitDef.unitKey} (×${activeUnitDef.conversionFactor})`, `R$ ${custoUnidade.toFixed(2)}`)}
 {chip('Varejo', `R$ ${precoVarejo.toFixed(2)}`, '#3f8600')}
-{chip('Margem', margem, '#1677ff')}
+{chip(taxaPreco.percentual > 0 ? `Margem (após taxa ${taxaPreco.percentual.toFixed(2)}%)` : 'Margem', margem, '#1677ff')}
 {chip('Faixas', `${faixas} / 3`, '#722ed1')}
 <Button size="small" type="primary" ghost icon={<EditOutlined />} onClick={() => handleOpenEditUnitModal(activeUnitDef)}>
 Editar unidade
@@ -803,7 +807,7 @@ pointerEvents: activeUnitDef.enabled ? 'auto' : 'none',
 const isFirstGomo = idx === 0;
 const isLastGomo = idx === unitRulesArr.length - 1;
 const unitCost = purchaseCost * activeUnitDef.conversionFactor;
-const profit = rule.unitPrice - unitCost;
+const profit = lucroLiquido(rule.unitPrice, unitCost);
 
 return (
 <div key={rule.key}>
@@ -891,7 +895,7 @@ const targetIndex = tierRules.findIndex(t => t.key === rule.key);
 if (targetIndex !== -1) {
 const factor = activeUnitDef.conversionFactor;
 updated[targetIndex].markupOrDiscount = markup;
-updated[targetIndex].unitPrice = (purchaseCost * factor) * markup;
+updated[targetIndex].unitPrice = precoPorMarkup(purchaseCost, factor, markup);
 setTierRules(updated);
 }
 }}
@@ -947,7 +951,7 @@ const updated = [...tierRules];
 const targetIndex = tierRules.findIndex(t => t.key === rule.key);
 if (targetIndex !== -1) {
 const baseCost = purchaseCost * activeUnitDef.conversionFactor;
-const calculatedMarkup = baseCost > 0 ? price / baseCost : 1;
+const calculatedMarkup = markupPorPreco(price, baseCost);
 
 updated[targetIndex].unitPrice = price;
 updated[targetIndex].markupOrDiscount = Number(calculatedMarkup.toFixed(2));

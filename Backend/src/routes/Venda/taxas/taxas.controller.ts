@@ -4,7 +4,7 @@ import { Request, Response } from 'express';
 import pool from '../../Estoque/db.config';
 import { conferirSenha } from '../regras/regrasVenda';
 import { carregarRegras } from '../regras/regrasVenda.controller';
-import { ajusteDaForma, ConfigTaxas, ErroTaxa, taxaReferencia, TaxaPagamento, validarTaxas } from './taxas';
+import { ajusteDaForma, ConfigTaxas, ErroTaxa, fatorTaxa, taxaReferencia, TaxaPagamento, validarTaxas } from './taxas';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
 
@@ -29,6 +29,12 @@ export const carregarConfigTaxas = async (conn: Conn, tenant: number): Promise<C
     parcelasSemJuros: Number(cfg?.parcelas_sem_juros) || 1,
     descontoFormaAutomatico: cfg ? Boolean(Number(cfg.desconto_forma_automatico)) : true,
   };
+};
+
+/** Taxa que o preço de tabela embute (precificação): percentual e fator 1 / (1 - taxa). */
+export const carregarTaxaPreco = async (conn: Conn, tenant: number) => {
+  const percentual = taxaReferencia(await carregarConfigTaxas(conn, tenant));
+  return { percentual, fator: fatorTaxa(percentual) };
 };
 
 // Tabela pronta para a tela: ajuste de cada forma/faixa sobre o preço de tabela

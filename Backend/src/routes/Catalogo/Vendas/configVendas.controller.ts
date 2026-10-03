@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import pool from '../../Estoque/db.config';
-import { analisarDefasagem, calcularPrecoUnidade } from './precificacao';
+import { analisarDefasagem, calcularPrecoUnidade, margemLiquida } from './precificacao';
+import { carregarTaxaPreco } from '../../Venda/taxas/taxas.controller';
 
 // Conexão do pool (mysql2/promise), dentro ou fora de transação
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
@@ -240,6 +241,7 @@ export const gravarConfigVendas = async (
 
   // Custo gerencial + preço de referência (varejo da unidade padrão do PDV, ou da base) para telas legadas
   const unidadePreco = unidades.find(u => u.padrao_pdv) || base;
+  const taxaPreco = await carregarTaxaPreco(connection, tenant);
   const varejo = faixas
     .filter(f => siglaNormalizada(f.sigla) === siglaNormalizada(unidadePreco.sigla))
     .sort((a, b) => a.ordem - b.ordem)[0];
@@ -253,8 +255,8 @@ export const gravarConfigVendas = async (
       tenant, idItem,
       custoGerencial,
       varejo ? Number(varejo.preco_unitario) : null,
-      varejo && Number(varejo.preco_unitario) > 0 && custoGerencial !== null
-        ? Number((((Number(varejo.preco_unitario) - custoGerencial * Number(unidadePreco.fator)) / Number(varejo.preco_unitario)) * 100).toFixed(2))
+      varejo && custoGerencial !== null
+        ? margemLiquida(Number(varejo.preco_unitario), custoGerencial * Number(unidadePreco.fator), taxaPreco.percentual)
         : null,
     ]
   );
@@ -333,10 +335,11 @@ export const atualizarCustoGerencial = async (req: Request, res: Response) => {
       [idItem, tenant]
     );
 
+    const taxaPreco = await carregarTaxaPreco(connection, tenant);
     for (const f of faixas) {
       await connection.execute(
         `UPDATE comercial_precos_faixas SET preco_unitario = ? WHERE id_faixa = ?`,
-        [calcularPrecoUnidade(novoCusto, Number(f.fator), Number(f.markup)), f.id_faixa]
+        [calcularPrecoUnidade(novoCusto, Number(f.fator), Number(f.markup), taxaPreco.fator), f.id_faixa]
       );
     }
 

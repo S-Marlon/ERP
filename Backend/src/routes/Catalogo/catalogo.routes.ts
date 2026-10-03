@@ -64,6 +64,7 @@ import { getConfigVendas, salvarConfigVendas, atualizarCustoGerencial, listarUni
 import { listarPendenciasPim } from './Produtos/pendencias.controller';
 import { resumoCatalogo } from './Produtos/resumoCatalogo.controller';
 import { painelPrecos } from './Vendas/painelPrecos.controller';
+import { aplicarPrecosComTaxa, previaPrecosComTaxa } from './Vendas/precosTaxa.controller';
 import { listarDuplicados, unificarItens } from './Produtos/unificacao.controller';
 import { getProdutoDetalhe, updateProdutoParcial, adicionarAnexo, removerAnexo, definirImagemPrincipal, getFichaTecnica, salvarFichaTecnica, getAtributosParaItem } from './Produtos/produtoDetalhe.controller';
 
@@ -161,6 +162,9 @@ router.get('/pendencias', listarPendenciasPim);
 router.get('/resumo', resumoCatalogo);
 // Painel de precificação (custo, preço, margem e situação dos itens de venda)
 router.get('/precos/painel', painelPrecos);
+// Preços com a taxa da maquininha embutida (Vendas › Taxas de pagamento): prévia e aplicação
+router.get('/precos/taxa/previa', previaPrecosComTaxa);
+router.post('/precos/taxa/aplicar', aplicarPrecosComTaxa);
 // Itens duplicados: suspeitas e unificação de um item em outro
 router.get('/itens/duplicados', listarDuplicados);
 router.post('/itens/unificar', unificarItens);

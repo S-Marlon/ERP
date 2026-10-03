@@ -1,5 +1,5 @@
 import { Routes, Route, useLocation, Navigate } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Layout } from "antd";
 
 // Componentes de Layout
@@ -33,6 +33,7 @@ import CaixasHistorico from './pages/PDV/pages/Caixas/CaixasHistorico';
 import RegrasVenda from './pages/PDV/pages/RegrasVenda/RegrasVenda';
 import TaxasPagamento from './pages/PDV/pages/TaxasPagamento/TaxasPagamento';
 import { CaixaPaineis } from './pages/PDV/caixa/CaixaPainel';
+import { carregarTaxaPreco } from './core/precos/taxaPreco';
 import NotasEntrada from './pages/Compras/NotasEntrada/NotasEntrada';
 import ComprasDashboard from "./pages/Compras/ComprasDashboard";
 import StockEntryForm from "./pages/Compras/StockEntry/StockEntryForm";
@@ -73,6 +74,8 @@ const { Sider, Header } = Layout;
 
 export default function AppLayout() {
   const location = useLocation();
+  // Taxa da maquininha embutida no preço: usada pelas contas de preço do catálogo e da entrada de NF
+  useEffect(() => { carregarTaxaPreco(); }, []);
   const isPDV = location.pathname.startsWith("/vendas/pdv");
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);

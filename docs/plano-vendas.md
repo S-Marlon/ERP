@@ -14,6 +14,7 @@ testes → telas → commit.
 | 1 | **Caixa**: abertura com troco, sangria/suprimento, fechamento com conferência por forma; venda só com caixa aberto | `vendas_caixas`, `vendas_caixas_movimentos`, `vendas_caixas_fechamentos`; `id_caixa` e `operador` em `vendas_pedidos` | feito |
 | 2 | **Prazo → contas a receber**: venda a prazo exige cliente, gera parcelas, limite de crédito, baixa (dinheiro entra no caixa) | `financeiro_contas_receber`, `financeiro_contas_receber_baixas`, limite de crédito | |
 | 3 | **Desconto e margem no servidor**: limite configurável, autorização registrada, aviso/bloqueio abaixo do custo | `vendas_configuracoes`; `autorizado_por` e `motivo_autorizacao` em `vendas_pedidos` | feito |
+| 3.5 | **Taxas dos meios de pagamento**: taxa por forma/parcelas, preço com a taxa embutida, desconto da forma sem autorização, acréscimo no parcelamento, margem líquida | `vendas_taxas_pagamento`; referência e sem juros em `vendas_configuracoes`; taxa em `vendas_pedidos_pagamentos` e `vendas_pedidos` | feito |
 | 4 | **Central de Vendas real**: faturamento, ticket médio, margem, formas, mais vendidos, a receber, caixa | — | |
 | 5 | **Orçamento e venda suspensa**: suspender/retomar, orçamento com validade e impressão, converter em venda | status e validade em `vendas_pedidos` | |
 | 6 | **OS de montagem de mangueira**: mão de obra + componentes, OS → venda (reaproveita `components/OrderService`) | itens de serviço, OS | |
@@ -36,6 +37,18 @@ testes → telas → commit.
 - Venda: desconto total acima do limite ou abaixo do custo (política AVISAR) → `403 AUTORIZACAO_NECESSARIA` até vir
   `autorizacao { senha, nome, motivo }`; BLOQUEAR → `409 ABAIXO_DO_CUSTO`. Quem autorizou e o motivo ficam na venda.
 - **Telas**: pedido de autorização na finalização (reenvia a venda), Vendas › Regras de venda, autorização no detalhe de Vendas do Dia.
+
+## Fase 3.5 — como ficou
+
+- **Conta**: para receber L com taxa t cobra-se L ÷ (1 − t). O preço de tabela embute a taxa de referência
+  (ex.: crédito 1x); na forma f o equivalente é tabela × (1 − t_ref) ÷ (1 − t_f): PIX/débito ganham desconto,
+  crédito acima do sem juros ganha acréscimo; até o sem juros a loja absorve.
+- **Backend**: `Venda/taxas` (cálculo com testes; `GET|PUT /api/vendas/taxas`); a venda grava a taxa de cada pagamento
+  e `total_taxas`; a regra de desconto usa o desconto efetivo (líquido recebido x líquido da referência).
+  Precificação: `calcularPrecoUnidade(custo, fator, markup, fatorTaxa)` nos recálculos automáticos; margem líquida;
+  `GET /api/catalogo/precos/taxa/previa` e `POST .../aplicar`.
+- **Telas**: Vendas › Taxas de pagamento (com prévia), finalização (desconto da forma e acréscimo),
+  Precificação (margens após a taxa, botão Preços com taxa), margem líquida no caixa.
 
 ## Critérios de pronto
 
