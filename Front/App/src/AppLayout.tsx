@@ -27,7 +27,7 @@ import Movimentacoes from './pages/Estoque/pages/Movimentacoes/Movimentacoes';
 import Etiquetagem from './pages/Estoque/pages/Etiquetagem/Etiquetagem';
 import { FinalizarVenda } from "./pages/PDV/pages/FinalizarVenda";
 import PDVContent from './pages/PDV/PDV';
-import HubVendas from './pages/PDV/HubVendas';
+import CentralVendas from './pages/PDV/CentralVendas';
 import VendasDoDia from './pages/PDV/pages/VendasDoDia/VendasDoDia';
 import CaixasHistorico from './pages/PDV/pages/Caixas/CaixasHistorico';
 import RegrasVenda from './pages/PDV/pages/RegrasVenda/RegrasVenda';
@@ -154,7 +154,7 @@ export default function AppLayout() {
             <Route path="/clientes/novo" element={<CadastroCliente />} /> 
             <Route path="/contratos/novo" element={<CadastroContrato />} />
             <Route path="/pocos/novo" element={<RelatorioPoco />} />
-            <Route path="/vendas" element={<HubVendas />} />
+            <Route path="/vendas" element={<CentralVendas />} />
             <Route path="/vendas/pdv" element={<PDVContent />} />
             <Route path="/vendas/do-dia" element={<VendasDoDia />} />
             <Route path="/vendas/caixas" element={<CaixasHistorico />} />

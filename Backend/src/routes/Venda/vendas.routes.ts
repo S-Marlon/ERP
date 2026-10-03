@@ -4,6 +4,7 @@ import { cancelarVenda, detalheVenda, listarVendas, registrarVenda } from './pdv
 import { abrirCaixa, caixaAtual, detalheCaixa, fecharCaixa, lancarMovimento, listarCaixas } from './caixa/caixa.controller';
 import { obterConfiguracoes, salvarConfiguracoes } from './regras/regrasVenda.controller';
 import { obterTaxas, salvarTaxas } from './taxas/taxas.controller';
+import { painelVendas } from './painel/painelVendas.controller';
 
 // Vendas no modelo novo (itens_core). Montado em /api/vendas
 const router = Router();
@@ -35,5 +36,8 @@ router.put('/configuracoes', salvarConfiguracoes);
 // Taxas dos meios de pagamento (maquininha) e parcelamento
 router.get('/taxas', obterTaxas);
 router.put('/taxas', salvarTaxas);
+
+// Central de Vendas (painel)
+router.get('/painel', painelVendas);
 
 export default router;
