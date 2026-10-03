@@ -26,6 +26,10 @@ const hora = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: 
 interface DetalheVenda {
   itens: any[];
   pagamentos: any[];
+  operador?: string | null;
+  id_caixa?: number | null;
+  autorizado_por?: string | null;
+  motivo_autorizacao?: string | null;
 }
 
 const DetalheLinha: React.FC<{ idVenda: number }> = ({ idVenda }) => {
@@ -89,6 +93,12 @@ const DetalheLinha: React.FC<{ idVenda: number }> = ({ idVenda }) => {
             </div>
           ))}
         </Card>
+        <div style={{ fontSize: 12, color: '#64748b', marginTop: 6 }}>
+          {detalhe.operador && <div>Operador: <b>{detalhe.operador}</b>{detalhe.id_caixa ? ` · caixa ${detalhe.id_caixa}` : ''}</div>}
+          {detalhe.autorizado_por && (
+            <div style={{ color: '#b45309' }}>Autorizado por <b>{detalhe.autorizado_por}</b>: {detalhe.motivo_autorizacao}</div>
+          )}
+        </div>
       </Col>
     </Row>
   );

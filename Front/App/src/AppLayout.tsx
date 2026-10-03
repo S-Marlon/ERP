@@ -30,6 +30,7 @@ import PDVContent from './pages/PDV/PDV';
 import HubVendas from './pages/PDV/HubVendas';
 import VendasDoDia from './pages/PDV/pages/VendasDoDia/VendasDoDia';
 import CaixasHistorico from './pages/PDV/pages/Caixas/CaixasHistorico';
+import RegrasVenda from './pages/PDV/pages/RegrasVenda/RegrasVenda';
 import { CaixaPaineis } from './pages/PDV/caixa/CaixaPainel';
 import NotasEntrada from './pages/Compras/NotasEntrada/NotasEntrada';
 import ComprasDashboard from "./pages/Compras/ComprasDashboard";
@@ -153,6 +154,7 @@ export default function AppLayout() {
             <Route path="/vendas/pdv" element={<PDVContent />} />
             <Route path="/vendas/do-dia" element={<VendasDoDia />} />
             <Route path="/vendas/caixas" element={<CaixasHistorico />} />
+            <Route path="/vendas/regras" element={<RegrasVenda />} />
             <Route path="/vendas/pdv/finalizar" element={<FinalizarVenda onBack={() => {}} />} />
             <Route path="/estoque" element={<Estoque />} />
             <Route path="/estoque/consulta" element={<SaldoEstoque />} />

@@ -4,7 +4,7 @@ import Badge from '../../../components/ui/Badge/Badge';
 import Button from '../../../components/ui/Button/Button';
 import Fieldset from '../../../components/ui/Fieldset/Fieldset';
 import { imprimirExtratoElgin } from '../../../utils/printService';
-import { salesService, VendaPdvPayload, FormaPagamentoPdv } from '../services/salesService';
+import { salesService, VendaPdvPayload, FormaPagamentoPdv, ErroVendaPdv, AutorizacaoVenda } from '../services/salesService';
 import Swal from 'sweetalert2';
 import { isCartItemOS } from '../types/cart.types';
 import { caixaStore } from '../caixa/caixaStore';
@@ -243,8 +243,36 @@ const toggleWindow = (id) => {
 
 
 
-    const handleFinalizarVenda = async () => {
+    // Desconto acima do limite ou venda abaixo do custo: o servidor pede autorização (senha + nome + motivo)
+    const pedirAutorizacao = async (motivos: string[], senhaIncorreta?: boolean): Promise<AutorizacaoVenda | null> => {
+        const esc = (t: string) => t.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
+        const r = await Swal.fire({
+            title: 'Autorização necessária',
+            icon: 'warning',
+            html: `${senhaIncorreta ? '<p style="color:#cf1322"><b>Senha incorreta.</b></p>' : ''}`
+                + `<div style="text-align:left;font-size:13px;margin-bottom:8px">${motivos.map(esc).join('<br>')}</div>`
+                + '<input id="aut-nome" class="swal2-input" placeholder="Quem autoriza" autocomplete="off">'
+                + '<input id="aut-senha" type="password" class="swal2-input" placeholder="Senha de autorização" autocomplete="new-password">'
+                + '<input id="aut-motivo" class="swal2-input" placeholder="Motivo (ex.: cliente antigo, queima de estoque)" autocomplete="off">',
+            focusConfirm: false,
+            showCancelButton: true,
+            confirmButtonText: 'Autorizar e concluir',
+            cancelButtonText: 'Voltar',
+            confirmButtonColor: '#28a745',
+            didOpen: () => (document.getElementById('aut-nome') as HTMLInputElement | null)?.focus(),
+            preConfirm: () => {
+                const valor = (id: string) => (document.getElementById(id) as HTMLInputElement | null)?.value.trim() || '';
+                const aut = { nome: valor('aut-nome'), senha: valor('aut-senha'), motivo: valor('aut-motivo') };
+                if (!aut.nome || !aut.senha || !aut.motivo) { Swal.showValidationMessage('Preencha quem autoriza, a senha e o motivo.'); return false; }
+                return aut;
+            },
+        });
+        return r.isConfirmed ? (r.value as AutorizacaoVenda) : null;
+    };
+
+    const handleFinalizarVenda = async (autorizacao?: AutorizacaoVenda) => {
         if (isEnviando) return;
+        let tentarDeNovo: AutorizacaoVenda | null = null;
 
         // OS e serviços ainda não são gravados pelo PDV do modelo novo
         const itensCarrinho: any[] = Array.isArray(itens) ? itens : [];
@@ -280,7 +308,7 @@ const toggleWindow = (id) => {
 
         setIsEnviando(true);
         try {
-            const resposta = await salesService.saveVenda(payload);
+            const resposta = await salesService.saveVenda(payload, autorizacao);
             caixaStore.recarregar();
 
             // Impressão só depois de gravada, com o número real da venda
@@ -320,7 +348,12 @@ const toggleWindow = (id) => {
             if (onVendaConcluida) onVendaConcluida();
             else onBack();
         } catch (error: any) {
-            if (/caixa/i.test(String(error?.message))) { caixaStore.recarregar(); caixaStore.mostrar('abrir'); }
+            const detalhes = error instanceof ErroVendaPdv ? error.detalhes : undefined;
+            if (detalhes?.codigo === 'AUTORIZACAO_NECESSARIA' && detalhes.temSenha) {
+                tentarDeNovo = await pedirAutorizacao(detalhes.motivos || [error.message], detalhes.senhaIncorreta);
+                return;
+            }
+            if (detalhes?.codigo === 'CAIXA_FECHADO' || /caixa/i.test(String(error?.message))) { caixaStore.recarregar(); caixaStore.mostrar('abrir'); }
             Swal.fire({
                 icon: 'error',
                 title: 'Venda não registrada',
@@ -329,6 +362,8 @@ const toggleWindow = (id) => {
             });
         } finally {
             setIsEnviando(false);
+            // Autorizado: reenvia a mesma venda com a autorização (fora do try, já liberado o envio)
+            if (tentarDeNovo) setTimeout(() => handleFinalizarVenda(tentarDeNovo!), 0);
         }
     };
 
@@ -1005,14 +1040,14 @@ useEffect(() => {
                 <button
                     className="btn-confirm-sale"
                     disabled={totalPago < totalLiquido}
-                    onClick={handleFinalizarVenda}                >
+                    onClick={() => handleFinalizarVenda()}                >
 
                     CONCLUIR VENDA (F5)
                 </button>
                  <button
                     className="btn-SendSale"
                     disabled={totalPago < totalLiquido}
-                    onClick={handleFinalizarVenda}>
+                    onClick={() => handleFinalizarVenda()}>
 
                     Enviar NF-e (F6)
                     

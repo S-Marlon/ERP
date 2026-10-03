@@ -49,17 +49,26 @@ export interface VendaResumo {
     motivoCancelamento?: string | null;
 }
 
+// Erro do servidor com o código de negócio (ex.: AUTORIZACAO_NECESSARIA, CAIXA_FECHADO) em `detalhes`
+export class ErroVendaPdv extends Error {
+    constructor(message: string, public status: number, public detalhes?: { codigo?: string; motivos?: string[]; temSenha?: boolean; senhaIncorreta?: boolean }) {
+        super(message);
+    }
+}
+
 const lerErro = async (response: Response, padrao: string) => {
     const data = await response.json().catch(() => ({}));
-    return new Error(data.error || data.message || padrao);
+    return new ErroVendaPdv(data.error || data.message || padrao, response.status, data.detalhes);
 };
 
+export interface AutorizacaoVenda { senha: string; nome: string; motivo: string }
+
 export const salesService = {
-    async saveVenda(venda: VendaPdvPayload): Promise<VendaPdvResposta> {
+    async saveVenda(venda: VendaPdvPayload, autorizacao?: AutorizacaoVenda): Promise<VendaPdvResposta> {
         const response = await fetch(`${apiBase}/vendas`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...venda, operador: operadorAtual() }),
+            body: JSON.stringify({ ...venda, operador: operadorAtual(), ...(autorizacao ? { autorizacao } : {}) }),
         });
         if (!response.ok) throw await lerErro(response, 'Erro ao registrar venda no servidor.');
         return response.json();

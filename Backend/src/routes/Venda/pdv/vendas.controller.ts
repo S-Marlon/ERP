@@ -9,6 +9,8 @@ import { carregarCaixaAberto, operadorDe } from '../caixa/caixa.controller';
 import { estornoDaVenda } from '../caixa/caixa';
 import { cancelarTitulosDaVenda, gravarTitulosDaVenda, planejarPrazo, PrazoDaVenda } from '../../Financeiro/receber/receber.controller';
 import { ErroReceber } from '../../Financeiro/receber/receber';
+import { carregarRegras } from '../regras/regrasVenda.controller';
+import { avaliarRegras, conferirSenha } from '../regras/regrasVenda';
 
 const ORIGEM_VENDA = 'VENDA_PDV';
 const ORIGEM_CANCELAMENTO = 'CANCELAMENTO_VENDA';
@@ -29,6 +31,8 @@ const responderErro = (res: Response, error: any, padrao: string) => {
  *   pagamentos: [{ forma: DINHEIRO|PIX|DEBITO|CREDITO|PRAZO|TRANSFERENCIA, valor, parcelas?,
  *                  intervaloDias?, primeiroVencimento? (só PRAZO: gera as parcelas em contas a receber) }] }
  * O preço de tabela é recalculado aqui; precoUnitario é o preço praticado (desconto individual).
+ * Desconto acima do limite / abaixo do custo: 403 AUTORIZACAO_NECESSARIA até vir
+ *   autorizacao: { senha, nome, motivo } (vendas_configuracoes).
  */
 export const registrarVenda = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
@@ -114,12 +118,36 @@ export const registrarVenda = async (req: Request, res: Response) => {
     };
     const totalCusto = venda.linhas.reduce((a, l) => a + custoBase(l.idItem) * l.quantidadeBase, 0);
 
+    // Regras de desconto e margem (servidor): acima do limite ou abaixo do custo exige autorização
+    const regras = await carregarRegras(connection as any, tenant);
+    const avaliacao = avaliarRegras(venda.totalBruto, venda.totalDesconto, venda.linhas.map(l => ({
+      idItem: l.idItem,
+      nome: itensBanco.get(l.idItem).nome_comercial || itensBanco.get(l.idItem).nome_item,
+      totalItem: l.totalItem,
+      custoTotal: custoBase(l.idItem) * l.quantidadeBase,
+    })), regras);
+    if (avaliacao.bloqueio) throw new ErroVenda(avaliacao.bloqueio, 409, { codigo: 'ABAIXO_DO_CUSTO' });
+    let autorizadoPor: string | null = null;
+    let motivoAutorizacao: string | null = null;
+    if (avaliacao.exigeAutorizacao) {
+      const aut = req.body?.autorizacao;
+      const detalhes = { codigo: 'AUTORIZACAO_NECESSARIA', motivos: avaliacao.motivos, percentualDesconto: avaliacao.percentualDesconto, temSenha: Boolean(regras.senhaHash) };
+      if (!regras.senhaHash) {
+        throw new ErroVenda(`${avaliacao.motivos.join(' ')} Nenhuma senha de autorização definida: configure em Vendas › Regras de venda.`, 403, detalhes);
+      }
+      if (!aut) throw new ErroVenda(`Autorização necessária: ${avaliacao.motivos.join(' ')}`, 403, detalhes);
+      if (!conferirSenha(String(aut.senha || ''), regras.senhaHash)) throw new ErroVenda('Senha de autorização incorreta.', 403, { ...detalhes, senhaIncorreta: true });
+      autorizadoPor = String(aut.nome || '').trim().slice(0, 60);
+      motivoAutorizacao = String(aut.motivo || '').trim().slice(0, 255);
+      if (!autorizadoPor || !motivoAutorizacao) throw new ErroVenda('Informe quem autorizou e o motivo.', 403, detalhes);
+    }
+
     const [cab] = await connection.execute(
       `INSERT INTO vendas_pedidos
-         (tenant_id, origem, status, id_caixa, operador, id_cliente, cliente_nome, total_bruto, total_desconto, total_liquido, total_custo, observacao)
-       VALUES (?, 'PDV', 'CONCLUIDA', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (tenant_id, origem, status, id_caixa, operador, autorizado_por, motivo_autorizacao, id_cliente, cliente_nome, total_bruto, total_desconto, total_liquido, total_custo, observacao)
+       VALUES (?, 'PDV', 'CONCLUIDA', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        tenant, caixa.id_caixa, operadorDe(req), idCliente ? Number(idCliente) : null, String(clienteNome || '').trim().slice(0, 150) || 'CONSUMIDOR',
+        tenant, caixa.id_caixa, operadorDe(req), autorizadoPor, motivoAutorizacao, idCliente ? Number(idCliente) : null, String(clienteNome || '').trim().slice(0, 150) || 'CONSUMIDOR',
         f4(venda.totalBruto), f4(venda.totalDesconto), f4(venda.totalLiquido), f4(totalCusto),
         String(observacao || '').trim().slice(0, 255) || null,
       ]

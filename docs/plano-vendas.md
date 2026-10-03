@@ -13,7 +13,7 @@ testes → telas → commit.
 | 0 | Limpeza: código morto do PDV, senha fixa de gerente e modal de cliente falso | — | feito |
 | 1 | **Caixa**: abertura com troco, sangria/suprimento, fechamento com conferência por forma; venda só com caixa aberto | `vendas_caixas`, `vendas_caixas_movimentos`, `vendas_caixas_fechamentos`; `id_caixa` e `operador` em `vendas_pedidos` | feito |
 | 2 | **Prazo → contas a receber**: venda a prazo exige cliente, gera parcelas, limite de crédito, baixa (dinheiro entra no caixa) | `financeiro_contas_receber`, `financeiro_contas_receber_baixas`, limite de crédito | |
-| 3 | **Desconto e margem no servidor**: limite configurável, autorização registrada, aviso/bloqueio abaixo do custo | `vendas_configuracoes`; autorização em `vendas_pedidos` | |
+| 3 | **Desconto e margem no servidor**: limite configurável, autorização registrada, aviso/bloqueio abaixo do custo | `vendas_configuracoes`; `autorizado_por` e `motivo_autorizacao` em `vendas_pedidos` | feito |
 | 4 | **Central de Vendas real**: faturamento, ticket médio, margem, formas, mais vendidos, a receber, caixa | — | |
 | 5 | **Orçamento e venda suspensa**: suspender/retomar, orçamento com validade e impressão, converter em venda | status e validade em `vendas_pedidos` | |
 | 6 | **OS de montagem de mangueira**: mão de obra + componentes, OS → venda (reaproveita `components/OrderService`) | itens de serviço, OS | |
@@ -28,6 +28,14 @@ testes → telas → commit.
 - Venda só com caixa aberto (`409 CAIXA_FECHADO`); cancelamento de venda de outro caixa lança `ESTORNO_VENDA` no caixa aberto.
 - **Telas**: indicador no cabeçalho do PDV (abre o resumo), abertura, sangria/suprimento, fechamento com contagem por
   forma e comprovante; aviso de caixa fechado na venda; Vendas › Caixas (histórico e detalhe).
+
+## Fase 3 — como ficou
+
+- **Backend** (`Backend/src/routes/Venda/regras`): `regrasVenda.ts` (avaliação e senha scrypt; com testes) e
+  `regrasVenda.controller.ts` (`GET|PUT /api/vendas/configuracoes`; alterar exige a senha atual quando há senha).
+- Venda: desconto total acima do limite ou abaixo do custo (política AVISAR) → `403 AUTORIZACAO_NECESSARIA` até vir
+  `autorizacao { senha, nome, motivo }`; BLOQUEAR → `409 ABAIXO_DO_CUSTO`. Quem autorizou e o motivo ficam na venda.
+- **Telas**: pedido de autorização na finalização (reenvia a venda), Vendas › Regras de venda, autorização no detalhe de Vendas do Dia.
 
 ## Critérios de pronto
 

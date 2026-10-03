@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { buscarClientesPdv, categoriasPdv, detalheItemPdv, itensParaEtiqueta, listarItensPdv, marcasPdv } from './pdv/pdv.controller';
 import { cancelarVenda, detalheVenda, listarVendas, registrarVenda } from './pdv/vendas.controller';
 import { abrirCaixa, caixaAtual, detalheCaixa, fecharCaixa, lancarMovimento, listarCaixas } from './caixa/caixa.controller';
+import { obterConfiguracoes, salvarConfiguracoes } from './regras/regrasVenda.controller';
 
 // Vendas no modelo novo (itens_core). Montado em /api/vendas
 const router = Router();
@@ -25,5 +26,9 @@ router.post('/caixa/movimentos', lancarMovimento);
 router.post('/caixa/fechar', fecharCaixa);
 router.get('/caixas', listarCaixas);
 router.get('/caixas/:idCaixa', detalheCaixa);
+
+// Regras de venda: limite de desconto, senha de autorização, política abaixo do custo
+router.get('/configuracoes', obterConfiguracoes);
+router.put('/configuracoes', salvarConfiguracoes);
 
 export default router;
