@@ -342,6 +342,7 @@ const toggleWindow = (id) => {
         try {
             const resposta = await salesService.saveVenda(payload, autorizacao);
             caixaStore.recarregar();
+            window.dispatchEvent(new CustomEvent('erp:venda-concluida', { detail: { idVenda: resposta.idVenda, idCliente: clienteId ?? null } }));
 
             // Impressão só depois de gravada, com o número real da venda
             imprimirExtratoElgin({

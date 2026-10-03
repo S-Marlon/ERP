@@ -187,7 +187,10 @@ export const useCart = () => {
    * servidor (unidades, faixas, estoque). Com `precoFixo`, o preço da linha fica congelado (preço do orçamento).
    * Devolve os nomes que não puderam ser carregados.
    */
-  const carregarItens = useCallback(async (linhas: Array<{ idItem: number; nome: string; quantidade: number; idUnidade: number | null; precoFixo?: number; precoTabelaFixa?: number }>) => {
+  const carregarItens = useCallback(async (
+    linhas: Array<{ idItem: number; nome: string; quantidade: number; idUnidade: number | null; precoFixo?: number; precoTabelaFixa?: number; unidadeBase?: boolean }>,
+    opcoes: { acrescentar?: boolean } = {}
+  ) => {
     const novos: CartItem[] = [];
     const falhas: string[] = [];
     for (const l of linhas) {
@@ -195,7 +198,9 @@ export const useCart = () => {
         const productData: any = await getPdvProductDetail(l.idItem);
         if (!productData) { falhas.push(l.nome); continue; }
         const unidades: UnidadeCarrinho[] = Array.isArray(productData.unidades) ? productData.unidades : [];
-        const unidade = unidades.find(u => u.idUnidade === l.idUnidade) || unidades.find(u => u.idUnidade === productData.idUnidadeVenda) || unidades[0];
+        // unidadeBase: a unidade de estoque (fator 1), ex.: metro da mangueira na montagem
+        const unidade = (l.unidadeBase ? unidades.find(u => Number(u.fator) === 1) : undefined)
+          || unidades.find(u => u.idUnidade === l.idUnidade) || unidades.find(u => u.idUnidade === productData.idUnidadeVenda) || unidades[0];
         let item: CartItem = {
           id: l.idItem,
           name: productData.name || l.nome,
@@ -222,7 +227,24 @@ export const useCart = () => {
         falhas.push(l.nome);
       }
     }
-    setCart(novos);
+    if (!opcoes.acrescentar) {
+      setCart(novos);
+      return falhas;
+    }
+    // Acrescentar (ex.: montagem): soma na linha do mesmo item; se a linha estiver em outra unidade,
+    // converte pela unidade base (ex.: 2 MT somados numa linha em RL de 50 MT = +0,04 RL)
+    setCart(prev => {
+      const proximo = [...prev];
+      for (const n of novos) {
+        const i = proximo.findIndex(x => x.id === n.id);
+        if (i < 0) { proximo.push(n); continue; }
+        const fatorNovo = Number(n.fatorConversao) || 1;
+        const fatorLinha = Number(proximo[i].fatorConversao) || 1;
+        const somar = proximo[i].idUnidadeVenda === n.idUnidadeVenda ? n.quantity : (n.quantity * fatorNovo) / fatorLinha;
+        proximo[i] = reprecificar({ ...proximo[i], quantity: Number((proximo[i].quantity + somar).toFixed(3)) });
+      }
+      return proximo;
+    });
     return falhas;
   }, []);
 

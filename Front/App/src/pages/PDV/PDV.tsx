@@ -25,6 +25,9 @@ import { caixaStore, useCaixa } from './caixa/caixaStore';
 import { useSituacaoCliente } from '../Financeiro/receber/receberApi';
 import { imprimirOrcamento, pedidosAbertosApi } from './services/pedidosAbertosApi';
 import { DadosOrcamento, DrawerPedidosAbertos, ModalSalvarOrcamento } from './components/PedidosAbertosPDV';
+import { extensoesPdv } from '../../modulos/registroModulos';
+import { useModulos } from '../../modulos/modulosStore';
+import { Suspense } from 'react';
 
 type DisplayMode = 'lista' | 'cards' | 'compact';
 
@@ -95,7 +98,13 @@ const PDVContent: React.FC = () => {
     .filter((i: any) => i.type !== 'service' && i.type !== 'os')
     .map((i: any) => ({ idItem: Number(i.id), quantidade: Number(i.quantity), idUnidade: i.idUnidadeVenda ?? null, precoUnitario: i.precoManual ? Number(i.price) : undefined }));
 
+  // Módulos plugáveis com botão no PDV (ex.: montagem de mangueira)
+  const { ativos: modulosAtivos } = useModulos();
+  const botoesModulos = extensoesPdv(modulosAtivos);
+
   const novaVenda = () => {
+    // Aviso genérico para os módulos (ex.: descartar fichas de montagem de um carrinho que não virou venda)
+    window.dispatchEvent(new Event('erp:venda-nova'));
     clearCart();
     setOrcamentoAtual(null);
     setEstagio('SELECAO');
@@ -398,6 +407,11 @@ const PDVContent: React.FC = () => {
               </Tooltip>
             )}
             <Space size={6}>
+              {botoesModulos.map((Botao, i) => (
+                <Suspense key={i} fallback={null}>
+                  <Botao adicionarItens={linhas => carregarItens(linhas, { acrescentar: true })} clienteId={clienteId} cliente={cliente} />
+                </Suspense>
+              ))}
               <Badge count={qtdSuspensas} size="small">
                 <Button size="small" onClick={() => setDrawerPedidos('SUSPENSA')}>Suspensas</Button>
               </Badge>
