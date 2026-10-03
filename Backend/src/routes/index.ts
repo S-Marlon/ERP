@@ -8,6 +8,7 @@ import parceirosRoutes from './Parceiros/parceiros.routes';
 import comprasRoutes from './Compras/compras.routes'
 import vendasRoutes from './Venda/vendas.routes';
 import estoqueItensRoutes from './EstoqueItens/estoqueItens.routes';
+import receberRoutes from './Financeiro/receber/receber.routes';
 import { Router, Request, Response } from 'express';
 
 
@@ -22,6 +23,8 @@ router.use('/estoque', estoqueItensRoutes);
 router.use('/estoque', estoqueRoutes);
 router.use('/comercial', comercialRoutes);
 router.use('/fiscal', fiscalRoutes);
+// Contas a receber no modelo novo antes das rotas legadas do financeiro
+router.use('/financeiro/receber', receberRoutes);
 router.use('/financeiro', financeiroRoutes);
 router.use('/catalogo', catalogoRoutes);
 router.use('/parceiros', parceirosRoutes); // Adicione esta linha para incluir as rotas de parceiros

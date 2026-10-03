@@ -7,6 +7,8 @@ import { carregarPrecos, SELECT_ITENS } from './pdv.controller';
 import { calcularLinha, conferirEstoque, ErroVenda, fecharVenda, LinhaPedido, validarPagamentos } from './vendaPdv';
 import { carregarCaixaAberto, operadorDe } from '../caixa/caixa.controller';
 import { estornoDaVenda } from '../caixa/caixa';
+import { cancelarTitulosDaVenda, gravarTitulosDaVenda, planejarPrazo, PrazoDaVenda } from '../../Financeiro/receber/receber.controller';
+import { ErroReceber } from '../../Financeiro/receber/receber';
 
 const ORIGEM_VENDA = 'VENDA_PDV';
 const ORIGEM_CANCELAMENTO = 'CANCELAMENTO_VENDA';
@@ -15,7 +17,7 @@ const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.hea
 const f4 = (v: number) => Number(v || 0).toFixed(4);
 
 const responderErro = (res: Response, error: any, padrao: string) => {
-  if (error instanceof ErroVenda) return res.status(error.status).json({ error: error.message, detalhes: error.detalhes });
+  if (error instanceof ErroVenda || error instanceof ErroReceber) return res.status(error.status).json({ error: error.message, detalhes: error.detalhes });
   console.error(padrao, error);
   return res.status(500).json({ error: padrao, details: error?.message });
 };
@@ -24,7 +26,8 @@ const responderErro = (res: Response, error: any, padrao: string) => {
  * POST /api/vendas/pdv/vendas
  * { clienteNome?, idCliente?, observacao?, descontoGeral?,
  *   itens: [{ idItem, quantidade, idUnidade?, precoUnitario? }],
- *   pagamentos: [{ forma: DINHEIRO|PIX|DEBITO|CREDITO|PRAZO|TRANSFERENCIA, valor, parcelas? }] }
+ *   pagamentos: [{ forma: DINHEIRO|PIX|DEBITO|CREDITO|PRAZO|TRANSFERENCIA, valor, parcelas?,
+ *                  intervaloDias?, primeiroVencimento? (só PRAZO: gera as parcelas em contas a receber) }] }
  * O preço de tabela é recalculado aqui; precoUnitario é o preço praticado (desconto individual).
  */
 export const registrarVenda = async (req: Request, res: Response) => {
@@ -98,6 +101,12 @@ export const registrarVenda = async (req: Request, res: Response) => {
       );
     }
 
+    // A prazo: exige cliente, respeita o crédito e planeja as parcelas (gravadas depois da venda)
+    const prazos: PrazoDaVenda[] = (Array.isArray(pagamentos) ? pagamentos : [])
+      .filter((p: any) => String(p?.forma || '').toUpperCase() === 'PRAZO')
+      .map((p: any) => ({ valor: Number(p.valor), parcelas: p.parcelas, intervaloDias: p.intervaloDias, primeiroVencimento: p.primeiroVencimento }));
+    const parcelasPrazo = await planejarPrazo(connection as any, tenant, idCliente ? Number(idCliente) : null, String(clienteNome || '').trim(), prazos);
+
     // Custo base: custo médio do estoque; sem ele, custo gerencial do cadastro
     const custoBase = (idItem: number) => {
       const medio = custos.get(idItem) || 0;
@@ -170,10 +179,15 @@ export const registrarVenda = async (req: Request, res: Response) => {
       );
     }
 
+    if (parcelasPrazo.length > 0) {
+      await gravarTitulosDaVenda(connection as any, tenant, idVenda, Number(idCliente), parcelasPrazo, operadorDe(req));
+    }
+
     await connection.commit();
     return res.status(201).json({
       success: true,
       idVenda,
+      parcelas: parcelasPrazo,
       totalBruto: venda.totalBruto,
       totalDesconto: venda.totalDesconto,
       totalLiquido: venda.totalLiquido,
@@ -206,6 +220,9 @@ export const cancelarVenda = async (req: Request, res: Response) => {
     );
     if (!venda) throw new ErroVenda('Venda não encontrada.', 404);
     if (venda.status !== 'CONCLUIDA') throw new ErroVenda(`A venda já está ${String(venda.status).toLowerCase()}.`, 409);
+
+    // A prazo: parcelas sem recebimento são canceladas (com recebimento, pede o estorno antes)
+    await cancelarTitulosDaVenda(connection as any, tenant, idVenda);
 
     // Venda do caixa aberto: basta sair da soma. De outro caixa (já fechado): o dinheiro sai do caixa aberto.
     const caixaAberto = await carregarCaixaAberto(connection as any, tenant, 'LOCK IN SHARE MODE');

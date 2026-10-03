@@ -1,13 +1,13 @@
 // Cálculo do caixa (sem banco): quanto deve haver por forma de pagamento e a conferência do fechamento.
 // Dinheiro esperado = troco inicial + vendas em dinheiro (líquidas do troco) + suprimentos + recebimentos
-//                     - sangrias - estornos.
+//                     - sangrias - estornos (de venda e de recebimento).
 // Cartão/PIX/prazo: só o que foi vendido (conferido contra a maquininha, o extrato e os títulos).
 
-export const TIPOS_MOVIMENTO_CAIXA = ['SUPRIMENTO', 'SANGRIA', 'ESTORNO_VENDA', 'RECEBIMENTO'] as const;
+export const TIPOS_MOVIMENTO_CAIXA = ['SUPRIMENTO', 'SANGRIA', 'ESTORNO_VENDA', 'RECEBIMENTO', 'ESTORNO_RECEBIMENTO'] as const;
 export type TipoMovimentoCaixa = typeof TIPOS_MOVIMENTO_CAIXA[number];
 
 // Entram (+) ou saem (-) do caixa
-const SINAL: Record<TipoMovimentoCaixa, 1 | -1> = { SUPRIMENTO: 1, RECEBIMENTO: 1, SANGRIA: -1, ESTORNO_VENDA: -1 };
+const SINAL: Record<TipoMovimentoCaixa, 1 | -1> = { SUPRIMENTO: 1, RECEBIMENTO: 1, SANGRIA: -1, ESTORNO_VENDA: -1, ESTORNO_RECEBIMENTO: -1 };
 
 // Formas que existem fisicamente no caixa (as demais são conferidas fora da gaveta)
 export const FORMA_DINHEIRO = 'DINHEIRO';
@@ -55,7 +55,7 @@ export const calcularResumoCaixa = (
     if (m.tipo === 'SUPRIMENTO') l.suprimentos += v;
     else if (m.tipo === 'RECEBIMENTO') l.recebimentos += v;
     else if (m.tipo === 'SANGRIA') l.sangrias += v;
-    else if (m.tipo === 'ESTORNO_VENDA') l.estornos += v;
+    else if (m.tipo === 'ESTORNO_VENDA' || m.tipo === 'ESTORNO_RECEBIMENTO') l.estornos += v;
   }
 
   const linhas = [...porForma.entries()]
@@ -92,9 +92,12 @@ export const validarMovimentoManual = (tipo: string, valor: number, dinheiroEspe
   return { tipo: t as TipoMovimentoCaixa, valor: r(v) };
 };
 
-/** Conferência do fechamento: esperado x informado por forma (forma não informada conta como zero). */
+/** Conferência do fechamento: esperado x informado por forma (forma não informada conta como zero; prazo fica fora). */
+export const FORMAS_SEM_CONFERENCIA = ['PRAZO']; // vira contas a receber, não é contado no caixa
+
 export const conferirFechamento = (linhas: LinhaResumoCaixa[], informado: Record<string, number>) => {
-  const formas = new Set([...linhas.map(l => l.forma), ...Object.keys(informado || {}).map(f => f.toUpperCase())]);
+  const formas = new Set([...linhas.map(l => l.forma), ...Object.keys(informado || {}).map(f => f.toUpperCase())]
+    .filter(f => !FORMAS_SEM_CONFERENCIA.includes(f)));
   const conferencia = [...formas].map(forma => {
     const esperado = linhas.find(l => l.forma === forma)?.esperado ?? 0;
     const chave = Object.keys(informado || {}).find(k => k.toUpperCase() === forma);

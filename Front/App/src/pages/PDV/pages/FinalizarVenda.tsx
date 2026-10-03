@@ -8,6 +8,7 @@ import { salesService, VendaPdvPayload, FormaPagamentoPdv } from '../services/sa
 import Swal from 'sweetalert2';
 import { isCartItemOS } from '../types/cart.types';
 import { caixaStore } from '../caixa/caixaStore';
+import { useSituacaoCliente } from '../../Financeiro/receber/receberApi';
 // import {ItemVenda} from '../../../utils/printService'
 
 import Draggable from 'react-draggable';
@@ -87,6 +88,9 @@ export interface Pagamento {
     valorLiquido?: number;    // Valor descontando taxas (útil para o financeiro)
     taxaAplicada?: number;    // % ou valor fixo da taxa da maquininha
     parcelas: number;         // Padrão 1
+    // A prazo: intervalo entre parcelas e primeiro vencimento (vazio = hoje + intervalo)
+    intervaloDias?: number;
+    primeiroVencimento?: string;
     status: PaymentStatus;
 
     // Metadados para Cartão/PIX
@@ -123,6 +127,10 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, onVendaC
     const [metodoSelecionado, setMetodoSelecionado] = useState<PaymentMethodType | null>(null);
     const [valorInput, setValorInput] = useState<string>(''); // string agora
     const [parcelasInput, setParcelasInput] = useState(1);
+    // A prazo (crediário): gera parcelas em Financeiro › Contas a Receber
+    const [intervaloPrazo, setIntervaloPrazo] = useState(30);
+    const [primeiroVencimento, setPrimeiroVencimento] = useState('');
+    const situacaoCliente = useSituacaoCliente(clienteId);
 
     const [activeModal, setActiveModal] = useState(null); // 'calc', 'obs', 'desc', etc.
     // Controle da Janela Flutuante da Calculadora
@@ -266,6 +274,7 @@ const toggleWindow = (id) => {
                 forma: FORMA_POR_METODO[p.metodo],
                 valor: Number(p.valor),
                 parcelas: p.parcelas,
+                ...(p.metodo === 'store_credit' ? { intervaloDias: p.intervaloDias, primeiroVencimento: p.primeiroVencimento } : {}),
             })),
         };
 
@@ -299,7 +308,10 @@ const toggleWindow = (id) => {
             await Swal.fire({
                 icon: 'success',
                 title: `Venda ${resposta.idVenda} finalizada!`,
-                html: `Total: <b>R$ ${resposta.totalLiquido.toFixed(2)}</b>${resposta.troco > 0 ? `<br>Troco: <b>R$ ${resposta.troco.toFixed(2)}</b>` : ''}`,
+                html: `Total: <b>R$ ${resposta.totalLiquido.toFixed(2)}</b>${resposta.troco > 0 ? `<br>Troco: <b>R$ ${resposta.troco.toFixed(2)}</b>` : ''}`
+                    + (resposta.parcelas?.length
+                        ? `<br><br><b>A prazo:</b><br>${resposta.parcelas.map(p => `${p.parcela}/${p.totalParcelas} · ${p.vencimento.split('-').reverse().join('/')} · R$ ${p.valor.toFixed(2)}`).join('<br>')}`
+                        : ''),
                 confirmButtonColor: '#28a745',
             });
 
@@ -359,6 +371,7 @@ useEffect(() => {
 
     // --- RENDERIZAÇÃO DO PARCELAMENTO ATUALIZADA ---
     const renderParcelamento = () => {
+        if (metodoSelecionado === 'store_credit') return renderPrazo();
         if (metodoSelecionado !== 'credit_card') return null;
 
         const opcoes = [];
@@ -381,6 +394,42 @@ useEffect(() => {
                 >
                     {opcoes}
                 </select>
+            </div>
+        );
+    };
+
+    // A prazo: exige cliente; parcelas, intervalo e 1º vencimento; mostra a dívida e o limite do cliente
+    const renderPrazo = () => {
+        if (!clienteId) {
+            return <div className="parcelas-group" style={{ color: '#cf1322', fontWeight: 600 }}>Identifique o cliente (F4) para vender a prazo.</div>;
+        }
+        const valor = parseFloat(String(valorInput).replace(',', '.')) || 0;
+        const s = situacaoCliente;
+        return (
+            <div className="parcelas-group" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <label>Parcelas:</label>
+                    <select value={parcelasInput} onChange={e => setParcelasInput(Number(e.target.value))} className="select-parcelas">
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map(n => (
+                            <option key={n} value={n}>{n}x de R$ {(valor / n).toFixed(2)}</option>
+                        ))}
+                    </select>
+                    <label>a cada</label>
+                    <select value={intervaloPrazo} onChange={e => setIntervaloPrazo(Number(e.target.value))} className="select-parcelas">
+                        {[7, 10, 14, 15, 21, 28, 30, 45, 60].map(d => <option key={d} value={d}>{d} dias</option>)}
+                    </select>
+                    <label>1º vencimento:</label>
+                    <input type="date" value={primeiroVencimento} min={new Date().toISOString().slice(0, 10)}
+                        onChange={e => setPrimeiroVencimento(e.target.value)} title="Vazio = hoje + intervalo" />
+                </div>
+                {s && (
+                    <div style={{ fontSize: 12, color: s.bloqueado || s.qtdVencidas > 0 ? '#cf1322' : '#475569' }}>
+                        {s.bloqueado && <b>Cliente bloqueado para compras a prazo. </b>}
+                        Em aberto: <b>R$ {s.emAberto.toFixed(2)}</b>
+                        {s.qtdVencidas > 0 && <> · <b>{s.qtdVencidas} parcela(s) vencida(s)</b> (R$ {s.vencido.toFixed(2)})</>}
+                        {s.limite !== null && <> · Disponível: <b>R$ {(s.disponivel ?? 0).toFixed(2)}</b> de R$ {s.limite.toFixed(2)}</>}
+                    </div>
+                )}
             </div>
         );
     };
@@ -430,12 +479,17 @@ useEffect(() => {
     const adicionarPagamento = () => {
         const valorNumerico = parseFloat(valorInput.replace(',', '.')) || 0;
         if (valorNumerico <= 0 || !metodoSelecionado) return;
+        if (metodoSelecionado === 'store_credit' && !clienteId) {
+            Swal.fire({ icon: 'warning', title: 'Cliente obrigatório', text: 'Para vender a prazo, identifique o cliente (F4).' });
+            return;
+        }
 
         const novoPagamento: Pagamento = {
             id: crypto.randomUUID(),
             metodo: metodoSelecionado,
             valor: parseFloat(valorInput.replace(',', '.')) || 0, // <-- aqui
-            parcelas: metodoSelecionado === 'credit_card' ? parcelasInput : 1,
+            parcelas: metodoSelecionado === 'credit_card' || metodoSelecionado === 'store_credit' ? parcelasInput : 1,
+            ...(metodoSelecionado === 'store_credit' ? { intervaloDias: intervaloPrazo, primeiroVencimento: primeiroVencimento || undefined } : {}),
             status: 'pending',
             createdAt: new Date(),
         };
@@ -443,6 +497,7 @@ useEffect(() => {
         setPagamentos([...pagamentos, novoPagamento]);
         setValorInput(''); // string, não número
         setParcelasInput(1);
+        setPrimeiroVencimento('');
         setMetodoSelecionado(null);
     };
 
@@ -659,7 +714,9 @@ useEffect(() => {
           <div className="payment-info">
             <strong>R$ {(Number(p.valor) || 0).toFixed(2)}</strong>
             <span className="payment-subtext">
-              {p.metodo === 'credit_card' ? ` (${p.parcelas}x)` : ' (À vista)'}
+              {p.metodo === 'credit_card' ? ` (${p.parcelas}x)`
+                : p.metodo === 'store_credit' ? ` (${p.parcelas}x a cada ${p.intervaloDias || 30} dias${p.primeiroVencimento ? `, 1ª em ${p.primeiroVencimento.split('-').reverse().join('/')}` : ''})`
+                : ' (À vista)'}
             </span>
           </div>
         </div>

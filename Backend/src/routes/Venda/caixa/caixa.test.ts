@@ -58,4 +58,13 @@ const est = estornoDaVenda([
 ]);
 assert(JSON.stringify(est) === JSON.stringify([{ forma: 'DINHEIRO', valor: 45 }, { forma: 'PIX', valor: 20 }]), `estorno ${JSON.stringify(est)}`);
 
+// Estorno de recebimento sai do caixa
+assert(calcularResumoCaixa(0, [], [{ tipo: 'RECEBIMENTO', forma: 'PIX', valor: 50 }, { tipo: 'ESTORNO_RECEBIMENTO', forma: 'PIX', valor: 20 }])
+  .linhas.find(l => l.forma === 'PIX')!.esperado === 30, 'estorno de recebimento');
+
+// Prazo não entra na conferência do fechamento
+const comPrazo = calcularResumoCaixa(0, [{ forma: 'PRAZO', valor: 300, troco: 0 }, { forma: 'PIX', valor: 10, troco: 0 }], []);
+assert(!conferirFechamento(comPrazo.linhas, { PIX: 10 }).conferencia.some(l => l.forma === 'PRAZO'), 'prazo fora da conferência');
+assert(conferirFechamento(comPrazo.linhas, { PIX: 10 }).diferencaTotal === 0, 'sem diferença por causa do prazo');
+
 console.log('caixa: ok');

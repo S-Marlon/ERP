@@ -33,7 +33,7 @@ export interface LinhaResumoCaixa {
 
 export interface MovimentoCaixa {
   idMovimento: number;
-  tipo: 'SUPRIMENTO' | 'SANGRIA' | 'ESTORNO_VENDA' | 'RECEBIMENTO';
+  tipo: 'SUPRIMENTO' | 'SANGRIA' | 'ESTORNO_VENDA' | 'RECEBIMENTO' | 'ESTORNO_RECEBIMENTO';
   forma: string;
   valor: number;
   idOrigem: number | null;
@@ -81,6 +81,9 @@ export const caixaApi = {
     pedir<{ caixa: Caixa; resumo: ResumoCaixa; fechamento: LinhaConferencia[] }>(`${API}/caixas/${idCaixa}`, undefined, 'Erro ao carregar o caixa.'),
 };
 
+// A prazo vira contas a receber: aparece no resumo, mas não é contado no fechamento
+export const FORMAS_SEM_CONFERENCIA = ['PRAZO'];
+
 export const ROTULO_FORMA: Record<string, string> = {
   DINHEIRO: 'Dinheiro', PIX: 'PIX', DEBITO: 'Débito', CREDITO: 'Crédito', PRAZO: 'A prazo', TRANSFERENCIA: 'Transferência',
 };
@@ -90,4 +93,5 @@ export const ROTULO_MOVIMENTO: Record<string, { label: string; color: string; si
   RECEBIMENTO: { label: 'Recebimento', color: 'blue', sinal: 1 },
   SANGRIA: { label: 'Sangria', color: 'orange', sinal: -1 },
   ESTORNO_VENDA: { label: 'Estorno de venda', color: 'red', sinal: -1 },
+  ESTORNO_RECEBIMENTO: { label: 'Estorno de recebimento', color: 'red', sinal: -1 },
 };

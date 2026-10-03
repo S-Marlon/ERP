@@ -18,7 +18,7 @@ export interface VendaPdvPayload {
     observacao?: string;
     descontoGeral?: number;
     itens: VendaPdvItemPayload[];
-    pagamentos: { forma: FormaPagamentoPdv; valor: number; parcelas?: number }[];
+    pagamentos: { forma: FormaPagamentoPdv; valor: number; parcelas?: number; intervaloDias?: number; primeiroVencimento?: string }[];
 }
 
 export interface VendaPdvResposta {
@@ -28,6 +28,8 @@ export interface VendaPdvResposta {
     totalDesconto: number;
     totalLiquido: number;
     troco: number;
+    // Venda a prazo: parcelas geradas em contas a receber
+    parcelas?: { parcela: number; totalParcelas: number; vencimento: string; valor: number }[];
 }
 
 export interface VendaResumo {

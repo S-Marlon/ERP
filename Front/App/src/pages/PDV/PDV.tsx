@@ -22,6 +22,7 @@ import { ClientePdvModal, formatarDocumento } from './components/ClientePdvModal
 import { ItemPdvDrawer } from './components/ItemPdvDrawer';
 import { AvisoCaixaFechado } from './caixa/CaixaPainel';
 import { caixaStore, useCaixa } from './caixa/caixaStore';
+import { useSituacaoCliente } from '../Financeiro/receber/receberApi';
 
 type DisplayMode = 'lista' | 'cards' | 'compact';
 
@@ -144,6 +145,9 @@ const PDVContent: React.FC = () => {
       message.warning(`Código ${limpo} não encontrado.`);
     }
   }, [incluir, mostrarNaoPublicaveis, searchTerm]);
+
+  // Situação de crédito do cliente escolhido (dívida, vencidos, bloqueio)
+  const situacaoCliente = useSituacaoCliente(clienteId);
 
   // Sem caixa aberto não se vende: F2/finalizar abrem o painel de abertura
   const { caixa, carregado: caixaCarregado } = useCaixa();
@@ -277,6 +281,14 @@ const PDVContent: React.FC = () => {
               {clienteId && clienteDocumento && <span style={{ color: '#64748b', marginLeft: 6, fontFamily: 'monospace', fontSize: 11 }}>{formatarDocumento(clienteDocumento)}</span>}
               <span style={{ color: '#94a3b8', marginLeft: 6, fontSize: 11 }}>F4</span>
             </Button>
+            {situacaoCliente && (situacaoCliente.emAberto > 0 || situacaoCliente.bloqueado) && (
+              <Tooltip title={`${situacaoCliente.titulos.length} parcela(s) em aberto${situacaoCliente.limite !== null ? ` · limite R$ ${situacaoCliente.limite.toFixed(2)}, disponível R$ ${(situacaoCliente.disponivel ?? 0).toFixed(2)}` : ''}`}>
+                <Tag color={situacaoCliente.bloqueado || situacaoCliente.qtdVencidas > 0 ? 'red' : 'gold'} style={{ margin: 0 }}>
+                  {situacaoCliente.bloqueado ? 'Bloqueado a prazo · ' : ''}Deve R$ {situacaoCliente.emAberto.toFixed(2)}
+                  {situacaoCliente.qtdVencidas > 0 ? ` · ${situacaoCliente.qtdVencidas} vencida(s)` : ''}
+                </Tag>
+              </Tooltip>
+            )}
             <span style={{ fontSize: 11, color: '#94a3b8' }}>F2 finalizar · F3 buscar · F4 cliente · bipe o código de barras a qualquer momento</span>
           </div>
 

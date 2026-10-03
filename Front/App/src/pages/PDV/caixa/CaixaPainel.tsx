@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Descriptions, Drawer, Empty, Input, InputNumber, Modal, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { MinusCircleOutlined, PlusCircleOutlined, PrinterOutlined, LockOutlined, UnlockOutlined } from '@ant-design/icons';
-import { caixaApi, LinhaConferencia, operadorAtual, ResumoCaixa, ROTULO_FORMA, ROTULO_MOVIMENTO, Caixa } from './caixaApi';
+import { caixaApi, FORMAS_SEM_CONFERENCIA, LinhaConferencia, operadorAtual, ResumoCaixa, ROTULO_FORMA, ROTULO_MOVIMENTO, Caixa } from './caixaApi';
 import { caixaStore, useCaixa } from './caixaStore';
 import { imprimirHtml } from '../../../core/impressao/saida';
 
@@ -52,11 +52,13 @@ export const TabelaResumoCaixa: React.FC<{ resumo: ResumoCaixa; fechamento?: Lin
       { title: 'Saídas', key: 'sai', align: 'right' as const, render: (_, l) => (l.sangrias + l.estornos ? <Text type="danger">-{brl(l.sangrias + l.estornos)}</Text> : '') },
       { title: 'Esperado', dataIndex: 'esperado', align: 'right' as const, render: (v: number) => <b>{brl(v)}</b> },
       ...(fechamento ? [
-        { title: 'Contado', key: 'cont', align: 'right' as const, render: (_: unknown, l: { forma: string }) => brl(fechamento.find(f => f.forma === l.forma)?.informado || 0) },
+        { title: 'Contado', key: 'cont', align: 'right' as const, render: (_: unknown, l: { forma: string }) => { const f = fechamento.find(x => x.forma === l.forma); return f ? brl(f.informado) : <Text type="secondary">não conta</Text>; } },
         {
           title: 'Diferença', key: 'dif', align: 'right' as const,
           render: (_: unknown, l: { forma: string }) => {
-            const d = fechamento.find(f => f.forma === l.forma)?.diferenca || 0;
+            const f = fechamento.find(x => x.forma === l.forma);
+            if (!f) return '';
+            const d = f.diferenca;
             return <Text type={d < 0 ? 'danger' : d > 0 ? 'warning' : 'success'}>{d > 0 ? '+' : ''}{brl(d)}</Text>;
           },
         },
@@ -191,7 +193,7 @@ const ModalFechar: React.FC = () => {
   const [salvando, setSalvando] = useState(false);
   useEffect(() => { if (aberto) { setContagem({}); setObservacao(''); } }, [aberto]);
 
-  const linhas = useMemo(() => resumo?.linhas || [], [resumo]);
+  const linhas = useMemo(() => (resumo?.linhas || []).filter(l => !FORMAS_SEM_CONFERENCIA.includes(l.forma)), [resumo]);
   const diferencaDe = (forma: string, esperado: number) => Number(((Number(contagem[forma]) || 0) - esperado).toFixed(2));
   const faltaContar = linhas.filter(l => contagem[l.forma] === undefined || contagem[l.forma] === null).map(l => ROTULO_FORMA[l.forma] || l.forma);
 
