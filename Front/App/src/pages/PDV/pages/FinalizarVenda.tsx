@@ -220,9 +220,6 @@ const toggleWindow = (id) => {
     const troco = Number(totalPago) > totalLiquido ? Number(totalPago) - totalLiquido : 0;
     const [showDiscount, setShowDiscount] = useState(false);
     // Estados para a Trava
-    const [autorizado, setAutorizado] = useState(false);
-    const [pedindoSenha, setPedindoSenha] = useState(false);
-    const [senhaGerente, setSenhaGerente] = useState("");
 
 
     const alterarStatusPagamento = (index: number, novoStatus: PaymentStatus) => {
@@ -231,23 +228,6 @@ const toggleWindow = (id) => {
         setPagamentos(novosPagamentos);
     };
 
-    const LIMITE_VENDEDOR_PORCENT = 4; // 10% de autonomia
-
-
-
-    // Regra: se o desconto for > limite e não estiver autorizado, bloqueia
-    // utiliza o total informado pelo pai (já líquido de imposto, se houver)
-    const descontoExcedido = (descontoCalculado / total) * 100 > LIMITE_VENDEDOR_PORCENT;
-    const precisaBloquear = descontoExcedido && !autorizado;
-
-    const validarGerente = () => {
-        if (senhaGerente === "1234") { // Simulação de senha
-            setAutorizado(true);
-            setPedindoSenha(false);
-        } else {
-            alert("Senha Inválida!");
-        }
-    };
 
   
 
@@ -471,26 +451,6 @@ useEffect(() => {
     const [passoEmFoco, setPassoEmFoco] = useState<number | null>(null);
 
     return (
-        // <div className="checkout-overlay">
-        //     {/* MODAL DE SENHA DO GERENTE */}
-        //     {pedindoSenha && (
-        //         <div className="manager-lock-overlay">
-        //             <div className="manager-lock-card">
-        //                 <span className="icon">🛡️</span>
-        //                 <h3>Autorização</h3>
-        //                 <input
-        //                     autoFocus
-        //                     type="password"
-        //                     placeholder="Senha do Gerente"
-        //                     value={senhaGerente}
-        //                     onChange={(e) => setSenhaGerente(e.target.value)}
-        //                     onKeyDown={(e) => e.key === 'Enter' && validarGerente()}
-        //                 />
-        //                 <button onClick={validarGerente}>Liberar (Enter)</button>
-        //                 <button className="btn-cancel" onClick={() => setPedindoSenha(false)}>Cancelar</button>
-        //             </div>
-        //         </div>
-        //     )}
 
         <div className="checkout-container">
 
@@ -795,10 +755,6 @@ useEffect(() => {
                             <span>Desconto/Acréscimo</span>
                         </button> */}
 
-                        <button className="action-card" title="Consultar ou adicionar cliente para CPF na nota ou fidelidade" onClick={() => setActiveModal('cliente')}>
-                            👤
-                            <span>Cliente / Fidelidade</span>
-                        </button>
 
                         <button className="action-card" title="Configurações avançadas, como ativar modo de emergência ou contato do suporte" onClick={() => setActiveModal('config')}>
                             ⚙️
@@ -897,19 +853,6 @@ useEffect(() => {
                 </div>
             )}
 
-            {/* --- TELA: CLIENTE --- */}
-            {activeModal === 'cliente' && (
-                <div className="modal-body">
-                    <h3>👤 Identificar Cliente</h3>
-                    <div className="input-row">
-                        <input type="text" placeholder="CPF ou Nome do cliente..." autoFocus />
-                        <button>🔍 Buscar</button>
-                    </div>
-                    <div className="fidelidade-info">
-                        <p>Pontos acumulados: <strong>150 pts</strong></p>
-                    </div>
-                </div>
-            )}
 
             {/* --- TELA: CONFIGURAÇÕES --- */}
             {activeModal === 'config' && (
@@ -1004,7 +947,7 @@ useEffect(() => {
                     disabled={totalPago < totalLiquido}
                     onClick={handleFinalizarVenda}                >
 
-                    {precisaBloquear ? "AGUARDANDO GERENTE" : "CONCLUIR VENDA .(F5)"}
+                    CONCLUIR VENDA (F5)
                 </button>
                  <button
                     className="btn-SendSale"
