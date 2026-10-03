@@ -14,14 +14,15 @@ const totalPct = (l: TaxaPagamento) => (Number(l.percentual) || 0) + (Number(l.v
 
 // Mesma conta do servidor, para a prévia enquanto edita
 const previa = (linhas: Linha[], formaRef: string, parcelasRef: number) => {
-  const taxa = (forma: string, n: number) => {
-    const l = linhas.find(x => x.forma === forma && n >= x.parcelasDe && n <= x.parcelasAte);
-    return l ? totalPct(l) : 0;
-  };
+  const linha = (forma: string, n: number) => linhas.find(x => x.forma === forma && n >= x.parcelasDe && n <= x.parcelasAte);
+  const taxa = (forma: string, n: number) => { const l = linha(forma, n); return l ? totalPct(l) : 0; };
+  const fixa = (forma: string, n: number) => { const l = linha(forma, n); return l && l.tipoFixa === 'RS' ? Number(l.fixa) || 0 : 0; };
   const ref = taxa(formaRef, parcelasRef) / 100;
   const ajuste = (forma: string, n: number) => ((1 - ref) / (1 - taxa(forma, n) / 100) - 1) * 100;
-  return { ref: ref * 100, ajuste };
+  return { ref: ref * 100, ajuste, taxa, fixa, fixaRef: fixa(formaRef, parcelasRef) };
 };
+
+const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 const TaxasPagamento: React.FC = () => {
   const [cfg, setCfg] = useState<ConfigTaxas | null>(null);
@@ -34,6 +35,9 @@ const TaxasPagamento: React.FC = () => {
   const [senhaAtual, setSenhaAtual] = useState('');
   const [salvando, setSalvando] = useState(false);
   const [vendaEmLote, setVendaEmLote] = useState<number | null>(null);
+  // Simulador: preço de tabela digitado ou o líquido que se quer receber
+  const [valorSimulado, setValorSimulado] = useState<number | null>(100);
+  const [modoSimulacao, setModoSimulacao] = useState<'TABELA' | 'RECEBER'>('TABELA');
 
   const aplicar = (c: ConfigTaxas) => {
     setCfg(c);
@@ -206,36 +210,68 @@ const TaxasPagamento: React.FC = () => {
           </Col>
 
           <Col xs={24} xl={9}>
-            <Card size="small" title="Prévia sobre o preço de tabela">
-              <Table
-                size="small"
-                pagination={false}
-                rowKey={r => `${r.forma}-${r.parcelas}`}
-                dataSource={[
+            <Card size="small" title="Simulador">
+              {(() => {
+                const valor = Number(valorSimulado) || 0;
+                // Preço de tabela: digitado, ou o necessário para receber o líquido na forma de referência
+                const precoTabela = modoSimulacao === 'TABELA' ? valor : (valor + prev.fixaRef) / (1 - prev.ref / 100);
+                const linhasSim = [
                   ...['DINHEIRO', 'PIX', 'DEBITO'].map(forma => ({ forma, parcelas: 1 })),
                   ...Array.from({ length: 12 }, (_, i) => ({ forma: 'CREDITO', parcelas: i + 1 })),
-                ]}
-                columns={[
-                  { title: 'Forma', key: 'f', render: (_, r) => `${ROTULO_FORMA_TAXA[r.forma]}${r.forma === 'CREDITO' ? ` ${r.parcelas}x` : ''}` },
-                  {
-                    title: 'Ajuste', key: 'a', align: 'right' as const,
-                    render: (_, r) => {
-                      const absorve = r.forma === 'CREDITO' && r.parcelas <= semJuros;
-                      const v = absorve ? 0 : prev.ajuste(r.forma, r.parcelas);
-                      return <Text style={{ color: corAjuste(v) }}>{absorve && prev.ajuste(r.forma, r.parcelas) > 0.005 ? 'loja absorve' : textoAjuste(v)}</Text>;
-                    },
-                  },
-                  {
-                    title: 'R$ 100 vira', key: 'v', align: 'right' as const,
-                    render: (_, r) => {
-                      const absorve = r.forma === 'CREDITO' && r.parcelas <= semJuros;
-                      const v = absorve ? 0 : prev.ajuste(r.forma, r.parcelas);
-                      return `R$ ${(100 * (1 + v / 100)).toFixed(2)}`;
-                    },
-                  },
-                ]}
-              />
-              <Text type="secondary" style={{ fontSize: 11 }}>Negativo = desconto permitido sem perder margem; positivo = acréscimo cobrado do cliente.</Text>
+                ].map(r => {
+                  const ajusteBruto = prev.ajuste(r.forma, r.parcelas);
+                  const absorve = r.forma === 'CREDITO' && r.parcelas <= semJuros;
+                  const ajuste = absorve ? 0 : ajusteBruto;
+                  const cobrar = Math.round(precoTabela * (1 + ajuste / 100) * 100) / 100;
+                  const taxaValor = Math.round((cobrar * prev.taxa(r.forma, r.parcelas) / 100 + prev.fixa(r.forma, r.parcelas)) * 100) / 100;
+                  return { ...r, ajuste, absorveTaxa: absorve && ajusteBruto > 0.005, cobrar, taxaValor, recebe: Math.round((cobrar - taxaValor) * 100) / 100 };
+                });
+                return (
+                  <Space direction="vertical" style={{ width: '100%' }} size={8}>
+                    <Space wrap>
+                      <Select size="small" value={modoSimulacao} onChange={setModoSimulacao} style={{ width: 180 }}
+                        options={[{ value: 'TABELA', label: 'Preço de tabela' }, { value: 'RECEBER', label: 'Quero receber (líquido)' }]} />
+                      <InputNumber size="small" min={0} precision={2} decimalSeparator="," prefix="R$" style={{ width: 130 }}
+                        value={valorSimulado} onChange={setValorSimulado} />
+                    </Space>
+                    <Text style={{ fontSize: 12 }}>
+                      Preço de tabela: <b>{brl(precoTabela)}</b>
+                      {modoSimulacao === 'RECEBER' && (
+                        <Text type="secondary" style={{ fontSize: 12 }}> (para receber {brl(valor)} no {ROTULO_FORMA_TAXA[formaRef]} {parcelasRef}x)</Text>
+                      )}
+                    </Text>
+                    <Table
+                      size="small"
+                      pagination={false}
+                      rowKey={r => `${r.forma}-${r.parcelas}`}
+                      dataSource={linhasSim}
+                      columns={[
+                        {
+                          title: 'Forma', key: 'f',
+                          render: (_, r) => (
+                            <span>
+                              {ROTULO_FORMA_TAXA[r.forma]}{r.forma === 'CREDITO' ? ` ${r.parcelas}x` : ''}{' '}
+                              {r.absorveTaxa
+                                ? <Tag style={{ fontSize: 10, margin: 0 }}>sem juros</Tag>
+                                : Math.abs(r.ajuste) >= 0.005 && <Text style={{ fontSize: 11, color: corAjuste(r.ajuste) }}>{textoAjuste(r.ajuste)}</Text>}
+                            </span>
+                          ),
+                        },
+                        { title: 'Cobrar', dataIndex: 'cobrar', align: 'right' as const, render: (v: number) => <b>{brl(v)}</b> },
+                        { title: 'Taxa', dataIndex: 'taxaValor', align: 'right' as const, render: (v: number) => (v ? <Text type="danger">-{brl(v)}</Text> : '—') },
+                        {
+                          title: 'Recebe', dataIndex: 'recebe', align: 'right' as const,
+                          render: (v: number, r) => <Text style={{ color: r.absorveTaxa ? '#d48806' : undefined }}>{brl(v)}</Text>,
+                        },
+                      ]}
+                    />
+                    <Text type="secondary" style={{ fontSize: 11 }}>
+                      Verde = desconto permitido sem perder margem; laranja = acréscimo cobrado do cliente.
+                      "Sem juros": a loja absorve a diferença de taxa (recebe um pouco menos).
+                    </Text>
+                  </Space>
+                );
+              })()}
             </Card>
           </Col>
         </Row>
