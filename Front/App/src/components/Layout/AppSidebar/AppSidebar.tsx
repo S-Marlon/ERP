@@ -14,6 +14,8 @@ import {
   QuestionCircleOutlined,
 } from "@ant-design/icons";
 import { ItemMenu, MENU_PRINCIPAL, itemDaRota } from "../menuRotas";
+import { menuComModulos } from "../../../modulos/registroModulos";
+import { useModulos } from "../../../modulos/modulosStore";
 import { useNotificacoes } from "../../../core/notificacoes/NotificacoesContext";
 
 const { Text } = Typography;
@@ -42,11 +44,15 @@ export default function AppSidebar({ isOpen, toggleSidebar }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Menu com os módulos plugáveis ligados nesta loja
+  const { ativos } = useModulos();
+  const menu = useMemo(() => menuComModulos(MENU_PRINCIPAL, ativos), [ativos]);
+
   // Item e grupo da rota atual (sub-rotas também marcam o item certo)
   const atual = useMemo(() => itemDaRota(location.pathname), [location.pathname]);
   const grupoAtual = useMemo(
-    () => MENU_PRINCIPAL.find(g => g.children?.some(c => c.key === atual?.item.key))?.key,
-    [atual]
+    () => menu.find(g => g.children?.some(c => c.key === atual?.item.key))?.key,
+    [atual, menu]
   );
 
   // Grupos abertos acompanham a navegação (sem fechar o que o usuário abriu)
@@ -55,7 +61,7 @@ export default function AppSidebar({ isOpen, toggleSidebar }: SidebarProps) {
     if (grupoAtual) setAbertos(prev => (prev.includes(grupoAtual) ? prev : [...prev, grupoAtual]));
   }, [grupoAtual]);
 
-  const items = useMemo(() => paraItensAntd(MENU_PRINCIPAL, rota => navigate(rota)), [navigate]);
+  const items = useMemo(() => paraItensAntd(menu, rota => navigate(rota)), [navigate, menu]);
   const { novas } = useNotificacoes();
   const [configAberto, setConfigAberto] = useState(false);
   const irPara = (rota: string) => { setConfigAberto(false); navigate(rota); };

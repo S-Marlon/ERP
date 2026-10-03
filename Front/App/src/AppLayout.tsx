@@ -35,6 +35,10 @@ import TaxasPagamento from './pages/PDV/pages/TaxasPagamento/TaxasPagamento';
 import Orcamentos from './pages/PDV/pages/Orcamentos/Orcamentos';
 import { CaixaPaineis } from './pages/PDV/caixa/CaixaPainel';
 import { carregarTaxaPreco } from './core/precos/taxaPreco';
+import { rotasDosModulos } from './modulos/registroModulos';
+import ModulosSistema from './modulos/ModulosSistema';
+import { useModulos } from './modulos/modulosStore';
+import { Suspense } from 'react';
 import NotasEntrada from './pages/Compras/NotasEntrada/NotasEntrada';
 import ComprasDashboard from "./pages/Compras/ComprasDashboard";
 import StockEntryForm from "./pages/Compras/StockEntry/StockEntryForm";
@@ -77,6 +81,8 @@ export default function AppLayout() {
   const location = useLocation();
   // Taxa da maquininha embutida no preço: usada pelas contas de preço do catálogo e da entrada de NF
   useEffect(() => { carregarTaxaPreco(); }, []);
+  // Módulos plugáveis ligados nesta loja (rotas e menu)
+  const { ativos: modulosAtivos } = useModulos();
   const isPDV = location.pathname.startsWith("/vendas/pdv");
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -176,6 +182,10 @@ export default function AppLayout() {
             <Route path="/configuracoes/empresa" element={<DadosDaEmpresa />} />
             <Route path="/configuracoes/preferencias" element={<PreferenciasSistema />} />
             <Route path="/configuracoes/notificacoes" element={<CentralNotificacoes />} />
+            <Route path="/configuracoes/modulos" element={<ModulosSistema />} />
+            {rotasDosModulos(modulosAtivos).map(r => (
+              <Route key={r.path} path={r.path} element={<Suspense fallback={null}>{r.element}</Suspense>} />
+            ))}
             <Route path="/ajuda" element={<AjudaSuporte />} />
             <Route path="/catalogo/familias" element={<FamilyManager />} />
             <Route path="/catalogo/familias/test" element={<FamilyManagementPanel />} />

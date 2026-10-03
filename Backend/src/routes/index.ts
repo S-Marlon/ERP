@@ -9,6 +9,8 @@ import comprasRoutes from './Compras/compras.routes'
 import vendasRoutes from './Venda/vendas.routes';
 import estoqueItensRoutes from './EstoqueItens/estoqueItens.routes';
 import receberRoutes from './Financeiro/receber/receber.routes';
+// Módulos plugáveis (cada um liga/desliga por loja em sistema_modulos)
+import modulosRoutes from '../modulos/registro';
 import { Router, Request, Response } from 'express';
 
 
@@ -31,5 +33,7 @@ router.use('/parceiros', parceirosRoutes); // Adicione esta linha para incluir a
 router.use('/compras' , comprasRoutes)
 // PDV e vendas no modelo novo (itens_core)
 router.use('/vendas', vendasRoutes);
+// /sistema/modulos e /modulos/<area>/<assunto>
+router.use(modulosRoutes);
 
 export default router;

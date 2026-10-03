@@ -1,5 +1,6 @@
 // Mapa único do menu: usado pela barra lateral (itens) e pelo cabeçalho (título da tela atual).
 import React from 'react';
+import { menuComModulos } from '../../modulos/registroModulos';
 import {
   AppstoreOutlined, DollarOutlined, FileTextOutlined, HomeOutlined, InboxOutlined, ShopOutlined,
   ShoppingCartOutlined, ShopTwoTone, TeamOutlined, ToolOutlined,
@@ -90,6 +91,7 @@ export const MENU_CONFIGURACOES: ItemMenu = {
     { key: '/configuracoes/empresa', label: 'Dados da Empresa' },
     { key: '/configuracoes/preferencias', label: 'Preferências do Sistema' },
     { key: '/configuracoes/notificacoes', label: 'Central de Notificações' },
+    { key: '/configuracoes/modulos', label: 'Módulos' },
     { key: '/ajuda', label: 'Ajuda e Suporte' },
   ],
 };
@@ -99,7 +101,7 @@ const folhas = (itens: ItemMenu[], pai?: ItemMenu): Array<{ item: ItemMenu; pai?
 
 /** Item do menu que corresponde à rota atual (a rota mais longa que é prefixo do caminho). */
 export const itemDaRota = (pathname: string) => {
-  const candidatos = folhas([...MENU_PRINCIPAL, MENU_CONFIGURACOES]).filter(({ item }) =>
+  const candidatos = folhas([...menuComModulos(MENU_PRINCIPAL, 'todos'), MENU_CONFIGURACOES]).filter(({ item }) =>
     item.key === pathname || (item.key !== '/' && pathname.startsWith(`${item.key}/`)));
   return candidatos.sort((a, b) => b.item.key.length - a.item.key.length)[0] || null;
 };
