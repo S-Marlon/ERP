@@ -4,6 +4,7 @@
     "main": "index.js",
     "scripts": {
         "start": "ts-node src/server.ts",
+        "dev": "nodemon",
         "start-estoque": "ts-node src/routes/Estoque/server.ts",
         "test": "echo \"Error: no test specified\" && exit 1",
         "test-stock-edge-cases": "ts-node src/tests/stock-edge-cases.test.ts",
@@ -26,6 +27,7 @@
         "@types/cors": "^2.8.19",
         "@types/express": "^5.0.3",
         "@types/mysql": "^2.15.27",
+        "nodemon": "^3.1.14",
         "ts-node": "^10.9.2",
         "typescript": "^5.9.3"
     }
