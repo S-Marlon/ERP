@@ -79,21 +79,29 @@ export const calcularLinha = (linha: LinhaPedido, dados: DadosItemVenda): LinhaC
  * Fecha os totais: desconto individual (tabela - praticado) + desconto geral rateado pelo valor de cada linha
  * (a última linha recebe a sobra dos centavos).
  */
-export const fecharVenda = (linhas: LinhaCalculada[], descontoGeral: number) => {
+export const fecharVenda = (linhas: LinhaCalculada[], descontoGeral: number, acrescimoGeral = 0) => {
   if (linhas.length === 0) throw new ErroVenda('A venda não tem itens.');
   const subtotais = linhas.map(l => centavos(l.precoPraticado * l.quantidade));
   const somaSubtotais = subtotais.reduce((a, b) => a + b, 0);
   const descontoC = centavos(Math.max(0, Number(descontoGeral) || 0));
   if (descontoC > somaSubtotais) throw new ErroVenda('O desconto é maior que o valor da venda.');
 
+  // Acréscimo (ex.: crédito parcelado acima do sem juros) rateado como o desconto
+  const acrescimoC = centavos(Math.max(0, Number(acrescimoGeral) || 0));
   let restante = descontoC;
+  let restanteAcr = acrescimoC;
   const fechadas = linhas.map((l, i) => {
-    const parte = i === linhas.length - 1
+    const ultima = i === linhas.length - 1;
+    const parte = ultima
       ? restante
       : somaSubtotais > 0 ? Math.floor((descontoC * subtotais[i]) / somaSubtotais) : 0;
     restante -= parte;
+    const parteAcr = ultima
+      ? restanteAcr
+      : somaSubtotais > 0 ? Math.floor((acrescimoC * subtotais[i]) / somaSubtotais) : 0;
+    restanteAcr -= parteAcr;
     const brutoC = centavos(l.precoTabela * l.quantidade);
-    const totalC = subtotais[i] - parte;
+    const totalC = subtotais[i] - parte + parteAcr;
     return {
       ...l,
       totalItem: reais(totalC),

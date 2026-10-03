@@ -9,6 +9,7 @@ import Swal from 'sweetalert2';
 import { isCartItemOS } from '../types/cart.types';
 import { caixaStore } from '../caixa/caixaStore';
 import { useSituacaoCliente } from '../../Financeiro/receber/receberApi';
+import { acrescimoParcelamento, ajusteDaForma, descontoDaForma, useTaxasVenda } from '../taxas/taxasVenda';
 // import {ItemVenda} from '../../../utils/printService'
 
 import Draggable from 'react-draggable';
@@ -91,6 +92,8 @@ export interface Pagamento {
     // A prazo: intervalo entre parcelas e primeiro vencimento (vazio = hoje + intervalo)
     intervaloDias?: number;
     primeiroVencimento?: string;
+    // Crédito acima do sem juros: diferença de taxa repassada ao cliente (já somada em `valor`)
+    acrescimo?: number;
     status: PaymentStatus;
 
     // Metadados para Cartão/PIX
@@ -131,6 +134,8 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, onVendaC
     const [intervaloPrazo, setIntervaloPrazo] = useState(30);
     const [primeiroVencimento, setPrimeiroVencimento] = useState('');
     const situacaoCliente = useSituacaoCliente(clienteId);
+    // Taxas da maquininha: desconto que cada forma permite e acréscimo do parcelamento
+    const taxasVenda = useTaxasVenda();
 
     const [activeModal, setActiveModal] = useState(null); // 'calc', 'obs', 'desc', etc.
     // Controle da Janela Flutuante da Calculadora
@@ -208,9 +213,11 @@ const toggleWindow = (id) => {
     // cliente e total já vêm do pai via props (comentário duplicado eliminado)
 
     // Cálculos de Totais
-    const totalPago: number = pagamentos
-        .filter(p => p.status === 'paid' || p.status === 'processing')
-        .reduce((acc, p) => acc + (Number(p.valor) || 0), 0);
+    const pagamentosAtivos = pagamentos.filter(p => p.status === 'paid' || p.status === 'processing');
+    const totalPago: number = pagamentosAtivos.reduce((acc, p) => acc + (Number(p.valor) || 0), 0);
+    const acrescimoTotal = Math.round(pagamentosAtivos.reduce((acc, p) => acc + (Number(p.acrescimo) || 0), 0) * 100) / 100;
+    // Parte da venda coberta pelos pagamentos (sem o acréscimo do parcelamento)
+    const totalCoberto = Math.round((totalPago - acrescimoTotal) * 100) / 100;
 
 
 
@@ -222,11 +229,11 @@ const toggleWindow = (id) => {
         : descontoValor;
 
     const totalLiquido = total - descontoCalculado;
-    const totalPagoNum = Number(totalPago) || 0;
+    const totalPagoNum = Number(totalCoberto) || 0;
     const totalLiquidoNum = Number(totalLiquido) || 0;
 
     const saldoRestante = Math.max(0, parseFloat((totalLiquidoNum - totalPagoNum).toFixed(2)));
-    const troco = Number(totalPago) > totalLiquido ? Number(totalPago) - totalLiquido : 0;
+    const troco = Number(totalCoberto) > totalLiquido ? Number(totalCoberto) - totalLiquido : 0;
     const [showDiscount, setShowDiscount] = useState(false);
     // Estados para a Trava
 
@@ -291,6 +298,7 @@ const toggleWindow = (id) => {
             clienteNome: cliente || 'CONSUMIDOR',
             idCliente: clienteId ?? null,
             descontoGeral: Number(descontoCalculado.toFixed(2)),
+            acrescimoGeral: acrescimoTotal,
             itens: itensCarrinho.map(item => ({
                 idItem: Number(item.id),
                 quantidade: Number(item.quantity),
@@ -345,6 +353,7 @@ const toggleWindow = (id) => {
 
             setPagamentos([]);
             setDescontoValor(0);
+            setTipoDesconto('real');
             if (onVendaConcluida) onVendaConcluida();
             else onBack();
         } catch (error: any) {
@@ -411,10 +420,11 @@ useEffect(() => {
 
         const opcoes = [];
         for (let i = 1; i <= 12; i++) {
-            const valorParcela = valorInput / i;
+            const base = parseFloat(String(valorInput).replace(',', '.')) || 0;
+            const acr = acrescimoParcelamento(taxasVenda, 'CREDITO', i, base);
             opcoes.push(
                 <option key={i} value={i}>
-                    {i}x de R$ {valorParcela.toFixed(2)} {i > 4 ? '(c/ juros)' : '(s/ juros)'}
+                    {i}x de R$ {((base + acr) / i).toFixed(2)} {acr > 0 ? `(+ R$ ${acr.toFixed(2)} de acréscimo)` : '(s/ juros)'}
                 </option>
             );
         }
@@ -519,10 +529,13 @@ useEffect(() => {
             return;
         }
 
+        const parcelasDoPagamento = metodoSelecionado === 'credit_card' ? parcelasInput : 1;
+        const acrescimo = acrescimoParcelamento(taxasVenda, FORMA_POR_METODO[metodoSelecionado], parcelasDoPagamento, valorNumerico);
         const novoPagamento: Pagamento = {
             id: crypto.randomUUID(),
             metodo: metodoSelecionado,
-            valor: parseFloat(valorInput.replace(',', '.')) || 0, // <-- aqui
+            valor: Math.round((valorNumerico + acrescimo) * 100) / 100,
+            ...(acrescimo > 0 ? { acrescimo } : {}),
             parcelas: metodoSelecionado === 'credit_card' || metodoSelecionado === 'store_credit' ? parcelasInput : 1,
             ...(metodoSelecionado === 'store_credit' ? { intervaloDias: intervaloPrazo, primeiroVencimento: primeiroVencimento || undefined } : {}),
             status: 'pending',
@@ -715,6 +728,27 @@ useEffect(() => {
                             </div>
                         </section>
 
+                        {metodoSelecionado && (() => {
+                            const forma = FORMA_POR_METODO[metodoSelecionado];
+                            const pct = descontoDaForma(taxasVenda, forma);
+                            if (pct <= 0 || pagamentos.length > 0) return null;
+                            const aplicado = tipoDesconto === 'porcent' && Math.abs(descontoValor - pct) < 0.001;
+                            return (
+                                <div className="parcelas-group" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, padding: '6px 8px', fontSize: 13 }}>
+                                    {PAYMENT_METHOD_DETAILS[metodoSelecionado].label} permite até <b>{pct.toFixed(2)}%</b> de desconto sem autorização
+                                    (R$ {(total * pct / 100).toFixed(2)}): a taxa da maquininha é menor que a embutida no preço.{' '}
+                                    {aplicado
+                                        ? <button type="button" className="btn-change-method" onClick={() => { setDescontoValor(0); setTipoDesconto('real'); }}>Remover desconto</button>
+                                        : <button type="button" className="btn-change-method" onClick={() => { setTipoDesconto('porcent'); setDescontoValor(pct); setValorInput(''); }}>Aplicar desconto</button>}
+                                </div>
+                            );
+                        })()}
+                        {metodoSelecionado === 'credit_card' && taxasVenda && parcelasInput > taxasVenda.parcelasSemJuros && (
+                            <div className="parcelas-group" style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6, padding: '6px 8px', fontSize: 13 }}>
+                                Acima de {taxasVenda.parcelasSemJuros}x sem juros: acréscimo de <b>{ajusteDaForma(taxasVenda, 'CREDITO', parcelasInput).toFixed(2)}%</b> (taxa da maquininha em {parcelasInput}x).
+                            </div>
+                        )}
+
                         <Button onClick={adicionarPagamento} color='primary' className={`btn-add-payment ${valorInput ? '' : 'btn-disabled'} ${passoEmFoco === 3 ? 'step-highlight-btn' : ''}`}>Adicionar → (Enter)</Button>
 
 
@@ -749,7 +783,7 @@ useEffect(() => {
           <div className="payment-info">
             <strong>R$ {(Number(p.valor) || 0).toFixed(2)}</strong>
             <span className="payment-subtext">
-              {p.metodo === 'credit_card' ? ` (${p.parcelas}x)`
+              {p.metodo === 'credit_card' ? ` (${p.parcelas}x${p.acrescimo ? `, + R$ ${p.acrescimo.toFixed(2)} de acréscimo` : ''})`
                 : p.metodo === 'store_credit' ? ` (${p.parcelas}x a cada ${p.intervaloDias || 30} dias${p.primeiroVencimento ? `, 1ª em ${p.primeiroVencimento.split('-').reverse().join('/')}` : ''})`
                 : ' (À vista)'}
             </span>
@@ -971,6 +1005,18 @@ useEffect(() => {
                     </div>
 
                     <div className="status-box">
+                        {descontoCalculado > 0 && (
+                            <div className="status-item">
+                                <small>Desconto </small>
+                                <strong>- R$ {descontoCalculado.toFixed(2)}</strong>
+                            </div>
+                        )}
+                        {acrescimoTotal > 0 && (
+                            <div className="status-item">
+                                <small>Acréscimo parcel. </small>
+                                <strong>+ R$ {acrescimoTotal.toFixed(2)}</strong>
+                            </div>
+                        )}
                         <div className={`status-item ${saldoRestante > 0 ? 'pending' : 'paid'}`}>
                             <small>Faltando </small>
                             <strong>R$ {saldoRestante.toFixed(2)}</strong>
@@ -1039,14 +1085,14 @@ useEffect(() => {
 
                 <button
                     className="btn-confirm-sale"
-                    disabled={totalPago < totalLiquido}
+                    disabled={totalCoberto < totalLiquido - 0.004}
                     onClick={() => handleFinalizarVenda()}                >
 
                     CONCLUIR VENDA (F5)
                 </button>
                  <button
                     className="btn-SendSale"
-                    disabled={totalPago < totalLiquido}
+                    disabled={totalCoberto < totalLiquido - 0.004}
                     onClick={() => handleFinalizarVenda()}>
 
                     Enviar NF-e (F6)

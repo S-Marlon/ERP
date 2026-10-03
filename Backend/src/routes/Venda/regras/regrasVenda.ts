@@ -35,9 +35,12 @@ export const avaliarRegras = (
   totalBruto: number,
   totalDesconto: number,
   linhas: LinhaAvaliada[],
-  regras: RegrasVenda
+  regras: RegrasVenda,
+  // Desconto já descontado o que a forma de pagamento permite (taxas); sem ele, o desconto nominal
+  percentualEfetivo?: number
 ): ResultadoRegras => {
-  const percentualDesconto = c(totalBruto) > 0 ? Number(((c(totalDesconto) / c(totalBruto)) * 100).toFixed(2)) : 0;
+  const nominal = c(totalBruto) > 0 ? Number(((c(totalDesconto) / c(totalBruto)) * 100).toFixed(2)) : 0;
+  const percentualDesconto = percentualEfetivo === undefined ? nominal : percentualEfetivo;
   const excedeDesconto = percentualDesconto > Number(regras.descontoMaxPercentual) + 1e-9;
 
   // Abaixo do custo: só itens com custo conhecido (custo zero = sem informação, não bloqueia)
@@ -47,7 +50,11 @@ export const avaliarRegras = (
       .map(l => ({ idItem: l.idItem, nome: l.nome, totalItem: l.totalItem, custoTotal: Number(l.custoTotal.toFixed(2)) }));
 
   const motivos: string[] = [];
-  if (excedeDesconto) motivos.push(`Desconto de ${percentualDesconto.toFixed(2)}% passa do limite de ${Number(regras.descontoMaxPercentual).toFixed(2)}%.`);
+  if (excedeDesconto) {
+    motivos.push(percentualEfetivo === undefined
+      ? `Desconto de ${percentualDesconto.toFixed(2)}% passa do limite de ${Number(regras.descontoMaxPercentual).toFixed(2)}%.`
+      : `Desconto de ${percentualDesconto.toFixed(2)}% (além do que a forma de pagamento permite) passa do limite de ${Number(regras.descontoMaxPercentual).toFixed(2)}%.`);
+  }
   let bloqueio: string | null = null;
   if (abaixoCusto.length > 0) {
     const lista = abaixoCusto.map(a => `${a.nome} (R$ ${a.totalItem.toFixed(2)} < custo R$ ${a.custoTotal.toFixed(2)})`).join('; ');

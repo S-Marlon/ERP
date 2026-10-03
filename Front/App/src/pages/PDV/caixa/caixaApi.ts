@@ -46,7 +46,7 @@ export interface ResumoCaixa {
   linhas: LinhaResumoCaixa[];
   totalVendas: number;
   dinheiroEsperado: number;
-  vendas: { concluidas: number; canceladas: number; total: number; custo: number };
+  vendas: { concluidas: number; canceladas: number; total: number; custo: number; taxas?: number };
   movimentos: MovimentoCaixa[];
 }
 

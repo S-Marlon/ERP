@@ -11,6 +11,8 @@ import { cancelarTitulosDaVenda, gravarTitulosDaVenda, planejarPrazo, PrazoDaVen
 import { ErroReceber } from '../../Financeiro/receber/receber';
 import { carregarRegras } from '../regras/regrasVenda.controller';
 import { avaliarRegras, conferirSenha } from '../regras/regrasVenda';
+import { carregarConfigTaxas } from '../taxas/taxas.controller';
+import { calcularTaxas, descontoEfetivoPct, liquidoParaRegra } from '../taxas/taxas';
 
 const ORIGEM_VENDA = 'VENDA_PDV';
 const ORIGEM_CANCELAMENTO = 'CANCELAMENTO_VENDA';
@@ -36,7 +38,7 @@ const responderErro = (res: Response, error: any, padrao: string) => {
  */
 export const registrarVenda = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
-  const { itens, pagamentos, descontoGeral, clienteNome, idCliente, observacao } = req.body || {};
+  const { itens, pagamentos, descontoGeral, acrescimoGeral, clienteNome, idCliente, observacao } = req.body || {};
   if (!Array.isArray(itens) || itens.length === 0) return res.status(400).json({ error: 'A venda não tem itens.' });
 
   const connection = await pool.getConnection();
@@ -77,7 +79,8 @@ export const registrarVenda = async (req: Request, res: Response) => {
         precoCadastro: item.preco_venda !== null ? Number(item.preco_venda) : null,
       });
     });
-    const venda = fecharVenda(linhas, Number(descontoGeral) || 0);
+    // Acréscimo: crédito parcelado acima do sem juros (a diferença de taxa repassada ao cliente)
+    const venda = fecharVenda(linhas, Number(descontoGeral) || 0, Number(acrescimoGeral) || 0);
     const pagamentosOk = validarPagamentos(pagamentos, venda.totalLiquido);
 
     // Trava os saldos (ordem fixa de ids para evitar deadlock)
@@ -118,6 +121,14 @@ export const registrarVenda = async (req: Request, res: Response) => {
     };
     const totalCusto = venda.linhas.reduce((a, l) => a + custoBase(l.idItem) * l.quantidadeBase, 0);
 
+    // Taxas dos meios de pagamento: gravadas em cada pagamento (margem líquida) e, com o desconto da forma
+    // automático, o desconto que a forma permite (PIX/débito) não conta para o limite
+    const cfgTaxas = await carregarConfigTaxas(connection as any, tenant);
+    const taxas = calcularTaxas(cfgTaxas, pagamentosOk.map(p => ({ forma: p.forma, valor: p.valor, parcelas: p.parcelas, troco: p.troco })));
+    const percentualEfetivo = cfgTaxas.descontoFormaAutomatico
+      ? descontoEfetivoPct(cfgTaxas, venda.totalBruto, liquidoParaRegra(cfgTaxas, pagamentosOk.map(p => ({ forma: p.forma, valor: p.valor, parcelas: p.parcelas, troco: p.troco }))))
+      : undefined;
+
     // Regras de desconto e margem (servidor): acima do limite ou abaixo do custo exige autorização
     const regras = await carregarRegras(connection as any, tenant);
     const avaliacao = avaliarRegras(venda.totalBruto, venda.totalDesconto, venda.linhas.map(l => ({
@@ -125,7 +136,7 @@ export const registrarVenda = async (req: Request, res: Response) => {
       nome: itensBanco.get(l.idItem).nome_comercial || itensBanco.get(l.idItem).nome_item,
       totalItem: l.totalItem,
       custoTotal: custoBase(l.idItem) * l.quantidadeBase,
-    })), regras);
+    })), regras, percentualEfetivo);
     if (avaliacao.bloqueio) throw new ErroVenda(avaliacao.bloqueio, 409, { codigo: 'ABAIXO_DO_CUSTO' });
     let autorizadoPor: string | null = null;
     let motivoAutorizacao: string | null = null;
@@ -144,11 +155,11 @@ export const registrarVenda = async (req: Request, res: Response) => {
 
     const [cab] = await connection.execute(
       `INSERT INTO vendas_pedidos
-         (tenant_id, origem, status, id_caixa, operador, autorizado_por, motivo_autorizacao, id_cliente, cliente_nome, total_bruto, total_desconto, total_liquido, total_custo, observacao)
-       VALUES (?, 'PDV', 'CONCLUIDA', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (tenant_id, origem, status, id_caixa, operador, autorizado_por, motivo_autorizacao, id_cliente, cliente_nome, total_bruto, total_desconto, total_liquido, total_custo, total_taxas, observacao)
+       VALUES (?, 'PDV', 'CONCLUIDA', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         tenant, caixa.id_caixa, operadorDe(req), autorizadoPor, motivoAutorizacao, idCliente ? Number(idCliente) : null, String(clienteNome || '').trim().slice(0, 150) || 'CONSUMIDOR',
-        f4(venda.totalBruto), f4(venda.totalDesconto), f4(venda.totalLiquido), f4(totalCusto),
+        f4(venda.totalBruto), f4(venda.totalDesconto), f4(venda.totalLiquido), f4(totalCusto), f4(taxas.totalTaxas),
         String(observacao || '').trim().slice(0, 255) || null,
       ]
     );
@@ -200,10 +211,11 @@ export const registrarVenda = async (req: Request, res: Response) => {
       );
     }
 
-    for (const p of pagamentosOk) {
+    for (const p of taxas.linhas) {
       await connection.execute(
-        `INSERT INTO vendas_pedidos_pagamentos (tenant_id, id_venda, forma, valor, parcelas, troco) VALUES (?, ?, ?, ?, ?, ?)`,
-        [tenant, idVenda, p.forma, f4(p.valor), p.parcelas, f4(p.troco)]
+        `INSERT INTO vendas_pedidos_pagamentos (tenant_id, id_venda, forma, valor, parcelas, troco, taxa_percentual, taxa_valor)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [tenant, idVenda, p.forma, f4(p.valor), p.parcelas, f4(p.troco), f4(p.taxaPercentual), f4(p.taxaValor)]
       );
     }
 
@@ -219,6 +231,7 @@ export const registrarVenda = async (req: Request, res: Response) => {
       totalBruto: venda.totalBruto,
       totalDesconto: venda.totalDesconto,
       totalLiquido: venda.totalLiquido,
+      totalTaxas: taxas.totalTaxas,
       troco: pagamentosOk.reduce((a, p) => a + p.troco, 0),
     });
   } catch (error: any) {
@@ -334,7 +347,7 @@ export const listarVendas = async (req: Request, res: Response) => {
   try {
     const data = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.data || '')) ? String(req.query.data) : null;
     const [rows] = await pool.execute(
-      `SELECT v.id_venda, v.status, v.cliente_nome, v.operador, v.id_caixa, v.total_bruto, v.total_desconto, v.total_liquido, v.total_custo,
+      `SELECT v.id_venda, v.status, v.cliente_nome, v.operador, v.id_caixa, v.total_taxas, v.total_bruto, v.total_desconto, v.total_liquido, v.total_custo,
               v.created_at, v.cancelado_em, v.motivo_cancelamento,
               (SELECT COUNT(*) FROM vendas_pedidos_itens i WHERE i.id_venda = v.id_venda) AS qtd_itens,
               (SELECT GROUP_CONCAT(DISTINCT p.forma) FROM vendas_pedidos_pagamentos p WHERE p.id_venda = v.id_venda) AS formas
@@ -353,6 +366,7 @@ export const listarVendas = async (req: Request, res: Response) => {
       totalDesconto: Number(r.total_desconto),
       totalLiquido: Number(r.total_liquido),
       totalCusto: Number(r.total_custo),
+      totalTaxas: Number(r.total_taxas) || 0,
       qtdItens: Number(r.qtd_itens),
       formas: r.formas ? String(r.formas).split(',') : [],
       criadoEm: r.created_at,

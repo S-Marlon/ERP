@@ -55,3 +55,16 @@ export const runVendaPdvTests = (): void => {
   assert(est.saidaPorItem.get(1) === 303 && est.faltas.length === 1, 'Soma das linhas passa do saldo.');
   assert(conferirEstoque([l1, rolo], new Map([[1, 200]]), new Map([[1, true]])).faltas.length === 0, 'Item que pode vender sem estoque passa.');
 };
+
+// Acréscimo geral (crédito parcelado acima do sem juros) rateado nas linhas
+{
+  const base = { idUnidade: null, sigla: null, fator: 1, quantidadeBase: 1, descontoValor: 0, totalItem: 0, precoUnitarioFinal: 0 };
+  const v = fecharVenda([
+    { ...base, idItem: 1, quantidade: 1, precoTabela: 60, precoPraticado: 60 },
+    { ...base, idItem: 2, quantidade: 1, precoTabela: 40, precoPraticado: 40 },
+  ], 0, 5);
+  if (v.totalLiquido !== 105 || v.linhas[0].totalItem !== 63 || v.linhas[1].totalItem !== 42 || v.totalDesconto !== 0) {
+    throw new Error(`acréscimo: ${JSON.stringify(v)}`);
+  }
+  console.log('acréscimo geral: ok');
+}

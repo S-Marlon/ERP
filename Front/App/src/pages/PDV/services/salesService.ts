@@ -17,6 +17,8 @@ export interface VendaPdvPayload {
     idCliente?: number | null;
     observacao?: string;
     descontoGeral?: number;
+    // Crédito parcelado acima do sem juros: diferença de taxa repassada ao cliente
+    acrescimoGeral?: number;
     itens: VendaPdvItemPayload[];
     pagamentos: { forma: FormaPagamentoPdv; valor: number; parcelas?: number; intervaloDias?: number; primeiroVencimento?: string }[];
 }
@@ -27,6 +29,7 @@ export interface VendaPdvResposta {
     totalBruto: number;
     totalDesconto: number;
     totalLiquido: number;
+    totalTaxas?: number;
     troco: number;
     // Venda a prazo: parcelas geradas em contas a receber
     parcelas?: { parcela: number; totalParcelas: number; vencimento: string; valor: number }[];

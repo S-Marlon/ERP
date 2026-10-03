@@ -282,7 +282,12 @@ const DrawerResumo: React.FC = () => {
             { key: 'v', label: 'Vendas', children: `${resumo.vendas.concluidas} · ${brl(resumo.vendas.total)}` },
             { key: 'c', label: 'Canceladas', children: resumo.vendas.canceladas },
             { key: 'd', label: 'Dinheiro na gaveta', children: <b style={{ fontSize: 16 }}>{brl(resumo.dinheiroEsperado)}</b> },
-            { key: 'm', label: 'Margem bruta', children: resumo.vendas.total > 0 ? `${(((resumo.vendas.total - resumo.vendas.custo) / resumo.vendas.total) * 100).toFixed(1)}%` : '—' },
+            {
+              key: 'm', label: 'Margem (líquida de taxas)',
+              children: resumo.vendas.total > 0
+                ? <Tooltip title={`Taxas de cartão/meios de pagamento: ${brl(resumo.vendas.taxas || 0)}`}>{(((resumo.vendas.total - resumo.vendas.custo - (resumo.vendas.taxas || 0)) / resumo.vendas.total) * 100).toFixed(1)}%</Tooltip>
+                : '—',
+            },
           ]} />
           <div>
             <Text strong>Por forma de pagamento</Text>

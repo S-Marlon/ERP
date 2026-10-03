@@ -55,7 +55,8 @@ export const montarResumo = async (conn: Conn, tenant: number, caixa: any) => {
   const [[vendas]]: any = await conn.execute(
     `SELECT SUM(status = 'CONCLUIDA') AS concluidas, SUM(status = 'CANCELADA') AS canceladas,
             COALESCE(SUM(CASE WHEN status = 'CONCLUIDA' THEN total_liquido END), 0) AS total,
-            COALESCE(SUM(CASE WHEN status = 'CONCLUIDA' THEN total_custo END), 0) AS custo
+            COALESCE(SUM(CASE WHEN status = 'CONCLUIDA' THEN total_custo END), 0) AS custo,
+            COALESCE(SUM(CASE WHEN status = 'CONCLUIDA' THEN total_taxas END), 0) AS taxas
      FROM vendas_pedidos WHERE tenant_id = ? AND id_caixa = ?`,
     [tenant, idCaixa]
   );
@@ -71,6 +72,7 @@ export const montarResumo = async (conn: Conn, tenant: number, caixa: any) => {
       canceladas: Number(vendas?.canceladas) || 0,
       total: Number(vendas?.total) || 0,
       custo: Number(vendas?.custo) || 0,
+      taxas: Number(vendas?.taxas) || 0,
     },
     movimentos: movimentos.map((m: any) => ({
       idMovimento: Number(m.id_movimento), tipo: m.tipo, forma: m.forma, valor: Number(m.valor),
