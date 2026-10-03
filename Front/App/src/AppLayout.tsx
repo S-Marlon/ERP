@@ -32,6 +32,7 @@ import VendasDoDia from './pages/PDV/pages/VendasDoDia/VendasDoDia';
 import CaixasHistorico from './pages/PDV/pages/Caixas/CaixasHistorico';
 import RegrasVenda from './pages/PDV/pages/RegrasVenda/RegrasVenda';
 import TaxasPagamento from './pages/PDV/pages/TaxasPagamento/TaxasPagamento';
+import Orcamentos from './pages/PDV/pages/Orcamentos/Orcamentos';
 import { CaixaPaineis } from './pages/PDV/caixa/CaixaPainel';
 import { carregarTaxaPreco } from './core/precos/taxaPreco';
 import NotasEntrada from './pages/Compras/NotasEntrada/NotasEntrada';
@@ -160,6 +161,7 @@ export default function AppLayout() {
             <Route path="/vendas/caixas" element={<CaixasHistorico />} />
             <Route path="/vendas/regras" element={<RegrasVenda />} />
             <Route path="/vendas/taxas" element={<TaxasPagamento />} />
+            <Route path="/vendas/orcamentos" element={<Orcamentos />} />
             <Route path="/vendas/pdv/finalizar" element={<FinalizarVenda onBack={() => {}} />} />
             <Route path="/estoque" element={<Estoque />} />
             <Route path="/estoque/consulta" element={<SaldoEstoque />} />

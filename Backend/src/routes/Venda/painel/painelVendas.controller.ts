@@ -85,7 +85,7 @@ export const painelVendas = async (req: Request, res: Response) => {
     const [ultimas]: any = await pool.execute(
       `SELECT v.id_venda, v.status, v.cliente_nome, v.total_liquido, v.created_at, v.operador, v.autorizado_por,
               (SELECT GROUP_CONCAT(DISTINCT p.forma) FROM vendas_pedidos_pagamentos p WHERE p.id_venda = v.id_venda) AS formas
-       FROM vendas_pedidos v WHERE v.tenant_id = ? ORDER BY v.id_venda DESC LIMIT 8`,
+       FROM vendas_pedidos v WHERE v.tenant_id = ? AND v.status IN ('CONCLUIDA', 'CANCELADA') ORDER BY v.id_venda DESC LIMIT 8`,
       [tenant]
     );
 

@@ -24,6 +24,7 @@ interface PDVContextType {
   removeItem: (id: string | number) => void;
   applyIndividualDiscount: (id: string | number, newPrice: number) => void;
   clearCart: () => void;
+  carregarItens: (linhas: Array<{ idItem: number; nome: string; quantidade: number; idUnidade: number | null; precoFixo?: number; precoTabelaFixa?: number }>) => Promise<string[]>;
 
   // PDV State
   estagio: 'SELECAO' | 'PAGAMENTO';

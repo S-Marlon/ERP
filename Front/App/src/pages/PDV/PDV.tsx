@@ -1,8 +1,8 @@
 // PDV (modelo novo): catálogo publicável com preço por unidade e atacado, leitor de código de barras,
 // cliente do cadastro e carrinho/pagamento. A OS fica fora até existir no modelo novo.
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
-import { Button, Input, Select, Space, Switch, Tag, Tooltip, TreeSelect, message } from 'antd';
+import { useParams, useSearchParams } from 'react-router-dom';
+import { Alert, Badge, Button, Input, Modal, Select, Space, Switch, Tag, Tooltip, TreeSelect, message } from 'antd';
 import { EnvironmentOutlined, InfoCircleOutlined, PlusOutlined, UserOutlined } from '@ant-design/icons';
 import styles from './PDV.module.css';
 import { Product } from './types/product.types';
@@ -23,6 +23,8 @@ import { ItemPdvDrawer } from './components/ItemPdvDrawer';
 import { AvisoCaixaFechado } from './caixa/CaixaPainel';
 import { caixaStore, useCaixa } from './caixa/caixaStore';
 import { useSituacaoCliente } from '../Financeiro/receber/receberApi';
+import { imprimirOrcamento, pedidosAbertosApi } from './services/pedidosAbertosApi';
+import { DadosOrcamento, DrawerPedidosAbertos, ModalSalvarOrcamento } from './components/PedidosAbertosPDV';
 
 type DisplayMode = 'lista' | 'cards' | 'compact';
 
@@ -53,8 +55,8 @@ const bip = () => {
 const PDVContent: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const {
-    cart, addToCart, updateQuantity, removeItem, changeUnit, applyIndividualDiscount, clearCart,
-    estagio, setEstagio, cliente, clienteId, clienteDocumento, selecionarCliente,
+    cart, addToCart, updateQuantity, removeItem, changeUnit, applyIndividualDiscount, clearCart, carregarItens,
+    estagio, setEstagio, cliente, setCliente, clienteId, clienteDocumento, selecionarCliente,
     mostrarModalCliente, setMostrarModalCliente,
     searchTerm, setSearchTerm, selectedCategory, setSelectedCategory, brand, setBrand,
     sortOrder, setSortOrder, onlyInStock, setOnlyInStock,
@@ -76,6 +78,112 @@ const PDVContent: React.FC = () => {
   useEffect(() => {
     if (!id && !cliente) setMostrarModalCliente(true);
   }, [id]);
+
+  // ---------------------------------------------------------------- Orçamentos e vendas suspensas
+  // Venda nascida de um orçamento (vai junto no envio; manterPreco = preços congelados do orçamento)
+  const [orcamentoAtual, setOrcamentoAtual] = useState<{ id: number; manterPreco: boolean } | null>(null);
+  const [drawerPedidos, setDrawerPedidos] = useState<null | 'SUSPENSA' | 'ORCAMENTO'>(null);
+  const [modalOrcamento, setModalOrcamento] = useState(false);
+  const [salvandoPedido, setSalvandoPedido] = useState(false);
+  const [qtdSuspensas, setQtdSuspensas] = useState(0);
+  const atualizarSuspensas = useCallback(() => {
+    pedidosAbertosApi.listar('SUSPENSA').then(l => setQtdSuspensas(l.length)).catch(() => undefined);
+  }, []);
+  useEffect(() => { atualizarSuspensas(); }, [atualizarSuspensas]);
+
+  const itensParaSalvar = () => cart
+    .filter((i: any) => i.type !== 'service' && i.type !== 'os')
+    .map((i: any) => ({ idItem: Number(i.id), quantidade: Number(i.quantity), idUnidade: i.idUnidadeVenda ?? null, precoUnitario: i.precoManual ? Number(i.price) : undefined }));
+
+  const novaVenda = () => {
+    clearCart();
+    setOrcamentoAtual(null);
+    setEstagio('SELECAO');
+    selecionarCliente(null);
+    setMostrarModalCliente(true);
+  };
+
+  const suspender = async () => {
+    const itens = itensParaSalvar();
+    if (itens.length === 0) return;
+    setSalvandoPedido(true);
+    try {
+      const r = await pedidosAbertosApi.salvar({ tipo: 'SUSPENSA', itens, clienteNome: cliente, idCliente: clienteId });
+      message.success(`Venda suspensa (Nº ${r.id}). Retome em "Suspensas".`);
+      novaVenda();
+      atualizarSuspensas();
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : 'Erro ao suspender.');
+    } finally {
+      setSalvandoPedido(false);
+    }
+  };
+
+  const salvarOrcamento = async (dados: DadosOrcamento) => {
+    setSalvandoPedido(true);
+    try {
+      const r = await pedidosAbertosApi.salvar({ tipo: 'ORCAMENTO', itens: itensParaSalvar(), clienteNome: cliente, idCliente: clienteId, ...dados });
+      setModalOrcamento(false);
+      novaVenda();
+      Modal.confirm({
+        title: `Orçamento Nº ${r.id} salvo`,
+        content: `Total ${money.format(r.totalLiquido)}. Ele fica em Vendas › Orçamentos e pode virar venda depois.`,
+        okText: 'Imprimir', cancelText: 'Fechar',
+        onOk: async () => imprimirOrcamento(await pedidosAbertosApi.detalhe(r.id)),
+      });
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : 'Erro ao salvar o orçamento.');
+    } finally {
+      setSalvandoPedido(false);
+    }
+  };
+
+  // Retomar suspensa / vender orçamento: recoloca os itens no carrinho
+  const abrirPedido = useCallback(async (idPedido: number, tipo: 'SUSPENSA' | 'ORCAMENTO') => {
+    try {
+      const d = tipo === 'SUSPENSA' ? await pedidosAbertosApi.retomar(idPedido) : await pedidosAbertosApi.detalhe(idPedido);
+      if (d.situacao === 'CONVERTIDO') { message.info(`O orçamento ${d.id} já virou venda.`); return; }
+      let manterPreco = false;
+      if (tipo === 'ORCAMENTO' && d.situacao === 'VALIDO') {
+        manterPreco = await new Promise<boolean>(resolve => Modal.confirm({
+          title: `Orçamento Nº ${d.id} (válido até ${String(d.validade).split('-').reverse().join('/')})`,
+          content: 'Vender com os preços do orçamento ou com os preços atuais do catálogo?',
+          okText: 'Manter preços do orçamento', cancelText: 'Usar preços atuais', closable: false,
+          onOk: () => resolve(true), onCancel: () => resolve(false),
+        }));
+      } else if (tipo === 'ORCAMENTO') {
+        message.info(`Orçamento ${d.id} vencido: os itens entram com os preços atuais.`);
+      }
+      const falhas = await carregarItens(d.itens.map(i => ({
+        idItem: i.idItem, nome: i.nome, quantidade: i.quantidade, idUnidade: i.idUnidade,
+        // Orçamento mantido: preço congelado; suspensa: mantém só o desconto manual que havia
+        ...(manterPreco
+          ? { precoFixo: i.precoUnitario, precoTabelaFixa: i.precoTabela }
+          : tipo === 'SUSPENSA' && i.precoUnitario < i.precoTabela - 0.004 ? { precoFixo: i.precoUnitario } : {}),
+      })));
+      if (d.idCliente) selecionarCliente({ id: d.idCliente, nome: d.cliente });
+      else { selecionarCliente(null); if (d.cliente && d.cliente !== 'CONSUMIDOR') setCliente(d.cliente); }
+      setOrcamentoAtual(tipo === 'ORCAMENTO' ? { id: d.id, manterPreco } : null);
+      setEstagio('SELECAO');
+      setDrawerPedidos(null);
+      setMostrarModalCliente(false);
+      if (falhas.length) message.warning(`Não foi possível carregar: ${falhas.join(', ')}.`);
+      else message.success(tipo === 'SUSPENSA' ? `Venda ${d.id} retomada.` : `Orçamento ${d.id} no carrinho.`);
+      atualizarSuspensas();
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : 'Erro ao abrir.');
+    }
+  }, [carregarItens, selecionarCliente, setCliente, setEstagio, setMostrarModalCliente, atualizarSuspensas]);
+
+  // Vindo de Vendas › Orçamentos (?orcamento=ID)
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const idOrc = Number(searchParams.get('orcamento'));
+    if (idOrc > 0) {
+      setSearchParams({}, { replace: true });
+      abrirPedido(idOrc, 'ORCAMENTO');
+    }
+  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     getArvoreCategoriasPdv().then(setArvoreCategorias);
@@ -289,8 +397,19 @@ const PDVContent: React.FC = () => {
                 </Tag>
               </Tooltip>
             )}
-            <span style={{ fontSize: 11, color: '#94a3b8' }}>F2 finalizar · F3 buscar · F4 cliente · bipe o código de barras a qualquer momento</span>
+            <Space size={6}>
+              <Badge count={qtdSuspensas} size="small">
+                <Button size="small" onClick={() => setDrawerPedidos('SUSPENSA')}>Suspensas</Button>
+              </Badge>
+              <Button size="small" onClick={() => setDrawerPedidos('ORCAMENTO')}>Orçamentos</Button>
+              <span style={{ fontSize: 11, color: '#94a3b8' }}>F2 finalizar · F3 buscar · F4 cliente</span>
+            </Space>
           </div>
+          {orcamentoAtual && (
+            <Alert type="info" showIcon style={{ padding: '2px 10px' }}
+              message={<span>Vendendo o <b>orçamento Nº {orcamentoAtual.id}</b> · {orcamentoAtual.manterPreco ? 'preços do orçamento mantidos' : 'preços atuais do catálogo'}</span>}
+              action={<Button size="small" type="link" onClick={() => setOrcamentoAtual(null)}>desvincular</Button>} />
+          )}
 
           <Space.Compact style={{ width: '100%' }}>
             <Input
@@ -366,6 +485,9 @@ const PDVContent: React.FC = () => {
         changeUnit={changeUnit}
         removeItem={removeItem}
         onFinalizar={irParaPagamento}
+        onSuspender={suspender}
+        onOrcamento={() => setModalOrcamento(true)}
+        salvandoPedido={salvandoPedido}
         onBack={() => setEstagio('SELECAO')}
         estagio={estagio}
         applyIndividualDiscount={applyIndividualDiscount}
@@ -374,13 +496,20 @@ const PDVContent: React.FC = () => {
       <aside className={styles.paymentSidebar}>
         <FinalizarVenda
           onBack={() => setEstagio('SELECAO')}
-          onVendaConcluida={() => { clearCart(); setEstagio('SELECAO'); selecionarCliente(null); setMostrarModalCliente(true); }}
+          onVendaConcluida={novaVenda}
+          idOrcamento={orcamentoAtual?.id ?? null}
+          manterPrecoOrcamento={Boolean(orcamentoAtual?.manterPreco)}
           total={total}
           cliente={cliente}
           clienteId={clienteId}
           itens={cart as any}
         />
       </aside>
+
+      <ModalSalvarOrcamento aberto={modalOrcamento} cliente={cliente} total={total} salvando={salvandoPedido}
+        onFechar={() => setModalOrcamento(false)} onSalvar={salvarOrcamento} />
+      <DrawerPedidosAbertos aberto={drawerPedidos !== null} abaInicial={drawerPedidos || 'SUSPENSA'} carrinhoComItens={cart.length > 0}
+        onFechar={() => setDrawerPedidos(null)} onAbrir={abrirPedido} onAlterado={atualizarSuspensas} />
 
       <ItemPdvDrawer
         idItem={itemDetalhe}

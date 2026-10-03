@@ -118,10 +118,13 @@ interface FinalizarVendaProps {
     cliente: string;
     // Cliente do cadastro (null = consumidor final)
     clienteId?: number | null;
+    // Venda nascida de um orçamento (preços congelados quando manterPrecoOrcamento)
+    idOrcamento?: number | null;
+    manterPrecoOrcamento?: boolean;
     itens: ItemVenda[]; // <-- Adicione esta linha
 }
 
-export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, onVendaConcluida, total, cliente, clienteId, itens }) => {
+export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, onVendaConcluida, total, cliente, clienteId, itens, idOrcamento, manterPrecoOrcamento }) => {
 
     const [isEnviando, setIsEnviando] = useState(false);
     const [descontoValor, setDescontoValor] = useState(0); // O valor digitado no input
@@ -299,6 +302,7 @@ const toggleWindow = (id) => {
             idCliente: clienteId ?? null,
             descontoGeral: Number(descontoCalculado.toFixed(2)),
             acrescimoGeral: acrescimoTotal,
+            ...(idOrcamento ? { idOrcamento, manterPrecoOrcamento: Boolean(manterPrecoOrcamento) } : {}),
             itens: itensCarrinho.map(item => ({
                 idItem: Number(item.id),
                 quantidade: Number(item.quantity),

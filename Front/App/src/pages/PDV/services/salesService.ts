@@ -19,6 +19,9 @@ export interface VendaPdvPayload {
     descontoGeral?: number;
     // Crédito parcelado acima do sem juros: diferença de taxa repassada ao cliente
     acrescimoGeral?: number;
+    // Venda gerada de um orçamento (manterPrecoOrcamento: preços do orçamento, se ainda válido)
+    idOrcamento?: number;
+    manterPrecoOrcamento?: boolean;
     itens: VendaPdvItemPayload[];
     pagamentos: { forma: FormaPagamentoPdv; valor: number; parcelas?: number; intervaloDias?: number; primeiroVencimento?: string }[];
 }

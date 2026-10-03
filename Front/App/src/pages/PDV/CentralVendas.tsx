@@ -113,6 +113,7 @@ const CentralVendas: React.FC = () => {
   const atalhos = [
     { titulo: 'PDV', descricao: 'Vender no balcão', rota: '/vendas/pdv', icone: <ShoppingCartOutlined /> },
     { titulo: 'Vendas do Dia', descricao: 'Consultar e cancelar vendas', rota: '/vendas/do-dia', icone: <FileTextOutlined /> },
+    { titulo: 'Orçamentos', descricao: 'Válidos, vencidos e convertidos', rota: '/vendas/orcamentos', icone: <FileTextOutlined /> },
     { titulo: 'Caixas', descricao: 'Abertura, fechamento e conferência', rota: '/vendas/caixas', icone: <UnlockOutlined /> },
     { titulo: 'Contas a Receber', descricao: 'Parcelas das vendas a prazo', rota: '/financeiro', icone: <DollarOutlined /> },
     { titulo: 'Taxas de pagamento', descricao: 'Maquininha, sem juros e simulador', rota: '/vendas/taxas', icone: <CalculatorOutlined /> },
@@ -334,7 +335,7 @@ const CentralVendas: React.FC = () => {
               {/* Atalhos */}
               <Row gutter={[10, 10]}>
                 {atalhos.map(a => (
-                  <Col key={a.rota} xs={12} md={8} xl={4}>
+                  <Col key={a.rota} xs={12} md={8} xl={6} xxl={3}>
                     <Card size="small" hoverable onClick={() => navigate(a.rota)} style={{ height: '100%' }} styles={{ body: { padding: '10px 12px' } }}>
                       <Space align="start">
                         <span style={{ fontSize: 18, color: '#1677ff' }}>{a.icone}</span>

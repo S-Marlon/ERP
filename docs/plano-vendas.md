@@ -16,7 +16,7 @@ testes → telas → commit.
 | 3 | **Desconto e margem no servidor**: limite configurável, autorização registrada, aviso/bloqueio abaixo do custo | `vendas_configuracoes`; `autorizado_por` e `motivo_autorizacao` em `vendas_pedidos` | feito |
 | 3.5 | **Taxas dos meios de pagamento**: taxa por forma/parcelas, preço com a taxa embutida, desconto da forma sem autorização, acréscimo no parcelamento, margem líquida | `vendas_taxas_pagamento`; referência e sem juros em `vendas_configuracoes`; taxa em `vendas_pedidos_pagamentos` e `vendas_pedidos` | feito |
 | 4 | **Central de Vendas real**: faturamento, ticket médio, margem, formas, mais vendidos, a receber, caixa | — | feito |
-| 5 | **Orçamento e venda suspensa**: suspender/retomar, orçamento com validade e impressão, converter em venda | status e validade em `vendas_pedidos` | |
+| 5 | **Orçamento e venda suspensa**: suspender/retomar, orçamento com validade e impressão, converter em venda | status, `validade`, `contato` e `id_orcamento` em `vendas_pedidos` | feito |
 | 6 | **OS de montagem de mangueira**: mão de obra + componentes, OS → venda (reaproveita `components/OrderService`) | itens de serviço, OS | |
 | 7 | **Devolução parcial e troca** | | |
 | 8 | **NFC-e / NF-e de saída** (emissor a definir) | | |
@@ -58,6 +58,15 @@ testes → telas → commit.
   sobre o período anterior), lucro e margem líquidos (custo + taxas), descontos/autorizações, taxas; vendas por hora/dia;
   formas de pagamento; mais vendidos com margem; caixa; a receber; alertas (estoque negativo, canceladas);
   operadores, melhores clientes, últimas vendas e atalhos.
+
+## Fase 5 — como ficou
+
+- **Backend**: `calcularItensDoPedido` (compartilhado por venda, orçamento e suspensa); `pdv/pedidosAbertos.controller.ts`
+  (`POST|GET /api/vendas/pdv/pedidos-abertos`, `GET :id`, `POST :id/retomar`, `DELETE :id`). Venda com `idOrcamento`
+  (+ `manterPrecoOrcamento` dentro da validade: a tabela da linha é a do orçamento) marca o orçamento como CONVERTIDO.
+  Vendas do Dia e o painel ignoram orçamentos e suspensas.
+- **Telas**: no PDV, botões Suspender / Orçamento (contato, validade, observação, impressão A4) e a lista Suspensas /
+  Orçamentos (retomar, vender, imprimir, excluir); faixa "vendendo o orçamento Nº X"; Vendas › Orçamentos.
 
 ## Critérios de pronto
 

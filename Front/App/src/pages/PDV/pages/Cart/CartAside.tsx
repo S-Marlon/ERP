@@ -28,6 +28,10 @@ interface CartAsideProps {
     changeUnit?: (id: string | number, idUnidade: number) => void;
     removeItem: (id: string | number) => void;
     onFinalizar: () => void;
+    // Guardar o carrinho sem vender: venda suspensa (retoma depois) ou orçamento (preço congelado)
+    onSuspender?: () => void;
+    onOrcamento?: () => void;
+    salvandoPedido?: boolean;
     onBack: () => void;
     applyIndividualDiscount: (id: string | number, newPrice: number) => void;
     estagio: 'SELECAO' | 'PAGAMENTO';
@@ -48,6 +52,9 @@ export const CartAside: React.FC<CartAsideProps> = ({
     changeUnit,
     removeItem,
     onFinalizar,
+    onSuspender,
+    onOrcamento,
+    salvandoPedido,
     estagio,
     onBack,
     applyIndividualDiscount,
@@ -459,6 +466,22 @@ export const CartAside: React.FC<CartAsideProps> = ({
                 <hr className={styles.separator} />
 
                 <div className={styles.btnFooteSection}>
+                    {estagio !== 'PAGAMENTO' && (onSuspender || onOrcamento) && (
+                        <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                            {onSuspender && (
+                                <Button block disabled={cart.length === 0} loading={salvandoPedido} onClick={onSuspender}
+                                    title="Guarda o carrinho e libera o PDV para o próximo cliente">
+                                    Suspender
+                                </Button>
+                            )}
+                            {onOrcamento && (
+                                <Button block disabled={cart.length === 0} onClick={onOrcamento}
+                                    title="Salva com preços congelados e validade, para imprimir e vender depois">
+                                    Orçamento
+                                </Button>
+                            )}
+                        </div>
+                    )}
                     <Button 
                         type="primary" 
                         danger={estagio === 'PAGAMENTO'}

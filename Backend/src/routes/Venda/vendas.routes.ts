@@ -5,6 +5,7 @@ import { abrirCaixa, caixaAtual, detalheCaixa, fecharCaixa, lancarMovimento, lis
 import { obterConfiguracoes, salvarConfiguracoes } from './regras/regrasVenda.controller';
 import { obterTaxas, salvarTaxas } from './taxas/taxas.controller';
 import { painelVendas } from './painel/painelVendas.controller';
+import { detalhePedidoAberto, excluirPedidoAberto, listarPedidosAbertos, retomarPedidoAberto, salvarPedidoAberto } from './pdv/pedidosAbertos.controller';
 
 // Vendas no modelo novo (itens_core). Montado em /api/vendas
 const router = Router();
@@ -20,6 +21,13 @@ router.post('/pdv/vendas', registrarVenda);
 router.get('/pdv/vendas', listarVendas);
 router.get('/pdv/vendas/:idVenda', detalheVenda);
 router.post('/pdv/vendas/:idVenda/cancelar', cancelarVenda);
+
+// Orçamentos e vendas suspensas (não mexem em estoque, caixa nem contas a receber)
+router.post('/pdv/pedidos-abertos', salvarPedidoAberto);
+router.get('/pdv/pedidos-abertos', listarPedidosAbertos);
+router.get('/pdv/pedidos-abertos/:id', detalhePedidoAberto);
+router.post('/pdv/pedidos-abertos/:id/retomar', retomarPedidoAberto);
+router.delete('/pdv/pedidos-abertos/:id', excluirPedidoAberto);
 
 // Caixa: abertura, sangria/suprimento, fechamento com conferência e histórico
 router.get('/caixa/atual', caixaAtual);

@@ -182,6 +182,50 @@ export const useCart = () => {
     setCart([]);
   }, []);
 
+  /**
+   * Recoloca itens no carrinho (venda suspensa retomada ou orçamento convertido): busca cada produto no
+   * servidor (unidades, faixas, estoque). Com `precoFixo`, o preço da linha fica congelado (preço do orçamento).
+   * Devolve os nomes que não puderam ser carregados.
+   */
+  const carregarItens = useCallback(async (linhas: Array<{ idItem: number; nome: string; quantidade: number; idUnidade: number | null; precoFixo?: number; precoTabelaFixa?: number }>) => {
+    const novos: CartItem[] = [];
+    const falhas: string[] = [];
+    for (const l of linhas) {
+      try {
+        const productData: any = await getPdvProductDetail(l.idItem);
+        if (!productData) { falhas.push(l.nome); continue; }
+        const unidades: UnidadeCarrinho[] = Array.isArray(productData.unidades) ? productData.unidades : [];
+        const unidade = unidades.find(u => u.idUnidade === l.idUnidade) || unidades.find(u => u.idUnidade === productData.idUnidadeVenda) || unidades[0];
+        let item: CartItem = {
+          id: l.idItem,
+          name: productData.name || l.nome,
+          type: 'product',
+          quantity: l.quantidade,
+          sku: productData.sku,
+          stock: unidade ? unidade.estoque : productData.currentStock,
+          costPrice: productData.costPrice || 0,
+          price: unidade ? unidade.preco : productData.salePrice,
+          unitOfMeasure: unidade?.sigla || productData.unitOfMeasure,
+          idUnidadeVenda: unidade?.idUnidade ?? null,
+          fatorConversao: unidade?.fator || 1,
+          unidades,
+          podeVenderSemEstoque: productData.podeVenderSemEstoque,
+          publicavel: productData.publicavel,
+          precoManual: false,
+        } as CartItem;
+        item = reprecificar(item);
+        if (l.precoFixo !== undefined) {
+          item = { ...item, price: l.precoFixo, precoTabela: l.precoTabelaFixa ?? l.precoFixo, originalPrice: l.precoTabelaFixa ?? l.precoFixo, precoManual: true };
+        }
+        novos.push(item);
+      } catch {
+        falhas.push(l.nome);
+      }
+    }
+    setCart(novos);
+    return falhas;
+  }, []);
+
   return {
     cart,
     addToCart,
@@ -189,6 +233,7 @@ export const useCart = () => {
     changeUnit,
     removeItem,
     applyIndividualDiscount,
-    clearCart
+    clearCart,
+    carregarItens
   };
 };

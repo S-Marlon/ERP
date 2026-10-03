@@ -26,6 +26,57 @@ const responderErro = (res: Response, error: any, padrao: string) => {
   return res.status(500).json({ error: padrao, details: error?.message });
 };
 
+type ConnVenda = { execute: (sql: string, params?: any[]) => Promise<any> };
+
+/** Preço congelado de um orçamento por item+unidade (venda convertida com "manter o preço"). */
+export type PrecosCongelados = Map<string, { precoTabela: number; precoUnitario: number }>;
+export const chaveLinha = (idItem: number, idUnidade: number | null | undefined) => `${idItem}:${idUnidade ?? ''}`;
+
+/**
+ * Carrega e valida os itens do pedido e calcula cada linha (preço de tabela pela faixa da unidade/quantidade).
+ * Usado pela venda, pelo orçamento e pela venda suspensa.
+ */
+export const calcularItensDoPedido = async (conn: ConnVenda, tenant: number, itens: any[], congelados?: PrecosCongelados) => {
+  const pedidos: LinhaPedido[] = itens.map((i: any) => ({
+    idItem: Number(i.idItem),
+    quantidade: Number(i.quantidade),
+    idUnidade: i.idUnidade ? Number(i.idUnidade) : null,
+    precoUnitario: i.precoUnitario === undefined || i.precoUnitario === null ? null : Number(i.precoUnitario),
+  }));
+  if (pedidos.some(p => !Number.isInteger(p.idItem) || p.idItem <= 0)) throw new ErroVenda('Item inválido na venda.');
+  const ids = [...new Set(pedidos.map(p => p.idItem))].sort((a, b) => a - b);
+
+  const [rows] = await conn.execute(
+    `${SELECT_ITENS} WHERE ic.tenant_id = ? AND ic.id_item IN (${ids.map(() => '?').join(',')})`,
+    [tenant, ...ids]
+  );
+  const itensBanco = new Map((rows as any[]).map(r => [Number(r.id_item), r]));
+  const faltando = ids.filter(id => !itensBanco.has(id));
+  if (faltando.length > 0) throw new ErroVenda(`Item não encontrado: ${faltando.join(', ')}.`, 404);
+  for (const item of itensBanco.values()) {
+    if (String(item.status).toUpperCase() !== 'ATIVO') throw new ErroVenda(`"${item.nome_comercial || item.nome_item}" está inativo.`);
+    if (String(item.tipo_recurso).toUpperCase() !== 'PRODUTO') throw new ErroVenda(`"${item.nome_comercial || item.nome_item}" não é um produto de venda.`);
+  }
+
+  const precos = await carregarPrecos(conn as any, tenant, [...itensBanco.values()]);
+  const linhas = pedidos.map(p => {
+    const item = itensBanco.get(p.idItem);
+    const linha = calcularLinha(p, {
+      unidades: precos.unidadesPorItem.get(p.idItem) || [],
+      faixas: precos.faixasPorItem.get(p.idItem) || [],
+      precoCadastro: item.preco_venda !== null ? Number(item.preco_venda) : null,
+    });
+    // Orçamento convertido mantendo o preço: a tabela da linha é a do orçamento (não conta como desconto)
+    const congelado = congelados?.get(chaveLinha(linha.idItem, linha.idUnidade));
+    if (congelado) {
+      linha.precoTabela = congelado.precoTabela;
+      if (p.precoUnitario === null || p.precoUnitario === undefined) linha.precoPraticado = congelado.precoUnitario;
+    }
+    return linha;
+  });
+  return { ids, itensBanco, linhas };
+};
+
 /**
  * POST /api/vendas/pdv/vendas
  * { clienteNome?, idCliente?, observacao?, descontoGeral?,
@@ -39,46 +90,38 @@ const responderErro = (res: Response, error: any, padrao: string) => {
 export const registrarVenda = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
   const { itens, pagamentos, descontoGeral, acrescimoGeral, clienteNome, idCliente, observacao } = req.body || {};
+  // Orçamento convertido em venda (manterPrecoOrcamento: usa os preços do orçamento se ainda válido)
+  const idOrcamento = Number(req.body?.idOrcamento) || null;
   if (!Array.isArray(itens) || itens.length === 0) return res.status(400).json({ error: 'A venda não tem itens.' });
 
   const connection = await pool.getConnection();
   try {
-    const pedidos: LinhaPedido[] = itens.map((i: any) => ({
-      idItem: Number(i.idItem),
-      quantidade: Number(i.quantidade),
-      idUnidade: i.idUnidade ? Number(i.idUnidade) : null,
-      precoUnitario: i.precoUnitario === undefined || i.precoUnitario === null ? null : Number(i.precoUnitario),
-    }));
-    if (pedidos.some(p => !Number.isInteger(p.idItem) || p.idItem <= 0)) throw new ErroVenda('Item inválido na venda.');
-    const ids = [...new Set(pedidos.map(p => p.idItem))].sort((a, b) => a - b);
-
     await connection.beginTransaction();
 
     // Toda venda pertence ao caixa aberto (trava compartilhada: o fechamento espera as vendas em andamento)
     const caixa = await carregarCaixaAberto(connection as any, tenant, 'LOCK IN SHARE MODE');
     if (!caixa) throw new ErroVenda('Abra o caixa antes de vender.', 409, { codigo: 'CAIXA_FECHADO' });
 
-    const [rows] = await connection.execute(
-      `${SELECT_ITENS} WHERE ic.tenant_id = ? AND ic.id_item IN (${ids.map(() => '?').join(',')})`,
-      [tenant, ...ids]
-    );
-    const itensBanco = new Map((rows as any[]).map(r => [Number(r.id_item), r]));
-    const faltando = ids.filter(id => !itensBanco.has(id));
-    if (faltando.length > 0) throw new ErroVenda(`Item não encontrado: ${faltando.join(', ')}.`, 404);
-    for (const item of itensBanco.values()) {
-      if (String(item.status).toUpperCase() !== 'ATIVO') throw new ErroVenda(`"${item.nome_comercial || item.nome_item}" está inativo.`);
-      if (String(item.tipo_recurso).toUpperCase() !== 'PRODUTO') throw new ErroVenda(`"${item.nome_comercial || item.nome_item}" não é um produto de venda.`);
+    // Orçamento de origem: precisa estar em aberto; com "manter o preço" e dentro da validade, congela os preços
+    let congelados: PrecosCongelados | undefined;
+    if (idOrcamento) {
+      const [[orc]]: any = await connection.execute(
+        `SELECT id_venda, status, validade >= CURDATE() AS valido FROM vendas_pedidos WHERE id_venda = ? AND tenant_id = ? FOR UPDATE`,
+        [idOrcamento, tenant]
+      );
+      if (!orc || orc.status !== 'ORCAMENTO') throw new ErroVenda('Orçamento não encontrado ou já convertido.', 409);
+      if (req.body?.manterPrecoOrcamento) {
+        if (!Number(orc.valido)) throw new ErroVenda('Orçamento vencido: atualize os preços para vender.', 409, { codigo: 'ORCAMENTO_VENCIDO' });
+        const [linhasOrc]: any = await connection.execute(
+          `SELECT id_item, id_unidade, preco_tabela, preco_unitario FROM vendas_pedidos_itens WHERE id_venda = ? AND tenant_id = ?`,
+          [idOrcamento, tenant]
+        );
+        congelados = new Map(linhasOrc.map((l: any) => [chaveLinha(Number(l.id_item), l.id_unidade ? Number(l.id_unidade) : null),
+          { precoTabela: Number(l.preco_tabela), precoUnitario: Number(l.preco_unitario) }]));
+      }
     }
 
-    const precos = await carregarPrecos(connection as any, tenant, [...itensBanco.values()]);
-    const linhas = pedidos.map(p => {
-      const item = itensBanco.get(p.idItem);
-      return calcularLinha(p, {
-        unidades: precos.unidadesPorItem.get(p.idItem) || [],
-        faixas: precos.faixasPorItem.get(p.idItem) || [],
-        precoCadastro: item.preco_venda !== null ? Number(item.preco_venda) : null,
-      });
-    });
+    const { ids, itensBanco, linhas } = await calcularItensDoPedido(connection as any, tenant, itens, congelados);
     // Acréscimo: crédito parcelado acima do sem juros (a diferença de taxa repassada ao cliente)
     const venda = fecharVenda(linhas, Number(descontoGeral) || 0, Number(acrescimoGeral) || 0);
     const pagamentosOk = validarPagamentos(pagamentos, venda.totalLiquido);
@@ -164,6 +207,10 @@ export const registrarVenda = async (req: Request, res: Response) => {
       ]
     );
     const idVenda = Number((cab as any).insertId);
+    if (idOrcamento) {
+      await connection.execute(`UPDATE vendas_pedidos SET id_orcamento = ? WHERE id_venda = ?`, [idOrcamento, idVenda]);
+      await connection.execute(`UPDATE vendas_pedidos SET status = 'CONVERTIDO' WHERE id_venda = ? AND tenant_id = ?`, [idOrcamento, tenant]);
+    }
 
     for (const l of venda.linhas) {
       const item = itensBanco.get(l.idItem);
@@ -352,7 +399,7 @@ export const listarVendas = async (req: Request, res: Response) => {
               (SELECT COUNT(*) FROM vendas_pedidos_itens i WHERE i.id_venda = v.id_venda) AS qtd_itens,
               (SELECT GROUP_CONCAT(DISTINCT p.forma) FROM vendas_pedidos_pagamentos p WHERE p.id_venda = v.id_venda) AS formas
        FROM vendas_pedidos v
-       WHERE v.tenant_id = ? AND DATE(v.created_at) = COALESCE(?, CURDATE())
+       WHERE v.tenant_id = ? AND v.status IN ('CONCLUIDA', 'CANCELADA') AND DATE(v.created_at) = COALESCE(?, CURDATE())
        ORDER BY v.id_venda DESC`,
       [tenant, data]
     );
