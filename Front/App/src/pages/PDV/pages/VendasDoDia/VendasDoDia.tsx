@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Button, Card, Col, Empty, Input, Row, Space, Spin, Statistic, Table, Tag, Tooltip, message } from 'antd';
 import { ReloadOutlined, StopOutlined } from '@ant-design/icons';
 import Swal from 'sweetalert2';
+import { ModalDevolucao } from '../../components/ModalDevolucao';
 import { salesService, VendaResumo } from '../../services/salesService';
 
 const API_VENDAS = 'http://localhost:3001/api/vendas/pdv/vendas';
@@ -105,6 +106,8 @@ const DetalheLinha: React.FC<{ idVenda: number }> = ({ idVenda }) => {
 };
 
 const VendasDoDia: React.FC = () => {
+  const [devolvendo, setDevolvendo] = useState<number | null>(null);
+  const [numeroVenda, setNumeroVenda] = useState('');
   const [data, setData] = useState<string>(hoje());
   const [vendas, setVendas] = useState<VendaResumo[]>([]);
   const [carregando, setCarregando] = useState(false);
@@ -166,6 +169,8 @@ const VendasDoDia: React.FC = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <h2 style={{ margin: 0, fontSize: 18 }}>Vendas do Dia</h2>
           <Space>
+            <Input.Search placeholder="Devolver venda Nº" style={{ width: 180 }} value={numeroVenda} onChange={e => setNumeroVenda(e.target.value.replace(/\D/g, ''))}
+              enterButton="Devolver" onSearch={v => { if (Number(v) > 0) setDevolvendo(Number(v)); }} />
             <Input type="date" value={data} max={hoje()} onChange={e => setData(e.target.value || hoje())} style={{ width: 160 }} />
             <Button icon={<ReloadOutlined />} onClick={carregar} loading={carregando}>Atualizar</Button>
           </Space>
@@ -211,7 +216,10 @@ const VendasDoDia: React.FC = () => {
               {
                 title: 'Total', dataIndex: 'totalLiquido', width: 120, align: 'right' as const,
                 render: (v: number, venda) => (
-                  <b style={venda.status === 'CANCELADA' ? { textDecoration: 'line-through', color: '#94a3b8' } : undefined}>{money(v)}</b>
+                  <span>
+                    <b style={venda.status === 'CANCELADA' ? { textDecoration: 'line-through', color: '#94a3b8' } : undefined}>{money(v)}</b>
+                    {Number(venda.totalDevolvido) > 0 && <div><Tag color="orange" style={{ margin: 0, fontSize: 10 }}>devolvido {money(Number(venda.totalDevolvido))}</Tag></div>}
+                  </span>
                 ),
               },
               {
@@ -221,17 +229,23 @@ const VendasDoDia: React.FC = () => {
                   : <Tag color="green">Concluída</Tag>),
               },
               {
-                title: '', key: 'acoes', width: 50, align: 'center' as const,
+                title: '', key: 'acoes', width: 120, align: 'center' as const,
                 render: (_: unknown, venda) => venda.status === 'CONCLUIDA' && (
-                  <Tooltip title="Cancelar venda (devolve o estoque)">
-                    <Button type="text" danger size="small" icon={<StopOutlined />} onClick={() => cancelar(venda)} />
-                  </Tooltip>
+                  <Space size={2}>
+                    <Button size="small" onClick={() => setDevolvendo(venda.idVenda)}>Devolver</Button>
+                    {!(Number(venda.totalDevolvido) > 0) && (
+                      <Tooltip title="Cancelar venda inteira (devolve o estoque)">
+                        <Button type="text" danger size="small" icon={<StopOutlined />} onClick={() => cancelar(venda)} />
+                      </Tooltip>
+                    )}
+                  </Space>
                 ),
               },
             ]}
           />
         </Card>
       </Space>
+      <ModalDevolucao idVenda={devolvendo} onFechar={() => { setDevolvendo(null); setNumeroVenda(''); }} onConcluido={carregar} />
     </div>
   );
 };

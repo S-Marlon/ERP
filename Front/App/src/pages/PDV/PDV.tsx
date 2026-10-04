@@ -26,6 +26,8 @@ import { useSituacaoCliente } from '../Financeiro/receber/receberApi';
 import { imprimirOrcamento, pedidosAbertosApi } from './services/pedidosAbertosApi';
 import { DadosOrcamento, DrawerPedidosAbertos, ModalSalvarOrcamento } from './components/PedidosAbertosPDV';
 import { extensoesPdv } from '../../modulos/registroModulos';
+import { devolucoesService } from './services/salesService';
+import { CHAVE_TROCA } from './components/ModalDevolucao';
 import { useModulos } from '../../modulos/modulosStore';
 import { Suspense } from 'react';
 
@@ -195,6 +197,18 @@ const PDVContent: React.FC = () => {
     if (idOrc > 0) {
       setSearchParams({}, { replace: true });
       abrirPedido(idOrc, 'ORCAMENTO');
+    }
+    // Troca vinda de Vendas do Dia (?troca=ID da devolução): cliente e crédito gerado ficam disponíveis no pagamento
+    const idTroca = Number(searchParams.get(CHAVE_TROCA));
+    if (idTroca > 0) {
+      setSearchParams({}, { replace: true });
+      devolucoesService.detalhe(idTroca).then(d => {
+        clearCart();
+        if (d.idCliente) selecionarCliente({ id: d.idCliente, nome: d.cliente });
+        else { selecionarCliente(null); if (d.cliente && d.cliente !== 'CONSUMIDOR') setCliente(d.cliente); }
+        setMostrarModalCliente(false);
+        setOrigemExterna({ origem: 'DEVOLUCAO', idOrigem: d.idDevolucao, rotulo: `Troca da venda ${d.idVenda}: crédito de ${money.format(d.valor)} disponível no pagamento (forma "Sinal")` });
+      }).catch(e => message.error(e.message));
     }
   }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 

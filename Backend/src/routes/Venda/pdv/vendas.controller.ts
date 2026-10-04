@@ -336,11 +336,12 @@ export const cancelarVenda = async (req: Request, res: Response) => {
   try {
     await connection.beginTransaction();
     const [[venda]]: any = await connection.execute(
-      `SELECT id_venda, status, id_caixa FROM vendas_pedidos WHERE id_venda = ? AND tenant_id = ? FOR UPDATE`,
+      `SELECT id_venda, status, id_caixa, total_devolvido FROM vendas_pedidos WHERE id_venda = ? AND tenant_id = ? FOR UPDATE`,
       [idVenda, tenant]
     );
     if (!venda) throw new ErroVenda('Venda não encontrada.', 404);
     if (venda.status !== 'CONCLUIDA') throw new ErroVenda(`A venda já está ${String(venda.status).toLowerCase()}.`, 409);
+    if (Number(venda.total_devolvido) > 0) throw new ErroVenda('Esta venda já teve devolução: devolva o restante pela devolução (não dá para cancelar).', 409);
 
     // A prazo: parcelas sem recebimento são canceladas (com recebimento, pede o estorno antes)
     await cancelarTitulosDaVenda(connection as any, tenant, idVenda);
@@ -440,7 +441,7 @@ export const listarVendas = async (req: Request, res: Response) => {
   try {
     const data = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.data || '')) ? String(req.query.data) : null;
     const [rows] = await pool.execute(
-      `SELECT v.id_venda, v.status, v.cliente_nome, v.operador, v.id_caixa, v.total_taxas, v.total_bruto, v.total_desconto, v.total_liquido, v.total_custo,
+      `SELECT v.id_venda, v.status, v.cliente_nome, v.operador, v.id_caixa, v.total_taxas, v.total_devolvido, v.total_bruto, v.total_desconto, v.total_liquido, v.total_custo,
               v.created_at, v.cancelado_em, v.motivo_cancelamento,
               (SELECT COUNT(*) FROM vendas_pedidos_itens i WHERE i.id_venda = v.id_venda) AS qtd_itens,
               (SELECT GROUP_CONCAT(DISTINCT p.forma) FROM vendas_pedidos_pagamentos p WHERE p.id_venda = v.id_venda) AS formas
@@ -460,6 +461,7 @@ export const listarVendas = async (req: Request, res: Response) => {
       totalLiquido: Number(r.total_liquido),
       totalCusto: Number(r.total_custo),
       totalTaxas: Number(r.total_taxas) || 0,
+      totalDevolvido: Number(r.total_devolvido) || 0,
       qtdItens: Number(r.qtd_itens),
       formas: r.formas ? String(r.formas).split(',') : [],
       criadoEm: r.created_at,

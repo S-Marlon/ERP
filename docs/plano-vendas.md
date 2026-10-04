@@ -18,7 +18,7 @@ testes → telas → commit.
 | 4 | **Central de Vendas real**: faturamento, ticket médio, margem, formas, mais vendidos, a receber, caixa | — | feito |
 | 5 | **Orçamento e venda suspensa**: suspender/retomar, orçamento com validade e impressão, converter em venda | status, `validade`, `contato` e `id_orcamento` em `vendas_pedidos` | feito |
 | 6 | **Módulo plugável Hidráulica · Montagens**: montagem na hora no PDV, OS com sinal e ficha técnica | `sistema_modulos`, `vendas_adiantamentos`, `modulo_hidraulica_montagens_*` | feito |
-| 7 | **Devolução parcial e troca** | | |
+| 7 | **Devolução parcial e troca**: devolução por item/quantidade, reembolso no caixa, crédito na loja ou abatimento do a prazo; troca | `vendas_devolucoes`, `vendas_devolucoes_itens`; `total_devolvido` em `vendas_pedidos` | feito |
 | 8 | **NFC-e / NF-e de saída** (emissor a definir) | | |
 
 ## Fase 1 — como ficou
@@ -80,6 +80,16 @@ testes → telas → commit.
   prensagem só se o cliente trouxe material; ficha gravada com a venda; refazer pelo histórico do cliente) e
   Vendas › Montagens (OS): etapas, mangueiras com ficha e materiais, itens avulsos, sinal, impressão A4, cancelamento
   (devolve ou guarda o sinal) e entrega pelo PDV (preços da OS, sinal abatido, OS fica ENTREGUE com a venda).
+
+## Fase 7 — como ficou
+
+- **Vendas do Dia**: botão Devolver por venda (e campo "Devolver venda Nº" para vendas de outros dias). Escolhe a quantidade
+  de cada item, se volta ao estoque (defeito não volta) e como devolver o valor: dinheiro/PIX/estorno no cartão (sai do caixa
+  aberto como DEVOLUCAO_VENDA), crédito na loja (fica como sinal do cliente, forma "Sinal" no PDV) ou abater do a prazo
+  (reduz as últimas parcelas em aberto).
+- **Valor**: proporcional ao que foi pago no item (descontos rateados); a última devolução do item fecha os centavos exatos.
+- **Troca**: devolução em crédito na loja e o PDV abre com o cliente e o crédito disponível no pagamento.
+- Venda com devolução não pode mais ser cancelada; a Central de Vendas mostra faturamento e lucro líquidos de devoluções.
 
 ## Critérios de pronto
 

@@ -53,6 +53,24 @@ export const registrarAdiantamento = async (conn: any, tenant: number, dados: {
   return id;
 };
 
+/**
+ * Crédito na loja (ex.: devolução com reembolso em crédito): fica como adiantamento ABERTO do cliente, sem
+ * passar pelo caixa (não entrou dinheiro). Usado depois como forma de pagamento "Sinal/Crédito".
+ */
+export const registrarCreditoLoja = async (conn: any, tenant: number, dados: {
+  idCliente?: number | null; clienteNome?: string; valor: number; origem: string; idOrigem: number; observacao?: string; operador: string;
+}) => {
+  const valor = Number(dados.valor);
+  if (!(valor > 0)) throw new ErroAdiantamento('Crédito sem valor.');
+  const [ins]: any = await conn.execute(
+    `INSERT INTO vendas_adiantamentos (tenant_id, id_cliente, cliente_nome, valor, forma, id_caixa, origem, id_origem, operador, observacao)
+     VALUES (?, ?, ?, ?, 'CREDITO_LOJA', NULL, ?, ?, ?, ?)`,
+    [tenant, dados.idCliente || null, String(dados.clienteNome || '').trim().slice(0, 150) || 'CONSUMIDOR', f4(valor),
+      dados.origem, dados.idOrigem, dados.operador, String(dados.observacao || '').trim().slice(0, 255) || null]
+  );
+  return Number(ins.insertId);
+};
+
 /** Devolve o saldo de um adiantamento (sai do caixa aberto). Usado pela rota e por módulos (cancelar OS). */
 export const devolverAdiantamento = async (conn: any, tenant: number, idAdiantamento: number, motivo: string, operador: string) => {
   const [[a]]: any = await conn.execute(`SELECT * FROM vendas_adiantamentos WHERE id_adiantamento = ? AND tenant_id = ? FOR UPDATE`, [idAdiantamento, tenant]);
@@ -60,6 +78,7 @@ export const devolverAdiantamento = async (conn: any, tenant: number, idAdiantam
   if (a.status !== 'ABERTO') throw new ErroAdiantamento(`Adiantamento ${String(a.status).toLowerCase()}: nada a devolver.`, 409);
   const saldo = Number(a.valor) - Number(a.valor_usado);
   if (!(saldo > 0.004)) throw new ErroAdiantamento('Adiantamento sem saldo.', 409);
+  if (a.forma === 'CREDITO_LOJA') throw new ErroAdiantamento('Crédito na loja não é devolvido em dinheiro: use-o numa compra.', 409);
   const caixa = await carregarCaixaAberto(conn, tenant, 'LOCK IN SHARE MODE');
   if (!caixa) throw new ErroAdiantamento('Abra o caixa para devolver (o valor sai do caixa do dia).', 409);
   await conn.execute(`UPDATE vendas_adiantamentos SET status = 'DEVOLVIDO' WHERE id_adiantamento = ?`, [idAdiantamento]);

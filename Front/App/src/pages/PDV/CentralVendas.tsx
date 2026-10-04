@@ -21,6 +21,7 @@ interface Painel {
   totais: {
     qtd: number; faturamento: number; bruto: number; descontos: number; custo: number; taxas: number; qtdCanceladas: number; canceladas: number;
     autorizadas: number; ticketMedio: number; lucroLiquido: number; margemLiquida: number | null;
+    faturamentoBruto: number; devolucoes: number; qtdDevolucoes: number;
   };
   anterior: { faturamento: number; qtd: number; ticketMedio: number; margemLiquida: number | null };
   variacao: { faturamento: number | null; qtd: number | null; ticketMedio: number | null };
@@ -112,7 +113,7 @@ const CentralVendas: React.FC = () => {
 
   const atalhos = [
     { titulo: 'PDV', descricao: 'Vender no balcão', rota: '/vendas/pdv', icone: <ShoppingCartOutlined /> },
-    { titulo: 'Vendas do Dia', descricao: 'Consultar e cancelar vendas', rota: '/vendas/do-dia', icone: <FileTextOutlined /> },
+    { titulo: 'Vendas do Dia', descricao: 'Consultar, devolver e cancelar vendas', rota: '/vendas/do-dia', icone: <FileTextOutlined /> },
     { titulo: 'Orçamentos', descricao: 'Válidos, vencidos e convertidos', rota: '/vendas/orcamentos', icone: <FileTextOutlined /> },
     { titulo: 'Caixas', descricao: 'Abertura, fechamento e conferência', rota: '/vendas/caixas', icone: <UnlockOutlined /> },
     { titulo: 'Contas a Receber', descricao: 'Parcelas das vendas a prazo', rota: '/financeiro', icone: <DollarOutlined /> },
@@ -149,7 +150,16 @@ const CentralVendas: React.FC = () => {
             <Space direction="vertical" size={14} style={{ width: '100%' }}>
               {/* Indicadores */}
               <Row gutter={[10, 10]}>
-                <Col xs={12} lg={4}>{kpi('Faturamento', brl(t!.faturamento), <Variacao valor={dados.variacao.faturamento} sufixo={comparacao} />, <DollarOutlined />, '#1677ff')}</Col>
+                <Col xs={12} lg={4}>{kpi('Faturamento', brl(t!.faturamento), (
+                  <>
+                    <Variacao valor={dados.variacao.faturamento} sufixo={comparacao} />
+                    {t!.devolucoes > 0 && (
+                      <Tooltip title={`Vendido ${brl(t!.faturamentoBruto)} − devoluções ${brl(t!.devolucoes)}`}>
+                        <div><Text type="danger" style={{ fontSize: 11 }}>− {brl(t!.devolucoes)} em {t!.qtdDevolucoes} devolução(ões)</Text></div>
+                      </Tooltip>
+                    )}
+                  </>
+                ), <DollarOutlined />, '#1677ff')}</Col>
                 <Col xs={12} lg={4}>{kpi('Vendas', t!.qtd, <Variacao valor={dados.variacao.qtd} sufixo={comparacao} />, <ShoppingCartOutlined />)}</Col>
                 <Col xs={12} lg={4}>{kpi('Ticket médio', brl(t!.ticketMedio), <Variacao valor={dados.variacao.ticketMedio} sufixo={comparacao} />, <FileTextOutlined />)}</Col>
                 <Col xs={12} lg={4}>

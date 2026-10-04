@@ -75,4 +75,7 @@ assert(comSinal.dinheiroEsperado === 30, `sinal no caixa ${comSinal.dinheiroEspe
 assert(!conferirFechamento(comSinal.linhas, { DINHEIRO: 30 }).conferencia.some(l => l.forma === 'ADIANTAMENTO'), 'adiantamento fora da conferência');
 assert(estornoDaVenda([{ forma: 'ADIANTAMENTO', valor: 50, troco: 0 }]).length === 0, 'cancelar venda paga com sinal não tira dinheiro');
 
+// Devolução de venda em dinheiro sai do caixa
+assert(calcularResumoCaixa(100, [], [{ tipo: 'DEVOLUCAO_VENDA', forma: 'DINHEIRO', valor: 30 }]).dinheiroEsperado === 70, 'devolução de venda');
+
 console.log('caixa: ok');

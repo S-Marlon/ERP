@@ -33,7 +33,7 @@ export interface LinhaResumoCaixa {
 
 export interface MovimentoCaixa {
   idMovimento: number;
-  tipo: 'SUPRIMENTO' | 'SANGRIA' | 'ESTORNO_VENDA' | 'RECEBIMENTO' | 'ESTORNO_RECEBIMENTO' | 'ADIANTAMENTO' | 'DEVOLUCAO_SINAL';
+  tipo: 'SUPRIMENTO' | 'SANGRIA' | 'ESTORNO_VENDA' | 'RECEBIMENTO' | 'ESTORNO_RECEBIMENTO' | 'ADIANTAMENTO' | 'DEVOLUCAO_SINAL' | 'DEVOLUCAO_VENDA';
   forma: string;
   valor: number;
   idOrigem: number | null;
@@ -85,7 +85,7 @@ export const caixaApi = {
 export const FORMAS_SEM_CONFERENCIA = ['PRAZO', 'ADIANTAMENTO'];
 
 export const ROTULO_FORMA: Record<string, string> = {
-  DINHEIRO: 'Dinheiro', PIX: 'PIX', DEBITO: 'Débito', CREDITO: 'Crédito', PRAZO: 'A prazo', TRANSFERENCIA: 'Transferência', ADIANTAMENTO: 'Sinal',
+  DINHEIRO: 'Dinheiro', PIX: 'PIX', DEBITO: 'Débito', CREDITO: 'Crédito', PRAZO: 'A prazo', TRANSFERENCIA: 'Transferência', ADIANTAMENTO: 'Sinal/crédito', CREDITO_LOJA: 'Crédito na loja',
 };
 
 export const ROTULO_MOVIMENTO: Record<string, { label: string; color: string; sinal: 1 | -1 }> = {
@@ -96,4 +96,5 @@ export const ROTULO_MOVIMENTO: Record<string, { label: string; color: string; si
   ESTORNO_RECEBIMENTO: { label: 'Estorno de recebimento', color: 'red', sinal: -1 },
   ADIANTAMENTO: { label: 'Sinal recebido', color: 'cyan', sinal: 1 },
   DEVOLUCAO_SINAL: { label: 'Devolução de sinal', color: 'red', sinal: -1 },
+  DEVOLUCAO_VENDA: { label: 'Devolução de venda', color: 'red', sinal: -1 },
 };

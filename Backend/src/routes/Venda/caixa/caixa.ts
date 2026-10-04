@@ -3,12 +3,12 @@
 //                     - sangrias - estornos (de venda e de recebimento).
 // Cartão/PIX/prazo: só o que foi vendido (conferido contra a maquininha, o extrato e os títulos).
 
-export const TIPOS_MOVIMENTO_CAIXA = ['SUPRIMENTO', 'SANGRIA', 'ESTORNO_VENDA', 'RECEBIMENTO', 'ESTORNO_RECEBIMENTO', 'ADIANTAMENTO', 'DEVOLUCAO_SINAL'] as const;
+export const TIPOS_MOVIMENTO_CAIXA = ['SUPRIMENTO', 'SANGRIA', 'ESTORNO_VENDA', 'RECEBIMENTO', 'ESTORNO_RECEBIMENTO', 'ADIANTAMENTO', 'DEVOLUCAO_SINAL', 'DEVOLUCAO_VENDA'] as const;
 export type TipoMovimentoCaixa = typeof TIPOS_MOVIMENTO_CAIXA[number];
 
 // Entram (+) ou saem (-) do caixa
 const SINAL: Record<TipoMovimentoCaixa, 1 | -1> = {
-  SUPRIMENTO: 1, RECEBIMENTO: 1, ADIANTAMENTO: 1, SANGRIA: -1, ESTORNO_VENDA: -1, ESTORNO_RECEBIMENTO: -1, DEVOLUCAO_SINAL: -1,
+  SUPRIMENTO: 1, RECEBIMENTO: 1, ADIANTAMENTO: 1, SANGRIA: -1, ESTORNO_VENDA: -1, ESTORNO_RECEBIMENTO: -1, DEVOLUCAO_SINAL: -1, DEVOLUCAO_VENDA: -1,
 };
 
 // Formas que existem fisicamente no caixa (as demais são conferidas fora da gaveta)
@@ -57,7 +57,7 @@ export const calcularResumoCaixa = (
     if (m.tipo === 'SUPRIMENTO') l.suprimentos += v;
     else if (m.tipo === 'RECEBIMENTO' || m.tipo === 'ADIANTAMENTO') l.recebimentos += v;
     else if (m.tipo === 'SANGRIA') l.sangrias += v;
-    else if (m.tipo === 'ESTORNO_VENDA' || m.tipo === 'ESTORNO_RECEBIMENTO' || m.tipo === 'DEVOLUCAO_SINAL') l.estornos += v;
+    else if (['ESTORNO_VENDA', 'ESTORNO_RECEBIMENTO', 'DEVOLUCAO_SINAL', 'DEVOLUCAO_VENDA'].includes(m.tipo)) l.estornos += v;
   }
 
   const linhas = [...porForma.entries()]

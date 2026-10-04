@@ -6,6 +6,7 @@ import { obterConfiguracoes, salvarConfiguracoes } from './regras/regrasVenda.co
 import { obterTaxas, salvarTaxas } from './taxas/taxas.controller';
 import { painelVendas } from './painel/painelVendas.controller';
 import { criarAdiantamento, devolverAdiantamentoRota, listarAdiantamentos } from './adiantamentos/adiantamentos.controller';
+import { dadosDevolucao, detalheDevolucao, registrarDevolucao } from './devolucoes/devolucoes.controller';
 import { detalhePedidoAberto, excluirPedidoAberto, listarPedidosAbertos, retomarPedidoAberto, salvarPedidoAberto } from './pdv/pedidosAbertos.controller';
 
 // Vendas no modelo novo (itens_core). Montado em /api/vendas
@@ -22,6 +23,10 @@ router.post('/pdv/vendas', registrarVenda);
 router.get('/pdv/vendas', listarVendas);
 router.get('/pdv/vendas/:idVenda', detalheVenda);
 router.post('/pdv/vendas/:idVenda/cancelar', cancelarVenda);
+// Devolução parcial/total e troca
+router.get('/pdv/vendas/:idVenda/devolucao', dadosDevolucao);
+router.post('/pdv/vendas/:idVenda/devolucoes', registrarDevolucao);
+router.get('/pdv/devolucoes/:id', detalheDevolucao);
 
 // Orçamentos e vendas suspensas (não mexem em estoque, caixa nem contas a receber)
 router.post('/pdv/pedidos-abertos', salvarPedidoAberto);

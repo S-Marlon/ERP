@@ -9,6 +9,18 @@ import { intervaloPeriodo, margemLiquidaPct, preencherSerie, variacaoPct } from 
 const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || 1);
 const n = (v: unknown) => Number(v) || 0;
 
+// Devoluções do período: valor devolvido e custo que voltou ao estoque (o que não voltou é perda)
+const devolucoesDoPeriodo = async (tenant: number, de: string, ate: string) => {
+  const [[d]]: any = await pool.execute(
+    `SELECT COUNT(DISTINCT d.id_devolucao) AS qtd, COALESCE(SUM(di.valor), 0) AS valor,
+            COALESCE(SUM(CASE WHEN di.voltou_estoque = 1 THEN di.custo_unitario_base * di.quantidade_base END), 0) AS custo_recuperado
+     FROM vendas_devolucoes d INNER JOIN vendas_devolucoes_itens di ON di.id_devolucao = d.id_devolucao
+     WHERE d.tenant_id = ? AND d.created_at >= ? AND d.created_at < DATE_ADD(?, INTERVAL 1 DAY)`,
+    [tenant, de, ate]
+  );
+  return { qtd: n(d?.qtd), valor: n(d?.valor), custoRecuperado: n(d?.custo_recuperado) };
+};
+
 const totaisDoPeriodo = async (tenant: number, de: string, ate: string) => {
   const [[t]]: any = await pool.execute(
     `SELECT SUM(status = 'CONCLUIDA') AS qtd,
@@ -37,10 +49,15 @@ export const painelVendas = async (req: Request, res: Response) => {
     const filtro = `v.tenant_id = ? AND v.created_at >= ? AND v.created_at < DATE_ADD(?, INTERVAL 1 DAY)`;
     const params = [tenant, intervalo.de, intervalo.ate];
 
-    const [atual, anterior] = await Promise.all([
+    const [bruto, anteriorBruto, devolucoes, devolucoesAnt] = await Promise.all([
       totaisDoPeriodo(tenant, intervalo.de, intervalo.ate),
       totaisDoPeriodo(tenant, intervalo.anteriorDe, intervalo.anteriorAte),
+      devolucoesDoPeriodo(tenant, intervalo.de, intervalo.ate),
+      devolucoesDoPeriodo(tenant, intervalo.anteriorDe, intervalo.anteriorAte),
     ]);
+    // Faturamento e custo líquidos de devolução (o item que voltou ao estoque devolve o custo)
+    const atual = { ...bruto, faturamento: bruto.faturamento - devolucoes.valor, custo: bruto.custo - devolucoes.custoRecuperado };
+    const anterior = { ...anteriorBruto, faturamento: anteriorBruto.faturamento - devolucoesAnt.valor, custo: anteriorBruto.custo - devolucoesAnt.custoRecuperado };
 
     const [formas]: any = await pool.execute(
       `SELECT p.forma, COALESCE(SUM(p.valor - p.troco), 0) AS total, COUNT(DISTINCT p.id_venda) AS qtd, COALESCE(SUM(p.taxa_valor), 0) AS taxas
@@ -110,6 +127,9 @@ export const painelVendas = async (req: Request, res: Response) => {
       intervalo,
       totais: {
         ...atual,
+        faturamentoBruto: bruto.faturamento,
+        devolucoes: devolucoes.valor,
+        qtdDevolucoes: devolucoes.qtd,
         ticketMedio: atual.qtd > 0 ? Number((atual.faturamento / atual.qtd).toFixed(2)) : 0,
         lucroLiquido: Number((atual.faturamento - atual.custo - atual.taxas).toFixed(2)),
         margemLiquida: margemLiquidaPct(atual.faturamento, atual.custo, atual.taxas),
