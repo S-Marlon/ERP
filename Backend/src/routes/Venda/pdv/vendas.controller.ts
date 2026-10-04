@@ -6,6 +6,7 @@ import { calcularCustoMedio } from '../../Compras/staging/penteFino';
 import { carregarPrecos, SELECT_ITENS } from './pdv.controller';
 import { calcularLinha, conferirEstoque, ErroVenda, fecharVenda, LinhaPedido, validarPagamentos } from './vendaPdv';
 import { carregarCaixaAberto, operadorDe } from '../caixa/caixa.controller';
+import { emitirAutomaticoSeConfigurado } from '../../Fiscal/saida/notasSaida.controller';
 import { estornoDaVenda } from '../caixa/caixa';
 import { cancelarTitulosDaVenda, gravarTitulosDaVenda, planejarPrazo, PrazoDaVenda } from '../../Financeiro/receber/receber.controller';
 import { ErroReceber } from '../../Financeiro/receber/receber';
@@ -304,6 +305,8 @@ export const registrarVenda = async (req: Request, res: Response) => {
     }
 
     await connection.commit();
+    // Nota fiscal no modo automático (no modo fila a venda espera a aprovação do dia)
+    void emitirAutomaticoSeConfigurado(tenant, idVenda, operadorDe(req));
     return res.status(201).json({
       success: true,
       idVenda,
@@ -342,6 +345,16 @@ export const cancelarVenda = async (req: Request, res: Response) => {
     if (!venda) throw new ErroVenda('Venda não encontrada.', 404);
     if (venda.status !== 'CONCLUIDA') throw new ErroVenda(`A venda já está ${String(venda.status).toLowerCase()}.`, 409);
     if (Number(venda.total_devolvido) > 0) throw new ErroVenda('Esta venda já teve devolução: devolva o restante pela devolução (não dá para cancelar).', 409);
+    // Nota autorizada precisa ser cancelada antes (Notas fiscais); a que ainda está na fila sai dela
+    const [[nota]]: any = await connection.execute(
+      `SELECT status FROM fiscal_documentos WHERE id_venda = ? AND status IN ('AUTORIZADA', 'PROCESSANDO') LIMIT 1`, [idVenda]
+    );
+    if (nota) throw new ErroVenda(nota.status === 'AUTORIZADA'
+      ? 'Esta venda tem nota fiscal autorizada: cancele a nota em Vendas › Notas fiscais antes de cancelar a venda.'
+      : 'A nota fiscal desta venda está sendo emitida: aguarde e tente de novo.', 409);
+    await connection.execute(
+      `UPDATE fiscal_documentos SET status = 'DISPENSADA', motivo_status = 'Venda cancelada' WHERE id_venda = ? AND status IN ('AGUARDANDO', 'REJEITADA')`, [idVenda]
+    );
 
     // A prazo: parcelas sem recebimento são canceladas (com recebimento, pede o estorno antes)
     await cancelarTitulosDaVenda(connection as any, tenant, idVenda);

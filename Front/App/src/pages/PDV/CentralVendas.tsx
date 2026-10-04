@@ -115,6 +115,7 @@ const CentralVendas: React.FC = () => {
     { titulo: 'PDV', descricao: 'Vender no balcão', rota: '/vendas/pdv', icone: <ShoppingCartOutlined /> },
     { titulo: 'Vendas do Dia', descricao: 'Consultar, devolver e cancelar vendas', rota: '/vendas/do-dia', icone: <FileTextOutlined /> },
     { titulo: 'Orçamentos', descricao: 'Válidos, vencidos e convertidos', rota: '/vendas/orcamentos', icone: <FileTextOutlined /> },
+    { titulo: 'Notas fiscais', descricao: 'Aprovar, emitir e enviar as notas do dia', rota: '/vendas/notas-fiscais', icone: <FileTextOutlined /> },
     { titulo: 'Caixas', descricao: 'Abertura, fechamento e conferência', rota: '/vendas/caixas', icone: <UnlockOutlined /> },
     { titulo: 'Contas a Receber', descricao: 'Parcelas das vendas a prazo', rota: '/financeiro', icone: <DollarOutlined /> },
     { titulo: 'Taxas de pagamento', descricao: 'Maquininha, sem juros e simulador', rota: '/vendas/taxas', icone: <CalculatorOutlined /> },

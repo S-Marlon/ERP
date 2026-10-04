@@ -1,7 +1,11 @@
 import express, { Request, Response, NextFunction } from 'express';
 import pool from '../routes/Estoque/db.config';
+import notasSaidaRoutes from './Fiscal/saida/notasSaida.routes';
 
 const router = express.Router();
+
+// Notas fiscais de saída das vendas (NFC-e/NF-e)
+router.use(notasSaidaRoutes);
 
 const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) =>
   (req: Request, res: Response, next: NextFunction) => {

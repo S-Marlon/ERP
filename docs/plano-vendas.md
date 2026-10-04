@@ -19,7 +19,7 @@ testes → telas → commit.
 | 5 | **Orçamento e venda suspensa**: suspender/retomar, orçamento com validade e impressão, converter em venda | status, `validade`, `contato` e `id_orcamento` em `vendas_pedidos` | feito |
 | 6 | **Módulo plugável Hidráulica · Montagens**: montagem na hora no PDV, OS com sinal e ficha técnica | `sistema_modulos`, `vendas_adiantamentos`, `modulo_hidraulica_montagens_*` | feito |
 | 7 | **Devolução parcial e troca**: devolução por item/quantidade, reembolso no caixa, crédito na loja ou abatimento do a prazo; troca | `vendas_devolucoes`, `vendas_devolucoes_itens`; `total_devolvido` em `vendas_pedidos` | feito |
-| 8 | **NFC-e / NF-e de saída** (emissor a definir) | | |
+| 8 | **NFC-e / NF-e de saída**: fila de aprovação do dia, emissão por provedor ou direta, cancelamento, envio por WhatsApp/e-mail | `fiscal_emitentes`, `fiscal_configuracoes`, `fiscal_documentos`, `fiscal_documentos_eventos`; `csosn` em `itens_dados_fiscais` | feito (provedor a contratar) |
 
 ## Fase 1 — como ficou
 
@@ -90,6 +90,23 @@ testes → telas → commit.
 - **Valor**: proporcional ao que foi pago no item (descontos rateados); a última devolução do item fecha os centavos exatos.
 - **Troca**: devolução em crédito na loja e o PDV abre com o cliente e o crédito disponível no pagamento.
 - Venda com devolução não pode mais ser cancelada; a Central de Vendas mostra faturamento e lucro líquidos de devoluções.
+
+## Fase 8 — como ficou
+
+- **Vendas › Notas fiscais**: as vendas do dia entram na fila (Aguardando). Revisa, escolhe NFC-e (65) ou NF-e (55; sugerida
+  para cliente com CNPJ), aprova e emite (uma ou em lote), dispensa com motivo ou volta à fila. Pendências (empresa sem
+  cadastro, item sem NCM) aparecem na linha e bloqueiam a emissão. Venda só de serviço não tem nota de produto.
+- **Configuração** (aba da mesma tela): empresa emitente, ambiente, modo (fila ou automático ao concluir a venda),
+  emissor (provedor ou direto), séries/numeração e tributação padrão (MEI/Simples 102/5102; com CEST 500/5405; exceção por item).
+- **Emissores** (`Backend/src/routes/Fiscal/saida/emissores.ts`): interface `EmissorFiscal` (emitir, cancelar, enviar e-mail).
+  `SIMULADO` autoriza em homologação para testar. Provedor contratado = um arquivo novo registrado em `PROVEDORES`.
+  Direto na SEFAZ fica preparado e pede o certificado A1. Segredos no `.env`: `FISCAL_PROVEDOR_TOKEN`, `FISCAL_CSC_TOKEN`,
+  `FISCAL_CERTIFICADO_ARQUIVO`, `FISCAL_CERTIFICADO_SENHA`.
+- A nota usa o preço de tabela com desconto por item, o acréscimo do parcelamento em "outras despesas", as formas no
+  código da SEFAZ (tPag) e o troco. Número reservado com trava; reenvio após rejeição usa o mesmo número.
+- Envio: WhatsApp (link com a mensagem pronta) e e-mail (pelo provedor ou programa de e-mail); o contato fica na nota.
+- Venda com nota autorizada só é cancelada depois de cancelar a nota; a que estava na fila sai dela.
+- Pendente: adaptador do provedor escolhido, NF-e de devolução e DANFE próprio (emissão direta).
 
 ## Critérios de pronto
 

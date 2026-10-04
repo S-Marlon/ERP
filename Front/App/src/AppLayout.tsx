@@ -33,6 +33,7 @@ import CaixasHistorico from './pages/PDV/pages/Caixas/CaixasHistorico';
 import RegrasVenda from './pages/PDV/pages/RegrasVenda/RegrasVenda';
 import TaxasPagamento from './pages/PDV/pages/TaxasPagamento/TaxasPagamento';
 import Orcamentos from './pages/PDV/pages/Orcamentos/Orcamentos';
+import NotasFiscais from './pages/PDV/pages/NotasFiscais/NotasFiscais';
 import { CaixaPaineis } from './pages/PDV/caixa/CaixaPainel';
 import { carregarTaxaPreco } from './core/precos/taxaPreco';
 import { rotasDosModulos } from './modulos/registroModulos';
@@ -168,6 +169,7 @@ export default function AppLayout() {
             <Route path="/vendas/regras" element={<RegrasVenda />} />
             <Route path="/vendas/taxas" element={<TaxasPagamento />} />
             <Route path="/vendas/orcamentos" element={<Orcamentos />} />
+            <Route path="/vendas/notas-fiscais" element={<NotasFiscais />} />
             <Route path="/vendas/pdv/finalizar" element={<FinalizarVenda onBack={() => {}} />} />
             <Route path="/estoque" element={<Estoque />} />
             <Route path="/estoque/consulta" element={<SaldoEstoque />} />
