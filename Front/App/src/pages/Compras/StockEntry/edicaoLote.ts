@@ -16,27 +16,34 @@ export const linhaSemVinculo = (item: any) => !(item.mapeamento || item.mappedId
 export const linhaItemNovo = (item: any) => item.mapeamento?.mode === 'DRAFT' && Boolean(item.mapeamento?.draftIdentity);
 
 /**
- * Itens novos com o mesmo SKU Customizado (sem diferenciar maiúsculas): se é o mesmo produto do fornecedor
- * (código ou descrição iguais), as linhas viram um item só na aprovação (agrupado); senão é conflito e bloqueia.
+ * Itens novos com o mesmo SKU Customizado (sem diferenciar maiúsculas). A aprovação fica bloqueada até o operador
+ * confirmar que são o mesmo produto (agrupa num item só) ou mudar o SKU. `mesmoProduto` indica se o código ou a
+ * descrição do fornecedor batem (só orienta: o fornecedor pode repetir código em produtos diferentes).
  */
-type LinhaSku = { sku?: unknown; descricao?: unknown; mapeamento?: { mode?: string; draftIdentity?: { sku_comercial?: unknown } | null } | null };
-export const situacaoSkusNovos = (itens: LinhaSku[]) => {
+type LinhaSku = {
+  tempId?: unknown; sku?: unknown; descricao?: unknown;
+  mapeamento?: { mode?: string; draftIdentity?: { sku_comercial?: unknown } | null; agrupamentoConfirmado?: unknown } | null;
+};
+export interface GrupoSkuRepetido<T> { linhas: T[]; mesmoProduto: boolean; confirmado: boolean }
+export const situacaoSkusNovos = <T extends LinhaSku>(itens: T[]): Map<string, GrupoSkuRepetido<T>> => {
   const n = (v: unknown) => String(v ?? '').trim().toUpperCase().replace(/\s+/g, ' ');
-  const mesmoProduto = (a: LinhaSku, b: LinhaSku) => (!!n(a.sku) && n(a.sku) === n(b.sku)) || (!!n(a.descricao) && n(a.descricao) === n(b.descricao));
-  const grupos = new Map<string, LinhaSku[]>();
+  const mesmo = (a: LinhaSku, b: LinhaSku) => (!!n(a.sku) && n(a.sku) === n(b.sku)) || (!!n(a.descricao) && n(a.descricao) === n(b.descricao));
+  const grupos = new Map<string, T[]>();
   for (const i of itens) {
     if (!linhaItemNovo(i)) continue;
     const sku = n(i.mapeamento?.draftIdentity?.sku_comercial);
     if (sku) grupos.set(sku, [...(grupos.get(sku) || []), i]);
   }
-  const agrupados = new Set<string>();
-  const conflitos = new Set<string>();
+  const repetidos = new Map<string, GrupoSkuRepetido<T>>();
   for (const [sku, linhas] of grupos) {
     if (linhas.length < 2) continue;
-    if (linhas.every(l => mesmoProduto(linhas[0], l))) agrupados.add(sku);
-    else conflitos.add(sku);
+    repetidos.set(sku, {
+      linhas,
+      mesmoProduto: linhas.every(l => mesmo(linhas[0], l)),
+      confirmado: linhas.every(l => n(l.mapeamento?.agrupamentoConfirmado) === sku),
+    });
   }
-  return { agrupados, conflitos };
+  return repetidos;
 };
 
 // Venda só na unidade da nota, preço de varejo = custo x markup (atacado/embalagens ficam para o editor)

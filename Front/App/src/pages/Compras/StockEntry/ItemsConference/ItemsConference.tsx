@@ -56,6 +56,8 @@ items?: Item[];
 onConfirmItems?: (ids: (string | number)[]) => void;
 onUnconfirmItems?: (ids: (string | number)[]) => void;
 onItemMapped?: (tempId: string | number, mapping: MappingPayload) => void;
+// Linhas com o mesmo SKU: confirma que são o mesmo produto (sku) ou desfaz (null)
+onConfirmarAgrupamento?: (ids: (string | number)[], sku: string | null) => void;
 // Itens nunca saem da NF: apenas mudam de tipo de entrada (produto, consumo, ativo...)
 onChangeTipoRecurso?: (ids: (string | number)[], tipo: TipoRecurso) => void;
 onQuantityChange?: (tempId: string | number, newReceivedQty: number) => void;
@@ -80,6 +82,7 @@ items: initialItems,
 onConfirmItems,
 onUnconfirmItems,
 onItemMapped,
+onConfirmarAgrupamento,
 onChangeTipoRecurso,
 onQuantityChange,
 onToggleItem,
@@ -223,8 +226,10 @@ contagem.set(t, (contagem.get(t) || 0) + 1);
 }
 return TIPOS_RECURSO.filter(t => contagem.has(t.value)).map(t => ({ ...t, linhas: contagem.get(t.value) || 0 }));
 }, [localItems]);
-// SKU Customizado repetido entre itens novos: mesmo produto agrupa num item só; produtos diferentes bloqueiam
-const skusNovos = useMemo(() => situacaoSkusNovos(localItems), [localItems]);
+// SKU Customizado repetido entre itens novos: bloqueia até confirmar que é o mesmo produto (agrupa) ou mudar o SKU
+const skusRepetidos = useMemo(() => situacaoSkusNovos(localItems), [localItems]);
+const [grupoSku, setGrupoSku] = useState<string | null>(null);
+const grupoAberto = grupoSku ? skusRepetidos.get(grupoSku) : undefined;
 const progressoConferencia = localItems.length > 0 ? Math.round((confirmedItems.length / localItems.length) * 100) : 0;
 
 const formatCurrency = (val: number) =>
@@ -348,15 +353,20 @@ text === SKU_A_GERAR ? (
 <Tooltip title="Item novo sem SKU Customizado digitado: recebe a sequência do banco na aprovação (ex.: IT-000123).">
 <Tag style={{ margin: 0, color: '#8c8c8c', borderStyle: 'dashed' }}>gerado na aprovação</Tag>
 </Tooltip>
-) : skusNovos.conflitos.has(String(text).trim().toUpperCase()) && linhaItemNovo(record) ? (
-<Tooltip title="Outro produto desta nota (código e descrição do fornecedor diferentes) usa o mesmo SKU Customizado. A aprovação fica bloqueada até mudar um deles.">
-<Tag color="red" style={{ margin: 0 }}>{text} · repetido</Tag>
+) : skusRepetidos.has(String(text).trim().toUpperCase()) && linhaItemNovo(record) ? (() => {
+const sku = String(text).trim().toUpperCase();
+const grupo = skusRepetidos.get(sku)!;
+const [cor, rotulo, dica] = grupo.confirmado
+? ['gold', 'agrupado', 'Confirmado como o mesmo produto: as linhas entram como um único item, com as quantidades somadas. Clique para revisar.']
+: grupo.mesmoProduto
+? ['orange', 'repetido · confirmar', 'Outra linha da nota usa o mesmo SKU e parece o mesmo produto. A aprovação fica bloqueada até você confirmar. Clique para revisar.']
+: ['red', 'repetido · confirmar', 'Outra linha da nota usa o mesmo SKU, mas código e descrição do fornecedor são diferentes. A aprovação fica bloqueada até você decidir. Clique para revisar.'];
+return (
+<Tooltip title={dica}>
+<Tag color={cor} style={{ margin: 0, cursor: 'pointer', fontWeight: 600 }} onClick={() => setGrupoSku(sku)}>{text} · {rotulo}</Tag>
 </Tooltip>
-) : skusNovos.agrupados.has(String(text).trim().toUpperCase()) && linhaItemNovo(record) ? (
-<Tooltip title="O mesmo produto aparece em mais de uma linha da nota: as linhas entram como um único item no catálogo, com as quantidades somadas no estoque.">
-<Tag color="blue" style={{ margin: 0 }}>{text} · agrupado</Tag>
-</Tooltip>
-) : (
+);
+})() : (
 <Tag color="blue" style={{ margin: 0 }}>{text}</Tag>
 )
 ) : (
@@ -1195,6 +1205,52 @@ atual={siglaDefinindo ? unidadesNota.resolucoes[siglaDefinindo] : undefined}
 onFechar={() => setSiglaDefinindo(null)}
 onSalvo={() => { setSiglaDefinindo(null); unidadesNota.recarregar(); }}
 />
+
+{/* Linhas novas com o mesmo SKU: confirmar agrupamento ou reclassificar */}
+<Modal
+open={!!grupoAberto}
+onCancel={() => setGrupoSku(null)}
+title={`SKU ${grupoSku} em ${grupoAberto?.linhas.length || 0} linhas: estes itens são o mesmo produto?`}
+width={760}
+destroyOnHidden
+footer={grupoAberto ? [
+<Button key="v" onClick={() => setGrupoSku(null)}>Voltar</Button>,
+grupoAberto.confirmado
+? <Button key="d" danger disabled={readOnly} onClick={() => { onConfirmarAgrupamento?.(grupoAberto.linhas.map(l => l.tempId), null); setGrupoSku(null); }}>Desfazer agrupamento</Button>
+: <Button key="c" type="primary" disabled={readOnly} onClick={() => { onConfirmarAgrupamento?.(grupoAberto.linhas.map(l => l.tempId), grupoSku); setGrupoSku(null); }}>Sim, são o mesmo produto (agrupar)</Button>,
+] : null}
+>
+{grupoAberto && (
+<Space direction="vertical" style={{ width: '100%' }}>
+{!grupoAberto.mesmoProduto && (
+<Alert type="error" showIcon message="Código e descrição do fornecedor são diferentes entre as linhas: confira com cuidado antes de agrupar." />
+)}
+<Table
+size="small"
+rowKey="tempId"
+pagination={false}
+dataSource={grupoAberto.linhas}
+columns={[
+{ title: 'Linha', dataIndex: 'nItem', width: 55 },
+{ title: 'Código forn.', dataIndex: 'sku', width: 110 },
+{ title: 'Descrição do fornecedor', dataIndex: 'descricao' },
+{ title: 'Qtd', key: 'q', width: 90, align: 'right' as const, render: (_: unknown, l: Item) => `${Number(l.quantidade).toLocaleString('pt-BR')} ${l.unidadeMedida || ''}` },
+{ title: 'Unit.', key: 'u', width: 90, align: 'right' as const, render: (_: unknown, l: Item) => formatCurrency(Number(l.valorUnitario) || 0) },
+{
+title: '', key: 'r', width: 110,
+render: (_: unknown, l: Item) => (
+<Button size="small" disabled={readOnly} onClick={() => { setGrupoSku(null); handleOpenMappingModal([l.tempId]); }}>Reclassificar</Button>
+),
+},
+]}
+/>
+<Text type="secondary" style={{ fontSize: 12 }}>
+Mesmo produto: as linhas entram como um único item no catálogo e as quantidades somam no estoque (vale o cadastro da primeira linha).
+Produtos diferentes: clique em Reclassificar na linha errada e mude o SKU Customizado ou vincule a outro item.
+</Text>
+</Space>
+)}
+</Modal>
 
 {/* ================= MODAL DE MAPEAMENTO EM FILA ================= */}
 {isMappingModalOpen && (

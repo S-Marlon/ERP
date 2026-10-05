@@ -71,6 +71,8 @@ export interface MappingPayload {
     custo_unitario_base: number;
     unidade_xml: string | undefined;
   } | null;
+  // SKU (maiúsculo) que o operador confirmou ser o mesmo produto em outras linhas da nota: agrupa num item só
+  agrupamentoConfirmado?: string | null;
 }
 
 // Marca de item novo cujo SKU Customizado será a sequência gerada na aprovação (com o id do banco)

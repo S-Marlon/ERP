@@ -257,6 +257,26 @@ message.warning('Lote de staging ainda não criado: o mapeamento ficou apenas na
 commitItemEdit([target.tempId], item => patchDoMapeamento(item, mapping));
 };
 
+// Confirma (ou desfaz) que linhas com o mesmo SKU são o mesmo produto: não reabre a conferência
+const handleConfirmarAgrupamento = (ids: ItemId[], sku: string | null) => {
+if (modoVisualizacao) {
+message.warning(MSG_SOMENTE_LEITURA);
+return;
+}
+const alvo = new Set(ids);
+const changed: typeof items = [];
+const novos = items.map(item => {
+if (!alvo.has(item.tempId) || !item.mapeamento) return item;
+const next = { ...item, mapeamento: { ...item.mapeamento, agrupamentoConfirmado: sku } };
+changed.push(next);
+return next;
+});
+if (changed.length === 0) return;
+setItems(novos);
+persistItemsToStaging(changed);
+message.success(sku ? `${changed.length} linhas agrupadas como o mesmo produto.` : 'Agrupamento desfeito.');
+};
+
 // Campos da linha que acompanham o mapeamento (modal, cadastro rápido ou classificação em lote)
 const patchDoMapeamento = (item: any, mapping: MappingPayload) => ({
 mapeamento: mapping,
@@ -866,6 +886,7 @@ items={items.map((i, index) => ({ ...i, nItem: i.nItem || index + 1, confirmed: 
 onConfirmItems={handleConfirmItems}
 onUnconfirmItems={handleUnconfirmItems}
 onItemMapped={handleItemMapped}
+onConfirmarAgrupamento={handleConfirmarAgrupamento}
 onChangeTipoRecurso={handleChangeTipoRecurso}
 onToggleItem={(tempId, confirmed) => setItemsConfirmation([tempId], confirmed)}
 onQuantityChange={handleQuantityChange}

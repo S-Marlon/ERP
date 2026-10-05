@@ -98,13 +98,6 @@ export const skuCustomizadoPlanejado = (item: StagingItemRow): string | null => 
   return null;
 };
 
-/** Mesmo produto do fornecedor: código (cProd) ou descrição (xProd) iguais. */
-export const mesmoProdutoFornecedor = (a: StagingItemRow, b: StagingItemRow) => {
-  const n = (v: unknown) => texto(v).toUpperCase().replace(/\s+/g, ' ');
-  return (!!n(a.codigo_fornecedor) && n(a.codigo_fornecedor) === n(b.codigo_fornecedor))
-    || (!!n(a.nome_fornecedor) && n(a.nome_fornecedor) === n(b.nome_fornecedor));
-};
-
 /** Chave do item novo na aprovação: linhas com o mesmo SKU customizado viram um item só (produto repetido na nota). */
 export const chaveItemNovo = (item: StagingItemRow): string => {
   const sku = skuCustomizadoPlanejado(item);
@@ -191,28 +184,20 @@ export const avaliarPenteFino = (
     });
   coletar(bloqueios, 'SKU_RESERVADO', 'SKU customizado no formato das sequências do sistema (IT-/CON-/ATV-000123): deixe vazio para gerar ou use outro código.',
     i => isItemNovo(i) && skuNoFormatoReservado(skuCustomizadoPlanejado(i)));
-  // Mesmo SKU customizado em mais de uma linha nova: se é o mesmo produto do fornecedor (repetido na nota),
-  // as linhas viram um item só; produtos diferentes com o mesmo SKU bloqueiam
-  const primeiroDoSku = new Map<string, StagingItemRow>();
-  const linhasDoSku = new Map<string, number>();
-  for (const i of itens) {
-    const sku = isItemNovo(i) ? skuCustomizadoPlanejado(i) : null;
-    if (!sku) continue;
-    const chave = sku.toUpperCase();
-    if (!primeiroDoSku.has(chave)) primeiroDoSku.set(chave, i);
-    linhasDoSku.set(chave, (linhasDoSku.get(chave) || 0) + 1);
-  }
-  const conflitoSku = (i: StagingItemRow) => {
-    const sku = isItemNovo(i) ? skuCustomizadoPlanejado(i) : null;
-    const dono = sku ? primeiroDoSku.get(sku.toUpperCase()) : undefined;
-    return !!dono && dono !== i && !mesmoProdutoFornecedor(dono, i);
+  // Mesmo SKU customizado em mais de uma linha nova: só agrupa num item depois que o operador confirma na
+  // conferência que são o mesmo produto (o fornecedor pode repetir código em produtos diferentes)
+  const skuRepetido = (i: StagingItemRow) => {
+    const sku = isItemNovo(i) ? skuCustomizadoPlanejado(i)?.toUpperCase() : null;
+    return sku && itens.filter(o => isItemNovo(o) && skuCustomizadoPlanejado(o)?.toUpperCase() === sku).length > 1 ? sku : null;
   };
-  coletar(bloqueios, 'SKU_REPETIDO_NA_NOTA', 'Produtos diferentes (código e descrição do fornecedor diferentes) com o mesmo SKU customizado nesta nota.', conflitoSku);
-  coletar(avisos, 'SKU_AGRUPADO', 'Linhas do mesmo produto com o mesmo SKU: entram como um único item no catálogo, com as quantidades somadas no estoque.',
-    i => {
-      const sku = isItemNovo(i) ? skuCustomizadoPlanejado(i) : null;
-      return !!sku && (linhasDoSku.get(sku.toUpperCase()) || 0) > 1 && !conflitoSku(i);
-    });
+  const agrupamentoConfirmado = (i: StagingItemRow, sku: string) =>
+    texto(lerMapeamento(i).agrupamentoConfirmado).toUpperCase() === sku;
+  const grupoConfirmado = (sku: string) =>
+    itens.filter(o => isItemNovo(o) && skuCustomizadoPlanejado(o)?.toUpperCase() === sku).every(o => agrupamentoConfirmado(o, sku));
+  coletar(bloqueios, 'SKU_REPETIDO_NA_NOTA', 'Itens novos com o mesmo SKU customizado: confirme na conferência se são o mesmo produto (agrupa num item só) ou mude o SKU de um deles.',
+    i => { const sku = skuRepetido(i); return !!sku && !grupoConfirmado(sku); });
+  coletar(avisos, 'SKU_AGRUPADO', 'Linhas confirmadas como o mesmo produto: entram como um único item no catálogo, com as quantidades somadas no estoque.',
+    i => { const sku = skuRepetido(i); return !!sku && grupoConfirmado(sku); });
   coletar(bloqueios, 'DESTINO_INVALIDO', 'Divisão entre depósitos não confere com a quantidade recebida.',
     i => validarDestinos(lerMapeamento(i).destinos, num(i.quantidade_recebida)) !== null);
   coletar(bloqueios, 'DESTINO_INCOMPATIVEL', 'Destino não combina com o tipo de entrada (ex.: produto de venda inteiro no almoxarifado). Ajuste o destino ou o tipo.',

@@ -48,11 +48,14 @@ export const runEdicaoLote = () => {
   const limpa = aplicarClassificacao(consumo, { familiaId: 7, categoriaId: null, atributos: null }, { substituir: true });
   ok(limpa?.draftIdentity?.atributos === null, 'substituir sem valores limpa');
 
-  // Mesmo SKU em itens novos: mesmo produto do fornecedor agrupa; produtos diferentes são conflito
-  const linha = (sku: string, cProd: string, xProd: string) => ({ sku: cProd, descricao: xProd, mapeamento: { mode: 'DRAFT', draftIdentity: { sku_comercial: sku } } });
-  let s = situacaoSkusNovos([linha('ABC', 'F1', 'Terminal'), linha('abc', 'F1', 'Terminal')]);
-  ok(s.agrupados.has('ABC') && s.conflitos.size === 0, 'mesmo produto agrupa');
-  s = situacaoSkusNovos([linha('ABC', 'F1', 'Terminal'), linha('ABC', 'F2', 'Mangueira')]);
-  ok(s.conflitos.has('ABC') && s.agrupados.size === 0, 'produtos diferentes conflitam');
-  ok(situacaoSkusNovos([linha('ABC', 'F1', 'T'), linha('ABD', 'F1', 'T')]).agrupados.size === 0, 'SKUs diferentes');
+  // Mesmo SKU em itens novos: precisa de confirmação; mesmoProduto orienta pela nota do fornecedor
+  const linha = (sku: string, cProd: string, xProd: string, conf?: string) =>
+    ({ sku: cProd, descricao: xProd, mapeamento: { mode: 'DRAFT', draftIdentity: { sku_comercial: sku }, agrupamentoConfirmado: conf } });
+  let s = situacaoSkusNovos([linha('ABC', 'F1', 'Terminal'), linha('abc', 'F1', 'Terminal')]).get('ABC');
+  ok(s && s.mesmoProduto && !s.confirmado && s.linhas.length === 2, 'mesmo produto sem confirmação');
+  s = situacaoSkusNovos([linha('ABC', 'F1', 'Terminal'), linha('ABC', 'F2', 'Mangueira')]).get('ABC');
+  ok(s && !s.mesmoProduto, 'produtos diferentes');
+  s = situacaoSkusNovos([linha('ABC', 'F1', 'T', 'abc'), linha('abc', 'F1', 'T', 'ABC')]).get('ABC');
+  ok(s && s.confirmado, 'confirmado nas duas linhas');
+  ok(situacaoSkusNovos([linha('ABC', 'F1', 'T'), linha('ABD', 'F1', 'T')]).size === 0, 'SKUs diferentes');
 };
