@@ -1,4 +1,4 @@
-import { aplicarClassificacao, configVendasRapida, foraDaVenda, linhaSemVinculo, mapeamentoRapido } from './edicaoLote';
+import { aplicarClassificacao, configVendasRapida, foraDaVenda, linhaSemVinculo, mapeamentoRapido, situacaoSkusNovos } from './edicaoLote';
 
 const ok = (cond: unknown, msg: string) => { if (!cond) throw new Error(`edicaoLote: ${msg}`); };
 const perto = (a: number, b: number) => Math.abs(a - b) < 0.0001;
@@ -47,4 +47,12 @@ export const runEdicaoLote = () => {
   ok((unica?.draftIdentity?.atributos as any)?.[5] === undefined && (unica?.draftIdentity?.atributos as any)?.[6] === '110V', 'substituir troca os valores');
   const limpa = aplicarClassificacao(consumo, { familiaId: 7, categoriaId: null, atributos: null }, { substituir: true });
   ok(limpa?.draftIdentity?.atributos === null, 'substituir sem valores limpa');
+
+  // Mesmo SKU em itens novos: mesmo produto do fornecedor agrupa; produtos diferentes são conflito
+  const linha = (sku: string, cProd: string, xProd: string) => ({ sku: cProd, descricao: xProd, mapeamento: { mode: 'DRAFT', draftIdentity: { sku_comercial: sku } } });
+  let s = situacaoSkusNovos([linha('ABC', 'F1', 'Terminal'), linha('abc', 'F1', 'Terminal')]);
+  ok(s.agrupados.has('ABC') && s.conflitos.size === 0, 'mesmo produto agrupa');
+  s = situacaoSkusNovos([linha('ABC', 'F1', 'Terminal'), linha('ABC', 'F2', 'Mangueira')]);
+  ok(s.conflitos.has('ABC') && s.agrupados.size === 0, 'produtos diferentes conflitam');
+  ok(situacaoSkusNovos([linha('ABC', 'F1', 'T'), linha('ABD', 'F1', 'T')]).agrupados.size === 0, 'SKUs diferentes');
 };

@@ -5,7 +5,7 @@ import { recalcularFaixas } from '../../Catalogo/Vendas/precificacao';
 import { validarGtin } from '../staging/gtin';
 import { lancarMovimentoEstoque } from '../../EstoqueItens/depositos';
 import { gravarAtributosItemNovo } from '../../Catalogo/Produtos/produtoDetalhe.controller';
-import { destinosDoItem, prefixoSkuSequencial, skuCustomizadoPlanejado, skuSequencial } from '../staging/penteFino';
+import { chaveItemNovo, destinosDoItem, prefixoSkuSequencial, skuCustomizadoPlanejado, skuSequencial } from '../staging/penteFino';
 import { canonizar, carregarResolvedor } from '../staging/unidadesEntrada';
 import { carregarTaxaPreco } from '../../Venda/taxas/taxas.controller';
 import {
@@ -240,8 +240,9 @@ export const aprovarLote = async (req: Request, res: Response): Promise<Response
       let idItem = item.produto_id_sistema ? Number(item.produto_id_sistema) : null;
       let tipoDoItem = tipoRecurso;
       if (!idItem) {
-        const sku = String(item.sku_sugerido).trim();
-        idItem = itensCriadosPorSku.get(sku.toUpperCase()) ?? null;
+        // Mesmo SKU customizado (produto repetido na nota): a segunda linha usa o item criado pela primeira
+        const chaveNovo = chaveItemNovo(item);
+        idItem = itensCriadosPorSku.get(chaveNovo) ?? null;
 
         if (!idItem) {
           const idUnidadeBase = await obterOuCriarUnidade(connection, tenant, conversao.unidadeBase);
@@ -253,7 +254,7 @@ export const aprovarLote = async (req: Request, res: Response): Promise<Response
           );
           idItem = Number(novo.insertId);
           await connection.execute(`UPDATE itens_core SET sku = ? WHERE id_item = ?`, [skuSequencial('IT', idItem), idItem]);
-          itensCriadosPorSku.set(sku.toUpperCase(), idItem);
+          itensCriadosPorSku.set(chaveNovo, idItem);
 
           // Item novo: o custo desta entrada já nasce como custo gerencial (base do preço de venda)
           const draft = mapeamento.draftIdentity || {};

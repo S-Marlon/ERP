@@ -98,6 +98,19 @@ export const skuCustomizadoPlanejado = (item: StagingItemRow): string | null => 
   return null;
 };
 
+/** Mesmo produto do fornecedor: código (cProd) ou descrição (xProd) iguais. */
+export const mesmoProdutoFornecedor = (a: StagingItemRow, b: StagingItemRow) => {
+  const n = (v: unknown) => texto(v).toUpperCase().replace(/\s+/g, ' ');
+  return (!!n(a.codigo_fornecedor) && n(a.codigo_fornecedor) === n(b.codigo_fornecedor))
+    || (!!n(a.nome_fornecedor) && n(a.nome_fornecedor) === n(b.nome_fornecedor));
+};
+
+/** Chave do item novo na aprovação: linhas com o mesmo SKU customizado viram um item só (produto repetido na nota). */
+export const chaveItemNovo = (item: StagingItemRow): string => {
+  const sku = skuCustomizadoPlanejado(item);
+  return sku ? `SKU:${sku.toUpperCase()}` : `LINHA:${texto(item.sku_sugerido).toUpperCase()}`;
+};
+
 // Formato das sequências geradas pelo sistema: digitado assim, colidiria com um código gerado depois
 export const skuNoFormatoReservado = (sku: string | null | undefined) => /^(IT|CON|ATV|TMP)-\d+$/i.test(String(sku || '').trim());
 
@@ -178,16 +191,27 @@ export const avaliarPenteFino = (
     });
   coletar(bloqueios, 'SKU_RESERVADO', 'SKU customizado no formato das sequências do sistema (IT-/CON-/ATV-000123): deixe vazio para gerar ou use outro código.',
     i => isItemNovo(i) && skuNoFormatoReservado(skuCustomizadoPlanejado(i)));
-  // Itens novos diferentes (linhas diferentes) com o mesmo SKU customizado
-  const donoSku = new Map<string, string>();
-  coletar(bloqueios, 'SKU_REPETIDO_NA_NOTA', 'Itens novos diferentes com o mesmo SKU customizado nesta nota.',
+  // Mesmo SKU customizado em mais de uma linha nova: se é o mesmo produto do fornecedor (repetido na nota),
+  // as linhas viram um item só; produtos diferentes com o mesmo SKU bloqueiam
+  const primeiroDoSku = new Map<string, StagingItemRow>();
+  const linhasDoSku = new Map<string, number>();
+  for (const i of itens) {
+    const sku = isItemNovo(i) ? skuCustomizadoPlanejado(i) : null;
+    if (!sku) continue;
+    const chave = sku.toUpperCase();
+    if (!primeiroDoSku.has(chave)) primeiroDoSku.set(chave, i);
+    linhasDoSku.set(chave, (linhasDoSku.get(chave) || 0) + 1);
+  }
+  const conflitoSku = (i: StagingItemRow) => {
+    const sku = isItemNovo(i) ? skuCustomizadoPlanejado(i) : null;
+    const dono = sku ? primeiroDoSku.get(sku.toUpperCase()) : undefined;
+    return !!dono && dono !== i && !mesmoProdutoFornecedor(dono, i);
+  };
+  coletar(bloqueios, 'SKU_REPETIDO_NA_NOTA', 'Produtos diferentes (código e descrição do fornecedor diferentes) com o mesmo SKU customizado nesta nota.', conflitoSku);
+  coletar(avisos, 'SKU_AGRUPADO', 'Linhas do mesmo produto com o mesmo SKU: entram como um único item no catálogo, com as quantidades somadas no estoque.',
     i => {
       const sku = isItemNovo(i) ? skuCustomizadoPlanejado(i) : null;
-      if (!sku) return false;
-      const chave = sku.toUpperCase();
-      const grupo = texto(i.sku_sugerido).toUpperCase();
-      if (!donoSku.has(chave)) { donoSku.set(chave, grupo); return false; }
-      return donoSku.get(chave) !== grupo;
+      return !!sku && (linhasDoSku.get(sku.toUpperCase()) || 0) > 1 && !conflitoSku(i);
     });
   coletar(bloqueios, 'DESTINO_INVALIDO', 'Divisão entre depósitos não confere com a quantidade recebida.',
     i => validarDestinos(lerMapeamento(i).destinos, num(i.quantidade_recebida)) !== null);

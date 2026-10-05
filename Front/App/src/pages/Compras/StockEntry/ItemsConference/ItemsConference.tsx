@@ -45,7 +45,7 @@ import { DestinosEditor, DestinoLinha } from './DestinosEditor';
 import { ModalCadastroRapido, ModalClassificarLote, type ValoresPorItem } from './ModaisLote';
 import { carregarFamiliasECategorias, type ClassificacaoItem } from './ClassificacaoPim';
 import { ClassificacaoTag, type ClassificacaoCatalogo, type NomesCatalogo } from './ClassificacaoTag';
-import { linhaItemNovo, linhaSemVinculo } from '../edicaoLote';
+import { linhaItemNovo, linhaSemVinculo, situacaoSkusNovos } from '../edicaoLote';
 import { buscarClassificacaoItens } from '../../api/comprasApi';
 import { TIPOS_RECURSO, TIPO_RECURSO_PADRAO, TipoRecurso, getTipoRecursoConfig } from '../tipoRecurso';
 import { hasCodigoInterno, MSG_SEM_CODIGO_INTERNO } from '../conferencia';
@@ -223,16 +223,8 @@ contagem.set(t, (contagem.get(t) || 0) + 1);
 }
 return TIPOS_RECURSO.filter(t => contagem.has(t.value)).map(t => ({ ...t, linhas: contagem.get(t.value) || 0 }));
 }, [localItems]);
-// SKU Customizado é único: itens novos da nota com o mesmo SKU (sem diferenciar maiúsculas)
-const skusRepetidos = useMemo(() => {
-const contagem = new Map<string, number>();
-for (const i of localItems) {
-if (!linhaItemNovo(i)) continue;
-const sku = String((i as any).mapeamento?.draftIdentity?.sku_comercial || '').trim().toUpperCase();
-if (sku) contagem.set(sku, (contagem.get(sku) || 0) + 1);
-}
-return new Set([...contagem].filter(([, n]) => n > 1).map(([sku]) => sku));
-}, [localItems]);
+// SKU Customizado repetido entre itens novos: mesmo produto agrupa num item só; produtos diferentes bloqueiam
+const skusNovos = useMemo(() => situacaoSkusNovos(localItems), [localItems]);
 const progressoConferencia = localItems.length > 0 ? Math.round((confirmedItems.length / localItems.length) * 100) : 0;
 
 const formatCurrency = (val: number) =>
@@ -356,9 +348,13 @@ text === SKU_A_GERAR ? (
 <Tooltip title="Item novo sem SKU Customizado digitado: recebe a sequência do banco na aprovação (ex.: IT-000123).">
 <Tag style={{ margin: 0, color: '#8c8c8c', borderStyle: 'dashed' }}>gerado na aprovação</Tag>
 </Tooltip>
-) : skusRepetidos.has(String(text).trim().toUpperCase()) && linhaItemNovo(record) ? (
-<Tooltip title="Outro item novo desta nota usa o mesmo SKU Customizado. O SKU é único: a aprovação fica bloqueada até mudar um deles.">
+) : skusNovos.conflitos.has(String(text).trim().toUpperCase()) && linhaItemNovo(record) ? (
+<Tooltip title="Outro produto desta nota (código e descrição do fornecedor diferentes) usa o mesmo SKU Customizado. A aprovação fica bloqueada até mudar um deles.">
 <Tag color="red" style={{ margin: 0 }}>{text} · repetido</Tag>
+</Tooltip>
+) : skusNovos.agrupados.has(String(text).trim().toUpperCase()) && linhaItemNovo(record) ? (
+<Tooltip title="O mesmo produto aparece em mais de uma linha da nota: as linhas entram como um único item no catálogo, com as quantidades somadas no estoque.">
+<Tag color="blue" style={{ margin: 0 }}>{text} · agrupado</Tag>
 </Tooltip>
 ) : (
 <Tag color="blue" style={{ margin: 0 }}>{text}</Tag>

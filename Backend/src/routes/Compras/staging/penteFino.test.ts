@@ -1,4 +1,4 @@
-import { avaliarPenteFino, calcularCustoMedio, lerConversaoCompra, StagingItemRow } from './penteFino';
+import { avaliarPenteFino, calcularCustoMedio, chaveItemNovo, lerConversaoCompra, StagingItemRow } from './penteFino';
 import { canonizar, criarResolvedor } from './unidadesEntrada';
 
 const assert = (condition: boolean, message: string): void => {
@@ -48,7 +48,15 @@ export const runPenteFinoTests = (): void => {
   // SKU customizado: único entre os novos da nota e fora do formato das sequências
   const novoCom = (seq: string, sku: string) => item({ item_nfe_seq: seq, produto_id_sistema: null, sku_sugerido: `LINHA-${seq}`, nome_item_sugerido: 'X',
     mapeamento_json: JSON.stringify({ mode: 'DRAFT', draftIdentity: { sku_comercial: sku } }) });
-  assert(avaliarPenteFino(lote, [novoCom('1', 'ABC'), novoCom('2', 'abc')], ctx).bloqueios.some(b => b.codigo === 'SKU_REPETIDO_NA_NOTA'), 'Dois novos com o mesmo SKU deveriam bloquear.');
+  // Mesmo produto do fornecedor repetido na nota: agrupa num item só (aviso, não bloqueia)
+  const repetido = avaliarPenteFino(lote, [novoCom('1', 'ABC'), novoCom('2', 'abc')], ctx);
+  assert(repetido.aprovavel && repetido.avisos.some(a => a.codigo === 'SKU_AGRUPADO' && a.itens?.length === 2), 'Mesmo produto com o mesmo SKU deveria agrupar.');
+  const soDescricao = avaliarPenteFino(lote, [novoCom('1', 'ABC'), { ...novoCom('2', 'ABC'), codigo_fornecedor: 'F9' }], ctx);
+  assert(soDescricao.aprovavel, 'Mesma descrição do fornecedor (código diferente) deveria agrupar.');
+  const diferentes = avaliarPenteFino(lote, [novoCom('1', 'ABC'), { ...novoCom('2', 'ABC'), codigo_fornecedor: 'F9', nome_fornecedor: 'Outro' }], ctx);
+  assert(diferentes.bloqueios.some(b => b.codigo === 'SKU_REPETIDO_NA_NOTA' && b.itens?.join() === '2'), 'Produtos diferentes com o mesmo SKU deveriam bloquear.');
+  assert(chaveItemNovo(novoCom('1', 'abc')) === chaveItemNovo(novoCom('2', 'ABC')), 'Mesma chave de criação para o mesmo SKU.');
+  assert(chaveItemNovo(item({ sku_sugerido: 'LINHA-1' })) !== chaveItemNovo(item({ sku_sugerido: 'LINHA-2' })), 'Sem SKU: uma chave por linha.');
   assert(avaliarPenteFino(lote, [novoCom('1', 'ABC'), novoCom('2', 'ABD')], ctx).aprovavel, 'SKUs diferentes são aprováveis.');
   assert(avaliarPenteFino(lote, [novoCom('1', 'it-000045')], ctx).bloqueios.some(b => b.codigo === 'SKU_RESERVADO'), 'SKU no formato da sequência deveria bloquear.');
 
