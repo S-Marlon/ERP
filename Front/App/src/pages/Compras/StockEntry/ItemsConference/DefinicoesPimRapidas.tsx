@@ -1,9 +1,11 @@
-// Definições rápidas do PIM na entrada de NF: criar categoria ou família (com os atributos principais)
+// Definições rápidas do PIM na entrada de NF: criar categoria, família (com os atributos principais) ou marca
 // sem sair da tela. O ajuste fino (templates, DNA com valor fixo, marca) continua nas telas do catálogo.
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Checkbox, Form, Input, Modal, Select, Space, Tag, Tooltip, Typography, message } from 'antd';
 import { createFamilia, getAtributosGlobais, updateFamilia } from '../../../Catalogo/pages/FamilyManager/FamilyManager.api';
 import { createCategory } from '../../../Catalogo/pages/CategoryManager/categoryService';
+import { createMarca } from '../../../Catalogo/pages/MarcasManager/services/comercialMarcas.service';
+import { SeletorCategoria } from './SeletorCategoria';
 import { PAPEL_ATRIBUTO } from '../../../Catalogo/pages/CatalogSkus/CampoAtributo';
 import type { AtributoFicha } from '../../../Catalogo/pages/CatalogSkus/CatalogSku.service';
 import { getAtributosParaItem } from '../../api/comprasApi';
@@ -119,8 +121,7 @@ export const ModalNovaCategoria: React.FC<NovaCategoriaProps> = ({ open, categor
           <Input placeholder="Ex: Terminais hidráulicos" autoFocus />
         </Form.Item>
         <Form.Item name="paiId" label="Dentro de (categoria pai)">
-          <Select allowClear showSearch optionFilterProp="label" placeholder="Nenhuma (categoria raiz)"
-            options={categorias.map(c => ({ value: c.id, label: c.caminho }))} />
+          <SeletorCategoria categorias={categorias} placeholder="Nenhuma (categoria raiz)" />
         </Form.Item>
         <ListaHerdados herdados={herdados} />
         <Form.Item name="grade" label={<Tooltip title={PAPEL_ATRIBUTO.grade.ajuda}>Atributos de grade (mudam de um item para outro)</Tooltip>}>
@@ -245,8 +246,7 @@ export const ModalNovaFamilia: React.FC<NovaFamiliaProps> = ({
         <Form.Item name="categoriaId" label={
           <Space size={8}>Categoria<a style={{ fontSize: 12 }} onClick={onNovaCategoria}>+ nova categoria</a></Space>
         }>
-          <Select allowClear showSearch optionFilterProp="label" placeholder="Sem categoria (não herda atributos)"
-            options={categorias.map(c => ({ value: c.id, label: c.caminho }))} />
+          <SeletorCategoria categorias={categorias} placeholder="Sem categoria (não herda atributos)" />
         </Form.Item>
         <ListaHerdados herdados={herdados} />
         <Form.Item name="grade" label={<Tooltip title={PAPEL_ATRIBUTO.grade.ajuda}>Atributos de grade (o que muda de um item para outro)</Tooltip>}
@@ -263,6 +263,60 @@ export const ModalNovaFamilia: React.FC<NovaFamiliaProps> = ({
           <Alert type="info" showIcon style={{ padding: '4px 8px', fontSize: 12 }}
             message="Sem atributo de grade a família não fica ativa: os itens dela não teriam como se diferenciar." />
         )}
+      </Form>
+    </Modal>
+  );
+};
+
+// ---------------------------------------------------------------------------------------------
+// Nova marca
+// ---------------------------------------------------------------------------------------------
+interface NovaMarcaProps {
+  open: boolean;
+  nomeInicial?: string;
+  onFechar: () => void;
+  onCriada: (id: number, nome: string) => void;
+}
+
+export const ModalNovaMarca: React.FC<NovaMarcaProps> = ({ open, nomeInicial, onFechar, onCriada }) => {
+  const [form] = Form.useForm();
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    if (open) { form.resetFields(); form.setFieldsValue({ nome: nomeInicial || undefined }); }
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const salvar = async () => {
+    const v = await form.validateFields();
+    const nome = String(v.nome).trim();
+    setSalvando(true);
+    try {
+      const r = await createMarca({ nome, codigo: String(v.codigo || '').trim() || null, site: String(v.site || '').trim() || null });
+      message.success(`Marca "${nome}" criada.`);
+      onCriada(Number(r.id_marca), nome);
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : 'Erro ao criar a marca.');
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <Modal open={open} title="Nova marca" okText="Criar marca" cancelText="Cancelar"
+      onOk={salvar} confirmLoading={salvando} onCancel={onFechar} destroyOnHidden width={420}>
+      <Form form={form} layout="vertical" size="small" onFinish={salvar}>
+        <Form.Item name="nome" label="Nome" rules={[{ required: true, whitespace: true, message: 'Informe o nome.' }]}>
+          <Input placeholder="Ex: Parker, Ebara, Tramontina" autoFocus onPressEnter={salvar} />
+        </Form.Item>
+        <Space.Compact block>
+          <Form.Item name="codigo" label="Código (opcional)" style={{ width: 140, marginRight: 8 }}>
+            <Input maxLength={30} />
+          </Form.Item>
+          <Form.Item name="site" label="Site (opcional)" style={{ flex: 1 }}>
+            <Input placeholder="www.marca.com.br" />
+          </Form.Item>
+        </Space.Compact>
+        <Text type="secondary" style={{ fontSize: 12 }}>Logo e descrição podem ser completados depois em Catálogo › Marcas.</Text>
       </Form>
     </Modal>
   );

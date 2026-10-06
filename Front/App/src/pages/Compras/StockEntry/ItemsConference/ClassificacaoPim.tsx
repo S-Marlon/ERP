@@ -1,17 +1,18 @@
 // Classificação do item novo na entrada de NF: família (que já traz a categoria) ou só a categoria, a marca
 // e, se o operador quiser, os valores dos atributos que o item herda. Nada disso é obrigatório aqui:
 // o que ficar vazio é completado depois no editor de catálogo (o item só não é publicado enquanto faltar obrigatório).
-import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Col, Row, Select, Space, Spin, Switch, Tag, Tooltip, Typography, message } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import React, { useEffect, useState } from 'react';
+import { Alert, Button, Select, Space, Spin, Switch, Tag, Tooltip, Typography, message } from 'antd';
+import { ApartmentOutlined, FolderOutlined, PlusOutlined, TagOutlined } from '@ant-design/icons';
 import { getCategorias, getFamilies } from '../../../Catalogo/pages/FamilyManager/FamilyManager.api';
 import { STATUS_FAMILIA_CONFIG } from '../../../Catalogo/pages/FamilyManager/CatalogManager.types';
 import type { AtributoFicha } from '../../../Catalogo/pages/CatalogSkus/CatalogSku.service';
 import CampoAtributo, { PAPEL_ATRIBUTO, ordenarPorPapel, valorVazio } from '../../../Catalogo/pages/CatalogSkus/CampoAtributo';
 import { getAtributosParaItem } from '../../api/comprasApi';
 import { definirCategoriaDaFamilia } from '../../../Catalogo/pages/CategoryManager/categoryService';
-import { createMarca, getMarcas } from '../../../Catalogo/pages/MarcasManager/services/comercialMarcas.service';
-import { ModalNovaCategoria, ModalNovaFamilia } from './DefinicoesPimRapidas';
+import { getMarcas } from '../../../Catalogo/pages/MarcasManager/services/comercialMarcas.service';
+import { ModalNovaCategoria, ModalNovaFamilia, ModalNovaMarca } from './DefinicoesPimRapidas';
+import { SeletorCategoria } from './SeletorCategoria';
 
 const { Text } = Typography;
 
@@ -81,6 +82,18 @@ export const carregarFamiliasECategorias = () => {
 // Depois de criar/alterar família ou categoria por aqui: a próxima leitura busca de novo no servidor
 export const invalidarFamiliasECategorias = () => { cacheCatalogo = null; };
 
+// Um campo da classificação: título com ícone, ação "+ nova" à direita, o seletor e uma dica curta embaixo
+const Campo: React.FC<{ icone: React.ReactNode; titulo: string; acao?: React.ReactNode; dica?: React.ReactNode; children: React.ReactNode; largo?: boolean }> = ({ icone, titulo, acao, dica, children, largo }) => (
+  <div style={largo ? { gridColumn: '1 / -1', minWidth: 0 } : { minWidth: 0 }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3, minHeight: 18 }}>
+      <Space size={4}><span style={{ color: '#8c8c8c', fontSize: 12 }}>{icone}</span><Text strong style={{ fontSize: 12 }}>{titulo}</Text></Space>
+      {acao}
+    </div>
+    {children}
+    {dica && <div style={{ fontSize: 11, marginTop: 3, lineHeight: 1.35 }}>{dica}</div>}
+  </div>
+);
+
 interface Props {
   value: ClassificacaoItem;
   onChange: (valor: ClassificacaoItem) => void;
@@ -105,7 +118,8 @@ export const ClassificacaoPim: React.FC<Props> = ({ value, onChange, lote, onAtr
   const [versao, setVersao] = useState(0);
   const [marcas, setMarcas] = useState<MarcaOpcao[]>([]);
   const [buscaMarca, setBuscaMarca] = useState('');
-  const [criandoMarca, setCriandoMarca] = useState(false);
+  // Modal de nova marca: null = fechado; texto = nome já digitado na busca
+  const [modalMarca, setModalMarca] = useState<string | null>(null);
 
   const recarregar = async () => {
     invalidarFamiliasECategorias();
@@ -122,23 +136,13 @@ export const ClassificacaoPim: React.FC<Props> = ({ value, onChange, lote, onAtr
     carregarMarcas().then(setMarcas).catch(e => setErro(e.message || 'Erro ao carregar as marcas.'));
   }, []);
 
-  // Marca nova sem sair da entrada: digita na busca e cria
-  const criarMarca = async () => {
-    const nome = buscaMarca.trim();
-    if (!nome) return;
-    setCriandoMarca(true);
-    try {
-      const r = await createMarca({ nome });
-      cacheMarcas = null;
-      setMarcas(await carregarMarcas());
-      setBuscaMarca('');
-      onChange({ ...value, marcaId: Number(r.id_marca) });
-      message.success(`Marca "${nome}" criada.`);
-    } catch (e) {
-      message.error(e instanceof Error ? e.message : 'Erro ao criar a marca.');
-    } finally {
-      setCriandoMarca(false);
-    }
+  // Marca criada pelo modal: recarrega a lista e já seleciona no item
+  const marcaCriada = async (id: number) => {
+    setModalMarca(null);
+    setBuscaMarca('');
+    cacheMarcas = null;
+    setMarcas(await carregarMarcas().catch(() => marcas));
+    onChange({ ...value, marcaId: id });
   };
 
   // Atributos que o item terá nesta família/categoria
@@ -157,13 +161,10 @@ export const ClassificacaoPim: React.FC<Props> = ({ value, onChange, lote, onAtr
 
   const familia = familias.find(f => f.id === value.familiaId) || null;
   const marcaDaFamilia = familia?.papelMarca === 'dna' && marcaReal(familia.nomeMarca) ? familia.nomeMarca : null;
-  const categoriaEfetiva = familia ? familia.categoriaId : value.categoriaId;
   const editaveis = atributos.filter(a => !a.valorFixo);
   const obrigatorios = editaveis.filter(a => a.obrigatorio);
   const preenchendo = value.atributos !== null;
   const faltando = obrigatorios.filter(a => !preenchendo || valorVazio(value.atributos?.[a.atributoId]));
-
-  const categoriaOptions = useMemo(() => categorias.map(c => ({ value: c.id, label: c.caminho })), [categorias]);
 
   // Família escolhida sem categoria: define aqui mesmo (os itens passam a herdar os atributos dela)
   const definirCategoria = async () => {
@@ -190,19 +191,25 @@ export const ClassificacaoPim: React.FC<Props> = ({ value, onChange, lote, onAtr
   return (
     <Space direction="vertical" size={8} style={{ width: '100%' }}>
       {erro && <Alert type="error" showIcon message={erro} style={{ padding: '4px 8px' }} />}
-      <Row gutter={8}>
-        <Col span={12}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text strong style={{ fontSize: 11 }}>Família</Text>
-            {linkNovo('nova família', () => setModalFamilia(true), 'Criar uma família com os atributos de grade, sem sair da entrada')}
-          </div>
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px 12px',
+        padding: '10px 12px', border: '1px solid #f0f0f0', borderRadius: 8, background: '#fafafa',
+      }}>
+        <Campo
+          icone={<ApartmentOutlined />}
+          titulo="Família"
+          acao={linkNovo('nova família', () => setModalFamilia(true), 'Criar uma família com os atributos de grade, sem sair da entrada')}
+          dica={familia && familia.status !== 'ATIVO'
+            ? <Text type="warning" style={{ fontSize: 11 }}>Família não está ativa: o item entra no estoque, mas só é publicado quando ela for ativada.</Text>
+            : null}
+        >
           <Select
             size="small"
             allowClear
             showSearch
             optionFilterProp="label"
             placeholder="Sem família (classificar depois)"
-            style={{ width: '100%', marginTop: 2 }}
+            style={{ width: '100%' }}
             value={value.familiaId ?? undefined}
             onChange={v => onChange({ ...value, familiaId: v ?? null, categoriaId: null, atributos: null })}
             options={familias.map(f => ({
@@ -210,82 +217,77 @@ export const ClassificacaoPim: React.FC<Props> = ({ value, onChange, lote, onAtr
               label: `${f.nome}${f.status !== 'ATIVO' ? ` (${STATUS_FAMILIA_CONFIG[f.status as keyof typeof STATUS_FAMILIA_CONFIG]?.label || f.status})` : ''}`,
             }))}
           />
-        </Col>
-        <Col span={12}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text strong style={{ fontSize: 11 }}>Categoria</Text>
-            {!familia && linkNovo('nova categoria', () => setModalCategoria('item'), 'Criar uma categoria (item sem família herda os atributos dela)')}
-          </div>
-          <Tooltip title={familia ? 'A categoria vem da família (regra do PIM). Para mudar, mude a família.' : undefined}>
+        </Campo>
+
+        <Campo
+          icone={<TagOutlined />}
+          titulo="Marca"
+          acao={!marcaDaFamilia && linkNovo('nova marca', () => setModalMarca(buscaMarca.trim()), 'Cadastrar uma marca sem sair da entrada')}
+          dica={marcaDaFamilia
+            ? <Text type="secondary" style={{ fontSize: 11 }}>Marca DNA da família: todos os itens dela recebem esta marca.</Text>
+            : familia?.papelMarca === 'grade' && !value.marcaId
+              ? <Text type="warning" style={{ fontSize: 11 }}>Nesta família a marca diferencia os itens: escolha a deste item.</Text>
+              : null}
+        >
+          {marcaDaFamilia ? (
+            <Select size="small" disabled style={{ width: '100%' }} value={marcaDaFamilia} options={[{ value: marcaDaFamilia, label: `${marcaDaFamilia} (da família)` }]} />
+          ) : (
             <Select
               size="small"
               allowClear
               showSearch
               optionFilterProp="label"
+              placeholder="Sem marca"
+              style={{ width: '100%' }}
+              value={value.marcaId ?? undefined}
+              onChange={v => onChange({ ...value, marcaId: v ?? null })}
+              searchValue={buscaMarca}
+              onSearch={setBuscaMarca}
+              options={marcas.map(m => ({ value: m.id, label: m.nome }))}
+              notFoundContent={buscaMarca.trim() ? (
+                <Button type="link" size="small" icon={<PlusOutlined />} onClick={() => setModalMarca(buscaMarca.trim())}>Cadastrar a marca "{buscaMarca.trim()}"</Button>
+              ) : 'Nenhuma marca'}
+            />
+          )}
+        </Campo>
+
+        {familia && !familia.categoriaId ? (
+          // Família ainda sem categoria: escolhe aqui e define na família (vale para todos os itens dela)
+          <Campo
+            largo
+            icone={<FolderOutlined />}
+            titulo="Categoria da família"
+            acao={linkNovo('nova categoria', () => setModalCategoria('familia'), 'Criar uma categoria nova para esta família')}
+            dica={<Text type="warning" style={{ fontSize: 11 }}>A família "{familia.nome}" ainda não tem categoria: escolha e clique em Definir (vale para todos os itens dela).</Text>}
+          >
+            <div style={{ display: 'flex', gap: 6 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <SeletorCategoria size="small" categorias={categorias} placeholder="Escolher a categoria da família" value={categoriaDaFamilia} onChange={setCategoriaDaFamilia} />
+              </div>
+              <Button size="small" type="primary" disabled={!categoriaDaFamilia} loading={salvandoCategoria} onClick={definirCategoria}>Definir</Button>
+            </div>
+          </Campo>
+        ) : (
+          <Campo
+            largo
+            icone={<FolderOutlined />}
+            titulo="Categoria"
+            acao={!familia && linkNovo('nova categoria', () => setModalCategoria('item'), 'Criar uma categoria (item sem família herda os atributos dela)')}
+            dica={<Text type="secondary" style={{ fontSize: 11 }}>
+              {familia ? 'Vem da família (regra do PIM): para mudar, mude a família.' : 'Sem família, o item herda os atributos da categoria.'}
+            </Text>}
+          >
+            <SeletorCategoria
+              size="small"
+              categorias={categorias}
               placeholder="Sem categoria"
               disabled={Boolean(familia)}
-              style={{ width: '100%', marginTop: 2 }}
-              value={categoriaEfetiva ?? undefined}
-              onChange={v => onChange({ ...value, familiaId: null, categoriaId: v ?? null, atributos: null })}
-              options={categoriaOptions}
+              value={familia ? familia.categoriaId : value.categoriaId}
+              onChange={v => onChange({ ...value, familiaId: null, categoriaId: v, atributos: null })}
             />
-          </Tooltip>
-        </Col>
-      </Row>
-
-      <div>
-        <Text strong style={{ fontSize: 11 }}>Marca</Text>
-        {marcaDaFamilia ? (
-          <Tooltip title="Marca DNA da família: todos os itens dela recebem esta marca. Para mudar, ajuste a família no catálogo.">
-            <Select size="small" disabled style={{ width: '100%', marginTop: 2 }} value={marcaDaFamilia} options={[{ value: marcaDaFamilia, label: `${marcaDaFamilia} (da família)` }]} />
-          </Tooltip>
-        ) : (
-          <Select
-            size="small"
-            allowClear
-            showSearch
-            optionFilterProp="label"
-            placeholder="Sem marca"
-            style={{ width: '100%', marginTop: 2 }}
-            value={value.marcaId ?? undefined}
-            onChange={v => onChange({ ...value, marcaId: v ?? null })}
-            searchValue={buscaMarca}
-            onSearch={setBuscaMarca}
-            options={marcas.map(m => ({ value: m.id, label: m.nome }))}
-            notFoundContent={buscaMarca.trim() ? (
-              <Button type="link" size="small" icon={<PlusOutlined />} loading={criandoMarca} onClick={criarMarca}>Criar marca "{buscaMarca.trim()}"</Button>
-            ) : 'Nenhuma marca'}
-          />
-        )}
-        {familia?.papelMarca === 'grade' && !value.marcaId && (
-          <Text type="warning" style={{ fontSize: 11 }}>Nesta família a marca diferencia os itens: escolha a marca deste item.</Text>
+          </Campo>
         )}
       </div>
-
-      {familia && !familia.categoriaId && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6, padding: '4px 8px' }}>
-          <Text style={{ fontSize: 11, whiteSpace: 'nowrap' }}>Família sem categoria:</Text>
-          <Select
-            size="small"
-            showSearch
-            allowClear
-            optionFilterProp="label"
-            placeholder="escolher a categoria da família"
-            style={{ flex: 1, minWidth: 0 }}
-            value={categoriaDaFamilia ?? undefined}
-            onChange={v => setCategoriaDaFamilia(v ?? null)}
-            options={categoriaOptions}
-          />
-          <Button size="small" type="primary" disabled={!categoriaDaFamilia} loading={salvandoCategoria} onClick={definirCategoria}>Definir</Button>
-          {linkNovo('nova', () => setModalCategoria('familia'), 'Criar uma categoria nova para esta família')}
-        </div>
-      )}
-
-      {familia && familia.status !== 'ATIVO' && (
-        <Text type="warning" style={{ fontSize: 11 }}>
-          Família não está ativa: o item entra no estoque, mas só é publicado quando a família for ativada.
-        </Text>
-      )}
 
       {(value.familiaId || value.categoriaId) && (
         <Spin spinning={carregando} size="small">
@@ -372,6 +374,12 @@ export const ClassificacaoPim: React.FC<Props> = ({ value, onChange, lote, onAtr
           await recarregar();
           onChange({ ...value, familiaId: id, categoriaId: null, atributos: null });
         }}
+      />
+      <ModalNovaMarca
+        open={modalMarca !== null}
+        nomeInicial={modalMarca || ''}
+        onFechar={() => setModalMarca(null)}
+        onCriada={marcaCriada}
       />
       <ModalNovaCategoria
         open={modalCategoria !== null}
