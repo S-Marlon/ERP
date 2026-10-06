@@ -1,6 +1,6 @@
 // Módulo Rolamentos. Montado em /api/modulos/transmissao/rolamentos (bloqueado se o módulo estiver desligado)
 import { Router } from 'express';
-import { analisarLinhas, excluirMedida, obterConfig, salvarConfig, salvarMarca, salvarMedidas, verificarSkus } from './rolamentos.controller';
+import { analisarLinhas, dicionario, excluirMedida, obterConfig, salvarConfig, salvarMarca, salvarMedidas, verificarSkus } from './rolamentos.controller';
 
 const router = Router();
 
@@ -8,6 +8,7 @@ router.get('/config', obterConfig);
 router.put('/config', salvarConfig);
 router.put('/marcas/:idMarca', salvarMarca);
 router.post('/analisar', analisarLinhas);
+router.get('/dicionario', dicionario);
 router.post('/skus', verificarSkus);
 router.post('/medidas', salvarMedidas);
 router.delete('/medidas/:id', excluirMedida);

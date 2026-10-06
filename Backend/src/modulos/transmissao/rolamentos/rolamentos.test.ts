@@ -33,7 +33,7 @@ for (const [desc, tipo, codigo, vedacao, folga, marca, medidas] of casos) {
 assert(lerDescricao('ROLAMENTO HK2220F NTN', marcas).marcaTexto === 'NTN', 'sugere NTN');
 assert(lerDescricao('ROLAMENTO PER.6802-2RSU PEER/SKF', []).marcaTexto === 'PEER', 'sugere PEER');
 // HK2220F: o "F" colado fica como sufixo; vedação de agulha sem sufixo = aberto
-assert(lerDescricao('ROLAMENTO HK2220F NTN', marcas).sufixos[0] === 'F', 'sufixo F');
+assert(lerDescricao('ROLAMENTO HK2220F NTN', marcas).sufixos[0]?.codigo === 'F', 'sufixo F');
 
 // Outros formatos comuns
 let l = lerDescricao('ROL 6205-2RS/C3 SKF', marcas);
@@ -56,5 +56,41 @@ assert(montarSku({ codigo: 'UC208-24', vedacao: 'ABERTO', folga: null, linha: 2,
 assert(montarSku({ codigo: 'HK2220', vedacao: 'ABERTO', folga: null, linha: 1, marca: { nome: 'NTN', codigo: null } }) === 'HK2220-NTN', 'sku HK');
 assert(montarNome({ tipo: 'RIGIDO_ESFERAS', codigo: '6005', vedacao: 'ZZ', folga: null, linha: 2, marca: null }) === 'Rolamento 6005 ZZ 2ª linha', 'nome 2ª');
 assert(montarNome({ tipo: 'AGULHAS', codigo: 'HK2220', vedacao: 'ABERTO', folga: null, linha: 1, marca: { nome: 'NTN' } }) === 'Rolamento de agulha HK2220 NTN', 'nome HK');
+
+// Nomenclaturas de fabricante (FAG, NTN, SKF, Timken): vedação, folga, prefixo inox e códigos sem significado conhecido
+const comFab: MarcaModulo[] = [...marcas, { id: 20, nome: 'FAG', codigo: 'FAG', linha: 1, apelidos: [] }, { id: 21, nome: 'NTN', codigo: 'NTN', linha: 1, apelidos: [] }];
+const fab: Array<[string, string, string, string, string | null, string, string[], string | null]> = [
+  // descrição, tipo, código, vedação, folga, código completo, desconhecidos, marca (nome ou texto)
+  ['ROLAMENTO 6201-2RSR-CO7-C3#N1 FAG', 'RIGIDO_ESFERAS', '6201', '2RS', 'C3', '6201-2RSR-CO7-C3#N1', ['CO7', '#N1'], 'FAG'],
+  ['ROLAMENTO 6300-B-2DRS-L278-C3-SNZ1#O FAG', 'RIGIDO_ESFERAS', '6300', '2RS', 'C3', '6300-B-2DRS-L278-C3-SNZ1#O', ['B', 'SNZ1', '#O'], 'FAG'],
+  ['ROLAMENTO 607-2RSR-HLN#N10 FAG', 'RIGIDO_ESFERAS', '607', '2RS', null, '607-2RSR-HLN#N10', ['HLN', '#N10'], 'FAG'],
+  ['ROLAMENTO 6206-2RSR-CO7-C3#N1 FAG', 'RIGIDO_ESFERAS', '6206', '2RS', 'C3', '6206-2RSR-CO7-C3#N1', ['CO7', '#N1'], 'FAG'],
+  ['ROLAMENTO 6205-2RS-C3 TIMKEN NCZADO', 'RIGIDO_ESFERAS', '6205', '2RS', 'C3', '6205-2RS-C3', [], 'TIMKEN'],
+  ['ROLAMENTO 6004-2RSR-CO7#N1 FAG', 'RIGIDO_ESFERAS', '6004', '2RS', null, '6004-2RSR-CO7#N1', ['CO7', '#N1'], 'FAG'],
+  ['ROLAMENTO SS 608 2RS GTOP-GBR', 'RIGIDO_ESFERAS', 'SS608', '2RS', null, 'SS608', [], 'GTOP-GBR'],
+  ['ROLAMENTO 30204-A-J42B-W136#N1 FAG', 'ROLOS_CONICOS', '30204', 'ABERTO', null, '30204-A-J42B-W136#N1', ['A', 'J42B', 'W136', '#N1'], 'FAG'],
+  ['ROLAMENTO 6902LLU/2AS NTN', 'RIGIDO_ESFERAS', '6902', '2RS', null, '6902LLU/2AS', ['2AS'], 'NTN'],
+  ['ROLAMENTO 30206.J42A4 FAG', 'ROLOS_CONICOS', '30206', 'ABERTO', null, '30206.J42A4', ['J42A4'], 'FAG'],
+  ['ROLAMENTO 6301-C-2HRS-C3#N1&gt;V FAG', 'RIGIDO_ESFERAS', '6301', '2RS', 'C3', '6301-C-2HRS-C3#N1>V', ['C', '#N1>V'], 'FAG'],
+  ['ROLAMENTO 6204-2RSH/AEM3/C3 SKF', 'RIGIDO_ESFERAS', '6204', '2RS', 'C3', '6204-2RSH/AEM3/C3', ['AEM3'], 'SKF'],
+  ['ROLAMENTO 30205AA3 FAG', 'ROLOS_CONICOS', '30205', 'ABERTO', null, '30205AA3', ['AA3'], 'FAG'],
+];
+for (const [desc, tipo, codigo, vedacao, folga, completo, desconhecidos, marca] of fab) {
+  const l = lerDescricao(desc, comFab);
+  const naoSei = l.sufixos.filter(x => !x.significado).map(x => x.codigo);
+  assert(l.tipo === tipo && l.codigo === codigo && l.vedacao === vedacao && l.folga === folga, `${desc}: ${JSON.stringify({ t: l.tipo, c: l.codigo, v: l.vedacao, f: l.folga })}`);
+  assert(l.codigoCompleto === completo, `${desc}: código completo ${l.codigoCompleto}`);
+  assert(JSON.stringify(naoSei) === JSON.stringify(desconhecidos), `${desc}: desconhecidos ${JSON.stringify(naoSei)}`);
+  assert((l.marca?.nome ?? l.marcaTexto) === marca, `${desc}: marca ${l.marca?.nome ?? l.marcaTexto}`);
+  assert(medidasDoCodigo(l.tipo, l.codigo!) !== null, `${desc}: medidas`);
+}
+// Significados: NCZADO informativo, inox no prefixo, L278 provável graxa, dicionário do operador vale primeiro
+let s1 = lerDescricao('ROLAMENTO 6205-2RS-C3 TIMKEN NCZADO', comFab);
+assert(s1.sufixos.some(x => x.codigo === 'NCZADO' && x.significado === 'importado e nacionalizado'), 'NCZADO');
+assert(lerDescricao('ROLAMENTO SS 608 2RS GTOP-GBR', comFab).sufixos[0].significado === 'aço inoxidável', 'inox');
+assert(Boolean(lerDescricao('ROLAMENTO 6300-B-2DRS-L278-C3-SNZ1#O FAG', comFab).sufixos.find(x => x.codigo === 'L278')?.provavel), 'graxa provável');
+s1 = lerDescricao('ROLAMENTO 6201-2RSR-CO7-C3#N1 FAG', comFab, { co7: 'código de lubrificação FAG' });
+assert(s1.sufixos.find(x => x.codigo === 'CO7')?.significado === 'código de lubrificação FAG', 'dicionário do operador');
+assert(montarSku({ codigo: 'SS608', vedacao: '2RS', folga: null, linha: 2, marca: null }) === 'SS608-2RS-2L', 'sku inox');
 
 console.log('rolamentos: ok');

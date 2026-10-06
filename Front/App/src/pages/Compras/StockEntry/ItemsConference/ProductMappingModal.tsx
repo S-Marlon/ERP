@@ -66,6 +66,8 @@ export interface MappingPayload {
     // Marca do item novo (família com marca DNA impõe a dela na aprovação)
     marca_id?: number | null;
     nome_comercial: string;
+    // Descrição comercial do item novo (ex.: o módulo de rolamentos explica os códigos do fabricante)
+    descricao_comercial?: string;
     nome_interno: string;
     // Chave da linha na staging (LINHA-n): agrupa linhas do mesmo item novo; nunca vira SKU
     sku_interno: string;

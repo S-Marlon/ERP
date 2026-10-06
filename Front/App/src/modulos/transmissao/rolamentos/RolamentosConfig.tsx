@@ -1,7 +1,7 @@
 // Compras › Rolamentos (módulo TRANSMISSAO_ROLAMENTOS): estrutura no catálogo, linha (1ª/2ª) e apelidos das
 // marcas, markup padrão, teste de leitura de descrição e medidas aprendidas.
 import React, { useEffect, useState } from 'react';
-import { Alert, Button, Card, Col, Descriptions, Input, InputNumber, Popconfirm, Row, Select, Space, Spin, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { Alert, Button, Card, Col, Collapse, Descriptions, Input, InputNumber, Popconfirm, Row, Select, Space, Spin, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { BuildOutlined, DeleteOutlined, ExperimentOutlined, PlusOutlined } from '@ant-design/icons';
 import { ModalNovaMarca } from '../../../pages/Compras/StockEntry/ItemsConference/DefinicoesPimRapidas';
 import { montarEstrutura } from './estruturaRolamentos';
@@ -25,6 +25,27 @@ const RolamentosConfig: React.FC = () => {
   const [teste, setTeste] = useState('ROLAMENTO 6205-2RS/C3 SKF');
   const [resultadoTeste, setResultadoTeste] = useState<LinhaAnalisada | null>(null);
 
+  // Dicionário de códigos do fabricante: os já conhecidos (fixos) e os definidos pelo operador
+  const [dicionarioPadrao, setDicionarioPadrao] = useState<Array<{ codigo: string; categoria: string; significado: string }>>([]);
+  const [novoCodigo, setNovoCodigo] = useState('');
+  const [novoSignificado, setNovoSignificado] = useState('');
+
+  const salvarSufixos = async (sufixos: Record<string, string>) => {
+    try {
+      const r = await rolamentosApi.salvarConfig({ sufixos });
+      setConfig(c => ({ ...c, sufixos: r.configuracao.sufixos || {} }));
+      return true;
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : 'Erro ao salvar o dicionário.');
+      return false;
+    }
+  };
+  const adicionarSufixo = async () => {
+    const codigo = novoCodigo.trim().toUpperCase();
+    if (!codigo || !novoSignificado.trim()) return;
+    if (await salvarSufixos({ ...(config.sufixos || {}), [codigo]: novoSignificado.trim() })) { setNovoCodigo(''); setNovoSignificado(''); }
+  };
+
   const carregar = async () => {
     try {
       const r = await rolamentosApi.config();
@@ -32,6 +53,7 @@ const RolamentosConfig: React.FC = () => {
       setFamilias(r.familias);
       setMarcas(r.marcas);
       setMedidas(r.medidas);
+      rolamentosApi.dicionario().then(setDicionarioPadrao).catch(() => undefined);
       setApelidos(Object.fromEntries(r.marcas.map(m => [m.id, m.apelidos.join(', ')])));
     } catch (e) {
       message.error(e instanceof Error ? e.message : 'Erro ao carregar.');
@@ -158,6 +180,17 @@ const RolamentosConfig: React.FC = () => {
                   {resultadoTeste.medidas ? `${mm(resultadoTeste.medidas.d)} × ${mm(resultadoTeste.medidas.D)} × ${mm(resultadoTeste.medidas.B)} mm` : 'fora da tabela'}
                 </Descriptions.Item>
                 <Descriptions.Item label="SKU">{resultadoTeste.sku || '—'}</Descriptions.Item>
+                <Descriptions.Item label="Códigos do fabricante" span={2}>
+                  {resultadoTeste.sufixos.length ? (
+                    <Space size={4} wrap>
+                      {resultadoTeste.sufixos.map(s => (
+                        <Tooltip key={s.codigo} title={s.significado ? `${s.significado}${s.provavel ? ' (provável)' : ''}` : 'sem significado: defina no dicionário'}>
+                          <Tag color={s.significado ? undefined : 'orange'}>{s.codigo}{s.significado ? '' : ' ?'}</Tag>
+                        </Tooltip>
+                      ))}
+                    </Space>
+                  ) : '—'}
+                </Descriptions.Item>
               </Descriptions>
             )}
           </Card>
@@ -204,6 +237,54 @@ const RolamentosConfig: React.FC = () => {
                 },
               ]}
             />
+          </Card>
+
+          <Card size="small" title="Dicionário de códigos do fabricante" style={{ marginTop: 14 }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Significado dos sufixos (ex.: CO7, #N1, J42B). Vai na descrição dos itens novos e não muda o SKU. Também dá para definir clicando no código laranja na entrada da nota.
+            </Text>
+            <Space.Compact style={{ width: '100%', marginTop: 8 }}>
+              <Input style={{ width: 120 }} placeholder="Código" value={novoCodigo} maxLength={20} onChange={e => setNovoCodigo(e.target.value.toUpperCase())} />
+              <Input placeholder="Significado" value={novoSignificado} maxLength={200} onChange={e => setNovoSignificado(e.target.value)} onPressEnter={adicionarSufixo} />
+              <Button type="primary" disabled={!novoCodigo.trim() || !novoSignificado.trim()} onClick={adicionarSufixo}>Adicionar</Button>
+            </Space.Compact>
+            <Table
+              size="small" rowKey="codigo" pagination={false} style={{ marginTop: 8 }}
+              dataSource={Object.entries(config.sufixos || {}).map(([codigo, significado]) => ({ codigo, significado })).sort((a, b) => a.codigo.localeCompare(b.codigo))}
+              locale={{ emptyText: 'Nenhum código definido por você ainda' }}
+              columns={[
+                { title: 'Código', dataIndex: 'codigo', width: 110, render: (v: string) => <Tag>{v}</Tag> },
+                {
+                  title: 'Significado', dataIndex: 'significado',
+                  render: (v: string, r: { codigo: string }) => (
+                    <Typography.Paragraph style={{ margin: 0 }} editable={{
+                      onChange: texto => { if (texto.trim() && texto !== v) salvarSufixos({ ...(config.sufixos || {}), [r.codigo]: texto.trim() }); },
+                    }}>{v}</Typography.Paragraph>
+                  ),
+                },
+                {
+                  title: '', key: 'x', width: 40,
+                  render: (_: unknown, r: { codigo: string }) => (
+                    <Button size="small" type="text" danger icon={<DeleteOutlined />} onClick={() => {
+                      const resto = { ...(config.sufixos || {}) };
+                      delete resto[r.codigo];
+                      salvarSufixos(resto);
+                    }} />
+                  ),
+                },
+              ]}
+            />
+            <Collapse ghost size="small" style={{ marginTop: 6 }} items={[{
+              key: 'padrao',
+              label: `Códigos já conhecidos pelo sistema (${dicionarioPadrao.length})`,
+              children: (
+                <Table size="small" rowKey="codigo" pagination={false} dataSource={dicionarioPadrao} scroll={{ y: 260 }}
+                  columns={[
+                    { title: 'Código', dataIndex: 'codigo', width: 100, render: (v: string) => <Tag>{v}</Tag> },
+                    { title: 'Significado', dataIndex: 'significado' },
+                  ]} />
+              ),
+            }]} />
           </Card>
 
           <Card size="small" title="Medidas aprendidas" style={{ marginTop: 14 }}>

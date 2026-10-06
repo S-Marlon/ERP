@@ -10,7 +10,7 @@ import type { MappingPayload } from '../../../pages/Compras/StockEntry/ItemsConf
 import { mapeamentoRapido } from '../../../pages/Compras/StockEntry/edicaoLote';
 import { createMarca } from '../../../pages/Catalogo/pages/MarcasManager/services/comercialMarcas.service';
 import {
-  ConfigRolamentos, ItemExistente, MarcaModulo, montarNome, montarSku, rolamentosApi, siglaDaMarca, TIPOS, TipoRolamento, VEDACOES,
+  ConfigRolamentos, ItemExistente, MarcaModulo, montarDescricao, montarNome, montarSku, rolamentosApi, siglaDaMarca, Sufixo, TIPOS, TipoRolamento, VEDACOES,
 } from './rolamentosApi';
 
 const { Text } = Typography;
@@ -31,6 +31,8 @@ interface Linha {
   linha: 1 | 2 | null;
   d: number | null; D: number | null; B: number | null;
   origemMedidas: 'TABELA' | 'APRENDIDA' | 'MANUAL' | null;
+  codigoCompleto: string | null;
+  sufixos: Sufixo[];
 }
 
 const RolamentosEntrada: React.FC<EntradaNfExtensaoProps> = ({ linhas: linhasNota, aplicarMapeamentos, readOnly }) => {
@@ -44,6 +46,9 @@ const RolamentosEntrada: React.FC<EntradaNfExtensaoProps> = ({ linhas: linhasNot
   const [existentes, setExistentes] = useState<Record<string, ItemExistente>>({});
   const [linhaDasMarcas, setLinhaDasMarcas] = useState<Record<number, 1 | 2>>({});
   const [markup, setMarkup] = useState(2);
+  // Código do fabricante sem significado conhecido que o operador está definindo (fica no dicionário do módulo)
+  const [definindo, setDefinindo] = useState<string | null>(null);
+  const [significado, setSignificado] = useState('');
 
   const candidatas = useMemo(() => linhasNota.filter(l => PARECE_ROLAMENTO.test(String(l.descricao || ''))).length, [linhasNota]);
 
@@ -69,6 +74,7 @@ const RolamentosEntrada: React.FC<EntradaNfExtensaoProps> = ({ linhas: linhasNot
           tipo: a.tipo, codigo: a.codigo || '', vedacao: a.vedacao || 'ABERTO', folga: a.folga,
           idMarca: a.marca?.id ?? null, marcaTexto: a.marca ? null : a.marcaTexto, linha: a.linha,
           d: a.medidas?.d ?? null, D: a.medidas?.D ?? null, B: a.medidas?.B ?? null, origemMedidas: a.origemMedidas,
+          codigoCompleto: a.codigoCompleto, sufixos: a.sufixos || [],
         };
       }));
     } catch (e) {
@@ -165,10 +171,35 @@ const RolamentosEntrada: React.FC<EntradaNfExtensaoProps> = ({ linhas: linhasNot
     });
     return {
       ...base,
-      draftIdentity: { ...base.draftIdentity!, tipo_recurso: 'PRODUTO', sku_comercial: sku, nome_comercial: nome },
+      draftIdentity: {
+        ...base.draftIdentity!, tipo_recurso: 'PRODUTO', sku_comercial: sku, nome_comercial: nome,
+        descricao_comercial: descricaoDe(l),
+      },
       // O módulo sabe que linhas com o mesmo SKU são o mesmo produto (ex.: duas marcas de 2ª linha)
       ...(agrupar ? { agrupamentoConfirmado: sku.toUpperCase() } : {}),
     };
+  };
+
+  // Descrição do item novo: tipo, medidas, código do fabricante e o significado de cada sufixo
+  const descricaoDe = (l: Linha) => (l.tipo ? montarDescricao({
+    tipo: l.tipo, codigo: l.codigo, codigoCompleto: l.codigoCompleto, marca: marcaDe(l.idMarca)?.nome ?? null, linha: l.linha ?? 1,
+    medidas: { d: l.d, D: l.D, B: l.B }, sufixos: l.sufixos,
+  }) : '');
+
+  const salvarSignificado = async () => {
+    const codigo = definindo;
+    const texto = significado.trim();
+    if (!codigo || !texto) return;
+    try {
+      const sufixos = { ...(config.sufixos || {}), [codigo]: texto };
+      await rolamentosApi.salvarConfig({ sufixos });
+      setConfig(c => ({ ...c, sufixos }));
+      setLinhas(ls => ls.map(l => ({ ...l, sufixos: l.sufixos.map(s => (s.codigo === codigo ? { ...s, significado: texto, categoria: s.categoria ?? 'OUTRO' } : s)) })));
+      setDefinindo(null);
+      message.success(`"${codigo}" salvo no dicionário de rolamentos.`);
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : 'Erro ao salvar o significado.');
+    }
   };
 
   const selecionadas = linhas.filter(l => l.aplicar);
@@ -259,6 +290,19 @@ const RolamentosEntrada: React.FC<EntradaNfExtensaoProps> = ({ linhas: linhasNot
                   <div style={{ lineHeight: 1.25 }}>
                     <Text style={{ fontSize: 12 }}>{l.nItem ? `${l.nItem}. ` : ''}{l.item.descricao}</Text>
                     {l.jaVinculada && <div><Tag color="purple" style={{ fontSize: 10, marginTop: 2 }}>já vinculada: {l.jaVinculada}</Tag></div>}
+                    {l.sufixos.length > 0 && (
+                      <div style={{ marginTop: 3, display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                        {l.sufixos.map(s => (s.significado ? (
+                          <Tooltip key={s.codigo} title={`${s.significado}${s.provavel ? ' (provável)' : ''}`}>
+                            <Tag style={{ fontSize: 10, margin: 0, cursor: 'help' }}>{s.codigo}</Tag>
+                          </Tooltip>
+                        ) : (
+                          <Tooltip key={s.codigo} title="Código sem significado conhecido: clique para definir (fica salvo para as próximas notas)">
+                            <Tag color="orange" style={{ fontSize: 10, margin: 0, cursor: 'pointer' }} onClick={() => { setDefinindo(s.codigo); setSignificado(''); }}>{s.codigo} ?</Tag>
+                          </Tooltip>
+                        )))}
+                      </div>
+                    )}
                   </div>
                 ),
               },
@@ -327,7 +371,11 @@ const RolamentosEntrada: React.FC<EntradaNfExtensaoProps> = ({ linhas: linhasNot
                       <b>{c.sku}</b>
                       <div>{c.existente
                         ? <Tag color="green" style={{ fontSize: 10, margin: 0 }}>vincula a: {c.existente.nome}</Tag>
-                        : <Tag color="blue" style={{ fontSize: 10, margin: 0 }}>novo: {c.nome}</Tag>}</div>
+                        : (
+                          <Tooltip title={<div style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>{descricaoDe(l)}</div>}>
+                            <Tag color="blue" style={{ fontSize: 10, margin: 0, cursor: 'help' }}>novo: {c.nome}</Tag>
+                          </Tooltip>
+                        )}</div>
                     </div>
                   );
                 },
@@ -335,6 +383,15 @@ const RolamentosEntrada: React.FC<EntradaNfExtensaoProps> = ({ linhas: linhasNot
             ]}
           />
         </Spin>
+      </Modal>
+
+      <Modal open={definindo !== null} title={`O que significa "${definindo ?? ''}"?`} okText="Salvar no dicionário" cancelText="Voltar"
+        onOk={salvarSignificado} okButtonProps={{ disabled: !significado.trim() }} onCancel={() => setDefinindo(null)} destroyOnHidden width={440}>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          Vai na descrição dos itens novos e vale para as próximas notas. Não muda o SKU. Confira no catálogo do fabricante se tiver dúvida.
+        </Text>
+        <Input autoFocus style={{ marginTop: 8 }} maxLength={200} value={significado} onChange={e => setSignificado(e.target.value)}
+          onPressEnter={salvarSignificado} placeholder="Ex.: código de embalagem do fabricante" />
       </Modal>
     </>
   );

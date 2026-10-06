@@ -2,7 +2,7 @@
 // medidas aprendidas e a análise das linhas da nota de entrada. O cadastro em si usa a entrada de NF do núcleo.
 import { Request, Response } from 'express';
 import pool from '../../../routes/Estoque/db.config';
-import { lerDescricao, MarcaModulo, medidasDoCodigo, montarNome, montarSku, TipoRolamento, TIPOS } from './rolamentos';
+import { DICIONARIO, lerDescricao, MarcaModulo, medidasDoCodigo, montarNome, montarSku, TipoRolamento, TIPOS } from './rolamentos';
 
 const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || req.body?.tenant_id || 1);
 const erro = (res: Response, error: any, padrao: string, status = 500) => {
@@ -16,6 +16,7 @@ export interface ConfigRolamentos {
   atributos?: Partial<Record<'codigo' | 'vedacao' | 'folga' | 'linha' | 'diametroInterno' | 'diametroExterno' | 'largura', number>>;
   idMarcaSegundaLinha?: number | null;
   markup?: number;
+  sufixos?: Record<string, string>;   // significado dos códigos de fabricante definidos pelo operador (ex.: CO7)
 }
 
 const carregarConfig = async (tenant: number): Promise<ConfigRolamentos> => {
@@ -100,6 +101,12 @@ export const salvarConfig = async (req: Request, res: Response) => {
   try {
     const atual = await carregarConfig(tenant);
     const nova: ConfigRolamentos = { ...atual, ...(req.body?.configuracao || {}) };
+    // Dicionário do operador: códigos em maiúsculas, sem significado vazio
+    if (nova.sufixos) {
+      nova.sufixos = Object.fromEntries(Object.entries(nova.sufixos)
+        .map(([k, v]) => [String(k).trim().toUpperCase().slice(0, 20), String(v || '').trim().slice(0, 200)])
+        .filter(([k, v]) => k && v));
+    }
     if (nova.markup !== undefined && !(Number(nova.markup) > 0)) return erro(res, 'Markup deve ser maior que zero.', '', 400);
     await pool.execute(
       `INSERT INTO modulo_transmissao_rolamentos_config (tenant_id, configuracao) VALUES (?, ?) ON DUPLICATE KEY UPDATE configuracao = VALUES(configuracao)`,
@@ -144,7 +151,7 @@ export const analisarLinhas = async (req: Request, res: Response) => {
     const [config, marcas, aprendidas] = await Promise.all([carregarConfig(tenant), carregarMarcas(tenant), medidasAprendidas(tenant)]);
     const porCodigo = new Map<string, MedidaAprendida>(aprendidas.map(m => [String(m.codigo).toUpperCase(), m]));
     const resultado = linhas.map(l => {
-      const leitura = lerDescricao(String(l.descricao || ''), marcas);
+      const leitura = lerDescricao(String(l.descricao || ''), marcas, config.sufixos || {});
       const aprendida = leitura.codigo ? porCodigo.get(leitura.codigo.toUpperCase()) : undefined;
       const tabela = leitura.codigo ? medidasDoCodigo(leitura.tipo, leitura.codigo) : null;
       const medidas = aprendida && aprendida.d !== null ? { d: aprendida.d, D: aprendida.D ?? 0, B: aprendida.B ?? 0 } : tabela;
@@ -162,6 +169,10 @@ export const analisarLinhas = async (req: Request, res: Response) => {
     return erro(res, e, 'Erro ao analisar as linhas.');
   }
 };
+
+// GET /api/modulos/transmissao/rolamentos/dicionario — códigos de fabricante com significado já conhecido
+export const dicionario = (_req: Request, res: Response) =>
+  res.json(Object.entries(DICIONARIO).map(([codigo, d]) => ({ codigo, categoria: d.categoria, significado: d.significado })));
 
 // POST /api/modulos/transmissao/rolamentos/skus { skus } — itens já cadastrados com esses SKUs
 export const verificarSkus = async (req: Request, res: Response) => {

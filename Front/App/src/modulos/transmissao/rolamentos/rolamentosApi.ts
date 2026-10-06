@@ -26,14 +26,16 @@ export interface ConfigRolamentos {
   atributos?: Partial<Record<CampoAtributo, number>>;
   idMarcaSegundaLinha?: number | null;
   markup?: number;
+  sufixos?: Record<string, string>; // significado dos códigos de fabricante definidos pelo operador
 }
 export interface MarcaModulo { id: number; nome: string; codigo: string | null; linha: 1 | 2 | null; apelidos: string[] }
 export interface MedidaAprendida { idMedida: number; codigo: string; tipo: string | null; d: number | null; D: number | null; B: number | null }
 export interface Medidas { d: number; D: number; B: number }
+export interface Sufixo { codigo: string; categoria: string | null; significado: string | null; provavel?: boolean }
 
 export interface LinhaAnalisada {
   chave: string; ehRolamento: boolean; tipo: TipoRolamento | null; codigo: string | null; vedacao: string; folga: string | null;
-  sufixos: string[]; marca: MarcaModulo | null; marcaTexto: string | null; linha: 1 | 2 | null;
+  codigoCompleto: string | null; prefixo: string | null; sufixos: Sufixo[]; marca: MarcaModulo | null; marcaTexto: string | null; linha: 1 | 2 | null;
   medidas: Medidas | null; origemMedidas: 'TABELA' | 'APRENDIDA' | null; sku: string | null; nome: string | null;
 }
 export interface ItemExistente { idItem: number; sku: string; nome: string; tipoRecurso: string; unidadeBase: string | null }
@@ -56,6 +58,7 @@ export const rolamentosApi = {
   salvarMarca: (idMarca: number, linha: 1 | 2 | null, apelidos: string) => requisitar(`${API}/marcas/${idMarca}`, json('PUT', { linha, apelidos }), 'Erro ao salvar a marca.'),
   analisar: (linhas: Array<{ chave: string; descricao: string }>) =>
     requisitar<{ linhas: LinhaAnalisada[]; existentes: Record<string, ItemExistente>; configuracao: ConfigRolamentos }>(`${API}/analisar`, json('POST', { linhas }), 'Erro ao analisar.'),
+  dicionario: () => requisitar<Array<{ codigo: string; categoria: string; significado: string }>>(`${API}/dicionario`, undefined, 'Erro ao carregar o dicionário.'),
   skus: (skus: string[]) => requisitar<{ existentes: Record<string, ItemExistente> }>(`${API}/skus`, json('POST', { skus }), 'Erro ao verificar SKUs.'),
   salvarMedidas: (lista: Array<{ codigo: string; tipo: string | null; d: number; D: number; B: number }>) =>
     requisitar(`${API}/medidas`, json('POST', { lista }), 'Erro ao salvar as medidas.'),
@@ -73,3 +76,21 @@ export const montarSku = (p: { codigo: string; vedacao: string; folga: string | 
 export const montarNome = (p: { tipo: TipoRolamento; codigo: string; vedacao: string; folga: string | null; linha: 1 | 2; marca: { nome: string } | null }) =>
   [TIPOS[p.tipo].nomeCurto, p.codigo.trim().toUpperCase(), p.vedacao && p.vedacao !== 'ABERTO' ? p.vedacao : null, p.folga,
     p.linha === 2 ? '2ª linha' : p.marca?.nome || null].filter(Boolean).join(' ');
+
+const mm = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
+
+/** Descrição do item para o operador: tipo, medidas, código completo do fabricante e o que cada sufixo significa. */
+export const montarDescricao = (p: {
+  tipo: TipoRolamento; codigo: string; codigoCompleto: string | null; marca: string | null; linha: 1 | 2;
+  medidas: { d: number | null; D: number | null; B: number | null }; sufixos: Sufixo[];
+}) => {
+  const linhas = [`${TIPOS[p.tipo].familia} ${p.codigo.toUpperCase()}${p.linha === 2 ? ' (2ª linha)' : p.marca ? ` ${p.marca}` : ''}`];
+  const { d, D, B } = p.medidas;
+  if (d && D && B) linhas.push(`Medidas: ${mm(d)} x ${mm(D)} x ${mm(B)} mm (furo x diâmetro externo x largura)`);
+  if (p.codigoCompleto && p.codigoCompleto.toUpperCase() !== p.codigo.toUpperCase()) linhas.push(`Código do fabricante: ${p.codigoCompleto}`);
+  const conhecidos = p.sufixos.filter(s => s.significado);
+  for (const s of conhecidos) linhas.push(`• ${s.codigo}: ${s.significado}${s.provavel ? ' (provável)' : ''}`);
+  const outros = p.sufixos.filter(s => !s.significado).map(s => s.codigo);
+  if (outros.length) linhas.push(`Outros códigos do fabricante: ${outros.join(', ')}`);
+  return linhas.join('\n');
+};

@@ -300,12 +300,13 @@ export const aprovarLote = async (req: Request, res: Response): Promise<Response
           // SKU customizado (o que o operador vê): digitado, código do fornecedor ou sequencial (consumo/patrimônio)
           const skuCustomizado = skuCustomizadoPlanejado(item) || skuSequencial(prefixoSkuSequencial(tipoRecurso), idItem);
           await connection.execute(
-            `INSERT INTO comercial_produtos_dados (tenant_id, id_item, sku_customizado, nome_comercial, custo_gerencial, familia_id, categoria_id, id_marca)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO comercial_produtos_dados (tenant_id, id_item, sku_customizado, nome_comercial, descricao_comercial, custo_gerencial, familia_id, categoria_id, id_marca)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               tenant, idItem,
               skuCustomizado,
               String(draft.nome_comercial || '').trim() || null,
+              String(draft.descricao_comercial || '').trim() || null,
               custoUnitario > 0 ? custoUnitario.toFixed(4) : null,
               familiaId,
               categoriaId,

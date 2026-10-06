@@ -68,7 +68,8 @@ const r3 = (v: number) => Math.round(v * 1000) / 1000;
 
 /** Medidas pelo código padrão (null quando o código não está na tabela). */
 export const medidasDoCodigo = (tipo: TipoRolamento | null, codigo: string): Medidas | null => {
-  const c = codigo.toUpperCase();
+  // Prefixo de material (SS608, W6205) não muda as medidas
+  const c = codigo.toUpperCase().replace(/^(SS|W)(?=\d)/, '');
   if (tipo === 'INSERCAO_UC') {
     const m = /^UC(\d{3})(?:-(\d{1,2}))?$/.exec(c);
     if (!m || !UC_DB[m[1]]) return null;
@@ -101,85 +102,146 @@ export const medidasDoCodigo = (tipo: TipoRolamento | null, codigo: string): Med
 // ---------------------------------------------------------------------------------------------
 export interface MarcaModulo { id: number; nome: string; codigo: string | null; linha: 1 | 2 | null; apelidos: string[] }
 
+export type CategoriaSufixo = 'VEDACAO' | 'FOLGA' | 'CONSTRUCAO' | 'GAIOLA' | 'PRECISAO' | 'MATERIAL' | 'GRAXA' | 'COMERCIAL' | 'OUTRO';
+export interface Sufixo { codigo: string; categoria: CategoriaSufixo | null; significado: string | null; provavel?: boolean }
+
 export interface LeituraRolamento {
   ehRolamento: boolean;
   tipo: TipoRolamento | null;
-  codigo: string | null;
+  codigo: string | null;      // código usado no SKU (com prefixo de material, ex.: SS608)
+  codigoCompleto: string | null; // como o fabricante escreveu (ex.: 6201-2RSR-CO7-C3#N1)
+  prefixo: string | null;     // SS / W (inox)
   vedacao: string;            // ABERTO, 2RS, RS, ZZ, Z
-  folga: string | null;       // C3, C4...
-  sufixos: string[];          // o que sobrou do código (ex.: 2RSU, B, F) — só informativo
+  folga: string | null;       // C2, C3, C4, C5
+  sufixos: Sufixo[];          // cada código do fabricante com o significado (null = desconhecido)
   marca: MarcaModulo | null;  // marca cadastrada reconhecida
   marcaTexto: string | null;  // palavra que parece marca, quando não é cadastrada (ex.: NTN)
 }
 
+// Dicionário dos códigos com significado conhecido (o operador completa os demais no módulo)
+interface EntradaDicionario { categoria: CategoriaSufixo; significado: string; vedacao?: string; folga?: string }
+const borracha = (lados: 'dois' | 'um', extra = ''): EntradaDicionario =>
+  ({ categoria: 'VEDACAO', significado: `vedação de borracha ${lados === 'dois' ? 'nos dois lados' : 'em um lado'}${extra}`, vedacao: lados === 'dois' ? '2RS' : 'RS' });
+const metalica = (lados: 'dois' | 'um', extra = ''): EntradaDicionario =>
+  ({ categoria: 'VEDACAO', significado: `placa de proteção metálica ${lados === 'dois' ? 'nos dois lados' : 'em um lado'}${extra}`, vedacao: lados === 'dois' ? 'ZZ' : 'Z' });
+
+export const DICIONARIO: Record<string, EntradaDicionario> = {
+  '2RS': borracha('dois'), RS: borracha('um'),
+  '2RS1': borracha('dois', ', de contato (SKF)'), '2RSH': borracha('dois', ', de contato (SKF)'), '2RSL': borracha('dois', ', de baixo atrito (SKF)'),
+  '2RSR': borracha('dois', ' (FAG)'), '2HRS': borracha('dois', ' (FAG)'), LLU: borracha('dois', ', de contato (NTN)'), DDU: borracha('dois', ', de contato (NSK)'),
+  LLB: borracha('dois', ', sem contato (NTN)'), '2RZ': borracha('dois', ', sem contato'), VV: borracha('dois', ', sem contato (NSK)'),
+  ZZ: metalica('dois'), '2Z': metalica('dois', ' (SKF)'), '2ZR': metalica('dois', ' (FAG)'), Z: metalica('um'),
+  C2: { categoria: 'FOLGA', significado: 'folga radial interna menor que a normal', folga: 'C2' },
+  CN: { categoria: 'FOLGA', significado: 'folga radial interna normal' },
+  C3: { categoria: 'FOLGA', significado: 'folga radial interna maior que a normal (calor ou ajuste apertado)', folga: 'C3' },
+  C4: { categoria: 'FOLGA', significado: 'folga radial interna bem maior que a normal (maior que C3)', folga: 'C4' },
+  C5: { categoria: 'FOLGA', significado: 'folga radial interna maior que C4', folga: 'C5' },
+  N: { categoria: 'CONSTRUCAO', significado: 'ranhura para anel de retenção no anel externo' },
+  NR: { categoria: 'CONSTRUCAO', significado: 'ranhura no anel externo com anel de retenção' },
+  K: { categoria: 'CONSTRUCAO', significado: 'furo cônico' },
+  M: { categoria: 'GAIOLA', significado: 'gaiola de latão' },
+  TN9: { categoria: 'GAIOLA', significado: 'gaiola de poliamida (SKF)' },
+  TVH: { categoria: 'GAIOLA', significado: 'gaiola de poliamida (FAG)' },
+  P6: { categoria: 'PRECISAO', significado: 'precisão P6 (melhor que a normal)' },
+  P5: { categoria: 'PRECISAO', significado: 'precisão P5 (alta precisão)' },
+  SS: { categoria: 'MATERIAL', significado: 'aço inoxidável' },
+  W: { categoria: 'MATERIAL', significado: 'aço inoxidável (SKF)' },
+  NCZADO: { categoria: 'COMERCIAL', significado: 'importado e nacionalizado' },
+  NACIONALIZADO: { categoria: 'COMERCIAL', significado: 'importado e nacionalizado' },
+};
+
+/** Significado de um código: dicionário do operador, depois o padrão, depois regras (variações de vedação, graxa FAG). */
+export const significadoSufixo = (codigo: string, doOperador: Record<string, string> = {}): Sufixo => {
+  const c = codigo.toUpperCase();
+  const proprio = Object.entries(doOperador).find(([k]) => k.toUpperCase() === c);
+  const padrao = DICIONARIO[c];
+  if (proprio) return { codigo: c, categoria: padrao?.categoria ?? 'OUTRO', significado: proprio[1] };
+  if (padrao) return { codigo: c, categoria: padrao.categoria, significado: padrao.significado };
+  if (/^2?[A-Z]{0,2}RS[A-Z0-9]?$/.test(c)) return { codigo: c, ...borracha(c.startsWith('2') ? 'dois' : 'um', ` (variante do fabricante: ${c})`), provavel: true };
+  if (/^L\d{3}$/.test(c)) return { codigo: c, categoria: 'GRAXA', significado: `graxa especial (código ${c} do fabricante)`, provavel: true };
+  return { codigo: c, categoria: null, significado: null };
+};
+const vedacaoDe = (s: Sufixo) => (s.categoria === 'VEDACAO' ? (DICIONARIO[s.codigo]?.vedacao ?? (s.codigo.startsWith('2') ? '2RS' : 'RS')) : null);
+
 const normalizar = (v: string) => v.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
 const escapar = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const decodificarXml = (v: string) => v.replace(/&gt;/gi, '>').replace(/&lt;/gi, '<').replace(/&quot;/gi, '"').replace(/&amp;/gi, '&');
 
 // Palavras que não são marca nem código
 const RUIDO = new Set(['ROLAMENTO', 'ROLAMENTOS', 'ROL', 'ROLAM', 'PER', 'RIGIDO', 'ESFERAS', 'ESFERA', 'DE', 'AGULHA', 'AGULHAS', 'CONICO',
-  'AXIAL', 'AUTOCOMPENSADOR', 'MANCAL', 'BUCHA', 'UNID', 'UN', 'PC', 'PCS', 'KIT', 'COM', 'SEM', 'C', 'P']);
+  'AXIAL', 'AUTOCOMPENSADOR', 'MANCAL', 'BUCHA', 'UNID', 'UN', 'PC', 'PCS', 'KIT', 'COM', 'SEM', 'P']);
 
-/** Vedação normalizada a partir dos sufixos (2RSU/2RS1/LLU/DDU = 2RS; 2Z/LLB = ZZ). */
-const lerVedacao = (texto: string): string => {
-  if (/(^|[^A-Z])(2RS\w*|LLU|DDU|2RZ|2RSH|2RS1)/.test(texto)) return '2RS';
-  if (/(^|[^A-Z0-9])(RS\w*|RZ)\b/.test(texto)) return 'RS';
-  if (/(^|[^A-Z])(ZZ|2Z|LLB)/.test(texto)) return 'ZZ';
-  if (/(^|[^A-Z0-9])Z\b/.test(texto)) return 'Z';
-  return 'ABERTO';
-};
-
-/** Reconhece tipo e código; o que vem colado ao código (ex.: 6802-2RSU, HK2220F) vira sufixo. */
-const lerCodigo = (t: string): { tipo: TipoRolamento; codigo: string; resto: string } | null => {
+/** Reconhece tipo e código; devolve onde o código começa (para ler o prefixo) e o texto depois dele. */
+const lerCodigo = (t: string): { tipo: TipoRolamento; codigo: string; inicio: number; resto: string } | null => {
   const regras: Array<[TipoRolamento, RegExp, (m: RegExpExecArray) => string]> = [
     ['INSERCAO_UC', /\bUC\s*-?\s*(\d{3})(?:\s*-\s*(\d{1,2})(?!\d))?/, m => `UC${m[1]}${m[2] ? `-${m[2]}` : ''}`],
     ['AGULHAS', /\b(HK|BK)\s*(\d{4})(?!\d)/, m => `${m[1]}${m[2]}`],
     ['AGULHAS', /\b(NKI|NK|NA|RNA)\s*(\d{2,5}(?:\/\d{2})?)/, m => `${m[1]}${m[2]}`],
     ['ROLOS_CILINDRICOS', /\b(NUP|NU|NJ|NF|N)\s*-?\s*(\d{3,4})(?!\d)/, m => `${m[1]}${m[2]}`],
-    ['AXIAL', /(?:^|[^\d])(51[1-4]\d{2})(?!\d)/, m => m[1]],
-    ['ROLOS_CONICOS', /(?:^|[^\d])(3[0-3]\d{3})(?!\d)/, m => m[1]],
-    ['AUTOCOMPENSADOR', /(?:^|[^\d])(2[2-4]\d{3})(?!\d)/, m => m[1]],
-    ['RIGIDO_ESFERAS', /(?:^|[^\d])(160\d{2}|6[0-9]\d{2}|6\d{2})(?!\d)/, m => m[1]],
-    ['AUTOCOMPENSADOR', /(?:^|[^\d])(1[23]\d{2}|2[23]\d{2})(?!\d)/, m => m[1]],
+    ['AXIAL', /(?:^|[^\dA-Z])(51[1-4]\d{2})(?!\d)/, m => m[1]],
+    ['ROLOS_CONICOS', /(?:^|[^\dA-Z])(3[0-3]\d{3})(?!\d)/, m => m[1]],
+    ['AUTOCOMPENSADOR', /(?:^|[^\dA-Z])(2[2-4]\d{3})(?!\d)/, m => m[1]],
+    ['RIGIDO_ESFERAS', /(?:^|[^\dA-Z])(160\d{2}|6[0-9]\d{2}|6\d{2})(?!\d)/, m => m[1]],
+    ['AUTOCOMPENSADOR', /(?:^|[^\dA-Z])(1[23]\d{2}|2[23]\d{2})(?!\d)/, m => m[1]],
   ];
   for (const [tipo, re, codigo] of regras) {
     const m = re.exec(t);
-    if (m) return { tipo, codigo: codigo(m), resto: t.slice(m.index + m[0].length) };
+    if (m) {
+      const grupo = m[1];
+      const inicio = m.index + m[0].indexOf(grupo);
+      return { tipo, codigo: codigo(m), inicio, resto: t.slice(m.index + m[0].length) };
+    }
   }
   return null;
 };
 
-export const lerDescricao = (descricao: string, marcas: MarcaModulo[]): LeituraRolamento => {
-  const t = normalizar(descricao);
+export const lerDescricao = (descricao: string, marcas: MarcaModulo[], doOperador: Record<string, string> = {}): LeituraRolamento => {
+  const t = normalizar(decodificarXml(descricao));
   // Marca: o nome ou apelido mais longo que aparece na descrição (ex.: apelido "PEER/SKF" ganha de "SKF")
   const candidatos = marcas.flatMap(m => [m.nome, ...m.apelidos].filter(Boolean).map(alias => ({ m, alias: normalizar(alias).trim() })))
     .filter(c => c.alias.length >= 2)
     .sort((a, b) => b.alias.length - a.alias.length);
   const achada = candidatos.find(c => new RegExp(`(^|[^A-Z0-9])${escapar(c.alias)}($|[^A-Z0-9])`).test(t));
-  const semMarca = achada ? t.replace(new RegExp(escapar(achada.alias), 'g'), ' ') : t;
+  const semMarca = achada ? t.replace(new RegExp(`(^|[^A-Z0-9])${escapar(achada.alias)}(?=$|[^A-Z0-9])`, 'g'), '$1 ') : t;
 
   const cod = lerCodigo(semMarca);
-  const ehRolamento = Boolean(cod) && /\b(ROL|ROLAMENTO|ROLAMENTOS|ROLAM|MANCAL|BUCHA)\b/.test(t) || Boolean(cod && cod.tipo !== 'AUTOCOMPENSADOR' && cod.tipo !== 'ROLOS_CONICOS');
-  const resto = cod ? cod.resto : '';
-  const colado = /^[-/]?([A-Z0-9/]+)/.exec(resto)?.[1] || '';
-  const vedacao = cod && TIPOS[cod.tipo].comVedacao ? lerVedacao(resto) : 'ABERTO';
-  const folga = /(^|[^A-Z0-9])\/?(C[2-5])($|[^A-Z0-9])/.exec(resto)?.[2] ?? null;
-
-  // Marca não cadastrada: a última palavra "de marca" depois do código (ex.: "HK2220F NTN" -> NTN)
-  let marcaTexto: string | null = null;
-  if (!achada && cod) {
-    const palavras = resto.split(/[\s]+/).map(p => p.replace(/^[^A-Z]+|[^A-Z0-9/-]+$/g, '')).filter(p =>
-      /^[A-Z][A-Z0-9/-]{1,}$/.test(p) && !RUIDO.has(p) && !/^(2RS|RS|ZZ|2Z|Z|C[2-5])/.test(p) && p !== colado);
-    // "PEER/SKF": a marca é a primeira (a segunda costuma ser o grupo/fabricante)
-    marcaTexto = palavras.length ? palavras[palavras.length - 1].split('/')[0] : null;
+  const ehRolamento = (Boolean(cod) && /\b(ROL|ROLAMENTO|ROLAMENTOS|ROLAM|MANCAL|BUCHA)\b/.test(t))
+    || Boolean(cod && cod.tipo !== 'AUTOCOMPENSADOR' && cod.tipo !== 'ROLOS_CONICOS');
+  if (!cod) {
+    return { ehRolamento: false, tipo: null, codigo: null, codigoCompleto: null, prefixo: null, vedacao: 'ABERTO', folga: null, sufixos: [], marca: achada?.m ?? null, marcaTexto: null };
   }
 
+  // Prefixo de material logo antes do código: "SS 608", "W6205"
+  const prefixo = /(?:^|[^A-Z0-9])(SS|W)\s*-?\s*$/.exec(semMarca.slice(0, cod.inicio))?.[1] ?? null;
+
+  // Sufixos: o pedaço colado ao código (separado por - / . #) e as palavras seguintes que forem códigos
+  const sufixos: Sufixo[] = [];
+  let marcaTexto: string | null = null;
+  const palavras = cod.resto.trim() ? cod.resto.split(/\s+/).filter(Boolean) : [];
+  const colado = /^\S/.test(cod.resto);
+  palavras.forEach((palavra, i) => {
+    const partes = palavra.split(/[-/.]+/).flatMap(p => p.split(/(?=#)/)).filter(Boolean);
+    const lidas = partes.map(p => significadoSufixo(p, doOperador));
+    const doCodigo = i === 0 && colado;
+    const pareceMarca = !doCodigo && /^[A-Z][A-Z/-]{1,}$/.test(palavra) && !RUIDO.has(palavra) && lidas.every(s => !s.significado);
+    if (pareceMarca) {
+      if (!achada && !marcaTexto) marcaTexto = palavra.split('/')[0];
+      return;
+    }
+    if (!doCodigo && partes.length === 1 && RUIDO.has(partes[0])) return;
+    sufixos.push(...lidas.filter(s => s.codigo));
+  });
+
+  const vedacao = TIPOS[cod.tipo].comVedacao ? (sufixos.map(vedacaoDe).find(Boolean) ?? 'ABERTO') : 'ABERTO';
+  const folga = sufixos.map(s => DICIONARIO[s.codigo]?.folga).find(Boolean) ?? null;
+  const codigoCompleto = `${prefixo ? `${prefixo}` : ''}${cod.codigo}${palavras.length && colado ? palavras[0] : ''}`;
+
   return {
-    ehRolamento,
-    tipo: cod?.tipo ?? null,
-    codigo: cod?.codigo ?? null,
-    vedacao,
-    folga,
-    sufixos: colado ? [colado] : [],
+    ehRolamento, tipo: cod.tipo,
+    codigo: `${prefixo ?? ''}${cod.codigo}`,
+    codigoCompleto,
+    prefixo, vedacao, folga,
+    sufixos: [...(prefixo ? [significadoSufixo(prefixo, doOperador)] : []), ...sufixos],
     marca: achada?.m ?? null,
     marcaTexto,
   };
