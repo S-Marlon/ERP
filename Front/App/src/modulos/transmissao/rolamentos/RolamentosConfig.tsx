@@ -1,7 +1,7 @@
 // Compras › Rolamentos (módulo TRANSMISSAO_ROLAMENTOS): estrutura no catálogo, linha (1ª/2ª) e apelidos das
 // marcas, markup padrão, teste de leitura de descrição e medidas aprendidas.
 import React, { useEffect, useState } from 'react';
-import { Alert, Button, Card, Col, Descriptions, Input, InputNumber, Popconfirm, Row, Select, Space, Spin, Table, Tag, Typography, message } from 'antd';
+import { Alert, Button, Card, Col, Descriptions, Input, InputNumber, Popconfirm, Row, Select, Space, Spin, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { BuildOutlined, DeleteOutlined, ExperimentOutlined, PlusOutlined } from '@ant-design/icons';
 import { ModalNovaMarca } from '../../../pages/Compras/StockEntry/ItemsConference/DefinicoesPimRapidas';
 import { montarEstrutura } from './estruturaRolamentos';
@@ -19,6 +19,9 @@ const RolamentosConfig: React.FC = () => {
   const [montando, setMontando] = useState<string | null>(null);
   const [apelidos, setApelidos] = useState<Record<number, string>>({});
   const [novaMarca, setNovaMarca] = useState(false);
+  // Trazer para o módulo uma marca que já existe no sistema (ou a recém-criada) com a linha escolhida
+  const [adicionarId, setAdicionarId] = useState<number | null>(null);
+  const [adicionarLinha, setAdicionarLinha] = useState<1 | 2>(1);
   const [teste, setTeste] = useState('ROLAMENTO 6205-2RS/C3 SKF');
   const [resultadoTeste, setResultadoTeste] = useState<LinhaAnalisada | null>(null);
 
@@ -61,6 +64,26 @@ const RolamentosConfig: React.FC = () => {
     }
   };
 
+  const removerMarca = async (m: MarcaModulo) => {
+    try {
+      await rolamentosApi.salvarMarca(m.id, null, '');
+      setMarcas(ms => ms.map(x => (x.id === m.id ? { ...x, linha: null, apelidos: [] } : x)));
+      setApelidos(x => ({ ...x, [m.id]: '' }));
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : 'Erro ao remover a marca.');
+    }
+  };
+
+  const adicionarMarca = async (id: number) => {
+    try {
+      await rolamentosApi.salvarMarca(id, adicionarLinha, '');
+      setAdicionarId(null);
+      await carregar();
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : 'Erro ao adicionar a marca.');
+    }
+  };
+
   const testar = async () => {
     try {
       const r = await rolamentosApi.analisar([{ chave: 't', descricao: teste }]);
@@ -73,7 +96,10 @@ const RolamentosConfig: React.FC = () => {
   if (carregando) return <div style={{ padding: 40, textAlign: 'center' }}><Spin /></div>;
   const tipos = Object.keys(TIPOS) as TipoRolamento[];
   const familiasOk = tipos.filter(t => config.familias?.[t] && familias[config.familias[t]!]).length;
-  const marcasVisiveis = marcas.filter(m => m.id !== config.idMarcaSegundaLinha && m.nome.toLowerCase() !== 'sem marca');
+  // Só as marcas de rolamento (com linha definida); as demais do sistema podem ser trazidas para cá
+  const marcaUtil = (m: MarcaModulo) => m.id !== config.idMarcaSegundaLinha && m.nome.toLowerCase() !== 'sem marca';
+  const marcasDoModulo = marcas.filter(m => marcaUtil(m) && m.linha !== null);
+  const outrasMarcas = marcas.filter(m => marcaUtil(m) && m.linha === null);
 
   return (
     <div style={{ padding: 16 }}>
@@ -142,15 +168,22 @@ const RolamentosConfig: React.FC = () => {
             <Text type="secondary" style={{ fontSize: 12 }}>
               1ª linha: cada marca é um item (6205-2RS-SKF). 2ª linha: todas viram o mesmo item (6205-2RS-2L). Apelidos: como a marca aparece nas notas (ex.: GTOP, GBR, PEER/SKF).
             </Text>
+            <Space.Compact style={{ width: '100%', marginTop: 8 }}>
+              <Select style={{ flex: 1 }} showSearch optionFilterProp="label" placeholder="Trazer uma marca que já existe no sistema" value={adicionarId ?? undefined}
+                onChange={setAdicionarId} options={outrasMarcas.map(m => ({ value: m.id, label: m.nome }))} notFoundContent="Nenhuma outra marca" />
+              <Select style={{ width: 110 }} value={adicionarLinha} onChange={setAdicionarLinha} options={[{ value: 1, label: '1ª linha' }, { value: 2, label: '2ª linha' }]} />
+              <Button type="primary" disabled={!adicionarId} onClick={() => adicionarId && adicionarMarca(adicionarId)}>Adicionar</Button>
+            </Space.Compact>
             <Table<MarcaModulo>
-              size="small" rowKey="id" dataSource={marcasVisiveis} pagination={false} style={{ marginTop: 8 }} scroll={{ y: 420 }}
+              size="small" rowKey="id" dataSource={marcasDoModulo} pagination={false} style={{ marginTop: 8 }} scroll={{ y: 420 }}
+              locale={{ emptyText: 'Nenhuma marca de rolamento ainda: adicione acima ou crie em "Nova marca".' }}
               columns={[
                 { title: 'Marca', dataIndex: 'nome' },
                 {
                   title: 'Linha', key: 'l', width: 110,
                   render: (_, m) => (
-                    <Select size="small" style={{ width: '100%' }} value={m.linha ?? undefined} placeholder="—" allowClear
-                      onChange={v => salvarMarca(m, (v ?? null) as 1 | 2 | null)} options={[{ value: 1, label: '1ª linha' }, { value: 2, label: '2ª linha' }]} />
+                    <Select size="small" style={{ width: '100%' }} value={m.linha ?? undefined}
+                      onChange={v => salvarMarca(m, v as 1 | 2)} options={[{ value: 1, label: '1ª linha' }, { value: 2, label: '2ª linha' }]} />
                   ),
                 },
                 {
@@ -159,6 +192,14 @@ const RolamentosConfig: React.FC = () => {
                     <Input size="small" placeholder="separe por vírgula" value={apelidos[m.id] ?? ''}
                       onChange={e => setApelidos(x => ({ ...x, [m.id]: e.target.value }))}
                       onBlur={() => { if ((apelidos[m.id] ?? '') !== m.apelidos.join(', ')) salvarMarca(m, m.linha ?? 1); }} />
+                  ),
+                },
+                {
+                  title: '', key: 'x', width: 40,
+                  render: (_, m) => (
+                    <Popconfirm title={`Tirar ${m.nome} dos rolamentos?`} description="A marca continua no sistema; só deixa de aparecer aqui." okText="Tirar" cancelText="Voltar" onConfirm={() => removerMarca(m)}>
+                      <Tooltip title="Tirar do módulo"><Button size="small" type="text" danger icon={<DeleteOutlined />} /></Tooltip>
+                    </Popconfirm>
                   ),
                 },
               ]}
@@ -185,7 +226,8 @@ const RolamentosConfig: React.FC = () => {
         </Col>
       </Row>
 
-      <ModalNovaMarca open={novaMarca} onFechar={() => setNovaMarca(false)} onCriada={() => { setNovaMarca(false); carregar(); }} />
+      <ModalNovaMarca open={novaMarca} onFechar={() => setNovaMarca(false)}
+        onCriada={id => { setNovaMarca(false); adicionarMarca(id); }} />
     </div>
   );
 };

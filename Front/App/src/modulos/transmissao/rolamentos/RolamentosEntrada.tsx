@@ -203,6 +203,12 @@ const RolamentosEntrada: React.FC<EntradaNfExtensaoProps> = ({ linhas: linhasNot
   };
 
   const configIncompleta = !config.familias || Object.keys(config.familias).length === 0;
+  // Marcas de rolamento (com linha) primeiro; as outras do sistema ficam num grupo à parte
+  const marcaUtil = (m: MarcaModulo) => m.id !== config.idMarcaSegundaLinha && m.nome.toLowerCase() !== 'sem marca';
+  const opcoesMarca = [
+    { label: 'Marcas de rolamento', options: marcas.filter(m => marcaUtil(m) && (m.linha || linhaDasMarcas[m.id])).map(m => ({ value: m.id, label: m.nome })) },
+    { label: 'Outras marcas do sistema', options: marcas.filter(m => marcaUtil(m) && !m.linha && !linhaDasMarcas[m.id]).map(m => ({ value: m.id, label: m.nome })) },
+  ].filter(g => g.options.length);
   const medida = (l: Linha, campo: 'd' | 'D' | 'B') => (
     <InputNumber size="small" min={0} precision={3} decimalSeparator="," controls={false} style={{ width: 62 }} value={l[campo]}
       onChange={v => alterar(l.tempId, { [campo]: v === null ? null : Number(v), origemMedidas: 'MANUAL' } as Partial<Linha>)} />
@@ -285,7 +291,7 @@ const RolamentosEntrada: React.FC<EntradaNfExtensaoProps> = ({ linhas: linhasNot
                   <Space direction="vertical" size={2} style={{ width: '100%' }}>
                     <Select size="small" showSearch allowClear optionFilterProp="label" style={{ width: '100%' }} placeholder="marca"
                       value={l.idMarca ?? undefined} onChange={v => trocarMarca(l, v ?? null)}
-                      options={marcas.filter(m => m.id !== config.idMarcaSegundaLinha && m.nome.toLowerCase() !== 'sem marca').map(m => ({ value: m.id, label: m.nome }))} />
+                      options={opcoesMarca} />
                     {!l.idMarca && l.marcaTexto && (
                       <Button size="small" type="link" icon={<PlusOutlined />} style={{ padding: 0, height: 16, fontSize: 11 }} onClick={() => criarMarca(l.marcaTexto!)}>
                         criar "{l.marcaTexto}"
