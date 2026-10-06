@@ -62,6 +62,8 @@ export const rolamentosApi = {
   skus: (skus: string[]) => requisitar<{ existentes: Record<string, ItemExistente> }>(`${API}/skus`, json('POST', { skus }), 'Erro ao verificar SKUs.'),
   salvarMedidas: (lista: Array<{ codigo: string; tipo: string | null; d: number; D: number; B: number }>) =>
     requisitar(`${API}/medidas`, json('POST', { lista }), 'Erro ao salvar as medidas.'),
+  renomear: (aplicar: boolean) => requisitar<{ total: number; aplicadas: number; mudancas: Array<{ idItem: number; sku: string; nomeAtual: string | null; nomeNovo: string }> }>(
+    `${API}/renomear`, json('POST', { aplicar }), 'Erro ao renomear os itens.'),
   excluirMedida: (id: number) => requisitar(`${API}/medidas/${id}`, { method: 'DELETE' }, 'Erro ao excluir a medida.'),
 };
 
@@ -73,9 +75,19 @@ export const montarSku = (p: { codigo: string; vedacao: string; folga: string | 
   [p.codigo.trim().toUpperCase(), p.vedacao && p.vedacao !== 'ABERTO' ? p.vedacao : null, p.folga, p.linha === 2 ? SIGLA_SEGUNDA_LINHA : siglaDaMarca(p.marca) || null]
     .filter(Boolean).join('-');
 
-export const montarNome = (p: { tipo: TipoRolamento; codigo: string; vedacao: string; folga: string | null; linha: 1 | 2; marca: { nome: string } | null }) =>
-  [TIPOS[p.tipo].nomeCurto, p.codigo.trim().toUpperCase(), p.vedacao && p.vedacao !== 'ABERTO' ? p.vedacao : null, p.folga,
-    p.linha === 2 ? '2ª linha' : p.marca?.nome || null].filter(Boolean).join(' ');
+const mmNome = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
+
+/** ROLAMENTO 6205-2RS/C3 | 25 mm × 52 mm × 15 mm | SKF — 2ª linha termina em "2ª LINHA"; sem medidas, a parte do meio sai. */
+export const montarNome = (p: {
+  codigo: string; vedacao: string; folga: string | null; linha: 1 | 2; marca: { nome: string } | null;
+  medidas?: { d: number | null; D: number | null; B: number | null } | null;
+}) => {
+  const codigo = `${p.codigo.trim().toUpperCase()}${p.vedacao && p.vedacao !== 'ABERTO' ? `-${p.vedacao}` : ''}${p.folga ? `/${p.folga}` : ''}`;
+  const m = p.medidas;
+  const medidas = m && m.d && m.D && m.B ? `${mmNome(m.d)} mm × ${mmNome(m.D)} mm × ${mmNome(m.B)} mm` : null;
+  const marca = p.linha === 2 ? '2ª LINHA' : (p.marca?.nome || '').toUpperCase() || null;
+  return [`ROLAMENTO ${codigo}`, medidas, marca].filter(Boolean).join(' | ');
+};
 
 const mm = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
 

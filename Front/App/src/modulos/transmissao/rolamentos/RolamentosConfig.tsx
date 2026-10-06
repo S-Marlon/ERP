@@ -1,7 +1,7 @@
 // Compras › Rolamentos (módulo TRANSMISSAO_ROLAMENTOS): estrutura no catálogo, linha (1ª/2ª) e apelidos das
 // marcas, markup padrão, teste de leitura de descrição e medidas aprendidas.
 import React, { useEffect, useState } from 'react';
-import { Alert, Button, Card, Col, Collapse, Descriptions, Input, InputNumber, Popconfirm, Row, Select, Space, Spin, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { Alert, Button, Card, Col, Collapse, Descriptions, Input, InputNumber, Modal, Popconfirm, Row, Select, Space, Spin, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { BuildOutlined, DeleteOutlined, ExperimentOutlined, PlusOutlined } from '@ant-design/icons';
 import { ModalNovaMarca } from '../../../pages/Compras/StockEntry/ItemsConference/DefinicoesPimRapidas';
 import { montarEstrutura } from './estruturaRolamentos';
@@ -28,6 +28,21 @@ const RolamentosConfig: React.FC = () => {
   // Dicionário de códigos do fabricante: os já conhecidos (fixos) e os definidos pelo operador
   const [dicionarioPadrao, setDicionarioPadrao] = useState<Array<{ codigo: string; categoria: string; significado: string }>>([]);
   const [novoCodigo, setNovoCodigo] = useState('');
+  // Renomear itens já cadastrados pelo padrão de nome atual (prévia antes de aplicar)
+  const [previaNomes, setPreviaNomes] = useState<Array<{ idItem: number; sku: string; nomeAtual: string | null; nomeNovo: string }> | null>(null);
+  const [renomeando, setRenomeando] = useState(false);
+  const verRenomear = async () => {
+    setRenomeando(true);
+    try { setPreviaNomes((await rolamentosApi.renomear(false)).mudancas); } catch (e) { message.error(e instanceof Error ? e.message : 'Erro.'); } finally { setRenomeando(false); }
+  };
+  const aplicarRenomear = async () => {
+    setRenomeando(true);
+    try {
+      const r = await rolamentosApi.renomear(true);
+      message.success(`${r.aplicadas} item(ns) renomeado(s).`);
+      setPreviaNomes(null);
+    } catch (e) { message.error(e instanceof Error ? e.message : 'Erro.'); } finally { setRenomeando(false); }
+  };
   const [novoSignificado, setNovoSignificado] = useState('');
 
   const salvarSufixos = async (sufixos: Record<string, string>) => {
@@ -164,6 +179,10 @@ const RolamentosConfig: React.FC = () => {
                 onChange={v => setConfig(c => ({ ...c, markup: Number(v) || 2 }))} />
               <Button size="small" onClick={() => rolamentosApi.salvarConfig({ markup: config.markup ?? 2 }).then(() => message.success('Markup salvo.')).catch(e => message.error(e.message))}>Salvar</Button>
             </Space>
+            <div style={{ marginTop: 10 }}>
+              <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>Nome dos itens: ROLAMENTO 6205-2RS/C3 | 25 mm × 52 mm × 15 mm | SKF</Text>
+              <Button size="small" style={{ marginTop: 4 }} loading={renomeando && !previaNomes} onClick={verRenomear}>Renomear itens já cadastrados</Button>
+            </div>
           </Card>
 
           <Card size="small" title={<Space><ExperimentOutlined />Testar uma descrição</Space>} style={{ marginTop: 14 }}>
@@ -306,6 +325,18 @@ const RolamentosConfig: React.FC = () => {
           </Card>
         </Col>
       </Row>
+
+      <Modal open={previaNomes !== null} width={900} title={`Renomear itens de rolamento (${previaNomes?.length ?? 0})`} onCancel={() => setPreviaNomes(null)}
+        okText={`Renomear ${previaNomes?.length ?? 0} item(ns)`} cancelText="Voltar" onOk={aplicarRenomear} okButtonProps={{ disabled: !previaNomes?.length }} confirmLoading={renomeando}>
+        <Text type="secondary" style={{ fontSize: 12 }}>O nome é montado pelos atributos de cada item (código, vedação, folga, medidas) e pela marca. O SKU não muda.</Text>
+        <Table size="small" rowKey="idItem" pagination={false} scroll={{ y: 420 }} style={{ marginTop: 8 }} dataSource={previaNomes || []}
+          locale={{ emptyText: 'Todos os itens já estão no padrão' }}
+          columns={[
+            { title: 'SKU', dataIndex: 'sku', width: 150 },
+            { title: 'Nome atual', dataIndex: 'nomeAtual', render: (v: string | null) => <Text type="secondary">{v || '—'}</Text> },
+            { title: 'Nome novo', dataIndex: 'nomeNovo', render: (v: string) => <b>{v}</b> },
+          ]} />
+      </Modal>
 
       <ModalNovaMarca open={novaMarca} onFechar={() => setNovaMarca(false)}
         onCriada={id => { setNovaMarca(false); adicionarMarca(id); }} />

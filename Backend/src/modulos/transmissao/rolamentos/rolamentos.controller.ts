@@ -161,7 +161,7 @@ export const analisarLinhas = async (req: Request, res: Response) => {
         chave: l.chave, ...leitura, linha, medidas,
         origemMedidas: aprendida && aprendida.d !== null ? 'APRENDIDA' : tabela ? 'TABELA' : null,
         sku,
-        nome: leitura.codigo && leitura.tipo && linha ? montarNome({ tipo: leitura.tipo, codigo: leitura.codigo, vedacao: leitura.vedacao, folga: leitura.folga, linha, marca: leitura.marca }) : null,
+        nome: leitura.codigo && leitura.tipo && linha ? montarNome({ codigo: leitura.codigo, vedacao: leitura.vedacao, folga: leitura.folga, linha, marca: leitura.marca, medidas }) : null,
       };
     });
     return res.json({ linhas: resultado, existentes: await itensPorSku(tenant, resultado.map(r => r.sku || '')), configuracao: config });
@@ -215,5 +215,63 @@ export const excluirMedida = async (req: Request, res: Response) => {
     return res.json({ success: true });
   } catch (e) {
     return erro(res, e, 'Erro ao excluir a medida.');
+  }
+};
+
+// POST /api/modulos/transmissao/rolamentos/renomear { aplicar } — recalcula o nome dos itens das famílias de rolamento
+// pelo padrão atual (ROLAMENTO 6205-2RS/C3 | 25 mm × 52 mm × 15 mm | SKF) a partir dos atributos gravados no item
+export const renomearItens = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const aplicar = Boolean(req.body?.aplicar);
+  try {
+    const config = await carregarConfig(tenant);
+    const familias = Object.values(config.familias || {}).filter(Boolean) as number[];
+    const a = config.atributos || {};
+    if (!familias.length || !a.codigo) return erro(res, 'Monte a estrutura de rolamentos primeiro.', '', 400);
+
+    const [itens]: any = await pool.query(
+      `SELECT cpd.id_item, cpd.sku_customizado, cpd.nome_comercial, cpd.id_marca, m.nome AS marca
+       FROM comercial_produtos_dados cpd LEFT JOIN comercial_marcas m ON m.id = cpd.id_marca
+       WHERE cpd.tenant_id = ? AND cpd.familia_id IN (?)`,
+      [tenant, familias]
+    );
+    if (!itens.length) return res.json({ total: 0, mudancas: [], aplicadas: 0 });
+    const idsAtributos = [a.codigo, a.vedacao, a.folga, a.diametroInterno, a.diametroExterno, a.largura].filter(Boolean);
+    const [valores]: any = await pool.query(
+      `SELECT id_entidade, atributo_id, valor_texto, valor_decimal, valor_numero FROM atributos_comercial_valores
+       WHERE tenant_id = ? AND tipo_entidade = 'produto' AND id_entidade IN (?) AND atributo_id IN (?)`,
+      [tenant, itens.map((i: any) => i.id_item), idsAtributos]
+    );
+    const porItem = new Map<number, Map<number, any>>();
+    for (const v of valores) {
+      const mapa = porItem.get(Number(v.id_entidade)) || new Map();
+      mapa.set(Number(v.atributo_id), v.valor_texto ?? v.valor_decimal ?? v.valor_numero);
+      porItem.set(Number(v.id_entidade), mapa);
+    }
+    const num = (v: unknown) => (v === null || v === undefined || v === '' ? null : Number(v));
+
+    const mudancas: Array<{ idItem: number; sku: string; nomeAtual: string | null; nomeNovo: string }> = [];
+    for (const i of itens) {
+      const v = porItem.get(Number(i.id_item)) || new Map();
+      const codigo = String(v.get(a.codigo!) || '').trim();
+      if (!codigo) continue;
+      const vedacao = String((a.vedacao && v.get(a.vedacao)) || 'ABERTO').toUpperCase();
+      const folga = String((a.folga && v.get(a.folga)) || '').toUpperCase();
+      const nomeNovo = montarNome({
+        codigo, vedacao, folga: folga && folga !== 'NORMAL' ? folga : null,
+        linha: config.idMarcaSegundaLinha && Number(i.id_marca) === config.idMarcaSegundaLinha ? 2 : 1,
+        marca: i.marca && i.marca.toLowerCase() !== 'sem marca' ? { nome: i.marca } : null,
+        medidas: { d: num(a.diametroInterno && v.get(a.diametroInterno)), D: num(a.diametroExterno && v.get(a.diametroExterno)), B: num(a.largura && v.get(a.largura)) },
+      });
+      if (nomeNovo !== i.nome_comercial) mudancas.push({ idItem: Number(i.id_item), sku: i.sku_customizado, nomeAtual: i.nome_comercial, nomeNovo });
+    }
+    if (aplicar) {
+      for (const m of mudancas) {
+        await pool.execute(`UPDATE comercial_produtos_dados SET nome_comercial = ? WHERE id_item = ? AND tenant_id = ?`, [m.nomeNovo, m.idItem, tenant]);
+      }
+    }
+    return res.json({ total: itens.length, mudancas, aplicadas: aplicar ? mudancas.length : 0 });
+  } catch (e) {
+    return erro(res, e, 'Erro ao renomear os itens.');
   }
 };

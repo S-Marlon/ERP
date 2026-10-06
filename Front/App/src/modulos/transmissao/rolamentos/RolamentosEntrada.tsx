@@ -93,7 +93,7 @@ const RolamentosEntrada: React.FC<EntradaNfExtensaoProps> = ({ linhas: linhasNot
     const marca = marcaDe(l.idMarca);
     const pronto = l.codigo.trim() && l.tipo && l.linha && (l.linha === 2 || marca);
     const sku = pronto ? montarSku({ codigo: l.codigo, vedacao: l.vedacao, folga: l.folga, linha: l.linha!, marca }) : null;
-    const nome = pronto ? montarNome({ tipo: l.tipo!, codigo: l.codigo, vedacao: l.vedacao, folga: l.folga, linha: l.linha!, marca }) : null;
+    const nome = pronto ? montarNome({ codigo: l.codigo, vedacao: l.vedacao, folga: l.folga, linha: l.linha!, marca, medidas: { d: l.d, D: l.D, B: l.B } }) : null;
     const pendencias: string[] = [];
     if (!l.tipo) pendencias.push('tipo');
     if (!l.codigo.trim()) pendencias.push('código');
