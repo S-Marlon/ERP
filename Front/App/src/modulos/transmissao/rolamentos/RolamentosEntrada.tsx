@@ -8,6 +8,7 @@ import { PlusOutlined, ToolOutlined } from '@ant-design/icons';
 import type { EntradaNfExtensaoProps, LinhaEntradaNf } from '../../registroModulos';
 import type { MappingPayload } from '../../../pages/Compras/StockEntry/ItemsConference/ProductMappingModal';
 import { mapeamentoRapido } from '../../../pages/Compras/StockEntry/edicaoLote';
+import { garantirFamilias } from './estruturaRolamentos';
 import { createMarca } from '../../../pages/Catalogo/pages/MarcasManager/services/comercialMarcas.service';
 import {
   ConfigRolamentos, ItemExistente, MarcaModulo, montarDescricao, montarNome, montarSku, rolamentosApi, siglaDaMarca, Sufixo, TIPOS, TipoRolamento, VEDACOES,
@@ -99,7 +100,7 @@ const RolamentosEntrada: React.FC<EntradaNfExtensaoProps> = ({ linhas: linhasNot
     if (!l.codigo.trim()) pendencias.push('código');
     if (!l.linha) pendencias.push('linha 1ª/2ª');
     if (l.linha === 1 && !marca) pendencias.push('marca');
-    if (l.tipo && !config.familias?.[l.tipo]) pendencias.push('família do tipo não configurada');
+    if (l.tipo && !config.subcategorias?.[l.tipo]) pendencias.push('subcategoria do tipo não configurada');
     if (l.linha === 2 && !config.idMarcaSegundaLinha) pendencias.push('marca "2ª Linha" não configurada');
     return { sku, nome, pendencias, existente: sku ? existentes[sku.toUpperCase()] : undefined };
   };
@@ -141,7 +142,7 @@ const RolamentosEntrada: React.FC<EntradaNfExtensaoProps> = ({ linhas: linhasNot
     }
   };
 
-  const montarMapping = (l: Linha, sku: string, nome: string, agrupar: boolean, existente?: ItemExistente): MappingPayload => {
+  const montarMapping = (l: Linha, sku: string, nome: string, agrupar: boolean, existente: ItemExistente | undefined, familiaId: number | null): MappingPayload => {
     const item = l.item;
     const unidadeNf = String(item.unidade || 'UN').toUpperCase();
     if (existente) {
@@ -165,7 +166,7 @@ const RolamentosEntrada: React.FC<EntradaNfExtensaoProps> = ({ linhas: linhasNot
     const base = mapeamentoRapido({ ...item, tipoRecurso: 'PRODUTO' }, {
       markup,
       classificacao: {
-        familiaId: config.familias?.[l.tipo!] ?? null, categoriaId: null,
+        familiaId, categoriaId: null,
         marcaId: l.linha === 2 ? (config.idMarcaSegundaLinha ?? null) : l.idMarca, atributos,
       },
     });
@@ -219,11 +220,14 @@ const RolamentosEntrada: React.FC<EntradaNfExtensaoProps> = ({ linhas: linhasNot
         .map(l => ({ codigo: l.codigo.trim().toUpperCase(), tipo: l.tipo, d: l.d!, D: l.D!, B: l.B! }));
       if (medidas.length) await rolamentosApi.salvarMedidas(medidas);
       const novos = calc.filter(x => !x.c.existente);
+      // Família de cada código (Rolamento 6205): a que já existe na subcategoria do tipo ou uma nova, com as medidas como DNA
+      const familias = await garantirFamilias(config, novos.map(x => ({ tipo: x.l.tipo!, codigo: x.l.codigo, medidas: { d: x.l.d, D: x.l.D, B: x.l.B } })));
       const contagem = new Map<string, number>();
       for (const x of novos) contagem.set(x.c.sku!, (contagem.get(x.c.sku!) || 0) + 1);
       aplicarMapeamentos(calc.map(x => ({
         tempId: x.l.tempId,
-        mapping: montarMapping(x.l, x.c.sku!, x.c.nome!, (contagem.get(x.c.sku!) || 0) > 1, x.c.existente),
+        mapping: montarMapping(x.l, x.c.sku!, x.c.nome!, (contagem.get(x.c.sku!) || 0) > 1, x.c.existente,
+          familias[`${x.l.tipo}|${x.l.codigo.trim().toUpperCase()}`] ?? null),
       })));
       setAberto(false);
     } catch (e) {
@@ -233,7 +237,7 @@ const RolamentosEntrada: React.FC<EntradaNfExtensaoProps> = ({ linhas: linhasNot
     }
   };
 
-  const configIncompleta = !config.familias || Object.keys(config.familias).length === 0;
+  const configIncompleta = !config.subcategorias || Object.keys(config.subcategorias).length === 0;
   // Marcas de rolamento (com linha) primeiro; as outras do sistema ficam num grupo à parte
   const marcaUtil = (m: MarcaModulo) => m.id !== config.idMarcaSegundaLinha && m.nome.toLowerCase() !== 'sem marca';
   const opcoesMarca = [

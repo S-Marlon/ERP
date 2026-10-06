@@ -4,17 +4,20 @@
 
 export type TipoRolamento = 'RIGIDO_ESFERAS' | 'INSERCAO_UC' | 'AGULHAS' | 'ROLOS_CONICOS' | 'AUTOCOMPENSADOR' | 'ROLOS_CILINDRICOS' | 'AXIAL';
 
-export const TIPOS: Record<TipoRolamento, { familia: string; nomeCurto: string; comVedacao: boolean }> = {
-  RIGIDO_ESFERAS: { familia: 'Rolamento rígido de esferas', nomeCurto: 'Rolamento', comVedacao: true },
-  INSERCAO_UC: { familia: 'Rolamento de inserção (UC)', nomeCurto: 'Rolamento de inserção', comVedacao: false },
-  AGULHAS: { familia: 'Rolamento de agulhas', nomeCurto: 'Rolamento de agulha', comVedacao: true },
-  ROLOS_CONICOS: { familia: 'Rolamento de rolos cônicos', nomeCurto: 'Rolamento cônico', comVedacao: false },
-  AUTOCOMPENSADOR: { familia: 'Rolamento autocompensador', nomeCurto: 'Rolamento autocompensador', comVedacao: false },
-  ROLOS_CILINDRICOS: { familia: 'Rolamento de rolos cilíndricos', nomeCurto: 'Rolamento de rolos cilíndricos', comVedacao: false },
-  AXIAL: { familia: 'Rolamento axial', nomeCurto: 'Rolamento axial', comVedacao: false },
+export const TIPOS: Record<TipoRolamento, { familia: string; subcategoria: string; nomeCurto: string; comVedacao: boolean }> = {
+  RIGIDO_ESFERAS: { familia: 'Rolamento rígido de esferas', subcategoria: 'Rígidos de esferas', nomeCurto: 'Rolamento', comVedacao: true },
+  INSERCAO_UC: { familia: 'Rolamento de inserção (UC)', subcategoria: 'Inserção (UC)', nomeCurto: 'Rolamento de inserção', comVedacao: false },
+  AGULHAS: { familia: 'Rolamento de agulhas', subcategoria: 'Agulhas', nomeCurto: 'Rolamento de agulha', comVedacao: true },
+  ROLOS_CONICOS: { familia: 'Rolamento de rolos cônicos', subcategoria: 'Rolos cônicos', nomeCurto: 'Rolamento cônico', comVedacao: false },
+  AUTOCOMPENSADOR: { familia: 'Rolamento autocompensador', subcategoria: 'Autocompensadores', nomeCurto: 'Rolamento autocompensador', comVedacao: false },
+  ROLOS_CILINDRICOS: { familia: 'Rolamento de rolos cilíndricos', subcategoria: 'Rolos cilíndricos', nomeCurto: 'Rolamento de rolos cilíndricos', comVedacao: false },
+  AXIAL: { familia: 'Rolamento axial', subcategoria: 'Axiais', nomeCurto: 'Rolamento axial', comVedacao: false },
 };
 
 export const SIGLA_SEGUNDA_LINHA = '2L';
+
+/** Família de um código (fica na subcategoria do tipo): Rolamento 6205, Rolamento UC207-20. */
+export const nomeFamiliaDoCodigo = (codigo: string) => `Rolamento ${codigo.trim().toUpperCase()}`;
 export const VEDACOES = ['ABERTO', '2RS', 'RS', 'ZZ', 'Z'];
 
 export interface Medidas { d: number; D: number; B: number }

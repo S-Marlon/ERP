@@ -4,8 +4,9 @@ import React, { useEffect, useState } from 'react';
 import { Alert, Button, Card, Col, Collapse, Descriptions, Input, InputNumber, Modal, Popconfirm, Row, Select, Space, Spin, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { BuildOutlined, DeleteOutlined, ExperimentOutlined, PlusOutlined } from '@ant-design/icons';
 import { ModalNovaMarca } from '../../../pages/Compras/StockEntry/ItemsConference/DefinicoesPimRapidas';
-import { montarEstrutura } from './estruturaRolamentos';
-import { ConfigRolamentos, LinhaAnalisada, MarcaModulo, MedidaAprendida, rolamentosApi, TIPOS, TipoRolamento } from './rolamentosApi';
+import { garantirFamilias, montarEstrutura } from './estruturaRolamentos';
+import { updateFamilia } from '../../../pages/Catalogo/pages/FamilyManager/FamilyManager.api';
+import { ConfigRolamentos, LinhaAnalisada, MarcaModulo, MedidaAprendida, nomeFamiliaDoCodigo, rolamentosApi, TIPOS, TipoRolamento } from './rolamentosApi';
 
 const { Title, Text } = Typography;
 const mm = (v: number | null) => (v === null ? '—' : v.toLocaleString('pt-BR', { maximumFractionDigits: 3 }));
@@ -14,6 +15,11 @@ const RolamentosConfig: React.FC = () => {
   const [carregando, setCarregando] = useState(true);
   const [config, setConfig] = useState<ConfigRolamentos>({});
   const [familias, setFamilias] = useState<Record<number, { id: number; nome: string; status: string }>>({});
+  const [subcategorias, setSubcategorias] = useState<Record<number, { id: number; nome: string; familias: number }>>({});
+  // Reorganizar: itens das famílias amplas antigas vão para a família do seu código (Rolamento 6205)
+  type ItemReorg = { idItem: number; sku: string; nome: string | null; tipo: TipoRolamento | null; codigo: string; medidas: { d: number | null; D: number | null; B: number | null } };
+  const [previaReorg, setPreviaReorg] = useState<ItemReorg[] | null>(null);
+  const [reorganizando, setReorganizando] = useState(false);
   const [marcas, setMarcas] = useState<MarcaModulo[]>([]);
   const [medidas, setMedidas] = useState<MedidaAprendida[]>([]);
   const [montando, setMontando] = useState<string | null>(null);
@@ -66,6 +72,7 @@ const RolamentosConfig: React.FC = () => {
       const r = await rolamentosApi.config();
       setConfig(r.configuracao);
       setFamilias(r.familias);
+      setSubcategorias(r.subcategorias || {});
       setMarcas(r.marcas);
       setMedidas(r.medidas);
       rolamentosApi.dicionario().then(setDicionarioPadrao).catch(() => undefined);
@@ -121,6 +128,35 @@ const RolamentosConfig: React.FC = () => {
     }
   };
 
+  const verReorganizar = async () => {
+    setReorganizando(true);
+    try { setPreviaReorg((await rolamentosApi.itensParaReorganizar()).itens); } catch (e) { message.error(e instanceof Error ? e.message : 'Erro.'); } finally { setReorganizando(false); }
+  };
+  const aplicarReorganizar = async () => {
+    if (!previaReorg) return;
+    if (!Object.keys(config.subcategorias || {}).length) { message.warning('Monte a estrutura (subcategorias) antes.'); return; }
+    setReorganizando(true);
+    try {
+      const validos = previaReorg.filter(i => i.tipo && i.codigo);
+      const fams = await garantirFamilias(config, validos.map(i => ({ tipo: i.tipo!, codigo: i.codigo, medidas: i.medidas })), setMontando);
+      const r = await rolamentosApi.moverItens(validos.map(i => ({ idItem: i.idItem, idFamilia: fams[`${i.tipo}|${i.codigo}`] })));
+      // Famílias amplas que ficaram vazias saem de uso (inativas; nada é apagado)
+      const restantes = (await rolamentosApi.itensParaReorganizar()).itens.length;
+      if (!restantes) {
+        for (const id of Object.values(config.familias || {}).filter(Boolean)) await updateFamilia(String(id), { status: 'INATIVO' } as never);
+        await rolamentosApi.salvarConfig({ familias: {} });
+      }
+      message.success(`${r.movidos} item(ns) nas famílias por código.${restantes ? ` ${restantes} ficaram (sem código ou tipo): ajuste no catálogo.` : ''}`);
+      setPreviaReorg(null);
+      await carregar();
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : 'Erro ao reorganizar.');
+    } finally {
+      setReorganizando(false);
+      setMontando(null);
+    }
+  };
+
   const testar = async () => {
     try {
       const r = await rolamentosApi.analisar([{ chave: 't', descricao: teste }]);
@@ -132,7 +168,8 @@ const RolamentosConfig: React.FC = () => {
 
   if (carregando) return <div style={{ padding: 40, textAlign: 'center' }}><Spin /></div>;
   const tipos = Object.keys(TIPOS) as TipoRolamento[];
-  const familiasOk = tipos.filter(t => config.familias?.[t] && familias[config.familias[t]!]).length;
+  const subcategoriasOk = tipos.filter(t => config.subcategorias?.[t] && subcategorias[config.subcategorias[t]!]).length;
+  const temFamiliasAntigas = Object.values(config.familias || {}).some(id => id && familias[id]);
   // Só as marcas de rolamento (com linha definida); as demais do sistema podem ser trazidas para cá
   const marcaUtil = (m: MarcaModulo) => m.id !== config.idMarcaSegundaLinha && m.nome.toLowerCase() !== 'sem marca';
   const marcasDoModulo = marcas.filter(m => marcaUtil(m) && m.linha !== null);
@@ -149,20 +186,20 @@ const RolamentosConfig: React.FC = () => {
             extra={
               <Popconfirm
                 title="Montar a estrutura de rolamentos?"
-                description={<div style={{ maxWidth: 340 }}>Cria (ou reaproveita pelo nome) a categoria Rolamentos, uma família por tipo com a marca na grade,
-                  os atributos (código, vedação, folga, linha, d, D, B) e a marca "2ª Linha" (sigla 2L). Nada é apagado.</div>}
+                description={<div style={{ maxWidth: 340 }}>Cria (ou reaproveita pelo nome) a categoria Rolamentos com uma subcategoria por tipo,
+                  os atributos (código, vedação, folga, linha, d, D, B) e a marca "2ª Linha" (sigla 2L). As famílias (Rolamento 6205...) nascem na entrada da nota. Nada é apagado.</div>}
                 okText="Montar" cancelText="Voltar" onConfirm={montar}>
-                <Button type="primary" icon={<BuildOutlined />} loading={montando !== null}>{familiasOk ? 'Completar estrutura' : 'Montar estrutura'}</Button>
+                <Button type="primary" icon={<BuildOutlined />} loading={montando !== null}>{subcategoriasOk ? 'Completar estrutura' : 'Montar estrutura'}</Button>
               </Popconfirm>
             }>
             {montando && <Alert type="info" showIcon message={montando} style={{ marginBottom: 10 }} />}
             <Descriptions size="small" column={1} bordered>
               {tipos.map(t => {
-                const id = config.familias?.[t];
-                const f = id ? familias[id] : null;
+                const id = config.subcategorias?.[t];
+                const sub = id ? subcategorias[id] : null;
                 return (
-                  <Descriptions.Item key={t} label={TIPOS[t].familia}>
-                    {f ? <Space>{f.nome}<Tag color={f.status === 'ATIVO' ? 'green' : 'orange'}>{f.status.toLowerCase()}</Tag></Space> : <Text type="secondary">não configurada</Text>}
+                  <Descriptions.Item key={t} label={`Rolamentos › ${TIPOS[t].subcategoria}`}>
+                    {sub ? <Space>{sub.familias} família(s) por código</Space> : <Text type="secondary">não criada</Text>}
                   </Descriptions.Item>
                 );
               })}
@@ -179,6 +216,12 @@ const RolamentosConfig: React.FC = () => {
                 onChange={v => setConfig(c => ({ ...c, markup: Number(v) || 2 }))} />
               <Button size="small" onClick={() => rolamentosApi.salvarConfig({ markup: config.markup ?? 2 }).then(() => message.success('Markup salvo.')).catch(e => message.error(e.message))}>Salvar</Button>
             </Space>
+            {temFamiliasAntigas && (
+              <Alert type="warning" showIcon style={{ marginTop: 10 }}
+                message="Há itens nas famílias amplas antigas (uma por tipo)."
+                description="Reorganize para a família do código de cada um (Rolamento 6205...), com as medidas como DNA da família."
+                action={<Button size="small" loading={reorganizando && !previaReorg} onClick={verReorganizar}>Reorganizar</Button>} />
+            )}
             <div style={{ marginTop: 10 }}>
               <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>Nome dos itens: ROLAMENTO 6205-2RS/C3 | 25 mm × 52 mm × 15 mm | SKF</Text>
               <Button size="small" style={{ marginTop: 4 }} loading={renomeando && !previaNomes} onClick={verRenomear}>Renomear itens já cadastrados</Button>
@@ -335,6 +378,20 @@ const RolamentosConfig: React.FC = () => {
             { title: 'SKU', dataIndex: 'sku', width: 150 },
             { title: 'Nome atual', dataIndex: 'nomeAtual', render: (v: string | null) => <Text type="secondary">{v || '—'}</Text> },
             { title: 'Nome novo', dataIndex: 'nomeNovo', render: (v: string) => <b>{v}</b> },
+          ]} />
+      </Modal>
+
+      <Modal open={previaReorg !== null} width={860} title={`Reorganizar itens nas famílias por código (${previaReorg?.length ?? 0})`} onCancel={() => setPreviaReorg(null)}
+        okText="Reorganizar" cancelText="Voltar" onOk={aplicarReorganizar} okButtonProps={{ disabled: !previaReorg?.some(i => i.tipo && i.codigo) }} confirmLoading={reorganizando}>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          Cada item vai para a família do seu código, na subcategoria do tipo (cria a família se ainda não existir). As famílias amplas antigas ficam inativas no fim. SKU e nome não mudam.
+        </Text>
+        {montando && <Alert type="info" showIcon message={montando} style={{ marginTop: 8 }} />}
+        <Table size="small" rowKey="idItem" pagination={false} scroll={{ y: 420 }} style={{ marginTop: 8 }} dataSource={previaReorg || []}
+          columns={[
+            { title: 'SKU', dataIndex: 'sku', width: 160 },
+            { title: 'Subcategoria', dataIndex: 'tipo', width: 160, render: (v: TipoRolamento | null) => (v ? TIPOS[v].subcategoria : <Text type="danger">sem tipo</Text>) },
+            { title: 'Família de destino', key: 'f', render: (_: unknown, i: ItemReorg) => (i.codigo ? <b>{nomeFamiliaDoCodigo(i.codigo)}</b> : <Text type="danger">sem código: fica onde está</Text>) },
           ]} />
       </Modal>
 

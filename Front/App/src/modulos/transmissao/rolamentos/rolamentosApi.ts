@@ -4,24 +4,28 @@ const API = 'http://localhost:3001/api/modulos/transmissao/rolamentos';
 export type TipoRolamento = 'RIGIDO_ESFERAS' | 'INSERCAO_UC' | 'AGULHAS' | 'ROLOS_CONICOS' | 'AUTOCOMPENSADOR' | 'ROLOS_CILINDRICOS' | 'AXIAL';
 export type CampoAtributo = 'codigo' | 'vedacao' | 'folga' | 'linha' | 'diametroInterno' | 'diametroExterno' | 'largura';
 
-export const TIPOS: Record<TipoRolamento, { familia: string; nomeCurto: string; comVedacao: boolean }> = {
-  RIGIDO_ESFERAS: { familia: 'Rolamento rígido de esferas', nomeCurto: 'Rolamento', comVedacao: true },
-  INSERCAO_UC: { familia: 'Rolamento de inserção (UC)', nomeCurto: 'Rolamento de inserção', comVedacao: false },
-  AGULHAS: { familia: 'Rolamento de agulhas', nomeCurto: 'Rolamento de agulha', comVedacao: true },
-  ROLOS_CONICOS: { familia: 'Rolamento de rolos cônicos', nomeCurto: 'Rolamento cônico', comVedacao: false },
-  AUTOCOMPENSADOR: { familia: 'Rolamento autocompensador', nomeCurto: 'Rolamento autocompensador', comVedacao: false },
-  ROLOS_CILINDRICOS: { familia: 'Rolamento de rolos cilíndricos', nomeCurto: 'Rolamento de rolos cilíndricos', comVedacao: false },
-  AXIAL: { familia: 'Rolamento axial', nomeCurto: 'Rolamento axial', comVedacao: false },
+export const TIPOS: Record<TipoRolamento, { familia: string; subcategoria: string; nomeCurto: string; comVedacao: boolean }> = {
+  RIGIDO_ESFERAS: { familia: 'Rolamento rígido de esferas', subcategoria: 'Rígidos de esferas', nomeCurto: 'Rolamento', comVedacao: true },
+  INSERCAO_UC: { familia: 'Rolamento de inserção (UC)', subcategoria: 'Inserção (UC)', nomeCurto: 'Rolamento de inserção', comVedacao: false },
+  AGULHAS: { familia: 'Rolamento de agulhas', subcategoria: 'Agulhas', nomeCurto: 'Rolamento de agulha', comVedacao: true },
+  ROLOS_CONICOS: { familia: 'Rolamento de rolos cônicos', subcategoria: 'Rolos cônicos', nomeCurto: 'Rolamento cônico', comVedacao: false },
+  AUTOCOMPENSADOR: { familia: 'Rolamento autocompensador', subcategoria: 'Autocompensadores', nomeCurto: 'Rolamento autocompensador', comVedacao: false },
+  ROLOS_CILINDRICOS: { familia: 'Rolamento de rolos cilíndricos', subcategoria: 'Rolos cilíndricos', nomeCurto: 'Rolamento de rolos cilíndricos', comVedacao: false },
+  AXIAL: { familia: 'Rolamento axial', subcategoria: 'Axiais', nomeCurto: 'Rolamento axial', comVedacao: false },
 };
 export const VEDACOES = [
   { value: 'ABERTO', label: 'Aberto' }, { value: '2RS', label: '2RS (borracha)' }, { value: 'RS', label: 'RS (1 lado)' },
   { value: 'ZZ', label: 'ZZ (metálica)' }, { value: 'Z', label: 'Z (1 lado)' },
 ];
 export const SIGLA_SEGUNDA_LINHA = '2L';
+
+/** Família de um código (fica na subcategoria do tipo): Rolamento 6205, Rolamento UC207-20. */
+export const nomeFamiliaDoCodigo = (codigo: string) => `Rolamento ${codigo.trim().toUpperCase()}`;
 export const NOME_MARCA_SEGUNDA_LINHA = '2ª Linha';
 
 export interface ConfigRolamentos {
   idCategoria?: number | null;
+  subcategorias?: Partial<Record<TipoRolamento, number>>;  // Rolamentos › Rígidos de esferas... (famílias por código ficam nelas)
   familias?: Partial<Record<TipoRolamento, number>>;
   atributos?: Partial<Record<CampoAtributo, number>>;
   idMarcaSegundaLinha?: number | null;
@@ -52,6 +56,7 @@ const json = (metodo: string, corpo: unknown): RequestInit => ({ method: metodo,
 export const rolamentosApi = {
   config: () => requisitar<{
     configuracao: ConfigRolamentos; familias: Record<number, { id: number; nome: string; status: string }>;
+    subcategorias: Record<number, { id: number; nome: string; familias: number }>;
     marcas: MarcaModulo[]; medidas: MedidaAprendida[];
   }>(`${API}/config`, undefined, 'Erro ao carregar a configuração de rolamentos.'),
   salvarConfig: (configuracao: ConfigRolamentos) => requisitar<{ configuracao: ConfigRolamentos }>(`${API}/config`, json('PUT', { configuracao }), 'Erro ao salvar a configuração.'),
@@ -64,6 +69,12 @@ export const rolamentosApi = {
     requisitar(`${API}/medidas`, json('POST', { lista }), 'Erro ao salvar as medidas.'),
   renomear: (aplicar: boolean) => requisitar<{ total: number; aplicadas: number; mudancas: Array<{ idItem: number; sku: string; nomeAtual: string | null; nomeNovo: string }> }>(
     `${API}/renomear`, json('POST', { aplicar }), 'Erro ao renomear os itens.'),
+  familias: (pares: Array<{ tipo: TipoRolamento; codigo: string }>) =>
+    requisitar<{ familias: Record<string, { id: number; nome: string } | null> }>(`${API}/familias`, json('POST', { pares }), 'Erro ao buscar as famílias.'),
+  itensParaReorganizar: () => requisitar<{ itens: Array<{ idItem: number; sku: string; nome: string | null; tipo: TipoRolamento | null; codigo: string; medidas: { d: number | null; D: number | null; B: number | null } }> }>(
+    `${API}/reorganizar`, undefined, 'Erro ao listar os itens.'),
+  moverItens: (movimentos: Array<{ idItem: number; idFamilia: number }>) =>
+    requisitar<{ movidos: number }>(`${API}/reorganizar/mover`, json('POST', { movimentos }), 'Erro ao mover os itens.'),
   excluirMedida: (id: number) => requisitar(`${API}/medidas/${id}`, { method: 'DELETE' }, 'Erro ao excluir a medida.'),
 };
 
