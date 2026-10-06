@@ -59,6 +59,7 @@ export const classificacaoNoRascunho = (c: ClassificacaoItem | null | undefined)
   // Com família, a categoria vem dela (regra do PIM)
   categoria_id: c?.familiaId ? null : (c?.categoriaId ?? null),
   atributos: c?.atributos && Object.keys(c.atributos).length > 0 ? { ...c.atributos } : null,
+  marca_id: c?.marcaId ?? null,
 });
 
 export const mapeamentoRapido = (item: any, opcoes: { markup: number; classificacao?: ClassificacaoItem | null }): MappingPayload => {
@@ -112,5 +113,7 @@ export const aplicarClassificacao = (
   const atributos = opcoes.substituir
     ? nova.atributos
     : nova.atributos ? { ...(atuais || {}), ...nova.atributos } : atuais;
-  return { ...mapping, draftIdentity: { ...d, familia_id: nova.familia_id, categoria_id: nova.categoria_id, atributos } };
+  // Lote sem marca escolhida mantém a de cada item; substituir aplica exatamente a escolhida
+  const marca_id = opcoes.substituir ? nova.marca_id : (nova.marca_id ?? d.marca_id ?? null);
+  return { ...mapping, draftIdentity: { ...d, familia_id: nova.familia_id, categoria_id: nova.categoria_id, atributos, marca_id } };
 };

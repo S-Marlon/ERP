@@ -48,6 +48,14 @@ export const runEdicaoLote = () => {
   const limpa = aplicarClassificacao(consumo, { familiaId: 7, categoriaId: null, atributos: null }, { substituir: true });
   ok(limpa?.draftIdentity?.atributos === null, 'substituir sem valores limpa');
 
+  // Marca: cadastro rápido grava a escolhida; lote sem marca mantém a do item; substituir aplica a escolhida
+  const comMarca = mapeamentoRapido({ nItem: 5, sku: 'B1', descricao: 'Bomba', unidade: 'UN', valorUnitario: 100, tipoRecurso: 'PRODUTO' },
+    { markup: 2, classificacao: { familiaId: null, categoriaId: null, atributos: null, marcaId: 4 } });
+  ok(comMarca.draftIdentity?.marca_id === 4, 'marca no cadastro rápido');
+  ok(aplicarClassificacao(comMarca, { familiaId: 9, categoriaId: null, atributos: null })?.draftIdentity?.marca_id === 4, 'lote mantém a marca');
+  ok(aplicarClassificacao(comMarca, { familiaId: 9, categoriaId: null, atributos: null, marcaId: 6 })?.draftIdentity?.marca_id === 6, 'lote troca a marca');
+  ok(aplicarClassificacao(comMarca, { familiaId: 9, categoriaId: null, atributos: null, marcaId: null }, { substituir: true })?.draftIdentity?.marca_id === null, 'substituir limpa');
+
   // Mesmo SKU em itens novos: precisa de confirmação; mesmoProduto orienta pela nota do fornecedor
   const linha = (sku: string, cProd: string, xProd: string, conf?: string) =>
     ({ sku: cProd, descricao: xProd, mapeamento: { mode: 'DRAFT', draftIdentity: { sku_comercial: sku }, agrupamentoConfirmado: conf } });

@@ -1,4 +1,4 @@
-// Classificação do item novo na entrada de NF: família (que já traz a categoria) ou só a categoria,
+// Classificação do item novo na entrada de NF: família (que já traz a categoria) ou só a categoria, a marca
 // e, se o operador quiser, os valores dos atributos que o item herda. Nada disso é obrigatório aqui:
 // o que ficar vazio é completado depois no editor de catálogo (o item só não é publicado enquanto faltar obrigatório).
 import React, { useEffect, useMemo, useState } from 'react';
@@ -10,6 +10,7 @@ import type { AtributoFicha } from '../../../Catalogo/pages/CatalogSkus/CatalogS
 import CampoAtributo, { PAPEL_ATRIBUTO, ordenarPorPapel, valorVazio } from '../../../Catalogo/pages/CatalogSkus/CampoAtributo';
 import { getAtributosParaItem } from '../../api/comprasApi';
 import { definirCategoriaDaFamilia } from '../../../Catalogo/pages/CategoryManager/categoryService';
+import { createMarca, getMarcas } from '../../../Catalogo/pages/MarcasManager/services/comercialMarcas.service';
 import { ModalNovaCategoria, ModalNovaFamilia } from './DefinicoesPimRapidas';
 
 const { Text } = Typography;
@@ -19,11 +20,31 @@ export interface ClassificacaoItem {
   categoriaId: number | null;
   // null = não preencher agora (fica para o editor de catálogo)
   atributos: Record<number, unknown> | null;
+  // Marca do item (família com marca DNA impõe a dela)
+  marcaId?: number | null;
 }
 
-export const CLASSIFICACAO_VAZIA: ClassificacaoItem = { familiaId: null, categoriaId: null, atributos: null };
+export const CLASSIFICACAO_VAZIA: ClassificacaoItem = { familiaId: null, categoriaId: null, atributos: null, marcaId: null };
 
-interface FamiliaOpcao { id: number; nome: string; status: string; categoriaId: number | null }
+interface FamiliaOpcao {
+  id: number; nome: string; status: string; categoriaId: number | null;
+  // Papel da marca na família: ficha (cada item a sua), dna (todos com a da família), grade (cada item precisa da sua)
+  papelMarca: string; idMarca: number | null; nomeMarca: string;
+}
+interface MarcaOpcao { id: number; nome: string }
+
+// "Sem Marca" (registro padrão do banco) vale como ausência de marca
+const marcaReal = (nome: unknown) => !['', 'semmarca'].includes(String(nome || '').toLowerCase().replace(/\s+/g, ''));
+
+let cacheMarcas: Promise<MarcaOpcao[]> | null = null;
+export const carregarMarcas = () => {
+  if (!cacheMarcas) {
+    cacheMarcas = getMarcas()
+      .then(ms => ms.filter(m => m.status !== 'Inativo' && marcaReal(m.nome)).map(m => ({ id: Number(m.id), nome: m.nome })).sort((a, b) => a.nome.localeCompare(b.nome)))
+      .catch(err => { cacheMarcas = null; throw err; });
+  }
+  return cacheMarcas;
+};
 interface CategoriaOpcao { id: number; caminho: string }
 
 // Famílias e categorias mudam pouco: carregadas uma vez por sessão da tela
@@ -45,7 +66,10 @@ export const carregarFamiliasECategorias = () => {
           return partes.join(' › ');
         };
         return {
-          familias: fams.map(f => ({ id: Number(f.id), nome: f.nome, status: f.status, categoriaId: Number(f.categoriaPai) || null })),
+          familias: fams.map(f => ({
+            id: Number(f.id), nome: f.nome, status: f.status, categoriaId: Number(f.categoriaPai) || null,
+            papelMarca: String(f.marcaComportamento || 'ficha'), idMarca: Number(f.idMarca) || null, nomeMarca: f.nomeMarca || '',
+          })),
           categorias: cats.map(c => ({ id: Number(c.id), caminho: caminho(c.id) })).sort((a, b) => a.caminho.localeCompare(b.caminho)),
         };
       })
@@ -79,6 +103,9 @@ export const ClassificacaoPim: React.FC<Props> = ({ value, onChange, lote, onAtr
   const [categoriaDaFamilia, setCategoriaDaFamilia] = useState<number | null>(null);
   const [salvandoCategoria, setSalvandoCategoria] = useState(false);
   const [versao, setVersao] = useState(0);
+  const [marcas, setMarcas] = useState<MarcaOpcao[]>([]);
+  const [buscaMarca, setBuscaMarca] = useState('');
+  const [criandoMarca, setCriandoMarca] = useState(false);
 
   const recarregar = async () => {
     invalidarFamiliasECategorias();
@@ -92,7 +119,27 @@ export const ClassificacaoPim: React.FC<Props> = ({ value, onChange, lote, onAtr
     carregarFamiliasECategorias()
       .then(r => { setFamilias(r.familias); setCategorias(r.categorias); })
       .catch(e => setErro(e.message || 'Erro ao carregar famílias e categorias.'));
+    carregarMarcas().then(setMarcas).catch(e => setErro(e.message || 'Erro ao carregar as marcas.'));
   }, []);
+
+  // Marca nova sem sair da entrada: digita na busca e cria
+  const criarMarca = async () => {
+    const nome = buscaMarca.trim();
+    if (!nome) return;
+    setCriandoMarca(true);
+    try {
+      const r = await createMarca({ nome });
+      cacheMarcas = null;
+      setMarcas(await carregarMarcas());
+      setBuscaMarca('');
+      onChange({ ...value, marcaId: Number(r.id_marca) });
+      message.success(`Marca "${nome}" criada.`);
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : 'Erro ao criar a marca.');
+    } finally {
+      setCriandoMarca(false);
+    }
+  };
 
   // Atributos que o item terá nesta família/categoria
   useEffect(() => {
@@ -109,6 +156,7 @@ export const ClassificacaoPim: React.FC<Props> = ({ value, onChange, lote, onAtr
   useEffect(() => { onAtributos?.(value.familiaId || value.categoriaId ? atributos : []); }, [atributos, value.familiaId, value.categoriaId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const familia = familias.find(f => f.id === value.familiaId) || null;
+  const marcaDaFamilia = familia?.papelMarca === 'dna' && marcaReal(familia.nomeMarca) ? familia.nomeMarca : null;
   const categoriaEfetiva = familia ? familia.categoriaId : value.categoriaId;
   const editaveis = atributos.filter(a => !a.valorFixo);
   const obrigatorios = editaveis.filter(a => a.obrigatorio);
@@ -156,7 +204,7 @@ export const ClassificacaoPim: React.FC<Props> = ({ value, onChange, lote, onAtr
             placeholder="Sem família (classificar depois)"
             style={{ width: '100%', marginTop: 2 }}
             value={value.familiaId ?? undefined}
-            onChange={v => onChange({ familiaId: v ?? null, categoriaId: null, atributos: null })}
+            onChange={v => onChange({ ...value, familiaId: v ?? null, categoriaId: null, atributos: null })}
             options={familias.map(f => ({
               value: f.id,
               label: `${f.nome}${f.status !== 'ATIVO' ? ` (${STATUS_FAMILIA_CONFIG[f.status as keyof typeof STATUS_FAMILIA_CONFIG]?.label || f.status})` : ''}`,
@@ -178,12 +226,41 @@ export const ClassificacaoPim: React.FC<Props> = ({ value, onChange, lote, onAtr
               disabled={Boolean(familia)}
               style={{ width: '100%', marginTop: 2 }}
               value={categoriaEfetiva ?? undefined}
-              onChange={v => onChange({ familiaId: null, categoriaId: v ?? null, atributos: null })}
+              onChange={v => onChange({ ...value, familiaId: null, categoriaId: v ?? null, atributos: null })}
               options={categoriaOptions}
             />
           </Tooltip>
         </Col>
       </Row>
+
+      <div>
+        <Text strong style={{ fontSize: 11 }}>Marca</Text>
+        {marcaDaFamilia ? (
+          <Tooltip title="Marca DNA da família: todos os itens dela recebem esta marca. Para mudar, ajuste a família no catálogo.">
+            <Select size="small" disabled style={{ width: '100%', marginTop: 2 }} value={marcaDaFamilia} options={[{ value: marcaDaFamilia, label: `${marcaDaFamilia} (da família)` }]} />
+          </Tooltip>
+        ) : (
+          <Select
+            size="small"
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            placeholder="Sem marca"
+            style={{ width: '100%', marginTop: 2 }}
+            value={value.marcaId ?? undefined}
+            onChange={v => onChange({ ...value, marcaId: v ?? null })}
+            searchValue={buscaMarca}
+            onSearch={setBuscaMarca}
+            options={marcas.map(m => ({ value: m.id, label: m.nome }))}
+            notFoundContent={buscaMarca.trim() ? (
+              <Button type="link" size="small" icon={<PlusOutlined />} loading={criandoMarca} onClick={criarMarca}>Criar marca "{buscaMarca.trim()}"</Button>
+            ) : 'Nenhuma marca'}
+          />
+        )}
+        {familia?.papelMarca === 'grade' && !value.marcaId && (
+          <Text type="warning" style={{ fontSize: 11 }}>Nesta família a marca diferencia os itens: escolha a marca deste item.</Text>
+        )}
+      </div>
 
       {familia && !familia.categoriaId && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6, padding: '4px 8px' }}>
@@ -293,7 +370,7 @@ export const ClassificacaoPim: React.FC<Props> = ({ value, onChange, lote, onAtr
         onCriada={async id => {
           setModalFamilia(false);
           await recarregar();
-          onChange({ familiaId: id, categoriaId: null, atributos: null });
+          onChange({ ...value, familiaId: id, categoriaId: null, atributos: null });
         }}
       />
       <ModalNovaCategoria
@@ -305,7 +382,7 @@ export const ClassificacaoPim: React.FC<Props> = ({ value, onChange, lote, onAtr
           const para = modalCategoria;
           setModalCategoria(null);
           await recarregar();
-          if (para === 'item') onChange({ familiaId: null, categoriaId: id, atributos: null });
+          if (para === 'item') onChange({ ...value, familiaId: null, categoriaId: id, atributos: null });
           else if (modalFamilia) setCategoriaCriada(id);
           else setCategoriaDaFamilia(id);
         }}

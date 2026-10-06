@@ -62,6 +62,8 @@ export interface MappingPayload {
     categoria_id?: number | null;
     // Valores de atributos preenchidos na entrada (opcional); null = completar no editor de catálogo
     atributos?: Record<number, unknown> | null;
+    // Marca do item novo (família com marca DNA impõe a dela na aprovação)
+    marca_id?: number | null;
     nome_comercial: string;
     nome_interno: string;
     // Chave da linha na staging (LINHA-n): agrupa linhas do mesmo item novo; nunca vira SKU
@@ -165,7 +167,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ items = [], onMap, o
     setNomeComercial(d?.nome_comercial || currentItem.descricao || "");
     setSkuCustomizado(d ? d.sku_comercial : (foraDaVenda(tipo) ? "" : currentItem.sku || ""));
     setClassificacao(d ? {
-      familiaId: d.familia_id ?? null, categoriaId: d.categoria_id ?? null, atributos: d.atributos ?? null,
+      familiaId: d.familia_id ?? null, categoriaId: d.categoria_id ?? null, atributos: d.atributos ?? null, marcaId: d.marca_id ?? null,
     } : CLASSIFICACAO_VAZIA);
     setConvUnidadeBase((m?.conversaoCompra?.unidade_base || unidadeNf).toUpperCase());
     setConvFator(m?.conversaoCompra?.fator || 1);

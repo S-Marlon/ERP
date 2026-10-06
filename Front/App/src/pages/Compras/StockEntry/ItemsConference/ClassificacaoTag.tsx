@@ -8,6 +8,7 @@ import { linhaItemNovo, linhaSemVinculo } from '../edicaoLote';
 export interface NomesCatalogo {
   familias: Map<number, { nome: string; status: string; categoriaId: number | null }>;
   categorias: Map<number, string>; // id -> caminho (Pai › Filha)
+  marcas?: Map<number, string>;
 }
 
 export interface ClassificacaoCatalogo {
@@ -35,13 +36,14 @@ export const ClassificacaoTag: React.FC<Props> = ({ item, nomes, catalogo, readO
     const idCategoria = familia ? familia.categoriaId : (d.categoria_id ? Number(d.categoria_id) : null);
     const caminho = idCategoria ? nomes.categorias.get(idCategoria) : null;
     const qtdAtributos = d.atributos ? Object.keys(d.atributos).length : 0;
+    const marca = d.marca_id ? (nomes.marcas?.get(Number(d.marca_id)) || `Marca #${d.marca_id}`) : null;
     const clicavel = !readOnly && onEditar;
 
     if (!d.familia_id && !d.categoria_id) {
       return (
         <Tooltip title={clicavel ? 'Item novo sem família/categoria: clique para classificar (opcional)' : 'Item novo sem família/categoria'}>
           <Tag color="orange" icon={<ExclamationCircleOutlined />} style={{ ...estilo, cursor: clicavel ? 'pointer' : 'default' }} onClick={clicavel ? onEditar : undefined}>
-            Sem classificação
+            Sem classificação{marca ? ` · ${marca}` : ''}
           </Tag>
         </Tooltip>
       );
@@ -54,12 +56,13 @@ export const ClassificacaoTag: React.FC<Props> = ({ item, nomes, catalogo, readO
         <div>
           <div>Família: {familia?.nome || (d.familia_id ? `#${d.familia_id}` : '—')}{familia && familia.status !== 'ATIVO' ? ` (${familia.status.toLowerCase()})` : ''}</div>
           <div>Categoria: {caminho || '—'}</div>
+          <div>Marca: {marca || '— (ou a marca DNA da família)'}</div>
           <div>Atributos preenchidos: {qtdAtributos || 'nenhum (completar no editor)'}</div>
           {clicavel && <div style={{ marginTop: 4, opacity: 0.8 }}>Clique para alterar</div>}
         </div>
       }>
         <Tag color="geekblue" icon={<ApartmentOutlined />} style={{ ...estilo, cursor: clicavel ? 'pointer' : 'default' }} onClick={clicavel ? onEditar : undefined}>
-          {texto}{qtdAtributos > 0 ? ` · ${qtdAtributos} atrib.` : ''}
+          {texto}{marca ? ` · ${marca}` : ''}{qtdAtributos > 0 ? ` · ${qtdAtributos} atrib.` : ''}
         </Tag>
       </Tooltip>
     );

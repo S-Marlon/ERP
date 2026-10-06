@@ -43,7 +43,7 @@ FilterType,
 import ProductMappingModal, { MappingPayload, getMappedId, SKU_A_GERAR } from './ProductMappingModal';
 import { DestinosEditor, DestinoLinha } from './DestinosEditor';
 import { ModalCadastroRapido, ModalClassificarLote, type ValoresPorItem } from './ModaisLote';
-import { carregarFamiliasECategorias, type ClassificacaoItem } from './ClassificacaoPim';
+import { carregarFamiliasECategorias, carregarMarcas, type ClassificacaoItem } from './ClassificacaoPim';
 import { ClassificacaoTag, type ClassificacaoCatalogo, type NomesCatalogo } from './ClassificacaoTag';
 import { linhaItemNovo, linhaSemVinculo, situacaoSkusNovos } from '../edicaoLote';
 import { buscarClassificacaoItens } from '../../api/comprasApi';
@@ -109,10 +109,11 @@ const [classificacaoParaCadastro, setClassificacaoParaCadastro] = useState<Class
 const [nomesCatalogo, setNomesCatalogo] = useState<NomesCatalogo>({ familias: new Map(), categorias: new Map() });
 const [classificacaoCatalogo, setClassificacaoCatalogo] = useState<Record<string, ClassificacaoCatalogo>>({});
 useEffect(() => {
-carregarFamiliasECategorias()
-.then(r => setNomesCatalogo({
+Promise.all([carregarFamiliasECategorias(), carregarMarcas().catch(() => [])])
+.then(([r, marcas]) => setNomesCatalogo({
 familias: new Map(r.familias.map(f => [f.id, { nome: f.nome, status: f.status, categoriaId: f.categoriaId }])),
 categorias: new Map(r.categorias.map(c => [c.id, c.caminho])),
+marcas: new Map(marcas.map(m => [m.id, m.nome])),
 }))
 .catch(() => { /* sem nomes: a tag mostra o id */ });
 }, []);
@@ -1191,6 +1192,7 @@ inicial={linhaClassificar?.mapeamento?.draftIdentity ? {
 familiaId: linhaClassificar.mapeamento.draftIdentity.familia_id ?? null,
 categoriaId: linhaClassificar.mapeamento.draftIdentity.categoria_id ?? null,
 atributos: linhaClassificar.mapeamento.draftIdentity.atributos ?? null,
+marcaId: linhaClassificar.mapeamento.draftIdentity.marca_id ?? null,
 } : null}
 onClose={() => setLinhaClassificar(null)}
 onConfirmar={(linhas, classificacao) => { onClassificarLote?.(linhas, classificacao, true); setLinhaClassificar(null); }}

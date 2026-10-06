@@ -280,6 +280,14 @@ export const aprovarLote = async (req: Request, res: Response): Promise<Response
               if (fam.comportamento_marca === 'dna' && fam.id_marca && marcaReal) marcaId = Number(fam.id_marca);
             }
           }
+          // Marca escolhida na entrada (a marca DNA da família tem prioridade; "Sem Marca" vale como nenhuma)
+          if (!marcaId && Number(draft.marca_id) > 0) {
+            const [marRows] = await connection.execute(
+              `SELECT id, nome FROM comercial_marcas WHERE id = ? AND tenant_id = ?`, [draft.marca_id, tenant]
+            );
+            const m = marRows[0];
+            if (m && String(m.nome).trim().toLowerCase() !== 'sem marca') marcaId = Number(m.id);
+          }
           // Sem família: categoria escolhida direto (a família, quando há, manda na categoria)
           if (!familiaId && Number(draft.categoria_id) > 0) {
             const [catRows] = await connection.execute(
