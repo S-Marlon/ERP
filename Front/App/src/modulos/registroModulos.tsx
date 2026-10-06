@@ -3,9 +3,12 @@
 // Para remover um módulo: tirar a pasta e a entrada dele em MODULOS_FRONT.
 import React, { lazy } from 'react';
 import type { ItemMenu } from '../components/Layout/menuRotas';
+import type { MappingPayload } from '../pages/Compras/StockEntry/ItemsConference/ProductMappingModal';
 
 const MontagensPagina = lazy(() => import('./hidraulica/montagens/MontagensPagina'));
 const MontagemPdv = lazy(() => import('./hidraulica/montagens/MontagemPdv'));
+const RolamentosConfig = lazy(() => import('./transmissao/rolamentos/RolamentosConfig'));
+const RolamentosEntrada = lazy(() => import('./transmissao/rolamentos/RolamentosEntrada'));
 
 /** O que o PDV entrega a um botão de módulo (o módulo não acessa o carrinho de outro jeito). */
 export interface PdvExtensaoProps {
@@ -22,11 +25,33 @@ export interface PdvExtensaoProps {
   vincularOrigem: (o: { origem: string; idOrigem: number; rotulo: string } | null) => void;
 }
 
+/** O que a entrada de NF entrega a um botão de módulo: as linhas da nota e como vincular/cadastrar nelas. */
+export interface LinhaEntradaNf {
+  tempId: string | number;
+  nItem?: number;
+  descricao: string;
+  sku?: string;                 // código do produto no fornecedor (cProd)
+  ean?: string;
+  unidade?: string;
+  quantidade?: number;
+  valorUnitario?: number;       // custo final por unidade da nota
+  tipoRecurso?: string;
+  mapeamento?: MappingPayload | null;
+  produtoIdSistema?: number | null;
+}
+export interface EntradaNfExtensaoProps {
+  linhas: LinhaEntradaNf[];
+  // Aplica o mapeamento (vínculo a item existente ou item novo) nas linhas; elas voltam para conferência
+  aplicarMapeamentos: (lista: Array<{ tempId: string | number; mapping: MappingPayload }>) => void;
+  readOnly?: boolean;
+}
+
 export interface ModuloFront {
   codigo: string;                                         // igual a sistema_modulos.codigo
   menu: Array<{ grupo: string; itens: ItemMenu[] }>;      // grupo do menu principal (ex.: grp:vendas)
   rotas: Array<{ path: string; element: React.ReactNode }>;
   pdv?: Array<React.ComponentType<PdvExtensaoProps>>;       // botões no cabeçalho do PDV
+  entradaNf?: Array<React.ComponentType<EntradaNfExtensaoProps>>; // botões na conferência da nota de entrada
 }
 
 export const MODULOS_FRONT: ModuloFront[] = [
@@ -35,6 +60,12 @@ export const MODULOS_FRONT: ModuloFront[] = [
     menu: [{ grupo: 'grp:vendas', itens: [{ key: '/modulos/hidraulica/montagens', label: 'Montagens (OS)' }] }],
     rotas: [{ path: '/modulos/hidraulica/montagens', element: <MontagensPagina /> }],
     pdv: [MontagemPdv],
+  },
+  {
+    codigo: 'TRANSMISSAO_ROLAMENTOS',
+    menu: [{ grupo: 'grp:compras', itens: [{ key: '/modulos/transmissao/rolamentos', label: 'Rolamentos' }] }],
+    rotas: [{ path: '/modulos/transmissao/rolamentos', element: <RolamentosConfig /> }],
+    entradaNf: [RolamentosEntrada],
   },
 ];
 
@@ -50,3 +81,5 @@ export const menuComModulos = (menu: ItemMenu[], ativos: Set<string> | 'todos'):
 export const rotasDosModulos = (ativos: Set<string>) => MODULOS_FRONT.filter(m => ativos.has(m.codigo)).flatMap(m => m.rotas);
 
 export const extensoesPdv = (ativos: Set<string>) => MODULOS_FRONT.filter(m => ativos.has(m.codigo)).flatMap(m => m.pdv || []);
+
+export const extensoesEntradaNf = (ativos: Set<string>) => MODULOS_FRONT.filter(m => ativos.has(m.codigo)).flatMap(m => m.entradaNf || []);

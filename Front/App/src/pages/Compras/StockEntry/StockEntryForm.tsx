@@ -257,6 +257,16 @@ message.warning('Lote de staging ainda não criado: o mapeamento ficou apenas na
 commitItemEdit([target.tempId], item => patchDoMapeamento(item, mapping));
 };
 
+// Módulos (ex.: Rolamentos): vínculo/cadastro pronto em várias linhas de uma vez
+const handleAplicarMapeamentos = (lista: Array<{ tempId: ItemId; mapping: MappingPayload }>) => {
+const porLinha = new Map(lista.map(l => [l.tempId, l.mapping]));
+const result = commitItemEdit(lista.map(l => l.tempId), item => {
+const mapping = porLinha.get(item.tempId);
+return mapping ? patchDoMapeamento(item, mapping) : null;
+});
+if (result.changed.length > 0) message.success(`${result.changed.length} linha(s) preenchida(s). Confira e dê entrada.`);
+};
+
 // Confirma (ou desfaz) que linhas com o mesmo SKU são o mesmo produto: não reabre a conferência
 const handleConfirmarAgrupamento = (ids: ItemId[], sku: string | null) => {
 if (modoVisualizacao) {
@@ -888,6 +898,7 @@ onConfirmItems={handleConfirmItems}
 onUnconfirmItems={handleUnconfirmItems}
 onItemMapped={handleItemMapped}
 onConfirmarAgrupamento={handleConfirmarAgrupamento}
+onAplicarMapeamentos={handleAplicarMapeamentos}
 onChangeTipoRecurso={handleChangeTipoRecurso}
 onToggleItem={(tempId, confirmed) => setItemsConfirmation([tempId], confirmed)}
 onQuantityChange={handleQuantityChange}

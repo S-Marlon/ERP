@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { Suspense, useMemo, useState, useEffect } from 'react';
 import { useSelecaoPlanilha } from './selecaoPlanilha';
 import { AvisoUnidadesNaoReconhecidas, ModalDefinirUnidade, normalizarSiglaNota, UnidadeNotaTag, useUnidadesEntrada } from './UnidadesEntrada';
 import {
@@ -45,6 +45,8 @@ import { DestinosEditor, DestinoLinha } from './DestinosEditor';
 import { ModalCadastroRapido, ModalClassificarLote, type ValoresPorItem } from './ModaisLote';
 import { carregarFamiliasECategorias, carregarMarcas, type ClassificacaoItem } from './ClassificacaoPim';
 import { ClassificacaoTag, type ClassificacaoCatalogo, type NomesCatalogo } from './ClassificacaoTag';
+import { extensoesEntradaNf, type LinhaEntradaNf } from '../../../../modulos/registroModulos';
+import { useModulos } from '../../../../modulos/modulosStore';
 import { linhaItemNovo, linhaSemVinculo, situacaoSkusNovos } from '../edicaoLote';
 import { buscarClassificacaoItens } from '../../api/comprasApi';
 import { TIPOS_RECURSO, TIPO_RECURSO_PADRAO, TipoRecurso, getTipoRecursoConfig } from '../tipoRecurso';
@@ -56,6 +58,8 @@ items?: Item[];
 onConfirmItems?: (ids: (string | number)[]) => void;
 onUnconfirmItems?: (ids: (string | number)[]) => void;
 onItemMapped?: (tempId: string | number, mapping: MappingPayload) => void;
+// Módulos (ex.: Rolamentos): aplicam vínculo/cadastro pronto em várias linhas
+onAplicarMapeamentos?: (lista: Array<{ tempId: string | number; mapping: MappingPayload }>) => void;
 // Linhas com o mesmo SKU: confirma que são o mesmo produto (sku) ou desfaz (null)
 onConfirmarAgrupamento?: (ids: (string | number)[], sku: string | null) => void;
 // Itens nunca saem da NF: apenas mudam de tipo de entrada (produto, consumo, ativo...)
@@ -83,6 +87,7 @@ onConfirmItems,
 onUnconfirmItems,
 onItemMapped,
 onConfirmarAgrupamento,
+onAplicarMapeamentos,
 onChangeTipoRecurso,
 onQuantityChange,
 onToggleItem,
@@ -95,6 +100,9 @@ onSendTotal,
 cnpjFornecedor = '',
 }) => {
 const [localItems, setLocalItems] = useState<Item[]>(initialItems || []);
+// Botões dos módulos ligados (ex.: Rolamentos) na barra de ações
+const { ativos: modulosAtivos } = useModulos();
+const botoesModulos = extensoesEntradaNf(modulosAtivos);
 const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
 const [filter, setFilter] = useState<FilterType>('all');
 const [tipoFiltro, setTipoFiltro] = useState<string | null>(null);
@@ -743,6 +751,11 @@ Vincular Selecionados
 <Tooltip title="Família/categoria e, se quiser, valores de atributos nos itens novos selecionados">
 <Button size="small" icon={<ApartmentOutlined />} disabled={readOnly || selectedRowKeys.length === 0} onClick={() => setLoteAberto('classificar')}>Classificar</Button>
 </Tooltip>
+{onAplicarMapeamentos && botoesModulos.map((Botao, i) => (
+<Suspense key={i} fallback={null}>
+<Botao linhas={localItems as unknown as LinhaEntradaNf[]} aplicarMapeamentos={onAplicarMapeamentos} readOnly={readOnly} />
+</Suspense>
+))}
 
  <div style={{ width: 120, display: 'inline-block', verticalAlign: 'middle', marginLeft: 8 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: -2 }}>

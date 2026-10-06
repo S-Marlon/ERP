@@ -4,6 +4,7 @@
 import { NextFunction, Request, Response, Router } from 'express';
 import pool from '../routes/Estoque/db.config';
 import hidraulicaMontagensRoutes from './hidraulica/montagens/montagens.routes';
+import transmissaoRolamentosRoutes from './transmissao/rolamentos/rolamentos.routes';
 
 export interface ModuloRegistrado {
   codigo: string;      // padrão AREA_ASSUNTO (sistema_modulos.codigo)
@@ -22,6 +23,14 @@ export const MODULOS: ModuloRegistrado[] = [
     descricao: 'Montagem de mangueiras hidráulicas no PDV, OS com sinal e ficha técnica para refazer igual.',
     rotaBase: '/hidraulica/montagens',
     router: hidraulicaMontagensRoutes,
+  },
+  {
+    codigo: 'TRANSMISSAO_ROLAMENTOS',
+    nome: 'Entrada de rolamentos',
+    area: 'Transmissão mecânica',
+    descricao: 'Lê os rolamentos da nota (tipo, código, vedação, marca), sugere as medidas pelo código e cadastra em lote com 1ª/2ª linha.',
+    rotaBase: '/transmissao/rolamentos',
+    router: transmissaoRolamentosRoutes,
   },
 ];
 

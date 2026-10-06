@@ -1,0 +1,75 @@
+// Módulo Rolamentos (TRANSMISSAO_ROLAMENTOS): API e regras de SKU/nome (iguais às do backend).
+const API = 'http://localhost:3001/api/modulos/transmissao/rolamentos';
+
+export type TipoRolamento = 'RIGIDO_ESFERAS' | 'INSERCAO_UC' | 'AGULHAS' | 'ROLOS_CONICOS' | 'AUTOCOMPENSADOR' | 'ROLOS_CILINDRICOS' | 'AXIAL';
+export type CampoAtributo = 'codigo' | 'vedacao' | 'folga' | 'linha' | 'diametroInterno' | 'diametroExterno' | 'largura';
+
+export const TIPOS: Record<TipoRolamento, { familia: string; nomeCurto: string; comVedacao: boolean }> = {
+  RIGIDO_ESFERAS: { familia: 'Rolamento rígido de esferas', nomeCurto: 'Rolamento', comVedacao: true },
+  INSERCAO_UC: { familia: 'Rolamento de inserção (UC)', nomeCurto: 'Rolamento de inserção', comVedacao: false },
+  AGULHAS: { familia: 'Rolamento de agulhas', nomeCurto: 'Rolamento de agulha', comVedacao: true },
+  ROLOS_CONICOS: { familia: 'Rolamento de rolos cônicos', nomeCurto: 'Rolamento cônico', comVedacao: false },
+  AUTOCOMPENSADOR: { familia: 'Rolamento autocompensador', nomeCurto: 'Rolamento autocompensador', comVedacao: false },
+  ROLOS_CILINDRICOS: { familia: 'Rolamento de rolos cilíndricos', nomeCurto: 'Rolamento de rolos cilíndricos', comVedacao: false },
+  AXIAL: { familia: 'Rolamento axial', nomeCurto: 'Rolamento axial', comVedacao: false },
+};
+export const VEDACOES = [
+  { value: 'ABERTO', label: 'Aberto' }, { value: '2RS', label: '2RS (borracha)' }, { value: 'RS', label: 'RS (1 lado)' },
+  { value: 'ZZ', label: 'ZZ (metálica)' }, { value: 'Z', label: 'Z (1 lado)' },
+];
+export const SIGLA_SEGUNDA_LINHA = '2L';
+export const NOME_MARCA_SEGUNDA_LINHA = '2ª Linha';
+
+export interface ConfigRolamentos {
+  idCategoria?: number | null;
+  familias?: Partial<Record<TipoRolamento, number>>;
+  atributos?: Partial<Record<CampoAtributo, number>>;
+  idMarcaSegundaLinha?: number | null;
+  markup?: number;
+}
+export interface MarcaModulo { id: number; nome: string; codigo: string | null; linha: 1 | 2 | null; apelidos: string[] }
+export interface MedidaAprendida { idMedida: number; codigo: string; tipo: string | null; d: number | null; D: number | null; B: number | null }
+export interface Medidas { d: number; D: number; B: number }
+
+export interface LinhaAnalisada {
+  chave: string; ehRolamento: boolean; tipo: TipoRolamento | null; codigo: string | null; vedacao: string; folga: string | null;
+  sufixos: string[]; marca: MarcaModulo | null; marcaTexto: string | null; linha: 1 | 2 | null;
+  medidas: Medidas | null; origemMedidas: 'TABELA' | 'APRENDIDA' | null; sku: string | null; nome: string | null;
+}
+export interface ItemExistente { idItem: number; sku: string; nome: string; tipoRecurso: string; unidadeBase: string | null }
+
+const requisitar = async <T>(url: string, init: RequestInit | undefined, erro: string): Promise<T> => {
+  const response = await fetch(url, init);
+  const dados = await response.json().catch(() => ({}));
+  if (response.status === 404 && !dados.error) throw new Error('Rota não encontrada: reinicie o backend.');
+  if (!response.ok) throw new Error(dados.error || erro);
+  return dados as T;
+};
+const json = (metodo: string, corpo: unknown): RequestInit => ({ method: metodo, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
+
+export const rolamentosApi = {
+  config: () => requisitar<{
+    configuracao: ConfigRolamentos; familias: Record<number, { id: number; nome: string; status: string }>;
+    marcas: MarcaModulo[]; medidas: MedidaAprendida[];
+  }>(`${API}/config`, undefined, 'Erro ao carregar a configuração de rolamentos.'),
+  salvarConfig: (configuracao: ConfigRolamentos) => requisitar<{ configuracao: ConfigRolamentos }>(`${API}/config`, json('PUT', { configuracao }), 'Erro ao salvar a configuração.'),
+  salvarMarca: (idMarca: number, linha: 1 | 2 | null, apelidos: string) => requisitar(`${API}/marcas/${idMarca}`, json('PUT', { linha, apelidos }), 'Erro ao salvar a marca.'),
+  analisar: (linhas: Array<{ chave: string; descricao: string }>) =>
+    requisitar<{ linhas: LinhaAnalisada[]; existentes: Record<string, ItemExistente>; configuracao: ConfigRolamentos }>(`${API}/analisar`, json('POST', { linhas }), 'Erro ao analisar.'),
+  skus: (skus: string[]) => requisitar<{ existentes: Record<string, ItemExistente> }>(`${API}/skus`, json('POST', { skus }), 'Erro ao verificar SKUs.'),
+  salvarMedidas: (lista: Array<{ codigo: string; tipo: string | null; d: number; D: number; B: number }>) =>
+    requisitar(`${API}/medidas`, json('POST', { lista }), 'Erro ao salvar as medidas.'),
+  excluirMedida: (id: number) => requisitar(`${API}/medidas/${id}`, { method: 'DELETE' }, 'Erro ao excluir a medida.'),
+};
+
+export const siglaDaMarca = (marca: { nome: string; codigo: string | null } | null) =>
+  (marca?.codigo || marca?.nome || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+
+/** 6205-2RS-SKF (1ª linha), 6205-2RS-C3-2L (2ª linha), UC208-24-2L, HK2220-NTN. Rolamento aberto não leva vedação. */
+export const montarSku = (p: { codigo: string; vedacao: string; folga: string | null; linha: 1 | 2; marca: { nome: string; codigo: string | null } | null }) =>
+  [p.codigo.trim().toUpperCase(), p.vedacao && p.vedacao !== 'ABERTO' ? p.vedacao : null, p.folga, p.linha === 2 ? SIGLA_SEGUNDA_LINHA : siglaDaMarca(p.marca) || null]
+    .filter(Boolean).join('-');
+
+export const montarNome = (p: { tipo: TipoRolamento; codigo: string; vedacao: string; folga: string | null; linha: 1 | 2; marca: { nome: string } | null }) =>
+  [TIPOS[p.tipo].nomeCurto, p.codigo.trim().toUpperCase(), p.vedacao && p.vedacao !== 'ABERTO' ? p.vedacao : null, p.folga,
+    p.linha === 2 ? '2ª linha' : p.marca?.nome || null].filter(Boolean).join(' ');
