@@ -861,6 +861,7 @@ Abrir na Staging
 {parsedNfe?.chaveAcesso && (
 <NfeCards
 key={parsedNfe.chaveAcesso}
+loteId={loteId}
 readOnly={Boolean(modoVisualizacao)}
 data={parsedNfe}
 supplierStatus={supplierStatus}

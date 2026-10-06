@@ -31,6 +31,8 @@ import {
   EditOutlined
 } from '@ant-design/icons';
 import { NfeDataFromXML } from '../xml/utils/nfeParser';
+import { CobrancaNota } from '../cobranca/CobrancaNota';
+import { CobrancaDaNota, pagarApi } from '../../../Financeiro/pagar/pagarApi';
 import { situacaoDoProtocolo, traduzirAmbiente, traduzirModelo, traduzirProcessoEmissao, traduzirTipoEmissao } from '../xml/utils/10-protocoloParser';
 
 interface NfeCardsProps {
@@ -50,6 +52,8 @@ interface NfeCardsProps {
   onUpdateFreteAdicional?: (dados: { valor: number; metodo: string; observacao: string }) => void;
   valorTotalFrete: number;
   readOnly?: boolean;
+  // Lote da staging: habilita o lançamento dos boletos no contas a pagar
+  loteId?: number | null;
 }
 
 const { Text, Title } = Typography;
@@ -124,7 +128,16 @@ const traduzirPresencaComprador = (indPres?: string) => {
 };
 
 
-const NfeCards: React.FC<NfeCardsProps> = ({ data, supplierStatus, actions, freteAdicionalData, valorTotalFrete, onUpdateFreteAdicional, readOnly = false }) => {
+const NfeCards: React.FC<NfeCardsProps> = ({ data, supplierStatus, actions, freteAdicionalData, valorTotalFrete, onUpdateFreteAdicional, readOnly = false, loteId }) => {
+  // Boletos da nota x contas a pagar (o botão de cobrança fica em destaque enquanto faltar lançar)
+  const [dadosCobranca, setDadosCobranca] = useState<CobrancaDaNota | null>(null);
+  const carregarCobranca = () => {
+    if (!loteId) { setDadosCobranca(null); return; }
+    pagarApi.cobrancaDaNota(loteId).then(setDadosCobranca).catch(() => setDadosCobranca(null));
+  };
+  useEffect(carregarCobranca, [loteId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const sitCobr = dadosCobranca?.situacao;
+  const cobrancaPendente = Boolean(sitCobr && sitCobr.duplicatas > 0 && sitCobr.titulos === 0 && !sitCobr.dispensado);
 
   const { emitente } = data;
   const [isNfDetailsOpen, setIsNfDetailsOpen] = useState(false);
@@ -329,9 +342,19 @@ const [valorFreteAdicional, setValorFreteAdicional] = useState(freteAdicionalDat
       <Space size={4} wrap style={{ marginTop: 6 }}>
         <Text type="secondary" style={{ fontSize: 12 }}>Mais da nota:</Text>
         <Button size="small" type="text" icon={<UserOutlined />} onClick={() => setIsDestDetailsOpen(true)}>Destinatário</Button>
-        <Button size="small" type="text" icon={<CreditCardOutlined />} onClick={() => setIsCobrDetailsOpen(true)}>
-          Cobrança ({cobranca.duplicatas?.length || cobranca.dup?.length || 0} parcela(s))
-        </Button>
+        {cobrancaPendente ? (
+          <Tooltip title="A aprovação da nota fica bloqueada até lançar os boletos no contas a pagar (ou dispensar).">
+            <Button size="small" danger icon={<WarningOutlined />} onClick={() => setIsCobrDetailsOpen(true)} style={{ fontWeight: 600 }}>
+              Cobrança: {sitCobr!.duplicatas} boleto(s) a lançar
+            </Button>
+          </Tooltip>
+        ) : (
+          <Button size="small" type="text" icon={<CreditCardOutlined />} onClick={() => setIsCobrDetailsOpen(true)}>
+            Cobrança ({cobranca.duplicatas?.length || cobranca.dup?.length || 0} parcela(s))
+            {sitCobr && sitCobr.titulos > 0 && <Badge status="success" text="lançada" style={{ marginLeft: 6 }} />}
+            {sitCobr?.dispensado && <Badge status="default" text="dispensada" style={{ marginLeft: 6 }} />}
+          </Button>
+        )}
         <Button size="small" type="text" icon={<CommentOutlined />} onClick={() => setIsInfAdicDetailsOpen(true)}>Informações adicionais</Button>
       </Space>
 
@@ -485,7 +508,7 @@ const [valorFreteAdicional, setValorFreteAdicional] = useState(freteAdicionalDat
         title="💳 Cobrança, Fatura e Duplicatas (Grupo <cobr>)"
         open={isCobrDetailsOpen}
         onCancel={() => setIsCobrDetailsOpen(false)}
-        width={650}
+        width={loteId ? 920 : 650}
         footer={[<Button key="close" onClick={() => setIsCobrDetailsOpen(false)}>Fechar</Button>]}
       >
         <div style={{ marginTop: 16 }}>
@@ -496,6 +519,12 @@ const [valorFreteAdicional, setValorFreteAdicional] = useState(freteAdicionalDat
             <Descriptions.Item label="Valor Líquido">{formatarMoeda(cobranca.fat?.vLiq || cobranca.fatura?.valorLiquido)}</Descriptions.Item>
           </Descriptions>
 
+          {loteId ? (
+            <>
+              <Title level={5}>Boletos no contas a pagar</Title>
+              <CobrancaNota idLote={loteId} dados={dadosCobranca} onAlterado={carregarCobranca} />
+            </>
+          ) : (<>
           <Title level={5}>Parcelas / Duplicatas</Title>
           <Table
             dataSource={cobranca.dup || cobranca.duplicatas || []}
@@ -509,6 +538,7 @@ const [valorFreteAdicional, setValorFreteAdicional] = useState(freteAdicionalDat
               { title: 'Valor (R$)', dataIndex: 'vDup', key: 'vDup', render: (v: number) => formatarMoeda(v) }
             ]}
           />
+          </>)}
         </div>
       </Modal>
 

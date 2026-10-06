@@ -69,6 +69,7 @@ import ListaComprasExport from "./pages/Compras/ListaComprasExport";
 import { LeitorXML } from "./pages/Compras/StockEntry/xml/LeitorXML";
 import EmissaoFaturado from "./pages/Compras/EmissaoFaturado";
 import { FinanceiroContasReceber } from "./pages/Financeiro/FinanceiroContasReceber";
+import FinanceiroContasPagar from "./pages/Financeiro/pagar/FinanceiroContasPagar";
 import { VendasFaturamento } from "./pages/Financeiro/VendasFaturamento";
 import Clientes from "./pages/Parceiros/Clientes";
 import FamilyManagementPanel from "./pages/Catalogo/pages/FamilyManager/FamilyManagementPanel";
@@ -151,6 +152,7 @@ export default function AppLayout() {
             <Route path="/pedidos" element={<Pedidos />} />
 
             <Route path="/financeiro" element={<FinanceiroContasReceber />} />
+            <Route path="/financeiro/pagar" element={<FinanceiroContasPagar />} />
             <Route path="/financeiro/faturamento" element={<VendasFaturamento />} />
 
             <Route path="/parceiros" element={<ParceirosDashboard />} />

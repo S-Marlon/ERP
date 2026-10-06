@@ -38,6 +38,8 @@ export interface PenteFinoContexto {
   fornecedorCadastrado: boolean;
   gtinsEmUso?: Map<string, number>; // GTIN -> id_item que já usa esse código
   unidades?: ResolvedorUnidade;     // sigla da NF -> unidade interna (dicionário de unidades de entrada)
+  // Duplicatas do XML x títulos lançados no contas a pagar (ausente = não verifica)
+  cobranca?: { duplicatas: number; totalDuplicatas: number; titulos: number; totalTitulos: number; dispensado: boolean; motivoDispensa: string | null };
 }
 
 export interface Verificacao {
@@ -167,6 +169,24 @@ export const avaliarPenteFino = (
   }
   if (itens.length === 0) {
     bloqueios.push({ codigo: 'SEM_ITENS', mensagem: 'Lote sem itens na staging.' });
+  }
+
+  // Boletos da nota: duplicatas do XML precisam estar no contas a pagar (ou dispensadas com motivo)
+  const cob = ctx.cobranca;
+  if (cob && cob.duplicatas > 0 && cob.titulos === 0 && !cob.dispensado) {
+    bloqueios.push({
+      codigo: 'COBRANCA_NAO_LANCADA',
+      mensagem: `A nota tem ${cob.duplicatas} duplicata(s) (R$ ${cob.totalDuplicatas.toFixed(2).replace('.', ',')}) que não foram lançadas no contas a pagar. Abra "Cobrança" no topo da nota e lance os boletos (ou dispense, se já foi paga).`,
+    });
+  }
+  if (cob && cob.duplicatas > 0 && cob.titulos > 0 && Math.abs(cob.totalTitulos - cob.totalDuplicatas) > 0.009) {
+    avisos.push({
+      codigo: 'COBRANCA_DIVERGENTE',
+      mensagem: `Total lançado no contas a pagar (R$ ${cob.totalTitulos.toFixed(2).replace('.', ',')}) diferente das duplicatas da nota (R$ ${cob.totalDuplicatas.toFixed(2).replace('.', ',')}).`,
+    });
+  }
+  if (cob && cob.duplicatas > 0 && cob.dispensado) {
+    avisos.push({ codigo: 'COBRANCA_DISPENSADA', mensagem: `Cobrança da nota dispensada: ${cob.motivoDispensa || 'sem motivo'}.` });
   }
 
   coletar(bloqueios, 'ITEM_SEM_VINCULO', 'Itens sem vínculo (nem item do catálogo nem cadastro novo).',

@@ -5,6 +5,7 @@ import { recalcularFaixas } from '../../Catalogo/Vendas/precificacao';
 import { validarGtin } from '../staging/gtin';
 import { lancarMovimentoEstoque } from '../../EstoqueItens/depositos';
 import { gravarAtributosItemNovo } from '../../Catalogo/Produtos/produtoDetalhe.controller';
+import { situacaoCobrancaDoLote } from '../../Financeiro/pagar/cobrancaLote';
 import { chaveItemNovo, destinosDoItem, prefixoSkuSequencial, skuCustomizadoPlanejado, skuSequencial } from '../staging/penteFino';
 import { canonizar, carregarResolvedor } from '../staging/unidadesEntrada';
 import { carregarTaxaPreco } from '../../Venda/taxas/taxas.controller';
@@ -108,7 +109,8 @@ const montarContexto = async (conn: Conn, tenant: number, lote: any, itens: Stag
 
   const idFornecedor = await buscarFornecedorId(conn, lote.cnpj_fornecedor, tenant);
   const unidades = await carregarResolvedor(conn, tenant, idFornecedor);
-  const ctx: PenteFinoContexto = { idsItensExistentes, skusExistentes, fornecedorCadastrado: idFornecedor !== null, gtinsEmUso, unidades };
+  const cobranca = await situacaoCobrancaDoLote(conn, tenant, lote);
+  const ctx: PenteFinoContexto = { idsItensExistentes, skusExistentes, fornecedorCadastrado: idFornecedor !== null, gtinsEmUso, unidades, cobranca };
   return { ctx, idFornecedor };
 };
 

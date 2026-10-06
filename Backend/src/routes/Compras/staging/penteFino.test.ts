@@ -118,6 +118,16 @@ export const runPenteFinoTests = (): void => {
   assert(!avaliarPenteFino(lote, [novoCfg], ctxUn).bloqueios.some(b => b.codigo === 'CONFIG_VENDAS_INCOERENTE'), 'Config de vendas em M deveria bater com a base MT traduzida.');
   assert(avaliarPenteFino(lote, [item({ unidade_original: 'KG' })], ctx).aprovavel, 'Sem dicionário no contexto não bloqueia (compatível).');
 
+  // Boletos: duplicatas do XML não lançadas bloqueiam; lançadas com total diferente ou dispensadas só avisam
+  const cob = { duplicatas: 2, totalDuplicatas: 300, titulos: 0, totalTitulos: 0, dispensado: false, motivoDispensa: null };
+  assert(avaliarPenteFino(lote, [item({})], { ...ctx, cobranca: cob }).bloqueios.some(b => b.codigo === 'COBRANCA_NAO_LANCADA'), 'Duplicatas não lançadas deveriam bloquear.');
+  assert(avaliarPenteFino(lote, [item({})], { ...ctx, cobranca: { ...cob, titulos: 2, totalTitulos: 300 } }).aprovavel, 'Lançadas: aprovável.');
+  const cobDivergente = avaliarPenteFino(lote, [item({})], { ...ctx, cobranca: { ...cob, titulos: 1, totalTitulos: 290 } });
+  assert(cobDivergente.aprovavel && cobDivergente.avisos.some(a => a.codigo === 'COBRANCA_DIVERGENTE'), 'Total diferente só avisa.');
+  const dispensada = avaliarPenteFino(lote, [item({})], { ...ctx, cobranca: { ...cob, dispensado: true, motivoDispensa: 'paga à vista' } });
+  assert(dispensada.aprovavel && dispensada.avisos.some(a => a.codigo === 'COBRANCA_DISPENSADA'), 'Dispensada: aprovável com aviso.');
+  assert(avaliarPenteFino(lote, [item({})], { ...ctx, cobranca: { ...cob, duplicatas: 0, totalDuplicatas: 0 } }).aprovavel, 'Nota sem duplicatas não bloqueia.');
+
   // Unidade corrigida na conferência (fornecedor mandou UN num rolo): vale sobre a do XML
   const corrigida = lerConversaoCompra(item({ unidade_original: 'UN', mapeamento_json: JSON.stringify({ conversaoCompra: { unidade_compra: 'rl', unidade_base: 'RL', fator: 1 } }) }));
   assert(corrigida.unidadeCompra === 'RL' && corrigida.unidadeBase === 'RL' && corrigida.fator === 1, `unidade corrigida ${JSON.stringify(corrigida)}`);

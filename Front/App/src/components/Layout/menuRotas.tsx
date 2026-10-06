@@ -76,6 +76,7 @@ export const MENU_PRINCIPAL: ItemMenu[] = [
     key: 'grp:financeiro', icon: <DollarOutlined />, label: 'Financeiro', rota: '/financeiro',
     children: [
       { key: '/financeiro', label: 'Contas a Receber' },
+      { key: '/financeiro/pagar', label: 'Contas a Pagar' },
       { key: '/financeiro/faturamento', label: 'Faturamento' },
     ],
   },
