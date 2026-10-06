@@ -106,13 +106,22 @@ export const obterOuCriarFornecedorPorCnpj = async (req: Request, res: Response)
       // Endereço da nota
       if (Array.isArray(dados.enderecos)) {
         for (const end of dados.enderecos) {
-          if (!end?.logradouro) continue;
+          if (!end?.logradouro && !end?.cidade) continue;
           await connection.execute(
             `INSERT INTO pessoas_enderecos (id_cliente, tenant_id, tipo, principal, logradouro, numero, complemento, bairro, cidade, estado, cep, pais, created_at)
              VALUES (?, ?, 'PRINCIPAL', 1, ?, ?, ?, ?, ?, ?, ?, 'Brasil', NOW())`,
-            [idPessoa, tenantId, end.logradouro, end.numero || '', end.complemento || null, end.bairro || '', end.cidade || '', end.estado || '', String(end.cep || '').replace(/\D/g, '')]
+            [idPessoa, tenantId, end.logradouro || '', end.numero || '', end.complemento || null, end.bairro || '', end.cidade || '', end.estado || '', String(end.cep || '').replace(/\D/g, '')]
           );
         }
+      }
+
+      // E-mail informado no cadastro manual
+      const email = String(dados.email || '').trim();
+      if (email) {
+        await connection.execute(
+          `INSERT INTO pessoas_emails (id_cliente, tenant_id, email, principal, created_at) VALUES (?, ?, ?, 1, NOW())`,
+          [idPessoa, tenantId, email.slice(0, 150)]
+        );
       }
 
       // Telefone da nota
@@ -228,6 +237,183 @@ export const getFornecedores = async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Erro ao buscar lista de fornecedores:', error);
     return res.status(500).json({ error: 'Erro interno ao buscar lista de fornecedores.' });
+  } finally {
+    connection.release();
+  }
+};
+
+// ---------------------------------------------------------------------------------------------
+// Detalhe e edição (tela de fornecedores)
+// ---------------------------------------------------------------------------------------------
+const textoOuNulo = (v: unknown, max: number) => String(v ?? '').trim().slice(0, max) || null;
+const dataIso = (v: any) => (v instanceof Date ? v.toISOString() : v ?? null);
+
+// GET /api/parceiros/fornecedores/:id — cadastro, contato, endereço e o histórico real (notas, contas a pagar, produtos)
+export const detalheFornecedor = async (req: Request, res: Response) => {
+  const tenantId = Number(req.query.tenant_id || req.headers['x-tenant-id'] || 1);
+  const id = Number(req.params.id);
+  try {
+    const [[f]]: any = await pool.execute(
+      `SELECT c.id_pessoa, c.status, c.observacoes, c.created_at, pj.razao_social, pj.nome_fantasia, pj.cnpj, pj.inscricao_estadual, pj.inscricao_municipal
+       FROM pessoas_core c INNER JOIN pessoas_pj pj ON pj.id_cliente = c.id_pessoa
+       WHERE c.id_pessoa = ? AND c.tenant_id = ? AND c.deleted_at IS NULL`,
+      [id, tenantId]
+    );
+    if (!f) return res.status(404).json({ error: 'Fornecedor não encontrado.' });
+    const cnpj = String(f.cnpj || '').replace(/\D/g, '');
+
+    const [[email]]: any = await pool.execute(
+      `SELECT email FROM pessoas_emails WHERE id_cliente = ? AND deleted_at IS NULL ORDER BY principal DESC, id_email LIMIT 1`, [id]
+    );
+    const [[contato]]: any = await pool.execute(
+      `SELECT nome_contato, telefone, whatsapp FROM pessoas_contatos WHERE id_cliente = ? AND deleted_at IS NULL ORDER BY principal DESC, id_contato LIMIT 1`, [id]
+    );
+    const [[endereco]]: any = await pool.execute(
+      `SELECT logradouro, numero, complemento, bairro, cidade, estado, cep FROM pessoas_enderecos
+       WHERE id_cliente = ? AND deleted_at IS NULL ORDER BY principal DESC, id_endereco LIMIT 1`, [id]
+    );
+    const [notas]: any = await pool.execute(
+      `SELECT id, numero_nf, serie, data_emissao, created_at, status, financeiro_situacao,
+              COALESCE(NULLIF(valor_total_nf, 0), CAST(JSON_UNQUOTE(JSON_EXTRACT(dados_nota_fiscal, '$.totais.icmsTot.vNF')) AS DECIMAL(15,2)), 0) AS valor
+       FROM importacoes_lotes
+       WHERE tenant_id = ? AND REPLACE(REPLACE(REPLACE(cnpj_fornecedor, '.', ''), '/', ''), '-', '') = ?
+       ORDER BY COALESCE(data_emissao, created_at) DESC LIMIT 100`,
+      [tenantId, cnpj]
+    );
+    const [titulos]: any = await pool.execute(
+      `SELECT t.id_titulo, t.numero_documento, t.parcela, t.total_parcelas, DATE_FORMAT(t.vencimento, '%Y-%m-%d') AS vencimento, t.valor, t.status,
+              DATE_FORMAT(t.pago_em, '%Y-%m-%d') AS pago_em, t.vencimento < CURDATE() AS vencido, l.numero_nf
+       FROM financeiro_contas_pagar t LEFT JOIN importacoes_lotes l ON l.id = t.id_lote
+       WHERE t.tenant_id = ? AND t.id_fornecedor = ? AND t.status <> 'CANCELADO'
+       ORDER BY t.status = 'PAGO', t.vencimento LIMIT 200`,
+      [tenantId, id]
+    );
+    const [produtos]: any = await pool.execute(
+      `SELECT fp.id_item, fp.codigo_produto_fornecedor, fp.unidade_compra, fp.fator_compra, fp.preco_ultima_compra, fp.criado_em,
+              COALESCE(NULLIF(cpd.sku_customizado, ''), ic.sku) AS sku, COALESCE(NULLIF(cpd.nome_comercial, ''), ic.nome_item) AS nome
+       FROM comercial_fornecedores_produtos fp
+       INNER JOIN itens_core ic ON ic.id_item = fp.id_item
+       LEFT JOIN comercial_produtos_dados cpd ON cpd.id_item = ic.id_item AND cpd.tenant_id = ic.tenant_id
+       WHERE fp.tenant_id = ? AND fp.id_fornecedor = ?
+       ORDER BY nome LIMIT 500`,
+      [tenantId, id]
+    );
+
+    const importadas = notas.filter((n: any) => n.status === 'IMPORTADO');
+    const abertos = titulos.filter((t: any) => t.status === 'ABERTO');
+    return res.json({
+      idPessoa: Number(f.id_pessoa), status: f.status, observacoes: f.observacoes, criadoEm: dataIso(f.created_at),
+      razaoSocial: f.razao_social, nomeFantasia: f.nome_fantasia, cnpj, inscricaoEstadual: f.inscricao_estadual, inscricaoMunicipal: f.inscricao_municipal,
+      email: email?.email || null, telefone: contato?.telefone || null, whatsapp: Boolean(Number(contato?.whatsapp)), nomeContato: contato?.nome_contato || null,
+      endereco: endereco ? { ...endereco } : null,
+      resumo: {
+        qtdNotas: importadas.length,
+        totalComprado: Number(importadas.reduce((a: number, n: any) => a + Number(n.valor), 0).toFixed(2)),
+        ultimaCompra: dataIso(importadas[0]?.data_emissao || importadas[0]?.created_at || null),
+        aPagar: Number(abertos.reduce((a: number, t: any) => a + Number(t.valor), 0).toFixed(2)),
+        vencido: Number(abertos.filter((t: any) => Number(t.vencido)).reduce((a: number, t: any) => a + Number(t.valor), 0).toFixed(2)),
+      },
+      notas: notas.map((n: any) => ({
+        idLote: Number(n.id), numero: n.numero_nf, serie: n.serie, emissao: dataIso(n.data_emissao || n.created_at), status: n.status,
+        financeiro: n.financeiro_situacao, valor: Number(n.valor),
+      })),
+      titulos: titulos.map((t: any) => ({
+        idTitulo: Number(t.id_titulo), documento: t.numero_documento, parcela: Number(t.parcela), totalParcelas: Number(t.total_parcelas),
+        vencimento: t.vencimento, valor: Number(t.valor), status: t.status, pagoEm: t.pago_em, vencido: t.status === 'ABERTO' && Boolean(Number(t.vencido)),
+        numeroNf: t.numero_nf,
+      })),
+      produtos: produtos.map((p: any) => ({
+        idItem: Number(p.id_item), sku: p.sku, nome: p.nome, codigoFornecedor: p.codigo_produto_fornecedor, unidadeCompra: p.unidade_compra,
+        fatorCompra: p.fator_compra === null ? null : Number(p.fator_compra), precoUltimaCompra: p.preco_ultima_compra === null ? null : Number(p.preco_ultima_compra),
+        vinculadoEm: dataIso(p.criado_em),
+      })),
+    });
+  } catch (error: any) {
+    console.error('Erro ao carregar fornecedor:', error);
+    return res.status(500).json({ error: 'Erro ao carregar o fornecedor.', details: error.message });
+  }
+};
+
+// PUT /api/parceiros/fornecedores/:id — razão/fantasia, inscrições, situação, observações e contato/endereço principais
+export const atualizarFornecedor = async (req: Request, res: Response) => {
+  const tenantId = Number(req.query.tenant_id || req.body?.tenant_id || 1);
+  const id = Number(req.params.id);
+  const d = req.body || {};
+  const razaoSocial = textoOuNulo(d.razaoSocial, 150);
+  if (!razaoSocial) return res.status(400).json({ error: 'Informe a razão social.' });
+  const status = String(d.status || 'ATIVO').toUpperCase();
+  if (!['ATIVO', 'INATIVO'].includes(status)) return res.status(400).json({ error: 'Situação inválida.' });
+  const email = textoOuNulo(d.email, 150);
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ error: 'E-mail inválido.' });
+
+  const connection: any = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [[f]]: any = await connection.execute(
+      `SELECT c.id_pessoa FROM pessoas_core c INNER JOIN pessoas_pj pj ON pj.id_cliente = c.id_pessoa WHERE c.id_pessoa = ? AND c.tenant_id = ? FOR UPDATE`,
+      [id, tenantId]
+    );
+    if (!f) { await connection.rollback(); return res.status(404).json({ error: 'Fornecedor não encontrado.' }); }
+
+    await connection.execute(
+      `UPDATE pessoas_pj SET razao_social = ?, nome_fantasia = ?, inscricao_estadual = ?, inscricao_municipal = ? WHERE id_cliente = ?`,
+      [razaoSocial, textoOuNulo(d.nomeFantasia, 150), textoOuNulo(d.inscricaoEstadual, 30), textoOuNulo(d.inscricaoMunicipal, 30), id]
+    );
+    await connection.execute(`UPDATE pessoas_core SET status = ?, observacoes = ? WHERE id_pessoa = ?`, [status, textoOuNulo(d.observacoes, 1000), id]);
+
+    // E-mail principal: atualiza, cria ou remove (vazio)
+    const [[emailAtual]]: any = await connection.execute(
+      `SELECT id_email FROM pessoas_emails WHERE id_cliente = ? AND deleted_at IS NULL ORDER BY principal DESC, id_email LIMIT 1`, [id]
+    );
+    if (emailAtual && email) await connection.execute(`UPDATE pessoas_emails SET email = ?, principal = 1 WHERE id_email = ?`, [email, emailAtual.id_email]);
+    else if (emailAtual) await connection.execute(`UPDATE pessoas_emails SET deleted_at = NOW() WHERE id_email = ?`, [emailAtual.id_email]);
+    else if (email) await connection.execute(`INSERT INTO pessoas_emails (id_cliente, tenant_id, email, principal, created_at) VALUES (?, ?, ?, 1, NOW())`, [id, tenantId, email]);
+
+    // Telefone principal
+    const telefone = textoOuNulo(d.telefone, 20);
+    const whatsapp = d.whatsapp ? 1 : 0;
+    const [[telAtual]]: any = await connection.execute(
+      `SELECT id_contato FROM pessoas_contatos WHERE id_cliente = ? AND deleted_at IS NULL ORDER BY principal DESC, id_contato LIMIT 1`, [id]
+    );
+    if (telAtual && telefone) {
+      await connection.execute(`UPDATE pessoas_contatos SET telefone = ?, whatsapp = ?, nome_contato = ?, principal = 1 WHERE id_contato = ?`,
+        [telefone, whatsapp, textoOuNulo(d.nomeContato, 100) || '', telAtual.id_contato]);
+    } else if (telAtual) {
+      await connection.execute(`UPDATE pessoas_contatos SET deleted_at = NOW() WHERE id_contato = ?`, [telAtual.id_contato]);
+    } else if (telefone) {
+      await connection.execute(
+        `INSERT INTO pessoas_contatos (id_cliente, tenant_id, nome_contato, tipo, telefone, principal, whatsapp, created_at) VALUES (?, ?, ?, ?, ?, 1, ?, NOW())`,
+        [id, tenantId, textoOuNulo(d.nomeContato, 100) || '', whatsapp ? 'CELULAR' : 'FIXO', telefone, whatsapp]
+      );
+    }
+
+    // Endereço principal
+    const e = d.endereco || {};
+    const temEndereco = ['logradouro', 'cidade', 'cep'].some(k => String(e[k] || '').trim());
+    const valoresEnd = [textoOuNulo(e.logradouro, 150) || '', textoOuNulo(e.numero, 20) || '', textoOuNulo(e.complemento, 100), textoOuNulo(e.bairro, 100) || '',
+      textoOuNulo(e.cidade, 100) || '', (textoOuNulo(e.estado, 2) || '').toUpperCase(), String(e.cep || '').replace(/\D/g, '').slice(0, 8)];
+    const [[endAtual]]: any = await connection.execute(
+      `SELECT id_endereco FROM pessoas_enderecos WHERE id_cliente = ? AND deleted_at IS NULL ORDER BY principal DESC, id_endereco LIMIT 1`, [id]
+    );
+    if (endAtual && temEndereco) {
+      await connection.execute(
+        `UPDATE pessoas_enderecos SET logradouro = ?, numero = ?, complemento = ?, bairro = ?, cidade = ?, estado = ?, cep = ?, principal = 1 WHERE id_endereco = ?`,
+        [...valoresEnd, endAtual.id_endereco]
+      );
+    } else if (!endAtual && temEndereco) {
+      await connection.execute(
+        `INSERT INTO pessoas_enderecos (id_cliente, tenant_id, tipo, principal, logradouro, numero, complemento, bairro, cidade, estado, cep, pais, created_at)
+         VALUES (?, ?, 'PRINCIPAL', 1, ?, ?, ?, ?, ?, ?, ?, 'Brasil', NOW())`,
+        [id, tenantId, ...valoresEnd]
+      );
+    }
+
+    await connection.commit();
+    return res.json({ success: true });
+  } catch (error: any) {
+    await connection.rollback().catch(() => undefined);
+    console.error('Erro ao atualizar fornecedor:', error);
+    return res.status(500).json({ error: 'Erro ao salvar o fornecedor.', details: error.message });
   } finally {
     connection.release();
   }

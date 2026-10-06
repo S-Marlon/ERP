@@ -1,9 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { getClientes, createCliente } from './Clientes/clientes.controller';
-import { 
-  getFornecedores, 
-  obterOuCriarFornecedorPorCnpj, 
-  verificarFornecedorPorCnpj 
+import {
+  atualizarFornecedor,
+  detalheFornecedor,
+  getFornecedores,
+  obterOuCriarFornecedorPorCnpj,
+  verificarFornecedorPorCnpj
 } from './Fornecedores/fornecedorController';
 
 const router = Router();
@@ -20,5 +22,7 @@ router.post('/clientes', createCliente);
 router.get('/fornecedores/verificar', verificarFornecedorPorCnpj); // GET /api/parceiros/fornecedores/verificar?cnpj=...
 router.get('/fornecedores', getFornecedores);                    // GET /api/parceiros/fornecedores
 router.post('/fornecedores', obterOuCriarFornecedorPorCnpj);     // POST /api/parceiros/fornecedores
+router.get('/fornecedores/:id', detalheFornecedor);               // cadastro + notas, contas a pagar e produtos
+router.put('/fornecedores/:id', atualizarFornecedor);
 
 export default router;

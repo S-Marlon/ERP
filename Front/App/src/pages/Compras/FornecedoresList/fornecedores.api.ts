@@ -38,7 +38,13 @@ export interface ProcessarItemXMLResponse {
 /**
  * 🟢 BUSCAR TODOS OS FORNECEDORES (Adicionado para corrigir o erro)
  */
-export const getFornecedores = async (tenantId: number = 1): Promise<any[]> => {
+export interface FornecedorLista {
+    id_pessoa: number; status: 'ATIVO' | 'INATIVO'; razao_social: string; nome_fantasia: string | null; cnpj: string;
+    inscricao_estadual: string | null; email: string; telefone: string;
+    enderecos: Array<{ cidade: string | null; estado: string | null; principal: number | boolean }>;
+}
+
+export const getFornecedores = async (tenantId: number = 1): Promise<FornecedorLista[]> => {
     const response = await fetch(`${API_BASE_URL}?tenant_id=${tenantId}`);
 
     if (!response.ok) {
@@ -71,11 +77,11 @@ export const createSupplier = async (
     supplierData: {
         cnpj: string; name: string; fantasyName: string;
         // Dados do XML (opcionais): IE, telefone e endereço
-        stateRegistration?: string; phone?: string;
+        stateRegistration?: string; phone?: string; email?: string;
         endereco?: { logradouro?: string; numero?: string; complemento?: string; bairro?: string; cidade?: string; estado?: string; cep?: string };
     },
     tenantId: number = 1
-): Promise<any> => {
+): Promise<{ success: boolean; message: string; id_pessoa: number; criado: boolean }> => {
     const response = await fetch(API_BASE_URL, {
         method: 'POST',
         headers: {
@@ -88,7 +94,8 @@ export const createSupplier = async (
             nome_fantasia: supplierData.fantasyName,
             inscricao_estadual: supplierData.stateRegistration || null,
             telefone: supplierData.phone || null,
-            enderecos: supplierData.endereco?.logradouro ? [supplierData.endereco] : [],
+            email: supplierData.email || null,
+            enderecos: supplierData.endereco?.logradouro || supplierData.endereco?.cidade ? [supplierData.endereco] : [],
         }),
     });
 
@@ -99,6 +106,37 @@ export const createSupplier = async (
     }
 
     return response.json();
+};
+
+// Detalhe do fornecedor (cadastro + notas de entrada, contas a pagar e produtos vinculados) e edição
+export interface EnderecoFornecedor { logradouro: string; numero: string; complemento: string | null; bairro: string; cidade: string; estado: string; cep: string }
+export interface FornecedorDetalhe {
+    idPessoa: number; status: 'ATIVO' | 'INATIVO'; observacoes: string | null; criadoEm: string | null;
+    razaoSocial: string; nomeFantasia: string | null; cnpj: string; inscricaoEstadual: string | null; inscricaoMunicipal: string | null;
+    email: string | null; telefone: string | null; whatsapp: boolean; nomeContato: string | null; endereco: EnderecoFornecedor | null;
+    resumo: { qtdNotas: number; totalComprado: number; ultimaCompra: string | null; aPagar: number; vencido: number };
+    notas: Array<{ idLote: number; numero: string | null; serie: string | null; emissao: string | null; status: string; financeiro: string | null; valor: number }>;
+    titulos: Array<{ idTitulo: number; documento: string | null; parcela: number; totalParcelas: number; vencimento: string; valor: number; status: string; pagoEm: string | null; vencido: boolean; numeroNf: string | null }>;
+    produtos: Array<{ idItem: number; sku: string; nome: string; codigoFornecedor: string | null; unidadeCompra: string | null; fatorCompra: number | null; precoUltimaCompra: number | null; vinculadoEm: string | null }>;
+}
+export type FornecedorEdicao = Pick<FornecedorDetalhe, 'razaoSocial' | 'nomeFantasia' | 'inscricaoEstadual' | 'inscricaoMunicipal' | 'status' | 'observacoes' | 'email' | 'telefone' | 'whatsapp' | 'nomeContato'> & { endereco: Partial<EnderecoFornecedor> | null };
+
+export const getFornecedor = async (id: number, tenantId: number = 1): Promise<FornecedorDetalhe> => {
+    const response = await fetch(`${API_BASE_URL}/${id}?tenant_id=${tenantId}`);
+    const dados = await response.json().catch(() => ({}));
+    if (response.status === 404 && !dados.error) throw new Error('Rota não encontrada: reinicie o backend.');
+    if (!response.ok) throw new Error(dados.error || 'Erro ao carregar o fornecedor.');
+    return dados;
+};
+
+export const updateFornecedor = async (id: number, dados: FornecedorEdicao, tenantId: number = 1): Promise<void> => {
+    const response = await fetch(`${API_BASE_URL}/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenant_id: tenantId, ...dados }),
+    });
+    const r = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(r.error || 'Erro ao salvar o fornecedor.');
 };
 
 // ==========================================
