@@ -75,7 +75,7 @@ export const criarFamiliaDoCodigo = async (
   const comVedacao = TIPOS[tipo].comVedacao;
   const r = await createFamilia({
     nome: nomeFamiliaDoCodigo(codigo), categoriaPai: String(sub), siglaSku: 'ROL', comportamentoMarca: 'grade', unidadeMedidaBase: 'PC',
-    templateSku: comVedacao ? '{Código do rolamento}{S}{Vedação}{S}{Folga}{S}{MARCA}' : '{Código do rolamento}{S}{Folga}{S}{MARCA}',
+    templateSku: comVedacao ? '{Código do rolamento}{S}{Vedação}{S}{Folga}/{MARCA}' : '{Código do rolamento}{S}{Folga}/{MARCA}',
     templateNomeComercial: 'ROLAMENTO {Código do rolamento} | {MARCA}',
   } as never);
   const id = String(r.id);

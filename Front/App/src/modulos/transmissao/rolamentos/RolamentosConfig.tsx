@@ -50,6 +50,23 @@ const RolamentosConfig: React.FC = () => {
     } catch (e) { message.error(e instanceof Error ? e.message : 'Erro.'); } finally { setRenomeando(false); }
   };
   const [novoSignificado, setNovoSignificado] = useState('');
+  // Atualizar SKUs dos itens já cadastrados para o padrão legível (6205-2RS-C3/SKF)
+  type MudancaSku = { idItem: number; nome: string | null; skuAtual: string; skuNovo: string; conflito: string | null };
+  const [previaSkus, setPreviaSkus] = useState<MudancaSku[] | null>(null);
+  const [atualizandoSkus, setAtualizandoSkus] = useState(false);
+  const verSkus = async () => {
+    setAtualizandoSkus(true);
+    try { setPreviaSkus((await rolamentosApi.atualizarSkus(false)).mudancas); } catch (e) { message.error(e instanceof Error ? e.message : 'Erro.'); } finally { setAtualizandoSkus(false); }
+  };
+  const aplicarSkus = async () => {
+    setAtualizandoSkus(true);
+    try {
+      const r = await rolamentosApi.atualizarSkus(true);
+      const conflitos = r.mudancas.filter(m => m.conflito).length;
+      message.success(`${r.aplicadas} SKU(s) atualizado(s).${conflitos ? ` ${conflitos} com conflito ficaram como estavam.` : ''}`);
+      setPreviaSkus(null);
+    } catch (e) { message.error(e instanceof Error ? e.message : 'Erro.'); } finally { setAtualizandoSkus(false); }
+  };
 
   const salvarSufixos = async (sufixos: Record<string, string>) => {
     try {
@@ -224,7 +241,11 @@ const RolamentosConfig: React.FC = () => {
             )}
             <div style={{ marginTop: 10 }}>
               <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>Nome dos itens: ROLAMENTO 6205-2RS/C3 | 25 mm × 52 mm × 15 mm | SKF</Text>
-              <Button size="small" style={{ marginTop: 4 }} loading={renomeando && !previaNomes} onClick={verRenomear}>Renomear itens já cadastrados</Button>
+              <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>SKU: 6205-2RS-C3/SKF · UC207-20/FAG · 6205-ZZ/2L (2ª linha)</Text>
+              <Space style={{ marginTop: 4 }} wrap>
+                <Button size="small" loading={renomeando && !previaNomes} onClick={verRenomear}>Renomear itens já cadastrados</Button>
+                <Button size="small" loading={atualizandoSkus && !previaSkus} onClick={verSkus}>Atualizar SKUs dos itens já cadastrados</Button>
+              </Space>
             </div>
           </Card>
 
@@ -392,6 +413,21 @@ const RolamentosConfig: React.FC = () => {
             { title: 'SKU', dataIndex: 'sku', width: 160 },
             { title: 'Subcategoria', dataIndex: 'tipo', width: 160, render: (v: TipoRolamento | null) => (v ? TIPOS[v].subcategoria : <Text type="danger">sem tipo</Text>) },
             { title: 'Família de destino', key: 'f', render: (_: unknown, i: ItemReorg) => (i.codigo ? <b>{nomeFamiliaDoCodigo(i.codigo)}</b> : <Text type="danger">sem código: fica onde está</Text>) },
+          ]} />
+      </Modal>
+
+      <Modal open={previaSkus !== null} width={860} title={`Atualizar SKUs de rolamento (${previaSkus?.length ?? 0})`} onCancel={() => setPreviaSkus(null)}
+        okText={`Atualizar ${previaSkus?.filter(m => !m.conflito).length ?? 0} SKU(s)`} cancelText="Voltar" onOk={aplicarSkus}
+        okButtonProps={{ disabled: !previaSkus?.some(m => !m.conflito) }} confirmLoading={atualizandoSkus}>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          O SKU é montado pelos atributos do item (código, vedação, folga) e pela marca. Vendas antigas continuam com o SKU da época. Itens com conflito ficam como estão.
+        </Text>
+        <Table size="small" rowKey="idItem" pagination={false} scroll={{ y: 420 }} style={{ marginTop: 8 }} dataSource={previaSkus || []}
+          locale={{ emptyText: 'Todos os SKUs já estão no padrão' }}
+          columns={[
+            { title: 'SKU atual', dataIndex: 'skuAtual', width: 190, render: (v: string) => <Text type="secondary">{v}</Text> },
+            { title: 'SKU novo', dataIndex: 'skuNovo', width: 210, render: (v: string, m: MudancaSku) => <b style={m.conflito ? { color: '#cf1322' } : undefined}>{v}</b> },
+            { title: 'Item', dataIndex: 'nome', render: (v: string | null, m: MudancaSku) => (m.conflito ? <Text type="danger" style={{ fontSize: 12 }}>{m.conflito}</Text> : <Text style={{ fontSize: 12 }}>{v}</Text>) },
           ]} />
       </Modal>
 

@@ -50,10 +50,10 @@ assert(!lerDescricao('PARAFUSO SEXTAVADO M8 X 30', marcas).ehRolamento, 'não é
 assert(medidasDoCodigo('RIGIDO_ESFERAS', '6299') === null, 'fora da tabela');
 
 // SKU e nome
-assert(montarSku({ codigo: '6205', vedacao: '2RS', folga: null, linha: 1, marca: { nome: 'SKF', codigo: 'SKF' } }) === '6205-2RS-SKF', 'sku 1ª');
-assert(montarSku({ codigo: '6205', vedacao: '2RS', folga: 'C3', linha: 2, marca: { nome: 'GTOP-GBR', codigo: null } }) === '6205-2RS-C3-2L', 'sku 2ª');
-assert(montarSku({ codigo: 'UC208-24', vedacao: 'ABERTO', folga: null, linha: 2, marca: null }) === 'UC208-24-2L', 'sku UC');
-assert(montarSku({ codigo: 'HK2220', vedacao: 'ABERTO', folga: null, linha: 1, marca: { nome: 'NTN', codigo: null } }) === 'HK2220-NTN', 'sku HK');
+assert(montarSku({ codigo: '6205', vedacao: '2RS', folga: null, linha: 1, marca: { nome: 'SKF', codigo: 'SKF' } }) === '6205-2RS/SKF', 'sku 1ª');
+assert(montarSku({ codigo: '6205', vedacao: '2RS', folga: 'C3', linha: 2, marca: { nome: 'GTOP-GBR', codigo: null } }) === '6205-2RS-C3/2L', 'sku 2ª');
+assert(montarSku({ codigo: 'UC208-24', vedacao: 'ABERTO', folga: null, linha: 2, marca: null }) === 'UC208-24/2L', 'sku UC');
+assert(montarSku({ codigo: 'HK2220', vedacao: 'ABERTO', folga: null, linha: 1, marca: { nome: 'NTN', codigo: null } }) === 'HK2220/NTN', 'sku HK');
 assert(montarNome({ codigo: '6205', vedacao: '2RS', folga: 'C3', linha: 1, marca: { nome: 'SKF' }, medidas: { d: 25, D: 52, B: 15 } })
   === 'ROLAMENTO 6205-2RS/C3 | 25 mm × 52 mm × 15 mm | SKF', 'nome 1ª');
 assert(montarNome({ codigo: 'UC207-20', vedacao: 'ABERTO', folga: null, linha: 2, marca: { nome: 'GTOP-GBR' }, medidas: { d: 31.75, D: 72, B: 42.9 } })
@@ -96,6 +96,10 @@ assert(lerDescricao('ROLAMENTO SS 608 2RS GTOP-GBR', comFab).sufixos[0].signific
 assert(Boolean(lerDescricao('ROLAMENTO 6300-B-2DRS-L278-C3-SNZ1#O FAG', comFab).sufixos.find(x => x.codigo === 'L278')?.provavel), 'graxa provável');
 s1 = lerDescricao('ROLAMENTO 6201-2RSR-CO7-C3#N1 FAG', comFab, { co7: 'código de lubrificação FAG' });
 assert(s1.sufixos.find(x => x.codigo === 'CO7')?.significado === 'código de lubrificação FAG', 'dicionário do operador');
-assert(montarSku({ codigo: 'SS608', vedacao: '2RS', folga: null, linha: 2, marca: null }) === 'SS608-2RS-2L', 'sku inox');
+assert(montarSku({ codigo: 'SS608', vedacao: '2RS', folga: null, linha: 2, marca: null }) === 'SS608-2RS/2L', 'sku inox');
+assert(montarSku({ codigo: 'UC207-20', vedacao: '2RS', folga: 'C3', linha: 1, marca: { nome: 'SKF', codigo: 'SKF' } }) === 'UC207-20-2RS-C3/SKF', 'sku UC completo');
+assert(montarSku({ codigo: 'UC207-20', vedacao: 'ABERTO', folga: null, linha: 1, marca: { nome: 'FAG', codigo: null } }) === 'UC207-20/FAG', 'sku UC simples');
+const uc = lerDescricao('ROLAMENTO UC207-20 2RS C3 INA', []);
+assert(uc.codigo === 'UC207-20' && uc.vedacao === '2RS' && uc.folga === 'C3', `UC com vedação ${JSON.stringify(uc)}`);
 
 console.log('rolamentos: ok');

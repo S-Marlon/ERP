@@ -6,7 +6,7 @@ export type TipoRolamento = 'RIGIDO_ESFERAS' | 'INSERCAO_UC' | 'AGULHAS' | 'ROLO
 
 export const TIPOS: Record<TipoRolamento, { familia: string; subcategoria: string; nomeCurto: string; comVedacao: boolean }> = {
   RIGIDO_ESFERAS: { familia: 'Rolamento rígido de esferas', subcategoria: 'Rígidos de esferas', nomeCurto: 'Rolamento', comVedacao: true },
-  INSERCAO_UC: { familia: 'Rolamento de inserção (UC)', subcategoria: 'Inserção (UC)', nomeCurto: 'Rolamento de inserção', comVedacao: false },
+  INSERCAO_UC: { familia: 'Rolamento de inserção (UC)', subcategoria: 'Inserção (UC)', nomeCurto: 'Rolamento de inserção', comVedacao: true },
   AGULHAS: { familia: 'Rolamento de agulhas', subcategoria: 'Agulhas', nomeCurto: 'Rolamento de agulha', comVedacao: true },
   ROLOS_CONICOS: { familia: 'Rolamento de rolos cônicos', subcategoria: 'Rolos cônicos', nomeCurto: 'Rolamento cônico', comVedacao: false },
   AUTOCOMPENSADOR: { familia: 'Rolamento autocompensador', subcategoria: 'Autocompensadores', nomeCurto: 'Rolamento autocompensador', comVedacao: false },
@@ -256,10 +256,15 @@ export const lerDescricao = (descricao: string, marcas: MarcaModulo[], doOperado
 export const siglaDaMarca = (marca: { nome: string; codigo: string | null } | null) =>
   (marca?.codigo || marca?.nome || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
 
-/** 6205-2RS-SKF (1ª linha), 6205-2RS-C3-2L (2ª linha), UC208-24-2L, HK2220-NTN. Rolamento aberto não leva vedação. */
-export const montarSku = (p: { codigo: string; vedacao: string; folga: string | null; linha: 1 | 2; marca: { nome: string; codigo: string | null } | null }) =>
-  [p.codigo.toUpperCase(), p.vedacao && p.vedacao !== 'ABERTO' ? p.vedacao : null, p.folga, p.linha === 2 ? SIGLA_SEGUNDA_LINHA : siglaDaMarca(p.marca) || null]
-    .filter(Boolean).join('-');
+/**
+ * SKU legível: código-vedação-folga/MARCA. A marca (ou 2L na 2ª linha) sempre fecha o código, depois da barra:
+ * 6205-2RS-C3/SKF, UC207-20-2RS-C3/INA, UC207-20/FAG, 6205-ZZ/2L. Rolamento aberto não leva vedação.
+ */
+export const montarSku = (p: { codigo: string; vedacao: string; folga: string | null; linha: 1 | 2; marca: { nome: string; codigo: string | null } | null }) => {
+  const corpo = [p.codigo.trim().toUpperCase(), p.vedacao && p.vedacao !== 'ABERTO' ? p.vedacao : null, p.folga].filter(Boolean).join('-');
+  const marca = p.linha === 2 ? SIGLA_SEGUNDA_LINHA : siglaDaMarca(p.marca);
+  return marca ? `${corpo}/${marca}` : corpo;
+};
 
 const mmNome = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
 

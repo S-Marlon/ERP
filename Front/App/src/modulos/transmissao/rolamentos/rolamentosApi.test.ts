@@ -5,11 +5,12 @@ const assert = (condition: boolean, message: string): void => {
 };
 
 // Mesmas regras do backend (rolamentos.test.ts)
-assert(montarSku({ codigo: '6205', vedacao: '2RS', folga: null, linha: 1, marca: { nome: 'SKF', codigo: 'SKF' } }) === '6205-2RS-SKF', 'sku 1ª');
-assert(montarSku({ codigo: '6205', vedacao: '2RS', folga: 'C3', linha: 2, marca: { nome: 'GTOP-GBR', codigo: null } }) === '6205-2RS-C3-2L', 'sku 2ª');
-assert(montarSku({ codigo: 'uc208-24', vedacao: 'ABERTO', folga: null, linha: 2, marca: null }) === 'UC208-24-2L', 'sku UC');
-assert(montarSku({ codigo: 'HK2220', vedacao: 'ABERTO', folga: null, linha: 1, marca: { nome: 'NTN', codigo: null } }) === 'HK2220-NTN', 'sku HK');
-assert(montarSku({ codigo: '6802', vedacao: '2RS', folga: null, linha: 1, marca: { nome: 'Peer Bearing', codigo: null } }) === '6802-2RS-PEERBEARIN', 'sigla pelo nome (10)');
+assert(montarSku({ codigo: '6205', vedacao: '2RS', folga: null, linha: 1, marca: { nome: 'SKF', codigo: 'SKF' } }) === '6205-2RS/SKF', 'sku 1ª');
+assert(montarSku({ codigo: '6205', vedacao: '2RS', folga: 'C3', linha: 2, marca: { nome: 'GTOP-GBR', codigo: null } }) === '6205-2RS-C3/2L', 'sku 2ª');
+assert(montarSku({ codigo: 'uc208-24', vedacao: 'ABERTO', folga: null, linha: 2, marca: null }) === 'UC208-24/2L', 'sku UC');
+assert(montarSku({ codigo: 'HK2220', vedacao: 'ABERTO', folga: null, linha: 1, marca: { nome: 'NTN', codigo: null } }) === 'HK2220/NTN', 'sku HK');
+assert(montarSku({ codigo: '6802', vedacao: '2RS', folga: null, linha: 1, marca: { nome: 'Peer Bearing', codigo: null } }) === '6802-2RS/PEERBEARIN', 'sigla pelo nome (10)');
+assert(montarSku({ codigo: 'UC207-20', vedacao: '2RS', folga: 'C3', linha: 1, marca: { nome: 'INA', codigo: null } }) === 'UC207-20-2RS-C3/INA', 'sku UC completo');
 assert(montarNome({ codigo: '6205', vedacao: '2RS', folga: 'C3', linha: 1, marca: { nome: 'SKF' }, medidas: { d: 25, D: 52, B: 15 } })
   === 'ROLAMENTO 6205-2RS/C3 | 25 mm × 52 mm × 15 mm | SKF', 'nome 1ª');
 assert(montarNome({ codigo: 'UC207-20', vedacao: 'ABERTO', folga: null, linha: 2, marca: { nome: 'GTOP-GBR' }, medidas: { d: 31.75, D: 72, B: 42.9 } })
