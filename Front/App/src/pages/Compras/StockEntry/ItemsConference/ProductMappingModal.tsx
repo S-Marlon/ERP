@@ -5,7 +5,7 @@ import {
   Alert, Button, Col, Empty, Input, InputNumber, Modal, Progress, Row, Space, Spin, Steps, Tag, Tooltip, Typography,
 } from "antd";
 import {
-  ArrowLeftOutlined, ArrowRightOutlined, CheckCircleFilled, CheckOutlined, FileAddOutlined, LinkOutlined,
+  ArrowLeftOutlined, ArrowRightOutlined, CheckCircleFilled, CheckOutlined, EditOutlined, FileAddOutlined, LinkOutlined,
   LockOutlined, RollbackOutlined, SearchOutlined, StepForwardOutlined,
 } from "@ant-design/icons";
 import { TIPO_RECURSO_PADRAO, getTipoRecursoConfig } from "../tipoRecurso";
@@ -47,7 +47,8 @@ export interface MappingPayload {
     descricao_fornecedor: string;
   };
   salesUnits: SalesUnit[];
-  // Como a unidade da NF vira estoque: 1 unidade_compra = fator x unidade_base
+  // Como a unidade da NF vira estoque: 1 unidade_compra = fator x unidade_base.
+  // unidade_compra pode ser a corrigida pelo operador quando o fornecedor errou a unidade (ex.: UN num rolo = RL)
   conversaoCompra: {
     unidade_compra: string;
     unidade_base: string;
@@ -119,7 +120,12 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ items = [], onMap, o
   const isBatch = items.length > 1;
   const ultimo = currentIndex >= items.length - 1;
   const currentItem: ProductEntry = items[currentIndex] ?? EMPTY_ITEM;
-  const unidadeNf = (currentItem.unidade || "UN").toUpperCase();
+  // Unidade como veio no XML e a corrigida pelo operador (fornecedor mandou UN num rolo, por exemplo)
+  const unidadeOriginalNf = (currentItem.unidade || "UN").toUpperCase();
+  const [unidadeCorrigida, setUnidadeCorrigida] = useState<string | null>(null);
+  const [editandoUnidade, setEditandoUnidade] = useState(false);
+  const [rascunhoUnidade, setRascunhoUnidade] = useState("");
+  const unidadeNf = unidadeCorrigida || unidadeOriginalNf;
   const tipo = currentItem.tipoRecurso || TIPO_RECURSO_PADRAO;
   const tipoCfg = getTipoRecursoConfig(tipo);
 
@@ -169,7 +175,11 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ items = [], onMap, o
     setClassificacao(d ? {
       familiaId: d.familia_id ?? null, categoriaId: d.categoria_id ?? null, atributos: d.atributos ?? null, marcaId: d.marca_id ?? null,
     } : CLASSIFICACAO_VAZIA);
-    setConvUnidadeBase((m?.conversaoCompra?.unidade_base || unidadeNf).toUpperCase());
+    const compraSalva = String(m?.conversaoCompra?.unidade_compra || "").trim().toUpperCase();
+    const corrigida = compraSalva && compraSalva !== unidadeOriginalNf ? compraSalva : null;
+    setUnidadeCorrigida(corrigida);
+    setEditandoUnidade(false);
+    setConvUnidadeBase((m?.conversaoCompra?.unidade_base || corrigida || unidadeOriginalNf).toUpperCase());
     setConvFator(m?.conversaoCompra?.fator || 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIndex, currentItem.tempId]);
@@ -242,6 +252,14 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ items = [], onMap, o
     setConvUnidadeBase((r.unitOfMeasure || unidadeNf).toUpperCase());
   };
 
+  // Corrige a unidade da nota: a base de estoque acompanha enquanto era igual à unidade da nota (item novo)
+  const corrigirUnidade = (valor: string) => {
+    const nova = valor.trim().toUpperCase();
+    const efetiva = nova && nova !== unidadeOriginalNf ? nova : null;
+    if (!unidadeBaseTravada && convUnidadeBase === unidadeNf) setConvUnidadeBase(efetiva || unidadeOriginalNf);
+    setUnidadeCorrigida(efetiva);
+  };
+
   const avancarFila = () => (ultimo ? onClose() : setCurrentIndex(i => i + 1));
 
   const confirmar = () => {
@@ -292,6 +310,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ items = [], onMap, o
       <div style={{ textAlign: "right" }}>
         <Text type="secondary" style={{ fontSize: 11, display: "block" }}>Quantidade</Text>
         <b style={{ fontSize: 15 }}>{qtd(currentItem.quantidade || 0)} {unidadeNf}</b>
+        {unidadeCorrigida && <Text type="secondary" style={{ fontSize: 11, display: "block" }}>na nota: {unidadeOriginalNf}</Text>}
       </div>
       <Tooltip title={composicao}>
         <div style={{ textAlign: "right", cursor: "help" }}>
@@ -449,7 +468,28 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ items = [], onMap, o
         <div style={{ ...secao, height: "100%" }}>
           <span style={rotulo}>Como a nota vira estoque</span>
           <Space align="center" wrap>
-            <Text>1 <b>{unidadeNf}</b> =</Text>
+            {editandoUnidade ? (
+              <Space size={4}>
+                <Text>1</Text>
+                <Input
+                  autoFocus
+                  size="small"
+                  value={rascunhoUnidade}
+                  maxLength={10}
+                  style={{ width: 70 }}
+                  onChange={e => setRascunhoUnidade(e.target.value.toUpperCase())}
+                  onPressEnter={() => { corrigirUnidade(rascunhoUnidade); setEditandoUnidade(false); }}
+                  onBlur={() => { corrigirUnidade(rascunhoUnidade); setEditandoUnidade(false); }}
+                />
+                <Text>=</Text>
+              </Space>
+            ) : (
+              <Tooltip title="O fornecedor mandou a unidade errada? Clique para corrigir só nesta linha (ex.: UN de um rolo de corda = RL).">
+                <Text style={{ cursor: "pointer" }} onClick={() => { setRascunhoUnidade(unidadeNf); setEditandoUnidade(true); }}>
+                  1 <b style={{ borderBottom: "1px dashed #1677ff" }}>{unidadeNf}</b> <EditOutlined style={{ fontSize: 11, color: "#1677ff" }} /> =
+                </Text>
+              </Tooltip>
+            )}
             <InputNumber min={0.000001} value={convFator} onChange={v => setConvFator(Number(v) || 0)} style={{ width: 100 }} />
             {unidadeBaseTravada ? (
               <Tooltip title="Unidade de estoque do item já cadastrado"><Tag color="purple" style={{ margin: 0, padding: "2px 10px" }}>{convUnidadeBase}</Tag></Tooltip>
@@ -460,6 +500,12 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ items = [], onMap, o
           <span style={ajuda}>
             Esta nota: {qtd(currentItem.quantidade || 0)} {unidadeNf} → <b style={{ color: "#262626" }}>{qtd((currentItem.quantidade || 0) * convFator)} {convUnidadeBase || "?"}</b> no estoque
           </span>
+          {unidadeCorrigida && (
+            <span style={{ ...ajuda, color: "#d46b08" }}>
+              Unidade corrigida: a nota veio em {unidadeOriginalNf}, entra como {unidadeCorrigida}.{" "}
+              <a onClick={() => corrigirUnidade(unidadeOriginalNf)}>Voltar para {unidadeOriginalNf}</a>
+            </span>
+          )}
         </div>
       </Col>
       <Col span={12}>

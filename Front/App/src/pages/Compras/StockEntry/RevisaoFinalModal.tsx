@@ -46,7 +46,8 @@ export const RevisaoFinalModal: React.FC<Props> = ({ open, loteId, items, nota, 
     const m = i.mapeamento;
     const recebida = Number(i.receivedQuantity ?? i.quantidade) || 0;
     const fator = Number(m?.conversaoCompra?.fator) || 1;
-    const unidadeNf = String(i.unidade || 'UN').toUpperCase();
+    // Unidade corrigida no mapeamento (fornecedor errou a unidade) vale sobre a do XML
+    const unidadeNf = String(m?.conversaoCompra?.unidade_compra || i.unidade || 'UN').toUpperCase();
     const unidadeBase = String(m?.conversaoCompra?.unidade_base || unidadeNf).toUpperCase();
     const tipo = i.tipoRecurso || TIPO_RECURSO_PADRAO;
     return {

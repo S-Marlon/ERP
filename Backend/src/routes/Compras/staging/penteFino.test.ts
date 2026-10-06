@@ -117,4 +117,8 @@ export const runPenteFinoTests = (): void => {
     mapeamento_json: JSON.stringify({ configVendas: { unidades: [{ sigla: 'M', fator: 1, is_base: true }] } }) });
   assert(!avaliarPenteFino(lote, [novoCfg], ctxUn).bloqueios.some(b => b.codigo === 'CONFIG_VENDAS_INCOERENTE'), 'Config de vendas em M deveria bater com a base MT traduzida.');
   assert(avaliarPenteFino(lote, [item({ unidade_original: 'KG' })], ctx).aprovavel, 'Sem dicionário no contexto não bloqueia (compatível).');
+
+  // Unidade corrigida na conferência (fornecedor mandou UN num rolo): vale sobre a do XML
+  const corrigida = lerConversaoCompra(item({ unidade_original: 'UN', mapeamento_json: JSON.stringify({ conversaoCompra: { unidade_compra: 'rl', unidade_base: 'RL', fator: 1 } }) }));
+  assert(corrigida.unidadeCompra === 'RL' && corrigida.unidadeBase === 'RL' && corrigida.fator === 1, `unidade corrigida ${JSON.stringify(corrigida)}`);
 };
