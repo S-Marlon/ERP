@@ -1,35 +1,46 @@
-import express, { Request, Response, NextFunction } from 'express';
+// Resumo do financeiro (a receber, a pagar, recebido e pago no mês) a partir das tabelas do modelo novo:
+// financeiro_contas_receber (+ _baixas) e financeiro_contas_pagar. Montado em /api/financeiro.
+import express, { Request, Response } from 'express';
 import pool from '../routes/Estoque/db.config';
 
 const router = express.Router();
+const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || 1);
+const n = (v: unknown) => Number(v) || 0;
 
-const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) =>
-  (req: Request, res: Response, next: NextFunction) => {
-    Promise.resolve(fn(req, res, next)).catch(next);
-  };
-
-router.get('/summary', asyncHandler(async (_req, res) => {
-  const [rows]: any = await pool.execute(`
-    SELECT 
-      (SELECT SUM(valor_nominal) FROM contas_receber WHERE status = 'PENDENTE') AS aReceber,
-      (SELECT SUM(valor_nominal) FROM contas_pagar WHERE status = 'PENDENTE') AS aPagar,
-      (SELECT SUM(valor_nominal) FROM contas_receber WHERE status = 'PAGO' AND MONTH(data_pagamento) = MONTH(NOW())) AS recebidoMes,
-      (SELECT SUM(valor_nominal) FROM contas_pagar WHERE status = 'PAGO' AND MONTH(data_pagamento) = MONTH(NOW())) AS pagoMes
-  `);
-
-  const r = rows[0] || { aReceber: 0, aPagar: 0, recebidoMes: 0, pagoMes: 0 };
-  const saldoPrevisto = (Number(r.recebidoMes) + Number(r.aReceber)) - (Number(r.pagoMes) + Number(r.aPagar));
-
-  res.json({ ...r, saldoPrevisto });
-}));
-
-router.patch('/pay/:tipo/:id', asyncHandler(async (req, res) => {
-  const { tipo, id } = req.params;
-  const tabela = tipo === 'pagar' ? 'contas_pagar' : 'contas_receber';
-  const idNome = tipo === 'pagar' ? 'id_conta_pagar' : 'id_conta_receber';
-
-  await pool.execute(`UPDATE ${tabela} SET status = 'PAGO', data_pagamento = NOW() WHERE ${idNome} = ?`, [id]);
-  res.json({ success: true, message: 'Pagamento registrado!' });
-}));
+// GET /api/financeiro/summary
+router.get('/summary', async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  try {
+    const [[receber]]: any = await pool.execute(
+      `SELECT COALESCE(SUM(valor - valor_pago), 0) AS aberto,
+              COALESCE(SUM(CASE WHEN vencimento < CURDATE() THEN valor - valor_pago END), 0) AS vencido
+       FROM financeiro_contas_receber WHERE tenant_id = ? AND status = 'ABERTO'`,
+      [tenant]
+    );
+    const [[recebido]]: any = await pool.execute(
+      `SELECT COALESCE(SUM(valor), 0) AS total FROM financeiro_contas_receber_baixas
+       WHERE tenant_id = ? AND estornado_em IS NULL AND created_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01')`,
+      [tenant]
+    );
+    const [[pagar]]: any = await pool.execute(
+      `SELECT COALESCE(SUM(CASE WHEN status = 'ABERTO' THEN valor - valor_pago END), 0) AS aberto,
+              COALESCE(SUM(CASE WHEN status = 'ABERTO' AND vencimento < CURDATE() THEN valor - valor_pago END), 0) AS vencido,
+              COALESCE(SUM(CASE WHEN status = 'PAGO' AND pago_em >= DATE_FORMAT(CURDATE(), '%Y-%m-01') THEN valor_pago END), 0) AS pagoMes
+       FROM financeiro_contas_pagar WHERE tenant_id = ?`,
+      [tenant]
+    );
+    const aReceber = n(receber?.aberto);
+    const aPagar = n(pagar?.aberto);
+    return res.json({
+      aReceber, aPagar, recebidoMes: n(recebido?.total), pagoMes: n(pagar?.pagoMes),
+      receberVencido: n(receber?.vencido), pagarVencido: n(pagar?.vencido),
+      // O que ainda entra menos o que ainda sai (títulos em aberto)
+      saldoPrevisto: Number((aReceber - aPagar).toFixed(2)),
+    });
+  } catch (error: any) {
+    console.error('Erro no resumo financeiro:', error);
+    return res.status(500).json({ error: 'Erro ao montar o resumo financeiro.', details: error?.message });
+  }
+});
 
 export default router;

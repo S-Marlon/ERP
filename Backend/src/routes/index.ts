@@ -1,6 +1,5 @@
 import express from 'express';
 import estoqueRoutes from './estoque.routes';
-import comercialRoutes from './comercial.routes';
 import fiscalRoutes from './fiscal.routes';
 import financeiroRoutes from './financeiro.routes';
 import catalogoRoutes from './Catalogo/catalogo.routes';
@@ -24,7 +23,6 @@ router.get('/', (req: Request, res: Response) => {
 // Estoque no modelo novo primeiro (saldos, movimentos, ajustes); rotas legadas depois
 router.use('/estoque', estoqueItensRoutes);
 router.use('/estoque', estoqueRoutes);
-router.use('/comercial', comercialRoutes);
 router.use('/fiscal', fiscalRoutes);
 // Contas a receber no modelo novo antes das rotas legadas do financeiro
 router.use('/financeiro/receber', receberRoutes);
