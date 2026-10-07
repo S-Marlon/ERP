@@ -863,7 +863,7 @@ Recarregar
 
 <Row gutter={[8, 8]}>
 
-      <Col xs={24} md={4} lg={4}>
+      <Col xs={24} md={4} lg={6}>
 
   
 {/* Coluna 1: Famílias Ativas */}
@@ -886,7 +886,7 @@ handleCriarGrupo={handleCriarFamilia}
 
 
 {/* Coluna 2: Configuração Central */}
-<Col xs={24} md={18} lg={13}>
+<Col xs={24} md={18} lg={12}>
 {familiaSelecionadaLocal ? (
 <Space direction="vertical" style={{ width: "100%" }}>
 <Row gutter={[4, 4]}>
@@ -1084,7 +1084,7 @@ Selecione ou crie uma família na barra lateral para começar a configurar.
 )}
 </Col>
 
-    <Col xs={24} md={18} lg={7}>
+    <Col xs={24} md={18} lg={6}>
 
 
      <Card 

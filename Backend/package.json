@@ -5,7 +5,6 @@
     "scripts": {
         "start": "ts-node src/server.ts",
         "dev": "nodemon",
-        "start-estoque": "ts-node src/routes/Estoque/server.ts",
         "test": "echo \"Error: no test specified\" && exit 1",
         "test-stock-edge-cases": "ts-node src/tests/stock-edge-cases.test.ts",
         "audit-stock": "ts-node src/tests/stock-audit.ts",
