@@ -18,6 +18,8 @@ export interface VendaPdvPayload {
     idCliente?: number | null;
     observacao?: string;
     descontoGeral?: number;
+    // Frete cobrado do cliente (fora do preço dos itens; soma no total)
+    frete?: number;
     // Crédito parcelado acima do sem juros: diferença de taxa repassada ao cliente
     acrescimoGeral?: number;
     // Venda gerada de um orçamento (manterPrecoOrcamento: preços do orçamento, se ainda válido)
@@ -33,6 +35,7 @@ export interface VendaPdvResposta {
     totalBruto: number;
     totalDesconto: number;
     totalLiquido: number;
+    frete?: number;
     totalTaxas?: number;
     troco: number;
     // Venda a prazo: parcelas geradas em contas a receber

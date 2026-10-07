@@ -80,7 +80,7 @@ export const calcularItensDoPedido = async (conn: ConnVenda, tenant: number, ite
 
 /**
  * POST /api/vendas/pdv/vendas
- * { clienteNome?, idCliente?, observacao?, descontoGeral?,
+ * { clienteNome?, idCliente?, observacao?, descontoGeral?, frete? (cobrado do cliente, fora do preço dos itens),
  *   itens: [{ idItem, quantidade, idUnidade?, precoUnitario? }],
  *   pagamentos: [{ forma: DINHEIRO|PIX|DEBITO|CREDITO|PRAZO|TRANSFERENCIA, valor, parcelas?,
  *                  intervaloDias?, primeiroVencimento? (só PRAZO: gera as parcelas em contas a receber) }] }
@@ -125,7 +125,10 @@ export const registrarVenda = async (req: Request, res: Response) => {
     const { ids, itensBanco, linhas } = await calcularItensDoPedido(connection as any, tenant, itens, congelados);
     // Acréscimo: crédito parcelado acima do sem juros (a diferença de taxa repassada ao cliente)
     const venda = fecharVenda(linhas, Number(descontoGeral) || 0, Number(acrescimoGeral) || 0);
-    const pagamentosOk = validarPagamentos(pagamentos, venda.totalLiquido);
+    // Frete cobrado do cliente: não mexe no preço dos itens, soma no total (na nota entra como outras despesas)
+    const frete = Math.round(Math.max(0, Number(req.body?.frete) || 0) * 100) / 100;
+    const totalComFrete = Math.round((venda.totalLiquido + frete) * 100) / 100;
+    const pagamentosOk = validarPagamentos(pagamentos, totalComFrete);
 
     // Serviço (ex.: prensagem avulsa) não tem estoque: só produtos travam saldo e geram movimento
     const ehServico = (idItem: number) => String(itensBanco.get(idItem).tipo_recurso).toUpperCase() === 'SERVICO';
@@ -193,7 +196,7 @@ export const registrarVenda = async (req: Request, res: Response) => {
     const cfgTaxas = await carregarConfigTaxas(connection as any, tenant);
     const taxas = calcularTaxas(cfgTaxas, pagamentosOk.map(p => ({ forma: p.forma, valor: p.valor, parcelas: p.parcelas, troco: p.troco })));
     const percentualEfetivo = cfgTaxas.descontoFormaAutomatico
-      ? descontoEfetivoPct(cfgTaxas, venda.totalBruto, liquidoParaRegra(cfgTaxas, pagamentosOk.map(p => ({ forma: p.forma, valor: p.valor, parcelas: p.parcelas, troco: p.troco }))))
+      ? descontoEfetivoPct(cfgTaxas, venda.totalBruto, liquidoParaRegra(cfgTaxas, pagamentosOk.map(p => ({ forma: p.forma, valor: p.valor, parcelas: p.parcelas, troco: p.troco }))) - frete)
       : undefined;
 
     // Regras de desconto e margem (servidor): acima do limite ou abaixo do custo exige autorização
@@ -226,11 +229,14 @@ export const registrarVenda = async (req: Request, res: Response) => {
        VALUES (?, 'PDV', 'CONCLUIDA', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         tenant, caixa.id_caixa, operadorDe(req), autorizadoPor, motivoAutorizacao, idCliente ? Number(idCliente) : null, String(clienteNome || '').trim().slice(0, 150) || 'CONSUMIDOR',
-        f4(venda.totalBruto), f4(venda.totalDesconto), f4(venda.totalLiquido), f4(totalCusto), f4(taxas.totalTaxas),
+        f4(venda.totalBruto), f4(venda.totalDesconto), f4(totalComFrete), f4(totalCusto), f4(taxas.totalTaxas),
         String(observacao || '').trim().slice(0, 255) || null,
       ]
     );
     const idVenda = Number((cab as any).insertId);
+    if (frete > 0) {
+      await connection.execute(`UPDATE vendas_pedidos SET total_frete = ? WHERE id_venda = ?`, [f4(frete), idVenda]);
+    }
     if (idOrcamento) {
       await connection.execute(`UPDATE vendas_pedidos SET id_orcamento = ? WHERE id_venda = ?`, [idOrcamento, idVenda]);
       await connection.execute(`UPDATE vendas_pedidos SET status = 'CONVERTIDO' WHERE id_venda = ? AND tenant_id = ?`, [idOrcamento, tenant]);
@@ -313,7 +319,8 @@ export const registrarVenda = async (req: Request, res: Response) => {
       parcelas: parcelasPrazo,
       totalBruto: venda.totalBruto,
       totalDesconto: venda.totalDesconto,
-      totalLiquido: venda.totalLiquido,
+      totalLiquido: totalComFrete,
+      frete,
       totalTaxas: taxas.totalTaxas,
       troco: pagamentosOk.reduce((a, p) => a + p.troco, 0),
     });

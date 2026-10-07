@@ -1,6 +1,6 @@
 // Cabeçalho do PDV: enxuto (a tela do PDV mostra cliente, busca e último item bipado).
 import { useEffect, useState } from "react";
-import { Tooltip } from "antd";
+import { Grid, Tooltip } from "antd";
 import { darkColors, colors } from "../../../shared/styles/colors";
 import { ListaTrabalhoBotao } from "../../../shared/core/listaTrabalho/ListaTrabalhoBotao";
 import styles from "./PDVHeader.module.css";
@@ -21,20 +21,24 @@ const PDVHeader: React.FC<PDVHeaderProps> = ({ isDarkMode, onThemeToggle }) => {
   }, []);
 
   const themeColors = isDarkMode ? darkColors : colors;
+  // Janela estreita (ex.: meia tela): some com data, atalhos e relógio para não quebrar a linha
+  const telas = Grid.useBreakpoint();
 
   return (
     <header className={styles.pdvHeader} style={{ borderBottomColor: themeColors.primary }}>
       <div className={styles.left}>
         <span className={styles.title}>🛒 PDV</span>
-        <div className={styles.divider} />
-        <span className={styles.empty}>
-          {agora.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" })}
-        </span>
+        {telas.lg && <div className={styles.divider} />}
+        {telas.lg && (
+          <span className={styles.empty}>
+            {agora.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" })}
+          </span>
+        )}
       </div>
 
       <div className={styles.center}>
         <CaixaIndicador />
-        <span className={styles.empty} style={{ marginLeft: 10 }}>F2 finalizar · F3 buscar · F4 cliente</span>
+        {telas.xl && <span className={styles.empty} style={{ marginLeft: 10 }}>F2 finalizar · F3 buscar · F4 cliente</span>}
       </div>
 
       <div className={styles.right}>
@@ -46,8 +50,8 @@ const PDVHeader: React.FC<PDVHeaderProps> = ({ isDarkMode, onThemeToggle }) => {
           </button>
         </Tooltip>
 
-        <span className={styles.clock}>{agora.toLocaleTimeString("pt-BR")}</span>
-        <div className={styles.divider} />
+        {telas.md && <span className={styles.clock}>{agora.toLocaleTimeString("pt-BR")}</span>}
+        {telas.md && <div className={styles.divider} />}
 
         <div className={styles.block}>
           <span className={styles.label}>Operador</span>

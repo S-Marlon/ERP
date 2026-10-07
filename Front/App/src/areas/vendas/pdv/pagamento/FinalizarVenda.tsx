@@ -1,20 +1,21 @@
+// Pagamento da venda no PDV: formas (com taxas, parcelamento, a prazo e sinal), lista de pagamentos, troco e conclusão.
 import React, { useEffect, useRef, useState } from 'react';
-import './FinalizarVenda.css';
-import Badge from '../../../../shared/components/ui/Badge/Badge';
-import Button from '../../../../shared/components/ui/Button/Button';
-import Fieldset from '../../../../shared/components/ui/Fieldset/Fieldset';
+import { Alert, Badge, Button, Checkbox, DatePicker, Divider, Flex, Form, Input, InputNumber, List, Modal, Popover, Segmented, Select, Steps, Switch, Tag, Tooltip, Typography, message, theme } from 'antd';
+import type { InputRef } from 'antd';
+import {
+    ArrowLeftOutlined, BankOutlined, CalculatorOutlined, CalendarOutlined, CheckOutlined, CreditCardOutlined, DeleteOutlined, DollarOutlined,
+    EditOutlined, FileTextOutlined, LockOutlined, MailOutlined, PercentageOutlined, PrinterOutlined, QrcodeOutlined, SettingOutlined,
+    SwapOutlined, TagOutlined, TruckOutlined, WhatsAppOutlined,
+} from '@ant-design/icons';
+import dayjs from 'dayjs';
 import { imprimirExtratoElgin } from '../../../../shared/utils/printService';
 import { salesService, VendaPdvPayload, FormaPagamentoPdv, ErroVendaPdv, AutorizacaoVenda } from '../services/salesService';
-import Swal from 'sweetalert2';
 import { isCartItemOS } from '../types/cart.types';
 import { caixaStore } from '../../caixa/caixaStore';
 import { useSituacaoCliente } from '../../../financeiro/receber/receberApi';
 import { acrescimoParcelamento, ajusteDaForma, descontoDaForma, useTaxasVenda } from '../../taxas/taxasVenda';
 import { useAdiantamentosAbertos } from '../services/adiantamentosApi';
-// import {ItemVenda} from '../../../../shared/utils/printService'
-
-import Draggable from 'react-draggable';
-
+import { Calculadora, PreferenciasPdv, bipConfirmacao, guardarUltimoComprovante, lerPreferencias, salvarPreferencias, textoComprovante, ultimoComprovante } from './apoioPagamento';
 
 export interface ItemVenda {
     id: string | number;
@@ -22,7 +23,7 @@ export interface ItemVenda {
     quantity: number;
     salePrice: number;
     costPrice?: number;
-    unidade?: string; // 👈 ADICIONE ISSO
+    unidade?: string;
 }
 
 export type PaymentMethodType =
@@ -34,35 +35,14 @@ export type PaymentMethodType =
     | 'store_credit' // 'Crediário'
     | 'advance';     // sinal/adiantamento já recebido do cliente
 
-export const PAYMENT_METHOD_DETAILS: Record<PaymentMethodType, { label: string; icon: string }> = {
-    money: {
-        label: 'Dinheiro',
-        icon: '💵'
-    },
-    pix: {
-        label: 'PIX',
-        icon: '💠'
-    },
-    credit_card: {
-        label: 'Cartão Crédito',
-        icon: '💳'
-    },
-    debit_card: {
-        label: 'Cartão Débito',
-        icon: '🏦'
-    },
-    store_credit: {
-        label: 'Crediário',
-        icon: '🎫'
-    },
-    bank_transfer: {
-        label: 'Transferência',
-        icon: '🏛️'
-    },
-    advance: {
-        label: 'Sinal',
-        icon: '🔖'
-    }
+export const PAYMENT_METHOD_DETAILS: Record<PaymentMethodType, { label: string; icon: React.ReactNode }> = {
+    money: { label: 'Dinheiro', icon: <DollarOutlined /> },
+    pix: { label: 'PIX', icon: <QrcodeOutlined /> },
+    credit_card: { label: 'Crédito', icon: <CreditCardOutlined /> },
+    debit_card: { label: 'Débito', icon: <CreditCardOutlined /> },
+    store_credit: { label: 'A prazo', icon: <CalendarOutlined /> },
+    bank_transfer: { label: 'Transferência', icon: <BankOutlined /> },
+    advance: { label: 'Sinal', icon: <TagOutlined /> },
 };
 
 // Forma de pagamento gravada no banco para cada método da tela
@@ -76,26 +56,22 @@ const FORMA_POR_METODO: Record<PaymentMethodType, FormaPagamentoPdv> = {
     advance: 'ADIANTAMENTO',
 };
 
-// 1. Defina o tipo técnico (Seguro e sem acentos)
 export type PaymentStatus = 'pending' | 'processing' | 'paid' | 'failed' | 'cancelled' | 'refunded';
 
-// 2. Crie um mapeamento de tradução (Dicionário)
 export const STATUS_LABELS: Record<PaymentStatus, string> = {
     pending: 'Pendente',
     processing: 'Processando',
     paid: 'Pago',
     failed: 'Falha',
     cancelled: 'Cancelado',
-    refunded: 'Reembolsado'
+    refunded: 'Reembolsado',
 };
 
 export interface Pagamento {
-    id: string;               // UUID para controle de lista (key no React)
-    metodo: PaymentMethodType; // Tipagem estrita em vez de string genérica
-    valor: number;            // Valor bruto
-    valorLiquido?: number;    // Valor descontando taxas (útil para o financeiro)
-    taxaAplicada?: number;    // % ou valor fixo da taxa da maquininha
-    parcelas: number;         // Padrão 1
+    id: string;
+    metodo: PaymentMethodType;
+    valor: number;
+    parcelas: number;
     // A prazo: intervalo entre parcelas e primeiro vencimento (vazio = hoje + intervalo)
     intervaloDias?: number;
     primeiroVencimento?: string;
@@ -104,25 +80,15 @@ export interface Pagamento {
     // Sinal usado (forma ADIANTAMENTO)
     idAdiantamento?: number;
     status: PaymentStatus;
-
-    // Metadados para Cartão/PIX
-    detalhes?: {
-        bandeira?: string;    // Visa, Master, etc.
-        authCode?: string;    // Código de autorização da maquininha/TEF
-        nsu?: string;         // Número sequencial único
-        chavePix?: string;    // ID da transação PIX
-    };
-
-    createdAt: Date;          // Timestamp do recebimento
-    updatedAt?: Date;         // Para quando um status muda (ex: de pendente para pago)
+    createdAt: Date;
 }
-
-
 
 interface FinalizarVendaProps {
     onBack: () => void;
     // Venda gravada: o pai limpa o carrinho e volta para a seleção
     onVendaConcluida?: () => void;
+    // Tela de pagamento visível (os atalhos de teclado só valem nela)
+    ativo?: boolean;
     total: number;
     cliente: string;
     // Cliente do cadastro (null = consumidor final)
@@ -132,17 +98,41 @@ interface FinalizarVendaProps {
     manterPrecoOrcamento?: boolean;
     // Sinais de uma origem (ex.: OS sendo entregue), além dos do cliente
     adiantamentosOrigem?: { origem: string; idOrigem: number } | null;
-    itens: ItemVenda[]; // <-- Adicione esta linha
+    itens: ItemVenda[];
 }
 
-export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, onVendaConcluida, total, cliente, clienteId, itens, idOrcamento, manterPrecoOrcamento, adiantamentosOrigem }) => {
+const brl = (v: number) => `R$ ${(Number(v) || 0).toFixed(2)}`;
+const dataBr = (iso: string) => iso.split('-').reverse().join('/');
+const numero = (v: string) => parseFloat(String(v).replace(',', '.')) || 0;
 
+// Troco em notas e moedas (sem a de 1 centavo: sobra de 1 a 4 centavos arredonda para 5)
+const notasDoTroco = (valor: number) => {
+    if (valor <= 0) return [];
+    const unidades = [100, 50, 20, 10, 5, 2, 1, 0.5, 0.25, 0.1, 0.05];
+    let resto = Math.round(valor * 100);
+    if (resto % 5) resto += 5 - (resto % 5);
+    const resultado: Array<{ valor: number; qtd: number; nota: boolean }> = [];
+    for (const v of unidades) {
+        const c = Math.round(v * 100);
+        const qtd = Math.floor(resto / c);
+        if (qtd > 0) { resultado.push({ valor: v, qtd, nota: v >= 2 }); resto %= c; }
+    }
+    return resultado;
+};
+
+// Pedido de autorização (senha + nome + motivo) aberto pelo servidor; resolve com os dados ou null
+interface PedidoAutorizacao { motivos: string[]; senhaIncorreta?: boolean; resolver: (a: AutorizacaoVenda | null) => void }
+
+export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
+    onBack, onVendaConcluida, ativo = true, total, cliente, clienteId, itens, idOrcamento, manterPrecoOrcamento, adiantamentosOrigem,
+}) => {
+    const { token } = theme.useToken();
     const [isEnviando, setIsEnviando] = useState(false);
-    const [descontoValor, setDescontoValor] = useState(0); // O valor digitado no input
+    const [descontoValor, setDescontoValor] = useState(0);
     const [tipoDesconto, setTipoDesconto] = useState<'real' | 'porcent'>('real');
     const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
     const [metodoSelecionado, setMetodoSelecionado] = useState<PaymentMethodType | null>(null);
-    const [valorInput, setValorInput] = useState<string>(''); // string agora
+    const [valorInput, setValorInput] = useState('');
     const [parcelasInput, setParcelasInput] = useState(1);
     // A prazo (crediário): gera parcelas em Financeiro › Contas a Receber
     const [intervaloPrazo, setIntervaloPrazo] = useState(30);
@@ -153,86 +143,46 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, onVendaC
     // Sinais em aberto (do cliente e da origem), usados como forma de pagamento "Sinal"
     const adiantamentos = useAdiantamentosAbertos(clienteId, adiantamentosOrigem);
     const [adiantamentoEscolhido, setAdiantamentoEscolhido] = useState<number | null>(null);
+    const [pedidoAutorizacao, setPedidoAutorizacao] = useState<PedidoAutorizacao | null>(null);
+    const [formAutorizacao] = Form.useForm<AutorizacaoVenda>();
+    // Apoio da finalização
+    const [apoio, setApoio] = useState<null | 'desconto' | 'obs' | 'comprovante' | 'config' | 'frete'>(null);
+    // Frete cobrado do cliente e o cálculo em edição no modal
+    const [frete, setFrete] = useState(0);
+    const [freteEdicao, setFreteEdicao] = useState<{ modo: 'valor' | 'km' | 'pct'; valor: number | null; km: number | null; valorKm: number | null; minimo: number | null; idaVolta: boolean; pct: number | null }>(
+        { modo: 'valor', valor: null, km: null, valorKm: null, minimo: null, idaVolta: false, pct: null });
+    const [calculadoraAberta, setCalculadoraAberta] = useState(false);
+    const [observacao, setObservacao] = useState('');
+    const [preferencias, setPreferencias] = useState<PreferenciasPdv>(lerPreferencias);
+    const [descontoEdicao, setDescontoEdicao] = useState<{ tipo: 'real' | 'porcent'; valor: number | null }>({ tipo: 'real', valor: null });
+    const mudarPreferencia = (p: Partial<PreferenciasPdv>) => setPreferencias(atual => { const novo = { ...atual, ...p }; salvarPreferencias(novo); return novo; });
+
     const saldoAdiantamento = (id: number) => {
         const a = adiantamentos.find(x => x.idAdiantamento === id);
         const usado = pagamentos.filter(p => p.idAdiantamento === id).reduce((acc, p) => acc + Number(p.valor), 0);
         return a ? Math.max(0, Math.round((a.saldo - usado) * 100) / 100) : 0;
     };
 
-    const [activeModal, setActiveModal] = useState<string | null>(null); // 'calc', 'obs', 'desc', etc.
-    // Controle da Janela Flutuante da Calculadora
-const [calcVisible, setCalcVisible] = useState(false);
-
-
-
-  const closeModal = () => setActiveModal(null);
-
-
-
-    // cliente e total já vêm do pai via props (comentário duplicado eliminado)
-
-    // Cálculos de Totais
+    // Totais: só pagamentos pagos/processando contam
     const pagamentosAtivos = pagamentos.filter(p => p.status === 'paid' || p.status === 'processing');
-    const totalPago: number = pagamentosAtivos.reduce((acc, p) => acc + (Number(p.valor) || 0), 0);
+    const totalPago = pagamentosAtivos.reduce((acc, p) => acc + (Number(p.valor) || 0), 0);
     const acrescimoTotal = Math.round(pagamentosAtivos.reduce((acc, p) => acc + (Number(p.acrescimo) || 0), 0) * 100) / 100;
     // Parte da venda coberta pelos pagamentos (sem o acréscimo do parcelamento)
     const totalCoberto = Math.round((totalPago - acrescimoTotal) * 100) / 100;
+    const descontoCalculado = tipoDesconto === 'porcent' ? (total * descontoValor) / 100 : descontoValor;
+    const totalLiquido = total - descontoCalculado + frete;
+    const saldoRestante = Math.max(0, parseFloat((totalLiquido - totalCoberto).toFixed(2)));
+    const troco = totalCoberto > totalLiquido ? totalCoberto - totalLiquido : 0;
+    const podeConcluir = totalCoberto >= totalLiquido - 0.004 && !isEnviando;
 
-
-
-    const [showChangeDetails, setShowChangeDetails] = useState(false);
-
-    // Cálculo do desconto real aplicado ao total
-    const descontoCalculado = tipoDesconto === 'porcent'
-        ? (total * descontoValor) / 100
-        : descontoValor;
-
-    const totalLiquido = total - descontoCalculado;
-    const totalPagoNum = Number(totalCoberto) || 0;
-    const totalLiquidoNum = Number(totalLiquido) || 0;
-
-    const saldoRestante = Math.max(0, parseFloat((totalLiquidoNum - totalPagoNum).toFixed(2)));
-    const troco = Number(totalCoberto) > totalLiquido ? Number(totalCoberto) - totalLiquido : 0;
-    // Estados para a Trava
-
-
-    const alterarStatusPagamento = (index: number, novoStatus: PaymentStatus) => {
-        const novosPagamentos = [...pagamentos];
-        novosPagamentos[index].status = novoStatus;
-        setPagamentos(novosPagamentos);
-    };
-
-
-  
-
-
-
-
-    // Desconto acima do limite ou venda abaixo do custo: o servidor pede autorização (senha + nome + motivo)
-    const pedirAutorizacao = async (motivos: string[], senhaIncorreta?: boolean): Promise<AutorizacaoVenda | null> => {
-        const esc = (t: string) => t.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
-        const r = await Swal.fire({
-            title: 'Autorização necessária',
-            icon: 'warning',
-            html: `${senhaIncorreta ? '<p style="color:#cf1322"><b>Senha incorreta.</b></p>' : ''}`
-                + `<div style="text-align:left;font-size:13px;margin-bottom:8px">${motivos.map(esc).join('<br>')}</div>`
-                + '<input id="aut-nome" class="swal2-input" placeholder="Quem autoriza" autocomplete="off">'
-                + '<input id="aut-senha" type="password" class="swal2-input" placeholder="Senha de autorização" autocomplete="new-password">'
-                + '<input id="aut-motivo" class="swal2-input" placeholder="Motivo (ex.: cliente antigo, queima de estoque)" autocomplete="off">',
-            focusConfirm: false,
-            showCancelButton: true,
-            confirmButtonText: 'Autorizar e concluir',
-            cancelButtonText: 'Voltar',
-            confirmButtonColor: '#28a745',
-            didOpen: () => (document.getElementById('aut-nome') as HTMLInputElement | null)?.focus(),
-            preConfirm: () => {
-                const valor = (id: string) => (document.getElementById(id) as HTMLInputElement | null)?.value.trim() || '';
-                const aut = { nome: valor('aut-nome'), senha: valor('aut-senha'), motivo: valor('aut-motivo') };
-                if (!aut.nome || !aut.senha || !aut.motivo) { Swal.showValidationMessage('Preencha quem autoriza, a senha e o motivo.'); return false; }
-                return aut;
-            },
+    const pedirAutorizacao = (motivos: string[], senhaIncorreta?: boolean) =>
+        new Promise<AutorizacaoVenda | null>(resolver => {
+            formAutorizacao.resetFields();
+            setPedidoAutorizacao({ motivos, senhaIncorreta, resolver });
         });
-        return r.isConfirmed ? (r.value as AutorizacaoVenda) : null;
+    const fecharAutorizacao = (resultado: AutorizacaoVenda | null) => {
+        pedidoAutorizacao?.resolver(resultado);
+        setPedidoAutorizacao(null);
     };
 
     const handleFinalizarVenda = async (autorizacao?: AutorizacaoVenda) => {
@@ -241,20 +191,16 @@ const [calcVisible, setCalcVisible] = useState(false);
 
         // OS e serviços ainda não são gravados pelo PDV do modelo novo
         const itensCarrinho: any[] = Array.isArray(itens) ? itens : [];
-        const naoSuportados = itensCarrinho.filter(item => isCartItemOS(item) || item.type === 'service' || item.type === 'os');
-        if (naoSuportados.length > 0) {
-            Swal.fire({
-                icon: 'info',
-                title: 'Ainda não suportado',
-                text: 'Ordens de serviço e serviços ainda não são gravados pelo PDV novo. Remova-os do carrinho para finalizar a venda dos produtos.',
-            });
+        if (itensCarrinho.some(item => isCartItemOS(item) || item.type === 'service' || item.type === 'os')) {
+            Modal.info({ title: 'Ainda não suportado', content: 'Ordens de serviço e serviços ainda não são gravados pelo PDV novo. Remova-os do carrinho para finalizar a venda dos produtos.' });
             return;
         }
 
-        const pagamentosValidos = pagamentos.filter(p => p.status === 'paid' || p.status === 'processing');
         const payload: VendaPdvPayload = {
             clienteNome: cliente || 'CONSUMIDOR',
             idCliente: clienteId ?? null,
+            ...(observacao.trim() ? { observacao: observacao.trim() } : {}),
+            ...(frete > 0 ? { frete } : {}),
             descontoGeral: Number(descontoCalculado.toFixed(2)),
             acrescimoGeral: acrescimoTotal,
             ...(idOrcamento ? { idOrcamento, manterPrecoOrcamento: Boolean(manterPrecoOrcamento) } : {}),
@@ -265,7 +211,7 @@ const [calcVisible, setCalcVisible] = useState(false);
                 // Sem desconto manual o servidor aplica a tabela (varejo/atacado) pela quantidade
                 precoUnitario: item.precoManual ? Number(item.price) : undefined,
             })),
-            pagamentos: pagamentosValidos.map(p => ({
+            pagamentos: pagamentosAtivos.map(p => ({
                 forma: FORMA_POR_METODO[p.metodo],
                 valor: Number(p.valor),
                 parcelas: p.parcelas,
@@ -280,8 +226,8 @@ const [calcVisible, setCalcVisible] = useState(false);
             caixaStore.recarregar();
             window.dispatchEvent(new CustomEvent('erp:venda-concluida', { detail: { idVenda: resposta.idVenda, idCliente: clienteId ?? null } }));
 
-            // Impressão só depois de gravada, com o número real da venda
-            imprimirExtratoElgin({
+            // Comprovante só depois de gravada, com o número real da venda (fica guardado para reimprimir/enviar)
+            const comprovante = {
                 cliente: payload.clienteNome || 'CONSUMIDOR',
                 cpf: '',
                 numero: String(resposta.idVenda),
@@ -294,27 +240,36 @@ const [calcVisible, setCalcVisible] = useState(false);
                     unidade: item.unitOfMeasure || item.unidade || 'UN',
                 })),
                 total: resposta.totalLiquido,
-                pagamentos: pagamentosValidos.map(p => ({
-                    metodo: PAYMENT_METHOD_DETAILS[p.metodo].label,
-                    valor: p.valor,
-                    parcelas: p.parcelas,
-                })),
+                pagamentos: pagamentosAtivos.map(p => ({ metodo: PAYMENT_METHOD_DETAILS[p.metodo].label, valor: p.valor, parcelas: p.parcelas })),
                 troco: resposta.troco,
-            });
+            };
+            guardarUltimoComprovante(comprovante);
+            if (preferencias.impressaoAutomatica) imprimirExtratoElgin(comprovante);
+            if (preferencias.somConfirmacao) bipConfirmacao();
 
-            await Swal.fire({
-                icon: 'success',
+            await new Promise<void>(fechar => Modal.success({
                 title: `Venda ${resposta.idVenda} finalizada!`,
-                html: `Total: <b>R$ ${resposta.totalLiquido.toFixed(2)}</b>${resposta.troco > 0 ? `<br>Troco: <b>R$ ${resposta.troco.toFixed(2)}</b>` : ''}`
-                    + (resposta.parcelas?.length
-                        ? `<br><br><b>A prazo:</b><br>${resposta.parcelas.map(p => `${p.parcela}/${p.totalParcelas} · ${p.vencimento.split('-').reverse().join('/')} · R$ ${p.valor.toFixed(2)}`).join('<br>')}`
-                        : ''),
-                confirmButtonColor: '#28a745',
-            });
+                content: (
+                    <div>
+                        Total: <b>{brl(resposta.totalLiquido)}</b>
+                        {resposta.troco > 0 && <div>Troco: <b>{brl(resposta.troco)}</b></div>}
+                        {resposta.parcelas?.length ? (
+                            <div style={{ marginTop: 8 }}>
+                                <b>A prazo:</b>
+                                {resposta.parcelas.map(p => <div key={p.parcela}>{p.parcela}/{p.totalParcelas} · {dataBr(p.vencimento)} · {brl(p.valor)}</div>)}
+                            </div>
+                        ) : null}
+                    </div>
+                ),
+                onOk: () => fechar(),
+            }));
 
             setPagamentos([]);
             setDescontoValor(0);
             setTipoDesconto('real');
+            setObservacao('');
+            setFrete(0);
+            setMetodoSelecionado(null);
             if (onVendaConcluida) onVendaConcluida();
             else onBack();
         } catch (error: any) {
@@ -324,12 +279,7 @@ const [calcVisible, setCalcVisible] = useState(false);
                 return;
             }
             if (detalhes?.codigo === 'CAIXA_FECHADO' || /caixa/i.test(String(error?.message))) { caixaStore.recarregar(); caixaStore.mostrar('abrir'); }
-            Swal.fire({
-                icon: 'error',
-                title: 'Venda não registrada',
-                text: error.message || 'Servidor offline ou falha na rede.',
-                confirmButtonColor: '#d33'
-            });
+            Modal.error({ title: 'Venda não registrada', content: error.message || 'Servidor offline ou falha na rede.' });
         } finally {
             setIsEnviando(false);
             // Autorizado: reenvia a mesma venda com a autorização (fora do try, já liberado o envio)
@@ -337,186 +287,57 @@ const [calcVisible, setCalcVisible] = useState(false);
         }
     };
 
+    // Valor sugerido = saldo restante, até o operador mexer
+    const valorRef = useRef<InputRef>(null);
+    const [usuarioInteragiu, setUsuarioInteragiu] = useState(false);
+    useEffect(() => {
+        if (metodoSelecionado && !usuarioInteragiu) setValorInput(saldoRestante.toFixed(2));
+    }, [metodoSelecionado, saldoRestante, usuarioInteragiu]);
 
+    // Na tela de pagamento, digitar número leva ao campo de valor
+    useEffect(() => {
+        if (!ativo || !metodoSelecionado) return;
+        const aoTeclar = (e: KeyboardEvent) => {
+            const alvo = e.target as HTMLElement | null;
+            if (alvo && /INPUT|TEXTAREA|SELECT/.test(alvo.tagName)) return;
+            if (/^[0-9.,]$/.test(e.key)) valorRef.current?.focus();
+        };
+        document.addEventListener('keydown', aoTeclar);
+        return () => document.removeEventListener('keydown', aoTeclar);
+    }, [ativo, metodoSelecionado]);
 
-
-
-    // Estado para controlar se o usuário já interagiu
-const valorInputRef = useRef<HTMLInputElement>(null);
-
-// Estado para controlar se o usuário já interagiu
-const [usuarioInteragiu, setUsuarioInteragiu] = useState(false);
-
-// Inicializa o valor do input com o saldo
-useEffect(() => {
-    if (metodoSelecionado && !usuarioInteragiu) {
-        setValorInput(saldoRestante.toFixed(2));
-    }
-}, [metodoSelecionado, saldoRestante, usuarioInteragiu]);
-
-// Foca o input quando o usuário pressiona qualquer tecla
-useEffect(() => {
-    const handleKeyPress = () => {
-        if (valorInputRef.current && !usuarioInteragiu) {
-            valorInputRef.current.focus();
-        }
+    const escolherMetodo = (m: PaymentMethodType | null) => {
+        setMetodoSelecionado(m);
+        setUsuarioInteragiu(false);
+        setParcelasInput(1);
+        if (!m) setValorInput('');
+        else setTimeout(() => valorRef.current?.focus({ cursor: 'all' }), 50);
     };
 
-    document.addEventListener('keydown', handleKeyPress);
-    return () => {
-        document.removeEventListener('keydown', handleKeyPress);
-    };
-}, [usuarioInteragiu]);
-
-    // Função para setar valor via botão de saldo
-    const inserirValorBotao = (valor: number) => {
-        setValorInput(valor.toFixed(2));
+    const inserirValor = (valor: number) => { setValorInput(valor.toFixed(2)); setUsuarioInteragiu(true); };
+    const teclar = (tecla: string) => {
+        if (tecla === 'C') { setValorInput(''); setUsuarioInteragiu(true); return; }
+        setValorInput(prev => {
+            const base = usuarioInteragiu ? prev : '';
+            if (tecla === '.' && base.includes('.')) return base;
+            return base + tecla;
+        });
         setUsuarioInteragiu(true);
     };
 
-    // --- RENDERIZAÇÃO DO PARCELAMENTO ATUALIZADA ---
-    const renderParcelamento = () => {
-        if (metodoSelecionado === 'store_credit') return renderPrazo();
-        if (metodoSelecionado === 'advance') {
-            return (
-                <div className="parcelas-group" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <label>Qual sinal:</label>
-                    <select className="select-parcelas" value={adiantamentoEscolhido ?? ''}
-                        onChange={e => setAdiantamentoEscolhido(Number(e.target.value) || null)}>
-                        <option value="">Escolha...</option>
-                        {adiantamentos.map(a => (
-                            <option key={a.idAdiantamento} value={a.idAdiantamento}>
-                                Nº {a.idAdiantamento} · {new Date(a.criadoEm).toLocaleDateString('pt-BR')} · disponível R$ {saldoAdiantamento(a.idAdiantamento).toFixed(2)}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-            );
-        }
-        if (metodoSelecionado !== 'credit_card') return null;
-
-        const opcoes = [];
-        for (let i = 1; i <= 12; i++) {
-            const base = parseFloat(String(valorInput).replace(',', '.')) || 0;
-            const acr = acrescimoParcelamento(taxasVenda, 'CREDITO', i, base);
-            opcoes.push(
-                <option key={i} value={i}>
-                    {i}x de R$ {((base + acr) / i).toFixed(2)} {acr > 0 ? `(+ R$ ${acr.toFixed(2)} de acréscimo)` : '(s/ juros)'}
-                </option>
-            );
-        }
-
-        return (
-            <div className="parcelas-group">
-                <label>Parcelamento:</label>
-                <select
-                    value={parcelasInput}
-                    onChange={(e) => setParcelasInput(Number(e.target.value))}
-                    className="select-parcelas"
-                >
-                    {opcoes}
-                </select>
-            </div>
-        );
-    };
-
-    // A prazo: exige cliente; parcelas, intervalo e 1º vencimento; mostra a dívida e o limite do cliente
-    const renderPrazo = () => {
-        if (!clienteId) {
-            return <div className="parcelas-group" style={{ color: '#cf1322', fontWeight: 600 }}>Identifique o cliente (F4) para vender a prazo.</div>;
-        }
-        const valor = parseFloat(String(valorInput).replace(',', '.')) || 0;
-        const s = situacaoCliente;
-        return (
-            <div className="parcelas-group" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <label>Parcelas:</label>
-                    <select value={parcelasInput} onChange={e => setParcelasInput(Number(e.target.value))} className="select-parcelas">
-                        {Array.from({ length: 12 }, (_, i) => i + 1).map(n => (
-                            <option key={n} value={n}>{n}x de R$ {(valor / n).toFixed(2)}</option>
-                        ))}
-                    </select>
-                    <label>a cada</label>
-                    <select value={intervaloPrazo} onChange={e => setIntervaloPrazo(Number(e.target.value))} className="select-parcelas">
-                        {[7, 10, 14, 15, 21, 28, 30, 45, 60].map(d => <option key={d} value={d}>{d} dias</option>)}
-                    </select>
-                    <label>1º vencimento:</label>
-                    <input type="date" value={primeiroVencimento} min={new Date().toISOString().slice(0, 10)}
-                        onChange={e => setPrimeiroVencimento(e.target.value)} title="Vazio = hoje + intervalo" />
-                </div>
-                {s && (
-                    <div style={{ fontSize: 12, color: s.bloqueado || s.qtdVencidas > 0 ? '#cf1322' : '#475569' }}>
-                        {s.bloqueado && <b>Cliente bloqueado para compras a prazo. </b>}
-                        Em aberto: <b>R$ {s.emAberto.toFixed(2)}</b>
-                        {s.qtdVencidas > 0 && <> · <b>{s.qtdVencidas} parcela(s) vencida(s)</b> (R$ {s.vencido.toFixed(2)})</>}
-                        {s.limite !== null && <> · Disponível: <b>R$ {(s.disponivel ?? 0).toFixed(2)}</b> de R$ {s.limite.toFixed(2)}</>}
-                    </div>
-                )}
-            </div>
-        );
-    };
-
-    // --- REGRA DE NEGÓCIO: CALCULADORA DE TROCO ---
-    const calcularNotasTroco = (valor: number) => {
-        if (valor <= 0) return null;
-
-        // Lista sem a moeda de 0.01
-        const unidades = [
-            { v: 100, t: 'nota' }, { v: 50, t: 'nota' }, { v: 20, t: 'nota' },
-            { v: 10, t: 'nota' }, { v: 5, t: 'nota' }, { v: 2, t: 'nota' },
-            { v: 1, t: 'moeda' }, { v: 0.5, t: 'moeda' }, { v: 0.25, t: 'moeda' },
-            { v: 0.1, t: 'moeda' }, { v: 0.05, t: 'moeda' }
-        ];
-
-        // Converte para centavos
-        let restoCentavos = Math.round(valor * 100);
-
-        // REGRA DE NEGÓCIO: Se sobrar 1, 2, 3 ou 4 centavos, arredondamos para 5 centavos
-        // para garantir que o troco seja fisicamente possível.
-        const sobraFinal = restoCentavos % 5;
-        if (sobraFinal > 0) {
-            restoCentavos = restoCentavos + (5 - sobraFinal);
-        }
-
-        const resultado: string[] = [];
-
-        unidades.forEach(unidade => {
-            const valorUnidadeCentavos = Math.round(unidade.v * 100);
-            const qtd = Math.floor(restoCentavos / valorUnidadeCentavos);
-
-            if (qtd > 0) {
-                if (unidade.t === 'nota') {
-                    resultado.push(`${qtd}x Nota de R$ ${unidade.v}`);
-                } else {
-                    const label = unidade.v >= 1 ? `R$ ${unidade.v}` : `${unidade.v * 100}¢`;
-                    resultado.push(`${qtd}x Moeda de ${label}`);
-                }
-                restoCentavos %= valorUnidadeCentavos;
-            }
-        });
-
-        return resultado;
-    };
-
     const adicionarPagamento = () => {
-        const valorNumerico = parseFloat(valorInput.replace(',', '.')) || 0;
+        const valorNumerico = numero(valorInput);
         if (valorNumerico <= 0 || !metodoSelecionado) return;
         if (metodoSelecionado === 'advance') {
-            if (!adiantamentoEscolhido) { Swal.fire({ icon: 'warning', title: 'Escolha o sinal', text: 'Selecione qual adiantamento usar.' }); return; }
+            if (!adiantamentoEscolhido) { message.warning('Selecione qual sinal usar.'); return; }
             const disponivel = saldoAdiantamento(adiantamentoEscolhido);
-            if (valorNumerico > disponivel + 0.004) {
-                Swal.fire({ icon: 'warning', title: 'Valor acima do sinal', text: `Este sinal tem R$ ${disponivel.toFixed(2)} disponível.` });
-                return;
-            }
+            if (valorNumerico > disponivel + 0.004) { message.warning(`Este sinal tem ${brl(disponivel)} disponível.`); return; }
         }
-        if (metodoSelecionado === 'store_credit' && !clienteId) {
-            Swal.fire({ icon: 'warning', title: 'Cliente obrigatório', text: 'Para vender a prazo, identifique o cliente (F4).' });
-            return;
-        }
+        if (metodoSelecionado === 'store_credit' && !clienteId) { message.warning('Para vender a prazo, identifique o cliente (F4).'); return; }
 
         const parcelasDoPagamento = metodoSelecionado === 'credit_card' ? parcelasInput : 1;
         const acrescimo = acrescimoParcelamento(taxasVenda, FORMA_POR_METODO[metodoSelecionado], parcelasDoPagamento, valorNumerico);
-        const novoPagamento: Pagamento = {
+        setPagamentos(atual => [...atual, {
             id: crypto.randomUUID(),
             metodo: metodoSelecionado,
             valor: Math.round((valorNumerico + acrescimo) * 100) / 100,
@@ -526,570 +347,395 @@ useEffect(() => {
             ...(metodoSelecionado === 'store_credit' ? { intervaloDias: intervaloPrazo, primeiroVencimento: primeiroVencimento || undefined } : {}),
             status: 'pending',
             createdAt: new Date(),
-        };
-
-        setPagamentos([...pagamentos, novoPagamento]);
-        setValorInput(''); // string, não número
-        setParcelasInput(1);
+        }]);
+        setValorInput('');
         setPrimeiroVencimento('');
-        setMetodoSelecionado(null);
+        escolherMetodo(null);
     };
 
-    const removerPagamento = (index: number) => {
-        setPagamentos(pagamentos.filter((_, i) => i !== index));
+    const alterarStatus = (id: string, status: PaymentStatus) =>
+        setPagamentos(atual => atual.map(p => (p.id === id ? { ...p, status } : p)));
+    const removerPagamento = (id: string) => setPagamentos(atual => atual.filter(p => p.id !== id));
+
+    const valorDigitado = numero(valorInput);
+    const etapaAtual = !metodoSelecionado ? 0 : valorDigitado <= 0 ? 1 : 2;
+    const metodos = (Object.keys(PAYMENT_METHOD_DETAILS) as PaymentMethodType[]).filter(m => m !== 'advance' || adiantamentos.length > 0);
+
+    // Opções que dependem da forma: parcelas do crédito, a prazo ou qual sinal
+    const opcoesDaForma = () => {
+        if (metodoSelecionado === 'advance') {
+            return (
+                <Select placeholder="Qual sinal" style={{ width: '100%' }} value={adiantamentoEscolhido ?? undefined}
+                    onChange={v => setAdiantamentoEscolhido(v ?? null)}
+                    options={adiantamentos.map(a => ({
+                        value: a.idAdiantamento,
+                        label: `Nº ${a.idAdiantamento} · ${new Date(a.criadoEm).toLocaleDateString('pt-BR')} · disponível ${brl(saldoAdiantamento(a.idAdiantamento))}`,
+                    }))} />
+            );
+        }
+        if (metodoSelecionado === 'credit_card') {
+            return (
+                <Select style={{ width: '100%' }} value={parcelasInput} onChange={setParcelasInput} popupMatchSelectWidth={false}
+                    options={Array.from({ length: 12 }, (_, i) => i + 1).map(n => {
+                        const acr = acrescimoParcelamento(taxasVenda, 'CREDITO', n, valorDigitado);
+                        return { value: n, label: `${n}x de ${brl((valorDigitado + acr) / n)} ${acr > 0 ? `(+ ${brl(acr)})` : '(sem juros)'}` };
+                    })} />
+            );
+        }
+        if (metodoSelecionado === 'store_credit') {
+            if (!clienteId) return <Alert type="error" showIcon title="Identifique o cliente (F4) para vender a prazo." />;
+            const s = situacaoCliente;
+            return (
+                <Flex vertical gap={6}>
+                    <Flex gap={6} wrap>
+                        <Select style={{ minWidth: 130, flex: 1 }} value={parcelasInput} onChange={setParcelasInput} popupMatchSelectWidth={false}
+                            options={Array.from({ length: 12 }, (_, i) => i + 1).map(n => ({ value: n, label: `${n}x de ${brl(valorDigitado / n)}` }))} />
+                        <Select style={{ width: 120 }} value={intervaloPrazo} onChange={setIntervaloPrazo}
+                            options={[7, 10, 14, 15, 21, 28, 30, 45, 60].map(d => ({ value: d, label: `a cada ${d} dias` }))} />
+                        <DatePicker format="DD/MM/YYYY" placeholder="1º vencimento" style={{ width: 140 }}
+                            value={primeiroVencimento ? dayjs(primeiroVencimento) : null}
+                            disabledDate={d => d.isBefore(dayjs(), 'day')}
+                            onChange={d => setPrimeiroVencimento(d ? d.format('YYYY-MM-DD') : '')} />
+                    </Flex>
+                    {s && (
+                        <Typography.Text type={s.bloqueado || s.qtdVencidas > 0 ? 'danger' : 'secondary'} style={{ fontSize: 12 }}>
+                            {s.bloqueado && <b>Cliente bloqueado para compras a prazo. </b>}
+                            Em aberto: <b>{brl(s.emAberto)}</b>
+                            {s.qtdVencidas > 0 && <> · <b>{s.qtdVencidas} vencida(s)</b> ({brl(s.vencido)})</>}
+                            {s.limite !== null && <> · Disponível: <b>{brl(s.disponivel ?? 0)}</b> de {brl(s.limite)}</>}
+                        </Typography.Text>
+                    )}
+                </Flex>
+            );
+        }
+        return null;
     };
 
-    const etapaAtual = !metodoSelecionado ? 1 : ((parseFloat(String(valorInput).replace(',', '.')) || 0) <= 0 ? 2 : 3);
-    const [passoEmFoco, setPassoEmFoco] = useState<number | null>(null);
-
-    return (
-
-        <div className="checkout-container">
-
-            {/* identifica o cliente em cima */}
-            <div className="checkout-header">
-                {/* <strong>Cliente: {cliente}</strong>
-
-
-                    <p>
-                        VALOR TOTAL: <strong>R$ {total.toFixed(2)}</strong>
-                    </p>
-                    <p>
-                        VALOR Pago: <strong>R$ {pagamentos.reduce((sum, p) => sum + p.valor, 0).toFixed(2)}</strong>
-                    </p> */}
-                <div className="payment-steps-guide">
-                    <span
-                        className={etapaAtual === 1 ? 'step-active' : 'step-done'}
-                        onMouseEnter={() => setPassoEmFoco(1)}
-                        onMouseLeave={() => setPassoEmFoco(null)}
-                    >
-                        {etapaAtual > 1 ? '✅' : '1.'} Escolha o método
-                    </span>
-
-                    <span className="step-arrow">→</span>
-
-                    <span
-                        className={etapaAtual === 2 ? 'step-active' : (etapaAtual > 2 ? 'step-done' : 'step-pending')}
-                        onMouseEnter={() => setPassoEmFoco(2)}
-                        onMouseLeave={() => setPassoEmFoco(null)}
-                    >
-                        {etapaAtual > 2 ? '✅' : '2.'} Insira o valor
-                    </span>
-
-                    <span className="step-arrow">→</span>
-
-                    <span
-                        className={etapaAtual === 3 ? 'step-active' : 'step-pending'}
-                        onMouseEnter={() => setPassoEmFoco(3)}
-                        onMouseLeave={() => setPassoEmFoco(null)}
-                    >
-                        3. Adicione o pagamento
-                    </span>
-                </div>
-            </div>
-
-            <div className="checkout-body">
-
-                <div className="checkout-container">
-
-
-                    {/* Guia de Passos */}
-                    <section
-                        className={`payment-methods ${metodoSelecionado ? 'section-locked' : ''} ${passoEmFoco === 1 ? 'step-highlight' : ''}`}
-                    >
-                        {/* <div className="payment-methods-header">
-                            <h4>Métodos de Pagamento</h4>
-                        </div> */}
-
-                        <div className="method-grid">
-                            {Object.entries(PAYMENT_METHOD_DETAILS).filter(([key]) => key !== 'advance' || adiantamentos.length > 0).map(([key, info]) => (
-                                <div
-                                    key={key}
-                                    className={`method-card ${metodoSelecionado === key ? 'selected' : ''} ${metodoSelecionado && metodoSelecionado !== key ? 'disabled' : ''}`}
-                                    onClick={() => !metodoSelecionado || metodoSelecionado === key ? setMetodoSelecionado(key as PaymentMethodType) : null}
-                                >
-                                    <div className="icon">{info.icon}</div>
-                                    <div className="label">{info.label}</div>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
-
-                    <div className={`payment-section `}>
-
-
-
-
-
-
-                        <section className={`payment-details ${!metodoSelecionado ? 'section-locked' : ''} ${passoEmFoco === 2 ? 'step-highlight' : ''}`}>
-
-                            <h4>
-                                {metodoSelecionado
-                                    ? `Pagamento: ${PAYMENT_METHOD_DETAILS[metodoSelecionado].label}`
-                                    : '(Selecione um método)'}
-
-                                {metodoSelecionado && (
-                                    <button
-                                        className="btn-change-method"
-                                        onClick={() => {
-                                            setMetodoSelecionado(null); // Destrava a seção de métodos
-                                            setValorInput('');           // Zera o valor
-                                        }}
-                                    >
-                                        🔄 Trocar Método de Pagamento
-                                    </button>
-                                )}
-                            </h4>
-
-                            <div className="add-payment">
-
-                                <div className="input-group">
-                                    <div>
-
-                                        <button
-                                            className='btn-add-saldo'
-                                            onClick={() => inserirValorBotao(saldoRestante)}
-                                            disabled={!metodoSelecionado}
-                                        >Saldo Restante Total →</button>
-                                        <button
-                                            className='btn-add-saldo'
-                                            onClick={() => inserirValorBotao(saldoRestante / 2)}
-                                            disabled={!metodoSelecionado}
-                                        >50% do Saldo →</button>
-
-                                        {renderParcelamento()}
-                                    </div>
-
-                                    <div className="input-with-keypad">
-
-                                        <input
-                                            ref={valorInputRef}
-                                            type="text"
-                                            value={valorInput}
-                                            onFocus={() => {
-                                                if (!usuarioInteragiu) {
-                                                    setValorInput(''); // Limpa só no primeiro foco
-                                                    setUsuarioInteragiu(true);
-                                                }
-                                            }}
-                                            onChange={(e) => {
-                                                const valor = e.target.value;
-                                                if (/^[0-9]*[.,]?[0-9]*$/.test(valor)) {
-                                                    setValorInput(valor.replace(',', '.'));
-                                                    setUsuarioInteragiu(true);
-                                                }
-                                            }}
-                                            disabled={!metodoSelecionado}
-                                            placeholder="0.00"
-                                        />
-
-                                        <div className="keypad">
-                                            {['7', '8', '9', '4', '5', '6', '1', '2', '3', '0', '.'].map((key) => (
-                                                <button
-                                                    key={key}
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setValorInput(prev => (usuarioInteragiu ? prev : '') + key);
-                                                        setUsuarioInteragiu(true);
-                                                    }}
-                                                    disabled={!metodoSelecionado}
-                                                >
-                                                    {key}
-                                                </button>
-                                            ))}
-
-                                            {/* Botão Limpar */}
-                                            <button
-                                                type="button"
-                                                onClick={() => setValorInput('')}
-                                                disabled={!metodoSelecionado}
-                                            >
-                                                C
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                            </div>
-                        </section>
-
-                        {metodoSelecionado && (() => {
-                            const forma = FORMA_POR_METODO[metodoSelecionado];
-                            const pct = descontoDaForma(taxasVenda, forma);
-                            if (pct <= 0 || pagamentos.length > 0) return null;
-                            const aplicado = tipoDesconto === 'porcent' && Math.abs(descontoValor - pct) < 0.001;
-                            return (
-                                <div className="parcelas-group" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, padding: '6px 8px', fontSize: 13 }}>
-                                    {PAYMENT_METHOD_DETAILS[metodoSelecionado].label} permite até <b>{pct.toFixed(2)}%</b> de desconto sem autorização
-                                    (R$ {(total * pct / 100).toFixed(2)}): a taxa da maquininha é menor que a embutida no preço.{' '}
-                                    {aplicado
-                                        ? <button type="button" className="btn-change-method" onClick={() => { setDescontoValor(0); setTipoDesconto('real'); }}>Remover desconto</button>
-                                        : <button type="button" className="btn-change-method" onClick={() => { setTipoDesconto('porcent'); setDescontoValor(pct); setValorInput(''); }}>Aplicar desconto</button>}
-                                </div>
-                            );
-                        })()}
-                        {metodoSelecionado === 'credit_card' && taxasVenda && parcelasInput > taxasVenda.parcelasSemJuros && (
-                            <div className="parcelas-group" style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6, padding: '6px 8px', fontSize: 13 }}>
-                                Acima de {taxasVenda.parcelasSemJuros}x sem juros: acréscimo de <b>{ajusteDaForma(taxasVenda, 'CREDITO', parcelasInput).toFixed(2)}%</b> (taxa da maquininha em {parcelasInput}x).
-                            </div>
-                        )}
-
-                        <Button onClick={adicionarPagamento} color='primary' className={`btn-add-payment ${valorInput ? '' : 'btn-disabled'} ${passoEmFoco === 3 ? 'step-highlight-btn' : ''}`}>Adicionar → (Enter)</Button>
-
-
-                        {
-                            pagamentos.length > 0 && (
-
-
-                                <Fieldset variant='card' >
-                                    {pagamentos.length > 0 && (
-                                        <div className="payment-summary">
-                                            <span>
-                                                {`Pagamento${pagamentos.length > 1 ? 's' : ''} ${pagamentos.length === 1 ? 'Adicionado' : 'Adicionados'} (${pagamentos.length})`}
-                                            </span>
-                                            <Badge color="success">
-                                                Valor PAGO: R$ {totalPago.toFixed(2)}
-                                            </Badge>
-                                        </div>
-                                    )}
-
-                                    <ul className="payment-history">
-  {pagamentos.map((p, i) => {
-    const infoMetodo = PAYMENT_METHOD_DETAILS[p.metodo];
-    const isCanceladoOuFalha = p.status === 'cancelled' || p.status === 'failed';
-
-    return (
-      <li key={p.id || i} className={isCanceladoOuFalha ? 'payment-row-disabled' : ''}>
-        {/* Número da linha à esquerda */}
-        <span className="line-number">{i + 1} {infoMetodo?.icon}</span>
-
-        <div className="payment-main-info">
-           <strong>{infoMetodo?.label}</strong>
-          <div className="payment-info">
-            <strong>R$ {(Number(p.valor) || 0).toFixed(2)}</strong>
-            <span className="payment-subtext">
-              {p.metodo === 'credit_card' ? ` (${p.parcelas}x${p.acrescimo ? `, + R$ ${p.acrescimo.toFixed(2)} de acréscimo` : ''})`
-                : p.metodo === 'advance' ? ` (Nº ${p.idAdiantamento})`
-                : p.metodo === 'store_credit' ? ` (${p.parcelas}x a cada ${p.intervaloDias || 30} dias${p.primeiroVencimento ? `, 1ª em ${p.primeiroVencimento.split('-').reverse().join('/')}` : ''})`
-                : ' (À vista)'}
-            </span>
-          </div>
-        </div>
-
-        <div className="status-workflow-wrapper">
-          <select
-            className={`select-status-inline status-select-${p.status}`}
-            value={p.status}
-            onChange={(e) => alterarStatusPagamento(i, e.target.value as PaymentStatus)}
-          >
-            <option value="pending">⏳ Pendente</option>
-            <option value="processing">🔄 Processando</option>
-            <option value="paid">✅ Pago</option>
-            <option value="failed">❌ Falha</option>
-            <option value="cancelled">🚫 Cancelado</option>
-          </select>
-
-          {p.status === 'pending' ? (
-            <button
-              className="btn-remove-line"
-              onClick={() => removerPagamento(i)}
-              title="Remover pagamento"
-            >
-              ✕
-            </button>
-          ) : (
-            <button
-              className="btn-lock-line"
-              disabled
-              title="Não é possível excluir um pagamento processado ou finalizado"
-            >
-              🔒
-            </button>
-          )}
-        </div>
-      </li>
+    // Desconto que a forma de pagamento permite sem autorização (taxa da maquininha menor que a embutida no preço).
+    // Reage ao pagamento: a forma escolhida agora ou, sem forma escolhida, a única forma já lançada.
+    const ativosOuPendentes = pagamentos.filter(p => p.status !== 'cancelled' && p.status !== 'failed');
+    const formaDoDesconto: PaymentMethodType | null = metodoSelecionado
+        ?? (ativosOuPendentes.length > 0 && ativosOuPendentes.every(p => p.metodo === ativosOuPendentes[0].metodo) ? ativosOuPendentes[0].metodo : null);
+    const pctForma = formaDoDesconto ? descontoDaForma(taxasVenda, FORMA_POR_METODO[formaDoDesconto]) : 0;
+    const rotuloFormaDesconto = formaDoDesconto ? PAYMENT_METHOD_DETAILS[formaDoDesconto].label : '';
+    const descontoFormaAplicado = pctForma > 0 && tipoDesconto === 'porcent' && Math.abs(descontoValor - pctForma) < 0.001;
+    const aplicarDescontoForma = () => { setTipoDesconto('porcent'); setDescontoValor(pctForma); setUsuarioInteragiu(false); };
+    const removerDesconto = () => { setDescontoValor(0); setTipoDesconto('real'); setUsuarioInteragiu(false); };
+    const sugestaoDescontoForma = pctForma > 0 && (
+        <Flex justify="space-between" align="center" gap={6} wrap
+            style={{ margin: '4px 0', padding: '4px 8px', borderRadius: token.borderRadius, background: token.colorSuccessBg, border: `1px solid ${token.colorSuccessBorder}` }}>
+            <Typography.Text style={{ fontSize: 12 }}>
+                {descontoFormaAplicado
+                    ? <>Desconto do {rotuloFormaDesconto} aplicado ({pctForma.toFixed(2)}%)</>
+                    : <>{rotuloFormaDesconto} permite <b>{brl(total * pctForma / 100)}</b> de desconto ({pctForma.toFixed(2)}%)</>}
+            </Typography.Text>
+            {descontoFormaAplicado
+                ? <Button size="small" onClick={removerDesconto}>Remover</Button>
+                : <Button size="small" type="primary" onClick={aplicarDescontoForma}>Aplicar</Button>}
+        </Flex>
     );
-  })}
-</ul>
-                                </Fieldset>
-                            )
-                        }
+
+    // Frete: valor direto, por km (com mínimo e ida e volta) ou % da venda
+    const calcularFrete = (f: typeof freteEdicao) => {
+        if (f.modo === 'valor') return Math.max(0, Number(f.valor) || 0);
+        if (f.modo === 'pct') return Math.round(total * (Number(f.pct) || 0)) / 100;
+        const porKm = (Number(f.km) || 0) * (f.idaVolta ? 2 : 1) * (Number(f.valorKm) || 0);
+        return porKm > 0 ? Math.round(Math.max(porKm, Number(f.minimo) || 0) * 100) / 100 : 0;
+    };
+    const freteCalculado = calcularFrete(freteEdicao);
+    const abrirFrete = () => {
+        setFreteEdicao({
+            modo: 'valor', valor: frete || null, km: null, idaVolta: false, pct: null,
+            valorKm: preferencias.freteValorKm || null, minimo: preferencias.freteMinimo || null,
+        });
+        setApoio('frete');
+    };
+    const aplicarFrete = () => {
+        if (freteEdicao.modo === 'km') mudarPreferencia({ freteValorKm: Number(freteEdicao.valorKm) || 0, freteMinimo: Number(freteEdicao.minimo) || 0 });
+        setFrete(Math.round(freteCalculado * 100) / 100);
+        setUsuarioInteragiu(false);
+        setApoio(null);
+    };
+
+    const notas = notasDoTroco(troco);
+    const linhaTotal = (rotulo: string, valor: React.ReactNode, cor?: string) => (
+        <Flex justify="space-between" align="baseline"><Typography.Text type="secondary">{rotulo}</Typography.Text><span style={{ color: cor, fontWeight: 600 }}>{valor}</span></Flex>
+    );
+
+    return (
+        <Flex vertical style={{ height: '100%', minWidth: 0, background: token.colorBgContainer }}>
+            <Flex align="center" gap={8} wrap style={{ padding: '8px 10px', borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
+                <Button icon={<ArrowLeftOutlined />} onClick={onBack}>Carrinho</Button>
+                <Steps size="small" current={etapaAtual} style={{ flex: 1, minWidth: 220 }}
+                    items={[{ title: 'Forma' }, { title: 'Valor' }, { title: 'Adicionar' }]} />
+            </Flex>
+
+            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 10 }}>
+                <Flex vertical gap={10}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(96px, 1fr))', gap: 6 }}>
+                        {metodos.map(m => {
+                            const selecionado = metodoSelecionado === m;
+                            return (
+                                <Button key={m} type={selecionado ? 'primary' : 'default'} disabled={!!metodoSelecionado && !selecionado}
+                                    onClick={() => escolherMetodo(selecionado ? null : m)}
+                                    style={{ height: 64, display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center', justifyContent: 'center' }}>
+                                    <span style={{ fontSize: 20, lineHeight: 1 }}>{PAYMENT_METHOD_DETAILS[m].icon}</span>
+                                    <span style={{ fontSize: 13 }}>{PAYMENT_METHOD_DETAILS[m].label}</span>
+                                </Button>
+                            );
+                        })}
                     </div>
 
-                    {/* Direita: PAGAMENTOS */}
-
-                    {/* <Button onClick={adicionarPagamento} color='primary' className={`btn-add-payment ${valorInput ? '' : 'btn-disabled'} ${passoEmFoco === 3 ? 'step-highlight-btn' : ''}`}>Adicionar ↓ (Enter)</Button> */}
-
-
-
-
-
-                </div>
-            </div>
-
-
-            <div className="checkout-footer">
-
-
-
-
-                <section className="totals-panel">
-
-                    <div className="action-buttons-grid">
-                       <button 
-                        className="action-card" 
-                        title="Abrir calculadora" 
-                        onClick={() => setCalcVisible(!calcVisible)}
-                    >
-                        🧮
-                        <span>Calculadora</span>
-                    </button>
-
-                        <button className="action-card" title="Imprimir ou enviar comprovante por e-mail/WhatsApp" onClick={() => setActiveModal('comprovante')}>
-                            📄
-                            <span>Comprovante</span>
-                        </button>
-
-                         <button className="action-card" title="Aplicar cupom de desconto ou código promocional" onClick={() => setActiveModal('cupom')}>
-                            🎟️
-                            <span>Cupom</span>
-                        </button>
-
-                        <button className="action-card" title="Adicionar observações ao pedido, ex: sem açúcar, embalar para presente" onClick={() => setActiveModal('obs')}>
-                            ✏️
-                            <span>Observações</span>
-                        </button>
-
-                        {/* <button className="action-card" title="Dividir conta ou pagamento entre clientes">
-                            🍽️
-                            <span>Dividir Conta</span>
-                        </button> */}
-
-                        {/* <button className="action-card" title="Aplicar desconto ou acréscimo de última hora no total da venda">
-                            🏷️
-                            <span>Desconto/Acréscimo</span>
-                        </button> */}
-
-
-                        <button className="action-card" title="Configurações avançadas, como ativar modo de emergência ou contato do suporte" onClick={() => setActiveModal('config')}>
-                            ⚙️
-                            <span>Configurações</span>
-                        </button>
-
-
-
-
-{/* Lógica de Renderização do Modal */}
-    {/* JANELA FLUTUANTE - Renderizar aqui no final para ficar sobre tudo */}
-        {calcVisible && (
-            <Draggable handle=".window-header" bounds="parent">
-                <div className="floating-window" style={{ 
-                    position: 'absolute', 
-                    top: '100px', 
-                    left: '100px', 
-                    zIndex: 9999,
-                    width: '280px',
-                    background: 'white',
-                    boxShadow: '0 8px 20px rgba(0,0,0,0.3)',
-                    borderRadius: '8px',
-                    border: '1px solid #ccc'
-                }}>
-                    <div className="window-header" style={{
-                        background: '#2c3e50',
-                        color: 'white',
-                        padding: '10px',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        cursor: 'move',
-                        borderTopLeftRadius: '8px',
-                        borderTopRightRadius: '8px'
-                    }}>
-                        <span>🧮 Calculadora</span>
-                        <button 
-                            onClick={() => setCalcVisible(false)}
-                            style={{ background: '#e74c3c', border: 'none', color: 'white', cursor: 'pointer', borderRadius: '4px', padding: '0 5px' }}
-                        >
-                            X
-                        </button>
-                    </div>
-                    <div className="window-body" style={{ padding: '15px' }}>
-                        {/* Aqui você pode inserir seu componente de calculadora real */}
-                        <input type="text" className="calc-display" style={{ width: '100%', fontSize: '20px', textAlign: 'right', marginBottom: '10px' }} value="0" readOnly />
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '5px' }}>
-                            {['7','8','9','/','4','5','6','*','1','2','3','-','0','.','=','+'].map(btn => (
-                                <button key={btn} style={{ padding: '10px' }}>{btn}</button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </Draggable>
-        )}
-
-     {activeModal && (
-    <div className="modal-overlay" onClick={closeModal}>
-        {/* onClick no overlay fecha o modal, stopPropagation no content impede fechar ao clicar dentro */}
-        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            
-            {/* --- TELA: COMPROVANTE --- */}
-            {activeModal === 'comprovante' && (
-                <div className="modal-body">
-                    <h3>📄 Opções de Comprovante</h3>
-                    <div className="options-vertical">
-                        <button onClick={() => { /* sua função de imprimir */ }}>🖨️ Reimprimir Último</button>
-                        <button>📧 Enviar por E-mail</button>
-                        <button>💬 Enviar via WhatsApp</button>
-                    </div>
-                </div>
-            )}
-
-            {/* --- TELA: CUPOM --- */}
-            {activeModal === 'cupom' && (
-                <div className="modal-body">
-                    <h3>🎟️ Aplicar Cupom</h3>
-                    <input type="text" placeholder="Digite o código do cupom..." autoFocus />
-                    <div className="modal-footer">
-                        <button className="btn-confirm">Validar Cupom</button>
-                    </div>
-                </div>
-            )}
-
-            {/* --- TELA: OBSERVAÇÕES --- */}
-            {activeModal === 'obs' && (
-                <div className="modal-body">
-                    <h3>✏️ Observações do Pedido</h3>
-                    <textarea 
-                        rows={5} 
-                        placeholder="Ex: Sem cebola, embrulhar para presente..."
-                        style={{ width: '100%', padding: '10px' }}
-                    />
-                    <div className="modal-footer">
-                        <button className="btn-confirm" onClick={closeModal}>Salvar Notas</button>
-                    </div>
-                </div>
-            )}
-
-
-            {/* --- TELA: CONFIGURAÇÕES --- */}
-            {activeModal === 'config' && (
-                <div className="modal-body">
-                    <h3>⚙️ Configurações Rápidas</h3>
-                    <div className="config-list">
-                        <label><input type="checkbox" /> Impressão Automática</label>
-                        <label><input type="checkbox" /> Som de confirmação</label>
-                        <hr />
-                        <button className="btn-danger">Suporte Técnico</button>
-                    </div>
-                </div>
-            )}
-
-            <button className="btn-close-modal" onClick={closeModal}>Fechar [Esc]</button>
-        </div>
-    </div>
-)}
-
-
-                    </div>
-
-                    <div className="status-box">
-                        {descontoCalculado > 0 && (
-                            <div className="status-item">
-                                <small>Desconto </small>
-                                <strong>- R$ {descontoCalculado.toFixed(2)}</strong>
-                            </div>
-                        )}
-                        {acrescimoTotal > 0 && (
-                            <div className="status-item">
-                                <small>Acréscimo parcel. </small>
-                                <strong>+ R$ {acrescimoTotal.toFixed(2)}</strong>
-                            </div>
-                        )}
-                        <div className={`status-item ${saldoRestante > 0 ? 'pending' : 'paid'}`}>
-                            <small>Faltando </small>
-                            <strong>R$ {saldoRestante.toFixed(2)}</strong>
-                        </div>
-                        {troco > 0 && (
-                            <div
-                                className={`status-item change changeWrapper`}
-                                onMouseEnter={() => setShowChangeDetails(true)}
-                                onMouseLeave={() => setShowChangeDetails(false)}
-                                onClick={() => setShowChangeDetails(!showChangeDetails)} // Suporte para touch
-                            >
-                                <div className='statusItem change'>
-                                    <small>Troco </small>
-                                    <strong>R$ {troco.toFixed(2)}</strong>
+                    {metodoSelecionado && (
+                        <Flex vertical gap={8} style={{ padding: 10, border: `1px solid ${token.colorPrimaryBorder}`, borderRadius: token.borderRadiusLG, background: token.colorPrimaryBg }}>
+                            <Flex justify="space-between" align="center" gap={8} wrap>
+                                <Typography.Text strong>{PAYMENT_METHOD_DETAILS[metodoSelecionado].icon} {PAYMENT_METHOD_DETAILS[metodoSelecionado].label}</Typography.Text>
+                                <Button size="small" type="link" icon={<SwapOutlined />} onClick={() => escolherMetodo(null)}>Trocar forma</Button>
+                            </Flex>
+                            <Flex gap={10} wrap align="flex-start">
+                                <Flex vertical gap={6} style={{ flex: '1 1 200px', minWidth: 0 }}>
+                                    <Input ref={valorRef} size="large" prefix="R$" value={valorInput} placeholder="0,00" inputMode="decimal"
+                                        style={{ fontSize: 22, fontWeight: 600 }}
+                                        onFocus={() => { if (!usuarioInteragiu) { setValorInput(''); setUsuarioInteragiu(true); } }}
+                                        onChange={e => { if (/^[0-9]*[.,]?[0-9]*$/.test(e.target.value)) { setValorInput(e.target.value.replace(',', '.')); setUsuarioInteragiu(true); } }}
+                                        onPressEnter={adicionarPagamento} />
+                                    <Flex gap={6}>
+                                        <Button block size="small" onClick={() => inserirValor(saldoRestante)}>Saldo todo</Button>
+                                        <Button block size="small" onClick={() => inserirValor(saldoRestante / 2)}>Metade</Button>
+                                    </Flex>
+                                    {opcoesDaForma()}
+                                </Flex>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 44px)', gap: 4 }}>
+                                    {['7', '8', '9', '4', '5', '6', '1', '2', '3', '0', '.', 'C'].map(t => (
+                                        <Button key={t} onClick={() => teclar(t)} danger={t === 'C'} style={{ height: 36, padding: 0 }}>{t}</Button>
+                                    ))}
                                 </div>
+                            </Flex>
+                            {metodoSelecionado === 'credit_card' && taxasVenda && parcelasInput > taxasVenda.parcelasSemJuros && (
+                                <Alert type="warning" showIcon
+                                    title={`Acima de ${taxasVenda.parcelasSemJuros}x sem juros: acréscimo de ${ajusteDaForma(taxasVenda, 'CREDITO', parcelasInput).toFixed(2)}% (taxa da maquininha em ${parcelasInput}x).`} />
+                            )}
+                            <Button type="primary" size="large" block disabled={valorDigitado <= 0} onClick={adicionarPagamento}>Adicionar pagamento (Enter)</Button>
+                        </Flex>
+                    )}
 
-                                {/* O BALÃO / TOOLTIP */}
-                                {showChangeDetails && (
-                                    <div className="change-calculator">
-                                        <div className="change-display">
-                                            <div className="change-header">
-                                                <span>Sugestão de Notas</span>
-                                                {(Math.round(troco * 100) % 5 !== 0) && (
-                                                    <span className="rounding-alert">
-                                                        Arredondado p/ R$ 0,05
-                                                    </span>
-                                                )}
-                                            </div>
-
-
-
-                                            <div className="change-details-grid">
-                                                {calcularNotasTroco(troco)?.map((item, i) => {
-                                                    // Pega apenas o número (ex: 100, 50, 0.5) para a cor
-                                                    const isNota = item.includes("Nota");
-
-
-                                                    // Dentro do seu .map no calcularNotasTroco
-                                                    const valorNumerico = item.replace(/[^0-9,.]/g, '').replace(',', '.');
-                                                    // Troca o ponto por hífen para o CSS não bugar (ex: 0.5 vira 0-5)
-                                                    const classeCSS = valorNumerico.replace('.', '-');
-                                                    return (
-                                                        <div
-                                                            key={i}
-                                                            className={`change-unit-item ${isNota ? 'tipo-nota' : 'tipo-moeda'} v-${classeCSS}`}
-                                                        >
-                                                            <span className="unit-label">{item.split(' de ')[1] || item}</span>
-                                                            <span className="unit-qty">{item.split('x')[0]}x</span>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                        {/* Setinha do balão */}
-                                        <div className="tooltip-arrow"></div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                    </div>
-
-
-                </section>
-
-
-                <button
-                    className="btn-confirm-sale"
-                    disabled={totalCoberto < totalLiquido - 0.004}
-                    onClick={() => handleFinalizarVenda()}                >
-
-                    CONCLUIR VENDA (F5)
-                </button>
-                 <button
-                    className="btn-SendSale"
-                    disabled={totalCoberto < totalLiquido - 0.004}
-                    onClick={() => handleFinalizarVenda()}>
-
-                    Enviar NF-e (F6)
-                    
-                </button>
+                    {pagamentos.length > 0 && (
+                        <List size="small" bordered
+                            header={<Flex justify="space-between"><Typography.Text strong>Pagamentos ({pagamentos.length})</Typography.Text><Tag color="success" style={{ margin: 0 }}>Pago {brl(totalPago)}</Tag></Flex>}
+                            dataSource={pagamentos}
+                            renderItem={(p, i) => {
+                                const inativo = p.status === 'cancelled' || p.status === 'failed';
+                                return (
+                                    <List.Item style={{ opacity: inativo ? 0.5 : 1, gap: 8, flexWrap: 'wrap' }}>
+                                        <Flex gap={8} align="center" style={{ flex: '1 1 160px', minWidth: 0 }}>
+                                            <Tag style={{ margin: 0 }}>{i + 1}</Tag>
+                                            <span style={{ fontSize: 16 }}>{PAYMENT_METHOD_DETAILS[p.metodo].icon}</span>
+                                            <Flex vertical style={{ minWidth: 0 }}>
+                                                <Typography.Text strong>{PAYMENT_METHOD_DETAILS[p.metodo].label} · {brl(p.valor)}</Typography.Text>
+                                                <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                                                    {p.metodo === 'credit_card' ? `${p.parcelas}x${p.acrescimo ? `, + ${brl(p.acrescimo)} de acréscimo` : ''}`
+                                                        : p.metodo === 'advance' ? `Sinal Nº ${p.idAdiantamento}`
+                                                            : p.metodo === 'store_credit' ? `${p.parcelas}x a cada ${p.intervaloDias || 30} dias${p.primeiroVencimento ? `, 1ª em ${dataBr(p.primeiroVencimento)}` : ''}`
+                                                                : 'À vista'}
+                                                </Typography.Text>
+                                            </Flex>
+                                        </Flex>
+                                        <Flex gap={4} align="center">
+                                            <Select size="small" value={p.status} onChange={v => alterarStatus(p.id, v)} style={{ width: 128 }}
+                                                options={(['pending', 'processing', 'paid', 'failed', 'cancelled'] as PaymentStatus[]).map(s => ({ value: s, label: STATUS_LABELS[s] }))} />
+                                            {p.status === 'pending'
+                                                ? <Tooltip title="Remover pagamento"><Button size="small" type="text" danger icon={<DeleteOutlined />} onClick={() => removerPagamento(p.id)} /></Tooltip>
+                                                : <Tooltip title="Pagamento processado ou finalizado não pode ser removido"><Button size="small" type="text" disabled icon={<LockOutlined />} /></Tooltip>}
+                                        </Flex>
+                                    </List.Item>
+                                );
+                            }} />
+                    )}
+                    {pagamentos.some(p => p.status === 'pending') && (
+                        <Alert type="info" showIcon title='Marque o pagamento como "Pago" quando confirmar o recebimento. Só pagamentos pagos ou em processamento contam no total.' />
+                    )}
+                </Flex>
             </div>
 
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(118px, 1fr))', gap: 6, padding: '8px 10px', borderTop: `1px solid ${token.colorBorderSecondary}` }}>
+                <Popover trigger="click" open={calculadoraAberta} onOpenChange={setCalculadoraAberta} title="Calculadora"
+                    content={<Calculadora onUsar={metodoSelecionado ? v => { inserirValor(v); setCalculadoraAberta(false); } : undefined} />}>
+                    <Button block icon={<CalculatorOutlined />}>Calculadora</Button>
+                </Popover>
+                <Badge dot={descontoCalculado > 0} style={{ display: 'block' }}>
+                    <Button block icon={<PercentageOutlined />}
+                        onClick={() => { setDescontoEdicao({ tipo: tipoDesconto, valor: descontoValor || null }); setApoio('desconto'); }}>Desconto</Button>
+                </Badge>
+                <Badge dot={frete > 0} style={{ display: 'block' }}>
+                    <Button block icon={<TruckOutlined />} onClick={abrirFrete}>Frete</Button>
+                </Badge>
+                <Badge dot={!!observacao.trim()} style={{ display: 'block' }}>
+                    <Button block icon={<EditOutlined />} onClick={() => setApoio('obs')}>Observações</Button>
+                </Badge>
+                <Button block icon={<FileTextOutlined />} onClick={() => setApoio('comprovante')}>Comprovante</Button>
+                <Button block icon={<SettingOutlined />} onClick={() => setApoio('config')}>Configurações</Button>
+            </div>
 
-        </div>
+            <div style={{ padding: 10, borderTop: `1px solid ${token.colorBorderSecondary}` }}>
+                {linhaTotal('Total da venda', brl(total))}
+                {descontoCalculado > 0 && linhaTotal(descontoFormaAplicado ? `Desconto do ${rotuloFormaDesconto}` : 'Desconto', `- ${brl(descontoCalculado)}`, token.colorSuccess)}
+                {sugestaoDescontoForma}
+                {frete > 0 && linhaTotal('Frete', `+ ${brl(frete)}`, token.colorInfo)}
+                {acrescimoTotal > 0 && linhaTotal('Acréscimo do parcelamento', `+ ${brl(acrescimoTotal)}`, token.colorWarning)}
+                {totalPago > 0 && linhaTotal('Pago', brl(totalPago))}
+                <Divider style={{ margin: '6px 0' }} />
+                <Flex justify="space-between" align="center" gap={8} wrap>
+                    {troco > 0 ? (
+                        <Popover title="Sugestão de troco" content={
+                            <Flex vertical gap={4}>
+                                {Math.round(troco * 100) % 5 !== 0 && <Typography.Text type="warning" style={{ fontSize: 12 }}>Arredondado para R$ 0,05</Typography.Text>}
+                                <Flex gap={4} wrap style={{ maxWidth: 240 }}>
+                                    {notas.map(n => <Tag key={n.valor} color={n.nota ? 'green' : 'gold'}>{n.qtd}x {n.valor >= 1 ? `R$ ${n.valor}` : `${Math.round(n.valor * 100)}¢`}</Tag>)}
+                                </Flex>
+                            </Flex>
+                        }>
+                            <Typography.Text strong style={{ fontSize: 20, color: token.colorPrimary, cursor: 'help' }}>Troco {brl(troco)}</Typography.Text>
+                        </Popover>
+                    ) : (
+                        <Typography.Text strong style={{ fontSize: 20, color: saldoRestante > 0 ? token.colorError : token.colorSuccess }}>
+                            {saldoRestante > 0 ? `Faltam ${brl(saldoRestante)}` : 'Pago'}
+                        </Typography.Text>
+                    )}
+                    <Button type="primary" size="large" icon={<CheckOutlined />} disabled={!podeConcluir} loading={isEnviando}
+                        onClick={() => handleFinalizarVenda()} style={{ minWidth: 180, background: podeConcluir ? token.colorSuccess : undefined }}>
+                        Concluir venda
+                    </Button>
+                </Flex>
+            </div>
 
+            <Modal open={apoio === 'desconto'} title="Desconto na venda" okText="Aplicar" cancelText="Cancelar" destroyOnHidden width={400}
+                onCancel={() => setApoio(null)}
+                onOk={() => {
+                    const v = Number(descontoEdicao.valor) || 0;
+                    const emReais = descontoEdicao.tipo === 'porcent' ? total * v / 100 : v;
+                    if (v < 0 || emReais >= total) { message.warning('O desconto precisa ser menor que o total da venda.'); return; }
+                    setTipoDesconto(descontoEdicao.tipo); setDescontoValor(v); setUsuarioInteragiu(false); setApoio(null);
+                }}
+                footer={(_, { OkBtn, CancelBtn }) => (
+                    <Flex justify="space-between">
+                        {descontoCalculado > 0
+                            ? <Button onClick={() => { setDescontoValor(0); setTipoDesconto('real'); setUsuarioInteragiu(false); setApoio(null); }}>Remover desconto</Button>
+                            : <span />}
+                        <Flex gap={8}><CancelBtn /><OkBtn /></Flex>
+                    </Flex>
+                )}>
+                <Flex vertical gap={8}>
+                    <Segmented block value={descontoEdicao.tipo} onChange={v => setDescontoEdicao(d => ({ ...d, tipo: v as 'real' | 'porcent' }))}
+                        options={[{ value: 'real', label: 'Em reais (R$)' }, { value: 'porcent', label: 'Em porcentagem (%)' }]} />
+                    <InputNumber autoFocus style={{ width: '100%' }} min={0} step={descontoEdicao.tipo === 'porcent' ? 0.5 : 1} precision={2} decimalSeparator=","
+                        prefix={descontoEdicao.tipo === 'porcent' ? '%' : 'R$'} value={descontoEdicao.valor}
+                        onChange={v => setDescontoEdicao(d => ({ ...d, valor: v }))} />
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                        Total {brl(total)}{descontoEdicao.valor ? ` → ${brl(total - (descontoEdicao.tipo === 'porcent' ? total * Number(descontoEdicao.valor) / 100 : Number(descontoEdicao.valor)))}` : ''}.
+                        Acima do limite da loja, a venda pede autorização com senha ao concluir.
+                    </Typography.Text>
+                </Flex>
+            </Modal>
 
+            <Modal open={apoio === 'frete'} title="Frete da venda" okText={freteCalculado > 0 ? `Aplicar ${brl(freteCalculado)}` : 'Aplicar'} cancelText="Cancelar"
+                destroyOnHidden width={420} onCancel={() => setApoio(null)} onOk={aplicarFrete}
+                footer={(_, { OkBtn, CancelBtn }) => (
+                    <Flex justify="space-between">
+                        {frete > 0 ? <Button onClick={() => { setFrete(0); setUsuarioInteragiu(false); setApoio(null); }}>Remover frete</Button> : <span />}
+                        <Flex gap={8}><CancelBtn /><OkBtn /></Flex>
+                    </Flex>
+                )}>
+                <Flex vertical gap={10}>
+                    <Segmented block value={freteEdicao.modo} onChange={v => setFreteEdicao(f => ({ ...f, modo: v as 'valor' | 'km' | 'pct' }))}
+                        options={[{ value: 'valor', label: 'Valor' }, { value: 'km', label: 'Por km' }, { value: 'pct', label: '% da venda' }]} />
+                    {freteEdicao.modo === 'valor' && (
+                        <InputNumber autoFocus style={{ width: '100%' }} min={0} precision={2} decimalSeparator="," prefix="R$" placeholder="Valor do frete"
+                            value={freteEdicao.valor} onChange={v => setFreteEdicao(f => ({ ...f, valor: v }))} onPressEnter={aplicarFrete} />
+                    )}
+                    {freteEdicao.modo === 'km' && (
+                        <>
+                            <Flex gap={8}>
+                                <InputNumber autoFocus style={{ flex: 1 }} min={0} precision={1} decimalSeparator="," suffix="km" placeholder="Distância"
+                                    value={freteEdicao.km} onChange={v => setFreteEdicao(f => ({ ...f, km: v }))} />
+                                <InputNumber style={{ flex: 1 }} min={0} precision={2} decimalSeparator="," prefix="R$" suffix="/km" placeholder="Valor do km"
+                                    value={freteEdicao.valorKm} onChange={v => setFreteEdicao(f => ({ ...f, valorKm: v }))} />
+                            </Flex>
+                            <Flex gap={8} align="center" justify="space-between" wrap>
+                                <Checkbox checked={freteEdicao.idaVolta} onChange={e => setFreteEdicao(f => ({ ...f, idaVolta: e.target.checked }))}>Cobrar ida e volta</Checkbox>
+                                <InputNumber style={{ width: 170 }} min={0} precision={2} decimalSeparator="," prefix="Mín. R$" placeholder="Frete mínimo"
+                                    value={freteEdicao.minimo} onChange={v => setFreteEdicao(f => ({ ...f, minimo: v }))} />
+                            </Flex>
+                            <Typography.Text type="secondary" style={{ fontSize: 12 }}>O valor do km e o mínimo ficam lembrados neste computador.</Typography.Text>
+                        </>
+                    )}
+                    {freteEdicao.modo === 'pct' && (
+                        <InputNumber autoFocus style={{ width: '100%' }} min={0} max={100} precision={2} decimalSeparator="," suffix="%" placeholder="Percentual sobre os produtos"
+                            value={freteEdicao.pct} onChange={v => setFreteEdicao(f => ({ ...f, pct: v }))} onPressEnter={aplicarFrete} />
+                    )}
+                    <Flex justify="space-between" style={{ padding: '6px 10px', borderRadius: token.borderRadius, background: token.colorFillTertiary }}>
+                        <span>Frete</span><b>{brl(freteCalculado)}</b>
+                    </Flex>
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                        O frete soma no total a pagar sem mudar o preço dos produtos. Na nota fiscal entra como outras despesas.
+                    </Typography.Text>
+                </Flex>
+            </Modal>
+
+            <Modal open={apoio === 'obs'} title="Observações da venda" okText="Salvar" cancelText="Cancelar" destroyOnHidden
+                onCancel={() => setApoio(null)} onOk={() => setApoio(null)}>
+                <Input.TextArea autoFocus rows={4} maxLength={255} showCount value={observacao} onChange={e => setObservacao(e.target.value)}
+                    placeholder="Ex.: entregar na obra, retirar amanhã, embalar para presente..." />
+            </Modal>
+
+            <Modal open={apoio === 'comprovante'} title="Comprovante da última venda" footer={null} destroyOnHidden onCancel={() => setApoio(null)}>
+                {(() => {
+                    const ultimo = ultimoComprovante();
+                    if (!ultimo) return <Typography.Text type="secondary">Nenhuma venda concluída neste computador ainda.</Typography.Text>;
+                    const texto = textoComprovante(ultimo);
+                    return (
+                        <Flex vertical gap={8}>
+                            <Typography.Paragraph style={{ whiteSpace: 'pre-line', margin: 0, padding: 8, background: token.colorFillTertiary, borderRadius: token.borderRadius, fontSize: 12 }}>
+                                {texto}
+                            </Typography.Paragraph>
+                            <Button icon={<PrinterOutlined />} onClick={() => imprimirExtratoElgin(ultimo)}>Reimprimir</Button>
+                            <Button icon={<WhatsAppOutlined />} href={`https://wa.me/?text=${encodeURIComponent(texto)}`} target="_blank">Enviar por WhatsApp</Button>
+                            <Button icon={<MailOutlined />} href={`mailto:?subject=${encodeURIComponent(`Venda Nº ${ultimo.numero}`)}&body=${encodeURIComponent(texto)}`}>Enviar por e-mail</Button>
+                        </Flex>
+                    );
+                })()}
+            </Modal>
+
+            <Modal open={apoio === 'config'} title="Configurações do PDV" footer={null} destroyOnHidden onCancel={() => setApoio(null)}>
+                <Flex vertical gap={10}>
+                    <Flex justify="space-between" align="center">
+                        <span>Imprimir o comprovante ao concluir</span>
+                        <Switch checked={preferencias.impressaoAutomatica} onChange={v => mudarPreferencia({ impressaoAutomatica: v })} />
+                    </Flex>
+                    <Flex justify="space-between" align="center">
+                        <span>Som de confirmação da venda</span>
+                        <Switch checked={preferencias.somConfirmacao} onChange={v => mudarPreferencia({ somConfirmacao: v })} />
+                    </Flex>
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>Vale para este computador.</Typography.Text>
+                </Flex>
+            </Modal>
+
+            <Modal open={!!pedidoAutorizacao} title="Autorização necessária" okText="Autorizar e concluir" cancelText="Voltar" destroyOnHidden
+                onCancel={() => fecharAutorizacao(null)}
+                onOk={() => formAutorizacao.validateFields().then(v => fecharAutorizacao({ nome: v.nome.trim(), senha: v.senha, motivo: v.motivo.trim() })).catch(() => undefined)}>
+                {pedidoAutorizacao?.senhaIncorreta && <Alert type="error" showIcon title="Senha incorreta." style={{ marginBottom: 8 }} />}
+                <Alert type="warning" style={{ marginBottom: 12 }} title={<Flex vertical>{pedidoAutorizacao?.motivos.map((m, i) => <span key={i}>{m}</span>)}</Flex>} />
+                <Form form={formAutorizacao} layout="vertical" autoComplete="off">
+                    <Form.Item name="nome" label="Quem autoriza" rules={[{ required: true, whitespace: true, message: 'Informe quem autoriza.' }]}>
+                        <Input autoFocus />
+                    </Form.Item>
+                    <Form.Item name="senha" label="Senha de autorização" rules={[{ required: true, message: 'Informe a senha.' }]}>
+                        <Input.Password autoComplete="new-password" />
+                    </Form.Item>
+                    <Form.Item name="motivo" label="Motivo" rules={[{ required: true, whitespace: true, message: 'Informe o motivo.' }]}>
+                        <Input placeholder="Ex.: cliente antigo, queima de estoque" />
+                    </Form.Item>
+                </Form>
+            </Modal>
+        </Flex>
     );
 };

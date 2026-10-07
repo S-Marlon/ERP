@@ -2,9 +2,8 @@
 // cliente do cadastro e carrinho/pagamento. A OS fica fora até existir no modelo novo.
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { Alert, Badge, Button, Input, Modal, Select, Space, Switch, Tag, Tooltip, TreeSelect, message } from 'antd';
-import { EnvironmentOutlined, InfoCircleOutlined, PlusOutlined, UserOutlined } from '@ant-design/icons';
-import styles from './PDV.module.css';
+import { Alert, Badge, Button, Drawer, Flex, FloatButton, Grid, Input, Modal, Select, Space, Switch, Tag, Tooltip, TreeSelect, Typography, message, theme } from 'antd';
+import { SearchOutlined, ShoppingCartOutlined, UserOutlined } from '@ant-design/icons';
 import { Product } from './types/product.types';
 import {
   getPdvProducts,
@@ -16,8 +15,7 @@ import { useDebounce } from './hooks/useDebounce';
 import { CartAside } from './carrinho/CartAside';
 import { FinalizarVenda } from './pagamento/FinalizarVenda';
 import { PDVProvider, usePDV } from './contexts/PDVContext';
-import ImageDisplay from '../../../shared/components/ui/ImageGallery/ImageDysplay';
-import UniversalInventory from '../../../app/layout/UniversalInventory/UniversalInventory';
+import { ListaProdutosPdv, ModoLista } from './components/ListaProdutosPdv';
 import { ClientePdvModal, formatarDocumento } from './components/ClientePdvModal';
 import { ItemPdvDrawer } from './components/ItemPdvDrawer';
 import { AvisoCaixaFechado } from '../caixa/CaixaPainel';
@@ -31,20 +29,7 @@ import { CHAVE_TROCA } from './components/ModalDevolucao';
 import { useModulos } from '../../../modulos/modulosStore';
 import { Suspense } from 'react';
 
-type DisplayMode = 'lista' | 'cards' | 'compact';
-
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
-const qtd = (v: number) => Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
-
-const destacar = (texto: string, termo: string) => {
-  if (!termo.trim()) return texto;
-  const escapado = termo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return String(texto).split(new RegExp(`(${escapado})`, 'gi')).map((parte, i) =>
-    parte.toLowerCase() === termo.toLowerCase()
-      ? <mark key={i} style={{ background: '#fde68a', padding: 0 }}>{parte}</mark>
-      : parte
-  );
-};
 
 const bip = () => {
   try {
@@ -68,7 +53,9 @@ const PDVContent: React.FC = () => {
     currentPage, setCurrentPage, itemsPerPage, setItemsPerPage,
   } = usePDV();
 
-  const [displayMode, setDisplayMode] = useState<DisplayMode>('lista');
+  const { token } = theme.useToken();
+  const [modoLista, setModoLista] = useState<ModoLista>('lista');
+  const [recarga, setRecarga] = useState(0);
   const [mostrarNaoPublicaveis, setMostrarNaoPublicaveis] = useState(false);
   const [produtos, setProdutos] = useState<Product[]>([]);
   const [totalItens, setTotalItens] = useState(0);
@@ -227,7 +214,7 @@ const PDVContent: React.FC = () => {
     onlyInStock,
     onlyActive: true,
     incluirNaoPublicaveis: mostrarNaoPublicaveis,
-  }), [buscaDebounce, selectedCategory, brand, sortOrder, currentPage, itemsPerPage, onlyInStock, mostrarNaoPublicaveis]);
+  }), [buscaDebounce, selectedCategory, brand, sortOrder, currentPage, itemsPerPage, onlyInStock, mostrarNaoPublicaveis, recarga]);
 
   useEffect(() => {
     let ativo = true;
@@ -315,116 +302,72 @@ const PDVContent: React.FC = () => {
     return () => window.removeEventListener('keydown', aoTeclar);
   }, [processarCodigo, cart.length, mostrarModalCliente, irParaPagamento]);
 
-  const colunas = [
-    {
-      header: '',
-      key: 'pictureUrl',
-      render: (item: any) => <ImageDisplay src={item.pictureUrl} size="38px" rounded="6px" />,
-    },
-    {
-      header: 'Item',
-      key: 'name',
-      render: (item: any) => (
-        <div>
-          <div style={{ fontWeight: 600 }}>{destacar(item.name, searchTerm)}</div>
-          <div style={{ fontSize: 11, color: '#64748b' }}>
-            {destacar(String(item.sku || ''), searchTerm)}{item.category ? ` · ${item.category}` : ''}{item.brand ? ` · ${item.brand}` : ''}
-          </div>
-          {item.publicavel === false && (
-            <Tooltip title={(item.motivosPublicacao || []).join(' · ')}>
-              <Tag color="gold" style={{ fontSize: 10, marginTop: 2 }}>Não publicável</Tag>
-            </Tooltip>
-          )}
-        </div>
-      ),
-    },
-    {
-      header: 'Preço',
-      key: 'price',
-      textAlign: 'right' as const,
-      render: (item: any) => (
-        <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-          <span>
-            <span style={{ fontWeight: 700, color: item.salePrice > 0 ? '#0f172a' : '#dc2626' }}>{money.format(Number(item.salePrice) || 0)}</span>
-            <span style={{ color: '#64748b', fontSize: 11 }}> /{item.unitOfMeasure || 'un'}</span>
-          </span>
-          {item.atacado && (
-            <Tooltip title={`Comprando a partir de ${qtd(item.atacado.quantidadeMinima)} ${item.unitOfMeasure || 'un'}, cada ${item.unitOfMeasure || 'un'} sai por ${money.format(item.atacado.preco)} (economia de ${Math.round((1 - item.atacado.preco / (Number(item.salePrice) || 1)) * 100)}%)`}>
-              <Tag color="green" style={{ margin: 0, fontSize: 11, fontWeight: 600 }}>
-                Atacado {qtd(item.atacado.quantidadeMinima)}+ {item.unitOfMeasure || 'un'}: {money.format(item.atacado.preco)}
-              </Tag>
-            </Tooltip>
-          )}
-        </div>
-      ),
-    },
-    {
-      header: 'Estoque',
-      key: 'stock',
-      textAlign: 'right' as const,
-      render: (item: any) => (
-        <div style={{ textAlign: 'right' }}>
-          <span style={{ fontWeight: 600, color: Number(item.currentStock) > 0 ? undefined : '#dc2626' }}>
-            {qtd(item.currentStock)} <span style={{ fontWeight: 400, color: '#64748b' }}>{item.unitOfMeasure}</span>
-          </span>
-          {item.location && <div><Tag icon={<EnvironmentOutlined />} style={{ fontSize: 10, margin: 0 }}>{item.location}</Tag></div>}
-        </div>
-      ),
-    },
-    {
-      header: '',
-      key: 'actions',
-      textAlign: 'center' as const,
-      render: (item: any) => (
-        <Space size={4}>
-          <Tooltip title="Detalhes, unidades e faixas">
-            <Button size="small" icon={<InfoCircleOutlined />} onClick={() => setItemDetalhe(item.id)} />
-          </Tooltip>
-          <Tooltip title="Adicionar ao carrinho">
-            <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => incluir(item)} />
-          </Tooltip>
-        </Space>
-      ),
-    },
-  ];
+  // Larguras: carrinho fixo ao lado da lista; janela estreita (ex.: meia tela) encolhe o carrinho e,
+  // abaixo de md, ele vira gaveta. No pagamento a lista some e o pagamento ocupa o espaço dela.
+  const telas = Grid.useBreakpoint();
+  const carrinhoEmGaveta = !telas.md;
+  const compacto = !telas.xl;
+  const larguraCarrinho = telas.xxl ? 520 : telas.xl ? 420 : telas.lg ? 380 : 330;
+  const [gavetaCarrinho, setGavetaCarrinho] = useState(false);
+  const emPagamento = estagio === 'PAGAMENTO';
+  // Transição seleção ⇄ pagamento: a lista encolhe e some enquanto o pagamento cresce (e o contrário)
+  const transicao = 'flex 0.45s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease';
+  const painel = (visivel: boolean): React.CSSProperties => ({
+    flex: visivel ? '1 1 0' : '0 0 0px', opacity: visivel ? 1 : 0, minWidth: 0, overflow: 'hidden',
+    transition: transicao, pointerEvents: visivel ? 'auto' : 'none',
+  });
+  useEffect(() => { if (emPagamento) setGavetaCarrinho(false); }, [emPagamento]);
 
-  const dadosLista = useMemo(() => produtos.map(p => ({
-    ...p,
-    price: Number(p.salePrice) || 0,
-    stock: Number(p.currentStock) || 0,
-    imageUrl: p.pictureUrl,
-    type: 'part' as const,
-  })), [produtos]);
+  const carrinho = (estilo?: React.CSSProperties) => (
+    <CartAside
+      cart={cart}
+      cliente={cliente}
+      total={total}
+      money={money}
+      updateQuantity={updateQuantity}
+      changeUnit={changeUnit}
+      removeItem={removeItem}
+      onFinalizar={() => { setGavetaCarrinho(false); irParaPagamento(); }}
+      onSuspender={suspender}
+      onOrcamento={() => setModalOrcamento(true)}
+      salvandoPedido={salvandoPedido}
+      onBack={() => setEstagio('SELECAO')}
+      estagio={estagio}
+      applyIndividualDiscount={applyIndividualDiscount}
+      style={estilo}
+    />
+  );
 
   return (
-    <div className={`${styles.PDVcontainer} ${estagio === 'PAGAMENTO' ? styles.checkoutActive : ''}`}>
+    <Flex style={{ height: 'calc(100vh - 58px)', minHeight: 420, overflow: 'hidden' }}>
       <ClientePdvModal
         open={mostrarModalCliente}
         onSelecionar={c => { selecionarCliente(c); setTimeout(() => buscaRef.current?.focus(), 50); }}
         onFechar={() => { if (!cliente) selecionarCliente(null); else setMostrarModalCliente(false); }}
       />
 
-      <main className={styles.mainContent}>
-        {estagio === 'PAGAMENTO' && <div className={styles.lockOverlay} onClick={() => setEstagio('SELECAO')} />}
+      <Flex vertical gap={8} aria-hidden={emPagamento} style={{ ...painel(!emPagamento), marginRight: emPagamento ? 0 : 8 }}>
         <AvisoCaixaFechado />
 
-        {/* Cabeçalho: cliente + busca + filtros */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 10px', background: '#fff', borderBottom: '1px solid #e2e8f0' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <Button icon={<UserOutlined />} onClick={() => setMostrarModalCliente(true)}>
-              <span style={{ fontWeight: 600 }}>{cliente || 'Consumidor Final'}</span>
-              {clienteId && clienteDocumento && <span style={{ color: '#64748b', marginLeft: 6, fontFamily: 'monospace', fontSize: 11 }}>{formatarDocumento(clienteDocumento)}</span>}
-              <span style={{ color: '#94a3b8', marginLeft: 6, fontSize: 11 }}>F4</span>
-            </Button>
-            {situacaoCliente && (situacaoCliente.emAberto > 0 || situacaoCliente.bloqueado) && (
-              <Tooltip title={`${situacaoCliente.titulos.length} parcela(s) em aberto${situacaoCliente.limite !== null ? ` · limite R$ ${situacaoCliente.limite.toFixed(2)}, disponível R$ ${(situacaoCliente.disponivel ?? 0).toFixed(2)}` : ''}`}>
-                <Tag color={situacaoCliente.bloqueado || situacaoCliente.qtdVencidas > 0 ? 'red' : 'gold'} style={{ margin: 0 }}>
-                  {situacaoCliente.bloqueado ? 'Bloqueado a prazo · ' : ''}Deve R$ {situacaoCliente.emAberto.toFixed(2)}
-                  {situacaoCliente.qtdVencidas > 0 ? ` · ${situacaoCliente.qtdVencidas} vencida(s)` : ''}
-                </Tag>
-              </Tooltip>
-            )}
-            <Space size={6}>
+        {/* Cabeçalho: cliente + ações + busca + filtros */}
+        <Flex vertical gap={8} style={{ padding: '8px 10px', background: token.colorBgContainer, borderRadius: token.borderRadiusLG, border: `1px solid ${token.colorBorderSecondary}` }}>
+          <Flex justify="space-between" align="center" gap={8} wrap>
+            <Flex align="center" gap={6} wrap style={{ minWidth: 0 }}>
+              <Button icon={<UserOutlined />} onClick={() => setMostrarModalCliente(true)} style={{ maxWidth: '100%' }}>
+                <Typography.Text strong ellipsis style={{ maxWidth: 220 }}>{cliente || 'Consumidor Final'}</Typography.Text>
+                {clienteId && clienteDocumento && <Typography.Text type="secondary" style={{ fontFamily: 'monospace', fontSize: 11 }}>{formatarDocumento(clienteDocumento)}</Typography.Text>}
+                <Typography.Text type="secondary" style={{ fontSize: 11 }}>F4</Typography.Text>
+              </Button>
+              {situacaoCliente && (situacaoCliente.emAberto > 0 || situacaoCliente.bloqueado) && (
+                <Tooltip title={`${situacaoCliente.titulos.length} parcela(s) em aberto${situacaoCliente.limite !== null ? ` · limite R$ ${situacaoCliente.limite.toFixed(2)}, disponível R$ ${(situacaoCliente.disponivel ?? 0).toFixed(2)}` : ''}`}>
+                  <Tag color={situacaoCliente.bloqueado || situacaoCliente.qtdVencidas > 0 ? 'red' : 'gold'} style={{ margin: 0 }}>
+                    {situacaoCliente.bloqueado ? 'Bloqueado a prazo · ' : ''}Deve R$ {situacaoCliente.emAberto.toFixed(2)}
+                    {situacaoCliente.qtdVencidas > 0 ? ` · ${situacaoCliente.qtdVencidas} vencida(s)` : ''}
+                  </Tag>
+                </Tooltip>
+              )}
+            </Flex>
+            <Space size={6} wrap>
               {botoesModulos.map((Botao, i) => (
                 <Suspense key={i} fallback={null}>
                   <Botao
@@ -447,34 +390,32 @@ const PDVContent: React.FC = () => {
                 <Button size="small" onClick={() => setDrawerPedidos('SUSPENSA')}>Suspensas</Button>
               </Badge>
               <Button size="small" onClick={() => setDrawerPedidos('ORCAMENTO')}>Orçamentos</Button>
-              <span style={{ fontSize: 11, color: '#94a3b8' }}>F2 finalizar · F3 buscar · F4 cliente</span>
             </Space>
-          </div>
+          </Flex>
           {origemExterna && (
-            <Alert type="info" showIcon style={{ padding: '2px 10px' }} message={origemExterna.rotulo}
+            <Alert type="info" showIcon style={{ padding: '2px 10px' }} title={origemExterna.rotulo}
               action={<Button size="small" type="link" onClick={() => setOrigemExterna(null)}>desvincular</Button>} />
           )}
           {orcamentoAtual && (
             <Alert type="info" showIcon style={{ padding: '2px 10px' }}
-              message={<span>Vendendo o <b>orçamento Nº {orcamentoAtual.id}</b> · {orcamentoAtual.manterPreco ? 'preços do orçamento mantidos' : 'preços atuais do catálogo'}</span>}
+              title={<span>Vendendo o <b>orçamento Nº {orcamentoAtual.id}</b> · {orcamentoAtual.manterPreco ? 'preços do orçamento mantidos' : 'preços atuais do catálogo'}</span>}
               action={<Button size="small" type="link" onClick={() => setOrcamentoAtual(null)}>desvincular</Button>} />
           )}
 
-          <Space.Compact style={{ width: '100%' }}>
-            <Input
-              ref={buscaRef}
-              size="large"
-              allowClear
-              autoFocus
-              placeholder="Buscar por nome, SKU ou código de barras (F3)"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
-          </Space.Compact>
+          <Input
+            ref={buscaRef}
+            size="large"
+            allowClear
+            autoFocus
+            prefix={<SearchOutlined />}
+            placeholder="Buscar por nome, SKU, código de barras ou medida (F3)"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+          />
 
-          <Space wrap size={[8, 6]}>
+          <Flex gap={8} wrap align="center">
             <TreeSelect
-              style={{ minWidth: 240 }}
+              style={{ flex: '1 1 200px', minWidth: 0, maxWidth: 320 }}
               treeData={arvoreCategorias}
               value={selectedCategory && selectedCategory !== 'Todas' ? selectedCategory : undefined}
               onChange={v => setSelectedCategory(v || 'Todas')}
@@ -483,67 +424,72 @@ const PDVContent: React.FC = () => {
               showSearch
               treeNodeFilterProp="title"
               treeDefaultExpandAll
+              popupMatchSelectWidth={false}
             />
             <Select
-              style={{ minWidth: 160 }}
+              style={{ flex: '1 1 140px', minWidth: 0, maxWidth: 220 }}
               value={brand}
               onChange={setBrand}
               options={marcas.map(m => ({ value: m, label: m === 'Todos' ? 'Todas as marcas' : m }))}
               showSearch
+              popupMatchSelectWidth={false}
             />
             <Space size={4}><Switch size="small" checked={onlyInStock} onChange={setOnlyInStock} /> Em estoque</Space>
             <Tooltip title="Provisório: inclui itens que ainda não passam na regra de publicação (ficha incompleta, família bloqueada...)">
               <Space size={4}><Switch size="small" checked={mostrarNaoPublicaveis} onChange={setMostrarNaoPublicaveis} /> Não publicáveis</Space>
             </Tooltip>
             {temFiltros && <Button size="small" onClick={limparFiltros}>Limpar filtros</Button>}
-            <span style={{ fontSize: 12, color: '#64748b' }}>{totalItens} item(ns)</span>
-          </Space>
-        </div>
+          </Flex>
+        </Flex>
 
-        <UniversalInventory
-          data={dadosLista}
-          columns={colunas}
-          loading={carregando}
-          displayMode={displayMode}
-          setDisplayMode={setDisplayMode}
-          sortOrder={sortOrder}
-          pagination={{
-            totalItems: totalItens,
-            currentPage,
-            itemsPerPage,
-            totalPages: Math.ceil(totalItens / itemsPerPage),
+        <ListaProdutosPdv
+          produtos={produtos}
+          total={totalItens}
+          carregando={carregando}
+          busca={searchTerm}
+          pagina={currentPage}
+          porPagina={itemsPerPage}
+          ordem={sortOrder}
+          modo={modoLista}
+          compacto={compacto}
+          onModo={setModoLista}
+          onPagina={(pagina, porPagina) => {
+            if (porPagina !== itemsPerPage) { setItemsPerPage(porPagina); setCurrentPage(1); } else setCurrentPage(pagina);
           }}
-          onPageChange={setCurrentPage}
-          onItemsPerPageChange={limit => { setItemsPerPage(limit); setCurrentPage(1); }}
-          onSortChange={sort => { setSortOrder(sort); setCurrentPage(1); }}
-          onRefresh={() => setCurrentPage(1)}
-          onAction={item => incluir(item)}
-          moneyFormatter={v => money.format(v)}
+          onOrdem={ordem => { setSortOrder(ordem); setCurrentPage(1); }}
+          onAtualizar={() => setRecarga(n => n + 1)}
+          onIncluir={p => incluir(p)}
+          onDetalhe={setItemDetalhe}
         />
-      </main>
+      </Flex>
 
-      <CartAside
-        cart={cart}
-        cliente={cliente}
-        itemsSubtotal={total}
-        activeTab="parts"
-        calculatedLabor={0}
-        total={total}
-        money={money}
-        updateQuantity={updateQuantity}
-        changeUnit={changeUnit}
-        removeItem={removeItem}
-        onFinalizar={irParaPagamento}
-        onSuspender={suspender}
-        onOrcamento={() => setModalOrcamento(true)}
-        salvandoPedido={salvandoPedido}
-        onBack={() => setEstagio('SELECAO')}
-        estagio={estagio}
-        applyIndividualDiscount={applyIndividualDiscount}
-      />
+      {/* Carrinho: coluna fixa ou gaveta (janela estreita). No pagamento em janela estreita, só o pagamento aparece. */}
+      {!carrinhoEmGaveta && carrinho({ flex: `0 0 ${larguraCarrinho}px`, width: larguraCarrinho })}
+      {carrinhoEmGaveta && !emPagamento && (
+        <FloatButton
+          type="primary"
+          icon={<ShoppingCartOutlined />}
+          badge={{ count: cart.length }}
+          tooltip={`Carrinho · ${money.format(total)}`}
+          onClick={() => setGavetaCarrinho(true)}
+        />
+      )}
+      <Drawer
+        open={carrinhoEmGaveta && gavetaCarrinho}
+        onClose={() => setGavetaCarrinho(false)}
+        size={Math.min(420, window.innerWidth - 24)}
+        closable={false}
+        styles={{ body: { padding: 0, display: 'flex' } }}
+      >
+        {carrinho({ flex: 1, border: 'none', borderRadius: 0 })}
+      </Drawer>
 
-      <aside className={styles.paymentSidebar}>
+      <div aria-hidden={!emPagamento} style={{
+        ...painel(emPagamento), marginLeft: emPagamento && !carrinhoEmGaveta ? 8 : 0,
+        borderRadius: token.borderRadiusLG, border: emPagamento ? `1px solid ${token.colorBorderSecondary}` : 'none',
+      }}>
         <FinalizarVenda
+          ativo={emPagamento}
           onBack={() => setEstagio('SELECAO')}
           onVendaConcluida={novaVenda}
           idOrcamento={orcamentoAtual?.id ?? null}
@@ -554,7 +500,7 @@ const PDVContent: React.FC = () => {
           clienteId={clienteId}
           itens={cart as any}
         />
-      </aside>
+      </div>
 
       <ModalSalvarOrcamento aberto={modalOrcamento} cliente={cliente} total={total} salvando={salvandoPedido}
         onFechar={() => setModalOrcamento(false)} onSalvar={salvarOrcamento} />
@@ -566,7 +512,7 @@ const PDVContent: React.FC = () => {
         onClose={() => setItemDetalhe(null)}
         onAdicionar={(p, idUnidade) => { incluir(p, idUnidade); message.success(`${p.name} adicionado.`); }}
       />
-    </div>
+    </Flex>
   );
 };
 
