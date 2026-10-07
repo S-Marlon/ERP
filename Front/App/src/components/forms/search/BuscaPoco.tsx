@@ -1,4 +1,5 @@
 // BuscaPoco.tsx (Final Integrado)
+import { API_URL as SERVIDOR } from '../../../shared/api/config';
 import React from 'react';
 
 // Importa o componente genérico e seus tipos
@@ -12,7 +13,7 @@ import ResultItem from '../../ui/ResultItem';
 import Badge from '../../ui/Badge/Badge';
 import Fieldset from '../../ui/Fieldset/Fieldset';
 
-const API_URL = 'http://localhost:3001';
+const API_URL = `${SERVIDOR}`;
 
 // ----------------- 1. TIPOS ESPECÍFICOS DE POÇO (Refletindo o DB e JOINs) -----------------
 

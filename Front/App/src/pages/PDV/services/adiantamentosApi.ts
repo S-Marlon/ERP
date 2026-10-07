@@ -1,8 +1,9 @@
 // Adiantamentos (sinais) de clientes (/api/vendas/adiantamentos)
 import { useEffect, useState } from 'react';
 import { operadorAtual } from '../caixa/caixaApi';
+import { API_URL } from '../../../shared/api/config';
 
-const API = 'http://localhost:3001/api/vendas/adiantamentos';
+const API = `${API_URL}/api/vendas/adiantamentos`;
 
 export interface Adiantamento {
   idAdiantamento: number; idCliente: number | null; cliente: string; valor: number; valorUsado: number; saldo: number;

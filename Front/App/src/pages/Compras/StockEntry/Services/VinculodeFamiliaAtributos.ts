@@ -1,4 +1,5 @@
 // VínculodeFamíliaAtributos.ts
+import { API_URL } from '../../../../shared/api/config';
 
 
 /*
@@ -6,7 +7,7 @@
 | SERVIÇO DE PRODUTOS COMERCIAIS (Vínculo de Família e Atributos)
 |--------------------------------------------------------------------------
 */
-const API_PRODUTO_COMERCIAL_URL = 'http://localhost:3001/api/catalogo/cadastros/produtos/familia';
+const API_PRODUTO_COMERCIAL_URL = `${API_URL}/api/catalogo/cadastros/produtos/familia`;
 
 export interface SalvarFamiliaAtributosPayload {
   isBatch: boolean;

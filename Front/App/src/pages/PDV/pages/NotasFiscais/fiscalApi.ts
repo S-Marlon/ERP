@@ -1,7 +1,8 @@
 // API das notas fiscais de saída (/api/fiscal): configuração, fila do dia, emissão, cancelamento e envio
 import { operadorAtual } from '../../caixa/caixaApi';
+import { API_URL } from '../../../../shared/api/config';
 
-const API = 'http://localhost:3001/api/fiscal';
+const API = `${API_URL}/api/fiscal`;
 
 export type Modelo = '65' | '55';
 export type SituacaoNota = 'AGUARDANDO' | 'SEM_NOTA' | 'DISPENSADA' | 'PROCESSANDO' | 'AUTORIZADA' | 'REJEITADA' | 'DENEGADA' | 'CANCELADA';

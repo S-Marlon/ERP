@@ -1,5 +1,6 @@
 // Notas de entrada (modelo novo): /api/compras/notas
-const API = 'http://localhost:3001/api/compras';
+import { API_URL } from '../../../shared/api/config';
+const API = `${API_URL}/api/compras`;
 
 export type SituacaoNota = 'EM_CONFERENCIA' | 'PRONTA' | 'IMPORTADA' | 'DESCARTADA';
 

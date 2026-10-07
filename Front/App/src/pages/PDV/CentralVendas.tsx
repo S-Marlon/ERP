@@ -1,5 +1,6 @@
 // Central de Vendas: faturamento, margem líquida (custo + taxas), comparação com o período anterior,
 // formas de pagamento, vendas por hora/dia, mais vendidos, caixa, a receber e atalhos do módulo.
+import { API_URL } from '../../shared/api/config';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card, Col, DatePicker, Empty, Row, Segmented, Space, Spin, Table, Tag, Tooltip, Typography, message } from 'antd';
@@ -12,7 +13,7 @@ import { caixaStore } from './caixa/caixaStore';
 import { ROTULO_FORMA } from './caixa/caixaApi';
 
 const { Text, Title } = Typography;
-const API = 'http://localhost:3001/api/vendas/painel';
+const API = `${API_URL}/api/vendas/painel`;
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const COR_FORMA: Record<string, string> = { DINHEIRO: '#52c41a', PIX: '#13c2c2', DEBITO: '#1677ff', CREDITO: '#722ed1', PRAZO: '#fa8c16', TRANSFERENCIA: '#8c8c8c' };
 

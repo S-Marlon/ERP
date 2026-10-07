@@ -1,4 +1,5 @@
-const API_BASE_URL = 'http://localhost:3001/api/parceiros/fornecedores'; // Base para fornecedores
+import { API_URL } from '../../../shared/api/config';
+const API_BASE_URL = `${API_URL}/api/parceiros/fornecedores`; // Base para fornecedores
 
 // --- INTERFACES DE SOLICITAÇÃO E RESPOSTA ---
 
@@ -144,7 +145,7 @@ export const updateFornecedor = async (id: number, dados: FornecedorEdicao, tena
 // ==========================================
 
 export const processItemXML = async (data: ProcessarItemXMLPayload): Promise<ProcessarItemXMLResponse> => {
-    const response = await fetch('http://localhost:3001/api/compras/itens/processar-xml', {
+    const response = await fetch(`${API_URL}/api/compras/itens/processar-xml`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

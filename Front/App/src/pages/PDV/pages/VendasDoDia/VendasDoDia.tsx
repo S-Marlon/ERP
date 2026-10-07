@@ -1,4 +1,5 @@
 // Vendas do dia (PDV, modelo novo): resumo do caixa, detalhe de cada venda e cancelamento com estorno de estoque.
+import { API_URL } from '../../../../shared/api/config';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button, Card, Col, Empty, Input, Row, Space, Spin, Statistic, Table, Tag, Tooltip, message } from 'antd';
 import { ReloadOutlined, StopOutlined } from '@ant-design/icons';
@@ -6,7 +7,7 @@ import Swal from 'sweetalert2';
 import { ModalDevolucao } from '../../components/ModalDevolucao';
 import { salesService, VendaResumo } from '../../services/salesService';
 
-const API_VENDAS = 'http://localhost:3001/api/vendas/pdv/vendas';
+const API_VENDAS = `${API_URL}/api/vendas/pdv/vendas`;
 
 const FORMAS: Record<string, { label: string; cor: string }> = {
   DINHEIRO: { label: 'Dinheiro', cor: 'green' },

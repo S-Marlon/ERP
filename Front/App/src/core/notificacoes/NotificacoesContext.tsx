@@ -7,6 +7,7 @@ import { listarNotas } from '../../pages/Compras/NotasEntrada/notasEntradaApi';
 import { getSaldos } from '../../pages/Estoque/api/estoqueItensApi';
 import { getPendenciasPim } from '../../pages/Catalogo/pages/PendenciasPim/pendenciasApi';
 import { getDuplicados } from '../../pages/Catalogo/pages/ItensDuplicados/duplicadosApi';
+import { API_URL } from '../../shared/api/config';
 
 const CHAVE_LIDAS = 'erp.notificacoes.lidas';
 const CHAVE_DUPLICADOS_IGNORADOS = 'erp.duplicados.ignorados';
@@ -16,7 +17,7 @@ const lerJson = <T,>(chave: string, padrao: T): T => {
 };
 
 const getPainelPrecos = async () => {
-  const r = await fetch('http://localhost:3001/api/catalogo/precos/painel?tenant_id=1&limit=1');
+  const r = await fetch(`${API_URL}/api/catalogo/precos/painel?tenant_id=1&limit=1`);
   if (!r.ok) throw new Error('painel de preços indisponível');
   return (await r.json()).resumo?.porSituacao as Record<string, number> | undefined;
 };

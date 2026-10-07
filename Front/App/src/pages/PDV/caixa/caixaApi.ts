@@ -1,7 +1,8 @@
 // API do caixa do PDV (/api/vendas/caixa e /api/vendas/caixas)
+import { API_URL } from '../../../shared/api/config';
 import { lerConfiguracoes } from '../../../core/configuracoes/configuracoes';
 
-const API = 'http://localhost:3001/api/vendas';
+const API = `${API_URL}/api/vendas`;
 
 // Sem login: o operador é o nome de Configurações › Meu Perfil (padrão ADM)
 export const operadorAtual = (): string => {

@@ -1,5 +1,6 @@
 // API do módulo Hidráulica · Montagens (/api/modulos/hidraulica/montagens)
-const API = 'http://localhost:3001/api/modulos/hidraulica/montagens';
+import { API_URL } from '../../../shared/api/config';
+const API = `${API_URL}/api/modulos/hidraulica/montagens`;
 
 export interface FichaMangueira {
   equipamento?: string; posicao?: string; bitola?: string; comprimentoM?: number | null; quantidade?: number;

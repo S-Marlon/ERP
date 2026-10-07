@@ -1,4 +1,5 @@
 // ClienteSelect.tsx (Com Integração Real com a API)
+import { API_URL as SERVIDOR } from '../../../shared/api/config';
 import React from 'react';
 import EntitySelectTabs, { EntitySelectProps } from '../../EntitySelectTabs'; 
 // Substituímos CLIENTES_MOCK e ClienteMock pela lógica de API
@@ -13,7 +14,7 @@ import Badge from '../../ui/Badge/Badge';
 // Importações de tipos e constantes
 
 // Endpoint da sua API
-const API_URL = 'http://localhost:3001'; 
+const API_URL = `${SERVIDOR}`; 
 
 // ----------------- TIPOS ESPECÍFICOS DE CLIENTE (Baseados no Retorno da API) -----------------
 

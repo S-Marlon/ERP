@@ -11,6 +11,7 @@ import { listarNotas, NotaEntrada, SITUACOES_NOTA } from './NotasEntrada/notasEn
 import { getFornecedores } from './FornecedoresList/fornecedores.api';
 import { getSaldos, ResumoSaldos, SaldoItem } from '../Estoque/api/estoqueItensApi';
 import { useListaTrabalho } from '../../core/listaTrabalho/ListaTrabalhoContext';
+import { API_URL } from '../../shared/api/config';
 
 const { Text, Title } = Typography;
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -19,7 +20,7 @@ const isoDia = (d: Date) => d.toISOString().slice(0, 10);
 const inicioMes = (deslocamento = 0) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + deslocamento); return d; };
 
 const getCustosDefasados = async (): Promise<number | null> => {
-  const r = await fetch('http://localhost:3001/api/catalogo/precos/painel?tenant_id=1&limit=1');
+  const r = await fetch(`${API_URL}/api/catalogo/precos/painel?tenant_id=1&limit=1`);
   if (!r.ok) return null;
   const d = await r.json().catch(() => null);
   return d?.resumo?.porSituacao?.CUSTO_DEFASADO ?? null;

@@ -1,4 +1,5 @@
 // BuscaContrato.tsx (Com Filtro por Tipo Implementado)
+import { API_URL as SERVIDOR } from '../../../shared/api/config';
 import React from 'react';
 import FlexGridContainer from '../../Layout/FlexGridContainer/FlexGridContainer';
 import Fieldset from '../../ui/Fieldset/Fieldset';
@@ -9,7 +10,7 @@ import EntitySelectTabs, { EntitySelectProps } from '../../EntitySelectTabs';
 
 // ... (Importações)
 
-const API_URL = 'http://localhost:3001'; 
+const API_URL = `${SERVIDOR}`; 
 
 // ----------------- 1. TIPOS ESPECÍFICOS DE CONTRATO (BASEADOS NO DB) -----------------
 

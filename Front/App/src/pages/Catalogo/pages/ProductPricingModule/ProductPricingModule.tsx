@@ -1,5 +1,6 @@
 // Precificação: painel com custo, preço de varejo, margem e situação de cada item de venda.
 // Clicar num item abre o configurador de preço dele (unidades de venda, faixas de atacado, custo defasado).
+import { API_URL } from '../../../../shared/api/config';
 import React, { useEffect, useState } from 'react';
 import { Button, Card, Col, Drawer, Empty, Input, Row, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { DollarOutlined, EditOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
@@ -38,7 +39,7 @@ const getPainel = async (f: { situacao?: string | null; busca?: string; page: nu
   const qs = new URLSearchParams({ tenant_id: '1', page: String(f.page), limit: String(f.limit) });
   if (f.situacao) qs.set('situacao', f.situacao);
   if (f.busca) qs.set('busca', f.busca);
-  const r = await fetch(`http://localhost:3001/api/catalogo/precos/painel?${qs}`);
+  const r = await fetch(`${API_URL}/api/catalogo/precos/painel?${qs}`);
   const d = await r.json().catch(() => ({}));
   if (r.status === 404) throw new Error('O servidor não conhece o painel de preços ainda: reinicie o backend (npm start).');
   if (!r.ok) throw new Error(d.error || 'Erro ao carregar o painel de preços.');

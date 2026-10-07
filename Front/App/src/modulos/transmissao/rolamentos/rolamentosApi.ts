@@ -1,5 +1,6 @@
 // Módulo Rolamentos (TRANSMISSAO_ROLAMENTOS): API e regras de SKU/nome (iguais às do backend).
-const API = 'http://localhost:3001/api/modulos/transmissao/rolamentos';
+import { API_URL } from '../../../shared/api/config';
+const API = `${API_URL}/api/modulos/transmissao/rolamentos`;
 
 export type TipoRolamento = 'RIGIDO_ESFERAS' | 'INSERCAO_UC' | 'AGULHAS' | 'ROLOS_CONICOS' | 'AUTOCOMPENSADOR' | 'ROLOS_CILINDRICOS' | 'AXIAL';
 export type CampoAtributo = 'codigo' | 'vedacao' | 'folga' | 'linha' | 'diametroInterno' | 'diametroExterno' | 'largura';

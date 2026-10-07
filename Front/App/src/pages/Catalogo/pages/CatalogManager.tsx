@@ -10,6 +10,7 @@ import {
 import { getPendenciasPim } from './PendenciasPim/pendenciasApi';
 import { getDuplicados } from './ItensDuplicados/duplicadosApi';
 import { getTipoRecursoConfig } from '../../Compras/StockEntry/tipoRecurso';
+import { API_URL } from '../../../shared/api/config';
 
 const { Text, Title } = Typography;
 
@@ -22,7 +23,7 @@ interface ResumoCatalogo {
 }
 
 const getResumo = async (): Promise<ResumoCatalogo> => {
-  const r = await fetch('http://localhost:3001/api/catalogo/resumo?tenant_id=1');
+  const r = await fetch(`${API_URL}/api/catalogo/resumo?tenant_id=1`);
   const d = await r.json().catch(() => ({}));
   if (r.status === 404) throw new Error('O servidor não conhece o resumo do catálogo ainda: reinicie o backend (npm start).');
   if (!r.ok) throw new Error(d.error || 'Erro ao carregar o resumo do catálogo.');

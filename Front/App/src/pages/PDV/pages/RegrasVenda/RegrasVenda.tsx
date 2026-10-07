@@ -3,9 +3,10 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, Button, Card, Form, Input, InputNumber, Radio, Space, Tag, Typography, message } from 'antd';
 import { LockOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
+import { API_URL } from '../../../../shared/api/config';
 
 const { Text, Title } = Typography;
-const API = 'http://localhost:3001/api/vendas/configuracoes';
+const API = `${API_URL}/api/vendas/configuracoes`;
 
 interface Regras { descontoMaxPercentual: number; politicaAbaixoCusto: 'PERMITIR' | 'AVISAR' | 'BLOQUEAR'; temSenha: boolean }
 

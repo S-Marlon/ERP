@@ -1,8 +1,9 @@
 // ==========================================
 // CLIENTES - SERVIÇO DE API DE CLIENTES
 // ==========================================
+import { API_URL } from '../../../shared/api/config';
 
-const API_BASE_URL = 'http://localhost:3001/api/parceiros'; // Ajuste conforme o prefixo da sua rota no index
+const API_BASE_URL = `${API_URL}/api/parceiros`; // Ajuste conforme o prefixo da sua rota no index
 const DEFAULT_HEADERS = { 'Content-Type': 'application/json' };
 
 const handleResponse = async <T>(response: Response, defaultError: string): Promise<T> => {

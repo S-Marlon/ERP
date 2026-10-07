@@ -2,9 +2,10 @@
 // Novo preço = custo gerencial x fator da unidade x markup x 1 / (1 - taxa de referência).
 import React, { useEffect, useState } from 'react';
 import { Alert, Button, Empty, Modal, Space, Table, Tag, Typography, message } from 'antd';
+import { API_URL } from '../../../../shared/api/config';
 
 const { Text } = Typography;
-const API = 'http://localhost:3001/api/catalogo/precos/taxa';
+const API = `${API_URL}/api/catalogo/precos/taxa`;
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 interface FaixaPrevia {

@@ -1,5 +1,6 @@
 // Estoque no modelo novo (itens_core): saldos, movimentações e ajustes — backend em /api/estoque
-const API = 'http://localhost:3001/api/estoque';
+import { API_URL } from '../../../shared/api/config';
+const API = `${API_URL}/api/estoque`;
 
 export type SituacaoSaldo = 'NEGATIVO' | 'ZERADO' | 'ABAIXO_MINIMO' | 'OK';
 export type TipoAjuste = 'ENTRADA' | 'SAIDA' | 'CONTAGEM';
@@ -144,7 +145,7 @@ export const transferirEstoque = async (payload: { de: Deposito; para: Deposito;
 
 export const getCategoriasEstoque = async (): Promise<string[]> => {
   try {
-    const r = await fetch('http://localhost:3001/api/vendas/pdv/categorias');
+    const r = await fetch(`${API_URL}/api/vendas/pdv/categorias`);
     return r.ok ? r.json() : ['Todas'];
   } catch {
     return ['Todas'];

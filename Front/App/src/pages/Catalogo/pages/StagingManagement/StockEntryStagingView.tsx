@@ -1,3 +1,4 @@
+import { API_URL } from '../../../../shared/api/config';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -44,7 +45,7 @@ import { getTipoRecursoConfig } from '../../../Compras/StockEntry/tipoRecurso';
 const { Text, Title } = Typography;
 const { Search } = Input;
 
-const API_BASE = 'http://localhost:3001/api/compras';
+const API_BASE = `${API_URL}/api/compras`;
 
 type StatusLote = 'RASCUNHO' | 'PRONTO_PARA_APROVACAO' | 'IMPORTADO' | 'DESCARTADO' | 'ERRO';
 

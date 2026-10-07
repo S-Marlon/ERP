@@ -1,8 +1,9 @@
 // services/api/products.ts
 // PDV no modelo novo (itens_core): backend em /api/vendas/pdv
 import { Product } from '../../types/product.types';
+import { API_URL } from '../../../../shared/api/config';
 
-const API_BASE_URL = 'http://localhost:3001';
+const API_BASE_URL = `${API_URL}`;
 const PDV_URL = `${API_BASE_URL}/api/vendas/pdv`;
 
 export interface ProductsResponse {

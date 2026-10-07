@@ -2,8 +2,9 @@
 import { operadorAtual } from '../caixa/caixaApi';
 import { lerConfiguracoes } from '../../../core/configuracoes/configuracoes';
 import { imprimirHtml } from '../../../core/impressao/saida';
+import { API_URL } from '../../../shared/api/config';
 
-const API = 'http://localhost:3001/api/vendas/pdv/pedidos-abertos';
+const API = `${API_URL}/api/vendas/pdv/pedidos-abertos`;
 
 export type TipoPedidoAberto = 'ORCAMENTO' | 'SUSPENSA';
 export type SituacaoPedido = 'VALIDO' | 'VENCIDO' | 'CONVERTIDO' | 'SUSPENSA';

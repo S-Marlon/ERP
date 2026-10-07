@@ -1,8 +1,9 @@
 // Quais módulos plugáveis estão ligados nesta loja (GET /api/sistema/modulos). Carregado uma vez e
 // recarregado ao ligar/desligar em Configurações › Módulos.
 import { useEffect, useSyncExternalStore } from 'react';
+import { API_URL } from '../shared/api/config';
 
-const API = 'http://localhost:3001/api/sistema/modulos';
+const API = `${API_URL}/api/sistema/modulos`;
 
 export interface ModuloInfo { codigo: string; nome: string; area: string; descricao: string; ativo: boolean }
 

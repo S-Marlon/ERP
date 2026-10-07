@@ -1,8 +1,9 @@
 // API de contas a receber (/api/financeiro/receber)
 import { useEffect, useState } from 'react';
 import { operadorAtual } from '../../PDV/caixa/caixaApi';
+import { API_URL } from '../../../shared/api/config';
 
-const API = 'http://localhost:3001/api/financeiro/receber';
+const API = `${API_URL}/api/financeiro/receber`;
 
 export type SituacaoTitulo = 'VENCIDO' | 'VENCE_HOJE' | 'A_VENCER' | 'PAGO' | 'CANCELADO';
 

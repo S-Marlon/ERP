@@ -1,5 +1,6 @@
 // Vendas › Taxas de pagamento: taxas da maquininha por forma e faixa de parcelas, qual taxa o preço de tabela
 // embute, até quantas parcelas a loja absorve e o simulador (quanto cobrar e quanto recebe em cada forma).
+import { API_URL } from '../../../../shared/api/config';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert, Button, Card, Col, Dropdown, Empty, Input, InputNumber, Row, Segmented, Select, Space, Switch, Table, Tag, Tooltip, Typography, message,
@@ -76,7 +77,7 @@ const TaxasPagamento: React.FC = () => {
 
   useEffect(() => {
     taxasApi.obter().then(aplicar).catch(e => message.error(e.message));
-    fetch('http://localhost:3001/api/vendas/configuracoes').then(r => r.json()).then(r => setTemSenha(Boolean(r.temSenha))).catch(() => undefined);
+    fetch(`${API_URL}/api/vendas/configuracoes`).then(r => r.json()).then(r => setTemSenha(Boolean(r.temSenha))).catch(() => undefined);
   }, []);
 
   const sujo = cfg !== null && fotografia(linhas, formaRef, parcelasRef, semJuros, automatico) !== salvo;

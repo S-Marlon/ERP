@@ -1,5 +1,6 @@
 // API do configurador de vendas (unidades de venda, faixas de preço e custo gerencial)
-const API_BASE_URL = 'http://localhost:3001/api/catalogo';
+import { API_URL } from '../../../../shared/api/config';
+const API_BASE_URL = `${API_URL}/api/catalogo`;
 
 export interface UnidadeVendaApi {
   sigla: string;

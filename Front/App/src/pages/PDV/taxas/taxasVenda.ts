@@ -1,8 +1,9 @@
 // Taxas dos meios de pagamento no front: mesma conta do servidor (Backend/src/routes/Venda/taxas/taxas.ts).
 // Preço de tabela embute a taxa de referência; na forma f o equivalente é tabela x (1 - t_ref) / (1 - t_f).
+import { API_URL } from '../../../shared/api/config';
 import { useEffect, useState } from 'react';
 
-const API = 'http://localhost:3001/api/vendas/taxas';
+const API = `${API_URL}/api/vendas/taxas`;
 
 // percentual = taxa da faixa; vendaPercentual = taxa % de toda venda (ex.: 3,09%); fixa = R$ por venda
 export interface TaxaPagamento { forma: string; parcelasDe: number; parcelasAte: number; percentual: number; vendaPercentual?: number; fixa: number; observacao?: string | null }

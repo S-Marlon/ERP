@@ -1,3 +1,4 @@
+import { API_URL } from '../../../../shared/api/config';
 import React, { useState, ChangeEvent, FormEvent } from "react";
 import "./CadastroCliente.css";
 import Button from "../../../ui/Button/Button";
@@ -189,7 +190,7 @@ const CadastroCliente: React.FC = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:3001/clientes', {
+      const response = await fetch(`${API_URL}/clientes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(clienteData),

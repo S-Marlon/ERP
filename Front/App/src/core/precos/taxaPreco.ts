@@ -3,8 +3,9 @@
 // O markup é líquido: depois de descontada a taxa, o preço rende o markup sobre o custo.
 // Carregada no início do app; as contas de preço do front leem o valor atual.
 import { useSyncExternalStore } from 'react';
+import { API_URL } from '../../shared/api/config';
 
-const API = 'http://localhost:3001/api/vendas/taxas';
+const API = `${API_URL}/api/vendas/taxas`;
 
 let estado = { percentual: 0, fator: 1, carregado: false };
 const ouvintes = new Set<() => void>();

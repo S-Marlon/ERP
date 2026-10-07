@@ -1,3 +1,4 @@
+import { API_URL } from '../../../../shared/api/config';
 import { 
   IAtributoGlobal, 
   CreateAttributePayload, 
@@ -8,7 +9,7 @@ import {
 } from './GlobalAttributeManager.types';
 
 // Centraliza a base apontando para o novo módulo criado no backend
-const API_BASE_URL = 'http://localhost:3001/api/catalogo';
+const API_BASE_URL = `${API_URL}/api/catalogo`;
 const DEFAULT_HEADERS = { 'Content-Type': 'application/json' };
 
 /**

@@ -1,4 +1,5 @@
-const API = 'http://localhost:3001/api/catalogo';
+import { API_URL } from '../../../../shared/api/config';
+const API = `${API_URL}/api/catalogo`;
 
 export interface ItemSuspeito {
   idItem: number;

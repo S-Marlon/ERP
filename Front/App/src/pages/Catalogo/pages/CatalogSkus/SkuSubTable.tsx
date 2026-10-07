@@ -1,3 +1,4 @@
+import { API_URL } from '../../../../shared/api/config';
 import React, { useState, useMemo, useEffect } from 'react';
 import { Table, Tag, Space, Button, Modal, Tabs, Input, InputNumber, Select, Switch, Card, Divider, message, Tooltip, Badge, Avatar } from 'antd';
 import { SwapOutlined, UserOutlined, ExclamationCircleOutlined, EditOutlined, LinkOutlined, DisconnectOutlined, SearchOutlined, PictureOutlined, ShopOutlined, CheckCircleOutlined } from '@ant-design/icons';
@@ -155,7 +156,7 @@ export const SkuSubTable: React.FC<SkuSubTableProps> = ({ parentItem, onMoveSkus
           if (skuItem.dna && skuItem.grade && skuItem.ficha) return skuItem;
 
           try {
-            const res = await fetch(`http://localhost:3001/api/catalogo/${identifier}/atributos`);
+            const res = await fetch(`${API_URL}/api/catalogo/${identifier}/atributos`);
             const response = await res.json();
             
             const atributosRetorno = response?.atributos || {};

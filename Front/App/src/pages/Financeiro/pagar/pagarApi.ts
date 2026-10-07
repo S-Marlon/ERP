@@ -1,7 +1,8 @@
 // API do contas a pagar (/api/financeiro/pagar): boletos das notas de entrada e títulos
 import { operadorAtual } from '../../PDV/caixa/caixaApi';
+import { API_URL } from '../../../shared/api/config';
 
-const API = 'http://localhost:3001/api/financeiro/pagar';
+const API = `${API_URL}/api/financeiro/pagar`;
 
 export type FormaPagamento = 'BOLETO' | 'PIX' | 'TRANSFERENCIA' | 'DINHEIRO' | 'CARTAO';
 export const FORMAS_PAGAMENTO: Array<{ value: FormaPagamento; label: string }> = [

@@ -1,5 +1,6 @@
+import { API_URL } from '../../../shared/api/config';
 import type { AtributoFicha } from '../../Catalogo/pages/CatalogSkus/CatalogSku.service';
-const API_BASE_URL = 'http://localhost:3001/api'; // Mudado para a raiz da API para facilitar o roteamento
+const API_BASE_URL = `${API_URL}/api`; // Mudado para a raiz da API para facilitar o roteamento
 
 // --- INTERFACES DE SOLICITAÇÃO E RESPOSTA ---
 

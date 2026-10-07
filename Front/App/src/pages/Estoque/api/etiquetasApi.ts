@@ -1,5 +1,6 @@
 // Dados para etiquetas: mesmo preço/unidade/GTIN do PDV (modelo novo)
-const PDV = 'http://localhost:3001/api/vendas/pdv';
+import { API_URL } from '../../../shared/api/config';
+const PDV = `${API_URL}/api/vendas/pdv`;
 
 export interface ItemEtiquetaApi {
   id: number;

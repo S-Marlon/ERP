@@ -1,6 +1,7 @@
+import { API_URL } from '../../../shared/api/config';
 import { operadorAtual } from '../caixa/caixaApi';
 
-const apiBase = 'http://localhost:3001/api/vendas/pdv';
+const apiBase = `${API_URL}/api/vendas/pdv`;
 
 // Venda no modelo novo: o backend recalcula o preço de tabela, baixa o estoque e valida os pagamentos
 export type FormaPagamentoPdv = 'DINHEIRO' | 'PIX' | 'DEBITO' | 'CREDITO' | 'PRAZO' | 'TRANSFERENCIA' | 'ADIANTAMENTO';
