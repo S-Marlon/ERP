@@ -272,8 +272,8 @@ export const montarSku = (p: {
 const mmNome = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
 
 /**
- * ROLAMENTO 6205-2RS/C3 | 25 mm × 52 mm × 15 mm | SKF — 2ª linha: "| GTOP-GBR (2ª LINHA)" (ou só "2ª LINHA" se juntada
- * num item só); sem medidas, a parte do meio sai.
+ * ROLAMENTO 6205-2RS/C3 | 25 mm × 52 mm × 15 mm | SKF — 2ª linha também só com a marca ("2ª LINHA" apenas quando
+ * juntada num item só); sem medidas, a parte do meio sai.
  */
 export const montarNome = (p: {
   codigo: string; vedacao: string; folga: string | null; linha: 1 | 2; marca: { nome: string } | null;
@@ -283,6 +283,6 @@ export const montarNome = (p: {
   const m = p.medidas;
   const medidas = m && m.d && m.D && m.B ? `${mmNome(m.d)} mm × ${mmNome(m.D)} mm × ${mmNome(m.B)} mm` : null;
   const nomeMarca = (p.marca?.nome || '').toUpperCase();
-  const marca = p.linha === 2 ? (p.mesclada || !nomeMarca ? '2ª LINHA' : `${nomeMarca} (2ª LINHA)`) : nomeMarca || null;
+  const marca = p.linha === 2 && (p.mesclada || !nomeMarca) ? '2ª LINHA' : nomeMarca || null;
   return [`ROLAMENTO ${codigo}`, medidas, marca].filter(Boolean).join(' | ');
 };

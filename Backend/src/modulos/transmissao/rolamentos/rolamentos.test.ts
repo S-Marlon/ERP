@@ -58,7 +58,7 @@ assert(montarSku({ codigo: 'HK2220', vedacao: 'ABERTO', folga: null, linha: 1, m
 assert(montarNome({ codigo: '6205', vedacao: '2RS', folga: 'C3', linha: 1, marca: { nome: 'SKF' }, medidas: { d: 25, D: 52, B: 15 } })
   === 'ROLAMENTO 6205-2RS/C3 | 25 mm × 52 mm × 15 mm | SKF', 'nome 1ª');
 assert(montarNome({ codigo: 'UC207-20', vedacao: 'ABERTO', folga: null, linha: 2, marca: { nome: 'GTOP-GBR' }, medidas: { d: 31.75, D: 72, B: 42.9 } })
-  === 'ROLAMENTO UC207-20 | 31,75 mm × 72 mm × 42,9 mm | GTOP-GBR (2ª LINHA)', 'nome UC 2ª');
+  === 'ROLAMENTO UC207-20 | 31,75 mm × 72 mm × 42,9 mm | GTOP-GBR', 'nome UC 2ª');
 assert(montarNome({ codigo: '6205', vedacao: 'ZZ', folga: null, linha: 2, marca: { nome: 'GTOP-GBR' }, medidas: null, mesclada: true }) === 'ROLAMENTO 6205-ZZ | 2ª LINHA', 'nome 2ª juntada');
 assert(montarNome({ codigo: 'HK2220', vedacao: 'ABERTO', folga: null, linha: 1, marca: { nome: 'ntn' }, medidas: null }) === 'ROLAMENTO HK2220 | NTN', 'nome sem medidas');
 assert(montarNome({ codigo: '6204', vedacao: 'ABERTO', folga: 'C3', linha: 1, marca: { nome: 'FAG' }, medidas: { d: 20, D: 47, B: 14 } })
