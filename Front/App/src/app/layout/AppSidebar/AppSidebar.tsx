@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Menu, Button, Popover, Flex, Typography, Tooltip, Badge } from "antd";
 import type { MenuProps } from "antd";
@@ -25,20 +25,41 @@ interface SidebarProps {
   toggleSidebar: () => void;
 }
 
-// Grupo com tela principal: duplo clique no nome abre o painel do módulo (um clique só abre/fecha o grupo)
-const paraItensAntd = (itens: ItemMenu[], abrirPainel: (rota: string) => void): MenuProps['items'] =>
-  itens.map(i => ({
-    key: i.key,
-    icon: i.icon,
-    label: i.children && i.rota
-      ? (
-        <Tooltip title="Duplo clique: abrir o painel" placement="right" mouseEnterDelay={0.8}>
-          <span onDoubleClick={e => { e.stopPropagation(); abrirPainel(i.rota!); }} style={{ display: 'inline-block', width: '100%' }}>{i.label}</span>
-        </Tooltip>
-      )
-      : i.label,
-    children: i.children ? paraItensAntd(i.children, abrirPainel) : undefined,
-  }));
+// Ctrl/Cmd/Shift + clique: o navegador abre o link em outra aba/janela (como na web)
+const cliqueComModificador = (e: React.MouseEvent) => e.ctrlKey || e.metaKey || e.shiftKey;
+
+// Itens viram links de verdade (<a href>), para Ctrl+clique e clique do meio abrirem em nova aba.
+// Grupo com tela principal: clicar no nome abre a tela do módulo; a setinha à direita abre/fecha o grupo.
+const paraItensAntd = (itens: ItemMenu[], abrirTela: (rota: string) => void): MenuProps['items'] =>
+  itens.map(i => {
+    const ehGrupo = !!i.children;
+    let label: React.ReactNode = i.label;
+    if (ehGrupo && i.rota) {
+      label = (
+        <a href={i.rota} style={{ color: 'inherit', display: 'inline-block', width: '100%' }}
+          onClick={e => {
+            e.stopPropagation(); // não abre/fecha o grupo
+            if (cliqueComModificador(e)) return;
+            e.preventDefault();
+            abrirTela(i.rota!);
+          }}>
+          {i.label}
+        </a>
+      );
+    } else if (!ehGrupo) {
+      label = (
+        <a href={i.key} style={{ color: 'inherit' }}
+          onClick={e => {
+            // Clique normal segue para o menu (que navega); com modificador fica com o navegador
+            if (cliqueComModificador(e)) e.stopPropagation();
+            else e.preventDefault();
+          }}>
+          {i.label}
+        </a>
+      );
+    }
+    return { key: i.key, icon: i.icon, label, children: i.children ? paraItensAntd(i.children, abrirTela) : undefined };
+  });
 
 export default function AppSidebar({ isOpen, toggleSidebar }: SidebarProps) {
   const navigate = useNavigate();
@@ -55,11 +76,15 @@ export default function AppSidebar({ isOpen, toggleSidebar }: SidebarProps) {
     [atual, menu]
   );
 
-  // Grupos abertos acompanham a navegação (sem fechar o que o usuário abriu)
+  // Um grupo aberto por vez: abrir outro fecha o anterior; a navegação abre o grupo da tela atual
   const [abertos, setAbertos] = useState<string[]>(grupoAtual ? [grupoAtual] : []);
   useEffect(() => {
-    if (grupoAtual) setAbertos(prev => (prev.includes(grupoAtual) ? prev : [...prev, grupoAtual]));
+    if (grupoAtual) setAbertos([grupoAtual]);
   }, [grupoAtual]);
+  const aoAbrirGrupo = (keys: string[]) => {
+    const novo = keys.find(k => !abertos.includes(k));
+    setAbertos(novo ? [novo] : keys);
+  };
 
   const items = useMemo(() => paraItensAntd(menu, rota => navigate(rota)), [navigate, menu]);
   const { novas } = useNotificacoes();
@@ -67,7 +92,11 @@ export default function AppSidebar({ isOpen, toggleSidebar }: SidebarProps) {
   const irPara = (rota: string) => { setConfigAberto(false); navigate(rota); };
 
   const handleMenuClick: MenuProps['onClick'] = (e) => {
-    if (!e.key.startsWith('grp:')) navigate(e.key);
+    if (e.key.startsWith('grp:')) return;
+    // Ctrl+clique fora do texto do item (ex.: no ícone) também abre em nova aba
+    const ev = e.domEvent as React.MouseEvent;
+    if (ev.ctrlKey || ev.metaKey || ev.shiftKey) window.open(e.key, '_blank');
+    else navigate(e.key);
   };
 
   // Configurações
@@ -127,7 +156,7 @@ export default function AppSidebar({ isOpen, toggleSidebar }: SidebarProps) {
           mode="inline"
           selectedKeys={atual ? [atual.item.key] : []}
           openKeys={isOpen ? abertos : undefined}
-          onOpenChange={keys => setAbertos(keys as string[])}
+          onOpenChange={keys => aoAbrirGrupo(keys as string[])}
           items={items}
           onClick={handleMenuClick}
           style={{ borderRight: 0, background: 'transparent' }}

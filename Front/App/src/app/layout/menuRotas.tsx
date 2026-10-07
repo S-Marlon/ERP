@@ -9,7 +9,7 @@ import {
 export interface ItemMenu {
   key: string;          // rota (folha) ou identificador do grupo (começa com "grp:")
   label: string;
-  rota?: string;        // grupo: tela principal do módulo (abre com duplo clique na barra lateral)
+  rota?: string;        // grupo: tela principal do módulo (abre ao clicar no nome na barra lateral)
   icon?: React.ReactNode;
   children?: ItemMenu[];
 }
