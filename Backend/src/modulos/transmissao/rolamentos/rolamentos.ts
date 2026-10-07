@@ -151,6 +151,13 @@ export const DICIONARIO: Record<string, EntradaDicionario> = {
   W: { categoria: 'MATERIAL', significado: 'aço inoxidável (SKF)' },
   NCZADO: { categoria: 'COMERCIAL', significado: 'importado e nacionalizado' },
   NACIONALIZADO: { categoria: 'COMERCIAL', significado: 'importado e nacionalizado' },
+  ABEC: { categoria: 'PRECISAO', significado: 'classe de precisão ABEC (padrão americano; o número ao lado é a classe)' },
+  AMARELA: { categoria: 'OUTRO', significado: 'cor amarela (identificação/vedação)' }, AMARELO: { categoria: 'OUTRO', significado: 'cor amarela (identificação/vedação)' },
+  AZUL: { categoria: 'OUTRO', significado: 'cor azul (identificação/vedação)' },
+  VERMELHA: { categoria: 'OUTRO', significado: 'cor vermelha (identificação/vedação)' }, VERMELHO: { categoria: 'OUTRO', significado: 'cor vermelha (identificação/vedação)' },
+  PRETA: { categoria: 'OUTRO', significado: 'cor preta (identificação/vedação)' }, PRETO: { categoria: 'OUTRO', significado: 'cor preta (identificação/vedação)' },
+  VERDE: { categoria: 'OUTRO', significado: 'cor verde (identificação/vedação)' },
+  BRANCA: { categoria: 'OUTRO', significado: 'cor branca (identificação/vedação)' }, BRANCO: { categoria: 'OUTRO', significado: 'cor branca (identificação/vedação)' },
 };
 
 /** Significado de um código: dicionário do operador, depois o padrão, depois regras (variações de vedação, graxa FAG). */
@@ -226,7 +233,7 @@ export const lerDescricao = (descricao: string, marcas: MarcaModulo[], doOperado
     const partes = palavra.split(/[-/.]+/).flatMap(p => p.split(/(?=#)/)).filter(Boolean);
     const lidas = partes.map(p => significadoSufixo(p, doOperador));
     const doCodigo = i === 0 && colado;
-    const pareceMarca = !doCodigo && /^[A-Z][A-Z/-]{1,}$/.test(palavra) && !RUIDO.has(palavra) && lidas.every(s => !s.significado);
+    const pareceMarca = !doCodigo && /^[A-Z][A-Z/-]{2,}$/.test(palavra) && !RUIDO.has(palavra) && lidas.every(s => !s.significado);
     if (pareceMarca) {
       if (!achada && !marcaTexto) marcaTexto = palavra.split('/')[0];
       return;
@@ -337,4 +344,27 @@ export const padroesComMedidas = (): Array<{ codigo: string; tipo: TipoRolamento
     ...de(S22, 'AUTOCOMPENSADOR'), ...de(S302, 'ROLOS_CONICOS'), ...de(S320, 'ROLOS_CONICOS'), ...de(S511, 'AXIAL'),
     ...uc,
   ].filter(p => p.medidas);
+};
+
+/**
+ * Lê a linha da nota usando a descrição e, quando ela não traz o código do rolamento (fornecedor que põe a descrição
+ * útil no código do produto e uma descrição genérica igual para todas as linhas), o código do fornecedor.
+ * A marca é procurada nos dois.
+ */
+export const lerLinhaNota = (
+  descricao: string, codigoFornecedor: string | null | undefined, marcas: MarcaModulo[], doOperador: Record<string, string> = {},
+): LeituraRolamento & { origem: 'DESCRICAO' | 'CODIGO_FORNECEDOR' } => {
+  const pelaDescricao = lerDescricao(descricao, marcas, doOperador);
+  const cprod = String(codigoFornecedor || '').trim();
+  if (pelaDescricao.codigo || !cprod) return { ...pelaDescricao, origem: 'DESCRICAO' };
+  const peloCodigo = lerDescricao(cprod, marcas, doOperador);
+  if (!peloCodigo.codigo) return { ...pelaDescricao, origem: 'DESCRICAO' };
+  return {
+    ...peloCodigo,
+    ehRolamento: peloCodigo.ehRolamento || /\bROLAMENTO/i.test(descricao),
+    codigoCompleto: cprod.toUpperCase(),
+    marca: peloCodigo.marca ?? pelaDescricao.marca,
+    marcaTexto: peloCodigo.marca || pelaDescricao.marca ? null : peloCodigo.marcaTexto ?? pelaDescricao.marcaTexto,
+    origem: 'CODIGO_FORNECEDOR',
+  };
 };

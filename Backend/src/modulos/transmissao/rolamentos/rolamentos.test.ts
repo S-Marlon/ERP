@@ -130,3 +130,18 @@ console.log('rolamentos: ok');
   assert(p17.includes('6003'), `padrões 17x?x10 ${p17.join()}`);
   console.log('busca por medidas: ok');
 }
+
+// Fornecedor que põe a descrição útil no código do produto e uma descrição genérica igual em todas as linhas
+{
+  const { lerLinhaNota } = require('./rolamentos');
+  const generica = 'ROLAMENTOS DE ACO CARBONO DE ESFERAS DE CARGA RADIAL';
+  const l = lerLinhaNota(generica, '608 2RS CS ABEC 13 - AMARELA', []);
+  assert(l.origem === 'CODIGO_FORNECEDOR' && l.ehRolamento && l.codigo === '608' && l.vedacao === '2RS', `cProd ${JSON.stringify(l)}`);
+  assert(l.marcaTexto === null && l.codigoCompleto === '608 2RS CS ABEC 13 - AMARELA', `sem marca inventada ${JSON.stringify(l)}`);
+  const naoSei = l.sufixos.filter((x: any) => !x.significado).map((x: any) => x.codigo).join(',');
+  assert(naoSei === 'CS,13', `desconhecidos ${naoSei}`);
+  // Descrição boa continua mandando; código numérico do fornecedor não atrapalha
+  const boa = lerLinhaNota('ROLAMENTO 6200 2RS GTOP-GBR', '000000021956A', []);
+  assert(boa.origem === 'DESCRICAO' && boa.codigo === '6200', 'descrição normal');
+  console.log('código do fornecedor: ok');
+}

@@ -2,7 +2,7 @@
 // medidas aprendidas e a análise das linhas da nota de entrada. O cadastro em si usa a entrada de NF do núcleo.
 import { Request, Response } from 'express';
 import pool from '../../../routes/Estoque/db.config';
-import { DICIONARIO, filtrarPorMedidas, lerDescricao, padroesComMedidas, MarcaModulo, medidasDoCodigo, montarNome, montarSku, nomeFamiliaDoCodigo, TipoRolamento, TIPOS } from './rolamentos';
+import { DICIONARIO, filtrarPorMedidas, lerDescricao, lerLinhaNota, padroesComMedidas, MarcaModulo, medidasDoCodigo, montarNome, montarSku, nomeFamiliaDoCodigo, TipoRolamento, TIPOS } from './rolamentos';
 
 const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || req.body?.tenant_id || 1);
 const erro = (res: Response, error: any, padrao: string, status = 500) => {
@@ -158,12 +158,12 @@ export const salvarMarca = async (req: Request, res: Response) => {
 // POST /api/modulos/transmissao/rolamentos/analisar { linhas: [{ chave, descricao }] }
 export const analisarLinhas = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
-  const linhas: Array<{ chave: string; descricao: string }> = Array.isArray(req.body?.linhas) ? req.body.linhas : [];
+  const linhas: Array<{ chave: string; descricao: string; codigoFornecedor?: string | null }> = Array.isArray(req.body?.linhas) ? req.body.linhas : [];
   try {
     const [config, marcas, aprendidas] = await Promise.all([carregarConfig(tenant), carregarMarcas(tenant), medidasAprendidas(tenant)]);
     const porCodigo = new Map<string, MedidaAprendida>(aprendidas.map(m => [String(m.codigo).toUpperCase(), m]));
     const resultado = linhas.map(l => {
-      const leitura = lerDescricao(String(l.descricao || ''), marcas, config.sufixos || {});
+      const leitura = lerLinhaNota(String(l.descricao || ''), l.codigoFornecedor, marcas, config.sufixos || {});
       const aprendida = leitura.codigo ? porCodigo.get(leitura.codigo.toUpperCase()) : undefined;
       const tabela = leitura.codigo ? medidasDoCodigo(leitura.tipo, leitura.codigo) : null;
       const medidas = aprendida && aprendida.d !== null ? { d: aprendida.d, D: aprendida.D ?? 0, B: aprendida.B ?? 0 } : tabela;

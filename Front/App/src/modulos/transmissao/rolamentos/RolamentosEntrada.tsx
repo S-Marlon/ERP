@@ -34,6 +34,8 @@ interface Linha {
   d: number | null; D: number | null; B: number | null;
   origemMedidas: 'TABELA' | 'APRENDIDA' | 'MANUAL' | null;
   codigoCompleto: string | null;
+  // Lido do código do fornecedor (descrição genérica na nota)
+  doCodigoFornecedor: boolean;
   sufixos: Sufixo[];
 }
 
@@ -60,7 +62,7 @@ const RolamentosEntrada: React.FC<EntradaNfExtensaoProps> = ({ linhas: linhasNot
     try {
       const [cfg, analise] = await Promise.all([
         rolamentosApi.config(),
-        rolamentosApi.analisar(linhasNota.map(l => ({ chave: String(l.tempId), descricao: String(l.descricao || '') }))),
+        rolamentosApi.analisar(linhasNota.map(l => ({ chave: String(l.tempId), descricao: String(l.descricao || ''), codigoFornecedor: l.sku || null }))),
       ]);
       setConfig(cfg.configuracao);
       setMarcas(cfg.marcas);
@@ -76,7 +78,7 @@ const RolamentosEntrada: React.FC<EntradaNfExtensaoProps> = ({ linhas: linhasNot
           tipo: a.tipo, codigo: a.codigo || '', vedacao: a.vedacao || 'ABERTO', folga: a.folga,
           idMarca: a.marca?.id ?? null, marcaTexto: a.marca ? null : a.marcaTexto, linha: a.linha,
           d: a.medidas?.d ?? null, D: a.medidas?.D ?? null, B: a.medidas?.B ?? null, origemMedidas: a.origemMedidas,
-          codigoCompleto: a.codigoCompleto, sufixos: a.sufixos || [],
+          codigoCompleto: a.codigoCompleto, sufixos: a.sufixos || [], doCodigoFornecedor: a.origem === 'CODIGO_FORNECEDOR',
         };
       }));
     } catch (e) {
@@ -295,6 +297,13 @@ const RolamentosEntrada: React.FC<EntradaNfExtensaoProps> = ({ linhas: linhasNot
                 render: (_, l) => (
                   <div style={{ lineHeight: 1.25 }}>
                     <Text style={{ fontSize: 12 }}>{l.nItem ? `${l.nItem}. ` : ''}{l.item.descricao}</Text>
+                    {l.doCodigoFornecedor && (
+                      <div>
+                        <Tooltip title="A descrição da nota não traz o código do rolamento: a leitura foi feita pelo código do produto do fornecedor">
+                          <Tag color="geekblue" style={{ fontSize: 10, marginTop: 2 }}>lido do cód. forn.: {l.item.sku}</Tag>
+                        </Tooltip>
+                      </div>
+                    )}
                     {l.jaVinculada && <div><Tag color="purple" style={{ fontSize: 10, marginTop: 2 }}>já vinculada: {l.jaVinculada}</Tag></div>}
                     {l.sufixos.length > 0 && (
                       <div style={{ marginTop: 3, display: 'flex', flexWrap: 'wrap', gap: 2 }}>

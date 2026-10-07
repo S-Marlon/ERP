@@ -40,7 +40,7 @@ export interface Sufixo { codigo: string; categoria: string | null; significado:
 
 export interface LinhaAnalisada {
   chave: string; ehRolamento: boolean; tipo: TipoRolamento | null; codigo: string | null; vedacao: string; folga: string | null;
-  codigoCompleto: string | null; prefixo: string | null; sufixos: Sufixo[]; marca: MarcaModulo | null; marcaTexto: string | null; linha: 1 | 2 | null;
+  codigoCompleto: string | null; prefixo: string | null; sufixos: Sufixo[]; origem?: 'DESCRICAO' | 'CODIGO_FORNECEDOR'; marca: MarcaModulo | null; marcaTexto: string | null; linha: 1 | 2 | null;
   medidas: Medidas | null; origemMedidas: 'TABELA' | 'APRENDIDA' | null; sku: string | null; nome: string | null;
 }
 export interface ItemExistente { idItem: number; sku: string; nome: string; tipoRecurso: string; unidadeBase: string | null }
@@ -62,7 +62,7 @@ export const rolamentosApi = {
   }>(`${API}/config`, undefined, 'Erro ao carregar a configuração de rolamentos.'),
   salvarConfig: (configuracao: ConfigRolamentos) => requisitar<{ configuracao: ConfigRolamentos }>(`${API}/config`, json('PUT', { configuracao }), 'Erro ao salvar a configuração.'),
   salvarMarca: (idMarca: number, linha: 1 | 2 | null, apelidos: string) => requisitar(`${API}/marcas/${idMarca}`, json('PUT', { linha, apelidos }), 'Erro ao salvar a marca.'),
-  analisar: (linhas: Array<{ chave: string; descricao: string }>) =>
+  analisar: (linhas: Array<{ chave: string; descricao: string; codigoFornecedor?: string | null }>) =>
     requisitar<{ linhas: LinhaAnalisada[]; existentes: Record<string, ItemExistente>; configuracao: ConfigRolamentos }>(`${API}/analisar`, json('POST', { linhas }), 'Erro ao analisar.'),
   dicionario: () => requisitar<Array<{ codigo: string; categoria: string; significado: string }>>(`${API}/dicionario`, undefined, 'Erro ao carregar o dicionário.'),
   skus: (skus: string[]) => requisitar<{ existentes: Record<string, ItemExistente> }>(`${API}/skus`, json('POST', { skus }), 'Erro ao verificar SKUs.'),
