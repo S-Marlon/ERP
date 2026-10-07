@@ -9,7 +9,7 @@ financeiro (receber/pagar), nota fiscal de saída e módulos plugáveis por loja
 |---|---|---|
 | Backend (Express + MySQL 5.7, porta 3001) | `Backend/` | `npm run dev` (nodemon, recarrega sozinho) |
 | Front (React 18 + antd 6 + Vite, porta 5173) | `Front/App/` | `npm run dev` |
-| Typecheck backend | `Backend/` | `npx tsc --noEmit -p .` (só deve sobrar o erro antigo de `src/tests/stock-audit.ts`) |
+| Typecheck backend | `Backend/` | `npx tsc --noEmit -p .` (só deve sobrar o erro antigo de `src/scripts/stock-audit.ts`) |
 | Typecheck front | `Front/App/` | `npx tsc --noEmit -p tsconfig.app.json` (há erros antigos; não aumente) |
 | Build de produção | `Front/App/` | `npx vite build` |
 | Teste backend | `Backend/` | `npx ts-node caminho/arquivo.test.ts` (alguns exportam `runXxxTests()`) |
@@ -48,25 +48,45 @@ por essa conexão (commit/rollback viram no-op), chamar os controllers com `req/
 - antd 6: `destroyOnHidden`, `styles={{ body: ... }}`, `popupMatchSelectWidth`; ícones de `@ant-design/icons`.
 - Dinheiro: arredondar por linha antes de somar; `decimal(18,4)` no banco.
 
-## Mapa das áreas
-Veja o `README.md` de cada área para os arquivos de entrada e as tabelas.
+## Estrutura de pastas
+Backend e front seguem a mesma divisão por área de negócio:
 
-| Área | Backend | Front | Tabelas principais |
+```
+Backend/src/
+  server.ts, rotas.ts      entrada do servidor e montagem de todas as rotas
+  areas/<area>/            rotas, controllers, regras puras e testes de cada área
+  modulos/                 módulos plugáveis (registro.ts + <area>/<assunto>/)
+  infra/db.ts              pool do MySQL
+  scripts/                 auditorias e testes avulsos (fora do nodemon)
+Front/App/src/
+  main.tsx                 entrada do Vite (+ index.css, forms.css globais)
+  app/                     App, AppLayout (rotas e menu) e layout/
+  areas/<area>/            telas + xApi.ts + regras puras de cada área
+  modulos/                 módulos plugáveis (registroModulos.tsx + <area>/<assunto>/)
+  shared/                  api/config.ts (API_URL), components, context, core, utils, types
+docs/                      planos e decisões; docs/legado guarda material antigo
+```
+
+## Mapa das áreas
+| Área | Backend (`Backend/src/`) | Front (`Front/App/src/`) | Tabelas principais |
 |---|---|---|---|
-| Vendas (PDV, caixa, orçamentos, devoluções, taxas, regras, painel) | `Backend/src/routes/Venda` | `Front/App/src/pages/PDV` | `vendas_*` |
-| Notas fiscais de saída (NFC-e/NF-e) | `Backend/src/routes/Fiscal` | `Front/App/src/pages/PDV/pages/NotasFiscais` | `fiscal_*` |
-| Financeiro (receber, pagar) | `Backend/src/routes/Financeiro` | `Front/App/src/pages/Financeiro` | `financeiro_*` |
-| Entrada de NF (staging) | `Backend/src/routes/Compras` | `Front/App/src/pages/Compras/StockEntry` | `importacoes_lotes`, `importacao_produtos_staging` |
-| Catálogo / PIM | `Backend/src/routes/Catalogo` | `Front/App/src/pages/Catalogo` | `itens_core`, `comercial_*`, `atributos_*` |
-| Estoque | `Backend/src/routes/EstoqueItens` | `Front/App/src/pages/Estoque` | `estoque_movimentos`, `estoque_saldos_itens` |
-| Parceiros (clientes, fornecedores) | `Backend/src/routes/Parceiros` | `Front/App/src/pages/Parceiros`, `pages/Compras/FornecedoresList` | `pessoas_*` |
-| Módulo Hidráulica · Montagens | `Backend/src/modulos/hidraulica/montagens` | `Front/App/src/modulos/hidraulica/montagens` | `modulo_hidraulica_montagens_*` |
-| Módulo Transmissão · Rolamentos | `Backend/src/modulos/transmissao/rolamentos` | `Front/App/src/modulos/transmissao/rolamentos` | `modulo_transmissao_rolamentos_*` |
+| Vendas (PDV, caixa, orçamentos, devoluções, taxas, regras, painel) | `areas/vendas` | `areas/vendas` (`pdv`, `caixa`, `orcamentos`, `taxas`, `regras`, `painel`, `vendasDoDia`) | `vendas_*` |
+| Notas fiscais de saída (NFC-e/NF-e) | `areas/fiscal` | `areas/fiscal/notasSaida` | `fiscal_*` |
+| Financeiro (receber, pagar) | `areas/financeiro` | `areas/financeiro` | `financeiro_*` |
+| Entrada de NF (staging) | `areas/compras` | `areas/compras/entradaNf`, `areas/compras/notasEntrada` | `importacoes_lotes`, `importacao_produtos_staging` |
+| Catálogo / PIM | `areas/catalogo` | `areas/catalogo` (`skus`, `familias`, `categorias`, `atributos`, `marcas`, `precos`, `staging`…) | `itens_core`, `comercial_*`, `atributos_*` |
+| Estoque | `areas/estoque` | `areas/estoque` | `estoque_movimentos`, `estoque_saldos_itens` |
+| Parceiros (clientes, fornecedores) | `areas/parceiros` | `areas/parceiros` (`fornecedores`), `areas/clientes` | `pessoas_*` |
+| Módulo Hidráulica · Montagens | `modulos/hidraulica/montagens` | `modulos/hidraulica/montagens` | `modulo_hidraulica_montagens_*` |
+| Módulo Transmissão · Rolamentos | `modulos/transmissao/rolamentos` | `modulos/transmissao/rolamentos` | `modulo_transmissao_rolamentos_*` |
+
+Arquivo novo vai para a área dele; o que é usado por várias áreas vai para `shared/` (front). Nomes de pasta em
+minúsculo/camelCase. Imports são relativos; o endereço do backend vem só de `shared/api/config.ts`.
 
 Planos e decisões: `docs/` (`plano-vendas.md`, `entrada-nf.md`).
 
 ## Pendências conhecidas (não "consertar" sem combinar)
-- Endereço do servidor `http://localhost:3001` repetido nos arquivos de API do front; tenant fixo em 1.
+- Tenant fixo em 1 (sem login).
 - Telas com dados de exemplo fixos (Financeiro › Faturamento, Emissão Faturado, Obras, Funcionários, modal antigo
   de novo produto do catálogo).
 - Erros de TypeScript antigos no front (concentrados em telas legadas).
