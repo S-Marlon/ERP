@@ -2,6 +2,7 @@
 // Devolve o mesmo formato de produto que a tela do PDV já consome (id, sku, name, salePrice, currentStock...).
 import { Request, Response } from 'express';
 import pool from '../../Estoque/db.config';
+import { filtroBusca } from './buscaPdv';
 import { avaliarPublicacaoItens } from '../../Catalogo/Produtos/publicacaoProdutos';
 import { carregarArvore } from '../../Catalogo/Categorias/herancaCategorias';
 import { FaixaPdv, faixaParaQuantidade, resolverPrecoPdv, UnidadeVendaPdv } from './precoPdv';
@@ -181,12 +182,10 @@ export const listarItensPdv = async (req: Request, res: Response) => {
     const params: any[] = [tenant];
 
     if (busca) {
-      // "×" (sinal de multiplicação, ex.: medidas 25 mm × 52 mm) vale como "x" comum dos dois lados
-      const termo = `%${busca.replace(/×/g, 'x')}%`;
-      where.push(`(ic.sku LIKE ? OR cpd.sku_customizado LIKE ? OR REPLACE(ic.nome_item, '×', 'x') LIKE ? OR REPLACE(cpd.nome_comercial, '×', 'x') LIKE ?
-                   OR EXISTS (SELECT 1 FROM comercial_unidades_venda g
-                              WHERE g.tenant_id = ic.tenant_id AND g.id_item = ic.id_item AND g.gtin = ?))`);
-      params.push(termo, termo, termo, termo, busca);
+      // Palavras em qualquer ordem, GTIN exato e medidas com espaço vazio ("17 mm x x 10mm")
+      const filtro = filtroBusca(busca);
+      where.push(filtro.sql);
+      params.push(...filtro.params);
     }
 
     if (categoria && categoria !== 'Todas') {
