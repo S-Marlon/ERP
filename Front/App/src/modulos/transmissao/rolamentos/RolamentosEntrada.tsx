@@ -1,6 +1,7 @@
 // Botão "Rolamentos" na conferência da nota: lê as linhas de rolamento (tipo, código, vedação, folga, marca),
 // sugere as medidas pelo código e cadastra em lote — ou vincula ao item que já tem o mesmo SKU. 1ª linha: a marca
-// diferencia o item (6205-2RS-SKF); 2ª linha: qualquer marca vira o mesmo item (6205-2RS-2L).
+// sempre fecha o SKU (6205-2RS-C3/SKF). 2ª linha também leva a marca (6205-ZZ/GTOP), a não ser que a opção de juntar a
+// 2ª linha num item só esteja ligada (6205-ZZ/2L).
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Alert, Badge, Button, Checkbox, Input, InputNumber, Modal, Select, Space, Spin, Table, Tag, Tooltip, Typography, message } from 'antd';
@@ -92,16 +93,17 @@ const RolamentosEntrada: React.FC<EntradaNfExtensaoProps> = ({ linhas: linhasNot
   // SKU e nome de cada linha (iguais às regras do backend) e o que falta para aplicar
   const calculado = (l: Linha) => {
     const marca = marcaDe(l.idMarca);
-    const pronto = l.codigo.trim() && l.tipo && l.linha && (l.linha === 2 || marca);
-    const sku = pronto ? montarSku({ codigo: l.codigo, vedacao: l.vedacao, folga: l.folga, linha: l.linha!, marca }) : null;
-    const nome = pronto ? montarNome({ codigo: l.codigo, vedacao: l.vedacao, folga: l.folga, linha: l.linha!, marca, medidas: { d: l.d, D: l.D, B: l.B } }) : null;
+    const mesclada = Boolean(config.segundaLinhaMesclada);
+    const pronto = l.codigo.trim() && l.tipo && l.linha && (marca || (l.linha === 2 && mesclada));
+    const sku = pronto ? montarSku({ codigo: l.codigo, vedacao: l.vedacao, folga: l.folga, linha: l.linha!, marca, mesclada }) : null;
+    const nome = pronto ? montarNome({ codigo: l.codigo, vedacao: l.vedacao, folga: l.folga, linha: l.linha!, marca, medidas: { d: l.d, D: l.D, B: l.B }, mesclada }) : null;
     const pendencias: string[] = [];
     if (!l.tipo) pendencias.push('tipo');
     if (!l.codigo.trim()) pendencias.push('código');
     if (!l.linha) pendencias.push('linha 1ª/2ª');
-    if (l.linha === 1 && !marca) pendencias.push('marca');
+    if (!marca && !(l.linha === 2 && mesclada)) pendencias.push('marca');
     if (l.tipo && !config.subcategorias?.[l.tipo]) pendencias.push('subcategoria do tipo não configurada');
-    if (l.linha === 2 && !config.idMarcaSegundaLinha) pendencias.push('marca "2ª Linha" não configurada');
+    if (l.linha === 2 && mesclada && !config.idMarcaSegundaLinha) pendencias.push('marca "2ª Linha" não configurada');
     return { sku, nome, pendencias, existente: sku ? existentes[sku.toUpperCase()] : undefined };
   };
 
@@ -167,7 +169,7 @@ const RolamentosEntrada: React.FC<EntradaNfExtensaoProps> = ({ linhas: linhasNot
       markup,
       classificacao: {
         familiaId, categoriaId: null,
-        marcaId: l.linha === 2 ? (config.idMarcaSegundaLinha ?? null) : l.idMarca, atributos,
+        marcaId: l.linha === 2 && config.segundaLinhaMesclada ? (config.idMarcaSegundaLinha ?? null) : l.idMarca, atributos,
       },
     });
     return {
@@ -277,7 +279,7 @@ const RolamentosEntrada: React.FC<EntradaNfExtensaoProps> = ({ linhas: linhasNot
               action={<Button size="small" onClick={() => navigate('/modulos/transmissao/rolamentos')}>Configurar</Button>} />
           )}
           <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
-            Confira o que foi lido da descrição. 1ª linha: a marca diferencia o item. 2ª linha: qualquer marca vira o mesmo item (SKU -2L).
+            Confira o que foi lido da descrição. A marca fecha o SKU (6205-2RS-C3/SKF){config.segundaLinhaMesclada ? '; 2ª linha: qualquer marca vira o mesmo item (/2L)' : ''}.
             Item que já existe com o mesmo SKU é vinculado; o resto vira item novo. Medidas digitadas ficam salvas para as próximas notas.
           </Text>
           <Table<Linha>

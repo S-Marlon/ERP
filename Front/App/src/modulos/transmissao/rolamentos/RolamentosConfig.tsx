@@ -1,7 +1,7 @@
 // Compras › Rolamentos (módulo TRANSMISSAO_ROLAMENTOS): estrutura no catálogo, linha (1ª/2ª) e apelidos das
 // marcas, markup padrão, teste de leitura de descrição e medidas aprendidas.
 import React, { useEffect, useState } from 'react';
-import { Alert, Button, Card, Col, Collapse, Descriptions, Input, InputNumber, Modal, Popconfirm, Row, Select, Space, Spin, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { Alert, Button, Card, Col, Collapse, Descriptions, Input, InputNumber, Modal, Popconfirm, Row, Select, Space, Spin, Switch, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { BuildOutlined, DeleteOutlined, ExperimentOutlined, PlusOutlined } from '@ant-design/icons';
 import { ModalNovaMarca } from '../../../pages/Compras/StockEntry/ItemsConference/DefinicoesPimRapidas';
 import { garantirFamilias, montarEstrutura } from './estruturaRolamentos';
@@ -51,7 +51,7 @@ const RolamentosConfig: React.FC = () => {
   };
   const [novoSignificado, setNovoSignificado] = useState('');
   // Atualizar SKUs dos itens já cadastrados para o padrão legível (6205-2RS-C3/SKF)
-  type MudancaSku = { idItem: number; nome: string | null; skuAtual: string; skuNovo: string; conflito: string | null };
+  type MudancaSku = { idItem: number; nome: string | null; skuAtual: string; skuNovo: string; conflito: string | null; marcaNova?: string | null };
   const [previaSkus, setPreviaSkus] = useState<MudancaSku[] | null>(null);
   const [atualizandoSkus, setAtualizandoSkus] = useState(false);
   const verSkus = async () => {
@@ -233,6 +233,16 @@ const RolamentosConfig: React.FC = () => {
                 onChange={v => setConfig(c => ({ ...c, markup: Number(v) || 2 }))} />
               <Button size="small" onClick={() => rolamentosApi.salvarConfig({ markup: config.markup ?? 2 }).then(() => message.success('Markup salvo.')).catch(e => message.error(e.message))}>Salvar</Button>
             </Space>
+            <div style={{ marginTop: 10 }}>
+              <Space>
+                <Switch size="small" checked={Boolean(config.segundaLinhaMesclada)}
+                  onChange={v => rolamentosApi.salvarConfig({ segundaLinhaMesclada: v }).then(() => setConfig(c => ({ ...c, segundaLinhaMesclada: v }))).catch(e => message.error(e.message))} />
+                <Text>Juntar a 2ª linha num item só (SKU /2L)</Text>
+              </Space>
+              <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
+                Desligado: cada marca de 2ª linha é um item (6205-ZZ/GTOP). Ligado: todas as marcas de 2ª linha viram o mesmo item (6205-ZZ/2L), com o estoque somado.
+              </Text>
+            </div>
             {temFamiliasAntigas && (
               <Alert type="warning" showIcon style={{ marginTop: 10 }}
                 message="Há itens nas famílias amplas antigas (uma por tipo)."
@@ -241,7 +251,7 @@ const RolamentosConfig: React.FC = () => {
             )}
             <div style={{ marginTop: 10 }}>
               <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>Nome dos itens: ROLAMENTO 6205-2RS/C3 | 25 mm × 52 mm × 15 mm | SKF</Text>
-              <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>SKU: 6205-2RS-C3/SKF · UC207-20/FAG · 6205-ZZ/2L (2ª linha)</Text>
+              <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>SKU: 6205-2RS-C3/SKF · UC207-20/FAG · 6205-ZZ/GTOP (2ª linha)</Text>
               <Space style={{ marginTop: 4 }} wrap>
                 <Button size="small" loading={renomeando && !previaNomes} onClick={verRenomear}>Renomear itens já cadastrados</Button>
                 <Button size="small" loading={atualizandoSkus && !previaSkus} onClick={verSkus}>Atualizar SKUs dos itens já cadastrados</Button>
@@ -282,7 +292,7 @@ const RolamentosConfig: React.FC = () => {
         <Col xs={24} xl={12}>
           <Card size="small" title="Marcas: 1ª ou 2ª linha" extra={<Button size="small" icon={<PlusOutlined />} onClick={() => setNovaMarca(true)}>Nova marca</Button>}>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              1ª linha: cada marca é um item (6205-2RS-SKF). 2ª linha: todas viram o mesmo item (6205-2RS-2L). Apelidos: como a marca aparece nas notas (ex.: GTOP, GBR, PEER/SKF).
+              A linha (1ª/2ª) fica no item e no nome; com "juntar a 2ª linha" ligado, as de 2ª viram um item só (/2L). Apelidos: como a marca aparece nas notas (ex.: GTOP, GBR, PEER/SKF).
             </Text>
             <Space.Compact style={{ width: '100%', marginTop: 8 }}>
               <Select style={{ flex: 1 }} showSearch optionFilterProp="label" placeholder="Trazer uma marca que já existe no sistema" value={adicionarId ?? undefined}
@@ -427,7 +437,7 @@ const RolamentosConfig: React.FC = () => {
           columns={[
             { title: 'SKU atual', dataIndex: 'skuAtual', width: 190, render: (v: string) => <Text type="secondary">{v}</Text> },
             { title: 'SKU novo', dataIndex: 'skuNovo', width: 210, render: (v: string, m: MudancaSku) => <b style={m.conflito ? { color: '#cf1322' } : undefined}>{v}</b> },
-            { title: 'Item', dataIndex: 'nome', render: (v: string | null, m: MudancaSku) => (m.conflito ? <Text type="danger" style={{ fontSize: 12 }}>{m.conflito}</Text> : <Text style={{ fontSize: 12 }}>{v}</Text>) },
+            { title: 'Item', dataIndex: 'nome', render: (v: string | null, m: MudancaSku) => (m.conflito ? <Text type="danger" style={{ fontSize: 12 }}>{m.conflito}</Text> : <span style={{ fontSize: 12 }}>{v}{m.marcaNova ? <Tag color="blue" style={{ marginLeft: 6, fontSize: 10 }}>marca volta para {m.marcaNova}</Tag> : null}</span>) },
           ]} />
       </Modal>
 

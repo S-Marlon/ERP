@@ -18,6 +18,7 @@ export interface ConfigRolamentos {
   idMarcaSegundaLinha?: number | null;
   markup?: number;
   sufixos?: Record<string, string>;   // significado dos códigos de fabricante definidos pelo operador (ex.: CO7)
+  segundaLinhaMesclada?: boolean;     // juntar a 2ª linha num item só (SKU /2L); desligado = item por marca
 }
 
 const carregarConfig = async (tenant: number): Promise<ConfigRolamentos> => {
@@ -26,7 +27,7 @@ const carregarConfig = async (tenant: number): Promise<ConfigRolamentos> => {
   return typeof c.configuracao === 'string' ? JSON.parse(c.configuracao) : c.configuracao || {};
 };
 
-const carregarMarcas = async (tenant: number) => {
+const carregarMarcas = async (tenant: number): Promise<MarcaModulo[]> => {
   const [rows]: any = await pool.execute(
     `SELECT m.id, m.nome, m.codigo, mm.linha, mm.apelidos
      FROM comercial_marcas m
@@ -167,12 +168,14 @@ export const analisarLinhas = async (req: Request, res: Response) => {
       const tabela = leitura.codigo ? medidasDoCodigo(leitura.tipo, leitura.codigo) : null;
       const medidas = aprendida && aprendida.d !== null ? { d: aprendida.d, D: aprendida.D ?? 0, B: aprendida.B ?? 0 } : tabela;
       const linha = leitura.marca?.linha ?? null;
-      const sku = leitura.codigo && linha ? montarSku({ codigo: leitura.codigo, vedacao: leitura.vedacao, folga: leitura.folga, linha, marca: leitura.marca }) : null;
+      const mesclada = Boolean(config.segundaLinhaMesclada);
+      const pronto = leitura.codigo && linha && (leitura.marca || (linha === 2 && mesclada));
+      const sku = pronto ? montarSku({ codigo: leitura.codigo!, vedacao: leitura.vedacao, folga: leitura.folga, linha: linha!, marca: leitura.marca, mesclada }) : null;
       return {
         chave: l.chave, ...leitura, linha, medidas,
         origemMedidas: aprendida && aprendida.d !== null ? 'APRENDIDA' : tabela ? 'TABELA' : null,
         sku,
-        nome: leitura.codigo && leitura.tipo && linha ? montarNome({ codigo: leitura.codigo, vedacao: leitura.vedacao, folga: leitura.folga, linha, marca: leitura.marca, medidas }) : null,
+        nome: pronto && leitura.tipo ? montarNome({ codigo: leitura.codigo!, vedacao: leitura.vedacao, folga: leitura.folga, linha: linha!, marca: leitura.marca, medidas, mesclada }) : null,
       };
     });
     return res.json({ linhas: resultado, existentes: await itensPorSku(tenant, resultado.map(r => r.sku || '')), configuracao: config });
@@ -266,8 +269,10 @@ const itensDoModulo = async (tenant: number, config: ConfigRolamentos) => {
   const antigas = Object.values(config.familias || {}).filter(Boolean) as number[];
   if (!a.codigo || (!subcats.length && !antigas.length)) return [];
   const [itens]: any = await pool.query(
-    `SELECT cpd.id_item, cpd.sku_customizado, cpd.nome_comercial, cpd.id_marca, cpd.familia_id, m.nome AS marca, m.codigo AS marca_codigo, f.categoria_id
+    `SELECT cpd.id_item, cpd.sku_customizado, cpd.nome_comercial, cpd.id_marca, cpd.familia_id, m.nome AS marca, m.codigo AS marca_codigo, f.categoria_id,
+            ic.nome_item
      FROM comercial_produtos_dados cpd
+     INNER JOIN itens_core ic ON ic.id_item = cpd.id_item
      INNER JOIN comercial_familias f ON f.id = cpd.familia_id AND f.tenant_id = cpd.tenant_id
      LEFT JOIN comercial_marcas m ON m.id = cpd.id_marca
      WHERE cpd.tenant_id = ? AND (f.categoria_id IN (?) OR f.id IN (?))`,
@@ -293,8 +298,18 @@ const itensDoModulo = async (tenant: number, config: ConfigRolamentos) => {
   const subTipo = tipoDaSubcategoria(config);
   const antigaTipo = tipoDaFamiliaAntiga(config);
 
+  const marcas = await carregarMarcas(tenant);
+  const marcaPorId = new Map(marcas.map(m => [m.id, m]));
+  const marcasReais = marcas.filter(m => m.id !== config.idMarcaSegundaLinha);
+  const mesclada = Boolean(config.segundaLinhaMesclada);
+
   return itens.map((i: any) => {
     const valor = (id?: number) => (id ? daFamilia.get(`${i.familia_id}|${id}`) ?? doItem.get(`${i.id_item}|${id}`) ?? null : null);
+    // Item que entrou com a marca genérica "2ª Linha": a marca real sai da descrição original da nota
+    const generica = Boolean(config.idMarcaSegundaLinha) && Number(i.id_marca) === config.idMarcaSegundaLinha;
+    const original = generica ? lerDescricao(String(i.nome_item || ''), marcasReais).marca : null;
+    const daMarca = marcaPorId.get(Number(i.id_marca));
+    const marcaAtual = !generica && i.marca && String(i.marca).toLowerCase() !== 'sem marca' ? { nome: i.marca as string, codigo: (i.marca_codigo as string) || null } : null;
     const folga = String(valor(a.folga) || '').toUpperCase();
     return {
       idItem: Number(i.id_item), sku: i.sku_customizado as string, nome: i.nome_comercial as string | null, idFamilia: Number(i.familia_id),
@@ -304,8 +319,12 @@ const itensDoModulo = async (tenant: number, config: ConfigRolamentos) => {
       vedacao: String(valor(a.vedacao) || 'ABERTO').toUpperCase(),
       folga: folga && folga !== 'NORMAL' ? folga : null,
       medidas: { d: num(valor(a.diametroInterno)), D: num(valor(a.diametroExterno)), B: num(valor(a.largura)) },
-      linha: (config.idMarcaSegundaLinha && Number(i.id_marca) === config.idMarcaSegundaLinha ? 2 : 1) as 1 | 2,
-      marca: i.marca && String(i.marca).toLowerCase() !== 'sem marca' ? { nome: i.marca as string, codigo: (i.marca_codigo as string) || null } : null,
+      linha: (generica || daMarca?.linha === 2 ? 2 : 1) as 1 | 2,
+      marca: generica ? (mesclada ? null : original ? { nome: original.nome, codigo: original.codigo } : null) : marcaAtual,
+      // Item juntado na 2ª linha que deve voltar a ter a marca própria (opção de juntar desligada)
+      marcaGenerica: generica,
+      idMarcaOriginal: generica && !mesclada ? original?.id ?? null : null,
+      mesclada,
     };
   });
 };
@@ -320,7 +339,7 @@ export const renomearItens = async (req: Request, res: Response) => {
     const itens = await itensDoModulo(tenant, config);
     const mudancas = itens.filter((i: any) => i.codigo).map((i: any) => ({
       idItem: i.idItem, sku: i.sku, nomeAtual: i.nome,
-      nomeNovo: montarNome({ codigo: i.codigo, vedacao: i.vedacao, folga: i.folga, linha: i.linha, marca: i.marca, medidas: i.medidas }),
+      nomeNovo: montarNome({ codigo: i.codigo, vedacao: i.vedacao, folga: i.folga, linha: i.linha, marca: i.marca, medidas: i.medidas, mesclada: i.mesclada }),
     })).filter((m: any) => m.nomeNovo !== m.nomeAtual);
     if (aplicar) {
       for (const m of mudancas) await pool.execute(`UPDATE comercial_produtos_dados SET nome_comercial = ? WHERE id_item = ? AND tenant_id = ?`, [m.nomeNovo, m.idItem, tenant]);
@@ -385,8 +404,11 @@ export const atualizarSkus = async (req: Request, res: Response) => {
     const itens = await itensDoModulo(tenant, config);
     const propostas = itens.filter((i: any) => i.codigo).map((i: any) => ({
       idItem: i.idItem as number, nome: i.nome as string | null, skuAtual: i.sku as string,
-      skuNovo: montarSku({ codigo: i.codigo, vedacao: i.vedacao, folga: i.folga, linha: i.linha, marca: i.marca }),
-    })).filter((p: any) => String(p.skuNovo).toUpperCase() !== String(p.skuAtual || '').toUpperCase());
+      skuNovo: montarSku({ codigo: i.codigo, vedacao: i.vedacao, folga: i.folga, linha: i.linha, marca: i.marca, mesclada: i.mesclada }),
+      // Juntado na 2ª linha: volta para a marca original (null = não deu para saber pela descrição da nota)
+      idMarcaNova: i.marcaGenerica && !i.mesclada ? (i.idMarcaOriginal as number | null) : undefined,
+      marcaNova: i.marcaGenerica && !i.mesclada ? (i.marca?.nome as string | undefined) ?? null : undefined,
+    })).filter((p: any) => String(p.skuNovo).toUpperCase() !== String(p.skuAtual || '').toUpperCase() || p.idMarcaNova !== undefined);
 
     const repetidos = new Map<string, number>();
     for (const p of propostas) repetidos.set(p.skuNovo.toUpperCase(), (repetidos.get(p.skuNovo.toUpperCase()) || 0) + 1);
@@ -400,14 +422,18 @@ export const atualizarSkus = async (req: Request, res: Response) => {
     }
     const mudancas = propostas.map((p: any) => {
       const dono = emUso.get(p.skuNovo.toUpperCase());
-      const conflito = (repetidos.get(p.skuNovo.toUpperCase()) || 0) > 1 ? 'mesmo SKU novo para mais de um item (itens iguais?)'
-        : dono && dono !== p.idItem ? 'SKU já usado por outro item do catálogo' : null;
+      const conflito = p.idMarcaNova === null ? 'marca original não encontrada na descrição da nota: ajuste a marca no catálogo'
+        : (repetidos.get(p.skuNovo.toUpperCase()) || 0) > 1 ? 'mesmo SKU novo para mais de um item (itens iguais?)'
+          : dono && dono !== p.idItem ? 'SKU já usado por outro item do catálogo' : null;
       return { ...p, conflito };
     });
     let aplicadas = 0;
     if (aplicar) {
       for (const m of mudancas.filter((x: any) => !x.conflito)) {
-        await pool.execute(`UPDATE comercial_produtos_dados SET sku_customizado = ? WHERE id_item = ? AND tenant_id = ?`, [m.skuNovo, m.idItem, tenant]);
+        await pool.execute(
+          `UPDATE comercial_produtos_dados SET sku_customizado = ?, id_marca = COALESCE(?, id_marca) WHERE id_item = ? AND tenant_id = ?`,
+          [m.skuNovo, m.idMarcaNova ?? null, m.idItem, tenant]
+        );
         aplicadas++;
       }
     }

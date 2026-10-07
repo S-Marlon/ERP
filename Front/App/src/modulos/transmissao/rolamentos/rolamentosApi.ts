@@ -31,6 +31,7 @@ export interface ConfigRolamentos {
   idMarcaSegundaLinha?: number | null;
   markup?: number;
   sufixos?: Record<string, string>; // significado dos códigos de fabricante definidos pelo operador
+  segundaLinhaMesclada?: boolean;     // juntar a 2ª linha num item só (SKU /2L); desligado = item por marca
 }
 export interface MarcaModulo { id: number; nome: string; codigo: string | null; linha: 1 | 2 | null; apelidos: string[] }
 export interface MedidaAprendida { idMedida: number; codigo: string; tipo: string | null; d: number | null; D: number | null; B: number | null }
@@ -70,7 +71,7 @@ export const rolamentosApi = {
   renomear: (aplicar: boolean) => requisitar<{ total: number; aplicadas: number; mudancas: Array<{ idItem: number; sku: string; nomeAtual: string | null; nomeNovo: string }> }>(
     `${API}/renomear`, json('POST', { aplicar }), 'Erro ao renomear os itens.'),
   atualizarSkus: (aplicar: boolean) => requisitar<{
-    total: number; aplicadas: number; mudancas: Array<{ idItem: number; nome: string | null; skuAtual: string; skuNovo: string; conflito: string | null }>;
+    total: number; aplicadas: number; mudancas: Array<{ idItem: number; nome: string | null; skuAtual: string; skuNovo: string; conflito: string | null; marcaNova?: string | null }>;
   }>(`${API}/atualizar-skus`, json('POST', { aplicar }), 'Erro ao atualizar os SKUs.'),
   familias: (pares: Array<{ tipo: TipoRolamento; codigo: string }>) =>
     requisitar<{ familias: Record<string, { id: number; nome: string } | null> }>(`${API}/familias`, json('POST', { pares }), 'Erro ao buscar as famílias.'),
@@ -88,23 +89,30 @@ export const siglaDaMarca = (marca: { nome: string; codigo: string | null } | nu
  * SKU legível: código-vedação-folga/MARCA. A marca (ou 2L na 2ª linha) sempre fecha o código, depois da barra:
  * 6205-2RS-C3/SKF, UC207-20-2RS-C3/INA, UC207-20/FAG, 6205-ZZ/2L. Rolamento aberto não leva vedação.
  */
-export const montarSku = (p: { codigo: string; vedacao: string; folga: string | null; linha: 1 | 2; marca: { nome: string; codigo: string | null } | null }) => {
+export const montarSku = (p: {
+  codigo: string; vedacao: string; folga: string | null; linha: 1 | 2; marca: { nome: string; codigo: string | null } | null;
+  mesclada?: boolean; // 2ª linha juntada num item só (opção do módulo): a marca vira 2L
+}) => {
   const corpo = [p.codigo.trim().toUpperCase(), p.vedacao && p.vedacao !== 'ABERTO' ? p.vedacao : null, p.folga].filter(Boolean).join('-');
-  const marca = p.linha === 2 ? SIGLA_SEGUNDA_LINHA : siglaDaMarca(p.marca);
+  const marca = p.linha === 2 && p.mesclada ? SIGLA_SEGUNDA_LINHA : siglaDaMarca(p.marca);
   return marca ? `${corpo}/${marca}` : corpo;
 };
 
 const mmNome = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
 
-/** ROLAMENTO 6205-2RS/C3 | 25 mm × 52 mm × 15 mm | SKF — 2ª linha termina em "2ª LINHA"; sem medidas, a parte do meio sai. */
+/**
+ * ROLAMENTO 6205-2RS/C3 | 25 mm × 52 mm × 15 mm | SKF — 2ª linha: "| GTOP-GBR (2ª LINHA)" (ou só "2ª LINHA" se juntada
+ * num item só); sem medidas, a parte do meio sai.
+ */
 export const montarNome = (p: {
   codigo: string; vedacao: string; folga: string | null; linha: 1 | 2; marca: { nome: string } | null;
-  medidas?: { d: number | null; D: number | null; B: number | null } | null;
+  medidas?: { d: number | null; D: number | null; B: number | null } | null; mesclada?: boolean;
 }) => {
   const codigo = `${p.codigo.trim().toUpperCase()}${p.vedacao && p.vedacao !== 'ABERTO' ? `-${p.vedacao}` : ''}${p.folga ? `/${p.folga}` : ''}`;
   const m = p.medidas;
   const medidas = m && m.d && m.D && m.B ? `${mmNome(m.d)} mm × ${mmNome(m.D)} mm × ${mmNome(m.B)} mm` : null;
-  const marca = p.linha === 2 ? '2ª LINHA' : (p.marca?.nome || '').toUpperCase() || null;
+  const nomeMarca = (p.marca?.nome || '').toUpperCase();
+  const marca = p.linha === 2 ? (p.mesclada || !nomeMarca ? '2ª LINHA' : `${nomeMarca} (2ª LINHA)`) : nomeMarca || null;
   return [`ROLAMENTO ${codigo}`, medidas, marca].filter(Boolean).join(' | ');
 };
 
@@ -115,7 +123,7 @@ export const montarDescricao = (p: {
   tipo: TipoRolamento; codigo: string; codigoCompleto: string | null; marca: string | null; linha: 1 | 2;
   medidas: { d: number | null; D: number | null; B: number | null }; sufixos: Sufixo[];
 }) => {
-  const linhas = [`${TIPOS[p.tipo].familia} ${p.codigo.toUpperCase()}${p.linha === 2 ? ' (2ª linha)' : p.marca ? ` ${p.marca}` : ''}`];
+  const linhas = [`${TIPOS[p.tipo].familia} ${p.codigo.toUpperCase()}${p.marca ? ` ${p.marca}` : ''}${p.linha === 2 ? ' (2ª linha)' : ''}`];
   const { d, D, B } = p.medidas;
   if (d && D && B) linhas.push(`Medidas: ${mm(d)} x ${mm(D)} x ${mm(B)} mm (furo x diâmetro externo x largura)`);
   if (p.codigoCompleto && p.codigoCompleto.toUpperCase() !== p.codigo.toUpperCase()) linhas.push(`Código do fabricante: ${p.codigoCompleto}`);
