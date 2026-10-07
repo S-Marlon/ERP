@@ -3,9 +3,9 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, Button, Card, Col, Collapse, Descriptions, Input, InputNumber, Modal, Popconfirm, Row, Select, Space, Spin, Switch, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { BuildOutlined, DeleteOutlined, ExperimentOutlined, PlusOutlined } from '@ant-design/icons';
-import { ModalNovaMarca } from '../../../pages/Compras/StockEntry/ItemsConference/DefinicoesPimRapidas';
+import { ModalNovaMarca } from '../../../areas/compras/entradaNf/itens/DefinicoesPimRapidas';
 import { garantirFamilias, montarEstrutura } from './estruturaRolamentos';
-import { updateFamilia } from '../../../pages/Catalogo/pages/FamilyManager/FamilyManager.api';
+import { updateFamilia } from '../../../areas/catalogo/familias/FamilyManager.api';
 import { ConfigRolamentos, LinhaAnalisada, MarcaModulo, MedidaAprendida, nomeFamiliaDoCodigo, rolamentosApi, TIPOS, TipoRolamento } from './rolamentosApi';
 
 const { Title, Text } = Typography;

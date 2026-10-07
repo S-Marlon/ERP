@@ -2,8 +2,8 @@
 // Cada módulo vive em src/modulos/<area>/<assunto>. O restante do sistema só conhece este registro.
 // Para remover um módulo: tirar a pasta e a entrada dele em MODULOS_FRONT.
 import React, { lazy } from 'react';
-import type { ItemMenu } from '../components/Layout/menuRotas';
-import type { MappingPayload } from '../pages/Compras/StockEntry/ItemsConference/ProductMappingModal';
+import type { ItemMenu } from '../app/layout/menuRotas';
+import type { MappingPayload } from '../areas/compras/entradaNf/itens/ProductMappingModal';
 
 const MontagensPagina = lazy(() => import('./hidraulica/montagens/MontagensPagina'));
 const MontagemPdv = lazy(() => import('./hidraulica/montagens/MontagemPdv'));

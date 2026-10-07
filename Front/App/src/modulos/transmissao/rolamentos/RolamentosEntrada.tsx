@@ -7,10 +7,10 @@ import { useNavigate } from 'react-router-dom';
 import { Alert, Badge, Button, Checkbox, Input, InputNumber, Modal, Select, Space, Spin, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { PlusOutlined, ToolOutlined } from '@ant-design/icons';
 import type { EntradaNfExtensaoProps, LinhaEntradaNf } from '../../registroModulos';
-import type { MappingPayload } from '../../../pages/Compras/StockEntry/ItemsConference/ProductMappingModal';
-import { mapeamentoRapido } from '../../../pages/Compras/StockEntry/edicaoLote';
+import type { MappingPayload } from '../../../areas/compras/entradaNf/itens/ProductMappingModal';
+import { mapeamentoRapido } from '../../../areas/compras/entradaNf/edicaoLote';
 import { garantirFamilias } from './estruturaRolamentos';
-import { createMarca } from '../../../pages/Catalogo/pages/MarcasManager/services/comercialMarcas.service';
+import { createMarca } from '../../../areas/catalogo/marcas/services/comercialMarcas.service';
 import {
   ConfigRolamentos, ItemExistente, MarcaModulo, montarDescricao, montarNome, montarSku, rolamentosApi, siglaDaMarca, Sufixo, TIPOS, TipoRolamento, VEDACOES,
 } from './rolamentosApi';

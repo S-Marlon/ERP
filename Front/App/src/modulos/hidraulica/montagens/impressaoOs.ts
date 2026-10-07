@@ -1,6 +1,6 @@
 // OS de montagem em A4: dados da empresa, cliente, cada mangueira com a ficha e os materiais, sinal e saldo.
-import { lerConfiguracoes } from '../../../core/configuracoes/configuracoes';
-import { imprimirHtml } from '../../../core/impressao/saida';
+import { lerConfiguracoes } from '../../../shared/core/configuracoes/configuracoes';
+import { imprimirHtml } from '../../../shared/core/impressao/saida';
 import { ETAPAS_OS, OsDetalhe } from './montagensApi';
 
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });

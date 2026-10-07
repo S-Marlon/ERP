@@ -10,9 +10,9 @@ import {
   CopyOutlined, DeleteOutlined, DollarOutlined, PlusOutlined, PrinterOutlined, ReloadOutlined, ShoppingCartOutlined, StopOutlined, ToolOutlined,
 } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
-import { buscarClientesPdv, ClienteBusca } from '../../../pages/PDV/services/api/products';
-import { operadorAtual, ROTULO_FORMA } from '../../../pages/PDV/caixa/caixaApi';
-import { caixaStore } from '../../../pages/PDV/caixa/caixaStore';
+import { buscarClientesPdv, ClienteBusca } from '../../../areas/vendas/pdv/services/api/products';
+import { operadorAtual, ROTULO_FORMA } from '../../../areas/vendas/caixa/caixaApi';
+import { caixaStore } from '../../../areas/vendas/caixa/caixaStore';
 import { EtapaOs, ETAPAS_OS, FichaMangueira, OsDetalhe, OsResumo, osApi } from './montagensApi';
 import { brl, CamposFicha, CamposMontagem, EstadoMontagem, estadoInicialMontagem, fichaDaMontagem, gravarUltimos, ItemEscolhido, linhasDaMontagem, SeletorItem } from './montador';
 import { imprimirOs } from './impressaoOs';

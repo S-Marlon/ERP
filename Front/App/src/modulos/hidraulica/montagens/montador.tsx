@@ -2,7 +2,7 @@
 // (mangueira + terminais + capas + prensagem opcional), ficha técnica e memória dos últimos itens usados.
 import React, { useEffect, useState } from 'react';
 import { Checkbox, Input, InputNumber, Select, Typography } from 'antd';
-import { getPdvProducts } from '../../../pages/PDV/services/api/products';
+import { getPdvProducts } from '../../../areas/vendas/pdv/services/api/products';
 import type { FichaMangueira } from './montagensApi';
 
 const { Text } = Typography;

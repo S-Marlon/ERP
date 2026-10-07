@@ -1,9 +1,9 @@
 // Estrutura de rolamentos no catálogo, sempre pelas APIs do próprio catálogo (as regras do PIM continuam valendo):
 // Rolamentos › subcategoria por tipo (Rígidos de esferas, Inserção (UC)...) › família por código (Rolamento 6205).
 // Na família do código: código e medidas são DNA (iguais para toda a família); vedação, folga e marca são grade.
-import { createFamilia, getAtributosGlobais, getCategorias, updateFamilia } from '../../../pages/Catalogo/pages/FamilyManager/FamilyManager.api';
-import { createAtributoRapido, createCategory } from '../../../pages/Catalogo/pages/CategoryManager/categoryService';
-import { createMarca, getMarcas } from '../../../pages/Catalogo/pages/MarcasManager/services/comercialMarcas.service';
+import { createFamilia, getAtributosGlobais, getCategorias, updateFamilia } from '../../../areas/catalogo/familias/FamilyManager.api';
+import { createAtributoRapido, createCategory } from '../../../areas/catalogo/categorias/categoryService';
+import { createMarca, getMarcas } from '../../../areas/catalogo/marcas/services/comercialMarcas.service';
 import {
   CampoAtributo, ConfigRolamentos, NOME_MARCA_SEGUNDA_LINHA, nomeFamiliaDoCodigo, rolamentosApi, SIGLA_SEGUNDA_LINHA, TIPOS, TipoRolamento,
 } from './rolamentosApi';
