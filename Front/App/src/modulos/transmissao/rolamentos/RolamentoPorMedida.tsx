@@ -20,7 +20,7 @@ interface Padrao { codigo: string; tipo: TipoRolamento | null; medidas: Medidas;
 const RolamentoPorMedida: React.FC<PdvExtensaoProps> = ({ adicionarItens }) => {
   const [aberto, setAberto] = useState(false);
   const [alvo, setAlvo] = useState<Medidas>({ d: null, D: null, B: null });
-  const [margem, setMargem] = useState<number>(0.5);
+  const [margem, setMargem] = useState<number>(1);
   const [vedacao, setVedacao] = useState('');
   const [soEstoque, setSoEstoque] = useState(false);
   const [carregando, setCarregando] = useState(false);
