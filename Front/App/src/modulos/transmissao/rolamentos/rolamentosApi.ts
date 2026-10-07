@@ -73,6 +73,11 @@ export const rolamentosApi = {
   atualizarSkus: (aplicar: boolean) => requisitar<{
     total: number; aplicadas: number; mudancas: Array<{ idItem: number; nome: string | null; skuAtual: string; skuNovo: string; conflito: string | null; marcaNova?: string | null }>;
   }>(`${API}/atualizar-skus`, json('POST', { aplicar }), 'Erro ao atualizar os SKUs.'),
+  buscarPorMedida: (query: string) => requisitar<{
+    itens: Array<{ idItem: number; sku: string; nome: string | null; codigo: string; tipo: TipoRolamento | null; vedacao: string; folga: string | null;
+      marca: string | null; medidas: { d: number | null; D: number | null; B: number | null }; desvio: number; estoque: number; preco: number | null }>;
+    padroes: Array<{ codigo: string; tipo: TipoRolamento | null; medidas: { d: number | null; D: number | null; B: number | null }; desvio: number }>;
+  }>(`${API}/buscar?${query}`, undefined, 'Erro na busca por medida.'),
   familias: (pares: Array<{ tipo: TipoRolamento; codigo: string }>) =>
     requisitar<{ familias: Record<string, { id: number; nome: string } | null> }>(`${API}/familias`, json('POST', { pares }), 'Erro ao buscar as famílias.'),
   itensParaReorganizar: () => requisitar<{ itens: Array<{ idItem: number; sku: string; nome: string | null; tipo: TipoRolamento | null; codigo: string; medidas: { d: number | null; D: number | null; B: number | null } }> }>(

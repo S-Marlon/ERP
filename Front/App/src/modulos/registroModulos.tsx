@@ -9,6 +9,7 @@ const MontagensPagina = lazy(() => import('./hidraulica/montagens/MontagensPagin
 const MontagemPdv = lazy(() => import('./hidraulica/montagens/MontagemPdv'));
 const RolamentosConfig = lazy(() => import('./transmissao/rolamentos/RolamentosConfig'));
 const RolamentosEntrada = lazy(() => import('./transmissao/rolamentos/RolamentosEntrada'));
+const RolamentoPorMedida = lazy(() => import('./transmissao/rolamentos/RolamentoPorMedida'));
 
 /** O que o PDV entrega a um botão de módulo (o módulo não acessa o carrinho de outro jeito). */
 export interface PdvExtensaoProps {
@@ -66,6 +67,7 @@ export const MODULOS_FRONT: ModuloFront[] = [
     menu: [{ grupo: 'grp:compras', itens: [{ key: '/modulos/transmissao/rolamentos', label: 'Rolamentos' }] }],
     rotas: [{ path: '/modulos/transmissao/rolamentos', element: <RolamentosConfig /> }],
     entradaNf: [RolamentosEntrada],
+    pdv: [RolamentoPorMedida],
   },
 ];
 

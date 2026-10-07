@@ -2,7 +2,7 @@
 // medidas aprendidas e a análise das linhas da nota de entrada. O cadastro em si usa a entrada de NF do núcleo.
 import { Request, Response } from 'express';
 import pool from '../../../routes/Estoque/db.config';
-import { DICIONARIO, lerDescricao, MarcaModulo, medidasDoCodigo, montarNome, montarSku, nomeFamiliaDoCodigo, TipoRolamento, TIPOS } from './rolamentos';
+import { DICIONARIO, filtrarPorMedidas, lerDescricao, padroesComMedidas, MarcaModulo, medidasDoCodigo, montarNome, montarSku, nomeFamiliaDoCodigo, TipoRolamento, TIPOS } from './rolamentos';
 
 const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || req.body?.tenant_id || 1);
 const erro = (res: Response, error: any, padrao: string, status = 500) => {
@@ -440,5 +440,57 @@ export const atualizarSkus = async (req: Request, res: Response) => {
     return res.json({ total: itens.length, mudancas, aplicadas });
   } catch (e) {
     return erro(res, e, 'Erro ao atualizar os SKUs.');
+  }
+};
+
+// GET /api/modulos/transmissao/rolamentos/buscar?d=&D=&B=&margem=&vedacao=&estoque=1
+// Rolamentos cadastrados pelas medidas (vazio = qualquer), dentro da margem, do mais próximo para o mais distante;
+// e os códigos padrão com essas medidas que ainda não estão cadastrados (para encomendar).
+export const buscarPorMedida = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const numero = (v: unknown) => (v === undefined || v === null || String(v).trim() === '' ? null : Number(String(v).replace(',', '.')));
+  const alvo = { d: numero(req.query.d), D: numero(req.query.D), B: numero(req.query.B) };
+  const margem = Math.min(5, Math.max(0, numero(req.query.margem) ?? 0));
+  const vedacao = String(req.query.vedacao || '').toUpperCase();
+  const soEstoque = req.query.estoque === '1';
+  try {
+    if ([alvo.d, alvo.D, alvo.B].some(v => v !== null && !Number.isFinite(v))) return erro(res, 'Medida inválida.', '', 400);
+    const config = await carregarConfig(tenant);
+    const todos = await itensDoModulo(tenant, config);
+    let achados = filtrarPorMedidas(alvo, margem, todos.filter((i: any) => i.codigo));
+    if (vedacao) achados = achados.filter((i: any) => i.vedacao === vedacao);
+
+    const ids = achados.map((i: any) => i.idItem);
+    const extras = new Map<number, { estoque: number; preco: number | null }>();
+    if (ids.length) {
+      const [rows]: any = await pool.query(
+        `SELECT cpd.id_item, cpd.preco_venda, COALESCE(es.quantidade_atual, 0) AS estoque
+         FROM comercial_produtos_dados cpd
+         LEFT JOIN estoque_saldos_itens es ON es.id_item = cpd.id_item AND es.tenant_id = cpd.tenant_id AND es.deposito = 'VENDA'
+         WHERE cpd.tenant_id = ? AND cpd.id_item IN (?)`,
+        [tenant, ids]
+      );
+      for (const r of rows) extras.set(Number(r.id_item), { estoque: Number(r.estoque), preco: r.preco_venda === null ? null : Number(r.preco_venda) });
+    }
+    let itens = achados.map((i: any) => ({
+      idItem: i.idItem, sku: i.sku, nome: i.nome, codigo: i.codigo, tipo: i.tipo, vedacao: i.vedacao, folga: i.folga,
+      marca: i.marca?.nome ?? null, medidas: i.medidas, desvio: i.desvio,
+      estoque: extras.get(i.idItem)?.estoque ?? 0, preco: extras.get(i.idItem)?.preco ?? null,
+    }));
+    if (soEstoque) itens = itens.filter((i: any) => i.estoque > 0);
+
+    // Códigos padrão (tabela + medidas aprendidas) que batem e não estão cadastrados
+    const cadastrados = new Set(todos.map((i: any) => i.codigo).filter(Boolean));
+    const aprendidas = (await medidasAprendidas(tenant))
+      .filter(m => m.d !== null && m.D !== null && m.B !== null)
+      .map(m => ({ codigo: m.codigo, tipo: m.tipo as TipoRolamento, medidas: { d: m.d!, D: m.D!, B: m.B! } }));
+    const vistos = new Set<string>();
+    const padroes = filtrarPorMedidas(alvo, margem, [...aprendidas, ...padroesComMedidas()])
+      .filter(p => !cadastrados.has(p.codigo) && !vistos.has(p.codigo) && vistos.add(p.codigo))
+      .slice(0, 30);
+
+    return res.json({ itens: itens.slice(0, 100), padroes });
+  } catch (e) {
+    return erro(res, e, 'Erro ao buscar por medida.');
   }
 };

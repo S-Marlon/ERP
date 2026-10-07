@@ -105,3 +105,28 @@ const uc = lerDescricao('ROLAMENTO UC207-20 2RS C3 INA', []);
 assert(uc.codigo === 'UC207-20' && uc.vedacao === '2RS' && uc.folga === 'C3', `UC com vedação ${JSON.stringify(uc)}`);
 
 console.log('rolamentos: ok');
+
+// Busca por medidas: só anel interno (furo e largura), margem e ordem por proximidade
+{
+  const { filtrarPorMedidas, padroesComMedidas } = require('./rolamentos');
+  const lista = [
+    { cod: '6003', medidas: { d: 17, D: 35, B: 10 } },
+    { cod: '6203', medidas: { d: 17, D: 40, B: 12 } },
+    { cod: '16003', medidas: { d: 17, D: 35, B: 8 } },
+    { cod: 'sem', medidas: null },
+  ];
+  const r1 = filtrarPorMedidas({ d: 17, B: 10 }, 0, lista);
+  assert(r1.length === 1 && r1[0].cod === '6003', `exato ${JSON.stringify(r1)}`);
+  const r2 = filtrarPorMedidas({ d: 17.2, B: 9.8 }, 0.5, lista);
+  assert(r2.length === 1 && r2[0].cod === '6003' && r2[0].desvio === 0.4, `margem ${JSON.stringify(r2)}`);
+  const r3 = filtrarPorMedidas({ d: 17 }, 0, lista);
+  assert(r3.length === 3, 'só furo');
+  const r4 = filtrarPorMedidas({ d: 17, B: 8.8 }, 1.5, lista);
+  assert(r4.map((x: any) => x.cod).join() === '16003,6003', `ordem por proximidade ${r4.map((x: any) => x.cod).join()}`);
+  assert(filtrarPorMedidas({}, 1, lista).length === 0, 'sem medida não busca');
+  const padroes = padroesComMedidas();
+  assert(padroes.some((p: any) => p.codigo === '6003') && padroes.some((p: any) => p.codigo === 'UC207-20' && p.medidas.d === 31.75), 'padrões');
+  const p17 = filtrarPorMedidas({ d: 17, B: 10 }, 0, padroes).map((p: any) => p.codigo);
+  assert(p17.includes('6003'), `padrões 17x?x10 ${p17.join()}`);
+  console.log('busca por medidas: ok');
+}

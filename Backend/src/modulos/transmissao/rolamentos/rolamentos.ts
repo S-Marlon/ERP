@@ -287,3 +287,54 @@ export const montarNome = (p: {
   const marca = p.linha === 2 && (p.mesclada || !nomeMarca) ? '2ª LINHA' : nomeMarca || null;
   return [`ROLAMENTO ${codigo}`, medidas, marca].filter(Boolean).join(' | ');
 };
+
+// ---------------------------------------------------------------------------------------------
+// Busca por medidas (rolamento trazido pelo cliente, às vezes só o anel interno)
+// ---------------------------------------------------------------------------------------------
+export interface AlvoMedidas { d?: number | null; D?: number | null; B?: number | null }
+type ComMedidas = { medidas: { d: number | null; D: number | null; B: number | null } | null };
+
+/**
+ * Filtra pelos valores informados (vazio = qualquer), cada um dentro da margem (± mm), e ordena do mais próximo
+ * (soma das diferenças) para o mais distante. Sem nenhuma medida informada não devolve nada.
+ */
+export const filtrarPorMedidas = <T extends ComMedidas>(alvo: AlvoMedidas, margem: number, lista: T[]): Array<T & { desvio: number }> => {
+  const campos = (['d', 'D', 'B'] as const).filter(c => alvo[c] !== null && alvo[c] !== undefined && Number.isFinite(Number(alvo[c])));
+  if (!campos.length) return [];
+  const tol = Math.max(0, margem) + 1e-9;
+  return lista
+    .map(item => {
+      const m = item.medidas;
+      if (!m) return null;
+      let desvio = 0;
+      for (const c of campos) {
+        const v = m[c];
+        if (v === null || v === undefined) return null;
+        const dif = Math.abs(Number(v) - Number(alvo[c]));
+        if (dif > tol) return null;
+        desvio += dif;
+      }
+      return { ...item, desvio: Math.round(desvio * 1000) / 1000 };
+    })
+    .filter((x): x is T & { desvio: number } => x !== null)
+    .sort((a, b) => a.desvio - b.desvio);
+};
+
+// UC com furo em polegada mais comuns (sufixo = furo em 1/16")
+const UC_POLEGADA: Record<string, number[]> = {
+  '204': [12], '205': [14, 15, 16], '206': [17, 18, 19, 20], '207': [20, 21, 22, 23], '208': [24, 25],
+  '209': [26, 27, 28], '210': [29, 30, 31, 32], '211': [32, 33, 34, 35], '212': [36, 37, 38, 39],
+};
+
+/** Códigos padrão da tabela (com medidas), para mostrar o que existe mesmo sem estar cadastrado. */
+export const padroesComMedidas = (): Array<{ codigo: string; tipo: TipoRolamento; medidas: Medidas }> => {
+  const de = (tabela: Record<string, Medidas>, tipo: TipoRolamento) => Object.entries(tabela).map(([codigo, medidas]) => ({ codigo, tipo, medidas }));
+  const uc = Object.keys(UC_DB).flatMap(n => [
+    `UC${n}`, ...(UC_POLEGADA[n] || []).map(p => `UC${n}-${p}`),
+  ]).map(codigo => ({ codigo, tipo: 'INSERCAO_UC' as TipoRolamento, medidas: medidasDoCodigo('INSERCAO_UC', codigo)! }));
+  return [
+    ...[S60, S62, S63, S68, S69, S160, MINIATURAS].flatMap(t => de(t, 'RIGIDO_ESFERAS')),
+    ...de(S22, 'AUTOCOMPENSADOR'), ...de(S302, 'ROLOS_CONICOS'), ...de(S320, 'ROLOS_CONICOS'), ...de(S511, 'AXIAL'),
+    ...uc,
+  ].filter(p => p.medidas);
+};
