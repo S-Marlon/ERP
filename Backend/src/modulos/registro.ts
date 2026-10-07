@@ -2,7 +2,7 @@
 // e só é alcançado por aqui. O núcleo (vendas, estoque, caixa) não importa nada de módulo.
 // Para remover um módulo: tirar a pasta e a linha dele em MODULOS (as tabelas podem ficar).
 import { NextFunction, Request, Response, Router } from 'express';
-import pool from '../routes/Estoque/db.config';
+import pool from '../infra/db';
 import hidraulicaMontagensRoutes from './hidraulica/montagens/montagens.routes';
 import transmissaoRolamentosRoutes from './transmissao/rolamentos/rolamentos.routes';
 

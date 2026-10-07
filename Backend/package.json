@@ -6,10 +6,10 @@
         "start": "ts-node src/server.ts",
         "dev": "nodemon",
         "test": "echo \"Error: no test specified\" && exit 1",
-        "test-stock-edge-cases": "ts-node src/tests/stock-edge-cases.test.ts",
-        "audit-stock": "ts-node src/tests/stock-audit.ts",
-        "create-trigger": "node src/tests/create-trigger.js",
-        "cleanup-test-data": "node src/tests/cleanup-test-data.js"
+        "test-stock-edge-cases": "ts-node src/scripts/stock-edge-cases.test.ts",
+        "audit-stock": "ts-node src/scripts/stock-audit.ts",
+        "create-trigger": "node src/scripts/create-trigger.js",
+        "cleanup-test-data": "node src/scripts/cleanup-test-data.js"
     },
     "keywords": [],
     "author": "",

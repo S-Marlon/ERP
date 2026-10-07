@@ -1,7 +1,7 @@
 // Módulo Rolamentos (TRANSMISSAO_ROLAMENTOS): configuração (famílias/atributos), linha das marcas (1ª/2ª),
 // medidas aprendidas e a análise das linhas da nota de entrada. O cadastro em si usa a entrada de NF do núcleo.
 import { Request, Response } from 'express';
-import pool from '../../../routes/Estoque/db.config';
+import pool from '../../../infra/db';
 import { DICIONARIO, filtrarPorMedidas, lerDescricao, lerLinhaNota, padroesComMedidas, MarcaModulo, medidasDoCodigo, montarNome, montarSku, nomeFamiliaDoCodigo, TipoRolamento, TIPOS } from './rolamentos';
 
 const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || req.body?.tenant_id || 1);

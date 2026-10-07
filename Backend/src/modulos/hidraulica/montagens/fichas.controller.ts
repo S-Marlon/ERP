@@ -1,7 +1,7 @@
 // Fichas técnicas das mangueiras (modulo_hidraulica_montagens_mangueiras): gravadas na montagem feita na hora
 // (ligadas à venda) ou na OS; o histórico por cliente/equipamento serve para refazer a mesma mangueira.
 import { Request, Response } from 'express';
-import pool from '../../../routes/Estoque/db.config';
+import pool from '../../../infra/db';
 
 const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || req.body?.tenant_id || 1);
 const txt = (v: unknown, max: number) => String(v ?? '').trim().slice(0, max) || null;

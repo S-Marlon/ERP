@@ -1,10 +1,10 @@
 // OS de montagem (modulo_hidraulica_montagens_os): mangueiras (ficha + materiais), itens avulsos, etapas,
 // sinal (adiantamento do núcleo) e entrega (vira venda no PDV). Os materiais saem do estoque só na venda.
 import { Request, Response } from 'express';
-import pool from '../../../routes/Estoque/db.config';
-import { calcularItensDoPedido } from '../../../routes/Venda/pdv/vendas.controller';
-import { operadorDe } from '../../../routes/Venda/caixa/caixa.controller';
-import { devolverAdiantamento, registrarAdiantamento } from '../../../routes/Venda/adiantamentos/adiantamentos.controller';
+import pool from '../../../infra/db';
+import { calcularItensDoPedido } from '../../../areas/vendas/pdv/vendas.controller';
+import { operadorDe } from '../../../areas/vendas/caixa/caixa.controller';
+import { devolverAdiantamento, registrarAdiantamento } from '../../../areas/vendas/adiantamentos/adiantamentos.controller';
 import { FichaEntrada, inserirFichas } from './fichas.controller';
 
 export const ORIGEM_ADIANTAMENTO_OS = 'HIDRAULICA_MONTAGENS_OS';
