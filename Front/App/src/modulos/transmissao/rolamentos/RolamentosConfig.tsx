@@ -250,7 +250,7 @@ const RolamentosConfig: React.FC = () => {
                 action={<Button size="small" loading={reorganizando && !previaReorg} onClick={verReorganizar}>Reorganizar</Button>} />
             )}
             <div style={{ marginTop: 10 }}>
-              <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>Nome dos itens: ROLAMENTO 6205-2RS/C3 | 25 mm × 52 mm × 15 mm | SKF</Text>
+              <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>Nome dos itens: ROLAMENTO 6205-2RS/C3 | 25 mm x 52 mm x 15 mm | SKF</Text>
               <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>SKU: 6205-2RS-C3/SKF · UC207-20/FAG · 6205-ZZ/GTOP (2ª linha)</Text>
               <Space style={{ marginTop: 4 }} wrap>
                 <Button size="small" loading={renomeando && !previaNomes} onClick={verRenomear}>Renomear itens já cadastrados</Button>
@@ -270,7 +270,7 @@ const RolamentosConfig: React.FC = () => {
                 <Descriptions.Item label="Marca">{resultadoTeste.marca?.nome || (resultadoTeste.marcaTexto ? `${resultadoTeste.marcaTexto} (não cadastrada)` : '—')}</Descriptions.Item>
                 <Descriptions.Item label="Linha">{resultadoTeste.linha ? `${resultadoTeste.linha}ª` : 'defina na marca'}</Descriptions.Item>
                 <Descriptions.Item label="Medidas">
-                  {resultadoTeste.medidas ? `${mm(resultadoTeste.medidas.d)} × ${mm(resultadoTeste.medidas.D)} × ${mm(resultadoTeste.medidas.B)} mm` : 'fora da tabela'}
+                  {resultadoTeste.medidas ? `${mm(resultadoTeste.medidas.d)} x ${mm(resultadoTeste.medidas.D)} x ${mm(resultadoTeste.medidas.B)} mm` : 'fora da tabela'}
                 </Descriptions.Item>
                 <Descriptions.Item label="SKU">{resultadoTeste.sku || '—'}</Descriptions.Item>
                 <Descriptions.Item label="Códigos do fabricante" span={2}>

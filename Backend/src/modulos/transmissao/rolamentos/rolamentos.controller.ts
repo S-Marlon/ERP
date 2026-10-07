@@ -329,7 +329,7 @@ const itensDoModulo = async (tenant: number, config: ConfigRolamentos) => {
   });
 };
 
-// POST /api/modulos/transmissao/rolamentos/renomear { aplicar } — nome pelo padrão atual (ROLAMENTO 6205-2RS/C3 | 25 mm × 52 mm × 15 mm | SKF)
+// POST /api/modulos/transmissao/rolamentos/renomear { aplicar } — nome pelo padrão atual (ROLAMENTO 6205-2RS/C3 | 25 mm x 52 mm x 15 mm | SKF)
 export const renomearItens = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
   const aplicar = Boolean(req.body?.aplicar);

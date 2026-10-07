@@ -181,8 +181,9 @@ export const listarItensPdv = async (req: Request, res: Response) => {
     const params: any[] = [tenant];
 
     if (busca) {
-      const termo = `%${busca}%`;
-      where.push(`(ic.sku LIKE ? OR cpd.sku_customizado LIKE ? OR ic.nome_item LIKE ? OR cpd.nome_comercial LIKE ?
+      // "×" (sinal de multiplicação, ex.: medidas 25 mm × 52 mm) vale como "x" comum dos dois lados
+      const termo = `%${busca.replace(/×/g, 'x')}%`;
+      where.push(`(ic.sku LIKE ? OR cpd.sku_customizado LIKE ? OR REPLACE(ic.nome_item, '×', 'x') LIKE ? OR REPLACE(cpd.nome_comercial, '×', 'x') LIKE ?
                    OR EXISTS (SELECT 1 FROM comercial_unidades_venda g
                               WHERE g.tenant_id = ic.tenant_id AND g.id_item = ic.id_item AND g.gtin = ?))`);
       params.push(termo, termo, termo, termo, busca);

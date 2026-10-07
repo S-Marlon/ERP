@@ -101,7 +101,7 @@ export const montarSku = (p: {
 const mmNome = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
 
 /**
- * ROLAMENTO 6205-2RS/C3 | 25 mm × 52 mm × 15 mm | SKF — 2ª linha também só com a marca ("2ª LINHA" apenas quando
+ * ROLAMENTO 6205-2RS/C3 | 25 mm x 52 mm x 15 mm | SKF — 2ª linha também só com a marca ("2ª LINHA" apenas quando
  * juntada num item só); sem medidas, a parte do meio sai.
  */
 export const montarNome = (p: {
@@ -110,7 +110,8 @@ export const montarNome = (p: {
 }) => {
   const codigo = `${p.codigo.trim().toUpperCase()}${p.vedacao && p.vedacao !== 'ABERTO' ? `-${p.vedacao}` : ''}${p.folga ? `/${p.folga}` : ''}`;
   const m = p.medidas;
-  const medidas = m && m.d && m.D && m.B ? `${mmNome(m.d)} mm × ${mmNome(m.D)} mm × ${mmNome(m.B)} mm` : null;
+  // "x" comum (não o sinal ×) para a busca do PDV achar "25 mm x 52"
+  const medidas = m && m.d && m.D && m.B ? `${mmNome(m.d)} mm x ${mmNome(m.D)} mm x ${mmNome(m.B)} mm` : null;
   const nomeMarca = (p.marca?.nome || '').toUpperCase();
   const marca = p.linha === 2 && (p.mesclada || !nomeMarca) ? '2ª LINHA' : nomeMarca || null;
   return [`ROLAMENTO ${codigo}`, medidas, marca].filter(Boolean).join(' | ');
