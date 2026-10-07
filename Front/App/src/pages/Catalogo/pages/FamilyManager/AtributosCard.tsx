@@ -1,5 +1,5 @@
 import React from "react";
-import { Col, Card, Button, Table, Tooltip, Empty, Tag, Dropdown, MenuProps, Switch, InputNumber, Input, Select, Space } from "antd";
+import { Card, Button, Table, Tooltip, Empty, Tag, Dropdown, MenuProps, Switch, InputNumber, Input, Select } from "antd";
 import { PlusOutlined, DeleteOutlined, InfoCircleOutlined, StarFilled, SwapOutlined } from "@ant-design/icons";
 
 export type PapelAtributo = "dna" | "grade" | "ficha";

@@ -1,6 +1,6 @@
 // StockEntryHeader.tsx
 import React, { useState } from 'react';
-import { Typography, Button, Badge, Upload, Row, Col, Card, Space, Tooltip, Progress, Tag, Modal, Descriptions, Divider, Select } from 'antd';
+import { Typography, Button, Upload, Row, Col, Card, Space, Tooltip, Tag, Modal, Descriptions, Divider } from 'antd';
 import {
     UploadOutlined,
     SyncOutlined,

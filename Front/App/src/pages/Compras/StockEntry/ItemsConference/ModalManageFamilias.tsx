@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { Modal, Button, Typography, Card, List, Empty, Space, Tag, Popconfirm, message } from 'antd';
 import { PlusOutlined, DeleteOutlined, EditOutlined, TableOutlined } from '@ant-design/icons';
 import { Item, Familia } from '../types';

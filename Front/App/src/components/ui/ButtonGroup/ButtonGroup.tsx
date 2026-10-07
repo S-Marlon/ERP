@@ -1,4 +1,4 @@
-import React, { FC } from 'react';
+import { FC } from 'react';
 import { ButtonGroupProps } from './ButtonTypes';
 // 🚨 Mude o caminho abaixo para o local real do seu componente Button
 import Button from '../Button/Button'; 

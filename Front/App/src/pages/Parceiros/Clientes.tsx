@@ -1,24 +1,24 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { getClientes, createCliente } from './Utils/cliente.service'; 
 import Swal from 'sweetalert2';
-import { 
-  Layout, 
-  Input, 
-  List, 
-  Avatar, 
-  Tag, 
-  Button, 
-  Typography, 
-  Tabs, 
-  Card, 
-  Row, 
-  Col, 
-  Descriptions, 
-  Table, 
-  Modal, 
-  Form, 
-  Radio, 
-  Select, 
+import {
+  Layout,
+  Input,
+  List,
+  Avatar,
+  Tag,
+  Button,
+  Typography,
+  Tabs,
+  Card,
+  Row,
+  Col,
+  Descriptions,
+  Table,
+  Modal,
+  Form,
+  Radio,
+  Select,
   Dropdown,
   message,
   Divider,
@@ -26,27 +26,25 @@ import {
   Space,
   Checkbox,
   Switch,
-  Tooltip
 } from 'antd';
-import { 
-  SearchOutlined, 
-  PlusOutlined, 
-  ReloadOutlined, 
-  UserOutlined, 
-  EnvironmentOutlined, 
-  PhoneOutlined, 
+import {
+  SearchOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  UserOutlined,
+  EnvironmentOutlined,
+  PhoneOutlined,
   MailOutlined,
   FileTextOutlined,
   DollarCircleOutlined,
   HistoryOutlined,
-  SafetyCertificateOutlined,
   ShoppingCartOutlined,
   CalculatorOutlined,
   EllipsisOutlined,
   ShopOutlined,
   DeleteOutlined,
   BankOutlined,
-  PaperClipOutlined
+  PaperClipOutlined,
 } from '@ant-design/icons';
 
 const { Sider, Content } = Layout;

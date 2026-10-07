@@ -15,8 +15,6 @@ import { AjudaSuporte, CentralNotificacoes, DadosDaEmpresa, MeuPerfil, Preferenc
 import { ObrasModule } from './pages/Obras/ObrasModule';
 
 // Contexts
-import { ServiceProductProvider } from './context/NewServiceProductContext';
-import { ProductProvider } from './context/NewProductContext';
 
 // Formulários e subpáginas
 import CadastroCliente from './components/forms/specific/CadastroCliente/CadastroCliente'; 
@@ -25,7 +23,6 @@ import RelatorioPoco from './components/forms/specific/CadastroRelatorio/Cadastr
 import SaldoEstoque from './pages/Estoque/pages/SaldoEstoque/SaldoEstoque';
 import Movimentacoes from './pages/Estoque/pages/Movimentacoes/Movimentacoes';
 import Etiquetagem from './pages/Estoque/pages/Etiquetagem/Etiquetagem';
-import { FinalizarVenda } from "./pages/PDV/pages/FinalizarVenda";
 import PDVContent from './pages/PDV/PDV';
 import CentralVendas from './pages/PDV/CentralVendas';
 import VendasDoDia from './pages/PDV/pages/VendasDoDia/VendasDoDia';
@@ -55,7 +52,6 @@ import CatalogSku from "./pages/Catalogo/pages/CatalogSkus/CatalogSku";
 import FornecedoresList from "./pages/Compras/FornecedoresList/FornecedoresList";
 import RelatoriosPage from "./pages/Estoque/Relatorios/Relatorios";
 import RelatorioPocoPage from "./pages/Estoque/Relatorios/RelatorioPocoPage";
-import { IndustrialLandingPage } from "./pages/Dashboard/IndustrialLandingPage";
 
 import { ParceirosDashboard } from "./pages/Parceiros/ParceirosDashboard";
 import FuncionariosPage from "./pages/Parceiros/FuncionariosPage";
@@ -172,7 +168,6 @@ export default function AppLayout() {
             <Route path="/vendas/taxas" element={<TaxasPagamento />} />
             <Route path="/vendas/orcamentos" element={<Orcamentos />} />
             <Route path="/vendas/notas-fiscais" element={<NotasFiscais />} />
-            <Route path="/vendas/pdv/finalizar" element={<FinalizarVenda onBack={() => {}} />} />
             <Route path="/estoque" element={<Estoque />} />
             <Route path="/estoque/consulta" element={<SaldoEstoque />} />
             <Route path="/estoque/gerenciamento" element={<StockEntryForm />} />

@@ -1,17 +1,16 @@
-import React, { useState } from 'react';
-import { 
-  Layout, 
-  Card, 
-  Table, 
-  Button, 
-  Space, 
-  Tag, 
-  Badge, 
-  Typography, 
-  Statistic, 
-  Row, 
-  Col, 
-  Tooltip 
+import { useState } from 'react';
+import {
+  Layout,
+  Card,
+  Table,
+  Button,
+  Space,
+  Tag,
+  Typography,
+  Statistic,
+  Row,
+  Col,
+  Tooltip,
 } from 'antd';
 import { 
   ShoppingCartOutlined, 

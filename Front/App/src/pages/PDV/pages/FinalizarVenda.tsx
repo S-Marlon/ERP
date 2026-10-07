@@ -159,78 +159,15 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({ onBack, onVendaC
         return a ? Math.max(0, Math.round((a.saldo - usado) * 100) / 100) : 0;
     };
 
-    const [activeModal, setActiveModal] = useState(null); // 'calc', 'obs', 'desc', etc.
+    const [activeModal, setActiveModal] = useState<string | null>(null); // 'calc', 'obs', 'desc', etc.
     // Controle da Janela Flutuante da Calculadora
 const [calcVisible, setCalcVisible] = useState(false);
-// Se quiser outras janelas futuramente, pode usar o openWindows que você citou
 
-    const FloatingCalc = ({ onClose }) => {
-  return (
-    <Draggable handle=".window-header">
-      <div style={{
-        position: 'absolute',
-        width: '300px',
-        backgroundColor: '#fff',
-        border: '1px solid #ccc',
-        boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
-        zIndex: 1000
-      }}>
-        {/* O 'handle' é onde o usuário clica para arrastar */}
-        <div className="window-header" style={{ 
-          cursor: 'move', 
-          background: '#2c3e50', 
-          color: '#fff', 
-          padding: '10px',
-          display: 'flex',
-          justifyContent: 'space-between'
-        }}>
-          <span>🧮 Calculadora</span>
-          <button onClick={onClose} style={{ background: 'red', border: 'none', color: 'white' }}>X</button>
-        </div>
-        
-        <div className="window-body" style={{ padding: '20px' }}>
-          {/* Lógica da sua calculadora aqui */}
-          <input type="number" style={{ width: '100%' }} />
-          <div className="grid-teclado">
-            {/* ...botões numéricos... */}
-          </div>
-        </div>
-      </div>
-    </Draggable>
-  );
-};
 
-const [openWindows, setOpenWindows] = useState([]);
-
-const toggleWindow = (id) => {
-  if (openWindows.includes(id)) {
-    setOpenWindows(openWindows.filter(w => w !== id));
-  } else {
-    setOpenWindows([...openWindows, id]);
-  }
-};
 
   const closeModal = () => setActiveModal(null);
 
 
-    // Mapeamento de Cores para o Badge de Status
-    const STATUS_COLORS: Record<PaymentStatus, "warning" | "info" | "success" | "error" | "secondary"> = {
-        pending: 'warning',
-        processing: 'info',
-        paid: 'success',
-        failed: 'error',
-        cancelled: 'secondary',
-        refunded: 'error'
-    };
-
-    // Mapeamento para o Select (Exibição Amigável)
-    const STATUS_OPTIONS = [
-        { value: 'pending', label: '⏳ Pendente' },
-        { value: 'processing', label: '🔄 Processando' },
-        { value: 'paid', label: '✅ Pago' },
-        { value: 'failed', label: '❌ Falha' },
-        { value: 'cancelled', label: '🚫 Cancelado' },
-    ];
 
     // cliente e total já vêm do pai via props (comentário duplicado eliminado)
 
@@ -256,7 +193,6 @@ const toggleWindow = (id) => {
 
     const saldoRestante = Math.max(0, parseFloat((totalLiquidoNum - totalPagoNum).toFixed(2)));
     const troco = Number(totalCoberto) > totalLiquido ? Number(totalCoberto) - totalLiquido : 0;
-    const [showDiscount, setShowDiscount] = useState(false);
     // Estados para a Trava
 
 
@@ -420,7 +356,7 @@ useEffect(() => {
 
 // Foca o input quando o usuário pressiona qualquer tecla
 useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
+    const handleKeyPress = () => {
         if (valorInputRef.current && !usuarioInteragiu) {
             valorInputRef.current.focus();
         }
@@ -603,7 +539,7 @@ useEffect(() => {
         setPagamentos(pagamentos.filter((_, i) => i !== index));
     };
 
-    const etapaAtual = !metodoSelecionado ? 1 : (valorInput <= 0 ? 2 : 3);
+    const etapaAtual = !metodoSelecionado ? 1 : ((parseFloat(String(valorInput).replace(',', '.')) || 0) <= 0 ? 2 : 3);
     const [passoEmFoco, setPassoEmFoco] = useState<number | null>(null);
 
     return (

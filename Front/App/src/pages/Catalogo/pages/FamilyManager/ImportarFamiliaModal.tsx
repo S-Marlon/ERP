@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { Modal, Upload, Input, Button, Tabs, message, Space, Typography, Card, Tag, Divider, Row, Col } from 'antd';
+import { Modal, Upload, Input, Tabs, message, Space, Typography, Card, Tag, Divider, Row, Col } from 'antd';
 import { InboxOutlined, FileTextOutlined, CodeOutlined, EyeOutlined } from '@ant-design/icons';
-import { Grupo as Familia, AtributoConfig } from '../CatalogManager.types';
+import { Grupo as Familia } from '../CatalogManager.types';
 
 interface ImportarFamiliaModalProps {
   visible: boolean;

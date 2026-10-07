@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRelatorioPoco } from "./useRelatorioPoco";
 import {
     Form,
@@ -18,19 +18,17 @@ import {
     Collapse,
 } from "antd";
 import {
-    PrinterOutlined,
-    ArrowLeftOutlined,
-    CompassOutlined,
-    BuildOutlined,
-    DashboardOutlined,
-    UserOutlined,
-    AlertOutlined,
-    FileImageOutlined,
-    SettingOutlined,
-    ExperimentOutlined,
-    UploadOutlined,
-    DownloadOutlined,
-    SaveOutlined
+  PrinterOutlined,
+  ArrowLeftOutlined,
+  CompassOutlined,
+  BuildOutlined,
+  DashboardOutlined,
+  UserOutlined,
+  SettingOutlined,
+  ExperimentOutlined,
+  UploadOutlined,
+  DownloadOutlined,
+  SaveOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 

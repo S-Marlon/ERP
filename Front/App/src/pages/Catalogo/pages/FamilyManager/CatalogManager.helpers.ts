@@ -1,4 +1,4 @@
-import { AtributoConfig, Familia, Grupo, Categoria, CategoriaTreeNode } from './CatalogManager.types';
+import { Familia, Grupo, Categoria, CategoriaTreeNode } from './CatalogManager.types';
 
 export const obterDicionarioOpcoes = (exemplosString: string) => {
   const lista = exemplosString ? exemplosString.split(',').map(o => o.trim()).filter(Boolean) : [];

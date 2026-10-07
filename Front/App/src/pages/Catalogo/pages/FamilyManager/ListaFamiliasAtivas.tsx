@@ -1,5 +1,5 @@
 import React from "react";
-import { Col, Card, Space, TreeSelect, Input, Empty, Button, Tag } from "antd";
+import { Card, Space, TreeSelect, Input, Empty, Button, Tag } from "antd";
 import { STATUS_FAMILIA_CONFIG } from "./CatalogManager.types";
 import { FolderOpenOutlined, PlusOutlined } from "@ant-design/icons";
 import Swal from "sweetalert2";

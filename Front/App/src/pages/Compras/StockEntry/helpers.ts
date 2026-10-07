@@ -1,4 +1,4 @@
-import { Item, Group } from './types'; // Ajuste o caminho conforme seu projeto
+import { Item } from './types'; // Ajuste o caminho conforme seu projeto
 
 /**
  * Gera UUID simples para o Grupo

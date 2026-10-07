@@ -10,14 +10,13 @@ normalizarChaveTemplate,
 resolverValorAtributo,
 } from "./CatalogManager.helpers";
 import {
-getFamilies,
-createFamily,
-updateFamily,
-getCategorias,
-getAtributosDaCategoria,
-getAtributosGlobais,
-getDiagnosticoFormalizacao,
-formalizarItensDaFamilia,
+  getFamilies,
+  createFamily,
+  getCategorias,
+  getAtributosDaCategoria,
+  getAtributosGlobais,
+  getDiagnosticoFormalizacao,
+  formalizarItensDaFamilia,
 } from "./FamilyManager.api";
 
 type ItemFormalizacao = ItemAssociado & {

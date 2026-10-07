@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Modal, Upload, Input, Button, Tabs, message, Space, Typography, Card, Tag, Divider, Row, Col } from 'antd';
+import { Modal, Upload, Input, Tabs, message, Space, Typography, Card, Tag, Divider, Row, Col } from 'antd';
 import { InboxOutlined, FileTextOutlined, CodeOutlined, EyeOutlined } from '@ant-design/icons';
 
 interface ImportarAtributosModalProps {

@@ -15,7 +15,6 @@ ItemAttribute,
 FamiliaAttribute,
 Familia
 } from '../types';
-import { generateFamiliaId } from '../helpers';
 import ModalManageFamilias from './ModalManageFamilias';
 import { getFamilias, createFamilia } from '../services/familiaService'; 
 import { updateProdutoFamiliaEAtributos } from '../Services/VinculodeFamiliaAtributos'; 

@@ -48,26 +48,7 @@ import type { ClassificacaoItem } from './ItemsConference/ClassificacaoPim';
 import type { ValoresPorItem } from './ItemsConference/ModaisLote';
 import { restaurarItensDoStaging, lerFreteAdicionalSalvo } from './stagingRestore';
 
-interface ItemConferencia {
-tempId: string;
-nItem: string;
-sku: string;
-ean: string;
-descricao: string;
-ncm: string;
-unidade: string;
-quantidade: number;
-receivedQuantity: number;
-difference: number;
-isConfirmed: boolean;
-// Novos campos a serem capturados:
-produtoIdSistema?: number | null;
-skuSistema?: string | null;
-familia?: string | null;
-tipoEntrada?: string; // Ex: 'COMPRA_NORMAL', 'BONIFICACAO'
-}
-
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 // Monta o item no formato esperado por /compras/lotes/sincronizar-xml (upsert por item_nfe_seq)
 const buildStagingItem = (item: any) => ({
@@ -331,38 +312,6 @@ const handleChangeDestinos = (tempId: ItemId, destinos: DestinoLinha[] | null) =
 commitItemEdit([tempId], item => (JSON.stringify(item.destinos ?? null) === JSON.stringify(destinos) ? null : { destinos }));
 };
 
-const handleProcessarXml = async (parsedNfeData) => {
-try {
-setStagingError(null);
-// Opcional: define que está salvando
-
-const response = await fetch('http://localhost:3001/api/stock-entry/staging', {
-method: 'POST',
-headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({
-chaveAcesso: parsedNfeData.chaveAcesso,
-emitente: parsedNfeData.emitente,
-produtos: parsedNfeData.produtos // Array com os itens da NF-e
-})
-});
-
-const data = await response.json();
-
-if (!response.ok || !data.success) {
-throw new Error(data.message || 'Erro ao salvar no banco de dados.');
-}
-
-// Seta o ID real retornado pelo banco!
-setLoteId(data.lote_importacao_id);
-message.success(`Staging #${data.lote_importacao_id} salvo com sucesso no banco!`);
-
-} catch (err: any) {
-console.error("Erro real no staging:", err);
-setStagingError(err.message || 'Erro de conexão com o servidor.');
-setLoteId(null);
-}
-};
-
 // 1. Processamento modular completo da NFe
 const parsedNfe = useMemo<NfeDataFromXML | null>(() => {
 if (!rawXmlString) return null;
@@ -450,11 +399,9 @@ const freightItem = parseFloat(item.prod.vFrete || '0') || 0;
 const otherExpenses = parseFloat(item.prod.vOutro || '0') || 0;
 const insuranceItem = parseFloat(item.prod.vSeg || '0') || 0;
 
-const ipiObj = item.imposto?.ipi?.IPITrib || item.imposto?.IPI?.ipitrib || item.imposto?.ipi || {};
-const vIpiItem = parseFloat(ipiObj.vIPI || ipiObj.VIPI || '0') || 0;
-
-const icmsObj = item.imposto?.icms || {};
-const vStItem = Number(icmsObj.vICMSST || icmsObj.vBCST || 0) || 0;
+const vIpiItem = Number(item.imposto?.ipi?.vIPI) || 0;
+// Só o valor do ICMS-ST entra no custo (vBCST é a BASE de cálculo, não imposto)
+const vStItem = Number(item.imposto?.icms?.vICMSST) || 0;
 
 const discountItem = parseFloat(item.prod.vDesc || '0') || 0;
 
@@ -774,11 +721,6 @@ Modal.error({ title: 'Entrada não aprovada', content: e.message });
 } finally {
 setAprovando(false);
 }
-};
-
-const handleReceberTotalDoFilho = (valorCalculado: number) => {
-console.log("O valor recebido do filho é:", valorCalculado);
-// Faça o que precisar com o valor aqui (ex: salvar em um estado do pai)
 };
 
 // Quantidade recebida: altera o item (desfaz a conferência) e grava na staging com debounce,

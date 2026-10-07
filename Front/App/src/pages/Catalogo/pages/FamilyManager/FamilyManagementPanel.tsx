@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { 
   Card, 
   Form, 
@@ -16,13 +16,12 @@ import {
   Divider,
   Tooltip
 } from 'antd';
-import { 
-  InboxOutlined, 
-  PlayCircleOutlined, 
+import {
+  InboxOutlined,
+  PlayCircleOutlined,
   SwapOutlined,
-  UnorderedListOutlined,
   PlusOutlined,
-  RightOutlined
+  RightOutlined,
 } from '@ant-design/icons';
 
 const { Title, Text } = Typography;

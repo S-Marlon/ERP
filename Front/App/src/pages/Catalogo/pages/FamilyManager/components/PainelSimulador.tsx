@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, Space, Typography, Input, Select, Row, Col, InputNumber, Tag, Button, Empty, Modal, Tooltip, Table, Alert } from 'antd';
 import { EditOutlined, EyeOutlined, SettingOutlined, WarningOutlined, CheckCircleOutlined } from '@ant-design/icons';
-import { Familia, ItemAssociado, AtributoFamilia } from '../CatalogManager.types';
+import { Familia, ItemAssociado } from '../CatalogManager.types';
 import { obterDicionarioOpcoes, gerarPreviewSku, gerarPreviewNome } from '../CatalogManager.helpers';
 
 const { Text } = Typography;
