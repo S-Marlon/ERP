@@ -165,7 +165,7 @@ export const analisarLinhas = async (req: Request, res: Response) => {
     const resultado = linhas.map(l => {
       const leitura = lerLinhaNota(String(l.descricao || ''), l.codigoFornecedor, marcas, config.sufixos || {});
       const aprendida = leitura.codigo ? porCodigo.get(leitura.codigo.toUpperCase()) : undefined;
-      const tabela = leitura.codigo ? medidasDoCodigo(leitura.tipo, leitura.codigo) : null;
+      const tabela = leitura.codigo ? medidasDoCodigo(leitura.tipo, leitura.codigo, leitura.vedacao) : null;
       const medidas = aprendida && aprendida.d !== null ? { d: aprendida.d, D: aprendida.D ?? 0, B: aprendida.B ?? 0 } : tabela;
       const linha = leitura.marca?.linha ?? null;
       const mesclada = Boolean(config.segundaLinhaMesclada);

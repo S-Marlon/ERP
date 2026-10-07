@@ -145,3 +145,14 @@ console.log('rolamentos: ok');
   assert(boa.origem === 'DESCRICAO' && boa.codigo === '6200', 'descrição normal');
   console.log('código do fornecedor: ok');
 }
+
+// Miniaturas finas 68x/69x: vedada mais larga que a aberta
+{
+  const m = (cod: string, ved?: string) => JSON.stringify(medidasDoCodigo('RIGIDO_ESFERAS', cod, ved));
+  assert(m('696') === JSON.stringify({ d: 6, D: 15, B: 5 }) && m('696', 'ZZ') === JSON.stringify({ d: 6, D: 15, B: 5 }), '696');
+  assert(m('685') === JSON.stringify({ d: 5, D: 11, B: 3 }) && m('685', 'ZZ') === JSON.stringify({ d: 5, D: 11, B: 5 }), '685');
+  assert(m('688', '2RS') === JSON.stringify({ d: 8, D: 16, B: 5 }) && m('688') === JSON.stringify({ d: 8, D: 16, B: 4 }), '688');
+  const l = lerDescricao('ROLAMENTO 696 ZZ GTOP-GBR', marcas);
+  assert(l.tipo === 'RIGIDO_ESFERAS' && l.codigo === '696' && l.vedacao === 'ZZ', `696 ZZ ${JSON.stringify(l)}`);
+  console.log('miniaturas 68x/69x: ok');
+}

@@ -49,7 +49,16 @@ const S160 = serie([['16001', 12, 28, 7], ['16002', 15, 32, 8], ['16003', 17, 35
   ['16007', 35, 62, 9], ['16008', 40, 68, 9]]);
 const MINIATURAS = serie([['604', 4, 12, 4], ['605', 5, 14, 5], ['606', 6, 17, 6], ['607', 7, 19, 6], ['608', 8, 22, 7], ['609', 9, 24, 7],
   ['623', 3, 10, 4], ['624', 4, 13, 5], ['625', 5, 16, 5], ['626', 6, 19, 6], ['627', 7, 22, 7], ['628', 8, 24, 8], ['629', 9, 26, 8],
-  ['634', 4, 16, 5], ['635', 5, 19, 6]]);
+  ['634', 4, 16, 5], ['635', 5, 19, 6],
+  // Séries finas 68x e 69x (largura do rolamento aberto; a vedada é mais larga, ver VEDADAS_LARGURA)
+  ['681', 1, 3, 1], ['682', 2, 5, 1.5], ['683', 3, 7, 2], ['684', 4, 9, 2.5], ['685', 5, 11, 3], ['686', 6, 13, 3.5],
+  ['687', 7, 14, 3.5], ['688', 8, 16, 4], ['689', 9, 17, 4],
+  ['691', 1, 4, 1.6], ['692', 2, 6, 2.3], ['693', 3, 8, 3], ['694', 4, 11, 4], ['695', 5, 13, 4], ['696', 6, 15, 5],
+  ['697', 7, 17, 5], ['698', 8, 19, 6], ['699', 9, 20, 6]]);
+// Miniaturas finas cuja versão vedada (ZZ/2RS) é mais larga que a aberta: largura da vedada
+const VEDADAS_LARGURA: Record<string, number> = {
+  '683': 3, '684': 4, '685': 5, '686': 5, '687': 5, '688': 5, '689': 5, '693': 4,
+};
 const S22 = serie([['2200', 10, 30, 14], ['2201', 12, 32, 14], ['2202', 15, 35, 14], ['2203', 17, 40, 16], ['2204', 20, 47, 18], ['2205', 25, 52, 18],
   ['2206', 30, 62, 20], ['2207', 35, 72, 23], ['2208', 40, 80, 23], ['2209', 45, 85, 23], ['2210', 50, 90, 23]]);
 const S302 = serie([['30203', 17, 40, 13.25], ['30204', 20, 47, 15.25], ['30205', 25, 52, 16.25], ['30206', 30, 62, 17.25], ['30207', 35, 72, 18.25],
@@ -70,7 +79,7 @@ const HK_D: Record<number, number> = { 6: 10, 8: 12, 10: 14, 12: 18, 14: 20, 15:
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
 
 /** Medidas pelo código padrão (null quando o código não está na tabela). */
-export const medidasDoCodigo = (tipo: TipoRolamento | null, codigo: string): Medidas | null => {
+export const medidasDoCodigo = (tipo: TipoRolamento | null, codigo: string, vedacao?: string | null): Medidas | null => {
   // Prefixo de material (SS608, W6205) não muda as medidas
   const c = codigo.toUpperCase().replace(/^(SS|W)(?=\d)/, '');
   if (tipo === 'INSERCAO_UC') {
@@ -97,7 +106,9 @@ export const medidasDoCodigo = (tipo: TipoRolamento | null, codigo: string): Med
     if (/^13\d{2}$/.test(c)) return S63[`63${c.slice(2)}`] ?? null;
     return S22[c] ?? null;
   }
-  return S60[c] ?? S62[c] ?? S63[c] ?? S68[c] ?? S69[c] ?? S160[c] ?? MINIATURAS[c] ?? S302[c] ?? S320[c] ?? S511[c] ?? null;
+  const m = S60[c] ?? S62[c] ?? S63[c] ?? S68[c] ?? S69[c] ?? S160[c] ?? MINIATURAS[c] ?? S302[c] ?? S320[c] ?? S511[c] ?? null;
+  // Miniatura fina vedada: largura maior que a aberta (685 = 5x11x3; 685ZZ = 5x11x5)
+  return m && vedacao && vedacao !== 'ABERTO' && VEDADAS_LARGURA[c] ? { ...m, B: VEDADAS_LARGURA[c] } : m;
 };
 
 // ---------------------------------------------------------------------------------------------
