@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { checkSupplier, createSupplier } from '../../parceiros/fornecedores/fornecedores.api'
 import {
 Typography,
@@ -40,6 +40,8 @@ import { distributeFreight, FreightMode, FREIGHT_MODE_LABELS } from './freightDi
 import { TipoRecurso, TIPO_RECURSO_PADRAO, getTipoRecursoConfig } from './tipoRecurso';
 import { applyConfirmation, applyItemEdit, ItemId, MSG_SEM_CODIGO_INTERNO } from './conferencia';
 import { StockEntryHeader } from './StockEntryHeader';
+import { AlteracoesLista, EntradaSemNotaModal } from './semNota/EntradaSemNotaModal';
+import { DadosSemNota, EntradaSemNotaLida, dadosDaEntradaSemNota } from './semNota/entradaSemNota';
 import { sincronizarLoteXMLCompleto, buscarEstadoLote, sugerirVinculos, aprovarLoteStaging } from '../api/comprasApi';
 import { aplicarSugestoes, chaveDaLinha } from './vinculoSugerido';
 import { DestinoLinha } from './depositos';
@@ -127,6 +129,10 @@ const [stagingError, setStagingError] = useState<string | null>(null); // <--- A
 const [rawXmlString, setRawXmlString] = useState<string>('');
 const [items, setItems] = useState<any[]>([]);
 const [isProcessingItems, setIsProcessingItems] = useState<boolean>(false);
+// Entrada sem nota (compra avulsa): formulário que gera o XML interno
+const [semNotaAberta, setSemNotaAberta] = useState(false);
+// Adicionar itens numa entrada sem nota já aberta: os dados dela (itens atuais) viram a base do XML novo
+const [semNotaBase, setSemNotaBase] = useState<DadosSemNota | null>(null);
 
 // Estados de Modais
 
@@ -356,7 +362,9 @@ total: totals?.vNF,
 // Função para lidar com o upload do arquivo XML
 // Função para lidar com o upload do arquivo XML atualizada
 // Carrega a NF a partir do conteúdo do XML (upload de arquivo ou retomada de um lote da Staging)
-const processarXmlConteudo = async (content: string) => {
+// preparo: entrada sem nota vinda do catálogo — linhas já classificadas (por nItem) e já conferidas
+// alteracoes: edição da lista da entrada sem nota — linhas mudadas voltam para conferência (unidade mudada: reclassificar)
+const processarXmlConteudo = async (content: string, preparo?: { mapeamentos?: Record<string, MappingPayload>; conferido?: boolean; alteracoes?: AlteracoesLista }) => {
 setIsProcessingItems(true);
 if (content) {
 setRawXmlString(content); // Salva o XML cru em string para download/visualização futura
@@ -449,7 +457,12 @@ tipoRecurso: TIPO_RECURSO_PADRAO,
 });
 
 // Retomada: se a NF já tem lote na staging, recupera o que foi feito (mapeamento, conferência, frete...)
-let itensDaNota: any[] = initialItems;
+let itensDaNota: any[] = preparo?.mapeamentos
+? initialItems.map(it => {
+const m = preparo.mapeamentos![String(it.nItem)];
+return m ? { ...it, ...patchDoMapeamento(it, m), ...(preparo.conferido ? { isConfirmed: true } : {}) } : it;
+})
+: initialItems;
 let freteDaNota = FRETE_ADICIONAL_INICIAL;
 let modoFreteDaNota: FreightMode = 'original';
 let podeSincronizar = true;
@@ -493,6 +506,21 @@ message.info(`Conferência retomada do lote #${estado.lote.id}: ${restauracao.ma
 podeSincronizar = false;
 console.error('Erro ao buscar estado salvo da NF:', err);
 message.warning('Não foi possível recuperar o estado salvo desta NF. Nada será gravado na Staging até recarregar o XML.');
+}
+
+// Edição da lista (entrada sem nota): as validações da tela valem de novo para as linhas alteradas
+if (preparo?.alteracoes) {
+const alteracoes = preparo.alteracoes;
+itensDaNota = itensDaNota.map(it => {
+const alt = alteracoes[String(it.nItem)];
+if (!alt) return it;
+const semClassificacao = alt.reclassificar
+? { mapeamento: null, produtoIdSistema: null, skuSistema: null, skuSugerido: null, nomeItemSugerido: null, mappedId: undefined, isMapped: false }
+: {};
+return { ...it, ...semClassificacao, receivedQuantity: it.quantidade, difference: 0, isConfirmed: false };
+});
+const qtd = Object.keys(alteracoes).length;
+if (qtd > 0) message.info(`${qtd} linha(s) alterada(s) voltaram para conferência.`);
 }
 
 // Reconhecimento automático: linhas sem vínculo recebem o item sugerido (código do fornecedor ou GTIN)
@@ -579,6 +607,15 @@ const reader = new FileReader();
 reader.onload = (e) => { processarXmlConteudo(e.target?.result as string); };
 reader.readAsText(file);
 };
+
+// Entrada sem nota montada no catálogo (Cadastrar produto): chega pelo state da navegação, uma vez só
+const location = useLocation();
+useEffect(() => {
+const preparo = (location.state as any)?.entradaSemNota;
+if (!preparo?.xml) return;
+navigate(location.pathname + location.search, { replace: true, state: null });
+processarXmlConteudo(preparo.xml, { mapeamentos: preparo.mapeamentos, conferido: true });
+}, [location.state]); // eslint-disable-line react-hooks/exhaustive-deps
 
 // Retomada vinda da tela de Staging: /compras/entrada-nfe?lote=ID
 const [searchParams] = useSearchParams();
@@ -787,7 +824,10 @@ stagingError={stagingError}
 beforeUpload={beforeUpload}
 handlePrintDanfeHtml={handlePrintDanfeHtml}
 onReset={onReset}
+onEntradaSemNota={() => { setSemNotaBase(null); setSemNotaAberta(true); }}
+onAdicionarItensSemNota={modoVisualizacao || !parsedNfe ? undefined : () => { setSemNotaBase(dadosDaEntradaSemNota(parsedNfe as unknown as EntradaSemNotaLida)); setSemNotaAberta(true); }}
 />
+<EntradaSemNotaModal open={semNotaAberta} base={semNotaBase} onClose={() => { setSemNotaAberta(false); setSemNotaBase(null); }} onGerar={(xml, alteracoes) => processarXmlConteudo(xml, { alteracoes })} />
 
 {/* 2. LAYOUT DO WORKSPACE */}
 <Spin spinning={isProcessingItems} tip="Analisando e vinculando itens com o banco...">

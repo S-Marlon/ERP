@@ -1,415 +1,289 @@
-import { useState, useEffect } from 'react';
-import { 
-  Modal, 
-  Form, 
-  Input, 
-  Select, 
-  InputNumber, 
-  Switch, 
-  Row, 
-  Col, 
-  Divider, 
-  Tooltip,
-  Space,
-  Button
+// Cadastrar produtos pelo catálogo com a compra sem nota (spot/avulsa): um ou vários itens da mesma compra nascem já
+// classificados e com preço, e a compra entra pela entrada de NF (staging) — estoque e custo entram na aprovação.
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Button, Collapse, DatePicker, Divider, Flex, Form, Input, InputNumber, Modal, Select, Tag, Typography, message, theme,
 } from 'antd';
-import { InfoCircleOutlined, RocketOutlined } from '@ant-design/icons';
-import Swal from 'sweetalert2';
+import type { FormInstance } from 'antd';
+import { DeleteOutlined, PlusOutlined, ShoppingCartOutlined } from '@ant-design/icons';
+import dayjs, { Dayjs } from 'dayjs';
+import { ClassificacaoPim, CLASSIFICACAO_VAZIA, ClassificacaoItem } from '../../compras/entradaNf/itens/ClassificacaoPim';
+import { TIPOS_RECURSO } from '../../compras/entradaNf/tipoRecurso';
+import { foraDaVenda } from '../../compras/entradaNf/edicaoLote';
+import { CNPJ_COMPRA_AVULSA, NOME_COMPRA_AVULSA, montarXmlSemNota, validarSemNota } from '../../compras/entradaNf/semNota/entradaSemNota';
+import { mapeamentoItemAvulso } from '../../compras/entradaNf/semNota/itemAvulso';
+import type { MappingPayload } from '../../compras/entradaNf/itens/ProductMappingModal';
+import { createSupplier, getFornecedores, FornecedorLista } from '../../parceiros/fornecedores/fornecedores.api';
+import { fatorTaxaPreco } from '../../../shared/core/precos/taxaPreco';
+import SeletorUnidade from '../unidades/SeletorUnidade';
 
-const { Option } = Select;
+const brl = (v: number) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const MARKUP_PADRAO = 1.8;
 
 interface CreateProductModalProps {
   open: boolean;
   onClose: () => void;
-  onSave: (values: any) => void;
-  loading?: boolean;
 }
 
-interface Atributo {
-  id: number;
-  nome: string;
-  tipo: 'texto' | 'numero' | 'decimal' | 'boolean' | 'lista' | 'data';
-  sufixo?: string;
-  simbolo_unidade?: string;
-  origem: 'categoria' | 'familia';
-  opcoes?: { id: number; valor: string; }[];
+interface ItemForm {
+  nome?: string;
+  skuCustomizado?: string;
+  tipoRecurso: string;
+  ean?: string;
+  ncm?: string;
+  codigoFornecedor?: string;
+  classificacao: ClassificacaoItem;
+  quantidade?: number;
+  unidade: string;
+  custoUnitario?: number;
+  markup?: number;
+  precoVenda?: number;
 }
 
-export default function CreateProductModal({ open, onClose, onSave, loading = false }: CreateProductModalProps) {
-  const [form] = Form.useForm();
-  const [atributosDinamicos, setAtributosDinamicos] = useState<Atributo[]>([]);
+interface Valores {
+  fornecedor: number | 'AVULSA';
+  data: Dayjs;
+  observacao?: string;
+  frete?: number;
+  desconto?: number;
+  itens: ItemForm[];
+}
 
-  const unidadesMedida = [
-    { simbolo: 'PC', nome: 'Peça' },
-    { simbolo: 'UN', nome: 'Unidade' },
-    { simbolo: 'mm', nome: 'Milímetros' },
-    { simbolo: 'M', metro: 'Metro' },
-    { simbolo: 'Kg', nome: 'Quilogramas' },
-  ];
+const novoItem = (): ItemForm => ({ tipoRecurso: 'PRODUTO', unidade: 'UN', quantidade: 1, markup: MARKUP_PADRAO, classificacao: CLASSIFICACAO_VAZIA });
 
-  const categorias = [
-    { id: 1, nome: '⚙️ HIDRÁULICA INDUSTRIAL' },
-    { id: 2, nome: '🛢️ MANGUEIRAS E TUBOS' },
-    { id: 3, nome: '🔄 TRANSMISSÃO E ROLAMENTOS' }
-  ];
+// Preço = custo × markup × taxa da maquininha embutida (o mesmo cálculo da entrada de NF)
+const precoDoMarkup = (custo: number, markup: number) => Math.round(custo * markup * fatorTaxaPreco() * 100) / 100;
 
-  const familias = [
-    { id: 1, categoria_id: 1, nome: 'Motobombas', unidade_base: 'PC' },
-    { id: 2, categoria_id: 3, nome: 'TESTE', unidade_base: 'UN' }
-  ];
+/** Campos de um item da compra (um painel por item). */
+const CamposItem: React.FC<{ form: FormInstance<Valores>; nome: number }> = ({ form, nome }) => {
+  const item: Partial<ItemForm> = Form.useWatch(['itens', nome], form) || {};
+  const vendavel = !foraDaVenda(item.tipoRecurso);
+  const custo = Number(item.custoUnitario) || 0;
+  const definir = (campo: keyof ItemForm, valor: unknown) => form.setFieldValue(['itens', nome, campo], valor);
 
-  const proveedores = [
-    { id: 101, nome: 'Ebara Bombas América do Sul' },
-    { id: 102, nome: 'Gates do Brasil Comercial' },
-    { id: 103, nome: 'Distribuidora de Rolamentos SKF' }
-  ];
+  return (
+    <>
+      <Flex gap={12} wrap>
+        <Form.Item name={[nome, 'nome']} label="Nome do produto" rules={[{ required: true, whitespace: true, message: 'Informe o nome' }]} style={{ flex: '3 1 280px' }}>
+          <Input maxLength={120} placeholder="Ex.: Graxa azul de lítio 500g" />
+        </Form.Item>
+        <Form.Item name={[nome, 'skuCustomizado']} label="SKU" tooltip="Código que você usa para o produto. Vazio: o sistema gera um sequencial." style={{ flex: '1 1 140px' }}>
+          <Input maxLength={60} placeholder="Gerado se vazio" disabled={!vendavel} />
+        </Form.Item>
+        <Form.Item name={[nome, 'tipoRecurso']} label="Tipo" style={{ flex: '1 1 170px' }}>
+          <Select options={TIPOS_RECURSO.filter(t => t.value !== 'SERVICO').map(t => ({ value: t.value, label: t.label }))} />
+        </Form.Item>
+      </Flex>
+      <Flex gap={12} wrap>
+        <Form.Item name={[nome, 'ean']} label="Código de barras (EAN)" style={{ flex: '1 1 160px' }}>
+          <Input maxLength={14} placeholder="Opcional" />
+        </Form.Item>
+        <Form.Item name={[nome, 'ncm']} label="NCM" tooltip="Sem NCM o item fica pendente para emitir nota fiscal na venda." style={{ flex: '1 1 120px' }}>
+          <Input maxLength={10} placeholder="Opcional" />
+        </Form.Item>
+        <Form.Item name={[nome, 'codigoFornecedor']} label="Código na loja" tooltip="Código do produto na loja onde comprou (opcional)" style={{ flex: '1 1 130px' }}>
+          <Input maxLength={60} placeholder="Opcional" />
+        </Form.Item>
+      </Flex>
 
-  const carregarAtributosGerais = (categoriaId: number, familiaId?: number) => {
-    let atributosFinais: Atributo[] = [];
-    if (categoriaId === 1) {
-      atributosFinais = [
-        { id: 3, nome: 'Diâmetro Interno', tipo: 'decimal', simbolo_unidade: 'mm', origem: 'categoria' },
-        { id: 6, nome: 'Pressão Máxima de Trabalho', tipo: 'numero', simbolo_unidade: 'BAR', origem: 'categoria' }
-      ];
-    }
-    if (familiaId === 1) {
-      atributosFinais = [
-        { id: 1, nome: 'Voltagem', tipo: 'lista', origem: 'familia', opcoes: [{ id: 1, valor: '110V' }, { id: 2, valor: '220V' }, { id: 3, valor: '380V (Trifásico)' }, { id: 4, valor: 'Bivolt' }] },
-        { id: 2, nome: 'Potência do Motor', tipo: 'numero', sufixo: 'HP', origem: 'familia' },
-        { id: 5, nome: 'Peso Líquido', tipo: 'decimal', simbolo_unidade: 'Kg', origem: 'familia' }
-      ];
-    }
-    setAtributosDinamicos(atributosFinais);
-  };
+      <Form.Item name={[nome, 'classificacao']} label="Classificação" style={{ marginBottom: 12 }}>
+        <ClassificacaoPim value={item.classificacao || CLASSIFICACAO_VAZIA} onChange={c => definir('classificacao', c)} />
+      </Form.Item>
 
-  const handleCategoriaChange = (categoriaId: number) => {
-    form.setFieldsValue({ familia_id: undefined });
-    carregarAtributosGerais(categoriaId);
-  };
+      <Flex gap={12} wrap align="flex-end">
+        <Form.Item name={[nome, 'quantidade']} label="Quantidade" rules={[{ required: true, message: 'Quantidade' }]} style={{ flex: '1 1 110px' }}>
+          <InputNumber min={0.0001} decimalSeparator="," style={{ width: '100%' }} />
+        </Form.Item>
+        <Form.Item name={[nome, 'unidade']} label="Unidade" rules={[{ required: true, message: 'Unidade' }]} style={{ flex: '0 1 100px' }}>
+          <SeletorUnidade style={{ width: '100%' }} />
+        </Form.Item>
+        <Form.Item name={[nome, 'custoUnitario']} label="Custo unitário" rules={[{ required: true, message: 'Custo' }]} style={{ flex: '1 1 130px' }}>
+          <InputNumber prefix="R$" min={0} precision={2} decimalSeparator="," style={{ width: '100%' }}
+            onChange={c => definir('precoVenda', c ? precoDoMarkup(Number(c), Number(item.markup) || MARKUP_PADRAO) : undefined)} />
+        </Form.Item>
+        {vendavel && (
+          <>
+            <Form.Item name={[nome, 'markup']} label="Markup" style={{ flex: '0 1 120px' }}>
+              <InputNumber min={0.01} step={0.1} precision={4} decimalSeparator="," suffix="×" style={{ width: '100%' }}
+                onChange={m => definir('precoVenda', m && custo ? precoDoMarkup(custo, Number(m)) : undefined)} />
+            </Form.Item>
+            <Form.Item name={[nome, 'precoVenda']} label="Preço de venda" style={{ flex: '1 1 140px' }}>
+              <InputNumber prefix="R$" min={0} precision={2} decimalSeparator="," style={{ width: '100%' }}
+                onChange={p => { if (p && custo > 0) definir('markup', Math.round((Number(p) / (custo * fatorTaxaPreco())) * 10000) / 10000); }} />
+            </Form.Item>
+          </>
+        )}
+      </Flex>
+    </>
+  );
+};
 
-  const handleFamiliaChange = (familiaId: number) => {
-    const categoriaId = form.getFieldValue('categoria_id');
-    const familiaSelecionada = familias.find(f => f.id === familiaId);
-    
-    if (familiaSelecionada) {
-      form.setFieldsValue({ uom: familiaSelecionada.unidade_base });
-    }
-    
-    carregarAtributosGerais(categoriaId, familiaId);
-  };
-
-  // Função central para processar os dados do formulário e gerar o mock estruturado
-  const processFormData = (values: any) => {
-    // Gerar código automático se não for inserido
-    const codigoFinal = values.codItem 
-      ? values.codItem.toUpperCase() 
-      : `AUTO-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
-
-    const atributosFormatados = Object.keys(values.atributos || {}).map(key => {
-      const attrId = key.replace('attr_', '');
-      const metaAttr = atributosDinamicos.find(a => a.id === Number(attrId));
-      const val = values.atributos[key];
-
-      return {
-        atributo_id: Number(attrId),
-        tipo_entidade: 'produto',
-        valor_texto: metaAttr?.tipo === 'texto' ? val : null,
-        valor_numero: metaAttr?.tipo === 'numero' ? val : null,
-        valor_decimal: metaAttr?.tipo === 'decimal' ? val : null,
-        valor_boolean: metaAttr?.tipo === 'boolean' ? (val ? 1 : 0) : null,
-        valor_data: metaAttr?.tipo === 'data' ? val?.format('YYYY-MM-DD HH:mm:ss') : null,
-        opcao_id: metaAttr?.tipo === 'lista' ? val : null,
-      };
-    });
-
-    return {
-      tenant_id: 1,
-      nome: values.nome,
-      codItem: codigoFinal,
-      categoria_id: values.categoria_id,
-      familia_id: values.familia_id || null,
-      uom: values.uom,
-      fornecedor_id: values.fornecedor_id || null,
-      financeiro: {
-        preco_custo_fornecedor: values.preco_custo_fornecedor || 0,
-        preco_custo_spot: values.preco_custo_spot || 0,
-        preco_venda: values.preco_venda,
-      },
-      atributos_valores: atributosFormatados,
-      // Metadados simulados para o Enriquecimento Posterior (Fotos, etc)
-      midia: [],
-      status: 'rascunho'
-    };
-  };
-
-  const handleSubmit = async () => {
-    try {
-      const values = await form.validateFields();
-      const produtoMockado = processFormData(values);
-
-      Swal.fire({
-        title: 'Confirmar Cadastro?',
-        text: `O produto será salvo com o código: ${produtoMockado.codItem}`,
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonColor: '#3085d6',
-        cancelButtonColor: '#d33',
-        confirmButtonText: 'Sim, salvar!',
-        cancelButtonText: 'Cancelar'
-      }).then((result) => {
-        if (result.isConfirmed) {
-          onSave(produtoMockado);
-          Swal.fire('Salvo!', 'Produto base criado com sucesso.', 'success');
-        }
-      });
-
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const handleEnrichment = async () => {
-    try {
-      const values = await form.validateFields();
-      const produtoMockado = processFormData(values);
-
-      Swal.fire({
-        title: 'Ir para Enriquecimento?',
-        text: 'Você preencheu os dados bases. Vamos te redirecionar para a tela completa (Galeria de Fotos, Árvore Mercadológica Avançada, etc).',
-        icon: 'info',
-        showCancelButton: true,
-        confirmButtonColor: '#722ed1',
-        cancelButtonColor: '#6c757d',
-        confirmButtonText: 'Sim, enriquecer!',
-        cancelButtonText: 'Voltar'
-      }).then((result) => {
-        if (result.isConfirmed) {
-          // Aqui injetamos o payload completo com a flag extra do fluxo expandido
-          onSave({
-            ...produtoMockado,
-            _flow: 'enriquecimento_avancado',
-            status: 'em_enriquecimento'
-          });
-          Swal.fire('Redirecionando...', 'Abrindo painel multimídia do SKU.', 'success');
-        }
-      });
-
-    } catch (error) {
-      Swal.fire('Campos Pendentes', 'Por favor, preencha os dados obrigatórios iniciais antes de enriquecer.', 'warning');
-    }
-  };
+export default function CreateProductModal({ open, onClose }: CreateProductModalProps) {
+  const { token } = theme.useToken();
+  const navigate = useNavigate();
+  const [form] = Form.useForm<Valores>();
+  const [fornecedores, setFornecedores] = useState<FornecedorLista[]>([]);
+  const [enviando, setEnviando] = useState(false);
+  const [aberto, setAberto] = useState<string[]>(['0']);
 
   useEffect(() => {
-    if (!open) {
-      form.resetFields();
-      setAtributosDinamicos([]);
-    }
+    if (!open) return;
+    form.resetFields();
+    setAberto(['0']);
+    getFornecedores().then(setFornecedores).catch(() => setFornecedores([]));
   }, [open, form]);
 
-  const renderDynamicField = (attr: Atributo) => {
-    const label = attr.simbolo_unidade || attr.sufixo 
-      ? `${attr.nome} (${attr.simbolo_unidade || attr.sufixo})` 
-      : attr.nome;
+  const itens: Partial<ItemForm>[] = Form.useWatch('itens', form) || [];
+  const frete = Number(Form.useWatch('frete', form)) || 0;
+  const desconto = Number(Form.useWatch('desconto', form)) || 0;
+  const totalProdutos = itens.reduce((a, i) => a + (Number(i?.quantidade) || 0) * (Number(i?.custoUnitario) || 0), 0);
 
-    switch (attr.tipo) {
-      case 'lista':
-        return (
-          <Form.Item name={['atributos', `attr_${attr.id}`]} label={label} key={attr.id}>
-            <Select placeholder="Selecione" allowClear>
-              {attr.opcoes?.map(op => <Option key={op.id} value={op.id}>{op.valor}</Option>)}
-            </Select>
-          </Form.Item>
-        );
-      case 'numero':
-        return (
-          <Form.Item name={['atributos', `attr_${attr.id}`]} label={label} key={attr.id}>
-            <InputNumber style={{ width: '100%' }} precision={0} />
-          </Form.Item>
-        );
-      case 'decimal':
-        return (
-          <Form.Item name={['atributos', `attr_${attr.id}`]} label={label} key={attr.id}>
-            <InputNumber style={{ width: '100%' }} precision={2} step={0.01} />
-          </Form.Item>
-        );
-      case 'boolean':
-        return (
-          <Form.Item name={['atributos', `attr_${attr.id}`]} label={label} key={attr.id} valuePropName="checked">
-            <Switch checkedChildren="Sim" unCheckedChildren="Não" />
-          </Form.Item>
-        );
-      default:
-        return (
-          <Form.Item name={['atributos', `attr_${attr.id}`]} label={label} key={attr.id}>
-            <Input placeholder="Digite o valor" />
-          </Form.Item>
-        );
+  const continuar = async () => {
+    let v: Valores;
+    try {
+      v = await form.validateFields();
+    } catch (e) {
+      // Abre os itens com campo faltando, para o operador achar o erro
+      const campos = (e as { errorFields?: Array<{ name: Array<string | number> }> })?.errorFields || [];
+      const comErro = new Set<string>(campos.filter(f => f.name[0] === 'itens').map(f => String(f.name[1])));
+      if (comErro.size) setAberto(atual => [...new Set([...atual, ...comErro])]);
+      return;
+    }
+    const escolhido = v.fornecedor === 'AVULSA' ? null : fornecedores.find(f => f.id_pessoa === v.fornecedor);
+    const fornecedor = escolhido
+      ? { cnpj: escolhido.cnpj, nome: escolhido.razao_social, uf: escolhido.enderecos?.find(e => e.principal)?.estado || undefined }
+      : { cnpj: CNPJ_COMPRA_AVULSA, nome: NOME_COMPRA_AVULSA };
+    const dados = {
+      fornecedor, data: v.data.toDate(), numero: Number(String(Date.now()).slice(-9)), observacao: v.observacao,
+      frete: v.frete || 0, desconto: v.desconto || 0,
+      itens: v.itens.map(i => ({
+        descricao: String(i.nome || '').trim(), codigo: i.codigoFornecedor, ean: i.ean, ncm: i.ncm,
+        unidade: i.unidade, quantidade: Number(i.quantidade), custoUnitario: Number(i.custoUnitario),
+      })),
+    };
+    const erros = validarSemNota(dados);
+    if (erros.length) { message.warning(erros.join(' ')); return; }
+
+    // Mesmo SKU em dois itens da compra viraria um produto só: avisa antes
+    const skus = v.itens.map(i => String(i.skuCustomizado || '').trim().toUpperCase()).filter(Boolean);
+    if (new Set(skus).size !== skus.length) { message.warning('Dois itens com o mesmo SKU. Use SKUs diferentes ou deixe em branco.'); return; }
+
+    setEnviando(true);
+    try {
+      if (!escolhido) await createSupplier({ cnpj: CNPJ_COMPRA_AVULSA, name: NOME_COMPRA_AVULSA, fantasyName: 'COMPRA AVULSA' });
+      const mapeamentos: Record<string, MappingPayload> = {};
+      v.itens.forEach((i, n) => {
+        mapeamentos[String(n + 1)] = mapeamentoItemAvulso({
+          nItem: n + 1, nome: String(i.nome), skuCustomizado: i.skuCustomizado, tipoRecurso: i.tipoRecurso, unidade: i.unidade,
+          custoUnitario: Number(i.custoUnitario), markup: Number(i.markup) || MARKUP_PADRAO, classificacao: i.classificacao,
+          codigoFornecedor: i.codigoFornecedor, ean: i.ean,
+        });
+      });
+      onClose();
+      navigate('/compras/entrada-nfe', { state: { entradaSemNota: { xml: montarXmlSemNota(dados), mapeamentos } } });
+      message.info(`${v.itens.length} produto(s) prontos na entrada sem nota: confira e dê entrada para lançar o estoque.`);
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : 'Erro ao preparar o cadastro.');
+    } finally {
+      setEnviando(false);
     }
   };
 
   return (
     <Modal
-      title="Cadastrar Novo Produto (Item Base)"
+      title="Cadastrar produtos (compra sem nota)"
       open={open}
       onCancel={onClose}
-      width={780}
-      footer={[
-        <Button key="back" onClick={onClose}>
-          Cancelar
-        </Button>,
-        <Button 
-          key="enrich" 
-          type="default" 
-          icon={<RocketOutlined style={{ color: '#722ed1' }} />} 
-          style={{ borderColor: '#722ed1', color: '#722ed1' }}
-          onClick={handleEnrichment}
-        >
-          Enriquecer Produto (Completo)
-        </Button>,
-        <Button key="submit" type="primary" loading={loading} onClick={handleSubmit}>
-          Salvar Produto
-        </Button>,
-      ]}
+      width={900}
+      destroyOnHidden
+      footer={(
+        <Flex justify="space-between" align="center" gap={8} wrap>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            Abre a entrada de mercadorias já preenchida. O estoque e o custo entram quando você der entrada.
+          </Typography.Text>
+          <Flex gap={8}>
+            <Button onClick={onClose}>Cancelar</Button>
+            <Button type="primary" icon={<ShoppingCartOutlined />} loading={enviando} onClick={continuar}>Continuar para a entrada</Button>
+          </Flex>
+        </Flex>
+      )}
     >
-      <Form form={form} layout="vertical" name="create_product_form">
-        <Divider style={{ margin: '0 0 16px 0' }}>Dados Estruturais & Unidade</Divider>
-        <Row gutter={16}>
-          <Col span={6}>
-            {/* Removido o required aqui para permitir a geração automática pelo Math.random */}
-            <Form.Item name="codItem" label="Código Base">
-              <Input placeholder="Deixe em branco p/ auto-gerar" />
-            </Form.Item>
-          </Col>
-          <Col span={12}>
-            <Form.Item name="nome" label="Nome do Produto / Agrupador" rules={[{ required: true, message: 'Obrigatório' }]}>
-              <Input placeholder="Ex: Motobomba Ebara Centrifuga" />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item 
-              name="uom" 
-              label="UOM (Unidade)" 
-              rules={[{ required: true, message: 'Selecione ou digite' }]}
-            >
-              <Select 
-                placeholder="Ex: PC, UN"
-                showSearch
-                onSearch={(value) => {
-                  if (value) form.setFieldsValue({ uom: value });
-                }}
-                filterOption={(input, option) =>
-                  (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                }
-                options={unidadesMedida.map(u => ({
-                  value: u.simbolo,
-                  label: `${u.simbolo} - ${u.nome}`
-                }))}
+      <Form form={form} layout="vertical" requiredMark={false}
+        initialValues={{ fornecedor: 'AVULSA', data: dayjs(), itens: [novoItem()] }}>
+        <Divider style={{ margin: '0 0 12px' }}>Compra</Divider>
+        <Flex gap={12} wrap>
+          <Form.Item name="fornecedor" label="Comprado de" style={{ flex: '2 1 260px' }}>
+            <Select showSearch optionFilterProp="label" options={[
+              { value: 'AVULSA', label: `${NOME_COMPRA_AVULSA} — sem fornecedor` },
+              ...fornecedores.map(f => ({ value: f.id_pessoa, label: `${f.nome_fantasia || f.razao_social} · ${f.cnpj}` })),
+            ]} />
+          </Form.Item>
+          <Form.Item name="data" label="Data da compra" rules={[{ required: true, message: 'Informe a data' }]} style={{ flex: '0 1 150px' }}>
+            <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} disabledDate={d => d.isAfter(dayjs(), 'day')} />
+          </Form.Item>
+          <Form.Item name="observacao" label="Observação" style={{ flex: '2 1 220px' }}>
+            <Input maxLength={200} placeholder="Ex.: loja, recibo nº, quem comprou" />
+          </Form.Item>
+        </Flex>
+
+        <Divider style={{ margin: '4px 0 12px' }}>Itens</Divider>
+        <Form.List name="itens">
+          {(campos, { add, remove }) => (
+            <Flex vertical gap={8}>
+              <Collapse
+                activeKey={aberto}
+                onChange={k => setAberto(Array.isArray(k) ? k : [k])}
+                items={campos.map(({ key, name }, n) => {
+                  const i = itens[n] || {};
+                  const subtotal = (Number(i.quantidade) || 0) * (Number(i.custoUnitario) || 0);
+                  return {
+                    key: String(name),
+                    forceRender: true,
+                    label: (
+                      <Flex gap={8} align="center" wrap>
+                        <Tag style={{ margin: 0 }}>{n + 1}</Tag>
+                        <Typography.Text strong>{String(i.nome || '').trim() || 'Novo item'}</Typography.Text>
+                        {Number(i.quantidade) > 0 && <Typography.Text type="secondary">{i.quantidade} {i.unidade}</Typography.Text>}
+                      </Flex>
+                    ),
+                    extra: (
+                      <Flex gap={8} align="center" onClick={e => e.stopPropagation()}>
+                        <Typography.Text strong>{brl(subtotal)}</Typography.Text>
+                        <Button size="small" type="text" danger icon={<DeleteOutlined />} disabled={campos.length === 1}
+                          onClick={() => { remove(name); setAberto(a => a.filter(x => x !== String(name))); }} />
+                      </Flex>
+                    ),
+                    children: <div key={key}><CamposItem form={form} nome={name} /></div>,
+                  };
+                })}
               />
-            </Form.Item>
-          </Col>
-        </Row>
+              <Button type="dashed" icon={<PlusOutlined />} block
+                onClick={() => {
+                  add(novoItem());
+                  // O item novo abre e os outros fecham, para a lista não ficar comprida
+                  const proximo = String(Math.max(-1, ...campos.map(c => c.name)) + 1);
+                  setAberto([proximo]);
+                }}>
+                Adicionar outro item
+              </Button>
+            </Flex>
+          )}
+        </Form.List>
 
-        <Row gutter={16}>
-          <Col span={12}>
-            <Form.Item name="categoria_id" label="Categoria" rules={[{ required: true, message: 'Obrigatório' }]}>
-              <Select placeholder="Selecione" onChange={handleCategoriaChange}>
-                {categorias.map(cat => <Option key={cat.id} value={cat.id}>{cat.nome}</Option>)}
-              </Select>
-            </Form.Item>
-          </Col>
-          
-          <Col span={12}>
-            <Form.Item noStyle shouldUpdate={(prevValues, currentValues) => prevValues.categoria_id !== currentValues.categoria_id}>
-              {({ getFieldValue }) => {
-                const categoriaSelecionada = getFieldValue('categoria_id');
-                const familiasFiltradas = familias.filter(f => Number(f.categoria_id) === Number(categoriaSelecionada));
-
-                return (
-                  <Form.Item name="familia_id" label="Família de SKUs (Opcional)">
-                    <Select 
-                      placeholder={categoriaSelecionada ? "Selecione" : "Selecione uma categoria primeiro"} 
-                      onChange={handleFamiliaChange} 
-                      allowClear
-                      disabled={!categoriaSelecionada}
-                    >
-                      {familiasFiltradas.map(fam => (
-                        <Option key={fam.id} value={fam.id}>{fam.nome}</Option>
-                      ))}
-                    </Select>
-                  </Form.Item>
-                );
-              }}
-            </Form.Item>
-          </Col>
-        </Row>  
-
-        <Divider orientation="left" style={{ marginTop: 16 }}>Atribuição Comercial & Precificação</Divider>
-        <Row gutter={16}>
-          <Col span={6}>
-            <Form.Item name="fornecedor_id" label="Fornecedor Principal">
-              <Select placeholder="Selecione o parceiro" allowClear>
-                {proveedores.map(p => <Option key={p.id} value={p.id}>{p.nome}</Option>)}
-              </Select>
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item 
-              name="preco_custo_fornecedor" 
-              label={
-                <Space>
-                  Custo Tabela
-                  <Tooltip title="Preço acordado em contrato com o fornecedor.">
-                    <InfoCircleOutlined style={{ color: '#1890ff' }} />
-                  </Tooltip>
-                </Space>
-              }
-            >
-              <InputNumber style={{ width: '100%' }} precision={2} min={0} addonBefore="R$" placeholder="0,00" />
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item 
-              name="preco_custo_spot" 
-              label={
-                <Space>
-                  Custo Spot
-                  <Tooltip title="Preço pago em compras sob demanda / mercado spot.">
-                    <InfoCircleOutlined style={{ color: '#fa8c16' }} />
-                  </Tooltip>
-                </Space>
-              }
-            >
-              <InputNumber style={{ width: '100%' }} precision={2} min={0} addonBefore="R$" placeholder="0,00" />
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item 
-              name="preco_venda" 
-              label="Preço Venda Base"
-              rules={[{ required: true, message: 'Informe o preço' }]}
-            >
-              <InputNumber style={{ width: '100%' }} precision={2} min={0} addonBefore="R$" placeholder="0,00" />
-            </Form.Item>
-          </Col>
-        </Row>
-
-        {atributosDinamicos.length > 0 && (
-          <>
-            <Divider style={{ marginTop: 16 }}>
-              {form.getFieldValue('familia_id') ? 'Especificações Técnicas da Família' : 'Especificações Técnicas da Categoria'}
-            </Divider>
-            <Row gutter={16}>
-              {atributosDinamicos.map(attr => (
-                <Col span={12} key={attr.id}>
-                  {renderDynamicField(attr)}
-                </Col>
-              ))}
-            </Row>
-          </>
-        )}
+        <Flex gap={12} wrap justify="flex-end" align="flex-end"
+          style={{ marginTop: 12, padding: '10px 12px', borderRadius: token.borderRadiusLG, background: token.colorFillQuaternary }}>
+          <Form.Item name="frete" label="Frete pago" tooltip="Dividido entre os itens: entra no custo" style={{ width: 140, marginBottom: 0 }}>
+            <InputNumber prefix="R$" min={0} precision={2} decimalSeparator="," style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="desconto" label="Desconto" style={{ width: 140, marginBottom: 0 }}>
+            <InputNumber prefix="R$" min={0} precision={2} decimalSeparator="," style={{ width: '100%' }} />
+          </Form.Item>
+          <Flex vertical align="flex-end" style={{ minWidth: 190 }}>
+            <Typography.Text type="secondary">{itens.length} item(ns) · produtos {brl(totalProdutos)}</Typography.Text>
+            <Typography.Text strong style={{ fontSize: 18 }}>Total da compra {brl(totalProdutos + frete - desconto)}</Typography.Text>
+          </Flex>
+        </Flex>
       </Form>
     </Modal>
   );

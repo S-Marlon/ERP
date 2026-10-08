@@ -11,8 +11,10 @@ import {
     CloudServerOutlined,
     InfoCircleOutlined,
     ExclamationCircleOutlined,
-    ClockCircleOutlined
+    ClockCircleOutlined,
+    EditOutlined
 } from '@ant-design/icons';
+import { ehEntradaSemNota } from './semNota/entradaSemNota';
 
 const { Title, Text } = Typography;
 
@@ -28,6 +30,10 @@ interface StockEntryHeaderProps {
     beforeUpload: (file: File) => boolean;
     handlePrintDanfeHtml: () => void;
     onReset: () => void;
+    /** Abre o formulário de entrada sem nota (compra avulsa) */
+    onEntradaSemNota?: () => void;
+    /** Entrada sem nota aberta (rascunho): editar a lista de itens (só sem nota; nota com XML não se edita) */
+    onAdicionarItensSemNota?: () => void;
 }
 
 export const StockEntryHeader: React.FC<StockEntryHeaderProps> = ({
@@ -41,7 +47,9 @@ export const StockEntryHeader: React.FC<StockEntryHeaderProps> = ({
     stagingError,
     beforeUpload,
     handlePrintDanfeHtml,
-    onReset
+    onReset,
+    onEntradaSemNota,
+    onAdicionarItensSemNota
 }) => {
     const [isStagingModalOpen, setIsStagingModalOpen] = useState(false);
 
@@ -56,6 +64,11 @@ export const StockEntryHeader: React.FC<StockEntryHeaderProps> = ({
                             </Title>
                             {parsedNfe?.chaveAcesso ? (
                                 <Space size={6} wrap>
+                                    {ehEntradaSemNota(parsedNfe.chaveAcesso) && (
+                                        <Tooltip title="Compra sem nota fiscal: os itens foram digitados e seguem o mesmo fluxo da nota">
+                                            <Tag color="orange" icon={<EditOutlined />}>Entrada sem nota</Tag>
+                                        </Tooltip>
+                                    )}
                                     
                                     {stagingError ? (
                                         <Tooltip title="Clique para ver o motivo da falha ao salvar o rascunho">
@@ -160,6 +173,18 @@ export const StockEntryHeader: React.FC<StockEntryHeaderProps> = ({
                                     <Button danger icon={<DeleteOutlined />} size="middle" onClick={onReset}>
                                         Limpar
                                     </Button>
+                                </Tooltip>
+                            )}
+
+                            {parsedNfe?.chaveAcesso && ehEntradaSemNota(parsedNfe.chaveAcesso) && onAdicionarItensSemNota && (
+                                <Tooltip title="Entrada sem nota: corrigir, remover ou adicionar itens. As linhas alteradas voltam para conferência">
+                                    <Button type="primary" ghost icon={<EditOutlined />} onClick={onAdicionarItensSemNota}>Editar itens</Button>
+                                </Tooltip>
+                            )}
+
+                            {!parsedNfe?.chaveAcesso && onEntradaSemNota && (
+                                <Tooltip title="Itens comprados sem nota fiscal: digite os itens e siga a conferência normalmente">
+                                    <Button icon={<EditOutlined />} onClick={onEntradaSemNota}>Entrada sem nota</Button>
                                 </Tooltip>
                             )}
 

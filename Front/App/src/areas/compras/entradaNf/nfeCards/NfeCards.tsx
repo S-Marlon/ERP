@@ -33,6 +33,7 @@ import {
 import { NfeDataFromXML } from '../xml/utils/nfeParser';
 import { CobrancaNota } from '../cobranca/CobrancaNota';
 import { CobrancaDaNota, pagarApi } from '../../../financeiro/pagar/pagarApi';
+import { ehEntradaSemNota } from '../semNota/entradaSemNota';
 import { situacaoDoProtocolo, traduzirAmbiente, traduzirModelo, traduzirProcessoEmissao, traduzirTipoEmissao } from '../xml/utils/10-protocoloParser';
 
 interface NfeCardsProps {
@@ -227,7 +228,8 @@ const [valorFreteAdicional, setValorFreteAdicional] = useState(freteAdicionalDat
                     <Badge status="success" text={<span style={{ fontSize: 12 }}>Autorizada</span>} />
                   </Tooltip>
                 )}
-                {situacaoNf === 'SEM_PROTOCOLO' && <Tooltip title="O XML não traz o protocolo de autorização (<protNFe>)."><Badge status="warning" text={<span style={{ fontSize: 12 }}>Sem protocolo</span>} /></Tooltip>}
+                {situacaoNf === 'SEM_PROTOCOLO' && ehEntradaSemNota(data.chaveAcesso) && <Badge status="warning" text={<span style={{ fontSize: 12 }}>Entrada sem nota</span>} />}
+                {situacaoNf === 'SEM_PROTOCOLO' && !ehEntradaSemNota(data.chaveAcesso) && <Tooltip title="O XML não traz o protocolo de autorização (<protNFe>)."><Badge status="warning" text={<span style={{ fontSize: 12 }}>Sem protocolo</span>} /></Tooltip>}
                 {situacaoNf === 'NAO_AUTORIZADA' && <Tooltip title={data.protocolo?.xMotivo}><Badge status="error" text={<span style={{ fontSize: 12 }}>{data.protocolo?.cStat} - não autorizada</span>} /></Tooltip>}
                 <Tooltip title="Detalhes técnicos da nota">
                   <Button type="text" size="small" icon={<InfoCircleOutlined />} onClick={() => setIsNfDetailsOpen(true)} />
