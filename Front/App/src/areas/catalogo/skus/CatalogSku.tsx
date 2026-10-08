@@ -1,1317 +1,410 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { SkuSubTable } from './SkuSubTable';
+// Gerenciador de catálogos: central de ajustes do cadastro (dados, preço, família) com visões por tipo de item
+// (venda, almoxarifado, patrimônio) e ligação com a lista de trabalho (precificar, etiquetar, conferir...).
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-Table,
-Card,
-Tag,
-Input,
-Button,
-Space,
-Breadcrumb,
-Typography,
-Row,
-Col,
-Statistic,
-Tooltip,
-Badge,
-Alert,
-Select,
-Radio,
-message,
-Avatar,
-Modal,
-Upload,
+  Avatar, Badge, Button, Card, Col, Drawer, Dropdown, Flex, Input, Row, Segmented, Select, Space, Table, Tag, Tooltip, Typography, message, theme,
 } from 'antd';
-import {
-  AppstoreOutlined,
-  SearchOutlined,
-  PlusOutlined,
-  DatabaseOutlined,
-  ShoppingCartOutlined,
-  DeleteOutlined,
-  CheckCircleOutlined,
-  ClearOutlined,
-  ClusterOutlined,
-  UserOutlined,
-  UnorderedListOutlined,
-  ReloadOutlined,
-  PictureOutlined,
-  ImportOutlined,
-  CodeOutlined,
-  UploadOutlined,
-  PrinterOutlined,
-  FolderAddOutlined,
-} from '@ant-design/icons';
-
 import type { ColumnsType } from 'antd/es/table';
-
-import { ItemParentType, SkuChildType } from './CatalogSku.types';
-import { getProdutos, updateProduto, saveProdutosLote } from './CatalogSku.service';
+import {
+  AppstoreOutlined, ClearOutlined, ClusterOutlined, DeleteOutlined, DollarOutlined, DownOutlined, EditOutlined, FolderAddOutlined, MoreOutlined,
+  PictureOutlined, PlusOutlined, PrinterOutlined, ReloadOutlined, SearchOutlined, UnorderedListOutlined,
+} from '@ant-design/icons';
+import { SkuSubTable } from './SkuSubTable';
+import type { ItemParentType } from './CatalogSku.types';
+import { getProdutos, updateProduto } from './CatalogSku.service';
 import ProductDetailsDrawer from './ProductDetailsDrawer';
 import CreateProductModal from './CreateProductModal';
-import { generatePRN, type LabelData } from '../../estoque/utils/labelGenerator';
-import { ModalFamiliaManager } from '../../compras/entradaNf/itens/ModalFamiliaManager';
+import MoverParaFamiliaModal, { ItemParaMover } from './MoverParaFamiliaModal';
+import ProductCommercialSalesConfig from '../precos/ProductCommercialSalesConfig';
+import ExclusaoItensModal from './ExclusaoItensModal';
+import { useListaTrabalho } from '../../../shared/core/listaTrabalho/ListaTrabalhoContext';
+import { ListaTrabalhoDrawer } from '../../../shared/core/listaTrabalho/ListaTrabalhoDrawer';
+import { TAGS_LISTA, TagLista } from '../../../shared/core/listaTrabalho/listaTrabalho';
+import {
+  agruparPorFamilia, contarSituacoes, ehDaVisao, Filtros, filtrarLinhas, itensDasLinhas, Linha, ROTULO_SITUACAO, Situacao, Visao, VISOES, visaoDoTipo,
+} from './catalogoVisoes';
 
 const { Title, Text } = Typography;
-const { TextArea } = Input;
-
-export interface SkuChildType {
-  key: string;
-  id_item: number | string;
-  sku: string;
-  variacao: string;
-  marca?: string;
-  estoque: number;
-  preco_venda: number;
-  custo_gerencial: number;
-  status: 'ATIVO' | 'Inativo' | 'Esgotado';
-  imagem_url?: string | null;
-  // Novos campos vindos do select atualizado:
-  dna?: Array<{ nome: string; valor: any }> | any;
-  grade?: Array<{ nome: string; valor: any; sufixo?: string }> | any;
-}
-
-type FilterType = 'all' | 'activeSkus' | 'noStock' | 'criticalStock' | 'semFamilia' | 'naoPublicaveis';
-
-// Item fora de qualquer família (a classificar no PIM)
-const semFamilia = (p: ItemParentType) => !p.familia_id && String(p.tipo_recurso || '').toUpperCase() !== 'FAMILIA';
-
-type QuickPrintItem = LabelData & {
-id: string;
+const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const qtd = (v: number) => Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
+const porTexto = (a: unknown, b: unknown) => String(a || '').localeCompare(String(b || ''), 'pt-BR', { numeric: true, sensitivity: 'base' });
+// Valores de ordenação de uma linha (família = menor SKU, soma do estoque, menor preço)
+const skuDaLinha = (l: Linha) => (l.familiaReal ? [...l.skus.map(s => s.sku)].sort(porTexto)[0] : l.sku) || '';
+const precoDaLinha = (l: Linha) => Math.min(...l.skus.map(s => Number(s.preco_venda) || 0).map(p => (p > 0 ? p : Infinity)));
+const estoqueDaLinha = (l: Linha) => l.skus.reduce((a, s) => a + (Number(s.estoque) || 0), 0);
+const marcaDaLinha = (l: Linha) => l.skus.map(s => s.marca).filter(Boolean).sort(porTexto)[0] || '';
+const ROTULO_TIPO: Record<string, { label: string; color: string }> = {
+  PRODUTO: { label: 'Venda', color: 'blue' }, SERVICO: { label: 'Serviço', color: 'cyan' }, CONSUMO: { label: 'Consumo', color: 'orange' },
+  INSUMO: { label: 'Insumo', color: 'green' }, ATIVO: { label: 'Patrimônio', color: 'purple' },
 };
+
+const lerVisao = (): Visao => {
+  try { return (localStorage.getItem('erp.catalogo.visao') as Visao) || 'VENDA'; } catch { return 'VENDA'; }
+};
+
+const FILTROS_INICIAIS: Filtros = { busca: '', categoriaId: null, marca: null, situacao: 'TODAS', estrutura: 'TODAS' };
 
 export default function CatalogSku() {
-const [products, setProducts] = useState<ItemParentType[]>([]);
-const [loading, setLoading] = useState<boolean>(false);
+  const { token } = theme.useToken();
+  const navigate = useNavigate();
+  const trabalho = useListaTrabalho();
 
+  const [itens, setItens] = useState<ItemParentType[]>([]);
+  const [carregando, setCarregando] = useState(false);
+  const [visao, setVisaoEstado] = useState<Visao>(lerVisao);
+  const setVisao = (v: Visao) => { setVisaoEstado(v); setSelecionados([]); try { localStorage.setItem('erp.catalogo.visao', v); } catch { /* sem armazenamento */ } };
+  const [filtros, setFiltros] = useState<Filtros>(FILTROS_INICIAIS);
+  const filtrar = (patch: Partial<Filtros>) => setFiltros(f => ({ ...f, ...patch }));
+  const [selecionados, setSelecionados] = useState<React.Key[]>([]);
+  const [expandidas, setExpandidas] = useState<React.Key[]>([]);
 
-const [expandedRowKeys, setExpandedRowKeys] = useState<React.Key[]>([]);
+  // Painéis
+  const [novoAberto, setNovoAberto] = useState(false);
+  const [editando, setEditando] = useState<ItemParentType | null>(null);
+  const [precoDe, setPrecoDe] = useState<ItemParentType | null>(null);
+  const [trabalhoAberto, setTrabalhoAberto] = useState(false);
+  const [paraMover, setParaMover] = useState<ItemParaMover[]>([]);
+  // Exclusão de itens sem histórico (itens de teste)
+  const [paraApagar, setParaApagar] = useState<number[]>([]);
+  const aoApagar = (ids: number[]) => {
+    ids.forEach(id => trabalho.remover(id));
+    // Tira também da lista de precificação guardada no navegador
+    try {
+      const chave = 'erp.precificacao.lista';
+      const s = new Set(ids);
+      const lista = JSON.parse(localStorage.getItem(chave) || '[]');
+      localStorage.setItem(chave, JSON.stringify(lista.filter((l: { idItem: number }) => !s.has(l.idItem))));
+    } catch { /* sem armazenamento */ }
+    setParaApagar([]);
+    setSelecionados([]);
+    carregar();
+  };
 
-// Filtros e Seletores de Interface
-const [searchText, setSearchText] = useState('');
-const [selectedFilter, setSelectedFilter] = useState<FilterType>('all');
-const [isModalVisible, setIsModalVisible] = useState(false);
-const [modalLoading, setModalLoading] = useState(false);
-const [isDrawerVisible, setIsDrawerVisible] = useState(false);
-const [selectedProduct, setSelectedProduct] = useState<ItemParentType | null>(null);
-
-const [selectedSupplier, setSelectedSupplier] = useState<string | undefined>(undefined);
-const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
-const [selectedStructure, setSelectedStructure] = useState<string | undefined>(undefined);
-
-// ESTADOS DO MODAL JSON
-const [isJsonModalVisible, setIsJsonModalVisible] = useState(false);
-const [jsonInput, setJsonInput] = useState('');
-const [parsedJsonPreview, setParsedJsonPreview] = useState<ItemParentType[]>([]);
-
-// Estados de Seleção em Lote (Batch Actions)
-
-// Estados de Seleção em Lote (Batch Actions)
-const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
-const [selectedRows, setSelectedRows] = useState<ItemParentType[]>([]);
-
-// Estados para o Gerenciador de Famílias
-const [isUnifiedFamiliaOpen, setIsUnifiedFamiliaOpen] = useState(false);
-const [itemSelecionadoUnitario, setItemSelecionadoUnitario] = useState<any>(null);
-const [skusParaMover, setSkusParaMover] = useState<any[]>([]);
-const [familiasCatalogo, setFamiliasCatalogo] = useState<any[]>([]);
-
-// Configuração da Seleção da Tabela principal
-const rowSelection = {
-selectedRowKeys,
-onChange: (keys: React.Key[], rows: ItemParentType[]) => {
-setSelectedRowKeys(keys);
-setSelectedRows(rows);
-},
-};
-
-// Rascunho / Lote
-const [creationBatch, setCreationBatch] = useState<ItemParentType[]>([]);
-const [showBatchPanel, setShowBatchPanel] = useState(false);
-const [showPrintPanel, setShowPrintPanel] = useState(false);
-
-// Impressão Rápida
-const [quickPrintQueue, setQuickPrintQueue] = useState<QuickPrintItem[]>([]);
-const [quickPrintSize, setQuickPrintSize] = useState<'105x27' | '60x40'>('105x27');
-
-const checkIsFamily = (record: ItemParentType): boolean => {
-const isFamKey = String(record.id_item).startsWith('FAM-') || String(record.sku || '').startsWith('FAM-');
-const isTipoFamilia = String(record.tipo_recurso || '').toUpperCase() === 'FAMILIA';
-
-// Só é família se tiver mais de um SKU filho agrupado
-const hasMultipleSkus = Array.isArray(record.skus) && record.skus.length > 1;
-
-return isFamKey || isTipoFamilia || hasMultipleSkus;
-};
-
-const fetchProducts = useCallback(async () => {
-setLoading(true);
-try {
-const data = await getProdutos();
-setProducts(data);
-} catch (error: unknown) {
-const messageText = error instanceof Error ? error.message : 'Falha ao carregar os produtos do servidor.';
-message.error(messageText);
-} finally {
-setLoading(false);
-}
-}, []);
-
-useEffect(() => {
-fetchProducts();
-}, [fetchProducts]);
-
-const handleUpdateProduct = async (idItem: string | number, updatedFields: Record<string, unknown>) => {
-try {
-const rawTargetId = idItem ?? selectedProduct?.id_item ?? selectedProduct?.key;
-const normalizedTargetId = Number(rawTargetId);
-
-if (
-rawTargetId === undefined ||
-rawTargetId === null ||
-rawTargetId === '' ||
-!Number.isFinite(normalizedTargetId) ||
-normalizedTargetId <= 0 ||
-String(rawTargetId).startsWith('FAM-') ||
-String(rawTargetId).startsWith('fam-') ||
-String(rawTargetId).startsWith('prod-')
-) {
-message.error('ID do item não informado ou inválido para atualização.');
-return;
-}
-
-await updateProduto(normalizedTargetId, updatedFields);
-message.success('Produto atualizado com sucesso!');
-setIsDrawerVisible(false);
-fetchProducts();
-} catch (error: unknown) {
-const errorMessage = error instanceof Error ? error.message : 'Erro ao salvar alterações no servidor.';
-message.error(errorMessage);
-}
-};
-
-const handleSaveProduct = async (payload: Record<string, unknown>) => {
-const tempId = Date.now();
-const payloadRecord = payload as Record<string, unknown>;
-const novoItemPai: ItemParentType = {
-key: String(tempId),
-id_item: tempId,
-tenant_id: 1,
-sku: String(payloadRecord.sku ?? payloadRecord.codItem ?? ''),
-nome_item: String(payloadRecord.nome ?? payloadRecord.nome_item ?? 'Produto sem nome'),
-tipo_recurso: payloadRecord.isFamilia ? 'FAMILIA' : 'PRODUTO',
-status: 'ATIVO',
-familia_id: Number(payloadRecord.familia_id ?? 0) || null,
-categoria_id: Number(payloadRecord.categoria_id ?? 0) || null,
-categoria: payloadRecord.categoria ? String(payloadRecord.categoria) : null,
-skus: [
-{
-key: `${tempId}-0`,
-id_item: tempId,
-sku: String(payloadRecord.sku ?? payloadRecord.codItem ?? ''),
-variacao: 'Principal',
-marca: payloadRecord.marca ? String(payloadRecord.marca) : 'Própria',
-estoque: Number(payloadRecord.estoque_inicial ?? 0),
-preco_venda: Number((payloadRecord.financeiro as Record<string, unknown> | undefined)?.preco_venda ?? 0),
-custo_gerencial: Number((payloadRecord.financeiro as Record<string, unknown> | undefined)?.custo_gerencial ?? 0),
-status: 'ATIVO'
-}
-]
-};
-
-setCreationBatch(prev => [novoItemPai, ...prev]);
-setShowBatchPanel(true);
-setIsModalVisible(false);
-message.info('Item adicionado à fila de criação.');
-};
-
-const handleMoveSkus = (selectedItems: any[], actionType: 'move' | 'ungroup') => {
-if (actionType === 'ungroup') {
-(async () => {
-try {
-for (const child of selectedItems) {
-const realId = child.id_item;
-if (realId) {
-await updateProduto(realId, { familia_id: null });
-}
-}
-message.success(`${selectedItems.length} item(ns) desagrupado(s) com sucesso!`);
-fetchProducts();
-} catch (error) {
-message.error('Erro ao desagrupar os itens.');
-}
-})();
-} else {
-const itensParaMover = selectedItems.map(item => ({
-...item,
-tempId: String(item.sku || item.id_item),
-nItem: String(item.id_item),
-nome_item: item.nome_item || item.descricao || '',
-descricao: item.nome_item || item.descricao || '',
-}));
-setSkusParaMover(itensParaMover);
-setItemSelecionadoUnitario(null);
-setSelectedRowKeys(itensParaMover.map(item => item.tempId));
-setIsUnifiedFamiliaOpen(true);
-}
-};
-
-const handleJsonInputChange = (val: string) => {
-setJsonInput(val);
-if (!val.trim()) {
-setParsedJsonPreview([]);
-return;
-}
-
-try {
-const parsed = JSON.parse(val);
-const itemsArray = Array.isArray(parsed) ? parsed : [parsed];
-
-const validatedItems: ItemParentType[] = itemsArray.map((item: unknown, idx: number) => {
-const itemRecord = item as Record<string, unknown>;
-const tempId = Number(itemRecord.id_item ?? Date.now() + idx);
-const mainSku = String(itemRecord.sku ?? `SKU-AUTO-${tempId}`);
-
-const innerSkus: SkuChildType[] = Array.isArray(itemRecord.skus) && (itemRecord.skus as unknown[]).length > 0
-? (itemRecord.skus as unknown[]).map((skuItem: unknown, sIdx: number) => {
-const skuRecord = skuItem as Record<string, unknown>;
-return {
-key: String(skuRecord.key ?? `${tempId}-${sIdx}`),
-id_item: tempId,
-sku: String(skuRecord.sku ?? `${mainSku}-${sIdx + 1}`),
-variacao: String(skuRecord.variacao ?? 'Padrão'),
-marca: skuRecord.marca ? String(skuRecord.marca) : String(itemRecord.marca ?? 'Própria'),
-estoque: Number(skuRecord.estoque ?? itemRecord.estoque ?? 0),
-preco_venda: Number(skuRecord.preco_venda ?? itemRecord.preco_venda ?? itemRecord.preco ?? 0),
-custo_gerencial: Number(skuRecord.custo_gerencial ?? itemRecord.custo_gerencial ?? itemRecord.custo ?? 0),
-status: String(skuRecord.status ?? 'ATIVO') as SkuChildType['status'],
-imagem_url: skuRecord.imagem_url ? String(skuRecord.imagem_url) : (typeof itemRecord.imagem_url === 'string' ? String(itemRecord.imagem_url) : null)
-};
-})
-: [
-{
-key: `${tempId}-0`,
-id_item: tempId,
-sku: mainSku,
-variacao: String(itemRecord.variacao ?? 'Principal'),
-marca: itemRecord.marca ? String(itemRecord.marca) : 'Própria',
-estoque: Number(itemRecord.estoque ?? 0),
-preco_venda: Number(itemRecord.preco_venda ?? itemRecord.preco ?? 0),
-custo_gerencial: Number(itemRecord.custo_gerencial ?? itemRecord.custo ?? 0),
-status: 'ATIVO' as SkuChildType['status'],
-imagem_url: typeof itemRecord.imagem_url === 'string' ? String(itemRecord.imagem_url) : null
-}
-];
-
-return {
-key: String(tempId),
-id_item: tempId,
-tenant_id: 1,
-sku: mainSku,
-nome_item: String(itemRecord.nome_item ?? itemRecord.nome ?? 'Produto Sem Nome'),
-tipo_recurso: String(itemRecord.tipo_recurso ?? 'PRODUTO'),
-status: String(itemRecord.status ?? 'ATIVO') as ItemParentType['status'],
-familia_id: Number(itemRecord.familia_id ?? 0) || null,
-categoria_id: Number(itemRecord.categoria_id ?? 0) || null,
-skus: innerSkus
-};
-});
-
-setParsedJsonPreview(validatedItems);
-} catch {
-setParsedJsonPreview([]);
-}
-};
-
-const handleFileUpload = (file: File) => {
-const reader = new FileReader();
-reader.onload = (e) => {
-const content = e.target?.result as string;
-handleJsonInputChange(content);
-};
-reader.readAsText(file);
-return false;
-};
-
-const handleImportJsonToBatch = () => {
-if (parsedJsonPreview.length === 0) {
-message.error('Cole ou envie um JSON válido primeiro!');
-return;
-}
-
-setCreationBatch(prev => [...parsedJsonPreview, ...prev]);
-setShowBatchPanel(true);
-message.success(`${parsedJsonPreview.length} item(ns) adicionado(s) à fila de criação!`);
-
-setIsJsonModalVisible(false);
-setJsonInput('');
-setParsedJsonPreview([]);
-};
-
-const handleConfirmEntireBatch = async () => {
-setModalLoading(true);
-try {
-console.log('📤 [BATCH INSERT] Payload sendo enviado ao backend:', JSON.stringify(creationBatch, null, 2));
-console.log('📤 [BATCH INSERT] Detalhando os SKUs de cada item:');
-creationBatch.forEach((item, idx) => {
-console.log(`  Item ${idx}: ${item.nome_item} (SKU: ${item.sku})`);
-item.skus.forEach((sku, skuIdx) => {
-console.log(`    SKU ${skuIdx}: preco_venda=${sku.preco_venda}, custo_gerencial=${sku.custo_gerencial}`);
-});
-});
-
-await saveProdutosLote(creationBatch);
-message.success(`${creationBatch.length} produtos salvos com sucesso no banco!`);
-setCreationBatch([]);
-setShowBatchPanel(false);
-fetchProducts();
-} catch (error: unknown) {
-const errorMessage = error instanceof Error ? error.message : 'Erro ao persistir o lote no banco de dados.';
-message.error(errorMessage);
-} finally {
-setModalLoading(false);
-}
-};
-
-const removeItemFromBatch = (key: string) => {
-setCreationBatch(prev => prev.filter(item => item.key !== key));
-};
-
-const addToQuickPrintQueue = (record: ItemParentType) => {
-const sourceSkus = record.skus?.length ? record.skus : [
-{
-key: String(record.key || record.id_item),
-id_item: record.id_item,
-sku: record.sku,
-variacao: 'Principal',
-marca: 'Própria',
-estoque: 0,
-preco_venda: 0,
-custo_gerencial: 0,
-status: record.status,
-imagem_url: null,
-} as SkuChildType
-];
-
-const nextItems = sourceSkus.map((sku, index) => {
-const displayName = record.familia_id
-? `${record.nome_item}${sku.variacao && sku.variacao !== 'Principal' ? ` - ${sku.variacao}` : ''}`
-: record.nome_item;
-
-return {
-id: `${record.id_item}-${sku.id_item ?? record.id_item}-${sku.sku ?? record.sku}-${index}`,
-name: displayName,
-sku: String(sku.sku || record.sku || 'SEM-SKU'),
-price: Number(sku.preco_venda ?? 0),
-quantity: 1,
-unit: 'UN',
-isPromo: false,
-batch: '',
-expiryDate: '',
-gtin: String(sku.sku || record.sku || 'SEM-SKU'),
-} satisfies QuickPrintItem;
-});
-
-setQuickPrintQueue(prev => {
-const ids = new Set(prev.map(item => item.id));
-const merged = [...prev];
-
-nextItems.forEach((item) => {
-if (!ids.has(item.id)) {
-merged.push(item);
-ids.add(item.id);
-}
-});
-
-return merged;
-});
-
-message.success(`${nextItems.length} item(ns) adicionado(s) à fila de impressão rápida.`);
-};
-
-const removeFromQuickPrintQueue = (id: string) => {
-setQuickPrintQueue(prev => prev.filter(item => item.id !== id));
-};
-
-const handlePrintQuickQueue = () => {
-if (quickPrintQueue.length === 0) {
-message.warning('A fila de impressão rápida está vazia.');
-return;
-}
-
-generatePRN(quickPrintQueue, quickPrintSize);
-message.success(`Arquivo .PRN gerado com ${quickPrintQueue.length} etiqueta(s).`);
-};
-
-const clearQuickPrintQueue = () => {
-setQuickPrintQueue([]);
-message.info('Fila de impressão rápida limpa.');
-};
-
-const parentColumns: ColumnsType<ItemParentType> = React.useMemo(() => [
-{
-title: 'SKU Master',
-dataIndex: 'sku',
-key: 'sku',
-width: '120px',
-render: (text) => <Text code style={{ fontSize: '13px', fontWeight: 'bold' }}>{text}</Text>,
-},
-{
-title: 'Imagem',
-key: 'imagem',
-width: '60px',
-render: (_, record) => {
-const imgSrc = record.skus?.[0]?.imagem_url;
-return (
-<Avatar
-shape="square"
-size={44}
-src={imgSrc}
-icon={<PictureOutlined style={{ color: '#bfbfbf' }} />}
-style={{ backgroundColor: '#f5f5f5', border: '1px solid #d9d9d9', borderRadius: '6px' }}
-/>
-);
-},
-},
-{
-title: 'Estrutura',
-key: 'estrutura_variacoes',
-width: '110px',
-render: (_, record) => {
-const isFamily = checkIsFamily(record);
-const skus: SkuChildType[] = record.skus || [];
-
-return (
-<Space size="small" wrap>
-{isFamily ? (
-<>
-<Tag color="purple" icon={<ClusterOutlined />}>Família</Tag>
-<Tag color="blue">{skus.length} Skus</Tag>
-</>
-) : (
-<Tag color="default" icon={<UserOutlined />}>Individual</Tag>
-)}
-</Space>
-);
-},
-},
-{
-title: 'Nome do Produto / Família',
-dataIndex: 'nome_item',
-key: 'nome_item',
-render: (text, record) => <Text strong>{text}</Text>,
-},
-{
-title: 'Categoria',
-key: 'categoria',
-width: '250px',
-render: (_, record) => <Text>{record.categoria || '-'}</Text>
-},
-{
-title: 'Marca',
-key: 'marca',
-width: '110px',
-render: (_, record) => {
-const isFamily = checkIsFamily(record);
-const skus = record.skus || [];
-if (skus.length === 0) return <Text type="secondary">-</Text>;
-
-const marcasUnicas = Array.from(new Set(skus.map(s => s.marca).filter(Boolean)));
-if (marcasUnicas.length === 0) return <Text type="secondary">-</Text>;
-
-// Lista de cores disponíveis no Ant Design para tags
-const coresAntd = ['magenta', 'red', 'volcano', 'orange', 'gold', 'lime', 'green', 'cyan', 'blue', 'geekblue', 'purple'];
-
-// Função simples que transforma o nome da marca em um número para escolher sempre a mesma cor
-const obterCorDaMarca = (nomeMarca: string) => {
-let hash = 0;
-for (let i = 0; i < nomeMarca.length; i++) {
-hash = nomeMarca.charCodeAt(i) + ((hash << 5) - hash);
-}
-const index = Math.abs(hash) % coresAntd.length;
-return coresAntd[index];
-};
-
-return (
-<Space size={[0, 4]} wrap>
-{marcasUnicas.map((marca) => {
-const nomeStr = String(marca);
-const corTag = obterCorDaMarca(nomeStr);
-return (
-<Tag key={nomeStr} color={corTag} style={{ margin: '1px' }}>
-{nomeStr}
-</Tag>
-);
-})}
-</Space>
-);
-},
-},
-{
-title: 'Preço Venda',
-key: 'precoVendaMedio',
-width: '150px',
-render: (_, record) => {
-const skus = record.skus || [];
-if (skus.length === 0) return 'R$ 0,00';
-const precos = skus.map(s => s.preco_venda || 0);
-const minPreco = Math.min(...precos);
-const maxPreco = Math.max(...precos);
-
-if (minPreco === maxPreco) return `R$ ${minPreco.toFixed(2)}`;
-return <span style={{ fontSize: '11px' }}>{`R$ ${minPreco.toFixed(2)} - R$ ${maxPreco.toFixed(2)}`}</span>;
-},
-},
-{
-title: 'Estoque',
-key: 'estoqueTotal',
-width: '90px',
-render: (_, record) => {
-const skus = record.skus || [];
-const total = skus.reduce((acc, sku) => acc + (sku.estoque || 0), 0);
-return <Text strong>{total} UN</Text>;
-},
-},
-{
-title: 'Status',
-key: 'statusGeral',
-width: '100px',
-render: (_, record) => {
-const skus = record.skus || [];
-const hasAtivo = skus.some(sku => sku.status === 'ATIVO');
-const hasSemEstoque = skus.some(sku => sku.status === 'Esgotado');
-
-if (hasAtivo) return <Tag color="green">Ativo</Tag>;
-if (hasSemEstoque) return <Tag color="orange">Esgotado</Tag>;
-return <Tag color="red">Inativo</Tag>;
-},
-},
-{
-title: 'Ações',
-key: 'action',
-width: '150px',
-render: (_, record) => {
-const isFamily = checkIsFamily(record);
-return (
-<Space size="small">
-<Button
-type="default"
-size="small"
-icon={<PrinterOutlined />}
-onClick={() => addToQuickPrintQueue(record)}
->
-Etiqueta
-</Button>
-<Button
-type="primary"
-size="small"
-onClick={() => {
-if (isFamily) {
-// Se for família, abre o gerenciador unificado/modal da família
-setItemSelecionadoUnitario(record);
-setIsUnifiedFamiliaOpen(true);
-} else {
-// Se for produto individual, abre o Drawer de edição normal
-setSelectedProduct(record);
-setIsDrawerVisible(true);
-}
-}}
->
-Editar
-</Button>
-</Space>
-);
-},
-}
-], []);
-
-const groupedProducts = React.useMemo(() => {
-  const map = new Map<string, ItemParentType>();
-
-  products.forEach((item) => {
-    const groupKey = item.familia_id ? `family-${item.familia_id}` : `single-${item.id_item}`;
-    const familyName = item.familia_id ? (item.familia || item.nome_familia || 'Família') : item.nome_item;
-
-    if (!map.has(groupKey)) {
-      map.set(groupKey, {
-        key: groupKey,
-        id_item: item.id_item,
-        tenant_id: item.tenant_id,
-        sku: item.familia_id ? `FAM-${item.familia_id}` : item.sku,
-        nome_item: familyName,
-        tipo_recurso: item.familia_id ? 'FAMILIA' : item.tipo_recurso,
-        status: item.status,
-        categoria_id: item.categoria_id,
-        categoria: item.categoria,
-        familia_id: item.familia_id,
-        skus: [],
-      });
+  const carregar = useCallback(async () => {
+    setCarregando(true);
+    try {
+      setItens(await getProdutos());
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : 'Falha ao carregar o catálogo.');
+    } finally {
+      setCarregando(false);
     }
+  }, []);
+  useEffect(() => { carregar(); }, [carregar]);
 
-    const parent = map.get(groupKey)!;
-    
-    // Pega o primeiro SKU ou usa o próprio item como base se vier achatado do SQL
-    const rawSkuData = item.skus?.[0] || item;
+  // Visão por tipo → famílias agrupadas → filtros
+  const contagemVisao = useMemo(() => {
+    const c: Record<Visao, number> = { VENDA: 0, ALMOXARIFADO: 0, PATRIMONIO: 0, TODOS: itens.length };
+    itens.forEach(i => { c[visaoDoTipo(i.tipo_recurso)]++; });
+    return c;
+  }, [itens]);
+  const linhasDaVisao = useMemo(() => agruparPorFamilia(itens.filter(i => ehDaVisao(i.tipo_recurso, visao))), [itens, visao]);
+  const linhas = useMemo(() => filtrarLinhas(linhasDaVisao, filtros), [linhasDaVisao, filtros]);
+  const contagem = useMemo(() => contarSituacoes(linhasDaVisao), [linhasDaVisao]);
+  const ehVenda = visao === 'VENDA' || visao === 'TODOS';
 
-    const candidateChild: SkuChildType = {
-      key: String(item.id_item),
-      id_item: item.id_item,
-      sku: item.sku,
-      nome_item: item.nome_item || item.descricao || 'Item sem nome',
-      variacao: rawSkuData.variacao || 'Principal',
-      marca: rawSkuData.marca || 'Própria',
-      estoque: rawSkuData.estoque ?? 0,
-      preco_venda: rawSkuData.preco_venda ?? 0,
-      custo_gerencial: rawSkuData.custo_gerencial ?? 0,
-      status: rawSkuData.status ?? item.status,
-      imagem_url: rawSkuData.imagem_url ?? null,
-      publicavel: rawSkuData.publicavel,
-      motivos_publicacao: rawSkuData.motivos_publicacao,
-      // 🚀 Repassa o DNA e a Grade vindos direto da nova query do backend
-      dna: (item as any).dna || rawSkuData.dna || [],
-      grade: (item as any).grade || rawSkuData.grade || [],
-    };
+  // Opções de filtro a partir do que existe na visão (nada fixo no código)
+  const categorias = useMemo(() => {
+    const m = new Map<number, string>();
+    linhasDaVisao.forEach(l => { if (l.categoria_id) m.set(Number(l.categoria_id), l.categoria || `Categoria ${l.categoria_id}`); });
+    return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1])).map(([value, label]) => ({ value, label }));
+  }, [linhasDaVisao]);
+  const marcas = useMemo(() => {
+    const s = new Set<string>();
+    linhasDaVisao.forEach(l => l.skus.forEach(x => { if (x.marca) s.add(x.marca); }));
+    return [...s].sort().map(m => ({ value: m, label: m }));
+  }, [linhasDaVisao]);
 
-    const alreadyExists = parent.skus.some((sku) => {
-      const matchesId = String(sku.id_item) === String(candidateChild.id_item);
-      const matchesSku = String(sku.sku || '').trim() === String(candidateChild.sku || '').trim();
-      return matchesId || matchesSku;
-    });
-
-    if (!alreadyExists) {
-      parent.skus.push(candidateChild);
-    }
+  // ---------------------------------------------------------------- lista de trabalho
+  const linhasSelecionadas = linhas.filter(l => selecionados.includes(l.key));
+  const mandar = (alvo: Linha[], tag: TagLista, irPara?: string) => {
+    const lista = itensDasLinhas(alvo);
+    if (!lista.length) return;
+    trabalho.adicionarVarios(lista, { tags: [tag], origem: 'Gerenciador de Catálogos' });
+    message.success(`${lista.length} item(ns) na lista de trabalho: ${TAGS_LISTA[tag].label}.`);
+    setSelecionados([]);
+    if (irPara) navigate(irPara);
+  };
+  const menuTarefas = (alvo: () => Linha[], comApagar = false) => ({
+    items: [
+      ...(Object.keys(TAGS_LISTA) as TagLista[])
+        .filter(t => ehVenda || (t !== 'ETIQUETAR' && t !== 'PRECIFICAR'))
+        .map(t => ({ key: t, label: `Lista de trabalho: ${TAGS_LISTA[t].label}`, onClick: () => mandar(alvo(), t) })),
+      ...(comApagar ? [
+        { type: 'divider' as const },
+        { key: 'apagar', danger: true, icon: <DeleteOutlined />, label: 'Apagar item (só sem histórico)', onClick: () => setParaApagar(itensDasLinhas(alvo()).map(i => i.idItem)) },
+      ] : []),
+    ],
   });
+  const naListaDeTrabalho = (l: Linha) => l.skus.some(s => trabalho.temItem(Number(s.id_item)));
 
-  return Array.from(map.values()).filter((parent) => {
-    const isFamilyRoot = Boolean(parent.familia_id) || parent.tipo_recurso === 'FAMILIA';
-    return isFamilyRoot ? parent.skus.length > 0 : true;
-  });
-}, [products]);
+  // ---------------------------------------------------------------- família em lote
+  const definirFamilia = (alvo: Linha[]) => setParaMover(alvo.flatMap(l => l.skus.map(s => ({
+    idItem: Number(s.id_item), sku: s.sku, nome: s.nome_item || l.nome_item, familiaId: l.familiaReal ? l.familia_id : null,
+  }))));
+  // Variação aberta pela sub-tabela da família: o cadastro completo do item está em `itens`
+  const itemPorId = (id: number) => itens.find(i => Number(i.id_item) === id) || null;
 
-const filteredData = React.useMemo(() => {
-return groupedProducts.filter(item => {
-const matchesSearch =
-item.nome_item?.toLowerCase().includes(searchText.toLowerCase()) ||
-item.sku?.toLowerCase().includes(searchText.toLowerCase()) ||
-item.skus.some(sku => sku.sku.toLowerCase().includes(searchText.toLowerCase()));
-
-if (!matchesSearch) return false;
-
-const skus = item.skus || [];
-
-if (selectedFilter === 'noStock' && !skus.some(sku => sku.estoque === 0)) return false;
-if (selectedFilter === 'criticalStock' && !skus.some(sku => sku.estoque > 0 && sku.estoque <= 5)) return false;
-if (selectedFilter === 'activeSkus' && !skus.some(sku => sku.estoque > 0)) return false;
-if (selectedFilter === 'semFamilia' && !semFamilia(item)) return false;
-if (selectedFilter === 'naoPublicaveis' && !skus.some(sku => sku.publicavel === false)) return false;
-
-if (selectedSupplier && !skus.some(sku => sku.marca?.toLowerCase() === selectedSupplier.toLowerCase())) return false;
-if (selectedCategory && String(item.categoria_id) !== selectedCategory) return false;
-
-const isFamily = checkIsFamily(item);
-if (selectedStructure === 'familia' && !isFamily) return false;
-if (selectedStructure === 'individual' && isFamily) return false;
-
-return true;
-});
-}, [groupedProducts, searchText, selectedFilter, selectedSupplier, selectedCategory, selectedStructure]);
-
-const handleClearAllFilters = () => {
-setSelectedFilter('all');
-setSelectedSupplier(undefined);
-setSelectedCategory(undefined);
-setSelectedStructure(undefined);
-setSearchText('');
-};
-
-const sampleJsonTemplate = `[
-{
-"sku": "MANG-38-GAT",
-"nome_item": "Mangueira Hidráulica 3/8",
-"categoria_id": 7,
-"marca": "Gates",
-"preco_venda": 145.00,
-"custo_gerencial": 85.00,
-"estoque": 20,
-"variacao": "Bitola 3/8 - 100M"
-}
-]`;
-
-return (
-
-<div style={{ padding: '12px 48px', background: '#f0f2f5', minHeight: '100vh' }}>
-
-{/* 🎨 CSS Injetado diretamente para ajustar a fusão da linha com a sub-tabela */}
-<style>{`
-/* Estilos anteriores de fusão da linha */
-.ant-table-row.parent-row-expanded > td {
-border-bottom: none !important;
-background-color: #f6f9fc !important;
-}
-.ant-table-expanded-row > td {
-border-top: none !important;
-padding: 12px 24px !important;
-}
-
-/* 🎨 Novo estilo para destacar o botão de expandir (Famílias) */
-.ant-table-row-expand-icon {
-background-color: #1890ff !important; /* Azul bem chamativo do Ant Design (ou use #52c41a para verde) */
-border-color: #1890ff !important;
-color: #ffffff !important;
-border-radius: 4px !important;
-font-weight: bold;
-}
-
-/* Ajusta a cor do ícone interno (+ / -) para branco */
-.ant-table-row-expand-icon::before,
-.ant-table-row-expand-icon::after {
-background: #ffffff !important;
-}
-
-/* Efeito hover para quando passar o mouse por cima */
-.ant-table-row-expand-icon:hover {
-background-color: #40a9ff !important;
-border-color: #40a9ff !important;
-}
-`}</style>
-
-<Breadcrumb style={{ marginBottom: '16px' }}>
-<Breadcrumb.Item onClick={() => window.history.back()} style={{ cursor: 'pointer' }}>Voltar</Breadcrumb.Item>
-<Breadcrumb.Item>Catálogo</Breadcrumb.Item>
-<Breadcrumb.Item>Gerenciador de Catálogo</Breadcrumb.Item>
-</Breadcrumb>
-as
-<Row justify="space-between" align="middle" style={{ marginBottom: '12px' }}>
-<Col>
-<Title level={2} style={{ margin: 0, display: 'flex', alignItems: 'center' }}>
-<AppstoreOutlined style={{ marginRight: '12px', color: '#1890ff' }} />
-Gerenciador de Catálogos
-</Title>
-</Col>
-<Col>
-<Space size="middle">
-<Button
-type="default"
-icon={<ImportOutlined />}
-onClick={() => setIsJsonModalVisible(true)}
-style={{ borderColor: '#722ed1', color: '#722ed1' }}
->
-Importar JSON
-</Button>
-<Button icon={<ReloadOutlined />} onClick={fetchProducts} loading={loading}>
-Atualizar
-</Button>
-<Badge count={creationBatch.length} status="processing">
-<Button
-type={creationBatch.length > 0 ? "dashed" : "default"}
-icon={<PrinterOutlined />}
-onClick={() => setShowPrintPanel(!showPrintPanel)}
->
-Fila de Impressão
-</Button>
-
-<Button
-type={creationBatch.length > 0 ? "dashed" : "default"}
-icon={<ShoppingCartOutlined />}
-onClick={() => setShowBatchPanel(!showBatchPanel)}
-disabled={creationBatch.length === 0}
->
-Fila de Criação
-</Button>
-
-
-</Badge>
-<Button type="primary" icon={<PlusOutlined />} size="large" onClick={() => setIsModalVisible(true)}>
-Adicionar Novo
-</Button>
-</Space>
-</Col>
-</Row>as
-
-{showBatchPanel && creationBatch.length > 0 && (
-<Card
-title="📋 Itens Aguardando Confirmação"
-style={{ marginBottom: 12, border: '2px dashed #1890ff', background: '#e6f7ff' }}
-extra={
-<Button
-type="primary"
-loading={modalLoading}
-icon={<CheckCircleOutlined />}
-onClick={handleConfirmEntireBatch}
-style={{ background: '#52c41a', borderColor: '#52c41a' }}
->
-Salvar Todos no Banco ({creationBatch.length})
-</Button>
-}
->
-<Alert
-message="Produtos temporários na fila. Clique para persistir no banco de dados."
-type="info"
-showIcon
-style={{ marginBottom: 16 }}
-/>
-<Table
-size="small"
-pagination={false}
-dataSource={creationBatch}
-columns={[
-{ title: 'SKU Master', dataIndex: 'sku', key: 'sku', render: (t) => <Text code>{t}</Text> },
-{ title: 'Nome do Produto', dataIndex: 'nome_item', key: 'nome_item' },
-{ title: 'Preço Venda', key: 'preco', render: (_, r) => `R$ ${(r.skus[0]?.preco_venda || 0).toFixed(2)}` },
-{
-title: 'Ações',
-key: 'remove',
-width: '100px',
-render: (_, record) => (
-<Button type="text" danger icon={<DeleteOutlined />} onClick={() => removeItemFromBatch(record.key)}>
-Remover
-</Button>
-)
-}
-]}
-/>
-</Card>
-)}
-
-{showPrintPanel && creationBatch.length > 0 && (
-
-<Card
-title="🖨️ Impressão Rápida"
-style={{ marginBottom: 18, border: '1px solid #d9d9d9' }}
-extra={
-<Space>
-<Select
-value={quickPrintSize}
-onChange={(value) => setQuickPrintSize(value)}
-options={[
-{ value: '105x27', label: '105x27 mm' },
-{ value: '60x40', label: '60x40 mm' },
-]}
-style={{ width: 120 }}
-/>
-<Button type="primary" icon={<PrinterOutlined />} onClick={handlePrintQuickQueue} disabled={quickPrintQueue.length === 0}>
-Imprimir ({quickPrintQueue.length})
-</Button>
-<Button danger type="text" onClick={clearQuickPrintQueue} disabled={quickPrintQueue.length === 0}>
-Limpar
-</Button>
-</Space>
-}
->
-{quickPrintQueue.length === 0 ? (
-<Text type="secondary">Selecione itens da tabela para criar uma fila de impressão rápida.</Text>
-) : (
-<Table
-size="small"
-pagination={false}
-dataSource={quickPrintQueue}
-rowKey="id"
-columns={[
-{ title: 'Produto', dataIndex: 'name', key: 'name' },
-{ title: 'SKU', dataIndex: 'sku', key: 'sku', render: (value) => <Text code>{value}</Text> },
-{ title: 'Preço', dataIndex: 'price', key: 'price', render: (value) => `R$ ${Number(value || 0).toFixed(2)}` },
-{ title: 'Qtd.', dataIndex: 'quantity', key: 'quantity', width: 70 },
-{
-title: 'Ações',
-key: 'remove',
-width: 90,
-render: (_, record) => (
-<Button type="text" danger size="small" onClick={() => removeFromQuickPrintQueue(record.id)}>
-Remover
-</Button>
-),
-},
-]}
-/>
-)}
-</Card>
-
-)}
-
-<Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
-<Col xs={24} sm={12} md={6}>
-<Card hoverable bodyStyle={{ padding: '16px' }} onClick={() => setSelectedFilter('all')}>
-<Statistic title="Total no Catálogo" value={products.length} prefix={<DatabaseOutlined style={{ color: '#1890ff' }} />} />
-</Card>
-</Col>
-<Col xs={24} sm={12} md={6}>
-<Card hoverable bodyStyle={{ padding: '16px' }} onClick={() => setSelectedFilter('activeSkus')}>
-<Statistic title="Itens com Estoque" value={products.filter(p => p.skus?.some(s => s.estoque > 0)).length} valueStyle={{ color: '#52c41a' }} />
-</Card>
-</Col>
-<Col xs={24} sm={12} md={6}>
-<Card hoverable bodyStyle={{ padding: '16px' }} onClick={() => setSelectedFilter('noStock')}>
-<Statistic title="Esgotado" value={products.filter(p => p.skus?.some(s => s.estoque === 0)).length} valueStyle={{ color: '#ff4d4f' }} />
-</Card>
-</Col>
-<Col xs={24} sm={12} md={6}>
-<Card hoverable bodyStyle={{ padding: '16px' }} onClick={() => setSelectedFilter('criticalStock')}>
-<Statistic title="Estoque Crítico (≤ 5)" value={products.filter(p => p.skus?.some(s => s.estoque > 0 && s.estoque <= 5)).length} valueStyle={{ color: '#fa8c16' }} />
-</Card>
-</Col>
-<Col xs={24} sm={12} md={6}>
-<Tooltip title="Itens fora de qualquer família: selecione-os e use Mover para classificar em lote">
-<Card hoverable bodyStyle={{ padding: '16px' }} onClick={() => setSelectedFilter('semFamilia')}>
-<Statistic title="Sem Família" value={products.filter(semFamilia).length} valueStyle={{ color: '#722ed1' }} />
-</Card>
-</Tooltip>
-</Col>
-<Col xs={24} sm={12} md={6}>
-<Tooltip title="Itens que não podem ir ao PDV/canais (família em rascunho/bloqueada, inativo, obrigatório sem valor...)">
-<Card hoverable bodyStyle={{ padding: '16px' }} onClick={() => setSelectedFilter('naoPublicaveis')}>
-<Statistic title="Não Publicáveis" value={products.filter(p => p.skus?.some(s => s.publicavel === false)).length} valueStyle={{ color: '#d46b08' }} />
-</Card>
-</Tooltip>
-</Col>
-</Row>
-
-<Card
-bordered={false}
-title={
-<Space>
-
-<Col span={12}>
-📦 Catálogo Definitivo 
-</Col>
-
-<Col span={12}>
-
-</Col>
-</Space>
-}
-extra={
-<Col span={24}>
-<Radio.Group
-buttonStyle="solid"
-value={selectedStructure || 'all_structures'}
-onChange={(e) => {
-const val = e.target.value;
-setSelectedStructure(val === 'all_structures' ? undefined : val);
-}}
-style={{ width: '120%', display: 'flex' }}
->
-<Radio.Button value="all_structures" style={{ flex: 1, textAlign: 'center', fontSize: '12px' }}>
-<UnorderedListOutlined style={{ marginRight: '4px' }} /> Todos
-</Radio.Button>
-<Radio.Button value="familia" style={{ flex: 1, textAlign: 'center', fontSize: '12px' }}>
-<ClusterOutlined style={{ marginRight: '4px' }} /> Famílias
-</Radio.Button>
-<Radio.Button value="individual" style={{ flex: 1, textAlign: 'center', fontSize: '12px' }}>
-<UserOutlined style={{ marginRight: '4px' }} /> Individuais
-</Radio.Button>
-</Radio.Group>
-</Col>
-}
->
-<Row style={{ marginBottom: '16px' }} gutter={[12, 12]} align="middle">
-
-{/* 🚀 BARRA FLUTUANTE DE AÇÕES EM LOTE (Aparece dinamicamente sem quebrar o layout) */}
-<Col span={24}>
-<Card
-size="small"
-style={{ 
-marginTop: 4, 
-background: 'linear-gradient(135deg, #f0f5ff 0%, #e6f7ff 100%)', 
-border: '1px solid #adc6ff', 
-borderRadius: '8px',
-boxShadow: '0 2px 6px rgba(24, 144, 255, 0.1)'
-}}
-bodyStyle={{ padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}
->
-<Space size="middle">
-<Badge 
-count={selectedRowKeys.length === 0 ? `Nenhum`  : selectedRowKeys.length } 
-style={{ backgroundColor: '#1890ff', fontWeight: 'bold', boxShadow: 'none' }} 
-/>
-<Text strong style={{ color: '#003a8c', fontSize: '13px' }}>
-{selectedRowKeys.length <= 1 ? 'item selecionado' : `itens selecionados`}
-</Text>
-</Space>
-
-<Space size="small" wrap>
-
-<Button
-background='green'
-size="small"
-icon={<PrinterOutlined />}
-
->
-Adicionar à fila de Impressão
-</Button>
-
-<Button
-  type="primary"
-  size="small"
-  icon={<FolderAddOutlined />}
-  onClick={() => {
-    // 1. Pega todos os itens selecionados na tabela principal
-    const selectedItems = filteredData.filter(item => 
-      selectedRowKeys.includes(String(item.key || item.id_item))
-    );
-
-    if (selectedItems.length === 0) {
-      message.warning('Selecione ao menos um item!');
-      return;
+  const salvarItem = async (idItem: string | number, campos: Record<string, unknown>) => {
+    const id = Number(idItem);
+    if (!Number.isFinite(id) || id <= 0) { message.error('Item inválido para atualização.'); return; }
+    try {
+      await updateProduto(id, campos);
+      message.success('Item atualizado.');
+      setEditando(null);
+      carregar();
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : 'Erro ao salvar o item.');
     }
+  };
 
-    // 2. Reutiliza a sua função handleMoveSkus passando a ação 'move'
-    handleMoveSkus(selectedItems, 'move');
-  }}
->
-  Definir Família em Lote
-</Button>
+  // ---------------------------------------------------------------- tabela
+  const colunas: ColumnsType<Linha> = [
+    {
+      title: '', key: 'foto', width: 56,
+      render: (_, l) => <Avatar shape="square" size={40} src={l.skus[0]?.imagem_url || undefined} icon={<PictureOutlined style={{ color: '#bfbfbf' }} />} style={{ background: token.colorFillTertiary }} />,
+    },
+    {
+      title: 'SKU', key: 'sku', width: 150,
+      sorter: (a, b) => porTexto(skuDaLinha(a), skuDaLinha(b)), defaultSortOrder: 'ascend',
+      render: (_, l) => <Text style={{ fontSize: 12 }}>{skuDaLinha(l)}{l.familiaReal && l.skus.length > 1 && <Text type="secondary" style={{ fontSize: 11 }}> +{l.skus.length - 1}</Text>}</Text>,
+    },
+    {
+      title: 'Item', key: 'item',
+      sorter: (a, b) => porTexto(a.nome_item, b.nome_item),
+      render: (_, l) => (
+        <div>
+          <Flex gap={6} align="center" wrap>
+            <Text strong>{l.nome_item}</Text>
+            {l.familiaReal && <Tag color="purple" icon={<ClusterOutlined />} style={{ margin: 0 }}>Família · {l.skus.length}</Tag>}
+            {visao === 'TODOS' && <Tag color={ROTULO_TIPO[String(l.tipo_recurso).toUpperCase()]?.color} style={{ margin: 0 }}>{ROTULO_TIPO[String(l.tipo_recurso).toUpperCase()]?.label || l.tipo_recurso}</Tag>}
+            {naListaDeTrabalho(l) && <Tooltip title="Na lista de trabalho"><Tag icon={<UnorderedListOutlined />} style={{ margin: 0 }}>lista</Tag></Tooltip>}
+          </Flex>
+          <Text type="secondary" style={{ fontSize: 11 }}>
+            {l.familiaReal ? `${l.skus.length} variação(ões)` : l.sku}{l.categoria ? ` · ${l.categoria}` : ''}
+          </Text>
+        </div>
+      ),
+    },
+    {
+      title: 'Marca', key: 'marca', width: 140,
+      sorter: (a, b) => porTexto(marcaDaLinha(a), marcaDaLinha(b)),
+      render: (_, l) => {
+        const m = [...new Set(l.skus.map(s => s.marca).filter(Boolean))];
+        return m.length ? <Space size={[2, 2]} wrap>{m.map(x => <Tag key={x} style={{ margin: 0 }}>{x}</Tag>)}</Space> : <Text type="secondary">—</Text>;
+      },
+    },
+    ...(visao === 'VENDA' || visao === 'TODOS' ? [{
+      title: 'Preço', key: 'preco', width: 150, align: 'right' as const,
+      sorter: (a: Linha, b: Linha) => precoDaLinha(a) - precoDaLinha(b) || porTexto(skuDaLinha(a), skuDaLinha(b)),
+      render: (_: unknown, l: Linha) => {
+        if (visaoDoTipo(l.tipo_recurso) !== 'VENDA') return <Text type="secondary">não vende</Text>;
+        const precos = l.skus.map(s => Number(s.preco_venda) || 0);
+        const min = Math.min(...precos); const max = Math.max(...precos);
+        if (max <= 0) return <Tag color="red" style={{ margin: 0 }}>sem preço</Tag>;
+        const un = l.skus[0]?.unidade;
+        return (
+          <div>
+            <Text strong>{min === max ? brl(min) : `${brl(min)} – ${brl(max)}`}</Text>{un && min === max && <Text type="secondary" style={{ fontSize: 11 }}> /{un}</Text>}
+            {l.skus.some(s => !s.temPrecoFaixa && Number(s.preco_venda) > 0) && (
+              <Tooltip title="Preço só no cadastro antigo (sem faixa de preço): ajuste na precificação"><div><Tag color="gold" style={{ margin: 0, fontSize: 10 }}>preço antigo</Tag></div></Tooltip>
+            )}
+          </div>
+        );
+      },
+    }] : []),
+    ...(visao === 'ALMOXARIFADO' || visao === 'PATRIMONIO' ? [{
+      title: 'Custo', key: 'custo', width: 130, align: 'right' as const,
+      sorter: (a: Linha, b: Linha) => Math.max(...a.skus.map(s => Number(s.custo_gerencial) || 0)) - Math.max(...b.skus.map(s => Number(s.custo_gerencial) || 0)),
+      render: (_: unknown, l: Linha) => {
+        const c = l.skus.map(s => Number(s.custo_gerencial) || 0);
+        return Math.max(...c) > 0 ? <Text>{brl(Math.max(...c))}</Text> : <Text type="secondary">sem custo</Text>;
+      },
+    }] : []),
+    {
+      title: 'Estoque', key: 'estoque', width: 120, align: 'right' as const,
+      sorter: (a, b) => estoqueDaLinha(a) - estoqueDaLinha(b),
+      render: (_, l) => {
+        const total = l.skus.reduce((a, s) => a + (Number(s.estoque) || 0), 0);
+        const un = l.skus[0]?.unidade;
+        return (
+          <span>
+            <Text strong type={total <= 0 ? 'danger' : total <= 5 ? 'warning' : undefined}>{qtd(total)}</Text>{' '}
+            {un ? <Text type="secondary">{un}</Text> : <Tooltip title="Item sem unidade base: defina no editor de preço ou na lista de precificação"><Tag color="red" style={{ margin: 0, fontSize: 10 }}>sem unidade</Tag></Tooltip>}
+          </span>
+        );
+      },
+    },
+    {
+      title: 'Situação', key: 'sit', width: 130,
+      render: (_, l) => (
+        <Space size={[2, 2]} wrap>
+          {String(l.status).toUpperCase() === 'INATIVO' ? <Tag color="red" style={{ margin: 0 }}>Inativo</Tag> : <Tag color="green" style={{ margin: 0 }}>Ativo</Tag>}
+          {visaoDoTipo(l.tipo_recurso) === 'VENDA' && l.skus.some(s => s.publicavel === false) && (
+            <Tooltip title={l.skus.flatMap(s => s.motivos_publicacao || []).join(' · ') || 'Não vai para o PDV'}>
+              <Tag color="orange" style={{ margin: 0 }}>Não publicável</Tag>
+            </Tooltip>
+          )}
+        </Space>
+      ),
+    },
+    {
+      title: '', key: 'acoes', width: 150, align: 'right' as const,
+      render: (_, l) => {
+        const venda = visaoDoTipo(l.tipo_recurso) === 'VENDA';
+        return (
+          <Space size={4}>
+            {l.familiaReal ? (
+              <Tooltip title="Abrir a família (atributos, grade, nomes e SKUs)">
+                <Button size="small" icon={<EditOutlined />} onClick={() => navigate(`/catalogo/familias?familia=${l.familia_id}`)}>Família</Button>
+              </Tooltip>
+            ) : (
+              <Tooltip title="Cadastro do item (dados, ficha técnica, anexos)">
+                <Button size="small" icon={<EditOutlined />} onClick={() => setEditando(l)}>Editar</Button>
+              </Tooltip>
+            )}
+            {venda && !l.familiaReal && (
+              <Tooltip title="Preço: unidades, fracionamento e atacado">
+                <Button size="small" icon={<DollarOutlined />} onClick={() => setPrecoDe(l)} />
+              </Tooltip>
+            )}
+            <Dropdown trigger={['click']} menu={menuTarefas(() => [l], true)}>
+              <Tooltip title="Lista de trabalho e mais ações"><Button size="small" icon={<MoreOutlined />} /></Tooltip>
+            </Dropdown>
+          </Space>
+        );
+      },
+    },
+  ];
 
-<Button 
-size="small" 
-onClick={() => { setSelectedRowKeys([]); setSelectedRows([]); }}
->
-Limpar Seleção
-</Button>
-</Space>
-</Card>
-</Col>
+  const card = (s: Situacao, titulo: string, cor?: string, ajuda?: string) => (
+    <Col xs={12} md={8} xl={3} key={s}>
+      <Tooltip title={ajuda}>
+        <Card size="small" hoverable onClick={() => filtrar({ situacao: filtros.situacao === s ? 'TODAS' : s })}
+          style={{ height: '100%', borderColor: filtros.situacao === s ? token.colorPrimary : undefined }} styles={{ body: { padding: '8px 12px' } }}>
+          <Text type="secondary" style={{ fontSize: 12 }}>{titulo}</Text>
+          <div style={{ fontSize: 22, fontWeight: 700, color: contagem[s] ? cor : undefined }}>{contagem[s]}</div>
+        </Card>
+      </Tooltip>
+    </Col>
+  );
 
+  const temFiltro = filtros.busca || filtros.categoriaId || filtros.marca || filtros.situacao !== 'TODAS' || filtros.estrutura !== 'TODAS';
 
-{/* 🔍 BARRA DE BUSCA PRINCIPAL */}
-<Col xs={24} sm={12} md={6}>
-<Input
-placeholder="Buscar por Nome ou SKU..."
-prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-value={searchText}
-onChange={(e) => setSearchText(e.target.value)}
-allowClear
-style={{ borderRadius: '6px' }}
-/>
-</Col>
+  return (
+    <div style={{ padding: 16 }}>
+      <Flex justify="space-between" align="center" wrap gap={8} style={{ marginBottom: 12 }}>
+        <div>
+          <Title level={3} style={{ margin: 0 }}><AppstoreOutlined style={{ color: token.colorPrimary, marginRight: 8 }} />Gerenciador de Catálogos</Title>
+          <Text type="secondary">Cadastro, preço e família dos itens; marque itens e mande para a lista de trabalho.</Text>
+        </div>
+        <Space wrap>
+          <Badge count={trabalho.itens.length} size="small">
+            <Button icon={<UnorderedListOutlined />} onClick={() => setTrabalhoAberto(true)}>Lista de trabalho</Button>
+          </Badge>
+          <Button icon={<ReloadOutlined />} onClick={carregar} loading={carregando}>Atualizar</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setNovoAberto(true)}>Adicionar Novo</Button>
+        </Space>
+      </Flex>
 
-{/* 📁 FILTRO DE CATEGORIA */}
-<Col xs={24} sm={12} md={5}>
-<Select
-style={{ width: '100%' }}
-placeholder="Filtrar Categoria"
-allowClear
-value={selectedCategory}
-onChange={(value) => setSelectedCategory(value)}
-options={[
-{ value: '7', label: 'Mangueiras (Cat 7)' },
-{ value: '6', label: 'Correias (Cat 6)' },
-]}
-/>
-</Col>
+      {/* Visão por tipo de item */}
+      <Segmented block value={visao} onChange={v => setVisao(v as Visao)} style={{ marginBottom: 12 }}
+        options={VISOES.map(v => ({ value: v.value, label: <Tooltip title={v.descricao}><span>{v.label} ({contagemVisao[v.value]})</span></Tooltip> }))} />
 
-{/* 🏢 FILTRO DE FORNECEDOR */}
-<Col xs={24} sm={12} md={6}>
-<Select
-style={{ width: '100%' }}
-placeholder="Filtrar Fornecedor"
-allowClear
-value={selectedSupplier}
-onChange={(value) => setSelectedSupplier(value)}
-options={[
-{ value: 'Gadan', label: 'Gadan' },
-{ value: 'Propria', label: 'Própria' },
-{ value: 'Lubriac', label: 'Lubriac' },
-]}
-/>
-</Col>
+      <Row gutter={[8, 8]} style={{ marginBottom: 12 }}>
+        {card('COM_ESTOQUE', 'Com estoque', token.colorSuccess)}
+        {card('ESGOTADO', 'Esgotado', token.colorError)}
+        {card('CRITICO', 'Estoque crítico', token.colorWarning, 'Até 5 em estoque')}
+        {card('SEM_UNIDADE', 'Sem unidade', token.colorError, 'Sem unidade base: não dá para dar preço nem estoque')}
+        {card('SEM_CUSTO', 'Sem custo', token.colorWarning)}
+        {ehVenda && card('SEM_PRECO', 'Sem preço', token.colorError, 'Itens de venda sem preço')}
+        {ehVenda && card('NAO_PUBLICAVEL', 'Não publicáveis', token.colorWarning, 'Não podem ir ao PDV (família em rascunho, inativo, obrigatório sem valor...)')}
+        {card('SEM_FAMILIA', 'Sem família', token.colorPrimary, 'Itens fora de qualquer família: marque e use "Definir família"')}
+      </Row>
 
-</Row>
+      <Card size="small">
+        {/* Filtros */}
+        <Flex gap={8} wrap align="center" style={{ marginBottom: 10 }}>
+          <Input allowClear prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />} placeholder="Buscar por nome ou SKU" style={{ width: 260 }}
+            value={filtros.busca} onChange={e => filtrar({ busca: e.target.value })} />
+          <Select allowClear showSearch optionFilterProp="label" placeholder="Categoria" style={{ width: 220 }} options={categorias}
+            value={filtros.categoriaId ?? undefined} onChange={v => filtrar({ categoriaId: v ?? null })} />
+          <Select allowClear showSearch optionFilterProp="label" placeholder="Marca" style={{ width: 160 }} options={marcas}
+            value={filtros.marca ?? undefined} onChange={v => filtrar({ marca: v ?? null })} />
+          <Select style={{ width: 190 }} value={filtros.situacao} onChange={v => filtrar({ situacao: v })}
+            options={(Object.keys(ROTULO_SITUACAO) as Situacao[])
+              .filter(s => ehVenda || (s !== 'SEM_PRECO' && s !== 'NAO_PUBLICAVEL'))
+              .map(s => ({ value: s, label: `Situação: ${ROTULO_SITUACAO[s]}` }))} />
+          <Segmented value={filtros.estrutura} onChange={v => filtrar({ estrutura: v as Filtros['estrutura'] })}
+            options={[{ value: 'TODAS', label: 'Tudo' }, { value: 'FAMILIAS', label: 'Famílias' }, { value: 'AVULSOS', label: 'Avulsos' }]} />
+          {temFiltro && <Button icon={<ClearOutlined />} onClick={() => setFiltros(FILTROS_INICIAIS)}>Limpar filtros</Button>}
+          <Text type="secondary" style={{ marginLeft: 'auto' }}>{linhas.length} linha(s)</Text>
+        </Flex>
 
-{(searchText || selectedStructure || selectedCategory || selectedSupplier || (selectedFilter && selectedFilter !== 'all')) && (
-<div style={{ marginBottom: '16px', display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
-<span style={{ fontSize: '12px', color: '#8c8c8c' }}>Filtros ativos:</span>
+        {/* Ações nos marcados */}
+        {selecionados.length > 0 && (
+          <Flex gap={8} wrap align="center" style={{ marginBottom: 10, padding: '8px 12px', borderRadius: token.borderRadiusLG, background: token.colorPrimaryBg, border: `1px solid ${token.colorPrimaryBorder}` }}>
+            <Text strong>{selecionados.length} marcada(s) · {itensDasLinhas(linhasSelecionadas).length} item(ns)</Text>
+            {ehVenda && (
+              <Tooltip title="Marca como 'Precificar' na lista de trabalho e abre a Precificação">
+                <Button size="small" type="primary" icon={<DollarOutlined />} onClick={() => mandar(linhasSelecionadas.filter(l => visaoDoTipo(l.tipo_recurso) === 'VENDA'), 'PRECIFICAR', '/catalogo/preco')}>Precificar</Button>
+              </Tooltip>
+            )}
+            {ehVenda && (
+              <Button size="small" icon={<PrinterOutlined />} onClick={() => mandar(linhasSelecionadas.filter(l => visaoDoTipo(l.tipo_recurso) === 'VENDA'), 'ETIQUETAR')}>Tirar etiqueta</Button>
+            )}
+            <Dropdown trigger={['click']} menu={menuTarefas(() => linhasSelecionadas)}>
+              <Button size="small" icon={<UnorderedListOutlined />}>Lista de trabalho <DownOutlined /></Button>
+            </Dropdown>
+            <Tooltip title="Colocar os itens marcados numa família (ou criar uma)">
+              <Button size="small" icon={<FolderAddOutlined />} onClick={() => definirFamilia(linhasSelecionadas)}>Definir família</Button>
+            </Tooltip>
+            <Tooltip title="Apaga de vez só os itens sem histórico (sem nota, estoque, venda...). Mostra a lista antes.">
+              <Button size="small" danger icon={<DeleteOutlined />} onClick={() => setParaApagar(itensDasLinhas(linhasSelecionadas).map(i => i.idItem))}>Apagar</Button>
+            </Tooltip>
+            <Button size="small" type="text" onClick={() => setSelecionados([])}>Limpar seleção</Button>
+          </Flex>
+        )}
 
-{searchText && (
-<Tag closable onClose={() => setSearchText('')}>
-Busca: {searchText}
-</Tag>
-)}
+        <Table<Linha>
+          size="small"
+          rowKey="key"
+          loading={carregando}
+          dataSource={linhas}
+          columns={colunas}
+          pagination={{ pageSize: 25, showSizeChanger: true, pageSizeOptions: [25, 50, 100] }}
+          rowSelection={{ selectedRowKeys: selecionados, onChange: setSelecionados, preserveSelectedRowKeys: true }}
+          scroll={{ x: 1150 }}
+          showSorterTooltip={{ title: 'Clique para ordenar' }}
+          expandable={{
+            rowExpandable: l => l.familiaReal && l.skus.length > 0,
+            expandedRowKeys: expandidas,
+            onExpandedRowsChange: k => setExpandidas([...k]),
+            expandedRowRender: l => (
+              <SkuSubTable linha={l} onAlterado={carregar} onMover={setParaMover}
+                onEditar={id => setEditando(itemPorId(id))} onPreco={id => setPrecoDe(itemPorId(id))} />
+            ),
+          }}
+        />
+      </Card>
 
-{selectedStructure && (
-<Tag closable onClose={() => setSelectedStructure(undefined)}>
-Estrutura: {selectedStructure === 'familia' ? 'Famílias' : 'Individuais'}
-</Tag>
-)}
-
-{selectedCategory && (
-<Tag closable onClose={() => setSelectedCategory(undefined)}>
-Categoria: {selectedCategory === '7' ? 'Mangueiras (Cat 7)' : selectedCategory === '6' ? 'Correias (Cat 6)' : selectedCategory}
-</Tag>
-)}
-
-{selectedSupplier && (
-<Tag closable onClose={() => setSelectedSupplier(undefined)}>
-Fornecedor: {selectedSupplier}
-</Tag>
-)}
-
-{selectedFilter && selectedFilter !== 'all' && (
-<Tag closable onClose={() => setSelectedFilter('all')}>
-Filtro: {selectedFilter}
-</Tag>
-)}
-// (selectedFilter !== 'all' || selectedSupplier || selectedCategory || selectedStructure || searchText) && (
-<Button type="dashed" danger icon={<ClearOutlined />} onClick={handleClearAllFilters}>
-Limpar Filtros
-</Button>
-// )
-</div>
-
-)}
-
-{/* TABELA COM SUPORTE A LINHAS EXPANSÍVEIS (FAMÍLIAS) */}
-<Table
-rowKey={(record, index) => String(record.key || record.id_item || index)}
-rowSelection={rowSelection}
-columns={parentColumns}
-dataSource={filteredData}
-loading={loading}
-pagination={{ pageSize: 25 }}
-rowClassName={(record) => {
-const rowKey = String(record.key || record.id_item);
-return expandedRowKeys.includes(rowKey) ? 'parent-row-expanded' : '';
-}}
-expandable={{
-rowExpandable: (record) => checkIsFamily(record) && (record.skus || []).length > 0,
-expandedRowKeys: expandedRowKeys,
-onExpand: (expanded, record) => {
-const rowKey = String(record.key || record.id_item);
-setExpandedRowKeys(prev =>
-expanded ? [...prev, rowKey] : prev.filter(k => k !== rowKey)
-);
-},
-expandedRowRender: (record) => {
-return (
-<div style={{
-margin: '-8px -12px -8px -12px',
-background: '#7e7d7d0e',
-padding: '16px',
-borderTop: 'none',
-borderBottom: '1px solid #d9d9d9',
-boxShadow: 'inset 0 3px 4px -2px rgba(0,0,0,0.05)'
-}}>
-<Text type="secondary" style={{ display: 'block', marginBottom: '8px', fontSize: '12px', fontWeight: 'bold' }}>
-📦 Variações da Família: {record.nome_item} ({record.skus.length})
-</Text>
-
-<SkuSubTable
-parentItem={record}
-onMoveSkus={handleMoveSkus}
-
-/>
-</div>
-);
-},
-}}
-/>
-</Card>
-
-<Modal
-title={
-<Space>
-<CodeOutlined style={{ color: '#722ed1' }} />
-<span>Importação / Criação Rápida via JSON</span>
-</Space>
-}
-open={isJsonModalVisible}
-onCancel={() => {
-setIsJsonModalVisible(false);
-setJsonInput('');
-setParsedJsonPreview([]);
-}}
-width={750}
-footer={[
-<Button key="cancel" onClick={() => setIsJsonModalVisible(false)}>
-Cancelar
-</Button>,
-<Button
-key="submit"
-type="primary"
-icon={<ImportOutlined />}
-disabled={parsedJsonPreview.length === 0}
-onClick={handleImportJsonToBatch}
-style={{ background: '#722ed1', borderColor: '#722ed1' }}
->
-Adicionar à Fila {parsedJsonPreview.length > 0 ? `(${parsedJsonPreview.length} item(ns))` : ''}
-</Button>
-]}
->
-<Alert
-message="Formato Aceito do JSON"
-description="Você pode colar um único objeto ou uma lista [ ] de objetos. Os itens importados irão diretamente para a Fila de Criação antes da gravação final no banco de dados."
-type="info"
-showIcon
-style={{ marginBottom: 16 }}
-/>
-
-<Row gutter={12} style={{ marginBottom: 12 }}>
-<Col span={18}>
-<Upload beforeUpload={handleFileUpload} showUploadList={false} accept=".json">
-<Button icon={<UploadOutlined />}>Carregar arquivo .json</Button>
-</Upload>
-</Col>
-<Col span={6} style={{ textAlign: 'right' }}>
-<Button
-type="link"
-size="small"
-onClick={() => handleJsonInputChange(sampleJsonTemplate)}
->
-Usar Exemplo
-</Button>
-</Col>
-</Row>
-
-<TextArea
-rows={7}
-placeholder="Cole seu código JSON aqui..."
-value={jsonInput}
-onChange={(e) => handleJsonInputChange(e.target.value)}
-style={{ fontFamily: 'monospace', fontSize: '12px' }}
-/>
-
-{parsedJsonPreview.length > 0 && (
-<div style={{ marginTop: 16 }}>
-<Text strong>Pré-visualização dos Itens Interpretados ({parsedJsonPreview.length}):</Text>
-<Table
-size="small"
-pagination={false}
-dataSource={parsedJsonPreview}
-rowKey="key"
-style={{ marginTop: 8 }}
-columns={[
-{ title: 'SKU Master', dataIndex: 'sku', render: (t) => <Text code>{t}</Text> },
-{ title: 'Nome', dataIndex: 'nome_item' },
-{ title: 'Preço Venda', key: 'preco', render: (_, r) => `R$ ${(r.skus[0]?.preco_venda || 0).toFixed(2)}` },
-{ title: 'Estoque', key: 'estoque', render: (_, r) => r.skus[0]?.estoque || 0 }
-]}
-/>
-</div>
-)}
-</Modal>
-
-<ModalFamiliaManager
-isOpen={isUnifiedFamiliaOpen && skusParaMover.length > 0}
-onClose={() => {
-setIsUnifiedFamiliaOpen(false);
-setSkusParaMover([]);
-setSelectedRowKeys([]);
-}}
-selectedRowKeys={skusParaMover.map(item => String(item.tempId))}
-allItems={skusParaMover}
-familias={familiasCatalogo}
-onSaveMapping={() => {
-setIsUnifiedFamiliaOpen(false);
-setSkusParaMover([]);
-setSelectedRowKeys([]);
-fetchProducts();
-}}
-/>
-
-
-
-<CreateProductModal open={isModalVisible} onClose={() => setIsModalVisible(false)} onSave={handleSaveProduct} loading={modalLoading} />
-<ProductDetailsDrawer open={isDrawerVisible} product={selectedProduct} onClose={() => setIsDrawerVisible(false)} onSave={handleUpdateProduct} />
-</div>
-);
+      <CreateProductModal open={novoAberto} onClose={() => { setNovoAberto(false); }} />
+      <ProductDetailsDrawer open={!!editando} product={editando} onClose={() => setEditando(null)} onSave={salvarItem} />
+      <Drawer open={!!precoDe} size={1100} title={precoDe ? `Preço · ${precoDe.sku} · ${precoDe.nome_item}` : ''} destroyOnHidden
+        onClose={() => { setPrecoDe(null); carregar(); }}>
+        {precoDe && <ProductCommercialSalesConfig idItem={Number(precoDe.id_item)} />}
+      </Drawer>
+      <MoverParaFamiliaModal itens={paraMover} onFechar={() => setParaMover([])}
+        onConcluido={() => { setParaMover([]); setSelecionados([]); carregar(); }} />
+      <ExclusaoItensModal ids={paraApagar} onFechar={() => setParaApagar([])} onApagados={aoApagar} />
+      <ListaTrabalhoDrawer open={trabalhoAberto} onClose={() => setTrabalhoAberto(false)}
+        extra={(
+          <Space>
+            {trabalho.contagem.PRECIFICAR > 0 && <Button onClick={() => navigate('/catalogo/preco')}>Ir para Precificação ({trabalho.contagem.PRECIFICAR})</Button>}
+            {trabalho.contagem.ETIQUETAR > 0 && <Button type="primary" onClick={() => navigate('/estoque/etiquetagem')}>Ir para Etiquetagem ({trabalho.contagem.ETIQUETAR})</Button>}
+          </Space>
+        )} />
+    </div>
+  );
 }

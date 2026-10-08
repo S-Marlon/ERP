@@ -13,6 +13,10 @@ export interface SkuChildType {
   custo_gerencial: number;
   imagem_url?: string | null;
   status: 'ATIVO' | 'INATIVO' | 'Esgotado' | 'Sem Estoque';
+  // Unidade base (UN, PC, MT...) e se o preço vem das faixas (o do PDV)
+  unidade?: string;
+  temPrecoFaixa?: boolean;
+  nome_item?: string;
   // Gatekeeper: pode ir para o PDV/canais? (motivos quando não)
   publicavel?: boolean;
   motivos_publicacao?: string[];
@@ -31,6 +35,7 @@ export interface ItemParentType {
   familia?: string | null;
   familia_id: number | null;
   id_marca?: number | null;
+  unidade?: string;
   skus: SkuChildType[];
 }
 

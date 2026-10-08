@@ -64,6 +64,9 @@ export const getProdutos = async (tenantId: number = 1): Promise<ItemParentType[
       custo_gerencial: toNumber(item.custo_gerencial ?? 0, 0),
       status: estoque === 0 ? 'Esgotado' : (itemStatus === 'INATIVO' ? 'INATIVO' : 'ATIVO'),
       imagem_url: typeof item.imagem_url === 'string' ? item.imagem_url : null,
+      unidade: String(item.unidade ?? item.unitOfMeasure ?? ''),
+      temPrecoFaixa: item.preco_varejo !== null && item.preco_varejo !== undefined,
+      nome_item: nomeItem,
       publicavel: item.publicavel !== false,
       motivos_publicacao: Array.isArray(item.motivos_publicacao) ? item.motivos_publicacao as string[] : [],
     }];
@@ -78,9 +81,10 @@ export const getProdutos = async (tenantId: number = 1): Promise<ItemParentType[
       status: itemStatus === 'INATIVO' ? 'INATIVO' : 'ATIVO',
       categoria_id: item.categoria_id ? toNumber(item.categoria_id, 0) || null : null,
       categoria: categoriaNome || null,
-      familia: item.familia || item.nome_familia || null,
+      familia: item.familia || item.nome_familia ? String(item.familia || item.nome_familia) : null,
       familia_id: item.familia_id ? toNumber(item.familia_id, 0) || null : null,
       id_marca: item.id_marca ? toNumber(item.id_marca, 0) || null : null,
+      unidade: String(item.unidade ?? item.unitOfMeasure ?? ''),
       skus: skusMapeados,
     };
   });

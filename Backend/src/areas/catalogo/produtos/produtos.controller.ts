@@ -115,12 +115,17 @@ export const getProdutos = async (req: Request, res: Response) => {
         ic.tipo_recurso,
         ic.status,
         ic.descricao_variacao,
-        cpd.categoria_id,
+        -- Categoria do item ou, sem ela, a da família (a família manda na categoria no PIM)
+        COALESCE(cpd.categoria_id, fam.categoria_id) AS categoria_id,
         cpd.familia_id,
         cpd.id_marca,
         cpd.custo_gerencial,
         cpd.preco_venda,
-        cat.nome AS nome_categoria,  -- Adicionado
+        cat.nome AS nome_categoria,
+        -- Preço de varejo da unidade base (faixas: o preço que o PDV usa)
+        (SELECT pf.preco_unitario FROM comercial_precos_faixas pf
+          WHERE pf.tenant_id = ic.tenant_id AND pf.id_item = ic.id_item AND pf.id_unidade = ic.id_unidade AND pf.tipo_faixa = 'VAREJO'
+          ORDER BY pf.ordem LIMIT 1) AS preco_varejo,
         fam.nome AS nome_familia,
         COALESCE(mar.nome, 'Própria') AS nome_marca,
         COALESCE(um.sigla, '') AS unidade,
@@ -131,10 +136,10 @@ export const getProdutos = async (req: Request, res: Response) => {
       FROM itens_core ic
       LEFT JOIN comercial_produtos_dados cpd 
         ON ic.id_item = cpd.id_item AND ic.tenant_id = cpd.tenant_id
-      LEFT JOIN comercial_categorias cat 
-        ON cpd.categoria_id = cat.id AND cpd.tenant_id = cat.tenant_id  -- Adicionado
       LEFT JOIN comercial_familias fam 
         ON cpd.familia_id = fam.id AND cpd.tenant_id = fam.tenant_id
+      LEFT JOIN comercial_categorias cat 
+        ON cat.id = COALESCE(cpd.categoria_id, fam.categoria_id) AND cat.tenant_id = ic.tenant_id
       LEFT JOIN comercial_marcas mar 
         ON cpd.id_marca = mar.id AND cpd.tenant_id = mar.tenant_id
       LEFT JOIN itens_unidades_medida um
@@ -161,7 +166,8 @@ export const getProdutos = async (req: Request, res: Response) => {
       const nomeFamilia = item.nome_familia || '';
       const nomeMarca = item.nome_marca || '';
       const unidade = item.unidade || '';
-      const preco = Number(item.preco_venda ?? 0);
+      // Preço das faixas (o do PDV); itens antigos sem faixa caem no preço de cadastro
+      const preco = item.preco_varejo !== null && item.preco_varejo !== undefined ? Number(item.preco_varejo) : Number(item.preco_venda ?? 0);
       const custo = Number(item.custo_gerencial ?? 0);
       const status = String(item.status || 'ATIVO').toUpperCase();
       const nomeCategoria = item.nome_categoria || '';
@@ -188,6 +194,7 @@ export const getProdutos = async (req: Request, res: Response) => {
         unidade,
         salePrice: preco,
         preco_venda: preco,
+        preco_varejo: item.preco_varejo !== null && item.preco_varejo !== undefined ? Number(item.preco_varejo) : null,
         custo_gerencial: custo,
         currentStock: Number(item.estoque_atual) || 0,
         estoque: Number(item.estoque_atual) || 0,

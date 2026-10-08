@@ -60,11 +60,13 @@ import {
   createMarca
 } from './marcas/comercialMarcas.controller';
 import { getAtributosPorProduto } from './atributos/atributos.controller';
-import { getConfigVendas, salvarConfigVendas, atualizarCustoGerencial, listarUnidadesItens } from './precos/configVendas.controller';
+import { getConfigVendas, salvarConfigVendas, atualizarCustoGerencial, listarUnidadesItens, criarUnidadeItem } from './precos/configVendas.controller';
 import { listarPendenciasPim } from './produtos/pendencias.controller';
 import { resumoCatalogo } from './produtos/resumoCatalogo.controller';
 import { painelPrecos } from './precos/painelPrecos.controller';
 import { aplicarPrecosComTaxa, previaPrecosComTaxa } from './precos/precosTaxa.controller';
+import { salvarPrecosLote } from './precos/precosLote.controller';
+import { apagarItens, conferirExclusao } from './produtos/exclusaoItens.controller';
 import { listarDuplicados, unificarItens } from './produtos/unificacao.controller';
 import { getProdutoDetalhe, updateProdutoParcial, adicionarAnexo, removerAnexo, definirImagemPrincipal, getFichaTecnica, salvarFichaTecnica, getAtributosParaItem } from './produtos/produtoDetalhe.controller';
 
@@ -107,6 +109,7 @@ router.get('/:id_item/atributos', getAtributosPorProduto);
 
 // Configuração de vendas: unidades (fracionamento/atacado), faixas de preço e custo gerencial
 router.get('/itens-unidades', listarUnidadesItens);
+router.post('/itens-unidades', criarUnidadeItem);
 router.get('/itens/:idItem/config-vendas', getConfigVendas);
 router.put('/itens/:idItem/config-vendas', salvarConfigVendas);
 router.post('/itens/:idItem/custo-gerencial', atualizarCustoGerencial);
@@ -164,6 +167,10 @@ router.get('/resumo', resumoCatalogo);
 router.get('/precos/painel', painelPrecos);
 // Preços com a taxa da maquininha embutida (Vendas › Taxas de pagamento): prévia e aplicação
 router.get('/precos/taxa/previa', previaPrecosComTaxa);
+router.post('/precos/lote', salvarPrecosLote);
+// Exclusão de itens sem histórico (itens de teste)
+router.post('/itens/exclusao/conferir', conferirExclusao);
+router.post('/itens/exclusao', apagarItens);
 router.post('/precos/taxa/aplicar', aplicarPrecosComTaxa);
 // Itens duplicados: suspeitas e unificação de um item em outro
 router.get('/itens/duplicados', listarDuplicados);
