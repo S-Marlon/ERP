@@ -40,6 +40,13 @@ export const extrairTokensTemplate = (template: string): string[] => {
   );
 };
 
+/** Valor do atributo no texto do nome/SKU: decimal do banco ("3.600000") sai sem zeros à direita ("3.6", "300"). */
+export const textoDoValor = (valor: unknown): string => {
+  if (typeof valor === 'number') return String(valor);
+  const s = String(valor ?? '').trim();
+  return /^-?\d+\.\d+$/.test(s) ? String(Number(s)) : s;
+};
+
 export const resolverValorAtributo = (
   dictValores: Record<string, any> | null | undefined,
   aliases: Array<string | number | undefined>
@@ -112,7 +119,7 @@ export const gerarPreviewNome = (
 
     const valorEncontrado = resolverValorAtributo(dictValores, aliasCandidates);
     const valorSubstituto = (valorEncontrado !== undefined && valorEncontrado !== null && String(valorEncontrado).trim() !== '')
-      ? String(valorEncontrado)
+      ? textoDoValor(valorEncontrado)
       : `[${token}]`;
 
     template = substituirGlobal(template, `{${token}}`, valorSubstituto);
@@ -170,7 +177,7 @@ export const gerarPreviewSku = (
 
     const valorEncontrado = resolverValorAtributo(dictValores, aliasCandidates);
     const valorSubstituto = (valorEncontrado !== undefined && valorEncontrado !== null && String(valorEncontrado).trim() !== '')
-      ? String(valorEncontrado)
+      ? textoDoValor(valorEncontrado)
       : `[${token}]`;
 
     resultado = substituirGlobal(resultado, `{${token}}`, valorSubstituto);

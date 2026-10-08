@@ -35,7 +35,7 @@ export const getAtributosPorProduto = async (req: Request, res: Response) => {
           ac_op.valor, 
           acv.valor_texto, 
           CAST(acv.valor_numero AS CHAR), 
-          CAST(acv.valor_decimal AS CHAR), 
+          TRIM(TRAILING '.' FROM TRIM(TRAILING '0' FROM CAST(acv.valor_decimal AS CHAR))), 
           CAST(acv.valor_data AS CHAR), 
           CASE 
             WHEN acv.valor_boolean = 1 THEN 'Sim' 

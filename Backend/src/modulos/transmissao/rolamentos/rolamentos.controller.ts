@@ -291,7 +291,7 @@ const itensDoModulo = async (tenant: number, config: ConfigRolamentos) => {
     [tenant, [...new Set(itens.map((i: any) => i.familia_id))], idsAtributos]
   );
   const doItem = new Map<string, unknown>();
-  for (const v of valores) doItem.set(`${v.id_entidade}|${v.atributo_id}`, v.valor_texto ?? v.valor_decimal ?? v.valor_numero);
+  for (const v of valores) doItem.set(`${v.id_entidade}|${v.atributo_id}`, v.valor_texto ?? (v.valor_decimal !== null ? String(Number(v.valor_decimal)) : null) ?? (v.valor_numero !== null ? String(Number(v.valor_numero)) : null));
   const daFamilia = new Map<string, unknown>();
   for (const v of dna) daFamilia.set(`${v.id_entidade}|${v.atributo_id}`, v.valor_padrao_grupo);
   const num = (v: unknown) => (v === null || v === undefined || v === '' ? null : Number(v));

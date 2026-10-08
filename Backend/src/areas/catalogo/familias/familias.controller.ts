@@ -55,8 +55,9 @@ const resolverValor = (valores: Record<string, any>, aliases: unknown[]): any =>
 const obterValorAtributo = (valor: any): any => {
   if (!valor) return undefined;
   if (valor.valor_texto !== null && valor.valor_texto !== undefined) return valor.valor_texto;
-  if (valor.valor_numero !== null && valor.valor_numero !== undefined) return valor.valor_numero;
-  if (valor.valor_decimal !== null && valor.valor_decimal !== undefined) return valor.valor_decimal;
+  // Número/decimal vêm do MySQL como texto com as casas da coluna ("3.600000"): no nome/SKU vai "3.6"
+  if (valor.valor_numero !== null && valor.valor_numero !== undefined) return String(Number(valor.valor_numero));
+  if (valor.valor_decimal !== null && valor.valor_decimal !== undefined) return String(Number(valor.valor_decimal));
   if (valor.valor_data !== null && valor.valor_data !== undefined) return valor.valor_data;
   if (valor.valor_boolean !== null && valor.valor_boolean !== undefined) return valor.valor_boolean;
   return valor.valor_opcao ?? valor.codigo_opcao;

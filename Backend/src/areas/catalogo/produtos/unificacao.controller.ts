@@ -60,7 +60,7 @@ export const listarDuplicados = async (req: Request, res: Response) => {
     if (ids.length > 0) {
       const [linhasValor]: any = await pool.execute(
         `SELECT v.id_entidade, v.atributo_id,
-                COALESCE(o.valor, NULLIF(TRIM(v.valor_texto), ''), v.valor_numero, v.valor_decimal, v.valor_boolean, v.valor_data) AS valor
+                COALESCE(o.valor, NULLIF(TRIM(v.valor_texto), ''), v.valor_numero, TRIM(TRAILING '.' FROM TRIM(TRAILING '0' FROM CAST(v.valor_decimal AS CHAR))), v.valor_boolean, v.valor_data) AS valor
          FROM atributos_comercial_valores v
          LEFT JOIN atributos_comercial_opcoes o ON o.id = v.opcao_id
          WHERE v.tenant_id = ? AND v.tipo_entidade = 'produto' AND v.id_entidade IN (${ids.map(() => '?').join(',')})`,
