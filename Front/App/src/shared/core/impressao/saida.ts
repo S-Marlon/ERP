@@ -38,3 +38,15 @@ export const baixarArquivo = (conteudo: string, nomeArquivo: string, tipo = 'tex
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
+
+/** Baixa bytes como arquivo (PRN com imagem: o conteúdo é binário e não pode passar por texto). */
+export const baixarBinario = (bytes: Uint8Array, nomeArquivo: string) => {
+  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/octet-stream' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nomeArquivo;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
