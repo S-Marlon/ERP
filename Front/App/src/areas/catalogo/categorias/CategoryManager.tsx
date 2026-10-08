@@ -210,6 +210,7 @@ const useCategoryState = () => {
         ativa: categoriaSelecionada.ativa,
         percentualMargemSugerida: categoriaSelecionada.percentualMargemSugerida,
         modoExibicao: categoriaSelecionada.modoExibicao,
+        etiquetaGondola: categoriaSelecionada.etiquetaGondola ?? null,
         descricao: categoriaSelecionada.descricao,
         atributosHeranca: categoriaSelecionada.atributosHeranca,
       };
@@ -579,6 +580,35 @@ export const CategoryManager: React.FC = () => {
                   {rotulo('Exibição na vitrine')}
                   <Select style={{ width: '100%' }} value={cat.modoExibicao} onChange={v => state.handleAtualizarCategoria('modoExibicao', v)}
                     options={[{ value: 'grade', label: 'Grade' }, { value: 'lista', label: 'Lista' }, { value: 'carrossel', label: 'Carrossel' }]} />
+                </Col>
+                <Col xs={24} md={8}>
+                  {rotulo('Etiqueta de gôndola')}
+                  {(() => {
+                    // Herdado: a primeira categoria acima com regra; nenhuma = automático (pelo histórico de impressão)
+                    let herdado: boolean | null = null;
+                    let pai = cat.parentId;
+                    const vistos = new Set<string>();
+                    while (pai && !vistos.has(pai)) {
+                      vistos.add(pai);
+                      const c = state.categorias.find(x => x.id === pai);
+                      if (!c) break;
+                      if (c.etiquetaGondola !== null && c.etiquetaGondola !== undefined) { herdado = c.etiquetaGondola; break; }
+                      pai = c.parentId;
+                    }
+                    const nomeHerdado = herdado === true ? 'sempre' : herdado === false ? 'nunca' : 'automático';
+                    const valor = cat.etiquetaGondola === true ? 'SEMPRE' : cat.etiquetaGondola === false ? 'NUNCA' : 'HERDAR';
+                    return (
+                      <Tooltip title="Avisa quando o preço muda e a etiqueta da gôndola fica velha. Automático: só itens que já tiveram etiqueta impressa. Nunca: itens que não ficam expostos (ex.: rolamentos).">
+                        <Select style={{ width: '100%' }} value={valor}
+                          onChange={v => state.handleAtualizarCategoria('etiquetaGondola', v === 'SEMPRE' ? true : v === 'NUNCA' ? false : null)}
+                          options={[
+                            { value: 'HERDAR', label: cat.parentId ? `Herdar (${nomeHerdado})` : 'Automático (pelas etiquetas impressas)' },
+                            { value: 'SEMPRE', label: 'Sempre tem etiqueta' },
+                            { value: 'NUNCA', label: 'Nunca tem etiqueta' },
+                          ]} />
+                      </Tooltip>
+                    );
+                  })()}
                 </Col>
               </Row>
             </Card>

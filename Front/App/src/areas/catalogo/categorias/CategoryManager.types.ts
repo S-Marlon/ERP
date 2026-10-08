@@ -33,6 +33,8 @@ export interface Categoria {
   ordem: number;
   percentualMargemSugerida: number | null;
   modoExibicao: 'grade' | 'lista' | 'carrossel';
+  // Etiqueta de gôndola: null = herda da categoria pai (na raiz: automático pelo histórico); true = sempre; false = nunca
+  etiquetaGondola?: boolean | null;
   descricao: string;
   atributosHeranca: AtributoHerdavel[];
   seo?: {
@@ -57,6 +59,8 @@ export interface CreateCategoryPayload {
   ativa?: boolean;
   percentualMargemSugerida: number | null;
   modoExibicao: 'grade' | 'lista' | 'carrossel';
+  // Etiqueta de gôndola: null = herda da categoria pai (na raiz: automático pelo histórico); true = sempre; false = nunca
+  etiquetaGondola?: boolean | null;
   descricao?: string;
   atributosHeranca?: AtributoHerdavel[];
   seo?: Categoria['seo'];

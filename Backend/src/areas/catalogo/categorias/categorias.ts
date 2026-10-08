@@ -109,7 +109,7 @@ export const getCategoriasSelect = async (req: Request, res: Response) => {
   try {
     const [catRows] = await pool.execute(
       `SELECT c.id, c.tenant_id, c.categoria_pai_id, c.nome, c.slug, c.ativa, c.ordem,
-              c.descricao, c.margem_sugerida, c.modo_exibicao,
+              c.descricao, c.margem_sugerida, c.modo_exibicao, c.etiqueta_gondola,
               (SELECT COUNT(*) FROM comercial_familias f WHERE f.categoria_id = c.id AND f.tenant_id = c.tenant_id) AS qtd_familias,
               (SELECT COUNT(*) FROM comercial_produtos_dados p WHERE p.categoria_id = c.id AND p.tenant_id = c.tenant_id) AS qtd_produtos
        FROM comercial_categorias c
@@ -139,6 +139,8 @@ export const getCategoriasSelect = async (req: Request, res: Response) => {
       categoria_pai_id: cat.categoria_pai_id ? String(cat.categoria_pai_id) : null,
       ativa: Boolean(cat.ativa),
       margem_sugerida: cat.margem_sugerida !== null ? Number(cat.margem_sugerida) : null,
+      // Etiqueta de gôndola: null = herda (na raiz, automático pelo histórico); true = sempre; false = nunca
+      etiqueta_gondola: cat.etiqueta_gondola === null || cat.etiqueta_gondola === undefined ? null : Boolean(Number(cat.etiqueta_gondola)),
       qtd_familias: Number(cat.qtd_familias || 0),
       qtd_produtos: Number(cat.qtd_produtos || 0),
       atributosHeranca: atributos
@@ -176,7 +178,7 @@ export const getCategoriasSelect = async (req: Request, res: Response) => {
 export const createCategoria = async (req: Request, res: Response) => {
   const connection = await pool.getConnection();
   try {
-    const { nome, categoria_pai_id, margem_sugerida, modo_exibicao, descricao, atributos_vinculados } = req.body;
+    const { nome, categoria_pai_id, margem_sugerida, modo_exibicao, descricao, atributos_vinculados, etiqueta_gondola } = req.body;
     const tenantId = tenantDe(req);
     const vNome = String(nome || '').trim() || 'Nova Categoria';
     const vPai = categoria_pai_id ? Number(categoria_pai_id) : null;
@@ -193,9 +195,10 @@ export const createCategoria = async (req: Request, res: Response) => {
     const slug = await slugDisponivel(connection, tenantId, vNome);
     const [result] = await connection.execute(
       `INSERT INTO comercial_categorias
-         (tenant_id, categoria_pai_id, nome, slug, ativa, margem_sugerida, modo_exibicao, descricao, ordem)
-       VALUES (?, ?, ?, ?, 1, ?, ?, ?, 0)`,
-      [tenantId, vPai, vNome, slug, margem_sugerida ?? null, modo_exibicao || 'grade', descricao || '']
+         (tenant_id, categoria_pai_id, nome, slug, ativa, margem_sugerida, modo_exibicao, descricao, ordem, etiqueta_gondola)
+       VALUES (?, ?, ?, ?, 1, ?, ?, ?, 0, ?)`,
+      [tenantId, vPai, vNome, slug, margem_sugerida ?? null, modo_exibicao || 'grade', descricao || '',
+        etiqueta_gondola === null || etiqueta_gondola === undefined ? null : (etiqueta_gondola ? 1 : 0)]
     );
     const novaCategoriaId = (result as any).insertId;
 
@@ -262,6 +265,10 @@ export const updateCategoria = async (req: Request, res: Response) => {
     if (body.margem_sugerida !== undefined) { fields.push('margem_sugerida = ?'); params.push(body.margem_sugerida ?? null); }
     if (body.modo_exibicao !== undefined) { fields.push('modo_exibicao = ?'); params.push(body.modo_exibicao || 'grade'); }
     if (body.descricao !== undefined) { fields.push('descricao = ?'); params.push(body.descricao ?? ''); }
+    if (body.etiqueta_gondola !== undefined) {
+      fields.push('etiqueta_gondola = ?');
+      params.push(body.etiqueta_gondola === null ? null : (body.etiqueta_gondola ? 1 : 0));
+    }
 
     if (fields.length > 0) {
       await connection.execute(

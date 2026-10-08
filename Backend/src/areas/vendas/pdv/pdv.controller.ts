@@ -297,24 +297,31 @@ export const detalheItemPdv = async (req: Request, res: Response) => {
  * GET /api/vendas/pdv/etiquetas?ids=1,2,3 — dados de etiqueta (preço da unidade padrão do PDV, GTIN,
  * menor preço de atacado dessa unidade e localização), no mesmo formato de produto do PDV.
  */
+/** Dados de etiqueta (mesmo preço/unidade/GTIN do PDV) de uma lista de itens — usado também pelo aviso de etiqueta desatualizada. */
+export const dadosParaEtiqueta = async (conn: Conn, tenant: number, ids: number[]) => {
+  const saida: ReturnType<typeof montarProduto>[] = [];
+  for (let i = 0; i < ids.length; i += 500) {
+    const lote = ids.slice(i, i + 500);
+    const [rows] = await conn.execute(
+      `${SELECT_ITENS} WHERE ic.tenant_id = ? AND ic.id_item IN (${lote.map(() => '?').join(',')})`,
+      [tenant, ...lote]
+    );
+    const itens = rows as any[];
+    const precos = await carregarPrecos(conn, tenant, itens);
+    for (const item of itens) {
+      const id = Number(item.id_item);
+      saida.push(montarProduto(item, precos.unidadesPorItem.get(id) || [], precos.faixasPorItem.get(id) || [], undefined));
+    }
+  }
+  return saida;
+};
+
 export const itensParaEtiqueta = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
   try {
     const ids = [...new Set(String(req.query.ids || '').split(',').map(Number).filter(n => Number.isInteger(n) && n > 0))].slice(0, 500);
     if (ids.length === 0) return res.json({ data: [] });
-    const [rows] = await pool.execute(
-      `${SELECT_ITENS} WHERE ic.tenant_id = ? AND ic.id_item IN (${ids.map(() => '?').join(',')})`,
-      [tenant, ...ids]
-    );
-    const itens = rows as any[];
-    const precos = await carregarPrecos(pool as any, tenant, itens);
-    return res.json({
-      data: itens.map(item => {
-        const id = Number(item.id_item);
-        const faixas = precos.faixasPorItem.get(id) || [];
-        return montarProduto(item, precos.unidadesPorItem.get(id) || [], faixas, undefined);
-      }),
-    });
+    return res.json({ data: await dadosParaEtiqueta(pool as any, tenant, ids) });
   } catch (error: any) {
     console.error('Erro ao carregar dados de etiqueta:', error);
     return res.status(500).json({ error: 'Erro ao carregar dados de etiqueta', details: error.message });
