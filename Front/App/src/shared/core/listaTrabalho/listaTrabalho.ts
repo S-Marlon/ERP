@@ -2,10 +2,11 @@
 // (tirar etiqueta, comprar, conferir...). Sobrevive à troca de telas e ao recarregar a página.
 // Este arquivo é só a regra (funções puras); o estado e a persistência ficam no ListaTrabalhoContext.
 
-export type TagLista = 'ETIQUETAR' | 'COMPRAR' | 'CONFERIR' | 'REVISAR';
+export type TagLista = 'ETIQUETAR' | 'PRECIFICAR' | 'COMPRAR' | 'CONFERIR' | 'REVISAR';
 
 export const TAGS_LISTA: Record<TagLista, { label: string; color: string; descricao: string }> = {
   ETIQUETAR: { label: 'Tirar etiqueta', color: 'blue', descricao: 'Vai para a fila da Etiquetagem' },
+  PRECIFICAR: { label: 'Precificar', color: 'gold', descricao: 'Vai para a lista de precificação (Catálogo › Precificação)' },
   COMPRAR: { label: 'Comprar', color: 'orange', descricao: 'Repor / incluir no próximo pedido de compra' },
   CONFERIR: { label: 'Conferir estoque', color: 'purple', descricao: 'Contar ou verificar no inventário' },
   REVISAR: { label: 'Revisar cadastro', color: 'red', descricao: 'Corrigir dados do produto (preço, ficha, foto...)' },
@@ -114,7 +115,7 @@ export const removerItem = (lista: ItemListaTrabalho[], idItem: number) => lista
 export const itensComTag = (lista: ItemListaTrabalho[], tag: TagLista) => lista.filter(i => i.tags.includes(tag));
 
 export const contagemPorTag = (lista: ItemListaTrabalho[]): Record<TagLista, number> => {
-  const c = { ETIQUETAR: 0, COMPRAR: 0, CONFERIR: 0, REVISAR: 0 } as Record<TagLista, number>;
+  const c = Object.fromEntries((Object.keys(TAGS_LISTA) as TagLista[]).map(t => [t, 0])) as Record<TagLista, number>;
   for (const i of lista) for (const t of i.tags) c[t] += 1;
   return c;
 };

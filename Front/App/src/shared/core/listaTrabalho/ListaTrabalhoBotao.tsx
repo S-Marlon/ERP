@@ -19,7 +19,7 @@ export const ListaTrabalhoBotao: React.FC<Props> = ({ cor }) => {
   const [resumoAberto, setResumoAberto] = useState(false);
 
   const resumo = (
-    <Space direction="vertical" size={8} style={{ width: 240 }}>
+    <Space direction="vertical" size={8} style={{ width: 300 }}>
       {(Object.keys(TAGS_LISTA) as TagLista[]).map(t => (
         <div key={t} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Tag color={TAGS_LISTA[t].color} style={{ margin: 0 }}>{TAGS_LISTA[t].label}</Tag>
@@ -31,6 +31,10 @@ export const ListaTrabalhoBotao: React.FC<Props> = ({ cor }) => {
         <Button size="small" disabled={lista.contagem.ETIQUETAR === 0}
           onClick={() => { setResumoAberto(false); navigate('/estoque/etiquetagem'); }}>
           Etiquetar ({lista.contagem.ETIQUETAR})
+        </Button>
+        <Button size="small" disabled={lista.contagem.PRECIFICAR === 0}
+          onClick={() => { setResumoAberto(false); navigate('/catalogo/preco'); }}>
+          Precificar ({lista.contagem.PRECIFICAR})
         </Button>
       </Space>
     </Space>
@@ -50,10 +54,19 @@ export const ListaTrabalhoBotao: React.FC<Props> = ({ cor }) => {
       <ListaTrabalhoDrawer
         open={aberta}
         onClose={() => setAberta(false)}
-        extra={lista.contagem.ETIQUETAR > 0 && (
-          <Button type="primary" onClick={() => { setAberta(false); navigate('/estoque/etiquetagem'); }}>
-            Ir para Etiquetagem ({lista.contagem.ETIQUETAR})
-          </Button>
+        extra={(
+          <Space>
+            {lista.contagem.PRECIFICAR > 0 && (
+              <Button onClick={() => { setAberta(false); navigate('/catalogo/preco'); }}>
+                Ir para Precificação ({lista.contagem.PRECIFICAR})
+              </Button>
+            )}
+            {lista.contagem.ETIQUETAR > 0 && (
+              <Button type="primary" onClick={() => { setAberta(false); navigate('/estoque/etiquetagem'); }}>
+                Ir para Etiquetagem ({lista.contagem.ETIQUETAR})
+              </Button>
+            )}
+          </Space>
         )}
       />
     </>
