@@ -3,16 +3,19 @@
 // Itens sem custo gerencial ficam de fora (não há de onde calcular).
 import { Request, Response } from 'express';
 import pool from '../../../infra/db';
-import { calcularPrecoUnidade, margemLiquida } from './precificacao';
+import { calcularPrecoUnidade, margemLiquida, precoSegueMarkup } from './precificacao';
 import { carregarTaxaPreco } from '../../vendas/taxas/taxas.controller';
+import { colunaTaxaEmbutida, temTaxaEmbutida } from './taxaEmbutida';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
 
 const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.body?.tenant_id || 1);
 
 const carregarFaixas = async (conn: Conn, tenant: number, ids: number[] | null, trava = false) => {
+  const tem = await temTaxaEmbutida(conn);
   const [rows]: any = await conn.execute(
     `SELECT f.id_faixa, f.id_item, f.tipo_faixa, f.ordem, f.quantidade_minima, f.markup, f.preco_unitario,
+            ${colunaTaxaEmbutida('f', tem)} AS taxa_embutida,
             u.sigla, cpd.custo_gerencial, ic.nome_item,
             COALESCE(NULLIF(TRIM(cpd.sku_customizado), ''), ic.sku) AS sku,
             COALESCE(NULLIF(TRIM(cpd.nome_comercial), ''), ic.nome_item) AS nome,
@@ -33,6 +36,16 @@ const carregarFaixas = async (conn: Conn, tenant: number, ids: number[] | null, 
   return rows as any[];
 };
 
+/**
+ * A faixa precisa de preço novo? Sim se foi calculada com outra taxa (registrada) ou se não segue custo × markup + taxa
+ * atual. Preço digitado à mão que segue o markup (arredondamento do markup) fica como está.
+ */
+const precisaAtualizar = (f: any, taxa: { percentual: number; fator: number }) => {
+  const registrada = f.taxa_embutida === null || f.taxa_embutida === undefined ? null : Number(f.taxa_embutida);
+  if (registrada !== null && Math.abs(registrada - taxa.percentual) >= 0.005) return true;
+  return !precoSegueMarkup(Number(f.preco_unitario), Number(f.custo_gerencial) * Number(f.fator), Number(f.markup), taxa.fator);
+};
+
 /** GET /api/catalogo/precos/taxa/previa — itens cujo preço muda com a taxa embutida */
 export const previaPrecosComTaxa = async (req: Request, res: Response) => {
   try {
@@ -43,12 +56,14 @@ export const previaPrecosComTaxa = async (req: Request, res: Response) => {
     for (const f of faixas) {
       const novo = calcularPrecoUnidade(Number(f.custo_gerencial), Number(f.fator), Number(f.markup), taxa.fator);
       const atual = Number(f.preco_unitario);
-      if (Math.abs(novo - atual) < 0.005) continue;
+      if (!precisaAtualizar(f, taxa)) continue;
       const id = Number(f.id_item);
       if (!porItem.has(id)) porItem.set(id, { idItem: id, sku: f.sku, nome: f.nome, custo: Number(f.custo_gerencial), faixas: [] });
       porItem.get(id).faixas.push({
         idFaixa: Number(f.id_faixa), sigla: f.sigla, tipo: f.tipo_faixa, quantidadeMinima: Number(f.quantidade_minima),
         markup: Number(f.markup), precoAtual: atual, precoNovo: novo,
+        // Taxa com que o preço atual foi calculado (null = anterior ao registro da taxa)
+        taxaEmbutida: f.taxa_embutida === null || f.taxa_embutida === undefined ? null : Number(f.taxa_embutida),
         variacaoPct: atual > 0 ? Number((((novo - atual) / atual) * 100).toFixed(2)) : null,
         margemAtual: margemLiquida(atual, Number(f.custo_gerencial) * Number(f.fator), taxa.percentual),
         margemNova: margemLiquida(novo, Number(f.custo_gerencial) * Number(f.fator), taxa.percentual),
@@ -71,14 +86,19 @@ export const aplicarPrecosComTaxa = async (req: Request, res: Response) => {
     await connection.beginTransaction();
     const taxa = await carregarTaxaPreco(connection, tenant);
     const faixas = await carregarFaixas(connection, tenant, ids, true);
+    const temColuna = await temTaxaEmbutida(connection);
     const itens = new Set<number>();
     let alteradas = 0;
     // Preço de referência do item (varejo da unidade padrão do PDV ou da base) para telas legadas
     const referencia = new Map<number, { preco: number; custoUnidade: number; prioridade: number }>();
     for (const f of faixas) {
       const novo = calcularPrecoUnidade(Number(f.custo_gerencial), Number(f.fator), Number(f.markup), taxa.fator);
-      if (Math.abs(novo - Number(f.preco_unitario)) >= 0.005) {
-        await connection.execute(`UPDATE comercial_precos_faixas SET preco_unitario = ? WHERE id_faixa = ?`, [novo, f.id_faixa]);
+      if (precisaAtualizar(f, taxa) && Math.abs(novo - Number(f.preco_unitario)) >= 0.005) {
+        await connection.execute(
+          temColuna ? `UPDATE comercial_precos_faixas SET preco_unitario = ?, taxa_embutida = ? WHERE id_faixa = ?`
+            : `UPDATE comercial_precos_faixas SET preco_unitario = ? WHERE id_faixa = ?`,
+          temColuna ? [novo, taxa.percentual, f.id_faixa] : [novo, f.id_faixa]
+        );
         alteradas++;
         itens.add(Number(f.id_item));
       }

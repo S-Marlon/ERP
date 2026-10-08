@@ -24,6 +24,8 @@ export interface FaixaPrecoApi {
   quantidade_maxima: number | null;
   markup: number;
   preco_unitario: number;
+  // Taxa da maquininha com que o preço foi calculado (null = preço anterior a esse registro)
+  taxa_embutida?: number | null;
 }
 
 export interface CustosApi {

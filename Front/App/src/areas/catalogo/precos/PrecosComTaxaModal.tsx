@@ -11,6 +11,7 @@ const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'curr
 interface FaixaPrevia {
   idFaixa: number; sigla: string; tipo: string; quantidadeMinima: number; markup: number;
   precoAtual: number; precoNovo: number; variacaoPct: number | null; margemAtual: number | null; margemNova: number | null;
+  taxaEmbutida?: number | null;
 }
 interface ItemPrevia { idItem: number; sku: string; nome: string; custo: number; faixas: FaixaPrevia[] }
 
@@ -69,7 +70,7 @@ export const PrecosComTaxaModal: React.FC<{ aberto: boolean; onFechar: () => voi
         {dados && (
           dados.taxaPercentual > 0
             ? <Alert type="info" showIcon message={<span>Taxa de referência: <b>{dados.taxaPercentual.toFixed(2)}%</b>. Para receber o markup depois da taxa, o preço é dividido por {(1 - dados.taxaPercentual / 100).toFixed(4)}.</span>}
-              description="Também aparecem itens cujo preço já não batia com o markup (preço digitado à mão ou arredondamento): o novo preço volta a seguir o markup." />
+              description="Mudar a taxa não muda preço sozinho: aqui aparecem os preços calculados com outra taxa (ou sem taxa) e os que não batem com o markup. Só os itens marcados são atualizados, mantendo o markup de cada faixa." />
             : <Alert type="warning" showIcon message="Nenhuma taxa de referência configurada (Vendas › Taxas de pagamento). A prévia só mostra preços que não batem com o markup." />
         )}
         <Table<ItemPrevia>
@@ -85,6 +86,12 @@ export const PrecosComTaxaModal: React.FC<{ aberto: boolean; onFechar: () => voi
               <Table<FaixaPrevia> size="small" rowKey="idFaixa" pagination={false} dataSource={i.faixas} columns={[
                 { title: 'Unidade', key: 'u', render: (_, f) => <span>{f.sigla} <Tag style={{ fontSize: 10 }}>{f.tipo === 'ATACADO' ? `atacado ≥ ${f.quantidadeMinima}` : 'varejo'}</Tag></span> },
                 { title: 'Markup', dataIndex: 'markup', render: (v: number) => `${v}x` },
+                {
+                  title: 'Taxa no preço', key: 't',
+                  render: (_, f) => (f.taxaEmbutida === null || f.taxaEmbutida === undefined
+                    ? <Text type="secondary">sem registro</Text>
+                    : <span>{f.taxaEmbutida.toFixed(2)}% → <b>{(dados?.taxaPercentual ?? 0).toFixed(2)}%</b></span>),
+                },
                 { title: 'Atual', dataIndex: 'precoAtual', align: 'right' as const, render: (v: number) => brl(v) },
                 { title: 'Novo', dataIndex: 'precoNovo', align: 'right' as const, render: (v: number) => <b>{brl(v)}</b> },
                 { title: 'Variação', dataIndex: 'variacaoPct', align: 'right' as const, render: (v: number | null) => (v === null ? '—' : <Text type={v > 0 ? 'warning' : 'success'}>{v > 0 ? '+' : ''}{v.toFixed(2)}%</Text>) },

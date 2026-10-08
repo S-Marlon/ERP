@@ -48,7 +48,8 @@ SaleUnitConfig,
 TierRuleRecord
 } from './configVendas.mapper';
 import { validarGtin } from '../../compras/entradaNf/gtin';
-import { lucroLiquido, margemLiquidaPct, markupPorPreco, useTaxaPreco } from '../../../shared/core/precos/taxaPreco';
+import SeletorUnidade from '../unidades/SeletorUnidade';
+import { lucroLiquido, margemLiquidaPct, markupPorPreco, precoSegueMarkup, useTaxaPreco } from '../../../shared/core/precos/taxaPreco';
 
 const { Text } = Typography;
 
@@ -177,7 +178,7 @@ buscarItens(termo.trim(), 1, controller.signal)
 const handleSalvar = async () => {
 if (!selectedItem) return;
 if (!baseUnit) {
-message.warning('Defina a unidade base do item (botão "Novo") antes de salvar.');
+message.warning('Defina a unidade base do item (botão "Nova", na lateral de unidades) antes de salvar.');
 return;
 }
 setSaving(true);
@@ -633,7 +634,7 @@ type="warning"
 showIcon
 style={{ margin: '6px 0' }}
 message={custos.custoGerencial ? 'Custo desatualizado pelas últimas entradas de NF' : 'Item sem custo gerencial definido'}
-description={
+description={<>
 <Space size={16} wrap style={{ fontSize: 12 }}>
 <span>Custo gerencial (preço atual): <b>{custos.custoGerencial ? formatBRL(custos.custoGerencial) : '—'}</b></span>
 {custos.ultimoCusto !== null && (
@@ -643,7 +644,37 @@ description={
 <span>Custo médio: <b>{formatBRL(custos.custoMedio)}</b>{custos.variacaoMedioPct !== null ? ` (${custos.variacaoMedioPct > 0 ? '+' : ''}${custos.variacaoMedioPct}%)` : ''}</span>
 )}
 </Space>
-}
+{/* Preço de venda que cada opção vai gerar (markup mantido, taxa embutida) */}
+{(() => {
+const opcoes = [
+...(custos.ultimoCusto !== null ? [{ rotulo: 'Com o último custo', custo: custos.ultimoCusto }] : []),
+...(custos.custoMedio !== null ? [{ rotulo: 'Com o custo médio', custo: custos.custoMedio }] : []),
+];
+const varejos = unitsConfig.filter(u => u.enabled).map(u => ({ u, faixa: tierRules.find(t => t.unitKey === u.unitKey && t.tierType === 'retail') })).filter(x => x.faixa);
+const atacado = tierRules.some(t => t.tierType === 'wholesale');
+if (!opcoes.length || !varejos.length) return null;
+return (
+<div style={{ marginTop: 6, fontSize: 12 }}>
+{opcoes.map(o => (
+<div key={o.rotulo}>
+<Text type="secondary" style={{ fontSize: 12 }}>{o.rotulo} ({formatBRL(o.custo)}), o varejo fica: </Text>
+{varejos.map(({ u, faixa }, k) => {
+const novo = precoPorMarkup(o.custo, u.conversionFactor, faixa!.markupOrDiscount);
+const sobe = novo > faixa!.unitPrice;
+return (
+<span key={u.unitKey}>
+{k > 0 && ' · '}
+{u.unitKey} {formatBRL(faixa!.unitPrice)} → <b style={{ color: sobe ? '#cf1322' : '#389e0d' }}>{formatBRL(novo)}</b>
+</span>
+);
+})}
+</div>
+))}
+{atacado && <Text type="secondary" style={{ fontSize: 11 }}>As faixas de atacado também são recalculadas, mantendo o markup de cada uma.</Text>}
+</div>
+);
+})()}
+</>}
 action={
 <Space direction="vertical" size={4}>
 {custos.ultimoCusto !== null && (
@@ -664,6 +695,56 @@ Manter defasado
 />
 )}
 
+{/* Taxa da maquininha mudou depois do preço: nada muda sozinho, o gestor decide */}
+{(() => {
+const atual = taxaPreco.percentual;
+const antigas = tierRules.filter(t => {
+const u = unitsConfig.find(x => x.unitKey === t.unitKey);
+if (!u || !u.enabled || t.precoGravado === undefined || Math.abs(t.unitPrice - t.precoGravado) >= 0.005) return false;
+if (t.taxaEmbutida !== null && t.taxaEmbutida !== undefined) return Math.abs(t.taxaEmbutida - atual) >= 0.005;
+// Preço sem registro da taxa: acusa se não bate com custo × markup + taxa atual
+return purchaseCost > 0 && !precoSegueMarkup(t.unitPrice, purchaseCost * u.conversionFactor, t.markupOrDiscount);
+});
+if (!antigas.length || modoRascunho) return null;
+const taxasAntigas = [...new Set(antigas.map(t => t.taxaEmbutida).filter((v): v is number => v !== null && v !== undefined))];
+const atualizar = () => setTierRules(tierRules.map(t => {
+if (!antigas.includes(t)) return t;
+const u = unitsConfig.find(x => x.unitKey === t.unitKey);
+return { ...t, unitPrice: precoPorMarkup(purchaseCost, u?.conversionFactor ?? 1, t.markupOrDiscount) };
+}));
+return (
+<Alert
+type="warning"
+showIcon
+style={{ margin: '6px 0' }}
+message={taxasAntigas.length
+? `Preço calculado com a taxa de ${taxasAntigas.map(v => `${v.toFixed(2)}%`).join(' / ')}; a taxa atual é ${atual.toFixed(2)}%`
+: `Preço não segue custo × markup com a taxa atual (${atual.toFixed(2)}%)`}
+description={
+<div style={{ fontSize: 12 }}>
+<div>A taxa mudou em Vendas › Taxas de pagamento. Os preços não mudam sozinhos: confira e atualize.</div>
+{antigas.map(t => {
+const u = unitsConfig.find(x => x.unitKey === t.unitKey);
+const novo = precoPorMarkup(purchaseCost, u?.conversionFactor ?? 1, t.markupOrDiscount);
+return (
+<div key={t.key}>
+{t.unitKey} {t.tierType === 'wholesale' ? `atacado ≥ ${t.minQuantity}` : 'varejo'}: {formatBRL(t.unitPrice)} → <b style={{ color: novo > t.unitPrice ? '#cf1322' : '#389e0d' }}>{formatBRL(novo)}</b> (markup {t.markupOrDiscount})
+</div>
+);
+})}
+</div>
+}
+action={
+<Space direction="vertical" size={4}>
+<Button size="small" type="primary" onClick={() => { atualizar(); message.info('Preços recalculados com a taxa atual. Clique em "Salvar Configuração" para gravar.'); }}>
+Atualizar preços
+</Button>
+</Space>
+}
+/>
+);
+})()}
+
 {!selectedItem && !modoRascunho ? (
 <div style={{ padding: 32, background: '#fafafa', borderRadius: 6, marginTop: 6 }}>
 <Spin spinning={loadingConfig}>
@@ -678,7 +759,7 @@ type="info"
 showIcon
 style={{ margin: '6px 0' }}
 message="Item sem unidade base"
-description='Cadastre a unidade base de estoque (ex: UN, MT, KG) pelo botão "Novo". As demais unidades (caixa, rolo...) são definidas como múltiplos dela.'
+description='Cadastre a unidade base de estoque (ex: UN, MT, KG) pelo botão "Nova" (na lateral de unidades). As demais unidades (caixa, rolo...) são definidas como múltiplos dela.'
 />
 )}
 {/* SEÇÃO PRINCIPAL: lateral de unidades + barra da unidade ativa + painel de faixas (layout em L) */}
@@ -772,6 +853,17 @@ return (
 {chip(`Custo base (${baseLabel})`, `R$ ${purchaseCost.toFixed(2)}`)}
 {activeUnitDef.conversionFactor !== 1 && chip(`Custo ${activeUnitDef.unitKey} (×${activeUnitDef.conversionFactor})`, `R$ ${custoUnidade.toFixed(2)}`)}
 {chip('Varejo', `R$ ${precoVarejo.toFixed(2)}`, '#3f8600')}
+{(() => {
+const markupVarejo = tierRules.find(t => t.unitKey === activeUnitDef.unitKey && t.tierType === 'retail')?.markupOrDiscount;
+if (!markupVarejo || custoUnidade <= 0 || precoVarejo <= 0) return null;
+const semTaxa = Math.round(custoUnidade * markupVarejo * 100) / 100;
+const valorTaxa = Math.round((precoVarejo - semTaxa) * 100) / 100;
+return (
+<Tooltip title={`Custo R$ ${custoUnidade.toFixed(2)} × markup ${markupVarejo.toFixed(2)} = R$ ${semTaxa.toFixed(2)}${taxaPreco.percentual > 0 ? `; + taxa da maquininha ${taxaPreco.percentual.toFixed(2)}% embutida (R$ ${valorTaxa.toFixed(2)})` : ''} = R$ ${precoVarejo.toFixed(2)}`}>
+<div>{chip(taxaPreco.percentual > 0 ? 'Custo × markup + taxa' : 'Custo × markup', taxaPreco.percentual > 0 ? `R$ ${semTaxa.toFixed(2)} + R$ ${valorTaxa.toFixed(2)}` : `R$ ${semTaxa.toFixed(2)}`)}</div>
+</Tooltip>
+);
+})()}
 {chip(taxaPreco.percentual > 0 ? `Margem (após taxa ${taxaPreco.percentual.toFixed(2)}%)` : 'Margem', margem, '#1677ff')}
 {chip('Faixas', `${faixas} / 3`, '#722ed1')}
 <Button size="small" type="primary" ghost icon={<EditOutlined />} onClick={() => handleOpenEditUnitModal(activeUnitDef)}>
@@ -808,6 +900,8 @@ const isFirstGomo = idx === 0;
 const isLastGomo = idx === unitRulesArr.length - 1;
 const unitCost = purchaseCost * activeUnitDef.conversionFactor;
 const profit = lucroLiquido(rule.unitPrice, unitCost);
+// Taxa da maquininha embutida no preço: venda = custo + taxa + lucro
+const valorTaxa = rule.unitPrice * (taxaPreco.percentual / 100);
 
 return (
 <div key={rule.key}>
@@ -869,17 +963,25 @@ style={{ padding: '0 4px', height: 20 }}
 )}
 </div>
 
-{/* Tabela Unificada de Parâmetros do Gomo (Markup, Modo, Venda e Lucro) */}
+{/* Parâmetros da faixa: custo, markup e modo; venda, lucro e taxa (venda = custo + taxa + lucro) */}
 <div style={{ background: '#ffffff', borderRadius: 4, border: '1px solid #f0f0f0', overflow: 'hidden' }}>
 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, textAlign: 'center' }}>
 <thead>
 <tr style={{ background: '#fafafa', borderBottom: '1px solid #f0f0f0', color: '#8c8c8c' }}>
+<th style={{ padding: '3px 4px', fontWeight: 500, width: '25%' }}>Custo</th>
 <th style={{ padding: '3px 4px', fontWeight: 500, width: '25%' }}>Markup</th>
 <th style={{ padding: '3px 4px', fontWeight: 500, width: '25%' }}>Modo</th>
 </tr>
 </thead>
 <tbody>
 <tr>
+<td style={{ padding: '4px 2px' }}>
+<Tooltip title={activeUnitDef.conversionFactor !== 1
+? `Custo base R$ ${purchaseCost.toFixed(2)} × ${activeUnitDef.conversionFactor} (${activeUnitDef.unitKey})`
+: 'Custo gerencial: a base do preço'}>
+<span style={{ color: '#595959', fontSize: 11, whiteSpace: 'nowrap' }}>R$ {unitCost.toFixed(2)}</span>
+</Tooltip>
+</td>
 <td style={{ padding: '4px 2px' }}>
 <InputNumber
 min={0}
@@ -932,6 +1034,7 @@ setTierRules(updated);
 <tr style={{ background: '#fafafa', borderBottom: '1px solid #f0f0f0', color: '#8c8c8c' }}>
 <th style={{ padding: '3px 4px', fontWeight: 500, width: '25%' }}>Venda (R$)</th>
 <th style={{ padding: '3px 4px', fontWeight: 500, width: '25%' }}>Lucro</th>
+<th style={{ padding: '3px 4px', fontWeight: 500, width: '25%' }}>Taxa</th>
 </tr>
 </thead>
 <tbody>
@@ -961,12 +1064,25 @@ setTierRules(updated);
 />
 </td>
 <td style={{ padding: '4px 2px', fontWeight: 'bold' }}>
-<span style={{ color: '#1890ff', fontSize: 11 }}>+R$ {profit.toFixed(2)}</span>
+<Tooltip title="Lucro líquido: venda − taxa − custo">
+<span style={{ color: profit < 0 ? '#cf1322' : '#1890ff', fontSize: 11, whiteSpace: 'nowrap' }}>{profit < 0 ? '−' : '+'}R$ {Math.abs(profit).toFixed(2)}</span>
+</Tooltip>
+</td>
+<td style={{ padding: '4px 2px' }}>
+<Tooltip title={taxaPreco.percentual > 0
+? `Taxa da maquininha embutida no preço: ${taxaPreco.percentual.toFixed(2)}% de R$ ${rule.unitPrice.toFixed(2)} (Vendas › Taxas de pagamento)`
+: 'Nenhuma taxa embutida no preço (Vendas › Taxas de pagamento)'}>
+<span style={{ color: '#d48806', fontSize: 11, whiteSpace: 'nowrap' }}>
+R$ {valorTaxa.toFixed(2)}
+{taxaPreco.percentual > 0 && <span style={{ color: '#8c8c8c' }}> ({taxaPreco.percentual.toFixed(2)}%)</span>}
+</span>
+</Tooltip>
 </td>
 </tr>
 </tbody>
 </table>
 </div>
+
 </div>
 </div>
 </div>
@@ -1018,14 +1134,22 @@ cancelText="Cancelar"
 </div>
 
 <div>
-<Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>Sigla da Unidade (Ex: RL, CX):</Text>
-<Input
-placeholder="Ex: RL"
-value={formUnitKey}
-disabled={modalMode === 'edit'}
-onChange={(e) => setFormUnitKey(e.target.value.toUpperCase())}
-maxLength={5}
+<Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>Unidade (do cadastro: UN, PC, MT, CX...):</Text>
+{modalMode === 'edit' ? (
+<Input value={formUnitKey} disabled />
+) : (
+<SeletorUnidade
+style={{ width: '100%' }}
+placeholder="Escolha a unidade"
+value={formUnitKey || null}
+excluir={unitsConfig.map(u => u.unitKey)}
+onChange={(sigla, unidade) => {
+setFormUnitKey(sigla);
+// Nome descritivo sugerido pelo cadastro (o operador pode detalhar: "Rolo com 150 metros")
+if (!formUnitName.trim()) setFormUnitName(unidade?.descricao || sigla);
+}}
 />
+)}
 </div>
 <div>
 <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>Nome Descritivo:</Text>

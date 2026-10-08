@@ -3,11 +3,12 @@
 import { API_URL } from '../../../../shared/api/config';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Alert, Button, Card, Col, Dropdown, Empty, Input, InputNumber, Row, Segmented, Select, Space, Switch, Table, Tag, Tooltip, Typography, message,
+  Alert, Button, Card, Col, Dropdown, Empty, Input, InputNumber, Modal, Row, Segmented, Select, Space, Switch, Table, Tag, Tooltip, Typography, message,
 } from 'antd';
+import { useNavigate } from 'react-router-dom';
 import { CalculatorOutlined, DeleteOutlined, InfoCircleOutlined, PlusOutlined, SaveOutlined } from '@ant-design/icons';
 import { ConfigTaxas, invalidarTaxas, ROTULO_FORMA_TAXA, TaxaPagamento, taxasApi } from '../taxasVenda';
-import { carregarTaxaPreco } from '../../../../shared/core/precos/taxaPreco';
+import { carregarTaxaPreco, percentualTaxaPreco } from '../../../../shared/core/precos/taxaPreco';
 
 const { Text, Title } = Typography;
 const FORMAS = ['CREDITO', 'DEBITO', 'PIX', 'DINHEIRO', 'TRANSFERENCIA', 'PRAZO'];
@@ -58,6 +59,7 @@ const TaxasPagamento: React.FC = () => {
   const [temSenha, setTemSenha] = useState(false);
   const [senhaAtual, setSenhaAtual] = useState('');
   const [salvando, setSalvando] = useState(false);
+  const navigate = useNavigate();
   const [salvo, setSalvo] = useState('');
   const [vendaEmLote, setVendaEmLote] = useState<number | null>(null);
   // Simulador: preço de tabela digitado ou o líquido que se quer receber
@@ -110,6 +112,8 @@ const TaxasPagamento: React.FC = () => {
   const formasAusentes = FORMAS.filter(f => !formasPresentes.includes(f));
 
   const salvar = async () => {
+    // Taxa embutida no preço antes de salvar: se mudar, os preços ficam defasados (não mudam sozinhos)
+    const taxaAntes = percentualTaxaPreco();
     setSalvando(true);
     try {
       const r = await taxasApi.salvar({
@@ -126,7 +130,17 @@ const TaxasPagamento: React.FC = () => {
       setSenhaAtual('');
       invalidarTaxas();
       carregarTaxaPreco();
-      message.success('Taxas salvas. Para atualizar os preços existentes, use Catálogo › Precificação › Preços com taxa.');
+      if (Math.abs((Number(r.taxaReferencia) || 0) - taxaAntes) >= 0.005) {
+        Modal.warning({
+          title: 'A taxa embutida no preço mudou',
+          content: `De ${taxaAntes.toFixed(2)}% para ${(Number(r.taxaReferencia) || 0).toFixed(2)}%. Os preços de venda NÃO foram alterados: na Precificação eles aparecem como "Taxa mudou" até você conferir e atualizar.`,
+          okText: 'Ir para a Precificação',
+          onOk: () => navigate('/catalogo/preco'),
+          closable: true,
+        });
+      } else {
+        message.success('Taxas salvas.');
+      }
     } catch (e) {
       message.error(e instanceof Error ? e.message : 'Erro ao salvar as taxas.');
     } finally {

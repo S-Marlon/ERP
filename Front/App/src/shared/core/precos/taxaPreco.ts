@@ -38,3 +38,13 @@ export const markupPorPreco = (preco: number, custoUnidade: number) =>
 /** Lucro e margem depois da taxa embutida. */
 export const lucroLiquido = (preco: number, custoUnidade: number) => preco * (1 - estado.percentual / 100) - custoUnidade;
 export const margemLiquidaPct = (preco: number, custoUnidade: number) => (preco > 0 ? (lucroLiquido(preco, custoUnidade) / preco) * 100 : 0);
+
+/**
+ * O preço segue custo × markup com a taxa atual? Aceita a diferença do markup gravado com 2 casas
+ * (preço digitado à mão, ex.: R$ 155 com markup 1,14). Mesma regra do painel de preços no backend.
+ */
+export const precoSegueMarkup = (preco: number, custoUnidade: number, markup: number) => {
+  const base = custoUnidade * estado.fator;
+  if (Math.abs(preco - Math.round(base * markup * 100) / 100) < 0.01) return true;
+  return base > 0 && Math.abs(preco / base - markup) <= 0.0051;
+};

@@ -71,3 +71,13 @@ export const recalcularFaixas = <T extends FaixaPreco>(faixas: T[], custoBase: n
 /** Margem líquida (%) do preço: o que sobra depois da taxa embutida e do custo. */
 export const margemLiquida = (preco: number, custo: number, taxaPercentual = 0): number | null =>
   preco > 0 ? arred(((preco * (1 - taxaPercentual / 100) - custo) / preco) * 100, 2) : null;
+
+/**
+ * O preço segue o markup? Aceita a diferença do markup gravado com 2 casas: preço digitado à mão (ex.: R$ 155 com
+ * markup 1,14) não conta como fora do markup.
+ */
+export const precoSegueMarkup = (preco: number, custoUnidade: number, markup: number, fatorTaxa = 1): boolean => {
+  if (Math.abs(Number(preco) - calcularPrecoUnidade(custoUnidade, 1, markup, fatorTaxa)) < 0.01) return true;
+  const base = Number(custoUnidade) * (Number(fatorTaxa) || 1);
+  return base > 0 && Math.abs(Number(preco) / base - Number(markup)) <= 0.0051;
+};

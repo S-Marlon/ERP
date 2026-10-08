@@ -22,6 +22,9 @@ export interface TierRuleRecord {
   maxQuantity: number | 'INF';
   markupOrDiscount: number;
   unitPrice: number;
+  // Como estava gravado: a taxa com que o preço foi calculado e o próprio preço (a defasagem some quando o preço muda)
+  taxaEmbutida?: number | null;
+  precoGravado?: number;
 }
 
 import { fatorTaxaPreco } from '../../../shared/core/precos/taxaPreco';
@@ -60,6 +63,8 @@ export const configParaEstado = (config: ConfigVendasApi) => {
     maxQuantity: f.quantidade_maxima === null ? 'INF' : f.quantidade_maxima,
     markupOrDiscount: f.markup,
     unitPrice: f.preco_unitario,
+    taxaEmbutida: f.taxa_embutida ?? null,
+    precoGravado: f.preco_unitario,
   }));
 
   // Unidade sem faixa (ex: embalagem aprendida na entrada de NF): começa com uma faixa de varejo

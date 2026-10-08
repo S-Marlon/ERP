@@ -2,7 +2,9 @@
 // margem e situação (sem preço, custo defasado, margem baixa...). A edição do preço é feita pelo configurador do item.
 import { Request, Response } from 'express';
 import pool from '../../../infra/db';
-import { margemPct, SITUACOES_PRECO, SituacaoPreco, situacoesPreco } from './painelPrecos';
+import { composicaoPreco, conferenciaTaxa, margemPct, SITUACOES_PRECO, SituacaoPreco, situacoesPreco } from './painelPrecos';
+import { carregarTaxaPreco } from '../../vendas/taxas/taxas.controller';
+import { colunaTaxaEmbutida, temTaxaEmbutida } from './taxaEmbutida';
 import { analisarDefasagem } from './precificacao';
 
 const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || 1);
@@ -10,7 +12,7 @@ const nulo = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 const TIPOS_FORA_DA_VENDA = ['CONSUMO', 'INSUMO', 'ATIVO'];
 
 /**
- * GET /catalogo/precos/painel?situacao=&busca=&page=&limit=
+ * GET /catalogo/precos/painel?situacao=&busca=&ids=&page=&limit=
  */
 export const painelPrecos = async (req: Request, res: Response) => {
   try {
@@ -26,7 +28,14 @@ export const painelPrecos = async (req: Request, res: Response) => {
       filtros.push('(ic.sku LIKE ? OR cpd.sku_customizado LIKE ? OR ic.nome_item LIKE ? OR cpd.nome_comercial LIKE ?)');
       params.push(...Array(4).fill(`%${busca}%`));
     }
+    // Itens específicos (ex.: os marcados "Precificar" na lista de trabalho)
+    const ids = [...new Set(String(req.query.ids || '').split(',').map(Number).filter(n => Number.isInteger(n) && n > 0))].slice(0, 500);
+    if (ids.length) {
+      filtros.push(`ic.id_item IN (${ids.map(() => '?').join(',')})`);
+      params.push(...ids);
+    }
 
+    const temTaxa = await temTaxaEmbutida(pool as any);
     const [rows]: any = await pool.execute(
       `SELECT ic.id_item, UPPER(COALESCE(ic.tipo_recurso, 'PRODUTO')) AS tipo,
               COALESCE(NULLIF(TRIM(cpd.sku_customizado), ''), ic.sku) AS sku,
@@ -36,6 +45,12 @@ export const painelPrecos = async (req: Request, res: Response) => {
               (SELECT pf.preco_unitario FROM comercial_precos_faixas pf
                WHERE pf.tenant_id = ic.tenant_id AND pf.id_item = ic.id_item AND pf.id_unidade = ic.id_unidade AND pf.tipo_faixa = 'VAREJO'
                ORDER BY pf.ordem LIMIT 1) AS preco_varejo,
+              (SELECT pf.markup FROM comercial_precos_faixas pf
+               WHERE pf.tenant_id = ic.tenant_id AND pf.id_item = ic.id_item AND pf.id_unidade = ic.id_unidade AND pf.tipo_faixa = 'VAREJO'
+               ORDER BY pf.ordem LIMIT 1) AS markup_varejo,
+              (SELECT ${colunaTaxaEmbutida('pf', temTaxa)} FROM comercial_precos_faixas pf
+               WHERE pf.tenant_id = ic.tenant_id AND pf.id_item = ic.id_item AND pf.id_unidade = ic.id_unidade AND pf.tipo_faixa = 'VAREJO'
+               ORDER BY pf.ordem LIMIT 1) AS taxa_embutida,
               (SELECT COUNT(*) FROM comercial_precos_faixas pf
                WHERE pf.tenant_id = ic.tenant_id AND pf.id_item = ic.id_item AND pf.tipo_faixa = 'ATACADO') AS faixas_atacado,
               (SELECT COUNT(*) FROM comercial_unidades_venda uv
@@ -49,6 +64,9 @@ export const painelPrecos = async (req: Request, res: Response) => {
       params
     );
 
+    // Taxa da maquininha embutida no preço: entra na margem e na conferência do preço com o markup
+    const taxa = await carregarTaxaPreco(pool as any, tenant);
+
     const itens = rows
       .filter((r: any) => !TIPOS_FORA_DA_VENDA.includes(r.tipo))
       .map((r: any) => {
@@ -57,6 +75,8 @@ export const painelPrecos = async (req: Request, res: Response) => {
           custoMedio: nulo(r.custo_medio),
           ultimoCusto: nulo(r.ultimo_custo),
           precoVarejo: nulo(r.preco_varejo),
+          markupVarejo: nulo(r.markup_varejo),
+          taxaEmbutida: nulo(r.taxa_embutida),
         };
         const defasagem = analisarDefasagem(preco.custoGerencial, preco.custoMedio, preco.ultimoCusto);
         return {
@@ -68,10 +88,13 @@ export const painelPrecos = async (req: Request, res: Response) => {
           estoqueVenda: Number(r.quantidade_atual) || 0,
           ...preco,
           variacaoUltimoPct: defasagem.variacaoUltimoPct,
-          margemPct: margemPct(preco),
+          margemPct: margemPct(preco, taxa),
+          // custo × markup = sem taxa; + taxa = preço que o markup manda (compara com o gravado)
+          composicao: composicaoPreco(preco, taxa),
+          conferenciaTaxa: conferenciaTaxa(preco, taxa),
           faixasAtacado: Number(r.faixas_atacado) || 0,
           unidadesVenda: Number(r.unidades_venda) || 0,
-          situacoes: situacoesPreco(preco),
+          situacoes: situacoesPreco(preco, taxa),
         };
       });
 
@@ -91,6 +114,7 @@ export const painelPrecos = async (req: Request, res: Response) => {
       data: filtrados.slice((page - 1) * limit, page * limit),
       pagination: { page, limit, total: filtrados.length },
       resumo: { itensVenda: itens.length, margemMedia, comMargem: margens.length, porSituacao: resumo },
+      taxa: { percentual: taxa.percentual, fator: Number(taxa.fator.toFixed(6)) },
       situacoes: SITUACOES_PRECO,
     });
   } catch (error: any) {

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import pool from '../../../infra/db';
 import { analisarDefasagem, calcularPrecoUnidade, margemLiquida } from './precificacao';
 import { carregarTaxaPreco } from '../../vendas/taxas/taxas.controller';
+import { colunaTaxaEmbutida, FaixaGravada, taxaParaGravar, temTaxaEmbutida } from './taxaEmbutida';
 
 // Conexão do pool (mysql2/promise), dentro ou fora de transação
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
@@ -64,8 +65,10 @@ const carregarConfig = async (conn: Conn, tenant: number, idItem: number) => {
     [item.id_unidade, item.id_unidade, idItem, tenant, idItem, tenant, tenant, item.id_unidade]
   );
 
+  const tem = await temTaxaEmbutida(conn);
   const [faixaRows] = await conn.execute(
-    `SELECT um.sigla, f.tipo_faixa, f.ordem, f.quantidade_minima, f.quantidade_maxima, f.markup, f.preco_unitario
+    `SELECT um.sigla, f.tipo_faixa, f.ordem, f.quantidade_minima, f.quantidade_maxima, f.markup, f.preco_unitario,
+            ${colunaTaxaEmbutida('f', tem)} AS taxa_embutida
      FROM comercial_precos_faixas f
      INNER JOIN itens_unidades_medida um ON um.id_unidade = f.id_unidade
      WHERE f.id_item = ? AND f.tenant_id = ?
@@ -112,6 +115,8 @@ const carregarConfig = async (conn: Conn, tenant: number, idItem: number) => {
       quantidade_maxima: f.quantidade_maxima === null ? null : Number(f.quantidade_maxima),
       markup: Number(f.markup),
       preco_unitario: Number(f.preco_unitario),
+      // Taxa da maquininha com que o preço foi calculado (null = preço anterior à coluna)
+      taxa_embutida: f.taxa_embutida === null || f.taxa_embutida === undefined ? null : Number(f.taxa_embutida),
     })),
   };
 };
@@ -193,6 +198,21 @@ export const gravarConfigVendas = async (
 
   await connection.execute(`UPDATE itens_core SET id_unidade = ? WHERE id_item = ? AND tenant_id = ?`, [idBase, idItem, tenant]);
 
+  // Taxa de cada faixa: preço que não mudou mantém a taxa com que foi calculado; o resto leva a taxa atual
+  const tem = await temTaxaEmbutida(connection);
+  const taxaAtual = tem ? (await carregarTaxaPreco(connection, tenant)).percentual : 0;
+  let anteriores: FaixaGravada[] = [];
+  if (tem) {
+    const [rows] = await connection.execute(
+      `SELECT um.sigla, f.tipo_faixa, f.ordem, f.preco_unitario, f.taxa_embutida
+       FROM comercial_precos_faixas f INNER JOIN itens_unidades_medida um ON um.id_unidade = f.id_unidade
+       WHERE f.id_item = ? AND f.tenant_id = ?`, [idItem, tenant]);
+    anteriores = (rows as any[]).map(r => ({
+      sigla: siglaNormalizada(r.sigla), tipo: r.tipo_faixa, ordem: Number(r.ordem), preco: Number(r.preco_unitario),
+      taxa: r.taxa_embutida === null ? null : Number(r.taxa_embutida),
+    }));
+  }
+
   // Reescreve conversões, unidades de venda e faixas do item (faixas caem em cascata com as unidades de venda)
   await connection.execute(`DELETE FROM comercial_precos_faixas WHERE id_item = ? AND tenant_id = ?`, [idItem, tenant]);
   await connection.execute(`DELETE FROM comercial_unidades_venda WHERE id_item = ? AND tenant_id = ?`, [idItem, tenant]);
@@ -223,20 +243,32 @@ export const gravarConfigVendas = async (
   }
 
   for (const f of faixas) {
-    await connection.execute(
-      `INSERT INTO comercial_precos_faixas
-       (tenant_id, id_item, id_unidade, tipo_faixa, ordem, quantidade_minima, quantidade_maxima, markup, preco_unitario)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        tenant, idItem, idPorSigla.get(siglaNormalizada(f.sigla)),
-        f.tipo_faixa === 'ATACADO' ? 'ATACADO' : 'VAREJO',
-        Number(f.ordem) || 1,
-        Number(f.quantidade_minima) || 0,
-        f.quantidade_maxima === null || f.quantidade_maxima === undefined ? null : Number(f.quantidade_maxima),
-        Number(f.markup) || 0,
-        Number(f.preco_unitario) || 0,
-      ]
-    );
+    const tipo = f.tipo_faixa === 'ATACADO' ? 'ATACADO' : 'VAREJO';
+    const valores = [
+      tenant, idItem, idPorSigla.get(siglaNormalizada(f.sigla)),
+      tipo,
+      Number(f.ordem) || 1,
+      Number(f.quantidade_minima) || 0,
+      f.quantidade_maxima === null || f.quantidade_maxima === undefined ? null : Number(f.quantidade_maxima),
+      Number(f.markup) || 0,
+      Number(f.preco_unitario) || 0,
+    ];
+    if (tem) {
+      const taxa = taxaParaGravar({ sigla: siglaNormalizada(f.sigla), tipo, ordem: Number(f.ordem) || 1, preco: Number(f.preco_unitario) || 0 }, anteriores, taxaAtual);
+      await connection.execute(
+        `INSERT INTO comercial_precos_faixas
+         (tenant_id, id_item, id_unidade, tipo_faixa, ordem, quantidade_minima, quantidade_maxima, markup, preco_unitario, taxa_embutida)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [...valores, taxa]
+      );
+    } else {
+      await connection.execute(
+        `INSERT INTO comercial_precos_faixas
+         (tenant_id, id_item, id_unidade, tipo_faixa, ordem, quantidade_minima, quantidade_maxima, markup, preco_unitario)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        valores
+      );
+    }
   }
 
   // Custo gerencial + preço de referência (varejo da unidade padrão do PDV, ou da base) para telas legadas
@@ -336,10 +368,13 @@ export const atualizarCustoGerencial = async (req: Request, res: Response) => {
     );
 
     const taxaPreco = await carregarTaxaPreco(connection, tenant);
+    const tem = await temTaxaEmbutida(connection);
     for (const f of faixas) {
+      const preco = calcularPrecoUnidade(novoCusto, Number(f.fator), Number(f.markup), taxaPreco.fator);
       await connection.execute(
-        `UPDATE comercial_precos_faixas SET preco_unitario = ? WHERE id_faixa = ?`,
-        [calcularPrecoUnidade(novoCusto, Number(f.fator), Number(f.markup), taxaPreco.fator), f.id_faixa]
+        tem ? `UPDATE comercial_precos_faixas SET preco_unitario = ?, taxa_embutida = ? WHERE id_faixa = ?`
+          : `UPDATE comercial_precos_faixas SET preco_unitario = ? WHERE id_faixa = ?`,
+        tem ? [preco, taxaPreco.percentual, f.id_faixa] : [preco, f.id_faixa]
       );
     }
 
@@ -379,5 +414,30 @@ export const listarUnidadesItens = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Erro ao listar unidades dos itens:', error);
     return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * POST /catalogo/itens-unidades { sigla, descricao } — cadastra uma unidade nova (a tela confirma antes).
+ * Sigla já existente devolve a do cadastro, sem duplicar.
+ */
+export const criarUnidadeItem = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const sigla = siglaNormalizada(req.body?.sigla);
+  const descricao = String(req.body?.descricao || '').trim().slice(0, 60);
+  if (!/^[A-Z0-9]{1,5}$/.test(sigla)) {
+    return res.status(400).json({ success: false, error: 'Sigla da unidade: de 1 a 5 letras ou números (ex.: GL, KIT).' });
+  }
+  if (!descricao) return res.status(400).json({ success: false, error: 'Informe o nome da unidade (ex.: Galão).' });
+  try {
+    const [existe]: any = await pool.execute(
+      `SELECT id_unidade, sigla, descricao FROM itens_unidades_medida WHERE tenant_id = ? AND sigla = ? LIMIT 1`, [tenant, sigla]
+    );
+    if (existe[0]) return res.json({ success: true, criada: false, unidade: existe[0] });
+    const id = await obterOuCriarUnidade(pool as any, tenant, sigla, descricao);
+    return res.status(201).json({ success: true, criada: true, unidade: { id_unidade: id, sigla, descricao } });
+  } catch (error: any) {
+    console.error('Erro ao cadastrar unidade:', error);
+    return res.status(500).json({ success: false, error: 'Erro ao cadastrar a unidade.' });
   }
 };
