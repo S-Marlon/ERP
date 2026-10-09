@@ -270,6 +270,11 @@ export const GlobalAttributeManager: React.FC<GlobalAttributeManagerProps> = ({ 
     }
   };
 
+  // Código da opção digitado pelo usuário (ex.: bitola "08"), diferente do gerado a partir do texto
+  const codigoGerado = (valor: string) => String(valor).normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  const codigoProprio = (o: { valor: string; codigo?: string }) => !!o.codigo && o.codigo !== codigoGerado(o.valor) && !/^OPC_\d+$/.test(o.codigo);
+
   // --- INLINE EDIT METHODS ---
   const startInlineEdit = (record: IAtributoGlobal) => {
     formEdicaoInline.setFieldsValue({
@@ -277,7 +282,8 @@ export const GlobalAttributeManager: React.FC<GlobalAttributeManagerProps> = ({ 
       ordemExibicao: (record as any).ordemExibicao || 0,
       tipoComponenteUI: (record as any).tipoComponenteUI || 'input',
       ajudaContextual: record.ajudaContextual || '',
-      valoresSugeridos: (record.opcoes || []).map(o => o.valor)
+      // Código próprio (ex.: bitola) aparece como "texto = código"; o gerado do texto fica escondido
+      valoresSugeridos: (record.opcoes || []).map(o => (codigoProprio(o) ? `${o.valor} = ${o.codigo}` : o.valor))
     });
     setIdAtributoEmEdicao(record.id);
   };
@@ -601,7 +607,7 @@ export const GlobalAttributeManager: React.FC<GlobalAttributeManagerProps> = ({ 
                   <Select
                     size="small"
                     mode="tags"
-                    placeholder="Opções da lista (Enter para adicionar)"
+                    placeholder='Opções (Enter). Com código: 1/2" = 08'
                     tokenSeparators={[',']}
                   />
                 </Form.Item>
@@ -632,7 +638,7 @@ export const GlobalAttributeManager: React.FC<GlobalAttributeManagerProps> = ({ 
               <div style={{ maxWidth: 220 }}>
                 {opcoes.map((op: any) => (
                   <Tooltip key={op.id || op.codigo} title={`Código: ${op.codigo}${op.emUso ? ' · em uso por itens (não pode sair da lista)' : ''}`}>
-                    <Tag color={op.emUso ? 'blue' : 'cyan'} style={{ marginBottom: 2, fontSize: 10 }}>{op.valor}{op.emUso ? ' •' : ''}</Tag>
+                    <Tag color={op.emUso ? 'blue' : 'cyan'} style={{ marginBottom: 2, fontSize: 10 }}>{op.valor}{codigoProprio(op) && <b> = {op.codigo}</b>}{op.emUso ? ' •' : ''}</Tag>
                   </Tooltip>
                 ))}
               </div>

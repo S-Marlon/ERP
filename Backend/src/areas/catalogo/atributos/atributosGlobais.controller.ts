@@ -2,7 +2,7 @@
 // Pool global de atributos do PIM (Diâmetro, Material, Tensão...), reaproveitado por categorias e famílias.
 import { Request, Response } from 'express';
 import pool from '../../../infra/db';
-import { codigoOpcao, diferencaOpcoes, normalizarTexto, templateUsaAtributo, trocarTokenTemplate } from './atributosRegras';
+import { codigoOpcao, diferencaOpcoes, normalizarTexto, separarOpcaoCodigo, templateUsaAtributo, trocarTokenTemplate } from './atributosRegras';
 
 type Conn = { query: (sql: string, params?: any[]) => Promise<any>; execute?: (sql: string, params?: any[]) => Promise<any> };
 
@@ -48,7 +48,11 @@ const familiasQueUsamNoTemplate = async (conn: Conn, tenant: number, aliases: Ar
  * Sincroniza as opções de uma lista preservando os ids (os valores dos itens apontam para eles).
  * Opção em uso não pode sair da lista; opção sem uso que sai fica inativa.
  */
-const sincronizarOpcoes = async (conn: Conn, tenant: number, idAtributo: number, desejadas: string[]) => {
+const sincronizarOpcoes = async (conn: Conn, tenant: number, idAtributo: number, desejadasTexto: string[]) => {
+  // "texto = código": o código informado vale para a opção (novo ou já existente); sem código, mantém/gera
+  const separadas = desejadasTexto.map(separarOpcaoCodigo);
+  const desejadas = separadas.map(s => s.valor);
+  const codigoInformado = new Map(separadas.filter(s => s.codigo).map(s => [normalizarTexto(s.valor), s.codigo as string]));
   const [atuais] = await conn.query(
     `SELECT o.id, o.valor,
             EXISTS (SELECT 1 FROM atributos_comercial_valores v WHERE v.opcao_id = o.id) AS em_uso
@@ -63,8 +67,11 @@ const sincronizarOpcoes = async (conn: Conn, tenant: number, idAtributo: number,
   if (diff.bloqueadas.length > 0) {
     throw new ErroNegocio(`Estas opções já estão em uso por itens e não podem sair da lista: ${diff.bloqueadas.join(', ')}.`);
   }
+  const valorPorId = new Map((atuais as any[]).map(o => [Number(o.id), String(o.valor)]));
   for (const m of diff.manter) {
-    await conn.query(`UPDATE atributos_comercial_opcoes SET ordem = ? WHERE id = ?`, [m.ordem, m.id]);
+    const codigo = codigoInformado.get(normalizarTexto(valorPorId.get(m.id)));
+    if (codigo) await conn.query(`UPDATE atributos_comercial_opcoes SET ordem = ?, codigo = ? WHERE id = ?`, [m.ordem, codigo, m.id]);
+    else await conn.query(`UPDATE atributos_comercial_opcoes SET ordem = ? WHERE id = ?`, [m.ordem, m.id]);
   }
   for (const n of diff.inserir) {
     // Reativa uma opção antiga com o mesmo valor, se existir (preserva o id)
@@ -74,11 +81,12 @@ const sincronizarOpcoes = async (conn: Conn, tenant: number, idAtributo: number,
     );
     const reaproveitar = (inativa as any[]).find(o => normalizarTexto(o.valor) === normalizarTexto(n.valor));
     if (reaproveitar) {
-      await conn.query(`UPDATE atributos_comercial_opcoes SET ativo = 1, ordem = ?, valor = ? WHERE id = ?`, [n.ordem, n.valor, reaproveitar.id]);
+      await conn.query(`UPDATE atributos_comercial_opcoes SET ativo = 1, ordem = ?, valor = ?, codigo = COALESCE(?, codigo) WHERE id = ?`,
+        [n.ordem, n.valor, codigoInformado.get(normalizarTexto(n.valor)) ?? null, reaproveitar.id]);
     } else {
       await conn.query(
         `INSERT INTO atributos_comercial_opcoes (tenant_id, atributo_id, valor, codigo, ordem, ativo) VALUES (?, ?, ?, ?, ?, 1)`,
-        [tenant, idAtributo, n.valor, codigoOpcao(n.valor, n.ordem), n.ordem]
+        [tenant, idAtributo, n.valor, codigoInformado.get(normalizarTexto(n.valor)) ?? codigoOpcao(n.valor, n.ordem), n.ordem]
       );
     }
   }

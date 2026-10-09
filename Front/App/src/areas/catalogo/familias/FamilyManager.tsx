@@ -407,7 +407,7 @@ showConfirmButton: false,
 const handleSalvarFamiliaNoBanco = async () => {
 if (!familiaSelecionadaLocal?.id) {
 Swal.fire("Atenção", "Nenhuma família selecionada para salvar.", "warning");
-return;
+return false;
 }
 
 try {
@@ -498,6 +498,8 @@ timer: 1500,
 showConfirmButton: false,
 });
 }
+// Quem chama (editor de variações) só segue se a família foi salva
+return true;
 
 } catch (error: any) {
 console.error("Erro ao salvar família no banco:", error);
@@ -506,6 +508,7 @@ title: "Erro ao salvar",
 text: error.response?.data?.error || error.message || "Não foi possível persistir as alterações.",
 icon: "error",
 });
+return false;
 }
 };
 
@@ -982,6 +985,9 @@ previewSkuSimulado={previewSkuSimulado}
 brandColor={brandColor} 
 itensDaFamilia={itensDaFamilia}
 carregandoItens={carregandoItens}
+temAlteracoes={temAlteracoes}
+onSalvarFamilia={handleSalvarFamiliaNoBanco}
+onVariacoesGravadas={catalogState.recarregarItensDaFamilia}
 />
 
  

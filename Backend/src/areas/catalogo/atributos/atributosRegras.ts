@@ -5,6 +5,14 @@ export const normalizarTexto = (v: unknown): string => String(v ?? '')
 
 const normalizarToken = (v: unknown): string => normalizarTexto(v).replace(/[^a-z0-9]/g, '');
 
+/**
+ * Token com ":cod" usa o código da opção da lista em vez do texto: {Rosca JIC} → 1.1/16"-12, {Rosca JIC:cod} → 12.
+ * Para saber qual atributo o token usa, vale só a base ("Rosca JIC").
+ */
+export const SUFIXO_CODIGO = /\s*:\s*(cod|codigo|código)\s*$/i;
+export const baseDoToken = (token: string): string => String(token ?? '').replace(SUFIXO_CODIGO, '').trim();
+export const tokenUsaCodigo = (token: string): boolean => SUFIXO_CODIGO.test(String(token ?? ''));
+
 export interface OpcaoExistente {
   id: number;
   valor: string;
@@ -48,6 +56,16 @@ export const diferencaOpcoes = (atuais: OpcaoExistente[], desejadas: string[]): 
   return resultado;
 };
 
+/**
+ * Opção digitada como "texto = código" (ex.: '1.1/16"-12 = 12'): o texto vai no nome do item e o código no SKU
+ * ({Atributo:cod}). Sem "=", o código é gerado do texto. Código: letras, números, ponto, hífen e sublinhado.
+ */
+export const separarOpcaoCodigo = (texto: string): { valor: string; codigo: string | null } => {
+  const t = String(texto ?? '').trim();
+  const m = t.match(/^(.*\S)\s*=\s*([A-Za-z0-9._-]{1,20})$/);
+  return m ? { valor: m[1].trim(), codigo: m[2] } : { valor: t, codigo: null };
+};
+
 // Código técnico de opção a partir do valor (ex: "Aço Inox" -> "ACO_INOX")
 export const codigoOpcao = (valor: string, indice: number): string => {
   const codigo = String(valor).normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -59,7 +77,7 @@ export const codigoOpcao = (valor: string, indice: number): string => {
 export const templateUsaAtributo = (template: string | null | undefined, aliases: Array<string | number | null | undefined>): boolean => {
   const alvos = aliases.filter(a => a !== null && a !== undefined && String(a).trim() !== '').map(normalizarToken);
   return ((template || '').match(/\{([^}]+)\}|\[([^\]]+)\]/g) || [])
-    .some(t => alvos.includes(normalizarToken(t.replace(/^[[{]/, '').replace(/[\]}]$/, ''))));
+    .some(t => alvos.includes(normalizarToken(baseDoToken(t.replace(/^[[{]/, '').replace(/[\]}]$/, '')))));
 };
 
 /**
@@ -74,7 +92,8 @@ export const trocarTokenTemplate = (
   const alvos = aliasesOrigem.filter(a => a !== null && a !== undefined && String(a).trim() !== '').map(normalizarToken);
   return (template || '').replace(/\{([^}]+)\}|\[([^\]]+)\]/g, (token, chave1, chave2) => {
     const chave = String(chave1 ?? chave2 ?? '');
-    if (!alvos.includes(normalizarToken(chave))) return token;
-    return token.startsWith('{') ? `{${codigoDestino}}` : `[${codigoDestino}]`;
+    if (!alvos.includes(normalizarToken(baseDoToken(chave)))) return token;
+    const destino = tokenUsaCodigo(chave) ? `${codigoDestino}:cod` : codigoDestino;
+    return token.startsWith('{') ? `{${destino}}` : `[${destino}]`;
   });
 };

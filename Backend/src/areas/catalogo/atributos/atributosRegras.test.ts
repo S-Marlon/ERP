@@ -1,4 +1,4 @@
-import { codigoOpcao, diferencaOpcoes, templateUsaAtributo, trocarTokenTemplate } from './atributosRegras';
+import { baseDoToken, codigoOpcao, separarOpcaoCodigo, diferencaOpcoes, templateUsaAtributo, tokenUsaCodigo, trocarTokenTemplate } from './atributosRegras';
 
 const assert = (condition: boolean, message: string): void => {
   if (!condition) throw new Error(message);
@@ -30,4 +30,17 @@ export const runAtributosRegrasTests = (): void => {
 
   const novo = trocarTokenTemplate('{SIGLA}-{Diametro Interno}x[diametro_int]', [13, 'Diâmetro interno', 'diametro_int'], 'DIAM_INT');
   assert(novo === '{SIGLA}-{DIAM_INT}x[DIAM_INT]', 'Mesclagem troca os tokens da origem pelo código do destino.');
+
+  // {Atributo:cod}: usa o código da opção; o atributo é o da base
+  assert(baseDoToken('Rosca JIC:cod') === 'Rosca JIC' && baseDoToken('Rosca JIC : código') === 'Rosca JIC' && baseDoToken('Rosca') === 'Rosca', 'Base do token.');
+  assert(tokenUsaCodigo('Mangueira:cod') && !tokenUsaCodigo('Mangueira'), 'Token com código.');
+  assert(templateUsaAtributo('1{Ângulo:cod}FJ-{Rosca JIC:cod}', [7, 'Rosca JIC', 'rosca_jic']), 'Template com :cod usa o atributo.');
+  assert(trocarTokenTemplate('{SIGLA}-{Diametro Interno:cod}', [13, 'Diâmetro interno'], 'DIAM') === '{SIGLA}-{DIAM:cod}', 'Mesclagem mantém o :cod.');
+
+  // Opção "texto = código"
+  const r1 = separarOpcaoCodigo('1.1/16"-12 = 12');
+  assert(r1.valor === '1.1/16"-12' && r1.codigo === '12', 'Texto e código da opção.');
+  const r2 = separarOpcaoCodigo('Aço Inox');
+  assert(r2.valor === 'Aço Inox' && r2.codigo === null, 'Sem código: só o texto.');
+  assert(separarOpcaoCodigo('30.2 mm (1/2") = 08').codigo === '08' && separarOpcaoCodigo('A = código inválido!').codigo === null, 'Código válido só com letras/números.');
 };

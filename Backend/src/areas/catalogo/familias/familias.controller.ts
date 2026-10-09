@@ -3,6 +3,7 @@
 import { Request, Response } from 'express';
 import pool from '../../../infra/db';
 import { carregarOpcoes, converterValorAtributo, gravarValorAtributo, OpcaoAtributo } from '../atributos/valoresAtributo';
+import { baseDoToken, tokenUsaCodigo } from '../atributos/atributosRegras';
 import { AtributoEfetivo, avaliarSaudeFamilia, mesclarAtributos, statusAposSaude } from './saudeFamilia';
 import { CHAVE_MARCA, marcaEfetiva, marcaReal, MarcaCadastro, papelMarca, pendenciaMarca, resolverMarcaInformada } from './marcaFamilia';
 import { atributosEfetivosDaCategoria, carregarArvore, carregarAtributosDaCategoria, carregarVinculosCategorias } from '../categorias/herancaCategorias';
@@ -32,9 +33,10 @@ const normalizarToken = (valor: unknown): string => String(valor ?? '')
   .replace(/[^a-zA-Z0-9]/g, '')
   .toLowerCase();
 
+// Tokens pela base: "{Rosca:cod}" usa o atributo Rosca
 const extrairTokens = (template: string): string[] => Array.from(new Set(
   (template || '').match(/\{([^}]+)\}|\[([^\]]+)\]/g)?.map(token =>
-    token.replace(/^[\[{]/, '').replace(/[\]}]$/, '').trim()
+    baseDoToken(token.replace(/^[\[{]/, '').replace(/[\]}]$/, ''))
   ) || []
 ));
 
@@ -70,10 +72,12 @@ const montarTextoTemplate = (
   familia: any,
   atributos: any[],
   valores: Record<string, any>,
-  variacao = ''
+  variacao = '',
+  opcoes?: Map<string, OpcaoAtributo[]>
 ): string => (template || '').replace(/\{([^}]+)\}|\[([^\]]+)\]/g, (_token, chaveBrace, chaveColchete) => {
   const token = String(chaveBrace || chaveColchete || '').trim();
-  const tokenNormalizado = normalizarToken(token);
+  const usaCodigo = tokenUsaCodigo(token);
+  const tokenNormalizado = normalizarToken(baseDoToken(token));
   const reservados: Record<string, any> = {
     familia: familia.nome,
     grupo: familia.nome,
@@ -91,7 +95,11 @@ const montarTextoTemplate = (
     .some(alias => normalizarToken(alias) === tokenNormalizado));
   if (!atributo) return `[${token}]`;
   const valor = resolverValor(valores, [atributo.id, atributo.nome, atributo.codigo, token]);
-  return estaVazio(valor) ? `[${token}]` : String(valor);
+  if (estaVazio(valor)) return `[${token}]`;
+  if (!usaCodigo) return String(valor);
+  // Código da opção escolhida (ex.: rosca 1.1/16"-12 → 12); sem código cadastrado, fica pendente
+  const opcao = (opcoes?.get(String(atributo.id)) || []).find(o => normalizarToken(o.valor) === normalizarToken(valor));
+  return opcao?.codigo && String(opcao.codigo).trim() ? String(opcao.codigo).trim() : `[${token}]`;
 });
 
 const carregarContextoFormalizacao = async (connection: DbConnection, familiaId: string, tenantId: number) => {
@@ -727,10 +735,10 @@ export const getDiagnosticoFormalizacao = async (req: Request, res: Response) =>
       // Para montar código/nome vale a marca efetiva pelo papel; a devolvida para edição é a do item
       const valoresCalculo = { ...valores, [CHAVE_MARCA]: marcaEfetiva(familia.papelMarca, familia.nomeMarca, item.marca) };
       const skuCalculado = atributosPendentes.length === 0
-        ? montarTextoTemplate(contexto.familia.templateSku, contexto.familia, atributos, valoresCalculo, item.variacao)
+        ? montarTextoTemplate(contexto.familia.templateSku, contexto.familia, atributos, valoresCalculo, item.variacao, contexto.opcoes)
         : null;
       const nomeCalculado = atributosPendentes.length === 0
-        ? montarTextoTemplate(contexto.familia.templateNomeComercial, contexto.familia, atributos, valoresCalculo, item.variacao)
+        ? montarTextoTemplate(contexto.familia.templateNomeComercial, contexto.familia, atributos, valoresCalculo, item.variacao, contexto.opcoes)
         : null;
 
       return {
@@ -865,8 +873,8 @@ export const formalizarItensFamilia = async (req: Request, res: Response) => {
       }
 
       const variacao = (itemRows as any[])[0].variacao || 'Principal';
-      const novoSku = montarTextoTemplate(contexto.familia.templateSku, contexto.familia, contexto.atributos, valores, variacao);
-      const novoNome = montarTextoTemplate(contexto.familia.templateNomeComercial, contexto.familia, contexto.atributos, valores, variacao);
+      const novoSku = montarTextoTemplate(contexto.familia.templateSku, contexto.familia, contexto.atributos, valores, variacao, contexto.opcoes);
+      const novoNome = montarTextoTemplate(contexto.familia.templateNomeComercial, contexto.familia, contexto.atributos, valores, variacao, contexto.opcoes);
       if (novoSku.includes('[') || novoNome.includes('[')) throw new Error(`Não foi possível resolver o template do item ${idItem}.`);
 
       // O SKU raiz (itens_core.sku) é a identidade do item e nunca muda: o template gera o SKU customizado

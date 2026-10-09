@@ -1,6 +1,8 @@
 // Saúde da família (regras do documento de arquitetura do PIM) e regra de publicação por item.
 // Funções puras: recebem os dados já carregados e devolvem o diagnóstico.
 
+import { baseDoToken } from '../atributos/atributosRegras';
+
 export type PapelAtributo = 'dna' | 'grade' | 'ficha';
 
 export interface AtributoEfetivo {
@@ -40,8 +42,9 @@ export const TOKENS_RESERVADOS = ['familia', 'grupo', 'sigla', 's', 'separador',
 export const normalizarToken = (valor: unknown): string => String(valor ?? '')
   .normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
 
+// Tokens pela base: "{Rosca:cod}" usa o atributo Rosca
 export const extrairTokens = (template?: string | null): string[] => Array.from(new Set(
-  (template || '').match(/\{([^}]+)\}|\[([^\]]+)\]/g)?.map(t => t.replace(/^[[{]/, '').replace(/[\]}]$/, '').trim()) || []
+  (template || '').match(/\{([^}]+)\}|\[([^\]]+)\]/g)?.map(t => baseDoToken(t.replace(/^[[{]/, '').replace(/[\]}]$/, ''))) || []
 ));
 
 const casaAtributo = (token: string, attr: AtributoEfetivo) =>

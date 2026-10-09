@@ -49,4 +49,11 @@ export const runSaudeFamiliaTests = (): void => {
   assert(!pend.publicavel && pend.motivos.length === 2, 'Família em rascunho e obrigatório vazio deveriam impedir a publicação.');
   assert(avaliarPublicacao({ statusItem: 'ATIVO', exibirNoPdv: true, statusFamilia: null, obrigatorios: [], atributosComValor: new Set() }).publicavel,
     'Item sem família e sem obrigatórios é publicável.');
+
+  // Token com código da opção conta como o atributo (não é "token desconhecido")
+  const comCodigo = avaliarSaudeFamilia(
+    { status: 'ATIVO', templateSku: '1{Ângulo:cod}{SIGLA}-{Rosca JIC:cod}', templateNomeComercial: '{FAMILIA} - {Rosca JIC}', siglaSku: 'FJ' },
+    [attr('1', 'Ângulo', 'grade'), attr('2', 'Rosca JIC', 'grade')]
+  );
+  assert(comCodigo.saudavel && comCodigo.avisos.length === 0, 'Template com {Atributo:cod} é saudável e a grade conta no código.');
 };

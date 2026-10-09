@@ -26,6 +26,19 @@ export const normalizarChaveTemplate = (valor: unknown): string => {
     .toLowerCase();
 };
 
+// {Atributo:cod}: código da opção da lista no lugar do texto (mesma regra do servidor)
+const SUFIXO_CODIGO = /\s*:\s*(cod|codigo|código)\s*$/i;
+const codigoDaOpcao = (attr: any, valor: unknown): string => {
+  const op = (attr?.opcoesValidas || attr?.opcoes || []).find((o: any) => typeof o === 'object' && normalizarChaveTemplate(o.valor) === normalizarChaveTemplate(valor));
+  return op?.codigo ? String(op.codigo).trim() : '';
+};
+const valorDoToken = (token: string, valor: unknown, atributos: any[]): string | undefined => {
+  if (!SUFIXO_CODIGO.test(token)) return textoDoValor(valor);
+  const base = normalizarChaveTemplate(token.replace(SUFIXO_CODIGO, ''));
+  const attr = atributos.find(a => [a?.nome, a?.codigo, a?.id].some(x => normalizarChaveTemplate(x) === base));
+  return codigoDaOpcao(attr, valor) || undefined;
+};
+
 export const extrairTokensTemplate = (template: string): string[] => {
   if (!template) return [];
 
@@ -82,6 +95,8 @@ export const gerarPreviewNome = (
   valoresTesteOrItem: Record<string, any>
 ): string => {
   if (!grupo) return '';
+  const grupoOuFamilia = grupo;
+  const extrasAtributos: any[] = [];
   
   let template = grupo.templateNomeComercial || '{FAMILIA}';
   template = substituirGlobal(template, '{FAMILIA}', grupo.nome || '');
@@ -100,7 +115,7 @@ export const gerarPreviewNome = (
 
     if (grupo.atributos && Array.isArray(grupo.atributos)) {
       grupo.atributos.forEach((attr) => {
-        const normToken = normalizarChaveTemplate(token);
+        const normToken = normalizarChaveTemplate(token.replace(SUFIXO_CODIGO, ''));
         const normNome = normalizarChaveTemplate(attr.nome);
         const normCodigo = normalizarChaveTemplate(attr.codigo);
         const normId = normalizarChaveTemplate(attr.id);
@@ -119,7 +134,7 @@ export const gerarPreviewNome = (
 
     const valorEncontrado = resolverValorAtributo(dictValores, aliasCandidates);
     const valorSubstituto = (valorEncontrado !== undefined && valorEncontrado !== null && String(valorEncontrado).trim() !== '')
-      ? textoDoValor(valorEncontrado)
+      ? (valorDoToken(token, valorEncontrado, [...(grupoOuFamilia?.atributos || []), ...(extrasAtributos || [])]) ?? `[${token}]`)
       : `[${token}]`;
 
     template = substituirGlobal(template, `{${token}}`, valorSubstituto);
@@ -135,6 +150,8 @@ export const gerarPreviewSku = (
   valoresTesteOrItem: Record<string, any>
 ): string => {
   if (!familia) return "";
+  const grupoOuFamilia = familia;
+  const extrasAtributos = atributosDoSku;
   let resultado = familia?.templateSku || "";
   if (!resultado) return "";
 
@@ -159,7 +176,7 @@ export const gerarPreviewSku = (
     ];
 
     atributosParaBusca.forEach((attr) => {
-      const normToken = normalizarChaveTemplate(token);
+      const normToken = normalizarChaveTemplate(token.replace(SUFIXO_CODIGO, ''));
       const normNome = normalizarChaveTemplate(attr?.nome);
       const normCodigo = normalizarChaveTemplate(attr?.codigo);
       const normId = normalizarChaveTemplate(attr?.id);
@@ -177,7 +194,7 @@ export const gerarPreviewSku = (
 
     const valorEncontrado = resolverValorAtributo(dictValores, aliasCandidates);
     const valorSubstituto = (valorEncontrado !== undefined && valorEncontrado !== null && String(valorEncontrado).trim() !== '')
-      ? textoDoValor(valorEncontrado)
+      ? (valorDoToken(token, valorEncontrado, [...(grupoOuFamilia?.atributos || []), ...(extrasAtributos || [])]) ?? `[${token}]`)
       : `[${token}]`;
 
     resultado = substituirGlobal(resultado, `{${token}}`, valorSubstituto);
