@@ -5,7 +5,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   AutoComplete, Button, Card, Checkbox, Col, Collapse, Empty, Input, InputNumber, Modal, Row, Segmented, Select, Slider, Space, Switch, Table, Tag, Tooltip, message,
 } from 'antd';
-import { CheckOutlined, DeleteOutlined, DownloadOutlined, PrinterOutlined, SettingOutlined, TagsOutlined, UnorderedListOutlined } from '@ant-design/icons';
+import { CheckOutlined, DeleteOutlined, FileImageOutlined, DownloadOutlined, PrinterOutlined, SettingOutlined, TagsOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { useListaTrabalho } from '../../../shared/core/listaTrabalho/ListaTrabalhoContext';
 import { ListaTrabalhoDrawer } from '../../../shared/core/listaTrabalho/ListaTrabalhoDrawer';
 import { ItemListaTrabalho } from '../../../shared/core/listaTrabalho/listaTrabalho';
@@ -20,6 +20,7 @@ import {
   buscarItensEtiqueta, EtiquetaDesatualizada, getDadosEtiquetas, getEtiquetasDesatualizadas, ItemEtiquetaApi, registrarEtiquetasImpressas,
 } from '../api/etiquetasApi';
 import { operadorAtual } from '../../vendas/caixa/caixaApi';
+import CartazesAtacado from './CartazesAtacado';
 
 const money = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -224,6 +225,10 @@ const Etiquetagem: React.FC = () => {
     [previa, etiquetas, modelo, perfil.deslocXmm, perfil.deslocYmm, perfil.limiar]);
 
   const [listaAberta, setListaAberta] = useState(false);
+  // Cartaz de atacado em A4: tela própria, com editor
+  const [modoCartaz, setModoCartaz] = useState<boolean>(() => lerPreferencia('erp.etiquetas.modoCartaz', false));
+  useEffect(() => salvarPreferencia('erp.etiquetas.modoCartaz', modoCartaz), [modoCartaz]);
+  if (modoCartaz) return <CartazesAtacado onVoltar={() => setModoCartaz(false)} />;
 
   return (
     <div style={{ padding: 16, background: '#f8fafc', minHeight: '100vh' }}>
@@ -236,6 +241,9 @@ const Etiquetagem: React.FC = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <h2 style={{ margin: 0, fontSize: 18 }}>Etiquetagem</h2>
           <Space wrap>
+            <Tooltip title="Cartaz em folha A4 com os preços de atacado, com editor">
+              <Button icon={<FileImageOutlined />} onClick={() => setModoCartaz(true)}>Cartazes A4</Button>
+            </Tooltip>
             <Button icon={<UnorderedListOutlined />} onClick={() => setListaAberta(true)}>
               Lista de trabalho ({lista.itens.length})
             </Button>

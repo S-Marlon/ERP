@@ -148,6 +148,11 @@ const montarProduto = (
         .sort((a, b) => a.precoUnitario - b.precoUnitario)[0];
       return f ? { quantidadeMinima: f.quantidadeMinima, preco: f.precoUnitario } : null;
     })(),
+    // Todas as faixas de atacado da unidade sugerida, da menor quantidade para a maior (cartaz de atacado)
+    atacadoFaixas: faixas
+      .filter(x => x.idUnidade === preco.unidade?.idUnidade && x.tipoFaixa === 'ATACADO' && x.precoUnitario > 0)
+      .sort((a, b) => a.quantidadeMinima - b.quantidadeMinima)
+      .map(x => ({ quantidadeMinima: x.quantidadeMinima, quantidadeMaxima: x.quantidadeMaxima, preco: x.precoUnitario })),
     podeVenderSemEstoque: Boolean(Number(item.pode_vender_sem_estoque)) || String(item.tipo_recurso).toUpperCase() === 'SERVICO',
     tipoRecurso: String(item.tipo_recurso || 'PRODUTO').toUpperCase(),
     publicavel: publicacao?.publicavel ?? true,

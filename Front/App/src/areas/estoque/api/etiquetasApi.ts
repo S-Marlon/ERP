@@ -15,6 +15,10 @@ export interface ItemEtiquetaApi {
   currentStock: number;
   publicavel: boolean;
   atacado: { quantidadeMinima: number; preco: number } | null;
+  /** Todas as faixas de atacado da unidade (cartaz A4); a busca não traz */
+  atacadoFaixas?: Array<{ quantidadeMinima: number; quantidadeMaxima: number | null; preco: number }>;
+  pictureUrl?: string | null;
+  brand?: string;
 }
 
 export const getDadosEtiquetas = async (ids: number[]): Promise<ItemEtiquetaApi[]> => {
