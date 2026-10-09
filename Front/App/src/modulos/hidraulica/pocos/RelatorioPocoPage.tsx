@@ -1,952 +1,455 @@
-import { useEffect, useState } from "react";
-import { useRelatorioPoco } from "./useRelatorioPoco";
+// Módulo Poços (HIDRAULICA_POCOS, sem banco): formulário por seções, rascunho automático no navegador, modelos de
+// impressão (completo, cobrança, teste de vazão, garantia, em branco) com pré-visualização e arquivo XML para guardar/reabrir.
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-    Form,
-    Input,
-    Row,
-    Col,
-    DatePicker,
-    Button,
-    Typography,
-    Space,
-    Checkbox,
-    message,
-    Card,
-    InputNumber,
-    Upload,
-    Select,
-    Collapse,
-} from "antd";
+  Button, Card, Checkbox, Col, Collapse, DatePicker, Descriptions, Drawer, Dropdown, Flex, Form, Input, InputNumber, message, Row, Segmented, Select, Space,
+  Statistic, Switch, Tag, Tooltip, Typography, Upload, theme,
+} from 'antd';
 import {
-  PrinterOutlined,
-  ArrowLeftOutlined,
-  CompassOutlined,
-  BuildOutlined,
-  DashboardOutlined,
-  UserOutlined,
-  SettingOutlined,
-  ExperimentOutlined,
-  UploadOutlined,
-  DownloadOutlined,
-  SaveOutlined,
-} from "@ant-design/icons";
-import dayjs from "dayjs";
-
-// IMPORTAÇÃO DAS FUNÇÕES DO SEU ARQUIVO DE LÓGICA
+  ArrowLeftOutlined, BuildOutlined, CompassOutlined, DashboardOutlined, DeleteOutlined, DollarOutlined, DownloadOutlined, ExperimentOutlined, EyeOutlined,
+  FileAddOutlined, LineChartOutlined, PlusOutlined, PrinterOutlined, SettingOutlined, UploadOutlined, UserOutlined,
+} from '@ant-design/icons';
+import { useRelatorioPoco } from './useRelatorioPoco';
+import {
+  ANOMALIAS, brl, calcularFinanceiro, dataGarantia, FORMAS_PAGAMENTO, OCORRENCIAS_OBRA, progresso, resumoTeste, SecaoId, TEXTO_GARANTIA_PADRAO,
+} from './relatorioPoco';
+import { MODELOS, ModeloId } from './templatesPoco';
 
 const { Title, Text } = Typography;
-const { Option } = Select;
 const { TextArea } = Input;
-const { Panel } = Collapse;
+
+const UNIDADES = [{ value: '"', label: 'pol (")' }, { value: 'mm', label: 'mm' }];
+const SOLOS = ['Arenoso', 'Argiloso', 'Silte (caxeta)', 'Rocha alterada', 'Rocha sã (cristalino)', 'Sedimentar (misto)'];
+const MATERIAIS_TUBO = ['Aço galvanizado', 'PVC geomecânico', 'Tubo flexível (Subteck/PEX)', 'PEAD'];
+const ROTULO_CURTO: Record<ModeloId, string> = { completo: 'Completo', cobranca: 'Cobrança', vazao: 'Teste de vazão', garantia: 'Garantia', branco: 'Em branco' };
 
 export default function RelatorioPocoPage() {
+  const { token } = theme.useToken();
+  const navigate = useNavigate();
+  const p = useRelatorioPoco();
+  const { form, valores } = p;
+  const [previa, setPrevia] = useState<ModeloId | null>(null);
 
+  const unidade = (name: string | Array<string | number>) => (
+    <Form.Item name={name} noStyle initialValue={'"'}><Select style={{ width: 82 }} options={UNIDADES} /></Form.Item>
+  );
 
-
-    const [isVazaoAprox, setIsVazaoAprox] = useState(false);
-    const [isBombaVazao, setIsBombaVazao] = useState(false);
-
-
-
-
-    // ESTADO DOS CHECKBOXES: Controla quais seções entram no relatório final
-    const [secoesAtivas, setSecoesAtivas] = useState({
-        dadosPoco: true,
-        perfuracao: true,
-        diagnostico: true,
-        bombeamento: true,
-        testeVazao: true
-    });
-
-    const handleToggleSecao = (secao) => {
-        setSecoesAtivas(prev => ({ ...prev, [secao]: !prev[secao] }));
-    };
-
-
-    // 2. Use o hook aqui dentro. Ele vai te dar o 'form' correto e as funções calibradas.
-    const {
-        form,
-        dtTermino,
-        garantiaMeses,
-        handleValuesChange,
-        handlePrint,
-        handlePrintBlank,
-        handleExportXML,
-        handleImportXML
-    } = useRelatorioPoco();
-
-
-    // Mantemos o setFormData para o caso de renderizações atreladas ao PDF externo
-    const [, setFormData] = useState<any>({});
-
-
-    useEffect(() => {
-        form.setFieldsValue({
-            perfDe: 0,
-            revDe: 0,
-            perfDiamUnidade: '"',
-            revDiamUnidade: '"',
-            diamInternoUnidade: '"'
-        });
-        setFormData(form.getFieldsValue());
-    }, [form]);
-
-    const renderDataGarantiaCalculada = () => {
-        if (!dtTermino || !garantiaMeses) return 'Selecione o término da obra e os meses';
-        const dataCalculada = dayjs(dtTermino).add(garantiaMeses, 'month');
-        return `Válida até: ${dataCalculada.format('DD/MM/YYYY')}`;
-    };
-
-    const selectUnidade = (name: string) => (
-        <Form.Item name={name} noStyle>
-            <Select style={{ width: 75 }}>
-                <Option value='"'>pol (")</Option>
-                <Option value="mm">mm</Option>
-            </Select>
-        </Form.Item>
+  const obterGps = () => {
+    if (!('geolocation' in navigator)) { message.error('Este aparelho não informa a localização.'); return; }
+    navigator.geolocation.getCurrentPosition(
+      pos => { form.setFieldValue('localizacao', `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`); p.aoMudar({}); message.success('Coordenadas obtidas.'); },
+      () => message.error('Não foi possível obter a localização (permita o acesso ao GPS).'),
+      { enableHighAccuracy: true, timeout: 15000 },
     );
+  };
 
-    const handleGetLocation = () => {
-        if ("geolocation" in navigator) {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const { latitude, longitude } = position.coords;
-                    form.setFieldsValue({ localizacao: `${latitude}, ${longitude}` });
-                    setFormData(form.getFieldsValue());
-                    message.success("Coordenadas obtidas com sucesso!");
-                },
-                () => message.error("Erro ao obter localização do GPS.")
-            );
-        }
-    };
-
+  // Cabeçalho de cada seção: título, quanto já foi preenchido e se entra no relatório
+  const cabecalho = (icone: React.ReactNode, titulo: string, secao: string, id?: SecaoId) => {
+    const pr = progresso(valores, secao);
     return (
-        <div style={{ padding: "24px", backgroundColor: "#f5f7fa", minHeight: "100vh" }}>
-            <div style={{ maxWidth: "1800px", margin: "0 auto", gap:'10px' }}>
-
-                {/* BARRA DE CONTROLE SUPERIOR */}
-                <div style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    background: "#fff",
-                    padding: "16px 24px",
-                    borderRadius: "8px",
-                    marginBottom: "24px",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1)"
-                }}>
-                    <Space size="middle">
-                        <Button icon={<ArrowLeftOutlined />} href="/relatorios">Voltar</Button>
-                        <Title level={4} style={{ margin: 0, color: "#1f1f1f", fontWeight: 600 }}>
-                            Emissão de Relatório Técnico de Poço
-                        </Title>
-                    </Space>
-
-                    <Space size="small">
-
-   <Button icon={<SaveOutlined />} onClick={handlePrintBlank}>
-                            Imprimir em Branco
-                        </Button>
-
-                        {/* IMPORTAR: O Hook já gerencia o arquivo internamente */}
-                        <Upload
-                            beforeUpload={(file) => {
-                                handleImportXML(file);
-                                return false;
-                            }}
-                            showUploadList={false}
-                            accept=".xml"
-                        >
-                            <Button icon={<UploadOutlined />}>Importar XML</Button>
-                        </Upload>
-
-                     
-
-                        {/* EXPORTAR: Não precisa passar 'form.getFieldsValue()', a função já usa o formData interno */}
-                        <Button icon={<DownloadOutlined />} onClick={handleExportXML}>
-                            Exportar XML
-                        </Button>
-
-                        {/* IMPRIMIR: Permanece igual, acionando a função direta do Hook */}
-                        <Button type="primary" icon={<PrinterOutlined />} onClick={handlePrint} style={{ fontWeight: 500 }}>
-                            Gerar e Imprimir PDF
-                        </Button>
-                    </Space>
-                </div>
-
-
-
-                {/* FORMULÁRIO DE CAPTURA */}
-               <Form 
-    form={form} 
-    layout="vertical" 
-    size="middle" 
-    onValuesChange={handleValuesChange}
-    style={{ 
-        display: "flex", 
-        gap: "12px",          // Espaçamento entre o formulário e a barra lateral
-        alignItems: "flex-start" // Mantém a barra lateral fixada no topo enquanto você rola o form
-    }}
->
-                    <Space direction="vertical" size="small" style={{ width: "30%" }} >
-                        {/* SEÇÃO 1: DADOS DO CLIENTE */}
-                        <Card
-                            title={<Space><UserOutlined style={{ color: "#1890ff" }} /><span>Dados do Cliente</span></Space>}
-                            bordered={false}
-                            style={{ borderRadius: "8px", boxShadow: "0 1px 2px rgba(0,0,0,0.03)" }}
-                        >
-                            <Row gutter={[16, 0]}>
-                                <Col xs={24} md={9}><Form.Item label="Nome do Cliente" name="cliente"><Input placeholder="Nome completo ou Razão Social" /></Form.Item></Col>
-                                <Col xs={24} md={6}><Form.Item label="CPF/CNPJ" name="documento"><Input placeholder="000.000.000-00" /></Form.Item></Col>
-                                <Col xs={24} md={9}><Form.Item label="Celular de Contato" name="celular"><Input placeholder="(00) 00000-0000" /></Form.Item></Col>
-                                <Col xs={12} md={4}><Form.Item label="CEP" name="cep"><Input placeholder="00000-000" /></Form.Item></Col>
-                                <Col xs={24} md={9}><Form.Item label="Endereço (Rua, Nº)" name="endereco"><Input placeholder="Av. Principal, 123" /></Form.Item></Col>
-                                <Col xs={24} md={5}><Form.Item label="Bairro" name="bairro"><Input placeholder="Centro" /></Form.Item></Col>
-                                <Col xs={24} md={4}><Form.Item label="Cidade" name="cidade"><Input placeholder="São Paulo" /></Form.Item></Col>
-                                <Col xs={12} md={2}><Form.Item label="UF" name="uf"><Input maxLength={2} style={{ textTransform: "uppercase" }} placeholder="SP" /></Form.Item></Col>
-                            </Row>
-                        </Card>
-
-                        {/* ========================================== */}
-                        {/* ESTRUTURA EM SANFONA PARA O RESTANTE       */}
-                        {/* ========================================== */}
-
-                        {/* SANFONA 1: DADOS DO POÇO */}
-                        {secoesAtivas.dadosPoco && (
-                            <Panel
-                                header={<Space><DashboardOutlined style={{ color: "#1890ff" }} /><b>1. Dados do Poço</b></Space>}
-                                key="dadosPoco"
-                                style={{ marginBottom: '16px', background: '#fff', borderRadius: '8px', border: 'none', boxShadow: "0 1px 2px rgba(0,0,0,0.03)" }}
-                            >
-                                <Row gutter={[16, 0]}>
-                                    <Col xs={24} md={10}>
-                                        <Form.Item label="Localização (GPS)" name="localizacao">
-                                            <Input placeholder="Coordenadas de Latitude e Longitude" addonAfter={<Button type="text" size="small" icon={<CompassOutlined />} onClick={handleGetLocation} style={{ padding: "0 4px", height: "auto" }}>Obter GPS</Button>} />
-                                        </Form.Item>
-                                    </Col>
-                                    <Col xs={24} sm={6} md={3}><Form.Item label="Última Limpeza" name="dtLimpeza"><DatePicker format="DD/MM/YYYY" style={{ width: "100%" }} /></Form.Item></Col>
-                                    <Col xs={12} sm={10} md={4}>
-                                        <Form.Item label="Vazão Aproximada" name="vazaoAprox" normalize={(value) => { if (!value) return ''; const limpo = value.replace('~', ''); return isVazaoAprox ? `~${limpo}` : limpo; }}>
-                                            <Input addonAfter="L/h" placeholder="5000" addonBefore={<Button type={isVazaoAprox ? "primary" : "text"} size="small" style={{ height: '100%', margin: '-4px -11px', borderRadius: '4px 0 0 4px', backgroundColor: isVazaoAprox ? '#1890ff' : 'transparent', color: isVazaoAprox ? '#fff' : '#8c8c8c', fontWeight: 'bold' }} onClick={() => { const novoEstado = !isVazaoAprox; setIsVazaoAprox(novoEstado); const valorAtual = form.getFieldValue('vazaoAprox') || ''; const valorLimpo = valorAtual.replace('~', ''); form.setFieldsValue({ vazaoAprox: novoEstado ? `~${valorLimpo}` : valorLimpo }); }}>~</Button>} />
-                                        </Form.Item>
-                                    </Col>
-                                    <Col xs={12} sm={12} md={4}><Form.Item label="Profundidade do Poço" name="profundidade"><InputNumber min={0} style={{ width: "100%" }} addonAfter="m" placeholder="0.00" /></Form.Item></Col>
-                                    <Col xs={12} sm={12} md={3}><Form.Item label="Diâmetro Interno" name="diametroInterno"><InputNumber style={{ width: "100%" }} placeholder="0.0" min={0} addonAfter={selectUnidade('diamInternoUnidade')} /></Form.Item></Col>
-                                </Row>
-                            </Panel>
-                        )}
-
-                        {/* SEÇÃO 2: DADOS DA OBRA */}
-                        <Card
-                            title={<Space><DashboardOutlined style={{ color: "#1890ff" }} /><span>Dados do Poço</span></Space>}
-                            bordered={false}
-                            style={{ borderRadius: "8px", boxShadow: "0 1px 2px rgba(0,0,0,0.03)" }}
-                        >
-                            <Row gutter={[16, 0]}>
-                                <Col xs={10}>
-                                    <Form.Item label="Localização (GPS)" name="localizacao">
-                                        <Input
-                                            placeholder="Coordenadas de Latitude e Longitude"
-                                            addonAfter={
-                                                <Button type="text" size="small" icon={<CompassOutlined />} onClick={handleGetLocation} style={{ padding: "0 4px", height: "auto" }}>
-                                                    Obter GPS
-                                                </Button>
-                                            }
-                                        />
-                                    </Form.Item>
-                                </Col>
-
-                                <Col xs={10} sm={6} md={3}><Form.Item label="Última Limpeza" name="dtLimpeza"><DatePicker format="DD/MM/YYYY" style={{ width: "100%" }} /></Form.Item></Col>
-
-
-
-
-                                <Col xs={12} sm={10} md={4}>
-                                    <Form.Item
-                                        label="Vazão Aproximada"
-                                        name="vazaoAprox"
-                                        normalize={(value) => {
-                                            if (!value) return '';
-                                            // Limpa qualquer '~' existente para não duplicar
-                                            const limpo = value.replace('~', '');
-                                            // Se estiver ativo, salva com '~', senão salva só o valor limpo
-                                            return isVazaoAprox ? `~${limpo}` : limpo;
-                                        }}
-                                    >
-                                        <Input
-                                            addonAfter="L/h"
-                                            placeholder="5000"
-                                            addonBefore={
-                                                <Button
-                                                    type={isVazaoAprox ? "primary" : "text"}
-                                                    size="small"
-                                                    style={{
-                                                        height: '100%',
-                                                        margin: '-4px -11px', // Ajuste para casar perfeitamente no design do Antd
-                                                        borderRadius: '4px 0 0 4px',
-                                                        backgroundColor: isVazaoAprox ? '#1890ff' : 'transparent',
-                                                        color: isVazaoAprox ? '#fff' : '#8c8c8c',
-                                                        fontWeight: 'bold'
-                                                    }}
-                                                    onClick={() => {
-                                                        const novoEstado = !isVazaoAprox;
-                                                        setIsVazaoAprox(novoEstado);
-
-                                                        // Força o formulário a se atualizar imediatamente com o novo formato
-                                                        const valorAtual = form.getFieldValue('vazaoAprox') || '';
-                                                        const valorLimpo = valorAtual.replace('~', '');
-                                                        form.setFieldsValue({
-                                                            vazaoAprox: novoEstado ? `~${valorLimpo}` : valorLimpo
-                                                        });
-                                                    }}
-                                                >
-                                                    ~
-                                                </Button>
-                                            }
-                                        />
-                                    </Form.Item>
-                                </Col>
-                                <Col xs={12} sm={12} md={4}><Form.Item label="Profundidade do Poço" name="profundidade"><InputNumber min={0} style={{ width: "100%" }} addonAfter="m" placeholder="0.00" /></Form.Item></Col>
-
-                                <Col xs={12} sm={12} md={3}>
-                                    <Form.Item label="Diâmetro Interno" name="diametroInterno">
-                                        <InputNumber style={{ width: "100%" }} placeholder="0.0" min={0} addonAfter={selectUnidade('diamInternoUnidade')} />
-                                    </Form.Item>
-                                </Col>
-                            </Row>
-                        </Card>
-
-                    </Space>
-
-                    <Space direction="vertical" size="large" style={{ width: "55%" }} >
-                        <Collapse
-                            expandIconPosition="right"
-                            style={{ background: 'transparent', border: 'none' }}
-                            // Abre todas as seções que estiverem ativas por padrão para facilitar o fluxo contínuo
-                            activeKey={Object.keys(secoesAtivas).filter(key => secoesAtivas[key])}
-                        >
-
-
-
-                           {/* SANFONA 2: PERFURAÇÃO E REVESTIMENTO */}
-{secoesAtivas.perfuracao && (
-    <Panel
-        header={
-            <Space>
-                <BuildOutlined style={{ color: "#8c5e3c" }} />
-                <b style={{ color: "#543d2b" }}>2. Dados de Perfuração e Revestimento</b>
-            </Space>
-        }
-        key="perfuracao"
-        style={{ 
-            marginBottom: '16px', 
-            background: '#fbf8f5', // Fundo marrom terroso bem suave
-            borderRadius: '8px', 
-            border: '1px solid #e6ded6', // Borda sutil combinando com o fundo
-            boxShadow: "0 1px 2px rgba(0,0,0,0.02)" 
-        }}
-    >
-        {/* Cabeçalho de Datas e Informações Gerais */}
-        <Row gutter={[16, 12]}>
-            <Col xs={12} sm={6} md={5}>
-                <Form.Item label="Data de Início" name="dtInicio">
-                    <DatePicker format="DD/MM/YYYY" style={{ width: "100%" }} />
-                </Form.Item>
-            </Col>
-            <Col xs={12} sm={6} md={5}>
-                <Form.Item label="Data de Término" name="dtTermino">
-                    <DatePicker format="DD/MM/YYYY" style={{ width: "100%" }} />
-                </Form.Item>
-            </Col>
-            <Col xs={24} sm={12} md={5}>
-                <Form.Item label="Tipo de Solo" name="tipoSolo">
-                    <Select placeholder="Selecione o tipo de solo">
-                        <Option value="Arenoso">Arenoso</Option>
-                        <Option value="Argiloso">Argiloso</Option>
-                        <Option value="Silte">Silte (Caxeta)</Option>
-                        <Option value="Rocha Alterada">Rocha Alterada</Option>
-                        <Option value="Rocha Sã (Cristalino)">Rocha Sã (Cristalino)</Option>
-                        <Option value="Sedimentar">Sedimentar (Misto)</Option>
-                    </Select>
-                </Form.Item>
-            </Col>
-            <Col xs={24} sm={12} md={5}>
-                <Form.Item label="Período de Garantia" name="garantiaMeses" style={{ marginBottom: '4px' }}>
-                    <Select placeholder="Selecione" style={{ width: "100%" }}>
-                        {[3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(mes => (
-                            <Option key={mes} value={mes}>{mes} Meses</Option>
-                        ))}
-                    </Select>
-                </Form.Item>
-               
-            </Col>
-            <Col xs={24} sm={12} md={4}>
-
- <div style={{ minHeight: "20px" }}>
-                    <Text type="secondary" strong style={{ fontSize: "11px", color: "#52c41a" }}>
-                        {renderDataGarantiaCalculada()}
-                    </Text>
-                </div>
-            </Col>
-
-
-        </Row>
-
-        {/* SUB-SEÇÕES DINÂMICAS EM DUAS COLUNAS */}
-        <Row gutter={[16, 16]} style={{ marginTop: '12px' }}>
-            
-            {/* SUB-SEÇÃO DINÂMICA: PERFURAÇÃO */}
-            <Col xs={24} lg={12}>
-                <Card 
-                    size="small" 
-                    title={<span style={{ fontSize: '12px', color: '#543d2b' }}>PERFURAÇÃO (ETAPAS / CAMADAS)</span>}
-                    style={{ background: "#ffffff", borderRadius: "6px", border: "1px solid #ebdcd0" }}
-                >
-                    <Form.List name="perfuracoes" initialValue={[{ perfDe: 0 }, {}]}>
-                        {(fields, { add, remove }) => (
-                            <>
-                                {fields.map(({ key, name, ...restField }, index) => (
-                                    <Row gutter={[8, 8]} key={key} style={{ alignItems: 'flex-end', marginBottom: '8px' }}>
-                                        <Col xs={5} md={4}>
-                                            <Form.Item {...restField} label={index === 0 ? "De" : ""} name={[name, 'perfDe']}>
-                                                <InputNumber style={{ width: "100%" }} addonAfter="m" disabled placeholder="0" />
-                                            </Form.Item>
-                                        </Col>
-                                        <Col xs={6} md={5}>
-                                            <Form.Item {...restField} label={index === 0 ? "Até" : ""} name={[name, 'perfAte']}>
-                                                <InputNumber 
-                                                    style={{ width: "100%" }} 
-                                                    addonAfter="m" 
-                                                    placeholder={index === 0 ? "Ex: 35" : "Ex: 90"} 
-                                                    onChange={(val) => { 
-                                                        if (fields[index + 1] !== undefined && val !== null) { 
-                                                            const valores = form.getFieldValue('perfuracoes'); 
-                                                            valores[index + 1].perfDe = val; 
-                                                            form.setFieldsValue({ perfuracoes: valores }); 
-                                                        } 
-                                                    }} 
-                                                />
-                                            </Form.Item>
-                                        </Col>
-                                        <Col xs={9} md={11}>
-                                            <Form.Item {...restField} label={index === 0 ? "Diâmetro" : ""} name={[name, 'perfDiam']}>
-                                                <InputNumber 
-                                                    style={{ width: "100%" }} 
-                                                    placeholder="0.0" 
-                                                    addonAfter={
-                                                        <Form.Item name={[name, 'perfDiamUnidade']} noStyle initialValue={'"'}>
-                                                            <Select style={{ width: 68 }} size="small">
-                                                                <Option value='"'>pol (")</Option>
-                                                                <Option value="mm">mm</Option>
-                                                            </Select>
-                                                        </Form.Item>
-                                                    } 
-                                                />
-                                            </Form.Item>
-                                        </Col>
-                                        <Col xs={4} md={4} style={{ display: 'flex', justifyContent: 'center' }}>
-                                            {index > 1 ? (
-                                                <Button type="text" danger onClick={() => remove(name)} style={{ padding: 0, height: '32px' }}>Remover</Button>
-                                            ) : (
-                                                <div style={{ height: '32px' }} /> // Spacer estrutural
-                                            )}
-                                        </Col>
-                                    </Row>
-                                ))}
-                                <Button type="dashed" onClick={() => { const lista = form.getFieldValue('perfuracoes') || []; const ultimoAte = lista[lista.length - 1]?.perfAte || 0; add({ perfDe: ultimoAte }); }} block style={{ marginTop: '8px', color: '#8c5e3c', borderColor: '#ebdcd0' }}>
-                                    + Adicionar Linha de Perfuração
-                                </Button>
-                            </>
-                        )}
-                    </Form.List>
-                </Card>
-            </Col>
-
-            {/* SUB-SEÇÃO DINÂMICA: REVESTIMENTO */}
-            <Col xs={24} lg={12}>
-                <Card 
-                    size="small" 
-                    title={<span style={{ fontSize: '12px', color: '#543d2b' }}>REVESTIMENTO</span>}
-                    style={{ background: "#ffffff", borderRadius: "6px", border: "1px solid #ebdcd0" }}
-                >
-                    <Form.List name="revestimentos" initialValue={[{ revDe: 0 }]}>
-                        {(fields, { add, remove }) => (
-                            <>
-                                {fields.map(({ key, name, ...restField }, index) => (
-                                    <Row gutter={[6, 6]} key={key} style={{ alignItems: 'flex-end', marginBottom: '8px' }}>
-                                        <Col xs={4} md={3}>
-                                            <Form.Item {...restField} label={index === 0 ? "De" : ""} name={[name, 'revDe']}>
-                                                <InputNumber style={{ width: "100%" }} addonAfter="m" disabled placeholder="0" />
-                                            </Form.Item>
-                                        </Col>
-                                        <Col xs={5} md={4}>
-                                            <Form.Item {...restField} label={index === 0 ? "Até" : ""} name={[name, 'revAte']}>
-                                                <InputNumber 
-                                                    style={{ width: "100%" }} 
-                                                    addonAfter="m" 
-                                                    placeholder="35" 
-                                                    onChange={(val) => { 
-                                                        if (fields[index + 1] !== undefined && val !== null) { 
-                                                            const valores = form.getFieldValue('revestimentos'); 
-                                                            valores[index + 1].revDe = val; 
-                                                            form.setFieldsValue({ revestimentos: valores }); 
-                                                        } 
-                                                    }} 
-                                                />
-                                            </Form.Item>
-                                        </Col>
-                                        <Col xs={6} md={6}>
-                                            <Form.Item {...restField} label={index === 0 ? "Diâmetro" : ""} name={[name, 'revDiam']}>
-                                                <InputNumber 
-                                                    style={{ width: "100%" }} 
-                                                    placeholder="0.0" 
-                                                    addonAfter={
-                                                        <Form.Item name={[name, 'revDiamUnidade']} noStyle initialValue={'"'}>
-                                                            <Select style={{ width: 55 }} size="small"><Option value='"'>"</Option><Option value="mm">mm</Option></Select>
-                                                        </Form.Item>
-                                                    } 
-                                                />
-                                            </Form.Item>
-                                        </Col>
-                                        <Col xs={5} md={4}>
-                                            <Form.Item {...restField} label={index === 0 ? "Mat." : ""} name={[name, 'revMaterial']}>
-                                                <Input placeholder="PVC" />
-                                            </Form.Item>
-                                        </Col>
-                                        <Col xs={4} md={4}>
-                                            <Form.Item {...restField} label={index === 0 ? "União" : ""} name={[name, 'revUniao']}>
-                                                <Input placeholder="Rosca" />
-                                            </Form.Item>
-                                        </Col>
-                                        {index > 0 && (
-                                            <Col xs={24} style={{ textAlign: 'right', marginTop: '-4px' }}>
-                                                <Button type="text" danger size="small" onClick={() => remove(name)} style={{ padding: 0 }}>remover revestimento</Button>
-                                            </Col>
-                                        )}
-                                    </Row>
-                                ))}
-                                <Button type="dashed" onClick={() => { const lista = form.getFieldValue('revestimentos') || []; const ultimoAte = lista[lista.length - 1]?.revAte || 0; add({ revDe: ultimoAte }); }} block style={{ marginTop: '8px', color: '#8c5e3c', borderColor: '#ebdcd0' }}>
-                                    + Adicionar Revestimento Extra
-                                </Button>
-                            </>
-                        )}
-                    </Form.List>
-                </Card>
-            </Col>
-        </Row>
-
-        {/* OUTROS REGISTROS DE CONSTRUÇÃO */}
-        <div style={{ marginTop: '16px', background: "#ffffff", padding: "16px", borderRadius: "6px", border: "1px solid #ebdcd0" }}>
-            <span style={{ fontWeight: "600", display: "block", marginBottom: "12px", color: "#543d2b", fontSize: "12px" }}>
-                REGISTROS DE CONSTRUÇÃO E GEOLOGIA
-            </span>
-            <Row gutter={[16, 12]} style={{ marginBottom: '16px' }}>
-                <Col xs={24} sm={12}>
-                    <Form.Item name="chkCaimento" valuePropName="checked" style={{ margin: 0 }}>
-                        <Checkbox>⚠️ Ocorrência de Caimento / Desmoronamento</Checkbox>
-                    </Form.Item>
-                </Col>
-                <Col xs={24} sm={12}>
-                    <Form.Item name="chkEstruturas" valuePropName="checked" style={{ margin: 0 }}>
-                        <Checkbox>🏗️ Interferência com Estruturas Subterrâneas</Checkbox>
-                    </Form.Item>
-                </Col>
-            </Row>
-            <Row gutter={[16, 12]}>
-                <Col xs={24} md={12}>
-                    <Form.Item label="Equipe de Perfuração / Sonda" name="equipePerfuracao">
-                        <Input placeholder="Sondador..." />
-                    </Form.Item>
-                </Col>
-                <Col xs={24} md={12}>
-                    <Form.Item label="Responsável Técnico" name="respNomePerf">
-                        <Input placeholder="Engenheiro/Geólogo" />
-                    </Form.Item>
-                </Col>
-                <Col xs={24}>
-                    <Form.Item label="Observações Geológicas" name="obsGeraisPerfuracao">
-                        <TextArea rows={2} placeholder="Descreva o comportamento geológico..." />
-                    </Form.Item>
-                </Col>
-            </Row>
-        </div>
-    </Panel>
-)}
-
-                         {/* SANFONA 3: DIAGNÓSTICO TÉCNICO */}
-{secoesAtivas.diagnostico && (
-    <Panel
-        header={
-            <Space>
-                <ExperimentOutlined style={{ color: "#08979c" }} />
-                <b style={{ color: "#00474f" }}>3. Diagnóstico Técnico</b>
-            </Space>
-        }
-        key="diagnostico"
-        style={{ 
-            marginBottom: '16px', 
-            background: '#ffffff', 
-            borderRadius: '8px', 
-            border: '1px solid #d9d9d9', 
-            boxShadow: "0 1px 2px rgba(0,0,0,0.03)" 
-        }}
-    >
-        {/* BLOCO 1: DINÂMICA E ÁGUA */}
-        <div style={{ 
-            background: "#f0f7f7", // Azul-ciano suave (laboratorial)
-            padding: "16px", 
-            borderRadius: "6px", 
-            border: "1px solid #c4e8e8", 
-            marginBottom: '16px' 
-        }}>
-            <span style={{ fontWeight: "600", display: "block", marginBottom: "12px", color: "#08979c", fontSize: "12px" }}>
-                DINÂMICA DO POÇO E QUALIDADE DA ÁGUA
-            </span>
-            
-            {/* Checkboxes organizados em grid fluido */}
-            <Row gutter={[16, 12]} style={{ marginBottom: '16px' }}>
-                <Col xs={24} sm={12} md={6}>
-                    <Form.Item name="chkReducaoVazao" valuePropName="checked" style={{ margin: 0 }}>
-                        <Checkbox>📉 Queda de Vazão</Checkbox>
-                    </Form.Item>
-                </Col>
-                <Col xs={24} sm={12} md={6}>
-                    <Form.Item name="chkPresencaFerro" valuePropName="checked" style={{ margin: 0 }}>
-                        <Checkbox>🧪 Água Vermelha / Ferro</Checkbox>
-                    </Form.Item>
-                </Col>
-                <Col xs={24} sm={12} md={6}>
-                    <Form.Item name="chkAguaNaoLimpou" valuePropName="checked" style={{ margin: 0 }}>
-                        <Checkbox>⏳ Água Turva</Checkbox>
-                    </Form.Item>
-                </Col>
-                <Col xs={24} sm={12} md={6}>
-                    <Form.Item name="chkLajeInfiltracao" valuePropName="checked" style={{ margin: 0 }}>
-                        <Checkbox>🛡️ Risco na Laje</Checkbox>
-                    </Form.Item>
-                </Col>
-            </Row>
-
-            <Row gutter={[16, 12]}>
-                <Col xs={24} md={8}>
-                    <Form.Item label="Ciclo de Limpeza Química" name="manutPeriodicidadeLimpeza">
-                        <Select placeholder="Selecione">
-                            <Option value="6_meses">A cada 6 meses</Option>
-                            <Option value="12_meses">Anual</Option>
-                        </Select>
-                    </Form.Item>
-                </Col>
-                <Col xs={24} md={16}>
-                    <Form.Item label="Diretrizes do Plano Mensal" name="manutDiretrizesTexto">
-                        <TextArea rows={1} autoSize={{ minRows: 1, maxRows: 3 }} placeholder="Ex: Monitorar decaimento de vazão e nível dinâmico..." />
-                    </Form.Item>
-                </Col>
-            </Row>
-        </div>
-
-        {/* BLOCO 2: MOTOBOMBA */}
-        <div style={{ 
-            background: "#f8f9fa", // Cinza-técnico industrial
-            padding: "16px", 
-            borderRadius: "6px", 
-            border: "1px solid #e9ecef" 
-        }}>
-            <span style={{ fontWeight: "600", display: "block", marginBottom: "12px", color: "#495057", fontSize: "12px" }}>
-                DIAGNÓSTICO DO CONJUNTO MOTOBOMBA (PARTE ELÉTRICA)
-            </span>
-            
-            <Row gutter={[16, 12]} style={{ marginBottom: '16px' }}>
-                <Col xs={24} sm={12}>
-                    <Form.Item name="chkEnergiaRuim" valuePropName="checked" style={{ margin: 0 }}>
-                        <Checkbox>⚡ Oscilação de Energia</Checkbox>
-                    </Form.Item>
-                </Col>
-                <Col xs={24} sm={12}>
-                    <Form.Item name="chkAquecimentoBomba" valuePropName="checked" style={{ margin: 0 }}>
-                        <Checkbox>🔥 Superaquecimento do Motor</Checkbox>
-                    </Form.Item>
-                </Col>
-            </Row>
-
-            <Row gutter={[16, 12]}>
-                <Col xs={24} sm={12}>
-                    <Form.Item label="Amperagem (Leitura Atual)" name="manutAmperagem">
-                        <InputNumber style={{ width: "100%" }} addonAfter="A" placeholder="0.0" />
-                    </Form.Item>
-                </Col>
-                <Col xs={24} sm={12}>
-                    <Form.Item label="Resistência de Isolamento" name="manutMegometro">
-                        <InputNumber style={{ width: "100%" }} addonAfter="MΩ" placeholder="Ex: >200" />
-                    </Form.Item>
-                </Col>
-            </Row>
-        </div>
-    </Panel>
-)}
-
-                          {/* SANFONA 4: CONJUNTO DE BOMBEAMENTO */}
-{secoesAtivas.bombeamento && (
-    <Panel
-        header={
-            <Space>
-                <SettingOutlined style={{ color: "#006d77" }} />
-                <b style={{ color: "#004d54" }}>4. Sistema de Bombeamento e Instalação</b>
-            </Space>
-        }
-        key="bombeamento"
-        style={{ 
-            marginBottom: '16px', 
-            background: '#f4f7f9', // Azul-petróleo industrial bem suave
-            borderRadius: '8px', 
-            border: '1px solid #d1dee2', 
-            boxShadow: "0 1px 2px rgba(0,0,0,0.03)" 
-        }}
-    >
-        {/* BLOCO 1: ESPECIFICAÇÕES DO CONJUNTO E TUBULAÇÃO */}
-        <div style={{ background: "#ffffff", padding: "16px", borderRadius: "6px", border: "1px solid #e1e8eb", marginBottom: '16px' }}>
-            <span style={{ fontWeight: "600", display: "block", marginBottom: "16px", color: "#006d77", fontSize: "12px" }}>
-                ESPECIFICAÇÕES DA BOMBA E ESTRUTURA EDUTORA
-            </span>
-            
-            <Row gutter={[16, 4]}>
-                <Col xs={24} sm={12} md={8}><Form.Item label="Marca da Bomba" name="bombaMarca"><Input placeholder="Ex: Ebara" /></Form.Item></Col>
-                <Col xs={24} sm={12} md={8}><Form.Item label="Motor (Modelo/Potência)" name="imgMotorModelo"><Input placeholder="Ex: Franklin 5HP" /></Form.Item></Col>
-                <Col xs={24} sm={12} md={8}><Form.Item label="Bombeador" name="imgBombeadorModelo"><Input placeholder="Ex: 4R5ST-18" /></Form.Item></Col>
-                
-                <Col xs={24} sm={12} md={8}><Form.Item label="Data de Instalação" name="bombaDtInstalacao"><DatePicker format="DD/MM/YYYY" style={{ width: "100%" }} /></Form.Item></Col>
-                <Col xs={24} sm={12} md={8}><Form.Item label="Cabeamento Utilizado" name="bombaCabeamento"><Input placeholder="Ex: 3x4mm²" /></Form.Item></Col>
-                <Col xs={24} sm={12} md={8}><Form.Item label="Cavalete de Saída" name="bombaCavalete"><Input placeholder="Ex: PEAD / Ferro Galv." /></Form.Item></Col>
-            </Row>
-
-            <hr style={{ border: '0', borderTop: '1px dashed #e1e8eb', margin: '8px 0 16px 0' }} />
-
-            <Row gutter={[16, 4]}>
-                <Col xs={12} sm={8} md={4}><Form.Item label="Qtd. Tubos (Barras)" name="bombaQtdTubos"><InputNumber min={0} style={{ width: "100%" }} placeholder="0" /></Form.Item></Col>
-                <Col xs={12} sm={8} md={4}><Form.Item label="Comp. do Tubo" name="bombaTamTubo"><InputNumber min={0} style={{ width: "100%" }} addonAfter="m" placeholder="6" /></Form.Item></Col>
-                <Col xs={12} sm={8} md={5}><Form.Item label="Medida/Diâmetro" name="bombaMedidaTubo"><Input addonAfter={selectUnidade('bombaTuboUnidade')} placeholder="Ex: 2" /></Form.Item></Col>
-                <Col xs={12} sm={12} md={6}>
-                    <Form.Item label="Material Tubo Edutor" name="bombaTubulacao">
-                        <Select placeholder="Selecione">
-                            <Option value="Aço Galvanizado">Aço Galvanizado</Option>
-                            <Option value="PVC Geomecânico">PVC Geomecânico</Option>
-                            <Option value="Tubo Flexível">Tubo Flexível (Subteck/PEX)</Option>
-                        </Select>
-                    </Form.Item>
-                </Col>
-                <Col xs={24} sm={12} md={5}><Form.Item label="Profundidade da Bomba" name="bombaProfundidade"><InputNumber style={{ width: "100%" }} addonAfter="m" placeholder="Ex: 80" /></Form.Item></Col>
-            </Row>
-        </div>
-
-        {/* BLOCO 2: DADOS OPERACIONAIS E COMPLEMENTARES */}
-        <div style={{ background: "#ffffff", padding: "16px", borderRadius: "6px", border: "1px solid #e1e8eb" }}>
-            <span style={{ fontWeight: "600", display: "block", marginBottom: "16px", color: "#006d77", fontSize: "12px" }}>
-                NÍVEIS OPERACIONAIS E RESPONSABILIDADE
-            </span>
-
-            <Row gutter={[16, 4]}>
-                <Col xs={12} sm={12} md={6}><Form.Item label="Nível Estático (NE)" name="bombaNivelEstatico"><InputNumber style={{ width: "100%" }} addonAfter="m" placeholder="0.00" /></Form.Item></Col>
-                <Col xs={12} sm={12} md={6}><Form.Item label="Nível Dinâmico (ND)" name="bombaNivelDinamico"><InputNumber style={{ width: "100%" }} addonAfter="m" placeholder="0.00" /></Form.Item></Col>
-                <Col xs={24} md={12}>
-                    <Form.Item 
-                        label="Vazão Estimada de Operação" 
-                        name="bombaVazaoEstimada" 
-                        normalize={(value) => { if (!value) return ''; const limpo = value.replace('~', ''); return isBombaVazao ? `~${limpo}` : limpo; }}
-                    >
-                        <Input 
-                            addonAfter="L/h" 
-                            placeholder="Ex: 5000"
-                            addonBefore={
-                                <Button 
-                                    type={isBombaVazao ? "primary" : "text"} 
-                                    size="small" 
-                                    style={{ 
-                                        height: '100%', 
-                                        margin: '-4px -11px', 
-                                        borderRadius: '4px 0 0 4px', 
-                                        backgroundColor: isBombaVazao ? '#006d77' : 'transparent', 
-                                        color: isBombaVazao ? '#fff' : '#8c8c8c', 
-                                        fontWeight: 'bold' 
-                                    }} 
-                                    onClick={() => { 
-                                        const novoEstado = !isBombaVazao; 
-                                        setIsBombaVazao(novoEstado); 
-                                        const valorAtual = form.getFieldValue('bombaVazaoEstimada') || ''; 
-                                        const valorLimpo = valorAtual.replace('~', ''); 
-                                        form.setFieldsValue({ bombaVazaoEstimada: novoEstado ? `~${valorLimpo}` : valorLimpo }); 
-                                    }}
-                                >
-                                    ~
-                                </Button>
-                            } 
-                        />
-                    </Form.Item>
-                </Col>
-            </Row>
-
-            <Row gutter={[16, 4]} style={{ marginTop: '8px' }}>
-                <Col xs={24} sm={12} md={12}><Form.Item label="Equipe de Instalação" name="equipeInstalacaoBomba"><Input placeholder="Nome da equipe/empresa" /></Form.Item></Col>
-                <Col xs={24} sm={12} md={12}><Form.Item label="Nome do Responsável" name="respNomeBomba"><Input placeholder="Técnico/Sondador responsável" /></Form.Item></Col>
-                <Col xs={24}><Form.Item label="Observações Gerais do Bombeamento" name="bombaObsGerais"><TextArea rows={2} autoSize={{ minRows: 2, maxRows: 4 }} placeholder="Descreva particularidades da instalação elétrica ou hidráulica..." /></Form.Item></Col>
-            </Row>
-        </div>
-    </Panel>
-)}
-
-                           {/* SANFONA 5: TESTE DE VAZÃO */}
-{secoesAtivas.testeVazao && (
-    <Panel
-        header={
-            <Space>
-                <DashboardOutlined style={{ color: "#1d39c4" }} />
-                <b style={{ color: "#061178" }}>5. Teste de Vazão e Parâmetros Hidrodinâmicos</b>
-            </Space>
-        }
-        key="testeVazao"
-        style={{ 
-            marginBottom: '16px', 
-            background: '#f0f5ff', // Azul dinâmico/hidrodinâmico sutil
-            borderRadius: '8px', 
-            border: '1px solid #adc6ff', 
-            boxShadow: "0 1px 2px rgba(0,0,0,0.03)" 
-        }}
-    >
-        <div style={{ background: "#ffffff", padding: "16px", borderRadius: "6px", border: "1px solid #d6e4ff" }}>
-            <span style={{ fontWeight: "600", display: "block", marginBottom: "16px", color: "#1d39c4", fontSize: "12px" }}>
-                DADOS EXTRAÍDOS DO ENSAIO DE VAZÃO
-            </span>
-
-            {/* Parâmetros rápidos adicionados para enriquecer a seção */}
-            <Row gutter={[16, 12]} style={{ marginBottom: '8px' }}>
-                <Col xs={24} sm={8}>
-                    <Form.Item label="Duração do Ensaio" name="testeVazaoDuracao">
-                        <InputNumber style={{ width: "100%" }} addonAfter="horas" placeholder="Ex: 24" />
-                    </Form.Item>
-                </Col>
-                <Col xs={24} sm={8}>
-                    <Form.Item label="Método Utilizado" name="testeVazaoMetodo">
-                        <Select placeholder="Selecione">
-                            <Option value="Fluxo Contínuo">Fluxo Contínuo</Option>
-                            <Option value="Estágios">Estágios Reversíveis</Option>
-                            <Option value="Air-Lift">Air-Lift (Compressores)</Option>
-                        </Select>
-                    </Form.Item>
-                </Col>
-                <Col xs={24} sm={8}>
-                    <Form.Item label="Vazão Estabilizada" name="testeVazaoEstabilizada">
-                        <InputNumber style={{ width: "100%" }} addonAfter="m³/h" placeholder="0.00" />
-                    </Form.Item>
-                </Col>
-            </Row>
-
-            <Row gutter={[16, 0]}>
-                <Col xs={24}>
-                    <Form.Item 
-                        label="Comportamento da Região e Parâmetros Estendidos" 
-                        name="testeVazaoDados"
-                        style={{ marginBottom: 0 }}
-                    >
-                        <TextArea 
-                            rows={4} 
-                            autoSize={{ minRows: 4, maxRows: 8 }} 
-                            placeholder="Descreva detalhadamente o comportamento do nível dinâmico durante as horas de teste, a recuperação do aquífero e as características geográficas ou climáticas marcantes da região..." 
-                        />
-                    </Form.Item>
-                </Col>
-            </Row>
-        </div>
-    </Panel>
-)}
-
-                        </Collapse>
-                    </Space>
-
-                    <Space direction="vertical" size="large" style={{ width: "15%" }}>
-
-                        {/* SELETOR DE SEÇÕES (PAINEL DE CONTROLE DO OPERADOR) */}
-                        <Card
-                            title="Seções do Relatório Final"
-                            size="small"
-                            style={{
-                                borderRadius: "8px",
-                                border: "1px solid #d9d9d9",
-                                boxShadow: "0 1px 2px rgba(0,0,0,0.03)"
-                            }}
-                        >
-                            {/* Mudamos para vertical para caber perfeitamente na barra de 20% */}
-                            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-                                <Checkbox checked disabled style={{ color: '#1890ff', fontWeight: 'bold' }}>
-                                    👤 Dados do Cliente (Fixo)
-                                </Checkbox>
-                                <Checkbox checked={secoesAtivas.dadosPoco} onChange={() => handleToggleSecao('dadosPoco')}>
-                                    📊 1. Dados do Poço
-                                </Checkbox>
-                                <Checkbox checked={secoesAtivas.perfuracao} onChange={() => handleToggleSecao('perfuracao')}>
-                                    🏗️ 2. Perfuração e Revestimento
-                                </Checkbox>
-                                <Checkbox checked={secoesAtivas.diagnostico} onChange={() => handleToggleSecao('diagnostico')}>
-                                    🧪 3. Diagnóstico Técnico
-                                </Checkbox>
-                                <Checkbox checked={secoesAtivas.bombeamento} onChange={() => handleToggleSecao('bombeamento')}>
-                                    ⚙️ 4. Sistema de Bombeamento
-                                </Checkbox>
-                                <Checkbox checked={secoesAtivas.testeVazao} onChange={() => handleToggleSecao('testeVazao')}>
-                                    🧪 5. Teste de Vazão
-                                </Checkbox>
-                            </Space>
-                        </Card>
-
-                        {/* PAINEL DE AÇÕES E IMPRESSÃO */}
-                        <Card
-                            title="Ações"
-                            size="small"
-                            style={{
-                                borderRadius: "8px",
-                                border: "1px solid #d9d9d9",
-                                boxShadow: "0 1px 2px rgba(0,0,0,0.03)"
-                            }}
-                        >
-                            <Space direction="vertical" size="small" style={{ width: '100%' }}>
-                                {/* Botão de Imprimir / Gerar PDF */}
-                                <Button
-                                    type="primary"
-                                    icon={<PrinterOutlined />}
-                                    block
-                                    onClick={handlePrint} // Substitua pela sua função de impressão
-                                    style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }} // Tom verde para destaque de conclusão
-                                >
-                                    Imprimir Relatório
-                                </Button>
-
-                                {/* Botão de Salvar Rascunho */}
-                                <Button
-                                    icon={<SaveOutlined />}
-                                    block
-                                    onClick={handlePrint} // Substitua pela sua função de salvar
-                                >
-                                    Salvar Rascunho
-                                </Button>
-
-                                {/* Botão de Limpar Seleção (Opcional) */}
-                                <Button
-                                    danger
-                                    type="text"
-                                    block
-                                    onClick={handlePrint} // Substitua pela sua função de reset
-                                    style={{ fontSize: '12px' }}
-                                >
-                                    Resetar Filtros
-                                </Button>
-                            </Space>
-                        </Card>
-
-                    </Space>
-
-
-
-
-
-                </Form>
-            </div>
-        </div>
+      <Flex justify="space-between" align="center" gap={8} wrap>
+        <Space>{icone}<b>{titulo}</b>
+          {pr.total > 0 && <Tag color={pr.feitos === pr.total ? 'green' : pr.feitos ? 'blue' : 'default'} style={{ margin: 0 }}>{pr.feitos}/{pr.total}</Tag>}
+        </Space>
+        {id && (
+          <span onClick={e => e.stopPropagation()}>
+            <Tooltip title="Incluir esta seção no relatório impresso">
+              <Space size={4}><Switch size="small" checked={p.secoes[id]} onChange={v => p.alternarSecao(id, v)} /><Text type="secondary" style={{ fontSize: 12 }}>no relatório</Text></Space>
+            </Tooltip>
+          </span>
+        )}
+      </Flex>
     );
+  };
+
+  // Lista de camadas (perfuração/revestimento): "De" vem da camada anterior
+  const camadas = (nome: 'perfuracoes' | 'revestimentos') => {
+    const perf = nome === 'perfuracoes';
+    const [de, ate, diam, un] = perf ? ['perfDe', 'perfAte', 'perfDiam', 'perfDiamUnidade'] : ['revDe', 'revAte', 'revDiam', 'revDiamUnidade'];
+    return (
+      <Form.List name={nome}>
+        {(campos, { add, remove }) => (
+          <Flex vertical gap={6}>
+            {campos.map(({ key, name }, i) => (
+              <Row key={key} gutter={6} align="bottom" wrap={false}>
+                <Col flex="90px"><Form.Item label={i === 0 ? 'De' : ''} name={[name, de]} style={{ marginBottom: 0 }}><InputNumber disabled style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
+                <Col flex="100px"><Form.Item label={i === 0 ? 'Até' : ''} name={[name, ate]} style={{ marginBottom: 0 }}><InputNumber min={0} style={{ width: '100%' }} suffix="m" placeholder="35" /></Form.Item></Col>
+                <Col flex="auto">
+                  <Form.Item label={i === 0 ? 'Diâmetro' : ''} style={{ marginBottom: 0 }}>
+                    <Space.Compact style={{ width: '100%' }}>
+                      <Form.Item name={[name, diam]} noStyle><InputNumber min={0} style={{ width: '100%' }} placeholder="6" /></Form.Item>
+                      {unidade([name, un])}
+                    </Space.Compact>
+                  </Form.Item>
+                </Col>
+                {!perf && <>
+                  <Col flex="120px"><Form.Item label={i === 0 ? 'Material' : ''} name={[name, 'revMaterial']} style={{ marginBottom: 0 }}><Input placeholder="PVC geomec." /></Form.Item></Col>
+                  <Col flex="90px"><Form.Item label={i === 0 ? 'União' : ''} name={[name, 'revUniao']} style={{ marginBottom: 0 }}><Input placeholder="Rosca" /></Form.Item></Col>
+                </>}
+                <Col flex="32px">
+                  <Button type="text" danger icon={<DeleteOutlined />} disabled={campos.length === 1} onClick={() => { remove(name); p.aoMudar({ [nome]: true }); }} />
+                </Col>
+              </Row>
+            ))}
+            <Button type="dashed" icon={<PlusOutlined />} onClick={() => { const l = form.getFieldValue(nome) || []; add({ [de]: Number(l[l.length - 1]?.[ate]) || 0, [un]: '"' }); }}>
+              {perf ? 'Adicionar etapa de perfuração' : 'Adicionar revestimento'}
+            </Button>
+          </Flex>
+        )}
+      </Form.List>
+    );
+  };
+
+  // Leituras do teste de vazão: tempo (min), nível (m) e, no bombeamento, vazão (L/h)
+  const leituras = (nome: 'testeLeituras' | 'testeRecuperacao', comVazao: boolean) => (
+    <Form.List name={nome}>
+      {(campos, { add, remove }) => (
+        <Flex vertical gap={6}>
+          {campos.map(({ key, name }, i) => (
+            <Row key={key} gutter={6} align="bottom" wrap={false}>
+              <Col flex="1"><Form.Item label={i === 0 ? 'Tempo' : ''} name={[name, 'tempo']} style={{ marginBottom: 0 }}><InputNumber min={0} style={{ width: '100%' }} suffix="min" /></Form.Item></Col>
+              <Col flex="1"><Form.Item label={i === 0 ? 'Nível' : ''} name={[name, 'nivel']} style={{ marginBottom: 0 }}><InputNumber min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
+              {comVazao && <Col flex="1"><Form.Item label={i === 0 ? 'Vazão' : ''} name={[name, 'vazao']} style={{ marginBottom: 0 }}><InputNumber min={0} style={{ width: '100%' }} suffix="L/h" /></Form.Item></Col>}
+              <Col flex="32px"><Button type="text" danger icon={<DeleteOutlined />} onClick={() => { remove(name); p.aoMudar({}); }} /></Col>
+            </Row>
+          ))}
+          <Button type="dashed" icon={<PlusOutlined />} onClick={() => {
+            // Próximo tempo: repete o intervalo das duas últimas leituras (15 min no começo)
+            const l = form.getFieldValue(nome) || [];
+            const passo = l.length >= 2 ? Number(l[l.length - 1]?.tempo || 0) - Number(l[l.length - 2]?.tempo || 0) : 15;
+            add({ tempo: l.length ? Number(l[l.length - 1]?.tempo || 0) + (passo > 0 ? passo : 15) : 0 });
+          }}>Adicionar leitura</Button>
+        </Flex>
+      )}
+    </Form.List>
+  );
+  const fin = calcularFinanceiro(valores);
+  const teste = resumoTeste(valores);
+
+  const fundoPerfuracao = (valores.perfuracoes || []).reduce((m: number, c: Record<string, unknown>) => Math.max(m, Number(c?.perfAte) || 0), 0);
+  const garantiaAte = dataGarantia(valores.dtTermino, valores.garantiaMeses);
+  const checks = (itens: Array<[string, string]>) => (
+    <Row gutter={[8, 4]}>{itens.map(([k, t]) => (
+      <Col xs={24} sm={12} md={8} key={k}><Form.Item name={k} valuePropName="checked" style={{ margin: 0 }}><Checkbox>{t}</Checkbox></Form.Item></Col>
+    ))}</Row>
+  );
+
+  const secoes = [
+    {
+      key: 'cliente', label: cabecalho(<UserOutlined style={{ color: token.colorPrimary }} />, 'Cliente / proprietário', 'cliente'),
+      children: (
+        <Row gutter={12}>
+          <Col xs={24} md={12}><Form.Item label="Nome / razão social" name="cliente"><Input placeholder="Nome completo" /></Form.Item></Col>
+          <Col xs={12} md={6}><Form.Item label="CPF / CNPJ" name="documento"><Input placeholder="000.000.000-00" /></Form.Item></Col>
+          <Col xs={12} md={6}><Form.Item label="Telefone" name="celular"><Input placeholder="(00) 00000-0000" /></Form.Item></Col>
+          <Col xs={24} md={10}><Form.Item label="Endereço (rua, nº)" name="endereco"><Input placeholder="Estrada Municipal, km 4" /></Form.Item></Col>
+          <Col xs={12} md={5}><Form.Item label="Bairro" name="bairro"><Input /></Form.Item></Col>
+          <Col xs={12} md={4}><Form.Item label="Cidade" name="cidade"><Input /></Form.Item></Col>
+          <Col xs={8} md={2}><Form.Item label="UF" name="uf" normalize={v => String(v || '').toUpperCase()}><Input maxLength={2} /></Form.Item></Col>
+          <Col xs={16} md={3}><Form.Item label="CEP" name="cep"><Input placeholder="00000-000" /></Form.Item></Col>
+        </Row>
+      ),
+    },
+    {
+      key: 'dadosPoco', label: cabecalho(<DashboardOutlined style={{ color: token.colorPrimary }} />, 'Dados do poço', 'dadosPoco', 'dadosPoco'),
+      children: (
+        <Row gutter={12}>
+          <Col xs={24} md={10}>
+            <Form.Item label="Localização (GPS)" name="localizacao">
+              <Input placeholder="-23.550520, -46.633308" suffix={<Button type="link" size="small" icon={<CompassOutlined />} onClick={obterGps}>Obter</Button>} />
+            </Form.Item>
+          </Col>
+          <Col xs={12} md={5}>
+            <Form.Item label="Profundidade" name="profundidade"
+              extra={fundoPerfuracao > 0 && Number(valores.profundidade) !== fundoPerfuracao
+                ? <Button type="link" size="small" style={{ padding: 0 }} onClick={() => { form.setFieldValue('profundidade', fundoPerfuracao); p.aoMudar({}); }}>usar {fundoPerfuracao} m da perfuração</Button>
+                : null}>
+              <InputNumber min={0} style={{ width: '100%' }} suffix="m" />
+            </Form.Item>
+          </Col>
+          <Col xs={12} md={4}>
+            <Form.Item label="Diâmetro interno">
+              <Space.Compact style={{ width: '100%' }}>
+                <Form.Item name="diametroInterno" noStyle><InputNumber min={0} style={{ width: '100%' }} /></Form.Item>{unidade('diamInternoUnidade')}
+              </Space.Compact>
+            </Form.Item>
+          </Col>
+          <Col xs={12} md={5}><Form.Item label="Última limpeza" name="dtLimpeza"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item></Col>
+          <Col xs={12} md={8}>
+            <Form.Item label="Vazão na perfuração">
+              <Space.Compact style={{ width: '100%' }}>
+                <Form.Item name="vazaoAprox" noStyle><InputNumber min={0} style={{ width: '100%' }} suffix="L/h" /></Form.Item>
+              </Space.Compact>
+              <Form.Item name="vazaoAproxAproximada" valuePropName="checked" noStyle><Checkbox style={{ marginTop: 4 }}>valor aproximado (~)</Checkbox></Form.Item>
+            </Form.Item>
+          </Col>
+        </Row>
+      ),
+    },
+    {
+      key: 'perfuracao', label: cabecalho(<BuildOutlined style={{ color: '#8c5e3c' }} />, 'Perfuração e revestimento', 'perfuracao', 'perfuracao'),
+      children: (
+        <Flex vertical gap={12}>
+          <Row gutter={12}>
+            <Col xs={12} md={5}><Form.Item label="Início" name="dtInicio"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item></Col>
+            <Col xs={12} md={5}><Form.Item label="Conclusão" name="dtTermino"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item></Col>
+            <Col xs={12} md={6}><Form.Item label="Formação / solo" name="tipoSolo"><Select allowClear options={SOLOS.map(s => ({ value: s, label: s }))} /></Form.Item></Col>
+            <Col xs={12} md={8}>
+              <Form.Item label="Garantia" name="garantiaMeses" extra={garantiaAte ? <Text type="success">válida até {garantiaAte}</Text> : 'informe a conclusão e os meses'}>
+                <Select allowClear options={[3, 6, 9, 12, 18, 24, 36].map(m => ({ value: m, label: `${m} meses` }))} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col xs={24} xl={10}><Card size="small" title="Etapas de perfuração">{camadas('perfuracoes')}</Card></Col>
+            <Col xs={24} xl={14}><Card size="small" title="Revestimento">{camadas('revestimentos')}</Card></Col>
+          </Row>
+          <div><Text type="secondary" style={{ fontSize: 12 }}>Ocorrências na obra</Text>{checks(OCORRENCIAS_OBRA)}</div>
+          <Row gutter={12}>
+            <Col xs={24} md={12}><Form.Item label="Equipe / sonda" name="equipePerfuracao"><Input /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item label="Responsável técnico" name="respNomePerf"><Input placeholder="Nome e registro (CREA/CFT)" /></Form.Item></Col>
+            <Col xs={24}><Form.Item label="Observações geológicas" name="obsGeraisPerfuracao"><TextArea autoSize={{ minRows: 2, maxRows: 5 }} /></Form.Item></Col>
+          </Row>
+        </Flex>
+      ),
+    },
+    {
+      key: 'diagnostico', label: cabecalho(<ExperimentOutlined style={{ color: '#08979c' }} />, 'Diagnóstico técnico', 'diagnostico', 'diagnostico'),
+      children: (
+        <Flex vertical gap={12}>
+          <div><Text type="secondary" style={{ fontSize: 12 }}>Anomalias encontradas (as marcadas saem em destaque)</Text>{checks(ANOMALIAS)}</div>
+          <Row gutter={12}>
+            <Col xs={12} md={6}><Form.Item label="Amperagem (leitura)" name="manutAmperagem"><InputNumber min={0} style={{ width: '100%' }} suffix="A" /></Form.Item></Col>
+            <Col xs={12} md={6}><Form.Item label="Isolamento (megômetro)" name="manutMegometro"><InputNumber min={0} style={{ width: '100%' }} suffix="MΩ" /></Form.Item></Col>
+            <Col xs={24} md={12}>
+              <Form.Item label="Limpeza química" name="manutPeriodicidadeLimpeza">
+                <Select allowClear options={[{ value: '6_meses', label: 'A cada 6 meses' }, { value: '12_meses', label: 'Anual' }]} />
+              </Form.Item>
+            </Col>
+            <Col xs={24}><Form.Item label="Diretrizes preventivas / observações" name="manutDiretrizesTexto"><TextArea autoSize={{ minRows: 2, maxRows: 5 }} placeholder="Ex.: monitorar a queda de vazão e o nível dinâmico..." /></Form.Item></Col>
+          </Row>
+        </Flex>
+      ),
+    },
+    {
+      key: 'bombeamento', label: cabecalho(<SettingOutlined style={{ color: '#006d77' }} />, 'Sistema de bombeamento', 'bombeamento', 'bombeamento'),
+      children: (
+        <Row gutter={12}>
+          <Col xs={12} md={6}><Form.Item label="Marca da bomba" name="bombaMarca"><Input placeholder="Ebara" /></Form.Item></Col>
+          <Col xs={12} md={6}><Form.Item label="Motor (modelo / potência)" name="imgMotorModelo"><Input placeholder="Franklin 1 HP" /></Form.Item></Col>
+          <Col xs={12} md={6}><Form.Item label="Bombeador" name="imgBombeadorModelo"><Input placeholder="3BPS2-14" /></Form.Item></Col>
+          <Col xs={12} md={6}><Form.Item label="Instalação" name="bombaDtInstalacao"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item></Col>
+          <Col xs={8} md={4}><Form.Item label="Tubos (barras)" name="bombaQtdTubos"><InputNumber min={0} style={{ width: '100%' }} /></Form.Item></Col>
+          <Col xs={8} md={4}><Form.Item label="Comp. do tubo" name="bombaTamTubo"><InputNumber min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
+          <Col xs={8} md={5}>
+            <Form.Item label="Diâmetro do tubo">
+              <Space.Compact style={{ width: '100%' }}><Form.Item name="bombaMedidaTubo" noStyle><Input placeholder="1" /></Form.Item>{unidade('bombaTuboUnidade')}</Space.Compact>
+            </Form.Item>
+          </Col>
+          <Col xs={12} md={6}><Form.Item label="Material do tubo" name="bombaTubulacao"><Select allowClear options={MATERIAIS_TUBO.map(m => ({ value: m, label: m }))} /></Form.Item></Col>
+          <Col xs={12} md={5}><Form.Item label="Profundidade da bomba" name="bombaProfundidade"
+            extra={Number(valores.bombaQtdTubos) > 0 && Number(valores.bombaTamTubo) > 0 ? `tubos somam ${Number(valores.bombaQtdTubos) * Number(valores.bombaTamTubo)} m` : null}>
+            <InputNumber min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
+          <Col xs={12} md={6}><Form.Item label="Cabo elétrico" name="bombaCabeamento"><Input placeholder="3 x 4 mm²" /></Form.Item></Col>
+          <Col xs={12} md={6}><Form.Item label="Cavalete de saída" name="bombaCavalete"><Input placeholder="PEAD / galvanizado" /></Form.Item></Col>
+          <Col xs={12} md={6}><Form.Item label="Nível estático (NE)" name="bombaNivelEstatico"><InputNumber min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
+          <Col xs={12} md={6}><Form.Item label="Nível dinâmico (ND)" name="bombaNivelDinamico"><InputNumber min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
+          <Col xs={24} md={8}>
+            <Form.Item label="Vazão regulada">
+              <Form.Item name="bombaVazaoEstimada" noStyle><InputNumber min={0} style={{ width: '100%' }} suffix="L/h" /></Form.Item>
+              <Form.Item name="bombaVazaoAproximada" valuePropName="checked" noStyle><Checkbox style={{ marginTop: 4 }}>valor aproximado (~)</Checkbox></Form.Item>
+            </Form.Item>
+          </Col>
+          <Col xs={12} md={8}><Form.Item label="Equipe de instalação" name="equipeInstalacaoBomba"><Input /></Form.Item></Col>
+          <Col xs={12} md={8}><Form.Item label="Responsável" name="respNomeBomba"><Input /></Form.Item></Col>
+          <Col xs={24}><Form.Item label="Observações da instalação" name="bombaObsGerais"><TextArea autoSize={{ minRows: 2, maxRows: 5 }} /></Form.Item></Col>
+        </Row>
+      ),
+    },
+    {
+      key: 'testeVazao', label: cabecalho(<DashboardOutlined style={{ color: '#1d39c4' }} />, 'Teste de vazão', 'testeVazao', 'testeVazao'),
+      children: (
+        <Row gutter={12}>
+          <Col xs={12} md={8}><Form.Item label="Duração do ensaio" name="testeVazaoDuracao"><InputNumber min={0} style={{ width: '100%' }} suffix="h" /></Form.Item></Col>
+          <Col xs={12} md={8}>
+            <Form.Item label="Método" name="testeVazaoMetodo">
+              <Select allowClear options={['Fluxo contínuo', 'Estágios', 'Air-lift (compressor)'].map(m => ({ value: m, label: m }))} />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={8}><Form.Item label="Vazão estabilizada" name="testeVazaoEstabilizada"><InputNumber min={0} style={{ width: '100%' }} suffix="m³/h" /></Form.Item></Col>
+          <Col xs={24} lg={14}><Card size="small" title="Leituras do bombeamento">{leituras('testeLeituras', true)}</Card></Col>
+          <Col xs={24} lg={10}><Card size="small" title="Leituras da recuperação (após desligar)">{leituras('testeRecuperacao', false)}</Card></Col>
+          <Col xs={24} style={{ marginTop: 8 }}>
+            <Flex gap={16} wrap>
+              <Statistic title="Rebaixamento" value={teste.rebaixamento ?? '—'} suffix={teste.rebaixamento !== null ? 'm' : ''} />
+              <Statistic title="Vazão" value={teste.vazaoM3h ?? '—'} suffix={teste.vazaoM3h !== null ? 'm³/h' : ''} />
+              <Statistic title="Vazão específica" value={teste.vazaoEspecifica ?? '—'} suffix={teste.vazaoEspecifica !== null ? 'm³/h/m' : ''} />
+              <Statistic title="Recuperação" value={teste.recuperacaoPct ?? '—'} suffix={teste.recuperacaoPct !== null ? '%' : ''} />
+            </Flex>
+          </Col>
+          <Col xs={24} style={{ marginTop: 8 }}><Form.Item label="Comportamento do nível e da recuperação" name="testeVazaoDados"><TextArea autoSize={{ minRows: 3, maxRows: 8 }} /></Form.Item></Col>
+        </Row>
+      ),
+    },
+    {
+      key: 'financeiro', label: cabecalho(<DollarOutlined style={{ color: '#389e0d' }} />, 'Financeiro da obra', 'financeiro', 'financeiro'),
+      children: (
+        <Flex vertical gap={12}>
+          <Row gutter={12}>
+            <Col xs={12} md={6}><Form.Item label="Metros contratados" name="finMetrosContratados"><InputNumber min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
+            <Col xs={12} md={6}><Form.Item label="Valor contratado (pacote)" name="finValorContratado"><InputNumber min={0} style={{ width: '100%' }} prefix="R$" precision={2} decimalSeparator="," /></Form.Item></Col>
+            <Col xs={12} md={6}><Form.Item label="Valor do metro excedente" name="finValorMetroExcedente"><InputNumber min={0} style={{ width: '100%' }} prefix="R$" precision={2} decimalSeparator="," /></Form.Item></Col>
+            <Col xs={12} md={6}>
+              <Form.Item label="Poço mais raso que o contratado">
+                <Form.Item name="finAbaterFalta" valuePropName="checked" noStyle><Checkbox>abater os metros a menos</Checkbox></Form.Item>
+                {valores.finAbaterFalta && (
+                  <Form.Item name="finValorMetroFalta" noStyle>
+                    <InputNumber min={0} size="small" style={{ width: '100%', marginTop: 4 }} prefix="R$"
+                      placeholder={fin.contratados ? `${(fin.valorContratado / fin.contratados).toFixed(2)} (média)` : 'valor do metro'} />
+                  </Form.Item>
+                )}
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col xs={24} lg={10}>
+              <Card size="small" title="Adicionais (bomba, instalação, materiais...)">
+                <Form.List name="finAdicionais">
+                  {(campos, { add, remove }) => (
+                    <Flex vertical gap={6}>
+                      {campos.map(({ key, name }) => (
+                        <Row key={key} gutter={6} wrap={false}>
+                          <Col flex="auto"><Form.Item name={[name, 'descricao']} noStyle><Input placeholder="Descrição" /></Form.Item></Col>
+                          <Col flex="130px"><Form.Item name={[name, 'valor']} noStyle><InputNumber min={0} style={{ width: '100%' }} prefix="R$" precision={2} decimalSeparator="," /></Form.Item></Col>
+                          <Col flex="32px"><Button type="text" danger icon={<DeleteOutlined />} onClick={() => { remove(name); p.aoMudar({}); }} /></Col>
+                        </Row>
+                      ))}
+                      <Button type="dashed" icon={<PlusOutlined />} onClick={() => add({})}>Adicionar</Button>
+                    </Flex>
+                  )}
+                </Form.List>
+              </Card>
+            </Col>
+            <Col xs={24} lg={14}>
+              <Card size="small" title="Pagamentos recebidos">
+                <Form.List name="finPagamentos">
+                  {(campos, { add, remove }) => (
+                    <Flex vertical gap={6}>
+                      {campos.map(({ key, name }) => (
+                        <Row key={key} gutter={6} wrap={false}>
+                          <Col flex="130px"><Form.Item name={[name, 'data']} noStyle><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item></Col>
+                          <Col flex="120px"><Form.Item name={[name, 'forma']} noStyle><Select style={{ width: '100%' }} options={FORMAS_PAGAMENTO.map(x => ({ value: x, label: x }))} /></Form.Item></Col>
+                          <Col flex="130px"><Form.Item name={[name, 'valor']} noStyle><InputNumber min={0} style={{ width: '100%' }} prefix="R$" precision={2} decimalSeparator="," /></Form.Item></Col>
+                          <Col flex="auto"><Form.Item name={[name, 'obs']} noStyle><Input placeholder="Obs. (entrada, parcela...)" /></Form.Item></Col>
+                          <Col flex="32px"><Button type="text" danger icon={<DeleteOutlined />} onClick={() => { remove(name); p.aoMudar({}); }} /></Col>
+                        </Row>
+                      ))}
+                      <Button type="dashed" icon={<PlusOutlined />} onClick={() => add({ forma: 'PIX' })}>Registrar pagamento</Button>
+                    </Flex>
+                  )}
+                </Form.List>
+              </Card>
+            </Col>
+          </Row>
+          <Card size="small" style={{ background: token.colorFillQuaternary }}>
+            <Flex gap={24} wrap align="center">
+              <Statistic title={`Contratado${fin.contratados ? ` (${fin.contratados} m)` : ''}`} value={brl(fin.valorContratado)} />
+              {fin.excedente > 0 && <Statistic title={`Excedente ${fin.excedente} m × ${brl(fin.valorMetroExcedente)}`} value={brl(fin.valorExcedente)} />}
+              {fin.falta > 0 && <Statistic title={`${fin.falta} m a menos`} value={fin.abatimento ? `− ${brl(fin.abatimento)}` : 'sem abatimento'} />}
+              {fin.totalAdicionais > 0 && <Statistic title="Adicionais" value={brl(fin.totalAdicionais)} />}
+              <Statistic title="Total da obra" value={brl(fin.total)} valueStyle={{ fontWeight: 700 }} />
+              <Statistic title="Pago" value={brl(fin.pago)} />
+              <Statistic title={fin.saldo > 0 ? 'Saldo a receber' : fin.saldo < 0 ? 'Crédito do cliente' : 'Quitado'} value={brl(Math.abs(fin.saldo))}
+                valueStyle={{ color: fin.saldo > 0 ? token.colorError : token.colorSuccess, fontWeight: 700 }} />
+            </Flex>
+            {!fin.profundidade && <Text type="warning" style={{ fontSize: 12 }}>Informe a profundidade do poço (ou a perfuração) para calcular o excedente.</Text>}
+          </Card>
+          <Form.Item label="Observações para o cliente" name="finObs" style={{ marginBottom: 0 }}><TextArea autoSize={{ minRows: 1, maxRows: 4 }} placeholder="Ex.: saldo em 2 parcelas..." /></Form.Item>
+        </Flex>
+      ),
+    },
+  ];
+
+  return (
+    <div style={{ padding: 16, background: token.colorBgLayout, minHeight: '100vh' }}>
+      <Card size="small" style={{ marginBottom: 12 }} styles={{ body: { padding: '10px 16px' } }}>
+        <Flex justify="space-between" align="center" wrap gap={8}>
+          <Space>
+            <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/relatorios')}>Voltar</Button>
+            <Title level={4} style={{ margin: 0 }}>Poços · relatórios</Title>
+          </Space>
+          <Space wrap>
+            <Button icon={<FileAddOutlined />} onClick={p.novo}>Novo</Button>
+            <Upload accept=".xml" showUploadList={false} beforeUpload={p.importar}><Button icon={<UploadOutlined />}>Abrir arquivo</Button></Upload>
+            <Button icon={<DownloadOutlined />} onClick={p.exportar}>Salvar arquivo</Button>
+            <Button icon={<EyeOutlined />} onClick={() => setPrevia('completo')}>Pré-visualizar</Button>
+            <Dropdown.Button type="primary" icon={<PrinterOutlined />} onClick={() => p.imprimir('completo')}
+              menu={{
+                items: MODELOS.map(m => ({
+                  key: m.id,
+                  icon: m.id === 'cobranca' ? <DollarOutlined /> : m.id === 'vazao' ? <LineChartOutlined /> : <PrinterOutlined />,
+                  label: <div><div>{m.nome}</div><Text type="secondary" style={{ fontSize: 11 }}>{m.descricao}</Text></div>,
+                })),
+                onClick: ({ key }) => p.imprimir(key as ModeloId),
+              }}>
+              Imprimir relatório
+            </Dropdown.Button>
+          </Space>
+        </Flex>
+      </Card>
+
+      <Form form={form} layout="vertical" onValuesChange={p.aoMudar}>
+        <Row gutter={12}>
+          <Col xs={24} xl={18}>
+            <Collapse items={secoes} defaultActiveKey={secoes.map(s => s.key)} style={{ background: token.colorBgContainer }} />
+          </Col>
+          <Col xs={24} xl={6}>
+            <Flex vertical gap={12} style={{ position: 'sticky', top: 12 }}>
+              <Card size="small" title="Resumo">
+                <Descriptions size="small" column={1} items={[
+                  { key: 'c', label: 'Cliente', children: valores.cliente || <Text type="secondary">—</Text> },
+                  { key: 'p', label: 'Profundidade', children: valores.profundidade ? `${valores.profundidade} m` : <Text type="secondary">—</Text> },
+                  { key: 'g', label: 'Garantia até', children: garantiaAte || <Text type="secondary">—</Text> },
+                  { key: 'a', label: 'Anomalias', children: ANOMALIAS.filter(([k]) => valores[k]).length || 'nenhuma' },
+                ]} />
+                <Text type="secondary" style={{ fontSize: 11 }}>
+                  {p.salvoEm ? `Rascunho salvo neste computador em ${p.salvoEm}.` : 'O rascunho é salvo sozinho neste computador.'} Para guardar de vez, use "Salvar arquivo".
+                </Text>
+              </Card>
+              <Card size="small" title="Empresa no cabeçalho">
+                <Flex vertical gap={6}>
+                  <Input size="small" placeholder="Nome da empresa" value={p.empresa.nome} onChange={e => p.setEmpresa({ nome: e.target.value })} />
+                  <Input size="small" placeholder="CNPJ" value={p.empresa.documento} onChange={e => p.setEmpresa({ documento: e.target.value })} />
+                  <Input size="small" placeholder="Telefone" value={p.empresa.telefone} onChange={e => p.setEmpresa({ telefone: e.target.value })} />
+                  <Input size="small" placeholder="Cidade / UF" value={p.empresa.cidade} onChange={e => p.setEmpresa({ cidade: e.target.value })} />
+                  <Input size="small" placeholder="Chave PIX (sai na cobrança)" value={p.empresa.pix} onChange={e => p.setEmpresa({ pix: e.target.value })} />
+                  <TextArea size="small" autoSize={{ minRows: 1, maxRows: 3 }} placeholder="Outros dados para pagamento (banco, agência...)"
+                    value={p.empresa.dadosPagamento} onChange={e => p.setEmpresa({ dadosPagamento: e.target.value })} />
+                  <Collapse size="small" items={[{
+                    key: 'g', label: 'Condições da garantia',
+                    children: <TextArea autoSize={{ minRows: 3, maxRows: 8 }} value={p.empresa.textoGarantia ?? TEXTO_GARANTIA_PADRAO} onChange={e => p.setEmpresa({ textoGarantia: e.target.value })} />,
+                  }]} />
+                  <Text type="secondary" style={{ fontSize: 11 }}>Fica guardado neste computador e sai em todos os relatórios.</Text>
+                </Flex>
+              </Card>
+              <Card size="small" title="Assinaturas">
+                <Space size={4}><Switch size="small" checked={p.secoes.assinaturas} onChange={v => p.alternarSecao('assinaturas', v)} /> Campos de assinatura no fim</Space>
+              </Card>
+            </Flex>
+          </Col>
+        </Row>
+      </Form>
+
+      <Drawer open={!!previa} onClose={() => setPrevia(null)} size={960} title="Pré-visualização (A4)" destroyOnHidden
+        extra={<Button type="primary" icon={<PrinterOutlined />} onClick={() => { const m = previa; setPrevia(null); if (m) p.imprimir(m); }}>Imprimir este modelo</Button>}>
+        {previa && (
+          <Flex vertical gap={8} style={{ height: '100%' }}>
+            <Segmented block value={previa} onChange={v => setPrevia(v as ModeloId)} options={MODELOS.map(m => ({ value: m.id, label: ROTULO_CURTO[m.id] }))} />
+            <iframe title="Pré-visualização do relatório" srcDoc={p.html(previa)} style={{ width: '100%', flex: 1, minHeight: '75vh', border: '1px solid #e2e8f0', background: '#fff' }} />
+          </Flex>
+        )}
+      </Drawer>
+    </div>
+  );
 }

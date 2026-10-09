@@ -10,6 +10,7 @@ const MontagemPdv = lazy(() => import('./hidraulica/montagens/MontagemPdv'));
 const RolamentosConfig = lazy(() => import('./transmissao/rolamentos/RolamentosConfig'));
 const RolamentosEntrada = lazy(() => import('./transmissao/rolamentos/RolamentosEntrada'));
 const RolamentoPorMedida = lazy(() => import('./transmissao/rolamentos/RolamentoPorMedida'));
+const RelatorioPocoPage = lazy(() => import('./hidraulica/pocos/RelatorioPocoPage'));
 
 /** O que o PDV entrega a um botão de módulo (o módulo não acessa o carrinho de outro jeito). */
 export interface PdvExtensaoProps {
@@ -53,6 +54,7 @@ export interface ModuloFront {
   rotas: Array<{ path: string; element: React.ReactNode }>;
   pdv?: Array<React.ComponentType<PdvExtensaoProps>>;       // botões no cabeçalho do PDV
   entradaNf?: Array<React.ComponentType<EntradaNfExtensaoProps>>; // botões na conferência da nota de entrada
+  relatorios?: Array<{ categoria: string; titulo: string; descricao: string; path: string }>; // atalhos na Central de Relatórios
 }
 
 export const MODULOS_FRONT: ModuloFront[] = [
@@ -68,6 +70,19 @@ export const MODULOS_FRONT: ModuloFront[] = [
     rotas: [{ path: '/modulos/transmissao/rolamentos', element: <RolamentosConfig /> }],
     entradaNf: [RolamentosEntrada],
     pdv: [RolamentoPorMedida],
+  },
+  {
+    codigo: 'HIDRAULICA_POCOS',
+    menu: [{ grupo: 'grp:vendas', itens: [{ key: '/modulos/hidraulica/pocos', label: 'Poços (relatórios)' }] }],
+    // /relatorios/poco: endereço antigo da tela, mantido para quem tem o link salvo
+    rotas: [
+      { path: '/modulos/hidraulica/pocos', element: <RelatorioPocoPage /> },
+      { path: '/relatorios/poco', element: <RelatorioPocoPage /> },
+    ],
+    relatorios: [{
+      categoria: 'Serviços técnicos e obras', titulo: 'Poços artesianos',
+      descricao: 'Relatório técnico completo, cobrança da obra, teste de vazão, garantia e formulário de campo.', path: '/modulos/hidraulica/pocos',
+    }],
   },
 ];
 
@@ -85,3 +100,5 @@ export const rotasDosModulos = (ativos: Set<string>) => MODULOS_FRONT.filter(m =
 export const extensoesPdv = (ativos: Set<string>) => MODULOS_FRONT.filter(m => ativos.has(m.codigo)).flatMap(m => m.pdv || []);
 
 export const extensoesEntradaNf = (ativos: Set<string>) => MODULOS_FRONT.filter(m => ativos.has(m.codigo)).flatMap(m => m.entradaNf || []);
+
+export const relatoriosDosModulos = (ativos: Set<string>) => MODULOS_FRONT.filter(m => ativos.has(m.codigo)).flatMap(m => m.relatorios || []);

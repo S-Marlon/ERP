@@ -5,6 +5,7 @@ import { NextFunction, Request, Response, Router } from 'express';
 import pool from '../infra/db';
 import hidraulicaMontagensRoutes from './hidraulica/montagens/montagens.routes';
 import transmissaoRolamentosRoutes from './transmissao/rolamentos/rolamentos.routes';
+import hidraulicaPocosRoutes from './hidraulica/pocos/pocos.routes';
 
 export interface ModuloRegistrado {
   codigo: string;      // padrão AREA_ASSUNTO (sistema_modulos.codigo)
@@ -31,6 +32,14 @@ export const MODULOS: ModuloRegistrado[] = [
     descricao: 'Lê os rolamentos da nota (tipo, código, vedação, marca), sugere as medidas pelo código e cadastra em lote com 1ª/2ª linha.',
     rotaBase: '/transmissao/rolamentos',
     router: transmissaoRolamentosRoutes,
+  },
+  {
+    codigo: 'HIDRAULICA_POCOS',
+    nome: 'Poços artesianos (relatórios)',
+    area: 'Hidráulica',
+    descricao: 'Relatório técnico de poço, cobrança da obra (metros excedentes e pagamentos), teste de vazão e garantia. Os dados ficam no navegador e em arquivo, sem banco.',
+    rotaBase: '/hidraulica/pocos',
+    router: hidraulicaPocosRoutes,
   },
 ];
 

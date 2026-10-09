@@ -51,7 +51,6 @@ import { FamilyManager } from "../areas/catalogo/familias/FamilyManager";
 import CatalogSku from "../areas/catalogo/skus/CatalogSku";
 import FornecedoresList from "../areas/parceiros/fornecedores/FornecedoresList";
 import RelatoriosPage from "../areas/estoque/relatorios/Relatorios";
-import RelatorioPocoPage from "../areas/estoque/relatorios/RelatorioPocoPage";
 
 import { ParceirosDashboard } from "../areas/parceiros/ParceirosDashboard";
 import FuncionariosPage from "../areas/parceiros/FuncionariosPage";
@@ -202,7 +201,6 @@ export default function AppLayout() {
             <Route path="/compras/fornecedores" element={<FornecedoresList />} />
             <Route path="/compras/Faturamento" element={<EmissaoFaturado/>} />
             <Route path="/relatorios" element={<RelatoriosPage />} />
-            <Route path="/relatorios/poco" element={<RelatorioPocoPage />} />
             <Route path="/obras" element={<ObrasModule />} />
 
             <Route path="/stagings" element={<StockEntryStagingView/>} />

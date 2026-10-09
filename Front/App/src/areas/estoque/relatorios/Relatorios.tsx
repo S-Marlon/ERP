@@ -1,6 +1,8 @@
-import React from "react";
-import { Link } from "react-router-dom";
-import { Row, Col, Card, Typography, Breadcrumb, Button, Space } from "antd";
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Row, Col, Card, Typography, Breadcrumb, Button, Space, Tag, message } from "antd";
+import { salvarModulo, useModulos } from "../../../modulos/modulosStore";
+import { relatoriosDosModulos } from "../../../modulos/registroModulos";
 import {
   FileTextOutlined,
   BarChartOutlined,
@@ -33,12 +35,6 @@ export default function RelatoriosPage() {
       icon: <BuildOutlined style={{ color: "#1890ff" }} />,
       reports: [
         {
-          title: "Perfuração e Instalação de Poços",
-          description: "Gerar relatório técnico detalhado de campo para impressão em A4/PDF.",
-          path: "/relatorios/poco", // Caminho da tela que criamos anteriormente
-          icon: <FileTextOutlined />
-        },
-        {
           title: "Cronograma de Obras Ativas",
           description: "Visão consolidada de prazos, equipe e status das perfurações.",
           path: "/obras/relatorio-cronograma",
@@ -66,6 +62,35 @@ export default function RelatoriosPage() {
     }
   ];
 
+  // Atalhos dos módulos ligados entram na categoria deles (o de Poços tem card fixo abaixo)
+  const { ativos } = useModulos();
+  const navigate = useNavigate();
+  const [ativando, setAtivando] = useState(false);
+  const POCOS = { codigo: 'HIDRAULICA_POCOS', path: '/modulos/hidraulica/pocos' };
+  const pocosLigado = ativos.has(POCOS.codigo);
+  // Desligado: liga o módulo e abre a tela
+  const abrirPocos = async () => {
+    if (pocosLigado) { navigate(POCOS.path); return; }
+    setAtivando(true);
+    try {
+      await salvarModulo(POCOS.codigo, true);
+      navigate(POCOS.path);
+    } catch (e) {
+      const texto = e instanceof Error ? e.message : '';
+      message.error(/desconhecido|Rota não encontrada/i.test(texto)
+        ? 'O servidor ainda não conhece o módulo de Poços: reinicie o backend e clique de novo.'
+        : texto || 'Não foi possível ativar o módulo de Poços.');
+    } finally {
+      setAtivando(false);
+    }
+  };
+  for (const r of relatoriosDosModulos(ativos).filter(x => x.path !== POCOS.path)) {
+    const link = { title: r.titulo, description: r.descricao, path: r.path, icon: <FileTextOutlined /> };
+    const secao = reportSections.find(x => x.category.toLowerCase() === r.categoria.toLowerCase());
+    if (secao) secao.reports.unshift(link);
+    else reportSections.unshift({ category: r.categoria, icon: <BuildOutlined style={{ color: "#1890ff" }} />, reports: [link] });
+  }
+
   return (
     <div style={{ padding: "24px", background: "#f0f2f5", minHeight: "100vh" }}>
       
@@ -84,6 +109,29 @@ export default function RelatoriosPage() {
           Selecione o módulo operacional desejado para gerar e exportar dados analíticos.
         </Text>
       </div>
+
+      {/* POÇOS ARTESIANOS: sempre visível; liga o módulo se estiver desligado */}
+      <Card style={{ marginBottom: "24px", borderRadius: "8px", borderLeft: "4px solid #1890ff" }}>
+        <Row gutter={[16, 12]} align="middle">
+          <Col xs={24} md={16}>
+            <Space direction="vertical" size={2}>
+              <Space>
+                <BuildOutlined style={{ color: "#1890ff", fontSize: 18 }} />
+                <Text strong style={{ fontSize: 16 }}>Poços artesianos</Text>
+                {pocosLigado ? <Tag color="green">módulo ligado</Tag> : <Tag>módulo desligado</Tag>}
+              </Space>
+              <Text type="secondary">
+                Relatório técnico completo, cobrança da obra (metros excedentes e pagamentos), teste de vazão, garantia e formulário de campo.
+              </Text>
+            </Space>
+          </Col>
+          <Col xs={24} md={8} style={{ textAlign: "right" }}>
+            <Button type="primary" size="large" icon={<FileTextOutlined />} loading={ativando} onClick={abrirPocos} block>
+              {pocosLigado ? "Abrir relatórios de poço" : "Ativar e abrir"}
+            </Button>
+          </Col>
+        </Row>
+      </Card>
 
       {/* RENDERIZAÇÃO DAS SEÇÕES */}
       <Space direction="vertical" size="large" style={{ width: "100%" }}>
