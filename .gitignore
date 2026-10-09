@@ -23,3 +23,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Configuração pessoal do Claude Code
+.claude/settings.local.json
+# Backups das migrações do catálogo
+backups/
