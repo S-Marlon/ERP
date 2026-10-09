@@ -6,6 +6,7 @@ import { filtroBusca } from './buscaPdv';
 import { avaliarPublicacaoItens } from '../../catalogo/produtos/publicacaoProdutos';
 import { carregarArvore } from '../../catalogo/categorias/herancaCategorias';
 import { FaixaPdv, faixaParaQuantidade, resolverPrecoPdv, UnidadeVendaPdv } from './precoPdv';
+import { aplicarKitsNasLinhasPdv } from '../../catalogo/kits/kitsBanco';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
 
@@ -155,6 +156,8 @@ const montarProduto = (
       .map(x => ({ quantidadeMinima: x.quantidadeMinima, quantidadeMaxima: x.quantidadeMaxima, preco: x.precoUnitario })),
     podeVenderSemEstoque: Boolean(Number(item.pode_vender_sem_estoque)) || String(item.tipo_recurso).toUpperCase() === 'SERVICO',
     tipoRecurso: String(item.tipo_recurso || 'PRODUTO').toUpperCase(),
+    // Kit: estoque = quantos dá para montar com os componentes (a venda baixa os componentes)
+    ehKit: Boolean(Number(item.eh_kit)),
     publicavel: publicacao?.publicavel ?? true,
     motivosPublicacao: publicacao?.motivos ?? [],
   };
@@ -212,11 +215,14 @@ export const listarItensPdv = async (req: Request, res: Response) => {
     if (marca && marca !== 'Todos') { where.push('mar.nome = ?'); params.push(marca); }
     if (status === 'Ativo') where.push(`ic.status = 'ATIVO'`);
     if (status === 'Inativo') where.push(`ic.status <> 'ATIVO'`);
-    if (onlyInStock) where.push('COALESCE(es.quantidade_atual, 0) > 0');
-    if (minStock !== undefined && minStock > 0) { where.push('COALESCE(es.quantidade_atual, 0) >= ?'); params.push(minStock); }
+    // Kit não tem saldo próprio: passa no SQL e é filtrado depois pelo estoque possível
+    const ehKitSql = `EXISTS (SELECT 1 FROM itens_composicoes k WHERE k.id_item_pai = ic.id_item AND k.tenant_id = ic.tenant_id AND k.tipo_relacao = 'KIT')`;
+    if (onlyInStock) where.push(`(COALESCE(es.quantidade_atual, 0) > 0 OR ${ehKitSql})`);
+    if (minStock !== undefined && minStock > 0) { where.push(`(COALESCE(es.quantidade_atual, 0) >= ? OR ${ehKitSql})`); params.push(minStock); }
 
     const [rows] = await pool.execute(`${SELECT_ITENS} WHERE ${where.join(' AND ')}`, params);
-    const itens = rows as any[];
+    const itens = (await aplicarKitsNasLinhasPdv(pool as any, tenant, rows as any[])).filter(i => !Number(i.eh_kit)
+      || ((!onlyInStock || Number(i.estoque_base) > 0 || Number(i.pode_vender_sem_estoque)) && (!(minStock && minStock > 0) || Number(i.estoque_base) >= minStock)));
 
     const ids = itens.map(i => Number(i.id_item));
     const [publicacao, precos] = await Promise.all([
@@ -265,7 +271,7 @@ export const detalheItemPdv = async (req: Request, res: Response) => {
   try {
     const idItem = Number(req.params.idItem);
     const [rows] = await pool.execute(`${SELECT_ITENS} WHERE ic.tenant_id = ? AND ic.id_item = ?`, [tenant, idItem]);
-    const item = (rows as any[])[0];
+    const item = (await aplicarKitsNasLinhasPdv(pool as any, tenant, rows as any[]))[0];
     if (!item) return res.status(404).json({ error: 'Item não encontrado.' });
 
     const [publicacao, precos] = await Promise.all([
@@ -311,7 +317,7 @@ export const dadosParaEtiqueta = async (conn: Conn, tenant: number, ids: number[
       `${SELECT_ITENS} WHERE ic.tenant_id = ? AND ic.id_item IN (${lote.map(() => '?').join(',')})`,
       [tenant, ...lote]
     );
-    const itens = rows as any[];
+    const itens = await aplicarKitsNasLinhasPdv(conn, tenant, rows as any[]);
     const precos = await carregarPrecos(conn, tenant, itens);
     for (const item of itens) {
       const id = Number(item.id_item);

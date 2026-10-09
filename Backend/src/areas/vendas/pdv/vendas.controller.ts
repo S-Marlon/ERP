@@ -14,6 +14,8 @@ import { carregarRegras } from '../regras/regrasVenda.controller';
 import { avaliarRegras, conferirSenha } from '../regras/regrasVenda';
 import { carregarConfigTaxas } from '../taxas/taxas.controller';
 import { calcularTaxas, descontoEfetivoPct, liquidoParaRegra } from '../taxas/taxas';
+import { carregarComposicoes, carregarDadosComponentes, saidasDoKitNaVenda } from '../../catalogo/kits/kitsBanco';
+import { saidaDosComponentes } from '../../catalogo/kits/kits';
 
 const ORIGEM_VENDA = 'VENDA_PDV';
 const ORIGEM_CANCELAMENTO = 'CANCELAMENTO_VENDA';
@@ -130,10 +132,23 @@ export const registrarVenda = async (req: Request, res: Response) => {
     const totalComFrete = Math.round((venda.totalLiquido + frete) * 100) / 100;
     const pagamentosOk = validarPagamentos(pagamentos, totalComFrete);
 
+    // Kit não tem estoque próprio: a saída é de cada componente (quantidade do kit × quantidade do componente)
+    const composicoes = await carregarComposicoes(connection as any, tenant, ids);
+    const componentes = await carregarDadosComponentes(connection as any, tenant, [...composicoes.values()].flat().map(c => c.idItem));
+    const ehKit = (idItem: number) => composicoes.has(idItem);
+    const tipoDe = (idItem: number) => String(itensBanco.get(idItem)?.tipo_recurso ?? componentes.get(idItem)?.tipoRecurso ?? 'PRODUTO').toUpperCase();
+    const nomeDe = (idItem: number) => {
+      const item = itensBanco.get(idItem);
+      return item ? item.nome_comercial || item.nome_item : `${componentes.get(idItem)?.nome || `Item ${idItem}`} (no kit)`;
+    };
     // Serviço (ex.: prensagem avulsa) não tem estoque: só produtos travam saldo e geram movimento
-    const ehServico = (idItem: number) => String(itensBanco.get(idItem).tipo_recurso).toUpperCase() === 'SERVICO';
-    const idsEstoque = ids.filter(id => !ehServico(id));
-    const linhasEstoque = venda.linhas.filter(l => !ehServico(l.idItem));
+    const ehServico = (idItem: number) => tipoDe(idItem) === 'SERVICO';
+    const saidasDaLinha = (l: { idItem: number; quantidadeBase: number }) => (ehKit(l.idItem)
+      ? saidaDosComponentes(composicoes.get(l.idItem)!, l.quantidadeBase)
+        .filter(c => !ehServico(c.idItem)).map(c => ({ idItem: c.idItem, quantidadeBase: c.quantidade }))
+      : ehServico(l.idItem) ? [] : [{ idItem: l.idItem, quantidadeBase: l.quantidadeBase }]);
+    const linhasEstoque = venda.linhas.flatMap(saidasDaLinha);
+    const idsEstoque = [...new Set(linhasEstoque.map(l => l.idItem))].sort((a, b) => a - b);
 
     // Trava os saldos (ordem fixa de ids para evitar deadlock)
     const [saldoRows] = idsEstoque.length === 0 ? [[]] : await connection.execute(
@@ -147,13 +162,15 @@ export const registrarVenda = async (req: Request, res: Response) => {
       saldos.set(Number(s.id_item), Number(s.quantidade_atual) || 0);
       custos.set(Number(s.id_item), Number(s.custo_medio) || 0);
     }
-    const podeSemEstoque = new Map(idsEstoque.map(id => [id, Boolean(Number(itensBanco.get(id).pode_vender_sem_estoque))]));
-    const estoque = conferirEstoque(linhasEstoque, saldos, podeSemEstoque);
+    const podeSemEstoque = new Map(idsEstoque.map(id => [id, itensBanco.has(id)
+      ? Boolean(Number(itensBanco.get(id).pode_vender_sem_estoque))
+      : Boolean(componentes.get(id)?.podeVenderSemEstoque)]));
+    const estoque = conferirEstoque(linhasEstoque as any, saldos, podeSemEstoque);
     if (estoque.faltas.length > 0) {
       throw new ErroVenda(
         `Estoque insuficiente: ${estoque.faltas.map(f => {
-          const item = itensBanco.get(f.idItem);
-          return `${item.nome_comercial || item.nome_item} (saldo ${f.saldo} ${item.sigla_base || ''}, venda ${f.saida})`;
+          const sigla = itensBanco.get(f.idItem)?.sigla_base ?? componentes.get(f.idItem)?.sigla ?? '';
+          return `${nomeDe(f.idItem)} (saldo ${f.saldo} ${sigla}, venda ${f.saida})`;
         }).join('; ')}.`,
         409,
         estoque.faltas
@@ -184,11 +201,14 @@ export const registrarVenda = async (req: Request, res: Response) => {
       usosAdiantamento.push({ indice, id: idAdiantamento, valor: p.valor });
     }
 
-    // Custo base: custo médio do estoque; sem ele, custo gerencial do cadastro
-    const custoBase = (idItem: number) => {
+    // Custo base: custo médio do estoque; sem ele, custo gerencial do cadastro. Kit: soma dos componentes.
+    const custoItem = (idItem: number) => {
       const medio = custos.get(idItem) || 0;
-      return medio > 0 ? medio : Number(itensBanco.get(idItem).custo_gerencial) || 0;
+      return medio > 0 ? medio : Number(itensBanco.get(idItem)?.custo_gerencial ?? componentes.get(idItem)?.custoGerencial) || 0;
     };
+    const custoBase = (idItem: number) => (ehKit(idItem)
+      ? composicoes.get(idItem)!.reduce((a, c) => a + Math.round(custoItem(c.idItem) * c.quantidade * 10000) / 10000, 0)
+      : custoItem(idItem));
     const totalCusto = venda.linhas.reduce((a, l) => a + custoBase(l.idItem) * l.quantidadeBase, 0);
 
     // Taxas dos meios de pagamento: gravadas em cada pagamento (margem líquida) e, com o desconto da forma
@@ -258,25 +278,30 @@ export const registrarVenda = async (req: Request, res: Response) => {
         ]
       );
       const idVendaItem = Number((ins as any).insertId);
-      if (ehServico(l.idItem)) continue;
 
-      const saldoAnterior = saldos.get(l.idItem) || 0;
-      const saldoPosterior = saldoAnterior - l.quantidadeBase;
-      saldos.set(l.idItem, saldoPosterior);
+      // Item comum: sai ele mesmo; kit: sai cada componente, ligado a esta linha (id_origem_item)
+      for (const s of saidasDaLinha(l)) {
+        const doKit = s.idItem !== l.idItem;
+        const custoSaida = custoItem(s.idItem);
+        const saldoAnterior = saldos.get(s.idItem) || 0;
+        const saldoPosterior = saldoAnterior - s.quantidadeBase;
+        saldos.set(s.idItem, saldoPosterior);
 
-      await connection.execute(
-        `INSERT INTO estoque_movimentos
-           (tenant_id, id_item, deposito, tipo_movimento, origem, id_origem, id_origem_item, documento_origem, tipo_recurso,
-            quantidade, quantidade_documento, unidade_documento, fator_conversao,
-            custo_unitario, custo_total, saldo_anterior, saldo_posterior, observacao)
-         VALUES (?, ?, 'VENDA', 'SAIDA', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          tenant, l.idItem, ORIGEM_VENDA, idVenda, idVendaItem, `VENDA ${idVenda}`, item.tipo_recurso || 'PRODUTO',
-          f4(l.quantidadeBase), f4(l.quantidade), l.sigla, Number(l.fator).toFixed(6),
-          f4(custo), f4(custo * l.quantidadeBase), f4(saldoAnterior), f4(saldoPosterior),
-          `Venda PDV ${idVenda}`,
-        ]
-      );
+        await connection.execute(
+          `INSERT INTO estoque_movimentos
+             (tenant_id, id_item, deposito, tipo_movimento, origem, id_origem, id_origem_item, documento_origem, tipo_recurso,
+              quantidade, quantidade_documento, unidade_documento, fator_conversao,
+              custo_unitario, custo_total, saldo_anterior, saldo_posterior, observacao)
+           VALUES (?, ?, 'VENDA', 'SAIDA', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            tenant, s.idItem, ORIGEM_VENDA, idVenda, idVendaItem, `VENDA ${idVenda}`, tipoDe(s.idItem),
+            f4(s.quantidadeBase), f4(doKit ? s.quantidadeBase : l.quantidade), doKit ? componentes.get(s.idItem)?.sigla || null : l.sigla,
+            doKit ? '1.000000' : Number(l.fator).toFixed(6),
+            f4(custoSaida), f4(custoSaida * s.quantidadeBase), f4(saldoAnterior), f4(saldoPosterior),
+            doKit ? `Venda PDV ${idVenda} (kit ${item.sku_customizado || item.sku_core})`.slice(0, 255) : `Venda PDV ${idVenda}`,
+          ]
+        );
+      }
     }
 
     // Saldo final por item (custo médio não muda na saída)
@@ -407,13 +432,31 @@ export const cancelarVenda = async (req: Request, res: Response) => {
       );
     }
 
+    // Entradas de volta: o próprio item ou, no kit, o que saiu de cada componente nesta venda
+    const entradas: Array<{ idItem: number; idVendaItem: number; tipoRecurso: string; qtd: number; qtdDocumento: number; sigla: string | null; fator: number; custo: number }> = [];
     for (const it of itens) {
       if (String(it.tipo_recurso).toUpperCase() === 'SERVICO') continue;
-      const qtd = Number(it.quantidade_base);
-      const custo = Number(it.custo_unitario_base) || 0;
+      const doKit = await saidasDoKitNaVenda(connection as any, tenant, idVenda, Number(it.id_venda_item), Number(it.id_item));
+      if (doKit) {
+        for (const s of doKit) {
+          entradas.push({ idItem: s.idItem, idVendaItem: Number(it.id_venda_item), tipoRecurso: s.tipoRecurso, qtd: s.quantidade, qtdDocumento: s.quantidade, sigla: s.sigla, fator: 1, custo: s.custo });
+        }
+        continue;
+      }
+      entradas.push({
+        idItem: Number(it.id_item), idVendaItem: Number(it.id_venda_item), tipoRecurso: it.tipo_recurso || 'PRODUTO',
+        qtd: Number(it.quantidade_base), qtdDocumento: Number(it.quantidade), sigla: it.unidade_sigla,
+        fator: Number(it.fator_conversao), custo: Number(it.custo_unitario_base) || 0,
+      });
+    }
+    entradas.sort((a, b) => a.idItem - b.idItem);
+
+    for (const e of entradas) {
+      const qtd = e.qtd;
+      const custo = e.custo;
       const [[saldo]]: any = await connection.execute(
         `SELECT quantidade_atual, custo_medio FROM estoque_saldos_itens WHERE tenant_id = ? AND id_item = ? AND deposito = 'VENDA' FOR UPDATE`,
-        [tenant, it.id_item]
+        [tenant, e.idItem]
       );
       const saldoAnterior = Number(saldo?.quantidade_atual) || 0;
       const custoMedioAnterior = Number(saldo?.custo_medio) || 0;
@@ -427,8 +470,8 @@ export const cancelarVenda = async (req: Request, res: Response) => {
             custo_unitario, custo_total, saldo_anterior, saldo_posterior, observacao)
          VALUES (?, ?, 'VENDA', 'ENTRADA', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          tenant, it.id_item, ORIGEM_CANCELAMENTO, idVenda, it.id_venda_item, `VENDA ${idVenda}`, it.tipo_recurso || 'PRODUTO',
-          f4(qtd), f4(Number(it.quantidade)), it.unidade_sigla, Number(it.fator_conversao).toFixed(6),
+          tenant, e.idItem, ORIGEM_CANCELAMENTO, idVenda, e.idVendaItem, `VENDA ${idVenda}`, e.tipoRecurso,
+          f4(qtd), f4(e.qtdDocumento), e.sigla, Number(e.fator).toFixed(6),
           f4(custo), f4(custo * qtd), f4(saldoAnterior), f4(saldoPosterior),
           `Cancelamento da venda ${idVenda}: ${motivo}`.slice(0, 255),
         ]
@@ -437,7 +480,7 @@ export const cancelarVenda = async (req: Request, res: Response) => {
         `INSERT INTO estoque_saldos_itens (tenant_id, id_item, deposito, quantidade_atual, custo_medio)
          VALUES (?, ?, 'VENDA', ?, ?)
          ON DUPLICATE KEY UPDATE quantidade_atual = VALUES(quantidade_atual), custo_medio = VALUES(custo_medio)`,
-        [tenant, it.id_item, f4(saldoPosterior), f4(custoMedio)]
+        [tenant, e.idItem, f4(saldoPosterior), f4(custoMedio)]
       );
     }
 

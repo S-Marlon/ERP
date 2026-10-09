@@ -5,6 +5,8 @@ import pool from '../../../infra/db';
 import { calcularCustoMedio } from '../../compras/staging/penteFino';
 import { carregarCaixaAberto, operadorDe } from '../caixa/caixa.controller';
 import { registrarCreditoLoja } from '../adiantamentos/adiantamentos.controller';
+import { saidasDoKitNaVenda } from '../../catalogo/kits/kitsBanco';
+import { voltaDaDevolucao } from '../../catalogo/kits/kits';
 import { abaterParcelas, calcularDevolucao, ErroDevolucao, LinhaVendida, Reembolso, REEMBOLSOS, REEMBOLSOS_CAIXA } from './devolucoes';
 
 export const ORIGEM_DEVOLUCAO = 'DEVOLUCAO_VENDA';
@@ -160,30 +162,43 @@ export const registrarDevolucao = async (req: Request, res: Response) => {
       if (!voltaEstoque) continue;
       // Referência do movimento: a linha da devolução (a mesma linha da venda pode ter várias devoluções)
       const idDevolucaoItem = Number(insItem.insertId);
-      const [[saldo]]: any = await connection.execute(
-        `SELECT quantidade_atual, custo_medio FROM estoque_saldos_itens WHERE tenant_id = ? AND id_item = ? AND deposito = 'VENDA' FOR UPDATE`,
-        [tenant, banco.id_item]
-      );
-      const anterior = Number(saldo?.quantidade_atual) || 0;
-      const medioAnterior = Number(saldo?.custo_medio) || 0;
-      const posterior = anterior + l.quantidadeBase;
-      const medio = custo > 0 ? calcularCustoMedio(anterior, medioAnterior, l.quantidadeBase, custo) : medioAnterior;
-      await connection.execute(
-        `INSERT INTO estoque_movimentos
-           (tenant_id, id_item, deposito, tipo_movimento, origem, id_origem, id_origem_item, documento_origem, tipo_recurso,
-            quantidade, quantidade_documento, unidade_documento, fator_conversao, custo_unitario, custo_total, saldo_anterior, saldo_posterior, observacao)
-         VALUES (?, ?, 'VENDA', 'ENTRADA', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          tenant, banco.id_item, ORIGEM_DEVOLUCAO, idDevolucao, idDevolucaoItem, `VENDA ${idVenda}`, banco.tipo_recurso || 'PRODUTO',
-          f4(l.quantidadeBase), f4(l.quantidade), banco.unidade_sigla, Number(banco.fator_conversao).toFixed(6),
-          f4(custo), f4(custo * l.quantidadeBase), f4(anterior), f4(posterior), `Devolução ${idDevolucao}: ${motivo}`.slice(0, 255),
-        ]
-      );
-      await connection.execute(
-        `INSERT INTO estoque_saldos_itens (tenant_id, id_item, deposito, quantidade_atual, custo_medio) VALUES (?, ?, 'VENDA', ?, ?)
-         ON DUPLICATE KEY UPDATE quantidade_atual = VALUES(quantidade_atual), custo_medio = VALUES(custo_medio)`,
-        [tenant, banco.id_item, f4(posterior), f4(medio)]
-      );
+      // Kit: voltam os componentes, na proporção do que saiu deles na venda
+      const doKit = await saidasDoKitNaVenda(connection, tenant, idVenda, l.idVendaItem, Number(banco.id_item));
+      const entradas = doKit
+        ? voltaDaDevolucao(doKit, Number(banco.quantidade), l.quantidade).map(v => {
+          const s = doKit.find(x => x.idItem === v.idItem)!;
+          return { idItem: v.idItem, tipoRecurso: s.tipoRecurso, qtd: v.quantidade, qtdDocumento: v.quantidade, sigla: s.sigla, fator: 1, custo: v.custo };
+        })
+        : [{
+          idItem: Number(banco.id_item), tipoRecurso: banco.tipo_recurso || 'PRODUTO', qtd: l.quantidadeBase, qtdDocumento: l.quantidade,
+          sigla: banco.unidade_sigla, fator: Number(banco.fator_conversao), custo,
+        }];
+      for (const e of entradas) {
+        const [[saldo]]: any = await connection.execute(
+          `SELECT quantidade_atual, custo_medio FROM estoque_saldos_itens WHERE tenant_id = ? AND id_item = ? AND deposito = 'VENDA' FOR UPDATE`,
+          [tenant, e.idItem]
+        );
+        const anterior = Number(saldo?.quantidade_atual) || 0;
+        const medioAnterior = Number(saldo?.custo_medio) || 0;
+        const posterior = anterior + e.qtd;
+        const medio = e.custo > 0 ? calcularCustoMedio(anterior, medioAnterior, e.qtd, e.custo) : medioAnterior;
+        await connection.execute(
+          `INSERT INTO estoque_movimentos
+             (tenant_id, id_item, deposito, tipo_movimento, origem, id_origem, id_origem_item, documento_origem, tipo_recurso,
+              quantidade, quantidade_documento, unidade_documento, fator_conversao, custo_unitario, custo_total, saldo_anterior, saldo_posterior, observacao)
+           VALUES (?, ?, 'VENDA', 'ENTRADA', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            tenant, e.idItem, ORIGEM_DEVOLUCAO, idDevolucao, idDevolucaoItem, `VENDA ${idVenda}`, e.tipoRecurso,
+            f4(e.qtd), f4(e.qtdDocumento), e.sigla, Number(e.fator).toFixed(6),
+            f4(e.custo), f4(e.custo * e.qtd), f4(anterior), f4(posterior), `Devolução ${idDevolucao}: ${motivo}`.slice(0, 255),
+          ]
+        );
+        await connection.execute(
+          `INSERT INTO estoque_saldos_itens (tenant_id, id_item, deposito, quantidade_atual, custo_medio) VALUES (?, ?, 'VENDA', ?, ?)
+           ON DUPLICATE KEY UPDATE quantidade_atual = VALUES(quantidade_atual), custo_medio = VALUES(custo_medio)`,
+          [tenant, e.idItem, f4(posterior), f4(medio)]
+        );
+      }
     }
 
     await connection.execute(`UPDATE vendas_pedidos SET total_devolvido = total_devolvido + ? WHERE id_venda = ?`, [f4(calculo.total), idVenda]);

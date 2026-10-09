@@ -59,6 +59,7 @@ import { MarcasPage } from "../areas/catalogo/marcas/MarcasPage";
 import PendenciasPim from "../areas/catalogo/pendencias/PendenciasPim";
 import ItensDuplicados from "../areas/catalogo/duplicados/ItensDuplicados";
 import UnidadesPage from "../areas/catalogo/unidades/UnidadesPage";
+import KitsPage from "../areas/catalogo/kits/KitsPage";
 import Pedidos from "../areas/clientes/Pedidos";
 import ListaComprasExport from "../areas/compras/ListaComprasExport";
 import { LeitorXML } from "../areas/compras/entradaNf/xml/LeitorXML";
@@ -192,6 +193,7 @@ export default function AppLayout() {
             <Route path="/catalogo/gerenciador" element={<CatalogSku />} />
             <Route path="/catalogo/marcas" element={<MarcasPage />} />
             <Route path="/catalogo/unidades" element={<UnidadesPage />} />
+            <Route path="/catalogo/kits" element={<KitsPage />} />
             <Route path="/catalogo/pendencias" element={<PendenciasPim />} />
             <Route path="/catalogo/duplicados" element={<ItensDuplicados />} />
             <Route path="/catalogo/preco" element={<ProductPricingModule/>} />
