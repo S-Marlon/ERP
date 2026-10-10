@@ -1,9 +1,9 @@
 // Gerenciador de catálogos: central de ajustes do cadastro (dados, preço, família) com visões por tipo de item
 // (venda, almoxarifado, patrimônio) e ligação com a lista de trabalho (precificar, etiquetar, conferir...).
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Avatar, Badge, Button, Card, Col, Drawer, Dropdown, Flex, Input, Row, Segmented, Select, Space, Table, Tag, Tooltip, Typography, message, theme,
+  Avatar, Badge, Button, Card, Col, Drawer, Dropdown, Flex, Input, Modal, Row, Segmented, Select, Space, Table, Tag, Tooltip, Typography, message, theme,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -145,6 +145,33 @@ export default function CatalogSku() {
   }))));
   // Variação aberta pela sub-tabela da família: o cadastro completo do item está em `itens`
   const itemPorId = (id: number) => itens.find(i => Number(i.id_item) === id) || null;
+
+  // Lista de trabalho › Revisar cadastro: chega com ?editar=<id> e abre a ficha do item
+  const [params, setParams] = useSearchParams();
+  useEffect(() => {
+    const id = Number(params.get('editar'));
+    if (!id || itens.length === 0) return;
+    const item = itemPorId(id);
+    if (item) setEditando(item);
+    else message.warning('Item da lista não encontrado no catálogo (pode ter sido apagado).');
+    params.delete('editar');
+    setParams(params, { replace: true });
+  }, [params, itens]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fechou a ficha de um item marcado para revisar: pergunta se a revisão terminou
+  const fecharFicha = () => {
+    const item = editando;
+    setEditando(null);
+    const id = Number(item?.id_item);
+    if (!id || !trabalho.temItem(id, 'REVISAR')) return;
+    Modal.confirm({
+      title: 'Revisão concluída?',
+      content: `${item?.sku || ''} está na lista de trabalho em "Revisar cadastro". Tirar a tarefa da lista?`,
+      okText: 'Sim, concluir',
+      cancelText: 'Ainda não',
+      onOk: () => { trabalho.removerTag(id, 'REVISAR'); message.success('Revisão concluída.'); },
+    });
+  };
 
   const salvarItem = async (idItem: string | number, campos: Record<string, unknown>) => {
     const id = Number(idItem);
@@ -390,7 +417,7 @@ export default function CatalogSku() {
       </Card>
 
       <CreateProductModal open={novoAberto} onClose={() => { setNovoAberto(false); }} />
-      <ProductDetailsDrawer open={!!editando} product={editando} onClose={() => setEditando(null)} onSave={salvarItem} />
+      <ProductDetailsDrawer open={!!editando} product={editando} onClose={fecharFicha} onSave={salvarItem} />
       <Drawer open={!!precoDe} size={1100} title={precoDe ? `Preço · ${precoDe.sku} · ${precoDe.nome_item}` : ''} destroyOnHidden
         onClose={() => { setPrecoDe(null); carregar(); }}>
         {precoDe && <ProductCommercialSalesConfig idItem={Number(precoDe.id_item)} />}

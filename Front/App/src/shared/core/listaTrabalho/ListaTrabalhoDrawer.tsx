@@ -1,7 +1,8 @@
 // Painel da lista de trabalho (será aberto pela toolbar; já usado na Consulta de Saldo e na Etiquetagem).
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button, Drawer, Empty, InputNumber, Popconfirm, Segmented, Space, Table, Tag, Tooltip } from 'antd';
-import { DeleteOutlined } from '@ant-design/icons';
+import { DeleteOutlined, EditOutlined } from '@ant-design/icons';
 import { useListaTrabalho } from './ListaTrabalhoContext';
 import { ItemListaTrabalho, TAGS_LISTA, TagLista } from './listaTrabalho';
 
@@ -15,7 +16,10 @@ interface Props {
 
 export const ListaTrabalhoDrawer: React.FC<Props> = ({ open, onClose, tagInicial = 'TODAS', extra }) => {
   const lista = useListaTrabalho();
+  const navigate = useNavigate();
   const [filtro, setFiltro] = useState<TagLista | 'TODAS'>(tagInicial);
+  // Aberto por um atalho de tarefa: já vem filtrado nela
+  useEffect(() => { if (open) setFiltro(tagInicial); }, [open, tagInicial]);
 
   const itens = useMemo(
     () => (filtro === 'TODAS' ? lista.itens : lista.comTag(filtro)),
@@ -26,7 +30,7 @@ export const ListaTrabalhoDrawer: React.FC<Props> = ({ open, onClose, tagInicial
     <Drawer
       open={open}
       onClose={onClose}
-      width={760}
+      width={880}
       title={`Lista de trabalho (${lista.itens.length})`}
       extra={
         <Space>
@@ -99,6 +103,16 @@ export const ListaTrabalhoDrawer: React.FC<Props> = ({ open, onClose, tagInicial
                 onChange={v => lista.atualizar(i.idItem, { quantidade: v === null ? undefined : Number(v) })}
               />
             ),
+          },
+          {
+            title: '', key: 'acao', width: 120,
+            render: (_, i) => (i.tags.includes('REVISAR') ? (
+              <Tooltip title="Abre a ficha do produto no Gerenciador; ao fechar, pergunta se a revisão terminou">
+                <Button size="small" icon={<EditOutlined />} onClick={() => { onClose(); navigate(`/catalogo/gerenciador?editar=${i.idItem}`); }}>
+                  Abrir cadastro
+                </Button>
+              </Tooltip>
+            ) : null),
           },
           {
             title: '', key: 'x', width: 40,
