@@ -49,3 +49,14 @@ export const unificarItens = async (
   ler(await fetch(`${API}/itens/unificar?tenant_id=${tenantId}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dados),
   }), 'Erro ao unificar os itens.');
+
+/** Itens escolhidos à mão para juntar (mesmo formato da lista de duplicados). */
+export const getItensParaJuntar = async (ids: number[], tenantId = 1): Promise<ItemSuspeito[]> =>
+  ids.length === 0 ? [] : (await ler(await fetch(`${API}/itens/resumo?tenant_id=${tenantId}&ids=${ids.join(',')}`), 'Erro ao carregar os itens.')).itens;
+
+/** Busca de itens ativos para a junção manual (mesma busca do PDV: palavras em qualquer ordem, SKU, GTIN). */
+export const buscarItensParaJuntar = async (texto: string): Promise<Array<{ idItem: number; sku: string; nome: string }>> => {
+  const q = new URLSearchParams({ query: texto, limit: '30', incluirNaoPublicaveis: 'true', status: 'Ativo' });
+  const d = await ler(await fetch(`${API_URL}/api/vendas/pdv/itens?${q}`), 'Erro ao buscar os itens.');
+  return (d.data || []).map((p: any) => ({ idItem: Number(p.id), sku: p.sku || '', nome: p.name || '' }));
+};

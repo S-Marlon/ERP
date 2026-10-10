@@ -228,3 +228,23 @@ export const unificarItens = async (req: Request, res: Response) => {
     conn.release();
   }
 };
+
+/**
+ * GET /catalogo/itens/resumo?ids=1,2,3 — os mesmos dados da lista de duplicados para itens escolhidos à mão
+ * (junção manual de itens que a busca automática não pegou, ex.: o mesmo produto de fornecedores diferentes).
+ */
+export const resumoItensParaJuntar = async (req: Request, res: Response) => {
+  try {
+    const tenant = tenantDe(req);
+    const ids = [...new Set(String(req.query.ids || '').split(',').map(Number).filter(x => Number.isInteger(x) && x > 0))].slice(0, 50);
+    if (ids.length === 0) return res.json({ itens: [] });
+    const [rows]: any = await pool.execute(
+      `${SELECT_ITEM} WHERE ic.tenant_id = ? AND ic.id_item IN (${ids.map(() => '?').join(',')})`, [tenant, ...ids]
+    );
+    const porId = new Map<number, any>(rows.map((r: any) => [Number(r.id_item), itemParaResposta(r)]));
+    return res.json({ itens: ids.map(id => porId.get(id)).filter(Boolean) });
+  } catch (error: any) {
+    console.error('Erro ao carregar os itens para juntar:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};

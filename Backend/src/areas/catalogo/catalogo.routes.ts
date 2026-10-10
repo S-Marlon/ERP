@@ -67,7 +67,7 @@ import { painelPrecos } from './precos/painelPrecos.controller';
 import { aplicarPrecosComTaxa, previaPrecosComTaxa } from './precos/precosTaxa.controller';
 import { salvarPrecosLote } from './precos/precosLote.controller';
 import { apagarItens, conferirExclusao } from './produtos/exclusaoItens.controller';
-import { listarDuplicados, unificarItens } from './produtos/unificacao.controller';
+import { listarDuplicados, resumoItensParaJuntar, unificarItens } from './produtos/unificacao.controller';
 import { atualizarCustosKits, atualizarKit, criarKit, desfazerKit, detalheKit, listarKits, relatorioKits } from './kits/kits.controller';
 import { getProdutoDetalhe, updateProdutoParcial, adicionarAnexo, removerAnexo, definirImagemPrincipal, getFichaTecnica, salvarFichaTecnica, getAtributosParaItem } from './produtos/produtoDetalhe.controller';
 
@@ -176,6 +176,7 @@ router.post('/precos/taxa/aplicar', aplicarPrecosComTaxa);
 // Itens duplicados: suspeitas e unificação de um item em outro
 router.get('/itens/duplicados', listarDuplicados);
 router.post('/itens/unificar', unificarItens);
+router.get('/itens/resumo', resumoItensParaJuntar);
 // Kits de venda (composição em itens_composicoes; na venda a baixa sai dos componentes)
 router.get('/kits', listarKits);
 router.get('/kits/relatorio', relatorioKits);
