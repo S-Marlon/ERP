@@ -5,13 +5,14 @@ import {
   Alert, Button, Card, Col, Empty, Flex, Input, Modal, Row, Segmented, Select, Space, Spin, Switch, Table, Tag, Tooltip, Typography, message, theme,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { CheckCircleOutlined, ExclamationCircleOutlined, SearchOutlined, SettingOutlined, UndoOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, ExclamationCircleOutlined, MergeCellsOutlined, SearchOutlined, SettingOutlined, UndoOutlined } from '@ant-design/icons';
 import type { AtributoConfig, Familia } from '../CatalogManager.types';
 import { formalizarItensDaFamilia, getDiagnosticoFormalizacao } from '../FamilyManager.api';
 import {
-  atributosNosTemplates, AvaliacaoVariacao, avaliarVariacao, CHAVE_MARCA, FamiliaNomenclatura, opcoesDoAtributo, PapelMarca, skusRepetidos,
-  valoresMudaram, VariacaoEditavel,
+  atributosNosTemplates, AvaliacaoVariacao, avaliarVariacao, CHAVE_MARCA, conferirGradeParaJuntar, FamiliaNomenclatura, opcoesDoAtributo,
+  PapelMarca, skusRepetidos, valoresMudaram, VariacaoEditavel,
 } from '../nomenclaturaVariacoes';
+import { JuntarItensModal } from '../../duplicados/juntarItens';
 
 const { Text } = Typography;
 const porTexto = (a: unknown, b: unknown) => String(a || '').localeCompare(String(b || ''), 'pt-BR', { numeric: true, sensitivity: 'base' });
@@ -49,6 +50,9 @@ export const EditorNomenclaturaModal: React.FC<Props> = ({
   const [marcadas, setMarcadas] = useState<React.Key[]>([]);
   const [lote, setLote] = useState<{ atributo?: string; valor?: string }>({});
   const [focoModelo, setFocoModelo] = useState<'nome' | 'sku'>('nome');
+  // Juntar variações que são o mesmo produto (componente da tela de Itens duplicados)
+  const [paraJuntar, setParaJuntar] = useState<number[] | null>(null);
+  const [inativos, setInativos] = useState(0);
 
   const carregar = async () => {
     if (!familia?.id) return;
@@ -56,7 +60,10 @@ export const EditorNomenclaturaModal: React.FC<Props> = ({
     try {
       const d = await getDiagnosticoFormalizacao(String(familia.id));
       setMarcas((d.marcas || []).map((m: { nome: string }) => m.nome));
-      setLinhas((d.itens || []).map((i: any) => {
+      // Inativos (ex.: já juntados em outro item) ficam fora da grade
+      const todos = d.itens || [];
+      setInativos(todos.filter((i: any) => String(i.status || '').toUpperCase() === 'INATIVO').length);
+      setLinhas(todos.filter((i: any) => String(i.status || '').toUpperCase() !== 'INATIVO').map((i: any) => {
         const valores = { ...(i.valoresAtributos || {}) };
         return {
           idItem: String(i.idItem || i.id), skuAtual: i.sku || '', nomeAtual: i.nomeComercial || i.nome || '', variacao: i.variacao,
@@ -104,6 +111,24 @@ export const EditorNomenclaturaModal: React.FC<Props> = ({
     const t = busca.trim().toLowerCase();
     return !t || [l.skuAtual, l.nomeAtual, a.skuNovo, a.nomeNovo, ...Object.values(l.valores).map(String)].some(x => String(x).toLowerCase().includes(t));
   });
+
+  // Juntar só variações com a grade igual (valores da tela, já com o que foi editado)
+  const tentarJuntar = (escolhidas: Linha[]) => {
+    const r = conferirGradeParaJuntar(escolhidas, fam, atributos);
+    if (r.pode) { setParaJuntar(escolhidas.map(l => Number(l.idItem))); return; }
+    Modal.warning({
+      title: escolhidas.length < 2 ? 'Marque 2 ou mais variações' : 'A grade é diferente: não são o mesmo produto',
+      content: escolhidas.length < 2 ? null : (
+        <div>
+          <p>Só dá para juntar variações com os atributos de grade iguais. Diferenças:</p>
+          <ul style={{ paddingLeft: 18 }}>
+            {r.diferencas.map(d => <li key={d.atributo}><b>{d.atributo}</b>: {d.valores.join(' × ')}</li>)}
+          </ul>
+          <p style={{ marginBottom: 0 }}>Se for o mesmo produto, corrija a grade (e grave) antes de juntar.</p>
+        </div>
+      ),
+    });
+  };
 
   const definir = (ids: string[], chave: string, valor: unknown) =>
     setLinhas(ls => ls.map(l => (ids.includes(l.idItem) ? { ...l, valores: { ...l.valores, [chave]: valor ?? '' } } : l)));
@@ -176,6 +201,14 @@ export const EditorNomenclaturaModal: React.FC<Props> = ({
             <Flex gap={4} align="center" wrap>
               <Text code style={{ fontSize: 11, color: cor }}>{a.skuNovo || '—'}</Text>
               {rep && <Tag color="red" style={{ fontSize: 10, margin: 0 }}>SKU repetido</Tag>}
+              {rep && (
+                <Tooltip title="São o mesmo produto? Junte as variações com este SKU numa só (só com a grade igual; estoque, fornecedores e códigos de barras vão junto)">
+                  <Tag color="volcano" icon={<MergeCellsOutlined />} style={{ fontSize: 10, margin: 0, cursor: 'pointer' }}
+                    onClick={() => tentarJuntar(linhas.filter(x => av(x).skuNovo.toUpperCase() === a.skuNovo.toUpperCase()))}>
+                    juntar
+                  </Tag>
+                </Tooltip>
+              )}
               {a.pronta && !rep && !a.mudaNome && !a.mudaSku && <Tag style={{ fontSize: 10, margin: 0 }}>sem mudança</Tag>}
               {!a.pronta && (
                 <Tooltip title={a.pendencias.join(' · ') || 'Falta valor no nome/SKU'}>
@@ -263,6 +296,7 @@ export const EditorNomenclaturaModal: React.FC<Props> = ({
         <Flex justify="space-between" align="center" wrap gap={8}>
           <Text type="secondary" style={{ fontSize: 12 }}>
             {linhas.length} variação(ões) · {contagem.mudam} mudam · {contagem.pendentes} com pendência · {contagem.editadas} editada(s)
+            {inativos > 0 && ` · ${inativos} inativa(s) fora da grade`}
           </Text>
           <Space>
             <Button onClick={fechar}>Fechar</Button>
@@ -320,7 +354,7 @@ export const EditorNomenclaturaModal: React.FC<Props> = ({
 
         {repetidos.size > 0 && (
           <Alert type="error" showIcon title={`${repetidos.size} SKU(s) repetido(s) na família`}
-            description="Duas variações gerariam o mesmo SKU: inclua no modelo do SKU o atributo que diferencia, ou corrija os valores." />
+            description="Duas variações gerariam o mesmo SKU: inclua no modelo do SKU o atributo que diferencia, ou corrija os valores. Se forem o mesmo produto (ex.: comprado de dois fornecedores), clique em juntar no SKU repetido." />
         )}
 
         {/* Variações */}
@@ -346,6 +380,11 @@ export const EditorNomenclaturaModal: React.FC<Props> = ({
                 onClick={() => { definir(marcadas.map(String), lote.atributo!, lote.valor); message.success(`${atributoLote?.nome} preenchido em ${marcadas.length}.`); }}>
                 Preencher
               </Button>
+              <Tooltip title={marcadas.length < 2 ? 'Marque 2 ou mais variações que são o mesmo produto' : 'Juntar as marcadas numa só (a grade precisa ser igual)'}>
+                <Button size="small" icon={<MergeCellsOutlined />} disabled={marcadas.length < 2} onClick={() => tentarJuntar(linhas.filter(l => marcadas.includes(l.idItem)))}>
+                  Juntar duplicados
+                </Button>
+              </Tooltip>
               <Button size="small" type="text" onClick={() => setMarcadas([])}>Limpar</Button>
             </Flex>
           )}
@@ -365,6 +404,12 @@ export const EditorNomenclaturaModal: React.FC<Props> = ({
             />
           )}
       </Flex>
+      <JuntarItensModal
+        ids={paraJuntar}
+        titulo={`Juntar variações iguais · ${familia?.nome || ''}`}
+        onFechar={() => setParaJuntar(null)}
+        onConcluido={() => { setMarcadas([]); carregar(); onSalvo?.(); }}
+      />
     </Modal>
   );
 };

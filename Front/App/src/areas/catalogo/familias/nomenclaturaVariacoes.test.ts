@@ -1,5 +1,5 @@
 import {
-  atributosNosTemplates, avaliarVariacao, CHAVE_MARCA, FamiliaNomenclatura, montarTexto, skusRepetidos, valoresMudaram,
+  atributosNosTemplates, avaliarVariacao, CHAVE_MARCA, conferirGradeParaJuntar, FamiliaNomenclatura, montarTexto, skusRepetidos, valoresMudaram,
 } from './nomenclaturaVariacoes';
 
 const assert = (condition: boolean, message: string): void => {
@@ -64,6 +64,24 @@ export const runNomenclaturaTests = (): void => {
   assert(!avaliarVariacao(linha({ '20': '1.1/16"-12', '21': '1/2"', '22': '90°' }), fj, terminais).pronta, 'Opção sem código deixa o SKU pendente.');
   assert([...atributosNosTemplates(fj, terminais)].sort().join() === '20,21,22', ':cod conta como uso do atributo.');
   console.log('código da opção: ok');
+
+  // Juntar só com a grade igual
+  {
+  const grade = [
+    { id: '30', nome: 'Bitola', classificacao: 'grade', tipoDado: 'lista' },
+    { id: '31', nome: 'Pressão', classificacao: 'ficha', tipoDado: 'texto' },
+    { id: '32', nome: 'Tipo', classificacao: 'grade', tipoDado: 'texto', valorPadraoFamilia: 'R2' },
+  ];
+  const v = (valores: Record<string, unknown>) => ({ valores });
+  const ok = conferirGradeParaJuntar([v({ '30': '3/8"', '31': '400' }), v({ '30': ' 3/8" ', '31': '350', '32': 'r2' })], { papelMarca: 'ficha' }, grade);
+  assert(ok.pode && ok.diferencas.length === 0, 'Grade igual (com espaços/caixa e padrão da família) pode juntar; ficha diferente não importa.');
+  const dif = conferirGradeParaJuntar([v({ '30': '3/8"' }), v({ '30': '1/2"' }), v({})], { papelMarca: 'ficha' }, grade);
+  assert(!dif.pode && dif.diferencas[0].atributo === 'Bitola' && dif.diferencas[0].valores.join('|') === '3/8"|1/2"|(vazio)', 'Grade diferente ou vazia bloqueia.');
+  const marca = conferirGradeParaJuntar([v({ '30': '3/8"', [CHAVE_MARCA]: 'GATES' }), v({ '30': '3/8"', [CHAVE_MARCA]: 'HILIK' })], { papelMarca: 'grade' }, grade);
+  assert(!marca.pode && marca.diferencas[0].atributo === 'Marca', 'Marca como grade também precisa ser igual.');
+  assert(!conferirGradeParaJuntar([v({})], { papelMarca: 'ficha' }, grade).pode, 'Precisa de 2 ou mais.');
+  console.log('juntar só com a grade igual: ok');
+  }
 };
 
 runNomenclaturaTests();

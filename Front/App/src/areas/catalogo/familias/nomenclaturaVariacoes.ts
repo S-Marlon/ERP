@@ -162,3 +162,27 @@ export const skusRepetidos = (avaliacoes: AvaliacaoVariacao[]): Set<string> => {
 /** Valores alterados em relação ao original (para saber o que salvar). */
 export const valoresMudaram = (antes: Record<string, unknown>, depois: Record<string, unknown>) =>
   Object.keys({ ...antes, ...depois }).some(k => String(antes[k] ?? '').trim() !== String(depois[k] ?? '').trim());
+
+/**
+ * Juntar variações (itens duplicados) só quando forem o mesmo produto na grade: todos os atributos de grade
+ * (e a marca, quando a família usa a marca como grade) iguais. Grade diferente é outro SKU, não duplicado.
+ * Vazio conta como valor: preencha a grade antes de juntar.
+ */
+export const conferirGradeParaJuntar = (
+  variacoes: Array<Pick<VariacaoEditavel, 'valores'>>,
+  familia: Pick<FamiliaNomenclatura, 'papelMarca' | 'marca'>,
+  atributos: AtributoNomenclatura[]
+) => {
+  if (variacoes.length < 2) return { pode: false, diferencas: [] as Array<{ atributo: string; valores: string[] }> };
+  const texto = (v: unknown) => (vazio(v) ? '(vazio)' : String(v).trim().replace(/\s+/g, ' ').toUpperCase());
+  const diferencas: Array<{ atributo: string; valores: string[] }> = [];
+  for (const a of atributos.filter(x => x.classificacao === 'grade')) {
+    const valores = [...new Set(variacoes.map(v => texto(valorDoAtributo(a, v.valores))))];
+    if (valores.length > 1) diferencas.push({ atributo: a.nome, valores });
+  }
+  if (familia.papelMarca === 'grade') {
+    const marcas = [...new Set(variacoes.map(v => texto(marcaEfetiva('grade', familia.marca, v.valores[CHAVE_MARCA]))))];
+    if (marcas.length > 1) diferencas.push({ atributo: 'Marca', valores: marcas });
+  }
+  return { pode: diferencas.length === 0, diferencas };
+};
