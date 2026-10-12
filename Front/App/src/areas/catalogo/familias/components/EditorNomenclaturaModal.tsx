@@ -101,6 +101,17 @@ export const EditorNomenclaturaModal: React.FC<Props> = ({
   const av = (l: Linha) => avaliacoes.get(l.idItem) as AvaliacaoVariacao;
   const editada = (l: Linha) => valoresMudaram(l.original, l.valores);
   const repetido = (l: Linha) => repetidos.has(av(l).skuNovo.toUpperCase());
+  // SKUs repetidos que dá para juntar: o grupo com o mesmo SKU tem a grade igual (senão é variação diferente)
+  const juntaveis = useMemo(() => {
+    const porSku = new Map<string, Linha[]>();
+    for (const l of linhas) {
+      const sku = av(l).skuNovo.toUpperCase();
+      if (!repetidos.has(sku)) continue;
+      if (!porSku.has(sku)) porSku.set(sku, []);
+      porSku.get(sku)!.push(l);
+    }
+    return new Set([...porSku.entries()].filter(([, g]) => conferirGradeParaJuntar(g, fam, atributos).pode).map(([sku]) => sku));
+  }, [linhas, repetidos, avaliacoes]); // eslint-disable-line react-hooks/exhaustive-deps
   const paraSalvar = linhas.filter(l => av(l).pronta && !repetido(l) && (editada(l) || av(l).mudaNome || av(l).mudaSku));
 
   const visiveis = linhas.filter(l => {
@@ -201,7 +212,7 @@ export const EditorNomenclaturaModal: React.FC<Props> = ({
             <Flex gap={4} align="center" wrap>
               <Text code style={{ fontSize: 11, color: cor }}>{a.skuNovo || '—'}</Text>
               {rep && <Tag color="red" style={{ fontSize: 10, margin: 0 }}>SKU repetido</Tag>}
-              {rep && (
+              {rep && juntaveis.has(a.skuNovo.toUpperCase()) && (
                 <Tooltip title="São o mesmo produto? Junte as variações com este SKU numa só (só com a grade igual; estoque, fornecedores e códigos de barras vão junto)">
                   <Tag color="volcano" icon={<MergeCellsOutlined />} style={{ fontSize: 10, margin: 0, cursor: 'pointer' }}
                     onClick={() => tentarJuntar(linhas.filter(x => av(x).skuNovo.toUpperCase() === a.skuNovo.toUpperCase()))}>
