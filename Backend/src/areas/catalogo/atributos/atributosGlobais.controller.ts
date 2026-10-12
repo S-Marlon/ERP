@@ -452,3 +452,37 @@ export async function createAtributoGlobalRapido(req: Request, res: Response): P
     responderErro(res, error, 'Erro ao processar criação rápida do atributo');
   }
 }
+
+/**
+ * POST /atributos-globais/:idAtributo/opcoes { valor, codigo? }
+ * Acrescenta uma opção à lista do atributo sem mexer nas outras (ex.: bitola 5/8" que faltava, direto do editor da família).
+ * Já existente (mesmo texto) não duplica. Devolve as opções ativas.
+ */
+export const adicionarOpcaoAtributo = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const idAtributo = Number(req.params.idAtributo);
+  const valor = String(req.body?.valor ?? '').trim();
+  const codigo = String(req.body?.codigo ?? '').trim();
+  const connection: any = await pool.getConnection();
+  try {
+    if (!valor) throw new ErroNegocio('Informe o valor da opção.');
+    if (valor.length > 100) throw new ErroNegocio('Valor muito longo (máx. 100).');
+    if (codigo && !/^[A-Za-z0-9._-]{1,20}$/.test(codigo)) throw new ErroNegocio('Código inválido: use letras, números, ponto, hífen ou _ (até 20).');
+    await connection.beginTransaction();
+    const [[atr]]: any = await connection.query(`SELECT id, tipo, nome FROM atributos_comercial WHERE id = ? AND tenant_id = ? AND ativo = 1`, [idAtributo, tenant]);
+    if (!atr) throw new ErroNegocio('Atributo não encontrado.');
+    if (String(atr.tipo) !== 'lista') throw new ErroNegocio(`"${atr.nome}" não é um atributo de lista.`);
+    await sincronizarOpcoesSemRemover(connection, tenant, idAtributo, codigo ? `${valor} = ${codigo}` : valor);
+    const [opcoes]: any = await connection.query(
+      `SELECT valor, codigo FROM atributos_comercial_opcoes WHERE tenant_id = ? AND atributo_id = ? AND ativo = 1 ORDER BY ordem, id`,
+      [tenant, idAtributo]
+    );
+    await connection.commit();
+    return res.status(201).json({ success: true, opcoes: opcoes.map((o: any) => ({ valor: o.valor, codigo: o.codigo || '' })) });
+  } catch (error) {
+    await connection.rollback().catch(() => undefined);
+    return responderErro(res, error, 'Erro ao acrescentar a opção');
+  } finally {
+    connection.release();
+  }
+};

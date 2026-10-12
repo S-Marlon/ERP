@@ -269,14 +269,26 @@ export const getDiagnosticoFormalizacao = async (familiaId: string, tenantId: nu
 export const formalizarItensDaFamilia = async (
   familiaId: string,
   itens: Array<{ idItem: string | number; atributos: Record<string, any> }>,
-  tenantId: number = 1
+  tenantId: number = 1,
+  /** Pendentes: grava os atributos preenchidos e mantém o nome/SKU atuais */
+  parcial = false
 ): Promise<any> => {
   const response = await fetch(`${API_BASE_URL}/cadastros/familias/${familiaId}/formalizacao?tenant_id=${tenantId}`, {
     method: 'POST',
     headers: DEFAULT_HEADERS,
-    body: JSON.stringify({ itens }),
+    body: JSON.stringify({ itens, parcial }),
   });
   return handleResponse<any>(response, 'Erro ao formalizar os itens da família.');
+};
+
+/** Acrescenta uma opção à lista do atributo (ex.: bitola que faltava). Devolve as opções ativas. */
+export const adicionarOpcaoAtributo = async (idAtributo: string | number, valor: string, codigo?: string, tenantId = 1) => {
+  const response = await fetch(`${API_BASE_URL}/atributos-globais/${idAtributo}/opcoes?tenant_id=${tenantId}`, {
+    method: 'POST',
+    headers: DEFAULT_HEADERS,
+    body: JSON.stringify({ valor, codigo }),
+  });
+  return handleResponse<{ success: boolean; opcoes: Array<{ valor: string; codigo: string }> }>(response, 'Erro ao acrescentar a opção.');
 };
 // Incluir / tirar itens da família. Itens de outra família só mudam com mover = true.
 export const vincularItensFamilia = async (

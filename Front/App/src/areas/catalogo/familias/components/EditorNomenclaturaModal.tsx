@@ -2,12 +2,12 @@
 // com o nome e o SKU novos calculados na hora. Salva pela formalização da família (o servidor monta de novo e grava).
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Alert, Button, Card, Col, Empty, Flex, Input, Modal, Row, Segmented, Select, Space, Spin, Switch, Table, Tag, Tooltip, Typography, message, theme,
+  Alert, Button, Card, Col, Divider, Empty, Flex, Input, Modal, Row, Segmented, Select, Space, Spin, Switch, Table, Tag, Tooltip, Typography, message, theme,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { CheckCircleOutlined, ExclamationCircleOutlined, MergeCellsOutlined, SearchOutlined, SettingOutlined, UndoOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, ExclamationCircleOutlined, MergeCellsOutlined, PlusOutlined, SearchOutlined, SettingOutlined, UndoOutlined } from '@ant-design/icons';
 import type { AtributoConfig, Familia } from '../CatalogManager.types';
-import { formalizarItensDaFamilia, getDiagnosticoFormalizacao } from '../FamilyManager.api';
+import { adicionarOpcaoAtributo, formalizarItensDaFamilia, getDiagnosticoFormalizacao } from '../FamilyManager.api';
 import {
   atributosNosTemplates, AvaliacaoVariacao, avaliarVariacao, CHAVE_MARCA, conferirGradeParaJuntar, FamiliaNomenclatura, opcoesDoAtributo,
   PapelMarca, skusRepetidos, valoresMudaram, VariacaoEditavel,
@@ -53,6 +53,11 @@ export const EditorNomenclaturaModal: React.FC<Props> = ({
   // Juntar variações que são o mesmo produto (componente da tela de Itens duplicados)
   const [paraJuntar, setParaJuntar] = useState<number[] | null>(null);
   const [inativos, setInativos] = useState(0);
+  // Opções criadas aqui (ex.: bitola 5/8" que faltava): valem na hora, antes de recarregar a família
+  const [opcoesExtras, setOpcoesExtras] = useState<Record<string, Array<{ valor: string; codigo?: string }>>>({});
+  const [buscaOpcao, setBuscaOpcao] = useState('');
+  const [novaOpcao, setNovaOpcao] = useState<{ atributo: AtributoConfig; idItem: string | null; valor: string; codigo: string } | null>(null);
+  const [salvandoOpcao, setSalvandoOpcao] = useState(false);
 
   const carregar = async () => {
     if (!familia?.id) return;
@@ -81,8 +86,13 @@ export const EditorNomenclaturaModal: React.FC<Props> = ({
 
   // Modelos e atributos da tela (com o que ainda não foi salvo na família)
   const atributos: AtributoConfig[] = useMemo(
-    () => (familia?.atributos || []).filter(a => !(a as any).isMarcaSistema && a.id !== CHAVE_MARCA),
-    [familia?.atributos],
+    () => (familia?.atributos || []).filter(a => !(a as any).isMarcaSistema && a.id !== CHAVE_MARCA).map(a => {
+      const extras = opcoesExtras[a.id];
+      if (!extras?.length) return a;
+      // A resposta do servidor traz a lista inteira (com códigos): ela vale no lugar da antiga
+      return { ...a, opcoesValidas: extras.map(o => (o.codigo ? { valor: o.valor, codigo: o.codigo } : o.valor)) } as AtributoConfig;
+    }),
+    [familia?.atributos, opcoesExtras],
   );
   const fam: FamiliaNomenclatura = {
     nome: familia?.nome || '', siglaSku: familia?.siglaSku, separadorSku: familia?.separadorSku ?? '-',
@@ -101,8 +111,8 @@ export const EditorNomenclaturaModal: React.FC<Props> = ({
   const av = (l: Linha) => avaliacoes.get(l.idItem) as AvaliacaoVariacao;
   const editada = (l: Linha) => valoresMudaram(l.original, l.valores);
   const repetido = (l: Linha) => repetidos.has(av(l).skuNovo.toUpperCase());
-  // SKUs repetidos que dá para juntar: o grupo com o mesmo SKU tem a grade igual (senão é variação diferente)
-  const juntaveis = useMemo(() => {
+  // Grupos de SKU repetido: grade igual = o mesmo produto (juntar); grade diferente = falta o atributo no SKU
+  const gruposRepetidos = useMemo(() => {
     const porSku = new Map<string, Linha[]>();
     for (const l of linhas) {
       const sku = av(l).skuNovo.toUpperCase();
@@ -110,9 +120,19 @@ export const EditorNomenclaturaModal: React.FC<Props> = ({
       if (!porSku.has(sku)) porSku.set(sku, []);
       porSku.get(sku)!.push(l);
     }
-    return new Set([...porSku.entries()].filter(([, g]) => conferirGradeParaJuntar(g, fam, atributos).pode).map(([sku]) => sku));
+    return [...porSku.entries()].map(([sku, g]) => ({ sku, linhas: g, ...conferirGradeParaJuntar(g, fam, atributos) }));
   }, [linhas, repetidos, avaliacoes]); // eslint-disable-line react-hooks/exhaustive-deps
+  const juntaveis = new Set(gruposRepetidos.filter(g => g.pode).map(g => g.sku));
+  const tokenNoSku = (nome: string) => {
+    const a = atributos.find(x => x.nome === nome);
+    const temCodigo = (a?.opcoesValidas || []).some(o => typeof o !== 'string' && o.codigo);
+    return `{${nome}${temCodigo ? ':cod' : ''}}`;
+  };
+  const noModeloSku = (nome: string) => usados.has(atributos.find(x => x.nome === nome)?.id || '')
+    && new RegExp(`\\{${nome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(:cod)?\\}`, 'i').test(fam.templateSku || '');
   const paraSalvar = linhas.filter(l => av(l).pronta && !repetido(l) && (editada(l) || av(l).mudaNome || av(l).mudaSku));
+  // Editadas que ainda têm pendência (ex.: grade sem valor): gravam o que já foi preenchido e ficam pendentes
+  const paraPendente = linhas.filter(l => !av(l).pronta && editada(l));
 
   const visiveis = linhas.filter(l => {
     const a = av(l);
@@ -162,6 +182,18 @@ export const EditorNomenclaturaModal: React.FC<Props> = ({
         <Select size="small" showSearch allowClear style={estilo} status={foraDaLista ? 'error' : undefined} placeholder={padrao}
           value={(valor as string) || undefined} popupMatchSelectWidth={false}
           options={[...(foraDaLista ? [{ value: String(valor), label: `${valor} (fora da lista)` }] : []), ...opcoes.map(o => ({ value: o, label: o }))]}
+          onSearch={setBuscaOpcao} onOpenChange={aberto => { if (!aberto) setBuscaOpcao(''); }}
+          popupRender={menu => (
+            <>
+              {menu}
+              <Divider style={{ margin: '4px 0' }} />
+              <Button type="link" size="small" icon={<PlusOutlined />} style={{ width: '100%', textAlign: 'left' }}
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => setNovaOpcao({ atributo: a, idItem: l.idItem, valor: buscaOpcao.trim() || (foraDaLista ? String(valor) : ''), codigo: '' })}>
+                {buscaOpcao.trim() ? `Adicionar "${buscaOpcao.trim()}" à lista de ${a.nome}` : `Nova opção em ${a.nome}…`}
+              </Button>
+            </>
+          )}
           onChange={v => definir([l.idItem], chave, v)} />
       );
     }
@@ -251,7 +283,7 @@ export const EditorNomenclaturaModal: React.FC<Props> = ({
 
   // ---------------------------------------------------------------- salvar
   const gravar = async () => {
-    if (!familia?.id || !paraSalvar.length) return;
+    if (!familia?.id || !(paraSalvar.length + paraPendente.length)) return;
     setSalvando(true);
     try {
       // Família não salva: o servidor montaria com os modelos antigos
@@ -259,7 +291,10 @@ export const EditorNomenclaturaModal: React.FC<Props> = ({
       for (let i = 0; i < paraSalvar.length; i += 50) {
         await formalizarItensDaFamilia(String(familia.id), paraSalvar.slice(i, i + 50).map(l => ({ idItem: l.idItem, atributos: l.valores })));
       }
-      message.success(`${paraSalvar.length} variação(ões) gravada(s) com o nome e o SKU novos.`);
+      for (let i = 0; i < paraPendente.length; i += 50) {
+        await formalizarItensDaFamilia(String(familia.id), paraPendente.slice(i, i + 50).map(l => ({ idItem: l.idItem, atributos: l.valores })), 1, true);
+      }
+      message.success(`${paraSalvar.length} variação(ões) com nome e SKU novos${paraPendente.length ? ` · ${paraPendente.length} pendente(s) com os atributos guardados` : ''}.`);
       onSalvo?.();
       await carregar();
     } catch (e) {
@@ -269,14 +304,19 @@ export const EditorNomenclaturaModal: React.FC<Props> = ({
     }
   };
   const confirmarGravar = () => {
-    const pendentes = linhas.filter(l => !av(l).pronta || repetido(l)).length;
+    const deFora = linhas.filter(l => repetido(l) || (!av(l).pronta && !editada(l))).length;
     Modal.confirm({
-      title: `Gravar ${paraSalvar.length} variação(ões)?`,
+      title: `Gravar ${paraSalvar.length + paraPendente.length} variação(ões)?`,
       content: (
         <div>
           {temAlteracoes && <p>Os modelos da família mudaram: a família é salva antes, para o servidor montar com os modelos novos.</p>}
-          <p>Os atributos, o nome e o SKU de cada uma são gravados. O SKU raiz (interno) não muda.</p>
-          {pendentes > 0 && <p style={{ color: token.colorWarning }}>{pendentes} com pendência ou SKU repetido ficam de fora.</p>}
+          {paraSalvar.length > 0 && <p>{paraSalvar.length} ficam com os atributos, o nome e o SKU novos. O SKU raiz (interno) não muda.</p>}
+          {paraPendente.length > 0 && (
+            <p style={{ color: token.colorWarning }}>
+              {paraPendente.length} ainda com pendência: guardam os atributos já preenchidos e mantêm o nome e o SKU atuais até completar.
+            </p>
+          )}
+          {deFora > 0 && <p style={{ color: token.colorTextSecondary }}>{deFora} com SKU repetido ou sem edição ficam de fora.</p>}
         </div>
       ),
       okText: 'Gravar', cancelText: 'Voltar', onOk: gravar,
@@ -311,8 +351,8 @@ export const EditorNomenclaturaModal: React.FC<Props> = ({
           </Text>
           <Space>
             <Button onClick={fechar}>Fechar</Button>
-            <Button type="primary" icon={<CheckCircleOutlined />} disabled={!paraSalvar.length} loading={salvando} onClick={confirmarGravar}>
-              Gravar {paraSalvar.length} variação(ões)
+            <Button type="primary" icon={<CheckCircleOutlined />} disabled={!(paraSalvar.length + paraPendente.length)} loading={salvando} onClick={confirmarGravar}>
+              Gravar {paraSalvar.length + paraPendente.length} variação(ões){paraPendente.length ? ` (${paraPendente.length} pendente)` : ''}
             </Button>
           </Space>
         </Flex>
@@ -363,9 +403,36 @@ export const EditorNomenclaturaModal: React.FC<Props> = ({
           )}
         </Card>
 
-        {repetidos.size > 0 && (
-          <Alert type="error" showIcon title={`${repetidos.size} SKU(s) repetido(s) na família`}
-            description="Duas variações gerariam o mesmo SKU: inclua no modelo do SKU o atributo que diferencia, ou corrija os valores. Se forem o mesmo produto (ex.: comprado de dois fornecedores), clique em juntar no SKU repetido." />
+        {gruposRepetidos.length > 0 && (
+          <Alert type="error" showIcon title={`${gruposRepetidos.length} SKU(s) repetido(s) na família`}
+            description={(
+              <Flex vertical gap={6}>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  Grade igual = o mesmo produto (ex.: comprado de dois fornecedores): junte. Grade diferente = o SKU não usa o atributo que diferencia: ponha no modelo do SKU.
+                </Text>
+                {gruposRepetidos.map(g => (
+                  <Flex key={g.sku} gap={6} wrap align="center">
+                    <Text code style={{ fontSize: 11 }}>{g.sku}</Text>
+                    <Text style={{ fontSize: 12 }}>{g.linhas.length} variações</Text>
+                    {g.pode ? (
+                      <Button size="small" type="primary" danger icon={<MergeCellsOutlined />} onClick={() => tentarJuntar(g.linhas)}>Juntar ({g.linhas.length})</Button>
+                    ) : g.diferencas.map(d => (
+                      <Flex key={d.atributo} gap={4} align="center">
+                        <Tag style={{ margin: 0, fontSize: 11 }}>{d.atributo}: {d.valores.join(' × ')}</Tag>
+                        {d.atributo !== 'Marca' && !noModeloSku(d.atributo) && familia?.templateSku && (
+                          <Tooltip title={`Acrescenta ${tokenNoSku(d.atributo)} no fim do modelo do SKU (revise antes de gravar)`}>
+                            <Button size="small" onClick={() => onAtualizarTemplateSku(`${familia?.templateSku || ''}{S}${tokenNoSku(d.atributo)}`)}>
+                              Pôr {d.atributo} no SKU
+                            </Button>
+                          </Tooltip>
+                        )}
+                      </Flex>
+                    ))}
+                    <Button size="small" type="link" onClick={() => { setFiltro('TODAS'); setBusca(g.sku); }}>Ver</Button>
+                  </Flex>
+                ))}
+              </Flex>
+            )} />
         )}
 
         {/* Variações */}
@@ -415,6 +482,46 @@ export const EditorNomenclaturaModal: React.FC<Props> = ({
             />
           )}
       </Flex>
+      <Modal
+        open={!!novaOpcao}
+        title={`Nova opção em ${novaOpcao?.atributo.nome || ''}`}
+        okText="Adicionar à lista"
+        cancelText="Cancelar"
+        confirmLoading={salvandoOpcao}
+        onCancel={() => setNovaOpcao(null)}
+        onOk={async () => {
+          if (!novaOpcao || !novaOpcao.valor.trim()) { message.warning('Informe o valor.'); return; }
+          setSalvandoOpcao(true);
+          try {
+            const r = await adicionarOpcaoAtributo(novaOpcao.atributo.id, novaOpcao.valor.trim(), novaOpcao.codigo.trim() || undefined);
+            setOpcoesExtras(x => ({ ...x, [novaOpcao.atributo.id]: r.opcoes }));
+            if (novaOpcao.idItem) definir([novaOpcao.idItem], novaOpcao.atributo.id, novaOpcao.valor.trim());
+            message.success(`"${novaOpcao.valor.trim()}" entrou na lista de ${novaOpcao.atributo.nome} (vale para todas as famílias).`);
+            setNovaOpcao(null);
+          } catch (e) {
+            message.error(e instanceof Error ? e.message : 'Erro ao acrescentar a opção.');
+          } finally {
+            setSalvandoOpcao(false);
+          }
+        }}
+        destroyOnHidden
+      >
+        {novaOpcao && (
+          <Flex vertical gap={8}>
+            <div>
+              <Text style={{ fontSize: 12 }}>Valor</Text>
+              <Input autoFocus value={novaOpcao.valor} placeholder='ex.: 5/8"' onChange={e => setNovaOpcao(o => (o ? { ...o, valor: e.target.value } : o))} />
+            </div>
+            <div>
+              <Tooltip title={`Usado no SKU quando o modelo tem {${novaOpcao.atributo.nome}:cod} (ex.: 5/8" = 10). Vazio: gerado automaticamente.`}>
+                <Text style={{ fontSize: 12 }}>Código (opcional)</Text>
+              </Tooltip>
+              <Input value={novaOpcao.codigo} placeholder="ex.: 10" maxLength={20} onChange={e => setNovaOpcao(o => (o ? { ...o, codigo: e.target.value.replace(/[^A-Za-z0-9._-]/g, '') } : o))} />
+            </div>
+            <Text type="secondary" style={{ fontSize: 12 }}>A opção entra na lista do atributo (vale para todas as famílias que usam {novaOpcao.atributo.nome}).</Text>
+          </Flex>
+        )}
+      </Modal>
       <JuntarItensModal
         ids={paraJuntar}
         titulo={`Juntar variações iguais · ${familia?.nome || ''}`}

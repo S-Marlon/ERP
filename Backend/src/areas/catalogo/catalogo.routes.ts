@@ -3,7 +3,7 @@
 import { Router, Request, Response } from 'express';
 
 // 🧬 Controller de Atributos Globais (Dicionário do ERP)
-import { getAtributosGlobais, createAtributoGlobal, createAtributoGlobalRapido, updateAtributoGlobal, deleteAtributoGlobal, mesclarAtributos } from './atributos/atributosGlobais.controller';
+import { getAtributosGlobais, createAtributoGlobal, createAtributoGlobalRapido, updateAtributoGlobal, deleteAtributoGlobal, mesclarAtributos, adicionarOpcaoAtributo } from './atributos/atributosGlobais.controller';
 
 // 📂 Controller de Grupos de Atributos Semânticos
 import { 
@@ -96,6 +96,7 @@ router.put('/atributos-globais/:idAtributo', updateAtributoGlobal);
 router.delete('/atributos-globais/:idAtributo', deleteAtributoGlobal);
 // Junta atributos duplicados (valores, vínculos e templates vão para o destino)
 router.post('/atributos-globais/:idAtributo/mesclar', mesclarAtributos);
+router.post('/atributos-globais/:idAtributo/opcoes', adicionarOpcaoAtributo);
 
 // =========================================================================
 // 📁 GRUPOS DE ATRIBUTOS SEMÂNTICOS

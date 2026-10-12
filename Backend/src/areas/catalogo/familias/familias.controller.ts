@@ -786,6 +786,8 @@ export const formalizarItensFamilia = async (req: Request, res: Response) => {
   const { idFamilia } = req.params;
   const tenantId = Number(req.query.tenant_id || req.headers['x-tenant-id'] || 1);
   const itensRecebidos = Array.isArray(req.body?.itens) ? req.body.itens : [];
+  // parcial: variação com pendência grava o que já está preenchido (e válido) e mantém o nome/SKU atuais
+  const parcial = Boolean(req.body?.parcial);
   const connection = await pool.getConnection();
 
   try {
@@ -859,7 +861,16 @@ export const formalizarItensFamilia = async (req: Request, res: Response) => {
       if (pendMarca) pendentes.push(pendMarca);
       valores[CHAVE_MARCA] = marcaEfetiva(familia.papelMarca, familia.nomeMarca, nomeMarcaItem);
       if (pendentes.length > 0) {
-        throw new Error(`O item ${idItem} possui atributos pendentes: ${pendentes.map(p => `${p.nome} (${p.motivo})`).join(', ')}.`);
+        if (!parcial) throw new Error(`O item ${idItem} possui atributos pendentes: ${pendentes.map(p => `${p.nome} (${p.motivo})`).join(', ')}.`);
+        // Pendente: guarda os atributos preenchidos e válidos; nome, SKU e marca ficam como estão
+        for (const attr of contexto.atributos) {
+          const valor = resolverValor(valores, [attr.id, attr.nome, attr.codigo]);
+          const opcoesAttr = contexto.opcoes.get(String(attr.id)) || [];
+          if (estaVazio(valor) || !converterValorAtributo(attr.tipoBanco, valor, opcoesAttr).ok) continue;
+          await gravarValorAtributo(connection as any, tenantId, 'produto', idItem, { id: attr.id, nome: attr.nome, tipo: attr.tipoBanco }, valor, opcoesAttr);
+        }
+        resultados.push({ idItem, status: 'PENDENTE', pendencias: pendentes.map(p => `${p.nome} (${p.motivo})`) });
+        continue;
       }
 
       // Cada valor vai para a coluna do seu tipo (número, decimal, opção...)
