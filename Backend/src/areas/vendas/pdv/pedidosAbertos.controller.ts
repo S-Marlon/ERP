@@ -5,6 +5,9 @@ import pool from '../../../infra/db';
 import { calcularItensDoPedido } from './vendas.controller';
 import { ErroVenda, fecharVenda } from './vendaPdv';
 import { operadorDe } from '../caixa/caixa.controller';
+import { nomeComTrocas } from '../../catalogo/kits/kits';
+import { carregarDadosComponentes } from '../../catalogo/kits/kitsBanco';
+import { escolhasDasLinhas, gravarEscolhasKit } from '../../catalogo/kits/kitsVenda';
 
 const TIPOS = ['ORCAMENTO', 'SUSPENSA'] as const;
 type TipoAberto = typeof TIPOS[number];
@@ -46,8 +49,13 @@ export const salvarPedidoAberto = async (req: Request, res: Response) => {
       [tenant, ...ids]
     );
     const medio = new Map<number, number>(saldos.map((s: any) => [Number(s.id_item), Number(s.custo_medio) || 0]));
+    // Kit: custo dos componentes escolhidos
+    const componentes = await carregarDadosComponentes(connection, tenant, venda.linhas.flatMap(l => (l.kit?.componentes || []).map(c => c.idItem)));
     const custoBase = (id: number) => medio.get(id) || Number(itensBanco.get(id).custo_gerencial) || 0;
-    const totalCusto = venda.linhas.reduce((a, l) => a + custoBase(l.idItem) * l.quantidadeBase, 0);
+    const custoDaLinha = (l: typeof venda.linhas[number]) => (l.kit
+      ? l.kit.componentes.reduce((a, c) => a + Math.round((componentes.get(c.idItem)?.custo || 0) * c.quantidade * 10000) / 10000, 0)
+      : custoBase(l.idItem));
+    const totalCusto = venda.linhas.reduce((a, l) => a + custoDaLinha(l) * l.quantidadeBase, 0);
 
     const [cab]: any = await connection.execute(
       `INSERT INTO vendas_pedidos
@@ -65,18 +73,19 @@ export const salvarPedidoAberto = async (req: Request, res: Response) => {
     const id = Number(cab.insertId);
     for (const l of venda.linhas) {
       const item = itensBanco.get(l.idItem);
-      const custo = custoBase(l.idItem);
-      await connection.execute(
+      const custo = custoDaLinha(l);
+      const [insItem]: any = await connection.execute(
         `INSERT INTO vendas_pedidos_itens
            (tenant_id, id_venda, id_item, sku_snapshot, nome_snapshot, id_unidade, unidade_sigla, fator_conversao,
             quantidade, quantidade_base, preco_tabela, preco_unitario, desconto_valor, total_item, custo_unitario_base, custo_total)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          tenant, id, l.idItem, item.sku_customizado || item.sku_core, item.nome_comercial || item.nome_item,
+          tenant, id, l.idItem, item.sku_customizado || item.sku_core, nomeComTrocas(item.nome_comercial || item.nome_item, l.kit),
           l.idUnidade, l.sigla, Number(l.fator).toFixed(6), f4(l.quantidade), f4(l.quantidadeBase),
           f4(l.precoTabela), f4(l.precoUnitarioFinal), f4(l.descontoValor), f4(l.totalItem), f4(custo), f4(custo * l.quantidadeBase),
         ]
       );
+      await gravarEscolhasKit(connection, tenant, id, Number(insItem.insertId), l.kit ?? null);
     }
     await connection.commit();
     return res.status(201).json({ success: true, id, tipo, totalLiquido: venda.totalLiquido });
@@ -134,10 +143,12 @@ const carregarDetalhe = async (conn: any, tenant: number, id: number, trava = fa
   );
   if (!p || !['ORCAMENTO', 'SUSPENSA', 'CONVERTIDO'].includes(p.status)) return null;
   const [itens]: any = await conn.execute(
-    `SELECT id_item, sku_snapshot, nome_snapshot, id_unidade, unidade_sigla, quantidade, preco_tabela, preco_unitario, desconto_valor, total_item
+    `SELECT id_venda_item, id_item, sku_snapshot, nome_snapshot, id_unidade, unidade_sigla, quantidade, preco_tabela, preco_unitario, desconto_valor, total_item
      FROM vendas_pedidos_itens WHERE id_venda = ? AND tenant_id = ? ORDER BY id_venda_item`,
     [id, tenant]
   );
+  // Kit configurável: as escolhas voltam com a linha (o carrinho remonta o kit igual)
+  const escolhas = await escolhasDasLinhas(conn, tenant, id);
   return {
     id: Number(p.id_venda), tipo: p.status === 'SUSPENSA' ? 'SUSPENSA' : 'ORCAMENTO', situacao: situacao(p.status, p.valido),
     cliente: p.cliente_nome, idCliente: p.id_cliente ? Number(p.id_cliente) : null, contato: p.contato, operador: p.operador,
@@ -147,6 +158,7 @@ const carregarDetalhe = async (conn: any, tenant: number, id: number, trava = fa
       idItem: Number(i.id_item), sku: i.sku_snapshot, nome: i.nome_snapshot, idUnidade: i.id_unidade ? Number(i.id_unidade) : null,
       unidade: i.unidade_sigla, quantidade: Number(i.quantidade), precoTabela: Number(i.preco_tabela), precoUnitario: Number(i.preco_unitario),
       desconto: Number(i.desconto_valor), total: Number(i.total_item),
+      componentes: escolhas.get(Number(i.id_venda_item))?.escolhas,
     })),
   };
 };

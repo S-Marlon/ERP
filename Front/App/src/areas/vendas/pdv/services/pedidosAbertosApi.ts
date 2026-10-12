@@ -18,6 +18,7 @@ export interface PedidoAbertoResumo {
 export interface ItemPedidoAberto {
   idItem: number; sku: string; nome: string; idUnidade: number | null; unidade: string | null; quantidade: number;
   precoTabela: number; precoUnitario: number; desconto: number; total: number;
+  componentes?: Array<{ slot: number; idItem: number; quantidade: number }>;
 }
 
 export interface PedidoAbertoDetalhe {
@@ -28,7 +29,7 @@ export interface PedidoAbertoDetalhe {
 
 export interface NovoPedidoAberto {
   tipo: TipoPedidoAberto;
-  itens: Array<{ idItem: number; quantidade: number; idUnidade?: number | null; precoUnitario?: number }>;
+  itens: Array<{ idItem: number; quantidade: number; idUnidade?: number | null; precoUnitario?: number; componentes?: Array<{ slot: number; idItem: number; quantidade: number }> }>;
   clienteNome?: string; idCliente?: number | null; contato?: string; observacao?: string; validadeDias?: number;
 }
 

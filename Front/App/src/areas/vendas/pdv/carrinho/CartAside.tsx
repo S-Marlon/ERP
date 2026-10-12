@@ -22,6 +22,8 @@ interface CartAsideProps {
     onBack: () => void;
     applyIndividualDiscount: (id: string | number, newPrice: number) => void;
     estagio: 'SELECAO' | 'PAGAMENTO';
+    // Kit configurável: reabre a escolha das variações da linha
+    onEditarKit?: (id: string | number) => void;
     style?: React.CSSProperties;
 }
 
@@ -41,7 +43,7 @@ export const CartAside: React.FC<CartAsideProps> = props => (
 
 const CarrinhoConteudo: React.FC<CartAsideProps> = ({
     cart, cliente, total, money, updateQuantity, changeUnit, removeItem, onFinalizar, onSuspender, onOrcamento,
-    salvandoPedido, estagio, onBack, applyIndividualDiscount, style,
+    salvandoPedido, estagio, onBack, applyIndividualDiscount, onEditarKit, style,
 }) => {
     const { token } = theme.useToken();
     // Fracionamento ligado à mão por item (unidades fracionáveis já vêm ligadas)
@@ -168,6 +170,13 @@ const CarrinhoConteudo: React.FC<CartAsideProps> = ({
 
                                     <Flex gap={6} wrap align="center" style={{ margin: '4px 0', fontSize: 12 }}>
                                         <Typography.Text type="secondary" style={{ fontSize: 12 }}>Cód: {item.sku ?? item.id}</Typography.Text>
+                                        {item.kitPosicoes && (
+                                            <Tooltip title="Kit: clique para trocar as variações ou quantidades">
+                                                <Tag color="geekblue" style={{ margin: 0, cursor: 'pointer', whiteSpace: 'normal' }} onClick={() => onEditarKit?.(item.id)}>
+                                                    {item.kitResumo ? `Kit: ${item.kitResumo}` : 'Kit padrão'} · trocar
+                                                </Tag>
+                                            </Tooltip>
+                                        )}
                                         {ehProduto && (
                                             <Typography.Text type={stock < 5 ? 'danger' : 'secondary'} style={{ fontSize: 12 }}>
                                                 · Estoque: {Number(stock).toLocaleString('pt-BR')} {item.unitOfMeasure || ''}

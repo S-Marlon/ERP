@@ -1,5 +1,6 @@
 // Cálculo da venda do PDV (sem banco): preço por linha, rateio do desconto geral e pagamentos.
 import { FaixaPdv, faixaParaQuantidade, unidadePadraoPdv, UnidadeVendaPdv } from './precoPdv';
+import type { KitResolvido } from '../../catalogo/kits/kits';
 
 // ADIANTAMENTO: sinal já recebido do cliente (vendas_adiantamentos), usado para pagar a venda
 export const FORMAS_PAGAMENTO = ['DINHEIRO', 'PIX', 'DEBITO', 'CREDITO', 'PRAZO', 'TRANSFERENCIA', 'ADIANTAMENTO'] as const;
@@ -41,6 +42,8 @@ export interface LinhaCalculada {
   descontoValor: number;
   totalItem: number;
   precoUnitarioFinal: number;
+  // Kit: componentes escolhidos (padrão ou trocados pelo cliente) e a diferença de preço
+  kit?: KitResolvido | null;
 }
 
 export const calcularLinha = (linha: LinhaPedido, dados: DadosItemVenda): LinhaCalculada => {

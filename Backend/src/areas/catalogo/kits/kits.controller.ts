@@ -11,6 +11,7 @@ import {
   normalizarComponentes, skuSugeridoKit, TIPO_KIT,
 } from './kits';
 import { carregarComposicoes, carregarDadosComponentes, DadosComponenteBanco, idsDosKits, ORIGEM_VENDA_PDV } from './kitsBanco';
+import { opcoesDoKit } from './kitsVenda';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
 
@@ -27,6 +28,10 @@ const responderErro = (res: Response, error: any, padrao: string) => {
 const paraComponente = (c: ComponenteKit, d?: DadosComponenteBanco) => ({
   idItem: c.idItem,
   quantidade: c.quantidade,
+  permiteTrocar: Boolean(c.permiteTrocar),
+  permiteAlterarQtd: Boolean(c.permiteAlterarQtd),
+  familiaId: d?.familiaId ?? null,
+  familia: d?.familia || '',
   nome: d?.nome || `Item ${c.idItem}`,
   sku: d?.sku || '',
   unidade: d?.sigla || '',
@@ -125,6 +130,15 @@ export const detalheKit = async (req: Request, res: Response) => {
   }
 };
 
+/** GET /api/catalogo/kits/:idItem/opcoes — posições do kit com as variações para o cliente escolher (PDV) */
+export const opcoesKit = async (req: Request, res: Response) => {
+  try {
+    return res.json(await opcoesDoKit(pool as any, tenantDe(req), Number(req.params.idItem)));
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao carregar as opções do kit.');
+  }
+};
+
 /** Confere os componentes no banco: existem, estão ativos, são de venda e nenhum é kit. */
 const validarComponentes = async (conn: Conn, tenant: number, entrada: any[], idKit: number | null) => {
   const ids = (Array.isArray(entrada) ? entrada : []).map(c => Number(c?.idItem)).filter(id => id > 0);
@@ -135,6 +149,7 @@ const validarComponentes = async (conn: Conn, tenant: number, entrada: any[], id
     const d = dados.get(c.idItem);
     if (!d) throw new ErroKit(`Item ${c.idItem} não encontrado.`, 404);
     if (!['PRODUTO', 'SERVICO'].includes(d.tipoRecurso)) throw new ErroKit(`"${d.nome}" não é produto nem serviço de venda.`);
+    if (c.permiteTrocar && !d.familiaId) throw new ErroKit(`"${d.nome}" não está numa família: para ser trocável, coloque-o numa família com as variações (ex.: CV, bitola).`);
   }
   return { componentes, dados };
 };
@@ -153,8 +168,9 @@ const gravarComposicao = async (conn: Conn, tenant: number, idKit: number, compo
   await conn.execute(`DELETE FROM itens_composicoes WHERE tenant_id = ? AND id_item_pai = ? AND tipo_relacao = '${TIPO_KIT}'`, [tenant, idKit]);
   for (const c of componentes) {
     await conn.execute(
-      `INSERT INTO itens_composicoes (tenant_id, id_item_pai, id_item_filho, quantidade, tipo_relacao) VALUES (?, ?, ?, ?, '${TIPO_KIT}')`,
-      [tenant, idKit, c.idItem, f4(c.quantidade)]
+      `INSERT INTO itens_composicoes (tenant_id, id_item_pai, id_item_filho, quantidade, permite_trocar, permite_alterar_qtd, tipo_relacao)
+       VALUES (?, ?, ?, ?, ?, ?, '${TIPO_KIT}')`,
+      [tenant, idKit, c.idItem, f4(c.quantidade), c.permiteTrocar ? 1 : 0, c.permiteAlterarQtd ? 1 : 0]
     );
   }
 };

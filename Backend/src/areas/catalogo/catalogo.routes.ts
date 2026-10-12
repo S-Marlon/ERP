@@ -68,7 +68,7 @@ import { aplicarPrecosComTaxa, previaPrecosComTaxa } from './precos/precosTaxa.c
 import { salvarPrecosLote } from './precos/precosLote.controller';
 import { apagarItens, conferirExclusao } from './produtos/exclusaoItens.controller';
 import { listarDuplicados, resumoItensParaJuntar, unificarItens } from './produtos/unificacao.controller';
-import { atualizarCustosKits, atualizarKit, criarKit, desfazerKit, detalheKit, listarKits, relatorioKits } from './kits/kits.controller';
+import { atualizarCustosKits, atualizarKit, criarKit, desfazerKit, detalheKit, listarKits, opcoesKit, relatorioKits } from './kits/kits.controller';
 import { getProdutoDetalhe, updateProdutoParcial, adicionarAnexo, removerAnexo, definirImagemPrincipal, getFichaTecnica, salvarFichaTecnica, getAtributosParaItem } from './produtos/produtoDetalhe.controller';
 
 const router = Router();
@@ -183,6 +183,7 @@ router.get('/kits/relatorio', relatorioKits);
 router.post('/kits/atualizar-custos', atualizarCustosKits);
 router.post('/kits', criarKit);
 router.get('/kits/:idItem', detalheKit);
+router.get('/kits/:idItem/opcoes', opcoesKit);
 router.put('/kits/:idItem', atualizarKit);
 router.delete('/kits/:idItem', desfazerKit);
 router.put('/produtos/:id_item/ficha-tecnica', salvarFichaTecnica);

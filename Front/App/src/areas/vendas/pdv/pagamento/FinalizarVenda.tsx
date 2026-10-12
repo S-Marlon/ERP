@@ -10,7 +10,7 @@ import {
 import dayjs from 'dayjs';
 import { imprimirExtratoElgin } from '../../../../shared/utils/printService';
 import { salesService, VendaPdvPayload, FormaPagamentoPdv, ErroVendaPdv, AutorizacaoVenda } from '../services/salesService';
-import { isCartItemOS } from '../types/cart.types';
+import { idItemDaLinha, isCartItemOS } from '../types/cart.types';
 import { caixaStore } from '../../caixa/caixaStore';
 import { useSituacaoCliente } from '../../../financeiro/receber/receberApi';
 import { acrescimoParcelamento, ajusteDaForma, descontoDaForma, useTaxasVenda } from '../../taxas/taxasVenda';
@@ -205,11 +205,13 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
             acrescimoGeral: acrescimoTotal,
             ...(idOrcamento ? { idOrcamento, manterPrecoOrcamento: Boolean(manterPrecoOrcamento) } : {}),
             itens: itensCarrinho.map(item => ({
-                idItem: Number(item.id),
+                idItem: idItemDaLinha(item),
                 quantidade: Number(item.quantity),
                 idUnidade: item.idUnidadeVenda ?? null,
                 // Sem desconto manual o servidor aplica a tabela (varejo/atacado) pela quantidade
                 precoUnitario: item.precoManual ? Number(item.price) : undefined,
+                // Kit configurável: o servidor confere as escolhas e recalcula a diferença
+                ...(item.kitEscolhas ? { componentes: item.kitEscolhas } : {}),
             })),
             pagamentos: pagamentosAtivos.map(p => ({
                 forma: FORMA_POR_METODO[p.metodo],
@@ -233,7 +235,7 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
                 numero: String(resposta.idVenda),
                 itens: itensCarrinho.map(item => ({
                     codigo: String(item.sku || item.id),
-                    name: item.name,
+                    name: item.kitResumo ? `${item.name} [${item.kitResumo}]` : item.name,
                     quantity: item.quantity,
                     price: Number(item.price ?? item.salePrice ?? 0),
                     desconto: 0,

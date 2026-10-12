@@ -4,6 +4,9 @@ import { CartItem, SaleItem, isCartItemOS } from '../types/cart.types';
 import Swal from 'sweetalert2';
 import { getPdvProductDetail } from '../services/api/products';
 import { podeFracionar, precoTabelaCarrinho, UnidadeCarrinho } from '../utils/precoCarrinho';
+import { calcularKit, chaveLinhaKit, EscolhaKitPdv, escolhasPadrao, PosicaoKit } from '../utils/kitPdv';
+import { opcoesDoKit } from '../services/kitsPdvApi';
+import type { KitPendente } from '../components/KitConfiguradorModal';
 
 // Produto do catálogo (vem do servidor com unidades e faixas); serviço e OS ficam fora dessa regra
 const ehProduto = (item: { type?: string }) => item.type !== 'service' && item.type !== 'os';
@@ -16,9 +19,28 @@ const unidadeAtual = (item: CartItem): UnidadeCarrinho | undefined =>
 const reprecificar = (item: CartItem): CartItem => {
   const unidade = unidadeAtual(item);
   if (!unidade) return item;
-  const tabela = precoTabelaCarrinho(unidade, item.quantity);
+  // Kit configurável: tabela do kit + diferença das trocas (por kit na unidade base, convertida para a unidade da linha)
+  const tabela = Math.max(0, Math.round((precoTabelaCarrinho(unidade, item.quantity) + (item.ajusteKit || 0) * (unidade.fator || 1)) * 10000) / 10000);
   if (item.precoManual) return { ...item, precoTabela: tabela, originalPrice: tabela };
   return { ...item, precoTabela: tabela, price: tabela, originalPrice: undefined };
+};
+
+/** Linha de kit configurável a partir da linha padrão e das escolhas do cliente. */
+const montarLinhaKit = (base: CartItem, posicoes: PosicaoKit[], escolhas: EscolhaKitPdv[]): CartItem => {
+  const idKit = Number(base.idItemCatalogo ?? base.id);
+  const c = calcularKit(posicoes, escolhas);
+  const fator = Number(base.fatorConversao) || 1;
+  return reprecificar({
+    ...base,
+    id: chaveLinhaKit(idKit, escolhas),
+    idItemCatalogo: idKit,
+    kitEscolhas: escolhas,
+    kitPosicoes: posicoes,
+    ajusteKit: c.ajuste,
+    kitResumo: c.resumo,
+    stock: c.estoque === null ? base.stock : Math.floor(c.estoque / fator),
+    podeVenderSemEstoque: c.estoque === null ? true : Boolean(base.podeVenderSemEstoque && c.estoque === null),
+  });
 };
 
 const lerCarrinhoSalvo = (): CartItem[] => {
@@ -32,6 +54,8 @@ const lerCarrinhoSalvo = (): CartItem[] => {
 
 export const useCart = () => {
   const [cart, setCart] = useState<CartItem[]>(lerCarrinhoSalvo);
+  // Kit configurável esperando a escolha das variações (tela KitConfiguradorModal)
+  const [kitPendente, setKitPendente] = useState<(KitPendente & { base: CartItem; substituir?: string | number }) | null>(null);
 
   useEffect(() => {
     try { localStorage.setItem('pdv-cart', JSON.stringify(cart)); } catch { /* armazenamento indisponível */ }
@@ -77,6 +101,20 @@ export const useCart = () => {
       // Unidade da linha: a do item bipado (GTIN da embalagem) ou a sugerida pelo servidor
       const idUnidade = item.idUnidadeVenda ?? productData.idUnidadeVenda ?? unidades[0]?.idUnidade ?? null;
       const unidade = unidades.find(u => u.idUnidade === idUnidade);
+
+      // Kit com itens trocáveis: abre a escolha antes de entrar no carrinho
+      if (productData.kitConfiguravel) {
+        const posicoes = await opcoesDoKit(Number(item.id));
+        const base = reprecificar({
+          ...item, type: 'product', quantity: 1, sku: productData.sku || item.sku, stock: unidade ? unidade.estoque : productData.currentStock,
+          costPrice: productData.costPrice || 0, price: unidade ? unidade.preco : productData.salePrice,
+          unitOfMeasure: unidade?.sigla || productData.unitOfMeasure || item.unitOfMeasure, idUnidadeVenda: idUnidade,
+          fatorConversao: unidade?.fator || productData.fatorConversao || 1, unidades, podeVenderSemEstoque: productData.podeVenderSemEstoque,
+          publicavel: productData.publicavel, precoManual: false, idItemCatalogo: Number(item.id),
+        } as CartItem);
+        setKitPendente({ nome: productData.name || item.name, precoKit: base.precoTabela ?? base.price, posicoes, base });
+        return;
+      }
 
       setCart(prev => {
         const existing = prev.find(i => i.id === item.id);
@@ -155,6 +193,45 @@ export const useCart = () => {
     }));
   }, []);
 
+  /** Confirma as escolhas do kit: entra no carrinho (mesma configuração soma 1) ou substitui a linha editada. */
+  const confirmarKit = useCallback((escolhas: EscolhaKitPdv[]) => {
+    if (!kitPendente) return;
+    const linha = montarLinhaKit(kitPendente.base, kitPendente.posicoes, escolhas);
+    if (!linha.podeVenderSemEstoque && linha.stock !== undefined && linha.quantity > linha.stock) {
+      Swal.fire('Estoque insuficiente', `Dá para montar só ${linha.stock} kit(s) com essas escolhas.`, 'warning');
+      return;
+    }
+    setCart(prev => {
+      const semEditada = kitPendente.substituir !== undefined ? prev.filter(i => i.id !== kitPendente.substituir) : prev;
+      const igual = semEditada.find(i => i.id === linha.id);
+      if (igual) return semEditada.map(i => (i.id === linha.id ? reprecificar({ ...i, quantity: i.quantity + linha.quantity }) : i));
+      if (kitPendente.substituir === undefined) return [...semEditada, linha];
+      // Editada: fica no mesmo lugar da lista
+      const pos = prev.findIndex(i => i.id === kitPendente.substituir);
+      const copia = [...semEditada];
+      copia.splice(Math.max(0, pos), 0, linha);
+      return copia;
+    });
+    setKitPendente(null);
+  }, [kitPendente]);
+
+  const cancelarKit = useCallback(() => setKitPendente(null), []);
+
+  /** Reabre a escolha das variações de uma linha de kit do carrinho. */
+  const editarKit = useCallback((id: string | number) => {
+    const linha = cart.find(i => i.id === id);
+    if (!linha?.kitPosicoes) return;
+    const fator = Number(linha.fatorConversao) || 1;
+    setKitPendente({
+      nome: linha.name,
+      precoKit: (linha.precoTabela ?? linha.price) - (linha.ajusteKit || 0) * fator,
+      posicoes: linha.kitPosicoes,
+      escolhas: linha.kitEscolhas,
+      base: { ...linha, precoManual: false },
+      substituir: id,
+    });
+  }, [cart]);
+
   const removeItem = useCallback((id: string | number) => {
     setCart(prev => prev.filter(item => item.id !== id));
   }, []);
@@ -188,7 +265,7 @@ export const useCart = () => {
    * Devolve os nomes que não puderam ser carregados.
    */
   const carregarItens = useCallback(async (
-    linhas: Array<{ idItem: number; nome: string; quantidade: number; idUnidade: number | null; precoFixo?: number; precoTabelaFixa?: number; unidadeBase?: boolean }>,
+    linhas: Array<{ idItem: number; nome: string; quantidade: number; idUnidade: number | null; precoFixo?: number; precoTabelaFixa?: number; unidadeBase?: boolean; componentes?: EscolhaKitPdv[] }>,
     opcoes: { acrescentar?: boolean } = {}
   ) => {
     const novos: CartItem[] = [];
@@ -219,6 +296,11 @@ export const useCart = () => {
           precoManual: false,
         } as CartItem;
         item = reprecificar(item);
+        // Kit configurável (orçamento/suspensa): remonta com as escolhas gravadas
+        if (productData.kitConfiguravel || l.componentes?.length) {
+          const posicoes = await opcoesDoKit(l.idItem);
+          item = montarLinhaKit({ ...item, idItemCatalogo: l.idItem }, posicoes, l.componentes?.length ? l.componentes : escolhasPadrao(posicoes));
+        }
         if (l.precoFixo !== undefined) {
           item = { ...item, price: l.precoFixo, precoTabela: l.precoTabelaFixa ?? l.precoFixo, originalPrice: l.precoTabelaFixa ?? l.precoFixo, precoManual: true };
         }
@@ -256,6 +338,10 @@ export const useCart = () => {
     removeItem,
     applyIndividualDiscount,
     clearCart,
-    carregarItens
+    carregarItens,
+    kitPendente,
+    confirmarKit,
+    cancelarKit,
+    editarKit,
   };
 };

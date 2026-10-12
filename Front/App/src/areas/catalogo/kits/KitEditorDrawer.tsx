@@ -1,7 +1,7 @@
 // Editor de kit: itens usados (com quantidade na unidade base), custo ao vivo, quantos dá para montar e preço.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert, Button, Card, Col, Drawer, Empty, Form, Input, InputNumber, Row, Select, Space, Statistic, Table, Tag, Typography, message,
+  Alert, Button, Card, Checkbox, Col, Drawer, Empty, Form, Input, InputNumber, Row, Select, Space, Statistic, Table, Tag, Tooltip, Typography, message,
 } from 'antd';
 import { DeleteOutlined, SaveOutlined } from '@ant-design/icons';
 import { atualizarKit, buscarItensParaKit, criarKit, ItemParaKit, Kit } from './kitsApi';
@@ -11,7 +11,7 @@ import { fatorTaxaPreco, lucroLiquido, margemLiquidaPct, useTaxaPreco } from '..
 const { Text } = Typography;
 const brl = (v: number) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-type Linha = LinhaKit & { nome: string; sku: string; unidade: string };
+type Linha = LinhaKit & { nome: string; sku: string; unidade: string; permiteTrocar: boolean; permiteAlterarQtd: boolean; familia: string | null };
 
 interface Props {
   aberto: boolean;
@@ -42,6 +42,7 @@ const KitEditorDrawer: React.FC<Props> = ({ aberto, kit, onFechar, onSalvo }) =>
     setLinhas((kit?.componentes || []).map(c => ({
       idItem: c.idItem, quantidade: c.quantidade, saldo: c.saldo, custoUnitario: c.custoUnitario, servico: c.servico,
       nome: c.nome, sku: c.sku, unidade: c.unidade,
+      permiteTrocar: c.permiteTrocar, permiteAlterarQtd: c.permiteAlterarQtd, familia: c.familiaId ? c.familia : '',
     })));
   }, [aberto, kit]);
 
@@ -66,6 +67,8 @@ const KitEditorDrawer: React.FC<Props> = ({ aberto, kit, onFechar, onSalvo }) =>
     setLinhas(ls => adicionarLinha(ls, {
       idItem: item.idItem, quantidade: 1, saldo: item.saldo, custoUnitario: item.custoUnitario, servico: item.servico,
       nome: item.nome, sku: item.sku, unidade: item.unidade,
+      // família só é conhecida depois de salvar (o servidor confere se dá para ser trocável)
+      permiteTrocar: false, permiteAlterarQtd: false, familia: null,
     }));
   };
 
@@ -90,7 +93,7 @@ const KitEditorDrawer: React.FC<Props> = ({ aberto, kit, onFechar, onSalvo }) =>
       const dados = {
         nome: nome.trim(),
         precoVenda: preco,
-        componentes: linhas.map(l => ({ idItem: l.idItem, quantidade: l.quantidade })),
+        componentes: linhas.map(l => ({ idItem: l.idItem, quantidade: l.quantidade, permiteTrocar: l.permiteTrocar, permiteAlterarQtd: l.permiteAlterarQtd })),
         ...(sku.trim() ? { sku: sku.trim() } : {}),
       };
       const salvo = kit ? await atualizarKit(kit.idItem, dados) : await criarKit(dados);
@@ -131,6 +134,24 @@ const KitEditorDrawer: React.FC<Props> = ({ aberto, kit, onFechar, onSalvo }) =>
         />
       ),
     },
+    {
+      title: <Tooltip title="Na venda o cliente pode trocar por outra variação da mesma família (ex.: 1 CV → 2 CV)">Trocável</Tooltip>,
+      key: 'troca', width: 90, align: 'center' as const,
+      render: (_: unknown, l: Linha) => (
+        <Tooltip title={l.familia === '' ? 'O item não está numa família: não há variações para trocar' : l.familia ? `Família: ${l.familia}` : undefined}>
+          <Checkbox checked={l.permiteTrocar} disabled={l.familia === ''}
+            onChange={e => setLinhas(ls => ls.map(x => (x.idItem === l.idItem ? { ...x, permiteTrocar: e.target.checked } : x)))} />
+        </Tooltip>
+      ),
+    },
+    {
+      title: <Tooltip title="Na venda pode mudar a quantidade (ex.: metros de fio)">Qtd. ajustável</Tooltip>,
+      key: 'qtdaj', width: 100, align: 'center' as const,
+      render: (_: unknown, l: Linha) => (
+        <Checkbox checked={l.permiteAlterarQtd}
+          onChange={e => setLinhas(ls => ls.map(x => (x.idItem === l.idItem ? { ...x, permiteAlterarQtd: e.target.checked } : x)))} />
+      ),
+    },
     { title: 'Custo un.', key: 'cu', width: 100, align: 'right' as const, render: (_: unknown, l: Linha) => brl(l.custoUnitario) },
     { title: 'Custo', key: 'ct', width: 100, align: 'right' as const, render: (_: unknown, l: Linha) => <Text strong>{brl(custoDaLinha(l))}</Text> },
     {
@@ -146,7 +167,7 @@ const KitEditorDrawer: React.FC<Props> = ({ aberto, kit, onFechar, onSalvo }) =>
       title={kit ? `Kit ${kit.sku}` : 'Novo kit'}
       open={aberto}
       onClose={onFechar}
-      width={880}
+      width={1040}
       destroyOnHidden
       extra={<Button type="primary" icon={<SaveOutlined />} loading={salvando} onClick={salvar}>Salvar</Button>}
     >
@@ -164,7 +185,7 @@ const KitEditorDrawer: React.FC<Props> = ({ aberto, kit, onFechar, onSalvo }) =>
           </Col>
         </Row>
 
-        <Form.Item label="Itens usados no kit" extra="Quantidade na unidade de estoque do item (ex.: metros de mangueira). Na venda, a baixa sai de cada item.">
+        <Form.Item label="Itens usados no kit" extra="Quantidade na unidade de estoque do item (ex.: metros de mangueira). Na venda, a baixa sai de cada item. Marque Trocável / Qtd. ajustável para o cliente escolher a variação (CV, bitola) ou os metros no PDV: o preço muda pela diferença.">
           <Select
             showSearch
             value={null}

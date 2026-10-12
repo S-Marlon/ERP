@@ -6,6 +6,8 @@ import { useFilters } from '../hooks/useFilters';
 import { useSalePreparation } from '../hooks/useSalePreparation';
 import { CartItem } from '../types/cart.types';
 import { VendaPayload } from '../types/sale.types';
+import type { KitPendente } from '../components/KitConfiguradorModal';
+import type { EscolhaKitPdv } from '../utils/kitPdv';
 
 interface OSData {
   equipment?: string;
@@ -25,9 +27,14 @@ interface PDVContextType {
   applyIndividualDiscount: (id: string | number, newPrice: number) => void;
   clearCart: () => void;
   carregarItens: (
-    linhas: Array<{ idItem: number; nome: string; quantidade: number; idUnidade: number | null; precoFixo?: number; precoTabelaFixa?: number; unidadeBase?: boolean }>,
+    linhas: Array<{ idItem: number; nome: string; quantidade: number; idUnidade: number | null; precoFixo?: number; precoTabelaFixa?: number; unidadeBase?: boolean; componentes?: EscolhaKitPdv[] }>,
     opcoes?: { acrescentar?: boolean }
   ) => Promise<string[]>;
+  // Kit configurável
+  kitPendente: KitPendente | null;
+  confirmarKit: (escolhas: EscolhaKitPdv[]) => void;
+  cancelarKit: () => void;
+  editarKit: (id: string | number) => void;
 
   // PDV State
   estagio: 'SELECAO' | 'PAGAMENTO';

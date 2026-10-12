@@ -42,7 +42,16 @@ export interface CartItem extends SaleItem {
   type: ItemType; // Agora unificado
   osData?: any;
   originalPrice?: number; // Para descontos
+  // Kit configurável: a linha tem chave própria (id), o item do catálogo vai em idItemCatalogo
+  idItemCatalogo?: number;
+  kitEscolhas?: import('../utils/kitPdv').EscolhaKitPdv[];
+  kitPosicoes?: import('../utils/kitPdv').PosicaoKit[];
+  ajusteKit?: number;   // diferença de preço por 1 kit (unidade base)
+  kitResumo?: string;   // ex.: "BOMBA-2CV; FIO-4MM x80"
 }
+
+/** Id do item no catálogo (a linha de kit configurável usa outra chave). */
+export const idItemDaLinha = (item: { id: string | number; idItemCatalogo?: number }) => Number(item.idItemCatalogo ?? item.id);
 
 export interface AutoPart extends SaleItem {
   type: 'part';

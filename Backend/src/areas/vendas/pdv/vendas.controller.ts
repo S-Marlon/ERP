@@ -14,8 +14,9 @@ import { carregarRegras } from '../regras/regrasVenda.controller';
 import { avaliarRegras, conferirSenha } from '../regras/regrasVenda';
 import { carregarConfigTaxas } from '../taxas/taxas.controller';
 import { calcularTaxas, descontoEfetivoPct, liquidoParaRegra } from '../taxas/taxas';
-import { carregarComposicoes, carregarDadosComponentes, saidasDoKitNaVenda } from '../../catalogo/kits/kitsBanco';
-import { saidaDosComponentes } from '../../catalogo/kits/kits';
+import { carregarDadosComponentes, saidasDoKitNaVenda } from '../../catalogo/kits/kitsBanco';
+import { ErroKit, nomeComTrocas, saidaDosComponentes } from '../../catalogo/kits/kits';
+import { escolhasDasLinhas, gravarEscolhasKit, resolverKitsDoPedido } from '../../catalogo/kits/kitsVenda';
 
 const ORIGEM_VENDA = 'VENDA_PDV';
 const ORIGEM_CANCELAMENTO = 'CANCELAMENTO_VENDA';
@@ -31,9 +32,10 @@ const responderErro = (res: Response, error: any, padrao: string) => {
 
 type ConnVenda = { execute: (sql: string, params?: any[]) => Promise<any> };
 
-/** Preço congelado de um orçamento por item+unidade (venda convertida com "manter o preço"). */
+/** Preço congelado de um orçamento por item+unidade (+ configuração do kit) (venda convertida com "manter o preço"). */
 export type PrecosCongelados = Map<string, { precoTabela: number; precoUnitario: number }>;
-export const chaveLinha = (idItem: number, idUnidade: number | null | undefined) => `${idItem}:${idUnidade ?? ''}`;
+export const chaveLinha = (idItem: number, idUnidade: number | null | undefined, assinaturaKit = '') =>
+  `${idItem}:${idUnidade ?? ''}${assinaturaKit ? `#${assinaturaKit}` : ''}`;
 
 /**
  * Carrega e valida os itens do pedido e calcula cada linha (preço de tabela pela faixa da unidade/quantidade).
@@ -47,6 +49,8 @@ export const calcularItensDoPedido = async (conn: ConnVenda, tenant: number, ite
     precoUnitario: i.precoUnitario === undefined || i.precoUnitario === null ? null : Number(i.precoUnitario),
   }));
   if (pedidos.some(p => !Number.isInteger(p.idItem) || p.idItem <= 0)) throw new ErroVenda('Item inválido na venda.');
+  // Kit configurável: escolhas do cliente por posição ({ slot, idItem, quantidade })
+  const escolhas = itens.map((i: any) => (Array.isArray(i.componentes) ? i.componentes : null));
   const ids = [...new Set(pedidos.map(p => p.idItem))].sort((a, b) => a - b);
 
   const [rows] = await conn.execute(
@@ -62,15 +66,33 @@ export const calcularItensDoPedido = async (conn: ConnVenda, tenant: number, ite
   }
 
   const precos = await carregarPrecos(conn as any, tenant, [...itensBanco.values()]);
-  const linhas = pedidos.map(p => {
+  let kits: Awaited<ReturnType<typeof resolverKitsDoPedido>>;
+  try {
+    kits = await resolverKitsDoPedido(conn, tenant, pedidos.map((p, i) => ({
+      idItem: p.idItem, componentes: escolhas[i], nome: itensBanco.get(p.idItem).nome_comercial || itensBanco.get(p.idItem).nome_item,
+    })));
+  } catch (e) {
+    if (e instanceof ErroKit) throw new ErroVenda(e.message, e.status);
+    throw e;
+  }
+  const linhas = pedidos.map((p, indice) => {
     const item = itensBanco.get(p.idItem);
     const linha = calcularLinha(p, {
       unidades: precos.unidadesPorItem.get(p.idItem) || [],
       faixas: precos.faixasPorItem.get(p.idItem) || [],
       precoCadastro: item.preco_venda !== null ? Number(item.preco_venda) : null,
     });
+    // Kit: preço do kit + diferença das trocas (por kit, convertida para a unidade da linha)
+    const kit = kits[indice];
+    if (kit) {
+      linha.kit = kit;
+      if (kit.ajuste) {
+        linha.precoTabela = Math.max(0, Math.round((linha.precoTabela + kit.ajuste * linha.fator) * 10000) / 10000);
+        if (p.precoUnitario === null || p.precoUnitario === undefined) linha.precoPraticado = linha.precoTabela;
+      }
+    }
     // Orçamento convertido mantendo o preço: a tabela da linha é a do orçamento (não conta como desconto)
-    const congelado = congelados?.get(chaveLinha(linha.idItem, linha.idUnidade));
+    const congelado = congelados?.get(chaveLinha(linha.idItem, linha.idUnidade, kit?.assinatura));
     if (congelado) {
       linha.precoTabela = congelado.precoTabela;
       if (p.precoUnitario === null || p.precoUnitario === undefined) linha.precoPraticado = congelado.precoUnitario;
@@ -116,10 +138,12 @@ export const registrarVenda = async (req: Request, res: Response) => {
       if (req.body?.manterPrecoOrcamento) {
         if (!Number(orc.valido)) throw new ErroVenda('Orçamento vencido: atualize os preços para vender.', 409, { codigo: 'ORCAMENTO_VENCIDO' });
         const [linhasOrc]: any = await connection.execute(
-          `SELECT id_item, id_unidade, preco_tabela, preco_unitario FROM vendas_pedidos_itens WHERE id_venda = ? AND tenant_id = ?`,
+          `SELECT id_venda_item, id_item, id_unidade, preco_tabela, preco_unitario FROM vendas_pedidos_itens WHERE id_venda = ? AND tenant_id = ?`,
           [idOrcamento, tenant]
         );
-        congelados = new Map(linhasOrc.map((l: any) => [chaveLinha(Number(l.id_item), l.id_unidade ? Number(l.id_unidade) : null),
+        const escolhasOrc = await escolhasDasLinhas(connection as any, tenant, idOrcamento);
+        congelados = new Map(linhasOrc.map((l: any) => [
+          chaveLinha(Number(l.id_item), l.id_unidade ? Number(l.id_unidade) : null, escolhasOrc.get(Number(l.id_venda_item))?.assinatura),
           { precoTabela: Number(l.preco_tabela), precoUnitario: Number(l.preco_unitario) }]));
       }
     }
@@ -133,9 +157,8 @@ export const registrarVenda = async (req: Request, res: Response) => {
     const pagamentosOk = validarPagamentos(pagamentos, totalComFrete);
 
     // Kit não tem estoque próprio: a saída é de cada componente (quantidade do kit × quantidade do componente)
-    const composicoes = await carregarComposicoes(connection as any, tenant, ids);
-    const componentes = await carregarDadosComponentes(connection as any, tenant, [...composicoes.values()].flat().map(c => c.idItem));
-    const ehKit = (idItem: number) => composicoes.has(idItem);
+    // Componentes vêm da linha (o cliente pode ter trocado a variação ou a quantidade)
+    const componentes = await carregarDadosComponentes(connection as any, tenant, venda.linhas.flatMap(l => (l.kit?.componentes || []).map(c => c.idItem)));
     const tipoDe = (idItem: number) => String(itensBanco.get(idItem)?.tipo_recurso ?? componentes.get(idItem)?.tipoRecurso ?? 'PRODUTO').toUpperCase();
     const nomeDe = (idItem: number) => {
       const item = itensBanco.get(idItem);
@@ -143,8 +166,8 @@ export const registrarVenda = async (req: Request, res: Response) => {
     };
     // Serviço (ex.: prensagem avulsa) não tem estoque: só produtos travam saldo e geram movimento
     const ehServico = (idItem: number) => tipoDe(idItem) === 'SERVICO';
-    const saidasDaLinha = (l: { idItem: number; quantidadeBase: number }) => (ehKit(l.idItem)
-      ? saidaDosComponentes(composicoes.get(l.idItem)!, l.quantidadeBase)
+    const saidasDaLinha = (l: { idItem: number; quantidadeBase: number; kit?: { componentes: Array<{ idItem: number; quantidade: number }> } | null }) => (l.kit
+      ? saidaDosComponentes(l.kit.componentes, l.quantidadeBase)
         .filter(c => !ehServico(c.idItem)).map(c => ({ idItem: c.idItem, quantidadeBase: c.quantidade }))
       : ehServico(l.idItem) ? [] : [{ idItem: l.idItem, quantidadeBase: l.quantidadeBase }]);
     const linhasEstoque = venda.linhas.flatMap(saidasDaLinha);
@@ -206,10 +229,10 @@ export const registrarVenda = async (req: Request, res: Response) => {
       const medio = custos.get(idItem) || 0;
       return medio > 0 ? medio : Number(itensBanco.get(idItem)?.custo_gerencial ?? componentes.get(idItem)?.custoGerencial) || 0;
     };
-    const custoBase = (idItem: number) => (ehKit(idItem)
-      ? composicoes.get(idItem)!.reduce((a, c) => a + Math.round(custoItem(c.idItem) * c.quantidade * 10000) / 10000, 0)
-      : custoItem(idItem));
-    const totalCusto = venda.linhas.reduce((a, l) => a + custoBase(l.idItem) * l.quantidadeBase, 0);
+    const custoDaLinha = (l: { idItem: number; kit?: { componentes: Array<{ idItem: number; quantidade: number }> } | null }) => (l.kit
+      ? l.kit.componentes.reduce((a, c) => a + Math.round(custoItem(c.idItem) * c.quantidade * 10000) / 10000, 0)
+      : custoItem(l.idItem));
+    const totalCusto = venda.linhas.reduce((a, l) => a + custoDaLinha(l) * l.quantidadeBase, 0);
 
     // Taxas dos meios de pagamento: gravadas em cada pagamento (margem líquida) e, com o desconto da forma
     // automático, o desconto que a forma permite (PIX/débito) não conta para o limite
@@ -225,7 +248,7 @@ export const registrarVenda = async (req: Request, res: Response) => {
       idItem: l.idItem,
       nome: itensBanco.get(l.idItem).nome_comercial || itensBanco.get(l.idItem).nome_item,
       totalItem: l.totalItem,
-      custoTotal: custoBase(l.idItem) * l.quantidadeBase,
+      custoTotal: custoDaLinha(l) * l.quantidadeBase,
     })), regras, percentualEfetivo);
     if (avaliacao.bloqueio) throw new ErroVenda(avaliacao.bloqueio, 409, { codigo: 'ABAIXO_DO_CUSTO' });
     let autorizadoPor: string | null = null;
@@ -264,20 +287,21 @@ export const registrarVenda = async (req: Request, res: Response) => {
 
     for (const l of venda.linhas) {
       const item = itensBanco.get(l.idItem);
-      const custo = custoBase(l.idItem);
+      const custo = custoDaLinha(l);
       const [ins] = await connection.execute(
         `INSERT INTO vendas_pedidos_itens
            (tenant_id, id_venda, id_item, sku_snapshot, nome_snapshot, id_unidade, unidade_sigla, fator_conversao,
             quantidade, quantidade_base, preco_tabela, preco_unitario, desconto_valor, total_item, custo_unitario_base, custo_total)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          tenant, idVenda, l.idItem, item.sku_customizado || item.sku_core, item.nome_comercial || item.nome_item,
+          tenant, idVenda, l.idItem, item.sku_customizado || item.sku_core, nomeComTrocas(item.nome_comercial || item.nome_item, l.kit),
           l.idUnidade, l.sigla, Number(l.fator).toFixed(6), f4(l.quantidade), f4(l.quantidadeBase),
           f4(l.precoTabela), f4(l.precoUnitarioFinal), f4(l.descontoValor), f4(l.totalItem),
           f4(custo), f4(custo * l.quantidadeBase),
         ]
       );
       const idVendaItem = Number((ins as any).insertId);
+      await gravarEscolhasKit(connection as any, tenant, idVenda, idVendaItem, l.kit ?? null);
 
       // Item comum: sai ele mesmo; kit: sai cada componente, ligado a esta linha (id_origem_item)
       for (const s of saidasDaLinha(l)) {

@@ -158,6 +158,7 @@ const montarProduto = (
     tipoRecurso: String(item.tipo_recurso || 'PRODUTO').toUpperCase(),
     // Kit: estoque = quantos dá para montar com os componentes (a venda baixa os componentes)
     ehKit: Boolean(Number(item.eh_kit)),
+    kitConfiguravel: Boolean(Number(item.kit_configuravel)),
     publicavel: publicacao?.publicavel ?? true,
     motivosPublicacao: publicacao?.motivos ?? [],
   };

@@ -14,6 +14,11 @@ export interface ComponenteKit {
   custoTotal: number;
   servico: boolean;
   inativo: boolean;
+  // Kit configurável: o cliente troca a variação (mesma família) ou a quantidade na venda
+  permiteTrocar: boolean;
+  permiteAlterarQtd: boolean;
+  familiaId: number | null;
+  familia: string;
 }
 
 export interface Kit {
@@ -56,7 +61,7 @@ export interface SalvarKit {
   nome?: string;
   sku?: string;
   precoVenda?: number | null;
-  componentes?: Array<{ idItem: number; quantidade: number }>;
+  componentes?: Array<{ idItem: number; quantidade: number; permiteTrocar?: boolean; permiteAlterarQtd?: boolean }>;
 }
 
 /** Item que pode entrar no kit (busca do PDV). Saldo e custo na unidade base. */

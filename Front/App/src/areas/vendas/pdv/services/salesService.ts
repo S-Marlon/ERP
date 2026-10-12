@@ -11,6 +11,7 @@ export interface VendaPdvItemPayload {
     quantidade: number;
     idUnidade?: number | null;
     precoUnitario?: number;   // preço praticado (com desconto individual)
+    componentes?: Array<{ slot: number; idItem: number; quantidade: number }>; // kit configurável
 }
 
 export interface VendaPdvPayload {

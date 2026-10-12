@@ -51,6 +51,12 @@ export interface CartItem extends SaleItem {
   type: ItemType;
   osData?: any;
   originalPrice?: number;
+  // Kit configurável (ver cart.types.ts)
+  idItemCatalogo?: number;
+  kitEscolhas?: import('../utils/kitPdv').EscolhaKitPdv[];
+  kitPosicoes?: import('../utils/kitPdv').PosicaoKit[];
+  ajusteKit?: number;
+  kitResumo?: string;
 }
 
 export interface AutoPart extends SaleItem {

@@ -91,7 +91,8 @@ const KitsPage: React.FC = () => {
             {k.status !== 'ATIVO' && <Tag>inativo</Tag>}
           </Space>
           <Text>{k.nome}</Text>
-          <Text type="secondary" style={{ fontSize: 12 }}>{k.componentes.length} item(ns): {k.componentes.map(c => `${num(c.quantidade)} ${c.unidade} ${c.sku}`).join(' + ')}</Text>
+          <Text type="secondary" style={{ fontSize: 12 }}>{k.componentes.length} item(ns): {k.componentes.map(c => `${num(c.quantidade)} ${c.unidade} ${c.sku}${c.permiteTrocar || c.permiteAlterarQtd ? '*' : ''}`).join(' + ')}</Text>
+          {k.componentes.some(c => c.permiteTrocar || c.permiteAlterarQtd) && <Tag color="geekblue" style={{ width: 'fit-content' }}>configurável na venda (* trocável/ajustável)</Tag>}
         </Space>
       ),
     },

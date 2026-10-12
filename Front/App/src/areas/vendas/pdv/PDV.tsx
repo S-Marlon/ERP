@@ -18,6 +18,8 @@ import { PDVProvider, usePDV } from './contexts/PDVContext';
 import { ListaProdutosPdv, ModoLista } from './components/ListaProdutosPdv';
 import { ClientePdvModal, formatarDocumento } from './components/ClientePdvModal';
 import { ItemPdvDrawer } from './components/ItemPdvDrawer';
+import KitConfiguradorModal from './components/KitConfiguradorModal';
+import { idItemDaLinha } from './types/cart.types';
 import { AvisoCaixaFechado } from '../caixa/CaixaPainel';
 import { caixaStore, useCaixa } from '../caixa/caixaStore';
 import { useSituacaoCliente } from '../../financeiro/receber/receberApi';
@@ -46,6 +48,7 @@ const PDVContent: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const {
     cart, addToCart, updateQuantity, removeItem, changeUnit, applyIndividualDiscount, clearCart, carregarItens,
+    kitPendente, confirmarKit, cancelarKit, editarKit,
     estagio, setEstagio, cliente, setCliente, clienteId, clienteDocumento, selecionarCliente,
     mostrarModalCliente, setMostrarModalCliente,
     searchTerm, setSearchTerm, selectedCategory, setSelectedCategory, brand, setBrand,
@@ -85,7 +88,10 @@ const PDVContent: React.FC = () => {
 
   const itensParaSalvar = () => cart
     .filter((i: any) => i.type !== 'service' && i.type !== 'os')
-    .map((i: any) => ({ idItem: Number(i.id), quantidade: Number(i.quantity), idUnidade: i.idUnidadeVenda ?? null, precoUnitario: i.precoManual ? Number(i.price) : undefined }));
+    .map((i: any) => ({
+      idItem: idItemDaLinha(i), quantidade: Number(i.quantity), idUnidade: i.idUnidadeVenda ?? null, precoUnitario: i.precoManual ? Number(i.price) : undefined,
+      ...(i.kitEscolhas ? { componentes: i.kitEscolhas } : {}),
+    }));
 
   // Módulos plugáveis com botão no PDV (ex.: montagem de mangueira)
   const { ativos: modulosAtivos } = useModulos();
@@ -157,7 +163,7 @@ const PDVContent: React.FC = () => {
         message.info(`Orçamento ${d.id} vencido: os itens entram com os preços atuais.`);
       }
       const falhas = await carregarItens(d.itens.map(i => ({
-        idItem: i.idItem, nome: i.nome, quantidade: i.quantidade, idUnidade: i.idUnidade,
+        idItem: i.idItem, nome: i.nome, quantidade: i.quantidade, idUnidade: i.idUnidade, componentes: i.componentes,
         // Orçamento mantido: preço congelado; suspensa: mantém só o desconto manual que havia
         ...(manterPreco
           ? { precoFixo: i.precoUnitario, precoTabelaFixa: i.precoTabela }
@@ -334,6 +340,7 @@ const PDVContent: React.FC = () => {
       onBack={() => setEstagio('SELECAO')}
       estagio={estagio}
       applyIndividualDiscount={applyIndividualDiscount}
+      onEditarKit={editarKit}
       style={estilo}
     />
   );
@@ -506,6 +513,8 @@ const PDVContent: React.FC = () => {
         onFechar={() => setModalOrcamento(false)} onSalvar={salvarOrcamento} />
       <DrawerPedidosAbertos aberto={drawerPedidos !== null} abaInicial={drawerPedidos || 'SUSPENSA'} carrinhoComItens={cart.length > 0}
         onFechar={() => setDrawerPedidos(null)} onAbrir={abrirPedido} onAlterado={atualizarSuspensas} />
+
+      <KitConfiguradorModal pendente={kitPendente} onConfirmar={confirmarKit} onCancelar={cancelarKit} />
 
       <ItemPdvDrawer
         idItem={itemDetalhe}

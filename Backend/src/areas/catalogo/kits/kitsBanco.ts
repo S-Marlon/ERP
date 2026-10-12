@@ -14,6 +14,8 @@ export type DadosComponenteBanco = DadosComponente & {
   status: string;
   custoMedio: number;
   custoGerencial: number;
+  familiaId: number | null;
+  familia: string;
 };
 
 const marcadores = (ids: unknown[]) => ids.map(() => '?').join(',');
@@ -24,7 +26,7 @@ export const carregarComposicoes = async (conn: Conn, tenant: number, idsKits: n
   const ids = [...new Set(idsKits.filter(id => Number(id) > 0))];
   if (ids.length === 0) return mapa;
   const [rows] = await conn.execute(
-    `SELECT id_item_pai, id_item_filho, quantidade FROM itens_composicoes
+    `SELECT id_composicao, id_item_pai, id_item_filho, quantidade, permite_trocar, permite_alterar_qtd FROM itens_composicoes
      WHERE tenant_id = ? AND tipo_relacao = '${TIPO_KIT}' AND id_item_pai IN (${marcadores(ids)})
      ORDER BY id_composicao`,
     [tenant, ...ids]
@@ -32,7 +34,10 @@ export const carregarComposicoes = async (conn: Conn, tenant: number, idsKits: n
   for (const r of rows as any[]) {
     const pai = Number(r.id_item_pai);
     if (!mapa.has(pai)) mapa.set(pai, []);
-    mapa.get(pai)!.push({ idItem: Number(r.id_item_filho), quantidade: Number(r.quantidade) });
+    mapa.get(pai)!.push({
+      idItem: Number(r.id_item_filho), quantidade: Number(r.quantidade), idComposicao: Number(r.id_composicao),
+      permiteTrocar: Boolean(Number(r.permite_trocar)), permiteAlterarQtd: Boolean(Number(r.permite_alterar_qtd)),
+    });
   }
   return mapa;
 };
@@ -53,6 +58,7 @@ export const carregarDadosComponentes = async (conn: Conn, tenant: number, idsIt
   const [rows] = await conn.execute(
     `SELECT ic.id_item, ic.sku AS sku_core, ic.nome_item, ic.tipo_recurso, ic.status, um.sigla,
             cpd.sku_customizado, cpd.nome_comercial, COALESCE(cpd.custo_gerencial, 0) AS custo_gerencial,
+            cpd.familia_id, (SELECT f.nome FROM comercial_familias f WHERE f.id = cpd.familia_id) AS familia_nome,
             COALESCE(cpd.pode_vender_sem_estoque, 0) AS pode_vender_sem_estoque,
             COALESCE(es.quantidade_atual, 0) AS saldo, COALESCE(es.custo_medio, 0) AS custo_medio
      FROM itens_core ic
@@ -77,6 +83,8 @@ export const carregarDadosComponentes = async (conn: Conn, tenant: number, idsIt
       custoMedio,
       custoGerencial,
       custo: custoMedio > 0 ? custoMedio : custoGerencial,
+      familiaId: r.familia_id ? Number(r.familia_id) : null,
+      familia: r.familia_nome || '',
       servico: tipoRecurso === 'SERVICO',
       podeVenderSemEstoque: Boolean(Number(r.pode_vender_sem_estoque)),
     });
@@ -98,6 +106,8 @@ export const aplicarKitsNasLinhasPdv = async (conn: Conn, tenant: number, rows: 
     if (!comp) continue;
     const possivel = estoqueDoKit(comp, dados);
     r.eh_kit = 1;
+    // Tem item trocável ou de quantidade ajustável: o PDV abre a escolha ao adicionar
+    r.kit_configuravel = comp.some(c => c.permiteTrocar || c.permiteAlterarQtd) ? 1 : 0;
     r.estoque_base = possivel ?? 0;
     if (possivel === null) r.pode_vender_sem_estoque = 1;
     r.custo_medio = custoDoKit(comp, dados);
