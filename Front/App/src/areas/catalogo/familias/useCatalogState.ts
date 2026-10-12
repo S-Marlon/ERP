@@ -232,7 +232,8 @@ valorPadraoFamilia: atributo.valorPadraoFamilia || '',
 pesquisavel: atributo.pesquisavel !== false,
 bloqueado: Boolean(atributo.bloqueado),
 retransmitir: atributo.retransmitir !== false,
-origem: atributo.origem || 'locais',
+// Vinculado aqui é da própria família (o da biblioteca vem com origem 'global' e o salvar só grava os 'locais')
+origem: 'locais',
 };
 
 handleAtualizarFamiliaDireto('atributos', [...familiaSelecionada.atributos, novoAtributo]);
