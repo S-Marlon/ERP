@@ -12,6 +12,10 @@ import { detalheNotaEntrada, listarNotasEntrada } from './controllers/notasEntra
 import { corrigirLinhaNota, listarCorrecoesNota } from './controllers/correcaoEntrada.controller';
 import { classificacaoItens, sugerirVinculos } from './controllers/sugestoesVinculo.controller';
 import { excluirEquivalencia, listarEquivalencias, resolverUnidadesEntrada, salvarEquivalencia } from './controllers/unidadesEntrada.controller';
+import {
+  analiseFornecedor, completarMinimo, criarPedido, detalhePedido, excluirPedido, historicoPrecos, listarPedidos,
+  mudarStatusPedido, registrarCotacao, resumoFornecedores, salvarCondicoes,
+} from './inteligente/compraInteligente.controller';
 
 const router = Router();
 
@@ -65,5 +69,18 @@ router.get('/unidades-entrada', resolverUnidadesEntrada);
 router.get('/unidades-equivalencias', listarEquivalencias);
 router.post('/unidades-equivalencias', salvarEquivalencia);
 router.delete('/unidades-equivalencias/:id', excluirEquivalencia);
+
+// Compra inteligente: giro x saldo x fornecedor, pedido mínimo, pedidos/cotações e memória de preços
+router.get('/inteligente/fornecedores', resumoFornecedores);
+router.get('/inteligente/fornecedores/:id', analiseFornecedor);
+router.post('/inteligente/fornecedores/:id/completar', completarMinimo);
+router.put('/fornecedores/:id/condicoes', salvarCondicoes);
+router.get('/pedidos', listarPedidos);
+router.post('/pedidos', criarPedido);
+router.get('/pedidos/:id', detalhePedido);
+router.put('/pedidos/:id/status', mudarStatusPedido);
+router.put('/pedidos/:id/cotacao', registrarCotacao);
+router.delete('/pedidos/:id', excluirPedido);
+router.get('/precos/:idItem', historicoPrecos);
 
 export default router;

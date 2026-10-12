@@ -39,6 +39,7 @@ import { useModulos } from '../modulos/modulosStore';
 import { Suspense } from 'react';
 import NotasEntrada from '../areas/compras/notasEntrada/NotasEntrada';
 import ComprasDashboard from "../areas/compras/ComprasDashboard";
+import CompraInteligente from "../areas/compras/inteligente/CompraInteligente";
 import StockEntryForm from "../areas/compras/entradaNf/StockEntryForm";
 import { CatalogManager } from "../areas/catalogo/CatalogManager";
 import { CategoryManager } from "../areas/catalogo/categorias/CategoryManager";
@@ -198,6 +199,7 @@ export default function AppLayout() {
             <Route path="/catalogo/duplicados" element={<ItensDuplicados />} />
             <Route path="/catalogo/preco" element={<ProductPricingModule/>} />
             <Route path="/compras" element={<ComprasDashboard />} />
+            <Route path="/compras/inteligente" element={<CompraInteligente />} />
             <Route path="/compras/ListaCompras" element={<ListaComprasExport />} />
             <Route path="/compras/entrada-nfe" element={<StockEntryForm />} />
             <Route path="/compras/fornecedores" element={<FornecedoresList />} />

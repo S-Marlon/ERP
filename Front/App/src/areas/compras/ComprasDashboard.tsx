@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button, Card, Col, Empty, Row, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
 import {
   AlertOutlined, ArrowRightOutlined, BarChartOutlined, DiffOutlined, FileDoneOutlined, FileTextOutlined,
-  ReloadOutlined, RiseOutlined, ShoppingCartOutlined, SolutionOutlined, TeamOutlined, UnorderedListOutlined,
+  ReloadOutlined, RiseOutlined, ShoppingCartOutlined, SolutionOutlined, TeamOutlined, ThunderboltOutlined, UnorderedListOutlined,
 } from '@ant-design/icons';
 import { listarNotas, NotaEntrada, SITUACOES_NOTA } from './notasEntrada/notasEntradaApi';
 import { getFornecedores } from '../parceiros/fornecedores/fornecedores.api';
@@ -98,6 +98,7 @@ export default function ComprasDashboard() {
   );
 
   const atalhos = [
+    { titulo: 'Compra inteligente', descricao: 'O que vendeu × saldo × fornecedor: monte o pedido, complete o mínimo e guarde as cotações.', rota: '/compras/inteligente', icone: <ThunderboltOutlined />, principal: true },
     { titulo: 'Entrada de NF-e', descricao: 'Importar o XML, conferir, vincular ou cadastrar itens e dar entrada.', rota: '/compras/entrada-nfe', icone: <FileTextOutlined />, principal: true },
     { titulo: 'Notas de Entrada', descricao: 'Histórico das notas, alertas de entrada errada e correção.', rota: '/compras/notas', icone: <FileDoneOutlined /> },
     { titulo: 'Aprovação (Staging)', descricao: 'Lotes em conferência e aprovação da entrada no estoque.', rota: '/stagings', icone: <DiffOutlined /> },
@@ -107,9 +108,9 @@ export default function ComprasDashboard() {
   ];
 
   const roadmap = [
-    { titulo: 'Pedido de compra', descricao: 'Pedido ao fornecedor a partir da lista de compras, conferido contra a NF na entrada.' },
-    { titulo: 'Cotação', descricao: 'Comparar preço e prazo de vários fornecedores para os mesmos itens.' },
-    { titulo: 'Lead time e ruptura', descricao: 'Prazo de entrega por fornecedor e alerta antes de o item acabar.' },
+    { titulo: 'Pedido × nota', descricao: 'Na entrada da NF, conferir contra o pedido comprado (falta, sobra, preço diferente do cotado).' },
+    { titulo: 'Cotação em vários fornecedores', descricao: 'Mandar a mesma lista para 2 ou 3 fornecedores e comparar lado a lado.' },
+    { titulo: 'Alerta de ruptura', descricao: 'Avisar antes de o item acabar, pelo giro e pelo prazo de entrega do fornecedor.' },
   ];
 
   return (

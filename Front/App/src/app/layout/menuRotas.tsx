@@ -58,6 +58,7 @@ export const MENU_PRINCIPAL: ItemMenu[] = [
     key: 'grp:compras', icon: <ShoppingCartOutlined />, label: 'Compras', rota: '/compras',
     children: [
       { key: '/compras', label: 'Painel de Compras' },
+      { key: '/compras/inteligente', label: 'Compra inteligente' },
       { key: '/compras/entrada-nfe', label: 'Entrada de NF-e' },
       { key: '/compras/notas', label: 'Notas de Entrada' },
       { key: '/stagings', label: 'Staging (Revisão de Lotes)' },
