@@ -14,7 +14,19 @@ export interface ItemSugestao {
   vendido: number; codigoFornecedor: string | null; unidadeCompra: string; fatorCompra: number; precoCompra: number;
   consumoDia: number; coberturaAtual: number | null; necessidadeBase: number; quantidade: number; valor: number;
   motivo: 'ABAIXO_MINIMO' | 'COBERTURA' | null; origemPreco: 'COTACAO' | 'NOTA'; dataCotacao: string | null;
-  precoUltimaNota: number; fornecedorPadrao: boolean; outrosFornecedores: number;
+  precoUltimaNota: number; fornecedorPadrao: boolean;
+  // Vários fornecedores: como ESTE escreve o item, qual é o principal (como a loja conhece) e os outros
+  descricaoFornecedor: string | null;
+  ehPrincipal: boolean;
+  principal: { idFornecedor: number; fornecedor: string; codigo: string | null; descricao: string | null } | null;
+  outrosFornecedores: OutroFornecedor[];
+  precoBase: number; // por unidade de estoque
+  emPedidos: Array<{ idPedido: number; idFornecedor: number; fornecedor: string; status: string; quantidade: number; unidade: string }>;
+}
+
+export interface OutroFornecedor {
+  idFornecedor: number; fornecedor: string; codigo: string | null; descricao: string | null; unidadeCompra: string;
+  fatorCompra: number; preco: number; precoBase: number; principal: boolean;
 }
 
 export interface CondicoesFornecedor { pedidoMinimo: number; prazoEntregaDias: number; contato: string; observacao: string }
@@ -34,7 +46,7 @@ export interface PedidoResumo {
 }
 
 export interface PedidoItem {
-  idPedidoItem: number; idItem: number | null; codigoFornecedor: string | null; nome: string; unidadeCompra: string;
+  idPedidoItem: number; idItem: number | null; codigoFornecedor: string | null; nome: string; nomeCatalogo: string; skuCatalogo: string; unidadeCompra: string;
   fatorCompra: number; quantidade: number; precoEstimado: number; precoCotado: number | null; origem: string;
 }
 
@@ -81,5 +93,7 @@ export const compraInteligenteApi = {
   cotacao: async (id: number, itens: Array<{ idPedidoItem: number; precoCotado: number | null }>, validade: string | null) =>
     ler<PedidoDetalhe>(await fetch(`${API}/pedidos/${id}/cotacao?tenant_id=1`, json('PUT', { itens, validade })), 'Erro ao registrar a cotação.'),
   excluir: async (id: number) => ler<{ success: boolean }>(await fetch(`${API}/pedidos/${id}?tenant_id=1`, { method: 'DELETE' }), 'Erro ao excluir.'),
+  definirPrincipal: async (idItem: number, idFornecedor: number) =>
+    ler<{ success: boolean }>(await fetch(`${API}/itens/${idItem}/fornecedor-principal?tenant_id=1`, json('PUT', { idFornecedor })), 'Erro ao definir o fornecedor principal.'),
   historico: async (idItem: number) => ler<{ historico: PrecoHistorico[] }>(await fetch(`${API}/precos/${idItem}?tenant_id=1`), 'Erro ao carregar os preços.'),
 };

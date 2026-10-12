@@ -2,12 +2,12 @@
 // completa o pedido mínimo com os itens que acabam primeiro e envia só "código do fornecedor + quantidade".
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Alert, Button, Card, Col, Empty, Input, InputNumber, Progress, Row, Segmented, Space, Statistic, Table, Tabs, Tag, Tooltip, Typography, message,
+  Alert, Button, Card, Col, Empty, Input, InputNumber, Popover, Progress, Row, Segmented, Space, Statistic, Switch, Table, Tabs, Tag, Tooltip, Typography, message,
 } from 'antd';
 import {
-  CopyOutlined, DownloadOutlined, HistoryOutlined, ReloadOutlined, SaveOutlined, ThunderboltOutlined, ClearOutlined,
+  CopyOutlined, DownloadOutlined, HistoryOutlined, ReloadOutlined, SaveOutlined, ThunderboltOutlined, ClearOutlined, StarFilled,
 } from '@ant-design/icons';
-import { AnaliseFornecedor, CondicoesFornecedor, compraInteligenteApi, ItemSugestao, ResumoFornecedor } from './compraInteligenteApi';
+import { AnaliseFornecedor, CondicoesFornecedor, compraInteligenteApi, ItemSugestao, OutroFornecedor, ResumoFornecedor } from './compraInteligenteApi';
 import { csvPedido, situacaoMinimo, textoPedido, totalPedido } from './pedidoCompra';
 import HistoricoPrecosDrawer from './HistoricoPrecosDrawer';
 import PedidosCompra, { copiarTexto } from './PedidosCompra';
@@ -29,6 +29,27 @@ const gravarRascunho = (id: number, q: Record<number, number>) => {
     else localStorage.removeItem(chaveRascunho(id));
   } catch { /* sem armazenamento */ }
 };
+
+/** Rascunhos dos OUTROS fornecedores neste navegador: idItem -> [{ idFornecedor, quantidade }] (item já está noutra lista). */
+const rascunhosDeOutros = (idAtual: number | null) => {
+  const mapa = new Map<number, Array<{ idFornecedor: number; quantidade: number }>>();
+  try {
+    for (let k = 0; k < localStorage.length; k++) {
+      const chave = localStorage.key(k) || '';
+      const m = /^erp\.compras\.rascunho\.(\d+)$/.exec(chave);
+      if (!m || Number(m[1]) === idAtual) continue;
+      const q = JSON.parse(localStorage.getItem(chave) || '{}') as Record<string, number>;
+      for (const [id, qtd] of Object.entries(q)) {
+        if (!(Number(qtd) > 0)) continue;
+        if (!mapa.has(Number(id))) mapa.set(Number(id), []);
+        mapa.get(Number(id))!.push({ idFornecedor: Number(m[1]), quantidade: Number(qtd) });
+      }
+    }
+  } catch { /* sem armazenamento */ }
+  return mapa;
+};
+
+const STATUS_PEDIDO: Record<string, string> = { RASCUNHO: 'rascunho', ENVIADO: 'enviado', COTADO: 'cotado' };
 
 const baixar = (nome: string, conteudo: string) => {
   const blob = new Blob(['﻿' + conteudo], { type: 'text/csv;charset=utf-8' });
@@ -59,6 +80,7 @@ const CompraInteligente: React.FC = () => {
   const [historico, setHistorico] = useState<ItemSugestao | null>(null);
   const [versaoPedidos, setVersaoPedidos] = useState(0);
   const [erro, setErro] = useState<string | null>(null);
+  const [incluirDescricao, setIncluirDescricao] = useState(false);
 
   const carregarResumo = useCallback(async () => {
     setCarregandoResumo(true);
@@ -95,6 +117,40 @@ const CompraInteligente: React.FC = () => {
   };
 
   const itens = analise?.itens || [];
+  const nomeDoFornecedor = useMemo(() => new Map(resumo.map(r => [r.idFornecedor, r.nome])), [resumo]);
+  // Item já colocado na lista (rascunho) de outro fornecedor neste navegador
+  const outrasListas = useMemo(() => rascunhosDeOutros(idFornecedor), [idFornecedor, quantidades, analise]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const tornarPrincipal = async (i: ItemSugestao, idNovo: number) => {
+    try {
+      await compraInteligenteApi.definirPrincipal(i.idItem, idNovo);
+      message.success('Fornecedor principal do item atualizado.');
+      if (idFornecedor) carregarFornecedor(idFornecedor, true);
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : 'Erro.');
+    }
+  };
+
+  // Outros fornecedores do item: código, preço por unidade de estoque (para comparar) e tornar principal
+  const painelFornecedores = (i: ItemSugestao) => {
+    const todos: Array<OutroFornecedor & { atual?: boolean }> = [
+      { idFornecedor: idFornecedor!, fornecedor: analise?.fornecedor.nome || '', codigo: i.codigoFornecedor, descricao: i.descricaoFornecedor,
+        unidadeCompra: i.unidadeCompra, fatorCompra: i.fatorCompra, preco: i.precoCompra, precoBase: i.precoBase, principal: i.ehPrincipal, atual: true },
+      ...i.outrosFornecedores,
+    ];
+    const menor = Math.min(...todos.filter(t => t.precoBase > 0).map(t => t.precoBase));
+    return (
+      <Table
+        size="small" rowKey="idFornecedor" pagination={false} dataSource={todos} style={{ width: 640 }}
+        columns={[
+          { title: 'Fornecedor', key: 'f', render: (_, t) => <Space size={4}>{t.principal && <StarFilled style={{ color: '#faad14' }} />}<Text strong={t.atual}>{t.fornecedor}</Text>{t.atual && <Tag>esta lista</Tag>}</Space> },
+          { title: 'Código / descrição', key: 'c', render: (_, t) => <Space direction="vertical" size={0}><Text>{t.codigo || '—'}</Text><Text type="secondary" style={{ fontSize: 11 }}>{t.descricao || ''}</Text></Space> },
+          { title: `Por ${i.unidade || 'un'}`, key: 'p', width: 100, align: 'right' as const, render: (_, t) => (t.precoBase > 0 ? <Text type={t.precoBase === menor ? 'success' : undefined} strong={t.precoBase === menor}>{brl(t.precoBase)}</Text> : '—') },
+          { key: 'a', width: 110, render: (_, t) => (t.principal ? <Tag color="gold">principal</Tag> : <Button size="small" onClick={() => tornarPrincipal(i, t.idFornecedor)}>Tornar principal</Button>) },
+        ]}
+      />
+    );
+  };
   const linhasPedido = useMemo(() => itens.filter(i => (quantidades[i.idItem] || 0) > 0)
     .map(i => ({ ...i, quantidadePedido: quantidades[i.idItem] })), [itens, quantidades]);
   const total = totalPedido(linhasPedido.map(l => ({ quantidade: l.quantidadePedido, precoCompra: l.precoCompra })));
@@ -148,8 +204,9 @@ const CompraInteligente: React.FC = () => {
     try { await compraInteligenteApi.salvarCondicoes(idFornecedor, condicoes); message.success('Condições do fornecedor salvas.'); carregarResumo(); } catch (e) { message.error(e instanceof Error ? e.message : 'Erro.'); }
   };
 
-  const linhasExport = linhasPedido.map(l => ({ codigoFornecedor: l.codigoFornecedor, nome: l.nome, quantidade: l.quantidadePedido, unidadeCompra: l.unidadeCompra, precoCompra: l.precoCompra }));
-  const texto = analise ? textoPedido(analise.fornecedor.nome, linhasExport) : '';
+  // O que vai para o fornecedor sai do jeito DELE (código e descrição da nota dele); a tela mostra o principal
+  const linhasExport = linhasPedido.map(l => ({ codigoFornecedor: l.codigoFornecedor, nome: l.descricaoFornecedor || l.nome, quantidade: l.quantidadePedido, unidadeCompra: l.unidadeCompra, precoCompra: l.precoCompra }));
+  const texto = analise ? textoPedido(analise.fornecedor.nome, linhasExport, '', incluirDescricao) : '';
   const semCodigo = linhasPedido.filter(l => !l.codigoFornecedor).length;
 
   const salvarPedido = async () => {
@@ -173,16 +230,47 @@ const CompraInteligente: React.FC = () => {
   const colunas = [
     {
       title: 'Item', key: 'item',
-      render: (_: unknown, i: ItemSugestao) => (
-        <Space direction="vertical" size={0}>
-          <Text>{i.nome}</Text>
-          <Space size={4} wrap>
-            <Text type="secondary" style={{ fontSize: 11 }}>{i.sku}</Text>
-            <Text style={{ fontSize: 11 }} type={i.codigoFornecedor ? undefined : 'warning'}>· cód. forn.: {i.codigoFornecedor || 'sem código'}</Text>
-            {i.outrosFornecedores > 0 && <Tooltip title="Também é comprado de outro fornecedor"><Tag style={{ fontSize: 10 }}>+{i.outrosFornecedores} forn.</Tag></Tooltip>}
+      render: (_: unknown, i: ItemSugestao) => {
+        const emOutraLista = (outrasListas.get(i.idItem) || []);
+        const pedidos = i.emPedidos || [];
+        return (
+          <Space direction="vertical" size={0}>
+            {/* Como a loja conhece o item: nome do catálogo + código do fornecedor principal */}
+            <Text strong>{i.nome}</Text>
+            <Space size={4} wrap>
+              <Text type="secondary" style={{ fontSize: 11 }}>{i.sku}</Text>
+              {i.principal && !i.ehPrincipal && (
+                <Tooltip title={i.principal.descricao || undefined}>
+                  <Tag color="gold" style={{ fontSize: 11 }}><StarFilled /> {i.principal.fornecedor} · {i.principal.codigo || 'sem código'}</Tag>
+                </Tooltip>
+              )}
+              {i.ehPrincipal && i.outrosFornecedores.length > 0 && <Tag color="gold" style={{ fontSize: 11 }}><StarFilled /> principal</Tag>}
+              {i.outrosFornecedores.length > 0 && (
+                <Popover content={painelFornecedores(i)} title="Fornecedores deste item" trigger="click">
+                  <Tag style={{ fontSize: 11, cursor: 'pointer' }}>+{i.outrosFornecedores.length} fornecedor(es) · comparar</Tag>
+                </Popover>
+              )}
+            </Space>
+            {/* Como ESTE fornecedor escreve (é assim que vai no pedido) */}
+            <Text style={{ fontSize: 11 }} type={i.codigoFornecedor ? 'secondary' : 'warning'}>
+              Nesta lista: {i.codigoFornecedor || 'sem código'}{i.descricaoFornecedor && i.descricaoFornecedor !== i.nome ? ` · ${i.descricaoFornecedor}` : ''}
+            </Text>
+            {(emOutraLista.length > 0 || pedidos.length > 0) && (
+              <Space size={4} wrap>
+                {emOutraLista.map(o => {
+                  const v = i.outrosFornecedores.find(x => x.idFornecedor === o.idFornecedor);
+                  return <Tag key={`r${o.idFornecedor}`} color="orange" style={{ fontSize: 11 }}>já na lista da {nomeDoFornecedor.get(o.idFornecedor) || v?.fornecedor || `fornecedor ${o.idFornecedor}`}: {num(o.quantidade)} {v?.unidadeCompra || ''}</Tag>;
+                })}
+                {pedidos.map(pd => (
+                  <Tag key={`p${pd.idPedido}`} color={pd.idFornecedor === idFornecedor ? 'blue' : 'purple'} style={{ fontSize: 11 }}>
+                    pedido {pd.idPedido} {pd.idFornecedor === idFornecedor ? '' : `(${pd.fornecedor}) `}{STATUS_PEDIDO[pd.status] || pd.status}: {num(pd.quantidade)} {pd.unidade}
+                  </Tag>
+                ))}
+              </Space>
+            )}
           </Space>
-        </Space>
-      ),
+        );
+      },
     },
     { title: 'Saldo', key: 'saldo', width: 90, align: 'right' as const, sorter: (a: ItemSugestao, b: ItemSugestao) => a.saldo - b.saldo, render: (_: unknown, i: ItemSugestao) => `${num(i.saldo)} ${i.unidade}` },
     {
@@ -321,6 +409,9 @@ const CompraInteligente: React.FC = () => {
                 <Col xs={12} md={5}><Statistic title="Total estimado" value={total} precision={2} prefix="R$" /></Col>
                 <Col xs={24} md={15} style={{ textAlign: 'right' }}>
                   <Space wrap>
+                    <Tooltip title="No texto, além do código, vai a descrição como este fornecedor escreve o item">
+                      <Space size={4}><Switch size="small" checked={incluirDescricao} onChange={setIncluirDescricao} /><Text style={{ fontSize: 12 }}>com descrição</Text></Space>
+                    </Tooltip>
                     <Button icon={<CopyOutlined />} disabled={!linhasPedido.length} onClick={() => copiarTexto(texto)}>Copiar texto</Button>
                     <Button icon={<DownloadOutlined />} disabled={!linhasPedido.length}
                       onClick={() => baixar(`pedido-${analise.fornecedor.nome.replace(/\W+/g, '-').toLowerCase()}.csv`, csvPedido(linhasExport))}>Baixar planilha</Button>

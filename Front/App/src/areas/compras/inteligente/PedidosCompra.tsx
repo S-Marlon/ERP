@@ -102,7 +102,15 @@ const PedidoDrawer: React.FC<{ id: number | null; onFechar: () => void; onAltera
             dataSource={p.itens}
             columns={[
               { title: 'Cód. fornecedor', dataIndex: 'codigoFornecedor', width: 130, render: (v: string | null) => v || <Text type="warning">sem código</Text> },
-              { title: 'Item', dataIndex: 'nome', ellipsis: true },
+              {
+                title: 'Item', key: 'item',
+                render: (_, i) => (
+                  <Space direction="vertical" size={0}>
+                    <Text strong>{i.nomeCatalogo}</Text>
+                    {i.nome !== i.nomeCatalogo && <Text type="secondary" style={{ fontSize: 11 }}>como o fornecedor escreve: {i.nome}</Text>}
+                  </Space>
+                ),
+              },
               { title: 'Qtd', key: 'q', width: 90, align: 'right' as const, render: (_, i) => `${i.quantidade.toLocaleString('pt-BR')} ${i.unidadeCompra}` },
               { title: 'Estimado', dataIndex: 'precoEstimado', width: 100, align: 'right' as const, render: (v: number) => brl(v) },
               {

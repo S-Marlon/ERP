@@ -121,3 +121,33 @@ export const textoDoPedido = (
     `${itens.length} item(ns).${observacao ? ` ${observacao}` : ''}`,
   ].join('\n');
 };
+
+// ---------------------------------------------------------------- vários fornecedores para o mesmo item
+
+export interface VinculoFornecedor {
+  idFornecedor: number;
+  fornecedor: string;
+  codigo: string | null;
+  descricao: string | null;   // como o fornecedor escreve (última nota)
+  unidadeCompra: string;
+  fatorCompra: number;
+  preco: number;              // por unidade de compra
+  padrao: boolean;            // marcado como fornecedor padrão no cadastro
+  notas: number;              // quantas vezes entrou em nota deste fornecedor
+  ultimaNota: number;         // id da última nota (desempate: a mais recente)
+}
+
+/**
+ * Fornecedor principal do item (o "jeito" como a loja conhece o item): o marcado como padrão;
+ * sem marcação, o de quem mais comprou (mais notas), depois o da compra mais recente.
+ */
+export const escolherPrincipal = (vinculos: VinculoFornecedor[]): VinculoFornecedor | null => {
+  if (vinculos.length === 0) return null;
+  const padrao = vinculos.find(v => v.padrao);
+  if (padrao) return padrao;
+  return [...vinculos].sort((a, b) => b.notas - a.notas || b.ultimaNota - a.ultimaNota || a.idFornecedor - b.idFornecedor)[0];
+};
+
+/** Preço por unidade de estoque, para comparar fornecedores com embalagens diferentes. */
+export const precoPorUnidadeBase = (v: { preco: number; fatorCompra: number }) =>
+  Math.round((v.preco / fatorValido(v.fatorCompra)) * 10000) / 10000;

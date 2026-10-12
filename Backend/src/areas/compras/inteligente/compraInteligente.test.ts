@@ -1,5 +1,8 @@
 import assert from 'assert';
-import { completarPedidoMinimo, coberturaDias, embalagens, ItemDoFornecedor, sugerirItem, textoDoPedido, totalDoPedido } from './compraInteligente';
+import {
+  completarPedidoMinimo, coberturaDias, embalagens, escolherPrincipal, ItemDoFornecedor, precoPorUnidadeBase, sugerirItem, textoDoPedido,
+  totalDoPedido, VinculoFornecedor,
+} from './compraInteligente';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -65,4 +68,18 @@ teste('texto só com código e quantidade', () => {
   assert.ok(t.includes('(sem código) ABRAÇADEIRA 1/2 - 1,5 CX'));
   assert.ok(!t.includes('F-300'));
   assert.ok(t.includes('2 item(ns).'));
+});
+
+
+const vinc = (idFornecedor: number, extra: Partial<VinculoFornecedor> = {}): VinculoFornecedor => ({
+  idFornecedor, fornecedor: `F${idFornecedor}`, codigo: `C${idFornecedor}`, descricao: null, unidadeCompra: 'MT', fatorCompra: 1,
+  preco: 10, padrao: false, notas: 0, ultimaNota: 0, ...extra,
+});
+
+teste('fornecedor principal: padrão, depois quem mais comprou, depois o mais recente', () => {
+  assert.strictEqual(escolherPrincipal([]), null);
+  assert.strictEqual(escolherPrincipal([vinc(1, { notas: 9 }), vinc(2, { padrao: true })])!.idFornecedor, 2);
+  assert.strictEqual(escolherPrincipal([vinc(1, { notas: 2 }), vinc(2, { notas: 5 })])!.idFornecedor, 2);
+  assert.strictEqual(escolherPrincipal([vinc(1, { notas: 2, ultimaNota: 10 }), vinc(2, { notas: 2, ultimaNota: 30 })])!.idFornecedor, 2);
+  assert.strictEqual(precoPorUnidadeBase({ preco: 200, fatorCompra: 50 }), 4);
 });

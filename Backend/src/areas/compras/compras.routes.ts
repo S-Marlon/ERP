@@ -13,7 +13,7 @@ import { corrigirLinhaNota, listarCorrecoesNota } from './controllers/correcaoEn
 import { classificacaoItens, sugerirVinculos } from './controllers/sugestoesVinculo.controller';
 import { excluirEquivalencia, listarEquivalencias, resolverUnidadesEntrada, salvarEquivalencia } from './controllers/unidadesEntrada.controller';
 import {
-  analiseFornecedor, completarMinimo, criarPedido, detalhePedido, excluirPedido, historicoPrecos, listarPedidos,
+  analiseFornecedor, completarMinimo, criarPedido, definirFornecedorPrincipal, detalhePedido, excluirPedido, historicoPrecos, listarPedidos,
   mudarStatusPedido, registrarCotacao, resumoFornecedores, salvarCondicoes,
 } from './inteligente/compraInteligente.controller';
 
@@ -82,5 +82,6 @@ router.put('/pedidos/:id/status', mudarStatusPedido);
 router.put('/pedidos/:id/cotacao', registrarCotacao);
 router.delete('/pedidos/:id', excluirPedido);
 router.get('/precos/:idItem', historicoPrecos);
+router.put('/itens/:idItem/fornecedor-principal', definirFornecedorPrincipal);
 
 export default router;

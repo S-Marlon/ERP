@@ -21,13 +21,20 @@ export const situacaoMinimo = (total: number, minimo: number) => ({
   atinge: !(minimo > 0) || total >= minimo - 0.004,
 });
 
-/** Texto para o fornecedor (WhatsApp/e-mail): só código e quantidade. */
-export const textoPedido = (fornecedor: string, linhas: LinhaPedido[], observacao = '') => {
+/**
+ * Texto para o fornecedor (WhatsApp/e-mail): código e quantidade; com incluirDescricao, também a descrição
+ * como o próprio fornecedor escreve (nome = descrição do fornecedor).
+ */
+export const textoPedido = (fornecedor: string, linhas: LinhaPedido[], observacao = '', incluirDescricao = false) => {
   const itens = linhas.filter(l => l.quantidade > 0);
   return [
     `Olá, ${fornecedor}! Por favor, orçamento dos itens abaixo:`,
     '',
-    ...itens.map(l => `${l.codigoFornecedor || `(sem código) ${l.nome}`} - ${qtdTexto(l.quantidade)} ${l.unidadeCompra}`.trim()),
+    ...itens.map(l => {
+      const qtd = `${qtdTexto(l.quantidade)} ${l.unidadeCompra}`.trim();
+      if (!l.codigoFornecedor) return `(sem código) ${l.nome} - ${qtd}`;
+      return incluirDescricao && l.nome ? `${l.codigoFornecedor} - ${l.nome} - ${qtd}` : `${l.codigoFornecedor} - ${qtd}`;
+    }),
     '',
     `${itens.length} item(ns).${observacao ? ` ${observacao}` : ''}`,
   ].join('\n');

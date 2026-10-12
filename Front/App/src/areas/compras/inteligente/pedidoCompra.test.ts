@@ -22,6 +22,7 @@ teste('texto e CSV só com o que tem quantidade', () => {
   assert.ok(t.includes('F-100 - 2 RL'));
   assert.ok(t.includes('(sem código) ABRAÇADEIRA; 1/2 - 1,5 CX'));
   assert.ok(!t.includes('F-300'));
+  assert.ok(textoPedido('Hilik', linhas, '', true).includes('F-100 - MANGUEIRA WAP - 2 RL'));
   const csv = csvPedido(linhas).split('\r\n');
   assert.strictEqual(csv.length, 3);
   assert.strictEqual(csv[1], 'F-100;2;RL;MANGUEIRA WAP');

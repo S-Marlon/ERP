@@ -4,7 +4,10 @@
 import { Request, Response } from 'express';
 import pool from '../../../infra/db';
 import { operadorDe } from '../../vendas/caixa/caixa.controller';
-import { completarPedidoMinimo, ItemDoFornecedor, sugerirItem, SugestaoItem, textoDoPedido, totalDoPedido } from './compraInteligente';
+import {
+  completarPedidoMinimo, escolherPrincipal, ItemDoFornecedor, precoPorUnidadeBase, sugerirItem, SugestaoItem, textoDoPedido, totalDoPedido,
+  VinculoFornecedor,
+} from './compraInteligente';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
 
@@ -76,17 +79,77 @@ const ultimasCotacoes = async (conn: Conn, tenant: number, idFornecedor: number)
   return mapa;
 };
 
+/**
+ * Todos os fornecedores de cada item: código, descrição como o fornecedor escreve (última nota), embalagem,
+ * preço e quantas vezes foi comprado de cada um (para achar o principal).
+ */
+const vinculosDosItens = async (conn: Conn, tenant: number, ids: number[]) => {
+  const mapa = new Map<number, VinculoFornecedor[]>();
+  if (ids.length === 0) return mapa;
+  const marc = ids.map(() => '?').join(',');
+  const [links] = await conn.execute(
+    `SELECT cfp.id_item, cfp.id_fornecedor, ${nomeFornecedor} AS fornecedor, cfp.codigo_produto_fornecedor, cfp.unidade_compra,
+            cfp.fator_compra, cfp.preco_ultima_compra, cfp.padrao
+     FROM comercial_fornecedores_produtos cfp INNER JOIN pessoas_pj pj ON pj.id_cliente = cfp.id_fornecedor
+     WHERE cfp.tenant_id = ? AND cfp.id_item IN (${marc})`,
+    [tenant, ...ids]
+  );
+  const [notas] = await conn.execute(
+    `SELECT s.produto_id_sistema AS id_item, pj.id_cliente AS id_fornecedor, COUNT(*) AS notas, MAX(l.id) AS ultima,
+            SUBSTRING_INDEX(GROUP_CONCAT(s.nome_fornecedor ORDER BY l.id DESC SEPARATOR '\n'), '\n', 1) AS descricao
+     FROM importacao_produtos_staging s
+     INNER JOIN importacoes_lotes l ON l.id = s.lote_importacao_id AND l.status = 'IMPORTADO'
+     INNER JOIN pessoas_pj pj ON pj.cnpj = l.cnpj_fornecedor
+     WHERE s.tenant_id = ? AND s.produto_id_sistema IN (${marc})
+     GROUP BY s.produto_id_sistema, pj.id_cliente`,
+    [tenant, ...ids]
+  );
+  const porPar = new Map<string, any>((notas as any[]).map(r => [`${r.id_item}:${r.id_fornecedor}`, r]));
+  for (const r of links as any[]) {
+    const id = Number(r.id_item);
+    const nf = porPar.get(`${id}:${r.id_fornecedor}`);
+    if (!mapa.has(id)) mapa.set(id, []);
+    mapa.get(id)!.push({
+      idFornecedor: Number(r.id_fornecedor), fornecedor: r.fornecedor, codigo: r.codigo_produto_fornecedor || null,
+      descricao: nf?.descricao || null, unidadeCompra: r.unidade_compra || '', fatorCompra: n(r.fator_compra) || 1,
+      preco: n(r.preco_ultima_compra), padrao: Boolean(Number(r.padrao)), notas: n(nf?.notas), ultimaNota: n(nf?.ultima),
+    });
+  }
+  return mapa;
+};
+
+/** Pedidos em aberto (rascunho salvo, enviado ou cotado) que já têm o item, de qualquer fornecedor. */
+const pedidosAbertosDosItens = async (conn: Conn, tenant: number, ids: number[]) => {
+  const mapa = new Map<number, Array<{ idPedido: number; idFornecedor: number; fornecedor: string; status: string; quantidade: number; unidade: string }>>();
+  if (ids.length === 0) return mapa;
+  const [rows] = await conn.execute(
+    `SELECT i.id_item, p.id_pedido, p.id_fornecedor, ${nomeFornecedor} AS fornecedor, p.status, i.quantidade, i.unidade_compra
+     FROM compras_pedidos_itens i
+     INNER JOIN compras_pedidos p ON p.id_pedido = i.id_pedido
+     LEFT JOIN pessoas_pj pj ON pj.id_cliente = p.id_fornecedor
+     WHERE p.tenant_id = ? AND p.status IN ('RASCUNHO', 'ENVIADO', 'COTADO') AND i.id_item IN (${ids.map(() => '?').join(',')})
+     ORDER BY p.id_pedido DESC`,
+    [tenant, ...ids]
+  );
+  for (const r of rows as any[]) {
+    const id = Number(r.id_item);
+    if (!mapa.has(id)) mapa.set(id, []);
+    mapa.get(id)!.push({ idPedido: Number(r.id_pedido), idFornecedor: Number(r.id_fornecedor), fornecedor: r.fornecedor || '', status: r.status, quantidade: n(r.quantidade), unidade: r.unidade_compra || '' });
+  }
+  return mapa;
+};
+
 /** Itens do fornecedor com giro, saldo, preço e sugestão. */
 const analisarFornecedor = async (
   conn: Conn, tenant: number, idFornecedor: number, p: { dias: number; coberturaDias: number; prazoEntregaDias: number },
-  vendidoPronto?: Map<number, number>
+  vendidoPronto?: Map<number, number>,
+  detalhado = true // vínculos de outros fornecedores e pedidos abertos (o resumo não precisa)
 ) => {
   const [rows] = await conn.execute(
     `SELECT cfp.id_item, cfp.codigo_produto_fornecedor, cfp.unidade_compra, cfp.fator_compra, cfp.preco_ultima_compra, cfp.padrao,
             ic.sku AS sku_core, ic.nome_item, ic.status, um.sigla AS unidade,
             cpd.sku_customizado, cpd.nome_comercial, f.estoque_minimo AS minimo_familia,
-            COALESCE(es.quantidade_atual, 0) AS saldo, es.estoque_minimo, es.estoque_maximo,
-            (SELECT COUNT(*) FROM comercial_fornecedores_produtos o WHERE o.tenant_id = cfp.tenant_id AND o.id_item = cfp.id_item AND o.id_fornecedor <> cfp.id_fornecedor) AS outros_fornecedores
+            COALESCE(es.quantidade_atual, 0) AS saldo, es.estoque_minimo, es.estoque_maximo
      FROM comercial_fornecedores_produtos cfp
      INNER JOIN itens_core ic ON ic.id_item = cfp.id_item AND ic.tenant_id = cfp.tenant_id
      LEFT JOIN itens_unidades_medida um ON um.id_unidade = ic.id_unidade
@@ -101,6 +164,9 @@ const analisarFornecedor = async (
     vendidoPronto ? Promise.resolve(vendidoPronto) : vendidoNoPeriodo(conn, tenant, p.dias, ids),
     ultimasCotacoes(conn, tenant, idFornecedor),
   ]);
+  const [vinculos, emPedidos] = detalhado
+    ? await Promise.all([vinculosDosItens(conn, tenant, ids), pedidosAbertosDosItens(conn, tenant, ids)])
+    : [new Map<number, VinculoFornecedor[]>(), new Map<number, any[]>()];
   return (rows as any[]).map(r => {
     const id = Number(r.id_item);
     const cotacao = cotacoes.get(id);
@@ -119,13 +185,27 @@ const analisarFornecedor = async (
       fatorCompra: n(r.fator_compra) || 1,
       precoCompra: cotacao ? cotacao.preco : n(r.preco_ultima_compra),
     };
+    const todos = vinculos.get(id) || [];
+    const principal = escolherPrincipal(todos);
+    const deste = todos.find(v => v.idFornecedor === idFornecedor);
     return {
       ...sugerirItem(item, p),
       origemPreco: cotacao ? 'COTACAO' : 'NOTA',
       dataCotacao: cotacao?.data || null,
       precoUltimaNota: n(r.preco_ultima_compra),
       fornecedorPadrao: Boolean(Number(r.padrao)),
-      outrosFornecedores: n(r.outros_fornecedores),
+      // Como ESTE fornecedor escreve o item (vai no pedido para ele)
+      descricaoFornecedor: deste?.descricao || null,
+      // Como a loja conhece o item: o fornecedor principal (marcado ou o mais comprado)
+      ehPrincipal: !principal || principal.idFornecedor === idFornecedor,
+      principal: principal ? { idFornecedor: principal.idFornecedor, fornecedor: principal.fornecedor, codigo: principal.codigo, descricao: principal.descricao } : null,
+      outrosFornecedores: todos.filter(v => v.idFornecedor !== idFornecedor).map(v => ({
+        idFornecedor: v.idFornecedor, fornecedor: v.fornecedor, codigo: v.codigo, descricao: v.descricao, unidadeCompra: v.unidadeCompra,
+        fatorCompra: v.fatorCompra, preco: v.preco, precoBase: precoPorUnidadeBase(v), principal: principal?.idFornecedor === v.idFornecedor,
+      })),
+      precoBase: precoPorUnidadeBase({ preco: item.precoCompra, fatorCompra: item.fatorCompra }),
+      // Já pedido (pedido salvo em aberto), deste ou de outro fornecedor
+      emPedidos: emPedidos.get(id) || [],
     };
   });
 };
@@ -151,7 +231,7 @@ export const resumoFornecedores = async (req: Request, res: Response) => {
     const saida = [];
     for (const f of forn) {
       const c = condicoes.get(Number(f.id));
-      const itens = await analisarFornecedor(pool as any, tenant, Number(f.id), parametros(req, c?.prazoEntregaDias || 0), vendido);
+      const itens = await analisarFornecedor(pool as any, tenant, Number(f.id), parametros(req, c?.prazoEntregaDias || 0), vendido, false);
       const repor = itens.filter(i => i.quantidade > 0);
       const valor = totalDoPedido(repor);
       saida.push({
@@ -242,11 +322,16 @@ const carregarPedido = async (conn: Conn, tenant: number, id: number) => {
   );
   if (!p) return null;
   const [itens]: any = await conn.execute(
-    `SELECT * FROM compras_pedidos_itens WHERE id_pedido = ? ORDER BY id_pedido_item`, [id]
+    `SELECT i.*, COALESCE(NULLIF(TRIM(cpd.nome_comercial), ''), ic.nome_item) AS nome_catalogo,
+            COALESCE(NULLIF(TRIM(cpd.sku_customizado), ''), ic.sku) AS sku_catalogo
+     FROM compras_pedidos_itens i
+     LEFT JOIN itens_core ic ON ic.id_item = i.id_item
+     LEFT JOIN comercial_produtos_dados cpd ON cpd.id_item = i.id_item AND cpd.tenant_id = i.tenant_id
+     WHERE i.id_pedido = ? ORDER BY i.id_pedido_item`, [id]
   );
   const linhas = itens.map((i: any) => ({
     idPedidoItem: Number(i.id_pedido_item), idItem: i.id_item ? Number(i.id_item) : null, codigoFornecedor: i.codigo_fornecedor,
-    nome: i.descricao, unidadeCompra: i.unidade_compra || '', fatorCompra: n(i.fator_compra) || 1, quantidade: n(i.quantidade),
+    nome: i.descricao, nomeCatalogo: i.nome_catalogo || i.descricao, skuCatalogo: i.sku_catalogo || '', unidadeCompra: i.unidade_compra || '', fatorCompra: n(i.fator_compra) || 1, quantidade: n(i.quantidade),
     precoEstimado: n(i.preco_estimado), precoCotado: i.preco_cotado !== null ? n(i.preco_cotado) : null, origem: i.origem,
   }));
   return {
@@ -288,7 +373,7 @@ export const criarPedido = async (req: Request, res: Response) => {
       await connection.execute(
         `INSERT INTO compras_pedidos_itens (tenant_id, id_pedido, id_item, codigo_fornecedor, descricao, unidade_compra, fator_compra, quantidade, preco_estimado, origem)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [tenant, idPedido, l.a.idItem, l.a.codigoFornecedor, String(l.a.nome).slice(0, 255), String(l.a.unidadeCompra || '').slice(0, 10),
+        [tenant, idPedido, l.a.idItem, l.a.codigoFornecedor, String(l.a.descricaoFornecedor || l.a.nome).slice(0, 255), String(l.a.unidadeCompra || '').slice(0, 10),
           Number(l.a.fatorCompra).toFixed(6), f4(l.quantidade), f4(l.a.precoCompra), l.origem]
       );
     }
@@ -392,6 +477,25 @@ export const registrarCotacao = async (req: Request, res: Response) => {
     return responderErro(res, error, 'Erro ao registrar a cotação.');
   } finally {
     connection.release();
+  }
+};
+
+/** PUT /api/compras/itens/:idItem/fornecedor-principal { idFornecedor } — marca o fornecedor padrão (principal) do item */
+export const definirFornecedorPrincipal = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  try {
+    const idItem = Number(req.params.idItem);
+    const idFornecedor = Number(req.body?.idFornecedor);
+    const [[existe]]: any = await pool.execute(
+      `SELECT 1 FROM comercial_fornecedores_produtos WHERE tenant_id = ? AND id_item = ? AND id_fornecedor = ?`, [tenant, idItem, idFornecedor]
+    );
+    if (!existe) throw new ErroCompra('Este fornecedor não tem vínculo com o item.', 404);
+    await pool.execute(
+      `UPDATE comercial_fornecedores_produtos SET padrao = (id_fornecedor = ?) WHERE tenant_id = ? AND id_item = ?`, [idFornecedor, tenant, idItem]
+    );
+    return res.json({ success: true });
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao definir o fornecedor principal.');
   }
 };
 
