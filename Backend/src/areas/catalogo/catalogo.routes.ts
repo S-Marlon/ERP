@@ -3,6 +3,7 @@
 import { Router, Request, Response } from 'express';
 
 // 🧬 Controller de Atributos Globais (Dicionário do ERP)
+import { converterEmLista, corrigirValores, detalheAtributo, editarOpcao, excluirOpcao, mesclarOpcao, ordenarOpcoes } from './atributos/atributoEdicao.controller';
 import { getAtributosGlobais, createAtributoGlobal, createAtributoGlobalRapido, updateAtributoGlobal, deleteAtributoGlobal, mesclarAtributos, adicionarOpcaoAtributo } from './atributos/atributosGlobais.controller';
 
 // 📂 Controller de Grupos de Atributos Semânticos
@@ -97,6 +98,14 @@ router.delete('/atributos-globais/:idAtributo', deleteAtributoGlobal);
 // Junta atributos duplicados (valores, vínculos e templates vão para o destino)
 router.post('/atributos-globais/:idAtributo/mesclar', mesclarAtributos);
 router.post('/atributos-globais/:idAtributo/opcoes', adicionarOpcaoAtributo);
+// Edição detalhada: uso, travas, opções no lugar (renomear, código, ordem, mesclar, excluir), texto → lista, correções
+router.get('/atributos-globais/:idAtributo/detalhe', detalheAtributo);
+router.put('/atributos-globais/:idAtributo/opcoes-ordem', ordenarOpcoes);
+router.put('/atributos-globais/:idAtributo/opcoes/:idOpcao', editarOpcao);
+router.delete('/atributos-globais/:idAtributo/opcoes/:idOpcao', excluirOpcao);
+router.post('/atributos-globais/:idAtributo/opcoes/:idOpcao/mesclar', mesclarOpcao);
+router.post('/atributos-globais/:idAtributo/converter-lista', converterEmLista);
+router.post('/atributos-globais/:idAtributo/corrigir-valores', corrigirValores);
 
 // =========================================================================
 // 📁 GRUPOS DE ATRIBUTOS SEMÂNTICOS

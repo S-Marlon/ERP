@@ -214,3 +214,58 @@ export const deleteAtributoGlobal = async (idAtributo: string, tenantId: number 
 
   return handleResponse<GenericAttributeAPIResponse>(response, 'Erro ao remover o atributo global selecionado.');
 };
+// =========================================================================
+// ✏️ EDIÇÃO DETALHADA: uso, travas, opções no lugar, texto → lista, correções
+// =========================================================================
+
+export type NivelTrava = 'livre' | 'aviso' | 'bloqueado';
+export interface Trava { nivel: NivelTrava; motivo: string }
+export interface FamiliaNoModelo { id: number; nome: string; noNome: { texto: boolean; codigo: boolean }; noSku: { texto: boolean; codigo: boolean } }
+export interface OpcaoDetalhe { id: number; valor: string; codigo: string; ordem: number; itens: number }
+export interface DetalheAtributo {
+  atributo: {
+    id: string; nome: string; codigo: string; tipo: string; escopoPadrao: string; grupoId: string; unidadeId: string;
+    descricao: string; obrigatorioPadrao: boolean; pesquisavel: boolean;
+  };
+  uso: {
+    itens: number;
+    vinculos: Array<{ tipo: 'familia' | 'categoria'; id: number; nome: string; escopo: string; obrigatorio: boolean }>;
+    familiasTemplate: FamiliaNoModelo[];
+  };
+  travas: Record<'tipo' | 'nome' | 'codigo' | 'unidade' | 'escopo' | 'excluir', Trava>;
+  opcoes: OpcaoDetalhe[];
+  valores: Array<{ texto: string; qtd: number }>;
+  inconsistencias: { valoresSemOpcao: number; textosSemOpcao: string[]; valoresDeItensApagados: number };
+}
+
+/** Erro com detalhes do servidor (ex.: CONFIRMAR com o impacto da mudança). */
+export class ErroApiAtributo extends Error {
+  constructor(message: string, public status: number, public detalhes?: any) { super(message); }
+}
+
+const pedir = async <T,>(url: string, init: RequestInit | undefined, padrao: string): Promise<T> => {
+  const r = await fetch(url, init);
+  const d = await r.json().catch(() => ({}));
+  if (r.status === 404 && !d.error) throw new ErroApiAtributo('Rota não encontrada: reinicie o backend.', 404);
+  if (!r.ok) throw new ErroApiAtributo(d.error || padrao, r.status, d.detalhes);
+  return d as T;
+};
+const corpo = (method: string, body?: unknown): RequestInit => ({ method, headers: DEFAULT_HEADERS, body: body === undefined ? undefined : JSON.stringify(body) });
+const urlAttr = (id: string | number, resto = '', tenantId = 1) => `${API_BASE_URL}/atributos-globais/${id}${resto}?tenant_id=${tenantId}`;
+
+export const atributoEdicaoApi = {
+  detalhe: (id: string | number) => pedir<DetalheAtributo>(urlAttr(id, '/detalhe'), undefined, 'Erro ao carregar o atributo.'),
+  adicionarOpcao: (id: string | number, valor: string, codigo?: string) =>
+    pedir<{ opcoes: Array<{ valor: string; codigo: string }> }>(urlAttr(id, '/opcoes'), corpo('POST', { valor, codigo }), 'Erro ao acrescentar a opção.'),
+  editarOpcao: (id: string | number, idOpcao: number, dados: { valor?: string; codigo?: string; confirmar?: boolean }) =>
+    pedir<{ success: boolean; impacto?: { mensagens: string[] } }>(urlAttr(id, `/opcoes/${idOpcao}`), corpo('PUT', dados), 'Erro ao editar a opção.'),
+  excluirOpcao: (id: string | number, idOpcao: number) => pedir<{ success: boolean }>(urlAttr(id, `/opcoes/${idOpcao}`), corpo('DELETE'), 'Erro ao excluir a opção.'),
+  mesclarOpcao: (id: string | number, idOpcao: number, destinoId: number, confirmar = false) =>
+    pedir<{ movidos: number }>(urlAttr(id, `/opcoes/${idOpcao}/mesclar`), corpo('POST', { destinoId, confirmar }), 'Erro ao mesclar as opções.'),
+  ordenarOpcoes: (id: string | number, ids: number[]) => pedir<{ success: boolean }>(urlAttr(id, '/opcoes-ordem'), corpo('PUT', { ids }), 'Erro ao ordenar.'),
+  converterEmLista: (id: string | number, aplicar: boolean) =>
+    pedir<{ aplicado: boolean; aviso: string | null; opcoes: Array<{ valor: string; codigo: string; qtd: number; variantes: string[] }> }>(
+      urlAttr(id, '/converter-lista'), corpo('POST', { aplicar }), 'Erro ao converter em lista.'),
+  corrigirValores: (id: string | number) =>
+    pedir<{ ligados: number; opcoesCriadas: number; orfaosApagados: number }>(urlAttr(id, '/corrigir-valores'), corpo('POST', {}), 'Erro ao corrigir os valores.'),
+};

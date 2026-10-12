@@ -1,918 +1,406 @@
-import React, { useState, useMemo, useEffect } from 'react';
+// Dicionário de atributos do PIM: lista com uso real e alertas (duplicados, sem uso, sem grupo),
+// edição detalhada numa gaveta (EditorAtributoDrawer: travas, opções no lugar, texto → lista) e grupos.
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Input, Select, Checkbox, Tooltip, Tag, Spin, Button,
-  Modal, Form, Table, Space, Typography, Card, Row, Col, Empty, InputNumber, message
+  Button, Card, Col, Empty, Flex, Form, Input, InputNumber, Modal, Row, Segmented, Select, Space, Spin, Table, Tag, Tooltip, Typography, message,
 } from 'antd';
 import {
-  PlusOutlined, FolderAddOutlined, EditOutlined,
-  DeleteOutlined, SearchOutlined, CheckOutlined, CloseOutlined,
-  InfoCircleOutlined, WarningOutlined, RobotOutlined, MergeCellsOutlined // 🚀 [NOVO] Ícone para IA
+  CloseOutlined, DeleteOutlined, EditOutlined, FolderAddOutlined, InfoCircleOutlined, MergeCellsOutlined, PlusOutlined, RobotOutlined, SearchOutlined,
 } from '@ant-design/icons';
 import Swal from 'sweetalert2';
 import {
-  getAtributosGlobais,
-  getGruposAtributos,
-  getUnidadesMedida,
-  createAtributoGlobal,
-  updateAtributoGlobal,
-  deleteAtributoGlobal,
-  createGrupoAtributo,
-  updateGrupoAtributo,
-  deleteGrupoAtributo,
-  mesclarAtributoGlobal
+  createAtributoGlobal, createGrupoAtributo, deleteAtributoGlobal, deleteGrupoAtributo, getAtributosGlobais, getGruposAtributos, getUnidadesMedida,
+  mesclarAtributoGlobal, updateGrupoAtributo,
 } from './GlobalAttributeManager.api';
-import {
-  IAtributoGlobal,
-  GrupoVisualAPIResponse,
-  UnidadeAPIResponse,
-  TipoDadoAtributo
-} from './GlobalAttributeManager.types';
-
-// 🚀 [NOVO] Importação do componente da Modal com Preview em Tempo Real criado anteriormente
+import { GrupoVisualAPIResponse, IAtributoGlobal, UnidadeAPIResponse } from './GlobalAttributeManager.types';
 import { ImportarAtributosModal } from './ImportarAtributosModal';
+import EditorAtributoDrawer from './EditorAtributoDrawer';
 
 const { Title, Text } = Typography;
 
-interface GlobalAttributeManagerProps {
-  tenantId?: number;
-}
+/** Nome comparável (sem acento, caixa, espaço e símbolos) para achar atributos duplicados. */
+export const chaveNomeAtributo = (nome: string) =>
+  String(nome || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\(.*?\)/g, '').replace(/[^a-z0-9]/g, '');
 
-export const GlobalAttributeManager: React.FC<GlobalAttributeManagerProps> = ({ tenantId = 1 }) => {
-  // --- FORMS ---
-  const [formCriarGrupo] = Form.useForm();
-  const [formEditarGrupo] = Form.useForm();
+// Código gerado a partir do texto (o "próprio" é o digitado pelo usuário, ex.: bitola "08")
+const codigoGerado = (valor: string) => String(valor).normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+const codigoProprio = (o: { valor: string; codigo?: string }) => !!o.codigo && o.codigo !== codigoGerado(o.valor) && !/^OPC_\d+$/.test(o.codigo);
+
+type FiltroRapido = 'todos' | 'sem_grupo' | 'sem_uso' | 'duplicados';
+const PAPEL: Record<string, { cor: string; rotulo: string }> = {
+  ficha: { cor: 'blue', rotulo: 'Ficha' }, grade: { cor: 'orange', rotulo: 'Grade' }, dna: { cor: 'magenta', rotulo: 'DNA' },
+};
+
+interface Props { tenantId?: number }
+
+export const GlobalAttributeManager: React.FC<Props> = ({ tenantId = 1 }) => {
+  const [formGrupo] = Form.useForm();
   const [formAtributo] = Form.useForm();
-  const [formEdicaoInline] = Form.useForm();
-
-  // --- STATES ---
   const [unidades, setUnidades] = useState<UnidadeAPIResponse[]>([]);
   const [grupos, setGrupos] = useState<GrupoVisualAPIResponse[]>([]);
   const [atributos, setAtributos] = useState<IAtributoGlobal[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [loading, setLoading] = useState(true);
+  const [salvando, setSalvando] = useState(false);
+  const [grupoFiltro, setGrupoFiltro] = useState<string>('todos');
+  const [rapido, setRapido] = useState<FiltroRapido>('todos');
+  const [busca, setBusca] = useState('');
+  const [editando, setEditando] = useState<string | null>(null);
+  const [modalGrupo, setModalGrupo] = useState<{ aberto: boolean; grupo: GrupoVisualAPIResponse | null }>({ aberto: false, grupo: null });
+  const [modalNovo, setModalNovo] = useState(false);
+  const [modalIa, setModalIa] = useState(false);
+  const tipoNovo = Form.useWatch('tipo', formAtributo);
 
-  // --- MODALS VISIBILITY ---
-  const [isModalGrupoOpen, setIsModalGrupoOpen] = useState(false);
-  const [isModalAtributoOpen, setIsModalAtributoOpen] = useState(false);
-  const [isModalEditarGrupoOpen, setIsModalEditarGrupoOpen] = useState(false);
-  
-  // 🚀 [NOVO] State para abrir/fechar a modal de importação por IA
-  const [isModalImportarAiOpen, setIsModalImportarAiOpen] = useState(false);
-
-  // --- FILTERS ---
-  const [grupoAtivoFiltro, setGrupoAtivoFiltro] = useState<string>('todos');
-  const [buscaTexto, setBuscaTexto] = useState<string>('');
-
-  // --- INLINE EDIT STATE ---
-  const [idAtributoEmEdicao, setIdAtributoEmEdicao] = useState<string | null>(null);
-  const [tipoAtributoSelecionado, setTipoAtributoSelecionado] = useState<TipoDadoAtributo>('texto');
-  const [unidadeSelecionada, setUnidadeSelecionada] = useState<string>('');
-  const [grupoEmEdicao, setGrupoEmEdicao] = useState<GrupoVisualAPIResponse | null>(null);
-
-  // --- STATE FOR LIST OPTIONS (KEY/VALUE) ---
-  const [opcoesLista, setOpcoesLista] = useState<{ chave: string; valor: string }[]>([]);
-  const [inputChaveOpcao, setInputChaveOpcao] = useState('');
-  const [inputValorOpcao, setInputValorOpcao] = useState('');
-
-  // --- API DATA FETCHING ---
-  const carregarDadosDoBanco = async () => {
-    setLoading(true);
+  const carregar = async () => {
     try {
-      const [listaUnidades, listaGrupos, listaAtributos] = await Promise.all([
-        getUnidadesMedida(tenantId),
-        getGruposAtributos(tenantId),
-        getAtributosGlobais(tenantId)
-      ]);
-      setUnidades(listaUnidades || []);
-
-      const gruposOrdenados = (listaGrupos || []).sort((a: any, b: any) => (a.ordemExibicao || 0) - (b.ordemExibicao || 0));
-      setGrupos(gruposOrdenados);
-
-      setAtributos(listaAtributos || []);
+      const [u, g, a] = await Promise.all([getUnidadesMedida(tenantId), getGruposAtributos(tenantId), getAtributosGlobais(tenantId)]);
+      setUnidades(u || []);
+      setGrupos((g || []).sort((x: any, y: any) => (x.ordemExibicao || 0) - (y.ordemExibicao || 0)));
+      setAtributos(a || []);
     } catch (err: any) {
-      Swal.fire('Erro!', `Falha na sincronização de dados: ${err.message}`, 'error');
+      message.error(`Falha ao carregar: ${err.message}`);
     } finally {
       setLoading(false);
     }
   };
+  useEffect(() => { carregar(); }, [tenantId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    carregarDadosDoBanco();
-  }, [tenantId]);
-
-  // --- SLUG GENERATOR ---
-  const handleNomeAttrChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const nome = e.target.value;
-    const slug = nome
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9\s-_]/g, '')
-      .replace(/[\s-]+/g, '_');
-
-    formAtributo.setFieldsValue({ nome, codigo: slug });
+  // ---------------------------------------------------------------- alertas
+  const gruposValidos = useMemo(() => new Set(grupos.map(g => String(g.id))), [grupos]);
+  const semGrupo = (a: IAtributoGlobal) => !a.grupoId || !gruposValidos.has(String(a.grupoId));
+  const duplicados = useMemo(() => {
+    const porChave = new Map<string, IAtributoGlobal[]>();
+    atributos.forEach(a => { const k = chaveNomeAtributo(a.nome); porChave.set(k, [...(porChave.get(k) || []), a]); });
+    const mapa = new Map<string, IAtributoGlobal[]>();
+    porChave.forEach(g => { if (g.length > 1) g.forEach(a => mapa.set(a.id, g.filter(x => x.id !== a.id))); });
+    return mapa;
+  }, [atributos]);
+  const contagem = {
+    sem_grupo: atributos.filter(semGrupo).length,
+    sem_uso: atributos.filter(a => !a.emUso).length,
+    duplicados: duplicados.size,
   };
 
-  // --- KEY GENERATOR FOR OPTIONS ---
-  const handleValorOpcaoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const valor = e.target.value;
-    const chave = valor
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9\s-_]/g, '')
-      .replace(/[\s-]+/g, '_');
-    setInputValorOpcao(valor);
-    setInputChaveOpcao(chave);
-  };
+  const exibidos = useMemo(() => {
+    const t = busca.trim().toLowerCase();
+    return atributos.filter(a => {
+      if (grupoFiltro !== 'todos' && String(a.grupoId) !== grupoFiltro) return false;
+      if (rapido === 'sem_grupo' && !semGrupo(a)) return false;
+      if (rapido === 'sem_uso' && a.emUso) return false;
+      if (rapido === 'duplicados' && !duplicados.has(a.id)) return false;
+      return !t || a.nome.toLowerCase().includes(t) || a.codigo.toLowerCase().includes(t)
+        || (a.opcoes || []).some(o => o.valor.toLowerCase().includes(t));
+    }).sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR'));
+  }, [atributos, grupoFiltro, rapido, busca, duplicados]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleAdicionarOpcao = () => {
-    if (!inputChaveOpcao || !inputValorOpcao) return;
-    if (opcoesLista.some(op => op.chave === inputChaveOpcao)) {
-      Swal.fire('Atenção', 'Esta chave de opção já existe.', 'warning');
-      return;
-    }
-    setOpcoesLista([...opcoesLista, { chave: inputChaveOpcao, valor: inputValorOpcao }]);
-    setInputChaveOpcao('');
-    setInputValorOpcao('');
-  };
-
-  const handleRemoverOpcao = (chaveParaRemover: string) => {
-    setOpcoesLista(opcoesLista.filter(op => op.chave !== chaveParaRemover));
-  };
-
-  // --- GRUPO ACTIONS ---
-  const handleCriarGrupo = async (valores: any) => {
-    setIsSaving(true);
+  // ---------------------------------------------------------------- ações
+  const salvarGrupo = async (v: any) => {
+    setSalvando(true);
     try {
-      await createGrupoAtributo({
-        nome: valores.nome.trim(),
-        descricao: valores.descricao?.trim(),
-        ordemExibicao: valores.ordemExibicao || 0
-      }, tenantId);
-      Swal.fire('Sucesso!', 'Grupo Semântico criado com sucesso.', 'success');
-      formCriarGrupo.resetFields();
-      setIsModalGrupoOpen(false);
-      carregarDadosDoBanco();
+      const dados = { nome: v.nome.trim(), descricao: v.descricao?.trim(), ordemExibicao: v.ordemExibicao || 0 };
+      if (modalGrupo.grupo) await updateGrupoAtributo(modalGrupo.grupo.id, dados, tenantId);
+      else await createGrupoAtributo(dados, tenantId);
+      message.success(modalGrupo.grupo ? 'Grupo atualizado.' : 'Grupo criado.');
+      setModalGrupo({ aberto: false, grupo: null });
+      formGrupo.resetFields();
+      carregar();
     } catch (err: any) {
-      Swal.fire('Erro!', err.message, 'error');
+      message.error(err.message);
     } finally {
-      setIsSaving(false);
+      setSalvando(false);
     }
   };
 
-  const handleIniciarEdicaoGrupo = (grupo: GrupoVisualAPIResponse) => {
-    setGrupoEmEdicao(grupo);
-    formEditarGrupo.setFieldsValue({
-      nome: grupo.nome,
-      descricao: grupo.descricao,
-      ordemExibicao: (grupo as any).ordemExibicao || 0
-    });
-    setIsModalEditarGrupoOpen(true);
+  const excluirGrupo = async (g: GrupoVisualAPIResponse) => {
+    if (atributos.some(a => String(a.grupoId) === String(g.id))) {
+      message.warning('Há atributos neste grupo: mude o grupo deles antes.');
+      return;
+    }
+    const ok = await Swal.fire({ title: `Remover o grupo "${g.nome}"?`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444' });
+    if (!ok.isConfirmed) return;
+    try {
+      await deleteGrupoAtributo(g.id, tenantId);
+      if (grupoFiltro === String(g.id)) setGrupoFiltro('todos');
+      carregar();
+    } catch (err: any) {
+      message.error(err.message);
+    }
   };
 
-  const handleSalvarEdicaoGrupo = async (valores: any) => {
-    if (!grupoEmEdicao) return;
-    setIsSaving(true);
+  const criarAtributo = async (v: any) => {
+    const opcoes: string[] = v.valoresSugeridos || [];
+    if (v.tipo === 'lista' && opcoes.length === 0) { message.warning('Lista precisa de ao menos 1 opção.'); return; }
+    setSalvando(true);
     try {
-      await updateGrupoAtributo(grupoEmEdicao.id, {
-        nome: valores.nome.trim(),
-        descricao: valores.descricao?.trim(),
-        ordemExibicao: valores.ordemExibicao || 0
+      await createAtributoGlobal({
+        ...v, nome: v.nome.trim(), codigo: String(v.codigo || '').trim(), descricao: v.descricao?.trim() || undefined,
+        valoresSugeridos: v.tipo === 'lista' ? opcoes : undefined,
       }, tenantId);
-      Swal.fire('Sucesso!', 'Grupo Semântico atualizado.', 'success');
-      formEditarGrupo.resetFields();
-      setIsModalEditarGrupoOpen(false);
-      setGrupoEmEdicao(null);
-      carregarDadosDoBanco();
-    } catch (err: any) {
-      Swal.fire('Erro!', err.message, 'error');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleDeletarGrupo = async (id: string) => {
-    const temVinculo = atributos.some(a => String(a.grupoId || '') === String(id));
-    if (temVinculo) {
-      Swal.fire('Bloqueado', 'Existem atributos vinculados a este grupo.', 'error');
-      return;
-    }
-
-    const confirmacao = await Swal.fire({
-      title: 'Remover Grupo?',
-      text: "Isso removerá a categoria lógica do dicionário.",
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#ef4444'
-    });
-
-    if (!confirmacao.isConfirmed) return;
-
-    try {
-      await deleteGrupoAtributo(id, tenantId);
-      Swal.fire('Deletado!', 'Grupo removido.', 'success');
-      if (grupoAtivoFiltro === id) setGrupoAtivoFiltro('todos');
-      carregarDadosDoBanco();
-    } catch (err: any) {
-      Swal.fire('Erro!', err.message, 'error');
-    }
-  };
-
-  // --- ATRIBUTO ACTIONS ---
-  const handleCriarAtributo = async (valores: any) => {
-    if (valores.tipo === 'lista' && opcoesLista.length === 0) {
-      Swal.fire('Atenção', 'Atributos do tipo lista precisam de ao menos 1 opção configurada.', 'warning');
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      const payload = {
-        ...valores,
-        nome: valores.nome.trim(),
-        codigo: valores.codigo.trim(),
-        sufixo: valores.sufixo?.trim() || undefined,
-        ajudaContextual: valores.ajudaContextual?.trim() || undefined,
-        ordemExibicao: valores.ordemExibicao || 0,
-        opcoesLista: valores.tipo === 'lista' ? opcoesLista : undefined
-      };
-      await createAtributoGlobal(payload, tenantId);
-      Swal.fire('Salvo!', 'Atributo adicionado ao pool global!', 'success');
+      message.success('Atributo criado.');
       formAtributo.resetFields();
-      setOpcoesLista([]);
-      setIsModalAtributoOpen(false);
-      carregarDadosDoBanco();
+      setModalNovo(false);
+      carregar();
     } catch (err: any) {
-      Swal.fire('Erro!', err.message, 'error');
+      message.error(err.message);
     } finally {
-      setIsSaving(false);
+      setSalvando(false);
     }
   };
 
-  // 🚀 [NOVO] Função executada ao importar com sucesso via Modal de IA
-  const handleImportacaoAiSucesso = async (dadosImportados: any) => {
-    try {
-      // Atribui automaticamente ao primeiro grupo disponível caso o JSON não traga grupoId
-      const grupoAlvo = dadosImportados.grupoId || (grupos.length > 0 ? grupos[0].id : null);
-      
-      const payload = {
-        ...dadosImportados,
-        grupoId: grupoAlvo,
-      };
-
-      await createAtributoGlobal(payload, tenantId);
-      message.success('Atributo IA persistido no banco com sucesso!');
-      carregarDadosDoBanco();
-    } catch (err: any) {
-      Swal.fire('Erro ao salvar IA', err.message || 'Erro desconhecido', 'error');
-    }
-  };
-
-  // Código da opção digitado pelo usuário (ex.: bitola "08"), diferente do gerado a partir do texto
-  const codigoGerado = (valor: string) => String(valor).normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-  const codigoProprio = (o: { valor: string; codigo?: string }) => !!o.codigo && o.codigo !== codigoGerado(o.valor) && !/^OPC_\d+$/.test(o.codigo);
-
-  // --- INLINE EDIT METHODS ---
-  const startInlineEdit = (record: IAtributoGlobal) => {
-    formEdicaoInline.setFieldsValue({
-      ...record,
-      ordemExibicao: (record as any).ordemExibicao || 0,
-      tipoComponenteUI: (record as any).tipoComponenteUI || 'input',
-      ajudaContextual: record.ajudaContextual || '',
-      // Código próprio (ex.: bitola) aparece como "texto = código"; o gerado do texto fica escondido
-      valoresSugeridos: (record.opcoes || []).map(o => (codigoProprio(o) ? `${o.valor} = ${o.codigo}` : o.valor))
-    });
-    setIdAtributoEmEdicao(record.id);
-  };
-
-  const cancelInlineEdit = () => {
-    setIdAtributoEmEdicao(null);
-    formEdicaoInline.resetFields();
-  };
-
-  const saveInlineEdit = async (id: string) => {
-    try {
-      const rowValues = await formEdicaoInline.validateFields();
-      const original = atributos.find(a => a.id === id);
-
-      if (original && original.unidadeId !== rowValues.unidadeId && original.emUso) {
-        const confirmacaoUnidade = await Swal.fire({
-          title: 'Alterar Unidade de Medida?',
-          html: `<p style="text-align: left;">Você está prestes a mudar a unidade deste atributo que já está em uso!</p>
-<p style="text-align: left; color: #d97706; font-weight: bold;">⚠️ Atenção: alterar a unidade não converterá matematicamente os números já digitados nos SKUs ativos.</p>`,
-          icon: 'warning',
-          showCancelButton: true,
-          confirmButtonText: 'Sim, alterar unidade',
-          cancelButtonText: 'Cancelar',
-          confirmButtonColor: '#f59e0b'
-        });
-
-        if (!confirmacaoUnidade.isConfirmed) {
-          return;
-        }
-      }
-
-      await updateAtributoGlobal(id, { ...original, ...rowValues }, tenantId);
-      Swal.fire('Atualizado!', 'Atributo alterado com sucesso.', 'success');
-      setIdAtributoEmEdicao(null);
-      carregarDadosDoBanco();
-    } catch (err: any) {
-      if (err?.errorFields) return; // validação do formulário: o antd já destaca os campos
-      Swal.fire('Não foi possível salvar', err?.message || 'Erro ao atualizar o atributo.', 'error');
-    }
-  };
-
-  // Junta um atributo duplicado em outro do mesmo tipo (valores, vínculos e templates vão para o destino)
-  const handleMesclarAtributo = async (origem: IAtributoGlobal) => {
+  const mesclarAtributo = async (origem: IAtributoGlobal) => {
     const candidatos = atributos.filter(a => a.id !== origem.id && a.tipo === origem.tipo);
-    if (candidatos.length === 0) {
-      Swal.fire('Sem destino', `Não há outro atributo do tipo "${origem.tipo}" para mesclar.`, 'info');
-      return;
-    }
-    const inputOptions = Object.fromEntries(
-      candidatos
-        .sort((a, b) => a.nome.localeCompare(b.nome))
-        .map(a => [a.id, `${a.nome} (${a.codigo})${a.emUso ? ` · ${a.qtdItens || 0} itens` : ''}`])
-    );
+    if (!candidatos.length) { message.info(`Não há outro atributo do tipo "${origem.tipo}" para mesclar.`); return; }
+    const sugeridos = new Set((duplicados.get(origem.id) || []).map(a => a.id));
     const { value: destinoId } = await Swal.fire({
       title: `Mesclar "${origem.nome}" em...`,
-      html: `<p style="text-align:left;font-size:13px">Os valores de <b>${origem.qtdItens || 0}</b> item(ns), os <b>${origem.qtdVinculos || 0}</b> vínculo(s) com família/categoria e os templates que citam este atributo passam para o destino. Depois, <b>"${origem.nome}"</b> sai do dicionário.<br><br>Se um item já tiver valor no destino, o valor do destino é mantido.</p>`,
+      html: `<p style="text-align:left;font-size:13px">Os valores de <b>${origem.qtdItens || 0}</b> item(ns), os <b>${origem.qtdVinculos || 0}</b> vínculo(s) e os modelos de nome/SKU que citam este atributo passam para o destino. Depois "${origem.nome}" sai do dicionário. Se um item já tiver valor no destino, o do destino fica.</p>`,
       input: 'select',
-      inputOptions,
-      inputPlaceholder: 'Escolha o atributo de destino',
+      inputOptions: Object.fromEntries(candidatos
+        .sort((a, b) => Number(sugeridos.has(b.id)) - Number(sugeridos.has(a.id)) || a.nome.localeCompare(b.nome))
+        .map(a => [a.id, `${sugeridos.has(a.id) ? '★ ' : ''}${a.nome} (${a.codigo}) · ${a.qtdItens || 0} itens`])),
+      inputPlaceholder: 'Atributo que fica',
       showCancelButton: true,
       confirmButtonText: 'Mesclar',
-      cancelButtonText: 'Cancelar',
-      inputValidator: (v) => (!v ? 'Escolha o atributo de destino' : undefined),
+      inputValidator: v => (!v ? 'Escolha o atributo que fica' : undefined),
     });
     if (!destinoId) return;
     try {
-      const resp = await mesclarAtributoGlobal(origem.id, String(destinoId), tenantId);
-      Swal.fire('Mesclado!', resp.message, 'success');
-      carregarDadosDoBanco();
+      const r = await mesclarAtributoGlobal(origem.id, String(destinoId), tenantId);
+      message.success(r.message);
+      setEditando(null);
+      carregar();
     } catch (err: any) {
-      Swal.fire('Não foi possível mesclar', err?.message || 'Erro ao mesclar os atributos.', 'error');
+      message.error(err?.message || 'Erro ao mesclar.');
     }
   };
 
-  const handleDeletarAtributo = async (record: IAtributoGlobal) => {
-    if ((record as any).emUso) {
-      Swal.fire({
-        title: 'Bloqueado!',
-        text: 'Este atributo está associado a produtos ativos e não pode ser deletado para evitar órfãos estruturais.',
-        icon: 'error'
-      });
-      return;
-    }
-
-    const confirm = await Swal.fire({
-      title: 'Remover Atributo?',
-      text: "Esta ação não pode ser desfeita no Dicionário PIM!",
-      icon: 'warning',
-      showCancelButton: true,
-    });
-    if (!confirm.isConfirmed) return;
-
+  const excluirAtributo = async (id: string) => {
+    const a = atributos.find(x => x.id === id);
+    if (!a) return;
+    const ok = await Swal.fire({ title: `Excluir "${a.nome}"?`, text: 'Sai do dicionário de atributos.', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444' });
+    if (!ok.isConfirmed) return;
     try {
-      await deleteAtributoGlobal(record.id, tenantId);
-      Swal.fire('Deletado!', 'O atributo foi removido.', 'success');
-      carregarDadosDoBanco();
+      await deleteAtributoGlobal(id, tenantId);
+      message.success('Atributo excluído.');
+      setEditando(null);
+      carregar();
     } catch (err: any) {
-      Swal.fire('Erro', err.message, 'error');
+      message.error(err.message);
     }
   };
 
-  // --- MEMOIZED FILTERS & SORTING ---
-  const atributosExibidos = useMemo(() => {
-    return atributos
-      .filter(attr => {
-        const matchesGrupo = grupoAtivoFiltro === 'todos' || String(attr.grupoId) === grupoAtivoFiltro;
-        const matchesBusca = !buscaTexto ||
-          attr.nome.toLowerCase().includes(buscaTexto.toLowerCase()) ||
-          attr.codigo.toLowerCase().includes(buscaTexto.toLowerCase());
-        return matchesGrupo && matchesBusca;
-      })
-      .sort((a, b) => ((a as any).ordemExibicao || 0) - ((b as any).ordemExibicao || 0));
-  }, [atributos, grupoAtivoFiltro, buscaTexto]);
-
-  // --- TABLE COLUMNS CONFIG ---
-  const columns = [
+  // ---------------------------------------------------------------- tabela
+  const colunas = [
     {
-      title: 'Status',
-      dataIndex: 'ativo',
-      key: 'ativo',
-      width: 80,
-      align: 'center' as const,
-      render: (ativo: number, record: IAtributoGlobal) => {
-        const isEditing = record.id === idAtributoEmEdicao;
-        if (isEditing) {
-          return (
-            <Form.Item name="ativo" valuePropName="checked" style={{ margin: 0 }}>
-              <Checkbox />
-            </Form.Item>
-          );
-        }
-        return (
-          <Tag color={ativo ? 'success' : 'default'} style={{ fontWeight: 'bold' }}>
-            {ativo ? 'ATIVO' : 'INATIVO'}
-          </Tag>
-        );
-      }
-    },
-    {
-      title: 'Nome / Código / Alteração',
-      dataIndex: 'nome',
-      key: 'nome',
-      render: (_: any, record: IAtributoGlobal) => {
-        const isEditing = record.id === idAtributoEmEdicao;
-        const estaEmUso = (record as any).emUso;
-        const dataAlteracao = (record as any).alterado_em
-          ? new Date((record as any).alterado_em).toLocaleDateString('pt-BR')
-          : null;
-
-        return isEditing ? (
-          <Space direction="vertical" style={{ width: '100%' }}>
-            <Form.Item name="nome" rules={[{ required: true, message: 'Obrigatório' }]} style={{ margin: 0 }}>
-              <Input size="small" placeholder="Nome Comercial" />
-            </Form.Item>
-
-            <Space size={4} style={{ width: '100%' }}>
-              <Form.Item
-                name="codigo"
-                style={{ margin: 0, flexGrow: 1 }}
-                rules={[
-                  { required: true, message: 'Obrigatório' },
-                  { pattern: /^[a-z0-9_]+$/, message: 'Apenas minúsculas, números e underline.' }
-                ]}
-              >
-                <Input size="small" style={{ fontFamily: 'monospace' }} disabled={estaEmUso} placeholder="codigo_tecnico" />
-              </Form.Item>
-              {estaEmUso ? (
-                <Tooltip title="🟨 Nível Amarelo: O código técnico já está em uso no banco e em integrações ativas (ERP/API). A edição deste campo está temporariamente travada.">
-                  <WarningOutlined style={{ color: '#d97706', fontSize: '14px', cursor: 'help' }} />
-                </Tooltip>
-              ) : (
-                <Tooltip title="🟨 Alterar o código técnico de integração após homologado pode quebrar APIs, ERPs ou motores de busca ativos que o consultam de forma estática.">
-                  <WarningOutlined style={{ color: '#eab308', fontSize: '14px', cursor: 'help' }} />
-                </Tooltip>
-              )}
-            </Space>
-          </Space>
-        ) : (
-          <div>
-            <Space size={4}>
-              <Text strong>{record.nome}</Text>
-              {(record as any).ajudaContextual && (
-                <Tooltip title={(record as any).ajudaContextual}>
-                  <InfoCircleOutlined style={{ color: '#1890ff', fontSize: 12 }} />
-                </Tooltip>
-              )}
-              {estaEmUso && (
-                <Tooltip title={`${record.qtdItens || 0} item(ns) com valor · ${record.qtdVinculos || 0} vínculo(s) com família/categoria`}>
-                  <Tag color="warning" style={{ fontSize: 10, lineHeight: '14px', fontWeight: 'bold' }}>EM USO ATIVO</Tag>
-                </Tooltip>
-              )}
-            </Space>
-            <div style={{ fontSize: '11px', color: '#919eab', fontFamily: 'monospace' }}>{record.codigo}</div>
-            {dataAlteracao && (
-              <div style={{ fontSize: '9px', color: '#a6b0cf', marginTop: '2px' }}>
-                Alterado em: {dataAlteracao}
-              </div>
+      title: 'Atributo', key: 'nome',
+      render: (_: unknown, a: IAtributoGlobal) => (
+        <Space direction="vertical" size={0}>
+          <Space size={4} wrap>
+            <Text strong style={{ cursor: 'pointer' }} onClick={() => setEditando(a.id)}>{a.nome}</Text>
+            {a.ajudaContextual && <Tooltip title={a.ajudaContextual}><InfoCircleOutlined style={{ color: '#1677ff', fontSize: 12 }} /></Tooltip>}
+            {duplicados.has(a.id) && (
+              <Tooltip title={`Parecido com: ${duplicados.get(a.id)!.map(x => `${x.nome} (${x.tipo}, ${x.qtdItens || 0} itens)`).join('; ')}. Mescle se for o mesmo.`}>
+                <Tag color="red" style={{ fontSize: 10, margin: 0 }}>possível duplicado</Tag>
+              </Tooltip>
             )}
-          </div>
-        );
-      }
-    },
-    {
-      title: 'Grupo',
-      dataIndex: 'grupoId',
-      key: 'grupoId',
-      render: (grupoId: string, record: IAtributoGlobal) => {
-        const isEditing = record.id === idAtributoEmEdicao;
-        if (isEditing) {
-          return (
-            <Form.Item name="grupoId" style={{ margin: 0 }}>
-              <Select size="small" style={{ width: '100%' }}>
-                {grupos.map(g => <Select.Option key={g.id} value={g.id}>{g.nome}</Select.Option>)}
-              </Select>
-            </Form.Item>
-          );
-        }
-        return grupos.find(g => String(g.id) === String(grupoId))?.nome || 'Sem Grupo';
-      }
-    },
-    {
-      title: 'Escopo Padrão',
-      dataIndex: 'escopo_padrao',
-      key: 'escopo_padrao',
-      render: (escopo: string, record: IAtributoGlobal) => {
-        const isEditing = record.id === idAtributoEmEdicao;
-        const escopoValor = escopo || (record as any).escopoPadrao || 'ficha';
-
-        if (isEditing) {
-          return (
-            <Form.Item name="escopo_padrao" style={{ margin: 0 }}>
-              <Select size="small" style={{ width: '100%' }}>
-                <Select.Option value="ficha">Ficha Técnica</Select.Option>
-                <Select.Option value="grade">Grade de Variantes</Select.Option>
-                <Select.Option value="dna">DNA de Integração</Select.Option>
-              </Select>
-            </Form.Item>
-          );
-        }
-
-        const tagsEscopo: Record<string, { color: string; label: string }> = {
-          ficha: { color: 'blue', label: '📄 Ficha' },
-          grade: { color: 'orange', label: '🔲 Grade' },
-          dna: { color: 'magenta', label: '🧬 DNA' }
-        };
-
-        const config = tagsEscopo[escopoValor] || { color: 'default', label: escopoValor };
-        return <Tag color={config.color}>{config.label}</Tag>;
-      }
-    },
-    {
-      title: 'Tipo físico / Componente',
-      dataIndex: 'tipo',
-      key: 'tipo',
-      render: (tipo: string, record: IAtributoGlobal) => {
-        const isEditing = record.id === idAtributoEmEdicao;
-        const estaEmUso = (record as any).emUso;
-        const unidade = unidades.find(u => String(u.id) === String(record.unidadeId));
-
-        if (isEditing) {
-          return (
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <Space size={4} style={{ width: '100%' }}>
-                <Form.Item name="tipo" style={{ margin: 0, flexGrow: 1 }}>
-                  <Select size="small" disabled={estaEmUso}>
-                    {['texto', 'numero', 'decimal', 'boolean', 'lista', 'data'].map(t => (
-                      <Select.Option key={t} value={t}>{t.toUpperCase()}</Select.Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-                {estaEmUso && (
-                  <Tooltip color="#ef4444" title="🟥 Nível Vermelho: Bloqueio estrutural! Este atributo já possui valores salvos em produtos. Mudar o tipo físico gerará desaparecimento ou incompatibilidade catastrófica nos dados salvos.">
-                    <WarningOutlined style={{ color: '#ef4444', fontSize: '15px', cursor: 'pointer' }} />
-                  </Tooltip>
-                )}
-              </Space>
-
-              <Form.Item name="tipoComponenteUI" style={{ margin: 0 }}>
-                <Select size="small" placeholder="UI Component">
-                  <Select.Option value="input">Input Simples</Select.Option>
-                  <Select.Option value="textarea">Área de Texto (TextArea)</Select.Option>
-                  <Select.Option value="select">Dropdown de Seleção</Select.Option>
-                  <Select.Option value="multiselect">Múltipla Escolha</Select.Option>
-                  <Select.Option value="switch">Alternador (Switch)</Select.Option>
-                  <Select.Option value="datepicker">Seletor de Data</Select.Option>
-                </Select>
-              </Form.Item>
-            </Space>
-          );
-        }
-        return (
-          <Space direction="vertical" size={2}>
-            <Space>
-              <code>{tipo}</code>
-              {unidade && <Text type="primary" strong>({unidade.simbolo})</Text>}
-            </Space>
-            <Tag color="purple" style={{ fontSize: 11 }}>UI: {(record as any).tipoComponenteUI || 'input'}</Tag>
+            {!a.emUso && <Tag style={{ fontSize: 10, margin: 0 }}>sem uso</Tag>}
+            {semGrupo(a) && <Tag color="default" style={{ fontSize: 10, margin: 0, borderStyle: 'dashed' }}>sem grupo</Tag>}
           </Space>
-        );
-      }
+          <Text type="secondary" style={{ fontSize: 11, fontFamily: 'monospace' }}>{a.codigo}</Text>
+        </Space>
+      ),
     },
     {
-      title: 'Regras & Valores',
-      key: 'regras',
-      render: (_: any, record: IAtributoGlobal) => {
-        const isEditing = record.id === idAtributoEmEdicao;
-        const estaEmUso = (record as any).emUso;
-
-        if (isEditing) {
-          return (
-            <Space direction="vertical">
-              <Form.Item name="obrigatorioPadrao" valuePropName="checked" style={{ margin: 0 }}>
-                <Checkbox>Obrigatório</Checkbox>
-              </Form.Item>
-              <Form.Item name="pesquisavel" valuePropName="checked" style={{ margin: 0 }}>
-                <Checkbox>Pesquisável</Checkbox>
-              </Form.Item>
-
-              {record.tipo === 'lista' && (
-                <Form.Item name="valoresSugeridos" style={{ margin: 0, width: 220 }}>
-                  <Select
-                    size="small"
-                    mode="tags"
-                    placeholder='Opções (Enter). Com código: 1/2" = 08'
-                    tokenSeparators={[',']}
-                  />
-                </Form.Item>
-              )}
-              <Form.Item name="unidadeId" style={{ margin: 0, width: 140 }}>
-                <Select size="small" placeholder="Unidade (FK)" allowClear>
-                  {unidades.map(u => (
-                    <Select.Option key={u.id} value={u.id}>{u.nome} ({u.simbolo})</Select.Option>
-                  ))}
-                </Select>
-              </Form.Item>
-              {estaEmUso && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <WarningOutlined style={{ color: '#d97706', fontSize: 11 }} />
-                  <span style={{ fontSize: 9, color: '#d97706' }}>Unidade física não retroativa</span>
-                </div>
-              )}
-            </Space>
-          );
-        }
-
-        const opcoes = record.opcoes || [];
-        const possuiOpcoes = opcoes.length > 0;
-
-        return (
-          <Space direction="vertical" size={4}>
-            {possuiOpcoes ? (
-              <div style={{ maxWidth: 220 }}>
-                {opcoes.map((op: any) => (
-                  <Tooltip key={op.id || op.codigo} title={`Código: ${op.codigo}${op.emUso ? ' · em uso por itens (não pode sair da lista)' : ''}`}>
-                    <Tag color={op.emUso ? 'blue' : 'cyan'} style={{ marginBottom: 2, fontSize: 10 }}>{op.valor}{codigoProprio(op) && <b> = {op.codigo}</b>}{op.emUso ? ' •' : ''}</Tag>
-                  </Tooltip>
-                ))}
-              </div>
-            ) : (
-              <Text type="secondary" italic style={{ fontSize: 11 }}>Valor Livre</Text>
-            )}
-            <Space>
-              {record.obrigatorioPadrao && <Tag color="error">OBRIGATÓRIO</Tag>}
-              <Tag color={record.pesquisavel ? 'processing' : 'default'}>{record.pesquisavel ? '🔍 BUSCA' : '🚫 INTRA'}</Tag>
-            </Space>
-          </Space>
-        );
-      }
+      title: 'Tipo', key: 'tipo', width: 120,
+      render: (_: unknown, a: IAtributoGlobal) => {
+        const u = unidades.find(x => String(x.id) === String(a.unidadeId));
+        return <Space size={4}><Tag style={{ margin: 0 }}>{a.tipo}</Tag>{u && <Text type="secondary">{u.simbolo}</Text>}</Space>;
+      },
     },
     {
-      title: 'Ações',
-      key: 'acoes',
-      align: 'center' as const,
-      render: (_: any, record: IAtributoGlobal) => {
-        const isEditing = record.id === idAtributoEmEdicao;
-        const estaEmUso = (record as any).emUso;
-
-        if (isEditing) {
-          return (
-            <Space>
-              <Button size="small" type="primary" shape="circle" icon={<CheckOutlined />} onClick={() => saveInlineEdit(record.id)} style={{ backgroundColor: '#16a34a' }} />
-              <Button size="small" shape="circle" icon={<CloseOutlined />} onClick={cancelInlineEdit} />
-            </Space>
-          );
-        }
+      title: 'Papel padrão', key: 'papel', width: 110,
+      render: (_: unknown, a: IAtributoGlobal) => { const p = PAPEL[a.escopoPadrao] || PAPEL.ficha; return <Tag color={p.cor}>{p.rotulo}</Tag>; },
+    },
+    {
+      title: 'Opções', key: 'opcoes',
+      render: (_: unknown, a: IAtributoGlobal) => {
+        const ops = a.opcoes || [];
+        if (a.tipo !== 'lista') return <Text type="secondary" style={{ fontSize: 12 }}>valor livre</Text>;
+        if (!ops.length) return <Tag color="red">lista sem opções</Tag>;
         return (
-          <Space>
-            <Tooltip title="Editar Atributo"><Button type="text" icon={<EditOutlined />} onClick={() => startInlineEdit(record)} /></Tooltip>
-            <Tooltip title="Mesclar em outro atributo (resolver duplicados)"><Button type="text" icon={<MergeCellsOutlined />} onClick={() => handleMesclarAtributo(record)} /></Tooltip>
-            <Tooltip title={estaEmUso ? "Em uso por itens ou famílias: mescle com outro atributo ou remova os vínculos antes" : "Excluir Atributo"}>
-              <Button type="text" danger disabled={estaEmUso} icon={<DeleteOutlined />} onClick={() => handleDeletarAtributo(record)} />
-            </Tooltip>
-          </Space>
+          <Flex gap={2} wrap style={{ maxWidth: 320 }}>
+            {ops.slice(0, 8).map(o => (
+              <Tag key={o.id} color={o.emUso ? 'blue' : 'default'} style={{ fontSize: 10, margin: 0 }}>{o.valor}{codigoProprio(o) && <b> = {o.codigo}</b>}</Tag>
+            ))}
+            {ops.length > 8 && <Tag style={{ fontSize: 10, margin: 0 }}>+{ops.length - 8}</Tag>}
+          </Flex>
         );
-      }
-    }
+      },
+    },
+    {
+      title: 'Uso', key: 'uso', width: 120, align: 'right' as const,
+      sorter: (x: IAtributoGlobal, y: IAtributoGlobal) => (x.qtdItens || 0) - (y.qtdItens || 0),
+      render: (_: unknown, a: IAtributoGlobal) => (
+        <Tooltip title={`${a.qtdItens || 0} item(ns) com valor · ${a.qtdVinculos || 0} vínculo(s) com família/categoria`}>
+          <Space direction="vertical" size={0} style={{ alignItems: 'flex-end' }}>
+            <Text strong={!!a.qtdItens}>{a.qtdItens || 0} itens</Text>
+            <Text type="secondary" style={{ fontSize: 11 }}>{a.qtdVinculos || 0} vínculo(s)</Text>
+          </Space>
+        </Tooltip>
+      ),
+    },
+    {
+      key: 'acoes', width: 120, align: 'center' as const,
+      render: (_: unknown, a: IAtributoGlobal) => (
+        <Space size={0}>
+          <Tooltip title="Editar (dados, opções, uso)"><Button type="text" icon={<EditOutlined />} onClick={() => setEditando(a.id)} /></Tooltip>
+          <Tooltip title="Mesclar em outro atributo (duplicados)"><Button type="text" icon={<MergeCellsOutlined />} onClick={() => mesclarAtributo(a)} /></Tooltip>
+          <Tooltip title={a.emUso ? 'Em uso por itens ou famílias: mescle ou remova os vínculos antes' : 'Excluir'}>
+            <Button type="text" danger disabled={a.emUso} icon={<DeleteOutlined />} onClick={() => excluirAtributo(a.id)} />
+          </Tooltip>
+        </Space>
+      ),
+    },
   ];
 
   if (loading) {
-    return (
-      <Row justify="center" align="middle" style={{ minHeight: '80vh', flexDirection: 'column', gap: 16 }}>
-        <Spin size="large" />
-        <Title level={4} type="secondary">Sincronizando Dicionário PIM Corporativo...</Title>
-      </Row>
-    );
+    return <Flex justify="center" align="center" style={{ minHeight: '60vh' }}><Spin size="large" /></Flex>;
   }
 
+  const itemGrupo = (id: string, nome: React.ReactNode, qtd: number, g?: GrupoVisualAPIResponse) => {
+    const ativo = grupoFiltro === id;
+    return (
+      <div key={id} onClick={() => setGrupoFiltro(id)} style={{
+        padding: '6px 10px', borderRadius: 6, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        background: ativo ? '#e6f4ff' : undefined, border: `1px solid ${ativo ? '#1677ff' : '#f0f0f0'}`,
+      }}>
+        <Text strong={ativo}>{nome}</Text>
+        <Space size={2}>
+          <Tag style={{ margin: 0 }}>{qtd}</Tag>
+          {g && <Button type="text" size="small" icon={<EditOutlined style={{ fontSize: 11 }} />} onClick={e => {
+            e.stopPropagation();
+            formGrupo.setFieldsValue({ nome: g.nome, descricao: g.descricao, ordemExibicao: (g as any).ordemExibicao || 0 });
+            setModalGrupo({ aberto: true, grupo: g });
+          }} />}
+          {g && <Button type="text" size="small" danger icon={<CloseOutlined style={{ fontSize: 11 }} />} onClick={e => { e.stopPropagation(); excluirGrupo(g); }} />}
+        </Space>
+      </div>
+    );
+  };
+
   return (
-    <div style={{ padding: '24px', background: '#f5f7fa', minHeight: '100vh' }}>
+    <div style={{ padding: 24 }}>
+      <Flex justify="space-between" align="center" wrap gap={12} style={{ marginBottom: 16 }}>
+        <div>
+          <Title level={3} style={{ margin: 0 }}>Atributos do PIM</Title>
+          <Text type="secondary">Dicionário usado por categorias e famílias: tipo, papel padrão, opções das listas (com código para o SKU) e onde cada um é usado.</Text>
+        </div>
+        <Space wrap>
+          <Button icon={<RobotOutlined />} onClick={() => setModalIa(true)}>Importar por IA</Button>
+          <Button icon={<FolderAddOutlined />} onClick={() => { formGrupo.resetFields(); setModalGrupo({ aberto: true, grupo: null }); }}>Novo grupo</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalNovo(true)}>Novo atributo</Button>
+        </Space>
+      </Flex>
 
-      {/* CONTROL HEADER */}
-      <Card style={{ marginBottom: 24, borderRadius: 8 }}>
-        <Row justify="space-between" align="middle">
-          <Col>
-            <Title level={3} style={{ margin: 0 }}>🌐 Dicionário de Atributos Globais (PIM)</Title>
-            <Text type="secondary">Gerencie taxonomia, ordenação visual, renderização de UI e chaves comerciais de SKUs.</Text>
-          </Col>
-          <Col>
-            <Space>
-              {/* 🚀 [NOVO] Botão de acionamento da Importação por IA */}
-              <Button 
-                icon={<RobotOutlined style={{ color: '#0284c7' }} />} 
-                onClick={() => setIsModalImportarAiOpen(true)}
-              >
-                Importar por IA
-              </Button>
-              <Button icon={<FolderAddOutlined />} onClick={() => setIsModalGrupoOpen(true)}>Criar Grupo Semântico</Button>
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsModalAtributoOpen(true)}>Novo Atributo Global</Button>
-            </Space>
-          </Col>
-        </Row>
-      </Card>
-
-      <Row gutter={[24, 24]}>
-        {/* SIDEBAR FILTERS */}
+      <Row gutter={[16, 16]}>
         <Col xs={24} md={6}>
-          <Card title="Grupos Estruturais (Ordem de Exibição)" size="small" style={{ borderRadius: 8 }}>
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <div
-                onClick={() => setGrupoAtivoFiltro('todos')}
-                style={{
-                  padding: '8px 12px', borderRadius: 4, cursor: 'pointer',
-                  background: grupoAtivoFiltro === 'todos' ? '#e6f7ff' : '#fafafa',
-                  border: `1px solid ${grupoAtivoFiltro === 'todos' ? '#1890ff' : '#d9d9d9'}`
-                }}
-              >
-                <Row justify="space-between">
-                  <Text strong={grupoAtivoFiltro === 'todos'}>🌟 Todos os Atributos</Text>
-                  <Tag color="blue">{atributos.length}</Tag>
-                </Row>
-              </div>
-
-              {grupos.map(g => {
-                const qtd = atributos.filter(a => String(a.grupoId) === String(g.id)).length;
-                const isSelected = grupoAtivoFiltro === String(g.id);
-                return (
-                  <div
-                    key={g.id}
-                    onClick={() => setGrupoAtivoFiltro(String(g.id))}
-                    style={{
-                      padding: '8px 12px', borderRadius: 4, cursor: 'pointer',
-                      background: isSelected ? '#e6f7ff' : '#fff',
-                      border: `1px solid ${isSelected ? '#1890ff' : '#f0f0f0'}`
-                    }}
-                  >
-                    <Row justify="space-between" align="middle">
-                      <Col span={14}>
-                        <Space direction="vertical" size={0}>
-                          <Text strong={isSelected}>{g.nome}</Text>
-                          <Text type="secondary" style={{ fontSize: 10 }}>Posição: {(g as any).ordemExibicao || 0}</Text>
-                        </Space>
-                      </Col>
-                      <Col span={10} style={{ textAlign: 'right' }}>
-                        <Space size={2}>
-                          <Tag>{qtd}</Tag>
-                          <Button type="text" size="small" icon={<EditOutlined style={{ fontSize: 11 }} />} onClick={(e) => { e.stopPropagation(); handleIniciarEdicaoGrupo(g); }} />
-                          <Button type="text" size="small" danger icon={<CloseOutlined style={{ fontSize: 11 }} />} onClick={(e) => { e.stopPropagation(); handleDeletarGrupo(g.id); }} />
-                        </Space>
-                      </Col>
-                    </Row>
-                  </div>
-                );
-              })}
+          <Card size="small" title="Grupos">
+            <Space direction="vertical" size={4} style={{ width: '100%' }}>
+              {itemGrupo('todos', 'Todos', atributos.length)}
+              {grupos.map(g => itemGrupo(String(g.id), g.nome, atributos.filter(a => String(a.grupoId) === String(g.id)).length, g))}
             </Space>
           </Card>
         </Col>
-
-        {/* DATA CONTAINER (TABLE) */}
         <Col xs={24} md={18}>
-          <Space direction="vertical" style={{ width: '100%' }} size={16}>
-            <Input
-              size="large"
-              placeholder="Filtrar atributos por nome ou código técnico..."
-              prefix={<SearchOutlined />}
-              value={buscaTexto}
-              onChange={e => setBuscaTexto(e.target.value)}
-              allowClear
-            />
-
-            <Form form={formEdicaoInline} component={false}>
-              <Table
-                dataSource={atributosExibidos}
-                columns={columns}
-                rowKey="id"
-                pagination={{ pageSize: 10, showSizeChanger: true }}
-                locale={{ emptyText: <Empty description="Nenhum atributo mapeado neste escopo" /> }}
-                bordered
-              />
-            </Form>
-          </Space>
+          <Card size="small">
+            <Flex gap={8} wrap align="center" style={{ marginBottom: 12 }}>
+              <Input allowClear prefix={<SearchOutlined />} placeholder="Buscar por nome, código ou opção (ex.: 1/2&quot;)" style={{ maxWidth: 340 }}
+                value={busca} onChange={e => setBusca(e.target.value)} />
+              <Segmented value={rapido} onChange={v => setRapido(v as FiltroRapido)} options={[
+                { value: 'todos', label: 'Todos' },
+                { value: 'duplicados', label: `Possíveis duplicados (${contagem.duplicados})` },
+                { value: 'sem_uso', label: `Sem uso (${contagem.sem_uso})` },
+                { value: 'sem_grupo', label: `Sem grupo (${contagem.sem_grupo})` },
+              ]} />
+            </Flex>
+            <Table<IAtributoGlobal> size="middle" rowKey="id" dataSource={exibidos} columns={colunas}
+              pagination={{ pageSize: 20, showSizeChanger: true, hideOnSinglePage: true }}
+              onRow={a => ({ onDoubleClick: () => setEditando(a.id) })}
+              locale={{ emptyText: <Empty description="Nenhum atributo aqui" /> }} />
+          </Card>
         </Col>
       </Row>
 
-      {/* MODALS */}
-      {/* Modal Criar Grupo */}
-      <Modal title="📁 Criar Grupo Semântico" open={isModalGrupoOpen} onCancel={() => { formCriarGrupo.resetFields(); setIsModalGrupoOpen(false); }} footer={null}>
-        <Form form={formCriarGrupo} layout="vertical" onFinish={handleCriarGrupo} initialValues={{ ordemExibicao: 0 }}>
-          <Row gutter={16}>
-            <Col span={18}>
-              <Form.Item name="nome" label="Nome do Grupo" rules={[{ required: true, message: 'Insira o nome do grupo!' }]}>
-                <Input placeholder="Ex: Especificações Elétricas" />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item name="ordemExibicao" label="Ordem (UI)">
-                <InputNumber min={0} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Form.Item name="descricao" label="Descrição">
-            <Input.TextArea rows={2} placeholder="Ex: Agrupador de propriedades de voltagem, amperagem..." />
-          </Form.Item>
-          <Form.Item style={{ display: 'flex', justifyContent: 'flex-end', margin: 0 }}>
-            <Button onClick={() => setIsModalGrupoOpen(false)} style={{ marginRight: 8 }}>Cancelar</Button>
-            <Button type="primary" htmlType="submit" loading={isSaving}>Salvar Grupo</Button>
-          </Form.Item>
+      <EditorAtributoDrawer idAtributo={editando} grupos={grupos} unidades={unidades} onFechar={() => setEditando(null)}
+        onAlterado={carregar} onExcluir={excluirAtributo} />
+
+      <Modal title={modalGrupo.grupo ? `Editar grupo · ${modalGrupo.grupo.nome}` : 'Novo grupo'} open={modalGrupo.aberto} footer={null} destroyOnHidden
+        onCancel={() => setModalGrupo({ aberto: false, grupo: null })}>
+        <Form form={formGrupo} layout="vertical" onFinish={salvarGrupo} initialValues={{ ordemExibicao: 0 }}>
+          <Flex gap={12}>
+            <Form.Item name="nome" label="Nome" rules={[{ required: true }]} style={{ flex: 1 }}><Input placeholder="Ex.: Medidas" /></Form.Item>
+            <Form.Item name="ordemExibicao" label="Ordem"><InputNumber min={0} /></Form.Item>
+          </Flex>
+          <Form.Item name="descricao" label="Descrição"><Input.TextArea rows={2} /></Form.Item>
+          <Flex justify="flex-end" gap={8}>
+            <Button onClick={() => setModalGrupo({ aberto: false, grupo: null })}>Cancelar</Button>
+            <Button type="primary" htmlType="submit" loading={salvando}>Salvar</Button>
+          </Flex>
         </Form>
       </Modal>
 
-      {/* Modal Criar Atributo */}
-      <Modal title="🧬 Novo Atributo Estrutural PIM" open={isModalAtributoOpen} onCancel={() => { setIsModalAtributoOpen(false); setOpcoesLista([]); }} footer={null} width={680}>
-        <Form form={formAtributo} layout="vertical" onFinish={handleCriarAtributo} initialValues={{ tipo: 'texto', tipoComponenteUI: 'input', escopoPadrao: 'ficha', pesquisavel: true, ordemExibicao: 0 }}>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item name="grupoId" label="Grupo Vinculado" rules={[{ required: true, message: 'Selecione o grupo!' }]}>
-                <Select placeholder="Selecione">
-                  {grupos.map(g => <Select.Option key={g.id} value={g.id}>{g.nome}</Select.Option>)}
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item name="nome" label="Nome do Atributo" rules={[{ required: true, message: 'Insira o nome!' }]}>
-                <Input placeholder="Ex: Diâmetro do Eixo" onChange={handleNomeAttrChange} />
-              </Form.Item>
-            </Col>
-            <Col span={4}>
-              <Form.Item name="ordemExibicao" label="Ordem (UI)">
-                <InputNumber min={0} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="codigo"
-                label={
-                  <Space>
-                    <span>Código Técnico (Database Key)</span>
-                    <Tooltip title="🟨 Alterar o código técnico após homologado pode quebrar APIs, ERPs ou integrações ativas. Use com cautela!">
-                      <WarningOutlined style={{ color: '#eab308' }} />
-                    </Tooltip>
-                  </Space>
-                }
-                rules={[
-                  { required: true, message: 'Insira o código!' },
-                  { pattern: /^[a-z0-9_]+$/, message: 'Use apenas minúsculas, números e underlines.' }
-                ]}
-              >
-                <Input placeholder="diametro_eixo" style={{ fontFamily: 'monospace', fontWeight: 'bold' }} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="tipoComponenteUI" label="Componente de Interface (UI Render)">
-                <Select>
-                  <Select.Option value="input">Caixa de Texto Padrão (Input)</Select.Option>
-                  <Select.Option value="textarea">Área de Texto (TextArea)</Select.Option>
-                  <Select.Option value="select">Seleção Única (Dropdown)</Select.Option>
-                  <Select.Option value="multiselect">Múltipla Escolha (MultiSelect)</Select.Option>
-                  <Select.Option value="switch">Booleano Alternador (Switch)</Select.Option>
-                </Select>
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Row gutter={16}>
-            <Col span={8}>
-              <Form.Item
-                name="tipo"
-                label={
-                  <Space>
-                    <span>Tipo de Dado</span>
-                    <Tooltip title="🟥 Escolha sabiamente. Alterações posteriores com o atributo 'Em Uso' serão totalmente travadas para proteger o banco de dados.">
-                      <WarningOutlined style={{ color: '#ef4444' }} />
-                    </Tooltip>
-                  </Space>
-                }
-              >
-                <Select onChange={(val: TipoDadoAtributo) => setTipoAtributoSelecionado(val)}>
-                  <Select.Option value="texto">Texto Livre</Select.Option>
-                  <Select.Option value="numero">Inteiro (Integer)</Select.Option>
-                  <Select.Option value="decimal">Float / Decimal</Select.Option>
-                  <Select.Option value="boolean">Booleano</Select.Option>
-                  <Select.Option value="lista">Dicionário / Lista</Select.Option>
-                </Select>
-              </Form.Item>
-            </Col>
-          </Row>
+      <Modal title="Novo atributo" open={modalNovo} footer={null} width={640} destroyOnHidden onCancel={() => setModalNovo(false)}>
+        <Form form={formAtributo} layout="vertical" onFinish={criarAtributo} initialValues={{ tipo: 'texto', escopoPadrao: 'ficha', pesquisavel: true }}>
+          <Flex gap={12} wrap>
+            <Form.Item name="nome" label="Nome" rules={[{ required: true }]} style={{ flex: '1 1 240px' }}>
+              <Input placeholder="Ex.: Bitola Nominal" onChange={e => formAtributo.setFieldsValue({
+                codigo: e.target.value.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, ''),
+              })} />
+            </Form.Item>
+            <Form.Item name="codigo" label="Código técnico" rules={[{ required: true }, { pattern: /^[A-Za-z0-9_]+$/, message: 'Letras, números e _' }]} style={{ flex: '1 1 200px' }}>
+              <Input style={{ fontFamily: 'monospace' }} />
+            </Form.Item>
+          </Flex>
+          <Flex gap={12} wrap>
+            <Form.Item name="tipo" label="Tipo de dado" style={{ flex: '1 1 150px' }}>
+              <Select options={[
+                { value: 'texto', label: 'Texto' }, { value: 'lista', label: 'Lista de opções' }, { value: 'numero', label: 'Número inteiro' },
+                { value: 'decimal', label: 'Decimal' }, { value: 'boolean', label: 'Sim/Não' }, { value: 'data', label: 'Data' },
+              ]} />
+            </Form.Item>
+            <Form.Item name="escopoPadrao" label="Papel padrão" style={{ flex: '1 1 170px' }}>
+              <Select options={[{ value: 'ficha', label: 'Ficha técnica' }, { value: 'grade', label: 'Grade (variação)' }, { value: 'dna', label: 'DNA (fixo)' }]} />
+            </Form.Item>
+            <Form.Item name="grupoId" label="Grupo" style={{ flex: '1 1 160px' }}>
+              <Select allowClear options={grupos.map(g => ({ value: g.id, label: g.nome }))} />
+            </Form.Item>
+            <Form.Item name="unidadeId" label="Unidade" style={{ flex: '1 1 140px' }}>
+              <Select allowClear options={unidades.map(u => ({ value: u.id, label: `${u.nome} (${u.simbolo})` }))} />
+            </Form.Item>
+          </Flex>
+          {tipoNovo === 'lista' && (
+            <Form.Item name="valoresSugeridos" label="Opções" extra='Enter para cada uma. Com código para o SKU: 1/2" = 08'>
+              <Select mode="tags" tokenSeparators={[',']} placeholder='Ex.: 1/4" = 04, 3/8" = 06, 1/2" = 08' open={false} />
+            </Form.Item>
+          )}
+          <Form.Item name="descricao" label="Ajuda para o operador"><Input.TextArea rows={2} /></Form.Item>
+          <Flex justify="flex-end" gap={8}>
+            <Button onClick={() => setModalNovo(false)}>Cancelar</Button>
+            <Button type="primary" htmlType="submit" loading={salvando}>Criar</Button>
+          </Flex>
         </Form>
       </Modal>
 
-      {/* 🚀 [NOVO] Renderização da Modal com Preview em Tempo Real */}
-      <ImportarAtributosModal
-        visible={isModalImportarAiOpen}
-        onClose={() => setIsModalImportarAiOpen(false)}
-        onImportarSucesso={handleImportacaoAiSucesso}
-        gruposDisponiveis={grupos}
-      />
-
+      <ImportarAtributosModal visible={modalIa} onClose={() => setModalIa(false)} gruposDisponiveis={grupos}
+        onImportarSucesso={async (dados: any) => {
+          try {
+            await createAtributoGlobal({ ...dados, grupoId: dados.grupoId || grupos[0]?.id }, tenantId);
+            message.success('Atributo importado.');
+            carregar();
+          } catch (err: any) {
+            message.error(err.message || 'Erro ao importar.');
+          }
+        }} />
     </div>
   );
 };
