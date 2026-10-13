@@ -8,8 +8,9 @@ import {
   BarcodeOutlined, CheckCircleFilled, LinkOutlined, SafetyCertificateOutlined, CloseCircleFilled, DeleteOutlined, ExclamationCircleFilled, InboxOutlined,
   PictureOutlined, PlusOutlined, SendOutlined, UploadOutlined, WarningFilled,
 } from '@ant-design/icons';
-import { enviarArquivoAnexo } from '../../../areas/catalogo/skus/CatalogSku.service';
-import { enviarImagemFamilia } from '../../../areas/catalogo/familias/FamilyManager.api';
+import { adicionarAnexo, enviarArquivoAnexo } from '../../../areas/catalogo/skus/CatalogSku.service';
+import FotoFamiliaControle from '../../../areas/catalogo/familias/FotoFamiliaControle';
+import EnviarFotoPopover from '../../../shared/components/EnviarFotoPopover';
 import { AnuncioDetalhe, anunciosApi, AtributoML, ConferenciaItem, formatarMoeda, ItemDoAnuncio, ROTULO_STATUS_ML, ValorAtributo } from './mercadoLivreApi';
 import { agruparPendencias, textoComPrimeiraMaiuscula } from './pendencias';
 import CategoriaMlModal from './CategoriaMlModal';
@@ -97,7 +98,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
   const [categoriaAberta, setCategoriaAberta] = useState(false);
   const [adicionarItens, setAdicionarItens] = useState(false);
   const [filtroItens, setFiltroItens] = useState<{ texto: string; ids: number[] } | null>(null);
-  const [enviandoFoto, setEnviandoFoto] = useState<number | 'todos' | 'familia' | null>(null);
+  const [enviandoFoto, setEnviandoFoto] = useState<number | 'todos' | null>(null);
   const [conferencia, setConferencia] = useState<ConferenciaItem[] | null>(null);
   const [falhas, setFalhas] = useState<{ sku: string; erro: string }[]>([]);
   const [conferindo, setConferindo] = useState(false);
@@ -218,13 +219,11 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
     }
   };
 
-  const enviarFotoFamilia = async (arquivo: File) => {
-    if (!det?.idFamilia) return;
-    setEnviandoFoto('familia');
+  const fotoPorLink = async (item: ItemDoAnuncio, url: string) => {
+    setEnviandoFoto(item.idItem);
     try {
-      await avisarFotoPequena(arquivo);
-      await enviarImagemFamilia(det.idFamilia, arquivo);
-      message.success('Foto da família salva: vale para os itens sem foto própria.');
+      await adicionarAnexo(item.idItem, url, item.fotos === 0 ? 'IMAGEM_PRINCIPAL' : 'FOTO_GALERIA');
+      message.success(`Foto colocada em ${item.sku}.`);
       await recarregar();
       onAlterado();
     } catch (e) {
@@ -313,16 +312,10 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
       extra={(
         <Space>
           {det.idFamilia && (
-            <Upload accept="image/*" showUploadList={false} beforeUpload={f => { enviarFotoFamilia(f); return false; }}>
-              <Tooltip title={det.fotoFamilia
-                ? 'Foto da família: vai nos itens sem foto própria. Clique para trocar (muda também no catálogo).'
-                : 'Envie uma foto da família: os itens sem foto própria passam a usar ela.'}>
-                <Button size="small" loading={enviandoFoto === 'familia'}
-                  icon={det.fotoFamilia ? <Avatar shape="square" size={18} src={det.fotoFamilia} style={{ marginTop: -2 }} /> : <UploadOutlined />}>
-                  {det.fotoFamilia ? 'Foto da família' : 'Enviar foto da família'}
-                </Button>
-              </Tooltip>
-            </Upload>
+            <FotoFamiliaControle
+              modo="compacto" idFamilia={det.idFamilia} nome={det.familia} imagem={det.fotoFamilia}
+              onAlterada={() => { recarregar(); onAlterado(); }}
+            />
           )}
           {det.itens.some(i => i.fotos === 0 && !i.ml.mlbId) && (
             <Upload accept="image/*" showUploadList={false} beforeUpload={f => { fotoParaTodosSemFoto(f); return false; }}>
@@ -347,7 +340,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
           {
             title: 'Foto', width: 64,
             render: (_, i) => (
-              <Upload accept="image/*" showUploadList={false} disabled={!!i.ml.mlbId} beforeUpload={f => { enviarFoto(i, f); return false; }}>
+              <EnviarFotoPopover titulo={`Foto de ${i.sku}`} disabled={!!i.ml.mlbId} onArquivo={f => enviarFoto(i, f)} onUrl={u => fotoPorLink(i, u)}>
                 <Tooltip title={i.fotos ? `${i.fotos} foto(s): clique para enviar mais`
                   : det.fotoFamilia ? 'Usa a foto da família. Clique para enviar uma foto própria do item.' : 'Sem foto: clique para enviar'}>
                   <Spin spinning={enviandoFoto === i.idItem} size="small">
@@ -358,7 +351,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
                       : <Avatar shape="square" size={44} icon={<UploadOutlined />} style={{ cursor: 'pointer', background: '#fff1f0', color: '#cf1322', border: '1px dashed #ffa39e' }} />}
                   </Spin>
                 </Tooltip>
-              </Upload>
+              </EnviarFotoPopover>
             ),
           },
           {
