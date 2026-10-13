@@ -176,7 +176,14 @@ export const pendenciasAnuncio = (
     if (i.fotos === 0) erro('itens', `${i.sku}: sem foto (o Mercado Livre exige ao menos uma).`, { idItem: i.idItem });
     if (!(precoNoMl(i, dados.ajustePreco) > 0)) erro('itens', `${i.sku}: sem preço de venda.`, { idItem: i.idItem });
     if (!(i.estoque > 0)) aviso('itens', `${i.sku}: sem estoque (entra com quantidade 0).`, { idItem: i.idItem });
-    if (temGtinNaCategoria && !i.gtin) aviso('itens', `${i.sku}: sem código de barras (GTIN): vai como "produto sem código".`, { idItem: i.idItem });
+    if (temGtinNaCategoria && !i.gtin) {
+      const marca = resolverValor(atributos.find(a => a.id === 'BRAND'), dados.atributos.BRAND, i)?.valor;
+      if (marca && !SEM_MARCA.has(normalizar(marca))) {
+        aviso('itens', `${i.sku}: sem código de barras (GTIN): com marca "${marca}" o ML costuma exigir o GTIN.`, { idItem: i.idItem });
+      } else {
+        aviso('itens', `${i.sku}: sem código de barras (GTIN): vai como "produto sem código".`, { idItem: i.idItem });
+      }
+    }
     if (!i.pesoKg || !i.medidasCm) aviso('itens', `${i.sku}: sem peso ou medidas da embalagem (o ML estima o frete).`, { idItem: i.idItem });
     for (const m of i.motivosCadastro) aviso('cadastro', `${i.sku}: ${m}`, { idItem: i.idItem });
   }
@@ -196,25 +203,21 @@ export const pendenciasAnuncio = (
     if (foraDaLista.length > 0) aviso('atributos', `"${a.nome}": valor fora da lista do ML em ${listaNomes(foraDaLista)}.`, { atributo: a.id });
   }
 
-  // Variações
+  // Variações: na conta com User Products cada item é um anúncio e o ML agrupa pelo nome da família,
+  // mostrando como opção o que muda entre eles
   if (itens.length > 1) {
-    for (const a of atributos) {
-      if (a.permiteVariar || a.porVariacao || !dados.atributos[a.id]) continue;
-      const distintos = new Set(itens.map(i => normalizar(resolverValor(a, dados.atributos[a.id], i)?.valor)));
-      if (distintos.size > 1) erro('atributos', `"${a.nome}" muda entre os itens, mas o ML não deixa variar por ele: use um valor só ou anuncie os itens separados.`, { atributo: a.id });
-    }
     const eixos = eixosDeVariacao(atributos, dados, itens);
     if (eixos.length === 0) {
       const possiveis = atributos.filter(a => a.permiteVariar).map(a => a.nome);
-      erro('atributos', possiveis.length
-        ? `Anúncio com ${itens.length} itens precisa de um atributo de variação com valores diferentes (${possiveis.slice(0, 4).join(', ')}).`
-        : `A categoria não aceita variações: anuncie os ${itens.length} itens separados.`);
+      aviso('atributos', possiveis.length
+        ? `Nenhum atributo de variação muda entre os ${itens.length} itens (${possiveis.slice(0, 4).join(', ')}): o ML pode mostrar cada item como anúncio separado.`
+        : 'A categoria não tem atributo de variação: no ML cada item aparece como anúncio separado.');
     } else {
       const vistos = new Map<string, ItemAnuncio>();
       for (const i of itens) {
         const chave = eixos.map(a => normalizar(resolverValor(a, dados.atributos[a.id], i)?.valor)).join('|');
         const outro = vistos.get(chave);
-        if (outro) erro('atributos', `${outro.sku} e ${i.sku} ficam iguais nas variações (${eixos.map(a => a.nome).join(', ')}).`, { idItem: i.idItem });
+        if (outro) aviso('atributos', `${outro.sku} e ${i.sku} ficam iguais nas opções do ML (${eixos.map(a => a.nome).join(', ')}).`, { idItem: i.idItem });
         else vistos.set(chave, i);
       }
     }
@@ -248,4 +251,101 @@ export const cortarTitulo = (s: string, max = 60) => {
   const corte = t.slice(0, max);
   const espaco = corte.lastIndexOf(' ');
   return limpar(espaco > max * 0.6 ? corte.slice(0, espaco) : corte);
+};
+
+// ---------------------------------------------------------------------------
+// Envio ao ML
+// ---------------------------------------------------------------------------
+
+export const MOTIVO_SEM_GTIN = '17055160';   // EMPTY_GTIN_REASON: "O produto não tem código cadastrado"
+
+export interface AtributoEnvio { id: string; value_id?: string; value_name?: string }
+
+const numeroMl = (n: number) => String(Math.round(n * 100) / 100);
+
+/** Atributos de um item para o ML: os da categoria + SKU, GTIN (ou o motivo de não ter) e a embalagem. */
+export const atributosDoItem = (atributos: AtributoML[], dados: AnuncioDados, item: ItemAnuncio, temGtin: boolean): AtributoEnvio[] => {
+  const saida: AtributoEnvio[] = [];
+  for (const a of atributos) {
+    const v = resolverValor(a, dados.atributos[a.id], item);
+    if (!v) continue;
+    const nome = a.tipo === 'number_unit' && v.unidade ? `${v.valor} ${v.unidade}` : v.valor;
+    saida.push(v.valorId ? { id: a.id, value_id: v.valorId, value_name: nome } : { id: a.id, value_name: nome });
+  }
+  if (item.sku) saida.push({ id: 'SELLER_SKU', value_name: item.sku });
+  if (temGtin) saida.push(item.gtin ? { id: 'GTIN', value_name: item.gtin } : { id: 'EMPTY_GTIN_REASON', value_id: MOTIVO_SEM_GTIN });
+  if (item.medidasCm) {
+    saida.push({ id: 'SELLER_PACKAGE_HEIGHT', value_name: `${numeroMl(item.medidasCm.altura)} cm` });
+    saida.push({ id: 'SELLER_PACKAGE_WIDTH', value_name: `${numeroMl(item.medidasCm.largura)} cm` });
+    saida.push({ id: 'SELLER_PACKAGE_LENGTH', value_name: `${numeroMl(item.medidasCm.comprimento)} cm` });
+  }
+  if (item.pesoKg) saida.push({ id: 'SELLER_PACKAGE_WEIGHT', value_name: `${Math.max(1, Math.round(item.pesoKg * 1000))} g` });
+  return saida;
+};
+
+export type FotoEnvio = { id: string } | { source: string };
+
+/**
+ * Corpo do POST /items de um item. Conta com User Products (porFamilia) manda family_name e o ML monta o título
+ * e agrupa os itens da mesma família; conta antiga manda o título.
+ */
+export const corpoDoItem = (p: {
+  dados: AnuncioDados; tipoAnuncio: string; condicao: string; item: ItemAnuncio; atributos: AtributoML[];
+  temGtin: boolean; fotos: FotoEnvio[]; porFamilia: boolean;
+}) => {
+  const titulo = (p.dados.titulo || '').trim();
+  return {
+    ...(p.porFamilia ? { family_name: titulo } : { title: titulo }),
+    category_id: p.dados.categoriaMl,
+    price: precoNoMl(p.item, p.dados.ajustePreco),
+    currency_id: 'BRL',
+    available_quantity: Math.max(0, Math.floor(p.item.estoque)),
+    buying_mode: 'buy_it_now',
+    condition: p.condicao === 'used' ? 'used' : 'new',
+    listing_type_id: p.tipoAnuncio,
+    pictures: p.fotos,
+    attributes: atributosDoItem(p.atributos, p.dados, p.item, p.temGtin),
+  };
+};
+
+/** Foto menor que o ML aceita (pelo menos 500 px num dos lados), a partir do "max_size" do upload ("498x343"). */
+export const fotoPequena = (maxSize: string | null | undefined) => {
+  const m = String(maxSize || '').match(/^(\d+)x(\d+)$/);
+  return m ? Math.max(Number(m[1]), Number(m[2])) < 500 : false;
+};
+
+// As mensagens mais comuns do validador, em português
+const TRADUCOES: [RegExp, (m: RegExpMatchArray) => string][] = [
+  [/The attributes \[(.+?)\] are required for category/i, m => `O ML exige os atributos: ${m[1]}.`],
+  [/The fields \[(.+?)\] are invalid/i, m => `Campos recusados pelo ML: ${m[1]}.`],
+  [/The body does not contains? some or none of the following properties \[(.+?)\]/i, m => `Faltou enviar: ${m[1]}.`],
+  [/Attribute \[(.+?)\] is not valid/i, m => `Valor inválido no atributo ${m[1]}.`],
+  [/title.*(too long|length)/i, () => 'Título maior do que o ML aceita.'],
+  [/price.*(minimum|lower|invalid)/i, () => 'Preço fora do que o ML aceita para a categoria.'],
+];
+export const traduzirErroMl = (msg: string) => {
+  for (const [re, f] of TRADUCOES) { const m = msg.match(re); if (m) return f(m); }
+  return msg;
+};
+
+/** Mensagens do validador do ML ({ cause: [...] }), só os erros. */
+export const errosDoValidador = (d: any): string[] => {
+  const causas = Array.isArray(d?.cause) ? d.cause : [];
+  const erros = causas.filter((c: any) => c?.type !== 'warning').map((c: any) => traduzirErroMl(String(c.message || c.code)));
+  if (erros.length) return erros;
+  if (d?.error && d.error !== 'validation_error') return [traduzirErroMl(String(d.error))];
+  return d?.message ? [String(d.message)] : [];
+};
+
+const skuNormal = (s: string | null | undefined) => String(s ?? '').trim().toUpperCase();
+
+/** Liga um anúncio que já está no ML a um item do ERP pelo SKU (o customizado ou o raiz). */
+export const ligarPorSku = <T extends { idItem: number; sku: string; skuRaiz?: string }>(skuMl: string | null, itensErp: T[]): T | null => {
+  const s = skuNormal(skuMl);
+  if (!s) return null;
+  return itensErp.find(i => skuNormal(i.sku) === s) || itensErp.find(i => skuNormal(i.skuRaiz) === s) || null;
+};
+
+export const SITUACAO_POR_STATUS: Record<string, string> = {
+  active: 'PUBLICADO', under_review: 'PUBLICADO', paused: 'PAUSADO', inactive: 'PAUSADO', closed: 'ENCERRADO',
 };

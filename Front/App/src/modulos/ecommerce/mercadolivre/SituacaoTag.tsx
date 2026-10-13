@@ -4,11 +4,12 @@ import { Tag } from 'antd';
 import { CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import type { AnuncioResumo } from './mercadoLivreApi';
 
-const SituacaoTag: React.FC<{ a: Pick<AnuncioResumo, 'situacao' | 'preparo' | 'erros' | 'avisos' | 'permalink'> }> = ({ a }) => {
+const SituacaoTag: React.FC<{ a: Pick<AnuncioResumo, 'situacao' | 'preparo' | 'erros' | 'avisos' | 'permalink'> & { aPublicar?: number } }> = ({ a }) => {
   if (a.situacao !== 'RASCUNHO') {
     const cor = a.situacao === 'PUBLICADO' ? 'green' : a.situacao === 'PAUSADO' ? 'orange' : 'default';
     const tag = <Tag color={cor}>{a.situacao === 'PUBLICADO' ? 'Publicado' : a.situacao === 'PAUSADO' ? 'Pausado' : 'Encerrado'}</Tag>;
-    return a.permalink ? <a href={a.permalink} target="_blank" rel="noreferrer">{tag}</a> : tag;
+    const link = a.permalink ? <a href={a.permalink} target="_blank" rel="noreferrer">{tag}</a> : tag;
+    return a.aPublicar ? <>{link}<Tag color={a.preparo === 'PRONTO' ? 'green' : 'red'}>{a.aPublicar} a publicar</Tag></> : link;
   }
   if (a.preparo === 'PRONTO') {
     return <Tag color="green" icon={<CheckCircleOutlined />}>Pronto para publicar{a.avisos ? ` · ${a.avisos} aviso(s)` : ''}</Tag>;

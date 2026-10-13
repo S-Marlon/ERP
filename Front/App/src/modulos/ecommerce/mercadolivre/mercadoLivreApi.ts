@@ -49,7 +49,7 @@ export interface AnuncioResumo {
   id: number; titulo: string | null; idFamilia: number | null; familia: string | null;
   categoriaMl: string | null; categoriaNome: string | null; tipoAnuncio: string;
   situacao: 'RASCUNHO' | 'PUBLICADO' | 'PAUSADO' | 'ENCERRADO'; preparo: 'PENDENTE' | 'PRONTO' | null;
-  mlbId: string | null; permalink: string | null; qtdItens: number; fotoUrl: string | null; estoque: number;
+  mlbId: string | null; permalink: string | null; qtdItens: number; publicados: number; aPublicar: number; fotoUrl: string | null; estoque: number;
   precoMin: number | null; precoMax: number | null; erros: number; avisos: number; atualizadoEm: string; ultimoErro: string | null;
 }
 
@@ -59,6 +59,7 @@ export interface ItemDoAnuncio {
   gtin: string | null; pesoKg: number | null; medidasCm: { altura: number; largura: number; comprimento: number } | null;
   marca: string | null; valoresErp: Record<string, string | null>; motivosCadastro: string[];
   valores: Record<string, { valor: string; valorId: string | null; unidade: string | null } | null>;
+  ml: { mlbId: string | null; status: string | null; permalink: string | null; erro: string | null };
 }
 
 export interface AnuncioDetalhe extends AnuncioResumo {
@@ -72,6 +73,21 @@ export interface Candidatos {
   familias: { id: number; nome: string; itens: number; anunciados: number; comFoto: number; comEstoque: number }[];
   itens: { idItem: number; sku: string; nome: string; preco: number; estoque: number; familia: string | null; idAnuncio: number | null; fotoUrl: string | null }[];
 }
+
+export interface ConferenciaItem { idItem: number; sku: string; ok: boolean; erros: string[] }
+
+export interface AnuncioNoMl {
+  mlbId: string; titulo: string; familia: string | null; status: string; preco: number; estoque: number; vendidos: number;
+  permalink: string; fotoUrl: string | null; sku: string | null; catalogo: boolean; tipoAnuncio: string;
+  sugestao: { idItem: number; sku: string; nome: string; idAnuncio: number | null } | null;
+}
+export interface PreviaImportacao { jaLigados: number; itens: AnuncioNoMl[] }
+
+export const ROTULO_STATUS_ML: Record<string, { texto: string; cor: string }> = {
+  active: { texto: 'Ativo no ML', cor: 'green' }, paused: { texto: 'Pausado no ML', cor: 'orange' },
+  closed: { texto: 'Encerrado no ML', cor: 'default' }, under_review: { texto: 'Em revisão no ML', cor: 'gold' },
+  inactive: { texto: 'Inativo no ML', cor: 'default' },
+};
 
 export interface CategoriaNo { id: string | null; nome: string; caminho: string; final: boolean; filhos: { id: string; nome: string }[] }
 
@@ -92,6 +108,14 @@ export const anunciosApi = {
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idItem}?tenant_id=1`, json('PUT', { preco })), 'Erro ao salvar o preço.'),
   sugerirCategorias: async (q: string) =>
     ler<{ id: string; nome: string; dominio: string }[]>(await fetch(`${API}/categorias/sugerir?tenant_id=1&q=${encodeURIComponent(q)}`), 'Erro ao sugerir categorias.'),
+  validar: async (id: number) =>
+    ler<{ itens: ConferenciaItem[]; detalhe: AnuncioDetalhe }>(await fetch(`${API}/anuncios/${id}/validar?tenant_id=1`, json('POST', {})), 'Erro ao conferir no ML.'),
+  publicar: async (id: number) =>
+    ler<{ publicados: { sku: string; mlbId: string }[]; falhas: { sku: string; erro: string }[]; detalhe: AnuncioDetalhe }>(
+      await fetch(`${API}/anuncios/${id}/publicar?tenant_id=1`, json('POST', {})), 'Erro ao publicar.'),
+  previaImportacao: async () => ler<PreviaImportacao>(await fetch(`${API}/importar?tenant_id=1`), 'Erro ao ler os anúncios do ML.'),
+  importar: async (ligacoes: { mlbId: string; idItem: number }[]) =>
+    ler<{ ids: number[]; ligados: number }>(await fetch(`${API}/importar?tenant_id=1`, json('POST', { ligacoes })), 'Erro ao importar.'),
   categoria: async (id?: string | null) => ler<CategoriaNo>(await fetch(`${API}/categorias${id ? `/${id}` : ''}?tenant_id=1`), 'Erro ao ler categorias.'),
 };
 

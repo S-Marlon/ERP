@@ -1,7 +1,7 @@
 import assert from 'assert';
 import {
   AnuncioDados, AtributoML, cortarTitulo, tituloLegivel, eixosDeVariacao, filtrarAtributosCategoria, ItemAnuncio, pendenciasAnuncio,
-  precoNoMl, resolverValor, sugerirAtributos,
+  precoNoMl, resolverValor, sugerirAtributos, corpoDoItem, fotoPequena, errosDoValidador, ligarPorSku,
 } from './anuncios';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
@@ -79,19 +79,61 @@ teste('atributo obrigatório sem valor em parte dos itens', () => {
   assert.ok(e.includes('Atributo obrigatório "Modelo" sem valor em SKU-2.'));
 });
 
-teste('variações: eixo, atributo que não varia e combinação repetida', () => {
+teste('variações: eixo e combinação repetida viram aviso (cada item é um anúncio no ML)', () => {
   const base = { BRAND: { origem: 'marca' }, MODEL: { origem: 'fixo', valor: 'BH' }, VOLTAGE: { origem: 'erp', atributoId: 3 } } as AnuncioDados['atributos'];
   const i1 = item(1, { valoresErp: { 3: '220V', 5: 'Aço' } });
   const i2 = item(2, { valoresErp: { 3: '127V', 5: 'Latão' } });
+  const avisos = (d: AnuncioDados, itens: ItemAnuncio[]) => pendenciasAnuncio(d, itens, categoria, atributos).filter(p => p.nivel === 'aviso').map(p => p.texto);
   assert.deepStrictEqual(eixosDeVariacao(atributos, dados({ atributos: base }), [i1, i2]).map(a => a.id), ['VOLTAGE']);
-  assert.deepStrictEqual(erros(dados({ atributos: base }), [i1, i2]), []);
-  // Material muda entre os itens e não é eixo
-  assert.ok(erros(dados({ atributos: { ...base, MATERIAL: { origem: 'erp', atributoId: 5 } } }), [i1, i2]).some(t => t.startsWith('"Material" muda')));
-  // sem eixo
-  assert.ok(erros(dados({ atributos: { BRAND: { origem: 'marca' }, MODEL: { origem: 'fixo', valor: 'BH' } } }), [i1, i2]).some(t => t.includes('atributo de variação')));
-  // repetida
+  // Material muda entre os itens: cada item vai com o seu
+  assert.deepStrictEqual(erros(dados({ atributos: { ...base, MATERIAL: { origem: 'erp', atributoId: 5 } } }), [i1, i2]), []);
+  assert.ok(avisos(dados({ atributos: { BRAND: { origem: 'marca' }, MODEL: { origem: 'fixo', valor: 'BH' } } }), [i1, i2]).some(t => t.startsWith('Nenhum atributo de variação')));
   const i3 = item(3, { valoresErp: { 3: '220v' } });
-  assert.ok(erros(dados({ atributos: base }), [i1, i2, i3]).some(t => t.startsWith('SKU-1 e SKU-3 ficam iguais')));
+  assert.ok(avisos(dados({ atributos: base }), [i1, i2, i3]).some(t => t.startsWith('SKU-1 e SKU-3 ficam iguais')));
+});
+
+teste('GTIN: marca conhecida avisa que o ML costuma exigir', () => {
+  const textos = (marca: string) => pendenciasAnuncio(dados(), [item(1, { gtin: null, marca })], categoria, atributos).map(p => p.texto);
+  assert.ok(textos('Starrett').some(t => t.includes('com marca "Starrett"')));
+  assert.ok(textos('Sem Marca').some(t => t.includes('produto sem código')));
+});
+
+teste('corpo do envio: família, preço, estoque, fotos e atributos', () => {
+  const d = dados({ ajustePreco: 10, atributos: { BRAND: { origem: 'marca' }, MODEL: { origem: 'fixo', valor: 'BH-1' }, MAX_PRESSURE: { origem: 'fixo', valor: '210', unidade: 'bar' } } });
+  const c: any = corpoDoItem({ dados: d, tipoAnuncio: 'gold_special', condicao: 'new', item: item(1, { estoque: 4.7, gtin: null }), atributos, temGtin: true, fotos: [{ id: 'F1' }], porFamilia: true });
+  assert.strictEqual(c.family_name, 'Bomba hidráulica');
+  assert.strictEqual(c.title, undefined);
+  assert.strictEqual(c.price, 110);
+  assert.strictEqual(c.available_quantity, 4);
+  assert.deepStrictEqual(c.attributes, [
+    { id: 'BRAND', value_name: 'Acme' },
+    { id: 'MODEL', value_name: 'BH-1' },
+    { id: 'MAX_PRESSURE', value_name: '210 bar' },
+    { id: 'SELLER_SKU', value_name: 'SKU-1' },
+    { id: 'EMPTY_GTIN_REASON', value_id: '17055160' },
+    { id: 'SELLER_PACKAGE_HEIGHT', value_name: '5 cm' },
+    { id: 'SELLER_PACKAGE_WIDTH', value_name: '5 cm' },
+    { id: 'SELLER_PACKAGE_LENGTH', value_name: '10 cm' },
+    { id: 'SELLER_PACKAGE_WEIGHT', value_name: '200 g' },
+  ]);
+  const antigo: any = corpoDoItem({ dados: d, tipoAnuncio: 'gold_pro', condicao: 'used', item: item(2), atributos, temGtin: false, fotos: [], porFamilia: false });
+  assert.strictEqual(antigo.title, 'Bomba hidráulica');
+  assert.strictEqual(antigo.condition, 'used');
+  assert.ok(!antigo.attributes.some((a: any) => a.id === 'GTIN' || a.id === 'EMPTY_GTIN_REASON'));
+});
+
+teste('foto pequena, erros do validador e ligação por SKU', () => {
+  assert.strictEqual(fotoPequena('498x343'), true);
+  assert.strictEqual(fotoPequena('1200x900'), false);
+  assert.strictEqual(fotoPequena(undefined), false);
+  assert.deepStrictEqual(errosDoValidador({ cause: [{ type: 'error', message: 'A' }, { type: 'warning', message: 'B' }], message: 'Validation error' }), ['A']);
+  assert.deepStrictEqual(errosDoValidador({ error: 'The fields [title] are invalid', message: 'body.invalid_fields', cause: [] }), ['Campos recusados pelo ML: title.']);
+  assert.deepStrictEqual(errosDoValidador({ cause: [{ type: 'error', message: 'The attributes [BRAND] are required for category MLB260685 and channel marketplace.' }] }), ['O ML exige os atributos: BRAND.']);
+  const erp = [{ idItem: 799, sku: '1460', skuRaiz: 'IT-000799' }, { idItem: 1169, sku: 'KIT-1169', skuRaiz: 'IT-001169' }];
+  assert.strictEqual(ligarPorSku(' kit-1169 ', erp)?.idItem, 1169);
+  assert.strictEqual(ligarPorSku('IT-000799', erp)?.idItem, 799);
+  assert.strictEqual(ligarPorSku('9999', erp), null);
+  assert.strictEqual(ligarPorSku(null, erp), null);
 });
 
 teste('título cortado na palavra', () => {

@@ -1,11 +1,12 @@
 // Aba Anúncios: rascunhos e publicados, com o que falta em cada um.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Avatar, Button, Card, Col, Empty, Flex, Input, Popconfirm, Row, Segmented, Space, Statistic, Table, Tag, Tooltip, Typography, message } from 'antd';
-import { DeleteOutlined, EditOutlined, PictureOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { CloudDownloadOutlined, DeleteOutlined, EditOutlined, PictureOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { AnuncioResumo, anunciosApi, formatarMoeda, ROTULO_TIPO_ANUNCIO } from './mercadoLivreApi';
 import AdicionarAnuncioModal from './AdicionarAnuncioModal';
 import AnuncioEditor from './AnuncioEditor';
 import SituacaoTag from './SituacaoTag';
+import ImportarMlModal from './ImportarMlModal';
 
 const { Text } = Typography;
 
@@ -19,6 +20,7 @@ const AnunciosMercadoLivre: React.FC = () => {
   const [busca, setBusca] = useState('');
   const [adicionar, setAdicionar] = useState(false);
   const [editando, setEditando] = useState<number | null>(null);
+  const [importar, setImportar] = useState(false);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -71,6 +73,9 @@ const AnunciosMercadoLivre: React.FC = () => {
           </Space>
           <Space>
             <Button icon={<ReloadOutlined />} onClick={carregar} loading={carregando} />
+            <Tooltip title="Liga ao ERP os anúncios que você já tem no Mercado Livre (pelo SKU)">
+              <Button icon={<CloudDownloadOutlined />} onClick={() => setImportar(true)}>Importar do Mercado Livre</Button>
+            </Tooltip>
             <Button type="primary" icon={<PlusOutlined />} onClick={() => setAdicionar(true)}>Adicionar do catálogo</Button>
           </Space>
         </Flex>
@@ -136,6 +141,7 @@ const AnunciosMercadoLivre: React.FC = () => {
         onCriados={ids => { setAdicionar(false); carregar(); if (ids.length === 1) setEditando(ids[0]); }}
       />
       <AnuncioEditor id={editando} onFechar={() => setEditando(null)} onAlterado={carregar} />
+      <ImportarMlModal aberto={importar} onFechar={() => setImportar(false)} onImportados={() => { setImportar(false); carregar(); }} />
     </>
   );
 };

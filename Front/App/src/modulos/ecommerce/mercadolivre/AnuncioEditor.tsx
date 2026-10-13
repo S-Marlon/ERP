@@ -5,11 +5,11 @@ import {
   Select, Space, Spin, Switch, Table, Tag, Tooltip, Typography, Upload, message,
 } from 'antd';
 import {
-  BarcodeOutlined, CheckCircleFilled, CloseCircleFilled, DeleteOutlined, ExclamationCircleFilled, InboxOutlined,
+  BarcodeOutlined, CheckCircleFilled, LinkOutlined, SafetyCertificateOutlined, CloseCircleFilled, DeleteOutlined, ExclamationCircleFilled, InboxOutlined,
   PictureOutlined, PlusOutlined, SendOutlined, UploadOutlined, WarningFilled,
 } from '@ant-design/icons';
 import { enviarArquivoAnexo } from '../../../areas/catalogo/skus/CatalogSku.service';
-import { AnuncioDetalhe, anunciosApi, AtributoML, formatarMoeda, ItemDoAnuncio, ValorAtributo } from './mercadoLivreApi';
+import { AnuncioDetalhe, anunciosApi, AtributoML, ConferenciaItem, formatarMoeda, ItemDoAnuncio, ROTULO_STATUS_ML, ValorAtributo } from './mercadoLivreApi';
 import { agruparPendencias, textoComPrimeiraMaiuscula } from './pendencias';
 import CategoriaMlModal from './CategoriaMlModal';
 import AdicionarAnuncioModal from './AdicionarAnuncioModal';
@@ -24,6 +24,21 @@ interface Props {
 }
 
 const erroMsg = (e: unknown) => (e instanceof Error ? e.message : 'Erro.');
+
+// O ML recusa foto com menos de 500 px no maior lado: avisa já no envio (a foto fica no catálogo do mesmo jeito)
+const avisarFotoPequena = (arquivo: File) => new Promise<void>(resolve => {
+  const url = URL.createObjectURL(arquivo);
+  const img = new Image();
+  img.onload = () => {
+    if (Math.max(img.naturalWidth, img.naturalHeight) < 500) {
+      message.warning(`Foto com ${img.naturalWidth}×${img.naturalHeight} px: o Mercado Livre pede ao menos 500 px num dos lados (o ideal é 1200).`, 6);
+    }
+    URL.revokeObjectURL(url);
+    resolve();
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); resolve(); };
+  img.src = url;
+});
 
 // ---------------------------------------------------------------------------
 // Valor fixo de um atributo, conforme o tipo do ML
@@ -82,6 +97,10 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
   const [adicionarItens, setAdicionarItens] = useState(false);
   const [filtroItens, setFiltroItens] = useState<{ texto: string; ids: number[] } | null>(null);
   const [enviandoFoto, setEnviandoFoto] = useState<number | 'todos' | null>(null);
+  const [conferencia, setConferencia] = useState<ConferenciaItem[] | null>(null);
+  const [falhas, setFalhas] = useState<{ sku: string; erro: string }[]>([]);
+  const [conferindo, setConferindo] = useState(false);
+  const [publicando, setPublicando] = useState(false);
 
   const aplicar = useCallback((d: AnuncioDetalhe) => {
     setDet(d);
@@ -102,8 +121,46 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
     setFixoEmEdicao(new Set());
     setFiltroItens(null);
     setTodosAtributos(false);
+    setConferencia(null);
+    setFalhas([]);
     if (id) recarregar();
   }, [id, recarregar]);
+
+  const conferirNoMl = async () => {
+    if (!det) return;
+    setConferindo(true);
+    try {
+      const r = await anunciosApi.validar(det.id);
+      setConferencia(r.itens);
+      aplicar(r.detalhe);
+      const comErro = r.itens.filter(i => !i.ok).length;
+      if (comErro) message.warning(`O ML apontou problema em ${comErro} item(ns): veja ao lado.`);
+      else message.success('O ML aceitou todos os itens: pode publicar.');
+    } catch (e) {
+      message.error(erroMsg(e));
+    } finally {
+      setConferindo(false);
+    }
+  };
+
+  const publicar = async () => {
+    if (!det) return;
+    setPublicando(true);
+    try {
+      const r = await anunciosApi.publicar(det.id);
+      aplicar(r.detalhe);
+      setFalhas(r.falhas);
+      setConferencia(null);
+      onAlterado();
+      if (r.publicados.length && !r.falhas.length) message.success(`${r.publicados.length} anúncio(s) criados no Mercado Livre.`);
+      else if (r.publicados.length) message.warning(`${r.publicados.length} publicado(s); ${r.falhas.length} não subiram (veja ao lado).`);
+      else message.error('Nenhum item subiu: veja o motivo ao lado.');
+    } catch (e) {
+      message.error(erroMsg(e));
+    } finally {
+      setPublicando(false);
+    }
+  };
 
   const executar = async (acao: () => Promise<AnuncioDetalhe>, ok?: string) => {
     setSalvando(true);
@@ -131,6 +188,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
   const enviarFoto = async (item: ItemDoAnuncio, arquivo: File) => {
     setEnviandoFoto(item.idItem);
     try {
+      await avisarFotoPequena(arquivo);
       await enviarArquivoAnexo(item.idItem, arquivo, item.fotos === 0 ? 'IMAGEM_PRINCIPAL' : 'FOTO_GALERIA');
       message.success(`Foto enviada para ${item.sku}.`);
       await recarregar();
@@ -147,6 +205,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
     const alvo = det.itens.filter(i => i.fotos === 0);
     setEnviandoFoto('todos');
     try {
+      await avisarFotoPequena(arquivo);
       for (const i of alvo) await enviarArquivoAnexo(i.idItem, arquivo, 'IMAGEM_PRINCIPAL');
       message.success(`Foto colocada em ${alvo.length} item(ns).`);
       await recarregar();
@@ -161,7 +220,9 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
   const skuDoItem = useMemo(() => new Map((det?.itens || []).map(i => [i.idItem, i.sku])), [det]);
   const pendencias = useMemo(() => agruparPendencias(det?.pendencias || [], skuDoItem), [det, skuDoItem]);
   const erros = (det?.pendencias || []).filter(p => p.nivel === 'erro').length;
-  const editavel = det?.situacao === 'RASCUNHO';
+  // Depois que algum item sobe, título/categoria/atributos ficam como estão no ML; itens novos e preço continuam
+  const editavel = !!det && det.publicados === 0;
+  const errosConferencia = new Map((conferencia || []).filter(c => !c.ok).map(c => [c.idItem, c.erros]));
   const atributoComErro = useMemo(() => new Set((det?.pendencias || []).filter(p => p.nivel === 'erro' && p.atributo).map(p => p.atributo!)), [det]);
   const itemComErro = useMemo(() => new Set((det?.pendencias || []).filter(p => p.nivel === 'erro' && p.idItem).map(p => p.idItem!)), [det]);
 
@@ -232,12 +293,12 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
     <Card
       size="small" style={{ marginBottom: 16 }}
       title={<Space>{det.itens.length > 1 ? `Variações (${det.itens.length})` : 'Item'}{det.eixos.length > 0 && <Text type="secondary" style={{ fontSize: 12, fontWeight: 400 }}>variando por {det.eixos.map(e => det.atributosCategoria.find(a => a.id === e)?.nome || e).join(', ')}</Text>}</Space>}
-      extra={editavel && (
+      extra={(
         <Space>
-          {det.itens.some(i => i.fotos === 0) && (
+          {det.itens.some(i => i.fotos === 0 && !i.ml.mlbId) && (
             <Upload accept="image/*" showUploadList={false} beforeUpload={f => { fotoParaTodosSemFoto(f); return false; }}>
               <Tooltip title="Coloca a mesma foto como principal em todos os itens que ainda não têm foto">
-                <Button size="small" icon={<UploadOutlined />} loading={enviandoFoto === 'todos'}>Foto para os sem foto ({det.itens.filter(i => i.fotos === 0).length})</Button>
+                <Button size="small" icon={<UploadOutlined />} loading={enviandoFoto === 'todos'}>Foto para os sem foto ({det.itens.filter(i => i.fotos === 0 && !i.ml.mlbId).length})</Button>
               </Tooltip>
             </Upload>
           )}
@@ -252,12 +313,12 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
       <Table<ItemDoAnuncio>
         size="small" rowKey="idItem" dataSource={itensVisiveis} pagination={itensVisiveis.length > 15 ? { pageSize: 15, showSizeChanger: false } : false}
         scroll={{ x: 900 }}
-        rowClassName={i => (itemComErro.has(i.idItem) ? 'ml-linha-erro' : '')}
+        rowClassName={i => (itemComErro.has(i.idItem) || errosConferencia.has(i.idItem) ? 'ml-linha-erro' : '')}
         columns={[
           {
             title: 'Foto', width: 64,
             render: (_, i) => (
-              <Upload accept="image/*" showUploadList={false} disabled={!editavel} beforeUpload={f => { enviarFoto(i, f); return false; }}>
+              <Upload accept="image/*" showUploadList={false} disabled={!!i.ml.mlbId} beforeUpload={f => { enviarFoto(i, f); return false; }}>
                 <Tooltip title={i.fotos ? `${i.fotos} foto(s): clique para enviar mais` : 'Sem foto: clique para enviar'}>
                   <Spin spinning={enviandoFoto === i.idItem} size="small">
                     {i.fotoUrl
@@ -274,6 +335,14 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
               <div>
                 <Text strong>{i.sku}</Text>{!i.ativo && <Tag color="red" style={{ marginLeft: 6 }}>inativo</Tag>}
                 <div><Text type="secondary" style={{ fontSize: 12 }}>{i.nome}</Text></div>
+                {i.ml.mlbId ? (
+                  <a href={i.ml.permalink || undefined} target="_blank" rel="noreferrer">
+                    <Tag color={ROTULO_STATUS_ML[i.ml.status || '']?.cor || 'green'} style={{ fontSize: 11 }}>{i.ml.mlbId} · {ROTULO_STATUS_ML[i.ml.status || '']?.texto || i.ml.status}</Tag>
+                  </a>
+                ) : i.ml.erro ? (
+                  <Tooltip title={i.ml.erro}><Tag color="red" style={{ fontSize: 11 }}>não subiu: {i.ml.erro.slice(0, 50)}{i.ml.erro.length > 50 ? '…' : ''}</Tag></Tooltip>
+                ) : det.publicados > 0 ? <Tag style={{ fontSize: 11 }}>a publicar</Tag> : null}
+                {errosConferencia.get(i.idItem)?.map((e, k) => <div key={k}><Text type="danger" style={{ fontSize: 12 }}>ML: {e}</Text></div>)}
                 {det.eixos.length > 0 && (
                   <Space size={2} wrap>
                     {det.eixos.map(e => <Tag key={e} color="blue" style={{ fontSize: 11 }}>{i.valores[e]?.valor || '—'}{i.valores[e]?.unidade ? ` ${i.valores[e]?.unidade}` : ''}</Tag>)}
@@ -285,10 +354,10 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
           { title: 'Estoque', dataIndex: 'estoque', width: 74, align: 'right', render: v => <Text type={v > 0 ? undefined : 'warning'}>{v}</Text> },
           { title: 'Preço ERP', dataIndex: 'preco', width: 96, align: 'right', render: formatarMoeda },
           {
-            title: <Tooltip title="Vazio = preço do ERP com o ajuste do anúncio">Preço no ML</Tooltip>, width: 130,
+            title: <Tooltip title="Vazio = preço do ERP com o ajuste do anúncio. Em item que já está no ML, o preço novo vai na hora.">Preço no ML</Tooltip>, width: 130,
             render: (_, i) => (
               <InputNumber
-                key={`${i.idItem}-${i.precoMl}-${i.precoAnuncio}`} size="small" style={{ width: '100%' }} min={0} step={0.1} precision={2} decimalSeparator="," disabled={!editavel}
+                key={`${i.idItem}-${i.precoMl}-${i.precoAnuncio}`} size="small" style={{ width: '100%' }} min={0} step={0.1} precision={2} decimalSeparator=","
                 defaultValue={i.precoMl ?? undefined} placeholder={i.precoAnuncio.toFixed(2).replace('.', ',')}
                 onBlur={e => {
                   const t = String(e.target.value).trim();
@@ -323,7 +392,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
           },
           {
             title: '', width: 40,
-            render: (_, i) => editavel && det.itens.length > 1 && (
+            render: (_, i) => !i.ml.mlbId && det.itens.length > 1 && (
               <Popconfirm title={`Tirar ${i.sku} deste anúncio?`} okText="Tirar" onConfirm={() => executar(() => anunciosApi.removerItem(det.id, i.idItem))}>
                 <Button type="text" size="small" danger icon={<DeleteOutlined />} />
               </Popconfirm>
@@ -446,9 +515,46 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
           {det.itens[0]?.percentualComissao != null && (
             <Flex justify="space-between"><Text type="secondary">Comissão ({det.tipoAnuncio === 'gold_pro' ? 'Premium' : 'Clássico'})</Text><Text>{det.itens[0].percentualComissao}%</Text></Flex>
           )}
-          <Tooltip title={erros ? 'Resolva as pendências em vermelho primeiro.' : 'A publicação entra na próxima etapa do módulo.'}>
-            <Button type="primary" block icon={<SendOutlined />} disabled>Publicar no Mercado Livre</Button>
-          </Tooltip>
+          {det.aPublicar > 0 && (
+            <>
+              <Tooltip title="O Mercado Livre confere cada item sem publicar nada (as fotos já sobem e ficam guardadas)">
+                <Button block icon={<SafetyCertificateOutlined />} loading={conferindo} disabled={!det.categoria || publicando} onClick={conferirNoMl}>
+                  Conferir no Mercado Livre
+                </Button>
+              </Tooltip>
+              <Popconfirm
+                title={`Publicar ${det.aPublicar} item(ns) no Mercado Livre?`}
+                description={<div style={{ maxWidth: 320 }}>Cada item vira um anúncio público{det.aPublicar > 1 ? ', agrupados pelo título como família' : ''}. Preço e estoque vão como estão aqui.</div>}
+                okText="Publicar" onConfirm={publicar} disabled={erros > 0}
+              >
+                <Tooltip title={erros ? 'Resolva as pendências em vermelho primeiro.' : undefined}>
+                  <Button type="primary" block icon={<SendOutlined />} loading={publicando} disabled={erros > 0 || conferindo}>
+                    Publicar {det.aPublicar > 1 ? `${det.aPublicar} itens` : ''} no Mercado Livre
+                  </Button>
+                </Tooltip>
+              </Popconfirm>
+            </>
+          )}
+          {det.publicados > 0 && det.permalink && (
+            <Button block icon={<LinkOutlined />} href={det.permalink} target="_blank">Ver no Mercado Livre</Button>
+          )}
+          {conferencia && (
+            <Alert
+              type={conferencia.every(c => c.ok) ? 'success' : 'warning'} showIcon
+              message={conferencia.every(c => c.ok) ? 'O ML aceitou todos os itens.' : `O ML apontou problema em ${conferencia.filter(c => !c.ok).length} item(ns).`}
+              description={conferencia.some(c => !c.ok) && (
+                <div style={{ maxHeight: 220, overflowY: 'auto' }}>
+                  {conferencia.filter(c => !c.ok).map(c => (
+                    <div key={c.idItem} style={{ marginBottom: 6 }}><Text strong>{c.sku}</Text>{c.erros.map((e, k) => <div key={k} style={{ fontSize: 12 }}>• {e}</div>)}</div>
+                  ))}
+                </div>
+              )}
+            />
+          )}
+          {falhas.length > 0 && (
+            <Alert type="error" showIcon message={`${falhas.length} item(ns) não subiram`}
+              description={<div style={{ maxHeight: 220, overflowY: 'auto' }}>{falhas.map(f => <div key={f.sku} style={{ fontSize: 12 }}><b>{f.sku}</b>: {f.erro}</div>)}</div>} />
+          )}
         </Space>
       </Card>
 
@@ -496,7 +602,11 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
         {!det ? <div style={{ minHeight: 300 }} /> : (
           <Row gutter={16}>
             <Col xs={24} xl={17}>
-              {!editavel && <Alert type="info" showIcon style={{ marginBottom: 16 }} message="Anúncio publicado: as alterações vão pelo envio ao ML (próxima etapa)." />}
+              {!editavel && (
+                <Alert type="info" showIcon style={{ marginBottom: 16 }}
+                  message={`${det.publicados} item(ns) já no Mercado Livre${det.aPublicar ? ` · ${det.aPublicar} a publicar` : ''}`}
+                  description="Título, categoria e atributos ficam como estão no ML. Preço do item muda na hora; itens novos da família entram pelo botão Publicar." />
+              )}
               {blocoDados}
               {blocoItens}
               {blocoAtributos}

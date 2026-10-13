@@ -11,9 +11,9 @@ import { ErroML, ml } from './mercadolivreApi';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
 
-const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || req.body?.tenant_id || 1);
+export const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || req.body?.tenant_id || 1);
 
-const responderErro = (res: Response, error: any, padrao: string) => {
+export const responderErro = (res: Response, error: any, padrao: string) => {
   if (error instanceof ErroML) return res.status(error.status).json({ error: error.message, detalhes: error.detalhes });
   if (error?.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Um dos itens já está em outro anúncio do Mercado Livre.' });
   console.error(padrao, error);
@@ -21,13 +21,12 @@ const responderErro = (res: Response, error: any, padrao: string) => {
 };
 
 const TIPOS_ANUNCIO = ['gold_special', 'gold_pro'];
-const SITUACOES_EDITAVEIS = ['RASCUNHO'];
 
 // ---------------------------------------------------------------------------
 // Categorias do ML (dados públicos, guardados em memória por algumas horas)
 // ---------------------------------------------------------------------------
 
-interface CategoriaML { info: CategoriaInfo; nome: string; caminho: string; atributos: AtributoML[]; temGtin: boolean; filhos: { id: string; nome: string }[] }
+export interface CategoriaML { info: CategoriaInfo; nome: string; caminho: string; atributos: AtributoML[]; temGtin: boolean; filhos: { id: string; nome: string }[] }
 const cacheCategorias = new Map<string, { em: number; valor: Promise<CategoriaML> }>();
 const VALIDADE_CACHE = 6 * 60 * 60 * 1000;
 
@@ -67,7 +66,7 @@ const sugerirCategorias = async (tenant: number, texto: string) => {
 // Itens do catálogo como o anúncio precisa
 // ---------------------------------------------------------------------------
 
-const lista = (ids: number[]) => ids.map(() => '?').join(',');
+export const lista = (ids: number[]) => ids.map(() => '?').join(',');
 
 const valorExibicao = (r: any): string | null => {
   if (r.opcao_valor !== null && r.opcao_valor !== undefined) return String(r.opcao_valor);
@@ -165,7 +164,7 @@ export const carregarItens = async (conn: Conn, tenant: number, ids: number[]) =
 // Anúncio completo (dados + itens + categoria + pendências)
 // ---------------------------------------------------------------------------
 
-const lerJson = <T,>(s: string | null, padrao: T): T => { try { return s ? JSON.parse(s) : padrao; } catch { return padrao; } };
+export const lerJson = <T,>(s: string | null, padrao: T): T => { try { return s ? JSON.parse(s) : padrao; } catch { return padrao; } };
 
 const dadosDoAnuncio = (a: any): AnuncioDados => ({
   titulo: a.titulo,
@@ -175,16 +174,20 @@ const dadosDoAnuncio = (a: any): AnuncioDados => ({
   atributos: lerJson<Record<string, ValorAtributo>>(a.atributos, {}),
 });
 
-interface AnuncioCarregado {
+/** O que já está no ML de cada item (na conta com User Products cada item é um anúncio MLB). */
+export interface ItemNoMl { mlbId: string | null; status: string | null; permalink: string | null; erro: string | null; fotosMl: Record<string, string> }
+
+export interface AnuncioCarregado {
   registro: any;
   dados: AnuncioDados;
   itens: ItemAnuncio[];
+  noMl: Map<number, ItemNoMl>;
   categoria: CategoriaML | null;
-  pendencias: Pendencia[];
+  pendencias: Pendencia[];      // só dos itens que ainda não estão no ML
   atributosErp: { id: number; nome: string }[];
 }
 
-const carregarAnuncios = async (conn: Conn, tenant: number, idAnuncio?: number): Promise<AnuncioCarregado[]> => {
+export const carregarAnuncios = async (conn: Conn, tenant: number, idAnuncio?: number): Promise<AnuncioCarregado[]> => {
   const [anuncios] = await conn.execute(
     `SELECT a.*, f.nome AS familia_nome,
             DATE_FORMAT(a.atualizado_em, '%Y-%m-%d %H:%i') AS atualizado_fmt,
@@ -198,7 +201,7 @@ const carregarAnuncios = async (conn: Conn, tenant: number, idAnuncio?: number):
   if (anuncios.length === 0) return [];
   const idsAnuncios = anuncios.map((a: any) => Number(a.id));
   const [vinculos] = await conn.execute(
-    `SELECT id_anuncio, id_item, preco, variacao_id FROM modulo_ecommerce_mercadolivre_anuncios_itens
+    `SELECT id_anuncio, id_item, preco, mlb_id, status_ml, permalink, ultimo_erro, fotos_ml FROM modulo_ecommerce_mercadolivre_anuncios_itens
      WHERE tenant_id = ? AND id_anuncio IN (${lista(idsAnuncios)}) ORDER BY ordem, id_item`,
     [tenant, ...idsAnuncios]
   );
@@ -206,23 +209,32 @@ const carregarAnuncios = async (conn: Conn, tenant: number, idAnuncio?: number):
 
   return Promise.all(anuncios.map(async (a: any) => {
     const dados = dadosDoAnuncio(a);
-    const itensDoAnuncio: ItemAnuncio[] = vinculos
-      .filter((v: any) => Number(v.id_anuncio) === Number(a.id) && itens.has(Number(v.id_item)))
-      .map((v: any) => ({ ...itens.get(Number(v.id_item))!, precoMl: v.preco === null ? null : Number(v.preco) }));
+    const meus = vinculos.filter((v: any) => Number(v.id_anuncio) === Number(a.id) && itens.has(Number(v.id_item)));
+    const itensDoAnuncio: ItemAnuncio[] = meus.map((v: any) => ({ ...itens.get(Number(v.id_item))!, precoMl: v.preco === null ? null : Number(v.preco) }));
+    const noMl = new Map<number, ItemNoMl>(meus.map((v: any) => [Number(v.id_item), {
+      mlbId: v.mlb_id || null, status: v.status_ml || null, permalink: v.permalink || null, erro: v.ultimo_erro || null,
+      fotosMl: lerJson<Record<string, string>>(v.fotos_ml, {}),
+    }]));
+    const aPublicar = itensDoAnuncio.filter(i => !noMl.get(i.idItem)?.mlbId);
     const { categoria, erro } = await categoriaOuErro(tenant, dados.categoriaMl);
-    const pendencias = pendenciasAnuncio(dados, itensDoAnuncio, categoria?.info || null, categoria?.atributos || [], categoria?.temGtin ?? true);
+    const pendencias = itensDoAnuncio.length > 0 && aPublicar.length === 0
+      ? []
+      : pendenciasAnuncio(dados, aPublicar, categoria?.info || null, categoria?.atributos || [], categoria?.temGtin ?? true);
     if (erro) pendencias.unshift({ nivel: 'aviso', area: 'dados', texto: `Não deu para conferir a categoria no Mercado Livre: ${erro}` });
     const idsErp = new Set(itensDoAnuncio.flatMap(i => Object.keys(i.valoresErp)));
     return {
-      registro: a, dados, itens: itensDoAnuncio, categoria, pendencias,
+      registro: a, dados, itens: itensDoAnuncio, noMl, categoria, pendencias,
       atributosErp: [...idsErp].map(id => ({ id: Number(id), nome: atributosErp.get(Number(id)) || `#${id}` })).sort((x, y) => x.nome.localeCompare(y.nome)),
     };
   }));
 };
 
-const resumo = (c: AnuncioCarregado) => {
+export const resumo = (c: AnuncioCarregado) => {
   const a = c.registro;
   const erros = c.pendencias.filter(p => p.nivel === 'erro').length;
+  const publicados = c.itens.filter(i => c.noMl.get(i.idItem)?.mlbId).length;
+  const aPublicar = c.itens.length - publicados;
+  const primeiro = c.itens.map(i => c.noMl.get(i.idItem)).find(m => m?.mlbId);
   return {
     id: Number(a.id),
     titulo: a.titulo,
@@ -232,10 +244,12 @@ const resumo = (c: AnuncioCarregado) => {
     categoriaNome: a.categoria_ml_nome,
     tipoAnuncio: a.tipo_anuncio,
     situacao: a.situacao,
-    preparo: a.situacao === 'RASCUNHO' ? situacaoPreparo(c.pendencias) : null,
-    mlbId: a.mlb_id,
-    permalink: a.permalink,
+    preparo: aPublicar > 0 || c.itens.length === 0 ? situacaoPreparo(c.pendencias) : null,
+    mlbId: a.mlb_id || primeiro?.mlbId || null,
+    permalink: a.permalink || primeiro?.permalink || null,
     qtdItens: c.itens.length,
+    publicados,
+    aPublicar,
     fotoUrl: c.itens.find(i => i.fotoUrl)?.fotoUrl || null,
     estoque: c.itens.reduce((s, i) => s + Math.max(0, i.estoque), 0),
     precoMin: c.itens.length ? Math.min(...c.itens.map(i => precoNoMl(i, c.dados.ajustePreco))) : null,
@@ -264,7 +278,7 @@ const taxaMl = (tenant: number, preco: number, categoria: string, tipo: string) 
   return valor;
 };
 
-const detalhe = async (tenant: number, c: AnuncioCarregado) => {
+export const detalhe = async (tenant: number, c: AnuncioCarregado) => {
   const a = c.registro;
   const atributosCat = c.categoria?.atributos || [];
   const eixos = c.itens.length > 1 ? eixosDeVariacao(atributosCat, c.dados, c.itens).map(x => x.id) : [];
@@ -295,6 +309,7 @@ const detalhe = async (tenant: number, c: AnuncioCarregado) => {
         comissao: taxa ? taxa.comissao : null,
         percentualComissao: taxa ? taxa.percentual : null,
         valores: Object.fromEntries(atributosCat.map(at => [at.id, resolverValor(at, c.dados.atributos[at.id], i)])),
+        ml: (({ fotosMl, ...m }) => m)(c.noMl.get(i.idItem) || { mlbId: null, status: null, permalink: null, erro: null, fotosMl: {} }),
       };
     }),
     pendencias: c.pendencias,
@@ -560,8 +575,8 @@ export const adicionarItens = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
   const id = Number(req.params.id);
   try {
-    const a = await anuncioEditavel(pool as any, tenant, id);
-    if (!SITUACOES_EDITAVEIS.includes(a.situacao)) throw new ErroML('Anúncio já publicado: novas variações entram na próxima etapa (sincronização).');
+    // em anúncio já publicado o item novo fica "a publicar" e sobe pelo botão Publicar
+    await anuncioEditavel(pool as any, tenant, id);
     const ids = [...new Set<number>((req.body?.idItens || []).map(Number).filter(Boolean))];
     if (ids.length === 0) throw new ErroML('Escolha ao menos um item.');
     const [[{ proxima }]]: any = await pool.execute(
@@ -587,8 +602,12 @@ export const removerItem = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
   const id = Number(req.params.id);
   try {
-    const a = await anuncioEditavel(pool as any, tenant, id);
-    if (!SITUACOES_EDITAVEIS.includes(a.situacao)) throw new ErroML('Anúncio já publicado: tirar variação entra na próxima etapa (sincronização).');
+    await anuncioEditavel(pool as any, tenant, id);
+    const [[vinculo]]: any = await pool.execute(
+      `SELECT mlb_id FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
+      [id, tenant, Number(req.params.idItem)]
+    );
+    if (vinculo?.mlb_id) throw new ErroML(`Este item já está no ML (${vinculo.mlb_id}): pause ou encerre o anúncio lá antes de tirar daqui.`);
     await pool.execute(
       `DELETE FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
       [id, tenant, Number(req.params.idItem)]
@@ -606,14 +625,27 @@ export const precoDoItem = async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   try {
     await anuncioEditavel(pool as any, tenant, id);
+    const idItem = Number(req.params.idItem);
     const bruto = req.body?.preco;
     const preco = bruto === null || bruto === undefined || bruto === '' ? null : Math.round(Number(bruto) * 100) / 100;
     if (preco !== null && !(preco > 0)) throw new ErroML('Preço inválido.');
     await pool.execute(
       `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET preco = ? WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
-      [preco, id, tenant, Number(req.params.idItem)]
+      [preco, id, tenant, idItem]
     );
     const [c] = await carregarAnuncios(pool as any, tenant, id);
+    // item já no ML: o preço novo vai na hora
+    const mlb = c.noMl.get(idItem)?.mlbId;
+    const item = c.itens.find(i => i.idItem === idItem);
+    if (mlb && item) {
+      const novo = precoNoMl(item, c.dados.ajustePreco);
+      await ml(tenant, 'PUT', `/items/${mlb}`, { price: novo });
+      await pool.execute(
+        `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET preco_enviado = ?, sincronizado_em = NOW(), ultimo_erro = NULL
+         WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
+        [novo, id, tenant, idItem]
+      );
+    }
     return res.json(await detalhe(tenant, c));
   } catch (error) {
     return responderErro(res, error, 'Erro ao salvar o preço.');
@@ -626,7 +658,10 @@ export const excluirAnuncio = async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   try {
     const a = await anuncioEditavel(pool as any, tenant, id);
-    if (a.situacao !== 'RASCUNHO') throw new ErroML('Só rascunho pode ser excluído. Anúncio publicado se encerra pelo ML.');
+    const [[{ noMl }]]: any = await pool.execute(
+      `SELECT COUNT(mlb_id) AS noMl FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE id_anuncio = ? AND tenant_id = ?`, [id, tenant]
+    );
+    if (a.situacao !== 'RASCUNHO' || Number(noMl) > 0) throw new ErroML('Só rascunho pode ser excluído. Anúncio publicado se encerra pelo ML.');
     await pool.execute(`DELETE FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE id_anuncio = ? AND tenant_id = ?`, [id, tenant]);
     await pool.execute(`DELETE FROM modulo_ecommerce_mercadolivre_anuncios WHERE id = ? AND tenant_id = ?`, [id, tenant]);
     return res.json({ success: true });

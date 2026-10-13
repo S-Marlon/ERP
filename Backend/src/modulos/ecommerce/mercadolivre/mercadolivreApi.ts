@@ -80,6 +80,28 @@ export const tokenValido = async (tenant: number): Promise<{ token: string; cont
   }
 };
 
+/** Envia uma foto ao ML (multipart). Devolve o id da foto e o tamanho máximo que o ML gerou ("498x343"). */
+export const enviarFotoMl = async (tenant: number, conteudo: Buffer, nome: string, tipo: string) => {
+  const { token } = await tokenValido(tenant);
+  const form = new FormData();
+  form.append('file', new Blob([new Uint8Array(conteudo)], { type: tipo }), nome);
+  const r = await fetch(`${URL_API}/pictures/items/upload`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form });
+  const d: any = await r.json().catch(() => ({}));
+  if (!r.ok || !d?.id) throw new ErroML(`Mercado Livre recusou a foto ${nome}: ${mensagemErroML(d, r.status)}`, 400, d);
+  return { id: String(d.id), maxSize: (d.max_size as string) || null };
+};
+
+// Conta no modelo User Products: cada variação é um anúncio e o ML agrupa pelo family_name
+const modeloPorConta = new Map<number, { em: number; porFamilia: boolean }>();
+export const contaPorFamilia = async (tenant: number) => {
+  const guardado = modeloPorConta.get(tenant);
+  if (guardado && Date.now() - guardado.em < 60 * 60 * 1000) return guardado.porFamilia;
+  const eu: any = await ml(tenant, 'GET', '/users/me');
+  const porFamilia = Array.isArray(eu?.tags) && eu.tags.includes('user_product_seller');
+  modeloPorConta.set(tenant, { em: Date.now(), porFamilia });
+  return porFamilia;
+};
+
 /** Chamada autenticada à API do ML (JSON). */
 export const ml = async <T = any>(tenant: number, metodo: 'GET' | 'POST' | 'PUT' | 'DELETE', caminho: string, corpo?: unknown): Promise<T> => {
   const { token } = await tokenValido(tenant);
