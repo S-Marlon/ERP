@@ -20,9 +20,10 @@ Radio,
 Divider,
 List,
 Select,
-Tabs,
 Flex,
 message,
+Splitter,
+Grid,
 } from "antd";
 import {
   PlusOutlined,
@@ -35,8 +36,6 @@ import {
   ReadOutlined,
   SaveOutlined,
   RobotOutlined,
-  ShoppingCartOutlined,
-  SettingOutlined,
 } from "@ant-design/icons";
 import Swal from "sweetalert2";
 import { useSearchParams } from "react-router-dom";
@@ -76,8 +75,18 @@ const [temAlteracoes, setTemAlteracoes] = useState<boolean>(false);
 // Editor "Nomes e SKUs": aberto pelo painel ou pela lista de itens
 const [editorNomesAberto, setEditorNomesAberto] = useState<boolean>(false);
 const snapshotRef = useRef<string>("");
-// Aba da família aberta (Atributos e SKU, Itens)
-const [abaFamilia, setAbaFamilia] = useState<string>("atributos");
+// Divisão entre "Atributos e SKU" e "Itens" (% do painel da esquerda), guardada neste navegador
+const telas = Grid.useBreakpoint();
+const [divisao, setDivisao] = useState<number>(() => {
+  try { const v = Number(localStorage.getItem("erp.familias.divisao")); return v >= 30 && v <= 85 ? v : 62; } catch { return 62; }
+});
+const guardarDivisao = (tamanhos: number[]) => {
+  const total = tamanhos.reduce((a, b) => a + b, 0);
+  if (!(total > 0) || !(tamanhos[0] > 0) || !(tamanhos[1] > 0)) return; // painel recolhido: não guarda
+  const pct = Math.round((tamanhos[0] / total) * 100);
+  setDivisao(pct);
+  try { localStorage.setItem("erp.familias.divisao", String(pct)); } catch { /* sem armazenamento */ }
+};
 
 const {
 grupoSelecionado: familiaSelecionadaHook,
@@ -609,11 +618,8 @@ showConfirmButton: false,
 
 
 
-// Itens ativos (inativos, como duplicados juntados, não contam) e quantos precisam de revisão
+// Itens ativos (inativos, como duplicados juntados, não contam)
 const itensAtivos = (itensDaFamilia || []).filter((i: any) => String(i.status || "").toUpperCase() !== "INATIVO");
-const itensARevisar = itensAtivos.filter((i: any) => (i.atributosPendentes || []).length > 0
-  || (i.skuCalculado && i.skuCalculado !== i.sku)
-  || (i.nomeCalculado && i.nomeCalculado !== (i.nomeComercial || i.nome))).length;
 
 // Papel da marca na família (DNA, grade ou ficha) e a marca da família: vai no cabeçalho
 const blocoMarca = (
@@ -726,14 +732,11 @@ Salvar família
 )}
 />
 
-<Tabs
-activeKey={abaFamilia}
-onChange={setAbaFamilia}
-items={[
-{
-key: "atributos",
-label: <Space size={6}><SettingOutlined />Atributos e SKU</Space>,
-children: (
+{/* Atributos e SKU | Itens: lado a lado (arraste o divisor); em tela estreita, um embaixo do outro */}
+{telas.lg ? (
+<Splitter onResizeEnd={guardarDivisao} style={{ alignItems: "flex-start" }}>
+<Splitter.Panel defaultSize={`${divisao}%`} min="30%" max="85%" collapsible={{ start: false, end: true }}>
+<div style={{ paddingRight: 8 }}>
 <Space direction="vertical" size={12} style={{ width: "100%" }}>
 <PainelSimulador
 familiaSelecionada={familiaSelecionadaLocal}
@@ -755,8 +758,8 @@ onVariacoesGravadas={catalogState.recarregarItensDaFamilia}
 editorAberto={editorNomesAberto}
 onEditorAberto={setEditorNomesAberto}
 />
-<Row gutter={[12, 12]} align="stretch">
-<Col xs={24} xl={8}>
+<Flex gap={12} wrap align="stretch">
+<div style={{ flex: "1 1 260px", minWidth: 0 }}>
 <AtributosCard
 titulo="DNA (fixo da família)"
 papel="dna"
@@ -771,8 +774,8 @@ onInfoClick={() => handleOpenGuideModal("dna")}
 emptyText="Nenhum atributo DNA"
 showDelete={true}
 />
-</Col>
-<Col xs={24} xl={8}>
+</div>
+<div style={{ flex: "1 1 260px", minWidth: 0 }}>
 <AtributosCard
 titulo="Grade (gera variação)"
 papel="grade"
@@ -787,8 +790,8 @@ onInfoClick={() => handleOpenGuideModal("grade")}
 emptyText="Nenhum atributo de grade"
 showDelete={true}
 />
-</Col>
-<Col xs={24} xl={8}>
+</div>
+<div style={{ flex: "1 1 260px", minWidth: 0 }}>
 <AtributosCard
 titulo="Ficha técnica"
 papel="ficha"
@@ -803,20 +806,13 @@ onInfoClick={() => handleOpenGuideModal("ficha")}
 emptyText="Nenhum atributo de ficha técnica"
 showDelete={true}
 />
-</Col>
-</Row>
+</div>
+</Flex>
 </Space>
-),
-},
-{
-key: "itens",
-label: (
-<Space size={6}>
-<ShoppingCartOutlined />Itens ({itensAtivos.length})
-{itensARevisar > 0 && <Tooltip title="Itens com grade pendente ou nome/SKU fora do modelo"><Badge count={itensARevisar} size="small" color="#d97706" /></Tooltip>}
-</Space>
-),
-children: (
+</div>
+</Splitter.Panel>
+<Splitter.Panel min="15%" collapsible={{ start: true, end: false }}>
+<div style={{ paddingLeft: 8 }}>
 <ItensFamiliaCard
 brandColor={brandColor}
 grupoSelecionado={familiaSelecionadaLocal}
@@ -828,10 +824,96 @@ handleEditarAtributosItem={handleEditarAtributosItem}
 onItensAlterados={catalogState.recarregarItensDaFamilia}
 onAbrirNomesSkus={() => setEditorNomesAberto(true)}
 />
-),
-},
-]}
+</div>
+</Splitter.Panel>
+</Splitter>
+) : (
+<Space direction="vertical" size={12} style={{ width: "100%" }}>
+<Space direction="vertical" size={12} style={{ width: "100%" }}>
+<PainelSimulador
+familiaSelecionada={familiaSelecionadaLocal}
+valoresTeste={valoresTeste}
+onMudancaValorTeste={onMudancaValorTeste}
+onAtualizarTemplateComercial={onAtualizarTemplateComercial}
+onAtualizarTemplateSku={onAtualizarTemplateSku}
+onAtualizarSiglaSku={onAtualizarSiglaSku}
+onAtualizarSeparadorSku={onAtualizarSeparadorSku}
+onAtualizarOrdemSku={onAtualizarOrdemSku}
+previewNomeSimulado={previewNomeSimulado}
+previewSkuSimulado={previewSkuSimulado}
+brandColor={brandColor}
+itensDaFamilia={itensDaFamilia}
+carregandoItens={carregandoItens}
+temAlteracoes={temAlteracoes}
+onSalvarFamilia={handleSalvarFamiliaNoBanco}
+onVariacoesGravadas={catalogState.recarregarItensDaFamilia}
+editorAberto={editorNomesAberto}
+onEditorAberto={setEditorNomesAberto}
 />
+<Flex gap={12} wrap align="stretch">
+<div style={{ flex: "1 1 260px", minWidth: 0 }}>
+<AtributosCard
+titulo="DNA (fixo da família)"
+papel="dna"
+cor={brandColor || "#1677ff"}
+dataSource={atributosDNA}
+onOpenModal={() => handleAbrirModal("dna")}
+onDelete={(record) => handleExcluirAtributo("dna", record)}
+onMover={moverAtributo}
+onAlterar={(record, patch) => alterarAtributoFamilia(record.id, patch)}
+tooltipText="DNA: igual em todos os itens da família (ex: Material = NBR). O valor fixo é definido aqui. Clique para ver o guia."
+onInfoClick={() => handleOpenGuideModal("dna")}
+emptyText="Nenhum atributo DNA"
+showDelete={true}
+/>
+</div>
+<div style={{ flex: "1 1 260px", minWidth: 0 }}>
+<AtributosCard
+titulo="Grade (gera variação)"
+papel="grade"
+cor="#9333ea"
+dataSource={atributosVariacao}
+onOpenModal={() => handleAbrirModal("grade")}
+onDelete={(record) => handleExcluirAtributo("grade", record)}
+onMover={moverAtributo}
+onAlterar={(record, patch) => alterarAtributoFamilia(record.id, patch)}
+tooltipText="Atributos que diferenciam as variações e entram no SKU (ex: bitola, CV, marca em grade). Clique para ver o guia."
+onInfoClick={() => handleOpenGuideModal("grade")}
+emptyText="Nenhum atributo de grade"
+showDelete={true}
+/>
+</div>
+<div style={{ flex: "1 1 260px", minWidth: 0 }}>
+<AtributosCard
+titulo="Ficha técnica"
+papel="ficha"
+cor="#0891b2"
+dataSource={atributosFichaTecnica}
+onOpenModal={() => handleAbrirModal("ficha")}
+onDelete={(record) => handleExcluirAtributo("ficha", record)}
+onMover={moverAtributo}
+onAlterar={(record, patch) => alterarAtributoFamilia(record.id, patch)}
+tooltipText="Informações de apoio que não mudam o SKU (ex: pressão, norma). Clique para ver o guia."
+onInfoClick={() => handleOpenGuideModal("ficha")}
+emptyText="Nenhum atributo de ficha técnica"
+showDelete={true}
+/>
+</div>
+</Flex>
+</Space>
+<ItensFamiliaCard
+brandColor={brandColor}
+grupoSelecionado={familiaSelecionadaLocal}
+pesquisaItem={pesquisaItem}
+setPesquisaItem={setPesquisaItem}
+itensFiltradosDoGrupo={itensFiltradosDaFamilia}
+temAlteracoes={temAlteracoes}
+handleEditarAtributosItem={handleEditarAtributosItem}
+onItensAlterados={catalogState.recarregarItensDaFamilia}
+onAbrirNomesSkus={() => setEditorNomesAberto(true)}
+/>
+</Space>
+)}
 </Space>
 ) : (
 <Card style={{ textAlign: "center", padding: "48px 0", borderStyle: "dashed" }}>
