@@ -156,6 +156,22 @@ export const updateFamilia = async (
   return handleResponse<GenericFamiliaAPIResponse>(response, 'Erro ao atualizar família.');
 };
 
+/** Envia a foto da família (arquivo) e devolve o link novo. */
+export const enviarImagemFamilia = async (idFamilia: number, arquivo: File, tenantId: number = 1): Promise<{ imagem: string }> => {
+  const conteudo = await new Promise<string>((resolve, reject) => {
+    const leitor = new FileReader();
+    leitor.onload = () => resolve(String(leitor.result));
+    leitor.onerror = () => reject(new Error('Não foi possível ler o arquivo.'));
+    leitor.readAsDataURL(arquivo);
+  });
+  const response = await fetch(`${API_BASE_URL}/cadastros/familias/${idFamilia}/imagem/arquivo?tenant_id=${tenantId}`, {
+    method: 'POST',
+    headers: DEFAULT_HEADERS,
+    body: JSON.stringify({ nome: arquivo.name, conteudo }),
+  });
+  return handleResponse<{ imagem: string }>(response, 'Erro ao enviar a foto da família.');
+};
+
 export const deleteFamilia = async (idFamilia: string, tenantId: number = 1): Promise<GenericFamiliaAPIResponse> => {
   const response = await fetch(`${API_BASE_URL}/cadastros/familias/${idFamilia}?tenant_id=${tenantId}`, {
     method: 'DELETE',

@@ -2,6 +2,7 @@
 
 import { Request, Response } from 'express';
 import pool from '../../../infra/db';
+import { apagarArquivoDaUrl, ErroArquivo, salvarArquivo } from '../../../infra/arquivos';
 import { carregarOpcoes, converterValorAtributo, gravarValorAtributo, OpcaoAtributo } from '../atributos/valoresAtributo';
 import { baseDoToken, tokenUsaCodigo } from '../atributos/atributosRegras';
 import { AtributoEfetivo, avaliarSaudeFamilia, mesclarAtributos, statusAposSaude } from './saudeFamilia';
@@ -259,6 +260,32 @@ const TIPO_BANCO_ATRIBUTO: Record<string, string> = {
 const primeiroDefinido = (...valores: unknown[]) => valores.find(v => v !== undefined);
 
 // 🟡 [UPDATE] Atualizar Família (parcial: campo ausente mantém; vazio limpa)
+/**
+ * POST /catalogo/cadastros/familias/:idFamilia/imagem/arquivo { nome, conteudo (data URL) }
+ * Grava a foto da família no servidor e troca o link (a anterior, se era arquivo daqui, é apagada).
+ */
+export const enviarImagemFamilia = async (req: Request, res: Response) => {
+  const tenantId = Number(req.query.tenant_id || 1);
+  const idFamilia = Number(req.params.idFamilia);
+  try {
+    const [[familia]]: any = await pool.execute(`SELECT imagem FROM comercial_familias WHERE id = ? AND tenant_id = ?`, [idFamilia, tenantId]);
+    if (!familia) return res.status(404).json({ error: 'Família não encontrada.' });
+    const salvo = salvarArquivo(`familias/${tenantId}/${idFamilia}`, String(req.body?.nome || 'foto'), String(req.body?.conteudo || ''));
+    if (!salvo.tipo.startsWith('image/')) {
+      apagarArquivoDaUrl(`/uploads/${salvo.relativo}`);
+      return res.status(400).json({ error: 'A foto da família precisa ser uma imagem (JPG, PNG ou WEBP).' });
+    }
+    const url = `${req.protocol}://${req.get('host')}/uploads/${salvo.relativo}`;
+    await pool.execute(`UPDATE comercial_familias SET imagem = ? WHERE id = ? AND tenant_id = ?`, [url, idFamilia, tenantId]);
+    if (familia.imagem) apagarArquivoDaUrl(familia.imagem);
+    return res.json({ success: true, imagem: url });
+  } catch (error: any) {
+    if (error instanceof ErroArquivo) return res.status(400).json({ error: error.message });
+    console.error('Erro ao enviar a foto da família:', error);
+    return res.status(500).json({ error: 'Erro ao enviar a foto da família.', details: error?.message });
+  }
+};
+
 export const updateFamilia = async (req: Request, res: Response) => {
   const { idFamilia } = req.params;
   const tenantId = Number(req.query.tenant_id || 1);

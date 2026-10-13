@@ -38,7 +38,8 @@ import {
   getDiagnosticoFormalizacao,
   formalizarItensFamilia,
   vincularItensFamilia,
-  updateFamilia 
+  updateFamilia,
+  enviarImagemFamilia,
 } from './familias/familias.controller';
 
 // 🏷️ Controller de Produtos do Catálogo
@@ -151,6 +152,7 @@ router.get('/cadastros/categorias/:idCategoria/atributos', getAtributosByCategor
 router.get('/cadastros/familias', getFamilias);
 router.post('/cadastros/familias', createFamilia);
 router.put('/cadastros/familias/:idFamilia', updateFamilia);
+router.post('/cadastros/familias/:idFamilia/imagem/arquivo', enviarImagemFamilia);
 router.delete('/cadastros/familias/:idFamilia', deleteFamilia);
 router.get('/cadastros/familias/:idFamilia/formalizacao', getDiagnosticoFormalizacao);
 router.post('/cadastros/familias/:idFamilia/formalizacao', formalizarItensFamilia);
