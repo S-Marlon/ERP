@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Space, Button, Tooltip, Typography, Tag, Modal, Form, Input, Select, Tabs, TreeSelect, message } from 'antd';
+import { Alert, Card, Flex, Space, Button, Tooltip, Typography, Tag, Modal, Form, Input, Select, Tabs, TreeSelect, message } from 'antd';
 import type { TreeSelectProps } from 'antd';
-import { EditOutlined, DollarOutlined, FileTextOutlined, InfoCircleOutlined, InboxOutlined, PictureOutlined, ShopOutlined, ShareAltOutlined, SafetyCertificateOutlined, CodeSandboxOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, EditOutlined, DollarOutlined, FileTextOutlined, InfoCircleOutlined, InboxOutlined, PictureOutlined, ReadOutlined, ShopOutlined, ShareAltOutlined } from '@ant-design/icons';
 import ImageDisplay from '../../../shared/components/ui/ImageGallery/ImageDysplay';
 import { STATUS_FAMILIA_CONFIG } from './CatalogManager.types';
 
-const { Text } = Typography;
+const { Text, Title } = Typography;
 
 interface FamiliaIdentidadeCardProps {
   grupoSelecionado?: {
     id?: string | number;
     nome?: string;
+    siglaSku?: string;
     descricao?: string;
     status?: string;
     tipoItem?: string;
@@ -42,6 +43,14 @@ interface FamiliaIdentidadeCardProps {
   // Categoria da família (os itens herdam os atributos dela e das categorias acima)
   arvoreCategorias?: TreeSelectProps["treeData"];
   onMudarCategoria?: (idCategoria: string | undefined) => void;
+  // Cabeçalho da família (a tela de famílias usa este card como cabeçalho)
+  /** Ações à direita (Excluir, Desfazer, Salvar) */
+  acoes?: React.ReactNode;
+  /** Papel da marca + marca da família (controles da tela) */
+  marca?: React.ReactNode;
+  qtdItens?: number;
+  temAlteracoes?: boolean;
+  onAbrirGuia?: () => void;
 }
 
 export const FamiliaIdentidadeCard: React.FC<FamiliaIdentidadeCardProps> = ({
@@ -51,6 +60,11 @@ export const FamiliaIdentidadeCard: React.FC<FamiliaIdentidadeCardProps> = ({
   onSalvarIdentidade,
   arvoreCategorias,
   onMudarCategoria,
+  acoes,
+  marca,
+  qtdItens,
+  temAlteracoes,
+  onAbrirGuia,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('1');
@@ -122,244 +136,113 @@ export const FamiliaIdentidadeCard: React.FC<FamiliaIdentidadeCardProps> = ({
     }
   };
 
-  const accentColor = grupoSelecionado?.cor || brandColor || "#618c3f";
-
+  const accentColor = grupoSelecionado?.cor || brandColor || "#1677ff";
+  const status = (grupoSelecionado?.status || 'RASCUNHO') as keyof typeof STATUS_FAMILIA_CONFIG;
+  const cfg = STATUS_FAMILIA_CONFIG[status] || STATUS_FAMILIA_CONFIG.RASCUNHO;
+  const bloqueios = grupoSelecionado?.saude?.bloqueios || [];
+  const avisos = grupoSelecionado?.saude?.avisos || [];
+  const herdados = (grupoSelecionado?.atributos || []).filter(a => a.origem === 'herdados').length;
+  const categoria = grupoSelecionado?.categoriaPai ? String(grupoSelecionado.categoriaPai) : undefined;
+  // DNA = atributos de papel DNA com o valor fixo da família (ex.: Material: NBR)
+  const dna = (grupoSelecionado?.atributos || []).filter(a => a.classificacao === 'dna');
+  const g = grupoSelecionado;
+  const dados: Array<[string, React.ReactNode]> = [
+    ['Unidade', g?.unidadeMedidaBase || g?.unidadeBase || '—'],
+    ['SPED', g?.tipoItem || '—'],
+    ['NCM', g?.ncmPadrao ? <Text code style={{ fontSize: 12 }}>{g.ncmPadrao}</Text> : '—'],
+    ['Margem', g?.margemMinima || g?.margemMaxima ? `${g?.margemMinima || '–'}% a ${g?.margemMaxima || '–'}%` : '—'],
+    ['Markup', g?.markupPadrao ? `${g.markupPadrao}x` : '—'],
+    ['Estoque mín.', g?.estoqueMinimo || '—'],
+    ['Curva', g?.curvaAbc || '—'],
+  ];
 
   return (
     <>
-      <Card
-        title={
-          <Space size={8}>
-            <span
-              style={{
-                width: 10,
-                height: 10,
-                borderRadius: "50%",
-                background: accentColor,
-                display: "inline-block",
-                boxShadow: `0 0 0 2px ${accentColor}25`
-              }}
-            />
-            <span style={{ fontSize: "13px", fontWeight: 700, color: "#1e293b" }}>
-              Identidade & Herança da Família
-            </span>
-          </Space>
-        }
-        size="small"
-        style={{
-          borderRadius: 12,
-          border: "1px solid #e2e8f0",
-          boxShadow: "0 2px 4px 0 rgba(0, 0, 0, 0.02)",
-          height: "100%",
-        }}
-        styles={{
-          header: {
-            borderBottom: "1px solid #f1f5f9",
-            minHeight: "40px",
-            background: "#f8fafc",
-            borderRadius: "12px 12px 0 0",
-            padding: "0 14px",
-          },
-          body: { padding: "14px" },
-        }}
-        extra={
-          <Tooltip title="Editar Identidade e Regras">
-            <Button
-              type="text"
-              size="small"
-              icon={<EditOutlined style={{ fontSize: "13px", color: accentColor }} />}
-              onClick={handleAbrirModalLocal}
-              style={{ fontWeight: 600 }}
-            >
-              Editar
-            </Button>
-          </Tooltip>
-        }
-      >
-        <Space direction="vertical" size={12} style={{ width: "100%" }}>
-          {/* Cabeçalho Principal com Imagem e Nome */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '6px', borderRadius: '8px', border: '1px solid #f1f5f9' }}>
-            <ImageDisplay
-              size="44px"
-              src={grupoSelecionado?.imagem || grupoImage || undefined}
-              style={{
-                borderRadius: 8,
-                overflow: "hidden",
-                border: "1px solid #e2e8f0",
-                background: "#fff",
-                flexShrink: 0
-              }}
-            />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <Text style={{ color: "#64748b", fontSize: "10px", display: "block", fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Família Ativa
-              </Text>
-              <Text style={{ color: "#0f172a", fontSize: "14px", fontWeight: 800, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {grupoSelecionado?.nome || "Sem nome definido"}
-              </Text>
-            </div>
-            {/* Categoria da família: escolhida aqui (os itens herdam os atributos dela e das categorias acima) */}
-            {(() => {
-              const herdados = (grupoSelecionado?.atributos || []).filter(a => a.origem === 'herdados').length;
-              const valor = grupoSelecionado?.categoriaPai ? String(grupoSelecionado.categoriaPai) : undefined;
-              return (
-                <div style={{ width: 240, flexShrink: 0 }}>
-                  <Text style={{ color: valor ? '#16a34a' : '#d97706', fontSize: '10px', display: 'block', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    <ShareAltOutlined /> Categoria{valor ? ` · herda ${herdados} atributo(s)` : ' · não herda atributos'}
-                  </Text>
-                  <TreeSelect
-                    size="small"
-                    style={{ width: '100%' }}
-                    value={valor}
-                    treeData={arvoreCategorias || []}
-                    placeholder="Escolher categoria..."
-                    allowClear
-                    showSearch
-                    treeNodeFilterProp="title"
-                    treeDefaultExpandAll
-                    disabled={!onMudarCategoria}
-                    status={valor ? undefined : 'warning'}
-                    onChange={(v) => onMudarCategoria?.(v ? String(v) : undefined)}
-                  />
-                </div>
-              );
-            })()}
-
-             {/* DESTAQUE: DNA Estrutural Macro (Exigência 1 do Guia) */}
-          <div style={{ background: '#f0fdf4', padding: '10px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <Space size={4}>
-                <CodeSandboxOutlined style={{ color: '#16a34a', fontSize: '12px' }} />
-                <Text style={{ color: '#166534', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase' }}>
-                  DNA Estrutural Macro (Herdado do Pai)
-                </Text>
+      <Card size="small" style={{ borderLeft: `4px solid ${bloqueios.length ? '#cf1322' : accentColor}` }} styles={{ body: { padding: 12 } }}>
+        <Space direction="vertical" size={10} style={{ width: '100%' }}>
+          {/* Nome, situação e ações */}
+          <Flex justify="space-between" align="flex-start" wrap gap={12}>
+            <Flex gap={12} align="center" style={{ minWidth: 0 }}>
+              <ImageDisplay size="48px" rounded="8px" src={g?.imagem || grupoImage || undefined} />
+              <Space direction="vertical" size={2} style={{ minWidth: 0 }}>
+                <Space size={8} wrap>
+                  <Title level={4} style={{ margin: 0 }}>{g?.nome || 'Família sem nome'}</Title>
+                  <Tooltip title={bloqueios.length ? bloqueios.map(b => b.mensagem).join(' · ') : status === 'ATIVO' ? 'Itens com os obrigatórios preenchidos vão para o PDV e os canais.' : 'Itens desta família só publicam quando ela estiver ativa.'}>
+                    <Tag color={cfg.color} style={{ margin: 0 }}>{cfg.label}</Tag>
+                  </Tooltip>
+                  {temAlteracoes && <Tag color="warning" icon={<InfoCircleOutlined />} style={{ margin: 0 }}>Alterações não salvas</Tag>}
+                </Space>
+                <Space size={8} wrap>
+                  <Text type="secondary">{qtdItens ?? 0} item(ns)</Text>
+                  {g?.siglaSku && <Text type="secondary">· sigla <Text code>{g.siglaSku}</Text></Text>}
+                  {dna.length > 0 && (
+                    <Text type="secondary">· DNA: {dna.map(a => `${a.nome} ${a.valorPadraoFamilia || a.valorPadraoGrupo || '(sem valor)'}`).join(' · ')}</Text>
+                  )}
+                </Space>
               </Space>
-              <Tag color="green" style={{ fontSize: '9px', margin: 0, border: 'none' }}>Norma / Série</Tag>
-            </div>
-            <Text style={{ color: '#14532d', fontSize: '12px', fontWeight: 700, display: 'block' }}>
-              {(() => {
-                // DNA = atributos de papel DNA com o valor fixo da família (ex: Material: NBR)
-                const dna = (grupoSelecionado?.atributos || []).filter(a => a.classificacao === 'dna');
-                if (dna.length === 0) return 'Nenhum atributo de DNA configurado';
-                return dna
-                  .map(a => `${a.nome}: ${a.valorPadraoFamilia || a.valorPadraoGrupo || '(sem valor fixo)'}`)
-                  .join(' · ');
-              })()}
-            </Text>
-          </div>
-          </div>
+            </Flex>
+            <Space wrap>
+              <Button icon={<EditOutlined />} onClick={handleAbrirModalLocal}>Editar dados</Button>
+              {acoes}
+            </Space>
+          </Flex>
 
+          {/* Categoria (os itens herdam os atributos dela) e marca */}
+          <Flex gap={16} wrap align="center">
+            <Space size={6} wrap>
+              <Tooltip title="Os itens da família herdam os atributos desta categoria e das categorias acima dela">
+                <Text style={{ color: categoria ? '#389e0d' : '#d48806', fontSize: 12 }}><ShareAltOutlined /> Categoria{categoria ? ` · herda ${herdados} atributo(s)` : ' · não herda atributos'}</Text>
+              </Tooltip>
+              <TreeSelect
+                size="small"
+                style={{ width: 260 }}
+                value={categoria}
+                treeData={arvoreCategorias || []}
+                placeholder="Escolher categoria..."
+                allowClear
+                showSearch
+                treeNodeFilterProp="title"
+                treeDefaultExpandAll
+                disabled={!onMudarCategoria}
+                status={categoria ? undefined : 'warning'}
+                onChange={(v) => onMudarCategoria?.(v ? String(v) : undefined)}
+              />
+            </Space>
+            {marca}
+          </Flex>
 
-          {/* Grid de Atributos Chave Organizados por Blocos Visuais */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5 , 1fr)", gap: "8px" }}>
+          {/* Dados da família (editados em "Editar dados") */}
+          <Flex gap={4} wrap style={{ padding: '6px 10px', borderRadius: 6, background: '#f8fafc' }}>
+            {dados.map(([rotulo, valor], i) => (
+              <span key={rotulo} style={{ fontSize: 12 }}>
+                <Text type="secondary" style={{ fontSize: 12 }}>{rotulo}</Text> <Text strong style={{ fontSize: 12 }}>{valor}</Text>
+                {i < dados.length - 1 && <Text type="secondary" style={{ margin: '0 6px' }}>·</Text>}
+              </span>
+            ))}
+          </Flex>
 
-
-            
-             {/* Bloco Estrutural / Identificação */}
-            <div style={{ background: '#fff', padding: '8px', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
-              <Text style={{ color: "#94a3b8", fontSize: "9px", display: "block", fontWeight: 700, textTransform: 'uppercase' }}>
-                Marca ({grupoSelecionado?.marcaComportamento || 'ficha'})
-              </Text>
-              <Text style={{ color: "#1e293b", fontSize: "12px", fontWeight: 700 }}>
-                {grupoSelecionado?.nomeMarca || "Sem Marca"}
-              </Text>
-            </div>
-
-
-            {/* Bloco Estrutural / Identificação */}
-            <div style={{ background: '#fff', padding: '8px', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
-              <Text style={{ color: "#94a3b8", fontSize: "9px", display: "block", fontWeight: 700, textTransform: 'uppercase' }}>
-                Unidade Base
-              </Text>
-              <Text style={{ color: "#1e293b", fontSize: "12px", fontWeight: 700 }}>
-                {grupoSelecionado?.unidadeBase || "PC"}
-              </Text>
-            </div>
-
-            <div style={{ background: '#fff', padding: '8px', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
-              <Text style={{ color: "#94a3b8", fontSize: "9px", display: "block", fontWeight: 700, textTransform: 'uppercase' }}>
-                Tipo SPED
-              </Text>
-              <Tag color="blue" style={{ margin: 0, fontSize: "10px", fontWeight: 700, border: 'none' }}>
-                {grupoSelecionado?.tipoItem || "PA"}
-              </Tag>
-            </div>
-
-            <div style={{ background: '#fff', padding: '8px', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
-              <Text style={{ color: "#94a3b8", fontSize: "9px", display: "block", fontWeight: 700, textTransform: 'uppercase' }}>
-                NCM Padrão
-              </Text>
-              <Text style={{ color: "#334155", fontSize: "11px", fontFamily: "monospace", fontWeight: 600 }}>
-                {grupoSelecionado?.ncmPadrao || "Não informado"}
-              </Text>
-            </div>
-
-            {/* Bloco Comercial / Margens */}
-            <div style={{ background: '#fff', padding: '8px', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
-              <Text style={{ color: "#94a3b8", fontSize: "9px", display: "block", fontWeight: 700, textTransform: 'uppercase' }}>
-                Margem Mín / Máx
-              </Text>
-              <Text style={{ color: "#1e293b", fontSize: "11px", fontWeight: 700 }}>
-                {grupoSelecionado?.margemMinima ? `${grupoSelecionado.margemMinima}%` : "-"} / {grupoSelecionado?.margemMaxima ? `${grupoSelecionado.margemMaxima}%` : "-"}
-              </Text>
-            </div>
-
-            <div style={{ background: '#fff', padding: '8px', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
-              <Text style={{ color: "#94a3b8", fontSize: "9px", display: "block", fontWeight: 700, textTransform: 'uppercase' }}>
-                Markup Padrão
-              </Text>
-              <Text style={{ color: "#0284c7", fontSize: "11px", fontWeight: 700 }}>
-                {grupoSelecionado?.markupPadrao ? `${grupoSelecionado.markupPadrao}x` : "-"}
-              </Text>
-            </div>
-
-            {/* Bloco Logístico / Estoque */}
-            <div style={{ background: '#fff', padding: '8px', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
-              <Text style={{ color: "#94a3b8", fontSize: "9px", display: "block", fontWeight: 700, textTransform: 'uppercase' }}>
-                Estoque Mín.
-              </Text>
-              <Text style={{ color: "#1e293b", fontSize: "11px", fontWeight: 700 }}>
-                {grupoSelecionado?.estoqueMinimo || "Não def."}
-              </Text>
-            </div>
-
-            {/* Rodapé do Card com Status de Governança */}
-            <div style={{ background: '#fff', padding: '8px', borderRadius: '6px', border: '1px solid #f1f5f9', gridColumn: 'span 2' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <Text style={{ color: "#94a3b8", fontSize: "9px", display: "block", fontWeight: 700, textTransform: 'uppercase' }}>
-                    Curva ABC / Classificação
-                  </Text>
-                  <Text style={{ color: "#1e293b", fontSize: "11px", fontWeight: 700 }}>
-                    {grupoSelecionado?.curvaAbc ? `Curva ${grupoSelecionado.curvaAbc}` : "Não definida"}
-                  </Text>
-                </div>
-                {(() => {
-                  // Publicação real: só família ATIVA publica; bloqueios da saúde explicam o motivo
-                  const status = (grupoSelecionado?.status || 'RASCUNHO') as keyof typeof STATUS_FAMILIA_CONFIG;
-                  const bloqueios = grupoSelecionado?.saude?.bloqueios || [];
-                  const cfg = STATUS_FAMILIA_CONFIG[status] || STATUS_FAMILIA_CONFIG.RASCUNHO;
-                  const texto = status === 'ATIVO' ? 'Itens publicáveis'
-                    : status === 'BLOQUEADO_INCONSISTENCIA' ? `Bloqueada: ${bloqueios.length} pendência(s)`
-                    : `${cfg.label}: itens não publicam`;
-                  const ajuda = status === 'ATIVO'
-                    ? 'Família ativa: itens com atributos obrigatórios preenchidos podem ir para o PDV e canais.'
-                    : bloqueios.length > 0 ? bloqueios.map(b => `• ${b.mensagem}`).join('\n')
-                    : 'Itens desta família só publicam quando ela estiver ATIVA.';
-                  return (
-                    <Tooltip title={<span style={{ whiteSpace: 'pre-line' }}>{ajuda}</span>}>
-                      <Tag icon={<SafetyCertificateOutlined />} color={cfg.color} style={{ margin: 0, fontSize: '10px' }}>
-                        {texto}
-                      </Tag>
-                    </Tooltip>
-                  );
-                })()}
-              </div>
-            </div>
-
-          </div>
-
-
+          {/* Regras mínimas (o servidor recalcula ao salvar) */}
+          {!g?.saude ? (
+            <Text type="secondary" style={{ fontSize: 12 }}>Salve a família para calcular as regras.</Text>
+          ) : bloqueios.length === 0 && avisos.length === 0 ? (
+            <Flex justify="space-between" align="center">
+              <Text style={{ color: '#389e0d', fontSize: 12 }}><CheckCircleOutlined /> A família atende a todas as regras mínimas.</Text>
+              {onAbrirGuia && <Button size="small" type="link" icon={<ReadOutlined />} onClick={onAbrirGuia}>Guia de regras</Button>}
+            </Flex>
+          ) : (
+            <Alert
+              type={bloqueios.length ? 'error' : 'warning'}
+              showIcon
+              message={bloqueios.length ? `Família bloqueada: ${bloqueios.length} regra(s) a corrigir` : `${avisos.length} aviso(s)`}
+              description={(
+                <ul style={{ paddingLeft: 18, margin: 0 }}>
+                  {[...bloqueios, ...avisos].map(r => <li key={r.codigo}>{r.mensagem}</li>)}
+                </ul>
+              )}
+              action={onAbrirGuia && <Button size="small" type="link" icon={<ReadOutlined />} onClick={onAbrirGuia}>Guia</Button>}
+            />
+          )}
+          {temAlteracoes && g?.saude && <Text type="secondary" style={{ fontSize: 12 }}>Há alterações não salvas: as regras são recalculadas ao salvar.</Text>}
         </Space>
       </Card>
 

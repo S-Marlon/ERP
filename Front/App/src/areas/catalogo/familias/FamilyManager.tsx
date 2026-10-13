@@ -27,7 +27,6 @@ message,
 import {
   PlusOutlined,
   ThunderboltOutlined,
-  InfoCircleOutlined,
   DeleteOutlined,
   AppstoreOutlined,
   FileTextOutlined,
@@ -35,17 +34,14 @@ import {
   UndoOutlined,
   ReadOutlined,
   SaveOutlined,
-  CheckCircleOutlined,
   RobotOutlined,
   ShoppingCartOutlined,
   SettingOutlined,
-  ProfileOutlined,
 } from "@ant-design/icons";
 import Swal from "sweetalert2";
 import { useSearchParams } from "react-router-dom";
 
 import { updateFamilia, deleteFamilia, getMarcasCatalogo } from './FamilyManager.api';
-import { STATUS_FAMILIA_CONFIG } from './CatalogManager.types'; // Ajuste o caminho do import conforme seu projeto
 
 // Hook desacoplado
 import { useCatalogState } from "./useCatalogState";
@@ -80,8 +76,8 @@ const [temAlteracoes, setTemAlteracoes] = useState<boolean>(false);
 // Editor "Nomes e SKUs": aberto pelo painel ou pela lista de itens
 const [editorNomesAberto, setEditorNomesAberto] = useState<boolean>(false);
 const snapshotRef = useRef<string>("");
-// Aba da família aberta (Visão geral, Atributos e SKU, Itens)
-const [abaFamilia, setAbaFamilia] = useState<string>("geral");
+// Aba da família aberta (Atributos e SKU, Itens)
+const [abaFamilia, setAbaFamilia] = useState<string>("atributos");
 
 const {
 grupoSelecionado: familiaSelecionadaHook,
@@ -618,27 +614,24 @@ const itensAtivos = (itensDaFamilia || []).filter((i: any) => String(i.status ||
 const itensARevisar = itensAtivos.filter((i: any) => (i.atributosPendentes || []).length > 0
   || (i.skuCalculado && i.skuCalculado !== i.sku)
   || (i.nomeCalculado && i.nomeCalculado !== (i.nomeComercial || i.nome))).length;
-const saude = familiaSelecionadaLocal?.saude;
-const statusFamilia = familiaSelecionadaLocal?.status as keyof typeof STATUS_FAMILIA_CONFIG | undefined;
-const cfgStatus = statusFamilia ? STATUS_FAMILIA_CONFIG[statusFamilia] : undefined;
-const bloqueios: any[] = saude?.bloqueios || [];
-const avisos: any[] = saude?.avisos || [];
 
-// Papel da marca na família (DNA, grade ou ficha) e a marca da família
+// Papel da marca na família (DNA, grade ou ficha) e a marca da família: vai no cabeçalho
 const blocoMarca = (
-<Card size="small" title={<Space size={6}><TagOutlined style={{ color: brandColor }} /><span>Marca nesta família</span></Space>}
-extra={<Tooltip title="DNA: a marca identifica a família (todos os itens têm a mesma). Grade: a marca diferencia os itens (ex.: Ebara x Schneider). Ficha: só informação."><InfoCircleOutlined style={{ color: "#64748b" }} /></Tooltip>}>
-<Flex gap={12} wrap align="center">
+<Space size={6} wrap>
+<Tooltip title="DNA: a marca identifica a família (todos os itens têm a mesma). Grade: a marca diferencia os itens (ex.: Ebara x Schneider). Ficha: só informação.">
+<Text style={{ fontSize: 12 }}><TagOutlined /> Marca</Text>
+</Tooltip>
 <Radio.Group buttonStyle="solid" size="small" value={marcaComportamento} onChange={(e) => setMarcaComportamento(e.target.value)}>
-<Radio.Button value="dna"><TagOutlined /> DNA</Radio.Button>
-<Radio.Button value="grade"><AppstoreOutlined /> Grade (SKU)</Radio.Button>
+<Radio.Button value="dna">DNA</Radio.Button>
+<Radio.Button value="grade"><AppstoreOutlined /> Grade</Radio.Button>
 <Radio.Button value="ficha"><FileTextOutlined /> Ficha</Radio.Button>
 </Radio.Group>
+<Tooltip title={marcaComportamento === "dna" ? "Todos os itens recebem a marca da família." : marcaComportamento === "grade" ? "Cada item tem a sua marca; use {MARCA} no modelo do SKU." : "Cada item pode ter a sua marca; a da família vale quando o item não tiver."}>
 <Select
 size="small"
 showSearch
 allowClear
-style={{ width: 220 }}
+style={{ width: 200 }}
 placeholder={marcaComportamento === "dna" ? "Marca (obrigatória)" : "Marca da família (opcional)"}
 status={marcaComportamento === "dna" && !familiaSelecionadaLocal?.nomeMarca ? "error" : undefined}
 value={familiaSelecionadaLocal?.idMarca && familiaSelecionadaLocal?.nomeMarca ? String(familiaSelecionadaLocal.idMarca) : undefined}
@@ -650,36 +643,8 @@ setFamiliaSelecionada((prev: any) => ({ ...prev, idMarca: marca ? marca.id : "1"
 options={marcasCatalogo.map(m => ({ value: m.id, label: m.nome }))}
 optionFilterProp="label"
 />
-<Text type="secondary" style={{ fontSize: 12 }}>
-{marcaComportamento === "dna" && "Todos os itens recebem a marca da família."}
-{marcaComportamento === "grade" && "Cada item tem a sua marca; use {MARCA} no modelo do SKU."}
-{marcaComportamento === "ficha" && "Cada item pode ter a sua marca; a da família vale quando o item não tiver."}
-</Text>
-</Flex>
-</Card>
-);
-
-// Diagnóstico das regras mínimas (o servidor recalcula ao salvar)
-const blocoDiagnostico = (
-<Card size="small" title={<Space size={6}><CheckCircleOutlined style={{ color: bloqueios.length ? "#cf1322" : "#389e0d" }} /><span>Regras da família</span></Space>}
-extra={<Button size="small" type="link" icon={<ReadOutlined />} onClick={() => setIsGuiaOpen(true)}>Guia de regras</Button>}>
-<Space direction="vertical" size={8} style={{ width: "100%" }}>
-{!saude ? (
-<Text type="secondary">Salve a família para calcular o diagnóstico.</Text>
-) : bloqueios.length === 0 && avisos.length === 0 ? (
-<Alert type="success" showIcon message="A família atende a todas as regras mínimas." />
-) : (
-<>
-{bloqueios.map((b: any) => <Alert key={b.codigo} type="error" showIcon message={b.mensagem} />)}
-{avisos.map((a: any) => <Alert key={a.codigo} type="warning" showIcon message={a.mensagem} />)}
-</>
-)}
-{temAlteracoes && <Text type="secondary" style={{ fontSize: 12 }}>Há alterações não salvas: o diagnóstico é recalculado ao salvar.</Text>}
-<Text type="secondary" style={{ fontSize: 12 }}>
-Regras: ao menos um atributo de grade (ou marca como grade); DNA com valor fixo; marca definida se ela é DNA; modelo só com atributos da família; sigla definida se o modelo usa {"{SIGLA}"}.
-</Text>
+</Tooltip>
 </Space>
-</Card>
 );
 
 return (
@@ -724,54 +689,7 @@ handleCriarGrupo={handleCriarFamilia}
 <Col xs={24} lg={17} xl={18}>
 {familiaSelecionadaLocal ? (
 <Space direction="vertical" size={12} style={{ width: "100%" }}>
-{/* Cabeçalho da família: situação, itens e ações */}
-<Card size="small" style={{ borderLeft: `4px solid ${bloqueios.length ? "#cf1322" : brandColor}` }}>
-<Flex justify="space-between" align="center" wrap gap={12}>
-<Space direction="vertical" size={2}>
-<Space size={8} wrap>
-<Title level={4} style={{ margin: 0 }}>{familiaSelecionadaLocal.nome || "Família sem nome"}</Title>
-{cfgStatus && (
-<Tooltip title={bloqueios.length ? bloqueios.map((b: any) => b.mensagem).join(" · ") : undefined}>
-<Tag color={cfgStatus.color} style={{ margin: 0 }}>{cfgStatus.label}</Tag>
-</Tooltip>
-)}
-{temAlteracoes && <Tag color="warning" icon={<InfoCircleOutlined />} style={{ margin: 0 }}>Alterações não salvas</Tag>}
-</Space>
-<Space size={12} wrap>
-<Text type="secondary">{familiaSelecionadaLocal.categoriaPaiNome || "Sem categoria"}</Text>
-<Text type="secondary">· {itensAtivos.length} item(ns)</Text>
-{familiaSelecionadaLocal.siglaSku && <Text type="secondary">· sigla <Text code>{familiaSelecionadaLocal.siglaSku}</Text></Text>}
-{familiaSelecionadaLocal.nomeMarca && <Text type="secondary">· marca {familiaSelecionadaLocal.nomeMarca} ({marcaComportamento})</Text>}
-</Space>
-</Space>
-<Space wrap>
-<Tooltip title={Number(familiaSelecionadaLocal?.totalItens || 0) > 0
-? `A família tem ${familiaSelecionadaLocal?.totalItens} produto(s): tire ou mova os itens antes de excluir`
-: "Excluir esta família"}>
-<Button danger icon={<DeleteOutlined />} onClick={handleExcluirFamilia}
-disabled={!familiaSelecionadaLocal?.id || Number(familiaSelecionadaLocal?.totalItens || 0) > 0}>Excluir</Button>
-</Tooltip>
-<Tooltip title="Ver o que mudou e desfazer">
-<Button icon={<UndoOutlined />} disabled={!temAlteracoes} onClick={handleDesfazerAlteracoes}>Desfazer</Button>
-</Tooltip>
-<Button type="primary" icon={<SaveOutlined />} disabled={!temAlteracoes} loading={loading} onClick={handleSalvarFamiliaNoBanco}>
-Salvar família
-</Button>
-</Space>
-</Flex>
-</Card>
-
-<Tabs
-activeKey={abaFamilia}
-onChange={setAbaFamilia}
-items={[
-{
-key: "geral",
-label: <Space size={6}><ProfileOutlined />Visão geral{bloqueios.length > 0 && <Badge count={bloqueios.length} size="small" />}</Space>,
-children: (
-<Row gutter={[12, 12]}>
-<Col xs={24} xl={14}>
-<Space direction="vertical" size={12} style={{ width: "100%" }}>
+{/* Cabeçalho da família: identidade, categoria, marca, dados, regras e ações */}
 <FamiliaIdentidadeCard
 grupoSelecionado={familiaSelecionadaLocal}
 grupoImage={grupoImage}
@@ -786,14 +704,32 @@ handleAtualizarIdentidadeFamilia(valores);
 setFamiliaSelecionada((prev: any) => ({ ...prev, ...valores, atributos: prev.atributos || [] }));
 }
 }}
+qtdItens={itensAtivos.length}
+temAlteracoes={temAlteracoes}
+onAbrirGuia={() => setIsGuiaOpen(true)}
+marca={blocoMarca}
+acoes={(
+<>
+<Tooltip title={Number(familiaSelecionadaLocal?.totalItens || 0) > 0
+? `A família tem ${familiaSelecionadaLocal?.totalItens} produto(s): tire ou mova os itens antes de excluir`
+: "Excluir esta família"}>
+<Button danger icon={<DeleteOutlined />} onClick={handleExcluirFamilia}
+disabled={!familiaSelecionadaLocal?.id || Number(familiaSelecionadaLocal?.totalItens || 0) > 0}>Excluir</Button>
+</Tooltip>
+<Tooltip title="Ver o que mudou e desfazer">
+<Button icon={<UndoOutlined />} disabled={!temAlteracoes} onClick={handleDesfazerAlteracoes}>Desfazer</Button>
+</Tooltip>
+<Button type="primary" icon={<SaveOutlined />} disabled={!temAlteracoes} loading={loading} onClick={handleSalvarFamiliaNoBanco}>
+Salvar família
+</Button>
+</>
+)}
 />
-{blocoMarca}
-</Space>
-</Col>
-<Col xs={24} xl={10}>{blocoDiagnostico}</Col>
-</Row>
-),
-},
+
+<Tabs
+activeKey={abaFamilia}
+onChange={setAbaFamilia}
+items={[
 {
 key: "atributos",
 label: <Space size={6}><SettingOutlined />Atributos e SKU</Space>,
