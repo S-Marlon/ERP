@@ -9,7 +9,7 @@ import { CheckCircleOutlined, ExclamationCircleOutlined, MergeCellsOutlined, Plu
 import type { AtributoConfig, Familia } from '../CatalogManager.types';
 import { adicionarOpcaoAtributo, formalizarItensDaFamilia, getDiagnosticoFormalizacao } from '../FamilyManager.api';
 import {
-  atributosNosTemplates, AvaliacaoVariacao, avaliarVariacao, CHAVE_MARCA, conferirGradeParaJuntar, FamiliaNomenclatura, opcoesDoAtributo,
+  atributosNosTemplates, AvaliacaoVariacao, avaliarVariacao, CHAVE_MARCA, conferirGradeParaJuntar, FamiliaNomenclatura, manterEdicoes, opcoesDoAtributo,
   PapelMarca, skusRepetidos, valoresMudaram, VariacaoEditavel,
 } from '../nomenclaturaVariacoes';
 import { JuntarItensModal } from '../../duplicados/juntarItens';
@@ -59,7 +59,8 @@ export const EditorNomenclaturaModal: React.FC<Props> = ({
   const [novaOpcao, setNovaOpcao] = useState<{ atributo: AtributoConfig; idItem: string | null; valor: string; codigo: string } | null>(null);
   const [salvandoOpcao, setSalvandoOpcao] = useState(false);
 
-  const carregar = async () => {
+  // manter: recarrega sem perder o que foi digitado e ainda não gravado (depois de juntar ou de gravar parte)
+  const carregar = async (manter = false) => {
     if (!familia?.id) return;
     setCarregando(true);
     try {
@@ -68,13 +69,14 @@ export const EditorNomenclaturaModal: React.FC<Props> = ({
       // Inativos (ex.: já juntados em outro item) ficam fora da grade
       const todos = d.itens || [];
       setInativos(todos.filter((i: any) => String(i.status || '').toUpperCase() === 'INATIVO').length);
-      setLinhas(todos.filter((i: any) => String(i.status || '').toUpperCase() !== 'INATIVO').map((i: any) => {
+      const novas: Linha[] = todos.filter((i: any) => String(i.status || '').toUpperCase() !== 'INATIVO').map((i: any) => {
         const valores = { ...(i.valoresAtributos || {}) };
         return {
           idItem: String(i.idItem || i.id), skuAtual: i.sku || '', nomeAtual: i.nomeComercial || i.nome || '', variacao: i.variacao,
           valores, original: { ...valores },
         };
-      }).sort((a: Linha, b: Linha) => porTexto(a.skuAtual, b.skuAtual)));
+      }).sort((a: Linha, b: Linha) => porTexto(a.skuAtual, b.skuAtual));
+      setLinhas(atuais => (manter ? manterEdicoes(novas, atuais) : novas));
       setMarcadas([]);
     } catch (e) {
       message.error(e instanceof Error ? e.message : 'Erro ao carregar as variações.');
@@ -296,7 +298,7 @@ export const EditorNomenclaturaModal: React.FC<Props> = ({
       }
       message.success(`${paraSalvar.length} variação(ões) com nome e SKU novos${paraPendente.length ? ` · ${paraPendente.length} pendente(s) com os atributos guardados` : ''}.`);
       onSalvo?.();
-      await carregar();
+      await carregar(true);
     } catch (e) {
       message.error(e instanceof Error ? e.message : 'Erro ao gravar as variações.');
     } finally {
@@ -526,7 +528,7 @@ export const EditorNomenclaturaModal: React.FC<Props> = ({
         ids={paraJuntar}
         titulo={`Juntar variações iguais · ${familia?.nome || ''}`}
         onFechar={() => setParaJuntar(null)}
-        onConcluido={() => { setMarcadas([]); carregar(); onSalvo?.(); }}
+        onConcluido={() => { setMarcadas([]); carregar(true); onSalvo?.(); }}
       />
     </Modal>
   );

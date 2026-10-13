@@ -186,3 +186,23 @@ export const conferirGradeParaJuntar = (
   }
   return { pode: diferencas.length === 0, diferencas };
 };
+
+/**
+ * Recarregar sem perder o que foi digitado: variação que voltou do servidor mantém os valores editados (e não gravados)
+ * da tela; a que sumiu (ex.: juntada em outra) sai. O "original" passa a ser o do servidor.
+ */
+export const manterEdicoes = <T extends { idItem: string; valores: Record<string, unknown>; original: Record<string, unknown> }>(
+  novas: T[],
+  antigas: T[]
+): T[] => {
+  const porId = new Map(antigas.map(l => [l.idItem, l]));
+  return novas.map(n => {
+    const a = porId.get(n.idItem);
+    if (!a || !valoresMudaram(a.original, a.valores)) return n;
+    // Só as chaves que o usuário mudou sobrepõem o que veio do servidor
+    const editados = Object.fromEntries(Object.keys({ ...a.original, ...a.valores })
+      .filter(k => String(a.original[k] ?? '').trim() !== String(a.valores[k] ?? '').trim())
+      .map(k => [k, a.valores[k]]));
+    return { ...n, valores: { ...n.valores, ...editados } };
+  });
+};

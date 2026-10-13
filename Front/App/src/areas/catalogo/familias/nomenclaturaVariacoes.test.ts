@@ -1,5 +1,5 @@
 import {
-  atributosNosTemplates, avaliarVariacao, CHAVE_MARCA, conferirGradeParaJuntar, FamiliaNomenclatura, montarTexto, skusRepetidos, valoresMudaram,
+  atributosNosTemplates, avaliarVariacao, CHAVE_MARCA, conferirGradeParaJuntar, manterEdicoes, FamiliaNomenclatura, montarTexto, skusRepetidos, valoresMudaram,
 } from './nomenclaturaVariacoes';
 
 const assert = (condition: boolean, message: string): void => {
@@ -81,6 +81,25 @@ export const runNomenclaturaTests = (): void => {
   assert(!marca.pode && marca.diferencas[0].atributo === 'Marca', 'Marca como grade também precisa ser igual.');
   assert(!conferirGradeParaJuntar([v({})], { papelMarca: 'ficha' }, grade).pode, 'Precisa de 2 ou mais.');
   console.log('juntar só com a grade igual: ok');
+  }
+
+  // Recarregar (após juntar/gravar) mantém o que foi digitado e não gravado
+  {
+    const antigas = [
+      { idItem: '1', valores: { '30': '1/2"', '31': 'X' }, original: { '30': '', '31': 'X' } }, // editado
+      { idItem: '2', valores: { '30': '3/8"' }, original: { '30': '3/8"' } },                    // sem edição
+      { idItem: '3', valores: { '30': '5/8"' }, original: { '30': '' } },                        // juntado: some
+    ];
+    const novas = [
+      { idItem: '1', valores: { '30': '', '31': 'Y' }, original: { '30': '', '31': 'Y' } },
+      { idItem: '2', valores: { '30': '3/4"' }, original: { '30': '3/4"' } },
+    ];
+    const r = manterEdicoes(novas, antigas);
+    assert(r.length === 2, 'Juntado sai da grade.');
+    assert(r[0].valores['30'] === '1/2"' && r[0].valores['31'] === 'Y', 'Editado fica; o resto vem do servidor.');
+    assert(r[0].original['30'] === '', 'Original é o do servidor (continua marcado como editado).');
+    assert(r[1].valores['30'] === '3/4"', 'Sem edição: vale o servidor.');
+    console.log('recarregar mantém as edições: ok');
   }
 };
 
