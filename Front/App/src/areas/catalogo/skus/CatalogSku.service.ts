@@ -146,6 +146,8 @@ export interface ProdutoDetalhe {
     descricao_comercial: string | null;
     categoria_id: number | null;
     familia_id: number | null;
+    familia_nome?: string | null;
+    familia_imagem?: string | null;   // vale para o item sem foto própria
     id_marca: number | null;
     custo_gerencial: number | null;
     preco_venda: number | null;

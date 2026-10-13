@@ -172,6 +172,16 @@ export const enviarImagemFamilia = async (idFamilia: number, arquivo: File, tena
   return handleResponse<{ imagem: string }>(response, 'Erro ao enviar a foto da família.');
 };
 
+/** Foto da família por link (vazio tira a foto). */
+export const definirImagemFamilia = async (idFamilia: number, url: string | null, tenantId: number = 1): Promise<{ imagem: string | null }> => {
+  const response = await fetch(`${API_BASE_URL}/cadastros/familias/${idFamilia}/imagem?tenant_id=${tenantId}`, {
+    method: 'PUT',
+    headers: DEFAULT_HEADERS,
+    body: JSON.stringify({ url: url || '' }),
+  });
+  return handleResponse<{ imagem: string | null }>(response, 'Erro ao salvar a foto da família.');
+};
+
 export const deleteFamilia = async (idFamilia: string, tenantId: number = 1): Promise<GenericFamiliaAPIResponse> => {
   const response = await fetch(`${API_BASE_URL}/cadastros/familias/${idFamilia}?tenant_id=${tenantId}`, {
     method: 'DELETE',

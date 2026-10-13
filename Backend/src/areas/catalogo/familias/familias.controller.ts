@@ -286,6 +286,25 @@ export const enviarImagemFamilia = async (req: Request, res: Response) => {
   }
 };
 
+/** PUT /catalogo/cadastros/familias/:idFamilia/imagem { url } — foto da família por link (url vazia tira a foto) */
+export const definirImagemFamilia = async (req: Request, res: Response) => {
+  const tenantId = Number(req.query.tenant_id || 1);
+  const idFamilia = Number(req.params.idFamilia);
+  const url = String(req.body?.url ?? '').trim();
+  try {
+    if (url && !/^https?:\/\/\S+$/i.test(url)) return res.status(400).json({ error: 'Cole um link válido (começando com http:// ou https://).' });
+    if (url.length > 255) return res.status(400).json({ error: `Link com ${url.length} caracteres: o máximo é 255. Envie a foto como arquivo.` });
+    const [[familia]]: any = await pool.execute(`SELECT imagem FROM comercial_familias WHERE id = ? AND tenant_id = ?`, [idFamilia, tenantId]);
+    if (!familia) return res.status(404).json({ error: 'Família não encontrada.' });
+    await pool.execute(`UPDATE comercial_familias SET imagem = ? WHERE id = ? AND tenant_id = ?`, [url || null, idFamilia, tenantId]);
+    if (familia.imagem && familia.imagem !== url) apagarArquivoDaUrl(familia.imagem);
+    return res.json({ success: true, imagem: url || null });
+  } catch (error: any) {
+    console.error('Erro ao definir a foto da família:', error);
+    return res.status(500).json({ error: 'Erro ao definir a foto da família.', details: error?.message });
+  }
+};
+
 export const updateFamilia = async (req: Request, res: Response) => {
   const { idFamilia } = req.params;
   const tenantId = Number(req.query.tenant_id || 1);

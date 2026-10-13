@@ -244,7 +244,10 @@ export default function ProductDetailsDrawer({ open, product, onClose, onSave }:
           </Card>
 
           {itemId && (
-            <AnexosCard idItem={itemId} anexos={detalhe?.anexos || []} onChange={() => recarregarAnexos(itemId)} />
+            <AnexosCard
+              idItem={itemId} anexos={detalhe?.anexos || []} onChange={() => recarregarAnexos(itemId)}
+              familia={item?.familia_id ? { id: item.familia_id, nome: item.familia_nome || null, imagem: item.familia_imagem || null } : null}
+            />
           )}
         </Space>
       )

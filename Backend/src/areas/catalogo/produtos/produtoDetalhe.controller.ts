@@ -25,7 +25,7 @@ export const getProdutoDetalhe = async (req: Request, res: Response) => {
               um.sigla AS unidade_sigla, um.descricao AS unidade_descricao,
               cpd.sku_customizado, cpd.nome_comercial, cpd.descricao_comercial, cpd.categoria_id, cpd.familia_id,
               cpd.id_marca, cpd.custo_gerencial, cpd.preco_venda, cpd.margem_lucro, cpd.exibir_no_pdv, cpd.pode_vender_sem_estoque,
-              cat.nome AS categoria_nome, fam.nome AS familia_nome, mar.nome AS marca_nome,
+              cat.nome AS categoria_nome, fam.nome AS familia_nome, NULLIF(TRIM(fam.imagem), '') AS familia_imagem, mar.nome AS marca_nome,
               log.altura_cm, log.largura_cm, log.comprimento_cm, log.volume_m3,
               fis.ncm, fis.cest, fis.origem_mercadoria, fis.cfop_padrao,
               es.quantidade_atual, es.custo_medio, es.ultimo_custo

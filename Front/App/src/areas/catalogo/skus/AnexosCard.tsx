@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, Card, Empty, Image, Input, Popconfirm, Select, Space, Tag, Tooltip, Typography, Upload, message } from 'antd';
 import { DeleteOutlined, FileTextOutlined, InboxOutlined, LinkOutlined, PlusOutlined, StarFilled, StarOutlined } from '@ant-design/icons';
 import { AnexoItem, TipoAnexo, adicionarAnexo, definirImagemPrincipal, enviarArquivoAnexo, removerAnexo } from './CatalogSku.service';
+import FotoFamiliaControle from '../familias/FotoFamiliaControle';
 
 const { Text } = Typography;
 
@@ -19,13 +20,17 @@ interface AnexosCardProps {
   idItem: number;
   anexos: AnexoItem[];
   onChange: () => void; // recarrega a ficha após qualquer alteração
+  /** família do item: a foto dela vale quando o item não tem foto própria */
+  familia?: { id: number; nome: string | null; imagem: string | null } | null;
 }
 
 /**
  * Imagens e documentos do item: arraste arquivos (ficam no servidor do ERP, em Backend/uploads)
  * ou cole o link de um arquivo já hospedado. A primeira imagem vira a principal.
  */
-export default function AnexosCard({ idItem, anexos, onChange }: AnexosCardProps) {
+export default function AnexosCard({ idItem, anexos, onChange, familia }: AnexosCardProps) {
+  const [fotoFamilia, setFotoFamilia] = useState<string | null>(familia?.imagem || null);
+  useEffect(() => { setFotoFamilia(familia?.imagem || null); }, [familia?.id, familia?.imagem]);
   const [url, setUrl] = useState('');
   const [tipo, setTipo] = useState<TipoAnexo>('FOTO_GALERIA');
   const [salvando, setSalvando] = useState(false);
@@ -72,6 +77,14 @@ export default function AnexosCard({ idItem, anexos, onChange }: AnexosCardProps
 
   return (
     <Card size="small" title="Imagens e Documentos" bordered={false} style={{ background: '#fafafa' }}>
+      {familia && (
+        <div style={{ marginBottom: 8 }}>
+          <FotoFamiliaControle
+            idFamilia={familia.id} nome={familia.nome} imagem={fotoFamilia} itemSemFoto={imagens.length === 0}
+            onAlterada={setFotoFamilia}
+          />
+        </div>
+      )}
       <Upload.Dragger
         multiple
         showUploadList={false}
