@@ -6,7 +6,7 @@ import {
   removerItem, salvarAnuncio, sugerirCategoria, desligarDoMl, encerrarNoMl,
 } from './anuncios.controller';
 import {
-  importarAnuncios, previaImportacao, publicarAnuncio, sincronizarAnuncio, sincronizarTodos, situacaoSincronizacao, validarAnuncio,
+  atualizarNoMl, importarAnuncios, pausarNoMl, previaImportacao, publicarAnuncio, sincronizarAnuncio, sincronizarTodos, situacaoSincronizacao, validarAnuncio,
 } from './publicacao.controller';
 
 import { buscarClientes, buscarPedidos, listarPedidos, obterConfig, reprocessarPedido, salvarConfig } from './pedidos.controller';
@@ -32,6 +32,8 @@ router.delete('/anuncios/:id/itens/:idItem/ml', desligarDoMl);
 router.post('/anuncios/:id/encerrar', encerrarNoMl);
 router.post('/anuncios/:id/validar', validarAnuncio);
 router.post('/anuncios/:id/publicar', publicarAnuncio);
+router.post('/anuncios/:id/atualizar-ml', atualizarNoMl);
+router.post('/anuncios/:id/pausar', pausarNoMl);
 router.post('/anuncios/:id/sincronizar', sincronizarAnuncio);
 router.get('/sincronizar', situacaoSincronizacao);
 router.post('/sincronizar', sincronizarTodos);

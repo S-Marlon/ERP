@@ -6,7 +6,8 @@ import { Request, Response } from 'express';
 import pool from '../../../infra/db';
 import { caminhoLocalDaUrl } from '../../../infra/arquivos';
 import {
-  corpoDoItem, cortarTitulo, errosDoValidador, FotoEnvio, fotoPequena, ItemAnuncio, ligarPorSku, SITUACAO_POR_STATUS, ValorAtributo,
+  atributosDoItem, corpoDoItem, cortarTitulo, errosDoValidador, FotoEnvio, foraDoMl, fotoPequena, ItemAnuncio, ligarPorSku, SITUACAO_POR_STATUS,
+  situacaoPorItens, ValorAtributo,
 } from './anuncios';
 import {
   AnuncioCarregado, carregarAnuncios, carregarCategoria, detalhe, lista, responderErro, tenantDe,
@@ -361,3 +362,88 @@ export const sincronizarTodos = async (req: Request, res: Response) => {
 
 /** GET /sincronizar — como foi a última rodada automática */
 export const situacaoSincronizacao = async (req: Request, res: Response) => res.json(situacaoAutomatica(tenantDe(req)));
+
+// ---------------------------------------------------------------------------
+// Alterar o que já está publicado
+// ---------------------------------------------------------------------------
+
+/** Itens publicados que ainda existem no ML (ativos ou pausados). */
+const noMlAinda = (c: AnuncioCarregado) => c.itens.filter(i => { const m = c.noMl.get(i.idItem); return m?.mlbId && !foraDoMl(m.status); });
+
+const mensagemDoMl = (e: any) => (e instanceof ErroML && errosDoValidador(e.detalhes).length ? errosDoValidador(e.detalhes).join('; ') : e?.message || 'erro');
+
+/**
+ * POST /anuncios/:id/atualizar-ml — manda atributos, fotos e descrição dos itens já publicados.
+ * Título e categoria não mudam no ML depois de publicado (conta com User Products): só republicando.
+ */
+export const atualizarNoMl = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const id = Number(req.params.id);
+  try {
+    const c = await carregarOuErro(tenant, id);
+    const itens = noMlAinda(c);
+    if (!itens.length) throw new ErroML('Nenhum item deste anúncio está ativo ou pausado no Mercado Livre.');
+    const descricao = String(c.dados.descricao || '').trim();
+    const resultado: { idItem: number; sku: string; ok: boolean; erros: string[] }[] = [];
+    for (const item of itens) {
+      const mlb = c.noMl.get(item.idItem)!.mlbId!;
+      const erros: string[] = [];
+      try {
+        const { fotos, problemas } = await fotosDoItem(tenant, c, item);
+        erros.push(...problemas.filter(() => fotos.length === 0));
+        await ml(tenant, 'PUT', `/items/${mlb}`, {
+          attributes: atributosDoItem(c.categoria?.atributos || [], c.dados, item, c.categoria?.temGtin ?? true),
+          ...(fotos.length ? { pictures: fotos } : {}),
+        });
+      } catch (e: any) {
+        erros.push(mensagemDoMl(e));
+      }
+      if (descricao) {
+        // PUT troca a descrição; item publicado sem descrição precisa de POST
+        await ml(tenant, 'PUT', `/items/${mlb}/description`, { plain_text: descricao })
+          .catch(() => ml(tenant, 'POST', `/items/${mlb}/description`, { plain_text: descricao }))
+          .catch((e: any) => erros.push(`descrição: ${mensagemDoMl(e)}`));
+      }
+      await pool.execute(
+        `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET ultimo_erro = ?, sincronizado_em = IF(? IS NULL, NOW(), sincronizado_em)
+         WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
+        [erros.length ? erros.join('; ').slice(0, 500) : null, erros.length ? 'erro' : null, id, tenant, item.idItem]
+      );
+      resultado.push({ idItem: item.idItem, sku: item.sku, ok: erros.length === 0, erros });
+    }
+    return res.json({ itens: resultado, detalhe: await detalhe(tenant, await carregarOuErro(tenant, id)) });
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao atualizar no Mercado Livre.');
+  }
+};
+
+/** POST /anuncios/:id/pausar { pausar: true | false } — pausa ou reativa no ML os itens deste anúncio */
+export const pausarNoMl = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const id = Number(req.params.id);
+  const pausar = req.body?.pausar !== false;
+  try {
+    const c = await carregarOuErro(tenant, id);
+    const itens = noMlAinda(c);
+    if (!itens.length) throw new ErroML('Nenhum item deste anúncio está ativo ou pausado no Mercado Livre.');
+    const falhas: string[] = [];
+    for (const item of itens) {
+      const m = c.noMl.get(item.idItem)!;
+      if ((pausar && m.status === 'paused') || (!pausar && m.status === 'active')) continue;
+      try {
+        const r: any = await ml(tenant, 'PUT', `/items/${m.mlbId}`, { status: pausar ? 'paused' : 'active' });
+        m.status = r?.status || (pausar ? 'paused' : 'active');
+        await pool.execute(`UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET status_ml = ? WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
+          [m.status, id, tenant, item.idItem]);
+      } catch (e: any) {
+        falhas.push(`${item.sku}: ${mensagemDoMl(e)}`);
+      }
+    }
+    const situacao = situacaoPorItens([...c.noMl.values()].filter(m => m.mlbId).map(m => m.status));
+    if (situacao) await pool.execute(`UPDATE modulo_ecommerce_mercadolivre_anuncios SET situacao = ? WHERE id = ? AND tenant_id = ?`, [situacao, id, tenant]);
+    if (falhas.length) throw new ErroML(`O ML não ${pausar ? 'pausou' : 'reativou'} ${falhas.length} item(ns): ${falhas[0]}`);
+    return res.json(await detalhe(tenant, await carregarOuErro(tenant, id)));
+  } catch (error) {
+    return responderErro(res, error, pausar ? 'Erro ao pausar no Mercado Livre.' : 'Erro ao reativar no Mercado Livre.');
+  }
+};

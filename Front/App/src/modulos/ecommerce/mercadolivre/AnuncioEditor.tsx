@@ -108,6 +108,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
   const [conferindo, setConferindo] = useState(false);
   const [publicando, setPublicando] = useState(false);
   const [sincronizando, setSincronizando] = useState(false);
+  const [enviandoAlteracoes, setEnviandoAlteracoes] = useState(false);
 
   const aplicar = useCallback((d: AnuncioDetalhe) => {
     setDet(d);
@@ -146,6 +147,24 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
       message.error(erroMsg(e));
     } finally {
       setSincronizando(false);
+    }
+  };
+
+  const enviarAlteracoes = async () => {
+    if (!det) return;
+    setEnviandoAlteracoes(true);
+    try {
+      const r = await anunciosApi.atualizarNoMl(det.id);
+      aplicar(r.detalhe);
+      const recusados = r.itens.filter(i => !i.ok);
+      setConferencia(recusados.length ? r.itens : null);
+      if (recusados.length) message.warning(`${r.itens.length - recusados.length} atualizado(s) no ML; ${recusados.length} recusado(s): veja ao lado.`);
+      else message.success(`Atributos, fotos e descrição enviados aos ${r.itens.length} anúncio(s) no ML.`);
+      onAlterado();
+    } catch (e) {
+      message.error(erroMsg(e));
+    } finally {
+      setEnviandoAlteracoes(false);
     }
   };
 
@@ -318,7 +337,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
           <Col xs={12} md={8}>
             <Form.Item label="Ajuste sobre o preço do ERP" style={{ marginBottom: 12 }} tooltip="Ex.: 15% cobre a comissão. Item com preço próprio (na tabela) ignora o ajuste.">
               <InputNumber
-                key={`aj${det.ajustePreco}`} defaultValue={det.ajustePreco} suffix="%" min={-50} max={300} step={1} style={{ width: '100%' }} decimalSeparator=","
+                key={`aj${det.ajustePreco}`} disabled={false} defaultValue={det.ajustePreco} suffix="%" min={-50} max={300} step={1} style={{ width: '100%' }} decimalSeparator=","
                 onBlur={e => { const v = Number(String(e.target.value).replace(',', '.').replace('%', '')) || 0; if (v !== det.ajustePreco) salvar({ ajustePreco: v }); }}
               />
             </Form.Item>
@@ -326,7 +345,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
         </Row>
         <Form.Item label="Descrição" style={{ marginBottom: 0 }}>
           <Input.TextArea
-            value={descricao} autoSize={{ minRows: 3, maxRows: 10 }} onChange={e => setDescricao(e.target.value)}
+            value={descricao} disabled={false} autoSize={{ minRows: 3, maxRows: 10 }} onChange={e => setDescricao(e.target.value)}
             onBlur={() => descricao.trim() !== (det.descricao || '').trim() && salvar({ descricao })}
             placeholder="Medidas, aplicação, material, o que vem na embalagem. Texto simples (o ML não aceita HTML nem links)."
           />
@@ -370,7 +389,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
           {
             title: 'Foto', width: 64,
             render: (_, i) => (
-              <EnviarFotoPopover titulo={`Foto de ${i.sku}`} disabled={!!i.ml.mlbId} onArquivo={f => enviarFoto(i, f)} onUrl={u => fotoPorLink(i, u)}>
+              <EnviarFotoPopover titulo={`Foto de ${i.sku}`} disabled={foraDoMl(i.ml.status)} onArquivo={f => enviarFoto(i, f)} onUrl={u => fotoPorLink(i, u)}>
                 <Tooltip title={i.fotos ? `${i.fotos} foto(s): clique para enviar mais`
                   : det.fotoFamilia ? 'Usa a foto da família. Clique para enviar uma foto própria do item.' : 'Sem foto: clique para enviar'}>
                   <Spin spinning={enviandoFoto === i.idItem} size="small">
@@ -538,7 +557,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
                   return (
                     <Space direction="vertical" size={4} style={{ width: '100%' }}>
                       <Select
-                        style={{ width: '100%' }} value={atual} disabled={!editavel} showSearch optionFilterProp="label" popupMatchSelectWidth={false}
+                        style={{ width: '100%' }} value={atual} showSearch optionFilterProp="label" popupMatchSelectWidth={false}
                         onChange={(x: string) => {
                           if (x === '') salvarAtributo(a.id, null);
                           else if (x === 'marca') salvarAtributo(a.id, { origem: 'marca' });
@@ -607,6 +626,21 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
           )}
           {det.publicados > 0 && det.permalink && (
             <Button block icon={<LinkOutlined />} href={det.permalink} target="_blank">Ver no Mercado Livre</Button>
+          )}
+          {det.publicados > 0 && det.itens.some(i => i.ml.mlbId && !foraDoMl(i.ml.status)) && (
+            <>
+              <Tooltip title="Manda atributos, fotos e descrição deste anúncio para os itens que já estão no ML">
+                <Button block icon={<SendOutlined />} loading={enviandoAlteracoes} onClick={enviarAlteracoes}>Enviar alterações ao ML</Button>
+              </Tooltip>
+              {det.itens.some(i => i.ml.status === 'active')
+                ? (
+                  <Popconfirm title="Pausar no Mercado Livre?" description="Os anúncios deixam de aparecer e vender até você reativar." okText="Pausar"
+                    onConfirm={() => executar(() => anunciosApi.pausarNoMl(det.id, true), 'Pausado no Mercado Livre.')}>
+                    <Button block>Pausar no ML</Button>
+                  </Popconfirm>
+                )
+                : <Button block onClick={() => executar(() => anunciosApi.pausarNoMl(det.id, false), 'Reativado no Mercado Livre.')}>Reativar no ML</Button>}
+            </>
           )}
           {det.publicados > 0 && (
             <Popconfirm
@@ -684,7 +718,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
               {!editavel && (
                 <Alert type="info" showIcon style={{ marginBottom: 16 }}
                   message={`${det.publicados} item(ns) já no Mercado Livre${det.aPublicar ? ` · ${det.aPublicar} a publicar` : ''}`}
-                  description="Título, categoria e atributos ficam como estão no ML. Preço do item muda na hora; itens novos da família entram pelo botão Publicar." />
+                  description={<>Atributos, fotos e descrição: altere aqui e clique em <b>Enviar alterações ao ML</b>. Preço e estoque vão sozinhos. Título e categoria o ML não deixa mudar depois de publicado: só republicando (Encerrar no ML). Itens novos da família entram pelo Publicar.</>} />
               )}
               {blocoDados}
               <EstoqueAnuncioCard det={det} sincronizando={sincronizando} onSincronizar={sincronizarAgora} onSalvar={corpo => salvar(corpo, 'Estoque do anúncio salvo.')} />
