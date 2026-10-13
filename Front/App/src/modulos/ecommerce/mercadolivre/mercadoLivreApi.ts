@@ -56,6 +56,18 @@ export interface AnuncioResumo {
 /** Preço por quantidade (B2B): a partir de `minimo` unidades, `desconto`% sobre o preço do anúncio. */
 export interface FaixaQuantidade { minimo: number; desconto: number }
 
+export interface CandidatoCatalogo {
+  produtoId: string; nome: string; marca: string | null; modelo: string | null; unidades: string | null; foto: string | null;
+  gtinConfere: boolean; marcaConfere: boolean; podeEntrar: boolean; conferem: string[];
+  diferentes: { nome: string; catalogo: string; item: string }[]; conferir: { nome: string; catalogo: string; item: string }[];
+}
+export interface CatalogoItem {
+  idItem: number; sku: string; mlbId: string; elegibilidade: string | null; elegibilidadeTexto: string; podeDisputar: boolean; mlbCatalogo: string | null;
+  disputa: { status: string; precoAtual: number | null; precoParaGanhar: number | null; motivos: string[]; oportunidades: string[]; vantagens: string[];
+    ganhador: { mlbId: string; preco: number | null } | null; produtoId: string | null } | null;
+  candidatos: CandidatoCatalogo[];
+}
+
 export interface UnidadeVenda { idUnidade: number; sigla: string; nome: string; fator: number; preco: number | null }
 
 export interface ItemDoAnuncio {
@@ -183,6 +195,9 @@ export const anunciosApi = {
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idItem}?tenant_id=1`, json('PUT', { preco })), 'Erro ao salvar o preço.'),
   regraItem: async (id: number, idItem: number, regra: { estoqueReserva?: number | null; estoqueMaximo?: number | null; idUnidade?: number | null }) =>
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idItem}?tenant_id=1`, json('PUT', regra)), 'Erro ao salvar o estoque do item.'),
+  verificarCatalogo: async (id: number) => ler<{ itens: CatalogoItem[] }>(await fetch(`${API}/anuncios/${id}/catalogo?tenant_id=1`), 'Erro ao verificar o catálogo.'),
+  entrarNoCatalogo: async (id: number, idItem: number, produtoId: string) =>
+    ler<{ mlbCatalogo: string | null; permalink: string | null }>(await fetch(`${API}/anuncios/${id}/itens/${idItem}/catalogo?tenant_id=1`, json('POST', { produtoId })), 'Erro ao entrar no catálogo.'),
   faixasNoMl: async (id: number, quantidades: string) =>
     ler<{ mlbId: string; sku: string; preco: number; noMl: FaixaQuantidade[]; sugestao: { quantidade: number; desconto: number; preco: number; incoerente: boolean }[] }>(
       await fetch(`${API}/anuncios/${id}/faixas/ml?tenant_id=1&quantidades=${encodeURIComponent(quantidades)}`), 'Erro ao consultar o ML.'),
