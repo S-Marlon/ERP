@@ -4,6 +4,7 @@ import pool from '../../../infra/db';
 import { foraDoMl, mudancasParaMl, precoNoMl, situacaoPorItens, statusDoMl } from './anuncios';
 import { AnuncioCarregado, carregarAnuncios } from './anuncios.controller';
 import { ErroML, ml } from './mercadolivreApi';
+import { importarPedidos } from './pedidos.controller';
 
 export interface ResultadoSincronizacao {
   idAnuncio: number;
@@ -109,7 +110,10 @@ export const atualizarStatusDoMl = async (tenant: number, anuncios: AnuncioCarre
 
 const INTERVALO_MS = 3 * 60 * 1000;
 
-export interface SituacaoAutomatica { ultimaEm: string | null; enviados: number; erros: number; mensagem: string | null; rodando: boolean }
+export interface SituacaoAutomatica {
+  ultimaEm: string | null; enviados: number; erros: number; mensagem: string | null; rodando: boolean;
+  vendasNovas?: number; pedidosPendentes?: number; erroPedidos?: string | null;   // pedidos do ML lidos na rodada
+}
 const situacao = new Map<number, SituacaoAutomatica>();
 let iniciado = false;
 let rodando = false;
@@ -131,15 +135,26 @@ const rodada = async () => {
     );
     for (const { tenant_id } of lojas) {
       const tenant = Number(tenant_id);
+      // Pedidos primeiro: a venda baixa o estoque e o envio logo abaixo já sai com o saldo novo
+      let vendasNovas = 0;
+      let pedidosPendentes = 0;
+      let erroPedidos: string | null = null;
+      try {
+        const pedidos = await importarPedidos(tenant);
+        vendasNovas = pedidos.filter(p => p.acao === 'VENDA_CRIADA').length;
+        pedidosPendentes = pedidos.filter(p => p.acao === 'PENDENTE').length;
+      } catch (e: any) {
+        erroPedidos = e?.message || 'erro';
+      }
       try {
         const r = await sincronizarAnuncios(tenant, { somenteAutomaticos: true });
         const erros = r.filter(x => x.erro);
         situacao.set(tenant, {
           ultimaEm: new Date().toISOString(), enviados: r.length - erros.length, erros: erros.length,
-          mensagem: erros[0] ? `${erros[0].sku}: ${erros[0].erro}` : null, rodando: false,
+          mensagem: erros[0] ? `${erros[0].sku}: ${erros[0].erro}` : null, rodando: false, vendasNovas, pedidosPendentes, erroPedidos,
         });
       } catch (e: any) {
-        situacao.set(tenant, { ultimaEm: new Date().toISOString(), enviados: 0, erros: 1, mensagem: e?.message || 'erro', rodando: false });
+        situacao.set(tenant, { ultimaEm: new Date().toISOString(), enviados: 0, erros: 1, mensagem: e?.message || 'erro', rodando: false, vendasNovas, pedidosPendentes, erroPedidos });
       }
     }
   } catch (e: any) {

@@ -114,7 +114,28 @@ export interface ResultadoSincronizacao {
   idAnuncio: number; idItem: number; sku: string; mlbId: string;
   estoqueDe: number | null; estoquePara: number | null; precoDe: number | null; precoPara: number | null; erro: string | null;
 }
-export interface SituacaoSincronizacao { ultimaEm: string | null; enviados: number; erros: number; mensagem: string | null; rodando: boolean; intervaloMin: number }
+export interface SituacaoSincronizacao {
+  ultimaEm: string | null; enviados: number; erros: number; mensagem: string | null; rodando: boolean; intervaloMin: number;
+  vendasNovas?: number; pedidosPendentes?: number; erroPedidos?: string | null;
+}
+
+export type SituacaoPedido = 'VENDA' | 'VENDA_CANCELADA' | 'CANCELADO_NO_ML' | 'CANCELADO' | 'PENDENTE' | 'AGUARDANDO';
+export interface PedidoMl {
+  id: number; mlOrderId: string; idVenda: number | null; statusMl: string; comprador: string;
+  total: number; comissao: number; frete: number; liquido: number; data: string | null; erro: string | null; situacao: SituacaoPedido;
+  itens: { mlbId: string; titulo: string; sku: string | null; quantidade: number; precoUnitario: number }[];
+}
+
+export const pedidosApi = {
+  listar: async () => ler<PedidoMl[]>(await fetch(`${API}/pedidos?tenant_id=1`), 'Erro ao listar os pedidos.'),
+  buscar: async () =>
+    ler<{ vendas: number; pendentes: number; canceladosNoMl: number; lidos: number }>(await fetch(`${API}/pedidos/buscar?tenant_id=1`, json('POST', {})), 'Erro ao buscar os pedidos no ML.'),
+  reprocessar: async (id: number) =>
+    ler<{ acao: string; idVenda: number | null; erro: string | null }>(await fetch(`${API}/pedidos/${id}/processar?tenant_id=1`, json('POST', {})), 'Erro ao processar o pedido.'),
+  /** Cancela a venda do ERP (a mesma ação de Vendas): devolve o estoque. */
+  cancelarVenda: async (idVenda: number, motivo: string) =>
+    ler<{ success: boolean }>(await fetch(`${API_URL}/api/vendas/pdv/vendas/${idVenda}/cancelar?tenant_id=1`, json('POST', { motivo })), 'Erro ao cancelar a venda.'),
+};
 
 /** Resumo de uma sincronização para mensagem: "3 itens atualizados (estoque 0 → 5...)". */
 export const resumoSincronizacao = (r: ResultadoSincronizacao[]) => {
