@@ -5,7 +5,7 @@ import { Request, Response } from 'express';
 import pool from '../../../infra/db';
 import { codigoOpcao, normalizarTexto } from './atributosRegras';
 import {
-  FamiliaNoTemplate, impactoEdicaoOpcao, planoConversaoLista, travasDoAtributo, usoNoTemplate, validarOpcao,
+  FamiliaNoTemplate, impactoDoLote, impactoEdicaoOpcao, planoConversaoLista, travasDoAtributo, usoNoTemplate, validarOpcao,
 } from './atributosEdicao';
 
 type Conn = { query: (sql: string, params?: any[]) => Promise<any> };
@@ -166,6 +166,61 @@ export const editarOpcao = async (req: Request, res: Response) => {
   } catch (error) {
     await connection.rollback().catch(() => undefined);
     return responderErro(res, error, 'Erro ao editar a opção');
+  } finally {
+    connection.release();
+  }
+};
+
+/**
+ * PUT /atributos-globais/:idAtributo/opcoes-lote { opcoes: [{ id, valor, codigo }], confirmar? }
+ * Salva várias opções de uma vez: confere contra a lista final (permite trocar valores entre opções),
+ * pede uma confirmação só se nome/SKU de itens mudar e grava tudo ou nada.
+ */
+export const editarOpcoesLote = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const id = Number(req.params.idAtributo);
+  const pedidas: Array<{ id: number; valor: string; codigo: string }> = (Array.isArray(req.body?.opcoes) ? req.body.opcoes : [])
+    .map((o: any) => ({ id: Number(o.id), valor: String(o.valor ?? '').trim(), codigo: String(o.codigo ?? '').trim() }));
+  const connection: any = await pool.getConnection();
+  try {
+    if (!pedidas.length) throw new ErroAtributo('Nenhuma opção alterada.');
+    await connection.beginTransaction();
+    const a = await carregarAtributo(connection, tenant, id, true);
+    const atuais = await opcoesComUso(connection, tenant, id);
+    // Lista final (com as edições) para conferir repetidos entre todas
+    const final = atuais.map(o => {
+      const e = pedidas.find(p => p.id === o.id);
+      return e ? { ...o, valor: e.valor, codigo: e.codigo } : o;
+    });
+    const mudancas = pedidas.map(p => {
+      const atual = atuais.find(o => o.id === p.id);
+      if (!atual) throw new ErroAtributo(`Opção ${p.id} não encontrada (recarregue).`, 404);
+      const erro = validarOpcao(final, p.id, p.valor, p.codigo || null);
+      if (erro) throw new ErroAtributo(`"${p.valor || atual.valor}": ${erro}`);
+      return { atual, p, mudaValor: p.valor !== atual.valor, mudaCodigo: p.codigo !== (atual.codigo || '') };
+    }).filter(m => m.mudaValor || m.mudaCodigo);
+    if (!mudancas.length) { await connection.rollback(); return res.json({ success: true, alteradas: 0 }); }
+
+    const impactos = [];
+    for (const m of mudancas) {
+      const i = impactoEdicaoOpcao({ itens: m.atual.itens, familias: await familiasDaOpcao(connection, tenant, a, m.atual.id), mudaValor: m.mudaValor, mudaCodigo: m.mudaCodigo });
+      impactos.push({ itens: m.atual.itens, afetaNome: i.afetaNome, afetaSku: i.afetaSku });
+    }
+    const impacto = impactoDoLote(impactos);
+    if (impacto.nivel === 'aviso' && !req.body?.confirmar) {
+      throw new ErroAtributo(`Estas ${mudancas.length} alterações mudam nome/SKU de itens.`, 409, { codigo: 'CONFIRMAR', impacto });
+    }
+    for (const m of mudancas) {
+      await connection.query(
+        `UPDATE atributos_comercial_opcoes SET valor = ?, codigo = ? WHERE id = ? AND atributo_id = ?`,
+        [m.p.valor, m.p.codigo || codigoOpcao(m.p.valor, m.atual.ordem || 1), m.atual.id, id]
+      );
+    }
+    await connection.commit();
+    return res.json({ success: true, alteradas: mudancas.length, impacto });
+  } catch (error) {
+    await connection.rollback().catch(() => undefined);
+    return responderErro(res, error, 'Erro ao salvar as opções');
   } finally {
     connection.release();
   }

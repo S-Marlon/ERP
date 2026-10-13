@@ -259,6 +259,9 @@ export const atributoEdicaoApi = {
     pedir<{ opcoes: Array<{ valor: string; codigo: string }> }>(urlAttr(id, '/opcoes'), corpo('POST', { valor, codigo }), 'Erro ao acrescentar a opção.'),
   editarOpcao: (id: string | number, idOpcao: number, dados: { valor?: string; codigo?: string; confirmar?: boolean }) =>
     pedir<{ success: boolean; impacto?: { mensagens: string[] } }>(urlAttr(id, `/opcoes/${idOpcao}`), corpo('PUT', dados), 'Erro ao editar a opção.'),
+  /** Salva várias opções de uma vez (tudo ou nada; uma confirmação só se mudar nome/SKU de itens) */
+  editarOpcoesLote: (id: string | number, opcoes: Array<{ id: number; valor: string; codigo: string }>, confirmar = false) =>
+    pedir<{ success: boolean; alteradas: number }>(urlAttr(id, '/opcoes-lote'), corpo('PUT', { opcoes, confirmar }), 'Erro ao salvar as opções.'),
   excluirOpcao: (id: string | number, idOpcao: number) => pedir<{ success: boolean }>(urlAttr(id, `/opcoes/${idOpcao}`), corpo('DELETE'), 'Erro ao excluir a opção.'),
   mesclarOpcao: (id: string | number, idOpcao: number, destinoId: number, confirmar = false) =>
     pedir<{ movidos: number }>(urlAttr(id, `/opcoes/${idOpcao}/mesclar`), corpo('POST', { destinoId, confirmar }), 'Erro ao mesclar as opções.'),

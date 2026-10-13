@@ -128,6 +128,14 @@ const EditorAtributoDrawer: React.FC<Props> = ({ idAtributo, grupos, unidades, o
     () => comConfirmacao(confirmar => atributoEdicaoApi.editarOpcao(d!.atributo.id, o.id, { ...edicao[o.id], confirmar })),
     `"${edicao[o.id].valor}" salvo.`,
   );
+  // Todas as opções editadas de uma vez (o servidor confere a lista final e pede uma confirmação só)
+  const editadas = (d?.opcoes || []).filter(o => editado(o));
+  const salvarTodas = () => executar(
+    () => comConfirmacao(confirmar => atributoEdicaoApi.editarOpcoesLote(
+      d!.atributo.id, editadas.map(o => ({ id: o.id, valor: edicao[o.id].valor.trim(), codigo: edicao[o.id].codigo.trim() })), confirmar,
+    )),
+    `${editadas.length} opção(ões) salva(s).`,
+  );
   const mover = (indice: number, delta: number) => {
     if (!d) return;
     const ids = d.opcoes.map(o => o.id);
@@ -223,7 +231,11 @@ const EditorAtributoDrawer: React.FC<Props> = ({ idAtributo, grupos, unidades, o
   return (
     <Drawer
       open={!!idAtributo}
-      onClose={onFechar}
+      onClose={() => {
+        const n = (d?.opcoes || []).filter(o => editado(o)).length;
+        if (!n) { onFechar(); return; }
+        Modal.confirm({ title: `Sair sem salvar ${n} opção(ões) alterada(s)?`, okText: 'Sair sem salvar', okButtonProps: { danger: true }, cancelText: 'Continuar editando', onOk: onFechar });
+      }}
       width={920}
       destroyOnHidden
       title={d ? <Space>{d.atributo.nome}<Text type="secondary" style={{ fontFamily: 'monospace', fontSize: 12 }}>{d.atributo.codigo}</Text><Tag>{d.atributo.tipo}</Tag></Space> : 'Atributo'}
@@ -235,6 +247,7 @@ const EditorAtributoDrawer: React.FC<Props> = ({ idAtributo, grupos, unidades, o
         </Space>
       )}
     >
+      <style>{'.opcao-editada td { background: #fffbe6 !important; }'}</style>
       <Spin spinning={carregando}>
         {d && (
           <Space direction="vertical" size={12} style={{ width: '100%' }}>
@@ -313,7 +326,17 @@ const EditorAtributoDrawer: React.FC<Props> = ({ idAtributo, grupos, unidades, o
                       Edite no lugar: os itens continuam ligados à opção (renomear não perde nada). Se a mudança alterar nome/SKU de itens, o sistema avisa antes.
                       Opção em uso não pode ser excluída: junte em outra.
                     </Text>
+                    {editadas.length > 0 && (
+                      <Flex justify="space-between" align="center" style={{ padding: '6px 10px', borderRadius: 6, background: '#fffbe6', border: '1px solid #ffe58f' }}>
+                        <Text>{editadas.length} opção(ões) alterada(s), ainda não salva(s)</Text>
+                        <Space>
+                          <Button size="small" onClick={() => setEdicao({})}>Descartar</Button>
+                          <Button size="small" type="primary" icon={<SaveOutlined />} loading={salvando} onClick={salvarTodas}>Salvar todas ({editadas.length})</Button>
+                        </Space>
+                      </Flex>
+                    )}
                     <Table<OpcaoDetalhe> size="small" rowKey="id" pagination={false} dataSource={d.opcoes} columns={colunasOpcoes}
+                      rowClassName={o => (editado(o) ? 'opcao-editada' : '')}
                       locale={{ emptyText: <Empty description="Sem opções ainda" /> }} />
                     <Flex gap={8} align="center">
                       <Input placeholder='Nova opção (ex.: 5/8")' value={nova.valor} onChange={e => setNova(n => ({ ...n, valor: e.target.value }))} onPressEnter={adicionar} />

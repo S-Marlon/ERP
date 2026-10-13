@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { impactoEdicaoOpcao, planoConversaoLista, travasDoAtributo, usoNoTemplate, validarOpcao } from './atributosEdicao';
+import { impactoDoLote, impactoEdicaoOpcao, planoConversaoLista, travasDoAtributo, usoNoTemplate, validarOpcao } from './atributosEdicao';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -58,4 +58,16 @@ teste('plano de conversão texto → lista', () => {
   assert.strictEqual(p.opcoes[0].codigo, 'CN');
   assert.strictEqual(p.aviso, null);
   assert.ok(planoConversaoLista(Array.from({ length: 61 }, (_, i) => ({ texto: `V${i}`, qtd: 1 }))).aviso);
+});
+
+teste('impacto do lote soma sem repetir família', () => {
+  const r = impactoDoLote([
+    { itens: 3, afetaNome: ['A'], afetaSku: [] },
+    { itens: 2, afetaNome: ['A', 'B'], afetaSku: ['C'] },
+  ]);
+  assert.deepStrictEqual(r.afetaNome, ['A', 'B']);
+  assert.deepStrictEqual(r.afetaSku, ['C']);
+  assert.strictEqual(r.nivel, 'aviso');
+  assert.match(r.mensagens[0], /2 opção\(ões\) alterada\(s\), usadas por 5 item/);
+  assert.strictEqual(impactoDoLote([{ itens: 0, afetaNome: [], afetaSku: [] }]).nivel, 'livre');
 });

@@ -113,3 +113,16 @@ export const planoConversaoLista = (valores: Array<{ texto: string; qtd: number 
     .map((o, i) => ({ ...o, codigo: codigoOpcao(o.valor, i + 1) }));
   return { opcoes, aviso: opcoes.length > 60 ? `São ${opcoes.length} valores diferentes: lista grande demais, talvez deva continuar texto.` : null };
 };
+
+/** Soma os impactos de várias opções alteradas de uma vez (salvar todas): uma confirmação só. */
+export const impactoDoLote = (impactos: Array<{ itens: number; afetaNome: string[]; afetaSku: string[] }>) => {
+  const nome = [...new Set(impactos.flatMap(i => i.afetaNome))];
+  const sku = [...new Set(impactos.flatMap(i => i.afetaSku))];
+  const itens = impactos.reduce((a, i) => a + i.itens, 0);
+  const lista = (nomes: string[]) => (nomes.length > 4 ? `${nomes.slice(0, 4).join(', ')} e mais ${nomes.length - 4}` : nomes.join(', '));
+  const mensagens: string[] = [];
+  if (itens > 0) mensagens.push(`${impactos.length} opção(ões) alterada(s), usadas por ${itens} item(ns): eles passam a mostrar o valor novo.`);
+  if (nome.length) mensagens.push(`O nome comercial muda (ao gravar as variações) nas famílias: ${lista(nome)}.`);
+  if (sku.length) mensagens.push(`O SKU muda (ao gravar as variações) nas famílias: ${lista(sku)}. Etiquetas impressas ficam desatualizadas.`);
+  return { nivel: (nome.length || sku.length ? 'aviso' : 'livre') as NivelTrava, afetaNome: nome, afetaSku: sku, mensagens };
+};
