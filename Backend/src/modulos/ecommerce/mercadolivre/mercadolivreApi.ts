@@ -92,22 +92,27 @@ export const enviarFotoMl = async (tenant: number, conteudo: Buffer, nome: strin
 };
 
 // Conta no modelo User Products: cada variação é um anúncio e o ML agrupa pelo family_name
-const modeloPorConta = new Map<number, { em: number; porFamilia: boolean }>();
-export const contaPorFamilia = async (tenant: number) => {
-  const guardado = modeloPorConta.get(tenant);
-  if (guardado && Date.now() - guardado.em < 60 * 60 * 1000) return guardado.porFamilia;
+// e a conta "business" pode ter preço por quantidade para compradores empresa (B2B)
+const tagsPorConta = new Map<number, { em: number; tags: string[] }>();
+const tagsDaConta = async (tenant: number) => {
+  const guardado = tagsPorConta.get(tenant);
+  if (guardado && Date.now() - guardado.em < 60 * 60 * 1000) return guardado.tags;
   const eu: any = await ml(tenant, 'GET', '/users/me');
-  const porFamilia = Array.isArray(eu?.tags) && eu.tags.includes('user_product_seller');
-  modeloPorConta.set(tenant, { em: Date.now(), porFamilia });
-  return porFamilia;
+  const tags: string[] = Array.isArray(eu?.tags) ? eu.tags : [];
+  tagsPorConta.set(tenant, { em: Date.now(), tags });
+  return tags;
 };
+export const contaPorFamilia = async (tenant: number) => (await tagsDaConta(tenant)).includes('user_product_seller');
+export const contaB2B = async (tenant: number) => (await tagsDaConta(tenant)).includes('business');
 
 /** Chamada autenticada à API do ML (JSON). */
-export const ml = async <T = any>(tenant: number, metodo: 'GET' | 'POST' | 'PUT' | 'DELETE', caminho: string, corpo?: unknown): Promise<T> => {
+export const ml = async <T = any>(
+  tenant: number, metodo: 'GET' | 'POST' | 'PUT' | 'DELETE', caminho: string, corpo?: unknown, cabecalhos: Record<string, string> = {}
+): Promise<T> => {
   const { token } = await tokenValido(tenant);
   const r = await fetch(`${URL_API}${caminho}`, {
     method: metodo,
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', ...(corpo !== undefined ? { 'Content-Type': 'application/json' } : {}) },
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', ...(corpo !== undefined ? { 'Content-Type': 'application/json' } : {}), ...cabecalhos },
     body: corpo !== undefined ? JSON.stringify(corpo) : undefined,
   });
   const d: any = await r.json().catch(() => ({}));

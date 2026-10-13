@@ -14,6 +14,8 @@ import {
 } from './anuncios.controller';
 import { contaPorFamilia, enviarFotoMl, ErroML, ml } from './mercadolivreApi';
 import { sincronizarAnuncios, situacaoAutomatica } from './sincronizacao';
+import { enviarFaixas, enviarFaixasDoAnuncio } from './faixas.controller';
+import { lerFaixas } from './faixasQuantidade';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
 
@@ -146,6 +148,11 @@ export const publicarAnuncio = async (req: Request, res: Response) => {
         if (corpo.pictures.length === 0) throw new ErroML(problemas.join('; ') || 'sem foto');
         const criado: any = await ml(tenant, 'POST', '/items', corpo);
         if (descricao) await ml(tenant, 'POST', `/items/${criado.id}/description`, { plain_text: descricao }).catch(() => null);
+        const faixas = lerFaixas(c.registro.faixas_quantidade);
+        if (faixas.length) {
+          await enviarFaixas(tenant, criado.id, faixas, corpo.price)
+            .catch((e: any) => falhas.push({ sku: item.sku, erro: `publicado, mas as faixas por quantidade não foram: ${e?.message || 'erro'}` }));
+        }
         await pool.execute(
           `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens
            SET mlb_id = ?, status_ml = ?, permalink = ?, preco_enviado = ?, estoque_enviado = ?, sincronizado_em = NOW(), ultimo_erro = NULL
@@ -410,6 +417,12 @@ export const atualizarNoMl = async (req: Request, res: Response) => {
         [erros.length ? erros.join('; ').slice(0, 500) : null, erros.length ? 'erro' : null, id, tenant, item.idItem]
       );
       resultado.push({ idItem: item.idItem, sku: item.sku, ok: erros.length === 0, erros });
+    }
+    // faixas por quantidade (a tabela inteira é substituída em cada item)
+    for (const falha of await enviarFaixasDoAnuncio(tenant, c)) {
+      const sku = falha.split(':')[0];
+      const r = resultado.find(x => x.sku === sku);
+      if (r) { r.ok = false; r.erros.push(`faixas por quantidade:${falha.slice(sku.length + 1)}`); }
     }
     return res.json({ itens: resultado, detalhe: await detalhe(tenant, await carregarOuErro(tenant, id)) });
   } catch (error) {

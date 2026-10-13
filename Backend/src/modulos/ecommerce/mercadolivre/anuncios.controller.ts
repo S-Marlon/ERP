@@ -11,6 +11,9 @@ import {
 } from './anuncios';
 import { ErroML, ml } from './mercadolivreApi';
 import { sincronizarAnuncios } from './sincronizacao';
+import { errosDasFaixas, faixasDoAtacado, lerFaixas, normalizarFaixas } from './faixasQuantidade';
+import { enviarFaixasDoAnuncio } from './faixas.controller';
+import { contaB2B } from './mercadolivreApi';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
 
@@ -348,8 +351,23 @@ const taxaMl = (tenant: number, preco: number, categoria: string, tipo: string) 
   return valor;
 };
 
+/** Faixas de atacado do cadastro do item (na unidade vendida no ML), para sugerir as faixas por quantidade. */
+const atacadoDoItem = async (tenant: number, item: ItemAnuncio | undefined) => {
+  if (!item) return [];
+  const [rows]: any = await pool.execute(
+    `SELECT f.quantidade_minima, f.preco_unitario FROM comercial_precos_faixas f
+     WHERE f.tenant_id = ? AND f.id_item = ? AND f.tipo_faixa = 'ATACADO'
+       AND f.id_unidade = COALESCE(?, (SELECT ic.id_unidade FROM itens_core ic WHERE ic.id_item = f.id_item))
+     ORDER BY f.quantidade_minima`,
+    [tenant, item.idItem, item.unidadeMl?.idUnidade ?? null]
+  );
+  return rows.map((r: any) => ({ quantidadeMinima: Number(r.quantidade_minima), precoUnitario: Number(r.preco_unitario) }));
+};
+
 export const detalhe = async (tenant: number, c: AnuncioCarregado) => {
   const a = c.registro;
+  const primeiro = c.itens[0];
+  const [atacado, b2b] = await Promise.all([atacadoDoItem(tenant, primeiro), contaB2B(tenant).catch(() => false)]);
   const atributosCat = c.categoria?.atributos || [];
   const eixos = c.itens.length > 1 ? eixosDeVariacao(atributosCat, c.dados, c.itens).map(x => x.id) : [];
   const precos = [...new Set(c.itens.map(i => precoNoMl(i, c.dados.ajustePreco)).filter(p => p > 0))].slice(0, 30);
@@ -365,6 +383,10 @@ export const detalhe = async (tenant: number, c: AnuncioCarregado) => {
     fotoFamilia: c.dados.fotoFamilia || null,
     ajustePreco: c.dados.ajustePreco,
     modo: c.modo,
+    faixasQuantidade: lerFaixas(a.faixas_quantidade),
+    faixasGerenciadas: a.faixas_quantidade !== null && a.faixas_quantidade !== undefined,
+    faixasAtacado: primeiro ? faixasDoAtacado(atacado, precoNoMl(primeiro, c.dados.ajustePreco)) : [],
+    contaB2B: b2b,
     modeloTitulo: c.dados.modeloTitulo || '',
     estoqueReserva: c.regraEstoque.reserva,
     estoqueMaximo: c.regraEstoque.maximo,
@@ -622,6 +644,15 @@ export const salvarAnuncio = async (req: Request, res: Response) => {
       if (!(n >= 0)) throw new ErroML(`${nome} inválido.`);
       return Math.floor(n);
     };
+    let faixasMudaram = false;
+    if (b.faixasQuantidade !== undefined) {
+      const faixas = normalizarFaixas(b.faixasQuantidade);
+      const problemas = errosDasFaixas(faixas);
+      if (problemas.length) throw new ErroML(problemas.join(' '));
+      // '[]' = sem faixas de propósito (apaga no ML); NULL = o ERP não mexe nas faixas (ex.: criadas pelo site do ML)
+      definir('faixas_quantidade', JSON.stringify(faixas));
+      faixasMudaram = true;
+    }
     if (b.modeloTitulo !== undefined) {
       const m = String(b.modeloTitulo || '').trim();
       if (m.length > 255) throw new ErroML('Modelo do título muito longo (máximo 255).');
@@ -655,6 +686,11 @@ export const salvarAnuncio = async (req: Request, res: Response) => {
     }
     definir('atributos', JSON.stringify(atributos));
     await pool.execute(`UPDATE modulo_ecommerce_mercadolivre_anuncios SET ${campos.join(', ')} WHERE id = ? AND tenant_id = ?`, [...valores, id, tenant]);
+    if (faixasMudaram) {
+      const [recarregado] = await carregarAnuncios(pool as any, tenant, id);
+      const falhas = await enviarFaixasDoAnuncio(tenant, recarregado);
+      if (falhas.length) throw new ErroML(`Faixas salvas no ERP, mas o ML recusou: ${falhas[0]}${falhas.length > 1 ? ` (e mais ${falhas.length - 1})` : ''}`);
+    }
     // divisão do estoque ou ajuste de preço mudou: os itens já no ML recebem na hora
     if (b.estoqueReserva !== undefined || b.estoqueMaximo !== undefined || b.ajustePreco !== undefined) {
       const recusado = (await sincronizarAnuncios(tenant, { idAnuncio: id })).find(r => r.erro);

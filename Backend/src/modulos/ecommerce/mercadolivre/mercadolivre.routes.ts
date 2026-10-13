@@ -9,6 +9,7 @@ import {
   atualizarNoMl, importarAnuncios, pausarNoMl, previaImportacao, publicarAnuncio, sincronizarAnuncio, sincronizarTodos, situacaoSincronizacao, validarAnuncio,
 } from './publicacao.controller';
 
+import { faixasNoMl } from './faixas.controller';
 import { buscarClientes, buscarPedidos, listarPedidos, obterConfig, reprocessarPedido, salvarConfig } from './pedidos.controller';
 
 const router = Router();
@@ -34,6 +35,7 @@ router.post('/anuncios/:id/validar', validarAnuncio);
 router.post('/anuncios/:id/publicar', publicarAnuncio);
 router.post('/anuncios/:id/atualizar-ml', atualizarNoMl);
 router.post('/anuncios/:id/pausar', pausarNoMl);
+router.get('/anuncios/:id/faixas/ml', faixasNoMl);
 router.post('/anuncios/:id/sincronizar', sincronizarAnuncio);
 router.get('/sincronizar', situacaoSincronizacao);
 router.post('/sincronizar', sincronizarTodos);

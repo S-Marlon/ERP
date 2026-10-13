@@ -53,6 +53,9 @@ export interface AnuncioResumo {
   precoMin: number | null; precoMax: number | null; erros: number; avisos: number; atualizadoEm: string; ultimoErro: string | null;
 }
 
+/** Preço por quantidade (B2B): a partir de `minimo` unidades, `desconto`% sobre o preço do anúncio. */
+export interface FaixaQuantidade { minimo: number; desconto: number }
+
 export interface UnidadeVenda { idUnidade: number; sigla: string; nome: string; fator: number; preco: number | null }
 
 export interface ItemDoAnuncio {
@@ -80,6 +83,7 @@ export interface AnuncioDetalhe extends AnuncioResumo {
   condicao: 'new' | 'used'; descricao: string; ajustePreco: number; atributos: Record<string, ValorAtributo>;
   fotoFamilia: string | null;   // vale para os itens sem foto própria
   modo: 'FAMILIA' | 'SEPARADO';  // página única com opções ou um anúncio por item
+  faixasQuantidade: FaixaQuantidade[]; faixasGerenciadas: boolean; faixasAtacado: FaixaQuantidade[]; contaB2B: boolean;
   modeloTitulo: string;
   estoqueReserva: number; estoqueMaximo: number | null; estoqueAutomatico: boolean; sincronizadoEm: string | null;
   categoria: { id: string; nome: string; caminho: string; final: boolean; maxTitulo: number; maxFotos: number; filhos: { id: string; nome: string }[] } | null;
@@ -167,6 +171,7 @@ export const anunciosApi = {
   salvar: async (id: number, corpo: Partial<{
     titulo: string; categoriaMl: string | null; tipoAnuncio: string; condicao: string; descricao: string; ajustePreco: number;
     atributos: Record<string, ValorAtributo>; estoqueReserva: number; estoqueMaximo: number | null; estoqueAutomatico: boolean; modeloTitulo: string;
+    faixasQuantidade: FaixaQuantidade[];
   }>) =>
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}?tenant_id=1`, json('PUT', corpo)), 'Erro ao salvar o anúncio.'),
   excluir: async (id: number) => ler<{ success: boolean }>(await fetch(`${API}/anuncios/${id}?tenant_id=1`, json('DELETE')), 'Erro ao excluir.'),
@@ -178,6 +183,9 @@ export const anunciosApi = {
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idItem}?tenant_id=1`, json('PUT', { preco })), 'Erro ao salvar o preço.'),
   regraItem: async (id: number, idItem: number, regra: { estoqueReserva?: number | null; estoqueMaximo?: number | null; idUnidade?: number | null }) =>
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idItem}?tenant_id=1`, json('PUT', regra)), 'Erro ao salvar o estoque do item.'),
+  faixasNoMl: async (id: number, quantidades: string) =>
+    ler<{ mlbId: string; sku: string; preco: number; noMl: FaixaQuantidade[]; sugestao: { quantidade: number; desconto: number; preco: number; incoerente: boolean }[] }>(
+      await fetch(`${API}/anuncios/${id}/faixas/ml?tenant_id=1&quantidades=${encodeURIComponent(quantidades)}`), 'Erro ao consultar o ML.'),
   atualizarNoMl: async (id: number) =>
     ler<{ itens: ConferenciaItem[]; detalhe: AnuncioDetalhe }>(await fetch(`${API}/anuncios/${id}/atualizar-ml?tenant_id=1`, json('POST', {})), 'Erro ao atualizar no ML.'),
   pausarNoMl: async (id: number, pausar: boolean) =>
