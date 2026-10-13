@@ -261,7 +261,7 @@ export default function ItensFamiliaCard({
             </Flex>
           )}
 
-          <div style={{ maxHeight: 380, overflowY: "auto", paddingRight: 4 }}>
+          <div style={{ maxHeight: "62vh", overflowY: "auto", paddingRight: 4 }}>
             {visiveis.length > 0
               ? <Space direction="vertical" size={6} style={{ width: "100%" }}>{visiveis.map(linha)}</Space>
               : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={<span style={{ fontSize: 11, color: "#94a3b8" }}>Nenhum item</span>} />}

@@ -20,6 +20,9 @@ Radio,
 Divider,
 List,
 Select,
+Tabs,
+Flex,
+message,
 } from "antd";
 import {
   PlusOutlined,
@@ -32,7 +35,11 @@ import {
   UndoOutlined,
   ReadOutlined,
   SaveOutlined,
-  ExclamationCircleOutlined,
+  CheckCircleOutlined,
+  RobotOutlined,
+  ShoppingCartOutlined,
+  SettingOutlined,
+  ProfileOutlined,
 } from "@ant-design/icons";
 import Swal from "sweetalert2";
 import { useSearchParams } from "react-router-dom";
@@ -44,11 +51,7 @@ import { STATUS_FAMILIA_CONFIG } from './CatalogManager.types'; // Ajuste o cami
 import { useCatalogState } from "./useCatalogState";
 
 // Importações dos helpers
-import {
-gerarPreviewSku,
-gerarPreviewNome,
-construirArvoreAntd,
-} from "./CatalogManager.helpers";
+import { construirArvoreAntd } from "./CatalogManager.helpers";
 
 // Componentes externos
 import { PainelSimulador } from "./components/PainelSimulador";
@@ -59,12 +62,9 @@ import { FamiliaIdentidadeCard } from "./FamiliaIdentidadeCard";
 import ListaFamiliasAtivas from "./ListaFamiliasAtivas";
 import ItensFamiliaCard from "./ItensFamiliaCard";
 import { AtributosCard } from "./AtributosCard";
-import Paragraph from "antd/es/typography/Paragraph";
 
 const { Title, Text } = Typography;
 
-// Ferramenta de desenvolvimento: mostra o payload local x salvo
-const MOSTRAR_DEBUG_PAYLOAD = false;
 
 export const FamilyManager: React.FC = () => {
 // Instância do formulário do Ant Design para o Modal de Pendências
@@ -80,7 +80,8 @@ const [temAlteracoes, setTemAlteracoes] = useState<boolean>(false);
 // Editor "Nomes e SKUs": aberto pelo painel ou pela lista de itens
 const [editorNomesAberto, setEditorNomesAberto] = useState<boolean>(false);
 const snapshotRef = useRef<string>("");
-const isFamilyCompliant = true
+// Aba da família aberta (Visão geral, Atributos e SKU, Itens)
+const [abaFamilia, setAbaFamilia] = useState<string>("geral");
 
 const {
 grupoSelecionado: familiaSelecionadaHook,
@@ -126,14 +127,9 @@ itensDaFamilia,
 carregandoItens,
 carregarDadosIniciais,
 setGrupoSelecionadoId: setFamiliaSelecionadaId,
-handlePadronizarNomesFamilia,
-handlePadronizarSkusFamilia,
 isModalPendenciaOpen,
 setIsModalPendenciaOpen,
 atributosPendentes,
-handleTentarNormalizarIndividual,
-handleNormalizarItemSku,
-handleNormalizarItemNome,
 handleSalvarAtributosPendentes,
 handleEditarAtributosItem,
 handleAtualizarAtributoItemEditado,
@@ -145,7 +141,6 @@ itemEmEdicaoPendencia,
 modalFormalizacaoAberto,
 setModalFormalizacaoAberto,
 itensPendentesFormalizacao,
-handleProcessarFormalizacaoLote,
 handleAtualizarAtributoItemPendente,
 handleSalvarEContinuarFormalizacao,
 atributosComMarcaInjetada, // <--- Adicione esta linha na desestruturação
@@ -468,11 +463,6 @@ saude: resposta?.saude ?? familiaSelecionadaLocal.saude,
 };
 setFamiliaSelecionada(familiaSalva);
 
-// 3. Se houver função de salvamento vinda do hook, executa também
-if (typeof hookSalvarFamilia === 'function') {
-await hookSalvarFamilia();
-}
-
 // 4. Atualiza o snapshot de referência original com o estado atual salvo
 const novoSnapshot = JSON.stringify({
 ...familiaSalva,
@@ -485,31 +475,24 @@ setTemAlteracoes(false);
 
 // 5. Feedback: bloqueio mostra o que falta corrigir
 if (familiaSalva.status === "BLOQUEADO_INCONSISTENCIA") {
-Swal.fire({
-title: "Salva, mas BLOQUEADA",
-html: `A família não atende às regras mínimas para ficar ativa:<br><br>${(familiaSalva.saude?.bloqueios || [])
-.map((b: any) => `• ${b.mensagem}`).join("<br>")}`,
-icon: "warning",
+Modal.warning({
+title: "Família salva, mas bloqueada",
+content: (
+<div>
+<p>Ela não atende às regras mínimas para ficar ativa:</p>
+<ul style={{ paddingLeft: 18, marginBottom: 0 }}>{(familiaSalva.saude?.bloqueios || []).map((b: any) => <li key={b.codigo}>{b.mensagem}</li>)}</ul>
+</div>
+),
 });
 } else {
-Swal.fire({
-title: "Sucesso!",
-text: "Família salva e sincronizada com o banco de dados.",
-icon: "success",
-timer: 1500,
-showConfirmButton: false,
-});
+message.success("Família salva.");
 }
 // Quem chama (editor de variações) só segue se a família foi salva
 return true;
 
 } catch (error: any) {
 console.error("Erro ao salvar família no banco:", error);
-Swal.fire({
-title: "Erro ao salvar",
-text: error.response?.data?.error || error.message || "Não foi possível persistir as alterações.",
-icon: "error",
-});
+message.error(error.response?.data?.error || error.message || "Não foi possível salvar a família.");
 return false;
 }
 };
@@ -548,19 +531,16 @@ const handleExcluirFamilia = async () => {
 if (!familiaSelecionadaLocal?.id) return;
 const totalItens = Number(familiaSelecionadaLocal.totalItens || 0);
 if (totalItens > 0) {
-Swal.fire("Exclusão bloqueada", `A família possui ${totalItens} produto(s). Mova ou desagrupe os itens antes de excluir.`, "info");
+message.info(`A família tem ${totalItens} produto(s): tire ou mova os itens antes de excluir.`);
 return;
 }
-const confirmacao = await Swal.fire({
-title: "Excluir família?",
-html: `A família <b>"${familiaSelecionadaLocal.nome}"</b> e a configuração de atributos dela serão removidas.`,
-icon: "warning",
-showCancelButton: true,
-confirmButtonColor: "#d33",
-confirmButtonText: "Sim, excluir",
-cancelButtonText: "Cancelar",
-});
-if (!confirmacao.isConfirmed) return;
+const confirmou = await new Promise<boolean>(resolve => Modal.confirm({
+title: `Excluir a família "${familiaSelecionadaLocal.nome}"?`,
+content: "A configuração de atributos dela também é removida.",
+okText: "Excluir", okButtonProps: { danger: true }, cancelText: "Cancelar",
+onOk: () => resolve(true), onCancel: () => resolve(false),
+}));
+if (!confirmou) return;
 
 try {
 await deleteFamilia(String(familiaSelecionadaLocal.id), 1);
@@ -569,9 +549,9 @@ setFamiliaSelecionadaLocal(null);
 setFamiliaOriginal(null);
 setTemAlteracoes(false);
 if (typeof carregarDadosIniciais === "function") await carregarDadosIniciais();
-Swal.fire({ title: "Excluída!", icon: "success", timer: 1300, showConfirmButton: false });
+message.success("Família excluída.");
 } catch (error: any) {
-Swal.fire("Não foi possível excluir", error?.message || "Erro ao excluir a família.", "error");
+message.error(error?.message || "Erro ao excluir a família.");
 }
 };
 
@@ -592,7 +572,7 @@ valorHerdadoDaFamilia: novoPapel === "dna",
 });
 };
 
-const handleExcluirAtributo = (tipo: string, record: any) => {
+const handleExcluirAtributo = (_papel: string, record: any) => {
 // 🛡️ Verifica se existem itens na família e se algum deles possui valor preenchido para este atributo
 const itensComValor = (itensDaFamilia || []).filter((item: any) => {
 const valor = item.valoresAtributos?.[record.id] || item.valoresAtributos?.[record.nome];
@@ -633,286 +613,23 @@ showConfirmButton: false,
 
 
 
-return (
-<div
-style={{
-backgroundColor: "#f8fafc",
-padding: "4px 6px",
-fontFamily:
-'-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-}}
->
-{/* Header unificado estilo SaaS */}
-<Card
-bordered={false}
-style={{
-marginBottom: 6,
-borderRadius: 6,
-boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)",
-}}
->
-<Row align="middle" justify="space-between" gutter={[2, 2]}>
-<Col span={4}>
-<Space direction="vertical" >
-<Tooltip
-title={
-<Space >
-<Badge status={loading ? "processing" : "success"} />
-<Text type="secondary" style={{ fontSize: "12px" }}>
-{loading
-? "Sincronizando com o banco..."
-: temAlteracoes
-? "Existem alterações pendentes não salvas"
-: "Banco de dados sincronizado e pronto"}
-</Text>
-</Space>
-}
->
-<Title
-level={3}
-style={{ margin: 0, fontWeight: 600, letterSpacing: "-0.08em" }}
->
-Gerenciamento de Família PIM
-</Title>
-</Tooltip>
-</Space>
-<Space  style={{ marginTop: 4 }}>
-{/* <Tag color="processing">
-Família: {familiaSelecionadaLocal?.nome || "Nenhuma"}
-</Tag> */}
-{temAlteracoes && (
-<Tag color="warning" icon={<InfoCircleOutlined />}>
-Alterações não salvas
-</Tag>
-)}
-</Space>
-</Col>
+// Itens ativos (inativos, como duplicados juntados, não contam) e quantos precisam de revisão
+const itensAtivos = (itensDaFamilia || []).filter((i: any) => String(i.status || "").toUpperCase() !== "INATIVO");
+const itensARevisar = itensAtivos.filter((i: any) => (i.atributosPendentes || []).length > 0
+  || (i.skuCalculado && i.skuCalculado !== i.sku)
+  || (i.nomeCalculado && i.nomeCalculado !== (i.nomeComercial || i.nome))).length;
+const saude = familiaSelecionadaLocal?.saude;
+const statusFamilia = familiaSelecionadaLocal?.status as keyof typeof STATUS_FAMILIA_CONFIG | undefined;
+const cfgStatus = statusFamilia ? STATUS_FAMILIA_CONFIG[statusFamilia] : undefined;
+const bloqueios: any[] = saude?.bloqueios || [];
+const avisos: any[] = saude?.avisos || [];
 
-<Col span={6}>
- {/* 0. verificações */}
-  {!isFamilyCompliant ? (
-    <Card 
-      style={{ backgroundColor: '#fff2f0', borderColor: '#ffccc7', marginBottom: 4   }}
-      size='small'
-      title={
-        <Space>
-          <ExclamationCircleOutlined style={{ color: '#ff4d4f', fontSize: 20 }} />
-          <span style={{ color: '#cf1322', fontWeight: 'bold' }}>
-            Família Bloqueada por Inconsistência Cadastral
-          </span>
-        </Space>
-      }
-    >
-      <Paragraph>
-        Esta família de itens foi temporariamente <strong>bloqueada e retirada de publicação</strong> nos canais de venda (Marketplaces e E-commerce) porque a sua estrutura atual violou as regras de governança e integridade do PIM.
-      </Paragraph>
-      <Divider style={{ margin: '12px 0' }} />
-      <Title level={5} style={{ color: '#cf1322', marginBottom: 8 }}>
-        Pendências que precisam ser resolvidas para desbloquear a família:
-      </Title>
-      {/* <List
-        size="small"
-        dataSource={complianceErrors}
-        renderItem={(item) => (
-          <List.Item>
-            <Space>
-              <Badge status="error" />
-              <Text type="danger">{item}</Text>
-            </Space>
-          </List.Item>
-        )}
-      /> */}
-      <div style={{ marginTop: 16 }}>
-        <Text type="secondary">
-          Nota arquitetural: Os atributos antigos não foram apagados; eles foram movidos automaticamente para a ficha técnica dos SKUs afetados. Reative os atributos de DNA/Grade necessários acima para restaurar o funcionamento desta família.
-        </Text>
-      </div>
-    </Card>
-  ) : (
-     ''
-  )}
-
-
-
-{/* <Space size={8}>
-<Button
-type="primary"
-ghost
-onClick={() => setIsImportModalOpen(true)}
-style={{ fontWeight: 600 }}
->
-✨ Importar Família por IA
-</Button>
-</Space> */}
-
-
-</Col>
-
-<Col span={12}>
-
-<Button
-type="primary"
-ghost
-onClick={() => setIsImportModalOpen(true)}
-style={{ fontWeight: 600 }}
->
-✨ Importar Família por IA
-</Button> 
-<Button
-type="default"
-onClick={handleCriarFamilia}
-loading={loading}
-icon={<PlusOutlined />}
-style={{ borderRadius: 8, fontWeight: 500 }}
->
-Nova Família
-</Button>
-
-{familiaSelecionadaLocal && (
-<>
-{/* Botão de debug: escondido; troque MOSTRAR_DEBUG_PAYLOAD para true ao depurar */}
-{MOSTRAR_DEBUG_PAYLOAD && (
-<Button
-type="dashed"
-icon={<InfoCircleOutlined />}
-onClick={() => {
-const payloadDebug = {
-original: familiaOriginal,
-atualLocal: familiaSelecionadaLocal,
-marcaComportamentoAtual: marcaComportamento,
-alteracoesCalculadas: calcularAlteracoesPendentes(),
-snapshotRef: snapshotRef.current ? JSON.parse(snapshotRef.current) : null
-};
-console.table(calcularAlteracoesPendentes());
-console.log("📦 PAYLOAD DEBUG COMPLETO:", payloadDebug);
-
-Swal.fire({
-title: "🔍 Debug de Payload",
-html: `<pre style="text-align: left; font-size: 10px; max-height: 300px; overflow: auto; background: #1e293b; color: #38bdf8; padding: 10px; border-radius: 6px;">${JSON.stringify(payloadDebug, null, 2)}</pre>`,
-width: 700,
-confirmButtonText: "Fechar"
-});
-}}
-style={{ borderRadius: 8, fontWeight: 500 }}
->
-Debug Payload
-</Button>
-)}
-
-<Tooltip
-title={Number(familiaSelecionadaLocal?.totalItens || 0) > 0
-? `A família tem ${familiaSelecionadaLocal?.totalItens} produto(s): mova-os antes de excluir`
-: "Excluir esta família"}
->
-<Button
-danger
-disabled={!familiaSelecionadaLocal?.id || Number(familiaSelecionadaLocal?.totalItens || 0) > 0}
-icon={<DeleteOutlined />}
-onClick={handleExcluirFamilia}
-style={{ borderRadius: 8, fontWeight: 500 }}
->
-Excluir Família
-</Button>
-</Tooltip>
-
-<Tooltip title="Desfaz as alterações feitas e retorna ao último estado salvo no banco">
-<Button
-type="default"
-disabled={!temAlteracoes}
-icon={<UndoOutlined />}
-onClick={handleDesfazerAlteracoes}
-style={{ borderRadius: 8, fontWeight: 500 }}
->
-Desfazer Alterações
-</Button>
-</Tooltip>
-
-<Tooltip title={temAlteracoes ? "Clique para salvar as alterações pendentes" : "Nenhuma alteração pendente para salvar"}>
-<Button
-type="primary"
-disabled={!temAlteracoes}
-onClick={handleSalvarFamiliaNoBanco}
-loading={loading}
-icon={<SaveOutlined />}
-style={{
-backgroundColor: temAlteracoes ? brandColor : undefined,
-borderColor: temAlteracoes ? brandColor : undefined,
-borderRadius: 8,
-fontWeight: 500,
-}}
->
-Salvar Alterações
-</Button>
-</Tooltip>
-</>
-)}
-</Col>
-</Row>
-</Card>
-
-{error && (
-<Alert
-type="error"
-showIcon
-message="Falha de Sincronização"
-description={error}
-style={{ marginBottom: 24, borderRadius: 8 }}
-action={
-<Button size="small" danger onClick={() => window.location.reload()}>
-Recarregar
-</Button>
-}
-/>
-)}
-
-<Row gutter={[8, 8]}>
-
-      <Col xs={24} md={4} lg={6}>
-
-  
-{/* Coluna 1: Famílias Ativas */}
-<ListaFamiliasAtivas
-brandColor={brandColor}
-categoriaFiltroId={categoriaFiltroId}
-setCategoriaFiltroId={setCategoriaFiltroId}
-dadosArvoreAntd={dadosArvoreAntd}
-pesquisaFamilia={pesquisaFamilia}
-setPesquisaFamilia={setPesquisaFamilia}
-familiasFiltradas={familiasFiltradas}
-familiasAgrupadas={familiasAgrupadas}
-grupoSelecionado={familiaSelecionadaLocal}
-temAlteracoes={temAlteracoes}
-handleSelecionarGrupo={handleSelecionarFamilia}
-handleCriarGrupo={handleCriarFamilia}
-/>
-
-</Col>
-
-
-{/* Coluna 2: Configuração Central */}
-<Col xs={24} md={18} lg={12}>
-{familiaSelecionadaLocal ? (
-<Space direction="vertical" style={{ width: "100%" }}>
-<Row gutter={[4, 4]}>
-
- 
-{/* 0. Papel da marca na família + guia de regras */}
-<Col xs={24} lg={24}>
-
-<Card size="small" style={{ borderRadius: 10, border: "1px solid #e2e8f0" }} styles={{ body: { padding: "8px 12px" } }}>
-<div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-<Space size={6}>
-<Text strong style={{ fontSize: 12 }}>Marca nesta família:</Text>
-<Tooltip title="DNA: a marca identifica a família (todos os itens têm a mesma). Grade: a marca diferencia os itens (ex.: Ebara x Schneider). Ficha: só informação.">
-<InfoCircleOutlined style={{ fontSize: 12, color: "#64748b" }} />
-</Tooltip>
-</Space>
-<Radio.Group
-buttonStyle="solid"
-size="small"
-value={marcaComportamento}
-onChange={(e) => setMarcaComportamento(e.target.value)}
->
+// Papel da marca na família (DNA, grade ou ficha) e a marca da família
+const blocoMarca = (
+<Card size="small" title={<Space size={6}><TagOutlined style={{ color: brandColor }} /><span>Marca nesta família</span></Space>}
+extra={<Tooltip title="DNA: a marca identifica a família (todos os itens têm a mesma). Grade: a marca diferencia os itens (ex.: Ebara x Schneider). Ficha: só informação."><InfoCircleOutlined style={{ color: "#64748b" }} /></Tooltip>}>
+<Flex gap={12} wrap align="center">
+<Radio.Group buttonStyle="solid" size="small" value={marcaComportamento} onChange={(e) => setMarcaComportamento(e.target.value)}>
 <Radio.Button value="dna"><TagOutlined /> DNA</Radio.Button>
 <Radio.Button value="grade"><AppstoreOutlined /> Grade (SKU)</Radio.Button>
 <Radio.Button value="ficha"><FileTextOutlined /> Ficha</Radio.Button>
@@ -921,7 +638,7 @@ onChange={(e) => setMarcaComportamento(e.target.value)}
 size="small"
 showSearch
 allowClear
-style={{ width: 200 }}
+style={{ width: 220 }}
 placeholder={marcaComportamento === "dna" ? "Marca (obrigatória)" : "Marca da família (opcional)"}
 status={marcaComportamento === "dna" && !familiaSelecionadaLocal?.nomeMarca ? "error" : undefined}
 value={familiaSelecionadaLocal?.idMarca && familiaSelecionadaLocal?.nomeMarca ? String(familiaSelecionadaLocal.idMarca) : undefined}
@@ -933,21 +650,129 @@ setFamiliaSelecionada((prev: any) => ({ ...prev, idMarca: marca ? marca.id : "1"
 options={marcasCatalogo.map(m => ({ value: m.id, label: m.nome }))}
 optionFilterProp="label"
 />
-<Text type="secondary" style={{ fontSize: 11, flex: 1, minWidth: 200 }}>
+<Text type="secondary" style={{ fontSize: 12 }}>
 {marcaComportamento === "dna" && "Todos os itens recebem a marca da família."}
-{marcaComportamento === "grade" && "Cada item tem a sua marca; use {MARCA} no template do código."}
+{marcaComportamento === "grade" && "Cada item tem a sua marca; use {MARCA} no modelo do SKU."}
 {marcaComportamento === "ficha" && "Cada item pode ter a sua marca; a da família vale quando o item não tiver."}
 </Text>
-<Button size="small" icon={<ReadOutlined />} onClick={() => setIsGuiaOpen(true)}>
-Guia de Regras
-</Button>
-</div>
+</Flex>
 </Card>
+);
+
+// Diagnóstico das regras mínimas (o servidor recalcula ao salvar)
+const blocoDiagnostico = (
+<Card size="small" title={<Space size={6}><CheckCircleOutlined style={{ color: bloqueios.length ? "#cf1322" : "#389e0d" }} /><span>Regras da família</span></Space>}
+extra={<Button size="small" type="link" icon={<ReadOutlined />} onClick={() => setIsGuiaOpen(true)}>Guia de regras</Button>}>
+<Space direction="vertical" size={8} style={{ width: "100%" }}>
+{!saude ? (
+<Text type="secondary">Salve a família para calcular o diagnóstico.</Text>
+) : bloqueios.length === 0 && avisos.length === 0 ? (
+<Alert type="success" showIcon message="A família atende a todas as regras mínimas." />
+) : (
+<>
+{bloqueios.map((b: any) => <Alert key={b.codigo} type="error" showIcon message={b.mensagem} />)}
+{avisos.map((a: any) => <Alert key={a.codigo} type="warning" showIcon message={a.mensagem} />)}
+</>
+)}
+{temAlteracoes && <Text type="secondary" style={{ fontSize: 12 }}>Há alterações não salvas: o diagnóstico é recalculado ao salvar.</Text>}
+<Text type="secondary" style={{ fontSize: 12 }}>
+Regras: ao menos um atributo de grade (ou marca como grade); DNA com valor fixo; marca definida se ela é DNA; modelo só com atributos da família; sigla definida se o modelo usa {"{SIGLA}"}.
+</Text>
+</Space>
+</Card>
+);
+
+return (
+<div style={{ padding: 24 }}>
+{/* Cabeçalho da página */}
+<Flex justify="space-between" align="center" wrap gap={12} style={{ marginBottom: 16 }}>
+<div>
+<Title level={3} style={{ margin: 0 }}>Famílias de produtos</Title>
+<Text type="secondary">Agrupa as variações de um produto: atributos (DNA, grade, ficha), modelo de nome e SKU, marca e os itens.</Text>
+</div>
+<Space wrap>
+<Button icon={<RobotOutlined />} onClick={() => setIsImportModalOpen(true)}>Importar por IA</Button>
+<Button type="primary" icon={<PlusOutlined />} onClick={handleCriarFamilia} loading={loading}>Nova família</Button>
+</Space>
+</Flex>
+
+{error && (
+<Alert type="error" showIcon message="Falha ao carregar" description={error} style={{ marginBottom: 16 }}
+action={<Button size="small" danger onClick={() => window.location.reload()}>Recarregar</Button>} />
+)}
+
+<Row gutter={[16, 16]}>
+{/* Lista de famílias */}
+<Col xs={24} lg={7} xl={6}>
+<ListaFamiliasAtivas
+brandColor={brandColor}
+categoriaFiltroId={categoriaFiltroId}
+setCategoriaFiltroId={(v) => setCategoriaFiltroId(v === undefined || v === null || v === '' ? 'TODAS' : String(v))}
+dadosArvoreAntd={dadosArvoreAntd}
+pesquisaFamilia={pesquisaFamilia}
+setPesquisaFamilia={setPesquisaFamilia}
+familiasFiltradas={familiasFiltradas}
+familiasAgrupadas={familiasAgrupadas}
+grupoSelecionado={familiaSelecionadaLocal}
+temAlteracoes={temAlteracoes}
+handleSelecionarGrupo={(id) => handleSelecionarFamilia(String(id))}
+handleCriarGrupo={handleCriarFamilia}
+/>
 </Col>
 
-{/* 1. Identidade da Família */}
-<Col xs={24} lg={24}>
-<FamiliaIdentidadeCard 
+{/* Família selecionada */}
+<Col xs={24} lg={17} xl={18}>
+{familiaSelecionadaLocal ? (
+<Space direction="vertical" size={12} style={{ width: "100%" }}>
+{/* Cabeçalho da família: situação, itens e ações */}
+<Card size="small" style={{ borderLeft: `4px solid ${bloqueios.length ? "#cf1322" : brandColor}` }}>
+<Flex justify="space-between" align="center" wrap gap={12}>
+<Space direction="vertical" size={2}>
+<Space size={8} wrap>
+<Title level={4} style={{ margin: 0 }}>{familiaSelecionadaLocal.nome || "Família sem nome"}</Title>
+{cfgStatus && (
+<Tooltip title={bloqueios.length ? bloqueios.map((b: any) => b.mensagem).join(" · ") : undefined}>
+<Tag color={cfgStatus.color} style={{ margin: 0 }}>{cfgStatus.label}</Tag>
+</Tooltip>
+)}
+{temAlteracoes && <Tag color="warning" icon={<InfoCircleOutlined />} style={{ margin: 0 }}>Alterações não salvas</Tag>}
+</Space>
+<Space size={12} wrap>
+<Text type="secondary">{familiaSelecionadaLocal.categoriaPaiNome || "Sem categoria"}</Text>
+<Text type="secondary">· {itensAtivos.length} item(ns)</Text>
+{familiaSelecionadaLocal.siglaSku && <Text type="secondary">· sigla <Text code>{familiaSelecionadaLocal.siglaSku}</Text></Text>}
+{familiaSelecionadaLocal.nomeMarca && <Text type="secondary">· marca {familiaSelecionadaLocal.nomeMarca} ({marcaComportamento})</Text>}
+</Space>
+</Space>
+<Space wrap>
+<Tooltip title={Number(familiaSelecionadaLocal?.totalItens || 0) > 0
+? `A família tem ${familiaSelecionadaLocal?.totalItens} produto(s): tire ou mova os itens antes de excluir`
+: "Excluir esta família"}>
+<Button danger icon={<DeleteOutlined />} onClick={handleExcluirFamilia}
+disabled={!familiaSelecionadaLocal?.id || Number(familiaSelecionadaLocal?.totalItens || 0) > 0}>Excluir</Button>
+</Tooltip>
+<Tooltip title="Ver o que mudou e desfazer">
+<Button icon={<UndoOutlined />} disabled={!temAlteracoes} onClick={handleDesfazerAlteracoes}>Desfazer</Button>
+</Tooltip>
+<Button type="primary" icon={<SaveOutlined />} disabled={!temAlteracoes} loading={loading} onClick={handleSalvarFamiliaNoBanco}>
+Salvar família
+</Button>
+</Space>
+</Flex>
+</Card>
+
+<Tabs
+activeKey={abaFamilia}
+onChange={setAbaFamilia}
+items={[
+{
+key: "geral",
+label: <Space size={6}><ProfileOutlined />Visão geral{bloqueios.length > 0 && <Badge count={bloqueios.length} size="small" />}</Space>,
+children: (
+<Row gutter={[12, 12]}>
+<Col xs={24} xl={14}>
+<Space direction="vertical" size={12} style={{ width: "100%" }}>
+<FamiliaIdentidadeCard
 grupoSelecionado={familiaSelecionadaLocal}
 grupoImage={grupoImage}
 brandColor={brandColor}
@@ -957,22 +782,23 @@ onSalvarIdentidade={(valores) => {
 // Usa a função dedicada ou garante que os atributos atuais não sejam perdidos
 if (typeof handleAtualizarIdentidadeFamilia === 'function') {
 handleAtualizarIdentidadeFamilia(valores);
-} else if (typeof setFamiliaSelecionada === 'function') {
-setFamiliaSelecionada((prev: any) => ({ 
-...prev, 
-...valores,
-atributos: prev.atributos || [] // 🛡️ Protege os atributos contra sumiço
-}));
+} else {
+setFamiliaSelecionada((prev: any) => ({ ...prev, ...valores, atributos: prev.atributos || [] }));
 }
 }}
 />
+{blocoMarca}
+</Space>
 </Col>
-
-
-
-
-{/* 2. Painel do Simulador Unificado */}
-<Col xs={24} lg={24}>
+<Col xs={24} xl={10}>{blocoDiagnostico}</Col>
+</Row>
+),
+},
+{
+key: "atributos",
+label: <Space size={6}><SettingOutlined />Atributos e SKU</Space>,
+children: (
+<Space direction="vertical" size={12} style={{ width: "100%" }}>
 <PainelSimulador
 familiaSelecionada={familiaSelecionadaLocal}
 valoresTeste={valoresTeste}
@@ -984,7 +810,7 @@ onAtualizarSeparadorSku={onAtualizarSeparadorSku}
 onAtualizarOrdemSku={onAtualizarOrdemSku}
 previewNomeSimulado={previewNomeSimulado}
 previewSkuSimulado={previewSkuSimulado}
-brandColor={brandColor} 
+brandColor={brandColor}
 itensDaFamilia={itensDaFamilia}
 carregandoItens={carregandoItens}
 temAlteracoes={temAlteracoes}
@@ -993,27 +819,10 @@ onVariacoesGravadas={catalogState.recarregarItensDaFamilia}
 editorAberto={editorNomesAberto}
 onEditorAberto={setEditorNomesAberto}
 />
-
- 
-
-
-</Col>
-</Row>
-
-<Row gutter={[8, 8]} align="stretch">
-
-
-
-
-
-{/* Tabelas de Atributos */}
-
-
-
-<Col span={10}>
-
+<Row gutter={[12, 12]} align="stretch">
+<Col xs={24} xl={8}>
 <AtributosCard
-titulo="Atributos DNA"
+titulo="DNA (fixo da família)"
 papel="dna"
 cor={brandColor || "#1677ff"}
 dataSource={atributosDNA}
@@ -1026,15 +835,10 @@ onInfoClick={() => handleOpenGuideModal("dna")}
 emptyText="Nenhum atributo DNA"
 showDelete={true}
 />
-
 </Col>
-
-
-<Col span={7}>
-
-{/* Atributos Variação (Grade) */}
+<Col xs={24} xl={8}>
 <AtributosCard
-titulo="Atributos de Variação (Grade)"
+titulo="Grade (gera variação)"
 papel="grade"
 cor="#9333ea"
 dataSource={atributosVariacao}
@@ -1042,18 +846,15 @@ onOpenModal={() => handleAbrirModal("grade")}
 onDelete={(record) => handleExcluirAtributo("grade", record)}
 onMover={moverAtributo}
 onAlterar={(record, patch) => alterarAtributoFamilia(record.id, patch)}
-tooltipText="Atributos que geram quebra de estoque e variações de SKU (ex: Blindagem, Marca em Grade). Clique para ver o guia."
+tooltipText="Atributos que diferenciam as variações e entram no SKU (ex: bitola, CV, marca em grade). Clique para ver o guia."
 onInfoClick={() => handleOpenGuideModal("grade")}
-emptyText="Nenhum atributo de variação"
+emptyText="Nenhum atributo de grade"
 showDelete={true}
 />
-
 </Col>
-<Col span={7}>
-
-{/* Atributos Ficha Técnica */}
+<Col xs={24} xl={8}>
 <AtributosCard
-titulo="Atributos de Ficha Técnica"
+titulo="Ficha técnica"
 papel="ficha"
 cor="#0891b2"
 dataSource={atributosFichaTecnica}
@@ -1061,81 +862,25 @@ onOpenModal={() => handleAbrirModal("ficha")}
 onDelete={(record) => handleExcluirAtributo("ficha", record)}
 onMover={moverAtributo}
 onAlterar={(record, patch) => alterarAtributoFamilia(record.id, patch)}
-tooltipText="Atributos descritivos de apoio que não alteram o SKU principal. Clique para ver o guia."
+tooltipText="Informações de apoio que não mudam o SKU (ex: pressão, norma). Clique para ver o guia."
 onInfoClick={() => handleOpenGuideModal("ficha")}
 emptyText="Nenhum atributo de ficha técnica"
 showDelete={true}
 />
 </Col>
-
-
-
 </Row>
 </Space>
-) : (
-<Card
-style={{
-borderRadius: 10,
-textAlign: "center",
-padding: "60px 0",
-border: "1px dashed #cbd5e1",
-background: "#fafafa",
-}}
->
-<Empty
-description={
-<span style={{ color: "#64748b", fontSize: "12px" }}>
-Selecione ou crie uma família na barra lateral para começar a configurar.
-</span>
-}
-/>
-</Card>
-)}
-</Col>
-
-    <Col xs={24} md={18} lg={6}>
-
-
-     <Card 
-  title="Diagnóstico de Conformidade e Regras de Bloqueio da Família" 
-  bordered={false} 
-  style={{ marginBottom: 24 }}
->
-  {(() => {
-const saude = familiaSelecionadaLocal?.saude;
-const status = familiaSelecionadaLocal?.status as keyof typeof STATUS_FAMILIA_CONFIG | undefined;
-const cfg = status ? STATUS_FAMILIA_CONFIG[status] : undefined;
-return (
-<Space direction="vertical" size={8} style={{ width: "100%" }}>
-<Space>
-<Text strong>Status:</Text>
-<Tag color={cfg?.color}>{cfg?.label || status || "—"}</Tag>
-{temAlteracoes && <Text type="secondary" style={{ fontSize: 11 }}>(recalculado ao salvar)</Text>}
+),
+},
+{
+key: "itens",
+label: (
+<Space size={6}>
+<ShoppingCartOutlined />Itens ({itensAtivos.length})
+{itensARevisar > 0 && <Tooltip title="Itens com grade pendente ou nome/SKU fora do modelo"><Badge count={itensARevisar} size="small" color="#d97706" /></Tooltip>}
 </Space>
-{!saude ? (
-<Text type="secondary">Salve a família para calcular o diagnóstico.</Text>
-) : saude.bloqueios.length === 0 && saude.avisos.length === 0 ? (
-<Alert type="success" showIcon message="A família atende a todas as regras mínimas." />
-) : (
-<>
-{saude.bloqueios.map((b: any) => (
-<Alert key={b.codigo} type="error" showIcon message={b.mensagem} />
-))}
-{saude.avisos.map((a: any) => (
-<Alert key={a.codigo} type="warning" showIcon message={a.mensagem} />
-))}
-</>
-)}
-<Text type="secondary" style={{ fontSize: 11 }}>
-Regras: ao menos um atributo de grade (ou marca como grade); DNA com valor fixo; marca definida se ela é DNA; template só com atributos da família; sigla definida se o template usa {"{SIGLA}"}.
-</Text>
-</Space>
-);
-})()}
-</Card>
-
-
-{/* Coluna 3: Itens da Família */}
+),
+children: (
 <ItensFamiliaCard
 brandColor={brandColor}
 grupoSelecionado={familiaSelecionadaLocal}
@@ -1143,21 +888,23 @@ pesquisaItem={pesquisaItem}
 setPesquisaItem={setPesquisaItem}
 itensFiltradosDoGrupo={itensFiltradosDaFamilia}
 temAlteracoes={temAlteracoes}
-gerarPreviewSku={gerarPreviewSku}
-gerarPreviewNome={gerarPreviewNome}
 handleEditarAtributosItem={handleEditarAtributosItem}
-handleNormalizarItemNome={handleNormalizarItemNome}
-handleNormalizarItemSku={handleNormalizarItemSku}
-handleTentarNormalizarIndividual={handleTentarNormalizarIndividual}
-handleProcessarFormalizacaoLote={handleProcessarFormalizacaoLote}
-handlePadronizarNomesFamilia={handlePadronizarNomesFamilia}
-handlePadronizarSkusFamilia={handlePadronizarSkusFamilia}
 onItensAlterados={catalogState.recarregarItensDaFamilia}
 onAbrirNomesSkus={() => setEditorNomesAberto(true)}
 />
-
+),
+},
+]}
+/>
+</Space>
+) : (
+<Card style={{ textAlign: "center", padding: "48px 0", borderStyle: "dashed" }}>
+<Empty description={<span>Escolha uma família na lista ou crie uma nova para configurar.</span>}>
+<Button type="primary" icon={<PlusOutlined />} onClick={handleCriarFamilia}>Nova família</Button>
+</Empty>
+</Card>
+)}
 </Col>
-
 </Row>
 
 {/* Modais auxiliares */}
