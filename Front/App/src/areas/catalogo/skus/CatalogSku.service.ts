@@ -250,6 +250,22 @@ export const adicionarAnexo = async (idItem: number, url: string, tipo: TipoAnex
     'Erro ao adicionar o anexo.'
   );
 
+/** Envia o arquivo (foto ou PDF) para o servidor do ERP; ele vira um anexo com o endereço de lá. */
+export const enviarArquivoAnexo = async (idItem: number, arquivo: File, tipo?: TipoAnexo, tenantId: number = 1) => {
+  const conteudo = await new Promise<string>((resolve, reject) => {
+    const leitor = new FileReader();
+    leitor.onload = () => resolve(String(leitor.result));
+    leitor.onerror = () => reject(new Error('Não foi possível ler o arquivo.'));
+    leitor.readAsDataURL(arquivo);
+  });
+  return handleResponse<GenericProductAPIResponse>(
+    await fetch(`${API_BASE_URL}/produtos/${idItem}/anexos/arquivo?tenant_id=${tenantId}`, {
+      method: 'POST', headers: DEFAULT_HEADERS, body: JSON.stringify({ nome: arquivo.name, tipo, conteudo }),
+    }),
+    'Erro ao enviar o arquivo.'
+  );
+};
+
 export const removerAnexo = async (idItem: number, idAnexo: number, tenantId: number = 1) =>
   handleResponse<GenericProductAPIResponse>(
     await fetch(`${API_BASE_URL}/produtos/${idItem}/anexos/${idAnexo}?tenant_id=${tenantId}`, { method: 'DELETE', headers: DEFAULT_HEADERS }),

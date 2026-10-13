@@ -1,3 +1,6 @@
+// Variáveis do Backend/.env (credenciais do Mercado Livre, fiscal...) antes de tudo
+import 'dotenv/config';
+import path from 'path';
 import express from 'express';
 import cors from 'cors';
 import routes from './rotas';
@@ -8,6 +11,8 @@ app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 
 app.use('/api', routes);
+// Fotos e documentos enviados (itens_anexos aponta para cá)
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 app.get('/', (req, res) => res.json({ message: 'API ERP rodando!' }));
 

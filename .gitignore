@@ -28,3 +28,10 @@ dist-ssr
 .claude/settings.local.json
 # Backups das migrações do catálogo
 backups/
+
+# Segredos (credenciais do Mercado Livre, certificado fiscal...): nunca no Git
+.env
+.env.*
+!.env.exemplo
+# Arquivos enviados (fotos dos itens)
+Backend/uploads/

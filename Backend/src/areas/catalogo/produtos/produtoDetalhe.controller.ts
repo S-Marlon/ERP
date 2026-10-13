@@ -3,6 +3,7 @@ import pool from '../../../infra/db';
 import { avaliarPublicacaoItens } from './publicacaoProdutos';
 import { carregarOpcoes, gravarValorAtributo } from '../atributos/valoresAtributo';
 import { carregarAtributosDaCategoria } from '../categorias/herancaCategorias';
+import { apagarArquivoDaUrl, ErroArquivo, salvarArquivo } from '../../../infra/arquivos';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
 
@@ -362,6 +363,9 @@ export const removerAnexo = async (req: Request, res: Response) => {
   const connection: any = await pool.getConnection();
   try {
     await connection.beginTransaction();
+    const [[anexo]] = await connection.execute(
+      `SELECT url_anexo FROM itens_anexos WHERE id_anexo = ? AND id_item = ? AND tenant_id = ?`, [idAnexo, idItem, tenant]
+    );
     const [resultado] = await connection.execute(
       `DELETE FROM itens_anexos WHERE id_anexo = ? AND id_item = ? AND tenant_id = ?`,
       [idAnexo, idItem, tenant]
@@ -372,6 +376,8 @@ export const removerAnexo = async (req: Request, res: Response) => {
     }
     await normalizarImagemPrincipal(connection, tenant, idItem);
     await connection.commit();
+    // Arquivo enviado pelo ERP (Backend/uploads): sai do disco junto
+    if (anexo?.url_anexo) apagarArquivoDaUrl(anexo.url_anexo);
     return res.json({ success: true, message: 'Anexo removido.' });
   } catch (error: any) {
     await connection.rollback();
@@ -379,6 +385,31 @@ export const removerAnexo = async (req: Request, res: Response) => {
     return res.status(500).json({ success: false, error: error.message });
   } finally {
     connection.release();
+  }
+};
+
+/**
+ * POST /catalogo/produtos/:id_item/anexos/arquivo { nome, tipo?, conteudo: data URL base64 }
+ * Envia o arquivo (foto ou PDF) para Backend/uploads e cadastra o anexo com o endereço dele.
+ */
+export const enviarArquivoAnexo = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const idItem = Number(req.params.id_item);
+  try {
+    const salvo = salvarArquivo(`itens/${tenant}/${idItem}`, String(req.body?.nome || 'arquivo'), String(req.body?.conteudo || ''));
+    const tipoPadrao = salvo.tipo === 'application/pdf' ? 'MANUAL_TECNICO' : 'FOTO_GALERIA';
+    req.body = {
+      ...req.body,
+      url: `${req.protocol}://${req.get('host')}/uploads/${salvo.relativo}`,
+      tipo: req.body?.tipo || tipoPadrao,
+      nome: String(req.body?.nome || '').slice(0, 255) || salvo.relativo.split('/').pop(),
+      conteudo: undefined,
+    };
+    return adicionarAnexo(req, res);
+  } catch (error: any) {
+    if (error instanceof ErroArquivo) return res.status(400).json({ success: false, error: error.message });
+    console.error('Erro ao enviar arquivo:', error);
+    return res.status(500).json({ success: false, error: error.message });
   }
 };
 

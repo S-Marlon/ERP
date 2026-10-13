@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Button, Card, Empty, Image, Input, Popconfirm, Select, Space, Tag, Tooltip, Typography, message } from 'antd';
-import { DeleteOutlined, FileTextOutlined, LinkOutlined, PlusOutlined, StarFilled, StarOutlined } from '@ant-design/icons';
-import { AnexoItem, TipoAnexo, adicionarAnexo, definirImagemPrincipal, removerAnexo } from './CatalogSku.service';
+import { Button, Card, Empty, Image, Input, Popconfirm, Select, Space, Tag, Tooltip, Typography, Upload, message } from 'antd';
+import { DeleteOutlined, FileTextOutlined, InboxOutlined, LinkOutlined, PlusOutlined, StarFilled, StarOutlined } from '@ant-design/icons';
+import { AnexoItem, TipoAnexo, adicionarAnexo, definirImagemPrincipal, enviarArquivoAnexo, removerAnexo } from './CatalogSku.service';
 
 const { Text } = Typography;
 
@@ -22,8 +22,8 @@ interface AnexosCardProps {
 }
 
 /**
- * Imagens e documentos do item. Por enquanto guarda só o LINK do arquivo hospedado;
- * quando houver um serviço de upload, ele gera a URL e o resto continua igual.
+ * Imagens e documentos do item: arraste arquivos (ficam no servidor do ERP, em Backend/uploads)
+ * ou cole o link de um arquivo já hospedado. A primeira imagem vira a principal.
  */
 export default function AnexosCard({ idItem, anexos, onChange }: AnexosCardProps) {
   const [url, setUrl] = useState('');
@@ -46,6 +46,21 @@ export default function AnexosCard({ idItem, anexos, onChange }: AnexosCardProps
     }
   };
 
+  // Vários arquivos de uma vez: envia um por um (fotos viram galeria; PDF vira manual técnico)
+  const [enviando, setEnviando] = useState(0);
+  const enviar = async (arquivo: File) => {
+    if (arquivo.size > 10 * 1024 * 1024) { message.warning(`${arquivo.name}: maior que 10 MB.`); return; }
+    setEnviando(n => n + 1);
+    try {
+      await enviarArquivoAnexo(idItem, arquivo);
+      onChange();
+    } catch (err: unknown) {
+      message.error(`${arquivo.name}: ${err instanceof Error ? err.message : 'erro ao enviar.'}`);
+    } finally {
+      setEnviando(n => n - 1);
+    }
+  };
+
   const handleAdicionar = () => {
     const link = url.trim();
     if (!/^https?:\/\/\S+$/i.test(link)) {
@@ -57,11 +72,23 @@ export default function AnexosCard({ idItem, anexos, onChange }: AnexosCardProps
 
   return (
     <Card size="small" title="Imagens e Documentos" bordered={false} style={{ background: '#fafafa' }}>
+      <Upload.Dragger
+        multiple
+        showUploadList={false}
+        accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+        beforeUpload={(arquivo) => { enviar(arquivo as File); return false; }}
+        disabled={salvando}
+        style={{ marginBottom: 8, padding: 4 }}
+      >
+        <p style={{ margin: 0 }}><InboxOutlined style={{ fontSize: 28, color: '#1677ff' }} /></p>
+        <Text>{enviando > 0 ? `Enviando ${enviando} arquivo(s)...` : 'Arraste fotos ou PDF aqui, ou clique para escolher'}</Text>
+        <div><Text type="secondary" style={{ fontSize: 11 }}>JPG, PNG, WEBP ou PDF, até 10 MB cada. Vários de uma vez.</Text></div>
+      </Upload.Dragger>
       <Space.Compact style={{ width: '100%', marginBottom: 12 }}>
         <Select value={tipo} onChange={setTipo} options={TIPOS} style={{ width: 170 }} />
         <Input
           prefix={<LinkOutlined />}
-          placeholder="Cole o link da imagem ou documento (https://...)"
+          placeholder="...ou cole o link de um arquivo já hospedado (https://...)"
           value={url}
           maxLength={500}
           onChange={(e) => setUrl(e.target.value)}
@@ -130,7 +157,7 @@ export default function AnexosCard({ idItem, anexos, onChange }: AnexosCardProps
       )}
 
       <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 8 }}>
-        Por enquanto o sistema guarda apenas o link do arquivo hospedado. A primeira imagem vira a principal automaticamente.
+        A primeira imagem vira a principal (estrela). As fotos são usadas nos anúncios do Mercado Livre.
       </Text>
     </Card>
   );
