@@ -813,8 +813,8 @@ export const desligarDoMl = async (req: Request, res: Response) => {
 };
 
 /**
- * POST /anuncios/:id/encerrar — encerra no ML os anúncios dos itens (não dá para desfazer lá) e devolve os itens
- * para "a publicar", para publicar de novo do jeito certo (ex.: título por item).
+ * POST /anuncios/:id/encerrar — encerra e exclui no ML os anúncios dos itens (não dá para desfazer lá) e devolve os
+ * itens para "a publicar", para publicar de novo do jeito certo (ex.: título por item). Nada fica sobrando nos finalizados.
  */
 export const encerrarNoMl = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
@@ -832,6 +832,8 @@ export const encerrarNoMl = async (req: Request, res: Response) => {
         try { await ml(tenant, 'PUT', `/items/${v.mlb_id}`, { status: 'closed' }); }
         catch (e: any) { falhas.push(`${v.mlb_id}: ${e?.message || 'erro'}`); continue; }
       }
+      // encerrado pode ser excluído (o ML pede encerrar antes); se a exclusão falhar ele só fica nos finalizados
+      if (v.status_ml !== 'deleted') await ml(tenant, 'PUT', `/items/${v.mlb_id}`, { deleted: 'true' }).catch(() => null);
       await pool.execute(
         `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens
          SET mlb_id = NULL, status_ml = NULL, permalink = NULL, estoque_enviado = NULL, preco_enviado = NULL, sincronizado_em = NULL, ultimo_erro = NULL

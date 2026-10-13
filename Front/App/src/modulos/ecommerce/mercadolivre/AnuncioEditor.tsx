@@ -610,9 +610,9 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
           )}
           {det.publicados > 0 && (
             <Popconfirm
-              title="Encerrar os anúncios no Mercado Livre?"
-              description={<div style={{ maxWidth: 320 }}>Os {det.publicados} anúncio(s) deste grupo são encerrados no ML (não dá para reabrir lá). Os itens voltam a "a publicar" aqui, para você publicar de novo do jeito certo.</div>}
-              okText="Encerrar no ML" okButtonProps={{ danger: true }} onConfirm={() => executar(() => anunciosApi.encerrarNoMl(det.id), 'Encerrados no ML: os itens voltaram a "a publicar".')}
+              title="Encerrar e excluir no Mercado Livre?"
+              description={<div style={{ maxWidth: 320 }}>Os {det.publicados} anúncio(s) deste grupo são encerrados e excluídos no ML (não dá para desfazer lá, e não sobram nos finalizados). Os itens voltam a "a publicar" aqui, para você publicar de novo do jeito certo.</div>}
+              okText="Encerrar e excluir" okButtonProps={{ danger: true }} onConfirm={() => executar(() => anunciosApi.encerrarNoMl(det.id), 'Encerrados e excluídos no ML: os itens voltaram a "a publicar".')}
             >
               <Button block danger>Encerrar no ML</Button>
             </Popconfirm>
