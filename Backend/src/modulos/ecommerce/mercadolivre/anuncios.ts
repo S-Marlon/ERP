@@ -26,7 +26,9 @@ export interface ItemAnuncio {
   ativo: boolean;
   preco: number;                    // preço de venda do ERP
   precoMl: number | null;           // preço só no ML (vazio = ERP + ajuste do anúncio)
-  estoque: number;
+  estoque: number;                  // saldo do ERP (kit: quantos dá para montar)
+  estoqueMl?: number;               // o que vai para o ML depois da reserva da loja e do teto
+  kit?: boolean;
   fotos: number;
   fotoUrl: string | null;
   gtin: string | null;
@@ -179,7 +181,12 @@ export const pendenciasAnuncio = (
       else erro('itens', `${i.sku}: sem foto (o Mercado Livre exige ao menos uma): envie a do item ou a foto da família.`, { idItem: i.idItem });
     }
     if (!(precoNoMl(i, dados.ajustePreco) > 0)) erro('itens', `${i.sku}: sem preço de venda.`, { idItem: i.idItem });
-    if (!(i.estoque > 0)) aviso('itens', `${i.sku}: sem estoque (entra com quantidade 0).`, { idItem: i.idItem });
+    const noMl = i.estoqueMl ?? Math.max(0, Math.floor(i.estoque));
+    if (!(noMl > 0)) {
+      aviso('itens', i.estoque > 0
+        ? `${i.sku}: estoque todo reservado para a loja (entra com 0 no ML).`
+        : `${i.sku}: sem estoque (entra com quantidade 0).`, { idItem: i.idItem });
+    }
     if (temGtinNaCategoria && !i.gtin) {
       const marca = resolverValor(atributos.find(a => a.id === 'BRAND'), dados.atributos.BRAND, i)?.valor;
       if (marca && !SEM_MARCA.has(normalizar(marca))) {
@@ -303,7 +310,7 @@ export const corpoDoItem = (p: {
     category_id: p.dados.categoriaMl,
     price: precoNoMl(p.item, p.dados.ajustePreco),
     currency_id: 'BRL',
-    available_quantity: Math.max(0, Math.floor(p.item.estoque)),
+    available_quantity: p.item.estoqueMl ?? Math.max(0, Math.floor(p.item.estoque)),
     buying_mode: 'buy_it_now',
     condition: p.condicao === 'used' ? 'used' : 'new',
     listing_type_id: p.tipoAnuncio,
@@ -352,4 +359,33 @@ export const ligarPorSku = <T extends { idItem: number; sku: string; skuRaiz?: s
 
 export const SITUACAO_POR_STATUS: Record<string, string> = {
   active: 'PUBLICADO', under_review: 'PUBLICADO', paused: 'PAUSADO', inactive: 'PAUSADO', closed: 'ENCERRADO',
+};
+
+// ---------------------------------------------------------------------------
+// Estoque dividido entre a loja e o ML
+// ---------------------------------------------------------------------------
+
+/** reserva: unidades que ficam para a loja; maximo: teto no ML (null = sem teto). */
+export interface RegraEstoque { reserva: number; maximo: number | null }
+
+/** Regra do item: a própria quando informada, senão a do anúncio. */
+export const regraDoItem = (doAnuncio: RegraEstoque, doItem: { reserva: number | null; maximo: number | null }): RegraEstoque => ({
+  reserva: doItem.reserva ?? doAnuncio.reserva,
+  maximo: doItem.maximo ?? doAnuncio.maximo,
+});
+
+/** Quantidade que vai para o ML: saldo menos a reserva da loja, limitado ao teto (sempre inteiro, nunca negativo). */
+export const estoqueParaMl = (saldo: number, regra: RegraEstoque) => {
+  const livre = Math.max(0, Math.floor((Number(saldo) || 0) - (Number(regra.reserva) || 0)));
+  return regra.maximo === null || regra.maximo === undefined ? livre : Math.min(livre, Math.max(0, Math.floor(regra.maximo)));
+};
+
+/** O que mudou desde o último envio (null = nada a mandar). */
+export const mudancasParaMl = (
+  enviado: { estoque: number | null; preco: number | null }, atual: { estoque: number; preco: number }
+): { available_quantity?: number; price?: number } | null => {
+  const corpo: { available_quantity?: number; price?: number } = {};
+  if (enviado.estoque === null || Number(enviado.estoque) !== atual.estoque) corpo.available_quantity = atual.estoque;
+  if (atual.preco > 0 && (enviado.preco === null || Math.abs(Number(enviado.preco) - atual.preco) >= 0.005)) corpo.price = atual.preco;
+  return Object.keys(corpo).length ? corpo : null;
 };

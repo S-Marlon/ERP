@@ -3,11 +3,14 @@
 import { Request, Response } from 'express';
 import pool from '../../../infra/db';
 import { avaliarPublicacaoItens } from '../../../areas/catalogo/produtos/publicacaoProdutos';
+import { carregarComposicoes, carregarDadosComponentes } from '../../../areas/catalogo/kits/kitsBanco';
+import { estoqueDoKit } from '../../../areas/catalogo/kits/kits';
 import {
   AnuncioDados, AtributoML, categoriaInfo, CategoriaInfo, cortarTitulo, eixosDeVariacao, filtrarAtributosCategoria,
-  ItemAnuncio, Pendencia, pendenciasAnuncio, precoNoMl, resolverValor, situacaoPreparo, sugerirAtributos, tituloLegivel, ValorAtributo,
+  ItemAnuncio, Pendencia, pendenciasAnuncio, precoNoMl, resolverValor, situacaoPreparo, sugerirAtributos, tituloLegivel, ValorAtributo, estoqueParaMl, regraDoItem, RegraEstoque,
 } from './anuncios';
 import { ErroML, ml } from './mercadolivreApi';
+import { sincronizarAnuncios } from './sincronizacao';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
 
@@ -157,6 +160,17 @@ export const carregarItens = async (conn: Conn, tenant: number, ids: number[]) =
     i.valoresErp[String(v.atributo_id)] = valor;
     atributosErp.set(Number(v.atributo_id), v.nome);
   }
+  // Kit não tem saldo próprio: vale quantos dá para montar com os componentes (o mais escasso manda)
+  const kits = await carregarComposicoes(conn, tenant, ids);
+  if (kits.size) {
+    const componentes = await carregarDadosComponentes(conn, tenant, [...kits.values()].flat().map(c => c.idItem));
+    for (const [idKit, comps] of kits) {
+      const i = itens.get(idKit);
+      if (!i) continue;
+      i.kit = true;
+      i.estoque = estoqueDoKit(comps, componentes) ?? 0;
+    }
+  }
   return { itens, atributosErp };
 };
 
@@ -176,11 +190,16 @@ const dadosDoAnuncio = (a: any): AnuncioDados => ({
 });
 
 /** O que já está no ML de cada item (na conta com User Products cada item é um anúncio MLB). */
-export interface ItemNoMl { mlbId: string | null; status: string | null; permalink: string | null; erro: string | null; fotosMl: Record<string, string> }
+export interface ItemNoMl {
+  mlbId: string | null; status: string | null; permalink: string | null; erro: string | null; fotosMl: Record<string, string>;
+  estoqueEnviado: number | null; precoEnviado: number | null; sincronizadoEm: string | null;
+  regra: { reserva: number | null; maximo: number | null };   // exceção do item (vazio = regra do anúncio)
+}
 
 export interface AnuncioCarregado {
   registro: any;
   dados: AnuncioDados;
+  regraEstoque: RegraEstoque;
   itens: ItemAnuncio[];
   noMl: Map<number, ItemNoMl>;
   categoria: CategoriaML | null;
@@ -202,7 +221,9 @@ export const carregarAnuncios = async (conn: Conn, tenant: number, idAnuncio?: n
   if (anuncios.length === 0) return [];
   const idsAnuncios = anuncios.map((a: any) => Number(a.id));
   const [vinculos] = await conn.execute(
-    `SELECT id_anuncio, id_item, preco, mlb_id, status_ml, permalink, ultimo_erro, fotos_ml FROM modulo_ecommerce_mercadolivre_anuncios_itens
+    `SELECT id_anuncio, id_item, preco, mlb_id, status_ml, permalink, ultimo_erro, fotos_ml, estoque_reserva, estoque_maximo,
+            estoque_enviado, preco_enviado, DATE_FORMAT(sincronizado_em, '%Y-%m-%d %H:%i') AS sincronizado_fmt
+     FROM modulo_ecommerce_mercadolivre_anuncios_itens
      WHERE tenant_id = ? AND id_anuncio IN (${lista(idsAnuncios)}) ORDER BY ordem, id_item`,
     [tenant, ...idsAnuncios]
   );
@@ -211,11 +232,19 @@ export const carregarAnuncios = async (conn: Conn, tenant: number, idAnuncio?: n
   return Promise.all(anuncios.map(async (a: any) => {
     const dados = dadosDoAnuncio(a);
     const meus = vinculos.filter((v: any) => Number(v.id_anuncio) === Number(a.id) && itens.has(Number(v.id_item)));
-    const itensDoAnuncio: ItemAnuncio[] = meus.map((v: any) => ({ ...itens.get(Number(v.id_item))!, precoMl: v.preco === null ? null : Number(v.preco) }));
+    const regraEstoque: RegraEstoque = { reserva: Number(a.estoque_reserva) || 0, maximo: a.estoque_maximo === null ? null : Number(a.estoque_maximo) };
+    const numeroOuNulo = (x: any) => (x === null || x === undefined ? null : Number(x));
     const noMl = new Map<number, ItemNoMl>(meus.map((v: any) => [Number(v.id_item), {
       mlbId: v.mlb_id || null, status: v.status_ml || null, permalink: v.permalink || null, erro: v.ultimo_erro || null,
       fotosMl: lerJson<Record<string, string>>(v.fotos_ml, {}),
+      estoqueEnviado: numeroOuNulo(v.estoque_enviado), precoEnviado: numeroOuNulo(v.preco_enviado), sincronizadoEm: v.sincronizado_fmt || null,
+      regra: { reserva: numeroOuNulo(v.estoque_reserva), maximo: numeroOuNulo(v.estoque_maximo) },
     }]));
+    const itensDoAnuncio: ItemAnuncio[] = meus.map((v: any) => {
+      const base = itens.get(Number(v.id_item))!;
+      const regra = regraDoItem(regraEstoque, noMl.get(base.idItem)!.regra);
+      return { ...base, precoMl: v.preco === null ? null : Number(v.preco), estoqueMl: estoqueParaMl(base.estoque, regra) };
+    });
     const aPublicar = itensDoAnuncio.filter(i => !noMl.get(i.idItem)?.mlbId);
     const { categoria, erro } = await categoriaOuErro(tenant, dados.categoriaMl);
     const pendencias = itensDoAnuncio.length > 0 && aPublicar.length === 0
@@ -224,7 +253,7 @@ export const carregarAnuncios = async (conn: Conn, tenant: number, idAnuncio?: n
     if (erro) pendencias.unshift({ nivel: 'aviso', area: 'dados', texto: `Não deu para conferir a categoria no Mercado Livre: ${erro}` });
     const idsErp = new Set(itensDoAnuncio.flatMap(i => Object.keys(i.valoresErp)));
     return {
-      registro: a, dados, itens: itensDoAnuncio, noMl, categoria, pendencias,
+      registro: a, dados, regraEstoque, itens: itensDoAnuncio, noMl, categoria, pendencias,
       atributosErp: [...idsErp].map(id => ({ id: Number(id), nome: atributosErp.get(Number(id)) || `#${id}` })).sort((x, y) => x.nome.localeCompare(y.nome)),
     };
   }));
@@ -295,6 +324,10 @@ export const detalhe = async (tenant: number, c: AnuncioCarregado) => {
     descricao: a.descricao || '',
     fotoFamilia: c.dados.fotoFamilia || null,
     ajustePreco: c.dados.ajustePreco,
+    estoqueReserva: c.regraEstoque.reserva,
+    estoqueMaximo: c.regraEstoque.maximo,
+    estoqueAutomatico: Boolean(Number(a.estoque_automatico)),
+    sincronizadoEm: a.sincronizado_fmt || null,
     atributos: c.dados.atributos,
     categoria: c.categoria
       ? { id: c.categoria.info.id, nome: c.categoria.nome, caminho: c.categoria.caminho, final: c.categoria.info.final, maxTitulo: c.categoria.info.maxTitulo, maxFotos: c.categoria.info.maxFotos, filhos: c.categoria.filhos }
@@ -311,7 +344,7 @@ export const detalhe = async (tenant: number, c: AnuncioCarregado) => {
         comissao: taxa ? taxa.comissao : null,
         percentualComissao: taxa ? taxa.percentual : null,
         valores: Object.fromEntries(atributosCat.map(at => [at.id, resolverValor(at, c.dados.atributos[at.id], i)])),
-        ml: (({ fotosMl, ...m }) => m)(c.noMl.get(i.idItem) || { mlbId: null, status: null, permalink: null, erro: null, fotosMl: {} }),
+        ml: (({ fotosMl, ...m }) => m)(c.noMl.get(i.idItem)!),
       };
     }),
     pendencias: c.pendencias,
@@ -540,6 +573,15 @@ export const salvarAnuncio = async (req: Request, res: Response) => {
     }
     if (b.condicao !== undefined) definir('condicao', b.condicao === 'used' ? 'used' : 'new');
     if (b.descricao !== undefined) definir('descricao', String(b.descricao || '').trim() || null);
+    const quantidade = (v: any, nome: string) => {
+      if (v === null || v === undefined || v === '') return null;
+      const n = Number(v);
+      if (!(n >= 0)) throw new ErroML(`${nome} inválido.`);
+      return Math.floor(n);
+    };
+    if (b.estoqueReserva !== undefined) definir('estoque_reserva', quantidade(b.estoqueReserva, 'Reserva da loja') ?? 0);
+    if (b.estoqueMaximo !== undefined) definir('estoque_maximo', quantidade(b.estoqueMaximo, 'Teto no ML'));
+    if (b.estoqueAutomatico !== undefined) definir('estoque_automatico', b.estoqueAutomatico ? 1 : 0);
     if (b.ajustePreco !== undefined) {
       const ajuste = Number(b.ajustePreco) || 0;
       if (ajuste < -50 || ajuste > 300) throw new ErroML('Ajuste de preço fora do razoável (-50% a 300%).');
@@ -565,6 +607,11 @@ export const salvarAnuncio = async (req: Request, res: Response) => {
     }
     definir('atributos', JSON.stringify(atributos));
     await pool.execute(`UPDATE modulo_ecommerce_mercadolivre_anuncios SET ${campos.join(', ')} WHERE id = ? AND tenant_id = ?`, [...valores, id, tenant]);
+    // divisão do estoque ou ajuste de preço mudou: os itens já no ML recebem na hora
+    if (b.estoqueReserva !== undefined || b.estoqueMaximo !== undefined || b.ajustePreco !== undefined) {
+      const recusado = (await sincronizarAnuncios(tenant, { idAnuncio: id })).find(r => r.erro);
+      if (recusado) throw new ErroML(`Salvo no ERP, mas o ML recusou ${recusado.sku}: ${recusado.erro}`);
+    }
     const [c] = await carregarAnuncios(pool as any, tenant, id);
     return res.json(await detalhe(tenant, c));
   } catch (error) {
@@ -621,36 +668,46 @@ export const removerItem = async (req: Request, res: Response) => {
   }
 };
 
-/** PUT /anuncios/:id/itens/:idItem { preco } — preço só no ML (null volta ao preço do ERP + ajuste) */
-export const precoDoItem = async (req: Request, res: Response) => {
+/**
+ * PUT /anuncios/:id/itens/:idItem { preco?, estoqueReserva?, estoqueMaximo? } — preço só no ML e a divisão do estoque
+ * do item (null volta à regra do anúncio). Item já no ML: a mudança vai na hora.
+ */
+export const salvarItem = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
   const id = Number(req.params.id);
   try {
     await anuncioEditavel(pool as any, tenant, id);
     const idItem = Number(req.params.idItem);
-    const bruto = req.body?.preco;
-    const preco = bruto === null || bruto === undefined || bruto === '' ? null : Math.round(Number(bruto) * 100) / 100;
-    if (preco !== null && !(preco > 0)) throw new ErroML('Preço inválido.');
-    await pool.execute(
-      `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET preco = ? WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
-      [preco, id, tenant, idItem]
-    );
-    const [c] = await carregarAnuncios(pool as any, tenant, id);
-    // item já no ML: o preço novo vai na hora
-    const mlb = c.noMl.get(idItem)?.mlbId;
-    const item = c.itens.find(i => i.idItem === idItem);
-    if (mlb && item) {
-      const novo = precoNoMl(item, c.dados.ajustePreco);
-      await ml(tenant, 'PUT', `/items/${mlb}`, { price: novo });
+    const b = req.body || {};
+    const campos: string[] = [];
+    const valores: any[] = [];
+    if ('preco' in b) {
+      const preco = b.preco === null || b.preco === '' ? null : Math.round(Number(b.preco) * 100) / 100;
+      if (preco !== null && !(preco > 0)) throw new ErroML('Preço inválido.');
+      campos.push('preco = ?');
+      valores.push(preco);
+    }
+    const regras: [string, string, string][] = [['estoqueReserva', 'estoque_reserva', 'Reserva da loja'], ['estoqueMaximo', 'estoque_maximo', 'Teto no ML']];
+    for (const [chave, coluna, nome] of regras) {
+      if (!(chave in b)) continue;
+      const v = b[chave] === null || b[chave] === '' ? null : Number(b[chave]);
+      if (v !== null && !(v >= 0)) throw new ErroML(`${nome} inválido.`);
+      campos.push(`${coluna} = ?`);
+      valores.push(v === null ? null : Math.floor(v));
+    }
+    if (campos.length) {
       await pool.execute(
-        `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET preco_enviado = ?, sincronizado_em = NOW(), ultimo_erro = NULL
-         WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
-        [novo, id, tenant, idItem]
+        `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET ${campos.join(', ')} WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
+        [...valores, id, tenant, idItem]
       );
     }
+    const enviados = await sincronizarAnuncios(tenant, { idAnuncio: id, idItem });
+    const recusado = enviados.find(r => r.erro);
+    if (recusado) throw new ErroML(`Salvo no ERP, mas o ML recusou: ${recusado.erro}`);
+    const [c] = await carregarAnuncios(pool as any, tenant, id);
     return res.json(await detalhe(tenant, c));
   } catch (error) {
-    return responderErro(res, error, 'Erro ao salvar o preço.');
+    return responderErro(res, error, 'Erro ao salvar o item.');
   }
 };
 

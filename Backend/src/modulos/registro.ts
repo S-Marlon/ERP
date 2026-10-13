@@ -7,6 +7,7 @@ import hidraulicaMontagensRoutes from './hidraulica/montagens/montagens.routes';
 import transmissaoRolamentosRoutes from './transmissao/rolamentos/rolamentos.routes';
 import hidraulicaPocosRoutes from './hidraulica/pocos/pocos.routes';
 import ecommerceMercadoLivreRoutes from './ecommerce/mercadolivre/mercadolivre.routes';
+import { iniciarSincronizacaoAutomatica } from './ecommerce/mercadolivre/sincronizacao';
 
 export interface ModuloRegistrado {
   codigo: string;      // padrão AREA_ASSUNTO (sistema_modulos.codigo)
@@ -15,6 +16,7 @@ export interface ModuloRegistrado {
   descricao: string;
   rotaBase: string;    // montado em /api/modulos<rotaBase>
   router: Router;
+  iniciar?: () => void; // tarefa de fundo do módulo (roda quando o servidor sobe; ela mesma confere se o módulo está ligado)
 }
 
 export const MODULOS: ModuloRegistrado[] = [
@@ -49,6 +51,7 @@ export const MODULOS: ModuloRegistrado[] = [
     descricao: 'Conecta a conta do Mercado Livre pela API: anúncios a partir do catálogo (fotos, categoria, atributos), preço e estoque sincronizados e pedidos que viram venda.',
     rotaBase: '/ecommerce/mercadolivre',
     router: ecommerceMercadoLivreRoutes,
+    iniciar: iniciarSincronizacaoAutomatica,
   },
 ];
 
@@ -97,5 +100,12 @@ router.put('/sistema/modulos/:codigo', async (req: Request, res: Response) => {
 });
 
 for (const m of MODULOS) router.use(`/modulos${m.rotaBase}`, exigirModulo(m.codigo), m.router);
+
+/** Liga as tarefas de fundo dos módulos (chamado uma vez quando o servidor sobe). */
+export const iniciarModulos = () => {
+  for (const m of MODULOS) {
+    try { m.iniciar?.(); } catch (e: any) { console.error(`[módulo ${m.codigo}] não iniciou:`, e?.message || e); }
+  }
+};
 
 export default router;

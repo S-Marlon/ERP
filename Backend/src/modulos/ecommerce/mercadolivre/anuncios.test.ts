@@ -1,7 +1,7 @@
 import assert from 'assert';
 import {
   AnuncioDados, AtributoML, cortarTitulo, tituloLegivel, eixosDeVariacao, filtrarAtributosCategoria, ItemAnuncio, pendenciasAnuncio,
-  precoNoMl, resolverValor, sugerirAtributos, corpoDoItem, fotoPequena, errosDoValidador, ligarPorSku,
+  precoNoMl, resolverValor, sugerirAtributos, estoqueParaMl, regraDoItem, mudancasParaMl, corpoDoItem, fotoPequena, errosDoValidador, ligarPorSku,
 } from './anuncios';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
@@ -158,4 +158,23 @@ teste('item sem foto herda a foto da família (vira aviso)', () => {
   assert.ok(erros(dados(), semFoto).some(t => t.includes('sem foto')));
   assert.deepStrictEqual(erros(dados({ fotoFamilia: 'https://x/familia.jpg' }), semFoto), []);
   assert.ok(pendenciasAnuncio(dados({ fotoFamilia: 'https://x/familia.jpg' }), semFoto, categoria, atributos).some(p => p.nivel === 'aviso' && p.texto.includes('foto da família')));
+});
+
+teste('estoque dividido entre loja e ML', () => {
+  assert.strictEqual(estoqueParaMl(24, { reserva: 0, maximo: null }), 24);
+  assert.strictEqual(estoqueParaMl(24, { reserva: 4, maximo: 10 }), 10);
+  assert.strictEqual(estoqueParaMl(5, { reserva: 4, maximo: 10 }), 1);
+  assert.strictEqual(estoqueParaMl(3, { reserva: 4, maximo: null }), 0);
+  assert.strictEqual(estoqueParaMl(7.6, { reserva: 0, maximo: null }), 7);
+  assert.deepStrictEqual(regraDoItem({ reserva: 2, maximo: 10 }, { reserva: null, maximo: 3 }), { reserva: 2, maximo: 3 });
+  const c: any = corpoDoItem({ dados: dados(), tipoAnuncio: 'gold_special', condicao: 'new', item: item(1, { estoque: 9, estoqueMl: 4 }), atributos, temGtin: false, fotos: [], porFamilia: true });
+  assert.strictEqual(c.available_quantity, 4);
+  assert.ok(pendenciasAnuncio(dados(), [item(1, { estoque: 3, estoqueMl: 0 })], categoria, atributos).some(p => p.texto.includes('reservado para a loja')));
+});
+
+teste('sincronização manda só o que mudou', () => {
+  assert.strictEqual(mudancasParaMl({ estoque: 5, preco: 29.9 }, { estoque: 5, preco: 29.9 }), null);
+  assert.deepStrictEqual(mudancasParaMl({ estoque: 0, preco: 29.9 }, { estoque: 5, preco: 29.9 }), { available_quantity: 5 });
+  assert.deepStrictEqual(mudancasParaMl({ estoque: 5, preco: 29.9 }, { estoque: 5, preco: 31.5 }), { price: 31.5 });
+  assert.deepStrictEqual(mudancasParaMl({ estoque: null, preco: null }, { estoque: 2, preco: 10 }), { available_quantity: 2, price: 10 });
 });

@@ -12,6 +12,7 @@ import {
   AnuncioCarregado, carregarAnuncios, carregarCategoria, detalhe, lista, responderErro, tenantDe,
 } from './anuncios.controller';
 import { contaPorFamilia, enviarFotoMl, ErroML, ml } from './mercadolivreApi';
+import { sincronizarAnuncios, situacaoAutomatica } from './sincronizacao';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
 
@@ -304,8 +305,8 @@ export const importarAnuncios = async (req: Request, res: Response) => {
       }
       const [ins] = await conn.execute(
         `INSERT INTO modulo_ecommerce_mercadolivre_anuncios
-           (tenant_id, titulo, categoria_ml, categoria_ml_nome, tipo_anuncio, condicao, descricao, atributos, situacao, mlb_id, status_ml, permalink, sincronizado_em)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+           (tenant_id, titulo, categoria_ml, categoria_ml_nome, tipo_anuncio, condicao, descricao, atributos, situacao, mlb_id, status_ml, permalink, sincronizado_em, estoque_automatico)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 0)`,
         [tenant, cortarTitulo(b0.family_name || b0.title), b0.category_id, caminho, b0.listing_type_id || 'gold_special',
           b0.condition === 'used' ? 'used' : 'new', descricao, JSON.stringify(atributos), situacao, b0.id, b0.status, b0.permalink]
       );
@@ -332,3 +333,31 @@ export const importarAnuncios = async (req: Request, res: Response) => {
   }
 };
 
+
+// ---------------------------------------------------------------------------
+// Sincronização de estoque e preço
+// ---------------------------------------------------------------------------
+
+/** POST /anuncios/:id/sincronizar { forcar? } — manda estoque e preço deste anúncio agora */
+export const sincronizarAnuncio = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const id = Number(req.params.id);
+  try {
+    const enviados = await sincronizarAnuncios(tenant, { idAnuncio: id, forcar: Boolean(req.body?.forcar) });
+    return res.json({ enviados, detalhe: await detalhe(tenant, await carregarOuErro(tenant, id)) });
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao atualizar no Mercado Livre.');
+  }
+};
+
+/** POST /sincronizar — todos os anúncios com "atualizar sozinho" ligado */
+export const sincronizarTodos = async (req: Request, res: Response) => {
+  try {
+    return res.json({ enviados: await sincronizarAnuncios(tenantDe(req), { somenteAutomaticos: true }) });
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao atualizar no Mercado Livre.');
+  }
+};
+
+/** GET /sincronizar — como foi a última rodada automática */
+export const situacaoSincronizacao = async (req: Request, res: Response) => res.json(situacaoAutomatica(tenantDe(req)));

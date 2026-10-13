@@ -11,8 +11,11 @@ import {
 import { adicionarAnexo, enviarArquivoAnexo } from '../../../areas/catalogo/skus/CatalogSku.service';
 import FotoFamiliaControle from '../../../areas/catalogo/familias/FotoFamiliaControle';
 import EnviarFotoPopover from '../../../shared/components/EnviarFotoPopover';
-import { AnuncioDetalhe, anunciosApi, AtributoML, ConferenciaItem, formatarMoeda, ItemDoAnuncio, ROTULO_STATUS_ML, ValorAtributo } from './mercadoLivreApi';
+import {
+  AnuncioDetalhe, anunciosApi, AtributoML, ConferenciaItem, formatarMoeda, ItemDoAnuncio, resumoSincronizacao, ROTULO_STATUS_ML, ValorAtributo,
+} from './mercadoLivreApi';
 import { agruparPendencias, textoComPrimeiraMaiuscula } from './pendencias';
+import { EstoqueAnuncioCard, EstoqueItemCelula } from './EstoqueMl';
 import CategoriaMlModal from './CategoriaMlModal';
 import AdicionarAnuncioModal from './AdicionarAnuncioModal';
 import SituacaoTag from './SituacaoTag';
@@ -103,6 +106,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
   const [falhas, setFalhas] = useState<{ sku: string; erro: string }[]>([]);
   const [conferindo, setConferindo] = useState(false);
   const [publicando, setPublicando] = useState(false);
+  const [sincronizando, setSincronizando] = useState(false);
 
   const aplicar = useCallback((d: AnuncioDetalhe) => {
     setDet(d);
@@ -127,6 +131,22 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
     setFalhas([]);
     if (id) recarregar();
   }, [id, recarregar]);
+
+  const sincronizarAgora = async () => {
+    if (!det) return;
+    setSincronizando(true);
+    try {
+      const r = await anunciosApi.sincronizarAnuncio(det.id);
+      aplicar(r.detalhe);
+      const resumo = resumoSincronizacao(r.enviados);
+      message[resumo.tipo](resumo.texto, 6);
+      onAlterado();
+    } catch (e) {
+      message.error(erroMsg(e));
+    } finally {
+      setSincronizando(false);
+    }
+  };
 
   const conferirNoMl = async () => {
     if (!det) return;
@@ -376,7 +396,10 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
               </div>
             ),
           },
-          { title: 'Estoque', dataIndex: 'estoque', width: 74, align: 'right', render: v => <Text type={v > 0 ? undefined : 'warning'}>{v}</Text> },
+          {
+            title: <Tooltip title="Saldo do ERP e o que vai para o ML. Clique para dar uma regra só a este item.">Estoque</Tooltip>, width: 92, align: 'right',
+            render: (_, i) => <EstoqueItemCelula item={i} det={det} onSalvarRegra={regra => executar(() => anunciosApi.regraItem(det.id, i.idItem, regra), 'Estoque do item salvo.')} />,
+          },
           { title: 'Preço ERP', dataIndex: 'preco', width: 96, align: 'right', render: formatarMoeda },
           {
             title: <Tooltip title="Vazio = preço do ERP com o ajuste do anúncio. Em item que já está no ML, o preço novo vai na hora.">Preço no ML</Tooltip>, width: 130,
@@ -633,6 +656,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
                   description="Título, categoria e atributos ficam como estão no ML. Preço do item muda na hora; itens novos da família entram pelo botão Publicar." />
               )}
               {blocoDados}
+              <EstoqueAnuncioCard det={det} sincronizando={sincronizando} onSincronizar={sincronizarAgora} onSalvar={corpo => salvar(corpo, 'Estoque do anúncio salvo.')} />
               {blocoItens}
               {blocoAtributos}
             </Col>

@@ -1,8 +1,8 @@
 // Aba Anúncios: rascunhos e publicados, com o que falta em cada um.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Avatar, Button, Card, Col, Empty, Flex, Input, Popconfirm, Row, Segmented, Space, Statistic, Table, Tag, Tooltip, Typography, message } from 'antd';
-import { CloudDownloadOutlined, DeleteOutlined, EditOutlined, PictureOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
-import { AnuncioResumo, anunciosApi, formatarMoeda, ROTULO_TIPO_ANUNCIO } from './mercadoLivreApi';
+import { CloudDownloadOutlined, DeleteOutlined, EditOutlined, PictureOutlined, PlusOutlined, ReloadOutlined, SyncOutlined } from '@ant-design/icons';
+import { AnuncioResumo, anunciosApi, formatarMoeda, resumoSincronizacao, ROTULO_TIPO_ANUNCIO, SituacaoSincronizacao } from './mercadoLivreApi';
 import AdicionarAnuncioModal from './AdicionarAnuncioModal';
 import AnuncioEditor from './AnuncioEditor';
 import SituacaoTag from './SituacaoTag';
@@ -29,6 +29,29 @@ const AnunciosMercadoLivre: React.FC = () => {
     finally { setCarregando(false); }
   }, []);
   useEffect(() => { carregar(); }, [carregar]);
+
+  // Atualização automática de estoque/preço no ML: mostra a última rodada e permite rodar agora
+  const [auto, setAuto] = useState<SituacaoSincronizacao | null>(null);
+  const [sincronizando, setSincronizando] = useState(false);
+  const lerAuto = useCallback(() => { anunciosApi.situacaoSincronizacao().then(setAuto).catch(() => null); }, []);
+  useEffect(() => {
+    lerAuto();
+    const t = window.setInterval(lerAuto, 60 * 1000);
+    return () => window.clearInterval(t);
+  }, [lerAuto]);
+  const sincronizarTodos = async () => {
+    setSincronizando(true);
+    try {
+      const r = await anunciosApi.sincronizarTodos();
+      const resumo = resumoSincronizacao(r.enviados);
+      message[resumo.tipo](resumo.texto, 6);
+      carregar();
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : 'Erro.');
+    } finally {
+      setSincronizando(false);
+    }
+  };
 
   const contagem = useMemo(() => ({
     pendentes: anuncios.filter(a => a.situacao === 'RASCUNHO' && a.preparo === 'PENDENTE').length,
@@ -72,6 +95,19 @@ const AnunciosMercadoLivre: React.FC = () => {
             <Input.Search placeholder="Buscar anúncio" allowClear value={busca} onChange={e => setBusca(e.target.value)} style={{ width: 240 }} />
           </Space>
           <Space>
+            {contagem.publicados > 0 && (
+              <Tooltip title={
+                <>
+                  Manda o estoque e o preço do ERP para os anúncios com "Atualizar sozinho" ligado.
+                  {auto && <div style={{ marginTop: 4 }}>Automático a cada {auto.intervaloMin} min{auto.ultimaEm ? ` · última: ${new Date(auto.ultimaEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} (${auto.enviados} enviados${auto.erros ? `, ${auto.erros} com erro` : ''})` : ' · ainda não rodou'}</div>}
+                  {auto?.mensagem && <div>Último erro: {auto.mensagem}</div>}
+                </>
+              }>
+                <Button icon={<SyncOutlined spin={sincronizando || !!auto?.rodando} />} onClick={sincronizarTodos} loading={sincronizando} danger={!!auto?.erros}>
+                  Atualizar estoque no ML
+                </Button>
+              </Tooltip>
+            )}
             <Button icon={<ReloadOutlined />} onClick={carregar} loading={carregando} />
             <Tooltip title="Liga ao ERP os anúncios que você já tem no Mercado Livre (pelo SKU)">
               <Button icon={<CloudDownloadOutlined />} onClick={() => setImportar(true)}>Importar do Mercado Livre</Button>

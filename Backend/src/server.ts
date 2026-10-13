@@ -4,6 +4,7 @@ import path from 'path';
 import express from 'express';
 import cors from 'cors';
 import routes from './rotas';
+import { iniciarModulos } from './modulos/registro';
 
 const app = express();
 app.use(cors());
@@ -59,6 +60,7 @@ async function iniciarServidor() {
         app.listen(Number(PORT), () => {
             console.log(`\n✅ Servidor ERP rodando com sucesso em http://localhost:${PORT}`);
             console.log(`✅ Conexão com o banco estabelecida!\n`);
+            iniciarModulos(); // tarefas de fundo dos módulos (ex.: estoque no Mercado Livre)
         });
 
     } catch (error: any) {

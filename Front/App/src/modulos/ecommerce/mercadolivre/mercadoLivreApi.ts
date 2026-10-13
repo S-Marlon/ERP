@@ -55,16 +55,24 @@ export interface AnuncioResumo {
 
 export interface ItemDoAnuncio {
   idItem: number; sku: string; nome: string; ativo: boolean; preco: number; precoMl: number | null; precoAnuncio: number;
-  comissao: number | null; percentualComissao: number | null; estoque: number; fotos: number; fotoUrl: string | null;
+  comissao: number | null; percentualComissao: number | null; fotos: number; fotoUrl: string | null;
+  estoque: number;          // saldo do ERP (kit: quantos dá para montar)
+  estoqueMl: number;        // o que vai para o ML (saldo − reserva, até o teto)
+  kit?: boolean;
   gtin: string | null; pesoKg: number | null; medidasCm: { altura: number; largura: number; comprimento: number } | null;
   marca: string | null; valoresErp: Record<string, string | null>; motivosCadastro: string[];
   valores: Record<string, { valor: string; valorId: string | null; unidade: string | null } | null>;
-  ml: { mlbId: string | null; status: string | null; permalink: string | null; erro: string | null };
+  ml: {
+    mlbId: string | null; status: string | null; permalink: string | null; erro: string | null;
+    estoqueEnviado: number | null; precoEnviado: number | null; sincronizadoEm: string | null;
+    regra: { reserva: number | null; maximo: number | null };   // exceção do item (vazio = regra do anúncio)
+  };
 }
 
 export interface AnuncioDetalhe extends AnuncioResumo {
   condicao: 'new' | 'used'; descricao: string; ajustePreco: number; atributos: Record<string, ValorAtributo>;
   fotoFamilia: string | null;   // vale para os itens sem foto própria
+  estoqueReserva: number; estoqueMaximo: number | null; estoqueAutomatico: boolean; sincronizadoEm: string | null;
   categoria: { id: string; nome: string; caminho: string; final: boolean; maxTitulo: number; maxFotos: number; filhos: { id: string; nome: string }[] } | null;
   atributosCategoria: AtributoML[]; atributosErp: { id: number; nome: string }[]; eixos: string[];
   itens: ItemDoAnuncio[]; pendencias: Pendencia[];
@@ -90,6 +98,22 @@ export const ROTULO_STATUS_ML: Record<string, { texto: string; cor: string }> = 
   inactive: { texto: 'Inativo no ML', cor: 'default' },
 };
 
+export interface ResultadoSincronizacao {
+  idAnuncio: number; idItem: number; sku: string; mlbId: string;
+  estoqueDe: number | null; estoquePara: number | null; precoDe: number | null; precoPara: number | null; erro: string | null;
+}
+export interface SituacaoSincronizacao { ultimaEm: string | null; enviados: number; erros: number; mensagem: string | null; rodando: boolean; intervaloMin: number }
+
+/** Resumo de uma sincronização para mensagem: "3 itens atualizados (estoque 0 → 5...)". */
+export const resumoSincronizacao = (r: ResultadoSincronizacao[]) => {
+  const ok = r.filter(x => !x.erro);
+  const erros = r.filter(x => x.erro);
+  if (!r.length) return { tipo: 'info' as const, texto: 'Nada para mandar: o ML já está igual ao ERP.' };
+  const exemplo = ok[0] ? ` (ex.: ${ok[0].sku}${ok[0].estoquePara !== null ? ` estoque ${ok[0].estoqueDe ?? '?'} → ${ok[0].estoquePara}` : ''}${ok[0].precoPara !== null ? ` preço ${ok[0].precoDe ?? '?'} → ${ok[0].precoPara}` : ''})` : '';
+  if (!erros.length) return { tipo: 'success' as const, texto: `${ok.length} item(ns) atualizados no Mercado Livre${exemplo}.` };
+  return { tipo: 'warning' as const, texto: `${ok.length} atualizados, ${erros.length} recusados (${erros[0].sku}: ${erros[0].erro}).` };
+};
+
 export interface CategoriaNo { id: string | null; nome: string; caminho: string; final: boolean; filhos: { id: string; nome: string }[] }
 
 export const anunciosApi = {
@@ -98,7 +122,10 @@ export const anunciosApi = {
   candidatos: async (busca: string) => ler<Candidatos>(await fetch(`${API}/candidatos?tenant_id=1&busca=${encodeURIComponent(busca)}`), 'Erro ao buscar no catálogo.'),
   criar: async (corpo: { idFamilia?: number; idItens?: number[]; separados?: boolean }) =>
     ler<{ ids: number[] }>(await fetch(`${API}/anuncios?tenant_id=1`, json('POST', corpo)), 'Erro ao criar o anúncio.'),
-  salvar: async (id: number, corpo: Partial<{ titulo: string; categoriaMl: string | null; tipoAnuncio: string; condicao: string; descricao: string; ajustePreco: number; atributos: Record<string, ValorAtributo> }>) =>
+  salvar: async (id: number, corpo: Partial<{
+    titulo: string; categoriaMl: string | null; tipoAnuncio: string; condicao: string; descricao: string; ajustePreco: number;
+    atributos: Record<string, ValorAtributo>; estoqueReserva: number; estoqueMaximo: number | null; estoqueAutomatico: boolean;
+  }>) =>
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}?tenant_id=1`, json('PUT', corpo)), 'Erro ao salvar o anúncio.'),
   excluir: async (id: number) => ler<{ success: boolean }>(await fetch(`${API}/anuncios/${id}?tenant_id=1`, json('DELETE')), 'Erro ao excluir.'),
   adicionarItens: async (id: number, idItens: number[]) =>
@@ -107,6 +134,13 @@ export const anunciosApi = {
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idItem}?tenant_id=1`, json('DELETE')), 'Erro ao tirar o item.'),
   precoItem: async (id: number, idItem: number, preco: number | null) =>
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idItem}?tenant_id=1`, json('PUT', { preco })), 'Erro ao salvar o preço.'),
+  regraItem: async (id: number, idItem: number, regra: { estoqueReserva: number | null; estoqueMaximo: number | null }) =>
+    ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idItem}?tenant_id=1`, json('PUT', regra)), 'Erro ao salvar o estoque do item.'),
+  sincronizarAnuncio: async (id: number, forcar = false) =>
+    ler<{ enviados: ResultadoSincronizacao[]; detalhe: AnuncioDetalhe }>(await fetch(`${API}/anuncios/${id}/sincronizar?tenant_id=1`, json('POST', { forcar })), 'Erro ao atualizar no ML.'),
+  sincronizarTodos: async () =>
+    ler<{ enviados: ResultadoSincronizacao[] }>(await fetch(`${API}/sincronizar?tenant_id=1`, json('POST', {})), 'Erro ao atualizar no ML.'),
+  situacaoSincronizacao: async () => ler<SituacaoSincronizacao>(await fetch(`${API}/sincronizar?tenant_id=1`), 'Erro ao ler a sincronização.'),
   sugerirCategorias: async (q: string) =>
     ler<{ id: string; nome: string; dominio: string }[]>(await fetch(`${API}/categorias/sugerir?tenant_id=1&q=${encodeURIComponent(q)}`), 'Erro ao sugerir categorias.'),
   validar: async (id: number) =>
