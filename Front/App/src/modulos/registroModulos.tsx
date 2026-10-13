@@ -11,6 +11,7 @@ const RolamentosConfig = lazy(() => import('./transmissao/rolamentos/RolamentosC
 const RolamentosEntrada = lazy(() => import('./transmissao/rolamentos/RolamentosEntrada'));
 const RolamentoPorMedida = lazy(() => import('./transmissao/rolamentos/RolamentoPorMedida'));
 const RelatorioPocoPage = lazy(() => import('./hidraulica/pocos/RelatorioPocoPage'));
+const MercadoLivrePage = lazy(() => import('./ecommerce/mercadolivre/MercadoLivrePage'));
 
 /** O que o PDV entrega a um botão de módulo (o módulo não acessa o carrinho de outro jeito). */
 export interface PdvExtensaoProps {
@@ -83,6 +84,10 @@ export const MODULOS_FRONT: ModuloFront[] = [
       categoria: 'Serviços técnicos e obras', titulo: 'Poços artesianos',
       descricao: 'Relatório técnico completo, cobrança da obra, teste de vazão, garantia e formulário de campo.', path: '/modulos/hidraulica/pocos',
     }],
+  },  {
+    codigo: 'ECOMMERCE_MERCADOLIVRE',
+    menu: [{ grupo: 'grp:vendas', itens: [{ key: '/modulos/ecommerce/mercadolivre', label: 'Mercado Livre' }] }],
+    rotas: [{ path: '/modulos/ecommerce/mercadolivre', element: <MercadoLivrePage /> }],
   },
 ];
 
