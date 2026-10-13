@@ -5,6 +5,7 @@ import { CopyOutlined, DeleteOutlined, ExportOutlined, MoreOutlined, PrinterOutl
 
 import { CartItem } from '../types';
 import { emAtacado, podeFracionar, proximaFaixa } from '../utils/precoCarrinho';
+import { PrecosPorFormaPainel } from './PrecosPorFormaPainel';
 
 interface CartAsideProps {
     cart: CartItem[];
@@ -248,6 +249,8 @@ const CarrinhoConteudo: React.FC<CartAsideProps> = ({
                     <Typography.Text strong>Total</Typography.Text>
                     <Typography.Text strong style={{ fontSize: 22 }}>{money.format(total)}</Typography.Text>
                 </Flex>
+                {/* À vista x parcelado: o que o cliente paga em cada forma (com as taxas) */}
+                {!emPagamento && <PrecosPorFormaPainel total={total} money={money} />}
 
                 {!emPagamento && (onSuspender || onOrcamento) && (
                     <Flex gap={6} style={{ marginTop: 8 }}>

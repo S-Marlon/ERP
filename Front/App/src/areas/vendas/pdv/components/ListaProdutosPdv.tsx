@@ -5,6 +5,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { AppstoreOutlined, EnvironmentOutlined, InfoCircleOutlined, PlusOutlined, ReloadOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import ImageDisplay from '../../../../shared/components/ui/ImageGallery/ImageDysplay';
 import { Product } from '../types/product.types';
+import { descontoDaForma, useTaxasVenda } from '../../taxas/taxasVenda';
 
 export type ModoLista = 'lista' | 'cards';
 
@@ -56,6 +57,9 @@ export const ListaProdutosPdv: React.FC<Props> = ({
   const { token } = theme.useToken();
   const rolagem = useRef<HTMLDivElement>(null);
   const un = (p: Product) => p.unitOfMeasure || 'un';
+  // Desconto do PIX (taxa menor que a embutida no preço de tabela)
+  const cfgTaxas = useTaxasVenda();
+  const pctPix = descontoDaForma(cfgTaxas, 'PIX');
 
   const preco = (p: Product) => (
     <Flex vertical align="flex-end" gap={2}>
@@ -63,6 +67,14 @@ export const ListaProdutosPdv: React.FC<Props> = ({
         <Typography.Text strong type={Number(p.salePrice) > 0 ? undefined : 'danger'}>{money.format(Number(p.salePrice) || 0)}</Typography.Text>
         <Typography.Text type="secondary" style={{ fontSize: 11 }}> /{un(p)}</Typography.Text>
       </span>
+      {/* Preço à vista (PIX), quando a forma tem desconto: para não confundir com o preço de tabela */}
+      {pctPix > 0 && Number(p.salePrice) > 0 && (
+        <Tooltip title={`À vista no PIX (desconto de ${pctPix.toFixed(1).replace('.', ',')}% da forma). O preço de tabela vale no cartão até ${cfgTaxas?.parcelasSemJuros || 1}x sem juros.`}>
+          <Typography.Text type="success" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>
+            à vista {money.format(Math.round((Number(p.salePrice) - Math.round(Number(p.salePrice) * pctPix) / 100) * 100) / 100)}
+          </Typography.Text>
+        </Tooltip>
+      )}
       {p.atacado && (
         <Tooltip title={`A partir de ${qtd(p.atacado.quantidadeMinima)} ${un(p)}, cada ${un(p)} sai por ${money.format(p.atacado.preco)} (economia de ${Math.round((1 - p.atacado.preco / (Number(p.salePrice) || 1)) * 100)}%)`}>
           <Tag color="green" style={{ margin: 0, fontSize: 11 }}>Atacado {qtd(p.atacado.quantidadeMinima)}+: {money.format(p.atacado.preco)}</Tag>

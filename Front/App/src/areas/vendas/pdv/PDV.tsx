@@ -313,7 +313,7 @@ const PDVContent: React.FC = () => {
   const telas = Grid.useBreakpoint();
   const carrinhoEmGaveta = !telas.md;
   const compacto = !telas.xl;
-  const larguraCarrinho = telas.xxl ? 520 : telas.xl ? 420 : telas.lg ? 380 : 330;
+  const larguraCarrinho = telas.xxl ? 600 : telas.xl ? 500 : telas.lg ? 440 : 360;
   const [gavetaCarrinho, setGavetaCarrinho] = useState(false);
   const emPagamento = estagio === 'PAGAMENTO';
   // Transição seleção ⇄ pagamento: a lista encolhe e some enquanto o pagamento cresce (e o contrário)
