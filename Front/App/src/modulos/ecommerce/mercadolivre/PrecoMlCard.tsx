@@ -1,7 +1,7 @@
 // Preço e lucro no ML de um item: lucro depois da tarifa, posição no mercado (preço por unidade), diferença para a
 // loja, faixas por quantidade e um simulador de preço. Os números vêm do servidor (tarifa real do ML e catálogo).
 import React, { useEffect, useState } from 'react';
-import { Alert, Button, Card, Col, Collapse, Flex, InputNumber, Popconfirm, Row, Select, Space, Spin, Statistic, Table, Tag, Typography, message } from 'antd';
+import { Alert, Button, Card, Col, Collapse, Flex, InputNumber, Row, Select, Space, Spin, Statistic, Table, Tag, Typography, message } from 'antd';
 import { BulbOutlined, LineChartOutlined } from '@ant-design/icons';
 import { AnalisePreco, AnuncioDetalhe, anunciosApi, formatarMoeda } from './mercadoLivreApi';
 
@@ -17,9 +17,9 @@ const MERCADO: Record<string, { texto: string; cor: string }> = {
 };
 const pct = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(1).replace('.', ',')}%`);
 
-interface Props { det: AnuncioDetalhe; onPrecoAplicado: () => void }
+interface Props { det: AnuncioDetalhe; onUsarPreco: (idItem: number, preco: number) => void }
 
-const PrecoMlCard: React.FC<Props> = ({ det, onPrecoAplicado }) => {
+const PrecoMlCard: React.FC<Props> = ({ det, onUsarPreco }) => {
   const [idItem, setIdItem] = useState<number>(det.itens[0]?.idItem);
   const [analise, setAnalise] = useState<AnalisePreco | null>(null);
   const [carregando, setCarregando] = useState(false);
@@ -35,16 +35,11 @@ const PrecoMlCard: React.FC<Props> = ({ det, onPrecoAplicado }) => {
     finally { setCarregando(false); }
   };
 
-  const aplicar = async (preco: number) => {
-    try {
-      await anunciosApi.precoItem(det.id, idItem, preco);
-      message.success(`Preço de ${formatarMoeda(preco)} salvo${det.itens.find(i => i.idItem === idItem)?.ml.mlbId ? ' e enviado ao ML' : ''}.`);
-      onPrecoAplicado();
-      setSimular(null);
-      analisar(null);
-    } catch (e) {
-      message.error(e instanceof Error ? e.message : 'Erro.');
-    }
+  // vai para o rascunho do editor: aparece na lista de alterações e só grava ao salvar
+  const aplicar = (preco: number) => {
+    onUsarPreco(idItem, preco);
+    message.info(`Preço de ${formatarMoeda(preco)} posto nas alterações: salve para gravar${det.itens.find(i => i.idItem === idItem)?.ml.mlbId ? ' e enviar ao ML' : ''}.`);
+    setSimular(null);
   };
 
   const a = analise;
@@ -128,9 +123,7 @@ const PrecoMlCard: React.FC<Props> = ({ det, onPrecoAplicado }) => {
                 {a.mercado.estatisticas && (
                   <Text type="secondary">{formatarMoeda(a.simulado.preco / a.unidades)}/un no mercado: {pct((a.simulado.preco / a.unidades / a.mercado.estatisticas.mediana - 1) * 100)} da mediana</Text>
                 )}
-                <Popconfirm title={`Usar ${formatarMoeda(a.simulado.preco)} como preço no ML?`} okText="Usar" onConfirm={() => aplicar(a.simulado!.preco)}>
-                  <Button size="small" type="primary">Usar este preço</Button>
-                </Popconfirm>
+                <Button size="small" type="primary" onClick={() => aplicar(a.simulado!.preco)}>Usar este preço</Button>
               </Flex>
             )}
 

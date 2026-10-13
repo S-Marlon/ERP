@@ -119,7 +119,7 @@ export const EstoqueItemCelula: React.FC<CelulaProps> = ({ item, det, onSalvarRe
       </Flex>
       <Flex justify="space-between">
         <Button size="small" disabled={!temExcecao} onClick={() => salvar({ estoqueReserva: null, estoqueMaximo: null })}>Usar a do anúncio</Button>
-        <Button size="small" type="primary" onClick={() => salvar({ estoqueReserva: reserva, estoqueMaximo: maximo })}>Salvar</Button>
+        <Button size="small" type="primary" onClick={() => salvar({ estoqueReserva: reserva, estoqueMaximo: maximo })}>Aplicar</Button>
       </Flex>
     </Space>
   );

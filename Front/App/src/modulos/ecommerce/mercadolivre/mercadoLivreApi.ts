@@ -210,6 +210,9 @@ export const anunciosApi = {
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idItem}?tenant_id=1`, json('DELETE')), 'Erro ao tirar o item.'),
   precoItem: async (id: number, idItem: number, preco: number | null) =>
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idItem}?tenant_id=1`, json('PUT', { preco })), 'Erro ao salvar o preço.'),
+  /** Grava o item do anúncio: preço só no ML, unidade vendida e a regra de estoque (só os campos enviados). */
+  salvarItem: async (id: number, idItem: number, corpo: Record<string, unknown>) =>
+    ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idItem}?tenant_id=1`, json('PUT', corpo)), 'Erro ao salvar o item.'),
   regraItem: async (id: number, idItem: number, regra: { estoqueReserva?: number | null; estoqueMaximo?: number | null; idUnidade?: number | null }) =>
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idItem}?tenant_id=1`, json('PUT', regra)), 'Erro ao salvar o estoque do item.'),
   analisePreco: async (id: number, idItem: number, p: { simular?: number | null; frete?: number | null }) => {
