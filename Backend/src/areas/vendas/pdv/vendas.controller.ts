@@ -416,9 +416,10 @@ export const cancelarVenda = async (req: Request, res: Response) => {
     await cancelarTitulosDaVenda(connection as any, tenant, idVenda);
 
     // Venda do caixa aberto: basta sair da soma. De outro caixa (já fechado): o dinheiro sai do caixa aberto.
+    // Venda sem caixa (ex.: Mercado Livre: o dinheiro entra pelo canal) não mexe no caixa.
     const caixaAberto = await carregarCaixaAberto(connection as any, tenant, 'LOCK IN SHARE MODE');
     const mesmoCaixa = caixaAberto && venda.id_caixa && Number(venda.id_caixa) === Number(caixaAberto.id_caixa);
-    if (!mesmoCaixa) {
+    if (venda.id_caixa && !mesmoCaixa) {
       const [pags]: any = await connection.execute(
         `SELECT forma, valor, troco FROM vendas_pedidos_pagamentos WHERE id_venda = ? AND tenant_id = ?`, [idVenda, tenant]
       );
