@@ -7,6 +7,7 @@ import AdicionarAnuncioModal from './AdicionarAnuncioModal';
 import AnuncioEditor from './AnuncioEditor';
 import SituacaoTag from './SituacaoTag';
 import ImportarMlModal from './ImportarMlModal';
+import AjudaCatalogo from './AjudaCatalogo';
 
 const { Text } = Typography;
 
@@ -109,6 +110,7 @@ const AnunciosMercadoLivre: React.FC = () => {
               </Tooltip>
             )}
             <Button icon={<ReloadOutlined />} onClick={carregar} loading={carregando} />
+            <AjudaCatalogo />
             <Tooltip title="Liga ao ERP os anúncios que você já tem no Mercado Livre (pelo SKU)">
               <Button icon={<CloudDownloadOutlined />} onClick={() => setImportar(true)}>Importar do Mercado Livre</Button>
             </Tooltip>
