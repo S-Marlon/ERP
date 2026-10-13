@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Card, Col, Empty, Flex, Popconfirm, Row, Segmented, Space, Statistic, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { CloudDownloadOutlined, LinkOutlined, ReloadOutlined } from '@ant-design/icons';
 import { anunciosApi, formatarMoeda, PedidoMl, pedidosApi, SituacaoPedido, SituacaoSincronizacao } from './mercadoLivreApi';
+import RecebiveisMl from './RecebiveisMl';
 
 const { Text } = Typography;
 
@@ -68,7 +69,8 @@ const PedidosMercadoLivre: React.FC = () => {
     } catch (e) { message.error(e instanceof Error ? e.message : 'Erro.'); }
   };
 
-  const atencao = (p: PedidoMl) => p.situacao === 'PENDENTE' || p.situacao === 'CANCELADO_NO_ML';
+  // MEI: comprador CNPJ precisa de nota
+  const atencao = (p: PedidoMl) => p.situacao === 'PENDENTE' || p.situacao === 'CANCELADO_NO_ML' || (p.situacao === 'VENDA' && p.exigeNota);
   const visiveis = useMemo(() => pedidos.filter(p => filtro === 'todos' || (filtro === 'atencao' ? atencao(p) : p.situacao === 'VENDA')), [pedidos, filtro]);
   const vendas = pedidos.filter(p => p.situacao === 'VENDA');
   const somar = (lista: PedidoMl[], campo: 'total' | 'liquido') => lista.reduce((s, p) => s + p[campo], 0);
@@ -87,6 +89,7 @@ const PedidosMercadoLivre: React.FC = () => {
           )}
         />
       )}
+      <RecebiveisMl onAlterado={carregar} />
       <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
         <Col xs={12} md={6}><Card size="small"><Statistic title="Vendas do ML" value={vendas.length} /></Card></Col>
         <Col xs={12} md={6}><Card size="small"><Statistic title="Vendido (itens)" value={formatarMoeda(somar(vendas, 'total'))} /></Card></Col>
@@ -149,13 +152,28 @@ const PedidosMercadoLivre: React.FC = () => {
                 </Tooltip>
               ),
             },
-            { title: 'Líquido', dataIndex: 'liquido', width: 100, align: 'right', render: v => <Text strong>{formatarMoeda(v)}</Text> },
+            {
+              title: 'Líquido', width: 120, align: 'right',
+              render: (_, p) => (
+                <div style={{ lineHeight: 1.25 }}>
+                  <Text strong>{formatarMoeda(p.liquido)}</Text>
+                  {p.titulo && p.titulo.status !== 'CANCELADO' && (
+                    <div><Text type="secondary" style={{ fontSize: 11 }}>{p.titulo.status === 'ABERTO' ? 'a receber' : p.titulo.status.toLowerCase()} {p.titulo.vencimento.split('-').reverse().slice(0, 2).join('/')}</Text></div>
+                  )}
+                </div>
+              ),
+            },
             {
               title: 'Situação', width: 210,
               render: (_, p) => (
                 <Space direction="vertical" size={2}>
                   <Tooltip title={ROTULO[p.situacao].dica}><Tag color={ROTULO[p.situacao].cor}>{ROTULO[p.situacao].texto}</Tag></Tooltip>
                   {p.idVenda && <Text type="secondary" style={{ fontSize: 12 }}>Venda #{p.idVenda}</Text>}
+                  {p.exigeNota && p.situacao === 'VENDA' && (
+                    <Tooltip title="O comprador é empresa (CNPJ): mesmo como MEI, emita a nota fiscal (pode ser pelo emissor gratuito do próprio Mercado Livre, em Vendas › Notas fiscais).">
+                      <Tag color="red">CNPJ: emitir nota</Tag>
+                    </Tooltip>
+                  )}
                 </Space>
               ),
             },

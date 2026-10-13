@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { acaoDoStatus, ligarItensDoPedido, liquidoDoPedido, lerPedidoMl, percentualComissao } from './pedidos';
+import { acaoDoStatus, exigeNota, ligarItensDoPedido, liquidoDoPedido, lerPedidoMl, percentualComissao, tipoDocumento, vencimentoDoRecebivel } from './pedidos';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -46,4 +46,19 @@ teste('líquido e percentual da comissão', () => {
   assert.strictEqual(liquidoDoPedido({ total: 72.9, comissao: 8.75, freteVendedor: 10 }), 54.15);
   assert.strictEqual(percentualComissao({ total: 100, comissao: 12 }), 12);
   assert.strictEqual(percentualComissao({ total: 0, comissao: 0 }), 0);
+});
+
+teste('liberação do dinheiro e vencimento do título', () => {
+  const p = lerPedidoMl({ ...pedido, payments: [{ money_release_date: '2026-11-02T10:00:00.000-04:00' }, { money_release_date: null }] });
+  assert.strictEqual(p.liberacaoEm, '2026-11-02');
+  assert.deepStrictEqual(vencimentoDoRecebivel(p), { data: '2026-11-02', estimado: false });
+  const sem = vencimentoDoRecebivel({ liberacaoEm: null, data: '2026-10-13T15:01:00.000-03:00' });
+  assert.deepStrictEqual(sem, { data: '2026-11-10', estimado: true });
+});
+
+teste('comprador CNPJ exige nota (MEI)', () => {
+  assert.strictEqual(tipoDocumento({ billing_info: { doc_type: 'CNPJ', doc_number: '12345678000199' } }), 'CNPJ');
+  assert.strictEqual(tipoDocumento({ billing_info: { doc_number: '123.456.789-09' } }), 'CPF');
+  assert.strictEqual(tipoDocumento({}), null);
+  assert.ok(exigeNota('CNPJ') && !exigeNota('CPF') && !exigeNota(null));
 });

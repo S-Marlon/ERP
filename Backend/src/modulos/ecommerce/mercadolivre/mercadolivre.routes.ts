@@ -9,7 +9,7 @@ import {
   importarAnuncios, previaImportacao, publicarAnuncio, sincronizarAnuncio, sincronizarTodos, situacaoSincronizacao, validarAnuncio,
 } from './publicacao.controller';
 
-import { buscarPedidos, listarPedidos, reprocessarPedido } from './pedidos.controller';
+import { buscarClientes, buscarPedidos, listarPedidos, obterConfig, reprocessarPedido, salvarConfig } from './pedidos.controller';
 
 const router = Router();
 
@@ -35,6 +35,9 @@ router.post('/anuncios/:id/publicar', publicarAnuncio);
 router.post('/anuncios/:id/sincronizar', sincronizarAnuncio);
 router.get('/sincronizar', situacaoSincronizacao);
 router.post('/sincronizar', sincronizarTodos);
+router.get('/config', obterConfig);
+router.put('/config', salvarConfig);
+router.get('/clientes', buscarClientes);
 router.get('/pedidos', listarPedidos);
 router.post('/pedidos/buscar', buscarPedidos);
 router.post('/pedidos/:id/processar', reprocessarPedido);

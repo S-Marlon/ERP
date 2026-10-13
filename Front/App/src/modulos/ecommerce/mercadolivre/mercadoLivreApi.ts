@@ -123,10 +123,19 @@ export type SituacaoPedido = 'VENDA' | 'VENDA_CANCELADA' | 'CANCELADO_NO_ML' | '
 export interface PedidoMl {
   id: number; mlOrderId: string; idVenda: number | null; statusMl: string; comprador: string;
   total: number; comissao: number; frete: number; liquido: number; data: string | null; erro: string | null; situacao: SituacaoPedido;
+  documentoTipo: string | null; exigeNota: boolean; liberacaoEm: string | null;
+  titulo: { status: string; vencimento: string } | null;   // título a receber da venda (Financeiro)
   itens: { mlbId: string; titulo: string; sku: string | null; quantidade: number; precoUnitario: number }[];
 }
 
+export interface ConfigMl { idClienteRecebiveis: number | null; clienteNome: string | null; pedidosDesde: string | null }
+
 export const pedidosApi = {
+  config: async () => ler<ConfigMl>(await fetch(`${API}/config?tenant_id=1`), 'Erro ao ler a configuração.'),
+  salvarConfig: async (idClienteRecebiveis: number | null) =>
+    ler<ConfigMl & { titulosCriados: number }>(await fetch(`${API}/config?tenant_id=1`, json('PUT', { idClienteRecebiveis })), 'Erro ao salvar a configuração.'),
+  clientes: async (busca: string) =>
+    ler<{ id: number; nome: string; fantasia: string | null; documento: string | null }[]>(await fetch(`${API}/clientes?tenant_id=1&busca=${encodeURIComponent(busca)}`), 'Erro ao buscar clientes.'),
   listar: async () => ler<PedidoMl[]>(await fetch(`${API}/pedidos?tenant_id=1`), 'Erro ao listar os pedidos.'),
   buscar: async () =>
     ler<{ vendas: number; pendentes: number; canceladosNoMl: number; lidos: number }>(await fetch(`${API}/pedidos/buscar?tenant_id=1`, json('POST', {})), 'Erro ao buscar os pedidos no ML.'),

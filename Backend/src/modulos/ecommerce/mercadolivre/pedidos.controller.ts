@@ -9,7 +9,10 @@ import { carregarDadosComponentes } from '../../../areas/catalogo/kits/kitsBanco
 import { nomeComTrocas, saidaDosComponentes } from '../../../areas/catalogo/kits/kits';
 import { gravarEscolhasKit } from '../../../areas/catalogo/kits/kitsVenda';
 import { lista, responderErro, tenantDe } from './anuncios.controller';
-import { acaoDoStatus, LigacaoAnuncio, ligarItensDoPedido, liquidoDoPedido, lerPedidoMl, PedidoMl, percentualComissao } from './pedidos';
+import {
+  acaoDoStatus, exigeNota, LigacaoAnuncio, ligarItensDoPedido, liquidoDoPedido, lerPedidoMl, PedidoMl, percentualComissao, tipoDocumento,
+  vencimentoDoRecebivel,
+} from './pedidos';
 import { ErroML, ml } from './mercadolivreApi';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
@@ -119,6 +122,56 @@ const criarVenda = async (conn: Conn, tenant: number, p: PedidoMl, linhasPedido:
   return { idVenda, negativos };
 };
 
+// ---------------------------------------------------------------------------
+// Configuração do módulo (não some ao reconectar a conta) e títulos a receber
+// ---------------------------------------------------------------------------
+
+export const carregarConfig = async (conn: Conn, tenant: number) => {
+  const [[c]] = await conn.execute(
+    `SELECT c.id_cliente_recebiveis, DATE_FORMAT(c.pedidos_desde, '%Y-%m-%d %H:%i:%s') AS desde,
+            COALESCE(pj.razao_social, pj.nome_fantasia, pf.nome) AS cliente_nome
+     FROM modulo_ecommerce_mercadolivre_config c
+     LEFT JOIN pessoas_pj pj ON pj.id_cliente = c.id_cliente_recebiveis
+     LEFT JOIN pessoas_pf pf ON pf.id_cliente = c.id_cliente_recebiveis
+     WHERE c.tenant_id = ?`,
+    [tenant]
+  );
+  return { idClienteRecebiveis: c?.id_cliente_recebiveis ? Number(c.id_cliente_recebiveis) : null, clienteNome: c?.cliente_nome || null, pedidosDesde: c?.desde || null };
+};
+
+/**
+ * Título a receber da venda do ML: o líquido (itens - comissão - frete do vendedor) no cliente escolhido (ex.: "Mercado Livre"),
+ * vencendo na liberação do dinheiro. Sem cliente configurado, não faz nada. Atualiza o vencimento quando o ML informar.
+ */
+const garantirRecebivel = async (conn: Conn, tenant: number, idVenda: number, p: PedidoMl, idCliente: number | null) => {
+  if (!idCliente) return;
+  const [[venda]] = await conn.execute(`SELECT status FROM vendas_pedidos WHERE id_venda = ? AND tenant_id = ?`, [idVenda, tenant]);
+  if (!venda || venda.status !== 'CONCLUIDA') return;
+  const venc = vencimentoDoRecebivel(p);
+  const valor = liquidoDoPedido(p);
+  const [[titulo]] = await conn.execute(
+    `SELECT id_titulo, status, vencimento FROM financeiro_contas_receber WHERE tenant_id = ? AND id_venda = ? AND status <> 'CANCELADO' LIMIT 1`,
+    [tenant, idVenda]
+  );
+  const descricao = `Mercado Livre pedido ${p.id}${venc.estimado ? ' (vencimento estimado)' : ''}`.slice(0, 150);
+  if (!titulo) {
+    if (!(valor > 0)) return;
+    await conn.execute(
+      `INSERT INTO financeiro_contas_receber (tenant_id, id_cliente, id_venda, parcela, total_parcelas, descricao, vencimento, valor, operador)
+       VALUES (?, ?, ?, 1, 1, ?, ?, ?, ?)`,
+      [tenant, idCliente, idVenda, descricao, venc.data, f4(valor), OPERADOR]
+    );
+  } else if (titulo.status === 'ABERTO' && !venc.estimado) {
+    await conn.execute(`UPDATE financeiro_contas_receber SET vencimento = ?, descricao = ?, valor = ? WHERE id_titulo = ?`,
+      [venc.data, descricao, f4(valor), titulo.id_titulo]);
+  }
+};
+
+/** CPF ou CNPJ do comprador (dados de faturamento do pedido); sem acesso, null. */
+const documentoDoComprador = async (tenant: number, idPedido: number) => {
+  try { return tipoDocumento(await ml(tenant, 'GET', `/orders/${idPedido}/billing_info`)); } catch { return null; }
+};
+
 /** Frete que o vendedor paga no envio (Mercado Envios com frete grátis); sem acesso, 0. */
 const freteDoVendedor = async (tenant: number, envioId: number | null) => {
   if (!envioId) return 0;
@@ -160,10 +213,15 @@ export const processarPedido = async (tenant: number, bruto: any): Promise<Resul
   const p = lerPedidoMl(bruto);
   p.freteVendedor = await freteDoVendedor(tenant, p.envioId);
   const acao = acaoDoStatus(p.status);
-  const resumo = JSON.stringify({ ...p, itens: p.itens });
   const [[existe]]: any = await pool.execute(
-    `SELECT id, id_venda, status FROM modulo_ecommerce_mercadolivre_pedidos WHERE tenant_id = ? AND ml_order_id = ?`, [tenant, p.id]
+    `SELECT id, id_venda, status, detalhes FROM modulo_ecommerce_mercadolivre_pedidos WHERE tenant_id = ? AND ml_order_id = ?`, [tenant, p.id]
   );
+  // CPF/CNPJ do comprador: lido uma vez (comprador CNPJ = MEI precisa emitir nota)
+  let anterior: any = {};
+  try { anterior = JSON.parse(existe?.detalhes || '{}'); } catch { /* sem detalhes */ }
+  p.documentoTipo = anterior.documentoTipo || (acao === 'VENDER' ? await documentoDoComprador(tenant, p.id) : null);
+  const resumo = JSON.stringify({ ...p, itens: p.itens });
+  const { idClienteRecebiveis } = await carregarConfig(pool as any, tenant);
   const gravar = async (idVenda: number | null, erro: string | null) => {
     await pool.execute(
       `INSERT INTO modulo_ecommerce_mercadolivre_pedidos (tenant_id, ml_order_id, id_venda, status, comprador, total, comissao, frete, data_pedido, detalhes, erro)
@@ -178,6 +236,7 @@ export const processarPedido = async (tenant: number, bruto: any): Promise<Resul
   // Já virou venda: só acompanha o status (cancelado no ML fica marcado para o operador decidir)
   if (existe?.id_venda) {
     await gravar(null, acao === 'CANCELAR' ? 'Cancelado no Mercado Livre: cancele a venda no ERP se a mercadoria não saiu (devolve o estoque).' : null);
+    if (acao === 'VENDER') await garantirRecebivel(pool as any, tenant, Number(existe.id_venda), p, idClienteRecebiveis);
     return { mlOrderId: p.id, acao: acao === 'CANCELAR' ? 'CANCELADO_NO_ML' : 'ATUALIZADO', idVenda: Number(existe.id_venda), erro: null };
   }
   if (acao !== 'VENDER') {
@@ -207,6 +266,7 @@ export const processarPedido = async (tenant: number, bruto: any): Promise<Resul
     if (trava?.id_venda) { await connection.rollback(); return { mlOrderId: p.id, acao: 'ATUALIZADO', idVenda: Number(trava.id_venda), erro: null }; }
     const { idVenda, negativos } = await criarVenda(connection as any, tenant, p, linhas);
     await connection.execute(`UPDATE modulo_ecommerce_mercadolivre_pedidos SET id_venda = ? WHERE tenant_id = ? AND ml_order_id = ?`, [idVenda, tenant, p.id]);
+    await garantirRecebivel(connection as any, tenant, idVenda, p, idClienteRecebiveis);
     await connection.commit();
     await gravar(idVenda, negativos.length ? `Venda criada, mas ${negativos.length} item(ns) ficaram com estoque negativo no ERP: confira o saldo.` : null);
     return { mlOrderId: p.id, acao: 'VENDA_CRIADA', idVenda, erro: null };
@@ -227,7 +287,14 @@ export const processarPedido = async (tenant: number, bruto: any): Promise<Resul
 export const importarPedidos = async (tenant: number) => {
   const [[conta]]: any = await pool.execute(`SELECT ml_user_id, conectado_em FROM modulo_ecommerce_mercadolivre_contas WHERE tenant_id = ?`, [tenant]);
   if (!conta) throw new ErroML('Conecte a conta do Mercado Livre primeiro.', 412);
-  const desde = new Date(conta.conectado_em).toISOString();
+  // A primeira conexão define desde quando os pedidos entram; reconectar não muda (senão pularia pedidos)
+  await pool.execute(
+    `INSERT INTO modulo_ecommerce_mercadolivre_config (tenant_id, pedidos_desde) VALUES (?, ?)
+     ON DUPLICATE KEY UPDATE pedidos_desde = COALESCE(pedidos_desde, VALUES(pedidos_desde))`,
+    [tenant, conta.conectado_em]
+  );
+  const [[cfg]]: any = await pool.execute(`SELECT pedidos_desde FROM modulo_ecommerce_mercadolivre_config WHERE tenant_id = ?`, [tenant]);
+  const desde = new Date(cfg.pedidos_desde).toISOString();
   const mexidos = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
   const resultado: ResultadoPedido[] = [];
   for (let offset = 0; offset < 200; offset += 50) {
@@ -249,17 +316,21 @@ export const listarPedidos = async (req: Request, res: Response) => {
   try {
     const [rows]: any = await pool.execute(
       `SELECT p.id, p.ml_order_id, p.id_venda, p.status, p.comprador, p.total, p.comissao, p.frete, p.erro, p.detalhes,
-              DATE_FORMAT(p.data_pedido, '%Y-%m-%d %H:%i') AS data_fmt, v.status AS status_venda
+              DATE_FORMAT(p.data_pedido, '%Y-%m-%d %H:%i') AS data_fmt, v.status AS status_venda,
+              t.status AS titulo_status, DATE_FORMAT(t.vencimento, '%Y-%m-%d') AS titulo_vencimento
        FROM modulo_ecommerce_mercadolivre_pedidos p
        LEFT JOIN vendas_pedidos v ON v.id_venda = p.id_venda AND v.tenant_id = p.tenant_id
+       LEFT JOIN financeiro_contas_receber t ON t.id_titulo = (
+         SELECT MAX(x.id_titulo) FROM financeiro_contas_receber x WHERE x.tenant_id = p.tenant_id AND x.id_venda = p.id_venda AND p.id_venda IS NOT NULL)
        WHERE p.tenant_id = ?
        ORDER BY p.data_pedido DESC, p.id DESC
        LIMIT 300`,
       [tenant]
     );
     return res.json(rows.map((r: any) => {
-      let itens: any[] = [];
-      try { itens = JSON.parse(r.detalhes || '{}').itens || []; } catch { /* sem detalhes */ }
+      let det: any = {};
+      try { det = JSON.parse(r.detalhes || '{}'); } catch { /* sem detalhes */ }
+      const itens: any[] = det.itens || [];
       const total = Number(r.total) || 0, comissao = Number(r.comissao) || 0, frete = Number(r.frete) || 0;
       const situacao = r.id_venda
         ? (r.status_venda === 'CANCELADA' ? 'VENDA_CANCELADA' : acaoDoStatus(r.status) === 'CANCELAR' ? 'CANCELADO_NO_ML' : 'VENDA')
@@ -268,6 +339,8 @@ export const listarPedidos = async (req: Request, res: Response) => {
         id: Number(r.id), mlOrderId: String(r.ml_order_id), idVenda: r.id_venda ? Number(r.id_venda) : null, statusMl: r.status,
         comprador: r.comprador, total, comissao, frete, liquido: liquidoDoPedido({ total, comissao, freteVendedor: frete }),
         data: r.data_fmt, erro: r.erro, situacao,
+        documentoTipo: det.documentoTipo || null, exigeNota: exigeNota(det.documentoTipo), liberacaoEm: det.liberacaoEm || null,
+        titulo: r.titulo_status ? { status: r.titulo_status, vencimento: r.titulo_vencimento } : null,
         itens: itens.map(i => ({ mlbId: i.mlbId, titulo: i.titulo, sku: i.sku, quantidade: i.quantidade, precoUnitario: i.precoUnitario })),
       };
     }));
@@ -301,5 +374,69 @@ export const reprocessarPedido = async (req: Request, res: Response) => {
     return res.json(await processarPedido(tenant, o));
   } catch (error) {
     return responderErro(res, error, 'Erro ao processar o pedido.');
+  }
+};
+
+/** GET /config — cliente dos títulos a receber e desde quando os pedidos entram */
+export const obterConfig = async (req: Request, res: Response) => {
+  try { return res.json(await carregarConfig(pool as any, tenantDe(req))); }
+  catch (error) { return responderErro(res, error, 'Erro ao ler a configuração.'); }
+};
+
+/** PUT /config { idClienteRecebiveis } — e cria os títulos das vendas do ML que ainda não têm */
+export const salvarConfig = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  try {
+    const idCliente = req.body?.idClienteRecebiveis ? Number(req.body.idClienteRecebiveis) : null;
+    if (idCliente) {
+      const [[pessoa]]: any = await pool.execute(`SELECT id_pessoa FROM pessoas_core WHERE id_pessoa = ? AND tenant_id = ? AND deleted_at IS NULL`, [idCliente, tenant]);
+      if (!pessoa) throw new ErroML('Cliente não encontrado no cadastro.', 404);
+    }
+    await pool.execute(
+      `INSERT INTO modulo_ecommerce_mercadolivre_config (tenant_id, id_cliente_recebiveis) VALUES (?, ?)
+       ON DUPLICATE KEY UPDATE id_cliente_recebiveis = VALUES(id_cliente_recebiveis)`,
+      [tenant, idCliente]
+    );
+    let criados = 0;
+    if (idCliente) {
+      const [semTitulo]: any = await pool.execute(
+        `SELECT p.id_venda, p.detalhes FROM modulo_ecommerce_mercadolivre_pedidos p
+         INNER JOIN vendas_pedidos v ON v.id_venda = p.id_venda AND v.status = 'CONCLUIDA'
+         WHERE p.tenant_id = ? AND NOT EXISTS (
+           SELECT 1 FROM financeiro_contas_receber t WHERE t.tenant_id = p.tenant_id AND t.id_venda = p.id_venda AND t.status <> 'CANCELADO')`,
+        [tenant]
+      );
+      for (const v of semTitulo) {
+        let det: any = null;
+        try { det = JSON.parse(v.detalhes || 'null'); } catch { /* sem detalhes */ }
+        if (!det) continue;
+        await garantirRecebivel(pool as any, tenant, Number(v.id_venda), det as PedidoMl, idCliente);
+        criados++;
+      }
+    }
+    return res.json({ ...(await carregarConfig(pool as any, tenant)), titulosCriados: criados });
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao salvar a configuração.');
+  }
+};
+
+/** GET /clientes?busca= — pessoas do cadastro para escolher quem recebe os títulos (ex.: "Mercado Livre") */
+export const buscarClientes = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const busca = `%${String(req.query.busca || '').trim()}%`;
+  try {
+    const [rows]: any = await pool.execute(
+      `SELECT c.id_pessoa, COALESCE(pj.razao_social, pj.nome_fantasia, pf.nome) AS nome, pj.nome_fantasia, COALESCE(pj.cnpj, pf.cpf) AS documento
+       FROM pessoas_core c
+       LEFT JOIN pessoas_pj pj ON pj.id_cliente = c.id_pessoa
+       LEFT JOIN pessoas_pf pf ON pf.id_cliente = c.id_pessoa
+       WHERE c.tenant_id = ? AND c.deleted_at IS NULL
+         AND (pj.razao_social LIKE ? OR pj.nome_fantasia LIKE ? OR pf.nome LIKE ? OR pj.cnpj LIKE ? OR pf.cpf LIKE ?)
+       ORDER BY nome LIMIT 30`,
+      [tenant, busca, busca, busca, busca, busca]
+    );
+    return res.json(rows.map((r: any) => ({ id: Number(r.id_pessoa), nome: r.nome || `#${r.id_pessoa}`, fantasia: r.nome_fantasia || null, documento: r.documento || null })));
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao buscar clientes.');
   }
 };
