@@ -1,7 +1,7 @@
 import assert from 'assert';
 import {
   AnuncioDados, AtributoML, cortarTitulo, tituloLegivel, eixosDeVariacao, filtrarAtributosCategoria, ItemAnuncio, pendenciasAnuncio,
-  precoNoMl, resolverValor, sugerirAtributos, estoqueParaMl, regraDoItem, mudancasParaMl, saldoNaUnidade, statusDoMl, foraDoMl, situacaoPorItens, corpoDoItem, fotoPequena, errosDoValidador, ligarPorSku,
+  precoNoMl, resolverValor, sugerirAtributos, estoqueParaMl, regraDoItem, mudancasParaMl, saldoNaUnidade, statusDoMl, foraDoMl, situacaoPorItens, modoPublicacao, tituloPeloModelo, corpoDoItem, fotoPequena, errosDoValidador, ligarPorSku,
 } from './anuncios';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
@@ -79,17 +79,46 @@ teste('atributo obrigatório sem valor em parte dos itens', () => {
   assert.ok(e.includes('Atributo obrigatório "Modelo" sem valor em SKU-2.'));
 });
 
-teste('variações: eixo e combinação repetida viram aviso (cada item é um anúncio no ML)', () => {
+teste('modo: página única só quando a variação diferencia todos os itens', () => {
   const base = { BRAND: { origem: 'marca' }, MODEL: { origem: 'fixo', valor: 'BH' }, VOLTAGE: { origem: 'erp', atributoId: 3 } } as AnuncioDados['atributos'];
-  const i1 = item(1, { valoresErp: { 3: '220V', 5: 'Aço' } });
-  const i2 = item(2, { valoresErp: { 3: '127V', 5: 'Latão' } });
-  const avisos = (d: AnuncioDados, itens: ItemAnuncio[]) => pendenciasAnuncio(d, itens, categoria, atributos).filter(p => p.nivel === 'aviso').map(p => p.texto);
+  const i1 = item(1, { valoresErp: { 3: '220V' }, tituloMl: 'Bomba 220V' });
+  const i2 = item(2, { valoresErp: { 3: '127V' }, tituloMl: 'Bomba 127V' });
+  const i3 = item(3, { valoresErp: { 3: '220v' }, tituloMl: 'Bomba 220V outra' });
   assert.deepStrictEqual(eixosDeVariacao(atributos, dados({ atributos: base }), [i1, i2]).map(a => a.id), ['VOLTAGE']);
-  // Material muda entre os itens: cada item vai com o seu
-  assert.deepStrictEqual(erros(dados({ atributos: { ...base, MATERIAL: { origem: 'erp', atributoId: 5 } } }), [i1, i2]), []);
-  assert.ok(avisos(dados({ atributos: { BRAND: { origem: 'marca' }, MODEL: { origem: 'fixo', valor: 'BH' } } }), [i1, i2]).some(t => t.startsWith('Nenhum atributo de variação')));
-  const i3 = item(3, { valoresErp: { 3: '220v' } });
-  assert.ok(avisos(dados({ atributos: base }), [i1, i2, i3]).some(t => t.startsWith('SKU-1 e SKU-3 ficam iguais')));
+  assert.strictEqual(modoPublicacao(atributos, dados({ atributos: base }), [i1, i2]), 'FAMILIA');
+  // 220V repetido: o ML juntaria i1 e i3 -> anúncios separados
+  assert.strictEqual(modoPublicacao(atributos, dados({ atributos: base }), [i1, i2, i3]), 'SEPARADO');
+  // nenhuma variação (ex.: abraçadeiras só variam por Cor e todas são pretas) -> separados
+  assert.strictEqual(modoPublicacao(atributos, dados({ atributos: { BRAND: { origem: 'marca' }, MODEL: { origem: 'fixo', valor: 'BH' } } }), [i1, i2]), 'SEPARADO');
+  assert.strictEqual(modoPublicacao(atributos, dados({ atributos: base }), [i1]), 'SEPARADO');
+});
+
+teste('anúncios separados: título igual trava (o ML juntaria como o mesmo produto)', () => {
+  const d = dados({ atributos: { BRAND: { origem: 'marca' }, MODEL: { origem: 'fixo', valor: 'BH' } } });
+  const a = item(1, { tituloMl: 'Abraçadeira de nylon' });
+  const b = item(2, { tituloMl: 'ABRAÇADEIRA DE NYLON' });
+  assert.ok(erros(d, [a, b]).some(t => t.includes('mesmo título no ML')));
+  assert.deepStrictEqual(erros(d, [a, item(2, { tituloMl: 'Abraçadeira de nylon 3.6x150mm' })]), []);
+  assert.ok(erros(d, [item(1, { tituloMl: '' })]).some(t => t.includes('sem título')));
+  // separado não exige o título do anúncio
+  assert.deepStrictEqual(erros(dados({ titulo: '', atributos: d.atributos }), [a]), []);
+});
+
+teste('título pelo modelo', () => {
+  const i = item(1, { nome: 'ABRAÇADEIRA de NYLON - 3.6x100mm - C/ 100 UN', marca: 'Gadan', valoresErp: { 17: '3.6', 23: '100mm' } });
+  const ctx = { familia: 'ABRAÇADEIRA de NYLON', atributosErp: [{ id: 17, nome: 'Bitola' }, { id: 23, nome: 'Comprimento' }] };
+  assert.deepStrictEqual(tituloPeloModelo(null, i, ctx), { titulo: 'ABRAÇADEIRA de NYLON - 3.6x100mm - C/ 100 UN', cortado: false });
+  assert.strictEqual(tituloPeloModelo('{familia} {Bitola}x{Comprimento} {marca}', i, ctx).titulo, 'ABRAÇADEIRA de NYLON 3.6x100mm Gadan');
+  assert.strictEqual(tituloPeloModelo('{familia} - {Cor} - {Comprimento}', i, ctx).titulo, 'ABRAÇADEIRA de NYLON - 100mm');
+  assert.strictEqual(tituloPeloModelo('{titulo} {Comprimento}', i, { ...ctx, titulo: 'Abraçadeira nylon preta' }).titulo, 'Abraçadeira nylon preta 100mm');
+  const longo = tituloPeloModelo('{nome} {nome}', i, ctx);
+  assert.ok(longo.cortado && longo.titulo.length <= 60);
+  assert.strictEqual(tituloPeloModelo('{nome}', item(2, { nome: 'TERMINAL JIC FÊMEA' }), ctx).titulo, 'Terminal JIC fêmea');
+});
+
+teste('corpo do envio usa o título do item', () => {
+  const c: any = corpoDoItem({ dados: dados(), tipoAnuncio: 'gold_special', condicao: 'new', item: item(1, { tituloMl: 'Bomba 220V' }), atributos, temGtin: false, fotos: [], porFamilia: true });
+  assert.strictEqual(c.family_name, 'Bomba 220V');
 });
 
 teste('GTIN: marca conhecida avisa que o ML costuma exigir', () => {

@@ -16,6 +16,7 @@ import {
 } from './mercadoLivreApi';
 import { agruparPendencias, textoComPrimeiraMaiuscula } from './pendencias';
 import { EstoqueAnuncioCard, EstoqueItemCelula } from './EstoqueMl';
+import { ModeloTituloCampo, ModoPublicacaoAviso } from './TituloMl';
 import CategoriaMlModal from './CategoriaMlModal';
 import AdicionarAnuncioModal from './AdicionarAnuncioModal';
 import SituacaoTag from './SituacaoTag';
@@ -276,13 +277,22 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
   const blocoDados = det && (
     <Card size="small" title="Anúncio" style={{ marginBottom: 16 }}>
       <Form layout="vertical" size="middle" disabled={!editavel}>
-        <Form.Item label="Título" style={{ marginBottom: 12 }} help={<Text type="secondary" style={{ fontSize: 12 }}>Produto + o que o comprador busca (tipo, medida, material). Sem caixa alta, sem "promoção" ou "frete grátis".</Text>}>
+        <ModoPublicacaoAviso det={det} />
+        <Form.Item
+          label={det.modo === 'FAMILIA' ? 'Título' : 'Título do anúncio (no ERP; no ML vai o título de cada item)'} style={{ marginBottom: 12 }}
+          help={<Text type="secondary" style={{ fontSize: 12 }}>Produto + o que o comprador busca (tipo, medida, material). Sem caixa alta, sem "promoção" ou "frete grátis".</Text>}
+        >
           <Input
             value={titulo} maxLength={det.categoria?.maxTitulo || 60} showCount
             onChange={e => setTitulo(e.target.value)}
             onBlur={() => titulo.trim() !== (det.titulo || '') && salvar({ titulo })}
           />
         </Form.Item>
+        {det.modo === 'SEPARADO' && (
+          <Form.Item label="Título de cada item no ML" style={{ marginBottom: 12 }} tooltip="Use os tokens: cada item recebe os valores dele. Títulos iguais travam a publicação (o ML juntaria itens diferentes).">
+            <ModeloTituloCampo det={det} disabled={!editavel} onSalvar={m => salvar({ modeloTitulo: m })} />
+          </Form.Item>
+        )}
         <Form.Item label="Categoria do Mercado Livre" style={{ marginBottom: 12 }}>
           <Flex gap={8} align="center" wrap>
             {det.categoria
@@ -380,6 +390,9 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
               <div>
                 <Text strong>{i.sku}</Text>{!i.ativo && <Tag color="red" style={{ marginLeft: 6 }}>inativo</Tag>}
                 <div><Text type="secondary" style={{ fontSize: 12 }}>{i.nome}</Text></div>
+                {det.modo === 'SEPARADO' && i.tituloMl && i.tituloMl !== i.nome && (
+                  <div><Text style={{ fontSize: 12 }}><Text type="secondary" style={{ fontSize: 12 }}>No ML: </Text>{i.tituloMl}</Text>{i.tituloCortado && <Tag color="orange" style={{ fontSize: 10, marginLeft: 4 }}>cortado</Tag>}</div>
+                )}
                 {i.ml.mlbId ? (
                   <a href={i.ml.permalink || undefined} target="_blank" rel="noreferrer">
                     <Tag color={ROTULO_STATUS_ML[i.ml.status || '']?.cor || 'green'} style={{ fontSize: 11 }}>{i.ml.mlbId} · {ROTULO_STATUS_ML[i.ml.status || '']?.texto || i.ml.status}</Tag>
@@ -594,6 +607,15 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
           )}
           {det.publicados > 0 && det.permalink && (
             <Button block icon={<LinkOutlined />} href={det.permalink} target="_blank">Ver no Mercado Livre</Button>
+          )}
+          {det.publicados > 0 && (
+            <Popconfirm
+              title="Encerrar os anúncios no Mercado Livre?"
+              description={<div style={{ maxWidth: 320 }}>Os {det.publicados} anúncio(s) deste grupo são encerrados no ML (não dá para reabrir lá). Os itens voltam a "a publicar" aqui, para você publicar de novo do jeito certo.</div>}
+              okText="Encerrar no ML" okButtonProps={{ danger: true }} onConfirm={() => executar(() => anunciosApi.encerrarNoMl(det.id), 'Encerrados no ML: os itens voltaram a "a publicar".')}
+            >
+              <Button block danger>Encerrar no ML</Button>
+            </Popconfirm>
           )}
           {conferencia && (
             <Alert

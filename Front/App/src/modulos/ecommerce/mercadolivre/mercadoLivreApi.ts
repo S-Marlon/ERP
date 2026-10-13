@@ -68,6 +68,7 @@ export interface ItemDoAnuncio {
   gtin: string | null; pesoKg: number | null; medidasCm: { altura: number; largura: number; comprimento: number } | null;
   marca: string | null; valoresErp: Record<string, string | null>; motivosCadastro: string[];
   valores: Record<string, { valor: string; valorId: string | null; unidade: string | null } | null>;
+  tituloMl?: string; tituloCortado?: boolean;   // título deste item no ML
   ml: {
     mlbId: string | null; status: string | null; permalink: string | null; erro: string | null;
     estoqueEnviado: number | null; precoEnviado: number | null; sincronizadoEm: string | null;
@@ -78,6 +79,8 @@ export interface ItemDoAnuncio {
 export interface AnuncioDetalhe extends AnuncioResumo {
   condicao: 'new' | 'used'; descricao: string; ajustePreco: number; atributos: Record<string, ValorAtributo>;
   fotoFamilia: string | null;   // vale para os itens sem foto própria
+  modo: 'FAMILIA' | 'SEPARADO';  // página única com opções ou um anúncio por item
+  modeloTitulo: string;
   estoqueReserva: number; estoqueMaximo: number | null; estoqueAutomatico: boolean; sincronizadoEm: string | null;
   categoria: { id: string; nome: string; caminho: string; final: boolean; maxTitulo: number; maxFotos: number; filhos: { id: string; nome: string }[] } | null;
   atributosCategoria: AtributoML[]; atributosErp: { id: number; nome: string }[]; eixos: string[];
@@ -133,7 +136,7 @@ export const anunciosApi = {
     ler<{ ids: number[] }>(await fetch(`${API}/anuncios?tenant_id=1`, json('POST', corpo)), 'Erro ao criar o anúncio.'),
   salvar: async (id: number, corpo: Partial<{
     titulo: string; categoriaMl: string | null; tipoAnuncio: string; condicao: string; descricao: string; ajustePreco: number;
-    atributos: Record<string, ValorAtributo>; estoqueReserva: number; estoqueMaximo: number | null; estoqueAutomatico: boolean;
+    atributos: Record<string, ValorAtributo>; estoqueReserva: number; estoqueMaximo: number | null; estoqueAutomatico: boolean; modeloTitulo: string;
   }>) =>
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}?tenant_id=1`, json('PUT', corpo)), 'Erro ao salvar o anúncio.'),
   excluir: async (id: number) => ler<{ success: boolean }>(await fetch(`${API}/anuncios/${id}?tenant_id=1`, json('DELETE')), 'Erro ao excluir.'),
@@ -145,6 +148,8 @@ export const anunciosApi = {
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idItem}?tenant_id=1`, json('PUT', { preco })), 'Erro ao salvar o preço.'),
   regraItem: async (id: number, idItem: number, regra: { estoqueReserva?: number | null; estoqueMaximo?: number | null; idUnidade?: number | null }) =>
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idItem}?tenant_id=1`, json('PUT', regra)), 'Erro ao salvar o estoque do item.'),
+  encerrarNoMl: async (id: number) =>
+    ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/encerrar?tenant_id=1`, json('POST', {})), 'Erro ao encerrar no ML.'),
   desligarDoMl: async (id: number, idItem: number) =>
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idItem}/ml?tenant_id=1`, json('DELETE')), 'Erro ao desligar do ML.'),
   sincronizarAnuncio: async (id: number, forcar = false) =>

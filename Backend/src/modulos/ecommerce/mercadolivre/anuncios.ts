@@ -40,6 +40,8 @@ export interface ItemAnuncio {
   marca: string | null;
   valoresErp: Record<string, string | null>;     // id do atributo nosso -> valor
   motivosCadastro: string[];                     // o que falta no cadastro interno (PIM)
+  tituloMl?: string;                             // título deste item no ML (anúncio separado) ou o da família
+  tituloCortado?: boolean;                       // o modelo passou do limite e o título foi cortado
 }
 
 /** Unidade de venda do item com o fator sobre a unidade base e o preço de varejo dela. */
@@ -50,6 +52,7 @@ export interface AnuncioDados {
   categoriaMl: string | null;
   descricao: string | null;
   ajustePreco: number;              // % sobre o preço do ERP
+  modeloTitulo?: string | null;     // título de cada item com {tokens}; vazio = {nome} (o nome do item no ERP)
   fotoFamilia?: string | null;      // foto da família: vale para o item que não tem foto própria
   atributos: Record<string, ValorAtributo>;
 }
@@ -162,7 +165,8 @@ const listaNomes = (itens: ItemAnuncio[], max = 3) =>
 
 /** Tudo o que falta para publicar (erros travam a publicação; avisos não). */
 export const pendenciasAnuncio = (
-  dados: AnuncioDados, itens: ItemAnuncio[], categoria: CategoriaInfo | null, atributos: AtributoML[], temGtinNaCategoria = true
+  dados: AnuncioDados, itens: ItemAnuncio[], categoria: CategoriaInfo | null, atributos: AtributoML[], temGtinNaCategoria = true,
+  modoInformado?: 'FAMILIA' | 'SEPARADO'   // o do anúncio inteiro (itens já publicados contam)
 ): Pendencia[] => {
   const p: Pendencia[] = [];
   const erro = (area: Pendencia['area'], texto: string, extra: Partial<Pendencia> = {}) => p.push({ nivel: 'erro', area, texto, ...extra });
@@ -173,8 +177,11 @@ export const pendenciasAnuncio = (
   else if (categoria && !categoria.final) erro('dados', 'A categoria escolhida tem subcategorias: escolha a mais específica.');
   const titulo = (dados.titulo || '').trim();
   const maxTitulo = categoria?.maxTitulo || 60;
-  if (!titulo) erro('dados', 'Informe o título do anúncio.');
-  else if (titulo.length > maxTitulo) erro('dados', `Título com ${titulo.length} caracteres: o máximo é ${maxTitulo}.`);
+  const modo = modoInformado ?? modoPublicacao(atributos, dados, itens);
+  if (modo === 'FAMILIA') {
+    if (!titulo) erro('dados', 'Informe o título do anúncio.');
+    else if (titulo.length > maxTitulo) erro('dados', `Título com ${titulo.length} caracteres: o máximo é ${maxTitulo}.`);
+  }
   if (!(dados.descricao || '').trim()) aviso('dados', 'Sem descrição: o anúncio vende melhor com medidas, aplicação e o que vem na embalagem.');
 
   // Itens
@@ -204,6 +211,20 @@ export const pendenciasAnuncio = (
     if (!i.pesoKg || !i.medidasCm) aviso('itens', `${i.sku}: sem peso ou medidas da embalagem (o ML estima o frete).`, { idItem: i.idItem });
     for (const m of i.motivosCadastro) aviso('cadastro', `${i.sku}: ${m}`, { idItem: i.idItem });
   }
+  // Anúncios separados: cada item vai com o seu título. Dois títulos iguais o ML junta como o mesmo produto.
+  if (modo === 'SEPARADO') {
+    const vistos = new Map<string, ItemAnuncio>();
+    for (const i of itens) {
+      const tituloItem = (i.tituloMl ?? titulo).trim();
+      if (!tituloItem) { erro('dados', `${i.sku}: sem título (confira o modelo do título).`, { idItem: i.idItem }); continue; }
+      if (tituloItem.length > maxTitulo) erro('dados', `Título com ${tituloItem.length} caracteres: o máximo é ${maxTitulo}${itens.length > 1 ? ` (${i.sku})` : ''}.`, { idItem: i.idItem });
+      if (i.tituloCortado) aviso('dados', `${i.sku}: título cortado em ${maxTitulo} caracteres ("${tituloItem}").`, { idItem: i.idItem });
+      const chave = normalizar(tituloItem);
+      const outro = vistos.get(chave);
+      if (outro) erro('dados', `${outro.sku} e ${i.sku} ficam com o mesmo título no ML ("${tituloItem}"): o ML junta os dois como o mesmo produto. Use um modelo de título que diferencie (ex.: {nome}).`, { idItem: i.idItem });
+      else vistos.set(chave, i);
+    }
+  }
   if (!dados.categoriaMl) return p;
 
   // Atributos
@@ -220,25 +241,6 @@ export const pendenciasAnuncio = (
     if (foraDaLista.length > 0) aviso('atributos', `"${a.nome}": valor fora da lista do ML em ${listaNomes(foraDaLista)}.`, { atributo: a.id });
   }
 
-  // Variações: na conta com User Products cada item é um anúncio e o ML agrupa pelo nome da família,
-  // mostrando como opção o que muda entre eles
-  if (itens.length > 1) {
-    const eixos = eixosDeVariacao(atributos, dados, itens);
-    if (eixos.length === 0) {
-      const possiveis = atributos.filter(a => a.permiteVariar).map(a => a.nome);
-      aviso('atributos', possiveis.length
-        ? `Nenhum atributo de variação muda entre os ${itens.length} itens (${possiveis.slice(0, 4).join(', ')}): o ML pode mostrar cada item como anúncio separado.`
-        : 'A categoria não tem atributo de variação: no ML cada item aparece como anúncio separado.');
-    } else {
-      const vistos = new Map<string, ItemAnuncio>();
-      for (const i of itens) {
-        const chave = eixos.map(a => normalizar(resolverValor(a, dados.atributos[a.id], i)?.valor)).join('|');
-        const outro = vistos.get(chave);
-        if (outro) aviso('atributos', `${outro.sku} e ${i.sku} ficam iguais nas opções do ML (${eixos.map(a => a.nome).join(', ')}).`, { idItem: i.idItem });
-        else vistos.set(chave, i);
-      }
-    }
-  }
   return p;
 };
 
@@ -312,7 +314,8 @@ export const corpoDoItem = (p: {
 }) => {
   const titulo = (p.dados.titulo || '').trim();
   return {
-    ...(p.porFamilia ? { family_name: titulo } : { title: titulo }),
+    // anúncio separado: o título do próprio item; página única: o da família (o ML junta e mostra as opções)
+    ...(p.porFamilia ? { family_name: p.item.tituloMl || titulo } : { title: p.item.tituloMl || titulo }),
     category_id: p.dados.categoriaMl,
     price: precoNoMl(p.item, p.dados.ajustePreco),
     currency_id: 'BRL',
@@ -417,4 +420,48 @@ export const situacaoPorItens = (status: (string | null)[]) => {
   if (status.length && !ativos.length) return 'ENCERRADO';
   if (ativos.some(s => s === 'active' || s === 'under_review')) return 'PUBLICADO';
   return ativos.length ? 'PAUSADO' : null;
+};
+
+// ---------------------------------------------------------------------------
+// Página única com opções x anúncios separados, e o título de cada item
+// ---------------------------------------------------------------------------
+
+/**
+ * O ML (User Products) junta numa página só os itens com o mesmo nome de família e mostra como opção os atributos
+ * que podem variar (ex.: Cor). Se esses atributos não diferenciam todos os itens, o ML trata itens diferentes como
+ * o mesmo produto: aí cada item vai como anúncio separado, com o título dele.
+ */
+export const modoPublicacao = (atributos: AtributoML[], dados: AnuncioDados, itens: ItemAnuncio[]): 'FAMILIA' | 'SEPARADO' => {
+  if (itens.length < 2) return 'SEPARADO';
+  const eixos = eixosDeVariacao(atributos, dados, itens);
+  if (!eixos.length) return 'SEPARADO';
+  const chaves = new Set(itens.map(i => eixos.map(a => normalizar(resolverValor(a, dados.atributos[a.id], i)?.valor)).join('|')));
+  return chaves.size === itens.length ? 'FAMILIA' : 'SEPARADO';
+};
+
+export const MODELO_TITULO_PADRAO = '{nome}';
+
+/**
+ * Título do item pelo modelo: {nome} (nome no ERP), {titulo} (do anúncio), {familia}, {marca}, {sku} e qualquer atributo do cadastro pelo nome
+ * (ex.: {Bitola}). Token sem valor some; o resultado passa pelo ajuste de maiúsculas e é cortado no limite.
+ */
+export const tituloPeloModelo = (
+  modelo: string | null | undefined, item: ItemAnuncio, ctx: { familia?: string | null; titulo?: string | null; atributosErp: { id: number; nome: string }[] }, max = 60
+) => {
+  const porNome = new Map(ctx.atributosErp.map(a => [normalizar(a.nome), a.id]));
+  const texto = String(modelo || MODELO_TITULO_PADRAO).replace(/\{([^}]+)\}/g, (_, token: string) => {
+    const t = normalizar(token);
+    if (t === 'nome') return item.nome || '';
+    if (t === 'familia') return ctx.familia || '';
+    if (t === 'titulo') return ctx.titulo || '';
+    if (t === 'marca') return item.marca && !SEM_MARCA.has(normalizar(item.marca)) ? item.marca : '';
+    if (t === 'sku') return item.sku || '';
+    const id = porNome.get(t);
+    return id !== undefined ? item.valoresErp[String(id)] || '' : '';
+  });
+  // separadores que ficaram sobrando quando um token veio vazio ("A -  - B" -> "A - B")
+  const limpo = texto.replace(/\s+/g, ' ').replace(/(\s[-–|,]\s)(?:[-–|,]\s)+/g, '$1').replace(/^[\s\-–|,]+|[\s\-–|,]+$/g, '').trim();
+  const legivel = tituloLegivel(limpo);
+  const titulo = cortarTitulo(legivel, max);
+  return { titulo, cortado: titulo.length < legivel.length };
 };

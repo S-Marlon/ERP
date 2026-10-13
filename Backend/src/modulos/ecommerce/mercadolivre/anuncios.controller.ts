@@ -7,7 +7,7 @@ import { carregarComposicoes, carregarDadosComponentes } from '../../../areas/ca
 import { estoqueDoKit } from '../../../areas/catalogo/kits/kits';
 import {
   AnuncioDados, AtributoML, categoriaInfo, CategoriaInfo, cortarTitulo, eixosDeVariacao, filtrarAtributosCategoria,
-  ItemAnuncio, Pendencia, pendenciasAnuncio, precoNoMl, resolverValor, situacaoPreparo, sugerirAtributos, tituloLegivel, ValorAtributo, estoqueParaMl, regraDoItem, RegraEstoque, saldoNaUnidade, UnidadeVenda, foraDoMl,
+  ItemAnuncio, Pendencia, pendenciasAnuncio, precoNoMl, resolverValor, situacaoPreparo, sugerirAtributos, tituloLegivel, ValorAtributo, modoPublicacao, tituloPeloModelo, estoqueParaMl, regraDoItem, RegraEstoque, saldoNaUnidade, UnidadeVenda, foraDoMl,
 } from './anuncios';
 import { ErroML, ml } from './mercadolivreApi';
 import { sincronizarAnuncios } from './sincronizacao';
@@ -207,6 +207,7 @@ const dadosDoAnuncio = (a: any): AnuncioDados => ({
   categoriaMl: a.categoria_ml,
   descricao: a.descricao,
   ajustePreco: Number(a.ajuste_preco) || 0,
+  modeloTitulo: a.modelo_titulo || null,
   fotoFamilia: a.familia_imagem || null,
   atributos: lerJson<Record<string, ValorAtributo>>(a.atributos, {}),
 });
@@ -227,6 +228,7 @@ export interface AnuncioCarregado {
   noMl: Map<number, ItemNoMl>;
   categoria: CategoriaML | null;
   pendencias: Pendencia[];      // só dos itens que ainda não estão no ML
+  modo: 'FAMILIA' | 'SEPARADO'; // página única com opções ou um anúncio por item
   atributosErp: { id: number; nome: string }[];
 }
 
@@ -276,14 +278,23 @@ export const carregarAnuncios = async (conn: Conn, tenant: number, idAnuncio?: n
     });
     const aPublicar = itensDoAnuncio.filter(i => !noMl.get(i.idItem)?.mlbId);
     const { categoria, erro } = await categoriaOuErro(tenant, dados.categoriaMl);
+    const idsErp = new Set(itensDoAnuncio.flatMap(i => Object.keys(i.valoresErp)));
+    const listaErp = [...idsErp].map(id => ({ id: Number(id), nome: atributosErp.get(Number(id)) || `#${id}` })).sort((x, y) => x.nome.localeCompare(y.nome));
+    // Página única (o ML junta pelo título da família) ou um anúncio por item, com o título dele pelo modelo
+    const modo = modoPublicacao(categoria?.atributos || [], dados, itensDoAnuncio);
+    for (const i of itensDoAnuncio) {
+      if (modo === 'FAMILIA') { i.tituloMl = (dados.titulo || '').trim(); i.tituloCortado = false; continue; }
+      const t = tituloPeloModelo(dados.modeloTitulo, i, { familia: a.familia_nome, titulo: dados.titulo, atributosErp: listaErp }, categoria?.info.maxTitulo || 60);
+      i.tituloMl = t.titulo;
+      i.tituloCortado = t.cortado;
+    }
     const pendencias = itensDoAnuncio.length > 0 && aPublicar.length === 0
       ? []
-      : pendenciasAnuncio(dados, aPublicar, categoria?.info || null, categoria?.atributos || [], categoria?.temGtin ?? true);
+      : pendenciasAnuncio(dados, aPublicar, categoria?.info || null, categoria?.atributos || [], categoria?.temGtin ?? true, modo);
     if (erro) pendencias.unshift({ nivel: 'aviso', area: 'dados', texto: `Não deu para conferir a categoria no Mercado Livre: ${erro}` });
-    const idsErp = new Set(itensDoAnuncio.flatMap(i => Object.keys(i.valoresErp)));
     return {
-      registro: a, dados, regraEstoque, unidades, itens: itensDoAnuncio, noMl, categoria, pendencias,
-      atributosErp: [...idsErp].map(id => ({ id: Number(id), nome: atributosErp.get(Number(id)) || `#${id}` })).sort((x, y) => x.nome.localeCompare(y.nome)),
+      registro: a, dados, regraEstoque, unidades, itens: itensDoAnuncio, noMl, categoria, pendencias, modo,
+      atributosErp: listaErp,
     };
   }));
 };
@@ -353,6 +364,8 @@ export const detalhe = async (tenant: number, c: AnuncioCarregado) => {
     descricao: a.descricao || '',
     fotoFamilia: c.dados.fotoFamilia || null,
     ajustePreco: c.dados.ajustePreco,
+    modo: c.modo,
+    modeloTitulo: c.dados.modeloTitulo || '',
     estoqueReserva: c.regraEstoque.reserva,
     estoqueMaximo: c.regraEstoque.maximo,
     estoqueAutomatico: Boolean(Number(a.estoque_automatico)),
@@ -609,6 +622,11 @@ export const salvarAnuncio = async (req: Request, res: Response) => {
       if (!(n >= 0)) throw new ErroML(`${nome} inválido.`);
       return Math.floor(n);
     };
+    if (b.modeloTitulo !== undefined) {
+      const m = String(b.modeloTitulo || '').trim();
+      if (m.length > 255) throw new ErroML('Modelo do título muito longo (máximo 255).');
+      definir('modelo_titulo', m || null);
+    }
     if (b.estoqueReserva !== undefined) definir('estoque_reserva', quantidade(b.estoqueReserva, 'Reserva da loja') ?? 0);
     if (b.estoqueMaximo !== undefined) definir('estoque_maximo', quantidade(b.estoqueMaximo, 'Teto no ML'));
     if (b.estoqueAutomatico !== undefined) definir('estoque_automatico', b.estoqueAutomatico ? 1 : 0);
@@ -791,6 +809,50 @@ export const desligarDoMl = async (req: Request, res: Response) => {
     return res.json(await detalhe(tenant, c));
   } catch (error) {
     return responderErro(res, error, 'Erro ao desligar do Mercado Livre.');
+  }
+};
+
+/**
+ * POST /anuncios/:id/encerrar — encerra no ML os anúncios dos itens (não dá para desfazer lá) e devolve os itens
+ * para "a publicar", para publicar de novo do jeito certo (ex.: título por item).
+ */
+export const encerrarNoMl = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const id = Number(req.params.id);
+  try {
+    await anuncioEditavel(pool as any, tenant, id);
+    const [vinculos]: any = await pool.execute(
+      `SELECT id_item, mlb_id, status_ml FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE id_anuncio = ? AND tenant_id = ? AND mlb_id IS NOT NULL`,
+      [id, tenant]
+    );
+    if (!vinculos.length) throw new ErroML('Nenhum item deste anúncio está no Mercado Livre.');
+    const falhas: string[] = [];
+    for (const v of vinculos) {
+      if (!foraDoMl(v.status_ml)) {
+        try { await ml(tenant, 'PUT', `/items/${v.mlb_id}`, { status: 'closed' }); }
+        catch (e: any) { falhas.push(`${v.mlb_id}: ${e?.message || 'erro'}`); continue; }
+      }
+      await pool.execute(
+        `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens
+         SET mlb_id = NULL, status_ml = NULL, permalink = NULL, estoque_enviado = NULL, preco_enviado = NULL, sincronizado_em = NULL, ultimo_erro = NULL
+         WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
+        [id, tenant, v.id_item]
+      );
+    }
+    const [[resta]]: any = await pool.execute(
+      `SELECT COUNT(*) AS n FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE id_anuncio = ? AND tenant_id = ? AND mlb_id IS NOT NULL`, [id, tenant]
+    );
+    if (!Number(resta.n)) {
+      await pool.execute(
+        `UPDATE modulo_ecommerce_mercadolivre_anuncios SET situacao = 'RASCUNHO', mlb_id = NULL, status_ml = NULL, permalink = NULL WHERE id = ? AND tenant_id = ?`,
+        [id, tenant]
+      );
+    }
+    if (falhas.length) throw new ErroML(`O ML não encerrou ${falhas.length} anúncio(s): ${falhas[0]}`);
+    const [c] = await carregarAnuncios(pool as any, tenant, id);
+    return res.json(await detalhe(tenant, c));
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao encerrar no Mercado Livre.');
   }
 };
 
