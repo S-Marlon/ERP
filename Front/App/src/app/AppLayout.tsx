@@ -70,7 +70,6 @@ import FinanceiroContasPagar from "../areas/financeiro/pagar/FinanceiroContasPag
 import { VendasFaturamento } from "../areas/financeiro/VendasFaturamento";
 import Clientes from "../areas/parceiros/Clientes";
 import FamilyManagementPanel from "../areas/catalogo/familias/FamilyManagementPanel";
-import EcommerceScreen from "../areas/ecommerce/EcommerceScreen";
 import ProductPricingModule from "../areas/catalogo/precos/ProductPricingModule";
 import { StockEntryStagingView } from "../areas/catalogo/staging/StockEntryStagingView";
 
@@ -211,7 +210,6 @@ export default function AppLayout() {
 
             
 
-          <Route path="/ecommerce" element={<EcommerceScreen />} />
 
             <Route path="*" element={<h2>404 | Página Não Encontrada</h2>} />
 

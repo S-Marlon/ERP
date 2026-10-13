@@ -1,0 +1,660 @@
+// Central de anúncios do Mercado Livre: o anúncio nasce como rascunho a partir de uma família (com variações) ou de
+// itens avulsos, e o ERP aponta o que falta (categoria, atributos, fotos, preço) antes de publicar.
+import { Request, Response } from 'express';
+import pool from '../../../infra/db';
+import { avaliarPublicacaoItens } from '../../../areas/catalogo/produtos/publicacaoProdutos';
+import {
+  AnuncioDados, AtributoML, categoriaInfo, CategoriaInfo, cortarTitulo, eixosDeVariacao, filtrarAtributosCategoria,
+  ItemAnuncio, Pendencia, pendenciasAnuncio, precoNoMl, resolverValor, situacaoPreparo, sugerirAtributos, tituloLegivel, ValorAtributo,
+} from './anuncios';
+import { ErroML, ml } from './mercadolivreApi';
+
+type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
+
+const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || req.body?.tenant_id || 1);
+
+const responderErro = (res: Response, error: any, padrao: string) => {
+  if (error instanceof ErroML) return res.status(error.status).json({ error: error.message, detalhes: error.detalhes });
+  if (error?.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Um dos itens já está em outro anúncio do Mercado Livre.' });
+  console.error(padrao, error);
+  return res.status(500).json({ error: padrao, details: error?.message });
+};
+
+const TIPOS_ANUNCIO = ['gold_special', 'gold_pro'];
+const SITUACOES_EDITAVEIS = ['RASCUNHO'];
+
+// ---------------------------------------------------------------------------
+// Categorias do ML (dados públicos, guardados em memória por algumas horas)
+// ---------------------------------------------------------------------------
+
+interface CategoriaML { info: CategoriaInfo; nome: string; caminho: string; atributos: AtributoML[]; temGtin: boolean; filhos: { id: string; nome: string }[] }
+const cacheCategorias = new Map<string, { em: number; valor: Promise<CategoriaML> }>();
+const VALIDADE_CACHE = 6 * 60 * 60 * 1000;
+
+export const carregarCategoria = (tenant: number, id: string): Promise<CategoriaML> => {
+  const guardado = cacheCategorias.get(id);
+  if (guardado && Date.now() - guardado.em < VALIDADE_CACHE) return guardado.valor;
+  const valor = (async () => {
+    const [c, brutos]: [any, any[]] = await Promise.all([ml(tenant, 'GET', `/categories/${id}`), ml(tenant, 'GET', `/categories/${id}/attributes`)]);
+    return {
+      info: categoriaInfo(c),
+      nome: c.name,
+      caminho: (c.path_from_root || []).map((p: any) => p.name).join(' › ') || c.name,
+      atributos: filtrarAtributosCategoria(brutos),
+      temGtin: brutos.some(a => a.id === 'GTIN'),
+      filhos: (c.children_categories || []).map((f: any) => ({ id: String(f.id), nome: f.name })),
+    };
+  })();
+  valor.catch(() => cacheCategorias.delete(id));
+  cacheCategorias.set(id, { em: Date.now(), valor });
+  return valor;
+};
+
+const categoriaOuErro = async (tenant: number, id: string | null): Promise<{ categoria: CategoriaML | null; erro: string | null }> => {
+  if (!id) return { categoria: null, erro: null };
+  try { return { categoria: await carregarCategoria(tenant, id), erro: null }; }
+  catch (e: any) { return { categoria: null, erro: e?.message || 'Não deu para ler a categoria no Mercado Livre.' }; }
+};
+
+const sugerirCategorias = async (tenant: number, texto: string) => {
+  const q = String(texto || '').trim();
+  if (!q) return [];
+  const r: any[] = await ml(tenant, 'GET', `/sites/MLB/domain_discovery/search?limit=6&q=${encodeURIComponent(q)}`);
+  return (r || []).map(x => ({ id: String(x.category_id), nome: x.category_name, dominio: x.domain_name }));
+};
+
+// ---------------------------------------------------------------------------
+// Itens do catálogo como o anúncio precisa
+// ---------------------------------------------------------------------------
+
+const lista = (ids: number[]) => ids.map(() => '?').join(',');
+
+const valorExibicao = (r: any): string | null => {
+  if (r.opcao_valor !== null && r.opcao_valor !== undefined) return String(r.opcao_valor);
+  if (r.valor_texto !== null && r.valor_texto !== undefined && String(r.valor_texto).trim() !== '') return String(r.valor_texto);
+  if (r.valor_numero !== null && r.valor_numero !== undefined) return String(r.valor_numero);
+  if (r.valor_decimal !== null && r.valor_decimal !== undefined) return String(Number(r.valor_decimal));
+  if (r.valor_boolean !== null && r.valor_boolean !== undefined) return Number(r.valor_boolean) === 1 ? 'Sim' : 'Não';
+  return null;
+};
+
+export const carregarItens = async (conn: Conn, tenant: number, ids: number[]) => {
+  const itens = new Map<number, ItemAnuncio>();
+  const atributosErp = new Map<number, string>();
+  if (ids.length === 0) return { itens, atributosErp };
+
+  const [base] = await conn.execute(
+    `SELECT ic.id_item, ic.status, ic.nome_item, ic.sku AS sku_core, ic.peso_bruto, ic.peso_liquido,
+            cpd.sku_customizado, cpd.nome_comercial, cpd.preco_venda,
+            COALESCE(mi.nome, mf.nome) AS marca, lg.altura_cm, lg.largura_cm, lg.comprimento_cm, es.quantidade_atual
+     FROM itens_core ic
+     LEFT JOIN comercial_produtos_dados cpd ON cpd.id_item = ic.id_item AND cpd.tenant_id = ic.tenant_id
+     LEFT JOIN comercial_familias f ON f.id = cpd.familia_id AND f.tenant_id = ic.tenant_id
+     LEFT JOIN comercial_marcas mi ON mi.id = cpd.id_marca
+     LEFT JOIN comercial_marcas mf ON mf.id = f.id_marca
+     LEFT JOIN itens_dados_logisticos lg ON lg.id_item = ic.id_item
+     LEFT JOIN estoque_saldos_itens es ON es.id_item = ic.id_item AND es.tenant_id = ic.tenant_id AND es.deposito = 'VENDA'
+     WHERE ic.tenant_id = ? AND ic.id_item IN (${lista(ids)})`,
+    [tenant, ...ids]
+  );
+  const [fotos] = await conn.execute(
+    `SELECT id_item, url_anexo FROM itens_anexos
+     WHERE tenant_id = ? AND id_item IN (${lista(ids)}) AND tipo_anexo IN ('IMAGEM_PRINCIPAL', 'FOTO_GALERIA')
+     ORDER BY (tipo_anexo = 'IMAGEM_PRINCIPAL') DESC, ordem, id_anexo`,
+    [tenant, ...ids]
+  );
+  const [gtins] = await conn.execute(
+    `SELECT id_item, gtin FROM comercial_unidades_venda
+     WHERE tenant_id = ? AND id_item IN (${lista(ids)}) AND NULLIF(TRIM(gtin), '') IS NOT NULL
+     ORDER BY padrao_pdv DESC`,
+    [tenant, ...ids]
+  );
+  const [valores] = await conn.execute(
+    `SELECT v.id_entidade, v.atributo_id, a.nome, v.valor_texto, v.valor_numero, v.valor_decimal, v.valor_boolean, o.valor AS opcao_valor
+     FROM atributos_comercial_valores v
+     INNER JOIN atributos_comercial a ON a.id = v.atributo_id AND a.tenant_id = v.tenant_id
+     LEFT JOIN atributos_comercial_opcoes o ON o.id = v.opcao_id
+     WHERE v.tenant_id = ? AND v.tipo_entidade = 'produto' AND v.id_entidade IN (${lista(ids)})`,
+    [tenant, ...ids]
+  );
+  const publicacao = await avaliarPublicacaoItens(conn, tenant, ids);
+
+  for (const r of base) {
+    const id = Number(r.id_item);
+    const alt = Number(r.altura_cm), lar = Number(r.largura_cm), com = Number(r.comprimento_cm);
+    const peso = Number(r.peso_bruto) || Number(r.peso_liquido) || null;
+    itens.set(id, {
+      idItem: id,
+      sku: r.sku_customizado || r.sku_core,
+      nome: r.nome_comercial || r.nome_item,
+      ativo: r.status === 'ATIVO',
+      preco: Number(r.preco_venda) || 0,
+      precoMl: null,
+      estoque: Number(r.quantidade_atual) || 0,
+      fotos: 0,
+      fotoUrl: null,
+      gtin: null,
+      pesoKg: peso,
+      medidasCm: alt > 0 && lar > 0 && com > 0 ? { altura: alt, largura: lar, comprimento: com } : null,
+      marca: r.marca || null,
+      valoresErp: {},
+      motivosCadastro: publicacao.get(id)?.motivos || [],
+    });
+  }
+  for (const f of fotos) {
+    const i = itens.get(Number(f.id_item));
+    if (!i) continue;
+    i.fotos++;
+    if (!i.fotoUrl) i.fotoUrl = f.url_anexo;
+  }
+  for (const g of gtins) {
+    const i = itens.get(Number(g.id_item));
+    if (i && !i.gtin) i.gtin = String(g.gtin).trim();
+  }
+  for (const v of valores) {
+    const i = itens.get(Number(v.id_entidade));
+    const valor = valorExibicao(v);
+    if (!i || valor === null) continue;
+    i.valoresErp[String(v.atributo_id)] = valor;
+    atributosErp.set(Number(v.atributo_id), v.nome);
+  }
+  return { itens, atributosErp };
+};
+
+// ---------------------------------------------------------------------------
+// Anúncio completo (dados + itens + categoria + pendências)
+// ---------------------------------------------------------------------------
+
+const lerJson = <T,>(s: string | null, padrao: T): T => { try { return s ? JSON.parse(s) : padrao; } catch { return padrao; } };
+
+const dadosDoAnuncio = (a: any): AnuncioDados => ({
+  titulo: a.titulo,
+  categoriaMl: a.categoria_ml,
+  descricao: a.descricao,
+  ajustePreco: Number(a.ajuste_preco) || 0,
+  atributos: lerJson<Record<string, ValorAtributo>>(a.atributos, {}),
+});
+
+interface AnuncioCarregado {
+  registro: any;
+  dados: AnuncioDados;
+  itens: ItemAnuncio[];
+  categoria: CategoriaML | null;
+  pendencias: Pendencia[];
+  atributosErp: { id: number; nome: string }[];
+}
+
+const carregarAnuncios = async (conn: Conn, tenant: number, idAnuncio?: number): Promise<AnuncioCarregado[]> => {
+  const [anuncios] = await conn.execute(
+    `SELECT a.*, f.nome AS familia_nome,
+            DATE_FORMAT(a.atualizado_em, '%Y-%m-%d %H:%i') AS atualizado_fmt,
+            DATE_FORMAT(a.sincronizado_em, '%Y-%m-%d %H:%i') AS sincronizado_fmt
+     FROM modulo_ecommerce_mercadolivre_anuncios a
+     LEFT JOIN comercial_familias f ON f.id = a.id_familia AND f.tenant_id = a.tenant_id
+     WHERE a.tenant_id = ? ${idAnuncio ? 'AND a.id = ?' : ''}
+     ORDER BY a.atualizado_em DESC, a.id DESC`,
+    idAnuncio ? [tenant, idAnuncio] : [tenant]
+  );
+  if (anuncios.length === 0) return [];
+  const idsAnuncios = anuncios.map((a: any) => Number(a.id));
+  const [vinculos] = await conn.execute(
+    `SELECT id_anuncio, id_item, preco, variacao_id FROM modulo_ecommerce_mercadolivre_anuncios_itens
+     WHERE tenant_id = ? AND id_anuncio IN (${lista(idsAnuncios)}) ORDER BY ordem, id_item`,
+    [tenant, ...idsAnuncios]
+  );
+  const { itens, atributosErp } = await carregarItens(conn, tenant, [...new Set<number>(vinculos.map((v: any) => Number(v.id_item)))]);
+
+  return Promise.all(anuncios.map(async (a: any) => {
+    const dados = dadosDoAnuncio(a);
+    const itensDoAnuncio: ItemAnuncio[] = vinculos
+      .filter((v: any) => Number(v.id_anuncio) === Number(a.id) && itens.has(Number(v.id_item)))
+      .map((v: any) => ({ ...itens.get(Number(v.id_item))!, precoMl: v.preco === null ? null : Number(v.preco) }));
+    const { categoria, erro } = await categoriaOuErro(tenant, dados.categoriaMl);
+    const pendencias = pendenciasAnuncio(dados, itensDoAnuncio, categoria?.info || null, categoria?.atributos || [], categoria?.temGtin ?? true);
+    if (erro) pendencias.unshift({ nivel: 'aviso', area: 'dados', texto: `Não deu para conferir a categoria no Mercado Livre: ${erro}` });
+    const idsErp = new Set(itensDoAnuncio.flatMap(i => Object.keys(i.valoresErp)));
+    return {
+      registro: a, dados, itens: itensDoAnuncio, categoria, pendencias,
+      atributosErp: [...idsErp].map(id => ({ id: Number(id), nome: atributosErp.get(Number(id)) || `#${id}` })).sort((x, y) => x.nome.localeCompare(y.nome)),
+    };
+  }));
+};
+
+const resumo = (c: AnuncioCarregado) => {
+  const a = c.registro;
+  const erros = c.pendencias.filter(p => p.nivel === 'erro').length;
+  return {
+    id: Number(a.id),
+    titulo: a.titulo,
+    idFamilia: a.id_familia ? Number(a.id_familia) : null,
+    familia: a.familia_nome || null,
+    categoriaMl: a.categoria_ml,
+    categoriaNome: a.categoria_ml_nome,
+    tipoAnuncio: a.tipo_anuncio,
+    situacao: a.situacao,
+    preparo: a.situacao === 'RASCUNHO' ? situacaoPreparo(c.pendencias) : null,
+    mlbId: a.mlb_id,
+    permalink: a.permalink,
+    qtdItens: c.itens.length,
+    fotoUrl: c.itens.find(i => i.fotoUrl)?.fotoUrl || null,
+    estoque: c.itens.reduce((s, i) => s + Math.max(0, i.estoque), 0),
+    precoMin: c.itens.length ? Math.min(...c.itens.map(i => precoNoMl(i, c.dados.ajustePreco))) : null,
+    precoMax: c.itens.length ? Math.max(...c.itens.map(i => precoNoMl(i, c.dados.ajustePreco))) : null,
+    erros,
+    avisos: c.pendencias.length - erros,
+    atualizadoEm: a.atualizado_fmt,
+    ultimoErro: a.ultimo_erro,
+  };
+};
+
+// Comissão do ML por preço (cache curto: muda pouco)
+const cacheTaxas = new Map<string, { em: number; valor: Promise<{ percentual: number; comissao: number; fixa: number } | null> }>();
+const taxaMl = (tenant: number, preco: number, categoria: string, tipo: string) => {
+  const chave = `${preco}|${categoria}|${tipo}`;
+  const guardado = cacheTaxas.get(chave);
+  if (guardado && Date.now() - guardado.em < 60 * 60 * 1000) return guardado.valor;
+  const valor = ml(tenant, 'GET', `/sites/MLB/listing_prices?price=${preco}&category_id=${categoria}&listing_type_id=${tipo}`)
+    .then((r: any) => ({
+      percentual: Number(r?.sale_fee_details?.percentage_fee) || 0,
+      comissao: Number(r?.sale_fee_amount) || 0,
+      fixa: Number(r?.sale_fee_details?.fixed_fee) || 0,
+    }))
+    .catch(() => null);
+  cacheTaxas.set(chave, { em: Date.now(), valor });
+  return valor;
+};
+
+const detalhe = async (tenant: number, c: AnuncioCarregado) => {
+  const a = c.registro;
+  const atributosCat = c.categoria?.atributos || [];
+  const eixos = c.itens.length > 1 ? eixosDeVariacao(atributosCat, c.dados, c.itens).map(x => x.id) : [];
+  const precos = [...new Set(c.itens.map(i => precoNoMl(i, c.dados.ajustePreco)).filter(p => p > 0))].slice(0, 30);
+  const taxas = new Map<number, Awaited<ReturnType<typeof taxaMl>>>();
+  if (c.dados.categoriaMl) {
+    const r = await Promise.all(precos.map(p => taxaMl(tenant, p, c.dados.categoriaMl!, a.tipo_anuncio)));
+    precos.forEach((p, k) => taxas.set(p, r[k]));
+  }
+  return {
+    ...resumo(c),
+    condicao: a.condicao,
+    descricao: a.descricao || '',
+    ajustePreco: c.dados.ajustePreco,
+    atributos: c.dados.atributos,
+    categoria: c.categoria
+      ? { id: c.categoria.info.id, nome: c.categoria.nome, caminho: c.categoria.caminho, final: c.categoria.info.final, maxTitulo: c.categoria.info.maxTitulo, maxFotos: c.categoria.info.maxFotos, filhos: c.categoria.filhos }
+      : null,
+    atributosCategoria: atributosCat,
+    atributosErp: c.atributosErp,
+    eixos,
+    itens: c.itens.map(i => {
+      const preco = precoNoMl(i, c.dados.ajustePreco);
+      const taxa = taxas.get(preco) || null;
+      return {
+        ...i,
+        precoAnuncio: preco,
+        comissao: taxa ? taxa.comissao : null,
+        percentualComissao: taxa ? taxa.percentual : null,
+        valores: Object.fromEntries(atributosCat.map(at => [at.id, resolverValor(at, c.dados.atributos[at.id], i)])),
+      };
+    }),
+    pendencias: c.pendencias,
+  };
+};
+
+// ---------------------------------------------------------------------------
+// Rotas
+// ---------------------------------------------------------------------------
+
+/** GET /anuncios — todos os anúncios (rascunhos e publicados) com o resumo das pendências */
+export const listarAnuncios = async (req: Request, res: Response) => {
+  try {
+    const todos = await carregarAnuncios(pool as any, tenantDe(req));
+    return res.json(todos.map(resumo));
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao listar os anúncios.');
+  }
+};
+
+/** GET /anuncios/:id */
+export const detalheAnuncio = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  try {
+    const [c] = await carregarAnuncios(pool as any, tenant, Number(req.params.id));
+    if (!c) throw new ErroML('Anúncio não encontrado.', 404);
+    return res.json(await detalhe(tenant, c));
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao abrir o anúncio.');
+  }
+};
+
+/** GET /candidatos?busca= — famílias e itens do catálogo para anunciar */
+export const candidatos = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const busca = `%${String(req.query.busca || '').trim()}%`;
+  try {
+    const [familias]: any = await pool.execute(
+      `SELECT f.id, f.nome, COUNT(ic.id_item) AS itens, SUM(ai.id_item IS NOT NULL) AS anunciados,
+              SUM(EXISTS(SELECT 1 FROM itens_anexos x WHERE x.tenant_id = f.tenant_id AND x.id_item = ic.id_item
+                         AND x.tipo_anexo IN ('IMAGEM_PRINCIPAL', 'FOTO_GALERIA'))) AS com_foto,
+              SUM(COALESCE(es.quantidade_atual, 0) > 0) AS com_estoque
+       FROM comercial_familias f
+       INNER JOIN comercial_produtos_dados cpd ON cpd.familia_id = f.id AND cpd.tenant_id = f.tenant_id
+       INNER JOIN itens_core ic ON ic.id_item = cpd.id_item AND ic.tenant_id = f.tenant_id AND ic.status = 'ATIVO'
+       LEFT JOIN estoque_saldos_itens es ON es.id_item = ic.id_item AND es.tenant_id = f.tenant_id AND es.deposito = 'VENDA'
+       LEFT JOIN modulo_ecommerce_mercadolivre_anuncios_itens ai ON ai.id_item = ic.id_item AND ai.tenant_id = f.tenant_id
+       WHERE f.tenant_id = ? AND f.status <> 'INATIVO' AND f.nome LIKE ?
+       GROUP BY f.id, f.nome
+       ORDER BY f.nome
+       LIMIT 60`,
+      [tenant, busca]
+    );
+    const [itens]: any = await pool.execute(
+      `SELECT ic.id_item, COALESCE(cpd.sku_customizado, ic.sku) AS sku, COALESCE(cpd.nome_comercial, ic.nome_item) AS nome,
+              cpd.preco_venda, COALESCE(es.quantidade_atual, 0) AS estoque, f.nome AS familia, ai.id_anuncio,
+              (SELECT x.url_anexo FROM itens_anexos x WHERE x.tenant_id = ic.tenant_id AND x.id_item = ic.id_item
+                 AND x.tipo_anexo IN ('IMAGEM_PRINCIPAL', 'FOTO_GALERIA')
+               ORDER BY (x.tipo_anexo = 'IMAGEM_PRINCIPAL') DESC, x.ordem, x.id_anexo LIMIT 1) AS foto_url
+       FROM itens_core ic
+       LEFT JOIN comercial_produtos_dados cpd ON cpd.id_item = ic.id_item AND cpd.tenant_id = ic.tenant_id
+       LEFT JOIN comercial_familias f ON f.id = cpd.familia_id AND f.tenant_id = ic.tenant_id
+       LEFT JOIN estoque_saldos_itens es ON es.id_item = ic.id_item AND es.tenant_id = ic.tenant_id AND es.deposito = 'VENDA'
+       LEFT JOIN modulo_ecommerce_mercadolivre_anuncios_itens ai ON ai.id_item = ic.id_item AND ai.tenant_id = ic.tenant_id
+       WHERE ic.tenant_id = ? AND ic.status = 'ATIVO'
+         AND (cpd.sku_customizado LIKE ? OR cpd.nome_comercial LIKE ? OR ic.nome_item LIKE ? OR ic.sku LIKE ?)
+       ORDER BY nome
+       LIMIT 60`,
+      [tenant, busca, busca, busca, busca]
+    );
+    return res.json({
+      familias: familias.map((f: any) => ({
+        id: Number(f.id), nome: f.nome, itens: Number(f.itens), anunciados: Number(f.anunciados) || 0,
+        comFoto: Number(f.com_foto) || 0, comEstoque: Number(f.com_estoque) || 0,
+      })),
+      itens: itens.map((i: any) => ({
+        idItem: Number(i.id_item), sku: i.sku, nome: i.nome, preco: Number(i.preco_venda) || 0, estoque: Number(i.estoque) || 0,
+        familia: i.familia || null, idAnuncio: i.id_anuncio ? Number(i.id_anuncio) : null, fotoUrl: i.foto_url || null,
+      })),
+    });
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao buscar itens do catálogo.');
+  }
+};
+
+/** Cria um rascunho e já tenta achar a categoria e ligar os atributos. */
+const criarRascunho = async (conn: Conn, tenant: number, r: { titulo: string; idFamilia: number | null; descricao: string | null; idItens: number[] }) => {
+  const titulo = cortarTitulo(tituloLegivel(r.titulo));
+  let categoria: CategoriaML | null = null;
+  let categoriaId: string | null = null;
+  try {
+    const [primeira] = await sugerirCategorias(tenant, titulo);
+    if (primeira) { categoria = await carregarCategoria(tenant, primeira.id); categoriaId = primeira.id; }
+  } catch { /* sem sugestão: o operador escolhe */ }
+  const { atributosErp } = await carregarItens(conn, tenant, r.idItens);
+  const atributos = categoria
+    ? sugerirAtributos(categoria.atributos, [...atributosErp].map(([id, nome]) => ({ id, nome })), {})
+    : {};
+  const [ins] = await conn.execute(
+    `INSERT INTO modulo_ecommerce_mercadolivre_anuncios (tenant_id, id_familia, titulo, categoria_ml, categoria_ml_nome, descricao, atributos)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [tenant, r.idFamilia, titulo, categoriaId, categoria?.caminho || null, r.descricao, JSON.stringify(atributos)]
+  );
+  const id = Number(ins.insertId);
+  let ordem = 0;
+  for (const idItem of r.idItens) {
+    await conn.execute(
+      `INSERT INTO modulo_ecommerce_mercadolivre_anuncios_itens (id_anuncio, tenant_id, id_item, ordem) VALUES (?, ?, ?, ?)`,
+      [id, tenant, idItem, ordem++]
+    );
+  }
+  return id;
+};
+
+/** POST /anuncios { idFamilia, separados? } ou { idItens: [...] } */
+export const criarAnuncio = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const conn = connection as unknown as Conn;
+    const idFamilia = Number(req.body?.idFamilia) || null;
+    const separados = Boolean(req.body?.separados);
+    const criados: number[] = [];
+
+    if (idFamilia) {
+      const [[familia]] = await conn.execute(
+        `SELECT id, nome, descricao_comercial_padrao FROM comercial_familias WHERE id = ? AND tenant_id = ?`, [idFamilia, tenant]
+      );
+      if (!familia) throw new ErroML('Família não encontrada.', 404);
+      const [livres] = await conn.execute(
+        `SELECT ic.id_item, COALESCE(cpd.nome_comercial, ic.nome_item) AS nome, cpd.descricao_comercial
+         FROM comercial_produtos_dados cpd
+         INNER JOIN itens_core ic ON ic.id_item = cpd.id_item AND ic.tenant_id = cpd.tenant_id AND ic.status = 'ATIVO'
+         LEFT JOIN modulo_ecommerce_mercadolivre_anuncios_itens ai ON ai.id_item = ic.id_item AND ai.tenant_id = cpd.tenant_id
+         WHERE cpd.tenant_id = ? AND cpd.familia_id = ? AND ai.id_item IS NULL
+         ORDER BY nome`,
+        [tenant, idFamilia]
+      );
+      if (livres.length === 0) throw new ErroML('Todos os itens ativos desta família já estão em anúncios.');
+      if (separados) {
+        for (const i of livres) {
+          criados.push(await criarRascunho(conn, tenant, {
+            titulo: i.nome, idFamilia, descricao: i.descricao_comercial || familia.descricao_comercial_padrao || null, idItens: [Number(i.id_item)],
+          }));
+        }
+      } else {
+        criados.push(await criarRascunho(conn, tenant, {
+          titulo: familia.nome, idFamilia, descricao: familia.descricao_comercial_padrao || null, idItens: livres.map((i: any) => Number(i.id_item)),
+        }));
+      }
+    } else {
+      const ids = [...new Set<number>((req.body?.idItens || []).map(Number).filter(Boolean))];
+      if (ids.length === 0) throw new ErroML('Escolha uma família ou ao menos um item.');
+      const [rows] = await conn.execute(
+        `SELECT ic.id_item, COALESCE(cpd.nome_comercial, ic.nome_item) AS nome, cpd.descricao_comercial, ai.id_anuncio
+         FROM itens_core ic
+         LEFT JOIN comercial_produtos_dados cpd ON cpd.id_item = ic.id_item AND cpd.tenant_id = ic.tenant_id
+         LEFT JOIN modulo_ecommerce_mercadolivre_anuncios_itens ai ON ai.id_item = ic.id_item AND ai.tenant_id = ic.tenant_id
+         WHERE ic.tenant_id = ? AND ic.id_item IN (${lista(ids)})`,
+        [tenant, ...ids]
+      );
+      const ocupado = rows.find((r: any) => r.id_anuncio);
+      if (ocupado) throw new ErroML(`"${ocupado.nome}" já está no anúncio #${ocupado.id_anuncio}.`, 409);
+      if (separados || rows.length === 1) {
+        for (const r of rows) {
+          criados.push(await criarRascunho(conn, tenant, { titulo: r.nome, idFamilia: null, descricao: r.descricao_comercial || null, idItens: [Number(r.id_item)] }));
+        }
+      } else {
+        criados.push(await criarRascunho(conn, tenant, {
+          titulo: String(req.body?.titulo || rows[0].nome), idFamilia: null, descricao: null, idItens: rows.map((r: any) => Number(r.id_item)),
+        }));
+      }
+    }
+    await connection.commit();
+    return res.status(201).json({ ids: criados });
+  } catch (error) {
+    await connection.rollback();
+    return responderErro(res, error, 'Erro ao criar o anúncio.');
+  } finally {
+    connection.release();
+  }
+};
+
+const anuncioEditavel = async (conn: Conn, tenant: number, id: number) => {
+  const [[a]] = await conn.execute(
+    `SELECT id, situacao, categoria_ml, atributos FROM modulo_ecommerce_mercadolivre_anuncios WHERE id = ? AND tenant_id = ?`, [id, tenant]
+  );
+  if (!a) throw new ErroML('Anúncio não encontrado.', 404);
+  return a;
+};
+
+const validarAtributos = (v: any): Record<string, ValorAtributo> => {
+  const saida: Record<string, ValorAtributo> = {};
+  if (!v || typeof v !== 'object') return saida;
+  for (const [id, x] of Object.entries<any>(v)) {
+    if (!x || typeof x !== 'object') continue;
+    if (x.origem === 'marca') saida[id] = { origem: 'marca' };
+    else if (x.origem === 'erp' && Number(x.atributoId)) saida[id] = { origem: 'erp', atributoId: Number(x.atributoId) };
+    else if (x.origem === 'fixo' && String(x.valor ?? '').trim()) {
+      saida[id] = { origem: 'fixo', valor: String(x.valor).trim(), valorId: x.valorId ? String(x.valorId) : null, unidade: x.unidade ? String(x.unidade) : null };
+    }
+  }
+  return saida;
+};
+
+/** PUT /anuncios/:id — dados do anúncio (título, categoria, tipo, descrição, ajuste de preço, atributos) */
+export const salvarAnuncio = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const id = Number(req.params.id);
+  try {
+    const a = await anuncioEditavel(pool as any, tenant, id);
+    const b = req.body || {};
+    const campos: string[] = [];
+    const valores: any[] = [];
+    const definir = (campo: string, valor: any) => { campos.push(`${campo} = ?`); valores.push(valor); };
+
+    if (b.titulo !== undefined) {
+      const t = String(b.titulo || '').replace(/\s+/g, ' ').trim();
+      if (t.length > 60) throw new ErroML(`O título tem ${t.length} caracteres: o máximo é 60.`);
+      definir('titulo', t || null);
+    }
+    if (b.tipoAnuncio !== undefined) {
+      if (!TIPOS_ANUNCIO.includes(b.tipoAnuncio)) throw new ErroML('Tipo de anúncio inválido.');
+      definir('tipo_anuncio', b.tipoAnuncio);
+    }
+    if (b.condicao !== undefined) definir('condicao', b.condicao === 'used' ? 'used' : 'new');
+    if (b.descricao !== undefined) definir('descricao', String(b.descricao || '').trim() || null);
+    if (b.ajustePreco !== undefined) {
+      const ajuste = Number(b.ajustePreco) || 0;
+      if (ajuste < -50 || ajuste > 300) throw new ErroML('Ajuste de preço fora do razoável (-50% a 300%).');
+      definir('ajuste_preco', ajuste);
+    }
+    let atributos = b.atributos !== undefined ? validarAtributos(b.atributos) : lerJson<Record<string, ValorAtributo>>(a.atributos, {});
+    if (b.categoriaMl !== undefined && (b.categoriaMl || null) !== a.categoria_ml) {
+      const idCat = b.categoriaMl ? String(b.categoriaMl).trim().toUpperCase() : null;
+      if (idCat) {
+        const cat = await carregarCategoria(tenant, idCat).catch((e: any) => { throw new ErroML(`Categoria ${idCat}: ${e?.message || 'não encontrada'}`); });
+        // mantém o que já foi ligado e que existe na categoria nova; sugere o resto pelo nome
+        const ids = new Set(cat.atributos.map(x => x.id));
+        const mantidos = Object.fromEntries(Object.entries(atributos).filter(([k]) => ids.has(k)));
+        const [vinc] = await pool.execute(`SELECT id_item FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE id_anuncio = ?`, [id]) as any;
+        const { atributosErp } = await carregarItens(pool as any, tenant, vinc.map((v: any) => Number(v.id_item)));
+        atributos = sugerirAtributos(cat.atributos, [...atributosErp].map(([i, nome]) => ({ id: i, nome })), mantidos);
+        definir('categoria_ml', idCat);
+        definir('categoria_ml_nome', cat.caminho.slice(0, 255));
+      } else {
+        definir('categoria_ml', null);
+        definir('categoria_ml_nome', null);
+      }
+    }
+    definir('atributos', JSON.stringify(atributos));
+    await pool.execute(`UPDATE modulo_ecommerce_mercadolivre_anuncios SET ${campos.join(', ')} WHERE id = ? AND tenant_id = ?`, [...valores, id, tenant]);
+    const [c] = await carregarAnuncios(pool as any, tenant, id);
+    return res.json(await detalhe(tenant, c));
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao salvar o anúncio.');
+  }
+};
+
+/** POST /anuncios/:id/itens { idItens } */
+export const adicionarItens = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const id = Number(req.params.id);
+  try {
+    const a = await anuncioEditavel(pool as any, tenant, id);
+    if (!SITUACOES_EDITAVEIS.includes(a.situacao)) throw new ErroML('Anúncio já publicado: novas variações entram na próxima etapa (sincronização).');
+    const ids = [...new Set<number>((req.body?.idItens || []).map(Number).filter(Boolean))];
+    if (ids.length === 0) throw new ErroML('Escolha ao menos um item.');
+    const [[{ proxima }]]: any = await pool.execute(
+      `SELECT COALESCE(MAX(ordem), -1) + 1 AS proxima FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE id_anuncio = ?`, [id]
+    );
+    let ordem = Number(proxima);
+    for (const idItem of ids) {
+      await pool.execute(
+        `INSERT INTO modulo_ecommerce_mercadolivre_anuncios_itens (id_anuncio, tenant_id, id_item, ordem) VALUES (?, ?, ?, ?)`,
+        [id, tenant, idItem, ordem++]
+      );
+    }
+    await pool.execute(`UPDATE modulo_ecommerce_mercadolivre_anuncios SET atualizado_em = NOW() WHERE id = ?`, [id]);
+    const [c] = await carregarAnuncios(pool as any, tenant, id);
+    return res.json(await detalhe(tenant, c));
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao adicionar itens.');
+  }
+};
+
+/** DELETE /anuncios/:id/itens/:idItem */
+export const removerItem = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const id = Number(req.params.id);
+  try {
+    const a = await anuncioEditavel(pool as any, tenant, id);
+    if (!SITUACOES_EDITAVEIS.includes(a.situacao)) throw new ErroML('Anúncio já publicado: tirar variação entra na próxima etapa (sincronização).');
+    await pool.execute(
+      `DELETE FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
+      [id, tenant, Number(req.params.idItem)]
+    );
+    const [c] = await carregarAnuncios(pool as any, tenant, id);
+    return res.json(await detalhe(tenant, c));
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao tirar o item.');
+  }
+};
+
+/** PUT /anuncios/:id/itens/:idItem { preco } — preço só no ML (null volta ao preço do ERP + ajuste) */
+export const precoDoItem = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const id = Number(req.params.id);
+  try {
+    await anuncioEditavel(pool as any, tenant, id);
+    const bruto = req.body?.preco;
+    const preco = bruto === null || bruto === undefined || bruto === '' ? null : Math.round(Number(bruto) * 100) / 100;
+    if (preco !== null && !(preco > 0)) throw new ErroML('Preço inválido.');
+    await pool.execute(
+      `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET preco = ? WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
+      [preco, id, tenant, Number(req.params.idItem)]
+    );
+    const [c] = await carregarAnuncios(pool as any, tenant, id);
+    return res.json(await detalhe(tenant, c));
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao salvar o preço.');
+  }
+};
+
+/** DELETE /anuncios/:id — só rascunho (o publicado se encerra no ML, na etapa de sincronização) */
+export const excluirAnuncio = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const id = Number(req.params.id);
+  try {
+    const a = await anuncioEditavel(pool as any, tenant, id);
+    if (a.situacao !== 'RASCUNHO') throw new ErroML('Só rascunho pode ser excluído. Anúncio publicado se encerra pelo ML.');
+    await pool.execute(`DELETE FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE id_anuncio = ? AND tenant_id = ?`, [id, tenant]);
+    await pool.execute(`DELETE FROM modulo_ecommerce_mercadolivre_anuncios WHERE id = ? AND tenant_id = ?`, [id, tenant]);
+    return res.json({ success: true });
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao excluir o anúncio.');
+  }
+};
+
+/** GET /categorias/sugerir?q= — categorias do ML pelo título */
+export const sugerirCategoria = async (req: Request, res: Response) => {
+  try {
+    return res.json(await sugerirCategorias(tenantDe(req), String(req.query.q || '')));
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao sugerir categorias.');
+  }
+};
+
+/** GET /categorias (raiz) ou /categorias/:id (caminho e subcategorias) */
+export const navegarCategorias = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  try {
+    if (!req.params.id) {
+      const raiz: any[] = await ml(tenant, 'GET', '/sites/MLB/categories');
+      return res.json({ id: null, nome: 'Todas', caminho: '', final: false, filhos: raiz.map(r => ({ id: String(r.id), nome: r.name })) });
+    }
+    const c = await carregarCategoria(tenant, String(req.params.id).toUpperCase());
+    return res.json({ id: c.info.id, nome: c.nome, caminho: c.caminho, final: c.info.final, filhos: c.filhos });
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao ler as categorias do Mercado Livre.');
+  }
+};

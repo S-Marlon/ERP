@@ -86,17 +86,19 @@ export const MODULOS_FRONT: ModuloFront[] = [
     }],
   },  {
     codigo: 'ECOMMERCE_MERCADOLIVRE',
-    menu: [{ grupo: 'grp:vendas', itens: [{ key: '/modulos/ecommerce/mercadolivre', label: 'Mercado Livre' }] }],
-    rotas: [{ path: '/modulos/ecommerce/mercadolivre', element: <MercadoLivrePage /> }],
+    menu: [{ grupo: 'grp:ecommerce', itens: [{ key: '/ecommerce', label: 'Mercado Livre' }] }],
+    rotas: [{ path: '/ecommerce', element: <MercadoLivrePage /> }],
   },
 ];
 
 /** Menu com os itens dos módulos ativos (ou de todos, para títulos e busca). */
 export const menuComModulos = (menu: ItemMenu[], ativos: Set<string> | 'todos'): ItemMenu[] => {
   const modulos = MODULOS_FRONT.filter(m => ativos === 'todos' || ativos.has(m.codigo));
-  return menu.map(g => {
+  return menu.flatMap(g => {
     const extras = modulos.flatMap(m => m.menu.filter(x => x.grupo === g.key).flatMap(x => x.itens));
-    return extras.length ? { ...g, children: [...(g.children || []), ...extras] } : g;
+    if (extras.length) return [{ ...g, children: [...(g.children || []), ...extras] }];
+    // grupo que só existe para módulos (children vazio) some quando nenhum módulo ligado o usa
+    return g.children && g.children.length === 0 ? [] : [g];
   });
 };
 

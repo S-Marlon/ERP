@@ -82,7 +82,8 @@ export const MENU_PRINCIPAL: ItemMenu[] = [
       { key: '/financeiro/faturamento', label: 'Faturamento' },
     ],
   },
-  { key: '/ecommerce', icon: <ShopOutlined />, label: 'E-commerce' },
+  // Só os módulos de canal (Mercado Livre...) preenchem: sem módulo ligado o grupo não aparece
+  { key: 'grp:ecommerce', icon: <ShopOutlined />, label: 'E-commerce', children: [] },
   { key: '/relatorios', icon: <FileTextOutlined />, label: 'Relatórios' },
   { key: '/obras', icon: <ToolOutlined />, label: 'Obras / Projetos' },
 ];
