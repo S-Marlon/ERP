@@ -11,6 +11,7 @@ import {
 
 import { faixasNoMl } from './faixas.controller';
 import { entrarNoCatalogo, verificarCatalogo } from './catalogo.controller';
+import { analisarPreco } from './precificacao.controller';
 import { buscarClientes, buscarPedidos, listarPedidos, obterConfig, reprocessarPedido, salvarConfig } from './pedidos.controller';
 
 const router = Router();
@@ -38,6 +39,7 @@ router.post('/anuncios/:id/atualizar-ml', atualizarNoMl);
 router.post('/anuncios/:id/pausar', pausarNoMl);
 router.get('/anuncios/:id/faixas/ml', faixasNoMl);
 router.get('/anuncios/:id/catalogo', verificarCatalogo);
+router.get('/anuncios/:id/itens/:idItem/preco', analisarPreco);
 router.post('/anuncios/:id/itens/:idItem/catalogo', entrarNoCatalogo);
 router.post('/anuncios/:id/sincronizar', sincronizarAnuncio);
 router.get('/sincronizar', situacaoSincronizacao);

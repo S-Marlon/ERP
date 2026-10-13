@@ -336,7 +336,7 @@ export const resumo = (c: AnuncioCarregado) => {
 
 // Comissão do ML por preço (cache curto: muda pouco)
 const cacheTaxas = new Map<string, { em: number; valor: Promise<{ percentual: number; comissao: number; fixa: number } | null> }>();
-const taxaMl = (tenant: number, preco: number, categoria: string, tipo: string) => {
+export const taxaMl = (tenant: number, preco: number, categoria: string, tipo: string) => {
   const chave = `${preco}|${categoria}|${tipo}`;
   const guardado = cacheTaxas.get(chave);
   if (guardado && Date.now() - guardado.em < 60 * 60 * 1000) return guardado.valor;

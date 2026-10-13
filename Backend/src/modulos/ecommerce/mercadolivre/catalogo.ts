@@ -89,14 +89,14 @@ const quaseIgual = (a: string, b: string) => {
  * é outro produto (trava); texto diferente (material, nome da cor) fica para o operador conferir.
  */
 export const compararAtributos = (
-  produtoAtributos: any[], itemValores: Record<string, { valor: string; unidade: string | null } | null>
+  produtoAtributos: any[], itemValores: Record<string, { valor: string; unidade: string | null } | null>, ignorar: Set<string> = new Set()
 ) => {
   const conferem: string[] = [];
   const diferentes: { nome: string; catalogo: string; item: string }[] = [];
   const conferir: { nome: string; catalogo: string; item: string }[] = [];
   for (const a of produtoAtributos || []) {
     const v = itemValores[a?.id];
-    if (!v || NAO_COMPARAR.has(a.id) || !a.value_name) continue;
+    if (!v || NAO_COMPARAR.has(a.id) || ignorar.has(a.id) || !a.value_name) continue;
     const doItem = `${v.valor}${v.unidade ? ` ${v.unidade}` : ''}`;
     const p = lerMedida(a.value_name);
     const i = lerMedida(doItem);

@@ -56,6 +56,23 @@ export interface AnuncioResumo {
 /** Preço por quantidade (B2B): a partir de `minimo` unidades, `desconto`% sobre o preço do anúncio. */
 export interface FaixaQuantidade { minimo: number; desconto: number }
 
+export interface LucroMl {
+  preco: number; tarifa: number; frete: number; liquido: number; custo: number; lucro: number;
+  lucroSobreCustoPct: number | null; margemSobrePrecoPct: number | null; nivel: 'PREJUIZO' | 'BAIXO' | 'BOM' | 'ALTO' | 'SEM_CUSTO';
+}
+export interface EstatisticasMercado { n: number; min: number; p25: number; mediana: number; p75: number; max: number }
+export interface AnalisePreco {
+  idItem: number; sku: string; titulo: string; marca: string | null; unidades: number; unidadeMl: string | null; custo: number; custoBase: number;
+  alvo: { pct: number; origem: 'FAMILIA' | 'PADRAO' }; tarifa: { comissaoPct: number; fixa: number }; frete: number;
+  atual: LucroMl; simulado: LucroMl | null; precoAlvo: number | null; loja: { preco: number; difPct: number | null };
+  mercado: {
+    produtos: { produtoId: string; nome: string; marca: string | null; unidades: number; preco: number; porUnidade: number; fonte: string }[];
+    estatisticas: EstatisticasMercado | null; todos?: EstatisticasMercado | null; mesmaMarca: EstatisticasMercado | null; regua?: 'PACOTE_PARECIDO' | 'TODOS';
+    erro: string | null; porUnidade: number; nivel: 'ABAIXO' | 'COMPETITIVO' | 'ACIMA' | 'SEM_REFERENCIA'; difMedianaPct: number | null; precoMercado: number | null;
+  };
+  faixas: (LucroMl & { minimo: number; desconto: number })[]; conselhos: string[];
+}
+
 export interface CandidatoCatalogo {
   produtoId: string; nome: string; marca: string | null; modelo: string | null; unidades: string | null; foto: string | null;
   gtinConfere: boolean; marcaConfere: boolean; podeEntrar: boolean; conferem: string[];
@@ -195,6 +212,12 @@ export const anunciosApi = {
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idItem}?tenant_id=1`, json('PUT', { preco })), 'Erro ao salvar o preço.'),
   regraItem: async (id: number, idItem: number, regra: { estoqueReserva?: number | null; estoqueMaximo?: number | null; idUnidade?: number | null }) =>
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idItem}?tenant_id=1`, json('PUT', regra)), 'Erro ao salvar o estoque do item.'),
+  analisePreco: async (id: number, idItem: number, p: { simular?: number | null; frete?: number | null }) => {
+    const q = new URLSearchParams({ tenant_id: '1' });
+    if (p.simular) q.set('simular', String(p.simular));
+    if (p.frete) q.set('frete', String(p.frete));
+    return ler<AnalisePreco>(await fetch(`${API}/anuncios/${id}/itens/${idItem}/preco?${q}`), 'Erro ao analisar o preço.');
+  },
   verificarCatalogo: async (id: number) => ler<{ itens: CatalogoItem[] }>(await fetch(`${API}/anuncios/${id}/catalogo?tenant_id=1`), 'Erro ao verificar o catálogo.'),
   entrarNoCatalogo: async (id: number, idItem: number, produtoId: string) =>
     ler<{ mlbCatalogo: string | null; permalink: string | null }>(await fetch(`${API}/anuncios/${id}/itens/${idItem}/catalogo?tenant_id=1`, json('POST', { produtoId })), 'Erro ao entrar no catálogo.'),

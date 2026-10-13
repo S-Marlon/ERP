@@ -19,6 +19,7 @@ import { EstoqueAnuncioCard, EstoqueItemCelula } from './EstoqueMl';
 import { ModeloTituloCampo, ModoPublicacaoAviso } from './TituloMl';
 import FaixasQuantidadeCard from './FaixasQuantidadeCard';
 import CatalogoMlCard from './CatalogoMlCard';
+import PrecoMlCard from './PrecoMlCard';
 import CategoriaMlModal from './CategoriaMlModal';
 import AdicionarAnuncioModal from './AdicionarAnuncioModal';
 import SituacaoTag from './SituacaoTag';
@@ -725,6 +726,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
               {blocoDados}
               <EstoqueAnuncioCard det={det} sincronizando={sincronizando} onSincronizar={sincronizarAgora} onSalvar={corpo => salvar(corpo, 'Estoque do anúncio salvo.')} />
               {blocoItens}
+              {det.categoria && det.itens.length > 0 && <PrecoMlCard det={det} onPrecoAplicado={recarregar} />}
               {det.publicados > 0 && <CatalogoMlCard det={det} />}
               <FaixasQuantidadeCard det={det} onSalvar={async faixas => { await salvar({ faixasQuantidade: faixas }, faixas.length ? 'Faixas por quantidade salvas.' : 'Faixas por quantidade retiradas.'); }} />
               {blocoAtributos}
