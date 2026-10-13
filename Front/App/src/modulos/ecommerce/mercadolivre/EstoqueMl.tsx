@@ -76,11 +76,14 @@ interface CelulaProps {
 /** Estoque do item: saldo do ERP, o que vai para o ML e a exceção do item (clicando). */
 export const EstoqueItemCelula: React.FC<CelulaProps> = ({ item, det, onSalvarRegra }) => {
   const [aberto, setAberto] = useState(false);
-  const [reserva, setReserva] = useState<number | null>(item.ml.regra.reserva);
-  const [maximo, setMaximo] = useState<number | null>(item.ml.regra.maximo);
-  useEffect(() => { setReserva(item.ml.regra.reserva); setMaximo(item.ml.regra.maximo); }, [item.ml.regra.reserva, item.ml.regra.maximo, aberto]);
-  const temExcecao = item.ml.regra.reserva !== null || item.ml.regra.maximo !== null;
-  const desatualizado = !!item.ml.mlbId && item.ml.estoqueEnviado !== null && item.ml.estoqueEnviado !== item.estoqueMl;
+  // backend de versão anterior pode não mandar estes campos: a célula não pode quebrar a tela
+  const unidades = item.unidades || [];
+  const regraItem = item.ml?.regra || { reserva: null, maximo: null };
+  const [reserva, setReserva] = useState<number | null>(regraItem.reserva);
+  const [maximo, setMaximo] = useState<number | null>(regraItem.maximo);
+  useEffect(() => { setReserva(regraItem.reserva); setMaximo(regraItem.maximo); }, [regraItem.reserva, regraItem.maximo, aberto]);
+  const temExcecao = regraItem.reserva !== null || regraItem.maximo !== null;
+  const desatualizado = !!item.ml?.mlbId && item.ml.estoqueEnviado != null && item.ml.estoqueEnviado !== item.estoqueMl;
 
   const salvar = async (regra: { estoqueReserva?: number | null; estoqueMaximo?: number | null; idUnidade?: number | null }) => {
     await onSalvarRegra(regra);
@@ -89,7 +92,7 @@ export const EstoqueItemCelula: React.FC<CelulaProps> = ({ item, det, onSalvarRe
 
   const conteudo = (
     <Space direction="vertical" size={8} style={{ width: 280 }}>
-      {item.unidades.length > 0 && (
+      {unidades.length > 0 && (
         <div>
           <Text style={{ fontSize: 12 }}>Vende no ML como</Text>
           <Select
@@ -97,7 +100,7 @@ export const EstoqueItemCelula: React.FC<CelulaProps> = ({ item, det, onSalvarRe
             onChange={(v: number) => salvar({ idUnidade: v || null })}
             options={[
               { value: 0, label: `${item.siglaBase || 'Unidade base'} (1 por 1)` },
-              ...item.unidades.map(u => ({ value: u.idUnidade, label: `${u.nome} (${u.sigla}) = ${u.fator} ${item.siglaBase || 'un.'}${u.preco ? ` · R$ ${u.preco.toFixed(2).replace('.', ',')}` : ''}` })),
+              ...unidades.map(u => ({ value: u.idUnidade, label: `${u.nome} (${u.sigla}) = ${u.fator} ${item.siglaBase || 'un.'}${u.preco ? ` · R$ ${u.preco.toFixed(2).replace('.', ',')}` : ''}` })),
             ]}
           />
           <Text type="secondary" style={{ fontSize: 11 }}>Estoque e preço do ML passam a contar nessa unidade (ex.: pacote c/12).</Text>
