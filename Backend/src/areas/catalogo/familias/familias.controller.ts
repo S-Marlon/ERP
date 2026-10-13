@@ -752,6 +752,26 @@ export const getDiagnosticoFormalizacao = async (req: Request, res: Response) =>
       };
     });
 
+    // Inativos juntados em outro item (Itens duplicados): em qual SKU entraram
+    const inativos = itensDiagnostico.filter((i: any) => String(i.status || '').toUpperCase() === 'INATIVO').map((i: any) => Number(i.idItem || i.id));
+    if (inativos.length) {
+      const [unif]: any = await connection.execute(
+        `SELECT u.id_item_origem, COALESCE(NULLIF(TRIM(p.sku_customizado), ''), ic.sku) AS sku_destino
+         FROM itens_core_unificacoes u
+         INNER JOIN itens_core ic ON ic.id_item = u.id_item_destino
+         LEFT JOIN comercial_produtos_dados p ON p.id_item = u.id_item_destino AND p.tenant_id = u.tenant_id
+         WHERE u.tenant_id = ? AND u.id_item_origem IN (${inativos.map(() => '?').join(',')})
+         ORDER BY u.id DESC`,
+        [tenantId, ...inativos]
+      );
+      const destino = new Map<number, string>();
+      for (const u of unif) if (!destino.has(Number(u.id_item_origem))) destino.set(Number(u.id_item_origem), u.sku_destino);
+      for (const i of itensDiagnostico as any[]) {
+        const d = destino.get(Number(i.idItem || i.id));
+        if (d) i.juntadoEm = d;
+      }
+    }
+
     return res.json({
       familia: {
         id: String(contexto.familia.id),

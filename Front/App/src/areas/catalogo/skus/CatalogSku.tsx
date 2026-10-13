@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Avatar, Badge, Button, Card, Col, Drawer, Dropdown, Flex, Input, Modal, Row, Segmented, Select, Space, Table, Tag, Tooltip, Typography, message, theme,
+  Avatar, Badge, Button, Card, Col, Drawer, Dropdown, Flex, Input, Modal, Row, Segmented, Select, Space, Switch, Table, Tag, Tooltip, Typography, message, theme,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -99,7 +99,11 @@ export default function CatalogSku() {
     itens.forEach(i => { c[visaoDoTipo(i.tipo_recurso)]++; });
     return c;
   }, [itens]);
-  const linhasDaVisao = useMemo(() => agruparPorFamilia(itens.filter(i => ehDaVisao(i.tipo_recurso, visao))), [itens, visao]);
+  // Inativos (ex.: duplicados juntados em outro item) ficam fora por padrão: não são variações em uso
+  const [mostrarInativos, setMostrarInativos] = useState(false);
+  const inativosNaVisao = useMemo(() => itens.filter(i => ehDaVisao(i.tipo_recurso, visao) && String(i.status).toUpperCase() === 'INATIVO').length, [itens, visao]);
+  const linhasDaVisao = useMemo(() => agruparPorFamilia(itens.filter(i => ehDaVisao(i.tipo_recurso, visao)
+    && (mostrarInativos || String(i.status).toUpperCase() !== 'INATIVO'))), [itens, visao, mostrarInativos]);
   const linhas = useMemo(() => filtrarLinhas(linhasDaVisao, filtros), [linhasDaVisao, filtros]);
   const contagem = useMemo(() => contarSituacoes(linhasDaVisao), [linhasDaVisao]);
   const ehVenda = visao === 'VENDA' || visao === 'TODOS';
@@ -363,6 +367,11 @@ export default function CatalogSku() {
             options={(Object.keys(ROTULO_SITUACAO) as Situacao[])
               .filter(s => ehVenda || (s !== 'SEM_PRECO' && s !== 'NAO_PUBLICAVEL'))
               .map(s => ({ value: s, label: `Situação: ${ROTULO_SITUACAO[s]}` }))} />
+          {inativosNaVisao > 0 && (
+            <Tooltip title="Itens inativos, como os duplicados já juntados em outro item. Ficam escondidos para não parecerem variações em uso.">
+              <Space size={4}><Switch size="small" checked={mostrarInativos} onChange={setMostrarInativos} /><Text style={{ fontSize: 12 }}>Inativos ({inativosNaVisao})</Text></Space>
+            </Tooltip>
+          )}
           <Segmented value={filtros.estrutura} onChange={v => filtrar({ estrutura: v as Filtros['estrutura'] })}
             options={[{ value: 'TODAS', label: 'Tudo' }, { value: 'FAMILIAS', label: 'Famílias' }, { value: 'AVULSOS', label: 'Avulsos' }]} />
           {temFiltro && <Button icon={<ClearOutlined />} onClick={() => setFiltros(FILTROS_INICIAIS)}>Limpar filtros</Button>}

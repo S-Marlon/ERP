@@ -77,6 +77,8 @@ const [isModalRevisaoOpen, setIsModalRevisaoOpen] = useState<boolean>(false);
 const [familiaSelecionadaLocal, setFamiliaSelecionadaLocal] = useState<any>(null);
 const [familiaOriginal, setFamiliaOriginal] = useState<any>(null);
 const [temAlteracoes, setTemAlteracoes] = useState<boolean>(false);
+// Editor "Nomes e SKUs": aberto pelo painel ou pela lista de itens
+const [editorNomesAberto, setEditorNomesAberto] = useState<boolean>(false);
 const snapshotRef = useRef<string>("");
 const isFamilyCompliant = true
 
@@ -988,6 +990,8 @@ carregandoItens={carregandoItens}
 temAlteracoes={temAlteracoes}
 onSalvarFamilia={handleSalvarFamiliaNoBanco}
 onVariacoesGravadas={catalogState.recarregarItensDaFamilia}
+editorAberto={editorNomesAberto}
+onEditorAberto={setEditorNomesAberto}
 />
 
  
@@ -1149,6 +1153,7 @@ handleProcessarFormalizacaoLote={handleProcessarFormalizacaoLote}
 handlePadronizarNomesFamilia={handlePadronizarNomesFamilia}
 handlePadronizarSkusFamilia={handlePadronizarSkusFamilia}
 onItensAlterados={catalogState.recarregarItensDaFamilia}
+onAbrirNomesSkus={() => setEditorNomesAberto(true)}
 />
 
 </Col>

@@ -22,6 +22,9 @@ interface PainelSimuladorProps {
   onSalvarFamilia?: () => Promise<unknown> | void;
   /** Variações gravadas pelo editor: recarregar os itens */
   onVariacoesGravadas?: () => void;
+  /** Editor de nomes e SKUs controlado por fora (ex.: aberto também pela lista de itens) */
+  editorAberto?: boolean;
+  onEditorAberto?: (aberto: boolean) => void;
   // Mantidos por compatibilidade com quem ainda passa (o editor novo não usa)
   valoresTeste?: Record<string, string>;
   onMudancaValorTeste?: (id: string, valor: string) => void;
@@ -32,8 +35,13 @@ interface PainelSimuladorProps {
 export const PainelSimulador: React.FC<PainelSimuladorProps> = ({
   familiaSelecionada, onAtualizarTemplateComercial, onAtualizarTemplateSku, onAtualizarSiglaSku, onAtualizarSeparadorSku,
   previewNomeSimulado, previewSkuSimulado, brandColor = '#1677ff', itensDaFamilia = [], temAlteracoes, onSalvarFamilia, onVariacoesGravadas,
+  editorAberto, onEditorAberto,
 }) => {
-  const [aberto, setAberto] = useState(false);
+  const [abertoLocal, setAbertoLocal] = useState(false);
+  const aberto = editorAberto ?? abertoLocal;
+  const setAberto = (v: boolean) => { if (onEditorAberto) onEditorAberto(v); else setAbertoLocal(v); };
+  // Inativos (ex.: juntados em outro item) não são variações em uso
+  const ativos = itensDaFamilia.filter((i: any) => String(i.status || '').toUpperCase() !== 'INATIVO').length;
   const temGradeNoSku = (familiaSelecionada?.atributos || []).some(a => a.classificacao === 'grade'
     && new RegExp(`\\{${a.nome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\}`, 'i').test(familiaSelecionada?.templateSku || ''));
 
@@ -50,7 +58,7 @@ export const PainelSimulador: React.FC<PainelSimuladorProps> = ({
         )}
         extra={(
           <Button type="primary" size="small" icon={<EditOutlined />} onClick={() => setAberto(true)} style={{ background: brandColor, borderColor: brandColor }}>
-            Editar variações ({itensDaFamilia.length})
+            Editar variações ({ativos})
           </Button>
         )}
       >
