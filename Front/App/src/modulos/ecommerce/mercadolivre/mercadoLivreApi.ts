@@ -53,12 +53,18 @@ export interface AnuncioResumo {
   precoMin: number | null; precoMax: number | null; erros: number; avisos: number; atualizadoEm: string; ultimoErro: string | null;
 }
 
+export interface UnidadeVenda { idUnidade: number; sigla: string; nome: string; fator: number; preco: number | null }
+
 export interface ItemDoAnuncio {
   idItem: number; sku: string; nome: string; ativo: boolean; preco: number; precoMl: number | null; precoAnuncio: number;
   comissao: number | null; percentualComissao: number | null; fotos: number; fotoUrl: string | null;
   estoque: number;          // saldo do ERP (kit: quantos dá para montar)
   estoqueMl: number;        // o que vai para o ML (saldo − reserva, até o teto)
   kit?: boolean;
+  siglaBase?: string | null;          // unidade em que o ERP controla o saldo (ex.: PC)
+  estoqueBase?: number;               // saldo na unidade base quando o ML vende outra unidade
+  unidadeMl?: UnidadeVenda | null;    // unidade vendida no ML (ex.: pacote c/12)
+  unidades: UnidadeVenda[];           // unidades derivadas que dá para vender no ML
   gtin: string | null; pesoKg: number | null; medidasCm: { altura: number; largura: number; comprimento: number } | null;
   marca: string | null; valoresErp: Record<string, string | null>; motivosCadastro: string[];
   valores: Record<string, { valor: string; valorId: string | null; unidade: string | null } | null>;
@@ -95,8 +101,11 @@ export interface PreviaImportacao { jaLigados: number; itens: AnuncioNoMl[] }
 export const ROTULO_STATUS_ML: Record<string, { texto: string; cor: string }> = {
   active: { texto: 'Ativo no ML', cor: 'green' }, paused: { texto: 'Pausado no ML', cor: 'orange' },
   closed: { texto: 'Encerrado no ML', cor: 'default' }, under_review: { texto: 'Em revisão no ML', cor: 'gold' },
-  inactive: { texto: 'Inativo no ML', cor: 'default' },
+  inactive: { texto: 'Inativo no ML', cor: 'default' }, deleted: { texto: 'Excluído no ML', cor: 'red' },
 };
+
+/** Item encerrado ou excluído no ML: não recebe mais estoque/preço e pode ser desligado. */
+export const foraDoMl = (status: string | null | undefined) => status === 'closed' || status === 'deleted';
 
 export interface ResultadoSincronizacao {
   idAnuncio: number; idItem: number; sku: string; mlbId: string;
@@ -134,8 +143,10 @@ export const anunciosApi = {
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idItem}?tenant_id=1`, json('DELETE')), 'Erro ao tirar o item.'),
   precoItem: async (id: number, idItem: number, preco: number | null) =>
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idItem}?tenant_id=1`, json('PUT', { preco })), 'Erro ao salvar o preço.'),
-  regraItem: async (id: number, idItem: number, regra: { estoqueReserva: number | null; estoqueMaximo: number | null }) =>
+  regraItem: async (id: number, idItem: number, regra: { estoqueReserva?: number | null; estoqueMaximo?: number | null; idUnidade?: number | null }) =>
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idItem}?tenant_id=1`, json('PUT', regra)), 'Erro ao salvar o estoque do item.'),
+  desligarDoMl: async (id: number, idItem: number) =>
+    ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idItem}/ml?tenant_id=1`, json('DELETE')), 'Erro ao desligar do ML.'),
   sincronizarAnuncio: async (id: number, forcar = false) =>
     ler<{ enviados: ResultadoSincronizacao[]; detalhe: AnuncioDetalhe }>(await fetch(`${API}/anuncios/${id}/sincronizar?tenant_id=1`, json('POST', { forcar })), 'Erro ao atualizar no ML.'),
   sincronizarTodos: async () =>

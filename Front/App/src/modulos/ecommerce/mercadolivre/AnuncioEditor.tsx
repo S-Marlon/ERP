@@ -12,7 +12,7 @@ import { adicionarAnexo, enviarArquivoAnexo } from '../../../areas/catalogo/skus
 import FotoFamiliaControle from '../../../areas/catalogo/familias/FotoFamiliaControle';
 import EnviarFotoPopover from '../../../shared/components/EnviarFotoPopover';
 import {
-  AnuncioDetalhe, anunciosApi, AtributoML, ConferenciaItem, formatarMoeda, ItemDoAnuncio, resumoSincronizacao, ROTULO_STATUS_ML, ValorAtributo,
+  AnuncioDetalhe, anunciosApi, AtributoML, ConferenciaItem, foraDoMl, formatarMoeda, ItemDoAnuncio, resumoSincronizacao, ROTULO_STATUS_ML, ValorAtributo,
 } from './mercadoLivreApi';
 import { agruparPendencias, textoComPrimeiraMaiuscula } from './pendencias';
 import { EstoqueAnuncioCard, EstoqueItemCelula } from './EstoqueMl';
@@ -384,7 +384,16 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
                   <a href={i.ml.permalink || undefined} target="_blank" rel="noreferrer">
                     <Tag color={ROTULO_STATUS_ML[i.ml.status || '']?.cor || 'green'} style={{ fontSize: 11 }}>{i.ml.mlbId} · {ROTULO_STATUS_ML[i.ml.status || '']?.texto || i.ml.status}</Tag>
                   </a>
-                ) : i.ml.erro ? (
+                ) : null}
+                {i.ml.mlbId && foraDoMl(i.ml.status) ? (
+                  <Popconfirm
+                    title="Desligar do Mercado Livre?"
+                    description={<div style={{ maxWidth: 300 }}>O anúncio {i.ml.mlbId} não existe mais no ML. O item volta a "a publicar": dá para publicar de novo ou tirar do anúncio.</div>}
+                    okText="Desligar" onConfirm={() => executar(() => anunciosApi.desligarDoMl(det.id, i.idItem), 'Item desligado do ML.')}
+                  >
+                    <Button size="small" type="link" style={{ padding: 0, fontSize: 12 }}>Desligar do ML</Button>
+                  </Popconfirm>
+                ) : i.ml.mlbId ? null : i.ml.erro ? (
                   <Tooltip title={i.ml.erro}><Tag color="red" style={{ fontSize: 11 }}>não subiu: {i.ml.erro.slice(0, 50)}{i.ml.erro.length > 50 ? '…' : ''}</Tag></Tooltip>
                 ) : det.publicados > 0 ? <Tag style={{ fontSize: 11 }}>a publicar</Tag> : null}
                 {errosConferencia.get(i.idItem)?.map((e, k) => <div key={k}><Text type="danger" style={{ fontSize: 12 }}>ML: {e}</Text></div>)}
@@ -440,7 +449,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
           },
           {
             title: '', width: 40,
-            render: (_, i) => !i.ml.mlbId && det.itens.length > 1 && (
+            render: (_, i) => (!i.ml.mlbId || foraDoMl(i.ml.status)) && (det.itens.length > 1 || foraDoMl(i.ml.status)) && (
               <Popconfirm title={`Tirar ${i.sku} deste anúncio?`} okText="Tirar" onConfirm={() => executar(() => anunciosApi.removerItem(det.id, i.idItem))}>
                 <Button type="text" size="small" danger icon={<DeleteOutlined />} />
               </Popconfirm>

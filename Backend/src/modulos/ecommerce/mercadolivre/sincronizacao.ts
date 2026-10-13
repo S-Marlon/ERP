@@ -1,8 +1,8 @@
 // Sincronização de estoque e preço com o Mercado Livre: manda só o que mudou desde o último envio.
 // Roda pelo botão (anúncio ou todos) e sozinha a cada poucos minutos, só com o módulo ligado e a conta conectada.
 import pool from '../../../infra/db';
-import { mudancasParaMl, precoNoMl } from './anuncios';
-import { carregarAnuncios } from './anuncios.controller';
+import { foraDoMl, mudancasParaMl, precoNoMl, situacaoPorItens, statusDoMl } from './anuncios';
+import { AnuncioCarregado, carregarAnuncios } from './anuncios.controller';
 import { ErroML, ml } from './mercadolivreApi';
 
 export interface ResultadoSincronizacao {
@@ -25,12 +25,13 @@ export const sincronizarAnuncios = async (
   tenant: number, opcoes: { idAnuncio?: number; idItem?: number; somenteAutomaticos?: boolean; forcar?: boolean } = {}
 ): Promise<ResultadoSincronizacao[]> => {
   const anuncios = await carregarAnuncios(pool as any, tenant, opcoes.idAnuncio);
+  await atualizarStatusDoMl(tenant, anuncios);
   const resultado: ResultadoSincronizacao[] = [];
   for (const c of anuncios) {
     if (opcoes.somenteAutomaticos && !Number(c.registro.estoque_automatico)) continue;
     for (const item of c.itens) {
       const m = c.noMl.get(item.idItem);
-      if (!m?.mlbId || (opcoes.idItem && opcoes.idItem !== item.idItem)) continue;
+      if (!m?.mlbId || foraDoMl(m.status) || (opcoes.idItem && opcoes.idItem !== item.idItem)) continue;
       const atual = { estoque: item.estoqueMl ?? 0, preco: precoNoMl(item, c.dados.ajustePreco) };
       const corpo = opcoes.forcar
         ? { available_quantity: atual.estoque, ...(atual.preco > 0 ? { price: atual.preco } : {}) }
@@ -70,6 +71,36 @@ export const sincronizarAnuncios = async (
     }
   }
   return resultado;
+};
+
+/**
+ * Lê no ML o status de cada item publicado (excluído, encerrado, pausado...) e atualiza o ERP, inclusive a situação
+ * do anúncio. Item excluído ou encerrado lá deixa de receber estoque e preço.
+ */
+export const atualizarStatusDoMl = async (tenant: number, anuncios: AnuncioCarregado[]) => {
+  const ids = anuncios.flatMap(c => [...c.noMl.values()].map(m => m.mlbId).filter(Boolean) as string[]);
+  if (!ids.length) return;
+  const status = new Map<string, string>();
+  for (let k = 0; k < ids.length; k += 20) {
+    const parte: any[] = await ml(tenant, 'GET', `/items?ids=${ids.slice(k, k + 20).join(',')}&attributes=id,status,sub_status`);
+    for (const r of parte || []) if (r?.code === 200 && r.body?.id) status.set(String(r.body.id), statusDoMl(r.body));
+  }
+  for (const c of anuncios) {
+    for (const [idItem, m] of c.noMl) {
+      const novo = m.mlbId ? status.get(m.mlbId) : undefined;
+      if (!novo || novo === m.status) continue;
+      await pool.execute(
+        `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET status_ml = ? WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
+        [novo, Number(c.registro.id), tenant, idItem]
+      );
+      m.status = novo;
+    }
+    const situacao = situacaoPorItens([...c.noMl.values()].filter(m => m.mlbId).map(m => m.status));
+    if (situacao && situacao !== c.registro.situacao) {
+      await pool.execute(`UPDATE modulo_ecommerce_mercadolivre_anuncios SET situacao = ? WHERE id = ? AND tenant_id = ?`, [situacao, Number(c.registro.id), tenant]);
+      c.registro.situacao = situacao;
+    }
+  }
 };
 
 // ---------------------------------------------------------------------------

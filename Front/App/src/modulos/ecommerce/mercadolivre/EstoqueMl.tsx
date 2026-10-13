@@ -1,6 +1,6 @@
 // Estoque no Mercado Livre: quanto fica para a loja (reserva), o teto no ML e a atualização automática.
 import React, { useEffect, useState } from 'react';
-import { Button, Card, Col, Flex, InputNumber, Popover, Row, Space, Switch, Tag, Tooltip, Typography } from 'antd';
+import { Button, Card, Col, Flex, InputNumber, Popover, Row, Select, Space, Switch, Tag, Tooltip, Typography } from 'antd';
 import { SyncOutlined } from '@ant-design/icons';
 import type { AnuncioDetalhe, ItemDoAnuncio } from './mercadoLivreApi';
 
@@ -70,7 +70,7 @@ export const EstoqueAnuncioCard: React.FC<CardProps> = ({ det, onSalvar, onSincr
 interface CelulaProps {
   item: ItemDoAnuncio;
   det: AnuncioDetalhe;
-  onSalvarRegra: (regra: { estoqueReserva: number | null; estoqueMaximo: number | null }) => Promise<void> | void;
+  onSalvarRegra: (regra: { estoqueReserva?: number | null; estoqueMaximo?: number | null; idUnidade?: number | null }) => Promise<void> | void;
 }
 
 /** Estoque do item: saldo do ERP, o que vai para o ML e a exceção do item (clicando). */
@@ -82,13 +82,27 @@ export const EstoqueItemCelula: React.FC<CelulaProps> = ({ item, det, onSalvarRe
   const temExcecao = item.ml.regra.reserva !== null || item.ml.regra.maximo !== null;
   const desatualizado = !!item.ml.mlbId && item.ml.estoqueEnviado !== null && item.ml.estoqueEnviado !== item.estoqueMl;
 
-  const salvar = async (regra: { estoqueReserva: number | null; estoqueMaximo: number | null }) => {
+  const salvar = async (regra: { estoqueReserva?: number | null; estoqueMaximo?: number | null; idUnidade?: number | null }) => {
     await onSalvarRegra(regra);
     setAberto(false);
   };
 
   const conteudo = (
-    <Space direction="vertical" size={8} style={{ width: 260 }}>
+    <Space direction="vertical" size={8} style={{ width: 280 }}>
+      {item.unidades.length > 0 && (
+        <div>
+          <Text style={{ fontSize: 12 }}>Vende no ML como</Text>
+          <Select
+            style={{ width: '100%' }} value={item.unidadeMl?.idUnidade ?? 0}
+            onChange={(v: number) => salvar({ idUnidade: v || null })}
+            options={[
+              { value: 0, label: `${item.siglaBase || 'Unidade base'} (1 por 1)` },
+              ...item.unidades.map(u => ({ value: u.idUnidade, label: `${u.nome} (${u.sigla}) = ${u.fator} ${item.siglaBase || 'un.'}${u.preco ? ` · R$ ${u.preco.toFixed(2).replace('.', ',')}` : ''}` })),
+            ]}
+          />
+          <Text type="secondary" style={{ fontSize: 11 }}>Estoque e preço do ML passam a contar nessa unidade (ex.: pacote c/12).</Text>
+        </div>
+      )}
       <Text type="secondary" style={{ fontSize: 12 }}>Só para {item.sku}. Vazio = regra do anúncio (reserva {det.estoqueReserva}, teto {det.estoqueMaximo ?? 'sem'}).</Text>
       <Flex gap={8}>
         <div style={{ flex: 1 }}>
@@ -110,7 +124,14 @@ export const EstoqueItemCelula: React.FC<CelulaProps> = ({ item, det, onSalvarRe
   return (
     <Popover trigger="click" open={aberto} onOpenChange={setAberto} title="Estoque deste item no ML" content={conteudo} destroyOnHidden>
       <div style={{ cursor: 'pointer', lineHeight: 1.25, textAlign: 'right' }}>
-        <div><Text type="secondary" style={{ fontSize: 11 }}>{item.kit ? 'monta' : 'ERP'}</Text> <Text type={item.estoque > 0 ? undefined : 'warning'}>{item.estoque}</Text></div>
+        <div>
+          <Text type="secondary" style={{ fontSize: 11 }}>{item.kit ? 'monta' : 'ERP'}</Text>{' '}
+          {item.unidadeMl
+            ? <Tooltip title={`${item.estoqueBase} ${item.siglaBase || ''} = ${item.estoque} ${item.unidadeMl.sigla} (${item.unidadeMl.fator} por ${item.unidadeMl.sigla})`}>
+                <Text type={item.estoque > 0 ? undefined : 'warning'}>{item.estoqueBase} {item.siglaBase} = {item.estoque} {item.unidadeMl.sigla}</Text>
+              </Tooltip>
+            : <Text type={item.estoque > 0 ? undefined : 'warning'}>{item.estoque}</Text>}
+        </div>
         <div>
           <Text type="secondary" style={{ fontSize: 11 }}>ML</Text> <Text strong>{item.estoqueMl}</Text>
           {temExcecao && <Tooltip title="Este item tem regra própria"><Tag color="purple" style={{ fontSize: 10, marginLeft: 4, marginRight: 0, padding: '0 3px' }}>próp.</Tag></Tooltip>}

@@ -7,7 +7,7 @@ import { carregarComposicoes, carregarDadosComponentes } from '../../../areas/ca
 import { estoqueDoKit } from '../../../areas/catalogo/kits/kits';
 import {
   AnuncioDados, AtributoML, categoriaInfo, CategoriaInfo, cortarTitulo, eixosDeVariacao, filtrarAtributosCategoria,
-  ItemAnuncio, Pendencia, pendenciasAnuncio, precoNoMl, resolverValor, situacaoPreparo, sugerirAtributos, tituloLegivel, ValorAtributo, estoqueParaMl, regraDoItem, RegraEstoque,
+  ItemAnuncio, Pendencia, pendenciasAnuncio, precoNoMl, resolverValor, situacaoPreparo, sugerirAtributos, tituloLegivel, ValorAtributo, estoqueParaMl, regraDoItem, RegraEstoque, saldoNaUnidade, UnidadeVenda, foraDoMl,
 } from './anuncios';
 import { ErroML, ml } from './mercadolivreApi';
 import { sincronizarAnuncios } from './sincronizacao';
@@ -83,10 +83,11 @@ const valorExibicao = (r: any): string | null => {
 export const carregarItens = async (conn: Conn, tenant: number, ids: number[]) => {
   const itens = new Map<number, ItemAnuncio>();
   const atributosErp = new Map<number, string>();
-  if (ids.length === 0) return { itens, atributosErp };
+  const unidades = new Map<number, UnidadeVenda[]>();
+  if (ids.length === 0) return { itens, atributosErp, unidades };
 
   const [base] = await conn.execute(
-    `SELECT ic.id_item, ic.status, ic.nome_item, ic.sku AS sku_core, ic.peso_bruto, ic.peso_liquido,
+    `SELECT ic.id_item, ic.status, ic.nome_item, ic.sku AS sku_core, ic.peso_bruto, ic.peso_liquido, umb.sigla AS sigla_base,
             cpd.sku_customizado, cpd.nome_comercial, cpd.preco_venda,
             COALESCE(mi.nome, mf.nome) AS marca, lg.altura_cm, lg.largura_cm, lg.comprimento_cm, es.quantidade_atual
      FROM itens_core ic
@@ -95,6 +96,7 @@ export const carregarItens = async (conn: Conn, tenant: number, ids: number[]) =
      LEFT JOIN comercial_marcas mi ON mi.id = cpd.id_marca
      LEFT JOIN comercial_marcas mf ON mf.id = f.id_marca
      LEFT JOIN itens_dados_logisticos lg ON lg.id_item = ic.id_item
+     LEFT JOIN itens_unidades_medida umb ON umb.id_unidade = ic.id_unidade
      LEFT JOIN estoque_saldos_itens es ON es.id_item = ic.id_item AND es.tenant_id = ic.tenant_id AND es.deposito = 'VENDA'
      WHERE ic.tenant_id = ? AND ic.id_item IN (${lista(ids)})`,
     [tenant, ...ids]
@@ -120,6 +122,25 @@ export const carregarItens = async (conn: Conn, tenant: number, ids: number[]) =
     [tenant, ...ids]
   );
   const publicacao = await avaliarPublicacaoItens(conn, tenant, ids);
+  // Unidades derivadas (ex.: pacote c/12) com o preço de varejo de cada uma
+  const [derivadas] = await conn.execute(
+    `SELECT conv.id_item, conv.id_unidade_derivada AS id_unidade, um.sigla, COALESCE(NULLIF(cuv.nome_exibicao, ''), um.descricao, um.sigla) AS nome,
+            conv.fator_conversao AS fator,
+            (SELECT f.preco_unitario FROM comercial_precos_faixas f
+             WHERE f.tenant_id = conv.tenant_id AND f.id_item = conv.id_item AND f.id_unidade = conv.id_unidade_derivada AND f.tipo_faixa = 'VAREJO'
+             ORDER BY f.ordem LIMIT 1) AS preco
+     FROM itens_unidades_conversao conv
+     INNER JOIN itens_unidades_medida um ON um.id_unidade = conv.id_unidade_derivada
+     LEFT JOIN comercial_unidades_venda cuv ON cuv.tenant_id = conv.tenant_id AND cuv.id_item = conv.id_item AND cuv.id_unidade = conv.id_unidade_derivada
+     WHERE conv.tenant_id = ? AND conv.id_item IN (${lista(ids)}) AND conv.fator_conversao > 0
+     ORDER BY conv.fator_conversao`,
+    [tenant, ...ids]
+  );
+  for (const u of derivadas) {
+    const id = Number(u.id_item);
+    if (!unidades.has(id)) unidades.set(id, []);
+    unidades.get(id)!.push({ idUnidade: Number(u.id_unidade), sigla: u.sigla, nome: u.nome, fator: Number(u.fator), preco: u.preco === null ? null : Number(u.preco) });
+  }
 
   for (const r of base) {
     const id = Number(r.id_item);
@@ -139,6 +160,7 @@ export const carregarItens = async (conn: Conn, tenant: number, ids: number[]) =
       pesoKg: peso,
       medidasCm: alt > 0 && lar > 0 && com > 0 ? { altura: alt, largura: lar, comprimento: com } : null,
       marca: r.marca || null,
+      siglaBase: r.sigla_base || null,
       valoresErp: {},
       motivosCadastro: publicacao.get(id)?.motivos || [],
     });
@@ -171,7 +193,7 @@ export const carregarItens = async (conn: Conn, tenant: number, ids: number[]) =
       i.estoque = estoqueDoKit(comps, componentes) ?? 0;
     }
   }
-  return { itens, atributosErp };
+  return { itens, atributosErp, unidades };
 };
 
 // ---------------------------------------------------------------------------
@@ -200,6 +222,7 @@ export interface AnuncioCarregado {
   registro: any;
   dados: AnuncioDados;
   regraEstoque: RegraEstoque;
+  unidades: Map<number, UnidadeVenda[]>;   // unidades derivadas de cada item (para escolher a do ML)
   itens: ItemAnuncio[];
   noMl: Map<number, ItemNoMl>;
   categoria: CategoriaML | null;
@@ -221,13 +244,13 @@ export const carregarAnuncios = async (conn: Conn, tenant: number, idAnuncio?: n
   if (anuncios.length === 0) return [];
   const idsAnuncios = anuncios.map((a: any) => Number(a.id));
   const [vinculos] = await conn.execute(
-    `SELECT id_anuncio, id_item, preco, mlb_id, status_ml, permalink, ultimo_erro, fotos_ml, estoque_reserva, estoque_maximo,
+    `SELECT id_anuncio, id_item, id_unidade, preco, mlb_id, status_ml, permalink, ultimo_erro, fotos_ml, estoque_reserva, estoque_maximo,
             estoque_enviado, preco_enviado, DATE_FORMAT(sincronizado_em, '%Y-%m-%d %H:%i') AS sincronizado_fmt
      FROM modulo_ecommerce_mercadolivre_anuncios_itens
      WHERE tenant_id = ? AND id_anuncio IN (${lista(idsAnuncios)}) ORDER BY ordem, id_item`,
     [tenant, ...idsAnuncios]
   );
-  const { itens, atributosErp } = await carregarItens(conn, tenant, [...new Set<number>(vinculos.map((v: any) => Number(v.id_item)))]);
+  const { itens, atributosErp, unidades } = await carregarItens(conn, tenant, [...new Set<number>(vinculos.map((v: any) => Number(v.id_item)))]);
 
   return Promise.all(anuncios.map(async (a: any) => {
     const dados = dadosDoAnuncio(a);
@@ -243,7 +266,13 @@ export const carregarAnuncios = async (conn: Conn, tenant: number, idAnuncio?: n
     const itensDoAnuncio: ItemAnuncio[] = meus.map((v: any) => {
       const base = itens.get(Number(v.id_item))!;
       const regra = regraDoItem(regraEstoque, noMl.get(base.idItem)!.regra);
-      return { ...base, precoMl: v.preco === null ? null : Number(v.preco), estoqueMl: estoqueParaMl(base.estoque, regra) };
+      // Vendido no ML em outra unidade (ex.: pacote c/12): saldo e preço nessa unidade
+      const unidade = v.id_unidade ? (unidades.get(base.idItem) || []).find(u => u.idUnidade === Number(v.id_unidade)) || null : null;
+      const noAnuncio: ItemAnuncio = unidade
+        ? { ...base, unidadeMl: unidade, estoqueBase: base.estoque, estoque: saldoNaUnidade(base.estoque, unidade.fator),
+            preco: unidade.preco ?? Math.round(base.preco * unidade.fator * 100) / 100 }
+        : { ...base, unidadeMl: null };
+      return { ...noAnuncio, precoMl: v.preco === null ? null : Number(v.preco), estoqueMl: estoqueParaMl(noAnuncio.estoque, regra) };
     });
     const aPublicar = itensDoAnuncio.filter(i => !noMl.get(i.idItem)?.mlbId);
     const { categoria, erro } = await categoriaOuErro(tenant, dados.categoriaMl);
@@ -253,7 +282,7 @@ export const carregarAnuncios = async (conn: Conn, tenant: number, idAnuncio?: n
     if (erro) pendencias.unshift({ nivel: 'aviso', area: 'dados', texto: `Não deu para conferir a categoria no Mercado Livre: ${erro}` });
     const idsErp = new Set(itensDoAnuncio.flatMap(i => Object.keys(i.valoresErp)));
     return {
-      registro: a, dados, regraEstoque, itens: itensDoAnuncio, noMl, categoria, pendencias,
+      registro: a, dados, regraEstoque, unidades, itens: itensDoAnuncio, noMl, categoria, pendencias,
       atributosErp: [...idsErp].map(id => ({ id: Number(id), nome: atributosErp.get(Number(id)) || `#${id}` })).sort((x, y) => x.nome.localeCompare(y.nome)),
     };
   }));
@@ -345,6 +374,7 @@ export const detalhe = async (tenant: number, c: AnuncioCarregado) => {
         percentualComissao: taxa ? taxa.percentual : null,
         valores: Object.fromEntries(atributosCat.map(at => [at.id, resolverValor(at, c.dados.atributos[at.id], i)])),
         ml: (({ fotosMl, ...m }) => m)(c.noMl.get(i.idItem)!),
+        unidades: c.unidades.get(i.idItem) || [],
       };
     }),
     pendencias: c.pendencias,
@@ -653,10 +683,10 @@ export const removerItem = async (req: Request, res: Response) => {
   try {
     await anuncioEditavel(pool as any, tenant, id);
     const [[vinculo]]: any = await pool.execute(
-      `SELECT mlb_id FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
+      `SELECT mlb_id, status_ml FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
       [id, tenant, Number(req.params.idItem)]
     );
-    if (vinculo?.mlb_id) throw new ErroML(`Este item já está no ML (${vinculo.mlb_id}): pause ou encerre o anúncio lá antes de tirar daqui.`);
+    if (vinculo?.mlb_id && !foraDoMl(vinculo.status_ml)) throw new ErroML(`Este item já está no ML (${vinculo.mlb_id}): pause ou encerre o anúncio lá antes de tirar daqui.`);
     await pool.execute(
       `DELETE FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
       [id, tenant, Number(req.params.idItem)]
@@ -681,6 +711,18 @@ export const salvarItem = async (req: Request, res: Response) => {
     const b = req.body || {};
     const campos: string[] = [];
     const valores: any[] = [];
+    if ('idUnidade' in b) {
+      const idUnidade = b.idUnidade ? Number(b.idUnidade) : null;
+      if (idUnidade) {
+        const [[existe]]: any = await pool.execute(
+          `SELECT 1 FROM itens_unidades_conversao WHERE tenant_id = ? AND id_item = ? AND id_unidade_derivada = ? AND fator_conversao > 0`,
+          [tenant, idItem, idUnidade]
+        );
+        if (!existe) throw new ErroML('Essa unidade não tem conversão cadastrada no item (Catálogo › Preços & Comercial).');
+      }
+      campos.push('id_unidade = ?');
+      valores.push(idUnidade);
+    }
     if ('preco' in b) {
       const preco = b.preco === null || b.preco === '' ? null : Math.round(Number(b.preco) * 100) / 100;
       if (preco !== null && !(preco > 0)) throw new ErroML('Preço inválido.');
@@ -711,6 +753,47 @@ export const salvarItem = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * DELETE /anuncios/:id/itens/:idItem/ml — desliga do ML o item que foi excluído ou encerrado lá:
+ * ele volta a "a publicar" (pode ser publicado de novo ou tirado do anúncio).
+ */
+export const desligarDoMl = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const id = Number(req.params.id);
+  const idItem = Number(req.params.idItem);
+  try {
+    await anuncioEditavel(pool as any, tenant, id);
+    const [[v]]: any = await pool.execute(
+      `SELECT mlb_id, status_ml FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
+      [id, tenant, idItem]
+    );
+    if (!v?.mlb_id) throw new ErroML('Este item não está ligado a um anúncio do ML.');
+    if (!foraDoMl(v.status_ml)) throw new ErroML(`O anúncio ${v.mlb_id} ainda está ativo ou pausado no ML: exclua ou encerre lá antes de desligar.`);
+    await pool.execute(
+      `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens
+       SET mlb_id = NULL, status_ml = NULL, permalink = NULL, estoque_enviado = NULL, preco_enviado = NULL, sincronizado_em = NULL, ultimo_erro = NULL
+       WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
+      [id, tenant, idItem]
+    );
+    // o anúncio fica com o MLB de outro item ainda ligado; sem nenhum, volta a rascunho
+    const [[outro]]: any = await pool.execute(
+      `SELECT mlb_id, status_ml, permalink FROM modulo_ecommerce_mercadolivre_anuncios_itens
+       WHERE id_anuncio = ? AND tenant_id = ? AND mlb_id IS NOT NULL ORDER BY ordem, id_item LIMIT 1`,
+      [id, tenant]
+    );
+    await pool.execute(
+      `UPDATE modulo_ecommerce_mercadolivre_anuncios SET mlb_id = ?, status_ml = ?, permalink = ?, situacao = ? WHERE id = ? AND tenant_id = ?`,
+      outro
+        ? [outro.mlb_id, outro.status_ml, outro.permalink, foraDoMl(outro.status_ml) ? 'ENCERRADO' : 'PUBLICADO', id, tenant]
+        : [null, null, null, 'RASCUNHO', id, tenant]
+    );
+    const [c] = await carregarAnuncios(pool as any, tenant, id);
+    return res.json(await detalhe(tenant, c));
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao desligar do Mercado Livre.');
+  }
+};
+
 /** DELETE /anuncios/:id — só rascunho (o publicado se encerra no ML, na etapa de sincronização) */
 export const excluirAnuncio = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
@@ -718,9 +801,10 @@ export const excluirAnuncio = async (req: Request, res: Response) => {
   try {
     const a = await anuncioEditavel(pool as any, tenant, id);
     const [[{ noMl }]]: any = await pool.execute(
-      `SELECT COUNT(mlb_id) AS noMl FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE id_anuncio = ? AND tenant_id = ?`, [id, tenant]
+      `SELECT COUNT(mlb_id) AS noMl FROM modulo_ecommerce_mercadolivre_anuncios_itens
+       WHERE id_anuncio = ? AND tenant_id = ? AND COALESCE(status_ml, '') NOT IN ('closed', 'deleted')`, [id, tenant]
     );
-    if (a.situacao !== 'RASCUNHO' || Number(noMl) > 0) throw new ErroML('Só rascunho pode ser excluído. Anúncio publicado se encerra pelo ML.');
+    if (Number(noMl) > 0) throw new ErroML('Só rascunho pode ser excluído. Anúncio publicado se encerra pelo ML.');
     await pool.execute(`DELETE FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE id_anuncio = ? AND tenant_id = ?`, [id, tenant]);
     await pool.execute(`DELETE FROM modulo_ecommerce_mercadolivre_anuncios WHERE id = ? AND tenant_id = ?`, [id, tenant]);
     return res.json({ success: true });

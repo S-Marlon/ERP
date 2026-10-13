@@ -1,7 +1,7 @@
 import assert from 'assert';
 import {
   AnuncioDados, AtributoML, cortarTitulo, tituloLegivel, eixosDeVariacao, filtrarAtributosCategoria, ItemAnuncio, pendenciasAnuncio,
-  precoNoMl, resolverValor, sugerirAtributos, estoqueParaMl, regraDoItem, mudancasParaMl, corpoDoItem, fotoPequena, errosDoValidador, ligarPorSku,
+  precoNoMl, resolverValor, sugerirAtributos, estoqueParaMl, regraDoItem, mudancasParaMl, saldoNaUnidade, statusDoMl, foraDoMl, situacaoPorItens, corpoDoItem, fotoPequena, errosDoValidador, ligarPorSku,
 } from './anuncios';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
@@ -177,4 +177,22 @@ teste('sincronização manda só o que mudou', () => {
   assert.deepStrictEqual(mudancasParaMl({ estoque: 0, preco: 29.9 }, { estoque: 5, preco: 29.9 }), { available_quantity: 5 });
   assert.deepStrictEqual(mudancasParaMl({ estoque: 5, preco: 29.9 }, { estoque: 5, preco: 31.5 }), { price: 31.5 });
   assert.deepStrictEqual(mudancasParaMl({ estoque: null, preco: null }, { estoque: 2, preco: 10 }), { available_quantity: 2, price: 10 });
+});
+
+teste('unidade do ML: saldo em pacotes', () => {
+  assert.strictEqual(saldoNaUnidade(24, 12), 2);
+  assert.strictEqual(saldoNaUnidade(23, 12), 1);
+  assert.strictEqual(saldoNaUnidade(120, 12), 10);
+  assert.strictEqual(saldoNaUnidade(7, null), 7);
+  assert.strictEqual(saldoNaUnidade(36, 12), 3);
+});
+
+teste('status do ML: excluído, encerrado e situação do anúncio', () => {
+  assert.strictEqual(statusDoMl({ status: 'closed', sub_status: ['deleted', 'paused_by_seller'] }), 'deleted');
+  assert.strictEqual(statusDoMl({ status: 'paused', sub_status: ['out_of_stock'] }), 'paused');
+  assert.ok(foraDoMl('deleted') && foraDoMl('closed') && !foraDoMl('paused'));
+  assert.strictEqual(situacaoPorItens(['deleted']), 'ENCERRADO');
+  assert.strictEqual(situacaoPorItens(['paused', 'deleted']), 'PAUSADO');
+  assert.strictEqual(situacaoPorItens(['paused', 'active']), 'PUBLICADO');
+  assert.strictEqual(situacaoPorItens([]), null);
 });

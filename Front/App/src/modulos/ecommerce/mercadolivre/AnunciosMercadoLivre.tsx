@@ -159,8 +159,8 @@ const AnunciosMercadoLivre: React.FC = () => {
               render: (_, a) => (
                 <Space size={0}>
                   <Tooltip title="Abrir"><Button type="text" icon={<EditOutlined />} onClick={() => setEditando(a.id)} /></Tooltip>
-                  {a.situacao === 'RASCUNHO' && (
-                    <Popconfirm title="Excluir este rascunho?" description="Os itens voltam a ficar livres para outro anúncio." okText="Excluir" okButtonProps={{ danger: true }} onConfirm={() => excluir(a.id)}>
+                  {(a.situacao === 'RASCUNHO' || a.situacao === 'ENCERRADO') && (
+                    <Popconfirm title={a.situacao === 'ENCERRADO' ? 'Excluir do ERP? (no ML ele já foi excluído/encerrado)' : 'Excluir este rascunho?'} description="Os itens voltam a ficar livres para outro anúncio." okText="Excluir" okButtonProps={{ danger: true }} onConfirm={() => excluir(a.id)}>
                       <Button type="text" danger icon={<DeleteOutlined />} />
                     </Popconfirm>
                   )}

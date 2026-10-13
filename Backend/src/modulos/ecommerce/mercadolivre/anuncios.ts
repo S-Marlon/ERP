@@ -29,6 +29,9 @@ export interface ItemAnuncio {
   estoque: number;                  // saldo do ERP (kit: quantos dá para montar)
   estoqueMl?: number;               // o que vai para o ML depois da reserva da loja e do teto
   kit?: boolean;
+  siglaBase?: string | null;        // unidade em que o ERP controla o saldo (ex.: PC)
+  estoqueBase?: number;             // saldo na unidade base quando o ML vende outra unidade
+  unidadeMl?: UnidadeVenda | null;  // unidade vendida no ML (ex.: pacote c/12); vazio = a base
   fotos: number;
   fotoUrl: string | null;
   gtin: string | null;
@@ -38,6 +41,9 @@ export interface ItemAnuncio {
   valoresErp: Record<string, string | null>;     // id do atributo nosso -> valor
   motivosCadastro: string[];                     // o que falta no cadastro interno (PIM)
 }
+
+/** Unidade de venda do item com o fator sobre a unidade base e o preço de varejo dela. */
+export interface UnidadeVenda { idUnidade: number; sigla: string; nome: string; fator: number; preco: number | null }
 
 export interface AnuncioDados {
   titulo: string | null;
@@ -388,4 +394,27 @@ export const mudancasParaMl = (
   if (enviado.estoque === null || Number(enviado.estoque) !== atual.estoque) corpo.available_quantity = atual.estoque;
   if (atual.preco > 0 && (enviado.preco === null || Math.abs(Number(enviado.preco) - atual.preco) >= 0.005)) corpo.price = atual.preco;
   return Object.keys(corpo).length ? corpo : null;
+};
+
+// ---------------------------------------------------------------------------
+// Unidade vendida no ML e status do anúncio lá
+// ---------------------------------------------------------------------------
+
+/** Saldo na unidade do ML (ex.: 24 peças em pacote de 12 = 2). Sem fator: a própria unidade base. */
+export const saldoNaUnidade = (saldoBase: number, fator: number | null | undefined) =>
+  fator && fator > 1 ? Math.floor((Number(saldoBase) || 0) / fator + 1e-9) : Number(saldoBase) || 0;
+
+/** Status do item no ML como o ERP guarda: "deleted" quando foi excluído lá. */
+export const statusDoMl = (b: { status?: string; sub_status?: string[] }) =>
+  (b.sub_status || []).includes('deleted') ? 'deleted' : String(b.status || '');
+
+/** Item que não recebe mais nada do ERP (encerrado ou excluído no ML). */
+export const foraDoMl = (status: string | null | undefined) => status === 'closed' || status === 'deleted';
+
+/** Situação do anúncio a partir do status de cada item publicado. */
+export const situacaoPorItens = (status: (string | null)[]) => {
+  const ativos = status.filter(s => s && !foraDoMl(s));
+  if (status.length && !ativos.length) return 'ENCERRADO';
+  if (ativos.some(s => s === 'active' || s === 'under_review')) return 'PUBLICADO';
+  return ativos.length ? 'PAUSADO' : null;
 };
