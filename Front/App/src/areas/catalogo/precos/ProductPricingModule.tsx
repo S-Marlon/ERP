@@ -205,6 +205,9 @@ export const ProductPricingModule: React.FC = () => {
             <Tooltip title={taxaPreco.percentual > 0 ? `O preço embute ${taxaPreco.percentual.toFixed(2)}% de taxa (Vendas › Taxas de pagamento)` : 'Nenhuma taxa embutida no preço'}>
               <Button onClick={() => setPrecosTaxa(true)}>Preços com taxa{taxaPreco.percentual > 0 ? ` (${taxaPreco.percentual.toFixed(2)}%)` : ''}</Button>
             </Tooltip>
+            <Tooltip title="Itens com preço de mercado e lucro sobre o custo abaixo do alvo: custo-alvo e melhor oferta para negociar (Compra inteligente)">
+              <Button onClick={() => navigate('/compras/inteligente?aba=margem')}>Margem abaixo do alvo</Button>
+            </Tooltip>
             <Button icon={<ReloadOutlined />} onClick={carregar} loading={carregando}>Atualizar</Button>
             <Badge count={trabalho.itens.length} size="small">
               <Button icon={<UnorderedListOutlined />} onClick={() => setTrabalhoAberto(true)}>Lista de trabalho</Button>

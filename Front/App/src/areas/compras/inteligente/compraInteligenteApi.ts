@@ -56,6 +56,14 @@ export interface PedidoDetalhe {
   itens: PedidoItem[]; texto: string;
 }
 
+export interface ItemMargemBaixa {
+  idItem: number; sku: string; nome: string; unidade: string; familia: string;
+  preco: number; custo: number; taxaPct: number; alvoPct: number; origemAlvo: 'FAMILIA' | 'PADRAO';
+  liquido: number; lucro: number; lucroSobreCustoPct: number; margemSobrePrecoPct: number; prejuizo: boolean;
+  custoAlvo: number; reducaoCustoPct: number; precoAlvo: number; vendido: number; saldo: number; perdaNoPeriodo: number;
+  melhorOferta: { fornecedor: string; idFornecedor: number | null; precoBase: number; origem: 'NOTA' | 'COTACAO'; data: string | null } | null;
+}
+
 export interface PrecoHistorico {
   tipo: 'NOTA' | 'COTACAO'; data: string; fornecedor: string; idFornecedor: number | null; documento: string;
   unidade: string; quantidade: number; preco: number; precoBase: number; validade: string | null;
@@ -95,5 +103,8 @@ export const compraInteligenteApi = {
   excluir: async (id: number) => ler<{ success: boolean }>(await fetch(`${API}/pedidos/${id}?tenant_id=1`, { method: 'DELETE' }), 'Erro ao excluir.'),
   definirPrincipal: async (idItem: number, idFornecedor: number) =>
     ler<{ success: boolean }>(await fetch(`${API}/itens/${idItem}/fornecedor-principal?tenant_id=1`, json('PUT', { idFornecedor })), 'Erro ao definir o fornecedor principal.'),
+  margemAbaixoAlvo: async (alvoPadrao: number, dias: number) =>
+    ler<{ alvoPadrao: number; dias: number; taxaReferencia: number; itens: ItemMargemBaixa[] }>(
+      await fetch(`${API}/margem-abaixo-alvo?tenant_id=1&alvoPadrao=${alvoPadrao}&dias=${dias}`), 'Erro ao analisar as margens.'),
   historico: async (idItem: number) => ler<{ historico: PrecoHistorico[] }>(await fetch(`${API}/precos/${idItem}?tenant_id=1`), 'Erro ao carregar os preços.'),
 };

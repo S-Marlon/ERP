@@ -14,7 +14,7 @@ import { classificacaoItens, sugerirVinculos } from './controllers/sugestoesVinc
 import { excluirEquivalencia, listarEquivalencias, resolverUnidadesEntrada, salvarEquivalencia } from './controllers/unidadesEntrada.controller';
 import {
   analiseFornecedor, completarMinimo, criarPedido, definirFornecedorPrincipal, detalhePedido, excluirPedido, historicoPrecos, listarPedidos,
-  mudarStatusPedido, registrarCotacao, resumoFornecedores, salvarCondicoes,
+  margemAbaixoDoAlvo, mudarStatusPedido, registrarCotacao, resumoFornecedores, salvarCondicoes,
 } from './inteligente/compraInteligente.controller';
 
 const router = Router();
@@ -82,6 +82,7 @@ router.put('/pedidos/:id/status', mudarStatusPedido);
 router.put('/pedidos/:id/cotacao', registrarCotacao);
 router.delete('/pedidos/:id', excluirPedido);
 router.get('/precos/:idItem', historicoPrecos);
+router.get('/margem-abaixo-alvo', margemAbaixoDoAlvo);
 router.put('/itens/:idItem/fornecedor-principal', definirFornecedorPrincipal);
 
 export default router;

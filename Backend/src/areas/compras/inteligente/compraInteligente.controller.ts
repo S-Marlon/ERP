@@ -4,6 +4,9 @@
 import { Request, Response } from 'express';
 import pool from '../../../infra/db';
 import { operadorDe } from '../../vendas/caixa/caixa.controller';
+import { carregarTaxaPreco } from '../../vendas/taxas/taxas.controller';
+import { colunaTaxaEmbutida, temTaxaEmbutida } from '../../catalogo/precos/taxaEmbutida';
+import { alvoEfetivo, analisarMargem, melhorOferta, OfertaCusto } from './margemAlvo';
 import {
   completarPedidoMinimo, escolherPrincipal, ItemDoFornecedor, precoPorUnidadeBase, sugerirItem, SugestaoItem, textoDoPedido, totalDoPedido,
   VinculoFornecedor,
@@ -556,5 +559,91 @@ export const historicoPrecos = async (req: Request, res: Response) => {
     return res.json({ idItem, historico });
   } catch (error) {
     return responderErro(res, error, 'Erro ao carregar o histórico de preços.');
+  }
+};
+
+/**
+ * GET /api/compras/margem-abaixo-alvo?alvoPadrao=30&dias=90
+ * Itens cujo preço (de mercado) deixa o lucro líquido sobre o custo abaixo do alvo (margem mínima da família;
+ * sem ela, o alvo padrão). Para cada um: custo-alvo, quanto o custo precisa cair, o giro e a melhor oferta
+ * conhecida (notas e cotações de qualquer fornecedor) abaixo do custo atual.
+ */
+export const margemAbaixoDoAlvo = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const alvoPadrao = Math.min(1000, Math.max(0, Number(req.query.alvoPadrao) || 30));
+  const dias = Math.min(365, Math.max(7, Number(req.query.dias) || 90));
+  try {
+    const temTaxa = await temTaxaEmbutida(pool as any);
+    const [rows]: any = await pool.execute(
+      `SELECT ic.id_item, COALESCE(NULLIF(TRIM(cpd.sku_customizado), ''), ic.sku) AS sku,
+              COALESCE(NULLIF(TRIM(cpd.nome_comercial), ''), ic.nome_item) AS nome, um.sigla AS unidade,
+              f.nome AS familia, f.margem_minima, cpd.preco_venda, cpd.custo_gerencial, es.custo_medio, es.quantidade_atual,
+              (SELECT pf.preco_unitario FROM comercial_precos_faixas pf
+               WHERE pf.tenant_id = ic.tenant_id AND pf.id_item = ic.id_item AND pf.id_unidade = ic.id_unidade AND pf.tipo_faixa = 'VAREJO'
+               ORDER BY pf.ordem LIMIT 1) AS preco_varejo,
+              (SELECT ${colunaTaxaEmbutida('pf', temTaxa)} FROM comercial_precos_faixas pf
+               WHERE pf.tenant_id = ic.tenant_id AND pf.id_item = ic.id_item AND pf.id_unidade = ic.id_unidade AND pf.tipo_faixa = 'VAREJO'
+               ORDER BY pf.ordem LIMIT 1) AS taxa_embutida
+       FROM itens_core ic
+       LEFT JOIN comercial_produtos_dados cpd ON cpd.id_item = ic.id_item AND cpd.tenant_id = ic.tenant_id
+       LEFT JOIN comercial_familias f ON f.id = cpd.familia_id AND f.tenant_id = ic.tenant_id
+       LEFT JOIN itens_unidades_medida um ON um.id_unidade = ic.id_unidade
+       LEFT JOIN estoque_saldos_itens es ON es.id_item = ic.id_item AND es.tenant_id = ic.tenant_id AND es.deposito = 'VENDA'
+       WHERE ic.tenant_id = ? AND ic.status = 'ATIVO' AND UPPER(COALESCE(ic.tipo_recurso, 'PRODUTO')) = 'PRODUTO'`,
+      [tenant]
+    );
+    const taxa = await carregarTaxaPreco(pool as any, tenant);
+    const analisados = (rows as any[]).map(r => {
+      const preco = r.preco_varejo !== null ? n(r.preco_varejo) : n(r.preco_venda);
+      const custo = n(r.custo_medio) > 0 ? n(r.custo_medio) : n(r.custo_gerencial);
+      const alvo = alvoEfetivo(r.margem_minima !== null ? n(r.margem_minima) : null, alvoPadrao);
+      const taxaPct = r.taxa_embutida !== null && r.taxa_embutida !== undefined ? n(r.taxa_embutida) : taxa.percentual;
+      const m = analisarMargem({ preco, custo, taxaPct, alvoPct: alvo.alvoPct });
+      return m && m.abaixoDoAlvo ? { r, preco, custo, alvo, taxaPct, m } : null;
+    }).filter(Boolean) as Array<{ r: any; preco: number; custo: number; alvo: ReturnType<typeof alvoEfetivo>; taxaPct: number; m: NonNullable<ReturnType<typeof analisarMargem>> }>;
+
+    const ids = analisados.map(a => Number(a.r.id_item));
+    const ofertas = new Map<number, OfertaCusto[]>();
+    const vendido = ids.length ? await vendidoNoPeriodo(pool as any, tenant, dias, ids) : new Map<number, number>();
+    if (ids.length) {
+      const marc = ids.map(() => '?').join(',');
+      // Última compra de cada fornecedor (por unidade de estoque)
+      const [links]: any = await pool.execute(
+        `SELECT cfp.id_item, cfp.id_fornecedor, ${nomeFornecedor} AS fornecedor, cfp.preco_ultima_compra, cfp.fator_compra
+         FROM comercial_fornecedores_produtos cfp INNER JOIN pessoas_pj pj ON pj.id_cliente = cfp.id_fornecedor
+         WHERE cfp.tenant_id = ? AND cfp.id_item IN (${marc}) AND cfp.preco_ultima_compra > 0`,
+        [tenant, ...ids]
+      );
+      // Cotações do último ano (mesmo sem compra)
+      const [cots]: any = await pool.execute(
+        `SELECT i.id_item, p.id_fornecedor, ${nomeFornecedor} AS fornecedor, i.preco_cotado, i.fator_compra, DATE_FORMAT(p.cotado_em, '%Y-%m-%d') AS data
+         FROM compras_pedidos_itens i INNER JOIN compras_pedidos p ON p.id_pedido = i.id_pedido
+         LEFT JOIN pessoas_pj pj ON pj.id_cliente = p.id_fornecedor
+         WHERE p.tenant_id = ? AND i.id_item IN (${marc}) AND i.preco_cotado > 0 AND p.cotado_em >= DATE_SUB(NOW(), INTERVAL 365 DAY)`,
+        [tenant, ...ids]
+      );
+      const add = (id: number, o: OfertaCusto) => { if (!ofertas.has(id)) ofertas.set(id, []); ofertas.get(id)!.push(o); };
+      for (const l of links) add(Number(l.id_item), { fornecedor: l.fornecedor, idFornecedor: Number(l.id_fornecedor), precoBase: n(l.preco_ultima_compra) / (n(l.fator_compra) || 1), origem: 'NOTA', data: null });
+      for (const c of cots) add(Number(c.id_item), { fornecedor: c.fornecedor || '—', idFornecedor: Number(c.id_fornecedor) || null, precoBase: n(c.preco_cotado) / (n(c.fator_compra) || 1), origem: 'COTACAO', data: c.data });
+    }
+
+    const itens = analisados.map(a => {
+      const id = Number(a.r.id_item);
+      const oferta = melhorOferta(ofertas.get(id) || [], a.custo);
+      const v = vendido.get(id) || 0;
+      return {
+        idItem: id, sku: a.r.sku, nome: a.r.nome, unidade: a.r.unidade || '', familia: a.r.familia || '',
+        preco: a.preco, custo: Math.round(a.custo * 10000) / 10000, taxaPct: a.taxaPct,
+        alvoPct: a.alvo.alvoPct, origemAlvo: a.alvo.origem, ...a.m,
+        vendido: v, saldo: n(a.r.quantidade_atual),
+        // Quanto deixa de ganhar no período (pelo giro) até chegar ao alvo
+        perdaNoPeriodo: Math.round(Math.max(0, a.custo - a.m.custoAlvo) * v * 100) / 100,
+        melhorOferta: oferta ? { ...oferta, precoBase: Math.round(oferta.precoBase * 10000) / 10000 } : null,
+      };
+    }).sort((x, y) => Number(y.prejuizo) - Number(x.prejuizo) || y.perdaNoPeriodo - x.perdaNoPeriodo || y.reducaoCustoPct - x.reducaoCustoPct);
+
+    return res.json({ alvoPadrao, dias, taxaReferencia: taxa.percentual, itens });
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao analisar as margens.');
   }
 };

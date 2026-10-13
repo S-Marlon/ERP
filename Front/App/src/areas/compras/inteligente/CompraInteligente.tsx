@@ -11,6 +11,8 @@ import { AnaliseFornecedor, CondicoesFornecedor, compraInteligenteApi, ItemSuges
 import { csvPedido, situacaoMinimo, textoPedido, totalPedido } from './pedidoCompra';
 import HistoricoPrecosDrawer from './HistoricoPrecosDrawer';
 import PedidosCompra, { copiarTexto } from './PedidosCompra';
+import MargemAbaixoAlvo from './MargemAbaixoAlvo';
+import { useSearchParams } from 'react-router-dom';
 
 const { Title, Text } = Typography;
 const brl = (v: number) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -62,7 +64,9 @@ const baixar = (nome: string, conteudo: string) => {
 const corCobertura = (d: number | null) => (d === null ? 'default' : d <= 7 ? 'red' : d <= 30 ? 'orange' : 'green');
 
 const CompraInteligente: React.FC = () => {
-  const [aba, setAba] = useState('montar');
+  // ?aba=margem abre direto a aba de margem (link da Precificação)
+  const [params] = useSearchParams();
+  const [aba, setAba] = useState(params.get('aba') === 'margem' ? 'margem' : 'montar');
   const [dias, setDias] = useState(90);
   const [cobertura, setCobertura] = useState(30);
   const [resumo, setResumo] = useState<ResumoFornecedor[]>([]);
@@ -449,6 +453,7 @@ const CompraInteligente: React.FC = () => {
       <Tabs activeKey={aba} onChange={setAba} items={[
         { key: 'montar', label: 'Montar pedido', children: montar },
         { key: 'pedidos', label: 'Pedidos e cotações', children: <PedidosCompra versao={versaoPedidos} /> },
+        { key: 'margem', label: 'Margem abaixo do alvo', children: <MargemAbaixoAlvo dias={dias} /> },
       ]} />
       <HistoricoPrecosDrawer item={historico} onFechar={() => setHistorico(null)} />
     </div>
