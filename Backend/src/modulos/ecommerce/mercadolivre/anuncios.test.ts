@@ -152,3 +152,10 @@ teste('marca "Sem Marca" vira Genérica', () => {
   assert.strictEqual(resolverValor(marca, { origem: 'marca' }, item(1, { marca: 'Sem Marca' }))?.valor, 'Genérica');
   assert.strictEqual(resolverValor(marca, { origem: 'marca' }, item(1, { marca: null })), null);
 });
+
+teste('item sem foto herda a foto da família (vira aviso)', () => {
+  const semFoto = [item(1, { fotos: 0 })];
+  assert.ok(erros(dados(), semFoto).some(t => t.includes('sem foto')));
+  assert.deepStrictEqual(erros(dados({ fotoFamilia: 'https://x/familia.jpg' }), semFoto), []);
+  assert.ok(pendenciasAnuncio(dados({ fotoFamilia: 'https://x/familia.jpg' }), semFoto, categoria, atributos).some(p => p.nivel === 'aviso' && p.texto.includes('foto da família')));
+});

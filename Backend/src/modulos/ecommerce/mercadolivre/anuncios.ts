@@ -42,6 +42,7 @@ export interface AnuncioDados {
   categoriaMl: string | null;
   descricao: string | null;
   ajustePreco: number;              // % sobre o preço do ERP
+  fotoFamilia?: string | null;      // foto da família: vale para o item que não tem foto própria
   atributos: Record<string, ValorAtributo>;
 }
 
@@ -173,7 +174,10 @@ export const pendenciasAnuncio = (
   if (categoria && itens.length > categoria.maxVariacoes) erro('itens', `São ${itens.length} itens: a categoria aceita até ${categoria.maxVariacoes} variações.`);
   for (const i of itens) {
     if (!i.ativo) erro('itens', `${i.sku}: item inativo no catálogo.`, { idItem: i.idItem });
-    if (i.fotos === 0) erro('itens', `${i.sku}: sem foto (o Mercado Livre exige ao menos uma).`, { idItem: i.idItem });
+    if (i.fotos === 0) {
+      if (dados.fotoFamilia) aviso('itens', `${i.sku}: sem foto própria: vai a foto da família.`, { idItem: i.idItem });
+      else erro('itens', `${i.sku}: sem foto (o Mercado Livre exige ao menos uma): envie a do item ou a foto da família.`, { idItem: i.idItem });
+    }
     if (!(precoNoMl(i, dados.ajustePreco) > 0)) erro('itens', `${i.sku}: sem preço de venda.`, { idItem: i.idItem });
     if (!(i.estoque > 0)) aviso('itens', `${i.sku}: sem estoque (entra com quantidade 0).`, { idItem: i.idItem });
     if (temGtinNaCategoria && !i.gtin) {

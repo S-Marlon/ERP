@@ -64,6 +64,7 @@ export interface ItemDoAnuncio {
 
 export interface AnuncioDetalhe extends AnuncioResumo {
   condicao: 'new' | 'used'; descricao: string; ajustePreco: number; atributos: Record<string, ValorAtributo>;
+  fotoFamilia: string | null;   // vale para os itens sem foto própria
   categoria: { id: string; nome: string; caminho: string; final: boolean; maxTitulo: number; maxFotos: number; filhos: { id: string; nome: string }[] } | null;
   atributosCategoria: AtributoML[]; atributosErp: { id: number; nome: string }[]; eixos: string[];
   itens: ItemDoAnuncio[]; pendencias: Pendencia[];

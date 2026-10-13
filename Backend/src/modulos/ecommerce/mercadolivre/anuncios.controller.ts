@@ -171,6 +171,7 @@ const dadosDoAnuncio = (a: any): AnuncioDados => ({
   categoriaMl: a.categoria_ml,
   descricao: a.descricao,
   ajustePreco: Number(a.ajuste_preco) || 0,
+  fotoFamilia: a.familia_imagem || null,
   atributos: lerJson<Record<string, ValorAtributo>>(a.atributos, {}),
 });
 
@@ -189,7 +190,7 @@ export interface AnuncioCarregado {
 
 export const carregarAnuncios = async (conn: Conn, tenant: number, idAnuncio?: number): Promise<AnuncioCarregado[]> => {
   const [anuncios] = await conn.execute(
-    `SELECT a.*, f.nome AS familia_nome,
+    `SELECT a.*, f.nome AS familia_nome, NULLIF(TRIM(f.imagem), '') AS familia_imagem,
             DATE_FORMAT(a.atualizado_em, '%Y-%m-%d %H:%i') AS atualizado_fmt,
             DATE_FORMAT(a.sincronizado_em, '%Y-%m-%d %H:%i') AS sincronizado_fmt
      FROM modulo_ecommerce_mercadolivre_anuncios a
@@ -250,7 +251,7 @@ export const resumo = (c: AnuncioCarregado) => {
     qtdItens: c.itens.length,
     publicados,
     aPublicar,
-    fotoUrl: c.itens.find(i => i.fotoUrl)?.fotoUrl || null,
+    fotoUrl: c.itens.find(i => i.fotoUrl)?.fotoUrl || c.dados.fotoFamilia || null,
     estoque: c.itens.reduce((s, i) => s + Math.max(0, i.estoque), 0),
     precoMin: c.itens.length ? Math.min(...c.itens.map(i => precoNoMl(i, c.dados.ajustePreco))) : null,
     precoMax: c.itens.length ? Math.max(...c.itens.map(i => precoNoMl(i, c.dados.ajustePreco))) : null,
@@ -292,6 +293,7 @@ export const detalhe = async (tenant: number, c: AnuncioCarregado) => {
     ...resumo(c),
     condicao: a.condicao,
     descricao: a.descricao || '',
+    fotoFamilia: c.dados.fotoFamilia || null,
     ajustePreco: c.dados.ajustePreco,
     atributos: c.dados.atributos,
     categoria: c.categoria

@@ -58,6 +58,21 @@ const fotosDoItem = async (tenant: number, c: AnuncioCarregado, item: ItemAnunci
       fotos.push({ source: a.url_anexo });
     }
   }
+  // item sem foto própria usa a foto da família (guardada como "familia:<link>", para subir de novo se o link mudar)
+  const fotoFamilia = c.dados.fotoFamilia;
+  if (anexos.length === 0 && fotoFamilia) {
+    const chave = `familia:${fotoFamilia}`;
+    const local = caminhoLocalDaUrl(fotoFamilia);
+    if (guardadas[chave]) fotos.push({ id: guardadas[chave] });
+    else if (local) {
+      const tipo = TIPO_POR_EXTENSAO[path.extname(local).toLowerCase()] || 'image/jpeg';
+      const r = await enviarFotoMl(tenant, fs.readFileSync(local), path.basename(local), tipo);
+      if (fotoPequena(r.maxSize)) problemas.push(`foto da família tem ${r.maxSize} px: o ML pede ao menos 500 px num dos lados`);
+      else { guardadas[chave] = r.id; mudou = true; fotos.push({ id: r.id }); }
+    } else if (/^https?:\/\//i.test(fotoFamilia) && !/\/\/(localhost|127\.0\.0\.1)[:/]/i.test(fotoFamilia)) {
+      fotos.push({ source: fotoFamilia });
+    }
+  }
   if (mudou) {
     await pool.execute(
       `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET fotos_ml = ? WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
