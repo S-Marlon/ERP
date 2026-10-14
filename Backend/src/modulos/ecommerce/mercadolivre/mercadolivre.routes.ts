@@ -11,7 +11,7 @@ import {
 
 import { faixasNoMl } from './faixas.controller';
 import { entrarNoCatalogo, verificarCatalogo } from './catalogo.controller';
-import { analisarPreco } from './precificacao.controller';
+import { analisarPreco, financeiroAnuncios } from './precificacao.controller';
 import { buscarClientes, buscarPedidos, listarPedidos, obterConfig, reprocessarPedido, salvarConfig } from './pedidos.controller';
 
 const router = Router();
@@ -24,6 +24,7 @@ router.get('/conta', conta);
 // Central de anúncios
 router.get('/candidatos', candidatos);
 router.get('/anuncios', listarAnuncios);
+router.get('/anuncios/financeiro', financeiroAnuncios);
 router.post('/anuncios', criarAnuncio);
 router.get('/anuncios/:id', detalheAnuncio);
 router.put('/anuncios/:id', salvarAnuncio);

@@ -325,6 +325,18 @@ export const resumo = (c: AnuncioCarregado) => {
     aPublicar,
     fotoUrl: c.itens.find(i => i.fotoUrl)?.fotoUrl || c.dados.fotoFamilia || null,
     estoque: c.itens.reduce((s, i) => s + Math.max(0, i.estoque), 0),
+    estoqueMl: c.itens.reduce((s, i) => s + (c.noMl.get(i.idItem)?.mlbId ? i.estoqueMl || 0 : 0), 0),
+    estoqueReserva: c.regraEstoque.reserva,
+    estoqueMaximo: c.regraEstoque.maximo,
+    ativosMl: c.itens.filter(i => c.noMl.get(i.idItem)?.status === 'active').length,
+    pausadosMl: c.itens.filter(i => c.noMl.get(i.idItem)?.status === 'paused').length,
+    itens: c.itens.map(i => {
+      const m = c.noMl.get(i.idItem);
+      return {
+        idItem: i.idItem, sku: i.sku, nome: i.tituloMl || i.nome, fotoUrl: i.fotoUrl, mlbId: m?.mlbId || null, status: m?.status || null, permalink: m?.permalink || null,
+        estoque: i.estoque, estoqueMl: i.estoqueMl ?? 0, precoMl: i.precoMl, preco: precoNoMl(i, c.dados.ajustePreco), unidade: i.unidadeMl?.sigla || null,
+      };
+    }),
     precoMin: c.itens.length ? Math.min(...c.itens.map(i => precoNoMl(i, c.dados.ajustePreco))) : null,
     precoMax: c.itens.length ? Math.max(...c.itens.map(i => precoNoMl(i, c.dados.ajustePreco))) : null,
     erros,

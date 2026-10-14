@@ -51,6 +51,16 @@ export interface AnuncioResumo {
   situacao: 'RASCUNHO' | 'PUBLICADO' | 'PAUSADO' | 'ENCERRADO'; preparo: 'PENDENTE' | 'PRONTO' | null;
   mlbId: string | null; permalink: string | null; qtdItens: number; publicados: number; aPublicar: number; fotoUrl: string | null; estoque: number;
   precoMin: number | null; precoMax: number | null; erros: number; avisos: number; atualizadoEm: string; ultimoErro: string | null;
+  estoqueMl: number; estoqueReserva: number; estoqueMaximo: number | null; ativosMl: number; pausadosMl: number; itens: ItemResumo[];
+}
+export interface ItemResumo {
+  idItem: number; sku: string; nome: string; fotoUrl: string | null; mlbId: string | null; status: string | null; permalink: string | null;
+  estoque: number; estoqueMl: number; precoMl: number | null; preco: number; unidade: string | null;
+}
+/** Você recebe e lucro de um item ao preço de hoje (tarifa e frete grátis do ML). */
+export interface FinanceiroItem {
+  idItem: number; preco: number; tarifa: number; frete: number; recebe: number; custo: number; lucro: number;
+  lucroSobreCustoPct: number | null; nivel: LucroMl['nivel']; freteGratis: boolean; freteDesconhecido: boolean; alvoPct: number;
 }
 
 /** Preço por quantidade (B2B): a partir de `minimo` unidades, `desconto`% sobre o preço do anúncio. */
@@ -120,7 +130,7 @@ export interface ItemDoAnuncio {
   };
 }
 
-export interface AnuncioDetalhe extends AnuncioResumo {
+export interface AnuncioDetalhe extends Omit<AnuncioResumo, 'itens'> {
   condicao: 'new' | 'used'; descricao: string; ajustePreco: number; atributos: Record<string, ValorAtributo>;
   fotoFamilia: string | null;   // vale para os itens sem foto própria
   modo: 'FAMILIA' | 'SEPARADO';  // página única com opções ou um anúncio por item
@@ -205,6 +215,7 @@ export interface CategoriaNo { id: string | null; nome: string; caminho: string;
 
 export const anunciosApi = {
   listar: async () => ler<AnuncioResumo[]>(await fetch(`${API}/anuncios?tenant_id=1`), 'Erro ao listar os anúncios.'),
+  financeiro: async () => ler<{ id: number; itens: FinanceiroItem[] }[]>(await fetch(`${API}/anuncios/financeiro?tenant_id=1`), 'Erro ao calcular o lucro dos anúncios.'),
   detalhe: async (id: number) => ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}?tenant_id=1`), 'Erro ao abrir o anúncio.'),
   candidatos: async (busca: string) => ler<Candidatos>(await fetch(`${API}/candidatos?tenant_id=1&busca=${encodeURIComponent(busca)}`), 'Erro ao buscar no catálogo.'),
   criar: async (corpo: { idFamilia?: number; idItens?: number[]; separados?: boolean }) =>

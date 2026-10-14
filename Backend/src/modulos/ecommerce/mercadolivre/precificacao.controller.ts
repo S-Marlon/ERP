@@ -5,8 +5,8 @@ import pool from '../../../infra/db';
 import { alvoEfetivo } from '../../../areas/compras/inteligente/margemAlvo';
 import { carregarComposicoes, carregarDadosComponentes } from '../../../areas/catalogo/kits/kitsBanco';
 import { custoDoKit } from '../../../areas/catalogo/kits/kits';
-import { normalizar, precoNoMl, resolverValor } from './anuncios';
-import { carregarAnuncios, responderErro, taxaMl, tenantDe } from './anuncios.controller';
+import { ItemAnuncio, normalizar, precoNoMl, resolverValor } from './anuncios';
+import { AnuncioCarregado, carregarAnuncios, responderErro, taxaMl, tenantDe } from './anuncios.controller';
 import { lerFaixas } from './faixasQuantidade';
 import { compararAtributos } from './catalogo';
 import {
@@ -78,6 +78,49 @@ const pesquisarMercado = (tenant: number, dominio: string | null, q: string, meu
   return valor;
 };
 
+/** Tudo o que entra no custo de uma venda do item no ML: custo do ERP, alvo, tarifa, frete grátis (com o peso cobrado). */
+export const contextoVenda = async (
+  tenant: number, c: AnuncioCarregado, item: ItemAnuncio, op: { informado?: number | null; alvoPadrao?: number } = {}
+) => {
+  const tipo: string = c.registro.tipo_anuncio;
+  const informado = op.informado ?? null;
+  // custo da unidade vendida no ML (pacote = custo base × fator)
+  const fator = item.unidadeMl?.fator || 1;
+  const custo = r2((await custoBase(tenant, item.idItem)) * fator);
+  const [[fam]]: any = await pool.execute(
+    `SELECT f.margem_minima FROM comercial_produtos_dados cpd LEFT JOIN comercial_familias f ON f.id = cpd.familia_id
+     WHERE cpd.id_item = ? AND cpd.tenant_id = ?`, [item.idItem, tenant]
+  );
+  const alvo = alvoEfetivo(fam?.margem_minima !== null && fam?.margem_minima !== undefined ? Number(fam.margem_minima) : null, op.alvoPadrao ?? 30);
+
+  const tarifaDe = async (preco: number, tipoAnuncio = tipo): Promise<Tarifa> => {
+    const t = await taxaMl(tenant, r2(preco), c.dados.categoriaMl!, tipoAnuncio);
+    return { comissaoPct: t?.percentual ?? (tipoAnuncio === 'gold_pro' ? 17 : 12), fixa: t?.fixa ?? 0 };
+  };
+
+  // frete grátis: ligado no anúncio publicado (ou o padrão da conta), peso cobrado e o custo por valor de compra
+  const mlb = c.noMl.get(item.idItem)?.mlbId || null;
+  const pref = await preferenciasEnvio(tenant).catch(() => null);
+  const noMlEnvio = mlb ? await freteGratisNoMl(tenant, mlb) : null;
+  const freteGratis = noMlEnvio ? noMlEnvio.gratis : pref?.freteGratisPadrao ?? true;
+  const logistica = noMlEnvio?.logistica || pref?.logistica || 'drop_off';
+  const peso = pref ? await pesoCobrado(tenant, { mlbId: mlb, pesoKg: item.pesoKg, medidasCm: item.medidasCm, fator }).catch(() => null) : null;
+  const envioDe = (valorCompra: number, quantidade = 1, tipoAnuncio = tipo) =>
+    (peso ? freteDoEnvio(tenant, { pesoG: peso.pesoG * quantidade, valorCompra, tipo: tipoAnuncio, logistica }) : Promise.resolve(null));
+  /** Frete que o vendedor paga numa compra (0 quando o comprador paga; null quando não deu para saber). */
+  const freteDe = async (valorCompra: number, quantidade = 1, gratis = freteGratis) => {
+    if (!vendedorPagaFrete(valorCompra, gratis)) return 0;
+    if (informado !== null) return informado * quantidade;
+    return (await envioDe(valorCompra, quantidade))?.valor ?? null;
+  };
+  const avaliar = async (preco: number) => {
+    const frete = await freteDe(preco);
+    const l = lucroNoMl({ preco, custo, tarifa: await tarifaDe(preco), frete: frete ?? 0 });
+    return { ...l, freteDesconhecido: frete === null, nivel: classificarLucro(custo > 0 ? l.lucroSobreCustoPct : null, alvo.alvoPct) };
+  };
+  return { tipo, fator, custo, alvo, tarifaDe, envioDe, freteDe, avaliar, freteGratis, logistica, peso, noMlEnvio };
+};
+
 /** GET /anuncios/:id/itens/:idItem/preco?simular=&frete=&alvoPadrao=30 */
 export const analisarPreco = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
@@ -86,46 +129,11 @@ export const analisarPreco = async (req: Request, res: Response) => {
     const item = c?.itens.find(i => i.idItem === Number(req.params.idItem));
     if (!c || !item) throw new ErroML('Item não encontrado no anúncio.', 404);
     if (!c.dados.categoriaMl) throw new ErroML('Escolha a categoria do ML primeiro: a tarifa depende dela.');
-    const tipo = c.registro.tipo_anuncio;
     // frete informado à mão vale para tudo; sem ele, o frete vem do ML para cada valor de compra
     const informado = req.query.frete !== undefined && req.query.frete !== '' ? Math.max(0, Number(req.query.frete) || 0) : null;
     const alvoPadrao = Math.min(1000, Math.max(0, Number(req.query.alvoPadrao) || 30));
-
-    // custo da unidade vendida no ML (pacote = custo base × fator)
-    const fator = item.unidadeMl?.fator || 1;
-    const custo = r2((await custoBase(tenant, item.idItem)) * fator);
-    const [[fam]]: any = await pool.execute(
-      `SELECT f.margem_minima FROM comercial_produtos_dados cpd LEFT JOIN comercial_familias f ON f.id = cpd.familia_id
-       WHERE cpd.id_item = ? AND cpd.tenant_id = ?`, [item.idItem, tenant]
-    );
-    const alvo = alvoEfetivo(fam?.margem_minima !== null && fam?.margem_minima !== undefined ? Number(fam.margem_minima) : null, alvoPadrao);
-
-    const tarifaDe = async (preco: number, tipoAnuncio = tipo): Promise<Tarifa> => {
-      const t = await taxaMl(tenant, r2(preco), c.dados.categoriaMl!, tipoAnuncio);
-      return { comissaoPct: t?.percentual ?? (tipoAnuncio === 'gold_pro' ? 17 : 12), fixa: t?.fixa ?? 0 };
-    };
-
-    // frete grátis: ligado no anúncio publicado (ou o padrão da conta), peso cobrado e o custo por valor de compra
-    const mlb = c.noMl.get(item.idItem)?.mlbId || null;
-    const pref = await preferenciasEnvio(tenant).catch(() => null);
-    const noMlEnvio = mlb ? await freteGratisNoMl(tenant, mlb) : null;
-    const freteGratis = noMlEnvio ? noMlEnvio.gratis : pref?.freteGratisPadrao ?? true;
-    const logistica = noMlEnvio?.logistica || pref?.logistica || 'drop_off';
-    const peso = pref ? await pesoCobrado(tenant, { mlbId: mlb, pesoKg: item.pesoKg, medidasCm: item.medidasCm, fator }).catch(() => null) : null;
-    const envioDe = (valorCompra: number, quantidade = 1, tipoAnuncio = tipo) =>
-      (peso ? freteDoEnvio(tenant, { pesoG: peso.pesoG * quantidade, valorCompra, tipo: tipoAnuncio, logistica }) : Promise.resolve(null));
-    /** Frete que o vendedor paga numa compra (0 quando o comprador paga; null quando não deu para saber). */
-    const freteDe = async (valorCompra: number, quantidade = 1, gratis = freteGratis) => {
-      if (!vendedorPagaFrete(valorCompra, gratis)) return 0;
-      if (informado !== null) return informado * quantidade;
-      return (await envioDe(valorCompra, quantidade))?.valor ?? null;
-    };
-
-    const avaliar = async (preco: number) => {
-      const frete = await freteDe(preco);
-      const l = lucroNoMl({ preco, custo, tarifa: await tarifaDe(preco), frete: frete ?? 0 });
-      return { ...l, freteDesconhecido: frete === null, nivel: classificarLucro(custo > 0 ? l.lucroSobreCustoPct : null, alvo.alvoPct) };
-    };
+    const ctx = await contextoVenda(tenant, c, item, { informado, alvoPadrao });
+    const { tipo, fator, custo, alvo, tarifaDe, envioDe, freteDe, avaliar, freteGratis, logistica, peso, noMlEnvio } = ctx;
     const precoAtual = precoNoMl(item, c.dados.ajustePreco);
     const atual = await avaliar(precoAtual);
     const frete = atual.frete;
@@ -243,5 +251,33 @@ export const analisarPreco = async (req: Request, res: Response) => {
     });
   } catch (error) {
     return responderErro(res, error, 'Erro ao analisar o preço.');
+  }
+};
+
+/** GET /anuncios/financeiro — quanto você recebe e o lucro de cada item ao preço de hoje (para a lista de anúncios). */
+export const financeiroAnuncios = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  try {
+    const saida = [];
+    for (const c of await carregarAnuncios(pool as any, tenant)) {
+      if (!c.dados.categoriaMl || !c.itens.length) continue;
+      const itens = await Promise.all(c.itens.map(async item => {
+        try {
+          const ctx = await contextoVenda(tenant, c, item);
+          const preco = precoNoMl(item, c.dados.ajustePreco);
+          const l = await ctx.avaliar(preco);
+          return {
+            idItem: item.idItem, preco: l.preco, tarifa: l.tarifa, frete: l.frete, recebe: l.liquido, custo: l.custo, lucro: l.lucro,
+            lucroSobreCustoPct: l.lucroSobreCustoPct, nivel: l.nivel, freteGratis: ctx.freteGratis, freteDesconhecido: l.freteDesconhecido, alvoPct: ctx.alvo.alvoPct,
+          };
+        } catch {
+          return null;
+        }
+      }));
+      saida.push({ id: Number(c.registro.id), itens: itens.filter(Boolean) });
+    }
+    return res.json(saida);
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao calcular o lucro dos anúncios.');
   }
 };
