@@ -519,3 +519,51 @@ export const registrarEnvio = async (req: Request, res: Response) => {
     return responderErro(res, error, 'Erro ao registrar o envio.');
   }
 };
+
+/**
+ * GET /api/fiscal/vendas/:idVenda/espelho?modelo=55|65 — a nota montada a partir da venda para digitar a NF à mão
+ * (emissor gratuito, site da SEFAZ). Não reserva número nem grava nada; o que falta no cadastro vem em `pendencias`.
+ */
+export const espelhoDaVenda = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const idVenda = Number(req.params.idVenda);
+  try {
+    const { emitente, config } = await carregarConfiguracao(pool, tenant);
+    const [[venda]]: any = await pool.execute(
+      `SELECT id_venda, status, id_cliente, cliente_nome, total_liquido, observacao, operador,
+              DATE_FORMAT(created_at, '%d/%m/%Y %H:%i') AS data_fmt
+       FROM vendas_pedidos WHERE id_venda = ? AND tenant_id = ?`,
+      [idVenda, tenant]
+    );
+    if (!venda) throw new ErroFiscal('Venda não encontrada.', 404);
+    const itens = (await itensFiscais(pool, tenant, [idVenda])).get(idVenda) || [];
+    const idCliente = venda.id_cliente ? Number(venda.id_cliente) : null;
+    const cliente = idCliente ? (await clientesDasVendas(pool, tenant, [idCliente])).get(idCliente) : undefined;
+    const pedido = String(req.query.modelo || '');
+    const modelo: Modelo = pedido === '55' || pedido === '65' ? pedido : modeloSugerido(cliente?.documento ?? null);
+    let destinatario: Destinatario | null = null;
+    if (cliente) {
+      const [[pj]]: any = await pool.execute(`SELECT inscricao_estadual FROM pessoas_pj WHERE id_cliente = ? AND deleted_at IS NULL`, [idCliente]);
+      destinatario = { ...cliente, inscricaoEstadual: pj?.inscricao_estadual || null, endereco: await enderecoDoCliente(pool, idCliente!) };
+    } else if (venda.cliente_nome && venda.cliente_nome !== 'CONSUMIDOR') {
+      destinatario = { documento: null, nome: venda.cliente_nome, email: null, celular: null, endereco: null };
+    }
+    const pendencias = pendenciasDaNota(emitente, itens, modelo, destinatario);
+    const [pagamentos]: any = await pool.execute(`SELECT forma, valor, troco, parcelas FROM vendas_pedidos_pagamentos WHERE id_venda = ? AND tenant_id = ?`, [idVenda, tenant]);
+    const nota = itens.some(i => !i.servico) ? montarNota({
+      modelo, config, emitente: emitente as Emitente, serie: modelo === '65' ? config.serieNfce : config.serieNfe, numero: 0, emissao: new Date(),
+      itens, pagamentos: pagamentos.map((p: any) => ({ forma: p.forma, valor: Number(p.valor), troco: Number(p.troco) || 0 })),
+      destinatario, idVenda, semConferir: true,
+    }) : null;
+    const doc = await documentoAtual(pool, tenant, idVenda);
+    return res.json({
+      venda: { idVenda, status: venda.status, cliente: venda.cliente_nome, data: venda.data_fmt, total: Number(venda.total_liquido), observacao: venda.observacao, operador: venda.operador },
+      modelo, pendencias, nota, emitente,
+      servicos: itens.filter(i => i.servico).map(i => ({ descricao: i.descricao, quantidade: i.quantidade, total: i.totalItem })),
+      pagamentos: pagamentos.map((p: any) => ({ forma: p.forma, valor: Number(p.valor), troco: Number(p.troco) || 0, parcelas: Number(p.parcelas) || 1 })),
+      notaEmitida: doc ? { status: doc.status, modelo: doc.modelo, serie: doc.serie, numero: doc.numero } : null,
+    });
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao montar o espelho da nota.');
+  }
+};

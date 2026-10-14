@@ -35,6 +35,7 @@ export interface ItemVendaFiscal {
 export interface PagamentoVenda { forma: string; valor: number; troco: number }
 export interface Destinatario {
   documento: string | null; nome: string | null; email: string | null; celular: string | null;
+  inscricaoEstadual?: string | null;
   endereco?: { logradouro: string; numero: string; bairro: string; municipio: string; uf: string; cep: string } | null;
 }
 
@@ -114,9 +115,10 @@ export const modeloSugerido = (documentoCliente: string | null): Modelo => (some
 export const montarNota = (args: {
   modelo: Modelo; config: ConfigFiscal; emitente: Emitente; serie: number; numero: number; emissao: Date;
   itens: ItemVendaFiscal[]; pagamentos: PagamentoVenda[]; destinatario: Destinatario | null; idVenda: number;
+  semConferir?: boolean;   // espelho para emissão manual: monta mesmo com pendências (elas vão à parte)
 }): NotaSaida => {
   const { modelo, config, emitente, itens, pagamentos, destinatario } = args;
-  const pendencias = pendenciasDaNota(emitente, itens, modelo, destinatario);
+  const pendencias = args.semConferir ? [] : pendenciasDaNota(emitente, itens, modelo, destinatario);
   if (pendencias.length) throw new ErroFiscal(pendencias.join(' '));
 
   // Serviço não entra na nota de produto (é ISS); se houver, a nota cobre só os produtos

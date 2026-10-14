@@ -1,8 +1,10 @@
-// Vendas do dia (PDV, modelo novo): resumo do caixa, detalhe de cada venda e cancelamento com estorno de estoque.
+// Vendas do dia (PDV, modelo novo): resumo do caixa, detalhe de cada venda, reimpressão do comprovante, espelho da NF
+// (para emissão manual) e cancelamento com estorno de estoque.
 import { API_URL } from '../../../shared/api/config';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Col, Empty, Input, Row, Space, Spin, Statistic, Table, Tag, Tooltip, message } from 'antd';
-import { ReloadOutlined, StopOutlined } from '@ant-design/icons';
+import { Button, Card, Col, Dropdown, Empty, Input, Row, Space, Spin, Statistic, Table, Tag, Tooltip, message } from 'antd';
+import { FilePdfOutlined, PrinterOutlined, ReloadOutlined, StopOutlined } from '@ant-design/icons';
+import { imprimirEspelhoNf, reimprimirComprovante } from './impressaoVenda';
 import Swal from 'sweetalert2';
 import { ModalDevolucao } from '../pdv/components/ModalDevolucao';
 import { salesService, VendaResumo } from '../pdv/services/salesService';
@@ -230,7 +232,35 @@ const VendasDoDia: React.FC = () => {
                   : <Tag color="green">Concluída</Tag>),
               },
               {
-                title: '', key: 'acoes', width: 120, align: 'center' as const,
+                title: '', key: 'acoes', width: 190, align: 'center' as const,
+                render: (_: unknown, venda) => (
+                  <Space size={2}>
+                    <Tooltip title="Reimprimir o comprovante da venda">
+                      <Button type="text" size="small" icon={<PrinterOutlined />}
+                        onClick={() => reimprimirComprovante(venda.idVenda).catch((e: Error) => message.error(e.message))} />
+                    </Tooltip>
+                    {venda.status === 'CONCLUIDA' && (
+                      <Dropdown
+                        trigger={['click']}
+                        menu={{
+                          items: [
+                            { key: 'auto', label: 'Modelo sugerido (pelo cliente)' },
+                            { key: '65', label: 'NFC-e (consumidor, modelo 65)' },
+                            { key: '55', label: 'NF-e (com CPF/CNPJ e endereço, modelo 55)' },
+                          ],
+                          onClick: ({ key }) => imprimirEspelhoNf(venda.idVenda, key === 'auto' ? undefined : key as '55' | '65').catch((e: Error) => message.error(e.message)),
+                        }}
+                      >
+                        <Tooltip title="PDF com os dados para emitir a nota à mão (NCM, CFOP, CSOSN, cliente, totais, pagamento)">
+                          <Button type="text" size="small" icon={<FilePdfOutlined />} />
+                        </Tooltip>
+                      </Dropdown>
+                    )}
+                  </Space>
+                ),
+              },
+              {
+                title: '', key: 'acoesVenda', width: 120, align: 'center' as const,
                 render: (_: unknown, venda) => venda.status === 'CONCLUIDA' && (
                   <Space size={2}>
                     <Button size="small" onClick={() => setDevolvendo(venda.idVenda)}>Devolver</Button>
