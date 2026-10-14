@@ -11,7 +11,7 @@ import {
 
 import { faixasNoMl } from './faixas.controller';
 import { entrarNoCatalogo, verificarCatalogo } from './catalogo.controller';
-import { analisarPreco, financeiroAnuncios, simularPreco } from './precificacao.controller';
+import { analisarPreco, financeiroAnuncio, financeiroAnuncios, simularPreco } from './precificacao.controller';
 import { buscarClientes, buscarPedidos, listarPedidos, resultadoPedidos, obterConfig, reprocessarPedido, salvarConfig } from './pedidos.controller';
 
 const router = Router();
@@ -42,6 +42,7 @@ router.get('/anuncios/:id/faixas/ml', faixasNoMl);
 router.get('/anuncios/:id/catalogo', verificarCatalogo);
 router.get('/anuncios/:id/itens/:idItem/preco', analisarPreco);
 router.get('/anuncios/:id/itens/:idItem/simular', simularPreco);
+router.get('/anuncios/:id/financeiro', financeiroAnuncio);
 router.post('/anuncios/:id/itens/:idItem/catalogo', entrarNoCatalogo);
 router.post('/anuncios/:id/sincronizar', sincronizarAnuncio);
 router.get('/sincronizar', situacaoSincronizacao);

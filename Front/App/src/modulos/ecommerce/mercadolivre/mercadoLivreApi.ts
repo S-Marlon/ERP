@@ -229,6 +229,8 @@ export interface CategoriaNo { id: string | null; nome: string; caminho: string;
 
 export const anunciosApi = {
   listar: async () => ler<AnuncioResumo[]>(await fetch(`${API}/anuncios?tenant_id=1`), 'Erro ao listar os anúncios.'),
+  financeiroAnuncio: async (id: number) =>
+    ler<{ id: number; itens: FinanceiroItem[] }>(await fetch(`${API}/anuncios/${id}/financeiro?tenant_id=1`), 'Erro ao calcular o lucro do anúncio.'),
   simularPreco: async (id: number, idItem: number, preco: number) =>
     ler<PrevisaoPreco>(await fetch(`${API}/anuncios/${id}/itens/${idItem}/simular?tenant_id=1&preco=${preco}`), 'Erro ao simular o preço.'),
   financeiro: async () => ler<{ id: number; itens: FinanceiroItem[] }[]>(await fetch(`${API}/anuncios/financeiro?tenant_id=1`), 'Erro ao calcular o lucro dos anúncios.'),

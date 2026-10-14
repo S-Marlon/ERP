@@ -1,13 +1,13 @@
 // Aba Itens e estoque do editor: divisão do estoque loja/ML, e cada item com foto, título no ML, situação no ML,
-// estoque, preço (no rascunho) e comissão. Fotos, adicionar e tirar itens valem na hora.
-import React, { useState } from 'react';
+// estoque, preço (no rascunho) e o lucro (tarifa, frete, você recebe, custo, % e preço para o alvo). Fotos, adicionar e tirar itens valem na hora.
+import React, { useEffect, useState } from 'react';
 import { Alert, Avatar, Button, Card, InputNumber, Popconfirm, Space, Spin, Table, Tag, Tooltip, Typography, Upload } from 'antd';
 import { BarcodeOutlined, DeleteOutlined, InboxOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons';
 import FotoFamiliaControle from '../../../../areas/catalogo/familias/FotoFamiliaControle';
 import EnviarFotoPopover from '../../../../shared/components/EnviarFotoPopover';
-import { AnuncioDetalhe, foraDoMl, formatarMoeda, ItemDoAnuncio, ROTULO_STATUS_ML } from '../mercadoLivreApi';
+import { AnuncioDetalhe, anunciosApi, FinanceiroItem, foraDoMl, formatarMoeda, ItemDoAnuncio, ROTULO_STATUS_ML } from '../mercadoLivreApi';
 import { EstoqueAnuncioCard, EstoqueItemCelula } from '../EstoqueMl';
-import { BotaoAlvo, LinhaPrevisao, usePrevisaoPreco } from '../AcoesRapidas';
+import { colunasLucro } from '../colunasLucro';
 import type { RascunhoItem } from '../rascunhoAnuncio';
 
 const { Text } = Typography;
@@ -34,34 +34,55 @@ interface Props {
   onSincronizar: () => void;
 }
 
-/** Preço no ML do item (vai ao rascunho) com o resultado ao vivo e o botão do preço para o alvo. */
-const PrecoDoItem: React.FC<{ idAnuncio: number; item: ItemDoAnuncio; mudou: boolean; onMudar: (v: number | null) => void }> = ({ idAnuncio, item, mudou, onMudar }) => {
-  const [ver, setVer] = useState(false);
-  const preco = item.precoMl ?? item.precoAnuncio;
-  const { previsao, carregando } = usePrevisaoPreco(idAnuncio, item.idItem, preco, mudou || ver);
-  return (
-    <div style={{ lineHeight: 1.3 }}>
-      <InputNumber
-        size="small" style={{ width: '100%' }} min={0.01} step={0.1} precision={2} decimalSeparator=","
-        value={item.precoMl ?? null} placeholder={item.precoAnuncio.toFixed(2).replace('.', ',')}
-        onChange={v => onMudar(v === null ? null : Number(v))}
-      />
-      {mudou || ver ? (
-        <>
-          <div><LinhaPrevisao p={previsao} carregando={carregando} /></div>
-          {previsao && <div><BotaoAlvo precoAlvo={previsao.precoAlvo} alvoPct={previsao.alvoPct} atual={preco} onUsar={onMudar} /></div>}
-        </>
-      ) : (
-        <Button size="small" type="link" style={{ padding: 0, height: 'auto', fontSize: 12 }} onClick={() => setVer(true)}>ver lucro</Button>
-      )}
-    </div>
-  );
+/**
+ * Lucro de cada item no editor: os números salvos e, para o item com preço mudado no rascunho, a simulação ao novo
+ * preço (espera parar de digitar).
+ */
+const useLucroDosItens = (salvo: AnuncioDetalhe, det: AnuncioDetalhe, rascunhoItens: Record<number, RascunhoItem>) => {
+  const [base, setBase] = useState<Map<number, FinanceiroItem>>(new Map());
+  const [simulados, setSimulados] = useState<Map<number, FinanceiroItem>>(new Map());
+  const [carregando, setCarregando] = useState(false);
+  useEffect(() => {
+    let vale = true;
+    setCarregando(true);
+    anunciosApi.financeiroAnuncio(salvo.id)
+      .then(r => { if (vale) setBase(new Map(r.itens.map(i => [i.idItem, i]))); })
+      .catch(() => null)
+      .finally(() => { if (vale) setCarregando(false); });
+    return () => { vale = false; };
+  }, [salvo]);
+
+  // preço que vale hoje na tela para cada item com preço no rascunho
+  const mudados = det.itens.filter(i => rascunhoItens[i.idItem] && 'precoMl' in rascunhoItens[i.idItem]).map(i => [i.idItem, i.precoMl ?? i.precoAnuncio] as const);
+  const chave = JSON.stringify(mudados);
+  useEffect(() => {
+    if (!mudados.length) { setSimulados(new Map()); return; }
+    let vale = true;
+    const t = window.setTimeout(async () => {
+      const r = await Promise.all(mudados.map(async ([idItem, preco]) => {
+        try { return { ...(await anunciosApi.simularPreco(salvo.id, idItem, preco)), idItem, freteGratis: base.get(idItem)?.freteGratis ?? false } as FinanceiroItem; }
+        catch { return null; }
+      }));
+      if (vale) setSimulados(new Map(r.filter((x): x is FinanceiroItem => !!x).map(x => [x.idItem, x])));
+    }, 400);
+    return () => { vale = false; window.clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chave, salvo.id]);
+
+  const doItem = (idItem: number) => {
+    const mudou = mudados.find(m => m[0] === idItem);
+    const sim = simulados.get(idItem);
+    if (mudou) return sim && Math.abs(sim.preco - mudou[1]) < 0.005 ? sim : undefined;
+    return base.get(idItem);
+  };
+  return { doItem, carregando };
 };
 
 const AbaItens: React.FC<Props> = p => {
   const { det } = p;
   const visiveis = det.itens.filter(i => !p.filtro || p.filtro.ids.includes(i.idItem));
   const semFoto = det.itens.filter(i => i.fotos === 0 && !i.ml.mlbId);
+  const lucro = useLucroDosItens(p.salvo, det, p.rascunhoItens);
 
   return (
     <>
@@ -89,7 +110,7 @@ const AbaItens: React.FC<Props> = p => {
         )}
         <Table<ItemDoAnuncio>
           size="small" rowKey="idItem" dataSource={visiveis} pagination={visiveis.length > 15 ? { pageSize: 15, showSizeChanger: false } : false}
-          scroll={{ x: 960 }}
+          scroll={{ x: 1650 }}
           rowClassName={i => (p.rascunhoItens[i.idItem] ? 'ml-linha-alterada' : p.comErro.has(i.idItem) || p.errosConferencia.has(i.idItem) ? 'ml-linha-erro' : '')}
           columns={[
             {
@@ -147,25 +168,21 @@ const AbaItens: React.FC<Props> = p => {
             },
             { title: 'Preço loja', dataIndex: 'preco', width: 92, align: 'right', render: formatarMoeda },
             {
-              title: <Tooltip title="Vazio = preço do ERP com o ajuste do anúncio. Ao mudar, mostra na hora quanto você recebe e o lucro. Item já no ML recebe o preço novo ao salvar.">Preço no ML</Tooltip>, width: 190,
+              title: <Tooltip title="Vazio = preço do ERP com o ajuste do anúncio. Ao mudar, as colunas de lucro recalculam na hora. Item já no ML recebe o preço novo ao salvar.">Preço no ML</Tooltip>, width: 120,
               render: (_, i) => (
-                <PrecoDoItem
-                  idAnuncio={det.id} item={i} mudou={!!p.rascunhoItens[i.idItem] && 'precoMl' in p.rascunhoItens[i.idItem]}
-                  onMudar={v => p.onMudarItem(i.idItem, { precoMl: v })}
+                <InputNumber
+                  size="small" style={{ width: '100%' }} min={0.01} step={0.1} precision={2} decimalSeparator=","
+                  value={i.precoMl ?? null} placeholder={i.precoAnuncio.toFixed(2).replace('.', ',')}
+                  onChange={v => p.onMudarItem(i.idItem, { precoMl: v === null ? null : Number(v) })}
                 />
               ),
             },
-            {
-              title: 'Comissão / recebe', width: 120, align: 'right',
-              render: (_, i) => (i.comissao === null ? <Text type="secondary">—</Text> : (
-                <Tooltip title={`Comissão do ML ${i.percentualComissao}% (${formatarMoeda(i.comissao)}) sobre o preço salvo. Frete, quando houver, à parte.`}>
-                  <div style={{ lineHeight: 1.2 }}>
-                    <Text type="secondary" style={{ fontSize: 12 }}>-{formatarMoeda(i.comissao)}</Text>
-                    <div><Text strong>{formatarMoeda(i.precoAnuncio - i.comissao)}</Text></div>
-                  </div>
-                </Tooltip>
-              )),
-            },
+            ...colunasLucro<ItemDoAnuncio>(i => lucro.doItem(i.idItem), { compacto: true, aplicarVaiAoRascunho: true, onAplicarPreco: (i, preco) => p.onMudarItem(i.idItem, { precoMl: preco }) }).map(c => ({
+              ...c,
+              render: (v: unknown, i: ItemDoAnuncio, k: number) => (lucro.doItem(i.idItem) || !(p.rascunhoItens[i.idItem] && 'precoMl' in p.rascunhoItens[i.idItem]) && !lucro.carregando
+                ? c.render?.(v, i, k)
+                : <Spin size="small" />),
+            })),
             {
               title: '', width: 56,
               render: (_, i) => (

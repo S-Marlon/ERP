@@ -257,32 +257,48 @@ export const analisarPreco = async (req: Request, res: Response) => {
   }
 };
 
+/** Você recebe e lucro de cada item do anúncio ao preço de hoje (e o preço para o alvo). */
+const financeiroDe = async (tenant: number, c: AnuncioCarregado) => {
+  const itens = await Promise.all(c.itens.map(async item => {
+    try {
+      const ctx = await contextoVenda(tenant, c, item);
+      const preco = precoNoMl(item, c.dados.ajustePreco);
+      const l = await ctx.avaliar(preco);
+      return {
+        idItem: item.idItem, preco: l.preco, tarifa: l.tarifa, frete: l.frete, recebe: l.liquido, custo: l.custo, lucro: l.lucro,
+        lucroSobreCustoPct: l.lucroSobreCustoPct, nivel: l.nivel, freteGratis: ctx.freteGratis, freteDesconhecido: l.freteDesconhecido, alvoPct: ctx.alvo.alvoPct,
+        precoAlvo: await ctx.precoAlvoDe(preco, l.frete),
+      };
+    } catch {
+      return null;
+    }
+  }));
+  return { id: Number(c.registro.id), itens: itens.filter(Boolean) };
+};
+
 /** GET /anuncios/financeiro — quanto você recebe e o lucro de cada item ao preço de hoje (para a lista de anúncios). */
 export const financeiroAnuncios = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
   try {
     const saida = [];
     for (const c of await carregarAnuncios(pool as any, tenant)) {
-      if (!c.dados.categoriaMl || !c.itens.length) continue;
-      const itens = await Promise.all(c.itens.map(async item => {
-        try {
-          const ctx = await contextoVenda(tenant, c, item);
-          const preco = precoNoMl(item, c.dados.ajustePreco);
-          const l = await ctx.avaliar(preco);
-          return {
-            idItem: item.idItem, preco: l.preco, tarifa: l.tarifa, frete: l.frete, recebe: l.liquido, custo: l.custo, lucro: l.lucro,
-            lucroSobreCustoPct: l.lucroSobreCustoPct, nivel: l.nivel, freteGratis: ctx.freteGratis, freteDesconhecido: l.freteDesconhecido, alvoPct: ctx.alvo.alvoPct,
-            precoAlvo: await ctx.precoAlvoDe(preco, l.frete),
-          };
-        } catch {
-          return null;
-        }
-      }));
-      saida.push({ id: Number(c.registro.id), itens: itens.filter(Boolean) });
+      if (c.dados.categoriaMl && c.itens.length) saida.push(await financeiroDe(tenant, c));
     }
     return res.json(saida);
   } catch (error) {
     return responderErro(res, error, 'Erro ao calcular o lucro dos anúncios.');
+  }
+};
+
+/** GET /anuncios/:id/financeiro — o mesmo, de um anúncio (editor). */
+export const financeiroAnuncio = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  try {
+    const [c] = await carregarAnuncios(pool as any, tenant, Number(req.params.id));
+    if (!c) throw new ErroML('Anúncio não encontrado.', 404);
+    return res.json(c.dados.categoriaMl && c.itens.length ? await financeiroDe(tenant, c) : { id: Number(c.registro.id), itens: [] });
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao calcular o lucro do anúncio.');
   }
 };
 

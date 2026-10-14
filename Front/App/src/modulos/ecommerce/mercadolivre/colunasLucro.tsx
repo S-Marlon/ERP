@@ -33,7 +33,7 @@ const num = (v: number | null | undefined) => (v === null || v === undefined ? -
  */
 export function colunasLucro<T>(
   fin: (linha: T) => FinanceiroItem | undefined,
-  op: { onAplicarPreco?: (linha: T, preco: number) => void; compacto?: boolean } = {},
+  op: { onAplicarPreco?: (linha: T, preco: number) => void; compacto?: boolean; aplicarVaiAoRascunho?: boolean } = {},
 ): ColumnsType<T> {
   const ordenar = (k: (f: FinanceiroItem) => number) => (a: T, b: T) => num(fin(a) && k(fin(a)!)) - num(fin(b) && k(fin(b)!));
   const colunas: ColumnsType<T> = [
@@ -81,8 +81,8 @@ export function colunasLucro<T>(
         return (
           <Popconfirm
             title={`Mudar o preço para ${formatarMoeda(sugerido)}?`}
-            description={<div style={{ maxWidth: 280 }}>Dá {f.alvoPct}% ou mais sobre o custo (mínimo exato {formatarMoeda(f.precoAlvo)}). Grava e envia ao ML.</div>}
-            okText="Mudar o preço" onConfirm={() => op.onAplicarPreco!(l, sugerido)}
+            description={<div style={{ maxWidth: 280 }}>Dá {f.alvoPct}% ou mais sobre o custo (mínimo exato {formatarMoeda(f.precoAlvo)}). {op.aplicarVaiAoRascunho ? 'Vai para as alterações: grava ao salvar.' : 'Grava e envia ao ML.'}</div>}
+            okText={op.aplicarVaiAoRascunho ? 'Usar este preço' : 'Mudar o preço'} onConfirm={() => op.onAplicarPreco!(l, sugerido)}
           >
             <Button type="text" size="small" style={{ height: 'auto', padding: '2px 4px' }}>{texto}</Button>
           </Popconfirm>
