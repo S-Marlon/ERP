@@ -115,30 +115,33 @@ export const contextoVenda = async (
     if (informado !== null) return informado * quantidade;
     return (await envioDe(valorCompra, quantidade))?.valor ?? null;
   };
-  const avaliar = async (preco: number) => {
-    const frete = await freteDe(preco);
-    const l = lucroNoMl({ preco, custo, tarifa: await tarifaDe(preco), frete: frete ?? 0 });
+  /** Lucro a um preço; `op` testa outro tipo de anúncio ou frete grátis ligado/desligado (cenários). */
+  const avaliar = async (preco: number, op: { tipo?: string; gratis?: boolean } = {}) => {
+    const frete = await freteDe(preco, 1, op.gratis ?? freteGratis);
+    const l = lucroNoMl({ preco, custo, tarifa: await tarifaDe(preco, op.tipo ?? tipo), frete: frete ?? 0 });
     return { ...l, freteDesconhecido: frete === null, nivel: classificarLucro(custo > 0 ? l.lucroSobreCustoPct : null, alvo.alvoPct) };
   };
   /**
    * Menor preço que dá o alvo sobre o custo. Tarifa (taxa fixa de item barato) e frete mudam com o preço, então recalcula
    * até firmar e confere o resultado; no degrau da taxa fixa a conta oscila e o mínimo real é o próprio limite.
    */
-  const precoAlvoDe = async (precoAtual: number, freteAtual: number) => {
+  const precoAlvoDe = async (precoAtual: number, freteAtual: number, op: { tipo?: string; gratis?: boolean } = {}) => {
     if (!(custo > 0)) return null;
+    const tipoA = op.tipo ?? tipo;
+    const gratis = op.gratis ?? freteGratis;
     let p = precoAtual;
     let frete = freteAtual;
     for (let k = 0; k < 6; k++) {
-      const n = precoParaAlvo({ custo, tarifa: await tarifaDe(p), frete, alvoPct: alvo.alvoPct });
+      const n = precoParaAlvo({ custo, tarifa: await tarifaDe(p, tipoA), frete, alvoPct: alvo.alvoPct });
       if (n === null) return null;
-      const f = (await freteDe(n)) ?? frete;
+      const f = (await freteDe(n, 1, gratis)) ?? frete;
       const firmou = Math.abs(n - p) < 0.005 && f === frete;
       p = n;
       frete = f;
       if (firmou) break;
     }
-    const atinge = async (x: number) => ((await avaliar(x)).lucroSobreCustoPct ?? -Infinity) >= alvo.alvoPct - 0.05;
-    const limite = await limiteTaxaFixa();
+    const atinge = async (x: number) => ((await avaliar(x, { tipo: tipoA, gratis })).lucroSobreCustoPct ?? -Infinity) >= alvo.alvoPct - 0.05;
+    const limite = await limiteTaxaFixa(tipoA);
     // acima do limite o lucro só cresce com o preço: se o limite já dá o alvo, ele é o mínimo
     if (limite !== null && p > limite && await atinge(limite)) return limite;
     if (await atinge(p)) return p;
@@ -148,11 +151,11 @@ export const contextoVenda = async (
     return p;
   };
   /** Centavo exato em que a taxa fixa de item barato some (por categoria e tipo; guardado por 6 h). */
-  const limiteTaxaFixa = () => {
-    const chave = `${tenant}|${c.dados.categoriaMl}|${tipo}`;
+  const limiteTaxaFixa = (tipoA: string = tipo) => {
+    const chave = `${tenant}|${c.dados.categoriaMl}|${tipoA}`;
     const g = cacheLimiteFixa.get(chave);
     if (g && Date.now() - g.em < 6 * 60 * 60 * 1000) return g.valor;
-    const valor = acharLimiteTaxaFixa(async p => (await tarifaDe(p)).fixa).catch(() => null);
+    const valor = acharLimiteTaxaFixa(async p => (await tarifaDe(p, tipoA)).fixa).catch(() => null);
     cacheLimiteFixa.set(chave, { em: Date.now(), valor });
     return valor;
   };
@@ -213,6 +216,11 @@ export const analisarPreco = async (req: Request, res: Response) => {
     const freteSeGratis = informado ?? envioAtual?.valor ?? null;
     const cenarios = montarCenarios({ preco: precoAtual, custoUnit: custo, tarifas, frete: freteSeGratis, tipoAtual: tipo, freteGratisAtual: freteGratis })
       .map(x => ({ ...x, nivel: classificarLucro(custo > 0 ? x.lucroSobreCustoPct : null, alvo.alvoPct) }));
+    // preço mínimo para o alvo em cada cenário (o frete grátis desligado só vale abaixo de R$ 79)
+    for (const x of cenarios as (typeof cenarios[number] & { precoAlvo?: number | null })[]) {
+      x.precoAlvo = await ctx.precoAlvoDe(precoAtual, x.frete, { tipo: x.tipo, gratis: x.freteGratis });
+      if (!x.freteGratis && x.precoAlvo !== null && x.precoAlvo >= LIMITE_FRETE_GRATIS) x.precoAlvo = null;
+    }
     const degraus = avisosDeDegrau({
       preco: precoAtual, comissaoPct: tarifaAtual.comissaoPct, freteGratis,
       freteAbaixo: informado ?? freteAbaixo?.valor ?? null, freteAcima: informado ?? freteAcima?.valor ?? null,

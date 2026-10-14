@@ -8,6 +8,8 @@ import { AimOutlined, BulbOutlined, CarOutlined, LineChartOutlined, RollbackOutl
 import { AnalisePreco, AnuncioDetalhe, anunciosApi, formatarMoeda, ResultadoVendaMl } from './mercadoLivreApi';
 import { AlertasPreco } from './colunasLucro';
 import { precoComercial } from './listaAnuncios';
+import { compararCenarios, ComparacaoCenario } from './cenariosMl';
+import AjudaCenarios from './AjudaCenarios';
 
 const { Text } = Typography;
 
@@ -37,6 +39,7 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idItem, onTrocarItem, onMuda
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [frete, setFrete] = useState<number | null>(null);
+  const [vendasMes, setVendasMes] = useState(10);
   const vez = useRef(0);
 
   const item = det.itens.find(i => i.idItem === idItem) || det.itens[0];
@@ -196,21 +199,57 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idItem, onTrocarItem, onMuda
             <Alert type={a.alertas.some(x => x.grave) ? 'error' : 'warning'} showIcon message={<AlertasPreco alertas={a.alertas} onUsar={mudar} textoUsar="Usar" />} />
           )}
 
-          <Table<AnalisePreco['cenarios'][number]>
-            size="small" pagination={false} rowKey={c => `${c.tipo}-${c.freteGratis}`} dataSource={a.cenarios}
-            title={() => <Text strong>Cenários a {formatarMoeda(l.preco)}: Clássico × Premium, com e sem frete grátis</Text>}
+          <Table<AnalisePreco['cenarios'][number] & ComparacaoCenario>
+            size="small" pagination={false} rowKey={c => `${c.tipo}-${c.freteGratis}`} dataSource={compararCenarios(a.cenarios, vendasMes)}
+            scroll={{ x: 1000 }}
+            title={() => (
+              <Flex justify="space-between" align="center" wrap gap={8}>
+                <Text strong>Cenários a {formatarMoeda(l.preco)}: Clássico × Premium, com e sem frete grátis</Text>
+                <Space size={8} wrap>
+                  <Tooltip title="Quantas vendas por mês você faz (ou espera fazer) do jeito de hoje. A tabela mostra quanto cada cenário precisaria vender para lucrar o mesmo.">
+                    <InputNumber size="small" min={1} max={100000} precision={0} value={vendasMes} onChange={v => setVendasMes(Math.max(1, Number(v) || 1))} addonAfter="vendas/mês hoje" style={{ width: 190 }} />
+                  </Tooltip>
+                  <AjudaCenarios />
+                </Space>
+              </Flex>
+            )}
             rowClassName={c => (c.atual ? 'ml-linha-alterada' : '')}
             columns={[
               {
-                title: 'Anúncio', render: (_, c) => (
+                title: 'Anúncio', width: 250, render: (_, c) => (
                   <Space size={4} wrap>
                     <Tooltip title={c.tipo === 'gold_pro' ? 'Mais exposição e parcelamento sem juros para o comprador' : 'Comissão menor, sem parcelamento sem juros'}><Text strong={c.atual}>{TIPO[c.tipo]}</Text></Tooltip>
                     <Text type="secondary">· {c.freteGratis ? 'frete grátis' : 'comprador paga o frete'}</Text>
                     {c.atual && <Tag color="blue">hoje</Tag>}
+                    {c.melhorPorVenda && !c.atual && <Tooltip title="Maior lucro por venda"><Tag color="green">mais lucro/venda</Tag></Tooltip>}
                   </Space>
                 ),
               },
               ...colunasVenda,
+              {
+                title: <Tooltip title={`Lucro no mês com ${vendasMes} vendas (o mesmo volume em todos)`}>Lucro/mês</Tooltip>, dataIndex: 'lucroMes', align: 'right' as const,
+                render: (v: number) => <Text style={{ color: corLucro(v) }}>{formatarMoeda(v)}</Text>,
+              },
+              {
+                title: <Tooltip title="Quantas vendas por mês este cenário precisa para lucrar o mesmo que hoje. Até 2× costuma valer testar; 4× ou mais quase nunca compensa.">Para lucrar o mesmo</Tooltip>,
+                align: 'right' as const, width: 150,
+                render: (_, c) => {
+                  if (c.atual) return <Text type="secondary">{vendasMes} (hoje)</Text>;
+                  if (c.vendasParaEmpatar === null || c.multiplicador === null) return <Tag color="red">nunca (prejuízo)</Tag>;
+                  const cor = c.multiplicador <= 1 ? 'green' : c.multiplicador <= 2 ? 'blue' : c.multiplicador < 4 ? 'orange' : 'red';
+                  return (
+                    <Tooltip title={c.multiplicador <= 1 ? 'Lucra mais com as mesmas vendas (ou menos)' : `Precisa vender ${c.multiplicador.toFixed(1).replace('.', ',')} vezes o que vende hoje`}>
+                      <Tag color={cor} style={{ marginRight: 0 }}>{c.vendasParaEmpatar} · {c.multiplicador <= 1 ? 'menos vendas' : `${c.multiplicador.toFixed(1).replace('.', ',')}×`}</Tag>
+                    </Tooltip>
+                  );
+                },
+              },
+              {
+                title: <Tooltip title="Menor preço que dá a sua margem alvo neste cenário (tarifa e frete do ML já descontados)">Preço p/ alvo</Tooltip>, align: 'right' as const, width: 110,
+                render: (_, c) => (c.precoAlvo === null || c.precoAlvo === undefined
+                  ? <Text type="secondary">—</Text>
+                  : <Text style={{ color: c.precoAlvo > l.preco ? '#d46b08' : '#389e0d' }}>{formatarMoeda(c.precoAlvo)}</Text>),
+              },
             ]}
           />
 
