@@ -11,6 +11,7 @@ import {
 
 import { faixasNoMl } from './faixas.controller';
 import { entrarNoCatalogo, verificarCatalogo } from './catalogo.controller';
+import { buscarFotosMl, fotosDoAnuncio, importarFotos } from './fotos.controller';
 import { analisarPreco, financeiroAnuncio, financeiroAnuncios, simularPreco } from './precificacao.controller';
 import { buscarClientes, buscarPedidos, listarPedidos, resultadoPedidos, obterConfig, reprocessarPedido, salvarConfig } from './pedidos.controller';
 
@@ -25,6 +26,7 @@ router.get('/conta', conta);
 router.get('/candidatos', candidatos);
 router.get('/anuncios', listarAnuncios);
 router.get('/anuncios/financeiro', financeiroAnuncios);
+router.get('/fotos-ml/buscar', buscarFotosMl);
 router.post('/anuncios', criarAnuncio);
 router.get('/anuncios/:id', detalheAnuncio);
 router.put('/anuncios/:id', salvarAnuncio);
@@ -43,6 +45,8 @@ router.get('/anuncios/:id/catalogo', verificarCatalogo);
 router.get('/anuncios/:id/itens/:idItem/preco', analisarPreco);
 router.get('/anuncios/:id/itens/:idItem/simular', simularPreco);
 router.get('/anuncios/:id/financeiro', financeiroAnuncio);
+router.get('/anuncios/:id/fotos', fotosDoAnuncio);
+router.post('/anuncios/:id/fotos/importar', importarFotos);
 router.post('/anuncios/:id/itens/:idItem/catalogo', entrarNoCatalogo);
 router.post('/anuncios/:id/sincronizar', sincronizarAnuncio);
 router.get('/sincronizar', situacaoSincronizacao);

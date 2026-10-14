@@ -156,6 +156,11 @@ export interface Candidatos {
 
 /** Modo de venda do anúncio publicado: tipo, frete grátis e o que o ML deixa trocar. */
 export interface VendaMl { tipo: string | null; freteGratis: boolean; tiposPermitidos: string[]; podeMudarFrete: boolean; misturado: boolean }
+/** Foto no ML (do anúncio, de outro anúncio ou do catálogo). */
+export interface FotoMl { id: string; url: string; tamanho: string | null; noErp?: boolean }
+/** Fotos de um item: as do cadastro do ERP e as do anúncio dele no ML. */
+export interface FotosItemMl { idItem: number; sku: string; nome: string; mlbId: string | null; erp: { idAnexo: number; url: string; principal: boolean }[]; ml: FotoMl[] }
+export interface BuscaFotosMl { origem: 'ANUNCIO' | 'CATALOGO'; id: string; titulo: string; proprio: boolean; catalogo?: string | null; fotos: FotoMl[] }
 export interface ConferenciaItem { idItem: number; sku: string; ok: boolean; erros: string[] }
 
 export interface AnuncioNoMl {
@@ -238,6 +243,10 @@ const comAlertas = <T extends { alertas?: AlertaPreco[]; precoAlvo?: number | nu
 
 export const anunciosApi = {
   listar: async () => ler<AnuncioResumo[]>(await fetch(`${API}/anuncios?tenant_id=1`), 'Erro ao listar os anúncios.'),
+  fotos: async (id: number) => ler<FotosItemMl[]>(await fetch(`${API}/anuncios/${id}/fotos?tenant_id=1`), 'Erro ao ler as fotos do anúncio.'),
+  buscarFotos: async (ref: string) => ler<BuscaFotosMl>(await fetch(`${API}/fotos-ml/buscar?tenant_id=1&ref=${encodeURIComponent(ref)}`), 'Erro ao buscar as fotos no ML.'),
+  importarFotos: async (id: number, itens: { idItem: number; fotos: { url: string; idMl?: string }[] }[]) =>
+    ler<{ importadas: number }>(await fetch(`${API}/anuncios/${id}/fotos/importar?tenant_id=1`, json('POST', { itens })), 'Erro ao trazer as fotos para o ERP.'),
   financeiroAnuncio: async (id: number) => {
     const r = await ler<{ id: number; itens: FinanceiroItem[] }>(await fetch(`${API}/anuncios/${id}/financeiro?tenant_id=1`), 'Erro ao calcular o lucro do anúncio.');
     return { ...r, itens: r.itens.map(comAlertas) };
