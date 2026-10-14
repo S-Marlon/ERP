@@ -43,3 +43,16 @@ export const passaNoFiltro = (a: AnuncioResumo, fin: ResumoFinanceiro | null, fi
 /** Faixa de valores "R$ a – R$ b" (ou um só). */
 export const faixaMoeda = (min: number, max: number, formatar: (v: number) => string) =>
   (Math.abs(max - min) < 0.005 ? formatar(min) : `${formatar(min)} a ${formatar(max)}`);
+
+/**
+ * Preço "de prateleira" para o alvo: o próximo final ,90 que não fica abaixo do mínimo. Não passa de R$ 79 por causa do
+ * arredondamento (lá o frete grátis fica mais caro): nesse caso usa R$ 78,90 ou o mínimo exato.
+ */
+export const precoComercial = (minimo: number, limiteFrete = 79) => {
+  const centavos = Math.ceil(Math.round(minimo * 1000) / 10);    // mínimo em centavos, arredondado para cima
+  let p = Math.floor(centavos / 100) * 100 + 90;
+  if (p < centavos) p += 100;
+  const preco = p / 100;
+  if (minimo < limiteFrete && preco >= limiteFrete) return minimo <= 78.9 ? 78.9 : centavos / 100;
+  return preco;
+};

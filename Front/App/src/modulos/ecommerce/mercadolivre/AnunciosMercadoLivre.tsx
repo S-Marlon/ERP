@@ -170,7 +170,7 @@ const AnunciosMercadoLivre: React.FC = () => {
             </Space>
           ),
         },
-        { title: 'Preço no ML', width: 190, render: (_, i) => <PrecoRapido valor={i.preco} proprio={i.precoMl !== null} onSalvar={v => salvarPreco(a, i, v)} /> },
+        { title: 'Preço no ML', width: 210, render: (_, i) => <PrecoRapido idAnuncio={a.id} idItem={i.idItem} atual={itemDoFin(a, i.idItem)} valor={i.preco} proprio={i.precoMl !== null} onSalvar={v => salvarPreco(a, i, v)} /> },
         { title: 'Recebe / lucro', width: 130, align: 'right', render: (_, i) => <LucroItem f={itemDoFin(a, i.idItem)} /> },
         {
           title: '', width: 110, align: 'right',
@@ -287,9 +287,9 @@ const AnunciosMercadoLivre: React.FC = () => {
               ),
             },
             {
-              title: 'Preço no ML', width: 190,
+              title: <Tooltip title="Mude o preço e veja na hora quanto você recebe e o lucro. O botão do alvo sugere o preço para a sua margem.">Preço no ML</Tooltip>, width: 210,
               render: (_, a) => (a.itens.length === 1
-                ? <PrecoRapido valor={a.itens[0].preco} proprio={a.itens[0].precoMl !== null} onSalvar={v => salvarPreco(a, a.itens[0], v)} />
+                ? <PrecoRapido idAnuncio={a.id} idItem={a.itens[0].idItem} atual={itemDoFin(a, a.itens[0].idItem)} valor={a.itens[0].preco} proprio={a.itens[0].precoMl !== null} onSalvar={v => salvarPreco(a, a.itens[0], v)} />
                 : <Text>{a.precoMin === null ? '—' : faixaMoeda(a.precoMin, a.precoMax ?? a.precoMin, formatarMoeda)}</Text>),
             },
             { title: <Tooltip title="Preço − tarifa − frete grátis do ML, e o lucro sobre o custo do ERP. Passe o mouse para ver a conta.">Você recebe</Tooltip>, width: 140, align: 'right', render: (_, a) => colunaLucro(a) },

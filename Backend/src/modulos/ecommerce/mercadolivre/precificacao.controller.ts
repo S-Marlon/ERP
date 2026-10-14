@@ -118,7 +118,22 @@ export const contextoVenda = async (
     const l = lucroNoMl({ preco, custo, tarifa: await tarifaDe(preco), frete: frete ?? 0 });
     return { ...l, freteDesconhecido: frete === null, nivel: classificarLucro(custo > 0 ? l.lucroSobreCustoPct : null, alvo.alvoPct) };
   };
-  return { tipo, fator, custo, alvo, tarifaDe, envioDe, freteDe, avaliar, freteGratis, logistica, peso, noMlEnvio };
+  /** Menor preço que dá o alvo sobre o custo: o frete muda com a faixa de preço, então recalcula até firmar. */
+  const precoAlvoDe = async (precoAtual: number, freteAtual: number) => {
+    if (!(custo > 0)) return null;
+    let precoAlvo: number | null = null;
+    let freteAlvo = freteAtual;
+    for (let k = 0; k < 4; k++) {
+      const p = precoParaAlvo({ custo, tarifa: await tarifaDe(precoAlvo ?? precoAtual), frete: freteAlvo, alvoPct: alvo.alvoPct });
+      if (p === null) break;
+      const f = (await freteDe(p)) ?? freteAlvo;
+      precoAlvo = p;
+      if (f === freteAlvo) break;
+      freteAlvo = f;
+    }
+    return precoAlvo;
+  };
+  return { tipo, fator, custo, alvo, tarifaDe, envioDe, freteDe, avaliar, precoAlvoDe, freteGratis, logistica, peso, noMlEnvio };
 };
 
 /** GET /anuncios/:id/itens/:idItem/preco?simular=&frete=&alvoPadrao=30 */
@@ -140,19 +155,7 @@ export const analisarPreco = async (req: Request, res: Response) => {
     const simular = Number(req.query.simular) > 0 ? Number(req.query.simular) : null;
     const simulado = simular ? await avaliar(simular) : null;
     const tarifaAtual = await tarifaDe(precoAtual);
-    // preço para o alvo: o frete muda com a faixa de preço, então recalcula até firmar
-    let precoAlvo: number | null = null;
-    if (custo > 0) {
-      let freteAlvo = frete;
-      for (let k = 0; k < 4; k++) {
-        const p = precoParaAlvo({ custo, tarifa: await tarifaDe(precoAlvo ?? precoAtual), frete: freteAlvo, alvoPct: alvo.alvoPct });
-        if (p === null) break;
-        const f = (await freteDe(p)) ?? freteAlvo;
-        precoAlvo = p;
-        if (f === freteAlvo) break;
-        freteAlvo = f;
-      }
-    }
+    const precoAlvo = await ctx.precoAlvoDe(precoAtual, frete);
 
     const envioAtual = await envioDe(precoAtual);
     const [freteAbaixo, freteAcima] = await Promise.all([envioDe(78.9), envioDe(Math.max(LIMITE_FRETE_GRATIS, precoAtual))]);
@@ -269,6 +272,7 @@ export const financeiroAnuncios = async (req: Request, res: Response) => {
           return {
             idItem: item.idItem, preco: l.preco, tarifa: l.tarifa, frete: l.frete, recebe: l.liquido, custo: l.custo, lucro: l.lucro,
             lucroSobreCustoPct: l.lucroSobreCustoPct, nivel: l.nivel, freteGratis: ctx.freteGratis, freteDesconhecido: l.freteDesconhecido, alvoPct: ctx.alvo.alvoPct,
+            precoAlvo: await ctx.precoAlvoDe(preco, l.frete),
           };
         } catch {
           return null;
@@ -279,5 +283,27 @@ export const financeiroAnuncios = async (req: Request, res: Response) => {
     return res.json(saida);
   } catch (error) {
     return responderErro(res, error, 'Erro ao calcular o lucro dos anúncios.');
+  }
+};
+
+/** GET /anuncios/:id/itens/:idItem/simular?preco= — você recebe e lucro a um preço (para ver enquanto digita) e o preço do alvo. */
+export const simularPreco = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  try {
+    const [c] = await carregarAnuncios(pool as any, tenant, Number(req.params.id));
+    const item = c?.itens.find(i => i.idItem === Number(req.params.idItem));
+    if (!c || !item) throw new ErroML('Item não encontrado no anúncio.', 404);
+    if (!c.dados.categoriaMl) throw new ErroML('Escolha a categoria do ML primeiro: a tarifa depende dela.');
+    const ctx = await contextoVenda(tenant, c, item);
+    const atual = precoNoMl(item, c.dados.ajustePreco);
+    const preco = Number(req.query.preco) > 0 ? r2(Number(req.query.preco)) : atual;
+    const l = await ctx.avaliar(preco);
+    const lAtual = preco === atual ? l : await ctx.avaliar(atual);
+    return res.json({
+      preco: l.preco, tarifa: l.tarifa, frete: l.frete, recebe: l.liquido, custo: l.custo, lucro: l.lucro, lucroSobreCustoPct: l.lucroSobreCustoPct,
+      nivel: l.nivel, freteDesconhecido: l.freteDesconhecido, alvoPct: ctx.alvo.alvoPct, precoAlvo: await ctx.precoAlvoDe(atual, lAtual.frete),
+    });
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao simular o preço.');
   }
 };

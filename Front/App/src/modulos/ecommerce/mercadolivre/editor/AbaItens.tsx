@@ -1,12 +1,13 @@
 // Aba Itens e estoque do editor: divisão do estoque loja/ML, e cada item com foto, título no ML, situação no ML,
 // estoque, preço (no rascunho) e comissão. Fotos, adicionar e tirar itens valem na hora.
-import React from 'react';
+import React, { useState } from 'react';
 import { Alert, Avatar, Button, Card, InputNumber, Popconfirm, Space, Spin, Table, Tag, Tooltip, Typography, Upload } from 'antd';
 import { BarcodeOutlined, DeleteOutlined, InboxOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons';
 import FotoFamiliaControle from '../../../../areas/catalogo/familias/FotoFamiliaControle';
 import EnviarFotoPopover from '../../../../shared/components/EnviarFotoPopover';
 import { AnuncioDetalhe, foraDoMl, formatarMoeda, ItemDoAnuncio, ROTULO_STATUS_ML } from '../mercadoLivreApi';
 import { EstoqueAnuncioCard, EstoqueItemCelula } from '../EstoqueMl';
+import { BotaoAlvo, LinhaPrevisao, usePrevisaoPreco } from '../AcoesRapidas';
 import type { RascunhoItem } from '../rascunhoAnuncio';
 
 const { Text } = Typography;
@@ -32,6 +33,30 @@ interface Props {
   sincronizando: boolean;
   onSincronizar: () => void;
 }
+
+/** Preço no ML do item (vai ao rascunho) com o resultado ao vivo e o botão do preço para o alvo. */
+const PrecoDoItem: React.FC<{ idAnuncio: number; item: ItemDoAnuncio; mudou: boolean; onMudar: (v: number | null) => void }> = ({ idAnuncio, item, mudou, onMudar }) => {
+  const [ver, setVer] = useState(false);
+  const preco = item.precoMl ?? item.precoAnuncio;
+  const { previsao, carregando } = usePrevisaoPreco(idAnuncio, item.idItem, preco, mudou || ver);
+  return (
+    <div style={{ lineHeight: 1.3 }}>
+      <InputNumber
+        size="small" style={{ width: '100%' }} min={0.01} step={0.1} precision={2} decimalSeparator=","
+        value={item.precoMl ?? null} placeholder={item.precoAnuncio.toFixed(2).replace('.', ',')}
+        onChange={v => onMudar(v === null ? null : Number(v))}
+      />
+      {mudou || ver ? (
+        <>
+          <div><LinhaPrevisao p={previsao} carregando={carregando} /></div>
+          {previsao && <div><BotaoAlvo precoAlvo={previsao.precoAlvo} alvoPct={previsao.alvoPct} atual={preco} onUsar={onMudar} /></div>}
+        </>
+      ) : (
+        <Button size="small" type="link" style={{ padding: 0, height: 'auto', fontSize: 12 }} onClick={() => setVer(true)}>ver lucro</Button>
+      )}
+    </div>
+  );
+};
 
 const AbaItens: React.FC<Props> = p => {
   const { det } = p;
@@ -122,12 +147,11 @@ const AbaItens: React.FC<Props> = p => {
             },
             { title: 'Preço loja', dataIndex: 'preco', width: 92, align: 'right', render: formatarMoeda },
             {
-              title: <Tooltip title="Vazio = preço do ERP com o ajuste do anúncio. Item já no ML recebe o preço novo ao salvar.">Preço no ML</Tooltip>, width: 128,
+              title: <Tooltip title="Vazio = preço do ERP com o ajuste do anúncio. Ao mudar, mostra na hora quanto você recebe e o lucro. Item já no ML recebe o preço novo ao salvar.">Preço no ML</Tooltip>, width: 190,
               render: (_, i) => (
-                <InputNumber
-                  size="small" style={{ width: '100%' }} min={0.01} step={0.1} precision={2} decimalSeparator=","
-                  value={i.precoMl ?? null} placeholder={i.precoAnuncio.toFixed(2).replace('.', ',')}
-                  onChange={v => p.onMudarItem(i.idItem, { precoMl: v === null ? null : Number(v) })}
+                <PrecoDoItem
+                  idAnuncio={det.id} item={i} mudou={!!p.rascunhoItens[i.idItem] && 'precoMl' in p.rascunhoItens[i.idItem]}
+                  onMudar={v => p.onMudarItem(i.idItem, { precoMl: v })}
                 />
               ),
             },

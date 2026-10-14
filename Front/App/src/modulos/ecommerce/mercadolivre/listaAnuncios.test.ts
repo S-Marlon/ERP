@@ -1,12 +1,12 @@
 import assert from 'assert';
-import { faixaMoeda, passaNoFiltro, resumirFinanceiro } from './listaAnuncios';
+import { faixaMoeda, passaNoFiltro, precoComercial, resumirFinanceiro } from './listaAnuncios';
 import type { AnuncioResumo, FinanceiroItem } from './mercadoLivreApi';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
 const fin = (lucro: number, nivel: FinanceiroItem['nivel'], extra: Partial<FinanceiroItem> = {}): FinanceiroItem => ({
   idItem: 1, preco: 10, tarifa: 1, frete: 0, recebe: 9 + lucro, custo: 9, lucro, lucroSobreCustoPct: (lucro / 9) * 100, nivel,
-  freteGratis: false, freteDesconhecido: false, alvoPct: 30, ...extra,
+  freteGratis: false, freteDesconhecido: false, alvoPct: 30, precoAlvo: null, ...extra,
 });
 const anuncio = (extra: Partial<AnuncioResumo>): AnuncioResumo => ({
   id: 1, titulo: 'x', idFamilia: null, familia: null, categoriaMl: null, categoriaNome: null, tipoAnuncio: 'gold_pro', situacao: 'PUBLICADO', preparo: null,
@@ -35,4 +35,14 @@ teste('faixa de valores', () => {
   const f = (v: number) => v.toFixed(2);
   assert.strictEqual(faixaMoeda(3, 3, f), '3.00');
   assert.strictEqual(faixaMoeda(3, 7.5, f), '3.00 a 7.50');
+});
+
+teste('preço comercial para o alvo (final ,90)', () => {
+  assert.strictEqual(precoComercial(46.02), 46.9);
+  assert.strictEqual(precoComercial(46.9), 46.9);
+  assert.strictEqual(precoComercial(46.95), 47.9);
+  assert.strictEqual(precoComercial(9.5), 9.9);
+  assert.strictEqual(precoComercial(78.5), 78.9);
+  assert.strictEqual(precoComercial(78.95), 78.95);
+  assert.strictEqual(precoComercial(120.3), 120.9);
 });

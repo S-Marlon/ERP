@@ -61,7 +61,10 @@ export interface ItemResumo {
 export interface FinanceiroItem {
   idItem: number; preco: number; tarifa: number; frete: number; recebe: number; custo: number; lucro: number;
   lucroSobreCustoPct: number | null; nivel: LucroMl['nivel']; freteGratis: boolean; freteDesconhecido: boolean; alvoPct: number;
+  precoAlvo: number | null;   // menor preço que dá o alvo sobre o custo (null sem custo)
 }
+/** Você recebe e lucro a um preço qualquer (simulação enquanto digita). */
+export type PrevisaoPreco = Omit<FinanceiroItem, 'idItem' | 'freteGratis'>;
 
 /** Preço por quantidade (B2B): a partir de `minimo` unidades, `desconto`% sobre o preço do anúncio. */
 export interface FaixaQuantidade { minimo: number; desconto: number }
@@ -226,6 +229,8 @@ export interface CategoriaNo { id: string | null; nome: string; caminho: string;
 
 export const anunciosApi = {
   listar: async () => ler<AnuncioResumo[]>(await fetch(`${API}/anuncios?tenant_id=1`), 'Erro ao listar os anúncios.'),
+  simularPreco: async (id: number, idItem: number, preco: number) =>
+    ler<PrevisaoPreco>(await fetch(`${API}/anuncios/${id}/itens/${idItem}/simular?tenant_id=1&preco=${preco}`), 'Erro ao simular o preço.'),
   financeiro: async () => ler<{ id: number; itens: FinanceiroItem[] }[]>(await fetch(`${API}/anuncios/financeiro?tenant_id=1`), 'Erro ao calcular o lucro dos anúncios.'),
   detalhe: async (id: number) => ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}?tenant_id=1`), 'Erro ao abrir o anúncio.'),
   candidatos: async (busca: string) => ler<Candidatos>(await fetch(`${API}/candidatos?tenant_id=1&busca=${encodeURIComponent(busca)}`), 'Erro ao buscar no catálogo.'),
