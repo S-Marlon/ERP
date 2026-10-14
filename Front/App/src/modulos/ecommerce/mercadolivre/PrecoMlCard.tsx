@@ -1,7 +1,7 @@
 // Preço e lucro no ML de um item: quanto você recebe (preço − tarifa − frete grátis), o lucro sobre o custo do ERP,
 // os cenários (Clássico × Premium, com e sem frete grátis), o lucro por quantidade, os degraus de custo do ML, a
 // posição no mercado e um simulador. Tarifa e frete vêm do ML (o frete muda com a faixa de preço da compra).
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Card, Col, Collapse, Flex, InputNumber, Row, Select, Space, Spin, Statistic, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { BulbOutlined, CarOutlined, LineChartOutlined, WarningOutlined } from '@ant-design/icons';
 import { AnalisePreco, AnuncioDetalhe, anunciosApi, formatarMoeda, ResultadoVendaMl } from './mercadoLivreApi';
@@ -21,20 +21,33 @@ const pct = (v: number | null | undefined) => (v === null || v === undefined ? '
 const corLucro = (v: number) => (v < 0 ? '#cf1322' : undefined);
 const TIPO: Record<string, string> = { gold_special: 'Clássico', gold_pro: 'Premium' };
 
-interface Props { det: AnuncioDetalhe; onUsarPreco: (idItem: number, preco: number) => void }
+interface Props {
+  det: AnuncioDetalhe;
+  onUsarPreco: (idItem: number, preco: number) => void;
+  escolhido?: { idItem: number; vez: number } | null;   // pedido de análise de um item (vem da tabela de preços)
+}
 
-const PrecoMlCard: React.FC<Props> = ({ det, onUsarPreco }) => {
+const PrecoMlCard: React.FC<Props> = ({ det, onUsarPreco, escolhido }) => {
   const [idItem, setIdItem] = useState<number>(det.itens[0]?.idItem);
   const [analise, setAnalise] = useState<AnalisePreco | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [simular, setSimular] = useState<number | null>(null);
   const [frete, setFrete] = useState<number | null>(null);
   useEffect(() => { setAnalise(null); }, [idItem]);
+  const cartao = useRef<HTMLDivElement>(null);
+  // a tabela de preços pediu a análise de um item: troca, analisa e rola até aqui
+  useEffect(() => {
+    if (!escolhido) return;
+    setIdItem(escolhido.idItem);
+    setSimular(null);
+    window.setTimeout(() => { analisar(null, escolhido.idItem); cartao.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [escolhido]);
 
-  const analisar = async (preco: number | null = simular) => {
-    if (!idItem) return;
+  const analisar = async (preco: number | null = simular, id: number = idItem) => {
+    if (!id) return;
     setCarregando(true);
-    try { setAnalise(await anunciosApi.analisePreco(det.id, idItem, { simular: preco, frete })); }
+    try { setAnalise(await anunciosApi.analisePreco(det.id, id, { simular: preco, frete })); }
     catch (e) { message.error(e instanceof Error ? e.message : 'Erro.'); }
     finally { setCarregando(false); }
   };
@@ -60,8 +73,9 @@ const PrecoMlCard: React.FC<Props> = ({ det, onUsarPreco }) => {
   ];
 
   return (
+    <div ref={cartao}>
     <Card
-      size="small" style={{ marginBottom: 16 }} title={<Space><LineChartOutlined />Preço e lucro no ML</Space>}
+      size="small" style={{ marginBottom: 16 }} title={<Space><LineChartOutlined />Análise detalhada de um item</Space>}
       extra={(
         <Space>
           {det.itens.length > 1 && (
@@ -241,6 +255,7 @@ const PrecoMlCard: React.FC<Props> = ({ det, onUsarPreco }) => {
         )}
       </Spin>
     </Card>
+    </div>
   );
 };
 

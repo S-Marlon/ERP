@@ -14,6 +14,7 @@ import {
 import AbaDados from './editor/AbaDados';
 import AbaItens from './editor/AbaItens';
 import AbaAtributos from './editor/AbaAtributos';
+import TabelaPrecos from './editor/TabelaPrecos';
 import PainelAlteracoes from './editor/PainelAlteracoes';
 import PainelLateral, { AcaoMl } from './editor/PainelLateral';
 import FaixasQuantidadeCard from './FaixasQuantidadeCard';
@@ -74,6 +75,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
   const [conferencia, setConferencia] = useState<ConferenciaItem[] | null>(null);
   const [falhas, setFalhas] = useState<{ sku: string; erro: string }[]>([]);
   const [sincronizando, setSincronizando] = useState(false);
+  const [detalhar, setDetalhar] = useState<{ idItem: number; vez: number } | null>(null);
 
   /** Detalhe novo do servidor: o rascunho perde o que ficou igual ao salvo (ou o que não existe mais). */
   const aplicar = useCallback((d: AnuncioDetalhe) => {
@@ -305,7 +307,11 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
   // ---------------------------------------------------------------------------
 
   const errosDaAba = (a: Aba) => (salvo?.pendencias || []).filter(p => p.nivel === 'erro' && ABA_DA_AREA[p.area] === a).length;
-  const mudouNaAba = (a: Aba) => CAMPOS_DA_ABA[a].some(c => c in rascunho.anuncio) || (a === 'itens' && Object.keys(rascunho.itens).length > 0);
+  // preço do item fica na aba Preço e lucro; unidade e regra de estoque, na aba Itens e estoque
+  const itensMudados = Object.values(rascunho.itens);
+  const mudouNaAba = (a: Aba) => CAMPOS_DA_ABA[a].some(c => c in rascunho.anuncio)
+    || (a === 'itens' && itensMudados.some(c => Object.keys(c).some(k => k !== 'precoMl')))
+    || (a === 'preco' && itensMudados.some(c => 'precoMl' in c));
   const rotuloAba = (a: Aba, texto: string) => {
     const erros = errosDaAba(a);
     return (
@@ -345,7 +351,14 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
       key: 'preco', label: rotuloAba('preco', 'Preço e lucro'),
       children: (
         <>
-          {det.categoria && det.itens.length > 0 && <PrecoMlCard det={det} onUsarPreco={(idItem, preco) => mudarDoItem(idItem, { precoMl: preco })} />}
+          {det.categoria && det.itens.length > 0 && (
+            <TabelaPrecos
+              salvo={salvo} det={det} rascunhoItens={rascunho.itens}
+              onMudarPreco={(idItem, preco) => mudarDoItem(idItem, { precoMl: preco })}
+              onDetalhar={idItem => setDetalhar(d => ({ idItem, vez: (d?.vez || 0) + 1 }))}
+            />
+          )}
+          {det.categoria && det.itens.length > 0 && <PrecoMlCard det={det} escolhido={detalhar} onUsarPreco={(idItem, preco) => mudarDoItem(idItem, { precoMl: preco })} />}
           <FaixasQuantidadeCard det={det} onMudar={faixas => mudarCampo('faixasQuantidade', faixas)} />
         </>
       ),
