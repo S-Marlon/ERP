@@ -10,9 +10,11 @@ import { carregarAnuncios, responderErro, taxaMl, tenantDe } from './anuncios.co
 import { lerFaixas } from './faixasQuantidade';
 import { compararAtributos } from './catalogo';
 import {
-  analisarFaixas, classificarLucro, classificarPreco, conselhos, estatisticas, lucroNoMl, precoParaAlvo, Tarifa, unidadesDoProduto,
+  classificarLucro, classificarPreco, conselhos, estatisticas, lucroNoMl, precoParaAlvo, Tarifa, unidadesDoProduto,
 } from './precificacao';
 import { ErroML, ml } from './mercadolivreApi';
+import { avisosDeDegrau, LIMITE_FRETE_GRATIS, montarCenarios, quantidadesParaAnalise, resultadoVenda, vendedorPagaFrete } from './custosMl';
+import { freteDoEnvio, freteGratisNoMl, pesoCobrado, preferenciasEnvio } from './freteMl';
 
 const r2 = (v: number) => Math.round((Number(v) + Number.EPSILON) * 100) / 100;
 
@@ -85,7 +87,8 @@ export const analisarPreco = async (req: Request, res: Response) => {
     if (!c || !item) throw new ErroML('Item não encontrado no anúncio.', 404);
     if (!c.dados.categoriaMl) throw new ErroML('Escolha a categoria do ML primeiro: a tarifa depende dela.');
     const tipo = c.registro.tipo_anuncio;
-    const frete = Math.max(0, Number(req.query.frete) || 0);
+    // frete informado à mão vale para tudo; sem ele, o frete vem do ML para cada valor de compra
+    const informado = req.query.frete !== undefined && req.query.frete !== '' ? Math.max(0, Number(req.query.frete) || 0) : null;
     const alvoPadrao = Math.min(1000, Math.max(0, Number(req.query.alvoPadrao) || 30));
 
     // custo da unidade vendida no ML (pacote = custo base × fator)
@@ -97,20 +100,69 @@ export const analisarPreco = async (req: Request, res: Response) => {
     );
     const alvo = alvoEfetivo(fam?.margem_minima !== null && fam?.margem_minima !== undefined ? Number(fam.margem_minima) : null, alvoPadrao);
 
-    const tarifaDe = async (preco: number): Promise<Tarifa> => {
-      const t = await taxaMl(tenant, r2(preco), c.dados.categoriaMl!, tipo);
-      return { comissaoPct: t?.percentual ?? 17, fixa: t?.fixa ?? 0 };
+    const tarifaDe = async (preco: number, tipoAnuncio = tipo): Promise<Tarifa> => {
+      const t = await taxaMl(tenant, r2(preco), c.dados.categoriaMl!, tipoAnuncio);
+      return { comissaoPct: t?.percentual ?? (tipoAnuncio === 'gold_pro' ? 17 : 12), fixa: t?.fixa ?? 0 };
     };
+
+    // frete grátis: ligado no anúncio publicado (ou o padrão da conta), peso cobrado e o custo por valor de compra
+    const mlb = c.noMl.get(item.idItem)?.mlbId || null;
+    const pref = await preferenciasEnvio(tenant).catch(() => null);
+    const noMlEnvio = mlb ? await freteGratisNoMl(tenant, mlb) : null;
+    const freteGratis = noMlEnvio ? noMlEnvio.gratis : pref?.freteGratisPadrao ?? true;
+    const logistica = noMlEnvio?.logistica || pref?.logistica || 'drop_off';
+    const peso = pref ? await pesoCobrado(tenant, { mlbId: mlb, pesoKg: item.pesoKg, medidasCm: item.medidasCm, fator }).catch(() => null) : null;
+    const envioDe = (valorCompra: number, quantidade = 1, tipoAnuncio = tipo) =>
+      (peso ? freteDoEnvio(tenant, { pesoG: peso.pesoG * quantidade, valorCompra, tipo: tipoAnuncio, logistica }) : Promise.resolve(null));
+    /** Frete que o vendedor paga numa compra (0 quando o comprador paga; null quando não deu para saber). */
+    const freteDe = async (valorCompra: number, quantidade = 1, gratis = freteGratis) => {
+      if (!vendedorPagaFrete(valorCompra, gratis)) return 0;
+      if (informado !== null) return informado * quantidade;
+      return (await envioDe(valorCompra, quantidade))?.valor ?? null;
+    };
+
     const avaliar = async (preco: number) => {
-      const l = lucroNoMl({ preco, custo, tarifa: await tarifaDe(preco), frete });
-      return { ...l, nivel: classificarLucro(custo > 0 ? l.lucroSobreCustoPct : null, alvo.alvoPct) };
+      const frete = await freteDe(preco);
+      const l = lucroNoMl({ preco, custo, tarifa: await tarifaDe(preco), frete: frete ?? 0 });
+      return { ...l, freteDesconhecido: frete === null, nivel: classificarLucro(custo > 0 ? l.lucroSobreCustoPct : null, alvo.alvoPct) };
     };
     const precoAtual = precoNoMl(item, c.dados.ajustePreco);
     const atual = await avaliar(precoAtual);
+    const frete = atual.frete;
     const simular = Number(req.query.simular) > 0 ? Number(req.query.simular) : null;
     const simulado = simular ? await avaliar(simular) : null;
     const tarifaAtual = await tarifaDe(precoAtual);
-    const precoAlvo = custo > 0 ? precoParaAlvo({ custo, tarifa: tarifaAtual, frete, alvoPct: alvo.alvoPct }) : null;
+    // preço para o alvo: o frete muda com a faixa de preço, então recalcula até firmar
+    let precoAlvo: number | null = null;
+    if (custo > 0) {
+      let freteAlvo = frete;
+      for (let k = 0; k < 4; k++) {
+        const p = precoParaAlvo({ custo, tarifa: await tarifaDe(precoAlvo ?? precoAtual), frete: freteAlvo, alvoPct: alvo.alvoPct });
+        if (p === null) break;
+        const f = (await freteDe(p)) ?? freteAlvo;
+        precoAlvo = p;
+        if (f === freteAlvo) break;
+        freteAlvo = f;
+      }
+    }
+
+    const envioAtual = await envioDe(precoAtual);
+    const [freteAbaixo, freteAcima] = await Promise.all([envioDe(78.9), envioDe(Math.max(LIMITE_FRETE_GRATIS, precoAtual))]);
+    let precoSemFixa: number | null = null;
+    if (tarifaAtual.fixa > 0) {
+      for (const p of [13, 15, 17, 19, 19.9, 25, 29, 35]) {
+        if (p > precoAtual && !(await tarifaDe(p)).fixa) { precoSemFixa = p; break; }
+      }
+    }
+    const tarifas = { gold_special: await tarifaDe(precoAtual, 'gold_special'), gold_pro: await tarifaDe(precoAtual, 'gold_pro') };
+    const freteSeGratis = informado ?? envioAtual?.valor ?? null;
+    const cenarios = montarCenarios({ preco: precoAtual, custoUnit: custo, tarifas, frete: freteSeGratis, tipoAtual: tipo, freteGratisAtual: freteGratis })
+      .map(x => ({ ...x, nivel: classificarLucro(custo > 0 ? x.lucroSobreCustoPct : null, alvo.alvoPct) }));
+    const degraus = avisosDeDegrau({
+      preco: precoAtual, comissaoPct: tarifaAtual.comissaoPct, freteGratis,
+      freteAbaixo: informado ?? freteAbaixo?.valor ?? null, freteAcima: informado ?? freteAcima?.valor ?? null,
+      tarifaFixa: tarifaAtual.fixa, precoSemFixa,
+    });
 
     // quantas unidades vêm no anúncio: atributo do ML (unidades por pacote), unidade do ML, ou o título
     const atributoUnidades = (c.categoria?.atributos || []).find(a => /^UNITS_PER_PACK(AGE)?$/.test(a.id));
@@ -156,14 +208,27 @@ export const analisarPreco = async (req: Request, res: Response) => {
     const posicao = classificarPreco(porUnidade, mercado.estatisticas);
     const precoMercado = mercado.estatisticas ? r2(mercado.estatisticas.mediana * unidades) : null;
 
-    const faixas = analisarFaixas(lerFaixas(c.registro.faixas_quantidade), {
-      preco: precoAtual, custo, frete, alvoPct: alvo.alvoPct, tarifaDaFaixa: () => tarifaAtual,
-    });
+    // por quantidade: preço da faixa, tarifa por unidade e um frete por envio (a compra maior pode passar do limite)
+    const faixasAnuncio = lerFaixas(c.registro.faixas_quantidade);
+    const porQuantidade = [];
+    for (const q of quantidadesParaAnalise(precoAtual, faixasAnuncio)) {
+      const precoUnit = r2(precoAtual * (1 - q.desconto / 100));
+      const freteQ = await freteDe(r2(precoUnit * q.quantidade), q.quantidade);
+      const r = resultadoVenda({ precoUnit, quantidade: q.quantidade, custoUnit: custo, tarifa: await tarifaDe(precoUnit), frete: freteQ ?? 0 });
+      porQuantidade.push({ ...r, desconto: q.desconto, faixa: faixasAnuncio.some(f => f.minimo === q.quantidade), freteDesconhecido: freteQ === null, nivel: classificarLucro(custo > 0 ? r.lucroSobreCustoPct : null, alvo.alvoPct) });
+    }
+    const faixas = porQuantidade.filter(x => x.faixa).map(x => ({ minimo: x.quantidade, desconto: x.desconto, preco: x.precoUnit, lucro: x.lucroPorUnidade, lucroSobreCustoPct: x.lucroSobreCustoPct, nivel: x.nivel }));
     return res.json({
       idItem: item.idItem, sku: item.sku, titulo: item.tituloMl || item.nome, marca: marcaDoAnuncio,
       unidades, unidadeMl: item.unidadeMl?.sigla || null, custo, custoBase: fator > 1 ? r2(custo / fator) : custo,
       alvo: { pct: alvo.alvoPct, origem: alvo.origem },
       tarifa: tarifaAtual, frete,
+      envio: {
+        gratis: freteGratis, obrigatorio: precoAtual >= LIMITE_FRETE_GRATIS, informado: informado !== null, logistica,
+        noAnuncio: !!noMlEnvio, peso, envio: envioAtual, limite: LIMITE_FRETE_GRATIS,
+        acimaDoLimite: freteAcima, abaixoDoLimite: freteAbaixo,
+      },
+      cenarios, porQuantidade, degraus,
       atual, simulado, precoAlvo,
       loja: { preco: item.preco, difPct: item.preco > 0 ? r2((precoAtual / item.preco - 1) * 100) : null },
       mercado: { ...mercado, porUnidade, nivel: posicao.nivel, difMedianaPct: posicao.difMedianaPct, precoMercado },

@@ -58,7 +58,7 @@ export interface FaixaQuantidade { minimo: number; desconto: number }
 
 export interface LucroMl {
   preco: number; tarifa: number; frete: number; liquido: number; custo: number; lucro: number;
-  lucroSobreCustoPct: number | null; margemSobrePrecoPct: number | null; nivel: 'PREJUIZO' | 'BAIXO' | 'BOM' | 'ALTO' | 'SEM_CUSTO';
+  lucroSobreCustoPct: number | null; margemSobrePrecoPct: number | null; nivel: 'PREJUIZO' | 'BAIXO' | 'BOM' | 'ALTO' | 'SEM_CUSTO'; freteDesconhecido?: boolean;
 }
 export interface EstatisticasMercado { n: number; min: number; p25: number; mediana: number; p75: number; max: number }
 export interface AnalisePreco {
@@ -71,6 +71,18 @@ export interface AnalisePreco {
     erro: string | null; porUnidade: number; nivel: 'ABAIXO' | 'COMPETITIVO' | 'ACIMA' | 'SEM_REFERENCIA'; difMedianaPct: number | null; precoMercado: number | null;
   };
   faixas: (LucroMl & { minimo: number; desconto: number })[]; conselhos: string[];
+  envio: {
+    gratis: boolean; obrigatorio: boolean; informado: boolean; logistica: string; noAnuncio: boolean; limite: number;
+    peso: { pesoG: number; fonte: 'ML' | 'ERP' } | null; envio: FreteEnvio | null; acimaDoLimite: FreteEnvio | null; abaixoDoLimite: FreteEnvio | null;
+  };
+  cenarios: (ResultadoVendaMl & { tipo: 'gold_special' | 'gold_pro'; freteGratis: boolean; atual: boolean; obrigatorio: boolean })[];
+  porQuantidade: (ResultadoVendaMl & { desconto: number; faixa: boolean; freteDesconhecido: boolean })[];
+  degraus: string[];
+}
+export interface FreteEnvio { valor: number; cheio: number | null; descontoPct: number | null; pesoG: number | null }
+export interface ResultadoVendaMl {
+  quantidade: number; precoUnit: number; receita: number; tarifa: number; frete: number; recebe: number; custo: number; lucro: number;
+  lucroPorUnidade: number; lucroSobreCustoPct: number | null; margemSobrePrecoPct: number | null; tarifaPct: number; nivel: LucroMl['nivel'];
 }
 
 export interface CandidatoCatalogo {
@@ -218,7 +230,7 @@ export const anunciosApi = {
   analisePreco: async (id: number, idItem: number, p: { simular?: number | null; frete?: number | null }) => {
     const q = new URLSearchParams({ tenant_id: '1' });
     if (p.simular) q.set('simular', String(p.simular));
-    if (p.frete) q.set('frete', String(p.frete));
+    if (p.frete !== null && p.frete !== undefined) q.set('frete', String(p.frete));
     return ler<AnalisePreco>(await fetch(`${API}/anuncios/${id}/itens/${idItem}/preco?${q}`), 'Erro ao analisar o preço.');
   },
   verificarCatalogo: async (id: number) => ler<{ itens: CatalogoItem[] }>(await fetch(`${API}/anuncios/${id}/catalogo?tenant_id=1`), 'Erro ao verificar o catálogo.'),
