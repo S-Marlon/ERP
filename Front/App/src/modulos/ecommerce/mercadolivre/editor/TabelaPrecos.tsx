@@ -59,10 +59,11 @@ interface Props {
   det: AnuncioDetalhe;                                  // com o rascunho aplicado
   rascunhoItens: Record<number, RascunhoItem>;
   onMudarPreco: (idItem: number, preco: number | null) => void;
-  onDetalhar: (idItem: number) => void;
+  selecionado: number | null;                           // item aberto no painel de cima
+  onSelecionar: (idItem: number) => void;
 }
 
-const TabelaPrecos: React.FC<Props> = ({ salvo, det, rascunhoItens, onMudarPreco, onDetalhar }) => {
+const TabelaPrecos: React.FC<Props> = ({ salvo, det, rascunhoItens, onMudarPreco, selecionado, onSelecionar }) => {
   const lucro = useLucroDosItens(salvo, det, rascunhoItens);
   const mudouPreco = (i: ItemDoAnuncio) => !!rascunhoItens[i.idItem] && 'precoMl' in rascunhoItens[i.idItem];
   const ajuste = det.ajustePreco ? `${det.ajustePreco > 0 ? '+' : ''}${det.ajustePreco}%` : '';
@@ -71,12 +72,13 @@ const TabelaPrecos: React.FC<Props> = ({ salvo, det, rascunhoItens, onMudarPreco
     <Card
       size="small" style={{ marginBottom: 16 }}
       title={<Space><LineChartOutlined />Preço e lucro por item</Space>}
-      extra={<Text type="secondary" style={{ fontSize: 12 }}>Ajuste do anúncio: {ajuste || '0%'} sobre o preço do ERP</Text>}
+      extra={<Text type="secondary" style={{ fontSize: 12 }}>Clique num item para ver no painel acima · ajuste do anúncio: {ajuste || '0%'} sobre o ERP</Text>}
     >
       <Table<ItemDoAnuncio>
         size="small" rowKey="idItem" dataSource={det.itens} pagination={det.itens.length > 20 ? { pageSize: 20, showSizeChanger: false } : false}
         scroll={{ x: 1500 }}
-        rowClassName={i => (mudouPreco(i) ? 'ml-linha-alterada' : lucro.doItem(i.idItem)?.nivel === 'PREJUIZO' ? 'ml-linha-erro' : '')}
+        rowClassName={i => [i.idItem === selecionado ? 'ml-linha-selecionada' : '', mudouPreco(i) ? 'ml-linha-alterada' : lucro.doItem(i.idItem)?.nivel === 'PREJUIZO' ? 'ml-linha-erro' : ''].join(' ')}
+        onRow={i => ({ onClick: ev => { if (!(ev.target as HTMLElement).closest('input, button, .ant-input-number, .ant-popover, .ant-tag')) onSelecionar(i.idItem); }, style: { cursor: 'pointer' } })}
         columns={[
           {
             title: 'Item', fixed: 'left', width: 230,
@@ -99,7 +101,7 @@ const TabelaPrecos: React.FC<Props> = ({ salvo, det, rascunhoItens, onMudarPreco
             render: (_, i) => (
               <div style={{ lineHeight: 1.3 }}>
                 <InputNumber
-                  size="small" style={{ width: '100%' }} min={0.01} step={0.1} precision={2} decimalSeparator="," prefix="R$"
+                  size="small" style={{ width: '100%' }} min={0.01} step={0.01} precision={2} decimalSeparator="," prefix="R$"
                   value={i.precoMl ?? i.precoAnuncio}
                   onChange={v => onMudarPreco(i.idItem, v === null ? null : Number(v))}
                 />
@@ -119,14 +121,6 @@ const TabelaPrecos: React.FC<Props> = ({ salvo, det, rascunhoItens, onMudarPreco
               ? c.render?.(v, i, k)
               : <Spin size="small" />),
           })),
-          {
-            title: '', width: 48, fixed: 'right',
-            render: (_, i) => (
-              <Tooltip title="Análise detalhada: cenários, por quantidade, mercado e simulador">
-                <Button type="text" size="small" icon={<LineChartOutlined />} onClick={() => onDetalhar(i.idItem)} />
-              </Tooltip>
-            ),
-          },
         ]}
       />
     </Card>

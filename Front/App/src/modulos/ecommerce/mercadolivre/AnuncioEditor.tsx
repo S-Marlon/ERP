@@ -1,8 +1,8 @@
 // Editor do anúncio do ML (modal): as mudanças de texto, preço, estoque, atributos e faixas ficam num rascunho, aparecem
 // no painel "Alterações não salvas" (antes → depois, com desfazer) e só vão para o banco/ML ao salvar.
 // Fotos, itens, categoria e as ações no ML (conferir, publicar, pausar, encerrar) valem na hora.
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Badge, Button, Col, Flex, Modal, Row, Space, Spin, Tabs, Tag, Tooltip, Typography, message } from 'antd';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Badge, Button, Card, Col, Flex, Modal, Row, Space, Spin, Tabs, Tag, Tooltip, Typography, message } from 'antd';
 import { CheckCircleOutlined, CloudUploadOutlined, LinkOutlined, SaveOutlined, ShopOutlined, UndoOutlined } from '@ant-design/icons';
 import { adicionarAnexo, enviarArquivoAnexo } from '../../../areas/catalogo/skus/CatalogSku.service';
 import { AnuncioDetalhe, anunciosApi, ConferenciaItem, ItemDoAnuncio, resumoSincronizacao } from './mercadoLivreApi';
@@ -75,7 +75,8 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
   const [conferencia, setConferencia] = useState<ConferenciaItem[] | null>(null);
   const [falhas, setFalhas] = useState<{ sku: string; erro: string }[]>([]);
   const [sincronizando, setSincronizando] = useState(false);
-  const [detalhar, setDetalhar] = useState<{ idItem: number; vez: number } | null>(null);
+  const [itemPreco, setItemPreco] = useState<number | null>(null);    // item aberto no painel de preço
+  const painelPreco = useRef<HTMLDivElement>(null);
 
   /** Detalhe novo do servidor: o rascunho perde o que ficou igual ao salvo (ou o que não existe mais). */
   const aplicar = useCallback((d: AnuncioDetalhe) => {
@@ -95,6 +96,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
     setSalvo(null);
     setRascunho(RASCUNHO_VAZIO);
     setAba('anuncio');
+    setItemPreco(null);
     setFiltroItens(null);
     setConferencia(null);
     setFalhas([]);
@@ -352,13 +354,22 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
       children: (
         <>
           {det.categoria && det.itens.length > 0 && (
-            <TabelaPrecos
-              salvo={salvo} det={det} rascunhoItens={rascunho.itens}
-              onMudarPreco={(idItem, preco) => mudarDoItem(idItem, { precoMl: preco })}
-              onDetalhar={idItem => setDetalhar(d => ({ idItem, vez: (d?.vez || 0) + 1 }))}
-            />
+            <>
+              <div ref={painelPreco} style={{ scrollMarginTop: 8 }}>
+                <PrecoMlCard
+                  salvo={salvo} det={det} idItem={itemPreco ?? det.itens[0].idItem} onTrocarItem={setItemPreco}
+                  onMudarPreco={(idItem, preco) => mudarDoItem(idItem, { precoMl: preco })}
+                />
+              </div>
+              <TabelaPrecos
+                salvo={salvo} det={det} rascunhoItens={rascunho.itens}
+                onMudarPreco={(idItem, preco) => mudarDoItem(idItem, { precoMl: preco })}
+                selecionado={itemPreco ?? det.itens[0].idItem}
+                onSelecionar={idItem => { setItemPreco(idItem); painelPreco.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
+              />
+            </>
           )}
-          {det.categoria && det.itens.length > 0 && <PrecoMlCard det={det} escolhido={detalhar} onUsarPreco={(idItem, preco) => mudarDoItem(idItem, { precoMl: preco })} />}
+          {!det.categoria && <Card size="small" style={{ marginBottom: 16 }}><Text type="secondary">Escolha a categoria do ML (aba Anúncio): a tarifa depende dela.</Text></Card>}
           <FaixasQuantidadeCard det={det} onMudar={faixas => mudarCampo('faixasQuantidade', faixas)} />
         </>
       ),
@@ -423,6 +434,8 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
         .ml-linha-erro > td { background: #fff7f6 !important; }
         .ml-linha-alterada > td { background: #f0f7ff !important; }
         .ml-linha-alterada > td:first-child { box-shadow: inset 3px 0 0 #1677ff; }
+        .ml-linha-selecionada > td { background: #e6f4ff !important; }
+        .ml-linha-selecionada > td:first-child { box-shadow: inset 4px 0 0 #1677ff; }
         .ml-editor-abas > .ant-tabs-nav { background: #fff; padding: 0 12px; border-radius: 8px; margin-bottom: 12px; }
       `}</style>
       <Spin spinning={carregando || ocupado}>

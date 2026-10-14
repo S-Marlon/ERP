@@ -195,7 +195,8 @@ export const analisarPreco = async (req: Request, res: Response) => {
     const alvoPadrao = Math.min(1000, Math.max(0, Number(req.query.alvoPadrao) || 30));
     const ctx = await contextoVenda(tenant, c, item, { informado, alvoPadrao });
     const { tipo, fator, custo, alvo, tarifaDe, envioDe, freteDe, avaliar, freteGratis, logistica, peso, noMlEnvio } = ctx;
-    const precoAtual = precoNoMl(item, c.dados.ajustePreco);
+    // ?preco= analisa a outro preço (o do rascunho do editor) como se fosse o atual
+    const precoAtual = Number(req.query.preco) > 0 ? r2(Number(req.query.preco)) : precoNoMl(item, c.dados.ajustePreco);
     const atual = await avaliar(precoAtual);
     const frete = atual.frete;
     const simular = Number(req.query.simular) > 0 ? Number(req.query.simular) : null;

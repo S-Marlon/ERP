@@ -265,9 +265,10 @@ export const anunciosApi = {
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idItem}?tenant_id=1`, json('PUT', corpo)), 'Erro ao salvar o item.'),
   regraItem: async (id: number, idItem: number, regra: { estoqueReserva?: number | null; estoqueMaximo?: number | null; idUnidade?: number | null }) =>
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idItem}?tenant_id=1`, json('PUT', regra)), 'Erro ao salvar o estoque do item.'),
-  analisePreco: async (id: number, idItem: number, p: { simular?: number | null; frete?: number | null }) => {
+  analisePreco: async (id: number, idItem: number, p: { simular?: number | null; frete?: number | null; preco?: number | null }) => {
     const q = new URLSearchParams({ tenant_id: '1' });
     if (p.simular) q.set('simular', String(p.simular));
+    if (p.preco) q.set('preco', String(p.preco));
     if (p.frete !== null && p.frete !== undefined) q.set('frete', String(p.frete));
     const r = await ler<AnalisePreco>(await fetch(`${API}/anuncios/${id}/itens/${idItem}/preco?${q}`), 'Erro ao analisar o preço.');
     // backend de versão anterior não manda os campos novos: a tela não pode quebrar
