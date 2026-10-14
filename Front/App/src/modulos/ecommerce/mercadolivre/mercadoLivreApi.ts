@@ -230,13 +230,19 @@ export const resumoSincronizacao = (r: ResultadoSincronizacao[]) => {
 
 export interface CategoriaNo { id: string | null; nome: string; caminho: string; final: boolean; filhos: { id: string; nome: string }[] }
 
+/** Garante a lista de alertas (backend de versão anterior não manda). */
+const comAlertas = <T extends { alertas?: AlertaPreco[]; precoAlvo?: number | null }>(x: T): T => ({ ...x, alertas: x.alertas ?? [], precoAlvo: x.precoAlvo ?? null });
+
 export const anunciosApi = {
   listar: async () => ler<AnuncioResumo[]>(await fetch(`${API}/anuncios?tenant_id=1`), 'Erro ao listar os anúncios.'),
-  financeiroAnuncio: async (id: number) =>
-    ler<{ id: number; itens: FinanceiroItem[] }>(await fetch(`${API}/anuncios/${id}/financeiro?tenant_id=1`), 'Erro ao calcular o lucro do anúncio.'),
+  financeiroAnuncio: async (id: number) => {
+    const r = await ler<{ id: number; itens: FinanceiroItem[] }>(await fetch(`${API}/anuncios/${id}/financeiro?tenant_id=1`), 'Erro ao calcular o lucro do anúncio.');
+    return { ...r, itens: r.itens.map(comAlertas) };
+  },
   simularPreco: async (id: number, idItem: number, preco: number) =>
-    ler<PrevisaoPreco>(await fetch(`${API}/anuncios/${id}/itens/${idItem}/simular?tenant_id=1&preco=${preco}`), 'Erro ao simular o preço.'),
-  financeiro: async () => ler<{ id: number; itens: FinanceiroItem[] }[]>(await fetch(`${API}/anuncios/financeiro?tenant_id=1`), 'Erro ao calcular o lucro dos anúncios.'),
+    comAlertas(await ler<PrevisaoPreco>(await fetch(`${API}/anuncios/${id}/itens/${idItem}/simular?tenant_id=1&preco=${preco}`), 'Erro ao simular o preço.')),
+  financeiro: async () => (await ler<{ id: number; itens: FinanceiroItem[] }[]>(await fetch(`${API}/anuncios/financeiro?tenant_id=1`), 'Erro ao calcular o lucro dos anúncios.'))
+    .map(a => ({ ...a, itens: a.itens.map(comAlertas) })),
   detalhe: async (id: number) => ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}?tenant_id=1`), 'Erro ao abrir o anúncio.'),
   candidatos: async (busca: string) => ler<Candidatos>(await fetch(`${API}/candidatos?tenant_id=1&busca=${encodeURIComponent(busca)}`), 'Erro ao buscar no catálogo.'),
   criar: async (corpo: { idFamilia?: number; idItens?: number[]; separados?: boolean }) =>
@@ -263,7 +269,9 @@ export const anunciosApi = {
     const q = new URLSearchParams({ tenant_id: '1' });
     if (p.simular) q.set('simular', String(p.simular));
     if (p.frete !== null && p.frete !== undefined) q.set('frete', String(p.frete));
-    return ler<AnalisePreco>(await fetch(`${API}/anuncios/${id}/itens/${idItem}/preco?${q}`), 'Erro ao analisar o preço.');
+    const r = await ler<AnalisePreco>(await fetch(`${API}/anuncios/${id}/itens/${idItem}/preco?${q}`), 'Erro ao analisar o preço.');
+    // backend de versão anterior não manda os campos novos: a tela não pode quebrar
+    return { ...r, alertas: r.alertas ?? [], alertasSimulado: r.alertasSimulado ?? [], degraus: r.degraus ?? [], cenarios: r.cenarios ?? [], porQuantidade: r.porQuantidade ?? [] };
   },
   verificarCatalogo: async (id: number) => ler<{ itens: CatalogoItem[] }>(await fetch(`${API}/anuncios/${id}/catalogo?tenant_id=1`), 'Erro ao verificar o catálogo.'),
   entrarNoCatalogo: async (id: number, idItem: number, produtoId: string) =>

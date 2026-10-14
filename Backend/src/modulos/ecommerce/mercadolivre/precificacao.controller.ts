@@ -120,20 +120,32 @@ export const contextoVenda = async (
     const l = lucroNoMl({ preco, custo, tarifa: await tarifaDe(preco), frete: frete ?? 0 });
     return { ...l, freteDesconhecido: frete === null, nivel: classificarLucro(custo > 0 ? l.lucroSobreCustoPct : null, alvo.alvoPct) };
   };
-  /** Menor preço que dá o alvo sobre o custo: o frete muda com a faixa de preço, então recalcula até firmar. */
+  /**
+   * Menor preço que dá o alvo sobre o custo. Tarifa (taxa fixa de item barato) e frete mudam com o preço, então recalcula
+   * até firmar e confere o resultado; no degrau da taxa fixa a conta oscila e o mínimo real é o próprio limite.
+   */
   const precoAlvoDe = async (precoAtual: number, freteAtual: number) => {
     if (!(custo > 0)) return null;
-    let precoAlvo: number | null = null;
-    let freteAlvo = freteAtual;
-    for (let k = 0; k < 4; k++) {
-      const p = precoParaAlvo({ custo, tarifa: await tarifaDe(precoAlvo ?? precoAtual), frete: freteAlvo, alvoPct: alvo.alvoPct });
-      if (p === null) break;
-      const f = (await freteDe(p)) ?? freteAlvo;
-      precoAlvo = p;
-      if (f === freteAlvo) break;
-      freteAlvo = f;
+    let p = precoAtual;
+    let frete = freteAtual;
+    for (let k = 0; k < 6; k++) {
+      const n = precoParaAlvo({ custo, tarifa: await tarifaDe(p), frete, alvoPct: alvo.alvoPct });
+      if (n === null) return null;
+      const f = (await freteDe(n)) ?? frete;
+      const firmou = Math.abs(n - p) < 0.005 && f === frete;
+      p = n;
+      frete = f;
+      if (firmou) break;
     }
-    return precoAlvo;
+    const atinge = async (x: number) => ((await avaliar(x)).lucroSobreCustoPct ?? -Infinity) >= alvo.alvoPct - 0.05;
+    const limite = await limiteTaxaFixa();
+    // acima do limite o lucro só cresce com o preço: se o limite já dá o alvo, ele é o mínimo
+    if (limite !== null && p > limite && await atinge(limite)) return limite;
+    if (await atinge(p)) return p;
+    if (limite !== null && limite > p && await atinge(limite)) return limite;
+    // ainda abaixo: sobe de 1 em 1% até atingir (casos raros de degrau)
+    for (let x = p, k = 0; k < 60; k++) { x = r2(x * 1.01); if (await atinge(x)) return x; }
+    return p;
   };
   /** Centavo exato em que a taxa fixa de item barato some (por categoria e tipo; guardado por 6 h). */
   const limiteTaxaFixa = () => {
