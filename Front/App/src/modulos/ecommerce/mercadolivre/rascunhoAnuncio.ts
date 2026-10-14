@@ -14,6 +14,7 @@ export interface RascunhoAnuncio {
   estoqueAutomatico?: boolean;
   atributos?: Record<string, ValorAtributo>;        // o mapa inteiro, quando algum atributo mudou
   faixasQuantidade?: FaixaQuantidade[];
+  freteGratis?: boolean;                             // só anúncio publicado (vai ao ML ao salvar)
 }
 export interface RascunhoItem { precoMl?: number | null; estoqueReserva?: number | null; estoqueMaximo?: number | null; idUnidade?: number | null }
 export interface Rascunho { anuncio: RascunhoAnuncio; itens: Record<number, RascunhoItem> }
@@ -41,6 +42,7 @@ export const originalAnuncio = (det: AnuncioDetalhe, campo: CampoAnuncio): unkno
   titulo: det.titulo || '', modeloTitulo: det.modeloTitulo || '', tipoAnuncio: det.tipoAnuncio, condicao: det.condicao,
   descricao: det.descricao || '', ajustePreco: det.ajustePreco, estoqueReserva: det.estoqueReserva, estoqueMaximo: det.estoqueMaximo,
   estoqueAutomatico: det.estoqueAutomatico, faixasQuantidade: det.faixasGerenciadas ? det.faixasQuantidade : null,
+  freteGratis: det.vendaMl ? det.vendaMl.freteGratis : null,
 } as Record<CampoAnuncio, unknown>)[campo];
 
 export const originalItem = (item: ItemDoAnuncio, campo: CampoItem): unknown => ({
@@ -122,7 +124,7 @@ const descreverFaixas = (f: FaixaQuantidade[] | null | undefined) =>
 const ROTULOS: Record<CampoAnuncio, { grupo: string; rotulo: string; formato: (v: unknown) => string }> = {
   titulo: { grupo: 'Anúncio', rotulo: 'Título', formato: v => texto(v) },
   modeloTitulo: { grupo: 'Anúncio', rotulo: 'Título de cada item', formato: v => texto(v, '{nome}') },
-  tipoAnuncio: { grupo: 'Anúncio', rotulo: 'Tipo', formato: v => (v === 'gold_pro' ? 'Premium' : 'Clássico') },
+  tipoAnuncio: { grupo: 'Venda no ML', rotulo: 'Tipo de anúncio', formato: v => (v === 'gold_pro' ? 'Premium' : 'Clássico') },
   condicao: { grupo: 'Anúncio', rotulo: 'Condição', formato: v => (v === 'used' ? 'Usado' : 'Novo') },
   descricao: { grupo: 'Anúncio', rotulo: 'Descrição', formato: v => cortar(texto(v)) },
   ajustePreco: { grupo: 'Preço', rotulo: 'Ajuste sobre o preço do ERP', formato: v => `${Number(v || 0)}%` },
@@ -130,6 +132,7 @@ const ROTULOS: Record<CampoAnuncio, { grupo: string; rotulo: string; formato: (v
   estoqueMaximo: { grupo: 'Estoque', rotulo: 'Teto no ML', formato: v => (v === null || v === undefined ? 'sem teto' : `${v} un.`) },
   estoqueAutomatico: { grupo: 'Estoque', rotulo: 'Atualizar sozinho', formato: v => (v ? 'Ligado' : 'Desligado') },
   faixasQuantidade: { grupo: 'Preço', rotulo: 'Preço por quantidade', formato: v => descreverFaixas(v as FaixaQuantidade[] | null) },
+  freteGratis: { grupo: 'Venda no ML', rotulo: 'Frete grátis', formato: v => (v === null || v === undefined ? '—' : v ? 'Ligado (você paga o frete)' : 'Desligado (o comprador paga)') },
 };
 
 /** Tudo o que mudou, na ordem da tela. vaiAoMl: o que vai sozinho ao salvar, o que precisa do "enviar ao ML" e o que não vai. */
@@ -139,7 +142,7 @@ export const listarAlteracoes = (det: AnuncioDetalhe, r: Rascunho, nomes: { atri
   for (const campo of Object.keys(ROTULOS) as CampoAnuncio[]) {
     if (!(campo in r.anuncio)) continue;
     const def = ROTULOS[campo];
-    const naHora = ['ajustePreco', 'estoqueReserva', 'estoqueMaximo', 'faixasQuantidade'].includes(campo);
+    const naHora = ['ajustePreco', 'estoqueReserva', 'estoqueMaximo', 'faixasQuantidade', 'tipoAnuncio', 'freteGratis'].includes(campo);
     lista.push({
       chave: `a:${campo}`, grupo: def.grupo, rotulo: def.rotulo, antes: def.formato(originalAnuncio(det, campo)), depois: def.formato(r.anuncio[campo]),
       vaiAoMl: !publicado ? 'NAO' : naHora ? 'NA_HORA' : campo === 'descricao' ? 'BOTAO' : 'NAO',
@@ -222,6 +225,7 @@ export const comRascunho = (det: AnuncioDetalhe, r: Rascunho): AnuncioDetalhe =>
     ...('estoqueMaximo' in a ? { estoqueMaximo: a.estoqueMaximo ?? null } : {}),
     ...('estoqueAutomatico' in a ? { estoqueAutomatico: !!a.estoqueAutomatico } : {}),
     ...('faixasQuantidade' in a ? { faixasQuantidade: a.faixasQuantidade ?? [], faixasGerenciadas: a.faixasQuantidade !== null && a.faixasQuantidade !== undefined } : {}),
+    ...('freteGratis' in a && det.vendaMl ? { vendaMl: { ...det.vendaMl, freteGratis: !!a.freteGratis } } : {}),
     atributos: a.atributos ?? det.atributos,
     itens: det.itens.map(i => {
       const c = r.itens[i.idItem];

@@ -141,6 +141,7 @@ export interface AnuncioDetalhe extends Omit<AnuncioResumo, 'itens'> {
   fotoFamilia: string | null;   // vale para os itens sem foto própria
   modo: 'FAMILIA' | 'SEPARADO';  // página única com opções ou um anúncio por item
   faixasQuantidade: FaixaQuantidade[]; faixasGerenciadas: boolean; faixasAtacado: FaixaQuantidade[]; contaB2B: boolean;
+  vendaMl?: VendaMl | null;   // tipo e frete grátis como estão no ML (null: nada publicado)
   modeloTitulo: string;
   estoqueReserva: number; estoqueMaximo: number | null; estoqueAutomatico: boolean; sincronizadoEm: string | null;
   categoria: { id: string; nome: string; caminho: string; final: boolean; maxTitulo: number; maxFotos: number; filhos: { id: string; nome: string }[] } | null;
@@ -153,6 +154,8 @@ export interface Candidatos {
   itens: { idItem: number; sku: string; nome: string; preco: number; estoque: number; familia: string | null; idAnuncio: number | null; fotoUrl: string | null }[];
 }
 
+/** Modo de venda do anúncio publicado: tipo, frete grátis e o que o ML deixa trocar. */
+export interface VendaMl { tipo: string | null; freteGratis: boolean; tiposPermitidos: string[]; podeMudarFrete: boolean; misturado: boolean }
 export interface ConferenciaItem { idItem: number; sku: string; ok: boolean; erros: string[] }
 
 export interface AnuncioNoMl {
@@ -250,7 +253,7 @@ export const anunciosApi = {
   salvar: async (id: number, corpo: Partial<{
     titulo: string; categoriaMl: string | null; tipoAnuncio: string; condicao: string; descricao: string; ajustePreco: number;
     atributos: Record<string, ValorAtributo>; estoqueReserva: number; estoqueMaximo: number | null; estoqueAutomatico: boolean; modeloTitulo: string;
-    faixasQuantidade: FaixaQuantidade[];
+    faixasQuantidade: FaixaQuantidade[]; freteGratis: boolean;
   }>) =>
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}?tenant_id=1`, json('PUT', corpo)), 'Erro ao salvar o anúncio.'),
   excluir: async (id: number) => ler<{ success: boolean }>(await fetch(`${API}/anuncios/${id}?tenant_id=1`, json('DELETE')), 'Erro ao excluir.'),

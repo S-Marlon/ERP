@@ -14,6 +14,7 @@ import { sincronizarAnuncios } from './sincronizacao';
 import { errosDasFaixas, faixasDoAtacado, lerFaixas, normalizarFaixas } from './faixasQuantidade';
 import { enviarFaixasDoAnuncio } from './faixas.controller';
 import { contaB2B } from './mercadolivreApi';
+import { aplicarModoDeVenda, vendaDoAnuncio } from './modoVenda';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
 
@@ -379,6 +380,12 @@ const atacadoDoItem = async (tenant: number, item: ItemAnuncio | undefined) => {
 export const detalhe = async (tenant: number, c: AnuncioCarregado) => {
   const a = c.registro;
   const primeiro = c.itens[0];
+  // tipo e frete grátis como estão no ML; o tipo do ERP acompanha o do ML (pode ter sido trocado pelo site)
+  const vendaMl = await vendaDoAnuncio(tenant, c).catch(() => null);
+  if (vendaMl?.tipo && TIPOS_ANUNCIO.includes(vendaMl.tipo) && vendaMl.tipo !== a.tipo_anuncio && !vendaMl.misturado) {
+    await pool.execute(`UPDATE modulo_ecommerce_mercadolivre_anuncios SET tipo_anuncio = ? WHERE id = ? AND tenant_id = ?`, [vendaMl.tipo, a.id, tenant]);
+    a.tipo_anuncio = vendaMl.tipo;
+  }
   const [atacado, b2b] = await Promise.all([atacadoDoItem(tenant, primeiro), contaB2B(tenant).catch(() => false)]);
   const atributosCat = c.categoria?.atributos || [];
   const eixos = c.itens.length > 1 ? eixosDeVariacao(atributosCat, c.dados, c.itens).map(x => x.id) : [];
@@ -399,6 +406,7 @@ export const detalhe = async (tenant: number, c: AnuncioCarregado) => {
     faixasGerenciadas: a.faixas_quantidade !== null && a.faixas_quantidade !== undefined,
     faixasAtacado: primeiro ? faixasDoAtacado(atacado, precoNoMl(primeiro, c.dados.ajustePreco)) : [],
     contaB2B: b2b,
+    vendaMl,
     modeloTitulo: c.dados.modeloTitulo || '',
     estoqueReserva: c.regraEstoque.reserva,
     estoqueMaximo: c.regraEstoque.maximo,
@@ -697,6 +705,19 @@ export const salvarAnuncio = async (req: Request, res: Response) => {
       }
     }
     definir('atributos', JSON.stringify(atributos));
+
+    // tipo e frete grátis de anúncio publicado: troca no ML antes de gravar (recusou = não grava)
+    const mudaTipo = b.tipoAnuncio !== undefined && b.tipoAnuncio !== a.tipo_anuncio;
+    if (mudaTipo || b.freteGratis !== undefined) {
+      const [atual] = await carregarAnuncios(pool as any, tenant, id);
+      const publicado = atual.itens.some(i => atual.noMl.get(i.idItem)?.mlbId && !foraDoMl(atual.noMl.get(i.idItem)?.status || null));
+      if (publicado) {
+        const falhas = await aplicarModoDeVenda(tenant, atual, { tipo: mudaTipo ? b.tipoAnuncio : undefined, freteGratis: b.freteGratis !== undefined ? !!b.freteGratis : undefined });
+        if (falhas.length) throw new ErroML(`O ML recusou: ${falhas[0]}${falhas.length > 1 ? ` (e mais ${falhas.length - 1})` : ''}`);
+      } else if (b.freteGratis !== undefined) {
+        throw new ErroML('O frete grátis se escolhe depois de publicar: na publicação vale o padrão da sua conta do ML.');
+      }
+    }
     await pool.execute(`UPDATE modulo_ecommerce_mercadolivre_anuncios SET ${campos.join(', ')} WHERE id = ? AND tenant_id = ?`, [...valores, id, tenant]);
     if (faixasMudaram) {
       const [recarregado] = await carregarAnuncios(pool as any, tenant, id);

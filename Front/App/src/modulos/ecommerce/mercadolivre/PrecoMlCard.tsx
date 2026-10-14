@@ -32,9 +32,11 @@ interface Props {
   idItem: number;
   onTrocarItem: (idItem: number) => void;
   onMudarPreco: (idItem: number, preco: number | null) => void;
+  /** Põe o tipo e o frete grátis do cenário nas alterações (freteGratis undefined = não muda o frete). */
+  onEscolherCenario: (tipo: string, freteGratis: boolean | undefined) => void;
 }
 
-const PrecoMlCard: React.FC<Props> = ({ salvo, det, idItem, onTrocarItem, onMudarPreco }) => {
+const PrecoMlCard: React.FC<Props> = ({ salvo, det, idItem, onTrocarItem, onMudarPreco, onEscolherCenario }) => {
   const [analise, setAnalise] = useState<AnalisePreco | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -75,6 +77,21 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idItem, onTrocarItem, onMuda
   const e = a?.envio;
   const alvoPct = a?.alvo.pct ?? 30;
   const pctAtual = l?.lucroSobreCustoPct ?? null;
+
+  // modo de venda: o de hoje no ML (salvo.vendaMl) e o escolhido nas alterações (det)
+  const publicado = !!salvo.vendaMl;
+  const freteEscolhido = det.vendaMl ? det.vendaMl.freteGratis : e?.gratis ?? null;
+  const escolhido = (c: { tipo: string; freteGratis: boolean; obrigatorio: boolean }) =>
+    c.tipo === det.tipoAnuncio && (c.obrigatorio || freteEscolhido === null || c.freteGratis === freteEscolhido);
+  const motivoBloqueio = (c: { tipo: string; freteGratis: boolean; obrigatorio: boolean }): string | null => {
+    if (publicado && c.tipo !== salvo.vendaMl!.tipo && !salvo.vendaMl!.tiposPermitidos.includes(c.tipo)) {
+      return `O ML não deixa trocar de ${TIPO[salvo.vendaMl!.tipo || ''] || salvo.vendaMl!.tipo} para ${TIPO[c.tipo]} num anúncio publicado: só subir de tipo. Para voltar, encerre e publique de novo.`;
+    }
+    const mudaFrete = !c.obrigatorio && freteEscolhido !== null && c.freteGratis !== freteEscolhido;
+    if (mudaFrete && !publicado) return 'O frete grátis se escolhe depois de publicar: na publicação vale o padrão da sua conta do ML.';
+    if (mudaFrete && !salvo.vendaMl!.podeMudarFrete) return 'Algum item deste anúncio custa R$ 79 ou mais: lá o frete grátis é obrigatório.';
+    return null;
+  };
 
   const colunasVenda = [
     { title: 'Tarifa', dataIndex: 'tarifa', align: 'right' as const, render: (v: number) => <Text type="secondary">−{formatarMoeda(v)}</Text> },
@@ -220,8 +237,9 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idItem, onTrocarItem, onMuda
                   <Space size={4} wrap>
                     <Tooltip title={c.tipo === 'gold_pro' ? 'Mais exposição e parcelamento sem juros para o comprador' : 'Comissão menor, sem parcelamento sem juros'}><Text strong={c.atual}>{TIPO[c.tipo]}</Text></Tooltip>
                     <Text type="secondary">· {c.freteGratis ? 'frete grátis' : 'comprador paga o frete'}</Text>
-                    {c.atual && <Tag color="blue">hoje</Tag>}
-                    {c.melhorPorVenda && !c.atual && <Tooltip title="Maior lucro por venda"><Tag color="green">mais lucro/venda</Tag></Tooltip>}
+                    {c.atual && <Tooltip title="Como o anúncio está hoje no ML"><Tag color="blue">hoje</Tag></Tooltip>}
+                    {escolhido(c) && !c.atual && <Tooltip title="Escolhido nas alterações: vai ao ML ao salvar"><Tag color="processing">nas alterações</Tag></Tooltip>}
+                    {c.melhorPorVenda && !c.atual && !escolhido(c) && <Tooltip title="Maior lucro por venda"><Tag color="green">mais lucro/venda</Tag></Tooltip>}
                   </Space>
                 ),
               },
@@ -240,6 +258,18 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idItem, onTrocarItem, onMuda
                   return (
                     <Tooltip title={c.multiplicador <= 1 ? 'Lucra mais com as mesmas vendas (ou menos)' : `Precisa vender ${c.multiplicador.toFixed(1).replace('.', ',')} vezes o que vende hoje`}>
                       <Tag color={cor} style={{ marginRight: 0 }}>{c.vendasParaEmpatar} · {c.multiplicador <= 1 ? 'menos vendas' : `${c.multiplicador.toFixed(1).replace('.', ',')}×`}</Tag>
+                    </Tooltip>
+                  );
+                },
+              },
+              {
+                title: '', width: 92, fixed: 'right' as const,
+                render: (_, c) => {
+                  if (escolhido(c)) return c.atual ? null : <Text type="secondary" style={{ fontSize: 12 }}>escolhido</Text>;
+                  const motivo = motivoBloqueio(c);
+                  return (
+                    <Tooltip title={motivo || 'Põe este modo de venda nas alterações (vai ao ML ao salvar)'}>
+                      <Button size="small" disabled={!!motivo} onClick={() => onEscolherCenario(c.tipo, publicado && !c.obrigatorio ? c.freteGratis : undefined)}>Usar</Button>
                     </Tooltip>
                   );
                 },

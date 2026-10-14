@@ -1,6 +1,6 @@
 import assert from 'assert';
 import {
-  atributosEfetivos, corposParaSalvar, desfazer, limparIguais, listarAlteracoes, mudarAnuncio, mudarAtributo, mudarItem, RASCUNHO_VAZIO,
+  atributosEfetivos, comRascunho, corposParaSalvar, desfazer, limparIguais, listarAlteracoes, mudarAnuncio, mudarAtributo, mudarItem, RASCUNHO_VAZIO,
   valorAnuncio, valorItem,
 } from './rascunhoAnuncio';
 
@@ -75,4 +75,17 @@ teste('corpos para salvar e limpar o que já foi gravado', () => {
   // depois de gravar a descrição, ela some do rascunho; o item continua
   const salvo = { ...det, descricao: 'Novo texto' };
   assert.deepStrictEqual(limparIguais(r, salvo), { anuncio: {}, itens: { 1: { estoqueMaximo: 5, precoMl: 10 } } });
+});
+
+teste('modo de venda: tipo e frete grátis no rascunho e na lista', () => {
+  const pub = { ...det, publicados: 1, vendaMl: { tipo: 'gold_special', freteGratis: false, tiposPermitidos: ['gold_special', 'gold_pro'], podeMudarFrete: true, misturado: false } } as any;
+  let r = mudarAnuncio(RASCUNHO_VAZIO, pub, 'freteGratis', true);
+  r = mudarAnuncio(r, pub, 'tipoAnuncio', 'gold_pro');
+  const lista = listarAlteracoes(pub, r, nomes);
+  const frete = lista.find(a => a.chave === 'a:freteGratis')!;
+  assert.deepStrictEqual([frete.grupo, frete.antes, frete.depois, frete.vaiAoMl], ['Venda no ML', 'Desligado (o comprador paga)', 'Ligado (você paga o frete)', 'NA_HORA']);
+  assert.strictEqual(lista.find(a => a.chave === 'a:tipoAnuncio')!.vaiAoMl, 'NA_HORA');
+  assert.strictEqual(comRascunho(pub, r).vendaMl!.freteGratis, true);
+  assert.deepStrictEqual(corposParaSalvar(r).anuncio, { freteGratis: true, tipoAnuncio: 'gold_pro' });
+  assert.deepStrictEqual(mudarAnuncio(r, pub, 'freteGratis', false).anuncio, { tipoAnuncio: 'gold_pro' });
 });

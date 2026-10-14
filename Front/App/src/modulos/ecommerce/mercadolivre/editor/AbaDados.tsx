@@ -26,7 +26,7 @@ const AbaDados: React.FC<Props> = ({ salvo, det, rascunho, onMudar, onTrocarCate
       {publicado && (
         <Alert type="info" showIcon style={{ marginBottom: 12 }}
           message="Anúncio publicado: título e categoria ficam como estão no ML"
-          description="O Mercado Livre não deixa mudar título nem categoria depois de publicado (só republicando: Encerrar no ML). Descrição, atributos e fotos vão pelo Salvar e enviar ao ML; preço e estoque vão sozinhos." />
+          description="O Mercado Livre não deixa mudar título nem categoria depois de publicado (só republicando: Encerrar no ML). O tipo só sobe (Clássico → Premium). Descrição, atributos e fotos vão pelo Salvar e enviar ao ML; preço, estoque, tipo e frete grátis vão ao salvar." />
       )}
       <ModoPublicacaoAviso det={salvo} />
       <Form layout="vertical">
@@ -64,9 +64,9 @@ const AbaDados: React.FC<Props> = ({ salvo, det, rascunho, onMudar, onTrocarCate
         <Row gutter={16}>
           <Col xs={24} md={8}>
             <Form.Item label={<>Tipo de anúncio<Marca mudou={'tipoAnuncio' in rascunho} /></>} style={{ marginBottom: 14 }}>
-              <Segmented value={det.tipoAnuncio} disabled={publicado} onChange={v => onMudar('tipoAnuncio', String(v))} options={[
-                { value: 'gold_special', label: 'Clássico' },
-                { value: 'gold_pro', label: <Tooltip title="Comissão maior, parcelamento sem juros para o comprador">Premium</Tooltip> },
+              <Segmented value={det.tipoAnuncio} disabled={publicado && !salvo.vendaMl} onChange={v => onMudar('tipoAnuncio', String(v))} options={[
+                { value: 'gold_special', label: 'Clássico', disabled: publicado && !!salvo.vendaMl && salvo.vendaMl.tipo !== 'gold_special' && !salvo.vendaMl.tiposPermitidos.includes('gold_special') },
+                { value: 'gold_pro', label: <Tooltip title="Comissão maior, parcelamento sem juros para o comprador">Premium</Tooltip>, disabled: publicado && !!salvo.vendaMl && salvo.vendaMl.tipo !== 'gold_pro' && !salvo.vendaMl.tiposPermitidos.includes('gold_pro') },
               ]} />
             </Form.Item>
           </Col>

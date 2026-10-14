@@ -38,7 +38,7 @@ const CAMPOS_DA_ABA: Record<Aba, (keyof RascunhoAnuncio)[]> = {
   anuncio: ['titulo', 'modeloTitulo', 'tipoAnuncio', 'condicao', 'descricao', 'ajustePreco'],
   itens: ['estoqueReserva', 'estoqueMaximo', 'estoqueAutomatico'],
   atributos: ['atributos'],
-  preco: ['faixasQuantidade'],
+  preco: ['faixasQuantidade', 'tipoAnuncio', 'freteGratis'],
   catalogo: [],
 };
 
@@ -359,6 +359,11 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
                 <PrecoMlCard
                   salvo={salvo} det={det} idItem={itemPreco ?? det.itens[0].idItem} onTrocarItem={setItemPreco}
                   onMudarPreco={(idItem, preco) => mudarDoItem(idItem, { precoMl: preco })}
+                  onEscolherCenario={(tipo, gratis) => {
+                    mudarCampo('tipoAnuncio', tipo);
+                    if (gratis !== undefined) mudarCampo('freteGratis', gratis);
+                    message.info('Modo de venda posto nas alterações: confira ao lado e salve para mandar ao ML.');
+                  }}
                 />
               </div>
               <TabelaPrecos

@@ -24,11 +24,26 @@ export const preferenciasEnvio = (tenant: number) => guardado(`pref|${tenant}`, 
   return { idUsuario: Number(eu.id), logistica: String(tipo?.type || 'drop_off'), freteGratisPadrao: !!padrao?.rule?.free_shipping_flag };
 });
 
-/** Frete grátis ligado no anúncio publicado (null se não deu para ler). */
+/** Como o anúncio publicado vende hoje no ML: frete grátis, logística e tipo (null se não deu para ler). */
 export const freteGratisNoMl = (tenant: number, mlbId: string) => guardado(`item|${mlbId}`, async () => {
-  const it: any = await ml(tenant, 'GET', `/items/${mlbId}?attributes=shipping`);
-  return { gratis: !!it?.shipping?.free_shipping, logistica: (it?.shipping?.logistic_type as string) || null };
+  const it: any = await ml(tenant, 'GET', `/items/${mlbId}?attributes=shipping,listing_type_id,price`);
+  return {
+    gratis: !!it?.shipping?.free_shipping, logistica: (it?.shipping?.logistic_type as string) || null,
+    tipo: (it?.listing_type_id as string) || null, preco: Number(it?.price) || 0,
+  };
 }).catch(() => null);
+
+/** Tipos de anúncio para onde o ML deixa trocar o anúncio publicado (só sobe: Clássico -> Premium). */
+export const tiposPermitidosNoMl = (tenant: number, mlbId: string) => guardado(`tipos|${mlbId}`, async () => {
+  const [sobe, desce]: any[] = await Promise.all([
+    ml(tenant, 'GET', `/items/${mlbId}/available_upgrades`).catch(() => []),
+    ml(tenant, 'GET', `/items/${mlbId}/available_downgrades`).catch(() => []),
+  ]);
+  return [...(sobe || []), ...(desce || [])].map((t: any) => String(t?.id)).filter(Boolean);
+}).catch(() => [] as string[]);
+
+/** Esquece o que foi lido do anúncio (depois de mudar tipo ou frete no ML). */
+export const esquecerItemNoMl = (mlbId: string) => { cache.delete(`item|${mlbId}`); cache.delete(`tipos|${mlbId}`); cache.delete(`peso|${mlbId}`); };
 
 const ajustarCm = (v: number) => Math.max(1, Math.ceil(v));
 

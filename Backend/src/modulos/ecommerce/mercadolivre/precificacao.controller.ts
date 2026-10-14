@@ -84,7 +84,10 @@ const cacheLimiteFixa = new Map<string, { em: number; valor: Promise<number | nu
 export const contextoVenda = async (
   tenant: number, c: AnuncioCarregado, item: ItemAnuncio, op: { informado?: number | null; alvoPadrao?: number } = {}
 ) => {
-  const tipo: string = c.registro.tipo_anuncio;
+  // o tipo vale o do ML quando o item já está publicado (o do ERP pode estar desatualizado)
+  const mlb = c.noMl.get(item.idItem)?.mlbId || null;
+  const noMlEnvio = mlb ? await freteGratisNoMl(tenant, mlb) : null;
+  const tipo: string = noMlEnvio?.tipo && ['gold_special', 'gold_pro'].includes(noMlEnvio.tipo) ? noMlEnvio.tipo : c.registro.tipo_anuncio;
   const informado = op.informado ?? null;
   // custo da unidade vendida no ML (pacote = custo base × fator)
   const fator = item.unidadeMl?.fator || 1;
@@ -101,9 +104,7 @@ export const contextoVenda = async (
   };
 
   // frete grátis: ligado no anúncio publicado (ou o padrão da conta), peso cobrado e o custo por valor de compra
-  const mlb = c.noMl.get(item.idItem)?.mlbId || null;
   const pref = await preferenciasEnvio(tenant).catch(() => null);
-  const noMlEnvio = mlb ? await freteGratisNoMl(tenant, mlb) : null;
   const freteGratis = noMlEnvio ? noMlEnvio.gratis : pref?.freteGratisPadrao ?? true;
   const logistica = noMlEnvio?.logistica || pref?.logistica || 'drop_off';
   const peso = pref ? await pesoCobrado(tenant, { mlbId: mlb, pesoKg: item.pesoKg, medidasCm: item.medidasCm, fator }).catch(() => null) : null;
