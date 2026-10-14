@@ -11,6 +11,7 @@ import {
 } from './mercadoLivreApi';
 import { faixaMoeda, FiltroLista, lucroBaixo, passaNoFiltro, resumirFinanceiro, ResumoFinanceiro, semEstoqueNoMl } from './listaAnuncios';
 import { AtivoNoMl, EstoqueRapido, PrecoRapido } from './AcoesRapidas';
+import { colunasLucro, TagSituacao } from './colunasLucro';
 import AdicionarAnuncioModal from './AdicionarAnuncioModal';
 import AnuncioEditor from './AnuncioEditor';
 import SituacaoTag from './SituacaoTag';
@@ -19,31 +20,10 @@ import AjudaCatalogo from './AjudaCatalogo';
 
 const { Text } = Typography;
 
-const NIVEL: Record<string, { texto: string; cor: string }> = {
-  PREJUIZO: { texto: 'Prejuízo', cor: 'red' }, BAIXO: { texto: 'Abaixo do alvo', cor: 'orange' },
-  BOM: { texto: 'Bom', cor: 'green' }, ALTO: { texto: 'Alto', cor: 'blue' }, SEM_CUSTO: { texto: 'Sem custo', cor: 'default' },
-};
-const pct = (v: number | null) => (v === null ? '—' : `${v.toFixed(0)}%`);
 const erroMsg = (e: unknown) => (e instanceof Error ? e.message : 'Erro.');
 
-/** Você recebe / lucro de um item, com a conta no tooltip. */
-const LucroItem: React.FC<{ f: FinanceiroItem | undefined }> = ({ f }) => {
-  if (!f) return <Text type="secondary">—</Text>;
-  return (
-    <Tooltip title={(
-      <div style={{ fontSize: 12 }}>
-        {formatarMoeda(f.preco)} − tarifa {formatarMoeda(f.tarifa)} − frete {f.frete ? formatarMoeda(f.frete) : 'R$ 0,00'}{!f.freteGratis && !f.frete ? ' (comprador paga)' : ''}
-        {' '}= {formatarMoeda(f.recebe)}<br />− custo {formatarMoeda(f.custo)} = {formatarMoeda(f.lucro)} ({pct(f.lucroSobreCustoPct)} sobre o custo, alvo {f.alvoPct}%)
-        {f.freteDesconhecido && <div>Frete não calculado: item sem peso no cadastro.</div>}
-      </div>
-    )}>
-      <div style={{ lineHeight: 1.25, textAlign: 'right' }}>
-        <div><Text strong>{formatarMoeda(f.recebe)}</Text></div>
-        <Text style={{ fontSize: 12, color: f.lucro < 0 ? '#cf1322' : undefined }}>lucro {formatarMoeda(f.lucro)}</Text>
-      </div>
-    </Tooltip>
-  );
-};
+type Visao = 'anuncios' | 'itens';
+interface LinhaItem { chave: string; a: AnuncioResumo; i: ItemResumo; f: FinanceiroItem | undefined }
 
 const AnunciosMercadoLivre: React.FC = () => {
   const [anuncios, setAnuncios] = useState<AnuncioResumo[]>([]);
@@ -57,6 +37,7 @@ const AnunciosMercadoLivre: React.FC = () => {
   const [importar, setImportar] = useState(false);
   const [selecionados, setSelecionados] = useState<number[]>([]);
   const [emMassa, setEmMassa] = useState(false);
+  const [visao, setVisao] = useState<Visao>('anuncios');
 
   const calcular = useCallback(async () => {
     setCalculando(true);
@@ -139,17 +120,24 @@ const AnunciosMercadoLivre: React.FC = () => {
 
   const itemDoFin = (a: AnuncioResumo, idItem: number) => financeiro.get(a.id)?.find(f => f.idItem === idItem);
 
-  const colunaLucro = (a: AnuncioResumo) => {
+  /** Anúncio com vários itens: faixa do lucro e a pior situação (os números de cada item ficam ao abrir a linha). */
+  const resumoVarios = (a: AnuncioResumo) => {
     const r = fin(a);
-    if (a.itens.length === 1) return <LucroItem f={itemDoFin(a, a.itens[0].idItem)} />;
-    if (!r) return calculando ? <Spin size="small" /> : <Text type="secondary">—</Text>;
+    if (!r) return calculando ? <Spin size="small" /> : null;
     return (
-      <div style={{ lineHeight: 1.25, textAlign: 'right' }}>
-        <div><Text strong>{faixaMoeda(r.recebeMin, r.recebeMax, formatarMoeda)}</Text></div>
-        <Text style={{ fontSize: 12, color: r.lucroMin < 0 ? '#cf1322' : undefined }}>lucro {faixaMoeda(r.lucroMin, r.lucroMax, formatarMoeda)}</Text>
-      </div>
+      <Space size={6} wrap style={{ marginTop: 2 }}>
+        <Text style={{ fontSize: 12 }}>recebe {faixaMoeda(r.recebeMin, r.recebeMax, formatarMoeda)} · lucro <span style={{ color: r.lucroMin < 0 ? '#cf1322' : undefined }}>{faixaMoeda(r.lucroMin, r.lucroMax, formatarMoeda)}</span></Text>
+        <TagSituacao nivel={r.nivel} />
+      </Space>
     );
   };
+  const finUnico = (a: AnuncioResumo) => (a.itens.length === 1 ? itemDoFin(a, a.itens[0].idItem) : undefined);
+
+  // visão por item: todos os itens dos anúncios do filtro, cada um com os números dele
+  const linhasItens = useMemo<LinhaItem[]>(() => visiveis.flatMap(a => a.itens.map(i => ({ chave: `${a.id}-${i.idItem}`, a, i, f: financeiro.get(a.id)?.find(x => x.idItem === i.idItem) })))
+    .filter(l => filtro !== 'lucroBaixo' || (l.f && (l.f.nivel === 'PREJUIZO' || l.f.nivel === 'BAIXO')))
+    .filter(l => !busca.trim() || [l.i.sku, l.i.nome, l.i.mlbId, l.a.titulo].some(x => String(x || '').toLowerCase().includes(busca.trim().toLowerCase()))),
+  [visiveis, financeiro, filtro, busca]);
 
   const itensExpandidos = (a: AnuncioResumo) => (
     <Table<ItemResumo>
@@ -171,11 +159,7 @@ const AnunciosMercadoLivre: React.FC = () => {
           ),
         },
         { title: 'Preço no ML', width: 210, render: (_, i) => <PrecoRapido idAnuncio={a.id} idItem={i.idItem} atual={itemDoFin(a, i.idItem)} valor={i.preco} proprio={i.precoMl !== null} onSalvar={v => salvarPreco(a, i, v)} /> },
-        { title: 'Recebe / lucro', width: 130, align: 'right', render: (_, i) => <LucroItem f={itemDoFin(a, i.idItem)} /> },
-        {
-          title: '', width: 110, align: 'right',
-          render: (_, i) => { const f = itemDoFin(a, i.idItem); return f ? <Tag color={NIVEL[f.nivel].cor}>{NIVEL[f.nivel].texto}</Tag> : null; },
-        },
+        ...colunasLucro<ItemResumo>(i => itemDoFin(a, i.idItem), { onAplicarPreco: (i, preco) => salvarPreco(a, i, preco), compacto: true }),
         {
           title: 'Estoque', width: 120, align: 'right',
           render: (_, i) => <Text><Text type="secondary" style={{ fontSize: 12 }}>ERP {i.estoque} →</Text> <Text strong style={{ color: i.mlbId && i.estoqueMl === 0 ? '#cf1322' : undefined }}>ML {i.estoqueMl}</Text>{i.unidade ? <Text type="secondary" style={{ fontSize: 11 }}> {i.unidade}</Text> : null}</Text>,
@@ -202,6 +186,10 @@ const AnunciosMercadoLivre: React.FC = () => {
       <Card size="small">
         <Flex justify="space-between" wrap gap={8} style={{ marginBottom: 12 }}>
           <Space wrap>
+            <Segmented<Visao> value={visao} onChange={setVisao} options={[
+              { value: 'anuncios', label: 'Por anúncio' },
+              { value: 'itens', label: <Tooltip title="Todos os itens numa tabela só, com o lucro de cada um (dá para ordenar as colunas)">Por item</Tooltip> },
+            ]} />
             <Segmented<FiltroLista> value={filtro} onChange={setFiltro} options={[
               { value: 'todos', label: `Todos (${anuncios.length})` },
               { value: 'publicados', label: `Publicados (${contagem.publicados})` },
@@ -247,9 +235,48 @@ const AnunciosMercadoLivre: React.FC = () => {
           </Flex>
         )}
 
+        {visao === 'itens' ? (
+          <Table<LinhaItem>
+            size="middle" rowKey="chave" loading={carregando} dataSource={linhasItens} pagination={{ pageSize: 30, hideOnSinglePage: true, showSizeChanger: false }}
+            scroll={{ x: 1650 }}
+            rowClassName={l => (l.f?.nivel === 'PREJUIZO' ? 'ml-linha-erro' : '')}
+            locale={{ emptyText: <Empty description="Nenhum item neste filtro." /> }}
+            columns={[
+              {
+                title: 'Item', fixed: 'left', width: 300,
+                sorter: (x, y) => x.i.sku.localeCompare(y.i.sku),
+                render: (_, l) => (
+                  <Space size={8} align="start">
+                    {l.i.fotoUrl ? <Avatar shape="square" size={36} src={l.i.fotoUrl} /> : <Avatar shape="square" size={36} icon={<PictureOutlined />} style={{ background: '#f5f5f5', color: '#bbb' }} />}
+                    <div style={{ lineHeight: 1.3 }}>
+                      <Text strong>{l.i.sku}</Text>{l.i.unidade && <Text type="secondary" style={{ fontSize: 11 }}> ({l.i.unidade})</Text>}
+                      <div><Text type="secondary" style={{ fontSize: 12 }}>{l.i.nome}</Text></div>
+                      <Space size={4} wrap>
+                        {l.i.mlbId
+                          ? <a href={l.i.permalink || undefined} target="_blank" rel="noreferrer"><Tag color={ROTULO_STATUS_ML[l.i.status || '']?.cor} style={{ fontSize: 11 }}>{l.i.mlbId} · {ROTULO_STATUS_ML[l.i.status || '']?.texto || l.i.status}</Tag></a>
+                          : <Tag style={{ fontSize: 11 }}>a publicar</Tag>}
+                        <a style={{ fontSize: 12 }} onClick={() => setEditando(l.a.id)}>{(l.a.titulo || 'anúncio').slice(0, 40)}</a>
+                      </Space>
+                    </div>
+                  </Space>
+                ),
+              },
+              {
+                title: 'Preço no ML', width: 200, sorter: (x, y) => x.i.preco - y.i.preco,
+                render: (_, l) => <PrecoRapido idAnuncio={l.a.id} idItem={l.i.idItem} atual={l.f} valor={l.i.preco} proprio={l.i.precoMl !== null} onSalvar={v => salvarPreco(l.a, l.i, v)} />,
+              },
+              ...colunasLucro<LinhaItem>(l => l.f, { onAplicarPreco: (l, preco) => salvarPreco(l.a, l.i, preco) }),
+              {
+                title: 'Estoque', width: 120, align: 'right', sorter: (x, y) => x.i.estoqueMl - y.i.estoqueMl,
+                render: (_, l) => <Text><Text type="secondary" style={{ fontSize: 12 }}>ERP {l.i.estoque} →</Text> <Text strong style={{ color: l.i.mlbId && l.i.estoqueMl === 0 ? '#cf1322' : undefined }}>ML {l.i.estoqueMl}</Text></Text>,
+              },
+              { title: '', width: 48, fixed: 'right', render: (_, l) => <Tooltip title="Abrir o anúncio"><Button type="text" icon={<EditOutlined />} onClick={() => setEditando(l.a.id)} /></Tooltip> },
+            ]}
+          />
+        ) : (
         <Table<AnuncioResumo>
           size="middle" rowKey="id" loading={carregando} dataSource={visiveis} pagination={{ pageSize: 20, hideOnSinglePage: true }}
-          scroll={{ x: 1100 }}
+          scroll={{ x: 1750 }}
           rowSelection={{
             selectedRowKeys: selecionados, onChange: k => setSelecionados(k as number[]),
             getCheckboxProps: a => ({ disabled: a.ativosMl + a.pausadosMl === 0 }),
@@ -283,6 +310,7 @@ const AnunciosMercadoLivre: React.FC = () => {
                       {a.itens.length === 1 && a.itens[0].mlbId && <Text type="secondary" style={{ fontSize: 12 }}>· {a.itens[0].mlbId}</Text>}
                     </Space>
                   </div>
+                  {a.itens.length > 1 && resumoVarios(a)}
                 </div>
               ),
             },
@@ -292,15 +320,7 @@ const AnunciosMercadoLivre: React.FC = () => {
                 ? <PrecoRapido idAnuncio={a.id} idItem={a.itens[0].idItem} atual={itemDoFin(a, a.itens[0].idItem)} valor={a.itens[0].preco} proprio={a.itens[0].precoMl !== null} onSalvar={v => salvarPreco(a, a.itens[0], v)} />
                 : <Text>{a.precoMin === null ? '—' : faixaMoeda(a.precoMin, a.precoMax ?? a.precoMin, formatarMoeda)}</Text>),
             },
-            { title: <Tooltip title="Preço − tarifa − frete grátis do ML, e o lucro sobre o custo do ERP. Passe o mouse para ver a conta.">Você recebe</Tooltip>, width: 140, align: 'right', render: (_, a) => colunaLucro(a) },
-            {
-              title: 'Lucro', width: 120,
-              render: (_, a) => {
-                const r = fin(a);
-                if (!r) return calculando ? <Spin size="small" /> : null;
-                return <Tooltip title={`Pior item: ${pct(r.pctMin)} sobre o custo`}><Tag color={NIVEL[r.nivel].cor}>{NIVEL[r.nivel].texto}</Tag></Tooltip>;
-              },
-            },
+            ...colunasLucro<AnuncioResumo>(finUnico, { onAplicarPreco: (a, preco) => salvarPreco(a, a.itens[0], preco) }),
             {
               title: 'Estoque', width: 130, align: 'right',
               render: (_, a) => (
@@ -332,6 +352,7 @@ const AnunciosMercadoLivre: React.FC = () => {
             },
           ]}
         />
+        )}
       </Card>
       <style>{'.ml-linha-erro > td { background: #fff7f6 !important; }'}</style>
 
