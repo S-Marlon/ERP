@@ -12,7 +12,10 @@ import { enviarArquivoAnexo } from '../../../../areas/catalogo/skus/CatalogSku.s
 import type { AnuncioDetalhe, ItemDoAnuncio } from '../mercadoLivreApi';
 import { camposDoItem, converterMedidas, modeloPadrao, textoDoModelo } from '../etiquetaFoto';
 import { enderecoParaDesenho } from '../desenhoEtiqueta';
-import { criarElemento, dadosDe, DadosElemento, encaixarFoto, parametrosAposEsticar, PROPRIEDADES, recriarElemento, TipoElemento, trocarImagemDaFoto } from './elementos';
+import {
+  criarElemento, dadosDe, DadosElemento, encaixarFoto, LadoTexto, parametrosAposEsticar, Pontas, precisaRedesenharAoGirar, PROPRIEDADES, recriarElemento, TipoElemento,
+  trocarImagemDaFoto,
+} from './elementos';
 
 const { Text } = Typography;
 const LADO = 1200;
@@ -136,7 +139,7 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
       c.on('selection:cleared', () => setSelecionado(null));
       c.on('object:modified', e => {
         const o = e.target as FabricObject;
-        const novos = o ? parametrosAposEsticar(o) : null;
+        const novos = o ? parametrosAposEsticar(o) || (precisaRedesenharAoGirar(o) ? dadosDe(o) : null) : null;
         if (o && novos) {
           const novo = substituir(o, recriarElemento(o, novos, textoPara(novos.modelo, itemAtual.current)));
           c.setActiveObject(novo);
@@ -163,7 +166,7 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
         const foto = primeiro?.fotoUrl || det.fotoFamilia;
         if (foto) await colocarFoto(foto);
         // começa com uma cota da medida do anúncio, embaixo
-        const d: DadosElemento = { tipo: 'COTA', cor: CORES[0], modelo: modeloPadrao(det) || '{Comprimento}', comprimento: 800 };
+        const d: DadosElemento = { tipo: 'COTA', cor: CORES[0], modelo: modeloPadrao(det) || '{Comprimento}', comprimento: 800, textoDePe: true, ladoTexto: 'ACIMA' };
         const cota = criarElemento(d, textoPara(d.modelo, primeiro || null));
         cota.set({ left: LADO / 2, top: LADO - 150, originX: 'center', originY: 'center' });
         c.add(cota);
@@ -192,8 +195,8 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
     const c = fab.current;
     if (!c) return;
     const base: Record<string, DadosElemento> = {
-      SETA: { tipo: 'SETA', cor: corAtual, comprimento: 320 },
-      COTA: { tipo: 'COTA', cor: corAtual, modelo: modeloPadrao(det!) || '{Comprimento}', comprimento: 600 },
+      SETA: { tipo: 'SETA', cor: corAtual, comprimento: 320, pontas: 'FIM' },
+      COTA: { tipo: 'COTA', cor: corAtual, modelo: modeloPadrao(det!) || '{Comprimento}', comprimento: 600, textoDePe: true, ladoTexto: 'ACIMA' },
       TEXTO: { tipo: 'TEXTO', cor: corAtual, modelo: 'Texto', tamanhoFonte: 80, fundoTexto: true },
       BALAO: { tipo: 'BALAO', cor: corAtual, modelo: 'Explique aqui', largura: 440 },
       DESTAQUE: { tipo: 'DESTAQUE', cor: corAtual, largura: 320, altura: 220 },
@@ -432,6 +435,40 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
                     </div>
                   )}
                   {d.tipo === 'TEXTO' && <Space><Switch size="small" checked={!!d.fundoTexto} onChange={v => mudarSelecionado({ fundoTexto: v })} /><Text style={{ fontSize: 12 }}>fundo branco atrás do texto</Text></Space>}
+                  {d.tipo === 'COTA' && (
+                    <Flex vertical gap={8}>
+                      <div>
+                        <Text type="secondary" style={{ fontSize: 12 }}>Lado do texto</Text>
+                        <Segmented block size="small" value={d.ladoTexto || 'ACIMA'} onChange={v => mudarSelecionado({ ladoTexto: v as LadoTexto })}
+                          options={[{ value: 'ACIMA', label: 'Acima' }, { value: 'SOBRE', label: 'Sobre a linha' }, { value: 'ABAIXO', label: 'Abaixo' }]} />
+                      </div>
+                      <Space wrap>
+                        <Tooltip title="O texto fica na horizontal, com a cota em pé ou inclinada"><Space size={4}><Switch size="small" checked={!!d.textoDePe} onChange={v => mudarSelecionado({ textoDePe: v })} /><Text style={{ fontSize: 12 }}>texto sempre de pé</Text></Space></Tooltip>
+                        <Button size="small" icon={<RedoOutlined />} onClick={() => mudarSelecionado({ textoVirado: !d.textoVirado })}>Virar texto 180°</Button>
+                      </Space>
+                      <Space size={4}><Switch size="small" checked={!d.semExtremidades} onChange={v => mudarSelecionado({ semExtremidades: !v })} /><Text style={{ fontSize: 12 }}>traços nas pontas</Text></Space>
+                    </Flex>
+                  )}
+                  {d.tipo === 'SETA' && (
+                    <div>
+                      <Text type="secondary" style={{ fontSize: 12 }}>Pontas</Text>
+                      <Segmented block size="small" value={d.pontas || 'FIM'} onChange={v => mudarSelecionado({ pontas: v as Pontas })}
+                        options={[{ value: 'FIM', label: '——►' }, { value: 'AMBAS', label: '◄——►' }, { value: 'NENHUMA', label: '——' }]} />
+                    </div>
+                  )}
+                  {d.tipo === 'DESTAQUE' && (
+                    <Segmented block size="small" value={d.forma || 'ELIPSE'} onChange={v => mudarSelecionado({ forma: v as 'ELIPSE' | 'RETANGULO' })}
+                      options={[{ value: 'ELIPSE', label: 'Elipse' }, { value: 'RETANGULO', label: 'Retângulo' }]} />
+                  )}
+                  {(d.tipo === 'SETA' || d.tipo === 'COTA' || d.tipo === 'DESTAQUE') && (
+                    <Flex gap={12} align="center" wrap>
+                      <div style={{ flex: 1, minWidth: 140 }}>
+                        <Text type="secondary" style={{ fontSize: 12 }}>Espessura</Text>
+                        <Slider min={3} max={30} value={d.espessura || (d.tipo === 'COTA' ? 9 : 12)} onChange={(v: number) => mudarSelecionado({ espessura: v })} />
+                      </div>
+                      <Space size={4}><Switch size="small" checked={!!d.tracejado} onChange={v => mudarSelecionado({ tracejado: v })} /><Text style={{ fontSize: 12 }}>tracejado</Text></Space>
+                    </Flex>
+                  )}
                   {d.tipo === 'FOTO' && (
                     <Flex vertical gap={6}>
                       <Select placeholder="Trocar a foto" style={{ width: '100%' }} value={undefined} onChange={(f: string) => colocarFoto(f)}
