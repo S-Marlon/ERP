@@ -2,8 +2,9 @@
 // e estoque. Preço e lucro de cada item ficam na aba Preço e lucro. Fotos, adicionar e tirar itens valem na hora.
 import React, { useState } from 'react';
 import { Alert, Avatar, Button, Card, Popconfirm, Space, Spin, Table, Tag, Tooltip, Typography, Upload } from 'antd';
-import { BarcodeOutlined, DeleteOutlined, InboxOutlined, PictureOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons';
+import { BarcodeOutlined, ColumnWidthOutlined, DeleteOutlined, InboxOutlined, PictureOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons';
 import FotosMlModal from '../FotosMlModal';
+import GeradorMedidasModal from '../GeradorMedidasModal';
 import FotoFamiliaControle from '../../../../areas/catalogo/familias/FotoFamiliaControle';
 import EnviarFotoPopover from '../../../../shared/components/EnviarFotoPopover';
 import { AnuncioDetalhe, foraDoMl, ItemDoAnuncio, ROTULO_STATUS_ML } from '../mercadoLivreApi';
@@ -37,6 +38,7 @@ interface Props {
 const AbaItens: React.FC<Props> = p => {
   const { det } = p;
   const [fotosMl, setFotosMl] = useState<{ idItem: number | null } | null>(null);
+  const [medidas, setMedidas] = useState(false);
   const visiveis = det.itens.filter(i => !p.filtro || p.filtro.ids.includes(i.idItem));
   const semFoto = det.itens.filter(i => i.fotos === 0 && !i.ml.mlbId);
 
@@ -58,6 +60,9 @@ const AbaItens: React.FC<Props> = p => {
             )}
             <Tooltip title="Ver as fotos que os itens usam no ML, trazer para o cadastro do ERP ou buscar fotos de outro anúncio/catálogo">
               <Button size="small" icon={<PictureOutlined />} onClick={() => setFotosMl({ idItem: null })}>Fotos ML ↔ ERP</Button>
+            </Tooltip>
+            <Tooltip title="Gera fotos com a medida escrita (ex.: 20 cm) a partir do cadastro, para todos os itens de uma vez">
+              <Button size="small" icon={<ColumnWidthOutlined />} onClick={() => setMedidas(true)}>Fotos com medida</Button>
             </Tooltip>
             <Button size="small" icon={<PlusOutlined />} onClick={p.onAdicionarItens}>Adicionar itens</Button>
           </Space>
@@ -147,6 +152,7 @@ const AbaItens: React.FC<Props> = p => {
           ]}
         />
       </Card>
+      <GeradorMedidasModal det={medidas ? p.salvo : null} onFechar={() => setMedidas(false)} onSalvo={p.onFotoFamilia} />
       <FotosMlModal idAnuncio={fotosMl ? det.id : null} idItemInicial={fotosMl?.idItem} onFechar={() => setFotosMl(null)} onImportado={p.onFotoFamilia} />
     </>
   );

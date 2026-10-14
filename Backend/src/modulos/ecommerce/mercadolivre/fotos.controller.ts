@@ -4,7 +4,7 @@ import { Request, Response } from 'express';
 import pool from '../../../infra/db';
 import { carregarAnuncios, responderErro, tenantDe } from './anuncios.controller';
 import { ErroML, ml } from './mercadolivreApi';
-import { referenciaDeFoto } from './fotos';
+import { referenciaDeFoto, urlPublicaDeImagem } from './fotos';
 
 interface FotoMl { id: string; url: string; tamanho: string | null }
 
@@ -141,5 +141,26 @@ export const importarFotos = async (req: Request, res: Response) => {
     return responderErro(res, error, 'Erro ao trazer as fotos para o ERP.');
   } finally {
     conn.release();
+  }
+};
+
+/** GET /fotos-ml/imagem?url= — repassa uma imagem pública (fornecedor, ML) para o gerador de imagens desenhar por cima. */
+export const repassarImagem = async (req: Request, res: Response) => {
+  const url = urlPublicaDeImagem(String(req.query.url || ''));
+  if (!url) return res.status(400).json({ error: 'Endereço de imagem inválido.' });
+  try {
+    const controle = new AbortController();
+    const espera = setTimeout(() => controle.abort(), 15000);
+    const r = await fetch(url, { signal: controle.signal, headers: { 'User-Agent': 'Mozilla/5.0 (ERP gerador de imagens)' } });
+    clearTimeout(espera);
+    const tipo = r.headers.get('content-type') || '';
+    if (!r.ok || !/^image\//i.test(tipo)) return res.status(400).json({ error: 'O endereço não devolveu uma imagem.' });
+    const dados = Buffer.from(await r.arrayBuffer());
+    if (dados.length > 15 * 1024 * 1024) return res.status(400).json({ error: 'Imagem grande demais (máximo 15 MB).' });
+    res.setHeader('Content-Type', tipo);
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    return res.send(dados);
+  } catch {
+    return res.status(502).json({ error: 'Não foi possível buscar a imagem.' });
   }
 };

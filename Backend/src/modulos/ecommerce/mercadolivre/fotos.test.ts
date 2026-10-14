@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { referenciaDeFoto } from './fotos';
+import { referenciaDeFoto, urlPublicaDeImagem } from './fotos';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -10,4 +10,13 @@ teste('link ou código colado vira anúncio ou catálogo', () => {
   assert.deepStrictEqual(referenciaDeFoto(' mlb-7804962608 '), { tipo: 'ANUNCIO', id: 'MLB7804962608' });
   assert.strictEqual(referenciaDeFoto('abraçadeira'), null);
   assert.strictEqual(referenciaDeFoto(''), null);
+});
+
+teste('só busca imagem em endereço público', () => {
+  assert.strictEqual(urlPublicaDeImagem('https://http2.mlstatic.com/D_1-O.jpg'), 'https://http2.mlstatic.com/D_1-O.jpg');
+  assert.strictEqual(urlPublicaDeImagem('http://localhost:3001/uploads/a.jpg'), null);
+  assert.strictEqual(urlPublicaDeImagem('http://192.168.0.10/x.png'), null);
+  assert.strictEqual(urlPublicaDeImagem('http://172.20.1.1/x.png'), null);
+  assert.strictEqual(urlPublicaDeImagem('file:///c:/x.png'), null);
+  assert.strictEqual(urlPublicaDeImagem('nada'), null);
 });

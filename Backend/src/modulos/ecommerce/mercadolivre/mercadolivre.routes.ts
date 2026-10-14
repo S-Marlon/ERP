@@ -11,7 +11,7 @@ import {
 
 import { faixasNoMl } from './faixas.controller';
 import { entrarNoCatalogo, verificarCatalogo } from './catalogo.controller';
-import { buscarFotosMl, fotosDoAnuncio, importarFotos } from './fotos.controller';
+import { buscarFotosMl, fotosDoAnuncio, importarFotos, repassarImagem } from './fotos.controller';
 import { analisarPreco, financeiroAnuncio, financeiroAnuncios, simularPreco } from './precificacao.controller';
 import { buscarClientes, buscarPedidos, listarPedidos, resultadoPedidos, obterConfig, reprocessarPedido, salvarConfig } from './pedidos.controller';
 
@@ -27,6 +27,7 @@ router.get('/candidatos', candidatos);
 router.get('/anuncios', listarAnuncios);
 router.get('/anuncios/financeiro', financeiroAnuncios);
 router.get('/fotos-ml/buscar', buscarFotosMl);
+router.get('/fotos-ml/imagem', repassarImagem);
 router.post('/anuncios', criarAnuncio);
 router.get('/anuncios/:id', detalheAnuncio);
 router.put('/anuncios/:id', salvarAnuncio);
