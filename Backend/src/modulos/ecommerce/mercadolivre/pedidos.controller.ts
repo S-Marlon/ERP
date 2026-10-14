@@ -11,7 +11,7 @@ import { gravarEscolhasKit } from '../../../areas/catalogo/kits/kitsVenda';
 import { lista, responderErro, tenantDe } from './anuncios.controller';
 import {
   acaoDoStatus, exigeNota, LigacaoAnuncio, ligarItensDoPedido, liquidoDoPedido, lerPedidoMl, PedidoMl, percentualComissao, tipoDocumento,
-  vencimentoDoRecebivel,
+  vencimentoDoRecebivel, PedidoComCusto, ResultadoAnuncio, resultadoPorAnuncio,
 } from './pedidos';
 import { ErroML, ml } from './mercadolivreApi';
 
@@ -316,7 +316,7 @@ export const listarPedidos = async (req: Request, res: Response) => {
   try {
     const [rows]: any = await pool.execute(
       `SELECT p.id, p.ml_order_id, p.id_venda, p.status, p.comprador, p.total, p.comissao, p.frete, p.erro, p.detalhes,
-              DATE_FORMAT(p.data_pedido, '%Y-%m-%d %H:%i') AS data_fmt, v.status AS status_venda,
+              DATE_FORMAT(p.data_pedido, '%Y-%m-%d %H:%i') AS data_fmt, v.status AS status_venda, v.total_custo,
               t.status AS titulo_status, DATE_FORMAT(t.vencimento, '%Y-%m-%d') AS titulo_vencimento
        FROM modulo_ecommerce_mercadolivre_pedidos p
        LEFT JOIN vendas_pedidos v ON v.id_venda = p.id_venda AND v.tenant_id = p.tenant_id
@@ -338,6 +338,8 @@ export const listarPedidos = async (req: Request, res: Response) => {
       return {
         id: Number(r.id), mlOrderId: String(r.ml_order_id), idVenda: r.id_venda ? Number(r.id_venda) : null, statusMl: r.status,
         comprador: r.comprador, total, comissao, frete, liquido: liquidoDoPedido({ total, comissao, freteVendedor: frete }),
+        custo: r.id_venda && r.status_venda !== 'CANCELADA' ? Number(r.total_custo) || 0 : null,
+        lucro: r.id_venda && r.status_venda !== 'CANCELADA' ? Math.round((liquidoDoPedido({ total, comissao, freteVendedor: frete }) - (Number(r.total_custo) || 0)) * 100) / 100 : null,
         data: r.data_fmt, erro: r.erro, situacao,
         documentoTipo: det.documentoTipo || null, exigeNota: exigeNota(det.documentoTipo), liberacaoEm: det.liberacaoEm || null,
         titulo: r.titulo_status ? { status: r.titulo_status, vencimento: r.titulo_vencimento } : null,
@@ -346,6 +348,38 @@ export const listarPedidos = async (req: Request, res: Response) => {
     }));
   } catch (error) {
     return responderErro(res, error, 'Erro ao listar os pedidos.');
+  }
+};
+
+/** GET /pedidos/resultado?dias=30 — resultado real por anúncio: tarifa e frete cobrados pelo ML, custo do ERP e lucro */
+export const resultadoPedidos = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const dias = Math.min(365, Math.max(1, Number(req.query.dias) || 30));
+  try {
+    const [rows]: any = await pool.execute(
+      `SELECT p.total, p.comissao, p.frete, p.detalhes, v.total_custo
+       FROM modulo_ecommerce_mercadolivre_pedidos p
+       JOIN vendas_pedidos v ON v.id_venda = p.id_venda AND v.tenant_id = p.tenant_id AND v.status <> 'CANCELADA'
+       WHERE p.tenant_id = ? AND p.data_pedido >= DATE_SUB(NOW(), INTERVAL ? DAY)`,
+      [tenant, dias]
+    );
+    const pedidos: PedidoComCusto[] = rows.map((r: any) => {
+      let det: any = {};
+      try { det = JSON.parse(r.detalhes || '{}'); } catch { /* sem detalhes */ }
+      return {
+        total: Number(r.total) || 0, comissao: Number(r.comissao) || 0, frete: Number(r.frete) || 0, custo: Number(r.total_custo) || 0,
+        itens: (det.itens || []).map((i: any) => ({ mlbId: String(i.mlbId || ''), titulo: String(i.titulo || ''), quantidade: Number(i.quantidade) || 0, precoUnitario: Number(i.precoUnitario) || 0, comissao: Number(i.comissao) || 0 })),
+      };
+    });
+    const anuncios = resultadoPorAnuncio(pedidos);
+    const soma = (k: keyof ResultadoAnuncio) => Math.round(anuncios.reduce((s, a) => s + (Number(a[k]) || 0), 0) * 100) / 100;
+    const custo = soma('custo'), lucro = soma('lucro');
+    return res.json({
+      dias, pedidos: pedidos.length, anuncios,
+      total: { receita: soma('receita'), comissao: soma('comissao'), frete: soma('frete'), recebido: soma('recebido'), custo, lucro, lucroSobreCustoPct: custo > 0 ? Math.round((lucro / custo) * 10000) / 100 : null },
+    });
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao calcular o resultado das vendas.');
   }
 };
 

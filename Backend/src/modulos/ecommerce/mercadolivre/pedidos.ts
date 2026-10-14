@@ -107,3 +107,45 @@ export const vencimentoDoRecebivel = (p: Pick<PedidoMl, 'liberacaoEm' | 'data'>)
   const dois = (n: number) => String(n).padStart(2, '0');
   return { data: `${d.getFullYear()}-${dois(d.getMonth() + 1)}-${dois(d.getDate())}`, estimado: true };
 };
+
+/** Pedido já virado venda, com o custo do ERP gravado na venda (para o resultado real). */
+export interface PedidoComCusto { total: number; comissao: number; frete: number; custo: number; itens: Pick<ItemPedidoMl, 'mlbId' | 'titulo' | 'quantidade' | 'precoUnitario' | 'comissao'>[] }
+
+export interface ResultadoAnuncio {
+  mlbId: string; titulo: string; pedidos: number; unidades: number; receita: number; comissao: number; frete: number;
+  custo: number; recebido: number; lucro: number; lucroSobreCustoPct: number | null; fretePorPedido: number;
+}
+
+/**
+ * Resultado real por anúncio (MLB): o que foi vendido, a tarifa e o frete cobrados de verdade, o custo do ERP e o lucro.
+ * Pedido com vários anúncios: frete e custo divididos pelo valor de cada linha; a comissão é a da própria linha.
+ */
+export const resultadoPorAnuncio = (pedidos: PedidoComCusto[]): ResultadoAnuncio[] => {
+  const grupos = new Map<string, ResultadoAnuncio>();
+  for (const p of pedidos) {
+    const totalLinhas = p.itens.reduce((s, i) => s + i.precoUnitario * i.quantidade, 0);
+    for (const i of p.itens) {
+      const valor = i.precoUnitario * i.quantidade;
+      const parte = totalLinhas > 0 ? valor / totalLinhas : 1 / p.itens.length;
+      const g = grupos.get(i.mlbId) || {
+        mlbId: i.mlbId, titulo: i.titulo, pedidos: 0, unidades: 0, receita: 0, comissao: 0, frete: 0, custo: 0, recebido: 0, lucro: 0, lucroSobreCustoPct: null, fretePorPedido: 0,
+      };
+      g.pedidos += 1;
+      g.unidades += i.quantidade;
+      g.receita += valor;
+      g.comissao += i.comissao || p.comissao * parte;
+      g.frete += p.frete * parte;
+      g.custo += p.custo * parte;
+      grupos.set(i.mlbId, g);
+    }
+  }
+  return [...grupos.values()].map(g => {
+    const receita = r2(g.receita), comissao = r2(g.comissao), frete = r2(g.frete), custo = r2(g.custo);
+    const recebido = r2(receita - comissao - frete);
+    const lucro = r2(recebido - custo);
+    return {
+      ...g, receita, comissao, frete, custo, recebido, lucro,
+      lucroSobreCustoPct: custo > 0 ? r2((lucro / custo) * 100) : null, fretePorPedido: g.pedidos ? r2(frete / g.pedidos) : 0,
+    };
+  }).sort((a, b) => a.lucro - b.lucro);
+};

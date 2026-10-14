@@ -178,6 +178,7 @@ export type SituacaoPedido = 'VENDA' | 'VENDA_CANCELADA' | 'CANCELADO_NO_ML' | '
 export interface PedidoMl {
   id: number; mlOrderId: string; idVenda: number | null; statusMl: string; comprador: string;
   total: number; comissao: number; frete: number; liquido: number; data: string | null; erro: string | null; situacao: SituacaoPedido;
+  custo: number | null; lucro: number | null;   // custo do ERP gravado na venda e o lucro real (sem venda: null)
   documentoTipo: string | null; exigeNota: boolean; liberacaoEm: string | null;
   titulo: { status: string; vencimento: string } | null;   // título a receber da venda (Financeiro)
   itens: { mlbId: string; titulo: string; sku: string | null; quantidade: number; precoUnitario: number }[];
@@ -185,7 +186,17 @@ export interface PedidoMl {
 
 export interface ConfigMl { idClienteRecebiveis: number | null; clienteNome: string | null; pedidosDesde: string | null }
 
+export interface ResultadoAnuncioMl {
+  mlbId: string; titulo: string; pedidos: number; unidades: number; receita: number; comissao: number; frete: number;
+  custo: number; recebido: number; lucro: number; lucroSobreCustoPct: number | null; fretePorPedido: number;
+}
+export interface ResultadoVendasMl {
+  dias: number; pedidos: number; anuncios: ResultadoAnuncioMl[];
+  total: { receita: number; comissao: number; frete: number; recebido: number; custo: number; lucro: number; lucroSobreCustoPct: number | null };
+}
+
 export const pedidosApi = {
+  resultado: async (dias: number) => ler<ResultadoVendasMl>(await fetch(`${API}/pedidos/resultado?tenant_id=1&dias=${dias}`), 'Erro ao calcular o resultado das vendas.'),
   config: async () => ler<ConfigMl>(await fetch(`${API}/config?tenant_id=1`), 'Erro ao ler a configuração.'),
   salvarConfig: async (idClienteRecebiveis: number | null) =>
     ler<ConfigMl & { titulosCriados: number }>(await fetch(`${API}/config?tenant_id=1`, json('PUT', { idClienteRecebiveis })), 'Erro ao salvar a configuração.'),

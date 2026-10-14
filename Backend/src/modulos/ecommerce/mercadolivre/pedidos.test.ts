@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { acaoDoStatus, exigeNota, ligarItensDoPedido, liquidoDoPedido, lerPedidoMl, percentualComissao, tipoDocumento, vencimentoDoRecebivel } from './pedidos';
+import { acaoDoStatus, exigeNota, ligarItensDoPedido, liquidoDoPedido, lerPedidoMl, percentualComissao, resultadoPorAnuncio, tipoDocumento, vencimentoDoRecebivel } from './pedidos';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -61,4 +61,20 @@ teste('comprador CNPJ exige nota (MEI)', () => {
   assert.strictEqual(tipoDocumento({ billing_info: { doc_number: '123.456.789-09' } }), 'CPF');
   assert.strictEqual(tipoDocumento({}), null);
   assert.ok(exigeNota('CNPJ') && !exigeNota('CPF') && !exigeNota(null));
+});
+
+teste('resultado real por anúncio (frete e custo divididos pelo valor da linha)', () => {
+  const r = resultadoPorAnuncio([
+    { total: 42.9, comissao: 7.29, frete: 14.45, custo: 23.88, itens: [{ mlbId: 'MLB1', titulo: 'Disco c/12', quantidade: 1, precoUnitario: 42.9, comissao: 7.29 }] },
+    { total: 72.9, comissao: 8.75, frete: 10, custo: 34.88, itens: [
+      { mlbId: 'MLB1', titulo: 'Disco c/12', quantidade: 1, precoUnitario: 42.9, comissao: 7.29 },
+      { mlbId: 'MLB2', titulo: 'Abraçadeira', quantidade: 2, precoUnitario: 15, comissao: 1.46 },
+    ] },
+  ]);
+  const disco = r.find(x => x.mlbId === 'MLB1')!;
+  assert.deepStrictEqual([disco.pedidos, disco.unidades, disco.receita, disco.comissao, disco.frete, disco.custo, disco.recebido, disco.lucro], [2, 2, 85.8, 14.58, 20.33, 44.41, 50.89, 6.48]);
+  assert.strictEqual(disco.fretePorPedido, 10.16);
+  const abr = r.find(x => x.mlbId === 'MLB2')!;
+  assert.deepStrictEqual([abr.receita, abr.frete, abr.custo, abr.lucro], [30, 4.12, 14.35, 10.07]);
+  assert.strictEqual(r[0].mlbId, 'MLB1');
 });

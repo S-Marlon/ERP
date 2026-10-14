@@ -4,6 +4,7 @@ import { Alert, Button, Card, Col, Empty, Flex, Popconfirm, Row, Segmented, Spac
 import { CloudDownloadOutlined, LinkOutlined, ReloadOutlined } from '@ant-design/icons';
 import { anunciosApi, formatarMoeda, PedidoMl, pedidosApi, SituacaoPedido, SituacaoSincronizacao } from './mercadoLivreApi';
 import RecebiveisMl from './RecebiveisMl';
+import ResultadoRealMl from './ResultadoRealMl';
 
 const { Text } = Typography;
 
@@ -90,6 +91,7 @@ const PedidosMercadoLivre: React.FC = () => {
         />
       )}
       <RecebiveisMl onAlterado={carregar} />
+      <ResultadoRealMl atualizar={pedidos.length} />
       <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
         <Col xs={12} md={6}><Card size="small"><Statistic title="Vendas do ML" value={vendas.length} /></Card></Col>
         <Col xs={12} md={6}><Card size="small"><Statistic title="Vendido (itens)" value={formatarMoeda(somar(vendas, 'total'))} /></Card></Col>
@@ -162,6 +164,14 @@ const PedidosMercadoLivre: React.FC = () => {
                   )}
                 </div>
               ),
+            },
+            {
+              title: <Tooltip title="Líquido − custo do ERP gravado na venda">Lucro</Tooltip>, width: 110, align: 'right',
+              render: (_, p) => (p.lucro === null ? <Text type="secondary">—</Text> : (
+                <Tooltip title={`${formatarMoeda(p.liquido)} recebidos − custo ${formatarMoeda(p.custo)}`}>
+                  <Text strong style={{ color: p.lucro < 0 ? '#cf1322' : '#389e0d' }}>{formatarMoeda(p.lucro)}</Text>
+                </Tooltip>
+              )),
             },
             {
               title: 'Situação', width: 210,

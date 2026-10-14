@@ -12,7 +12,7 @@ import {
 import { faixasNoMl } from './faixas.controller';
 import { entrarNoCatalogo, verificarCatalogo } from './catalogo.controller';
 import { analisarPreco, financeiroAnuncios } from './precificacao.controller';
-import { buscarClientes, buscarPedidos, listarPedidos, obterConfig, reprocessarPedido, salvarConfig } from './pedidos.controller';
+import { buscarClientes, buscarPedidos, listarPedidos, resultadoPedidos, obterConfig, reprocessarPedido, salvarConfig } from './pedidos.controller';
 
 const router = Router();
 
@@ -49,6 +49,7 @@ router.get('/config', obterConfig);
 router.put('/config', salvarConfig);
 router.get('/clientes', buscarClientes);
 router.get('/pedidos', listarPedidos);
+router.get('/pedidos/resultado', resultadoPedidos);
 router.post('/pedidos/buscar', buscarPedidos);
 router.post('/pedidos/:id/processar', reprocessarPedido);
 router.get('/importar', previaImportacao);
