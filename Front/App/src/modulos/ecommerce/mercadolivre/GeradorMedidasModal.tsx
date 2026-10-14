@@ -6,7 +6,7 @@ import { BgColorsOutlined, ColumnWidthOutlined, PictureOutlined, UploadOutlined 
 import { enviarArquivoAnexo } from '../../../areas/catalogo/skus/CatalogSku.service';
 import { AnuncioDetalhe, ItemDoAnuncio } from './mercadoLivreApi';
 import { camposDoItem, converterMedidas, modeloPadrao, textoDoModelo } from './etiquetaFoto';
-import { canvasParaArquivo, carregarImagem, desenharEtiqueta, EstiloEtiqueta } from './desenhoEtiqueta';
+import { canvasParaArquivo, carregarImagem, desenharEtiqueta, EstiloEtiqueta, limparCacheImagens } from './desenhoEtiqueta';
 
 const { Text } = Typography;
 
@@ -32,6 +32,7 @@ const GeradorMedidasModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
   const [marcados, setMarcados] = useState<Set<number>>(new Set());
   const [salvando, setSalvando] = useState<{ feitos: number; total: number } | null>(null);
   const vez = useRef(0);
+  useEffect(() => () => { limparCacheImagens(); setPrevias([]); }, []);   // fechou: solta as fotos da memória
 
   // ao abrir: modelo com o que varia no anúncio; foto única sugerida = a da família
   useEffect(() => {

@@ -51,7 +51,7 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
   const guardar = () => {
     if (!fab.current || carregando.current) return;
     historico.current.push(estadoAtual());
-    if (historico.current.length > 50) historico.current.shift();
+    if (historico.current.length > 30) historico.current.shift();
     refeitos.current = [];
     atualizarPainel();
   };
@@ -173,7 +173,7 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
       }
       guardar();
     }, 50);
-    return () => { vivo = false; window.clearTimeout(t); fab.current?.dispose(); fab.current = null; setSelecionado(null); };
+    return () => { vivo = false; window.clearTimeout(t); fab.current?.dispose(); fab.current = null; historico.current = []; refeitos.current = []; setSelecionado(null); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [det]);
 

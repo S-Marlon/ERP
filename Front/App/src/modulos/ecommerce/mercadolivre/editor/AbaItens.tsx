@@ -1,11 +1,12 @@
 // Aba Itens e estoque do editor: divisão do estoque loja/ML, e cada item com foto, título no ML, situação no ML,
 // e estoque. Preço e lucro de cada item ficam na aba Preço e lucro. Fotos, adicionar e tirar itens valem na hora.
-import React, { useState } from 'react';
+import React, { lazy, Suspense, useState } from 'react';
 import { Alert, Avatar, Button, Card, Popconfirm, Space, Spin, Table, Tag, Tooltip, Typography, Upload } from 'antd';
 import { BarcodeOutlined, ColumnWidthOutlined, EditOutlined, DeleteOutlined, InboxOutlined, PictureOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons';
-import FotosMlModal from '../FotosMlModal';
-import GeradorMedidasModal from '../GeradorMedidasModal';
-import EditorImagemModal from '../editorImagem/EditorImagemModal';
+// telas de imagem só carregam quando abertas (o editor traz a biblioteca de desenho, que é pesada)
+const FotosMlModal = lazy(() => import('../FotosMlModal'));
+const GeradorMedidasModal = lazy(() => import('../GeradorMedidasModal'));
+const EditorImagemModal = lazy(() => import('../editorImagem/EditorImagemModal'));
 import FotoFamiliaControle from '../../../../areas/catalogo/familias/FotoFamiliaControle';
 import EnviarFotoPopover from '../../../../shared/components/EnviarFotoPopover';
 import { AnuncioDetalhe, foraDoMl, ItemDoAnuncio, ROTULO_STATUS_ML } from '../mercadoLivreApi';
@@ -157,9 +158,11 @@ const AbaItens: React.FC<Props> = p => {
           ]}
         />
       </Card>
-      <EditorImagemModal det={editor ? p.salvo : null} onFechar={() => setEditor(false)} onSalvo={p.onFotoFamilia} />
-      <GeradorMedidasModal det={medidas ? p.salvo : null} onFechar={() => setMedidas(false)} onSalvo={p.onFotoFamilia} />
-      <FotosMlModal idAnuncio={fotosMl ? det.id : null} idItemInicial={fotosMl?.idItem} onFechar={() => setFotosMl(null)} onImportado={p.onFotoFamilia} />
+      <Suspense fallback={null}>
+        {editor && <EditorImagemModal det={p.salvo} onFechar={() => setEditor(false)} onSalvo={p.onFotoFamilia} />}
+        {medidas && <GeradorMedidasModal det={p.salvo} onFechar={() => setMedidas(false)} onSalvo={p.onFotoFamilia} />}
+        {fotosMl && <FotosMlModal idAnuncio={det.id} idItemInicial={fotosMl.idItem} onFechar={() => setFotosMl(null)} onImportado={p.onFotoFamilia} />}
+      </Suspense>
     </>
   );
 };

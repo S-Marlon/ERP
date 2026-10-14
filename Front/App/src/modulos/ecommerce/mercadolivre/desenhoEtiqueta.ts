@@ -17,6 +17,9 @@ export const enderecoParaDesenho = (url: string) => {
   return `${API_URL}/api/modulos/ecommerce/mercadolivre/fotos-ml/imagem?tenant_id=1&url=${encodeURIComponent(url)}`;
 };
 
+/** Solta as fotos guardadas (chamado ao fechar o gerador: cada foto aberta ocupa vários MB de memória). */
+export const limparCacheImagens = () => cacheImagens.clear();
+
 export const carregarImagem = (url: string) => {
   const chave = enderecoParaDesenho(url);
   if (!cacheImagens.has(chave)) {
