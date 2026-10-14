@@ -1,9 +1,10 @@
 // Colunas de lucro no ML (tarifa, frete, você recebe, custo, lucro, % sobre o custo, preço para o alvo e situação),
 // usadas na lista por anúncio, nos itens de cada anúncio e na visão por item. Todas ordenáveis.
 import React from 'react';
-import { Button, Popconfirm, Tag, Tooltip, Typography } from 'antd';
+import { Button, Popconfirm, Popover, Space, Tag, Tooltip, Typography } from 'antd';
+import { InfoCircleOutlined, WarningFilled } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { FinanceiroItem, formatarMoeda } from './mercadoLivreApi';
+import { AlertaPreco, FinanceiroItem, formatarMoeda } from './mercadoLivreApi';
 import { precoComercial } from './listaAnuncios';
 
 const { Text } = Typography;
@@ -23,6 +24,35 @@ export const TagSituacao: React.FC<{ nivel: string; alvoPct?: number }> = ({ niv
     <Tag color={SITUACAO_LUCRO[nivel].cor} style={{ marginRight: 0 }}>{SITUACAO_LUCRO[nivel].texto}</Tag>
   </Tooltip>
 );
+
+/**
+ * Degraus de preço do ML (taxa fixa de item barato, frete grátis a partir de R$ 79): grave em vermelho, com o botão do
+ * preço certo; aviso em laranja. `compacto` mostra só um selo com os detalhes ao passar o mouse.
+ */
+export const AlertasPreco: React.FC<{ alertas: AlertaPreco[] | undefined; onUsar?: (preco: number) => void; compacto?: boolean; textoUsar?: string }> = ({ alertas, onUsar, compacto, textoUsar }) => {
+  if (!alertas?.length) return null;
+  const grave = alertas.some(a => a.grave);
+  const lista = (
+    <Space direction="vertical" size={6} style={{ maxWidth: 340 }}>
+      {alertas.map(a => (
+        <div key={a.tipo}>
+          <Text style={{ fontSize: 12, color: a.grave ? '#cf1322' : '#d46b08' }}>{a.grave ? <WarningFilled /> : <InfoCircleOutlined />} {a.texto}</Text>
+          {a.precoSugerido !== null && onUsar && (
+            <div><Button size="small" type={a.grave ? 'primary' : 'default'} danger={a.grave} style={{ marginTop: 4 }} onClick={() => onUsar(a.precoSugerido!)}>{textoUsar || 'Usar'} {formatarMoeda(a.precoSugerido)}</Button></div>
+          )}
+        </div>
+      ))}
+    </Space>
+  );
+  if (!compacto) return lista;
+  return (
+    <Popover content={lista} title={grave ? 'Preço num degrau do ML' : 'Atenção ao mudar o preço'}>
+      <Tag color={grave ? 'red' : 'orange'} icon={grave ? <WarningFilled /> : <InfoCircleOutlined />} style={{ cursor: 'pointer', marginTop: 4, marginRight: 0 }}>
+        {grave ? (alertas.find(a => a.grave)!.tipo === 'TAXA_FIXA' ? 'taxa fixa' : 'frete R$ 79') : 'degrau perto'}
+      </Tag>
+    </Popover>
+  );
+};
 
 const cinza = (v: number) => <Text type="secondary">{v ? `−${formatarMoeda(v)}` : '—'}</Text>;
 const num = (v: number | null | undefined) => (v === null || v === undefined ? -Infinity : v);
@@ -91,7 +121,16 @@ export function colunasLucro<T>(
     },
     {
       title: 'Situação', width: 128, sorter: (a, b) => (ORDEM[fin(a)?.nivel ?? ''] ?? 9) - (ORDEM[fin(b)?.nivel ?? ''] ?? 9),
-      render: (_, l) => { const f = fin(l); return f ? <TagSituacao nivel={f.nivel} alvoPct={f.alvoPct} /> : null; },
+      render: (_, l) => {
+        const f = fin(l);
+        if (!f) return null;
+        return (
+          <div>
+            <TagSituacao nivel={f.nivel} alvoPct={f.alvoPct} />
+            <div><AlertasPreco compacto alertas={f.alertas} onUsar={op.onAplicarPreco ? v => op.onAplicarPreco!(l, v) : undefined} textoUsar={op.aplicarVaiAoRascunho ? 'Pôr' : 'Mudar para'} /></div>
+          </div>
+        );
+      },
     },
   ];
   return colunas;

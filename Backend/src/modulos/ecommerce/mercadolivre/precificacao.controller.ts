@@ -13,7 +13,7 @@ import {
   classificarLucro, classificarPreco, conselhos, estatisticas, lucroNoMl, precoParaAlvo, Tarifa, unidadesDoProduto,
 } from './precificacao';
 import { ErroML, ml } from './mercadolivreApi';
-import { avisosDeDegrau, LIMITE_FRETE_GRATIS, montarCenarios, quantidadesParaAnalise, resultadoVenda, vendedorPagaFrete } from './custosMl';
+import { acharLimiteTaxaFixa, alertasDePreco, avisosDeDegrau, LIMITE_FRETE_GRATIS, precoQueCompensaFrete, montarCenarios, quantidadesParaAnalise, resultadoVenda, vendedorPagaFrete } from './custosMl';
 import { freteDoEnvio, freteGratisNoMl, pesoCobrado, preferenciasEnvio } from './freteMl';
 
 const r2 = (v: number) => Math.round((Number(v) + Number.EPSILON) * 100) / 100;
@@ -78,6 +78,8 @@ const pesquisarMercado = (tenant: number, dominio: string | null, q: string, meu
   return valor;
 };
 
+const cacheLimiteFixa = new Map<string, { em: number; valor: Promise<number | null> }>();
+
 /** Tudo o que entra no custo de uma venda do item no ML: custo do ERP, alvo, tarifa, frete grátis (com o peso cobrado). */
 export const contextoVenda = async (
   tenant: number, c: AnuncioCarregado, item: ItemAnuncio, op: { informado?: number | null; alvoPadrao?: number } = {}
@@ -133,7 +135,39 @@ export const contextoVenda = async (
     }
     return precoAlvo;
   };
-  return { tipo, fator, custo, alvo, tarifaDe, envioDe, freteDe, avaliar, precoAlvoDe, freteGratis, logistica, peso, noMlEnvio };
+  /** Centavo exato em que a taxa fixa de item barato some (por categoria e tipo; guardado por 6 h). */
+  const limiteTaxaFixa = () => {
+    const chave = `${tenant}|${c.dados.categoriaMl}|${tipo}`;
+    const g = cacheLimiteFixa.get(chave);
+    if (g && Date.now() - g.em < 6 * 60 * 60 * 1000) return g.valor;
+    const valor = acharLimiteTaxaFixa(async p => (await tarifaDe(p)).fixa).catch(() => null);
+    cacheLimiteFixa.set(chave, { em: Date.now(), valor });
+    return valor;
+  };
+  /** Avisos de degrau no preço: taxa fixa (com o lucro no limite) e o frete grátis a partir de R$ 79. */
+  const alertasDe = async (preco: number, l: { lucro: number; lucroSobreCustoPct: number | null; frete: number }) => {
+    const limite = await limiteTaxaFixa();
+    const fixa = (await tarifaDe(preco)).fixa;
+    let taxaFixa: Parameters<typeof alertasDePreco>[0]['taxaFixa'] = null;
+    if (limite !== null) {
+      const noLimite = preco < limite ? await avaliar(limite) : null;
+      taxaFixa = { limite, fixa, noLimite: noLimite ? { lucro: noLimite.lucro, pct: noLimite.lucroSobreCustoPct } : null };
+    }
+    let frete: Parameters<typeof alertasDePreco>[0]['frete'] = null;
+    if (preco >= LIMITE_FRETE_GRATIS && preco <= LIMITE_FRETE_GRATIS * 1.15) {
+      const ab = await avaliar(78.9);
+      frete = { abaixo: ab.freteDesconhecido ? null : { lucro: ab.lucro, pct: ab.lucroSobreCustoPct }, freteHoje: l.frete, freteAcima: null, compensaAPartir: null };
+    } else if (preco < LIMITE_FRETE_GRATIS && preco >= LIMITE_FRETE_GRATIS * 0.8 && (freteGratis || informado !== null)) {
+      const acima = await freteDe(LIMITE_FRETE_GRATIS);
+      const comissaoPct = (await tarifaDe(preco)).comissaoPct;
+      frete = {
+        abaixo: null, freteHoje: l.frete, freteAcima: acima,
+        compensaAPartir: acima === null ? null : precoQueCompensaFrete({ preco, comissaoPct, freteHoje: l.frete, freteAcima: acima }),
+      };
+    }
+    return alertasDePreco({ preco, lucro: l.lucro, pct: l.lucroSobreCustoPct, taxaFixa, frete });
+  };
+  return { tipo, fator, custo, alvo, tarifaDe, envioDe, freteDe, avaliar, precoAlvoDe, limiteTaxaFixa, alertasDe, freteGratis, logistica, peso, noMlEnvio };
 };
 
 /** GET /anuncios/:id/itens/:idItem/preco?simular=&frete=&alvoPadrao=30 */
@@ -159,12 +193,9 @@ export const analisarPreco = async (req: Request, res: Response) => {
 
     const envioAtual = await envioDe(precoAtual);
     const [freteAbaixo, freteAcima] = await Promise.all([envioDe(78.9), envioDe(Math.max(LIMITE_FRETE_GRATIS, precoAtual))]);
-    let precoSemFixa: number | null = null;
-    if (tarifaAtual.fixa > 0) {
-      for (const p of [13, 15, 17, 19, 19.9, 25, 29, 35]) {
-        if (p > precoAtual && !(await tarifaDe(p)).fixa) { precoSemFixa = p; break; }
-      }
-    }
+    const precoSemFixa = tarifaAtual.fixa > 0 ? await ctx.limiteTaxaFixa() : null;
+    const alertas = await ctx.alertasDe(precoAtual, atual);
+    const alertasSimulado = simulado && simular ? await ctx.alertasDe(simular, simulado) : [];
     const tarifas = { gold_special: await tarifaDe(precoAtual, 'gold_special'), gold_pro: await tarifaDe(precoAtual, 'gold_pro') };
     const freteSeGratis = informado ?? envioAtual?.valor ?? null;
     const cenarios = montarCenarios({ preco: precoAtual, custoUnit: custo, tarifas, frete: freteSeGratis, tipoAtual: tipo, freteGratisAtual: freteGratis })
@@ -172,7 +203,7 @@ export const analisarPreco = async (req: Request, res: Response) => {
     const degraus = avisosDeDegrau({
       preco: precoAtual, comissaoPct: tarifaAtual.comissaoPct, freteGratis,
       freteAbaixo: informado ?? freteAbaixo?.valor ?? null, freteAcima: informado ?? freteAcima?.valor ?? null,
-      tarifaFixa: tarifaAtual.fixa, precoSemFixa,
+      tarifaFixa: 0, precoSemFixa,   // a taxa fixa vai nos alertas (com o limite exato e o lucro)
     });
 
     // quantas unidades vêm no anúncio: atributo do ML (unidades por pacote), unidade do ML, ou o título
@@ -239,7 +270,7 @@ export const analisarPreco = async (req: Request, res: Response) => {
         noAnuncio: !!noMlEnvio, peso, envio: envioAtual, limite: LIMITE_FRETE_GRATIS,
         acimaDoLimite: freteAcima, abaixoDoLimite: freteAbaixo,
       },
-      cenarios, porQuantidade, degraus,
+      cenarios, porQuantidade, degraus, alertas, alertasSimulado,
       atual, simulado, precoAlvo,
       loja: { preco: item.preco, difPct: item.preco > 0 ? r2((precoAtual / item.preco - 1) * 100) : null },
       mercado: { ...mercado, porUnidade, nivel: posicao.nivel, difMedianaPct: posicao.difMedianaPct, precoMercado },
@@ -268,6 +299,7 @@ const financeiroDe = async (tenant: number, c: AnuncioCarregado) => {
         idItem: item.idItem, preco: l.preco, tarifa: l.tarifa, frete: l.frete, recebe: l.liquido, custo: l.custo, lucro: l.lucro,
         lucroSobreCustoPct: l.lucroSobreCustoPct, nivel: l.nivel, freteGratis: ctx.freteGratis, freteDesconhecido: l.freteDesconhecido, alvoPct: ctx.alvo.alvoPct,
         precoAlvo: await ctx.precoAlvoDe(preco, l.frete),
+        alertas: await ctx.alertasDe(preco, l),
       };
     } catch {
       return null;
@@ -318,6 +350,7 @@ export const simularPreco = async (req: Request, res: Response) => {
     return res.json({
       preco: l.preco, tarifa: l.tarifa, frete: l.frete, recebe: l.liquido, custo: l.custo, lucro: l.lucro, lucroSobreCustoPct: l.lucroSobreCustoPct,
       nivel: l.nivel, freteDesconhecido: l.freteDesconhecido, alvoPct: ctx.alvo.alvoPct, precoAlvo: await ctx.precoAlvoDe(atual, lAtual.frete),
+      alertas: await ctx.alertasDe(preco, l),
     });
   } catch (error) {
     return responderErro(res, error, 'Erro ao simular o preço.');

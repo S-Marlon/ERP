@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { Alert, Button, Card, Col, Collapse, Flex, InputNumber, Row, Select, Space, Spin, Statistic, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { BulbOutlined, CarOutlined, LineChartOutlined, WarningOutlined } from '@ant-design/icons';
 import { AnalisePreco, AnuncioDetalhe, anunciosApi, formatarMoeda, ResultadoVendaMl } from './mercadoLivreApi';
+import { AlertasPreco } from './colunasLucro';
 
 const { Text } = Typography;
 
@@ -141,6 +142,9 @@ const PrecoMlCard: React.FC<Props> = ({ det, onUsarPreco }) => {
               )}
             />
 
+            {a.alertas.length > 0 && (
+              <Alert type={a.alertas.some(x => x.grave) ? 'error' : 'warning'} showIcon message={<AlertasPreco alertas={a.alertas} onUsar={aplicar} textoUsar="Usar" />} />
+            )}
             {a.degraus.length > 0 && (
               <Alert type="warning" showIcon icon={<WarningOutlined />} message={<Space direction="vertical" size={2}>{a.degraus.map(d => <span key={d}>{d}</span>)}</Space>} />
             )}
@@ -212,6 +216,7 @@ const PrecoMlCard: React.FC<Props> = ({ det, onUsarPreco }) => {
                   <Text type="secondary">{formatarMoeda(a.simulado.preco / a.unidades)}/un: {pct((a.simulado.preco / a.unidades / a.mercado.estatisticas.mediana - 1) * 100)} da mediana</Text>
                 )}
                 <Button size="small" type="primary" onClick={() => aplicar(a.simulado!.preco)}>Usar este preço</Button>
+                {a.alertasSimulado.some(x => x.grave) && <div style={{ width: '100%' }}><AlertasPreco alertas={a.alertasSimulado.filter(x => x.grave)} onUsar={v => { setSimular(v); analisar(v); }} textoUsar="Simular" /></div>}
               </Flex>
             )}
 

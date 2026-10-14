@@ -62,7 +62,10 @@ export interface FinanceiroItem {
   idItem: number; preco: number; tarifa: number; frete: number; recebe: number; custo: number; lucro: number;
   lucroSobreCustoPct: number | null; nivel: LucroMl['nivel']; freteGratis: boolean; freteDesconhecido: boolean; alvoPct: number;
   precoAlvo: number | null;   // menor preço que dá o alvo sobre o custo (null sem custo)
+  alertas: AlertaPreco[];     // degraus de preço (taxa fixa de item barato, frete grátis a partir de R$ 79)
 }
+/** Degrau de preço do ML: grave = o preço atual está perdendo dinheiro por pouco (com o preço sugerido). */
+export interface AlertaPreco { tipo: 'TAXA_FIXA' | 'PERTO_TAXA_FIXA' | 'FRETE_ACIMA_79' | 'PERTO_FRETE_79'; grave: boolean; texto: string; precoSugerido: number | null }
 /** Você recebe e lucro a um preço qualquer (simulação enquanto digita). */
 export type PrevisaoPreco = Omit<FinanceiroItem, 'idItem' | 'freteGratis'>;
 
@@ -90,7 +93,7 @@ export interface AnalisePreco {
   };
   cenarios: (ResultadoVendaMl & { tipo: 'gold_special' | 'gold_pro'; freteGratis: boolean; atual: boolean; obrigatorio: boolean })[];
   porQuantidade: (ResultadoVendaMl & { desconto: number; faixa: boolean; freteDesconhecido: boolean })[];
-  degraus: string[];
+  degraus: string[]; alertas: AlertaPreco[]; alertasSimulado: AlertaPreco[];
 }
 export interface FreteEnvio { valor: number; cheio: number | null; descontoPct: number | null; pesoG: number | null }
 export interface ResultadoVendaMl {

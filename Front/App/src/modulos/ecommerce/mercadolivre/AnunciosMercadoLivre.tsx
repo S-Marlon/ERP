@@ -82,7 +82,7 @@ const AnunciosMercadoLivre: React.FC = () => {
 
   const contagem = useMemo(() => {
     const conta = (f: FiltroLista) => anuncios.filter(a => passaNoFiltro(a, resumos.get(a.id) ?? null, f)).length;
-    return { pendentes: conta('pendentes'), prontos: conta('prontos'), publicados: conta('publicados'), pausados: conta('pausados'), lucroBaixo: conta('lucroBaixo'), semEstoque: conta('semEstoque') };
+    return { pendentes: conta('pendentes'), prontos: conta('prontos'), publicados: conta('publicados'), pausados: conta('pausados'), lucroBaixo: conta('lucroBaixo'), degrau: conta('degrau'), semEstoque: conta('semEstoque') };
   }, [anuncios, resumos]);
 
   const visiveis = useMemo(() => {
@@ -136,6 +136,7 @@ const AnunciosMercadoLivre: React.FC = () => {
   // visão por item: todos os itens dos anúncios do filtro, cada um com os números dele
   const linhasItens = useMemo<LinhaItem[]>(() => visiveis.flatMap(a => a.itens.map(i => ({ chave: `${a.id}-${i.idItem}`, a, i, f: financeiro.get(a.id)?.find(x => x.idItem === i.idItem) })))
     .filter(l => filtro !== 'lucroBaixo' || (l.f && (l.f.nivel === 'PREJUIZO' || l.f.nivel === 'BAIXO')))
+    .filter(l => filtro !== 'degrau' || (l.f?.alertas || []).some(x => x.grave))
     .filter(l => !busca.trim() || [l.i.sku, l.i.nome, l.i.mlbId, l.a.titulo].some(x => String(x || '').toLowerCase().includes(busca.trim().toLowerCase()))),
   [visiveis, financeiro, filtro, busca]);
 
@@ -195,6 +196,7 @@ const AnunciosMercadoLivre: React.FC = () => {
               { value: 'publicados', label: `Publicados (${contagem.publicados})` },
               { value: 'pausados', label: `Pausados (${contagem.pausados})` },
               { value: 'lucroBaixo', label: `Lucro baixo (${contagem.lucroBaixo})` },
+              ...(contagem.degrau ? [{ value: 'degrau' as FiltroLista, label: <Tooltip title="Preço num degrau do ML: taxa fixa de item barato ou frete grátis logo acima de R$ 79. Poucos centavos mudam muito o lucro."><span style={{ color: '#cf1322' }}>Degrau de preço ({contagem.degrau})</span></Tooltip> }] : []),
               { value: 'semEstoque', label: `Sem estoque (${contagem.semEstoque})` },
               { value: 'pendentes', label: `Com pendência (${contagem.pendentes})` },
               { value: 'prontos', label: `Prontos (${contagem.prontos})` },

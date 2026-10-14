@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { avisosDeDegrau, montarCenarios, precoQueCompensaFrete, quantidadesParaAnalise, resultadoVenda, vendedorPagaFrete } from './custosMl';
+import { acharLimiteTaxaFixa, alertasDePreco, avisosDeDegrau, montarCenarios, precoQueCompensaFrete, quantidadesParaAnalise, resultadoVenda, vendedorPagaFrete } from './custosMl';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -53,4 +53,27 @@ teste('quantidades para analisar', () => {
   assert.deepStrictEqual(quantidadesParaAnalise(42.9, [{ minimo: 5, desconto: 5 }, { minimo: 24, desconto: 25 }]),
     [{ quantidade: 1, desconto: 0 }, { quantidade: 2, desconto: 0 }, { quantidade: 5, desconto: 5 }, { quantidade: 24, desconto: 25 }]);
   assert.deepStrictEqual(quantidadesParaAnalise(120, []), [{ quantidade: 1, desconto: 0 }]);
+});
+
+teste('limite exato da taxa fixa (busca ao centavo)', async () => {
+  const chamadas: number[] = [];
+  const fixaDe = async (p: number) => { chamadas.push(p); return p <= 12.5 ? r(p * 0.5) : 0; };
+  const r = (v: number) => Math.round(v * 100) / 100;
+  assert.strictEqual(await acharLimiteTaxaFixa(fixaDe), 12.51);
+  assert.ok(chamadas.length <= 14);
+  assert.strictEqual(await acharLimiteTaxaFixa(async () => 0), null);
+  assert.strictEqual(await acharLimiteTaxaFixa(async () => 5), null);
+});
+
+teste('alertas de degrau de preço', () => {
+  const barato = alertasDePreco({ preco: 12.5, lucro: 1.26, pct: 36, taxaFixa: { limite: 12.51, fixa: 6.24, noLimite: { lucro: 7.51, pct: 214.57 } }, frete: null });
+  assert.strictEqual(barato[0].tipo, 'TAXA_FIXA');
+  assert.strictEqual(barato[0].precoSugerido, 12.51);
+  assert.strictEqual(barato[0].texto, 'Até R$ 12,50 o ML cobra R$ 6,24 de taxa fixa por unidade. Com R$ 12,51 (+R$ 0,01) o lucro vai de R$ 1,26 (36,0%) para R$ 7,51 (214,6%).');
+  assert.strictEqual(alertasDePreco({ preco: 12.6, lucro: 6, pct: 200, taxaFixa: { limite: 12.51, fixa: 0, noLimite: null }, frete: null })[0].tipo, 'PERTO_TAXA_FIXA');
+  assert.deepStrictEqual(alertasDePreco({ preco: 20, lucro: 6, pct: 50, taxaFixa: { limite: 12.51, fixa: 0, noLimite: null }, frete: null }), []);
+  const acima = alertasDePreco({ preco: 82, lucro: 20, pct: 40, taxaFixa: null, frete: { abaixo: { lucro: 21.5, pct: 43 }, freteHoje: 14.45, freteAcima: null, compensaAPartir: null } });
+  assert.deepStrictEqual([acima[0].tipo, acima[0].grave, acima[0].precoSugerido], ['FRETE_ACIMA_79', true, 78.9]);
+  const perto = alertasDePreco({ preco: 72, lucro: 20, pct: 40, taxaFixa: null, frete: { abaixo: null, freteHoje: 8.45, freteAcima: 14.45, compensaAPartir: 79.23 } });
+  assert.ok(perto[0].texto.endsWith('só suba o preço se for para R$ 79,23 ou mais.'));
 });

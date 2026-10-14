@@ -6,7 +6,7 @@ const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok
 
 const fin = (lucro: number, nivel: FinanceiroItem['nivel'], extra: Partial<FinanceiroItem> = {}): FinanceiroItem => ({
   idItem: 1, preco: 10, tarifa: 1, frete: 0, recebe: 9 + lucro, custo: 9, lucro, lucroSobreCustoPct: (lucro / 9) * 100, nivel,
-  freteGratis: false, freteDesconhecido: false, alvoPct: 30, precoAlvo: null, ...extra,
+  freteGratis: false, freteDesconhecido: false, alvoPct: 30, precoAlvo: null, alertas: [], ...extra,
 });
 const anuncio = (extra: Partial<AnuncioResumo>): AnuncioResumo => ({
   id: 1, titulo: 'x', idFamilia: null, familia: null, categoriaMl: null, categoriaNome: null, tipoAnuncio: 'gold_pro', situacao: 'PUBLICADO', preparo: null,
@@ -19,6 +19,9 @@ teste('resumo do lucro: o pior item manda', () => {
   assert.deepStrictEqual([r.lucroMin, r.lucroMax, r.nivel, r.comFrete], [0.16, 16.48, 'BAIXO', 1]);
   assert.strictEqual(resumirFinanceiro([fin(-2.72, 'PREJUIZO'), fin(3, 'SEM_CUSTO')])!.nivel, 'PREJUIZO');
   assert.strictEqual(resumirFinanceiro([]), null);
+  const comDegrau = resumirFinanceiro([fin(1.26, 'BAIXO', { alertas: [{ tipo: 'TAXA_FIXA', grave: true, texto: '', precoSugerido: 12.51 }] }), fin(5, 'BOM', { alertas: [{ tipo: 'PERTO_TAXA_FIXA', grave: false, texto: '', precoSugerido: null }] })]);
+  assert.strictEqual(comDegrau!.degraus, 1);
+  assert.ok(passaNoFiltro(anuncio({}), comDegrau, 'degrau'));
 });
 
 teste('filtros rápidos', () => {

@@ -106,3 +106,55 @@ export const quantidadesParaAnalise = (preco: number, faixas: { minimo: number; 
   }
   return [...q.entries()].sort((a, b) => a[0] - b[0]).slice(0, 7).map(([quantidade, desconto]) => ({ quantidade, desconto }));
 };
+
+/**
+ * Menor preço (ao centavo) em que o ML não cobra mais a taxa fixa de item barato. Busca binária entre R$ 1 e `ate`:
+ * a taxa fixa vale até um limite e some acima dele. null quando não há taxa fixa (ou ela não some até `ate`).
+ */
+export const acharLimiteTaxaFixa = async (fixaDe: (preco: number) => Promise<number>, ate = 40) => {
+  if ((await fixaDe(ate)) > 0) return null;
+  let comTaxa = 100;            // centavos
+  if (!((await fixaDe(comTaxa / 100)) > 0)) return null;
+  let semTaxa = Math.round(ate * 100);
+  while (semTaxa - comTaxa > 1) {
+    const meio = Math.floor((comTaxa + semTaxa) / 2);
+    if ((await fixaDe(meio / 100)) > 0) comTaxa = meio; else semTaxa = meio;
+  }
+  return semTaxa / 100;
+};
+
+export interface AlertaPreco { tipo: 'TAXA_FIXA' | 'PERTO_TAXA_FIXA' | 'FRETE_ACIMA_79' | 'PERTO_FRETE_79'; grave: boolean; texto: string; precoSugerido: number | null }
+
+const pctTexto = (v: number | null) => (v === null ? '' : ` (${v.toFixed(1).replace('.', ',')}%)`);
+
+/** Degraus de preço que mudam muito a margem: taxa fixa de item barato e o frete grátis a partir de R$ 79. */
+export const alertasDePreco = (p: {
+  preco: number; lucro: number; pct: number | null;
+  taxaFixa: { limite: number; fixa: number; noLimite: { lucro: number; pct: number | null } | null } | null;
+  frete: { abaixo: { lucro: number; pct: number | null } | null; freteHoje: number; freteAcima: number | null; compensaAPartir: number | null } | null;
+}): AlertaPreco[] => {
+  const a: AlertaPreco[] = [];
+  const t = p.taxaFixa;
+  if (t && p.preco < t.limite && t.fixa > 0) {
+    a.push({
+      tipo: 'TAXA_FIXA', grave: true, precoSugerido: t.limite,
+      texto: `Até ${moeda(r2(t.limite - 0.01))} o ML cobra ${moeda(t.fixa)} de taxa fixa por unidade.`
+        + (t.noLimite ? ` Com ${moeda(t.limite)} (+${moeda(r2(t.limite - p.preco))}) o lucro vai de ${moeda(p.lucro)}${pctTexto(p.pct)} para ${moeda(t.noLimite.lucro)}${pctTexto(t.noLimite.pct)}.` : ` A partir de ${moeda(t.limite)} ela some.`),
+    });
+  } else if (t && p.preco >= t.limite && p.preco <= t.limite * 1.2) {
+    a.push({ tipo: 'PERTO_TAXA_FIXA', grave: false, precoSugerido: null, texto: `Cuidado ao baixar: abaixo de ${moeda(t.limite)} o ML cobra taxa fixa por unidade e o lucro despenca.` });
+  }
+  const f = p.frete;
+  if (f && p.preco >= LIMITE_FRETE_GRATIS && f.abaixo && f.abaixo.lucro > p.lucro) {
+    a.push({
+      tipo: 'FRETE_ACIMA_79', grave: true, precoSugerido: 78.9,
+      texto: `A partir de ${moeda(LIMITE_FRETE_GRATIS)} o frete grátis custa ${moeda(f.freteHoje)}. Baixando para ${moeda(78.9)} o lucro vai de ${moeda(p.lucro)}${pctTexto(p.pct)} para ${moeda(f.abaixo.lucro)}${pctTexto(f.abaixo.pct)} e o preço fica menor.`,
+    });
+  } else if (f && p.preco < LIMITE_FRETE_GRATIS && f.freteAcima !== null && f.freteAcima > f.freteHoje && f.compensaAPartir !== null) {
+    a.push({
+      tipo: 'PERTO_FRETE_79', grave: false, precoSugerido: null,
+      texto: `A partir de ${moeda(LIMITE_FRETE_GRATIS)} o frete grátis sobe para ${moeda(f.freteAcima)} (hoje ${moeda(f.freteHoje)}): só suba o preço se for para ${moeda(f.compensaAPartir)} ou mais.`,
+    });
+  }
+  return a;
+};

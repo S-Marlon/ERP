@@ -5,6 +5,7 @@ import { Button, Flex, InputNumber, Popover, Space, Spin, Switch, Tooltip, Typog
 import { AimOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import { anunciosApi, FinanceiroItem, formatarMoeda, PrevisaoPreco } from './mercadoLivreApi';
 import { precoComercial } from './listaAnuncios';
+import { AlertasPreco } from './colunasLucro';
 
 const { Text } = Typography;
 
@@ -88,6 +89,7 @@ export const PrecoRapido: React.FC<{
         {mudou && <Tooltip title="Desfazer"><Button size="small" icon={<CloseOutlined />} disabled={salvando} onClick={() => setV(valor)} /></Tooltip>}
       </Space.Compact>
       {mudou && <div><LinhaPrevisao p={previsao} carregando={carregando} /></div>}
+      {mudou && previsao && <AlertasPreco alertas={previsao.alertas.filter(a => a.grave)} onUsar={setV} textoUsar="Usar" />}
       {(mudou || abaixoDoAlvo) && (
         <div><BotaoAlvo precoAlvo={precoAlvo} alvoPct={atual?.alvoPct ?? previsao?.alvoPct ?? 30} atual={v} onUsar={setV} /></div>
       )}

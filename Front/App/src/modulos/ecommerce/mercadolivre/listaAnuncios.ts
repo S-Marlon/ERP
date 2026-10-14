@@ -2,7 +2,7 @@
 // testadas em listaAnuncios.test.ts.
 import type { AnuncioResumo, FinanceiroItem } from './mercadoLivreApi';
 
-export type FiltroLista = 'todos' | 'pendentes' | 'prontos' | 'publicados' | 'pausados' | 'lucroBaixo' | 'semEstoque';
+export type FiltroLista = 'todos' | 'pendentes' | 'prontos' | 'publicados' | 'pausados' | 'lucroBaixo' | 'degrau' | 'semEstoque';
 
 // do pior para o melhor: é o pior item que pede atenção
 const ORDEM_NIVEL: FinanceiroItem['nivel'][] = ['PREJUIZO', 'BAIXO', 'SEM_CUSTO', 'BOM', 'ALTO'];
@@ -10,6 +10,7 @@ const ORDEM_NIVEL: FinanceiroItem['nivel'][] = ['PREJUIZO', 'BAIXO', 'SEM_CUSTO'
 export interface ResumoFinanceiro {
   recebeMin: number; recebeMax: number; lucroMin: number; lucroMax: number;
   pctMin: number | null; nivel: FinanceiroItem['nivel']; freteDesconhecido: boolean; comFrete: number;
+  degraus: number;              // itens perdendo dinheiro num degrau de preço (taxa fixa, frete de R$ 79)
 }
 
 export const resumirFinanceiro = (itens: FinanceiroItem[] | undefined): ResumoFinanceiro | null => {
@@ -22,6 +23,7 @@ export const resumirFinanceiro = (itens: FinanceiroItem[] | undefined): ResumoFi
     nivel: [...itens].sort((a, b) => ORDEM_NIVEL.indexOf(a.nivel) - ORDEM_NIVEL.indexOf(b.nivel))[0].nivel,
     freteDesconhecido: itens.some(i => i.freteDesconhecido),
     comFrete: itens.filter(i => i.frete > 0).length,
+    degraus: itens.filter(i => (i.alertas || []).some(a => a.grave)).length,
   };
 };
 
@@ -35,6 +37,7 @@ export const passaNoFiltro = (a: AnuncioResumo, fin: ResumoFinanceiro | null, fi
     case 'publicados': return a.situacao !== 'RASCUNHO';
     case 'pausados': return a.pausadosMl > 0;
     case 'lucroBaixo': return lucroBaixo(fin);
+    case 'degrau': return !!fin && fin.degraus > 0;
     case 'semEstoque': return semEstoqueNoMl(a);
     default: return true;
   }
