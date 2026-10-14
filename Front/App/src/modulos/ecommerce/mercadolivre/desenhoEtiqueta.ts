@@ -9,7 +9,7 @@ const LADO = 1200;
 const cacheImagens = new Map<string, Promise<HTMLImageElement>>();
 
 /** Foto de fora do ERP passa pelo servidor (sem isso o navegador não deixa salvar o desenho). */
-const enderecoParaDesenho = (url: string) => {
+export const enderecoParaDesenho = (url: string) => {
   if (/^(data|blob):/i.test(url)) return url;
   try {
     if (new URL(url).origin === new URL(API_URL).origin) return url;
