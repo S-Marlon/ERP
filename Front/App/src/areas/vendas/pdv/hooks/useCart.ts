@@ -249,8 +249,8 @@ export const useCart = () => {
         return item;
       }
       const tabela = item.precoTabela ?? item.originalPrice ?? item.price;
-      // Voltar ao preço de tabela remove o desconto manual
-      if (newPrice >= tabela) return { ...item, price: tabela, originalPrice: undefined, precoManual: false };
+      // Voltar ao preço de tabela remove o ajuste manual; abaixo é desconto, acima é acréscimo
+      if (Math.abs(newPrice - tabela) < 0.005) return { ...item, price: tabela, originalPrice: undefined, precoManual: false };
       return { ...item, originalPrice: tabela, price: newPrice, precoManual: true };
     }));
   }, []);

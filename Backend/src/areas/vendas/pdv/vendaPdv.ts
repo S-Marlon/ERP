@@ -104,7 +104,8 @@ export const fecharVenda = (linhas: LinhaCalculada[], descontoGeral: number, acr
       ? restanteAcr
       : somaSubtotais > 0 ? Math.floor((acrescimoC * subtotais[i]) / somaSubtotais) : 0;
     restanteAcr -= parteAcr;
-    const brutoC = centavos(l.precoTabela * l.quantidade);
+    // preço acima da tabela (acréscimo no item): o bruto é o praticado, para bruto - desconto = líquido
+    const brutoC = centavos(Math.max(l.precoTabela, l.precoPraticado) * l.quantidade);
     const totalC = subtotais[i] - parte + parteAcr;
     return {
       ...l,
@@ -114,7 +115,7 @@ export const fecharVenda = (linhas: LinhaCalculada[], descontoGeral: number, acr
     };
   });
 
-  const totalBruto = reais(fechadas.reduce((a, l) => a + centavos(l.precoTabela * l.quantidade), 0));
+  const totalBruto = reais(fechadas.reduce((a, l) => a + centavos(Math.max(l.precoTabela, l.precoPraticado) * l.quantidade), 0));
   const totalLiquido = reais(fechadas.reduce((a, l) => a + centavos(l.totalItem), 0));
   return { linhas: fechadas, totalBruto, totalLiquido, totalDesconto: reais(Math.max(0, centavos(totalBruto) - centavos(totalLiquido))) };
 };

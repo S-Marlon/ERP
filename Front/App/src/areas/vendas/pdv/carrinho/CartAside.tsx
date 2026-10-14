@@ -1,7 +1,8 @@
-// Carrinho do PDV: itens com unidade, quantidade, desconto por item e faixa de atacado; rodapé com total e ações.
+// Carrinho do PDV: itens com unidade, quantidade, preço por item (desconto ou acréscimo) e faixa de atacado; rodapé com total e ações.
 import React, { useState } from 'react';
 import { Button, ConfigProvider, Divider, Dropdown, Empty, Flex, InputNumber, Modal, Popconfirm, Select, Tag, Tooltip, Typography, message, theme } from 'antd';
 import { CopyOutlined, DeleteOutlined, ExportOutlined, MoreOutlined, PrinterOutlined, SplitCellsOutlined } from '@ant-design/icons';
+import { ajusteDaLinha, ajustesDoCarrinho, precoBaseLinha } from '../utils/ajustesCarrinho';
 
 import { CartItem } from '../types';
 import { emAtacado, podeFracionar, proximaFaixa } from '../utils/precoCarrinho';
@@ -49,18 +50,17 @@ const CarrinhoConteudo: React.FC<CartAsideProps> = ({
     const { token } = theme.useToken();
     // Fracionamento ligado à mão por item (unidades fracionáveis já vêm ligadas)
     const [fracionados, setFracionados] = useState<Record<string | number, boolean>>({});
-    // Desconto por item: item aberto no modal e o preço digitado
+    // Preço por item (desconto ou acréscimo): item aberto no modal e o preço digitado
     const [itemDesconto, setItemDesconto] = useState<CartItem | null>(null);
     const [novoPreco, setNovoPreco] = useState<number | null>(null);
 
-    const precoBase = (item: CartItem) => item.originalPrice || item.price;
-    const subtotalTabela = cart.reduce((acc, i) => acc + precoBase(i) * i.quantity, 0);
-    const descontos = Math.max(0, Math.round((subtotalTabela - total) * 100) / 100);
+    const precoBase = (item: CartItem) => precoBaseLinha(item);
+    // desconto e acréscimo somados por linha: um não esconde o outro
+    const { subtotalTabela, descontos, acrescimos } = ajustesDoCarrinho(cart);
 
     const abrirDesconto = (item: CartItem) => { setItemDesconto(item); setNovoPreco(item.price); };
     const aplicarDesconto = () => {
         if (!itemDesconto || !novoPreco || novoPreco <= 0) { message.warning('Informe um preço válido.'); return; }
-        if (novoPreco > precoBase(itemDesconto) + 0.004) { message.warning('O preço com desconto não pode ser maior que o original.'); return; }
         applyIndividualDiscount(itemDesconto.id, novoPreco);
         setItemDesconto(null);
     };
@@ -70,7 +70,7 @@ const CarrinhoConteudo: React.FC<CartAsideProps> = ({
         if (!janela) return;
         const linhas = cart.map(item => {
             const original = precoBase(item);
-            return `<tr><td>${escapar(item.name)}${item.price < original ? `<div style="font-size:10px;color:#999">De: ${money.format(original)}</div>` : ''}</td>`
+            return `<tr><td>${escapar(item.name)}${item.price < original - 0.004 ? `<div style="font-size:10px;color:#999">De: ${money.format(original)}</div>` : ''}</td>`
                 + `<td style="text-align:center">${item.quantity}</td><td style="text-align:right">${money.format(item.price)}</td>`
                 + `<td style="text-align:right">${money.format(item.price * item.quantity)}</td></tr>`;
         }).join('');
@@ -86,6 +86,7 @@ const CarrinhoConteudo: React.FC<CartAsideProps> = ({
             <table><thead><tr><th>Descrição</th><th>Qtd</th><th>Unitário</th><th>Total</th></tr></thead><tbody>${linhas}</tbody></table>
             <div class="res"><div><span>Subtotal:</span><span>${money.format(subtotalTabela)}</span></div>
             ${descontos > 0 ? `<div><span>Descontos:</span><span style="color:#16a34a">- ${money.format(descontos)}</span></div>` : ''}
+            ${acrescimos > 0 ? `<div><span>Acréscimos:</span><span>+ ${money.format(acrescimos)}</span></div>` : ''}
             <div class="tot"><span>Total:</span><span>${money.format(total)}</span></div></div>
             <script>window.onload=()=>{window.print();setTimeout(()=>window.close(),300)}</script></body></html>`);
         janela.document.close();
@@ -141,8 +142,10 @@ const CarrinhoConteudo: React.FC<CartAsideProps> = ({
                     <Flex vertical gap={6}>
                         {cart.map((item, index) => {
                             const original = precoBase(item);
-                            const temDesconto = item.price < original - 0.004;
-                            const pctOff = ((1 - item.price / original) * 100).toFixed(0);
+                            const ajuste = ajusteDaLinha(item);
+                            const temDesconto = ajuste.tipo === 'DESCONTO';
+                            const temAcrescimo = ajuste.tipo === 'ACRESCIMO';
+                            const pctOff = ajuste.pct.toFixed(0);
                             const fracionado = !!fracionados[item.id] || podeFracionar(item.unitOfMeasure);
                             const stock = item.stock ?? 0;
                             const ehProduto = item.type !== 'service' && item.type !== 'os';
@@ -155,7 +158,7 @@ const CarrinhoConteudo: React.FC<CartAsideProps> = ({
                             return (
                                 <div key={item.id} style={{
                                     padding: 8, borderRadius: token.borderRadius, border: `1px solid ${token.colorBorderSecondary}`,
-                                    borderLeft: `3px solid ${temDesconto ? token.colorSuccess : token.colorBorderSecondary}`,
+                                    borderLeft: `3px solid ${temDesconto ? token.colorSuccess : temAcrescimo ? token.colorWarning : token.colorBorderSecondary}`,
                                     background: item.quantity === 0 ? token.colorFillQuaternary : token.colorBgContainer,
                                 }}>
                                     <Flex gap={6} align="flex-start">
@@ -206,6 +209,7 @@ const CarrinhoConteudo: React.FC<CartAsideProps> = ({
                                     <Flex gap={6} wrap align="center" justify="space-between" style={{ borderTop: `1px dashed ${token.colorBorderSecondary}`, paddingTop: 6 }}>
                                         <Flex vertical style={{ lineHeight: 1.2 }}>
                                             {temDesconto && <Typography.Text delete type="secondary" style={{ fontSize: 11 }}>{money.format(original)}</Typography.Text>}
+                                            {temAcrescimo && <Typography.Text type="secondary" style={{ fontSize: 11 }}>tabela {money.format(original)}</Typography.Text>}
                                             <span style={{ whiteSpace: 'nowrap' }}>
                                                 <Typography.Text strong>{money.format(item.price)}</Typography.Text>
                                                 <Typography.Text type="secondary" style={{ fontSize: 11 }}> /{un}</Typography.Text>
@@ -216,10 +220,11 @@ const CarrinhoConteudo: React.FC<CartAsideProps> = ({
                                                 <Button size="small" type={fracionado ? 'primary' : 'default'} icon={<SplitCellsOutlined />}
                                                     onClick={() => setFracionados(prev => ({ ...prev, [item.id]: !prev[item.id] }))} />
                                             </Tooltip>
-                                            <Tooltip title="Desconto no item">
+                                            <Tooltip title={temAcrescimo ? `Acréscimo de ${pctOff}% sobre a tabela` : temDesconto ? `Desconto de ${pctOff}%` : 'Mudar o preço do item (desconto ou acréscimo)'}>
                                                 <Button size="small" onClick={() => abrirDesconto(item)}
-                                                    style={temDesconto ? { color: token.colorSuccess, borderColor: token.colorSuccess } : undefined}>
-                                                    {temDesconto ? `-${pctOff}%` : '%'}
+                                                    style={temDesconto ? { color: token.colorSuccess, borderColor: token.colorSuccess }
+                                                        : temAcrescimo ? { color: token.colorWarning, borderColor: token.colorWarning } : undefined}>
+                                                    {temDesconto ? `-${pctOff}%` : temAcrescimo ? `+${pctOff}%` : '%'}
                                                 </Button>
                                             </Tooltip>
                                             <InputNumber size="small" min={0} max={limitaEstoque ? stock : undefined} step={fracionado ? 0.1 : 1}
@@ -242,6 +247,12 @@ const CarrinhoConteudo: React.FC<CartAsideProps> = ({
                     <Flex justify="space-between">
                         <Typography.Text type="secondary">Descontos</Typography.Text>
                         <Typography.Text type="success">- {money.format(descontos)}</Typography.Text>
+                    </Flex>
+                )}
+                {acrescimos > 0 && (
+                    <Flex justify="space-between">
+                        <Typography.Text type="secondary">Acréscimos</Typography.Text>
+                        <Typography.Text type="warning">+ {money.format(acrescimos)}</Typography.Text>
                     </Flex>
                 )}
                 <Divider style={{ margin: '6px 0' }} />
@@ -272,12 +283,12 @@ const CarrinhoConteudo: React.FC<CartAsideProps> = ({
                 </Button>
             </div>
 
-            <Modal open={!!itemDesconto} title="Desconto no item" okText="Aplicar" cancelText="Cancelar" destroyOnHidden width={380}
+            <Modal open={!!itemDesconto} title="Preço do item" okText="Aplicar" cancelText="Cancelar" destroyOnHidden width={380}
                 onOk={aplicarDesconto} onCancel={() => setItemDesconto(null)}
                 footer={(_, { OkBtn, CancelBtn }) => (
                     <Flex justify="space-between">
-                        {itemDesconto && itemDesconto.price < precoBase(itemDesconto) - 0.004
-                            ? <Button onClick={() => { applyIndividualDiscount(itemDesconto.id, precoBase(itemDesconto)); setItemDesconto(null); }}>Remover desconto</Button>
+                        {itemDesconto && Math.abs(itemDesconto.price - precoBase(itemDesconto)) >= 0.005
+                            ? <Button onClick={() => { applyIndividualDiscount(itemDesconto.id, precoBase(itemDesconto)); setItemDesconto(null); }}>Voltar ao preço de tabela</Button>
                             : <span />}
                         <Flex gap={8}><CancelBtn /><OkBtn /></Flex>
                     </Flex>
@@ -285,12 +296,17 @@ const CarrinhoConteudo: React.FC<CartAsideProps> = ({
                 {itemDesconto && (
                     <Flex vertical gap={8}>
                         <Typography.Text strong>{itemDesconto.name}</Typography.Text>
-                        <Typography.Text type="secondary">Preço base: {money.format(precoBase(itemDesconto))}</Typography.Text>
-                        <InputNumber autoFocus prefix="R$" min={0.01} max={precoBase(itemDesconto)} step={0.01} precision={2} decimalSeparator=","
+                        <Typography.Text type="secondary">Preço de tabela: {money.format(precoBase(itemDesconto))} · abaixo dá desconto, acima dá acréscimo</Typography.Text>
+                        <InputNumber autoFocus prefix="R$" min={0.01} step={0.01} precision={2} decimalSeparator=","
                             value={novoPreco} onChange={v => setNovoPreco(v)} onPressEnter={aplicarDesconto} style={{ width: '100%' }} />
-                        {novoPreco !== null && novoPreco > 0 && novoPreco < precoBase(itemDesconto) && (
+                        {novoPreco !== null && novoPreco > 0 && novoPreco < precoBase(itemDesconto) - 0.004 && (
                             <Typography.Text type="success">
                                 Desconto de {((1 - novoPreco / precoBase(itemDesconto)) * 100).toFixed(1)}% ({money.format((precoBase(itemDesconto) - novoPreco) * itemDesconto.quantity)} no item)
+                            </Typography.Text>
+                        )}
+                        {novoPreco !== null && novoPreco > precoBase(itemDesconto) + 0.004 && (
+                            <Typography.Text type="warning">
+                                Acréscimo de {((novoPreco / precoBase(itemDesconto) - 1) * 100).toFixed(1)}% (+{money.format((novoPreco - precoBase(itemDesconto)) * itemDesconto.quantity)} no item)
                             </Typography.Text>
                         )}
                     </Flex>

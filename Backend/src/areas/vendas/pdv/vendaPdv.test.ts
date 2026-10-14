@@ -42,6 +42,13 @@ export const runVendaPdvTests = (): void => {
   assert(venda.linhas[0].totalItem === 26.28 && venda.linhas[1].totalItem === 9.72, 'Rateio proporcional com a sobra na última linha.');
   lanca(() => fecharVenda([b], 50), 'maior que o valor', 'Desconto acima do total é recusado.');
 
+  // Acréscimo no item (tabela 10, vendido a 13) junto com desconto em outro: bruto acompanha o praticado
+  const caro = calcularLinha({ idItem: 1, quantidade: 2, precoUnitario: 13 }, mangueira);  // 26,00 (tabela 20,00)
+  const comAcrescimo = fecharVenda([caro, a], 0);                                          // + 27,00 (tabela 30,00)
+  assert(comAcrescimo.totalBruto === 56 && comAcrescimo.totalLiquido === 53 && comAcrescimo.totalDesconto === 3,
+    'Acréscimo: bruto 56 (26 + 30), líquido 53, desconto só o do outro item (3).');
+  assert(comAcrescimo.linhas[0].descontoValor === 0 && comAcrescimo.linhas[0].precoTabela === 10, 'Linha com acréscimo: sem desconto e tabela guardada.');
+
   // Pagamentos
   const pag = validarPagamentos([{ forma: 'pix', valor: 20 }, { forma: 'DINHEIRO', valor: 20 }], 36);
   assert(pag[1].troco === 4 && pag[0].troco === 0, 'Troco sai do dinheiro.');
