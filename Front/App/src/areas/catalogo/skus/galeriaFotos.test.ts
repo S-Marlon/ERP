@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { avisosDaFoto, comMedidasEmSegundo, ehImagemDeMedidas, moverFoto } from './galeriaFotos';
+import { avisosDaFoto, comMedidasEmSegundo, ehImagemDeMedidas, fotosNoCanal, moverFoto } from './galeriaFotos';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 const f = (nome: string, url = nome) => ({ nome_arquivo: nome, url_anexo: url });
@@ -29,4 +29,15 @@ teste('galeria: avisos', () => {
   assert.deepStrictEqual(avisosDaFoto(todas[1], 1, todas, { w: 400, h: 300 }), ['PEQUENA']);
   assert.deepStrictEqual(avisosDaFoto(todas[2], 2, todas, undefined, 3), ['REPETIDA']);
   assert.deepStrictEqual(avisosDaFoto(todas[3], 3, todas, undefined, 3), ['FORA_DO_LIMITE', 'REPETIDA']);
+});
+
+teste('galeria: como a variação vai ao canal (fotos da família incluídas)', () => {
+  const fam = [{ url: 'f/produto.png', nome: 'produto.png' }, { url: 'f/aplicacao.jpg', nome: 'aplicacao.jpg' }];
+  const limpa = { url: 'i/foto.png', nome: 'foto.png' };
+  const medida = { url: 'i/X-editada.jpg', nome: 'X-editada.jpg' };
+  const urls = (l: { url: string; daFamilia: boolean }[]) => l.map(f => `${f.url}${f.daFamilia ? '*' : ''}`);
+  assert.deepStrictEqual(urls(fotosNoCanal([limpa, medida], fam)), ['i/foto.png', 'i/X-editada.jpg', 'f/aplicacao.jpg*']);
+  assert.deepStrictEqual(urls(fotosNoCanal([medida], fam)), ['f/produto.png*', 'i/X-editada.jpg', 'f/aplicacao.jpg*']);
+  assert.deepStrictEqual(urls(fotosNoCanal([], fam)), ['f/produto.png*', 'f/aplicacao.jpg*']);
+  assert.deepStrictEqual(urls(fotosNoCanal([{ url: 'f/aplicacao.jpg', nome: 'aplicacao.jpg' }], fam)), ['f/aplicacao.jpg']);
 });

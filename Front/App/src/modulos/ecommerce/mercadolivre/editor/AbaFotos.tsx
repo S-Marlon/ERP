@@ -8,8 +8,9 @@ import { ColumnWidthOutlined, CopyOutlined, EditOutlined, PictureOutlined, Reloa
 import type { AnuncioDetalhe } from '../mercadoLivreApi';
 import GaleriaImagens from '../../../../areas/catalogo/skus/GaleriaImagens';
 import { AnexoItem, copiarImagem, listarImagensDosItens } from '../../../../areas/catalogo/skus/CatalogSku.service';
-import GaleriaFamilia from '../../../../areas/catalogo/familias/GaleriaFamilia';
-import { fotosFamiliaApi } from '../../../../areas/catalogo/familias/FamilyManager.api';
+import GaleriaFamilia, { COR_FAMILIA, COR_VARIACAO } from '../../../../areas/catalogo/familias/GaleriaFamilia';
+import { FotoFamilia, fotosFamiliaApi } from '../../../../areas/catalogo/familias/FamilyManager.api';
+import { fotosNoCanal } from '../../../../areas/catalogo/skus/galeriaFotos';
 import { umaLinhaPorItem } from '../linhasAnuncio';
 
 const EditorImagemModal = lazy(() => import('../../../../areas/catalogo/imagens/editor/EditorImagemModal'));
@@ -97,6 +98,12 @@ const AbaFotos: React.FC<Props> = ({ salvo: salvoLinhas, det: detLinhas, onAlter
   useEffect(() => { carregar(); }, [carregar]);
   const mudou = () => { carregar(); onAlterado(); };
   const [versaoFamilia, setVersaoFamilia] = useState(0);
+  // fotos da família: entram em cada variação na hora de ir ao ML (a prévia de cada uma mostra onde)
+  const [daFamilia, setDaFamilia] = useState<FotoFamilia[]>([]);
+  useEffect(() => {
+    if (!det.idFamilia) { setDaFamilia([]); return; }
+    fotosFamiliaApi.listar(det.idFamilia).then(r => setDaFamilia(r.fotos)).catch(() => setDaFamilia([]));
+  }, [det.idFamilia, versaoFamilia]);
   const levarParaFamilia = async (idAnexo: number) => {
     if (!det.idFamilia) return;
     try {
@@ -139,14 +146,14 @@ const AbaFotos: React.FC<Props> = ({ salvo: salvoLinhas, det: detLinhas, onAlter
 
       {det.idFamilia && (
         <Card
-          size="small" style={{ marginBottom: 12, borderColor: '#d3adf7' }}
+          size="small" style={{ marginBottom: 12, borderColor: COR_FAMILIA }}
           title={<Space wrap><Text strong>Família {det.familia}</Text><Tag color="purple">vale para todas as variações</Tag></Space>}
         >
           <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
             A <b>1ª (modelo)</b> é a foto do produto: vai como principal na variação sem foto própria e é a base do editor de imagem, que guarda nela as
             cotas e textos. As <b>outras</b> (aplicação, embalagem) entram em todas as variações, depois das fotos de cada uma.
           </Text>
-          <GaleriaFamilia idFamilia={det.idFamilia} recarregar={versaoFamilia} onChange={() => onAlterado()} onEditar={idFoto => setEditor(idFoto)} />
+          <GaleriaFamilia idFamilia={det.idFamilia} recarregar={versaoFamilia} onChange={f => { setDaFamilia(f); onAlterado(); }} onEditar={idFoto => setEditor(idFoto)} />
         </Card>
       )}
 
@@ -154,22 +161,24 @@ const AbaFotos: React.FC<Props> = ({ salvo: salvoLinhas, det: detLinhas, onAlter
         <Flex vertical gap={12}>
           {det.itens.map(i => {
             const lista = fotos[i.idItem] || [];
+            const noMl = fotosNoCanal(lista.map(f => ({ url: f.url_anexo, nome: f.nome_arquivo })), daFamilia.map(f => ({ url: f.url, nome: f.nome })));
+            const herdadas = noMl.filter(f => f.daFamilia).length;
             return (
               <Card key={i.idItem} size="small"
                 title={(
                   <Space wrap size={6}>
                     <Text strong>{i.sku}</Text>
                     <Text type="secondary" style={{ fontWeight: 400 }} ellipsis>{i.tituloMl || i.nome}</Text>
-                    <Tag color={lista.length > limite ? 'orange' : lista.length ? 'default' : 'red'}>{lista.length} de {limite}</Tag>
+                    <Tooltip title={`${lista.length} própria(s) + ${herdadas} da família = ${noMl.length} no ML (até ${limite})`}>
+                      <Tag color={noMl.length > limite ? 'orange' : noMl.length ? 'default' : 'red'}>{noMl.length} de {limite}{herdadas ? ` · ${herdadas} da família` : ''}</Tag>
+                    </Tooltip>
                     {i.ml.mlbId && <Tag color="green">no ML</Tag>}
                   </Space>
                 )}
               >
-                {!lista.length && det.fotoFamilia && (
-                  <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>Sem foto própria: vai para o ML com a foto da família.</Text>
-                )}
+
                 <GaleriaImagens
-                  idItem={i.idItem} imagens={lista} onChange={mudou} limite={limite}
+                  idItem={i.idItem} imagens={lista} onChange={mudou} limite={limite} corBorda={COR_VARIACAO}
                   acaoExtra={foto => (
                     <>
                       <CopiarPara foto={foto} origem={i.idItem} itens={det.itens} onCopiado={mudou} />
@@ -181,6 +190,21 @@ const AbaFotos: React.FC<Props> = ({ salvo: salvoLinhas, det: detLinhas, onAlter
                     </>
                   )}
                 />
+                {herdadas > 0 && (
+                  <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px dashed #f0f0f0' }}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>Vai ao ML assim: <b style={{ color: COR_VARIACAO }}>azul</b> é da variação, <b style={{ color: COR_FAMILIA }}>roxo</b> vem da família (mude na galeria lá em cima).</Text>
+                    <Flex wrap gap={6} style={{ marginTop: 6 }}>
+                      {noMl.map((f, k) => (
+                        <Tooltip key={f.url} title={`${k + 1}ª${k === 0 ? ' (principal)' : ''}: ${f.nome}${f.daFamilia ? ' · da família' : ''}${k >= limite ? ' · passa do limite, não vai' : ''}`}>
+                          <div style={{ position: 'relative', width: 54, opacity: k >= limite ? 0.4 : 1 }}>
+                            <img src={f.url} alt="" style={{ width: 54, height: 54, objectFit: 'contain', borderRadius: 4, background: '#fafafa', border: `2px solid ${f.daFamilia ? COR_FAMILIA : COR_VARIACAO}`, display: 'block' }} />
+                            <span style={{ position: 'absolute', top: 1, left: 3, fontSize: 10, fontWeight: 600, color: '#555', background: 'rgba(255,255,255,.85)', borderRadius: 3, padding: '0 3px' }}>{k + 1}</span>
+                          </div>
+                        </Tooltip>
+                      ))}
+                    </Flex>
+                  </div>
+                )}
               </Card>
             );
           })}

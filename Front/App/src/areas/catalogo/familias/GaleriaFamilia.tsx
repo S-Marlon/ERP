@@ -18,6 +18,10 @@ interface Props {
   onEditar?: (idFoto: number) => void;
 }
 
+/** Roxo marca o que vem da família (o pai) em todas as telas de fotos; azul, o que é da variação. */
+export const COR_FAMILIA = '#9254de';
+export const COR_VARIACAO = '#1677ff';
+
 const comoAnexo = (f: FotoFamilia): AnexoItem => ({ id_anexo: f.idFoto, tipo_anexo: f.ordem === 0 ? 'IMAGEM_PRINCIPAL' : 'FOTO_GALERIA', nome_arquivo: f.nome, url_anexo: f.url, ordem: f.ordem });
 
 const GaleriaFamilia: React.FC<Props> = ({ idFamilia, onChange, tamanho = 88, recarregar, onEditar }) => {
@@ -32,7 +36,7 @@ const GaleriaFamilia: React.FC<Props> = ({ idFamilia, onChange, tamanho = 88, re
   const comModelo = new Set(fotos.filter(f => f.temModelo).map(f => f.idFoto));
   return (
     <GaleriaImagens
-      imagens={fotos.map(comoAnexo)} tamanho={tamanho} rotuloPrincipal="modelo" regraMedidas={false}
+      imagens={fotos.map(comoAnexo)} tamanho={tamanho} rotuloPrincipal="modelo" regraMedidas={false} corBorda={COR_FAMILIA}
       onChange={async () => { const r = await fotosFamiliaApi.listar(idFamilia).catch(() => null); if (r) { setFotos(r.fotos); onChange?.(r.fotos); } }}
       acoes={{
         ordenar: ids => fotosFamiliaApi.ordenar(idFamilia, ids),

@@ -38,9 +38,10 @@ interface Props {
   rotuloPrincipal?: string;          // texto da 1ª (padrão "principal")
   regraMedidas?: boolean;            // imagem de medidas logo depois da principal (padrão sim)
   etiqueta?: (foto: AnexoItem) => React.ReactNode;
+  corBorda?: string;                 // cor da moldura das fotos (ex.: roxo = da família, azul = da variação)
 }
 
-const GaleriaImagens: React.FC<Props> = ({ idItem, acoes: acoesProprias, imagens, onChange, limite, tamanho = 96, semAdicionar, acaoExtra, rotuloPrincipal = 'principal', regraMedidas = true, etiqueta }) => {
+const GaleriaImagens: React.FC<Props> = ({ idItem, acoes: acoesProprias, imagens, onChange, limite, tamanho = 96, semAdicionar, acaoExtra, rotuloPrincipal = 'principal', regraMedidas = true, etiqueta, corBorda }) => {
   const acoes: AcoesGaleria = acoesProprias || {
     ordenar: ids => ordenarImagens(idItem!, ids),
     remover: id => removerAnexo(idItem!, id),
@@ -94,7 +95,7 @@ const GaleriaImagens: React.FC<Props> = ({ idItem, acoes: acoesProprias, imagens
                 onDragEnd={() => { setArrastando(null); setSobre(null); }}
                 style={{
                   width: largura, padding: 6, borderRadius: 8, background: '#fff', cursor: 'grab',
-                  border: principal ? '2px solid #faad14' : sobre === k && arrastando !== k ? '2px dashed #1677ff' : '1px solid #e5e7eb',
+                  border: principal ? '2px solid #faad14' : sobre === k && arrastando !== k ? '2px dashed #1677ff' : corBorda ? `2px solid ${corBorda}` : '1px solid #e5e7eb',
                   opacity: arrastando === k ? 0.4 : avisos.includes('FORA_DO_LIMITE') ? 0.55 : 1,
                 }}
               >

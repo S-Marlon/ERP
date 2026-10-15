@@ -36,3 +36,21 @@ export const avisosDaFoto = (
   if (todas.slice(0, posicao).some(igual)) avisos.push('REPETIDA');
   return avisos;
 };
+
+export interface FotoNoCanal { url: string; nome: string; daFamilia: boolean }
+
+/**
+ * Fotos de uma variação como vão ao canal (mesma regra do envio ao ML): a principal própria (foto limpa) ou, se o item
+ * não tem foto ou começa por uma imagem de medidas, a principal-modelo da família; depois as fotos do item na ordem
+ * dele; por fim as outras fotos da família. Sem repetir arquivo.
+ */
+export const fotosNoCanal = (doItem: { url: string; nome: string }[], daFamilia: { url: string; nome: string }[]): FotoNoCanal[] => {
+  const comecaLimpa = doItem.length > 0 && !ehImagemDeMedidas(doItem[0].nome);
+  const lista: FotoNoCanal[] = [
+    ...(comecaLimpa ? [] : daFamilia.slice(0, 1).map(f => ({ ...f, daFamilia: true }))),
+    ...doItem.map(f => ({ ...f, daFamilia: false })),
+    ...daFamilia.slice(1).map(f => ({ ...f, daFamilia: true })),
+  ];
+  const vistas = new Set<string>();
+  return lista.filter(f => (vistas.has(f.url) ? false : (vistas.add(f.url), true)));
+};
