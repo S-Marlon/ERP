@@ -16,6 +16,7 @@ import {
   criarElemento, dadosDe, DadosElemento, encaixarFoto, LadoTexto, parametrosAposEsticar, Pontas, precisaRedesenharAoGirar, PROPRIEDADES, recriarElemento, TipoElemento,
   trocarImagemDaFoto,
 } from './elementos';
+import { limparModelo } from './modeloSalvo';
 
 const { Text } = Typography;
 const LADO = 1200;
@@ -50,7 +51,9 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
   const estadoAtual = () => JSON.stringify(fab.current!.toObject(PROPRIEDADES));
   const guardar = () => {
     if (!fab.current || carregando.current) return;
-    historico.current.push(estadoAtual());
+    const estado = estadoAtual();
+    if (estado === historico.current[historico.current.length - 1]) return;
+    historico.current.push(estado);
     if (historico.current.length > 30) historico.current.shift();
     refeitos.current = [];
     atualizarPainel();
@@ -58,11 +61,14 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
   const carregarEstado = async (json: string) => {
     const c = fab.current!;
     carregando.current = true;
-    await c.loadFromJSON(json);
-    c.getObjects().forEach(o => o.set({ cornerColor: '#1677ff', cornerStyle: 'circle', borderColor: '#1677ff', transparentCorners: false, cornerSize: 16 }));
-    c.requestRenderAll();
-    carregando.current = false;
-    setSelecionado(null);
+    try {
+      await c.loadFromJSON(json);
+      c.getObjects().forEach(o => o.set({ cornerColor: '#1677ff', cornerStyle: 'circle', borderColor: '#1677ff', transparentCorners: false, cornerSize: 16 }));
+      c.requestRenderAll();
+    } finally {
+      carregando.current = false;
+      setSelecionado(null);
+    }
   };
   const desfazer = async () => {
     if (historico.current.length < 2) return;
@@ -82,8 +88,9 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
   const substituir = (antigo: FabricObject, novo: FabricObject) => {
     const c = fab.current!;
     const i = c.getObjects().indexOf(antigo);
+    if (i < 0) return null;   // o antigo já saiu do quadro: não acrescenta uma cópia
     c.remove(antigo);
-    c.insertAt(i < 0 ? c.getObjects().length : i, novo);
+    c.insertAt(i, novo);
     return novo;
   };
   /** Redesenha os textos de todos os elementos para o item da prévia. */
@@ -121,6 +128,9 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
   };
 
   // ---------------------------------------------------------------- abrir / fechar
+  // os eventos do quadro são ligados uma vez; leem a unidade atual por aqui
+  const textoParaAtual = useRef(textoPara);
+  textoParaAtual.current = textoPara;
   useEffect(() => {
     if (!det) return;
     const primeiro = det.itens.find(i => i.fotoUrl) || det.itens[0];
@@ -141,8 +151,8 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
         const o = e.target as FabricObject;
         const novos = o ? parametrosAposEsticar(o) || (precisaRedesenharAoGirar(o) ? dadosDe(o) : null) : null;
         if (o && novos) {
-          const novo = substituir(o, recriarElemento(o, novos, textoPara(novos.modelo, itemAtual.current)));
-          c.setActiveObject(novo);
+          const novo = substituir(o, recriarElemento(o, novos, textoParaAtual.current(novos.modelo, itemAtual.current)));
+          if (novo) c.setActiveObject(novo);
           c.requestRenderAll();
         }
         guardar();
@@ -155,16 +165,33 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
       c.on('text:editing:exited', e => {
         const o = e.target as IText;
         const d = dadosDe(o);
-        if (d) { (o as any).dadosElemento = { ...d, modelo: o.text }; o.set('text', textoPara(o.text, itemAtual.current) || ' '); c.requestRenderAll(); guardar(); }
+        if (d) { (o as any).dadosElemento = { ...d, modelo: o.text }; o.set('text', textoParaAtual.current(o.text, itemAtual.current) || ' '); c.requestRenderAll(); guardar(); }
       });
+      const foto = primeiro?.fotoUrl || det.fotoFamilia;
       const salvo = (() => { try { return localStorage.getItem(chaveModelo(det.id)); } catch { return null; } })();
+      let abriuSalvo = false;
       if (salvo) {
-        await carregarEstado(salvo);
-        renderizarTextos(primeiro || null);
-        message.info('Abri o último modelo deste anúncio. "Começar do zero" limpa.');
-      } else {
-        const foto = primeiro?.fotoUrl || det.fotoFamilia;
+        try {
+          const limpo = limparModelo(salvo);
+          await carregarEstado(limpo.json);
+          if (!vivo) return;
+          if (limpo.fotoDescartada && foto) await colocarFoto(foto);
+          if (!vivo) return;
+          renderizarTextos(primeiro || null);
+          abriuSalvo = true;
+          message.info(limpo.repetidos
+            ? `Abri o último modelo deste anúncio e tirei ${limpo.repetidos} elemento(s) repetido(s). "Começar do zero" limpa.`
+            : 'Abri o último modelo deste anúncio. "Começar do zero" limpa.');
+        } catch {
+          if (!vivo) return;
+          c.clear();
+          c.backgroundColor = '#ffffff';
+          message.warning('Não consegui abrir o modelo guardado deste anúncio; comecei um novo.');
+        }
+      }
+      if (!abriuSalvo) {
         if (foto) await colocarFoto(foto);
+        if (!vivo) return;
         // começa com uma cota da medida do anúncio, embaixo
         const d: DadosElemento = { tipo: 'COTA', cor: CORES[0], modelo: modeloPadrao(det) || '{Comprimento}', comprimento: 800, textoDePe: true, ladoTexto: 'ACIMA' };
         const cota = criarElemento(d, textoPara(d.modelo, primeiro || null));
@@ -211,24 +238,30 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
   };
 
   const d = dadosDe(selecionado);
-  const mudarSelecionado = (novos: Partial<DadosElemento>) => {
+  /**
+   * Muda o elemento selecionado. Lê o selecionado do próprio quadro: o do estado do React pode estar atrasado (o Slider
+   * dispara vários onChange antes de a tela atualizar) e recriar a partir dele deixava cópias empilhadas.
+   * `guardarAgora` false: quem chama guarda no histórico ao terminar (soltar o slider, sair do campo).
+   */
+  const mudarSelecionado = (novos: Partial<DadosElemento>, guardarAgora = true) => {
     const c = fab.current;
-    if (!c || !selecionado || !d) return;
-    const dados = { ...d, ...novos };
-    if (d.tipo === 'TEXTO') {
-      const t = selecionado as IText;
+    const atual = c?.getActiveObject();
+    const da = dadosDe(atual);
+    if (!c || !atual || !da || !c.getObjects().includes(atual)) return;
+    const dados = { ...da, ...novos };
+    if (da.tipo === 'TEXTO') {
+      const t = atual as IText;
       (t as any).dadosElemento = dados;
       t.set({ fill: dados.cor, fontSize: dados.tamanhoFonte || 80, backgroundColor: dados.fundoTexto ? '#ffffff' : '', text: textoPara(dados.modelo, item) || ' ' });
       c.requestRenderAll();
       atualizarPainel();
-    } else if (d.tipo !== 'FOTO') {
-      const novo = substituir(selecionado, recriarElemento(selecionado, dados, textoPara(dados.modelo, item)));
-      c.setActiveObject(novo);
-      setSelecionado(novo);
+    } else if (da.tipo !== 'FOTO') {
+      const novo = substituir(atual, recriarElemento(atual, dados, textoPara(dados.modelo, item)));
+      if (novo) { c.setActiveObject(novo); setSelecionado(novo); }
       c.requestRenderAll();
     }
     if (novos.cor) setCorAtual(novos.cor);
-    guardar();
+    if (guardarAgora) guardar();
   };
 
   const acao = async (qual: 'duplicar' | 'girar' | 'frente' | 'tras' | 'apagar' | 'encaixar') => {
@@ -410,7 +443,7 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
                   <Text strong>{{ SETA: 'Seta', COTA: 'Cota', TEXTO: 'Texto', BALAO: 'Balão', DESTAQUE: 'Destaque', FOTO: 'Foto do produto' }[d.tipo]}</Text>
                   {temTexto && (
                     <div>
-                      <Input.TextArea autoSize={{ minRows: 1, maxRows: 4 }} value={d.modelo} onChange={e => mudarSelecionado({ modelo: e.target.value })} />
+                      <Input.TextArea autoSize={{ minRows: 1, maxRows: 4 }} value={d.modelo} onChange={e => mudarSelecionado({ modelo: e.target.value }, false)} onBlur={guardar} />
                       <Flex wrap gap={4} style={{ marginTop: 4 }}>
                         {campos.map(cp => (
                           <Tooltip key={cp.chave} title={`neste item: ${cp.valor}`}>
@@ -431,7 +464,7 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
                   {(d.tipo === 'TEXTO' || d.tipo === 'COTA' || d.tipo === 'BALAO') && (
                     <div>
                       <Text type="secondary" style={{ fontSize: 12 }}>Tamanho do texto</Text>
-                      <Slider min={30} max={200} value={d.tamanhoFonte || (d.tipo === 'COTA' ? 90 : d.tipo === 'BALAO' ? 52 : 80)} onChange={(v: number) => mudarSelecionado({ tamanhoFonte: v })} />
+                      <Slider min={30} max={200} value={d.tamanhoFonte || (d.tipo === 'COTA' ? 90 : d.tipo === 'BALAO' ? 52 : 80)} onChange={(v: number) => mudarSelecionado({ tamanhoFonte: v }, false)} onChangeComplete={guardar} />
                     </div>
                   )}
                   {d.tipo === 'TEXTO' && <Space><Switch size="small" checked={!!d.fundoTexto} onChange={v => mudarSelecionado({ fundoTexto: v })} /><Text style={{ fontSize: 12 }}>fundo branco atrás do texto</Text></Space>}
@@ -464,7 +497,7 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
                     <Flex gap={12} align="center" wrap>
                       <div style={{ flex: 1, minWidth: 140 }}>
                         <Text type="secondary" style={{ fontSize: 12 }}>Espessura</Text>
-                        <Slider min={3} max={30} value={d.espessura || (d.tipo === 'COTA' ? 9 : 12)} onChange={(v: number) => mudarSelecionado({ espessura: v })} />
+                        <Slider min={3} max={30} value={d.espessura || (d.tipo === 'COTA' ? 9 : 12)} onChange={(v: number) => mudarSelecionado({ espessura: v }, false)} onChangeComplete={guardar} />
                       </div>
                       <Space size={4}><Switch size="small" checked={!!d.tracejado} onChange={v => mudarSelecionado({ tracejado: v })} /><Text style={{ fontSize: 12 }}>tracejado</Text></Space>
                     </Flex>
