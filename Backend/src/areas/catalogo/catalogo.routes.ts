@@ -43,7 +43,7 @@ import {
   definirImagemFamilia,
 } from './familias/familias.controller';
 import {
-  adicionarFotoFamilia, dadosDoEditorFamilia, enviarFotoFamilia, fotoDoItemParaFamilia, lerModeloEditor, listarFotosFamilia, ordenarFotosFamilia, removerFotoFamilia, salvarModeloEditor,
+  adicionarFotoFamilia, dadosDoEditorFamilia, definirUsoFotoFamilia, enviarFotoFamilia, fotoDoItemParaFamilia, lerModeloEditor, listarFotosFamilia, ordenarFotosFamilia, removerFotoFamilia, salvarModeloEditor,
 } from './familias/fotosFamilia.controller';
 import { repassarImagem } from './imagens/repassarImagem.controller';
 
@@ -165,6 +165,7 @@ router.post('/cadastros/familias/:idFamilia/fotos', adicionarFotoFamilia);
 router.post('/cadastros/familias/:idFamilia/fotos/arquivo', enviarFotoFamilia);
 router.post('/cadastros/familias/:idFamilia/fotos/do-item', fotoDoItemParaFamilia);
 router.put('/cadastros/familias/:idFamilia/fotos-ordem', ordenarFotosFamilia);
+router.put('/cadastros/familias/:idFamilia/fotos/:idFoto/uso', definirUsoFotoFamilia);
 router.delete('/cadastros/familias/:idFamilia/fotos/:idFoto', removerFotoFamilia);
 router.get('/cadastros/familias/:idFamilia/fotos/:idFoto/modelo', lerModeloEditor);
 router.put('/cadastros/familias/:idFamilia/fotos/:idFoto/modelo', salvarModeloEditor);

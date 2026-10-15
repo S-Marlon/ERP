@@ -39,9 +39,11 @@ interface Props {
   regraMedidas?: boolean;            // imagem de medidas logo depois da principal (padrão sim)
   etiqueta?: (foto: AnexoItem) => React.ReactNode;
   corBorda?: string;                 // cor da moldura das fotos (ex.: roxo = da família, azul = da variação)
+  bordaDe?: (foto: AnexoItem) => string | undefined;   // moldura de cada foto (ex.: pelo papel na família)
+  semPrincipal?: boolean;            // a posição não decide a principal (família: o papel decide): sem estrela nem destaque
 }
 
-const GaleriaImagens: React.FC<Props> = ({ idItem, acoes: acoesProprias, imagens, onChange, limite, tamanho = 96, semAdicionar, acaoExtra, rotuloPrincipal = 'principal', regraMedidas = true, etiqueta, corBorda }) => {
+const GaleriaImagens: React.FC<Props> = ({ idItem, acoes: acoesProprias, imagens, onChange, limite, tamanho = 96, semAdicionar, acaoExtra, rotuloPrincipal = 'principal', regraMedidas = true, etiqueta, corBorda, bordaDe, semPrincipal }) => {
   const acoes: AcoesGaleria = acoesProprias || {
     ordenar: ids => ordenarImagens(idItem!, ids),
     remover: id => removerAnexo(idItem!, id),
@@ -82,7 +84,7 @@ const GaleriaImagens: React.FC<Props> = ({ idItem, acoes: acoesProprias, imagens
       <Image.PreviewGroup>
         <Flex wrap gap={10} align="flex-start">
           {lista.map((foto, k) => {
-            const principal = k === 0;
+            const principal = k === 0 && !semPrincipal;
             const avisos = avisosDaFoto(foto, k, lista, medidas[foto.url_anexo], limite).filter(a => regraMedidas || a !== 'PRINCIPAL_COM_MEDIDAS');
             return (
               <div
@@ -95,7 +97,7 @@ const GaleriaImagens: React.FC<Props> = ({ idItem, acoes: acoesProprias, imagens
                 onDragEnd={() => { setArrastando(null); setSobre(null); }}
                 style={{
                   width: largura, padding: 6, borderRadius: 8, background: '#fff', cursor: 'grab',
-                  border: principal ? '2px solid #faad14' : sobre === k && arrastando !== k ? '2px dashed #1677ff' : corBorda ? `2px solid ${corBorda}` : '1px solid #e5e7eb',
+                  border: sobre === k && arrastando !== k ? '2px dashed #1677ff' : bordaDe?.(foto) || (principal ? '2px solid #faad14' : corBorda ? `2px solid ${corBorda}` : '1px solid #e5e7eb'),
                   opacity: arrastando === k ? 0.4 : avisos.includes('FORA_DO_LIMITE') ? 0.55 : 1,
                 }}
               >
@@ -118,10 +120,12 @@ const GaleriaImagens: React.FC<Props> = ({ idItem, acoes: acoesProprias, imagens
                   ))}
                 </div>
                 <Flex justify="space-between" align="center">
-                  <Tooltip title={principal ? `Foto ${rotuloPrincipal}` : `Fazer ${rotuloPrincipal} (vai para o 1º lugar)`}>
-                    <Button type="text" size="small" disabled={principal || salvando} onClick={() => reordenar(k, 0)}
-                      icon={principal ? <StarFilled style={{ color: '#faad14' }} /> : <StarOutlined />} />
-                  </Tooltip>
+                  {!semPrincipal && (
+                    <Tooltip title={principal ? `Foto ${rotuloPrincipal}` : `Fazer ${rotuloPrincipal} (vai para o 1º lugar)`}>
+                      <Button type="text" size="small" disabled={principal || salvando} onClick={() => reordenar(k, 0)}
+                        icon={principal ? <StarFilled style={{ color: '#faad14' }} /> : <StarOutlined />} />
+                    </Tooltip>
+                  )}
                   <Button type="text" size="small" icon={<LeftOutlined />} disabled={k === 0 || salvando} onClick={() => reordenar(k, k - 1)} />
                   <Button type="text" size="small" icon={<RightOutlined />} disabled={k === lista.length - 1 || salvando} onClick={() => reordenar(k, k + 1)} />
                   {acaoExtra?.(foto)}

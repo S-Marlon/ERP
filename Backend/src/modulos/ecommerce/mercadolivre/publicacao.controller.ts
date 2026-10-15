@@ -36,12 +36,12 @@ const fotosDaFamilia = async (tenant: number, c: AnuncioCarregado) => {
   const idFamilia = Number(c.registro.id_familia) || null;
   if (idFamilia) {
     const [rows]: any = await pool.execute(
-      `SELECT url_foto, nome_arquivo FROM comercial_familias_fotos WHERE tenant_id = ? AND id_familia = ? ORDER BY ordem, id_foto`, [tenant, idFamilia]
+      `SELECT url_foto, nome_arquivo, uso FROM comercial_familias_fotos WHERE tenant_id = ? AND id_familia = ? ORDER BY ordem, id_foto`, [tenant, idFamilia]
     );
-    if (rows.length) return rows.map((r: any) => ({ url: String(r.url_foto), nome: String(r.nome_arquivo) }));
+    if (rows.length) return rows.map((r: any) => ({ url: String(r.url_foto), nome: String(r.nome_arquivo), uso: String(r.uso || 'COMUM') }));
   }
   const unica = c.dados.fotoFamilia;
-  return unica ? [{ url: unica, nome: path.basename(unica.split('?')[0]) }] : [];
+  return unica ? [{ url: unica, nome: path.basename(unica.split('?')[0]), uso: 'PRINCIPAL' }] : [];
 };
 
 /**

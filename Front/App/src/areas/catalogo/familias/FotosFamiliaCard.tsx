@@ -23,8 +23,8 @@ const FotosFamiliaCard: React.FC<{ idFamilia: number; qtdItens?: number }> = ({ 
       )}
     >
       <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
-        A <b>1ª (modelo)</b> é a base crua do editor (não vai às variações, só à que não tem nenhuma foto). O lápis numa foto abre o
-        editor nela: as cotas e textos vão para cada item com a medida dele. As outras fotos entram em todos os anúncios das variações.
+        Papel de cada foto (troque na etiqueta): <b>principal</b> (foto limpa do produto: 1ª das variações sem foto limpa própria), <b>comum</b>
+        (entra em todas) ou <b>só editor</b> (gabarito, não vai ao ML). O lápis abre o editor na foto: as cotas vão para cada item com a medida dele.
       </Text>
       <GaleriaFamilia idFamilia={idFamilia} tamanho={80} recarregar={versao} onEditar={idFoto => abrir(idFoto)} />
       <EditorDaFamilia idFamilia={idFamilia} aberto={editor} onFechar={() => setEditor(null)} onSalvo={() => setVersao(v => v + 1)} />

@@ -8,17 +8,21 @@ export const ehImagemGerada = ehImagemDeMedidas;
 export interface FotoDaVariacao { chave: string; url: string; nome: string }
 
 /**
- * Fotos de uma variação no ML, na ordem combinada: as fotos do item na ordem dele (principal, medidas, outras) e depois
- * as outras fotos da família (aplicação, embalagem). A principal-modelo da família é a base crua do editor (sem as
- * medidas): não vai às variações, só à que não tem nenhuma foto (o ML não aceita anúncio sem foto). Sem repetir arquivo.
+ * Fotos de uma variação no ML, na ordem combinada: a foto limpa do item ou, se o item não tem foto ou começa por uma
+ * imagem de medidas, a PRINCIPAL da família (foto limpa do produto: o ML pede a 1ª sem texto); depois as fotos do item
+ * na ordem dele (medidas logo após a principal); por fim as COMUNS da família. As de uso EDITOR (gabarito do editor)
+ * não vão. Sem repetir arquivo.
  * chave: id do anexo, ou "familia:<link>" (é como o ERP guarda o id da foto que subiu ao ML).
  */
 export const fotosDaVariacao = (
-  doItem: { idAnexo: number; url: string; nome: string }[], daFamilia: { url: string; nome: string }[],
+  doItem: { idAnexo: number; url: string; nome: string }[], daFamilia: { url: string; nome: string; uso?: string }[],
 ): FotoDaVariacao[] => {
-  const familia = daFamilia.map(f => ({ chave: `familia:${f.url}`, url: f.url, nome: f.nome }));
+  const comoFoto = (f: { url: string; nome: string }) => ({ chave: `familia:${f.url}`, url: f.url, nome: f.nome });
+  const principal = daFamilia.filter(f => f.uso === 'PRINCIPAL').map(comoFoto);
+  const comuns = daFamilia.filter(f => (f.uso || 'COMUM') === 'COMUM').map(comoFoto);
   const proprias = doItem.map(f => ({ chave: String(f.idAnexo), url: f.url, nome: f.nome }));
-  const lista = [...(proprias.length ? [] : familia.slice(0, 1)), ...proprias, ...familia.slice(1)];
+  const comecaLimpa = proprias.length > 0 && !ehImagemDeMedidas(proprias[0].nome);
+  const lista = [...(comecaLimpa ? [] : principal.slice(0, 1)), ...proprias, ...comuns];
   const vistas = new Set<string>();
   return lista.filter(f => (vistas.has(f.url) ? false : (vistas.add(f.url), true)));
 };

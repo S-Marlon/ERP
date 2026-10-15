@@ -40,14 +40,18 @@ export const avisosDaFoto = (
 export interface FotoNoCanal { url: string; nome: string; daFamilia: boolean }
 
 /**
- * Fotos de uma variação como vão ao canal (mesma regra do envio ao ML): as fotos do item na ordem dele e depois as outras
- * fotos da família. A modelo da família (a base crua do editor) só vai à variação que não tem nenhuma foto.
+ * Fotos de uma variação como vão ao canal (mesma regra do envio ao ML): a foto limpa do item ou, se o item não tem foto
+ * ou começa pela imagem de medidas, a PRINCIPAL da família; depois as fotos do item na ordem dele; por fim as COMUNS da
+ * família. As de uso EDITOR (gabarito do editor) não vão.
  */
-export const fotosNoCanal = (doItem: { url: string; nome: string }[], daFamilia: { url: string; nome: string }[]): FotoNoCanal[] => {
+export const fotosNoCanal = (doItem: { url: string; nome: string }[], daFamilia: { url: string; nome: string; uso?: string }[]): FotoNoCanal[] => {
+  const comecaLimpa = doItem.length > 0 && !ehImagemDeMedidas(doItem[0].nome);
+  const principal = daFamilia.filter(f => f.uso === 'PRINCIPAL').slice(0, 1);
+  const comuns = daFamilia.filter(f => (f.uso || 'COMUM') === 'COMUM');
   const lista: FotoNoCanal[] = [
-    ...(doItem.length ? [] : daFamilia.slice(0, 1).map(f => ({ ...f, daFamilia: true }))),
+    ...(comecaLimpa ? [] : principal.map(f => ({ url: f.url, nome: f.nome, daFamilia: true }))),
     ...doItem.map(f => ({ ...f, daFamilia: false })),
-    ...daFamilia.slice(1).map(f => ({ ...f, daFamilia: true })),
+    ...comuns.map(f => ({ url: f.url, nome: f.nome, daFamilia: true })),
   ];
   const vistas = new Set<string>();
   return lista.filter(f => (vistas.has(f.url) ? false : (vistas.add(f.url), true)));

@@ -183,7 +183,9 @@ export const definirImagemFamilia = async (idFamilia: number, url: string | null
 };
 
 // ---------------------------------------------------------------- galeria da família (a 1ª é a principal-modelo)
-export interface FotoFamilia { idFoto: number; nome: string; url: string; ordem: number; temModelo: boolean }
+/** uso: PRINCIPAL (foto limpa, 1ª das variações sem foto limpa), COMUM (entra em todas), EDITOR (só base do editor). */
+export type UsoFotoFamilia = 'PRINCIPAL' | 'COMUM' | 'EDITOR';
+export interface FotoFamilia { idFoto: number; nome: string; url: string; ordem: number; uso: UsoFotoFamilia; temModelo: boolean }
 const lerArquivo = (arquivo: File) => new Promise<string>((resolve, reject) => {
   const leitor = new FileReader();
   leitor.onload = () => resolve(String(leitor.result));
@@ -207,6 +209,9 @@ export const fotosFamiliaApi = {
     handleResponse<{ fotos: FotoFamilia[] }>(await fetch(urlFotos(idFamilia, `/${idFoto}`), { method: 'DELETE', headers: DEFAULT_HEADERS }), 'Erro ao tirar a foto da família.'),
   ordenar: async (idFamilia: number, ids: number[]) =>
     handleResponse<{ fotos: FotoFamilia[] }>(await fetch(`${API_BASE_URL}/cadastros/familias/${idFamilia}/fotos-ordem?tenant_id=1`, { method: 'PUT', headers: DEFAULT_HEADERS, body: JSON.stringify({ ids }) }), 'Erro ao ordenar as fotos da família.'),
+  /** Papel da foto: PRINCIPAL (uma só por família), COMUM ou EDITOR. */
+  definirUso: async (idFamilia: number, idFoto: number, uso: UsoFotoFamilia) =>
+    handleResponse<{ fotos: FotoFamilia[] }>(await fetch(urlFotos(idFamilia, `/${idFoto}/uso`), { method: 'PUT', headers: DEFAULT_HEADERS, body: JSON.stringify({ uso }) }), 'Erro ao mudar o papel da foto.'),
   /** Modelo do editor de imagem (JSON) guardado numa foto da família. */
   lerModelo: async (idFamilia: number, idFoto: number) =>
     handleResponse<{ modelo: string | null }>(await fetch(urlFotos(idFamilia, `/${idFoto}/modelo`)), 'Erro ao ler o modelo do editor.'),

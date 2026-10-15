@@ -70,7 +70,7 @@ const EditorImagemModal: React.FC<Props> = ({ entrada, onFechar, onSalvo }) => {
   const campos = item?.campos || [];
   const textoPara = useCallback((modelo: string | undefined, it: ItemDoEditor | null) =>
     (it ? converterMedidas(textoDoModelo(modelo || '', it.campos), unidade) : modelo || ''), [unidade]);
-  const principalFamilia = galeria?.[0]?.url || null;
+  const principalFamilia = galeria?.find(f => f.uso === 'PRINCIPAL')?.url || galeria?.[0]?.url || null;
 
   // ---------------------------------------------------------------- histórico
   /** O modelo guarda a foto pela origem (sem tratamento); o fundo é tirado de novo ao abrir. */
@@ -367,14 +367,16 @@ const EditorImagemModal: React.FC<Props> = ({ entrada, onFechar, onSalvo }) => {
       // a foto escolhida; o modelo fica guardado nela (foto da família) ou na foto-modelo da família
       const foto = escolha.url;
       const daGaleria = escolha.idFotoFamilia ? galeria.find(f => f.idFoto === escolha.idFotoFamilia) || null : null;
-      const guardarEm = daGaleria || galeria[0] || null;
+      // cotas guardadas: na foto da família escolhida; escolheu foto de item: no gabarito do editor, senão na principal
+      const guardarEm = daGaleria || galeria.find(f => f.uso === 'EDITOR') || galeria.find(f => f.uso === 'PRINCIPAL') || galeria[0] || null;
       fotoModelo.current = guardarEm && entrada.idFamilia ? { idFamilia: entrada.idFamilia, idFoto: guardarEm.idFoto } : null;
-      sufixoArquivo.current = daGaleria && galeria[0] && daGaleria.idFoto !== galeria[0].idFoto ? `-f${daGaleria.idFoto}` : '';
+      // a imagem gerada sobre a principal ou o gabarito é a "-editada" de cada item; sobre uma foto comum, uma à parte
+      sufixoArquivo.current = daGaleria && daGaleria.uso === 'COMUM' ? `-f${daGaleria.idFoto}` : '';
       // cotas e textos guardados: os da foto escolhida, senão os da foto-modelo, senão os deste navegador
       let salvo: string | null = null;
       let daFamilia = false;
       if (escolha.usarModelo) {
-        const comModelo = [daGaleria, galeria[0]].find(f => f?.temModelo);
+        const comModelo = [daGaleria, guardarEm, ...galeria].find(f => f?.temModelo);
         if (comModelo && entrada.idFamilia) {
           const m = await fotosFamiliaApi.lerModelo(entrada.idFamilia, comModelo.idFoto).then(r => r.modelo).catch(() => null);
           if (!vivo) return;
@@ -675,7 +677,7 @@ const EditorImagemModal: React.FC<Props> = ({ entrada, onFechar, onSalvo }) => {
                 <div><Text type="secondary" style={{ fontSize: 12 }}>As cotas e textos vão por cima da foto de cada variação ({entrada.itens.filter(i => i.foto).length} de {entrada.itens.length} têm foto; as outras usam a da família). Escolhendo uma foto abaixo, todas saem sobre ela.</Text></div>
               </div>
             )}
-            {([['Da família', (galeria || []).map((f, k) => ({ url: f.url, idFoto: f.idFoto, rotulo: k === 0 ? 'modelo' : 'comum', temModelo: f.temModelo }))],
+            {([['Da família', (galeria || []).map(f => ({ url: f.url, idFoto: f.idFoto, rotulo: f.uso === 'PRINCIPAL' ? 'principal' : f.uso === 'EDITOR' ? 'só editor' : 'comum', temModelo: f.temModelo }))],
               ['Dos itens', fotosDosItens.map(f => ({ url: f.url, idFoto: null as number | null, rotulo: f.sku, temModelo: false }))]] as const).map(([titulo, lista]) => (
               <div key={titulo}>
                 <Text strong>{titulo}{titulo === 'Da família' && entrada.familia ? ` ${entrada.familia}` : ''}</Text>
@@ -686,7 +688,7 @@ const EditorImagemModal: React.FC<Props> = ({ entrada, onFechar, onSalvo }) => {
                         style={{ width: 132, padding: 6, border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', background: '#fff' }}>
                         <img src={f.url} alt="" style={{ width: 120, height: 120, objectFit: 'contain', background: '#fafafa', borderRadius: 4, display: 'block' }} />
                         <Space size={4} wrap style={{ marginTop: 4 }}>
-                          <Tag color={f.rotulo === 'modelo' ? 'purple' : undefined} style={{ margin: 0, fontSize: 11 }}>{f.rotulo}</Tag>
+                          <Tag color={f.rotulo === 'principal' ? 'purple' : undefined} style={{ margin: 0, fontSize: 11 }}>{f.rotulo}</Tag>
                           {f.temModelo && <Tooltip title="Tem cotas e textos guardados"><Tag color="blue" style={{ margin: 0, fontSize: 11 }}>cotas</Tag></Tooltip>}
                         </Space>
                       </div>

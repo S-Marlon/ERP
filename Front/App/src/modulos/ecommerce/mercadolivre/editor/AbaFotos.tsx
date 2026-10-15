@@ -150,8 +150,9 @@ const AbaFotos: React.FC<Props> = ({ salvo: salvoLinhas, det: detLinhas, onAlter
           title={<Space wrap><Text strong>Família {det.familia}</Text><Tag color="purple">vale para todas as variações</Tag></Space>}
         >
           <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
-            A <b>1ª (modelo)</b> é a base crua do editor de imagem (sem as medidas): o lápis abre o editor nela e as cotas vão para cada variação com a medida dela.
-            Ela não vai às variações (só à que não tem nenhuma foto). As <b>outras</b> (aplicação, embalagem) entram em todas, depois das fotos de cada uma.
+            Troque o papel na etiqueta de cada foto: <b>principal</b> (foto limpa do produto: 1ª das variações sem foto limpa própria), <b>comum</b> (entra em
+            todas, depois das fotos de cada variação) ou <b>só editor</b> (gabarito: não vai ao ML). O lápis abre o editor na foto e as cotas vão para cada
+            variação com a medida dela.
           </Text>
           <GaleriaFamilia idFamilia={det.idFamilia} recarregar={versaoFamilia} onChange={f => { setDaFamilia(f); onAlterado(); }} onEditar={idFoto => setEditor(idFoto)} />
         </Card>
@@ -161,7 +162,7 @@ const AbaFotos: React.FC<Props> = ({ salvo: salvoLinhas, det: detLinhas, onAlter
         <Flex vertical gap={12}>
           {det.itens.map(i => {
             const lista = fotos[i.idItem] || [];
-            const noMl = fotosNoCanal(lista.map(f => ({ url: f.url_anexo, nome: f.nome_arquivo })), daFamilia.map(f => ({ url: f.url, nome: f.nome })));
+            const noMl = fotosNoCanal(lista.map(f => ({ url: f.url_anexo, nome: f.nome_arquivo })), daFamilia.map(f => ({ url: f.url, nome: f.nome, uso: f.uso })));
             const herdadas = noMl.filter(f => f.daFamilia).length;
             return (
               <Card key={i.idItem} size="small"
