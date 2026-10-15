@@ -4,7 +4,7 @@ import { avaliarPublicacaoItens } from './publicacaoProdutos';
 import { carregarOpcoes, gravarValorAtributo } from '../atributos/valoresAtributo';
 import { carregarAtributosDaCategoria } from '../categorias/herancaCategorias';
 import { apagarArquivoDaUrl, ErroArquivo, salvarArquivo } from '../../../infra/arquivos';
-import { lerPosicao, ordemComNovaNaPosicao } from './ordemAnexos';
+import { ehImagemDeMedidas, lerIds, lerPosicao, ordemComNovaNaPosicao, ordemFinalDasImagens } from './ordemAnexos';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
 
@@ -273,27 +273,29 @@ export const updateProdutoParcial = async (req: Request, res: Response) => {
 export const TIPOS_ANEXO = ['IMAGEM_PRINCIPAL', 'FOTO_GALERIA', 'MANUAL_TECNICO', 'CERTIFICADO', 'FISPQ'];
 const TIPOS_IMAGEM = ['IMAGEM_PRINCIPAL', 'FOTO_GALERIA'];
 
-// Garante uma única imagem principal: sem principal, promove a primeira foto da galeria
-const normalizarImagemPrincipal = async (conn: Conn, tenant: number, idItem: number) => {
-  const [principais] = await conn.execute(
-    `SELECT id_anexo FROM itens_anexos WHERE tenant_id = ? AND id_item = ? AND tipo_anexo = 'IMAGEM_PRINCIPAL' ORDER BY ordem, id_anexo`,
+const IMAGENS_SQL = `tipo_anexo IN ('IMAGEM_PRINCIPAL', 'FOTO_GALERIA')`;
+
+/**
+ * Regrava a ordem das imagens do item: a pedida (ou a de hoje), a 1ª é a principal e a de medidas vem logo depois
+ * (regra combinada: principal -> medidas -> o resto como o operador quiser).
+ */
+const reordenarImagens = async (conn: Conn, tenant: number, idItem: number, pedida?: number[]) => {
+  const [imagens] = await conn.execute(
+    `SELECT id_anexo, nome_arquivo FROM itens_anexos WHERE tenant_id = ? AND id_item = ? AND ${IMAGENS_SQL}
+     ORDER BY (tipo_anexo = 'IMAGEM_PRINCIPAL') DESC, ordem, id_anexo`,
     [tenant, idItem]
   );
-  if (principais.length > 1) {
-    const extras = principais.slice(1).map((p: any) => p.id_anexo);
-    await conn.execute(
-      `UPDATE itens_anexos SET tipo_anexo = 'FOTO_GALERIA' WHERE id_anexo IN (${extras.map(() => '?').join(',')})`,
-      extras
-    );
+  const ordem = ordemFinalDasImagens((imagens as any[]).map(i => ({ id: Number(i.id_anexo), medidas: ehImagemDeMedidas(i.nome_arquivo) })), pedida);
+  for (const [k, id] of ordem.entries()) {
+    await conn.execute(`UPDATE itens_anexos SET ordem = ?, tipo_anexo = ? WHERE id_anexo = ?`, [k, k === 0 ? 'IMAGEM_PRINCIPAL' : 'FOTO_GALERIA', id]);
   }
-  if (principais.length === 0) {
-    await conn.execute(
-      `UPDATE itens_anexos SET tipo_anexo = 'IMAGEM_PRINCIPAL'
-       WHERE tenant_id = ? AND id_item = ? AND tipo_anexo = 'FOTO_GALERIA'
-       ORDER BY ordem, id_anexo LIMIT 1`,
-      [tenant, idItem]
-    );
-  }
+};
+
+/** Outro item ou família ainda usa o arquivo (a mesma foto pode estar copiada em vários itens): não apaga do disco. */
+const arquivoEmUso = async (conn: Conn, url: string) => {
+  const [[a]] = await conn.execute(`SELECT COUNT(*) AS n FROM itens_anexos WHERE url_anexo = ?`, [url]);
+  const [[f]] = await conn.execute(`SELECT COUNT(*) AS n FROM comercial_familias WHERE imagem = ?`, [url]);
+  return Number(a.n) + Number(f.n) > 0;
 };
 
 /**
@@ -358,18 +360,18 @@ export const adicionarAnexo = async (req: Request, res: Response) => {
     );
     if (posicao && tipo === 'FOTO_GALERIA') {
       const [imagens] = await connection.execute(
-        `SELECT id_anexo FROM itens_anexos WHERE tenant_id = ? AND id_item = ? AND tipo_anexo IN ('IMAGEM_PRINCIPAL', 'FOTO_GALERIA')
+        `SELECT id_anexo FROM itens_anexos WHERE tenant_id = ? AND id_item = ? AND ${IMAGENS_SQL}
          ORDER BY (tipo_anexo = 'IMAGEM_PRINCIPAL') DESC, ordem, id_anexo`,
         [tenant, idItem]
       );
-      const ids = ordemComNovaNaPosicao((imagens as any[]).map(i => Number(i.id_anexo)), Number(inserido.insertId), posicao);
-      for (const [i, id] of ids.entries()) await connection.execute(`UPDATE itens_anexos SET ordem = ? WHERE id_anexo = ?`, [i, id]);
-    }
-    if (TIPOS_IMAGEM.includes(tipo)) await normalizarImagemPrincipal(connection, tenant, idItem);
+      await reordenarImagens(connection, tenant, idItem, ordemComNovaNaPosicao((imagens as any[]).map(i => Number(i.id_anexo)), Number(inserido.insertId), posicao));
+    } else if (TIPOS_IMAGEM.includes(tipo)) await reordenarImagens(connection, tenant, idItem);
+    const semUso: string[] = [];
+    for (const u of arquivosParaApagar) if (!(await arquivoEmUso(connection, u))) semUso.push(u);
 
     await connection.commit();
     // Arquivo enviado pelo ERP (Backend/uploads) da imagem substituída: sai do disco junto
-    arquivosParaApagar.forEach(apagarArquivoDaUrl);
+    semUso.forEach(apagarArquivoDaUrl);
     return res.json({ success: true, message: 'Anexo adicionado.' });
   } catch (error: any) {
     await connection.rollback();
@@ -402,10 +404,11 @@ export const removerAnexo = async (req: Request, res: Response) => {
       await connection.rollback();
       return res.status(404).json({ success: false, error: 'Anexo não encontrado.' });
     }
-    await normalizarImagemPrincipal(connection, tenant, idItem);
+    await reordenarImagens(connection, tenant, idItem);
+    const apagar = !!anexo?.url_anexo && !(await arquivoEmUso(connection, anexo.url_anexo));
     await connection.commit();
-    // Arquivo enviado pelo ERP (Backend/uploads): sai do disco junto
-    if (anexo?.url_anexo) apagarArquivoDaUrl(anexo.url_anexo);
+    // Arquivo enviado pelo ERP (Backend/uploads): sai do disco junto, se nenhum outro item ou família usa
+    if (apagar) apagarArquivoDaUrl(anexo.url_anexo);
     return res.json({ success: true, message: 'Anexo removido.' });
   } catch (error: any) {
     await connection.rollback();
@@ -460,16 +463,112 @@ export const definirImagemPrincipal = async (req: Request, res: Response) => {
       await connection.rollback();
       return res.status(400).json({ success: false, error: 'Só uma imagem pode ser a principal.' });
     }
-    await connection.execute(
-      `UPDATE itens_anexos SET tipo_anexo = IF(id_anexo = ?, 'IMAGEM_PRINCIPAL', 'FOTO_GALERIA')
-       WHERE tenant_id = ? AND id_item = ? AND tipo_anexo IN ('IMAGEM_PRINCIPAL', 'FOTO_GALERIA')`,
-      [idAnexo, tenant, idItem]
-    );
+    await reordenarImagens(connection, tenant, idItem, [idAnexo]);
     await connection.commit();
     return res.json({ success: true, message: 'Imagem principal definida.' });
   } catch (error: any) {
     await connection.rollback();
     console.error('Erro ao definir imagem principal:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  } finally {
+    connection.release();
+  }
+};
+
+/**
+ * PUT /catalogo/produtos/:id_item/anexos/ordem { ids } — ordem das imagens: a 1ª vira a principal e a de medidas fica
+ * logo depois dela.
+ */
+export const ordenarImagens = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const idItem = Number(req.params.id_item);
+  const ids = lerIds(req.body?.ids);
+  if (!ids.length) return res.status(400).json({ success: false, error: 'Informe a ordem das imagens.' });
+  const connection: any = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    await reordenarImagens(connection, tenant, idItem, ids);
+    await connection.commit();
+    return res.json({ success: true, message: 'Ordem das fotos salva.' });
+  } catch (error: any) {
+    await connection.rollback();
+    console.error('Erro ao ordenar imagens:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  } finally {
+    connection.release();
+  }
+};
+
+/**
+ * GET /catalogo/anexos/imagens?ids=1,2,3 — imagens de vários itens, na ordem em que vão para os canais
+ * (ex.: as variações de um anúncio do ML).
+ */
+export const listarImagensDosItens = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const ids = lerIds(req.query.ids);
+  if (!ids.length) return res.json({ success: true, itens: [] });
+  try {
+    const [linhas]: any = await pool.execute(
+      `SELECT id_anexo, id_item, tipo_anexo, nome_arquivo, url_anexo, ordem FROM itens_anexos
+       WHERE tenant_id = ? AND id_item IN (${ids.map(() => '?').join(',')}) AND ${IMAGENS_SQL}
+       ORDER BY id_item, (tipo_anexo = 'IMAGEM_PRINCIPAL') DESC, ordem, id_anexo`,
+      [tenant, ...ids]
+    );
+    const itens = ids.map(idItem => ({
+      idItem,
+      imagens: linhas.filter((l: any) => Number(l.id_item) === idItem).map((l: any) => ({
+        id_anexo: Number(l.id_anexo), tipo_anexo: l.tipo_anexo, nome_arquivo: l.nome_arquivo, url_anexo: l.url_anexo, ordem: Number(l.ordem),
+      })),
+    }));
+    return res.json({ success: true, itens });
+  } catch (error: any) {
+    console.error('Erro ao listar imagens:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * POST /catalogo/anexos/copiar { idAnexo, idsItens } — a mesma foto (mesmo arquivo) na galeria de outros itens.
+ * Item que já tem a foto fica como está.
+ */
+export const copiarImagem = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const idAnexo = Number(req.body?.idAnexo);
+  const idsItens = lerIds(req.body?.idsItens);
+  if (!idAnexo || !idsItens.length) return res.status(400).json({ success: false, error: 'Escolha a foto e os itens.' });
+  const connection: any = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [[foto]] = await connection.execute(
+      `SELECT id_item, nome_arquivo, url_anexo FROM itens_anexos WHERE id_anexo = ? AND tenant_id = ? AND ${IMAGENS_SQL}`, [idAnexo, tenant]
+    );
+    if (!foto) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, error: 'Foto não encontrada.' });
+    }
+    let copiados = 0;
+    for (const idItem of idsItens) {
+      if (idItem === Number(foto.id_item)) continue;
+      const [[existe]] = await connection.execute(`SELECT id_item FROM itens_core WHERE id_item = ? AND tenant_id = ?`, [idItem, tenant]);
+      const [[jaTem]] = await connection.execute(
+        `SELECT id_anexo FROM itens_anexos WHERE tenant_id = ? AND id_item = ? AND url_anexo = ?`, [tenant, idItem, foto.url_anexo]
+      );
+      if (!existe || jaTem) continue;
+      const [[ordem]] = await connection.execute(
+        `SELECT COALESCE(MAX(ordem), -1) + 1 AS proxima FROM itens_anexos WHERE tenant_id = ? AND id_item = ?`, [tenant, idItem]
+      );
+      await connection.execute(
+        `INSERT INTO itens_anexos (tenant_id, id_item, tipo_anexo, nome_arquivo, url_anexo, ordem) VALUES (?, ?, 'FOTO_GALERIA', ?, ?, ?)`,
+        [tenant, idItem, foto.nome_arquivo, foto.url_anexo, Number(ordem.proxima)]
+      );
+      await reordenarImagens(connection, tenant, idItem);
+      copiados++;
+    }
+    await connection.commit();
+    return res.json({ success: true, copiados, message: copiados ? `Foto copiada para ${copiados} item(ns).` : 'Os itens escolhidos já tinham esta foto.' });
+  } catch (error: any) {
+    await connection.rollback();
+    console.error('Erro ao copiar imagem:', error);
     return res.status(500).json({ success: false, error: error.message });
   } finally {
     connection.release();

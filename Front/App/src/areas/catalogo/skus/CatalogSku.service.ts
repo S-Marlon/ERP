@@ -283,6 +283,27 @@ export const definirImagemPrincipal = async (idItem: number, idAnexo: number, te
     'Erro ao definir a imagem principal.'
   );
 
+/** Ordem das imagens do item: a 1ª vira a principal e a de medidas fica logo depois (o servidor garante). */
+export const ordenarImagens = async (idItem: number, ids: number[], tenantId: number = 1) =>
+  handleResponse<GenericProductAPIResponse>(
+    await fetch(`${API_BASE_URL}/produtos/${idItem}/anexos-ordem?tenant_id=${tenantId}`, { method: 'PUT', headers: DEFAULT_HEADERS, body: JSON.stringify({ ids }) }),
+    'Erro ao salvar a ordem das fotos.'
+  );
+
+/** Imagens de vários itens, na ordem em que vão para os canais. */
+export const listarImagensDosItens = async (ids: number[], tenantId: number = 1) =>
+  handleResponse<{ itens: { idItem: number; imagens: AnexoItem[] }[] }>(
+    await fetch(`${API_BASE_URL}/anexos/imagens?tenant_id=${tenantId}&ids=${ids.join(',')}`, { headers: DEFAULT_HEADERS }),
+    'Erro ao ler as fotos.'
+  );
+
+/** A mesma foto (mesmo arquivo) na galeria de outros itens; quem já tem fica como está. */
+export const copiarImagem = async (idAnexo: number, idsItens: number[], tenantId: number = 1) =>
+  handleResponse<{ copiados: number; message: string }>(
+    await fetch(`${API_BASE_URL}/anexos/copiar?tenant_id=${tenantId}`, { method: 'POST', headers: DEFAULT_HEADERS, body: JSON.stringify({ idAnexo, idsItens }) }),
+    'Erro ao copiar a foto.'
+  );
+
 export const getProdutoDetalhe = async (idItem: number, tenantId: number = 1): Promise<ProdutoDetalhe> => {
   const response = await fetch(`${API_BASE_URL}/produtos/${idItem}/detalhe?tenant_id=${tenantId}`, { headers: DEFAULT_HEADERS });
   const dados = await handleResponse<Partial<ProdutoDetalhe>>(response, 'Erro ao carregar a ficha do produto.');

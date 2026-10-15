@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Button, Card, Empty, Image, Input, Popconfirm, Select, Space, Tag, Tooltip, Typography, Upload, message } from 'antd';
-import { DeleteOutlined, FileTextOutlined, InboxOutlined, LinkOutlined, PlusOutlined, StarFilled, StarOutlined } from '@ant-design/icons';
-import { AnexoItem, TipoAnexo, adicionarAnexo, definirImagemPrincipal, enviarArquivoAnexo, removerAnexo } from './CatalogSku.service';
+import { Button, Card, Empty, Input, Popconfirm, Select, Space, Tag, Typography, Upload, message } from 'antd';
+import { DeleteOutlined, FileTextOutlined, InboxOutlined, LinkOutlined, PlusOutlined } from '@ant-design/icons';
+import { AnexoItem, TipoAnexo, adicionarAnexo, enviarArquivoAnexo, removerAnexo } from './CatalogSku.service';
 import FotoFamiliaControle from '../familias/FotoFamiliaControle';
+import GaleriaImagens from './GaleriaImagens';
 
 const { Text } = Typography;
 
@@ -114,43 +115,7 @@ export default function AnexosCard({ idItem, anexos, onChange, familia }: Anexos
         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Nenhuma imagem ou documento" />
       ) : (
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
-          {imagens.length > 0 && (
-            <Image.PreviewGroup>
-              <Space wrap size={12}>
-                {imagens.map(a => {
-                  const principal = a.tipo_anexo === 'IMAGEM_PRINCIPAL';
-                  return (
-                    <div
-                      key={a.id_anexo}
-                      style={{ border: principal ? '2px solid #faad14' : '1px solid #d9d9d9', borderRadius: 6, padding: 4, background: '#fff', width: 112 }}
-                    >
-                      <Image
-                        src={a.url_anexo}
-                        width={100}
-                        height={100}
-                        style={{ objectFit: 'contain' }}
-                        fallback="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100'><rect width='100' height='100' fill='%23f5f5f5'/><text x='50' y='54' font-size='10' text-anchor='middle' fill='%23999'>link inválido</text></svg>"
-                      />
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-                        <Tooltip title={principal ? 'Imagem principal' : 'Definir como principal'}>
-                          <Button
-                            type="text"
-                            size="small"
-                            disabled={principal || salvando}
-                            icon={principal ? <StarFilled style={{ color: '#faad14' }} /> : <StarOutlined />}
-                            onClick={() => executar(() => definirImagemPrincipal(idItem, a.id_anexo), 'Imagem principal definida.')}
-                          />
-                        </Tooltip>
-                        <Popconfirm title="Remover esta imagem?" onConfirm={() => executar(() => removerAnexo(idItem, a.id_anexo), 'Imagem removida.')}>
-                          <Button type="text" size="small" danger icon={<DeleteOutlined />} disabled={salvando} />
-                        </Popconfirm>
-                      </div>
-                    </div>
-                  );
-                })}
-              </Space>
-            </Image.PreviewGroup>
-          )}
+          {imagens.length > 0 && <GaleriaImagens idItem={idItem} imagens={imagens} onChange={onChange} semAdicionar />}
 
           {documentos.length > 0 && (
             <Space direction="vertical" size={4}>
@@ -170,7 +135,7 @@ export default function AnexosCard({ idItem, anexos, onChange, familia }: Anexos
       )}
 
       <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 8 }}>
-        A primeira imagem vira a principal (estrela). As fotos são usadas nos anúncios do Mercado Livre.
+        Arraste para mudar a ordem: a 1ª é a principal e a de medidas fica logo depois. É nessa ordem que as fotos vão para o Mercado Livre.
       </Text>
     </Card>
   );

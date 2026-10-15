@@ -72,7 +72,7 @@ import { salvarPrecosLote } from './precos/precosLote.controller';
 import { apagarItens, conferirExclusao } from './produtos/exclusaoItens.controller';
 import { listarDuplicados, resumoItensParaJuntar, unificarItens } from './produtos/unificacao.controller';
 import { atualizarCustosKits, atualizarKit, criarKit, desfazerKit, detalheKit, listarKits, opcoesKit, relatorioKits } from './kits/kits.controller';
-import { getProdutoDetalhe, updateProdutoParcial, enviarArquivoAnexo, adicionarAnexo, removerAnexo, definirImagemPrincipal, getFichaTecnica, salvarFichaTecnica, getAtributosParaItem } from './produtos/produtoDetalhe.controller';
+import { getProdutoDetalhe, updateProdutoParcial, enviarArquivoAnexo, adicionarAnexo, removerAnexo, definirImagemPrincipal, ordenarImagens, listarImagensDosItens, copiarImagem, getFichaTecnica, salvarFichaTecnica, getAtributosParaItem } from './produtos/produtoDetalhe.controller';
 
 const router = Router();
 
@@ -207,6 +207,9 @@ router.post('/produtos/:id_item/anexos', adicionarAnexo);
 router.post('/produtos/:id_item/anexos/arquivo', enviarArquivoAnexo);
 router.delete('/produtos/:id_item/anexos/:id_anexo', removerAnexo);
 router.put('/produtos/:id_item/anexos/:id_anexo/principal', definirImagemPrincipal);
+router.put('/produtos/:id_item/anexos-ordem', ordenarImagens);
+router.get('/anexos/imagens', listarImagensDosItens);
+router.post('/anexos/copiar', copiarImagem);
 
 // =========================================================================
 // 🟡 ROTAS COMERCIAIS DE PRODUTOS (Família e Atributos Customizados)
