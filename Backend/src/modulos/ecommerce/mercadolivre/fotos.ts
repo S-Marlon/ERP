@@ -1,6 +1,12 @@
 // Regras puras das fotos do ML: entender o que o operador colou (link ou código) para buscar as fotos.
 
 /**
+ * Imagem gerada pelo editor ou pelo gerador de medidas (`SKU-editada.jpg`, `SKU-medida.jpg`): já tem medidas desenhadas,
+ * então não serve de base para gerar outra.
+ */
+export const ehImagemGerada = (nomeArquivo: string | null | undefined) => /-(editada|medida)\.jpe?g$/i.test(String(nomeArquivo || '').trim());
+
+/**
  * Link ou código colado -> anúncio (MLB123…) ou produto do catálogo (link com /p/MLB…). Aceita "MLB-123", "MLB123",
  * links de produto.mercadolivre.com.br e www.mercadolivre.com.br/…/p/MLB….
  */

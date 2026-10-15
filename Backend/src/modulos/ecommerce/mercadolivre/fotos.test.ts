@@ -1,7 +1,15 @@
 import assert from 'assert';
-import { referenciaDeFoto, urlPublicaDeImagem } from './fotos';
+import { ehImagemGerada, referenciaDeFoto, urlPublicaDeImagem } from './fotos';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
+
+teste('imagem gerada pelo editor ou gerador não serve de base', () => {
+  assert.strictEqual(ehImagemGerada('ABR-3.6-100-editada.jpg'), true);
+  assert.strictEqual(ehImagemGerada('6204-ZZ-medida.jpg'), true);
+  assert.strictEqual(ehImagemGerada('Img_ftr_rp_300601-1160x1160.PNG'), false);
+  assert.strictEqual(ehImagemGerada('editada.jpg'), false);
+  assert.strictEqual(ehImagemGerada(null), false);
+});
 
 teste('link ou código colado vira anúncio ou catálogo', () => {
   assert.deepStrictEqual(referenciaDeFoto('MLB5384283051'), { tipo: 'ANUNCIO', id: 'MLB5384283051' });

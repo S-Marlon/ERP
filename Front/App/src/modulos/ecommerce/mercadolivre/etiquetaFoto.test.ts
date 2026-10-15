@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { camposDoItem, converterMedidas, modeloPadrao, textoDoModelo } from './etiquetaFoto';
+import { camposDoItem, fotoBaseDoItem, converterMedidas, modeloPadrao, textoDoModelo } from './etiquetaFoto';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -34,4 +34,10 @@ teste('converte medidas de unidade', () => {
   assert.strictEqual(converterMedidas('12cm', 'mm'), '120 mm');
   assert.strictEqual(converterMedidas('3/8" JIC', 'cm'), '3/8" JIC');
   assert.strictEqual(converterMedidas('200 mm', 'original'), '200 mm');
+});
+
+teste('foto base: pula a imagem gerada; sem a informação usa a principal', () => {
+  assert.strictEqual(fotoBaseDoItem({ fotoUrl: 'x-editada.jpg', fotoBase: 'original.jpg' }), 'original.jpg');
+  assert.strictEqual(fotoBaseDoItem({ fotoUrl: 'x-editada.jpg', fotoBase: null }), null);
+  assert.strictEqual(fotoBaseDoItem({ fotoUrl: 'original.jpg' }), 'original.jpg');
 });

@@ -11,7 +11,7 @@ import {
 import { Canvas, FabricImage, FabricObject, IText, Point, Rect, StaticCanvas, util } from 'fabric';
 import { enviarArquivoAnexo } from '../../../../areas/catalogo/skus/CatalogSku.service';
 import type { AnuncioDetalhe, ItemDoAnuncio } from '../mercadoLivreApi';
-import { camposDoItem, converterMedidas, modeloPadrao, textoDoModelo } from '../etiquetaFoto';
+import { camposDoItem, converterMedidas, fotoBaseDoItem, modeloPadrao, textoDoModelo } from '../etiquetaFoto';
 import { enderecoParaDesenho } from '../desenhoEtiqueta';
 import {
   aplicarCorte, criarElemento, dadosDe, DadosElemento, encaixarFoto, LadoTexto, montarFoto, origemDaFoto, parametrosAposEsticar, Pontas,
@@ -45,8 +45,8 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
   const [aplicando, setAplicando] = useState<{ feitos: number; total: number } | null>(null);
   const [marcados, setMarcados] = useState<number[]>([]);
   const [corAtual, setCorAtual] = useState(CORES[0]);
-  // a regra do ML pede a foto principal sem textos: o padrão é ir para a galeria
-  const [destino, setDestino] = useState<'GALERIA' | 'PRINCIPAL'>('GALERIA');
+  // a regra do ML pede a foto principal sem textos: o padrão é a 2ª foto
+  const [destino, setDestino] = useState<'SEGUNDA' | 'PRINCIPAL'>('SEGUNDA');
   const [cortando, setCortando] = useState<Proporcao | null>(null);
   const quadroCorte = useRef<Rect | null>(null);
   const [tratandoFoto, setTratandoFoto] = useState(false);
@@ -295,7 +295,7 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
   textoParaAtual.current = textoPara;
   useEffect(() => {
     if (!det) return;
-    const primeiro = det.itens.find(i => i.fotoUrl) || det.itens[0];
+    const primeiro = det.itens.find(i => fotoBaseDoItem(i)) || det.itens[0];
     setIdItem(primeiro?.idItem ?? null);
     setMarcados(det.itens.map(i => i.idItem));
     let vivo = true;
@@ -329,7 +329,7 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
         const d = dadosDe(o);
         if (d) { (o as any).dadosElemento = { ...d, modelo: o.text }; o.set('text', textoParaAtual.current(o.text, itemAtual.current) || ' '); c.requestRenderAll(); guardar(); }
       });
-      const foto = primeiro?.fotoUrl || det.fotoFamilia;
+      const foto = (primeiro && fotoBaseDoItem(primeiro)) || det.fotoFamilia;
       const salvo = (() => { try { return localStorage.getItem(chaveModelo(det.id)); } catch { return null; } })();
       let abriuSalvo = false;
       if (salvo) {
@@ -366,8 +366,9 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
       vivo = false; window.clearTimeout(t); fab.current?.dispose(); fab.current = null; historico.current = []; refeitos.current = [];
       quadroCorte.current = null; setCortando(null); setSelecionado(null); soltarFotosTratadas();
     };
+    // só reabre ao trocar de anúncio: depois de salvar o anúncio recarrega e o quadro continua como está
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [det]);
+  }, [det?.id]);
 
   const itemAtual = useRef<ItemDoAnuncio | null>(null);
   useEffect(() => { itemAtual.current = item; }, [item]);
@@ -379,7 +380,7 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
     setIdItem(id);
     const it = det?.itens.find(i => i.idItem === id) || null;
     itemAtual.current = it;
-    if (fotoPorItem && it) { const f = it.fotoUrl || det?.fotoFamilia; if (f) await colocarFoto(f); }
+    if (fotoPorItem && it) { const f = fotoBaseDoItem(it) || det?.fotoFamilia; if (f) await colocarFoto(f); }
     renderizarTextos(it);
   };
   useEffect(() => { renderizarTextos(itemAtual.current); }, [unidade]);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -495,7 +496,7 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
       const dd = dadosDe(o);
       if (!dd) continue;
       if (dd.tipo === 'FOTO') {
-        const f = fotoPorItem ? it.fotoUrl || det!.fotoFamilia : null;
+        const f = fotoPorItem ? fotoBaseDoItem(it) || det!.fotoFamilia : null;
         const alvo = f ? enderecoParaDesenho(f) : dd.semFundo !== undefined || dd.corteAuto ? dd.origem : undefined;
         if (alvo) await montarFoto(o as FabricImage, alvo);
       } else if (dd.tipo === 'TEXTO') (o as IText).set('text', textoPara(dd.modelo, it) || ' ');
@@ -511,6 +512,7 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
     return dataUrl;
   };
 
+  /** Salva a imagem de cada item; a gerada antes por aqui (mesmo nome) é trocada, não se acumula. */
   const salvarEm = async (itens: ItemDoAnuncio[], comoPrincipal: boolean) => {
     if (!det || !itens.length) return;
     const modelo = modeloAtual();
@@ -522,7 +524,8 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
         const dataUrl = await gerarParaItem(modelo, it);
         const blob = await (await fetch(dataUrl)).blob();
         const nome = `${it.sku}-editada.jpg`.replace(/[^\w.-]+/g, '-');
-        await enviarArquivoAnexo(it.idItem, new File([blob], nome, { type: 'image/jpeg' }), comoPrincipal ? 'IMAGEM_PRINCIPAL' : 'FOTO_GALERIA');
+        await enviarArquivoAnexo(it.idItem, new File([blob], nome, { type: 'image/jpeg' }), comoPrincipal ? 'IMAGEM_PRINCIPAL' : 'FOTO_GALERIA',
+          { substituir: true, posicao: comoPrincipal ? undefined : 2 });
       } catch (e) {
         falhas.push(`${it.sku}: ${e instanceof Error ? e.message : 'erro'}`);
       }
@@ -544,7 +547,7 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
     a.click();
   };
 
-  const fotosDisponiveis = useMemo(() => [...new Set([det?.fotoFamilia, ...(det?.itens || []).map(i => i.fotoUrl)].filter((f): f is string => !!f))], [det]);
+  const fotosDisponiveis = useMemo(() => [...new Set([det?.fotoFamilia, ...(det?.itens || []).map(fotoBaseDoItem)].filter((f): f is string => !!f))], [det]);
   const temTexto = d && d.modelo !== undefined;
   const botao = (icone: React.ReactNode, rotulo: string, tipo: TipoElemento, dica: string) => (
     <Tooltip title={dica} placement="right"><Button block icon={icone} disabled={!!cortando} onClick={() => adicionar(tipo)} style={{ justifyContent: 'flex-start' }}>{rotulo}</Button></Tooltip>
@@ -564,9 +567,9 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
           <Space wrap>
             {aplicando && <Progress percent={Math.round((aplicando.feitos / aplicando.total) * 100)} style={{ width: 160, margin: 0 }} size="small" />}
             <Button onClick={onFechar} disabled={!!aplicando}>Fechar</Button>
-            <Tooltip title="O Mercado Livre pede a foto principal com fundo branco e sem textos; imagem com cotas vai melhor na galeria">
+            <Tooltip title="O Mercado Livre pede a foto principal com fundo branco e sem textos; a imagem com medidas vai melhor como 2ª foto">
               <Segmented size="small" value={destino} onChange={v => setDestino(v as typeof destino)}
-                options={[{ value: 'GALERIA', label: 'Na galeria' }, { value: 'PRINCIPAL', label: 'Como principal' }]} />
+                options={[{ value: 'SEGUNDA', label: 'Como 2ª foto' }, { value: 'PRINCIPAL', label: 'Como principal' }]} />
             </Tooltip>
             <Button disabled={!item || !!aplicando || !!cortando || tratandoFoto} onClick={() => item && salvarEm([item], destino === 'PRINCIPAL')}>Salvar só em {item?.sku}</Button>
             <Button type="primary" disabled={!marcados.length || !!aplicando || !!cortando || tratandoFoto} loading={!!aplicando}
@@ -739,7 +742,7 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
               <Select mode="multiple" style={{ width: '100%' }} value={marcados} onChange={setMarcados} maxTagCount="responsive"
                 options={det.itens.map(i => ({ value: i.idItem, label: i.sku }))} />
               <Text type="secondary" style={{ fontSize: 11 }}>
-                {destino === 'PRINCIPAL' ? 'Salva como foto principal (a atual vai para a galeria).' : 'Salva no fim da galeria; a foto principal continua a mesma.'} O modelo fica guardado neste anúncio.
+                {destino === 'PRINCIPAL' ? 'Salva como foto principal (a atual vai para a galeria).' : 'Salva como 2ª foto, logo depois da principal.'} Salvar de novo troca a imagem anterior do editor. O modelo fica guardado neste anúncio.
               </Text>
             </div>
           </Flex>

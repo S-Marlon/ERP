@@ -34,6 +34,7 @@ export interface ItemAnuncio {
   unidadeMl?: UnidadeVenda | null;  // unidade vendida no ML (ex.: pacote c/12); vazio = a base
   fotos: number;
   fotoUrl: string | null;
+  fotoBase?: string | null;         // 1ª foto sem medidas desenhadas (base do editor de imagem)
   gtin: string | null;
   pesoKg: number | null;
   medidasCm: { altura: number; largura: number; comprimento: number } | null;

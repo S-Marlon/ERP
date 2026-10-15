@@ -5,7 +5,7 @@ import { Alert, Button, Card, Checkbox, Col, Empty, Flex, Input, Modal, Progress
 import { BgColorsOutlined, ColumnWidthOutlined, PictureOutlined, UploadOutlined } from '@ant-design/icons';
 import { enviarArquivoAnexo } from '../../../areas/catalogo/skus/CatalogSku.service';
 import { AnuncioDetalhe, ItemDoAnuncio } from './mercadoLivreApi';
-import { camposDoItem, converterMedidas, modeloPadrao, textoDoModelo } from './etiquetaFoto';
+import { camposDoItem, converterMedidas, fotoBaseDoItem, modeloPadrao, textoDoModelo } from './etiquetaFoto';
 import { canvasParaArquivo, carregarImagem, desenharEtiqueta, EstiloEtiqueta, limparCacheImagens } from './desenhoEtiqueta';
 
 const { Text } = Typography;
@@ -26,7 +26,7 @@ const GeradorMedidasModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
   const [cor, setCor] = useState(CORES[0].valor);
   const [base, setBase] = useState<'ITEM' | 'UMA'>('ITEM');
   const [fotoUnica, setFotoUnica] = useState<string | null>(null);
-  const [comoPrincipal, setComoPrincipal] = useState(true);
+  const [comoPrincipal, setComoPrincipal] = useState(false);   // o ML pede a principal sem textos: padrão 2ª foto
   const [previas, setPrevias] = useState<Previa[]>([]);
   const [gerando, setGerando] = useState(false);
   const [marcados, setMarcados] = useState<Set<number>>(new Set());
@@ -39,8 +39,8 @@ const GeradorMedidasModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
     if (!det) return;
     setModelo(modeloPadrao(det) || '');
     setModeloSub('');
-    setFotoUnica(det.fotoFamilia || det.itens.find(i => i.fotoUrl)?.fotoUrl || null);
-    setBase(det.itens.some(i => i.fotoUrl) ? 'ITEM' : 'UMA');
+    setFotoUnica(det.fotoFamilia || det.itens.map(fotoBaseDoItem).find(Boolean) || null);
+    setBase(det.itens.some(i => fotoBaseDoItem(i)) ? 'ITEM' : 'UMA');
     setMarcados(new Set(det.itens.map(i => i.idItem)));
   }, [det]);
 
@@ -53,7 +53,7 @@ const GeradorMedidasModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
 
   const fotos = useMemo(() => {
     if (!det) return [];
-    return [...new Set([det.fotoFamilia, ...det.itens.map(i => i.fotoUrl)].filter((f): f is string => !!f))];
+    return [...new Set([det.fotoFamilia, ...det.itens.map(fotoBaseDoItem)].filter((f): f is string => !!f))];
   }, [det]);
 
   // prévias: refaz quando muda alguma opção (espera parar de digitar)
@@ -67,7 +67,7 @@ const GeradorMedidasModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
         const cs = camposDoItem(det, item);
         const texto = converterMedidas(textoDoModelo(modelo, cs), unidade);
         const subtexto = converterMedidas(textoDoModelo(modeloSub, cs), unidade);
-        const foto = base === 'UMA' ? fotoUnica : item.fotoUrl || det.fotoFamilia;
+        const foto = base === 'UMA' ? fotoUnica : fotoBaseDoItem(item) || det.fotoFamilia;
         let imagem: string | null = null;
         let erro: string | null = null;
         if (foto) {
@@ -95,7 +95,8 @@ const GeradorMedidasModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
         const img = await carregarImagem(p.foto!);
         const cv = desenharEtiqueta(img, { texto: p.texto, subtexto: p.subtexto, estilo, cor });
         const nome = `${p.item.sku}-medida.jpg`.replace(/[^\w.-]+/g, '-');
-        await enviarArquivoAnexo(p.item.idItem, await canvasParaArquivo(cv, nome), comoPrincipal ? 'IMAGEM_PRINCIPAL' : 'FOTO_GALERIA');
+        await enviarArquivoAnexo(p.item.idItem, await canvasParaArquivo(cv, nome), comoPrincipal ? 'IMAGEM_PRINCIPAL' : 'FOTO_GALERIA',
+          { substituir: true, posicao: comoPrincipal ? undefined : 2 });
       } catch (e) {
         falhas.push(`${p.item.sku}: ${e instanceof Error ? e.message : 'erro'}`);
       }
@@ -117,7 +118,7 @@ const GeradorMedidasModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
       title={<Space><ColumnWidthOutlined />Fotos com a medida</Space>}
       footer={(
         <Flex justify="space-between" align="center">
-          <Text type="secondary">{prontos.length} de {previas.length} item(ns) prontos · salva como {comoPrincipal ? 'foto principal (a atual vai para a galeria)' : 'foto extra na galeria'}</Text>
+          <Text type="secondary">{prontos.length} de {previas.length} item(ns) prontos · salva como {comoPrincipal ? 'foto principal (a atual vai para a galeria)' : '2ª foto (troca a de medida anterior)'}</Text>
           <Space>
             <Button onClick={onFechar} disabled={!!salvando}>Fechar</Button>
             <Button type="primary" icon={<PictureOutlined />} disabled={!prontos.length || gerando} loading={!!salvando} onClick={salvar}>Salvar em {prontos.length} item(ns)</Button>
@@ -193,7 +194,7 @@ const GeradorMedidasModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
             </Card>
             <Card size="small" style={{ marginTop: 12 }}>
               <Segmented block value={comoPrincipal ? 'P' : 'G'} onChange={v => setComoPrincipal(v === 'P')} options={[
-                { value: 'P', label: 'Salvar como principal' }, { value: 'G', label: 'Como foto extra' },
+                { value: 'P', label: 'Salvar como principal' }, { value: 'G', label: 'Como 2ª foto' },
               ]} />
             </Card>
           </Col>

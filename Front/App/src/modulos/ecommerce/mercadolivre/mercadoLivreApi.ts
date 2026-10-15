@@ -118,6 +118,7 @@ export interface UnidadeVenda { idUnidade: number; sigla: string; nome: string; 
 export interface ItemDoAnuncio {
   idItem: number; sku: string; nome: string; ativo: boolean; preco: number; precoMl: number | null; precoAnuncio: number;
   comissao: number | null; percentualComissao: number | null; fotos: number; fotoUrl: string | null;
+  fotoBase?: string | null;   // 1ª foto sem medidas desenhadas (as geradas pelo editor não servem de base)
   estoque: number;          // saldo do ERP (kit: quantos dá para montar)
   estoqueMl: number;        // o que vai para o ML (saldo − reserva, até o teto)
   kit?: boolean;

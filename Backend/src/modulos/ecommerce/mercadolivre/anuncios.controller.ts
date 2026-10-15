@@ -10,6 +10,7 @@ import {
   ItemAnuncio, Pendencia, pendenciasAnuncio, precoNoMl, resolverValor, situacaoPreparo, sugerirAtributos, tituloLegivel, ValorAtributo, modoPublicacao, tituloPeloModelo, estoqueParaMl, regraDoItem, RegraEstoque, saldoNaUnidade, UnidadeVenda, foraDoMl,
 } from './anuncios';
 import { ErroML, ml } from './mercadolivreApi';
+import { ehImagemGerada } from './fotos';
 import { sincronizarAnuncios } from './sincronizacao';
 import { errosDasFaixas, faixasDoAtacado, lerFaixas, normalizarFaixas } from './faixasQuantidade';
 import { enviarFaixasDoAnuncio } from './faixas.controller';
@@ -106,7 +107,7 @@ export const carregarItens = async (conn: Conn, tenant: number, ids: number[]) =
     [tenant, ...ids]
   );
   const [fotos] = await conn.execute(
-    `SELECT id_item, url_anexo FROM itens_anexos
+    `SELECT id_item, url_anexo, nome_arquivo FROM itens_anexos
      WHERE tenant_id = ? AND id_item IN (${lista(ids)}) AND tipo_anexo IN ('IMAGEM_PRINCIPAL', 'FOTO_GALERIA')
      ORDER BY (tipo_anexo = 'IMAGEM_PRINCIPAL') DESC, ordem, id_anexo`,
     [tenant, ...ids]
@@ -160,6 +161,7 @@ export const carregarItens = async (conn: Conn, tenant: number, ids: number[]) =
       estoque: Number(r.quantidade_atual) || 0,
       fotos: 0,
       fotoUrl: null,
+      fotoBase: null,
       gtin: null,
       pesoKg: peso,
       medidasCm: alt > 0 && lar > 0 && com > 0 ? { altura: alt, largura: lar, comprimento: com } : null,
@@ -174,6 +176,7 @@ export const carregarItens = async (conn: Conn, tenant: number, ids: number[]) =
     if (!i) continue;
     i.fotos++;
     if (!i.fotoUrl) i.fotoUrl = f.url_anexo;
+    if (!i.fotoBase && !ehImagemGerada(f.nome_arquivo)) i.fotoBase = f.url_anexo;
   }
   for (const g of gtins) {
     const i = itens.get(Number(g.id_item));

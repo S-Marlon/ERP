@@ -8,6 +8,9 @@ const limpar = (s: string) => s.replace(/\s+/g, ' ').trim();
 const normal = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 
 /** Campos do item que podem ir na foto: o que varia no anúncio (atributos do ML) e os atributos do cadastro do ERP. */
+/** Foto sobre a qual se desenha a medida: a 1ª sem medidas desenhadas (nunca uma imagem gerada antes pelo editor). */
+export const fotoBaseDoItem = (item: Pick<ItemDoAnuncio, 'fotoUrl' | 'fotoBase'>) => (item.fotoBase !== undefined ? item.fotoBase : item.fotoUrl);
+
 export const camposDoItem = (det: Pick<AnuncioDetalhe, 'eixos' | 'atributosCategoria' | 'atributosErp'>, item: Pick<ItemDoAnuncio, 'valores' | 'valoresErp'>): CampoEtiqueta[] => {
   const campos: CampoEtiqueta[] = [];
   const vistos = new Set<string>();
