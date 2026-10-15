@@ -2,7 +2,8 @@
 // próprios parâmetros (dadosElemento) e é recriado a partir deles: esticar a cota aumenta o comprimento sem deformar o
 // texto, o texto da cota pode ficar sempre de pé (com a cota em qualquer ângulo) e o mesmo modelo serve para todos os
 // itens (o texto tem {Campo} trocado pela medida de cada item).
-import { Ellipse, FabricImage, FabricObject, FabricText, Group, IText, Path, Rect, Textbox } from 'fabric';
+import { Ellipse, FabricImage, FabricObject, FabricText, Group, IText, Path, Rect, StaticCanvas, Textbox } from 'fabric';
+import { caixaDoProduto, Corte, CORTE_INTEIRO, mascaraDoFundo, tirarFundo } from './fotoPixels';
 
 export type TipoElemento = 'SETA' | 'COTA' | 'TEXTO' | 'BALAO' | 'DESTAQUE' | 'FOTO';
 export type LadoTexto = 'ACIMA' | 'SOBRE' | 'ABAIXO';
@@ -24,6 +25,10 @@ export interface DadosElemento {
   textoVirado?: boolean;    // cota: texto girado 180°
   semExtremidades?: boolean; // cota sem os traços das pontas
   forma?: 'ELIPSE' | 'RETANGULO'; // destaque
+  origem?: string;          // foto: endereço da foto sem tratamento (é o que vai no modelo salvo)
+  corte?: Corte;            // foto: recorte em frações, vale para a foto de cada item
+  corteAuto?: boolean;      // foto: corta as sobras de cada foto (o produto de cada item fica enquadrado)
+  semFundo?: number;        // foto: tira o fundo com esta tolerância (sem o campo, fundo original)
 }
 
 /** Propriedades próprias que vão junto quando o modelo é salvo. */
@@ -144,19 +149,100 @@ export const parametrosAposEsticar = (o: FabricObject): DadosElemento | null => 
 export const encaixarFoto = (img: FabricImage, lado: number, margem = 60) => {
   const escala = Math.min((lado - 2 * margem) / (img.width || 1), (lado - 2 * margem) / (img.height || 1));
   img.set({ scaleX: escala, scaleY: escala, originX: 'center', originY: 'center', left: lado / 2, top: lado / 2 });
-  (img as any).dadosElemento = { tipo: 'FOTO', cor: '' } as DadosElemento;
+  (img as any).dadosElemento = { ...dadosDe(img), tipo: 'FOTO', cor: '' } as DadosElemento;
   img.set({ cornerColor: '#1677ff', cornerStyle: 'circle', borderColor: '#1677ff', transparentCorners: false, cornerSize: 16 });
   return img;
 };
 
-/** Troca a imagem da foto mantendo o lugar e o tamanho (a nova cabe na mesma caixa). */
-export const trocarImagemDaFoto = async (foto: FabricImage, url: string) => {
+// ---------------------------------------------------------------- foto: fundo e corte
+const LIMITE_FUNDO = 1600;   // lado maior da foto tratada (o quadro tem 1200)
+const fotosSemFundo = new Map<string, Promise<string>>();
+
+/** Solta as fotos tratadas guardadas (chamado ao fechar o editor). */
+export const soltarFotosTratadas = () => {
+  fotosSemFundo.forEach(p => p.then(u => URL.revokeObjectURL(u), () => undefined));
+  fotosSemFundo.clear();
+};
+
+const abrirImagem = (url: string) => new Promise<HTMLImageElement>((resolve, reject) => {
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => resolve(img);
+  img.onerror = () => reject(new Error('Não foi possível abrir a foto.'));
+  img.src = url;
+});
+
+const pixelsDe = (el: CanvasImageSource, w: number, h: number) => {
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  const ctx = cv.getContext('2d', { willReadFrequently: true })!;
+  ctx.drawImage(el, 0, 0, w, h);
+  return { cv, ctx, dados: ctx.getImageData(0, 0, w, h) };
+};
+
+/** Foto sem o fundo (PNG transparente; no quadro branco fica branco). Guarda o resultado: desfazer e aplicar não refazem a conta. */
+export const fotoSemFundo = (url: string, tolerancia: number) => {
+  const chave = `${tolerancia}|${url}`;
+  if (!fotosSemFundo.has(chave)) {
+    const p = (async () => {
+      const img = await abrirImagem(url);
+      const k = Math.min(1, LIMITE_FUNDO / Math.max(img.naturalWidth, img.naturalHeight, 1));
+      const w = Math.max(1, Math.round(img.naturalWidth * k));
+      const h = Math.max(1, Math.round(img.naturalHeight * k));
+      const { cv, ctx, dados } = pixelsDe(img, w, h);
+      tirarFundo(dados.data, w, h, mascaraDoFundo(dados.data, w, h, tolerancia));
+      ctx.putImageData(dados, 0, 0);
+      const blob = await new Promise<Blob>((resolve, reject) => cv.toBlob(b => (b ? resolve(b) : reject(new Error('Não foi possível tratar a foto.'))), 'image/png'));
+      return URL.createObjectURL(blob);
+    })();
+    p.catch(() => fotosSemFundo.delete(chave));
+    fotosSemFundo.set(chave, p);
+  }
+  return fotosSemFundo.get(chave)!;
+};
+
+/** Endereço da foto sem tratamento. */
+export const origemDaFoto = (foto: FabricImage) => dadosDe(foto)?.origem || foto.getSrc();
+
+/** Mostra só o pedaço `corte` da foto (frações da foto inteira). Não mexe na escala. */
+export const aplicarCorte = (foto: FabricImage, corte: Corte) => {
+  const { width: W, height: H } = foto.getOriginalSize();
+  foto.set({ cropX: corte.x * W, cropY: corte.y * H, width: Math.max(1, corte.w * W), height: Math.max(1, corte.h * H) });
+};
+
+/**
+ * Põe `url` na foto mantendo o lugar e o tamanho (a nova cabe na mesma caixa), com o corte e o fundo que estão nos
+ * dados da foto. Serve para trocar a foto, ligar/desligar o fundo e refazer a foto tratada depois de abrir um modelo.
+ */
+export const montarFoto = async (foto: FabricImage, url: string) => {
+  const d: DadosElemento = { ...(dadosDe(foto) || { tipo: 'FOTO', cor: '' }), origem: url };
   const largura = (foto.width || 1) * (foto.scaleX || 1);
   const altura = (foto.height || 1) * (foto.scaleY || 1);
   const centro = foto.getCenterPoint();
-  await foto.setSrc(url, { crossOrigin: 'anonymous' });
+  const src = d.semFundo !== undefined ? await fotoSemFundo(url, d.semFundo) : url;
+  await foto.setSrc(src, { crossOrigin: 'anonymous' });
+  (foto as any).dadosElemento = d;
+  aplicarCorte(foto, (d.corteAuto && corteDasSobras(foto)) || d.corte || CORTE_INTEIRO);
   const escala = Math.min(largura / (foto.width || 1), altura / (foto.height || 1));
   foto.set({ scaleX: escala, scaleY: escala });
   foto.setPositionByOrigin(centro, 'center', 'center');
   foto.setCoords();
+};
+
+/** Depois de abrir um modelo: a foto vem sem tratamento (o modelo guarda a origem) e o fundo é tirado de novo. */
+export const refazerFotosTratadas = async (c: StaticCanvas) => {
+  for (const o of c.getObjects()) {
+    const d = dadosDe(o);
+    if (d?.tipo === 'FOTO' && d.semFundo !== undefined && d.origem) await montarFoto(o as FabricImage, d.origem);
+  }
+};
+
+/** Pedaço da foto inteira onde está o produto (sem as sobras brancas ou transparentes). */
+export const corteDasSobras = (foto: FabricImage): Corte | null => {
+  const { width: W, height: H } = foto.getOriginalSize();
+  const k = Math.min(1, 600 / Math.max(W, H, 1));
+  const w = Math.max(1, Math.round(W * k));
+  const h = Math.max(1, Math.round(H * k));
+  const { dados } = pixelsDe(foto.getElement() as CanvasImageSource, w, h);
+  return caixaDoProduto(dados.data, w, h);
 };
