@@ -37,7 +37,7 @@ teste('galeria: como a variação vai ao canal (fotos da família incluídas)', 
   const medida = { url: 'i/X-editada.jpg', nome: 'X-editada.jpg' };
   const urls = (l: { url: string; daFamilia: boolean }[]) => l.map(f => `${f.url}${f.daFamilia ? '*' : ''}`);
   assert.deepStrictEqual(urls(fotosNoCanal([limpa, medida], fam)), ['i/foto.png', 'i/X-editada.jpg', 'f/aplicacao.jpg*']);
-  assert.deepStrictEqual(urls(fotosNoCanal([medida], fam)), ['f/produto.png*', 'i/X-editada.jpg', 'f/aplicacao.jpg*']);
+  assert.deepStrictEqual(urls(fotosNoCanal([medida], fam)), ['i/X-editada.jpg', 'f/aplicacao.jpg*']);
   assert.deepStrictEqual(urls(fotosNoCanal([], fam)), ['f/produto.png*', 'f/aplicacao.jpg*']);
   assert.deepStrictEqual(urls(fotosNoCanal([{ url: 'f/aplicacao.jpg', nome: 'aplicacao.jpg' }], fam)), ['f/aplicacao.jpg']);
 });

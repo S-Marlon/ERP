@@ -1,5 +1,5 @@
-// Galeria da família: fotos-modelo das variações. A 1ª é a principal-modelo (vale para a variação sem foto própria e é
-// a base do editor de imagem); as outras (aplicação, embalagem) entram em todas as variações depois das fotos de cada
+// Galeria da família: fotos-modelo das variações. A 1ª é a modelo, base crua do editor de imagem (não vai às variações,
+// só à que não tem nenhuma foto); as outras (aplicação, embalagem) entram em todas as variações depois das fotos de cada
 // item. Arrastar ordena, a estrela faz principal; a foto com o modelo do editor guardado mostra a etiqueta.
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button, Spin, Tag, Tooltip, message } from 'antd';

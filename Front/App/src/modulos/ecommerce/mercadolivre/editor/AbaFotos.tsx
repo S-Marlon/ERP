@@ -150,8 +150,8 @@ const AbaFotos: React.FC<Props> = ({ salvo: salvoLinhas, det: detLinhas, onAlter
           title={<Space wrap><Text strong>Família {det.familia}</Text><Tag color="purple">vale para todas as variações</Tag></Space>}
         >
           <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
-            A <b>1ª (modelo)</b> é a foto do produto: vai como principal na variação sem foto própria e é a base do editor de imagem, que guarda nela as
-            cotas e textos. As <b>outras</b> (aplicação, embalagem) entram em todas as variações, depois das fotos de cada uma.
+            A <b>1ª (modelo)</b> é a base crua do editor de imagem (sem as medidas): o lápis abre o editor nela e as cotas vão para cada variação com a medida dela.
+            Ela não vai às variações (só à que não tem nenhuma foto). As <b>outras</b> (aplicação, embalagem) entram em todas, depois das fotos de cada uma.
           </Text>
           <GaleriaFamilia idFamilia={det.idFamilia} recarregar={versaoFamilia} onChange={f => { setDaFamilia(f); onAlterado(); }} onEditar={idFoto => setEditor(idFoto)} />
         </Card>

@@ -18,8 +18,8 @@ teste('fotos da variação: própria, medidas, família', () => {
   const chaves = (l: { chave: string }[]) => l.map(f => f.chave);
   // com foto própria: ela, a medida, depois as comuns da família (sem a principal-modelo)
   assert.deepStrictEqual(chaves(fotosDaVariacao([limpa, medida], fam)), ['1', '2', 'familia:f/aplicacao.jpg']);
-  // só a medida: a principal-modelo da família vem antes dela
-  assert.deepStrictEqual(chaves(fotosDaVariacao([medida], fam)), ['familia:f/produto.png', '2', 'familia:f/aplicacao.jpg']);
+  // só a medida: a modelo crua da família não vai (a variação já tem a imagem dela)
+  assert.deepStrictEqual(chaves(fotosDaVariacao([medida], fam)), ['2', 'familia:f/aplicacao.jpg']);
   // sem foto: a família inteira
   assert.deepStrictEqual(chaves(fotosDaVariacao([], fam)), ['familia:f/produto.png', 'familia:f/aplicacao.jpg']);
   // o mesmo arquivo no item e na família vai uma vez só

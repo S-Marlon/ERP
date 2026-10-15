@@ -40,14 +40,12 @@ export const avisosDaFoto = (
 export interface FotoNoCanal { url: string; nome: string; daFamilia: boolean }
 
 /**
- * Fotos de uma variação como vão ao canal (mesma regra do envio ao ML): a principal própria (foto limpa) ou, se o item
- * não tem foto ou começa por uma imagem de medidas, a principal-modelo da família; depois as fotos do item na ordem
- * dele; por fim as outras fotos da família. Sem repetir arquivo.
+ * Fotos de uma variação como vão ao canal (mesma regra do envio ao ML): as fotos do item na ordem dele e depois as outras
+ * fotos da família. A modelo da família (a base crua do editor) só vai à variação que não tem nenhuma foto.
  */
 export const fotosNoCanal = (doItem: { url: string; nome: string }[], daFamilia: { url: string; nome: string }[]): FotoNoCanal[] => {
-  const comecaLimpa = doItem.length > 0 && !ehImagemDeMedidas(doItem[0].nome);
   const lista: FotoNoCanal[] = [
-    ...(comecaLimpa ? [] : daFamilia.slice(0, 1).map(f => ({ ...f, daFamilia: true }))),
+    ...(doItem.length ? [] : daFamilia.slice(0, 1).map(f => ({ ...f, daFamilia: true }))),
     ...doItem.map(f => ({ ...f, daFamilia: false })),
     ...daFamilia.slice(1).map(f => ({ ...f, daFamilia: true })),
   ];

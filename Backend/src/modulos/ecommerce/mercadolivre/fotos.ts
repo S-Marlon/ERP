@@ -8,9 +8,9 @@ export const ehImagemGerada = ehImagemDeMedidas;
 export interface FotoDaVariacao { chave: string; url: string; nome: string }
 
 /**
- * Fotos de uma variação no ML, na ordem combinada: a principal própria do item (foto limpa) ou, se o item não tem foto
- * ou começa por uma imagem de medidas, a principal-modelo da família; depois as fotos do item na ordem dele (medidas
- * logo após a principal); por fim as outras fotos da família (aplicação, embalagem). Sem repetir arquivo.
+ * Fotos de uma variação no ML, na ordem combinada: as fotos do item na ordem dele (principal, medidas, outras) e depois
+ * as outras fotos da família (aplicação, embalagem). A principal-modelo da família é a base crua do editor (sem as
+ * medidas): não vai às variações, só à que não tem nenhuma foto (o ML não aceita anúncio sem foto). Sem repetir arquivo.
  * chave: id do anexo, ou "familia:<link>" (é como o ERP guarda o id da foto que subiu ao ML).
  */
 export const fotosDaVariacao = (
@@ -18,8 +18,7 @@ export const fotosDaVariacao = (
 ): FotoDaVariacao[] => {
   const familia = daFamilia.map(f => ({ chave: `familia:${f.url}`, url: f.url, nome: f.nome }));
   const proprias = doItem.map(f => ({ chave: String(f.idAnexo), url: f.url, nome: f.nome }));
-  const comecaLimpa = proprias.length > 0 && !ehImagemDeMedidas(proprias[0].nome);
-  const lista = [...(comecaLimpa ? [] : familia.slice(0, 1)), ...proprias, ...familia.slice(1)];
+  const lista = [...(proprias.length ? [] : familia.slice(0, 1)), ...proprias, ...familia.slice(1)];
   const vistas = new Set<string>();
   return lista.filter(f => (vistas.has(f.url) ? false : (vistas.add(f.url), true)));
 };
