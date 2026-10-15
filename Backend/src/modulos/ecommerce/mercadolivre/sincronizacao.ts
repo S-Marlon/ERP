@@ -9,6 +9,7 @@ import { importarPedidos } from './pedidos.controller';
 export interface ResultadoSincronizacao {
   idAnuncio: number;
   idItem: number;
+  idLinha: number;
   sku: string;
   mlbId: string;
   estoqueDe: number | null;
@@ -23,7 +24,7 @@ export interface ResultadoSincronizacao {
  * (o importado começa desligado, para o operador revisar a divisão loja/ML antes).
  */
 export const sincronizarAnuncios = async (
-  tenant: number, opcoes: { idAnuncio?: number; idItem?: number; somenteAutomaticos?: boolean; forcar?: boolean } = {}
+  tenant: number, opcoes: { idAnuncio?: number; idLinha?: number; somenteAutomaticos?: boolean; forcar?: boolean } = {}
 ): Promise<ResultadoSincronizacao[]> => {
   const anuncios = await carregarAnuncios(pool as any, tenant, opcoes.idAnuncio);
   await atualizarStatusDoMl(tenant, anuncios);
@@ -31,15 +32,16 @@ export const sincronizarAnuncios = async (
   for (const c of anuncios) {
     if (opcoes.somenteAutomaticos && !Number(c.registro.estoque_automatico)) continue;
     for (const item of c.itens) {
-      const m = c.noMl.get(item.idItem);
-      if (!m?.mlbId || foraDoMl(m.status) || (opcoes.idItem && opcoes.idItem !== item.idItem)) continue;
+      const m = c.noMl.get(item.idLinha);
+      if (!m?.mlbId || foraDoMl(m.status) || (opcoes.idLinha && opcoes.idLinha !== item.idLinha)) continue;
+      if (item.linhaAtiva === false) continue;   // desativada pelo operador: fica pausada, sem receber estoque
       const atual = { estoque: item.estoqueMl ?? 0, preco: precoNoMl(item, c.dados.ajustePreco) };
       const corpo = opcoes.forcar
         ? { available_quantity: atual.estoque, ...(atual.preco > 0 ? { price: atual.preco } : {}) }
         : mudancasParaMl({ estoque: m.estoqueEnviado, preco: m.precoEnviado }, atual);
       if (!corpo) continue;
       const linha: ResultadoSincronizacao = {
-        idAnuncio: Number(c.registro.id), idItem: item.idItem, sku: item.sku, mlbId: m.mlbId,
+        idAnuncio: Number(c.registro.id), idItem: item.idItem, idLinha: item.idLinha, sku: item.sku, mlbId: m.mlbId,
         estoqueDe: corpo.available_quantity !== undefined ? m.estoqueEnviado : null,
         estoquePara: corpo.available_quantity ?? null,
         precoDe: corpo.price !== undefined ? m.precoEnviado : null,
@@ -52,14 +54,14 @@ export const sincronizarAnuncios = async (
           `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens
            SET estoque_enviado = COALESCE(?, estoque_enviado), preco_enviado = COALESCE(?, preco_enviado),
                status_ml = COALESCE(?, status_ml), sincronizado_em = NOW(), ultimo_erro = NULL
-           WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
-          [corpo.available_quantity ?? null, corpo.price ?? null, r?.status || null, Number(c.registro.id), tenant, item.idItem]
+           WHERE id_anuncio = ? AND tenant_id = ? AND id_anuncio_item = ?`,
+          [corpo.available_quantity ?? null, corpo.price ?? null, r?.status || null, Number(c.registro.id), tenant, item.idLinha]
         );
       } catch (e: any) {
         linha.erro = e instanceof ErroML ? e.message : (e?.message || 'erro');
         await pool.execute(
-          `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET ultimo_erro = ? WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
-          [String(linha.erro).slice(0, 500), Number(c.registro.id), tenant, item.idItem]
+          `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET ultimo_erro = ? WHERE id_anuncio = ? AND tenant_id = ? AND id_anuncio_item = ?`,
+          [String(linha.erro).slice(0, 500), Number(c.registro.id), tenant, item.idLinha]
         );
       }
       resultado.push(linha);
@@ -87,12 +89,12 @@ export const atualizarStatusDoMl = async (tenant: number, anuncios: AnuncioCarre
     for (const r of parte || []) if (r?.code === 200 && r.body?.id) status.set(String(r.body.id), statusDoMl(r.body));
   }
   for (const c of anuncios) {
-    for (const [idItem, m] of c.noMl) {
+    for (const [idLinha, m] of c.noMl) {
       const novo = m.mlbId ? status.get(m.mlbId) : undefined;
       if (!novo || novo === m.status) continue;
       await pool.execute(
-        `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET status_ml = ? WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
-        [novo, Number(c.registro.id), tenant, idItem]
+        `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET status_ml = ? WHERE id_anuncio = ? AND tenant_id = ? AND id_anuncio_item = ?`,
+        [novo, Number(c.registro.id), tenant, idLinha]
       );
       m.status = novo;
     }

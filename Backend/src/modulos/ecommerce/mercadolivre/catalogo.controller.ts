@@ -45,10 +45,10 @@ export const verificarCatalogo = async (req: Request, res: Response) => {
   try {
     const [c] = await carregarAnuncios(pool as any, tenant, Number(req.params.id));
     if (!c) throw new ErroML('Anúncio não encontrado.', 404);
-    const publicados = c.itens.filter(i => { const m = c.noMl.get(i.idItem); return m?.mlbId && ativoNoMl(m.status); });
+    const publicados = c.itens.filter(i => { const m = c.noMl.get(i.idLinha); return m?.mlbId && ativoNoMl(m.status); });
     if (!publicados.length) throw new ErroML('Publique o anúncio primeiro: o catálogo é verificado sobre o anúncio que já está no ML.');
 
-    const mlbs = publicados.map(i => c.noMl.get(i.idItem)!.mlbId!);
+    const mlbs = publicados.map(i => c.noMl.get(i.idLinha)!.mlbId!);
     const elegibilidade = new Map<string, any>();
     for (let k = 0; k < mlbs.length; k += 20) {
       const r: any = await ml(tenant, 'GET', `/multiget/catalog_listing_eligibility?ids=${mlbs.slice(k, k + 20).join(',')}`).catch(() => []);
@@ -60,7 +60,7 @@ export const verificarCatalogo = async (req: Request, res: Response) => {
 
     const itens = [];
     for (const item of publicados) {
-      const mlb = c.noMl.get(item.idItem)!.mlbId!;
+      const mlb = c.noMl.get(item.idLinha)!.mlbId!;
       const e = elegibilidade.get(mlb) || await ml(tenant, 'GET', `/items/${mlb}/catalog_listing_eligibility`).catch(() => null);
       const status = String(e?.status || '');
       let disputa = null;
@@ -76,7 +76,7 @@ export const verificarCatalogo = async (req: Request, res: Response) => {
         });
       }
       itens.push({
-        idItem: item.idItem, sku: item.sku, mlbId: mlb, preco: item.precoMl ?? null, gtin: item.gtin, marca: item.marca,
+        idItem: item.idItem, idLinha: item.idLinha, sku: item.sku, mlbId: mlb, preco: item.precoMl ?? null, gtin: item.gtin, marca: item.marca,
         elegibilidade: status || null, elegibilidadeTexto: ELEGIBILIDADE[status]?.texto || (status ? status : 'Sem resposta do ML'),
         podeDisputar: Boolean(e?.buy_box_eligible), mlbCatalogo, disputa, candidatos,
       });
@@ -87,15 +87,15 @@ export const verificarCatalogo = async (req: Request, res: Response) => {
   }
 };
 
-/** POST /anuncios/:id/itens/:idItem/catalogo { produtoId } — entra no catálogo com o anúncio tradicional (optin) */
+/** POST /anuncios/:id/itens/:idLinha/catalogo { produtoId } — entra no catálogo com o anúncio tradicional (optin) */
 export const entrarNoCatalogo = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
   try {
     const produtoId = String(req.body?.produtoId || '').trim().toUpperCase();
     if (!/^MLB\d+$/.test(produtoId)) throw new ErroML('Escolha o produto do catálogo.');
     const [c] = await carregarAnuncios(pool as any, tenant, Number(req.params.id));
-    const item = c?.itens.find(i => i.idItem === Number(req.params.idItem));
-    const mlb = item ? c!.noMl.get(item.idItem)?.mlbId : null;
+    const item = c?.itens.find(i => i.idLinha === Number(req.params.idLinha));
+    const mlb = item ? c!.noMl.get(item.idLinha)?.mlbId : null;
     if (!item || !mlb) throw new ErroML('Item não publicado no ML.', 404);
     const e: any = await ml(tenant, 'GET', `/items/${mlb}/catalog_listing_eligibility`);
     if (e?.status !== 'READY_FOR_OPTIN') throw new ErroML(`O ML diz que este item não pode entrar agora: ${ELEGIBILIDADE[e?.status]?.texto || e?.status || 'sem resposta'}.`);

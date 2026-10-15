@@ -22,9 +22,9 @@ const ResultadoRealMl: React.FC<{ atualizar?: unknown }> = ({ atualizar }) => {
       setR(res);
       if (res.anuncios.length) {
         const [lista, fin] = await Promise.all([anunciosApi.listar(), anunciosApi.financeiro()]);
-        const porItem = new Map(fin.flatMap(a => a.itens.map(i => [`${a.id}|${i.idItem}`, i.frete] as const)));
+        const porItem = new Map(fin.flatMap(a => a.itens.map(i => [`${a.id}|${i.idLinha}`, i.frete] as const)));
         const m = new Map<string, number>();
-        for (const a of lista) for (const i of a.itens) if (i.mlbId && porItem.has(`${a.id}|${i.idItem}`)) m.set(i.mlbId, porItem.get(`${a.id}|${i.idItem}`)!);
+        for (const a of lista) for (const i of a.itens) if (i.mlbId && porItem.has(`${a.id}|${i.idLinha}`)) m.set(i.mlbId, porItem.get(`${a.id}|${i.idLinha}`)!);
         setEstimado(m);
       }
     } catch (e) {

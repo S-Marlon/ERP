@@ -22,34 +22,34 @@ const useLucroDosItens = (salvo: AnuncioDetalhe, det: AnuncioDetalhe, rascunhoIt
     let vale = true;
     setCarregando(true);
     anunciosApi.financeiroAnuncio(salvo.id)
-      .then(r => { if (vale) setBase(new Map(r.itens.map(i => [i.idItem, i]))); })
+      .then(r => { if (vale) setBase(new Map(r.itens.map(i => [i.idLinha, i]))); })
       .catch(() => null)
       .finally(() => { if (vale) setCarregando(false); });
     return () => { vale = false; };
   }, [salvo]);
 
   // preço que vale hoje na tela para cada item com preço no rascunho
-  const mudados = det.itens.filter(i => rascunhoItens[i.idItem] && 'precoMl' in rascunhoItens[i.idItem]).map(i => [i.idItem, i.precoMl ?? i.precoAnuncio] as const);
+  const mudados = det.itens.filter(i => rascunhoItens[i.idLinha] && 'precoMl' in rascunhoItens[i.idLinha]).map(i => [i.idLinha, i.precoMl ?? i.precoAnuncio] as const);
   const chave = JSON.stringify(mudados);
   useEffect(() => {
     if (!mudados.length) { setSimulados(new Map()); return; }
     let vale = true;
     const t = window.setTimeout(async () => {
-      const r = await Promise.all(mudados.map(async ([idItem, preco]) => {
-        try { return { ...(await anunciosApi.simularPreco(salvo.id, idItem, preco)), idItem, freteGratis: base.get(idItem)?.freteGratis ?? false } as FinanceiroItem; }
+      const r = await Promise.all(mudados.map(async ([idLinha, preco]) => {
+        try { return { ...(await anunciosApi.simularPreco(salvo.id, idLinha, preco)), idLinha, idItem: det.itens.find(i => i.idLinha === idLinha)?.idItem ?? 0, freteGratis: base.get(idLinha)?.freteGratis ?? false } as FinanceiroItem; }
         catch { return null; }
       }));
-      if (vale) setSimulados(new Map(r.filter((x): x is FinanceiroItem => !!x).map(x => [x.idItem, x])));
+      if (vale) setSimulados(new Map(r.filter((x): x is FinanceiroItem => !!x).map(x => [x.idLinha, x])));
     }, 400);
     return () => { vale = false; window.clearTimeout(t); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chave, salvo.id]);
 
-  const doItem = (idItem: number) => {
-    const mudou = mudados.find(m => m[0] === idItem);
-    const sim = simulados.get(idItem);
+  const doItem = (idLinha: number) => {
+    const mudou = mudados.find(m => m[0] === idLinha);
+    const sim = simulados.get(idLinha);
     if (mudou) return sim && Math.abs(sim.preco - mudou[1]) < 0.005 ? sim : undefined;
-    return base.get(idItem);
+    return base.get(idLinha);
   };
   return { doItem, carregando };
 };
@@ -58,14 +58,14 @@ interface Props {
   salvo: AnuncioDetalhe;
   det: AnuncioDetalhe;                                  // com o rascunho aplicado
   rascunhoItens: Record<number, RascunhoItem>;
-  onMudarPreco: (idItem: number, preco: number | null) => void;
+  onMudarPreco: (idLinha: number, preco: number | null) => void;
   selecionado: number | null;                           // item aberto no painel de cima
-  onSelecionar: (idItem: number) => void;
+  onSelecionar: (idLinha: number) => void;
 }
 
 const TabelaPrecos: React.FC<Props> = ({ salvo, det, rascunhoItens, onMudarPreco, selecionado, onSelecionar }) => {
   const lucro = useLucroDosItens(salvo, det, rascunhoItens);
-  const mudouPreco = (i: ItemDoAnuncio) => !!rascunhoItens[i.idItem] && 'precoMl' in rascunhoItens[i.idItem];
+  const mudouPreco = (i: ItemDoAnuncio) => !!rascunhoItens[i.idLinha] && 'precoMl' in rascunhoItens[i.idLinha];
   const ajuste = det.ajustePreco ? `${det.ajustePreco > 0 ? '+' : ''}${det.ajustePreco}%` : '';
 
   return (
@@ -75,10 +75,10 @@ const TabelaPrecos: React.FC<Props> = ({ salvo, det, rascunhoItens, onMudarPreco
       extra={<Text type="secondary" style={{ fontSize: 12 }}>Clique num item para ver no painel acima · ajuste do anúncio: {ajuste || '0%'} sobre o ERP</Text>}
     >
       <Table<ItemDoAnuncio>
-        size="small" rowKey="idItem" dataSource={det.itens} pagination={det.itens.length > 20 ? { pageSize: 20, showSizeChanger: false } : false}
+        size="small" rowKey="idLinha" dataSource={det.itens} pagination={det.itens.length > 20 ? { pageSize: 20, showSizeChanger: false } : false}
         scroll={{ x: 1500 }}
-        rowClassName={i => [i.idItem === selecionado ? 'ml-linha-selecionada' : '', mudouPreco(i) ? 'ml-linha-alterada' : lucro.doItem(i.idItem)?.nivel === 'PREJUIZO' ? 'ml-linha-erro' : ''].join(' ')}
-        onRow={i => ({ onClick: ev => { if (!(ev.target as HTMLElement).closest('input, button, .ant-input-number, .ant-popover, .ant-tag')) onSelecionar(i.idItem); }, style: { cursor: 'pointer' } })}
+        rowClassName={i => [i.idLinha === selecionado ? 'ml-linha-selecionada' : '', mudouPreco(i) ? 'ml-linha-alterada' : lucro.doItem(i.idLinha)?.nivel === 'PREJUIZO' ? 'ml-linha-erro' : ''].join(' ')}
+        onRow={i => ({ onClick: ev => { if (!(ev.target as HTMLElement).closest('input, button, .ant-input-number, .ant-popover, .ant-tag')) onSelecionar(i.idLinha); }, style: { cursor: 'pointer' } })}
         columns={[
           {
             title: 'Item', fixed: 'left', width: 230,
@@ -103,21 +103,21 @@ const TabelaPrecos: React.FC<Props> = ({ salvo, det, rascunhoItens, onMudarPreco
                 <InputNumber
                   size="small" style={{ width: '100%' }} min={0.01} step={0.01} precision={2} decimalSeparator="," prefix="R$"
                   value={i.precoMl ?? i.precoAnuncio}
-                  onChange={v => onMudarPreco(i.idItem, v === null ? null : Number(v))}
+                  onChange={v => onMudarPreco(i.idLinha, v === null ? null : Number(v))}
                 />
                 {i.precoMl === null
                   ? <Text type="secondary" style={{ fontSize: 11 }}>do ERP{ajuste ? ` ${ajuste}` : ''}</Text>
                   : (
                     <Tooltip title={`Voltar ao preço do ERP com o ajuste do anúncio (${formatarMoeda(i.precoAnuncio)} hoje)`}>
-                      <Button type="link" size="small" icon={<RollbackOutlined />} style={{ padding: 0, height: 'auto', fontSize: 11 }} onClick={() => onMudarPreco(i.idItem, null)}>preço próprio</Button>
+                      <Button type="link" size="small" icon={<RollbackOutlined />} style={{ padding: 0, height: 'auto', fontSize: 11 }} onClick={() => onMudarPreco(i.idLinha, null)}>preço próprio</Button>
                     </Tooltip>
                   )}
               </div>
             ),
           },
-          ...colunasLucro<ItemDoAnuncio>(i => lucro.doItem(i.idItem), { aplicarVaiAoRascunho: true, onAplicarPreco: (i, preco) => onMudarPreco(i.idItem, preco) }).map(c => ({
+          ...colunasLucro<ItemDoAnuncio>(i => lucro.doItem(i.idLinha), { aplicarVaiAoRascunho: true, onAplicarPreco: (i, preco) => onMudarPreco(i.idLinha, preco) }).map(c => ({
             ...c,
-            render: (v: unknown, i: ItemDoAnuncio, k: number) => (lucro.doItem(i.idItem) || (!mudouPreco(i) && !lucro.carregando)
+            render: (v: unknown, i: ItemDoAnuncio, k: number) => (lucro.doItem(i.idLinha) || (!mudouPreco(i) && !lucro.carregando)
               ? c.render?.(v, i, k)
               : <Spin size="small" />),
           })),

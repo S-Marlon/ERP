@@ -5,7 +5,7 @@ import type { AnuncioResumo, FinanceiroItem } from './mercadoLivreApi';
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
 const fin = (lucro: number, nivel: FinanceiroItem['nivel'], extra: Partial<FinanceiroItem> = {}): FinanceiroItem => ({
-  idItem: 1, preco: 10, tarifa: 1, frete: 0, recebe: 9 + lucro, custo: 9, lucro, lucroSobreCustoPct: (lucro / 9) * 100, nivel,
+  idItem: 1, idLinha: 1, preco: 10, tarifa: 1, frete: 0, recebe: 9 + lucro, custo: 9, lucro, lucroSobreCustoPct: (lucro / 9) * 100, nivel,
   freteGratis: false, freteDesconhecido: false, alvoPct: 30, precoAlvo: null, alertas: [], ...extra,
 });
 const anuncio = (extra: Partial<AnuncioResumo>): AnuncioResumo => ({

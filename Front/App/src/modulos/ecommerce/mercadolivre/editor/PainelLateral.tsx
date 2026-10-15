@@ -103,7 +103,7 @@ const PainelLateral: React.FC<Props> = ({ det, temRascunho, ocupado, conferencia
               description={conferencia.some(c => !c.ok) && (
                 <div style={{ maxHeight: 200, overflowY: 'auto' }}>
                   {conferencia.filter(c => !c.ok).map(c => (
-                    <div key={c.idItem} style={{ marginBottom: 6 }}><Text strong>{c.sku}</Text>{c.erros.map((e, k) => <div key={k} style={{ fontSize: 12 }}>• {e}</div>)}</div>
+                    <div key={c.idLinha ?? c.idItem} style={{ marginBottom: 6 }}><Text strong>{c.sku}</Text>{c.erros.map((e, k) => <div key={k} style={{ fontSize: 12 }}>• {e}</div>)}</div>
                   ))}
                 </div>
               )}

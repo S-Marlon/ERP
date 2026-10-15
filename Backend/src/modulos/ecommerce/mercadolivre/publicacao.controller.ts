@@ -27,7 +27,8 @@ const carregarOuErro = async (tenant: number, id: number) => {
   return c;
 };
 
-const aPublicar = (c: AnuncioCarregado) => c.itens.filter(i => !c.noMl.get(i.idItem)?.mlbId);
+// linha desativada pelo operador não sobe
+const aPublicar = (c: AnuncioCarregado) => c.itens.filter(i => !c.noMl.get(i.idLinha)?.mlbId && i.linhaAtiva !== false);
 
 /**
  * Fotos do item no formato do ML. Arquivo do servidor sobe para o ML (e o id fica guardado para não subir de novo);
@@ -40,7 +41,7 @@ const fotosDoItem = async (tenant: number, c: AnuncioCarregado, item: ItemAnunci
      ORDER BY (tipo_anexo = 'IMAGEM_PRINCIPAL') DESC, ordem, id_anexo`,
     [tenant, item.idItem]
   );
-  const guardadas = { ...(c.noMl.get(item.idItem)?.fotosMl || {}) };
+  const guardadas = { ...(c.noMl.get(item.idLinha)?.fotosMl || {}) };
   const fotos: FotoEnvio[] = [];
   const problemas: string[] = [];
   let mudou = false;
@@ -79,10 +80,10 @@ const fotosDoItem = async (tenant: number, c: AnuncioCarregado, item: ItemAnunci
   }
   if (mudou) {
     await pool.execute(
-      `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET fotos_ml = ? WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
-      [JSON.stringify(guardadas), Number(c.registro.id), tenant, item.idItem]
+      `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET fotos_ml = ? WHERE id_anuncio = ? AND tenant_id = ? AND id_anuncio_item = ?`,
+      [JSON.stringify(guardadas), Number(c.registro.id), tenant, item.idLinha]
     );
-    const m = c.noMl.get(item.idItem);
+    const m = c.noMl.get(item.idLinha);
     if (m) m.fotosMl = guardadas;
   }
   if (fotos.length === 0 && problemas.length === 0) problemas.push('nenhuma foto que o ML consiga ler (envie a foto pelo ERP ou use link https)');
@@ -120,7 +121,7 @@ export const validarAnuncio = async (req: Request, res: Response) => {
         if (!(e instanceof ErroML)) throw e;
         erros = [...erros, ...(errosDoValidador(e.detalhes).length ? errosDoValidador(e.detalhes) : [e.message])];
       }
-      resultado.push({ idItem: item.idItem, sku: item.sku, ok: erros.length === 0, erros });
+      resultado.push({ idItem: item.idItem, idLinha: item.idLinha, sku: item.sku, ok: erros.length === 0, erros });
     }
     return res.json({ itens: resultado, detalhe: await detalhe(tenant, await carregarOuErro(tenant, Number(req.params.id))) });
   } catch (error) {
@@ -156,16 +157,16 @@ export const publicarAnuncio = async (req: Request, res: Response) => {
         await pool.execute(
           `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens
            SET mlb_id = ?, status_ml = ?, permalink = ?, preco_enviado = ?, estoque_enviado = ?, sincronizado_em = NOW(), ultimo_erro = NULL
-           WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
-          [criado.id, criado.status || null, criado.permalink || null, corpo.price, corpo.available_quantity, id, tenant, item.idItem]
+           WHERE id_anuncio = ? AND tenant_id = ? AND id_anuncio_item = ?`,
+          [criado.id, criado.status || null, criado.permalink || null, corpo.price, corpo.available_quantity, id, tenant, item.idLinha]
         );
         publicados.push({ sku: item.sku, mlbId: criado.id });
       } catch (e: any) {
         const erro = e instanceof ErroML && errosDoValidador(e.detalhes).length ? errosDoValidador(e.detalhes).join('; ') : (e?.message || 'erro');
         falhas.push({ sku: item.sku, erro });
         await pool.execute(
-          `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET ultimo_erro = ? WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
-          [erro.slice(0, 500), id, tenant, item.idItem]
+          `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET ultimo_erro = ? WHERE id_anuncio = ? AND tenant_id = ? AND id_anuncio_item = ?`,
+          [erro.slice(0, 500), id, tenant, item.idLinha]
         );
       }
     }
@@ -375,7 +376,7 @@ export const situacaoSincronizacao = async (req: Request, res: Response) => res.
 // ---------------------------------------------------------------------------
 
 /** Itens publicados que ainda existem no ML (ativos ou pausados). */
-const noMlAinda = (c: AnuncioCarregado) => c.itens.filter(i => { const m = c.noMl.get(i.idItem); return m?.mlbId && !foraDoMl(m.status); });
+const noMlAinda = (c: AnuncioCarregado) => c.itens.filter(i => { const m = c.noMl.get(i.idLinha); return m?.mlbId && !foraDoMl(m.status); });
 
 const mensagemDoMl = (e: any) => (e instanceof ErroML && errosDoValidador(e.detalhes).length ? errosDoValidador(e.detalhes).join('; ') : e?.message || 'erro');
 
@@ -391,9 +392,9 @@ export const atualizarNoMl = async (req: Request, res: Response) => {
     const itens = noMlAinda(c);
     if (!itens.length) throw new ErroML('Nenhum item deste anúncio está ativo ou pausado no Mercado Livre.');
     const descricao = String(c.dados.descricao || '').trim();
-    const resultado: { idItem: number; sku: string; ok: boolean; erros: string[] }[] = [];
+    const resultado: { idItem: number; idLinha: number; sku: string; ok: boolean; erros: string[] }[] = [];
     for (const item of itens) {
-      const mlb = c.noMl.get(item.idItem)!.mlbId!;
+      const mlb = c.noMl.get(item.idLinha)!.mlbId!;
       const erros: string[] = [];
       try {
         const { fotos, problemas } = await fotosDoItem(tenant, c, item);
@@ -413,10 +414,10 @@ export const atualizarNoMl = async (req: Request, res: Response) => {
       }
       await pool.execute(
         `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET ultimo_erro = ?, sincronizado_em = IF(? IS NULL, NOW(), sincronizado_em)
-         WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
-        [erros.length ? erros.join('; ').slice(0, 500) : null, erros.length ? 'erro' : null, id, tenant, item.idItem]
+         WHERE id_anuncio = ? AND tenant_id = ? AND id_anuncio_item = ?`,
+        [erros.length ? erros.join('; ').slice(0, 500) : null, erros.length ? 'erro' : null, id, tenant, item.idLinha]
       );
-      resultado.push({ idItem: item.idItem, sku: item.sku, ok: erros.length === 0, erros });
+      resultado.push({ idItem: item.idItem, idLinha: item.idLinha, sku: item.sku, ok: erros.length === 0, erros });
     }
     // faixas por quantidade (a tabela inteira é substituída em cada item)
     for (const falha of await enviarFaixasDoAnuncio(tenant, c)) {
@@ -441,13 +442,14 @@ export const pausarNoMl = async (req: Request, res: Response) => {
     if (!itens.length) throw new ErroML('Nenhum item deste anúncio está ativo ou pausado no Mercado Livre.');
     const falhas: string[] = [];
     for (const item of itens) {
-      const m = c.noMl.get(item.idItem)!;
+      const m = c.noMl.get(item.idLinha)!;
       if ((pausar && m.status === 'paused') || (!pausar && m.status === 'active')) continue;
+      if (!pausar && item.linhaAtiva === false) continue;   // linha desativada pelo operador fica pausada
       try {
         const r: any = await ml(tenant, 'PUT', `/items/${m.mlbId}`, { status: pausar ? 'paused' : 'active' });
         m.status = r?.status || (pausar ? 'paused' : 'active');
-        await pool.execute(`UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET status_ml = ? WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
-          [m.status, id, tenant, item.idItem]);
+        await pool.execute(`UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET status_ml = ? WHERE id_anuncio = ? AND tenant_id = ? AND id_anuncio_item = ?`,
+          [m.status, id, tenant, item.idLinha]);
       } catch (e: any) {
         falhas.push(`${item.sku}: ${mensagemDoMl(e)}`);
       }

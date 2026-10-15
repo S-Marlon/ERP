@@ -13,7 +13,7 @@ const NIVEL_COR: Record<string, string> = { PREJUIZO: '#cf1322', BAIXO: '#d46b08
 const moeda = (v: number) => formatarMoeda(v);
 
 /** Você recebe e lucro a um preço, perguntando ao servidor (espera parar de digitar). */
-export const usePrevisaoPreco = (idAnuncio: number, idItem: number, preco: number | null, ativo: boolean) => {
+export const usePrevisaoPreco = (idAnuncio: number, idLinha: number, preco: number | null, ativo: boolean) => {
   const [previsao, setPrevisao] = useState<PrevisaoPreco | null>(null);
   const [carregando, setCarregando] = useState(false);
   useEffect(() => {
@@ -21,12 +21,12 @@ export const usePrevisaoPreco = (idAnuncio: number, idItem: number, preco: numbe
     let vale = true;
     const t = window.setTimeout(async () => {
       setCarregando(true);
-      try { const p = await anunciosApi.simularPreco(idAnuncio, idItem, preco); if (vale) setPrevisao(p); }
+      try { const p = await anunciosApi.simularPreco(idAnuncio, idLinha, preco); if (vale) setPrevisao(p); }
       catch { /* a previsão é só ajuda */ }
       finally { if (vale) setCarregando(false); }
     }, 350);
     return () => { vale = false; window.clearTimeout(t); };
-  }, [idAnuncio, idItem, preco, ativo]);
+  }, [idAnuncio, idLinha, preco, ativo]);
   return { previsao: ativo ? previsao : null, carregando: ativo && carregando };
 };
 
@@ -62,13 +62,13 @@ export const BotaoAlvo: React.FC<{ precoAlvo: number | null; alvoPct: number; at
  * alvo põe o preço recomendado. Confirma com ✓ ou Enter (Esc desfaz).
  */
 export const PrecoRapido: React.FC<{
-  idAnuncio: number; idItem: number; valor: number; proprio: boolean; atual?: FinanceiroItem; onSalvar: (v: number) => Promise<void>;
-}> = ({ idAnuncio, idItem, valor, proprio, atual, onSalvar }) => {
+  idAnuncio: number; idLinha: number; valor: number; proprio: boolean; atual?: FinanceiroItem; onSalvar: (v: number) => Promise<void>;
+}> = ({ idAnuncio, idLinha, valor, proprio, atual, onSalvar }) => {
   const [v, setV] = useState<number | null>(valor);
   const [salvando, setSalvando] = useState(false);
   useEffect(() => { setV(valor); }, [valor]);
   const mudou = v !== null && Math.abs(v - valor) >= 0.005;
-  const { previsao, carregando } = usePrevisaoPreco(idAnuncio, idItem, v, mudou);
+  const { previsao, carregando } = usePrevisaoPreco(idAnuncio, idLinha, v, mudou);
   const confirmar = async () => {
     if (!mudou || !v || v <= 0) return;
     setSalvando(true);

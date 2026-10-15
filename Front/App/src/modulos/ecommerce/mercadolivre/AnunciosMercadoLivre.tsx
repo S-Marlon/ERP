@@ -98,7 +98,7 @@ const AnunciosMercadoLivre: React.FC = () => {
   };
   const excluir = (id: number) => acao(() => anunciosApi.excluir(id), 'Rascunho excluído.').catch(() => undefined);
   const salvarPreco = (a: AnuncioResumo, i: ItemResumo, preco: number) =>
-    acao(() => anunciosApi.precoItem(a.id, i.idItem, preco), i.mlbId ? `Preço de ${i.sku} salvo e enviado ao ML.` : `Preço de ${i.sku} salvo.`).catch(() => undefined);
+    acao(() => anunciosApi.precoItem(a.id, i.idLinha, preco), i.mlbId ? `Preço de ${i.sku} salvo e enviado ao ML.` : `Preço de ${i.sku} salvo.`).catch(() => undefined);
   const salvarEstoque = (a: AnuncioResumo, r: { estoqueReserva: number; estoqueMaximo: number | null }) =>
     acao(() => anunciosApi.salvar(a.id, r), a.publicados ? 'Estoque salvo e enviado ao ML.' : 'Estoque salvo.').catch(() => undefined);
   const ativar = (a: AnuncioResumo, sim: boolean) =>
@@ -118,7 +118,7 @@ const AnunciosMercadoLivre: React.FC = () => {
     carregar();
   };
 
-  const itemDoFin = (a: AnuncioResumo, idItem: number) => financeiro.get(a.id)?.find(f => f.idItem === idItem);
+  const itemDoFin = (a: AnuncioResumo, idLinha: number) => financeiro.get(a.id)?.find(f => f.idLinha === idLinha);
 
   /** Anúncio com vários itens: faixa do lucro e a pior situação (os números de cada item ficam ao abrir a linha). */
   const resumoVarios = (a: AnuncioResumo) => {
@@ -131,10 +131,10 @@ const AnunciosMercadoLivre: React.FC = () => {
       </Space>
     );
   };
-  const finUnico = (a: AnuncioResumo) => (a.itens.length === 1 ? itemDoFin(a, a.itens[0].idItem) : undefined);
+  const finUnico = (a: AnuncioResumo) => (a.itens.length === 1 ? itemDoFin(a, a.itens[0].idLinha) : undefined);
 
   // visão por item: todos os itens dos anúncios do filtro, cada um com os números dele
-  const linhasItens = useMemo<LinhaItem[]>(() => visiveis.flatMap(a => a.itens.map(i => ({ chave: `${a.id}-${i.idItem}`, a, i, f: financeiro.get(a.id)?.find(x => x.idItem === i.idItem) })))
+  const linhasItens = useMemo<LinhaItem[]>(() => visiveis.flatMap(a => a.itens.map(i => ({ chave: `${a.id}-${i.idLinha}`, a, i, f: financeiro.get(a.id)?.find(x => x.idLinha === i.idLinha) })))
     .filter(l => filtro !== 'lucroBaixo' || (l.f && (l.f.nivel === 'PREJUIZO' || l.f.nivel === 'BAIXO')))
     .filter(l => filtro !== 'degrau' || (l.f?.alertas || []).some(x => x.grave))
     .filter(l => !busca.trim() || [l.i.sku, l.i.nome, l.i.mlbId, l.a.titulo].some(x => String(x || '').toLowerCase().includes(busca.trim().toLowerCase()))),
@@ -142,7 +142,7 @@ const AnunciosMercadoLivre: React.FC = () => {
 
   const itensExpandidos = (a: AnuncioResumo) => (
     <Table<ItemResumo>
-      size="small" rowKey="idItem" dataSource={a.itens} pagination={false} style={{ margin: '4px 0' }}
+      size="small" rowKey="idLinha" dataSource={a.itens} pagination={false} style={{ margin: '4px 0' }}
       columns={[
         {
           title: 'Item', render: (_, i) => (
@@ -159,8 +159,8 @@ const AnunciosMercadoLivre: React.FC = () => {
             </Space>
           ),
         },
-        { title: 'Preço no ML', width: 210, render: (_, i) => <PrecoRapido idAnuncio={a.id} idItem={i.idItem} atual={itemDoFin(a, i.idItem)} valor={i.preco} proprio={i.precoMl !== null} onSalvar={v => salvarPreco(a, i, v)} /> },
-        ...colunasLucro<ItemResumo>(i => itemDoFin(a, i.idItem), { onAplicarPreco: (i, preco) => salvarPreco(a, i, preco), compacto: true }),
+        { title: 'Preço no ML', width: 210, render: (_, i) => <PrecoRapido idAnuncio={a.id} idLinha={i.idLinha} atual={itemDoFin(a, i.idLinha)} valor={i.preco} proprio={i.precoMl !== null} onSalvar={v => salvarPreco(a, i, v)} /> },
+        ...colunasLucro<ItemResumo>(i => itemDoFin(a, i.idLinha), { onAplicarPreco: (i, preco) => salvarPreco(a, i, preco), compacto: true }),
         {
           title: 'Estoque', width: 120, align: 'right',
           render: (_, i) => <Text><Text type="secondary" style={{ fontSize: 12 }}>ERP {i.estoque} →</Text> <Text strong style={{ color: i.mlbId && i.estoqueMl === 0 ? '#cf1322' : undefined }}>ML {i.estoqueMl}</Text>{i.unidade ? <Text type="secondary" style={{ fontSize: 11 }}> {i.unidade}</Text> : null}</Text>,
@@ -265,7 +265,7 @@ const AnunciosMercadoLivre: React.FC = () => {
               },
               {
                 title: 'Preço no ML', width: 200, sorter: (x, y) => x.i.preco - y.i.preco,
-                render: (_, l) => <PrecoRapido idAnuncio={l.a.id} idItem={l.i.idItem} atual={l.f} valor={l.i.preco} proprio={l.i.precoMl !== null} onSalvar={v => salvarPreco(l.a, l.i, v)} />,
+                render: (_, l) => <PrecoRapido idAnuncio={l.a.id} idLinha={l.i.idLinha} atual={l.f} valor={l.i.preco} proprio={l.i.precoMl !== null} onSalvar={v => salvarPreco(l.a, l.i, v)} />,
               },
               ...colunasLucro<LinhaItem>(l => l.f, { onAplicarPreco: (l, preco) => salvarPreco(l.a, l.i, preco) }),
               {
@@ -319,7 +319,7 @@ const AnunciosMercadoLivre: React.FC = () => {
             {
               title: <Tooltip title="Mude o preço e veja na hora quanto você recebe e o lucro. O botão do alvo sugere o preço para a sua margem.">Preço no ML</Tooltip>, width: 210,
               render: (_, a) => (a.itens.length === 1
-                ? <PrecoRapido idAnuncio={a.id} idItem={a.itens[0].idItem} atual={itemDoFin(a, a.itens[0].idItem)} valor={a.itens[0].preco} proprio={a.itens[0].precoMl !== null} onSalvar={v => salvarPreco(a, a.itens[0], v)} />
+                ? <PrecoRapido idAnuncio={a.id} idLinha={a.itens[0].idLinha} atual={itemDoFin(a, a.itens[0].idLinha)} valor={a.itens[0].preco} proprio={a.itens[0].precoMl !== null} onSalvar={v => salvarPreco(a, a.itens[0], v)} />
                 : <Text>{a.precoMin === null ? '—' : faixaMoeda(a.precoMin, a.precoMax ?? a.precoMin, formatarMoeda)}</Text>),
             },
             ...colunasLucro<AnuncioResumo>(finUnico, { onAplicarPreco: (a, preco) => salvarPreco(a, a.itens[0], preco) }),

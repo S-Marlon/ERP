@@ -85,7 +85,7 @@ export const contextoVenda = async (
   tenant: number, c: AnuncioCarregado, item: ItemAnuncio, op: { informado?: number | null; alvoPadrao?: number } = {}
 ) => {
   // o tipo vale o do ML quando o item já está publicado (o do ERP pode estar desatualizado)
-  const mlb = c.noMl.get(item.idItem)?.mlbId || null;
+  const mlb = c.noMl.get(item.idLinha)?.mlbId || null;
   const noMlEnvio = mlb ? await freteGratisNoMl(tenant, mlb) : null;
   const tipo: string = noMlEnvio?.tipo && ['gold_special', 'gold_pro'].includes(noMlEnvio.tipo) ? noMlEnvio.tipo : c.registro.tipo_anuncio;
   const informado = op.informado ?? null;
@@ -186,12 +186,12 @@ export const contextoVenda = async (
   return { tipo, fator, custo, alvo, tarifaDe, envioDe, freteDe, avaliar, precoAlvoDe, limiteTaxaFixa, alertasDe, freteGratis, logistica, peso, noMlEnvio };
 };
 
-/** GET /anuncios/:id/itens/:idItem/preco?simular=&frete=&alvoPadrao=30 */
+/** GET /anuncios/:id/itens/:idLinha/preco?simular=&frete=&alvoPadrao=30 */
 export const analisarPreco = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
   try {
     const [c] = await carregarAnuncios(pool as any, tenant, Number(req.params.id));
-    const item = c?.itens.find(i => i.idItem === Number(req.params.idItem));
+    const item = c?.itens.find(i => i.idLinha === Number(req.params.idLinha));
     if (!c || !item) throw new ErroML('Item não encontrado no anúncio.', 404);
     if (!c.dados.categoriaMl) throw new ErroML('Escolha a categoria do ML primeiro: a tarifa depende dela.');
     // frete informado à mão vale para tudo; sem ele, o frete vem do ML para cada valor de compra
@@ -246,7 +246,7 @@ export const analisarPreco = async (req: Request, res: Response) => {
         const v = resolverValor(a, c.dados.atributos[a.id], item);
         return [a.id, v ? { valor: v.valor, unidade: v.unidade } : null];
       }));
-      const mlb = c.noMl.get(item.idItem)?.mlbId;
+      const mlb = c.noMl.get(item.idLinha)?.mlbId;
       const noMl: any = mlb ? await ml(tenant, 'GET', `/items/${mlb}?attributes=catalog_product_id`).catch(() => null) : null;
       if (noMl?.catalog_product_id) {
         const prod: any = await ml(tenant, 'GET', `/products/${noMl.catalog_product_id}`).catch(() => null);
@@ -283,7 +283,7 @@ export const analisarPreco = async (req: Request, res: Response) => {
     }
     const faixas = porQuantidade.filter(x => x.faixa).map(x => ({ minimo: x.quantidade, desconto: x.desconto, preco: x.precoUnit, lucro: x.lucroPorUnidade, lucroSobreCustoPct: x.lucroSobreCustoPct, nivel: x.nivel }));
     return res.json({
-      idItem: item.idItem, sku: item.sku, titulo: item.tituloMl || item.nome, marca: marcaDoAnuncio,
+      idItem: item.idItem, idLinha: item.idLinha, sku: item.sku, titulo: item.tituloMl || item.nome, marca: marcaDoAnuncio,
       unidades, unidadeMl: item.unidadeMl?.sigla || null, custo, custoBase: fator > 1 ? r2(custo / fator) : custo,
       alvo: { pct: alvo.alvoPct, origem: alvo.origem },
       tarifa: tarifaAtual, frete,
@@ -318,7 +318,7 @@ const financeiroDe = async (tenant: number, c: AnuncioCarregado) => {
       const preco = precoNoMl(item, c.dados.ajustePreco);
       const l = await ctx.avaliar(preco);
       return {
-        idItem: item.idItem, preco: l.preco, tarifa: l.tarifa, frete: l.frete, recebe: l.liquido, custo: l.custo, lucro: l.lucro,
+        idItem: item.idItem, idLinha: item.idLinha, preco: l.preco, tarifa: l.tarifa, frete: l.frete, recebe: l.liquido, custo: l.custo, lucro: l.lucro,
         lucroSobreCustoPct: l.lucroSobreCustoPct, nivel: l.nivel, freteGratis: ctx.freteGratis, freteDesconhecido: l.freteDesconhecido, alvoPct: ctx.alvo.alvoPct,
         precoAlvo: await ctx.precoAlvoDe(preco, l.frete),
         alertas: await ctx.alertasDe(preco, l),
@@ -356,12 +356,12 @@ export const financeiroAnuncio = async (req: Request, res: Response) => {
   }
 };
 
-/** GET /anuncios/:id/itens/:idItem/simular?preco= — você recebe e lucro a um preço (para ver enquanto digita) e o preço do alvo. */
+/** GET /anuncios/:id/itens/:idLinha/simular?preco= — você recebe e lucro a um preço (para ver enquanto digita) e o preço do alvo. */
 export const simularPreco = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
   try {
     const [c] = await carregarAnuncios(pool as any, tenant, Number(req.params.id));
-    const item = c?.itens.find(i => i.idItem === Number(req.params.idItem));
+    const item = c?.itens.find(i => i.idLinha === Number(req.params.idLinha));
     if (!c || !item) throw new ErroML('Item não encontrado no anúncio.', 404);
     if (!c.dados.categoriaMl) throw new ErroML('Escolha a categoria do ML primeiro: a tarifa depende dela.');
     const ctx = await contextoVenda(tenant, c, item);

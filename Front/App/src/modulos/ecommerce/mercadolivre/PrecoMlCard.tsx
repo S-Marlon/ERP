@@ -29,14 +29,14 @@ const r2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
 interface Props {
   salvo: AnuncioDetalhe;
   det: AnuncioDetalhe;                                  // com o rascunho aplicado
-  idItem: number;
-  onTrocarItem: (idItem: number) => void;
-  onMudarPreco: (idItem: number, preco: number | null) => void;
+  idLinha: number;
+  onTrocarItem: (idLinha: number) => void;
+  onMudarPreco: (idLinha: number, preco: number | null) => void;
   /** Põe o tipo e o frete grátis do cenário nas alterações (freteGratis undefined = não muda o frete). */
   onEscolherCenario: (tipo: string, freteGratis: boolean | undefined) => void;
 }
 
-const PrecoMlCard: React.FC<Props> = ({ salvo, det, idItem, onTrocarItem, onMudarPreco, onEscolherCenario }) => {
+const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onTrocarItem, onMudarPreco, onEscolherCenario }) => {
   const [analise, setAnalise] = useState<AnalisePreco | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -44,8 +44,8 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idItem, onTrocarItem, onMuda
   const [vendasMes, setVendasMes] = useState(10);
   const vez = useRef(0);
 
-  const item = det.itens.find(i => i.idItem === idItem) || det.itens[0];
-  const itemSalvo = salvo.itens.find(i => i.idItem === item?.idItem);
+  const item = det.itens.find(i => i.idLinha === idLinha) || det.itens[0];
+  const itemSalvo = salvo.itens.find(i => i.idLinha === item?.idLinha);
   const preco = item ? item.precoMl ?? item.precoAnuncio : 0;
   const precoSalvo = itemSalvo ? itemSalvo.precoMl ?? itemSalvo.precoAnuncio : preco;
   const mudou = Math.abs(preco - precoSalvo) >= 0.005;
@@ -57,7 +57,7 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idItem, onTrocarItem, onMuda
     const t = window.setTimeout(async () => {
       setCarregando(true);
       try {
-        const r = await anunciosApi.analisePreco(det.id, item.idItem, { preco, frete });
+        const r = await anunciosApi.analisePreco(det.id, item.idLinha, { preco, frete });
         if (minha === vez.current) { setAnalise(r); setErro(null); }
       } catch (e) {
         if (minha === vez.current) setErro(e instanceof Error ? e.message : 'Erro ao analisar.');
@@ -66,13 +66,13 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idItem, onTrocarItem, onMuda
       }
     }, 300);
     return () => window.clearTimeout(t);
-  }, [det.id, item?.idItem, preco, frete]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [det.id, item?.idLinha, preco, frete]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!item) return null;
-  const mudar = (v: number | null) => { if (v !== null && v > 0) onMudarPreco(item.idItem, r2(v)); };
+  const mudar = (v: number | null) => { if (v !== null && v > 0) onMudarPreco(item.idLinha, r2(v)); };
   const passo = (d: number) => mudar(r2(preco + d));
 
-  const a = analise && analise.idItem === item.idItem ? analise : null;
+  const a = analise && analise.idLinha === item.idLinha ? analise : null;
   const l = a?.atual;
   const e = a?.envio;
   const alvoPct = a?.alvo.pct ?? 30;
@@ -110,8 +110,8 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idItem, onTrocarItem, onMuda
           <LineChartOutlined style={{ color: '#1677ff' }} />
           {det.itens.length > 1 ? (
             <Select
-              size="small" style={{ minWidth: 280 }} value={item.idItem} onChange={onTrocarItem} showSearch optionFilterProp="label"
-              options={det.itens.map(i => ({ value: i.idItem, label: `${i.sku} · ${i.tituloMl || i.nome}` }))}
+              size="small" style={{ minWidth: 280 }} value={item.idLinha} onChange={onTrocarItem} showSearch optionFilterProp="label"
+              options={det.itens.map(i => ({ value: i.idLinha, label: `${i.sku} · ${i.tituloMl || i.nome}` }))}
             />
           ) : <span>{item.sku} · {item.tituloMl || item.nome}</span>}
           {carregando && <Spin size="small" />}
@@ -140,8 +140,8 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idItem, onTrocarItem, onMuda
           <div style={{ marginTop: 2 }}>
             <Space size={8} wrap>
               <Text type="secondary" style={{ fontSize: 12 }}>loja {formatarMoeda(item.preco)}</Text>
-              {mudou && <Button type="link" size="small" icon={<RollbackOutlined />} style={{ padding: 0, height: 'auto', fontSize: 12 }} onClick={() => onMudarPreco(item.idItem, itemSalvo?.precoMl ?? null)}>voltar a {formatarMoeda(precoSalvo)}</Button>}
-              {item.precoMl !== null && <Tooltip title={`Seguir o preço do ERP com o ajuste do anúncio (${formatarMoeda(item.precoAnuncio)})`}><Button type="link" size="small" style={{ padding: 0, height: 'auto', fontSize: 12 }} onClick={() => onMudarPreco(item.idItem, null)}>usar o do ERP</Button></Tooltip>}
+              {mudou && <Button type="link" size="small" icon={<RollbackOutlined />} style={{ padding: 0, height: 'auto', fontSize: 12 }} onClick={() => onMudarPreco(item.idLinha, itemSalvo?.precoMl ?? null)}>voltar a {formatarMoeda(precoSalvo)}</Button>}
+              {item.precoMl !== null && <Tooltip title={`Seguir o preço do ERP com o ajuste do anúncio (${formatarMoeda(item.precoAnuncio)})`}><Button type="link" size="small" style={{ padding: 0, height: 'auto', fontSize: 12 }} onClick={() => onMudarPreco(item.idLinha, null)}>usar o do ERP</Button></Tooltip>}
             </Space>
           </div>
         </div>

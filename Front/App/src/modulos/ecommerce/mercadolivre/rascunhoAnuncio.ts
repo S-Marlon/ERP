@@ -67,13 +67,13 @@ export const mudarAtributo = (r: Rascunho, det: AnuncioDetalhe, idAtributo: stri
   return { ...r, anuncio };
 };
 
-export const mudarItem = <K extends CampoItem>(r: Rascunho, det: AnuncioDetalhe, idItem: number, campo: K, valor: RascunhoItem[K]): Rascunho => {
-  const item = det.itens.find(i => i.idItem === idItem);
+export const mudarItem = <K extends CampoItem>(r: Rascunho, det: AnuncioDetalhe, idLinha: number, campo: K, valor: RascunhoItem[K]): Rascunho => {
+  const item = det.itens.find(i => i.idLinha === idLinha);
   if (!item) return r;
-  const doItem = { ...(r.itens[idItem] || {}) };
+  const doItem = { ...(r.itens[idLinha] || {}) };
   if (igual(valor, originalItem(item, campo))) delete doItem[campo]; else doItem[campo] = valor;
   const itens = { ...r.itens };
-  if (Object.keys(doItem).length) itens[idItem] = doItem; else delete itens[idItem];
+  if (Object.keys(doItem).length) itens[idLinha] = doItem; else delete itens[idLinha];
   return { ...r, itens };
 };
 
@@ -82,7 +82,7 @@ export const valorAnuncio = <K extends CampoAnuncio>(det: AnuncioDetalhe, r: Ras
   (campo in r.anuncio ? r.anuncio[campo] : originalAnuncio(det, campo)) as Exclude<RascunhoAnuncio[K], undefined> | null;
 export const atributosEfetivos = (det: AnuncioDetalhe, r: Rascunho) => r.anuncio.atributos ?? det.atributos;
 export const valorItem = <K extends CampoItem>(item: ItemDoAnuncio, r: Rascunho, campo: K) => {
-  const doItem = r.itens[item.idItem];
+  const doItem = r.itens[item.idLinha];
   return (doItem && campo in doItem ? doItem[campo] : originalItem(item, campo)) as RascunhoItem[K] | null;
 };
 
@@ -160,7 +160,7 @@ export const listarAlteracoes = (det: AnuncioDetalhe, r: Rascunho, nomes: { atri
     }
   }
   for (const item of det.itens) {
-    const doItem = r.itens[item.idItem];
+    const doItem = r.itens[item.idLinha];
     if (!doItem) continue;
     const noMl = !!item.ml?.mlbId;
     const unidade = (id: unknown) => (id ? item.unidades.find(u => u.idUnidade === id)?.sigla || `#${id}` : item.siglaBase || 'unidade base');
@@ -173,7 +173,7 @@ export const listarAlteracoes = (det: AnuncioDetalhe, r: Rascunho, nomes: { atri
     for (const [campo, rotulo, formato] of campos) {
       if (!(campo in doItem)) continue;
       lista.push({
-        chave: `i:${item.idItem}:${campo}`, grupo: `Item ${item.sku}`, rotulo,
+        chave: `i:${item.idLinha}:${campo}`, grupo: `Item ${item.sku}`, rotulo,
         antes: formato(originalItem(item, campo)), depois: formato(doItem[campo]), vaiAoMl: noMl ? 'NA_HORA' : 'NAO',
       });
     }
@@ -187,8 +187,8 @@ export const desfazer = (r: Rascunho, det: AnuncioDetalhe, chave: string): Rascu
   if (tipo === 'a') { const anuncio = { ...r.anuncio }; delete anuncio[a as CampoAnuncio]; return { ...r, anuncio }; }
   if (tipo === 't') return mudarAtributo(r, det, a, det.atributos[a] || null);
   if (tipo === 'i') {
-    const item = det.itens.find(i => i.idItem === Number(a));
-    return item ? mudarItem(r, det, item.idItem, b as CampoItem, originalItem(item, b as CampoItem) as never) : r;
+    const item = det.itens.find(i => i.idLinha === Number(a));
+    return item ? mudarItem(r, det, item.idLinha, b as CampoItem, originalItem(item, b as CampoItem) as never) : r;
   }
   return r;
 };
@@ -197,7 +197,7 @@ export const desfazer = (r: Rascunho, det: AnuncioDetalhe, chave: string): Rascu
 export const corposParaSalvar = (r: Rascunho) => ({
   anuncio: Object.keys(r.anuncio).length ? { ...r.anuncio } : null,
   itens: Object.entries(r.itens).map(([id, c]) => ({
-    idItem: Number(id),
+    idLinha: Number(id),
     corpo: {
       ...('precoMl' in c ? { preco: c.precoMl ?? null } : {}),
       ...('idUnidade' in c ? { idUnidade: c.idUnidade ?? null } : {}),
@@ -228,7 +228,7 @@ export const comRascunho = (det: AnuncioDetalhe, r: Rascunho): AnuncioDetalhe =>
     ...('freteGratis' in a && det.vendaMl ? { vendaMl: { ...det.vendaMl, freteGratis: !!a.freteGratis } } : {}),
     atributos: a.atributos ?? det.atributos,
     itens: det.itens.map(i => {
-      const c = r.itens[i.idItem];
+      const c = r.itens[i.idLinha];
       if (!c) return i;
       return {
         ...i,

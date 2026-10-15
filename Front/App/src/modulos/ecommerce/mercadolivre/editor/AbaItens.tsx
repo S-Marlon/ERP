@@ -1,8 +1,8 @@
 // Aba Itens e estoque do editor: divisão do estoque loja/ML, e cada item com foto, título no ML, situação no ML,
 // e estoque. Preço e lucro de cada item ficam na aba Preço e lucro. Fotos, adicionar e tirar itens valem na hora.
 import React, { lazy, Suspense, useState } from 'react';
-import { Alert, Avatar, Button, Card, Popconfirm, Space, Spin, Table, Tag, Tooltip, Typography, Upload } from 'antd';
-import { BarcodeOutlined, ColumnWidthOutlined, EditOutlined, DeleteOutlined, InboxOutlined, PictureOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons';
+import { Alert, Avatar, Button, Card, Dropdown, Popconfirm, Space, Spin, Switch, Table, Tag, Tooltip, Typography, Upload } from 'antd';
+import { AppstoreAddOutlined, BarcodeOutlined, ColumnWidthOutlined, EditOutlined, DeleteOutlined, InboxOutlined, PictureOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons';
 // telas de imagem só carregam quando abertas (o editor traz a biblioteca de desenho, que é pesada)
 const FotosMlModal = lazy(() => import('../FotosMlModal'));
 const GeradorMedidasModal = lazy(() => import('../GeradorMedidasModal'));
@@ -12,6 +12,7 @@ import EnviarFotoPopover from '../../../../shared/components/EnviarFotoPopover';
 import { AnuncioDetalhe, foraDoMl, ItemDoAnuncio, ROTULO_STATUS_ML } from '../mercadoLivreApi';
 import { EstoqueAnuncioCard, EstoqueItemCelula } from '../EstoqueMl';
 import type { RascunhoItem } from '../rascunhoAnuncio';
+import { linhasDoItem, rotuloDaUnidade, umaLinhaPorItem, unidadesLivres } from '../linhasAnuncio';
 
 const { Text } = Typography;
 
@@ -20,7 +21,7 @@ interface Props {
   det: AnuncioDetalhe;                                  // com o rascunho aplicado
   rascunhoItens: Record<number, RascunhoItem>;
   onMudarEstoque: (corpo: { estoqueReserva?: number; estoqueMaximo?: number | null; estoqueAutomatico?: boolean }) => void;
-  onMudarItem: (idItem: number, corpo: RascunhoItem) => void;
+  onMudarItem: (idLinha: number, corpo: RascunhoItem) => void;   // linha do anúncio (item + unidade)
   filtro: { texto: string; ids: number[] } | null;
   onLimparFiltro: () => void;
   comErro: Set<number>;
@@ -33,6 +34,8 @@ interface Props {
   onAdicionarItens: () => void;
   onRemoverItem: (item: ItemDoAnuncio) => void;
   onDesligar: (item: ItemDoAnuncio) => void;
+  onOutraUnidade: (item: ItemDoAnuncio, idUnidade: number | null) => void;   // vender o mesmo item também em outra unidade
+  onAtivar: (item: ItemDoAnuncio, ativo: boolean) => void;                     // desativada: não publica; no ML, pausa
   sincronizando: boolean;
   onSincronizar: () => void;
 }
@@ -42,8 +45,8 @@ const AbaItens: React.FC<Props> = p => {
   const [fotosMl, setFotosMl] = useState<{ idItem: number | null } | null>(null);
   const [medidas, setMedidas] = useState(false);
   const [editor, setEditor] = useState(false);
-  const visiveis = det.itens.filter(i => !p.filtro || p.filtro.ids.includes(i.idItem));
-  const semFoto = det.itens.filter(i => i.fotos === 0 && !i.ml.mlbId);
+  const visiveis = det.itens.filter(i => !p.filtro || p.filtro.ids.includes(i.idLinha));
+  const semFoto = [...new Map(det.itens.filter(i => i.fotos === 0 && !i.ml.mlbId).map(i => [i.idItem, i])).values()];
 
   return (
     <>
@@ -79,9 +82,9 @@ const AbaItens: React.FC<Props> = p => {
             action={<Button size="small" onClick={p.onLimparFiltro}>Mostrar todos</Button>} />
         )}
         <Table<ItemDoAnuncio>
-          size="small" rowKey="idItem" dataSource={visiveis} pagination={visiveis.length > 15 ? { pageSize: 15, showSizeChanger: false } : false}
+          size="small" rowKey="idLinha" dataSource={visiveis} pagination={visiveis.length > 15 ? { pageSize: 15, showSizeChanger: false } : false}
           scroll={{ x: 760 }}
-          rowClassName={i => (p.rascunhoItens[i.idItem] ? 'ml-linha-alterada' : p.comErro.has(i.idItem) || p.errosConferencia.has(i.idItem) ? 'ml-linha-erro' : '')}
+          rowClassName={i => (p.rascunhoItens[i.idLinha] ? 'ml-linha-alterada' : p.comErro.has(i.idLinha) || p.errosConferencia.has(i.idLinha) ? 'ml-linha-erro' : i.linhaAtiva === false ? 'ml-linha-desativada' : '')}
           columns={[
             {
               title: 'Foto', width: 64,
@@ -104,9 +107,11 @@ const AbaItens: React.FC<Props> = p => {
               render: (_, i) => (
                 <div style={{ lineHeight: 1.35 }}>
                   <Space size={4} wrap>
-                    <Text strong>{i.sku}</Text>
+                    <Text strong delete={i.linhaAtiva === false}>{i.sku}</Text>
+                    {i.unidadeMl && <Tooltip title="Vendido no ML nesta unidade: estoque, preço e baixa na venda contam o fator"><Tag color="purple" style={{ fontSize: 11 }}>{rotuloDaUnidade(i)}</Tag></Tooltip>}
                     {!i.ativo && <Tag color="red">inativo</Tag>}
-                    {p.rascunhoItens[i.idItem] && <Tag color="processing" style={{ fontSize: 11 }}>alterado</Tag>}
+                    {i.linhaAtiva === false && <Tag style={{ fontSize: 11 }}>desativado</Tag>}
+                    {p.rascunhoItens[i.idLinha] && <Tag color="processing" style={{ fontSize: 11 }}>alterado</Tag>}
                   </Space>
                   <div><Text type="secondary" style={{ fontSize: 12 }}>{i.nome}</Text></div>
                   {det.modo === 'SEPARADO' && i.tituloMl && i.tituloMl !== i.nome && (
@@ -128,13 +133,13 @@ const AbaItens: React.FC<Props> = p => {
                     {!i.ml.mlbId && !i.ml.erro && det.publicados > 0 && <Tag style={{ fontSize: 11 }}>a publicar</Tag>}
                     {det.eixos.map(e => <Tag key={e} color="blue" style={{ fontSize: 11 }}>{i.valores[e]?.valor || '—'}{i.valores[e]?.unidade ? ` ${i.valores[e]?.unidade}` : ''}</Tag>)}
                   </Space>
-                  {p.errosConferencia.get(i.idItem)?.map((e, k) => <div key={k}><Text type="danger" style={{ fontSize: 12 }}>ML: {e}</Text></div>)}
+                  {p.errosConferencia.get(i.idLinha)?.map((e, k) => <div key={k}><Text type="danger" style={{ fontSize: 12 }}>ML: {e}</Text></div>)}
                 </div>
               ),
             },
             {
               title: <Tooltip title="Saldo do ERP e o que vai para o ML. Clique para mudar a unidade vendida ou dar uma regra só a este item.">Estoque</Tooltip>, width: 110, align: 'right',
-              render: (_, i) => <EstoqueItemCelula item={i} det={det} onSalvarRegra={regra => p.onMudarItem(i.idItem, regra)} />,
+              render: (_, i) => <EstoqueItemCelula item={i} det={det} onSalvarRegra={regra => p.onMudarItem(i.idLinha, regra)} />,
             },
             {
               title: '', width: 56,
@@ -148,6 +153,30 @@ const AbaItens: React.FC<Props> = p => {
               ),
             },
             {
+              title: <Tooltip title="Desligado: não publica e, se já está no ML, fica pausado lá. Ao lado, vender o mesmo item também em outra unidade (ex.: kit c/10).">Vende</Tooltip>,
+              width: 92,
+              render: (_, i) => {
+                const livres = unidadesLivres(det.itens, i);
+                return (
+                  <Space size={4}>
+                    <Tooltip title={i.linhaAtiva === false ? 'Desativado: clique para vender de novo' : i.ml.mlbId ? 'Desativar (pausa no ML)' : 'Desativar (não publica)'}>
+                      <Switch size="small" checked={i.linhaAtiva !== false} disabled={foraDoMl(i.ml.status)} onChange={v => p.onAtivar(i, v)} />
+                    </Tooltip>
+                    {livres.length > 0 && (
+                      <Dropdown trigger={['click']} menu={{
+                        items: livres.map(o => ({ key: String(o.idUnidade ?? 'base'), label: `Vender também como ${o.rotulo}` })),
+                        onClick: ({ key }) => p.onOutraUnidade(i, key === 'base' ? null : Number(key)),
+                      }}>
+                        <Tooltip title={linhasDoItem(det.itens, i.idItem) > 1 ? 'Vender em mais uma unidade' : 'Vender também em outra unidade (ex.: kit c/10)'}>
+                          <Button type="text" size="small" icon={<AppstoreAddOutlined />} />
+                        </Tooltip>
+                      </Dropdown>
+                    )}
+                  </Space>
+                );
+              },
+            },
+            {
               title: '', width: 40,
               render: (_, i) => (!i.ml.mlbId || foraDoMl(i.ml.status)) && (det.itens.length > 1 || foraDoMl(i.ml.status)) && (
                 <Popconfirm title={`Tirar ${i.sku} deste anúncio?`} description="Vale na hora." okText="Tirar" onConfirm={() => p.onRemoverItem(i)}>
@@ -159,8 +188,8 @@ const AbaItens: React.FC<Props> = p => {
         />
       </Card>
       <Suspense fallback={null}>
-        {editor && <EditorImagemModal det={p.salvo} onFechar={() => setEditor(false)} onSalvo={p.onFotoFamilia} />}
-        {medidas && <GeradorMedidasModal det={p.salvo} onFechar={() => setMedidas(false)} onSalvo={p.onFotoFamilia} />}
+        {editor && <EditorImagemModal det={umaLinhaPorItem(p.salvo)} onFechar={() => setEditor(false)} onSalvo={p.onFotoFamilia} />}
+        {medidas && <GeradorMedidasModal det={umaLinhaPorItem(p.salvo)} onFechar={() => setMedidas(false)} onSalvo={p.onFotoFamilia} />}
         {fotosMl && <FotosMlModal idAnuncio={det.id} idItemInicial={fotosMl.idItem} onFechar={() => setFotosMl(null)} onImportado={p.onFotoFamilia} />}
       </Suspense>
     </>

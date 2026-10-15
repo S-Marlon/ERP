@@ -43,7 +43,7 @@ export interface AtributoML {
   valores: { id: string; nome: string }[]; unidades: string[]; unidadePadrao: string | null;
 }
 
-export interface Pendencia { nivel: 'erro' | 'aviso'; area: 'dados' | 'itens' | 'atributos' | 'cadastro'; texto: string; idItem?: number; atributo?: string }
+export interface Pendencia { nivel: 'erro' | 'aviso'; area: 'dados' | 'itens' | 'atributos' | 'cadastro'; texto: string; idItem?: number; idLinha?: number; atributo?: string }
 
 export interface AnuncioResumo {
   id: number; titulo: string | null; idFamilia: number | null; familia: string | null;
@@ -54,12 +54,12 @@ export interface AnuncioResumo {
   estoqueMl: number; estoqueReserva: number; estoqueMaximo: number | null; ativosMl: number; pausadosMl: number; itens: ItemResumo[];
 }
 export interface ItemResumo {
-  idItem: number; sku: string; nome: string; fotoUrl: string | null; mlbId: string | null; status: string | null; permalink: string | null;
+  idItem: number; idLinha: number; ativo: boolean; sku: string; nome: string; fotoUrl: string | null; mlbId: string | null; status: string | null; permalink: string | null;
   estoque: number; estoqueMl: number; precoMl: number | null; preco: number; unidade: string | null;
 }
 /** Você recebe e lucro de um item ao preço de hoje (tarifa e frete grátis do ML). */
 export interface FinanceiroItem {
-  idItem: number; preco: number; tarifa: number; frete: number; recebe: number; custo: number; lucro: number;
+  idItem: number; idLinha: number; preco: number; tarifa: number; frete: number; recebe: number; custo: number; lucro: number;
   lucroSobreCustoPct: number | null; nivel: LucroMl['nivel']; freteGratis: boolean; freteDesconhecido: boolean; alvoPct: number;
   precoAlvo: number | null;   // menor preço que dá o alvo sobre o custo (null sem custo)
   alertas: AlertaPreco[];     // degraus de preço (taxa fixa de item barato, frete grátis a partir de R$ 79)
@@ -67,7 +67,7 @@ export interface FinanceiroItem {
 /** Degrau de preço do ML: grave = o preço atual está perdendo dinheiro por pouco (com o preço sugerido). */
 export interface AlertaPreco { tipo: 'TAXA_FIXA' | 'PERTO_TAXA_FIXA' | 'FRETE_ACIMA_79' | 'PERTO_FRETE_79'; grave: boolean; texto: string; precoSugerido: number | null }
 /** Você recebe e lucro a um preço qualquer (simulação enquanto digita). */
-export type PrevisaoPreco = Omit<FinanceiroItem, 'idItem' | 'freteGratis'>;
+export type PrevisaoPreco = Omit<FinanceiroItem, 'idItem' | 'idLinha' | 'freteGratis'>;
 
 /** Preço por quantidade (B2B): a partir de `minimo` unidades, `desconto`% sobre o preço do anúncio. */
 export interface FaixaQuantidade { minimo: number; desconto: number }
@@ -78,7 +78,7 @@ export interface LucroMl {
 }
 export interface EstatisticasMercado { n: number; min: number; p25: number; mediana: number; p75: number; max: number }
 export interface AnalisePreco {
-  idItem: number; sku: string; titulo: string; marca: string | null; unidades: number; unidadeMl: string | null; custo: number; custoBase: number;
+  idItem: number; idLinha: number; sku: string; titulo: string; marca: string | null; unidades: number; unidadeMl: string | null; custo: number; custoBase: number;
   alvo: { pct: number; origem: 'FAMILIA' | 'PADRAO' }; tarifa: { comissaoPct: number; fixa: number }; frete: number;
   atual: LucroMl; simulado: LucroMl | null; precoAlvo: number | null; loja: { preco: number; difPct: number | null };
   mercado: {
@@ -107,7 +107,7 @@ export interface CandidatoCatalogo {
   diferentes: { nome: string; catalogo: string; item: string }[]; conferir: { nome: string; catalogo: string; item: string }[];
 }
 export interface CatalogoItem {
-  idItem: number; sku: string; mlbId: string; elegibilidade: string | null; elegibilidadeTexto: string; podeDisputar: boolean; mlbCatalogo: string | null;
+  idItem: number; idLinha: number; sku: string; mlbId: string; elegibilidade: string | null; elegibilidadeTexto: string; podeDisputar: boolean; mlbCatalogo: string | null;
   disputa: { status: string; precoAtual: number | null; precoParaGanhar: number | null; motivos: string[]; oportunidades: string[]; vantagens: string[];
     ganhador: { mlbId: string; preco: number | null } | null; produtoId: string | null } | null;
   candidatos: CandidatoCatalogo[];
@@ -116,7 +116,10 @@ export interface CatalogoItem {
 export interface UnidadeVenda { idUnidade: number; sigla: string; nome: string; fator: number; preco: number | null }
 
 export interface ItemDoAnuncio {
-  idItem: number; sku: string; nome: string; ativo: boolean; preco: number; precoMl: number | null; precoAnuncio: number;
+  idItem: number;
+  idLinha: number;            // linha do anúncio: o mesmo item pode estar em mais de uma unidade (ex.: UN e kit c/10)
+  linhaAtiva?: boolean;       // false = desativada (não publica; no ML fica pausada)
+  sku: string; nome: string; ativo: boolean; preco: number; precoMl: number | null; precoAnuncio: number;
   comissao: number | null; percentualComissao: number | null; fotos: number; fotoUrl: string | null;
   fotoBase?: string | null;   // 1ª foto sem medidas desenhadas (as geradas pelo editor não servem de base)
   estoque: number;          // saldo do ERP (kit: quantos dá para montar)
@@ -160,9 +163,9 @@ export interface VendaMl { tipo: string | null; freteGratis: boolean; tiposPermi
 /** Foto no ML (do anúncio, de outro anúncio ou do catálogo). */
 export interface FotoMl { id: string; url: string; tamanho: string | null; noErp?: boolean }
 /** Fotos de um item: as do cadastro do ERP e as do anúncio dele no ML. */
-export interface FotosItemMl { idItem: number; sku: string; nome: string; mlbId: string | null; erp: { idAnexo: number; url: string; principal: boolean }[]; ml: FotoMl[] }
+export interface FotosItemMl { idItem: number; idLinha: number; sku: string; nome: string; mlbId: string | null; erp: { idAnexo: number; url: string; principal: boolean }[]; ml: FotoMl[] }
 export interface BuscaFotosMl { origem: 'ANUNCIO' | 'CATALOGO'; id: string; titulo: string; proprio: boolean; catalogo?: string | null; fotos: FotoMl[] }
-export interface ConferenciaItem { idItem: number; sku: string; ok: boolean; erros: string[] }
+export interface ConferenciaItem { idItem: number; idLinha: number; sku: string; ok: boolean; erros: string[] }
 
 export interface AnuncioNoMl {
   mlbId: string; titulo: string; familia: string | null; status: string; preco: number; estoque: number; vendidos: number;
@@ -246,14 +249,14 @@ export const anunciosApi = {
   listar: async () => ler<AnuncioResumo[]>(await fetch(`${API}/anuncios?tenant_id=1`), 'Erro ao listar os anúncios.'),
   fotos: async (id: number) => ler<FotosItemMl[]>(await fetch(`${API}/anuncios/${id}/fotos?tenant_id=1`), 'Erro ao ler as fotos do anúncio.'),
   buscarFotos: async (ref: string) => ler<BuscaFotosMl>(await fetch(`${API}/fotos-ml/buscar?tenant_id=1&ref=${encodeURIComponent(ref)}`), 'Erro ao buscar as fotos no ML.'),
-  importarFotos: async (id: number, itens: { idItem: number; fotos: { url: string; idMl?: string }[] }[]) =>
+  importarFotos: async (id: number, itens: { idItem: number; idLinha?: number; fotos: { url: string; idMl?: string }[] }[]) =>
     ler<{ importadas: number }>(await fetch(`${API}/anuncios/${id}/fotos/importar?tenant_id=1`, json('POST', { itens })), 'Erro ao trazer as fotos para o ERP.'),
   financeiroAnuncio: async (id: number) => {
     const r = await ler<{ id: number; itens: FinanceiroItem[] }>(await fetch(`${API}/anuncios/${id}/financeiro?tenant_id=1`), 'Erro ao calcular o lucro do anúncio.');
     return { ...r, itens: r.itens.map(comAlertas) };
   },
-  simularPreco: async (id: number, idItem: number, preco: number) =>
-    comAlertas(await ler<PrevisaoPreco>(await fetch(`${API}/anuncios/${id}/itens/${idItem}/simular?tenant_id=1&preco=${preco}`), 'Erro ao simular o preço.')),
+  simularPreco: async (id: number, idLinha: number, preco: number) =>
+    comAlertas(await ler<PrevisaoPreco>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}/simular?tenant_id=1&preco=${preco}`), 'Erro ao simular o preço.')),
   financeiro: async () => (await ler<{ id: number; itens: FinanceiroItem[] }[]>(await fetch(`${API}/anuncios/financeiro?tenant_id=1`), 'Erro ao calcular o lucro dos anúncios.'))
     .map(a => ({ ...a, itens: a.itens.map(comAlertas) })),
   detalhe: async (id: number) => ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}?tenant_id=1`), 'Erro ao abrir o anúncio.'),
@@ -269,27 +272,33 @@ export const anunciosApi = {
   excluir: async (id: number) => ler<{ success: boolean }>(await fetch(`${API}/anuncios/${id}?tenant_id=1`, json('DELETE')), 'Erro ao excluir.'),
   adicionarItens: async (id: number, idItens: number[]) =>
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens?tenant_id=1`, json('POST', { idItens })), 'Erro ao adicionar itens.'),
-  removerItem: async (id: number, idItem: number) =>
-    ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idItem}?tenant_id=1`, json('DELETE')), 'Erro ao tirar o item.'),
-  precoItem: async (id: number, idItem: number, preco: number | null) =>
-    ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idItem}?tenant_id=1`, json('PUT', { preco })), 'Erro ao salvar o preço.'),
+  removerItem: async (id: number, idLinha: number) =>
+    ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}?tenant_id=1`, json('DELETE')), 'Erro ao tirar o item.'),
+  /** Vende o mesmo item também em outra unidade (nova linha); idUnidade null = a unidade base. */
+  adicionarUnidade: async (id: number, idLinha: number, idUnidade: number | null) =>
+    ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}/unidade?tenant_id=1`, json('POST', { idUnidade })), 'Erro ao adicionar a unidade.'),
+  /** Liga ou desliga a linha: desligada não publica e, se já está no ML, fica pausada. */
+  ativarLinha: async (id: number, idLinha: number, ativo: boolean) =>
+    ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}?tenant_id=1`, json('PUT', { ativo })), ativo ? 'Erro ao ativar.' : 'Erro ao desativar.'),
+  precoItem: async (id: number, idLinha: number, preco: number | null) =>
+    ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}?tenant_id=1`, json('PUT', { preco })), 'Erro ao salvar o preço.'),
   /** Grava o item do anúncio: preço só no ML, unidade vendida e a regra de estoque (só os campos enviados). */
-  salvarItem: async (id: number, idItem: number, corpo: Record<string, unknown>) =>
-    ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idItem}?tenant_id=1`, json('PUT', corpo)), 'Erro ao salvar o item.'),
-  regraItem: async (id: number, idItem: number, regra: { estoqueReserva?: number | null; estoqueMaximo?: number | null; idUnidade?: number | null }) =>
-    ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idItem}?tenant_id=1`, json('PUT', regra)), 'Erro ao salvar o estoque do item.'),
-  analisePreco: async (id: number, idItem: number, p: { simular?: number | null; frete?: number | null; preco?: number | null }) => {
+  salvarItem: async (id: number, idLinha: number, corpo: Record<string, unknown>) =>
+    ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}?tenant_id=1`, json('PUT', corpo)), 'Erro ao salvar o item.'),
+  regraItem: async (id: number, idLinha: number, regra: { estoqueReserva?: number | null; estoqueMaximo?: number | null; idUnidade?: number | null }) =>
+    ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}?tenant_id=1`, json('PUT', regra)), 'Erro ao salvar o estoque do item.'),
+  analisePreco: async (id: number, idLinha: number, p: { simular?: number | null; frete?: number | null; preco?: number | null }) => {
     const q = new URLSearchParams({ tenant_id: '1' });
     if (p.simular) q.set('simular', String(p.simular));
     if (p.preco) q.set('preco', String(p.preco));
     if (p.frete !== null && p.frete !== undefined) q.set('frete', String(p.frete));
-    const r = await ler<AnalisePreco>(await fetch(`${API}/anuncios/${id}/itens/${idItem}/preco?${q}`), 'Erro ao analisar o preço.');
+    const r = await ler<AnalisePreco>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}/preco?${q}`), 'Erro ao analisar o preço.');
     // backend de versão anterior não manda os campos novos: a tela não pode quebrar
     return { ...r, alertas: r.alertas ?? [], alertasSimulado: r.alertasSimulado ?? [], degraus: r.degraus ?? [], cenarios: r.cenarios ?? [], porQuantidade: r.porQuantidade ?? [] };
   },
   verificarCatalogo: async (id: number) => ler<{ itens: CatalogoItem[] }>(await fetch(`${API}/anuncios/${id}/catalogo?tenant_id=1`), 'Erro ao verificar o catálogo.'),
-  entrarNoCatalogo: async (id: number, idItem: number, produtoId: string) =>
-    ler<{ mlbCatalogo: string | null; permalink: string | null }>(await fetch(`${API}/anuncios/${id}/itens/${idItem}/catalogo?tenant_id=1`, json('POST', { produtoId })), 'Erro ao entrar no catálogo.'),
+  entrarNoCatalogo: async (id: number, idLinha: number, produtoId: string) =>
+    ler<{ mlbCatalogo: string | null; permalink: string | null }>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}/catalogo?tenant_id=1`, json('POST', { produtoId })), 'Erro ao entrar no catálogo.'),
   faixasNoMl: async (id: number, quantidades: string) =>
     ler<{ mlbId: string; sku: string; preco: number; noMl: FaixaQuantidade[]; sugestao: { quantidade: number; desconto: number; preco: number; incoerente: boolean }[] }>(
       await fetch(`${API}/anuncios/${id}/faixas/ml?tenant_id=1&quantidades=${encodeURIComponent(quantidades)}`), 'Erro ao consultar o ML.'),
@@ -299,8 +308,8 @@ export const anunciosApi = {
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/pausar?tenant_id=1`, json('POST', { pausar })), pausar ? 'Erro ao pausar no ML.' : 'Erro ao reativar no ML.'),
   encerrarNoMl: async (id: number) =>
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/encerrar?tenant_id=1`, json('POST', {})), 'Erro ao encerrar no ML.'),
-  desligarDoMl: async (id: number, idItem: number) =>
-    ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idItem}/ml?tenant_id=1`, json('DELETE')), 'Erro ao desligar do ML.'),
+  desligarDoMl: async (id: number, idLinha: number) =>
+    ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}/ml?tenant_id=1`, json('DELETE')), 'Erro ao desligar do ML.'),
   sincronizarAnuncio: async (id: number, forcar = false) =>
     ler<{ enviados: ResultadoSincronizacao[]; detalhe: AnuncioDetalhe }>(await fetch(`${API}/anuncios/${id}/sincronizar?tenant_id=1`, json('POST', { forcar })), 'Erro ao atualizar no ML.'),
   sincronizarTodos: async () =>

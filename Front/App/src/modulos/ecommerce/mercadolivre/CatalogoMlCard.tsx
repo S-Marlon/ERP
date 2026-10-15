@@ -27,9 +27,9 @@ const CatalogoMlCard: React.FC<{ det: AnuncioDetalhe }> = ({ det }) => {
   };
 
   const entrar = async (item: CatalogoItem, produtoId: string) => {
-    setEntrando(`${item.idItem}:${produtoId}`);
+    setEntrando(`${item.idLinha}:${produtoId}`);
     try {
-      const r = await anunciosApi.entrarNoCatalogo(det.id, item.idItem, produtoId);
+      const r = await anunciosApi.entrarNoCatalogo(det.id, item.idLinha, produtoId);
       message.success(`${item.sku} entrou no catálogo${r.mlbCatalogo ? ` (${r.mlbCatalogo})` : ''}. Preço e estoque acompanham o anúncio de sempre.`);
       verificar();
     } catch (e) {
@@ -55,7 +55,7 @@ const CatalogoMlCard: React.FC<{ det: AnuncioDetalhe }> = ({ det }) => {
       )}
       {itens && (
         <Table<CatalogoItem>
-          size="small" rowKey="idItem" dataSource={itens} pagination={itens.length > 10 ? { pageSize: 10 } : false}
+          size="small" rowKey="idLinha" dataSource={itens} pagination={itens.length > 10 ? { pageSize: 10 } : false}
           columns={[
             { title: 'Item', width: 150, render: (_, i) => <div><Text strong>{i.sku}</Text><div><Text type="secondary" style={{ fontSize: 11 }}>{i.mlbId}</Text></div></div> },
             {
@@ -99,7 +99,7 @@ const CatalogoMlCard: React.FC<{ det: AnuncioDetalhe }> = ({ det }) => {
                             <Popconfirm key="e" title="Entrar neste produto do catálogo?"
                               description={<div style={{ maxWidth: 320 }}>Confira se é exatamente o mesmo produto (marca, medida, quantidade). Produto diferente do anunciado gera reclamação e prejudica a reputação.</div>}
                               okText="Entrar no catálogo" onConfirm={() => entrar(i, c.produtoId)}>
-                              <Button size="small" type="primary" loading={entrando === `${i.idItem}:${c.produtoId}`}>Entrar neste</Button>
+                              <Button size="small" type="primary" loading={entrando === `${i.idLinha}:${c.produtoId}`}>Entrar neste</Button>
                             </Popconfirm>
                           ) : <Tooltip key="b" title={c.marcaConfere ? 'Medida ou quantidade diferente: é outro produto' : 'Outra marca: é outro produto'}><Button size="small" disabled>Não é o mesmo</Button></Tooltip>,
                         ]}>

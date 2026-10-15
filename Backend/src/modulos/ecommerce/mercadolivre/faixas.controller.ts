@@ -41,7 +41,7 @@ export const enviarFaixasDoAnuncio = async (tenant: number, c: AnuncioCarregado)
   const faixas = lerFaixas(c.registro.faixas_quantidade);
   const falhas: string[] = [];
   for (const item of c.itens) {
-    const m = c.noMl.get(item.idItem);
+    const m = c.noMl.get(item.idLinha);
     if (!m?.mlbId || m.status === 'closed' || m.status === 'deleted') continue;
     try { await enviarFaixas(tenant, m.mlbId, faixas, precoNoMl(item, c.dados.ajustePreco)); }
     catch (e: any) { falhas.push(`${item.sku}: ${e?.message || 'erro'}`); }
@@ -58,9 +58,9 @@ export const faixasNoMl = async (req: Request, res: Response) => {
   try {
     const [c] = await carregarAnuncios(pool as any, tenant, Number(req.params.id));
     if (!c) throw new ErroML('Anúncio não encontrado.', 404);
-    const item = c.itens.find(i => { const m = c.noMl.get(i.idItem); return m?.mlbId && m.status !== 'closed' && m.status !== 'deleted'; });
+    const item = c.itens.find(i => { const m = c.noMl.get(i.idLinha); return m?.mlbId && m.status !== 'closed' && m.status !== 'deleted'; });
     if (!item) throw new ErroML('Publique o anúncio primeiro: a sugestão do ML é calculada sobre um anúncio que já está lá.');
-    const mlb = c.noMl.get(item.idItem)!.mlbId!;
+    const mlb = c.noMl.get(item.idLinha)!.mlbId!;
     const preco = precoNoMl(item, c.dados.ajustePreco);
     const quantidades = String(req.query.quantidades || '5,10,24,48,100').split(',').map(Number).filter(n => Number.isInteger(n) && n >= 2 && n <= 100);
     const [{ precos }, sugestao] = await Promise.all([

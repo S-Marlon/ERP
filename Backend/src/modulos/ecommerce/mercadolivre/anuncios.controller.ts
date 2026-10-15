@@ -8,6 +8,7 @@ import { estoqueDoKit } from '../../../areas/catalogo/kits/kits';
 import {
   AnuncioDados, AtributoML, categoriaInfo, CategoriaInfo, cortarTitulo, eixosDeVariacao, filtrarAtributosCategoria,
   ItemAnuncio, Pendencia, pendenciasAnuncio, precoNoMl, resolverValor, situacaoPreparo, sugerirAtributos, tituloLegivel, ValorAtributo, modoPublicacao, tituloPeloModelo, estoqueParaMl, regraDoItem, RegraEstoque, saldoNaUnidade, UnidadeVenda, foraDoMl,
+  skuDaLinha, tituloComUnidade,
 } from './anuncios';
 import { ErroML, ml } from './mercadolivreApi';
 import { ehImagemGerada } from './fotos';
@@ -23,7 +24,7 @@ export const tenantDe = (req: Request): number => Number(req.query.tenant_id || 
 
 export const responderErro = (res: Response, error: any, padrao: string) => {
   if (error instanceof ErroML) return res.status(error.status).json({ error: error.message, detalhes: error.detalhes });
-  if (error?.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Um dos itens já está em outro anúncio do Mercado Livre.' });
+  if (error?.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Este item já está anunciado nessa unidade (neste ou em outro anúncio do Mercado Livre).' });
   console.error(padrao, error);
   return res.status(500).json({ error: padrao, details: error?.message });
 };
@@ -89,10 +90,11 @@ export const carregarItens = async (conn: Conn, tenant: number, ids: number[]) =
   const itens = new Map<number, ItemAnuncio>();
   const atributosErp = new Map<number, string>();
   const unidades = new Map<number, UnidadeVenda[]>();
-  if (ids.length === 0) return { itens, atributosErp, unidades };
+  const gtinsPorUnidade = new Map<number, Map<number, string>>();   // item -> unidade -> GTIN (o kit tem o código dele)
+  if (ids.length === 0) return { itens, atributosErp, unidades, gtinsPorUnidade };
 
   const [base] = await conn.execute(
-    `SELECT ic.id_item, ic.status, ic.nome_item, ic.sku AS sku_core, ic.peso_bruto, ic.peso_liquido, umb.sigla AS sigla_base,
+    `SELECT ic.id_item, ic.status, ic.nome_item, ic.sku AS sku_core, ic.peso_bruto, ic.peso_liquido, umb.sigla AS sigla_base, ic.id_unidade AS id_unidade_base,
             cpd.sku_customizado, cpd.nome_comercial, cpd.preco_venda,
             COALESCE(mi.nome, mf.nome) AS marca, lg.altura_cm, lg.largura_cm, lg.comprimento_cm, es.quantidade_atual
      FROM itens_core ic
@@ -113,7 +115,7 @@ export const carregarItens = async (conn: Conn, tenant: number, ids: number[]) =
     [tenant, ...ids]
   );
   const [gtins] = await conn.execute(
-    `SELECT id_item, gtin FROM comercial_unidades_venda
+    `SELECT id_item, id_unidade, gtin FROM comercial_unidades_venda
      WHERE tenant_id = ? AND id_item IN (${lista(ids)}) AND NULLIF(TRIM(gtin), '') IS NOT NULL
      ORDER BY padrao_pdv DESC`,
     [tenant, ...ids]
@@ -153,6 +155,7 @@ export const carregarItens = async (conn: Conn, tenant: number, ids: number[]) =
     const peso = Number(r.peso_bruto) || Number(r.peso_liquido) || null;
     itens.set(id, {
       idItem: id,
+      idLinha: 0,
       sku: r.sku_customizado || r.sku_core,
       nome: r.nome_comercial || r.nome_item,
       ativo: r.status === 'ATIVO',
@@ -178,9 +181,17 @@ export const carregarItens = async (conn: Conn, tenant: number, ids: number[]) =
     if (!i.fotoUrl) i.fotoUrl = f.url_anexo;
     if (!i.fotoBase && !ehImagemGerada(f.nome_arquivo)) i.fotoBase = f.url_anexo;
   }
+  const unidadeBase = new Map<number, number>(base.map((r: any) => [Number(r.id_item), Number(r.id_unidade_base)]));
   for (const g of gtins) {
-    const i = itens.get(Number(g.id_item));
-    if (i && !i.gtin) i.gtin = String(g.gtin).trim();
+    const id = Number(g.id_item);
+    if (!gtinsPorUnidade.has(id)) gtinsPorUnidade.set(id, new Map());
+    const porUnidade = gtinsPorUnidade.get(id)!;
+    if (!porUnidade.has(Number(g.id_unidade))) porUnidade.set(Number(g.id_unidade), String(g.gtin).trim());
+  }
+  for (const [id, i] of itens) {
+    const porUnidade = gtinsPorUnidade.get(id);
+    // o da unidade base; sem ele, o primeiro cadastrado (como era antes)
+    i.gtin = porUnidade?.get(unidadeBase.get(id) || 0) || (porUnidade ? [...porUnidade.values()][0] : null) || null;
   }
   for (const v of valores) {
     const i = itens.get(Number(v.id_entidade));
@@ -200,7 +211,7 @@ export const carregarItens = async (conn: Conn, tenant: number, ids: number[]) =
       i.estoque = estoqueDoKit(comps, componentes) ?? 0;
     }
   }
-  return { itens, atributosErp, unidades };
+  return { itens, atributosErp, unidades, gtinsPorUnidade };
 };
 
 // ---------------------------------------------------------------------------
@@ -253,46 +264,53 @@ export const carregarAnuncios = async (conn: Conn, tenant: number, idAnuncio?: n
   if (anuncios.length === 0) return [];
   const idsAnuncios = anuncios.map((a: any) => Number(a.id));
   const [vinculos] = await conn.execute(
-    `SELECT id_anuncio, id_item, id_unidade, preco, mlb_id, status_ml, permalink, ultimo_erro, fotos_ml, estoque_reserva, estoque_maximo,
+    `SELECT id_anuncio_item, id_anuncio, id_item, id_unidade, ativo, preco, mlb_id, status_ml, permalink, ultimo_erro, fotos_ml, estoque_reserva, estoque_maximo,
             estoque_enviado, preco_enviado, DATE_FORMAT(sincronizado_em, '%Y-%m-%d %H:%i') AS sincronizado_fmt
      FROM modulo_ecommerce_mercadolivre_anuncios_itens
-     WHERE tenant_id = ? AND id_anuncio IN (${lista(idsAnuncios)}) ORDER BY ordem, id_item`,
+     WHERE tenant_id = ? AND id_anuncio IN (${lista(idsAnuncios)}) ORDER BY ordem, id_item, id_anuncio_item`,
     [tenant, ...idsAnuncios]
   );
-  const { itens, atributosErp, unidades } = await carregarItens(conn, tenant, [...new Set<number>(vinculos.map((v: any) => Number(v.id_item)))]);
+  const { itens, atributosErp, unidades, gtinsPorUnidade } = await carregarItens(conn, tenant, [...new Set<number>(vinculos.map((v: any) => Number(v.id_item)))]);
 
   return Promise.all(anuncios.map(async (a: any) => {
     const dados = dadosDoAnuncio(a);
     const meus = vinculos.filter((v: any) => Number(v.id_anuncio) === Number(a.id) && itens.has(Number(v.id_item)));
     const regraEstoque: RegraEstoque = { reserva: Number(a.estoque_reserva) || 0, maximo: a.estoque_maximo === null ? null : Number(a.estoque_maximo) };
     const numeroOuNulo = (x: any) => (x === null || x === undefined ? null : Number(x));
-    const noMl = new Map<number, ItemNoMl>(meus.map((v: any) => [Number(v.id_item), {
+    // chave: a linha do anúncio (o mesmo item pode estar em mais de uma unidade)
+    const noMl = new Map<number, ItemNoMl>(meus.map((v: any) => [Number(v.id_anuncio_item), {
       mlbId: v.mlb_id || null, status: v.status_ml || null, permalink: v.permalink || null, erro: v.ultimo_erro || null,
       fotosMl: lerJson<Record<string, string>>(v.fotos_ml, {}),
       estoqueEnviado: numeroOuNulo(v.estoque_enviado), precoEnviado: numeroOuNulo(v.preco_enviado), sincronizadoEm: v.sincronizado_fmt || null,
       regra: { reserva: numeroOuNulo(v.estoque_reserva), maximo: numeroOuNulo(v.estoque_maximo) },
     }]));
     const itensDoAnuncio: ItemAnuncio[] = meus.map((v: any) => {
-      const base = itens.get(Number(v.id_item))!;
-      const regra = regraDoItem(regraEstoque, noMl.get(base.idItem)!.regra);
-      // Vendido no ML em outra unidade (ex.: pacote c/12): saldo e preço nessa unidade
+      const idLinha = Number(v.id_anuncio_item);
+      const base: ItemAnuncio = { ...itens.get(Number(v.id_item))!, idLinha, linhaAtiva: Number(v.ativo) !== 0 };
+      const regra = regraDoItem(regraEstoque, noMl.get(idLinha)!.regra);
+      // Vendido no ML em outra unidade (ex.: kit c/10): saldo, preço, SKU e GTIN nessa unidade
       const unidade = v.id_unidade ? (unidades.get(base.idItem) || []).find(u => u.idUnidade === Number(v.id_unidade)) || null : null;
       const noAnuncio: ItemAnuncio = unidade
         ? { ...base, unidadeMl: unidade, estoqueBase: base.estoque, estoque: saldoNaUnidade(base.estoque, unidade.fator),
-            preco: unidade.preco ?? Math.round(base.preco * unidade.fator * 100) / 100 }
+            preco: unidade.preco ?? Math.round(base.preco * unidade.fator * 100) / 100,
+            sku: skuDaLinha(base.sku, unidade), gtin: gtinsPorUnidade.get(base.idItem)?.get(unidade.idUnidade) || null }
         : { ...base, unidadeMl: null };
       return { ...noAnuncio, precoMl: v.preco === null ? null : Number(v.preco), estoqueMl: estoqueParaMl(noAnuncio.estoque, regra) };
     });
-    const aPublicar = itensDoAnuncio.filter(i => !noMl.get(i.idItem)?.mlbId);
+    // linha desativada pelo operador não publica nem conta para o modo e as pendências
+    const vendidos = itensDoAnuncio.filter(i => i.linhaAtiva !== false || noMl.get(i.idLinha)?.mlbId);
+    const aPublicar = itensDoAnuncio.filter(i => !noMl.get(i.idLinha)?.mlbId && i.linhaAtiva !== false);
     const { categoria, erro } = await categoriaOuErro(tenant, dados.categoriaMl);
     const idsErp = new Set(itensDoAnuncio.flatMap(i => Object.keys(i.valoresErp)));
     const listaErp = [...idsErp].map(id => ({ id: Number(id), nome: atributosErp.get(Number(id)) || `#${id}` })).sort((x, y) => x.nome.localeCompare(y.nome));
     // Página única (o ML junta pelo título da família) ou um anúncio por item, com o título dele pelo modelo
-    const modo = modoPublicacao(categoria?.atributos || [], dados, itensDoAnuncio);
+    const modo = modoPublicacao(categoria?.atributos || [], dados, vendidos);
+    const maxTitulo = categoria?.info.maxTitulo || 60;
     for (const i of itensDoAnuncio) {
       if (modo === 'FAMILIA') { i.tituloMl = (dados.titulo || '').trim(); i.tituloCortado = false; continue; }
-      const t = tituloPeloModelo(dados.modeloTitulo, i, { familia: a.familia_nome, titulo: dados.titulo, atributosErp: listaErp }, categoria?.info.maxTitulo || 60);
-      i.tituloMl = t.titulo;
+      const t = tituloPeloModelo(dados.modeloTitulo, i, { familia: a.familia_nome, titulo: dados.titulo, atributosErp: listaErp }, maxTitulo);
+      // em kit o título diz quantas unidades (e fica diferente do da unidade, senão o ML junta os dois)
+      i.tituloMl = tituloComUnidade(t.titulo, i.unidadeMl, maxTitulo);
       i.tituloCortado = t.cortado;
     }
     const pendencias = itensDoAnuncio.length > 0 && aPublicar.length === 0
@@ -309,9 +327,9 @@ export const carregarAnuncios = async (conn: Conn, tenant: number, idAnuncio?: n
 export const resumo = (c: AnuncioCarregado) => {
   const a = c.registro;
   const erros = c.pendencias.filter(p => p.nivel === 'erro').length;
-  const publicados = c.itens.filter(i => c.noMl.get(i.idItem)?.mlbId).length;
+  const publicados = c.itens.filter(i => c.noMl.get(i.idLinha)?.mlbId).length;
   const aPublicar = c.itens.length - publicados;
-  const primeiro = c.itens.map(i => c.noMl.get(i.idItem)).find(m => m?.mlbId);
+  const primeiro = c.itens.map(i => c.noMl.get(i.idLinha)).find(m => m?.mlbId);
   return {
     id: Number(a.id),
     titulo: a.titulo,
@@ -329,15 +347,15 @@ export const resumo = (c: AnuncioCarregado) => {
     aPublicar,
     fotoUrl: c.itens.find(i => i.fotoUrl)?.fotoUrl || c.dados.fotoFamilia || null,
     estoque: c.itens.reduce((s, i) => s + Math.max(0, i.estoque), 0),
-    estoqueMl: c.itens.reduce((s, i) => s + (c.noMl.get(i.idItem)?.mlbId ? i.estoqueMl || 0 : 0), 0),
+    estoqueMl: c.itens.reduce((s, i) => s + (c.noMl.get(i.idLinha)?.mlbId ? i.estoqueMl || 0 : 0), 0),
     estoqueReserva: c.regraEstoque.reserva,
     estoqueMaximo: c.regraEstoque.maximo,
-    ativosMl: c.itens.filter(i => c.noMl.get(i.idItem)?.status === 'active').length,
-    pausadosMl: c.itens.filter(i => c.noMl.get(i.idItem)?.status === 'paused').length,
+    ativosMl: c.itens.filter(i => c.noMl.get(i.idLinha)?.status === 'active').length,
+    pausadosMl: c.itens.filter(i => c.noMl.get(i.idLinha)?.status === 'paused').length,
     itens: c.itens.map(i => {
-      const m = c.noMl.get(i.idItem);
+      const m = c.noMl.get(i.idLinha);
       return {
-        idItem: i.idItem, sku: i.sku, nome: i.tituloMl || i.nome, fotoUrl: i.fotoUrl, mlbId: m?.mlbId || null, status: m?.status || null, permalink: m?.permalink || null,
+        idItem: i.idItem, idLinha: i.idLinha, ativo: i.linhaAtiva !== false, sku: i.sku, nome: i.tituloMl || i.nome, fotoUrl: i.fotoUrl, mlbId: m?.mlbId || null, status: m?.status || null, permalink: m?.permalink || null,
         estoque: i.estoque, estoqueMl: i.estoqueMl ?? 0, precoMl: i.precoMl, preco: precoNoMl(i, c.dados.ajustePreco), unidade: i.unidadeMl?.sigla || null,
       };
     }),
@@ -391,7 +409,8 @@ export const detalhe = async (tenant: number, c: AnuncioCarregado) => {
   }
   const [atacado, b2b] = await Promise.all([atacadoDoItem(tenant, primeiro), contaB2B(tenant).catch(() => false)]);
   const atributosCat = c.categoria?.atributos || [];
-  const eixos = c.itens.length > 1 ? eixosDeVariacao(atributosCat, c.dados, c.itens).map(x => x.id) : [];
+  const vendidos = c.itens.filter(i => i.linhaAtiva !== false);
+  const eixos = vendidos.length > 1 ? eixosDeVariacao(atributosCat, c.dados, vendidos).map(x => x.id) : [];
   const precos = [...new Set(c.itens.map(i => precoNoMl(i, c.dados.ajustePreco)).filter(p => p > 0))].slice(0, 30);
   const taxas = new Map<number, Awaited<ReturnType<typeof taxaMl>>>();
   if (c.dados.categoriaMl) {
@@ -431,7 +450,7 @@ export const detalhe = async (tenant: number, c: AnuncioCarregado) => {
         comissao: taxa ? taxa.comissao : null,
         percentualComissao: taxa ? taxa.percentual : null,
         valores: Object.fromEntries(atributosCat.map(at => [at.id, resolverValor(at, c.dados.atributos[at.id], i)])),
-        ml: (({ fotosMl, ...m }) => m)(c.noMl.get(i.idItem)!),
+        ml: (({ fotosMl, ...m }) => m)(c.noMl.get(i.idLinha)!),
         unidades: c.unidades.get(i.idItem) || [],
       };
     }),
@@ -471,7 +490,8 @@ export const candidatos = async (req: Request, res: Response) => {
   const busca = `%${String(req.query.busca || '').trim()}%`;
   try {
     const [familias]: any = await pool.execute(
-      `SELECT f.id, f.nome, COUNT(ic.id_item) AS itens, SUM(ai.id_item IS NOT NULL) AS anunciados,
+      `SELECT f.id, f.nome, COUNT(ic.id_item) AS itens,
+              SUM(EXISTS(SELECT 1 FROM modulo_ecommerce_mercadolivre_anuncios_itens ai WHERE ai.id_item = ic.id_item AND ai.tenant_id = f.tenant_id)) AS anunciados,
               SUM(EXISTS(SELECT 1 FROM itens_anexos x WHERE x.tenant_id = f.tenant_id AND x.id_item = ic.id_item
                          AND x.tipo_anexo IN ('IMAGEM_PRINCIPAL', 'FOTO_GALERIA'))) AS com_foto,
               SUM(COALESCE(es.quantidade_atual, 0) > 0) AS com_estoque
@@ -479,7 +499,6 @@ export const candidatos = async (req: Request, res: Response) => {
        INNER JOIN comercial_produtos_dados cpd ON cpd.familia_id = f.id AND cpd.tenant_id = f.tenant_id
        INNER JOIN itens_core ic ON ic.id_item = cpd.id_item AND ic.tenant_id = f.tenant_id AND ic.status = 'ATIVO'
        LEFT JOIN estoque_saldos_itens es ON es.id_item = ic.id_item AND es.tenant_id = f.tenant_id AND es.deposito = 'VENDA'
-       LEFT JOIN modulo_ecommerce_mercadolivre_anuncios_itens ai ON ai.id_item = ic.id_item AND ai.tenant_id = f.tenant_id
        WHERE f.tenant_id = ? AND f.status <> 'INATIVO' AND f.nome LIKE ?
        GROUP BY f.id, f.nome
        ORDER BY f.nome
@@ -488,7 +507,8 @@ export const candidatos = async (req: Request, res: Response) => {
     );
     const [itens]: any = await pool.execute(
       `SELECT ic.id_item, COALESCE(cpd.sku_customizado, ic.sku) AS sku, COALESCE(cpd.nome_comercial, ic.nome_item) AS nome,
-              cpd.preco_venda, COALESCE(es.quantidade_atual, 0) AS estoque, f.nome AS familia, ai.id_anuncio,
+              cpd.preco_venda, COALESCE(es.quantidade_atual, 0) AS estoque, f.nome AS familia,
+              (SELECT MIN(ai.id_anuncio) FROM modulo_ecommerce_mercadolivre_anuncios_itens ai WHERE ai.id_item = ic.id_item AND ai.tenant_id = ic.tenant_id) AS id_anuncio,
               (SELECT x.url_anexo FROM itens_anexos x WHERE x.tenant_id = ic.tenant_id AND x.id_item = ic.id_item
                  AND x.tipo_anexo IN ('IMAGEM_PRINCIPAL', 'FOTO_GALERIA')
                ORDER BY (x.tipo_anexo = 'IMAGEM_PRINCIPAL') DESC, x.ordem, x.id_anexo LIMIT 1) AS foto_url
@@ -496,7 +516,6 @@ export const candidatos = async (req: Request, res: Response) => {
        LEFT JOIN comercial_produtos_dados cpd ON cpd.id_item = ic.id_item AND cpd.tenant_id = ic.tenant_id
        LEFT JOIN comercial_familias f ON f.id = cpd.familia_id AND f.tenant_id = ic.tenant_id
        LEFT JOIN estoque_saldos_itens es ON es.id_item = ic.id_item AND es.tenant_id = ic.tenant_id AND es.deposito = 'VENDA'
-       LEFT JOIN modulo_ecommerce_mercadolivre_anuncios_itens ai ON ai.id_item = ic.id_item AND ai.tenant_id = ic.tenant_id
        WHERE ic.tenant_id = ? AND ic.status = 'ATIVO'
          AND (cpd.sku_customizado LIKE ? OR cpd.nome_comercial LIKE ? OR ic.nome_item LIKE ? OR ic.sku LIKE ?)
        ORDER BY nome
@@ -567,8 +586,8 @@ export const criarAnuncio = async (req: Request, res: Response) => {
         `SELECT ic.id_item, COALESCE(cpd.nome_comercial, ic.nome_item) AS nome, cpd.descricao_comercial
          FROM comercial_produtos_dados cpd
          INNER JOIN itens_core ic ON ic.id_item = cpd.id_item AND ic.tenant_id = cpd.tenant_id AND ic.status = 'ATIVO'
-         LEFT JOIN modulo_ecommerce_mercadolivre_anuncios_itens ai ON ai.id_item = ic.id_item AND ai.tenant_id = cpd.tenant_id
-         WHERE cpd.tenant_id = ? AND cpd.familia_id = ? AND ai.id_item IS NULL
+         WHERE cpd.tenant_id = ? AND cpd.familia_id = ?
+           AND NOT EXISTS(SELECT 1 FROM modulo_ecommerce_mercadolivre_anuncios_itens ai WHERE ai.id_item = ic.id_item AND ai.tenant_id = cpd.tenant_id)
          ORDER BY nome`,
         [tenant, idFamilia]
       );
@@ -588,10 +607,10 @@ export const criarAnuncio = async (req: Request, res: Response) => {
       const ids = [...new Set<number>((req.body?.idItens || []).map(Number).filter(Boolean))];
       if (ids.length === 0) throw new ErroML('Escolha uma família ou ao menos um item.');
       const [rows] = await conn.execute(
-        `SELECT ic.id_item, COALESCE(cpd.nome_comercial, ic.nome_item) AS nome, cpd.descricao_comercial, ai.id_anuncio
+        `SELECT ic.id_item, COALESCE(cpd.nome_comercial, ic.nome_item) AS nome, cpd.descricao_comercial,
+                (SELECT MIN(ai.id_anuncio) FROM modulo_ecommerce_mercadolivre_anuncios_itens ai WHERE ai.id_item = ic.id_item AND ai.tenant_id = ic.tenant_id) AS id_anuncio
          FROM itens_core ic
          LEFT JOIN comercial_produtos_dados cpd ON cpd.id_item = ic.id_item AND cpd.tenant_id = ic.tenant_id
-         LEFT JOIN modulo_ecommerce_mercadolivre_anuncios_itens ai ON ai.id_item = ic.id_item AND ai.tenant_id = ic.tenant_id
          WHERE ic.tenant_id = ? AND ic.id_item IN (${lista(ids)})`,
         [tenant, ...ids]
       );
@@ -713,7 +732,7 @@ export const salvarAnuncio = async (req: Request, res: Response) => {
     const mudaTipo = b.tipoAnuncio !== undefined && b.tipoAnuncio !== a.tipo_anuncio;
     if (mudaTipo || b.freteGratis !== undefined) {
       const [atual] = await carregarAnuncios(pool as any, tenant, id);
-      const publicado = atual.itens.some(i => atual.noMl.get(i.idItem)?.mlbId && !foraDoMl(atual.noMl.get(i.idItem)?.status || null));
+      const publicado = atual.itens.some(i => atual.noMl.get(i.idLinha)?.mlbId && !foraDoMl(atual.noMl.get(i.idLinha)?.status || null));
       if (publicado) {
         const falhas = await aplicarModoDeVenda(tenant, atual, { tipo: mudaTipo ? b.tipoAnuncio : undefined, freteGratis: b.freteGratis !== undefined ? !!b.freteGratis : undefined });
         if (falhas.length) throw new ErroML(`O ML recusou: ${falhas[0]}${falhas.length > 1 ? ` (e mais ${falhas.length - 1})` : ''}`);
@@ -766,21 +785,37 @@ export const adicionarItens = async (req: Request, res: Response) => {
   }
 };
 
-/** DELETE /anuncios/:id/itens/:idItem */
+/** Linha do anúncio (item + unidade) pelo id dela; erro se não é deste anúncio. */
+const linhaDoAnuncio = async (tenant: number, id: number, idLinha: number) => {
+  const [[v]]: any = await pool.execute(
+    `SELECT id_anuncio_item, id_item, id_unidade, ativo, mlb_id, status_ml FROM modulo_ecommerce_mercadolivre_anuncios_itens
+     WHERE id_anuncio_item = ? AND id_anuncio = ? AND tenant_id = ?`,
+    [idLinha, id, tenant]
+  );
+  if (!v) throw new ErroML('Item não encontrado neste anúncio.', 404);
+  return v;
+};
+
+/** Unidade derivada do item (com conversão cadastrada); null = a unidade base. */
+const conferirUnidade = async (tenant: number, idItem: number, idUnidade: number | null) => {
+  if (!idUnidade) return null;
+  const [[existe]]: any = await pool.execute(
+    `SELECT 1 FROM itens_unidades_conversao WHERE tenant_id = ? AND id_item = ? AND id_unidade_derivada = ? AND fator_conversao > 0`,
+    [tenant, idItem, idUnidade]
+  );
+  if (!existe) throw new ErroML('Essa unidade não tem conversão cadastrada no item (Catálogo › Preços & Comercial).');
+  return idUnidade;
+};
+
+/** DELETE /anuncios/:id/itens/:idLinha */
 export const removerItem = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
   const id = Number(req.params.id);
   try {
     await anuncioEditavel(pool as any, tenant, id);
-    const [[vinculo]]: any = await pool.execute(
-      `SELECT mlb_id, status_ml FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
-      [id, tenant, Number(req.params.idItem)]
-    );
-    if (vinculo?.mlb_id && !foraDoMl(vinculo.status_ml)) throw new ErroML(`Este item já está no ML (${vinculo.mlb_id}): pause ou encerre o anúncio lá antes de tirar daqui.`);
-    await pool.execute(
-      `DELETE FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
-      [id, tenant, Number(req.params.idItem)]
-    );
+    const vinculo = await linhaDoAnuncio(tenant, id, Number(req.params.idLinha));
+    if (vinculo.mlb_id && !foraDoMl(vinculo.status_ml)) throw new ErroML(`Este item já está no ML (${vinculo.mlb_id}): pause ou encerre o anúncio lá antes de tirar daqui.`);
+    await pool.execute(`DELETE FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE id_anuncio_item = ? AND tenant_id = ?`, [vinculo.id_anuncio_item, tenant]);
     const [c] = await carregarAnuncios(pool as any, tenant, id);
     return res.json(await detalhe(tenant, c));
   } catch (error) {
@@ -789,29 +824,52 @@ export const removerItem = async (req: Request, res: Response) => {
 };
 
 /**
- * PUT /anuncios/:id/itens/:idItem { preco?, estoqueReserva?, estoqueMaximo? } — preço só no ML e a divisão do estoque
- * do item (null volta à regra do anúncio). Item já no ML: a mudança vai na hora.
+ * POST /anuncios/:id/itens/:idLinha/unidade { idUnidade } — vende o mesmo item também em outra unidade (ex.: kit c/10):
+ * nova linha logo depois, com preço, estoque, SKU e título dessa unidade. idUnidade vazio = a unidade base.
+ */
+export const adicionarUnidade = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const id = Number(req.params.id);
+  try {
+    await anuncioEditavel(pool as any, tenant, id);
+    const origem = await linhaDoAnuncio(tenant, id, Number(req.params.idLinha));
+    const idUnidade = await conferirUnidade(tenant, Number(origem.id_item), req.body?.idUnidade ? Number(req.body.idUnidade) : null);
+    const [[{ proxima }]]: any = await pool.execute(
+      `SELECT COALESCE(MAX(ordem), -1) + 1 AS proxima FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE id_anuncio = ?`, [id]
+    );
+    await pool.execute(
+      `INSERT INTO modulo_ecommerce_mercadolivre_anuncios_itens (id_anuncio, tenant_id, id_item, id_unidade, ordem) VALUES (?, ?, ?, ?, ?)`,
+      [id, tenant, origem.id_item, idUnidade, Number(proxima)]
+    );
+    await pool.execute(`UPDATE modulo_ecommerce_mercadolivre_anuncios SET atualizado_em = NOW() WHERE id = ?`, [id]);
+    const [c] = await carregarAnuncios(pool as any, tenant, id);
+    return res.json(await detalhe(tenant, c));
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao adicionar a unidade.');
+  }
+};
+
+/**
+ * PUT /anuncios/:id/itens/:idLinha { preco?, estoqueReserva?, estoqueMaximo?, idUnidade?, ativo? } — preço só no ML, a
+ * divisão do estoque (null volta à regra do anúncio), a unidade vendida e ligar/desligar a linha. Já no ML: vai na hora
+ * (desativar pausa lá; ativar de novo reativa).
  */
 export const salvarItem = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
   const id = Number(req.params.id);
   try {
     await anuncioEditavel(pool as any, tenant, id);
-    const idItem = Number(req.params.idItem);
+    const linha = await linhaDoAnuncio(tenant, id, Number(req.params.idLinha));
+    const idLinha = Number(linha.id_anuncio_item);
     const b = req.body || {};
     const campos: string[] = [];
     const valores: any[] = [];
     if ('idUnidade' in b) {
-      const idUnidade = b.idUnidade ? Number(b.idUnidade) : null;
-      if (idUnidade) {
-        const [[existe]]: any = await pool.execute(
-          `SELECT 1 FROM itens_unidades_conversao WHERE tenant_id = ? AND id_item = ? AND id_unidade_derivada = ? AND fator_conversao > 0`,
-          [tenant, idItem, idUnidade]
-        );
-        if (!existe) throw new ErroML('Essa unidade não tem conversão cadastrada no item (Catálogo › Preços & Comercial).');
+      if (linha.mlb_id && !foraDoMl(linha.status_ml) && (Number(b.idUnidade) || null) !== (Number(linha.id_unidade) || null)) {
+        throw new ErroML('Este item já está no ML nesta unidade: para vender em outra, use "Vender também em outra unidade".');
       }
       campos.push('id_unidade = ?');
-      valores.push(idUnidade);
+      valores.push(await conferirUnidade(tenant, Number(linha.id_item), b.idUnidade ? Number(b.idUnidade) : null));
     }
     if ('preco' in b) {
       const preco = b.preco === null || b.preco === '' ? null : Math.round(Number(b.preco) * 100) / 100;
@@ -827,13 +885,25 @@ export const salvarItem = async (req: Request, res: Response) => {
       campos.push(`${coluna} = ?`);
       valores.push(v === null ? null : Math.floor(v));
     }
+    const mudaAtivo = 'ativo' in b && (b.ativo ? 1 : 0) !== Number(linha.ativo);
+    if (mudaAtivo) {
+      // no ML: desativar pausa, ativar reativa (recusou = não grava)
+      if (linha.mlb_id && !foraDoMl(linha.status_ml)) {
+        const status = b.ativo ? 'active' : 'paused';
+        const r: any = await ml(tenant, 'PUT', `/items/${linha.mlb_id}`, { status });
+        campos.push('status_ml = ?');
+        valores.push(r?.status || status);
+      }
+      campos.push('ativo = ?');
+      valores.push(b.ativo ? 1 : 0);
+    }
     if (campos.length) {
       await pool.execute(
-        `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET ${campos.join(', ')} WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
-        [...valores, id, tenant, idItem]
+        `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET ${campos.join(', ')} WHERE id_anuncio_item = ? AND tenant_id = ?`,
+        [...valores, idLinha, tenant]
       );
     }
-    const enviados = await sincronizarAnuncios(tenant, { idAnuncio: id, idItem });
+    const enviados = await sincronizarAnuncios(tenant, { idAnuncio: id, idLinha });
     const recusado = enviados.find(r => r.erro);
     if (recusado) throw new ErroML(`Salvo no ERP, mas o ML recusou: ${recusado.erro}`);
     const [c] = await carregarAnuncios(pool as any, tenant, id);
@@ -844,26 +914,22 @@ export const salvarItem = async (req: Request, res: Response) => {
 };
 
 /**
- * DELETE /anuncios/:id/itens/:idItem/ml — desliga do ML o item que foi excluído ou encerrado lá:
+ * DELETE /anuncios/:id/itens/:idLinha/ml — desliga do ML o item que foi excluído ou encerrado lá:
  * ele volta a "a publicar" (pode ser publicado de novo ou tirado do anúncio).
  */
 export const desligarDoMl = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
   const id = Number(req.params.id);
-  const idItem = Number(req.params.idItem);
   try {
     await anuncioEditavel(pool as any, tenant, id);
-    const [[v]]: any = await pool.execute(
-      `SELECT mlb_id, status_ml FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
-      [id, tenant, idItem]
-    );
-    if (!v?.mlb_id) throw new ErroML('Este item não está ligado a um anúncio do ML.');
+    const v = await linhaDoAnuncio(tenant, id, Number(req.params.idLinha));
+    if (!v.mlb_id) throw new ErroML('Este item não está ligado a um anúncio do ML.');
     if (!foraDoMl(v.status_ml)) throw new ErroML(`O anúncio ${v.mlb_id} ainda está ativo ou pausado no ML: exclua ou encerre lá antes de desligar.`);
     await pool.execute(
       `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens
        SET mlb_id = NULL, status_ml = NULL, permalink = NULL, estoque_enviado = NULL, preco_enviado = NULL, sincronizado_em = NULL, ultimo_erro = NULL
-       WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
-      [id, tenant, idItem]
+       WHERE id_anuncio_item = ? AND tenant_id = ?`,
+      [v.id_anuncio_item, tenant]
     );
     // o anúncio fica com o MLB de outro item ainda ligado; sem nenhum, volta a rascunho
     const [[outro]]: any = await pool.execute(
@@ -894,7 +960,7 @@ export const encerrarNoMl = async (req: Request, res: Response) => {
   try {
     await anuncioEditavel(pool as any, tenant, id);
     const [vinculos]: any = await pool.execute(
-      `SELECT id_item, mlb_id, status_ml FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE id_anuncio = ? AND tenant_id = ? AND mlb_id IS NOT NULL`,
+      `SELECT id_anuncio_item, mlb_id, status_ml FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE id_anuncio = ? AND tenant_id = ? AND mlb_id IS NOT NULL`,
       [id, tenant]
     );
     if (!vinculos.length) throw new ErroML('Nenhum item deste anúncio está no Mercado Livre.');
@@ -909,8 +975,8 @@ export const encerrarNoMl = async (req: Request, res: Response) => {
       await pool.execute(
         `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens
          SET mlb_id = NULL, status_ml = NULL, permalink = NULL, estoque_enviado = NULL, preco_enviado = NULL, sincronizado_em = NULL, ultimo_erro = NULL
-         WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
-        [id, tenant, v.id_item]
+         WHERE id_anuncio_item = ? AND tenant_id = ?`,
+        [v.id_anuncio_item, tenant]
       );
     }
     const [[resta]]: any = await pool.execute(

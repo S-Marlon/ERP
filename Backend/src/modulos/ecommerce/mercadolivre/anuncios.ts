@@ -21,6 +21,8 @@ export type ValorAtributo =
 
 export interface ItemAnuncio {
   idItem: number;
+  idLinha: number;                  // linha do anúncio: o mesmo item pode estar em mais de uma unidade (ex.: UN e kit c/10)
+  linhaAtiva?: boolean;             // false = desativada pelo operador (não publica; se já está no ML, fica pausada)
   sku: string;
   nome: string;
   ativo: boolean;
@@ -71,6 +73,7 @@ export interface Pendencia {
   area: 'dados' | 'itens' | 'atributos' | 'cadastro';
   texto: string;
   idItem?: number;
+  idLinha?: number;
   atributo?: string;
 }
 
@@ -189,40 +192,43 @@ export const pendenciasAnuncio = (
   if (itens.length === 0) { erro('itens', 'Adicione ao menos um item do catálogo.'); return p; }
   if (categoria && itens.length > categoria.maxVariacoes) erro('itens', `São ${itens.length} itens: a categoria aceita até ${categoria.maxVariacoes} variações.`);
   for (const i of itens) {
-    if (!i.ativo) erro('itens', `${i.sku}: item inativo no catálogo.`, { idItem: i.idItem });
+    if (!i.ativo) erro('itens', `${i.sku}: item inativo no catálogo.`, { idItem: i.idItem, idLinha: i.idLinha });
     if (i.fotos === 0) {
-      if (dados.fotoFamilia) aviso('itens', `${i.sku}: sem foto própria: vai a foto da família.`, { idItem: i.idItem });
-      else erro('itens', `${i.sku}: sem foto (o Mercado Livre exige ao menos uma): envie a do item ou a foto da família.`, { idItem: i.idItem });
+      if (dados.fotoFamilia) aviso('itens', `${i.sku}: sem foto própria: vai a foto da família.`, { idItem: i.idItem, idLinha: i.idLinha });
+      else erro('itens', `${i.sku}: sem foto (o Mercado Livre exige ao menos uma): envie a do item ou a foto da família.`, { idItem: i.idItem, idLinha: i.idLinha });
     }
-    if (!(precoNoMl(i, dados.ajustePreco) > 0)) erro('itens', `${i.sku}: sem preço de venda.`, { idItem: i.idItem });
+    if (!(precoNoMl(i, dados.ajustePreco) > 0)) erro('itens', `${i.sku}: sem preço de venda.`, { idItem: i.idItem, idLinha: i.idLinha });
     const noMl = i.estoqueMl ?? Math.max(0, Math.floor(i.estoque));
     if (!(noMl > 0)) {
       aviso('itens', i.estoque > 0
         ? `${i.sku}: estoque todo reservado para a loja (entra com 0 no ML).`
-        : `${i.sku}: sem estoque (entra com quantidade 0).`, { idItem: i.idItem });
+        : `${i.sku}: sem estoque (entra com quantidade 0).`, { idItem: i.idItem, idLinha: i.idLinha });
     }
     if (temGtinNaCategoria && !i.gtin) {
       const marca = resolverValor(atributos.find(a => a.id === 'BRAND'), dados.atributos.BRAND, i)?.valor;
       if (marca && !SEM_MARCA.has(normalizar(marca))) {
-        aviso('itens', `${i.sku}: sem código de barras (GTIN): com marca "${marca}" o ML costuma exigir o GTIN.`, { idItem: i.idItem });
+        aviso('itens', `${i.sku}: sem código de barras (GTIN): com marca "${marca}" o ML costuma exigir o GTIN.`, { idItem: i.idItem, idLinha: i.idLinha });
       } else {
-        aviso('itens', `${i.sku}: sem código de barras (GTIN): vai como "produto sem código".`, { idItem: i.idItem });
+        aviso('itens', `${i.sku}: sem código de barras (GTIN): vai como "produto sem código".`, { idItem: i.idItem, idLinha: i.idLinha });
       }
     }
-    if (!i.pesoKg || !i.medidasCm) aviso('itens', `${i.sku}: sem peso ou medidas da embalagem (o ML estima o frete).`, { idItem: i.idItem });
-    for (const m of i.motivosCadastro) aviso('cadastro', `${i.sku}: ${m}`, { idItem: i.idItem });
+    if (!i.pesoKg || !i.medidasCm) aviso('itens', `${i.sku}: sem peso ou medidas da embalagem (o ML estima o frete).`, { idItem: i.idItem, idLinha: i.idLinha });
+    else if (fatorDaLinha(i) > 1) {
+      aviso('itens', `${i.sku}: vendido em kit de ${numeroBr(fatorDaLinha(i))}: o peso vai multiplicado, mas as medidas da embalagem são as de uma unidade (confira, o ML cobra diferença de frete).`, { idItem: i.idItem, idLinha: i.idLinha });
+    }
+    for (const m of i.motivosCadastro) aviso('cadastro', `${i.sku}: ${m}`, { idItem: i.idItem, idLinha: i.idLinha });
   }
   // Anúncios separados: cada item vai com o seu título. Dois títulos iguais o ML junta como o mesmo produto.
   if (modo === 'SEPARADO') {
     const vistos = new Map<string, ItemAnuncio>();
     for (const i of itens) {
       const tituloItem = (i.tituloMl ?? titulo).trim();
-      if (!tituloItem) { erro('dados', `${i.sku}: sem título (confira o modelo do título).`, { idItem: i.idItem }); continue; }
-      if (tituloItem.length > maxTitulo) erro('dados', `Título com ${tituloItem.length} caracteres: o máximo é ${maxTitulo}${itens.length > 1 ? ` (${i.sku})` : ''}.`, { idItem: i.idItem });
-      if (i.tituloCortado) aviso('dados', `${i.sku}: título cortado em ${maxTitulo} caracteres ("${tituloItem}").`, { idItem: i.idItem });
+      if (!tituloItem) { erro('dados', `${i.sku}: sem título (confira o modelo do título).`, { idItem: i.idItem, idLinha: i.idLinha }); continue; }
+      if (tituloItem.length > maxTitulo) erro('dados', `Título com ${tituloItem.length} caracteres: o máximo é ${maxTitulo}${itens.length > 1 ? ` (${i.sku})` : ''}.`, { idItem: i.idItem, idLinha: i.idLinha });
+      if (i.tituloCortado) aviso('dados', `${i.sku}: título cortado em ${maxTitulo} caracteres ("${tituloItem}").`, { idItem: i.idItem, idLinha: i.idLinha });
       const chave = normalizar(tituloItem);
       const outro = vistos.get(chave);
-      if (outro) erro('dados', `${outro.sku} e ${i.sku} ficam com o mesmo título no ML ("${tituloItem}"): o ML junta os dois como o mesmo produto. Use um modelo de título que diferencie (ex.: {nome}).`, { idItem: i.idItem });
+      if (outro) erro('dados', `${outro.sku} e ${i.sku} ficam com o mesmo título no ML ("${tituloItem}"): o ML junta os dois como o mesmo produto. Use um modelo de título que diferencie (ex.: {nome}).`, { idItem: i.idItem, idLinha: i.idLinha });
       else vistos.set(chave, i);
     }
   }
@@ -292,6 +298,14 @@ export const atributosDoItem = (atributos: AtributoML[], dados: AnuncioDados, it
     const nome = a.tipo === 'number_unit' && v.unidade ? `${v.valor} ${v.unidade}` : v.valor;
     saida.push(v.valorId ? { id: a.id, value_id: v.valorId, value_name: nome } : { id: a.id, value_name: nome });
   }
+  // vendido em kit (ex.: c/10): unidades por kit e formato "Kit" mandam sobre o que o anúncio ligou
+  const fator = fatorDaLinha(item);
+  if (fator > 1) {
+    const trocar = (a: AtributoEnvio) => { const k = saida.findIndex(s => s.id === a.id); if (k >= 0) saida.splice(k, 1); saida.push(a); };
+    if (atributos.some(a => a.id === 'UNITS_PER_PACK')) trocar({ id: 'UNITS_PER_PACK', value_name: numeroMl(fator) });
+    const kit = atributos.find(a => a.id === 'SALE_FORMAT')?.valores.find(v => normalizar(v.nome) === 'kit');
+    if (kit) trocar({ id: 'SALE_FORMAT', value_id: kit.id, value_name: kit.nome });
+  }
   if (item.sku) saida.push({ id: 'SELLER_SKU', value_name: item.sku });
   if (temGtin) saida.push(item.gtin ? { id: 'GTIN', value_name: item.gtin } : { id: 'EMPTY_GTIN_REASON', value_id: MOTIVO_SEM_GTIN });
   if (item.medidasCm) {
@@ -299,7 +313,7 @@ export const atributosDoItem = (atributos: AtributoML[], dados: AnuncioDados, it
     saida.push({ id: 'SELLER_PACKAGE_WIDTH', value_name: `${numeroMl(item.medidasCm.largura)} cm` });
     saida.push({ id: 'SELLER_PACKAGE_LENGTH', value_name: `${numeroMl(item.medidasCm.comprimento)} cm` });
   }
-  if (item.pesoKg) saida.push({ id: 'SELLER_PACKAGE_WEIGHT', value_name: `${Math.max(1, Math.round(item.pesoKg * 1000))} g` });
+  if (item.pesoKg) saida.push({ id: 'SELLER_PACKAGE_WEIGHT', value_name: `${Math.max(1, Math.round(item.pesoKg * fator * 1000))} g` });
   return saida;
 };
 
@@ -407,6 +421,25 @@ export const mudancasParaMl = (
 /** Saldo na unidade do ML (ex.: 24 peças em pacote de 12 = 2). Sem fator: a própria unidade base. */
 export const saldoNaUnidade = (saldoBase: number, fator: number | null | undefined) =>
   fator && fator > 1 ? Math.floor((Number(saldoBase) || 0) / fator + 1e-9) : Number(saldoBase) || 0;
+
+/** Quantas unidades base a linha vende por vez (kit c/10 = 10); a unidade base ou fração = 1. */
+export const fatorDaLinha = (i: Pick<ItemAnuncio, 'unidadeMl'>) => (i.unidadeMl && i.unidadeMl.fator > 1 ? i.unidadeMl.fator : 1);
+
+const numeroBr = (n: number) => (Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100).replace('.', ','));
+
+/** SKU da linha no ML: o do item, e na outra unidade com a sigla dela (ex.: ABR-3.6-100-KIT10), para não repetir o SKU. */
+export const skuDaLinha = (sku: string, unidade: Pick<UnidadeVenda, 'sigla'> | null | undefined) => {
+  const sigla = String(unidade?.sigla || '').toUpperCase().replace(/[^A-Z0-9]+/g, '');
+  return unidade && sigla ? `${sku}-${sigla}` : sku;
+};
+
+/** Título da linha em kit: o do item com "Kit 10 Unidades" no fim (cortado para caber), se ainda não fala do kit. */
+export const tituloComUnidade = (titulo: string, unidade: Pick<UnidadeVenda, 'fator'> | null | undefined, max = 60) => {
+  if (!unidade || !(unidade.fator > 1)) return titulo;
+  const sufixo = `Kit ${numeroBr(unidade.fator)} Unidades`;
+  if (/\bkit\b/.test(normalizar(titulo))) return titulo;
+  return `${cortarTitulo(titulo, max - sufixo.length - 1)} ${sufixo}`.trim();
+};
 
 /** Status do item no ML como o ERP guarda: "deleted" quando foi excluído lá. */
 export const statusDoMl = (b: { status?: string; sub_status?: string[] }) =>

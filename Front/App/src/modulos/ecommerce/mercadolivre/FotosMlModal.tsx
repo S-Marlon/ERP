@@ -31,7 +31,7 @@ const Grade: React.FC<{ fotos: FotoMl[]; selecionadas: Set<string>; onAlternar: 
 const FotosMlModal: React.FC<Props> = ({ idAnuncio, idItemInicial, onFechar, onImportado }) => {
   const [itens, setItens] = useState<FotosItemMl[]>([]);
   const [carregando, setCarregando] = useState(false);
-  const [idItem, setIdItem] = useState<number | null>(null);
+  const [idLinha, setIdLinha] = useState<number | null>(null);
   const [selDoAnuncio, setSelDoAnuncio] = useState<Set<string>>(new Set());
   const [ref, setRef] = useState('');
   const [busca, setBusca] = useState<BuscaFotosMl | null>(null);
@@ -45,7 +45,7 @@ const FotosMlModal: React.FC<Props> = ({ idAnuncio, idItemInicial, onFechar, onI
     try {
       const r = await anunciosApi.fotos(idAnuncio);
       setItens(r);
-      setIdItem(atual => atual ?? idItemInicial ?? r.find(i => i.ml.some(f => !f.noErp))?.idItem ?? r[0]?.idItem ?? null);
+      setIdLinha(atual => atual ?? r.find(i => i.idItem === idItemInicial)?.idLinha ?? r.find(i => i.ml.some(f => !f.noErp))?.idLinha ?? r[0]?.idLinha ?? null);
     } catch (e) {
       message.error(e instanceof Error ? e.message : 'Erro.');
     } finally {
@@ -53,18 +53,18 @@ const FotosMlModal: React.FC<Props> = ({ idAnuncio, idItemInicial, onFechar, onI
     }
   };
   useEffect(() => {
-    setItens([]); setIdItem(null); setSelDoAnuncio(new Set()); setBusca(null); setSelDaBusca(new Set()); setRef('');
+    setItens([]); setIdLinha(null); setSelDoAnuncio(new Set()); setBusca(null); setSelDaBusca(new Set()); setRef('');
     if (idAnuncio) carregar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idAnuncio]);
-  useEffect(() => { setSelDoAnuncio(new Set()); }, [idItem]);
+  useEffect(() => { setSelDoAnuncio(new Set()); }, [idLinha]);
 
-  const item = itens.find(i => i.idItem === idItem) || null;
+  const item = itens.find(i => i.idLinha === idLinha) || null;
   const faltando = useMemo(() => itens.filter(i => i.ml.some(f => !f.noErp)), [itens]);
   const alternar = (setter: React.Dispatch<React.SetStateAction<Set<string>>>) => (url: string) =>
     setter(s => { const n = new Set(s); if (n.has(url)) n.delete(url); else n.add(url); return n; });
 
-  const importar = async (pedido: { idItem: number; fotos: { url: string; idMl?: string }[] }[], ok: string) => {
+  const importar = async (pedido: { idItem: number; idLinha?: number; fotos: { url: string; idMl?: string }[] }[], ok: string) => {
     if (!idAnuncio || !pedido.some(p => p.fotos.length)) { message.info('Nenhuma foto escolhida.'); return; }
     setGravando(true);
     try {
@@ -98,15 +98,15 @@ const FotosMlModal: React.FC<Props> = ({ idAnuncio, idItemInicial, onFechar, onI
       <Spin spinning={carregando || gravando}>
         <Flex justify="space-between" align="center" wrap gap={8} style={{ marginBottom: 12 }}>
           <Select
-            style={{ minWidth: 360 }} value={idItem ?? undefined} onChange={setIdItem} showSearch optionFilterProp="label" placeholder="Item"
+            style={{ minWidth: 360 }} value={idLinha ?? undefined} onChange={setIdLinha} showSearch optionFilterProp="label" placeholder="Item"
             options={itens.map(i => {
               const falta = i.ml.filter(f => !f.noErp).length;
-              return { value: i.idItem, label: `${i.sku} · ${i.nome}${falta ? ` · ${falta} foto(s) no ML fora do ERP` : ''}` };
+              return { value: i.idLinha, label: `${i.sku} · ${i.nome}${falta ? ` · ${falta} foto(s) no ML fora do ERP` : ''}` };
             })}
           />
           {faltando.length > 0 && (
             <Tooltip title="Traz para o cadastro do ERP todas as fotos que os itens usam no ML e ainda não estão no ERP">
-              <Button icon={<CloudDownloadOutlined />} onClick={() => importar(faltando.map(i => ({ idItem: i.idItem, fotos: i.ml.filter(f => !f.noErp).map(f => ({ url: f.url, idMl: f.id })) })), 'trazidas do ML para o ERP.')}>
+              <Button icon={<CloudDownloadOutlined />} onClick={() => importar(faltando.map(i => ({ idItem: i.idItem, idLinha: i.idLinha, fotos: i.ml.filter(f => !f.noErp).map(f => ({ url: f.url, idMl: f.id })) })), 'trazidas do ML para o ERP.')}>
                 Trazer todas do ML ({faltando.reduce((s, i) => s + i.ml.filter(f => !f.noErp).length, 0)})
               </Button>
             </Tooltip>
@@ -120,11 +120,11 @@ const FotosMlModal: React.FC<Props> = ({ idAnuncio, idItemInicial, onFechar, onI
               extra={item.ml.some(f => !f.noErp) && (
                 <Space>
                   <Button size="small" disabled={!selDoAnuncio.size}
-                    onClick={() => importar([{ idItem: item.idItem, fotos: item.ml.filter(f => selDoAnuncio.has(f.url)).map(f => ({ url: f.url, idMl: f.id })) }], `trazidas para ${item.sku}.`)}>
+                    onClick={() => importar([{ idItem: item.idItem, idLinha: item.idLinha, fotos: item.ml.filter(f => selDoAnuncio.has(f.url)).map(f => ({ url: f.url, idMl: f.id })) }], `trazidas para ${item.sku}.`)}>
                     Trazer selecionadas ({selDoAnuncio.size})
                   </Button>
                   <Button size="small" type="primary"
-                    onClick={() => importar([{ idItem: item.idItem, fotos: item.ml.filter(f => !f.noErp).map(f => ({ url: f.url, idMl: f.id })) }], `trazidas para ${item.sku}.`)}>
+                    onClick={() => importar([{ idItem: item.idItem, idLinha: item.idLinha, fotos: item.ml.filter(f => !f.noErp).map(f => ({ url: f.url, idMl: f.id })) }], `trazidas para ${item.sku}.`)}>
                     Trazer as que faltam
                   </Button>
                 </Space>
@@ -170,7 +170,7 @@ const FotosMlModal: React.FC<Props> = ({ idAnuncio, idItemInicial, onFechar, onI
                       <Text strong>{busca.titulo}</Text>
                     </Space>
                     <Space>
-                      <Button size="small" disabled={!daBusca.length} onClick={() => item && importar([{ idItem: item.idItem, fotos: daBusca }], `postas em ${item.sku}.`)}>
+                      <Button size="small" disabled={!daBusca.length} onClick={() => item && importar([{ idItem: item.idItem, idLinha: item.idLinha, fotos: daBusca }], `postas em ${item.sku}.`)}>
                         Para {item.sku} ({daBusca.length})
                       </Button>
                       {itens.length > 1 && (

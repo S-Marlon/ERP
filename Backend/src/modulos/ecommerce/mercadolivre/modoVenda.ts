@@ -9,7 +9,7 @@ import { LIMITE_FRETE_GRATIS } from './custosMl';
 const NOME_TIPO: Record<string, string> = { gold_special: 'Clássico', gold_pro: 'Premium', gold_premium: 'Diamante' };
 
 const vivos = (c: AnuncioCarregado) => c.itens
-  .map(i => ({ item: i, mlbId: c.noMl.get(i.idItem)?.mlbId || null, status: c.noMl.get(i.idItem)?.status || null }))
+  .map(i => ({ item: i, mlbId: c.noMl.get(i.idLinha)?.mlbId || null, status: c.noMl.get(i.idLinha)?.status || null }))
   .filter(x => x.mlbId && !foraDoMl(x.status)) as { item: AnuncioCarregado['itens'][number]; mlbId: string; status: string | null }[];
 
 /** Como o anúncio vende hoje no ML (pelos itens publicados) e o que dá para trocar. null se nada está no ML. */

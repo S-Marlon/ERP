@@ -51,15 +51,15 @@ export const fotosDoAnuncio = async (req: Request, res: Response) => {
   try {
     const [c] = await carregarAnuncios(pool as any, tenant, Number(req.params.id));
     if (!c) throw new ErroML('Anúncio não encontrado.', 404);
-    const mlbs = c.itens.map(i => c.noMl.get(i.idItem)?.mlbId).filter((x): x is string => !!x);
+    const mlbs = c.itens.map(i => c.noMl.get(i.idLinha)?.mlbId).filter((x): x is string => !!x);
     const [doMl, doErp] = await Promise.all([mlbs.length ? fotosDosAnuncios(tenant, mlbs) : new Map<string, FotoMl[]>(), fotosDoErp(tenant, c.itens.map(i => i.idItem))]);
     return res.json(c.itens.map(i => {
-      const m = c.noMl.get(i.idItem);
+      const m = c.noMl.get(i.idLinha);
       const erp = doErp.get(i.idItem) || [];
       const urlsErp = new Set(erp.map(f => f.url));
       const idsEnviados = new Set(Object.values(m?.fotosMl || {}));   // fotos do ERP que o ERP mesmo subiu ao ML
       return {
-        idItem: i.idItem, sku: i.sku, nome: i.tituloMl || i.nome, mlbId: m?.mlbId || null, erp,
+        idItem: i.idItem, idLinha: i.idLinha, sku: i.sku, nome: i.tituloMl || i.nome, mlbId: m?.mlbId || null, erp,
         ml: (m?.mlbId ? doMl.get(m.mlbId) || [] : []).map(f => ({ ...f, noErp: urlsErp.has(f.url) || idsEnviados.has(f.id) })),
       };
     }));
@@ -99,18 +99,18 @@ export const importarFotos = async (req: Request, res: Response) => {
   try {
     const [c] = await carregarAnuncios(pool as any, tenant, Number(req.params.id));
     if (!c) throw new ErroML('Anúncio não encontrado.', 404);
-    const pedidos: { idItem: number; fotos: { url: string; idMl?: string }[] }[] = Array.isArray(req.body?.itens) ? req.body.itens : [];
+    const pedidos: { idItem: number; idLinha?: number; fotos: { url: string; idMl?: string }[] }[] = Array.isArray(req.body?.itens) ? req.body.itens : [];
     const doErp = await fotosDoErp(tenant, c.itens.map(i => i.idItem));
     await conn.beginTransaction();
     let total = 0;
     for (const p of pedidos) {
-      const item = c.itens.find(i => i.idItem === Number(p.idItem));
+      const item = c.itens.find(i => (p.idLinha ? i.idLinha === Number(p.idLinha) : i.idItem === Number(p.idItem)));
       if (!item) continue;
       const existentes = new Set((doErp.get(item.idItem) || []).map(f => f.url));
       let temPrincipal = (doErp.get(item.idItem) || []).some(f => f.principal);
       const [[ordem]]: any = await conn.execute(`SELECT COALESCE(MAX(ordem), -1) + 1 AS proxima FROM itens_anexos WHERE tenant_id = ? AND id_item = ?`, [tenant, item.idItem]);
       let proxima = Number(ordem.proxima);
-      const m = c.noMl.get(item.idItem);
+      const m = c.noMl.get(item.idLinha);
       const ligadas: Record<string, string> = { ...(m?.fotosMl || {}) };
       for (const f of p.fotos || []) {
         const url = String(f.url || '').trim();
@@ -129,8 +129,8 @@ export const importarFotos = async (req: Request, res: Response) => {
       }
       if (m?.mlbId && Object.keys(ligadas).length !== Object.keys(m.fotosMl || {}).length) {
         await conn.execute(
-          `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET fotos_ml = ? WHERE id_anuncio = ? AND tenant_id = ? AND id_item = ?`,
-          [JSON.stringify(ligadas), Number(c.registro.id), tenant, item.idItem]
+          `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET fotos_ml = ? WHERE id_anuncio = ? AND tenant_id = ? AND id_anuncio_item = ?`,
+          [JSON.stringify(ligadas), Number(c.registro.id), tenant, item.idLinha]
         );
       }
     }

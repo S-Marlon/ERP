@@ -6,8 +6,8 @@ import {
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
-const item = (idItem: number, extra: any = {}) => ({
-  idItem, sku: `SKU-${idItem}`, precoMl: null, siglaBase: 'PC', unidadeMl: null,
+const item = (idLinha: number, extra: any = {}) => ({
+  idItem: idLinha, idLinha, sku: `SKU-${idLinha}`, precoMl: null, siglaBase: 'PC', unidadeMl: null,
   unidades: [{ idUnidade: 9, sigla: 'PCT', nome: 'Pacote', fator: 12, preco: 40 }],
   ml: { mlbId: null, status: null, permalink: null, erro: null, estoqueEnviado: null, precoEnviado: null, sincronizadoEm: null, regra: { reserva: null, maximo: null } },
   ...extra,
@@ -71,7 +71,7 @@ teste('corpos para salvar e limpar o que já foi gravado', () => {
   let r = mudarAnuncio(RASCUNHO_VAZIO, det, 'descricao', 'Novo texto');
   r = mudarItem(r, det, 1, 'estoqueMaximo', 5);
   r = mudarItem(r, det, 1, 'precoMl', 10);
-  assert.deepStrictEqual(corposParaSalvar(r), { anuncio: { descricao: 'Novo texto' }, itens: [{ idItem: 1, corpo: { preco: 10, estoqueMaximo: 5 } }] });
+  assert.deepStrictEqual(corposParaSalvar(r), { anuncio: { descricao: 'Novo texto' }, itens: [{ idLinha: 1, corpo: { preco: 10, estoqueMaximo: 5 } }] });
   // depois de gravar a descrição, ela some do rascunho; o item continua
   const salvo = { ...det, descricao: 'Novo texto' };
   assert.deepStrictEqual(limparIguais(r, salvo), { anuncio: {}, itens: { 1: { estoqueMaximo: 5, precoMl: 10 } } });

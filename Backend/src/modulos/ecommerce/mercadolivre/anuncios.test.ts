@@ -2,6 +2,7 @@ import assert from 'assert';
 import {
   AnuncioDados, AtributoML, cortarTitulo, tituloLegivel, eixosDeVariacao, filtrarAtributosCategoria, ItemAnuncio, pendenciasAnuncio,
   precoNoMl, resolverValor, sugerirAtributos, estoqueParaMl, regraDoItem, mudancasParaMl, saldoNaUnidade, statusDoMl, foraDoMl, situacaoPorItens, modoPublicacao, tituloPeloModelo, corpoDoItem, fotoPequena, errosDoValidador, ligarPorSku,
+  atributosDoItem, fatorDaLinha, skuDaLinha, tituloComUnidade,
 } from './anuncios';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
@@ -18,7 +19,7 @@ const brutos = [
 const atributos: AtributoML[] = filtrarAtributosCategoria(brutos);
 
 const item = (id: number, extra: Partial<ItemAnuncio> = {}): ItemAnuncio => ({
-  idItem: id, sku: `SKU-${id}`, nome: `Item ${id}`, ativo: true, preco: 100, precoMl: null, estoque: 5, fotos: 1, fotoUrl: null,
+  idItem: id, idLinha: id, sku: `SKU-${id}`, nome: `Item ${id}`, ativo: true, preco: 100, precoMl: null, estoque: 5, fotos: 1, fotoUrl: null,
   gtin: '7891234567890', pesoKg: 0.2, medidasCm: { altura: 5, largura: 5, comprimento: 10 }, marca: 'Acme',
   valoresErp: {}, motivosCadastro: [], ...extra,
 });
@@ -224,4 +225,34 @@ teste('status do ML: excluído, encerrado e situação do anúncio', () => {
   assert.strictEqual(situacaoPorItens(['paused', 'deleted']), 'PAUSADO');
   assert.strictEqual(situacaoPorItens(['paused', 'active']), 'PUBLICADO');
   assert.strictEqual(situacaoPorItens([]), null);
+});
+
+teste('linha em kit: SKU, título e fator próprios', () => {
+  const kit = { idUnidade: 9, sigla: 'Kit 10', nome: 'Kit c/10', fator: 10, preco: null };
+  assert.strictEqual(skuDaLinha('ABR-3.6-100', kit), 'ABR-3.6-100-KIT10');
+  assert.strictEqual(skuDaLinha('ABR-3.6-100', null), 'ABR-3.6-100');
+  assert.strictEqual(tituloComUnidade('Abraçadeira Nylon 3,6 x 100 mm', kit), 'Abraçadeira Nylon 3,6 x 100 mm Kit 10 Unidades');
+  assert.strictEqual(tituloComUnidade('Kit Abraçadeira 3,6 x 100 mm', kit), 'Kit Abraçadeira 3,6 x 100 mm');
+  assert.ok(tituloComUnidade('A'.repeat(30) + ' ' + 'B'.repeat(29), kit, 60).length <= 60);
+  assert.strictEqual(tituloComUnidade('Abraçadeira', null), 'Abraçadeira');
+  assert.strictEqual(fatorDaLinha({ unidadeMl: kit }), 10);
+  assert.strictEqual(fatorDaLinha({ unidadeMl: null }), 1);
+  assert.strictEqual(fatorDaLinha({ unidadeMl: { ...kit, fator: 0.5 } }), 1);
+});
+
+teste('linha em kit: peso multiplicado, unidades por kit e formato Kit', () => {
+  const cat: AtributoML[] = [
+    ...atributos,
+    { id: 'UNITS_PER_PACK', nome: 'Unidades por kit', tipo: 'number', obrigatorio: false, permiteVariar: false, porVariacao: false, valores: [], unidades: [], unidadePadrao: null },
+    { id: 'SALE_FORMAT', nome: 'Formato de venda', tipo: 'list', obrigatorio: false, permiteVariar: false, porVariacao: false, valores: [{ id: '1', nome: 'Unidade' }, { id: '2', nome: 'Kit' }], unidades: [], unidadePadrao: null },
+  ];
+  const d = dados({ atributos: { BRAND: { origem: 'marca' }, SALE_FORMAT: { origem: 'fixo', valor: 'Unidade', valorId: '1' } } });
+  const kit = item(1, { unidadeMl: { idUnidade: 9, sigla: 'KIT10', nome: 'Kit c/10', fator: 10, preco: null } });
+  const a = atributosDoItem(cat, d, kit, true);
+  assert.deepStrictEqual(a.find(x => x.id === 'SELLER_PACKAGE_WEIGHT'), { id: 'SELLER_PACKAGE_WEIGHT', value_name: '2000 g' });
+  assert.deepStrictEqual(a.find(x => x.id === 'UNITS_PER_PACK'), { id: 'UNITS_PER_PACK', value_name: '10' });
+  assert.deepStrictEqual(a.filter(x => x.id === 'SALE_FORMAT'), [{ id: 'SALE_FORMAT', value_id: '2', value_name: 'Kit' }]);
+  const un = atributosDoItem(cat, d, item(1), true);
+  assert.deepStrictEqual(un.find(x => x.id === 'SALE_FORMAT'), { id: 'SALE_FORMAT', value_id: '1', value_name: 'Unidade' });
+  assert.strictEqual(un.some(x => x.id === 'UNITS_PER_PACK'), false);
 });

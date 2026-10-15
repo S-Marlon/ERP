@@ -8,6 +8,7 @@ import type { AnuncioDetalhe } from '../mercadoLivreApi';
 import GaleriaImagens from '../../../../areas/catalogo/skus/GaleriaImagens';
 import { AnexoItem, copiarImagem, listarImagensDosItens } from '../../../../areas/catalogo/skus/CatalogSku.service';
 import FotoFamiliaControle from '../../../../areas/catalogo/familias/FotoFamiliaControle';
+import { umaLinhaPorItem } from '../linhasAnuncio';
 
 const EditorImagemModal = lazy(() => import('../editorImagem/EditorImagemModal'));
 const GeradorMedidasModal = lazy(() => import('../GeradorMedidasModal'));
@@ -65,7 +66,10 @@ const CopiarPara: React.FC<{ foto: AnexoItem; origem: number; itens: AnuncioDeta
   );
 };
 
-const AbaFotos: React.FC<Props> = ({ salvo, det, onAlterado }) => {
+const AbaFotos: React.FC<Props> = ({ salvo: salvoLinhas, det: detLinhas, onAlterado }) => {
+  // as fotos são do item: o item vendido em duas unidades aparece uma vez só
+  const salvo = umaLinhaPorItem(salvoLinhas);
+  const det = umaLinhaPorItem(detLinhas);
   const [fotos, setFotos] = useState<Record<number, AnexoItem[]>>({});
   const [carregando, setCarregando] = useState(false);
   const [editor, setEditor] = useState(false);

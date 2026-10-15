@@ -113,11 +113,12 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
   const temRascunho = alteracoes.length > 0;
   const vaiPeloBotao = alteracoes.some(a => a.vaiAoMl === 'BOTAO');
 
-  const skuDoItem = useMemo(() => new Map((salvo?.itens || []).map(i => [i.idItem, i.sku])), [salvo]);
-  const pendencias = useMemo(() => agruparPendencias(salvo?.pendencias || [], skuDoItem), [salvo, skuDoItem]);
+  const skuDaLinha = useMemo(() => new Map((salvo?.itens || []).map(i => [i.idLinha, i.sku])), [salvo]);
+  const pendencias = useMemo(() => agruparPendencias(salvo?.pendencias || [], skuDaLinha), [salvo, skuDaLinha]);
   const atributoComErro = useMemo(() => new Set((salvo?.pendencias || []).filter(p => p.nivel === 'erro' && p.atributo).map(p => p.atributo!)), [salvo]);
-  const itemComErro = useMemo(() => new Set((salvo?.pendencias || []).filter(p => p.nivel === 'erro' && p.idItem).map(p => p.idItem!)), [salvo]);
-  const errosConferencia = useMemo(() => new Map((conferencia || []).filter(c => !c.ok).map(c => [c.idItem, c.erros])), [conferencia]);
+  // por linha do anúncio (o mesmo item pode estar em mais de uma unidade)
+  const itemComErro = useMemo(() => new Set((salvo?.pendencias || []).filter(p => p.nivel === 'erro' && (p.idLinha ?? p.idItem)).map(p => (p.idLinha ?? p.idItem)!)), [salvo]);
+  const errosConferencia = useMemo(() => new Map((conferencia || []).filter(c => !c.ok).map(c => [c.idLinha ?? c.idItem, c.erros])), [conferencia]);
 
   // ---------------------------------------------------------------------------
   // Rascunho
@@ -128,8 +129,8 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
   };
   const mudarEstoque = (corpo: { estoqueReserva?: number; estoqueMaximo?: number | null; estoqueAutomatico?: boolean }) =>
     salvo && setRascunho(r => (Object.entries(corpo) as [keyof typeof corpo, never][]).reduce((acc, [c, v]) => mudarAnuncio(acc, salvo, c, v), r));
-  const mudarDoItem = (idItem: number, corpo: RascunhoItem) =>
-    salvo && setRascunho(r => (Object.entries(corpo) as [keyof RascunhoItem, never][]).reduce((acc, [c, v]) => mudarItem(acc, salvo, idItem, c, v), r));
+  const mudarDoItem = (idLinha: number, corpo: RascunhoItem) =>
+    salvo && setRascunho(r => (Object.entries(corpo) as [keyof RascunhoItem, never][]).reduce((acc, [c, v]) => mudarItem(acc, salvo, idLinha, c, v), r));
 
   const desfazerTudo = () => setRascunho(RASCUNHO_VAZIO);
 
@@ -141,7 +142,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
     let atual = salvo;
     try {
       if (corpos.anuncio) atual = await anunciosApi.salvar(salvo.id, corpos.anuncio);
-      for (const i of corpos.itens) if (Object.keys(i.corpo).length) atual = await anunciosApi.salvarItem(salvo.id, i.idItem, i.corpo);
+      for (const i of corpos.itens) if (Object.keys(i.corpo).length) atual = await anunciosApi.salvarItem(salvo.id, i.idLinha, i.corpo);
       setSalvo(atual);
       setRascunho(RASCUNHO_VAZIO);
       if (enviarMl) {
@@ -221,7 +222,8 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
   const fotoPorLink = (item: ItemDoAnuncio, url: string) =>
     comFoto(item.idItem, () => adicionarAnexo(item.idItem, url, item.fotos === 0 ? 'IMAGEM_PRINCIPAL' : 'FOTO_GALERIA'), `Foto colocada em ${item.sku}.`);
   const fotoParaTodos = (arquivo: File) => {
-    const alvo = (salvo?.itens || []).filter(i => i.fotos === 0 && !i.ml.mlbId);
+    // a foto é do item: com o item em duas unidades, vai uma vez só
+    const alvo = [...new Map((salvo?.itens || []).filter(i => i.fotos === 0 && !i.ml.mlbId).map(i => [i.idItem, i])).values()];
     return comFoto('todos', async () => {
       await avisarFotoPequena(arquivo);
       for (const i of alvo) await enviarArquivoAnexo(i.idItem, arquivo, 'IMAGEM_PRINCIPAL');
@@ -302,7 +304,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
 
   const irParaPendencia = (p: PendenciaAgrupada) => {
     const destino = ABA_DA_AREA[p.area] || 'anuncio';
-    if (p.idItens.length) { setFiltroItens({ texto: p.texto, ids: p.idItens }); setAba('itens'); return; }
+    if (p.idLinhas.length) { setFiltroItens({ texto: p.texto, ids: p.idLinhas }); setAba('itens'); return; }
     setAba(destino);
   };
 
@@ -341,8 +343,12 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
           enviandoFoto={enviandoFoto} onFoto={enviarFoto} onFotoLink={fotoPorLink} onFotoTodos={fotoParaTodos}
           onFotoFamilia={() => { recarregar(); onAlterado(); }}
           onAdicionarItens={() => setAdicionarItens(true)}
-          onRemoverItem={i => executar(() => anunciosApi.removerItem(salvo.id, i.idItem), `${i.sku} saiu do anúncio.`)}
-          onDesligar={i => executar(() => anunciosApi.desligarDoMl(salvo.id, i.idItem), 'Item desligado do ML.')}
+          onRemoverItem={i => executar(() => anunciosApi.removerItem(salvo.id, i.idLinha), `${i.sku} saiu do anúncio.`)}
+          onDesligar={i => executar(() => anunciosApi.desligarDoMl(salvo.id, i.idLinha), 'Item desligado do ML.')}
+          onOutraUnidade={(i, idUnidade) => executar(() => anunciosApi.adicionarUnidade(salvo.id, i.idLinha, idUnidade),
+            'Nova linha no anúncio: confira o preço e publique (ela tem SKU e título próprios).')}
+          onAtivar={(i, ativo) => executar(() => anunciosApi.ativarLinha(salvo.id, i.idLinha, ativo),
+            ativo ? `${i.sku} ativado${i.ml.mlbId ? ' e reativado no ML' : ''}.` : `${i.sku} desativado${i.ml.mlbId ? ' e pausado no ML' : ': não vai ser publicado'}.`)}
           sincronizando={sincronizando} onSincronizar={sincronizarAgora}
         />
       ),
@@ -363,8 +369,8 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
             <>
               <div ref={painelPreco} style={{ scrollMarginTop: 8 }}>
                 <PrecoMlCard
-                  salvo={salvo} det={det} idItem={itemPreco ?? det.itens[0].idItem} onTrocarItem={setItemPreco}
-                  onMudarPreco={(idItem, preco) => mudarDoItem(idItem, { precoMl: preco })}
+                  salvo={salvo} det={det} idLinha={itemPreco ?? det.itens[0].idLinha} onTrocarItem={setItemPreco}
+                  onMudarPreco={(idLinha, preco) => mudarDoItem(idLinha, { precoMl: preco })}
                   onEscolherCenario={(tipo, gratis) => {
                     mudarCampo('tipoAnuncio', tipo);
                     if (gratis !== undefined) mudarCampo('freteGratis', gratis);
@@ -374,9 +380,9 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
               </div>
               <TabelaPrecos
                 salvo={salvo} det={det} rascunhoItens={rascunho.itens}
-                onMudarPreco={(idItem, preco) => mudarDoItem(idItem, { precoMl: preco })}
-                selecionado={itemPreco ?? det.itens[0].idItem}
-                onSelecionar={idItem => { setItemPreco(idItem); painelPreco.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
+                onMudarPreco={(idLinha, preco) => mudarDoItem(idLinha, { precoMl: preco })}
+                selecionado={itemPreco ?? det.itens[0].idLinha}
+                onSelecionar={idLinha => { setItemPreco(idLinha); painelPreco.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
               />
             </>
           )}
@@ -443,6 +449,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
       {contextoModal}
       <style>{`
         .ml-linha-erro > td { background: #fff7f6 !important; }
+        .ml-linha-desativada > td { opacity: 0.55; }
         .ml-linha-alterada > td { background: #f0f7ff !important; }
         .ml-linha-alterada > td:first-child { box-shadow: inset 3px 0 0 #1677ff; }
         .ml-linha-selecionada > td { background: #e6f4ff !important; }
