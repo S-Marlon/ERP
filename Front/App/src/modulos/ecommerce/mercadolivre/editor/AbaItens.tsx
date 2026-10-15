@@ -6,7 +6,8 @@ import { AppstoreAddOutlined, ColumnWidthOutlined, EditOutlined, DeleteOutlined,
 // telas de imagem só carregam quando abertas (o editor traz a biblioteca de desenho, que é pesada)
 const FotosMlModal = lazy(() => import('../FotosMlModal'));
 const GeradorMedidasModal = lazy(() => import('../GeradorMedidasModal'));
-const EditorImagemModal = lazy(() => import('../editorImagem/EditorImagemModal'));
+const EditorImagemModal = lazy(() => import('../../../../areas/catalogo/imagens/editor/EditorImagemModal'));
+import { entradaDoAnuncio } from '../entradaEditorMl';
 import FotoFamiliaControle from '../../../../areas/catalogo/familias/FotoFamiliaControle';
 import EnviarFotoPopover from '../../../../shared/components/EnviarFotoPopover';
 import { AnuncioDetalhe, foraDoMl, ItemDoAnuncio, ROTULO_STATUS_ML } from '../mercadoLivreApi';
@@ -188,7 +189,7 @@ const AbaItens: React.FC<Props> = p => {
         />
       </Card>
       <Suspense fallback={null}>
-        {editor && <EditorImagemModal det={umaLinhaPorItem(p.salvo)} onFechar={() => setEditor(false)} onSalvo={p.onFotoFamilia} />}
+        {editor && <EditorImagemModal entrada={entradaDoAnuncio(p.salvo)} onFechar={() => setEditor(false)} onSalvo={p.onFotoFamilia} />}
         {medidas && <GeradorMedidasModal det={umaLinhaPorItem(p.salvo)} onFechar={() => setMedidas(false)} onSalvo={p.onFotoFamilia} />}
         {fotosMl && <FotosMlModal idAnuncio={det.id} idItemInicial={fotosMl.idItem} onFechar={() => setFotosMl(null)} onImportado={p.onFotoFamilia} />}
       </Suspense>

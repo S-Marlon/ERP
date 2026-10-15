@@ -54,6 +54,7 @@ import { ModalVinculoAtributos } from "./components/ModalVinculoAtributos";
 import { ImportarFamiliaModal } from "./ImportarFamiliaModal";
 import { AttributeGuideModal } from "./guide/AttributeGuideModal";
 import { FamiliaIdentidadeCard } from "./FamiliaIdentidadeCard";
+import FotosFamiliaCard from './FotosFamiliaCard';
 import ListaFamiliasAtivas from "./ListaFamiliasAtivas";
 import ItensFamiliaCard from "./ItensFamiliaCard";
 import { AtributosCard } from "./AtributosCard";
@@ -731,6 +732,9 @@ Salvar família
 </>
 )}
 />
+
+{/* Fotos da família: galeria (a 1ª é a modelo) e o editor de imagem que aplica nas variações */}
+{familiaSelecionadaLocal?.id && <FotosFamiliaCard idFamilia={Number(familiaSelecionadaLocal.id)} qtdItens={itensAtivos.length} />}
 
 {/* Atributos e SKU | Itens: lado a lado (arraste o divisor); em tela estreita, um embaixo do outro */}
 {telas.lg ? (

@@ -210,6 +210,12 @@ export const fotosFamiliaApi = {
   /** Modelo do editor de imagem (JSON) guardado numa foto da família. */
   lerModelo: async (idFamilia: number, idFoto: number) =>
     handleResponse<{ modelo: string | null }>(await fetch(urlFotos(idFamilia, `/${idFoto}/modelo`)), 'Erro ao ler o modelo do editor.'),
+  /** Itens ativos da família com as fotos limpas e os campos do cadastro (para o editor aplicar nas variações). */
+  dadosEditor: async (idFamilia: number) =>
+    handleResponse<{
+      familia: { id: number; nome: string }; fotos: FotoFamilia[]; variam: string[]; modeloPadrao: string;
+      itens: { idItem: number; sku: string; nome: string; foto: string | null; fotos: { url: string; nome: string }[]; campos: { chave: string; nome: string; valor: string }[] }[];
+    }>(await fetch(`${API_BASE_URL}/cadastros/familias/${idFamilia}/editor-imagem?tenant_id=1`), 'Erro ao ler os itens da família.'),
   salvarModelo: async (idFamilia: number, idFoto: number, modelo: string | null) =>
     handleResponse<{ success: boolean }>(await fetch(urlFotos(idFamilia, `/${idFoto}/modelo`), { method: 'PUT', headers: DEFAULT_HEADERS, body: JSON.stringify({ modelo }) }), 'Erro ao guardar o modelo do editor.'),
 };

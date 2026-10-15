@@ -2,7 +2,8 @@
 // a base do editor de imagem); as outras (aplicação, embalagem) entram em todas as variações depois das fotos de cada
 // item. Arrastar ordena, a estrela faz principal; a foto com o modelo do editor guardado mostra a etiqueta.
 import React, { useCallback, useEffect, useState } from 'react';
-import { Spin, Tag, Tooltip, message } from 'antd';
+import { Button, Spin, Tag, Tooltip, message } from 'antd';
+import { EditOutlined } from '@ant-design/icons';
 import GaleriaImagens from '../skus/GaleriaImagens';
 import type { AnexoItem } from '../skus/CatalogSku.service';
 import { FotoFamilia, fotosFamiliaApi } from './FamilyManager.api';
@@ -13,11 +14,13 @@ interface Props {
   tamanho?: number;
   /** muda quando alguém de fora mexeu na galeria (ex.: "levar para a família" numa foto do item) */
   recarregar?: number;
+  /** abre o editor de imagem sobre esta foto (aplicar nas variações) */
+  onEditar?: (idFoto: number) => void;
 }
 
 const comoAnexo = (f: FotoFamilia): AnexoItem => ({ id_anexo: f.idFoto, tipo_anexo: f.ordem === 0 ? 'IMAGEM_PRINCIPAL' : 'FOTO_GALERIA', nome_arquivo: f.nome, url_anexo: f.url, ordem: f.ordem });
 
-const GaleriaFamilia: React.FC<Props> = ({ idFamilia, onChange, tamanho = 88, recarregar }) => {
+const GaleriaFamilia: React.FC<Props> = ({ idFamilia, onChange, tamanho = 88, recarregar, onEditar }) => {
   const [fotos, setFotos] = useState<FotoFamilia[] | null>(null);
   const carregar = useCallback(async () => {
     try { setFotos((await fotosFamiliaApi.listar(idFamilia)).fotos); }
@@ -37,6 +40,11 @@ const GaleriaFamilia: React.FC<Props> = ({ idFamilia, onChange, tamanho = 88, re
         enviar: f => fotosFamiliaApi.enviar(idFamilia, f),
         link: u => fotosFamiliaApi.link(idFamilia, u),
       }}
+      acaoExtra={onEditar ? f => (
+        <Tooltip title="Editar esta foto e aplicar nas variações (cada uma com a sua medida)">
+          <Button type="text" size="small" icon={<EditOutlined />} onClick={() => onEditar(f.id_anexo)} />
+        </Tooltip>
+      ) : undefined}
       etiqueta={f => comModelo.has(f.id_anexo) && (
         <Tooltip title="Tem o modelo do editor de imagem (cotas e textos) guardado: o editor abre com ele em qualquer anúncio">
           <Tag color="purple" style={{ margin: 0, fontSize: 10, lineHeight: '16px' }}>modelo</Tag>

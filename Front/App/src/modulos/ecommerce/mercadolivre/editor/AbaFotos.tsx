@@ -12,7 +12,8 @@ import GaleriaFamilia from '../../../../areas/catalogo/familias/GaleriaFamilia';
 import { fotosFamiliaApi } from '../../../../areas/catalogo/familias/FamilyManager.api';
 import { umaLinhaPorItem } from '../linhasAnuncio';
 
-const EditorImagemModal = lazy(() => import('../editorImagem/EditorImagemModal'));
+const EditorImagemModal = lazy(() => import('../../../../areas/catalogo/imagens/editor/EditorImagemModal'));
+import { entradaDoAnuncio } from '../entradaEditorMl';
 const GeradorMedidasModal = lazy(() => import('../GeradorMedidasModal'));
 const FotosMlModal = lazy(() => import('../FotosMlModal'));
 
@@ -74,7 +75,8 @@ const AbaFotos: React.FC<Props> = ({ salvo: salvoLinhas, det: detLinhas, onAlter
   const det = umaLinhaPorItem(detLinhas);
   const [fotos, setFotos] = useState<Record<number, AnexoItem[]>>({});
   const [carregando, setCarregando] = useState(false);
-  const [editor, setEditor] = useState(false);
+  // editor: false fechado; true abre pedindo a foto; número = abre direto nesta foto da família
+  const [editor, setEditor] = useState<boolean | number>(false);
   const [medidas, setMedidas] = useState(false);
   const [fotosMl, setFotosMl] = useState(false);
   const limite = det.categoria?.maxFotos || 10;
@@ -144,7 +146,7 @@ const AbaFotos: React.FC<Props> = ({ salvo: salvoLinhas, det: detLinhas, onAlter
             A <b>1ª (modelo)</b> é a foto do produto: vai como principal na variação sem foto própria e é a base do editor de imagem, que guarda nela as
             cotas e textos. As <b>outras</b> (aplicação, embalagem) entram em todas as variações, depois das fotos de cada uma.
           </Text>
-          <GaleriaFamilia idFamilia={det.idFamilia} recarregar={versaoFamilia} onChange={() => onAlterado()} />
+          <GaleriaFamilia idFamilia={det.idFamilia} recarregar={versaoFamilia} onChange={() => onAlterado()} onEditar={idFoto => setEditor(idFoto)} />
         </Card>
       )}
 
@@ -187,7 +189,7 @@ const AbaFotos: React.FC<Props> = ({ salvo: salvoLinhas, det: detLinhas, onAlter
       </Spin>
 
       <Suspense fallback={null}>
-        {editor && <EditorImagemModal det={salvo} onFechar={() => setEditor(false)} onSalvo={mudou} />}
+        {editor !== false && <EditorImagemModal entrada={entradaDoAnuncio(salvo, typeof editor === 'number' ? editor : null)} onFechar={() => setEditor(false)} onSalvo={mudou} />}
         {medidas && <GeradorMedidasModal det={salvo} onFechar={() => setMedidas(false)} onSalvo={mudou} />}
         {fotosMl && <FotosMlModal idAnuncio={det.id} idItemInicial={null} onFechar={() => setFotosMl(false)} onImportado={mudou} />}
       </Suspense>

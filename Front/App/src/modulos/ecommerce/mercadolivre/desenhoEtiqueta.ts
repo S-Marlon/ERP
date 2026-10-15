@@ -1,6 +1,5 @@
 // Desenha a foto do produto num quadro de 1200×1200 (fundo branco, o tamanho que o ML recomenda) com a medida escrita:
 // faixa embaixo, cota com seta (como em desenho técnico) ou selo no canto. Roda no navegador (canvas).
-import { API_URL } from '../../../shared/api/config';
 
 export type EstiloEtiqueta = 'FAIXA' | 'COTA' | 'SELO';
 export interface OpcoesEtiqueta { texto: string; subtexto?: string; estilo: EstiloEtiqueta; cor: string; lado?: number }
@@ -9,13 +8,8 @@ const LADO = 1200;
 const cacheImagens = new Map<string, Promise<HTMLImageElement>>();
 
 /** Foto de fora do ERP passa pelo servidor (sem isso o navegador não deixa salvar o desenho). */
-export const enderecoParaDesenho = (url: string) => {
-  if (/^(data|blob):/i.test(url)) return url;
-  try {
-    if (new URL(url).origin === new URL(API_URL).origin) return url;
-  } catch { return url; }
-  return `${API_URL}/api/modulos/ecommerce/mercadolivre/fotos-ml/imagem?tenant_id=1&url=${encodeURIComponent(url)}`;
-};
+export { enderecoParaDesenho } from '../../../areas/catalogo/imagens/enderecoImagem';
+import { enderecoParaDesenho } from '../../../areas/catalogo/imagens/enderecoImagem';
 
 /** Solta as fotos guardadas (chamado ao fechar o gerador: cada foto aberta ocupa vários MB de memória). */
 export const limparCacheImagens = () => cacheImagens.clear();

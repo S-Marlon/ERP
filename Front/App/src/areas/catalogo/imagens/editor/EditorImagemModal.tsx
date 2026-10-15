@@ -1,19 +1,20 @@
 // Editor de imagem simplificado: a foto do produto num quadro 1200×1200 e, por cima, setas, cotas com medida, textos,
 // balões e destaques que se movem, giram e esticam. O texto aceita {Campo} (ex.: {Comprimento}); o mesmo modelo é
-// aplicado em todos os itens do anúncio, cada um com a sua medida e a sua foto, e salvo no cadastro do ERP.
+// aplicado em todos os itens (variações), cada um com a sua medida, e salvo no cadastro do ERP. Ao abrir, escolhe-se a
+// foto que vai ser editada (da família ou de um item). Usado pela família (catálogo) e pelo anúncio do ML.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Divider, Flex, Input, Modal, Progress, Segmented, Select, Slider, Space, Switch, Tag, Tooltip, Typography, Upload, message } from 'antd';
+import { Button, Checkbox, Divider, Empty, Flex, Input, Modal, Progress, Segmented, Select, Slider, Space, Spin, Switch, Tag, Tooltip, Typography, Upload, message } from 'antd';
 import {
   ArrowRightOutlined, BgColorsOutlined, BorderOutlined, ColumnWidthOutlined, CommentOutlined, CopyOutlined, DeleteOutlined, DownloadOutlined,
   ExpandOutlined, FileImageOutlined, FontSizeOutlined, PictureOutlined, RedoOutlined, SaveOutlined, ScissorOutlined, UndoOutlined, UploadOutlined,
-  VerticalAlignBottomOutlined, VerticalAlignTopOutlined,
+  SwapOutlined, VerticalAlignBottomOutlined, VerticalAlignTopOutlined,
 } from '@ant-design/icons';
 import { Canvas, FabricImage, FabricObject, IText, Point, Rect, StaticCanvas, util } from 'fabric';
-import { enviarArquivoAnexo } from '../../../../areas/catalogo/skus/CatalogSku.service';
-import { fotosFamiliaApi } from '../../../../areas/catalogo/familias/FamilyManager.api';
-import type { AnuncioDetalhe, ItemDoAnuncio } from '../mercadoLivreApi';
-import { camposDoItem, converterMedidas, fotoBaseDoItem, modeloPadrao, textoDoModelo } from '../etiquetaFoto';
-import { enderecoParaDesenho } from '../desenhoEtiqueta';
+import { enviarArquivoAnexo } from '../../skus/CatalogSku.service';
+import { FotoFamilia, fotosFamiliaApi } from '../../familias/FamilyManager.api';
+import { converterMedidas, textoDoModelo } from '../etiqueta';
+import { enderecoParaDesenho } from '../enderecoImagem';
+import type { EntradaEditor, ItemDoEditor } from './entradaEditor';
 import {
   aplicarCorte, criarElemento, dadosDe, DadosElemento, encaixarFoto, LadoTexto, montarFoto, origemDaFoto, parametrosAposEsticar, Pontas,
   precisaRedesenharAoGirar, PROPRIEDADES, recriarElemento, refazerFotosTratadas, soltarFotosTratadas, TipoElemento,
@@ -25,13 +26,17 @@ const { Text } = Typography;
 const LADO = 1200;
 const TELA = 600;
 const CORES = ['#731717', '#111111', '#d4380d', '#1554c0', '#15803d', '#ffffff'];
-const chaveModelo = (id: number) => `ml-editor-imagem-${id}`;
+// "ml-4" é o nome antigo (anúncio 4): mantém o modelo que já estava guardado no navegador
+const chaveModelo = (chave: string) => (chave.startsWith("ml-") ? `ml-editor-imagem-${chave.slice(3)}` : `editor-imagem-${chave}`);
 const TOLERANCIA_PADRAO = 40;
 type Proporcao = 'LIVRE' | 'QUADRADO';
 
-interface Props { det: AnuncioDetalhe | null; onFechar: () => void; onSalvo: () => void }
+interface Props { entrada: EntradaEditor | null; onFechar: () => void; onSalvo: () => void }
 
-const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
+/** Foto escolhida para editar: url (null = a do modelo guardado), a foto da família dela e se vem com as cotas guardadas. */
+interface Escolha { url: string | null; idFotoFamilia: number | null; usarModelo: boolean }
+
+const EditorImagemModal: React.FC<Props> = ({ entrada, onFechar, onSalvo }) => {
   const elCanvas = useRef<HTMLCanvasElement>(null);
   const fab = useRef<Canvas | null>(null);
   const historico = useRef<string[]>([]);
@@ -44,7 +49,12 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
   const atualizarPainel = () => setVersao(v => v + 1);
   const [idItem, setIdItem] = useState<number | null>(null);
   const [unidade, setUnidade] = useState<'original' | 'mm' | 'cm'>('original');
-  const [fotoPorItem, setFotoPorItem] = useState(true);
+  const [fotoPorItem, setFotoPorItem] = useState(entrada?.fotoPorItem ?? true);
+  // escolha da foto ao abrir: a galeria da família e se há modelo guardado
+  const [escolha, setEscolha] = useState<Escolha | null>(null);
+  const [galeria, setGaleria] = useState<FotoFamilia[] | null>(null);
+  const [usarModelo, setUsarModelo] = useState(true);
+  const sufixoArquivo = useRef('');                      // foto da família que não é a modelo: imagem com nome próprio
   const [aplicando, setAplicando] = useState<{ feitos: number; total: number } | null>(null);
   const [marcados, setMarcados] = useState<number[]>([]);
   const [corAtual, setCorAtual] = useState(CORES[0]);
@@ -55,10 +65,11 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
   const [tratandoFoto, setTratandoFoto] = useState(false);
   const [tolerancia, setTolerancia] = useState(TOLERANCIA_PADRAO);
 
-  const item = useMemo(() => det?.itens.find(i => i.idItem === idItem) || det?.itens[0] || null, [det, idItem]);
-  const campos = useMemo(() => (det && item ? camposDoItem(det, item) : []), [det, item]);
-  const textoPara = useCallback((modelo: string | undefined, it: ItemDoAnuncio | null) =>
-    (det && it ? converterMedidas(textoDoModelo(modelo || '', camposDoItem(det, it)), unidade) : modelo || ''), [det, unidade]);
+  const item = useMemo(() => entrada?.itens.find(i => i.idItem === idItem) || entrada?.itens[0] || null, [entrada, idItem]);
+  const campos = item?.campos || [];
+  const textoPara = useCallback((modelo: string | undefined, it: ItemDoEditor | null) =>
+    (it ? converterMedidas(textoDoModelo(modelo || '', it.campos), unidade) : modelo || ''), [unidade]);
+  const principalFamilia = galeria?.[0]?.url || null;
 
   // ---------------------------------------------------------------- histórico
   /** O modelo guarda a foto pela origem (sem tratamento); o fundo é tirado de novo ao abrir. */
@@ -113,7 +124,7 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
     return novo;
   };
   /** Redesenha os textos de todos os elementos para o item da prévia. */
-  const renderizarTextos = useCallback((it: ItemDoAnuncio | null) => {
+  const renderizarTextos = useCallback((it: ItemDoEditor | null) => {
     const c = fab.current;
     if (!c) return;
     carregando.current = true;
@@ -296,11 +307,29 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
   // os eventos do quadro são ligados uma vez; leem a unidade atual por aqui
   const textoParaAtual = useRef(textoPara);
   textoParaAtual.current = textoPara;
+  // galeria da família e o que há guardado: é o que aparece na escolha da foto ao abrir
   useEffect(() => {
-    if (!det) return;
-    const primeiro = det.itens.find(i => fotoBaseDoItem(i)) || det.itens[0];
+    if (!entrada) return;
+    let vivo = true;
+    setEscolha(null);
+    setGaleria(null);
+    setFotoPorItem(entrada.fotoPorItem ?? true);
+    (async () => {
+      const fotos = entrada.idFamilia ? await fotosFamiliaApi.listar(entrada.idFamilia).then(r => r.fotos).catch(() => []) : [];
+      if (!vivo) return;
+      setGaleria(fotos);
+      const inicial = entrada.idFotoFamiliaInicial ? fotos.find(f => f.idFoto === entrada.idFotoFamiliaInicial) : null;
+      if (inicial) setEscolha({ url: inicial.url, idFotoFamilia: inicial.idFoto, usarModelo: true });
+    })();
+    return () => { vivo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entrada?.chave]);
+
+  useEffect(() => {
+    if (!entrada || !escolha || !galeria) return;
+    const primeiro = entrada.itens.find(i => i.foto) || entrada.itens[0];
     setIdItem(primeiro?.idItem ?? null);
-    setMarcados(det.itens.map(i => i.idItem));
+    setMarcados(entrada.itens.map(i => i.idItem));
     let vivo = true;
     const t = window.setTimeout(async () => {
       if (!elCanvas.current || !vivo) return;
@@ -332,23 +361,23 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
         const d = dadosDe(o);
         if (d) { (o as any).dadosElemento = { ...d, modelo: o.text }; o.set('text', textoParaAtual.current(o.text, itemAtual.current) || ' '); c.requestRenderAll(); guardar(); }
       });
-      const foto = (primeiro && fotoBaseDoItem(primeiro)) || det.fotoFamilia;
-      // o modelo guardado na foto-modelo da família manda; sem ele, o último deste anúncio neste navegador
-      let salvo = (() => { try { return localStorage.getItem(chaveModelo(det.id)); } catch { return null; } })();
+      // a foto escolhida; o modelo fica guardado nela (foto da família) ou na foto-modelo da família
+      const foto = escolha.url;
+      const daGaleria = escolha.idFotoFamilia ? galeria.find(f => f.idFoto === escolha.idFotoFamilia) || null : null;
+      const guardarEm = daGaleria || galeria[0] || null;
+      fotoModelo.current = guardarEm && entrada.idFamilia ? { idFamilia: entrada.idFamilia, idFoto: guardarEm.idFoto } : null;
+      sufixoArquivo.current = daGaleria && galeria[0] && daGaleria.idFoto !== galeria[0].idFoto ? `-f${daGaleria.idFoto}` : '';
+      // cotas e textos guardados: os da foto escolhida, senão os da foto-modelo, senão os deste navegador
+      let salvo: string | null = null;
       let daFamilia = false;
-      fotoModelo.current = null;
-      if (det.idFamilia) {
-        try {
-          const { fotos } = await fotosFamiliaApi.listar(det.idFamilia);
+      if (escolha.usarModelo) {
+        const comModelo = [daGaleria, galeria[0]].find(f => f?.temModelo);
+        if (comModelo && entrada.idFamilia) {
+          const m = await fotosFamiliaApi.lerModelo(entrada.idFamilia, comModelo.idFoto).then(r => r.modelo).catch(() => null);
           if (!vivo) return;
-          const modelo = fotos[0];
-          if (modelo) fotoModelo.current = { idFamilia: det.idFamilia, idFoto: modelo.idFoto };
-          if (modelo?.temModelo) {
-            const m = (await fotosFamiliaApi.lerModelo(det.idFamilia, modelo.idFoto)).modelo;
-            if (!vivo) return;
-            if (m) { salvo = m; daFamilia = true; }
-          }
-        } catch { /* sem a galeria da família: vale o do navegador */ }
+          if (m) { salvo = m; daFamilia = true; }
+        }
+        if (!salvo) salvo = (() => { try { return localStorage.getItem(chaveModelo(entrada.chave)); } catch { return null; } })();
       }
       let abriuSalvo = false;
       if (salvo) {
@@ -363,7 +392,7 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
           if (!vivo) return;
           renderizarTextos(primeiro || null);
           abriuSalvo = true;
-          const onde = daFamilia ? `o modelo da família ${det.familia || ''}`.trim() : 'o último modelo deste anúncio';
+          const onde = daFamilia ? `as cotas guardadas na família ${entrada.familia || ''}`.trim() : 'as últimas cotas guardadas neste navegador';
           message.info(limpo.repetidos
             ? `Abri ${onde} e tirei ${limpo.repetidos} elemento(s) repetido(s).`
             : `Abri ${onde}. "Começar do zero" limpa o quadro.`);
@@ -371,14 +400,14 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
           if (!vivo) return;
           c.clear();
           c.backgroundColor = '#ffffff';
-          message.warning('Não consegui abrir o modelo guardado deste anúncio; comecei um novo.');
+          message.warning('Não consegui abrir o modelo guardado; comecei um novo sobre a foto escolhida.');
         }
       }
       if (!abriuSalvo) {
         if (foto) await colocarFoto(foto);
         if (!vivo) return;
         // começa com uma cota da medida do anúncio, embaixo
-        const d: DadosElemento = { tipo: 'COTA', cor: CORES[0], modelo: modeloPadrao(det) || '{Comprimento}', comprimento: 800, textoDePe: true, ladoTexto: 'ACIMA' };
+        const d: DadosElemento = { tipo: 'COTA', cor: CORES[0], modelo: entrada.modeloPadrao || '{Comprimento}', comprimento: 800, textoDePe: true, ladoTexto: 'ACIMA' };
         const cota = criarElemento(d, textoPara(d.modelo, primeiro || null));
         cota.set({ left: LADO / 2, top: LADO - 150, originX: 'center', originY: 'center' });
         c.add(cota);
@@ -389,11 +418,11 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
       vivo = false; window.clearTimeout(t); fab.current?.dispose(); fab.current = null; historico.current = []; refeitos.current = [];
       quadroCorte.current = null; setCortando(null); setSelecionado(null); soltarFotosTratadas();
     };
-    // só reabre ao trocar de anúncio: depois de salvar o anúncio recarrega e o quadro continua como está
+    // só reabre ao trocar de entrada ou de foto escolhida: depois de salvar a tela de fora recarrega e o quadro continua
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [det?.id]);
+  }, [entrada?.chave, escolha, galeria !== null]);
 
-  const itemAtual = useRef<ItemDoAnuncio | null>(null);
+  const itemAtual = useRef<ItemDoEditor | null>(null);
   useEffect(() => { itemAtual.current = item; }, [item]);
   // a tolerância do controle acompanha a da foto selecionada
   useEffect(() => { const t = dadosDe(selecionado)?.semFundo; if (t !== undefined) setTolerancia(t); }, [selecionado]);
@@ -401,9 +430,9 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
   // trocou o item da prévia ou a unidade: textos e (se for por item) a foto
   const trocarItem = async (id: number) => {
     setIdItem(id);
-    const it = det?.itens.find(i => i.idItem === id) || null;
+    const it = entrada?.itens.find(i => i.idItem === id) || null;
     itemAtual.current = it;
-    if (fotoPorItem && it) { const f = fotoBaseDoItem(it) || det?.fotoFamilia; if (f) await colocarFoto(f); }
+    if (fotoPorItem && it) { const f = it.foto || escolha?.url || principalFamilia; if (f) await colocarFoto(f); }
     renderizarTextos(it);
   };
   useEffect(() => { renderizarTextos(itemAtual.current); }, [unidade]);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -414,7 +443,7 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
     if (!c) return;
     const base: Record<string, DadosElemento> = {
       SETA: { tipo: 'SETA', cor: corAtual, comprimento: 320, pontas: 'FIM' },
-      COTA: { tipo: 'COTA', cor: corAtual, modelo: modeloPadrao(det!) || '{Comprimento}', comprimento: 600, textoDePe: true, ladoTexto: 'ACIMA' },
+      COTA: { tipo: 'COTA', cor: corAtual, modelo: entrada?.modeloPadrao || '{Comprimento}', comprimento: 600, textoDePe: true, ladoTexto: 'ACIMA' },
       TEXTO: { tipo: 'TEXTO', cor: corAtual, modelo: 'Texto', tamanhoFonte: 80, fundoTexto: true },
       BALAO: { tipo: 'BALAO', cor: corAtual, modelo: 'Explique aqui', largura: 440 },
       DESTAQUE: { tipo: 'DESTAQUE', cor: corAtual, largura: 320, altura: 220 },
@@ -477,7 +506,7 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
 
   // teclado: Delete apaga, Ctrl+Z desfaz, Ctrl+Y refaz (fora de campos de texto); cortando: Enter aplica, Esc cancela
   useEffect(() => {
-    if (!det) return;
+    if (!entrada) return;
     const tecla = (e: KeyboardEvent) => {
       const alvo = e.target as HTMLElement;
       if (alvo && /input|textarea/i.test(alvo.tagName)) return;
@@ -499,14 +528,15 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
   const modeloAtual = () => { fab.current!.discardActiveObject(); return estadoAtual(); };
   /** Guarda o modelo na foto-modelo da família (vale para todos os anúncios dela) e, de reserva, neste navegador. */
   const guardarNaFamilia = async (modelo: string, avisar: boolean) => {
-    try { localStorage.setItem(chaveModelo(det!.id), modelo); } catch { /* sem armazenamento */ }
+    try { localStorage.setItem(chaveModelo(entrada!.chave), modelo); } catch { /* sem armazenamento */ }
     if (!fotoModelo.current) {
-      if (avisar) message.success('Modelo guardado neste navegador. Com uma foto na galeria da família, ele passa a valer em qualquer anúncio.');
+      if (avisar) message.success('Modelo guardado neste navegador. Com uma foto na galeria da família, ele passa a valer em qualquer lugar.');
       return;
     }
     try {
       await fotosFamiliaApi.salvarModelo(fotoModelo.current.idFamilia, fotoModelo.current.idFoto, modelo);
-      if (avisar) message.success(`Modelo guardado na família${det!.familia ? ` ${det!.familia}` : ''}: abre assim em qualquer anúncio dela.`);
+      if (avisar) message.success(`Modelo guardado na família${entrada!.familia ? ` ${entrada!.familia}` : ''}: abre assim em qualquer anúncio dela.`);
+      setGaleria(g => g && g.map(f => (f.idFoto === fotoModelo.current?.idFoto ? { ...f, temModelo: true } : f)));
     } catch (e) {
       message.error(e instanceof Error ? e.message : 'Não foi possível guardar o modelo na família.');
     }
@@ -514,7 +544,7 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
   const salvarModelo = () => guardarNaFamilia(modeloAtual(), true);
   const comecarDoZero = async () => {
     // só o quadro: o modelo guardado na família continua até você guardar outro
-    try { localStorage.removeItem(chaveModelo(det!.id)); } catch { /* sem armazenamento */ }
+    try { localStorage.removeItem(chaveModelo(entrada!.chave)); } catch { /* sem armazenamento */ }
     const c = fab.current!;
     c.getObjects().filter(o => dadosDe(o)?.tipo !== 'FOTO').forEach(o => c.remove(o));
     c.discardActiveObject();
@@ -523,7 +553,7 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
   };
 
   /** Aplica o modelo num item (texto e, se for por item, a foto) e devolve a imagem em JPEG. */
-  const gerarParaItem = async (modelo: string, it: ItemDoAnuncio) => {
+  const gerarParaItem = async (modelo: string, it: ItemDoEditor) => {
     const el = document.createElement('canvas');
     const sc = new StaticCanvas(el, { width: LADO, height: LADO, backgroundColor: '#ffffff' });
     await sc.loadFromJSON(modelo);
@@ -531,7 +561,7 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
       const dd = dadosDe(o);
       if (!dd) continue;
       if (dd.tipo === 'FOTO') {
-        const f = fotoPorItem ? fotoBaseDoItem(it) || det!.fotoFamilia : null;
+        const f = fotoPorItem ? it.foto || escolha?.url || principalFamilia : null;
         const alvo = f ? enderecoParaDesenho(f) : dd.semFundo !== undefined || dd.corteAuto ? dd.origem : undefined;
         if (alvo) await montarFoto(o as FabricImage, alvo);
       } else if (dd.tipo === 'TEXTO') (o as IText).set('text', textoPara(dd.modelo, it) || ' ');
@@ -548,8 +578,8 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
   };
 
   /** Salva a imagem de cada item; a gerada antes por aqui (mesmo nome) é trocada, não se acumula. */
-  const salvarEm = async (itens: ItemDoAnuncio[], comoPrincipal: boolean) => {
-    if (!det || !itens.length) return;
+  const salvarEm = async (itens: ItemDoEditor[], comoPrincipal: boolean) => {
+    if (!entrada || !itens.length) return;
     const modelo = modeloAtual();
     await guardarNaFamilia(modelo, false);
     setAplicando({ feitos: 0, total: itens.length });
@@ -558,7 +588,8 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
       try {
         const dataUrl = await gerarParaItem(modelo, it);
         const blob = await (await fetch(dataUrl)).blob();
-        const nome = `${it.sku}-editada.jpg`.replace(/[^\w.-]+/g, '-');
+        // uma imagem por foto-base: a da foto-modelo é "-editada"; a de outra foto da família tem o id dela no nome
+        const nome = `${it.sku}${sufixoArquivo.current}-editada.jpg`.replace(/[^\w.-]+/g, '-');
         await enviarArquivoAnexo(it.idItem, new File([blob], nome, { type: 'image/jpeg' }), comoPrincipal ? 'IMAGEM_PRINCIPAL' : 'FOTO_GALERIA',
           { substituir: true, posicao: comoPrincipal ? undefined : 2 });
       } catch (e) {
@@ -568,7 +599,7 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
     }
     setAplicando(null);
     if (falhas.length) message.warning(`${itens.length - falhas.length} salva(s); ${falhas.length} com erro: ${falhas[0]}`, 8);
-    else message.success(`${itens.length} imagem(ns) salvas no cadastro${itens.some(i => i.ml.mlbId) ? '. Para os itens já no ML, use "Enviar atributos, fotos e descrição".' : '.'}`, 8);
+    else message.success(`${itens.length} imagem(ns) salvas no cadastro${itens.some(i => i.noMl) ? '. Para os itens já no ML, use "Enviar atributos, fotos e descrição".' : '.'}`, 8);
     onSalvo();
   };
 
@@ -582,7 +613,15 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
     a.click();
   };
 
-  const fotosDisponiveis = useMemo(() => [...new Set([det?.fotoFamilia, ...(det?.itens || []).map(fotoBaseDoItem)].filter((f): f is string => !!f))], [det]);
+  const fotosDisponiveis = useMemo(() => [...new Set([...(galeria || []).map(f => f.url), ...(entrada?.itens || []).flatMap(i => [i.foto, ...(i.fotos || []).map(f => f.url)])].filter((f): f is string => !!f))], [entrada, galeria]);
+  // fotos para escolher ao abrir: as da família e as dos itens (uma vez cada)
+  const fotosDosItens = useMemo(() => {
+    const vistas = new Set((galeria || []).map(f => f.url));
+    const lista: { url: string; sku: string }[] = [];
+    for (const i of entrada?.itens || []) for (const u of [i.foto, ...(i.fotos || []).map(f => f.url)]) if (u && !vistas.has(u)) { vistas.add(u); lista.push({ url: u, sku: i.sku }); }
+    return lista;
+  }, [entrada, galeria]);
+  const haModelo = !!galeria?.some(f => f.temModelo) || (() => { try { return !!entrada && !!localStorage.getItem(chaveModelo(entrada.chave)); } catch { return false; } })();
   const temTexto = d && d.modelo !== undefined;
   const botao = (icone: React.ReactNode, rotulo: string, tipo: TipoElemento, dica: string) => (
     <Tooltip title={dica} placement="right"><Button block icon={icone} disabled={!!cortando} onClick={() => adicionar(tipo)} style={{ justifyContent: 'flex-start' }}>{rotulo}</Button></Tooltip>
@@ -590,9 +629,9 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
 
   return (
     <Modal
-      open={!!det} onCancel={aplicando ? undefined : onFechar} width="min(1280px, 98vw)" style={{ top: 12 }} destroyOnHidden maskClosable={false} keyboard={false}
-      title={<Space><PictureOutlined />Editor de imagem</Space>}
-      footer={(
+      open={!!entrada} onCancel={aplicando ? undefined : onFechar} width="min(1280px, 98vw)" style={{ top: 12 }} destroyOnHidden maskClosable={false} keyboard={false}
+      title={<Space><PictureOutlined />Editor de imagem{entrada?.familia && <Tag color="purple">família {entrada.familia}</Tag>}</Space>}
+      footer={!escolha ? null : (
         <Flex justify="space-between" align="center" wrap gap={8}>
           <Space wrap>
             <Button icon={<SaveOutlined />} onClick={salvarModelo} disabled={!!cortando}>Guardar modelo</Button>
@@ -608,14 +647,47 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
             </Tooltip>
             <Button disabled={!item || !!aplicando || !!cortando || tratandoFoto} onClick={() => item && salvarEm([item], destino === 'PRINCIPAL')}>Salvar só em {item?.sku}</Button>
             <Button type="primary" disabled={!marcados.length || !!aplicando || !!cortando || tratandoFoto} loading={!!aplicando}
-              onClick={() => det && salvarEm(det.itens.filter(i => marcados.includes(i.idItem)), destino === 'PRINCIPAL')}>
+              onClick={() => entrada && salvarEm(entrada.itens.filter(i => marcados.includes(i.idItem)), destino === 'PRINCIPAL')}>
               Aplicar em {marcados.length} item(ns)
             </Button>
           </Space>
         </Flex>
       )}
     >
-      {det && (
+      {entrada && !escolha && (
+        !galeria ? <div style={{ minHeight: 300, display: 'grid', placeItems: 'center' }}><Spin /></div> : (
+          <Flex vertical gap={14}>
+            <Text>Qual foto você quer editar? As cotas e textos que você montar valem para as {entrada.itens.length} variações, cada uma com a sua medida.</Text>
+            {haModelo && (
+              <Checkbox checked={usarModelo} onChange={e => setUsarModelo(e.target.checked)}>Abrir com as cotas e textos guardados (se a foto escolhida não tiver, vêm os da foto-modelo)</Checkbox>
+            )}
+            {([['Da família', (galeria || []).map((f, k) => ({ url: f.url, idFoto: f.idFoto, rotulo: k === 0 ? 'modelo' : 'comum', temModelo: f.temModelo }))],
+              ['Dos itens', fotosDosItens.map(f => ({ url: f.url, idFoto: null as number | null, rotulo: f.sku, temModelo: false }))]] as const).map(([titulo, lista]) => (
+              <div key={titulo}>
+                <Text strong>{titulo}{titulo === 'Da família' && entrada.familia ? ` ${entrada.familia}` : ''}</Text>
+                {!lista.length ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={titulo === 'Da família' ? 'A família ainda não tem fotos (adicione na aba Fotos)' : 'Os itens não têm foto própria'} /> : (
+                  <Flex wrap gap={10} style={{ marginTop: 6 }}>
+                    {lista.map(f => (
+                      <div key={f.url} onClick={() => setEscolha({ url: f.url, idFotoFamilia: f.idFoto, usarModelo: usarModelo && haModelo })}
+                        style={{ width: 132, padding: 6, border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', background: '#fff' }}>
+                        <img src={f.url} alt="" style={{ width: 120, height: 120, objectFit: 'contain', background: '#fafafa', borderRadius: 4, display: 'block' }} />
+                        <Space size={4} wrap style={{ marginTop: 4 }}>
+                          <Tag color={f.rotulo === 'modelo' ? 'purple' : undefined} style={{ margin: 0, fontSize: 11 }}>{f.rotulo}</Tag>
+                          {f.temModelo && <Tooltip title="Tem cotas e textos guardados"><Tag color="blue" style={{ margin: 0, fontSize: 11 }}>cotas</Tag></Tooltip>}
+                        </Space>
+                      </div>
+                    ))}
+                  </Flex>
+                )}
+              </div>
+            ))}
+            <Upload accept="image/*" showUploadList={false} beforeUpload={f => { setEscolha({ url: URL.createObjectURL(f), idFotoFamilia: null, usarModelo: usarModelo && haModelo }); return false; }}>
+              <Button icon={<UploadOutlined />}>Outra foto do computador</Button>
+            </Upload>
+          </Flex>
+        )
+      )}
+      {entrada && escolha && (
         <Flex gap={16} align="flex-start" wrap>
           {/* ferramentas */}
           <Flex vertical gap={6} style={{ width: 150 }}>
@@ -627,6 +699,9 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
             {botao(<BorderOutlined />, 'Destaque', 'DESTAQUE', 'Contorno para chamar atenção')}
             <Tooltip title="Seleciona a foto do produto: cortar, tirar o fundo, trocar" placement="right">
               <Button block icon={<FileImageOutlined />} disabled={!!cortando} onClick={selecionarFoto} style={{ justifyContent: 'flex-start' }}>Foto</Button>
+            </Tooltip>
+            <Tooltip title="Voltar à escolha da foto (o que não foi guardado se perde)" placement="right">
+              <Button block icon={<SwapOutlined />} disabled={!!cortando || !!aplicando} onClick={() => setEscolha(null)} style={{ justifyContent: 'flex-start' }}>Outra foto</Button>
             </Tooltip>
             <Divider style={{ margin: '6px 0' }} />
             <Flex gap={6}>
@@ -646,7 +721,7 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
             <div>
               <Text type="secondary" style={{ fontSize: 12 }}>Prévia do item (o texto troca {'{Campo}'} pela medida dele)</Text>
               <Select style={{ width: '100%' }} value={item?.idItem} onChange={trocarItem} disabled={!!cortando} showSearch optionFilterProp="label"
-                options={det.itens.map(i => ({ value: i.idItem, label: `${i.sku} · ${i.tituloMl || i.nome}` }))} />
+                options={entrada.itens.map(i => ({ value: i.idItem, label: `${i.sku} · ${i.nome}` }))} />
             </div>
             <Flex gap={8} wrap>
               <Segmented size="small" value={unidade} onChange={v => setUnidade(v as typeof unidade)} options={[{ value: 'original', label: 'Medida como está' }, { value: 'mm', label: 'mm' }, { value: 'cm', label: 'cm' }]} />
@@ -734,7 +809,7 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
                   {d.tipo === 'FOTO' && (
                     <Flex vertical gap={6}>
                       <Select placeholder="Trocar a foto" style={{ width: '100%' }} value={undefined} onChange={(f: string) => colocarFoto(f)}
-                        options={fotosDisponiveis.map((f, k) => ({ value: f, label: <Space><img src={f} alt="" style={{ width: 28, height: 28, objectFit: 'contain' }} />{f === det.fotoFamilia ? 'Foto da família' : `Foto ${k + 1}`}</Space> }))} />
+                        options={fotosDisponiveis.map((f, k) => ({ value: f, label: <Space><img src={f} alt="" style={{ width: 28, height: 28, objectFit: 'contain' }} />{f === principalFamilia ? 'Foto-modelo da família' : `Foto ${k + 1}`}</Space> }))} />
                       <Upload accept="image/*" showUploadList={false} beforeUpload={f => { colocarFoto(URL.createObjectURL(f)); return false; }}>
                         <Button size="small" icon={<UploadOutlined />}>Foto do computador</Button>
                       </Upload>
@@ -775,7 +850,7 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
             <div>
               <Text type="secondary" style={{ fontSize: 12 }}>Aplicar em</Text>
               <Select mode="multiple" style={{ width: '100%' }} value={marcados} onChange={setMarcados} maxTagCount="responsive"
-                options={det.itens.map(i => ({ value: i.idItem, label: i.sku }))} />
+                options={entrada.itens.map(i => ({ value: i.idItem, label: i.sku }))} />
               <Text type="secondary" style={{ fontSize: 11 }}>
                 {destino === 'PRINCIPAL' ? 'Salva como foto principal (a atual vai para a galeria).' : 'Salva como 2ª foto, logo depois da principal.'} Salvar de novo troca a imagem anterior do editor. O modelo (cotas e textos) fica guardado na foto-modelo da família.
               </Text>

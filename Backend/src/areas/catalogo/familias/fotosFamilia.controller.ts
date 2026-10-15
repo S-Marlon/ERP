@@ -6,7 +6,8 @@ import { Request, Response } from 'express';
 import pool from '../../../infra/db';
 import { ErroArquivo, salvarArquivo } from '../../../infra/arquivos';
 import { apagarArquivos, semUso } from '../arquivosEmUso';
-import { lerIds, ordemComNovaNaPosicao, lerPosicao } from '../produtos/ordemAnexos';
+import { ehImagemDeMedidas, lerIds, ordemComNovaNaPosicao, lerPosicao } from '../produtos/ordemAnexos';
+import { CampoEtiqueta, camposQueVariam, modeloPadraoDosCampos } from '../imagens/camposEtiqueta';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
 const tenantDe = (req: Request) => Number(req.query.tenant_id || req.body?.tenant_id || 1);
@@ -215,5 +216,65 @@ export const salvarModeloEditor = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Erro ao guardar o modelo do editor:', error);
     return res.status(500).json({ error: 'Erro ao guardar o modelo do editor.' });
+  }
+};
+
+const valorExibicao = (r: any): string | null => {
+  if (r.opcao_valor !== null && r.opcao_valor !== undefined) return String(r.opcao_valor);
+  if (r.valor_texto !== null && r.valor_texto !== undefined && String(r.valor_texto).trim() !== '') return String(r.valor_texto);
+  if (r.valor_numero !== null && r.valor_numero !== undefined) return String(r.valor_numero);
+  if (r.valor_decimal !== null && r.valor_decimal !== undefined) return String(Number(r.valor_decimal));
+  if (r.valor_boolean !== null && r.valor_boolean !== undefined) return Number(r.valor_boolean) === 1 ? 'Sim' : 'Não';
+  return null;
+};
+
+/**
+ * GET /catalogo/cadastros/familias/:idFamilia/editor-imagem — o que o editor de imagem precisa para aplicar nas
+ * variações: as fotos da família, os itens ativos com as fotos limpas de cada um e os campos do cadastro (atributos)
+ * que vão escritos na imagem, e o texto padrão da cota (os campos que variam).
+ */
+export const dadosDoEditorFamilia = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const idFamilia = Number(req.params.idFamilia);
+  try {
+    const [[familia]]: any = await pool.execute(`SELECT id, nome FROM comercial_familias WHERE id = ? AND tenant_id = ?`, [idFamilia, tenant]);
+    if (!familia) return res.status(404).json({ error: 'Família não encontrada.' });
+    const [itens]: any = await pool.execute(
+      `SELECT ic.id_item, COALESCE(cpd.sku_customizado, ic.sku) AS sku, COALESCE(cpd.nome_comercial, ic.nome_item) AS nome
+       FROM comercial_produtos_dados cpd
+       INNER JOIN itens_core ic ON ic.id_item = cpd.id_item AND ic.tenant_id = cpd.tenant_id AND ic.status = 'ATIVO'
+       WHERE cpd.tenant_id = ? AND cpd.familia_id = ? ORDER BY sku`,
+      [tenant, idFamilia]
+    );
+    const ids: number[] = itens.map((i: any) => Number(i.id_item));
+    const lista = ids.map(() => '?').join(',');
+    const [anexos]: any = ids.length ? await pool.execute(
+      `SELECT id_item, url_anexo, nome_arquivo FROM itens_anexos WHERE tenant_id = ? AND id_item IN (${lista}) AND tipo_anexo IN ('IMAGEM_PRINCIPAL', 'FOTO_GALERIA')
+       ORDER BY id_item, (tipo_anexo = 'IMAGEM_PRINCIPAL') DESC, ordem, id_anexo`, [tenant, ...ids]
+    ) : [[]];
+    const [valores]: any = ids.length ? await pool.execute(
+      `SELECT v.id_entidade, a.nome, v.valor_texto, v.valor_numero, v.valor_decimal, v.valor_boolean, o.valor AS opcao_valor
+       FROM atributos_comercial_valores v
+       INNER JOIN atributos_comercial a ON a.id = v.atributo_id AND a.tenant_id = v.tenant_id
+       LEFT JOIN atributos_comercial_opcoes o ON o.id = v.opcao_id
+       WHERE v.tenant_id = ? AND v.tipo_entidade = 'produto' AND v.id_entidade IN (${lista})
+       ORDER BY a.nome`, [tenant, ...ids]
+    ) : [[]];
+    const saida = itens.map((i: any) => {
+      const id = Number(i.id_item);
+      // fotos limpas do item (sem as imagens de medidas geradas pelo editor)
+      const fotos = anexos.filter((a: any) => Number(a.id_item) === id && !ehImagemDeMedidas(a.nome_arquivo)).map((a: any) => ({ url: a.url_anexo, nome: a.nome_arquivo }));
+      const campos: CampoEtiqueta[] = [];
+      for (const v of valores.filter((x: any) => Number(x.id_entidade) === id)) {
+        const valor = valorExibicao(v);
+        if (valor && !campos.some(c => c.chave === v.nome)) campos.push({ chave: v.nome, nome: v.nome, valor: valor.replace(/\s+/g, ' ').trim() });
+      }
+      return { idItem: id, sku: i.sku, nome: i.nome, foto: fotos[0]?.url || null, fotos, campos };
+    });
+    const variam = camposQueVariam(saida);
+    return res.json({ familia: { id: Number(familia.id), nome: familia.nome }, fotos: await listar(pool as any, tenant, idFamilia), itens: saida, variam, modeloPadrao: modeloPadraoDosCampos(variam) });
+  } catch (error: any) {
+    console.error('Erro ao ler os dados do editor da família:', error);
+    return res.status(500).json({ error: 'Erro ao ler os itens da família.' });
   }
 };

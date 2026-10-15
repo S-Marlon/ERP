@@ -43,8 +43,9 @@ import {
   definirImagemFamilia,
 } from './familias/familias.controller';
 import {
-  adicionarFotoFamilia, enviarFotoFamilia, fotoDoItemParaFamilia, lerModeloEditor, listarFotosFamilia, ordenarFotosFamilia, removerFotoFamilia, salvarModeloEditor,
+  adicionarFotoFamilia, dadosDoEditorFamilia, enviarFotoFamilia, fotoDoItemParaFamilia, lerModeloEditor, listarFotosFamilia, ordenarFotosFamilia, removerFotoFamilia, salvarModeloEditor,
 } from './familias/fotosFamilia.controller';
+import { repassarImagem } from './imagens/repassarImagem.controller';
 
 // 🏷️ Controller de Produtos do Catálogo
 import {
@@ -167,6 +168,9 @@ router.put('/cadastros/familias/:idFamilia/fotos-ordem', ordenarFotosFamilia);
 router.delete('/cadastros/familias/:idFamilia/fotos/:idFoto', removerFotoFamilia);
 router.get('/cadastros/familias/:idFamilia/fotos/:idFoto/modelo', lerModeloEditor);
 router.put('/cadastros/familias/:idFamilia/fotos/:idFoto/modelo', salvarModeloEditor);
+router.get('/cadastros/familias/:idFamilia/editor-imagem', dadosDoEditorFamilia);
+// imagem de fora repassada pelo servidor (o editor de imagem desenha sobre ela)
+router.get('/imagens/repassar', repassarImagem);
 router.delete('/cadastros/familias/:idFamilia', deleteFamilia);
 router.get('/cadastros/familias/:idFamilia/formalizacao', getDiagnosticoFormalizacao);
 router.post('/cadastros/familias/:idFamilia/formalizacao', formalizarItensFamilia);
