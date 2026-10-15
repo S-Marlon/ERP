@@ -2,7 +2,7 @@ import assert from 'assert';
 import {
   AnuncioDados, AtributoML, cortarTitulo, tituloLegivel, eixosDeVariacao, filtrarAtributosCategoria, ItemAnuncio, pendenciasAnuncio,
   precoNoMl, resolverValor, sugerirAtributos, estoqueParaMl, regraDoItem, mudancasParaMl, saldoNaUnidade, statusDoMl, foraDoMl, situacaoPorItens, modoPublicacao, tituloPeloModelo, corpoDoItem, fotoPequena, errosDoValidador, ligarPorSku,
-  atributosDoItem, fatorDaLinha, skuDaLinha, tituloComUnidade,
+  atributosDoItem, fatorDaLinha, skuDaLinha, tituloComUnidade, descricaoPeloModelo, camposDesconhecidos,
 } from './anuncios';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
@@ -255,4 +255,15 @@ teste('linha em kit: peso multiplicado, unidades por kit e formato Kit', () => {
   const un = atributosDoItem(cat, d, item(1), true);
   assert.deepStrictEqual(un.find(x => x.id === 'SALE_FORMAT'), { id: 'SALE_FORMAT', value_id: '1', value_name: 'Unidade' });
   assert.strictEqual(un.some(x => x.id === 'UNITS_PER_PACK'), false);
+});
+
+teste('descrição por item: {Campo} trocado pelo valor de cada um', () => {
+  const ctx = { familia: 'ABRAÇADEIRA', titulo: 'Abraçadeira de nylon', atributosErp: [{ id: 1, nome: 'Tamanho' }, { id: 2, nome: 'Cor' }] };
+  const it = item(1, { nome: 'Abraçadeira 3.6x100', marca: 'Acme', valoresErp: { 1: '100 mm', 2: 'Preta' } });
+  const modelo = 'Abraçadeira {Cor}, {Tamanho} de comprimento.\n\nMarca {marca} · SKU {sku}.\nAplicação: {Aplicacao}.';
+  assert.strictEqual(descricaoPeloModelo(modelo, it, ctx), 'Abraçadeira Preta, 100 mm de comprimento.\n\nMarca Acme · SKU SKU-1.\nAplicação:.');
+  assert.strictEqual(descricaoPeloModelo('Texto igual para todos.', it, ctx), 'Texto igual para todos.');
+  assert.strictEqual(descricaoPeloModelo(null, it, ctx), '');
+  assert.deepStrictEqual(camposDesconhecidos(modelo, ctx), ['Aplicacao']);
+  assert.deepStrictEqual(camposDesconhecidos('{cor} {TAMANHO} {nome}', ctx), []);
 });

@@ -1,8 +1,11 @@
-// Como o anúncio vai para o ML (página única com opções x um anúncio por item) e o modelo do título de cada item.
+// Como o anúncio vai para o ML (página única com opções x um anúncio por item), o modelo do título de cada item e a
+// descrição com {Campo} (cada item recebe a sua, com a prévia).
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Input, Space, Tag, Tooltip, Typography } from 'antd';
+import { Alert, Input, Select, Space, Tag, Tooltip, Typography } from 'antd';
 import type { InputRef } from 'antd';
+import type { TextAreaRef } from 'antd/es/input/TextArea';
 import type { AnuncioDetalhe } from './mercadoLivreApi';
+import { camposDesconhecidos, descricaoDoItem, temCampos } from './descricaoModelo';
 
 const { Text } = Typography;
 
@@ -75,6 +78,69 @@ export const ModeloTituloCampo: React.FC<{ det: AnuncioDetalhe; disabled?: boole
         <div style={{ marginTop: 6 }}>
           <Text type="secondary" style={{ fontSize: 12 }}>Ex.: </Text><Text style={{ fontSize: 12 }}>{exemplo}</Text>
           {cortados > 0 && <Tag color="orange" style={{ marginLeft: 6 }}>{cortados} cortado(s) em {det.categoria?.maxTitulo || 60}</Tag>}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/** Tags clicáveis dos {Campo}: os fixos e os atributos do cadastro dos itens do anúncio. */
+const TagsDeCampos: React.FC<{ det: AnuncioDetalhe; disabled?: boolean; onInserir: (token: string) => void }> = ({ det, disabled, onInserir }) => (
+  <Space size={[4, 4]} wrap style={{ marginTop: 6 }}>
+    <Text type="secondary" style={{ fontSize: 12 }}>Inserir:</Text>
+    {TOKENS_FIXOS.map(t => (
+      <Tooltip key={t.token} title={t.dica}>
+        <Tag style={{ cursor: disabled ? 'default' : 'pointer' }} onClick={() => !disabled && onInserir(t.token)}>{t.token}</Tag>
+      </Tooltip>
+    ))}
+    {[...new Set(det.atributosErp.map(a => a.nome))].map(nome => (
+      <Tooltip key={nome} title="Atributo do cadastro do item">
+        <Tag color="blue" style={{ cursor: disabled ? 'default' : 'pointer' }} onClick={() => !disabled && onInserir(`{${nome}}`)}>{`{${nome}}`}</Tag>
+      </Tooltip>
+    ))}
+  </Space>
+);
+
+/**
+ * Descrição do anúncio com {Campo}: escreve uma vez e cada item recebe a sua, com os valores dele (na publicação e no
+ * "Enviar atributos, fotos e descrição"). Sem {Campo}, o texto vai igual para todos.
+ */
+export const DescricaoCampo: React.FC<{ det: AnuncioDetalhe; onMudar: (texto: string) => void }> = ({ det, onMudar }) => {
+  const ref = useRef<TextAreaRef>(null);
+  const [idLinha, setIdLinha] = useState<number | null>(null);
+  const texto = det.descricao || '';
+  const item = det.itens.find(i => i.idLinha === idLinha) || det.itens[0];
+  const desconhecidos = camposDesconhecidos(texto, det);
+
+  const inserir = (token: string) => {
+    const el = ref.current?.resizableTextArea?.textArea;
+    const ini = el?.selectionStart ?? texto.length;
+    const fim = el?.selectionEnd ?? ini;
+    onMudar(`${texto.slice(0, ini)}${token}${texto.slice(fim)}`);
+    // volta o cursor para depois do campo inserido
+    window.setTimeout(() => { if (el) { el.focus(); el.setSelectionRange(ini + token.length, ini + token.length); } }, 0);
+  };
+
+  return (
+    <div>
+      <Input.TextArea
+        ref={ref} value={texto} autoSize={{ minRows: 5, maxRows: 16 }} onChange={e => onMudar(e.target.value)}
+        placeholder={'Medidas, aplicação, material, o que vem na embalagem. Texto simples (o ML não aceita HTML nem links).\nUse {Campo} para cada item sair com o valor dele, ex.: Abraçadeira {Cor} de {Tamanho} mm.'}
+      />
+      <TagsDeCampos det={det} onInserir={inserir} />
+      {desconhecidos.length > 0 && (
+        <Alert type="warning" showIcon style={{ marginTop: 8, padding: '4px 10px' }}
+          message={`Campo que não existe: ${desconhecidos.map(c => `{${c}}`).join(', ')} (sai em branco). Use as etiquetas acima para não errar o nome.`} />
+      )}
+      {temCampos(texto) && item && (
+        <div style={{ marginTop: 8, border: '1px solid #f0f0f0', borderRadius: 8, padding: '8px 10px', background: '#fafafa' }}>
+          <Space size={6} wrap style={{ marginBottom: 6 }}>
+            <Tag color="processing" style={{ margin: 0 }}>cada item recebe a sua</Tag>
+            <Text type="secondary" style={{ fontSize: 12 }}>Prévia de</Text>
+            <Select size="small" style={{ minWidth: 260 }} value={item.idLinha} onChange={setIdLinha} showSearch optionFilterProp="label"
+              options={det.itens.map(i => ({ value: i.idLinha, label: `${i.sku} · ${i.tituloMl || i.nome}` }))} />
+          </Space>
+          <div style={{ whiteSpace: 'pre-wrap', fontSize: 13 }}>{descricaoDoItem(texto, item, det) || <Text type="secondary">(vazia)</Text>}</div>
         </div>
       )}
     </div>

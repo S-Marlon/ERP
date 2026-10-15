@@ -316,7 +316,8 @@ export const carregarAnuncios = async (conn: Conn, tenant: number, idAnuncio?: n
     }
     const pendencias = itensDoAnuncio.length > 0 && aPublicar.length === 0
       ? []
-      : pendenciasAnuncio(dados, aPublicar, categoria?.info || null, categoria?.atributos || [], categoria?.temGtin ?? true, modo);
+      : pendenciasAnuncio(dados, aPublicar, categoria?.info || null, categoria?.atributos || [], categoria?.temGtin ?? true, modo,
+        { familia: a.familia_nome, titulo: dados.titulo, atributosErp: listaErp });
     if (erro) pendencias.unshift({ nivel: 'aviso', area: 'dados', texto: `Não deu para conferir a categoria no Mercado Livre: ${erro}` });
     return {
       registro: a, dados, regraEstoque, unidades, itens: itensDoAnuncio, noMl, categoria, pendencias, modo,

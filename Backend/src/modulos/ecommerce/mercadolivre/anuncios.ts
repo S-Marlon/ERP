@@ -170,7 +170,8 @@ const listaNomes = (itens: ItemAnuncio[], max = 3) =>
 /** Tudo o que falta para publicar (erros travam a publicação; avisos não). */
 export const pendenciasAnuncio = (
   dados: AnuncioDados, itens: ItemAnuncio[], categoria: CategoriaInfo | null, atributos: AtributoML[], temGtinNaCategoria = true,
-  modoInformado?: 'FAMILIA' | 'SEPARADO'   // o do anúncio inteiro (itens já publicados contam)
+  modoInformado?: 'FAMILIA' | 'SEPARADO',  // o do anúncio inteiro (itens já publicados contam)
+  contexto?: ContextoCampos,               // para conferir os {Campo} da descrição
 ): Pendencia[] => {
   const p: Pendencia[] = [];
   const erro = (area: Pendencia['area'], texto: string, extra: Partial<Pendencia> = {}) => p.push({ nivel: 'erro', area, texto, ...extra });
@@ -187,6 +188,10 @@ export const pendenciasAnuncio = (
     else if (titulo.length > maxTitulo) erro('dados', `Título com ${titulo.length} caracteres: o máximo é ${maxTitulo}.`);
   }
   if (!(dados.descricao || '').trim()) aviso('dados', 'Sem descrição: o anúncio vende melhor com medidas, aplicação e o que vem na embalagem.');
+  else if (contexto) {
+    const desconhecidos = camposDesconhecidos(dados.descricao, contexto);
+    if (desconhecidos.length) aviso('dados', `Descrição com campo que não existe: ${desconhecidos.map(c => `{${c}}`).join(', ')} (sai em branco). Confira o nome do atributo.`);
+  }
 
   // Itens
   if (itens.length === 0) { erro('itens', 'Adicione ao menos um item do catálogo.'); return p; }
@@ -479,11 +484,15 @@ export const MODELO_TITULO_PADRAO = '{nome}';
  * Título do item pelo modelo: {nome} (nome no ERP), {titulo} (do anúncio), {familia}, {marca}, {sku} e qualquer atributo do cadastro pelo nome
  * (ex.: {Bitola}). Token sem valor some; o resultado passa pelo ajuste de maiúsculas e é cortado no limite.
  */
-export const tituloPeloModelo = (
-  modelo: string | null | undefined, item: ItemAnuncio, ctx: { familia?: string | null; titulo?: string | null; atributosErp: { id: number; nome: string }[] }, max = 60
-) => {
+export interface ContextoCampos { familia?: string | null; titulo?: string | null; atributosErp: { id: number; nome: string }[] }
+
+/**
+ * Troca os {Campo} pelo valor do item: {nome} (nome no ERP), {titulo} (do anúncio), {familia}, {marca}, {sku} e qualquer
+ * atributo do cadastro pelo nome (ex.: {Tamanho}). Campo sem valor vira vazio. Vale para o título e a descrição.
+ */
+export const trocarCampos = (texto: string, item: ItemAnuncio, ctx: ContextoCampos) => {
   const porNome = new Map(ctx.atributosErp.map(a => [normalizar(a.nome), a.id]));
-  const texto = String(modelo || MODELO_TITULO_PADRAO).replace(/\{([^}]+)\}/g, (_, token: string) => {
+  return String(texto || '').replace(/\{([^}]+)\}/g, (_, token: string) => {
     const t = normalizar(token);
     if (t === 'nome') return item.nome || '';
     if (t === 'familia') return ctx.familia || '';
@@ -493,6 +502,27 @@ export const tituloPeloModelo = (
     const id = porNome.get(t);
     return id !== undefined ? item.valoresErp[String(id)] || '' : '';
   });
+};
+
+/**
+ * Descrição do item: o texto do anúncio com os {Campo} trocados pelos valores dele (a mesma lista do título). Sem
+ * {Campo}, é o texto igual para todos. Mantém as quebras de linha; tira espaço sobrando de campo vazio.
+ */
+export const descricaoPeloModelo = (modelo: string | null | undefined, item: ItemAnuncio, ctx: ContextoCampos) =>
+  trocarCampos(String(modelo || ''), item, ctx)
+    .split('\n').map(l => l.replace(/[ \t]+/g, ' ').replace(/ ([,.;:])/g, '$1').trimEnd()).join('\n')
+    .replace(/\n{3,}/g, '\n\n').trim();
+
+/** Campos {…} do texto que não existem (nem fixos nem atributo do cadastro): erro de digitação no modelo. */
+export const camposDesconhecidos = (texto: string | null | undefined, ctx: ContextoCampos) => {
+  const conhecidos = new Set(['nome', 'familia', 'titulo', 'marca', 'sku', ...ctx.atributosErp.map(a => normalizar(a.nome))]);
+  return [...new Set([...String(texto || '').matchAll(/\{([^}]+)\}/g)].map(m => m[1].trim()))].filter(t => !conhecidos.has(normalizar(t)));
+};
+
+export const tituloPeloModelo = (
+  modelo: string | null | undefined, item: ItemAnuncio, ctx: ContextoCampos, max = 60
+) => {
+  const texto = trocarCampos(String(modelo || MODELO_TITULO_PADRAO), item, ctx);
   // separadores que ficaram sobrando quando um token veio vazio ("A -  - B" -> "A - B")
   const limpo = texto.replace(/\s+/g, ' ').replace(/(\s[-–|,]\s)(?:[-–|,]\s)+/g, '$1').replace(/^[\s\-–|,]+|[\s\-–|,]+$/g, '').trim();
   const legivel = tituloLegivel(limpo);

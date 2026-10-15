@@ -3,7 +3,7 @@
 import React from 'react';
 import { Alert, Button, Card, Col, Flex, Form, Input, InputNumber, Row, Segmented, Tag, Tooltip, Typography } from 'antd';
 import { AnuncioDetalhe } from '../mercadoLivreApi';
-import { ModeloTituloCampo, ModoPublicacaoAviso } from '../TituloMl';
+import { DescricaoCampo, ModeloTituloCampo, ModoPublicacaoAviso } from '../TituloMl';
 import type { RascunhoAnuncio } from '../rascunhoAnuncio';
 
 const { Text } = Typography;
@@ -86,11 +86,9 @@ const AbaDados: React.FC<Props> = ({ salvo, det, rascunho, onMudar, onTrocarCate
           </Col>
         </Row>
 
-        <Form.Item label={<>Descrição<Marca mudou={'descricao' in rascunho} /></>} style={{ marginBottom: 0 }}>
-          <Input.TextArea
-            value={det.descricao} autoSize={{ minRows: 4, maxRows: 14 }} onChange={e => onMudar('descricao', e.target.value)}
-            placeholder="Medidas, aplicação, material, o que vem na embalagem. Texto simples (o ML não aceita HTML nem links)."
-          />
+        <Form.Item label={<>Descrição<Marca mudou={'descricao' in rascunho} /></>} style={{ marginBottom: 0 }}
+          tooltip="Escreva uma vez: os {Campo} viram o valor de cada item (como no título). Vai ao ML na publicação e em Enviar atributos, fotos e descrição.">
+          <DescricaoCampo det={det} onMudar={t => onMudar('descricao', t)} />
         </Form.Item>
       </Form>
     </Card>

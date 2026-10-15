@@ -8,6 +8,7 @@ import { caminhoLocalDaUrl } from '../../../infra/arquivos';
 import {
   atributosDoItem, corpoDoItem, cortarTitulo, errosDoValidador, FotoEnvio, foraDoMl, fotoPequena, ItemAnuncio, ligarPorSku, SITUACAO_POR_STATUS,
   situacaoPorItens, ValorAtributo,
+  descricaoPeloModelo,
 } from './anuncios';
 import {
   AnuncioCarregado, carregarAnuncios, carregarCategoria, detalhe, lista, responderErro, tenantDe,
@@ -27,6 +28,10 @@ const carregarOuErro = async (tenant: number, id: number) => {
   if (!c) throw new ErroML('Anúncio não encontrado.', 404);
   return c;
 };
+
+/** Descrição de cada item: o texto do anúncio com os {Campo} trocados pelos valores dele. */
+const descricaoDoItem = (c: AnuncioCarregado, item: ItemAnuncio) =>
+  descricaoPeloModelo(c.dados.descricao, item, { familia: c.registro.familia_nome, titulo: c.dados.titulo, atributosErp: c.atributosErp });
 
 // linha desativada pelo operador não sobe
 const aPublicar = (c: AnuncioCarregado) => c.itens.filter(i => !c.noMl.get(i.idLinha)?.mlbId && i.linhaAtiva !== false);
@@ -145,7 +150,6 @@ export const publicarAnuncio = async (req: Request, res: Response) => {
     const travas = c.pendencias.filter(p => p.nivel === 'erro');
     if (travas.length) throw new ErroML(`Resolva antes: ${travas.slice(0, 3).map(p => p.texto).join(' · ')}${travas.length > 3 ? ' …' : ''}`);
     const porFamilia = await contaPorFamilia(tenant);
-    const descricao = String(c.dados.descricao || '').trim();
     const publicados: { sku: string; mlbId: string }[] = [];
     const falhas: { sku: string; erro: string }[] = [];
 
@@ -154,6 +158,7 @@ export const publicarAnuncio = async (req: Request, res: Response) => {
         const { corpo, problemas } = await montarCorpo(tenant, c, item, porFamilia);
         if (corpo.pictures.length === 0) throw new ErroML(problemas.join('; ') || 'sem foto');
         const criado: any = await ml(tenant, 'POST', '/items', corpo);
+        const descricao = descricaoDoItem(c, item);
         if (descricao) await ml(tenant, 'POST', `/items/${criado.id}/description`, { plain_text: descricao }).catch(() => null);
         const faixas = lerFaixas(c.registro.faixas_quantidade);
         if (faixas.length) {
@@ -397,7 +402,6 @@ export const atualizarNoMl = async (req: Request, res: Response) => {
     const c = await carregarOuErro(tenant, id);
     const itens = noMlAinda(c);
     if (!itens.length) throw new ErroML('Nenhum item deste anúncio está ativo ou pausado no Mercado Livre.');
-    const descricao = String(c.dados.descricao || '').trim();
     const resultado: { idItem: number; idLinha: number; sku: string; ok: boolean; erros: string[] }[] = [];
     for (const item of itens) {
       const mlb = c.noMl.get(item.idLinha)!.mlbId!;
@@ -412,6 +416,7 @@ export const atualizarNoMl = async (req: Request, res: Response) => {
       } catch (e: any) {
         erros.push(mensagemDoMl(e));
       }
+      const descricao = descricaoDoItem(c, item);
       if (descricao) {
         // PUT troca a descrição; item publicado sem descrição precisa de POST
         await ml(tenant, 'PUT', `/items/${mlb}/description`, { plain_text: descricao })
