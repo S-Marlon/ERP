@@ -304,6 +304,13 @@ export const copiarImagem = async (idAnexo: number, idsItens: number[], tenantId
     'Erro ao copiar a foto.'
   );
 
+/** Código de barras de uma embalagem do item (idUnidade vazio = a unidade base); gtin vazio tira. */
+export const salvarGtin = async (idItem: number, idUnidade: number | null, gtin: string, tenantId: number = 1) =>
+  handleResponse<GenericProductAPIResponse>(
+    await fetch(`${API_BASE_URL}/produtos/${idItem}/gtin?tenant_id=${tenantId}`, { method: 'PUT', headers: DEFAULT_HEADERS, body: JSON.stringify({ idUnidade, gtin }) }),
+    'Erro ao salvar o código de barras.'
+  );
+
 export const getProdutoDetalhe = async (idItem: number, tenantId: number = 1): Promise<ProdutoDetalhe> => {
   const response = await fetch(`${API_BASE_URL}/produtos/${idItem}/detalhe?tenant_id=${tenantId}`, { headers: DEFAULT_HEADERS });
   const dados = await handleResponse<Partial<ProdutoDetalhe>>(response, 'Erro ao carregar a ficha do produto.');

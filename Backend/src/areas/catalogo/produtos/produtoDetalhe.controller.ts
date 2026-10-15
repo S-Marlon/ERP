@@ -5,6 +5,7 @@ import { carregarOpcoes, gravarValorAtributo } from '../atributos/valoresAtribut
 import { carregarAtributosDaCategoria } from '../categorias/herancaCategorias';
 import { apagarArquivoDaUrl, ErroArquivo, salvarArquivo } from '../../../infra/arquivos';
 import { ehImagemDeMedidas, lerIds, lerPosicao, ordemComNovaNaPosicao, ordemFinalDasImagens } from './ordemAnexos';
+import { normalizarGtin, validarGtin } from '../../compras/staging/gtin';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
 
@@ -569,6 +570,68 @@ export const copiarImagem = async (req: Request, res: Response) => {
   } catch (error: any) {
     await connection.rollback();
     console.error('Erro ao copiar imagem:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  } finally {
+    connection.release();
+  }
+};
+
+/**
+ * PUT /catalogo/produtos/:id_item/gtin { idUnidade?, gtin } — código de barras de uma embalagem do item (vazio tira).
+ * Sem idUnidade vale a unidade base. A unidade que ainda não tem cadastro de venda ganha um com o padrão.
+ */
+export const salvarGtin = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const idItem = Number(req.params.id_item);
+  const gtin = normalizarGtin(req.body?.gtin);
+  if (gtin && !validarGtin(gtin)) {
+    return res.status(400).json({ success: false, error: 'Código de barras inválido: confira os números (8, 12, 13 ou 14 dígitos; o último é o verificador).' });
+  }
+  const connection: any = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [[item]] = await connection.execute(`SELECT id_unidade FROM itens_core WHERE id_item = ? AND tenant_id = ? FOR UPDATE`, [idItem, tenant]);
+    if (!item) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, error: 'Item não encontrado.' });
+    }
+    const base = Number(item.id_unidade);
+    const idUnidade = Number(req.body?.idUnidade) || base;
+    if (idUnidade !== base) {
+      const [[conv]] = await connection.execute(
+        `SELECT 1 FROM itens_unidades_conversao WHERE tenant_id = ? AND id_item = ? AND id_unidade_derivada = ? AND fator_conversao > 0`, [tenant, idItem, idUnidade]
+      );
+      if (!conv) {
+        await connection.rollback();
+        return res.status(400).json({ success: false, error: 'Essa unidade não tem conversão cadastrada no item (Catálogo › Preços & Comercial).' });
+      }
+    }
+    if (gtin) {
+      const [[outro]] = await connection.execute(
+        `SELECT cuv.id_item, COALESCE(cpd.sku_customizado, ic.sku) AS sku FROM comercial_unidades_venda cuv
+         INNER JOIN itens_core ic ON ic.id_item = cuv.id_item
+         LEFT JOIN comercial_produtos_dados cpd ON cpd.id_item = cuv.id_item AND cpd.tenant_id = cuv.tenant_id
+         WHERE cuv.tenant_id = ? AND cuv.gtin = ? AND NOT (cuv.id_item = ? AND cuv.id_unidade = ?) LIMIT 1`,
+        [tenant, gtin, idItem, idUnidade]
+      );
+      if (outro) {
+        await connection.rollback();
+        return res.status(409).json({ success: false, error: `Este código de barras já está no item ${outro.sku}.` });
+      }
+    }
+    const [[temPadrao]] = await connection.execute(
+      `SELECT COUNT(*) AS n FROM comercial_unidades_venda WHERE tenant_id = ? AND id_item = ? AND padrao_pdv = 1`, [tenant, idItem]
+    );
+    await connection.execute(
+      `INSERT INTO comercial_unidades_venda (tenant_id, id_item, id_unidade, gtin, permite_venda, permite_atacado, padrao_pdv)
+       VALUES (?, ?, ?, ?, 1, 0, ?) ON DUPLICATE KEY UPDATE gtin = VALUES(gtin)`,
+      [tenant, idItem, idUnidade, gtin || null, idUnidade === base && !Number(temPadrao.n) ? 1 : 0]
+    );
+    await connection.commit();
+    return res.json({ success: true, message: gtin ? 'Código de barras salvo.' : 'Código de barras retirado.' });
+  } catch (error: any) {
+    await connection.rollback();
+    console.error('Erro ao salvar o código de barras:', error);
     return res.status(500).json({ success: false, error: error.message });
   } finally {
     connection.release();
