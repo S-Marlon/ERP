@@ -593,7 +593,9 @@ const EditorImagemModal: React.FC<Props> = ({ entrada, onFechar, onSalvo }) => {
         await enviarArquivoAnexo(it.idItem, new File([blob], nome, { type: 'image/jpeg' }), comoPrincipal ? 'IMAGEM_PRINCIPAL' : 'FOTO_GALERIA',
           { substituir: true, posicao: comoPrincipal ? undefined : 2 });
       } catch (e) {
-        falhas.push(`${it.sku}: ${e instanceof Error ? e.message : 'erro'}`);
+        const msg = e instanceof Error ? e.message : 'erro';
+        // a foto não abriu (arquivo que não existe mais no servidor ou link fora do ar)
+        falhas.push(`${it.sku}: ${/error loading/i.test(msg) ? `a foto não abriu (${msg.replace(/^.*error loading\s*/i, '').split('/').pop()}): confira se ela ainda existe` : msg}`);
       }
       setAplicando({ feitos: k + 1, total: itens.length });
     }
