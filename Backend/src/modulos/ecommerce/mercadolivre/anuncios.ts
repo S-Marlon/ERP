@@ -207,12 +207,12 @@ export const pendenciasAnuncio = (
     if (temGtinNaCategoria && !i.gtin) {
       const marca = resolverValor(atributos.find(a => a.id === 'BRAND'), dados.atributos.BRAND, i)?.valor;
       if (marca && !SEM_MARCA.has(normalizar(marca))) {
-        aviso('itens', `${i.sku}: sem código de barras (GTIN): com marca "${marca}" o ML costuma exigir o GTIN.`, { idItem: i.idItem, idLinha: i.idLinha });
+        aviso('itens', `${i.sku}: sem código de barras (GTIN): com marca "${marca}" o ML costuma exigir o GTIN. Preencha em Itens e estoque › Cadastro.`, { idItem: i.idItem, idLinha: i.idLinha });
       } else {
-        aviso('itens', `${i.sku}: sem código de barras (GTIN): vai como "produto sem código".`, { idItem: i.idItem, idLinha: i.idLinha });
+        aviso('itens', `${i.sku}: sem código de barras (GTIN): vai como "produto sem código" (dá para preencher em Itens e estoque › Cadastro).`, { idItem: i.idItem, idLinha: i.idLinha });
       }
     }
-    if (!i.pesoKg || !i.medidasCm) aviso('itens', `${i.sku}: sem peso ou medidas da embalagem (o ML estima o frete).`, { idItem: i.idItem, idLinha: i.idLinha });
+    if (!i.pesoKg || !i.medidasCm) aviso('itens', `${i.sku}: sem peso ou medidas da embalagem (o ML estima o frete). Preencha em Itens e estoque › Cadastro.`, { idItem: i.idItem, idLinha: i.idLinha });
     else if (fatorDaLinha(i) > 1) {
       aviso('itens', `${i.sku}: vendido em kit de ${numeroBr(fatorDaLinha(i))}: o peso vai multiplicado, mas as medidas da embalagem são as de uma unidade (confira, o ML cobra diferença de frete).`, { idItem: i.idItem, idLinha: i.idLinha });
     }

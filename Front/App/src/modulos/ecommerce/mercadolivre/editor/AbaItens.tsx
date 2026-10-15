@@ -2,7 +2,7 @@
 // e estoque. Preço e lucro de cada item ficam na aba Preço e lucro. Fotos, adicionar e tirar itens valem na hora.
 import React, { lazy, Suspense, useState } from 'react';
 import { Alert, Avatar, Button, Card, Dropdown, Popconfirm, Space, Spin, Switch, Table, Tag, Tooltip, Typography, Upload } from 'antd';
-import { AppstoreAddOutlined, BarcodeOutlined, ColumnWidthOutlined, EditOutlined, DeleteOutlined, InboxOutlined, PictureOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons';
+import { AppstoreAddOutlined, ColumnWidthOutlined, EditOutlined, DeleteOutlined, PictureOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons';
 // telas de imagem só carregam quando abertas (o editor traz a biblioteca de desenho, que é pesada)
 const FotosMlModal = lazy(() => import('../FotosMlModal'));
 const GeradorMedidasModal = lazy(() => import('../GeradorMedidasModal'));
@@ -13,6 +13,7 @@ import { AnuncioDetalhe, foraDoMl, ItemDoAnuncio, ROTULO_STATUS_ML } from '../me
 import { EstoqueAnuncioCard, EstoqueItemCelula } from '../EstoqueMl';
 import type { RascunhoItem } from '../rascunhoAnuncio';
 import { linhasDoItem, rotuloDaUnidade, umaLinhaPorItem, unidadesLivres } from '../linhasAnuncio';
+import { EmbalagemDoItem, GtinDoItem } from './CadastroDoItem';
 
 const { Text } = Typography;
 
@@ -83,7 +84,7 @@ const AbaItens: React.FC<Props> = p => {
         )}
         <Table<ItemDoAnuncio>
           size="small" rowKey="idLinha" dataSource={visiveis} pagination={visiveis.length > 15 ? { pageSize: 15, showSizeChanger: false } : false}
-          scroll={{ x: 760 }}
+          scroll={{ x: 860 }}
           rowClassName={i => (p.rascunhoItens[i.idLinha] ? 'ml-linha-alterada' : p.comErro.has(i.idLinha) || p.errosConferencia.has(i.idLinha) ? 'ml-linha-erro' : i.linhaAtiva === false ? 'ml-linha-desativada' : '')}
           columns={[
             {
@@ -142,13 +143,12 @@ const AbaItens: React.FC<Props> = p => {
               render: (_, i) => <EstoqueItemCelula item={i} det={det} onSalvarRegra={regra => p.onMudarItem(i.idLinha, regra)} />,
             },
             {
-              title: '', width: 56,
+              title: <Tooltip title="Código de barras e peso/medidas da embalagem: o ML pede. Clique para preencher (grava no cadastro do produto).">Cadastro</Tooltip>,
+              width: 150,
               render: (_, i) => (
-                <Space size={6}>
-                  <Tooltip title={i.gtin ? `GTIN ${i.gtin}` : 'Sem código de barras'}><BarcodeOutlined style={{ color: i.gtin ? '#52c41a' : '#d9d9d9' }} /></Tooltip>
-                  <Tooltip title={i.pesoKg && i.medidasCm ? `${i.pesoKg} kg · ${i.medidasCm.altura}×${i.medidasCm.largura}×${i.medidasCm.comprimento} cm` : 'Sem peso ou medidas'}>
-                    <InboxOutlined style={{ color: i.pesoKg && i.medidasCm ? '#52c41a' : '#d9d9d9' }} />
-                  </Tooltip>
+                <Space size={4} wrap>
+                  <GtinDoItem item={i} disabled={foraDoMl(i.ml.status)} onSalvo={p.onFotoFamilia} />
+                  <EmbalagemDoItem item={i} disabled={foraDoMl(i.ml.status)} onSalvo={p.onFotoFamilia} />
                 </Space>
               ),
             },
