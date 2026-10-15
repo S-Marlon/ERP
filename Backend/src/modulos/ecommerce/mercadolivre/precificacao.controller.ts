@@ -5,7 +5,8 @@ import pool from '../../../infra/db';
 import { alvoEfetivo } from '../../../areas/compras/inteligente/margemAlvo';
 import { carregarComposicoes, carregarDadosComponentes } from '../../../areas/catalogo/kits/kitsBanco';
 import { custoDoKit } from '../../../areas/catalogo/kits/kits';
-import { ItemAnuncio, normalizar, precoNoMl, resolverValor } from './anuncios';
+import { ItemAnuncio, normalizar, precoNoMl, resolverValor, saldoNaUnidade } from './anuncios';
+import { formasDoItem, lerPrecos, lerQuantidades, precoPorUnidade, quantidadeDaLinha, siglaDoKit } from './formasVenda';
 import { AnuncioCarregado, carregarAnuncios, responderErro, taxaMl, tenantDe } from './anuncios.controller';
 import { lerFaixas } from './faixasQuantidade';
 import { compararAtributos } from './catalogo';
@@ -353,6 +354,56 @@ export const financeiroAnuncio = async (req: Request, res: Response) => {
     return res.json(c.dados.categoriaMl && c.itens.length ? await financeiroDe(tenant, c) : { id: Number(c.registro.id), itens: [] });
   } catch (error) {
     return responderErro(res, error, 'Erro ao calcular o lucro do anúncio.');
+  }
+};
+
+/**
+ * GET /anuncios/:id/itens/:idLinha/formas?quantidades=1,2,10&precos=10:34.9 — o item vendido sozinho e em conjuntos:
+ * preço, você recebe, lucro e preço para o alvo de cada forma (custo e peso × quantidade). A forma que ainda não tem
+ * linha no anúncio é simulada (preço do ERP × quantidade, ou o informado em `precos`).
+ */
+export const formasDeVenda = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  try {
+    const [c] = await carregarAnuncios(pool as any, tenant, Number(req.params.id));
+    const linha = c?.itens.find(i => i.idLinha === Number(req.params.idLinha));
+    if (!c || !linha) throw new ErroML('Item não encontrado no anúncio.', 404);
+    if (!c.dados.categoriaMl) throw new ErroML('Escolha a categoria do ML primeiro: a tarifa depende dela.');
+    const doItem = c.itens.filter(i => i.idItem === linha.idItem);
+    const base = doItem.find(i => !i.unidadeMl) || null;
+    // preço de uma unidade: o da linha unitária, ou o do conjunto dividido
+    const precoUnit = base ? precoNoMl(base, c.dados.ajustePreco) : r2(precoNoMl(linha, c.dados.ajustePreco) / quantidadeDaLinha(linha));
+    const saldoBase = linha.unidadeMl ? linha.estoqueBase ?? 0 : linha.estoque;
+    const precos = lerPrecos(req.query.precos);
+    const formas = [];
+    let custoUnidade: number | null = null;
+    let alvoPct: number | null = null;
+    for (const f of formasDoItem(doItem, lerQuantidades(req.query.quantidades))) {
+      const q = f.quantidade;
+      const item: ItemAnuncio = f.linha || {
+        ...(base || linha), idLinha: -q, linhaAtiva: true, precoMl: null, preco: r2(precoUnit * q),
+        unidadeMl: q === 1 ? null : { idUnidade: 0, sigla: siglaDoKit(q), nome: `Kit c/${q}`, fator: q, preco: null },
+      };
+      const ctx = await contextoVenda(tenant, c, item);
+      const preco = precos.get(q) ?? (f.linha ? precoNoMl(f.linha, c.dados.ajustePreco) : r2(precoUnit * q));
+      const l = await ctx.avaliar(preco);
+      const precoAlvo = await ctx.precoAlvoDe(preco, l.frete);
+      custoUnidade = custoUnidade ?? r2(ctx.custo / q);
+      alvoPct = ctx.alvo.alvoPct;
+      const m = f.linha ? c.noMl.get(f.linha.idLinha) : null;
+      formas.push({
+        quantidade: q, idLinha: f.linha?.idLinha ?? null, ativo: f.linha ? f.linha.linhaAtiva !== false : null,
+        sigla: f.linha?.unidadeMl?.sigla ?? (q === 1 ? linha.siglaBase || 'UN' : siglaDoKit(q)), sku: f.linha?.sku ?? null,
+        mlbId: m?.mlbId ?? null, status: m?.status ?? null, simulado: precos.has(q) || !f.linha,
+        preco, porUnidade: precoPorUnidade(preco, q), tarifa: l.tarifa, frete: l.frete, freteDesconhecido: l.freteDesconhecido,
+        recebe: l.liquido, custo: l.custo, lucro: l.lucro, lucroPorUnidade: r2(l.lucro / q), lucroSobreCustoPct: l.lucroSobreCustoPct, nivel: l.nivel,
+        precoAlvo, precoAlvoPorUnidade: precoAlvo !== null ? precoPorUnidade(precoAlvo, q) : null,
+        estoque: saldoNaUnidade(saldoBase, q),
+      });
+    }
+    return res.json({ idItem: linha.idItem, sku: base?.sku || linha.sku, custoUnidade, alvoPct, formas });
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao calcular as formas de venda.');
   }
 };
 

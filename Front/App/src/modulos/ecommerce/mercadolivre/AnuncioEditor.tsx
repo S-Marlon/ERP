@@ -21,6 +21,7 @@ import PainelLateral, { AcaoMl } from './editor/PainelLateral';
 import FaixasQuantidadeCard from './FaixasQuantidadeCard';
 import CatalogoMlCard from './CatalogoMlCard';
 import PrecoMlCard from './PrecoMlCard';
+import FormasDeVendaCard from './FormasDeVendaCard';
 import CategoriaMlModal from './CategoriaMlModal';
 import AdicionarAnuncioModal from './AdicionarAnuncioModal';
 import SituacaoTag from './SituacaoTag';
@@ -202,6 +203,15 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
     }
   };
 
+  /** Vende o item da linha escolhida também em conjunto de `quantidade` (ou volta o unitário), já com o preço simulado. */
+  const criarForma = (idLinha: number, quantidade: number, preco: number | null) => salvo && executar(async () => {
+    const idItem = salvo.itens.find(i => i.idLinha === idLinha)?.idItem;
+    let r: AnuncioDetalhe = await anunciosApi.criarKit(salvo.id, idLinha, quantidade);
+    const nova = r.itens.find(i => i.idItem === idItem && (i.unidadeMl?.fator ?? 1) === quantidade);
+    if (preco && nova) r = await anunciosApi.precoItem(salvo.id, nova.idLinha, preco);
+    return r;
+  }, quantidade > 1 ? `Kit c/${quantidade} no anúncio: confira e publique (ele tem SKU e título próprios).` : 'Unitário de volta ao anúncio.');
+
   const comFoto = async (alvo: number | 'todos', envio: () => Promise<unknown>, ok: string) => {
     setEnviandoFoto(alvo);
     try {
@@ -367,6 +377,13 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
         <>
           {det.categoria && det.itens.length > 0 && (
             <>
+              <FormasDeVendaCard
+                det={det} idLinha={itemPreco ?? det.itens[0].idLinha} rascunhoItens={rascunho.itens} ocupado={ocupado}
+                onMudarPreco={(idLinha, preco) => mudarDoItem(idLinha, { precoMl: preco })}
+                onCriar={(q, preco) => criarForma(itemPreco ?? det.itens[0].idLinha, q, preco)}
+                onAtivar={(idLinha, ativo) => executar(() => anunciosApi.ativarLinha(salvo.id, idLinha, ativo), ativo ? 'Forma de venda ativada.' : 'Forma de venda desativada.')}
+                onAnalisar={idLinha => { setItemPreco(idLinha); painelPreco.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
+              />
               <div ref={painelPreco} style={{ scrollMarginTop: 8 }}>
                 <PrecoMlCard
                   salvo={salvo} det={det} idLinha={itemPreco ?? det.itens[0].idLinha} onTrocarItem={setItemPreco}

@@ -113,6 +113,14 @@ export interface CatalogoItem {
   candidatos: CandidatoCatalogo[];
 }
 
+/** Uma forma de vender o item no ML: sozinho (1) ou em conjunto (kit c/N), com o lucro a esse preço. */
+export interface FormaDeVenda {
+  quantidade: number; idLinha: number | null; ativo: boolean | null; sigla: string; sku: string | null; mlbId: string | null; status: string | null;
+  simulado: boolean; preco: number; porUnidade: number; tarifa: number; frete: number; freteDesconhecido: boolean; recebe: number; custo: number;
+  lucro: number; lucroPorUnidade: number; lucroSobreCustoPct: number | null; nivel: LucroMl['nivel']; precoAlvo: number | null; precoAlvoPorUnidade: number | null;
+  estoque: number;
+}
+export interface FormasDeVenda { idItem: number; sku: string; custoUnidade: number | null; alvoPct: number | null; formas: FormaDeVenda[] }
 export interface UnidadeVenda { idUnidade: number; sigla: string; nome: string; fator: number; preco: number | null }
 
 export interface ItemDoAnuncio {
@@ -280,6 +288,14 @@ export const anunciosApi = {
   /** Liga ou desliga a linha: desligada não publica e, se já está no ML, fica pausada. */
   ativarLinha: async (id: number, idLinha: number, ativo: boolean) =>
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}?tenant_id=1`, json('PUT', { ativo })), ativo ? 'Erro ao ativar.' : 'Erro ao desativar.'),
+  /** Vende o item também em conjunto (kit c/N): cria a unidade e a conversão no cadastro se faltar, e a linha. */
+  criarKit: async (id: number, idLinha: number, quantidade: number) =>
+    ler<AnuncioDetalhe & { mensagem?: string }>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}/kit?tenant_id=1`, json('POST', { quantidade })), 'Erro ao criar o conjunto.'),
+  /** O item sozinho e em conjuntos: lucro de cada forma (a que não existe é simulada). precos: quantidade -> preço. */
+  formasDeVenda: async (id: number, idLinha: number, quantidades: number[], precos: Record<number, number>) => {
+    const p = Object.entries(precos).map(([q, v]) => `${q}:${v}`).join(',');
+    return ler<FormasDeVenda>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}/formas?tenant_id=1&quantidades=${quantidades.join(',')}${p ? `&precos=${p}` : ''}`), 'Erro ao calcular as formas de venda.');
+  },
   precoItem: async (id: number, idLinha: number, preco: number | null) =>
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}?tenant_id=1`, json('PUT', { preco })), 'Erro ao salvar o preço.'),
   /** Grava o item do anúncio: preço só no ML, unidade vendida e a regra de estoque (só os campos enviados). */

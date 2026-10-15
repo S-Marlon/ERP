@@ -10,6 +10,7 @@ import {
   ItemAnuncio, Pendencia, pendenciasAnuncio, precoNoMl, resolverValor, situacaoPreparo, sugerirAtributos, tituloLegivel, ValorAtributo, modoPublicacao, tituloPeloModelo, estoqueParaMl, regraDoItem, RegraEstoque, saldoNaUnidade, UnidadeVenda, foraDoMl,
   skuDaLinha, tituloComUnidade,
 } from './anuncios';
+import { siglaDoKit } from './formasVenda';
 import { ErroML, ml } from './mercadolivreApi';
 import { ehImagemGerada } from './fotos';
 import { sincronizarAnuncios } from './sincronizacao';
@@ -846,6 +847,76 @@ export const adicionarUnidade = async (req: Request, res: Response) => {
     return res.json(await detalhe(tenant, c));
   } catch (error) {
     return responderErro(res, error, 'Erro ao adicionar a unidade.');
+  }
+};
+
+/**
+ * POST /anuncios/:id/itens/:idLinha/kit { quantidade } — vende o item também em conjunto de `quantidade` unidades. Usa
+ * a unidade do item que já tem esse fator (ex.: um KIT c/8 cadastrado) ou cria a unidade KIT{n} e a conversão no
+ * cadastro; depois põe a linha no anúncio. Já existe desativada: ativa. quantidade 1 = a unidade do ERP.
+ */
+export const adicionarKit = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const id = Number(req.params.id);
+  const quantidade = Number(req.body?.quantidade);
+  const connection = await pool.getConnection();
+  const conn = connection as unknown as Conn;
+  try {
+    if (!Number.isInteger(quantidade) || quantidade < 1 || quantidade > 999) throw new ErroML('Quantidade do conjunto inválida (de 1 a 999).');
+    await anuncioEditavel(pool as any, tenant, id);
+    const origem = await linhaDoAnuncio(tenant, id, Number(req.params.idLinha));
+    const idItem = Number(origem.id_item);
+    await connection.beginTransaction();
+    let idUnidade: number | null = null;
+    if (quantidade > 1) {
+      const [[mesmoFator]] = await conn.execute(
+        `SELECT id_unidade_derivada FROM itens_unidades_conversao WHERE tenant_id = ? AND id_item = ? AND ABS(fator_conversao - ?) < 0.0001 LIMIT 1`,
+        [tenant, idItem, quantidade]
+      );
+      if (mesmoFator) idUnidade = Number(mesmoFator.id_unidade_derivada);
+      else {
+        const sigla = siglaDoKit(quantidade);
+        const [[unidade]] = await conn.execute(`SELECT id_unidade FROM itens_unidades_medida WHERE tenant_id = ? AND sigla = ?`, [tenant, sigla]);
+        idUnidade = unidade
+          ? Number(unidade.id_unidade)
+          : Number((await conn.execute(`INSERT INTO itens_unidades_medida (tenant_id, sigla, descricao) VALUES (?, ?, ?)`, [tenant, sigla, `Kit c/${quantidade}`]))[0].insertId);
+        const [[outra]] = await conn.execute(
+          `SELECT fator_conversao FROM itens_unidades_conversao WHERE tenant_id = ? AND id_item = ? AND id_unidade_derivada = ?`, [tenant, idItem, idUnidade]
+        );
+        if (outra) throw new ErroML(`O item já usa a unidade ${sigla} com ${Number(outra.fator_conversao)} unidades: confira em Catálogo › Preços & Comercial.`);
+        await conn.execute(
+          `INSERT INTO itens_unidades_conversao (tenant_id, id_item, id_unidade_derivada, fator_conversao) VALUES (?, ?, ?, ?)`, [tenant, idItem, idUnidade, quantidade]
+        );
+      }
+    }
+    const [[existe]] = await conn.execute(
+      `SELECT id_anuncio_item, id_anuncio, ativo FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE tenant_id = ? AND id_item = ? AND unidade_chave = ?`,
+      [tenant, idItem, idUnidade ?? 0]
+    );
+    let mensagem: string;
+    if (existe && Number(existe.id_anuncio) !== id) throw new ErroML(`Este item já está à venda nessa forma no anúncio #${existe.id_anuncio}.`, 409);
+    if (existe) {
+      if (!Number(existe.ativo)) await conn.execute(`UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET ativo = 1 WHERE id_anuncio_item = ?`, [existe.id_anuncio_item]);
+      mensagem = Number(existe.ativo) ? 'Essa forma de venda já está no anúncio.' : 'Forma de venda ativada de novo.';
+    } else {
+      const [[{ proxima }]] = await conn.execute(
+        `SELECT COALESCE(MAX(ordem), -1) + 1 AS proxima FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE id_anuncio = ?`, [id]
+      );
+      await conn.execute(
+        `INSERT INTO modulo_ecommerce_mercadolivre_anuncios_itens (id_anuncio, tenant_id, id_item, id_unidade, ordem) VALUES (?, ?, ?, ?, ?)`,
+        [id, tenant, idItem, idUnidade, Number(proxima)]
+      );
+      mensagem = quantidade > 1 ? `Kit c/${quantidade} no anúncio: confira o preço e publique.` : 'Unitário no anúncio: confira o preço e publique.';
+    }
+    await conn.execute(`UPDATE modulo_ecommerce_mercadolivre_anuncios SET atualizado_em = NOW() WHERE id = ?`, [id]);
+    await connection.commit();
+    const [c] = await carregarAnuncios(pool as any, tenant, id);
+    return res.json({ ...(await detalhe(tenant, c)), mensagem });
+  } catch (error) {
+    await connection.rollback().catch(() => null);
+    return responderErro(res, error, 'Erro ao criar o conjunto.');
+  } finally {
+    connection.release();
   }
 };
 

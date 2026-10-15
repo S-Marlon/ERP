@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { conectar, conta, desconectar, status } from './mercadolivre.controller';
 import {
   adicionarItens, candidatos, criarAnuncio, detalheAnuncio, excluirAnuncio, listarAnuncios, navegarCategorias, salvarItem,
-  removerItem, salvarAnuncio, adicionarUnidade, sugerirCategoria, desligarDoMl, encerrarNoMl,
+  removerItem, salvarAnuncio, adicionarUnidade, adicionarKit, sugerirCategoria, desligarDoMl, encerrarNoMl,
 } from './anuncios.controller';
 import {
   atualizarNoMl, importarAnuncios, pausarNoMl, previaImportacao, publicarAnuncio, sincronizarAnuncio, sincronizarTodos, situacaoSincronizacao, validarAnuncio,
@@ -12,7 +12,7 @@ import {
 import { faixasNoMl } from './faixas.controller';
 import { entrarNoCatalogo, verificarCatalogo } from './catalogo.controller';
 import { buscarFotosMl, fotosDoAnuncio, importarFotos, repassarImagem } from './fotos.controller';
-import { analisarPreco, financeiroAnuncio, financeiroAnuncios, simularPreco } from './precificacao.controller';
+import { analisarPreco, financeiroAnuncio, financeiroAnuncios, formasDeVenda, simularPreco } from './precificacao.controller';
 import { buscarClientes, buscarPedidos, listarPedidos, resultadoPedidos, obterConfig, reprocessarPedido, salvarConfig } from './pedidos.controller';
 
 const router = Router();
@@ -35,6 +35,7 @@ router.delete('/anuncios/:id', excluirAnuncio);
 router.post('/anuncios/:id/itens', adicionarItens);
 router.put('/anuncios/:id/itens/:idLinha', salvarItem);
 router.post('/anuncios/:id/itens/:idLinha/unidade', adicionarUnidade);
+router.post('/anuncios/:id/itens/:idLinha/kit', adicionarKit);
 router.delete('/anuncios/:id/itens/:idLinha', removerItem);
 router.delete('/anuncios/:id/itens/:idLinha/ml', desligarDoMl);
 router.post('/anuncios/:id/encerrar', encerrarNoMl);
@@ -46,6 +47,7 @@ router.get('/anuncios/:id/faixas/ml', faixasNoMl);
 router.get('/anuncios/:id/catalogo', verificarCatalogo);
 router.get('/anuncios/:id/itens/:idLinha/preco', analisarPreco);
 router.get('/anuncios/:id/itens/:idLinha/simular', simularPreco);
+router.get('/anuncios/:id/itens/:idLinha/formas', formasDeVenda);
 router.get('/anuncios/:id/financeiro', financeiroAnuncio);
 router.get('/anuncios/:id/fotos', fotosDoAnuncio);
 router.post('/anuncios/:id/fotos/importar', importarFotos);
