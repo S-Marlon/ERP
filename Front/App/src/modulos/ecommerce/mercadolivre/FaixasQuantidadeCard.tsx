@@ -55,6 +55,15 @@ const FaixasQuantidadeCard: React.FC<Props> = ({ det, onMudar }) => {
               ? <Text>{formatarMoeda(Math.round(preco * (1 - f.desconto / 100) * 100) / 100)} <Text type="secondary" style={{ fontSize: 12 }}>({det.itens[0]?.sku})</Text></Text>
               : '—'),
           },
+          
+          // valor final do conjunto: o preço da unidade (já arredondado, como o ML cobra) × a quantidade da faixa
+          { title: 'Preço conjunto', width: 160, render: (_, f) => {
+            if (!(preco > 0)) return '—';
+            const unidade = Math.round(preco * (1 - f.desconto / 100) * 100) / 100;
+            return <Text strong>{formatarMoeda(Math.round(unidade * f.minimo * 100) / 100)} <Text type="secondary" style={{ fontSize: 12, fontWeight: 400 }}>({f.minimo} × {formatarMoeda(unidade)})</Text></Text>;
+          },
+          },
+          
           { title: '', width: 40, render: (_, f) => <Button type="text" danger size="small" icon={<DeleteOutlined />} onClick={() => onMudar(faixas.filter((_, i) => i !== f.k))} /> },
         ]}
       />
