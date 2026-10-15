@@ -10,6 +10,7 @@ import {
 } from '@ant-design/icons';
 import { Canvas, FabricImage, FabricObject, IText, Point, Rect, StaticCanvas, util } from 'fabric';
 import { enviarArquivoAnexo } from '../../../../areas/catalogo/skus/CatalogSku.service';
+import { fotosFamiliaApi } from '../../../../areas/catalogo/familias/FamilyManager.api';
 import type { AnuncioDetalhe, ItemDoAnuncio } from '../mercadoLivreApi';
 import { camposDoItem, converterMedidas, fotoBaseDoItem, modeloPadrao, textoDoModelo } from '../etiquetaFoto';
 import { enderecoParaDesenho } from '../desenhoEtiqueta';
@@ -36,6 +37,8 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
   const historico = useRef<string[]>([]);
   const refeitos = useRef<string[]>([]);
   const carregando = useRef(false);
+  // foto-modelo da família (a principal da galeria): o modelo do editor fica guardado nela e vale para todos os anúncios
+  const fotoModelo = useRef<{ idFamilia: number; idFoto: number } | null>(null);
   const [selecionado, setSelecionado] = useState<FabricObject | null>(null);
   const [, setVersao] = useState(0);
   const atualizarPainel = () => setVersao(v => v + 1);
@@ -330,20 +333,40 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
         if (d) { (o as any).dadosElemento = { ...d, modelo: o.text }; o.set('text', textoParaAtual.current(o.text, itemAtual.current) || ' '); c.requestRenderAll(); guardar(); }
       });
       const foto = (primeiro && fotoBaseDoItem(primeiro)) || det.fotoFamilia;
-      const salvo = (() => { try { return localStorage.getItem(chaveModelo(det.id)); } catch { return null; } })();
+      // o modelo guardado na foto-modelo da família manda; sem ele, o último deste anúncio neste navegador
+      let salvo = (() => { try { return localStorage.getItem(chaveModelo(det.id)); } catch { return null; } })();
+      let daFamilia = false;
+      fotoModelo.current = null;
+      if (det.idFamilia) {
+        try {
+          const { fotos } = await fotosFamiliaApi.listar(det.idFamilia);
+          if (!vivo) return;
+          const modelo = fotos[0];
+          if (modelo) fotoModelo.current = { idFamilia: det.idFamilia, idFoto: modelo.idFoto };
+          if (modelo?.temModelo) {
+            const m = (await fotosFamiliaApi.lerModelo(det.idFamilia, modelo.idFoto)).modelo;
+            if (!vivo) return;
+            if (m) { salvo = m; daFamilia = true; }
+          }
+        } catch { /* sem a galeria da família: vale o do navegador */ }
+      }
       let abriuSalvo = false;
       if (salvo) {
         try {
           const limpo = limparModelo(salvo);
           await carregarEstado(limpo.json);
           if (!vivo) return;
-          if (limpo.fotoDescartada && foto) await colocarFoto(foto);
+          // a foto do modelo é a de quando ele foi guardado: troca pela foto de hoje (mesmo lugar e tamanho)
+          const fotoNoQuadro = fotoDoQuadro();
+          const alvo = foto ? enderecoParaDesenho(foto) : null;
+          if (foto && (limpo.fotoDescartada || (fotoNoQuadro && alvo !== origemDaFoto(fotoNoQuadro)))) await colocarFoto(foto);
           if (!vivo) return;
           renderizarTextos(primeiro || null);
           abriuSalvo = true;
+          const onde = daFamilia ? `o modelo da família ${det.familia || ''}`.trim() : 'o último modelo deste anúncio';
           message.info(limpo.repetidos
-            ? `Abri o último modelo deste anúncio e tirei ${limpo.repetidos} elemento(s) repetido(s). "Começar do zero" limpa.`
-            : 'Abri o último modelo deste anúncio. "Começar do zero" limpa.');
+            ? `Abri ${onde} e tirei ${limpo.repetidos} elemento(s) repetido(s).`
+            : `Abri ${onde}. "Começar do zero" limpa o quadro.`);
         } catch {
           if (!vivo) return;
           c.clear();
@@ -474,11 +497,23 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
 
   // ---------------------------------------------------------------- salvar
   const modeloAtual = () => { fab.current!.discardActiveObject(); return estadoAtual(); };
-  const salvarModelo = () => {
-    try { localStorage.setItem(chaveModelo(det!.id), modeloAtual()); message.success('Modelo guardado: abre assim da próxima vez neste anúncio.'); }
-    catch { message.error('Não foi possível guardar o modelo neste navegador.'); }
+  /** Guarda o modelo na foto-modelo da família (vale para todos os anúncios dela) e, de reserva, neste navegador. */
+  const guardarNaFamilia = async (modelo: string, avisar: boolean) => {
+    try { localStorage.setItem(chaveModelo(det!.id), modelo); } catch { /* sem armazenamento */ }
+    if (!fotoModelo.current) {
+      if (avisar) message.success('Modelo guardado neste navegador. Com uma foto na galeria da família, ele passa a valer em qualquer anúncio.');
+      return;
+    }
+    try {
+      await fotosFamiliaApi.salvarModelo(fotoModelo.current.idFamilia, fotoModelo.current.idFoto, modelo);
+      if (avisar) message.success(`Modelo guardado na família${det!.familia ? ` ${det!.familia}` : ''}: abre assim em qualquer anúncio dela.`);
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : 'Não foi possível guardar o modelo na família.');
+    }
   };
+  const salvarModelo = () => guardarNaFamilia(modeloAtual(), true);
   const comecarDoZero = async () => {
+    // só o quadro: o modelo guardado na família continua até você guardar outro
     try { localStorage.removeItem(chaveModelo(det!.id)); } catch { /* sem armazenamento */ }
     const c = fab.current!;
     c.getObjects().filter(o => dadosDe(o)?.tipo !== 'FOTO').forEach(o => c.remove(o));
@@ -516,7 +551,7 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
   const salvarEm = async (itens: ItemDoAnuncio[], comoPrincipal: boolean) => {
     if (!det || !itens.length) return;
     const modelo = modeloAtual();
-    try { localStorage.setItem(chaveModelo(det.id), modelo); } catch { /* sem armazenamento */ }
+    await guardarNaFamilia(modelo, false);
     setAplicando({ feitos: 0, total: itens.length });
     const falhas: string[] = [];
     for (const [k, it] of itens.entries()) {
@@ -742,7 +777,7 @@ const EditorImagemModal: React.FC<Props> = ({ det, onFechar, onSalvo }) => {
               <Select mode="multiple" style={{ width: '100%' }} value={marcados} onChange={setMarcados} maxTagCount="responsive"
                 options={det.itens.map(i => ({ value: i.idItem, label: i.sku }))} />
               <Text type="secondary" style={{ fontSize: 11 }}>
-                {destino === 'PRINCIPAL' ? 'Salva como foto principal (a atual vai para a galeria).' : 'Salva como 2ª foto, logo depois da principal.'} Salvar de novo troca a imagem anterior do editor. O modelo fica guardado neste anúncio.
+                {destino === 'PRINCIPAL' ? 'Salva como foto principal (a atual vai para a galeria).' : 'Salva como 2ª foto, logo depois da principal.'} Salvar de novo troca a imagem anterior do editor. O modelo (cotas e textos) fica guardado na foto-modelo da família.
               </Text>
             </div>
           </Flex>

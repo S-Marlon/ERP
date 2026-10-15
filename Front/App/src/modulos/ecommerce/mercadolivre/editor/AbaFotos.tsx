@@ -1,13 +1,15 @@
-// Aba Fotos do editor: a galeria de cada variação na ordem em que vai para o ML (principal -> medidas -> o resto como
-// arrastar), com adicionar, excluir, copiar uma foto para as outras variações e as ferramentas de imagem. Vale na hora
-// no cadastro do ERP; os itens já publicados recebem as fotos em "Enviar atributos, fotos e descrição".
+// Aba Fotos do editor: em cima a galeria da família (a 1ª é a principal-modelo, base do editor de imagem; as outras
+// entram em todas as variações), embaixo a galeria de cada variação na ordem em que vai para o ML (principal -> medidas
+// -> o resto como arrastar), com adicionar, excluir, copiar para as outras variações e levar para a família. Vale na
+// hora no cadastro do ERP; os itens já publicados recebem as fotos em "Enviar atributos, fotos e descrição".
 import React, { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { Alert, Button, Card, Checkbox, Empty, Flex, Popover, Space, Spin, Tag, Tooltip, Typography, message } from 'antd';
-import { ColumnWidthOutlined, CopyOutlined, EditOutlined, PictureOutlined, ReloadOutlined } from '@ant-design/icons';
+import { ColumnWidthOutlined, CopyOutlined, EditOutlined, PictureOutlined, ReloadOutlined, VerticalAlignTopOutlined } from '@ant-design/icons';
 import type { AnuncioDetalhe } from '../mercadoLivreApi';
 import GaleriaImagens from '../../../../areas/catalogo/skus/GaleriaImagens';
 import { AnexoItem, copiarImagem, listarImagensDosItens } from '../../../../areas/catalogo/skus/CatalogSku.service';
-import FotoFamiliaControle from '../../../../areas/catalogo/familias/FotoFamiliaControle';
+import GaleriaFamilia from '../../../../areas/catalogo/familias/GaleriaFamilia';
+import { fotosFamiliaApi } from '../../../../areas/catalogo/familias/FamilyManager.api';
 import { umaLinhaPorItem } from '../linhasAnuncio';
 
 const EditorImagemModal = lazy(() => import('../editorImagem/EditorImagemModal'));
@@ -92,6 +94,18 @@ const AbaFotos: React.FC<Props> = ({ salvo: salvoLinhas, det: detLinhas, onAlter
   }, [ids]);
   useEffect(() => { carregar(); }, [carregar]);
   const mudou = () => { carregar(); onAlterado(); };
+  const [versaoFamilia, setVersaoFamilia] = useState(0);
+  const levarParaFamilia = async (idAnexo: number) => {
+    if (!det.idFamilia) return;
+    try {
+      await fotosFamiliaApi.doItem(det.idFamilia, idAnexo);
+      message.success('Foto na galeria da família: vale para todas as variações.');
+      setVersaoFamilia(v => v + 1);
+      onAlterado();
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : 'Erro ao levar a foto para a família.');
+    }
+  };
 
   const publicados = det.itens.filter(i => i.ml.mlbId).length;
   return (
@@ -122,13 +136,15 @@ const AbaFotos: React.FC<Props> = ({ salvo: salvoLinhas, det: detLinhas, onAlter
       </Card>
 
       {det.idFamilia && (
-        <Card size="small" style={{ marginBottom: 12 }} title={<Space><Text strong>Todas as variações</Text><Tag>família {det.familia}</Tag></Space>}>
-          <Flex align="center" gap={12} wrap>
-            <FotoFamiliaControle modo="compacto" idFamilia={det.idFamilia} nome={det.familia} imagem={det.fotoFamilia} onAlterada={onAlterado} />
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              Hoje a família tem uma foto, usada pelas variações sem foto própria. A galeria da família (fotos que entram em todas as variações) vem na próxima etapa.
-            </Text>
-          </Flex>
+        <Card
+          size="small" style={{ marginBottom: 12, borderColor: '#d3adf7' }}
+          title={<Space wrap><Text strong>Família {det.familia}</Text><Tag color="purple">vale para todas as variações</Tag></Space>}
+        >
+          <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
+            A <b>1ª (modelo)</b> é a foto do produto: vai como principal na variação sem foto própria e é a base do editor de imagem, que guarda nela as
+            cotas e textos. As <b>outras</b> (aplicação, embalagem) entram em todas as variações, depois das fotos de cada uma.
+          </Text>
+          <GaleriaFamilia idFamilia={det.idFamilia} recarregar={versaoFamilia} onChange={() => onAlterado()} />
         </Card>
       )}
 
@@ -152,7 +168,16 @@ const AbaFotos: React.FC<Props> = ({ salvo: salvoLinhas, det: detLinhas, onAlter
                 )}
                 <GaleriaImagens
                   idItem={i.idItem} imagens={lista} onChange={mudou} limite={limite}
-                  acaoExtra={foto => <CopiarPara foto={foto} origem={i.idItem} itens={det.itens} onCopiado={mudou} />}
+                  acaoExtra={foto => (
+                    <>
+                      <CopiarPara foto={foto} origem={i.idItem} itens={det.itens} onCopiado={mudou} />
+                      {det.idFamilia && (
+                        <Tooltip title="Levar para a família (mesmo arquivo): entra como foto comum de todas as variações. Lá dá para fazer dela a modelo.">
+                          <Button type="text" size="small" icon={<VerticalAlignTopOutlined />} onClick={() => levarParaFamilia(foto.id_anexo)} />
+                        </Tooltip>
+                      )}
+                    </>
+                  )}
                 />
               </Card>
             );

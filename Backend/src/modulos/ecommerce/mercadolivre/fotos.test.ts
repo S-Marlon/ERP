@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { ehImagemGerada, referenciaDeFoto, urlPublicaDeImagem } from './fotos';
+import { ehImagemGerada, fotosDaVariacao, referenciaDeFoto, urlPublicaDeImagem } from './fotos';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -9,6 +9,22 @@ teste('imagem gerada pelo editor ou gerador não serve de base', () => {
   assert.strictEqual(ehImagemGerada('Img_ftr_rp_300601-1160x1160.PNG'), false);
   assert.strictEqual(ehImagemGerada('editada.jpg'), false);
   assert.strictEqual(ehImagemGerada(null), false);
+});
+
+teste('fotos da variação: própria, medidas, família', () => {
+  const fam = [{ url: 'f/produto.png', nome: 'produto.png' }, { url: 'f/aplicacao.jpg', nome: 'aplicacao.jpg' }];
+  const limpa = { idAnexo: 1, url: 'i/foto.png', nome: 'foto.png' };
+  const medida = { idAnexo: 2, url: 'i/X-editada.jpg', nome: 'X-editada.jpg' };
+  const chaves = (l: { chave: string }[]) => l.map(f => f.chave);
+  // com foto própria: ela, a medida, depois as comuns da família (sem a principal-modelo)
+  assert.deepStrictEqual(chaves(fotosDaVariacao([limpa, medida], fam)), ['1', '2', 'familia:f/aplicacao.jpg']);
+  // só a medida: a principal-modelo da família vem antes dela
+  assert.deepStrictEqual(chaves(fotosDaVariacao([medida], fam)), ['familia:f/produto.png', '2', 'familia:f/aplicacao.jpg']);
+  // sem foto: a família inteira
+  assert.deepStrictEqual(chaves(fotosDaVariacao([], fam)), ['familia:f/produto.png', 'familia:f/aplicacao.jpg']);
+  // o mesmo arquivo no item e na família vai uma vez só
+  assert.deepStrictEqual(chaves(fotosDaVariacao([{ idAnexo: 3, url: 'f/aplicacao.jpg', nome: 'aplicacao.jpg' }], fam)), ['3']);
+  assert.deepStrictEqual(chaves(fotosDaVariacao([limpa], [])), ['1']);
 });
 
 teste('link ou código colado vira anúncio ou catálogo', () => {

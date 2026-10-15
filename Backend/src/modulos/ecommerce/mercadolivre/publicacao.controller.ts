@@ -16,6 +16,7 @@ import { contaPorFamilia, enviarFotoMl, ErroML, ml } from './mercadolivreApi';
 import { sincronizarAnuncios, situacaoAutomatica } from './sincronizacao';
 import { enviarFaixas, enviarFaixasDoAnuncio } from './faixas.controller';
 import { lerFaixas } from './faixasQuantidade';
+import { fotosDaVariacao } from './fotos';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
 
@@ -30,6 +31,19 @@ const carregarOuErro = async (tenant: number, id: number) => {
 // linha desativada pelo operador não sobe
 const aPublicar = (c: AnuncioCarregado) => c.itens.filter(i => !c.noMl.get(i.idLinha)?.mlbId && i.linhaAtiva !== false);
 
+/** Fotos da galeria da família do anúncio (a 1ª é a principal-modelo); sem galeria, a foto única da família. */
+const fotosDaFamilia = async (tenant: number, c: AnuncioCarregado) => {
+  const idFamilia = Number(c.registro.id_familia) || null;
+  if (idFamilia) {
+    const [rows]: any = await pool.execute(
+      `SELECT url_foto, nome_arquivo FROM comercial_familias_fotos WHERE tenant_id = ? AND id_familia = ? ORDER BY ordem, id_foto`, [tenant, idFamilia]
+    );
+    if (rows.length) return rows.map((r: any) => ({ url: String(r.url_foto), nome: String(r.nome_arquivo) }));
+  }
+  const unica = c.dados.fotoFamilia;
+  return unica ? [{ url: unica, nome: path.basename(unica.split('?')[0]) }] : [];
+};
+
 /**
  * Fotos do item no formato do ML. Arquivo do servidor sobe para o ML (e o id fica guardado para não subir de novo);
  * link https vai como "source". Foto pequena demais volta como problema.
@@ -41,41 +55,33 @@ const fotosDoItem = async (tenant: number, c: AnuncioCarregado, item: ItemAnunci
      ORDER BY (tipo_anexo = 'IMAGEM_PRINCIPAL') DESC, ordem, id_anexo`,
     [tenant, item.idItem]
   );
+  // ordem combinada: principal própria (ou a principal-modelo da família), medidas, outras do item, comuns da família
+  const lista = fotosDaVariacao(
+    anexos.map((a: any) => ({ idAnexo: Number(a.id_anexo), url: String(a.url_anexo), nome: String(a.nome_arquivo || '') })),
+    await fotosDaFamilia(tenant, c),
+  );
+  // o id da foto que já subiu fica guardado por anexo (ou "familia:<link>"): atualizar o anúncio não sobe de novo
   const guardadas = { ...(c.noMl.get(item.idLinha)?.fotosMl || {}) };
   const fotos: FotoEnvio[] = [];
   const problemas: string[] = [];
   let mudou = false;
-  for (const a of anexos.slice(0, c.categoria?.info.maxFotos || 10)) {
-    const chave = String(a.id_anexo);
-    if (guardadas[chave]) { fotos.push({ id: guardadas[chave] }); continue; }
-    const local = caminhoLocalDaUrl(a.url_anexo);
+  for (const f of lista) {
+    if (fotos.length >= (c.categoria?.info.maxFotos || 10)) break;
+    if (guardadas[f.chave]) { fotos.push({ id: guardadas[f.chave] }); continue; }
+    const local = caminhoLocalDaUrl(f.url);
+    const nome = f.nome || (local ? path.basename(local) : 'foto');
     if (local) {
       const tipo = TIPO_POR_EXTENSAO[path.extname(local).toLowerCase()] || 'image/jpeg';
-      const r = await enviarFotoMl(tenant, fs.readFileSync(local), a.nome_arquivo || path.basename(local), tipo);
+      const r = await enviarFotoMl(tenant, fs.readFileSync(local), nome, tipo);
       if (fotoPequena(r.maxSize)) {
-        problemas.push(`foto "${a.nome_arquivo || path.basename(local)}" tem ${r.maxSize} px: o ML pede ao menos 500 px num dos lados`);
+        problemas.push(`foto "${nome}"${f.chave.startsWith('familia:') ? ' (da família)' : ''} tem ${r.maxSize} px: o ML pede ao menos 500 px num dos lados`);
         continue;
       }
-      guardadas[chave] = r.id;
+      guardadas[f.chave] = r.id;
       mudou = true;
       fotos.push({ id: r.id });
-    } else if (/^https:\/\//i.test(a.url_anexo)) {
-      fotos.push({ source: a.url_anexo });
-    }
-  }
-  // item sem foto própria usa a foto da família (guardada como "familia:<link>", para subir de novo se o link mudar)
-  const fotoFamilia = c.dados.fotoFamilia;
-  if (anexos.length === 0 && fotoFamilia) {
-    const chave = `familia:${fotoFamilia}`;
-    const local = caminhoLocalDaUrl(fotoFamilia);
-    if (guardadas[chave]) fotos.push({ id: guardadas[chave] });
-    else if (local) {
-      const tipo = TIPO_POR_EXTENSAO[path.extname(local).toLowerCase()] || 'image/jpeg';
-      const r = await enviarFotoMl(tenant, fs.readFileSync(local), path.basename(local), tipo);
-      if (fotoPequena(r.maxSize)) problemas.push(`foto da família tem ${r.maxSize} px: o ML pede ao menos 500 px num dos lados`);
-      else { guardadas[chave] = r.id; mudou = true; fotos.push({ id: r.id }); }
-    } else if (/^https?:\/\//i.test(fotoFamilia) && !/\/\/(localhost|127\.0\.0\.1)[:/]/i.test(fotoFamilia)) {
-      fotos.push({ source: fotoFamilia });
+    } else if (/^https:\/\//i.test(f.url) || (f.chave.startsWith('familia:') && /^http:\/\//i.test(f.url) && !/\/\/(localhost|127\.0\.0\.1)[:/]/i.test(f.url))) {
+      fotos.push({ source: f.url });
     }
   }
   if (mudou) {
