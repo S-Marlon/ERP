@@ -6,6 +6,7 @@ import { carregarAtributosDaCategoria } from '../categorias/herancaCategorias';
 import { apagarArquivoDaUrl, ErroArquivo, salvarArquivo } from '../../../infra/arquivos';
 import { ehImagemDeMedidas, lerIds, lerPosicao, ordemComNovaNaPosicao, ordemFinalDasImagens } from './ordemAnexos';
 import { normalizarGtin, validarGtin } from '../../compras/staging/gtin';
+import { arquivoEmUso } from '../arquivosEmUso';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
 
@@ -292,12 +293,6 @@ const reordenarImagens = async (conn: Conn, tenant: number, idItem: number, pedi
   }
 };
 
-/** Outro item ou família ainda usa o arquivo (a mesma foto pode estar copiada em vários itens): não apaga do disco. */
-const arquivoEmUso = async (conn: Conn, url: string) => {
-  const [[a]] = await conn.execute(`SELECT COUNT(*) AS n FROM itens_anexos WHERE url_anexo = ?`, [url]);
-  const [[f]] = await conn.execute(`SELECT COUNT(*) AS n FROM comercial_familias WHERE imagem = ?`, [url]);
-  return Number(a.n) + Number(f.n) > 0;
-};
 
 /**
  * POST /catalogo/produtos/:id_item/anexos  { url, tipo, nome?, posicao?, substituir? }

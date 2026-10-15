@@ -18,17 +18,35 @@ const TEXTO_AVISO: Record<AvisoFoto, { cor: string; texto: string; dica: string 
 };
 const FALHA = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100'><rect width='100' height='100' fill='%23f5f5f5'/><text x='50' y='54' font-size='10' text-anchor='middle' fill='%23999'>sem imagem</text></svg>";
 
+/** O que a galeria faz ao mexer: no item (padrão, pelos anexos) ou noutro dono, como a galeria da família. */
+export interface AcoesGaleria {
+  ordenar: (ids: number[]) => Promise<unknown>;
+  remover: (id: number) => Promise<unknown>;
+  enviar: (arquivo: File) => Promise<unknown>;
+  link: (url: string) => Promise<unknown>;
+}
+
 interface Props {
-  idItem: number;
+  idItem?: number;                   // fotos do item (anexos); sem ele, use `acoes`
+  acoes?: AcoesGaleria;
   imagens: AnexoItem[];
   onChange: () => void;              // recarregar depois de qualquer alteração
   limite?: number;                   // fotos que o canal aceita (as demais ficam marcadas)
   tamanho?: number;                  // lado da miniatura
   semAdicionar?: boolean;            // quem usa já tem o próprio envio (ex.: área de arrastar arquivos)
   acaoExtra?: (foto: AnexoItem) => React.ReactNode;
+  rotuloPrincipal?: string;          // texto da 1ª (padrão "principal")
+  regraMedidas?: boolean;            // imagem de medidas logo depois da principal (padrão sim)
+  etiqueta?: (foto: AnexoItem) => React.ReactNode;
 }
 
-const GaleriaImagens: React.FC<Props> = ({ idItem, imagens, onChange, limite, tamanho = 96, semAdicionar, acaoExtra }) => {
+const GaleriaImagens: React.FC<Props> = ({ idItem, acoes: acoesProprias, imagens, onChange, limite, tamanho = 96, semAdicionar, acaoExtra, rotuloPrincipal = 'principal', regraMedidas = true, etiqueta }) => {
+  const acoes: AcoesGaleria = acoesProprias || {
+    ordenar: ids => ordenarImagens(idItem!, ids),
+    remover: id => removerAnexo(idItem!, id),
+    enviar: f => enviarArquivoAnexo(idItem!, f),
+    link: u => adicionarAnexo(idItem!, u, 'FOTO_GALERIA'),
+  };
   const [lista, setLista] = useState(imagens);
   useEffect(() => { setLista(imagens); }, [imagens]);
   const [arrastando, setArrastando] = useState<number | null>(null);
@@ -50,10 +68,11 @@ const GaleriaImagens: React.FC<Props> = ({ idItem, imagens, onChange, limite, ta
     }
   };
   const reordenar = (de: number, para: number) => {
-    const nova = comMedidasEmSegundo(moverFoto(lista, de, para));
+    const movida = moverFoto(lista, de, para);
+    const nova = regraMedidas ? comMedidasEmSegundo(movida) : movida;
     if (nova.every((f, k) => f.id_anexo === lista[k].id_anexo)) return;
     setLista(nova);
-    executar(() => ordenarImagens(idItem, nova.map(f => f.id_anexo)));
+    executar(() => acoes.ordenar(nova.map(f => f.id_anexo)));
   };
 
   const largura = tamanho + 16;
@@ -63,7 +82,7 @@ const GaleriaImagens: React.FC<Props> = ({ idItem, imagens, onChange, limite, ta
         <Flex wrap gap={10} align="flex-start">
           {lista.map((foto, k) => {
             const principal = k === 0;
-            const avisos = avisosDaFoto(foto, k, lista, medidas[foto.url_anexo], limite);
+            const avisos = avisosDaFoto(foto, k, lista, medidas[foto.url_anexo], limite).filter(a => regraMedidas || a !== 'PRINCIPAL_COM_MEDIDAS');
             return (
               <div
                 key={foto.id_anexo}
@@ -80,8 +99,9 @@ const GaleriaImagens: React.FC<Props> = ({ idItem, imagens, onChange, limite, ta
                 }}
               >
                 <Flex justify="space-between" align="center" style={{ marginBottom: 4 }}>
-                  <Text strong style={{ fontSize: 11 }}>{k + 1}ª{principal ? ' · principal' : ''}</Text>
+                  <Text strong style={{ fontSize: 11 }}>{k + 1}ª{principal ? ` · ${rotuloPrincipal}` : ''}</Text>
                   {ehImagemDeMedidas(foto.nome_arquivo) && <Tag color="blue" style={{ margin: 0, fontSize: 10, lineHeight: '16px' }}>medidas</Tag>}
+                  {etiqueta?.(foto)}
                 </Flex>
                 <Image
                   src={foto.url_anexo} width={tamanho} height={tamanho} fallback={FALHA} draggable={false}
@@ -97,7 +117,7 @@ const GaleriaImagens: React.FC<Props> = ({ idItem, imagens, onChange, limite, ta
                   ))}
                 </div>
                 <Flex justify="space-between" align="center">
-                  <Tooltip title={principal ? 'Foto principal' : 'Fazer principal (vai para o 1º lugar)'}>
+                  <Tooltip title={principal ? `Foto ${rotuloPrincipal}` : `Fazer ${rotuloPrincipal} (vai para o 1º lugar)`}>
                     <Button type="text" size="small" disabled={principal || salvando} onClick={() => reordenar(k, 0)}
                       icon={principal ? <StarFilled style={{ color: '#faad14' }} /> : <StarOutlined />} />
                   </Tooltip>
@@ -105,7 +125,7 @@ const GaleriaImagens: React.FC<Props> = ({ idItem, imagens, onChange, limite, ta
                   <Button type="text" size="small" icon={<RightOutlined />} disabled={k === lista.length - 1 || salvando} onClick={() => reordenar(k, k + 1)} />
                   {acaoExtra?.(foto)}
                   <Popconfirm title="Excluir esta foto?" okText="Excluir" okButtonProps={{ danger: true }}
-                    onConfirm={() => executar(() => removerAnexo(idItem, foto.id_anexo), 'Foto excluída.')}>
+                    onConfirm={() => executar(() => acoes.remover(foto.id_anexo), 'Foto excluída.')}>
                     <Button type="text" size="small" danger icon={<DeleteOutlined />} disabled={salvando} />
                   </Popconfirm>
                 </Flex>
@@ -115,8 +135,8 @@ const GaleriaImagens: React.FC<Props> = ({ idItem, imagens, onChange, limite, ta
           {!semAdicionar && (
             <EnviarFotoPopover
               titulo="Adicionar foto"
-              onArquivo={f => executar(() => enviarArquivoAnexo(idItem, f), 'Foto adicionada.')}
-              onUrl={u => executar(() => adicionarAnexo(idItem, u, 'FOTO_GALERIA'), 'Foto adicionada.')}
+              onArquivo={f => executar(() => acoes.enviar(f), 'Foto adicionada.')}
+              onUrl={u => executar(() => acoes.link(u), 'Foto adicionada.')}
             >
               <div style={{
                 width: largura, height: tamanho + 74, borderRadius: 8, border: '1px dashed #91caff', background: '#f5faff', cursor: 'pointer',

@@ -3,6 +3,8 @@
 import { Request, Response } from 'express';
 import pool from '../../../infra/db';
 import { apagarArquivoDaUrl, ErroArquivo, salvarArquivo } from '../../../infra/arquivos';
+import { apagarArquivos } from '../arquivosEmUso';
+import { trocarPrincipalDaFamilia } from './fotosFamilia.controller';
 import { carregarOpcoes, converterValorAtributo, gravarValorAtributo, OpcaoAtributo } from '../atributos/valoresAtributo';
 import { baseDoToken, tokenUsaCodigo } from '../atributos/atributosRegras';
 import { AtributoEfetivo, avaliarSaudeFamilia, mesclarAtributos, statusAposSaude } from './saudeFamilia';
@@ -277,7 +279,8 @@ export const enviarImagemFamilia = async (req: Request, res: Response) => {
     }
     const url = `${req.protocol}://${req.get('host')}/uploads/${salvo.relativo}`;
     await pool.execute(`UPDATE comercial_familias SET imagem = ? WHERE id = ? AND tenant_id = ?`, [url, idFamilia, tenantId]);
-    if (familia.imagem) apagarArquivoDaUrl(familia.imagem);
+    // a foto única é a principal-modelo da galeria da família (a anterior sai, se ninguém mais usa o arquivo)
+    apagarArquivos(await trocarPrincipalDaFamilia(pool as any, tenantId, idFamilia, url, familia.imagem));
     return res.json({ success: true, imagem: url });
   } catch (error: any) {
     if (error instanceof ErroArquivo) return res.status(400).json({ error: error.message });
@@ -297,7 +300,7 @@ export const definirImagemFamilia = async (req: Request, res: Response) => {
     const [[familia]]: any = await pool.execute(`SELECT imagem FROM comercial_familias WHERE id = ? AND tenant_id = ?`, [idFamilia, tenantId]);
     if (!familia) return res.status(404).json({ error: 'Família não encontrada.' });
     await pool.execute(`UPDATE comercial_familias SET imagem = ? WHERE id = ? AND tenant_id = ?`, [url || null, idFamilia, tenantId]);
-    if (familia.imagem && familia.imagem !== url) apagarArquivoDaUrl(familia.imagem);
+    apagarArquivos(await trocarPrincipalDaFamilia(pool as any, tenantId, idFamilia, url || null, familia.imagem !== url ? familia.imagem : null));
     return res.json({ success: true, imagem: url || null });
   } catch (error: any) {
     console.error('Erro ao definir a foto da família:', error);
@@ -355,6 +358,11 @@ export const updateFamilia = async (req: Request, res: Response) => {
         `UPDATE comercial_familias SET ${sets.join(', ')} WHERE id = ? AND tenant_id = ?`,
         [...valores, idFamilia, tenantId]
       );
+    }
+    // foto da família pelo formulário: vira a principal-modelo da galeria (o arquivo antigo sai depois do commit)
+    let arquivosParaApagar: string[] = [];
+    if (body.imagem !== undefined) {
+      arquivosParaApagar = await trocarPrincipalDaFamilia(connection as any, tenantId, Number(idFamilia), String(body.imagem || '').trim() || null);
     }
 
     // 2. Atributos PRÓPRIOS da família (os herdados da categoria não são copiados)
@@ -449,6 +457,7 @@ export const updateFamilia = async (req: Request, res: Response) => {
     }
 
     await connection.commit();
+    apagarArquivos(arquivosParaApagar);
     return res.json({
       success: true,
       message: statusFinal === 'BLOQUEADO_INCONSISTENCIA'
@@ -510,6 +519,7 @@ export const createFamilia = async (req: Request, res: Response) => {
     ]);
 
     const insertId = (result as any).insertId;
+    if (imagem) await trocarPrincipalDaFamilia(pool as any, Number(req.query.tenant_id || 1), Number(insertId), String(imagem).trim());
 
     return res.status(201).json({
       success: true,

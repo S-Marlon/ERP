@@ -42,6 +42,9 @@ import {
   enviarImagemFamilia,
   definirImagemFamilia,
 } from './familias/familias.controller';
+import {
+  adicionarFotoFamilia, enviarFotoFamilia, fotoDoItemParaFamilia, lerModeloEditor, listarFotosFamilia, ordenarFotosFamilia, removerFotoFamilia, salvarModeloEditor,
+} from './familias/fotosFamilia.controller';
 
 // 🏷️ Controller de Produtos do Catálogo
 import {
@@ -155,6 +158,15 @@ router.post('/cadastros/familias', createFamilia);
 router.put('/cadastros/familias/:idFamilia', updateFamilia);
 router.post('/cadastros/familias/:idFamilia/imagem/arquivo', enviarImagemFamilia);
 router.put('/cadastros/familias/:idFamilia/imagem', definirImagemFamilia);
+// Galeria da família (fotos-modelo; a 1ª é a principal) e o modelo do editor de imagem guardado em cada foto
+router.get('/cadastros/familias/:idFamilia/fotos', listarFotosFamilia);
+router.post('/cadastros/familias/:idFamilia/fotos', adicionarFotoFamilia);
+router.post('/cadastros/familias/:idFamilia/fotos/arquivo', enviarFotoFamilia);
+router.post('/cadastros/familias/:idFamilia/fotos/do-item', fotoDoItemParaFamilia);
+router.put('/cadastros/familias/:idFamilia/fotos-ordem', ordenarFotosFamilia);
+router.delete('/cadastros/familias/:idFamilia/fotos/:idFoto', removerFotoFamilia);
+router.get('/cadastros/familias/:idFamilia/fotos/:idFoto/modelo', lerModeloEditor);
+router.put('/cadastros/familias/:idFamilia/fotos/:idFoto/modelo', salvarModeloEditor);
 router.delete('/cadastros/familias/:idFamilia', deleteFamilia);
 router.get('/cadastros/familias/:idFamilia/formalizacao', getDiagnosticoFormalizacao);
 router.post('/cadastros/familias/:idFamilia/formalizacao', formalizarItensFamilia);
