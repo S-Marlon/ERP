@@ -4,6 +4,7 @@ import { avaliarPublicacaoItens } from './publicacaoProdutos';
 import { carregarOpcoes, gravarValorAtributo } from '../atributos/valoresAtributo';
 import { carregarAtributosDaCategoria } from '../categorias/herancaCategorias';
 import { apagarArquivoDaUrl, ErroArquivo, salvarArquivo } from '../../../infra/arquivos';
+import { lerPosicao, ordemComNovaNaPosicao } from './ordemAnexos';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
 
@@ -296,7 +297,9 @@ const normalizarImagemPrincipal = async (conn: Conn, tenant: number, idItem: num
 };
 
 /**
- * POST /catalogo/produtos/:id_item/anexos  { url, tipo, nome? }
+ * POST /catalogo/produtos/:id_item/anexos  { url, tipo, nome?, posicao?, substituir? }
+ * posicao: lugar da imagem entre as fotos (1 = principal; ex.: 2 = sempre a 2ª foto).
+ * substituir: apaga antes as imagens do item com o mesmo nome (ex.: a imagem de medidas gerada de novo).
  */
 export const adicionarAnexo = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
@@ -314,6 +317,9 @@ export const adicionarAnexo = async (req: Request, res: Response) => {
     return res.status(400).json({ success: false, error: 'Tipo de anexo inválido.' });
   }
   const nome = String(req.body?.nome || '').trim() || decodeURIComponent(url.split('?')[0].split('/').pop() || 'arquivo').slice(0, 255);
+  const posicao = TIPOS_IMAGEM.includes(tipo) ? lerPosicao(req.body?.posicao) : null;
+  const substituir = TIPOS_IMAGEM.includes(tipo) && req.body?.substituir === true;
+  const arquivosParaApagar: string[] = [];
 
   const connection: any = await pool.getConnection();
   try {
@@ -324,6 +330,17 @@ export const adicionarAnexo = async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, error: 'Item não encontrado.' });
     }
 
+    if (substituir) {
+      const [antigas] = await connection.execute(
+        `SELECT id_anexo, url_anexo FROM itens_anexos
+         WHERE tenant_id = ? AND id_item = ? AND nome_arquivo = ? AND tipo_anexo IN ('IMAGEM_PRINCIPAL', 'FOTO_GALERIA')`,
+        [tenant, idItem, nome]
+      );
+      for (const a of antigas as any[]) {
+        await connection.execute(`DELETE FROM itens_anexos WHERE id_anexo = ?`, [a.id_anexo]);
+        if (a.url_anexo && a.url_anexo !== url) arquivosParaApagar.push(a.url_anexo);
+      }
+    }
     // Nova principal rebaixa a anterior para a galeria
     if (tipo === 'IMAGEM_PRINCIPAL') {
       await connection.execute(
@@ -335,13 +352,24 @@ export const adicionarAnexo = async (req: Request, res: Response) => {
       `SELECT COALESCE(MAX(ordem), -1) + 1 AS proxima FROM itens_anexos WHERE tenant_id = ? AND id_item = ?`,
       [tenant, idItem]
     );
-    await connection.execute(
+    const [inserido] = await connection.execute(
       `INSERT INTO itens_anexos (tenant_id, id_item, tipo_anexo, nome_arquivo, url_anexo, ordem) VALUES (?, ?, ?, ?, ?, ?)`,
       [tenant, idItem, tipo, nome, url, Number(ordem.proxima)]
     );
+    if (posicao && tipo === 'FOTO_GALERIA') {
+      const [imagens] = await connection.execute(
+        `SELECT id_anexo FROM itens_anexos WHERE tenant_id = ? AND id_item = ? AND tipo_anexo IN ('IMAGEM_PRINCIPAL', 'FOTO_GALERIA')
+         ORDER BY (tipo_anexo = 'IMAGEM_PRINCIPAL') DESC, ordem, id_anexo`,
+        [tenant, idItem]
+      );
+      const ids = ordemComNovaNaPosicao((imagens as any[]).map(i => Number(i.id_anexo)), Number(inserido.insertId), posicao);
+      for (const [i, id] of ids.entries()) await connection.execute(`UPDATE itens_anexos SET ordem = ? WHERE id_anexo = ?`, [i, id]);
+    }
     if (TIPOS_IMAGEM.includes(tipo)) await normalizarImagemPrincipal(connection, tenant, idItem);
 
     await connection.commit();
+    // Arquivo enviado pelo ERP (Backend/uploads) da imagem substituída: sai do disco junto
+    arquivosParaApagar.forEach(apagarArquivoDaUrl);
     return res.json({ success: true, message: 'Anexo adicionado.' });
   } catch (error: any) {
     await connection.rollback();

@@ -253,7 +253,10 @@ export const adicionarAnexo = async (idItem: number, url: string, tipo: TipoAnex
   );
 
 /** Envia o arquivo (foto ou PDF) para o servidor do ERP; ele vira um anexo com o endereço de lá. */
-export const enviarArquivoAnexo = async (idItem: number, arquivo: File, tipo?: TipoAnexo, tenantId: number = 1) => {
+/** `posicao`: lugar entre as fotos (2 = sempre a 2ª); `substituir`: troca a imagem do item com o mesmo nome de arquivo. */
+export const enviarArquivoAnexo = async (
+  idItem: number, arquivo: File, tipo?: TipoAnexo, opcoes: { posicao?: number; substituir?: boolean } = {}, tenantId: number = 1,
+) => {
   const conteudo = await new Promise<string>((resolve, reject) => {
     const leitor = new FileReader();
     leitor.onload = () => resolve(String(leitor.result));
@@ -262,7 +265,7 @@ export const enviarArquivoAnexo = async (idItem: number, arquivo: File, tipo?: T
   });
   return handleResponse<GenericProductAPIResponse>(
     await fetch(`${API_BASE_URL}/produtos/${idItem}/anexos/arquivo?tenant_id=${tenantId}`, {
-      method: 'POST', headers: DEFAULT_HEADERS, body: JSON.stringify({ nome: arquivo.name, tipo, conteudo }),
+      method: 'POST', headers: DEFAULT_HEADERS, body: JSON.stringify({ nome: arquivo.name, tipo, conteudo, ...opcoes }),
     }),
     'Erro ao enviar o arquivo.'
   );
