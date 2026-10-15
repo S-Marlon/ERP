@@ -34,7 +34,8 @@ type Proporcao = 'LIVRE' | 'QUADRADO';
 interface Props { entrada: EntradaEditor | null; onFechar: () => void; onSalvo: () => void }
 
 /** Foto escolhida para editar: url (null = a do modelo guardado), a foto da família dela e se vem com as cotas guardadas. */
-interface Escolha { url: string | null; idFotoFamilia: number | null; usarModelo: boolean }
+/** porItem: cada variação sai com a própria foto; sem ele, todas saem sobre a foto escolhida. */
+interface Escolha { url: string | null; idFotoFamilia: number | null; usarModelo: boolean; porItem?: boolean }
 
 const EditorImagemModal: React.FC<Props> = ({ entrada, onFechar, onSalvo }) => {
   const elCanvas = useRef<HTMLCanvasElement>(null);
@@ -319,7 +320,7 @@ const EditorImagemModal: React.FC<Props> = ({ entrada, onFechar, onSalvo }) => {
       if (!vivo) return;
       setGaleria(fotos);
       const inicial = entrada.idFotoFamiliaInicial ? fotos.find(f => f.idFoto === entrada.idFotoFamiliaInicial) : null;
-      if (inicial) setEscolha({ url: inicial.url, idFotoFamilia: inicial.idFoto, usarModelo: true });
+      if (inicial) setEscolha({ url: inicial.url, idFotoFamilia: inicial.idFoto, usarModelo: true, porItem: false });
     })();
     return () => { vivo = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -327,6 +328,8 @@ const EditorImagemModal: React.FC<Props> = ({ entrada, onFechar, onSalvo }) => {
 
   useEffect(() => {
     if (!entrada || !escolha || !galeria) return;
+    // escolheu uma foto: ela vale para todas as variações (a de cada item só se pediu "cada item com a própria foto")
+    setFotoPorItem(!!escolha.porItem);
     const primeiro = entrada.itens.find(i => i.foto) || entrada.itens[0];
     setIdItem(primeiro?.idItem ?? null);
     setMarcados(entrada.itens.map(i => i.idItem));
@@ -662,6 +665,15 @@ const EditorImagemModal: React.FC<Props> = ({ entrada, onFechar, onSalvo }) => {
             <Text>Qual foto você quer editar? As cotas e textos que você montar valem para as {entrada.itens.length} variações, cada uma com a sua medida.</Text>
             {haModelo && (
               <Checkbox checked={usarModelo} onChange={e => setUsarModelo(e.target.checked)}>Abrir com as cotas e textos guardados (se a foto escolhida não tiver, vêm os da foto-modelo)</Checkbox>
+            )}
+            {entrada.itens.some(i => i.foto) && (
+              <div
+                onClick={() => { const p = entrada.itens.find(i => i.foto)!; setEscolha({ url: p.foto, idFotoFamilia: null, usarModelo: usarModelo && haModelo, porItem: true }); }}
+                style={{ padding: '10px 12px', border: '1px dashed #91caff', borderRadius: 8, cursor: 'pointer', background: '#f5faff' }}
+              >
+                <Text strong>Cada item com a própria foto</Text>
+                <div><Text type="secondary" style={{ fontSize: 12 }}>As cotas e textos vão por cima da foto de cada variação ({entrada.itens.filter(i => i.foto).length} de {entrada.itens.length} têm foto; as outras usam a da família). Escolhendo uma foto abaixo, todas saem sobre ela.</Text></div>
+              </div>
             )}
             {([['Da família', (galeria || []).map((f, k) => ({ url: f.url, idFoto: f.idFoto, rotulo: k === 0 ? 'modelo' : 'comum', temModelo: f.temModelo }))],
               ['Dos itens', fotosDosItens.map(f => ({ url: f.url, idFoto: null as number | null, rotulo: f.sku, temModelo: false }))]] as const).map(([titulo, lista]) => (
