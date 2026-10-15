@@ -24,11 +24,12 @@ interface Props {
   onAtivar: (idLinha: number, ativo: boolean) => void;
   onAnalisar: (idLinha: number) => void;                 // abre a análise de mercado dessa forma
   ocupado?: boolean;
+  embutido?: boolean;                                    // dentro do painel de preço: sem a moldura do cartão
 }
 
 const nomeDaForma = (q: number) => (q === 1 ? 'Unitário' : `Kit c/${q}`);
 
-const FormasDeVendaCard: React.FC<Props> = ({ det, idLinha, rascunhoItens, onMudarPreco, onCriar, onAtivar, onAnalisar, ocupado }) => {
+const FormasDeVendaCard: React.FC<Props> = ({ det, idLinha, rascunhoItens, onMudarPreco, onCriar, onAtivar, onAnalisar, ocupado, embutido }) => {
   const linha = det.itens.find(i => i.idLinha === idLinha) || det.itens[0];
   const [quantidades, setQuantidades] = useState<number[]>(lerQuantidadesSalvas);
   const [simulados, setSimulados] = useState<Record<number, number>>({});
@@ -87,7 +88,9 @@ const FormasDeVendaCard: React.FC<Props> = ({ det, idLinha, rascunhoItens, onMud
 
   return (
     <Card
-      size="small" style={{ marginBottom: 16 }} loading={carregando && !dados}
+      size="small" style={embutido ? { boxShadow: 'none' } : { marginBottom: 16 }} variant={embutido ? 'borderless' : undefined}
+      styles={embutido ? { header: { padding: '0 0 4px', minHeight: 0, borderBottom: 0 }, body: { padding: 0 } } : undefined}
+      loading={carregando && !dados}
       title={<Space wrap><ShoppingCartOutlined />Formas de venda<Text type="secondary" style={{ fontWeight: 400, fontSize: 12 }}>{dados?.sku || linha.sku}</Text></Space>}
       extra={(
         <Space size={4}>

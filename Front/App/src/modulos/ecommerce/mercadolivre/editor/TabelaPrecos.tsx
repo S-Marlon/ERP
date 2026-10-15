@@ -14,7 +14,7 @@ const { Text } = Typography;
  * Lucro de cada item no editor: os números salvos e, para o item com preço mudado no rascunho, a simulação ao novo
  * preço (espera parar de digitar).
  */
-const useLucroDosItens = (salvo: AnuncioDetalhe, det: AnuncioDetalhe, rascunhoItens: Record<number, RascunhoItem>) => {
+export const useLucroDosItens = (salvo: AnuncioDetalhe, det: AnuncioDetalhe, rascunhoItens: Record<number, RascunhoItem>) => {
   const [base, setBase] = useState<Map<number, FinanceiroItem>>(new Map());
   const [simulados, setSimulados] = useState<Map<number, FinanceiroItem>>(new Map());
   const [carregando, setCarregando] = useState(false);
@@ -71,8 +71,8 @@ const TabelaPrecos: React.FC<Props> = ({ salvo, det, rascunhoItens, onMudarPreco
   return (
     <Card
       size="small" style={{ marginBottom: 16 }}
-      title={<Space><LineChartOutlined />Preço e lucro por item</Space>}
-      extra={<Text type="secondary" style={{ fontSize: 12 }}>Clique num item para ver no painel acima · ajuste do anúncio: {ajuste || '0%'} sobre o ERP</Text>}
+      title={<Space><LineChartOutlined />Preço e lucro de todos</Space>}
+      extra={<Text type="secondary" style={{ fontSize: 12 }}>Clique numa linha para abrir no painel · ajuste do anúncio: {ajuste || '0%'} sobre o ERP</Text>}
     >
       <Table<ItemDoAnuncio>
         size="small" rowKey="idLinha" dataSource={det.itens} pagination={det.itens.length > 20 ? { pageSize: 20, showSizeChanger: false } : false}

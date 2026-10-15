@@ -1,8 +1,8 @@
 // Editor do anúncio do ML (modal): as mudanças de texto, preço, estoque, atributos e faixas ficam num rascunho, aparecem
 // no painel "Alterações não salvas" (antes → depois, com desfazer) e só vão para o banco/ML ao salvar.
 // Fotos, itens, categoria e as ações no ML (conferir, publicar, pausar, encerrar) valem na hora.
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Badge, Button, Card, Col, Flex, Modal, Row, Space, Spin, Tabs, Tag, Tooltip, Typography, message } from 'antd';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Badge, Button, Col, Flex, Modal, Row, Space, Spin, Tabs, Tag, Tooltip, Typography, message } from 'antd';
 import { CheckCircleOutlined, CloudUploadOutlined, LinkOutlined, SaveOutlined, ShopOutlined, UndoOutlined } from '@ant-design/icons';
 import { adicionarAnexo, enviarArquivoAnexo } from '../../../areas/catalogo/skus/CatalogSku.service';
 import { AnuncioDetalhe, anunciosApi, ConferenciaItem, ItemDoAnuncio, resumoSincronizacao } from './mercadoLivreApi';
@@ -15,13 +15,10 @@ import AbaDados from './editor/AbaDados';
 import AbaItens from './editor/AbaItens';
 import AbaFotos from './editor/AbaFotos';
 import AbaAtributos from './editor/AbaAtributos';
-import TabelaPrecos from './editor/TabelaPrecos';
 import PainelAlteracoes from './editor/PainelAlteracoes';
 import PainelLateral, { AcaoMl } from './editor/PainelLateral';
-import FaixasQuantidadeCard from './FaixasQuantidadeCard';
 import CatalogoMlCard from './CatalogoMlCard';
-import PrecoMlCard from './PrecoMlCard';
-import FormasDeVendaCard from './FormasDeVendaCard';
+import AbaPreco from './editor/AbaPreco';
 import CategoriaMlModal from './CategoriaMlModal';
 import AdicionarAnuncioModal from './AdicionarAnuncioModal';
 import SituacaoTag from './SituacaoTag';
@@ -79,7 +76,6 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
   const [falhas, setFalhas] = useState<{ sku: string; erro: string }[]>([]);
   const [sincronizando, setSincronizando] = useState(false);
   const [itemPreco, setItemPreco] = useState<number | null>(null);    // item aberto no painel de preço
-  const painelPreco = useRef<HTMLDivElement>(null);
 
   /** Detalhe novo do servidor: o rascunho perde o que ficou igual ao salvo (ou o que não existe mais). */
   const aplicar = useCallback((d: AnuncioDetalhe) => {
@@ -374,38 +370,18 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
     {
       key: 'preco', label: rotuloAba('preco', 'Preço e lucro'),
       children: (
-        <>
-          {det.categoria && det.itens.length > 0 && (
-            <>
-              <FormasDeVendaCard
-                det={det} idLinha={itemPreco ?? det.itens[0].idLinha} rascunhoItens={rascunho.itens} ocupado={ocupado}
-                onMudarPreco={(idLinha, preco) => mudarDoItem(idLinha, { precoMl: preco })}
-                onCriar={(q, preco) => criarForma(itemPreco ?? det.itens[0].idLinha, q, preco)}
-                onAtivar={(idLinha, ativo) => executar(() => anunciosApi.ativarLinha(salvo.id, idLinha, ativo), ativo ? 'Forma de venda ativada.' : 'Forma de venda desativada.')}
-                onAnalisar={idLinha => { setItemPreco(idLinha); painelPreco.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
-              />
-              <div ref={painelPreco} style={{ scrollMarginTop: 8 }}>
-                <PrecoMlCard
-                  salvo={salvo} det={det} idLinha={itemPreco ?? det.itens[0].idLinha} onTrocarItem={setItemPreco}
-                  onMudarPreco={(idLinha, preco) => mudarDoItem(idLinha, { precoMl: preco })}
-                  onEscolherCenario={(tipo, gratis) => {
-                    mudarCampo('tipoAnuncio', tipo);
-                    if (gratis !== undefined) mudarCampo('freteGratis', gratis);
-                    message.info('Modo de venda posto nas alterações: confira ao lado e salve para mandar ao ML.');
-                  }}
-                />
-              </div>
-              <TabelaPrecos
-                salvo={salvo} det={det} rascunhoItens={rascunho.itens}
-                onMudarPreco={(idLinha, preco) => mudarDoItem(idLinha, { precoMl: preco })}
-                selecionado={itemPreco ?? det.itens[0].idLinha}
-                onSelecionar={idLinha => { setItemPreco(idLinha); painelPreco.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
-              />
-            </>
-          )}
-          {!det.categoria && <Card size="small" style={{ marginBottom: 16 }}><Text type="secondary">Escolha a categoria do ML (aba Anúncio): a tarifa depende dela.</Text></Card>}
-          <FaixasQuantidadeCard det={det} onMudar={faixas => mudarCampo('faixasQuantidade', faixas)} />
-        </>
+        <AbaPreco
+          salvo={salvo} det={det} rascunhoItens={rascunho.itens} idLinha={itemPreco} onSelecionar={setItemPreco} ocupado={ocupado}
+          onMudarPreco={(idLinha, preco) => mudarDoItem(idLinha, { precoMl: preco })}
+          onEscolherCenario={(tipo, gratis) => {
+            mudarCampo('tipoAnuncio', tipo);
+            if (gratis !== undefined) mudarCampo('freteGratis', gratis);
+            message.info('Modo de venda posto nas alterações: confira ao lado e salve para mandar ao ML.');
+          }}
+          onMudarFaixas={faixas => mudarCampo('faixasQuantidade', faixas)}
+          onCriarForma={criarForma}
+          onAtivar={(idLinha, ativo) => executar(() => anunciosApi.ativarLinha(salvo.id, idLinha, ativo), ativo ? 'Forma de venda ativada.' : 'Forma de venda desativada.')}
+        />
       ),
     },
     ...(salvo.publicados > 0 ? [{ key: 'catalogo', label: rotuloAba('catalogo', 'Catálogo'), children: <CatalogoMlCard det={salvo} /> }] : []),
@@ -454,7 +430,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
   return (
     <Modal
       open={id !== null} onCancel={fechar} destroyOnHidden maskClosable={false} centered={false}
-      width="min(1440px, 96vw)" style={{ top: 16, paddingBottom: 0 }}
+      width="min(1680px, 98vw)" style={{ top: 16, paddingBottom: 0 }}
       title={titulo || 'Anúncio'} footer={rodape}
       styles={{
         container: { padding: 0, overflow: 'hidden' },
@@ -476,10 +452,11 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
       <Spin spinning={carregando || ocupado}>
         {!det || !salvo ? <div style={{ minHeight: 400 }} /> : (
           <Row gutter={16}>
-            <Col xs={24} xl={17}>
+            {/* no preço o painel pede mais largura: a coluna das alterações estreita */}
+            <Col xs={24} xl={aba === 'preco' ? 19 : 17}>
               <Tabs className="ml-editor-abas" activeKey={aba} onChange={k => setAba(k as Aba)} items={abas} />
             </Col>
-            <Col xs={24} xl={7}>
+            <Col xs={24} xl={aba === 'preco' ? 5 : 7}>
               <div style={{ position: 'sticky', top: 0 }}>
                 <PainelAlteracoes alteracoes={alteracoes} onDesfazer={chave => setRascunho(r => desfazer(r, salvo, chave))} onDesfazerTudo={desfazerTudo} />
                 <PainelLateral

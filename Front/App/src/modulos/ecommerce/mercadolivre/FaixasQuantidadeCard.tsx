@@ -11,9 +11,10 @@ const PADRAO: FaixaQuantidade[] = [{ minimo: 5, desconto: 5 }, { minimo: 10, des
 interface Props {
   det: AnuncioDetalhe;                      // já com o rascunho aplicado
   onMudar: (faixas: FaixaQuantidade[]) => void;
+  embutido?: boolean;                       // dentro do painel de preço: sem a moldura do cartão
 }
 
-const FaixasQuantidadeCard: React.FC<Props> = ({ det, onMudar }) => {
+const FaixasQuantidadeCard: React.FC<Props> = ({ det, onMudar, embutido }) => {
   const faixas = det.faixasQuantidade;
   const [noMl, setNoMl] = useState<{ noMl: FaixaQuantidade[]; sugestao: { quantidade: number; desconto: number; incoerente: boolean }[] } | null>(null);
   const [lendo, setLendo] = useState(false);
@@ -33,7 +34,8 @@ const FaixasQuantidadeCard: React.FC<Props> = ({ det, onMudar }) => {
 
   return (
     <Card
-      size="small" style={{ marginBottom: 16 }}
+      size="small" style={embutido ? { boxShadow: 'none' } : { marginBottom: 16 }} variant={embutido ? 'borderless' : undefined}
+      styles={embutido ? { header: { padding: '0 0 4px', minHeight: 0, borderBottom: 0 }, body: { padding: 0 } } : undefined}
       title={<Space>Preço por quantidade<Tag color="blue">compradores empresa (CNPJ)</Tag></Space>}
       extra={<Text type="secondary" style={{ fontSize: 12 }}>No anúncio: botões 1 · {faixas.map(f => f.minimo).join(' · ') || '…'}</Text>}
     >
