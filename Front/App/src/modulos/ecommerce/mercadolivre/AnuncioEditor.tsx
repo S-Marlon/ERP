@@ -13,6 +13,7 @@ import {
 } from './rascunhoAnuncio';
 import AbaDados from './editor/AbaDados';
 import AbaItens from './editor/AbaItens';
+import AbaFotos from './editor/AbaFotos';
 import AbaAtributos from './editor/AbaAtributos';
 import TabelaPrecos from './editor/TabelaPrecos';
 import PainelAlteracoes from './editor/PainelAlteracoes';
@@ -32,11 +33,12 @@ interface Props {
   onAlterado: () => void;
 }
 
-type Aba = 'anuncio' | 'itens' | 'atributos' | 'preco' | 'catalogo';
+type Aba = 'anuncio' | 'itens' | 'fotos' | 'atributos' | 'preco' | 'catalogo';
 const ABA_DA_AREA: Record<string, Aba> = { dados: 'anuncio', itens: 'itens', cadastro: 'itens', atributos: 'atributos' };
 const CAMPOS_DA_ABA: Record<Aba, (keyof RascunhoAnuncio)[]> = {
   anuncio: ['titulo', 'modeloTitulo', 'tipoAnuncio', 'condicao', 'descricao', 'ajustePreco'],
   itens: ['estoqueReserva', 'estoqueMaximo', 'estoqueAutomatico'],
+  fotos: [],
   atributos: ['atributos'],
   preco: ['faixasQuantidade', 'tipoAnuncio', 'freteGratis'],
   catalogo: [],
@@ -344,6 +346,10 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
           sincronizando={sincronizando} onSincronizar={sincronizarAgora}
         />
       ),
+    },
+    {
+      key: 'fotos', label: rotuloAba('fotos', 'Fotos'),
+      children: <AbaFotos salvo={salvo} det={det} onAlterado={() => { recarregar(); onAlterado(); }} />,
     },
     {
       key: 'atributos', label: rotuloAba('atributos', 'Atributos'),
