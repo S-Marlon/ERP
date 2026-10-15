@@ -39,6 +39,37 @@ por essa conexão (commit/rollback viram no-op), chamar os controllers com `req/
 - Pergunta do usuário ("é só uma dúvida") se responde sem mexer no código.
 - Commits no padrão `tipo(area): descrição` em português (`feat`, `fix`, `chore`), um assunto por commit.
 
+## Scripts de banco (como entregar)
+- **Fluxo:** propor o desenho → mandar o script com "Por que precisa" em poucas palavras → esperar o usuário dizer
+  que rodou → só então depender da estrutura nova. Dizer quando o código depende do script e se rodá-lo muda dados.
+  Cargas iniciais (`INSERT IGNORE`) vão num bloco separado e opcional. Senhas e tokens ficam no `.env`, nunca no banco.
+- **Antes de escrever FK, conferir o tipo real da coluna de destino** (dump do phpMyAdmin ou `INFORMATION_SCHEMA`).
+  Os tipos variam: `itens_core.id_item` e tabelas novas são `bigint(20)`; `fornecedores.id_fornecedor`, pessoas,
+  `importacoes_lotes` e `importacao_produtos_staging` são `int(11)`. Tipo diferente = erro **#1215**.
+- **Armadilhas que já deram erro:** FK com `ON DELETE CASCADE` numa coluna usada por coluna gerada `STORED` (#1215);
+  `UNIQUE` com coluna NULL não impede duplicata (usar coluna gerada `IFNULL(col, 0) STORED` na chave única).
+- **Modelo de tabela** (padrão das tabelas recentes):
+  ```sql
+  -- 1) O que é e por que existe (um comentário por bloco do script)
+  CREATE TABLE `area_assunto` (
+    `id_entidade` bigint(20) NOT NULL AUTO_INCREMENT,
+    `tenant_id` bigint(20) NOT NULL,
+    `id_item` bigint(20) NOT NULL COMMENT 'FK para itens_core',
+    `status` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'ABERTO' COMMENT 'ABERTO, PAGO, CANCELADO',
+    `valor` decimal(18,4) NOT NULL,            -- dinheiro 18,4 · percentual 6,4 · fator de conversão 18,6
+    `operador` varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'ADM',
+    `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id_entidade`),
+    KEY `idx_area_assunto_tenant_status` (`tenant_id`, `status`),
+    KEY `fk_area_assunto_item` (`id_item`),
+    CONSTRAINT `fk_area_assunto_item` FOREIGN KEY (`id_item`) REFERENCES `itens_core` (`id_item`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Descrição curta da tabela';
+  ```
+  Valores fixos (status, forma, tipo) são `varchar` com as opções no `COMMENT`, não `ENUM`. Nomes de índice:
+  `idx_`, `uk_`, `fk_` + tabela abreviada + campo. Coluna nova: `ALTER TABLE ... ADD COLUMN ... AFTER <coluna>`,
+  com `NULL`/`DEFAULT` que não mude as linhas existentes.
+
 ## Padrões de código
 - **Backend por área:** `x.routes.ts` (rotas) · `x.controller.ts` (HTTP + banco) · `x.ts` (regras puras) ·
   `x.test.ts`. Controllers usam `tenantDe(req)`, `operadorDe(req)` e uma classe `ErroXxx` com status HTTP.
