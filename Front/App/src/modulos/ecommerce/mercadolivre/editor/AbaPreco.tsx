@@ -31,7 +31,6 @@ interface Props {
   onIrParaItens?: (s: SugestaoMl) => void;
   /** Produto escolhido no editor: sem a lista lateral (as formas viram botões) e o painel enxuto. */
   porProduto?: boolean;
-  curva?: React.ComponentProps<typeof PrecoMlCard>['curva'];
 }
 
 const AbaPreco: React.FC<Props> = p => {
@@ -85,7 +84,7 @@ const AbaPreco: React.FC<Props> = p => {
         )}
         <PrecoMlCard
           salvo={salvo} det={det} idLinha={atual} onMudarPreco={p.onMudarPreco} onEscolherCenario={p.onEscolherCenario}
-          sugestoes={sugestoes.filter(s => s.idLinha === atual)} onIrParaItens={p.onIrParaItens} enxuto curva={p.curva}
+          sugestoes={sugestoes.filter(s => s.idLinha === atual)} onIrParaItens={p.onIrParaItens} enxuto
         />
       </>
     );

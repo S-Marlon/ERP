@@ -15,6 +15,7 @@ import { compararCenarios, ComparacaoCenario } from './cenariosMl';
 import AjudaCenarios from './AjudaCenarios';
 import { rotuloDaUnidade } from './linhasAnuncio';
 import CascataLucro from './CascataLucro';
+import CurvaPreco from './CurvaPreco';
 
 const { Text } = Typography;
 
@@ -67,15 +68,14 @@ interface Props {
   faixas?: React.ReactNode;                             // preço por quantidade para CNPJ (do anúncio inteiro)
   /** Produto escolhido no editor: sem as seções que a aba "Formas e escada" já mostra, e o resto empilhado (sem abas). */
   enxuto?: boolean;
-  /** "Onde o preço está" (gráfico do lucro por preço), no modo enxuto. Recebe a análise para marcar mercado e alvo. */
-  curva?: (a: AnalisePreco | null, mudarPreco: (v: number) => void) => React.ReactNode;
+
   /** Pedido de fora para abrir uma seção (ex.: "Analisar" numa forma de venda abre o mercado). */
   secaoPedida?: { secao: Secao; vez: number } | null;
   sugestoes?: SugestaoMl[];                                    // da central, só desta linha
   onIrParaItens?: (s: SugestaoMl) => void;
 }
 
-const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEscolherCenario, formas, faixas, secaoPedida, sugestoes, onIrParaItens, enxuto, curva }) => {
+const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEscolherCenario, formas, faixas, secaoPedida, sugestoes, onIrParaItens, enxuto }) => {
   const [analise, setAnalise] = useState<AnalisePreco | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -430,7 +430,9 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEsc
           {!a ? <div style={{ minHeight: 160, display: 'grid', placeItems: 'center' }}><Spin /></div> : (
             <Space direction="vertical" size={14} style={{ width: '100%' }}>
               <Bloco titulo={<><CalculatorOutlined /> De onde vem o lucro</>}>{conta}</Bloco>
-              {curva && <Bloco titulo={<><AimOutlined /> Onde o preço está</>}>{curva(a, mudar)}</Bloco>}
+              <Bloco titulo={<><AimOutlined /> Onde o preço está</>}>
+                <CurvaPreco idAnuncio={det.id} idLinha={item.idLinha} preco={preco} mediana={a.mercado.precoMercado} versao={salvo} onEscolher={mudar} />
+              </Bloco>
               <Bloco titulo={<><ThunderboltOutlined /> Clássico × Premium e frete</>}>{cenarios}</Bloco>
               <Collapse size="small" items={[{ key: 'mercado', label: <Space size={4}><BarChartOutlined />Mercado: {a.mercado.produtos.length} anúncio(s) parecido(s){a.mercado.estatisticas ? ` · mediana ${formatarMoeda(a.mercado.estatisticas.mediana)}/un` : ''}</Space>, children: mercado }]} />
             </Space>

@@ -10,6 +10,7 @@ import { formasDoItem, lerPrecos, lerQuantidades, precoPorUnidade, quantidadeDaL
 import { AnuncioCarregado, carregarAnuncios, responderErro, taxaMl, tenantDe } from './anuncios.controller';
 import { avisosDaEscada, errosDasFaixas, lerFaixas, normalizarFaixas } from './faixasQuantidade';
 import { faixasEfetivas } from './faixas.controller';
+import { precosDaCurva } from './curvaPreco';
 import { compararAtributos } from './catalogo';
 import {
   classificarLucro, classificarPreco, conselhos, estatisticas, lucroNoMl, precoParaAlvo, Tarifa, unidadesDoProduto,
@@ -436,6 +437,41 @@ export const formasDeVenda = async (req: Request, res: Response) => {
     return res.json({ idItem: linha.idItem, sku: base?.sku || linha.sku, custoUnidade, alvoPct, formas });
   } catch (error) {
     return responderErro(res, error, 'Erro ao calcular as formas de venda.');
+  }
+};
+
+/**
+ * GET /anuncios/:id/itens/:idLinha/curva — o lucro em função do preço (com a tarifa e o frete do ML em cada preço), o
+ * preço de hoje, o do alvo e os degraus do ML (taxa fixa do item barato e frete a partir de R$ 79).
+ */
+export const curvaDaLinha = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  try {
+    const [c] = await carregarAnuncios(pool as any, tenant, Number(req.params.id));
+    if (!c) throw new ErroML('Anúncio não encontrado.', 404);
+    const item = c.itens.find(i => i.idLinha === Number(req.params.idLinha));
+    if (!item) throw new ErroML('Item não encontrado neste anúncio.', 404);
+    if (!c.dados.categoriaMl) throw new ErroML('Escolha a categoria do ML antes: a tarifa depende dela.');
+    const ctx = await contextoVenda(tenant, c, item);
+    const atual = Number(req.query.preco) > 0 ? r2(Number(req.query.preco)) : precoNoMl(item, c.dados.ajustePreco);
+    const lAtual = await ctx.avaliar(atual);
+    const alvo = await ctx.precoAlvoDe(atual, lAtual.frete);
+    const limiteTaxaFixa = await ctx.limiteTaxaFixa();
+    const precos = precosDaCurva({ atual, custo: ctx.custo, alvo, marcas: [limiteTaxaFixa], limiteFrete: LIMITE_FRETE_GRATIS });
+    const pontos: { preco: number; lucro: number; pct: number | null; nivel: string }[] = [];
+    for (let k = 0; k < precos.length; k += 6) {
+      const parte = await Promise.all(precos.slice(k, k + 6).map(async p => {
+        const l = await ctx.avaliar(p);
+        return { preco: p, lucro: l.lucro, pct: l.lucroSobreCustoPct, nivel: l.nivel };
+      }));
+      pontos.push(...parte);
+    }
+    return res.json({
+      atual, alvo, alvoPct: ctx.alvo.alvoPct, custo: ctx.custo, limiteTaxaFixa, limiteFrete: LIMITE_FRETE_GRATIS,
+      freteDesconhecido: lAtual.freteDesconhecido, pontos,
+    });
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao calcular a curva de preço.');
   }
 };
 

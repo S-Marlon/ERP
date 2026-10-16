@@ -303,6 +303,11 @@ export interface LinhaFicha {
   erp: string | null; ml: string | null; situacao: 'IGUAL' | 'DIFERENTE' | 'FALTA' | 'SO_ML' | 'A_PUBLICAR' | 'SEM_VALOR';
 }
 export interface FichaForma { publicado: boolean; mlbId: string | null; linhas: LinhaFicha[]; pacoteMl: PacoteMl | null }
+/** Lucro por venda em função do preço, com os degraus do ML (gráfico "Onde o preço está"). */
+export interface CurvaPrecoMl {
+  atual: number; alvo: number | null; alvoPct: number; custo: number; limiteTaxaFixa: number | null; limiteFrete: number;
+  freteDesconhecido: boolean; pontos: { preco: number; lucro: number; pct: number | null; nivel: string }[];
+}
 export interface FaixasFrete {
   logistica: string | null;
   linhas: { ateG: number; gratisAbaixo79: number | null; compradorPaga20: number | null; compradorPaga50: number | null; acima79: number | null }[];
@@ -352,6 +357,9 @@ export const anunciosApi = {
   /** Grava a escada só desta forma (null = volta à regra do anúncio; [] = sem escada); publicada, vai ao ML na hora. */
   salvarEscada: async (id: number, idLinha: number, faixas: FaixaQuantidade[] | null) =>
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}?tenant_id=1`, json('PUT', { faixas })), 'Erro ao salvar a escada.'),
+  /** Lucro em função do preço (com tarifa e frete do ML em cada preço) e os degraus do ML. */
+  curva: async (id: number, idLinha: number) =>
+    ler<CurvaPrecoMl>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}/curva?tenant_id=1`), 'Erro ao calcular a curva de preço.'),
   /** A ficha da forma: atributo, de onde vem, ERP × ML. */
   ficha: async (id: number, idLinha: number) =>
     ler<FichaForma>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}/ficha?tenant_id=1`), 'Erro ao montar a ficha.'),
