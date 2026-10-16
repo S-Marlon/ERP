@@ -10,7 +10,7 @@ import {
   AnuncioResumo, anunciosApi, Desempenho, FinanceiroItem, formatarMoeda, ItemResumo, NumerosDesempenho, resumoSincronizacao, ROTULO_STATUS_ML, ROTULO_TIPO_ANUNCIO, SituacaoSincronizacao,
 } from './mercadoLivreApi';
 import { faixaMoeda, FiltroLista, lucroBaixo, passaNoFiltro, resumirFinanceiro, ResumoFinanceiro, semEstoqueNoMl } from './listaAnuncios';
-import { AtivoNoMl, EstoqueRapido, PrecoRapido } from './AcoesRapidas';
+import { AtivoLinha, AtivoNoMl, EstoqueRapido, PrecoRapido } from './AcoesRapidas';
 import { colunasLucro, TagSituacao } from './colunasLucro';
 import AdicionarAnuncioModal from './AdicionarAnuncioModal';
 import AnuncioEditor from './AnuncioEditor';
@@ -117,6 +117,10 @@ const AnunciosMercadoLivre: React.FC = () => {
     acao(() => anunciosApi.precoItem(a.id, i.idLinha, preco), i.mlbId ? `Preço de ${i.sku} salvo e enviado ao ML.` : `Preço de ${i.sku} salvo.`).catch(() => undefined);
   const salvarEstoque = (a: AnuncioResumo, r: { estoqueReserva: number; estoqueMaximo: number | null }) =>
     acao(() => anunciosApi.salvar(a.id, r), a.publicados ? 'Estoque salvo e enviado ao ML.' : 'Estoque salvo.').catch(() => undefined);
+  const ativarLinha = (a: AnuncioResumo, i: ItemResumo, sim: boolean) =>
+    acao(() => anunciosApi.ativarLinha(a.id, i.idLinha, sim), i.mlbId
+      ? (sim ? `${i.sku} reativado no Mercado Livre.` : `${i.sku} pausado no Mercado Livre.`)
+      : (sim ? `${i.sku} entra na publicação.` : `${i.sku} fica de fora da publicação.`)).catch(() => undefined);
   const ativar = (a: AnuncioResumo, sim: boolean) =>
     acao(() => anunciosApi.pausarNoMl(a.id, !sim), sim ? 'Reativado no Mercado Livre.' : 'Pausado no Mercado Livre.').catch(() => undefined);
 
@@ -182,6 +186,7 @@ const AnunciosMercadoLivre: React.FC = () => {
           title: 'Estoque', width: 120, align: 'right',
           render: (_, i) => <><Text><Text type="secondary" style={{ fontSize: 12 }}>ERP {i.estoque} →</Text> <Text strong style={{ color: i.mlbId && i.estoqueMl === 0 ? '#cf1322' : undefined }}>ML {i.estoqueMl}</Text>{i.unidade ? <Text type="secondary" style={{ fontSize: 11 }}> {i.unidade}</Text> : null}</Text><div><Cobertura dias={desempenhoDaLinha(a.id, i.idLinha)?.coberturaDias} periodo={desempenho?.dias ?? 30} /></div></>,
         },
+        { title: 'No ML', width: 100, align: 'center', render: (_, i) => <AtivoLinha ativo={i.ativo} mlbId={i.mlbId} status={i.status} onMudar={sim => ativarLinha(a, i, sim)} /> },
       ]}
     />
   );
@@ -291,6 +296,7 @@ const AnunciosMercadoLivre: React.FC = () => {
                 title: 'Estoque', width: 120, align: 'right', sorter: (x, y) => x.i.estoqueMl - y.i.estoqueMl,
                 render: (_, l) => <><Text><Text type="secondary" style={{ fontSize: 12 }}>ERP {l.i.estoque} →</Text> <Text strong style={{ color: l.i.mlbId && l.i.estoqueMl === 0 ? '#cf1322' : undefined }}>ML {l.i.estoqueMl}</Text></Text><div><Cobertura dias={desempenhoDaLinha(l.a.id, l.i.idLinha)?.coberturaDias} periodo={desempenho?.dias ?? 30} /></div></>,
               },
+              { title: 'No ML', width: 100, align: 'center', render: (_, l) => <AtivoLinha ativo={l.i.ativo} mlbId={l.i.mlbId} status={l.i.status} onMudar={sim => ativarLinha(l.a, l.i, sim)} /> },
               { title: '', width: 48, fixed: 'right', render: (_, l) => <Tooltip title="Abrir o anúncio"><Button type="text" icon={<EditOutlined />} onClick={() => setEditando(l.a.id)} /></Tooltip> },
             ]}
           />

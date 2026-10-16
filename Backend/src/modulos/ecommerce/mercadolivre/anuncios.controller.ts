@@ -978,15 +978,17 @@ export const salvarItem = async (req: Request, res: Response) => {
     const mudaAtivo = 'ativo' in b && (b.ativo ? 1 : 0) !== Number(linha.ativo);
     // trava de prejuízo: a linha que fica ativa no ML (ou volta a ficar) não pode dar prejuízo ao preço novo
     const noMl = !!linha.mlb_id && !foraDoMl(linha.status_ml);
-    const ficaAtiva = noMl && (mudaAtivo ? !!b.ativo : Number(linha.ativo) !== 0 && linha.status_ml === 'active');
-    if (ficaAtiva && ('preco' in b || mudaAtivo)) {
+    // ligada no ERP mas pausada no ML (ex.: o anúncio inteiro foi pausado): ligar de novo reativa lá
+    const reativar = !mudaAtivo && b.ativo === true && noMl && linha.status_ml === 'paused';
+    const ficaAtiva = noMl && (mudaAtivo || reativar ? !!b.ativo : Number(linha.ativo) !== 0 && linha.status_ml === 'active');
+    if (ficaAtiva && ('preco' in b || mudaAtivo || reativar)) {
       const [c] = await carregarAnuncios(pool as any, tenant, id);
       const item = c?.itens.find(i => i.idLinha === idLinha);
       const precoNovo = 'preco' in b ? (b.preco === null || b.preco === '' ? null : Math.round(Number(b.preco) * 100) / 100) : undefined;
       const texto = item ? await prejuizoDaLinha(tenant, c, precoNovo === undefined ? item : { ...item, precoMl: precoNovo }) : null;
-      if (texto) throw new ErroML(recusaPorPrejuizo(mudaAtivo ? 'ativar' : 'usar este preço', [texto]), 422);
+      if (texto) throw new ErroML(recusaPorPrejuizo(mudaAtivo || reativar ? 'ativar' : 'usar este preço', [texto]), 422);
     }
-    if (mudaAtivo) {
+    if (mudaAtivo || reativar) {
       campos.push('ultimo_erro = NULL');   // ligou ou desligou à mão: a pausa deixa de ser da trava
       // no ML: desativar pausa, ativar reativa (recusou = não grava)
       if (linha.mlb_id && !foraDoMl(linha.status_ml)) {

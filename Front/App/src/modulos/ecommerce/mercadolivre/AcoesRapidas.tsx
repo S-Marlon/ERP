@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Flex, InputNumber, Popover, Space, Spin, Switch, Tooltip, Typography } from 'antd';
 import { AimOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
-import { anunciosApi, FinanceiroItem, formatarMoeda, PrevisaoPreco } from './mercadoLivreApi';
+import { anunciosApi, FinanceiroItem, foraDoMl, formatarMoeda, PrevisaoPreco } from './mercadoLivreApi';
 import { precoComercial } from './listaAnuncios';
 import { AlertasPreco } from './colunasLucro';
 
@@ -148,6 +148,31 @@ export const EstoqueRapido: React.FC<{
 };
 
 /** Ativo/pausado no ML (todos os itens do anúncio). */
+/**
+ * Liga/desliga uma linha do anúncio (variação, kit). Publicada: ativa ou pausa no ML. Ainda não publicada: entra ou não
+ * na publicação. Encerrada ou excluída no ML: sem switch.
+ */
+export const AtivoLinha: React.FC<{
+  ativo: boolean; mlbId: string | null; status: string | null; onMudar: (ativar: boolean) => Promise<void>;
+}> = ({ ativo, mlbId, status, onMudar }) => {
+  const [carregando, setCarregando] = useState(false);
+  if (mlbId && foraDoMl(status)) return <Text type="secondary" style={{ fontSize: 12 }}>fora do ML</Text>;
+  const ligado = mlbId ? ativo && status === 'active' : ativo;
+  const mudar = async (ativar: boolean) => {
+    setCarregando(true);
+    try { await onMudar(ativar); } finally { setCarregando(false); }
+  };
+  const dica = mlbId
+    ? (ligado ? 'Ativo no ML: clique para pausar só este item' : 'Pausado no ML: clique para reativar só este item (não reativa se der prejuízo)')
+    : (ligado ? 'Ainda não publicado: vai na próxima publicação. Clique para deixar de fora' : 'Fora da publicação: clique para incluir');
+  return (
+    <Tooltip title={dica}>
+      <Switch size="small" checked={ligado} loading={carregando} onChange={mudar}
+        checkedChildren={mlbId ? 'ativo' : 'vende'} unCheckedChildren={mlbId ? 'pausado' : 'não vende'} />
+    </Tooltip>
+  );
+};
+
 export const AtivoNoMl: React.FC<{ ativos: number; pausados: number; onMudar: (ativar: boolean) => Promise<void> }> = ({ ativos, pausados, onMudar }) => {
   const [carregando, setCarregando] = useState(false);
   if (ativos + pausados === 0) return <Text type="secondary">—</Text>;
