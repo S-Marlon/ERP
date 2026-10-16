@@ -36,6 +36,9 @@ por essa conexão (commit/rollback viram no-op), chamar os controllers com `req/
 - **Módulo plugável** liga/desliga por loja e não pode quebrar nada desligado. O núcleo nunca importa um módulo;
   o contato é só pelo registro (`Backend/src/modulos/registro.ts` e `Front/App/src/modulos/registroModulos.tsx`)
   e pelos pontos de extensão (`pdv`, `entradaNf`).
+- **Integração com canais (ML) é de mão dupla:** o que o canal calcula (frete, tarifa, "você recebe") o ERP **lê do canal**
+  para o anúncio publicado; a conta própria do ERP é só para o que ainda não está lá. Regra de custo do canal fica numa função
+  pura com teste e a data em que foi conferida com o painel. Ver `docs/incidentes/2026-10-16-frete-ml-divergente.md`.
 - Pergunta do usuário ("é só uma dúvida") se responde sem mexer no código.
 - Commits no padrão `tipo(area): descrição` em português (`feat`, `fix`, `chore`), um assunto por commit.
 
@@ -115,7 +118,7 @@ docs/                      planos e decisões; docs/legado guarda material antig
 Arquivo novo vai para a área dele; o que é usado por várias áreas vai para `shared/` (front). Nomes de pasta em
 minúsculo/camelCase. Imports são relativos; o endereço do backend vem só de `shared/api/config.ts`.
 
-Planos e decisões: `docs/` (`plano-vendas.md`, `entrada-nf.md`).
+Planos e decisões: `docs/` (`plano-vendas.md`, `entrada-nf.md`). Relatórios de erro: `docs/incidentes/AAAA-MM-DD-assunto.md`.
 
 ## Pendências conhecidas (não "consertar" sem combinar)
 - Tenant fixo em 1 (sem login).
