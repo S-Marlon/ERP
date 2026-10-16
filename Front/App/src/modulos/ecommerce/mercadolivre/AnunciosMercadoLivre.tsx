@@ -210,7 +210,7 @@ const AnunciosMercadoLivre: React.FC = () => {
               <Tooltip title={
                 <>
                   Manda o estoque e o preço do ERP para os anúncios com "Atualizar sozinho" ligado.
-                  {auto && <div style={{ marginTop: 4 }}>Automático a cada {auto.intervaloMin} min{auto.ultimaEm ? ` · última: ${new Date(auto.ultimaEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} (${auto.enviados} enviados${auto.erros ? `, ${auto.erros} com erro` : ''})` : ' · ainda não rodou'}</div>}
+                  {auto && <div style={{ marginTop: 4 }}>Automático a cada {auto.intervaloMin} min{auto.ultimaEm ? ` · última: ${new Date(auto.ultimaEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} (${auto.enviados} enviados${auto.erros ? `, ${auto.erros} com erro` : ''}${auto.pausadosPrejuizo ? `, ${auto.pausadosPrejuizo} pausado(s) por prejuízo` : ''}${auto.reativadosPrejuizo ? `, ${auto.reativadosPrejuizo} reativado(s)` : ''})` : ' · ainda não rodou'}</div>}
                   {auto?.mensagem && <div>Último erro: {auto.mensagem}</div>}
                 </>
               }>
@@ -339,7 +339,16 @@ const AnunciosMercadoLivre: React.FC = () => {
               title: 'No ML', width: 100, align: 'center',
               render: (_, a) => (semEstoqueNoMl(a) && a.ativosMl > 0
                 ? <Tooltip title="Sem estoque: o ML não vende até o estoque voltar"><Tag color="red">sem estoque</Tag></Tooltip>
-                : <AtivoNoMl ativos={a.ativosMl} pausados={a.pausadosMl} onMudar={sim => ativar(a, sim)} />),
+                : (
+                  <Space direction="vertical" size={2}>
+                    <AtivoNoMl ativos={a.ativosMl} pausados={a.pausadosMl} onMudar={sim => ativar(a, sim)} />
+                    {!!a.pausadosPrejuizo && (
+                      <Tooltip title="Pausado pela trava de prejuízo: volta sozinho quando o item der lucro de novo (suba o preço ou baixe o frete; veja as Sugestões).">
+                        <Tag color="red" style={{ fontSize: 11, marginInlineEnd: 0 }}>{a.pausadosPrejuizo} por prejuízo</Tag>
+                      </Tooltip>
+                    )}
+                  </Space>
+                )),
             },
             {
               title: '', width: 110, align: 'right', fixed: 'right',

@@ -16,6 +16,7 @@ import {
 import { ErroML, ml } from './mercadolivreApi';
 import { acharLimiteTaxaFixa, alertasDePreco, avisosDeDegrau, LIMITE_FRETE_GRATIS, precoQueCompensaFrete, montarCenarios, quantidadesParaAnalise, resultadoVenda, valorNaTabelaDeFrete, vendedorPagaFrete } from './custosMl';
 import { freteDoEnvio, freteGratisNoMl, pesoCobrado, preferenciasEnvio } from './freteMl';
+import { daPrejuizo, textoPrejuizo } from './travaPrejuizo';
 
 const r2 = (v: number) => Math.round((Number(v) + Number.EPSILON) * 100) / 100;
 
@@ -129,15 +130,17 @@ export const contextoVenda = async (
   /**
    * Menor preço que dá o alvo sobre o custo. Tarifa (taxa fixa de item barato) e frete mudam com o preço, então recalcula
    * até firmar e confere o resultado; no degrau da taxa fixa a conta oscila e o mínimo real é o próprio limite.
+   * `op.alvoPct` 0 dá o menor preço sem prejuízo.
    */
-  const precoAlvoDe = async (precoAtual: number, freteAtual: number, op: { tipo?: string; gratis?: boolean } = {}) => {
+  const precoAlvoDe = async (precoAtual: number, freteAtual: number, op: { tipo?: string; gratis?: boolean; alvoPct?: number } = {}) => {
     if (!(custo > 0)) return null;
+    const alvoPct = op.alvoPct ?? alvo.alvoPct;
     const tipoA = op.tipo ?? tipo;
     const gratis = op.gratis ?? freteGratis;
     let p = precoAtual;
     let frete = freteAtual;
     for (let k = 0; k < 6; k++) {
-      const n = precoParaAlvo({ custo, tarifa: await tarifaDe(p, tipoA), frete, alvoPct: alvo.alvoPct });
+      const n = precoParaAlvo({ custo, tarifa: await tarifaDe(p, tipoA), frete, alvoPct });
       if (n === null) return null;
       const f = (await freteDe(n, 1, gratis)) ?? frete;
       const firmou = Math.abs(n - p) < 0.005 && f === frete;
@@ -145,7 +148,7 @@ export const contextoVenda = async (
       frete = f;
       if (firmou) break;
     }
-    const atinge = async (x: number) => ((await avaliar(x, { tipo: tipoA, gratis })).lucroSobreCustoPct ?? -Infinity) >= alvo.alvoPct - 0.05;
+    const atinge = async (x: number) => ((await avaliar(x, { tipo: tipoA, gratis })).lucroSobreCustoPct ?? -Infinity) >= alvoPct - 0.05;
     const limite = await limiteTaxaFixa(tipoA);
     // acima do limite o lucro só cresce com o preço: se o limite já dá o alvo, ele é o mínimo
     if (limite !== null && p > limite && await atinge(limite)) return limite;
@@ -316,6 +319,27 @@ export const analisarPreco = async (req: Request, res: Response) => {
     return responderErro(res, error, 'Erro ao analisar o preço.');
   }
 };
+
+/**
+ * Trava de prejuízo: o motivo, se a linha der prejuízo ao preço (o de hoje ou `op.preco`, com outro tipo de anúncio ou
+ * frete grátis, se informados); null = dá lucro ou não dá para saber (sem custo no ERP).
+ */
+export const prejuizoDaLinha = async (
+  tenant: number, c: AnuncioCarregado, item: ItemAnuncio, op: { preco?: number; tipo?: string; gratis?: boolean } = {}
+): Promise<string | null> => {
+  const preco = op.preco ?? precoNoMl(item, c.dados.ajustePreco);
+  if (!(preco > 0) || !c.dados.categoriaMl) return null;
+  const ctx = await contextoVenda(tenant, c, item);
+  const l = await ctx.avaliar(preco, { tipo: op.tipo, gratis: op.gratis });
+  if (!daPrejuizo(l)) return null;
+  const precoMinimo = await ctx.precoAlvoDe(preco, l.frete, { tipo: op.tipo, gratis: op.gratis, alvoPct: 0 }).catch(() => null);
+  return textoPrejuizo(item.sku, { preco, lucro: l.lucro, precoMinimo });
+};
+
+/** A trava nas linhas indicadas (em paralelo): os motivos das que dão prejuízo. */
+export const prejuizosDasLinhas = async (
+  tenant: number, c: AnuncioCarregado, itens: ItemAnuncio[], op: (i: ItemAnuncio) => { preco?: number; tipo?: string; gratis?: boolean } = () => ({})
+) => (await Promise.all(itens.map(i => prejuizoDaLinha(tenant, c, i, op(i)).catch(() => null)))).filter((x): x is string => !!x);
 
 /** Você recebe e lucro de cada item do anúncio ao preço de hoje (e o preço para o alvo). */
 const financeiroDe = async (tenant: number, c: AnuncioCarregado) => {

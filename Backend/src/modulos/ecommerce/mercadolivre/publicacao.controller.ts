@@ -18,6 +18,8 @@ import { sincronizarAnuncios, situacaoAutomatica } from './sincronizacao';
 import { enviarFaixas, enviarFaixasDoAnuncio } from './faixas.controller';
 import { lerFaixas } from './faixasQuantidade';
 import { fotosDaVariacao } from './fotos';
+import { prejuizoDaLinha } from './precificacao.controller';
+import { PREFIXO_TRAVA, recusaPorPrejuizo } from './travaPrejuizo';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
 
@@ -126,6 +128,8 @@ export const validarAnuncio = async (req: Request, res: Response) => {
     for (const item of aPublicar(c)) {
       const { corpo, problemas } = await montarCorpo(tenant, c, item, porFamilia);
       let erros: string[] = [...problemas];
+      const prejuizo = await prejuizoDaLinha(tenant, c, item).catch(() => null);
+      if (prejuizo) erros.push(`Trava de prejuízo: ${prejuizo}`);
       try {
         await ml(tenant, 'POST', '/items/validate', corpo);
       } catch (e: any) {
@@ -155,6 +159,8 @@ export const publicarAnuncio = async (req: Request, res: Response) => {
 
     for (const item of aPublicar(c)) {
       try {
+        const prejuizo = await prejuizoDaLinha(tenant, c, item);
+        if (prejuizo) throw new ErroML(`Trava de prejuízo: ${prejuizo}`, 422);
         const { corpo, problemas } = await montarCorpo(tenant, c, item, porFamilia);
         if (corpo.pictures.length === 0) throw new ErroML(problemas.join('; ') || 'sem foto');
         const criado: any = await ml(tenant, 'POST', '/items', corpo);
@@ -452,14 +458,22 @@ export const pausarNoMl = async (req: Request, res: Response) => {
     const itens = noMlAinda(c);
     if (!itens.length) throw new ErroML('Nenhum item deste anúncio está ativo ou pausado no Mercado Livre.');
     const falhas: string[] = [];
+    const travadas: string[] = [];
+    let mexidos = 0;
     for (const item of itens) {
       const m = c.noMl.get(item.idLinha)!;
       if ((pausar && m.status === 'paused') || (!pausar && m.status === 'active')) continue;
       if (!pausar && item.linhaAtiva === false) continue;   // linha desativada pelo operador fica pausada
+      if (!pausar) {
+        // trava de prejuízo: a linha que daria prejuízo continua pausada
+        const prejuizo = await prejuizoDaLinha(tenant, c, item).catch(() => null);
+        if (prejuizo) { travadas.push(prejuizo); continue; }
+      }
       try {
         const r: any = await ml(tenant, 'PUT', `/items/${m.mlbId}`, { status: pausar ? 'paused' : 'active' });
         m.status = r?.status || (pausar ? 'paused' : 'active');
-        await pool.execute(`UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET status_ml = ? WHERE id_anuncio = ? AND tenant_id = ? AND id_anuncio_item = ?`,
+        mexidos++;
+        await pool.execute(`UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET status_ml = ?, ultimo_erro = NULL WHERE id_anuncio = ? AND tenant_id = ? AND id_anuncio_item = ?`,
           [m.status, id, tenant, item.idLinha]);
       } catch (e: any) {
         falhas.push(`${item.sku}: ${mensagemDoMl(e)}`);
@@ -467,7 +481,15 @@ export const pausarNoMl = async (req: Request, res: Response) => {
     }
     const situacao = situacaoPorItens([...c.noMl.values()].filter(m => m.mlbId).map(m => m.status));
     if (situacao) await pool.execute(`UPDATE modulo_ecommerce_mercadolivre_anuncios SET situacao = ? WHERE id = ? AND tenant_id = ?`, [situacao, id, tenant]);
+    // pausou à mão: a pausa deixa de ser da trava (não reativa sozinha)
+    if (pausar) {
+      await pool.execute(`UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET ultimo_erro = NULL WHERE id_anuncio = ? AND tenant_id = ? AND ultimo_erro LIKE ?`,
+        [id, tenant, `${PREFIXO_TRAVA}%`]);
+    }
     if (falhas.length) throw new ErroML(`O ML não ${pausar ? 'pausou' : 'reativou'} ${falhas.length} item(ns): ${falhas[0]}`);
+    if (travadas.length) {
+      throw new ErroML(`${mexidos > 0 ? `${mexidos} item(ns) reativado(s). ` : ''}${recusaPorPrejuizo(`reativar ${travadas.length} item(ns)`, travadas)}`, 422);
+    }
     return res.json(await detalhe(tenant, await carregarOuErro(tenant, id)));
   } catch (error) {
     return responderErro(res, error, pausar ? 'Erro ao pausar no Mercado Livre.' : 'Erro ao reativar no Mercado Livre.');

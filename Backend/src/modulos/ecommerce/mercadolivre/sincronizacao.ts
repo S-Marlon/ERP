@@ -5,6 +5,8 @@ import { foraDoMl, mudancasParaMl, precoNoMl, situacaoPorItens, statusDoMl } fro
 import { AnuncioCarregado, carregarAnuncios } from './anuncios.controller';
 import { ErroML, ml } from './mercadolivreApi';
 import { importarPedidos } from './pedidos.controller';
+import { prejuizoDaLinha } from './precificacao.controller';
+import { decidirTrava, pausadoPelaTrava, pausaPor } from './travaPrejuizo';
 
 export interface ResultadoSincronizacao {
   idAnuncio: number;
@@ -17,11 +19,14 @@ export interface ResultadoSincronizacao {
   precoDe: number | null;
   precoPara: number | null;
   erro: string | null;
+  trava?: 'PAUSADO' | 'REATIVADO' | null;   // trava de prejuízo: pausou ou reativou no ML nesta rodada
+  motivo?: string | null;
 }
 
 /**
- * Sincroniza os itens já publicados. somenteAutomaticos: só anúncios com "atualizar sozinho" ligado
- * (o importado começa desligado, para o operador revisar a divisão loja/ML antes).
+ * Sincroniza os itens já publicados. somenteAutomaticos: estoque e preço só nos anúncios com "atualizar sozinho" ligado
+ * (o importado começa desligado, para o operador revisar a divisão loja/ML antes). A trava de prejuízo vale para todos:
+ * a linha ativa que dá prejuízo ao preço que está no ML é pausada lá; a que a trava pausou volta quando dá lucro.
  */
 export const sincronizarAnuncios = async (
   tenant: number, opcoes: { idAnuncio?: number; idLinha?: number; somenteAutomaticos?: boolean; forcar?: boolean } = {}
@@ -30,16 +35,36 @@ export const sincronizarAnuncios = async (
   await atualizarStatusDoMl(tenant, anuncios);
   const resultado: ResultadoSincronizacao[] = [];
   for (const c of anuncios) {
-    if (opcoes.somenteAutomaticos && !Number(c.registro.estoque_automatico)) continue;
+    const soTrava = !!opcoes.somenteAutomaticos && !Number(c.registro.estoque_automatico);
     for (const item of c.itens) {
       const m = c.noMl.get(item.idLinha);
       if (!m?.mlbId || foraDoMl(m.status) || (opcoes.idLinha && opcoes.idLinha !== item.idLinha)) continue;
       if (item.linhaAtiva === false) continue;   // desativada pelo operador: fica pausada, sem receber estoque
       const atual = { estoque: item.estoqueMl ?? 0, preco: precoNoMl(item, c.dados.ajustePreco) };
-      const corpo = opcoes.forcar
+      let corpo: { available_quantity?: number; price?: number; status?: string } | null = soTrava ? null : opcoes.forcar
         ? { available_quantity: atual.estoque, ...(atual.preco > 0 ? { price: atual.preco } : {}) }
         : mudancasParaMl({ estoque: m.estoqueEnviado, preco: m.precoEnviado }, atual);
-      if (!corpo) continue;
+
+      // trava de prejuízo, ao preço que fica no ML (só ativas e as que ela mesma pausou)
+      let trava: ReturnType<typeof decidirTrava> | null = null;
+      if (m.status === 'active' || (m.status === 'paused' && pausadoPelaTrava(m.erro))) {
+        const texto = await prejuizoDaLinha(tenant, c, item, { preco: corpo?.price ?? m.precoEnviado ?? atual.preco }).catch(() => undefined);
+        if (texto !== undefined) {   // não deu para calcular: não mexe
+          trava = decidirTrava({
+            status: m.status, linhaAtiva: true, erroAntes: m.erro, estoque: corpo?.available_quantity ?? m.estoqueEnviado ?? atual.estoque,
+            prejuizo: texto ? pausaPor(texto) : null,
+          });
+          if (trava.acao !== 'MANTER') corpo = { ...(corpo || {}), status: trava.acao === 'PAUSAR' ? 'paused' : 'active' };
+        }
+      }
+      if (!corpo) {
+        // nada a mandar, mas o motivo da pausa mudou (ex.: o preço mínimo)
+        if (trava?.erro && trava.erro !== m.erro) {
+          await pool.execute(`UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET ultimo_erro = ? WHERE id_anuncio = ? AND tenant_id = ? AND id_anuncio_item = ?`,
+            [trava.erro.slice(0, 500), Number(c.registro.id), tenant, item.idLinha]);
+        }
+        continue;
+      }
       const linha: ResultadoSincronizacao = {
         idAnuncio: Number(c.registro.id), idItem: item.idItem, idLinha: item.idLinha, sku: item.sku, mlbId: m.mlbId,
         estoqueDe: corpo.available_quantity !== undefined ? m.estoqueEnviado : null,
@@ -47,16 +72,19 @@ export const sincronizarAnuncios = async (
         precoDe: corpo.price !== undefined ? m.precoEnviado : null,
         precoPara: corpo.price ?? null,
         erro: null,
+        trava: corpo.status === 'paused' ? 'PAUSADO' : corpo.status === 'active' ? 'REATIVADO' : null,
+        motivo: corpo.status === 'paused' ? trava?.erro ?? null : null,
       };
       try {
         const r: any = await ml(tenant, 'PUT', `/items/${m.mlbId}`, corpo);
         await pool.execute(
           `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens
            SET estoque_enviado = COALESCE(?, estoque_enviado), preco_enviado = COALESCE(?, preco_enviado),
-               status_ml = COALESCE(?, status_ml), sincronizado_em = NOW(), ultimo_erro = NULL
+               status_ml = COALESCE(?, status_ml), sincronizado_em = NOW(), ultimo_erro = ?
            WHERE id_anuncio = ? AND tenant_id = ? AND id_anuncio_item = ?`,
-          [corpo.available_quantity ?? null, corpo.price ?? null, r?.status || null, Number(c.registro.id), tenant, item.idLinha]
+          [corpo.available_quantity ?? null, corpo.price ?? null, r?.status || corpo.status || null, trava?.erro?.slice(0, 500) ?? null, Number(c.registro.id), tenant, item.idLinha]
         );
+        if (corpo.status) m.status = r?.status || corpo.status;
       } catch (e: any) {
         linha.erro = e instanceof ErroML ? e.message : (e?.message || 'erro');
         await pool.execute(
@@ -65,6 +93,14 @@ export const sincronizarAnuncios = async (
         );
       }
       resultado.push(linha);
+    }
+    // a trava pausou ou reativou: a situação do anúncio (publicado/pausado) muda junto
+    if (resultado.some(r => r.idAnuncio === Number(c.registro.id) && r.trava && !r.erro)) {
+      const nova = situacaoPorItens([...c.noMl.values()].filter(x => x.mlbId).map(x => x.status));
+      if (nova && nova !== c.registro.situacao) {
+        await pool.execute(`UPDATE modulo_ecommerce_mercadolivre_anuncios SET situacao = ? WHERE id = ? AND tenant_id = ?`, [nova, Number(c.registro.id), tenant]);
+        c.registro.situacao = nova;
+      }
     }
   }
   if (resultado.length) {
@@ -115,6 +151,7 @@ const INTERVALO_MS = 3 * 60 * 1000;
 export interface SituacaoAutomatica {
   ultimaEm: string | null; enviados: number; erros: number; mensagem: string | null; rodando: boolean;
   vendasNovas?: number; pedidosPendentes?: number; erroPedidos?: string | null;   // pedidos do ML lidos na rodada
+  pausadosPrejuizo?: number; reativadosPrejuizo?: number;                         // trava de prejuízo na rodada
 }
 const situacao = new Map<number, SituacaoAutomatica>();
 let iniciado = false;
@@ -154,6 +191,7 @@ const rodada = async () => {
         situacao.set(tenant, {
           ultimaEm: new Date().toISOString(), enviados: r.length - erros.length, erros: erros.length,
           mensagem: erros[0] ? `${erros[0].sku}: ${erros[0].erro}` : null, rodando: false, vendasNovas, pedidosPendentes, erroPedidos,
+          pausadosPrejuizo: r.filter(x => x.trava === 'PAUSADO' && !x.erro).length, reativadosPrejuizo: r.filter(x => x.trava === 'REATIVADO' && !x.erro).length,
         });
       } catch (e: any) {
         situacao.set(tenant, { ultimaEm: new Date().toISOString(), enviados: 0, erros: 1, mensagem: e?.message || 'erro', rodando: false, vendasNovas, pedidosPendentes, erroPedidos });

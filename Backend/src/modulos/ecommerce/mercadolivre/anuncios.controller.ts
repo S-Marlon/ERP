@@ -18,6 +18,8 @@ import { errosDasFaixas, faixasDoAtacado, lerFaixas, normalizarFaixas } from './
 import { enviarFaixasDoAnuncio } from './faixas.controller';
 import { contaB2B } from './mercadolivreApi';
 import { aplicarModoDeVenda, vendaDoAnuncio } from './modoVenda';
+import { prejuizoDaLinha, prejuizosDasLinhas } from './precificacao.controller';
+import { pausadoPelaTrava, recusaPorPrejuizo } from './travaPrejuizo';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
 
@@ -354,6 +356,7 @@ export const resumo = (c: AnuncioCarregado) => {
     estoqueMaximo: c.regraEstoque.maximo,
     ativosMl: c.itens.filter(i => c.noMl.get(i.idLinha)?.status === 'active').length,
     pausadosMl: c.itens.filter(i => c.noMl.get(i.idLinha)?.status === 'paused').length,
+    pausadosPrejuizo: c.itens.filter(i => c.noMl.get(i.idLinha)?.status === 'paused' && pausadoPelaTrava(c.noMl.get(i.idLinha)?.erro)).length,
     itens: c.itens.map(i => {
       const m = c.noMl.get(i.idLinha);
       return {
@@ -732,6 +735,21 @@ export const salvarAnuncio = async (req: Request, res: Response) => {
 
     // tipo e frete grátis de anúncio publicado: troca no ML antes de gravar (recusou = não grava)
     const mudaTipo = b.tipoAnuncio !== undefined && b.tipoAnuncio !== a.tipo_anuncio;
+
+    // trava de prejuízo: ajuste de preço, tipo ou frete grátis não podem deixar linha ativa no ML vendendo com prejuízo
+    const mudaAjuste = b.ajustePreco !== undefined && Number(b.ajustePreco) !== Number(a.ajuste_preco);
+    if (mudaAjuste || mudaTipo || b.freteGratis !== undefined) {
+      const [atual] = await carregarAnuncios(pool as any, tenant, id);
+      // o ajuste só muda o preço das linhas sem preço próprio no ML; tipo e frete grátis mudam o custo de todas
+      const ativas = atual.itens.filter(i => i.linhaAtiva !== false && atual.noMl.get(i.idLinha)?.status === 'active'
+        && (mudaTipo || b.freteGratis !== undefined || i.precoMl === null || i.precoMl === undefined));
+      const travadas = await prejuizosDasLinhas(tenant, atual, ativas, i => ({
+        preco: mudaAjuste ? precoNoMl(i, Number(b.ajustePreco) || 0) : undefined,
+        tipo: mudaTipo ? b.tipoAnuncio : undefined,
+        gratis: b.freteGratis !== undefined ? !!b.freteGratis : undefined,
+      }));
+      if (travadas.length) throw new ErroML(recusaPorPrejuizo('salvar assim', travadas), 422);
+    }
     if (mudaTipo || b.freteGratis !== undefined) {
       const [atual] = await carregarAnuncios(pool as any, tenant, id);
       const publicado = atual.itens.some(i => atual.noMl.get(i.idLinha)?.mlbId && !foraDoMl(atual.noMl.get(i.idLinha)?.status || null));
@@ -958,7 +976,18 @@ export const salvarItem = async (req: Request, res: Response) => {
       valores.push(v === null ? null : Math.floor(v));
     }
     const mudaAtivo = 'ativo' in b && (b.ativo ? 1 : 0) !== Number(linha.ativo);
+    // trava de prejuízo: a linha que fica ativa no ML (ou volta a ficar) não pode dar prejuízo ao preço novo
+    const noMl = !!linha.mlb_id && !foraDoMl(linha.status_ml);
+    const ficaAtiva = noMl && (mudaAtivo ? !!b.ativo : Number(linha.ativo) !== 0 && linha.status_ml === 'active');
+    if (ficaAtiva && ('preco' in b || mudaAtivo)) {
+      const [c] = await carregarAnuncios(pool as any, tenant, id);
+      const item = c?.itens.find(i => i.idLinha === idLinha);
+      const precoNovo = 'preco' in b ? (b.preco === null || b.preco === '' ? null : Math.round(Number(b.preco) * 100) / 100) : undefined;
+      const texto = item ? await prejuizoDaLinha(tenant, c, precoNovo === undefined ? item : { ...item, precoMl: precoNovo }) : null;
+      if (texto) throw new ErroML(recusaPorPrejuizo(mudaAtivo ? 'ativar' : 'usar este preço', [texto]), 422);
+    }
     if (mudaAtivo) {
+      campos.push('ultimo_erro = NULL');   // ligou ou desligou à mão: a pausa deixa de ser da trava
       // no ML: desativar pausa, ativar reativa (recusou = não grava)
       if (linha.mlb_id && !foraDoMl(linha.status_ml)) {
         const status = b.ativo ? 'active' : 'paused';

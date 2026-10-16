@@ -51,7 +51,7 @@ export interface AnuncioResumo {
   situacao: 'RASCUNHO' | 'PUBLICADO' | 'PAUSADO' | 'ENCERRADO'; preparo: 'PENDENTE' | 'PRONTO' | null;
   mlbId: string | null; permalink: string | null; qtdItens: number; publicados: number; aPublicar: number; fotoUrl: string | null; estoque: number;
   precoMin: number | null; precoMax: number | null; erros: number; avisos: number; atualizadoEm: string; ultimoErro: string | null;
-  estoqueMl: number; estoqueReserva: number; estoqueMaximo: number | null; ativosMl: number; pausadosMl: number; itens: ItemResumo[];
+  estoqueMl: number; estoqueReserva: number; estoqueMaximo: number | null; ativosMl: number; pausadosMl: number; pausadosPrejuizo?: number; itens: ItemResumo[];
 }
 export interface ItemResumo {
   idItem: number; idLinha: number; ativo: boolean; sku: string; nome: string; fotoUrl: string | null; mlbId: string | null; status: string | null; permalink: string | null;
@@ -194,10 +194,12 @@ export const foraDoMl = (status: string | null | undefined) => status === 'close
 export interface ResultadoSincronizacao {
   idAnuncio: number; idItem: number; sku: string; mlbId: string;
   estoqueDe: number | null; estoquePara: number | null; precoDe: number | null; precoPara: number | null; erro: string | null;
+  trava?: 'PAUSADO' | 'REATIVADO' | null; motivo?: string | null;   // trava de prejuízo
 }
 export interface SituacaoSincronizacao {
   ultimaEm: string | null; enviados: number; erros: number; mensagem: string | null; rodando: boolean; intervaloMin: number;
   vendasNovas?: number; pedidosPendentes?: number; erroPedidos?: string | null;
+  pausadosPrejuizo?: number; reativadosPrejuizo?: number;
 }
 
 export type SituacaoPedido = 'VENDA' | 'VENDA_CANCELADA' | 'CANCELADO_NO_ML' | 'CANCELADO' | 'PENDENTE' | 'AGUARDANDO';
@@ -243,6 +245,13 @@ export const resumoSincronizacao = (r: ResultadoSincronizacao[]) => {
   const ok = r.filter(x => !x.erro);
   const erros = r.filter(x => x.erro);
   if (!r.length) return { tipo: 'info' as const, texto: 'Nada para mandar: o ML já está igual ao ERP.' };
+  const pausados = ok.filter(x => x.trava === 'PAUSADO');
+  const reativados = ok.filter(x => x.trava === 'REATIVADO');
+  const trava = [
+    pausados.length ? `${pausados.length} pausado(s) por prejuízo (${pausados.map(x => x.sku).slice(0, 3).join(', ')})` : '',
+    reativados.length ? `${reativados.length} reativado(s): voltaram a dar lucro` : '',
+  ].filter(Boolean).join(' · ');
+  if (trava) return { tipo: pausados.length || erros.length ? 'warning' as const : 'success' as const, texto: `${ok.length} item(ns) atualizados no ML. Trava de prejuízo: ${trava}.${erros.length ? ` ${erros.length} recusados (${erros[0].sku}: ${erros[0].erro}).` : ''}` };
   const exemplo = ok[0] ? ` (ex.: ${ok[0].sku}${ok[0].estoquePara !== null ? ` estoque ${ok[0].estoqueDe ?? '?'} → ${ok[0].estoquePara}` : ''}${ok[0].precoPara !== null ? ` preço ${ok[0].precoDe ?? '?'} → ${ok[0].precoPara}` : ''})` : '';
   if (!erros.length) return { tipo: 'success' as const, texto: `${ok.length} item(ns) atualizados no Mercado Livre${exemplo}.` };
   return { tipo: 'warning' as const, texto: `${ok.length} atualizados, ${erros.length} recusados (${erros[0].sku}: ${erros[0].erro}).` };
