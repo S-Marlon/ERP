@@ -5,7 +5,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Col, Flex, InputNumber, Modal, Row, Space, Spin, Tabs, Tag, Tooltip, Typography, message } from 'antd';
 import { CheckCircleOutlined, CloudUploadOutlined, LinkOutlined, SaveOutlined, ShopOutlined, UndoOutlined } from '@ant-design/icons';
 import { adicionarAnexo, enviarArquivoAnexo, updateProduto } from '../../../areas/catalogo/skus/CatalogSku.service';
-import { AnuncioDetalhe, anunciosApi, ConferenciaItem, DivergenciasLinha, ItemDoAnuncio, resumoSincronizacao, SecaoPreco } from './mercadoLivreApi';
+import { AnuncioDetalhe, anunciosApi, ConferenciaItem, DivergenciasLinha, ItemDoAnuncio, PacoteMl, resumoSincronizacao, SecaoPreco } from './mercadoLivreApi';
 import { destinoDa, DestinoSugestao } from './SugestoesMl';
 import { agruparPendencias, PendenciaAgrupada } from './pendencias';
 import {
@@ -22,6 +22,7 @@ import CatalogoMlCard from './CatalogoMlCard';
 import AbaPreco from './editor/AbaPreco';
 import NavegacaoAnuncio, { SelecaoEditor } from './editor/NavegacaoAnuncio';
 import FormasDoProduto from './editor/FormasDoProduto';
+import FichaDoProduto from './editor/FichaDoProduto';
 import CategoriaMlModal from './CategoriaMlModal';
 import AdicionarAnuncioModal from './AdicionarAnuncioModal';
 import SituacaoTag from './SituacaoTag';
@@ -344,6 +345,24 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado, abrirEm }) =
     setAba(destino);
   };
 
+  /** Grava no cadastro a embalagem que está no ML (quando a do ML é a certa). */
+  const trazerPacote = (l: { idItem: number; sku: string; pacoteMl?: PacoteMl | null }) => {
+    const p = l.pacoteMl!;
+    modal.confirm({
+      title: `Trazer a embalagem do ML para o cadastro de ${l.sku}?`, okText: 'Gravar no cadastro', cancelText: 'Cancelar',
+      content: `O cadastro passa a ter ${p.alturaCm} × ${p.larguraCm} × ${p.comprimentoCm} cm e ${p.pesoG} g (como está no ML). Confira se é o pacote real, como ele sai.`,
+      onOk: async () => {
+        try {
+          await updateProduto(l.idItem, { peso_bruto: p.pesoG / 1000, altura_cm: p.alturaCm, largura_cm: p.larguraCm, comprimento_cm: p.comprimentoCm });
+          message.success(`Embalagem de ${l.sku} gravada no cadastro.`);
+          await recarregar();
+        } catch (e) {
+          message.error(e instanceof Error ? e.message : 'Erro ao gravar a embalagem.');
+        }
+      },
+    });
+  };
+
   // ---------------------------------------------------------------------------
   // Abas
   // ---------------------------------------------------------------------------
@@ -439,8 +458,10 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado, abrirEm }) =
       children: <AbaFotos salvo={salvo} det={det} onAlterado={() => { recarregar(); onAlterado(); }} />,
     }]),
     {
-      key: 'atributos', label: rotuloAba('atributos', noProduto ? 'Ficha' : 'Atributos'),
-      children: <AbaAtributos salvo={salvoVista} det={detVista} comErro={atributoComErro} onMudar={(idA, v) => setRascunho(r => mudarAtributo(r, salvo, idA, v))} />,
+      key: 'atributos', label: rotuloAba('atributos', noProduto ? 'Ficha' : 'Ficha do anúncio'),
+      children: noProduto ? (
+        <FichaDoProduto det={detVista} onIrParaFichaDoAnuncio={() => { setSelecao('geral'); setAba('atributos'); }} onTrazerPacote={trazerPacote} />
+      ) : <AbaAtributos salvo={salvoVista} det={detVista} comErro={atributoComErro} onMudar={(idA, v) => setRascunho(r => mudarAtributo(r, salvo, idA, v))} />,
     },
     {
       key: 'preco', label: rotuloAba('preco', noProduto ? 'Análise de preço' : 'Preço e lucro'),
@@ -557,22 +578,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado, abrirEm }) =
                 <PainelLateral
                   det={salvo} temRascunho={temRascunho} ocupado={acaoMl} conferencia={conferencia} falhas={falhas}
                   pendencias={pendencias} onAcao={acaoNoMl} onPendencia={irParaPendencia} divergencias={divergencias}
-                  onTrazerPacote={l => {
-                    const p = l.pacoteMl!;
-                    modal.confirm({
-                      title: `Trazer a embalagem do ML para o cadastro de ${l.sku}?`, okText: 'Gravar no cadastro', cancelText: 'Cancelar',
-                      content: `O cadastro passa a ter ${p.alturaCm} × ${p.larguraCm} × ${p.comprimentoCm} cm e ${p.pesoG} g (como está no ML). Confira se é o pacote real, como ele sai.`,
-                      onOk: async () => {
-                        try {
-                          await updateProduto(l.idItem, { peso_bruto: p.pesoG / 1000, altura_cm: p.alturaCm, largura_cm: p.larguraCm, comprimento_cm: p.comprimentoCm });
-                          message.success(`Embalagem de ${l.sku} gravada no cadastro.`);
-                          await recarregar();
-                        } catch (e) {
-                          message.error(e instanceof Error ? e.message : 'Erro ao gravar a embalagem.');
-                        }
-                      },
-                    });
-                  }}
+                  onTrazerPacote={trazerPacote}
                 />
               </div>
             </Col>

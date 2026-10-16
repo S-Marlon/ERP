@@ -297,6 +297,12 @@ export interface EscadaLinha {
   propria: FaixaQuantidade[] | null; doAnuncio: FaixaQuantidade[] | null; faixas: FaixaQuantidade[];
   degraus: DegrauEscada[]; freteDesconhecido: boolean; erros: string[]; avisos: string[];
 }
+/** Ficha de uma forma de venda: cada atributo com a origem, o que o ERP manda e o que está no ML. */
+export interface LinhaFicha {
+  id: string; nome: string; obrigatorio: boolean; origem: 'cadastro' | 'marca' | 'fixo' | 'automatico' | 'nenhuma';
+  erp: string | null; ml: string | null; situacao: 'IGUAL' | 'DIFERENTE' | 'FALTA' | 'SO_ML' | 'A_PUBLICAR' | 'SEM_VALOR';
+}
+export interface FichaForma { publicado: boolean; mlbId: string | null; linhas: LinhaFicha[]; pacoteMl: PacoteMl | null }
 export interface FaixasFrete {
   logistica: string | null;
   linhas: { ateG: number; gratisAbaixo79: number | null; compradorPaga20: number | null; compradorPaga50: number | null; acima79: number | null }[];
@@ -346,6 +352,9 @@ export const anunciosApi = {
   /** Grava a escada só desta forma (null = volta à regra do anúncio; [] = sem escada); publicada, vai ao ML na hora. */
   salvarEscada: async (id: number, idLinha: number, faixas: FaixaQuantidade[] | null) =>
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}?tenant_id=1`, json('PUT', { faixas })), 'Erro ao salvar a escada.'),
+  /** A ficha da forma: atributo, de onde vem, ERP × ML. */
+  ficha: async (id: number, idLinha: number) =>
+    ler<FichaForma>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}/ficha?tenant_id=1`), 'Erro ao montar a ficha.'),
   /** Liga ou desliga a linha: desligada não publica e, se já está no ML, fica pausada. */
   ativarLinha: async (id: number, idLinha: number, ativo: boolean) =>
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}?tenant_id=1`, json('PUT', { ativo })), ativo ? 'Erro ao ativar.' : 'Erro ao desativar.'),
