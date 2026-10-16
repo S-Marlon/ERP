@@ -143,6 +143,7 @@ export interface ItemDoAnuncio {
   marca: string | null; valoresErp: Record<string, string | null>; motivosCadastro: string[];
   valores: Record<string, { valor: string; valorId: string | null; unidade: string | null } | null>;
   tituloMl?: string; tituloCortado?: boolean;   // título deste item no ML
+  faixasProprias?: FaixaQuantidade[] | null;    // escada só desta forma (null = unidade segue o anúncio, kit sem escada)
   ml: {
     mlbId: string | null; status: string | null; permalink: string | null; erro: string | null;
     estoqueEnviado: number | null; precoEnviado: number | null; sincronizadoEm: string | null;
@@ -286,6 +287,16 @@ export interface DivergenciaMl { campo: 'ATRIBUTOS' | 'FOTOS' | 'DESCRICAO' | 'T
 export interface PacoteMl { pesoG: number; alturaCm: number; larguraCm: number; comprimentoCm: number }
 export interface DivergenciasLinha { idLinha: number; idItem: number; sku: string; diferencas: DivergenciaMl[]; pacoteMl?: PacoteMl | null }
 export interface DivergenciasResumo { paraEnviar: number; soPainel: number; resumo: string[] }
+/** A escada de uma forma de venda, com cada degrau calculado (quantidade na unidade do anúncio: kits no kit). */
+export interface DegrauEscada {
+  quantidade: number; pecas: number; desconto: number; precoUnit: number; precoPorPeca: number; receita: number;
+  tarifa: number; frete: number; recebe: number; custo: number; lucro: number; lucroPorUnidade: number; lucroSobreCustoPct: number | null; nivel: string;
+}
+export interface EscadaLinha {
+  idLinha: number; fator: number; siglaBase: string; preco: number; alvoPct: number;
+  propria: FaixaQuantidade[] | null; doAnuncio: FaixaQuantidade[] | null; faixas: FaixaQuantidade[];
+  degraus: DegrauEscada[]; freteDesconhecido: boolean; erros: string[]; avisos: string[];
+}
 export interface FaixasFrete {
   logistica: string | null;
   linhas: { ateG: number; gratisAbaixo79: number | null; compradorPaga20: number | null; compradorPaga50: number | null; acima79: number | null }[];
@@ -329,6 +340,12 @@ export const anunciosApi = {
   /** Troca o tipo e/ou o frete grátis de um item já publicado, só nele (direto no ML). */
   modoDaLinha: async (id: number, idLinha: number, corpo: { tipo?: string; freteGratis?: boolean }) =>
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}/modo?tenant_id=1`, json('POST', corpo)), 'Erro ao mudar o modo de venda do item.'),
+  /** A escada da forma calculada degrau a degrau (faixas = simular outra; sem = a que vale hoje). */
+  escada: async (id: number, idLinha: number, faixas?: FaixaQuantidade[]) =>
+    ler<EscadaLinha>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}/escada?tenant_id=1${faixas ? `&faixas=${faixas.map(f => `${f.minimo}:${f.desconto}`).join(',')}` : ''}`), 'Erro ao calcular a escada.'),
+  /** Grava a escada só desta forma (null = volta à regra do anúncio; [] = sem escada); publicada, vai ao ML na hora. */
+  salvarEscada: async (id: number, idLinha: number, faixas: FaixaQuantidade[] | null) =>
+    ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}?tenant_id=1`, json('PUT', { faixas })), 'Erro ao salvar a escada.'),
   /** Liga ou desliga a linha: desligada não publica e, se já está no ML, fica pausada. */
   ativarLinha: async (id: number, idLinha: number, ativo: boolean) =>
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}?tenant_id=1`, json('PUT', { ativo })), ativo ? 'Erro ao ativar.' : 'Erro ao desativar.'),

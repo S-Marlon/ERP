@@ -21,6 +21,7 @@ import PainelLateral, { AcaoMl } from './editor/PainelLateral';
 import CatalogoMlCard from './CatalogoMlCard';
 import AbaPreco from './editor/AbaPreco';
 import NavegacaoAnuncio, { SelecaoEditor } from './editor/NavegacaoAnuncio';
+import FormasDoProduto from './editor/FormasDoProduto';
 import CategoriaMlModal from './CategoriaMlModal';
 import AdicionarAnuncioModal from './AdicionarAnuncioModal';
 import SituacaoTag from './SituacaoTag';
@@ -34,11 +35,12 @@ interface Props {
   abrirEm?: DestinoSugestao | null;       // aba/linha/seção vinda da central de sugestões
 }
 
-type Aba = 'anuncio' | 'itens' | 'fotos' | 'atributos' | 'preco' | 'catalogo';
+type Aba = 'anuncio' | 'formas' | 'itens' | 'fotos' | 'atributos' | 'preco' | 'catalogo';
 const ABA_DA_AREA: Record<string, Aba> = { dados: 'anuncio', itens: 'itens', cadastro: 'itens', atributos: 'atributos' };
 const CAMPOS_DA_ABA: Record<Aba, (keyof RascunhoAnuncio)[]> = {
   anuncio: ['titulo', 'modeloTitulo', 'tipoAnuncio', 'condicao', 'descricao', 'ajustePreco'],
   itens: ['estoqueReserva', 'estoqueMaximo', 'estoqueAutomatico'],
+  formas: [],
   fotos: [],
   atributos: ['atributos'],
   preco: ['faixasQuantidade', 'tipoAnuncio', 'freteGratis'],
@@ -371,7 +373,28 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado, abrirEm }) =
   const noProduto = selecao !== 'geral';
 
   const abas = !det || !salvo || !detVista || !salvoVista ? [] : [
-    ...(noProduto ? [] : [{
+    ...(noProduto ? [{
+      key: 'formas', label: rotuloAba('formas', 'Formas e escada'),
+      children: (
+        <FormasDoProduto
+          det={detVista}
+          onAtivar={(idLinha, ativo) => executar(() => anunciosApi.ativarLinha(salvo.id, idLinha, ativo), ativo ? 'Forma de venda ativada.' : 'Forma de venda tirada da venda.')}
+          onSalvarEscada={async (idLinha, faixas) => {
+            // erro: o editor da escada fica aberto (não usa o executar, que engole o erro)
+            try {
+              aplicar(await anunciosApi.salvarEscada(salvo.id, idLinha, faixas));
+              message.success(faixas === null ? 'A forma voltou a seguir a escada do anúncio.' : faixas.length ? 'Escada salva.' : 'Forma sem escada.');
+              onAlterado();
+            } catch (e) {
+              message.error(erroMsg(e), 6);
+              throw e;
+            }
+          }}
+          onCriarKit={(idLinha, quantidade) => criarForma(idLinha, quantidade, null)}
+          onAnalise={idLinha => { setItemPreco(idLinha); setAba('preco'); }}
+        />
+      ),
+    }] : [{
       key: 'anuncio', label: rotuloAba('anuncio', 'Anúncio'),
       children: <AbaDados salvo={salvo} det={det} rascunho={rascunho.anuncio} onMudar={mudarCampo} onTrocarCategoria={pedirCategoria} />,
     }]),
@@ -420,7 +443,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado, abrirEm }) =
       children: <AbaAtributos salvo={salvoVista} det={detVista} comErro={atributoComErro} onMudar={(idA, v) => setRascunho(r => mudarAtributo(r, salvo, idA, v))} />,
     },
     {
-      key: 'preco', label: rotuloAba('preco', noProduto ? 'Venda' : 'Preço e lucro'),
+      key: 'preco', label: rotuloAba('preco', noProduto ? 'Análise de preço' : 'Preço e lucro'),
       children: (
         <AbaPreco
           salvo={salvoVista} det={detVista} rascunhoItens={rascunho.itens} idLinha={linhaPreco} onSelecionar={setItemPreco} ocupado={ocupado}
@@ -444,12 +467,13 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado, abrirEm }) =
     ...(salvo.publicados > 0 && !noProduto ? [{ key: 'catalogo', label: rotuloAba('catalogo', 'Catálogo'), children: <CatalogoMlCard det={salvo} /> }] : []),
   ];
 
-  if (noProduto) abas.sort((a, b) => ['preco', 'itens', 'atributos'].indexOf(a.key) - ['preco', 'itens', 'atributos'].indexOf(b.key));
+  const ORDEM_PRODUTO = ['formas', 'preco', 'itens', 'atributos'];
+  if (noProduto) abas.sort((a, b) => ORDEM_PRODUTO.indexOf(a.key) - ORDEM_PRODUTO.indexOf(b.key));
   // a aba escolhida não existe nesta seleção (ex.: Fotos num produto): abre a primeira
   const abaVista: Aba = abas.some(a => a.key === aba) ? aba : ((abas[0]?.key as Aba) || 'anuncio');
   const escolher = (s: SelecaoEditor) => {
     setSelecao(s);
-    if (s !== 'geral' && !['preco', 'itens', 'atributos'].includes(aba)) setAba('preco');
+    if (s !== 'geral' && !['formas', 'preco', 'itens', 'atributos'].includes(aba)) setAba('formas');
   };
 
   // ---------------------------------------------------------------------------
