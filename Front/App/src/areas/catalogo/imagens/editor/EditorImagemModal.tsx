@@ -3,9 +3,9 @@
 // aplicado em todos os itens (variações), cada um com a sua medida, e salvo no cadastro do ERP. Ao abrir, escolhe-se a
 // foto que vai ser editada (da família ou de um item). Usado pela família (catálogo) e pelo anúncio do ML.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Checkbox, Divider, Empty, Flex, Input, Modal, Progress, Segmented, Select, Slider, Space, Spin, Switch, Tag, Tooltip, Typography, Upload, message } from 'antd';
+import { Button, Checkbox, Divider, Empty, Flex, Input, InputNumber, Modal, Progress, Segmented, Select, Slider, Space, Spin, Switch, Tag, Tooltip, Typography, Upload, message } from 'antd';
 import {
-  ArrowRightOutlined, BgColorsOutlined, BorderOutlined, ColumnWidthOutlined, CommentOutlined, CopyOutlined, DeleteOutlined, DownloadOutlined,
+  AppstoreOutlined, ArrowRightOutlined, BgColorsOutlined, BorderOutlined, ColumnWidthOutlined, CommentOutlined, CopyOutlined, DeleteOutlined, DownloadOutlined,
   ExpandOutlined, FileImageOutlined, FontSizeOutlined, PictureOutlined, RedoOutlined, SaveOutlined, ScissorOutlined, UndoOutlined, UploadOutlined,
   SwapOutlined, VerticalAlignBottomOutlined, VerticalAlignTopOutlined,
 } from '@ant-design/icons';
@@ -17,7 +17,7 @@ import { enderecoParaDesenho } from '../enderecoImagem';
 import type { EntradaEditor, ItemDoEditor } from './entradaEditor';
 import {
   aplicarCorte, criarElemento, dadosDe, DadosElemento, encaixarFoto, LadoTexto, montarFoto, origemDaFoto, parametrosAposEsticar, Pontas,
-  precisaRedesenharAoGirar, PROPRIEDADES, recriarElemento, refazerFotosTratadas, soltarFotosTratadas, TipoElemento,
+  precisaRedesenharAoGirar, PROPRIEDADES, recriarElemento, refazerFotosTratadas, soltarFotosTratadas, TipoElemento, vezesDaFoto,
 } from './elementos';
 import { CORTE_INTEIRO, corteDoQuadro } from './fotoPixels';
 import { limparModelo } from './modeloSalvo';
@@ -303,6 +303,28 @@ const EditorImagemModal: React.FC<Props> = ({ entrada, onFechar, onSalvo }) => {
       atualizarPainel();
     }
   };
+  /** Repete o produto N vezes em grade (foto de kit); 1 volta a foto normal. Vale para a foto de cada item. */
+  const mudarMultiplicar = async (vezes: number) => {
+    const c = fab.current;
+    const foto = fotoDoQuadro();
+    if (!c || !foto) return;
+    const n = Math.max(1, Math.min(48, Math.floor(vezes || 1)));
+    (foto as any).dadosElemento = { ...dadosDe(foto)!, multiplicar: n > 1 ? n : undefined };
+    setTratandoFoto(true);
+    try {
+      await montarFoto(foto, origemDaFoto(foto));
+      encaixarFoto(foto, LADO);
+      foto.setCoords();
+      c.requestRenderAll();
+      guardar();
+    } catch {
+      message.error('Não foi possível montar a foto do kit.');
+    } finally {
+      setTratandoFoto(false);
+      atualizarPainel();
+    }
+  };
+  const kitsDoAnuncio = useMemo(() => [...new Set((entrada?.itens || []).flatMap(i => i.kits || []))].sort((a, b) => a - b), [entrada]);
 
   // ---------------------------------------------------------------- abrir / fechar
   // os eventos do quadro são ligados uma vez; leem a unidade atual por aqui
@@ -587,6 +609,9 @@ const EditorImagemModal: React.FC<Props> = ({ entrada, onFechar, onSalvo }) => {
     if (!entrada || !itens.length) return;
     const modelo = modeloAtual();
     await guardarNaFamilia(modelo, false);
+    // foto repetida ×N = foto do kit c/N: nome próprio ("SKU-kit10.jpg"), nunca a principal do item; no ML vai primeiro
+    // só no anúncio do kit c/N
+    const vezes = vezesDaFoto(dadosDe(fotoDoQuadro()));
     setAplicando({ feitos: 0, total: itens.length });
     const falhas: string[] = [];
     for (const [k, it] of itens.entries()) {
@@ -594,9 +619,10 @@ const EditorImagemModal: React.FC<Props> = ({ entrada, onFechar, onSalvo }) => {
         const dataUrl = await gerarParaItem(modelo, it);
         const blob = await (await fetch(dataUrl)).blob();
         // uma imagem por foto-base: a da foto-modelo é "-editada"; a de outra foto da família tem o id dela no nome
-        const nome = `${it.sku}${sufixoArquivo.current}-editada.jpg`.replace(/[^\w.-]+/g, '-');
-        await enviarArquivoAnexo(it.idItem, new File([blob], nome, { type: 'image/jpeg' }), comoPrincipal ? 'IMAGEM_PRINCIPAL' : 'FOTO_GALERIA',
-          { substituir: true, posicao: comoPrincipal ? undefined : 2 });
+        const nome = (vezes > 1 ? `${it.sku}${sufixoArquivo.current}-kit${vezes}.jpg` : `${it.sku}${sufixoArquivo.current}-editada.jpg`).replace(/[^\w.-]+/g, '-');
+        const principal = comoPrincipal && vezes === 1;
+        await enviarArquivoAnexo(it.idItem, new File([blob], nome, { type: 'image/jpeg' }), principal ? 'IMAGEM_PRINCIPAL' : 'FOTO_GALERIA',
+          { substituir: true, posicao: principal || vezes > 1 ? undefined : 2 });
       } catch (e) {
         const msg = e instanceof Error ? e.message : 'erro';
         // a foto não abriu (arquivo que não existe mais no servidor ou link fora do ar)
@@ -606,7 +632,7 @@ const EditorImagemModal: React.FC<Props> = ({ entrada, onFechar, onSalvo }) => {
     }
     setAplicando(null);
     if (falhas.length) message.warning(`${itens.length - falhas.length} salva(s); ${falhas.length} com erro: ${falhas[0]}`, 8);
-    else message.success(`${itens.length} imagem(ns) salvas no cadastro${itens.some(i => i.noMl) ? '. Para os itens já no ML, use "Enviar atributos, fotos e descrição".' : '.'}`, 8);
+    else message.success(`${itens.length} ${vezes > 1 ? `foto(s) do kit c/${vezes}` : 'imagem(ns)'} salvas no cadastro${vezes > 1 ? ' (vão primeiro só no anúncio do kit)' : ''}${itens.some(i => i.noMl) ? '. Para os itens já no ML, use "Enviar atributos, fotos e descrição".' : '.'}`, 8);
     onSalvo();
   };
 
@@ -830,7 +856,9 @@ const EditorImagemModal: React.FC<Props> = ({ entrada, onFechar, onSalvo }) => {
                         <Button size="small" icon={<UploadOutlined />}>Foto do computador</Button>
                       </Upload>
                       <Flex gap={6} wrap>
-                        <Button size="small" icon={<ScissorOutlined />} onClick={iniciarCorte} disabled={tratandoFoto}>Cortar</Button>
+                        <Tooltip title={vezesDaFoto(d) > 1 ? 'Volte a foto para ×1 para cortar à mão (ou use "cortar as sobras")' : undefined}>
+                          <Button size="small" icon={<ScissorOutlined />} onClick={iniciarCorte} disabled={tratandoFoto || vezesDaFoto(d) > 1}>Cortar</Button>
+                        </Tooltip>
                         {(d.corte || d.corteAuto) && <Button size="small" onClick={tirarCorte} disabled={tratandoFoto}>Foto inteira</Button>}
                         <Button size="small" icon={<ExpandOutlined />} onClick={() => acao('encaixar')}>Encaixar no quadro</Button>
                       </Flex>
@@ -849,6 +877,29 @@ const EditorImagemModal: React.FC<Props> = ({ entrada, onFechar, onSalvo }) => {
                           <Text type="secondary" style={{ fontSize: 12 }}>Quanto tirar (comeu o produto? diminua; sobrou fundo? aumente)</Text>
                           <Slider min={8} max={120} value={tolerancia} disabled={tratandoFoto} onChange={(v: number) => setTolerancia(v)} onChangeComplete={(v: number) => mudarFundo(v)} />
                         </div>
+                      )}
+                      <Divider style={{ margin: '4px 0' }} />
+                      <Tooltip title="Repete o produto N vezes em grade, como nos anúncios de kit (copia a foto da unidade; com fundo branco não dá diferença). Salva como foto do kit c/N: no ML ela vai primeiro só no anúncio do kit, e a unidade continua com a foto normal.">
+                        <Space size={6} wrap>
+                          <Text style={{ fontSize: 12 }}><AppstoreOutlined /> repetir a foto</Text>
+                          <InputNumber size="small" min={1} max={48} precision={0} value={vezesDaFoto(d)} disabled={tratandoFoto}
+                            onChange={v => { if (v && v !== vezesDaFoto(d)) mudarMultiplicar(Number(v)); }} style={{ width: 70 }} />
+                          <Text type="secondary" style={{ fontSize: 12 }}>vezes</Text>
+                        </Space>
+                      </Tooltip>
+                      {kitsDoAnuncio.length > 0 && (
+                        <Space size={4} wrap>
+                          <Text type="secondary" style={{ fontSize: 12 }}>kits do anúncio:</Text>
+                          {kitsDoAnuncio.map(n => (
+                            <Button key={n} size="small" type={vezesDaFoto(d) === n ? 'primary' : 'default'} disabled={tratandoFoto} onClick={() => mudarMultiplicar(n)}>×{n}</Button>
+                          ))}
+                          {vezesDaFoto(d) > 1 && <Button size="small" disabled={tratandoFoto} onClick={() => mudarMultiplicar(1)}>×1</Button>}
+                        </Space>
+                      )}
+                      {vezesDaFoto(d) > 1 && (
+                        <Text type="warning" style={{ fontSize: 12 }}>
+                          Foto do kit c/{vezesDaFoto(d)}: deixe sem texto se for a 1ª foto do anúncio (regra de foto do ML).
+                        </Text>
                       )}
                     </Flex>
                   )}

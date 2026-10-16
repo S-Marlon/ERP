@@ -1,5 +1,6 @@
 import assert from 'assert';
-import { ehImagemGerada, fotosDaVariacao, referenciaDeFoto, urlPublicaDeImagem } from './fotos';
+import { ehImagemGerada, fotosDaLinha, fotosDaVariacao, referenciaDeFoto, urlPublicaDeImagem } from './fotos';
+import { kitDaImagem } from '../../../areas/catalogo/produtos/ordemAnexos';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -9,6 +10,17 @@ teste('imagem gerada pelo editor ou gerador não serve de base', () => {
   assert.strictEqual(ehImagemGerada('Img_ftr_rp_300601-1160x1160.PNG'), false);
   assert.strictEqual(ehImagemGerada('editada.jpg'), false);
   assert.strictEqual(ehImagemGerada(null), false);
+  assert.strictEqual(ehImagemGerada('6902-ZZ-HHMS-kit10.jpg'), true);   // foto do kit também não é base
+});
+
+teste('foto do kit: só na linha do kit do mesmo tamanho, e primeiro', () => {
+  const lista = [{ nome: '6902-limpa.jpg' }, { nome: '6902-ZZ-HHMS-editada.jpg' }, { nome: '6902-ZZ-HHMS-kit10.jpg' }, { nome: '6902-ZZ-HHMS-kit2.png' }];
+  assert.deepStrictEqual(fotosDaLinha(lista, 10).map(f => f.nome), ['6902-ZZ-HHMS-kit10.jpg', '6902-limpa.jpg', '6902-ZZ-HHMS-editada.jpg']);
+  assert.deepStrictEqual(fotosDaLinha(lista, 2).map(f => f.nome), ['6902-ZZ-HHMS-kit2.png', '6902-limpa.jpg', '6902-ZZ-HHMS-editada.jpg']);
+  assert.deepStrictEqual(fotosDaLinha(lista, 1).map(f => f.nome), ['6902-limpa.jpg', '6902-ZZ-HHMS-editada.jpg']);
+  assert.deepStrictEqual(fotosDaLinha(lista, 5).map(f => f.nome), ['6902-limpa.jpg', '6902-ZZ-HHMS-editada.jpg']);   // kit sem foto própria
+  assert.strictEqual(kitDaImagem('A-kit10.jpg'), 10);
+  assert.strictEqual(kitDaImagem('kit10-editada.jpg'), null);
 });
 
 teste('fotos da variação: própria, medidas, família', () => {

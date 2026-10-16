@@ -11,6 +11,7 @@ export interface ItemDoEditor {
   fotos?: { url: string; nome: string }[];   // fotos limpas do item, para escolher a que vai editar
   campos: CampoEtiqueta[];
   noMl?: boolean;                            // já publicado: a imagem nova vai ao ML pelo botão do anúncio
+  kits?: number[];                           // o item também é vendido em kit c/N (atalho do "repetir a foto")
 }
 
 export interface EntradaEditor {

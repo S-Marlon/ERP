@@ -17,7 +17,7 @@ import { contaPorFamilia, enviarFotoMl, ErroML, ml } from './mercadolivreApi';
 import { sincronizarAnuncios, situacaoAutomatica } from './sincronizacao';
 import { enviarFaixas, enviarFaixasDoAnuncio } from './faixas.controller';
 import { lerFaixas } from './faixasQuantidade';
-import { fotosDaVariacao } from './fotos';
+import { fotosDaLinha, fotosDaVariacao } from './fotos';
 import { prejuizoDaLinha } from './precificacao.controller';
 import { PREFIXO_TRAVA, recusaPorPrejuizo } from './travaPrejuizo';
 
@@ -63,10 +63,11 @@ const fotosDoItem = async (tenant: number, c: AnuncioCarregado, item: ItemAnunci
     [tenant, item.idItem]
   );
   // ordem combinada: principal própria (ou a principal-modelo da família), medidas, outras do item, comuns da família
-  const lista = fotosDaVariacao(
+  // e a linha em kit leva a foto do kit primeiro (a unidade não leva foto de kit)
+  const lista = fotosDaLinha(fotosDaVariacao(
     anexos.map((a: any) => ({ idAnexo: Number(a.id_anexo), url: String(a.url_anexo), nome: String(a.nome_arquivo || '') })),
     await fotosDaFamilia(tenant, c),
-  );
+  ), item.unidadeMl?.fator || 1);
   // o id da foto que já subiu fica guardado por anexo (ou "familia:<link>"): atualizar o anúncio não sobe de novo
   const guardadas = { ...(c.noMl.get(item.idLinha)?.fotosMl || {}) };
   const fotos: FotoEnvio[] = [];

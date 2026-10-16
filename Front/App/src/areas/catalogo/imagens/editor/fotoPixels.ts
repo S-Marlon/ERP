@@ -100,3 +100,27 @@ export const corteDoQuadro = (
 };
 
 export const CORTE_INTEIRO: Corte = { x: 0, y: 0, w: 1, h: 1 };
+
+/**
+ * Grade para repetir o produto n vezes (foto de kit): escolhe colunas e linhas para o conjunto ficar o mais perto de um
+ * quadrado (o quadro é quadrado), com a última linha centralizada. `aspecto` = largura ÷ altura do produto.
+ * Devolve o centro de cada cópia em células (coluna + 0,5; linha + 0,5).
+ */
+export const gradeDoKit = (n: number, aspecto: number) => {
+  const total = Math.max(1, Math.floor(n));
+  const a = aspecto > 0 ? aspecto : 1;
+  let colunas = 1;
+  let melhor = Infinity;
+  for (let c = 1; c <= total; c++) {
+    const lado = Math.max(c * a, Math.ceil(total / c));
+    if (lado <= melhor + 1e-9) { melhor = lado; colunas = c; }   // empate: mais colunas (a grade fica mais baixa)
+    if (c * a > melhor) break;
+  }
+  const linhas = Math.ceil(total / colunas);
+  const posicoes = Array.from({ length: total }, (_, k) => {
+    const linha = Math.floor(k / colunas);
+    const naLinha = Math.min(colunas, total - linha * colunas);
+    return { x: (k % colunas) + (colunas - naLinha) / 2 + 0.5, y: linha + 0.5 };
+  });
+  return { colunas, linhas, posicoes };
+};

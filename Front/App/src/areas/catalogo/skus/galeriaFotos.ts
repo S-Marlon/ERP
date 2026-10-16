@@ -3,6 +3,11 @@
 
 /** Imagem de medidas gerada pelo editor ou pelo gerador do ML (`SKU-editada.jpg`, `SKU-medida.jpg`). */
 export const ehImagemDeMedidas = (nomeArquivo: string | null | undefined) => /-(editada|medida)\.jpe?g$/i.test(String(nomeArquivo || '').trim());
+/** Foto do pacote com N unidades gerada no editor (`SKU-kit10.jpg`): N, ou null. Vai só no anúncio do kit c/N. */
+export const kitDaImagem = (nomeArquivo: string | null | undefined): number | null => {
+  const m = String(nomeArquivo || '').trim().match(/-kit(\d+)\.(jpe?g|png|webp)$/i);
+  return m ? Number(m[1]) : null;
+};
 
 /** Lista com o elemento de `de` levado para `para`. */
 export const moverFoto = <T,>(lista: T[], de: number, para: number): T[] => {

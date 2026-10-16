@@ -3,7 +3,7 @@
 // texto, o texto da cota pode ficar sempre de pé (com a cota em qualquer ângulo) e o mesmo modelo serve para todos os
 // itens (o texto tem {Campo} trocado pela medida de cada item).
 import { Ellipse, FabricImage, FabricObject, FabricText, Group, IText, Path, Rect, StaticCanvas, Textbox } from 'fabric';
-import { caixaDoProduto, Corte, CORTE_INTEIRO, mascaraDoFundo, tirarFundo } from './fotoPixels';
+import { caixaDoProduto, Corte, CORTE_INTEIRO, gradeDoKit, mascaraDoFundo, tirarFundo } from './fotoPixels';
 
 export type TipoElemento = 'SETA' | 'COTA' | 'TEXTO' | 'BALAO' | 'DESTAQUE' | 'FOTO';
 export type LadoTexto = 'ACIMA' | 'SOBRE' | 'ABAIXO';
@@ -29,6 +29,7 @@ export interface DadosElemento {
   corte?: Corte;            // foto: recorte em frações, vale para a foto de cada item
   corteAuto?: boolean;      // foto: corta as sobras de cada foto (o produto de cada item fica enquadrado)
   semFundo?: number;        // foto: tira o fundo com esta tolerância (sem o campo, fundo original)
+  multiplicar?: number;     // foto: repete o produto N vezes em grade (foto de kit); sem o campo, 1
 }
 
 /** Propriedades próprias que vão junto quando o modelo é salvo. */
@@ -158,11 +159,15 @@ export const encaixarFoto = (img: FabricImage, lado: number, margem = 60) => {
 const LIMITE_FUNDO = 1600;   // lado maior da foto tratada (o quadro tem 1200)
 const fotosSemFundo = new Map<string, Promise<string>>();
 
+const fotosMultiplicadas = new Map<string, Promise<string>>();
+
 /** Solta as fotos tratadas guardadas (chamado ao fechar o editor). */
 export const soltarFotosTratadas = () => {
-  fotosSemFundo.forEach(p => p.then(u => URL.revokeObjectURL(u), () => undefined));
-  fotosSemFundo.clear();
+  [fotosSemFundo, fotosMultiplicadas].forEach(m => { m.forEach(p => p.then(u => URL.revokeObjectURL(u), () => undefined)); m.clear(); });
 };
+
+/** Quantas vezes a foto repete o produto (1 = foto normal). */
+export const vezesDaFoto = (d: DadosElemento | null | undefined) => (d?.multiplicar && d.multiplicar > 1 ? Math.floor(d.multiplicar) : 1);
 
 const abrirImagem = (url: string) => new Promise<HTMLImageElement>((resolve, reject) => {
   const img = new Image();
@@ -201,6 +206,48 @@ export const fotoSemFundo = (url: string, tolerancia: number) => {
   return fotosSemFundo.get(chave)!;
 };
 
+/**
+ * Foto de kit: o produto (cortado no `corte`, ou nas sobras com 'AUTO') repetido `n` vezes em grade, num PNG com fundo
+ * transparente (no quadro fica branco). Como os anúncios de kit fazem: copiar e colar a foto da unidade.
+ */
+export const fotoMultiplicada = (src: string, n: number, corte: Corte | 'AUTO') => {
+  const chave = `${n}|${JSON.stringify(corte)}|${src}`;
+  if (!fotosMultiplicadas.has(chave)) {
+    const p = (async () => {
+      const img = await abrirImagem(src);
+      const W = img.naturalWidth || 1;
+      const H = img.naturalHeight || 1;
+      let caixa = corte === 'AUTO' ? null : corte;
+      if (corte === 'AUTO') {
+        const k = Math.min(1, 600 / Math.max(W, H));
+        const w = Math.max(1, Math.round(W * k));
+        const h = Math.max(1, Math.round(H * k));
+        caixa = caixaDoProduto(pixelsDe(img, w, h).dados.data, w, h);
+      }
+      const c = caixa || CORTE_INTEIRO;
+      const sw = Math.max(1, c.w * W);
+      const sh = Math.max(1, c.h * H);
+      const grade = gradeDoKit(n, sw / sh);
+      const folga = 0.08;                                          // espaço entre as cópias
+      const escala = Math.min(1, 2400 / (Math.max(grade.colunas * sw, grade.linhas * sh) * (1 + folga)));
+      const cw = sw * (1 + folga) * escala;
+      const ch = sh * (1 + folga) * escala;
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(grade.colunas * cw);
+      cv.height = Math.round(grade.linhas * ch);
+      const ctx = cv.getContext('2d')!;
+      for (const pos of grade.posicoes) {
+        ctx.drawImage(img, c.x * W, c.y * H, sw, sh, pos.x * cw - (sw * escala) / 2, pos.y * ch - (sh * escala) / 2, sw * escala, sh * escala);
+      }
+      const blob = await new Promise<Blob>((resolve, reject) => cv.toBlob(b => (b ? resolve(b) : reject(new Error('Não foi possível montar a foto do kit.'))), 'image/png'));
+      return URL.createObjectURL(blob);
+    })();
+    p.catch(() => fotosMultiplicadas.delete(chave));
+    fotosMultiplicadas.set(chave, p);
+  }
+  return fotosMultiplicadas.get(chave)!;
+};
+
 /** Endereço da foto sem tratamento. */
 export const origemDaFoto = (foto: FabricImage) => dadosDe(foto)?.origem || foto.getSrc();
 
@@ -219,10 +266,13 @@ export const montarFoto = async (foto: FabricImage, url: string) => {
   const largura = (foto.width || 1) * (foto.scaleX || 1);
   const altura = (foto.height || 1) * (foto.scaleY || 1);
   const centro = foto.getCenterPoint();
-  const src = d.semFundo !== undefined ? await fotoSemFundo(url, d.semFundo) : url;
+  const vezes = vezesDaFoto(d);
+  let src = d.semFundo !== undefined ? await fotoSemFundo(url, d.semFundo) : url;
+  // foto de kit: o corte vai na montagem (cada cópia já sai cortada); a montagem entra inteira
+  if (vezes > 1) src = await fotoMultiplicada(src, vezes, d.corteAuto ? 'AUTO' : d.corte || CORTE_INTEIRO);
   await foto.setSrc(src, { crossOrigin: 'anonymous' });
   (foto as any).dadosElemento = d;
-  aplicarCorte(foto, (d.corteAuto && corteDasSobras(foto)) || d.corte || CORTE_INTEIRO);
+  aplicarCorte(foto, vezes > 1 ? CORTE_INTEIRO : (d.corteAuto && corteDasSobras(foto)) || d.corte || CORTE_INTEIRO);
   const escala = Math.min(largura / (foto.width || 1), altura / (foto.height || 1));
   foto.set({ scaleX: escala, scaleY: escala });
   foto.setPositionByOrigin(centro, 'center', 'center');
@@ -233,7 +283,7 @@ export const montarFoto = async (foto: FabricImage, url: string) => {
 export const refazerFotosTratadas = async (c: StaticCanvas) => {
   for (const o of c.getObjects()) {
     const d = dadosDe(o);
-    if (d?.tipo === 'FOTO' && d.semFundo !== undefined && d.origem) await montarFoto(o as FabricImage, d.origem);
+    if (d?.tipo === 'FOTO' && (d.semFundo !== undefined || vezesDaFoto(d) > 1) && d.origem) await montarFoto(o as FabricImage, d.origem);
   }
 };
 

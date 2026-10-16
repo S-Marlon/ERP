@@ -7,7 +7,7 @@ import { Request, Response } from 'express';
 import pool from '../../../infra/db';
 import { ErroArquivo, salvarArquivo } from '../../../infra/arquivos';
 import { apagarArquivos, semUso } from '../arquivosEmUso';
-import { ehImagemDeMedidas, lerIds, ordemComNovaNaPosicao, lerPosicao } from '../produtos/ordemAnexos';
+import { ehImagemGeradaNoEditor, lerIds, ordemComNovaNaPosicao, lerPosicao } from '../produtos/ordemAnexos';
 import { CampoEtiqueta, camposQueVariam, modeloPadraoDosCampos } from '../imagens/camposEtiqueta';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
@@ -278,7 +278,7 @@ export const dadosDoEditorFamilia = async (req: Request, res: Response) => {
     const saida = itens.map((i: any) => {
       const id = Number(i.id_item);
       // fotos limpas do item (sem as imagens de medidas geradas pelo editor)
-      const fotos = anexos.filter((a: any) => Number(a.id_item) === id && !ehImagemDeMedidas(a.nome_arquivo)).map((a: any) => ({ url: a.url_anexo, nome: a.nome_arquivo }));
+      const fotos = anexos.filter((a: any) => Number(a.id_item) === id && !ehImagemGeradaNoEditor(a.nome_arquivo)).map((a: any) => ({ url: a.url_anexo, nome: a.nome_arquivo }));
       const campos: CampoEtiqueta[] = [];
       for (const v of valores.filter((x: any) => Number(x.id_entidade) === id)) {
         const valor = valorExibicao(v);

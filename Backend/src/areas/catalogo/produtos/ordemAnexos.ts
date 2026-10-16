@@ -6,6 +6,13 @@
  * da principal e não serve de base para desenhar outra.
  */
 export const ehImagemDeMedidas = (nomeArquivo: string | null | undefined) => /-(editada|medida)\.jpe?g$/i.test(String(nomeArquivo || '').trim());
+/** Foto do pacote com N unidades gerada no editor ("SKU-kit10.jpg"): N, ou null se não é foto de kit. */
+export const kitDaImagem = (nomeArquivo: string | null | undefined): number | null => {
+  const m = String(nomeArquivo || '').trim().match(/-kit(\d+)\.(jpe?g|png|webp)$/i);
+  return m ? Number(m[1]) : null;
+};
+/** Imagem gerada no editor (medidas ou foto de kit): não serve de foto-base do item. */
+export const ehImagemGeradaNoEditor = (nomeArquivo: string | null | undefined) => ehImagemDeMedidas(nomeArquivo) || kitDaImagem(nomeArquivo) !== null;
 
 /** Posição pedida no corpo (1 = primeira); null quando não veio ou não é um número inteiro maior que zero. */
 export const lerPosicao = (v: unknown): number | null => {

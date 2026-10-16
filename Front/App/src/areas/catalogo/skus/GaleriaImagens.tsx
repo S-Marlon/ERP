@@ -6,7 +6,7 @@ import { Button, Flex, Image, Popconfirm, Spin, Tag, Tooltip, Typography, messag
 import { DeleteOutlined, LeftOutlined, PlusOutlined, RightOutlined, StarFilled, StarOutlined } from '@ant-design/icons';
 import EnviarFotoPopover from '../../../shared/components/EnviarFotoPopover';
 import { AnexoItem, adicionarAnexo, enviarArquivoAnexo, ordenarImagens, removerAnexo } from './CatalogSku.service';
-import { AvisoFoto, avisosDaFoto, comMedidasEmSegundo, ehImagemDeMedidas, moverFoto } from './galeriaFotos';
+import { AvisoFoto, avisosDaFoto, comMedidasEmSegundo, ehImagemDeMedidas, kitDaImagem, moverFoto } from './galeriaFotos';
 
 const { Text } = Typography;
 
@@ -104,6 +104,11 @@ const GaleriaImagens: React.FC<Props> = ({ idItem, acoes: acoesProprias, imagens
                 <Flex justify="space-between" align="center" style={{ marginBottom: 4 }}>
                   <Text strong style={{ fontSize: 11 }}>{k + 1}ª{principal ? ` · ${rotuloPrincipal}` : ''}</Text>
                   {ehImagemDeMedidas(foto.nome_arquivo) && <Tag color="blue" style={{ margin: 0, fontSize: 10, lineHeight: '16px' }}>medidas</Tag>}
+                  {kitDaImagem(foto.nome_arquivo) !== null && (
+                    <Tooltip title={`Foto do kit c/${kitDaImagem(foto.nome_arquivo)}: no ML vai primeiro só no anúncio desse kit (a unidade não usa)`}>
+                      <Tag color="purple" style={{ margin: 0, fontSize: 10, lineHeight: '16px' }}>kit {kitDaImagem(foto.nome_arquivo)}</Tag>
+                    </Tooltip>
+                  )}
                   {etiqueta?.(foto)}
                 </Flex>
                 <Image

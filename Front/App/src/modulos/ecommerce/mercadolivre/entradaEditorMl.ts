@@ -12,6 +12,7 @@ export const entradaDoAnuncio = (det: AnuncioDetalhe, idFotoFamiliaInicial: numb
     fotoPorItem: true, idFotoFamiliaInicial,
     itens: porItem.itens.map(i => ({
       idItem: i.idItem, sku: i.sku, nome: i.tituloMl || i.nome, foto: fotoBaseDoItem(i), campos: camposDoItem(det, i), noMl: !!i.ml.mlbId,
+      kits: [...new Set(det.itens.filter(x => x.idItem === i.idItem && (x.unidadeMl?.fator || 1) > 1).map(x => x.unidadeMl!.fator))].sort((a, b) => a - b),
     })),
   };
 };

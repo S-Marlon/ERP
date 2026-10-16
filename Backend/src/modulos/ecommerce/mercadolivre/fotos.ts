@@ -1,9 +1,19 @@
 // Regras puras das fotos do ML: entender o que o operador colou (link ou código) para buscar as fotos.
 
-import { ehImagemDeMedidas } from '../../../areas/catalogo/produtos/ordemAnexos';
+import { ehImagemGeradaNoEditor, kitDaImagem } from '../../../areas/catalogo/produtos/ordemAnexos';
 
 /** Imagem gerada pelo editor ou pelo gerador de medidas: já tem medidas desenhadas, não serve de base (regra do catálogo). */
-export const ehImagemGerada = ehImagemDeMedidas;
+export const ehImagemGerada = ehImagemGeradaNoEditor;
+
+/**
+ * Fotos de uma linha do anúncio: a linha em kit c/N leva primeiro a foto do kit c/N (a do produto repetido N vezes) e
+ * depois as do item; a unidade (e o kit de outro tamanho) não leva foto de kit nenhuma.
+ */
+export const fotosDaLinha = <T extends { nome: string }>(lista: T[], fator: number): T[] => {
+  const outras = lista.filter(f => kitDaImagem(f.nome) === null);
+  if (!(fator > 1)) return outras;
+  return [...lista.filter(f => kitDaImagem(f.nome) === fator), ...outras];
+};
 
 export interface FotoDaVariacao { chave: string; url: string; nome: string }
 
@@ -21,7 +31,7 @@ export const fotosDaVariacao = (
   const principal = daFamilia.filter(f => f.uso === 'PRINCIPAL').map(comoFoto);
   const comuns = daFamilia.filter(f => (f.uso || 'COMUM') === 'COMUM').map(comoFoto);
   const proprias = doItem.map(f => ({ chave: String(f.idAnexo), url: f.url, nome: f.nome }));
-  const comecaLimpa = proprias.length > 0 && !ehImagemDeMedidas(proprias[0].nome);
+  const comecaLimpa = proprias.length > 0 && !ehImagemGeradaNoEditor(proprias[0].nome);
   const lista = [...(comecaLimpa ? [] : principal.slice(0, 1)), ...proprias, ...comuns];
   const vistas = new Set<string>();
   return lista.filter(f => (vistas.has(f.url) ? false : (vistas.add(f.url), true)));
