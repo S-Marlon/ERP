@@ -7,7 +7,7 @@ import {
   ReloadOutlined, SyncOutlined,
 } from '@ant-design/icons';
 import {
-  AnuncioResumo, anunciosApi, FinanceiroItem, formatarMoeda, ItemResumo, resumoSincronizacao, ROTULO_STATUS_ML, ROTULO_TIPO_ANUNCIO, SituacaoSincronizacao,
+  AnuncioResumo, anunciosApi, Desempenho, FinanceiroItem, formatarMoeda, ItemResumo, NumerosDesempenho, resumoSincronizacao, ROTULO_STATUS_ML, ROTULO_TIPO_ANUNCIO, SituacaoSincronizacao,
 } from './mercadoLivreApi';
 import { faixaMoeda, FiltroLista, lucroBaixo, passaNoFiltro, resumirFinanceiro, ResumoFinanceiro, semEstoqueNoMl } from './listaAnuncios';
 import { AtivoNoMl, EstoqueRapido, PrecoRapido } from './AcoesRapidas';
@@ -18,6 +18,7 @@ import SituacaoTag from './SituacaoTag';
 import ImportarMlModal from './ImportarMlModal';
 import AjudaCatalogo from './AjudaCatalogo';
 import SugestoesMl, { DestinoSugestao } from './SugestoesMl';
+import { Cobertura, DesempenhoCelula } from './DesempenhoMl';
 
 const { Text } = Typography;
 
@@ -40,6 +41,7 @@ const AnunciosMercadoLivre: React.FC = () => {
   const [selecionados, setSelecionados] = useState<number[]>([]);
   const [emMassa, setEmMassa] = useState(false);
   const [visao, setVisao] = useState<Visao>('anuncios');
+  const [desempenho, setDesempenho] = useState<Desempenho | null>(null);
 
   const calcular = useCallback(async () => {
     setCalculando(true);
@@ -53,7 +55,19 @@ const AnunciosMercadoLivre: React.FC = () => {
     catch (e) { message.error(erroMsg(e)); }
     finally { setCarregando(false); }
     calcular();
+    anunciosApi.desempenho().then(setDesempenho).catch(() => undefined);   // a lista funciona sem
   }, [calcular]);
+  const desempenhoDe = useMemo(() => new Map((desempenho?.anuncios || []).map(d => [d.id, d])), [desempenho]);
+  const desempenhoDaLinha = (idAnuncio: number, idLinha: number) => desempenhoDe.get(idAnuncio)?.linhas.find(l => l.idLinha === idLinha);
+  const colunaDesempenho = <T,>(de: (l: T) => { atual: NumerosDesempenho; anterior: NumerosDesempenho; semVisitas?: boolean } | undefined) => ({
+    title: <Tooltip title="Últimos 30 dias: visitas (com a variação sobre os 30 anteriores), vendas e conversão. Passe o mouse para o comparativo.">Desempenho</Tooltip>,
+    width: 104,
+    sorter: (x: T, y: T) => (de(x)?.atual.visitas ?? -1) - (de(y)?.atual.visitas ?? -1),
+    render: (_: unknown, l: T) => {
+      const d = de(l);
+      return d && desempenho ? <DesempenhoCelula atual={d.atual} anterior={d.anterior} semVisitas={d.semVisitas} periodo={desempenho.periodo} dias={desempenho.dias} /> : null;
+    },
+  });
   useEffect(() => { carregar(); }, [carregar]);
 
   // Atualização automática de estoque/preço no ML: mostra a última rodada e permite rodar agora
@@ -163,9 +177,10 @@ const AnunciosMercadoLivre: React.FC = () => {
         },
         { title: 'Preço no ML', width: 180, render: (_, i) => <PrecoRapido idAnuncio={a.id} idLinha={i.idLinha} atual={itemDoFin(a, i.idLinha)} valor={i.preco} proprio={i.precoMl !== null} onSalvar={v => salvarPreco(a, i, v)} /> },
         ...colunasLucro<ItemResumo>(i => itemDoFin(a, i.idLinha), { onAplicarPreco: (i, preco) => salvarPreco(a, i, preco), compacto: true }),
+        colunaDesempenho<ItemResumo>(i => desempenhoDaLinha(a.id, i.idLinha)),
         {
           title: 'Estoque', width: 120, align: 'right',
-          render: (_, i) => <Text><Text type="secondary" style={{ fontSize: 12 }}>ERP {i.estoque} →</Text> <Text strong style={{ color: i.mlbId && i.estoqueMl === 0 ? '#cf1322' : undefined }}>ML {i.estoqueMl}</Text>{i.unidade ? <Text type="secondary" style={{ fontSize: 11 }}> {i.unidade}</Text> : null}</Text>,
+          render: (_, i) => <><Text><Text type="secondary" style={{ fontSize: 12 }}>ERP {i.estoque} →</Text> <Text strong style={{ color: i.mlbId && i.estoqueMl === 0 ? '#cf1322' : undefined }}>ML {i.estoqueMl}</Text>{i.unidade ? <Text type="secondary" style={{ fontSize: 11 }}> {i.unidade}</Text> : null}</Text><div><Cobertura dias={desempenhoDaLinha(a.id, i.idLinha)?.coberturaDias} periodo={desempenho?.dias ?? 30} /></div></>,
         },
       ]}
     />
@@ -243,7 +258,7 @@ const AnunciosMercadoLivre: React.FC = () => {
         {visao === 'itens' ? (
           <Table<LinhaItem>
             size="middle" rowKey="chave" loading={carregando} dataSource={linhasItens} pagination={{ pageSize: 30, hideOnSinglePage: true, showSizeChanger: false }}
-            scroll={{ x: 1450 }}
+            scroll={{ x: 1550 }}
             rowClassName={l => (l.f?.nivel === 'PREJUIZO' ? 'ml-linha-erro' : '')}
             locale={{ emptyText: <Empty description="Nenhum item neste filtro." /> }}
             columns={[
@@ -271,9 +286,10 @@ const AnunciosMercadoLivre: React.FC = () => {
                 render: (_, l) => <PrecoRapido idAnuncio={l.a.id} idLinha={l.i.idLinha} atual={l.f} valor={l.i.preco} proprio={l.i.precoMl !== null} onSalvar={v => salvarPreco(l.a, l.i, v)} />,
               },
               ...colunasLucro<LinhaItem>(l => l.f, { onAplicarPreco: (l, preco) => salvarPreco(l.a, l.i, preco) }),
+              colunaDesempenho<LinhaItem>(l => desempenhoDaLinha(l.a.id, l.i.idLinha)),
               {
                 title: 'Estoque', width: 120, align: 'right', sorter: (x, y) => x.i.estoqueMl - y.i.estoqueMl,
-                render: (_, l) => <Text><Text type="secondary" style={{ fontSize: 12 }}>ERP {l.i.estoque} →</Text> <Text strong style={{ color: l.i.mlbId && l.i.estoqueMl === 0 ? '#cf1322' : undefined }}>ML {l.i.estoqueMl}</Text></Text>,
+                render: (_, l) => <><Text><Text type="secondary" style={{ fontSize: 12 }}>ERP {l.i.estoque} →</Text> <Text strong style={{ color: l.i.mlbId && l.i.estoqueMl === 0 ? '#cf1322' : undefined }}>ML {l.i.estoqueMl}</Text></Text><div><Cobertura dias={desempenhoDaLinha(l.a.id, l.i.idLinha)?.coberturaDias} periodo={desempenho?.dias ?? 30} /></div></>,
               },
               { title: '', width: 48, fixed: 'right', render: (_, l) => <Tooltip title="Abrir o anúncio"><Button type="text" icon={<EditOutlined />} onClick={() => setEditando(l.a.id)} /></Tooltip> },
             ]}
@@ -281,7 +297,7 @@ const AnunciosMercadoLivre: React.FC = () => {
         ) : (
         <Table<AnuncioResumo>
           size="middle" rowKey="id" loading={carregando} dataSource={visiveis} pagination={{ pageSize: 20, hideOnSinglePage: true }}
-          scroll={{ x: 1550 }}
+          scroll={{ x: 1650 }}
           rowSelection={{
             selectedRowKeys: selecionados, onChange: k => setSelecionados(k as number[]),
             getCheckboxProps: a => ({ disabled: a.ativosMl + a.pausadosMl === 0 }),
@@ -326,13 +342,17 @@ const AnunciosMercadoLivre: React.FC = () => {
                 : <Text>{a.precoMin === null ? '—' : faixaMoeda(a.precoMin, a.precoMax ?? a.precoMin, formatarMoeda)}</Text>),
             },
             ...colunasLucro<AnuncioResumo>(finUnico, { onAplicarPreco: (a, preco) => salvarPreco(a, a.itens[0], preco) }),
+            colunaDesempenho<AnuncioResumo>(a => desempenhoDe.get(a.id)),
             {
               title: 'Estoque', width: 130, align: 'right',
               render: (_, a) => (
-                <EstoqueRapido
-                  erp={a.estoque} ml={a.estoqueMl} noMl={a.ativosMl + a.pausadosMl > 0} reserva={a.estoqueReserva} maximo={a.estoqueMaximo}
-                  onSalvar={r => salvarEstoque(a, r)}
-                />
+                <>
+                  <EstoqueRapido
+                    erp={a.estoque} ml={a.estoqueMl} noMl={a.ativosMl + a.pausadosMl > 0} reserva={a.estoqueReserva} maximo={a.estoqueMaximo}
+                    onSalvar={r => salvarEstoque(a, r)}
+                  />
+                  <div><Cobertura dias={desempenhoDe.get(a.id)?.coberturaDias} periodo={desempenho?.dias ?? 30} /></div>
+                </>
               ),
             },
             {

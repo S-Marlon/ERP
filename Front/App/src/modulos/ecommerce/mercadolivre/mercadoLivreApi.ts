@@ -269,6 +269,13 @@ export interface SugestaoMl {
   economia: number | null;                                   // R$ a mais por venda; null = sem valor (cadastro)
   acao: { aba: 'preco' | 'itens'; secao?: SecaoPreco };
 }
+export interface NumerosDesempenho { visitas: number; vendas: number; unidades: number; conversao: number | null }
+export interface DesempenhoPeriodos { atual: { de: string; ate: string }; anterior: { de: string; ate: string } }
+export interface DesempenhoAnuncio {
+  id: number; atual: NumerosDesempenho; anterior: NumerosDesempenho; semVisitas: boolean; coberturaDias: number | null;
+  linhas: { idLinha: number; atual: NumerosDesempenho; anterior: NumerosDesempenho; coberturaDias: number | null }[];
+}
+export interface Desempenho { dias: number; periodo: DesempenhoPeriodos; anuncios: DesempenhoAnuncio[] }
 export interface FaixasFrete {
   logistica: string | null;
   linhas: { ateG: number; gratisAbaixo79: number | null; compradorPaga20: number | null; compradorPaga50: number | null; acima79: number | null }[];
@@ -365,6 +372,8 @@ export const anunciosApi = {
   /** Central de sugestões: o que mudar em cada linha para custar menos ou lucrar mais (de todos os anúncios ou de um). */
   sugestoes: async (id?: number) =>
     ler<{ sugestoes: SugestaoMl[]; titulos: Record<number, string> }>(await fetch(`${API}/anuncios/sugestoes?tenant_id=1${id ? `&id=${id}` : ''}`), 'Erro ao montar as sugestões.'),
+  /** Visitas, vendas e conversão (30 dias × 30 anteriores) e cobertura do estoque, por anúncio e por linha. */
+  desempenho: async () => ler<Desempenho>(await fetch(`${API}/anuncios/desempenho?tenant_id=1`), 'Erro ao ler o desempenho dos anúncios.'),
   /** Quanto o ML cobra do vendedor por faixa de peso hoje (guia de frete). */
   faixasFrete: async () => ler<FaixasFrete>(await fetch(`${API}/frete/faixas?tenant_id=1`), 'Erro ao ler as faixas de frete.'),
   categoria: async (id?: string | null) => ler<CategoriaNo>(await fetch(`${API}/categorias${id ? `/${id}` : ''}?tenant_id=1`), 'Erro ao ler categorias.'),
