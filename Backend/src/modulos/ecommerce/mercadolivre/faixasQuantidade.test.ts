@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { corpoFaixas, errosDasFaixas, faixasDaLinha, faixasDoAtacado, faixasDoMl, lerFaixas, normalizarFaixas, precoNaFaixa } from './faixasQuantidade';
+import { avisosDaEscada, corpoFaixas, errosDasFaixas, faixasDaLinha, faixasDoAtacado, faixasDoMl, lerFaixas, normalizarFaixas, precoNaFaixa } from './faixasQuantidade';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -51,4 +51,15 @@ teste('escada só na forma unidade (no kit c/10, "a partir de 10" seriam 100 pe�
   assert.deepStrictEqual(faixasDaLinha(escada, 1), escada);
   assert.deepStrictEqual(faixasDaLinha(escada, 10), []);   // kit: sem escada (o envio apaga a que estiver no ML)
   assert.deepStrictEqual(faixasDaLinha(escada, 2), []);
+});
+
+teste('escada própria da forma e avisos em peças no kit', () => {
+  const anuncio = [{ minimo: 2, desconto: 5 }, { minimo: 10, desconto: 8 }];
+  const doKit = [{ minimo: 3, desconto: 4 }];
+  assert.deepStrictEqual(faixasDaLinha(anuncio, 10, doKit), doKit);   // kit com a própria
+  assert.deepStrictEqual(faixasDaLinha(anuncio, 1, []), []);          // unidade sem escada (escolhido)
+  assert.deepStrictEqual(faixasDaLinha(anuncio, 1, null), anuncio);   // unidade segue o anúncio
+  assert.deepStrictEqual(avisosDaEscada(doKit, 10), []);              // 3 kits = 30 peças: sem aviso
+  assert.strictEqual(avisosDaEscada([{ minimo: 10, desconto: 8 }], 10, 'PC')[0].startsWith('A partir de 10 kits = 100 PC'), true);
+  assert.deepStrictEqual(avisosDaEscada(anuncio, 1), []);             // unidade: a quantidade já é em peças
 });

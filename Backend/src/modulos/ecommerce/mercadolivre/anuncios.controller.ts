@@ -15,7 +15,7 @@ import { ErroML, ml } from './mercadolivreApi';
 import { ehImagemGerada } from './fotos';
 import { sincronizarAnuncios } from './sincronizacao';
 import { errosDasFaixas, faixasDoAtacado, lerFaixas, normalizarFaixas } from './faixasQuantidade';
-import { enviarFaixasDoAnuncio } from './faixas.controller';
+import { enviarFaixas, enviarFaixasDoAnuncio, faixasEfetivas } from './faixas.controller';
 import { contaB2B } from './mercadolivreApi';
 import { aplicarModoDeVenda, vendaDoAnuncio } from './modoVenda';
 import { prejuizoDaLinha, prejuizosDasLinhas } from './precificacao.controller';
@@ -268,7 +268,7 @@ export const carregarAnuncios = async (conn: Conn, tenant: number, idAnuncio?: n
   if (anuncios.length === 0) return [];
   const idsAnuncios = anuncios.map((a: any) => Number(a.id));
   const [vinculos] = await conn.execute(
-    `SELECT id_anuncio_item, id_anuncio, id_item, id_unidade, ativo, preco, mlb_id, status_ml, permalink, ultimo_erro, fotos_ml, estoque_reserva, estoque_maximo,
+    `SELECT id_anuncio_item, id_anuncio, id_item, id_unidade, ativo, preco, faixas_quantidade, mlb_id, status_ml, permalink, ultimo_erro, fotos_ml, estoque_reserva, estoque_maximo,
             estoque_enviado, preco_enviado, DATE_FORMAT(sincronizado_em, '%Y-%m-%d %H:%i') AS sincronizado_fmt
      FROM modulo_ecommerce_mercadolivre_anuncios_itens
      WHERE tenant_id = ? AND id_anuncio IN (${lista(idsAnuncios)}) ORDER BY ordem, id_item, id_anuncio_item`,
@@ -290,7 +290,10 @@ export const carregarAnuncios = async (conn: Conn, tenant: number, idAnuncio?: n
     }]));
     const itensDoAnuncio: ItemAnuncio[] = meus.map((v: any) => {
       const idLinha = Number(v.id_anuncio_item);
-      const base: ItemAnuncio = { ...itens.get(Number(v.id_item))!, idLinha, linhaAtiva: Number(v.ativo) !== 0 };
+      const base: ItemAnuncio = {
+        ...itens.get(Number(v.id_item))!, idLinha, linhaAtiva: Number(v.ativo) !== 0,
+        faixasProprias: v.faixas_quantidade === null || v.faixas_quantidade === undefined ? null : lerFaixas(v.faixas_quantidade),
+      };
       const regra = regraDoItem(regraEstoque, noMl.get(idLinha)!.regra);
       // Vendido no ML em outra unidade (ex.: kit c/10): saldo, preço, SKU e GTIN nessa unidade
       const unidade = v.id_unidade ? (unidades.get(base.idItem) || []).find(u => u.idUnidade === Number(v.id_unidade)) || null : null;
@@ -1076,6 +1079,18 @@ export const salvarItem = async (req: Request, res: Response) => {
       campos.push('preco = ?');
       valores.push(preco);
     }
+    // escada só desta forma: null = volta à regra (unidade segue o anúncio, kit sem escada); [] = sem escada
+    const mudaFaixas = 'faixas' in b;
+    if (mudaFaixas) {
+      if (b.faixas === null) campos.push('faixas_quantidade = NULL');
+      else {
+        const faixas = normalizarFaixas(b.faixas);
+        const erros = errosDasFaixas(faixas);
+        if (erros.length) throw new ErroML(erros[0]);
+        campos.push('faixas_quantidade = ?');
+        valores.push(JSON.stringify(faixas));
+      }
+    }
     const regras: [string, string, string][] = [['estoqueReserva', 'estoque_reserva', 'Reserva da loja'], ['estoqueMaximo', 'estoque_maximo', 'Teto no ML']];
     for (const [chave, coluna, nome] of regras) {
       if (!(chave in b)) continue;
@@ -1118,6 +1133,15 @@ export const salvarItem = async (req: Request, res: Response) => {
     const enviados = await sincronizarAnuncios(tenant, { idAnuncio: id, idLinha });
     const recusado = enviados.find(r => r.erro);
     if (recusado) throw new ErroML(`Salvo no ERP, mas o ML recusou: ${recusado.erro}`);
+    // escada mudou e a forma já está no ML: vai na hora
+    if (mudaFaixas && linha.mlb_id && !foraDoMl(linha.status_ml)) {
+      const [ca] = await carregarAnuncios(pool as any, tenant, id);
+      const item = ca?.itens.find(i => i.idLinha === idLinha);
+      if (item) {
+        await enviarFaixas(tenant, String(linha.mlb_id), faixasEfetivas(ca, item) || [], precoNoMl(item, ca.dados.ajustePreco))
+          .catch((e: any) => { throw new ErroML(`Escada salva no ERP, mas o ML recusou: ${e?.message || 'erro'}`); });
+      }
+    }
     const [c] = await carregarAnuncios(pool as any, tenant, id);
     return res.json(await detalhe(tenant, c));
   } catch (error) {

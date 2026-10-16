@@ -15,8 +15,8 @@ import {
 } from './anuncios.controller';
 import { contaPorFamilia, enviarFotoMl, ErroML, ml } from './mercadolivreApi';
 import { sincronizarAnuncios, situacaoAutomatica } from './sincronizacao';
-import { enviarFaixas, enviarFaixasDoAnuncio } from './faixas.controller';
-import { faixasDaLinha, lerFaixas } from './faixasQuantidade';
+import { enviarFaixas, enviarFaixasDoAnuncio, faixasEfetivas } from './faixas.controller';
+import { lerFaixas } from './faixasQuantidade';
 import { fotosDaLinha, fotosDaVariacao } from './fotos';
 import { prejuizoDaLinha } from './precificacao.controller';
 import { Divergencia, divergenciasDaLinha, PacoteMl, pacoteParaTrazer } from './divergencias';
@@ -188,7 +188,7 @@ export const publicarAnuncio = async (req: Request, res: Response) => {
         const criado: any = await ml(tenant, 'POST', '/items', corpo);
         const descricao = descricaoDoItem(c, item);
         if (descricao) await ml(tenant, 'POST', `/items/${criado.id}/description`, { plain_text: descricao }).catch(() => null);
-        const faixas = faixasDaLinha(lerFaixas(c.registro.faixas_quantidade), item.unidadeMl?.fator || 1);   // kit: sem escada
+        const faixas = faixasEfetivas(c, item) || [];   // a da forma; senão a do anúncio na unidade, nenhuma no kit
         if (faixas.length) {
           await enviarFaixas(tenant, criado.id, faixas, corpo.price)
             .catch((e: any) => falhas.push({ sku: item.sku, erro: `publicado, mas as faixas por quantidade não foram: ${e?.message || 'erro'}` }));

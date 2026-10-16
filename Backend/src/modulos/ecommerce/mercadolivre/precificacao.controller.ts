@@ -8,7 +8,8 @@ import { custoDoKit } from '../../../areas/catalogo/kits/kits';
 import { ItemAnuncio, normalizar, precoNoMl, resolverValor, saldoNaUnidade } from './anuncios';
 import { formasDoItem, lerPrecos, lerQuantidades, precoPorUnidade, quantidadeDaLinha, siglaDoKit } from './formasVenda';
 import { AnuncioCarregado, carregarAnuncios, responderErro, taxaMl, tenantDe } from './anuncios.controller';
-import { faixasDaLinha, lerFaixas } from './faixasQuantidade';
+import { avisosDaEscada, errosDasFaixas, lerFaixas, normalizarFaixas } from './faixasQuantidade';
+import { faixasEfetivas } from './faixas.controller';
 import { compararAtributos } from './catalogo';
 import {
   classificarLucro, classificarPreco, conselhos, estatisticas, lucroNoMl, precoParaAlvo, Tarifa, unidadesDoProduto,
@@ -283,7 +284,7 @@ export const analisarPreco = async (req: Request, res: Response) => {
     const precoMercado = mercado.estatisticas ? r2(mercado.estatisticas.mediana * unidades) : null;
 
     // por quantidade: preço da faixa, tarifa por unidade e um frete por envio (a compra maior pode passar do limite)
-    const faixasAnuncio = faixasDaLinha(lerFaixas(c.registro.faixas_quantidade), item.unidadeMl?.fator || 1);   // kit: sem escada
+    const faixasAnuncio = faixasEfetivas(c, item) || [];   // a da forma; senão a do anúncio na unidade, nenhuma no kit
     const porQuantidade = [];
     for (const q of quantidadesParaAnalise(precoAtual, faixasAnuncio)) {
       const precoUnit = r2(precoAtual * (1 - q.desconto / 100));
@@ -435,6 +436,47 @@ export const formasDeVenda = async (req: Request, res: Response) => {
     return res.json({ idItem: linha.idItem, sku: base?.sku || linha.sku, custoUnidade, alvoPct, formas });
   } catch (error) {
     return responderErro(res, error, 'Erro ao calcular as formas de venda.');
+  }
+};
+
+/**
+ * GET /anuncios/:id/itens/:idLinha/escada?faixas=3:4,5:6 — a escada da forma (a informada, ou a que vale hoje) com cada
+ * degrau: quantidade (na unidade do anúncio), peças, preço, frete de um envio, lucro da compra e por unidade.
+ */
+export const escadaDaLinha = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  try {
+    const [c] = await carregarAnuncios(pool as any, tenant, Number(req.params.id));
+    if (!c) throw new ErroML('Anúncio não encontrado.', 404);
+    const item = c.itens.find(i => i.idLinha === Number(req.params.idLinha));
+    if (!item) throw new ErroML('Item não encontrado neste anúncio.', 404);
+    if (!c.dados.categoriaMl) throw new ErroML('Escolha a categoria do ML antes: a tarifa depende dela.');
+    const informada = req.query.faixas !== undefined
+      ? normalizarFaixas(String(req.query.faixas || '').split(',').filter(Boolean).map(p => { const [m, d] = p.split(':'); return { minimo: Number(m), desconto: Number(d) }; }))
+      : null;
+    const faixas = informada ?? faixasEfetivas(c, item) ?? [];
+    const fator = item.unidadeMl?.fator || 1;
+    const ctx = await contextoVenda(tenant, c, item);
+    const preco = precoNoMl(item, c.dados.ajustePreco);
+    let freteDesconhecido = false;
+    const degraus = [];
+    for (const f of [{ minimo: 1, desconto: 0 }, ...faixas]) {
+      const precoUnit = r2(preco * (1 - f.desconto / 100));
+      const frete = await ctx.freteDe(r2(precoUnit * f.minimo), f.minimo);
+      if (frete === null) freteDesconhecido = true;
+      const r = resultadoVenda({ precoUnit, quantidade: f.minimo, custoUnit: ctx.custo, tarifa: await ctx.tarifaDe(precoUnit), frete: frete ?? 0 });
+      degraus.push({
+        ...r, desconto: f.desconto, pecas: f.minimo * fator, precoPorPeca: r2(precoUnit / fator),
+        nivel: classificarLucro(ctx.custo > 0 ? r.lucroSobreCustoPct : null, ctx.alvo.alvoPct),
+      });
+    }
+    return res.json({
+      idLinha: item.idLinha, fator, siglaBase: item.siglaBase || 'un', preco, alvoPct: ctx.alvo.alvoPct,
+      propria: item.faixasProprias ?? null, doAnuncio: c.registro.faixas_quantidade === null || c.registro.faixas_quantidade === undefined ? null : lerFaixas(c.registro.faixas_quantidade),
+      faixas, degraus, freteDesconhecido, erros: errosDasFaixas(faixas), avisos: avisosDaEscada(faixas, fator, item.siglaBase || 'un'),
+    });
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao calcular a escada.');
   }
 };
 

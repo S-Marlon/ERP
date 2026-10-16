@@ -40,10 +40,20 @@ export const normalizarFaixas = (entrada: any[]): FaixaQuantidade[] =>
 /** Corpo do POST /items/:id/prices/price-per-quantity (substitui a tabela inteira; vazio apaga). */
 /**
  * Escada que vai para uma linha do anúncio. Cada forma de venda é um anúncio separado no ML e a quantidade da escada
- * conta na unidade DAQUELE anúncio: no kit c/10, "a partir de 10" são 10 kits = 100 peças. Por isso a escada do anúncio
- * vale só para a forma unidade; o kit fica sem escada (até ter a própria).
+ * conta na unidade DAQUELE anúncio: no kit c/10, "a partir de 10" são 10 kits = 100 peças. A forma com escada própria
+ * usa a dela; sem, a unidade segue a escada do anúncio e o kit fica sem escada.
  */
-export const faixasDaLinha = (faixasAnuncio: FaixaQuantidade[], fator: number): FaixaQuantidade[] => (fator > 1 ? [] : faixasAnuncio);
+export const faixasDaLinha = (faixasAnuncio: FaixaQuantidade[], fator: number, propria: FaixaQuantidade[] | null = null): FaixaQuantidade[] =>
+  (propria !== null ? propria : fator > 1 ? [] : faixasAnuncio);
+
+/** A partir de quantas peças avisar que o degrau do kit é grande (o operador pode estar pensando em peças, não em kits). */
+export const PECAS_PARA_AVISAR = 50;
+
+/** Avisos da escada de uma forma: no kit, cada degrau em peças (e o que passa de PECAS_PARA_AVISAR). */
+export const avisosDaEscada = (faixas: FaixaQuantidade[], fator: number, siglaBase = 'un'): string[] =>
+  fator > 1
+    ? faixas.filter(f => f.minimo * fator >= PECAS_PARA_AVISAR).map(f => `A partir de ${f.minimo} kits = ${f.minimo * fator} ${siglaBase}: confira se é isso mesmo (a quantidade do kit conta em kits, não em peças).`)
+    : [];
 
 export const corpoFaixas = (faixas: FaixaQuantidade[]) => ({
   price_per_quantity: faixas.map(f => ({

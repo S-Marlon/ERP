@@ -2,7 +2,7 @@
 // do que o ML recomenda / do que já está lá.
 import { Request, Response } from 'express';
 import pool from '../../../infra/db';
-import { precoNoMl } from './anuncios';
+import { ItemAnuncio, precoNoMl } from './anuncios';
 import { AnuncioCarregado, carregarAnuncios, responderErro, tenantDe } from './anuncios.controller';
 import { corpoFaixas, FaixaQuantidade, faixasDaLinha, faixasDoMl, lerFaixas } from './faixasQuantidade';
 import { ErroML, ml } from './mercadolivreApi';
@@ -23,6 +23,17 @@ export const recomendacoes = async (tenant: number, mlb: string, preco: number, 
   }));
 };
 
+/**
+ * Escada que vale para a linha: a própria da forma; senão, a do anúncio na unidade e nenhuma no kit. null = nada definido
+ * no ERP (nem no anúncio nem na forma): o ERP não mexe na escada que estiver no ML.
+ */
+export const faixasEfetivas = (c: AnuncioCarregado, item: ItemAnuncio): FaixaQuantidade[] | null => {
+  const propria = item.faixasProprias ?? null;
+  const doAnuncio = c.registro.faixas_quantidade === null || c.registro.faixas_quantidade === undefined ? null : lerFaixas(c.registro.faixas_quantidade);
+  if (propria === null && doAnuncio === null) return null;
+  return faixasDaLinha(doAnuncio || [], item.unidadeMl?.fator || 1, propria);
+};
+
 /** Manda as faixas para um item publicado (lista vazia apaga as faixas de empresa do item). */
 export const enviarFaixas = async (tenant: number, mlb: string, faixas: FaixaQuantidade[], preco: number) => {
   if (faixas.length) {
@@ -39,14 +50,13 @@ export const enviarFaixas = async (tenant: number, mlb: string, faixas: FaixaQua
  * escada vazia (apaga a que estiver lá: a quantidade do kit conta em kits). Devolve as falhas por SKU.
  */
 export const enviarFaixasDoAnuncio = async (tenant: number, c: AnuncioCarregado) => {
-  // nunca definidas no ERP: não mexe nas faixas que estiverem no ML
-  if (c.registro.faixas_quantidade === null || c.registro.faixas_quantidade === undefined) return [];
-  const faixas = lerFaixas(c.registro.faixas_quantidade);
   const falhas: string[] = [];
   for (const item of c.itens) {
     const m = c.noMl.get(item.idLinha);
     if (!m?.mlbId || m.status === 'closed' || m.status === 'deleted') continue;
-    try { await enviarFaixas(tenant, m.mlbId, faixasDaLinha(faixas, item.unidadeMl?.fator || 1), precoNoMl(item, c.dados.ajustePreco)); }
+    const faixas = faixasEfetivas(c, item);
+    if (faixas === null) continue;   // nada definido no ERP: não mexe na escada que estiver no ML
+    try { await enviarFaixas(tenant, m.mlbId, faixas, precoNoMl(item, c.dados.ajustePreco)); }
     catch (e: any) { falhas.push(`${item.sku}: ${e?.message || 'erro'}`); }
   }
   return falhas;

@@ -28,6 +28,7 @@ export interface ItemAnuncio {
   ativo: boolean;
   preco: number;                    // preço de venda do ERP
   precoMl: number | null;           // preço só no ML (vazio = ERP + ajuste do anúncio)
+  faixasProprias?: { minimo: number; desconto: number }[] | null;   // escada só desta forma (null = regra do anúncio)
   estoque: number;                  // saldo do ERP (kit: quantos dá para montar)
   estoqueMl?: number;               // o que vai para o ML depois da reserva da loja e do teto
   kit?: boolean;

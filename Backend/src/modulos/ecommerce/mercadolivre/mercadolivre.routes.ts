@@ -14,7 +14,7 @@ import { faixasDeFrete, listarSugestoes } from './sugestoes.controller';
 import { desempenhoAnuncios } from './desempenho.controller';
 import { entrarNoCatalogo, verificarCatalogo } from './catalogo.controller';
 import { buscarFotosMl, fotosDoAnuncio, importarFotos, repassarImagem } from './fotos.controller';
-import { analisarPreco, financeiroAnuncio, financeiroAnuncios, formasDeVenda, simularPreco } from './precificacao.controller';
+import { analisarPreco, escadaDaLinha, financeiroAnuncio, financeiroAnuncios, formasDeVenda, simularPreco } from './precificacao.controller';
 import { buscarClientes, buscarPedidos, listarPedidos, resultadoPedidos, obterConfig, reprocessarPedido, salvarConfig } from './pedidos.controller';
 
 const router = Router();
@@ -41,6 +41,7 @@ router.delete('/anuncios/:id', excluirAnuncio);
 router.post('/anuncios/:id/itens', adicionarItens);
 router.put('/anuncios/:id/itens/:idLinha', salvarItem);
 router.post('/anuncios/:id/itens/:idLinha/modo', modoDaLinha);
+router.get('/anuncios/:id/itens/:idLinha/escada', escadaDaLinha);
 router.get('/anuncios/:id/divergencias', divergenciasAnuncio);
 router.post('/anuncios/:id/itens/:idLinha/corrigir-unidade', corrigirUnidade);
 router.post('/anuncios/:id/itens/:idLinha/unidade', adicionarUnidade);
