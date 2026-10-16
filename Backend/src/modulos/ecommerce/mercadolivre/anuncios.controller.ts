@@ -720,13 +720,9 @@ export const salvarAnuncio = async (req: Request, res: Response) => {
     if (b.categoriaMl !== undefined && (b.categoriaMl || null) !== a.categoria_ml) {
       const idCat = b.categoriaMl ? String(b.categoriaMl).trim().toUpperCase() : null;
       if (idCat) {
-        const cat = await carregarCategoria(tenant, idCat).catch((e: any) => { throw new ErroML(`Categoria ${idCat}: ${e?.message || 'não encontrada'}`); });
-        // mantém o que já foi ligado e que existe na categoria nova; sugere o resto pelo nome
-        const ids = new Set(cat.atributos.map(x => x.id));
-        const mantidos = Object.fromEntries(Object.entries(atributos).filter(([k]) => ids.has(k)));
-        const [vinc] = await pool.execute(`SELECT id_item FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE id_anuncio = ?`, [id]) as any;
-        const { atributosErp } = await carregarItens(pool as any, tenant, vinc.map((v: any) => Number(v.id_item)));
-        atributos = sugerirAtributos(cat.atributos, [...atributosErp].map(([i, nome]) => ({ id: i, nome })), mantidos);
+        const nova = await atributosNaCategoria(tenant, id, idCat, atributos);
+        const cat = nova.cat;
+        atributos = nova.atributos;
         definir('categoria_ml', idCat);
         definir('categoria_ml_nome', cat.caminho.slice(0, 255));
       } else {
@@ -908,6 +904,31 @@ const unidadeDoKit = async (conn: Conn, tenant: number, idItem: number, quantida
  * mantendo o anúncio do ML (o mesmo MLB) e o preço que está lá; o estoque passa a ir dividido por N. Título, unidades por
  * pacote e foto do kit vão ao ML pelo "Enviar atributos, fotos e descrição".
  */
+/** Atributos do anúncio numa categoria nova: mantém o que já foi ligado e existe nela; sugere o resto pelo nome. */
+const atributosNaCategoria = async (tenant: number, id: number, idCat: string, atuais: Record<string, ValorAtributo>) => {
+  const cat = await carregarCategoria(tenant, idCat).catch((e: any) => { throw new ErroML(`Categoria ${idCat}: ${e?.message || 'não encontrada'}`); });
+  const ids = new Set(cat.atributos.map(x => x.id));
+  const mantidos = Object.fromEntries(Object.entries(atuais).filter(([k]) => ids.has(k)));
+  const [vinc] = await pool.execute(`SELECT id_item FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE id_anuncio = ?`, [id]) as any;
+  const { atributosErp } = await carregarItens(pool as any, tenant, vinc.map((v: any) => Number(v.id_item)));
+  return { cat, atributos: sugerirAtributos(cat.atributos, [...atributosErp].map(([i, nome]) => ({ id: i, nome })), mantidos) };
+};
+
+/**
+ * Mão dupla: a categoria foi trocada no ML (pelo operador ou pela moderação) e o ERP passa a usar a mesma, com os
+ * atributos refeitos. Chamado pela sincronização quando todos os itens publicados estão numa categoria só.
+ */
+export const trazerCategoriaDoMl = async (tenant: number, id: number, idCat: string) => {
+  const [[a]]: any = await pool.execute(`SELECT atributos, categoria_ml FROM modulo_ecommerce_mercadolivre_anuncios WHERE id = ? AND tenant_id = ?`, [id, tenant]);
+  if (!a || a.categoria_ml === idCat) return false;
+  const { cat, atributos } = await atributosNaCategoria(tenant, id, idCat, lerJson<Record<string, ValorAtributo>>(a.atributos, {}));
+  await pool.execute(
+    `UPDATE modulo_ecommerce_mercadolivre_anuncios SET categoria_ml = ?, categoria_ml_nome = ?, atributos = ?, atualizado_em = NOW() WHERE id = ? AND tenant_id = ?`,
+    [idCat, cat.caminho.slice(0, 255), JSON.stringify(atributos), id, tenant]
+  );
+  return true;
+};
+
 export const corrigirUnidade = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
   const id = Number(req.params.id);

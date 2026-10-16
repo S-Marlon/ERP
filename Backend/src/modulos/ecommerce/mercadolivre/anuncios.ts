@@ -479,6 +479,15 @@ export const tituloComUnidade = (titulo: string, unidade: Pick<UnidadeVenda, 'fa
   return cortarTitulo(comKit.trim(), max);
 };
 
+/**
+ * Categoria que o ERP deve trazer do ML: quando todos os itens publicados (vivos) estão numa mesma categoria e ela é
+ * diferente da do anúncio no ERP (ex.: o ML ou o operador trocou lá, depois de uma moderação). null = nada a trazer.
+ */
+export const categoriaParaTrazer = (doMl: (string | null | undefined)[], noErp: string | null | undefined): string | null => {
+  const cats = [...new Set(doMl.filter((c): c is string => !!c))];
+  return cats.length === 1 && cats[0] !== (noErp || null) ? cats[0] : null;
+};
+
 /** Status do item no ML como o ERP guarda: "deleted" quando foi excluído lá. */
 export const statusDoMl = (b: { status?: string; sub_status?: string[] }) =>
   (b.sub_status || []).includes('deleted') ? 'deleted' : String(b.status || '');

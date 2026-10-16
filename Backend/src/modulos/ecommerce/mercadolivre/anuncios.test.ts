@@ -2,7 +2,7 @@ import assert from 'assert';
 import {
   AnuncioDados, AtributoML, cortarTitulo, tituloLegivel, eixosDeVariacao, filtrarAtributosCategoria, ItemAnuncio, pendenciasAnuncio,
   precoNoMl, resolverValor, sugerirAtributos, estoqueParaMl, regraDoItem, mudancasParaMl, saldoNaUnidade, statusDoMl, foraDoMl, situacaoPorItens, modoPublicacao, tituloPeloModelo, corpoDoItem, fotoPequena, errosDoValidador, ligarPorSku,
-  atributosDoItem, fatorDaLinha, skuDaLinha, tituloComUnidade, pluralBr, descricaoPeloModelo, camposDesconhecidos,
+  atributosDoItem, fatorDaLinha, skuDaLinha, tituloComUnidade, pluralBr, descricaoPeloModelo, camposDesconhecidos, categoriaParaTrazer,
 } from './anuncios';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
@@ -274,4 +274,12 @@ teste('descrição por item: {Campo} trocado pelo valor de cada um', () => {
   assert.strictEqual(descricaoPeloModelo(null, it, ctx), '');
   assert.deepStrictEqual(camposDesconhecidos(modelo, ctx), ['Aplicacao']);
   assert.deepStrictEqual(camposDesconhecidos('{cor} {TAMANHO} {nome}', ctx), []);
+});
+
+teste('categoria trocada no ML vem para o ERP (só quando os itens publicados concordam)', () => {
+  assert.strictEqual(categoriaParaTrazer(['MLB63829', 'MLB63829'], 'MLB9907'), 'MLB63829');   // o 6902-ZZ depois da moderação
+  assert.strictEqual(categoriaParaTrazer(['MLB63829', 'MLB9907'], 'MLB9907'), null);          // itens discordam: não mexe
+  assert.strictEqual(categoriaParaTrazer(['MLB9907'], 'MLB9907'), null);
+  assert.strictEqual(categoriaParaTrazer([null, undefined], 'MLB9907'), null);
+  assert.strictEqual(categoriaParaTrazer(['MLB63829'], null), 'MLB63829');
 });

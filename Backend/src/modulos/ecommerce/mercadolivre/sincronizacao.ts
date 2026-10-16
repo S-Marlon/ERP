@@ -1,8 +1,8 @@
 // Sincronização de estoque e preço com o Mercado Livre: manda só o que mudou desde o último envio.
 // Roda pelo botão (anúncio ou todos) e sozinha a cada poucos minutos, só com o módulo ligado e a conta conectada.
 import pool from '../../../infra/db';
-import { foraDoMl, mudancasParaMl, precoNoMl, situacaoPorItens, statusDoMl } from './anuncios';
-import { AnuncioCarregado, carregarAnuncios } from './anuncios.controller';
+import { categoriaParaTrazer, foraDoMl, mudancasParaMl, precoNoMl, situacaoPorItens, statusDoMl } from './anuncios';
+import { AnuncioCarregado, carregarAnuncios, trazerCategoriaDoMl } from './anuncios.controller';
 import { ErroML, ml } from './mercadolivreApi';
 import { importarPedidos } from './pedidos.controller';
 import { prejuizoDaLinha } from './precificacao.controller';
@@ -125,15 +125,23 @@ export const atualizarStatusDoMl = async (tenant: number, anuncios: AnuncioCarre
   if (!ids.length) return;
   const status = new Map<string, string>();
   const bloqueados = new Map<string, string>();   // MLB -> status bruto, dos que a moderação do ML parou
+  const categorias = new Map<string, string>();   // MLB -> categoria no ML
   for (let k = 0; k < ids.length; k += 20) {
-    const parte: any[] = await ml(tenant, 'GET', `/items?ids=${ids.slice(k, k + 20).join(',')}&attributes=id,status,sub_status`);
+    const parte: any[] = await ml(tenant, 'GET', `/items?ids=${ids.slice(k, k + 20).join(',')}&attributes=id,status,sub_status,category_id`);
     for (const r of parte || []) {
       if (r?.code !== 200 || !r.body?.id) continue;
       status.set(String(r.body.id), statusDoMl(r.body));
+      if (r.body.category_id) categorias.set(String(r.body.id), String(r.body.category_id));
       if (bloqueadoPeloMl(r.body.status, r.body.sub_status)) bloqueados.set(String(r.body.id), String(r.body.status || ''));
     }
   }
   await anotarModeracao(tenant, anuncios, bloqueados);
+  // categoria trocada no ML (pelo operador ou pela moderação): o ERP passa a usar a mesma
+  for (const c of anuncios) {
+    const vivos = [...c.noMl.values()].filter(m => m.mlbId && !foraDoMl(status.get(m.mlbId) || m.status));
+    const nova = categoriaParaTrazer(vivos.map(m => categorias.get(m.mlbId!)), c.dados.categoriaMl);
+    if (nova && await trazerCategoriaDoMl(tenant, Number(c.registro.id), nova).catch(() => false)) c.dados.categoriaMl = nova;
+  }
   for (const c of anuncios) {
     for (const [idLinha, m] of c.noMl) {
       const novo = m.mlbId ? status.get(m.mlbId) : undefined;
