@@ -1,4 +1,4 @@
-// Colunas de lucro no ML (tarifa, frete, você recebe, custo, lucro, % sobre o custo, preço para o alvo e situação),
+// Colunas de lucro no ML (tarifa e frete, você recebe e custo, lucro e % sobre o custo, preço para o alvo e situação),
 // usadas na lista por anúncio, nos itens de cada anúncio e na visão por item. Todas ordenáveis.
 import React from 'react';
 import { Button, Popconfirm, Popover, Space, Tag, Tooltip, Typography } from 'antd';
@@ -55,6 +55,10 @@ export const AlertasPreco: React.FC<{ alertas: AlertaPreco[] | undefined; onUsar
 };
 
 const cinza = (v: number) => <Text type="secondary">{v ? `−${formatarMoeda(v)}` : '—'}</Text>;
+/** Nome pequeno à esquerda do valor, nas colunas de dois andares. */
+const Rotulo: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <Text type="secondary" style={{ fontSize: 11, marginRight: 4 }}>{children}</Text>
+);
 const num = (v: number | null | undefined) => (v === null || v === undefined ? -Infinity : v);
 
 /**
@@ -67,27 +71,55 @@ export function colunasLucro<T>(
 ): ColumnsType<T> {
   const ordenar = (k: (f: FinanceiroItem) => number) => (a: T, b: T) => num(fin(a) && k(fin(a)!)) - num(fin(b) && k(fin(b)!));
   const colunas: ColumnsType<T> = [
-    { title: 'Tarifa', width: 88, align: 'right', sorter: ordenar(f => f.tarifa), render: (_, l) => (fin(l) ? cinza(fin(l)!.tarifa) : null) },
     {
-      title: <Tooltip title="O que o ML cobra de você por envio: com frete grátis, o envio (abaixo de R$ 79, o cheio); sem frete grátis abaixo de R$ 79, a tarifa de envio do item barato (cobrada mesmo com o comprador pagando o envio)">Frete</Tooltip>, width: 88, align: 'right',
-      sorter: ordenar(f => f.frete),
-      render: (_, l) => { const f = fin(l); if (!f) return null; return f.freteDesconhecido ? <Tooltip title="Item sem peso no cadastro"><Text type="warning">?</Text></Tooltip> : cinza(f.frete); },
-    },
-    { title: 'Você recebe', width: 104, align: 'right', sorter: ordenar(f => f.recebe), render: (_, l) => (fin(l) ? <Text strong>{formatarMoeda(fin(l)!.recebe)}</Text> : null) },
-    { title: 'Custo', width: 92, align: 'right', sorter: ordenar(f => f.custo), render: (_, l) => (fin(l) ? cinza(fin(l)!.custo) : null) },
-    {
-      title: 'Lucro', width: 96, align: 'right', sorter: ordenar(f => f.lucro),
-      render: (_, l) => { const f = fin(l); return f ? <Text strong style={{ color: f.lucro < 0 ? '#cf1322' : '#389e0d' }}>{formatarMoeda(f.lucro)}</Text> : null; },
-    },
-    {
-      title: <Tooltip title="Lucro sobre o custo do ERP (o alvo é medido assim)">% s/ custo</Tooltip>, width: 96, align: 'right', sorter: ordenar(f => f.lucroSobreCustoPct ?? -Infinity),
+      title: <Tooltip title="O que o ML desconta de cada venda. Tarifa: a comissão do tipo de anúncio. Frete: com frete grátis, o envio (abaixo de R$ 79, o cheio); sem frete grátis abaixo de R$ 79, a tarifa de envio do item barato (cobrada mesmo com o comprador pagando o envio).">Tarifa e frete</Tooltip>,
+      width: 118, align: 'right', sorter: ordenar(f => f.tarifa + f.frete),
       render: (_, l) => {
         const f = fin(l);
-        if (!f || f.lucroSobreCustoPct === null) return f ? <Text type="secondary">—</Text> : null;
+        if (!f) return null;
         return (
-          <div style={{ lineHeight: 1.2 }}>
-            <Text strong style={{ color: f.lucroSobreCustoPct < 0 ? '#cf1322' : f.lucroSobreCustoPct < f.alvoPct ? '#d46b08' : '#389e0d' }}>{f.lucroSobreCustoPct.toFixed(1).replace('.', ',')}%</Text>
-            {!op.compacto && <div><Text type="secondary" style={{ fontSize: 11 }}>alvo {f.alvoPct}%</Text></div>}
+          <div style={{ lineHeight: 1.35 }}>
+            <div><Rotulo>tarifa</Rotulo>{cinza(f.tarifa)}</div>
+            <div>
+              <Rotulo>frete</Rotulo>
+              {f.freteDesconhecido ? <Tooltip title="Item sem peso no cadastro: o frete não entrou na conta"><Text type="warning">?</Text></Tooltip> : cinza(f.frete)}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      title: <Tooltip title="Você recebe: o preço menos tarifa e frete. Embaixo, o custo do item no ERP (a diferença é o lucro).">Recebe / custo</Tooltip>,
+      width: 112, align: 'right', sorter: ordenar(f => f.recebe),
+      render: (_, l) => {
+        const f = fin(l);
+        if (!f) return null;
+        return (
+          <div style={{ lineHeight: 1.35 }}>
+            <Text strong>{formatarMoeda(f.recebe)}</Text>
+            <div><Rotulo>custo</Rotulo>{cinza(f.custo)}</div>
+          </div>
+        );
+      },
+    },
+    {
+      title: <Tooltip title="Lucro por venda e, embaixo, o % sobre o custo do ERP (o alvo é medido assim)">Lucro</Tooltip>,
+      width: 104, align: 'right', sorter: ordenar(f => f.lucro),
+      render: (_, l) => {
+        const f = fin(l);
+        if (!f) return null;
+        const pct = f.lucroSobreCustoPct;
+        return (
+          <div style={{ lineHeight: 1.35 }}>
+            <Text strong style={{ color: f.lucro < 0 ? '#cf1322' : '#389e0d' }}>{formatarMoeda(f.lucro)}</Text>
+            <div style={{ fontSize: 12 }}>
+              {pct === null ? <Text type="secondary">—</Text> : (
+                <Tooltip title={`Alvo: ${f.alvoPct}% sobre o custo`}>
+                  <Text style={{ color: pct < 0 ? '#cf1322' : pct < f.alvoPct ? '#d46b08' : '#389e0d' }}>{pct.toFixed(1).replace('.', ',')}%</Text>
+                  {!op.compacto && <Text type="secondary" style={{ fontSize: 11 }}> / {f.alvoPct}%</Text>}
+                </Tooltip>
+              )}
+            </div>
           </div>
         );
       },

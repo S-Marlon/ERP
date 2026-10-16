@@ -161,7 +161,7 @@ const AnunciosMercadoLivre: React.FC = () => {
             </Space>
           ),
         },
-        { title: 'Preço no ML', width: 210, render: (_, i) => <PrecoRapido idAnuncio={a.id} idLinha={i.idLinha} atual={itemDoFin(a, i.idLinha)} valor={i.preco} proprio={i.precoMl !== null} onSalvar={v => salvarPreco(a, i, v)} /> },
+        { title: 'Preço no ML', width: 180, render: (_, i) => <PrecoRapido idAnuncio={a.id} idLinha={i.idLinha} atual={itemDoFin(a, i.idLinha)} valor={i.preco} proprio={i.precoMl !== null} onSalvar={v => salvarPreco(a, i, v)} /> },
         ...colunasLucro<ItemResumo>(i => itemDoFin(a, i.idLinha), { onAplicarPreco: (i, preco) => salvarPreco(a, i, preco), compacto: true }),
         {
           title: 'Estoque', width: 120, align: 'right',
@@ -243,7 +243,7 @@ const AnunciosMercadoLivre: React.FC = () => {
         {visao === 'itens' ? (
           <Table<LinhaItem>
             size="middle" rowKey="chave" loading={carregando} dataSource={linhasItens} pagination={{ pageSize: 30, hideOnSinglePage: true, showSizeChanger: false }}
-            scroll={{ x: 1650 }}
+            scroll={{ x: 1450 }}
             rowClassName={l => (l.f?.nivel === 'PREJUIZO' ? 'ml-linha-erro' : '')}
             locale={{ emptyText: <Empty description="Nenhum item neste filtro." /> }}
             columns={[
@@ -281,7 +281,7 @@ const AnunciosMercadoLivre: React.FC = () => {
         ) : (
         <Table<AnuncioResumo>
           size="middle" rowKey="id" loading={carregando} dataSource={visiveis} pagination={{ pageSize: 20, hideOnSinglePage: true }}
-          scroll={{ x: 1750 }}
+          scroll={{ x: 1550 }}
           rowSelection={{
             selectedRowKeys: selecionados, onChange: k => setSelecionados(k as number[]),
             getCheckboxProps: a => ({ disabled: a.ativosMl + a.pausadosMl === 0 }),
