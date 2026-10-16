@@ -1,8 +1,8 @@
 // Colunas de lucro no ML (tarifa e frete, você recebe e custo, lucro e % sobre o custo, preço para o alvo e situação),
 // usadas na lista por anúncio, nos itens de cada anúncio e na visão por item. Todas ordenáveis.
 import React from 'react';
-import { Button, Popconfirm, Popover, Space, Tag, Tooltip, Typography } from 'antd';
-import { InfoCircleOutlined, WarningFilled } from '@ant-design/icons';
+import { Button, Dropdown, Modal, Popconfirm, Popover, Space, Spin, Tag, Tooltip, Typography } from 'antd';
+import { CheckOutlined, DownOutlined, InfoCircleOutlined, WarningFilled } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { AlertaPreco, FinanceiroItem, formatarMoeda } from './mercadoLivreApi';
 import { precoComercial } from './listaAnuncios';
@@ -58,24 +58,98 @@ export const AlertasPreco: React.FC<{ alertas: AlertaPreco[] | undefined; onUsar
  * Modo de venda: Clássico/Premium e frete grátis (você paga) ou frete cliente (o comprador paga). `noMl` falso = ainda não publicado
  * (tipo do ERP e frete do padrão da conta); 'misto' quando os itens do anúncio estão diferentes.
  */
-export const ModoVenda: React.FC<{ tipo: string | 'misto' | null; freteGratis: boolean | 'misto' | null; noMl: boolean }> = ({ tipo, freteGratis, noMl }) => {
-  const origem = noMl ? '' : ' (ainda não publicado: vale o do ERP e o padrão da sua conta do ML)';
-  const tipoTag = tipo === null ? null : tipo === 'misto'
-    ? <Tooltip title="Itens com tipos diferentes no ML"><Tag style={{ marginInlineEnd: 0 }}>Misto</Tag></Tooltip>
-    : (
-      <Tooltip title={`${tipo === 'gold_pro' ? 'Premium: mais exposição e parcelamento sem juros para o comprador (tarifa maior)' : 'Clássico: tarifa menor, sem parcelamento sem juros'}${origem}`}>
-        <Tag color={tipo === 'gold_pro' ? 'purple' : 'geekblue'} style={{ marginInlineEnd: 0 }}>{tipo === 'gold_pro' ? 'Premium' : 'Clássico'}</Tag>
+export interface EdicaoModo {
+  /** 'anuncio': vale para todos os itens publicados; 'item': só este. */
+  escopo: 'anuncio' | 'item';
+  onTipo?: (tipo: string) => Promise<unknown>;
+  onFrete?: (gratis: boolean) => Promise<unknown>;
+  /** Motivo de não deixar trocar (ex.: ainda não publicado); null = pode. */
+  bloqueioTipo?: string | null;
+  bloqueioFrete?: string | null;
+}
+
+const NOME_TIPO: Record<string, string> = { gold_special: 'Clássico', gold_pro: 'Premium' };
+const NOME_FRETE = (g: boolean) => (g ? 'Frete grátis' : 'Frete cliente');
+
+/** Etiqueta que abre as opções ao clicar e confirma antes de mandar ao ML. */
+const TagEditavel: React.FC<{
+  tag: React.ReactNode; dica: string; opcoes: { valor: string; texto: string; atual: boolean }[];
+  bloqueio?: string | null; confirmar: (valor: string) => { titulo: string; texto: string }; onEscolher?: (valor: string) => Promise<unknown>;
+}> = ({ tag, dica, opcoes, bloqueio, confirmar, onEscolher }) => {
+  const [ocupado, setOcupado] = React.useState(false);
+  if (!onEscolher) return <Tooltip title={dica}>{tag}</Tooltip>;
+  if (bloqueio) return <Tooltip title={`${dica} · ${bloqueio}`}>{tag}</Tooltip>;
+  const escolher = (valor: string) => {
+    const c = confirmar(valor);
+    Modal.confirm({
+      title: c.titulo, content: c.texto, okText: 'Mudar no ML', cancelText: 'Cancelar',
+      onOk: async () => {
+        setOcupado(true);
+        try { await onEscolher(valor); } finally { setOcupado(false); }
+      },
+    });
+  };
+  return (
+    <Dropdown
+      trigger={['click']} disabled={ocupado}
+      menu={{
+        items: opcoes.map(o => ({ key: o.valor, label: o.texto, icon: o.atual ? <CheckOutlined /> : <span style={{ display: 'inline-block', width: 14 }} />, disabled: o.atual })),
+        onClick: ({ key }) => escolher(String(key)),
+      }}
+    >
+      <Tooltip title={`${dica} · Clique para mudar`}>
+        <span style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+          {ocupado ? <Spin size="small" /> : tag}<DownOutlined style={{ fontSize: 9, color: '#8c8c8c' }} />
+        </span>
       </Tooltip>
-    );
-  const freteTag = freteGratis === null ? null : freteGratis === 'misto'
-    ? <Tooltip title="Uns itens com frete grátis, outros sem"><Tag style={{ marginInlineEnd: 0 }}>Frete misto</Tag></Tooltip>
-    : freteGratis
-      ? <Tooltip title={`Frete grátis para o comprador: você paga o envio${origem}`}><Tag color="cyan" style={{ marginInlineEnd: 0 }}>Frete grátis</Tag></Tooltip>
-      : <Tooltip title={`O comprador paga o envio (abaixo de R$ 79 o ML ainda cobra de você a tarifa de envio do item barato)${origem}`}><Tag color="gold" style={{ marginInlineEnd: 0 }}>Frete cliente</Tag></Tooltip>;
+    </Dropdown>
+  );
+};
+
+export const ModoVenda: React.FC<{ tipo: string | 'misto' | null; freteGratis: boolean | 'misto' | null; noMl: boolean; edicao?: EdicaoModo }> = ({ tipo, freteGratis, noMl, edicao }) => {
+  const origem = noMl ? '' : ' (ainda não publicado: vale o do ERP e o padrão da sua conta do ML)';
+  const todos = edicao?.escopo === 'anuncio';
+  const onde = todos ? 'em todos os itens publicados deste anúncio' : 'só neste item';
+
+  const tipoTag = tipo === null ? null : tipo === 'misto'
+    ? <Tag style={{ marginInlineEnd: 0 }}>Misto</Tag>
+    : <Tag color={tipo === 'gold_pro' ? 'purple' : 'geekblue'} style={{ marginInlineEnd: 0 }}>{NOME_TIPO[tipo] || tipo}</Tag>;
+  const dicaTipo = tipo === 'misto' ? 'Itens com tipos diferentes no ML'
+    : `${tipo === 'gold_pro' ? 'Premium: mais exposição e parcelamento sem juros para o comprador (tarifa maior)' : 'Clássico: tarifa menor, sem parcelamento sem juros'}${origem}`;
+
+  const freteTagEl = freteGratis === null ? null : freteGratis === 'misto'
+    ? <Tag style={{ marginInlineEnd: 0 }}>Frete misto</Tag>
+    : <Tag color={freteGratis ? 'cyan' : 'gold'} style={{ marginInlineEnd: 0 }}>{NOME_FRETE(freteGratis)}</Tag>;
+  const dicaFrete = freteGratis === 'misto' ? 'Uns itens com frete grátis, outros com o cliente pagando'
+    : freteGratis ? `Frete grátis para o comprador: você paga o envio${origem}`
+      : `O comprador paga o envio (abaixo de R$ 79 o ML ainda cobra de você a tarifa de envio do item barato)${origem}`;
+
   return (
     <Space direction="vertical" size={2} style={{ opacity: noMl ? 1 : 0.75 }}>
-      {tipoTag}
-      {freteTag}
+      {tipoTag && (
+        <TagEditavel
+          tag={tipoTag} dica={dicaTipo} bloqueio={edicao?.bloqueioTipo} onEscolher={edicao?.onTipo}
+          opcoes={['gold_special', 'gold_pro'].map(t => ({ valor: t, texto: NOME_TIPO[t], atual: tipo === t }))}
+          confirmar={t => ({
+            titulo: `Mudar para ${NOME_TIPO[t]} ${onde}?`,
+            texto: t === 'gold_pro'
+              ? 'Premium cobra tarifa maior e dá parcelamento sem juros ao comprador. Vai ao ML na hora; se algum item passar a dar prejuízo, a trava recusa.'
+              : 'Clássico cobra tarifa menor. O ML costuma não deixar descer de Premium para Clássico num anúncio publicado: se recusar, o motivo aparece aqui.',
+          })}
+        />
+      )}
+      {freteTagEl && (
+        <TagEditavel
+          tag={freteTagEl} dica={dicaFrete} bloqueio={edicao?.bloqueioFrete} onEscolher={edicao?.onFrete ? v => edicao.onFrete!(v === 'sim') : undefined}
+          opcoes={[true, false].map(g => ({ valor: g ? 'sim' : 'nao', texto: NOME_FRETE(g), atual: freteGratis === g }))}
+          confirmar={v => ({
+            titulo: `${v === 'sim' ? 'Ligar o frete grátis' : 'Passar o frete para o cliente'} ${onde}?`,
+            texto: v === 'sim'
+              ? 'Você passa a pagar o envio (abaixo de R$ 79, o frete cheio). Vai ao ML na hora; se algum item passar a dar prejuízo, a trava recusa.'
+              : 'O comprador paga o envio; abaixo de R$ 79 o ML ainda cobra de você a tarifa de envio do item barato. A partir de R$ 79 o frete grátis é obrigatório.',
+          })}
+        />
+      )}
     </Space>
   );
 };

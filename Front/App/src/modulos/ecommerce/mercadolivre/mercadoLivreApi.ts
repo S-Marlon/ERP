@@ -317,6 +317,9 @@ export const anunciosApi = {
   /** Vende o mesmo item também em outra unidade (nova linha); idUnidade null = a unidade base. */
   adicionarUnidade: async (id: number, idLinha: number, idUnidade: number | null) =>
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}/unidade?tenant_id=1`, json('POST', { idUnidade })), 'Erro ao adicionar a unidade.'),
+  /** Troca o tipo e/ou o frete grátis de um item já publicado, só nele (direto no ML). */
+  modoDaLinha: async (id: number, idLinha: number, corpo: { tipo?: string; freteGratis?: boolean }) =>
+    ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}/modo?tenant_id=1`, json('POST', corpo)), 'Erro ao mudar o modo de venda do item.'),
   /** Liga ou desliga a linha: desligada não publica e, se já está no ML, fica pausada. */
   ativarLinha: async (id: number, idLinha: number, ativo: boolean) =>
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}?tenant_id=1`, json('PUT', { ativo })), ativo ? 'Erro ao ativar.' : 'Erro ao desativar.'),

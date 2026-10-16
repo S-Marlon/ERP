@@ -734,7 +734,9 @@ export const salvarAnuncio = async (req: Request, res: Response) => {
     definir('atributos', JSON.stringify(atributos));
 
     // tipo e frete grátis de anúncio publicado: troca no ML antes de gravar (recusou = não grava)
-    const mudaTipo = b.tipoAnuncio !== undefined && b.tipoAnuncio !== a.tipo_anuncio;
+    // o tipo vai ao ML sempre que pedido: o ERP pode estar diferente do ML (ou os itens entre si), e a troca já pula
+    // os itens que estão no tipo pedido
+    const mudaTipo = b.tipoAnuncio !== undefined;
 
     // trava de prejuízo: ajuste de preço, tipo ou frete grátis não podem deixar linha ativa no ML vendendo com prejuízo
     const mudaAjuste = b.ajustePreco !== undefined && Number(b.ajustePreco) !== Number(a.ajuste_preco);
@@ -936,6 +938,39 @@ export const adicionarKit = async (req: Request, res: Response) => {
     return responderErro(res, error, 'Erro ao criar o conjunto.');
   } finally {
     connection.release();
+  }
+};
+
+/**
+ * POST /anuncios/:id/itens/:idLinha/modo { tipo?, freteGratis? } — troca o tipo de anúncio e/ou o frete grátis de UM item
+ * já publicado, direto no ML (os outros itens ficam como estão). Passa pela trava de prejuízo.
+ */
+export const modoDaLinha = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const id = Number(req.params.id);
+  try {
+    await anuncioEditavel(pool as any, tenant, id);
+    const linha = await linhaDoAnuncio(tenant, id, Number(req.params.idLinha));
+    const idLinha = Number(linha.id_anuncio_item);
+    const b = req.body || {};
+    const tipo = b.tipo !== undefined ? String(b.tipo) : undefined;
+    const freteGratis = b.freteGratis !== undefined ? !!b.freteGratis : undefined;
+    if (tipo !== undefined && !TIPOS_ANUNCIO.includes(tipo)) throw new ErroML('Tipo de anúncio inválido.');
+    if (tipo === undefined && freteGratis === undefined) throw new ErroML('Nada para mudar.');
+    if (!linha.mlb_id || foraDoMl(linha.status_ml)) throw new ErroML('Este item não está publicado no ML: o modo de venda dele segue o do anúncio na publicação.');
+    const [c] = await carregarAnuncios(pool as any, tenant, id);
+    const item = c.itens.find(i => i.idLinha === idLinha);
+    // trava de prejuízo: item ativo no ML não pode passar a dar prejuízo
+    if (item && item.linhaAtiva !== false && linha.status_ml === 'active') {
+      const texto = await prejuizoDaLinha(tenant, c, item, { tipo, gratis: freteGratis });
+      if (texto) throw new ErroML(recusaPorPrejuizo('mudar assim', [texto]), 422);
+    }
+    const falhas = await aplicarModoDeVenda(tenant, c, { tipo, freteGratis, idLinhas: [idLinha] });
+    if (falhas.length) throw new ErroML(`O ML recusou: ${falhas[0]}`);
+    const [depois] = await carregarAnuncios(pool as any, tenant, id);
+    return res.json(await detalhe(tenant, depois));
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao mudar o modo de venda do item.');
   }
 };
 

@@ -388,9 +388,13 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado, abrirEm }) =
           secaoPedida={secaoPreco} onIrParaItens={s => irPara(destinoDa(s))}
           onMudarPreco={(idLinha, preco) => mudarDoItem(idLinha, { precoMl: preco })}
           onEscolherCenario={(tipo, gratis) => {
+            // só avisa "posto nas alterações" quando muda de verdade (escolher o que já está não entra na lista)
+            const mudaTipo = tipo !== salvo.tipoAnuncio;
+            const mudaFrete = gratis !== undefined && gratis !== (salvo.vendaMl?.freteGratis ?? null);
             mudarCampo('tipoAnuncio', tipo);
             if (gratis !== undefined) mudarCampo('freteGratis', gratis);
-            message.info('Modo de venda posto nas alterações: confira ao lado e salve para mandar ao ML.');
+            if (mudaTipo || mudaFrete) message.info('Modo de venda posto nas alterações: confira ao lado e salve para mandar ao ML.');
+            else message.info('Nada a mudar: o anúncio já está assim (as alterações de modo de venda foram desfeitas).');
           }}
           onMudarFaixas={faixas => mudarCampo('faixasQuantidade', faixas)}
           onCriarForma={criarForma}

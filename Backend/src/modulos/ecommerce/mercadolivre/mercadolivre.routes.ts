@@ -2,7 +2,7 @@
 import { Router } from 'express';
 import { conectar, conta, desconectar, status } from './mercadolivre.controller';
 import {
-  adicionarItens, candidatos, criarAnuncio, detalheAnuncio, excluirAnuncio, listarAnuncios, navegarCategorias, salvarItem,
+  adicionarItens, candidatos, criarAnuncio, detalheAnuncio, excluirAnuncio, listarAnuncios, navegarCategorias, salvarItem, modoDaLinha,
   removerItem, salvarAnuncio, adicionarUnidade, adicionarKit, sugerirCategoria, desligarDoMl, encerrarNoMl,
 } from './anuncios.controller';
 import {
@@ -39,6 +39,7 @@ router.put('/anuncios/:id', salvarAnuncio);
 router.delete('/anuncios/:id', excluirAnuncio);
 router.post('/anuncios/:id/itens', adicionarItens);
 router.put('/anuncios/:id/itens/:idLinha', salvarItem);
+router.post('/anuncios/:id/itens/:idLinha/modo', modoDaLinha);
 router.post('/anuncios/:id/itens/:idLinha/unidade', adicionarUnidade);
 router.post('/anuncios/:id/itens/:idLinha/kit', adicionarKit);
 router.delete('/anuncios/:id/itens/:idLinha', removerItem);

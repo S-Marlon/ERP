@@ -7,11 +7,11 @@ import {
   ReloadOutlined, SyncOutlined,
 } from '@ant-design/icons';
 import {
-  AnuncioResumo, anunciosApi, Desempenho, FinanceiroItem, formatarMoeda, ItemResumo, NumerosDesempenho, resumoSincronizacao, ROTULO_STATUS_ML, SituacaoSincronizacao,
+  AnuncioResumo, anunciosApi, Desempenho, FinanceiroItem, foraDoMl, formatarMoeda, ItemResumo, NumerosDesempenho, resumoSincronizacao, ROTULO_STATUS_ML, SituacaoSincronizacao,
 } from './mercadoLivreApi';
 import { faixaMoeda, FiltroLista, lucroBaixo, passaNoFiltro, resumirFinanceiro, ResumoFinanceiro, semEstoqueNoMl } from './listaAnuncios';
 import { AtivoLinha, AtivoNoMl, EstoqueRapido, PrecoRapido } from './AcoesRapidas';
-import { colunasLucro, ModoVenda, modoDosItens, TagSituacao } from './colunasLucro';
+import { colunasLucro, EdicaoModo, ModoVenda, modoDosItens, TagSituacao } from './colunasLucro';
 import AdicionarAnuncioModal from './AdicionarAnuncioModal';
 import AnuncioEditor from './AnuncioEditor';
 import SituacaoTag from './SituacaoTag';
@@ -121,6 +121,22 @@ const AnunciosMercadoLivre: React.FC = () => {
     acao(() => anunciosApi.ativarLinha(a.id, i.idLinha, sim), i.mlbId
       ? (sim ? `${i.sku} reativado no Mercado Livre.` : `${i.sku} pausado no Mercado Livre.`)
       : (sim ? `${i.sku} entra na publicação.` : `${i.sku} fica de fora da publicação.`)).catch(() => undefined);
+  // modo de venda direto na lista: no anúncio vale para todos os itens publicados; no item, só nele
+  const NOME_TIPO: Record<string, string> = { gold_special: 'Clássico', gold_pro: 'Premium' };
+  const edicaoDoAnuncio = (a: AnuncioResumo): EdicaoModo => ({
+    escopo: 'anuncio',
+    onTipo: t => acao(() => anunciosApi.salvar(a.id, { tipoAnuncio: t }), `${NOME_TIPO[t]} ${a.publicados ? 'no ML' : 'no anúncio'}.`).catch(() => undefined),
+    onFrete: g => acao(() => anunciosApi.salvar(a.id, { freteGratis: g }), g ? 'Frete grátis ligado no ML.' : 'Frete passado para o cliente no ML.').catch(() => undefined),
+    bloqueioFrete: a.publicados ? null : 'O frete se escolhe depois de publicar (na publicação vale o padrão da sua conta)',
+  });
+  const edicaoDoItem = (a: AnuncioResumo, i: ItemResumo): EdicaoModo => {
+    const semMl = !i.mlbId || foraDoMl(i.status) ? 'Ainda não publicado: segue o modo do anúncio na publicação' : null;
+    return {
+      escopo: 'item', bloqueioTipo: semMl, bloqueioFrete: semMl,
+      onTipo: t => acao(() => anunciosApi.modoDaLinha(a.id, i.idLinha, { tipo: t }), `${i.sku}: ${NOME_TIPO[t]} no ML.`).catch(() => undefined),
+      onFrete: g => acao(() => anunciosApi.modoDaLinha(a.id, i.idLinha, { freteGratis: g }), `${i.sku}: ${g ? 'frete grátis' : 'frete do cliente'} no ML.`).catch(() => undefined),
+    };
+  };
   const ativar = (a: AnuncioResumo, sim: boolean) =>
     acao(() => anunciosApi.pausarNoMl(a.id, !sim), sim ? 'Reativado no Mercado Livre.' : 'Pausado no Mercado Livre.').catch(() => undefined);
 
@@ -179,7 +195,7 @@ const AnunciosMercadoLivre: React.FC = () => {
             </Space>
           ),
         },
-        { title: 'Modo de venda', width: 120, render: (_, i) => { const f = itemDoFin(a, i.idLinha); return <ModoVenda {...modoDosItens(f ? [f] : [], a.tipoAnuncio)} />; } },
+        { title: 'Modo de venda', width: 130, render: (_, i) => { const f = itemDoFin(a, i.idLinha); return <ModoVenda {...modoDosItens(f ? [f] : [], a.tipoAnuncio)} edicao={edicaoDoItem(a, i)} />; } },
         { title: 'Preço no ML', width: 180, render: (_, i) => <PrecoRapido idAnuncio={a.id} idLinha={i.idLinha} atual={itemDoFin(a, i.idLinha)} valor={i.preco} proprio={i.precoMl !== null} onSalvar={v => salvarPreco(a, i, v)} /> },
         ...colunasLucro<ItemResumo>(i => itemDoFin(a, i.idLinha), { onAplicarPreco: (i, preco) => salvarPreco(a, i, preco), compacto: true }),
         colunaDesempenho<ItemResumo>(i => desempenhoDaLinha(a.id, i.idLinha)),
@@ -289,7 +305,7 @@ const AnunciosMercadoLivre: React.FC = () => {
               },
               {
                 title: 'Modo de venda', width: 120,
-                render: (_, l) => <ModoVenda {...modoDosItens(l.f ? [l.f] : [], l.a.tipoAnuncio)} />,
+                render: (_, l) => <ModoVenda {...modoDosItens(l.f ? [l.f] : [], l.a.tipoAnuncio)} edicao={edicaoDoItem(l.a, l.i)} />,
               },
               {
                 title: 'Preço no ML', width: 200, sorter: (x, y) => x.i.preco - y.i.preco,
@@ -348,7 +364,7 @@ const AnunciosMercadoLivre: React.FC = () => {
             {
               title: <Tooltip title="Tipo de anúncio (Clássico ou Premium) e frete: grátis (você paga o envio) ou custeado (o comprador paga). Publicado: como está no ML.">Modo de venda</Tooltip>,
               width: 120,
-              render: (_, a) => { const m = modoDosItens(financeiro.get(a.id) || [], a.tipoAnuncio); return <ModoVenda {...m} />; },
+              render: (_, a) => { const m = modoDosItens(financeiro.get(a.id) || [], a.tipoAnuncio); return <ModoVenda {...m} edicao={edicaoDoAnuncio(a)} />; },
             },
             {
               title: <Tooltip title="Mude o preço e veja na hora quanto você recebe e o lucro. O botão do alvo sugere o preço para a sua margem.">Preço no ML</Tooltip>, width: 210,

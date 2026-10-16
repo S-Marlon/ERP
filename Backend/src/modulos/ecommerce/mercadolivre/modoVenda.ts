@@ -31,10 +31,10 @@ export const vendaDoAnuncio = async (tenant: number, c: AnuncioCarregado) => {
   };
 };
 
-/** Troca o tipo e/ou o frete grátis nos itens publicados. Devolve as falhas ("SKU: motivo"). */
-export const aplicarModoDeVenda = async (tenant: number, c: AnuncioCarregado, op: { tipo?: string; freteGratis?: boolean }) => {
+/** Troca o tipo e/ou o frete grátis nos itens publicados (todos, ou só `idLinhas`). Devolve as falhas ("SKU: motivo"). */
+export const aplicarModoDeVenda = async (tenant: number, c: AnuncioCarregado, op: { tipo?: string; freteGratis?: boolean; idLinhas?: number[] }) => {
   const falhas: string[] = [];
-  for (const { item, mlbId } of vivos(c)) {
+  for (const { item, mlbId } of vivos(c).filter(x => !op.idLinhas || op.idLinhas.includes(x.item.idLinha))) {
     try {
       const agora = await freteGratisNoMl(tenant, mlbId);
       if (op.tipo && agora?.tipo !== op.tipo) {
