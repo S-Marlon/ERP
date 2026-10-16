@@ -2,12 +2,11 @@
 // escolher; à direita o painel da linha escolhida (preço, os números que decidem e as seções em abas). A tabela de
 // todos, para mexer em vários preços de uma vez, abre por cima.
 import React, { useEffect, useMemo, useState } from 'react';
-import { Badge, Button, Card, Col, Empty, Flex, Input, Modal, Row, Segmented, Space, Tag, Tooltip, Typography } from 'antd';
+import { Alert, Badge, Button, Card, Col, Empty, Flex, Input, Modal, Row, Segmented, Space, Tag, Tooltip, Typography } from 'antd';
 import { TableOutlined, WarningFilled } from '@ant-design/icons';
 import { AnuncioDetalhe, anunciosApi, FaixaQuantidade, formatarMoeda, SecaoPreco, SugestaoMl } from '../mercadoLivreApi';
 import type { RascunhoItem } from '../rascunhoAnuncio';
 import PrecoMlCard from '../PrecoMlCard';
-import FormasDeVendaCard from '../FormasDeVendaCard';
 import FaixasQuantidadeCard from '../FaixasQuantidadeCard';
 import TabelaPrecos, { useLucroDosItens } from './TabelaPrecos';
 import { SITUACAO_LUCRO } from '../colunasLucro';
@@ -31,6 +30,8 @@ interface Props {
   onIrParaItens?: (s: SugestaoMl) => void;
   /** Produto escolhido no editor: sem a lista lateral (as formas viram botões) e o painel enxuto. */
   porProduto?: boolean;
+  /** Geral: abre o produto da linha escolhida (formas de venda e escada ficam lá). */
+  onAbrirProduto?: (idItem: number) => void;
 }
 
 const AbaPreco: React.FC<Props> = p => {
@@ -61,14 +62,15 @@ const AbaPreco: React.FC<Props> = p => {
     <PrecoMlCard
       salvo={salvo} det={det} idLinha={atual} onMudarPreco={p.onMudarPreco} onEscolherCenario={p.onEscolherCenario} secaoPedida={pedido}
       sugestoes={sugestoes.filter(s => s.idLinha === atual)} onIrParaItens={p.onIrParaItens}
-      formas={(
-        <FormasDeVendaCard
-          embutido det={det} idLinha={atual} rascunhoItens={p.rascunhoItens} ocupado={p.ocupado}
-          onMudarPreco={p.onMudarPreco} onCriar={(q, preco) => p.onCriarForma(atual, q, preco)} onAtivar={p.onAtivar}
-          onAnalisar={idLinha => { p.onSelecionar(idLinha); setPedido(x => ({ secao: 'mercado', vez: (x?.vez || 0) + 1 })); }}
-        />
-      )}
       faixas={<FaixasQuantidadeCard embutido det={det} onMudar={p.onMudarFaixas} />}
+    />
+  );
+  const doProduto = det.itens.find(i => i.idLinha === atual);
+  const avisoProduto = p.onAbrirProduto && doProduto && (
+    <Alert
+      type="info" showIcon style={{ marginBottom: 8, padding: '6px 12px' }}
+      message="Formas de venda (unidade, kits) e a escada de cada uma ficam no produto, à esquerda"
+      action={<Button size="small" onClick={() => p.onAbrirProduto!(doProduto.idItem)}>Abrir {doProduto.sku}</Button>}
     />
   );
 
@@ -94,6 +96,7 @@ const AbaPreco: React.FC<Props> = p => {
     return (
       <>
         <Flex justify="flex-end" style={{ marginBottom: 8 }}><Button size="small" icon={<TableOutlined />} onClick={() => setTabela(true)}>Tabela com tarifa e custo</Button></Flex>
+        {avisoProduto}
         {painel}
         <Modal open={tabela} onCancel={() => setTabela(false)} footer={null} width="min(1600px, 98vw)" destroyOnHidden title="Preço e lucro">
           <TabelaPrecos salvo={salvo} det={det} rascunhoItens={p.rascunhoItens} onMudarPreco={p.onMudarPreco} selecionado={atual} onSelecionar={id => { p.onSelecionar(id); setTabela(false); }} />
@@ -154,7 +157,7 @@ const AbaPreco: React.FC<Props> = p => {
           </div>
         </div>
       </Col>
-      <Col xs={24} lg={17} xxl={18}>{painel}</Col>
+      <Col xs={24} lg={17} xxl={18}>{avisoProduto}{painel}</Col>
       <Modal open={tabela} onCancel={() => setTabela(false)} footer={null} width="min(1600px, 98vw)" destroyOnHidden title="Preço e lucro de todos">
         <TabelaPrecos salvo={salvo} det={det} rascunhoItens={p.rascunhoItens} onMudarPreco={p.onMudarPreco} selecionado={atual} onSelecionar={id => { p.onSelecionar(id); setTabela(false); }} />
       </Modal>

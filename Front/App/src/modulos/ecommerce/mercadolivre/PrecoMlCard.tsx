@@ -81,7 +81,8 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEsc
   const [erro, setErro] = useState<string | null>(null);
   const [frete, setFrete] = useState<number | null>(null);
   const [vendasMes, setVendasMes] = useState(10);
-  const [secao, setSecao] = useState<Secao>(secaoSalva);
+  // "Formas de venda" saiu do Geral (fica no produto): quem tinha ela guardada abre nos cenários
+  const [secao, setSecao] = useState<Secao>(() => { const s = secaoSalva(); return s === 'formas' && !formas ? 'cenarios' : s; });
   const vez = useRef(0);
   useEffect(() => { try { localStorage.setItem(CHAVE_SECAO, secao); } catch { /* sem armazenamento */ } }, [secao]);
   useEffect(() => { if (secaoPedida) setSecao(secaoPedida.secao); }, [secaoPedida?.vez]);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -443,10 +444,10 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEsc
       <Segmented
         block style={{ marginTop: 12 }} value={secao} onChange={v => setSecao(v as Secao)}
         options={[
-          { value: 'formas', label: <Space size={4}><ShoppingCartOutlined />Formas de venda</Space> },
+          ...(formas ? [{ value: 'formas', label: <Space size={4}><ShoppingCartOutlined />Formas de venda</Space> }] : []),
           { value: 'cenarios', label: <Space size={4}><ThunderboltOutlined />Clássico × Premium</Space> },
           { value: 'mercado', label: <Space size={4}><BarChartOutlined />Mercado{a ? ` (${a.mercado.produtos.length})` : ''}</Space> },
-          { value: 'quantidade', label: <Space size={4}><TeamOutlined />Por quantidade (CNPJ)</Space> },
+          { value: 'quantidade', label: <Tooltip title="A escada que as formas unidade seguem quando não têm a própria (cada forma tem a sua em Formas e escada, no produto)"><Space size={4}><TeamOutlined />Escada padrão (unidade)</Space></Tooltip> },
           { value: 'conta', label: <Space size={4}><CalculatorOutlined />Conta e frete{atencao ? <WarningOutlined style={{ color: '#fa8c16' }} /> : null}</Space> },
         ]}
       />

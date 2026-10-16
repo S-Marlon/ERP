@@ -21,6 +21,7 @@ import PainelLateral, { AcaoMl } from './editor/PainelLateral';
 import CatalogoMlCard from './CatalogoMlCard';
 import AbaPreco from './editor/AbaPreco';
 import NavegacaoAnuncio, { SelecaoEditor } from './editor/NavegacaoAnuncio';
+import { produtosDoAnuncio } from './linhasAnuncio';
 import FormasDoProduto from './editor/FormasDoProduto';
 import FichaDoProduto from './editor/FichaDoProduto';
 import CategoriaMlModal from './CategoriaMlModal';
@@ -469,6 +470,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado, abrirEm }) =
         <AbaPreco
           salvo={salvoVista} det={detVista} rascunhoItens={rascunho.itens} idLinha={linhaPreco} onSelecionar={setItemPreco} ocupado={ocupado}
           secaoPedida={secaoPreco} onIrParaItens={s => irPara(destinoDa(s))} porProduto={noProduto}
+          onAbrirProduto={idItem => escolher(idItem)}
           onMudarPreco={(idLinha, preco) => mudarDoItem(idLinha, { precoMl: preco })}
           onEscolherCenario={(tipo, gratis) => {
             // só avisa "posto nas alterações" quando muda de verdade (escolher o que já está não entra na lista)
@@ -496,6 +498,23 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado, abrirEm }) =
     setSelecao(s);
     if (s !== 'geral' && !['formas', 'preco', 'itens', 'atributos'].includes(aba)) setAba('formas');
   };
+
+  // painel da direita: com um produto escolhido, só o dele (o que é do anúncio inteiro, sem linha, fica sempre)
+  const linhasFoco = noProduto && detVista ? new Set(detVista.itens.map(i => i.idLinha)) : null;
+  const skusFoco = noProduto && detVista ? new Set(detVista.itens.map(i => i.sku)) : null;
+  const doFoco = <T,>(lista: T[], linhas: (x: T) => number[]) => (linhasFoco ? lista.filter(x => { const ls = linhas(x); return !ls.length || ls.some(l => linhasFoco.has(l)); }) : lista);
+  const painel = {
+    pendencias: doFoco(pendencias, p => p.idLinhas),
+    divergencias: divergencias && linhasFoco ? divergencias.filter(d => linhasFoco.has(d.idLinha)) : divergencias,
+    conferencia: conferencia && doFoco(conferencia, c => [c.idLinha]),
+    falhas: skusFoco ? falhas.filter(f => skusFoco.has(f.sku)) : falhas,
+    foco: null as null | { rotulo: string; outros: number; onVerTudo: () => void },
+  };
+  if (noProduto && detVista) {
+    const outros = (pendencias.length - painel.pendencias.length)
+      + ((divergencias || []).filter(d => d.diferencas.length).length - (painel.divergencias || []).filter(d => d.diferencas.length).length);
+    painel.foco = { rotulo: produtosDoAnuncio(detVista.itens)[0]?.sku || 'este produto', outros, onVerTudo: () => setSelecao('geral') };
+  }
 
   // ---------------------------------------------------------------------------
   // Tela
@@ -576,8 +595,8 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado, abrirEm }) =
               <div style={{ position: 'sticky', top: 0 }}>
                 <PainelAlteracoes alteracoes={alteracoes} onDesfazer={chave => setRascunho(r => desfazer(r, salvo, chave))} onDesfazerTudo={desfazerTudo} />
                 <PainelLateral
-                  det={salvo} temRascunho={temRascunho} ocupado={acaoMl} conferencia={conferencia} falhas={falhas}
-                  pendencias={pendencias} onAcao={acaoNoMl} onPendencia={irParaPendencia} divergencias={divergencias}
+                  det={salvo} temRascunho={temRascunho} ocupado={acaoMl} conferencia={painel.conferencia} falhas={painel.falhas}
+                  pendencias={painel.pendencias} onAcao={acaoNoMl} onPendencia={irParaPendencia} divergencias={painel.divergencias} foco={painel.foco}
                   onTrazerPacote={trazerPacote}
                 />
               </div>

@@ -24,13 +24,15 @@ interface Props {
   onPendencia: (p: PendenciaAgrupada) => void;
   divergencias?: DivergenciasLinha[] | null;            // ERP × ML dos itens publicados (null = conferindo)
   onTrazerPacote?: (linha: DivergenciasLinha) => void;   // grava no cadastro a embalagem que está no ML
+  /** Produto escolhido no editor: o painel mostra só o dele (e quanto há nos outros). */
+  foco?: { rotulo: string; outros: number; onVerTudo: () => void } | null;
 }
 
 const Linha: React.FC<{ rotulo: string; children: React.ReactNode }> = ({ rotulo, children }) => (
   <Flex justify="space-between" gap={8}><Text type="secondary">{rotulo}</Text><Text style={{ textAlign: 'right' }}>{children}</Text></Flex>
 );
 
-const PainelLateral: React.FC<Props> = ({ det, temRascunho, ocupado, conferencia, falhas, pendencias, onAcao, onPendencia, divergencias, onTrazerPacote }) => {
+const PainelLateral: React.FC<Props> = ({ det, temRascunho, ocupado, conferencia, falhas, pendencias, onAcao, onPendencia, divergencias, onTrazerPacote, foco }) => {
   const paraEnviar = (divergencias || []).filter(l => l.diferencas.some(d => d.enviavel));
   const soPainel = (divergencias || []).flatMap(l => l.diferencas.filter(d => !d.enviavel).map(d => ({ sku: l.sku, d })));
   const erros = pendencias.filter(p => p.nivel === 'erro').length;
@@ -40,6 +42,13 @@ const PainelLateral: React.FC<Props> = ({ det, temRascunho, ocupado, conferencia
 
   return (
     <>
+      {foco && (
+        <Alert
+          type="info" style={{ marginBottom: 12, padding: '6px 10px' }}
+          message={<span style={{ fontSize: 12 }}>Avisos de <b>{foco.rotulo}</b>{foco.outros ? ` · +${foco.outros} nos outros produtos` : ''}</span>}
+          action={<Button size="small" type="link" onClick={foco.onVerTudo}>ver todos</Button>}
+        />
+      )}
       <Card size="small" style={{ marginBottom: 12 }} title="Mercado Livre">
         <Space direction="vertical" size={6} style={{ width: '100%' }}>
           <Linha rotulo="Itens">{det.qtdItens}{det.publicados > 0 ? ` · ${det.publicados} no ML` : ''}{det.aPublicar && det.publicados ? ` · ${det.aPublicar} a publicar` : ''}</Linha>
