@@ -362,6 +362,8 @@ const TRADUCOES: [RegExp, (m: RegExpMatchArray) => string][] = [
   [/Attribute \[(.+?)\] is not valid/i, m => `Valor inválido no atributo ${m[1]}.`],
   [/title.*(too long|length)/i, () => 'Título maior do que o ML aceita.'],
   [/price.*(minimum|lower|invalid)/i, () => 'Preço fora do que o ML aceita para a categoria.'],
+  [/pictures is not modifiable/i, () => 'O ML não deixou trocar as fotos deste anúncio agora (ele trava as fotos em alguns casos, ex.: anúncio em revisão).'],
+  [/description is not modifiable/i, () => 'O ML não deixou trocar a descrição deste anúncio agora.'],
 ];
 export const traduzirErroMl = (msg: string) => {
   for (const [re, f] of TRADUCOES) { const m = msg.match(re); if (m) return f(m); }
@@ -371,10 +373,11 @@ export const traduzirErroMl = (msg: string) => {
 /** Mensagens do validador do ML ({ cause: [...] }), só os erros. */
 export const errosDoValidador = (d: any): string[] => {
   const causas = Array.isArray(d?.cause) ? d.cause : [];
-  const erros = causas.filter((c: any) => c?.type !== 'warning').map((c: any) => traduzirErroMl(String(c.message || c.code)));
+  // causa sem mensagem nem código não vira "undefined" no texto
+  const erros = causas.filter((c: any) => c?.type !== 'warning' && (c?.message || c?.code)).map((c: any) => traduzirErroMl(String(c.message || c.code)));
   if (erros.length) return erros;
   if (d?.error && d.error !== 'validation_error') return [traduzirErroMl(String(d.error))];
-  return d?.message ? [String(d.message)] : [];
+  return d?.message ? [traduzirErroMl(String(d.message))] : [];
 };
 
 const skuNormal = (s: string | null | undefined) => String(s ?? '').trim().toUpperCase();

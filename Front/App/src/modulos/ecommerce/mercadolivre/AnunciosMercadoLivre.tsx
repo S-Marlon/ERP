@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Avatar, Button, Card, Col, Empty, Flex, Input, Popconfirm, Row, Segmented, Space, Spin, Statistic, Table, Tag, Tooltip, Typography, message } from 'antd';
 import {
   CloudDownloadOutlined, DeleteOutlined, EditOutlined, ExportOutlined, PauseCircleOutlined, PictureOutlined, PlayCircleOutlined, PlusOutlined,
-  ReloadOutlined, SyncOutlined,
+  ReloadOutlined, StopOutlined, SyncOutlined,
 } from '@ant-design/icons';
 import {
   AnuncioResumo, anunciosApi, Desempenho, FinanceiroItem, foraDoMl, formatarMoeda, ItemResumo, NumerosDesempenho, resumoSincronizacao, ROTULO_STATUS_ML, SituacaoSincronizacao,
@@ -19,6 +19,7 @@ import ImportarMlModal from './ImportarMlModal';
 import AjudaCatalogo from './AjudaCatalogo';
 import SugestoesMl, { DestinoSugestao } from './SugestoesMl';
 import { Cobertura, DesempenhoCelula } from './DesempenhoMl';
+import { AvisoMl, tipoDoAviso } from './AvisoMl';
 
 const { Text } = Typography;
 
@@ -190,6 +191,7 @@ const AnunciosMercadoLivre: React.FC = () => {
                   {i.mlbId
                     ? <a href={i.permalink || undefined} target="_blank" rel="noreferrer"><Tag color={ROTULO_STATUS_ML[i.status || '']?.cor} style={{ fontSize: 11 }}>{i.mlbId} · {ROTULO_STATUS_ML[i.status || '']?.texto || i.status}</Tag></a>
                     : <Tag style={{ fontSize: 11 }}>a publicar</Tag>}
+                  <AvisoMl erro={i.erroMl} publicado={!!i.mlbId} />
                 </div>
               </div>
             </Space>
@@ -297,6 +299,7 @@ const AnunciosMercadoLivre: React.FC = () => {
                         {l.i.mlbId
                           ? <a href={l.i.permalink || undefined} target="_blank" rel="noreferrer"><Tag color={ROTULO_STATUS_ML[l.i.status || '']?.cor} style={{ fontSize: 11 }}>{l.i.mlbId} · {ROTULO_STATUS_ML[l.i.status || '']?.texto || l.i.status}</Tag></a>
                           : <Tag style={{ fontSize: 11 }}>a publicar</Tag>}
+                        <AvisoMl erro={l.i.erroMl} publicado={!!l.i.mlbId} />
                         <a style={{ fontSize: 12 }} onClick={() => setEditando(l.a.id)}>{(l.a.titulo || 'anúncio').slice(0, 40)}</a>
                       </Space>
                     </div>
@@ -353,6 +356,14 @@ const AnunciosMercadoLivre: React.FC = () => {
                   <div>
                     <Space size={4} wrap>
                       <SituacaoTag a={a} />
+                      {!!a.bloqueadosMl && (
+                        <Tooltip title={<div style={{ maxWidth: 440 }}>
+                          {a.itens.filter(i => tipoDoAviso(i.erroMl) === 'MODERACAO').map(i => <div key={i.idLinha} style={{ marginBottom: 6 }}><b>{i.sku}</b>: {i.erroMl}</div>)}
+                          <div style={{ opacity: 0.85 }}>Abra o anúncio, corrija o que o ML pediu e mande de novo.</div>
+                        </div>}>
+                          <Tag color="red" icon={<StopOutlined />} style={{ cursor: 'pointer' }} onClick={() => setEditando(a.id)}>{a.bloqueadosMl} bloqueado(s) pelo ML</Tag>
+                        </Tooltip>
+                      )}
                       {a.itens.length > 1 ? <Tag>{a.itens.length} itens</Tag> : a.itens[0] && <Text type="secondary" style={{ fontSize: 12 }}>{a.itens[0].sku}</Text>}
                       {a.itens.length === 1 && a.itens[0].mlbId && <Text type="secondary" style={{ fontSize: 12 }}>· {a.itens[0].mlbId}</Text>}
                     </Space>

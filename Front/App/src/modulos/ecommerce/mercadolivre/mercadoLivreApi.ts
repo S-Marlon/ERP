@@ -51,11 +51,12 @@ export interface AnuncioResumo {
   situacao: 'RASCUNHO' | 'PUBLICADO' | 'PAUSADO' | 'ENCERRADO'; preparo: 'PENDENTE' | 'PRONTO' | null;
   mlbId: string | null; permalink: string | null; qtdItens: number; publicados: number; aPublicar: number; fotoUrl: string | null; estoque: number;
   precoMin: number | null; precoMax: number | null; erros: number; avisos: number; atualizadoEm: string; ultimoErro: string | null;
-  estoqueMl: number; estoqueReserva: number; estoqueMaximo: number | null; ativosMl: number; pausadosMl: number; pausadosPrejuizo?: number; itens: ItemResumo[];
+  estoqueMl: number; estoqueReserva: number; estoqueMaximo: number | null; ativosMl: number; pausadosMl: number; pausadosPrejuizo?: number; bloqueadosMl?: number; itens: ItemResumo[];
 }
 export interface ItemResumo {
   idItem: number; idLinha: number; ativo: boolean; sku: string; nome: string; fotoUrl: string | null; mlbId: string | null; status: string | null; permalink: string | null;
   estoque: number; estoqueMl: number; precoMl: number | null; preco: number; unidade: string | null;
+  erroMl?: string | null;   // o que o ML devolveu de problema (moderação, trava de prejuízo, envio recusado)
 }
 /** Você recebe e lucro de um item ao preço de hoje (tarifa e frete grátis do ML). */
 export interface FinanceiroItem {

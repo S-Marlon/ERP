@@ -20,6 +20,7 @@ import { contaB2B } from './mercadolivreApi';
 import { aplicarModoDeVenda, vendaDoAnuncio } from './modoVenda';
 import { prejuizoDaLinha, prejuizosDasLinhas } from './precificacao.controller';
 import { pausadoPelaTrava, recusaPorPrejuizo } from './travaPrejuizo';
+import { ehModeracao } from './moderacao';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
 
@@ -357,11 +358,13 @@ export const resumo = (c: AnuncioCarregado) => {
     ativosMl: c.itens.filter(i => c.noMl.get(i.idLinha)?.status === 'active').length,
     pausadosMl: c.itens.filter(i => c.noMl.get(i.idLinha)?.status === 'paused').length,
     pausadosPrejuizo: c.itens.filter(i => c.noMl.get(i.idLinha)?.status === 'paused' && pausadoPelaTrava(c.noMl.get(i.idLinha)?.erro)).length,
+    bloqueadosMl: c.itens.filter(i => ehModeracao(c.noMl.get(i.idLinha)?.erro)).length,   // parados pela moderação do ML
     itens: c.itens.map(i => {
       const m = c.noMl.get(i.idLinha);
       return {
         idItem: i.idItem, idLinha: i.idLinha, ativo: i.linhaAtiva !== false, sku: i.sku, nome: i.tituloMl || i.nome, fotoUrl: i.fotoUrl, mlbId: m?.mlbId || null, status: m?.status || null, permalink: m?.permalink || null,
         estoque: i.estoque, estoqueMl: i.estoqueMl ?? 0, precoMl: i.precoMl, preco: precoNoMl(i, c.dados.ajustePreco), unidade: i.unidadeMl?.sigla || null,
+        erroMl: m?.erro || null,   // último erro do ML na linha (moderação, trava de prejuízo, envio recusado...)
       };
     }),
     precoMin: c.itens.length ? Math.min(...c.itens.map(i => precoNoMl(i, c.dados.ajustePreco))) : null,

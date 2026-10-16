@@ -8,7 +8,7 @@ import { caminhoLocalDaUrl } from '../../../infra/arquivos';
 import {
   atributosDoItem, corpoDoItem, cortarTitulo, errosDoValidador, FotoEnvio, foraDoMl, fotoPequena, ItemAnuncio, ligarPorSku, SITUACAO_POR_STATUS,
   situacaoPorItens, ValorAtributo,
-  descricaoPeloModelo,
+  descricaoPeloModelo, traduzirErroMl,
 } from './anuncios';
 import {
   AnuncioCarregado, carregarAnuncios, carregarCategoria, detalhe, lista, responderErro, tenantDe,
@@ -396,7 +396,7 @@ export const situacaoSincronizacao = async (req: Request, res: Response) => res.
 /** Itens publicados que ainda existem no ML (ativos ou pausados). */
 const noMlAinda = (c: AnuncioCarregado) => c.itens.filter(i => { const m = c.noMl.get(i.idLinha); return m?.mlbId && !foraDoMl(m.status); });
 
-const mensagemDoMl = (e: any) => (e instanceof ErroML && errosDoValidador(e.detalhes).length ? errosDoValidador(e.detalhes).join('; ') : e?.message || 'erro');
+const mensagemDoMl = (e: any) => (e instanceof ErroML && errosDoValidador(e.detalhes).length ? errosDoValidador(e.detalhes).join('; ') : traduzirErroMl(String(e?.message || 'erro')));
 
 /**
  * POST /anuncios/:id/atualizar-ml — manda atributos, fotos e descrição dos itens já publicados.

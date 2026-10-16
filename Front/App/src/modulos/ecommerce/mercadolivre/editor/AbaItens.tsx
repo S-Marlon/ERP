@@ -15,6 +15,7 @@ import { EstoqueAnuncioCard, EstoqueItemCelula } from '../EstoqueMl';
 import type { RascunhoItem } from '../rascunhoAnuncio';
 import { linhasDoItem, rotuloDaUnidade, umaLinhaPorItem, unidadesLivres } from '../linhasAnuncio';
 import { EmbalagemDoItem, GtinDoItem } from './CadastroDoItem';
+import { AvisoMl } from '../AvisoMl';
 
 const { Text } = Typography;
 
@@ -132,11 +133,7 @@ const AbaItens: React.FC<Props> = p => {
                         <Button size="small" type="link" style={{ padding: 0, fontSize: 12 }}>Desligar do ML</Button>
                       </Popconfirm>
                     )}
-                    {i.ml.mlbId && i.ml.status === 'paused' && i.ml.erro?.startsWith('Pausado por prejuízo') && (
-                      <Tooltip title={<>{i.ml.erro}<div style={{ marginTop: 4 }}>A trava de prejuízo reativa sozinha quando o item voltar a dar lucro (preço, custo ou frete).</div></>}>
-                        <Tag color="red" style={{ fontSize: 11 }}>pausado: prejuízo</Tag>
-                      </Tooltip>
-                    )}
+                    {i.ml.mlbId && <AvisoMl erro={i.ml.erro} />}
                     {!i.ml.mlbId && i.ml.erro && <Tooltip title={i.ml.erro}><Tag color="red" style={{ fontSize: 11 }}>não subiu: {i.ml.erro.slice(0, 50)}{i.ml.erro.length > 50 ? '…' : ''}</Tag></Tooltip>}
                     {!i.ml.mlbId && !i.ml.erro && det.publicados > 0 && <Tag style={{ fontSize: 11 }}>a publicar</Tag>}
                     {det.eixos.map(e => <Tag key={e} color="blue" style={{ fontSize: 11 }}>{i.valores[e]?.valor || '—'}{i.valores[e]?.unidade ? ` ${i.valores[e]?.unidade}` : ''}</Tag>)}

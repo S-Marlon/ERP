@@ -7,6 +7,10 @@ import { ErroML, ml } from './mercadolivreApi';
 import { importarPedidos } from './pedidos.controller';
 import { prejuizoDaLinha } from './precificacao.controller';
 import { decidirTrava, pausadoPelaTrava, pausaPor } from './travaPrejuizo';
+import { bloqueadoPeloMl, ehModeracao, Infracao, infracaoMaisRecente, PREFIXO_MODERACAO, textoModeracao } from './moderacao';
+
+/** O motivo da moderação do ML que está na linha não é apagado pelo que a sincronização grava (só sai quando o ML libera). */
+const ERRO_SEM_APAGAR_MODERACAO = `ultimo_erro = CASE WHEN ultimo_erro LIKE '${PREFIXO_MODERACAO}%' THEN ultimo_erro ELSE ? END`;
 
 export interface ResultadoSincronizacao {
   idAnuncio: number;
@@ -80,7 +84,7 @@ export const sincronizarAnuncios = async (
         await pool.execute(
           `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens
            SET estoque_enviado = COALESCE(?, estoque_enviado), preco_enviado = COALESCE(?, preco_enviado),
-               status_ml = COALESCE(?, status_ml), sincronizado_em = NOW(), ultimo_erro = ?
+               status_ml = COALESCE(?, status_ml), sincronizado_em = NOW(), ${ERRO_SEM_APAGAR_MODERACAO}
            WHERE id_anuncio = ? AND tenant_id = ? AND id_anuncio_item = ?`,
           [corpo.available_quantity ?? null, corpo.price ?? null, r?.status || corpo.status || null, trava?.erro?.slice(0, 500) ?? null, Number(c.registro.id), tenant, item.idLinha]
         );
@@ -88,7 +92,7 @@ export const sincronizarAnuncios = async (
       } catch (e: any) {
         linha.erro = e instanceof ErroML ? e.message : (e?.message || 'erro');
         await pool.execute(
-          `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET ultimo_erro = ? WHERE id_anuncio = ? AND tenant_id = ? AND id_anuncio_item = ?`,
+          `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET ${ERRO_SEM_APAGAR_MODERACAO} WHERE id_anuncio = ? AND tenant_id = ? AND id_anuncio_item = ?`,
           [String(linha.erro).slice(0, 500), Number(c.registro.id), tenant, item.idLinha]
         );
       }
@@ -120,10 +124,16 @@ export const atualizarStatusDoMl = async (tenant: number, anuncios: AnuncioCarre
   const ids = anuncios.flatMap(c => [...c.noMl.values()].map(m => m.mlbId).filter(Boolean) as string[]);
   if (!ids.length) return;
   const status = new Map<string, string>();
+  const bloqueados = new Map<string, string>();   // MLB -> status bruto, dos que a moderação do ML parou
   for (let k = 0; k < ids.length; k += 20) {
     const parte: any[] = await ml(tenant, 'GET', `/items?ids=${ids.slice(k, k + 20).join(',')}&attributes=id,status,sub_status`);
-    for (const r of parte || []) if (r?.code === 200 && r.body?.id) status.set(String(r.body.id), statusDoMl(r.body));
+    for (const r of parte || []) {
+      if (r?.code !== 200 || !r.body?.id) continue;
+      status.set(String(r.body.id), statusDoMl(r.body));
+      if (bloqueadoPeloMl(r.body.status, r.body.sub_status)) bloqueados.set(String(r.body.id), String(r.body.status || ''));
+    }
   }
+  await anotarModeracao(tenant, anuncios, bloqueados);
   for (const c of anuncios) {
     for (const [idLinha, m] of c.noMl) {
       const novo = m.mlbId ? status.get(m.mlbId) : undefined;
@@ -138,6 +148,43 @@ export const atualizarStatusDoMl = async (tenant: number, anuncios: AnuncioCarre
     if (situacao && situacao !== c.registro.situacao) {
       await pool.execute(`UPDATE modulo_ecommerce_mercadolivre_anuncios SET situacao = ? WHERE id = ? AND tenant_id = ?`, [situacao, Number(c.registro.id), tenant]);
       c.registro.situacao = situacao;
+    }
+  }
+};
+
+// infrações do ML por anúncio (o motivo muda pouco): guardadas por 30 min
+const cacheInfracoes = new Map<string, { em: number; valor: Promise<Infracao | null> }>();
+const infracaoDoMl = (tenant: number, mlUserId: number, mlb: string) => {
+  const chave = `${tenant}|${mlb}`;
+  const g = cacheInfracoes.get(chave);
+  if (g && Date.now() - g.em < 30 * 60 * 1000) return g.valor;
+  const valor = ml(tenant, 'GET', `/moderations/infractions/${mlUserId}?related_item_id=${mlb}`)
+    .then((r: any) => infracaoMaisRecente(r?.infractions))
+    .catch(() => null);
+  cacheInfracoes.set(chave, { em: Date.now(), valor });
+  return valor;
+};
+
+/**
+ * Mão dupla com a moderação do ML: o anúncio parado pelo ML (em revisão, bloqueado, finalizado) recebe na linha o motivo,
+ * o que fazer e as categorias sugeridas; quando o ML libera, o motivo sai.
+ */
+const anotarModeracao = async (tenant: number, anuncios: AnuncioCarregado[], bloqueados: Map<string, string>) => {
+  const [[conta]]: any = await pool.execute(`SELECT ml_user_id FROM modulo_ecommerce_mercadolivre_contas WHERE tenant_id = ?`, [tenant]);
+  for (const c of anuncios) {
+    for (const [idLinha, m] of c.noMl) {
+      if (!m.mlbId) continue;
+      let texto: string | null = null;
+      if (bloqueados.has(m.mlbId)) {
+        const inf = conta?.ml_user_id ? await infracaoDoMl(tenant, Number(conta.ml_user_id), m.mlbId) : null;
+        texto = textoModeracao(inf, bloqueados.get(m.mlbId) || null);
+      } else if (!ehModeracao(m.erro)) continue;   // nem bloqueado nem com motivo antigo: nada a fazer
+      if ((texto ?? null) === (m.erro ?? null)) continue;
+      await pool.execute(
+        `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET ultimo_erro = ? WHERE id_anuncio = ? AND tenant_id = ? AND id_anuncio_item = ?`,
+        [texto, Number(c.registro.id), tenant, idLinha]
+      );
+      m.erro = texto;
     }
   }
 };
