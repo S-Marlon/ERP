@@ -396,6 +396,22 @@ export const situacaoSincronizacao = async (req: Request, res: Response) => res.
 /** Itens publicados que ainda existem no ML (ativos ou pausados). */
 const noMlAinda = (c: AnuncioCarregado) => c.itens.filter(i => { const m = c.noMl.get(i.idLinha); return m?.mlbId && !foraDoMl(m.status); });
 
+/**
+ * Anúncio User Products (com family_name): o título que o comprador vê é montado pelo ML a partir do family_name. Quando
+ * o título é o próprio family_name, trocar o título = trocar o family_name. Devolve o aviso (null = trocou).
+ */
+const trocarPeloNomeDaFamilia = async (tenant: number, mlb: string, titulo: string, temFamilia: boolean): Promise<string | null> => {
+  if (!temFamilia) return 'o ML não deixou trocar o título deste anúncio.';
+  const b: any = await ml(tenant, 'GET', `/items/${mlb}?attributes=title,family_name`);
+  const igual = (x: unknown, y: unknown) => String(x ?? '').toLowerCase().replace(/\s+/g, ' ').trim() === String(y ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+  if (igual(b?.title, titulo)) return null;   // o ML só muda maiúsculas: já está certo
+  if (!b?.family_name || !igual(b.title, b.family_name)) {
+    return `o ML monta o título deste anúncio pelo nome da família + atributos ("${b?.title}"); troque o nome da família no painel do ML.`;
+  }
+  await ml(tenant, 'PUT', `/items/${mlb}`, { family_name: titulo });
+  return null;
+};
+
 const mensagemDoMl = (e: any) => (e instanceof ErroML && errosDoValidador(e.detalhes).length ? errosDoValidador(e.detalhes).join('; ') : traduzirErroMl(String(e?.message || 'erro')));
 
 /**
@@ -427,9 +443,13 @@ export const atualizarNoMl = async (req: Request, res: Response) => {
         try {
           await ml(tenant, 'PUT', `/items/${mlb}`, titulo ? { ...corpo, title: titulo } : corpo);
         } catch (e: any) {
-          if (!titulo || !/title|t[ií]tulo/i.test(`${mensagemDoMl(e)} ${JSON.stringify(e?.detalhes ?? '')}`)) throw e;
+          const motivo = `${mensagemDoMl(e)} ${JSON.stringify(e?.detalhes ?? '')}`;
+          if (!titulo || !/title|t[ií]tulo/i.test(motivo)) throw e;
           await ml(tenant, 'PUT', `/items/${mlb}`, corpo);
-          erros.push(`título: o ML não deixou trocar o título deste anúncio (${mensagemDoMl(e)})`);
+          // User Products: o título é o family_name (o ML monta). Se o título de lá é o próprio family_name (sem
+          // atributo que o ML acrescenta, ex.: a cor), troca o family_name; senão só avisa
+          const aviso = await trocarPeloNomeDaFamilia(tenant, mlb, titulo, /family_name/i.test(motivo)).catch((x: any) => mensagemDoMl(x));
+          if (aviso) erros.push(`título: ${aviso}`);
         }
       } catch (e: any) {
         erros.push(mensagemDoMl(e));
