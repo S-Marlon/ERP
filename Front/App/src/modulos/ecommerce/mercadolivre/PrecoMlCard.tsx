@@ -172,10 +172,12 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEsc
       rowClassName={c => (c.atual ? 'ml-linha-alterada' : '')}
       columns={[
         {
-          title: 'Anúncio', width: 250, render: (_, c) => (
+          title: 'Anúncio', width: 200, render: (_, c) => (
             <Space size={4} wrap>
               <Tooltip title={c.tipo === 'gold_pro' ? 'Mais exposição e parcelamento sem juros para o comprador' : 'Comissão menor, sem parcelamento sem juros'}><Text strong={c.atual}>{TIPO[c.tipo]}</Text></Tooltip>
-              <Text type="secondary">· {c.freteGratis ? 'frete grátis' : 'comprador paga o frete'}</Text>
+              {c.freteGratis
+                ? <Tooltip title="Frete grátis para o comprador: você paga o envio"><Tag color="cyan" style={{ marginInlineEnd: 0 }}>Frete grátis</Tag></Tooltip>
+                : <Tooltip title="O comprador paga o envio (abaixo de R$ 79 o ML ainda cobra de você a tarifa de envio do item barato)"><Tag color="gold" style={{ marginInlineEnd: 0 }}>Frete custeado</Tag></Tooltip>}
               {c.atual && <Tooltip title="Como o anúncio está hoje no ML"><Tag color="blue">hoje</Tag></Tooltip>}
               {escolhido(c) && !c.atual && <Tooltip title="Escolhido nas alterações: vai ao ML ao salvar"><Tag color="processing">nas alterações</Tag></Tooltip>}
               {c.melhorPorVenda && !c.atual && !escolhido(c) && <Tooltip title="Maior lucro por venda"><Tag color="green">mais lucro/venda</Tag></Tooltip>}
