@@ -400,7 +400,8 @@ const mensagemDoMl = (e: any) => (e instanceof ErroML && errosDoValidador(e.deta
 
 /**
  * POST /anuncios/:id/atualizar-ml — manda atributos, fotos e descrição dos itens já publicados.
- * Título e categoria não mudam no ML depois de publicado (conta com User Products): só republicando.
+ * O título vai junto (se o ML recusar a troca, vai o resto e o aviso); a categoria não muda por aqui (vem do ML na
+ * sincronização, depois de trocada lá).
  */
 export const atualizarNoMl = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
@@ -416,10 +417,20 @@ export const atualizarNoMl = async (req: Request, res: Response) => {
       try {
         const { fotos, problemas } = await fotosDoItem(tenant, c, item);
         erros.push(...problemas.filter(() => fotos.length === 0));
-        await ml(tenant, 'PUT', `/items/${mlb}`, {
+        const corpo = {
           attributes: atributosDoItem(c.categoria?.atributos || [], c.dados, item, c.categoria?.temGtin ?? true),
           ...(fotos.length ? { pictures: fotos } : {}),
-        });
+        };
+        // o título vai junto (ex.: "Kit 10 Unidades …"); o ML às vezes não deixa trocar (em análise, com vendas, User
+        // Products): aí manda o resto sem ele e avisa
+        const titulo = item.tituloMl ? cortarTitulo(item.tituloMl, c.categoria?.info.maxTitulo || 60) : null;
+        try {
+          await ml(tenant, 'PUT', `/items/${mlb}`, titulo ? { ...corpo, title: titulo } : corpo);
+        } catch (e: any) {
+          if (!titulo || !/title|t[ií]tulo/i.test(`${mensagemDoMl(e)} ${JSON.stringify(e?.detalhes ?? '')}`)) throw e;
+          await ml(tenant, 'PUT', `/items/${mlb}`, corpo);
+          erros.push(`título: o ML não deixou trocar o título deste anúncio (${mensagemDoMl(e)})`);
+        }
       } catch (e: any) {
         erros.push(mensagemDoMl(e));
       }

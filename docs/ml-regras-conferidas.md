@@ -31,7 +31,8 @@ Quando duas fontes discordam, vale a de cima. Atualize esta página quando confe
 |---|---|---|---|---|
 | Foto principal sem texto, selo, logo, marca-d'água, QR ou borda | Aviso no editor de imagem | Assistente | 2026-10-16 | **Valendo** |
 | Montagem digital (produto repetido N vezes) como foto do kit | Vai como **2ª** foto do anúncio do kit (`fotosDaLinha()`) | Assistente: **não confirmou** que é aceita; recomenda foto real das N unidades | 2026-10-16 | Em dúvida: por isso não é a 1ª |
-| Título do kit deve deixar claro quantas unidades são | `tituloComUnidade()` ("Kit 10 Rolamentos …") | Assistente | 2026-10-16 | Valendo |
+| Título do kit deve deixar claro quantas unidades são | `tituloComUnidade()` ("Kit 10 Unidades Rolamento …") | Assistente | 2026-10-16 | Valendo |
+| Trocar o título de anúncio já publicado | "Enviar atributos, fotos e descrição" manda o título; se o ML recusar, manda o resto e avisa | Assistente: bloqueado enquanto está em análise | 2026-10-16 | Em dúvida fora da análise (com vendas, User Products): o aviso do envio mostra |
 | Kit: preencher unidades por pacote e formato de venda quando a categoria tiver esses campos | `atributosDoItem()` (UNITS_PER_PACK, SALE_FORMAT) | Assistente | 2026-10-16 | Valendo |
 
 ## Categoria e moderação

@@ -72,7 +72,7 @@ const PainelLateral: React.FC<Props> = ({ det, temRascunho, ocupado, conferencia
 
           {vivos.length > 0 && (
             <>
-              <Tooltip title={travado || 'Manda atributos, fotos e descrição para os itens que já estão no ML'}>
+              <Tooltip title={travado || 'Manda título, atributos, fotos e descrição para os itens que já estão no ML (se o ML não deixar trocar o título, avisa e manda o resto)'}>
                 <Button block icon={<SendOutlined />} loading={ocupado === 'enviar'} disabled={temRascunho || algumOcupado} onClick={() => onAcao('enviar')}>
                   Enviar atributos, fotos e descrição
                 </Button>

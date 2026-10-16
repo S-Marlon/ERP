@@ -2,7 +2,7 @@ import assert from 'assert';
 import {
   AnuncioDados, AtributoML, cortarTitulo, tituloLegivel, eixosDeVariacao, filtrarAtributosCategoria, ItemAnuncio, pendenciasAnuncio,
   precoNoMl, resolverValor, sugerirAtributos, estoqueParaMl, regraDoItem, mudancasParaMl, saldoNaUnidade, statusDoMl, foraDoMl, situacaoPorItens, modoPublicacao, tituloPeloModelo, corpoDoItem, fotoPequena, errosDoValidador, ligarPorSku,
-  atributosDoItem, fatorDaLinha, skuDaLinha, tituloComUnidade, pluralBr, descricaoPeloModelo, camposDesconhecidos, categoriaParaTrazer,
+  atributosDoItem, fatorDaLinha, skuDaLinha, tituloComUnidade, descricaoPeloModelo, camposDesconhecidos, categoriaParaTrazer,
 } from './anuncios';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
@@ -232,16 +232,11 @@ teste('linha em kit: SKU, título e fator próprios', () => {
   assert.strictEqual(skuDaLinha('ABR-3.6-100', kit), 'ABR-3.6-100-KIT10');
   assert.strictEqual(skuDaLinha('ABR-3.6-100', null), 'ABR-3.6-100');
   // o kit na frente e o nome no plural, sem repetir ("Kit 10 Rolamentos Rolamento ..." não)
-  assert.strictEqual(tituloComUnidade('Abraçadeira Nylon 3,6 x 100 mm', kit), 'Kit 10 Abraçadeiras Nylon 3,6 x 100 mm');
-  assert.strictEqual(tituloComUnidade('ROLAMENTO 6902-ZZ | 15 mm x 28 mm x 7 mm | HHMS', kit), 'Kit 10 ROLAMENTOS 6902-ZZ | 15 mm x 28 mm x 7 mm | HHMS');
-  assert.strictEqual(tituloComUnidade('Rolamento 6902 ZZ 15x28x7 Alta Precisão Blindado', { ...kit, fator: 2 }), 'Kit 2 Rolamentos 6902 ZZ 15x28x7 Alta Precisão Blindado');
-  assert.strictEqual(tituloComUnidade('6902-ZZ Rolamento', kit), 'Kit 10 6902-ZZ Rolamento');
+  assert.strictEqual(tituloComUnidade('Abraçadeira Nylon 3,6 x 100 mm', kit), 'Kit 10 Unidades Abraçadeira Nylon 3,6 x 100 mm');
+  assert.strictEqual(tituloComUnidade('Rolamento 6902-zz | 15 Mm X 28 Mm X 7 Mm', kit), 'Kit 10 Unidades Rolamento 6902-zz | 15 Mm X 28 Mm X 7 Mm');
+  assert.strictEqual(tituloComUnidade('Rolamento 6902 ZZ 15x28x7 Blindado', { ...kit, fator: 2 }), 'Kit 2 Unidades Rolamento 6902 ZZ 15x28x7 Blindado');
   assert.strictEqual(tituloComUnidade('Kit Abraçadeira 3,6 x 100 mm', kit), 'Kit Abraçadeira 3,6 x 100 mm');
   assert.ok(tituloComUnidade('A'.repeat(30) + ' ' + 'B'.repeat(29), kit, 60).length <= 60);
-  assert.deepStrictEqual(
-    ['Conexão', 'Terminal', 'Anel', 'Retentor', 'Engate', 'Parafusos', 'Funil', 'Item', 'MANGUEIRA'].map(pluralBr),
-    ['Conexões', 'Terminais', 'Anéis', 'Retentores', 'Engates', 'Parafusos', 'Funis', 'Itens', 'MANGUEIRAS'],
-  );
   assert.strictEqual(tituloComUnidade('Abraçadeira', null), 'Abraçadeira');
   assert.strictEqual(fatorDaLinha({ unidadeMl: kit }), 10);
   assert.strictEqual(fatorDaLinha({ unidadeMl: null }), 1);
