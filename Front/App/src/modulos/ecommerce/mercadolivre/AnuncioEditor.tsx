@@ -2,7 +2,7 @@
 // no painel "Alterações não salvas" (antes → depois, com desfazer) e só vão para o banco/ML ao salvar.
 // Fotos, itens, categoria e as ações no ML (conferir, publicar, pausar, encerrar) valem na hora.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Badge, Button, Col, Flex, Modal, Row, Space, Spin, Tabs, Tag, Tooltip, Typography, message } from 'antd';
+import { Badge, Button, Col, Flex, InputNumber, Modal, Row, Space, Spin, Tabs, Tag, Tooltip, Typography, message } from 'antd';
 import { CheckCircleOutlined, CloudUploadOutlined, LinkOutlined, SaveOutlined, ShopOutlined, UndoOutlined } from '@ant-design/icons';
 import { adicionarAnexo, enviarArquivoAnexo } from '../../../areas/catalogo/skus/CatalogSku.service';
 import { AnuncioDetalhe, anunciosApi, ConferenciaItem, ItemDoAnuncio, resumoSincronizacao, SecaoPreco } from './mercadoLivreApi';
@@ -366,6 +366,23 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado, abrirEm }) =
           onDesligar={i => executar(() => anunciosApi.desligarDoMl(salvo.id, i.idLinha), 'Item desligado do ML.')}
           onOutraUnidade={(i, idUnidade) => executar(() => anunciosApi.adicionarUnidade(salvo.id, i.idLinha, idUnidade),
             'Nova linha no anúncio: confira o preço e publique (ela tem SKU e título próprios).')}
+          onCorrigirUnidade={i => {
+            let quantidade = i.unidadeMl && i.unidadeMl.fator > 1 ? i.unidadeMl.fator : 2;
+            modal.confirm({
+              title: `Quantas unidades o anúncio ${i.ml.mlbId} vende por venda?`, okText: 'Corrigir', cancelText: 'Cancelar', width: 480,
+              content: (
+                <div>
+                  <p style={{ marginBottom: 8 }}>
+                    Para quando o anúncio que já está no ML vende outra quantidade (ex.: o par a R$ 24,90 cadastrado como 1 unidade).
+                    O anúncio do ML continua o mesmo; o preço de lá fica como preço desta linha e o estoque passa a ir dividido.
+                  </p>
+                  <InputNumber min={1} max={999} precision={0} defaultValue={quantidade} onChange={v => { quantidade = Number(v) || 1; }} addonAfter="unidades" />
+                </div>
+              ),
+              onOk: () => executar(() => anunciosApi.corrigirUnidade(salvo.id, i.idLinha, quantidade),
+                'Unidade corrigida. Use "Enviar atributos, fotos e descrição" para o título, as unidades por pacote e a foto do kit irem ao ML.'),
+            });
+          }}
           onAtivar={(i, ativo) => executar(() => anunciosApi.ativarLinha(salvo.id, i.idLinha, ativo),
             ativo ? `${i.sku} ativado${i.ml.mlbId ? ' e reativado no ML' : ''}.` : `${i.sku} desativado${i.ml.mlbId ? ' e pausado no ML' : ': não vai ser publicado'}.`)}
           sincronizando={sincronizando} onSincronizar={sincronizarAgora}

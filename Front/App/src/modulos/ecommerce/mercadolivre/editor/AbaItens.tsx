@@ -37,6 +37,7 @@ interface Props {
   onRemoverItem: (item: ItemDoAnuncio) => void;
   onDesligar: (item: ItemDoAnuncio) => void;
   onOutraUnidade: (item: ItemDoAnuncio, idUnidade: number | null) => void;   // vender o mesmo item também em outra unidade
+  onCorrigirUnidade?: (item: ItemDoAnuncio) => void;                          // o anúncio publicado vende outra quantidade
   onAtivar: (item: ItemDoAnuncio, ativo: boolean) => void;                     // desativada: não publica; no ML, pausa
   sincronizando: boolean;
   onSincronizar: () => void;
@@ -163,15 +164,22 @@ const AbaItens: React.FC<Props> = p => {
               width: 92,
               render: (_, i) => {
                 const livres = unidadesLivres(det.itens, i);
+                const corrigir = !!p.onCorrigirUnidade && !!i.ml.mlbId && !foraDoMl(i.ml.status);
                 return (
                   <Space size={4}>
                     <Tooltip title={i.linhaAtiva === false ? 'Desativado: clique para vender de novo' : i.ml.mlbId ? 'Desativar (pausa no ML)' : 'Desativar (não publica)'}>
                       <Switch size="small" checked={i.linhaAtiva !== false} disabled={foraDoMl(i.ml.status)} onChange={v => p.onAtivar(i, v)} />
                     </Tooltip>
-                    {livres.length > 0 && (
+                    {(livres.length > 0 || corrigir) && (
                       <Dropdown trigger={['click']} menu={{
-                        items: livres.map(o => ({ key: String(o.idUnidade ?? 'base'), label: `Vender também como ${o.rotulo}` })),
-                        onClick: ({ key }) => p.onOutraUnidade(i, key === 'base' ? null : Number(key)),
+                        items: [
+                          ...livres.map(o => ({ key: String(o.idUnidade ?? 'base'), label: `Vender também como ${o.rotulo}` })),
+                          ...(corrigir ? [
+                            ...(livres.length ? [{ type: 'divider' as const }] : []),
+                            { key: 'corrigir', label: 'No ML este anúncio vende outra quantidade (corrigir)' },
+                          ] : []),
+                        ],
+                        onClick: ({ key }) => (key === 'corrigir' ? p.onCorrigirUnidade?.(i) : p.onOutraUnidade(i, key === 'base' ? null : Number(key))),
                       }}>
                         <Tooltip title={linhasDoItem(det.itens, i.idItem) > 1 ? 'Vender em mais uma unidade' : 'Vender também em outra unidade (ex.: kit c/10)'}>
                           <Button type="text" size="small" icon={<AppstoreAddOutlined />} />

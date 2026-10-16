@@ -876,6 +876,77 @@ export const adicionarUnidade = async (req: Request, res: Response) => {
  * a unidade do item que já tem esse fator (ex.: um KIT c/8 cadastrado) ou cria a unidade KIT{n} e a conversão no
  * cadastro; depois põe a linha no anúncio. Já existe desativada: ativa. quantidade 1 = a unidade do ERP.
  */
+/** Unidade "Kit c/N" do item (null para 1): usa a conversão que já existe ou cria a unidade e a conversão. */
+const unidadeDoKit = async (conn: Conn, tenant: number, idItem: number, quantidade: number): Promise<number | null> => {
+  if (quantidade <= 1) return null;
+  const [[mesmoFator]] = await conn.execute(
+    `SELECT id_unidade_derivada FROM itens_unidades_conversao WHERE tenant_id = ? AND id_item = ? AND ABS(fator_conversao - ?) < 0.0001 LIMIT 1`,
+    [tenant, idItem, quantidade]
+  );
+  if (mesmoFator) return Number(mesmoFator.id_unidade_derivada);
+  const sigla = siglaDoKit(quantidade);
+  const [[unidade]] = await conn.execute(`SELECT id_unidade FROM itens_unidades_medida WHERE tenant_id = ? AND sigla = ?`, [tenant, sigla]);
+  const idUnidade = unidade
+    ? Number(unidade.id_unidade)
+    : Number((await conn.execute(`INSERT INTO itens_unidades_medida (tenant_id, sigla, descricao) VALUES (?, ?, ?)`, [tenant, sigla, `Kit c/${quantidade}`]))[0].insertId);
+  const [[outra]] = await conn.execute(
+    `SELECT fator_conversao FROM itens_unidades_conversao WHERE tenant_id = ? AND id_item = ? AND id_unidade_derivada = ?`, [tenant, idItem, idUnidade]
+  );
+  if (outra) throw new ErroML(`O item já usa a unidade ${sigla} com ${Number(outra.fator_conversao)} unidades: confira em Catálogo › Preços & Comercial.`);
+  await conn.execute(
+    `INSERT INTO itens_unidades_conversao (tenant_id, id_item, id_unidade_derivada, fator_conversao) VALUES (?, ?, ?, ?)`, [tenant, idItem, idUnidade, quantidade]
+  );
+  return idUnidade;
+};
+
+/**
+ * POST /anuncios/:id/itens/:idLinha/corrigir-unidade { quantidade } — o anúncio que já está no ML vende N unidades por
+ * venda, mas a linha está noutra unidade no ERP (ex.: o par de R$ 24,90 cadastrado como 1 un.). Troca a unidade da linha
+ * mantendo o anúncio do ML (o mesmo MLB) e o preço que está lá; o estoque passa a ir dividido por N. Título, unidades por
+ * pacote e foto do kit vão ao ML pelo "Enviar atributos, fotos e descrição".
+ */
+export const corrigirUnidade = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const id = Number(req.params.id);
+  const quantidade = Number(req.body?.quantidade);
+  const connection = await pool.getConnection();
+  const conn = connection as unknown as Conn;
+  try {
+    if (!Number.isInteger(quantidade) || quantidade < 1 || quantidade > 999) throw new ErroML('Quantidade inválida (de 1 a 999).');
+    await anuncioEditavel(pool as any, tenant, id);
+    const linha = await linhaDoAnuncio(tenant, id, Number(req.params.idLinha));
+    if (!linha.mlb_id || foraDoMl(linha.status_ml)) throw new ErroML('Só para item já publicado. Antes de publicar, escolha a unidade na coluna Unidade.');
+    const idItem = Number(linha.id_item);
+    await connection.beginTransaction();
+    const idUnidade = await unidadeDoKit(conn, tenant, idItem, quantidade);
+    if ((idUnidade ?? null) === (linha.id_unidade === null ? null : Number(linha.id_unidade))) throw new ErroML('A linha já está nessa unidade.');
+    const [[outra]] = await conn.execute(
+      `SELECT id_anuncio, id_anuncio_item FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE tenant_id = ? AND id_item = ? AND unidade_chave = ? AND id_anuncio_item <> ?`,
+      [tenant, idItem, idUnidade ?? 0, Number(linha.id_anuncio_item)]
+    );
+    if (outra) throw new ErroML(`Já existe outra linha deste item nessa forma (anúncio #${outra.id_anuncio}): tire ela antes de corrigir.`, 409);
+    // o preço que está no ML vale para o pacote: fica como preço próprio da linha (senão o ERP mandaria o da unidade)
+    const [[atual]] = await conn.execute(`SELECT preco, preco_enviado FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE id_anuncio_item = ?`, [Number(linha.id_anuncio_item)]);
+    const precoNoMl = atual?.preco_enviado !== null && atual?.preco_enviado !== undefined ? Number(atual.preco_enviado) : null;
+    await conn.execute(
+      `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET id_unidade = ?, preco = COALESCE(?, preco) WHERE id_anuncio_item = ? AND tenant_id = ?`,
+      [idUnidade, precoNoMl, Number(linha.id_anuncio_item), tenant]
+    );
+    await conn.execute(`UPDATE modulo_ecommerce_mercadolivre_anuncios SET atualizado_em = NOW() WHERE id = ?`, [id]);
+    await connection.commit();
+    const [c] = await carregarAnuncios(pool as any, tenant, id);
+    return res.json({
+      ...(await detalhe(tenant, c)),
+      mensagem: `Linha corrigida para ${quantidade > 1 ? `kit c/${quantidade}` : '1 unidade'}${precoNoMl ? ` (preço do ML mantido: R$ ${precoNoMl.toFixed(2).replace('.', ',')})` : ''}. Use "Enviar atributos, fotos e descrição" para o título, as unidades por pacote e a foto do kit irem ao ML.`,
+    });
+  } catch (error) {
+    await connection.rollback().catch(() => null);
+    return responderErro(res, error, 'Erro ao corrigir a unidade.');
+  } finally {
+    connection.release();
+  }
+};
+
 export const adicionarKit = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
   const id = Number(req.params.id);
@@ -888,28 +959,7 @@ export const adicionarKit = async (req: Request, res: Response) => {
     const origem = await linhaDoAnuncio(tenant, id, Number(req.params.idLinha));
     const idItem = Number(origem.id_item);
     await connection.beginTransaction();
-    let idUnidade: number | null = null;
-    if (quantidade > 1) {
-      const [[mesmoFator]] = await conn.execute(
-        `SELECT id_unidade_derivada FROM itens_unidades_conversao WHERE tenant_id = ? AND id_item = ? AND ABS(fator_conversao - ?) < 0.0001 LIMIT 1`,
-        [tenant, idItem, quantidade]
-      );
-      if (mesmoFator) idUnidade = Number(mesmoFator.id_unidade_derivada);
-      else {
-        const sigla = siglaDoKit(quantidade);
-        const [[unidade]] = await conn.execute(`SELECT id_unidade FROM itens_unidades_medida WHERE tenant_id = ? AND sigla = ?`, [tenant, sigla]);
-        idUnidade = unidade
-          ? Number(unidade.id_unidade)
-          : Number((await conn.execute(`INSERT INTO itens_unidades_medida (tenant_id, sigla, descricao) VALUES (?, ?, ?)`, [tenant, sigla, `Kit c/${quantidade}`]))[0].insertId);
-        const [[outra]] = await conn.execute(
-          `SELECT fator_conversao FROM itens_unidades_conversao WHERE tenant_id = ? AND id_item = ? AND id_unidade_derivada = ?`, [tenant, idItem, idUnidade]
-        );
-        if (outra) throw new ErroML(`O item já usa a unidade ${sigla} com ${Number(outra.fator_conversao)} unidades: confira em Catálogo › Preços & Comercial.`);
-        await conn.execute(
-          `INSERT INTO itens_unidades_conversao (tenant_id, id_item, id_unidade_derivada, fator_conversao) VALUES (?, ?, ?, ?)`, [tenant, idItem, idUnidade, quantidade]
-        );
-      }
-    }
+    const idUnidade = await unidadeDoKit(conn, tenant, idItem, quantidade);
     const [[existe]] = await conn.execute(
       `SELECT id_anuncio_item, id_anuncio, ativo FROM modulo_ecommerce_mercadolivre_anuncios_itens WHERE tenant_id = ? AND id_item = ? AND unidade_chave = ?`,
       [tenant, idItem, idUnidade ?? 0]

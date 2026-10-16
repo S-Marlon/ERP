@@ -317,6 +317,9 @@ export const anunciosApi = {
   /** Vende o mesmo item também em outra unidade (nova linha); idUnidade null = a unidade base. */
   adicionarUnidade: async (id: number, idLinha: number, idUnidade: number | null) =>
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}/unidade?tenant_id=1`, json('POST', { idUnidade })), 'Erro ao adicionar a unidade.'),
+  /** O anúncio publicado vende N unidades por venda: troca a unidade da linha mantendo o MLB e o preço de lá. */
+  corrigirUnidade: async (id: number, idLinha: number, quantidade: number) =>
+    ler<AnuncioDetalhe & { mensagem?: string }>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}/corrigir-unidade?tenant_id=1`, json('POST', { quantidade })), 'Erro ao corrigir a unidade.'),
   /** Troca o tipo e/ou o frete grátis de um item já publicado, só nele (direto no ML). */
   modoDaLinha: async (id: number, idLinha: number, corpo: { tipo?: string; freteGratis?: boolean }) =>
     ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}/modo?tenant_id=1`, json('POST', corpo)), 'Erro ao mudar o modo de venda do item.'),
