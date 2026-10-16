@@ -439,11 +439,41 @@ export const skuDaLinha = (sku: string, unidade: Pick<UnidadeVenda, 'sigla'> | n
 };
 
 /** Título da linha em kit: o do item com "Kit 10 Unidades" no fim (cortado para caber), se ainda não fala do kit. */
+/**
+ * Plural de uma palavra em português (o nome do produto que abre o título): rolamento → rolamentos, conexão → conexões,
+ * terminal → terminais, anel → anéis, retentor → retentores. Mantém maiúsculas ("ROLAMENTO" → "ROLAMENTOS").
+ */
+export const pluralBr = (palavra: string) => {
+  const p = palavra;
+  const alto = p.length > 1 && p === p.toUpperCase() && p !== p.toLowerCase();
+  const m = p.toLowerCase();
+  let r: string;
+  if (!/[a-zà-ú]$/.test(m) || m.endsWith('s') || m.endsWith('x')) r = m;           // já no plural, sigla ou "tórax"
+  else if (m.endsWith('ão')) r = `${m.slice(0, -2)}ões`;
+  else if (m.endsWith('al')) r = `${m.slice(0, -2)}ais`;
+  else if (m.endsWith('el')) r = `${m.slice(0, -2)}éis`;
+  else if (m.endsWith('ol')) r = `${m.slice(0, -2)}óis`;
+  else if (m.endsWith('ul')) r = `${m.slice(0, -2)}uis`;
+  else if (m.endsWith('il')) r = `${m.slice(0, -2)}is`;
+  else if (m.endsWith('m')) r = `${m.slice(0, -1)}ns`;
+  else if (/[rz]$/.test(m)) r = `${m}es`;
+  else r = `${m}s`;
+  if (alto) return r.toUpperCase();
+  return p[0] === p[0].toUpperCase() ? r[0].toUpperCase() + r.slice(1) : r;
+};
+
+/**
+ * Título da linha vendida em kit: "Kit 10 Rolamentos 6902-ZZ …" (o kit na frente, que é o que o comprador lê e o que não
+ * é cortado, e a primeira palavra no plural, sem repetir o nome). Título que já fala em kit fica como está.
+ */
 export const tituloComUnidade = (titulo: string, unidade: Pick<UnidadeVenda, 'fator'> | null | undefined, max = 60) => {
   if (!unidade || !(unidade.fator > 1)) return titulo;
-  const sufixo = `Kit ${numeroBr(unidade.fator)} Unidades`;
-  if (/\bkit\b/.test(normalizar(titulo))) return titulo;
-  return `${cortarTitulo(titulo, max - sufixo.length - 1)} ${sufixo}`.trim();
+  const t = titulo.trim();
+  if (/\bkit\b/.test(normalizar(t))) return t;
+  const [primeira, ...resto] = t.split(/\s+/);
+  const nome = /^[A-Za-zÀ-ú]{3,}$/.test(primeira || '') ? pluralBr(primeira) : null;   // "6902-ZZ ..." não vira plural
+  const comKit = nome ? `Kit ${numeroBr(unidade.fator)} ${nome} ${resto.join(' ')}` : `Kit ${numeroBr(unidade.fator)} ${t}`;
+  return cortarTitulo(comKit.trim(), max);
 };
 
 /** Status do item no ML como o ERP guarda: "deleted" quando foi excluído lá. */
