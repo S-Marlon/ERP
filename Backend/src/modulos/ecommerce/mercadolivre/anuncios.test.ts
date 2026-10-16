@@ -169,6 +169,7 @@ teste('foto pequena, erros do validador e ligação por SKU', () => {
 teste('título cortado na palavra', () => {
   assert.strictEqual(cortarTitulo('Conexão hidráulica JIC fêmea giratória 1/2 x 3/4 com porca de aço carbono zincado', 60), 'Conexão hidráulica JIC fêmea giratória 1/2 x 3/4 com porca');
   assert.strictEqual(cortarTitulo('  curto  '), 'curto');
+  assert.strictEqual(cortarTitulo('Kit 10 Unidades ROLAMENTO 6902-ZZ | 15 mm x 28 mm x 7 mm | HHMS', 60), 'Kit 10 Unidades ROLAMENTO 6902-ZZ | 15 mm x 28 mm x 7 mm');   // sem "|" sobrando
 });
 
 teste('título: sem separador no fim e maiúsculas suavizadas', () => {

@@ -400,6 +400,8 @@ const noMlAinda = (c: AnuncioCarregado) => c.itens.filter(i => { const m = c.noM
  * Anúncio User Products (com family_name): o título que o comprador vê é montado pelo ML a partir do family_name. Quando
  * o título é o próprio family_name, trocar o título = trocar o family_name. Devolve o aviso (null = trocou).
  */
+const LIMITE_NOME_FAMILIA = 60;   // hipótese (2026-10-16): 63 caracteres deram "The field family name is invalid"
+
 const trocarPeloNomeDaFamilia = async (tenant: number, mlb: string, titulo: string, temFamilia: boolean): Promise<string | null> => {
   if (!temFamilia) return 'o ML não deixou trocar o título deste anúncio.';
   const b: any = await ml(tenant, 'GET', `/items/${mlb}?attributes=title,family_name`);
@@ -408,7 +410,8 @@ const trocarPeloNomeDaFamilia = async (tenant: number, mlb: string, titulo: stri
   if (!b?.family_name || !igual(b.title, b.family_name)) {
     return `o ML monta o título deste anúncio pelo nome da família + atributos ("${b?.title}"); troque o nome da família no painel do ML.`;
   }
-  await ml(tenant, 'PUT', `/items/${mlb}`, { family_name: titulo });
+  // o family_name tem limite próprio (60, como o título clássico), mesmo na categoria que aceita título maior
+  await ml(tenant, 'PUT', `/items/${mlb}`, { family_name: cortarTitulo(titulo, LIMITE_NOME_FAMILIA) });
   return null;
 };
 

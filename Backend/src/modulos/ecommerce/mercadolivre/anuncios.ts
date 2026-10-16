@@ -277,7 +277,7 @@ export const tituloLegivel = (s: string) => {
 /** Corta o título no limite, na palavra, sem deixar separador pendurado no fim. */
 export const cortarTitulo = (s: string, max = 60) => {
   const t = String(s || '').replace(/\s+/g, ' ').trim();
-  const limpar = (x: string) => x.replace(/[\s\-–,/]+$/, '').trim();
+  const limpar = (x: string) => x.replace(/[\s\-–,/|]+$/, '').trim();   // sem separador sobrando no fim ("… 7 mm |")
   if (t.length <= max) return limpar(t);
   const corte = t.slice(0, max);
   const espaco = corte.lastIndexOf(' ');
