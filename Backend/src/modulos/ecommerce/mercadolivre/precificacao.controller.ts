@@ -14,7 +14,7 @@ import {
   classificarLucro, classificarPreco, conselhos, estatisticas, lucroNoMl, precoParaAlvo, Tarifa, unidadesDoProduto,
 } from './precificacao';
 import { ErroML, ml } from './mercadolivreApi';
-import { acharLimiteTaxaFixa, alertasDePreco, avisosDeDegrau, LIMITE_FRETE_GRATIS, precoQueCompensaFrete, montarCenarios, quantidadesParaAnalise, resultadoVenda, vendedorPagaFrete } from './custosMl';
+import { acharLimiteTaxaFixa, alertasDePreco, avisosDeDegrau, LIMITE_FRETE_GRATIS, precoQueCompensaFrete, montarCenarios, quantidadesParaAnalise, resultadoVenda, valorNaTabelaDeFrete, vendedorPagaFrete } from './custosMl';
 import { freteDoEnvio, freteGratisNoMl, pesoCobrado, preferenciasEnvio } from './freteMl';
 
 const r2 = (v: number) => Math.round((Number(v) + Number.EPSILON) * 100) / 100;
@@ -111,11 +111,14 @@ export const contextoVenda = async (
   const peso = pref ? await pesoCobrado(tenant, { mlbId: mlb, pesoKg: item.pesoKg, medidasCm: item.medidasCm, fator }).catch(() => null) : null;
   const envioDe = (valorCompra: number, quantidade = 1, tipoAnuncio = tipo) =>
     (peso ? freteDoEnvio(tenant, { pesoG: peso.pesoG * quantidade, valorCompra, tipo: tipoAnuncio, logistica }) : Promise.resolve(null));
-  /** Frete que o vendedor paga numa compra (0 quando o comprador paga; null quando não deu para saber). */
+  /**
+   * Frete que o vendedor paga numa compra (null quando não deu para saber), pela regra do ML: abaixo de R$ 79 com frete
+   * grátis, o cheio (tabela de R$ 79); abaixo sem frete grátis, a tarifa de envio do item barato; de R$ 79 em diante, o da
+   * faixa. Frete informado à mão vale só para o frete grátis.
+   */
   const freteDe = async (valorCompra: number, quantidade = 1, gratis = freteGratis) => {
-    if (!vendedorPagaFrete(valorCompra, gratis)) return 0;
-    if (informado !== null) return informado * quantidade;
-    return (await envioDe(valorCompra, quantidade))?.valor ?? null;
+    if (informado !== null) return vendedorPagaFrete(valorCompra, gratis) ? informado * quantidade : 0;
+    return (await envioDe(valorNaTabelaDeFrete(valorCompra, gratis), quantidade))?.valor ?? null;
   };
   /** Lucro a um preço; `op` testa outro tipo de anúncio ou frete grátis ligado/desligado (cenários). */
   const avaliar = async (preco: number, op: { tipo?: string; gratis?: boolean } = {}) => {
@@ -209,14 +212,17 @@ export const analisarPreco = async (req: Request, res: Response) => {
     const tarifaAtual = await tarifaDe(precoAtual);
     const precoAlvo = await ctx.precoAlvoDe(precoAtual, frete);
 
-    const envioAtual = await envioDe(precoAtual);
-    const [freteAbaixo, freteAcima] = await Promise.all([envioDe(78.9), envioDe(Math.max(LIMITE_FRETE_GRATIS, precoAtual))]);
+    // um envio com frete grátis ligado (abaixo de R$ 79 é o cheio, pela tabela de R$ 79) e a tarifa de envio sem ele
+    const envioAtual = await envioDe(valorNaTabelaDeFrete(precoAtual, true));
+    const envioSemGratis = precoAtual < LIMITE_FRETE_GRATIS ? await envioDe(precoAtual) : null;
+    const [freteAbaixo, freteAcima] = await Promise.all([envioDe(valorNaTabelaDeFrete(78.9, freteGratis)), envioDe(Math.max(LIMITE_FRETE_GRATIS, precoAtual))]);
     const precoSemFixa = tarifaAtual.fixa > 0 ? await ctx.limiteTaxaFixa() : null;
     const alertas = await ctx.alertasDe(precoAtual, atual);
     const alertasSimulado = simulado && simular ? await ctx.alertasDe(simular, simulado) : [];
     const tarifas = { gold_special: await tarifaDe(precoAtual, 'gold_special'), gold_pro: await tarifaDe(precoAtual, 'gold_pro') };
     const freteSeGratis = informado ?? envioAtual?.valor ?? null;
-    const cenarios = montarCenarios({ preco: precoAtual, custoUnit: custo, tarifas, frete: freteSeGratis, tipoAtual: tipo, freteGratisAtual: freteGratis })
+    const freteSemGratis = informado !== null ? 0 : envioSemGratis?.valor ?? null;
+    const cenarios = montarCenarios({ preco: precoAtual, custoUnit: custo, tarifas, frete: freteSeGratis, freteSemGratis, tipoAtual: tipo, freteGratisAtual: freteGratis })
       .map(x => ({ ...x, nivel: classificarLucro(custo > 0 ? x.lucroSobreCustoPct : null, alvo.alvoPct) }));
     // preço mínimo para o alvo em cada cenário (o frete grátis desligado só vale abaixo de R$ 79)
     for (const x of cenarios as (typeof cenarios[number] & { precoAlvo?: number | null })[]) {
@@ -290,7 +296,7 @@ export const analisarPreco = async (req: Request, res: Response) => {
       tarifa: tarifaAtual, frete,
       envio: {
         gratis: freteGratis, obrigatorio: precoAtual >= LIMITE_FRETE_GRATIS, informado: informado !== null, logistica,
-        noAnuncio: !!noMlEnvio, peso, envio: envioAtual, limite: LIMITE_FRETE_GRATIS,
+        noAnuncio: !!noMlEnvio, peso, envio: envioAtual, semGratis: envioSemGratis, limite: LIMITE_FRETE_GRATIS,
         acimaDoLimite: freteAcima, abaixoDoLimite: freteAbaixo,
       },
       cenarios, porQuantidade, degraus, alertas, alertasSimulado,

@@ -69,7 +69,7 @@ export function colunasLucro<T>(
   const colunas: ColumnsType<T> = [
     { title: 'Tarifa', width: 88, align: 'right', sorter: ordenar(f => f.tarifa), render: (_, l) => (fin(l) ? cinza(fin(l)!.tarifa) : null) },
     {
-      title: <Tooltip title="Frete grátis que você paga por envio (sem frete grátis abaixo de R$ 79, o comprador paga)">Frete</Tooltip>, width: 88, align: 'right',
+      title: <Tooltip title="O que o ML cobra de você por envio: com frete grátis, o envio (abaixo de R$ 79, o cheio); sem frete grátis abaixo de R$ 79, a tarifa de envio do item barato (cobrada mesmo com o comprador pagando o envio)">Frete</Tooltip>, width: 88, align: 'right',
       sorter: ordenar(f => f.frete),
       render: (_, l) => { const f = fin(l); if (!f) return null; return f.freteDesconhecido ? <Tooltip title="Item sem peso no cadastro"><Text type="warning">?</Text></Tooltip> : cinza(f.frete); },
     },

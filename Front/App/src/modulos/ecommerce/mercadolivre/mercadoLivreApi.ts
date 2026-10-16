@@ -89,7 +89,7 @@ export interface AnalisePreco {
   faixas: (LucroMl & { minimo: number; desconto: number })[]; conselhos: string[];
   envio: {
     gratis: boolean; obrigatorio: boolean; informado: boolean; logistica: string; noAnuncio: boolean; limite: number;
-    peso: { pesoG: number; fonte: 'ML' | 'ERP' } | null; envio: FreteEnvio | null; acimaDoLimite: FreteEnvio | null; abaixoDoLimite: FreteEnvio | null;
+    peso: { pesoG: number; fonte: 'ML' | 'ERP' } | null; envio: FreteEnvio | null; semGratis?: FreteEnvio | null; acimaDoLimite: FreteEnvio | null; abaixoDoLimite: FreteEnvio | null;
   };
   cenarios: (ResultadoVendaMl & { tipo: 'gold_special' | 'gold_pro'; freteGratis: boolean; atual: boolean; obrigatorio: boolean; precoAlvo?: number | null })[];
   porQuantidade: (ResultadoVendaMl & { desconto: number; faixa: boolean; freteDesconhecido: boolean })[];

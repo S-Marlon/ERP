@@ -257,7 +257,7 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEsc
     <Space direction="vertical" size={10} style={{ width: '100%' }}>
       <div style={{ padding: '8px 12px', background: '#fafafa', borderRadius: 8, fontSize: 13 }}>
         {formatarMoeda(l.preco)} − tarifa {formatarMoeda(l.tarifa)} ({a.tarifa.comissaoPct}%{a.tarifa.fixa ? ` + ${formatarMoeda(a.tarifa.fixa)} fixa` : ''})
-        {' '}− frete {l.frete ? formatarMoeda(l.frete) : 'R$ 0,00 (o comprador paga)'} = <b>{formatarMoeda(l.liquido)}</b>
+        {' '}− frete {l.frete ? `${formatarMoeda(l.frete)}${!e.gratis && !e.obrigatorio ? ' (tarifa de envio do item barato)' : ''}` : 'R$ 0,00'} = <b>{formatarMoeda(l.liquido)}</b>
         {' '}− custo {formatarMoeda(l.custo)}{a.unidadeMl ? ` (${a.unidades} × ${formatarMoeda(a.custoBase)})` : ''}
         {' '}= <b style={{ color: corLucro(l.lucro) }}>{formatarMoeda(l.lucro)}</b>
       </div>
@@ -273,7 +273,8 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEsc
         )}
         description={l.freteDesconhecido ? 'Não deu para calcular o frete: o item não tem peso no cadastro e ainda não está no ML. Preencha em Itens e estoque › Cadastro, ou teste um frete à mão (campo "frete" no topo).' : (
           <div style={{ fontSize: 12 }}>
-            {e.envio && <div>Um envio custa <b>{formatarMoeda(e.envio.valor)}</b> para você{e.envio.cheio ? ` (tabela ${formatarMoeda(e.envio.cheio)}${e.envio.descontoPct ? `, ${e.envio.descontoPct}% de desconto do ML` : ''})` : ''}{!e.gratis && !e.obrigatorio ? ' se ligar o frete grátis' : ''}.</div>}
+            {e.envio && <div>Com frete grátis, um envio custa <b>{formatarMoeda(e.envio.valor)}</b> para você{e.envio.cheio ? ` (tabela ${formatarMoeda(e.envio.cheio)}${e.envio.descontoPct ? `, ${e.envio.descontoPct}% de desconto do ML` : ''})` : ''}{!e.obrigatorio ? ': abaixo de R$ 79 é o frete grátis cheio, sem o desconto do item barato' : ''}.</div>}
+            {e.semGratis && !e.obrigatorio && <div>Sem frete grátis, o ML ainda cobra de você <b>{formatarMoeda(e.semGratis.valor)}</b> por envio (tarifa de envio de item abaixo de R$ 79), mesmo com o comprador pagando o frete.</div>}
             {e.acimaDoLimite && !e.obrigatorio && <div>Compra a partir de {formatarMoeda(e.limite)}: <b>{formatarMoeda(e.acimaDoLimite.valor)}</b> por envio (aí é obrigatório).</div>}
             {e.peso && <div>Peso cobrado: {e.peso.pesoG} g {e.peso.fonte === 'ML' ? '(calculado pelo ML)' : '(do cadastro do ERP)'}.</div>}
             <div style={{ marginTop: 2 }}><Text type="secondary" style={{ fontSize: 12 }}>Estimativa do ML. O frete cobrado de verdade aparece em Pedidos › Resultado real.</Text></div>

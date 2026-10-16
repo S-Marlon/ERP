@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { acharLimiteTaxaFixa, alertasDePreco, avisosDeDegrau, montarCenarios, precoQueCompensaFrete, quantidadesParaAnalise, resultadoVenda, vendedorPagaFrete } from './custosMl';
+import { acharLimiteTaxaFixa, alertasDePreco, avisosDeDegrau, montarCenarios, precoQueCompensaFrete, quantidadesParaAnalise, resultadoVenda, valorNaTabelaDeFrete, vendedorPagaFrete } from './custosMl';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -25,6 +25,17 @@ teste('quem paga o frete', () => {
   assert.strictEqual(vendedorPagaFrete(42.9, false), false);
   assert.strictEqual(vendedorPagaFrete(42.9, true), true);
   assert.strictEqual(vendedorPagaFrete(85.8, false), true);
+});
+
+teste('tabela do frete que o ML cobra (conferida com o painel)', () => {
+  // abaixo de 79 com frete grátis: a tabela de 79 (R$ 23,40 / 438 g pagou R$ 13,85 = a de R$ 79)
+  assert.strictEqual(valorNaTabelaDeFrete(23.4, true), 79);
+  // abaixo sem frete grátis: a do próprio valor (R$ 12,59 / 400 g pagou R$ 5,95, mesmo com o comprador pagando o envio)
+  assert.strictEqual(valorNaTabelaDeFrete(12.59, false), 12.59);
+  assert.strictEqual(valorNaTabelaDeFrete(100, true), 100);
+  assert.strictEqual(valorNaTabelaDeFrete(100, false), 100);
+  const c = montarCenarios({ preco: 12.59, custoUnit: 3.5, tarifas: { gold_special: CLASSICO, gold_pro: PREMIUM }, frete: 13.85, freteSemGratis: 5.95, tipoAtual: 'gold_special', freteGratisAtual: false });
+  assert.deepStrictEqual(c.filter(x => x.tipo === 'gold_special').map(x => [x.freteGratis, x.frete]), [[true, 13.85], [false, 5.95]]);
 });
 
 teste('cenários Clássico × Premium, com e sem frete grátis', () => {

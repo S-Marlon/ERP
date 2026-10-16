@@ -12,8 +12,17 @@ export const LIMITE_FRETE_GRATIS = 79;
 /** Frete grátis que o vendedor paga num envio (consulta ao ML): com desconto, cheio (tabela) e o peso cobrado. */
 export interface FreteEnvio { valor: number; cheio: number | null; descontoPct: number | null; pesoG: number | null }
 
-/** O vendedor paga o frete quando oferece frete grátis ou quando a compra passa do limite (aí é obrigatório). */
+/** O vendedor paga o frete grátis (o envio inteiro) quando oferece ou quando a compra passa do limite (aí é obrigatório). */
 export const vendedorPagaFrete = (totalCompra: number, freteGratis: boolean) => freteGratis || totalCompra >= LIMITE_FRETE_GRATIS;
+
+/**
+ * Valor de compra pela tabela do frete que o ML cobra do vendedor (regra que trocou a taxa fixa do item barato, conferida
+ * com o painel do ML): de R$ 79 em diante, a do próprio valor (frete grátis obrigatório); abaixo, com frete grátis ligado,
+ * a de R$ 79 (o frete grátis cheio, sem o subsídio do item barato); abaixo sem frete grátis, a do próprio valor (a tarifa
+ * de envio do item barato, com o desconto do ML, cobrada mesmo com o comprador pagando o envio).
+ */
+export const valorNaTabelaDeFrete = (totalCompra: number, freteGratis: boolean) =>
+  totalCompra < LIMITE_FRETE_GRATIS && freteGratis ? LIMITE_FRETE_GRATIS : totalCompra;
 
 export interface ResultadoVenda {
   quantidade: number; precoUnit: number; receita: number; tarifa: number; frete: number; recebe: number;
@@ -81,12 +90,13 @@ export interface Cenario extends ResultadoVenda { tipo: TipoAnuncio; freteGratis
 /** Clássico × Premium, com e sem frete grátis (sem frete grátis só existe abaixo do limite). */
 export const montarCenarios = (p: {
   preco: number; custoUnit: number; tarifas: Record<TipoAnuncio, Tarifa>; frete: number | null; tipoAtual: string; freteGratisAtual: boolean;
+  freteSemGratis?: number | null;   // abaixo de R$ 79 sem frete grátis: a tarifa de envio que o ML cobra mesmo assim
 }): Cenario[] => {
   const obrigatorio = p.preco >= LIMITE_FRETE_GRATIS;
   const saida: Cenario[] = [];
   for (const tipo of ['gold_special', 'gold_pro'] as TipoAnuncio[]) {
     for (const freteGratis of obrigatorio ? [true] : [true, false]) {
-      const r = resultadoVenda({ precoUnit: p.preco, custoUnit: p.custoUnit, tarifa: p.tarifas[tipo], frete: freteGratis ? p.frete ?? 0 : 0 });
+      const r = resultadoVenda({ precoUnit: p.preco, custoUnit: p.custoUnit, tarifa: p.tarifas[tipo], frete: freteGratis ? p.frete ?? 0 : p.freteSemGratis ?? 0 });
       saida.push({ ...r, tipo, freteGratis, obrigatorio, atual: tipo === p.tipoAtual && (obrigatorio || freteGratis === p.freteGratisAtual) });
     }
   }
