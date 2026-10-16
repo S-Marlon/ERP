@@ -20,6 +20,7 @@ import { lerFaixas } from './faixasQuantidade';
 import { fotosDaLinha, fotosDaVariacao } from './fotos';
 import { prejuizoDaLinha } from './precificacao.controller';
 import { Divergencia, divergenciasDaLinha, PacoteMl, pacoteParaTrazer } from './divergencias';
+import { fichaDaLinha } from './ficha';
 import { lerMedidaMl } from './sugestoes';
 import { PREFIXO_TRAVA, recusaPorPrejuizo } from './travaPrejuizo';
 
@@ -482,6 +483,31 @@ export const divergenciasAnuncio = async (req: Request, res: Response) => {
     return res.json({ linhas: await divergenciasDe(tenant, c) });
   } catch (error) {
     return responderErro(res, error, 'Erro ao comparar com o Mercado Livre.');
+  }
+};
+
+/**
+ * GET /anuncios/:id/itens/:idLinha/ficha — a ficha da forma: cada atributo com de onde vem, o que o ERP manda e o que
+ * está no anúncio do ML (e a embalagem do ML para trazer ao cadastro, na unidade).
+ */
+export const fichaDaForma = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  try {
+    const c = await carregarOuErro(tenant, Number(req.params.id));
+    const item = c.itens.find(i => i.idLinha === Number(req.params.idLinha));
+    if (!item) throw new ErroML('Item não encontrado neste anúncio.', 404);
+    if (!c.categoria) throw new ErroML('Escolha a categoria do ML antes (no Geral).');
+    const m = c.noMl.get(item.idLinha);
+    const publicado = !!m?.mlbId && !foraDoMl(m.status);
+    const noMl: any[] | null = publicado ? ((await ml(tenant, 'GET', `/items/${m!.mlbId}?attributes=attributes`))?.attributes || []) : null;
+    const envio = atributosDoItem(c.categoria.atributos, c.dados, item, c.categoria.temGtin ?? true);
+    return res.json({
+      publicado, mlbId: m?.mlbId || null,
+      linhas: fichaDaLinha({ categoria: c.categoria.atributos, envio, noMl, origens: c.dados.atributos }),
+      pacoteMl: publicado && (item.unidadeMl?.fator || 1) === 1 ? pacoteParaTrazer(envio, noMl || [], lerMedidaMl) : null,
+    });
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao montar a ficha.');
   }
 };
 
