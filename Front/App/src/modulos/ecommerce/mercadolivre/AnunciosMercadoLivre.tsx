@@ -7,11 +7,11 @@ import {
   ReloadOutlined, SyncOutlined,
 } from '@ant-design/icons';
 import {
-  AnuncioResumo, anunciosApi, Desempenho, FinanceiroItem, formatarMoeda, ItemResumo, NumerosDesempenho, resumoSincronizacao, ROTULO_STATUS_ML, ROTULO_TIPO_ANUNCIO, SituacaoSincronizacao,
+  AnuncioResumo, anunciosApi, Desempenho, FinanceiroItem, formatarMoeda, ItemResumo, NumerosDesempenho, resumoSincronizacao, ROTULO_STATUS_ML, SituacaoSincronizacao,
 } from './mercadoLivreApi';
 import { faixaMoeda, FiltroLista, lucroBaixo, passaNoFiltro, resumirFinanceiro, ResumoFinanceiro, semEstoqueNoMl } from './listaAnuncios';
 import { AtivoLinha, AtivoNoMl, EstoqueRapido, PrecoRapido } from './AcoesRapidas';
-import { colunasLucro, TagSituacao } from './colunasLucro';
+import { colunasLucro, ModoVenda, modoDosItens, TagSituacao } from './colunasLucro';
 import AdicionarAnuncioModal from './AdicionarAnuncioModal';
 import AnuncioEditor from './AnuncioEditor';
 import SituacaoTag from './SituacaoTag';
@@ -263,7 +263,7 @@ const AnunciosMercadoLivre: React.FC = () => {
         {visao === 'itens' ? (
           <Table<LinhaItem>
             size="middle" rowKey="chave" loading={carregando} dataSource={linhasItens} pagination={{ pageSize: 30, hideOnSinglePage: true, showSizeChanger: false }}
-            scroll={{ x: 1550 }}
+            scroll={{ x: 1670 }}
             rowClassName={l => (l.f?.nivel === 'PREJUIZO' ? 'ml-linha-erro' : '')}
             locale={{ emptyText: <Empty description="Nenhum item neste filtro." /> }}
             columns={[
@@ -287,6 +287,10 @@ const AnunciosMercadoLivre: React.FC = () => {
                 ),
               },
               {
+                title: 'Modo de venda', width: 120,
+                render: (_, l) => <ModoVenda {...modoDosItens(l.f ? [l.f] : [], l.a.tipoAnuncio)} />,
+              },
+              {
                 title: 'Preço no ML', width: 200, sorter: (x, y) => x.i.preco - y.i.preco,
                 render: (_, l) => <PrecoRapido idAnuncio={l.a.id} idLinha={l.i.idLinha} atual={l.f} valor={l.i.preco} proprio={l.i.precoMl !== null} onSalvar={v => salvarPreco(l.a, l.i, v)} />,
               },
@@ -303,7 +307,7 @@ const AnunciosMercadoLivre: React.FC = () => {
         ) : (
         <Table<AnuncioResumo>
           size="middle" rowKey="id" loading={carregando} dataSource={visiveis} pagination={{ pageSize: 20, hideOnSinglePage: true }}
-          scroll={{ x: 1650 }}
+          scroll={{ x: 1770 }}
           rowSelection={{
             selectedRowKeys: selecionados, onChange: k => setSelecionados(k as number[]),
             getCheckboxProps: a => ({ disabled: a.ativosMl + a.pausadosMl === 0 }),
@@ -332,7 +336,6 @@ const AnunciosMercadoLivre: React.FC = () => {
                   <div>
                     <Space size={4} wrap>
                       <SituacaoTag a={a} />
-                      <Tag>{ROTULO_TIPO_ANUNCIO[a.tipoAnuncio] || a.tipoAnuncio}</Tag>
                       {a.itens.length > 1 ? <Tag>{a.itens.length} itens</Tag> : a.itens[0] && <Text type="secondary" style={{ fontSize: 12 }}>{a.itens[0].sku}</Text>}
                       {a.itens.length === 1 && a.itens[0].mlbId && <Text type="secondary" style={{ fontSize: 12 }}>· {a.itens[0].mlbId}</Text>}
                     </Space>
@@ -340,6 +343,11 @@ const AnunciosMercadoLivre: React.FC = () => {
                   {a.itens.length > 1 && resumoVarios(a)}
                 </div>
               ),
+            },
+            {
+              title: <Tooltip title="Tipo de anúncio (Clássico ou Premium) e frete: grátis (você paga o envio) ou custeado (o comprador paga). Publicado: como está no ML.">Modo de venda</Tooltip>,
+              width: 120,
+              render: (_, a) => { const m = modoDosItens(financeiro.get(a.id) || [], a.tipoAnuncio); return <ModoVenda {...m} />; },
             },
             {
               title: <Tooltip title="Mude o preço e veja na hora quanto você recebe e o lucro. O botão do alvo sugere o preço para a sua margem.">Preço no ML</Tooltip>, width: 210,

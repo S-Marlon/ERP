@@ -351,6 +351,7 @@ const financeiroDe = async (tenant: number, c: AnuncioCarregado) => {
       return {
         idItem: item.idItem, idLinha: item.idLinha, preco: l.preco, tarifa: l.tarifa, frete: l.frete, recebe: l.liquido, custo: l.custo, lucro: l.lucro,
         lucroSobreCustoPct: l.lucroSobreCustoPct, nivel: l.nivel, freteGratis: ctx.freteGratis, freteDesconhecido: l.freteDesconhecido, alvoPct: ctx.alvo.alvoPct,
+        tipo: ctx.tipo, modoNoMl: !!ctx.noMlEnvio,   // tipo e frete grátis: lidos do ML quando publicado
         precoAlvo: await ctx.precoAlvoDe(preco, l.frete),
         alertas: await ctx.alertasDe(preco, l),
       };

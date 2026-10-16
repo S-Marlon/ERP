@@ -61,6 +61,7 @@ export interface ItemResumo {
 export interface FinanceiroItem {
   idItem: number; idLinha: number; preco: number; tarifa: number; frete: number; recebe: number; custo: number; lucro: number;
   lucroSobreCustoPct: number | null; nivel: LucroMl['nivel']; freteGratis: boolean; freteDesconhecido: boolean; alvoPct: number;
+  tipo?: string; modoNoMl?: boolean;   // tipo de anúncio e frete grátis lidos do ML (modoNoMl) ou do ERP/padrão da conta
   precoAlvo: number | null;   // menor preço que dá o alvo sobre o custo (null sem custo)
   alertas: AlertaPreco[];     // degraus de preço (taxa fixa de item barato, frete grátis a partir de R$ 79)
 }

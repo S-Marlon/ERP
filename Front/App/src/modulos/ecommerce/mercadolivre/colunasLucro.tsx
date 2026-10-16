@@ -54,6 +54,42 @@ export const AlertasPreco: React.FC<{ alertas: AlertaPreco[] | undefined; onUsar
   );
 };
 
+/**
+ * Modo de venda: Clássico/Premium e frete grátis ou frete custeado (o comprador paga). `noMl` falso = ainda não publicado
+ * (tipo do ERP e frete do padrão da conta); 'misto' quando os itens do anúncio estão diferentes.
+ */
+export const ModoVenda: React.FC<{ tipo: string | 'misto' | null; freteGratis: boolean | 'misto' | null; noMl: boolean }> = ({ tipo, freteGratis, noMl }) => {
+  const origem = noMl ? '' : ' (ainda não publicado: vale o do ERP e o padrão da sua conta do ML)';
+  const tipoTag = tipo === null ? null : tipo === 'misto'
+    ? <Tooltip title="Itens com tipos diferentes no ML"><Tag style={{ marginInlineEnd: 0 }}>Misto</Tag></Tooltip>
+    : (
+      <Tooltip title={`${tipo === 'gold_pro' ? 'Premium: mais exposição e parcelamento sem juros para o comprador (tarifa maior)' : 'Clássico: tarifa menor, sem parcelamento sem juros'}${origem}`}>
+        <Tag color={tipo === 'gold_pro' ? 'purple' : 'geekblue'} style={{ marginInlineEnd: 0 }}>{tipo === 'gold_pro' ? 'Premium' : 'Clássico'}</Tag>
+      </Tooltip>
+    );
+  const freteTag = freteGratis === null ? null : freteGratis === 'misto'
+    ? <Tooltip title="Uns itens com frete grátis, outros sem"><Tag style={{ marginInlineEnd: 0 }}>Frete misto</Tag></Tooltip>
+    : freteGratis
+      ? <Tooltip title={`Frete grátis para o comprador: você paga o envio${origem}`}><Tag color="cyan" style={{ marginInlineEnd: 0 }}>Frete grátis</Tag></Tooltip>
+      : <Tooltip title={`O comprador paga o envio (abaixo de R$ 79 o ML ainda cobra de você a tarifa de envio do item barato)${origem}`}><Tag color="gold" style={{ marginInlineEnd: 0 }}>Frete custeado</Tag></Tooltip>;
+  return (
+    <Space direction="vertical" size={2} style={{ opacity: noMl ? 1 : 0.75 }}>
+      {tipoTag}
+      {freteTag}
+    </Space>
+  );
+};
+
+/** Junta o modo de venda de vários itens (um valor só, ou 'misto'). */
+export const modoDosItens = (itens: FinanceiroItem[], tipoErp: string) => {
+  const um = <V,>(vs: V[]): V | 'misto' | null => (!vs.length ? null : vs.every(v => v === vs[0]) ? vs[0] : 'misto');
+  return {
+    tipo: um(itens.length ? itens.map(f => f.tipo || tipoErp) : [tipoErp]),
+    freteGratis: um(itens.map(f => f.freteGratis)),
+    noMl: itens.some(f => f.modoNoMl),
+  };
+};
+
 const cinza = (v: number) => <Text type="secondary">{v ? `−${formatarMoeda(v)}` : '—'}</Text>;
 /** Nome pequeno à esquerda do valor, nas colunas de dois andares. */
 const Rotulo: React.FC<{ children: React.ReactNode }> = ({ children }) => (
