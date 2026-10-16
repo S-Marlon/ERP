@@ -17,6 +17,7 @@ import AnuncioEditor from './AnuncioEditor';
 import SituacaoTag from './SituacaoTag';
 import ImportarMlModal from './ImportarMlModal';
 import AjudaCatalogo from './AjudaCatalogo';
+import SugestoesMl, { DestinoSugestao } from './SugestoesMl';
 
 const { Text } = Typography;
 
@@ -34,6 +35,7 @@ const AnunciosMercadoLivre: React.FC = () => {
   const [busca, setBusca] = useState('');
   const [adicionar, setAdicionar] = useState(false);
   const [editando, setEditando] = useState<number | null>(null);
+  const [abrirEm, setAbrirEm] = useState<DestinoSugestao | null>(null);   // aba/linha ao abrir por uma sugestão
   const [importar, setImportar] = useState(false);
   const [selecionados, setSelecionados] = useState<number[]>([]);
   const [emMassa, setEmMassa] = useState(false);
@@ -218,6 +220,7 @@ const AnunciosMercadoLivre: React.FC = () => {
               </Tooltip>
             )}
             <Tooltip title="Recarregar a lista e recalcular o lucro"><Button icon={<ReloadOutlined />} onClick={carregar} loading={carregando || calculando} /></Tooltip>
+            <SugestoesMl onAbrir={(id, d) => { setAbrirEm(d); setEditando(id); }} />
             <AjudaCatalogo />
             <Tooltip title="Liga ao ERP os anúncios que você já tem no Mercado Livre (pelo SKU)">
               <Button icon={<CloudDownloadOutlined />} onClick={() => setImportar(true)}>Importar do ML</Button>
@@ -363,7 +366,7 @@ const AnunciosMercadoLivre: React.FC = () => {
         onFechar={() => setAdicionar(false)}
         onCriados={ids => { setAdicionar(false); carregar(); if (ids.length === 1) setEditando(ids[0]); }}
       />
-      <AnuncioEditor id={editando} onFechar={() => setEditando(null)} onAlterado={carregar} />
+      <AnuncioEditor id={editando} abrirEm={abrirEm} onFechar={() => { setEditando(null); setAbrirEm(null); }} onAlterado={carregar} />
       <ImportarMlModal aberto={importar} onFechar={() => setImportar(false)} onImportados={() => { setImportar(false); carregar(); }} />
     </>
   );

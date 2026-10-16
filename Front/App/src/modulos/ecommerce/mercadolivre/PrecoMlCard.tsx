@@ -7,7 +7,8 @@ import { Alert, Button, Flex, InputNumber, Progress, Segmented, Space, Spin, Tab
 import {
   AimOutlined, BarChartOutlined, BulbOutlined, CalculatorOutlined, CarOutlined, RollbackOutlined, ShoppingCartOutlined, TeamOutlined, ThunderboltOutlined, WarningOutlined,
 } from '@ant-design/icons';
-import { AnalisePreco, AnuncioDetalhe, anunciosApi, formatarMoeda, ResultadoVendaMl } from './mercadoLivreApi';
+import { AnalisePreco, AnuncioDetalhe, anunciosApi, formatarMoeda, ResultadoVendaMl, SecaoPreco, SugestaoMl } from './mercadoLivreApi';
+import { SugestoesDaLinha } from './SugestoesMl';
 import { AlertasPreco } from './colunasLucro';
 import { precoComercial } from './listaAnuncios';
 import { compararCenarios, ComparacaoCenario } from './cenariosMl';
@@ -29,7 +30,7 @@ const corLucro = (v: number) => (v < 0 ? '#cf1322' : undefined);
 const TIPO: Record<string, string> = { gold_special: 'Clássico', gold_pro: 'Premium' };
 const r2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
 
-type Secao = 'formas' | 'cenarios' | 'mercado' | 'quantidade' | 'conta';
+type Secao = SecaoPreco;
 const CHAVE_SECAO = 'ml-preco-secao';
 const secaoSalva = (): Secao => { try { return (localStorage.getItem(CHAVE_SECAO) as Secao) || 'formas'; } catch { return 'formas'; } };
 
@@ -53,9 +54,11 @@ interface Props {
   faixas: React.ReactNode;                              // preço por quantidade para CNPJ (do anúncio inteiro)
   /** Pedido de fora para abrir uma seção (ex.: "Analisar" numa forma de venda abre o mercado). */
   secaoPedida?: { secao: Secao; vez: number } | null;
+  sugestoes?: SugestaoMl[];                                    // da central, só desta linha
+  onIrParaItens?: (s: SugestaoMl) => void;
 }
 
-const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEscolherCenario, formas, faixas, secaoPedida }) => {
+const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEscolherCenario, formas, faixas, secaoPedida, sugestoes, onIrParaItens }) => {
   const [analise, setAnalise] = useState<AnalisePreco | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -362,6 +365,8 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEsc
       {a && a.alertas.length > 0 && (
         <Alert type={a.alertas.some(x => x.grave) ? 'error' : 'warning'} showIcon style={{ marginTop: 10, padding: '6px 12px' }} message={<AlertasPreco alertas={a.alertas} onUsar={mudar} textoUsar="Usar" />} />
       )}
+
+      <SugestoesDaLinha lista={sugestoes || []} onAbrir={s => (s.acao.aba === 'itens' ? onIrParaItens?.(s) : s.acao.secao && setSecao(s.acao.secao))} />
 
       {/* seções */}
       <Segmented

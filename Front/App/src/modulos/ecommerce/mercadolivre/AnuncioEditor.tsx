@@ -5,7 +5,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Col, Flex, Modal, Row, Space, Spin, Tabs, Tag, Tooltip, Typography, message } from 'antd';
 import { CheckCircleOutlined, CloudUploadOutlined, LinkOutlined, SaveOutlined, ShopOutlined, UndoOutlined } from '@ant-design/icons';
 import { adicionarAnexo, enviarArquivoAnexo } from '../../../areas/catalogo/skus/CatalogSku.service';
-import { AnuncioDetalhe, anunciosApi, ConferenciaItem, ItemDoAnuncio, resumoSincronizacao } from './mercadoLivreApi';
+import { AnuncioDetalhe, anunciosApi, ConferenciaItem, ItemDoAnuncio, resumoSincronizacao, SecaoPreco } from './mercadoLivreApi';
+import { destinoDa, DestinoSugestao } from './SugestoesMl';
 import { agruparPendencias, PendenciaAgrupada } from './pendencias';
 import {
   comRascunho, corposParaSalvar, desfazer, limparIguais, listarAlteracoes, mudarAnuncio, mudarAtributo, mudarItem,
@@ -29,6 +30,7 @@ interface Props {
   id: number | null;
   onFechar: () => void;
   onAlterado: () => void;
+  abrirEm?: DestinoSugestao | null;       // aba/linha/seção vinda da central de sugestões
 }
 
 type Aba = 'anuncio' | 'itens' | 'fotos' | 'atributos' | 'preco' | 'catalogo';
@@ -59,7 +61,7 @@ const avisarFotoPequena = (arquivo: File) => new Promise<void>(resolve => {
   img.src = url;
 });
 
-const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
+const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado, abrirEm }) => {
   const [modal, contextoModal] = Modal.useModal();
   const [salvo, setSalvo] = useState<AnuncioDetalhe | null>(null);
   const [rascunho, setRascunho] = useState<Rascunho>(RASCUNHO_VAZIO);
@@ -76,6 +78,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
   const [falhas, setFalhas] = useState<{ sku: string; erro: string }[]>([]);
   const [sincronizando, setSincronizando] = useState(false);
   const [itemPreco, setItemPreco] = useState<number | null>(null);    // item aberto no painel de preço
+  const [secaoPreco, setSecaoPreco] = useState<{ secao: SecaoPreco; vez: number } | null>(null);   // seção pedida no painel de preço
 
   /** Detalhe novo do servidor: o rascunho perde o que ficou igual ao salvo (ou o que não existe mais). */
   const aplicar = useCallback((d: AnuncioDetalhe) => {
@@ -96,11 +99,21 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
     setRascunho(RASCUNHO_VAZIO);
     setAba('anuncio');
     setItemPreco(null);
+    setSecaoPreco(null);
     setFiltroItens(null);
     setConferencia(null);
     setFalhas([]);
     if (id) recarregar();
   }, [id, recarregar]);
+
+  // vindo de uma sugestão: abre direto na aba, na linha e na seção dela (depois do efeito acima, que zera tudo)
+  const irPara = useCallback((d: DestinoSugestao) => {
+    if (d.aba === 'itens') { setFiltroItens({ texto: d.sku, ids: [d.idLinha] }); setAba('itens'); return; }
+    setItemPreco(d.idLinha);
+    if (d.secao) setSecaoPreco({ secao: d.secao, vez: d.vez });
+    setAba('preco');
+  }, []);
+  useEffect(() => { if (id && abrirEm) irPara(abrirEm); }, [id, abrirEm?.vez]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const det = useMemo(() => (salvo ? comRascunho(salvo, rascunho) : null), [salvo, rascunho]);
   const alteracoes = useMemo(() => (salvo ? listarAlteracoes(salvo, rascunho, {
@@ -372,6 +385,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado }) => {
       children: (
         <AbaPreco
           salvo={salvo} det={det} rascunhoItens={rascunho.itens} idLinha={itemPreco} onSelecionar={setItemPreco} ocupado={ocupado}
+          secaoPedida={secaoPreco} onIrParaItens={s => irPara(destinoDa(s))}
           onMudarPreco={(idLinha, preco) => mudarDoItem(idLinha, { precoMl: preco })}
           onEscolherCenario={(tipo, gratis) => {
             mudarCampo('tipoAnuncio', tipo);

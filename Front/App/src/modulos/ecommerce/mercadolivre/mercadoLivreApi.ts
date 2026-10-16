@@ -253,6 +253,18 @@ export interface CategoriaNo { id: string | null; nome: string; caminho: string;
 /** Garante a lista de alertas (backend de versão anterior não manda). */
 const comAlertas = <T extends { alertas?: AlertaPreco[]; precoAlvo?: number | null }>(x: T): T => ({ ...x, alertas: x.alertas ?? [], precoAlvo: x.precoAlvo ?? null });
 
+export type TipoSugestao = 'FRETE_GRATIS' | 'CAIXA' | 'PESO' | 'KIT' | 'PRECO' | 'CADASTRO';
+export type SecaoPreco = 'formas' | 'cenarios' | 'mercado' | 'quantidade' | 'conta';
+export interface SugestaoMl {
+  tipo: TipoSugestao; idAnuncio: number; idLinha: number; sku: string; titulo: string; texto: string;
+  economia: number | null;                                   // R$ a mais por venda; null = sem valor (cadastro)
+  acao: { aba: 'preco' | 'itens'; secao?: SecaoPreco };
+}
+export interface FaixasFrete {
+  logistica: string | null;
+  linhas: { ateG: number; gratisAbaixo79: number | null; compradorPaga20: number | null; compradorPaga50: number | null; acima79: number | null }[];
+}
+
 export const anunciosApi = {
   listar: async () => ler<AnuncioResumo[]>(await fetch(`${API}/anuncios?tenant_id=1`), 'Erro ao listar os anúncios.'),
   fotos: async (id: number) => ler<FotosItemMl[]>(await fetch(`${API}/anuncios/${id}/fotos?tenant_id=1`), 'Erro ao ler as fotos do anúncio.'),
@@ -341,6 +353,11 @@ export const anunciosApi = {
   previaImportacao: async () => ler<PreviaImportacao>(await fetch(`${API}/importar?tenant_id=1`), 'Erro ao ler os anúncios do ML.'),
   importar: async (ligacoes: { mlbId: string; idItem: number }[]) =>
     ler<{ ids: number[]; ligados: number }>(await fetch(`${API}/importar?tenant_id=1`, json('POST', { ligacoes })), 'Erro ao importar.'),
+  /** Central de sugestões: o que mudar em cada linha para custar menos ou lucrar mais (de todos os anúncios ou de um). */
+  sugestoes: async (id?: number) =>
+    ler<{ sugestoes: SugestaoMl[]; titulos: Record<number, string> }>(await fetch(`${API}/anuncios/sugestoes?tenant_id=1${id ? `&id=${id}` : ''}`), 'Erro ao montar as sugestões.'),
+  /** Quanto o ML cobra do vendedor por faixa de peso hoje (guia de frete). */
+  faixasFrete: async () => ler<FaixasFrete>(await fetch(`${API}/frete/faixas?tenant_id=1`), 'Erro ao ler as faixas de frete.'),
   categoria: async (id?: string | null) => ler<CategoriaNo>(await fetch(`${API}/categorias${id ? `/${id}` : ''}?tenant_id=1`), 'Erro ao ler categorias.'),
 };
 
