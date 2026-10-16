@@ -29,6 +29,10 @@ const pct = (v: number | null | undefined) => (v === null || v === undefined ? '
 const corLucro = (v: number) => (v < 0 ? '#cf1322' : undefined);
 const TIPO: Record<string, string> = { gold_special: 'Clássico', gold_pro: 'Premium' };
 const r2 = (v: number) => Math.round((v + Number.EPSILON) * 100) / 100;
+/** Nome pequeno à esquerda do valor, nas colunas de dois andares. */
+const Rotulo: React.FC<{ children: React.ReactNode }> = ({ children }) => <Text type="secondary" style={{ fontSize: 11, marginRight: 4 }}>{children}</Text>;
+const menos = (v: number) => <Text type="secondary">{v ? `−${formatarMoeda(v)}` : '—'}</Text>;
+const DOIS_ANDARES: React.CSSProperties = { lineHeight: 1.35 };
 
 type Secao = SecaoPreco;
 const CHAVE_SECAO = 'ml-preco-secao';
@@ -119,14 +123,32 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEsc
     return null;
   };
 
-  const colunasVenda = [
-    { title: 'Tarifa', dataIndex: 'tarifa', align: 'right' as const, render: (v: number) => <Text type="secondary">−{formatarMoeda(v)}</Text> },
-    { title: 'Frete', dataIndex: 'frete', align: 'right' as const, render: (v: number) => (v ? <Text type="secondary">−{formatarMoeda(v)}</Text> : <Text type="secondary">—</Text>) },
-    { title: 'Você recebe', dataIndex: 'recebe', align: 'right' as const, render: (v: number) => <b>{formatarMoeda(v)}</b> },
-    { title: 'Lucro', dataIndex: 'lucro', align: 'right' as const, render: (v: number) => <b style={{ color: corLucro(v) }}>{formatarMoeda(v)}</b> },
-    { title: 'Sobre o custo', dataIndex: 'lucroSobreCustoPct', align: 'right' as const, render: pct },
-    { title: '', dataIndex: 'nivel', width: 130, render: (v: string) => <Tag color={LUCRO[v].cor}>{LUCRO[v].texto}</Tag> },
-  ];
+  // colunas de dois andares (como na lista de anúncios): tarifa e frete · você recebe · lucro com % e situação
+  type Venda = { tarifa: number; frete: number; recebe: number; lucro: number; lucroSobreCustoPct: number | null; nivel: string };
+  const colTarifaFrete = {
+    title: <Tooltip title="O que o ML desconta: a tarifa (comissão do tipo de anúncio) e o frete que você paga">Tarifa e frete</Tooltip>,
+    align: 'right' as const, width: 120,
+    render: (_: unknown, v: Venda) => (
+      <div style={DOIS_ANDARES}>
+        <div><Rotulo>tarifa</Rotulo>{menos(v.tarifa)}</div>
+        <div><Rotulo>frete</Rotulo>{menos(v.frete)}</div>
+      </div>
+    ),
+  };
+  const colRecebe = { title: 'Você recebe', dataIndex: 'recebe', align: 'right' as const, width: 100, render: (v: number) => <b>{formatarMoeda(v)}</b> };
+  /** Lucro (em cima) e % sobre o custo com a situação (embaixo); `topo` troca o valor de cima (ex.: lucro da compra inteira). */
+  const colLucro = <T extends Venda>(titulo: React.ReactNode, topo?: (v: T) => React.ReactNode) => ({
+    title: titulo, align: 'right' as const, width: 150,
+    render: (_: unknown, v: T) => (
+      <div style={DOIS_ANDARES}>
+        {topo ? topo(v) : <b style={{ color: corLucro(v.lucro) }}>{formatarMoeda(v.lucro)}</b>}
+        <div style={{ whiteSpace: 'nowrap' }}>
+          <Text type="secondary" style={{ fontSize: 12, marginRight: 4 }}>{pct(v.lucroSobreCustoPct)}</Text>
+          <Tag color={LUCRO[v.nivel].cor} style={{ fontSize: 11, lineHeight: '16px', marginInlineEnd: 0 }}>{LUCRO[v.nivel].texto}</Tag>
+        </div>
+      </div>
+    ),
+  });
 
   const sugerido = a?.precoAlvo !== null && a?.precoAlvo !== undefined ? precoComercial(a.precoAlvo) : null;
   const atencao = !!a && (a.alertas.length > 0 || a.degraus.length > 0 || (l?.freteDesconhecido ?? false));
@@ -135,7 +157,7 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEsc
   const cenarios = a && l && (
     <Table<AnalisePreco['cenarios'][number] & ComparacaoCenario>
       size="small" pagination={false} rowKey={c => `${c.tipo}-${c.freteGratis}`} dataSource={compararCenarios(a.cenarios, vendasMes)}
-      scroll={{ x: 1000 }}
+      scroll={{ x: 880 }}
       title={() => (
         <Flex justify="space-between" align="center" wrap gap={8}>
           <Text type="secondary" style={{ fontSize: 12 }}>A {formatarMoeda(l.preco)}: qual tipo de anúncio e se vale ligar o frete grátis. "Usar" põe nas alterações.</Text>
@@ -160,22 +182,30 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEsc
             </Space>
           ),
         },
-        ...colunasVenda,
+        colTarifaFrete,
+        colRecebe,
+        colLucro<AnalisePreco['cenarios'][number] & ComparacaoCenario>('Lucro por venda'),
         {
-          title: <Tooltip title={`Lucro no mês com ${vendasMes} vendas (o mesmo volume em todos)`}>Lucro/mês</Tooltip>, dataIndex: 'lucroMes', align: 'right' as const,
-          render: (v: number) => <Text style={{ color: corLucro(v) }}>{formatarMoeda(v)}</Text>,
-        },
-        {
-          title: <Tooltip title="Quantas vendas por mês este cenário precisa para lucrar o mesmo que hoje. Até 2× costuma valer testar; 4× ou mais quase nunca compensa.">Para lucrar o mesmo</Tooltip>,
-          align: 'right' as const, width: 150,
+          title: <Tooltip title={`Em cima: lucro no mês com ${vendasMes} vendas (o mesmo volume em todos). Embaixo: quantas vendas por mês o cenário precisa para lucrar o mesmo que hoje. Até 2× costuma valer testar; 4× ou mais quase nunca compensa.`}>No mês</Tooltip>,
+          align: 'right' as const, width: 160,
           render: (_, c) => {
-            if (c.atual) return <Text type="secondary">{vendasMes} (hoje)</Text>;
-            if (c.vendasParaEmpatar === null || c.multiplicador === null) return <Tag color="red">nunca (prejuízo)</Tag>;
-            const cor = c.multiplicador <= 1 ? 'green' : c.multiplicador <= 2 ? 'blue' : c.multiplicador < 4 ? 'orange' : 'red';
+            let empate: React.ReactNode;
+            if (c.atual) empate = <Text type="secondary" style={{ fontSize: 12 }}>{vendasMes} vendas (hoje)</Text>;
+            else if (c.vendasParaEmpatar === null || c.multiplicador === null) empate = <Tag color="red" style={{ fontSize: 11, marginInlineEnd: 0 }}>nunca (prejuízo)</Tag>;
+            else {
+              const cor = c.multiplicador <= 1 ? 'green' : c.multiplicador <= 2 ? 'blue' : c.multiplicador < 4 ? 'orange' : 'red';
+              const vezes = c.multiplicador.toFixed(1).replace('.', ',');
+              empate = (
+                <Tooltip title={c.multiplicador <= 1 ? 'Lucra mais com as mesmas vendas (ou menos)' : `Precisa vender ${vezes} vezes o que vende hoje para lucrar o mesmo`}>
+                  <Tag color={cor} style={{ fontSize: 11, marginInlineEnd: 0 }}>{c.multiplicador <= 1 ? 'mesmas vendas ou menos' : `precisa ${c.vendasParaEmpatar} (${vezes}×)`}</Tag>
+                </Tooltip>
+              );
+            }
             return (
-              <Tooltip title={c.multiplicador <= 1 ? 'Lucra mais com as mesmas vendas (ou menos)' : `Precisa vender ${c.multiplicador.toFixed(1).replace('.', ',')} vezes o que vende hoje`}>
-                <Tag color={cor} style={{ marginRight: 0 }}>{c.vendasParaEmpatar} · {c.multiplicador <= 1 ? 'menos vendas' : `${c.multiplicador.toFixed(1).replace('.', ',')}×`}</Tag>
-              </Tooltip>
+              <div style={DOIS_ANDARES}>
+                <Text style={{ color: corLucro(c.lucroMes) }}>{formatarMoeda(c.lucroMes)}</Text>
+                <div>{empate}</div>
+              </div>
             );
           },
         },
@@ -247,10 +277,14 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEsc
             ),
           },
           { title: 'Preço un.', dataIndex: 'precoUnit', align: 'right', render: formatarMoeda },
-          ...colunasVenda.slice(0, 3),
-          { title: 'Lucro da compra', dataIndex: 'lucro', align: 'right', render: (v: number) => <b style={{ color: corLucro(v) }}>{formatarMoeda(v)}</b> },
-          { title: 'Por unidade', dataIndex: 'lucroPorUnidade', align: 'right', render: (v: number) => <Text style={{ color: corLucro(v) }}>{formatarMoeda(v)}</Text> },
-          ...colunasVenda.slice(4),
+          colTarifaFrete,
+          colRecebe,
+          colLucro<AnalisePreco['porQuantidade'][number]>(<Tooltip title="Lucro da compra inteira (e por unidade); embaixo, o % sobre o custo e a situação">Lucro da compra</Tooltip>, q => (
+            <div style={{ whiteSpace: 'nowrap' }}>
+              <b style={{ color: corLucro(q.lucro) }}>{formatarMoeda(q.lucro)}</b>
+              {q.quantidade > 1 && <Text type="secondary" style={{ fontSize: 11 }}> · {formatarMoeda(q.lucroPorUnidade)}/un</Text>}
+            </div>
+          )),
         ]}
       />
     </Space>
