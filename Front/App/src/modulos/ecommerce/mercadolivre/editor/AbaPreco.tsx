@@ -2,7 +2,7 @@
 // escolher; à direita o painel da linha escolhida (preço, os números que decidem e as seções em abas). A tabela de
 // todos, para mexer em vários preços de uma vez, abre por cima.
 import React, { useEffect, useMemo, useState } from 'react';
-import { Badge, Button, Card, Col, Empty, Flex, Input, Modal, Row, Space, Tag, Tooltip, Typography } from 'antd';
+import { Badge, Button, Card, Col, Empty, Flex, Input, Modal, Row, Segmented, Space, Tag, Tooltip, Typography } from 'antd';
 import { TableOutlined, WarningFilled } from '@ant-design/icons';
 import { AnuncioDetalhe, anunciosApi, FaixaQuantidade, formatarMoeda, SecaoPreco, SugestaoMl } from '../mercadoLivreApi';
 import type { RascunhoItem } from '../rascunhoAnuncio';
@@ -29,6 +29,9 @@ interface Props {
   ocupado?: boolean;
   secaoPedida?: { secao: SecaoPreco; vez: number } | null;   // vinda da central de sugestões
   onIrParaItens?: (s: SugestaoMl) => void;
+  /** Produto escolhido no editor: sem a lista lateral (as formas viram botões) e o painel enxuto. */
+  porProduto?: boolean;
+  curva?: React.ComponentProps<typeof PrecoMlCard>['curva'];
 }
 
 const AbaPreco: React.FC<Props> = p => {
@@ -70,6 +73,23 @@ const AbaPreco: React.FC<Props> = p => {
     />
   );
 
+  // produto escolhido: as formas em botões e o painel enxuto (Formas e escada já mostra formas e quantidade)
+  if (p.porProduto) {
+    return (
+      <>
+        {det.itens.length > 1 && (
+          <Segmented
+            style={{ marginBottom: 10 }} value={atual} onChange={v => p.onSelecionar(Number(v))}
+            options={det.itens.map(i => ({ value: i.idLinha, label: i.unidadeMl ? `Kit c/${i.unidadeMl.fator}` : 'Unidade' }))}
+          />
+        )}
+        <PrecoMlCard
+          salvo={salvo} det={det} idLinha={atual} onMudarPreco={p.onMudarPreco} onEscolherCenario={p.onEscolherCenario}
+          sugestoes={sugestoes.filter(s => s.idLinha === atual)} onIrParaItens={p.onIrParaItens} enxuto curva={p.curva}
+        />
+      </>
+    );
+  }
   // anúncio de uma linha só: o painel ocupa tudo
   if (det.itens.length === 1) {
     return (

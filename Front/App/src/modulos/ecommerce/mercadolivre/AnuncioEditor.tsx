@@ -468,7 +468,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado, abrirEm }) =
       children: (
         <AbaPreco
           salvo={salvoVista} det={detVista} rascunhoItens={rascunho.itens} idLinha={linhaPreco} onSelecionar={setItemPreco} ocupado={ocupado}
-          secaoPedida={secaoPreco} onIrParaItens={s => irPara(destinoDa(s))}
+          secaoPedida={secaoPreco} onIrParaItens={s => irPara(destinoDa(s))} porProduto={noProduto}
           onMudarPreco={(idLinha, preco) => mudarDoItem(idLinha, { precoMl: preco })}
           onEscolherCenario={(tipo, gratis) => {
             // só avisa "posto nas alterações" quando muda de verdade (escolher o que já está não entra na lista)

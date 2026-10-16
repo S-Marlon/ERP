@@ -3,7 +3,7 @@
 // abas, sem rolar: formas de venda, Clássico × Premium, mercado, preço por quantidade (CNPJ) e a conta com o frete.
 // O preço vai para o rascunho do editor (desfaz e salva como o resto).
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Flex, InputNumber, Progress, Segmented, Space, Spin, Table, Tag, Tooltip, Typography } from 'antd';
+import { Alert, Button, Collapse, Flex, InputNumber, Progress, Segmented, Space, Spin, Table, Tag, Tooltip, Typography } from 'antd';
 import {
   AimOutlined, BarChartOutlined, BulbOutlined, CalculatorOutlined, CarOutlined, RollbackOutlined, ShoppingCartOutlined, TeamOutlined, ThunderboltOutlined, WarningOutlined,
 } from '@ant-design/icons';
@@ -14,6 +14,7 @@ import { precoComercial } from './listaAnuncios';
 import { compararCenarios, ComparacaoCenario } from './cenariosMl';
 import AjudaCenarios from './AjudaCenarios';
 import { rotuloDaUnidade } from './linhasAnuncio';
+import CascataLucro from './CascataLucro';
 
 const { Text } = Typography;
 
@@ -38,6 +39,14 @@ type Secao = SecaoPreco;
 const CHAVE_SECAO = 'ml-preco-secao';
 const secaoSalva = (): Secao => { try { return (localStorage.getItem(CHAVE_SECAO) as Secao) || 'formas'; } catch { return 'formas'; } };
 
+/** Uma seção do modo enxuto: título e conteúdo, sem aba. */
+const Bloco: React.FC<{ titulo: React.ReactNode; children: React.ReactNode }> = ({ titulo, children }) => (
+  <div>
+    <Text strong style={{ display: 'block', marginBottom: 6, fontSize: 13 }}>{titulo}</Text>
+    {children}
+  </div>
+);
+
 /** Um número grande do topo do painel. */
 const Indicador: React.FC<{ titulo: React.ReactNode; valor: React.ReactNode; cor?: string; children?: React.ReactNode; destaque?: boolean }> = ({ titulo, valor, cor, children, destaque }) => (
   <div style={{ flex: '1 1 170px', minWidth: 160, padding: '8px 12px', borderRadius: 8, background: destaque ? '#f0f7ff' : '#fafafa', border: `1px solid ${destaque ? '#bae0ff' : '#f0f0f0'}` }}>
@@ -54,15 +63,19 @@ interface Props {
   onMudarPreco: (idLinha: number, preco: number | null) => void;
   /** Põe o tipo e o frete grátis do cenário nas alterações (freteGratis undefined = não muda o frete). */
   onEscolherCenario: (tipo: string, freteGratis: boolean | undefined) => void;
-  formas: React.ReactNode;                              // seção "Formas de venda" (unitário e conjuntos)
-  faixas: React.ReactNode;                              // preço por quantidade para CNPJ (do anúncio inteiro)
+  formas?: React.ReactNode;                             // seção "Formas de venda" (unitário e conjuntos)
+  faixas?: React.ReactNode;                             // preço por quantidade para CNPJ (do anúncio inteiro)
+  /** Produto escolhido no editor: sem as seções que a aba "Formas e escada" já mostra, e o resto empilhado (sem abas). */
+  enxuto?: boolean;
+  /** "Onde o preço está" (gráfico do lucro por preço), no modo enxuto. Recebe a análise para marcar mercado e alvo. */
+  curva?: (a: AnalisePreco | null, mudarPreco: (v: number) => void) => React.ReactNode;
   /** Pedido de fora para abrir uma seção (ex.: "Analisar" numa forma de venda abre o mercado). */
   secaoPedida?: { secao: Secao; vez: number } | null;
   sugestoes?: SugestaoMl[];                                    // da central, só desta linha
   onIrParaItens?: (s: SugestaoMl) => void;
 }
 
-const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEscolherCenario, formas, faixas, secaoPedida, sugestoes, onIrParaItens }) => {
+const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEscolherCenario, formas, faixas, secaoPedida, sugestoes, onIrParaItens, enxuto, curva }) => {
   const [analise, setAnalise] = useState<AnalisePreco | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -302,12 +315,12 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEsc
 
   const conta = a && l && e && (
     <Space direction="vertical" size={10} style={{ width: '100%' }}>
-      <div style={{ padding: '8px 12px', background: '#fafafa', borderRadius: 8, fontSize: 13 }}>
-        {formatarMoeda(l.preco)} − tarifa {formatarMoeda(l.tarifa)} ({a.tarifa.comissaoPct}%{a.tarifa.fixa ? ` + ${formatarMoeda(a.tarifa.fixa)} fixa` : ''})
-        {' '}− frete {l.frete ? `${formatarMoeda(l.frete)}${!e.gratis && !e.obrigatorio ? ' (tarifa de envio do item barato)' : ''}` : 'R$ 0,00'} = <b>{formatarMoeda(l.liquido)}</b>
-        {' '}− custo {formatarMoeda(l.custo)}{a.unidadeMl ? ` (${a.unidades} × ${formatarMoeda(a.custoBase)})` : ''}
-        {' '}= <b style={{ color: corLucro(l.lucro) }}>{formatarMoeda(l.lucro)}</b>
-      </div>
+      <CascataLucro
+        partes={{ preco: l.preco, tarifa: l.tarifa, frete: l.frete, custo: l.custo, lucro: l.lucro }}
+        detalheTarifa={`${a.tarifa.comissaoPct}%${a.tarifa.fixa ? ` + ${formatarMoeda(a.tarifa.fixa)} fixa` : ''}`}
+        detalheFrete={!e.gratis && !e.obrigatorio ? 'tarifa de envio do item barato (o comprador paga o frete)' : e.gratis ? 'frete grátis: você paga o envio' : undefined}
+        detalheCusto={a.unidadeMl ? `${a.unidades} × ${formatarMoeda(a.custoBase)}` : undefined}
+      />
       <Alert
         type={l.freteDesconhecido ? 'warning' : 'info'} showIcon icon={<CarOutlined />}
         message={(
@@ -412,6 +425,18 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEsc
 
       <SugestoesDaLinha lista={sugestoes || []} onAbrir={s => (s.acao.aba === 'itens' ? onIrParaItens?.(s) : s.acao.secao && setSecao(s.acao.secao))} />
 
+      {enxuto ? (
+        <div style={{ marginTop: 12 }}>
+          {!a ? <div style={{ minHeight: 160, display: 'grid', placeItems: 'center' }}><Spin /></div> : (
+            <Space direction="vertical" size={14} style={{ width: '100%' }}>
+              <Bloco titulo={<><CalculatorOutlined /> De onde vem o lucro</>}>{conta}</Bloco>
+              {curva && <Bloco titulo={<><AimOutlined /> Onde o preço está</>}>{curva(a, mudar)}</Bloco>}
+              <Bloco titulo={<><ThunderboltOutlined /> Clássico × Premium e frete</>}>{cenarios}</Bloco>
+              <Collapse size="small" items={[{ key: 'mercado', label: <Space size={4}><BarChartOutlined />Mercado: {a.mercado.produtos.length} anúncio(s) parecido(s){a.mercado.estatisticas ? ` · mediana ${formatarMoeda(a.mercado.estatisticas.mediana)}/un` : ''}</Space>, children: mercado }]} />
+            </Space>
+          )}
+        </div>
+      ) : (<>
       {/* seções */}
       <Segmented
         block style={{ marginTop: 12 }} value={secao} onChange={v => setSecao(v as Secao)}
@@ -426,6 +451,7 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEsc
       <div style={{ marginTop: 10, minHeight: 160 }}>
         {secao === 'formas' ? formas : !a ? <div style={{ minHeight: 160, display: 'grid', placeItems: 'center' }}><Spin /></div> : conteudo[secao]}
       </div>
+      </>)}
     </div>
   );
 };
