@@ -518,7 +518,8 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado, abrirEm }) =
         {!det || !salvo ? <div style={{ minHeight: 400 }} /> : (
           <Row gutter={16}>
             <Col xs={24} xl={4}>
-              <div style={{ position: 'sticky', top: 0 }}>
+              {/* rolagem própria: família grande (as abraçadeiras) rola sem depender do meio */}
+              <div style={{ position: 'sticky', top: 0, maxHeight: 'calc(100vh - 192px)', overflowY: 'auto', overscrollBehavior: 'contain' }}>
                 <NavegacaoAnuncio det={det} selecao={selecao} onSelecionar={escolher} divergencias={divergencias} />
               </div>
             </Col>
