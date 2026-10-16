@@ -6,13 +6,16 @@ import { ehImagemGeradaNoEditor, kitDaImagem } from '../../../areas/catalogo/pro
 export const ehImagemGerada = ehImagemGeradaNoEditor;
 
 /**
- * Fotos de uma linha do anúncio: a linha em kit c/N leva primeiro a foto do kit c/N (a do produto repetido N vezes) e
- * depois as do item; a unidade (e o kit de outro tamanho) não leva foto de kit nenhuma.
+ * Fotos de uma linha do anúncio: a linha em kit c/N leva a foto do kit c/N (o produto repetido N vezes) como 2ª foto,
+ * logo depois da principal; a unidade (e o kit de outro tamanho) não leva foto de kit nenhuma.
+ * 2ª e não 1ª: o assistente do ML (16/10) não confirmou que a montagem é aceita como foto principal e recomenda uma
+ * foto real das N unidades. Quem tiver a foto real das N unidades põe ela como principal do item.
  */
 export const fotosDaLinha = <T extends { nome: string }>(lista: T[], fator: number): T[] => {
   const outras = lista.filter(f => kitDaImagem(f.nome) === null);
   if (!(fator > 1)) return outras;
-  return [...lista.filter(f => kitDaImagem(f.nome) === fator), ...outras];
+  const doKit = lista.filter(f => kitDaImagem(f.nome) === fator);
+  return outras.length ? [outras[0], ...doKit, ...outras.slice(1)] : doKit;
 };
 
 export interface FotoDaVariacao { chave: string; url: string; nome: string }

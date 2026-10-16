@@ -105,7 +105,7 @@ const GaleriaImagens: React.FC<Props> = ({ idItem, acoes: acoesProprias, imagens
                   <Text strong style={{ fontSize: 11 }}>{k + 1}ª{principal ? ` · ${rotuloPrincipal}` : ''}</Text>
                   {ehImagemDeMedidas(foto.nome_arquivo) && <Tag color="blue" style={{ margin: 0, fontSize: 10, lineHeight: '16px' }}>medidas</Tag>}
                   {kitDaImagem(foto.nome_arquivo) !== null && (
-                    <Tooltip title={`Foto do kit c/${kitDaImagem(foto.nome_arquivo)}: no ML vai primeiro só no anúncio desse kit (a unidade não usa)`}>
+                    <Tooltip title={`Foto do kit c/${kitDaImagem(foto.nome_arquivo)}: no ML vai como 2ª foto só no anúncio desse kit (a unidade não usa)`}>
                       <Tag color="purple" style={{ margin: 0, fontSize: 10, lineHeight: '16px' }}>kit {kitDaImagem(foto.nome_arquivo)}</Tag>
                     </Tooltip>
                   )}

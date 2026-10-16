@@ -75,7 +75,7 @@ const AjudaFrete: React.FC<{ pequeno?: boolean }> = ({ pequeno }) => {
 
         <Title level={5} style={{ marginTop: 16 }}>Regras de ouro</Title>
         <ul style={{ paddingLeft: 18, marginBottom: 0 }}>
-          <li><b>Declare o pacote como ele sai</b>, nunca menor. O ML pesa e mede no centro de distribuição: se for maior, cobra a diferença e corrige o anúncio.</li>
+          <li><b>Declare o pacote como ele sai</b>, nunca menor. O ML mede e pesa os pacotes na operação: o que passa do declarado pode ser recusado (e, numa venda, pode haver ajuste de custo).</li>
           <li><b>Pese numa balança</b> com a embalagem fechada. Peso "de cabeça" costuma sair maior que o real e joga para a faixa de cima.</li>
           <li><b>Meça os três lados</b> com o pacote fechado e arredonde para cima.</li>
           <li>Ponha no cadastro (<Text code>Itens e estoque › Cadastro</Text>) e mande ao ML com <b>Enviar atributos, fotos e descrição</b>: assim o frete do ERP e o do ML ficam iguais.</li>

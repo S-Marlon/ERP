@@ -609,8 +609,8 @@ const EditorImagemModal: React.FC<Props> = ({ entrada, onFechar, onSalvo }) => {
     if (!entrada || !itens.length) return;
     const modelo = modeloAtual();
     await guardarNaFamilia(modelo, false);
-    // foto repetida ×N = foto do kit c/N: nome próprio ("SKU-kit10.jpg"), nunca a principal do item; no ML vai primeiro
-    // só no anúncio do kit c/N
+    // foto repetida ×N = foto do kit c/N: nome próprio ("SKU-kit10.jpg"), nunca a principal do item; no ML vai como 2ª
+    // foto só no anúncio do kit c/N
     const vezes = vezesDaFoto(dadosDe(fotoDoQuadro()));
     setAplicando({ feitos: 0, total: itens.length });
     const falhas: string[] = [];
@@ -632,7 +632,7 @@ const EditorImagemModal: React.FC<Props> = ({ entrada, onFechar, onSalvo }) => {
     }
     setAplicando(null);
     if (falhas.length) message.warning(`${itens.length - falhas.length} salva(s); ${falhas.length} com erro: ${falhas[0]}`, 8);
-    else message.success(`${itens.length} ${vezes > 1 ? `foto(s) do kit c/${vezes}` : 'imagem(ns)'} salvas no cadastro${vezes > 1 ? ' (vão primeiro só no anúncio do kit)' : ''}${itens.some(i => i.noMl) ? '. Para os itens já no ML, use "Enviar atributos, fotos e descrição".' : '.'}`, 8);
+    else message.success(`${itens.length} ${vezes > 1 ? `foto(s) do kit c/${vezes}` : 'imagem(ns)'} salvas no cadastro${vezes > 1 ? ' (vão como 2ª foto só no anúncio do kit)' : ''}${itens.some(i => i.noMl) ? '. Para os itens já no ML, use "Enviar atributos, fotos e descrição".' : '.'}`, 8);
     onSalvo();
   };
 
@@ -879,7 +879,7 @@ const EditorImagemModal: React.FC<Props> = ({ entrada, onFechar, onSalvo }) => {
                         </div>
                       )}
                       <Divider style={{ margin: '4px 0' }} />
-                      <Tooltip title="Repete o produto N vezes em grade, como nos anúncios de kit (copia a foto da unidade; com fundo branco não dá diferença). Salva como foto do kit c/N: no ML ela vai primeiro só no anúncio do kit, e a unidade continua com a foto normal.">
+                      <Tooltip title="Repete o produto N vezes em grade, como nos anúncios de kit (copia a foto da unidade; com fundo branco não dá diferença). Salva como foto do kit c/N: no ML ela vai como 2ª foto só no anúncio do kit (a unidade continua com a foto normal). O ML recomenda, como foto principal do kit, uma foto real das N unidades juntas.">
                         <Space size={6} wrap>
                           <Text style={{ fontSize: 12 }}><AppstoreOutlined /> repetir a foto</Text>
                           <InputNumber size="small" min={1} max={48} precision={0} value={vezesDaFoto(d)} disabled={tratandoFoto}
@@ -898,7 +898,7 @@ const EditorImagemModal: React.FC<Props> = ({ entrada, onFechar, onSalvo }) => {
                       )}
                       {vezesDaFoto(d) > 1 && (
                         <Text type="warning" style={{ fontSize: 12 }}>
-                          Foto do kit c/{vezesDaFoto(d)}: deixe sem texto se for a 1ª foto do anúncio (regra de foto do ML).
+                          Foto do kit c/{vezesDaFoto(d)}: vai como 2ª foto do anúncio do kit. Para a 1ª, o ML recomenda foto real das unidades juntas, sem texto nem selo.
                         </Text>
                       )}
                     </Flex>

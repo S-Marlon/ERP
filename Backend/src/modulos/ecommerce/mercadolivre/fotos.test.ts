@@ -13,10 +13,11 @@ teste('imagem gerada pelo editor ou gerador não serve de base', () => {
   assert.strictEqual(ehImagemGerada('6902-ZZ-HHMS-kit10.jpg'), true);   // foto do kit também não é base
 });
 
-teste('foto do kit: só na linha do kit do mesmo tamanho, e primeiro', () => {
+teste('foto do kit: só na linha do kit do mesmo tamanho, como 2ª foto', () => {
   const lista = [{ nome: '6902-limpa.jpg' }, { nome: '6902-ZZ-HHMS-editada.jpg' }, { nome: '6902-ZZ-HHMS-kit10.jpg' }, { nome: '6902-ZZ-HHMS-kit2.png' }];
-  assert.deepStrictEqual(fotosDaLinha(lista, 10).map(f => f.nome), ['6902-ZZ-HHMS-kit10.jpg', '6902-limpa.jpg', '6902-ZZ-HHMS-editada.jpg']);
-  assert.deepStrictEqual(fotosDaLinha(lista, 2).map(f => f.nome), ['6902-ZZ-HHMS-kit2.png', '6902-limpa.jpg', '6902-ZZ-HHMS-editada.jpg']);
+  assert.deepStrictEqual(fotosDaLinha(lista, 10).map(f => f.nome), ['6902-limpa.jpg', '6902-ZZ-HHMS-kit10.jpg', '6902-ZZ-HHMS-editada.jpg']);
+  assert.deepStrictEqual(fotosDaLinha(lista, 2).map(f => f.nome), ['6902-limpa.jpg', '6902-ZZ-HHMS-kit2.png', '6902-ZZ-HHMS-editada.jpg']);
+  assert.deepStrictEqual(fotosDaLinha([{ nome: 'A-kit10.jpg' }], 10).map(f => f.nome), ['A-kit10.jpg']);   // só a do kit
   assert.deepStrictEqual(fotosDaLinha(lista, 1).map(f => f.nome), ['6902-limpa.jpg', '6902-ZZ-HHMS-editada.jpg']);
   assert.deepStrictEqual(fotosDaLinha(lista, 5).map(f => f.nome), ['6902-limpa.jpg', '6902-ZZ-HHMS-editada.jpg']);   // kit sem foto própria
   assert.strictEqual(kitDaImagem('A-kit10.jpg'), 10);
