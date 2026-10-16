@@ -19,6 +19,7 @@ import { enviarFaixas, enviarFaixasDoAnuncio } from './faixas.controller';
 import { lerFaixas } from './faixasQuantidade';
 import { fotosDaLinha, fotosDaVariacao } from './fotos';
 import { prejuizoDaLinha } from './precificacao.controller';
+import { Divergencia, divergenciasDaLinha } from './divergencias';
 import { PREFIXO_TRAVA, recusaPorPrejuizo } from './travaPrejuizo';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
@@ -55,7 +56,8 @@ const fotosDaFamilia = async (tenant: number, c: AnuncioCarregado) => {
  * Fotos do item no formato do ML. Arquivo do servidor sobe para o ML (e o id fica guardado para não subir de novo);
  * link https vai como "source". Foto pequena demais volta como problema.
  */
-const fotosDoItem = async (tenant: number, c: AnuncioCarregado, item: ItemAnuncio) => {
+/** As fotos que vão para a linha, na ordem, e os ids que elas já têm no ML (sem subir nada). */
+const planoDeFotos = async (tenant: number, c: AnuncioCarregado, item: ItemAnuncio) => {
   const [anexos]: any = await pool.execute(
     `SELECT id_anexo, url_anexo, nome_arquivo FROM itens_anexos
      WHERE tenant_id = ? AND id_item = ? AND tipo_anexo IN ('IMAGEM_PRINCIPAL', 'FOTO_GALERIA')
@@ -63,13 +65,31 @@ const fotosDoItem = async (tenant: number, c: AnuncioCarregado, item: ItemAnunci
     [tenant, item.idItem]
   );
   // ordem combinada: principal própria (ou a principal-modelo da família), medidas, outras do item, comuns da família
-  // e a linha em kit leva a foto do kit primeiro (a unidade não leva foto de kit)
+  // e a linha em kit leva a foto do kit (a unidade não leva foto de kit)
   const lista = fotosDaLinha(fotosDaVariacao(
     anexos.map((a: any) => ({ idAnexo: Number(a.id_anexo), url: String(a.url_anexo), nome: String(a.nome_arquivo || '') })),
     await fotosDaFamilia(tenant, c),
   ), item.unidadeMl?.fator || 1);
   // o id da foto que já subiu fica guardado por anexo (ou "familia:<link>"): atualizar o anúncio não sobe de novo
-  const guardadas = { ...(c.noMl.get(item.idLinha)?.fotosMl || {}) };
+  const guardadas: Record<string, string> = { ...(c.noMl.get(item.idLinha)?.fotosMl || {}) };
+  return { lista, guardadas };
+};
+
+/** Para comparar com o ML: cada foto planejada com o id que já tem lá (null = ainda vai subir; link = vai por link). */
+const fotosPlanejadas = async (tenant: number, c: AnuncioCarregado, item: ItemAnuncio) => {
+  const { lista, guardadas } = await planoDeFotos(tenant, c, item);
+  const saida: { idMl: string | null; link?: boolean }[] = [];
+  for (const f of lista) {
+    if (saida.length >= (c.categoria?.info.maxFotos || 10)) break;
+    if (guardadas[f.chave]) saida.push({ idMl: guardadas[f.chave] });
+    else if (caminhoLocalDaUrl(f.url)) saida.push({ idMl: null });
+    else if (/^https?:\/\//i.test(f.url)) saida.push({ idMl: null, link: true });
+  }
+  return saida;
+};
+
+const fotosDoItem = async (tenant: number, c: AnuncioCarregado, item: ItemAnuncio) => {
+  const { lista, guardadas } = await planoDeFotos(tenant, c, item);
   const fotos: FotoEnvio[] = [];
   const problemas: string[] = [];
   let mudou = false;
@@ -400,27 +420,97 @@ const noMlAinda = (c: AnuncioCarregado) => c.itens.filter(i => { const m = c.noM
  * Anúncio User Products (com family_name): o título que o comprador vê é montado pelo ML a partir do family_name. Quando
  * o título é o próprio family_name, trocar o título = trocar o family_name. Devolve o aviso (null = trocou).
  */
-const LIMITE_NOME_FAMILIA = 60;   // hipótese (2026-10-16): 63 caracteres deram "The field family name is invalid"
-
-const trocarPeloNomeDaFamilia = async (tenant: number, mlb: string, titulo: string, temFamilia: boolean): Promise<string | null> => {
-  if (!temFamilia) return 'o ML não deixou trocar o título deste anúncio.';
-  const b: any = await ml(tenant, 'GET', `/items/${mlb}?attributes=title,family_name`);
-  const igual = (x: unknown, y: unknown) => String(x ?? '').toLowerCase().replace(/\s+/g, ' ').trim() === String(y ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
-  if (igual(b?.title, titulo)) return null;   // o ML só muda maiúsculas: já está certo
-  if (!b?.family_name || !igual(b.title, b.family_name)) {
-    return `o ML monta o título deste anúncio pelo nome da família + atributos ("${b?.title}"); troque o nome da família no painel do ML.`;
-  }
-  // o family_name tem limite próprio (60, como o título clássico), mesmo na categoria que aceita título maior
-  await ml(tenant, 'PUT', `/items/${mlb}`, { family_name: cortarTitulo(titulo, LIMITE_NOME_FAMILIA) });
-  return null;
-};
-
 const mensagemDoMl = (e: any) => (e instanceof ErroML && errosDoValidador(e.detalhes).length ? errosDoValidador(e.detalhes).join('; ') : traduzirErroMl(String(e?.message || 'erro')));
 
+// ---------------------------------------------------------------------------
+// Divergências ERP × ML (o que o "Enviar atributos, fotos e descrição" mudaria)
+// ---------------------------------------------------------------------------
+
+export interface DivergenciasLinha { idLinha: number; sku: string; diferencas: Divergencia[] }
+
+// guardadas por anúncio por 5 min (a lista pede de todos; o envio limpa a do anúncio)
+const cacheDivergencias = new Map<string, { em: number; valor: Promise<DivergenciasLinha[]> }>();
+const esquecerDivergencias = (tenant: number, id: number) => cacheDivergencias.delete(`${tenant}|${id}`);
+
+/** Compara cada linha publicada do anúncio com o que está no ML hoje. */
+const calcularDivergencias = async (tenant: number, c: AnuncioCarregado): Promise<DivergenciasLinha[]> => {
+  if (!c.categoria) return [];
+  const itens = noMlAinda(c);
+  const mlbs = itens.map(i => c.noMl.get(i.idLinha)!.mlbId!);
+  const noMl = new Map<string, any>();
+  for (let k = 0; k < mlbs.length; k += 20) {
+    const parte: any[] = await ml(tenant, 'GET', `/items?ids=${mlbs.slice(k, k + 20).join(',')}&attributes=id,title,family_name,attributes,pictures`);
+    for (const r of parte || []) if (r?.code === 200 && r.body?.id) noMl.set(String(r.body.id), r.body);
+  }
+  const nomeAtributo = (idAtributo: string) => c.categoria?.atributos.find(a => a.id === idAtributo)?.nome || idAtributo;
+  const saida: DivergenciasLinha[] = [];
+  for (const item of itens) {
+    const mlb = c.noMl.get(item.idLinha)!.mlbId!;
+    const b = noMl.get(mlb);
+    if (!b) continue;
+    const descricaoMl: any = await ml(tenant, 'GET', `/items/${mlb}/description`).catch(() => null);
+    saida.push({
+      idLinha: item.idLinha, sku: item.sku,
+      diferencas: divergenciasDaLinha({
+        atributos: { erp: atributosDoItem(c.categoria.atributos, c.dados, item, c.categoria.temGtin ?? true), ml: b.attributes || [] },
+        fotos: { planejadas: await fotosPlanejadas(tenant, c, item), ml: (b.pictures || []).map((f: any) => String(f.id)) },
+        descricao: { erp: descricaoDoItem(c, item), ml: descricaoMl?.plain_text ?? null },
+        titulo: { erp: item.tituloMl ? cortarTitulo(item.tituloMl, c.categoria.info.maxTitulo || 60) : null, ml: b.title || null, temFamilia: !!b.family_name, familia: b.family_name || null },
+        nomeAtributo,
+      }),
+    });
+  }
+  return saida;
+};
+
+const divergenciasDe = (tenant: number, c: AnuncioCarregado) => {
+  const chave = `${tenant}|${c.registro.id}`;
+  const g = cacheDivergencias.get(chave);
+  if (g && Date.now() - g.em < 5 * 60 * 1000) return g.valor;
+  const valor = calcularDivergencias(tenant, c);
+  valor.catch(() => cacheDivergencias.delete(chave));
+  cacheDivergencias.set(chave, { em: Date.now(), valor });
+  return valor;
+};
+
+/** GET /anuncios/:id/divergencias — o que está diferente do ML em cada item publicado (editor). */
+export const divergenciasAnuncio = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  try {
+    const c = await carregarOuErro(tenant, Number(req.params.id));
+    if (req.query.recalcular) esquecerDivergencias(tenant, Number(c.registro.id));
+    return res.json({ linhas: await divergenciasDe(tenant, c) });
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao comparar com o Mercado Livre.');
+  }
+};
+
+/** GET /anuncios/divergencias — por anúncio: quantos itens têm algo para enviar ao ML e quantos só pelo painel (lista). */
+export const divergenciasTodas = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  try {
+    const saida: Record<number, { paraEnviar: number; soPainel: number; resumo: string[] }> = {};
+    for (const c of await carregarAnuncios(pool as any, tenant)) {
+      if (!noMlAinda(c).length || !c.categoria) continue;
+      const linhas = await divergenciasDe(tenant, c).catch(() => []);
+      const paraEnviar = linhas.filter(l => l.diferencas.some(d => d.enviavel));
+      const soPainel = linhas.filter(l => l.diferencas.length && !l.diferencas.some(d => d.enviavel));
+      if (!paraEnviar.length && !soPainel.length) continue;
+      saida[Number(c.registro.id)] = {
+        paraEnviar: paraEnviar.length, soPainel: soPainel.length,
+        resumo: linhas.filter(l => l.diferencas.length).slice(0, 5).map(l => `${l.sku}: ${l.diferencas.map(d => d.texto).join(' · ')}`),
+      };
+    }
+    return res.json(saida);
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao comparar com o Mercado Livre.');
+  }
+};
+
 /**
- * POST /anuncios/:id/atualizar-ml — manda atributos, fotos e descrição dos itens já publicados.
- * O título vai junto (se o ML recusar a troca, vai o resto e o aviso); a categoria não muda por aqui (vem do ML na
- * sincronização, depois de trocada lá).
+ * POST /anuncios/:id/atualizar-ml — manda aos itens já publicados só o que está diferente do ML: atributos, fotos,
+ * descrição e título (o título de anúncio com family_name não muda pela API: fica como aviso). Sem dar para comparar,
+ * manda tudo como antes. A categoria não muda por aqui (vem do ML na sincronização, depois de trocada lá).
  */
 export const atualizarNoMl = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
@@ -429,39 +519,46 @@ export const atualizarNoMl = async (req: Request, res: Response) => {
     const c = await carregarOuErro(tenant, id);
     const itens = noMlAinda(c);
     if (!itens.length) throw new ErroML('Nenhum item deste anúncio está ativo ou pausado no Mercado Livre.');
-    const resultado: { idItem: number; idLinha: number; sku: string; ok: boolean; erros: string[] }[] = [];
+    esquecerDivergencias(tenant, id);
+    const comparacao = await calcularDivergencias(tenant, c).catch(() => null);
+    const resultado: { idItem: number; idLinha: number; sku: string; ok: boolean; erros: string[]; enviados: string[] }[] = [];
     for (const item of itens) {
       const mlb = c.noMl.get(item.idLinha)!.mlbId!;
       const erros: string[] = [];
+      const enviados: string[] = [];
+      const difs = comparacao?.find(l => l.idLinha === item.idLinha)?.diferencas ?? null;   // null = não deu para comparar
+      const precisa = (campo: Divergencia['campo']) => difs === null || difs.some(d => d.campo === campo && d.enviavel);
       try {
-        const { fotos, problemas } = await fotosDoItem(tenant, c, item);
-        erros.push(...problemas.filter(() => fotos.length === 0));
-        const corpo = {
-          attributes: atributosDoItem(c.categoria?.atributos || [], c.dados, item, c.categoria?.temGtin ?? true),
-          ...(fotos.length ? { pictures: fotos } : {}),
-        };
-        // o título vai junto (ex.: "Kit 10 Unidades …"); o ML às vezes não deixa trocar (em análise, com vendas, User
-        // Products): aí manda o resto sem ele e avisa
+        const corpo: Record<string, unknown> = {};
+        if (precisa('ATRIBUTOS')) corpo.attributes = atributosDoItem(c.categoria?.atributos || [], c.dados, item, c.categoria?.temGtin ?? true);
+        if (precisa('FOTOS')) {
+          const { fotos, problemas } = await fotosDoItem(tenant, c, item);
+          erros.push(...problemas.filter(() => fotos.length === 0));
+          if (fotos.length) corpo.pictures = fotos;
+        }
         const titulo = item.tituloMl ? cortarTitulo(item.tituloMl, c.categoria?.info.maxTitulo || 60) : null;
-        try {
-          await ml(tenant, 'PUT', `/items/${mlb}`, titulo ? { ...corpo, title: titulo } : corpo);
-        } catch (e: any) {
-          const motivo = `${mensagemDoMl(e)} ${JSON.stringify(e?.detalhes ?? '')}`;
-          if (!titulo || !/title|t[ií]tulo/i.test(motivo)) throw e;
-          await ml(tenant, 'PUT', `/items/${mlb}`, corpo);
-          // User Products: o título é o family_name (o ML monta). Se o título de lá é o próprio family_name (sem
-          // atributo que o ML acrescenta, ex.: a cor), troca o family_name; senão só avisa
-          const aviso = await trocarPeloNomeDaFamilia(tenant, mlb, titulo, /family_name/i.test(motivo)).catch((x: any) => mensagemDoMl(x));
-          if (aviso) erros.push(`título: ${aviso}`);
+        if (titulo && difs !== null && precisa('TITULO')) corpo.title = titulo;
+        if (Object.keys(corpo).length) {
+          try {
+            await ml(tenant, 'PUT', `/items/${mlb}`, corpo);
+          } catch (e: any) {
+            // o título recusado não derruba o resto
+            if (!corpo.title || !/title|t[ií]tulo|family/i.test(`${mensagemDoMl(e)} ${JSON.stringify(e?.detalhes ?? '')}`)) throw e;
+            delete corpo.title;
+            if (Object.keys(corpo).length) await ml(tenant, 'PUT', `/items/${mlb}`, corpo);
+            erros.push(`título: o ML não deixou trocar (${mensagemDoMl(e)})`);
+          }
+          enviados.push(...Object.keys(corpo).map(k => ({ attributes: 'atributos', pictures: 'fotos', title: 'título' } as Record<string, string>)[k] || k));
         }
       } catch (e: any) {
         erros.push(mensagemDoMl(e));
       }
-      const descricao = descricaoDoItem(c, item);
+      const descricao = precisa('DESCRICAO') ? descricaoDoItem(c, item) : null;
       if (descricao) {
         // PUT troca a descrição; item publicado sem descrição precisa de POST
         await ml(tenant, 'PUT', `/items/${mlb}/description`, { plain_text: descricao })
           .catch(() => ml(tenant, 'POST', `/items/${mlb}/description`, { plain_text: descricao }))
+          .then(() => enviados.push('descrição'))
           .catch((e: any) => erros.push(`descrição: ${mensagemDoMl(e)}`));
       }
       await pool.execute(
@@ -469,7 +566,7 @@ export const atualizarNoMl = async (req: Request, res: Response) => {
          WHERE id_anuncio = ? AND tenant_id = ? AND id_anuncio_item = ?`,
         [erros.length ? erros.join('; ').slice(0, 500) : null, erros.length ? 'erro' : null, id, tenant, item.idLinha]
       );
-      resultado.push({ idItem: item.idItem, idLinha: item.idLinha, sku: item.sku, ok: erros.length === 0, erros });
+      resultado.push({ idItem: item.idItem, idLinha: item.idLinha, sku: item.sku, ok: erros.length === 0, erros, enviados });
     }
     // faixas por quantidade (a tabela inteira é substituída em cada item)
     for (const falha of await enviarFaixasDoAnuncio(tenant, c)) {
@@ -477,6 +574,7 @@ export const atualizarNoMl = async (req: Request, res: Response) => {
       const r = resultado.find(x => x.sku === sku);
       if (r) { r.ok = false; r.erros.push(`faixas por quantidade:${falha.slice(sku.length + 1)}`); }
     }
+    esquecerDivergencias(tenant, id);
     return res.json({ itens: resultado, detalhe: await detalhe(tenant, await carregarOuErro(tenant, id)) });
   } catch (error) {
     return responderErro(res, error, 'Erro ao atualizar no Mercado Livre.');

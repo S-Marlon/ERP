@@ -6,7 +6,7 @@ import {
   removerItem, salvarAnuncio, adicionarUnidade, adicionarKit, sugerirCategoria, desligarDoMl, encerrarNoMl,
 } from './anuncios.controller';
 import {
-  atualizarNoMl, importarAnuncios, pausarNoMl, previaImportacao, publicarAnuncio, sincronizarAnuncio, sincronizarTodos, situacaoSincronizacao, validarAnuncio,
+  atualizarNoMl, divergenciasAnuncio, divergenciasTodas, importarAnuncios, pausarNoMl, previaImportacao, publicarAnuncio, sincronizarAnuncio, sincronizarTodos, situacaoSincronizacao, validarAnuncio,
 } from './publicacao.controller';
 
 import { faixasNoMl } from './faixas.controller';
@@ -29,6 +29,7 @@ router.get('/candidatos', candidatos);
 router.get('/anuncios', listarAnuncios);
 router.get('/anuncios/financeiro', financeiroAnuncios);
 router.get('/anuncios/sugestoes', listarSugestoes);
+router.get('/anuncios/divergencias', divergenciasTodas);
 router.get('/anuncios/desempenho', desempenhoAnuncios);
 router.get('/frete/faixas', faixasDeFrete);
 router.get('/fotos-ml/buscar', buscarFotosMl);
@@ -40,6 +41,7 @@ router.delete('/anuncios/:id', excluirAnuncio);
 router.post('/anuncios/:id/itens', adicionarItens);
 router.put('/anuncios/:id/itens/:idLinha', salvarItem);
 router.post('/anuncios/:id/itens/:idLinha/modo', modoDaLinha);
+router.get('/anuncios/:id/divergencias', divergenciasAnuncio);
 router.post('/anuncios/:id/itens/:idLinha/corrigir-unidade', corrigirUnidade);
 router.post('/anuncios/:id/itens/:idLinha/unidade', adicionarUnidade);
 router.post('/anuncios/:id/itens/:idLinha/kit', adicionarKit);
