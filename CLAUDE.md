@@ -39,6 +39,7 @@ por essa conexão (commit/rollback viram no-op), chamar os controllers com `req/
 - **Integração com canais (ML) é de mão dupla:** o que o canal calcula (frete, tarifa, "você recebe") o ERP **lê do canal**
   para o anúncio publicado; a conta própria do ERP é só para o que ainda não está lá. Regra de custo do canal fica numa função
   pura com teste e a data em que foi conferida com o painel. Ver `docs/incidentes/2026-10-16-frete-ml-divergente.md`.
+  O que já foi conferido (e com qual fonte: painel > API > assistente do ML) fica em `docs/ml-regras-conferidas.md`.
 - **Trava de prejuízo no ML:** linha de anúncio não fica ativa vendendo com prejuízo (lucro < 0; margem baixa pode).
   O operador é recusado ao publicar, reativar ou mudar preço/ajuste/tipo/frete grátis; a sincronização pausa sozinha a
   que cair em prejuízo e reativa a que ela pausou quando volta a dar lucro. Regra em `mercadolivre/travaPrejuizo.ts`.
