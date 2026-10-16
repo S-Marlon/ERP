@@ -5,7 +5,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Col, Flex, InputNumber, Modal, Row, Space, Spin, Tabs, Tag, Tooltip, Typography, message } from 'antd';
 import { CheckCircleOutlined, CloudUploadOutlined, LinkOutlined, SaveOutlined, ShopOutlined, UndoOutlined } from '@ant-design/icons';
 import { adicionarAnexo, enviarArquivoAnexo } from '../../../areas/catalogo/skus/CatalogSku.service';
-import { AnuncioDetalhe, anunciosApi, ConferenciaItem, ItemDoAnuncio, resumoSincronizacao, SecaoPreco } from './mercadoLivreApi';
+import { AnuncioDetalhe, anunciosApi, ConferenciaItem, DivergenciasLinha, ItemDoAnuncio, resumoSincronizacao, SecaoPreco } from './mercadoLivreApi';
 import { destinoDa, DestinoSugestao } from './SugestoesMl';
 import { agruparPendencias, PendenciaAgrupada } from './pendencias';
 import {
@@ -75,6 +75,8 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado, abrirEm }) =
   const [filtroItens, setFiltroItens] = useState<{ texto: string; ids: number[] } | null>(null);
   const [enviandoFoto, setEnviandoFoto] = useState<number | 'todos' | null>(null);
   const [conferencia, setConferencia] = useState<ConferenciaItem[] | null>(null);
+  // ERP × ML dos itens publicados: refeita a cada vez que o anúncio salvo muda (salvar, enviar, publicar...)
+  const [divergencias, setDivergencias] = useState<DivergenciasLinha[] | null | undefined>(undefined);
   const [falhas, setFalhas] = useState<{ sku: string; erro: string }[]>([]);
   const [sincronizando, setSincronizando] = useState(false);
   const [itemPreco, setItemPreco] = useState<number | null>(null);    // item aberto no painel de preço
@@ -105,6 +107,14 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado, abrirEm }) =
     setFalhas([]);
     if (id) recarregar();
   }, [id, recarregar]);
+
+  useEffect(() => {
+    if (!salvo || !salvo.publicados) { setDivergencias(undefined); return; }
+    let vivo = true;
+    setDivergencias(null);
+    anunciosApi.divergencias(salvo.id, true).then(r => vivo && setDivergencias(r.linhas)).catch(() => vivo && setDivergencias(undefined));
+    return () => { vivo = false; };
+  }, [salvo]);
 
   // vindo de uma sugestão: abre direto na aba, na linha e na seção dela (depois do efeito acima, que zera tudo)
   const irPara = useCallback((d: DestinoSugestao) => {
@@ -496,7 +506,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado, abrirEm }) =
                 <PainelAlteracoes alteracoes={alteracoes} onDesfazer={chave => setRascunho(r => desfazer(r, salvo, chave))} onDesfazerTudo={desfazerTudo} />
                 <PainelLateral
                   det={salvo} temRascunho={temRascunho} ocupado={acaoMl} conferencia={conferencia} falhas={falhas}
-                  pendencias={pendencias} onAcao={acaoNoMl} onPendencia={irParaPendencia}
+                  pendencias={pendencias} onAcao={acaoNoMl} onPendencia={irParaPendencia} divergencias={divergencias}
                 />
               </div>
             </Col>

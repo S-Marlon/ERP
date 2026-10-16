@@ -281,6 +281,10 @@ export interface DesempenhoAnuncio {
   linhas: { idLinha: number; atual: NumerosDesempenho; anterior: NumerosDesempenho; coberturaDias: number | null }[];
 }
 export interface Desempenho { dias: number; periodo: DesempenhoPeriodos; anuncios: DesempenhoAnuncio[] }
+/** O que está diferente entre o ERP e o anúncio no ML (o "Enviar atributos, fotos e descrição" resolve os enviáveis). */
+export interface DivergenciaMl { campo: 'ATRIBUTOS' | 'FOTOS' | 'DESCRICAO' | 'TITULO'; texto: string; enviavel: boolean }
+export interface DivergenciasLinha { idLinha: number; sku: string; diferencas: DivergenciaMl[] }
+export interface DivergenciasResumo { paraEnviar: number; soPainel: number; resumo: string[] }
 export interface FaixasFrete {
   logistica: string | null;
   linhas: { ateG: number; gratisAbaixo79: number | null; compradorPaga20: number | null; compradorPaga50: number | null; acima79: number | null }[];
@@ -357,6 +361,11 @@ export const anunciosApi = {
   faixasNoMl: async (id: number, quantidades: string) =>
     ler<{ mlbId: string; sku: string; preco: number; noMl: FaixaQuantidade[]; sugestao: { quantidade: number; desconto: number; preco: number; incoerente: boolean }[] }>(
       await fetch(`${API}/anuncios/${id}/faixas/ml?tenant_id=1&quantidades=${encodeURIComponent(quantidades)}`), 'Erro ao consultar o ML.'),
+  /** Compara cada item publicado com o ML (recalcular: ignora o que o servidor guardou). */
+  divergencias: async (id: number, recalcular = false) =>
+    ler<{ linhas: DivergenciasLinha[] }>(await fetch(`${API}/anuncios/${id}/divergencias?tenant_id=1${recalcular ? '&recalcular=1' : ''}`), 'Erro ao comparar com o ML.'),
+  /** Por anúncio: quantos itens têm algo para enviar ao ML (só os que têm). */
+  divergenciasTodas: async () => ler<Record<number, DivergenciasResumo>>(await fetch(`${API}/anuncios/divergencias?tenant_id=1`), 'Erro ao comparar com o ML.'),
   atualizarNoMl: async (id: number) =>
     ler<{ itens: ConferenciaItem[]; detalhe: AnuncioDetalhe }>(await fetch(`${API}/anuncios/${id}/atualizar-ml?tenant_id=1`, json('POST', {})), 'Erro ao atualizar no ML.'),
   pausarNoMl: async (id: number, pausar: boolean) =>

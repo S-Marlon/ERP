@@ -1,12 +1,12 @@
 // Painel lateral do editor: resumo do anúncio, ações no Mercado Livre (travadas enquanto há alterações não salvas),
 // resultado da conferência/publicação e o que falta para publicar.
 import React from 'react';
-import { Alert, Button, Card, Divider, Flex, List, Popconfirm, Space, Tooltip, Typography } from 'antd';
+import { Alert, Badge, Button, Card, Divider, Flex, List, Popconfirm, Space, Tooltip, Typography } from 'antd';
 import {
-  CheckCircleFilled, CloseCircleFilled, ExclamationCircleFilled, LinkOutlined, PauseCircleOutlined, PlayCircleOutlined,
+  CheckCircleFilled, CheckCircleOutlined, CloseCircleFilled, LoadingOutlined, ExclamationCircleFilled, LinkOutlined, PauseCircleOutlined, PlayCircleOutlined,
   SafetyCertificateOutlined, SendOutlined, StopOutlined, WarningFilled,
 } from '@ant-design/icons';
-import { AnuncioDetalhe, ConferenciaItem, foraDoMl, formatarMoeda } from '../mercadoLivreApi';
+import { AnuncioDetalhe, ConferenciaItem, DivergenciasLinha, foraDoMl, formatarMoeda } from '../mercadoLivreApi';
 import { PendenciaAgrupada, textoComPrimeiraMaiuscula } from '../pendencias';
 
 const { Text } = Typography;
@@ -22,13 +22,16 @@ interface Props {
   pendencias: PendenciaAgrupada[];
   onAcao: (acao: AcaoMl) => void;
   onPendencia: (p: PendenciaAgrupada) => void;
+  divergencias?: DivergenciasLinha[] | null;            // ERP × ML dos itens publicados (null = conferindo)
 }
 
 const Linha: React.FC<{ rotulo: string; children: React.ReactNode }> = ({ rotulo, children }) => (
   <Flex justify="space-between" gap={8}><Text type="secondary">{rotulo}</Text><Text style={{ textAlign: 'right' }}>{children}</Text></Flex>
 );
 
-const PainelLateral: React.FC<Props> = ({ det, temRascunho, ocupado, conferencia, falhas, pendencias, onAcao, onPendencia }) => {
+const PainelLateral: React.FC<Props> = ({ det, temRascunho, ocupado, conferencia, falhas, pendencias, onAcao, onPendencia, divergencias }) => {
+  const paraEnviar = (divergencias || []).filter(l => l.diferencas.some(d => d.enviavel));
+  const soPainel = (divergencias || []).flatMap(l => l.diferencas.filter(d => !d.enviavel).map(d => ({ sku: l.sku, d })));
   const erros = pendencias.filter(p => p.nivel === 'erro').length;
   const vivos = det.itens.filter(i => i.ml.mlbId && !foraDoMl(i.ml.status));
   const travado = temRascunho ? 'Salve ou desfaça as alterações antes.' : undefined;
@@ -72,11 +75,40 @@ const PainelLateral: React.FC<Props> = ({ det, temRascunho, ocupado, conferencia
 
           {vivos.length > 0 && (
             <>
-              <Tooltip title={travado || 'Manda título, atributos, fotos e descrição para os itens que já estão no ML (se o ML não deixar trocar o título, avisa e manda o resto)'}>
-                <Button block icon={<SendOutlined />} loading={ocupado === 'enviar'} disabled={temRascunho || algumOcupado} onClick={() => onAcao('enviar')}>
-                  Enviar atributos, fotos e descrição
-                </Button>
+              <Tooltip title={travado || 'Manda aos itens que já estão no ML só o que está diferente: atributos, fotos, descrição e título'}>
+                <Badge count={paraEnviar.length} size="small" style={{ width: '100%' }} title={`${paraEnviar.length} item(ns) diferente(s) do ML`}>
+                  <Button block type={paraEnviar.length ? 'primary' : 'default'} icon={<SendOutlined />} loading={ocupado === 'enviar'} disabled={temRascunho || algumOcupado} onClick={() => onAcao('enviar')}>
+                    Enviar atributos, fotos e descrição
+                  </Button>
+                </Badge>
               </Tooltip>
+              {divergencias === null && <Text type="secondary" style={{ fontSize: 12 }}><LoadingOutlined /> comparando com o ML…</Text>}
+              {divergencias && !paraEnviar.length && !soPainel.length && (
+                <Text type="success" style={{ fontSize: 12 }}><CheckCircleOutlined /> Atributos, fotos e descrição iguais ao ML.</Text>
+              )}
+              {paraEnviar.length > 0 && (
+                <Alert
+                  type="warning" showIcon style={{ padding: '6px 10px' }}
+                  message={<b>{paraEnviar.length} item(ns) diferente(s) do ML: clique em Enviar</b>}
+                  description={(
+                    <div style={{ fontSize: 12, maxHeight: 220, overflowY: 'auto' }}>
+                      {paraEnviar.map(l => (
+                        <div key={l.idLinha} style={{ marginBottom: 4 }}>
+                          <b>{l.sku}</b>
+                          {l.diferencas.filter(d => d.enviavel).map((d, k) => <div key={k}>• {d.texto}</div>)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                />
+              )}
+              {soPainel.length > 0 && (
+                <Alert
+                  type="info" showIcon style={{ padding: '6px 10px' }}
+                  message={`${soPainel.length} diferença(s) que só mudam pelo painel do ML`}
+                  description={<div style={{ fontSize: 12, maxHeight: 160, overflowY: 'auto' }}>{soPainel.map((x, k) => <div key={k}><b>{x.sku}</b>: {x.d.texto}</div>)}</div>}
+                />
+              )}
               <Flex gap={8}>
                 {vivos.some(i => i.ml.status === 'active') ? (
                   <Popconfirm title="Pausar no Mercado Livre?" description="Os anúncios deixam de aparecer e vender até você reativar." okText="Pausar" onConfirm={() => onAcao('pausar')} disabled={algumOcupado}>

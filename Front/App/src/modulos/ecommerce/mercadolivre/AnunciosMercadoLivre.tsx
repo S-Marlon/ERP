@@ -4,10 +4,10 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Avatar, Button, Card, Col, Empty, Flex, Input, Popconfirm, Row, Segmented, Space, Spin, Statistic, Table, Tag, Tooltip, Typography, message } from 'antd';
 import {
   CloudDownloadOutlined, DeleteOutlined, EditOutlined, ExportOutlined, PauseCircleOutlined, PictureOutlined, PlayCircleOutlined, PlusOutlined,
-  ReloadOutlined, StopOutlined, SyncOutlined,
+  ReloadOutlined, SendOutlined, StopOutlined, SyncOutlined,
 } from '@ant-design/icons';
 import {
-  AnuncioResumo, anunciosApi, Desempenho, FinanceiroItem, foraDoMl, formatarMoeda, ItemResumo, NumerosDesempenho, resumoSincronizacao, ROTULO_STATUS_ML, SituacaoSincronizacao,
+  AnuncioResumo, anunciosApi, Desempenho, DivergenciasResumo, FinanceiroItem, foraDoMl, formatarMoeda, ItemResumo, NumerosDesempenho, resumoSincronizacao, ROTULO_STATUS_ML, SituacaoSincronizacao,
 } from './mercadoLivreApi';
 import { faixaMoeda, FiltroLista, lucroBaixo, passaNoFiltro, resumirFinanceiro, ResumoFinanceiro, semEstoqueNoMl } from './listaAnuncios';
 import { AtivoLinha, AtivoNoMl, EstoqueRapido, PrecoRapido } from './AcoesRapidas';
@@ -43,6 +43,7 @@ const AnunciosMercadoLivre: React.FC = () => {
   const [emMassa, setEmMassa] = useState(false);
   const [visao, setVisao] = useState<Visao>('anuncios');
   const [desempenho, setDesempenho] = useState<Desempenho | null>(null);
+  const [divergencias, setDivergencias] = useState<Record<number, DivergenciasResumo>>({});   // anúncios com algo para enviar ao ML
 
   const calcular = useCallback(async () => {
     setCalculando(true);
@@ -57,6 +58,7 @@ const AnunciosMercadoLivre: React.FC = () => {
     finally { setCarregando(false); }
     calcular();
     anunciosApi.desempenho().then(setDesempenho).catch(() => undefined);   // a lista funciona sem
+    anunciosApi.divergenciasTodas().then(setDivergencias).catch(() => undefined);
   }, [calcular]);
   const desempenhoDe = useMemo(() => new Map((desempenho?.anuncios || []).map(d => [d.id, d])), [desempenho]);
   const desempenhoDaLinha = (idAnuncio: number, idLinha: number) => desempenhoDe.get(idAnuncio)?.linhas.find(l => l.idLinha === idLinha);
@@ -356,6 +358,20 @@ const AnunciosMercadoLivre: React.FC = () => {
                   <div>
                     <Space size={4} wrap>
                       <SituacaoTag a={a} />
+                      {divergencias[a.id]?.paraEnviar ? (
+                        <Tooltip title={<div style={{ maxWidth: 460 }}>
+                          {divergencias[a.id].resumo.map((r, k) => <div key={k} style={{ marginBottom: 4 }}>{r}</div>)}
+                          <div style={{ opacity: 0.85 }}>Abra o anúncio e use "Enviar atributos, fotos e descrição".</div>
+                        </div>}>
+                          <Tag color="orange" icon={<SendOutlined />} style={{ cursor: 'pointer' }} onClick={() => setEditando(a.id)}>
+                            {divergencias[a.id].paraEnviar} para enviar ao ML
+                          </Tag>
+                        </Tooltip>
+                      ) : divergencias[a.id]?.soPainel ? (
+                        <Tooltip title={<div style={{ maxWidth: 460 }}>{divergencias[a.id].resumo.map((r, k) => <div key={k}>{r}</div>)}</div>}>
+                          <Tag style={{ cursor: 'pointer' }} onClick={() => setEditando(a.id)}>título difere (só pelo painel)</Tag>
+                        </Tooltip>
+                      ) : null}
                       {!!a.bloqueadosMl && (
                         <Tooltip title={<div style={{ maxWidth: 440 }}>
                           {a.itens.filter(i => tipoDoAviso(i.erroMl) === 'MODERACAO').map(i => <div key={i.idLinha} style={{ marginBottom: 6 }}><b>{i.sku}</b>: {i.erroMl}</div>)}
