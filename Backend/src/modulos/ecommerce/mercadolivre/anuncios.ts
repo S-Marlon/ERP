@@ -313,7 +313,9 @@ export const atributosDoItem = (atributos: AtributoML[], dados: AnuncioDados, it
   }
   if (item.sku) saida.push({ id: 'SELLER_SKU', value_name: item.sku });
   if (temGtin) saida.push(item.gtin ? { id: 'GTIN', value_name: item.gtin } : { id: 'EMPTY_GTIN_REASON', value_id: MOTIVO_SEM_GTIN });
-  if (item.medidasCm) {
+  // as medidas do cadastro são da embalagem de UMA unidade: no kit elas não valem (10 rolamentos não cabem na caixa de
+  // um). Sem a embalagem do kit no ERP, a linha de kit não manda medidas e fica a que está no ML; o peso multiplica
+  if (item.medidasCm && fator === 1) {
     saida.push({ id: 'SELLER_PACKAGE_HEIGHT', value_name: `${numeroMl(item.medidasCm.altura)} cm` });
     saida.push({ id: 'SELLER_PACKAGE_WIDTH', value_name: `${numeroMl(item.medidasCm.largura)} cm` });
     saida.push({ id: 'SELLER_PACKAGE_LENGTH', value_name: `${numeroMl(item.medidasCm.comprimento)} cm` });
