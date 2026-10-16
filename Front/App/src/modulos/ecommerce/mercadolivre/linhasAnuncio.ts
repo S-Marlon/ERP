@@ -36,3 +36,20 @@ export const umaLinhaPorItem = <T extends { itens: Pick<ItemDoAnuncio, 'idItem' 
 
 /** Quantas linhas o item tem no anúncio (com mais de uma, a tela mostra a unidade de cada). */
 export const linhasDoItem = (linhas: Pick<ItemDoAnuncio, 'idItem'>[], idItem: number) => linhas.filter(l => l.idItem === idItem).length;
+
+export interface ProdutoDoAnuncio<L> { idItem: number; sku: string; nome: string; linhas: L[] }
+
+/**
+ * Os produtos do anúncio (item do catálogo) com as formas de venda dentro (unidade, kit c/2, kit c/10...), na ordem em
+ * que aparecem no anúncio e, dentro de cada um, da menor forma para a maior. O SKU do produto é o da unidade (ou o do
+ * kit sem o "-KIT10").
+ */
+export const produtosDoAnuncio = <L extends Pick<ItemDoAnuncio, 'idItem' | 'sku' | 'nome' | 'unidadeMl'>>(linhas: L[]): ProdutoDoAnuncio<L>[] => {
+  const porItem = new Map<number, L[]>();
+  for (const l of linhas) porItem.set(l.idItem, [...(porItem.get(l.idItem) || []), l]);
+  return [...porItem.entries()].map(([idItem, ls]) => {
+    const ordenadas = [...ls].sort((a, b) => (a.unidadeMl?.fator || 1) - (b.unidadeMl?.fator || 1));
+    const base = ordenadas.find(l => !l.unidadeMl) || ordenadas[0];
+    return { idItem, sku: base.unidadeMl ? base.sku.replace(/-[A-Z]*\d+$/i, '') : base.sku, nome: base.nome, linhas: ordenadas };
+  });
+};

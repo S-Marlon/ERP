@@ -20,6 +20,7 @@ import PainelAlteracoes from './editor/PainelAlteracoes';
 import PainelLateral, { AcaoMl } from './editor/PainelLateral';
 import CatalogoMlCard from './CatalogoMlCard';
 import AbaPreco from './editor/AbaPreco';
+import NavegacaoAnuncio, { SelecaoEditor } from './editor/NavegacaoAnuncio';
 import CategoriaMlModal from './CategoriaMlModal';
 import AdicionarAnuncioModal from './AdicionarAnuncioModal';
 import SituacaoTag from './SituacaoTag';
@@ -66,6 +67,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado, abrirEm }) =
   const [salvo, setSalvo] = useState<AnuncioDetalhe | null>(null);
   const [rascunho, setRascunho] = useState<Rascunho>(RASCUNHO_VAZIO);
   const [aba, setAba] = useState<Aba>('anuncio');
+  const [selecao, setSelecao] = useState<SelecaoEditor>('geral');   // Geral ou um produto (idItem) do anúncio
   const [carregando, setCarregando] = useState(false);
   const [ocupado, setOcupado] = useState(false);                       // ação imediata (foto, itens, categoria)
   const [salvando, setSalvando] = useState(false);
@@ -100,6 +102,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado, abrirEm }) =
     setSalvo(null);
     setRascunho(RASCUNHO_VAZIO);
     setAba('anuncio');
+    setSelecao('geral');
     setItemPreco(null);
     setSecaoPreco(null);
     setFiltroItens(null);
@@ -118,6 +121,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado, abrirEm }) =
 
   // vindo de uma sugestão: abre direto na aba, na linha e na seção dela (depois do efeito acima, que zera tudo)
   const irPara = useCallback((d: DestinoSugestao) => {
+    setSelecao('geral');
     if (d.aba === 'itens') { setFiltroItens({ texto: d.sku, ids: [d.idLinha] }); setAba('itens'); return; }
     setItemPreco(d.idLinha);
     if (d.secao) setSecaoPreco({ secao: d.secao, vez: d.vez });
@@ -333,6 +337,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado, abrirEm }) =
 
   const irParaPendencia = (p: PendenciaAgrupada) => {
     const destino = ABA_DA_AREA[p.area] || 'anuncio';
+    setSelecao('geral');
     if (p.idLinhas.length) { setFiltroItens({ texto: p.texto, ids: p.idLinhas }); setAba('itens'); return; }
     setAba(destino);
   };
@@ -358,16 +363,23 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado, abrirEm }) =
     );
   };
 
-  const abas = !det || !salvo ? [] : [
-    {
+  // produto escolhido: as abas mostram só as linhas dele (as formas de venda: unidade, kit c/2, kit c/10...)
+  const doProduto = <T extends { itens: ItemDoAnuncio[] }>(x: T): T => (selecao === 'geral' ? x : { ...x, itens: x.itens.filter(i => i.idItem === selecao) });
+  const detVista = det && doProduto(det);
+  const salvoVista = salvo && doProduto(salvo);
+  const linhaPreco = itemPreco !== null && detVista?.itens.some(i => i.idLinha === itemPreco) ? itemPreco : null;
+  const noProduto = selecao !== 'geral';
+
+  const abas = !det || !salvo || !detVista || !salvoVista ? [] : [
+    ...(noProduto ? [] : [{
       key: 'anuncio', label: rotuloAba('anuncio', 'Anúncio'),
       children: <AbaDados salvo={salvo} det={det} rascunho={rascunho.anuncio} onMudar={mudarCampo} onTrocarCategoria={pedirCategoria} />,
-    },
+    }]),
     {
-      key: 'itens', label: rotuloAba('itens', `Itens e estoque (${det.itens.length})`),
+      key: 'itens', label: rotuloAba('itens', noProduto ? 'Cadastro e estoque' : `Itens e estoque (${det.itens.length})`),
       children: (
         <AbaItens
-          salvo={salvo} det={det} rascunhoItens={rascunho.itens} onMudarEstoque={mudarEstoque} onMudarItem={mudarDoItem}
+          salvo={salvoVista} det={detVista} rascunhoItens={rascunho.itens} onMudarEstoque={mudarEstoque} onMudarItem={mudarDoItem}
           filtro={filtroItens} onLimparFiltro={() => setFiltroItens(null)} comErro={itemComErro} errosConferencia={errosConferencia}
           enviandoFoto={enviandoFoto} onFoto={enviarFoto} onFotoLink={fotoPorLink} onFotoTodos={fotoParaTodos}
           onFotoFamilia={() => { recarregar(); onAlterado(); }}
@@ -399,19 +411,19 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado, abrirEm }) =
         />
       ),
     },
-    {
+    ...(noProduto ? [] : [{
       key: 'fotos', label: rotuloAba('fotos', 'Fotos'),
       children: <AbaFotos salvo={salvo} det={det} onAlterado={() => { recarregar(); onAlterado(); }} />,
+    }]),
+    {
+      key: 'atributos', label: rotuloAba('atributos', noProduto ? 'Ficha' : 'Atributos'),
+      children: <AbaAtributos salvo={salvoVista} det={detVista} comErro={atributoComErro} onMudar={(idA, v) => setRascunho(r => mudarAtributo(r, salvo, idA, v))} />,
     },
     {
-      key: 'atributos', label: rotuloAba('atributos', 'Atributos'),
-      children: <AbaAtributos salvo={salvo} det={det} comErro={atributoComErro} onMudar={(idA, v) => setRascunho(r => mudarAtributo(r, salvo, idA, v))} />,
-    },
-    {
-      key: 'preco', label: rotuloAba('preco', 'Preço e lucro'),
+      key: 'preco', label: rotuloAba('preco', noProduto ? 'Venda' : 'Preço e lucro'),
       children: (
         <AbaPreco
-          salvo={salvo} det={det} rascunhoItens={rascunho.itens} idLinha={itemPreco} onSelecionar={setItemPreco} ocupado={ocupado}
+          salvo={salvoVista} det={detVista} rascunhoItens={rascunho.itens} idLinha={linhaPreco} onSelecionar={setItemPreco} ocupado={ocupado}
           secaoPedida={secaoPreco} onIrParaItens={s => irPara(destinoDa(s))}
           onMudarPreco={(idLinha, preco) => mudarDoItem(idLinha, { precoMl: preco })}
           onEscolherCenario={(tipo, gratis) => {
@@ -429,8 +441,16 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado, abrirEm }) =
         />
       ),
     },
-    ...(salvo.publicados > 0 ? [{ key: 'catalogo', label: rotuloAba('catalogo', 'Catálogo'), children: <CatalogoMlCard det={salvo} /> }] : []),
+    ...(salvo.publicados > 0 && !noProduto ? [{ key: 'catalogo', label: rotuloAba('catalogo', 'Catálogo'), children: <CatalogoMlCard det={salvo} /> }] : []),
   ];
+
+  if (noProduto) abas.sort((a, b) => ['preco', 'itens', 'atributos'].indexOf(a.key) - ['preco', 'itens', 'atributos'].indexOf(b.key));
+  // a aba escolhida não existe nesta seleção (ex.: Fotos num produto): abre a primeira
+  const abaVista: Aba = abas.some(a => a.key === aba) ? aba : ((abas[0]?.key as Aba) || 'anuncio');
+  const escolher = (s: SelecaoEditor) => {
+    setSelecao(s);
+    if (s !== 'geral' && !['preco', 'itens', 'atributos'].includes(aba)) setAba('preco');
+  };
 
   // ---------------------------------------------------------------------------
   // Tela
@@ -497,11 +517,16 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado, abrirEm }) =
       <Spin spinning={carregando || ocupado}>
         {!det || !salvo ? <div style={{ minHeight: 400 }} /> : (
           <Row gutter={16}>
-            {/* no preço o painel pede mais largura: a coluna das alterações estreita */}
-            <Col xs={24} xl={aba === 'preco' ? 19 : 17}>
-              <Tabs className="ml-editor-abas" activeKey={aba} onChange={k => setAba(k as Aba)} items={abas} />
+            <Col xs={24} xl={4}>
+              <div style={{ position: 'sticky', top: 0 }}>
+                <NavegacaoAnuncio det={det} selecao={selecao} onSelecionar={escolher} divergencias={divergencias} />
+              </div>
             </Col>
-            <Col xs={24} xl={aba === 'preco' ? 5 : 7}>
+            {/* no preço o painel pede mais largura: a coluna das alterações estreita */}
+            <Col xs={24} xl={abaVista === 'preco' ? 15 : 13}>
+              <Tabs className="ml-editor-abas" activeKey={abaVista} onChange={k => setAba(k as Aba)} items={abas} />
+            </Col>
+            <Col xs={24} xl={abaVista === 'preco' ? 5 : 7}>
               <div style={{ position: 'sticky', top: 0 }}>
                 <PainelAlteracoes alteracoes={alteracoes} onDesfazer={chave => setRascunho(r => desfazer(r, salvo, chave))} onDesfazerTudo={desfazerTudo} />
                 <PainelLateral
