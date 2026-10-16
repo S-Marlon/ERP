@@ -8,7 +8,7 @@ import { custoDoKit } from '../../../areas/catalogo/kits/kits';
 import { ItemAnuncio, normalizar, precoNoMl, resolverValor, saldoNaUnidade } from './anuncios';
 import { formasDoItem, lerPrecos, lerQuantidades, precoPorUnidade, quantidadeDaLinha, siglaDoKit } from './formasVenda';
 import { AnuncioCarregado, carregarAnuncios, responderErro, taxaMl, tenantDe } from './anuncios.controller';
-import { lerFaixas } from './faixasQuantidade';
+import { faixasDaLinha, lerFaixas } from './faixasQuantidade';
 import { compararAtributos } from './catalogo';
 import {
   classificarLucro, classificarPreco, conselhos, estatisticas, lucroNoMl, precoParaAlvo, Tarifa, unidadesDoProduto,
@@ -283,7 +283,7 @@ export const analisarPreco = async (req: Request, res: Response) => {
     const precoMercado = mercado.estatisticas ? r2(mercado.estatisticas.mediana * unidades) : null;
 
     // por quantidade: preço da faixa, tarifa por unidade e um frete por envio (a compra maior pode passar do limite)
-    const faixasAnuncio = lerFaixas(c.registro.faixas_quantidade);
+    const faixasAnuncio = faixasDaLinha(lerFaixas(c.registro.faixas_quantidade), item.unidadeMl?.fator || 1);   // kit: sem escada
     const porQuantidade = [];
     for (const q of quantidadesParaAnalise(precoAtual, faixasAnuncio)) {
       const precoUnit = r2(precoAtual * (1 - q.desconto / 100));

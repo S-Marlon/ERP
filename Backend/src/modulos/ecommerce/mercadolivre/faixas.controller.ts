@@ -4,7 +4,7 @@ import { Request, Response } from 'express';
 import pool from '../../../infra/db';
 import { precoNoMl } from './anuncios';
 import { AnuncioCarregado, carregarAnuncios, responderErro, tenantDe } from './anuncios.controller';
-import { corpoFaixas, FaixaQuantidade, faixasDoMl, lerFaixas } from './faixasQuantidade';
+import { corpoFaixas, FaixaQuantidade, faixasDaLinha, faixasDoMl, lerFaixas } from './faixasQuantidade';
 import { ErroML, ml } from './mercadolivreApi';
 
 const versaoDosPrecos = async (tenant: number, mlb: string) => {
@@ -34,7 +34,10 @@ export const enviarFaixas = async (tenant: number, mlb: string, faixas: FaixaQua
   await ml(tenant, 'POST', `/items/${mlb}/prices/price-per-quantity`, corpoFaixas(faixas), { 'X-Version': String(versao ?? '') });
 };
 
-/** Envia as faixas do anúncio a todos os itens já publicados e ativos/pausados. Devolve as falhas por SKU. */
+/**
+ * Envia as faixas do anúncio aos itens já publicados e ativos/pausados: a forma unidade recebe a escada; o kit recebe
+ * escada vazia (apaga a que estiver lá: a quantidade do kit conta em kits). Devolve as falhas por SKU.
+ */
 export const enviarFaixasDoAnuncio = async (tenant: number, c: AnuncioCarregado) => {
   // nunca definidas no ERP: não mexe nas faixas que estiverem no ML
   if (c.registro.faixas_quantidade === null || c.registro.faixas_quantidade === undefined) return [];
@@ -43,7 +46,7 @@ export const enviarFaixasDoAnuncio = async (tenant: number, c: AnuncioCarregado)
   for (const item of c.itens) {
     const m = c.noMl.get(item.idLinha);
     if (!m?.mlbId || m.status === 'closed' || m.status === 'deleted') continue;
-    try { await enviarFaixas(tenant, m.mlbId, faixas, precoNoMl(item, c.dados.ajustePreco)); }
+    try { await enviarFaixas(tenant, m.mlbId, faixasDaLinha(faixas, item.unidadeMl?.fator || 1), precoNoMl(item, c.dados.ajustePreco)); }
     catch (e: any) { falhas.push(`${item.sku}: ${e?.message || 'erro'}`); }
   }
   return falhas;

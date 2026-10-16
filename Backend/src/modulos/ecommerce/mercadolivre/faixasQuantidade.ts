@@ -38,6 +38,13 @@ export const normalizarFaixas = (entrada: any[]): FaixaQuantidade[] =>
     .sort((a, b) => a.minimo - b.minimo);
 
 /** Corpo do POST /items/:id/prices/price-per-quantity (substitui a tabela inteira; vazio apaga). */
+/**
+ * Escada que vai para uma linha do anúncio. Cada forma de venda é um anúncio separado no ML e a quantidade da escada
+ * conta na unidade DAQUELE anúncio: no kit c/10, "a partir de 10" são 10 kits = 100 peças. Por isso a escada do anúncio
+ * vale só para a forma unidade; o kit fica sem escada (até ter a própria).
+ */
+export const faixasDaLinha = (faixasAnuncio: FaixaQuantidade[], fator: number): FaixaQuantidade[] => (fator > 1 ? [] : faixasAnuncio);
+
 export const corpoFaixas = (faixas: FaixaQuantidade[]) => ({
   price_per_quantity: faixas.map(f => ({
     type: 'discount_percentage',

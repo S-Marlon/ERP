@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { corpoFaixas, errosDasFaixas, faixasDoAtacado, faixasDoMl, lerFaixas, normalizarFaixas, precoNaFaixa } from './faixasQuantidade';
+import { corpoFaixas, errosDasFaixas, faixasDaLinha, faixasDoAtacado, faixasDoMl, lerFaixas, normalizarFaixas, precoNaFaixa } from './faixasQuantidade';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -44,4 +44,11 @@ teste('faixas que já estão no ML (só as de empresa)', () => {
   ] };
   assert.deepStrictEqual(faixasDoMl(precos), [{ minimo: 3, desconto: 6.99 }]);
   assert.deepStrictEqual(faixasDoMl({}), []);
+});
+
+teste('escada só na forma unidade (no kit c/10, "a partir de 10" seriam 100 peças)', () => {
+  const escada = [{ minimo: 2, desconto: 5 }, { minimo: 10, desconto: 8 }];   // a do 6902-ZZ em 16/10
+  assert.deepStrictEqual(faixasDaLinha(escada, 1), escada);
+  assert.deepStrictEqual(faixasDaLinha(escada, 10), []);   // kit: sem escada (o envio apaga a que estiver no ML)
+  assert.deepStrictEqual(faixasDaLinha(escada, 2), []);
 });
