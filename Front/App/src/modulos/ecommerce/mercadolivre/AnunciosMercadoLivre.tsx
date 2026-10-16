@@ -179,6 +179,7 @@ const AnunciosMercadoLivre: React.FC = () => {
             </Space>
           ),
         },
+        { title: 'Modo de venda', width: 120, render: (_, i) => { const f = itemDoFin(a, i.idLinha); return <ModoVenda {...modoDosItens(f ? [f] : [], a.tipoAnuncio)} />; } },
         { title: 'Preço no ML', width: 180, render: (_, i) => <PrecoRapido idAnuncio={a.id} idLinha={i.idLinha} atual={itemDoFin(a, i.idLinha)} valor={i.preco} proprio={i.precoMl !== null} onSalvar={v => salvarPreco(a, i, v)} /> },
         ...colunasLucro<ItemResumo>(i => itemDoFin(a, i.idLinha), { onAplicarPreco: (i, preco) => salvarPreco(a, i, preco), compacto: true }),
         colunaDesempenho<ItemResumo>(i => desempenhoDaLinha(a.id, i.idLinha)),
