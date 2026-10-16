@@ -75,6 +75,21 @@ export const descricaoDiverge = (erp: string | null | undefined, noMl: string | 
 
 const tituloComparavel = (s: string | null | undefined) => String(s ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
 
+export interface PacoteMl { pesoG: number; alturaCm: number; larguraCm: number; comprimentoCm: number }
+const PACOTE = ['SELLER_PACKAGE_HEIGHT', 'SELLER_PACKAGE_WIDTH', 'SELLER_PACKAGE_LENGTH', 'SELLER_PACKAGE_WEIGHT'];
+
+/**
+ * Embalagem que está no ML, quando ela difere da que o ERP mandaria (para trazer ao cadastro). Só com as 4 medidas lá.
+ * `lerMedida` lê "4 cm" / "0,095 kg" em cm ou g.
+ */
+export const pacoteParaTrazer = (erp: AtributoComparavel[], noMl: AtributoComparavel[], lerMedida: (t: string | null | undefined) => number | null): PacoteMl | null => {
+  const difere = atributosDivergentes(erp.filter(a => PACOTE.includes(a.id)), noMl).length > 0;
+  if (!difere) return null;
+  const v = (id: string) => lerMedida(noMl.find(a => a.id === id)?.value_name);
+  const [alturaCm, larguraCm, comprimentoCm, pesoG] = PACOTE.map(v);
+  return alturaCm && larguraCm && comprimentoCm && pesoG ? { pesoG, alturaCm, larguraCm, comprimentoCm } : null;
+};
+
 /** Junta tudo de uma linha. `nomeAtributo` traduz o id do atributo para o nome que o operador conhece. */
 export const divergenciasDaLinha = (p: {
   atributos: { erp: AtributoComparavel[]; ml: AtributoComparavel[] };

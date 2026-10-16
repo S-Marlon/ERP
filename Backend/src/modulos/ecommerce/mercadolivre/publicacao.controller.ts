@@ -19,7 +19,8 @@ import { enviarFaixas, enviarFaixasDoAnuncio } from './faixas.controller';
 import { lerFaixas } from './faixasQuantidade';
 import { fotosDaLinha, fotosDaVariacao } from './fotos';
 import { prejuizoDaLinha } from './precificacao.controller';
-import { Divergencia, divergenciasDaLinha } from './divergencias';
+import { Divergencia, divergenciasDaLinha, PacoteMl, pacoteParaTrazer } from './divergencias';
+import { lerMedidaMl } from './sugestoes';
 import { PREFIXO_TRAVA, recusaPorPrejuizo } from './travaPrejuizo';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
@@ -422,7 +423,7 @@ const mensagemDoMl = (e: any) => (e instanceof ErroML && errosDoValidador(e.deta
 // Divergências ERP × ML (o que o "Enviar atributos, fotos e descrição" mudaria)
 // ---------------------------------------------------------------------------
 
-export interface DivergenciasLinha { idLinha: number; sku: string; diferencas: Divergencia[] }
+export interface DivergenciasLinha { idLinha: number; idItem: number; sku: string; diferencas: Divergencia[]; pacoteMl: PacoteMl | null }
 
 // guardadas por anúncio por 5 min (a lista pede de todos; o envio limpa a do anúncio)
 const cacheDivergencias = new Map<string, { em: number; valor: Promise<DivergenciasLinha[]> }>();
@@ -445,10 +446,13 @@ const calcularDivergencias = async (tenant: number, c: AnuncioCarregado): Promis
     const b = noMl.get(mlb);
     if (!b) continue;
     const descricaoMl: any = await ml(tenant, 'GET', `/items/${mlb}/description`).catch(() => null);
+    const atributosErp = atributosDoItem(c.categoria.atributos, c.dados, item, c.categoria.temGtin ?? true);
     saida.push({
-      idLinha: item.idLinha, sku: item.sku,
+      idLinha: item.idLinha, idItem: item.idItem, sku: item.sku,
+      // embalagem do ML para trazer ao cadastro: só na unidade (o cadastro guarda a embalagem de uma unidade)
+      pacoteMl: (item.unidadeMl?.fator || 1) === 1 ? pacoteParaTrazer(atributosErp, b.attributes || [], lerMedidaMl) : null,
       diferencas: divergenciasDaLinha({
-        atributos: { erp: atributosDoItem(c.categoria.atributos, c.dados, item, c.categoria.temGtin ?? true), ml: b.attributes || [] },
+        atributos: { erp: atributosErp, ml: b.attributes || [] },
         fotos: { planejadas: await fotosPlanejadas(tenant, c, item), ml: (b.pictures || []).map((f: any) => String(f.id)) },
         descricao: { erp: descricaoDoItem(c, item), ml: descricaoMl?.plain_text ?? null },
         titulo: { erp: item.tituloMl ? cortarTitulo(item.tituloMl, c.categoria.info.maxTitulo || 60) : null, ml: b.title || null, temFamilia: !!b.family_name, familia: b.family_name || null },

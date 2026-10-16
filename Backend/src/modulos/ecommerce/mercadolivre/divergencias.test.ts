@@ -1,5 +1,6 @@
 import assert from 'assert';
-import { atributosDivergentes, descricaoDiverge, divergenciasDaLinha, fotosDivergentes, valorComparavel } from './divergencias';
+import { atributosDivergentes, descricaoDiverge, divergenciasDaLinha, fotosDivergentes, pacoteParaTrazer, valorComparavel } from './divergencias';
+import { lerMedidaMl } from './sugestoes';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -55,4 +56,18 @@ teste('divergências: descrição e título (o 6902-ZZ do dia 16/10)', () => {
     atributos: { erp: [], ml: [] }, fotos: null, descricao: null,
     titulo: { erp: 'ABRAÇADEIRA de NYLON - 3.6x100mm - C/ 100 UN NYLON', ml: 'Abraçadeira De Nylon - 3.6x100mm - C/ 100 Un Nylon Preto', temFamilia: true, familia: 'Abraçadeira De Nylon - 3.6x100mm - C/ 100 Un Nylon' },
   }), []);   // o ML acrescenta a cor ao nome da família: não é diferença
+});
+
+teste('divergências: embalagem do ML para trazer ao cadastro (o 6902-ZZ do dia 16/10)', () => {
+  const erp = [
+    { id: 'SELLER_PACKAGE_HEIGHT', value_name: '7 cm' }, { id: 'SELLER_PACKAGE_WIDTH', value_name: '3.1 cm' },
+    { id: 'SELLER_PACKAGE_LENGTH', value_name: '3.1 cm' }, { id: 'SELLER_PACKAGE_WEIGHT', value_name: '10 g' },
+  ];
+  const ml = [
+    { id: 'SELLER_PACKAGE_HEIGHT', value_name: '4 cm' }, { id: 'SELLER_PACKAGE_WIDTH', value_name: '4 cm' },
+    { id: 'SELLER_PACKAGE_LENGTH', value_name: '2 cm' }, { id: 'SELLER_PACKAGE_WEIGHT', value_name: '95 g' },
+  ];
+  assert.deepStrictEqual(pacoteParaTrazer(erp, ml, lerMedidaMl), { pesoG: 95, alturaCm: 4, larguraCm: 4, comprimentoCm: 2 });
+  assert.strictEqual(pacoteParaTrazer(ml, ml, lerMedidaMl), null);                        // igual: nada a trazer
+  assert.strictEqual(pacoteParaTrazer(erp, ml.slice(0, 2), lerMedidaMl), null);           // ML sem as 4 medidas
 });

@@ -4,7 +4,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Col, Flex, InputNumber, Modal, Row, Space, Spin, Tabs, Tag, Tooltip, Typography, message } from 'antd';
 import { CheckCircleOutlined, CloudUploadOutlined, LinkOutlined, SaveOutlined, ShopOutlined, UndoOutlined } from '@ant-design/icons';
-import { adicionarAnexo, enviarArquivoAnexo } from '../../../areas/catalogo/skus/CatalogSku.service';
+import { adicionarAnexo, enviarArquivoAnexo, updateProduto } from '../../../areas/catalogo/skus/CatalogSku.service';
 import { AnuncioDetalhe, anunciosApi, ConferenciaItem, DivergenciasLinha, ItemDoAnuncio, resumoSincronizacao, SecaoPreco } from './mercadoLivreApi';
 import { destinoDa, DestinoSugestao } from './SugestoesMl';
 import { agruparPendencias, PendenciaAgrupada } from './pendencias';
@@ -507,6 +507,22 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado, abrirEm }) =
                 <PainelLateral
                   det={salvo} temRascunho={temRascunho} ocupado={acaoMl} conferencia={conferencia} falhas={falhas}
                   pendencias={pendencias} onAcao={acaoNoMl} onPendencia={irParaPendencia} divergencias={divergencias}
+                  onTrazerPacote={l => {
+                    const p = l.pacoteMl!;
+                    modal.confirm({
+                      title: `Trazer a embalagem do ML para o cadastro de ${l.sku}?`, okText: 'Gravar no cadastro', cancelText: 'Cancelar',
+                      content: `O cadastro passa a ter ${p.alturaCm} × ${p.larguraCm} × ${p.comprimentoCm} cm e ${p.pesoG} g (como está no ML). Confira se é o pacote real, como ele sai.`,
+                      onOk: async () => {
+                        try {
+                          await updateProduto(l.idItem, { peso_bruto: p.pesoG / 1000, altura_cm: p.alturaCm, largura_cm: p.larguraCm, comprimento_cm: p.comprimentoCm });
+                          message.success(`Embalagem de ${l.sku} gravada no cadastro.`);
+                          await recarregar();
+                        } catch (e) {
+                          message.error(e instanceof Error ? e.message : 'Erro ao gravar a embalagem.');
+                        }
+                      },
+                    });
+                  }}
                 />
               </div>
             </Col>

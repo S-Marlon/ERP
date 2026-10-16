@@ -4,7 +4,7 @@ import React from 'react';
 import { Alert, Badge, Button, Card, Divider, Flex, List, Popconfirm, Space, Tooltip, Typography } from 'antd';
 import {
   CheckCircleFilled, CheckCircleOutlined, CloseCircleFilled, LoadingOutlined, ExclamationCircleFilled, LinkOutlined, PauseCircleOutlined, PlayCircleOutlined,
-  SafetyCertificateOutlined, SendOutlined, StopOutlined, WarningFilled,
+  DownloadOutlined, SafetyCertificateOutlined, SendOutlined, StopOutlined, WarningFilled,
 } from '@ant-design/icons';
 import { AnuncioDetalhe, ConferenciaItem, DivergenciasLinha, foraDoMl, formatarMoeda } from '../mercadoLivreApi';
 import { PendenciaAgrupada, textoComPrimeiraMaiuscula } from '../pendencias';
@@ -23,13 +23,14 @@ interface Props {
   onAcao: (acao: AcaoMl) => void;
   onPendencia: (p: PendenciaAgrupada) => void;
   divergencias?: DivergenciasLinha[] | null;            // ERP × ML dos itens publicados (null = conferindo)
+  onTrazerPacote?: (linha: DivergenciasLinha) => void;   // grava no cadastro a embalagem que está no ML
 }
 
 const Linha: React.FC<{ rotulo: string; children: React.ReactNode }> = ({ rotulo, children }) => (
   <Flex justify="space-between" gap={8}><Text type="secondary">{rotulo}</Text><Text style={{ textAlign: 'right' }}>{children}</Text></Flex>
 );
 
-const PainelLateral: React.FC<Props> = ({ det, temRascunho, ocupado, conferencia, falhas, pendencias, onAcao, onPendencia, divergencias }) => {
+const PainelLateral: React.FC<Props> = ({ det, temRascunho, ocupado, conferencia, falhas, pendencias, onAcao, onPendencia, divergencias, onTrazerPacote }) => {
   const paraEnviar = (divergencias || []).filter(l => l.diferencas.some(d => d.enviavel));
   const soPainel = (divergencias || []).flatMap(l => l.diferencas.filter(d => !d.enviavel).map(d => ({ sku: l.sku, d })));
   const erros = pendencias.filter(p => p.nivel === 'erro').length;
@@ -96,6 +97,13 @@ const PainelLateral: React.FC<Props> = ({ det, temRascunho, ocupado, conferencia
                         <div key={l.idLinha} style={{ marginBottom: 4 }}>
                           <b>{l.sku}</b>
                           {l.diferencas.filter(d => d.enviavel).map((d, k) => <div key={k}>• {d.texto}</div>)}
+                          {l.pacoteMl && onTrazerPacote && (
+                            <Tooltip title={`Grava no cadastro do item a embalagem que está no ML (${l.pacoteMl.alturaCm} × ${l.pacoteMl.larguraCm} × ${l.pacoteMl.comprimentoCm} cm, ${l.pacoteMl.pesoG} g), em vez de mandar a do ERP`}>
+                              <Button size="small" type="link" icon={<DownloadOutlined />} style={{ padding: 0, height: 'auto', fontSize: 12 }} disabled={temRascunho || algumOcupado} onClick={() => onTrazerPacote(l)}>
+                                Trazer embalagem do ML para o cadastro
+                              </Button>
+                            </Tooltip>
+                          )}
                         </div>
                       ))}
                     </div>

@@ -283,7 +283,8 @@ export interface DesempenhoAnuncio {
 export interface Desempenho { dias: number; periodo: DesempenhoPeriodos; anuncios: DesempenhoAnuncio[] }
 /** O que está diferente entre o ERP e o anúncio no ML (o "Enviar atributos, fotos e descrição" resolve os enviáveis). */
 export interface DivergenciaMl { campo: 'ATRIBUTOS' | 'FOTOS' | 'DESCRICAO' | 'TITULO'; texto: string; enviavel: boolean }
-export interface DivergenciasLinha { idLinha: number; sku: string; diferencas: DivergenciaMl[] }
+export interface PacoteMl { pesoG: number; alturaCm: number; larguraCm: number; comprimentoCm: number }
+export interface DivergenciasLinha { idLinha: number; idItem: number; sku: string; diferencas: DivergenciaMl[]; pacoteMl?: PacoteMl | null }
 export interface DivergenciasResumo { paraEnviar: number; soPainel: number; resumo: string[] }
 export interface FaixasFrete {
   logistica: string | null;
