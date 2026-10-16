@@ -588,10 +588,10 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado, abrirEm }) =
               </div>
             </Col>
             {/* no preço o painel pede mais largura: a coluna das alterações estreita */}
-            <Col xs={24} xl={abaVista === 'preco' ? 15 : 13}>
+            <Col xs={24} xl={abaVista === 'preco' ? 16 : 15}>
               <Tabs className="ml-editor-abas" activeKey={abaVista} onChange={k => setAba(k as Aba)} items={abas} />
             </Col>
-            <Col xs={24} xl={abaVista === 'preco' ? 5 : 7}>
+            <Col xs={24} xl={abaVista === 'preco' ? 4 : 5}>
               <div style={{ position: 'sticky', top: 0 }}>
                 <PainelAlteracoes alteracoes={alteracoes} onDesfazer={chave => setRascunho(r => desfazer(r, salvo, chave))} onDesfazerTudo={desfazerTudo} />
                 <PainelLateral
