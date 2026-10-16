@@ -136,6 +136,7 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEsc
     ),
   };
   const colRecebe = { title: 'Você recebe', dataIndex: 'recebe', align: 'right' as const, width: 100, render: (v: number) => <b>{formatarMoeda(v)}</b> };
+  const colCusto = { title: <Tooltip title='Custo do item no ERP (da compra inteira, na tabela por quantidade)'>Custo</Tooltip>, dataIndex: 'custo', align: 'right' as const, width: 90, render: (v: number) => menos(v) };
   /** Lucro (em cima) e % sobre o custo com a situação (embaixo); `topo` troca o valor de cima (ex.: lucro da compra inteira). */
   const colLucro = <T extends Venda>(titulo: React.ReactNode, topo?: (v: T) => React.ReactNode) => ({
     title: titulo, align: 'right' as const, width: 150,
@@ -186,6 +187,7 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEsc
         },
         colTarifaFrete,
         colRecebe,
+        colCusto,
         colLucro<AnalisePreco['cenarios'][number] & ComparacaoCenario>('Lucro por venda'),
         {
           title: <Tooltip title={`Em cima: lucro no mês com ${vendasMes} vendas (o mesmo volume em todos). Embaixo: quantas vendas por mês o cenário precisa para lucrar o mesmo que hoje. Até 2× costuma valer testar; 4× ou mais quase nunca compensa.`}>No mês</Tooltip>,
@@ -199,7 +201,7 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEsc
               const vezes = c.multiplicador.toFixed(1).replace('.', ',');
               empate = (
                 <Tooltip title={c.multiplicador <= 1 ? 'Lucra mais com as mesmas vendas (ou menos)' : `Precisa vender ${vezes} vezes o que vende hoje para lucrar o mesmo`}>
-                  <Tag color={cor} style={{ fontSize: 11, marginInlineEnd: 0 }}>{c.multiplicador <= 1 ? 'mesmas vendas ou menos' : `precisa ${c.vendasParaEmpatar} (${vezes}×)`}</Tag>
+                  <Tag color={cor} style={{ fontSize: 11, marginInlineEnd: 0 }}>{c.multiplicador <= 1 ? 'mesmas vendas ou -' : `precisa ${c.vendasParaEmpatar} (${vezes}×)`}</Tag>
                 </Tooltip>
               );
             }
@@ -281,6 +283,7 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEsc
           { title: 'Preço un.', dataIndex: 'precoUnit', align: 'right', render: formatarMoeda },
           colTarifaFrete,
           colRecebe,
+          colCusto,
           colLucro<AnalisePreco['porQuantidade'][number]>(<Tooltip title="Lucro da compra inteira (e por unidade); embaixo, o % sobre o custo e a situação">Lucro da compra</Tooltip>, q => (
             <div style={{ whiteSpace: 'nowrap' }}>
               <b style={{ color: corLucro(q.lucro) }}>{formatarMoeda(q.lucro)}</b>
