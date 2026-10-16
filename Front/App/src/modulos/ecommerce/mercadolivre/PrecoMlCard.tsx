@@ -110,7 +110,10 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEsc
 
   // modo de venda: o de hoje no ML (salvo.vendaMl) e o escolhido nas alterações (det)
   const publicado = !!salvo.vendaMl;
-  const freteEscolhido = det.vendaMl ? det.vendaMl.freteGratis : e?.gratis ?? null;
+  // frete: o das alterações, se mudou; senão o deste item no ML (os itens podem estar diferentes entre si)
+  const freteMudou = !!det.vendaMl && det.vendaMl.freteGratis !== null && det.vendaMl.freteGratis !== (salvo.vendaMl?.freteGratis ?? null);
+  const freteEscolhido = freteMudou ? det.vendaMl!.freteGratis : e?.gratis ?? null;
+  const freteMisto = salvo.vendaMl?.freteGratis === null;
   const escolhido = (c: { tipo: string; freteGratis: boolean; obrigatorio: boolean }) =>
     c.tipo === det.tipoAnuncio && (c.obrigatorio || freteEscolhido === null || c.freteGratis === freteEscolhido);
   const motivoBloqueio = (c: { tipo: string; freteGratis: boolean; obrigatorio: boolean }): string | null => {
@@ -174,11 +177,11 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEsc
       columns={[
         {
           title: 'Anúncio', width: 200, render: (_, c) => (
-            <Space size={4} wrap>
+            <Space size={2} wrap>
               <Tooltip title={c.tipo === 'gold_pro' ? 'Mais exposição e parcelamento sem juros para o comprador' : 'Comissão menor, sem parcelamento sem juros'}><Text strong={c.atual}>{TIPO[c.tipo]}</Text></Tooltip>
               {c.freteGratis
                 ? <Tooltip title="Frete grátis para o comprador: você paga o envio"><Tag color="cyan" style={{ marginInlineEnd: 0 }}>Frete grátis</Tag></Tooltip>
-                : <Tooltip title="O comprador paga o envio (abaixo de R$ 79 o ML ainda cobra de você a tarifa de envio do item barato)"><Tag color="gold" style={{ marginInlineEnd: 0 }}>Frete custeado</Tag></Tooltip>}
+                : <Tooltip title="O comprador paga o envio (abaixo de R$ 79 o ML ainda cobra de você a tarifa de envio do item barato)"><Tag color="gold" style={{ marginInlineEnd: 0 }}>Frete cliente</Tag></Tooltip>}
               {c.atual && <Tooltip title="Como o anúncio está hoje no ML"><Tag color="blue">hoje</Tag></Tooltip>}
               {escolhido(c) && !c.atual && <Tooltip title="Escolhido nas alterações: vai ao ML ao salvar"><Tag color="processing">nas alterações</Tag></Tooltip>}
               {c.melhorPorVenda && !c.atual && !escolhido(c) && <Tooltip title="Maior lucro por venda"><Tag color="green">mais lucro/venda</Tag></Tooltip>}
@@ -225,7 +228,9 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEsc
             if (escolhido(c)) return c.atual ? null : <Text type="secondary" style={{ fontSize: 12 }}>escolhido</Text>;
             const motivo = motivoBloqueio(c);
             return (
-              <Tooltip title={motivo || 'Põe este modo de venda nas alterações (vai ao ML ao salvar)'}>
+              <Tooltip title={motivo || (freteMisto && !c.obrigatorio
+                ? 'Põe nas alterações. Atenção: o frete escolhido vale para TODOS os itens deste anúncio no ML (hoje eles estão diferentes).'
+                : 'Põe este modo de venda nas alterações (vai ao ML ao salvar)')}>
                 <Button size="small" disabled={!!motivo} onClick={() => onEscolherCenario(c.tipo, publicado && !c.obrigatorio ? c.freteGratis : undefined)}>Usar</Button>
               </Tooltip>
             );

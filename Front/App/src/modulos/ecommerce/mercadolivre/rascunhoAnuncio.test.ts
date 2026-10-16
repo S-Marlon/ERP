@@ -83,9 +83,18 @@ teste('modo de venda: tipo e frete grátis no rascunho e na lista', () => {
   r = mudarAnuncio(r, pub, 'tipoAnuncio', 'gold_pro');
   const lista = listarAlteracoes(pub, r, nomes);
   const frete = lista.find(a => a.chave === 'a:freteGratis')!;
-  assert.deepStrictEqual([frete.grupo, frete.antes, frete.depois, frete.vaiAoMl], ['Venda no ML', 'Desligado (o comprador paga)', 'Ligado (você paga o frete)', 'NA_HORA']);
+  assert.deepStrictEqual([frete.grupo, frete.antes, frete.depois, frete.vaiAoMl], ['Venda no ML', 'Cliente paga, em todos os itens', 'Grátis em todos os itens (você paga o frete)', 'NA_HORA']);
   assert.strictEqual(lista.find(a => a.chave === 'a:tipoAnuncio')!.vaiAoMl, 'NA_HORA');
   assert.strictEqual(comRascunho(pub, r).vendaMl!.freteGratis, true);
   assert.deepStrictEqual(corposParaSalvar(r).anuncio, { freteGratis: true, tipoAnuncio: 'gold_pro' });
   assert.deepStrictEqual(mudarAnuncio(r, pub, 'freteGratis', false).anuncio, { tipoAnuncio: 'gold_pro' });
+});
+
+teste('modo de venda: itens com frete diferente (misto) e escolher um vale para todos', () => {
+  const misto = { ...det, publicados: 2, vendaMl: { tipo: 'gold_special', freteGratis: null, tiposPermitidos: ['gold_special'], podeMudarFrete: true, misturado: true } } as any;
+  // qualquer escolha é uma alteração (mesmo a que já vale para alguns itens)
+  const r = mudarAnuncio(RASCUNHO_VAZIO, misto, 'freteGratis', false);
+  const frete = listarAlteracoes(misto, r, nomes).find(a => a.chave === 'a:freteGratis')!;
+  assert.deepStrictEqual([frete.antes, frete.depois], ['Misto (cada item de um jeito)', 'Cliente paga, em todos os itens']);
+  assert.deepStrictEqual(corposParaSalvar(r).anuncio, { freteGratis: false });
 });

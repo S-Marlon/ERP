@@ -132,7 +132,7 @@ const ROTULOS: Record<CampoAnuncio, { grupo: string; rotulo: string; formato: (v
   estoqueMaximo: { grupo: 'Estoque', rotulo: 'Teto no ML', formato: v => (v === null || v === undefined ? 'sem teto' : `${v} un.`) },
   estoqueAutomatico: { grupo: 'Estoque', rotulo: 'Atualizar sozinho', formato: v => (v ? 'Ligado' : 'Desligado') },
   faixasQuantidade: { grupo: 'Preço', rotulo: 'Preço por quantidade', formato: v => descreverFaixas(v as FaixaQuantidade[] | null) },
-  freteGratis: { grupo: 'Venda no ML', rotulo: 'Frete grátis', formato: v => (v === null || v === undefined ? '—' : v ? 'Ligado (você paga o frete)' : 'Desligado (o comprador paga)') },
+  freteGratis: { grupo: 'Venda no ML', rotulo: 'Frete grátis', formato: v => (v === null || v === undefined ? 'Misto (cada item de um jeito)' : v ? 'Grátis em todos os itens (você paga o frete)' : 'Cliente paga, em todos os itens') },
 };
 
 /** Tudo o que mudou, na ordem da tela. vaiAoMl: o que vai sozinho ao salvar, o que precisa do "enviar ao ML" e o que não vai. */

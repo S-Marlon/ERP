@@ -20,9 +20,11 @@ export const vendaDoAnuncio = async (tenant: number, c: AnuncioCarregado) => {
   const primeiro = estados.find(Boolean);
   if (!primeiro) return null;
   const permitidos = await tiposPermitidosNoMl(tenant, lista[0].mlbId);
+  // frete grátis é por item no ML: com itens diferentes o anúncio fica "misto" (null), não o do primeiro item
+  const freteMisto = estados.some(e => !!e && e.gratis !== primeiro.gratis);
   return {
     tipo: primeiro.tipo,
-    freteGratis: primeiro.gratis,
+    freteGratis: freteMisto ? null : primeiro.gratis,
     tiposPermitidos: [...new Set([primeiro.tipo, ...permitidos].filter((t): t is string => !!t))],
     podeMudarFrete: estados.every(e => !e || e.preco < LIMITE_FRETE_GRATIS),
     misturado: estados.some(e => !!e && (e.gratis !== primeiro.gratis || e.tipo !== primeiro.tipo)),

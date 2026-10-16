@@ -55,7 +55,7 @@ export const AlertasPreco: React.FC<{ alertas: AlertaPreco[] | undefined; onUsar
 };
 
 /**
- * Modo de venda: Clássico/Premium e frete grátis ou frete custeado (o comprador paga). `noMl` falso = ainda não publicado
+ * Modo de venda: Clássico/Premium e frete grátis (você paga) ou frete cliente (o comprador paga). `noMl` falso = ainda não publicado
  * (tipo do ERP e frete do padrão da conta); 'misto' quando os itens do anúncio estão diferentes.
  */
 export const ModoVenda: React.FC<{ tipo: string | 'misto' | null; freteGratis: boolean | 'misto' | null; noMl: boolean }> = ({ tipo, freteGratis, noMl }) => {
@@ -71,7 +71,7 @@ export const ModoVenda: React.FC<{ tipo: string | 'misto' | null; freteGratis: b
     ? <Tooltip title="Uns itens com frete grátis, outros sem"><Tag style={{ marginInlineEnd: 0 }}>Frete misto</Tag></Tooltip>
     : freteGratis
       ? <Tooltip title={`Frete grátis para o comprador: você paga o envio${origem}`}><Tag color="cyan" style={{ marginInlineEnd: 0 }}>Frete grátis</Tag></Tooltip>
-      : <Tooltip title={`O comprador paga o envio (abaixo de R$ 79 o ML ainda cobra de você a tarifa de envio do item barato)${origem}`}><Tag color="gold" style={{ marginInlineEnd: 0 }}>Frete custeado</Tag></Tooltip>;
+      : <Tooltip title={`O comprador paga o envio (abaixo de R$ 79 o ML ainda cobra de você a tarifa de envio do item barato)${origem}`}><Tag color="gold" style={{ marginInlineEnd: 0 }}>Frete cliente</Tag></Tooltip>;
   return (
     <Space direction="vertical" size={2} style={{ opacity: noMl ? 1 : 0.75 }}>
       {tipoTag}

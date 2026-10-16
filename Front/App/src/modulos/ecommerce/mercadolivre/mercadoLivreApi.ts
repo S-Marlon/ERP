@@ -168,7 +168,10 @@ export interface Candidatos {
 }
 
 /** Modo de venda do anúncio publicado: tipo, frete grátis e o que o ML deixa trocar. */
-export interface VendaMl { tipo: string | null; freteGratis: boolean; tiposPermitidos: string[]; podeMudarFrete: boolean; misturado: boolean }
+export interface VendaMl {
+  tipo: string | null; tiposPermitidos: string[]; podeMudarFrete: boolean; misturado: boolean;
+  freteGratis: boolean | null;   // null: itens diferentes no ML (cada um mostra o seu); escolher um vale para todos
+}
 /** Foto no ML (do anúncio, de outro anúncio ou do catálogo). */
 export interface FotoMl { id: string; url: string; tamanho: string | null; noErp?: boolean }
 /** Fotos de um item: as do cadastro do ERP e as do anúncio dele no ML. */
