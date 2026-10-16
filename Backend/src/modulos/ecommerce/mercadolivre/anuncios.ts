@@ -324,6 +324,8 @@ export const atributosDoItem = (atributos: AtributoML[], dados: AnuncioDados, it
 
 export type FotoEnvio = { id: string } | { source: string };
 
+export const LIMITE_NOME_FAMILIA = 60;
+
 /**
  * Corpo do POST /items de um item. Conta com User Products (porFamilia) manda family_name e o ML monta o título
  * e agrupa os itens da mesma família; conta antiga manda o título.
@@ -335,7 +337,9 @@ export const corpoDoItem = (p: {
   const titulo = (p.dados.titulo || '').trim();
   return {
     // anúncio separado: o título do próprio item; página única: o da família (o ML junta e mostra as opções)
-    ...(p.porFamilia ? { family_name: p.item.tituloMl || titulo } : { title: p.item.tituloMl || titulo }),
+    // o family_name fica em 60 caracteres (o título clássico) mesmo na categoria que aceita título maior; depois de
+    // publicado ele não muda mais pela API (2026-10-16)
+    ...(p.porFamilia ? { family_name: cortarTitulo(p.item.tituloMl || titulo, LIMITE_NOME_FAMILIA) } : { title: p.item.tituloMl || titulo }),
     category_id: p.dados.categoriaMl,
     price: precoNoMl(p.item, p.dados.ajustePreco),
     currency_id: 'BRL',

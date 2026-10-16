@@ -416,10 +416,6 @@ export const situacaoSincronizacao = async (req: Request, res: Response) => res.
 /** Itens publicados que ainda existem no ML (ativos ou pausados). */
 const noMlAinda = (c: AnuncioCarregado) => c.itens.filter(i => { const m = c.noMl.get(i.idLinha); return m?.mlbId && !foraDoMl(m.status); });
 
-/**
- * Anúncio User Products (com family_name): o título que o comprador vê é montado pelo ML a partir do family_name. Quando
- * o título é o próprio family_name, trocar o título = trocar o family_name. Devolve o aviso (null = trocou).
- */
 const mensagemDoMl = (e: any) => (e instanceof ErroML && errosDoValidador(e.detalhes).length ? errosDoValidador(e.detalhes).join('; ') : traduzirErroMl(String(e?.message || 'erro')));
 
 // ---------------------------------------------------------------------------
