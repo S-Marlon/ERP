@@ -256,6 +256,9 @@ teste('linha em kit: peso multiplicado, unidades por kit e formato Kit', () => {
   assert.deepStrictEqual(a.find(x => x.id === 'SELLER_PACKAGE_WEIGHT'), { id: 'SELLER_PACKAGE_WEIGHT', value_name: '2000 g' });
   assert.deepStrictEqual(a.find(x => x.id === 'UNITS_PER_PACK'), { id: 'UNITS_PER_PACK', value_name: '10' });
   assert.deepStrictEqual(a.filter(x => x.id === 'SALE_FORMAT'), [{ id: 'SALE_FORMAT', value_id: '2', value_name: 'Kit' }]);
+  // kit sem código de barras próprio: motivo "é um kit ou pack"; a unidade sem código: "não tem código cadastrado"
+  assert.deepStrictEqual(atributosDoItem(cat, d, { ...kit, gtin: null }, true).find(x => x.id === 'EMPTY_GTIN_REASON'), { id: 'EMPTY_GTIN_REASON', value_id: '17055159' });
+  assert.deepStrictEqual(atributosDoItem(cat, d, { ...item(1), gtin: null }, true).find(x => x.id === 'EMPTY_GTIN_REASON'), { id: 'EMPTY_GTIN_REASON', value_id: '17055160' });
   // a caixa do cadastro é de uma unidade: o kit não manda medidas (fica a que está no ML)
   assert.strictEqual(a.some(x => x.id === 'SELLER_PACKAGE_HEIGHT'), false);
   assert.strictEqual(atributosDoItem(cat, d, item(1), true).some(x => x.id === 'SELLER_PACKAGE_HEIGHT'), true);

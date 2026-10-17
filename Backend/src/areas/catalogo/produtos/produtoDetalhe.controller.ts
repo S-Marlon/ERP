@@ -603,15 +603,23 @@ export const salvarGtin = async (req: Request, res: Response) => {
     }
     if (gtin) {
       const [[outro]] = await connection.execute(
-        `SELECT cuv.id_item, COALESCE(cpd.sku_customizado, ic.sku) AS sku FROM comercial_unidades_venda cuv
+        `SELECT cuv.id_item, COALESCE(cpd.sku_customizado, ic.sku) AS sku, um.sigla FROM comercial_unidades_venda cuv
          INNER JOIN itens_core ic ON ic.id_item = cuv.id_item
          LEFT JOIN comercial_produtos_dados cpd ON cpd.id_item = cuv.id_item AND cpd.tenant_id = cuv.tenant_id
+         LEFT JOIN itens_unidades_medida um ON um.id_unidade = cuv.id_unidade
          WHERE cuv.tenant_id = ? AND cuv.gtin = ? AND NOT (cuv.id_item = ? AND cuv.id_unidade = ?) LIMIT 1`,
         [tenant, gtin, idItem, idUnidade]
       );
       if (outro) {
         await connection.rollback();
-        return res.status(409).json({ success: false, error: `Este código de barras já está no item ${outro.sku}.` });
+        // o mesmo item em outra embalagem: o código não pode repetir (é ele que o PDV lê para saber se é 1 ou o kit)
+        const mesmoItem = Number(outro.id_item) === idItem;
+        return res.status(409).json({
+          success: false,
+          error: mesmoItem
+            ? `Este código já é o da embalagem ${outro.sigla || 'base'} deste item. Cada embalagem precisa de um código diferente (é ele que o PDV lê para saber se vende 1 ou o kit). Kit montado na loja não precisa de código: deixe vazio.`
+            : `Este código de barras já está no item ${outro.sku}.`,
+        });
       }
     }
     const [[temPadrao]] = await connection.execute(

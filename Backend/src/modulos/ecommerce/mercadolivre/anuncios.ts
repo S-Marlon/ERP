@@ -210,7 +210,8 @@ export const pendenciasAnuncio = (
         ? `${i.sku}: estoque todo reservado para a loja (entra com 0 no ML).`
         : `${i.sku}: sem estoque (entra com quantidade 0).`, { idItem: i.idItem, idLinha: i.idLinha });
     }
-    if (temGtinNaCategoria && !i.gtin) {
+    // kit sem código próprio vai como "é um kit ou pack": não pede o código (o da unidade não serve)
+    if (temGtinNaCategoria && !i.gtin && fatorDaLinha(i) === 1) {
       const marca = resolverValor(atributos.find(a => a.id === 'BRAND'), dados.atributos.BRAND, i)?.valor;
       if (marca && !SEM_MARCA.has(normalizar(marca))) {
         aviso('itens', `${i.sku}: sem código de barras (GTIN): com marca "${marca}" o ML costuma exigir o GTIN. Preencha em Itens e estoque › Cadastro.`, { idItem: i.idItem, idLinha: i.idLinha });
@@ -290,6 +291,7 @@ export const cortarTitulo = (s: string, max = 60) => {
 // ---------------------------------------------------------------------------
 
 export const MOTIVO_SEM_GTIN = '17055160';   // EMPTY_GTIN_REASON: "O produto não tem código cadastrado"
+export const MOTIVO_SEM_GTIN_KIT = '17055159';   // EMPTY_GTIN_REASON: "O produto é um kit ou pack" (o kit montado na loja)
 
 export interface AtributoEnvio { id: string; value_id?: string; value_name?: string }
 
@@ -313,7 +315,8 @@ export const atributosDoItem = (atributos: AtributoML[], dados: AnuncioDados, it
     if (kit) trocar({ id: 'SALE_FORMAT', value_id: kit.id, value_name: kit.nome });
   }
   if (item.sku) saida.push({ id: 'SELLER_SKU', value_name: item.sku });
-  if (temGtin) saida.push(item.gtin ? { id: 'GTIN', value_name: item.gtin } : { id: 'EMPTY_GTIN_REASON', value_id: MOTIVO_SEM_GTIN });
+  // kit sem código próprio: "é um kit ou pack" (o código da unidade não serve: cada embalagem tem o seu, é o que o PDV lê)
+  if (temGtin) saida.push(item.gtin ? { id: 'GTIN', value_name: item.gtin } : { id: 'EMPTY_GTIN_REASON', value_id: fator > 1 ? MOTIVO_SEM_GTIN_KIT : MOTIVO_SEM_GTIN });
   // as medidas do cadastro são da embalagem de UMA unidade: no kit elas não valem (10 rolamentos não cabem na caixa de
   // um). Sem a embalagem do kit no ERP, a linha de kit não manda medidas e fica a que está no ML; o peso multiplica
   if (item.medidasCm && fator === 1) {

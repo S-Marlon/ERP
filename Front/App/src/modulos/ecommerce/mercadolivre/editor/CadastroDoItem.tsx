@@ -39,6 +39,12 @@ export const GtinDoItem: React.FC<Props> = ({ item, disabled, onSalvo }) => {
       <Text type="secondary" style={{ fontSize: 12 }}>
         {item.unidadeMl ? `Código da embalagem ${rotuloDaUnidade(item)} (não o da unidade).` : 'Código de barras da unidade (o da etiqueta do produto).'}
       </Text>
+      {item.unidadeMl && (
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          Kit montado na loja não tem código próprio: deixe vazio e o ML recebe "é um kit ou pack". Use só se a embalagem do kit
+          vier com um código impresso diferente do da unidade.
+        </Text>
+      )}
       <Input autoFocus value={valor} onChange={e => setValor(e.target.value)} onPressEnter={() => !invalido && salvar(codigo)}
         placeholder="EAN de 8, 12, 13 ou 14 dígitos" status={invalido ? 'error' : undefined} maxLength={20} />
       {invalido && <Text type="danger" style={{ fontSize: 12 }}>Não confere: falta um número ou o último (verificador) está errado.</Text>}
