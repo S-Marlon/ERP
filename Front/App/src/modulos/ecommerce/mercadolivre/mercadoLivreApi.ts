@@ -166,6 +166,20 @@ export interface AnuncioDetalhe extends Omit<AnuncioResumo, 'itens'> {
   itens: ItemDoAnuncio[]; pendencias: Pendencia[];
 }
 
+/** Item do catálogo que ainda não está no ML (aba Oportunidades). */
+export interface Oportunidade {
+  idItem: number; sku: string; nome: string; fotoUrl: string | null; marca: string | null;
+  preco: number; estoque: number; fotos: number; pesoKg: number | null; medidas: boolean; gtin: boolean; vendidos90: number;
+  idFamilia: number | null; familia: string | null; familiaNoMl: { idAnuncio: number; titulo: string } | null;
+  faltas: { texto: string; nivel: 'erro' | 'aviso' | 'info' }[]; situacao: 'PRONTO' | 'QUASE' | 'FALTA';
+}
+/** Lucro que o item daria no ML pelo preço do ERP (Clássico, frete grátis padrão da conta). */
+export type LucroOportunidade = { idItem: number; erro: string } | {
+  idItem: number; erro?: undefined; preco: number; tarifa: number; frete: number; freteDesconhecido: boolean; freteMinimo: boolean; freteGratis: boolean;
+  custo: number; lucro: number; lucroPct: number | null; nivel: LucroMl['nivel']; alvoPct: number; precoAlvo: number | null;
+  categoria: { id: string; nome: string; fonte: 'FAMILIA' | 'SUGERIDA' };
+};
+
 export interface Candidatos {
   familias: { id: number; nome: string; itens: number; anunciados: number; comFoto: number; comEstoque: number }[];
   itens: { idItem: number; sku: string; nome: string; preco: number; estoque: number; familia: string | null; idAnuncio: number | null; fotoUrl: string | null }[];
@@ -336,6 +350,9 @@ export const anunciosApi = {
   financeiro: async () => (await ler<{ id: number; itens: FinanceiroItem[] }[]>(await fetch(`${API}/anuncios/financeiro?tenant_id=1`), 'Erro ao calcular o lucro dos anúncios.'))
     .map(a => ({ ...a, itens: a.itens.map(comAlertas) })),
   detalhe: async (id: number) => ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}?tenant_id=1`), 'Erro ao abrir o anúncio.'),
+  oportunidades: async () => ler<{ dias: number; itens: Oportunidade[] }>(await fetch(`${API}/oportunidades?tenant_id=1`), 'Erro ao listar as oportunidades.'),
+  lucroOportunidades: async (ids: number[]) =>
+    ler<LucroOportunidade[]>(await fetch(`${API}/oportunidades/lucro?tenant_id=1&ids=${ids.join(',')}`), 'Erro ao calcular o lucro no ML.'),
   candidatos: async (busca: string) => ler<Candidatos>(await fetch(`${API}/candidatos?tenant_id=1&busca=${encodeURIComponent(busca)}`), 'Erro ao buscar no catálogo.'),
   criar: async (corpo: { idFamilia?: number; idItens?: number[]; separados?: boolean }) =>
     ler<{ ids: number[] }>(await fetch(`${API}/anuncios?tenant_id=1`, json('POST', corpo)), 'Erro ao criar o anúncio.'),

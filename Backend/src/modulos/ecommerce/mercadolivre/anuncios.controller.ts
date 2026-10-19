@@ -68,7 +68,7 @@ const categoriaOuErro = async (tenant: number, id: string | null): Promise<{ cat
   catch (e: any) { return { categoria: null, erro: e?.message || 'Não deu para ler a categoria no Mercado Livre.' }; }
 };
 
-const sugerirCategorias = async (tenant: number, texto: string) => {
+export const sugerirCategorias = async (tenant: number, texto: string) => {
   const q = String(texto || '').trim();
   if (!q) return [];
   const r: any[] = await ml(tenant, 'GET', `/sites/MLB/domain_discovery/search?limit=6&q=${encodeURIComponent(q)}`);

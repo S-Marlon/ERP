@@ -12,6 +12,7 @@ import {
 import { faixasNoMl } from './faixas.controller';
 import { faixasDeFrete, listarSugestoes } from './sugestoes.controller';
 import { desempenhoAnuncios } from './desempenho.controller';
+import { listarOportunidades, lucroDasOportunidades } from './oportunidades.controller';
 import { entrarNoCatalogo, verificarCatalogo } from './catalogo.controller';
 import { buscarFotosMl, fotosDoAnuncio, importarFotos, repassarImagem } from './fotos.controller';
 import { analisarPreco, curvaDaLinha, escadaDaLinha, financeiroAnuncio, financeiroAnuncios, formasDeVenda, simularPreco } from './precificacao.controller';
@@ -26,6 +27,8 @@ router.get('/conta', conta);
 
 // Central de anúncios
 router.get('/candidatos', candidatos);
+router.get('/oportunidades', listarOportunidades);
+router.get('/oportunidades/lucro', lucroDasOportunidades);
 router.get('/anuncios', listarAnuncios);
 router.get('/anuncios/financeiro', financeiroAnuncios);
 router.get('/anuncios/sugestoes', listarSugestoes);
