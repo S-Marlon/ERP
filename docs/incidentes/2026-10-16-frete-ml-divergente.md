@@ -85,7 +85,7 @@ de fato não volta para o ERP. Princípios para daqui em diante:
 
 | # | O quê | Onde | Banco |
 |---|---|---|---|
-| 1 | Para anúncio publicado, frete do próprio anúncio (`/items/{mlb}/shipping_options`, opção de frete grátis) em vez da simulação | `freteMl.ts`, `contextoVenda` | não |
+| 1 | ✅ **Feito em 2026-10-19.** Para anúncio publicado, no preço de lá, o frete vem do próprio anúncio (`/items/{mlb}/shipping_options`, `list_cost` da opção grátis para o comprador); a tela marca "ML" e avisa "ML≠ERP" quando a estimativa diferia | `freteRealNoMl()`, `freteDoVendedorNasOpcoes()`, `contextoVenda` | não |
 | 2 | Guardar o que o ML cobra por anúncio (frete, tarifa, recebe, data) e mostrar "ERP × ML" com aviso de divergência | anúncios do ML | sim (colunas em `modulo_ecommerce_mercadolivre_anuncios_itens`, por script) |
 | 3 | A sincronização automática relê esses valores junto com estoque e preço | `sincronizacao.ts` | não |
 | 4 | Aviso no Resultado real quando o frete cobrado nas vendas difere do estimado | pedidos do ML | não |

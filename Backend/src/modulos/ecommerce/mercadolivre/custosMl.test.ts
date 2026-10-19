@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { acharLimiteTaxaFixa, alertasDePreco, avisosDeDegrau, montarCenarios, precoQueCompensaFrete, quantidadesParaAnalise, resultadoVenda, valorNaTabelaDeFrete, vendedorPagaFrete } from './custosMl';
+import { acharLimiteTaxaFixa, alertasDePreco, avisosDeDegrau, freteDiverge, freteDoVendedorNasOpcoes, montarCenarios, precoQueCompensaFrete, quantidadesParaAnalise, resultadoVenda, valorNaTabelaDeFrete, vendedorPagaFrete } from './custosMl';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -87,4 +87,17 @@ teste('alertas de degrau de preço', () => {
   assert.deepStrictEqual([acima[0].tipo, acima[0].grave, acima[0].precoSugerido], ['FRETE_ACIMA_79', true, 78.9]);
   const perto = alertasDePreco({ preco: 72, lucro: 20, pct: 40, taxaFixa: null, frete: { abaixo: null, freteHoje: 8.45, freteAcima: 14.45, compensaAPartir: 79.23 } });
   assert.ok(perto[0].texto.endsWith('só suba o preço se for para R$ 79,23 ou mais.'));
+});
+
+teste('frete do vendedor lido das opções de envio do anúncio (ML em 2026-10-19)', () => {
+  // 1460-PCT, frete grátis ligado: o comprador paga 0 e o vendedor 14,45
+  assert.strictEqual(freteDoVendedorNasOpcoes([{ cost: 0, list_cost: 14.45 }, { cost: 9.99, list_cost: 9.99 }]), 14.45);
+  // abraçadeira de R$ 26 com frete grátis desligado: o ML dá grátis ao comprador (≥ R$ 19) e cobra 6,95 do vendedor
+  assert.strictEqual(freteDoVendedorNasOpcoes([{ cost: 0, list_cost: 6.95 }, { cost: 9.99, list_cost: 9.99 }]), 6.95);
+  // abaixo de R$ 19, comprador pagando: não aparece o custo do vendedor
+  assert.strictEqual(freteDoVendedorNasOpcoes([{ cost: 17.99, list_cost: 17.99 }, { cost: 8.99, list_cost: 8.99 }]), null);
+  assert.strictEqual(freteDoVendedorNasOpcoes(null), null);
+  assert.strictEqual(freteDiverge(5.65, 6.85), true);    // o par do 6902-ZZ
+  assert.strictEqual(freteDiverge(6.95, 6.95), false);
+  assert.strictEqual(freteDiverge(null, 6.95), false);
 });

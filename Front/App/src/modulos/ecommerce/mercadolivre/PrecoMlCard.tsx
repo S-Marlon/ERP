@@ -338,6 +338,14 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEsc
             {e.semGratis && !e.obrigatorio && <div>Sem frete grátis, o ML ainda cobra de você <b>{formatarMoeda(e.semGratis.valor)}</b> por envio (tarifa de envio de item abaixo de R$ 79), mesmo com o comprador pagando o frete.</div>}
             {e.acimaDoLimite && !e.obrigatorio && <div>Compra a partir de {formatarMoeda(e.limite)}: <b>{formatarMoeda(e.acimaDoLimite.valor)}</b> por envio (aí é obrigatório).</div>}
             {e.peso && <div>Peso cobrado: {e.peso.pesoG} g {e.peso.fonte === 'ML' ? '(calculado pelo ML)' : '(do cadastro do ERP)'}.</div>}
+            {e.doMl?.valor !== null && e.doMl?.valor !== undefined && (
+              <div>
+                <b>Frete deste preço lido do anúncio no ML: {formatarMoeda(e.doMl.valor)}</b>
+                {e.doMl.estimado !== null && Math.abs(e.doMl.estimado - e.doMl.valor) > 0.05
+                  ? <Text type="warning"> (o ERP estimava {formatarMoeda(e.doMl.estimado)}: confira peso e medidas; nos outros preços vale a estimativa)</Text>
+                  : <Text type="secondary"> (igual à estimativa do ERP)</Text>}
+              </div>
+            )}
             <div style={{ marginTop: 2 }}><Text type="secondary" style={{ fontSize: 12 }}>Estimativa do ML. O frete cobrado de verdade aparece em Pedidos › Resultado real.</Text></div>
           </div>
         )}

@@ -21,6 +21,9 @@ Quando duas fontes discordam, vale a de cima. Atualize esta página quando confe
 | R$ 79 ou mais: frete grátis obrigatório, com desconto por reputação/condição | `freteDe()` | Painel + assistente | 2026-10-16 | **Valendo** |
 | "De R$ 19 a R$ 78,99, com frete grátis padrão, o ML cobre o custo total do envio" | — | Assistente | 2026-10-16 | **Contradiz o painel.** Não aplicado. Confirmar com um anúncio específico ou com a 1ª venda real (Pedidos › Resultado real) |
 | "Frete grátis acima de R$ 19,90" que o comprador vê é benefício pago pelo ML | (só texto de ajuda) | Assistente | 2026-10-16 | Informativo |
+| Frete do anúncio publicado: `list_cost` da opção que sai grátis para o comprador em `/items/{id}/shipping_options` (CEP 01001-000) é o que o vendedor paga | `freteDoVendedorNasOpcoes()` (`custosMl.ts`), `freteRealNoMl()`; vale no preço que está no ML | API, 15 anúncios iguais à estimativa menos 1 (o par do 6902: 5,65 × 6,85) | 2026-10-19 | **Valendo** |
+| A partir de R$ 19, mesmo com o frete grátis **desligado**, o comprador vê frete R$ 0 e o vendedor paga a tarifa de envio do item barato | (é o que `list_cost` mostra) | API | 2026-10-19 | Confirma o assistente sobre o comprador; o custo do vendedor é o que o ERP já usava |
+| Abaixo de R$ 19 sem frete grátis: o ML não mostra o custo do vendedor nas opções de envio | fica a estimativa | API | 2026-10-19 | Valendo |
 | Peso cobrado = maior entre o real e o volumétrico (cm³ ÷ 6) | `pesoVolumetrico()` (`sugestoes.ts`) | API (peso cobrado do anúncio) | 2026-10-16 | Valendo |
 | Pacote maior que o declarado: medido e pesado na operação, pode ser **recusado** | Guia de frete | Assistente | 2026-10-16 | Valendo. "Cobra a diferença automaticamente" **não** foi confirmado |
 | Fatores do frete: peso, medidas, distância e serviço (a categoria muda a tarifa de venda, não o frete) | — | Assistente | 2026-10-16 | Informativo |

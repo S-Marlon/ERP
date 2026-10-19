@@ -63,6 +63,7 @@ export interface FinanceiroItem {
   idItem: number; idLinha: number; preco: number; tarifa: number; frete: number; recebe: number; custo: number; lucro: number;
   lucroSobreCustoPct: number | null; nivel: LucroMl['nivel']; freteGratis: boolean; freteDesconhecido: boolean; alvoPct: number;
   tipo?: string; modoNoMl?: boolean;   // tipo de anúncio e frete grátis lidos do ML (modoNoMl) ou do ERP/padrão da conta
+  freteDoMl?: boolean; freteEstimado?: number | null;   // frete lido do anúncio no ML (e o que o ERP estimava)
   precoAlvo: number | null;   // menor preço que dá o alvo sobre o custo (null sem custo)
   alertas: AlertaPreco[];     // degraus de preço (taxa fixa de item barato, frete grátis a partir de R$ 79)
 }
@@ -92,6 +93,7 @@ export interface AnalisePreco {
   envio: {
     gratis: boolean; obrigatorio: boolean; informado: boolean; logistica: string; noAnuncio: boolean; limite: number;
     peso: { pesoG: number; fonte: 'ML' | 'ERP' } | null; envio: FreteEnvio | null; semGratis?: FreteEnvio | null; acimaDoLimite: FreteEnvio | null; abaixoDoLimite: FreteEnvio | null;
+    doMl?: { valor: number | null; estimado: number | null } | null;   // frete lido do anúncio no ML, no preço de lá
   };
   cenarios: (ResultadoVendaMl & { tipo: 'gold_special' | 'gold_pro'; freteGratis: boolean; atual: boolean; obrigatorio: boolean; precoAlvo?: number | null })[];
   porQuantidade: (ResultadoVendaMl & { desconto: number; faixa: boolean; freteDesconhecido: boolean })[];

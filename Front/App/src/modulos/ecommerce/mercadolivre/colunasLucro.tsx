@@ -193,6 +193,11 @@ export function colunasLucro<T>(
             <div>
               <Rotulo>frete</Rotulo>
               {f.freteDesconhecido ? <Tooltip title="Item sem peso no cadastro: o frete não entrou na conta"><Text type="warning">?</Text></Tooltip> : cinza(f.frete)}
+              {f.freteDoMl && (
+                f.freteEstimado !== null && f.freteEstimado !== undefined && Math.abs(f.freteEstimado - f.frete) > 0.05
+                  ? <Tooltip title={`Frete lido do anúncio no ML. O ERP estimava ${formatarMoeda(f.freteEstimado)}: confira o peso e as medidas do cadastro (a estimativa vale para os outros preços).`}><Tag color="orange" style={{ fontSize: 10, lineHeight: '14px', marginLeft: 4, marginInlineEnd: 0, padding: '0 4px' }}>ML≠ERP</Tag></Tooltip>
+                  : <Tooltip title="Frete lido do anúncio no ML (o que ele cobra de você neste preço)"><Tag color="cyan" style={{ fontSize: 10, lineHeight: '14px', marginLeft: 4, marginInlineEnd: 0, padding: '0 4px' }}>ML</Tag></Tooltip>
+              )}
             </div>
           </div>
         );

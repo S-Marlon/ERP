@@ -17,7 +17,7 @@ import {
 } from './precificacao';
 import { ErroML, ml } from './mercadolivreApi';
 import { acharLimiteTaxaFixa, alertasDePreco, avisosDeDegrau, LIMITE_FRETE_GRATIS, precoQueCompensaFrete, montarCenarios, quantidadesParaAnalise, resultadoVenda, valorNaTabelaDeFrete, vendedorPagaFrete } from './custosMl';
-import { freteDoEnvio, freteGratisNoMl, pesoCobrado, preferenciasEnvio } from './freteMl';
+import { freteDoEnvio, freteGratisNoMl, freteRealNoMl, pesoCobrado, preferenciasEnvio } from './freteMl';
 import { daPrejuizo, textoPrejuizo } from './travaPrejuizo';
 
 const r2 = (v: number) => Math.round((Number(v) + Number.EPSILON) * 100) / 100;
@@ -119,10 +119,16 @@ export const contextoVenda = async (
    * grátis, o cheio (tabela de R$ 79); abaixo sem frete grátis, a tarifa de envio do item barato; de R$ 79 em diante, o da
    * faixa. Frete informado à mão vale só para o frete grátis.
    */
-  const freteDe = async (valorCompra: number, quantidade = 1, gratis = freteGratis) => {
+  const freteEstimadoDe = async (valorCompra: number, quantidade = 1, gratis = freteGratis) => {
     if (informado !== null) return vendedorPagaFrete(valorCompra, gratis) ? informado * quantidade : 0;
     return (await envioDe(valorNaTabelaDeFrete(valorCompra, gratis), quantidade))?.valor ?? null;
   };
+  // mão dupla: anúncio publicado, no preço e no frete grátis que estão no ML, vale o frete que o ML mostra para ele
+  const freteNoMl = mlb && informado === null ? await freteRealNoMl(tenant, mlb) : null;
+  const usaFreteDoMl = (valorCompra: number, quantidade = 1, gratis = freteGratis) =>
+    freteNoMl !== null && !!noMlEnvio && quantidade === 1 && gratis === noMlEnvio.gratis && Math.abs(valorCompra - noMlEnvio.preco) < 0.005;
+  const freteDe = async (valorCompra: number, quantidade = 1, gratis = freteGratis) =>
+    (usaFreteDoMl(valorCompra, quantidade, gratis) ? freteNoMl : freteEstimadoDe(valorCompra, quantidade, gratis));
   /** Lucro a um preço; `op` testa outro tipo de anúncio ou frete grátis ligado/desligado (cenários). */
   const avaliar = async (preco: number, op: { tipo?: string; gratis?: boolean } = {}) => {
     const frete = await freteDe(preco, 1, op.gratis ?? freteGratis);
@@ -192,7 +198,7 @@ export const contextoVenda = async (
     }
     return alertasDePreco({ preco, lucro: l.lucro, pct: l.lucroSobreCustoPct, taxaFixa, frete });
   };
-  return { tipo, fator, custo, alvo, tarifaDe, envioDe, freteDe, avaliar, precoAlvoDe, limiteTaxaFixa, alertasDe, freteGratis, logistica, peso, noMlEnvio };
+  return { tipo, fator, custo, alvo, tarifaDe, envioDe, freteDe, freteEstimadoDe, freteNoMl, usaFreteDoMl, avaliar, precoAlvoDe, limiteTaxaFixa, alertasDe, freteGratis, logistica, peso, noMlEnvio };
 };
 
 /** GET /anuncios/:id/itens/:idLinha/preco?simular=&frete=&alvoPadrao=30 */
@@ -303,6 +309,7 @@ export const analisarPreco = async (req: Request, res: Response) => {
         gratis: freteGratis, obrigatorio: precoAtual >= LIMITE_FRETE_GRATIS, informado: informado !== null, logistica,
         noAnuncio: !!noMlEnvio, peso, envio: envioAtual, semGratis: envioSemGratis, limite: LIMITE_FRETE_GRATIS,
         acimaDoLimite: freteAcima, abaixoDoLimite: freteAbaixo,
+        doMl: ctx.usaFreteDoMl(precoAtual) ? { valor: ctx.freteNoMl, estimado: await ctx.freteEstimadoDe(precoAtual) } : null,
       },
       cenarios, porQuantidade, degraus, alertas, alertasSimulado,
       atual, simulado, precoAlvo,
@@ -354,6 +361,8 @@ const financeiroDe = async (tenant: number, c: AnuncioCarregado) => {
         idItem: item.idItem, idLinha: item.idLinha, preco: l.preco, tarifa: l.tarifa, frete: l.frete, recebe: l.liquido, custo: l.custo, lucro: l.lucro,
         lucroSobreCustoPct: l.lucroSobreCustoPct, nivel: l.nivel, freteGratis: ctx.freteGratis, freteDesconhecido: l.freteDesconhecido, alvoPct: ctx.alvo.alvoPct,
         tipo: ctx.tipo, modoNoMl: !!ctx.noMlEnvio,   // tipo e frete grátis: lidos do ML quando publicado
+        // frete lido do anúncio no ML (mão dupla) e o que o ERP estimava (diferença = regra do ML a revisar)
+        freteDoMl: ctx.usaFreteDoMl(preco), freteEstimado: ctx.usaFreteDoMl(preco) ? await ctx.freteEstimadoDe(preco) : null,
         precoAlvo: await ctx.precoAlvoDe(preco, l.frete),
         alertas: await ctx.alertasDe(preco, l),
       };

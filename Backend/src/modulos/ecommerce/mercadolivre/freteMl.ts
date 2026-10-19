@@ -2,6 +2,7 @@
 // para um valor de compra (a faixa de preço muda o frete). Consultas com cache de 1 h.
 import { ml } from './mercadolivreApi';
 import type { FreteEnvio } from './custosMl';
+import { freteDoVendedorNasOpcoes } from './custosMl';
 
 const UMA_HORA = 60 * 60 * 1000;
 const cache = new Map<string, { em: number; valor: Promise<any> }>();
@@ -42,8 +43,22 @@ export const tiposPermitidosNoMl = (tenant: number, mlbId: string) => guardado(`
   return [...(sobe || []), ...(desce || [])].map((t: any) => String(t?.id)).filter(Boolean);
 }).catch(() => [] as string[]);
 
+/** CEP de referência para ler as opções de envio do anúncio (o custo do vendedor não muda com o destino). */
+const CEP_REFERENCIA = '01001000';
+
+/**
+ * Mão dupla: o frete que o ML cobra do vendedor neste anúncio publicado, no preço que está lá (lido das opções de envio
+ * do próprio anúncio). null = o ML não mostra (item abaixo de R$ 19 com o comprador pagando): fica a estimativa.
+ */
+export const freteRealNoMl = (tenant: number, mlbId: string) => guardado(`real|${mlbId}`, async () => {
+  const r: any = await ml(tenant, 'GET', `/items/${mlbId}/shipping_options?zip_code=${CEP_REFERENCIA}`);
+  return freteDoVendedorNasOpcoes(r?.options);
+}).catch(() => null);
+
 /** Esquece o que foi lido do anúncio (depois de mudar tipo ou frete no ML). */
-export const esquecerItemNoMl = (mlbId: string) => { cache.delete(`item|${mlbId}`); cache.delete(`tipos|${mlbId}`); cache.delete(`peso|${mlbId}`); };
+export const esquecerItemNoMl = (mlbId: string) => {
+  for (const k of ['item', 'tipos', 'peso', 'real']) cache.delete(`${k}|${mlbId}`);
+};
 
 const ajustarCm = (v: number) => Math.max(1, Math.ceil(v));
 

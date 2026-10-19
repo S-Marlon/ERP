@@ -168,3 +168,21 @@ export const alertasDePreco = (p: {
   }
   return a;
 };
+
+/**
+ * Frete que o vendedor paga num anúncio publicado, lido das opções de envio do próprio anúncio
+ * (GET /items/{id}/shipping_options): a opção que sai de graça para o comprador (cost 0) tem em list_cost o que o ML
+ * cobra do vendedor. Vale com o frete grátis ligado e, desde que o ML dá frete grátis ao comprador a partir de R$ 19,
+ * também com ele desligado. Sem opção grátis (item abaixo de R$ 19 com o comprador pagando), o ML não mostra o custo
+ * do vendedor: null (fica a estimativa). Conferido com o painel e a API em 2026-10-19 (14,45 / 6,95 / 7,15 / 50,75).
+ */
+export const freteDoVendedorNasOpcoes = (opcoes: { cost?: number | null; list_cost?: number | null }[] | null | undefined): number | null => {
+  const gratis = (opcoes || []).filter(o => Number(o.cost) === 0 && o.list_cost !== null && o.list_cost !== undefined && Number.isFinite(Number(o.list_cost)));
+  if (!gratis.length) return null;
+  return r2(Math.min(...gratis.map(o => Number(o.list_cost))));
+};
+
+/** Diferença que vale aviso entre o frete estimado pelo ERP e o que o ML mostra no anúncio. */
+export const TOLERANCIA_FRETE = 0.05;
+export const freteDiverge = (estimado: number | null, doMl: number | null) =>
+  estimado !== null && doMl !== null && Math.abs(estimado - doMl) > TOLERANCIA_FRETE;
