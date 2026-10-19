@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { CartItem, SaleItem, isCartItemOS } from '../types/cart.types';
 import Swal from 'sweetalert2';
+import { message } from 'antd';
 import { getPdvProductDetail } from '../services/api/products';
 import { podeFracionar, precoTabelaCarrinho, UnidadeCarrinho } from '../utils/precoCarrinho';
 import { calcularKit, chaveLinhaKit, EscolhaKitPdv, escolhasPadrao, PosicaoKit } from '../utils/kitPdv';
@@ -79,9 +80,9 @@ export const useCart = () => {
         return;
       }
 
+      // Sem estoque entra (serve para orçamento); a venda é barrada no pagamento
       if (productData.currentStock <= 0 && !productData.podeVenderSemEstoque) {
-        Swal.fire('Sem estoque', `"${item.name}" está sem estoque.`, 'warning');
-        return;
+        message.warning(`"${item.name}" está sem estoque: dá para orçar, mas não para vender.`);
       }
 
       // Provisório: itens fora da regra de publicação só entram com confirmação
@@ -121,12 +122,7 @@ export const useCart = () => {
         if (existing) {
           return prev.map(i => {
             if (i.id !== item.id) return i;
-            const quantity = i.quantity + 1;
-            if (!i.podeVenderSemEstoque && i.stock !== undefined && quantity > i.stock) {
-              Swal.fire('Estoque insuficiente', `Só há ${i.stock} ${i.unitOfMeasure || ''} de "${i.name}".`, 'warning');
-              return i;
-            }
-            return reprecificar({ ...i, quantity });
+            return reprecificar({ ...i, quantity: i.quantity + 1 });
           });
         }
         const novo: CartItem = {
@@ -165,10 +161,6 @@ export const useCart = () => {
       newQty = Math.max(0, newQty);
       if (!podeFracionar(item.unitOfMeasure)) newQty = Math.floor(newQty);
 
-      if (ehProduto(item) && !item.podeVenderSemEstoque && item.stock !== undefined && newQty > item.stock) {
-        Swal.fire('Estoque insuficiente', `Só há ${item.stock} ${item.unitOfMeasure || ''} de "${item.name}".`, 'warning');
-        return item;
-      }
       return reprecificar({ ...item, quantity: Number(newQty.toFixed(3)) });
     }));
   }, []);
@@ -179,8 +171,7 @@ export const useCart = () => {
       if (item.id !== id) return item;
       const unidade = item.unidades?.find(u => u.idUnidade === idUnidade);
       if (!unidade) return item;
-      let quantity = podeFracionar(unidade.sigla) ? item.quantity : Math.max(1, Math.floor(item.quantity));
-      if (!item.podeVenderSemEstoque && quantity > unidade.estoque) quantity = Math.max(0, Math.floor(unidade.estoque));
+      const quantity = podeFracionar(unidade.sigla) ? item.quantity : Math.max(1, Math.floor(item.quantity));
       return reprecificar({
         ...item,
         idUnidadeVenda: unidade.idUnidade,
@@ -197,10 +188,6 @@ export const useCart = () => {
   const confirmarKit = useCallback((escolhas: EscolhaKitPdv[]) => {
     if (!kitPendente) return;
     const linha = montarLinhaKit(kitPendente.base, kitPendente.posicoes, escolhas);
-    if (!linha.podeVenderSemEstoque && linha.stock !== undefined && linha.quantity > linha.stock) {
-      Swal.fire('Estoque insuficiente', `Dá para montar só ${linha.stock} kit(s) com essas escolhas.`, 'warning');
-      return;
-    }
     setCart(prev => {
       const semEditada = kitPendente.substituir !== undefined ? prev.filter(i => i.id !== kitPendente.substituir) : prev;
       const igual = semEditada.find(i => i.id === linha.id);

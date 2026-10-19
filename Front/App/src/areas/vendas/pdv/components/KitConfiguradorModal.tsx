@@ -43,7 +43,7 @@ const KitConfiguradorModal: React.FC<Props> = ({ pendente, onConfirmar, onCancel
       cancelText="Cancelar"
       onOk={() => onConfirmar(escolhas)}
       onCancel={onCancelar}
-      okButtonProps={{ disabled: semEstoque || qtdInvalida }}
+      okButtonProps={{ disabled: qtdInvalida }}
       destroyOnHidden
     >
       <Space direction="vertical" size={10} style={{ width: '100%' }}>
@@ -123,7 +123,7 @@ const KitConfiguradorModal: React.FC<Props> = ({ pendente, onConfirmar, onCancel
           <Statistic title="Preço montado" value={Math.max(0, pendente.precoKit + calculo.ajuste)} precision={2} prefix="R$" valueStyle={{ color: '#1677ff' }} />
           <Statistic title="Dá para montar" value={calculo.estoque === null ? '∞' : calculo.estoque} valueStyle={{ color: semEstoque ? '#cf1322' : undefined }} />
         </div>
-        {semEstoque && <Alert type="error" showIcon message="Falta estoque de algum item escolhido para montar este kit." />}
+        {semEstoque && <Alert type="warning" showIcon message="Falta estoque de algum item escolhido para montar este kit: dá para orçar, mas não para vender." />}
       </Space>
     </Modal>
   );

@@ -20,6 +20,7 @@ import { ClientePdvModal, formatarDocumento } from './components/ClientePdvModal
 import { ItemPdvDrawer } from './components/ItemPdvDrawer';
 import KitConfiguradorModal from './components/KitConfiguradorModal';
 import { idItemDaLinha } from './types/cart.types';
+import { linhasSemEstoque } from './utils/estoqueCarrinho';
 import { AvisoCaixaFechado } from '../caixa/CaixaPainel';
 import { caixaStore, useCaixa } from '../caixa/caixaStore';
 import { useSituacaoCliente } from '../../financeiro/receber/receberApi';
@@ -280,9 +281,35 @@ const PDVContent: React.FC = () => {
   // Sem caixa aberto não se vende: F2/finalizar abrem o painel de abertura
   const { caixa, carregado: caixaCarregado } = useCaixa();
   const irParaPagamento = useCallback(() => {
+    // Item sem estoque fica no carrinho para orçamento, mas não vende: oferece salvar como orçamento
+    const semEstoque = linhasSemEstoque(cart);
+    if (semEstoque.length > 0) {
+      Modal.confirm({
+        title: 'Não dá para vender: falta estoque',
+        width: 480,
+        content: (
+          <div>
+            <ul style={{ paddingLeft: 18, margin: '8px 0' }}>
+              {semEstoque.map(({ item, falta }) => (
+                <li key={item.id}>
+                  {item.name}: {Number(item.stock) > 0
+                    ? `há ${Number(item.stock).toLocaleString('pt-BR')}, faltam ${falta.toLocaleString('pt-BR')} ${item.unitOfMeasure || ''}`
+                    : 'sem estoque'}
+                </li>
+              ))}
+            </ul>
+            Salve como orçamento, ou ajuste as quantidades (ou dê entrada no estoque) para vender.
+          </div>
+        ),
+        okText: 'Salvar como orçamento',
+        cancelText: 'Voltar ao carrinho',
+        onOk: () => setModalOrcamento(true),
+      });
+      return;
+    }
     if (caixaCarregado && !caixa) { caixaStore.mostrar('abrir'); return; }
     setEstagio('PAGAMENTO');
-  }, [caixa, caixaCarregado]);
+  }, [cart, caixa, caixaCarregado]);
 
   useEffect(() => {
     let acumulado = '';

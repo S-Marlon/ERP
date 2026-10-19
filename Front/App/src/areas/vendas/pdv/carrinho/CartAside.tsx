@@ -6,6 +6,7 @@ import { ajusteDaLinha, ajustesDoCarrinho, precoBaseLinha } from '../utils/ajust
 
 import { CartItem } from '../types';
 import { emAtacado, podeFracionar, proximaFaixa } from '../utils/precoCarrinho';
+import { faltaNaLinha } from '../utils/estoqueCarrinho';
 import { PrecosPorFormaPainel } from './PrecosPorFormaPainel';
 
 interface CartAsideProps {
@@ -149,7 +150,7 @@ const CarrinhoConteudo: React.FC<CartAsideProps> = ({
                             const fracionado = !!fracionados[item.id] || podeFracionar(item.unitOfMeasure);
                             const stock = item.stock ?? 0;
                             const ehProduto = item.type !== 'service' && item.type !== 'os';
-                            const limitaEstoque = ehProduto && !item.podeVenderSemEstoque;
+                            const falta = faltaNaLinha(item);
                             const unidade = item.unidades?.find(u => u.idUnidade === item.idUnidadeVenda);
                             const atacado = unidade ? emAtacado(unidade, item.quantity) : false;
                             const proxima = unidade && !item.precoManual ? proximaFaixa(unidade, item.quantity) : null;
@@ -158,7 +159,7 @@ const CarrinhoConteudo: React.FC<CartAsideProps> = ({
                             return (
                                 <div key={item.id} style={{
                                     padding: 8, borderRadius: token.borderRadius, border: `1px solid ${token.colorBorderSecondary}`,
-                                    borderLeft: `3px solid ${temDesconto ? token.colorSuccess : temAcrescimo ? token.colorWarning : token.colorBorderSecondary}`,
+                                    borderLeft: `3px solid ${falta > 0 ? token.colorError : temDesconto ? token.colorSuccess : temAcrescimo ? token.colorWarning : token.colorBorderSecondary}`,
                                     background: item.quantity === 0 ? token.colorFillQuaternary : token.colorBgContainer,
                                 }}>
                                     <Flex gap={6} align="flex-start">
@@ -185,6 +186,13 @@ const CarrinhoConteudo: React.FC<CartAsideProps> = ({
                                             <Typography.Text type={stock < 5 ? 'danger' : 'secondary'} style={{ fontSize: 12 }}>
                                                 · Estoque: {Number(stock).toLocaleString('pt-BR')} {item.unitOfMeasure || ''}
                                             </Typography.Text>
+                                        )}
+                                        {falta > 0 && (
+                                            <Tooltip title="Dá para salvar como orçamento; para vender, ajuste a quantidade ou dê entrada no estoque.">
+                                                <Tag color="red" style={{ margin: 0 }}>
+                                                    {stock > 0 ? `Faltam ${falta.toLocaleString('pt-BR')} ${un}` : 'Sem estoque'}: só orçamento
+                                                </Tag>
+                                            </Tooltip>
                                         )}
                                         {ehProduto && (item.unidades?.length || 0) > 1 && (
                                             <Select size="small" style={{ minWidth: 120 }} popupMatchSelectWidth={false}
@@ -227,7 +235,7 @@ const CarrinhoConteudo: React.FC<CartAsideProps> = ({
                                                     {temDesconto ? `-${pctOff}%` : temAcrescimo ? `+${pctOff}%` : '%'}
                                                 </Button>
                                             </Tooltip>
-                                            <InputNumber size="small" min={0} max={limitaEstoque ? stock : undefined} step={fracionado ? 0.1 : 1}
+                                            <InputNumber size="small" min={0} step={fracionado ? 0.1 : 1}
                                                 value={item.quantity} onChange={val => updateQuantity(item.id, val ?? 0)} style={{ width: 80 }} />
                                         </Flex>
                                         <Typography.Text strong style={{ minWidth: 80, textAlign: 'right', whiteSpace: 'nowrap' }}>
