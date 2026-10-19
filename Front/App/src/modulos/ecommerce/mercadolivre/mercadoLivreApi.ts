@@ -275,7 +275,7 @@ export interface CategoriaNo { id: string | null; nome: string; caminho: string;
 /** Garante a lista de alertas (backend de versão anterior não manda). */
 const comAlertas = <T extends { alertas?: AlertaPreco[]; precoAlvo?: number | null }>(x: T): T => ({ ...x, alertas: x.alertas ?? [], precoAlvo: x.precoAlvo ?? null });
 
-export type TipoSugestao = 'FRETE_GRATIS' | 'CAIXA' | 'PESO' | 'KIT' | 'PRECO' | 'CADASTRO';
+export type TipoSugestao = 'FRETE_GRATIS' | 'CAIXA' | 'PESO' | 'KIT' | 'PRECO' | 'CADASTRO' | 'FRETE_19';
 export type SecaoPreco = 'formas' | 'cenarios' | 'mercado' | 'quantidade' | 'conta';
 export interface SugestaoMl {
   tipo: TipoSugestao; idAnuncio: number; idLinha: number; sku: string; titulo: string; texto: string;
@@ -313,6 +313,7 @@ export interface FichaForma { publicado: boolean; mlbId: string | null; linhas: 
 /** Lucro por venda em função do preço, com os degraus do ML (gráfico "Onde o preço está"). */
 export interface CurvaPrecoMl {
   atual: number; alvo: number | null; alvoPct: number; custo: number; limiteTaxaFixa: number | null; limiteFrete: number;
+  limiteFreteComprador?: number | null;   // R$ 19: frete grátis ao comprador (com o frete grátis desligado)
   freteDesconhecido: boolean; pontos: { preco: number; lucro: number; pct: number | null; nivel: string }[];
 }
 export interface FaixasFrete {

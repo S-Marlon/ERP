@@ -13,7 +13,7 @@ import { foraDoMl } from './anuncios';
 import { siglaDoKit } from './formasVenda';
 import {
   Caixa, faixasAbaixo, lerMedidaMl, ordenarSugestoes, pesoVolumetrico, Sugestao, sugestaoCadastro, sugestaoCaixa, sugestaoFreteGratis,
-  sugestaoKit, sugestaoPeso, sugestaoPreco, unidadesParaPassar79,
+  sugestaoFrete19, sugestaoKit, sugestaoPeso, sugestaoPreco, unidadesParaPassar79,
 } from './sugestoes';
 
 const r2 = (v: number) => Math.round((Number(v) + Number.EPSILON) * 100) / 100;
@@ -75,6 +75,10 @@ const sugestoesDaLinha = async (tenant: number, c: AnuncioCarregado, item: ItemA
     const lk = await (await contextoVenda(tenant, c, kit)).avaliar(precoKit);
     if (!lk.freteDesconhecido) saida.push(sugestaoKit(b, { preco, unidades: n, lucroUnitario: l.lucro, lucroDoKit: lk.lucro, precoKit }));
   }
+
+  // degrau dos R$ 19: subir um pouco e o comprador ganha frete grátis sem você ganhar menos
+  const d19 = preco < 19 ? await ctx.degrau19(l.lucro) : null;
+  if (d19) saida.push(sugestaoFrete19(b, { preco, freteGratis: ctx.freteGratis, ...d19 }));
 
   // preço abaixo do alvo ou prejuízo
   const precoAlvo = await ctx.precoAlvoDe(preco, l.frete);

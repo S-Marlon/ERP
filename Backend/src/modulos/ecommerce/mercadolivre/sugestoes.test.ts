@@ -1,7 +1,7 @@
 import assert from 'assert';
 import {
   caixaQueCobraPeloPeso, faixasAbaixo, lerMedidaMl, ordenarSugestoes, pesoVolumetrico, sugestaoCadastro, sugestaoCaixa, sugestaoFreteGratis,
-  sugestaoKit, sugestaoPeso, sugestaoPreco, unidadesParaPassar79,
+  sugestaoFrete19, sugestaoKit, sugestaoPeso, sugestaoPreco, unidadesParaPassar79,
 } from './sugestoes';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
@@ -48,4 +48,19 @@ teste('sugestões: kit, preço e cadastro', () => {
   const cx = sugestaoCaixa(b, { caixa: { comprimento: 43, largura: 19, altura: 4 }, pesoRealG: 425, freteNoVolume: 14.45, freteNoPeso: 13.85 })!;
   const ordem = ordenarSugestoes([sugestaoCadastro(b, { pesoErpG: null, caixaErp: null, pesoMlG: 425, caixaMl: null })!, cx, fg]);
   assert.deepStrictEqual(ordem.map(s => s.tipo), ['FRETE_GRATIS', 'CAIXA', 'CADASTRO']);
+});
+
+teste('sugestões: degrau dos R$ 19 (frete grátis ao comprador)', () => {
+  const base = { freteGratis: false, freteAbaixo: 5.95, freteAcima: 6.95, lucroEm19: 4.27 };
+  // a R$ 15,90 (lucro 2,54): R$ 19 já dá mais lucro
+  const sobe = sugestaoFrete19(b, { ...base, preco: 15.9, empataEm: 19, lucroHoje: 2.54 });
+  assert.strictEqual(sobe?.tipo, 'FRETE_19');
+  assert.ok(sobe?.titulo.includes('o seu lucro sobe'));
+  assert.strictEqual(sobe?.economia, 1.73);
+  // a R$ 18,90 (lucro 5,18): precisa ir a R$ 20,04 para empatar
+  const empata = sugestaoFrete19(b, { ...base, preco: 18.9, empataEm: 20.04, lucroHoje: 5.18 });
+  assert.ok(empata?.titulo.includes('R$ 20,04') && empata.titulo.includes('fica igual'));
+  assert.strictEqual(empata?.economia, null);
+  assert.strictEqual(sugestaoFrete19(b, { ...base, preco: 15.9, freteGratis: true, empataEm: 19, lucroHoje: 2.54 }), null);   // já tem frete grátis
+  assert.strictEqual(sugestaoFrete19(b, { ...base, preco: 9, empataEm: 20, lucroHoje: 1 }), null);                          // longe de 19
 });

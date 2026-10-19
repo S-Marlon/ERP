@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { acharLimiteTaxaFixa, alertasDePreco, avisosDeDegrau, freteDiverge, freteDoVendedorNasOpcoes, montarCenarios, precoQueCompensaFrete, quantidadesParaAnalise, resultadoVenda, valorNaTabelaDeFrete, vendedorPagaFrete } from './custosMl';
+import { acharLimiteTaxaFixa, alertasDePreco, avisosDeDegrau, freteDiverge, freteDoVendedorNasOpcoes, precoQueEmpata, textoDoDegrau19, montarCenarios, precoQueCompensaFrete, quantidadesParaAnalise, resultadoVenda, valorNaTabelaDeFrete, vendedorPagaFrete } from './custosMl';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -100,4 +100,21 @@ teste('frete do vendedor lido das opções de envio do anúncio (ML em 2026-10-1
   assert.strictEqual(freteDiverge(5.65, 6.85), true);    // o par do 6902-ZZ
   assert.strictEqual(freteDiverge(6.95, 6.95), false);
   assert.strictEqual(freteDiverge(null, 6.95), false);
+});
+
+teste('degrau dos R$ 19: preço que mantém o lucro e os avisos (a ABR-3.6-200 em 2026-10-19)', () => {
+  // a R$ 18,90: lucro 5,18 (tarifa 12%, frete 5,95, custo 5,50); a partir de R$ 19 o frete vai a 6,95
+  const empata = precoQueEmpata({ lucroAlvo: 5.18, custo: 5.5, comissaoPct: 12, fixa: 0, frete: 6.95 });
+  assert.strictEqual(empata, 20.04);
+  const d = { freteAbaixo: 5.95, freteAcima: 6.95, empataEm: empata, lucroEm19: 4.27, lucroHoje: 5.18 };
+  assert.ok(textoDoDegrau19(d).includes('com R$ 20,04 ou mais o seu lucro fica igual'));
+  // a R$ 15,90 (lucro 2,54) subir para R$ 19 já dá mais: 4,27
+  assert.ok(textoDoDegrau19({ ...d, empataEm: 19, lucroHoje: 2.54 }).includes('sobe de R$ 2,54 para R$ 4,27'));
+  const abaixo = alertasDePreco({ preco: 18.9, lucro: 5.18, pct: 94, taxaFixa: null, frete: null, degrau19: d });
+  assert.strictEqual(abaixo[0].tipo, 'ABAIXO_19');
+  assert.strictEqual(abaixo[0].precoSugerido, 20.04);
+  assert.ok(abaixo[0].texto.includes('o ML dá frete grátis a ele'));
+  assert.strictEqual(alertasDePreco({ preco: 19.5, lucro: 4.5, pct: 80, taxaFixa: null, frete: null, degrau19: d })[0].tipo, 'PERTO_19');
+  assert.strictEqual(alertasDePreco({ preco: 10, lucro: 1, pct: 20, taxaFixa: null, frete: null, degrau19: d }).length, 0);   // longe de 19
+  assert.strictEqual(alertasDePreco({ preco: 18.9, lucro: 5.18, pct: 94, taxaFixa: null, frete: null, degrau19: null }).length, 0);   // frete grátis ligado
 });

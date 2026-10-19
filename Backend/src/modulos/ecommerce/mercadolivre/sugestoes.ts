@@ -2,7 +2,7 @@
 // de R$ 79, caixa que paga por volume, peso perto de uma faixa mais barata, kit que passa de R$ 79, preço abaixo do alvo,
 // peso e medidas do cadastro). Regras puras; os valores de frete vêm da mesma conta conferida com o painel do ML.
 
-export type TipoSugestao = 'FRETE_GRATIS' | 'CAIXA' | 'PESO' | 'KIT' | 'PRECO' | 'CADASTRO';
+export type TipoSugestao = 'FRETE_GRATIS' | 'CAIXA' | 'PESO' | 'KIT' | 'PRECO' | 'CADASTRO' | 'FRETE_19';
 
 export interface Sugestao {
   tipo: TipoSugestao;
@@ -115,6 +115,28 @@ export const sugestaoPreco = (b: Base, p: { preco: number; lucro: number; pct: n
   };
 };
 
+/**
+ * Degrau dos R$ 19: item um pouco abaixo de R$ 19 com o frete grátis desligado (o comprador paga o envio). Subindo para o
+ * preço que mantém o lucro, o ML dá frete grátis ao comprador: vende mais sem ganhar menos por venda.
+ */
+export const sugestaoFrete19 = (b: Base, p: {
+  preco: number; freteGratis: boolean; empataEm: number | null; freteAbaixo: number; freteAcima: number; lucroEm19: number; lucroHoje: number;
+}): Sugestao | null => {
+  if (p.freteGratis || p.empataEm === null || !(p.preco >= 12 && p.preco < 19)) return null;
+  if (p.empataEm - p.preco > 8) return null;   // subir demais não é a mesma oferta
+  const sobe = p.lucroEm19 >= p.lucroHoje - 0.005;   // a R$ 19 já ganha mais que hoje
+  return {
+    ...b, tipo: 'FRETE_19', economia: sobe ? r2(p.lucroEm19 - p.lucroHoje) : null, acao: { aba: 'preco', secao: 'conta' },
+    titulo: sobe
+      ? `Com R$ 19,00 o comprador ganha frete grátis e o seu lucro sobe`
+      : `Com ${moeda(p.empataEm)} o comprador ganha frete grátis (e o seu lucro fica igual)`,
+    texto: `A ${moeda(p.preco)} o comprador paga o envio. A partir de R$ 19,00 o ML dá frete grátis a ele e você paga ${moeda(p.freteAcima)} em vez de ${moeda(p.freteAbaixo)}: `
+      + (sobe
+        ? `com R$ 19,00 o lucro por venda vai de ${moeda(p.lucroHoje)} para ${moeda(p.lucroEm19)} e o anúncio aparece com frete grátis.`
+        : `com ${moeda(p.empataEm)} o lucro por venda continua ${moeda(p.lucroHoje)} (a R$ 19,00 cairia para ${moeda(p.lucroEm19)}) e o anúncio aparece com frete grátis.`),
+  };
+};
+
 export const sugestaoCadastro = (b: Base, p: {
   pesoErpG: number | null; caixaErp: Caixa | null; pesoMlG: number | null; caixaMl: Caixa | null;
 }): Sugestao | null => {
@@ -137,7 +159,7 @@ export const sugestaoCadastro = (b: Base, p: {
   };
 };
 
-const ORDEM: Record<TipoSugestao, number> = { PRECO: 0, FRETE_GRATIS: 1, KIT: 2, CAIXA: 3, PESO: 4, CADASTRO: 5 };
+const ORDEM: Record<TipoSugestao, number> = { PRECO: 0, FRETE_GRATIS: 1, KIT: 2, FRETE_19: 3, CAIXA: 4, PESO: 5, CADASTRO: 6 };
 
 /** Mais economia primeiro; sem valor (cadastro) no fim. */
 export const ordenarSugestoes = (lista: Sugestao[]) =>

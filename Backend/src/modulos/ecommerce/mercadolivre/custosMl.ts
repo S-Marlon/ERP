@@ -8,6 +8,12 @@ const moeda = (v: number) => `R$ ${v.toFixed(2).replace('.', ',')}`;
 
 /** A partir deste valor de compra o frete grátis é obrigatório no ML Brasil (e o frete fica mais caro para o vendedor). */
 export const LIMITE_FRETE_GRATIS = 79;
+/**
+ * A partir deste preço o ML dá frete grátis ao COMPRADOR mesmo com o frete grátis do anúncio desligado (o ML banca) e
+ * o vendedor passa a pagar o frete com desconto (ex.: 6,95 em vez da tarifa de envio do item barato, 5,95). É um degrau
+ * a mais, além do de R$ 79. Fonte: assistente do ML + API (anúncios de R$ 21 a 26 com cost 0), 2026-10-19.
+ */
+export const LIMITE_FRETE_COMPRADOR = 19;
 
 /** Frete grátis que o vendedor paga num envio (consulta ao ML): com desconto, cheio (tabela) e o peso cobrado. */
 export interface FreteEnvio { valor: number; cheio: number | null; descontoPct: number | null; pesoG: number | null }
@@ -133,7 +139,26 @@ export const acharLimiteTaxaFixa = async (fixaDe: (preco: number) => Promise<num
   return semTaxa / 100;
 };
 
-export interface AlertaPreco { tipo: 'TAXA_FIXA' | 'PERTO_TAXA_FIXA' | 'FRETE_ACIMA_79' | 'PERTO_FRETE_79'; grave: boolean; texto: string; precoSugerido: number | null }
+export interface AlertaPreco { tipo: 'TAXA_FIXA' | 'PERTO_TAXA_FIXA' | 'FRETE_ACIMA_79' | 'PERTO_FRETE_79' | 'ABAIXO_19' | 'PERTO_19'; grave: boolean; texto: string; precoSugerido: number | null }
+
+/**
+ * Menor preço (ao centavo) que dá `lucroAlvo` com a tarifa (comissão % + fixa) e o frete informados. Para achar, acima de
+ * R$ 19, o preço em que o lucro volta ao de hoje (o frete sobe um pouco no degrau).
+ */
+export const precoQueEmpata = (p: { lucroAlvo: number; custo: number; comissaoPct: number; fixa: number; frete: number }) => {
+  const fator = 1 - p.comissaoPct / 100;
+  if (!(fator > 0)) return null;
+  return Math.ceil(((p.lucroAlvo + p.custo + p.fixa + p.frete) / fator) * 100 - 1e-6) / 100;
+};
+
+/** O degrau dos R$ 19 para um preço (só com o frete grátis desligado; ligado, o comprador já não paga). */
+export interface Degrau19 { freteAbaixo: number; freteAcima: number; empataEm: number | null; lucroEm19: number; lucroHoje: number }
+
+/** O que dizer do degrau: subir para R$ 19 já dá mais lucro que hoje, ou é preciso ir até o preço que empata. */
+export const textoDoDegrau19 = (d: Degrau19) =>
+  d.lucroEm19 >= d.lucroHoje - 0.005
+    ? `com ${moeda(LIMITE_FRETE_COMPRADOR)} o seu lucro sobe de ${moeda(d.lucroHoje)} para ${moeda(d.lucroEm19)} por venda`
+    : `com ${moeda(d.empataEm ?? LIMITE_FRETE_COMPRADOR)} ou mais o seu lucro fica igual ao de hoje (a ${moeda(LIMITE_FRETE_COMPRADOR)} cairia para ${moeda(d.lucroEm19)})`;
 
 const pctTexto = (v: number | null) => (v === null ? '' : ` (${v.toFixed(1).replace('.', ',')}%)`);
 
@@ -142,6 +167,7 @@ export const alertasDePreco = (p: {
   preco: number; lucro: number; pct: number | null;
   taxaFixa: { limite: number; fixa: number; noLimite: { lucro: number; pct: number | null } | null } | null;
   frete: { abaixo: { lucro: number; pct: number | null } | null; freteHoje: number; freteAcima: number | null; compensaAPartir: number | null } | null;
+  degrau19?: Degrau19 | null;
 }): AlertaPreco[] => {
   const a: AlertaPreco[] = [];
   const t = p.taxaFixa;
@@ -164,6 +190,19 @@ export const alertasDePreco = (p: {
     a.push({
       tipo: 'PERTO_FRETE_79', grave: false, precoSugerido: null,
       texto: `A partir de ${moeda(LIMITE_FRETE_GRATIS)} o frete grátis sobe para ${moeda(f.freteAcima)} (hoje ${moeda(f.freteHoje)}): só suba o preço se for para ${moeda(f.compensaAPartir)} ou mais.`,
+    });
+  }
+  // degrau dos R$ 19 (a mais, além do de R$ 79): abaixo o comprador paga o envio; a partir dele o ML dá frete grátis a ele
+  const d = p.degrau19;
+  if (d && p.preco < LIMITE_FRETE_COMPRADOR && p.preco >= LIMITE_FRETE_COMPRADOR * 0.7) {
+    a.push({
+      tipo: 'ABAIXO_19', grave: false, precoSugerido: d.empataEm,
+      texto: `Abaixo de ${moeda(LIMITE_FRETE_COMPRADOR)} o comprador paga o frete. A partir de ${moeda(LIMITE_FRETE_COMPRADOR)} o ML dá frete grátis a ele e você paga ${moeda(d.freteAcima)} (hoje ${moeda(d.freteAbaixo)}): ${textoDoDegrau19(d)}.`,
+    });
+  } else if (d && p.preco >= LIMITE_FRETE_COMPRADOR && p.preco <= LIMITE_FRETE_COMPRADOR * 1.15) {
+    a.push({
+      tipo: 'PERTO_19', grave: false, precoSugerido: null,
+      texto: `Cuidado ao baixar: abaixo de ${moeda(LIMITE_FRETE_COMPRADOR)} o comprador passa a pagar o frete (hoje o ML dá frete grátis a ele).`,
     });
   }
   return a;

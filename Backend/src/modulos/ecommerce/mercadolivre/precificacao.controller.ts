@@ -16,7 +16,7 @@ import {
   classificarLucro, classificarPreco, conselhos, estatisticas, lucroNoMl, precoParaAlvo, Tarifa, unidadesDoProduto,
 } from './precificacao';
 import { ErroML, ml } from './mercadolivreApi';
-import { acharLimiteTaxaFixa, alertasDePreco, avisosDeDegrau, LIMITE_FRETE_GRATIS, precoQueCompensaFrete, montarCenarios, quantidadesParaAnalise, resultadoVenda, valorNaTabelaDeFrete, vendedorPagaFrete } from './custosMl';
+import { acharLimiteTaxaFixa, alertasDePreco, avisosDeDegrau, Degrau19, LIMITE_FRETE_COMPRADOR, LIMITE_FRETE_GRATIS, precoQueEmpata, precoQueCompensaFrete, montarCenarios, quantidadesParaAnalise, resultadoVenda, valorNaTabelaDeFrete, vendedorPagaFrete } from './custosMl';
 import { freteDoEnvio, freteGratisNoMl, freteRealNoMl, pesoCobrado, preferenciasEnvio } from './freteMl';
 import { daPrejuizo, textoPrejuizo } from './travaPrejuizo';
 
@@ -175,7 +175,19 @@ export const contextoVenda = async (
     cacheLimiteFixa.set(chave, { em: Date.now(), valor });
     return valor;
   };
-  /** Avisos de degrau no preço: taxa fixa (com o lucro no limite) e o frete grátis a partir de R$ 79. */
+  /**
+   * O degrau dos R$ 19 (só com o frete grátis desligado): o frete logo abaixo e a partir de R$ 19 e o preço, a partir de
+   * R$ 19, que dá o lucro `lucroHoje`. null = frete grátis ligado ou frete desconhecido.
+   */
+  const degrau19 = async (lucroHoje: number): Promise<Degrau19 | null> => {
+    if (freteGratis || informado !== null) return null;
+    const [abaixo, acima, t19] = await Promise.all([freteEstimadoDe(r2(LIMITE_FRETE_COMPRADOR - 0.01), 1, false), freteEstimadoDe(LIMITE_FRETE_COMPRADOR, 1, false), tarifaDe(LIMITE_FRETE_COMPRADOR)]);
+    if (abaixo === null || acima === null) return null;
+    const empata = precoQueEmpata({ lucroAlvo: lucroHoje, custo, comissaoPct: t19.comissaoPct, fixa: t19.fixa, frete: acima });
+    const lucroEm19 = lucroNoMl({ preco: LIMITE_FRETE_COMPRADOR, custo, tarifa: t19, frete: acima }).lucro;
+    return { freteAbaixo: abaixo, freteAcima: acima, empataEm: empata === null ? null : Math.max(LIMITE_FRETE_COMPRADOR, empata), lucroEm19, lucroHoje };
+  };
+  /** Avisos de degrau no preço: taxa fixa (com o lucro no limite), R$ 19 (frete grátis ao comprador) e R$ 79. */
   const alertasDe = async (preco: number, l: { lucro: number; lucroSobreCustoPct: number | null; frete: number }) => {
     const limite = await limiteTaxaFixa();
     const fixa = (await tarifaDe(preco)).fixa;
@@ -196,9 +208,10 @@ export const contextoVenda = async (
         compensaAPartir: acima === null ? null : precoQueCompensaFrete({ preco, comissaoPct, freteHoje: l.frete, freteAcima: acima }),
       };
     }
-    return alertasDePreco({ preco, lucro: l.lucro, pct: l.lucroSobreCustoPct, taxaFixa, frete });
+    const d19 = preco < LIMITE_FRETE_COMPRADOR * 1.15 && preco >= LIMITE_FRETE_COMPRADOR * 0.7 ? await degrau19(l.lucro) : null;
+    return alertasDePreco({ preco, lucro: l.lucro, pct: l.lucroSobreCustoPct, taxaFixa, frete, degrau19: d19 });
   };
-  return { tipo, fator, custo, alvo, tarifaDe, envioDe, freteDe, freteEstimadoDe, freteNoMl, usaFreteDoMl, avaliar, precoAlvoDe, limiteTaxaFixa, alertasDe, freteGratis, logistica, peso, noMlEnvio };
+  return { tipo, fator, custo, alvo, tarifaDe, envioDe, freteDe, freteEstimadoDe, freteNoMl, usaFreteDoMl, avaliar, precoAlvoDe, limiteTaxaFixa, alertasDe, degrau19, freteGratis, logistica, peso, noMlEnvio };
 };
 
 /** GET /anuncios/:id/itens/:idLinha/preco?simular=&frete=&alvoPadrao=30 */
@@ -466,7 +479,8 @@ export const curvaDaLinha = async (req: Request, res: Response) => {
     const lAtual = await ctx.avaliar(atual);
     const alvo = await ctx.precoAlvoDe(atual, lAtual.frete);
     const limiteTaxaFixa = await ctx.limiteTaxaFixa();
-    const precos = precosDaCurva({ atual, custo: ctx.custo, alvo, marcas: [limiteTaxaFixa], limiteFrete: LIMITE_FRETE_GRATIS });
+    const limiteFreteComprador = ctx.freteGratis ? null : LIMITE_FRETE_COMPRADOR;   // degrau a mais, com o frete grátis desligado
+    const precos = precosDaCurva({ atual, custo: ctx.custo, alvo, marcas: [limiteTaxaFixa, limiteFreteComprador], limiteFrete: LIMITE_FRETE_GRATIS });
     const pontos: { preco: number; lucro: number; pct: number | null; nivel: string }[] = [];
     for (let k = 0; k < precos.length; k += 6) {
       const parte = await Promise.all(precos.slice(k, k + 6).map(async p => {
@@ -476,7 +490,7 @@ export const curvaDaLinha = async (req: Request, res: Response) => {
       pontos.push(...parte);
     }
     return res.json({
-      atual, alvo, alvoPct: ctx.alvo.alvoPct, custo: ctx.custo, limiteTaxaFixa, limiteFrete: LIMITE_FRETE_GRATIS,
+      atual, alvo, alvoPct: ctx.alvo.alvoPct, custo: ctx.custo, limiteTaxaFixa, limiteFrete: LIMITE_FRETE_GRATIS, limiteFreteComprador,
       freteDesconhecido: lAtual.freteDesconhecido, pontos,
     });
   } catch (error) {

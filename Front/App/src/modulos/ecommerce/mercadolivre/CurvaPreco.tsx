@@ -52,6 +52,7 @@ const CurvaPreco: React.FC<{
   const dentro = (v: number | null | undefined) => v !== null && v !== undefined && v >= x0 && v <= x1;
   const marcas: Marca[] = [
     ...(dentro(curva.limiteTaxaFixa) ? [{ preco: curva.limiteTaxaFixa!, rotulo: 'taxa fixa', cor: '#fa8c16' }] : []),
+    ...(dentro(curva.limiteFreteComprador) ? [{ preco: curva.limiteFreteComprador!, rotulo: 'R$ 19', cor: '#13c2c2' }] : []),
     ...(dentro(curva.limiteFrete) ? [{ preco: curva.limiteFrete, rotulo: 'R$ 79', cor: '#722ed1' }] : []),
     ...(dentro(curva.alvo) ? [{ preco: curva.alvo!, rotulo: `alvo ${curva.alvoPct}%`, cor: '#52c41a', tracejado: true }] : []),
     ...(dentro(mediana) ? [{ preco: mediana!, rotulo: 'mercado', cor: '#8c8c8c', tracejado: true }] : []),
@@ -113,7 +114,7 @@ const CurvaPreco: React.FC<{
       </svg>
       <Flex justify="space-between" wrap gap={8}>
         <Text type="secondary" style={{ fontSize: 12 }}>
-          Lucro por venda em cada preço, com a tarifa e o frete que o ML cobraria. Linha em pé = degrau do ML (o lucro muda de uma vez).
+          Lucro por venda em cada preço, com a tarifa e o frete que o ML cobraria. Linha em pé = degrau do ML (o lucro muda de uma vez).{curva.limiteFreteComprador ? ' A partir de R$ 19 o comprador ganha frete grátis do ML.' : ''}
         </Text>
         <Text type="secondary" style={{ fontSize: 12 }}>Clique para usar o preço.</Text>
       </Flex>

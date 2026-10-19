@@ -16,6 +16,7 @@ export const ROTULO_SUGESTAO: Record<TipoSugestao, { texto: string; cor: string 
   CAIXA: { texto: 'Embalagem', cor: 'gold' },
   PESO: { texto: 'Peso', cor: 'cyan' },
   CADASTRO: { texto: 'Cadastro', cor: 'default' },
+  FRETE_19: { texto: 'R$ 19', cor: 'cyan' },
 };
 
 /** Para onde levar o operador ao abrir uma sugestão. */
