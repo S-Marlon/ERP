@@ -2,7 +2,7 @@ import assert from 'assert';
 import {
   AnuncioDados, AtributoML, cortarTitulo, tituloLegivel, eixosDeVariacao, filtrarAtributosCategoria, ItemAnuncio, pendenciasAnuncio,
   precoNoMl, resolverValor, sugerirAtributos, estoqueParaMl, regraDoItem, mudancasParaMl, saldoNaUnidade, statusDoMl, foraDoMl, situacaoPorItens, modoPublicacao, tituloPeloModelo, corpoDoItem, fotoPequena, errosDoValidador, ligarPorSku,
-  atributosDoItem, fatorDaLinha, skuDaLinha, tituloComUnidade, descricaoPeloModelo, camposDesconhecidos, categoriaParaTrazer,
+  atributosDoItem, fatorDaLinha, skuDaLinha, tituloComUnidade, descricaoPeloModelo, camposDesconhecidos, categoriaParaTrazer, pausarLinhaDesligada,
 } from './anuncios';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
@@ -284,4 +284,12 @@ teste('categoria trocada no ML vem para o ERP (só quando os itens publicados co
   assert.strictEqual(categoriaParaTrazer(['MLB9907'], 'MLB9907'), null);
   assert.strictEqual(categoriaParaTrazer([null, undefined], 'MLB9907'), null);
   assert.strictEqual(categoriaParaTrazer(['MLB63829'], null), 'MLB63829');
+});
+
+teste('linha desligada no ERP e ativa no ML é pausada (o par do 6902-ZZ em 16/10)', () => {
+  assert.strictEqual(pausarLinhaDesligada(false, 'active'), true);
+  assert.strictEqual(pausarLinhaDesligada(false, 'paused'), false);   // já pausada: fica
+  assert.strictEqual(pausarLinhaDesligada(true, 'active'), false);
+  assert.strictEqual(pausarLinhaDesligada(undefined, 'active'), false);
+  assert.strictEqual(pausarLinhaDesligada(false, 'under_review'), false);
 });

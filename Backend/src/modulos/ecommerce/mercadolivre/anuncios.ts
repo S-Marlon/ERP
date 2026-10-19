@@ -475,6 +475,13 @@ export const categoriaParaTrazer = (doMl: (string | null | undefined)[], noErp: 
 export const statusDoMl = (b: { status?: string; sub_status?: string[] }) =>
   (b.sub_status || []).includes('deleted') ? 'deleted' : String(b.status || '');
 
+/**
+ * Linha desligada no ERP ("não vende") que está ativa no ML (reativada pelo painel do ML, por exemplo): o ERP manda e
+ * ela é pausada lá. A pausada continua pausada; o ERP nunca reativa linha desligada.
+ */
+export const pausarLinhaDesligada = (linhaAtiva: boolean | undefined, status: string | null | undefined) =>
+  linhaAtiva === false && status === 'active';
+
 /** Item que não recebe mais nada do ERP (encerrado ou excluído no ML). */
 export const foraDoMl = (status: string | null | undefined) => status === 'closed' || status === 'deleted';
 

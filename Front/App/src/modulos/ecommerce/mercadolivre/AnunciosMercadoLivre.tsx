@@ -251,7 +251,7 @@ const AnunciosMercadoLivre: React.FC = () => {
               <Tooltip title={
                 <>
                   Manda o estoque e o preço do ERP para os anúncios com "Atualizar sozinho" ligado.
-                  {auto && <div style={{ marginTop: 4 }}>Automático a cada {auto.intervaloMin} min{auto.ultimaEm ? ` · última: ${new Date(auto.ultimaEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} (${auto.enviados} enviados${auto.erros ? `, ${auto.erros} com erro` : ''}${auto.pausadosPrejuizo ? `, ${auto.pausadosPrejuizo} pausado(s) por prejuízo` : ''}${auto.reativadosPrejuizo ? `, ${auto.reativadosPrejuizo} reativado(s)` : ''})` : ' · ainda não rodou'}</div>}
+                  {auto && <div style={{ marginTop: 4 }}>Automático a cada {auto.intervaloMin} min{auto.ultimaEm ? ` · última: ${new Date(auto.ultimaEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} (${auto.enviados} enviados${auto.erros ? `, ${auto.erros} com erro` : ''}${auto.pausadosPrejuizo ? `, ${auto.pausadosPrejuizo} pausado(s) por prejuízo` : ''}${auto.reativadosPrejuizo ? `, ${auto.reativadosPrejuizo} reativado(s)` : ''}${auto.pausadosDesligados ? `, ${auto.pausadosDesligados} pausado(s) por estar desligado no ERP` : ''})` : ' · ainda não rodou'}</div>}
                   {auto?.mensagem && <div>Último erro: {auto.mensagem}</div>}
                 </>
               }>

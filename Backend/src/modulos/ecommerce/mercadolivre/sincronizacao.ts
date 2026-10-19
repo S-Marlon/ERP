@@ -1,7 +1,7 @@
 // Sincronização de estoque e preço com o Mercado Livre: manda só o que mudou desde o último envio.
 // Roda pelo botão (anúncio ou todos) e sozinha a cada poucos minutos, só com o módulo ligado e a conta conectada.
 import pool from '../../../infra/db';
-import { categoriaParaTrazer, foraDoMl, mudancasParaMl, precoNoMl, situacaoPorItens, statusDoMl } from './anuncios';
+import { categoriaParaTrazer, foraDoMl, mudancasParaMl, pausarLinhaDesligada, precoNoMl, situacaoPorItens, statusDoMl } from './anuncios';
 import { AnuncioCarregado, carregarAnuncios, trazerCategoriaDoMl } from './anuncios.controller';
 import { ErroML, ml } from './mercadolivreApi';
 import { importarPedidos } from './pedidos.controller';
@@ -24,6 +24,7 @@ export interface ResultadoSincronizacao {
   precoPara: number | null;
   erro: string | null;
   trava?: 'PAUSADO' | 'REATIVADO' | null;   // trava de prejuízo: pausou ou reativou no ML nesta rodada
+  desligadoNoErp?: boolean;                 // pausado no ML porque está desligado no ERP ("não vende")
   motivo?: string | null;
 }
 
@@ -43,7 +44,27 @@ export const sincronizarAnuncios = async (
     for (const item of c.itens) {
       const m = c.noMl.get(item.idLinha);
       if (!m?.mlbId || foraDoMl(m.status) || (opcoes.idLinha && opcoes.idLinha !== item.idLinha)) continue;
-      if (item.linhaAtiva === false) continue;   // desativada pelo operador: fica pausada, sem receber estoque
+      if (item.linhaAtiva === false) {
+        // desligada no ERP: não recebe estoque nem preço; se estiver ativa no ML (reativada lá), o ERP pausa
+        if (pausarLinhaDesligada(item.linhaAtiva, m.status)) {
+          const linha: ResultadoSincronizacao = {
+            idAnuncio: Number(c.registro.id), idItem: item.idItem, idLinha: item.idLinha, sku: item.sku, mlbId: m.mlbId,
+            estoqueDe: null, estoquePara: null, precoDe: null, precoPara: null, erro: null, desligadoNoErp: true,
+          };
+          try {
+            const r: any = await ml(tenant, 'PUT', `/items/${m.mlbId}`, { status: 'paused' });
+            m.status = r?.status || 'paused';
+            await pool.execute(
+              `UPDATE modulo_ecommerce_mercadolivre_anuncios_itens SET status_ml = ?, sincronizado_em = NOW() WHERE id_anuncio = ? AND tenant_id = ? AND id_anuncio_item = ?`,
+              [m.status, Number(c.registro.id), tenant, item.idLinha]
+            );
+          } catch (e: any) {
+            linha.erro = e instanceof ErroML ? e.message : (e?.message || 'erro');
+          }
+          resultado.push(linha);
+        }
+        continue;
+      }
       const atual = { estoque: item.estoqueMl ?? 0, preco: precoNoMl(item, c.dados.ajustePreco) };
       let corpo: { available_quantity?: number; price?: number; status?: string } | null = soTrava ? null : opcoes.forcar
         ? { available_quantity: atual.estoque, ...(atual.preco > 0 ? { price: atual.preco } : {}) }
@@ -99,7 +120,7 @@ export const sincronizarAnuncios = async (
       resultado.push(linha);
     }
     // a trava pausou ou reativou: a situação do anúncio (publicado/pausado) muda junto
-    if (resultado.some(r => r.idAnuncio === Number(c.registro.id) && r.trava && !r.erro)) {
+    if (resultado.some(r => r.idAnuncio === Number(c.registro.id) && (r.trava || r.desligadoNoErp) && !r.erro)) {
       const nova = situacaoPorItens([...c.noMl.values()].filter(x => x.mlbId).map(x => x.status));
       if (nova && nova !== c.registro.situacao) {
         await pool.execute(`UPDATE modulo_ecommerce_mercadolivre_anuncios SET situacao = ? WHERE id = ? AND tenant_id = ?`, [nova, Number(c.registro.id), tenant]);
@@ -207,6 +228,7 @@ export interface SituacaoAutomatica {
   ultimaEm: string | null; enviados: number; erros: number; mensagem: string | null; rodando: boolean;
   vendasNovas?: number; pedidosPendentes?: number; erroPedidos?: string | null;   // pedidos do ML lidos na rodada
   pausadosPrejuizo?: number; reativadosPrejuizo?: number;                         // trava de prejuízo na rodada
+  pausadosDesligados?: number;                                                    // desligados no ERP e ativos no ML
 }
 const situacao = new Map<number, SituacaoAutomatica>();
 let iniciado = false;
@@ -247,6 +269,7 @@ const rodada = async () => {
           ultimaEm: new Date().toISOString(), enviados: r.length - erros.length, erros: erros.length,
           mensagem: erros[0] ? `${erros[0].sku}: ${erros[0].erro}` : null, rodando: false, vendasNovas, pedidosPendentes, erroPedidos,
           pausadosPrejuizo: r.filter(x => x.trava === 'PAUSADO' && !x.erro).length, reativadosPrejuizo: r.filter(x => x.trava === 'REATIVADO' && !x.erro).length,
+          pausadosDesligados: r.filter(x => x.desligadoNoErp && !x.erro).length,
         });
       } catch (e: any) {
         situacao.set(tenant, { ultimaEm: new Date().toISOString(), enviados: 0, erros: 1, mensagem: e?.message || 'erro', rodando: false, vendasNovas, pedidosPendentes, erroPedidos });

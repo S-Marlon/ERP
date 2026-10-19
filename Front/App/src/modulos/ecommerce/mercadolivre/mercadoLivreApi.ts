@@ -201,11 +201,12 @@ export interface ResultadoSincronizacao {
   idAnuncio: number; idItem: number; sku: string; mlbId: string;
   estoqueDe: number | null; estoquePara: number | null; precoDe: number | null; precoPara: number | null; erro: string | null;
   trava?: 'PAUSADO' | 'REATIVADO' | null; motivo?: string | null;   // trava de prejuízo
+  desligadoNoErp?: boolean;   // pausado no ML porque está desligado no ERP
 }
 export interface SituacaoSincronizacao {
   ultimaEm: string | null; enviados: number; erros: number; mensagem: string | null; rodando: boolean; intervaloMin: number;
   vendasNovas?: number; pedidosPendentes?: number; erroPedidos?: string | null;
-  pausadosPrejuizo?: number; reativadosPrejuizo?: number;
+  pausadosPrejuizo?: number; reativadosPrejuizo?: number; pausadosDesligados?: number;
 }
 
 export type SituacaoPedido = 'VENDA' | 'VENDA_CANCELADA' | 'CANCELADO_NO_ML' | 'CANCELADO' | 'PENDENTE' | 'AGUARDANDO';
@@ -257,6 +258,10 @@ export const resumoSincronizacao = (r: ResultadoSincronizacao[]) => {
     pausados.length ? `${pausados.length} pausado(s) por prejuízo (${pausados.map(x => x.sku).slice(0, 3).join(', ')})` : '',
     reativados.length ? `${reativados.length} reativado(s): voltaram a dar lucro` : '',
   ].filter(Boolean).join(' · ');
+  const desligados = ok.filter(x => x.desligadoNoErp);
+  if (desligados.length && !trava) {
+    return { tipo: 'warning' as const, texto: `${desligados.length} pausado(s) no ML porque estão desligados no ERP (${desligados.map(x => x.sku).slice(0, 3).join(', ')}).${erros.length ? ` ${erros.length} recusados (${erros[0].sku}: ${erros[0].erro}).` : ''}` };
+  }
   if (trava) return { tipo: pausados.length || erros.length ? 'warning' as const : 'success' as const, texto: `${ok.length} item(ns) atualizados no ML. Trava de prejuízo: ${trava}.${erros.length ? ` ${erros.length} recusados (${erros[0].sku}: ${erros[0].erro}).` : ''}` };
   const exemplo = ok[0] ? ` (ex.: ${ok[0].sku}${ok[0].estoquePara !== null ? ` estoque ${ok[0].estoqueDe ?? '?'} → ${ok[0].estoquePara}` : ''}${ok[0].precoPara !== null ? ` preço ${ok[0].precoDe ?? '?'} → ${ok[0].precoPara}` : ''})` : '';
   if (!erros.length) return { tipo: 'success' as const, texto: `${ok.length} item(ns) atualizados no Mercado Livre${exemplo}.` };
