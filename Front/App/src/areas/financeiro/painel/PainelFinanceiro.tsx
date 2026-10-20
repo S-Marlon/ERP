@@ -109,9 +109,9 @@ const PainelFinanceiro: React.FC = () => {
                             <Flex key={`${x.tipo}${x.idTitulo}`} justify="space-between" gap={8} style={{ padding: '2px 0 2px 8px', cursor: 'pointer' }} onClick={() => irPara(x.tipo)}>
                               <Text ellipsis style={{ maxWidth: '70%' }}>
                                 <Tag color={x.tipo === 'RECEBER' ? 'green' : 'red'} style={{ marginRight: 6 }}>{x.tipo === 'RECEBER' ? 'receber' : 'pagar'}</Tag>
-                                {x.nome}{x.totalParcelas > 1 ? ` · ${x.parcela}/${x.totalParcelas}` : ''}{x.forma ? <Text type="secondary"> · {x.forma.toLowerCase()}</Text> : null}
+                                {x.nome}{x.totalParcelas > 1 ? ` · ${x.parcela}/${x.totalParcelas}` : ''}{x.categoria ? <Text type="secondary"> · {x.categoria}</Text> : null}
                               </Text>
-                              <Text>{brl(x.valor)}</Text>
+                              <Text>{x.estimado && <Tooltip title="Valor estimado: confirme quando a conta chegar"><Tag color="blue" style={{ marginRight: 4 }}>estimado</Tag></Tooltip>}{brl(x.valor)}</Text>
                             </Flex>
                           ))}
                         </div>
@@ -168,11 +168,34 @@ const PainelFinanceiro: React.FC = () => {
               />
             </Card>
 
+            <Card size="small" title="Para onde vai o dinheiro"
+              extra={<Text type="secondary" style={{ fontSize: 12 }}>Pago nos últimos 6 meses e o que vence nos próximos {dias} dias, por categoria</Text>}>
+              {dados.categorias.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Sem contas a pagar" /> : (
+                <Row gutter={[24, 6]}>
+                  {dados.categorias.map(c => {
+                    const maior = Math.max(1, ...dados.categorias.map(x => x.pago + x.previsto));
+                    return (
+                      <Col xs={24} md={12} key={`${c.grupo}|${c.nome}`}>
+                        <Flex justify="space-between">
+                          <Text>{c.nome} <Text type="secondary" style={{ fontSize: 12 }}>· {c.grupo}</Text></Text>
+                          <Text strong>{brl(c.pago + c.previsto)}</Text>
+                        </Flex>
+                        <Tooltip title={`Pago ${brl(c.pago)} · vence no período ${brl(c.previsto)}`}>
+                          <Progress percent={((c.pago + c.previsto) / maior) * 100} success={{ percent: (c.pago / maior) * 100 }} showInfo={false} size="small" strokeColor="#ffa39e" />
+                        </Tooltip>
+                      </Col>
+                    );
+                  })}
+                </Row>
+              )}
+              {dados.categorias.length > 0 && <Text type="secondary" style={{ fontSize: 12 }}>Verde: pago · rosa: vence no período. Conta sem categoria aparece como "Sem categoria" (dá para pôr no lápis do contas a pagar).</Text>}
+            </Card>
+
             <Row gutter={[16, 16]}>
               <Col xs={24} lg={12}>
-                <Card size="small" title="Maiores fornecedores (6 meses + em aberto)" style={{ height: '100%' }}>
+                <Card size="small" title="Para quem mais paga (6 meses + em aberto)" style={{ height: '100%' }}>
                   {dados.fornecedores.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Sem contas a pagar" /> : dados.fornecedores.map(f => (
-                    <div key={f.idPessoa} style={{ marginBottom: 6 }}>
+                    <div key={`${f.idPessoa}|${f.nome}`} style={{ marginBottom: 6 }}>
                       <Flex justify="space-between"><Text>{f.nome}</Text><Text strong>{brl(f.pago + f.aberto)}</Text></Flex>
                       <Tooltip title={`Pago ${brl(f.pago)} · em aberto ${brl(f.aberto)}`}>
                         <Progress percent={((f.pago + f.aberto) / maiorFornecedor) * 100} success={{ percent: (f.pago / maiorFornecedor) * 100 }}
@@ -200,7 +223,7 @@ const PainelFinanceiro: React.FC = () => {
                 </Card>
               </Col>
             </Row>
-            <Text type="secondary" style={{ fontSize: 12 }}>Atualizado em {dataBr(dados.hoje)}. As contas da loja (água, luz, aluguel...) entram aqui quando forem lançadas no Contas a pagar.</Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>Atualizado em {dataBr(dados.hoje)}. As contas fixas (água, luz, aluguel...) entram sozinhas: <a onClick={() => navigate('/financeiro/contas-fixas')}>cadastrar contas fixas</a>.</Text>
           </Space>
         )}
       </Spin>

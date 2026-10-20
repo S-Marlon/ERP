@@ -80,6 +80,7 @@ export const MENU_PRINCIPAL: ItemMenu[] = [
       { key: '/financeiro/painel', label: 'Painel' },
       { key: '/financeiro', label: 'Contas a Receber' },
       { key: '/financeiro/pagar', label: 'Contas a Pagar' },
+      { key: '/financeiro/contas-fixas', label: 'Contas Fixas' },
       { key: '/financeiro/faturamento', label: 'Faturamento' },
     ],
   },

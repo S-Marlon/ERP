@@ -54,7 +54,7 @@ export const situacaoCobranca = (cobranca: CobrancaXml, titulos: { qtd: number; 
   motivoDispensa: lote.situacao === 'DISPENSADO' ? lote.observacao : null,
 });
 
-export const FORMAS_PAGAMENTO = ['BOLETO', 'PIX', 'TRANSFERENCIA', 'DINHEIRO', 'CARTAO'];
+export const FORMAS_PAGAMENTO = ['BOLETO', 'PIX', 'TRANSFERENCIA', 'DINHEIRO', 'CARTAO', 'DEBITO_AUTOMATICO'];
 
 export interface ParcelaLancamento { numero: string | null; vencimento: string; valor: number; codigoBarras: string | null; forma: string }
 

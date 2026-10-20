@@ -1,16 +1,19 @@
-// Contas a pagar: boletos/duplicatas das notas de entrada (lançar, dispensar, desfazer) e a lista de títulos
-// (pagar, reabrir, ajustar). Tabela financeiro_contas_pagar; situação da nota em importacoes_lotes.financeiro_*.
+// Contas a pagar: boletos/duplicatas das notas de entrada (lançar, dispensar, desfazer), contas da loja lançadas à
+// mão (água, luz, seguro...) e as geradas pelas contas fixas, e a lista de títulos (pagar, reabrir, ajustar).
+// Tabela financeiro_contas_pagar; situação da nota em importacoes_lotes.financeiro_*.
 import { Request, Response } from 'express';
 import pool from '../../../infra/db';
 import { operadorDe } from '../../vendas/caixa/caixa.controller';
 import { buscarFornecedorId } from '../../compras/controllers/stagingLoteController';
 import { cobrancaDoXml, dataValidaPagamento, ErroPagar, FORMAS_PAGAMENTO, validarParcelas } from './pagar';
 import { situacaoCobrancaDoLote, titulosAtivosDoLote } from './cobrancaLote';
+import { validarContaAvulsa } from './contasLoja';
+import { gerarTitulosRecorrentes } from './recorrentes.controller';
 
 const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || req.body?.tenant_id || 1);
 const f4 = (v: number) => Number(v || 0).toFixed(4);
 
-const NOME_FORNECEDOR = `COALESCE(NULLIF(pj.nome_fantasia, ''), NULLIF(pj.razao_social, ''), NULLIF(pf.nome, ''), CONCAT('Fornecedor ', c.id_pessoa))`;
+const NOME_FORNECEDOR = `COALESCE(NULLIF(t.favorecido, ''), NULLIF(pj.nome_fantasia, ''), NULLIF(pj.razao_social, ''), NULLIF(pf.nome, ''), CONCAT('Fornecedor ', c.id_pessoa))`;
 const JOIN_FORNECEDOR = `LEFT JOIN pessoas_core c ON c.id_pessoa = t.id_fornecedor
        LEFT JOIN pessoas_pf pf ON pf.id_cliente = c.id_pessoa
        LEFT JOIN pessoas_pj pj ON pj.id_cliente = c.id_pessoa`;
@@ -22,7 +25,9 @@ const responderErro = (res: Response, error: any, padrao: string) => {
 };
 
 const formatarTitulo = (t: any) => ({
-  idTitulo: Number(t.id_titulo), idFornecedor: Number(t.id_fornecedor), fornecedor: t.fornecedor ?? null,
+  idTitulo: Number(t.id_titulo), idFornecedor: t.id_fornecedor ? Number(t.id_fornecedor) : null, fornecedor: t.fornecedor ?? null, favorecido: t.favorecido || null,
+  idCategoria: t.id_categoria ? Number(t.id_categoria) : null, categoria: t.categoria ?? null, grupo: t.grupo ?? null,
+  idRecorrente: t.id_recorrente ? Number(t.id_recorrente) : null, competencia: t.competencia_txt || null, estimado: !!Number(t.valor_estimado),
   idLote: t.id_lote ? Number(t.id_lote) : null, numeroNf: t.numero_nf ?? null,
   numeroDocumento: t.numero_documento, parcela: Number(t.parcela), totalParcelas: Number(t.total_parcelas), descricao: t.descricao,
   vencimento: String(t.vencimento_txt),
@@ -33,10 +38,12 @@ const formatarTitulo = (t: any) => ({
 });
 
 const SELECT_TITULO = `SELECT t.*, DATE_FORMAT(t.vencimento, '%Y-%m-%d') AS vencimento_txt, DATE_FORMAT(t.pago_em, '%Y-%m-%d') AS pago_em_txt,
+              DATE_FORMAT(t.competencia, '%Y-%m-%d') AS competencia_txt, cat.nome AS categoria, cat.grupo,
               ${NOME_FORNECEDOR} AS fornecedor, l.numero_nf, t.vencimento < CURDATE() AS vencido
        FROM financeiro_contas_pagar t
        ${JOIN_FORNECEDOR}
-       LEFT JOIN importacoes_lotes l ON l.id = t.id_lote`;
+       LEFT JOIN importacoes_lotes l ON l.id = t.id_lote
+       LEFT JOIN financeiro_categorias cat ON cat.id_categoria = t.id_categoria`;
 
 const carregarLote = async (conn: any, tenant: number, idLote: number, trava = false) => {
   const [[lote]]: any = await conn.execute(
@@ -151,8 +158,10 @@ export const desfazerCobranca = async (req: Request, res: Response) => {
 export const listarTitulos = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
   try {
+    await gerarTitulosRecorrentes(pool, tenant);
     const situacao = String(req.query.situacao || 'ABERTOS').toUpperCase();
     const busca = String(req.query.busca || '').trim();
+    const idCategoria = Number(req.query.idCategoria) || null;
     const where = ['t.tenant_id = ?'];
     const params: any[] = [tenant];
     if (situacao === 'ABERTOS') where.push(`t.status = 'ABERTO'`);
@@ -160,9 +169,10 @@ export const listarTitulos = async (req: Request, res: Response) => {
     else if (situacao === 'PAGOS') where.push(`t.status = 'PAGO'`);
     else where.push(`t.status <> 'CANCELADO'`);
     if (busca) {
-      where.push(`(${NOME_FORNECEDOR} LIKE ? OR t.numero_documento LIKE ? OR l.numero_nf LIKE ? OR t.descricao LIKE ?)`);
-      params.push(...Array(4).fill(`%${busca}%`));
+      where.push(`(${NOME_FORNECEDOR} LIKE ? OR t.numero_documento LIKE ? OR l.numero_nf LIKE ? OR t.descricao LIKE ? OR cat.nome LIKE ?)`);
+      params.push(...Array(5).fill(`%${busca}%`));
     }
+    if (idCategoria) { where.push('t.id_categoria = ?'); params.push(idCategoria); }
     const [rows]: any = await pool.execute(
       `${SELECT_TITULO} WHERE ${where.join(' AND ')}
        ORDER BY ${situacao === 'PAGOS' ? 't.pago_em DESC, t.id_titulo DESC' : 't.vencimento, t.id_titulo'} LIMIT 500`,
@@ -226,7 +236,36 @@ export const reabrirTitulo = async (req: Request, res: Response) => {
   }
 };
 
-// PUT /api/financeiro/pagar/:idTitulo { vencimento, valor, codigoBarras, forma } — boleto chegou diferente da nota
+// POST /api/financeiro/pagar { descricao, idCategoria, idFornecedor | favorecido, vencimento, valor, parcelas, forma, codigoBarras, estimado }
+// Conta da loja lançada à mão (água, luz, seguro em 10x...): uma ou várias parcelas mensais do mesmo valor.
+export const criarConta = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const conn: any = await pool.getConnection();
+  try {
+    const c = validarContaAvulsa(req.body);
+    await conn.beginTransaction();
+    const n = c.parcelas.length;
+    for (const p of c.parcelas) {
+      await conn.execute(
+        `INSERT INTO financeiro_contas_pagar (tenant_id, id_fornecedor, favorecido, id_categoria, numero_documento, parcela, total_parcelas, descricao,
+           vencimento, valor, valor_estimado, forma_pagamento, codigo_barras, operador)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [tenant, c.idFornecedor, c.favorecido, c.idCategoria, c.numeroDocumento, p.parcela, n, c.descricao,
+          p.vencimento, f4(p.valor), c.estimado ? 1 : 0, c.forma, c.codigoBarras, operadorDe(req)]
+      );
+    }
+    await conn.commit();
+    return res.status(201).json({ success: true, parcelas: n, total: Number((c.parcelas[0].valor * n).toFixed(2)) });
+  } catch (error) {
+    await conn.rollback().catch(() => undefined);
+    return responderErro(res, error, 'Erro ao lançar a conta.');
+  } finally {
+    conn.release();
+  }
+};
+
+// PUT /api/financeiro/pagar/:idTitulo { vencimento, valor, codigoBarras, forma, idCategoria, descricao } — boleto chegou
+// diferente da nota, ou a conta de valor estimado (água, luz) chegou: informar o valor confirma
 export const ajustarTitulo = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
   try {
@@ -236,9 +275,14 @@ export const ajustarTitulo = async (req: Request, res: Response) => {
       numero: req.body?.numeroDocumento ?? t.numero_documento, vencimento: req.body?.vencimento ?? t.vencimento_txt,
       valor: req.body?.valor ?? t.valor, codigoBarras: req.body?.codigoBarras ?? t.codigo_barras, forma: req.body?.forma ?? t.forma_pagamento,
     }]);
+    const idCategoria = req.body?.idCategoria !== undefined ? (Number(req.body.idCategoria) > 0 ? Number(req.body.idCategoria) : null) : t.id_categoria;
+    const descricao = req.body?.descricao !== undefined ? (String(req.body.descricao).trim().slice(0, 150) || t.descricao) : t.descricao;
+    // valor informado confirma a estimativa (conta de água/luz chegou)
+    const estimado = req.body?.valor !== undefined ? 0 : Number(t.valor_estimado) ? 1 : 0;
     await pool.execute(
-      `UPDATE financeiro_contas_pagar SET numero_documento = ?, vencimento = ?, valor = ?, codigo_barras = ?, forma_pagamento = ?, operador = ? WHERE id_titulo = ?`,
-      [p.numero, p.vencimento, f4(p.valor), p.codigoBarras, p.forma, operadorDe(req), t.id_titulo]
+      `UPDATE financeiro_contas_pagar SET numero_documento = ?, vencimento = ?, valor = ?, codigo_barras = ?, forma_pagamento = ?, id_categoria = ?,
+         descricao = ?, valor_estimado = ?, operador = ? WHERE id_titulo = ?`,
+      [p.numero, p.vencimento, f4(p.valor), p.codigoBarras, p.forma, idCategoria, descricao, estimado, operadorDe(req), t.id_titulo]
     );
     return res.json({ success: true });
   } catch (error) {

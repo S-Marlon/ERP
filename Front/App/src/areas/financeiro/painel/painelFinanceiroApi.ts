@@ -3,7 +3,7 @@ import { API_URL } from '../../../shared/api/config';
 
 export interface TituloPainel {
   tipo: 'RECEBER' | 'PAGAR'; idTitulo: number; nome: string; descricao: string | null; vencimento: string; valor: number;
-  parcela: number; totalParcelas: number; forma: string | null; diasAtraso?: number;
+  parcela: number; totalParcelas: number; forma: string | null; diasAtraso?: number; categoria?: string | null; estimado?: boolean;
 }
 export interface PontoFluxo { chave: string; rotulo: string; de: string; ate: string; entradas: number; saidas: number; saldo: number; acumulado: number }
 export interface MesRealizado {
@@ -25,6 +25,8 @@ export interface PainelFinanceiro {
   realizado: MesRealizado[];
   fornecedores: { idPessoa: number; nome: string; pago: number; aberto: number }[];
   devedores: { idPessoa: number; nome: string; aberto: number; vencido: number; titulos: number }[];
+  /** Para onde vai o dinheiro: pago nos 6 meses e o que vence no período, por categoria. */
+  categorias: { grupo: string; nome: string; pago: number; previsto: number }[];
 }
 
 export const painelFinanceiroApi = {

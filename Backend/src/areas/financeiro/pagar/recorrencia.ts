@@ -46,3 +46,10 @@ export const titulosQueFaltam = (c: ContaRecorrente, op: { hoje: string; horizon
     .filter(comp => !ja.has(comp.slice(0, 7)))
     .map(competencia => ({ competencia, vencimento: vencimentoNaCompetencia(competencia, c.diaVencimento) }));
 };
+
+/** Vencimentos de n parcelas mensais a partir da primeira, no mesmo dia (ou no último dia do mês mais curto). */
+export const vencimentosMensais = (primeiro: string, n: number) => {
+  const dia = Number(primeiro.slice(8, 10));
+  const m0 = mesDe(primeiro);
+  return Array.from({ length: Math.max(1, n) }, (_, k) => vencimentoNaCompetencia(textoDoMes(m0 + k), dia));
+};

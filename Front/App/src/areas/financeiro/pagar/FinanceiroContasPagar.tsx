@@ -1,8 +1,13 @@
-// Financeiro › Contas a pagar: boletos das notas de entrada (e outros títulos), vencimentos, pagamento e ajuste.
+// Financeiro › Contas a pagar: boletos das notas de entrada, contas da loja (lançadas à mão ou pelas contas fixas),
+// vencimentos, pagamento e ajuste (inclusive confirmar o valor da conta que entrou estimada).
 import React, { useCallback, useEffect, useState } from 'react';
-import { Button, Card, Col, Input, InputNumber, Modal, Row, Segmented, Select, Space, Statistic, Table, Tag, Tooltip, Typography, message } from 'antd';
-import { CheckOutlined, CopyOutlined, EditOutlined, ReloadOutlined, RollbackOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import { Alert, Button, Card, Col, Input, InputNumber, Modal, Row, Segmented, Select, Space, Statistic, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { CheckOutlined, CopyOutlined, EditOutlined, PlusOutlined, ReloadOutlined, RetweetOutlined, RollbackOutlined } from '@ant-design/icons';
 import { dataBr, FORMAS_PAGAMENTO, FormaPagamento, hojeIso, pagarApi, TituloPagar } from './pagarApi';
+import NovaContaModal from './NovaContaModal';
+import { SelectCategoria, useDadosConta } from './camposConta';
+import { opcoesDeCategoria } from './contasForm';
 
 const { Text, Title } = Typography;
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -13,7 +18,11 @@ const SITUACOES = [
 ];
 
 export const FinanceiroContasPagar: React.FC = () => {
+  const navigate = useNavigate();
   const [situacao, setSituacao] = useState('ABERTOS');
+  const [idCategoria, setIdCategoria] = useState<number | null>(null);
+  const [novaConta, setNovaConta] = useState(false);
+  const { categorias } = useDadosConta(true);
   const [busca, setBusca] = useState('');
   const [titulos, setTitulos] = useState<TituloPagar[]>([]);
   const [resumo, setResumo] = useState({ aberto: 0, vencido: 0, proximos7: 0, pagoMes: 0 });
@@ -22,12 +31,12 @@ export const FinanceiroContasPagar: React.FC = () => {
   const [pagoEm, setPagoEm] = useState(hojeIso());
   const [forma, setForma] = useState<FormaPagamento>('BOLETO');
   const [ajustando, setAjustando] = useState<TituloPagar | null>(null);
-  const [ajuste, setAjuste] = useState({ vencimento: '', valor: 0, codigoBarras: '' });
+  const [ajuste, setAjuste] = useState({ vencimento: '', valor: 0, codigoBarras: '', idCategoria: null as number | null, descricao: '' });
 
   const carregar = useCallback(async () => {
     setCarregando(true);
     try {
-      const r = await pagarApi.listar(situacao, busca.trim());
+      const r = await pagarApi.listar(situacao, busca.trim(), idCategoria);
       setTitulos(r.titulos);
       setResumo(r.resumo);
     } catch (e) {
@@ -35,8 +44,8 @@ export const FinanceiroContasPagar: React.FC = () => {
     } finally {
       setCarregando(false);
     }
-  }, [situacao, busca]);
-  useEffect(() => { carregar(); }, [situacao]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [situacao, busca, idCategoria]);
+  useEffect(() => { carregar(); }, [situacao, idCategoria]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const acao = async (fn: () => Promise<unknown>, sucesso: string) => {
     try {
@@ -56,7 +65,13 @@ export const FinanceiroContasPagar: React.FC = () => {
   const salvarAjuste = async () => {
     if (ajustando && await acao(() => pagarApi.ajustar(ajustando.idTitulo, {
       vencimento: ajuste.vencimento, valor: ajuste.valor, codigoBarras: ajuste.codigoBarras.trim() || null,
-    }), 'Título ajustado.')) setAjustando(null);
+      idCategoria: ajuste.idCategoria, descricao: ajuste.descricao,
+    }), ajustando.estimado ? 'Valor confirmado.' : 'Título ajustado.')) setAjustando(null);
+  };
+
+  const abrirAjuste = (t: TituloPagar) => {
+    setAjustando(t);
+    setAjuste({ vencimento: t.vencimento, valor: t.valor, codigoBarras: t.codigoBarras || '', idCategoria: t.idCategoria, descricao: t.descricao || '' });
   };
 
   const card = (titulo: string, valor: number, cor?: string, filtro?: string) => (
@@ -71,15 +86,21 @@ export const FinanceiroContasPagar: React.FC = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
         <div>
           <Title level={3} style={{ margin: 0 }}>Contas a pagar</Title>
-          <Text type="secondary">Boletos das notas de entrada lançados pela Cobrança da nota.</Text>
+          <Text type="secondary">Boletos das notas de entrada e as contas da loja (água, luz, aluguel...), lançadas à mão ou pelas contas fixas.</Text>
         </div>
         <Space wrap>
-          <Segmented value={situacao} onChange={v => setSituacao(String(v))} options={SITUACOES} />
-          <Input.Search allowClear placeholder="Fornecedor, documento ou NF" style={{ width: 240 }} value={busca}
-            onChange={e => setBusca(e.target.value)} onSearch={carregar} />
-          <Button icon={<ReloadOutlined />} onClick={carregar} loading={carregando} />
+          <Button icon={<RetweetOutlined />} onClick={() => navigate('/financeiro/contas-fixas')}>Contas fixas</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setNovaConta(true)}>Nova conta</Button>
         </Space>
       </div>
+      <Space wrap style={{ marginBottom: 12 }}>
+        <Segmented value={situacao} onChange={v => setSituacao(String(v))} options={SITUACOES} />
+        <Select allowClear showSearch optionFilterProp="label" placeholder="Todas as categorias" style={{ width: 230 }} value={idCategoria ?? undefined}
+          options={opcoesDeCategoria(categorias, 'DESPESA', idCategoria)} onChange={v => setIdCategoria((v as number) ?? null)} />
+        <Input.Search allowClear placeholder="Quem recebe, descrição, documento ou NF" style={{ width: 280 }} value={busca}
+          onChange={e => setBusca(e.target.value)} onSearch={carregar} />
+        <Button icon={<ReloadOutlined />} onClick={carregar} loading={carregando} />
+      </Space>
 
       <Row gutter={[10, 10]} style={{ marginBottom: 12 }}>
         <Col xs={12} lg={6}>{card('Em aberto', resumo.aberto, undefined, 'ABERTOS')}</Col>
@@ -96,7 +117,18 @@ export const FinanceiroContasPagar: React.FC = () => {
               title: 'Vencimento', dataIndex: 'vencimento', width: 110,
               render: (v: string, t) => <Text type={t.vencido ? 'danger' : undefined} strong={t.vencido}>{dataBr(v)}</Text>,
             },
-            { title: 'Fornecedor', dataIndex: 'fornecedor', ellipsis: true },
+            {
+              title: 'Quem recebe', key: 'quem', ellipsis: true,
+              render: (_, t) => (
+                <div style={{ lineHeight: 1.3 }}>
+                  <div>{t.fornecedor || '—'}</div>
+                  <Text type="secondary" style={{ fontSize: 11 }}>
+                    {t.idLote ? '' : t.descricao}{t.idRecorrente ? ' · conta fixa' : ''}
+                  </Text>
+                  {t.categoria && <Tag style={{ marginLeft: t.idLote ? 0 : 6, fontSize: 11 }}>{t.categoria}</Tag>}
+                </div>
+              ),
+            },
             {
               title: 'Documento', key: 'doc', width: 170,
               render: (_, t) => (
@@ -119,7 +151,17 @@ export const FinanceiroContasPagar: React.FC = () => {
                 </Space>
               ),
             },
-            { title: 'Valor', dataIndex: 'valor', width: 120, align: 'right' as const, render: (v: number) => <b>{brl(v)}</b> },
+            {
+              title: 'Valor', dataIndex: 'valor', width: 130, align: 'right' as const,
+              render: (v: number, t) => (
+                <div>
+                  <b>{brl(v)}</b>
+                  {t.estimado && t.status === 'ABERTO' && (
+                    <div><Tooltip title="Valor estimado: confirme quando a conta chegar"><Tag color="blue" style={{ margin: 0, cursor: 'pointer' }} onClick={() => abrirAjuste(t)}>estimado · confirmar</Tag></Tooltip></div>
+                  )}
+                </div>
+              ),
+            },
             {
               title: 'Situação', key: 'sit', width: 140,
               render: (_, t) => (t.status === 'PAGO'
@@ -132,8 +174,8 @@ export const FinanceiroContasPagar: React.FC = () => {
                 <Space size={2}>
                   {t.status === 'ABERTO' && (<>
                     <Button size="small" type="primary" ghost icon={<CheckOutlined />} onClick={() => { setPagando(t); setPagoEm(hojeIso()); setForma(t.forma); }}>Pagar</Button>
-                    <Tooltip title="Ajustar vencimento, valor ou linha digitável">
-                      <Button size="small" type="text" icon={<EditOutlined />} onClick={() => { setAjustando(t); setAjuste({ vencimento: t.vencimento, valor: t.valor, codigoBarras: t.codigoBarras || '' }); }} />
+                    <Tooltip title="Ajustar vencimento, valor, categoria ou linha digitável">
+                      <Button size="small" type="text" icon={<EditOutlined />} onClick={() => abrirAjuste(t)} />
                     </Tooltip>
                   </>)}
                   {t.status === 'PAGO' && (
@@ -150,7 +192,8 @@ export const FinanceiroContasPagar: React.FC = () => {
 
       <Modal open={pagando !== null} title={`Pagar ${pagando?.numeroDocumento || ''} · ${brl(pagando?.valor || 0)}`} okText="Registrar pagamento" cancelText="Voltar"
         onOk={confirmarPagamento} onCancel={() => setPagando(null)} destroyOnHidden width={380}>
-        <Text type="secondary">{pagando?.fornecedor}</Text>
+        <Text type="secondary">{pagando?.fornecedor}{pagando?.idLote ? '' : ` · ${pagando?.descricao || ''}`}</Text>
+        {pagando?.estimado && <Alert type="warning" showIcon style={{ marginTop: 8 }} message="O valor ainda é estimado: confirme o valor da conta (no lápis) antes de pagar." />}
         <Space direction="vertical" style={{ width: '100%', marginTop: 10 }}>
           <span>Data do pagamento</span>
           <Input type="date" value={pagoEm} max={hojeIso()} onChange={e => setPagoEm(e.target.value)} />
@@ -159,17 +202,28 @@ export const FinanceiroContasPagar: React.FC = () => {
         </Space>
       </Modal>
 
-      <Modal open={ajustando !== null} title={`Ajustar ${ajustando?.numeroDocumento || ''}`} okText="Salvar" cancelText="Voltar"
-        onOk={salvarAjuste} onCancel={() => setAjustando(null)} destroyOnHidden width={440}>
+      <Modal open={ajustando !== null} title={ajustando?.estimado ? `Confirmar o valor · ${ajustando.descricao || ''}` : `Ajustar ${ajustando?.numeroDocumento || ajustando?.descricao || ''}`}
+        okText={ajustando?.estimado ? 'Confirmar' : 'Salvar'} cancelText="Voltar"
+        onOk={salvarAjuste} onCancel={() => setAjustando(null)} destroyOnHidden width={460}>
         <Space direction="vertical" style={{ width: '100%' }}>
+          {ajustando?.estimado && <Text type="secondary">A conta chegou: informe o valor dela (e a linha digitável, se for boleto).</Text>}
+          {ajustando && !ajustando.idLote && (<>
+            <span>Descrição</span>
+            <Input maxLength={150} value={ajuste.descricao} onChange={e => setAjuste(a => ({ ...a, descricao: e.target.value }))} />
+          </>)}
           <span>Vencimento</span>
           <Input type="date" value={ajuste.vencimento} onChange={e => setAjuste(a => ({ ...a, vencimento: e.target.value }))} />
           <span>Valor</span>
           <InputNumber min={0} precision={2} decimalSeparator="," style={{ width: '100%' }} value={ajuste.valor} onChange={v => setAjuste(a => ({ ...a, valor: Number(v) || 0 }))} />
           <span>Linha digitável</span>
           <Input value={ajuste.codigoBarras} placeholder="cole a linha digitável do boleto" onChange={e => setAjuste(a => ({ ...a, codigoBarras: e.target.value }))} />
+          <span>Categoria</span>
+          <SelectCategoria categorias={categorias} value={ajuste.idCategoria} onChange={v => setAjuste(a => ({ ...a, idCategoria: v }))} />
         </Space>
       </Modal>
+
+      <NovaContaModal aberto={novaConta} onFechar={() => setNovaConta(false)} onSalvo={() => { setNovaConta(false); carregar(); }}
+        onContaFixa={() => { setNovaConta(false); navigate('/financeiro/contas-fixas'); }} />
     </div>
   );
 };
