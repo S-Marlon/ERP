@@ -11,6 +11,7 @@ import {
 import dayjs, { Dayjs } from 'dayjs';
 import { caixaStore } from '../caixa/caixaStore';
 import { ROTULO_FORMA } from '../caixa/caixaApi';
+import GraficoBarras from '../../../shared/components/graficos/GraficoBarras';
 
 const { Text, Title } = Typography;
 const API = `${API_URL}/api/vendas/painel`;
@@ -51,28 +52,6 @@ const Variacao: React.FC<{ valor: number | null; sufixo: string }> = ({ valor, s
     <span style={{ fontSize: 11, color: cor }}>
       {valor > 0 ? <ArrowUpOutlined /> : valor < 0 ? <ArrowDownOutlined /> : null} {Math.abs(valor).toFixed(1).replace('.', ',')}% <Text type="secondary" style={{ fontSize: 11 }}>vs {sufixo}</Text>
     </span>
-  );
-};
-
-// Barras simples (sem biblioteca de gráficos)
-const GraficoBarras: React.FC<{ pontos: Painel['serie'] }> = ({ pontos }) => {
-  const max = Math.max(1, ...pontos.map(p => p.total));
-  const rotular = pontos.length <= 16 ? 1 : Math.ceil(pontos.length / 12);
-  return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 180, padding: '8px 0 0' }}>
-      {pontos.map((p, i) => (
-        <Tooltip key={p.chave} title={<span>{p.rotulo}: <b>{brl(p.total)}</b> · {p.qtd} venda(s)</span>}>
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
-            <div style={{
-              width: '100%', maxWidth: 34, height: `${Math.max(p.total > 0 ? 3 : 0, (p.total / max) * 140)}px`,
-              background: p.total > 0 ? 'linear-gradient(180deg, #4096ff, #1677ff)' : 'transparent', borderRadius: '4px 4px 0 0',
-            }} />
-            <div style={{ height: 1, width: '100%', background: '#f0f0f0' }} />
-            <Text type="secondary" style={{ fontSize: 10, marginTop: 4, visibility: i % rotular === 0 ? 'visible' : 'hidden', whiteSpace: 'nowrap' }}>{p.rotulo}</Text>
-          </div>
-        </Tooltip>
-      ))}
-    </div>
   );
 };
 
@@ -186,7 +165,11 @@ const CentralVendas: React.FC = () => {
               <Row gutter={[14, 14]}>
                 <Col xs={24} xl={16}>
                   <Card size="small" title={dados.intervalo.agrupamento === 'hora' ? 'Vendas por hora' : 'Vendas por dia'} style={{ height: '100%' }}>
-                    {t!.qtd === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Nenhuma venda no período" /> : <GraficoBarras pontos={dados.serie} />}
+                    {t!.qtd === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Nenhuma venda no período" /> : <GraficoBarras
+                      pontos={dados.serie.map(p => ({ chave: p.chave, rotulo: p.rotulo, valores: { total: p.total } }))}
+                      series={[{ chave: 'total', nome: 'Vendas', cor: '#1677ff' }]} formatar={brl} altura={190} semLegenda
+                      detalhe={p => `${dados.serie.find(x => x.chave === p.chave)?.qtd ?? 0} venda(s)`}
+                    />}
                   </Card>
                 </Col>
                 <Col xs={24} xl={8}>

@@ -9,6 +9,7 @@ import vendasRoutes from './areas/vendas/vendas.routes';
 import estoqueItensRoutes from './areas/estoque/estoqueItens.routes';
 import receberRoutes from './areas/financeiro/receber/receber.routes';
 import pagarRoutes from './areas/financeiro/pagar/pagar.routes';
+import { painelFinanceiro } from './areas/financeiro/painel/painelFinanceiro.controller';
 // Módulos plugáveis (cada um liga/desliga por loja em sistema_modulos)
 import modulosRoutes from './modulos/registro';
 import { Router, Request, Response } from 'express';
@@ -27,6 +28,7 @@ router.use('/fiscal', fiscalRoutes);
 // Contas a receber no modelo novo antes das rotas legadas do financeiro
 router.use('/financeiro/receber', receberRoutes);
 router.use('/financeiro/pagar', pagarRoutes);
+router.get('/financeiro/painel', painelFinanceiro);
 router.use('/financeiro', financeiroRoutes);
 router.use('/catalogo', catalogoRoutes);
 router.use('/parceiros', parceirosRoutes); // Adicione esta linha para incluir as rotas de parceiros

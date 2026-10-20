@@ -68,6 +68,7 @@ import EmissaoFaturado from "../areas/compras/EmissaoFaturado";
 import { FinanceiroContasReceber } from "../areas/financeiro/FinanceiroContasReceber";
 import FinanceiroContasPagar from "../areas/financeiro/pagar/FinanceiroContasPagar";
 import { VendasFaturamento } from "../areas/financeiro/VendasFaturamento";
+import PainelFinanceiro from "../areas/financeiro/painel/PainelFinanceiro";
 import Clientes from "../areas/parceiros/Clientes";
 import FamilyManagementPanel from "../areas/catalogo/familias/FamilyManagementPanel";
 import ProductPricingModule from "../areas/catalogo/precos/ProductPricingModule";
@@ -149,6 +150,7 @@ export default function AppLayout() {
 
             <Route path="/financeiro" element={<FinanceiroContasReceber />} />
             <Route path="/financeiro/pagar" element={<FinanceiroContasPagar />} />
+            <Route path="/financeiro/painel" element={<PainelFinanceiro />} />
             <Route path="/financeiro/faturamento" element={<VendasFaturamento />} />
 
             <Route path="/parceiros" element={<ParceirosDashboard />} />
