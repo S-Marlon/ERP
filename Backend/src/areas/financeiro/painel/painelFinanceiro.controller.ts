@@ -167,7 +167,8 @@ export const painelFinanceiro = async (req: Request, res: Response) => {
       fornecedores: fornecedores.map((f: any) => ({ idPessoa: Number(f.id_pessoa) || 0, nome: f.nome, pago: n(f.pago), aberto: n(f.aberto) })),
       categorias: categorias.map((c: any) => ({ grupo: c.grupo, nome: c.nome, pago: n(c.pago), previsto: n(c.previsto) }))
         .filter((c: any) => c.pago + c.previsto > 0).sort((a: any, b: any) => b.pago + b.previsto - (a.pago + a.previsto)),
-      devedores: [...devedores.entries()].map(([idPessoa, d]) => ({ idPessoa, ...d })).sort((a, b) => b.aberto - a.aberto).slice(0, 6),
+      // todos (o painel mostra os maiores e abre o resto em "ver todos")
+      devedores: [...devedores.entries()].map(([idPessoa, d]) => ({ idPessoa, ...d })).sort((a, b) => b.aberto - a.aberto),
     });
   } catch (error: any) {
     console.error('Erro no painel financeiro:', error);

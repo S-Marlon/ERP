@@ -10,6 +10,7 @@ import { vencimentosPorDia } from './vencimentosPorDia';
 
 const { Text, Title } = Typography;
 const VERDE = '#52c41a', VERMELHO = '#ff4d4f', AZUL = '#1677ff';
+const DEVEDORES_NO_CARD = 6;
 
 const Kpi: React.FC<{ titulo: string; valor: number; cor?: string; icone: React.ReactNode; rodape?: React.ReactNode; onClick?: () => void }> = ({ titulo, valor, cor, icone, rodape, onClick }) => (
   <Card size="small" hoverable={!!onClick} onClick={onClick} style={{ height: '100%' }} styles={{ body: { padding: '10px 14px' } }}>
@@ -40,6 +41,9 @@ const PainelFinanceiro: React.FC = () => {
   const irPara = (tipo: 'RECEBER' | 'PAGAR') => navigate(tipo === 'RECEBER' ? '/financeiro' : '/financeiro/pagar');
   const maiorFornecedor = Math.max(1, ...(dados?.fornecedores || []).map(f => f.pago + f.aberto));
   const maiorDevedor = Math.max(1, ...(dados?.devedores || []).map(d => d.aberto));
+  const [todosDevedores, setTodosDevedores] = useState(false);
+  const devedoresNaTela = todosDevedores ? dados?.devedores || [] : (dados?.devedores || []).slice(0, DEVEDORES_NO_CARD);
+  const totalDevido = (dados?.devedores || []).reduce((a, d) => a + d.aberto, 0);
 
   return (
     <div style={{ padding: 24 }}>
@@ -207,8 +211,10 @@ const PainelFinanceiro: React.FC = () => {
                 </Card>
               </Col>
               <Col xs={24} lg={12}>
-                <Card size="small" title="Quem mais deve à loja" style={{ height: '100%' }}>
-                  {dados.devedores.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Ninguém devendo" /> : dados.devedores.map(d => (
+                <Card size="small" title="Quem mais deve à loja" style={{ height: '100%' }}
+                  extra={dados.devedores.length > 0 && <Text type="secondary" style={{ fontSize: 12 }}>{dados.devedores.length} cliente(s) · {brl(totalDevido)}</Text>}>
+                  <div style={todosDevedores ? { maxHeight: 420, overflowY: 'auto', paddingRight: 4 } : undefined}>
+                  {dados.devedores.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Ninguém devendo" /> : devedoresNaTela.map(d => (
                     <div key={d.idPessoa} style={{ marginBottom: 6 }}>
                       <Flex justify="space-between">
                         <Text>{d.nome} <Text type="secondary" style={{ fontSize: 12 }}>· {d.titulos} parcela(s)</Text></Text>
@@ -220,6 +226,12 @@ const PainelFinanceiro: React.FC = () => {
                       </Tooltip>
                     </div>
                   ))}
+                  </div>
+                  {dados.devedores.length > DEVEDORES_NO_CARD && (
+                    <Button type="link" size="small" style={{ padding: 0 }} onClick={() => setTodosDevedores(v => !v)}>
+                      {todosDevedores ? 'Mostrar só os maiores' : `Ver todos (${dados.devedores.length})`}
+                    </Button>
+                  )}
                 </Card>
               </Col>
             </Row>
