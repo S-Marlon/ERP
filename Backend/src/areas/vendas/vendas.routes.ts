@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { buscarClientesPdv, categoriasPdv, detalheItemPdv, itensParaEtiqueta, listarItensPdv, marcasPdv } from './pdv/pdv.controller';
+import { buscarClientesPdv, cadastrarClienteRapido, categoriasPdv, detalheItemPdv, itensParaEtiqueta, listarItensPdv, marcasPdv } from './pdv/pdv.controller';
 import { cancelarVenda, detalheVenda, listarVendas, registrarVenda } from './pdv/vendas.controller';
 import { abrirCaixa, caixaAtual, detalheCaixa, fecharCaixa, lancarMovimento, listarCaixas } from './caixa/caixa.controller';
 import { obterConfiguracoes, salvarConfiguracoes } from './regras/regrasVenda.controller';
@@ -18,6 +18,7 @@ router.get('/pdv/categorias', categoriasPdv);
 router.get('/pdv/marcas', marcasPdv);
 router.get('/pdv/etiquetas', itensParaEtiqueta);
 router.get('/pdv/clientes', buscarClientesPdv);
+router.post('/pdv/clientes', cadastrarClienteRapido);
 
 router.post('/pdv/vendas', registrarVenda);
 router.get('/pdv/vendas', listarVendas);

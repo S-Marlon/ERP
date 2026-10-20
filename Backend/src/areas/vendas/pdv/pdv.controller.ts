@@ -7,6 +7,8 @@ import { avaliarPublicacaoItens } from '../../catalogo/produtos/publicacaoProdut
 import { carregarArvore } from '../../catalogo/categorias/herancaCategorias';
 import { FaixaPdv, faixaParaQuantidade, resolverPrecoPdv, UnidadeVendaPdv } from './precoPdv';
 import { aplicarKitsNasLinhasPdv } from '../../catalogo/kits/kitsBanco';
+import { ErroVenda } from './vendaPdv';
+import { validarClienteRapido } from './clienteRapido';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
 
@@ -353,13 +355,18 @@ export const buscarClientesPdv = async (req: Request, res: Response) => {
     let filtro = '';
     if (busca) {
       const termo = `%${busca}%`;
+      // números: CPF/CNPJ ou telefone (o cliente do balcão costuma ter só o telefone)
       filtro = `AND (pf.nome LIKE ? OR pj.razao_social LIKE ? OR pj.nome_fantasia LIKE ?
-                ${digitos.length >= 3 ? `OR REPLACE(REPLACE(REPLACE(COALESCE(pf.cpf, pj.cnpj, ''), '.', ''), '-', ''), '/', '') LIKE ?` : ''})`;
+                ${digitos.length >= 3 ? `OR REPLACE(REPLACE(REPLACE(COALESCE(pf.cpf, pj.cnpj, ''), '.', ''), '-', ''), '/', '') LIKE ?
+                OR EXISTS (SELECT 1 FROM pessoas_contatos ct WHERE ct.id_cliente = c.id_pessoa AND ct.deleted_at IS NULL
+                           AND REPLACE(REPLACE(REPLACE(REPLACE(ct.telefone, '(', ''), ')', ''), '-', ''), ' ', '') LIKE ?)` : ''})`;
       params.push(termo, termo, termo);
-      if (digitos.length >= 3) params.push(`%${digitos}%`);
+      if (digitos.length >= 3) params.push(`%${digitos}%`, `%${digitos}%`);
     }
     const [rows] = await pool.execute(
-      `SELECT DISTINCT c.id_pessoa, c.tipo_pessoa, pf.nome, pf.cpf, pj.razao_social, pj.nome_fantasia, pj.cnpj
+      `SELECT DISTINCT c.id_pessoa, c.tipo_pessoa, pf.nome, pf.cpf, pj.razao_social, pj.nome_fantasia, pj.cnpj,
+              (SELECT ct.telefone FROM pessoas_contatos ct WHERE ct.id_cliente = c.id_pessoa AND ct.deleted_at IS NULL
+               ORDER BY ct.principal DESC, ct.id_contato LIMIT 1) AS telefone
        FROM pessoas_core c
        INNER JOIN pessoas_papeis_atribuido pa ON pa.id_cliente = c.id_pessoa
        INNER JOIN pessoas_papeis_definicao pd ON pd.id_cliente_papel = pa.id_cliente_papel AND pd.codigo IN ('CLIENTE', 'CONSUMIDOR')
@@ -376,10 +383,64 @@ export const buscarClientesPdv = async (req: Request, res: Response) => {
       nome: r.tipo_pessoa === 'PJ' ? (r.nome_fantasia || r.razao_social || '') : (r.nome || ''),
       razaoSocial: r.razao_social || null,
       documento: r.tipo_pessoa === 'PJ' ? (r.cnpj || '') : (r.cpf || ''),
+      telefone: r.telefone || null,
     })));
   } catch (error: any) {
     console.error('Erro ao buscar clientes do PDV:', error);
     return res.status(500).json({ error: 'Erro ao buscar clientes', details: error.message });
+  }
+};
+
+/**
+ * POST /api/vendas/pdv/clientes { nome, telefone } — cliente do balcão só com nome e telefone (para vender a prazo).
+ * Telefone já cadastrado em outro cliente: 409 com esse cliente, para usar o mesmo em vez de duplicar.
+ */
+export const cadastrarClienteRapido = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const conn: any = await pool.getConnection();
+  try {
+    const c = validarClienteRapido(req.body);
+    const [[existe]]: any = await conn.execute(
+      `SELECT c.id_pessoa, COALESCE(pf.nome, pj.nome_fantasia, pj.razao_social) AS nome, c.tipo_pessoa, COALESCE(pf.cpf, pj.cnpj, '') AS documento, ct.telefone
+       FROM pessoas_contatos ct
+       INNER JOIN pessoas_core c ON c.id_pessoa = ct.id_cliente AND c.tenant_id = ? AND c.deleted_at IS NULL
+       LEFT JOIN pessoas_pf pf ON pf.id_cliente = c.id_pessoa
+       LEFT JOIN pessoas_pj pj ON pj.id_cliente = c.id_pessoa
+       WHERE ct.deleted_at IS NULL AND REPLACE(REPLACE(REPLACE(REPLACE(ct.telefone, '(', ''), ')', ''), '-', ''), ' ', '') = ?
+       LIMIT 1`,
+      [tenant, c.digitos]
+    );
+    if (existe) {
+      return res.status(409).json({
+        error: `Este telefone já é do cliente ${existe.nome}.`, codigo: 'TELEFONE_CADASTRADO',
+        cliente: { id: Number(existe.id_pessoa), nome: existe.nome, tipo: existe.tipo_pessoa, documento: existe.documento || '', telefone: existe.telefone },
+      });
+    }
+    const [[papel]]: any = await conn.execute(`SELECT id_cliente_papel FROM pessoas_papeis_definicao WHERE codigo = 'CONSUMIDOR' LIMIT 1`);
+    await conn.beginTransaction();
+    const [ins]: any = await conn.execute(
+      `INSERT INTO pessoas_core (tenant_id, tipo_pessoa, status, observacoes) VALUES (?, 'PF', 'ATIVO', ?)`,
+      [tenant, 'Cadastro rápido no PDV (só nome e telefone)']
+    );
+    const id = Number(ins.insertId);
+    await conn.execute(`INSERT INTO pessoas_pf (id_cliente, tenant_id, nome, cpf, created_at) VALUES (?, ?, ?, NULL, NOW())`, [id, tenant, c.nome]);
+    await conn.execute(
+      `INSERT INTO pessoas_contatos (id_cliente, tenant_id, nome_contato, tipo, telefone, principal, whatsapp, created_at) VALUES (?, ?, ?, ?, ?, 1, ?, NOW())`,
+      [id, tenant, c.nome, c.celular ? 'CELULAR' : 'FIXO', c.telefone, c.celular ? 1 : 0]
+    );
+    await conn.execute(
+      `INSERT INTO pessoas_papeis_atribuido (tenant_id, id_cliente, id_cliente_papel, created_at) VALUES (?, ?, ?, NOW())`,
+      [tenant, id, Number(papel?.id_cliente_papel) || 1]
+    );
+    await conn.commit();
+    return res.status(201).json({ id, nome: c.nome, tipo: 'PF', documento: '', telefone: c.telefone });
+  } catch (error: any) {
+    await conn.rollback().catch(() => undefined);
+    if (error instanceof ErroVenda) return res.status(error.status).json({ error: error.message });
+    console.error('Erro no cadastro rápido de cliente:', error);
+    return res.status(500).json({ error: 'Erro ao cadastrar o cliente.', details: error?.message });
+  } finally {
+    conn.release();
   }
 };
 

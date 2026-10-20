@@ -55,7 +55,7 @@ export const createCliente = async (req: Request, res: Response) => {
         idPessoa,
         tenantId,
         dados.nome_pf || '',
-        dados.documento || '', // CPF
+        String(dados.documento || '').trim() || null, // CPF (vazio = sem CPF)
         dados.rg || null
       ]);
     }

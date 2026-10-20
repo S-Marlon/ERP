@@ -126,7 +126,23 @@ export interface ClienteBusca {
   nome: string;
   razaoSocial: string | null;
   documento: string;
+  telefone?: string | null;
 }
+
+/** Cliente do balcão só com nome e telefone. 409 = telefone de outro cliente (vem em `cliente`, para usar o mesmo). */
+export const cadastrarClienteRapido = async (nome: string, telefone: string): Promise<{ ok: true; cliente: ClienteBusca } | { ok: false; erro: string; cliente?: ClienteBusca }> => {
+  try {
+    const response = await fetch(`${PDV_URL}/clientes`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome, telefone }),
+    });
+    const d = await response.json().catch(() => ({}));
+    if (response.status === 404 && !d.error) return { ok: false, erro: 'Rota não encontrada: reinicie o backend.' };
+    if (!response.ok) return { ok: false, erro: d.error || 'Erro ao cadastrar o cliente.', cliente: d.cliente ? { razaoSocial: null, ...d.cliente } : undefined };
+    return { ok: true, cliente: { razaoSocial: null, ...d } };
+  } catch {
+    return { ok: false, erro: 'Sem conexão com o servidor.' };
+  }
+};
 
 export const buscarClientesPdv = async (busca: string): Promise<ClienteBusca[]> => {
   try {
