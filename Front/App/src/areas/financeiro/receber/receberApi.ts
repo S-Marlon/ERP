@@ -5,7 +5,7 @@ import { API_URL } from '../../../shared/api/config';
 
 const API = `${API_URL}/api/financeiro/receber`;
 
-export type SituacaoTitulo = 'VENCIDO' | 'VENCE_HOJE' | 'A_VENCER' | 'PAGO' | 'CANCELADO';
+export type SituacaoTitulo = 'VENCIDO' | 'VENCE_HOJE' | 'A_VENCER' | 'SEM_PRAZO' | 'PAGO' | 'CANCELADO';
 
 export interface Titulo {
   idTitulo: number;
@@ -15,7 +15,8 @@ export interface Titulo {
   parcela: number;
   totalParcelas: number;
   descricao: string | null;
-  vencimento: string;
+  /** null = sem prazo (paga quando puder) */
+  vencimento: string | null;
   valor: number;
   valorPago: number;
   saldo: number;
@@ -42,7 +43,7 @@ export interface SituacaoCliente {
   titulos: Titulo[];
 }
 
-export interface ResumoReceber { emAberto: number; vencido: number; qtdVencidos: number; venceHoje: number; proximos7: number; recebidoMes: number }
+export interface ResumoReceber { emAberto: number; vencido: number; qtdVencidos: number; venceHoje: number; proximos7: number; recebidoMes: number; semPrazo: number; qtdSemPrazo: number }
 
 const pedir = async <T,>(url: string, init: RequestInit | undefined, erro: string): Promise<T> => {
   const response = await fetch(url, init);
@@ -86,8 +87,9 @@ export const ROTULO_SITUACAO: Record<SituacaoTitulo, { label: string; color: str
   VENCIDO: { label: 'Vencida', color: 'red' },
   VENCE_HOJE: { label: 'Vence hoje', color: 'orange' },
   A_VENCER: { label: 'A vencer', color: 'blue' },
+  SEM_PRAZO: { label: 'Sem prazo', color: 'purple' },
   PAGO: { label: 'Paga', color: 'green' },
   CANCELADO: { label: 'Cancelada', color: 'default' },
 };
 
-export const dataBr = (iso: string) => (iso ? iso.slice(0, 10).split('-').reverse().join('/') : '—');
+export const dataBr = (iso: string | null | undefined) => (iso ? iso.slice(0, 10).split('-').reverse().join('/') : '—');

@@ -75,6 +75,8 @@ export interface Pagamento {
     // A prazo: intervalo entre parcelas e primeiro vencimento (vazio = hoje + intervalo)
     intervaloDias?: number;
     primeiroVencimento?: string;
+    // A prazo sem data ("paga quando puder"): um título sem vencimento no contas a receber
+    semPrazo?: boolean;
     // Crédito acima do sem juros: diferença de taxa repassada ao cliente (já somada em `valor`)
     acrescimo?: number;
     // Sinal usado (forma ADIANTAMENTO)
@@ -137,6 +139,7 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
     // A prazo (crediário): gera parcelas em Financeiro › Contas a Receber
     const [intervaloPrazo, setIntervaloPrazo] = useState(30);
     const [primeiroVencimento, setPrimeiroVencimento] = useState('');
+    const [semPrazo, setSemPrazo] = useState(false);
     const situacaoCliente = useSituacaoCliente(clienteId);
     // Taxas da maquininha: desconto que cada forma permite e acréscimo do parcelamento
     const taxasVenda = useTaxasVenda();
@@ -217,7 +220,7 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
                 forma: FORMA_POR_METODO[p.metodo],
                 valor: Number(p.valor),
                 parcelas: p.parcelas,
-                ...(p.metodo === 'store_credit' ? { intervaloDias: p.intervaloDias, primeiroVencimento: p.primeiroVencimento } : {}),
+                ...(p.metodo === 'store_credit' ? { intervaloDias: p.intervaloDias, primeiroVencimento: p.primeiroVencimento, semPrazo: !!p.semPrazo } : {}),
                 ...(p.idAdiantamento ? { idAdiantamento: p.idAdiantamento } : {}),
             })),
         };
@@ -335,7 +338,7 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
             const disponivel = saldoAdiantamento(adiantamentoEscolhido);
             if (valorNumerico > disponivel + 0.004) { message.warning(`Este sinal tem ${brl(disponivel)} disponível.`); return; }
         }
-        if (metodoSelecionado === 'store_credit' && !clienteId) { message.warning('Para vender a prazo, identifique o cliente (F4).'); return; }
+        if (metodoSelecionado === 'store_credit' && !clienteId) { message.warning('Para vender a prazo, identifique o cliente (F4: dá para cadastrar só com nome e telefone).'); return; }
 
         const parcelasDoPagamento = metodoSelecionado === 'credit_card' ? parcelasInput : 1;
         const acrescimo = acrescimoParcelamento(taxasVenda, FORMA_POR_METODO[metodoSelecionado], parcelasDoPagamento, valorNumerico);
@@ -345,8 +348,10 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
             valor: Math.round((valorNumerico + acrescimo) * 100) / 100,
             ...(acrescimo > 0 ? { acrescimo } : {}),
             ...(metodoSelecionado === 'advance' && adiantamentoEscolhido ? { idAdiantamento: adiantamentoEscolhido } : {}),
-            parcelas: metodoSelecionado === 'credit_card' || metodoSelecionado === 'store_credit' ? parcelasInput : 1,
-            ...(metodoSelecionado === 'store_credit' ? { intervaloDias: intervaloPrazo, primeiroVencimento: primeiroVencimento || undefined } : {}),
+            parcelas: metodoSelecionado === 'credit_card' || (metodoSelecionado === 'store_credit' && !semPrazo) ? parcelasInput : 1,
+            ...(metodoSelecionado === 'store_credit'
+                ? semPrazo ? { semPrazo: true } : { intervaloDias: intervaloPrazo, primeiroVencimento: primeiroVencimento || undefined }
+                : {}),
             status: 'pending',
             createdAt: new Date(),
         }]);
@@ -385,10 +390,17 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
             );
         }
         if (metodoSelecionado === 'store_credit') {
-            if (!clienteId) return <Alert type="error" showIcon title="Identifique o cliente (F4) para vender a prazo." />;
+            if (!clienteId) return <Alert type="error" showIcon title="Identifique o cliente (F4) para vender a prazo." description="No F4 dá para cadastrar o cliente na hora, só com nome e telefone." />;
             const s = situacaoCliente;
             return (
                 <Flex vertical gap={6}>
+                    <Segmented size="small" block value={semPrazo ? 'SEM' : 'COM'} onChange={v => setSemPrazo(v === 'SEM')}
+                        options={[{ value: 'COM', label: 'Com datas (parcelas)' }, { value: 'SEM', label: 'Sem data (paga quando puder)' }]} />
+                    {semPrazo ? (
+                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                            Fica em aberto no Contas a receber sem vencimento (nunca aparece como vencido). O cliente paga quando puder, de uma vez ou aos poucos.
+                        </Typography.Text>
+                    ) : (
                     <Flex gap={6} wrap>
                         <Select style={{ minWidth: 130, flex: 1 }} value={parcelasInput} onChange={setParcelasInput} popupMatchSelectWidth={false}
                             options={Array.from({ length: 12 }, (_, i) => i + 1).map(n => ({ value: n, label: `${n}x de ${brl(valorDigitado / n)}` }))} />
@@ -399,6 +411,7 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
                             disabledDate={d => d.isBefore(dayjs(), 'day')}
                             onChange={d => setPrimeiroVencimento(d ? d.format('YYYY-MM-DD') : '')} />
                     </Flex>
+                    )}
                     {s && (
                         <Typography.Text type={s.bloqueado || s.qtdVencidas > 0 ? 'danger' : 'secondary'} style={{ fontSize: 12 }}>
                             {s.bloqueado && <b>Cliente bloqueado para compras a prazo. </b>}
@@ -537,7 +550,7 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
                                                 <Typography.Text type="secondary" style={{ fontSize: 11 }}>
                                                     {p.metodo === 'credit_card' ? `${p.parcelas}x${p.acrescimo ? `, + ${brl(p.acrescimo)} de acréscimo` : ''}`
                                                         : p.metodo === 'advance' ? `Sinal Nº ${p.idAdiantamento}`
-                                                            : p.metodo === 'store_credit' ? `${p.parcelas}x a cada ${p.intervaloDias || 30} dias${p.primeiroVencimento ? `, 1ª em ${dataBr(p.primeiroVencimento)}` : ''}`
+                                                            : p.metodo === 'store_credit' ? (p.semPrazo ? 'sem data (paga quando puder)' : `${p.parcelas}x a cada ${p.intervaloDias || 30} dias${p.primeiroVencimento ? `, 1ª em ${dataBr(p.primeiroVencimento)}` : ''}`)
                                                                 : 'À vista'}
                                                 </Typography.Text>
                                             </Flex>

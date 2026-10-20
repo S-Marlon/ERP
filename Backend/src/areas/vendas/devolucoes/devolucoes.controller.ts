@@ -119,7 +119,7 @@ export const registrarDevolucao = async (req: Request, res: Response) => {
         [tenant, idVenda]
       );
       if (titulos.length === 0) throw new ErroDevolucao('Esta venda não tem parcelas a prazo em aberto.', 409);
-      const alteracoes = abaterParcelas(titulos.map((t: any) => ({ idTitulo: Number(t.id_titulo), vencimento: t.venc, valor: Number(t.valor), valorPago: Number(t.valor_pago) })), calculo.total);
+      const alteracoes = abaterParcelas(titulos.map((t: any) => ({ idTitulo: Number(t.id_titulo), vencimento: t.venc || '9999-12-31', valor: Number(t.valor), valorPago: Number(t.valor_pago) })), calculo.total);
       for (const a of alteracoes) {
         await connection.execute(`UPDATE financeiro_contas_receber SET valor = ?, status = ? WHERE id_titulo = ?`, [f4(a.novoValor), a.status, a.idTitulo]);
       }

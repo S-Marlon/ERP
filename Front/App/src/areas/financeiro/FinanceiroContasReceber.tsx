@@ -56,7 +56,7 @@ const ModalReceber: React.FC<{ titulo: Titulo | null; onFechar: () => void; onRe
       {titulo && (
         <Space direction="vertical" style={{ width: '100%' }}>
           <Text type="secondary">
-            {titulo.descricao || `Parcela ${titulo.parcela}/${titulo.totalParcelas}`} · vence {dataBr(titulo.vencimento)} ·
+            {titulo.descricao || `Parcela ${titulo.parcela}/${titulo.totalParcelas}`} · {titulo.vencimento ? `vence ${dataBr(titulo.vencimento)}` : 'sem prazo'} ·
             saldo <b>{brl(titulo.saldo)}</b>{titulo.diasAtraso > 0 && <Text type="danger"> · {titulo.diasAtraso} dia(s) de atraso</Text>}
           </Text>
           {carregado && !caixa && (
@@ -115,7 +115,7 @@ const DrawerTitulo: React.FC<{ titulo: Titulo | null; onFechar: () => void; onAl
         <Space direction="vertical" size={14} style={{ width: '100%' }}>
           <Descriptions size="small" column={2} bordered items={[
             { key: 'v', label: 'Venda', children: titulo.idVenda ? `#${titulo.idVenda}` : '—' },
-            { key: 'd', label: 'Vencimento', children: dataBr(titulo.vencimento) },
+            { key: 'd', label: 'Vencimento', children: titulo.vencimento ? dataBr(titulo.vencimento) : 'sem prazo (paga quando puder)' },
             { key: 'val', label: 'Valor', children: brl(titulo.valor) },
             { key: 'p', label: 'Pago', children: brl(titulo.valorPago) },
             { key: 's', label: 'Saldo', children: <b>{brl(titulo.saldo)}</b> },
@@ -269,7 +269,7 @@ export const FinanceiroContasReceber: React.FC = () => {
           <Col xs={12} lg={5}>{indicador('Em aberto', brl(resumo?.emAberto || 0), undefined, () => setSituacao('ABERTO'))}</Col>
           <Col xs={12} lg={5}>{indicador(`Vencido${resumo?.qtdVencidos ? ` (${resumo.qtdVencidos})` : ''}`, brl(resumo?.vencido || 0), resumo?.vencido ? '#cf1322' : '#389e0d', () => setSituacao('VENCIDO'))}</Col>
           <Col xs={12} lg={4}>{indicador('Vence hoje', brl(resumo?.venceHoje || 0), resumo?.venceHoje ? '#d48806' : undefined)}</Col>
-          <Col xs={12} lg={5}>{indicador('Próximos 7 dias', brl(resumo?.proximos7 || 0))}</Col>
+          <Col xs={12} lg={5}>{indicador(resumo?.qtdSemPrazo ? `Próx. 7 dias · sem prazo ${brl(resumo.semPrazo)}` : 'Próximos 7 dias', brl(resumo?.proximos7 || 0), undefined, resumo?.qtdSemPrazo ? () => setSituacao('SEM_PRAZO') : undefined)}</Col>
           <Col xs={24} lg={5}>{indicador('Recebido no mês', brl(resumo?.recebidoMes || 0), '#389e0d', () => setSituacao('PAGO'))}</Col>
         </Row>
 
@@ -277,6 +277,7 @@ export const FinanceiroContasReceber: React.FC = () => {
           <Space wrap style={{ marginBottom: 10 }}>
             <Segmented value={situacao} onChange={v => setSituacao(String(v))} options={[
               { value: 'ABERTO', label: 'Em aberto' }, { value: 'VENCIDO', label: 'Vencidas' }, { value: 'A_VENCER', label: 'A vencer' },
+              { value: 'SEM_PRAZO', label: `Sem prazo${resumo?.qtdSemPrazo ? ` (${resumo.qtdSemPrazo})` : ''}` },
               { value: 'PAGO', label: 'Pagas' }, { value: 'CANCELADO', label: 'Canceladas' }, { value: 'TODOS', label: 'Todas' },
             ]} />
             <Input allowClear prefix={<SearchOutlined />} placeholder="Cliente, descrição ou nº da venda" style={{ width: 260 }}
@@ -292,7 +293,7 @@ export const FinanceiroContasReceber: React.FC = () => {
             locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Nenhuma parcela. Elas nascem das vendas a prazo do PDV." /> }}
             onRow={t => ({ onDoubleClick: () => setDetalhe(t) })}
             columns={[
-              { title: 'Vencimento', dataIndex: 'vencimento', width: 105, render: (v: string) => dataBr(v) },
+              { title: 'Vencimento', dataIndex: 'vencimento', width: 105, render: (v: string | null) => (v ? dataBr(v) : <Text type="secondary">sem prazo</Text>) },
               {
                 title: 'Cliente', dataIndex: 'cliente',
                 render: (c: string) => <a onClick={() => { setBusca(c); setTimeout(carregar, 0); }}>{c}</a>,

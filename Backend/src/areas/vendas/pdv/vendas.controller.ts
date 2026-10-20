@@ -107,7 +107,8 @@ export const calcularItensDoPedido = async (conn: ConnVenda, tenant: number, ite
  * { clienteNome?, idCliente?, observacao?, descontoGeral?, frete? (cobrado do cliente, fora do preço dos itens),
  *   itens: [{ idItem, quantidade, idUnidade?, precoUnitario? }],
  *   pagamentos: [{ forma: DINHEIRO|PIX|DEBITO|CREDITO|PRAZO|TRANSFERENCIA, valor, parcelas?,
- *                  intervaloDias?, primeiroVencimento? (só PRAZO: gera as parcelas em contas a receber) }] }
+ *                  intervaloDias?, primeiroVencimento?, semPrazo? (só PRAZO: gera as parcelas em contas a receber;
+ *                  semPrazo = um título sem vencimento, "paga quando puder") }] }
  * O preço de tabela é recalculado aqui; precoUnitario é o preço praticado (desconto individual).
  * Desconto acima do limite / abaixo do custo: 403 AUTORIZACAO_NECESSARIA até vir
  *   autorizacao: { senha, nome, motivo } (vendas_configuracoes).
@@ -203,7 +204,7 @@ export const registrarVenda = async (req: Request, res: Response) => {
     // A prazo: exige cliente, respeita o crédito e planeja as parcelas (gravadas depois da venda)
     const prazos: PrazoDaVenda[] = (Array.isArray(pagamentos) ? pagamentos : [])
       .filter((p: any) => String(p?.forma || '').toUpperCase() === 'PRAZO')
-      .map((p: any) => ({ valor: Number(p.valor), parcelas: p.parcelas, intervaloDias: p.intervaloDias, primeiroVencimento: p.primeiroVencimento }));
+      .map((p: any) => ({ valor: Number(p.valor), parcelas: p.parcelas, intervaloDias: p.intervaloDias, primeiroVencimento: p.primeiroVencimento, semPrazo: Boolean(p.semPrazo) }));
     const parcelasPrazo = await planejarPrazo(connection as any, tenant, idCliente ? Number(idCliente) : null, String(clienteNome || '').trim(), prazos);
 
     // Adiantamento (sinal): cada pagamento ADIANTAMENTO aponta para um sinal em aberto com saldo suficiente

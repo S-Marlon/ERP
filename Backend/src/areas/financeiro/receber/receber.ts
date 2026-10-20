@@ -9,7 +9,8 @@ export class ErroReceber extends Error {
   }
 }
 
-export interface ParcelaPlanejada { parcela: number; totalParcelas: number; vencimento: string; valor: number }
+/** vencimento null = sem prazo (paga quando puder; nunca fica vencido). */
+export interface ParcelaPlanejada { parcela: number; totalParcelas: number; vencimento: string | null; valor: number }
 
 const dataIso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
@@ -99,17 +100,26 @@ export const estornarBaixa = (valorTitulo: number, valorPago: number, valorBaixa
   return { valorPago: r(novoPagoC), status: novoPagoC >= c(valorTitulo) ? 'PAGO' : 'ABERTO' };
 };
 
-export type SituacaoTitulo = 'VENCIDO' | 'VENCE_HOJE' | 'A_VENCER' | 'PAGO' | 'CANCELADO';
+/** A prazo sem data definida ("paga quando puder"): um título só, sem vencimento. */
+export const parcelaSemPrazo = (total: number): ParcelaPlanejada[] => {
+  const totalC = c(total);
+  if (totalC <= 0) throw new ErroReceber('Valor a prazo inválido.');
+  return [{ parcela: 1, totalParcelas: 1, vencimento: null, valor: r(totalC) }];
+};
 
-export const situacaoTitulo = (status: string, vencimento: string, hoje: Date): SituacaoTitulo => {
+export type SituacaoTitulo = 'VENCIDO' | 'VENCE_HOJE' | 'A_VENCER' | 'SEM_PRAZO' | 'PAGO' | 'CANCELADO';
+
+export const situacaoTitulo = (status: string, vencimento: string | null, hoje: Date): SituacaoTitulo => {
   if (status === 'PAGO') return 'PAGO';
   if (status === 'CANCELADO') return 'CANCELADO';
+  if (!vencimento) return 'SEM_PRAZO';
   const h = dataIso(hoje);
   const v = String(vencimento).slice(0, 10);
   return v < h ? 'VENCIDO' : v === h ? 'VENCE_HOJE' : 'A_VENCER';
 };
 
-export const diasDeAtraso = (vencimento: string, hoje: Date) => {
+export const diasDeAtraso = (vencimento: string | null, hoje: Date) => {
+  if (!vencimento) return 0;
   const v = lerData(String(vencimento).slice(0, 10));
   if (!v) return 0;
   const h = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());

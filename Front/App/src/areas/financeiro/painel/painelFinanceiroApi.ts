@@ -15,7 +15,7 @@ export interface PainelFinanceiro {
   hoje: string; dias: number; agrupamento: 'dia' | 'semana';
   totais: {
     aReceber: number; aPagar: number; receberVencido: number; pagarVencido: number; qtdReceberVencido: number; qtdPagarVencido: number;
-    entraNoPeriodo: number; saiNoPeriodo: number;
+    entraNoPeriodo: number; saiNoPeriodo: number; receberSemPrazo: number; qtdReceberSemPrazo: number;
   };
   fluxo: PontoFluxo[];
   vencimentos: TituloPainel[];

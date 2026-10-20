@@ -62,7 +62,7 @@ const PainelFinanceiro: React.FC = () => {
             <Row gutter={[12, 12]}>
               <Col xs={12} lg={6}>
                 <Kpi titulo={`Entra nos próximos ${dias} dias`} valor={t.entraNoPeriodo} cor="#389e0d" icone={<ArrowUpOutlined />}
-                  rodape={<Text type="secondary">a receber no total: {brl(t.aReceber)}</Text>} onClick={() => irPara('RECEBER')} />
+                  rodape={<Text type="secondary">a receber no total: {brl(t.aReceber)}{t.qtdReceberSemPrazo ? ` (${brl(t.receberSemPrazo)} sem prazo)` : ''}</Text>} onClick={() => irPara('RECEBER')} />
               </Col>
               <Col xs={12} lg={6}>
                 <Kpi titulo={`Sai nos próximos ${dias} dias`} valor={t.saiNoPeriodo} cor="#cf1322" icone={<ArrowDownOutlined />}

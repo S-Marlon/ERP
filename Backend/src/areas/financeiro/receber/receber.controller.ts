@@ -4,7 +4,7 @@ import { Request, Response } from 'express';
 import pool from '../../../infra/db';
 import { carregarCaixaAberto, operadorDe } from '../../vendas/caixa/caixa.controller';
 import {
-  aplicarBaixa, CreditoCliente, diasDeAtraso, ErroReceber, estornarBaixa, gerarParcelas, situacaoTitulo, validarCredito,
+  aplicarBaixa, CreditoCliente, diasDeAtraso, ErroReceber, estornarBaixa, gerarParcelas, ParcelaPlanejada, parcelaSemPrazo, situacaoTitulo, validarCredito,
 } from './receber';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
@@ -44,7 +44,7 @@ export const saldoDevedor = async (conn: Conn, tenant: number, idCliente: number
   return { aberto: Number(s?.aberto) || 0, vencido: Number(s?.vencido) || 0, qtdVencidas: Number(s?.qtd_vencidas) || 0 };
 };
 
-export interface PrazoDaVenda { valor: number; parcelas?: number; intervaloDias?: number; primeiroVencimento?: string | null }
+export interface PrazoDaVenda { valor: number; parcelas?: number; intervaloDias?: number; primeiroVencimento?: string | null; semPrazo?: boolean }
 
 /** Venda a prazo: exige cliente, confere crédito e devolve as parcelas planejadas (gravadas depois da venda). */
 export const planejarPrazo = async (conn: Conn, tenant: number, idCliente: number | null, nomeCliente: string, prazos: PrazoDaVenda[]) => {
@@ -52,18 +52,20 @@ export const planejarPrazo = async (conn: Conn, tenant: number, idCliente: numbe
   if (!idCliente) throw new ErroReceber('Venda a prazo precisa do cliente identificado (F4).', 400, { codigo: 'PRAZO_SEM_CLIENTE' });
   const total = prazos.reduce((a, p) => a + Number(p.valor), 0);
   validarCredito(await carregarCredito(conn, tenant, idCliente), (await saldoDevedor(conn, tenant, idCliente)).aberto, total, nomeCliente || 'O cliente');
-  return prazos.flatMap(p => gerarParcelas(Number(p.valor), p.parcelas ?? 1, new Date(), p.intervaloDias ?? 30, p.primeiroVencimento || null));
+  return prazos.flatMap(p => (p.semPrazo
+    ? parcelaSemPrazo(Number(p.valor))
+    : gerarParcelas(Number(p.valor), p.parcelas ?? 1, new Date(), p.intervaloDias ?? 30, p.primeiroVencimento || null)));
 };
 
 export const gravarTitulosDaVenda = async (
-  conn: Conn, tenant: number, idVenda: number, idCliente: number, parcelas: ReturnType<typeof gerarParcelas>, operador: string
+  conn: Conn, tenant: number, idVenda: number, idCliente: number, parcelas: ParcelaPlanejada[], operador: string
 ) => {
   for (const p of parcelas) {
     await conn.execute(
       `INSERT INTO financeiro_contas_receber
          (tenant_id, id_cliente, id_venda, parcela, total_parcelas, descricao, vencimento, valor, operador)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [tenant, idCliente, idVenda, p.parcela, p.totalParcelas, `Venda ${idVenda} - parcela ${p.parcela}/${p.totalParcelas}`, p.vencimento, f4(p.valor), operador]
+      [tenant, idCliente, idVenda, p.parcela, p.totalParcelas, p.vencimento ? `Venda ${idVenda} - parcela ${p.parcela}/${p.totalParcelas}` : `Venda ${idVenda} - sem prazo`, p.vencimento, f4(p.valor), operador]
     );
   }
 };
@@ -96,13 +98,13 @@ const formatarTitulo = (t: any, hoje: Date) => ({
   parcela: Number(t.parcela),
   totalParcelas: Number(t.total_parcelas),
   descricao: t.descricao,
-  vencimento: String(t.vencimento_txt),
+  vencimento: t.vencimento_txt || null,
   valor: Number(t.valor),
   valorPago: Number(t.valor_pago),
   saldo: Number((Number(t.valor) - Number(t.valor_pago)).toFixed(2)),
   status: t.status,
-  situacao: situacaoTitulo(t.status, String(t.vencimento_txt), hoje),
-  diasAtraso: t.status === 'ABERTO' ? diasDeAtraso(String(t.vencimento_txt), hoje) : 0,
+  situacao: situacaoTitulo(t.status, t.vencimento_txt || null, hoje),
+  diasAtraso: t.status === 'ABERTO' ? diasDeAtraso(t.vencimento_txt || null, hoje) : 0,
   criadoEm: t.created_at,
 });
 
@@ -120,6 +122,7 @@ export const listarTitulos = async (req: Request, res: Response) => {
     if (situacao === 'ABERTO') filtros.push(`t.status = 'ABERTO'`);
     else if (situacao === 'VENCIDO') filtros.push(`t.status = 'ABERTO' AND t.vencimento < CURDATE()`);
     else if (situacao === 'A_VENCER') filtros.push(`t.status = 'ABERTO' AND t.vencimento >= CURDATE()`);
+    else if (situacao === 'SEM_PRAZO') filtros.push(`t.status = 'ABERTO' AND t.vencimento IS NULL`);
     else if (situacao === 'PAGO' || situacao === 'CANCELADO') { filtros.push('t.status = ?'); params.push(situacao); }
     if (Number(req.query.idCliente) > 0) { filtros.push('t.id_cliente = ?'); params.push(Number(req.query.idCliente)); }
     const busca = String(req.query.busca || '').trim();
@@ -128,7 +131,7 @@ export const listarTitulos = async (req: Request, res: Response) => {
       params.push(`%${busca}%`, `%${busca}%`, Number(busca) || 0);
     }
     const [rows]: any = await pool.execute(
-      `${SELECT_TITULO} WHERE ${filtros.join(' AND ')} ORDER BY t.status = 'ABERTO' DESC, t.vencimento, t.id_titulo LIMIT 500`, params
+      `${SELECT_TITULO} WHERE ${filtros.join(' AND ')} ORDER BY t.status = 'ABERTO' DESC, t.vencimento IS NULL, t.vencimento, t.id_titulo LIMIT 500`, params
     );
     const hoje = new Date();
     return res.json(rows.map((t: any) => formatarTitulo(t, hoje)));
@@ -146,7 +149,9 @@ export const resumoReceber = async (req: Request, res: Response) => {
               COALESCE(SUM(CASE WHEN status = 'ABERTO' AND vencimento < CURDATE() THEN valor - valor_pago END), 0) AS vencido,
               SUM(status = 'ABERTO' AND vencimento < CURDATE()) AS qtd_vencidos,
               COALESCE(SUM(CASE WHEN status = 'ABERTO' AND vencimento = CURDATE() THEN valor - valor_pago END), 0) AS vence_hoje,
-              COALESCE(SUM(CASE WHEN status = 'ABERTO' AND vencimento > CURDATE() AND vencimento <= CURDATE() + INTERVAL 7 DAY THEN valor - valor_pago END), 0) AS proximos_7
+              COALESCE(SUM(CASE WHEN status = 'ABERTO' AND vencimento > CURDATE() AND vencimento <= CURDATE() + INTERVAL 7 DAY THEN valor - valor_pago END), 0) AS proximos_7,
+              COALESCE(SUM(CASE WHEN status = 'ABERTO' AND vencimento IS NULL THEN valor - valor_pago END), 0) AS sem_prazo,
+              SUM(status = 'ABERTO' AND vencimento IS NULL) AS qtd_sem_prazo
        FROM financeiro_contas_receber WHERE tenant_id = ?`,
       [tenant]
     );
@@ -158,6 +163,7 @@ export const resumoReceber = async (req: Request, res: Response) => {
     return res.json({
       emAberto: Number(r?.em_aberto) || 0, vencido: Number(r?.vencido) || 0, qtdVencidos: Number(r?.qtd_vencidos) || 0,
       venceHoje: Number(r?.vence_hoje) || 0, proximos7: Number(r?.proximos_7) || 0, recebidoMes: Number(m?.recebido) || 0,
+      semPrazo: Number(r?.sem_prazo) || 0, qtdSemPrazo: Number(r?.qtd_sem_prazo) || 0,
     });
   } catch (error) {
     return responderErro(res, error, 'Erro ao carregar o resumo.');
@@ -172,7 +178,7 @@ export const situacaoCliente = async (req: Request, res: Response) => {
     const credito = await carregarCredito(pool as any, tenant, idCliente);
     const saldo = await saldoDevedor(pool as any, tenant, idCliente);
     const [abertos]: any = await pool.execute(
-      `${SELECT_TITULO} WHERE t.tenant_id = ? AND t.id_cliente = ? AND t.status = 'ABERTO' ORDER BY t.vencimento LIMIT 100`, [tenant, idCliente]
+      `${SELECT_TITULO} WHERE t.tenant_id = ? AND t.id_cliente = ? AND t.status = 'ABERTO' ORDER BY t.vencimento IS NULL, t.vencimento LIMIT 100`, [tenant, idCliente]
     );
     const [[obs]]: any = await pool.execute(
       `SELECT observacao FROM financeiro_clientes_credito WHERE id_cliente = ? AND tenant_id = ?`, [idCliente, tenant]

@@ -55,15 +55,18 @@ export const painelFinanceiro = async (req: Request, res: Response) => {
     const abertosReceber = receber.map((t: any) => titulo(t, 'RECEBER'));
     const abertosPagar = pagar.map((t: any) => titulo(t, 'PAGAR'));
 
+    // a receber sem prazo ("paga quando puder") não tem data: fica fora do fluxo e dos atrasados, com o total à parte
+    const semPrazo = abertosReceber.filter((t: any) => !t.vencimento);
+    const comData = <T extends { vencimento: string | null }>(l: T[]) => l.filter(t => !!t.vencimento) as (T & { vencimento: string })[];
     const lancamentos: Lancamento[] = [
-      ...abertosReceber.map((t: any) => ({ data: t.vencimento, valor: t.valor, tipo: 'ENTRADA' as const })),
+      ...comData(abertosReceber).map((t: any) => ({ data: t.vencimento, valor: t.valor, tipo: 'ENTRADA' as const })),
       ...abertosPagar.map((t: any) => ({ data: t.vencimento, valor: t.valor, tipo: 'SAIDA' as const })),
     ];
     const fluxo = montarFluxo(lancamentos, { hoje, dias, agrupamento });
     const fimPeriodo = somarDias(hoje, dias - 1);
     const soma = (l: { valor: number }[]) => n(l.reduce((a, t) => a + t.valor, 0));
-    const vencidos = (l: any[]) => l.filter(t => t.vencimento < hoje);
-    const noPeriodo = (l: any[]) => l.filter(t => t.vencimento >= hoje && t.vencimento <= fimPeriodo);
+    const vencidos = (l: any[]) => l.filter(t => t.vencimento && t.vencimento < hoje);
+    const noPeriodo = (l: any[]) => l.filter(t => t.vencimento && t.vencimento >= hoje && t.vencimento <= fimPeriodo);
 
     // Realizado por mês: o dinheiro que entrou e saiu de verdade
     const [vendas]: any = await pool.execute(
@@ -137,7 +140,7 @@ export const painelFinanceiro = async (req: Request, res: Response) => {
       const id = Number(t.id_pessoa);
       const d = devedores.get(id) || { nome: t.nome, aberto: 0, vencido: 0, titulos: 0 };
       d.aberto = n(d.aberto + Number(t.saldo));
-      if (t.vencimento < hoje) d.vencido = n(d.vencido + Number(t.saldo));
+      if (t.vencimento && t.vencimento < hoje) d.vencido = n(d.vencido + Number(t.saldo));
       d.titulos++;
       devedores.set(id, d);
     }
@@ -149,15 +152,16 @@ export const painelFinanceiro = async (req: Request, res: Response) => {
         receberVencido: soma(vencidos(abertosReceber)), pagarVencido: soma(vencidos(abertosPagar)),
         qtdReceberVencido: vencidos(abertosReceber).length, qtdPagarVencido: vencidos(abertosPagar).length,
         entraNoPeriodo: soma(noPeriodo(abertosReceber)), saiNoPeriodo: soma(noPeriodo(abertosPagar)),
+        receberSemPrazo: soma(semPrazo), qtdReceberSemPrazo: semPrazo.length,
       },
       fluxo,
-      vencimentos: [...abertosReceber, ...abertosPagar]
+      vencimentos: [...comData(abertosReceber), ...abertosPagar]
         .filter(t => t.vencimento >= hoje && diasEntre(hoje, t.vencimento) < DIAS_VENCIMENTOS)
         .sort((a, b) => a.vencimento.localeCompare(b.vencimento) || b.valor - a.valor),
       atrasados: [...vencidos(abertosReceber), ...vencidos(abertosPagar)]
         .map(t => ({ ...t, diasAtraso: diasEntre(t.vencimento, hoje) }))
         .sort((a, b) => b.diasAtraso - a.diasAtraso),
-      atrasoReceber: atrasosPorFaixa(abertosReceber, hoje),
+      atrasoReceber: atrasosPorFaixa(comData(abertosReceber), hoje),
       atrasoPagar: atrasosPorFaixa(abertosPagar, hoje),
       realizado,
       fornecedores: fornecedores.map((f: any) => ({ idPessoa: Number(f.id_pessoa) || 0, nome: f.nome, pago: n(f.pago), aberto: n(f.aberto) })),
