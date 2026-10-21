@@ -12,7 +12,7 @@ export interface Politica {
   varejo: RegraVarejo;
   atacado: { modo: 'MANTER' } | { modo: 'DEFINIR'; nivel1: NivelAtacado | null; nivel2: NivelAtacado | null; pularQuemTem: boolean };
 }
-export interface FiltroPolitica { idCategoria?: number | null; idsFamilias?: number[]; idMarca?: number | null; idTag?: number | null; busca?: string }
+export interface FiltroPolitica { idCategoria?: number | null; idsFamilias?: number[]; idsMarcas?: number[]; idTag?: number | null; busca?: string }
 
 export interface FaixaPrevia {
   tipo: 'VAREJO' | 'ATACADO'; ordem: number; quantidadeMinima: number; quantidadeMaxima: number | null; markup: number; preco: number;

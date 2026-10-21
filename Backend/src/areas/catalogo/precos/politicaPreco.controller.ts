@@ -14,7 +14,7 @@ const ALVO_PADRAO = 30;
 const MAX_ITENS = 500;
 const lista = (n: number) => Array(n).fill('?').join(',');
 
-interface Filtro { idCategoria?: number | null; idsFamilias?: number[]; idMarca?: number | null; idTag?: number | null; busca?: string }
+interface Filtro { idCategoria?: number | null; idsFamilias?: number[]; idsMarcas?: number[]; idTag?: number | null; busca?: string }
 interface ItemCarregado extends ItemPolitica {
   idItem: number; sku: string; nome: string; familia: string | null; marca: string | null; idUnidade: number | null; unidade: string | null;
   alvoPct: number; idFaixaVarejo: number | null;
@@ -53,14 +53,15 @@ const carregarItens = async (conn: any, tenant: number, filtro: Filtro, ids?: nu
     }
     const fams = (filtro.idsFamilias || []).map(Number).filter(n => n > 0);
     if (fams.length) { where.push(`cpd.familia_id IN (${lista(fams.length)})`); params.push(...fams); }
-    if (filtro.idMarca) { where.push(`COALESCE(cpd.id_marca, f.id_marca) = ?`); params.push(Number(filtro.idMarca)); }
+    const marcas = (filtro.idsMarcas || []).map(Number).filter(n => n > 0);
+    if (marcas.length) { where.push(`COALESCE(cpd.id_marca, f.id_marca) IN (${lista(marcas.length)})`); params.push(...marcas); }
     if (filtro.idTag) { where.push(SQL_ITEM_TEM_TAG_ID); params.push(Number(filtro.idTag), Number(filtro.idTag)); }
     const busca = String(filtro.busca || '').trim();
     if (busca) {
       where.push(`(ic.sku LIKE ? OR cpd.sku_customizado LIKE ? OR ic.nome_item LIKE ? OR cpd.nome_comercial LIKE ? OR f.nome LIKE ?)`);
       params.push(...Array(5).fill(`%${busca}%`));
     }
-    if (!filtro.idCategoria && !fams.length && !filtro.idMarca && !filtro.idTag && !busca) throw new ErroPolitica('Escolha uma categoria, família, marca, tag ou digite uma busca.');
+    if (!filtro.idCategoria && !fams.length && !marcas.length && !filtro.idTag && !busca) throw new ErroPolitica('Escolha uma categoria, família, marca, tag ou digite uma busca.');
   }
   const [itens]: any = await conn.execute(
     `SELECT ic.id_item, COALESCE(cpd.sku_customizado, ic.sku) AS sku, COALESCE(cpd.nome_comercial, ic.nome_item) AS nome,

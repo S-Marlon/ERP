@@ -87,9 +87,12 @@ const VarejoAtacadoLote: React.FC = () => {
   const familiasDaCat = opcoes ? familiasDaCategoria(opcoes, filtro.idCategoria) : [];
   const familiasOpcoes = familiasDaCat.map(f => ({ value: f.id, label: `${f.nome} (${f.itens})` }));
   const marcasOpcoes = opcoes ? marcasDoFiltro(opcoes, filtro) : [];
-  // a marca escolhida que não existe na categoria/famílias novas sai
-  const comMarcaValida = (f: FiltroPolitica): FiltroPolitica =>
-    !f.idMarca || !opcoes || marcasDoFiltro(opcoes, f).some(m => m.id === f.idMarca) ? f : { ...f, idMarca: null };
+  // as marcas escolhidas que não existem na categoria/famílias novas saem
+  const comMarcaValida = (f: FiltroPolitica): FiltroPolitica => {
+    if (!f.idsMarcas?.length || !opcoes) return f;
+    const validas = new Set(marcasDoFiltro(opcoes, f).map(m => m.id));
+    return { ...f, idsMarcas: f.idsMarcas.filter(id => validas.has(id)) };
+  };
   const escolherCategoria = (idCategoria: number | null) => setFiltro(f => {
     // as famílias escolhidas que não são da categoria nova saem
     const validas = new Set((opcoes ? familiasDaCategoria(opcoes, idCategoria) : []).map(x => x.id));
@@ -141,11 +144,11 @@ const VarejoAtacadoLote: React.FC = () => {
                 </Col>
                 <Col span={12}>
                   <Text>Marca{filtro.idCategoria || (filtro.idsFamilias || []).length ? ` (${marcasOpcoes.length})` : ''}</Text>
-                  <Select allowClear showSearch optionFilterProp="label" style={{ width: '100%' }}
+                  <Select mode="multiple" allowClear showSearch optionFilterProp="label" style={{ width: '100%' }} maxTagCount="responsive"
                     placeholder={filtro.idCategoria || (filtro.idsFamilias || []).length ? 'Todas as do filtro' : 'Todas'}
                     notFoundContent="Nenhuma marca nos itens do filtro"
-                    options={marcasOpcoes.map(m => ({ value: m.id, label: m.nome }))} value={filtro.idMarca ?? undefined}
-                    onChange={v => setFiltro(f => ({ ...f, idMarca: (v as number) ?? null }))} />
+                    options={marcasOpcoes.map(m => ({ value: m.id, label: m.nome }))} value={filtro.idsMarcas || []}
+                    onChange={v => setFiltro(f => ({ ...f, idsMarcas: v as number[] }))} />
                 </Col>
                 <Col span={24}>
                   <Text>Busca (nome, SKU ou família)</Text>
