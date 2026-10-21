@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { arvoreCategorias, familiasDaCategoria, resumoPrevia } from './politicaPrecoTela';
+import { arvoreCategorias, familiasDaCategoria, marcasDoFiltro, resumoPrevia } from './politicaPrecoTela';
 import type { ItemPrevia } from './politicaPrecoApi';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
@@ -28,6 +28,22 @@ teste('varejo e atacado: famílias da categoria e das subcategorias', () => {
   assert.deepStrictEqual(familiasDaCategoria(opcoes, 1).map(f => f.id), [10, 11]);   // Transmissão inteira
   assert.deepStrictEqual(familiasDaCategoria(opcoes, 3).map(f => f.id), [10]);
   assert.strictEqual(familiasDaCategoria(opcoes, null).length, 4);
+});
+
+teste('varejo e atacado: marcas seguem as famílias e a categoria', () => {
+  const opcoes = {
+    categorias: [{ id: 1, nome: 'Rolamentos', idPai: null }, { id: 2, nome: 'Esferas', idPai: 1 }, { id: 3, nome: 'Hidráulica', idPai: null }],
+    familias: [],
+    marcas: [
+      { id: 100, nome: 'GTOP-GBR', familias: [10, 11], categorias: [2] }, { id: 101, nome: 'TIMKEN', familias: [10], categorias: [2] },
+      { id: 102, nome: 'Parker', familias: [20], categorias: [3] }, { id: 103, nome: 'Sem uso', familias: [], categorias: [] },
+    ],
+    tags: [],
+  };
+  assert.deepStrictEqual(marcasDoFiltro(opcoes, { idCategoria: 1 }).map(m => m.nome), ['GTOP-GBR', 'TIMKEN']);   // pela subcategoria
+  assert.deepStrictEqual(marcasDoFiltro(opcoes, { idCategoria: 1, idsFamilias: [11] }).map(m => m.nome), ['GTOP-GBR']);   // família manda
+  assert.deepStrictEqual(marcasDoFiltro(opcoes, { idsFamilias: [20] }).map(m => m.nome), ['Parker']);
+  assert.strictEqual(marcasDoFiltro(opcoes, {}).length, 4);
 });
 
 teste('varejo e atacado: resumo da prévia', () => {

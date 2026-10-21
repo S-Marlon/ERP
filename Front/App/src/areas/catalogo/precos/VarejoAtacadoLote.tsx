@@ -8,7 +8,7 @@ import {
 } from 'antd';
 import { ArrowLeftOutlined, CheckOutlined, DeleteOutlined, EyeOutlined, PlusOutlined, WarningOutlined } from '@ant-design/icons';
 import { FaixaPrevia, FiltroPolitica, ItemPrevia, NivelAtacado, OpcoesPolitica, Politica, politicaPrecoApi, RegraVarejo } from './politicaPrecoApi';
-import { arvoreCategorias, familiasDaCategoria, resumoPrevia } from './politicaPrecoTela';
+import { arvoreCategorias, familiasDaCategoria, marcasDoFiltro, resumoPrevia } from './politicaPrecoTela';
 
 const { Text, Title } = Typography;
 const brl = (v: number | null | undefined) => (v === null || v === undefined ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
@@ -86,11 +86,16 @@ const VarejoAtacadoLote: React.FC = () => {
   const linhas = (previa?.itens || []).filter(i => !soProblemas || i.plano.situacao === 'ERRO' || i.plano.avisos.length > 0);
   const familiasDaCat = opcoes ? familiasDaCategoria(opcoes, filtro.idCategoria) : [];
   const familiasOpcoes = familiasDaCat.map(f => ({ value: f.id, label: `${f.nome} (${f.itens})` }));
+  const marcasOpcoes = opcoes ? marcasDoFiltro(opcoes, filtro) : [];
+  // a marca escolhida que não existe na categoria/famílias novas sai
+  const comMarcaValida = (f: FiltroPolitica): FiltroPolitica =>
+    !f.idMarca || !opcoes || marcasDoFiltro(opcoes, f).some(m => m.id === f.idMarca) ? f : { ...f, idMarca: null };
   const escolherCategoria = (idCategoria: number | null) => setFiltro(f => {
     // as famílias escolhidas que não são da categoria nova saem
     const validas = new Set((opcoes ? familiasDaCategoria(opcoes, idCategoria) : []).map(x => x.id));
-    return { ...f, idCategoria, idsFamilias: (f.idsFamilias || []).filter(id => validas.has(id)) };
+    return comMarcaValida({ ...f, idCategoria, idsFamilias: (f.idsFamilias || []).filter(id => validas.has(id)) });
   });
+  const escolherFamilias = (idsFamilias: number[]) => setFiltro(f => comMarcaValida({ ...f, idsFamilias }));
   const mudarFaixaCusto = (k: number, p: Partial<{ ateCusto: number | null; markup: number }>) => setFaixasCusto(l => l.map((f, i) => (i === k ? { ...f, ...p } : f)));
 
   return (
@@ -118,14 +123,14 @@ const VarejoAtacadoLote: React.FC = () => {
                   <Text>Famílias{filtro.idCategoria ? ` da categoria (${familiasDaCat.length})` : ''}</Text>
                   <Space size={8}>
                     {filtro.idCategoria && familiasDaCat.length > 0 && (
-                      <a onClick={() => setFiltro(f => ({ ...f, idsFamilias: familiasDaCat.map(x => x.id) }))}>adicionar todas ({familiasDaCat.length})</a>
+                      <a onClick={() => escolherFamilias(familiasDaCat.map(x => x.id))}>adicionar todas ({familiasDaCat.length})</a>
                     )}
-                    {(filtro.idsFamilias || []).length > 0 && <a onClick={() => setFiltro(f => ({ ...f, idsFamilias: [] }))}>limpar</a>}
+                    {(filtro.idsFamilias || []).length > 0 && <a onClick={() => escolherFamilias([])}>limpar</a>}
                   </Space>
                 </Flex>
                 <Select mode="multiple" allowClear showSearch optionFilterProp="label" style={{ width: '100%' }}
                   placeholder={filtro.idCategoria ? 'Todas as da categoria (ou escolha algumas)' : 'Ex.: Rolamento 608, Rolamento 6004'}
-                  maxTagCount="responsive" options={familiasOpcoes} value={filtro.idsFamilias || []} onChange={v => setFiltro(f => ({ ...f, idsFamilias: v }))} />
+                  maxTagCount="responsive" options={familiasOpcoes} value={filtro.idsFamilias || []} onChange={v => escolherFamilias(v)} />
               </div>
               <Row gutter={8}>
                 <Col span={12}>
@@ -135,9 +140,11 @@ const VarejoAtacadoLote: React.FC = () => {
                     onChange={v => setFiltro(f => ({ ...f, idTag: (v as number) ?? null }))} />
                 </Col>
                 <Col span={12}>
-                  <Text>Marca</Text>
-                  <Select allowClear showSearch optionFilterProp="label" style={{ width: '100%' }} placeholder="Todas"
-                    options={(opcoes?.marcas || []).map(m => ({ value: m.id, label: m.nome }))} value={filtro.idMarca ?? undefined}
+                  <Text>Marca{filtro.idCategoria || (filtro.idsFamilias || []).length ? ` (${marcasOpcoes.length})` : ''}</Text>
+                  <Select allowClear showSearch optionFilterProp="label" style={{ width: '100%' }}
+                    placeholder={filtro.idCategoria || (filtro.idsFamilias || []).length ? 'Todas as do filtro' : 'Todas'}
+                    notFoundContent="Nenhuma marca nos itens do filtro"
+                    options={marcasOpcoes.map(m => ({ value: m.id, label: m.nome }))} value={filtro.idMarca ?? undefined}
                     onChange={v => setFiltro(f => ({ ...f, idMarca: (v as number) ?? null }))} />
                 </Col>
                 <Col span={24}>

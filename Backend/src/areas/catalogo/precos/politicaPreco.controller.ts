@@ -132,6 +132,15 @@ export const opcoesPolitica = async (req: Request, res: Response) => {
        LEFT JOIN comercial_produtos_dados cpd ON cpd.familia_id = f.id AND cpd.tenant_id = f.tenant_id
        WHERE f.tenant_id = ? AND f.status <> 'INATIVO' GROUP BY f.id, f.nome ORDER BY f.nome`, [tenant]);
     const [marcas]: any = await pool.execute(`SELECT id, nome FROM comercial_marcas ORDER BY nome`);
+    // onde cada marca aparece (a do item ou, sem ela, a da família): para a lista de marcas seguir categoria e famílias
+    const [usos]: any = await pool.execute(
+      `SELECT COALESCE(cpd.id_marca, f.id_marca) AS id_marca, GROUP_CONCAT(DISTINCT cpd.familia_id) AS familias,
+              GROUP_CONCAT(DISTINCT COALESCE(f.categoria_id, cpd.categoria_id)) AS categorias
+       FROM comercial_produtos_dados cpd LEFT JOIN comercial_familias f ON f.id = cpd.familia_id AND f.tenant_id = cpd.tenant_id
+       WHERE cpd.tenant_id = ? AND COALESCE(cpd.id_marca, f.id_marca) IS NOT NULL
+       GROUP BY COALESCE(cpd.id_marca, f.id_marca)`, [tenant]);
+    const usoDa = new Map<number, any>(usos.map((u: any) => [Number(u.id_marca), u]));
+    const numeros = (v: unknown) => String(v || '').split(',').map(Number).filter(n => n > 0);
     const [tags]: any = await pool.execute(`SELECT id_tag, nome, cor FROM comercial_tags WHERE tenant_id = ? AND ativo = 1 ORDER BY nome`, [tenant]);
     return res.json({
       categorias: categorias.map((c: any) => ({ id: Number(c.id), nome: c.nome, idPai: c.categoria_pai_id ? Number(c.categoria_pai_id) : null })),
@@ -140,7 +149,10 @@ export const opcoesPolitica = async (req: Request, res: Response) => {
         id: Number(f.id), nome: f.nome, itens: Number(f.itens) || 0,
         categorias: String(f.categorias || '').split(',').map(Number).filter(n => n > 0),
       })),
-      marcas: marcas.map((m: any) => ({ id: Number(m.id), nome: m.nome })),
+      marcas: marcas.map((m: any) => ({
+        id: Number(m.id), nome: m.nome,
+        familias: numeros(usoDa.get(Number(m.id))?.familias), categorias: numeros(usoDa.get(Number(m.id))?.categorias),
+      })),
       tags: tags.map((t: any) => ({ id: Number(t.id_tag), nome: t.nome, cor: t.cor })),
     });
   } catch (e) { return erro(res, e, 'Erro ao carregar as opções do filtro.'); }

@@ -28,7 +28,8 @@ export interface ItemPrevia {
 export interface OpcoesPolitica {
   categorias: { id: number; nome: string; idPai: number | null }[];
   familias: { id: number; nome: string; itens: number; categorias: number[] }[];
-  marcas: { id: number; nome: string }[];
+  /** familias/categorias: onde a marca aparece (a do item ou a da família) */
+  marcas: { id: number; nome: string; familias: number[]; categorias: number[] }[];
   tags: { id: number; nome: string; cor: string }[];
 }
 

@@ -34,6 +34,18 @@ export const familiasDaCategoria = (opcoes: OpcoesPolitica, idCategoria: number 
   return opcoes.familias.filter(f => f.categorias.some(c => cats.has(c)));
 };
 
+/**
+ * Marcas que fazem sentido no filtro: as das famílias escolhidas; sem família, as da categoria (com as subcategorias);
+ * sem nada, todas.
+ */
+export const marcasDoFiltro = (opcoes: OpcoesPolitica, f: { idCategoria?: number | null; idsFamilias?: number[] }) => {
+  const fams = new Set(f.idsFamilias || []);
+  if (fams.size) return opcoes.marcas.filter(m => m.familias.some(x => fams.has(x)));
+  if (!f.idCategoria) return opcoes.marcas;
+  const cats = comSubcategorias(opcoes.categorias, f.idCategoria);
+  return opcoes.marcas.filter(m => m.categorias.some(c => cats.has(c)));
+};
+
 /** Contagens da prévia: o que muda, o que já está igual, o que não dá para aplicar e quantos têm aviso. */
 export const resumoPrevia = (itens: ItemPrevia[]) => ({
   total: itens.length,
