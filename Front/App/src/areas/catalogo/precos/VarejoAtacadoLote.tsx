@@ -4,11 +4,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Alert, Button, Card, Checkbox, Col, Empty, Flex, Input, InputNumber, Popconfirm, Row, Segmented, Select, Space, Table, Tag, Tooltip, TreeSelect, Typography, message,
+  Alert, Button, Card, Checkbox, Col, Empty, Flex, InputNumber, Popconfirm, Row, Segmented, Space, Table, Tag, Tooltip, Typography, message,
 } from 'antd';
 import { ArrowLeftOutlined, CheckOutlined, DeleteOutlined, EyeOutlined, PlusOutlined, WarningOutlined } from '@ant-design/icons';
 import { FaixaPrevia, FiltroPolitica, ItemPrevia, NivelAtacado, OpcoesPolitica, Politica, politicaPrecoApi, RegraVarejo } from './politicaPrecoApi';
-import { arvoreCategorias, familiasDaCategoria, marcasDoFiltro, resumoPrevia } from './politicaPrecoTela';
+import { resumoPrevia } from './politicaPrecoTela';
+import FiltroItensLote from '../FiltroItensLote';
 
 const { Text, Title } = Typography;
 const brl = (v: number | null | undefined) => (v === null || v === undefined ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
@@ -84,21 +85,6 @@ const VarejoAtacadoLote: React.FC = () => {
 
   const resumo = previa ? resumoPrevia(previa.itens) : null;
   const linhas = (previa?.itens || []).filter(i => !soProblemas || i.plano.situacao === 'ERRO' || i.plano.avisos.length > 0);
-  const familiasDaCat = opcoes ? familiasDaCategoria(opcoes, filtro.idCategoria) : [];
-  const familiasOpcoes = familiasDaCat.map(f => ({ value: f.id, label: `${f.nome} (${f.itens})` }));
-  const marcasOpcoes = opcoes ? marcasDoFiltro(opcoes, filtro) : [];
-  // as marcas escolhidas que não existem na categoria/famílias novas saem
-  const comMarcaValida = (f: FiltroPolitica): FiltroPolitica => {
-    if (!f.idsMarcas?.length || !opcoes) return f;
-    const validas = new Set(marcasDoFiltro(opcoes, f).map(m => m.id));
-    return { ...f, idsMarcas: f.idsMarcas.filter(id => validas.has(id)) };
-  };
-  const escolherCategoria = (idCategoria: number | null) => setFiltro(f => {
-    // as famílias escolhidas que não são da categoria nova saem
-    const validas = new Set((opcoes ? familiasDaCategoria(opcoes, idCategoria) : []).map(x => x.id));
-    return comMarcaValida({ ...f, idCategoria, idsFamilias: (f.idsFamilias || []).filter(id => validas.has(id)) });
-  });
-  const escolherFamilias = (idsFamilias: number[]) => setFiltro(f => comMarcaValida({ ...f, idsFamilias }));
   const mudarFaixaCusto = (k: number, p: Partial<{ ateCusto: number | null; markup: number }>) => setFaixasCusto(l => l.map((f, i) => (i === k ? { ...f, ...p } : f)));
 
   return (
@@ -114,49 +100,7 @@ const VarejoAtacadoLote: React.FC = () => {
       <Row gutter={[12, 12]}>
         <Col xs={24} lg={10}>
           <Card size="small" title="1. Quais itens" style={{ height: '100%' }}>
-            <Space direction="vertical" style={{ width: '100%' }} size={8}>
-              <div>
-                <Text>Categoria (com as subcategorias)</Text>
-                <TreeSelect allowClear showSearch treeNodeFilterProp="title" style={{ width: '100%' }} placeholder="Ex.: Rolamentos"
-                  treeData={opcoes ? arvoreCategorias(opcoes.categorias) : []} value={filtro.idCategoria ?? undefined}
-                  onChange={v => escolherCategoria((v as number) ?? null)} />
-              </div>
-              <div>
-                <Flex justify="space-between">
-                  <Text>Famílias{filtro.idCategoria ? ` da categoria (${familiasDaCat.length})` : ''}</Text>
-                  <Space size={8}>
-                    {filtro.idCategoria && familiasDaCat.length > 0 && (
-                      <a onClick={() => escolherFamilias(familiasDaCat.map(x => x.id))}>adicionar todas ({familiasDaCat.length})</a>
-                    )}
-                    {(filtro.idsFamilias || []).length > 0 && <a onClick={() => escolherFamilias([])}>limpar</a>}
-                  </Space>
-                </Flex>
-                <Select mode="multiple" allowClear showSearch optionFilterProp="label" style={{ width: '100%' }}
-                  placeholder={filtro.idCategoria ? 'Todas as da categoria (ou escolha algumas)' : 'Ex.: Rolamento 608, Rolamento 6004'}
-                  maxTagCount="responsive" options={familiasOpcoes} value={filtro.idsFamilias || []} onChange={v => escolherFamilias(v)} />
-              </div>
-              <Row gutter={8}>
-                <Col span={12}>
-                  <Text>Tag</Text>
-                  <Select allowClear showSearch optionFilterProp="label" style={{ width: '100%' }} placeholder="Ex.: bicicleta"
-                    options={(opcoes?.tags || []).map(t => ({ value: t.id, label: t.nome }))} value={filtro.idTag ?? undefined}
-                    onChange={v => setFiltro(f => ({ ...f, idTag: (v as number) ?? null }))} />
-                </Col>
-                <Col span={12}>
-                  <Text>Marca{filtro.idCategoria || (filtro.idsFamilias || []).length ? ` (${marcasOpcoes.length})` : ''}</Text>
-                  <Select mode="multiple" allowClear showSearch optionFilterProp="label" style={{ width: '100%' }} maxTagCount="responsive"
-                    placeholder={filtro.idCategoria || (filtro.idsFamilias || []).length ? 'Todas as do filtro' : 'Todas'}
-                    notFoundContent="Nenhuma marca nos itens do filtro"
-                    options={marcasOpcoes.map(m => ({ value: m.id, label: m.nome }))} value={filtro.idsMarcas || []}
-                    onChange={v => setFiltro(f => ({ ...f, idsMarcas: v as number[] }))} />
-                </Col>
-                <Col span={24}>
-                  <Text>Busca (nome, SKU ou família)</Text>
-                  <Input allowClear placeholder="Ex.: Rolamento 62" value={filtro.busca} onChange={e => setFiltro(f => ({ ...f, busca: e.target.value }))} onPressEnter={verPrevia} />
-                </Col>
-              </Row>
-              <Text type="secondary" style={{ fontSize: 12 }}>Os filtros se somam (ex.: categoria Rolamentos + tag bicicleta). Até 500 itens por vez.</Text>
-            </Space>
+            <FiltroItensLote opcoes={opcoes} filtro={filtro} setFiltro={setFiltro} onEnter={verPrevia} />
           </Card>
         </Col>
 

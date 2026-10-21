@@ -7,14 +7,14 @@ import { alvoEfetivo } from '../../compras/inteligente/margemAlvo';
 import { temTaxaEmbutida } from './taxaEmbutida';
 import { margemLiquida } from './precificacao';
 import { ErroPolitica, ItemPolitica, planejarPolitica, Politica, validarPolitica } from './politicaPreco';
-import { SQL_ITEM_TEM_TAG_ID } from '../tags/tags';
+import { condicoesDoFiltro, FiltroItens } from '../filtroItens';
 
 const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || req.body?.tenant_id || 1);
 const ALVO_PADRAO = 30;
 const MAX_ITENS = 500;
 const lista = (n: number) => Array(n).fill('?').join(',');
 
-interface Filtro { idCategoria?: number | null; idsFamilias?: number[]; idsMarcas?: number[]; idTag?: number | null; busca?: string }
+type Filtro = FiltroItens;
 interface ItemCarregado extends ItemPolitica {
   idItem: number; sku: string; nome: string; familia: string | null; marca: string | null; idUnidade: number | null; unidade: string | null;
   alvoPct: number; idFaixaVarejo: number | null;
@@ -26,42 +26,15 @@ const erro = (res: Response, e: any, padrao: string) => {
   return res.status(500).json({ error: padrao, details: e?.message });
 };
 
-/** A categoria e todas as que estão abaixo dela. */
-const comSubcategorias = async (conn: any, tenant: number, id: number) => {
-  const [cats]: any = await conn.execute(`SELECT id, categoria_pai_id FROM comercial_categorias WHERE tenant_id = ?`, [tenant]);
-  const filhos = new Map<number, number[]>();
-  for (const c of cats) {
-    const pai = Number(c.categoria_pai_id) || 0;
-    if (!filhos.has(pai)) filhos.set(pai, []);
-    filhos.get(pai)!.push(Number(c.id));
-  }
-  const saida = new Set<number>([id]);
-  const fila = [id];
-  while (fila.length) for (const f of filhos.get(fila.shift()!) || []) if (!saida.has(f)) { saida.add(f); fila.push(f); }
-  return [...saida];
-};
-
 /** Itens do filtro (ou dos ids) com o custo, o alvo e as faixas da unidade base. */
 const carregarItens = async (conn: any, tenant: number, filtro: Filtro, ids?: number[], trava = false): Promise<ItemCarregado[]> => {
   const where = [`ic.tenant_id = ?`, `UPPER(COALESCE(ic.status, 'ATIVO')) <> 'INATIVO'`, `UPPER(COALESCE(ic.tipo_recurso, 'PRODUTO')) = 'PRODUTO'`];
   const params: any[] = [tenant];
   if (ids) { where.push(`ic.id_item IN (${lista(ids.length)})`); params.push(...ids); }
   else {
-    if (filtro.idCategoria) {
-      const cats = await comSubcategorias(conn, tenant, Number(filtro.idCategoria));
-      where.push(`COALESCE(f.categoria_id, cpd.categoria_id) IN (${lista(cats.length)})`); params.push(...cats);
-    }
-    const fams = (filtro.idsFamilias || []).map(Number).filter(n => n > 0);
-    if (fams.length) { where.push(`cpd.familia_id IN (${lista(fams.length)})`); params.push(...fams); }
-    const marcas = (filtro.idsMarcas || []).map(Number).filter(n => n > 0);
-    if (marcas.length) { where.push(`COALESCE(cpd.id_marca, f.id_marca) IN (${lista(marcas.length)})`); params.push(...marcas); }
-    if (filtro.idTag) { where.push(SQL_ITEM_TEM_TAG_ID); params.push(Number(filtro.idTag), Number(filtro.idTag)); }
-    const busca = String(filtro.busca || '').trim();
-    if (busca) {
-      where.push(`(ic.sku LIKE ? OR cpd.sku_customizado LIKE ? OR ic.nome_item LIKE ? OR cpd.nome_comercial LIKE ? OR f.nome LIKE ?)`);
-      params.push(...Array(5).fill(`%${busca}%`));
-    }
-    if (!filtro.idCategoria && !fams.length && !marcas.length && !filtro.idTag && !busca) throw new ErroPolitica('Escolha uma categoria, família, marca, tag ou digite uma busca.');
+    const c = await condicoesDoFiltro(conn, tenant, filtro);
+    if (c.vazio) throw new ErroPolitica('Escolha uma categoria, família, marca, tag ou digite uma busca.');
+    where.push(...c.where); params.push(...c.params);
   }
   const [itens]: any = await conn.execute(
     `SELECT ic.id_item, COALESCE(cpd.sku_customizado, ic.sku) AS sku, COALESCE(cpd.nome_comercial, ic.nome_item) AS nome,
