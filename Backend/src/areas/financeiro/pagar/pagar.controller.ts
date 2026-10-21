@@ -92,12 +92,16 @@ export const lancarCobranca = async (req: Request, res: Response) => {
     if (!idFornecedor) throw new ErroPagar('Cadastre o fornecedor da nota antes de lançar os boletos.', 422);
 
     const descricao = `NF ${lote.numero_nf || lote.id}${lote.razao_social_fornecedor ? ` - ${lote.razao_social_fornecedor}` : ''}`.slice(0, 150);
+    // compra de mercadoria: não entra como despesa no resultado do mês (o custo entra na venda)
+    const [[cat]]: any = await conn.execute(
+      `SELECT id_categoria FROM financeiro_categorias WHERE tenant_id = ? AND tipo = 'DESPESA' AND grupo = 'Mercadoria' AND ativo = 1 ORDER BY id_categoria LIMIT 1`, [tenant]
+    );
     for (const [i, p] of parcelas.entries()) {
       await conn.execute(
-        `INSERT INTO financeiro_contas_pagar (tenant_id, id_fornecedor, id_lote, numero_documento, parcela, total_parcelas, descricao,
+        `INSERT INTO financeiro_contas_pagar (tenant_id, id_fornecedor, id_lote, id_categoria, numero_documento, parcela, total_parcelas, descricao,
            vencimento, valor, forma_pagamento, codigo_barras, operador)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [tenant, idFornecedor, lote.id, p.numero || `${lote.numero_nf || lote.id}/${i + 1}`, i + 1, parcelas.length, descricao,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [tenant, idFornecedor, lote.id, cat?.id_categoria ?? null, p.numero || `${lote.numero_nf || lote.id}/${i + 1}`, i + 1, parcelas.length, descricao,
           p.vencimento, f4(p.valor), p.forma, p.codigoBarras, operadorDe(req)]
       );
     }

@@ -11,6 +11,7 @@ import receberRoutes from './areas/financeiro/receber/receber.routes';
 import pagarRoutes from './areas/financeiro/pagar/pagar.routes';
 import { painelFinanceiro } from './areas/financeiro/painel/painelFinanceiro.controller';
 import categoriasFinanceiroRoutes from './areas/financeiro/categorias.routes';
+import { resultadoDosMeses } from './areas/financeiro/resultado/resultadoMes.controller';
 // Módulos plugáveis (cada um liga/desliga por loja em sistema_modulos)
 import modulosRoutes from './modulos/registro';
 import { Router, Request, Response } from 'express';
@@ -30,6 +31,7 @@ router.use('/fiscal', fiscalRoutes);
 router.use('/financeiro/receber', receberRoutes);
 router.use('/financeiro/pagar', pagarRoutes);
 router.get('/financeiro/painel', painelFinanceiro);
+router.get('/financeiro/resultado', resultadoDosMeses);
 router.use('/financeiro/categorias', categoriasFinanceiroRoutes);
 router.use('/financeiro', financeiroRoutes);
 router.use('/catalogo', catalogoRoutes);
