@@ -19,6 +19,7 @@ import { ErroML, ml } from './mercadolivreApi';
 import { acharLimiteTaxaFixa, alertasDePreco, avisosDeDegrau, Degrau19, LIMITE_FRETE_COMPRADOR, LIMITE_FRETE_GRATIS, precoQueEmpata, precoQueCompensaFrete, montarCenarios, quantidadesParaAnalise, resultadoVenda, valorNaTabelaDeFrete, vendedorPagaFrete } from './custosMl';
 import { freteDoEnvio, freteGratisNoMl, freteRealNoMl, pesoCobrado, preferenciasEnvio } from './freteMl';
 import { daPrejuizo, textoPrejuizo } from './travaPrejuizo';
+import { custoEmbalagemNoLucro } from './configEmbalagem';
 
 const r2 = (v: number) => Math.round((Number(v) + Number.EPSILON) * 100) / 100;
 
@@ -95,7 +96,9 @@ export const contextoVenda = async (
   const informado = op.informado ?? null;
   // custo da unidade vendida no ML (pacote = custo base × fator)
   const fator = item.unidadeMl?.fator || 1;
-  const custo = r2((await custoBase(tenant, item.idItem)) * fator);
+  // com o interruptor ligado (aba Envio), a embalagem de envio da forma de venda entra no custo
+  const custoEmbalagem = item.pacoteEnvio && await custoEmbalagemNoLucro(tenant) ? Number(item.pacoteEnvio.custo) || 0 : 0;
+  const custo = r2((await custoBase(tenant, item.idItem)) * fator + custoEmbalagem);
   const [[fam]]: any = await pool.execute(
     `SELECT f.margem_minima FROM comercial_produtos_dados cpd LEFT JOIN comercial_familias f ON f.id = cpd.familia_id
      WHERE cpd.id_item = ? AND cpd.tenant_id = ?`, [item.idItem, tenant]

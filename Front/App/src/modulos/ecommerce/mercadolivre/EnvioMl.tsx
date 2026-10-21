@@ -1,9 +1,9 @@
 // Aba Envio do Mercado Livre: cada forma de venda com o pacote que está no anúncio e o do ERP (embalagem recomendada +
-// produto × quantidade), o frete hoje e com o pacote do ERP, o custo da embalagem e o lucro com ela (prévia: ainda não
-// entra na conta), e o que falta. "Enviar pacote" manda só peso e medidas ao anúncio.
+// produto × quantidade), o frete hoje e com o pacote do ERP, o custo da embalagem e o lucro com ela, e o que falta.
+// O interruptor põe o custo da embalagem no lucro (e na trava de prejuízo). "Enviar pacote" manda só peso e medidas.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Alert, Button, Card, Col, Flex, Popconfirm, Row, Segmented, Space, Statistic, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { Alert, Button, Card, Col, Flex, Popconfirm, Row, Segmented, Space, Statistic, Switch, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { CloudUploadOutlined, InboxOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/icons';
 import { anunciosApi, Caixa, formatarMoeda, LinhaEnvio } from './mercadoLivreApi';
 import { cairiaEmPrejuizo, contarEnvio, FiltroEnvio, passaNoFiltroEnvio, podeEnviarPacote } from './envioLista';
@@ -27,10 +27,12 @@ const EnvioMl: React.FC = () => {
   const [filtro, setFiltro] = useState<FiltroEnvio>('todos');
   const [marcadas, setMarcadas] = useState<string[]>([]);
   const [enviando, setEnviando] = useState<string | null>(null);
+  const [naConta, setNaConta] = useState(false);
+  const [trocando, setTrocando] = useState(false);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
-    try { setLinhas(await anunciosApi.envio()); setMarcadas([]); }
+    try { const r = await anunciosApi.envio(); setLinhas(r.linhas); setNaConta(r.custoEmbalagemNoLucro); setMarcadas([]); }
     catch (e) { message.error(e instanceof Error ? e.message : 'Erro.'); }
     finally { setCarregando(false); }
   }, []);
@@ -54,19 +56,42 @@ const EnvioMl: React.FC = () => {
     if (erros.length) message.error(erros.slice(0, 3).join(' · '), 8);
     carregar();
   };
+  const trocarInterruptor = async (ligado: boolean) => {
+    setTrocando(true);
+    try {
+      await anunciosApi.custoEmbalagemNoLucro(ligado);
+      message.success(ligado ? 'O custo da embalagem entrou no lucro dos anúncios.' : 'O custo da embalagem saiu do lucro dos anúncios.');
+      await carregar();
+    } catch (e) { message.error(e instanceof Error ? e.message : 'Erro.'); }
+    finally { setTrocando(false); }
+  };
   const resolver = (l: LinhaEnvio) => navigate(`/catalogo/logistica${l.idFamilia ? `?familia=${l.idFamilia}` : ''}`);
   const marcadasParaEnviar = linhas.filter(l => marcadas.includes(chave(l)) && podeEnviarPacote(l));
 
   return (
     <div>
-      <Alert type="info" showIcon style={{ marginBottom: 12 }}
-        message="Prévia: o custo da embalagem ainda não entra no lucro dos anúncios"
-        description="Veja aqui como fica o lucro de cada forma de venda com a embalagem. Quando conferir, o custo passa a entrar na conta (e na trava de prejuízo) por um interruptor nas configurações do ML." />
+      <Alert type={naConta ? 'success' : 'info'} showIcon style={{ marginBottom: 12 }}
+        message={naConta ? 'O custo da embalagem entra no lucro dos anúncios' : 'Prévia: o custo da embalagem ainda não entra no lucro dos anúncios'}
+        description={naConta
+          ? 'Preço, sugestões, lucro da lista e a trava de prejuízo já descontam a embalagem de cada forma de venda.'
+          : 'Veja abaixo como fica o lucro de cada forma de venda com a embalagem. Ligado, o custo passa a entrar na conta (e na trava de prejuízo).'}
+        action={
+          <Popconfirm
+            title={naConta ? 'Tirar o custo da embalagem do lucro?' : 'Pôr o custo da embalagem no lucro?'}
+            description={naConta ? 'O lucro dos anúncios volta a ser sem a embalagem.'
+              : contagem.prejuizo > 0
+                ? `${contagem.prejuizo} forma(s) de venda passam a dar prejuízo: a trava de prejuízo vai pausá-las na próxima sincronização (veja o cartão "Cairiam em prejuízo").`
+                : 'Nenhum anúncio cai em prejuízo com a embalagem.'}
+            okText={naConta ? 'Tirar' : 'Pôr no lucro'} okButtonProps={{ danger: !naConta && contagem.prejuizo > 0 }} cancelText="Voltar"
+            onConfirm={() => trocarInterruptor(!naConta)}>
+            <Space><Text>Custo da embalagem no lucro</Text><Switch checked={naConta} loading={trocando} /></Space>
+          </Popconfirm>
+        } />
       <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
         {([
           ['diferente', 'Pacote diferente do ML', contagem.diferente, '#d46b08', 'O ML cobra o frete pelo pacote de lá: mande o do ERP.'],
           ['semErp', 'Sem pacote no ERP', contagem.semErp, undefined, 'Falta embalagem recomendada ou peso do produto.'],
-          ['prejuizo', 'Cairiam em prejuízo', contagem.prejuizo, contagem.prejuizo ? '#cf1322' : '#389e0d', 'Dão lucro hoje, mas com o custo da embalagem passariam a dar prejuízo.'],
+          ['prejuizo', naConta ? 'Em prejuízo pela embalagem' : 'Cairiam em prejuízo', contagem.prejuizo, contagem.prejuizo ? '#cf1322' : '#389e0d', 'Sem a embalagem dão lucro; com o custo dela, prejuízo.'],
           ['falta', 'Com algo faltando', contagem.falta, undefined, 'Sem peso, medidas, embalagem ou foto.'],
         ] as const).map(([f, titulo, valor, cor, dica]) => (
           <Col xs={12} lg={6} key={f}>

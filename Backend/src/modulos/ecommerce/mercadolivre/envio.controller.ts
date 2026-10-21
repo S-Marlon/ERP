@@ -11,6 +11,7 @@ import { embalagensNoMl } from './sugestoes.controller';
 import { esquecerDivergencias } from './publicacao.controller';
 import { ErroML, ml } from './mercadolivreApi';
 import { faltasDoEnvio, situacaoDoPacote } from './envio';
+import { custoEmbalagemNoLucro, salvarCustoEmbalagemNoLucro } from './configEmbalagem';
 
 const r2 = (v: number) => Math.round((Number(v) + Number.EPSILON) * 100) / 100;
 const numeroMl = (n: number) => String(Math.round(n * 100) / 100);
@@ -28,6 +29,8 @@ export const envioDosAnuncios = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
   try {
     const anuncios = (await carregarAnuncios(pool as any, tenant)).filter(c => c.dados.categoriaMl && c.itens.length);
+    // ligado: o lucro da conta já desconta a embalagem (sem ela = soma de volta); desligado: é o contrário
+    const naConta = await custoEmbalagemNoLucro(tenant);
     const mlbs = anuncios.flatMap(c => [...c.noMl.values()].filter(m => m.mlbId && !foraDoMl(m.status)).map(m => m.mlbId!));
     const noMl = mlbs.length ? await embalagensNoMl(tenant, mlbs) : new Map();
     const linhas: any[] = [];
@@ -68,16 +71,27 @@ export const envioDosAnuncios = async (req: Request, res: Response) => {
           embalagem: pacote ? { ...pacote.embalagem, custo: custoEmbalagem } : null,
           pacoteErp: erp, pacoteMl: lido,
           situacaoPacote: situacaoDoPacote(lido, erp, publicado),
-          frete, freteComPacote, lucro,
-          lucroComEmbalagem: lucro === null ? null : r2(lucro - custoEmbalagem),
+          frete, freteComPacote,
+          lucro: lucro === null ? null : naConta ? r2(lucro + custoEmbalagem) : lucro,
+          lucroComEmbalagem: lucro === null ? null : naConta ? lucro : r2(lucro - custoEmbalagem),
           faltas: faltasDoEnvio({ pesoKg: item.pesoKg, medidas: item.medidasCm, temEmbalagem: !!pacote, fotos: item.fotos, fotoFamilia: !!c.dados.fotoFamilia }),
         };
       }));
       linhas.push(...doAnuncio.filter(Boolean));
     }
-    return res.json(linhas);
+    return res.json({ custoEmbalagemNoLucro: naConta, linhas });
   } catch (error) {
     return responderErro(res, error, 'Erro ao montar o envio dos anúncios.');
+  }
+};
+
+// PUT /anuncios/envio/custo-embalagem { ligado } — o custo da embalagem entra (ou sai) do lucro e da trava de prejuízo
+export const salvarCustoEmbalagem = async (req: Request, res: Response) => {
+  try {
+    await salvarCustoEmbalagemNoLucro(tenantDe(req), req.body?.ligado === true);
+    return res.json({ custoEmbalagemNoLucro: req.body?.ligado === true });
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao salvar o interruptor.');
   }
 };
 

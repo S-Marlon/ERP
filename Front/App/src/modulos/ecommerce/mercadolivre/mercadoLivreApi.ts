@@ -365,7 +365,10 @@ export const anunciosApi = {
   financeiro: async () => (await ler<{ id: number; itens: FinanceiroItem[] }[]>(await fetch(`${API}/anuncios/financeiro?tenant_id=1`), 'Erro ao calcular o lucro dos anúncios.'))
     .map(a => ({ ...a, itens: a.itens.map(comAlertas) })),
   detalhe: async (id: number) => ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}?tenant_id=1`), 'Erro ao abrir o anúncio.'),
-  envio: async () => ler<LinhaEnvio[]>(await fetch(`${API}/anuncios/envio?tenant_id=1`), 'Erro ao montar o envio dos anúncios.'),
+  envio: async () => ler<{ custoEmbalagemNoLucro: boolean; linhas: LinhaEnvio[] }>(await fetch(`${API}/anuncios/envio?tenant_id=1`), 'Erro ao montar o envio dos anúncios.'),
+  /** Liga/desliga o custo da embalagem no lucro dos anúncios (e na trava de prejuízo). */
+  custoEmbalagemNoLucro: async (ligado: boolean) =>
+    ler<{ custoEmbalagemNoLucro: boolean }>(await fetch(`${API}/anuncios/envio/custo-embalagem?tenant_id=1`, json('PUT', { ligado })), 'Erro ao salvar o interruptor.'),
   enviarPacote: async (id: number, idLinha: number) =>
     ler<{ success: boolean; mlbId: string }>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}/pacote?tenant_id=1`, json('POST')), 'Erro ao enviar o pacote ao ML.'),
   oportunidades: async () => ler<{ dias: number; itens: Oportunidade[] }>(await fetch(`${API}/oportunidades?tenant_id=1`), 'Erro ao listar as oportunidades.'),
