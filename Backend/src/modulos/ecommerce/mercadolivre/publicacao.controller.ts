@@ -428,7 +428,7 @@ export interface DivergenciasLinha { idLinha: number; idItem: number; sku: strin
 
 // guardadas por anúncio por 5 min (a lista pede de todos; o envio limpa a do anúncio)
 const cacheDivergencias = new Map<string, { em: number; valor: Promise<DivergenciasLinha[]> }>();
-const esquecerDivergencias = (tenant: number, id: number) => cacheDivergencias.delete(`${tenant}|${id}`);
+export const esquecerDivergencias = (tenant: number, id: number) => cacheDivergencias.delete(`${tenant}|${id}`);
 
 /** Compara cada linha publicada do anúncio com o que está no ML hoje. */
 const calcularDivergencias = async (tenant: number, c: AnuncioCarregado): Promise<DivergenciasLinha[]> => {
@@ -451,7 +451,8 @@ const calcularDivergencias = async (tenant: number, c: AnuncioCarregado): Promis
     saida.push({
       idLinha: item.idLinha, idItem: item.idItem, sku: item.sku,
       // embalagem do ML para trazer ao cadastro: só na unidade (o cadastro guarda a embalagem de uma unidade)
-      pacoteMl: (item.unidadeMl?.fator || 1) === 1 ? pacoteParaTrazer(atributosErp, b.attributes || [], lerMedidaMl) : null,
+      // com embalagem de envio, as medidas do ML são as da embalagem: não vêm para o produto
+      pacoteMl: (item.unidadeMl?.fator || 1) === 1 && !item.pacoteEnvio ? pacoteParaTrazer(atributosErp, b.attributes || [], lerMedidaMl) : null,
       diferencas: divergenciasDaLinha({
         atributos: { erp: atributosErp, ml: b.attributes || [] },
         fotos: { planejadas: await fotosPlanejadas(tenant, c, item), ml: (b.pictures || []).map((f: any) => String(f.id)) },
@@ -504,7 +505,7 @@ export const fichaDaForma = async (req: Request, res: Response) => {
     return res.json({
       publicado, mlbId: m?.mlbId || null,
       linhas: fichaDaLinha({ categoria: c.categoria.atributos, envio, noMl, origens: c.dados.atributos }),
-      pacoteMl: publicado && (item.unidadeMl?.fator || 1) === 1 ? pacoteParaTrazer(envio, noMl || [], lerMedidaMl) : null,
+      pacoteMl: publicado && (item.unidadeMl?.fator || 1) === 1 && !item.pacoteEnvio ? pacoteParaTrazer(envio, noMl || [], lerMedidaMl) : null,
     });
   } catch (error) {
     return responderErro(res, error, 'Erro ao montar a ficha.');

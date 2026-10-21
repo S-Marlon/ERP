@@ -21,6 +21,7 @@ import { aplicarModoDeVenda, vendaDoAnuncio } from './modoVenda';
 import { prejuizoDaLinha, prejuizosDasLinhas } from './precificacao.controller';
 import { pausadoPelaTrava, recusaPorPrejuizo } from './travaPrejuizo';
 import { ehModeracao } from './moderacao';
+import { embalagensDosItens, pacoteDoItem } from '../../../areas/catalogo/logistica/embalagensBanco';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
 
@@ -99,7 +100,7 @@ export const carregarItens = async (conn: Conn, tenant: number, ids: number[]) =
 
   const [base] = await conn.execute(
     `SELECT ic.id_item, ic.status, ic.nome_item, ic.sku AS sku_core, ic.peso_bruto, ic.peso_liquido, umb.sigla AS sigla_base, ic.id_unidade AS id_unidade_base,
-            cpd.sku_customizado, cpd.nome_comercial, cpd.preco_venda,
+            cpd.sku_customizado, cpd.nome_comercial, cpd.preco_venda, cpd.familia_id,
             COALESCE(mi.nome, mf.nome) AS marca, lg.altura_cm, lg.largura_cm, lg.comprimento_cm, es.quantidade_atual
      FROM itens_core ic
      LEFT JOIN comercial_produtos_dados cpd ON cpd.id_item = ic.id_item AND cpd.tenant_id = ic.tenant_id
@@ -172,6 +173,7 @@ export const carregarItens = async (conn: Conn, tenant: number, ids: number[]) =
       gtin: null,
       pesoKg: peso,
       medidasCm: alt > 0 && lar > 0 && com > 0 ? { altura: alt, largura: lar, comprimento: com } : null,
+      idFamilia: r.familia_id ? Number(r.familia_id) : null,
       marca: r.marca || null,
       siglaBase: r.sigla_base || null,
       valoresErp: {},
@@ -275,6 +277,8 @@ export const carregarAnuncios = async (conn: Conn, tenant: number, idAnuncio?: n
     [tenant, ...idsAnuncios]
   );
   const { itens, atributosErp, unidades, gtinsPorUnidade } = await carregarItens(conn, tenant, [...new Set<number>(vinculos.map((v: any) => Number(v.id_item)))]);
+  // embalagem de envio recomendada (Catálogo › Logística): o pacote de cada linha sai dela
+  const embalagens = await embalagensDosItens(conn, tenant, [...itens.values()].map(i => ({ idItem: i.idItem, idFamilia: i.idFamilia ?? null }))).catch(() => null);
 
   return Promise.all(anuncios.map(async (a: any) => {
     const dados = dadosDoAnuncio(a);
@@ -302,7 +306,8 @@ export const carregarAnuncios = async (conn: Conn, tenant: number, idAnuncio?: n
             preco: unidade.preco ?? Math.round(base.preco * unidade.fator * 100) / 100,
             sku: skuDaLinha(base.sku, unidade), gtin: gtinsPorUnidade.get(base.idItem)?.get(unidade.idUnidade) || null }
         : { ...base, unidadeMl: null };
-      return { ...noAnuncio, precoMl: v.preco === null ? null : Number(v.preco), estoqueMl: estoqueParaMl(noAnuncio.estoque, regra) };
+      const pacoteEnvio = embalagens ? pacoteDoItem(embalagens, base.idItem, unidade?.fator || 1, base.pesoKg) : null;
+      return { ...noAnuncio, precoMl: v.preco === null ? null : Number(v.preco), estoqueMl: estoqueParaMl(noAnuncio.estoque, regra), pacoteEnvio };
     });
     // linha desativada pelo operador não publica nem conta para o modo e as pendências
     const vendidos = itensDoAnuncio.filter(i => i.linhaAtiva !== false || noMl.get(i.idLinha)?.mlbId);

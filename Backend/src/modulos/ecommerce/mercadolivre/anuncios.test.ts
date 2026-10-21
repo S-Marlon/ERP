@@ -262,6 +262,9 @@ teste('linha em kit: peso multiplicado, unidades por kit e formato Kit', () => {
   // a caixa do cadastro é de uma unidade: o kit não manda medidas (fica a que está no ML)
   assert.strictEqual(a.some(x => x.id === 'SELLER_PACKAGE_HEIGHT'), false);
   assert.strictEqual(atributosDoItem(cat, d, item(1), true).some(x => x.id === 'SELLER_PACKAGE_HEIGHT'), true);
+  // com embalagem recomendada (Logística): o kit manda a caixa dele e o peso do pacote (produto × 10 + caixa)
+  const comCaixa = atributosDoItem(cat, d, { ...kit, pacoteEnvio: { medidas: { altura: 6, largura: 10, comprimento: 15 }, pesoKg: 2.06, custo: 0.8, embalagem: { idEmbalagem: 5, nome: 'Caixa nº 1' } } }, true);
+  assert.deepStrictEqual(comCaixa.filter(x => x.id.startsWith('SELLER_PACKAGE')).map(x => x.value_name), ['6 cm', '10 cm', '15 cm', '2060 g']);
   const un = atributosDoItem(cat, d, item(1), true);
   assert.deepStrictEqual(un.find(x => x.id === 'SALE_FORMAT'), { id: 'SALE_FORMAT', value_id: '1', value_name: 'Unidade' });
   assert.strictEqual(un.some(x => x.id === 'UNITS_PER_PACK'), false);

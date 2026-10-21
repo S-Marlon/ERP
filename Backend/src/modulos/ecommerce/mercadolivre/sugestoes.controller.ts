@@ -20,7 +20,7 @@ const r2 = (v: number) => Math.round((Number(v) + Number.EPSILON) * 100) / 100;
 type Embalagem = { pesoG: number | null; caixa: Caixa | null };
 
 /** Peso e medidas da embalagem como estão nos anúncios do ML (atributos SELLER_PACKAGE_*). */
-const embalagensNoMl = async (tenant: number, mlbs: string[]) => {
+export const embalagensNoMl = async (tenant: number, mlbs: string[]) => {
   const mapa = new Map<string, Embalagem>();
   for (let k = 0; k < mlbs.length; k += 20) {
     const parte: any[] = await ml(tenant, 'GET', `/items?ids=${mlbs.slice(k, k + 20).join(',')}&attributes=id,attributes`).catch(() => []);

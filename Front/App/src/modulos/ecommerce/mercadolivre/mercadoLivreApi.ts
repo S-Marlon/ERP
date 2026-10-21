@@ -166,6 +166,21 @@ export interface AnuncioDetalhe extends Omit<AnuncioResumo, 'itens'> {
   itens: ItemDoAnuncio[]; pendencias: Pendencia[];
 }
 
+/** Uma forma de venda de um anúncio na aba Envio: pacote no ML x do ERP, frete, custo da embalagem e o que falta. */
+export interface Caixa { altura: number; largura: number; comprimento: number }
+export interface LinhaEnvio {
+  idAnuncio: number; titulo: string; idLinha: number; idItem: number; idFamilia: number | null; sku: string; nome: string;
+  quantidade: number; forma: string; mlbId: string | null; status: string | null; publicado: boolean; linhaAtiva: boolean;
+  preco: number; tipo: string | null; freteGratis: boolean | null;
+  produto: { pesoKg: number | null; medidas: Caixa | null };
+  embalagem: { idEmbalagem: number; nome: string; custo: number } | null;
+  pacoteErp: { pesoG: number | null; caixa: Caixa | null } | null;
+  pacoteMl: { pesoG: number | null; caixa: Caixa | null } | null;
+  situacaoPacote: 'IGUAL' | 'DIFERENTE' | 'FALTA_NO_ML' | 'SEM_ERP' | 'NAO_PUBLICADO';
+  frete: number | null; freteComPacote: number | null; lucro: number | null; lucroComEmbalagem: number | null;
+  faltas: ('PESO' | 'MEDIDAS' | 'EMBALAGEM' | 'FOTO')[];
+}
+
 /** Item do catálogo que ainda não está no ML (aba Oportunidades). */
 export interface Oportunidade {
   idItem: number; sku: string; nome: string; fotoUrl: string | null; marca: string | null;
@@ -350,6 +365,9 @@ export const anunciosApi = {
   financeiro: async () => (await ler<{ id: number; itens: FinanceiroItem[] }[]>(await fetch(`${API}/anuncios/financeiro?tenant_id=1`), 'Erro ao calcular o lucro dos anúncios.'))
     .map(a => ({ ...a, itens: a.itens.map(comAlertas) })),
   detalhe: async (id: number) => ler<AnuncioDetalhe>(await fetch(`${API}/anuncios/${id}?tenant_id=1`), 'Erro ao abrir o anúncio.'),
+  envio: async () => ler<LinhaEnvio[]>(await fetch(`${API}/anuncios/envio?tenant_id=1`), 'Erro ao montar o envio dos anúncios.'),
+  enviarPacote: async (id: number, idLinha: number) =>
+    ler<{ success: boolean; mlbId: string }>(await fetch(`${API}/anuncios/${id}/itens/${idLinha}/pacote?tenant_id=1`, json('POST')), 'Erro ao enviar o pacote ao ML.'),
   oportunidades: async () => ler<{ dias: number; itens: Oportunidade[] }>(await fetch(`${API}/oportunidades?tenant_id=1`), 'Erro ao listar as oportunidades.'),
   lucroOportunidades: async (ids: number[]) =>
     ler<LucroOportunidade[]>(await fetch(`${API}/oportunidades/lucro?tenant_id=1&ids=${ids.join(',')}`), 'Erro ao calcular o lucro no ML.'),

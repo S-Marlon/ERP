@@ -2,12 +2,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Alert, Flex, Spin, Tabs, Tag, Typography } from 'antd';
-import { ApiOutlined, BulbOutlined, ShopOutlined, ShoppingCartOutlined, UnorderedListOutlined } from '@ant-design/icons';
+import { ApiOutlined, BulbOutlined, InboxOutlined, ShopOutlined, ShoppingCartOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { mercadoLivreApi, StatusML } from './mercadoLivreApi';
 import ContaMercadoLivre from './ContaMercadoLivre';
 import AnunciosMercadoLivre from './AnunciosMercadoLivre';
 import PedidosMercadoLivre from './PedidosMercadoLivre';
 import OportunidadesMl from './OportunidadesMl';
+import EnvioMl from './EnvioMl';
 
 const { Title, Text } = Typography;
 
@@ -54,6 +55,12 @@ const MercadoLivrePage: React.FC = () => {
             children: status && !status.conectado
               ? <Alert type="warning" showIcon message="Conecte a conta do Mercado Livre na aba Conta para calcular o lucro dos itens no ML." />
               : <OportunidadesMl />,
+          },
+          {
+            key: 'envio', label: <span><InboxOutlined /> Envio</span>,
+            children: status && !status.conectado
+              ? <Alert type="warning" showIcon message="Conecte a conta do Mercado Livre na aba Conta para comparar o pacote dos anúncios." />
+              : <EnvioMl />,
           },
           {
             key: 'pedidos', label: <span><ShoppingCartOutlined /> Pedidos</span>,

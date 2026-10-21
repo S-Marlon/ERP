@@ -41,6 +41,12 @@ export interface ItemAnuncio {
   gtin: string | null;
   pesoKg: number | null;
   medidasCm: { altura: number; largura: number; comprimento: number } | null;
+  idFamilia?: number | null;
+  /**
+   * Pacote do envio desta linha pela embalagem recomendada (Catálogo › Logística): medidas da embalagem e peso do produto
+   * × quantidade + o da embalagem. Vazio = sem embalagem para essa quantidade (vale o peso/medidas do produto).
+   */
+  pacoteEnvio?: { medidas: { altura: number; largura: number; comprimento: number } | null; pesoKg: number | null; custo: number; embalagem: { idEmbalagem: number; nome: string } } | null;
   marca: string | null;
   valoresErp: Record<string, string | null>;     // id do atributo nosso -> valor
   motivosCadastro: string[];                     // o que falta no cadastro interno (PIM)
@@ -317,8 +323,18 @@ export const atributosDoItem = (atributos: AtributoML[], dados: AnuncioDados, it
   if (item.sku) saida.push({ id: 'SELLER_SKU', value_name: item.sku });
   // kit sem código próprio: "é um kit ou pack" (o código da unidade não serve: cada embalagem tem o seu, é o que o PDV lê)
   if (temGtin) saida.push(item.gtin ? { id: 'GTIN', value_name: item.gtin } : { id: 'EMPTY_GTIN_REASON', value_id: fator > 1 ? MOTIVO_SEM_GTIN_KIT : MOTIVO_SEM_GTIN });
-  // as medidas do cadastro são da embalagem de UMA unidade: no kit elas não valem (10 rolamentos não cabem na caixa de
-  // um). Sem a embalagem do kit no ERP, a linha de kit não manda medidas e fica a que está no ML; o peso multiplica
+  // com embalagem recomendada (Logística), o pacote é ela: medidas da embalagem e peso do produto × quantidade + o dela
+  // (vale também para o kit, que ganha a caixa dele)
+  const pacote = item.pacoteEnvio;
+  if (pacote?.medidas) {
+    saida.push({ id: 'SELLER_PACKAGE_HEIGHT', value_name: `${numeroMl(pacote.medidas.altura)} cm` });
+    saida.push({ id: 'SELLER_PACKAGE_WIDTH', value_name: `${numeroMl(pacote.medidas.largura)} cm` });
+    saida.push({ id: 'SELLER_PACKAGE_LENGTH', value_name: `${numeroMl(pacote.medidas.comprimento)} cm` });
+    if (pacote.pesoKg) saida.push({ id: 'SELLER_PACKAGE_WEIGHT', value_name: `${Math.max(1, Math.round(pacote.pesoKg * 1000))} g` });
+    return saida;
+  }
+  // sem embalagem: as medidas do cadastro são da embalagem de UMA unidade e no kit elas não valem (10 rolamentos não
+  // cabem na caixa de um). A linha de kit não manda medidas e fica a que está no ML; o peso multiplica
   if (item.medidasCm && fator === 1) {
     saida.push({ id: 'SELLER_PACKAGE_HEIGHT', value_name: `${numeroMl(item.medidasCm.altura)} cm` });
     saida.push({ id: 'SELLER_PACKAGE_WIDTH', value_name: `${numeroMl(item.medidasCm.largura)} cm` });

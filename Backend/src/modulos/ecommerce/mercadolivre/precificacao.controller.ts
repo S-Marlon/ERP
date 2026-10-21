@@ -111,7 +111,10 @@ export const contextoVenda = async (
   const pref = await preferenciasEnvio(tenant).catch(() => null);
   const freteGratis = noMlEnvio ? noMlEnvio.gratis : pref?.freteGratisPadrao ?? true;
   const logistica = noMlEnvio?.logistica || pref?.logistica || 'drop_off';
-  const peso = pref ? await pesoCobrado(tenant, { mlbId: mlb, pesoKg: item.pesoKg, medidasCm: item.medidasCm, fator }).catch(() => null) : null;
+  const pacote = item.pacoteEnvio?.medidas && item.pacoteEnvio.pesoKg ? item.pacoteEnvio : null;
+  const peso = pref ? await pesoCobrado(tenant, pacote
+    ? { mlbId: mlb, pesoKg: pacote.pesoKg, medidasCm: pacote.medidas, fator: 1 }
+    : { mlbId: mlb, pesoKg: item.pesoKg, medidasCm: item.medidasCm, fator }).catch(() => null) : null;
   const envioDe = (valorCompra: number, quantidade = 1, tipoAnuncio = tipo) =>
     (peso ? freteDoEnvio(tenant, { pesoG: peso.pesoG * quantidade, valorCompra, tipo: tipoAnuncio, logistica }) : Promise.resolve(null));
   /**
