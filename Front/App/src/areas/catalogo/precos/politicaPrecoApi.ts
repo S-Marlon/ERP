@@ -12,7 +12,7 @@ export interface Politica {
   varejo: RegraVarejo;
   atacado: { modo: 'MANTER' } | { modo: 'DEFINIR'; nivel1: NivelAtacado | null; nivel2: NivelAtacado | null; pularQuemTem: boolean };
 }
-export interface FiltroPolitica { idCategoria?: number | null; idsFamilias?: number[]; idMarca?: number | null; busca?: string }
+export interface FiltroPolitica { idCategoria?: number | null; idsFamilias?: number[]; idMarca?: number | null; idTag?: number | null; busca?: string }
 
 export interface FaixaPrevia {
   tipo: 'VAREJO' | 'ATACADO'; ordem: number; quantidadeMinima: number; quantidadeMaxima: number | null; markup: number; preco: number;
@@ -29,6 +29,7 @@ export interface OpcoesPolitica {
   categorias: { id: number; nome: string; idPai: number | null }[];
   familias: { id: number; nome: string; itens: number; categorias: number[] }[];
   marcas: { id: number; nome: string }[];
+  tags: { id: number; nome: string; cor: string }[];
 }
 
 const pedir = async <T,>(url: string, init: RequestInit | undefined, padrao: string): Promise<T> => {

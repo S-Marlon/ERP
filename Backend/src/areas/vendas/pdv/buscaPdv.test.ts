@@ -22,7 +22,9 @@ assert(!casa(padraoMedidas('7 x x 10')!, nome6003), '7 não casa com 17');
 
 // Palavras em qualquer ordem: uma condição por palavra; GTIN pelo termo inteiro
 const f = filtroBusca('skf 6205');
-assert(f.params.length === 9 && f.params[0] === '%skf%' && f.params[4] === '%6205%' && f.params[8] === 'skf 6205', `palavras ${JSON.stringify(f.params)}`);
+assert(f.params.length === 11 && f.params[0] === '%skf%' && f.params[4] === '%skf%' && f.params[5] === '%6205%' && f.params[10] === 'skf 6205', `palavras ${JSON.stringify(f.params)}`);
+// tag: a palavra vai sem acento e minúscula (o slug da tag)
+assert(filtroBusca('Bicicléta').params[4] === '%bicicleta%', 'palavra casa com o slug da tag');
 assert(f.sql.split(') AND (').length === 2, 'duas palavras com AND');
 const m = filtroBusca('17 x x 10');
 assert(m.params[0] === '%| 17 mm x % x 10 mm%' && m.params[2] === '17 x x 10', 'filtro de medidas');

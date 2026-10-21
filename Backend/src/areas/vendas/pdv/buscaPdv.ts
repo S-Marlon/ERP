@@ -1,4 +1,7 @@
-// Busca do PDV: cada palavra precisa aparecer (em qualquer ordem) no SKU ou no nome; GTIN exato; e busca por medidas
+import { slugTag, SQL_ITEM_TEM_TAG_LIKE } from '../../catalogo/tags/tags';
+
+// Busca do PDV: cada palavra precisa aparecer (em qualquer ordem) no SKU, no nome ou numa tag do item (dele ou da
+// família: "bicicleta" acha os itens marcados); GTIN exato; e busca por medidas
 // com espaço vazio ("17 mm x x 10mm" acha "| 17 mm x 35 mm x 10 mm |"), usando o padrão de medidas dos nomes.
 // O sinal × vale como x dos dois lados.
 
@@ -32,9 +35,9 @@ export const filtroBusca = (busca: string): { sql: string; params: string[] } =>
     return { sql: `((${NOME_COMERCIAL} LIKE ? OR ${NOME_ITEM} LIKE ?) OR ${GTIN})`, params: [medidas, medidas, termo] };
   }
   const palavras = termo.replace(/×/g, 'x').split(/\s+/).filter(Boolean).slice(0, 8);
-  const porPalavra = palavras.map(() => `(ic.sku LIKE ? OR cpd.sku_customizado LIKE ? OR ${NOME_ITEM} LIKE ? OR ${NOME_COMERCIAL} LIKE ?)`);
+  const porPalavra = palavras.map(() => `(ic.sku LIKE ? OR cpd.sku_customizado LIKE ? OR ${NOME_ITEM} LIKE ? OR ${NOME_COMERCIAL} LIKE ? OR ${SQL_ITEM_TEM_TAG_LIKE})`);
   return {
     sql: `((${porPalavra.join(' AND ')}) OR ${GTIN})`,
-    params: [...palavras.flatMap(p => Array(4).fill(`%${p}%`)), termo],
+    params: [...palavras.flatMap(p => [...Array(4).fill(`%${p}%`), `%${slugTag(p)}%`]), termo],
   };
 };

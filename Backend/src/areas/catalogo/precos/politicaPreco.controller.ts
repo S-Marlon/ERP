@@ -7,13 +7,14 @@ import { alvoEfetivo } from '../../compras/inteligente/margemAlvo';
 import { temTaxaEmbutida } from './taxaEmbutida';
 import { margemLiquida } from './precificacao';
 import { ErroPolitica, ItemPolitica, planejarPolitica, Politica, validarPolitica } from './politicaPreco';
+import { SQL_ITEM_TEM_TAG_ID } from '../tags/tags';
 
 const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || req.body?.tenant_id || 1);
 const ALVO_PADRAO = 30;
 const MAX_ITENS = 500;
 const lista = (n: number) => Array(n).fill('?').join(',');
 
-interface Filtro { idCategoria?: number | null; idsFamilias?: number[]; idMarca?: number | null; busca?: string }
+interface Filtro { idCategoria?: number | null; idsFamilias?: number[]; idMarca?: number | null; idTag?: number | null; busca?: string }
 interface ItemCarregado extends ItemPolitica {
   idItem: number; sku: string; nome: string; familia: string | null; marca: string | null; idUnidade: number | null; unidade: string | null;
   alvoPct: number; idFaixaVarejo: number | null;
@@ -53,12 +54,13 @@ const carregarItens = async (conn: any, tenant: number, filtro: Filtro, ids?: nu
     const fams = (filtro.idsFamilias || []).map(Number).filter(n => n > 0);
     if (fams.length) { where.push(`cpd.familia_id IN (${lista(fams.length)})`); params.push(...fams); }
     if (filtro.idMarca) { where.push(`COALESCE(cpd.id_marca, f.id_marca) = ?`); params.push(Number(filtro.idMarca)); }
+    if (filtro.idTag) { where.push(SQL_ITEM_TEM_TAG_ID); params.push(Number(filtro.idTag), Number(filtro.idTag)); }
     const busca = String(filtro.busca || '').trim();
     if (busca) {
       where.push(`(ic.sku LIKE ? OR cpd.sku_customizado LIKE ? OR ic.nome_item LIKE ? OR cpd.nome_comercial LIKE ? OR f.nome LIKE ?)`);
       params.push(...Array(5).fill(`%${busca}%`));
     }
-    if (!filtro.idCategoria && !fams.length && !filtro.idMarca && !busca) throw new ErroPolitica('Escolha uma categoria, família, marca ou digite uma busca.');
+    if (!filtro.idCategoria && !fams.length && !filtro.idMarca && !filtro.idTag && !busca) throw new ErroPolitica('Escolha uma categoria, família, marca, tag ou digite uma busca.');
   }
   const [itens]: any = await conn.execute(
     `SELECT ic.id_item, COALESCE(cpd.sku_customizado, ic.sku) AS sku, COALESCE(cpd.nome_comercial, ic.nome_item) AS nome,
@@ -130,6 +132,7 @@ export const opcoesPolitica = async (req: Request, res: Response) => {
        LEFT JOIN comercial_produtos_dados cpd ON cpd.familia_id = f.id AND cpd.tenant_id = f.tenant_id
        WHERE f.tenant_id = ? AND f.status <> 'INATIVO' GROUP BY f.id, f.nome ORDER BY f.nome`, [tenant]);
     const [marcas]: any = await pool.execute(`SELECT id, nome FROM comercial_marcas ORDER BY nome`);
+    const [tags]: any = await pool.execute(`SELECT id_tag, nome, cor FROM comercial_tags WHERE tenant_id = ? AND ativo = 1 ORDER BY nome`, [tenant]);
     return res.json({
       categorias: categorias.map((c: any) => ({ id: Number(c.id), nome: c.nome, idPai: c.categoria_pai_id ? Number(c.categoria_pai_id) : null })),
       // categorias da família: a dela ou, sem ela, as dos itens (a mesma regra do filtro de itens)
@@ -138,6 +141,7 @@ export const opcoesPolitica = async (req: Request, res: Response) => {
         categorias: String(f.categorias || '').split(',').map(Number).filter(n => n > 0),
       })),
       marcas: marcas.map((m: any) => ({ id: Number(m.id), nome: m.nome })),
+      tags: tags.map((t: any) => ({ id: Number(t.id_tag), nome: t.nome, cor: t.cor })),
     });
   } catch (e) { return erro(res, e, 'Erro ao carregar as opções do filtro.'); }
 };

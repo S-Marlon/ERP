@@ -128,18 +128,24 @@ const VarejoAtacadoLote: React.FC = () => {
                   maxTagCount="responsive" options={familiasOpcoes} value={filtro.idsFamilias || []} onChange={v => setFiltro(f => ({ ...f, idsFamilias: v }))} />
               </div>
               <Row gutter={8}>
-                <Col span={10}>
+                <Col span={12}>
+                  <Text>Tag</Text>
+                  <Select allowClear showSearch optionFilterProp="label" style={{ width: '100%' }} placeholder="Ex.: bicicleta"
+                    options={(opcoes?.tags || []).map(t => ({ value: t.id, label: t.nome }))} value={filtro.idTag ?? undefined}
+                    onChange={v => setFiltro(f => ({ ...f, idTag: (v as number) ?? null }))} />
+                </Col>
+                <Col span={12}>
                   <Text>Marca</Text>
                   <Select allowClear showSearch optionFilterProp="label" style={{ width: '100%' }} placeholder="Todas"
                     options={(opcoes?.marcas || []).map(m => ({ value: m.id, label: m.nome }))} value={filtro.idMarca ?? undefined}
                     onChange={v => setFiltro(f => ({ ...f, idMarca: (v as number) ?? null }))} />
                 </Col>
-                <Col span={14}>
+                <Col span={24}>
                   <Text>Busca (nome, SKU ou família)</Text>
                   <Input allowClear placeholder="Ex.: Rolamento 62" value={filtro.busca} onChange={e => setFiltro(f => ({ ...f, busca: e.target.value }))} onPressEnter={verPrevia} />
                 </Col>
               </Row>
-              <Text type="secondary" style={{ fontSize: 12 }}>Os filtros se somam (ex.: categoria Rolamentos + marca GTOP-GBR). Até 500 itens por vez.</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>Os filtros se somam (ex.: categoria Rolamentos + tag bicicleta). Até 500 itens por vez.</Text>
             </Space>
           </Card>
         </Col>

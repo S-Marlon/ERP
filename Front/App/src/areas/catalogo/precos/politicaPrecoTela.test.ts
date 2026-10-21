@@ -22,6 +22,7 @@ teste('varejo e atacado: famílias da categoria e das subcategorias', () => {
       { id: 12, nome: 'Mangueira R2', itens: 9, categorias: [4] }, { id: 13, nome: 'Sem categoria', itens: 1, categorias: [] },
     ],
     marcas: [],
+    tags: [],
   };
   assert.deepStrictEqual(familiasDaCategoria(opcoes, 2).map(f => f.id), [10, 11]);   // Rolamentos + Esferas
   assert.deepStrictEqual(familiasDaCategoria(opcoes, 1).map(f => f.id), [10, 11]);   // Transmissão inteira
