@@ -124,13 +124,19 @@ export const opcoesPolitica = async (req: Request, res: Response) => {
   try {
     const [categorias]: any = await pool.execute(`SELECT id, nome, categoria_pai_id FROM comercial_categorias WHERE tenant_id = ? AND ativa = 1 ORDER BY nome`, [tenant]);
     const [familias]: any = await pool.execute(
-      `SELECT f.id, f.nome, COUNT(cpd.id_item) AS itens FROM comercial_familias f
+      `SELECT f.id, f.nome, COUNT(cpd.id_item) AS itens,
+              GROUP_CONCAT(DISTINCT COALESCE(f.categoria_id, cpd.categoria_id)) AS categorias
+       FROM comercial_familias f
        LEFT JOIN comercial_produtos_dados cpd ON cpd.familia_id = f.id AND cpd.tenant_id = f.tenant_id
        WHERE f.tenant_id = ? AND f.status <> 'INATIVO' GROUP BY f.id, f.nome ORDER BY f.nome`, [tenant]);
     const [marcas]: any = await pool.execute(`SELECT id, nome FROM comercial_marcas ORDER BY nome`);
     return res.json({
       categorias: categorias.map((c: any) => ({ id: Number(c.id), nome: c.nome, idPai: c.categoria_pai_id ? Number(c.categoria_pai_id) : null })),
-      familias: familias.map((f: any) => ({ id: Number(f.id), nome: f.nome, itens: Number(f.itens) || 0 })),
+      // categorias da família: a dela ou, sem ela, as dos itens (a mesma regra do filtro de itens)
+      familias: familias.map((f: any) => ({
+        id: Number(f.id), nome: f.nome, itens: Number(f.itens) || 0,
+        categorias: String(f.categorias || '').split(',').map(Number).filter(n => n > 0),
+      })),
       marcas: marcas.map((m: any) => ({ id: Number(m.id), nome: m.nome })),
     });
   } catch (e) { return erro(res, e, 'Erro ao carregar as opções do filtro.'); }

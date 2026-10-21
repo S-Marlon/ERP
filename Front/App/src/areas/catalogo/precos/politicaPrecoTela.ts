@@ -16,6 +16,24 @@ export const arvoreCategorias = (cats: OpcoesPolitica['categorias']): NoArvore[]
   return filhos(null);
 };
 
+/** A categoria e todas as que estão abaixo dela. */
+export const comSubcategorias = (cats: OpcoesPolitica['categorias'], id: number) => {
+  const saida = new Set<number>([id]);
+  const fila = [id];
+  while (fila.length) {
+    const atual = fila.shift()!;
+    for (const c of cats) if (c.idPai === atual && !saida.has(c.id)) { saida.add(c.id); fila.push(c.id); }
+  }
+  return saida;
+};
+
+/** Famílias da categoria (ou das subcategorias); sem categoria, todas. */
+export const familiasDaCategoria = (opcoes: OpcoesPolitica, idCategoria: number | null | undefined) => {
+  if (!idCategoria) return opcoes.familias;
+  const cats = comSubcategorias(opcoes.categorias, idCategoria);
+  return opcoes.familias.filter(f => f.categorias.some(c => cats.has(c)));
+};
+
 /** Contagens da prévia: o que muda, o que já está igual, o que não dá para aplicar e quantos têm aviso. */
 export const resumoPrevia = (itens: ItemPrevia[]) => ({
   total: itens.length,

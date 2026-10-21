@@ -8,7 +8,7 @@ import {
 } from 'antd';
 import { ArrowLeftOutlined, CheckOutlined, DeleteOutlined, EyeOutlined, PlusOutlined, WarningOutlined } from '@ant-design/icons';
 import { FaixaPrevia, FiltroPolitica, ItemPrevia, NivelAtacado, OpcoesPolitica, Politica, politicaPrecoApi, RegraVarejo } from './politicaPrecoApi';
-import { arvoreCategorias, resumoPrevia } from './politicaPrecoTela';
+import { arvoreCategorias, familiasDaCategoria, resumoPrevia } from './politicaPrecoTela';
 
 const { Text, Title } = Typography;
 const brl = (v: number | null | undefined) => (v === null || v === undefined ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
@@ -84,7 +84,13 @@ const VarejoAtacadoLote: React.FC = () => {
 
   const resumo = previa ? resumoPrevia(previa.itens) : null;
   const linhas = (previa?.itens || []).filter(i => !soProblemas || i.plano.situacao === 'ERRO' || i.plano.avisos.length > 0);
-  const familiasOpcoes = (opcoes?.familias || []).map(f => ({ value: f.id, label: `${f.nome} (${f.itens})` }));
+  const familiasDaCat = opcoes ? familiasDaCategoria(opcoes, filtro.idCategoria) : [];
+  const familiasOpcoes = familiasDaCat.map(f => ({ value: f.id, label: `${f.nome} (${f.itens})` }));
+  const escolherCategoria = (idCategoria: number | null) => setFiltro(f => {
+    // as famílias escolhidas que não são da categoria nova saem
+    const validas = new Set((opcoes ? familiasDaCategoria(opcoes, idCategoria) : []).map(x => x.id));
+    return { ...f, idCategoria, idsFamilias: (f.idsFamilias || []).filter(id => validas.has(id)) };
+  });
   const mudarFaixaCusto = (k: number, p: Partial<{ ateCusto: number | null; markup: number }>) => setFaixasCusto(l => l.map((f, i) => (i === k ? { ...f, ...p } : f)));
 
   return (
@@ -105,11 +111,20 @@ const VarejoAtacadoLote: React.FC = () => {
                 <Text>Categoria (com as subcategorias)</Text>
                 <TreeSelect allowClear showSearch treeNodeFilterProp="title" style={{ width: '100%' }} placeholder="Ex.: Rolamentos"
                   treeData={opcoes ? arvoreCategorias(opcoes.categorias) : []} value={filtro.idCategoria ?? undefined}
-                  onChange={v => setFiltro(f => ({ ...f, idCategoria: (v as number) ?? null }))} />
+                  onChange={v => escolherCategoria((v as number) ?? null)} />
               </div>
               <div>
-                <Text>Famílias</Text>
-                <Select mode="multiple" allowClear showSearch optionFilterProp="label" style={{ width: '100%' }} placeholder="Ex.: Rolamento 608, Rolamento 6004"
+                <Flex justify="space-between">
+                  <Text>Famílias{filtro.idCategoria ? ` da categoria (${familiasDaCat.length})` : ''}</Text>
+                  <Space size={8}>
+                    {filtro.idCategoria && familiasDaCat.length > 0 && (
+                      <a onClick={() => setFiltro(f => ({ ...f, idsFamilias: familiasDaCat.map(x => x.id) }))}>adicionar todas ({familiasDaCat.length})</a>
+                    )}
+                    {(filtro.idsFamilias || []).length > 0 && <a onClick={() => setFiltro(f => ({ ...f, idsFamilias: [] }))}>limpar</a>}
+                  </Space>
+                </Flex>
+                <Select mode="multiple" allowClear showSearch optionFilterProp="label" style={{ width: '100%' }}
+                  placeholder={filtro.idCategoria ? 'Todas as da categoria (ou escolha algumas)' : 'Ex.: Rolamento 608, Rolamento 6004'}
                   maxTagCount="responsive" options={familiasOpcoes} value={filtro.idsFamilias || []} onChange={v => setFiltro(f => ({ ...f, idsFamilias: v }))} />
               </div>
               <Row gutter={8}>
