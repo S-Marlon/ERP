@@ -58,6 +58,7 @@ import FuncionariosPage from "../areas/parceiros/FuncionariosPage";
 
 import { MarcasPage } from "../areas/catalogo/marcas/MarcasPage";
 import TagsCatalogo from "../areas/catalogo/tags/TagsCatalogo";
+import LogisticaLote from "../areas/catalogo/logistica/LogisticaLote";
 import PendenciasPim from "../areas/catalogo/pendencias/PendenciasPim";
 import ItensDuplicados from "../areas/catalogo/duplicados/ItensDuplicados";
 import UnidadesPage from "../areas/catalogo/unidades/UnidadesPage";
@@ -201,6 +202,7 @@ export default function AppLayout() {
             <Route path="/catalogo/gerenciador" element={<CatalogSku />} />
             <Route path="/catalogo/marcas" element={<MarcasPage />} />
             <Route path="/catalogo/tags" element={<TagsCatalogo />} />
+            <Route path="/catalogo/logistica" element={<LogisticaLote />} />
             <Route path="/catalogo/unidades" element={<UnidadesPage />} />
             <Route path="/catalogo/kits" element={<KitsPage />} />
             <Route path="/catalogo/pendencias" element={<PendenciasPim />} />

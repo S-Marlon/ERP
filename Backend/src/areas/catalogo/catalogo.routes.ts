@@ -75,6 +75,7 @@ import { aplicarPrecosComTaxa, previaPrecosComTaxa } from './precos/precosTaxa.c
 import { salvarPrecosLote } from './precos/precosLote.controller';
 import { aplicarPolitica, opcoesPolitica, previaPolitica } from './precos/politicaPreco.controller';
 import { aplicarTag, criarTag, excluirTag, familiasComTags, itensDaFamilia, juntarTag, listarTags, salvarTag } from './tags/tags.controller';
+import { criarEmbalagem, itensLogistica, listarEmbalagens, salvarLogistica, salvarRegrasEmbalagem } from './logistica/logistica.controller';
 import { apagarItens, conferirExclusao } from './produtos/exclusaoItens.controller';
 import { listarDuplicados, resumoItensParaJuntar, unificarItens } from './produtos/unificacao.controller';
 import { atualizarCustosKits, atualizarKit, criarKit, desfazerKit, detalheKit, listarKits, opcoesKit, relatorioKits } from './kits/kits.controller';
@@ -211,6 +212,11 @@ router.put('/tags/:id', salvarTag);
 router.delete('/tags/:id', excluirTag);
 router.post('/tags/:id/juntar', juntarTag);
 router.post('/tags/:id/aplicar', aplicarTag);
+router.post('/logistica/itens', itensLogistica);
+router.put('/logistica/itens', salvarLogistica);
+router.get('/logistica/embalagens', listarEmbalagens);
+router.post('/logistica/embalagens', criarEmbalagem);
+router.put('/logistica/embalagens/regras', salvarRegrasEmbalagem);
 // Preços com a taxa da maquininha embutida (Vendas › Taxas de pagamento): prévia e aplicação
 router.get('/precos/taxa/previa', previaPrecosComTaxa);
 router.post('/precos/lote', salvarPrecosLote);
