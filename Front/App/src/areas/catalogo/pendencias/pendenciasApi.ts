@@ -1,7 +1,7 @@
 import { API_URL } from '../../../shared/api/config';
 const API = `${API_URL}/api/catalogo`;
 
-export type NivelPendencia = 'critico' | 'incompleto';
+export type NivelPendencia = 'critico' | 'incompleto' | 'logistica';
 
 export interface Pendencia {
   codigo: string;

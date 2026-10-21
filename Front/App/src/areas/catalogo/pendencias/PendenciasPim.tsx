@@ -1,19 +1,22 @@
 // Pendências do PIM: todos os itens com algo a resolver numa tela só (sem entrar família por família).
-// Crítico = fica fora do PDV ou vende sem preço; incompleto = cadastro sem informação importante.
+// Crítico = fica fora do PDV ou vende sem preço; incompleto = cadastro sem informação importante; logística = o que falta
+// para enviar e anunciar (foto, peso, medidas, embalagem), resolvido em lote na Logística em lote.
 import React, { useEffect, useState } from 'react';
 import { Alert, Button, Card, Col, Empty, Input, Row, Segmented, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
-import { EditOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/icons';
-import { useSearchParams } from 'react-router-dom';
+import { EditOutlined, InboxOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/icons';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import ProductDetailsDrawer from '../skus/ProductDetailsDrawer';
 import { updateProduto } from '../skus/CatalogSku.service';
 import { getTipoRecursoConfig } from '../../compras/entradaNf/tipoRecurso';
 import { getPendenciasPim, ItemPendente, RespostaPendencias } from './pendenciasApi';
 
 const { Text } = Typography;
-const COR_NIVEL = { critico: 'red', incompleto: 'orange' } as const;
+const COR_NIVEL = { critico: 'red', incompleto: 'orange', logistica: 'blue' } as const;
+const ROTULO_NIVEL = { critico: 'crítico', incompleto: 'incompleto', logistica: 'logística' } as const;
 
 const PendenciasPim: React.FC = () => {
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
   const lote = Number(params.get('lote')) || null;
 
   const [tipo, setTipo] = useState<'VENDA' | 'TODOS'>('VENDA');
@@ -47,6 +50,12 @@ const PendenciasPim: React.FC = () => {
 
   const tipos = dados?.tipos || {};
   const codigos = Object.keys(tipos);
+  const ehLogistica = !!codigo && tipos[codigo]?.nivel === 'logistica';
+  // Logística em lote já filtrada na família escolhida (ou na mais pendente da lista)
+  const resolverEmLote = () => {
+    const fam = familiaId || (dados?.porFamilia || []).find(f => f.familiaId)?.familiaId || null;
+    navigate(`/catalogo/logistica${fam ? `?familia=${fam}` : ''}`);
+  };
 
   return (
     <div style={{ padding: 16 }}>
@@ -92,7 +101,7 @@ const PendenciasPim: React.FC = () => {
               <Tooltip title={tipos[c].ajuda}>
                 <Card size="small" hoverable onClick={() => { setCodigo(codigo === c ? null : c); setPage(1); }}
                   style={{ borderColor: codigo === c ? '#1677ff' : undefined, opacity: dados?.resumo[c] ? 1 : 0.55, height: '100%' }}>
-                  <Tag color={COR_NIVEL[tipos[c].nivel]} style={{ margin: 0, fontSize: 10 }}>{tipos[c].nivel === 'critico' ? 'crítico' : 'incompleto'}</Tag>
+                  <Tag color={COR_NIVEL[tipos[c].nivel]} style={{ margin: 0, fontSize: 10 }}>{ROTULO_NIVEL[tipos[c].nivel]}</Tag>
                   <div style={{ fontSize: 12, marginTop: 4 }}>{tipos[c].label}</div>
                   <div style={{ fontSize: 18, fontWeight: 700 }}>{dados?.resumo[c] ?? 0}</div>
                 </Card>
@@ -131,8 +140,15 @@ const PendenciasPim: React.FC = () => {
           {/* Itens */}
           <Col xs={24} md={18}>
             <Card size="small">
-              <Input.Search allowClear placeholder="Buscar por SKU ou nome" style={{ width: 300, marginBottom: 8 }}
-                value={buscaDigitada} onChange={e => setBuscaDigitada(e.target.value)} />
+              <Space wrap style={{ marginBottom: 8 }}>
+                <Input.Search allowClear placeholder="Buscar por SKU ou nome" style={{ width: 300 }}
+                  value={buscaDigitada} onChange={e => setBuscaDigitada(e.target.value)} />
+                {ehLogistica && (
+                  <Tooltip title="Peso, medidas e embalagem de vários itens de uma vez, já filtrado na família">
+                    <Button type="primary" icon={<InboxOutlined />} onClick={resolverEmLote}>Resolver em lote{familiaId ? ' (esta família)' : ''}</Button>
+                  </Tooltip>
+                )}
+              </Space>
               <Table<ItemPendente>
                 rowKey="idItem"
                 size="small"

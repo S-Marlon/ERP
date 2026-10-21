@@ -44,11 +44,18 @@ export const listarPendenciasPim = async (req: Request, res: Response) => {
               EXISTS (SELECT 1 FROM comercial_precos_faixas pf
                       WHERE pf.tenant_id = ic.tenant_id AND pf.id_item = ic.id_item AND pf.preco_unitario > 0) AS tem_preco,
               EXISTS (SELECT 1 FROM comercial_unidades_venda uv
-                      WHERE uv.tenant_id = ic.tenant_id AND uv.id_item = ic.id_item AND NULLIF(TRIM(uv.gtin), '') IS NOT NULL) AS tem_gtin
+                      WHERE uv.tenant_id = ic.tenant_id AND uv.id_item = ic.id_item AND NULLIF(TRIM(uv.gtin), '') IS NOT NULL) AS tem_gtin,
+              COALESCE(ic.peso_bruto, ic.peso_liquido) AS peso,
+              (lg.altura_cm > 0 AND lg.largura_cm > 0 AND lg.comprimento_cm > 0) AS tem_medidas,
+              (SELECT COUNT(*) FROM itens_anexos x WHERE x.tenant_id = ic.tenant_id AND x.id_item = ic.id_item
+                 AND x.tipo_anexo IN ('IMAGEM_PRINCIPAL', 'FOTO_GALERIA')) + (NULLIF(TRIM(f.imagem), '') IS NOT NULL) AS fotos,
+              (EXISTS (SELECT 1 FROM comercial_embalagens_itens ei WHERE ei.id_item = ic.id_item)
+                OR EXISTS (SELECT 1 FROM comercial_embalagens_familias ef WHERE ef.id_familia = cpd.familia_id)) AS tem_embalagem
        FROM itens_core ic
        LEFT JOIN comercial_produtos_dados cpd ON cpd.id_item = ic.id_item AND cpd.tenant_id = ic.tenant_id
        LEFT JOIN comercial_familias f ON f.id = cpd.familia_id AND f.tenant_id = ic.tenant_id
        LEFT JOIN comercial_categorias cat ON cat.id = COALESCE(f.categoria_id, cpd.categoria_id)
+       LEFT JOIN itens_dados_logisticos lg ON lg.id_item = ic.id_item
        WHERE ${where.join(' AND ')}`,
       params
     );
@@ -70,6 +77,10 @@ export const listarPendenciasPim = async (req: Request, res: Response) => {
         temGtin: Boolean(Number(r.tem_gtin)),
         motivosPublicacao: pub?.motivos || [],
         gradeSemValor: pub?.gradeSemValor || [],
+        fotos: Number(r.fotos) || 0,
+        pesoKg: r.peso === null ? null : Number(r.peso),
+        temMedidas: Boolean(Number(r.tem_medidas)),
+        temEmbalagem: Boolean(Number(r.tem_embalagem)),
       });
       if (pendencias.length > 0) comPendencia.push({ item: r, pendencias });
     }

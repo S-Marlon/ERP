@@ -2,6 +2,7 @@
 // item), com o mesmo filtro das outras telas em lote. É o que o frete do Mercado Livre precisa e o custo da embalagem
 // que entra no lucro de cada envio.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Alert, Button, Card, Col, Empty, Flex, Input, InputNumber, Modal, Popover, Row, Segmented, Select, Space, Table, Tag, Tooltip, Typography, message,
 } from 'antd';
@@ -39,8 +40,10 @@ const EditorRegras: React.FC<{ regras: RegraEmbalagem[]; embalagens: EmbalagemCa
 );
 
 const LogisticaLote: React.FC = () => {
+  const [params] = useSearchParams();
+  const familiaInicial = Number(params.get('familia')) || null;   // vindo das Pendências do PIM
   const [opcoes, setOpcoes] = useState<OpcoesPolitica | null>(null);
-  const [filtro, setFiltro] = useState<FiltroPolitica>({ busca: '' });
+  const [filtro, setFiltro] = useState<FiltroPolitica>(familiaInicial ? { busca: '', idsFamilias: [familiaInicial] } : { busca: '' });
   const [falta, setFalta] = useState<FaltaLogistica | 'TODOS'>('TODOS');
   const [itens, setItens] = useState<ItemLogistica[] | null>(null);
   const [carregando, setCarregando] = useState(false);
@@ -65,6 +68,7 @@ const LogisticaLote: React.FC = () => {
     finally { setCarregando(false); }
   }, [filtro, falta]);
   useEffect(() => { if (itens) buscar(); }, [falta]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (familiaInicial) buscar(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const mudancas = useMemo(() => (itens ? alteracoes(itens, rascunho) : []), [itens, rascunho]);
   const editar = (idItem: number, p: Partial<ValoresLogistica>) => setRascunho(r => ({ ...r, [idItem]: { ...(r[idItem] || {}), ...p } }));
