@@ -215,6 +215,9 @@ export const ProductPricingModule: React.FC = () => {
             <Badge count={lista.length} size="small">
               <Button icon={<OrderedListOutlined />} onClick={() => setListaAberta(true)}>Lista de precificação</Button>
             </Badge>
+            <Tooltip title="Markup do varejo e do atacado (atacado 1 e 2) para vários itens de uma vez, por categoria, família ou marca">
+              <Button onClick={() => navigate('/catalogo/preco/atacado')}>Varejo e atacado em lote</Button>
+            </Tooltip>
             <Button type="primary" icon={<DollarOutlined />} onClick={() => setEditando({ titulo: 'Configurar preço' })}>Buscar produto</Button>
           </Space>
         </div>

@@ -73,6 +73,7 @@ import { resumoCatalogo } from './produtos/resumoCatalogo.controller';
 import { painelPrecos } from './precos/painelPrecos.controller';
 import { aplicarPrecosComTaxa, previaPrecosComTaxa } from './precos/precosTaxa.controller';
 import { salvarPrecosLote } from './precos/precosLote.controller';
+import { aplicarPolitica, opcoesPolitica, previaPolitica } from './precos/politicaPreco.controller';
 import { apagarItens, conferirExclusao } from './produtos/exclusaoItens.controller';
 import { listarDuplicados, resumoItensParaJuntar, unificarItens } from './produtos/unificacao.controller';
 import { atualizarCustosKits, atualizarKit, criarKit, desfazerKit, detalheKit, listarKits, opcoesKit, relatorioKits } from './kits/kits.controller';
@@ -198,6 +199,9 @@ router.get('/pendencias', listarPendenciasPim);
 router.get('/resumo', resumoCatalogo);
 // Painel de precificação (custo, preço, margem e situação dos itens de venda)
 router.get('/precos/painel', painelPrecos);
+router.get('/precos/politica/opcoes', opcoesPolitica);
+router.post('/precos/politica/previa', previaPolitica);
+router.post('/precos/politica/aplicar', aplicarPolitica);
 // Preços com a taxa da maquininha embutida (Vendas › Taxas de pagamento): prévia e aplicação
 router.get('/precos/taxa/previa', previaPrecosComTaxa);
 router.post('/precos/lote', salvarPrecosLote);

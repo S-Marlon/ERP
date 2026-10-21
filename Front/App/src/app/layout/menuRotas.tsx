@@ -43,6 +43,7 @@ export const MENU_PRINCIPAL: ItemMenu[] = [
       { key: '/catalogo/unidades', label: 'Unidades' },
       { key: '/catalogo/kits', label: 'Kits de venda' },
       { key: '/catalogo/preco', label: 'Precificação' },
+      { key: '/catalogo/preco/atacado', label: 'Varejo e atacado em lote' },
     ],
   },
   {

@@ -73,6 +73,7 @@ import ContasFixas from "../areas/financeiro/pagar/ContasFixas";
 import Clientes from "../areas/parceiros/Clientes";
 import FamilyManagementPanel from "../areas/catalogo/familias/FamilyManagementPanel";
 import ProductPricingModule from "../areas/catalogo/precos/ProductPricingModule";
+import VarejoAtacadoLote from "../areas/catalogo/precos/VarejoAtacadoLote";
 import { StockEntryStagingView } from "../areas/catalogo/staging/StockEntryStagingView";
 
 const { Sider, Header } = Layout;
@@ -201,6 +202,7 @@ export default function AppLayout() {
             <Route path="/catalogo/pendencias" element={<PendenciasPim />} />
             <Route path="/catalogo/duplicados" element={<ItensDuplicados />} />
             <Route path="/catalogo/preco" element={<ProductPricingModule/>} />
+            <Route path="/catalogo/preco/atacado" element={<VarejoAtacadoLote />} />
             <Route path="/compras" element={<ComprasDashboard />} />
             <Route path="/compras/inteligente" element={<CompraInteligente />} />
             <Route path="/compras/ListaCompras" element={<ListaComprasExport />} />
