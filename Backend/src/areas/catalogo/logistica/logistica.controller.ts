@@ -6,6 +6,7 @@ import { condicoesDoFiltro, FiltroItens } from '../filtroItens';
 import { obterOuCriarUnidade } from '../precos/configVendas.controller';
 import { skuSequencial } from '../../compras/staging/penteFino';
 import { ErroLogistica, FaltaLogistica, faltasLogistica, RegraEmbalagem, regrasEfetivas, validarLogistica, validarRegras } from './logistica';
+import { carregarEmbalagens } from './embalagensBanco';
 
 const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || req.body?.tenant_id || 1);
 const lista = (n: number) => Array(n).fill('?').join(',');
@@ -23,30 +24,9 @@ const medidasDe = (r: any) => {
   return a > 0 && l > 0 && c > 0 ? { altura: a, largura: l, comprimento: c } : null;
 };
 
-/** Embalagens do catálogo (itens de consumo) com peso, medidas, custo e estoque. */
-const carregarEmbalagens = async (tenant: number, ids?: number[]) => {
-  const [rows]: any = await pool.execute(
-    `SELECT ic.id_item, COALESCE(cpd.sku_customizado, ic.sku) AS sku, COALESCE(cpd.nome_comercial, ic.nome_item) AS nome,
-            COALESCE(ic.peso_bruto, ic.peso_liquido) AS peso, lg.altura_cm, lg.largura_cm, lg.comprimento_cm, cpd.custo_gerencial,
-            COALESCE(es.quantidade_atual, 0) AS estoque
-     FROM itens_core ic
-     LEFT JOIN comercial_produtos_dados cpd ON cpd.id_item = ic.id_item AND cpd.tenant_id = ic.tenant_id
-     LEFT JOIN itens_dados_logisticos lg ON lg.id_item = ic.id_item
-     LEFT JOIN estoque_saldos_itens es ON es.id_item = ic.id_item AND es.tenant_id = ic.tenant_id AND es.deposito = 'VENDA'
-     WHERE ic.tenant_id = ? AND UPPER(COALESCE(ic.status, 'ATIVO')) <> 'INATIVO'
-       ${ids ? `AND ic.id_item IN (${lista(Math.max(1, ids.length))})` : `AND UPPER(COALESCE(ic.tipo_recurso, 'PRODUTO')) = 'CONSUMO'`}
-     ORDER BY nome`,
-    ids ? [tenant, ...(ids.length ? ids : [0])] : [tenant]
-  );
-  return rows.map((r: any) => ({
-    idEmbalagem: Number(r.id_item), sku: r.sku, nome: r.nome, pesoKg: nulo(r.peso) || null, medidas: medidasDe(r),
-    custo: Number(r.custo_gerencial) || 0, estoque: Number(r.estoque) || 0,
-  }));
-};
-
 // GET /api/catalogo/logistica/embalagens
 export const listarEmbalagens = async (req: Request, res: Response) => {
-  try { return res.json(await carregarEmbalagens(tenantDe(req))); }
+  try { return res.json(await carregarEmbalagens(pool, tenantDe(req))); }
   catch (e) { return erro(res, e, 'Erro ao listar as embalagens.'); }
 };
 
@@ -115,7 +95,7 @@ export const itensLogistica = async (req: Request, res: Response) => {
     const [doItem]: any = ids.length ? await pool.execute(`SELECT id_item, quantidade_ate, id_embalagem FROM comercial_embalagens_itens WHERE id_item IN (${lista(ids.length)})`, ids) : [[]];
     const [daFamilia]: any = fams.length ? await pool.execute(`SELECT id_familia, quantidade_ate, id_embalagem FROM comercial_embalagens_familias WHERE id_familia IN (${lista(fams.length)})`, fams) : [[]];
     const idsEmb = [...new Set<number>([...doItem, ...daFamilia].map((r: any) => Number(r.id_embalagem)))];
-    const embalagens = new Map<number, any>((idsEmb.length ? await carregarEmbalagens(tenant, idsEmb) : []).map((e: any) => [e.idEmbalagem, e]));
+    const embalagens = new Map<number, any>((await carregarEmbalagens(pool, tenant, idsEmb)).map((e: any) => [e.idEmbalagem, e]));
     const regra = (r: any): RegraEmbalagem => ({ quantidadeAte: Number(r.quantidade_ate), idEmbalagem: Number(r.id_embalagem) });
 
     const saida = itens.map((i: any) => {
@@ -182,7 +162,7 @@ export const salvarRegrasEmbalagem = async (req: Request, res: Response) => {
     const itens = [...new Set<number>((req.body?.idsItens || []).map(Number).filter((n: number) => n > 0))];
     if (!familias.length && !itens.length) throw new ErroLogistica('Escolha as famílias ou os itens.');
     if (regras.length) {
-      const embs = await carregarEmbalagens(tenant, regras.map(r => r.idEmbalagem));
+      const embs = await carregarEmbalagens(pool, tenant, [...new Set(regras.map(r => r.idEmbalagem))]);
       if (embs.length !== new Set(regras.map(r => r.idEmbalagem)).size) throw new ErroLogistica('Embalagem não encontrada.');
     }
     await conn.beginTransaction();
