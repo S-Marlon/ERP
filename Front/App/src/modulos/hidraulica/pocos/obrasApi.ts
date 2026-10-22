@@ -1,4 +1,4 @@
-// API do módulo Obras de poços (/api/modulos/hidraulica/pocos): obras e poços.
+// API do módulo Obras de poços (/api/modulos/hidraulica/pocos): obras, poços, clientes de poço e o mapa regional.
 import { API_URL } from '../../../shared/api/config';
 import type { Dados } from './relatorioPoco';
 
@@ -25,6 +25,7 @@ export interface ObraForm {
 }
 export interface Obra extends Omit<ObraForm, 'idCliente'> {
   idObra: number; idCliente: number; cliente: string; telefone: string | null; poco: string | null; cidade: string | null;
+  latitude: number | null; longitude: number | null;
   situacao: SituacaoObra; proximas: SituacaoObra[]; dataInicio: string | null; dataTermino: string | null; garantiaAte: string | null;
   criadaEm: string; relatorio?: Dados;
 }
@@ -35,6 +36,31 @@ export interface PocoForm {
   perfuradoPor: 'NOS' | 'TERCEIRO' | 'DESCONHECIDO'; perfuradoPorNome: string | null; situacao: 'ATIVO' | 'SECO' | 'DESATIVADO'; observacao: string | null;
 }
 export interface Poco extends Omit<PocoForm, 'gps'> { idPoco: number; proprietario: string | null; latitude: number | null; longitude: number | null; obras: number }
+
+/** Cliente de poço: cadastro do módulo, separado do cadastro geral do ERP por enquanto. */
+export interface ClientePocoForm {
+  nome: string; telefone: string | null; documento: string | null; email: string | null; endereco: string | null; bairro: string | null;
+  cidade: string | null; uf: string | null; observacao: string | null;
+}
+export interface ClientePoco extends ClientePocoForm { idCliente: number; pocos: number; pocosComGps: number; obras: number; obrasAbertas: number }
+
+export interface PocoNoMapa {
+  idPoco: number; identificacao: string; latitude: number; longitude: number; profundidadeM: number | null; vazaoLh: number | null;
+  nivelEstaticoM: number | null; situacao: Poco['situacao']; cidade: string | null; perfuradoPor: Poco['perfuradoPor'];
+  idProprietario: number | null; proprietario: string | null; telefone: string | null; obras: number;
+  ultimaObra: { idObra: number; situacao: SituacaoObra; servicos: Servico[] } | null;
+}
+/** [id, lat, lon, profundidade m, vazão m³/h, município] */
+export type ReferenciaNoMapa = [number, number, number, number | null, number | null, string | null];
+/** [latMin, latMax, lonMin, lonMax, valor] */
+export type CelulaPotencial = [number, number, number, number, number];
+export interface ResumoMapa {
+  referencias: { regiao: string; quantidade: number }[]; potencial: { regiao: string; quantidade: number }[]; nossos: { total: number; comGps: number };
+}
+export interface AnaliseRegiao {
+  latitude: number; longitude: number; raioM: number; quantidade: number; nossos: number; profundidadeMedia: number | null; profundidadeMediana: number | null;
+  profundidadeMin: number | null; profundidadeMax: number | null; vazaoMediaM3h: number | null; metrosSugeridos: number | null; potencial: number | null;
+}
 
 const pedir = async <T,>(url: string, init: RequestInit | undefined, padrao: string): Promise<T> => {
   const r = await fetch(url, init);
@@ -61,6 +87,29 @@ export const obrasApi = {
   pocos: (f: { busca?: string; idProprietario?: number | null } = {}) => pedir<Poco[]>(`${API}/pocos?${q(f)}`, undefined, 'Erro ao listar os poços.'),
   criarPoco: (p: PocoForm) => pedir<Poco>(`${API}/pocos?tenant_id=1`, corpo('POST', p), 'Erro ao cadastrar o poço.'),
   salvarPoco: (id: number, p: PocoForm) => pedir<Poco>(`${API}/pocos/${id}?tenant_id=1`, corpo('PUT', p), 'Erro ao salvar o poço.'),
+  obrasDe: (f: { idCliente?: number; idPoco?: number }) => pedir<Obra[]>(`${API}/obras?${q(f)}`, undefined, 'Erro ao listar as obras.'),
+  clientes: (busca = '') => pedir<ClientePoco[]>(`${API}/clientes?${q({ busca })}`, undefined, 'Erro ao listar os clientes de poço.'),
+  cliente: (id: number) => pedir<ClientePoco>(`${API}/clientes/${id}?tenant_id=1`, undefined, 'Erro ao abrir o cliente.'),
+  criarCliente: (c: Partial<ClientePocoForm>) => pedir<ClientePoco>(`${API}/clientes?tenant_id=1`, corpo('POST', c), 'Erro ao cadastrar o cliente.'),
+  salvarCliente: (id: number, c: ClientePocoForm) => pedir<ClientePoco>(`${API}/clientes/${id}?tenant_id=1`, corpo('PUT', c), 'Erro ao salvar o cliente.'),
+  mapaResumo: () => pedir<ResumoMapa>(`${API}/mapa/resumo?tenant_id=1`, undefined, 'Erro ao ler o resumo do mapa.'),
+  mapaPocos: () => pedir<PocoNoMapa[]>(`${API}/mapa/pocos?tenant_id=1`, undefined, 'Erro ao carregar os poços do mapa.'),
+  mapaReferencias: () => pedir<ReferenciaNoMapa[]>(`${API}/mapa/referencias?tenant_id=1`, undefined, 'Erro ao carregar os poços de referência.'),
+  mapaPotencial: () => pedir<CelulaPotencial[]>(`${API}/mapa/potencial?tenant_id=1`, undefined, 'Erro ao carregar o potencial hídrico.'),
+  analisar: (latitude: number, longitude: number, raio: number) =>
+    pedir<AnaliseRegiao>(`${API}/mapa/analise?${q({ lat: latitude, lon: longitude, raio })}`, undefined, 'Erro ao analisar a região.'),
+  importar: (arquivo: string, geojson: unknown) =>
+    pedir<{ tipo: 'POCOS' | 'POTENCIAL'; regiao: string; gravados: number }>(`${API}/mapa/importar?tenant_id=1`, corpo('POST', { arquivo, geojson }), 'Erro ao importar o arquivo.'),
+  removerImportacao: (tipo: 'POCOS' | 'POTENCIAL', regiao: string) =>
+    pedir<{ removidos: number }>(`${API}/mapa/importacoes?${q({ tipo, regiao })}`, { method: 'DELETE' }, 'Erro ao remover a região.'),
+};
+
+/** Telefone guardado só com dígitos → "(11) 99876-5432". */
+export const foneBr = (s: string | null | undefined) => {
+  const d = String(s ?? '').replace(/\D/g, '');
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return d || '';
 };
 
 /** Quantas obras em cada situação (para os cartões). */

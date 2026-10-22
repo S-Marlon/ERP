@@ -18,8 +18,8 @@ pelas etapas abaixo, ligado ao resto do ERP.
 | Etapa | Funcionalidade |
 |---|---|
 | 0 | Relatório técnico e impressões (já existe; vira a ficha da obra na etapa 1) |
-| 1 | Obras e poços no banco (cliente do cadastro, ficha do poço, relatório gravado) |
-| 2 | Mapa regional dos poços (integrar o mapa já em desenvolvimento) |
+| 1 | Obras e poços no banco (cliente de poço, ficha do poço, relatório gravado) |
+| 2 | Mapa regional dos poços (integrado ao maperf) |
 | 3 | Orçamento, sinal e cobrança (contas a receber) |
 | 4 | Materiais da obra (estoque) |
 | 5 | Agenda, equipe e sonda (funcionários, Gestor de frotas) |
@@ -28,10 +28,23 @@ pelas etapas abaixo, ligado ao resto do ERP.
 | 8 | Resultado e painel |
 
 ## Etapa 1 (desenho)
-- `modulo_hidraulica_pocos_pocos`: identificação, proprietário (cliente do cadastro), endereço, GPS (latitude e
+- `modulo_hidraulica_pocos_clientes`: **clientes de poço**, cadastro próprio do módulo, separado do cadastro geral da
+  loja por decisão do dono (juntar quando o sistema amadurecer; `id_pessoa` fica guardado para isso).
+- `modulo_hidraulica_pocos_pocos`: identificação, proprietário (cliente de poço), endereço, GPS (latitude e
   longitude, para o mapa), profundidade, diâmetro, vazão, níveis estático e dinâmico, solo, data da perfuração, quem
   perfurou (nós, terceiro, não sabe), situação (ativo, seco, desativado).
-- `modulo_hidraulica_pocos_obras`: cliente (cadastro), poço, serviços (perfuração, instalação, limpeza, manutenção,
+- `modulo_hidraulica_pocos_obras`: cliente (cliente de poço), poço, serviços (perfuração, instalação, limpeza, manutenção,
   troca de bomba, teste de vazão, outro), situação (orçamento, aguardando sinal, em execução, concluída, cancelada),
   datas, garantia, metros previstos, valor contratado, valor do metro excedente e o relatório (o formulário de hoje,
   guardado como JSON para as impressões continuarem iguais).
+
+## Etapa 2 (mapa regional)
+- `modulo_hidraulica_pocos_referencias`: poços da base pública (o maperf), **nunca misturados** com os poços dos
+  clientes. Vazão em m³/h como na origem (os nossos ficam em L/h).
+- `modulo_hidraulica_pocos_potencial`: a grade de potencial hídrico do maperf, um retângulo por linha.
+- Os dados entram pela tela (Importar GeoJSON): o arquivo é reconhecido sozinho (pontos = poços, polígonos = potencial)
+  e importar de novo atualiza sem duplicar. Regiões podem ser retiradas.
+- Camadas ligam e desligam (poços dos clientes, referência, potencial, satélite); a escolha fica no navegador.
+- Análise de um raio (padrão 2 km): quantidade, profundidade média/mediana/faixa, vazão média e o potencial do ponto.
+  A sugestão de metros para o orçamento é a mediana arredondada para cima de 10 em 10 m (regra em `mapa.ts`).
+- "Ver no mapa" na obra, no poço e no cliente; no mapa, o poço do cliente abre a obra, a ficha do poço e a do cliente.

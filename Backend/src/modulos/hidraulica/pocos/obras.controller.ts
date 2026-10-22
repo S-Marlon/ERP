@@ -1,5 +1,5 @@
-// Obras de poços (etapa 1): obras (cliente do cadastro, serviços, situação, valores, relatório técnico em JSON) e a ficha
-// de cada poço. Tabelas modulo_hidraulica_pocos_obras e modulo_hidraulica_pocos_pocos.
+// Obras de poços (etapa 1): obras (cliente de poço, serviços, situação, valores, relatório técnico em JSON) e a ficha
+// de cada poço. Tabelas modulo_hidraulica_pocos_obras, _pocos e _clientes (cadastro do módulo, separado do geral).
 import { Request, Response } from 'express';
 import pool from '../../../infra/db';
 import { operadorDe } from '../../../areas/vendas/caixa/caixa.controller';
@@ -9,10 +9,8 @@ import {
 
 const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || req.body?.tenant_id || 1);
 const nulo = (v: unknown) => (v === null || v === undefined ? null : Number(v));
-const NOME_PESSOA = `COALESCE(NULLIF(pf.nome, ''), NULLIF(pj.nome_fantasia, ''), NULLIF(pj.razao_social, ''), CONCAT('Cliente ', c.id_pessoa))`;
-const JOIN_PESSOA = (col: string) => `LEFT JOIN pessoas_core c ON c.id_pessoa = ${col}
-       LEFT JOIN pessoas_pf pf ON pf.id_cliente = c.id_pessoa
-       LEFT JOIN pessoas_pj pj ON pj.id_cliente = c.id_pessoa`;
+const NOME_PESSOA = 'c.nome';
+const JOIN_PESSOA = (col: string) => `LEFT JOIN modulo_hidraulica_pocos_clientes c ON c.id_cliente = ${col}`;
 
 export const responderErro = (res: Response, e: any, padrao: string) => {
   if (e instanceof ErroObra) return res.status(e.status).json({ error: e.message });
@@ -31,7 +29,7 @@ const formatarPoco = (r: any) => ({
   dataPerfuracao: r.data_perfuracao_txt || null, perfuradoPor: r.perfurado_por, perfuradoPorNome: r.perfurado_por_nome || null,
   situacao: r.situacao, observacao: r.observacao || null, obras: Number(r.obras) || 0,
 });
-const SELECT_POCO = `SELECT p.*, DATE_FORMAT(p.data_perfuracao, '%Y-%m-%d') AS data_perfuracao_txt, ${NOME_PESSOA.replace("'Cliente '", "'Cadastro '")} AS proprietario,
+const SELECT_POCO = `SELECT p.*, DATE_FORMAT(p.data_perfuracao, '%Y-%m-%d') AS data_perfuracao_txt, ${NOME_PESSOA} AS proprietario,
          (SELECT COUNT(*) FROM modulo_hidraulica_pocos_obras o WHERE o.id_poco = p.id_poco) AS obras
        FROM modulo_hidraulica_pocos_pocos p ${JOIN_PESSOA('p.id_proprietario')}`;
 
@@ -104,6 +102,7 @@ const formatarObra = (r: any, comRelatorio = false) => {
   return {
     idObra: Number(r.id_obra), idCliente: Number(r.id_cliente), cliente: r.cliente, telefone: r.telefone || null,
     idPoco: nulo(r.id_poco), poco: r.poco_identificacao || null, cidade: r.poco_cidade || null,
+    latitude: nulo(r.poco_latitude), longitude: nulo(r.poco_longitude),
     titulo: r.titulo || null, servicos: lerServicos(r.servicos), situacao: r.situacao as SituacaoObra, proximas: proximasSituacoes(r.situacao),
     dataPrevisao: r.data_previsao_txt || null, dataInicio: r.data_inicio_txt || null, dataTermino: termino,
     garantiaMeses: garantia, garantiaAte: garantiaAte(termino, garantia), metrosPrevistos: nulo(r.metros_previstos),
@@ -112,9 +111,8 @@ const formatarObra = (r: any, comRelatorio = false) => {
     ...(comRelatorio ? { relatorio: lerJson(r.dados_relatorio) } : {}),
   };
 };
-const SELECT_OBRA = `SELECT o.*, ${NOME_PESSOA} AS cliente,
-         (SELECT ct.telefone FROM pessoas_contatos ct WHERE ct.id_cliente = o.id_cliente AND ct.deleted_at IS NULL ORDER BY ct.principal DESC, ct.id_contato LIMIT 1) AS telefone,
-         po.identificacao AS poco_identificacao, po.cidade AS poco_cidade,
+const SELECT_OBRA = `SELECT o.*, ${NOME_PESSOA} AS cliente, c.telefone,
+         po.identificacao AS poco_identificacao, po.cidade AS poco_cidade, po.latitude AS poco_latitude, po.longitude AS poco_longitude,
          DATE_FORMAT(o.data_previsao, '%Y-%m-%d') AS data_previsao_txt, DATE_FORMAT(o.data_inicio, '%Y-%m-%d') AS data_inicio_txt,
          DATE_FORMAT(o.data_termino, '%Y-%m-%d') AS data_termino_txt, DATE_FORMAT(o.created_at, '%Y-%m-%d') AS criada_txt
        FROM modulo_hidraulica_pocos_obras o ${JOIN_PESSOA('o.id_cliente')}
@@ -126,7 +124,7 @@ const carregarObra = async (tenant: number, id: number) => {
   return o;
 };
 
-// GET /obras?situacao=&busca=
+// GET /obras?situacao=&busca=&idCliente=&idPoco=
 export const listarObras = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
   try {
@@ -134,6 +132,9 @@ export const listarObras = async (req: Request, res: Response) => {
     const params: any[] = [tenant];
     const situacao = String(req.query.situacao || '').toUpperCase();
     if ((SITUACOES_OBRA as readonly string[]).includes(situacao)) { where.push('o.situacao = ?'); params.push(situacao); }
+    for (const [chave, coluna] of [['idCliente', 'o.id_cliente'], ['idPoco', 'o.id_poco']]) {
+      if (Number(req.query[chave]) > 0) { where.push(`${coluna} = ?`); params.push(Number(req.query[chave])); }
+    }
     const busca = String(req.query.busca || '').trim();
     if (busca) { where.push(`(o.titulo LIKE ? OR po.identificacao LIKE ? OR po.cidade LIKE ? OR ${NOME_PESSOA} LIKE ? OR o.id_obra = ?)`); params.push(...Array(4).fill(`%${busca}%`), Number(busca) || 0); }
     const [rows]: any = await pool.execute(`${SELECT_OBRA} WHERE ${where.join(' AND ')} ORDER BY FIELD(o.situacao, 'EM_EXECUCAO', 'AGUARDANDO_SINAL', 'ORCAMENTO', 'CONCLUIDA', 'CANCELADA'), o.id_obra DESC LIMIT 500`, params);
@@ -147,16 +148,12 @@ export const detalheObra = async (req: Request, res: Response) => {
   catch (e) { return responderErro(res, e, 'Erro ao abrir a obra.'); }
 };
 
-/** Cliente (nome, documento, telefone) para preencher o relatório da obra nova. */
+/** Cliente de poço (nome, documento, telefone) para preencher o relatório da obra nova. */
 const dadosDoCliente = async (conn: any, tenant: number, idCliente: number) => {
   const [[c]]: any = await conn.execute(
-    `SELECT ${NOME_PESSOA} AS nome, COALESCE(pf.cpf, pj.cnpj) AS documento,
-            (SELECT ct.telefone FROM pessoas_contatos ct WHERE ct.id_cliente = c.id_pessoa AND ct.deleted_at IS NULL ORDER BY ct.principal DESC, ct.id_contato LIMIT 1) AS telefone
-     FROM pessoas_core c LEFT JOIN pessoas_pf pf ON pf.id_cliente = c.id_pessoa LEFT JOIN pessoas_pj pj ON pj.id_cliente = c.id_pessoa
-     WHERE c.id_pessoa = ? AND c.tenant_id = ? AND c.deleted_at IS NULL`,
-    [idCliente, tenant]
+    `SELECT nome, documento, telefone FROM modulo_hidraulica_pocos_clientes WHERE id_cliente = ? AND tenant_id = ?`, [idCliente, tenant]
   );
-  if (!c) throw new ErroObra('Cliente não encontrado no cadastro.', 404);
+  if (!c) throw new ErroObra('Cliente não encontrado no cadastro de clientes de poço.', 404);
   return c;
 };
 

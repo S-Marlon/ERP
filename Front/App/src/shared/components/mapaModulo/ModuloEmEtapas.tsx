@@ -22,6 +22,9 @@ interface Props {
   telas: Record<string, React.ReactNode>;
   textoAlertas: string;
   abaInicial?: string;
+  /** Aba controlada por fora (ex.: "ver no mapa" vindo de outra aba); sem isso a tela guarda a aba sozinha. */
+  aba?: string;
+  onAba?: (chave: string) => void;
 }
 
 /** Aba de uma funcionalidade que ainda não abriu: o que ela vai fazer, o que guarda e com o que se liga. */
@@ -81,8 +84,10 @@ const VisaoGeral: React.FC<Pick<Props, 'funcionalidades' | 'icones' | 'textoAler
   );
 };
 
-const ModuloEmEtapas: React.FC<Props> = ({ titulo, descricao, funcionalidades, icones, telas, textoAlertas, abaInicial = 'visao' }) => {
-  const [aba, setAba] = useState(abaInicial);
+const ModuloEmEtapas: React.FC<Props> = ({ titulo, descricao, funcionalidades, icones, telas, textoAlertas, abaInicial = 'visao', aba: abaFora, onAba }) => {
+  const [abaPropria, setAbaPropria] = useState(abaInicial);
+  const aba = abaFora ?? abaPropria;
+  const setAba = (k: string) => { setAbaPropria(k); onAba?.(k); };
   return (
     <div style={{ padding: 24 }}>
       <div style={{ marginBottom: 12 }}>

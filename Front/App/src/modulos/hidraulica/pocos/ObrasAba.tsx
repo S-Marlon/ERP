@@ -1,14 +1,16 @@
-// Obras de poços › Obras e poços (etapa 1): a lista de obras por situação, a obra nova (cliente do cadastro, poço já
+// Obras de poços › Obras e poços (etapa 1): a lista de obras por situação, a obra nova (cliente de poço, poço já
 // cadastrado, novo ou criado ao concluir a perfuração), a obra aberta com a situação e o relatório técnico gravando nela,
-// e a ficha dos poços.
+// a ficha dos poços e os clientes de poço. "Ver no mapa" leva à aba do mapa (etapa 2) já no ponto.
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert, Button, Card, Checkbox, Col, Descriptions, Empty, Flex, Input, InputNumber, Modal, Popconfirm, Row, Segmented, Select, Space, Statistic, Steps, Table, Tag, Tooltip, Typography, message,
 } from 'antd';
-import { AimOutlined, EditOutlined, EnvironmentOutlined, PlusOutlined, ReloadOutlined, UserOutlined } from '@ant-design/icons';
-import { ClientePdvModal } from '../../../areas/vendas/pdv/components/ClientePdvModal';
-import { contarObras, dataBr, Obra, ObraForm, obrasApi, Poco, PocoForm, Servico, SERVICOS, SituacaoObra, SITUACOES_OBRA } from './obrasApi';
+import { AimOutlined, CalculatorOutlined, EditOutlined, EnvironmentOutlined, PlusOutlined, ReloadOutlined, UserOutlined } from '@ant-design/icons';
+import { contarObras, dataBr, foneBr, Obra, ObraForm, obrasApi, Poco, PocoForm, Servico, SERVICOS, SituacaoObra, SITUACOES_OBRA } from './obrasApi';
 import RelatorioPocoPage from './RelatorioPocoPage';
+import { ClientePocoModal, ListaClientes } from './ClientesPoco';
+import { lerGpsTexto, textoRaio } from './mapaRegional';
+import { abrirCliente, useNavPocos, verNoMapa, VistaObras } from './navPocos';
 
 const { Text } = Typography;
 const brl = (v: number | null | undefined) => (v === null || v === undefined ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
@@ -69,6 +71,14 @@ const PocoModal: React.FC<{ poco: Poco | 'novo' | null; onFechar: () => void; on
   return (
     <Modal open={!!poco} title={poco === 'novo' ? 'Novo poço' : `Poço · ${poco && poco.identificacao}`} okText="Salvar" cancelText="Voltar" onOk={salvar} onCancel={onFechar} width={720} destroyOnHidden>
       <Space direction="vertical" style={{ width: '100%' }} size={10}>
+        {poco && poco !== 'novo' && (poco.latitude !== null || poco.idProprietario) && (
+          <Space wrap>
+            {poco.latitude !== null && poco.longitude !== null && (
+              <Button size="small" icon={<EnvironmentOutlined />} onClick={() => { onFechar(); verNoMapa(poco.latitude!, poco.longitude!, poco.idPoco); }}>Ver no mapa</Button>
+            )}
+            {poco.idProprietario && <Button size="small" icon={<UserOutlined />} onClick={() => { onFechar(); abrirCliente(poco.idProprietario!); }}>Ficha do cliente</Button>}
+          </Space>
+        )}
         <Row gutter={8}>
           <Col span={14}><Text>Identificação</Text><Input maxLength={100} value={p.identificacao} onChange={e => mudar({ identificacao: e.target.value })} placeholder="Ex.: Sítio São José - poço 1" /></Col>
           <Col span={10}>
@@ -100,8 +110,8 @@ const PocoModal: React.FC<{ poco: Poco | 'novo' | null; onFechar: () => void; on
           {p.perfuradoPor === 'TERCEIRO' && <Col span={16}><Text>Empresa que perfurou</Text><Input value={p.perfuradoPorNome || ''} onChange={e => mudar({ perfuradoPorNome: e.target.value || null })} /></Col>}
         </Row>
       </Space>
-      <ClientePdvModal open={escolhendo} onFechar={() => setEscolhendo(false)}
-        onSelecionar={c => { setEscolhendo(false); setCliente(c ? { id: c.id, nome: c.nome } : null); }} />
+      <ClientePocoModal open={escolhendo} onFechar={() => setEscolhendo(false)}
+        onSelecionar={c => { setEscolhendo(false); setCliente({ id: c.idCliente, nome: c.nome }); }} />
     </Modal>
   );
 };
@@ -115,8 +125,10 @@ const ObraModal: React.FC<{ obra: Obra | 'nova' | null; onFechar: () => void; on
   const [pocos, setPocos] = useState<Poco[]>([]);
   const [novoPoco, setNovoPoco] = useState<Partial<PocoForm>>({ perfuradoPor: 'NOS' });
   const [salvando, setSalvando] = useState(false);
+  const [estimativa, setEstimativa] = useState<string | null>(null);
   useEffect(() => {
     if (!obra) return;
+    setEstimativa(null);
     if (obra === 'nova') { setF(obraVazia()); setCliente(null); setModoPoco('DEPOIS'); setNovoPoco({ perfuradoPor: 'NOS' }); return; }
     setF({ ...obra });
     setCliente({ id: obra.idCliente, nome: obra.cliente });
@@ -136,6 +148,23 @@ const ObraModal: React.FC<{ obra: Obra | 'nova' | null; onFechar: () => void; on
     } catch (e) { message.error(e instanceof Error ? e.message : 'Erro.'); }
     finally { setSalvando(false); }
   };
+  /** GPS do poço escolhido (ou do poço novo) para estimar a profundidade pelos poços da região. */
+  const gpsDaObra = () => {
+    if (modoPoco === 'NOVO') return lerGpsTexto(novoPoco.gps);
+    const p = modoPoco === 'EXISTENTE' ? pocos.find(x => x.idPoco === f.idPoco) : null;
+    return p && p.latitude !== null && p.longitude !== null ? { latitude: p.latitude, longitude: p.longitude } : null;
+  };
+  const estimar = async () => {
+    const gps = gpsDaObra();
+    if (!gps) { message.info('Para estimar, o poço precisa do GPS (escolha um poço com GPS ou preencha a localização do poço novo).'); return; }
+    try {
+      const a = await obrasApi.analisar(gps.latitude, gps.longitude, 2000);
+      if (!a.metrosSugeridos) { setEstimativa(`Nenhum poço com profundidade num raio de ${textoRaio(a.raioM)}.`); return; }
+      mudar({ metrosPrevistos: a.metrosSugeridos });
+      setEstimativa(`${a.quantidade} poço(s) em ${textoRaio(a.raioM)}: mediana ${a.profundidadeMediana} m (de ${a.profundidadeMin} a ${a.profundidadeMax} m)`
+        + `${a.vazaoMediaM3h !== null ? `, vazão média ${a.vazaoMediaM3h} m³/h` : ''}${a.potencial !== null ? `, potencial ${a.potencial.toFixed(0)}` : ''}.`);
+    } catch (e) { message.error(e instanceof Error ? e.message : 'Erro.'); }
+  };
   const num = (k: 'metrosPrevistos' | 'valorContratado' | 'valorMetroExcedente' | 'garantiaMeses', props: object) => (
     <InputNumber min={0} style={{ width: '100%' }} decimalSeparator="," value={f[k] ?? undefined} onChange={v => mudar({ [k]: v === null ? null : Number(v) } as any)} {...props} />
   );
@@ -146,7 +175,7 @@ const ObraModal: React.FC<{ obra: Obra | 'nova' | null; onFechar: () => void; on
         <Row gutter={8}>
           <Col span={12}>
             <Text>Cliente</Text>
-            <Button block icon={<UserOutlined />} onClick={() => setEscolhendo(true)} type={cliente ? 'default' : 'primary'} ghost={!cliente}>{cliente?.nome || 'Escolher no cadastro (ou cadastrar)'}</Button>
+            <Button block icon={<UserOutlined />} onClick={() => setEscolhendo(true)} type={cliente ? 'default' : 'primary'} ghost={!cliente}>{cliente?.nome || 'Escolher cliente de poço (ou cadastrar)'}</Button>
           </Col>
           <Col span={12}><Text>Título</Text><Input maxLength={150} value={f.titulo || ''} onChange={e => mudar({ titulo: e.target.value || null })} placeholder="Ex.: Perfuração + bomba - Sítio São José" /></Col>
         </Row>
@@ -178,18 +207,25 @@ const ObraModal: React.FC<{ obra: Obra | 'nova' | null; onFechar: () => void; on
         </div>
         <Row gutter={8}>
           <Col span={6}><Text>Início previsto</Text><Input type="date" value={f.dataPrevisao || ''} onChange={e => mudar({ dataPrevisao: e.target.value || null })} /></Col>
-          <Col span={6}><Text>Metros previstos</Text>{num('metrosPrevistos', { suffix: 'm' })}</Col>
+          <Col span={6}>
+            <Text>Metros previstos</Text>
+            <Space.Compact style={{ width: '100%' }}>
+              {num('metrosPrevistos', { suffix: 'm' })}
+              <Tooltip title="Estimar pelos poços da região (raio de 2 km)"><Button icon={<CalculatorOutlined />} onClick={estimar} /></Tooltip>
+            </Space.Compact>
+          </Col>
           <Col span={6}><Text>Valor contratado</Text>{num('valorContratado', { prefix: 'R$', precision: 2 })}</Col>
           <Col span={6}><Text>Metro excedente</Text>{num('valorMetroExcedente', { prefix: 'R$', precision: 2 })}</Col>
         </Row>
+        {estimativa && <Alert type="info" showIcon style={{ padding: '4px 10px' }} message={<Text style={{ fontSize: 12 }}>{estimativa}</Text>} closable onClose={() => setEstimativa(null)} />}
         <Row gutter={8}>
           <Col span={6}><Text>Garantia</Text>{num('garantiaMeses', { suffix: 'meses', max: 120 })}</Col>
           <Col span={18}><Text>Observação</Text><Input maxLength={255} value={f.observacao || ''} onChange={e => mudar({ observacao: e.target.value || null })} /></Col>
         </Row>
         {obra === 'nova' && <Text type="secondary" style={{ fontSize: 12 }}>A obra começa como orçamento, com o relatório técnico já preenchido com o cliente, o poço e os valores.</Text>}
       </Space>
-      <ClientePdvModal open={escolhendo} onFechar={() => setEscolhendo(false)}
-        onSelecionar={c => { setEscolhendo(false); if (!c) { message.info('A obra precisa de um cliente do cadastro.'); return; } setCliente({ id: c.id, nome: c.nome }); mudar({ idPoco: null }); }} />
+      <ClientePocoModal open={escolhendo} onFechar={() => setEscolhendo(false)}
+        onSelecionar={c => { setEscolhendo(false); setCliente({ id: c.idCliente, nome: c.nome }); mudar({ idPoco: null }); }} />
     </Modal>
   );
 };
@@ -217,7 +253,7 @@ const ObraAberta: React.FC<{ idObra: number; onVoltar: () => void }> = ({ idObra
           <div>
             <Text strong style={{ fontSize: 16 }}>Obra {obra.idObra}{obra.titulo ? ` · ${obra.titulo}` : ''}</Text>
             <div>
-              <Text type="secondary">{obra.cliente}{obra.telefone ? ` · ${obra.telefone}` : ''}{obra.poco ? ` · poço ${obra.poco}` : ''}</Text>
+              <Text type="secondary">{obra.cliente}{obra.telefone ? ` · ${foneBr(obra.telefone)}` : ''}{obra.poco ? ` · poço ${obra.poco}` : ''}</Text>
               <span style={{ marginLeft: 8 }}>{obra.servicos.map(s => <Tag key={s}>{SERVICOS[s]}</Tag>)}</span>
             </div>
           </div>
@@ -229,6 +265,11 @@ const ObraAberta: React.FC<{ idObra: number; onVoltar: () => void }> = ({ idObra
               </Popconfirm>
             ))}
             <Button icon={<EditOutlined />} onClick={() => setEditando(true)}>Dados da obra</Button>
+            <Button icon={<UserOutlined />} onClick={() => abrirCliente(obra.idCliente)}>Cliente</Button>
+            <Tooltip title={obra.latitude === null ? 'O poço desta obra ainda não tem GPS' : undefined}>
+              <Button icon={<EnvironmentOutlined />} disabled={obra.latitude === null || obra.longitude === null}
+                onClick={() => verNoMapa(obra.latitude!, obra.longitude!, obra.idPoco ?? undefined)}>Ver no mapa</Button>
+            </Tooltip>
           </Space>
         </Flex>
         {obra.situacao === 'CANCELADA'
@@ -310,7 +351,7 @@ const ListaObras: React.FC<{ onAbrir: (id: number) => void }> = ({ onAbrir }) =>
   );
 };
 
-const ListaPocos: React.FC = () => {
+const ListaPocos: React.FC<{ abrir?: number; pedido?: number }> = ({ abrir, pedido }) => {
   const [pocos, setPocos] = useState<Poco[]>([]);
   const [carregando, setCarregando] = useState(false);
   const [busca, setBusca] = useState('');
@@ -322,6 +363,12 @@ const ListaPocos: React.FC = () => {
     finally { setCarregando(false); }
   }, [busca]);
   useEffect(() => { const t = setTimeout(carregar, 250); return () => clearTimeout(t); }, [carregar]);
+  useEffect(() => {
+    if (!abrir) return;
+    const achado = pocos.find(p => p.idPoco === abrir);
+    if (achado) setEditando(achado);
+    else obrasApi.pocos({}).then(l => { const p = l.find(x => x.idPoco === abrir); if (p) setEditando(p); }).catch(() => undefined);
+  }, [abrir, pedido]);   // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <Card size="small"
       title={<Input allowClear placeholder="Identificação, cidade, endereço ou proprietário" style={{ width: 320 }} value={busca} onChange={e => setBusca(e.target.value)} />}
@@ -345,7 +392,14 @@ const ListaPocos: React.FC = () => {
           { title: 'Profundidade', width: 110, align: 'right', render: (_, p) => (p.profundidadeM ? `${p.profundidadeM} m` : '—') },
           { title: 'Vazão', width: 110, align: 'right', render: (_, p) => (p.vazaoLh ? `${Number(p.vazaoLh).toLocaleString('pt-BR')} L/h` : '—') },
           { title: 'NE / ND', width: 110, align: 'right', render: (_, p) => (p.nivelEstaticoM || p.nivelDinamicoM ? `${p.nivelEstaticoM ?? '—'} / ${p.nivelDinamicoM ?? '—'} m` : '—') },
-          { title: 'GPS', width: 70, align: 'center', render: (_, p) => (p.latitude !== null ? <Tooltip title={`${p.latitude}, ${p.longitude}`}><EnvironmentOutlined style={{ color: '#389e0d' }} /></Tooltip> : <Text type="secondary">—</Text>) },
+          {
+            title: 'Mapa', width: 70, align: 'center', render: (_, p) => (p.latitude !== null && p.longitude !== null
+              ? <Tooltip title={`Ver no mapa (${p.latitude}, ${p.longitude})`}>
+                  <Button size="small" type="text" icon={<EnvironmentOutlined style={{ color: '#389e0d' }} />}
+                    onClick={e => { e.stopPropagation(); verNoMapa(p.latitude!, p.longitude!, p.idPoco); }} />
+                </Tooltip>
+              : <Tooltip title="Sem GPS"><Text type="secondary">—</Text></Tooltip>),
+          },
           { title: 'Perfurado por', width: 130, render: (_, p) => (p.perfuradoPor === 'NOS' ? <Tag color="blue">nós</Tag> : p.perfuradoPor === 'TERCEIRO' ? <Tag>{p.perfuradoPorNome || 'terceiro'}</Tag> : <Tag>não sei</Tag>) },
           { title: 'Obras', dataIndex: 'obras', width: 70, align: 'center' },
           { title: 'Situação', width: 100, render: (_, p) => <Tag color={p.situacao === 'ATIVO' ? 'green' : 'default'}>{p.situacao === 'ATIVO' ? 'Ativo' : p.situacao === 'SECO' ? 'Seco' : 'Desativado'}</Tag> },
@@ -357,13 +411,23 @@ const ListaPocos: React.FC = () => {
 };
 
 const ObrasAba: React.FC = () => {
-  const [vista, setVista] = useState<'OBRAS' | 'POCOS'>('OBRAS');
-  const [aberta, setAberta] = useState<number | null>(null);
-  if (aberta) return <ObraAberta idObra={aberta} onVoltar={() => setAberta(null)} />;
+  const nav = useNavPocos();
+  const [vista, setVista] = useState<VistaObras>(nav.vista || 'OBRAS');
+  const [aberta, setAberta] = useState<number | null>(nav.abrirObra ?? null);
+  // pedidos vindos do mapa ou da ficha do cliente ("abrir obra", "ficha do poço", "ficha do cliente")
+  useEffect(() => {
+    if (nav.aba !== 'obras' || !nav.vista) return;
+    setVista(nav.vista);
+    setAberta(nav.abrirObra ?? null);
+  }, [nav.pedido]);   // eslint-disable-line react-hooks/exhaustive-deps
+  if (aberta) return <ObraAberta key={aberta} idObra={aberta} onVoltar={() => setAberta(null)} />;
   return (
     <Space direction="vertical" size={12} style={{ width: '100%' }}>
-      <Segmented value={vista} onChange={v => setVista(v as 'OBRAS' | 'POCOS')} options={[{ value: 'OBRAS', label: 'Obras' }, { value: 'POCOS', label: 'Poços' }]} />
-      {vista === 'OBRAS' ? <ListaObras onAbrir={setAberta} /> : <ListaPocos />}
+      <Segmented value={vista} onChange={v => setVista(v as VistaObras)}
+        options={[{ value: 'OBRAS', label: 'Obras' }, { value: 'POCOS', label: 'Poços' }, { value: 'CLIENTES', label: 'Clientes de poço' }]} />
+      {vista === 'OBRAS' && <ListaObras onAbrir={setAberta} />}
+      {vista === 'POCOS' && <ListaPocos abrir={nav.abrirPoco} pedido={nav.pedido} />}
+      {vista === 'CLIENTES' && <ListaClientes abrir={nav.abrirCliente} pedido={nav.pedido} />}
     </Space>
   );
 };

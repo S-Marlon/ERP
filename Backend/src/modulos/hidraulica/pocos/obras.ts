@@ -90,6 +90,24 @@ export const validarPoco = (b: any) => {
   };
 };
 
+/** Cliente de poço (cadastro do módulo, separado do cadastro geral): basta o nome; telefone e documento só com os dígitos. */
+export const validarCliente = (b: any) => {
+  const nome = texto(b?.nome, 120);
+  if (!nome) throw new ErroObra('Informe o nome do cliente.');
+  const digitos = (v: unknown, max: number) => String(v ?? '').replace(/\D/g, '').slice(0, max) || null;
+  const telefone = digitos(b?.telefone, 20);
+  if (telefone && telefone.length < 8) throw new ErroObra('Telefone incompleto.');
+  const documento = digitos(b?.documento, 18);
+  if (documento && documento.length !== 11 && documento.length !== 14) throw new ErroObra('Documento: CPF com 11 ou CNPJ com 14 dígitos.');
+  const email = texto(b?.email, 120);
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new ErroObra('E-mail inválido.');
+  return {
+    nome, telefone, documento, email: email ? email.toLowerCase() : null,
+    endereco: texto(b?.endereco, 150), bairro: texto(b?.bairro, 60), cidade: texto(b?.cidade, 60),
+    uf: String(b?.uf ?? '').trim().toUpperCase().slice(0, 2) || null, observacao: texto(b?.observacao, 255),
+  };
+};
+
 type Rel = Record<string, any>;
 const num = (v: unknown) => (v === undefined || v === null || String(v).trim() === '' ? null : Number(String(v).replace(',', '.')) || null);
 
