@@ -1,18 +1,7 @@
 // Mapa do Gestor de frotas: as funcionalidades do módulo, em que etapa cada uma entra, o que vai fazer e com que parte
 // do ERP se liga. A tela mostra tudo desde o começo; cada funcionalidade abre quando a etapa dela fica pronta.
 
-export type SituacaoFuncionalidade = 'PLANEJADA' | 'EM_CONSTRUCAO' | 'PRONTA';
-
-export interface Funcionalidade {
-  chave: string;
-  titulo: string;
-  etapa: number;
-  situacao: SituacaoFuncionalidade;
-  resumo: string;
-  oQueFaz: string[];
-  dados: string[];        // o que se guarda (campos principais)
-  ligaCom: string[];      // partes do ERP que conversam com ela
-}
+import type { Funcionalidade } from '../../../shared/components/mapaModulo/mapaModulo';
 
 export const FUNCIONALIDADES: Funcionalidade[] = [
   {
@@ -100,15 +89,3 @@ export const FUNCIONALIDADES: Funcionalidade[] = [
     ligaCom: ['Financeiro › Resultado do mês e Painel financeiro'],
   },
 ];
-
-/** Etapas em ordem com a situação de cada uma (a etapa fica pronta quando todas as funcionalidades dela ficam). */
-export const etapasDoPlano = (lista: Funcionalidade[] = FUNCIONALIDADES) =>
-  [...new Set(lista.map(f => f.etapa))].sort((a, b) => a - b).map(etapa => {
-    const da = lista.filter(f => f.etapa === etapa);
-    const situacao: SituacaoFuncionalidade = da.every(f => f.situacao === 'PRONTA') ? 'PRONTA'
-      : da.some(f => f.situacao !== 'PLANEJADA') ? 'EM_CONSTRUCAO' : 'PLANEJADA';
-    return { etapa, titulos: da.map(f => f.titulo), situacao };
-  });
-
-/** A etapa em que estamos: a primeira que não está pronta (null = tudo pronto). */
-export const etapaAtual = (lista: Funcionalidade[] = FUNCIONALIDADES) => etapasDoPlano(lista).find(e => e.situacao !== 'PRONTA')?.etapa ?? null;
