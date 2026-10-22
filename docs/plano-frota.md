@@ -19,7 +19,7 @@ cada funcionalidade tem a etapa e a situação (planejada, em construção, pron
 | 6 | Viagens e entregas (saída/retorno, km, vendas/OS entregues, checklist) | Vendas, módulo Montagens |
 | 7 | Custos e painel (custo por km e por mês, alertas) | Resultado do mês, Painel financeiro |
 
-## Etapa 1: veículos (desenho)
+## Etapa 1: veículos (pronta em 2026-10-21)
 
 `modulo_logistica_frota_veiculos`: placa (única na loja, guardada sem traço; aceita a antiga ABC1234 e a Mercosul
 ABC1D23), apelido ("Strada branca"), tipo (carro, utilitário, caminhão, moto, outro), marca, modelo, ano de fabricação e

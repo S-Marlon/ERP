@@ -6,6 +6,7 @@ import {
   AlertOutlined, CarOutlined, DashboardOutlined, FileProtectOutlined, IdcardOutlined, NodeIndexOutlined, ToolOutlined, FireOutlined,
 } from '@ant-design/icons';
 import { etapaAtual, etapasDoPlano, Funcionalidade, FUNCIONALIDADES, SituacaoFuncionalidade } from './planoFrota';
+import VeiculosAba from './VeiculosAba';
 
 const { Text, Title, Paragraph } = Typography;
 
@@ -89,7 +90,8 @@ const FrotaPagina: React.FC = () => {
         ...FUNCIONALIDADES.map(f => ({
           key: f.chave,
           label: <span style={{ opacity: f.situacao === 'PRONTA' ? 1 : 0.65 }}>{ICONE[f.chave]} {f.titulo}</span>,
-          children: <FuncionalidadeEmBreve f={f} />,
+          // a funcionalidade pronta mostra a tela dela; as outras, o que vão fazer
+          children: f.chave === 'veiculos' ? <VeiculosAba /> : <FuncionalidadeEmBreve f={f} />,
         })),
       ]} />
     </div>

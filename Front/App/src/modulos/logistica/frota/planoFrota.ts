@@ -16,7 +16,7 @@ export interface Funcionalidade {
 
 export const FUNCIONALIDADES: Funcionalidade[] = [
   {
-    chave: 'veiculos', titulo: 'Veículos', etapa: 1, situacao: 'PLANEJADA',
+    chave: 'veiculos', titulo: 'Veículos', etapa: 1, situacao: 'PRONTA',
     resumo: 'O cadastro da frota: cada veículo com documento, quilometragem e situação.',
     oQueFaz: [
       'Cadastro de carros, utilitários, caminhões e motos da loja',

@@ -16,5 +16,5 @@ teste('frota: situação das etapas e a etapa atual', () => {
   assert.deepStrictEqual(etapasDoPlano(lista).map(e => e.situacao), ['PRONTA', 'EM_CONSTRUCAO', 'PLANEJADA']);
   assert.strictEqual(etapaAtual(lista), 2);
   assert.strictEqual(etapaAtual([f('a', 1, 'PRONTA')]), null);
-  assert.strictEqual(etapaAtual(), 1);
+  assert.strictEqual(etapaAtual(), 2);   // a etapa 1 (veículos) está pronta
 });
