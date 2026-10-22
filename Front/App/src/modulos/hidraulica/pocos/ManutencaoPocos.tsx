@@ -113,14 +113,16 @@ export const HistoricoDoPoco: React.FC<{ idPoco: number; onAbrirObra?: () => voi
       </Space>
       {vista === 'LINHA' && (h.linhaDoTempo.length
         ? <Timeline style={{ marginTop: 8 }} items={h.linhaDoTempo.map(e => ({
-            color: e.tipo === 'OBRA' ? 'blue' : e.tipo === 'PROBLEMA' ? 'red' : 'gray',
+            color: e.tipo === 'OBRA' ? 'blue' : e.tipo === 'PROBLEMA' || e.tipo === 'ALERTA' ? 'red' : 'gray',
             children: (
               <div style={{ cursor: 'pointer' }} onClick={() => {
                 if (e.idObra) { onAbrirObra?.(); abrirObra(e.idObra); }
                 else if (e.idRegistro) setRegistro(h.registros.find(r => r.idRegistro === e.idRegistro) || null);
               }}>
                 <Text type="secondary" style={{ fontSize: 12 }}>{dataBr(e.data)}</Text>{' '}
-                <Tag color={e.tipo === 'OBRA' ? 'blue' : TIPOS_REGISTRO[e.tipo].cor}>{e.tipo === 'OBRA' ? 'Obra' : TIPOS_REGISTRO[e.tipo].texto}</Tag>
+                <Tag color={e.tipo === 'OBRA' ? 'blue' : e.tipo === 'ALERTA' ? 'volcano' : TIPOS_REGISTRO[e.tipo].cor}>
+                  {e.tipo === 'OBRA' ? 'Obra' : e.tipo === 'ALERTA' ? 'Sensor' : TIPOS_REGISTRO[e.tipo].texto}
+                </Tag>
                 <Text strong>{e.titulo}</Text>
                 {e.detalhe && <div><Text type="secondary">{e.detalhe}</Text></div>}
               </div>
@@ -138,7 +140,7 @@ export const HistoricoDoPoco: React.FC<{ idPoco: number; onAbrirObra?: () => voi
           <Table size="small" rowKey={(m, i) => `${m.data}-${i}`} dataSource={[...h.medicoes].reverse()} pagination={false} locale={{ emptyText: 'Nenhuma medição' }}
             columns={[
               { title: 'Data', width: 110, render: (_, m) => dataBr(m.data) },
-              { title: 'Origem', width: 130, render: (_, m) => (m.origem === 'PERFURACAO' ? <Tag>ficha (perfuração)</Tag> : <Tag color="blue">medição</Tag>) },
+              { title: 'Origem', width: 130, render: (_, m) => (m.origem === 'PERFURACAO' ? <Tag>ficha (perfuração)</Tag> : m.origem === 'SENSOR' ? <Tag color="purple">sensor (média do dia)</Tag> : <Tag color="blue">medição</Tag>) },
               { title: 'Nível estático', align: 'right', render: (_, m) => (m.nivelEstaticoM === null ? '—' : `${num(m.nivelEstaticoM)} m`) },
               { title: 'Nível dinâmico', align: 'right', render: (_, m) => (m.nivelDinamicoM === null ? '—' : `${num(m.nivelDinamicoM)} m`) },
               { title: 'Vazão', align: 'right', render: (_, m) => (m.vazaoLh === null ? '—' : `${m.vazaoLh.toLocaleString('pt-BR')} L/h`) },

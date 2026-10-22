@@ -12,6 +12,7 @@ import MapaPocos from './MapaPocos';
 import AgendaPocos from './AgendaPocos';
 import PainelPocos from './PainelPocos';
 import { ManutencoesPocos } from './ManutencaoPocos';
+import MonitoramentoPocos from './MonitoramentoPocos';
 import { navPocos, useNavPocos } from './navPocos';
 
 const ICONES: Record<string, React.ReactNode> = {
@@ -26,9 +27,9 @@ const ObrasPocosPagina: React.FC = () => {
     <ModuloEmEtapas
       titulo={<><AimOutlined /> Obras de poços artesianos</>}
       descricao="Da perfuração à manutenção: obras, ficha de cada poço, mapa regional, sinal e cobrança, materiais, agenda e monitoramento remoto."
-      funcionalidades={FUNCIONALIDADES} icones={ICONES} telas={{ relatorio: <RelatorioPocoPage />, obras: <ObrasAba />, mapa: <MapaPocos />, agenda: <AgendaPocos />, manutencao: <ManutencoesPocos />, resultado: <PainelPocos /> }}
+      funcionalidades={FUNCIONALIDADES} icones={ICONES} telas={{ relatorio: <RelatorioPocoPage />, obras: <ObrasAba />, mapa: <MapaPocos />, agenda: <AgendaPocos />, manutencao: <ManutencoesPocos />, iot: <MonitoramentoPocos />, resultado: <PainelPocos /> }}
       aba={nav.aba} onAba={navPocos.trocarAba}
-      textoAlertas="Obras paradas ou atrasadas ficam em Resultado e painel; manutenções vencendo e garantias em Histórico e manutenção; os sensores aparecem aqui quando a etapa 7 abrir."
+      textoAlertas="Obras paradas ou atrasadas ficam em Resultado e painel; manutenções vencendo e garantias em Histórico e manutenção; alertas dos sensores em Monitoramento remoto."
     />
   );
 };

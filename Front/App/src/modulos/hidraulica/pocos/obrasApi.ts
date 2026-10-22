@@ -267,10 +267,10 @@ export interface PlanoForm { servico: ServicoPlano; descricao: string | null; aC
 export interface PlanoManutencao extends PlanoForm {
   idPlano: number; idPoco: number; ultima: string | null; origemUltima: 'OBRA' | 'INFORMADA' | null; proxima: string | null; situacao: SituacaoPlano;
 }
-export interface EventoPoco { data: string; tipo: 'OBRA' | TipoRegistro; titulo: string; detalhe: string | null; idObra?: number; idRegistro?: number }
+export interface EventoPoco { data: string; tipo: 'OBRA' | 'ALERTA' | TipoRegistro; titulo: string; detalhe: string | null; idObra?: number; idRegistro?: number }
 export interface HistoricoPoco {
   linhaDoTempo: EventoPoco[]; registros: RegistroPoco[]; planos: PlanoManutencao[];
-  medicoes: { data: string; origem: 'MEDICAO' | 'PERFURACAO'; nivelEstaticoM: number | null; nivelDinamicoM: number | null; vazaoLh: number | null }[];
+  medicoes: { data: string; origem: 'MEDICAO' | 'PERFURACAO' | 'SENSOR'; nivelEstaticoM: number | null; nivelDinamicoM: number | null; vazaoLh: number | null }[];
 }
 export interface ManutencaoAOferecer extends PlanoManutencao {
   poco: string; cidade: string | null; idCliente: number | null; cliente: string | null; telefone: string | null; obraAberta: { idObra: number; situacao: SituacaoObra } | null;
@@ -287,6 +287,67 @@ export const manutencaoApi = {
   criarPlano: (idPoco: number, p: PlanoForm) => pedir<{ idPlano: number }>(`${API}/pocos/${idPoco}/planos?tenant_id=1`, corpo('POST', p), 'Erro ao criar o plano.'),
   salvarPlano: (id: number, p: PlanoForm) => pedir<{ ok: boolean }>(`${API}/planos/${id}?tenant_id=1`, corpo('PUT', p), 'Erro ao salvar o plano.'),
   aOferecer: (todas = false) => pedir<{ planos: ManutencaoAOferecer[]; garantias: GarantiaVencendo[] }>(`${API}/manutencoes?${q({ todas: todas ? 1 : null })}`, undefined, 'Erro ao listar as manutenções.'),
+};
+
+// ------------------------------------------------------------------ monitoramento remoto (etapa 7)
+export type ConexaoIot = 'WIFI' | 'GSM_4G' | 'LORA' | 'OUTRO';
+export type TipoAlertaIot = 'NIVEL_BAIXO' | 'A_SECO' | 'SOBRECORRENTE' | 'VAZAO_BAIXA' | 'TENSAO' | 'SEM_SINAL';
+export type StatusIot = 'ONLINE' | 'ATRASADO' | 'SEM_SINAL' | 'NUNCA' | 'INATIVO';
+export const CONEXOES_IOT: Record<ConexaoIot, string> = { WIFI: 'Wi-Fi', GSM_4G: '4G (chip)', LORA: 'LoRa', OUTRO: 'Outro' };
+export const TIPOS_ALERTA_IOT: Record<TipoAlertaIot, { texto: string; cor: string }> = {
+  NIVEL_BAIXO: { texto: 'Nível baixo', cor: 'orange' }, A_SECO: { texto: 'Bomba a seco', cor: 'red' }, SOBRECORRENTE: { texto: 'Sobrecorrente', cor: 'red' },
+  VAZAO_BAIXA: { texto: 'Vazão baixa', cor: 'orange' }, TENSAO: { texto: 'Tensão', cor: 'gold' }, SEM_SINAL: { texto: 'Sem sinal', cor: 'default' },
+};
+export const STATUS_IOT: Record<StatusIot, { texto: string; cor: string }> = {
+  ONLINE: { texto: 'Online', cor: 'green' }, ATRASADO: { texto: 'Atrasado', cor: 'orange' }, SEM_SINAL: { texto: 'Sem sinal', cor: 'red' },
+  NUNCA: { texto: 'Nunca enviou', cor: 'default' }, INATIVO: { texto: 'Inativo', cor: 'default' },
+};
+export interface DispositivoForm {
+  idPoco: number | null; nome: string; identificador: string; conexao: ConexaoIot; intervaloMin: number; profundidadeSensorM: number | null;
+  nivelAlertaM: number | null; correnteMinA: number | null; correnteMaxA: number | null; vazaoMinLh: number | null; tensaoMinV: number | null; tensaoMaxV: number | null;
+  situacao: 'ATIVO' | 'INATIVO'; observacao: string | null;
+}
+export interface Dispositivo extends DispositivoForm {
+  idDispositivo: number; idPoco: number; poco: string | null; cidade: string | null; cliente: string | null; telefone: string | null; ultimaLeituraEm: string | null;
+}
+export interface LeituraIot {
+  em: string; nivelM: number | null; vazaoLh: number | null; correnteA: number | null; tensaoV: number | null; bombaLigada: boolean | null;
+  horimetroH: number | null; temperaturaC: number | null; sinalDbm: number | null; bateriaV: number | null;
+}
+export interface ResumoDiaIot { dia: string; leituras: number; nivelEstaticoM: number | null; nivelDinamicoM: number | null; vazaoMediaLh: number | null; horasBomba: number; volumeM3: number }
+export interface DispositivoNoPainel extends Dispositivo { status: StatusIot; ultima: LeituraIot | null; hoje: ResumoDiaIot | null; alertasAbertos: number }
+export interface AlertaIot {
+  idAlerta: number; idDispositivo: number; dispositivo: string | null; idPoco: number | null; poco: string | null; cliente: string | null; telefone: string | null;
+  tipo: TipoAlertaIot; mensagem: string; valor: number | null; inicio: string; fim: string | null; vistoEm: string | null; vistoPor: string | null;
+}
+/** Leitura no formato que o aparelho envia (o mesmo do simulador). */
+export interface LeituraEnvio {
+  em?: string; nivel_m?: number | null; coluna_m?: number | null; vazao_lh?: number | null; corrente_a?: number | null; tensao_v?: number | null;
+  bomba?: boolean | null; horimetro_h?: number | null; temp_c?: number | null; sinal_dbm?: number | null; bateria_v?: number | null;
+}
+export const URL_LEITURAS = `${API}/iot/leituras`;
+export const iotApi = {
+  painel: () => pedir<{ dispositivos: DispositivoNoPainel[]; alertas: AlertaIot[]; chaveConfigurada: boolean }>(`${API}/iot/painel?tenant_id=1`, undefined, 'Erro ao montar o painel.'),
+  alertas: (dias = 30) => pedir<AlertaIot[]>(`${API}/iot/alertas?${q({ dias })}`, undefined, 'Erro ao listar os alertas.'),
+  visto: (id: number) => pedir<{ ok: boolean }>(`${API}/iot/alertas/${id}/visto?tenant_id=1`, corpo('POST', {}), 'Erro ao marcar.'),
+  dispositivos: () => pedir<Dispositivo[]>(`${API}/iot/dispositivos?tenant_id=1`, undefined, 'Erro ao listar os aparelhos.'),
+  criar: (d: DispositivoForm) => pedir<Dispositivo>(`${API}/iot/dispositivos?tenant_id=1`, corpo('POST', d), 'Erro ao cadastrar o aparelho.'),
+  salvar: (id: number, d: DispositivoForm) => pedir<Dispositivo>(`${API}/iot/dispositivos/${id}?tenant_id=1`, corpo('PUT', d), 'Erro ao salvar o aparelho.'),
+  chave: (id: number) => pedir<{ identificador: string; chave: string }>(`${API}/iot/dispositivos/${id}/chave?tenant_id=1`, undefined, 'Erro ao gerar a chave.'),
+  leituras: (id: number, horas: number) =>
+    pedir<{ dispositivo: Dispositivo; horas: number; total: number; leituras: LeituraIot[]; dias: ResumoDiaIot[] }>(`${API}/iot/dispositivos/${id}/leituras?${q({ horas })}`, undefined, 'Erro ao carregar as leituras.'),
+  simular: (id: number, l: LeituraEnvio) =>
+    pedir<{ recebidas: number; gravadas: number; alertasAbertos: number; alertasFechados: number }>(`${API}/iot/dispositivos/${id}/simular?tenant_id=1`, corpo('POST', l), 'Erro ao simular.'),
+};
+
+/** "há 5 min", "há 3 h", "há 2 dias" (para a última leitura). */
+export const haQuanto = (s: string | null, agora: Date) => {
+  if (!s) return 'nunca';
+  const min = Math.max(0, Math.round((agora.getTime() - new Date(s.replace(' ', 'T')).getTime()) / 60000));
+  if (min < 1) return 'agora';
+  if (min < 60) return `há ${min} min`;
+  if (min < 48 * 60) return `há ${Math.round(min / 60)} h`;
+  return `há ${Math.round(min / 1440)} dias`;
 };
 
 // ------------------------------------------------------------------ painel e resultado (etapa 8)

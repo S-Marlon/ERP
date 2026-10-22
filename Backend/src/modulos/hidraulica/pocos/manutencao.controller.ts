@@ -59,8 +59,28 @@ export const historicoDoPoco = async (req: Request, res: Response) => {
     if (poco.perfuracao && (poco.nivel_estatico_m !== null || poco.nivel_dinamico_m !== null || poco.vazao_lh !== null)) {
       medicoes.unshift({ data: poco.perfuracao, origem: 'PERFURACAO', nivelEstaticoM: nulo(poco.nivel_estatico_m), nivelDinamicoM: nulo(poco.nivel_dinamico_m), vazaoLh: nulo(poco.vazao_lh) });
     }
+    // monitoramento (etapa 7): o resumo de cada dia do sensor vira uma medição (último ano) e os alertas entram na linha do tempo
+    const [sensor]: any = await pool.execute(
+      `SELECT DATE_FORMAT(l.em, '%Y-%m-%d') AS dia, ROUND(AVG(CASE WHEN COALESCE(l.bomba_ligada, l.corrente_a > 0.5, 0) = 0 THEN l.nivel_m END), 2) AS ne,
+              ROUND(AVG(CASE WHEN COALESCE(l.bomba_ligada, l.corrente_a > 0.5, 0) = 1 THEN l.nivel_m END), 2) AS nd,
+              ROUND(AVG(CASE WHEN COALESCE(l.bomba_ligada, l.corrente_a > 0.5, 0) = 1 THEN l.vazao_lh END), 2) AS vazao
+       FROM modulo_hidraulica_pocos_leituras l JOIN modulo_hidraulica_pocos_dispositivos d ON d.id_dispositivo = l.id_dispositivo
+       WHERE d.id_poco = ? AND l.em >= CURDATE() - INTERVAL 365 DAY GROUP BY dia ORDER BY dia`, [id]);
+    for (const s of sensor) {
+      if (s.ne === null && s.nd === null && s.vazao === null) continue;
+      medicoes.push({ data: s.dia, origem: 'SENSOR', nivelEstaticoM: nulo(s.ne), nivelDinamicoM: nulo(s.nd), vazaoLh: nulo(s.vazao) });
+    }
+    medicoes.sort((a: any, b: any) => a.data.localeCompare(b.data));
+    const [alertas]: any = await pool.execute(
+      `SELECT a.tipo, a.mensagem, DATE_FORMAT(a.inicio, '%Y-%m-%d') AS dia, DATE_FORMAT(a.fim, '%d/%m %H:%i') AS fim_txt
+       FROM modulo_hidraulica_pocos_alertas a JOIN modulo_hidraulica_pocos_dispositivos d ON d.id_dispositivo = a.id_dispositivo
+       WHERE d.id_poco = ? ORDER BY a.inicio DESC LIMIT 200`, [id]);
+    const linha = [
+      ...linhaDoTempo(obras, registros),
+      ...alertas.map((a: any) => ({ data: a.dia, tipo: 'ALERTA', titulo: 'Alerta do sensor', detalhe: `${a.mensagem}${a.fim_txt ? ` (normalizou ${a.fim_txt})` : ' (aberto)'}` })),
+    ].sort((x, y) => (x.data < y.data ? 1 : x.data > y.data ? -1 : 0));
     return res.json({
-      linhaDoTempo: linhaDoTempo(obras, registros), registros, medicoes,
+      linhaDoTempo: linha, registros, medicoes,
       planos: planoRows.map((p: any) => formatarPlano(p, ultimas[p.servico] || null, hoje)),
     });
   } catch (e) { return responderErro(res, e, 'Erro ao carregar o histórico do poço.'); }

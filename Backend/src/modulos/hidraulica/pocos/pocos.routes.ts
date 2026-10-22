@@ -5,6 +5,7 @@
 // não usa o caixa, o financeiro nem os clientes da loja. Etapa 4: materiais (cadastro próprio, previsto × usado).
 // Etapa 5: agenda, equipe e equipamentos (cadastros próprios; avisos de conflito). Etapa 8: painel e resultado.
 // Etapa 6: histórico (linha do tempo, medições) e plano de manutenção do poço; garantias vencendo.
+// Etapa 7: monitoramento remoto (aparelhos, rota das leituras com a chave do aparelho, alertas, painel e simulador).
 import { Router } from 'express';
 import { criarObra, criarPoco, detalheObra, listarObras, listarPocos, mudarSituacao, salvarObra, salvarPoco, salvarRelatorio } from './obras.controller';
 import { criarCliente, detalheCliente, listarClientes, salvarCliente } from './clientes.controller';
@@ -19,6 +20,9 @@ import {
   salvarEquipamento, salvarMembro,
 } from './agenda.controller';
 import { painelPocos } from './painel.controller';
+import {
+  chaveDoAparelho, criarDispositivo, leiturasDoDispositivo, listarAlertas, listarDispositivos, marcarVisto, painelIot, receberLeituras, salvarDispositivo, simularLeitura,
+} from './iot.controller';
 import {
   criarPlano, criarRegistro, historicoDoPoco, listaManutencoes, removerRegistro, salvarPlano, salvarRegistro,
 } from './manutencao.controller';
@@ -69,6 +73,16 @@ router.delete('/historico/:id', removerRegistro);
 router.post('/pocos/:id/planos', criarPlano);
 router.put('/planos/:id', salvarPlano);
 router.get('/manutencoes', listaManutencoes);
+router.post('/iot/leituras', receberLeituras);
+router.get('/iot/painel', painelIot);
+router.get('/iot/alertas', listarAlertas);
+router.post('/iot/alertas/:id/visto', marcarVisto);
+router.get('/iot/dispositivos', listarDispositivos);
+router.post('/iot/dispositivos', criarDispositivo);
+router.put('/iot/dispositivos/:id', salvarDispositivo);
+router.get('/iot/dispositivos/:id/chave', chaveDoAparelho);
+router.get('/iot/dispositivos/:id/leituras', leiturasDoDispositivo);
+router.post('/iot/dispositivos/:id/simular', simularLeitura);
 router.get('/pocos', listarPocos);
 router.post('/pocos', criarPoco);
 router.put('/pocos/:id', salvarPoco);

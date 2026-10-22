@@ -107,3 +107,14 @@ com a loja, se um dia for o caso, é uma decisão nova.
   (30 dias), em dia ou nunca feita. Regras em `manutencao.ts`.
 - Lista "manutenções para oferecer" (vencidas e a vencer) com o cliente, e "criar obra"/"criar e agendar" (orçamento já
   com cliente, poço e serviço); mostra quando já existe obra aberta para o serviço. Garantias vencendo em 30 dias.
+
+## Etapa 7 (monitoramento remoto, IoT)
+- `modulo_hidraulica_pocos_dispositivos` (aparelho no poço, identificador único, conexão, intervalo, profundidade do
+  sensor e limites), `_leituras` (hora da medição + recebido; a mesma hora do mesmo aparelho não duplica) e `_alertas`.
+- Chave do aparelho = HMAC-SHA256(`IOT_CHAVE_MESTRA`, identificador), 32 caracteres; não fica no banco. Trocar a mestra
+  invalida todas. A rota `POST /iot/leituras` usa os cabeçalhos `X-Dispositivo` e `X-Chave` e aceita lote (até 500).
+- Alertas (regras em `iot.ts`): nível baixo, a seco (ligada com corrente baixa), sobrecorrente, vazão baixa, tensão e
+  sem sinal (3× o intervalo, conferido ao abrir o painel). Um aberto por tipo; fecha quando a leitura volta ao normal;
+  o que abriu e fechou dentro do lote fica registrado com início e fim.
+- Resumo do dia (NE com bomba desligada, ND ligada, horas de bomba, volume) entra nas medições do poço; alertas na linha
+  do tempo. Simulador na tela; guia com peças e exemplo de firmware ESP32.

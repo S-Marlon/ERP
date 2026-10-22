@@ -93,15 +93,16 @@ export const FUNCIONALIDADES: Funcionalidade[] = [
     ligaCom: ['Obras (cada manutenção é uma obra)', 'Agenda (criar e agendar)'],
   },
   {
-    chave: 'iot', titulo: 'Monitoramento remoto (IoT)', etapa: 7, situacao: 'PLANEJADA',
+    chave: 'iot', titulo: 'Monitoramento remoto (IoT)', etapa: 7, situacao: 'PRONTA',
     resumo: 'Sensores no poço mandando nível, vazão e corrente da bomba: alerta antes de o poço secar ou a bomba queimar.',
     oQueFaz: [
-      'Cadastro do dispositivo ligado ao poço',
-      'Leituras de nível da água, vazão, corrente e horas de bomba ligada',
-      'Alertas: nível baixando, bomba trabalhando a seco, corrente fora do normal',
-      'Base para vender o monitoramento como serviço mensal',
+      'Aparelho ligado ao poço com limites próprios; chave calculada da IOT_CHAVE_MESTRA do .env (não fica no banco)',
+      'Rota que recebe leituras em lote (nível ou coluna d\'água, vazão, corrente, tensão, bomba, horímetro, sinal, bateria)',
+      'Alertas que abrem e fecham sozinhos: nível baixo, bomba a seco, sobrecorrente, vazão baixa, tensão, sem sinal',
+      'Painel com situação, última leitura, horas de bomba e volume do dia; gráficos de 24 h, 7 e 30 dias; simulador',
+      'Guia de como ligar: formato do envio, peças sugeridas e exemplo de firmware ESP32',
     ],
-    dados: ['dispositivo (poço, identificador, chave de acesso)', 'leituras (data, nível, vazão, corrente)', 'alertas'],
+    dados: ['aparelho (poço, identificador, conexão, intervalo, limites)', 'leituras (hora, medidas)', 'alertas (tipo, início, fim, visto)'],
     ligaCom: ['Histórico do poço (etapa 6)', 'Notificações'],
   },
   {
