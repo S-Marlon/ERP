@@ -118,6 +118,7 @@ docs/                      planos e decisões; docs/legado guarda material antig
 | Módulo Hidráulica · Montagens | `modulos/hidraulica/montagens` | `modulos/hidraulica/montagens` | `modulo_hidraulica_montagens_*` |
 | Módulo Transmissão · Rolamentos | `modulos/transmissao/rolamentos` | `modulos/transmissao/rolamentos` | `modulo_transmissao_rolamentos_*` |
 | Módulo E-commerce · Mercado Livre (tela `/ecommerce`) | `modulos/ecommerce/mercadolivre` | `modulos/ecommerce/mercadolivre` | `modulo_ecommerce_mercadolivre_*` |
+| Módulo Logística · Gestor de frotas (em etapas, ver `docs/plano-frota.md`) | `modulos/logistica/frota` | `modulos/logistica/frota` | `modulo_logistica_frota_*` |
 
 Arquivo novo vai para a área dele; o que é usado por várias áreas vai para `shared/` (front). Nomes de pasta em
 minúsculo/camelCase. Imports são relativos; o endereço do backend vem só de `shared/api/config.ts`.
