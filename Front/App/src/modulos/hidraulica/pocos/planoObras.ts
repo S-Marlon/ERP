@@ -81,15 +81,16 @@ export const FUNCIONALIDADES: Funcionalidade[] = [
     ligaCom: ['Nada da loja'],
   },
   {
-    chave: 'manutencao', titulo: 'Histórico e manutenção do poço', etapa: 6, situacao: 'PLANEJADA',
+    chave: 'manutencao', titulo: 'Histórico e manutenção do poço', etapa: 6, situacao: 'PRONTA',
     resumo: 'O histórico de cada poço e o plano de manutenção, com aviso de garantia e de limpeza periódica.',
     oQueFaz: [
-      'Linha do tempo do poço: perfuração, testes de vazão, limpezas, trocas de bomba',
-      'Plano de manutenção (ex.: limpeza química a cada 2 anos, revisão da bomba) com aviso',
-      'Aviso de garantia vencendo e lista de clientes para oferecer manutenção',
+      'Linha do tempo do poço: as obras (perfuração, limpezas, trocas de bomba) e registros avulsos (medição, visita, problema)',
+      'Medições de nível e vazão ao longo dos anos, com gráfico (a mesma base do monitoramento remoto)',
+      'Plano de manutenção (ex.: limpeza a cada 24 meses): a última vez vem da última obra concluída com o serviço',
+      'Lista de manutenções vencidas/a vencer e garantias vencendo, com "criar obra" e "criar e agendar"',
     ],
-    dados: ['poço', 'tipo de serviço', 'periodicidade', 'próxima data'],
-    ligaCom: ['Obras (cada manutenção é uma obra)', 'Notificações'],
+    dados: ['registros do poço (data, tipo, medidas)', 'plano (serviço, a cada meses, última informada)'],
+    ligaCom: ['Obras (cada manutenção é uma obra)', 'Agenda (criar e agendar)'],
   },
   {
     chave: 'iot', titulo: 'Monitoramento remoto (IoT)', etapa: 7, situacao: 'PLANEJADA',

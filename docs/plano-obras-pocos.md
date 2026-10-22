@@ -98,3 +98,12 @@ com a loja, se um dia for o caso, é uma decisão nova.
 - Alertas: orçamento sem resposta > 30 dias, início previsto vencido sem começar, em execução > 15 dias, concluída com
   valor sem parcela lançada.
 - Ainda não entram outros custos da obra (combustível, diárias, terceiros): ficariam numa tabela própria, se quiser.
+
+## Etapa 6 (histórico e manutenção do poço)
+- `modulo_hidraulica_pocos_historico`: registros avulsos do poço (medição com NE/ND/vazão, visita, observação,
+  problema). A medição da ficha (perfuração) entra como primeiro ponto das medições.
+- `modulo_hidraulica_pocos_planos_manutencao`: serviço + "a cada N meses". A última vez é a mais recente entre a última
+  obra concluída com o serviço no poço e a data informada (poço antigo); próxima = última + N meses; vencida, a vencer
+  (30 dias), em dia ou nunca feita. Regras em `manutencao.ts`.
+- Lista "manutenções para oferecer" (vencidas e a vencer) com o cliente, e "criar obra"/"criar e agendar" (orçamento já
+  com cliente, poço e serviço); mostra quando já existe obra aberta para o serviço. Garantias vencendo em 30 dias.

@@ -250,6 +250,45 @@ export const agendaApi = {
   remover: (id: number) => pedir<{ ok: boolean }>(`${API}/agenda/${id}?tenant_id=1`, { method: 'DELETE' }, 'Erro ao apagar.'),
 };
 
+// ------------------------------------------------------------------ histórico e manutenção do poço (etapa 6)
+export type TipoRegistro = 'MEDICAO' | 'VISITA' | 'OBSERVACAO' | 'PROBLEMA';
+export type ServicoPlano = 'LIMPEZA' | 'MANUTENCAO' | 'TROCA_BOMBA' | 'TESTE_VAZAO' | 'OUTRO';
+export type SituacaoPlano = 'VENCIDA' | 'A_VENCER' | 'EM_DIA' | 'SEM_BASE';
+export const TIPOS_REGISTRO: Record<TipoRegistro, { texto: string; cor: string }> = {
+  MEDICAO: { texto: 'Medição', cor: 'blue' }, VISITA: { texto: 'Visita', cor: 'cyan' }, OBSERVACAO: { texto: 'Observação', cor: 'default' }, PROBLEMA: { texto: 'Problema', cor: 'red' },
+};
+export const SITUACOES_PLANO: Record<SituacaoPlano, { texto: string; cor: string }> = {
+  VENCIDA: { texto: 'Vencida', cor: 'red' }, A_VENCER: { texto: 'Vence em até 30 dias', cor: 'orange' }, EM_DIA: { texto: 'Em dia', cor: 'green' },
+  SEM_BASE: { texto: 'Nunca feita', cor: 'default' },
+};
+export interface RegistroForm { tipo: TipoRegistro; data: string; descricao: string | null; nivelEstaticoM: number | null; nivelDinamicoM: number | null; vazaoLh: number | null }
+export interface RegistroPoco extends RegistroForm { idRegistro: number; operador: string }
+export interface PlanoForm { servico: ServicoPlano; descricao: string | null; aCadaMeses: number; ultimaInformada: string | null; ativo: boolean }
+export interface PlanoManutencao extends PlanoForm {
+  idPlano: number; idPoco: number; ultima: string | null; origemUltima: 'OBRA' | 'INFORMADA' | null; proxima: string | null; situacao: SituacaoPlano;
+}
+export interface EventoPoco { data: string; tipo: 'OBRA' | TipoRegistro; titulo: string; detalhe: string | null; idObra?: number; idRegistro?: number }
+export interface HistoricoPoco {
+  linhaDoTempo: EventoPoco[]; registros: RegistroPoco[]; planos: PlanoManutencao[];
+  medicoes: { data: string; origem: 'MEDICAO' | 'PERFURACAO'; nivelEstaticoM: number | null; nivelDinamicoM: number | null; vazaoLh: number | null }[];
+}
+export interface ManutencaoAOferecer extends PlanoManutencao {
+  poco: string; cidade: string | null; idCliente: number | null; cliente: string | null; telefone: string | null; obraAberta: { idObra: number; situacao: SituacaoObra } | null;
+}
+export interface GarantiaVencendo {
+  idObra: number; idPoco: number | null; idCliente: number; titulo: string; servicos: Servico[]; dataTermino: string | null; garantiaAte: string | null;
+  cliente: string | null; telefone: string | null; poco: string | null;
+}
+export const manutencaoApi = {
+  historico: (idPoco: number) => pedir<HistoricoPoco>(`${API}/pocos/${idPoco}/historico?tenant_id=1`, undefined, 'Erro ao carregar o histórico.'),
+  criarRegistro: (idPoco: number, r: RegistroForm) => pedir<{ idRegistro: number }>(`${API}/pocos/${idPoco}/historico?tenant_id=1`, corpo('POST', r), 'Erro ao registrar.'),
+  salvarRegistro: (id: number, r: RegistroForm) => pedir<{ ok: boolean }>(`${API}/historico/${id}?tenant_id=1`, corpo('PUT', r), 'Erro ao salvar o registro.'),
+  removerRegistro: (id: number) => pedir<{ ok: boolean }>(`${API}/historico/${id}?tenant_id=1`, { method: 'DELETE' }, 'Erro ao apagar.'),
+  criarPlano: (idPoco: number, p: PlanoForm) => pedir<{ idPlano: number }>(`${API}/pocos/${idPoco}/planos?tenant_id=1`, corpo('POST', p), 'Erro ao criar o plano.'),
+  salvarPlano: (id: number, p: PlanoForm) => pedir<{ ok: boolean }>(`${API}/planos/${id}?tenant_id=1`, corpo('PUT', p), 'Erro ao salvar o plano.'),
+  aOferecer: (todas = false) => pedir<{ planos: ManutencaoAOferecer[]; garantias: GarantiaVencendo[] }>(`${API}/manutencoes?${q({ todas: todas ? 1 : null })}`, undefined, 'Erro ao listar as manutenções.'),
+};
+
 // ------------------------------------------------------------------ painel e resultado (etapa 8)
 export interface LucroObra {
   idObra: number; titulo: string; cliente: string | null; situacao: SituacaoObra; servicos: Servico[]; inicio: string | null; termino: string | null;

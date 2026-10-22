@@ -11,6 +11,7 @@ import RelatorioPocoPage from './RelatorioPocoPage';
 import { ClientePocoModal, ListaClientes } from './ClientesPoco';
 import { AReceberObras, CobrancaDaObra } from './CobrancaObra';
 import { CadastroMateriais, MateriaisDaObra } from './MateriaisObra';
+import { HistoricoDoPoco } from './ManutencaoPocos';
 import { lerGpsTexto, textoRaio } from './mapaRegional';
 import { abrirCliente, agendarObra, ParteObra, useNavPocos, verNoMapa, VistaObras } from './navPocos';
 
@@ -52,8 +53,10 @@ const PocoModal: React.FC<{ poco: Poco | 'novo' | null; onFechar: () => void; on
   const [p, setP] = useState(pocoVazio());
   const [cliente, setCliente] = useState<{ id: number; nome: string } | null>(null);
   const [escolhendo, setEscolhendo] = useState(false);
+  const [parte, setParte] = useState<'FICHA' | 'HISTORICO'>('FICHA');
   useEffect(() => {
     if (!poco) return;
+    setParte('FICHA');
     if (poco === 'novo') { setP(pocoVazio()); setCliente(null); return; }
     setP({ ...poco, gps: poco.latitude !== null && poco.longitude !== null ? `${poco.latitude}, ${poco.longitude}` : null });
     setCliente(poco.idProprietario ? { id: poco.idProprietario, nome: poco.proprietario || '' } : null);
@@ -71,7 +74,13 @@ const PocoModal: React.FC<{ poco: Poco | 'novo' | null; onFechar: () => void; on
     } catch (e) { message.error(e instanceof Error ? e.message : 'Erro.'); }
   };
   return (
-    <Modal open={!!poco} title={poco === 'novo' ? 'Novo poço' : `Poço · ${poco && poco.identificacao}`} okText="Salvar" cancelText="Voltar" onOk={salvar} onCancel={onFechar} width={720} destroyOnHidden>
+    <Modal open={!!poco} title={poco === 'novo' ? 'Novo poço' : `Poço · ${poco && poco.identificacao}`} okText="Salvar" cancelText="Voltar" onOk={salvar} onCancel={onFechar}
+      width={parte === 'HISTORICO' ? 900 : 720} okButtonProps={{ style: parte === 'HISTORICO' ? { display: 'none' } : undefined }} destroyOnHidden>
+      {poco && poco !== 'novo' && (
+        <Segmented style={{ marginBottom: 10 }} value={parte} onChange={v => setParte(v as 'FICHA' | 'HISTORICO')}
+          options={[{ value: 'FICHA', label: 'Ficha' }, { value: 'HISTORICO', label: 'Histórico e manutenção' }]} />
+      )}
+      {parte === 'HISTORICO' && poco && poco !== 'novo' ? <HistoricoDoPoco idPoco={poco.idPoco} onAbrirObra={onFechar} /> : (
       <Space direction="vertical" style={{ width: '100%' }} size={10}>
         {poco && poco !== 'novo' && (poco.latitude !== null || poco.idProprietario) && (
           <Space wrap>
@@ -112,6 +121,7 @@ const PocoModal: React.FC<{ poco: Poco | 'novo' | null; onFechar: () => void; on
           {p.perfuradoPor === 'TERCEIRO' && <Col span={16}><Text>Empresa que perfurou</Text><Input value={p.perfuradoPorNome || ''} onChange={e => mudar({ perfuradoPorNome: e.target.value || null })} /></Col>}
         </Row>
       </Space>
+      )}
       <ClientePocoModal open={escolhendo} onFechar={() => setEscolhendo(false)}
         onSelecionar={c => { setEscolhendo(false); setCliente({ id: c.idCliente, nome: c.nome }); }} />
     </Modal>
