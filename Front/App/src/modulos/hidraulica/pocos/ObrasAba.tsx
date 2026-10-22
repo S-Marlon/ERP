@@ -9,6 +9,7 @@ import { AimOutlined, CalculatorOutlined, EditOutlined, EnvironmentOutlined, Plu
 import { contarObras, dataBr, foneBr, Obra, ObraForm, obrasApi, Poco, PocoForm, Servico, SERVICOS, SituacaoObra, SITUACOES_OBRA } from './obrasApi';
 import RelatorioPocoPage from './RelatorioPocoPage';
 import { ClientePocoModal, ListaClientes } from './ClientesPoco';
+import { AReceberObras, CobrancaDaObra } from './CobrancaObra';
 import { lerGpsTexto, textoRaio } from './mapaRegional';
 import { abrirCliente, useNavPocos, verNoMapa, VistaObras } from './navPocos';
 
@@ -22,7 +23,7 @@ const pocoVazio = (): PocoForm => ({
 });
 const obraVazia = (): ObraForm => ({
   idCliente: null, idPoco: null, servicos: ['PERFURACAO'], titulo: null, dataPrevisao: null, garantiaMeses: 12, metrosPrevistos: null,
-  valorContratado: null, valorMetroExcedente: null, observacao: null,
+  valorContratado: null, valorMetroExcedente: null, valorSinal: null, sinalQuando: 'ANTES', observacao: null,
 });
 
 /** Campos de endereço e GPS do poço (usados no poço novo da obra e na ficha). */
@@ -165,7 +166,7 @@ const ObraModal: React.FC<{ obra: Obra | 'nova' | null; onFechar: () => void; on
         + `${a.vazaoMediaM3h !== null ? `, vazão média ${a.vazaoMediaM3h} m³/h` : ''}${a.potencial !== null ? `, potencial ${a.potencial.toFixed(0)}` : ''}.`);
     } catch (e) { message.error(e instanceof Error ? e.message : 'Erro.'); }
   };
-  const num = (k: 'metrosPrevistos' | 'valorContratado' | 'valorMetroExcedente' | 'garantiaMeses', props: object) => (
+  const num = (k: 'metrosPrevistos' | 'valorContratado' | 'valorMetroExcedente' | 'garantiaMeses' | 'valorSinal', props: object) => (
     <InputNumber min={0} style={{ width: '100%' }} decimalSeparator="," value={f[k] ?? undefined} onChange={v => mudar({ [k]: v === null ? null : Number(v) } as any)} {...props} />
   );
   return (
@@ -219,6 +220,16 @@ const ObraModal: React.FC<{ obra: Obra | 'nova' | null; onFechar: () => void; on
         </Row>
         {estimativa && <Alert type="info" showIcon style={{ padding: '4px 10px' }} message={<Text style={{ fontSize: 12 }}>{estimativa}</Text>} closable onClose={() => setEstimativa(null)} />}
         <Row gutter={8}>
+          <Col span={6}><Text>Sinal</Text>{num('valorSinal', { prefix: 'R$', precision: 2 })}</Col>
+          <Col span={8}><Text>Quando paga o sinal</Text>
+            <Select style={{ width: '100%' }} value={f.sinalQuando} onChange={sinalQuando => mudar({ sinalQuando })} disabled={!f.valorSinal}
+              options={[{ value: 'ANTES', label: 'Antes (libera o início)' }, { value: 'NO_ATO', label: 'No ato da perfuração' }]} />
+          </Col>
+          <Col span={10}><Text type="secondary" style={{ fontSize: 12, display: 'block', paddingTop: 22 }}>
+            {f.valorSinal ? (f.sinalQuando === 'ANTES' ? 'A obra só começa com o sinal recebido.' : 'O sinal fica cobrando e é recebido no dia.') : 'Sem sinal combinado.'}
+          </Text></Col>
+        </Row>
+        <Row gutter={8}>
           <Col span={6}><Text>Garantia</Text>{num('garantiaMeses', { suffix: 'meses', max: 120 })}</Col>
           <Col span={18}><Text>Observação</Text><Input maxLength={255} value={f.observacao || ''} onChange={e => mudar({ observacao: e.target.value || null })} /></Col>
         </Row>
@@ -231,8 +242,10 @@ const ObraModal: React.FC<{ obra: Obra | 'nova' | null; onFechar: () => void; on
 };
 
 /** A obra aberta: a situação (com as passagens possíveis) e o relatório técnico gravando nela. */
-const ObraAberta: React.FC<{ idObra: number; onVoltar: () => void }> = ({ idObra, onVoltar }) => {
+const ObraAberta: React.FC<{ idObra: number; parte?: 'RELATORIO' | 'COBRANCA'; onVoltar: () => void }> = ({ idObra, parte: parteInicial, onVoltar }) => {
   const [obra, setObra] = useState<Obra | null>(null);
+  const [parte, setParte] = useState<'RELATORIO' | 'COBRANCA'>(parteInicial || 'RELATORIO');
+  const [versaoCobranca, setVersaoCobranca] = useState(0);
   const [editando, setEditando] = useState(false);
   const [versao, setVersao] = useState(0);
   const carregar = useCallback(() => obrasApi.obra(idObra).then(setObra).catch(e => message.error(e.message)), [idObra]);
@@ -243,6 +256,7 @@ const ObraAberta: React.FC<{ idObra: number; onVoltar: () => void }> = ({ idObra
       const r = await obrasApi.mudarSituacao(obra.idObra, s);
       message.success(`Obra ${SITUACOES_OBRA[s].texto.toLowerCase()}.${r.pocoAtualizado ? ' A ficha do poço recebeu o que o relatório mediu.' : ''}`);
       carregar();
+      setVersaoCobranca(v => v + 1);
     } catch (e) { message.error(e instanceof Error ? e.message : 'Erro.'); }
   };
   const indice = ORDEM.indexOf(obra.situacao);
@@ -281,14 +295,24 @@ const ObraAberta: React.FC<{ idObra: number; onVoltar: () => void }> = ({ idObra
           { key: 't', label: 'Conclusão', children: dataBr(obra.dataTermino) },
           { key: 'g', label: 'Garantia até', children: dataBr(obra.garantiaAte) },
           { key: 'm', label: 'Metros', children: obra.metrosPrevistos ? `${obra.metrosPrevistos} m` : '—' },
-          { key: 'v', label: 'Contratado', children: brl(obra.valorContratado) },
+          { key: 'v', label: 'Contratado', children: <>{brl(obra.valorContratado)}{obra.valorSinal ? <Text type="secondary" style={{ fontSize: 12 }}> · sinal {brl(obra.valorSinal)}</Text> : null}</> },
         ]} />
       </Card>
-      <div style={{ margin: '0 -16px' }}>
-        <RelatorioPocoPage key={versao} titulo={`Relatório técnico · obra ${obra.idObra}`} onVoltar={onVoltar}
-          obra={{ dados: obra.relatorio || {}, salvar: dados => obrasApi.salvarRelatorio(obra.idObra, dados) }} />
-      </div>
-      <ObraModal obra={editando ? obra : null} onFechar={() => setEditando(false)} onSalva={() => { setEditando(false); carregar(); setVersao(v => v + 1); }} />
+      <Flex justify="space-between" align="center" style={{ marginBottom: 8 }}>
+        <Segmented value={parte} onChange={v => setParte(v as 'RELATORIO' | 'COBRANCA')}
+          options={[{ value: 'RELATORIO', label: 'Relatório técnico' }, { value: 'COBRANCA', label: 'Sinal e cobrança' }]} />
+        {parte === 'COBRANCA' && <Button onClick={onVoltar}>Voltar para as obras</Button>}
+      </Flex>
+      {parte === 'RELATORIO'
+        ? (
+          <div style={{ margin: '0 -16px' }}>
+            <RelatorioPocoPage key={versao} titulo={`Relatório técnico · obra ${obra.idObra}`} onVoltar={onVoltar}
+              obra={{ dados: obra.relatorio || {}, salvar: dados => obrasApi.salvarRelatorio(obra.idObra, dados) }} />
+          </div>
+        )
+        : <CobrancaDaObra key={versaoCobranca} idObra={obra.idObra} cancelada={obra.situacao === 'CANCELADA'} />}
+      <ObraModal obra={editando ? obra : null} onFechar={() => setEditando(false)}
+        onSalva={() => { setEditando(false); carregar(); setVersao(v => v + 1); setVersaoCobranca(v => v + 1); }} />
     </Space>
   );
 };
@@ -414,20 +438,23 @@ const ObrasAba: React.FC = () => {
   const nav = useNavPocos();
   const [vista, setVista] = useState<VistaObras>(nav.vista || 'OBRAS');
   const [aberta, setAberta] = useState<number | null>(nav.abrirObra ?? null);
+  const [parte, setParte] = useState(nav.parteObra);
   // pedidos vindos do mapa ou da ficha do cliente ("abrir obra", "ficha do poço", "ficha do cliente")
   useEffect(() => {
     if (nav.aba !== 'obras' || !nav.vista) return;
     setVista(nav.vista);
     setAberta(nav.abrirObra ?? null);
+    setParte(nav.parteObra);
   }, [nav.pedido]);   // eslint-disable-line react-hooks/exhaustive-deps
-  if (aberta) return <ObraAberta key={aberta} idObra={aberta} onVoltar={() => setAberta(null)} />;
+  if (aberta) return <ObraAberta key={`${aberta}-${nav.pedido}`} idObra={aberta} parte={parte} onVoltar={() => setAberta(null)} />;
   return (
     <Space direction="vertical" size={12} style={{ width: '100%' }}>
       <Segmented value={vista} onChange={v => setVista(v as VistaObras)}
-        options={[{ value: 'OBRAS', label: 'Obras' }, { value: 'POCOS', label: 'Poços' }, { value: 'CLIENTES', label: 'Clientes de poço' }]} />
+        options={[{ value: 'OBRAS', label: 'Obras' }, { value: 'RECEBER', label: 'A receber' }, { value: 'POCOS', label: 'Poços' }, { value: 'CLIENTES', label: 'Clientes de poço' }]} />
       {vista === 'OBRAS' && <ListaObras onAbrir={setAberta} />}
       {vista === 'POCOS' && <ListaPocos abrir={nav.abrirPoco} pedido={nav.pedido} />}
       {vista === 'CLIENTES' && <ListaClientes abrir={nav.abrirCliente} pedido={nav.pedido} />}
+      {vista === 'RECEBER' && <AReceberObras />}
     </Space>
   );
 };

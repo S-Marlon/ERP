@@ -49,3 +49,15 @@ pelas etapas abaixo, ligado ao resto do ERP.
 - Análise de um raio (padrão 2 km): quantidade, profundidade média/mediana/faixa, vazão média e o potencial do ponto.
   A sugestão de metros para o orçamento é a mediana arredondada para cima de 10 em 10 m (regra em `mapa.ts`).
 - "Ver no mapa" na obra, no poço e no cliente; no mapa, o poço do cliente abre a obra, a ficha do poço e a do cliente.
+
+## Etapa 3 (sinal e cobrança)
+- A cobrança fica **no próprio módulo** (`modulo_hidraulica_pocos_parcelas`, `_adicionais`, `_recebimentos`): o contas a
+  receber da loja exige cliente do cadastro geral e os clientes de poço são separados. Quando juntar os cadastros, as
+  parcelas abertas passam para o contas a receber.
+- Sinal na obra (`valor_sinal`, `sinal_quando`): ANTES = a obra só vai para "em execução" com a parcela do sinal paga;
+  NO_ATO = libera o início e fica cobrando. A parcela do sinal acompanha o valor (não fica abaixo do já recebido).
+- Adicional nasce pendente e só entra no saldo aprovado, com o meio (mensagem, assinatura, presencial, telefone), a data
+  e uma observação. O relatório sugere o metro excedente (perfurado − previsto) × valor do metro.
+- Saldo = contrato + adicionais aprovados − parcelas lançadas; vira à vista, parcelado ou sem prazo (mesmas regras do
+  contas a receber da loja). Recebimento só com caixa aberto (movimento RECEBIMENTO); estorno com motivo.
+- Resultado do mês e painel financeiro da loja ainda não contam as obras (fica para o painel do módulo, etapa 8).

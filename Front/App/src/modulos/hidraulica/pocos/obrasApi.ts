@@ -1,4 +1,5 @@
-// API do módulo Obras de poços (/api/modulos/hidraulica/pocos): obras, poços, clientes de poço e o mapa regional.
+// API do módulo Obras de poços (/api/modulos/hidraulica/pocos): obras, poços, clientes de poço, o mapa regional e a
+// cobrança das obras (sinal, adicionais, parcelas e recebimentos).
 import { API_URL } from '../../../shared/api/config';
 import type { Dados } from './relatorioPoco';
 
@@ -22,6 +23,8 @@ export const SITUACOES_OBRA: Record<SituacaoObra, { texto: string; cor: string; 
 export interface ObraForm {
   idCliente: number | null; idPoco: number | null; servicos: Servico[]; titulo: string | null; dataPrevisao: string | null;
   garantiaMeses: number | null; metrosPrevistos: number | null; valorContratado: number | null; valorMetroExcedente: number | null; observacao: string | null;
+  /** Sinal combinado; ANTES = só começa com o sinal recebido, NO_ATO = pago no dia da perfuração. */
+  valorSinal: number | null; sinalQuando: 'ANTES' | 'NO_ATO';
 }
 export interface Obra extends Omit<ObraForm, 'idCliente'> {
   idObra: number; idCliente: number; cliente: string; telefone: string | null; poco: string | null; cidade: string | null;
@@ -100,6 +103,74 @@ export const obrasApi = {
   mapaPotencial: () => pedir<CelulaPotencial[]>(`${API}/mapa/potencial?tenant_id=1`, undefined, 'Erro ao carregar o potencial hídrico.'),
   analisar: (latitude: number, longitude: number, raio: number) =>
     pedir<AnaliseRegiao>(`${API}/mapa/analise?${q({ lat: latitude, lon: longitude, raio })}`, undefined, 'Erro ao analisar a região.'),
+};
+
+// ------------------------------------------------------------------ cobrança (etapa 3)
+export type TipoAdicional = 'METRO_EXCEDENTE' | 'MATERIAL' | 'SERVICO' | 'OUTRO';
+export type SituacaoAdicional = 'PENDENTE' | 'APROVADO' | 'RECUSADO' | 'CANCELADO';
+export type MeioAprovacao = 'MENSAGEM' | 'ASSINATURA' | 'PRESENCIAL' | 'TELEFONE';
+export type FormaRecebimento = 'DINHEIRO' | 'PIX' | 'DEBITO' | 'CREDITO' | 'TRANSFERENCIA';
+export type SituacaoParcela = 'VENCIDO' | 'VENCE_HOJE' | 'A_VENCER' | 'SEM_PRAZO' | 'PAGO' | 'CANCELADO';
+
+export const TIPOS_ADICIONAL: Record<TipoAdicional, string> = { METRO_EXCEDENTE: 'Metro excedente', MATERIAL: 'Material', SERVICO: 'Serviço', OUTRO: 'Outro' };
+export const SITUACOES_ADICIONAL: Record<SituacaoAdicional, { texto: string; cor: string }> = {
+  PENDENTE: { texto: 'Aguardando o cliente', cor: 'gold' }, APROVADO: { texto: 'Aprovado', cor: 'green' },
+  RECUSADO: { texto: 'Recusado', cor: 'red' }, CANCELADO: { texto: 'Cancelado', cor: 'default' },
+};
+export const MEIOS_APROVACAO: Record<MeioAprovacao, string> = { MENSAGEM: 'Mensagem (WhatsApp, e-mail)', ASSINATURA: 'Assinatura', PRESENCIAL: 'Presencial', TELEFONE: 'Telefone' };
+export const FORMAS_RECEBIMENTO: Record<FormaRecebimento, string> = { DINHEIRO: 'Dinheiro', PIX: 'PIX', DEBITO: 'Débito', CREDITO: 'Crédito', TRANSFERENCIA: 'Transferência' };
+export const SITUACOES_PARCELA: Record<SituacaoParcela, { texto: string; cor: string }> = {
+  VENCIDO: { texto: 'Vencida', cor: 'red' }, VENCE_HOJE: { texto: 'Vence hoje', cor: 'orange' }, A_VENCER: { texto: 'A vencer', cor: 'blue' },
+  SEM_PRAZO: { texto: 'Sem prazo', cor: 'purple' }, PAGO: { texto: 'Paga', cor: 'green' }, CANCELADO: { texto: 'Cancelada', cor: 'default' },
+};
+
+export interface AdicionalForm { tipo: TipoAdicional; descricao: string; quantidade: number; valorUnitario: number }
+export interface Adicional extends AdicionalForm {
+  idAdicional: number; valor: number; situacao: SituacaoAdicional; aprovacaoMeio: MeioAprovacao | null; aprovadoEm: string | null;
+  aprovacaoObs: string | null; operador: string; criadoEm: string;
+}
+export interface ParcelaObra {
+  idParcela: number; idObra: number; tipo: 'SINAL' | 'SALDO'; parcela: number; totalParcelas: number; descricao: string | null;
+  vencimento: string | null; valor: number; valorPago: number; saldo: number; status: 'ABERTO' | 'PAGO' | 'CANCELADO'; situacao: SituacaoParcela; diasAtraso: number;
+}
+export interface RecebimentoObra {
+  idRecebimento: number; idParcela: number; parcela: string | null; forma: FormaRecebimento; valor: number; observacao: string | null;
+  operador: string; em: string; estornadoEm: string | null; estornoMotivo: string | null;
+}
+export interface ResumoCobranca {
+  contratado: number; adicionaisAprovados: number; adicionaisPendentes: number; total: number; sinal: number; sinalPago: boolean;
+  recebido: number; aReceber: number; parcelado: number; semParcela: number;
+}
+export interface CobrancaObra {
+  resumo: ResumoCobranca; sinalQuando: 'ANTES' | 'NO_ATO'; adicionais: Adicional[]; parcelas: ParcelaObra[]; recebimentos: RecebimentoObra[];
+  metrosPerfurados: number | null; sugestao: (AdicionalForm & { valor: number }) | null; caixaAberto: boolean;
+}
+export interface AReceberObra extends ParcelaObra { obra: string | null; obraSituacao: SituacaoObra; idCliente: number; cliente: string | null; telefone: string | null }
+
+export const cobrancaApi = {
+  daObra: (id: number) => pedir<CobrancaObra>(`${API}/obras/${id}/cobranca?tenant_id=1`, undefined, 'Erro ao carregar a cobrança.'),
+  criarAdicional: (idObra: number, a: AdicionalForm) => pedir<{ idAdicional: number }>(`${API}/obras/${idObra}/adicionais?tenant_id=1`, corpo('POST', a), 'Erro ao lançar o adicional.'),
+  salvarAdicional: (id: number, a: AdicionalForm) => pedir<{ ok: boolean }>(`${API}/adicionais/${id}?tenant_id=1`, corpo('PUT', a), 'Erro ao salvar o adicional.'),
+  mudarAdicional: (id: number, situacao: SituacaoAdicional, aprovacao?: { meio: MeioAprovacao; observacao?: string | null }) =>
+    pedir<{ ok: boolean }>(`${API}/adicionais/${id}/situacao?tenant_id=1`, corpo('POST', { situacao, ...aprovacao }), 'Erro ao mudar o adicional.'),
+  lancarParcelas: (idObra: number, p: { valor?: number | null; quantidade?: number; primeiroVencimento?: string | null; intervaloDias?: number; semPrazo?: boolean }) =>
+    pedir<{ parcelas: number }>(`${API}/obras/${idObra}/parcelas?tenant_id=1`, corpo('POST', p), 'Erro ao lançar as parcelas.'),
+  cancelarParcela: (id: number) => pedir<{ ok: boolean }>(`${API}/parcelas/${id}/cancelar?tenant_id=1`, corpo('POST', {}), 'Erro ao cancelar a parcela.'),
+  receber: (id: number, r: { forma: FormaRecebimento; valor: number; observacao?: string | null }) =>
+    pedir<{ idRecebimento: number; status: string }>(`${API}/parcelas/${id}/receber?tenant_id=1`, corpo('POST', r), 'Erro ao registrar o recebimento.'),
+  estornar: (id: number, motivo: string) => pedir<{ status: string }>(`${API}/recebimentos/${id}/estornar?tenant_id=1`, corpo('POST', { motivo }), 'Erro ao estornar.'),
+  aReceber: () => pedir<AReceberObra[]>(`${API}/receber?tenant_id=1`, undefined, 'Erro ao listar o a receber das obras.'),
+};
+
+/** Totais do "a receber de obras" por situação (vencido, vence hoje, a vencer, sem prazo). */
+export const totaisAReceber = (lista: Pick<AReceberObra, 'situacao' | 'saldo'>[]) => {
+  const t = { VENCIDO: 0, VENCE_HOJE: 0, A_VENCER: 0, SEM_PRAZO: 0, total: 0 };
+  for (const p of lista) {
+    const v = Math.round(p.saldo * 100);
+    if (p.situacao in t) (t as Record<string, number>)[p.situacao] += v;
+    t.total += v;
+  }
+  return Object.fromEntries(Object.entries(t).map(([k, v]) => [k, v / 100])) as typeof t;
 };
 
 /** Telefone guardado só com dígitos → "(11) 99876-5432". */

@@ -3,6 +3,9 @@
 import { Request, Response } from 'express';
 import pool from '../../../infra/db';
 import { operadorDe } from '../../../areas/vendas/caixa/caixa.controller';
+import { ErroReceber } from '../../../areas/financeiro/receber/receber';
+import { bloqueioDoSinal } from './cobranca';
+import { acertarSinal, parcelaDoSinal } from './cobrancaBanco';
 import {
   ErroObra, garantiaAte, lerServicos, podeIrPara, pocoDoRelatorio, proximasSituacoes, relatorioInicial, SituacaoObra, SITUACOES_OBRA, validarObra, validarPoco,
 } from './obras';
@@ -13,7 +16,7 @@ const NOME_PESSOA = 'c.nome';
 const JOIN_PESSOA = (col: string) => `LEFT JOIN modulo_hidraulica_pocos_clientes c ON c.id_cliente = ${col}`;
 
 export const responderErro = (res: Response, e: any, padrao: string) => {
-  if (e instanceof ErroObra) return res.status(e.status).json({ error: e.message });
+  if (e instanceof ErroObra || e instanceof ErroReceber) return res.status(e.status).json({ error: e.message });
   console.error(padrao, e);
   return res.status(500).json({ error: padrao, details: e?.message });
 };
@@ -107,6 +110,7 @@ const formatarObra = (r: any, comRelatorio = false) => {
     dataPrevisao: r.data_previsao_txt || null, dataInicio: r.data_inicio_txt || null, dataTermino: termino,
     garantiaMeses: garantia, garantiaAte: garantiaAte(termino, garantia), metrosPrevistos: nulo(r.metros_previstos),
     valorContratado: nulo(r.valor_contratado), valorMetroExcedente: nulo(r.valor_metro_excedente), observacao: r.observacao || null,
+    valorSinal: nulo(r.valor_sinal), sinalQuando: r.sinal_quando || 'ANTES',
     criadaEm: r.criada_txt,
     ...(comRelatorio ? { relatorio: lerJson(r.dados_relatorio) } : {}),
   };
@@ -177,11 +181,12 @@ export const criarObra = async (req: Request, res: Response) => {
     const relatorio = relatorioInicial(cliente, poco, o);
     const [ins]: any = await conn.execute(
       `INSERT INTO modulo_hidraulica_pocos_obras (tenant_id, id_cliente, id_poco, titulo, servicos, situacao, data_previsao, garantia_meses, metros_previstos,
-         valor_contratado, valor_metro_excedente, dados_relatorio, observacao, operador)
-       VALUES (?, ?, ?, ?, ?, 'ORCAMENTO', ?, ?, ?, ?, ?, ?, ?, ?)`,
+         valor_contratado, valor_metro_excedente, valor_sinal, sinal_quando, dados_relatorio, observacao, operador)
+       VALUES (?, ?, ?, ?, ?, 'ORCAMENTO', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [tenant, o.idCliente, idPoco, o.titulo, o.servicos.join(','), o.dataPrevisao, o.garantiaMeses, o.metrosPrevistos, o.valorContratado,
-        o.valorMetroExcedente, JSON.stringify(relatorio), o.observacao, operadorDe(req)]
+        o.valorMetroExcedente, o.valorSinal, o.sinalQuando, JSON.stringify(relatorio), o.observacao, operadorDe(req)]
     );
+    await acertarSinal(conn, tenant, Number(ins.insertId), o.valorSinal, operadorDe(req));
     await conn.commit();
     return res.status(201).json(formatarObra(await carregarObra(tenant, Number(ins.insertId)), true));
   } catch (e) {
@@ -190,21 +195,29 @@ export const criarObra = async (req: Request, res: Response) => {
   } finally { conn.release(); }
 };
 
-// PUT /obras/:id (dados da obra; a situação muda por /situacao e o relatório por /relatorio)
+// PUT /obras/:id (dados da obra; a situação muda por /situacao e o relatório por /relatorio). A parcela do sinal
+// acompanha o valor do sinal (não deixa ficar abaixo do que já foi recebido).
 export const salvarObra = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
+  const conn: any = await pool.getConnection();
   try {
     const id = Number(req.params.id);
     await carregarObra(tenant, id);
     const o = validarObra(req.body);
-    await pool.execute(
+    await conn.beginTransaction();
+    await conn.execute(
       `UPDATE modulo_hidraulica_pocos_obras SET id_cliente = ?, id_poco = ?, titulo = ?, servicos = ?, data_previsao = ?, garantia_meses = ?, metros_previstos = ?,
-         valor_contratado = ?, valor_metro_excedente = ?, observacao = ?, operador = ? WHERE id_obra = ? AND tenant_id = ?`,
+         valor_contratado = ?, valor_metro_excedente = ?, valor_sinal = ?, sinal_quando = ?, observacao = ?, operador = ? WHERE id_obra = ? AND tenant_id = ?`,
       [o.idCliente, o.idPoco, o.titulo, o.servicos.join(','), o.dataPrevisao, o.garantiaMeses, o.metrosPrevistos, o.valorContratado,
-        o.valorMetroExcedente, o.observacao, operadorDe(req), id, tenant]
+        o.valorMetroExcedente, o.valorSinal, o.sinalQuando, o.observacao, operadorDe(req), id, tenant]
     );
+    await acertarSinal(conn, tenant, id, o.valorSinal, operadorDe(req));
+    await conn.commit();
     return res.json(formatarObra(await carregarObra(tenant, id), true));
-  } catch (e) { return responderErro(res, e, 'Erro ao salvar a obra.'); }
+  } catch (e) {
+    await conn.rollback().catch(() => undefined);
+    return responderErro(res, e, 'Erro ao salvar a obra.');
+  } finally { conn.release(); }
 };
 
 // PUT /obras/:id/relatorio { dados } — o relatório técnico (gravado sozinho enquanto o operador preenche)
@@ -235,6 +248,10 @@ export const mudarSituacao = async (req: Request, res: Response) => {
     const [[o]]: any = await conn.execute(`SELECT * FROM modulo_hidraulica_pocos_obras WHERE id_obra = ? AND tenant_id = ? FOR UPDATE`, [id, tenant]);
     if (!o) throw new ErroObra('Obra não encontrada.', 404);
     if (!podeIrPara(o.situacao, para)) throw new ErroObra(`A obra não pode ir de "${o.situacao}" para "${para}".`, 409);
+    if (para === 'EM_EXECUCAO') {
+      const bloqueio = bloqueioDoSinal(nulo(o.valor_sinal), o.sinal_quando, await parcelaDoSinal(conn, id));
+      if (bloqueio) throw new ErroObra(bloqueio, 409);
+    }
     await conn.execute(
       `UPDATE modulo_hidraulica_pocos_obras SET situacao = ?, operador = ?,
          data_inicio = CASE WHEN ? = 'EM_EXECUCAO' AND data_inicio IS NULL THEN CURDATE() ELSE data_inicio END,

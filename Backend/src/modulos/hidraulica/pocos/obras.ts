@@ -58,6 +58,8 @@ export const validarObra = (b: any) => {
     titulo: texto(b?.titulo, 150), dataPrevisao: dataIso(b?.dataPrevisao, 'Início previsto'),
     garantiaMeses: garantia, metrosPrevistos: numero(b?.metrosPrevistos, 'Metros previstos', 2000),
     valorContratado: numero(b?.valorContratado, 'Valor contratado'), valorMetroExcedente: numero(b?.valorMetroExcedente, 'Valor do metro excedente'),
+    valorSinal: numero(b?.valorSinal, 'Sinal') || null,
+    sinalQuando: String(b?.sinalQuando || '').toUpperCase() === 'NO_ATO' ? 'NO_ATO' : 'ANTES',
     observacao: texto(b?.observacao, 255),
   };
 };

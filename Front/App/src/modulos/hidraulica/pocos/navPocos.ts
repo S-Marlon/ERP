@@ -2,13 +2,15 @@
 // "ficha do poço" a partir do mapa. Estado compartilhado entre as abas (useSyncExternalStore).
 import { useSyncExternalStore } from 'react';
 
-export type VistaObras = 'OBRAS' | 'POCOS' | 'CLIENTES';
+export type VistaObras = 'OBRAS' | 'POCOS' | 'CLIENTES' | 'RECEBER';
 export interface NavPocos {
   aba: string;
   /** Contador que muda a cada pedido (para a aba reagir mesmo se o pedido repetir). */
   pedido: number;
   vista?: VistaObras;
   abrirObra?: number;
+  /** Parte da obra aberta: o relatório técnico (padrão) ou a cobrança. */
+  parteObra?: 'RELATORIO' | 'COBRANCA';
   abrirPoco?: number;
   abrirCliente?: number;
   /** Foco do mapa: o ponto (e o poço destacado) ou todos os poços de um cliente. */
@@ -31,6 +33,6 @@ export const useNavPocos = () => useSyncExternalStore(navPocos.assinar, navPocos
 
 export const verNoMapa = (latitude: number, longitude: number, idPoco?: number) => navPocos.ir({ aba: 'mapa', foco: { latitude, longitude, idPoco } });
 export const verClienteNoMapa = (idCliente: number) => navPocos.ir({ aba: 'mapa', focoCliente: idCliente });
-export const abrirObra = (idObra: number) => navPocos.ir({ aba: 'obras', vista: 'OBRAS', abrirObra: idObra });
+export const abrirObra = (idObra: number, parteObra?: 'RELATORIO' | 'COBRANCA') => navPocos.ir({ aba: 'obras', vista: 'OBRAS', abrirObra: idObra, parteObra });
 export const abrirPoco = (idPoco: number) => navPocos.ir({ aba: 'obras', vista: 'POCOS', abrirPoco: idPoco });
 export const abrirCliente = (idCliente: number) => navPocos.ir({ aba: 'obras', vista: 'CLIENTES', abrirCliente: idCliente });

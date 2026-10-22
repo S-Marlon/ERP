@@ -42,16 +42,18 @@ export const FUNCIONALIDADES: Funcionalidade[] = [
     ligaCom: ['Obras e poços (etapa 1)', 'Orçamento da obra (etapa 3)'],
   },
   {
-    chave: 'cobranca', titulo: 'Orçamento, sinal e cobrança', etapa: 3, situacao: 'PLANEJADA',
+    chave: 'cobranca', titulo: 'Orçamento, sinal e cobrança', etapa: 3, situacao: 'PRONTA',
     resumo: 'Orçamento por metro, o sinal que libera o início da obra, adicionais aprovados pelo cliente e o saldo no contas a receber.',
     oQueFaz: [
       'Orçamento: metros previstos, valor do pacote, metro excedente, instalação e materiais à parte',
       'Sinal obrigatório: a obra só sai de "aguardando sinal" quando ele é recebido (ou no ato da perfuração)',
       'Adicionais com aprovação do cliente (registrada: por mensagem, assinatura ou presencial) entram no saldo',
-      'Saldo à vista no fim do serviço ou parcelado: vira contas a receber do cliente',
+      'Saldo à vista, parcelado ou sem prazo, a receber no próprio módulo (os clientes de poço não estão no cadastro geral)',
+      'Metro excedente sugerido pelo relatório (perfurado além do previsto × valor do metro)',
+      'Recebimentos entram no caixa aberto; estorno com motivo; lista "a receber de obras"',
     ],
-    dados: ['orçamento', 'sinal (valor, quando, como)', 'adicionais (descrição, valor, aprovação)', 'parcelas do saldo'],
-    ligaCom: ['Financeiro › Contas a receber', 'Caixa (sinal recebido na loja)', 'Resultado do mês'],
+    dados: ['sinal (valor, antes ou no ato)', 'adicionais (descrição, valor, aprovação: meio, data)', 'parcelas (sinal e saldo)', 'recebimentos'],
+    ligaCom: ['Caixa (o recebimento entra no caixa do dia)', 'Contas a receber da loja (quando juntar os cadastros)'],
   },
   {
     chave: 'materiais', titulo: 'Materiais da obra', etapa: 4, situacao: 'PLANEJADA',
