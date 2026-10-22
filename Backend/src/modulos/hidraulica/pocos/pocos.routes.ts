@@ -3,7 +3,7 @@
 // dentro da obra. Etapa 2: o mapa regional (nossos poços do banco; referência e potencial lidos dos GeoJSON do maperf).
 // Etapa 3: sinal, adicionais aprovados pelo cliente, parcelas do saldo e recebimentos. O módulo é um sistema à parte:
 // não usa o caixa, o financeiro nem os clientes da loja. Etapa 4: materiais (cadastro próprio, previsto × usado).
-// Etapa 5: agenda, equipe e equipamentos (cadastros próprios; avisos de conflito).
+// Etapa 5: agenda, equipe e equipamentos (cadastros próprios; avisos de conflito). Etapa 8: painel e resultado.
 import { Router } from 'express';
 import { criarObra, criarPoco, detalheObra, listarObras, listarPocos, mudarSituacao, salvarObra, salvarPoco, salvarRelatorio } from './obras.controller';
 import { criarCliente, detalheCliente, listarClientes, salvarCliente } from './clientes.controller';
@@ -17,6 +17,7 @@ import {
   criarCompromisso, criarEquipamento, criarMembro, listarAgenda, listarEquipamentos, listarEquipe, mudarCompromisso, removerCompromisso, salvarCompromisso,
   salvarEquipamento, salvarMembro,
 } from './agenda.controller';
+import { painelPocos } from './painel.controller';
 import { analiseDoMapa, pocosDoMapa, potencialDoMapa, referenciasDoMapa, resumoMapa } from './mapa.controller';
 
 const router = Router();
@@ -56,6 +57,7 @@ router.post('/agenda', criarCompromisso);
 router.put('/agenda/:id', salvarCompromisso);
 router.post('/agenda/:id/situacao', mudarCompromisso);
 router.delete('/agenda/:id', removerCompromisso);
+router.get('/painel', painelPocos);
 router.get('/pocos', listarPocos);
 router.post('/pocos', criarPoco);
 router.put('/pocos/:id', salvarPoco);

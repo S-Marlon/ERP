@@ -87,3 +87,14 @@ com a loja, se um dia for o caso, é uma decisão nova.
 - Avisos sem bloquear (regra em `agenda.ts`): pessoa ou equipamento em dois compromissos que se encontram (cancelados
   não contam; só o compromisso agendado gera aviso) e equipamento em manutenção/inativo.
 - "Agendar" na obra abre a agenda com o compromisso já preenchido (título, local, data prevista).
+
+## Etapa 8 (resultado e painel) — feita antes da 6 e da 7
+- Sem tabela nova: calculado das obras, cobrança, materiais e relatório (regras em `painel.ts`). Fora do Resultado do
+  mês da loja.
+- Lucro da obra = contrato + adicionais aprovados − materiais; o custo usa o usado de cada linha e, onde não foi
+  conferido, o previsto ("estimado").
+- Período: recebido (sem estornos), faturado e lucro das obras concluídas no período, metros perfurados (profundidade
+  do relatório das perfurações concluídas). Gráfico dos últimos 12 meses (recebido × faturado).
+- Alertas: orçamento sem resposta > 30 dias, início previsto vencido sem começar, em execução > 15 dias, concluída com
+  valor sem parcela lançada.
+- Ainda não entram outros custos da obra (combustível, diárias, terceiros): ficariam numa tabela própria, se quiser.

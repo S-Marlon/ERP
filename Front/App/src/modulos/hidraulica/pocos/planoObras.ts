@@ -104,12 +104,12 @@ export const FUNCIONALIDADES: Funcionalidade[] = [
     ligaCom: ['Histórico do poço (etapa 6)', 'Notificações'],
   },
   {
-    chave: 'resultado', titulo: 'Resultado e painel', etapa: 8, situacao: 'PLANEJADA',
+    chave: 'resultado', titulo: 'Resultado e painel', etapa: 8, situacao: 'PRONTA',
     resumo: 'Lucro de cada obra e o painel da empresa: metros perfurados, obras em andamento e atrasadas.',
     oQueFaz: [
-      'Lucro por obra: cobrado − materiais − custos lançados',
-      'Metros perfurados no mês, obras por situação, sinais a receber',
-      'Obras paradas ou atrasadas',
+      'Lucro por obra: contrato + adicionais aprovados − materiais (estimado enquanto faltar conferir)',
+      'Período escolhido: recebido, faturado (obras concluídas), custo, lucro e metros perfurados; últimos 12 meses no gráfico',
+      'Obras para olhar: orçamento parado, início atrasado, execução longa e concluída sem o saldo lançado',
     ],
     dados: ['(calculado das outras etapas)'],
     ligaCom: ['Nada da loja: o painel é do próprio módulo'],

@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { contarObras, dataBr, diasDoCompromisso, Obra, totaisAReceber } from './obrasApi';
+import { contarObras, dataBr, diasDoCompromisso, Obra, periodoRapido, totaisAReceber } from './obrasApi';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -13,6 +13,13 @@ teste('obras de poços: contagem por situação e data', () => {
 teste('obras de poços: dias de um compromisso da agenda', () => {
   assert.deepStrictEqual(diasDoCompromisso({ dataInicio: '2026-10-30', dataFim: '2026-11-02' }), ['2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02']);
   assert.deepStrictEqual(diasDoCompromisso({ dataInicio: '2026-10-26', dataFim: '2026-10-26' }), ['2026-10-26']);
+});
+
+teste('obras de poços: períodos rápidos do painel', () => {
+  const hoje = new Date(2026, 0, 15);   // 15/01/2026
+  assert.deepStrictEqual(periodoRapido('MES', hoje), { de: '2026-01-01', ate: '2026-01-15' });
+  assert.deepStrictEqual(periodoRapido('MES_ANTERIOR', hoje), { de: '2025-12-01', ate: '2025-12-31' });
+  assert.deepStrictEqual(periodoRapido('ANO', hoje), { de: '2026-01-01', ate: '2026-01-15' });
 });
 
 teste('obras de poços: totais do a receber', () => {

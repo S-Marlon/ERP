@@ -250,6 +250,34 @@ export const agendaApi = {
   remover: (id: number) => pedir<{ ok: boolean }>(`${API}/agenda/${id}?tenant_id=1`, { method: 'DELETE' }, 'Erro ao apagar.'),
 };
 
+// ------------------------------------------------------------------ painel e resultado (etapa 8)
+export interface LucroObra {
+  idObra: number; titulo: string; cliente: string | null; situacao: SituacaoObra; servicos: Servico[]; inicio: string | null; termino: string | null;
+  concluidaNoPeriodo: boolean; total: number; recebido: number; aReceber: number; custo: number; lucro: number; margem: number | null;
+  custoEstimado: boolean; semMateriais: boolean;
+}
+export interface PainelPocos {
+  periodo: { de: string; ate: string };
+  contagem: Record<SituacaoObra, number>;
+  aReceber: { total: number; vencido: number };
+  periodoResumo: { recebido: number; recebimentos: number; concluidas: number; faturado: number; custo: number; lucro: number; metrosPerfurados: number; perfuracoes: number };
+  serie: { chave: string; rotulo: string; recebido: number; faturado: number }[];
+  obras: LucroObra[];
+  alertas: { idObra: number; titulo: string; tipo: 'ORCAMENTO_PARADO' | 'INICIO_ATRASADO' | 'EXECUCAO_LONGA' | 'SALDO_NAO_LANCADO'; texto: string }[];
+}
+export const painelApi = {
+  carregar: (de: string, ate: string) => pedir<PainelPocos>(`${API}/painel?${q({ de, ate })}`, undefined, 'Erro ao montar o painel.'),
+};
+
+/** Períodos rápidos do painel: este mês, mês passado, este ano (datas AAAA-MM-DD). */
+export const periodoRapido = (qual: 'MES' | 'MES_ANTERIOR' | 'ANO', hoje: Date) => {
+  const f = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const a = hoje.getFullYear(), m = hoje.getMonth();
+  if (qual === 'MES_ANTERIOR') return { de: f(new Date(a, m - 1, 1)), ate: f(new Date(a, m, 0)) };
+  if (qual === 'ANO') return { de: `${a}-01-01`, ate: f(hoje) };
+  return { de: f(new Date(a, m, 1)), ate: f(hoje) };
+};
+
 /** Os dias (AAAA-MM-DD) de um compromisso, do início ao fim. */
 export const diasDoCompromisso = (c: { dataInicio: string; dataFim: string }) => {
   const dias: string[] = [];
