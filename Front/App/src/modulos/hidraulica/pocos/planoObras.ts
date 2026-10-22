@@ -10,13 +10,13 @@ export const FUNCIONALIDADES: Funcionalidade[] = [
       'Dados do poço, perfuração e revestimento por camada, diagnóstico e bombeamento',
       'Teste de vazão com NE, ND, rebaixamento, vazão específica e gráfico',
       'Financeiro da obra: metros contratados, excedente, abatimento, adicionais e pagamentos',
-      'Hoje fica no navegador e em arquivo; na etapa 1 passa a ser a ficha da obra, gravada no banco',
+      'Dentro da obra ele grava sozinho; aqui fica o relatório avulso (no navegador e em arquivo), para quando não há obra'
     ],
     dados: ['(no navegador e em arquivo XML, até a etapa 1)'],
     ligaCom: [],
   },
   {
-    chave: 'obras', titulo: 'Obras e poços', etapa: 1, situacao: 'PLANEJADA',
+    chave: 'obras', titulo: 'Obras e poços', etapa: 1, situacao: 'PRONTA',
     resumo: 'A lista de obras e a ficha permanente de cada poço, com o cliente do cadastro: o relatório técnico passa a ser gravado.',
     oQueFaz: [
       'Obra com os serviços dela: perfuração, instalação da bomba (junto ou separada), limpeza, manutenção, troca de bomba',

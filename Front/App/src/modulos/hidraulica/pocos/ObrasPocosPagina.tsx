@@ -7,6 +7,7 @@ import {
 import ModuloEmEtapas from '../../../shared/components/mapaModulo/ModuloEmEtapas';
 import { FUNCIONALIDADES } from './planoObras';
 import RelatorioPocoPage from './RelatorioPocoPage';
+import ObrasAba from './ObrasAba';
 
 const ICONES: Record<string, React.ReactNode> = {
   relatorio: <FileTextOutlined />, obras: <AimOutlined />, mapa: <EnvironmentOutlined />, cobranca: <DollarOutlined />, materiais: <InboxOutlined />,
@@ -17,7 +18,7 @@ const ObrasPocosPagina: React.FC = () => (
   <ModuloEmEtapas
     titulo={<><AimOutlined /> Obras de poços artesianos</>}
     descricao="Da perfuração à manutenção: obras, ficha de cada poço, mapa regional, sinal e cobrança, materiais, agenda e monitoramento remoto."
-    funcionalidades={FUNCIONALIDADES} icones={ICONES} telas={{ relatorio: <RelatorioPocoPage /> }}
+    funcionalidades={FUNCIONALIDADES} icones={ICONES} telas={{ relatorio: <RelatorioPocoPage />, obras: <ObrasAba /> }} abaInicial="obras"
     textoAlertas="Obra aguardando sinal, garantia vencendo, manutenção periódica e alertas dos sensores aparecem aqui quando as etapas abrirem."
   />
 );

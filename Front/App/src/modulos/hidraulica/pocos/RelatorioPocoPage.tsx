@@ -10,7 +10,7 @@ import {
   ArrowLeftOutlined, BuildOutlined, CompassOutlined, DashboardOutlined, DeleteOutlined, DollarOutlined, DownloadOutlined, ExperimentOutlined, EyeOutlined,
   FileAddOutlined, LineChartOutlined, PlusOutlined, PrinterOutlined, SettingOutlined, UploadOutlined, UserOutlined,
 } from '@ant-design/icons';
-import { useRelatorioPoco } from './useRelatorioPoco';
+import { RelatorioDaObra, useRelatorioPoco } from './useRelatorioPoco';
 import {
   ANOMALIAS, brl, calcularFinanceiro, dataGarantia, FORMAS_PAGAMENTO, OCORRENCIAS_OBRA, progresso, resumoTeste, SecaoId, TEXTO_GARANTIA_PADRAO,
 } from './relatorioPoco';
@@ -24,10 +24,10 @@ const SOLOS = ['Arenoso', 'Argiloso', 'Silte (caxeta)', 'Rocha alterada', 'Rocha
 const MATERIAIS_TUBO = ['Aço galvanizado', 'PVC geomecânico', 'Tubo flexível (Subteck/PEX)', 'PEAD'];
 const ROTULO_CURTO: Record<ModeloId, string> = { completo: 'Completo', cobranca: 'Cobrança', vazao: 'Teste de vazão', garantia: 'Garantia', branco: 'Em branco' };
 
-export default function RelatorioPocoPage() {
+export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: RelatorioDaObra; titulo?: string; onVoltar?: () => void } = {}) {
   const { token } = theme.useToken();
   const navigate = useNavigate();
-  const p = useRelatorioPoco();
+  const p = useRelatorioPoco(obra);
   const { form, valores } = p;
   const [previa, setPrevia] = useState<ModeloId | null>(null);
 
@@ -376,11 +376,11 @@ export default function RelatorioPocoPage() {
       <Card size="small" style={{ marginBottom: 12 }} styles={{ body: { padding: '10px 16px' } }}>
         <Flex justify="space-between" align="center" wrap gap={8}>
           <Space>
-            <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/relatorios')}>Voltar</Button>
-            <Title level={4} style={{ margin: 0 }}>Poços · relatórios</Title>
+            <Button icon={<ArrowLeftOutlined />} onClick={() => (onVoltar ? onVoltar() : navigate('/relatorios'))}>Voltar</Button>
+            <Title level={4} style={{ margin: 0 }}>{titulo || 'Poços · relatório avulso'}</Title>
           </Space>
           <Space wrap>
-            <Button icon={<FileAddOutlined />} onClick={p.novo}>Novo</Button>
+            {!obra && <Button icon={<FileAddOutlined />} onClick={p.novo}>Novo</Button>}
             <Upload accept=".xml" showUploadList={false} beforeUpload={p.importar}><Button icon={<UploadOutlined />}>Abrir arquivo</Button></Upload>
             <Button icon={<DownloadOutlined />} onClick={p.exportar}>Salvar arquivo</Button>
             <Button icon={<EyeOutlined />} onClick={() => setPrevia('completo')}>Pré-visualizar</Button>
@@ -414,7 +414,9 @@ export default function RelatorioPocoPage() {
                   { key: 'a', label: 'Anomalias', children: ANOMALIAS.filter(([k]) => valores[k]).length || 'nenhuma' },
                 ]} />
                 <Text type="secondary" style={{ fontSize: 11 }}>
-                  {p.salvoEm ? `Rascunho salvo neste computador em ${p.salvoEm}.` : 'O rascunho é salvo sozinho neste computador.'} Para guardar de vez, use "Salvar arquivo".
+                  {obra
+                    ? (p.salvoEm ? `Salvo na obra em ${p.salvoEm}.` : 'Grava sozinho na obra a cada alteração.')
+                    : <>{p.salvoEm ? `Rascunho salvo neste computador em ${p.salvoEm}.` : 'O rascunho é salvo sozinho neste computador.'} Para guardar de vez, use "Salvar arquivo" (ou crie uma obra).</>}
                 </Text>
               </Card>
               <Card size="small" title="Empresa no cabeçalho">

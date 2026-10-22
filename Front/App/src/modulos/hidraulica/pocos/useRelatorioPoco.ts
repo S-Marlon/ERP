@@ -1,5 +1,5 @@
-// Estado da tela do módulo Poços. Sem banco: o rascunho fica no navegador (salvo sozinho a cada alteração)
-// e o relatório vai para arquivo XML (exportar/importar) ou para a impressão.
+// Estado do relatório técnico do poço. Dentro de uma obra (`obra`), abre com o relatório dela e grava sozinho nela; sem
+// obra (relatório avulso), o rascunho fica no navegador. Nos dois, dá para exportar/importar XML e imprimir.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Form, Modal, message } from 'antd';
 import dayjs from 'dayjs';
@@ -18,7 +18,10 @@ const gravar = (chave: string, valor: unknown) => {
   try { localStorage.setItem(chave, JSON.stringify(valor)); } catch { /* sem armazenamento */ }
 };
 
-export function useRelatorioPoco() {
+/** Relatório de uma obra: os dados gravados e como gravar (o hook chama a cada alteração, com uma pausa). */
+export interface RelatorioDaObra { dados: Dados; salvar: (dados: Dados) => Promise<unknown> }
+
+export function useRelatorioPoco(obra?: RelatorioDaObra) {
   const [form] = Form.useForm();
   const valores: Dados = Form.useWatch([], form) || {};
   const [secoes, setSecoes] = useState<Record<SecaoId, boolean>>(() => ler(CHAVE_SECOES, SECOES_PADRAO));
@@ -30,8 +33,9 @@ export function useRelatorioPoco() {
   const setEmpresa = (patch: Partial<Empresa>) => setEmpresaEstado(e => { const n = { ...e, ...patch }; gravar(CHAVE_EMPRESA, n); return n; });
   const alternarSecao = (id: SecaoId, ligado: boolean) => setSecoes(s => ({ ...s, [id]: ligado }));
 
-  // Abre o último rascunho (se houver)
+  // Abre o relatório da obra ou o último rascunho (se houver)
   useEffect(() => {
+    if (obra) { form.setFieldsValue({ ...VALORES_INICIAIS, ...deRascunho(obra.dados || {}) }); return; }
     try {
       const bruto = localStorage.getItem(CHAVE_RASCUNHO);
       if (bruto) {
@@ -43,13 +47,18 @@ export function useRelatorioPoco() {
       }
     } catch { /* rascunho ilegível: começa do zero */ }
     form.setFieldsValue(VALORES_INICIAIS);
-  }, [form]);
+  }, [form]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const salvarRascunho = useCallback(() => {
     const agora = dayjs().format('DD/MM/YYYY HH:mm');
-    gravar(CHAVE_RASCUNHO, { salvoEm: agora, dados: paraRascunho(form.getFieldsValue(true)) });
+    const dados = paraRascunho(form.getFieldsValue(true));
+    if (obra) {
+      obra.salvar(dados).then(() => setSalvoEm(agora)).catch(e => message.error(e instanceof Error ? e.message : 'Erro ao salvar o relatório.'));
+      return;
+    }
+    gravar(CHAVE_RASCUNHO, { salvoEm: agora, dados });
     setSalvoEm(agora);
-  }, [form]);
+  }, [form, obra]);
 
   // Cada camada de perfuração/revestimento começa onde a anterior terminou; o rascunho salva sozinho
   const aoMudar = (mudou: Dados) => {
