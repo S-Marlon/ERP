@@ -1,5 +1,5 @@
 // API do módulo Obras de poços (/api/modulos/hidraulica/pocos): obras, poços, clientes de poço, o mapa regional e a
-// cobrança das obras (sinal, adicionais, parcelas e recebimentos).
+// cobrança das obras (sinal, adicionais, parcelas e recebimentos) e os materiais (cadastro do módulo e de cada obra).
 import { API_URL } from '../../../shared/api/config';
 import type { Dados } from './relatorioPoco';
 
@@ -162,6 +162,41 @@ export const cobrancaApi = {
     pedir<{ idRecebimento: number; status: string }>(`${API}/parcelas/${id}/receber?tenant_id=1`, corpo('POST', r), 'Erro ao registrar o recebimento.'),
   estornar: (id: number, motivo: string) => pedir<{ status: string }>(`${API}/recebimentos/${id}/estornar?tenant_id=1`, corpo('POST', { motivo }), 'Erro ao estornar.'),
   aReceber: () => pedir<AReceberObra[]>(`${API}/receber?tenant_id=1`, undefined, 'Erro ao listar o a receber das obras.'),
+};
+
+// ------------------------------------------------------------------ materiais (etapa 4)
+export type CategoriaMaterial = 'TUBO' | 'FILTRO' | 'BOMBA' | 'CABO' | 'CONEXAO' | 'PRE_FILTRO' | 'QUIMICO' | 'OUTRO';
+export const CATEGORIAS_MATERIAL: Record<CategoriaMaterial, string> = {
+  TUBO: 'Tubo', FILTRO: 'Filtro', BOMBA: 'Bomba', CABO: 'Cabo / corda', CONEXAO: 'Conexão / tampa', PRE_FILTRO: 'Pré-filtro / brita', QUIMICO: 'Químico', OUTRO: 'Outro',
+};
+export const UNIDADES_MATERIAL = ['m', 'un', 'kg', 'sc', 'L'] as const;
+
+export interface MaterialForm {
+  nome: string; categoria: CategoriaMaterial; unidade: string; custo: number; precoVenda: number | null; observacao: string | null; ativo: boolean;
+}
+export interface MaterialPoco extends MaterialForm { idMaterial: number; usos: number }
+export interface LinhaMaterialObra {
+  idLinha: number; idObra: number; idMaterial: number | null; descricao: string; unidade: string; categoria: CategoriaMaterial | null;
+  qtdPrevista: number; qtdUsada: number | null; custoUnitario: number; totalPrevisto: number; totalReal: number | null; precoVenda: number | null;
+  idAdicional: number | null; adicionalSituacao: SituacaoAdicional | null; adicionalValor: number | null; observacao: string | null;
+}
+export interface ResumoMateriais { linhas: number; conferidas: number; custoPrevisto: number; custoReal: number; completo: boolean; diferenca: number | null }
+export interface LinhaMaterialForm {
+  idMaterial?: number | null; descricao?: string | null; unidade?: string | null; qtdPrevista: number; qtdUsada?: number | null; custoUnitario?: number | null; observacao?: string | null;
+}
+
+export const materiaisApi = {
+  cadastro: (f: { busca?: string; todos?: boolean } = {}) =>
+    pedir<MaterialPoco[]>(`${API}/materiais?${q({ busca: f.busca, todos: f.todos ? 1 : null })}`, undefined, 'Erro ao listar os materiais.'),
+  criar: (m: MaterialForm) => pedir<MaterialPoco>(`${API}/materiais?tenant_id=1`, corpo('POST', m), 'Erro ao cadastrar o material.'),
+  salvar: (id: number, m: MaterialForm) => pedir<MaterialPoco>(`${API}/materiais/${id}?tenant_id=1`, corpo('PUT', m), 'Erro ao salvar o material.'),
+  daObra: (idObra: number) => pedir<{ linhas: LinhaMaterialObra[]; resumo: ResumoMateriais }>(`${API}/obras/${idObra}/materiais?tenant_id=1`, undefined, 'Erro ao carregar os materiais.'),
+  adicionar: (idObra: number, l: LinhaMaterialForm) => pedir<{ idLinha: number }>(`${API}/obras/${idObra}/materiais?tenant_id=1`, corpo('POST', l), 'Erro ao lançar o material.'),
+  salvarLinha: (idLinha: number, l: LinhaMaterialForm) => pedir<{ ok: boolean }>(`${API}/obra-materiais/${idLinha}?tenant_id=1`, corpo('PUT', l), 'Erro ao salvar o material.'),
+  removerLinha: (idLinha: number) => pedir<{ ok: boolean }>(`${API}/obra-materiais/${idLinha}?tenant_id=1`, { method: 'DELETE' }, 'Erro ao tirar o material.'),
+  copiar: (idObra: number, deObra: number) => pedir<{ copiados: number }>(`${API}/obras/${idObra}/materiais/copiar?tenant_id=1`, corpo('POST', { deObra }), 'Erro ao copiar.'),
+  cobrar: (idLinha: number, valorUnitario: number | null) =>
+    pedir<{ idAdicional: number; valor: number }>(`${API}/obra-materiais/${idLinha}/cobrar?tenant_id=1`, corpo('POST', { valorUnitario }), 'Erro ao cobrar o material.'),
 };
 
 /** Totais do "a receber de obras" por situação (vencido, vence hoje, a vencer, sem prazo). */

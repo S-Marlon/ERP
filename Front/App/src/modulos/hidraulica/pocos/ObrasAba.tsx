@@ -10,8 +10,9 @@ import { contarObras, dataBr, foneBr, Obra, ObraForm, obrasApi, Poco, PocoForm, 
 import RelatorioPocoPage from './RelatorioPocoPage';
 import { ClientePocoModal, ListaClientes } from './ClientesPoco';
 import { AReceberObras, CobrancaDaObra } from './CobrancaObra';
+import { CadastroMateriais, MateriaisDaObra } from './MateriaisObra';
 import { lerGpsTexto, textoRaio } from './mapaRegional';
-import { abrirCliente, useNavPocos, verNoMapa, VistaObras } from './navPocos';
+import { abrirCliente, ParteObra, useNavPocos, verNoMapa, VistaObras } from './navPocos';
 
 const { Text } = Typography;
 const brl = (v: number | null | undefined) => (v === null || v === undefined ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
@@ -242,9 +243,9 @@ const ObraModal: React.FC<{ obra: Obra | 'nova' | null; onFechar: () => void; on
 };
 
 /** A obra aberta: a situação (com as passagens possíveis) e o relatório técnico gravando nela. */
-const ObraAberta: React.FC<{ idObra: number; parte?: 'RELATORIO' | 'COBRANCA'; onVoltar: () => void }> = ({ idObra, parte: parteInicial, onVoltar }) => {
+const ObraAberta: React.FC<{ idObra: number; parte?: ParteObra; onVoltar: () => void }> = ({ idObra, parte: parteInicial, onVoltar }) => {
   const [obra, setObra] = useState<Obra | null>(null);
-  const [parte, setParte] = useState<'RELATORIO' | 'COBRANCA'>(parteInicial || 'RELATORIO');
+  const [parte, setParte] = useState<ParteObra>(parteInicial || 'RELATORIO');
   const [versaoCobranca, setVersaoCobranca] = useState(0);
   const [editando, setEditando] = useState(false);
   const [versao, setVersao] = useState(0);
@@ -299,9 +300,9 @@ const ObraAberta: React.FC<{ idObra: number; parte?: 'RELATORIO' | 'COBRANCA'; o
         ]} />
       </Card>
       <Flex justify="space-between" align="center" style={{ marginBottom: 8 }}>
-        <Segmented value={parte} onChange={v => setParte(v as 'RELATORIO' | 'COBRANCA')}
-          options={[{ value: 'RELATORIO', label: 'Relatório técnico' }, { value: 'COBRANCA', label: 'Sinal e cobrança' }]} />
-        {parte === 'COBRANCA' && <Button onClick={onVoltar}>Voltar para as obras</Button>}
+        <Segmented value={parte} onChange={v => setParte(v as ParteObra)}
+          options={[{ value: 'RELATORIO', label: 'Relatório técnico' }, { value: 'COBRANCA', label: 'Sinal e cobrança' }, { value: 'MATERIAIS', label: 'Materiais' }]} />
+        {parte !== 'RELATORIO' && <Button onClick={onVoltar}>Voltar para as obras</Button>}
       </Flex>
       {parte === 'RELATORIO'
         ? (
@@ -310,7 +311,9 @@ const ObraAberta: React.FC<{ idObra: number; parte?: 'RELATORIO' | 'COBRANCA'; o
               obra={{ dados: obra.relatorio || {}, salvar: dados => obrasApi.salvarRelatorio(obra.idObra, dados) }} />
           </div>
         )
-        : <CobrancaDaObra key={versaoCobranca} idObra={obra.idObra} cancelada={obra.situacao === 'CANCELADA'} />}
+        : parte === 'COBRANCA'
+          ? <CobrancaDaObra key={versaoCobranca} idObra={obra.idObra} cancelada={obra.situacao === 'CANCELADA'} />
+          : <MateriaisDaObra idObra={obra.idObra} cancelada={obra.situacao === 'CANCELADA'} />}
       <ObraModal obra={editando ? obra : null} onFechar={() => setEditando(false)}
         onSalva={() => { setEditando(false); carregar(); setVersao(v => v + 1); setVersaoCobranca(v => v + 1); }} />
     </Space>
@@ -450,11 +453,13 @@ const ObrasAba: React.FC = () => {
   return (
     <Space direction="vertical" size={12} style={{ width: '100%' }}>
       <Segmented value={vista} onChange={v => setVista(v as VistaObras)}
-        options={[{ value: 'OBRAS', label: 'Obras' }, { value: 'RECEBER', label: 'A receber' }, { value: 'POCOS', label: 'Poços' }, { value: 'CLIENTES', label: 'Clientes de poço' }]} />
+        options={[{ value: 'OBRAS', label: 'Obras' }, { value: 'RECEBER', label: 'A receber' }, { value: 'POCOS', label: 'Poços' }, { value: 'CLIENTES', label: 'Clientes de poço' },
+          { value: 'MATERIAIS', label: 'Materiais' }]} />
       {vista === 'OBRAS' && <ListaObras onAbrir={setAberta} />}
       {vista === 'POCOS' && <ListaPocos abrir={nav.abrirPoco} pedido={nav.pedido} />}
       {vista === 'CLIENTES' && <ListaClientes abrir={nav.abrirCliente} pedido={nav.pedido} />}
       {vista === 'RECEBER' && <AReceberObras />}
+      {vista === 'MATERIAIS' && <CadastroMateriais />}
     </Space>
   );
 };

@@ -57,12 +57,13 @@ export const FUNCIONALIDADES: Funcionalidade[] = [
     ligaCom: ['Nada da loja: caixa e financeiro próprios do módulo'],
   },
   {
-    chave: 'materiais', titulo: 'Materiais da obra', etapa: 4, situacao: 'PLANEJADA',
+    chave: 'materiais', titulo: 'Materiais da obra', etapa: 4, situacao: 'PRONTA',
     resumo: 'Tubos, filtros, bomba, cabos, brita e conexões usados na obra, com o custo real dela (lista própria do módulo).',
     oQueFaz: [
       'Lista de materiais da obra (previstos no orçamento e usados de fato), com custo',
-      'Materiais mais usados para preencher rápido (cadastro próprio do módulo)',
-      'Custo real da obra para o resultado',
+      'Cadastro próprio do módulo (tubo, filtro, bomba, cabo...) e item avulso; copiar a lista de uma obra parecida',
+      'Custo congelado na linha (mudar o cadastro não mexe nas obras antigas); custo real = usado × custo',
+      'Material cobrado à parte vira adicional da obra (o cliente aprova como os outros)',
     ],
     dados: ['obra', 'material (cadastro do módulo)', 'quantidade prevista e usada', 'custo'],
     ligaCom: ['Nada da loja: o estoque e o catálogo da loja não são tocados'],

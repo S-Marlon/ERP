@@ -67,3 +67,13 @@ com a loja, se um dia for o caso, é uma decisão nova.
   contas a receber da loja, copiadas em `cobranca.ts`). O recebimento fica só no módulo (não passa pelo caixa da loja);
   estorno com motivo. A coluna `id_caixa` de `_recebimentos` não é usada.
 - O resultado das obras fica no painel do próprio módulo (etapa 8), fora do Resultado do mês da loja.
+
+## Etapa 4 (materiais da obra)
+- `modulo_hidraulica_pocos_materiais`: cadastro próprio (nome único, categoria, unidade, custo, preço quando cobrado à
+  parte, ativo). Não usa o catálogo nem o estoque da loja.
+- `modulo_hidraulica_pocos_obras_materiais`: linhas da obra (do cadastro ou avulsas) com previsto, usado (vazio = não
+  conferido) e o custo congelado na linha. Custo real = usado × custo, arredondado por linha; o real é parcial
+  enquanto houver linha sem conferir.
+- Copiar de outra obra traz materiais e quantidades previstas com o custo atual do cadastro.
+- Cobrar à parte cria um adicional MATERIAL pendente (quantidade usada, ou a prevista, × preço) e guarda o vínculo
+  (não cobra duas vezes; não tira da obra o material cobrado).
