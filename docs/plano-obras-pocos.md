@@ -118,3 +118,21 @@ com a loja, se um dia for o caso, é uma decisão nova.
   o que abriu e fechou dentro do lote fica registrado com início e fim.
 - Resumo do dia (NE com bomba desligada, ND ligada, horas de bomba, volume) entra nas medições do poço; alertas na linha
   do tempo. Simulador na tela; guia com peças e exemplo de firmware ESP32.
+
+### Etapa 7, quadro de comando (2026-10-22)
+- O servidor não depende da placa (ESP-01, ESP32, 4G, LoRa ou arquivo): vale o formato do envio. A placa pode mudar em
+  cada poço; a observação do aparelho registra qual é.
+- Leituras ganharam fases R/S/T, pressão, energia acumulada (kWh), contador de partidas, contator (bobina), térmico,
+  boia e seletora. Aparelho ganhou alimentação (mono/bi/tri), pressão mínima, horas máximas ligada, partidas por hora,
+  tarifa de energia e "aceita comandos".
+- Alertas do quadro (regras e testes em `iot.ts`): falta de fase, sem energia (segura os alertas da bomba), não parte
+  (boia pede e o contator não liga em 2 leituras seguidas, em AUTO), sem funcionamento (contator ligado e corrente
+  ≈ 0: bomba queimada/cabo), térmico, pressão baixa com a bomba trabalhando (cano estourado), ligada demais (boia),
+  partidas demais (conta a partida da própria leitura).
+- Poço sem internet: conexão OFFLINE (sem "sem sinal") e importação de arquivo (JSON, JSONL ou CSV com cabeçalho), até
+  1 ano, sem duplicar.
+- Relatório do mês: horas, partidas, volume, kWh, custo pela tarifa, m³/kWh, níveis médios, alertas por tipo e
+  disponibilidade; impressão e CSV.
+- Comandos (`modulo_hidraulica_pocos_comandos`): BLOQUEAR (com motivo), LIBERAR, RECONHECER; um pendente por vez,
+  vale 10 min, vai na resposta do envio e o aparelho confirma no seguinte. No quadro, o relé da placa é NF em série
+  com a bobina: a placa só bloqueia/libera, nunca liga por cima das proteções.

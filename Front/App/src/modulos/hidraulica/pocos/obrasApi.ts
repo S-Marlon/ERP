@@ -290,31 +290,54 @@ export const manutencaoApi = {
 };
 
 // ------------------------------------------------------------------ monitoramento remoto (etapa 7)
-export type ConexaoIot = 'WIFI' | 'GSM_4G' | 'LORA' | 'OUTRO';
-export type TipoAlertaIot = 'NIVEL_BAIXO' | 'A_SECO' | 'SOBRECORRENTE' | 'VAZAO_BAIXA' | 'TENSAO' | 'SEM_SINAL';
-export type StatusIot = 'ONLINE' | 'ATRASADO' | 'SEM_SINAL' | 'NUNCA' | 'INATIVO';
-export const CONEXOES_IOT: Record<ConexaoIot, string> = { WIFI: 'Wi-Fi', GSM_4G: '4G (chip)', LORA: 'LoRa', OUTRO: 'Outro' };
+export type ConexaoIot = 'WIFI' | 'GSM_4G' | 'LORA' | 'OFFLINE' | 'OUTRO';
+export type AlimentacaoIot = 'MONOFASICO' | 'BIFASICO' | 'TRIFASICO';
+export type TipoAlertaIot = 'NIVEL_BAIXO' | 'A_SECO' | 'SOBRECORRENTE' | 'VAZAO_BAIXA' | 'TENSAO' | 'SEM_SINAL'
+  | 'FALTA_FASE' | 'SEM_ENERGIA' | 'NAO_PARTE' | 'SEM_FUNCIONAMENTO' | 'TERMICO' | 'PRESSAO_BAIXA' | 'LIGADA_DEMAIS' | 'PARTIDAS_DEMAIS';
+export type StatusIot = 'ONLINE' | 'ATRASADO' | 'SEM_SINAL' | 'NUNCA' | 'OFFLINE' | 'INATIVO';
+export type ComandoIot = 'BLOQUEAR' | 'LIBERAR' | 'RECONHECER';
+export const CONEXOES_IOT: Record<ConexaoIot, string> = { WIFI: 'Wi-Fi', GSM_4G: '4G (chip)', LORA: 'LoRa', OFFLINE: 'Sem internet (arquivo)', OUTRO: 'Outro' };
+export const ALIMENTACOES_IOT: Record<AlimentacaoIot, string> = { MONOFASICO: 'Monofásico', BIFASICO: 'Bifásico', TRIFASICO: 'Trifásico' };
 export const TIPOS_ALERTA_IOT: Record<TipoAlertaIot, { texto: string; cor: string }> = {
   NIVEL_BAIXO: { texto: 'Nível baixo', cor: 'orange' }, A_SECO: { texto: 'Bomba a seco', cor: 'red' }, SOBRECORRENTE: { texto: 'Sobrecorrente', cor: 'red' },
   VAZAO_BAIXA: { texto: 'Vazão baixa', cor: 'orange' }, TENSAO: { texto: 'Tensão', cor: 'gold' }, SEM_SINAL: { texto: 'Sem sinal', cor: 'default' },
+  FALTA_FASE: { texto: 'Falta de fase', cor: 'red' }, SEM_ENERGIA: { texto: 'Sem energia', cor: 'volcano' }, NAO_PARTE: { texto: 'Não parte', cor: 'red' },
+  SEM_FUNCIONAMENTO: { texto: 'Sem funcionamento', cor: 'red' }, TERMICO: { texto: 'Térmico desarmado', cor: 'red' },
+  PRESSAO_BAIXA: { texto: 'Pressão baixa', cor: 'magenta' }, LIGADA_DEMAIS: { texto: 'Ligada demais', cor: 'orange' }, PARTIDAS_DEMAIS: { texto: 'Partidas demais', cor: 'orange' },
 };
 export const STATUS_IOT: Record<StatusIot, { texto: string; cor: string }> = {
   ONLINE: { texto: 'Online', cor: 'green' }, ATRASADO: { texto: 'Atrasado', cor: 'orange' }, SEM_SINAL: { texto: 'Sem sinal', cor: 'red' },
-  NUNCA: { texto: 'Nunca enviou', cor: 'default' }, INATIVO: { texto: 'Inativo', cor: 'default' },
+  NUNCA: { texto: 'Nunca enviou', cor: 'default' }, OFFLINE: { texto: 'Sem internet', cor: 'purple' }, INATIVO: { texto: 'Inativo', cor: 'default' },
 };
+export const COMANDOS_IOT: Record<ComandoIot, string> = { BLOQUEAR: 'Bloquear a bomba', LIBERAR: 'Liberar (automático)', RECONHECER: 'Reconhecer alarme' };
 export interface DispositivoForm {
-  idPoco: number | null; nome: string; identificador: string; conexao: ConexaoIot; intervaloMin: number; profundidadeSensorM: number | null;
+  idPoco: number | null; nome: string; identificador: string; conexao: ConexaoIot; alimentacao: AlimentacaoIot; intervaloMin: number; profundidadeSensorM: number | null;
   nivelAlertaM: number | null; correnteMinA: number | null; correnteMaxA: number | null; vazaoMinLh: number | null; tensaoMinV: number | null; tensaoMaxV: number | null;
+  pressaoMinBar: number | null; horasMaxLigada: number | null; partidasMaxHora: number | null; tarifaKwh: number | null; aceitaComandos: boolean;
   situacao: 'ATIVO' | 'INATIVO'; observacao: string | null;
 }
 export interface Dispositivo extends DispositivoForm {
   idDispositivo: number; idPoco: number; poco: string | null; cidade: string | null; cliente: string | null; telefone: string | null; ultimaLeituraEm: string | null;
 }
 export interface LeituraIot {
-  em: string; nivelM: number | null; vazaoLh: number | null; correnteA: number | null; tensaoV: number | null; bombaLigada: boolean | null;
-  horimetroH: number | null; temperaturaC: number | null; sinalDbm: number | null; bateriaV: number | null;
+  em: string; nivelM: number | null; vazaoLh: number | null; pressaoBar: number | null; correnteA: number | null; tensaoV: number | null;
+  faseAV: number | null; faseBV: number | null; faseCV: number | null; bombaLigada: boolean | null; comandoLigado: boolean | null; termicoOk: boolean | null;
+  boiaPedindo: boolean | null; modo: 'AUTO' | 'MANUAL' | 'DESLIGADO' | null; horimetroH: number | null; energiaKwh: number | null; partidas: number | null;
+  temperaturaC: number | null; sinalDbm: number | null; bateriaV: number | null;
 }
-export interface ResumoDiaIot { dia: string; leituras: number; nivelEstaticoM: number | null; nivelDinamicoM: number | null; vazaoMediaLh: number | null; horasBomba: number; volumeM3: number }
+export interface ResumoDiaIot {
+  dia: string; leituras: number; nivelEstaticoM: number | null; nivelDinamicoM: number | null; vazaoMediaLh: number | null; pressaoMediaBar: number | null;
+  horasBomba: number; volumeM3: number; partidas: number; energiaKwh: number | null;
+}
+export interface RelatorioIot {
+  mes: string; dias: ResumoDiaIot[]; dispositivo: Dispositivo; alertas: AlertaIot[]; alertasPorTipo: Partial<Record<TipoAlertaIot, number>>;
+  totais: { horasBomba: number; volumeM3: number; partidas: number; energiaKwh: number | null; custoEnergia: number | null; m3PorKwh: number | null;
+    nivelEstaticoMedioM: number | null; nivelDinamicoMedioM: number | null; disponibilidade: number | null; leituras: number };
+}
+export interface ComandoRegistro {
+  idComando: number; comando: ComandoIot; situacao: 'PENDENTE' | 'ENVIADO' | 'EXECUTADO' | 'FALHOU' | 'EXPIRADO' | 'CANCELADO'; motivo: string | null; operador: string;
+  criadoEm: string; expiraEm: string; enviadoEm: string | null; respondidoEm: string | null; resposta: string | null;
+}
 export interface DispositivoNoPainel extends Dispositivo { status: StatusIot; ultima: LeituraIot | null; hoje: ResumoDiaIot | null; alertasAbertos: number }
 export interface AlertaIot {
   idAlerta: number; idDispositivo: number; dispositivo: string | null; idPoco: number | null; poco: string | null; cliente: string | null; telefone: string | null;
@@ -322,8 +345,10 @@ export interface AlertaIot {
 }
 /** Leitura no formato que o aparelho envia (o mesmo do simulador). */
 export interface LeituraEnvio {
-  em?: string; nivel_m?: number | null; coluna_m?: number | null; vazao_lh?: number | null; corrente_a?: number | null; tensao_v?: number | null;
-  bomba?: boolean | null; horimetro_h?: number | null; temp_c?: number | null; sinal_dbm?: number | null; bateria_v?: number | null;
+  em?: string; nivel_m?: number | null; coluna_m?: number | null; vazao_lh?: number | null; pressao_bar?: number | null; corrente_a?: number | null; tensao_v?: number | null;
+  fase_a_v?: number | null; fase_b_v?: number | null; fase_c_v?: number | null; bomba?: boolean | null; comando?: boolean | null; termico_ok?: boolean | null;
+  boia?: boolean | null; modo?: 'AUTO' | 'MANUAL' | 'DESLIGADO' | null; horimetro_h?: number | null; energia_kwh?: number | null; partidas?: number | null;
+  temp_c?: number | null; sinal_dbm?: number | null; bateria_v?: number | null;
 }
 export const URL_LEITURAS = `${API}/iot/leituras`;
 export const iotApi = {
@@ -338,6 +363,21 @@ export const iotApi = {
     pedir<{ dispositivo: Dispositivo; horas: number; total: number; leituras: LeituraIot[]; dias: ResumoDiaIot[] }>(`${API}/iot/dispositivos/${id}/leituras?${q({ horas })}`, undefined, 'Erro ao carregar as leituras.'),
   simular: (id: number, l: LeituraEnvio) =>
     pedir<{ recebidas: number; gravadas: number; alertasAbertos: number; alertasFechados: number }>(`${API}/iot/dispositivos/${id}/simular?tenant_id=1`, corpo('POST', l), 'Erro ao simular.'),
+  importar: (id: number, conteudo: string) =>
+    pedir<{ recebidas: number; gravadas: number; alertasAbertos: number; alertasFechados: number }>(`${API}/iot/dispositivos/${id}/importar?tenant_id=1`, corpo('POST', { conteudo }), 'Erro ao importar.'),
+  relatorio: (id: number, mes: string) => pedir<RelatorioIot>(`${API}/iot/dispositivos/${id}/relatorio?${q({ mes })}`, undefined, 'Erro ao montar o relatório.'),
+  comandos: (id: number) => pedir<ComandoRegistro[]>(`${API}/iot/dispositivos/${id}/comandos?tenant_id=1`, undefined, 'Erro ao listar os comandos.'),
+  enviarComando: (id: number, comando: ComandoIot, motivo: string | null) =>
+    pedir<{ idComando: number }>(`${API}/iot/dispositivos/${id}/comandos?tenant_id=1`, corpo('POST', { comando, motivo }), 'Erro ao enviar o comando.'),
+  cancelarComando: (idComando: number) => pedir<{ ok: boolean }>(`${API}/iot/comandos/${idComando}/cancelar?tenant_id=1`, corpo('POST', {}), 'Erro ao cancelar.'),
+};
+
+/** CSV do relatório do mês (separado por ";", vírgula decimal, para abrir no Excel). */
+export const csvDoRelatorio = (r: Pick<RelatorioIot, 'dias'>) => {
+  const n = (v: number | null) => (v === null ? '' : String(v).replace('.', ','));
+  return ['dia;horas_bomba;partidas;volume_m3;energia_kwh;nivel_estatico_m;nivel_dinamico_m;vazao_media_lh;pressao_media_bar;leituras',
+    ...r.dias.map(d => [d.dia, n(d.horasBomba), d.partidas, n(d.volumeM3), n(d.energiaKwh), n(d.nivelEstaticoM), n(d.nivelDinamicoM), n(d.vazaoMediaLh),
+      n(d.pressaoMediaBar), d.leituras].join(';'))].join('\r\n');
 };
 
 /** "há 5 min", "há 3 h", "há 2 dias" (para a última leitura). */

@@ -5,7 +5,8 @@
 // não usa o caixa, o financeiro nem os clientes da loja. Etapa 4: materiais (cadastro próprio, previsto × usado).
 // Etapa 5: agenda, equipe e equipamentos (cadastros próprios; avisos de conflito). Etapa 8: painel e resultado.
 // Etapa 6: histórico (linha do tempo, medições) e plano de manutenção do poço; garantias vencendo.
-// Etapa 7: monitoramento remoto (aparelhos, rota das leituras com a chave do aparelho, alertas, painel e simulador).
+// Etapa 7: monitoramento remoto (aparelhos, rota das leituras com a chave do aparelho, quadro de comando, alertas, painel,
+// simulador, importação do poço sem internet, relatório do mês e fila de comandos remotos).
 import { Router } from 'express';
 import { criarObra, criarPoco, detalheObra, listarObras, listarPocos, mudarSituacao, salvarObra, salvarPoco, salvarRelatorio } from './obras.controller';
 import { criarCliente, detalheCliente, listarClientes, salvarCliente } from './clientes.controller';
@@ -21,7 +22,8 @@ import {
 } from './agenda.controller';
 import { painelPocos } from './painel.controller';
 import {
-  chaveDoAparelho, criarDispositivo, leiturasDoDispositivo, listarAlertas, listarDispositivos, marcarVisto, painelIot, receberLeituras, salvarDispositivo, simularLeitura,
+  cancelarComando, chaveDoAparelho, comandosDoDispositivo, criarDispositivo, enviarComando, importarLeituras, leiturasDoDispositivo, listarAlertas, listarDispositivos,
+  marcarVisto, painelIot, receberLeituras, relatorioMensal, salvarDispositivo, simularLeitura,
 } from './iot.controller';
 import {
   criarPlano, criarRegistro, historicoDoPoco, listaManutencoes, removerRegistro, salvarPlano, salvarRegistro,
@@ -83,6 +85,11 @@ router.put('/iot/dispositivos/:id', salvarDispositivo);
 router.get('/iot/dispositivos/:id/chave', chaveDoAparelho);
 router.get('/iot/dispositivos/:id/leituras', leiturasDoDispositivo);
 router.post('/iot/dispositivos/:id/simular', simularLeitura);
+router.post('/iot/dispositivos/:id/importar', importarLeituras);
+router.get('/iot/dispositivos/:id/relatorio', relatorioMensal);
+router.get('/iot/dispositivos/:id/comandos', comandosDoDispositivo);
+router.post('/iot/dispositivos/:id/comandos', enviarComando);
+router.post('/iot/comandos/:id/cancelar', cancelarComando);
 router.get('/pocos', listarPocos);
 router.post('/pocos', criarPoco);
 router.put('/pocos/:id', salvarPoco);
