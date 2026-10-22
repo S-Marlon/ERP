@@ -16,6 +16,8 @@ export interface NavPocos {
   abrirCliente?: number;
   /** Foco do mapa: o ponto (e o poço destacado) ou todos os poços de um cliente. */
   foco?: { latitude: number; longitude: number; idPoco?: number } | null;
+  /** Abrir a agenda já com um compromisso novo para esta obra. */
+  agendarObra?: number;
   focoCliente?: number | null;
 }
 
@@ -36,4 +38,5 @@ export const verNoMapa = (latitude: number, longitude: number, idPoco?: number) 
 export const verClienteNoMapa = (idCliente: number) => navPocos.ir({ aba: 'mapa', focoCliente: idCliente });
 export const abrirObra = (idObra: number, parteObra?: ParteObra) => navPocos.ir({ aba: 'obras', vista: 'OBRAS', abrirObra: idObra, parteObra });
 export const abrirPoco = (idPoco: number) => navPocos.ir({ aba: 'obras', vista: 'POCOS', abrirPoco: idPoco });
+export const agendarObra = (idObra: number) => navPocos.ir({ aba: 'agenda', agendarObra: idObra });
 export const abrirCliente = (idCliente: number) => navPocos.ir({ aba: 'obras', vista: 'CLIENTES', abrirCliente: idCliente });

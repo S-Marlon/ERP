@@ -5,14 +5,14 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert, Button, Card, Checkbox, Col, Descriptions, Empty, Flex, Input, InputNumber, Modal, Popconfirm, Row, Segmented, Select, Space, Statistic, Steps, Table, Tag, Tooltip, Typography, message,
 } from 'antd';
-import { AimOutlined, CalculatorOutlined, EditOutlined, EnvironmentOutlined, PlusOutlined, ReloadOutlined, UserOutlined } from '@ant-design/icons';
+import { AimOutlined, CalculatorOutlined, CalendarOutlined, EditOutlined, EnvironmentOutlined, PlusOutlined, ReloadOutlined, UserOutlined } from '@ant-design/icons';
 import { contarObras, dataBr, foneBr, Obra, ObraForm, obrasApi, Poco, PocoForm, Servico, SERVICOS, SituacaoObra, SITUACOES_OBRA } from './obrasApi';
 import RelatorioPocoPage from './RelatorioPocoPage';
 import { ClientePocoModal, ListaClientes } from './ClientesPoco';
 import { AReceberObras, CobrancaDaObra } from './CobrancaObra';
 import { CadastroMateriais, MateriaisDaObra } from './MateriaisObra';
 import { lerGpsTexto, textoRaio } from './mapaRegional';
-import { abrirCliente, ParteObra, useNavPocos, verNoMapa, VistaObras } from './navPocos';
+import { abrirCliente, agendarObra, ParteObra, useNavPocos, verNoMapa, VistaObras } from './navPocos';
 
 const { Text } = Typography;
 const brl = (v: number | null | undefined) => (v === null || v === undefined ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
@@ -281,6 +281,7 @@ const ObraAberta: React.FC<{ idObra: number; parte?: ParteObra; onVoltar: () => 
             ))}
             <Button icon={<EditOutlined />} onClick={() => setEditando(true)}>Dados da obra</Button>
             <Button icon={<UserOutlined />} onClick={() => abrirCliente(obra.idCliente)}>Cliente</Button>
+            {obra.situacao !== 'CANCELADA' && <Button icon={<CalendarOutlined />} onClick={() => agendarObra(obra.idObra)}>Agendar</Button>}
             <Tooltip title={obra.latitude === null ? 'O poço desta obra ainda não tem GPS' : undefined}>
               <Button icon={<EnvironmentOutlined />} disabled={obra.latitude === null || obra.longitude === null}
                 onClick={() => verNoMapa(obra.latitude!, obra.longitude!, obra.idPoco ?? undefined)}>Ver no mapa</Button>

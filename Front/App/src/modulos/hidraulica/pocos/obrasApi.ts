@@ -1,5 +1,6 @@
 // API do módulo Obras de poços (/api/modulos/hidraulica/pocos): obras, poços, clientes de poço, o mapa regional e a
-// cobrança das obras (sinal, adicionais, parcelas e recebimentos) e os materiais (cadastro do módulo e de cada obra).
+// cobrança das obras (sinal, adicionais, parcelas e recebimentos), os materiais (cadastro do módulo e de cada obra) e a
+// agenda (equipe e equipamentos do módulo).
 import { API_URL } from '../../../shared/api/config';
 import type { Dados } from './relatorioPoco';
 
@@ -197,6 +198,65 @@ export const materiaisApi = {
   copiar: (idObra: number, deObra: number) => pedir<{ copiados: number }>(`${API}/obras/${idObra}/materiais/copiar?tenant_id=1`, corpo('POST', { deObra }), 'Erro ao copiar.'),
   cobrar: (idLinha: number, valorUnitario: number | null) =>
     pedir<{ idAdicional: number; valor: number }>(`${API}/obra-materiais/${idLinha}/cobrar?tenant_id=1`, corpo('POST', { valorUnitario }), 'Erro ao cobrar o material.'),
+};
+
+// ------------------------------------------------------------------ agenda, equipe e equipamentos (etapa 5)
+export type FuncaoEquipe = 'PERFURADOR' | 'AJUDANTE' | 'MOTORISTA' | 'ELETRICISTA' | 'OUTRO';
+export type TipoEquipamento = 'SONDA' | 'CAMINHAO' | 'COMPRESSOR' | 'BOMBA_TESTE' | 'GERADOR' | 'OUTRO';
+export type SituacaoEquipamento = 'ATIVO' | 'MANUTENCAO' | 'INATIVO';
+export type TipoAgenda = 'OBRA' | 'VISITA_ORCAMENTO' | 'MANUTENCAO' | 'OUTRO';
+export type SituacaoAgenda = 'AGENDADO' | 'REALIZADO' | 'CANCELADO';
+export const FUNCOES_EQUIPE: Record<FuncaoEquipe, string> = { PERFURADOR: 'Perfurador', AJUDANTE: 'Ajudante', MOTORISTA: 'Motorista', ELETRICISTA: 'Eletricista', OUTRO: 'Outro' };
+export const TIPOS_EQUIPAMENTO: Record<TipoEquipamento, string> = {
+  SONDA: 'Sonda', CAMINHAO: 'Caminhão', COMPRESSOR: 'Compressor', BOMBA_TESTE: 'Bomba de teste', GERADOR: 'Gerador', OUTRO: 'Outro',
+};
+export const SITUACOES_EQUIPAMENTO: Record<SituacaoEquipamento, { texto: string; cor: string }> = {
+  ATIVO: { texto: 'Ativo', cor: 'green' }, MANUTENCAO: { texto: 'Em manutenção', cor: 'orange' }, INATIVO: { texto: 'Inativo', cor: 'default' },
+};
+export const TIPOS_AGENDA: Record<TipoAgenda, { texto: string; cor: string }> = {
+  OBRA: { texto: 'Obra', cor: '#1677ff' }, VISITA_ORCAMENTO: { texto: 'Visita de orçamento', cor: '#722ed1' },
+  MANUTENCAO: { texto: 'Manutenção', cor: '#13a8a8' }, OUTRO: { texto: 'Outro', cor: '#8c8c8c' },
+};
+export const SITUACOES_AGENDA: Record<SituacaoAgenda, { texto: string; cor: string }> = {
+  AGENDADO: { texto: 'Agendado', cor: 'blue' }, REALIZADO: { texto: 'Realizado', cor: 'green' }, CANCELADO: { texto: 'Cancelado', cor: 'default' },
+};
+
+export interface MembroForm { nome: string; funcao: FuncaoEquipe; telefone: string | null; observacao: string | null; ativo: boolean }
+export interface Membro extends MembroForm { idMembro: number }
+export interface EquipamentoForm { nome: string; tipo: TipoEquipamento; identificacao: string | null; situacao: SituacaoEquipamento; observacao: string | null }
+export interface Equipamento extends EquipamentoForm { idEquipamento: number }
+export interface CompromissoForm {
+  idObra: number | null; tipo: TipoAgenda; titulo: string; local: string | null; dataInicio: string; dataFim: string; horaInicio: string | null;
+  situacao: SituacaoAgenda; observacao: string | null; equipe: number[]; equipamentos: number[];
+}
+export interface Compromisso extends Omit<CompromissoForm, 'equipe' | 'equipamentos'> {
+  idAgenda: number; obra: string | null; obraSituacao: SituacaoObra | null; cliente: string | null; clienteTelefone: string | null;
+  equipe: { id: number; nome: string; funcao: FuncaoEquipe }[]; equipamentos: { id: number; nome: string; tipo: TipoEquipamento; situacao: SituacaoEquipamento }[];
+  avisos: { tipo: 'PESSOA' | 'EQUIPAMENTO' | 'INDISPONIVEL'; texto: string }[];
+}
+
+export const agendaApi = {
+  equipe: (todos = false) => pedir<Membro[]>(`${API}/equipe?${q({ todos: todos ? 1 : null })}`, undefined, 'Erro ao listar a equipe.'),
+  criarMembro: (m: MembroForm) => pedir<Membro>(`${API}/equipe?tenant_id=1`, corpo('POST', m), 'Erro ao cadastrar.'),
+  salvarMembro: (id: number, m: MembroForm) => pedir<Membro>(`${API}/equipe/${id}?tenant_id=1`, corpo('PUT', m), 'Erro ao salvar.'),
+  equipamentos: (todos = false) => pedir<Equipamento[]>(`${API}/equipamentos?${q({ todos: todos ? 1 : null })}`, undefined, 'Erro ao listar os equipamentos.'),
+  criarEquipamento: (e: EquipamentoForm) => pedir<Equipamento>(`${API}/equipamentos?tenant_id=1`, corpo('POST', e), 'Erro ao cadastrar.'),
+  salvarEquipamento: (id: number, e: EquipamentoForm) => pedir<Equipamento>(`${API}/equipamentos/${id}?tenant_id=1`, corpo('PUT', e), 'Erro ao salvar.'),
+  periodo: (de: string, ate: string) => pedir<Compromisso[]>(`${API}/agenda?${q({ de, ate })}`, undefined, 'Erro ao carregar a agenda.'),
+  daObra: (idObra: number) => pedir<Compromisso[]>(`${API}/agenda?${q({ idObra })}`, undefined, 'Erro ao carregar a agenda da obra.'),
+  criar: (c: CompromissoForm) => pedir<Compromisso>(`${API}/agenda?tenant_id=1`, corpo('POST', c), 'Erro ao agendar.'),
+  salvar: (id: number, c: CompromissoForm) => pedir<Compromisso>(`${API}/agenda/${id}?tenant_id=1`, corpo('PUT', c), 'Erro ao salvar o compromisso.'),
+  mudar: (id: number, situacao: SituacaoAgenda) => pedir<{ ok: boolean }>(`${API}/agenda/${id}/situacao?tenant_id=1`, corpo('POST', { situacao }), 'Erro ao mudar.'),
+  remover: (id: number) => pedir<{ ok: boolean }>(`${API}/agenda/${id}?tenant_id=1`, { method: 'DELETE' }, 'Erro ao apagar.'),
+};
+
+/** Os dias (AAAA-MM-DD) de um compromisso, do início ao fim. */
+export const diasDoCompromisso = (c: { dataInicio: string; dataFim: string }) => {
+  const dias: string[] = [];
+  const d = new Date(`${c.dataInicio}T12:00:00`);
+  const fim = new Date(`${c.dataFim}T12:00:00`);
+  while (d <= fim && dias.length < 120) { dias.push(d.toISOString().slice(0, 10)); d.setDate(d.getDate() + 1); }
+  return dias;
 };
 
 /** Totais do "a receber de obras" por situação (vencido, vence hoje, a vencer, sem prazo). */

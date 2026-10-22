@@ -9,6 +9,7 @@ import { FUNCIONALIDADES } from './planoObras';
 import RelatorioPocoPage from './RelatorioPocoPage';
 import ObrasAba from './ObrasAba';
 import MapaPocos from './MapaPocos';
+import AgendaPocos from './AgendaPocos';
 import { navPocos, useNavPocos } from './navPocos';
 
 const ICONES: Record<string, React.ReactNode> = {
@@ -23,7 +24,7 @@ const ObrasPocosPagina: React.FC = () => {
     <ModuloEmEtapas
       titulo={<><AimOutlined /> Obras de poços artesianos</>}
       descricao="Da perfuração à manutenção: obras, ficha de cada poço, mapa regional, sinal e cobrança, materiais, agenda e monitoramento remoto."
-      funcionalidades={FUNCIONALIDADES} icones={ICONES} telas={{ relatorio: <RelatorioPocoPage />, obras: <ObrasAba />, mapa: <MapaPocos /> }}
+      funcionalidades={FUNCIONALIDADES} icones={ICONES} telas={{ relatorio: <RelatorioPocoPage />, obras: <ObrasAba />, mapa: <MapaPocos />, agenda: <AgendaPocos /> }}
       aba={nav.aba} onAba={navPocos.trocarAba}
       textoAlertas="Obra aguardando sinal, garantia vencendo, manutenção periódica e alertas dos sensores aparecem aqui quando as etapas abrirem."
     />

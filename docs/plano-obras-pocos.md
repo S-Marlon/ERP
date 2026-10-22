@@ -77,3 +77,13 @@ com a loja, se um dia for o caso, é uma decisão nova.
 - Copiar de outra obra traz materiais e quantidades previstas com o custo atual do cadastro.
 - Cobrar à parte cria um adicional MATERIAL pendente (quantidade usada, ou a prevista, × preço) e guarda o vínculo
   (não cobra duas vezes; não tira da obra o material cobrado).
+
+## Etapa 5 (agenda, equipe e sonda)
+- `modulo_hidraulica_pocos_equipe` e `_equipamentos`: cadastros próprios (não usam os funcionários nem a frota da loja).
+  Equipamento tem situação (ativo, em manutenção, inativo).
+- `modulo_hidraulica_pocos_agenda`: compromisso de um ou vários dias (até 90), hora opcional, tipo (obra, visita de
+  orçamento, manutenção, outro), situação (agendado, realizado, cancelado), ligado à obra quando houver.
+  `_agenda_equipe` e `_agenda_equipamentos` guardam quem vai e o que vai (chave dupla, apagam junto com o compromisso).
+- Avisos sem bloquear (regra em `agenda.ts`): pessoa ou equipamento em dois compromissos que se encontram (cancelados
+  não contam; só o compromisso agendado gera aviso) e equipamento em manutenção/inativo.
+- "Agendar" na obra abre a agenda com o compromisso já preenchido (título, local, data prevista).

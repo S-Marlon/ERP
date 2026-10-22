@@ -69,12 +69,13 @@ export const FUNCIONALIDADES: Funcionalidade[] = [
     ligaCom: ['Nada da loja: o estoque e o catálogo da loja não são tocados'],
   },
   {
-    chave: 'agenda', titulo: 'Agenda, equipe e sonda', etapa: 5, situacao: 'PLANEJADA',
+    chave: 'agenda', titulo: 'Agenda, equipe e sonda', etapa: 5, situacao: 'PRONTA',
     resumo: 'Calendário das obras, quem trabalha em cada uma e qual sonda ou equipamento vai.',
     oQueFaz: [
-      'Calendário das obras e das visitas de manutenção',
-      'Quem vai e qual equipamento vai em cada obra',
+      'Calendário do mês e lista dos próximos: obras (de vários dias), visitas de orçamento e manutenções',
+      'Quem vai e qual equipamento vai em cada compromisso; "Agendar" direto da obra',
       'Equipe e equipamentos (sonda, caminhão, compressor) cadastrados no próprio módulo',
+      'Aviso (sem bloquear) de pessoa ou equipamento em dois lugares e de equipamento em manutenção',
     ],
     dados: ['obra', 'datas', 'equipe (cadastro do módulo)', 'equipamento'],
     ligaCom: ['Nada da loja'],
