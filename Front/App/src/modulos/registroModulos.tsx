@@ -11,6 +11,7 @@ const RolamentosConfig = lazy(() => import('./transmissao/rolamentos/RolamentosC
 const RolamentosEntrada = lazy(() => import('./transmissao/rolamentos/RolamentosEntrada'));
 const RolamentoPorMedida = lazy(() => import('./transmissao/rolamentos/RolamentoPorMedida'));
 const RelatorioPocoPage = lazy(() => import('./hidraulica/pocos/RelatorioPocoPage'));
+const ObrasPocosPagina = lazy(() => import('./hidraulica/pocos/ObrasPocosPagina'));
 const MercadoLivrePage = lazy(() => import('./ecommerce/mercadolivre/MercadoLivrePage'));
 const FrotaPagina = lazy(() => import('./logistica/frota/FrotaPagina'));
 
@@ -75,10 +76,10 @@ export const MODULOS_FRONT: ModuloFront[] = [
   },
   {
     codigo: 'HIDRAULICA_POCOS',
-    menu: [{ grupo: 'grp:vendas', itens: [{ key: '/modulos/hidraulica/pocos', label: 'Poços (relatórios)' }] }],
+    menu: [{ grupo: 'grp:vendas', itens: [{ key: '/modulos/hidraulica/pocos', label: 'Obras de poços' }] }],
     // /relatorios/poco: endereço antigo da tela, mantido para quem tem o link salvo
     rotas: [
-      { path: '/modulos/hidraulica/pocos', element: <RelatorioPocoPage /> },
+      { path: '/modulos/hidraulica/pocos', element: <ObrasPocosPagina /> },
       { path: '/relatorios/poco', element: <RelatorioPocoPage /> },
     ],
     relatorios: [{

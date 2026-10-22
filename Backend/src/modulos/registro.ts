@@ -39,9 +39,9 @@ export const MODULOS: ModuloRegistrado[] = [
   },
   {
     codigo: 'HIDRAULICA_POCOS',
-    nome: 'Poços artesianos (relatórios)',
+    nome: 'Obras de poços artesianos',
     area: 'Hidráulica',
-    descricao: 'Relatório técnico de poço, cobrança da obra (metros excedentes e pagamentos), teste de vazão e garantia. Os dados ficam no navegador e em arquivo, sem banco.',
+    descricao: 'Para empresa de poços: obras (perfuração, instalação, manutenção), ficha de cada poço, mapa regional, sinal e cobrança, materiais, agenda e monitoramento remoto. Abre por etapas; o relatório técnico e as impressões já funcionam.',
     rotaBase: '/hidraulica/pocos',
     router: hidraulicaPocosRoutes,
   },
