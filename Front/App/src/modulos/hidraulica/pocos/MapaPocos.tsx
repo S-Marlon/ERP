@@ -1,10 +1,11 @@
 // Obras de poços › mapa regional (etapa 2). Camadas que ligam e desligam: os poços dos clientes (marcador grande, com a
 // cor da situação da última obra), os poços de referência da base pública (pontinhos cinza, nunca misturados com os
-// nossos) e o potencial hídrico (a grade do maperf). Clicar no mapa analisa o raio em volta do ponto; clicar no poço
-// de um cliente mostra o dono e as obras, com atalhos para a obra, a ficha do poço e a do cliente.
+// nossos) e o potencial hídrico (a grade do maperf). A referência e o potencial vêm direto dos GeoJSON do maperf (o
+// servidor lê a pasta; não vão para o banco). Clicar no mapa analisa o raio em volta do ponto; clicar no poço de um
+// cliente mostra o dono e as obras, com atalhos para a obra, a ficha do poço e a do cliente.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Card, Checkbox, Col, Descriptions, Empty, Input, List, Modal, Popconfirm, Row, Select, Space, Tag, Tooltip, Typography, Upload, message } from 'antd';
-import { AimOutlined, DeleteOutlined, EnvironmentOutlined, FileSearchOutlined, ReloadOutlined, UploadOutlined, UserOutlined } from '@ant-design/icons';
+import { Alert, Button, Card, Checkbox, Col, Descriptions, Empty, Input, List, Modal, Row, Select, Space, Tag, Tooltip, Typography, message } from 'antd';
+import { AimOutlined, EnvironmentOutlined, FileSearchOutlined, FolderOpenOutlined, ReloadOutlined, UserOutlined } from '@ant-design/icons';
 import { Circle, CircleMarker, MapContainer, Rectangle, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { AnaliseRegiao, CelulaPotencial, foneBr, obrasApi, PocoNoMapa, ReferenciaNoMapa, ResumoMapa, SERVICOS, SITUACOES_OBRA } from './obrasApi';
@@ -49,28 +50,24 @@ const Analise: React.FC<{ a: AnaliseRegiao }> = ({ a }) => (
   ]} />
 );
 
-const RegioesModal: React.FC<{ open: boolean; resumo: ResumoMapa | null; onFechar: () => void; onMudou: () => void }> = ({ open, resumo, onFechar, onMudou }) => {
-  const remover = async (tipo: 'POCOS' | 'POTENCIAL', regiao: string) => {
-    try { const r = await obrasApi.removerImportacao(tipo, regiao); message.success(`${r.removidos} registro(s) removido(s).`); onMudou(); }
-    catch (e) { message.error(e instanceof Error ? e.message : 'Erro.'); }
-  };
-  const lista = (tipo: 'POCOS' | 'POTENCIAL', itens: { regiao: string; quantidade: number }[], unidade: string) => (
-    <List size="small" dataSource={itens} locale={{ emptyText: 'Nada importado' }} renderItem={r => (
-      <List.Item actions={[
-        <Popconfirm key="x" title={`Tirar "${r.regiao}" do mapa?`} description="Os poços dos clientes não são tocados." okText="Tirar" cancelText="Voltar" onConfirm={() => remover(tipo, r.regiao)}>
-          <Button size="small" type="text" danger icon={<DeleteOutlined />} />
-        </Popconfirm>,
-      ]}>
-        <Text>{r.regiao}</Text><Text type="secondary">{r.quantidade.toLocaleString('pt-BR')} {unidade}</Text>
-      </List.Item>
+/** Os arquivos do maperf que o servidor leu (para trocar uma região, é só trocar o arquivo na pasta). */
+const ArquivosModal: React.FC<{ open: boolean; resumo: ResumoMapa | null; onFechar: () => void }> = ({ open, resumo, onFechar }) => {
+  const lista = (tipo: 'POCOS' | 'POTENCIAL', unidade: string) => (
+    <List size="small" dataSource={(resumo?.arquivos || []).filter(a => a.tipo === tipo)} locale={{ emptyText: 'Nenhum arquivo' }} renderItem={a => (
+      <List.Item><Tooltip title={a.caminho}><Text>{a.regiao}</Text></Tooltip><Text type="secondary">{a.quantidade.toLocaleString('pt-BR')} {unidade}</Text></List.Item>
     )} />
   );
   return (
-    <Modal open={open} title="Regiões importadas" footer={null} onCancel={onFechar} width={560}>
-      <Row gutter={12}>
-        <Col span={12}><Text strong>Poços de referência</Text>{lista('POCOS', resumo?.referencias || [], 'poços')}</Col>
-        <Col span={12}><Text strong>Potencial hídrico</Text>{lista('POTENCIAL', resumo?.potencial || [], 'células')}</Col>
-      </Row>
+    <Modal open={open} title="Arquivos do maperf" footer={null} onCancel={onFechar} width={600}>
+      <Space direction="vertical" style={{ width: '100%' }}>
+        <Text type="secondary">Lidos direto da pasta (não vão para o banco). Para mudar uma região, troque o arquivo e clique em recarregar.</Text>
+        <Text code copyable style={{ fontSize: 12 }}>{resumo?.pasta}</Text>
+        {!!resumo?.erros.length && <Alert type="warning" showIcon message="Arquivos que não deu para ler" description={resumo.erros.join(' · ')} />}
+        <Row gutter={12}>
+          <Col span={12}><Text strong>Poços de referência</Text>{lista('POCOS', 'poços')}</Col>
+          <Col span={12}><Text strong>Potencial hídrico</Text>{lista('POTENCIAL', 'células')}</Col>
+        </Row>
+      </Space>
     </Modal>
   );
 };
@@ -89,8 +86,7 @@ const MapaPocos: React.FC = () => {
   const [selecionado, setSelecionado] = useState<PocoNoMapa | null>(null);
   const [referencia, setReferencia] = useState<ReferenciaNoMapa | null>(null);
   const [irPara, setIrPara] = useState('');
-  const [importando, setImportando] = useState(false);
-  const [regioes, setRegioes] = useState(false);
+  const [verArquivos, setVerArquivos] = useState(false);
   const [focoLocal, setFocoLocal] = useState<{ pedido: number; alvo: { centro: [number, number]; zoom: number } | null; limites: [number, number][] | null }>({ pedido: 0, alvo: null, limites: null });
 
   const carregar = useCallback(async () => {
@@ -143,29 +139,14 @@ const MapaPocos: React.FC = () => {
     if (!nav.foco && !nav.focoCliente && nossos.length) setFocoLocal(f => (f.pedido ? f : { pedido: 1, alvo: enquadramento(nossos), limites: null }));
   }, [nossos.length]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  const importar = async (arquivos: File[]) => {
-    setImportando(true);
-    try {
-      for (const a of arquivos) {
-        let json: unknown;
-        try { json = JSON.parse(await a.text()); } catch { message.error(`${a.name}: não é um JSON válido.`); continue; }
-        try {
-          const r = await obrasApi.importar(a.name, json);
-          message.success(`${a.name}: ${r.gravados.toLocaleString('pt-BR')} ${r.tipo === 'POCOS' ? 'poços de referência' : 'células de potencial'} (região "${r.regiao}").`);
-          if (r.tipo === 'POCOS') cacheReferencias = null; else cachePotencial = null;
-        } catch (e) { message.error(`${a.name}: ${e instanceof Error ? e.message : 'erro'}`); }
-      }
-      await recarregarCamadas();
-    } finally { setImportando(false); }
-  };
   const recarregarCamadas = async () => {
     cacheReferencias = null; cachePotencial = null;
     await carregar();
     if (camadas.referencias) { const r = await obrasApi.mapaReferencias(); cacheReferencias = r; setReferencias(r); } else setReferencias([]);
     if (camadas.potencial) { const p = await obrasApi.mapaPotencial(); cachePotencial = p; setPotencial(p); } else setPotencial([]);
   };
-  const totalRef = resumo?.referencias.reduce((s, r) => s + r.quantidade, 0) ?? 0;
-  const totalPot = resumo?.potencial.reduce((s, r) => s + r.quantidade, 0) ?? 0;
+  const totalRef = resumo?.referencias ?? 0;
+  const totalPot = resumo?.potencial ?? 0;
 
   const irParaPonto = () => {
     const gps = lerGpsTexto(irPara);
@@ -187,7 +168,7 @@ const MapaPocos: React.FC = () => {
                 <span style={{ color: COR_REFERENCIA }}>•</span> Referência pública ({totalRef.toLocaleString('pt-BR')})
               </Checkbox>
               <Checkbox checked={camadas.potencial} onChange={e => mudarCamada('potencial', e.target.checked)} disabled={!totalPot}>
-                Potencial hídrico{totalPot ? '' : ' (nada importado)'}
+                Potencial hídrico{totalPot ? '' : ' (sem arquivos)'}
               </Checkbox>
               <Checkbox checked={camadas.satelite} onChange={e => mudarCamada('satelite', e.target.checked)}>Satélite</Checkbox>
             </Space>
@@ -198,18 +179,15 @@ const MapaPocos: React.FC = () => {
               <Select size="small" style={{ width: 90 }} value={raio} onChange={setRaio} options={RAIOS.map(r => ({ value: r, label: textoRaio(r) }))} />
               <Input size="small" style={{ width: 230 }} placeholder="Ir para: -23.1171, -46.5565" value={irPara} onChange={e => setIrPara(e.target.value)} onPressEnter={irParaPonto}
                 suffix={<AimOutlined onClick={irParaPonto} style={{ cursor: 'pointer' }} />} />
-              <Upload accept=".geojson,.json" multiple showUploadList={false} beforeUpload={(_, lista) => { if (_ === lista[0]) importar(lista as unknown as File[]); return false; }}>
-                <Button size="small" icon={<UploadOutlined />} loading={importando}>Importar GeoJSON</Button>
-              </Upload>
-              <Button size="small" onClick={() => setRegioes(true)}>Regiões</Button>
-              <Tooltip title="Recarregar"><Button size="small" icon={<ReloadOutlined />} onClick={recarregarCamadas} /></Tooltip>
+              <Tooltip title="Os GeoJSON do maperf que o servidor leu"><Button size="small" icon={<FolderOpenOutlined />} onClick={() => setVerArquivos(true)}>Arquivos</Button></Tooltip>
+              <Tooltip title="Recarregar (relê os arquivos que mudaram)"><Button size="small" icon={<ReloadOutlined />} onClick={recarregarCamadas} /></Tooltip>
             </Space>
           </Col>
         </Row>
       </Card>
-      {!totalRef && !totalPot && (
-        <Alert type="info" showIcon closable message="Mapa sem a base pública ainda"
-          description={'Use "Importar GeoJSON" com os arquivos do maperf: get_pocos_with_center/*.geojson (poços de referência) e get_hydric_potential_raster_with_center/*.geojson (potencial). Pode escolher vários de uma vez; importar de novo não duplica.'} />
+      {resumo && !totalRef && !totalPot && (
+        <Alert type="info" showIcon closable message="Mapa sem a base pública"
+          description={`O servidor não achou os GeoJSON do maperf em ${resumo.pasta} (subpastas get_pocos_with_center e get_hydric_potential_raster_with_center). Também dá para apontar MAPERF_DIR no .env do backend para a pasta do maperf.`} />
       )}
       <Row gutter={10}>
         <Col xs={24} lg={17}>
@@ -293,7 +271,7 @@ const MapaPocos: React.FC = () => {
           </Space>
         </Col>
       </Row>
-      <RegioesModal open={regioes} resumo={resumo} onFechar={() => setRegioes(false)} onMudou={recarregarCamadas} />
+      <ArquivosModal open={verArquivos} resumo={resumo} onFechar={() => setVerArquivos(false)} />
     </Space>
   );
 };

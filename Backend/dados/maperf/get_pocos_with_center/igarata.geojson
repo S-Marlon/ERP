@@ -1,0 +1,2234 @@
+{
+	
+		"type": "FeatureCollection",
+		
+		"features": [
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500000545,
+					"municipio": "Piracaia",
+					"profundida": 100,
+					"vazao": 6.48
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.348888,
+						-23.05972199999985
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500000694,
+					"municipio": "Jacareí",
+					"profundida": 40,
+					"vazao": 1.5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.00972199999984,
+						-23.308888
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500000699,
+					"municipio": "Jacareí",
+					"profundida": 91,
+					"vazao": 44
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.069444,
+						-23.280833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500000700,
+					"municipio": "Jacareí",
+					"profundida": 120,
+					"vazao": 12.47
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.062222,
+						-23.266111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500005379,
+					"municipio": "Jacareí",
+					"profundida": 60,
+					"vazao": 27
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.0075,
+						-23.214166
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500006804,
+					"municipio": "Santa Isabel",
+					"profundida": 138,
+					"vazao": 10
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.21638799999988,
+						-23.240555
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500007620,
+					"municipio": "Guararema",
+					"profundida": 79.81,
+					"vazao": 13.16
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.110833,
+						-23.316388
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500007804,
+					"municipio": "São José dos Campos",
+					"profundida": 200,
+					"vazao": 3
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.959444,
+						-23.051111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500009220,
+					"municipio": "Santa Isabel",
+					"profundida": 220,
+					"vazao": 7
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.230555,
+						-23.313055
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500030204,
+					"municipio": "Jacareí",
+					"profundida": 123.2,
+					"vazao": 9
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.06083299999989,
+						-23.273333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500030211,
+					"municipio": "Jacareí",
+					"profundida": 88,
+					"vazao": 24
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.975833,
+						-23.271667
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500030212,
+					"municipio": "Jacareí",
+					"profundida": 206,
+					"vazao": 8.4
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.961667,
+						-23.303889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500030219,
+					"municipio": "Jacareí",
+					"profundida": 99.3,
+					"vazao": 26.4
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.953889,
+						-23.285
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500030221,
+					"municipio": "Jacareí",
+					"profundida": 129,
+					"vazao": 46.58
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.98277799999988,
+						-23.278611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500030311,
+					"municipio": "São José dos Campos",
+					"profundida": 150,
+					"vazao": 4
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.965556,
+						-23.1527779999999
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500030427,
+					"municipio": "Piracaia",
+					"profundida": 120,
+					"vazao": 1.5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.337778,
+						-23.003611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500030430,
+					"municipio": "Igaratá",
+					"profundida": 180,
+					"vazao": 1.8
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.111667,
+						-23.213611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500030431,
+					"municipio": "Igaratá",
+					"profundida": 234,
+					"vazao": 3.6
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.106389,
+						-23.210833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500030438,
+					"municipio": "São José dos Campos",
+					"profundida": 243,
+					"vazao": 5.14
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.95749999999987,
+						-23.15
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500031223,
+					"municipio": "Piracaia",
+					"profundida": 180,
+					"vazao": 3.79
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.334444,
+						-22.986111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500031224,
+					"municipio": "Piracaia",
+					"profundida": 33,
+					"vazao": 0.9
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.338056,
+						-22.98
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049521,
+					"municipio": "Piracaia",
+					"profundida": 144,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.32749999999987,
+						-22.985556
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049531,
+					"municipio": "Joanópolis",
+					"profundida": 250,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.316389,
+						-22.945833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049571,
+					"municipio": "Joanópolis",
+					"profundida": 30,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.238889,
+						-22.95
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049572,
+					"municipio": "Joanópolis",
+					"profundida": 25,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.212778,
+						-22.935833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500050929,
+					"municipio": "Nazaré Paulista",
+					"profundida": 9.5,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.335278,
+						-23.197499999999877
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500050947,
+					"municipio": "Nazaré Paulista",
+					"profundida": 8,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.2925,
+						-23.170833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500050952,
+					"municipio": "Nazaré Paulista",
+					"profundida": 2,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.327778,
+						-23.206111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500050958,
+					"municipio": "Piracaia",
+					"profundida": 2,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.2975,
+						-23.002778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500050959,
+					"municipio": "Piracaia",
+					"profundida": 138,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.2975,
+						-23.00416699999988
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500050969,
+					"municipio": "Igaratá",
+					"profundida": 10,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.17361099999988,
+						-23.2175
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500050970,
+					"municipio": "Igaratá",
+					"profundida": 222,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.104167,
+						-23.21527799999984
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500050972,
+					"municipio": "Igaratá",
+					"profundida": 90,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.223611,
+						-23.157778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500050973,
+					"municipio": "Igaratá",
+					"profundida": 180,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.20638899999989,
+						-23.193611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500050974,
+					"municipio": "Igaratá",
+					"profundida": 300,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.121944,
+						-23.2125
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500050975,
+					"municipio": "Igaratá",
+					"profundida": 250,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.1,
+						-23.216667
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500050976,
+					"municipio": "Igaratá",
+					"profundida": 210,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.195833,
+						-23.173611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500050977,
+					"municipio": "Jacareí",
+					"profundida": 161,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.071111,
+						-23.241943999999876
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500051038,
+					"municipio": "São José dos Campos",
+					"profundida": 204,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.957222,
+						-23.145833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500051039,
+					"municipio": "São José dos Campos",
+					"profundida": 240,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.958889,
+						-23.148333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500051099,
+					"municipio": "São José dos Campos",
+					"profundida": 101,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.965278,
+						-23.114166999999895
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500051951,
+					"municipio": "Jacareí",
+					"profundida": 80,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.951389,
+						-23.265832999999816
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052347,
+					"municipio": "Santa Isabel",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.272777999999846,
+						-23.287222
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052521,
+					"municipio": "Jacareí",
+					"profundida": 76,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.016944,
+						-23.30361099999982
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052522,
+					"municipio": "Jacareí",
+					"profundida": 81,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.007778,
+						-23.312778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052523,
+					"municipio": "Jacareí",
+					"profundida": 120,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.012221999999895,
+						-23.305556
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052524,
+					"municipio": "Jacareí",
+					"profundida": 88,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.005,
+						-23.311944
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052525,
+					"municipio": "Jacareí",
+					"profundida": 76,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.015,
+						-23.305556
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052526,
+					"municipio": "Jacareí",
+					"profundida": 94,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.008333,
+						-23.305556
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052528,
+					"municipio": "Jacareí",
+					"profundida": 120,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.05916699999989,
+						-23.26555599999989
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052530,
+					"municipio": "Jacareí",
+					"profundida": 94,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.016111,
+						-23.30361099999982
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052538,
+					"municipio": "Santa Isabel",
+					"profundida": 232.6,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.249722,
+						-23.281944
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052544,
+					"municipio": "Santa Isabel",
+					"profundida": 156,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.20722199999989,
+						-23.312778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052553,
+					"municipio": "Jacareí",
+					"profundida": 55,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.006667,
+						-23.296944
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052554,
+					"municipio": "Jacareí",
+					"profundida": 60,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.024444,
+						-23.301389
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052560,
+					"municipio": "Jacareí",
+					"profundida": 89,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.00972199999984,
+						-23.304722
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052564,
+					"municipio": "Jacareí",
+					"profundida": 105.6,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.014167,
+						-23.314444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052568,
+					"municipio": "Santa Isabel",
+					"profundida": 102,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.208055999999885,
+						-23.316111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052580,
+					"municipio": "Jacareí",
+					"profundida": 80,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.010278,
+						-23.30999999999989
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052581,
+					"municipio": "Jacareí",
+					"profundida": 94,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.966667,
+						-23.262221999999895
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052582,
+					"municipio": "Jacareí",
+					"profundida": 104,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.98,
+						-23.291111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052583,
+					"municipio": "Jacareí",
+					"profundida": 94,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.981389,
+						-23.288889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052584,
+					"municipio": "Jacareí",
+					"profundida": 105,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.981943999999885,
+						-23.288889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052587,
+					"municipio": "Jacareí",
+					"profundida": 75,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.970833,
+						-23.280833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052589,
+					"municipio": "Jacareí",
+					"profundida": 95,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.98,
+						-23.291111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052590,
+					"municipio": "Jacareí",
+					"profundida": 60,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.958611,
+						-23.2825
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052593,
+					"municipio": "Jacareí",
+					"profundida": 135,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.981667,
+						-23.278611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052597,
+					"municipio": "Jacareí",
+					"profundida": 70.5,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.987222,
+						-23.311111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052600,
+					"municipio": "Jacareí",
+					"profundida": 99,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.980833,
+						-23.285278
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052601,
+					"municipio": "Jacareí",
+					"profundida": 112,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.951389,
+						-23.288332999999852
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052605,
+					"municipio": "Jacareí",
+					"profundida": 25,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.951389,
+						-23.265832999999816
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052607,
+					"municipio": "Jacareí",
+					"profundida": 135,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.953889,
+						-23.27638899999988
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052610,
+					"municipio": "Jacareí",
+					"profundida": 126,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.950832999999875,
+						-23.289722
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052613,
+					"municipio": "Jacareí",
+					"profundida": 112,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.966944,
+						-23.262221999999895
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052614,
+					"municipio": "Jacareí",
+					"profundida": 90,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.962778,
+						-23.263055999999892
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052619,
+					"municipio": "Jacareí",
+					"profundida": 92,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.962778,
+						-23.263055999999892
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052625,
+					"municipio": "Jacareí",
+					"profundida": 105,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.98277799999988,
+						-23.286389
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052626,
+					"municipio": "Jacareí",
+					"profundida": 83.5,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.987222,
+						-23.286389
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052627,
+					"municipio": "Jacareí",
+					"profundida": 127,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.984722,
+						-23.285278
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052628,
+					"municipio": "Jacareí",
+					"profundida": 97,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.980277999999885,
+						-23.285278
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052629,
+					"municipio": "Jacareí",
+					"profundida": 75.5,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.974722,
+						-23.273333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052630,
+					"municipio": "Jacareí",
+					"profundida": 69,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.974722,
+						-23.272778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052631,
+					"municipio": "Jacareí",
+					"profundida": 96,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.981667,
+						-23.290278
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052632,
+					"municipio": "Jacareí",
+					"profundida": 106,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.98277799999988,
+						-23.2925
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052633,
+					"municipio": "Jacareí",
+					"profundida": 107,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.971667,
+						-23.281111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052635,
+					"municipio": "Jacareí",
+					"profundida": 102,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.971389,
+						-23.280556
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052636,
+					"municipio": "Jacareí",
+					"profundida": 88,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.97027799999984,
+						-23.279444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052637,
+					"municipio": "Jacareí",
+					"profundida": 75,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.970556,
+						-23.28999999999985
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052638,
+					"municipio": "Jacareí",
+					"profundida": 76.3,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.981943999999885,
+						-23.310556
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052645,
+					"municipio": "Jacareí",
+					"profundida": 76.4,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.998611,
+						-23.314722
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052647,
+					"municipio": "Jacareí",
+					"profundida": 96,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.953056,
+						-23.289444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052651,
+					"municipio": "Jacareí",
+					"profundida": 97.5,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.977222,
+						-23.280556
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052652,
+					"municipio": "Jacareí",
+					"profundida": 76.6,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.974443999999835,
+						-23.281111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052654,
+					"municipio": "Jacareí",
+					"profundida": 124,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.953889,
+						-23.291389
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052655,
+					"municipio": "Jacareí",
+					"profundida": 119,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.951389,
+						-23.272778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052658,
+					"municipio": "Jacareí",
+					"profundida": 153.1,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.952778,
+						-23.2925
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052659,
+					"municipio": "Jacareí",
+					"profundida": 104.4,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.953611,
+						-23.292778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052662,
+					"municipio": "Jacareí",
+					"profundida": 252,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.955,
+						-23.293611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052663,
+					"municipio": "Jacareí",
+					"profundida": 130,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.954167,
+						-23.291389
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052664,
+					"municipio": "Jacareí",
+					"profundida": 100.5,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.980277999999885,
+						-23.291111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052666,
+					"municipio": "Jacareí",
+					"profundida": 84,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.972777999999835,
+						-23.273333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052671,
+					"municipio": "Jacareí",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.950832999999875,
+						-23.261944
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052675,
+					"municipio": "Jacareí",
+					"profundida": 130,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.98277799999988,
+						-23.278611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052676,
+					"municipio": "Jacareí",
+					"profundida": 83,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.955,
+						-23.28916699999985
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052678,
+					"municipio": "Jacareí",
+					"profundida": 100,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.974167,
+						-23.293889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052679,
+					"municipio": "Jacareí",
+					"profundida": 102,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.956111,
+						-23.285278
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052680,
+					"municipio": "Jacareí",
+					"profundida": 180,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.981389,
+						-23.286389
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055381,
+					"municipio": "Jacareí",
+					"profundida": 120,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.011111,
+						-23.305556
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057615,
+					"municipio": "Igaratá",
+					"profundida": 190,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.18027799999987,
+						-23.198611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057616,
+					"municipio": "Igaratá",
+					"profundida": 220,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.127778,
+						-23.228889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057617,
+					"municipio": "Igaratá",
+					"profundida": 250,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.118889,
+						-23.216389
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057797,
+					"municipio": "Santa Isabel",
+					"profundida": 130,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.296389,
+						-23.30916699999989
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057848,
+					"municipio": "Jacareí",
+					"profundida": 160,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.010833,
+						-23.299166999999898
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057855,
+					"municipio": "Jacareí",
+					"profundida": 32,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.018333,
+						-23.299444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057856,
+					"municipio": "Jacareí",
+					"profundida": 120,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.055556,
+						-23.27555599999988
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057858,
+					"municipio": "Jacareí",
+					"profundida": 100,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.0175,
+						-23.301666999999895
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057859,
+					"municipio": "Jacareí",
+					"profundida": 100,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.0175,
+						-23.30111099999982
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057861,
+					"municipio": "Santa Isabel",
+					"profundida": 240,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.179722,
+						-23.275833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057872,
+					"municipio": "Jacareí",
+					"profundida": 24,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.950278,
+						-23.273333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057875,
+					"municipio": "Jacareí",
+					"profundida": 139.3,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.952222,
+						-23.270833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057878,
+					"municipio": "Jacareí",
+					"profundida": 92,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.98694399999988,
+						-23.28999999999985
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057879,
+					"municipio": "Jacareí",
+					"profundida": 97,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.986389,
+						-23.291389
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057880,
+					"municipio": "Jacareí",
+					"profundida": 90,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.98444399999988,
+						-23.293056
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057881,
+					"municipio": "Jacareí",
+					"profundida": 67,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.974722,
+						-23.276111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057883,
+					"municipio": "Jacareí",
+					"profundida": 6,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.980833,
+						-23.287778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057886,
+					"municipio": "Jacareí",
+					"profundida": 62,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.963056,
+						-23.301666999999895
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057887,
+					"municipio": "Jacareí",
+					"profundida": 6.5,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.981389,
+						-23.287778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057889,
+					"municipio": "Jacareí",
+					"profundida": 70,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.980277999999885,
+						-23.281389
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057890,
+					"municipio": "Jacareí",
+					"profundida": 75.5,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.974722,
+						-23.271667
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057891,
+					"municipio": "Jacareí",
+					"profundida": 190,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.972777999999835,
+						-23.272221999999886
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057896,
+					"municipio": "Jacareí",
+					"profundida": 84,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.97194399999984,
+						-23.271667
+					]
+				},
+				"structure": "Poço"
+			}
+		]
+	}

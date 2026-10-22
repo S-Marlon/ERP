@@ -1,0 +1,517 @@
+{
+	
+		"type": "FeatureCollection",
+		
+		"features": [
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100004536,
+					"municipio": "Camanducaia",
+					"profundida": 62,
+					"vazao": 22.5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.116666,
+						-22.741666
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100004537,
+					"municipio": "Camanducaia",
+					"profundida": 68,
+					"vazao": 4.1
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.118054999999856,
+						-22.7425
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100004538,
+					"municipio": "Camanducaia",
+					"profundida": 91,
+					"vazao": 21.82
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.118887999999856,
+						-22.743610999999873
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100004539,
+					"municipio": "Camanducaia",
+					"profundida": 106,
+					"vazao": 44.78
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.12,
+						-22.744443999999874
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100004540,
+					"municipio": "Camanducaia",
+					"profundida": 120,
+					"vazao": 4.5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.120833,
+						-22.745833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100004541,
+					"municipio": "Camanducaia",
+					"profundida": 100,
+					"vazao": 21.81
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.121944,
+						-22.746388
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100004542,
+					"municipio": "Cambuí",
+					"profundida": 84,
+					"vazao": 10.91
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.02722199999988,
+						-22.523055
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100005300,
+					"municipio": "Estiva",
+					"profundida": 72,
+					"vazao": 12
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.004166,
+						-22.516665999999873
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100005638,
+					"municipio": "Itapeva",
+					"profundida": 99,
+					"vazao": 7.88
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.223054999999874,
+						-22.76722199999989
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100005639,
+					"municipio": "Itapeva",
+					"profundida": 70,
+					"vazao": 6.26
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.223611,
+						-22.76722199999989
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100005640,
+					"municipio": "Itapeva",
+					"profundida": 80,
+					"vazao": 5.54
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.223333,
+						-22.7675
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100005641,
+					"municipio": "Itapeva",
+					"profundida": 100,
+					"vazao": 8.35
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.223887999999874,
+						-22.7675
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100005642,
+					"municipio": "Itapeva",
+					"profundida": 155,
+					"vazao": 8.78
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.223611,
+						-22.767777
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100006348,
+					"municipio": "Munhoz",
+					"profundida": 74,
+					"vazao": 12.16
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.35,
+						-22.6
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100006350,
+					"municipio": "Munhoz",
+					"profundida": 99,
+					"vazao": 1.8
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.35,
+						-22.600555
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100007294,
+					"municipio": "Senador Amaral",
+					"profundida": 97,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.1749999999999,
+						-22.5875
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100007295,
+					"municipio": "Senador Amaral",
+					"profundida": 93,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.1749999999999,
+						-22.587777
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100007296,
+					"municipio": "Senador Amaral",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.17527699999988,
+						-22.5875
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100017642,
+					"municipio": "Camanducaia",
+					"profundida": 150,
+					"vazao": 7.488
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.035,
+						-22.70583299999987
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100017643,
+					"municipio": "Camanducaia",
+					"profundida": 138,
+					"vazao": 5.616
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.118056,
+						-22.741943999999876
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100017680,
+					"municipio": "Cambuí",
+					"profundida": 0,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.057222,
+						-22.544722
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100017681,
+					"municipio": "Cambuí",
+					"profundida": 0,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.05916699999989,
+						-22.545556
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100017682,
+					"municipio": "Cambuí",
+					"profundida": 0,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.05999999999989,
+						-22.545277999999882
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100017683,
+					"municipio": "Cambuí",
+					"profundida": 120,
+					"vazao": 11.99
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.05916599999989,
+						-22.544722
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100018611,
+					"municipio": "Itapeva",
+					"profundida": 0,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.220833,
+						-22.767778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100020136,
+					"municipio": "Itapeva",
+					"profundida": 150,
+					"vazao": 6.3
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.225833,
+						-22.66
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100021073,
+					"municipio": "Camanducaia",
+					"profundida": 150,
+					"vazao": 7.2
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.035556,
+						-22.703889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100021482,
+					"municipio": "Itapeva",
+					"profundida": 150,
+					"vazao": 3.42
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.195833,
+						-22.706111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100022170,
+					"municipio": "Camanducaia",
+					"profundida": 150,
+					"vazao": 21.16
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.14083299999987,
+						-22.755833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100022459,
+					"municipio": "Senador Amaral",
+					"profundida": 150,
+					"vazao": 14.4
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.173889,
+						-22.587221999999883
+					]
+				},
+				"structure": "Poço"
+			}
+		]
+	}

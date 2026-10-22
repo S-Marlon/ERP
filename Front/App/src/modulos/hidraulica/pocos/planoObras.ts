@@ -36,9 +36,9 @@ export const FUNCIONALIDADES: Funcionalidade[] = [
       'Camada de potencial hídrico que liga e desliga (e o satélite)',
       'Ao clicar num ponto: poços num raio, profundidade média/mediana/faixa, vazão média e o potencial do local',
       'Estimativa de metros para a obra nova; clicar no poço mostra o cliente e abre a obra',
-      'Importação dos GeoJSON do maperf (regiões novas a qualquer hora, sem duplicar)',
+      'Referência e potencial lidos direto dos GeoJSON do maperf (fora do banco): região nova é só pôr o arquivo na pasta',
     ],
-    dados: ['poços de referência (origem, município, GPS, profundidade, vazão)', 'potencial hídrico (grade por região)'],
+    dados: ['(no banco, só os poços dos clientes; a base pública fica nos arquivos do maperf)'],
     ligaCom: ['Obras e poços (etapa 1)', 'Orçamento da obra (etapa 3)'],
   },
   {

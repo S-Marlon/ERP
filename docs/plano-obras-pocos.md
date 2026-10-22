@@ -39,11 +39,12 @@ pelas etapas abaixo, ligado ao resto do ERP.
   guardado como JSON para as impressões continuarem iguais).
 
 ## Etapa 2 (mapa regional)
-- `modulo_hidraulica_pocos_referencias`: poços da base pública (o maperf), **nunca misturados** com os poços dos
-  clientes. Vazão em m³/h como na origem (os nossos ficam em L/h).
-- `modulo_hidraulica_pocos_potencial`: a grade de potencial hídrico do maperf, um retângulo por linha.
-- Os dados entram pela tela (Importar GeoJSON): o arquivo é reconhecido sozinho (pontos = poços, polígonos = potencial)
-  e importar de novo atualiza sem duplicar. Regiões podem ser retiradas.
+- A base pública (poços de referência e potencial hídrico) **não vai para o banco** (decisão do dono): o servidor lê
+  os GeoJSON do maperf direto da pasta `Backend/dados/maperf` (ou `MAPERF_DIR` no `.env`, que pode apontar para a
+  pasta do próprio maperf), nas subpastas `get_pocos_with_center` e `get_hydric_potential_raster_with_center`.
+  Guarda em memória e relê quando um arquivo muda. O banco fica só com os poços dos clientes; nunca se misturam.
+- O tipo do arquivo é reconhecido pela geometria (pontos = poços, polígonos = potencial). Vazão da referência em m³/h
+  (como na origem); a dos nossos poços em L/h.
 - Camadas ligam e desligam (poços dos clientes, referência, potencial, satélite); a escolha fica no navegador.
 - Análise de um raio (padrão 2 km): quantidade, profundidade média/mediana/faixa, vazão média e o potencial do ponto.
   A sugestão de metros para o orçamento é a mediana arredondada para cima de 10 em 10 m (regra em `mapa.ts`).

@@ -54,8 +54,10 @@ export interface PocoNoMapa {
 export type ReferenciaNoMapa = [number, number, number, number | null, number | null, string | null];
 /** [latMin, latMax, lonMin, lonMax, valor] */
 export type CelulaPotencial = [number, number, number, number, number];
+/** De onde vêm as camadas: os GeoJSON do maperf lidos pelo servidor (fora do banco) e os nossos poços (banco). */
 export interface ResumoMapa {
-  referencias: { regiao: string; quantidade: number }[]; potencial: { regiao: string; quantidade: number }[]; nossos: { total: number; comGps: number };
+  pasta: string; arquivos: { caminho: string; tipo: 'POCOS' | 'POTENCIAL'; regiao: string; quantidade: number }[]; erros: string[];
+  referencias: number; potencial: number; nossos: { total: number; comGps: number };
 }
 export interface AnaliseRegiao {
   latitude: number; longitude: number; raioM: number; quantidade: number; nossos: number; profundidadeMedia: number | null; profundidadeMediana: number | null;
@@ -98,10 +100,6 @@ export const obrasApi = {
   mapaPotencial: () => pedir<CelulaPotencial[]>(`${API}/mapa/potencial?tenant_id=1`, undefined, 'Erro ao carregar o potencial hídrico.'),
   analisar: (latitude: number, longitude: number, raio: number) =>
     pedir<AnaliseRegiao>(`${API}/mapa/analise?${q({ lat: latitude, lon: longitude, raio })}`, undefined, 'Erro ao analisar a região.'),
-  importar: (arquivo: string, geojson: unknown) =>
-    pedir<{ tipo: 'POCOS' | 'POTENCIAL'; regiao: string; gravados: number }>(`${API}/mapa/importar?tenant_id=1`, corpo('POST', { arquivo, geojson }), 'Erro ao importar o arquivo.'),
-  removerImportacao: (tipo: 'POCOS' | 'POTENCIAL', regiao: string) =>
-    pedir<{ removidos: number }>(`${API}/mapa/importacoes?${q({ tipo, regiao })}`, { method: 'DELETE' }, 'Erro ao remover a região.'),
 };
 
 /** Telefone guardado só com dígitos → "(11) 99876-5432". */

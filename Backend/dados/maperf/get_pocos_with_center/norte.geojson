@@ -1,0 +1,5309 @@
+{
+	"type": "FeatureCollection",
+		"features": [
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100006349,
+					"municipio": "Munhoz",
+					"profundida": 70,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.350277,
+						-22.6
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100006351,
+					"municipio": "Munhoz",
+					"profundida": 99,
+					"vazao": 2.19
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.350555,
+						-22.6
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100007084,
+					"municipio": "Toledo",
+					"profundida": 84,
+					"vazao": 11.05
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.375,
+						-22.733333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100007085,
+					"municipio": "Toledo",
+					"profundida": 90,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.375,
+						-22.733610999999883
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100007086,
+					"municipio": "Toledo",
+					"profundida": 80,
+					"vazao": 4.21
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.375,
+						-22.733888
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100007088,
+					"municipio": "Toledo",
+					"profundida": 66,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.426388,
+						-22.733888
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3100007089,
+					"municipio": "Toledo",
+					"profundida": 108,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.426388,
+						-22.733610999999883
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003614,
+					"municipio": "Serra Negra",
+					"profundida": 150,
+					"vazao": 8.82
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.699166,
+						-22.61
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003615,
+					"municipio": "Serra Negra",
+					"profundida": 250,
+					"vazao": 8
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.698611,
+						-22.610833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003616,
+					"municipio": "Serra Negra",
+					"profundida": 41,
+					"vazao": 3.5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.70388799999989,
+						-22.605277
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003617,
+					"municipio": "Serra Negra",
+					"profundida": 99,
+					"vazao": 11.43
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.706111,
+						-22.600833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003618,
+					"municipio": "Serra Negra",
+					"profundida": 55,
+					"vazao": 0.9
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.703333,
+						-22.600833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003619,
+					"municipio": "Serra Negra",
+					"profundida": 96,
+					"vazao": 4.96
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.699166,
+						-22.614722
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003620,
+					"municipio": "Serra Negra",
+					"profundida": 60,
+					"vazao": 6
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.718611,
+						-22.618610999999817
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003621,
+					"municipio": "Serra Negra",
+					"profundida": 93,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.728055,
+						-22.634444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003622,
+					"municipio": "Serra Negra",
+					"profundida": 26,
+					"vazao": 1
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.726666,
+						-22.634444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003623,
+					"municipio": "Serra Negra",
+					"profundida": 30,
+					"vazao": 2.8
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.735277,
+						-22.637777
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003624,
+					"municipio": "Serra Negra",
+					"profundida": 0,
+					"vazao": 2.88
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.736388,
+						-22.635277
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003625,
+					"municipio": "Serra Negra",
+					"profundida": 30,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.735833,
+						-22.636944
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003626,
+					"municipio": "Serra Negra",
+					"profundida": 30,
+					"vazao": 0.2
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.734444,
+						-22.6375
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003627,
+					"municipio": "Serra Negra",
+					"profundida": 27,
+					"vazao": 1
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.731111,
+						-22.638333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003628,
+					"municipio": "Serra Negra",
+					"profundida": 23,
+					"vazao": 2.57
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.72999999999985,
+						-22.639443999999855
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003629,
+					"municipio": "Serra Negra",
+					"profundida": 36,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.73166599999985,
+						-22.6425
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003630,
+					"municipio": "Serra Negra",
+					"profundida": 90,
+					"vazao": 9
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.71888799999988,
+						-22.61
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003631,
+					"municipio": "Serra Negra",
+					"profundida": 230,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.702777,
+						-22.596666
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003632,
+					"municipio": "Serra Negra",
+					"profundida": 60,
+					"vazao": 3
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.718611,
+						-22.612777
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003633,
+					"municipio": "Serra Negra",
+					"profundida": 103,
+					"vazao": 8.5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.713611,
+						-22.61
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003634,
+					"municipio": "Serra Negra",
+					"profundida": 106,
+					"vazao": 19
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.714166,
+						-22.609166
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003635,
+					"municipio": "Serra Negra",
+					"profundida": 70,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.736944,
+						-22.610277
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003636,
+					"municipio": "Serra Negra",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.7383329999999,
+						-22.630555
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003637,
+					"municipio": "Serra Negra",
+					"profundida": 120,
+					"vazao": 2.75
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.724444,
+						-22.624999999999886
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003638,
+					"municipio": "Serra Negra",
+					"profundida": 43,
+					"vazao": 7.6
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.700833,
+						-22.631111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003639,
+					"municipio": "Serra Negra",
+					"profundida": 300,
+					"vazao": 3.6
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.715,
+						-22.611111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003640,
+					"municipio": "Lindóia",
+					"profundida": 132,
+					"vazao": 8
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.66,
+						-22.522777
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003641,
+					"municipio": "Lindóia",
+					"profundida": 49,
+					"vazao": 7.5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.651388,
+						-22.51916599999987
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003645,
+					"municipio": "Lindóia",
+					"profundida": 100,
+					"vazao": 2
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.637777,
+						-22.526944
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003646,
+					"municipio": "Lindóia",
+					"profundida": 100,
+					"vazao": 11.5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.63666599999988,
+						-22.523888
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003647,
+					"municipio": "Serra Negra",
+					"profundida": 347,
+					"vazao": 8
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.670833,
+						-22.566666
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003648,
+					"municipio": "Serra Negra",
+					"profundida": 80,
+					"vazao": 5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.67277699999988,
+						-22.568054999999845
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003649,
+					"municipio": "Serra Negra",
+					"profundida": 80,
+					"vazao": 2.7
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.670833,
+						-22.565555
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003650,
+					"municipio": "Serra Negra",
+					"profundida": 200,
+					"vazao": 12.47
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.66361099999989,
+						-22.570833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003651,
+					"municipio": "Serra Negra",
+					"profundida": 100,
+					"vazao": 3
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.67277699999988,
+						-22.570833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003652,
+					"municipio": "Serra Negra",
+					"profundida": 69,
+					"vazao": 1.3
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.672222,
+						-22.570554999999842
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003653,
+					"municipio": "Serra Negra",
+					"profundida": 53,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.663888,
+						-22.565833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003654,
+					"municipio": "Serra Negra",
+					"profundida": 45,
+					"vazao": 1.26
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.723055,
+						-22.62277699999987
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003655,
+					"municipio": "Serra Negra",
+					"profundida": 55,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.721944,
+						-22.621388
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003656,
+					"municipio": "Serra Negra",
+					"profundida": 143,
+					"vazao": 12
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.720555,
+						-22.61999999999989
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003657,
+					"municipio": "Lindóia",
+					"profundida": 261,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.653333,
+						-22.535
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003658,
+					"municipio": "Monte Alegre do Sul",
+					"profundida": 60,
+					"vazao": 5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.691111,
+						-22.705555
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003663,
+					"municipio": "Monte Alegre do Sul",
+					"profundida": 120,
+					"vazao": 3
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.69,
+						-22.706111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003664,
+					"municipio": "Monte Alegre do Sul",
+					"profundida": 50,
+					"vazao": 24
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.679443999999876,
+						-22.679722
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003665,
+					"municipio": "Monte Alegre do Sul",
+					"profundida": 61,
+					"vazao": 4.5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.6775,
+						-22.67722199999986
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003666,
+					"municipio": "Monte Alegre do Sul",
+					"profundida": 50,
+					"vazao": 4.8
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.678055,
+						-22.691665999999827
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003667,
+					"municipio": "Monte Alegre do Sul",
+					"profundida": 60,
+					"vazao": 2
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.687777,
+						-22.689444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003668,
+					"municipio": "Monte Alegre do Sul",
+					"profundida": 41,
+					"vazao": 11.2
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.67611099999988,
+						-22.689444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003669,
+					"municipio": "Amparo",
+					"profundida": 107,
+					"vazao": 30
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.718333,
+						-22.698888999999895
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003670,
+					"municipio": "Amparo",
+					"profundida": 115,
+					"vazao": 4.8
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.721111,
+						-22.696111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003671,
+					"municipio": "Amparo",
+					"profundida": 100,
+					"vazao": 1.56
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.725277,
+						-22.69666599999988
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003672,
+					"municipio": "Amparo",
+					"profundida": 50,
+					"vazao": 2
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.725277,
+						-22.69499999999988
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003673,
+					"municipio": "Amparo",
+					"profundida": 121.3,
+					"vazao": 5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.734722,
+						-22.694444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003674,
+					"municipio": "Amparo",
+					"profundida": 204,
+					"vazao": 5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.7374999999999,
+						-22.687222
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003675,
+					"municipio": "Amparo",
+					"profundida": 100,
+					"vazao": 4
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.74277699999982,
+						-22.684722
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003676,
+					"municipio": "Amparo",
+					"profundida": 70,
+					"vazao": 1
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.74527699999982,
+						-22.683888
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003677,
+					"municipio": "Amparo",
+					"profundida": 50,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.748055,
+						-22.688888
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003678,
+					"municipio": "Monte Alegre do Sul",
+					"profundida": 0,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.62999999999988,
+						-22.734166
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003679,
+					"municipio": "Monte Alegre do Sul",
+					"profundida": 100,
+					"vazao": 17
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.636111,
+						-22.719722
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003680,
+					"municipio": "Monte Alegre do Sul",
+					"profundida": 343,
+					"vazao": 5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.629165999999884,
+						-22.707222
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003681,
+					"municipio": "Monte Alegre do Sul",
+					"profundida": 55,
+					"vazao": 9
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.683889,
+						-22.750833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003682,
+					"municipio": "Monte Alegre do Sul",
+					"profundida": 90,
+					"vazao": 3.2
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.674166,
+						-22.691944
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003683,
+					"municipio": "Monte Alegre do Sul",
+					"profundida": 100,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.67277699999988,
+						-22.689444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003684,
+					"municipio": "Socorro",
+					"profundida": 70,
+					"vazao": 24
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.545555,
+						-22.585277
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003685,
+					"municipio": "Socorro",
+					"profundida": 60,
+					"vazao": 9
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.532222,
+						-22.565
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003686,
+					"municipio": "Socorro",
+					"profundida": 130,
+					"vazao": 10.8
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.543888,
+						-22.563611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003687,
+					"municipio": "Socorro",
+					"profundida": 110.5,
+					"vazao": 4.2
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.532222,
+						-22.621388
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003688,
+					"municipio": "Pinhalzinho",
+					"profundida": 91,
+					"vazao": 6
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.568888,
+						-22.743055
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003689,
+					"municipio": "Socorro",
+					"profundida": 87,
+					"vazao": 15
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.535555,
+						-22.635
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003690,
+					"municipio": "Socorro",
+					"profundida": 70,
+					"vazao": 36
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.569444,
+						-22.5575
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003691,
+					"municipio": "Socorro",
+					"profundida": 93,
+					"vazao": 7.5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.54861099999982,
+						-22.563611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003692,
+					"municipio": "Socorro",
+					"profundida": 60,
+					"vazao": 40
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.532777,
+						-22.568054999999845
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003693,
+					"municipio": "Socorro",
+					"profundida": 65,
+					"vazao": 10
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.53,
+						-22.596666
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003694,
+					"municipio": "Socorro",
+					"profundida": 100,
+					"vazao": 12
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.5225,
+						-22.526388
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003695,
+					"municipio": "Amparo",
+					"profundida": 215,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.725,
+						-22.67388899999986
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003696,
+					"municipio": "Amparo",
+					"profundida": 63,
+					"vazao": 4
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.725833,
+						-22.672778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003697,
+					"municipio": "Serra Negra",
+					"profundida": 21,
+					"vazao": 4
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.658888,
+						-22.553610999999876
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003698,
+					"municipio": "Serra Negra",
+					"profundida": 26,
+					"vazao": 4.3
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.708333,
+						-22.620555
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003699,
+					"municipio": "Serra Negra",
+					"profundida": 0,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.71,
+						-22.623888
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003700,
+					"municipio": "Serra Negra",
+					"profundida": 45,
+					"vazao": 5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.725833,
+						-22.61611099999982
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003701,
+					"municipio": "Serra Negra",
+					"profundida": 150,
+					"vazao": 0.4
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.69,
+						-22.624444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003702,
+					"municipio": "Monte Alegre do Sul",
+					"profundida": 92,
+					"vazao": 6.3
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.678055,
+						-22.686388
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003703,
+					"municipio": "Monte Alegre do Sul",
+					"profundida": 100,
+					"vazao": 7
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.62416599999983,
+						-22.723888
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500003704,
+					"municipio": "Lindóia",
+					"profundida": 150,
+					"vazao": 3
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.64166599999987,
+						-22.525
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500004256,
+					"municipio": "Lindóia",
+					"profundida": 20,
+					"vazao": 7.2
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.635555,
+						-22.525
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500004968,
+					"municipio": "Monte Alegre do Sul",
+					"profundida": 49,
+					"vazao": 5.5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.678610999999876,
+						-22.691665999999827
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500004969,
+					"municipio": "Amparo",
+					"profundida": 121,
+					"vazao": 4.4
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.727777,
+						-22.692777
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500006371,
+					"municipio": "Bragança Paulista",
+					"profundida": 0,
+					"vazao": 2.5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.554722,
+						-22.843055
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500006372,
+					"municipio": "Bragança Paulista",
+					"profundida": 23,
+					"vazao": 1.6
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.547222,
+						-22.855555
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500006373,
+					"municipio": "Bragança Paulista",
+					"profundida": 22,
+					"vazao": 1.5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.547222,
+						-22.856110999999885
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500006374,
+					"municipio": "Bragança Paulista",
+					"profundida": 142,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.530555,
+						-22.861666
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500006375,
+					"municipio": "Bragança Paulista",
+					"profundida": 142,
+					"vazao": 6
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.5325,
+						-22.8625
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500006376,
+					"municipio": "Bragança Paulista",
+					"profundida": 120,
+					"vazao": 3.8
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.600277,
+						-22.89305499999989
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500006377,
+					"municipio": "Bragança Paulista",
+					"profundida": 250,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.612777,
+						-22.884721999999897
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500006378,
+					"municipio": "Bragança Paulista",
+					"profundida": 100,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.617777,
+						-22.885277
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500007228,
+					"municipio": "Tuiuti",
+					"profundida": 115,
+					"vazao": 19
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.696111,
+						-22.808055
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500007229,
+					"municipio": "Tuiuti",
+					"profundida": 150,
+					"vazao": 21.4
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.725,
+						-22.85194399999989
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500007230,
+					"municipio": "Tuiuti",
+					"profundida": 141,
+					"vazao": 16.5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.64666599999987,
+						-22.831666
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500007277,
+					"municipio": "Pedra Bela",
+					"profundida": 180,
+					"vazao": 20
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.439722,
+						-22.792222
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500007278,
+					"municipio": "Pedra Bela",
+					"profundida": 140,
+					"vazao": 7
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.443611,
+						-22.789444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500007855,
+					"municipio": "Serra Negra",
+					"profundida": 168,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.616944,
+						-22.5475
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500007856,
+					"municipio": "Serra Negra",
+					"profundida": 120,
+					"vazao": 8.1
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.623611,
+						-22.5475
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500007857,
+					"municipio": "Serra Negra",
+					"profundida": 223,
+					"vazao": 18.4
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.669443999999885,
+						-22.569721999999842
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500007858,
+					"municipio": "Serra Negra",
+					"profundida": 180,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.7391659999999,
+						-22.626665999999886
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500007860,
+					"municipio": "Serra Negra",
+					"profundida": 120,
+					"vazao": 3.27
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.737777,
+						-22.624722
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500010321,
+					"municipio": "Socorro",
+					"profundida": 183,
+					"vazao": 2
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.531111,
+						-22.596666
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500010322,
+					"municipio": "Socorro",
+					"profundida": 29,
+					"vazao": 12
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.531666,
+						-22.596666
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500029488,
+					"municipio": "Pinhalzinho",
+					"profundida": 170,
+					"vazao": 1
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.55027799999982,
+						-22.782221999999877
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500029489,
+					"municipio": "Bragança Paulista",
+					"profundida": 200,
+					"vazao": 24
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.54944399999982,
+						-22.901389
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500029491,
+					"municipio": "Tuiuti",
+					"profundida": 150,
+					"vazao": 3.13
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.678333,
+						-22.793889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500029493,
+					"municipio": "Pinhalzinho",
+					"profundida": 152,
+					"vazao": 5.2
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.561944,
+						-22.785833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500029508,
+					"municipio": "Bragança Paulista",
+					"profundida": 220,
+					"vazao": 0.14
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.595,
+						-22.90333299999986
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500029519,
+					"municipio": "Vargem",
+					"profundida": 230,
+					"vazao": 0.25
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.40388899999988,
+						-22.913056
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500029885,
+					"municipio": "Socorro",
+					"profundida": 110,
+					"vazao": 10.42
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.51555599999989,
+						-22.595556
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500029886,
+					"municipio": "Monte Alegre do Sul",
+					"profundida": 160,
+					"vazao": 5.14
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.680556,
+						-22.689444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500029887,
+					"municipio": "Monte Alegre do Sul",
+					"profundida": 160,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.668610999999885,
+						-22.664167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500029888,
+					"municipio": "Monte Alegre do Sul",
+					"profundida": 130,
+					"vazao": 20
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.645278,
+						-22.709999999999866
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500029889,
+					"municipio": "Serra Negra",
+					"profundida": 50,
+					"vazao": 4.8
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.70222199999989,
+						-22.639722
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500029890,
+					"municipio": "Socorro",
+					"profundida": 100,
+					"vazao": 9.73
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.528056,
+						-22.575
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500029891,
+					"municipio": "Socorro",
+					"profundida": 170,
+					"vazao": 60
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.536111,
+						-22.637222
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500029892,
+					"municipio": "Serra Negra",
+					"profundida": 175,
+					"vazao": 6.54
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.624722,
+						-22.603611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500031166,
+					"municipio": "Serra Negra",
+					"profundida": 50,
+					"vazao": 7.92
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.651667,
+						-22.566944
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500031167,
+					"municipio": "Monte Alegre do Sul",
+					"profundida": 70,
+					"vazao": 10
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.638332999999875,
+						-22.713332999999864
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500031168,
+					"municipio": "Serra Negra",
+					"profundida": 154,
+					"vazao": 5.38
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.691944,
+						-22.628889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500031169,
+					"municipio": "Socorro",
+					"profundida": 100,
+					"vazao": 1.02
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.5225,
+						-22.61527799999982
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500031170,
+					"municipio": "Socorro",
+					"profundida": 60,
+					"vazao": 8.6
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.533056,
+						-22.62027799999987
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500031171,
+					"municipio": "Socorro",
+					"profundida": 60,
+					"vazao": 4.5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.538611,
+						-22.566388999999845
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500031210,
+					"municipio": "Pinhalzinho",
+					"profundida": 180,
+					"vazao": 8
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.5508329999999,
+						-22.783055999999874
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500031212,
+					"municipio": "Pinhalzinho",
+					"profundida": 10,
+					"vazao": 0.01
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.538056,
+						-22.779444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500031346,
+					"municipio": "Monte Alegre do Sul",
+					"profundida": 105,
+					"vazao": 1.88
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.678889,
+						-22.678056
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500047423,
+					"municipio": "Serra Negra",
+					"profundida": 114,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.63083299999988,
+						-22.554443999999876
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048186,
+					"municipio": "Serra Negra",
+					"profundida": 102,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.738056,
+						-22.64
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048203,
+					"municipio": "Socorro",
+					"profundida": 80,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.527222,
+						-22.581944
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048204,
+					"municipio": "Socorro",
+					"profundida": 67,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.535556,
+						-22.635
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048205,
+					"municipio": "Serra Negra",
+					"profundida": 50,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.733889,
+						-22.638333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048206,
+					"municipio": "Socorro",
+					"profundida": 80,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.535278,
+						-22.635
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048207,
+					"municipio": "Socorro",
+					"profundida": 100,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.510555999999895,
+						-22.61
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048208,
+					"municipio": "Serra Negra",
+					"profundida": 100,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.71138899999988,
+						-22.650555999999824
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048209,
+					"municipio": "Socorro",
+					"profundida": 160,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.55611099999987,
+						-22.69166699999988
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048212,
+					"municipio": "Serra Negra",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.735,
+						-22.633889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048213,
+					"municipio": "Socorro",
+					"profundida": 102,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.543333,
+						-22.580555999999888
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048214,
+					"municipio": "Serra Negra",
+					"profundida": 90,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.728056,
+						-22.638333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048215,
+					"municipio": "Socorro",
+					"profundida": 100,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.5325,
+						-22.617222
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048216,
+					"municipio": "Socorro",
+					"profundida": 65,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.53,
+						-22.59138899999988
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048217,
+					"municipio": "Socorro",
+					"profundida": 102,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.543333,
+						-22.580555999999888
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048218,
+					"municipio": "Socorro",
+					"profundida": 61.5,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.544722,
+						-22.581111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048219,
+					"municipio": "Socorro",
+					"profundida": 4,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.581944,
+						-22.595
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048220,
+					"municipio": "Socorro",
+					"profundida": 170,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.5675,
+						-22.670833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048221,
+					"municipio": "Socorro",
+					"profundida": 66,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.540556,
+						-22.580832999999814
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048222,
+					"municipio": "Socorro",
+					"profundida": 136,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.537778,
+						-22.577221999999892
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048223,
+					"municipio": "Socorro",
+					"profundida": 90,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.537778,
+						-22.5775
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048224,
+					"municipio": "Socorro",
+					"profundida": 173.2,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.537778,
+						-22.579166999999813
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048225,
+					"municipio": "Socorro",
+					"profundida": 134,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.536389,
+						-22.577778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048226,
+					"municipio": "Lindóia",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.648056,
+						-22.528056
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048227,
+					"municipio": "Lindóia",
+					"profundida": 220,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.659722,
+						-22.541943999999887
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048228,
+					"municipio": "Pinhalzinho",
+					"profundida": 160,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.615278,
+						-22.736389
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048229,
+					"municipio": "Pinhalzinho",
+					"profundida": 168,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.57111099999986,
+						-22.749167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048230,
+					"municipio": "Amparo",
+					"profundida": 60,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.734722,
+						-22.706944
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048231,
+					"municipio": "Amparo",
+					"profundida": 5,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.714444,
+						-22.703332999999873
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048232,
+					"municipio": "Socorro",
+					"profundida": 225,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.58722199999983,
+						-22.604999999999848
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048233,
+					"municipio": "Monte Alegre do Sul",
+					"profundida": 65,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.679167,
+						-22.678889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048234,
+					"municipio": "Socorro",
+					"profundida": 100,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.529444,
+						-22.553610999999876
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048235,
+					"municipio": "Socorro",
+					"profundida": 80,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.536111,
+						-22.553889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048236,
+					"municipio": "Socorro",
+					"profundida": 181,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.581111,
+						-22.525278
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048237,
+					"municipio": "Serra Negra",
+					"profundida": 250,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.698611,
+						-22.608333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048238,
+					"municipio": "Lindóia",
+					"profundida": 168.5,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.666667,
+						-22.51833299999987
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048240,
+					"municipio": "Lindóia",
+					"profundida": 90,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.67027799999988,
+						-22.526389
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048241,
+					"municipio": "Lindóia",
+					"profundida": 96,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.668610999999885,
+						-22.520832999999868
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048242,
+					"municipio": "Amparo",
+					"profundida": 121,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.727222,
+						-22.6930559999999
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048243,
+					"municipio": "Lindóia",
+					"profundida": 183.9,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.667777999999885,
+						-22.517778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048245,
+					"municipio": "Monte Alegre do Sul",
+					"profundida": 168,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.677777999999876,
+						-22.67638899999986
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048246,
+					"municipio": "Socorro",
+					"profundida": 72,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.564444,
+						-22.698888999999895
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048247,
+					"municipio": "Socorro",
+					"profundida": 78,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.598889,
+						-22.710832999999866
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048253,
+					"municipio": "Amparo",
+					"profundida": 100,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.723889,
+						-22.722777999999835
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048257,
+					"municipio": "Pinhalzinho",
+					"profundida": 9,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.563889,
+						-22.734167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048258,
+					"municipio": "Socorro",
+					"profundida": 100,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.530278,
+						-22.611944
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048259,
+					"municipio": "Serra Negra",
+					"profundida": 70,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.7025,
+						-22.611389
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048260,
+					"municipio": "Serra Negra",
+					"profundida": 240,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.6972219999999,
+						-22.608611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048261,
+					"municipio": "Serra Negra",
+					"profundida": 13,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.715278,
+						-22.650833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048262,
+					"municipio": "Serra Negra",
+					"profundida": 300,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.701944,
+						-22.568333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048263,
+					"municipio": "Serra Negra",
+					"profundida": 120,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.698055999999895,
+						-22.611944
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048264,
+					"municipio": "Amparo",
+					"profundida": 200,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.683333,
+						-22.748056
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048265,
+					"municipio": "Serra Negra",
+					"profundida": 140,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.713333,
+						-22.607778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048266,
+					"municipio": "Serra Negra",
+					"profundida": 90,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.716667,
+						-22.606944
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048267,
+					"municipio": "Socorro",
+					"profundida": 60,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.526667,
+						-22.539722
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048268,
+					"municipio": "Serra Negra",
+					"profundida": 60,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.723333,
+						-22.629167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048269,
+					"municipio": "Serra Negra",
+					"profundida": 100,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.624999999999886,
+						-22.553056
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048270,
+					"municipio": "Serra Negra",
+					"profundida": 80,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.718333,
+						-22.6527779999999
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048271,
+					"municipio": "Amparo",
+					"profundida": 156,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.681389,
+						-22.738333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048272,
+					"municipio": "Socorro",
+					"profundida": 236,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.54777799999982,
+						-22.585278
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048273,
+					"municipio": "Socorro",
+					"profundida": 67,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.516111,
+						-22.595833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048276,
+					"municipio": "Socorro",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.511388999999895,
+						-22.5975
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048277,
+					"municipio": "Amparo",
+					"profundida": 50,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.747778,
+						-22.70416699999987
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048278,
+					"municipio": "Socorro",
+					"profundida": 105,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.49,
+						-22.584721999999886
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048279,
+					"municipio": "Pedra Bela",
+					"profundida": 10,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.461389,
+						-22.7425
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500048280,
+					"municipio": "Pedra Bela",
+					"profundida": 20,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.438611,
+						-22.739443999999878
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049371,
+					"municipio": "Tuiuti",
+					"profundida": 168,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.684444,
+						-22.803889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049374,
+					"municipio": "Pinhalzinho",
+					"profundida": 33,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.56083299999989,
+						-22.785833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049375,
+					"municipio": "Amparo",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.688611,
+						-22.750833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049382,
+					"municipio": "Amparo",
+					"profundida": 200,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.690833,
+						-22.753889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049387,
+					"municipio": "Bragança Paulista",
+					"profundida": 140,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.611667,
+						-22.851389
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049390,
+					"municipio": "Bragança Paulista",
+					"profundida": 50,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.541111,
+						-22.856110999999885
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049393,
+					"municipio": "Bragança Paulista",
+					"profundida": 180,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.54777799999982,
+						-22.90166699999986
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049397,
+					"municipio": "Bragança Paulista",
+					"profundida": 162,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.526111,
+						-22.861944
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049400,
+					"municipio": "Pinhalzinho",
+					"profundida": 200,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.579167,
+						-22.774167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049411,
+					"municipio": "Bragança Paulista",
+					"profundida": 210,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.6,
+						-22.8975
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049414,
+					"municipio": "Amparo",
+					"profundida": 250,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.748889,
+						-22.774444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049415,
+					"municipio": "Bragança Paulista",
+					"profundida": 5,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.531667,
+						-22.9075
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049416,
+					"municipio": "Amparo",
+					"profundida": 96,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.749166999999886,
+						-22.806111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049426,
+					"municipio": "Pinhalzinho",
+					"profundida": 80,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.576389,
+						-22.783611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049431,
+					"municipio": "Pinhalzinho",
+					"profundida": 110,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.608611,
+						-22.793056
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049432,
+					"municipio": "Morungaba",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.725278,
+						-22.898611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049444,
+					"municipio": "Bragança Paulista",
+					"profundida": 204,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.531389,
+						-22.849167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049445,
+					"municipio": "Bragança Paulista",
+					"profundida": 9,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.545,
+						-22.911944
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049446,
+					"municipio": "Bragança Paulista",
+					"profundida": 7,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.544722,
+						-22.912222
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049447,
+					"municipio": "Bragança Paulista",
+					"profundida": 6,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.544722,
+						-22.911944
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049463,
+					"municipio": "Morungaba",
+					"profundida": 35,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.713611,
+						-22.892778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049464,
+					"municipio": "Amparo",
+					"profundida": 160,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.729722,
+						-22.782221999999877
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049466,
+					"municipio": "Bragança Paulista",
+					"profundida": 240,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.55583299999989,
+						-22.90416699999986
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049467,
+					"municipio": "Bragança Paulista",
+					"profundida": 200,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.608333,
+						-22.893889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049468,
+					"municipio": "Tuiuti",
+					"profundida": 180,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.695278,
+						-22.811111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049469,
+					"municipio": "Bragança Paulista",
+					"profundida": 70,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.538611,
+						-22.849167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049470,
+					"municipio": "Pinhalzinho",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.608333,
+						-22.751111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049472,
+					"municipio": "Bragança Paulista",
+					"profundida": 271,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.52,
+						-22.904722
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049475,
+					"municipio": "Pinhalzinho",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.58388899999983,
+						-22.764167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049476,
+					"municipio": "Pinhalzinho",
+					"profundida": 180,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.594443999999896,
+						-22.7625
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049477,
+					"municipio": "Bragança Paulista",
+					"profundida": 130,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.621389,
+						-22.89166699999987
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049478,
+					"municipio": "Bragança Paulista",
+					"profundida": 6,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.5911109999999,
+						-22.900278
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049479,
+					"municipio": "Tuiuti",
+					"profundida": 152,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.66111099999989,
+						-22.837778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049481,
+					"municipio": "Bragança Paulista",
+					"profundida": 6,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.5175,
+						-22.898056
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049482,
+					"municipio": "Bragança Paulista",
+					"profundida": 5,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.544444,
+						-22.8475
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049483,
+					"municipio": "Pinhalzinho",
+					"profundida": 285,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.556389,
+						-22.801111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049487,
+					"municipio": "Bragança Paulista",
+					"profundida": 225,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.617222,
+						-22.884444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049489,
+					"municipio": "Tuiuti",
+					"profundida": 9,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.695,
+						-22.844167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049490,
+					"municipio": "Tuiuti",
+					"profundida": 9,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.695278,
+						-22.844443999999896
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049497,
+					"municipio": "Bragança Paulista",
+					"profundida": 225,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.615556,
+						-22.883888999999897
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049498,
+					"municipio": "Bragança Paulista",
+					"profundida": 12,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.557222,
+						-22.845833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049499,
+					"municipio": "Bragança Paulista",
+					"profundida": 15,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.55499999999989,
+						-22.8475
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049501,
+					"municipio": "Bragança Paulista",
+					"profundida": 10,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.554443999999876,
+						-22.853056
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049502,
+					"municipio": "Pinhalzinho",
+					"profundida": 7,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.545278,
+						-22.81083299999989
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049505,
+					"municipio": "Pinhalzinho",
+					"profundida": 8,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.553332999999895,
+						-22.791389
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049506,
+					"municipio": "Bragança Paulista",
+					"profundida": 6,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.482222,
+						-22.880278
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049507,
+					"municipio": "Bragança Paulista",
+					"profundida": 7,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.534722,
+						-22.84472199999982
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049508,
+					"municipio": "Pinhalzinho",
+					"profundida": 17,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.642222,
+						-22.786389
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049509,
+					"municipio": "Bragança Paulista",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.636389,
+						-22.851667
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049510,
+					"municipio": "Bragança Paulista",
+					"profundida": 12,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.533889,
+						-22.8475
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049511,
+					"municipio": "Bragança Paulista",
+					"profundida": 9,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.545833,
+						-22.885555999999895
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049514,
+					"municipio": "Bragança Paulista",
+					"profundida": 141,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.613611,
+						-22.831667
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049517,
+					"municipio": "Vargem",
+					"profundida": 6,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.38111099999986,
+						-22.897222
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049523,
+					"municipio": "Vargem",
+					"profundida": 102,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.41722199999987,
+						-22.879999999999825
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049530,
+					"municipio": "Pedra Bela",
+					"profundida": 180,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.388611,
+						-22.76722199999989
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049532,
+					"municipio": "Vargem",
+					"profundida": 102,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.384167,
+						-22.876667
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049535,
+					"municipio": "Pedra Bela",
+					"profundida": 8,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.383333,
+						-22.788333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049538,
+					"municipio": "Bragança Paulista",
+					"profundida": 1,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.493889,
+						-22.894167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049540,
+					"municipio": "Bragança Paulista",
+					"profundida": 4,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.467777999999896,
+						-22.839722
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049542,
+					"municipio": "Vargem",
+					"profundida": 5,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.388056,
+						-22.8805559999999
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049546,
+					"municipio": "Vargem",
+					"profundida": 8,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.380833,
+						-22.8975
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049547,
+					"municipio": "Vargem",
+					"profundida": 7,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.380833,
+						-22.8975
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049552,
+					"municipio": "Bragança Paulista",
+					"profundida": 10,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.48,
+						-22.883888999999897
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049553,
+					"municipio": "Bragança Paulista",
+					"profundida": 17,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.467222,
+						-22.913611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049555,
+					"municipio": "Bragança Paulista",
+					"profundida": 15,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.49972199999985,
+						-22.90583299999986
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049556,
+					"municipio": "Pedra Bela",
+					"profundida": 8,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.480556,
+						-22.767778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049557,
+					"municipio": "Bragança Paulista",
+					"profundida": 15,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.48861099999988,
+						-22.892778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049559,
+					"municipio": "Bragança Paulista",
+					"profundida": 2,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.47777799999989,
+						-22.862778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049561,
+					"municipio": "Bragança Paulista",
+					"profundida": 38,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.448889,
+						-22.829167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500049566,
+					"municipio": "Pedra Bela",
+					"profundida": 8,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.491944,
+						-22.801666999999895
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500056953,
+					"municipio": "Serra Negra",
+					"profundida": 114,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.631944,
+						-22.564722
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057121,
+					"municipio": "Serra Negra",
+					"profundida": 102,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.720833,
+						-22.641110999999853
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057124,
+					"municipio": "Monte Alegre do Sul",
+					"profundida": 250,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.713333,
+						-22.696944
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057125,
+					"municipio": "Monte Alegre do Sul",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.704167,
+						-22.692222
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057126,
+					"municipio": "Monte Alegre do Sul",
+					"profundida": 250,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.706667,
+						-22.688889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057127,
+					"municipio": "Serra Negra",
+					"profundida": 102,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.698055999999895,
+						-22.641110999999853
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057128,
+					"municipio": "Socorro",
+					"profundida": 0.6,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.531944,
+						-22.61694399999982
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057129,
+					"municipio": "Serra Negra",
+					"profundida": 120,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.729722,
+						-22.638333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057130,
+					"municipio": "Serra Negra",
+					"profundida": 50,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.72999999999985,
+						-22.638056
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057131,
+					"municipio": "Socorro",
+					"profundida": 92,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.51388899999989,
+						-22.598056
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057132,
+					"municipio": "Monte Alegre do Sul",
+					"profundida": 49,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.678889,
+						-22.692222
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057133,
+					"municipio": "Socorro",
+					"profundida": 8,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.533889,
+						-22.62194399999987
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057134,
+					"municipio": "Socorro",
+					"profundida": 60,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.612222,
+						-22.703332999999873
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057135,
+					"municipio": "Socorro",
+					"profundida": 5,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.612222,
+						-22.703056
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057136,
+					"municipio": "Socorro",
+					"profundida": 5,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.613056,
+						-22.703332999999873
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057138,
+					"municipio": "Amparo",
+					"profundida": 200,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.692221999999845,
+						-22.748056
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057139,
+					"municipio": "Serra Negra",
+					"profundida": 80,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.718056,
+						-22.633333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057140,
+					"municipio": "Amparo",
+					"profundida": 144,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.705833,
+						-22.738056
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057142,
+					"municipio": "Socorro",
+					"profundida": 6,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.491111,
+						-22.56
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057316,
+					"municipio": "Morungaba",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.725278,
+						-22.898611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057317,
+					"municipio": "Bragança Paulista",
+					"profundida": 204,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.548889,
+						-22.912778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057318,
+					"municipio": "Morungaba",
+					"profundida": 35,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.714167,
+						-22.900556
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057325,
+					"municipio": "Bragança Paulista",
+					"profundida": 112,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.588333,
+						-22.908056
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057333,
+					"municipio": "Tuiuti",
+					"profundida": 115,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.696667,
+						-22.785556
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057336,
+					"municipio": "Bragança Paulista",
+					"profundida": 70,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.539722,
+						-22.875278
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057342,
+					"municipio": "Pedra Bela",
+					"profundida": 20,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.51472199999989,
+						-22.790833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057344,
+					"municipio": "Bragança Paulista",
+					"profundida": 5,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.634722,
+						-22.91611099999983
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057348,
+					"municipio": "Tuiuti",
+					"profundida": 25,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.678333,
+						-22.786667
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057351,
+					"municipio": "Bragança Paulista",
+					"profundida": 7,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.535556,
+						-22.866111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057352,
+					"municipio": "Pinhalzinho",
+					"profundida": 17,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.630278,
+						-22.786944
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057353,
+					"municipio": "Bragança Paulista",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.61,
+						-22.852777999999887
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057355,
+					"municipio": "Bragança Paulista",
+					"profundida": 141,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.648056,
+						-22.911667
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057380,
+					"municipio": "Vargem",
+					"profundida": 280,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.425,
+						-22.908333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057382,
+					"municipio": "Vargem",
+					"profundida": 12,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.458333,
+						-22.913333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057384,
+					"municipio": "Bragança Paulista",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.548889,
+						-22.908611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057385,
+					"municipio": "Vargem",
+					"profundida": 156,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.40472199999988,
+						-22.913056
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057386,
+					"municipio": "Bragança Paulista",
+					"profundida": 4,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.468333,
+						-22.840556
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057389,
+					"municipio": "Bragança Paulista",
+					"profundida": 38,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.537778,
+						-22.878333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057391,
+					"municipio": "Vargem",
+					"profundida": 24,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.3633329999999,
+						-22.910833
+					]
+				},
+				"structure": "Poço"
+			}
+		]
+	}

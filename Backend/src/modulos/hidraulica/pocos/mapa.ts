@@ -1,6 +1,6 @@
 // Obras de poços › mapa regional (etapa 2): regras puras. Lê os GeoJSON do maperf (poços de referência da base pública
-// e a grade de potencial hídrico), mede distâncias e resume os poços num raio para estimar a profundidade da obra nova.
-// Os poços de referência guardam a vazão em m³/h (como na origem); os nossos em L/h.
+// e a grade de potencial hídrico, usados direto dos arquivos, fora do banco), mede distâncias e resume os poços num raio
+// para estimar a profundidade da obra nova. A referência tem a vazão em m³/h (como na origem); os nossos poços, em L/h.
 import { ErroObra } from './obras';
 
 export interface Referencia { idExterno: string; municipio: string | null; latitude: number; longitude: number; profundidadeM: number | null; vazaoM3h: number | null }

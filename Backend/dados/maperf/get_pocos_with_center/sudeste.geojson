@@ -1,0 +1,6178 @@
+{
+	
+		"type": "FeatureCollection",
+		
+		"features": [
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500000693,
+					"municipio": "Jacareí",
+					"profundida": 110,
+					"vazao": 36
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.094443999999896,
+						-23.323610999999858
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500000695,
+					"municipio": "Jacareí",
+					"profundida": 100,
+					"vazao": 7
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.01138799999984,
+						-23.355
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500000696,
+					"municipio": "Jacareí",
+					"profundida": 157,
+					"vazao": 2.93
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.009166,
+						-23.376111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500000697,
+					"municipio": "Jacareí",
+					"profundida": 120,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.014166,
+						-23.344166
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500000698,
+					"municipio": "Jacareí",
+					"profundida": 130,
+					"vazao": 10.8
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.013054999999895,
+						-23.356388
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500007621,
+					"municipio": "Guararema",
+					"profundida": 68.9,
+					"vazao": 23.1
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.125277,
+						-23.324722
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500008472,
+					"municipio": "Arujá",
+					"profundida": 180,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.33388799999989,
+						-23.403888
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500008473,
+					"municipio": "Arujá",
+					"profundida": 68,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.321111,
+						-23.404166
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500008483,
+					"municipio": "Biritiba Mirim",
+					"profundida": 151,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.05999999999989,
+						-23.564999999999827
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500008484,
+					"municipio": "Biritiba Mirim",
+					"profundida": 70,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.076111,
+						-23.562222
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500008485,
+					"municipio": "Biritiba Mirim",
+					"profundida": 122,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.04,
+						-23.555833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500008640,
+					"municipio": "Guararema",
+					"profundida": 166,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.003055,
+						-23.416388
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500008641,
+					"municipio": "Guararema",
+					"profundida": 253,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.103055,
+						-23.377777
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500008642,
+					"municipio": "Guararema",
+					"profundida": 130,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.096110999999894,
+						-23.369722
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500008703,
+					"municipio": "Suzano",
+					"profundida": 152,
+					"vazao": 5.6
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.301111,
+						-23.56
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500008704,
+					"municipio": "Suzano",
+					"profundida": 150,
+					"vazao": 5.8
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.301111,
+						-23.56
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500008748,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 111,
+					"vazao": 7.5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.13666599999988,
+						-23.5925
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500008764,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 182,
+					"vazao": 14
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.1749999999999,
+						-23.589444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500008765,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 180,
+					"vazao": 27
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.1749999999999,
+						-23.589444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500008766,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 127,
+					"vazao": 0.7
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.1425,
+						-23.589722
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500008903,
+					"municipio": "Suzano",
+					"profundida": 0,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.302777,
+						-23.685555
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500009000,
+					"municipio": "Suzano",
+					"profundida": 150,
+					"vazao": 15.9
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.301111,
+						-23.568611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500009128,
+					"municipio": "Salesópolis",
+					"profundida": 160,
+					"vazao": 1.3
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.963611,
+						-23.55222199999986
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500009164,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 135,
+					"vazao": 5.5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.209444,
+						-23.548055
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500009199,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 233,
+					"vazao": 12
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.21805499999988,
+						-23.543611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500009200,
+					"municipio": "Suzano",
+					"profundida": 120,
+					"vazao": 10.5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.288055,
+						-23.543055
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500009205,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 300,
+					"vazao": 1.5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.143611,
+						-23.526111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500009287,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 150,
+					"vazao": 4.2
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.084444,
+						-23.480555
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500009288,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 0,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.084444,
+						-23.480555
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500009421,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 150,
+					"vazao": 4
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.243611,
+						-23.444166
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500009447,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 300,
+					"vazao": 9
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.347222,
+						-23.491388
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500009465,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 281,
+					"vazao": 1.7
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.3475,
+						-23.493610999999817
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500009467,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 103,
+					"vazao": 0.1
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.3475,
+						-23.493610999999817
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500009468,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 150,
+					"vazao": 10
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.3475,
+						-23.493888
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500009469,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 280,
+					"vazao": 9
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.3475,
+						-23.493888
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500009486,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 120,
+					"vazao": 12
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.347222,
+						-23.497776999999815
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500009492,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 134,
+					"vazao": 10
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.188333,
+						-23.501388
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500009520,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 151,
+					"vazao": 15
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.151665999999864,
+						-23.506111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500009534,
+					"municipio": "Suzano",
+					"profundida": 100,
+					"vazao": 2
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.306388,
+						-23.508055
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500009539,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 102,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.159166,
+						-23.510277
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500009628,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 186,
+					"vazao": 90
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.2075,
+						-23.520555
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500009632,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 151,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.162222,
+						-23.521388
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500009659,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 100,
+					"vazao": 27
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.197777,
+						-23.5225
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500009663,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 128,
+					"vazao": 36
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.200277,
+						-23.522777
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500009680,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 152,
+					"vazao": 35
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.219166,
+						-23.540833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500009681,
+					"municipio": "Salesópolis",
+					"profundida": 162,
+					"vazao": 38
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.98611099999988,
+						-23.53777799999989
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500010630,
+					"municipio": "Arujá",
+					"profundida": 286,
+					"vazao": 2.5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.347777,
+						-23.411943999999835
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500010631,
+					"municipio": "Arujá",
+					"profundida": 210,
+					"vazao": 0.1
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.318333,
+						-23.408055
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500010632,
+					"municipio": "Arujá",
+					"profundida": 150,
+					"vazao": 2.5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.304722,
+						-23.404722
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500010642,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 251,
+					"vazao": 0.7
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.331944,
+						-23.44
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500010687,
+					"municipio": "Arujá",
+					"profundida": 180,
+					"vazao": 6
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.33388799999989,
+						-23.403888
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500010688,
+					"municipio": "Arujá",
+					"profundida": 200,
+					"vazao": 0.48
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.340833,
+						-23.378055
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500010741,
+					"municipio": "Arujá",
+					"profundida": 248,
+					"vazao": 1
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.32972199999989,
+						-23.409722
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500010743,
+					"municipio": "Arujá",
+					"profundida": 200,
+					"vazao": 17.8
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.305555,
+						-23.397777
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500010744,
+					"municipio": "Arujá",
+					"profundida": 350,
+					"vazao": 0.1
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.303055,
+						-23.396388
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500010936,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 200,
+					"vazao": 0.3
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.331666,
+						-23.442222
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500010937,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 182,
+					"vazao": 0.6
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.347222,
+						-23.423888
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500010938,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 236,
+					"vazao": 14
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.3238879999999,
+						-23.474722
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500010939,
+					"municipio": "Suzano",
+					"profundida": 167,
+					"vazao": 46.6
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.341111,
+						-23.653333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500010940,
+					"municipio": "Suzano",
+					"profundida": 150,
+					"vazao": 10
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.315833,
+						-23.647221999999886
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500010941,
+					"municipio": "Suzano",
+					"profundida": 123,
+					"vazao": 49.5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.309166,
+						-23.589444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500010942,
+					"municipio": "Suzano",
+					"profundida": 150,
+					"vazao": 10
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.3325,
+						-23.563055
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500010943,
+					"municipio": "Suzano",
+					"profundida": 150,
+					"vazao": 14.4
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.298611,
+						-23.586111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500010944,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 138,
+					"vazao": 20
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.32749999999987,
+						-23.475555
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500030044,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 160,
+					"vazao": 6.54
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.33222199999989,
+						-23.453333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500030045,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 240,
+					"vazao": 2.25
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.331111,
+						-23.456667
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500030193,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 150,
+					"vazao": 2.57
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.346389,
+						-23.438611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500030201,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 158,
+					"vazao": 8
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.347778,
+						-23.491944
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500030203,
+					"municipio": "Santa Isabel",
+					"profundida": 120,
+					"vazao": 5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.24333299999989,
+						-23.343333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500030205,
+					"municipio": "Santa Isabel",
+					"profundida": 160,
+					"vazao": 82
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.205,
+						-23.346943999999894
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500030206,
+					"municipio": "Guararema",
+					"profundida": 241,
+					"vazao": 12.7
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.13583299999988,
+						-23.333333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500030207,
+					"municipio": "Guararema",
+					"profundida": 225,
+					"vazao": 12
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.080833,
+						-23.34055599999988
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500030208,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 87,
+					"vazao": 10.2
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.205278,
+						-23.423056
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500030209,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 250,
+					"vazao": 168.62
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.207778,
+						-23.426943999999878
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500030210,
+					"municipio": "Guararema",
+					"profundida": 170,
+					"vazao": 2.5
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.068056,
+						-23.453611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500030215,
+					"municipio": "Guararema",
+					"profundida": 120,
+					"vazao": 24
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.999444,
+						-23.426110999999878
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500030251,
+					"municipio": "Santa Isabel",
+					"profundida": 117,
+					"vazao": 30.2
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.28388899999982,
+						-23.355
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500030252,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 150,
+					"vazao": 9.995
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.31,
+						-23.476389
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500030260,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 350,
+					"vazao": 4.1
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.323611,
+						-23.453611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500030733,
+					"municipio": "Suzano",
+					"profundida": 200,
+					"vazao": 9
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.301944,
+						-23.64138899999989
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500030737,
+					"municipio": "Suzano",
+					"profundida": 160,
+					"vazao": 40
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.304722,
+						-23.6425
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500030748,
+					"municipio": "Suzano",
+					"profundida": 150,
+					"vazao": 2
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.303056,
+						-23.685278
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500050618,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.195833,
+						-23.567222
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500050971,
+					"municipio": "Santa Isabel",
+					"profundida": 138,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.21722199999988,
+						-23.322222
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052309,
+					"municipio": "Suzano",
+					"profundida": 158,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.295,
+						-23.499444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052319,
+					"municipio": "Suzano",
+					"profundida": 137,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.293333,
+						-23.499444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052331,
+					"municipio": "Arujá",
+					"profundida": 117,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.306111,
+						-23.398611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052348,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 156,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.344722,
+						-23.471944
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052349,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 200,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.34416699999986,
+						-23.4725
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052350,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 200,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.345278,
+						-23.471111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052351,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 144,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.345556,
+						-23.4725
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052357,
+					"municipio": "Arujá",
+					"profundida": 215,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.337222,
+						-23.4075
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052361,
+					"municipio": "Arujá",
+					"profundida": 182,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.346389,
+						-23.399722
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052388,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 8.92,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.3222219999999,
+						-23.458611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052389,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 9.55,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.3222219999999,
+						-23.458888999999886
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052390,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 9.63,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.32249999999982,
+						-23.458888999999886
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052394,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.249722,
+						-23.468888999999876
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052396,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 252,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.25916699999988,
+						-23.474444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052397,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 145,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.259444,
+						-23.471389
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052398,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 60,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.258889,
+						-23.472778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052399,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 200,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.25916699999988,
+						-23.469167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052400,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 240,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.25916699999988,
+						-23.470278
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052401,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 240,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.25749999999988,
+						-23.476389
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052402,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 250,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.258889,
+						-23.473333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052403,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 300,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.258889,
+						-23.471944
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052404,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 282,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.259722,
+						-23.469444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052405,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 180,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.25833299999988,
+						-23.471389
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052407,
+					"municipio": "Arujá",
+					"profundida": 200,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.330833,
+						-23.423889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052408,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 294,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.320278,
+						-23.451944
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052412,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 258,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.254444,
+						-23.4325
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052432,
+					"municipio": "Arujá",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.304722,
+						-23.404722
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052452,
+					"municipio": "Arujá",
+					"profundida": 300,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.34166699999986,
+						-23.412222
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052454,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 233,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.242778,
+						-23.441667
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052459,
+					"municipio": "Arujá",
+					"profundida": 209,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.273056,
+						-23.405833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052462,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 29,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.339167,
+						-23.429443999999876
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052492,
+					"municipio": "Suzano",
+					"profundida": 100,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.294443999999885,
+						-23.496110999999814
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052503,
+					"municipio": "Suzano",
+					"profundida": 200,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.294443999999885,
+						-23.497222
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052514,
+					"municipio": "Suzano",
+					"profundida": 180,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.300278,
+						-23.49666699999989
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052519,
+					"municipio": "Suzano",
+					"profundida": 7,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.271667,
+						-23.488056
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052527,
+					"municipio": "Jacareí",
+					"profundida": 90,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.094167,
+						-23.328056
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052529,
+					"municipio": "Santa Isabel",
+					"profundida": 175,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.216111,
+						-23.374444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052531,
+					"municipio": "Guararema",
+					"profundida": 100,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.046111,
+						-23.401111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052532,
+					"municipio": "Jacareí",
+					"profundida": 124,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.09,
+						-23.326943999999855
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052533,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 210,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.145556,
+						-23.491389
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052534,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 9,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.194444,
+						-23.473333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052535,
+					"municipio": "Jacareí",
+					"profundida": 100,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.0125,
+						-23.353889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052536,
+					"municipio": "Guararema",
+					"profundida": 210,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.103889,
+						-23.328333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052537,
+					"municipio": "Guararema",
+					"profundida": 148,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.110833,
+						-23.323610999999858
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052539,
+					"municipio": "Santa Isabel",
+					"profundida": 100,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.2125,
+						-23.37416699999983
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052540,
+					"municipio": "Santa Isabel",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.221388999999874,
+						-23.366389
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052541,
+					"municipio": "Jacareí",
+					"profundida": 160,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.01472199999989,
+						-23.367778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052542,
+					"municipio": "Guararema",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.109444,
+						-23.323610999999858
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052543,
+					"municipio": "Guararema",
+					"profundida": 132,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.110833,
+						-23.323610999999858
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052545,
+					"municipio": "Santa Isabel",
+					"profundida": 96,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.249166999999886,
+						-23.34944399999989
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052546,
+					"municipio": "Santa Isabel",
+					"profundida": 300,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.219444,
+						-23.325277999999855
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052547,
+					"municipio": "Guararema",
+					"profundida": 95,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.112778,
+						-23.366111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052548,
+					"municipio": "Guararema",
+					"profundida": 180,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.09222199999982,
+						-23.331111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052549,
+					"municipio": "Guararema",
+					"profundida": 170,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.13805599999989,
+						-23.332222
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052550,
+					"municipio": "Guararema",
+					"profundida": 92,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.149999999999864,
+						-23.338333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052551,
+					"municipio": "Santa Isabel",
+					"profundida": 182,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.18027799999987,
+						-23.352778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052552,
+					"municipio": "Guararema",
+					"profundida": 66,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.1322219999999,
+						-23.329167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052555,
+					"municipio": "Santa Isabel",
+					"profundida": 250,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.23499999999984,
+						-23.366389
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052556,
+					"municipio": "Guararema",
+					"profundida": 178,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.1347219999999,
+						-23.34055599999988
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052557,
+					"municipio": "Santa Isabel",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.244722,
+						-23.350556
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052558,
+					"municipio": "Guararema",
+					"profundida": 6,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.115555999999856,
+						-23.33
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052559,
+					"municipio": "Santa Isabel",
+					"profundida": 5,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.199167,
+						-23.357222
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052561,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 170,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.244444,
+						-23.445833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052562,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 300,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.24749999999989,
+						-23.474167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052563,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 162,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.242778,
+						-23.43444399999987
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052565,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 149,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.24249999999989,
+						-23.440556
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052566,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 109,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.241944,
+						-23.436111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052567,
+					"municipio": "Santa Isabel",
+					"profundida": 130,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.2125,
+						-23.336388999999826
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052569,
+					"municipio": "Guararema",
+					"profundida": 200,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.096388999999874,
+						-23.33
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052570,
+					"municipio": "Guararema",
+					"profundida": 184,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.09388899999982,
+						-23.332778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052571,
+					"municipio": "Guararema",
+					"profundida": 30,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.003333,
+						-23.425277999999878
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052572,
+					"municipio": "Guararema",
+					"profundida": 56,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.115833,
+						-23.319444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052573,
+					"municipio": "Guararema",
+					"profundida": 103,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.030833,
+						-23.472778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052574,
+					"municipio": "Guararema",
+					"profundida": 132,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.110556,
+						-23.323610999999858
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052575,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 90,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.232778,
+						-23.43277799999987
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052576,
+					"municipio": "Guararema",
+					"profundida": 180,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.153889,
+						-23.383888999999897
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052577,
+					"municipio": "Guararema",
+					"profundida": 111,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.144722,
+						-23.377499999999884
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052578,
+					"municipio": "Santa Isabel",
+					"profundida": 100,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.195833,
+						-23.34222199999988
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052579,
+					"municipio": "Santa Isabel",
+					"profundida": 160,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.17111099999988,
+						-23.338888999999824
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052595,
+					"municipio": "Guararema",
+					"profundida": 4,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.997778,
+						-23.45
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052646,
+					"municipio": "Jacareí",
+					"profundida": 145,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.97527799999989,
+						-23.357778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052648,
+					"municipio": "Guararema",
+					"profundida": 200,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.99277799999987,
+						-23.449721999999895
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052649,
+					"municipio": "Guararema",
+					"profundida": 202,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.991110999999876,
+						-23.444167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052657,
+					"municipio": "Jacareí",
+					"profundida": 100,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.97527799999989,
+						-23.340833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052672,
+					"municipio": "Guararema",
+					"profundida": 203,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.992222,
+						-23.444444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500052682,
+					"municipio": "Jacareí",
+					"profundida": 147,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.096388999999874,
+						-23.326667
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500054868,
+					"municipio": "Arujá",
+					"profundida": 84,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.321944,
+						-23.392222
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055115,
+					"municipio": "Suzano",
+					"profundida": 133,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.306667,
+						-23.585
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055119,
+					"municipio": "Suzano",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.300278,
+						-23.5697219999999
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055124,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 168,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.224167,
+						-23.5275
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055125,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 221.8,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.2225,
+						-23.528333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055128,
+					"municipio": "Suzano",
+					"profundida": 200,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.282777999999894,
+						-23.535833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055129,
+					"municipio": "Suzano",
+					"profundida": 250,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.280833,
+						-23.534443999999894
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055130,
+					"municipio": "Suzano",
+					"profundida": 127,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.28388899999982,
+						-23.535555999999872
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055131,
+					"municipio": "Suzano",
+					"profundida": 250,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.283610999999894,
+						-23.536388999999872
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055132,
+					"municipio": "Suzano",
+					"profundida": 128,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.289167,
+						-23.539167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055134,
+					"municipio": "Suzano",
+					"profundida": 155,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.288056,
+						-23.540556
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055135,
+					"municipio": "Suzano",
+					"profundida": 230,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.289167,
+						-23.538056
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055138,
+					"municipio": "Suzano",
+					"profundida": 220,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.295,
+						-23.566666999999825
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055142,
+					"municipio": "Poá",
+					"profundida": 41,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.333611,
+						-23.519167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055143,
+					"municipio": "Poá",
+					"profundida": 204,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.334444,
+						-23.519167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055145,
+					"municipio": "Suzano",
+					"profundida": 462,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.289167,
+						-23.528333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055147,
+					"municipio": "Suzano",
+					"profundida": 462,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.28861099999989,
+						-23.53222199999982
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055153,
+					"municipio": "Suzano",
+					"profundida": 186,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.316111,
+						-23.544167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055155,
+					"municipio": "Poá",
+					"profundida": 100,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.3325,
+						-23.53
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055159,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 45,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.1925,
+						-23.51861099999985
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055160,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 112,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.193889,
+						-23.51
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055161,
+					"municipio": "Suzano",
+					"profundida": 105,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.2786109999999,
+						-23.533333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055162,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.271389,
+						-23.554167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055163,
+					"municipio": "Suzano",
+					"profundida": 300,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.301111,
+						-23.528888999999822
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055164,
+					"municipio": "Suzano",
+					"profundida": 157,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.305,
+						-23.56916699999988
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055166,
+					"municipio": "Suzano",
+					"profundida": 380,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.293333,
+						-23.541667
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055167,
+					"municipio": "Suzano",
+					"profundida": 68.7,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.304722,
+						-23.53
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055169,
+					"municipio": "Suzano",
+					"profundida": 175,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.306944,
+						-23.584167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055172,
+					"municipio": "Suzano",
+					"profundida": 154,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.303056,
+						-23.57083299999988
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055174,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 160,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.21138899999988,
+						-23.543333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055183,
+					"municipio": "Suzano",
+					"profundida": 154,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.304167,
+						-23.573332999999877
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055185,
+					"municipio": "Suzano",
+					"profundida": 291.22,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.288056,
+						-23.540277999999887
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055187,
+					"municipio": "Suzano",
+					"profundida": 184,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.302778,
+						-23.577778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055188,
+					"municipio": "Suzano",
+					"profundida": 166,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.305278,
+						-23.583889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055189,
+					"municipio": "Suzano",
+					"profundida": 135,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.30805599999985,
+						-23.566389
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055194,
+					"municipio": "Suzano",
+					"profundida": 175,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.302778,
+						-23.567499999999825
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055195,
+					"municipio": "Suzano",
+					"profundida": 178,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.288333,
+						-23.535555999999872
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055196,
+					"municipio": "Suzano",
+					"profundida": 100,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.30805599999985,
+						-23.631111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055198,
+					"municipio": "Suzano",
+					"profundida": 228,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.278333,
+						-23.532777999999894
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055199,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 205,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.222778,
+						-23.527222
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055200,
+					"municipio": "Suzano",
+					"profundida": 210,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.30805599999985,
+						-23.567222
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055201,
+					"municipio": "Suzano",
+					"profundida": 188,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.302778,
+						-23.565556
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055202,
+					"municipio": "Suzano",
+					"profundida": 113.4,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.302222,
+						-23.566111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055208,
+					"municipio": "Suzano",
+					"profundida": 180,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.28305599999982,
+						-23.538333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055209,
+					"municipio": "Suzano",
+					"profundida": 155,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.315278,
+						-23.574166999999875
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055210,
+					"municipio": "Suzano",
+					"profundida": 110,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.338889,
+						-23.656944
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055212,
+					"municipio": "Suzano",
+					"profundida": 186,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.305555999999854,
+						-23.585556
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055214,
+					"municipio": "Suzano",
+					"profundida": 216,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.31,
+						-23.586111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055216,
+					"municipio": "Suzano",
+					"profundida": 162,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.321944,
+						-23.641667
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055220,
+					"municipio": "Suzano",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.324166999999875,
+						-23.699444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055222,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 151,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.25666699999988,
+						-23.588056
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055223,
+					"municipio": "Suzano",
+					"profundida": 174,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.305555999999854,
+						-23.583333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055227,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 190,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.238611,
+						-23.543889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055228,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 171,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.239444,
+						-23.5425
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055229,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 188.5,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.239999999999895,
+						-23.543611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055230,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 220,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.240832999999895,
+						-23.542222
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055232,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 220,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.241944,
+						-23.542778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055233,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 30,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.240832999999895,
+						-23.544167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055234,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 250,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.240278,
+						-23.544444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055235,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 290,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.240278,
+						-23.544167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055236,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 290,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.239999999999895,
+						-23.543889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055240,
+					"municipio": "Poá",
+					"profundida": 250,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.338611,
+						-23.5275
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055245,
+					"municipio": "Suzano",
+					"profundida": 6,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.341389,
+						-23.64
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055246,
+					"municipio": "Suzano",
+					"profundida": 6,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.341944,
+						-23.639444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055247,
+					"municipio": "Suzano",
+					"profundida": 5,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.342222,
+						-23.639167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055248,
+					"municipio": "Suzano",
+					"profundida": 4,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.343611,
+						-23.638611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055250,
+					"municipio": "Suzano",
+					"profundida": 323,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.28388899999982,
+						-23.534167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055251,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 6,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.259444,
+						-23.528888999999822
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055253,
+					"municipio": "Suzano",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.3125,
+						-23.571111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055256,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 200,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.204444,
+						-23.505832999999882
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055260,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 170,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.226667,
+						-23.53222199999982
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055275,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 200,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.273889,
+						-23.709167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055276,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 204,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.273889,
+						-23.709167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055278,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 100,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.19888899999984,
+						-23.523611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055291,
+					"municipio": "Suzano",
+					"profundida": 152,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.33,
+						-23.657778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055292,
+					"municipio": "Suzano",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.33055599999989,
+						-23.657778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055303,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 141,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.259444,
+						-23.592778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055304,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 98,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.253332999999884,
+						-23.619167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055308,
+					"municipio": "Suzano",
+					"profundida": 102,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.3025,
+						-23.53694399999989
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055314,
+					"municipio": "Suzano",
+					"profundida": 8,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.288056,
+						-23.69499999999988
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055315,
+					"municipio": "Suzano",
+					"profundida": 187,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.28777799999989,
+						-23.539167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055316,
+					"municipio": "Suzano",
+					"profundida": 200,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.301111,
+						-23.528888999999822
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055317,
+					"municipio": "Suzano",
+					"profundida": 222,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.306667,
+						-23.577778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055325,
+					"municipio": "Suzano",
+					"profundida": 126,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.2775,
+						-23.53527799999989
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055326,
+					"municipio": "Suzano",
+					"profundida": 234,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.276944,
+						-23.534443999999894
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055329,
+					"municipio": "Suzano",
+					"profundida": 180,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.300833,
+						-23.576944
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055330,
+					"municipio": "Poá",
+					"profundida": 198,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.34,
+						-23.520556
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055335,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 250,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.141389,
+						-23.555278
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055336,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 190.5,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.205,
+						-23.533888999999874
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055337,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 6,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.110556,
+						-23.61027799999988
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055338,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 193,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.209167,
+						-23.521111
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055339,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 180,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.176667,
+						-23.51861099999985
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055340,
+					"municipio": "Biritiba Mirim",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.062499999999886,
+						-23.565556
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055341,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 137,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.179443999999876,
+						-23.514444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055342,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 100,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.168333,
+						-23.582222
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055343,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 200,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.160556,
+						-23.502778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055344,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 153,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.163333,
+						-23.503889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055345,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 146,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.161667,
+						-23.50416699999988
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055346,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 152,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.206111,
+						-23.523611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055347,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 234.6,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.233333,
+						-23.553055999999856
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055349,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 81,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.146944,
+						-23.503889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055350,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 124,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.215833,
+						-23.526944
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055351,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 80,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.229444,
+						-23.541110999999887
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055352,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 148,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.221667,
+						-23.5325
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055353,
+					"municipio": "Biritiba Mirim",
+					"profundida": 50,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.071389,
+						-23.574999999999875
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055354,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 200,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.222221999999874,
+						-23.515277999999853
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055355,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 200,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.190278,
+						-23.503056
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055356,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 100,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.216667,
+						-23.529167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055357,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 120,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.16,
+						-23.511389
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055358,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 142,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.158333,
+						-23.511389
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055359,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 78,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.156667,
+						-23.509444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055360,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 149,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.151944,
+						-23.547778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055361,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 120,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.153056,
+						-23.5475
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055362,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 98,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.229722,
+						-23.615833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055363,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 107.4,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.21222199999988,
+						-23.523889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055364,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 90,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.195,
+						-23.570278
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500055365,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 110,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.1825,
+						-23.513056
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057788,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 82,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.25416699999988,
+						-23.465278
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057789,
+					"municipio": "Suzano",
+					"profundida": 230,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.293333,
+						-23.49749999999989
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057790,
+					"municipio": "Arujá",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.266111,
+						-23.408333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057791,
+					"municipio": "Arujá",
+					"profundida": 160,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.335278,
+						-23.373056
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057798,
+					"municipio": "Arujá",
+					"profundida": 166,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.338333,
+						-23.373056
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057815,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 404,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.328611,
+						-23.433889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057818,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 5.6,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.325278,
+						-23.4775
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057822,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 200,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.323611,
+						-23.450833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057828,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 200,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.306667,
+						-23.444444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057830,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 3.5,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.32833299999987,
+						-23.445833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057831,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 7,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.32805599999989,
+						-23.44555599999984
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057834,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 200,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.323611,
+						-23.450833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057835,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 20,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.343611,
+						-23.43277799999987
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057837,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 15,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.263056,
+						-23.455555999999888
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057838,
+					"municipio": "Itaquaquecetuba",
+					"profundida": 300,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.306944,
+						-23.444721999999842
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057843,
+					"municipio": "Suzano",
+					"profundida": 180,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.300556,
+						-23.5075
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057849,
+					"municipio": "Jacareí",
+					"profundida": 150,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.0225,
+						-23.366667
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057850,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 100,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.20722199999989,
+						-23.42
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057851,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 109,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.208888999999886,
+						-23.42
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057852,
+					"municipio": "Santa Isabel",
+					"profundida": 180,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.179722,
+						-23.353333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057853,
+					"municipio": "Santa Isabel",
+					"profundida": 200,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.178333,
+						-23.353889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057854,
+					"municipio": "Santa Isabel",
+					"profundida": 250,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.226389,
+						-23.383055999999897
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057857,
+					"municipio": "Santa Isabel",
+					"profundida": 132,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.233889,
+						-23.367778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057860,
+					"municipio": "Jacareí",
+					"profundida": 80,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.016111,
+						-23.357778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057862,
+					"municipio": "Santa Isabel",
+					"profundida": 137,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.245556,
+						-23.357778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057863,
+					"municipio": "Guararema",
+					"profundida": 225,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.088333,
+						-23.34055599999988
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057864,
+					"municipio": "Guararema",
+					"profundida": 200,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.106944,
+						-23.326110999999855
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057865,
+					"municipio": "Guararema",
+					"profundida": 184,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.103889,
+						-23.325833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057866,
+					"municipio": "Guararema",
+					"profundida": 304,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.140556,
+						-23.39249999999987
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057867,
+					"municipio": "Guararema",
+					"profundida": 88,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.15166699999986,
+						-23.34055599999988
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057868,
+					"municipio": "Santa Isabel",
+					"profundida": 315,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.22,
+						-23.370556
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057869,
+					"municipio": "Santa Isabel",
+					"profundida": 200,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.217778,
+						-23.369722
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057870,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 135,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.214167,
+						-23.434167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057871,
+					"municipio": "Guararema",
+					"profundida": 66,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.002778,
+						-23.415277999999887
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500057897,
+					"municipio": "Guararema",
+					"profundida": 203,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-45.981110999999885,
+						-23.449167
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058564,
+					"municipio": "Arujá",
+					"profundida": 84,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.3222219999999,
+						-23.392778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058573,
+					"municipio": "Suzano",
+					"profundida": 128,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.288889,
+						-23.538889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058577,
+					"municipio": "Suzano",
+					"profundida": 100,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.274443999999846,
+						-23.516110999999853
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058578,
+					"municipio": "Suzano",
+					"profundida": 162,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.321944,
+						-23.64138899999989
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058583,
+					"municipio": "Suzano",
+					"profundida": 250,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.296389,
+						-23.563611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058584,
+					"municipio": "Suzano",
+					"profundida": 250,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.297222,
+						-23.563056
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058585,
+					"municipio": "Suzano",
+					"profundida": 252,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.295556,
+						-23.563611
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058586,
+					"municipio": "Suzano",
+					"profundida": 250,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.29527799999988,
+						-23.563333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058587,
+					"municipio": "Suzano",
+					"profundida": 320,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.297778,
+						-23.563333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058589,
+					"municipio": "Suzano",
+					"profundida": 300,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.306667,
+						-23.524444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058592,
+					"municipio": "Suzano",
+					"profundida": 180,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.314722,
+						-23.638055999999835
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058602,
+					"municipio": "Suzano",
+					"profundida": 93,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.30972199999985,
+						-23.593333
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058603,
+					"municipio": "Suzano",
+					"profundida": 136,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.30888899999985,
+						-23.591944
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058604,
+					"municipio": "Suzano",
+					"profundida": 206,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.314167,
+						-23.577499999999873
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058605,
+					"municipio": "Suzano",
+					"profundida": 326,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.288056,
+						-23.540277999999887
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058607,
+					"municipio": "Suzano",
+					"profundida": 180,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.310278,
+						-23.584722
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058619,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 4,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.201388999999836,
+						-23.523889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058620,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 4.4,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.193611,
+						-23.53861099999989
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058621,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 133,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.160278,
+						-23.514444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058622,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 80,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.146944,
+						-23.557778
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058623,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 106,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.180833,
+						-23.520278
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058624,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 101,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.216667,
+						-23.66
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058625,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 43,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.114167,
+						-23.639444
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058626,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 220,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.221111,
+						-23.530277999999896
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058627,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 205,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.221388999999874,
+						-23.53
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058628,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 200,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.143333,
+						-23.531110999999896
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058629,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 180,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.143056,
+						-23.53138899999982
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058630,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 135,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.141944,
+						-23.531667
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058631,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 177,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.140278,
+						-23.530833
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058632,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 300,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.1425,
+						-23.531110999999896
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058633,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 213,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.143889,
+						-23.531110999999896
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058634,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 200,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.144444,
+						-23.500832999999886
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058635,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 120,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.216111,
+						-23.5286109999999
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058636,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 100,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.139444,
+						-23.578889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058637,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 110,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.1775,
+						-23.363889
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058638,
+					"municipio": "Biritiba Mirim",
+					"profundida": 124,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.0491669999999,
+						-23.56916699999988
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058639,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 100,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.219444,
+						-23.5325
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058640,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 7,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.221111,
+						-23.534721999999874
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058641,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 238,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.17694399999988,
+						-23.583056
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058643,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 100,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.152778,
+						-23.51777799999985
+					]
+				},
+				"structure": "Poço"
+			},
+			{
+				"type": "Feature",
+				"properties": {
+					"id_ponto": 3500058644,
+					"municipio": "Mogi das Cruzes",
+					"profundida": 24,
+					"vazao": 0
+				},
+				"geometry": {
+					"type": "Point",
+					"coordinates": [
+						-46.21555599999988,
+						-23.532777999999894
+					]
+				},
+				"structure": "Poço"
+			}
+		]
+	}

@@ -1,29 +1,61 @@
-// Obras de poços › mapa regional (etapa 2): as camadas do mapa (nossos poços, poços de referência e potencial hídrico),
-// a análise de um raio e a importação dos GeoJSON do maperf. Os poços de referência ficam em tabela própria e nunca se
-// misturam com os poços dos clientes (modulo_hidraulica_pocos_referencias e _potencial).
+// Obras de poços › mapa regional (etapa 2): as camadas do mapa e a análise de um raio. Os poços de referência e o
+// potencial hídrico vêm direto dos GeoJSON do maperf (pasta MAPERF_DIR do .env, ou Backend/dados/maperf), lidos em
+// memória e relidos quando um arquivo muda; o banco guarda só os poços dos clientes. Nunca se misturam.
+import fs from 'fs';
+import path from 'path';
 import { Request, Response } from 'express';
 import pool from '../../../infra/db';
 import { ErroObra, lerGps } from './obras';
 import { responderErro } from './obras.controller';
-import { analisarRaio, caixaDoRaio, lerGeojson, lerRaio, PontoAnalise } from './mapa';
+import { analisarRaio, caixaDoRaio, Celula, lerGeojson, lerRaio, PontoAnalise, Referencia } from './mapa';
 
 const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || req.body?.tenant_id || 1);
 const nulo = (v: unknown) => (v === null || v === undefined ? null : Number(v));
-const LOTE = 500;
 
-// GET /mapa/resumo — o que já foi importado (para a tela saber o que oferecer)
+/** Pasta do maperf: as subpastas com os .geojson são as mesmas do projeto maperf. */
+const pastaMaperf = () => path.resolve(process.env.MAPERF_DIR || path.join(__dirname, '../../../../dados/maperf'));
+const SUBPASTAS = ['get_pocos_with_center', 'get_hydric_potential_raster_with_center'];
+
+interface Arquivo { caminho: string; tipo: 'POCOS' | 'POTENCIAL'; regiao: string; quantidade: number }
+interface Camadas { assinatura: string; referencias: (Referencia & { regiao: string })[]; potencial: Celula[]; arquivos: Arquivo[]; erros: string[] }
+let cache: Camadas | null = null;
+
+const listarGeojson = () => {
+  const base = pastaMaperf();
+  return SUBPASTAS.flatMap(sub => {
+    const dir = path.join(base, sub);
+    if (!fs.existsSync(dir)) return [];
+    return fs.readdirSync(dir).filter(f => /\.(geo)?json$/i.test(f)).sort().map(f => path.join(dir, f));
+  });
+};
+
+/** Lê os arquivos (só de novo quando algum muda: nome, tamanho ou data). Arquivo com problema não derruba os outros. */
+const camadas = (): Camadas => {
+  const arquivos = listarGeojson();
+  const assinatura = arquivos.map(a => { const s = fs.statSync(a); return `${a}:${s.size}:${s.mtimeMs}`; }).join('|');
+  if (cache && cache.assinatura === assinatura) return cache;
+  const novo: Camadas = { assinatura, referencias: [], potencial: [], arquivos: [], erros: [] };
+  for (const caminho of arquivos) {
+    try {
+      const imp = lerGeojson(JSON.parse(fs.readFileSync(caminho, 'utf8')), caminho);
+      if (imp.tipo === 'POCOS') novo.referencias.push(...imp.itens.map(r => ({ ...r, regiao: imp.regiao })));
+      else novo.potencial.push(...imp.itens);
+      novo.arquivos.push({ caminho: path.relative(pastaMaperf(), caminho), tipo: imp.tipo, regiao: imp.regiao, quantidade: imp.itens.length });
+    } catch (e: any) { novo.erros.push(`${path.basename(caminho)}: ${e?.message || 'não deu para ler'}`); }
+  }
+  cache = novo;
+  return novo;
+};
+
+// GET /mapa/resumo — de onde vêm os dados e o que foi lido
 export const resumoMapa = async (req: Request, res: Response) => {
-  const tenant = tenantDe(req);
   try {
-    const [ref]: any = await pool.execute(
-      `SELECT regiao, COUNT(*) AS n FROM modulo_hidraulica_pocos_referencias WHERE tenant_id = ? GROUP BY regiao ORDER BY regiao`, [tenant]);
-    const [pot]: any = await pool.execute(
-      `SELECT regiao, COUNT(*) AS n FROM modulo_hidraulica_pocos_potencial WHERE tenant_id = ? GROUP BY regiao ORDER BY regiao`, [tenant]);
+    const c = camadas();
     const [[nossos]]: any = await pool.execute(
-      `SELECT COUNT(*) AS total, SUM(latitude IS NOT NULL) AS com_gps FROM modulo_hidraulica_pocos_pocos WHERE tenant_id = ?`, [tenant]);
+      `SELECT COUNT(*) AS total, SUM(latitude IS NOT NULL) AS com_gps FROM modulo_hidraulica_pocos_pocos WHERE tenant_id = ?`, [tenantDe(req)]);
     return res.json({
-      referencias: ref.map((r: any) => ({ regiao: r.regiao, quantidade: Number(r.n) })),
-      potencial: pot.map((r: any) => ({ regiao: r.regiao, quantidade: Number(r.n) })),
+      pasta: pastaMaperf(), arquivos: c.arquivos, erros: c.erros,
+      referencias: c.referencias.length, potencial: c.potencial.length,
       nossos: { total: Number(nossos.total) || 0, comGps: Number(nossos.com_gps) || 0 },
     });
   } catch (e) { return responderErro(res, e, 'Erro ao ler o resumo do mapa.'); }
@@ -54,42 +86,34 @@ export const pocosDoMapa = async (req: Request, res: Response) => {
   } catch (e) { return responderErro(res, e, 'Erro ao carregar os poços do mapa.'); }
 };
 
-// GET /mapa/referencias — todos os poços de referência, em lista compacta [id, lat, lon, profundidade, vazão m³/h, município]
-export const referenciasDoMapa = async (req: Request, res: Response) => {
-  try {
-    const [rows]: any = await pool.execute(
-      `SELECT id_referencia, latitude, longitude, profundidade_m, vazao_m3h, municipio FROM modulo_hidraulica_pocos_referencias WHERE tenant_id = ?`, [tenantDe(req)]);
-    return res.json(rows.map((r: any) => [Number(r.id_referencia), Number(r.latitude), Number(r.longitude), nulo(r.profundidade_m), nulo(r.vazao_m3h), r.municipio || null]));
-  } catch (e) { return responderErro(res, e, 'Erro ao carregar os poços de referência.'); }
+// GET /mapa/referencias — os poços de referência, em lista compacta [nº, lat, lon, profundidade, vazão m³/h, município]
+export const referenciasDoMapa = async (_req: Request, res: Response) => {
+  try { return res.json(camadas().referencias.map((r, i) => [i + 1, r.latitude, r.longitude, r.profundidadeM, r.vazaoM3h, r.municipio])); }
+  catch (e) { return responderErro(res, e, 'Erro ao ler os poços de referência.'); }
 };
 
 // GET /mapa/potencial — a grade de potencial hídrico, compacta [latMin, latMax, lonMin, lonMax, valor]
-export const potencialDoMapa = async (req: Request, res: Response) => {
-  try {
-    const [rows]: any = await pool.execute(
-      `SELECT lat_min, lat_max, lon_min, lon_max, valor FROM modulo_hidraulica_pocos_potencial WHERE tenant_id = ?`, [tenantDe(req)]);
-    return res.json(rows.map((r: any) => [Number(r.lat_min), Number(r.lat_max), Number(r.lon_min), Number(r.lon_max), Number(r.valor)]));
-  } catch (e) { return responderErro(res, e, 'Erro ao carregar o potencial hídrico.'); }
+export const potencialDoMapa = async (_req: Request, res: Response) => {
+  try { return res.json(camadas().potencial.map(c => [c.latMin, c.latMax, c.lonMin, c.lonMax, c.valor])); }
+  catch (e) { return responderErro(res, e, 'Erro ao ler o potencial hídrico.'); }
 };
 
-/** Resumo de um raio em volta do ponto: nossos poços + os de referência, e o potencial do quadradinho do ponto. */
+/** Resumo de um raio em volta do ponto: nossos poços (banco) + os de referência (arquivos), e o potencial do ponto. */
 export const analisarPonto = async (tenant: number, latitude: number, longitude: number, raioM: number) => {
   const c = caixaDoRaio(latitude, longitude, raioM);
-  const [ref]: any = await pool.execute(
-    `SELECT latitude, longitude, profundidade_m, vazao_m3h FROM modulo_hidraulica_pocos_referencias
-     WHERE tenant_id = ? AND latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ?`, [tenant, c.latMin, c.latMax, c.lonMin, c.lonMax]);
+  const dentro = (lat: number, lon: number) => lat >= c.latMin && lat <= c.latMax && lon >= c.lonMin && lon <= c.lonMax;
+  const arq = camadas();
   const [nossos]: any = await pool.execute(
     `SELECT latitude, longitude, profundidade_m, vazao_lh FROM modulo_hidraulica_pocos_pocos
      WHERE tenant_id = ? AND latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ?`, [tenant, c.latMin, c.latMax, c.lonMin, c.lonMax]);
   const pontos: PontoAnalise[] = [
-    ...ref.map((r: any) => ({ latitude: Number(r.latitude), longitude: Number(r.longitude), profundidadeM: nulo(r.profundidade_m), vazaoM3h: nulo(r.vazao_m3h), nosso: false })),
+    ...arq.referencias.filter(r => dentro(r.latitude, r.longitude))
+      .map(r => ({ latitude: r.latitude, longitude: r.longitude, profundidadeM: r.profundidadeM, vazaoM3h: r.vazaoM3h, nosso: false })),
     ...nossos.map((r: any) => ({ latitude: Number(r.latitude), longitude: Number(r.longitude), profundidadeM: nulo(r.profundidade_m),
       vazaoM3h: r.vazao_lh === null ? null : Number(r.vazao_lh) / 1000, nosso: true })),
   ];
-  const [[cel]]: any = await pool.execute(
-    `SELECT valor FROM modulo_hidraulica_pocos_potencial WHERE tenant_id = ? AND ? BETWEEN lat_min AND lat_max AND ? BETWEEN lon_min AND lon_max LIMIT 1`,
-    [tenant, latitude, longitude]);
-  return { latitude, longitude, ...analisarRaio({ latitude, longitude }, raioM, pontos), potencial: cel ? Number(cel.valor) : null };
+  const cel = arq.potencial.find(p => latitude >= p.latMin && latitude <= p.latMax && longitude >= p.lonMin && longitude <= p.lonMax);
+  return { latitude, longitude, ...analisarRaio({ latitude, longitude }, raioM, pontos), potencial: cel ? cel.valor : null };
 };
 
 // GET /mapa/analise?gps=-23.1,-46.5&raio=2000 (ou lat=&lon=)
@@ -99,52 +123,4 @@ export const analiseDoMapa = async (req: Request, res: Response) => {
     if (!gps) throw new ErroObra('Ponto sem GPS válido.');
     return res.json(await analisarPonto(tenantDe(req), gps.latitude, gps.longitude, lerRaio(req.query.raio)));
   } catch (e) { return responderErro(res, e, 'Erro ao analisar a região.'); }
-};
-
-/**
- * POST /mapa/importar { arquivo, geojson } — reconhece se é de poços ou de potencial e grava em lotes. Importar o mesmo
- * arquivo de novo atualiza as linhas (chave única por origem + identificador), não duplica.
- */
-export const importarGeojson = async (req: Request, res: Response) => {
-  const tenant = tenantDe(req);
-  const conn: any = await pool.getConnection();
-  try {
-    const imp = lerGeojson(req.body?.geojson, String(req.body?.arquivo || ''));
-    if (!imp.itens.length) throw new ErroObra('Nenhum ponto válido no arquivo.');
-    await conn.beginTransaction();
-    let gravados = 0;
-    for (let i = 0; i < imp.itens.length; i += LOTE) {
-      if (imp.tipo === 'POCOS') {
-        const linhas = imp.itens.slice(i, i + LOTE).map(r => [tenant, 'MAPERF', r.idExterno, imp.regiao, r.municipio, r.latitude, r.longitude, r.profundidadeM, r.vazaoM3h]);
-        await conn.query(
-          `INSERT INTO modulo_hidraulica_pocos_referencias (tenant_id, origem, id_externo, regiao, municipio, latitude, longitude, profundidade_m, vazao_m3h)
-           VALUES ? ON DUPLICATE KEY UPDATE regiao = VALUES(regiao), municipio = VALUES(municipio), latitude = VALUES(latitude), longitude = VALUES(longitude),
-             profundidade_m = VALUES(profundidade_m), vazao_m3h = VALUES(vazao_m3h)`, [linhas]);
-        gravados += linhas.length;
-      } else {
-        const linhas = imp.itens.slice(i, i + LOTE).map(c => [tenant, 'MAPERF', imp.regiao, c.idExterno, c.latMin, c.latMax, c.lonMin, c.lonMax, c.valor]);
-        await conn.query(
-          `INSERT INTO modulo_hidraulica_pocos_potencial (tenant_id, origem, regiao, id_externo, lat_min, lat_max, lon_min, lon_max, valor)
-           VALUES ? ON DUPLICATE KEY UPDATE lat_min = VALUES(lat_min), lat_max = VALUES(lat_max), lon_min = VALUES(lon_min), lon_max = VALUES(lon_max), valor = VALUES(valor)`, [linhas]);
-        gravados += linhas.length;
-      }
-    }
-    await conn.commit();
-    return res.json({ tipo: imp.tipo, regiao: imp.regiao, gravados });
-  } catch (e) {
-    await conn.rollback().catch(() => undefined);
-    return responderErro(res, e, 'Erro ao importar o arquivo.');
-  } finally { conn.release(); }
-};
-
-// DELETE /mapa/importacoes?tipo=POCOS|POTENCIAL&regiao= — tira uma região importada (os poços dos clientes não são tocados)
-export const removerImportacao = async (req: Request, res: Response) => {
-  try {
-    const tipo = String(req.query.tipo || '').toUpperCase();
-    const regiao = String(req.query.regiao || '');
-    if (!regiao || !['POCOS', 'POTENCIAL'].includes(tipo)) throw new ErroObra('Informe o tipo e a região.');
-    const tabela = tipo === 'POCOS' ? 'modulo_hidraulica_pocos_referencias' : 'modulo_hidraulica_pocos_potencial';
-    const [r]: any = await pool.execute(`DELETE FROM ${tabela} WHERE tenant_id = ? AND regiao = ?`, [tenantDe(req), regiao]);
-    return res.json({ removidos: r.affectedRows });
-  } catch (e) { return responderErro(res, e, 'Erro ao remover a região.'); }
 };
