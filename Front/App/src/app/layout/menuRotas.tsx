@@ -2,7 +2,7 @@
 import React from 'react';
 import { menuComModulos } from '../../modulos/registroModulos';
 import {
-  AppstoreOutlined, DollarOutlined, FileTextOutlined, HomeOutlined, InboxOutlined, ShopOutlined,
+  AppstoreOutlined, CarOutlined, DollarOutlined, FileTextOutlined, HomeOutlined, InboxOutlined, ShopOutlined,
   ShoppingCartOutlined, ShopTwoTone, TeamOutlined, ToolOutlined,
 } from '@ant-design/icons';
 
@@ -90,6 +90,7 @@ export const MENU_PRINCIPAL: ItemMenu[] = [
   },
   // Só os módulos de canal (Mercado Livre...) preenchem: sem módulo ligado o grupo não aparece
   { key: 'grp:ecommerce', icon: <ShopOutlined />, label: 'E-commerce', children: [] },
+  { key: 'grp:frota', icon: <CarOutlined />, label: 'Frota', children: [] },
   { key: '/relatorios', icon: <FileTextOutlined />, label: 'Relatórios' },
   { key: '/obras', icon: <ToolOutlined />, label: 'Obras / Projetos' },
 ];

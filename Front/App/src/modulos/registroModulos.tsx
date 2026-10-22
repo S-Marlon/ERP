@@ -12,6 +12,7 @@ const RolamentosEntrada = lazy(() => import('./transmissao/rolamentos/Rolamentos
 const RolamentoPorMedida = lazy(() => import('./transmissao/rolamentos/RolamentoPorMedida'));
 const RelatorioPocoPage = lazy(() => import('./hidraulica/pocos/RelatorioPocoPage'));
 const MercadoLivrePage = lazy(() => import('./ecommerce/mercadolivre/MercadoLivrePage'));
+const FrotaPagina = lazy(() => import('./logistica/frota/FrotaPagina'));
 
 /** O que o PDV entrega a um botão de módulo (o módulo não acessa o carrinho de outro jeito). */
 export interface PdvExtensaoProps {
@@ -88,6 +89,11 @@ export const MODULOS_FRONT: ModuloFront[] = [
     codigo: 'ECOMMERCE_MERCADOLIVRE',
     menu: [{ grupo: 'grp:ecommerce', itens: [{ key: '/ecommerce', label: 'Mercado Livre' }] }],
     rotas: [{ path: '/ecommerce', element: <MercadoLivrePage /> }],
+  },
+  {
+    codigo: 'LOGISTICA_FROTA',
+    menu: [{ grupo: 'grp:frota', itens: [{ key: '/modulos/logistica/frota', label: 'Gestor de frotas' }] }],
+    rotas: [{ path: '/modulos/logistica/frota', element: <FrotaPagina /> }],
   },
 ];
 

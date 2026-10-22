@@ -8,6 +8,7 @@ import transmissaoRolamentosRoutes from './transmissao/rolamentos/rolamentos.rou
 import hidraulicaPocosRoutes from './hidraulica/pocos/pocos.routes';
 import ecommerceMercadoLivreRoutes from './ecommerce/mercadolivre/mercadolivre.routes';
 import { iniciarSincronizacaoAutomatica } from './ecommerce/mercadolivre/sincronizacao';
+import logisticaFrotaRoutes from './logistica/frota/frota.routes';
 
 export interface ModuloRegistrado {
   codigo: string;      // padrão AREA_ASSUNTO (sistema_modulos.codigo)
@@ -52,6 +53,14 @@ export const MODULOS: ModuloRegistrado[] = [
     rotaBase: '/ecommerce/mercadolivre',
     router: ecommerceMercadoLivreRoutes,
     iniciar: iniciarSincronizacaoAutomatica,
+  },
+  {
+    codigo: 'LOGISTICA_FROTA',
+    nome: 'Gestor de frotas',
+    area: 'Logística',
+    descricao: 'Veículos da loja, abastecimentos (consumo e custo por km), manutenções preventivas, documentos e vencimentos, motoristas e viagens, com o custo indo para o financeiro.',
+    rotaBase: '/logistica/frota',
+    router: logisticaFrotaRoutes,
   },
 ];
 
