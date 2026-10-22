@@ -14,6 +14,12 @@ pelas etapas abaixo, ligado ao resto do ERP.
 - A empresa atende poços que outros perfuraram: o **poço é uma ficha própria**, com várias obras ao longo do tempo.
 - Mapa regional dos poços (profundidade e vazão da região antes de perfurar) e monitoramento remoto (IoT) estão no plano.
 
+## Sistema à parte (decisão do dono, 2026-10-22)
+O módulo de poços veio de outro sistema e fica **separado do resto do ERP**: clientes, contratos, cobrança, caixa,
+materiais, equipe e resultado são do próprio módulo. Não grava nem lê caixa, financeiro, clientes (pessoas) ou estoque
+da loja, e as regras de parcela/recebimento são cópias próprias (mudança no financeiro da loja não mexe aqui). Juntar
+com a loja, se um dia for o caso, é uma decisão nova.
+
 ## Etapas
 | Etapa | Funcionalidade |
 |---|---|
@@ -51,13 +57,13 @@ pelas etapas abaixo, ligado ao resto do ERP.
 - "Ver no mapa" na obra, no poço e no cliente; no mapa, o poço do cliente abre a obra, a ficha do poço e a do cliente.
 
 ## Etapa 3 (sinal e cobrança)
-- A cobrança fica **no próprio módulo** (`modulo_hidraulica_pocos_parcelas`, `_adicionais`, `_recebimentos`): o contas a
-  receber da loja exige cliente do cadastro geral e os clientes de poço são separados. Quando juntar os cadastros, as
-  parcelas abertas passam para o contas a receber.
+- A cobrança fica **no próprio módulo** (`modulo_hidraulica_pocos_parcelas`, `_adicionais`, `_recebimentos`), separada
+  do contas a receber e do caixa da loja.
 - Sinal na obra (`valor_sinal`, `sinal_quando`): ANTES = a obra só vai para "em execução" com a parcela do sinal paga;
   NO_ATO = libera o início e fica cobrando. A parcela do sinal acompanha o valor (não fica abaixo do já recebido).
 - Adicional nasce pendente e só entra no saldo aprovado, com o meio (mensagem, assinatura, presencial, telefone), a data
   e uma observação. O relatório sugere o metro excedente (perfurado − previsto) × valor do metro.
 - Saldo = contrato + adicionais aprovados − parcelas lançadas; vira à vista, parcelado ou sem prazo (mesmas regras do
-  contas a receber da loja). Recebimento só com caixa aberto (movimento RECEBIMENTO); estorno com motivo.
-- Resultado do mês e painel financeiro da loja ainda não contam as obras (fica para o painel do módulo, etapa 8).
+  contas a receber da loja, copiadas em `cobranca.ts`). O recebimento fica só no módulo (não passa pelo caixa da loja);
+  estorno com motivo. A coluna `id_caixa` de `_recebimentos` não é usada.
+- O resultado das obras fica no painel do próprio módulo (etapa 8), fora do Resultado do mês da loja.

@@ -36,6 +36,9 @@ por essa conexão (commit/rollback viram no-op), chamar os controllers com `req/
 - **Módulo plugável** liga/desliga por loja e não pode quebrar nada desligado. O núcleo nunca importa um módulo;
   o contato é só pelo registro (`Backend/src/modulos/registro.ts` e `Front/App/src/modulos/registroModulos.tsx`)
   e pelos pontos de extensão (`pdv`, `entradaNf`).
+- **Módulo Obras de poços (`HIDRAULICA_POCOS`) é um sistema à parte:** veio de outro sistema; clientes, cobrança, caixa,
+  materiais e resultado são do próprio módulo. Não ler nem gravar caixa, financeiro, `pessoas_*` ou estoque da loja.
+  Ver `docs/plano-obras-pocos.md`.
 - **Integração com canais (ML) é de mão dupla:** o que o canal calcula (frete, tarifa, "você recebe") o ERP **lê do canal**
   para o anúncio publicado; a conta própria do ERP é só para o que ainda não está lá. Regra de custo do canal fica numa função
   pura com teste e a data em que foi conferida com o painel. Ver `docs/incidentes/2026-10-16-frete-ml-divergente.md`.
@@ -119,6 +122,7 @@ docs/                      planos e decisões; docs/legado guarda material antig
 | Módulo Transmissão · Rolamentos | `modulos/transmissao/rolamentos` | `modulos/transmissao/rolamentos` | `modulo_transmissao_rolamentos_*` |
 | Módulo E-commerce · Mercado Livre (tela `/ecommerce`) | `modulos/ecommerce/mercadolivre` | `modulos/ecommerce/mercadolivre` | `modulo_ecommerce_mercadolivre_*` |
 | Módulo Logística · Gestor de frotas (em etapas, ver `docs/plano-frota.md`) | `modulos/logistica/frota` | `modulos/logistica/frota` | `modulo_logistica_frota_*` |
+| Módulo Hidráulica · Obras de poços (sistema à parte, ver `docs/plano-obras-pocos.md`) | `modulos/hidraulica/pocos` | `modulos/hidraulica/pocos` | `modulo_hidraulica_pocos_*` |
 
 Arquivo novo vai para a área dele; o que é usado por várias áreas vai para `shared/` (front). Nomes de pasta em
 minúsculo/camelCase. Imports são relativos; o endereço do backend vem só de `shared/api/config.ts`.

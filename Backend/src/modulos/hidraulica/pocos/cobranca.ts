@@ -1,7 +1,8 @@
 // Obras de poços › orçamento, sinal e cobrança (etapa 3): regras puras. O sinal pode ser pago ANTES (libera o início
 // da obra) ou NO_ATO da perfuração; adicionais só entram no saldo depois de aprovados pelo cliente (meio e data
-// registrados); o saldo vira parcelas (com ou sem vencimento) a receber no próprio módulo, porque os clientes de poço
-// não estão no cadastro geral. Parcelas, baixa e estorno usam as mesmas regras do contas a receber da loja.
+// registrados); o saldo vira parcelas (com ou sem vencimento) a receber no próprio módulo. O módulo de poços é um
+// sistema à parte (veio de outro sistema): não usa o caixa, o financeiro nem os clientes da loja, e tem as próprias
+// regras de parcela, recebimento e estorno (mudança no financeiro da loja não mexe aqui).
 import { ErroObra } from './obras';
 
 const c = (v: number) => Math.round((Number(v) || 0) * 100);
@@ -113,6 +114,86 @@ export const sugestaoExcedente = (metrosPrevistos: number | null, metrosPerfurad
   };
 };
 
-/** Texto da parcela no caixa e nas listas: "Obra 12 · sinal" / "Obra 12 · saldo 2/3". */
+/** Texto da parcela nas listas: "Obra 12 · sinal" / "Obra 12 · saldo 2/3". */
 export const descricaoParcela = (idObra: number, tipo: 'SINAL' | 'SALDO', parcela: number, total: number) =>
   `Obra ${idObra} · ${tipo === 'SINAL' ? 'sinal' : total > 1 ? `saldo ${parcela}/${total}` : 'saldo'}`;
+
+// ------------------------------------------------------------------ parcelas, recebimento e estorno (próprios do módulo)
+export const FORMAS_RECEBIMENTO = ['DINHEIRO', 'PIX', 'DEBITO', 'CREDITO', 'TRANSFERENCIA', 'CHEQUE', 'BOLETO'] as const;
+export interface ParcelaPlanejada { parcela: number; totalParcelas: number; vencimento: string | null; valor: number }
+
+const dataIso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const lerData = (s: string): Date | null => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(s || ''))) return null;
+  const [a, m, d] = s.split('-').map(Number);
+  const data = new Date(a, m - 1, d);
+  return data.getFullYear() === a && data.getMonth() === m - 1 && data.getDate() === d ? data : null;
+};
+
+/** Parcelas iguais (os centavos que sobram vão para a primeira), a cada `intervaloDias` a partir do 1º vencimento. */
+export const planejarParcelas = (total: number, quantidade: number, hoje: Date, intervaloDias = 30, primeiroVencimento?: string | null): ParcelaPlanejada[] => {
+  const n = Math.floor(Number(quantidade ?? 1));
+  if (!Number.isFinite(n) || n < 1 || n > 36) throw new ErroObra('Número de parcelas inválido (1 a 36).');
+  const intervalo = Math.floor(Number(intervaloDias) || 30);
+  if (intervalo < 1 || intervalo > 365) throw new ErroObra('Intervalo entre parcelas inválido (1 a 365 dias).');
+  const totalC = c(total);
+  if (totalC <= 0) throw new ErroObra('Valor inválido.');
+  const hojeSemHora = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+  let primeiro: Date;
+  if (primeiroVencimento) {
+    const d = lerData(primeiroVencimento);
+    if (!d) throw new ErroObra('Data do primeiro vencimento inválida.');
+    if (d < hojeSemHora) throw new ErroObra('O primeiro vencimento não pode ser antes de hoje.');
+    primeiro = d;
+  } else {
+    primeiro = new Date(hojeSemHora);
+    primeiro.setDate(primeiro.getDate() + intervalo);
+  }
+  const base = Math.floor(totalC / n);
+  const sobra = totalC - base * n;
+  return Array.from({ length: n }, (_, i) => {
+    const venc = new Date(primeiro);
+    venc.setDate(venc.getDate() + intervalo * i);
+    return { parcela: i + 1, totalParcelas: n, vencimento: dataIso(venc), valor: r(base + (i === 0 ? sobra : 0)) };
+  });
+};
+
+/** Sem prazo ("paga quando puder"): uma parcela só, sem vencimento. */
+export const parcelaUnicaSemPrazo = (total: number): ParcelaPlanejada[] => {
+  if (c(total) <= 0) throw new ErroObra('Valor inválido.');
+  return [{ parcela: 1, totalParcelas: 1, vencimento: null, valor: r(c(total)) }];
+};
+
+/** Recebimento de uma parcela: forma válida, valor > 0 e até o saldo; quita quando chega no valor. */
+export const aplicarRecebimento = (valorParcela: number, valorPago: number, valor: number, forma: string, status: string) => {
+  if (status !== 'ABERTO') throw new ErroObra(`Parcela ${status === 'PAGO' ? 'já paga' : 'cancelada'}.`, 409);
+  const f = String(forma || '').toUpperCase();
+  if (!(FORMAS_RECEBIMENTO as readonly string[]).includes(f)) throw new ErroObra(`Forma de recebimento inválida: ${forma}.`);
+  const saldoC = c(valorParcela) - c(valorPago);
+  const recebidoC = c(valor);
+  if (!Number.isFinite(recebidoC) || recebidoC <= 0) throw new ErroObra('Informe um valor maior que zero.');
+  if (recebidoC > saldoC) throw new ErroObra(`O valor (R$ ${r(recebidoC).toFixed(2)}) passa do saldo da parcela (R$ ${r(saldoC).toFixed(2)}).`);
+  const novoC = c(valorPago) + recebidoC;
+  return { forma: f, valor: r(recebidoC), valorPago: r(novoC), status: (novoC >= c(valorParcela) ? 'PAGO' : 'ABERTO') as 'PAGO' | 'ABERTO' };
+};
+
+/** Estorno: devolve o valor ao saldo e reabre a parcela. */
+export const estornarRecebimento = (valorParcela: number, valorPago: number, valor: number) => {
+  const novoC = Math.max(0, c(valorPago) - c(valor));
+  return { valorPago: r(novoC), status: (novoC >= c(valorParcela) ? 'PAGO' : 'ABERTO') as 'PAGO' | 'ABERTO' };
+};
+
+export type SituacaoParcela = 'VENCIDO' | 'VENCE_HOJE' | 'A_VENCER' | 'SEM_PRAZO' | 'PAGO' | 'CANCELADO';
+export const situacaoParcela = (status: string, vencimento: string | null, hoje: Date): SituacaoParcela => {
+  if (status === 'PAGO') return 'PAGO';
+  if (status === 'CANCELADO') return 'CANCELADO';
+  if (!vencimento) return 'SEM_PRAZO';
+  const h = dataIso(hoje), v = String(vencimento).slice(0, 10);
+  return v < h ? 'VENCIDO' : v === h ? 'VENCE_HOJE' : 'A_VENCER';
+};
+export const diasAtraso = (vencimento: string | null, hoje: Date) => {
+  const v = vencimento ? lerData(String(vencimento).slice(0, 10)) : null;
+  if (!v) return 0;
+  const h = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+  return Math.max(0, Math.round((h.getTime() - v.getTime()) / 86400000));
+};

@@ -3,7 +3,6 @@
 import { Request, Response } from 'express';
 import pool from '../../../infra/db';
 import { operadorDe } from '../../../areas/vendas/caixa/caixa.controller';
-import { ErroReceber } from '../../../areas/financeiro/receber/receber';
 import { bloqueioDoSinal } from './cobranca';
 import { acertarSinal, parcelaDoSinal } from './cobrancaBanco';
 import {
@@ -16,7 +15,7 @@ const NOME_PESSOA = 'c.nome';
 const JOIN_PESSOA = (col: string) => `LEFT JOIN modulo_hidraulica_pocos_clientes c ON c.id_cliente = ${col}`;
 
 export const responderErro = (res: Response, e: any, padrao: string) => {
-  if (e instanceof ErroObra || e instanceof ErroReceber) return res.status(e.status).json({ error: e.message });
+  if (e instanceof ErroObra) return res.status(e.status).json({ error: e.message });
   console.error(padrao, e);
   return res.status(500).json({ error: padrao, details: e?.message });
 };

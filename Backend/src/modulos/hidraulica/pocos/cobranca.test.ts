@@ -1,5 +1,8 @@
 import assert from 'assert';
-import { acertoDoSinal, adicionalPodeIr, bloqueioDoSinal, descricaoParcela, resumoCobranca, sugestaoExcedente, validarAdicional, validarAprovacao } from './cobranca';
+import {
+  acertoDoSinal, adicionalPodeIr, aplicarRecebimento, bloqueioDoSinal, descricaoParcela, diasAtraso, estornarRecebimento, parcelaUnicaSemPrazo, planejarParcelas,
+  resumoCobranca, situacaoParcela, sugestaoExcedente, validarAdicional, validarAprovacao,
+} from './cobranca';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -55,4 +58,26 @@ teste('cobrança de obra: sugestão do metro excedente e descrição', () => {
   assert.strictEqual(sugestaoExcedente(120, 132, null, false), null);
   assert.deepStrictEqual([descricaoParcela(12, 'SINAL', 1, 1), descricaoParcela(12, 'SALDO', 2, 3), descricaoParcela(12, 'SALDO', 1, 1)],
     ['Obra 12 · sinal', 'Obra 12 · saldo 2/3', 'Obra 12 · saldo']);
+});
+
+teste('cobrança de obra: parcelas, recebimento e estorno (regras do próprio módulo)', () => {
+  const hoje = new Date(2026, 9, 22);
+  assert.deepStrictEqual(planejarParcelas(15250, 3, hoje), [
+    { parcela: 1, totalParcelas: 3, vencimento: '2026-11-21', valor: 5083.34 },
+    { parcela: 2, totalParcelas: 3, vencimento: '2026-12-21', valor: 5083.33 },
+    { parcela: 3, totalParcelas: 3, vencimento: '2027-01-20', valor: 5083.33 },
+  ]);
+  assert.strictEqual(planejarParcelas(100, 1, hoje, 30, '2026-10-30')[0].vencimento, '2026-10-30');
+  assert.throws(() => planejarParcelas(100, 1, hoje, 30, '2026-10-01'), /antes de hoje/);
+  assert.throws(() => planejarParcelas(100, 40, hoje), /1 a 36/);
+  assert.deepStrictEqual(parcelaUnicaSemPrazo(99.999), [{ parcela: 1, totalParcelas: 1, vencimento: null, valor: 100 }]);
+  assert.deepStrictEqual(aplicarRecebimento(5000, 1000, 4000, 'pix', 'ABERTO'), { forma: 'PIX', valor: 4000, valorPago: 5000, status: 'PAGO' });
+  assert.strictEqual(aplicarRecebimento(5000, 0, 1000, 'CHEQUE', 'ABERTO').status, 'ABERTO');
+  assert.throws(() => aplicarRecebimento(5000, 1000, 4000.01, 'PIX', 'ABERTO'), /passa do saldo/);
+  assert.throws(() => aplicarRecebimento(5000, 5000, 1, 'PIX', 'PAGO'), /já paga/);
+  assert.throws(() => aplicarRecebimento(5000, 0, 1, 'FIADO', 'ABERTO'), /Forma/);
+  assert.deepStrictEqual(estornarRecebimento(5000, 5000, 1000), { valorPago: 4000, status: 'ABERTO' });
+  assert.deepStrictEqual([situacaoParcela('ABERTO', '2026-10-21', hoje), situacaoParcela('ABERTO', '2026-10-22', hoje), situacaoParcela('ABERTO', null, hoje),
+    situacaoParcela('PAGO', '2020-01-01', hoje)], ['VENCIDO', 'VENCE_HOJE', 'SEM_PRAZO', 'PAGO']);
+  assert.deepStrictEqual([diasAtraso('2026-10-12', hoje), diasAtraso('2026-11-01', hoje), diasAtraso(null, hoje)], [10, 0, 0]);
 });

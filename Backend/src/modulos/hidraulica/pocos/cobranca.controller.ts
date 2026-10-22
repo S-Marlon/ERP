@@ -1,13 +1,15 @@
 // Obras de poços › orçamento, sinal e cobrança (etapa 3): adicionais com aprovação do cliente, parcelas do saldo,
-// recebimentos (entram no caixa aberto, como no contas a receber da loja) e a lista "a receber de obras".
-// Tabelas modulo_hidraulica_pocos_adicionais, _parcelas e _recebimentos.
+// recebimentos e a lista "a receber de obras". Tabelas modulo_hidraulica_pocos_adicionais, _parcelas e _recebimentos.
+// Separado da loja: o recebimento fica só no módulo (não entra no caixa nem no financeiro da loja).
 import { Request, Response } from 'express';
 import pool from '../../../infra/db';
-import { carregarCaixaAberto, operadorDe } from '../../../areas/vendas/caixa/caixa.controller';
-import { aplicarBaixa, diasDeAtraso, estornarBaixa, gerarParcelas, parcelaSemPrazo, situacaoTitulo } from '../../../areas/financeiro/receber/receber';
+import { operadorDe } from '../../../areas/vendas/caixa/caixa.controller';
 import { ErroObra, pocoDoRelatorio } from './obras';
 import { responderErro } from './obras.controller';
-import { adicionalPodeIr, descricaoParcela, resumoCobranca, SituacaoAdicional, SITUACOES_ADICIONAL, sugestaoExcedente, validarAdicional, validarAprovacao } from './cobranca';
+import {
+  adicionalPodeIr, aplicarRecebimento, descricaoParcela, diasAtraso, estornarRecebimento as estornarValor, parcelaUnicaSemPrazo, planejarParcelas,
+  resumoCobranca, SituacaoAdicional, SITUACOES_ADICIONAL, situacaoParcela, sugestaoExcedente, validarAdicional, validarAprovacao,
+} from './cobranca';
 
 const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || req.body?.tenant_id || 1);
 const f4 = (v: number) => Math.round(v * 10000) / 10000;
@@ -24,7 +26,7 @@ const formatarParcela = (p: any, hoje: Date) => ({
   idParcela: Number(p.id_parcela), idObra: Number(p.id_obra), tipo: p.tipo, parcela: Number(p.parcela), totalParcelas: Number(p.total_parcelas),
   descricao: p.descricao, vencimento: p.vencimento_txt || null, valor: Number(p.valor), valorPago: Number(p.valor_pago),
   saldo: Math.round((Number(p.valor) - Number(p.valor_pago)) * 100) / 100, status: p.status,
-  situacao: situacaoTitulo(p.status, p.vencimento_txt || null, hoje), diasAtraso: p.status === 'ABERTO' ? diasDeAtraso(p.vencimento_txt || null, hoje) : 0,
+  situacao: situacaoParcela(p.status, p.vencimento_txt || null, hoje), diasAtraso: p.status === 'ABERTO' ? diasAtraso(p.vencimento_txt || null, hoje) : 0,
 });
 const formatarAdicional = (a: any) => ({
   idAdicional: Number(a.id_adicional), tipo: a.tipo, descricao: a.descricao, quantidade: Number(a.quantidade), valorUnitario: Number(a.valor_unitario),
@@ -54,7 +56,6 @@ export const cobrancaDaObra = async (req: Request, res: Response) => {
     const medido = pocoDoRelatorio(lerJson(o.dados_relatorio)).profundidadeM;
     const perfurado = medido === undefined || medido === null ? null : Number(medido);
     const jaTemExcedente = adicionais.some((a: any) => a.tipo === 'METRO_EXCEDENTE' && (a.situacao === 'PENDENTE' || a.situacao === 'APROVADO'));
-    const caixa = await carregarCaixaAberto(pool as any, tenant);
     return res.json({
       resumo: resumoCobranca({ valorContratado: o.valor_contratado === null ? null : Number(o.valor_contratado), valorSinal: o.valor_sinal === null ? null : Number(o.valor_sinal) }, adicionais, parcelas),
       sinalQuando: o.sinal_quando, adicionais, parcelas,
@@ -65,7 +66,6 @@ export const cobrancaDaObra = async (req: Request, res: Response) => {
       metrosPerfurados: perfurado,
       sugestao: sugestaoExcedente(o.metros_previstos === null ? null : Number(o.metros_previstos), perfurado,
         o.valor_metro_excedente === null ? null : Number(o.valor_metro_excedente), jaTemExcedente),
-      caixaAberto: !!caixa,
     });
   } catch (e) { return responderErro(res, e, 'Erro ao carregar a cobrança da obra.'); }
 };
@@ -148,8 +148,8 @@ export const lancarParcelas = async (req: Request, res: Response) => {
     if (Math.round(valor * 100) > Math.round(resumo.semParcela * 100)) {
       throw new ErroObra(`O valor passa do saldo que falta parcelar (R$ ${resumo.semParcela.toFixed(2).replace('.', ',')}).`);
     }
-    const plano = req.body?.semPrazo ? parcelaSemPrazo(valor)
-      : gerarParcelas(valor, Number(req.body?.quantidade ?? 1), new Date(), Number(req.body?.intervaloDias || 30), req.body?.primeiroVencimento || null);
+    const plano = req.body?.semPrazo ? parcelaUnicaSemPrazo(valor)
+      : planejarParcelas(valor, Number(req.body?.quantidade ?? 1), new Date(), Number(req.body?.intervaloDias || 30), req.body?.primeiroVencimento || null);
     const operador = operadorDe(req);
     for (const p of plano) {
       await conn.execute(
@@ -179,25 +179,19 @@ export const cancelarParcela = async (req: Request, res: Response) => {
   } catch (e) { return responderErro(res, e, 'Erro ao cancelar a parcela.'); }
 };
 
-// POST /parcelas/:id/receber { forma, valor, observacao } — entra no caixa aberto (movimento RECEBIMENTO)
+// POST /parcelas/:id/receber { forma, valor, observacao } — fica só no módulo (não passa pelo caixa da loja)
 export const receberParcela = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
   const conn: any = await pool.getConnection();
   try {
     await conn.beginTransaction();
-    const caixa = await carregarCaixaAberto(conn, tenant, 'LOCK IN SHARE MODE');
-    if (!caixa) throw new ErroObra('Abra o caixa para receber (o valor entra no caixa do dia).', 409);
     const [[p]]: any = await conn.execute(`SELECT * FROM modulo_hidraulica_pocos_parcelas WHERE id_parcela = ? AND tenant_id = ? FOR UPDATE`, [Number(req.params.id), tenant]);
     if (!p) throw new ErroObra('Parcela não encontrada.', 404);
-    const baixa = aplicarBaixa(Number(p.valor), Number(p.valor_pago), Number(req.body?.valor), req.body?.forma, p.status);
-    const operador = operadorDe(req);
+    const baixa = aplicarRecebimento(Number(p.valor), Number(p.valor_pago), Number(req.body?.valor), req.body?.forma, p.status);
     const [ins]: any = await conn.execute(
-      `INSERT INTO modulo_hidraulica_pocos_recebimentos (tenant_id, id_parcela, id_obra, forma, valor, id_caixa, observacao, operador) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [tenant, p.id_parcela, p.id_obra, baixa.forma, f4(baixa.valor), caixa.id_caixa, String(req.body?.observacao || '').trim().slice(0, 255) || null, operador]);
+      `INSERT INTO modulo_hidraulica_pocos_recebimentos (tenant_id, id_parcela, id_obra, forma, valor, observacao, operador) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [tenant, p.id_parcela, p.id_obra, baixa.forma, f4(baixa.valor), String(req.body?.observacao || '').trim().slice(0, 255) || null, operadorDe(req)]);
     await conn.execute(`UPDATE modulo_hidraulica_pocos_parcelas SET valor_pago = ?, status = ? WHERE id_parcela = ?`, [f4(baixa.valorPago), baixa.status, p.id_parcela]);
-    await conn.execute(
-      `INSERT INTO vendas_caixas_movimentos (tenant_id, id_caixa, tipo, forma, valor, id_origem, motivo, operador) VALUES (?, ?, 'RECEBIMENTO', ?, ?, ?, ?, ?)`,
-      [tenant, caixa.id_caixa, baixa.forma, f4(baixa.valor), Number(ins.insertId), `Poço: ${p.descricao || `parcela ${p.id_parcela}`}`.slice(0, 255), operador]);
     await conn.commit();
     return res.status(201).json({ idRecebimento: Number(ins.insertId), status: baixa.status, valorPago: baixa.valorPago });
   } catch (e) {
@@ -206,7 +200,7 @@ export const receberParcela = async (req: Request, res: Response) => {
   } finally { conn.release(); }
 };
 
-// POST /recebimentos/:id/estornar { motivo } — o valor sai do caixa aberto e a parcela reabre
+// POST /recebimentos/:id/estornar { motivo } — a parcela reabre (só no módulo)
 export const estornarRecebimento = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
   const motivo = String(req.body?.motivo || '').trim();
@@ -214,20 +208,14 @@ export const estornarRecebimento = async (req: Request, res: Response) => {
   try {
     if (!motivo) throw new ErroObra('Informe o motivo do estorno.');
     await conn.beginTransaction();
-    const caixa = await carregarCaixaAberto(conn, tenant, 'LOCK IN SHARE MODE');
-    if (!caixa) throw new ErroObra('Abra o caixa para estornar (o valor sai do caixa do dia).', 409);
     const [[r]]: any = await conn.execute(`SELECT * FROM modulo_hidraulica_pocos_recebimentos WHERE id_recebimento = ? AND tenant_id = ? FOR UPDATE`, [Number(req.params.id), tenant]);
     if (!r) throw new ErroObra('Recebimento não encontrado.', 404);
     if (r.estornado_em) throw new ErroObra('Recebimento já estornado.', 409);
     const [[p]]: any = await conn.execute(`SELECT * FROM modulo_hidraulica_pocos_parcelas WHERE id_parcela = ? FOR UPDATE`, [r.id_parcela]);
     if (p.status === 'CANCELADO') throw new ErroObra('A parcela está cancelada.', 409);
-    const novo = estornarBaixa(Number(p.valor), Number(p.valor_pago), Number(r.valor));
-    const operador = operadorDe(req);
+    const novo = estornarValor(Number(p.valor), Number(p.valor_pago), Number(r.valor));
     await conn.execute(`UPDATE modulo_hidraulica_pocos_recebimentos SET estornado_em = NOW(), estorno_motivo = ? WHERE id_recebimento = ?`, [motivo.slice(0, 255), r.id_recebimento]);
     await conn.execute(`UPDATE modulo_hidraulica_pocos_parcelas SET valor_pago = ?, status = ? WHERE id_parcela = ?`, [f4(novo.valorPago), novo.status, p.id_parcela]);
-    await conn.execute(
-      `INSERT INTO vendas_caixas_movimentos (tenant_id, id_caixa, tipo, forma, valor, id_origem, motivo, operador) VALUES (?, ?, 'ESTORNO_RECEBIMENTO', ?, ?, ?, ?, ?)`,
-      [tenant, caixa.id_caixa, r.forma, f4(Number(r.valor)), r.id_recebimento, `Poço: estorno ${p.descricao || ''} (${motivo})`.slice(0, 255), operador]);
     await conn.commit();
     return res.json({ status: novo.status, valorPago: novo.valorPago });
   } catch (e) {

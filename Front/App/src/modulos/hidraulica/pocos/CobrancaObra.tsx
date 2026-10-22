@@ -1,6 +1,6 @@
 // Obras de poços › cobrança da obra (etapa 3): o resumo (contratado + adicionais aprovados, recebido, a receber), o
-// sinal, os adicionais com a aprovação do cliente, as parcelas do saldo e os recebimentos (entram no caixa aberto).
-// E a lista "a receber de obras" com tudo o que está em aberto.
+// sinal, os adicionais com a aprovação do cliente, as parcelas do saldo e os recebimentos. E a lista "a receber de
+// obras". Tudo fica só no módulo: não passa pelo caixa nem pelo financeiro da loja.
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert, Button, Card, Col, Empty, Input, InputNumber, Modal, Popconfirm, Row, Segmented, Select, Space, Statistic, Table, Tag, Tooltip, Typography, message,
@@ -79,7 +79,7 @@ const AprovarModal: React.FC<{ adicional: Adicional | null; onFechar: () => void
   );
 };
 
-const ReceberModal: React.FC<{ parcela: ParcelaObra | null; caixaAberto: boolean; onFechar: () => void; onFeito: () => void }> = ({ parcela, caixaAberto, onFechar, onFeito }) => {
+const ReceberModal: React.FC<{ parcela: ParcelaObra | null; onFechar: () => void; onFeito: () => void }> = ({ parcela, onFechar, onFeito }) => {
   const [forma, setForma] = useState<FormaRecebimento>('PIX');
   const [valor, setValor] = useState<number>(0);
   const [obs, setObs] = useState('');
@@ -90,17 +90,16 @@ const ReceberModal: React.FC<{ parcela: ParcelaObra | null; caixaAberto: boolean
     setSalvando(true);
     try {
       const r = await cobrancaApi.receber(parcela.idParcela, { forma, valor, observacao: obs || null });
-      message.success(r.status === 'PAGO' ? 'Recebido: parcela quitada (entrou no caixa).' : 'Recebido em parte (entrou no caixa).');
+      message.success(r.status === 'PAGO' ? 'Recebido: parcela quitada.' : 'Recebido em parte.');
       onFeito();
     } catch (e) { erro(e); }
     finally { setSalvando(false); }
   };
   return (
     <Modal open={!!parcela} title={`Receber · ${parcela?.descricao || ''}`} okText="Receber" cancelText="Voltar" onOk={receber} confirmLoading={salvando}
-      okButtonProps={{ disabled: !caixaAberto }} onCancel={onFechar} destroyOnHidden>
+      onCancel={onFechar} destroyOnHidden>
       {parcela && (
         <Space direction="vertical" style={{ width: '100%' }} size={10}>
-          {!caixaAberto && <Alert type="warning" showIcon message="Abra o caixa para receber: o valor entra no caixa do dia." />}
           <Text>Saldo da parcela: <Text strong>{brl(parcela.saldo)}</Text></Text>
           <Row gutter={8}>
             <Col span={12}><Text>Forma</Text>
@@ -174,7 +173,7 @@ export const CobrancaDaObra: React.FC<{ idObra: number; cancelada: boolean; onMu
   const estornar = async () => {
     if (!estorno) return;
     if (!estorno.motivo.trim()) { message.warning('Informe o motivo do estorno.'); return; }
-    try { await cobrancaApi.estornar(estorno.id, estorno.motivo); message.success('Estornado: o valor saiu do caixa e a parcela reabriu.'); feito(); } catch (e) { erro(e); }
+    try { await cobrancaApi.estornar(estorno.id, estorno.motivo); message.success('Estornado: a parcela reabriu.'); feito(); } catch (e) { erro(e); }
   };
   if (!c) return <Card size="small" loading />;
   const r = c.resumo;
@@ -276,10 +275,10 @@ export const CobrancaDaObra: React.FC<{ idObra: number; cancelada: boolean; onMu
       </Card>
       <AdicionalModal aberto={adicional} idObra={idObra} onFechar={() => setAdicional(null)} onSalvo={feito} />
       <AprovarModal adicional={aprovando} onFechar={() => setAprovando(null)} onFeito={feito} />
-      <ReceberModal parcela={recebendo} caixaAberto={c.caixaAberto} onFechar={() => setRecebendo(null)} onFeito={feito} />
+      <ReceberModal parcela={recebendo} onFechar={() => setRecebendo(null)} onFeito={feito} />
       <SaldoModal aberto={saldo} idObra={idObra} semParcela={r.semParcela} onFechar={() => setSaldo(false)} onFeito={feito} />
       <Modal open={!!estorno} title="Estornar o recebimento" okText="Estornar" okButtonProps={{ danger: true }} cancelText="Voltar" onOk={estornar} onCancel={() => setEstorno(null)} destroyOnHidden>
-        <Text>O valor sai do caixa aberto e a parcela reabre.</Text>
+        <Text>O recebimento fica marcado como estornado e a parcela reabre.</Text>
         <Input style={{ marginTop: 8 }} placeholder="Motivo (obrigatório)" value={estorno?.motivo || ''} onChange={e => setEstorno(s => (s ? { ...s, motivo: e.target.value } : s))} />
       </Modal>
     </Space>

@@ -1,7 +1,8 @@
 // Módulo Obras de poços (HIDRAULICA_POCOS). Montado em /api/modulos/hidraulica/pocos (bloqueado se o módulo estiver
 // desligado). Etapa 1: obras, poços e clientes de poço (tabelas modulo_hidraulica_pocos_*); o relatório técnico fica
 // dentro da obra. Etapa 2: o mapa regional (nossos poços do banco; referência e potencial lidos dos GeoJSON do maperf).
-// Etapa 3: sinal, adicionais aprovados pelo cliente, parcelas do saldo e recebimentos (no caixa aberto).
+// Etapa 3: sinal, adicionais aprovados pelo cliente, parcelas do saldo e recebimentos. O módulo é um sistema à parte:
+// não usa o caixa, o financeiro nem os clientes da loja.
 import { Router } from 'express';
 import { criarObra, criarPoco, detalheObra, listarObras, listarPocos, mudarSituacao, salvarObra, salvarPoco, salvarRelatorio } from './obras.controller';
 import { criarCliente, detalheCliente, listarClientes, salvarCliente } from './clientes.controller';

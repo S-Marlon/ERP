@@ -1,5 +1,6 @@
 // Mapa do módulo Obras de poços (HIDRAULICA_POCOS): da perfuração à manutenção do poço, para empresa de poços
-// artesianos. O relatório técnico (etapa 0) já existe; o resto abre por etapas, ligado ao ERP.
+// artesianos. É um sistema à parte dentro do ERP (veio de outro sistema): clientes, cobrança, materiais, equipe e
+// resultado próprios, sem misturar com o caixa, o financeiro, os clientes ou o estoque da loja.
 import type { Funcionalidade } from '../../../shared/components/mapaModulo/mapaModulo';
 
 export const FUNCIONALIDADES: Funcionalidade[] = [
@@ -50,32 +51,32 @@ export const FUNCIONALIDADES: Funcionalidade[] = [
       'Adicionais com aprovação do cliente (registrada: por mensagem, assinatura ou presencial) entram no saldo',
       'Saldo à vista, parcelado ou sem prazo, a receber no próprio módulo (os clientes de poço não estão no cadastro geral)',
       'Metro excedente sugerido pelo relatório (perfurado além do previsto × valor do metro)',
-      'Recebimentos entram no caixa aberto; estorno com motivo; lista "a receber de obras"',
+      'Recebimentos e estornos (com motivo) só no módulo; lista "a receber de obras"',
     ],
     dados: ['sinal (valor, antes ou no ato)', 'adicionais (descrição, valor, aprovação: meio, data)', 'parcelas (sinal e saldo)', 'recebimentos'],
-    ligaCom: ['Caixa (o recebimento entra no caixa do dia)', 'Contas a receber da loja (quando juntar os cadastros)'],
+    ligaCom: ['Nada da loja: caixa e financeiro próprios do módulo'],
   },
   {
     chave: 'materiais', titulo: 'Materiais da obra', etapa: 4, situacao: 'PLANEJADA',
-    resumo: 'Tubos, filtros, bomba, cabos, brita e conexões saindo do estoque para a obra, com o custo real dela.',
+    resumo: 'Tubos, filtros, bomba, cabos, brita e conexões usados na obra, com o custo real dela (lista própria do módulo).',
     oQueFaz: [
-      'Lista de materiais da obra (previstos no orçamento e usados de fato)',
-      'Saída do estoque ao separar ou ao concluir (com devolução do que sobrou)',
+      'Lista de materiais da obra (previstos no orçamento e usados de fato), com custo',
+      'Materiais mais usados para preencher rápido (cadastro próprio do módulo)',
       'Custo real da obra para o resultado',
     ],
-    dados: ['obra', 'item do catálogo', 'quantidade prevista e usada', 'custo'],
-    ligaCom: ['Estoque', 'Catálogo'],
+    dados: ['obra', 'material (cadastro do módulo)', 'quantidade prevista e usada', 'custo'],
+    ligaCom: ['Nada da loja: o estoque e o catálogo da loja não são tocados'],
   },
   {
     chave: 'agenda', titulo: 'Agenda, equipe e sonda', etapa: 5, situacao: 'PLANEJADA',
     resumo: 'Calendário das obras, quem trabalha em cada uma e qual sonda ou equipamento vai.',
     oQueFaz: [
       'Calendário das obras e das visitas de manutenção',
-      'Equipe (funcionários) e equipamento de cada obra',
-      'A sonda e o caminhão podem ser veículos do Gestor de frotas',
+      'Quem vai e qual equipamento vai em cada obra',
+      'Equipe e equipamentos (sonda, caminhão, compressor) cadastrados no próprio módulo',
     ],
-    dados: ['obra', 'datas', 'equipe', 'equipamento/veículo'],
-    ligaCom: ['Parceiros › Funcionários', 'Gestor de frotas (quando ligado)'],
+    dados: ['obra', 'datas', 'equipe (cadastro do módulo)', 'equipamento'],
+    ligaCom: ['Nada da loja'],
   },
   {
     chave: 'manutencao', titulo: 'Histórico e manutenção do poço', etapa: 6, situacao: 'PLANEJADA',
@@ -109,6 +110,6 @@ export const FUNCIONALIDADES: Funcionalidade[] = [
       'Obras paradas ou atrasadas',
     ],
     dados: ['(calculado das outras etapas)'],
-    ligaCom: ['Financeiro › Resultado do mês'],
+    ligaCom: ['Nada da loja: o painel é do próprio módulo'],
   },
 ];

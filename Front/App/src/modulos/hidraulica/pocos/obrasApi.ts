@@ -109,7 +109,7 @@ export const obrasApi = {
 export type TipoAdicional = 'METRO_EXCEDENTE' | 'MATERIAL' | 'SERVICO' | 'OUTRO';
 export type SituacaoAdicional = 'PENDENTE' | 'APROVADO' | 'RECUSADO' | 'CANCELADO';
 export type MeioAprovacao = 'MENSAGEM' | 'ASSINATURA' | 'PRESENCIAL' | 'TELEFONE';
-export type FormaRecebimento = 'DINHEIRO' | 'PIX' | 'DEBITO' | 'CREDITO' | 'TRANSFERENCIA';
+export type FormaRecebimento = 'DINHEIRO' | 'PIX' | 'DEBITO' | 'CREDITO' | 'TRANSFERENCIA' | 'CHEQUE' | 'BOLETO';
 export type SituacaoParcela = 'VENCIDO' | 'VENCE_HOJE' | 'A_VENCER' | 'SEM_PRAZO' | 'PAGO' | 'CANCELADO';
 
 export const TIPOS_ADICIONAL: Record<TipoAdicional, string> = { METRO_EXCEDENTE: 'Metro excedente', MATERIAL: 'Material', SERVICO: 'Serviço', OUTRO: 'Outro' };
@@ -118,7 +118,9 @@ export const SITUACOES_ADICIONAL: Record<SituacaoAdicional, { texto: string; cor
   RECUSADO: { texto: 'Recusado', cor: 'red' }, CANCELADO: { texto: 'Cancelado', cor: 'default' },
 };
 export const MEIOS_APROVACAO: Record<MeioAprovacao, string> = { MENSAGEM: 'Mensagem (WhatsApp, e-mail)', ASSINATURA: 'Assinatura', PRESENCIAL: 'Presencial', TELEFONE: 'Telefone' };
-export const FORMAS_RECEBIMENTO: Record<FormaRecebimento, string> = { DINHEIRO: 'Dinheiro', PIX: 'PIX', DEBITO: 'Débito', CREDITO: 'Crédito', TRANSFERENCIA: 'Transferência' };
+export const FORMAS_RECEBIMENTO: Record<FormaRecebimento, string> = {
+  DINHEIRO: 'Dinheiro', PIX: 'PIX', DEBITO: 'Débito', CREDITO: 'Crédito', TRANSFERENCIA: 'Transferência', CHEQUE: 'Cheque', BOLETO: 'Boleto',
+};
 export const SITUACOES_PARCELA: Record<SituacaoParcela, { texto: string; cor: string }> = {
   VENCIDO: { texto: 'Vencida', cor: 'red' }, VENCE_HOJE: { texto: 'Vence hoje', cor: 'orange' }, A_VENCER: { texto: 'A vencer', cor: 'blue' },
   SEM_PRAZO: { texto: 'Sem prazo', cor: 'purple' }, PAGO: { texto: 'Paga', cor: 'green' }, CANCELADO: { texto: 'Cancelada', cor: 'default' },
@@ -143,7 +145,7 @@ export interface ResumoCobranca {
 }
 export interface CobrancaObra {
   resumo: ResumoCobranca; sinalQuando: 'ANTES' | 'NO_ATO'; adicionais: Adicional[]; parcelas: ParcelaObra[]; recebimentos: RecebimentoObra[];
-  metrosPerfurados: number | null; sugestao: (AdicionalForm & { valor: number }) | null; caixaAberto: boolean;
+  metrosPerfurados: number | null; sugestao: (AdicionalForm & { valor: number }) | null;
 }
 export interface AReceberObra extends ParcelaObra { obra: string | null; obraSituacao: SituacaoObra; idCliente: number; cliente: string | null; telefone: string | null }
 
