@@ -1,11 +1,11 @@
-// Módulo Obras de poços: abre na Central (contratos a finalizar, informações a completar e a prévia do plano mensal) e
-// tem uma aba para cada parte do dia a dia. O mapa de etapas do desenvolvimento ficou em planoObras.ts e
-// docs/plano-obras-pocos.md (todas prontas); as partes de cobrança, materiais e processo vivem dentro da obra.
-import React, { useEffect } from 'react';
-import { Tabs, Typography } from 'antd';
-import {
-  AimOutlined, ApiOutlined, BarChartOutlined, CalendarOutlined, CustomerServiceOutlined, DashboardOutlined, EnvironmentOutlined, FileTextOutlined, HistoryOutlined,
-} from '@ant-design/icons';
+// Módulo Obras de poços: grupo próprio na barra lateral ("Poços artesianos"), uma seção por endereço
+// (/modulos/hidraulica/pocos/<secao>, ver secoesPocos.ts). A Central é a entrada. Os atalhos internos ("abrir obra",
+// "ver no mapa", os cartões da Central) mudam a seção pelo navPocos e o endereço acompanha; as partes de cobrança,
+// materiais, processo e orçamento/contrato vivem dentro da obra.
+import React, { useEffect, useRef } from 'react';
+import { Typography } from 'antd';
+import { AimOutlined } from '@ant-design/icons';
+import { useNavigate, useParams } from 'react-router-dom';
 import CentralPocos from './CentralPocos';
 import RelatorioPocoPage from './RelatorioPocoPage';
 import ObrasAba from './ObrasAba';
@@ -16,33 +16,45 @@ import { ManutencoesPocos } from './ManutencaoPocos';
 import MonitoramentoPocos from './MonitoramentoPocos';
 import AtendimentoPocos from './AtendimentoPocos';
 import { navPocos, useNavPocos } from './navPocos';
+import { secaoDaAba, secaoDoEndereco } from './secoesPocos';
 
 const { Title, Text } = Typography;
+const BASE = '/modulos/hidraulica/pocos';
 
-const ABAS: { chave: string; titulo: string; icone: React.ReactNode; tela: React.ReactNode }[] = [
-  { chave: 'central', titulo: 'Central', icone: <DashboardOutlined />, tela: <CentralPocos /> },
-  { chave: 'atendimento', titulo: 'Atendimento e pós-venda', icone: <CustomerServiceOutlined />, tela: <AtendimentoPocos /> },
-  { chave: 'obras', titulo: 'Obras, poços e clientes', icone: <AimOutlined />, tela: <ObrasAba /> },
-  { chave: 'agenda', titulo: 'Agenda', icone: <CalendarOutlined />, tela: <AgendaPocos /> },
-  { chave: 'manutencao', titulo: 'Manutenção', icone: <HistoryOutlined />, tela: <ManutencoesPocos /> },
-  { chave: 'iot', titulo: 'Monitoramento', icone: <ApiOutlined />, tela: <MonitoramentoPocos /> },
-  { chave: 'mapa', titulo: 'Mapa', icone: <EnvironmentOutlined />, tela: <MapaPocos /> },
-  { chave: 'resultado', titulo: 'Resultado', icone: <BarChartOutlined />, tela: <PainelPocos /> },
-  { chave: 'relatorio', titulo: 'Relatório avulso', icone: <FileTextOutlined />, tela: <RelatorioPocoPage /> },
-];
+const TELAS: Record<string, React.ReactNode> = {
+  central: <CentralPocos />, atendimento: <AtendimentoPocos />, obras: <ObrasAba />, agenda: <AgendaPocos />, manutencao: <ManutencoesPocos />,
+  iot: <MonitoramentoPocos />, mapa: <MapaPocos />, resultado: <PainelPocos />, relatorio: <RelatorioPocoPage />,
+};
 
 const ObrasPocosPagina: React.FC = () => {
-  const nav = useNavPocos();   // "ver no mapa", "abrir obra" e os atalhos da Central trocam a aba
+  const { secao } = useParams<{ secao?: string }>();
+  const navigate = useNavigate();
+  const nav = useNavPocos();
+  const atual = secaoDoEndereco(secao);
+  const ultimoPedido = useRef(nav.pedido);
+
+  // endereço → seção interna (clique na barra lateral, voltar do navegador, link salvo)
+  useEffect(() => {
+    if (nav.aba === atual.aba && (!atual.vista || nav.vista === atual.vista)) return;
+    if (atual.vista) navPocos.ir({ aba: atual.aba, vista: atual.vista }); else navPocos.trocarAba(atual.aba);
+  }, [atual.secao]);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  // pedido interno ("abrir obra", "ver no mapa", atalhos da Central) → endereço
+  useEffect(() => {
+    if (nav.pedido === ultimoPedido.current) return;
+    ultimoPedido.current = nav.pedido;
+    const destino = secaoDaAba(nav.aba, nav.vista);
+    if (destino.secao !== atual.secao) navigate(destino.secao ? `${BASE}/${destino.secao}` : BASE);
+  }, [nav.pedido]);   // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => () => navPocos.trocarAba('central'), []);   // ao sair do módulo, volta a abrir pela Central
-  const aba = ABAS.some(a => a.chave === nav.aba) ? nav.aba : 'central';
   return (
     <div style={{ padding: 24 }}>
       <div style={{ marginBottom: 12 }}>
-        <Title level={3} style={{ margin: 0 }}><AimOutlined /> Obras de poços artesianos</Title>
-        <Text type="secondary">Do primeiro contato à manutenção: contratos, obras, poços, agenda, monitoramento e pós-venda.</Text>
+        <Title level={3} style={{ margin: 0 }}><AimOutlined /> Poços artesianos · {atual.titulo}</Title>
+        {atual.aba === 'central' && <Text type="secondary">Do primeiro contato à manutenção: contratos, obras, poços, agenda, monitoramento e pós-venda.</Text>}
       </div>
-      <Tabs activeKey={aba} onChange={navPocos.trocarAba} destroyOnHidden
-        items={ABAS.map(a => ({ key: a.chave, label: <span>{a.icone} {a.titulo}</span>, children: a.tela }))} />
+      <React.Fragment key={atual.aba}>{TELAS[atual.aba]}</React.Fragment>
     </div>
   );
 };

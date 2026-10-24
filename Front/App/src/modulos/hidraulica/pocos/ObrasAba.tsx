@@ -15,7 +15,7 @@ import { HistoricoDoPoco } from './ManutencaoPocos';
 import { ProcessoDaObra } from './ProcessoObra';
 import { OrcamentoEContrato, OrcamentoRapido } from './OrcamentoContrato';
 import { lerGpsTexto, textoRaio } from './mapaRegional';
-import { abrirCliente, agendarObra, ParteObra, useNavPocos, verNoMapa, VistaObras } from './navPocos';
+import { abrirCliente, agendarObra, navPocos, ParteObra, useNavPocos, verNoMapa, VistaObras } from './navPocos';
 
 const { Text } = Typography;
 const brl = (v: number | null | undefined) => (v === null || v === undefined ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
@@ -489,7 +489,7 @@ const ObrasAba: React.FC = () => {
   if (aberta) return <ObraAberta key={`${aberta}-${nav.pedido}`} idObra={aberta} parte={parte} onVoltar={() => setAberta(null)} />;
   return (
     <Space direction="vertical" size={12} style={{ width: '100%' }}>
-      <Segmented value={vista} onChange={v => setVista(v as VistaObras)}
+      <Segmented value={vista} onChange={v => navPocos.ir({ aba: 'obras', vista: v as VistaObras })}
         options={[{ value: 'OBRAS', label: 'Obras' }, { value: 'RECEBER', label: 'A receber' }, { value: 'POCOS', label: 'Poços' }, { value: 'CLIENTES', label: 'Clientes de poço' },
           { value: 'MATERIAIS', label: 'Materiais' }]} />
       {vista === 'OBRAS' && <ListaObras onAbrir={setAberta} />}
