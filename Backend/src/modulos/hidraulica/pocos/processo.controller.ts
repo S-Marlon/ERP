@@ -36,6 +36,8 @@ export const carregarConfig = async (tenant: number) => {
     respostaLeadMin: c ? Number(c.resposta_lead_min) : CONFIG_PADRAO.respostaLeadMin, orcamentoHoras: c ? Number(c.orcamento_horas) : CONFIG_PADRAO.orcamentoHoras,
     avaliacaoDias: c ? Number(c.avaliacao_dias) : CONFIG_PADRAO.avaliacaoDias, revisaoMeses: c ? Number(c.revisao_meses) : CONFIG_PADRAO.revisaoMeses,
     horaAbre: c?.abre || '08:00', horaFecha: c?.fecha || '18:00', sabadoFecha: c ? c.sabado || null : '12:00', configurado: !!c,
+    modeloContrato: c?.modelo_contrato || null, modeloAditivo: c?.modelo_aditivo || null, foroCidade: c?.foro_cidade || null,
+    responsavelTecnico: c?.responsavel_tecnico || null, registroTecnico: c?.registro_tecnico || null,
   };
 };
 export type Config = Awaited<ReturnType<typeof carregarConfig>>;
@@ -68,6 +70,8 @@ export const salvarConfig = async (req: Request, res: Response) => {
       ['forma_pagamento_padrao', c.formaPagamentoPadrao], ['validade_orcamento_dias', c.validadeOrcamentoDias], ['link_avaliacao', c.linkAvaliacao],
       ['msg_avaliacao', c.msgAvaliacao], ['msg_revisao', c.msgRevisao], ['resposta_lead_min', c.respostaLeadMin], ['orcamento_horas', c.orcamentoHoras],
       ['avaliacao_dias', c.avaliacaoDias], ['revisao_meses', c.revisaoMeses], ['hora_abre', c.horaAbre], ['hora_fecha', c.horaFecha], ['sabado_fecha', c.sabadoFecha],
+      ['modelo_contrato', c.modeloContrato], ['modelo_aditivo', c.modeloAditivo], ['foro_cidade', c.foroCidade], ['responsavel_tecnico', c.responsavelTecnico],
+      ['registro_tecnico', c.registroTecnico],
       ['operador', operadorDe(req)],
     ];
     await pool.execute(
@@ -449,6 +453,9 @@ export const dadosDoDocumento = async (req: Request, res: Response) => {
       ? await pool.execute(`SELECT p.*, DATE_FORMAT(p.data_perfuracao, '%Y-%m-%d') AS perfuracao_txt FROM modulo_hidraulica_pocos_pocos p WHERE p.id_poco = ?`, [o.id_poco])
       : [[null]];
     const [adic]: any = await pool.execute(`SELECT descricao, valor FROM modulo_hidraulica_pocos_adicionais WHERE id_obra = ? AND situacao = 'APROVADO'`, [id]);
+    const [itens]: any = await pool.execute(`SELECT * FROM modulo_hidraulica_pocos_orcamento_itens WHERE id_obra = ? ORDER BY ordem, id_item`, [id]);
+    const [[contrato]]: any = await pool.execute(
+      `SELECT DATE_FORMAT(feito_em, '%Y-%m-%d') AS em FROM modulo_hidraulica_pocos_processo WHERE id_obra = ? AND etapa = 'CONTRATO_ASSINADO' AND situacao = 'FEITO'`, [id]);
     let relatorio: any = {};
     try { relatorio = o.dados_relatorio ? JSON.parse(o.dados_relatorio) : {}; } catch { relatorio = {}; }
     const medido = pocoDoRelatorio(relatorio);
@@ -461,8 +468,15 @@ export const dadosDoDocumento = async (req: Request, res: Response) => {
         garantiaAte: garantiaAte(o.termino_txt || null, nulo(o.garantia_meses)), escopo: o.escopo || null, prazoExecucaoDias: nulo(o.prazo_execucao_dias),
         formaPagamento: o.forma_pagamento || cfg.formaPagamentoPadrao, validadeOrcamentoDias: nulo(o.validade_orcamento_dias) ?? cfg.validadeOrcamentoDias,
         adicionais: adic.map((a: any) => ({ descricao: a.descricao, valor: Number(a.valor) })),
+        itens: itens.map((i: any) => ({ grupo: i.grupo, descricao: i.descricao, quantidade: Number(i.quantidade), unidade: i.unidade,
+          valorUnitario: Number(i.valor_unitario), valorTotal: Number(i.valor_total), opcional: !!i.opcional })),
+        contratoAssinadoEm: contrato?.em || null,
       },
-      cliente: cli ? { nome: cli.nome, documento: cli.documento || null, telefone: cli.telefone || null, endereco: cli.endereco || null, cidade: cli.cidade || null, uf: cli.uf || null } : null,
+      cliente: cli ? {
+        nome: cli.nome, tipoPessoa: cli.tipo_pessoa || 'PF', documento: cli.documento || null, rgIe: cli.rg_ie || null, estadoCivil: cli.estado_civil || null,
+        profissao: cli.profissao || null, telefone: cli.telefone || null, email: cli.email || null, endereco: cli.endereco || null, bairro: cli.bairro || null,
+        cidade: cli.cidade || null, uf: cli.uf || null, cep: cli.cep || null, representante: cli.representante || null, representanteDocumento: cli.representante_documento || null,
+      } : null,
       poco: poco ? {
         idPoco: Number(poco.id_poco), identificacao: poco.identificacao, endereco: poco.endereco || null, cidade: poco.cidade || null, uf: poco.uf || null,
         latitude: nulo(poco.latitude), longitude: nulo(poco.longitude), profundidadeM: nulo(poco.profundidade_m), diametro: poco.diametro || null,

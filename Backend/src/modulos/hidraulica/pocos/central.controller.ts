@@ -29,9 +29,9 @@ const meses = (de: string, ate: string) => {
 const MANUTENCAO = ['LIMPEZA', 'MANUTENCAO', 'TROCA_BOMBA', 'TESTE_VAZAO'];
 const VISITA = ['LIMPEZA', 'MANUTENCAO'];
 
-export const central = async (req: Request, res: Response) => {
-  const tenant = tenantDe(req);
-  try {
+/** Monta todos os números da Central (usado também pela ficha completa do cliente, para a prévia do plano). */
+export const calcularCentral = async (tenant: number) => {
+  {
     const agora = agoraLocal();
     const hoje = agora.slice(0, 10);
     const cfg = await carregarConfig(tenant);
@@ -160,7 +160,7 @@ export const central = async (req: Request, res: Response) => {
       `SELECT COALESCE(SUM(valor - valor_pago), 0) AS total, COALESCE(SUM(CASE WHEN vencimento < CURDATE() THEN valor - valor_pago ELSE 0 END), 0) AS vencido
        FROM modulo_hidraulica_pocos_parcelas WHERE tenant_id = ? AND status = 'ABERTO'`, [tenant]);
 
-    return res.json({
+    return {
       hoje: {
         agenda: n(ag.n), agendaTitulos: ag.titulos ? String(ag.titulos).split(' | ').slice(0, 5) : [], contatosSemResposta: n(ld.n), alertasIot: n(al.n),
         aReceber: n(rc.total), vencido: n(rc.vencido),
@@ -170,6 +170,12 @@ export const central = async (req: Request, res: Response) => {
         clientes: plano, potencialAlta: potencial('ALTA'), potencialMedia: potencial('MEDIA'), visitaEmpresa: visitaEmpresa === null ? null : Math.round(visitaEmpresa * 100) / 100,
         alta: plano.filter((c: any) => c.faixa === 'ALTA').length, media: plano.filter((c: any) => c.faixa === 'MEDIA').length,
       },
-    });
-  } catch (e) { return responderErro(res, e, 'Erro ao montar a central.'); }
+    };
+  }
+};
+
+// GET /central
+export const central = async (req: Request, res: Response) => {
+  try { return res.json(await calcularCentral(tenantDe(req))); }
+  catch (e) { return responderErro(res, e, 'Erro ao montar a central.'); }
 };

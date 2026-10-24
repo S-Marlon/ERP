@@ -110,14 +110,24 @@ export const validarCliente = (b: any) => {
   const digitos = (v: unknown, max: number) => String(v ?? '').replace(/\D/g, '').slice(0, max) || null;
   const telefone = digitos(b?.telefone, 20);
   if (telefone && telefone.length < 8) throw new ErroObra('Telefone incompleto.');
+  const tipoPessoa = String(b?.tipoPessoa || 'PF').toUpperCase() === 'PJ' ? 'PJ' : 'PF';
   const documento = digitos(b?.documento, 18);
   if (documento && documento.length !== 11 && documento.length !== 14) throw new ErroObra('Documento: CPF com 11 ou CNPJ com 14 dígitos.');
+  if (documento && tipoPessoa === 'PJ' && documento.length !== 14) throw new ErroObra('Empresa (PJ): o CNPJ tem 14 dígitos.');
+  if (documento && tipoPessoa === 'PF' && documento.length !== 11) throw new ErroObra('Pessoa física: o CPF tem 11 dígitos (empresa: marque PJ).');
   const email = texto(b?.email, 120);
   if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new ErroObra('E-mail inválido.');
+  const telefone2 = digitos(b?.telefone2, 20);
+  const cep = digitos(b?.cep, 8);
+  if (cep && cep.length !== 8) throw new ErroObra('CEP com 8 dígitos.');
+  const representanteDocumento = tipoPessoa === 'PJ' ? digitos(b?.representanteDocumento, 11) : null;
+  if (representanteDocumento && representanteDocumento.length !== 11) throw new ErroObra('CPF do representante com 11 dígitos.');
   return {
-    nome, telefone, documento, email: email ? email.toLowerCase() : null,
+    nome, tipoPessoa, telefone, telefone2, documento, rgIe: texto(b?.rgIe, 20), estadoCivil: tipoPessoa === 'PF' ? texto(b?.estadoCivil, 20) : null,
+    profissao: tipoPessoa === 'PF' ? texto(b?.profissao, 60) : null, email: email ? email.toLowerCase() : null,
     endereco: texto(b?.endereco, 150), bairro: texto(b?.bairro, 60), cidade: texto(b?.cidade, 60),
-    uf: String(b?.uf ?? '').trim().toUpperCase().slice(0, 2) || null, observacao: texto(b?.observacao, 255),
+    uf: String(b?.uf ?? '').trim().toUpperCase().slice(0, 2) || null, cep: cep ? `${cep.slice(0, 5)}-${cep.slice(5)}` : null,
+    representante: tipoPessoa === 'PJ' ? texto(b?.representante, 120) : null, representanteDocumento, observacao: texto(b?.observacao, 255),
   };
 };
 

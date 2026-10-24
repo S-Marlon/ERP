@@ -9,6 +9,7 @@
 // simulador, importação do poço sem internet, relatório do mês e fila de comandos remotos).
 // Processo: leads (prazo de resposta), checklist da obra, fotos, orçamento/laudo/adesivo, pós-venda e indicadores.
 // Central: contratos a finalizar, informações a completar e a prévia do plano mensal.
+// Orçamento rápido (itens), duplicar, termos aditivos e a ficha completa do cliente.
 import { Router } from 'express';
 import { criarObra, criarPoco, detalheObra, listarObras, listarPocos, mudarSituacao, salvarObra, salvarPoco, salvarRelatorio } from './obras.controller';
 import { criarCliente, detalheCliente, listarClientes, salvarCliente } from './clientes.controller';
@@ -35,6 +36,10 @@ import {
   processoDaObra, salvarConfig, salvarFoto, salvarLead, verConfig, verIndicadores,
 } from './processo.controller';
 import { central } from './central.controller';
+import { clienteCompleto } from './clienteCompleto.controller';
+import {
+  aditivosDaObra, apagarAditivo, criarOrcamento, duplicarOrcamento, emitirAditivo, itensDaObra, marcarAditivoAssinado, salvarItens,
+} from './orcamento.controller';
 import { analiseDoMapa, pocosDoMapa, potencialDoMapa, referenciasDoMapa, resumoMapa } from './mapa.controller';
 
 const router = Router();
@@ -110,6 +115,15 @@ router.get('/mapa/referencias', referenciasDoMapa);
 router.get('/mapa/potencial', potencialDoMapa);
 router.get('/mapa/analise', analiseDoMapa);
 router.get('/central', central);
+router.post('/orcamentos', criarOrcamento);
+router.get('/obras/:id/itens', itensDaObra);
+router.put('/obras/:id/itens', salvarItens);
+router.post('/obras/:id/duplicar', duplicarOrcamento);
+router.get('/obras/:id/aditivos', aditivosDaObra);
+router.post('/obras/:id/aditivos', emitirAditivo);
+router.post('/aditivos/:id/assinado', marcarAditivoAssinado);
+router.delete('/aditivos/:id', apagarAditivo);
+router.get('/clientes/:id/completo', clienteCompleto);
 router.get('/processo/config', verConfig);
 router.put('/processo/config', salvarConfig);
 router.get('/processo/pendencias', pendencias);

@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { garantiaAte, lerGps, lerServicos, podeIrPara, pocoDoRelatorio, relatorioInicial, validarObra, validarPoco } from './obras';
+import { garantiaAte, lerGps, lerServicos, podeIrPara, pocoDoRelatorio, relatorioInicial, validarCliente, validarObra, validarPoco } from './obras';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -46,6 +46,16 @@ teste('obras de poços: relatório inicial e o que volta para o poço', () => {
     tipoSolo: 'Cristalino', dtTermino: '2026-10-20', localizacao: '-23.1, -46.9', diametroInterno: 6 });
   assert.deepStrictEqual(p, { profundidadeM: 132, vazaoLh: 4500, nivelEstaticoM: 18, nivelDinamicoM: 62, tipoSolo: 'Cristalino', diametro: '6"', dataPerfuracao: '2026-10-20', latitude: -23.1, longitude: -46.9 });
   assert.deepStrictEqual(pocoDoRelatorio({}), {});
+});
+
+teste('obras de poços: qualificação do cliente', () => {
+  const pf = validarCliente({ nome: 'José', documento: '123.456.789-01', rgIe: '12.345.678-9', estadoCivil: 'casado', profissao: 'agricultor', cep: '13250000', representante: 'x' });
+  assert.deepStrictEqual([pf.tipoPessoa, pf.documento, pf.estadoCivil, pf.cep, pf.representante], ['PF', '12345678901', 'casado', '13250-000', null]);
+  const pj = validarCliente({ nome: 'Fazenda Boa Vista Ltda', tipoPessoa: 'pj', documento: '12.345.678/0001-90', representante: 'Maria', representanteDocumento: '98765432100', estadoCivil: 'x' });
+  assert.deepStrictEqual([pj.tipoPessoa, pj.representante, pj.representanteDocumento, pj.estadoCivil], ['PJ', 'Maria', '98765432100', null]);
+  assert.throws(() => validarCliente({ nome: 'A', tipoPessoa: 'PJ', documento: '12345678901' }), /CNPJ tem 14/);
+  assert.throws(() => validarCliente({ nome: 'A', documento: '12345678000190' }), /marque PJ/);
+  assert.throws(() => validarCliente({ nome: 'A', cep: '1325' }), /CEP/);
 });
 
 teste('obras de poços: garantia', () => {

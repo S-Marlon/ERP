@@ -5,11 +5,12 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert, Badge, Button, Card, Col, Empty, Flex, Popover, Progress, Row, Segmented, Space, Statistic, Switch, Table, Tag, Tooltip, Typography, message,
 } from 'antd';
-import { ApiOutlined, CalendarOutlined, CustomerServiceOutlined, DollarOutlined, ReloadOutlined, WhatsAppOutlined } from '@ant-design/icons';
+import { ApiOutlined, CalculatorOutlined, CalendarOutlined, CustomerServiceOutlined, DollarOutlined, ReloadOutlined, WhatsAppOutlined } from '@ant-design/icons';
 import {
   AcaoPendencia, Central, centralApi, ClientePlano, ContratoCentral, FaseContrato, FASES_CONTRATO, foneBr, GRAVIDADES, SERVICOS,
 } from './obrasApi';
 import { abrirCliente, abrirObra, abrirPoco, navPocos } from './navPocos';
+import { OrcamentoRapido } from './OrcamentoContrato';
 
 const { Text } = Typography;
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -28,7 +29,7 @@ const CartaoContrato: React.FC<{ c: ContratoCentral }> = ({ c }) => {
   const visiveis = c.pendencias.slice(0, 4);
   return (
     <Card size="small" hoverable style={{ marginBottom: 8, borderLeft: `3px solid ${c.gravidade === 'ALTA' ? '#ff4d4f' : c.gravidade === 'MEDIA' ? '#fa8c16' : '#d9d9d9'}` }}
-      styles={{ body: { padding: '8px 10px' } }} onClick={() => abrirObra(c.idObra, c.fase === 'NEGOCIACAO' ? 'PROCESSO' : 'COBRANCA')}>
+      styles={{ body: { padding: '8px 10px' } }} onClick={() => abrirObra(c.idObra, c.fase === 'NEGOCIACAO' ? 'ORCAMENTO' : 'COBRANCA')}>
       <Flex justify="space-between" gap={6}>
         <Text strong style={{ fontSize: 13 }} ellipsis>Nº {c.idObra} · {c.titulo}</Text>
         {c.total > 0 && <Text style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{brl0(c.total)}</Text>}
@@ -181,6 +182,7 @@ const PlanoMensal: React.FC<{ d: Central['plano'] }> = ({ d }) => {
 const CentralPocos: React.FC = () => {
   const [d, setD] = useState<Central | null>(null);
   const [carregando, setCarregando] = useState(false);
+  const [orcamento, setOrcamento] = useState(false);
   const carregar = useCallback(async () => {
     setCarregando(true);
     try { setD(await centralApi.carregar()); } catch (e) { message.error(e instanceof Error ? e.message : 'Erro.'); } finally { setCarregando(false); }
@@ -200,8 +202,12 @@ const CentralPocos: React.FC = () => {
     <Space direction="vertical" size={12} style={{ width: '100%' }}>
       <Flex justify="space-between" align="center">
         <Text type="secondary">Comece por aqui: o que precisa da sua atenção hoje e o que falta para fechar cada contrato.</Text>
-        <Tooltip title="Recarregar"><Button icon={<ReloadOutlined />} loading={carregando} onClick={carregar} /></Tooltip>
+        <Space>
+          <Button type="primary" icon={<CalculatorOutlined />} onClick={() => setOrcamento(true)}>Orçamento rápido</Button>
+          <Tooltip title="Recarregar"><Button icon={<ReloadOutlined />} loading={carregando} onClick={carregar} /></Tooltip>
+        </Space>
       </Flex>
+      <OrcamentoRapido aberto={orcamento} onFechar={() => setOrcamento(false)} />
       <Row gutter={[12, 12]}>
         {atalho('Agenda de hoje', d.hoje.agenda, <CalendarOutlined />, 'agenda', undefined, d.hoje.agendaTitulos.join(' · ') || 'nada agendado')}
         {atalho('Contatos sem resposta', d.hoje.contatosSemResposta, <CustomerServiceOutlined />, 'atendimento', d.hoje.contatosSemResposta ? '#cf1322' : undefined)}

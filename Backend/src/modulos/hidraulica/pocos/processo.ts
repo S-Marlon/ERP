@@ -9,7 +9,7 @@ export const ORIGENS = ['GOOGLE', 'INDICACAO', 'PLACA', 'INSTAGRAM', 'FACEBOOK',
 export const SITUACOES_LEAD = ['NOVO', 'EM_CONTATO', 'VISITA_AGENDADA', 'ORCAMENTO_ENVIADO', 'CONVERTIDO', 'PERDIDO'] as const;
 export type SituacaoLead = typeof SITUACOES_LEAD[number];
 /** Etapas registradas à mão (as fotos saem da tabela de fotos). */
-export const ETAPAS_REGISTRO = ['VISITA', 'ORCAMENTO_ENVIADO', 'LAUDO_ENTREGUE', 'ADESIVO_QUADRO', 'AVALIACAO_PEDIDA', 'AVALIACAO_RECEBIDA', 'REVISAO_LEMBRADA'] as const;
+export const ETAPAS_REGISTRO = ['VISITA', 'ORCAMENTO_ENVIADO', 'CONTRATO_ASSINADO', 'LAUDO_ENTREGUE', 'ADESIVO_QUADRO', 'AVALIACAO_PEDIDA', 'AVALIACAO_RECEBIDA', 'REVISAO_LEMBRADA'] as const;
 export type EtapaRegistro = typeof ETAPAS_REGISTRO[number];
 export const ETAPAS_FOTO = ['ANTES', 'DURANTE', 'DEPOIS'] as const;
 export type EtapaFoto = typeof ETAPAS_FOTO[number];
@@ -133,6 +133,9 @@ export const validarConfig = (b: any) => {
     respostaLeadMin: inteiro(b?.respostaLeadMin, 'Prazo de resposta', 5, 1440, 60), orcamentoHoras: inteiro(b?.orcamentoHoras, 'Prazo do orçamento', 1, 240, 24),
     avaliacaoDias: inteiro(b?.avaliacaoDias, 'Dias para pedir avaliação', 1, 90, 7), revisaoMeses: inteiro(b?.revisaoMeses, 'Meses para a revisão', 1, 60, 11),
     horaAbre: hora(b?.horaAbre, 'Abre', '08:00') as string, horaFecha: hora(b?.horaFecha, 'Fecha', '18:00') as string, sabadoFecha: hora(b?.sabadoFecha, 'Sábado', null),
+    // contrato e aditivo
+    modeloContrato: textoLongo(b?.modeloContrato, 60000), modeloAditivo: textoLongo(b?.modeloAditivo, 20000), foroCidade: texto(b?.foroCidade, 60),
+    responsavelTecnico: texto(b?.responsavelTecnico, 120), registroTecnico: texto(b?.registroTecnico, 30),
   };
   if (c.horaFecha <= c.horaAbre) throw new ErroObra('O horário de fechar tem de ser depois do de abrir.');
   if (c.sabadoFecha && c.sabadoFecha <= c.horaAbre) throw new ErroObra('O horário de sábado tem de ser depois do de abrir.');
@@ -185,6 +188,8 @@ export const checklistDaObra = (o: ObraParaProcesso, eventos: EventoProcesso[], 
   manual('VISITA', 'Visita técnica', 'ORCAMENTO', o.criadaEm, null);
   const baseOrcamento = visita && visita.situacao === 'FEITO' ? visita.feitoEm : o.criadaEm;
   manual('ORCAMENTO_ENVIADO', `Orçamento enviado (até ${cfg.orcamentoHoras} h da visita)`, 'ORCAMENTO', baseOrcamento, somarHoras(baseOrcamento, cfg.orcamentoHoras));
+  // contrato: vale quando o orçamento é aprovado (sai de "orçamento"); antes de começar a obra, deveria estar assinado
+  manual('CONTRATO_ASSINADO', 'Contrato assinado', 'OBRA', o.situacao !== 'ORCAMENTO' ? o.criadaEm : null, o.dataInicio ? `${o.dataInicio} 23:59:59` : null);
   foto('ANTES', 'Fotos de antes', iniciada);
   foto('DURANTE', 'Fotos durante', concluida);
   foto('DEPOIS', 'Fotos de depois', concluida);

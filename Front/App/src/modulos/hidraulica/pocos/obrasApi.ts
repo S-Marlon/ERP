@@ -45,10 +45,15 @@ export interface Poco extends Omit<PocoForm, 'gps'> { idPoco: number; proprietar
 
 /** Cliente de poço: cadastro do módulo, separado do cadastro geral do ERP por enquanto. */
 export interface ClientePocoForm {
-  nome: string; telefone: string | null; documento: string | null; email: string | null; endereco: string | null; bairro: string | null;
-  cidade: string | null; uf: string | null; observacao: string | null;
+  nome: string; tipoPessoa: 'PF' | 'PJ'; telefone: string | null; telefone2: string | null; documento: string | null; rgIe: string | null;
+  estadoCivil: string | null; profissao: string | null; email: string | null; endereco: string | null; bairro: string | null;
+  cidade: string | null; uf: string | null; cep: string | null; representante: string | null; representanteDocumento: string | null; observacao: string | null;
 }
-export interface ClientePoco extends ClientePocoForm { idCliente: number; pocos: number; pocosComGps: number; obras: number; obrasAbertas: number }
+export interface ClientePoco extends ClientePocoForm {
+  idCliente: number; pocos: number; pocosComGps: number; obras: number; obrasAbertas: number; aReceber: number; vencido: number;
+}
+export type FiltroClientes = 'ABERTA' | 'VENCIDO' | 'SEM_TELEFONE';
+export const ESTADOS_CIVIS = ['solteiro(a)', 'casado(a)', 'união estável', 'divorciado(a)', 'viúvo(a)'];
 
 export interface PocoNoMapa {
   idPoco: number; identificacao: string; latitude: number; longitude: number; profundidadeM: number | null; vazaoLh: number | null;
@@ -96,7 +101,9 @@ export const obrasApi = {
   criarPoco: (p: PocoForm) => pedir<Poco>(`${API}/pocos?tenant_id=1`, corpo('POST', p), 'Erro ao cadastrar o poço.'),
   salvarPoco: (id: number, p: PocoForm) => pedir<Poco>(`${API}/pocos/${id}?tenant_id=1`, corpo('PUT', p), 'Erro ao salvar o poço.'),
   obrasDe: (f: { idCliente?: number; idPoco?: number }) => pedir<Obra[]>(`${API}/obras?${q(f)}`, undefined, 'Erro ao listar as obras.'),
-  clientes: (busca = '') => pedir<ClientePoco[]>(`${API}/clientes?${q({ busca })}`, undefined, 'Erro ao listar os clientes de poço.'),
+  clientes: (busca = '', f: { cidade?: string; filtro?: FiltroClientes | null } = {}) =>
+    pedir<ClientePoco[]>(`${API}/clientes?${q({ busca, cidade: f.cidade, filtro: f.filtro })}`, undefined, 'Erro ao listar os clientes de poço.'),
+  clienteCompleto: (id: number) => pedir<ClienteCompleto>(`${API}/clientes/${id}/completo?tenant_id=1`, undefined, 'Erro ao abrir a ficha do cliente.'),
   cliente: (id: number) => pedir<ClientePoco>(`${API}/clientes/${id}?tenant_id=1`, undefined, 'Erro ao abrir o cliente.'),
   criarCliente: (c: Partial<ClientePocoForm>) => pedir<ClientePoco>(`${API}/clientes?tenant_id=1`, corpo('POST', c), 'Erro ao cadastrar o cliente.'),
   salvarCliente: (id: number, c: ClientePocoForm) => pedir<ClientePoco>(`${API}/clientes/${id}?tenant_id=1`, corpo('PUT', c), 'Erro ao salvar o cliente.'),
@@ -420,6 +427,8 @@ export interface ConfigProcesso {
   empresaEndereco: string | null; logo: string | null; textoGarantia: string | null; formaPagamentoPadrao: string | null; validadeOrcamentoDias: number;
   linkAvaliacao: string | null; msgAvaliacao: string; msgRevisao: string; respostaLeadMin: number; orcamentoHoras: number; avaliacaoDias: number;
   revisaoMeses: number; horaAbre: string; horaFecha: string; sabadoFecha: string | null; configurado: boolean;
+  /** Contrato e aditivo: modelos com {campos} (vazio = modelo padrão), foro e responsável técnico. */
+  modeloContrato: string | null; modeloAditivo: string | null; foroCidade: string | null; responsavelTecnico: string | null; registroTecnico: string | null;
 }
 export interface LeadForm { nome: string; telefone: string | null; origem: OrigemLead; indicadoPor: string | null; cidade: string | null; necessidade: string | null; recebidoEm: string | null; observacao: string | null }
 export interface Lead extends LeadForm {
@@ -449,8 +458,9 @@ export interface DocumentoObra {
     metrosPrevistos: number | null; valorContratado: number | null; valorMetroExcedente: number | null; valorSinal: number | null; sinalQuando: 'ANTES' | 'NO_ATO';
     garantiaMeses: number | null; garantiaAte: string | null; escopo: string | null; prazoExecucaoDias: number | null; formaPagamento: string | null;
     validadeOrcamentoDias: number; adicionais: { descricao: string; valor: number }[];
+    itens: ItemOrcamentoForm[]; contratoAssinadoEm: string | null;
   };
-  cliente: { nome: string; documento: string | null; telefone: string | null; endereco: string | null; cidade: string | null; uf: string | null } | null;
+  cliente: (Omit<ClientePocoForm, 'telefone2' | 'observacao'>) | null;
   poco: {
     idPoco: number; identificacao: string; endereco: string | null; cidade: string | null; uf: string | null; latitude: number | null; longitude: number | null;
     profundidadeM: number | null; diametro: string | null; vazaoLh: number | null; nivelEstaticoM: number | null; nivelDinamicoM: number | null;
@@ -485,6 +495,79 @@ export const processoApi = {
 };
 /** Endereço completo de um arquivo do servidor (/uploads/...). */
 export const urlArquivo = (caminho: string | null) => (!caminho ? null : /^https?:/.test(caminho) ? caminho : `${API_URL}${caminho}`);
+
+// ------------------------------------------------------------------ orçamento rápido, termos aditivos e ficha do cliente
+export type GrupoItem = 'PERFURACAO' | 'REVESTIMENTO' | 'BOMBA' | 'INSTALACAO' | 'MATERIAL' | 'SERVICO' | 'OUTRO';
+export const GRUPOS_ITEM: Record<GrupoItem, string> = {
+  PERFURACAO: 'Perfuração', REVESTIMENTO: 'Revestimento', BOMBA: 'Bomba', INSTALACAO: 'Instalação', MATERIAL: 'Material', SERVICO: 'Serviço', OUTRO: 'Outro',
+};
+export const UNIDADES_ITEM = ['m', 'un', 'h', 'sc', 'kg', 'L', 'vb'] as const;
+export interface ItemOrcamentoForm {
+  grupo: GrupoItem; descricao: string; quantidade: number; unidade: string; valorUnitario: number; valorTotal: number;
+  /** "Se necessário": não entra no total (ex.: metro excedente). */
+  opcional: boolean;
+}
+export interface ResumoItens { total: number; opcionais: number; metrosPrevistos: number | null; valorMetro: number | null; valorMetroExcedente: number | null }
+export interface AdicionalDoAditivo { idAdicional: number; tipo: TipoAdicional; descricao: string; quantidade: number; valorUnitario: number; valor: number; situacao: SituacaoAdicional; aprovadoEm: string | null; idAditivo: number | null }
+export interface Aditivo { idAditivo: number; numero: number; valor: number; observacao: string | null; emitidoEm: string; assinadoEm: string | null; operador: string; adicionais: AdicionalDoAditivo[] }
+export interface NovoOrcamento extends Partial<Omit<ObraForm, 'idCliente' | 'idPoco'>> {
+  idCliente?: number | null; novoCliente?: Partial<ClientePocoForm>; idLead?: number | null; idPoco?: number | null;
+  local?: { identificacao?: string | null; endereco?: string | null; cidade?: string | null; uf?: string | null; gps?: string | null } | null;
+  itens: ItemOrcamentoForm[];
+}
+export interface ClienteCompleto {
+  cliente: ClientePocoForm & { idCliente: number };
+  resumo: { contratos: number; abertos: number; valorTotal: number; recebido: number; aReceber: number; vencido: number; pocos: number };
+  contratos: { idObra: number; titulo: string; servicos: Servico[]; situacao: SituacaoObra; poco: string | null; idPoco: number | null; criadaEm: string;
+    dataInicio: string | null; dataTermino: string | null; total: number; recebido: number; aReceber: number; vencido: number; aditivos: number;
+    contratoAssinado: boolean; garantiaAte: string | null }[];
+  pocos: { idPoco: number; identificacao: string; endereco: string | null; cidade: string | null; latitude: number | null; longitude: number | null;
+    profundidadeM: number | null; diametro: string | null; vazaoLh: number | null; nivelEstaticoM: number | null; nivelDinamicoM: number | null;
+    dataPerfuracao: string | null; perfuradoPor: Poco['perfuradoPor']; situacao: Poco['situacao']; obras: number; iot: boolean; planos: number }[];
+  parcelas: { idParcela: number; idObra: number; descricao: string; vencimento: string | null; saldo: number; vencida: boolean }[];
+  recebimentos: { idObra: number; descricao: string; forma: FormaRecebimento; valor: number; em: string }[];
+  linhaDoTempo: { data: string; tipo: 'CONTATO' | 'OBRA' | 'PROCESSO' | 'ALERTA'; titulo: string; detalhe: string | null; idObra: number | null }[];
+  plano: ClientePlano | null;
+}
+export const orcamentoApi = {
+  criar: (o: NovoOrcamento) => pedir<{ idObra: number; idCliente: number; idPoco: number | null; total: number }>(`${API}/orcamentos?tenant_id=1`, corpo('POST', o), 'Erro ao criar o orçamento.'),
+  itens: (idObra: number) => pedir<{ itens: ItemOrcamentoForm[]; resumo: ResumoItens }>(`${API}/obras/${idObra}/itens?tenant_id=1`, undefined, 'Erro ao carregar os itens.'),
+  salvarItens: (idObra: number, itens: ItemOrcamentoForm[]) =>
+    pedir<{ itens: ItemOrcamentoForm[]; resumo: ResumoItens | null }>(`${API}/obras/${idObra}/itens?tenant_id=1`, corpo('PUT', { itens }), 'Erro ao salvar os itens.'),
+  duplicar: (idObra: number, idCliente?: number | null) => pedir<{ idObra: number }>(`${API}/obras/${idObra}/duplicar?tenant_id=1`, corpo('POST', { idCliente }), 'Erro ao duplicar o orçamento.'),
+  aditivos: (idObra: number) => pedir<{ aditivos: Aditivo[]; semAditivo: AdicionalDoAditivo[] }>(`${API}/obras/${idObra}/aditivos?tenant_id=1`, undefined, 'Erro ao listar os aditivos.'),
+  emitirAditivo: (idObra: number, d: { idsAdicionais?: number[]; observacao?: string | null }) =>
+    pedir<{ idAditivo: number; numero: number; valor: number }>(`${API}/obras/${idObra}/aditivos?tenant_id=1`, corpo('POST', d), 'Erro ao emitir o aditivo.'),
+  assinado: (idAditivo: number, assinadoEm: string | null) =>
+    pedir<{ ok: boolean }>(`${API}/aditivos/${idAditivo}/assinado?tenant_id=1`, corpo('POST', { assinadoEm }), 'Erro ao marcar a assinatura.'),
+  apagarAditivo: (idAditivo: number) => pedir<{ ok: boolean }>(`${API}/aditivos/${idAditivo}?tenant_id=1`, { method: 'DELETE' }, 'Erro ao apagar o aditivo.'),
+};
+
+/** Linha do orçamento com o total arredondado (quantidade × valor unitário). */
+export const linhaItem = (i: Omit<ItemOrcamentoForm, 'valorTotal'>): ItemOrcamentoForm =>
+  ({ ...i, valorTotal: Math.round((Number(i.quantidade) || 0) * (Number(i.valorUnitario) || 0) * 100) / 100 });
+/** Mesmo cálculo do servidor: total sem os opcionais; metros e metro excedente pela linha de perfuração em metros. */
+export const resumoItens = (itens: ItemOrcamentoForm[]): ResumoItens => {
+  const c = (v: number) => Math.round(v * 100);
+  const perf = itens.find(i => i.grupo === 'PERFURACAO' && i.unidade === 'm' && !i.opcional);
+  const exc = itens.find(i => i.grupo === 'PERFURACAO' && i.unidade === 'm' && i.opcional);
+  return {
+    total: itens.filter(i => !i.opcional).reduce((s, i) => s + c(i.valorTotal), 0) / 100,
+    opcionais: itens.filter(i => i.opcional).reduce((s, i) => s + c(i.valorTotal), 0) / 100,
+    metrosPrevistos: perf ? perf.quantidade : null, valorMetro: perf ? perf.valorUnitario : null,
+    valorMetroExcedente: exc ? exc.valorUnitario : perf ? perf.valorUnitario : null,
+  };
+};
+/** Linhas prontas para começar um orçamento (o operador ajusta quantidade e valor). */
+export const ITENS_PRONTOS: { rotulo: string; item: Omit<ItemOrcamentoForm, 'valorTotal'> }[] = [
+  { rotulo: 'Perfuração (m × R$)', item: { grupo: 'PERFURACAO', descricao: 'Perfuração do poço', quantidade: 50, unidade: 'm', valorUnitario: 0, opcional: false } },
+  { rotulo: 'Metro excedente', item: { grupo: 'PERFURACAO', descricao: 'Metro excedente (acima do previsto, se necessário)', quantidade: 1, unidade: 'm', valorUnitario: 0, opcional: true } },
+  { rotulo: 'Revestimento', item: { grupo: 'REVESTIMENTO', descricao: 'Tubo de revestimento', quantidade: 50, unidade: 'm', valorUnitario: 0, opcional: false } },
+  { rotulo: 'Bomba', item: { grupo: 'BOMBA', descricao: 'Bomba submersa', quantidade: 1, unidade: 'un', valorUnitario: 0, opcional: false } },
+  { rotulo: 'Instalação', item: { grupo: 'INSTALACAO', descricao: 'Instalação da bomba e do quadro de comando', quantidade: 1, unidade: 'vb', valorUnitario: 0, opcional: false } },
+  { rotulo: 'Materiais', item: { grupo: 'MATERIAL', descricao: 'Materiais (cabo, tubo edutor, conexões)', quantidade: 1, unidade: 'vb', valorUnitario: 0, opcional: false } },
+  { rotulo: 'Teste de vazão', item: { grupo: 'SERVICO', descricao: 'Teste de vazão', quantidade: 1, unidade: 'un', valorUnitario: 0, opcional: false } },
+];
 
 // ------------------------------------------------------------------ central (painel principal)
 export type FaseContrato = 'NEGOCIACAO' | 'SINAL' | 'EXECUCAO' | 'FECHAMENTO';

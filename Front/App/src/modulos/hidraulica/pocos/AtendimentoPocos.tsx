@@ -3,7 +3,7 @@
 // propaganda e a configuração (dados da empresa, logo, mensagens e prazos).
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Alert, Button, Card, Checkbox, Col, Empty, Image, Input, InputNumber, Modal, Row, Segmented, Select, Space, Statistic, Table, Tag, Tooltip, Typography, Upload, message,
+  Alert, Button, Card, Checkbox, Col, Empty, Flex, Image, Input, InputNumber, Modal, Row, Segmented, Select, Space, Statistic, Table, Tag, Tooltip, Typography, Upload, message,
 } from 'antd';
 import { CheckOutlined, FileSearchOutlined, PlusOutlined, ReloadOutlined, SettingOutlined, WhatsAppOutlined } from '@ant-design/icons';
 import {
@@ -12,6 +12,8 @@ import {
 } from './obrasApi';
 import { abrirObra } from './navPocos';
 import { reduzirImagem } from './ProcessoObra';
+import { OrcamentoRapido } from './OrcamentoContrato';
+import { CAMPOS_MODELO, MODELO_ADITIVO_PADRAO, MODELO_CONTRATO_PADRAO } from './documentosPocos';
 
 const { Text } = Typography;
 const erro = (e: unknown) => message.error(e instanceof Error ? e.message : 'Erro.');
@@ -68,6 +70,7 @@ const Leads: React.FC = () => {
   const [aberto, setAberto] = useState<Lead | 'novo' | null>(null);
   const [obraDe, setObraDe] = useState<{ lead: Lead; servicos: Servico[]; titulo: string } | null>(null);
   const [perder, setPerder] = useState<{ lead: Lead; motivo: string } | null>(null);
+  const [orcamentoDe, setOrcamentoDe] = useState<Lead | null>(null);
   const carregar = useCallback(async () => {
     setCarregando(true);
     try { setLista(await processoApi.leads({ busca, todos })); } catch (e) { erro(e); } finally { setCarregando(false); }
@@ -130,6 +133,9 @@ const Leads: React.FC = () => {
                 {l.whatsapp && <Tooltip title="Abrir o WhatsApp com a mensagem pronta"><Button size="small" icon={<WhatsAppOutlined />} onClick={() => window.open(l.whatsapp!, '_blank')} /></Tooltip>}
                 {!l.respondidoEm && l.situacao !== 'PERDIDO' && <Button size="small" type="primary" icon={<CheckOutlined />} onClick={() => acao(() => processoApi.respondido(l.idLead), 'Resposta registrada.')}>Respondi</Button>}
                 {!l.idObra && l.situacao !== 'PERDIDO' && (
+                  <Button size="small" type="primary" ghost onClick={() => setOrcamentoDe(l)}>Orçamento</Button>
+                )}
+                {!l.idObra && l.situacao !== 'PERDIDO' && (
                   <Button size="small" onClick={() => setObraDe({ lead: l, servicos: /limp/i.test(l.necessidade || '') ? ['LIMPEZA'] : /bomba/i.test(l.necessidade || '') ? ['TROCA_BOMBA'] : ['PERFURACAO'], titulo: '' })}>Criar obra</Button>
                 )}
                 {l.situacao !== 'PERDIDO' && l.situacao !== 'CONVERTIDO' && (
@@ -143,6 +149,7 @@ const Leads: React.FC = () => {
           },
         ]} />
       <LeadModal aberto={aberto} onFechar={() => setAberto(null)} onSalvo={() => { setAberto(null); carregar(); }} />
+      <OrcamentoRapido aberto={!!orcamentoDe} lead={orcamentoDe} onFechar={() => { setOrcamentoDe(null); carregar(); }} />
       <Modal open={!!obraDe} title={`Criar obra para ${obraDe?.lead.nome || ''}`} okText="Criar obra (orçamento)" cancelText="Voltar" onOk={criarObra} onCancel={() => setObraDe(null)} destroyOnHidden>
         {obraDe && (
           <Space direction="vertical" style={{ width: '100%' }}>
@@ -318,6 +325,30 @@ const Configuracao: React.FC = () => {
           </Col>
           {campo('formaPagamentoPadrao', 'Forma de pagamento padrão', 18, { placeholder: 'Ex.: 30% de sinal, saldo na entrega ou em até 3 vezes' })}
           {n('validadeOrcamentoDias', 'Validade do orçamento', 'dias', 1, 365)}
+        </Row>
+      </Card>
+      <Card size="small" title="Contrato e termo aditivo">
+        <Row gutter={[8, 8]}>
+          {campo('foroCidade', 'Foro (cidade da comarca)', 8, { maxLength: 60 })}
+          {campo('responsavelTecnico', 'Responsável técnico', 10, { maxLength: 120 })}
+          {campo('registroTecnico', 'CREA / registro', 6, { maxLength: 30 })}
+          {([['modeloContrato', 'Modelo do contrato', MODELO_CONTRATO_PADRAO, 14], ['modeloAditivo', 'Modelo do termo aditivo', MODELO_ADITIVO_PADRAO, 10]] as const).map(([k, rotulo, padrao, linhas]) => (
+            <Col span={24} key={k}>
+              <Flex justify="space-between" align="center">
+                <Text>{rotulo}{!c[k] && <Text type="secondary" style={{ fontSize: 12 }}> (usando o modelo padrão)</Text>}</Text>
+                {c[k] && <Button size="small" type="link" onClick={() => setC({ ...c, [k]: null })}>restaurar o padrão</Button>}
+              </Flex>
+              <Input.TextArea rows={linhas} maxLength={k === 'modeloContrato' ? 60000 : 20000} value={c[k] || padrao}
+                onChange={e => setC({ ...c, [k]: e.target.value.trim() && e.target.value !== padrao ? e.target.value : null })} />
+            </Col>
+          ))}
+          <Col span={24}>
+            <Alert type="warning" showIcon message="O modelo padrão é uma referência: peça para um advogado revisar as cláusulas antes de usar com clientes." />
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Linhas que começam com "CLÁUSULA" viram título; {'{tabela_itens}'} e {'{tabela_adicionais}'} vão numa linha sozinha. Campos:{' '}
+              {Object.entries(CAMPOS_MODELO).map(([k, t]) => <Tooltip key={k} title={t}><Tag style={{ marginBottom: 2 }}>{`{${k}}`}</Tag></Tooltip>)}
+            </Text>
+          </Col>
         </Row>
       </Card>
       <Card size="small" title="Pós-venda (mensagens de WhatsApp)">

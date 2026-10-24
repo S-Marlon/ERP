@@ -61,7 +61,8 @@ teste('processo de poços: checklist da obra, entrega e pós-venda', () => {
   const ev = [{ etapa: 'VISITA', situacao: 'FEITO' as const, feitoEm: '2026-10-02 10:00:00', observacao: null },
     { etapa: 'ORCAMENTO_ENVIADO', situacao: 'FEITO' as const, feitoEm: '2026-10-02 16:00:00', observacao: null }];
   const exec = estados(checklistDaObra(obra({ situacao: 'EM_EXECUCAO', dataInicio: '2026-10-10' }), ev, {}, CONFIG_PADRAO, '2026-10-11 08:00:00'));
-  assert.deepStrictEqual([exec.FOTOS_ANTES, exec.FOTOS_DURANTE, exec.LAUDO_ENTREGUE], ['PENDENTE', 'AINDA_NAO', 'AINDA_NAO']);
+  assert.deepStrictEqual([exec.FOTOS_ANTES, exec.FOTOS_DURANTE, exec.LAUDO_ENTREGUE, exec.CONTRATO_ASSINADO], ['PENDENTE', 'AINDA_NAO', 'AINDA_NAO', 'ATRASADO']);   // começou sem contrato
+  assert.strictEqual(estados(checklistDaObra(obra({}), ev, {}, CONFIG_PADRAO, '2026-10-11 08:00:00')).CONTRATO_ASSINADO, 'AINDA_NAO');   // ainda orçamento
   const fim = { situacao: 'CONCLUIDA', dataInicio: '2026-10-10', dataTermino: '2026-10-12' };
   const conc = checklistDaObra(obra(fim), ev, { ANTES: 3, DURANTE: 2 }, CONFIG_PADRAO, '2026-10-13 09:00:00');
   assert.deepStrictEqual([estados(conc).FOTOS_ANTES, estados(conc).FOTOS_DEPOIS, estados(conc).LAUDO_ENTREGUE, estados(conc).AVALIACAO_PEDIDA, estados(conc).AVALIACAO_RECEBIDA],
@@ -74,7 +75,7 @@ teste('processo de poços: checklist da obra, entrega e pós-venda', () => {
   // revisão aos 11 meses (12/09/2027)
   const rev = checklistDaObra(obra(fim), ev, {}, CONFIG_PADRAO, '2027-09-12 08:00:00');
   assert.deepStrictEqual([estados(rev).REVISAO_LEMBRADA, rev.find(i => i.etapa === 'REVISAO_LEMBRADA')!.prazo], ['PENDENTE', '2027-09-27 23:59:59']);
-  assert.deepStrictEqual(resumoDoChecklist(conc), { pendentes: 3, atrasadas: 0, feitas: 4, emDia: false });   // fotos de depois, laudo e adesivo
+  assert.deepStrictEqual(resumoDoChecklist(conc), { pendentes: 3, atrasadas: 1, feitas: 4, emDia: false });   // fotos de depois, laudo e adesivo; contrato atrasado
 });
 
 teste('processo de poços: WhatsApp e mensagens', () => {

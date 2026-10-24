@@ -13,6 +13,7 @@ import { AReceberObras, CobrancaDaObra } from './CobrancaObra';
 import { CadastroMateriais, MateriaisDaObra } from './MateriaisObra';
 import { HistoricoDoPoco } from './ManutencaoPocos';
 import { ProcessoDaObra } from './ProcessoObra';
+import { OrcamentoEContrato, OrcamentoRapido } from './OrcamentoContrato';
 import { lerGpsTexto, textoRaio } from './mapaRegional';
 import { abrirCliente, agendarObra, ParteObra, useNavPocos, verNoMapa, VistaObras } from './navPocos';
 
@@ -328,7 +329,8 @@ const ObraAberta: React.FC<{ idObra: number; parte?: ParteObra; onVoltar: () => 
       </Card>
       <Flex justify="space-between" align="center" style={{ marginBottom: 8 }}>
         <Segmented value={parte} onChange={v => setParte(v as ParteObra)}
-          options={[{ value: 'RELATORIO', label: 'Relatório técnico' }, { value: 'PROCESSO', label: 'Processo e fotos' }, { value: 'COBRANCA', label: 'Sinal e cobrança' },
+          options={[{ value: 'ORCAMENTO', label: 'Orçamento e contrato' }, { value: 'RELATORIO', label: 'Relatório técnico' }, { value: 'PROCESSO', label: 'Processo e fotos' },
+            { value: 'COBRANCA', label: 'Sinal e cobrança' },
             { value: 'MATERIAIS', label: 'Materiais' }]} />
         {parte !== 'RELATORIO' && <Button onClick={onVoltar}>Voltar para as obras</Button>}
       </Flex>
@@ -339,6 +341,8 @@ const ObraAberta: React.FC<{ idObra: number; parte?: ParteObra; onVoltar: () => 
               obra={{ dados: obra.relatorio || {}, salvar: dados => obrasApi.salvarRelatorio(obra.idObra, dados) }} />
           </div>
         )
+        : parte === 'ORCAMENTO'
+          ? <OrcamentoEContrato obra={obra} onMudou={() => { carregar(); setVersaoCobranca(v => v + 1); }} />
         : parte === 'PROCESSO'
           ? <ProcessoDaObra idObra={obra.idObra} cancelada={obra.situacao === 'CANCELADA'} />
         : parte === 'COBRANCA'
@@ -356,6 +360,7 @@ const ListaObras: React.FC<{ onAbrir: (id: number) => void }> = ({ onAbrir }) =>
   const [situacao, setSituacao] = useState<SituacaoObra | 'TODAS'>('TODAS');
   const [busca, setBusca] = useState('');
   const [nova, setNova] = useState(false);
+  const [orcamento, setOrcamento] = useState(false);
   const carregar = useCallback(async () => {
     setCarregando(true);
     try { setObras(await obrasApi.obras({ busca })); }
@@ -380,7 +385,8 @@ const ListaObras: React.FC<{ onAbrir: (id: number) => void }> = ({ onAbrir }) =>
         title={<Input allowClear placeholder="Cliente, título, poço, cidade ou nº da obra" style={{ width: 320 }} value={busca} onChange={e => setBusca(e.target.value)} />}
         extra={<Space>
           <Tooltip title="Recarregar"><Button icon={<ReloadOutlined />} loading={carregando} onClick={carregar} /></Tooltip>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setNova(true)}>Nova obra</Button>
+          <Button icon={<PlusOutlined />} onClick={() => setNova(true)}>Nova obra</Button>
+          <Button type="primary" icon={<CalculatorOutlined />} onClick={() => setOrcamento(true)}>Orçamento rápido</Button>
         </Space>}>
         <Table<Obra>
           size="small" rowKey="idObra" loading={carregando} dataSource={visiveis} pagination={{ pageSize: 50, hideOnSinglePage: true }}
@@ -404,6 +410,7 @@ const ListaObras: React.FC<{ onAbrir: (id: number) => void }> = ({ onAbrir }) =>
         />
       </Card>
       <ObraModal obra={nova ? 'nova' : null} onFechar={() => setNova(false)} onSalva={o => { setNova(false); onAbrir(o.idObra); }} />
+      <OrcamentoRapido aberto={orcamento} onFechar={() => setOrcamento(false)} />
     </Space>
   );
 };

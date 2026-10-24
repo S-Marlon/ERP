@@ -171,3 +171,22 @@ materiais e processo continuam dentro da obra. Regras e pesos em `central.ts` (c
   idade e profundidade do poço, relacionamento, paga em dia, IoT; tiram pontos: inadimplência, sem telefone, sem poço)
   e estimativa do valor (visitas/ano × poços × valor da visita — do cliente, da empresa ou o padrão — ÷ 12 + margem +
   monitoramento). Pesos em `PESOS_PLANO` e valores em `BASE_PLANO`, para calibrar quando o plano existir.
+
+## Orçamento rápido, contrato, aditivo e ficha completa do cliente (2026-10-24)
+Tabelas novas: `_orcamento_itens`, `_aditivos` (e `id_aditivo` em `_adicionais`); qualificação do cliente em
+`_clientes` (PF/PJ, RG/IE, estado civil, profissão, 2º telefone, CEP, representante); modelos em `_config`.
+- **Orçamento rápido** (Central, Obras, contato do Atendimento e ficha do cliente): cliente escolhido/cadastrado ou o
+  do contato, local (poço do cliente ou local novo), itens "quantidade × valor" com linhas prontas (perfuração em m,
+  metro excedente "se necessário", revestimento, bomba, instalação, materiais, teste de vazão) e as condições. Grava a
+  obra em ORCAMENTO e abre o PDF. O total dos itens (sem os "se necessário") vira o valor contratado; a perfuração em
+  metros dá os metros previstos e o metro excedente. Regras em `orcamento.ts` (com teste).
+- **Obra › Orçamento e contrato:** editar itens (até concluir), orçamento PDF, duplicar, contrato completo em PDF,
+  "contrato assinado" (etapa `CONTRATO_ASSINADO` do processo, atrasada se a obra começar sem ela) e termos aditivos
+  (agrupam adicionais aprovados; numerados por obra; só o último, sem assinatura, pode ser apagado).
+- **Contrato e aditivo** saem de modelos de texto com `{campos}` (Atendimento › Configuração; vazio = modelo padrão),
+  com qualificação das partes, valor por extenso, foro, responsável técnico e testemunhas. O modelo padrão é referência:
+  revisar com advogado. Montagem em `documentosPocos.ts` (com teste).
+- **Ficha completa do cliente** (`GET /clientes/:id/completo`): dados, contratos (total, recebido, a receber,
+  assinado, aditivos, garantia), poços com ficha técnica, parcelas e recebimentos, linha do tempo (contato, obras,
+  processo, alertas dos sensores) e a prévia do plano mensal (mesmo cálculo da Central). Lista com filtros (obra aberta,
+  vencido, sem telefone, cidade). Orçamento ainda não aprovado não conta como "a receber".
