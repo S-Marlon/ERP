@@ -486,6 +486,40 @@ export const processoApi = {
 /** Endereço completo de um arquivo do servidor (/uploads/...). */
 export const urlArquivo = (caminho: string | null) => (!caminho ? null : /^https?:/.test(caminho) ? caminho : `${API_URL}${caminho}`);
 
+// ------------------------------------------------------------------ central (painel principal)
+export type FaseContrato = 'NEGOCIACAO' | 'SINAL' | 'EXECUCAO' | 'FECHAMENTO';
+export type Gravidade = 'ALTA' | 'MEDIA' | 'BAIXA';
+export type AcaoPendencia = 'PROCESSO' | 'COBRANCA' | 'MATERIAIS' | 'DADOS_OBRA' | 'POCO' | 'CLIENTE';
+export const FASES_CONTRATO: Record<FaseContrato, { texto: string; dica: string }> = {
+  NEGOCIACAO: { texto: 'Negociação', dica: 'orçamento' }, SINAL: { texto: 'Aguardando sinal', dica: 'aprovado, falta o sinal' },
+  EXECUCAO: { texto: 'Em execução', dica: 'obra em andamento' }, FECHAMENTO: { texto: 'Fechamento', dica: 'concluída com algo pendente' },
+};
+export const GRAVIDADES: Record<Gravidade, string> = { ALTA: 'red', MEDIA: 'orange', BAIXA: 'default' };
+export interface ContratoCentral {
+  idObra: number; titulo: string; cliente: string | null; telefone: string | null; idCliente: number; idPoco: number | null; poco: string | null; servicos: Servico[];
+  situacao: SituacaoObra; fase: FaseContrato; total: number; recebido: number; aReceber: number; desde: string; gravidade: Gravidade;
+  pendencias: { texto: string; gravidade: Gravidade; acao: AcaoPendencia }[];
+}
+export interface ClientePlano {
+  idCliente: number; nome: string; telefone: string | null; cidade: string | null; pocos: number; pocosNossos: number; idadeMaisVelhoAnos: number | null;
+  profundidadeMaxM: number | null; obrasConcluidas: number; obrasManutencao: number; valorGasto: number; mesesDesdeUltimaObra: number | null;
+  mesesDesdeUltimaManutencao: number | null; garantiaVencida: boolean; garantiaVencendoMeses: number | null; avaliou: boolean; temIot: boolean;
+  temPlanoManutencao: boolean; parcelasVencidas: number; temTelefone: boolean; obraAberta: boolean;
+  pontos: number; faixa: Gravidade; motivos: { texto: string; pontos: number }[];
+  estimativa: { valorMensal: number; minimo: number; maximo: number; base: string };
+}
+export interface Central {
+  hoje: { agenda: number; agendaTitulos: string[]; contatosSemResposta: number; alertasIot: number; aReceber: number; vencido: number };
+  contratos: ContratoCentral[];
+  completar: {
+    pct: number; totalClientes: number; totalPocos: number;
+    clientes: { idCliente: number; nome: string; pct: number; faltando: string[] }[];
+    pocos: { idPoco: number; identificacao: string; proprietario: string | null; pct: number; faltando: string[] }[];
+  };
+  plano: { clientes: ClientePlano[]; potencialAlta: number; potencialMedia: number; visitaEmpresa: number | null; alta: number; media: number };
+}
+export const centralApi = { carregar: () => pedir<Central>(`${API}/central?tenant_id=1`, undefined, 'Erro ao montar a central.') };
+
 // ------------------------------------------------------------------ painel e resultado (etapa 8)
 export interface LucroObra {
   idObra: number; titulo: string; cliente: string | null; situacao: SituacaoObra; servicos: Servico[]; inicio: string | null; termino: string | null;

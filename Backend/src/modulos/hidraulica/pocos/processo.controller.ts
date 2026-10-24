@@ -23,7 +23,7 @@ const erro = (res: Response, e: unknown, padrao: string) =>
   (e instanceof ErroArquivo ? res.status(400).json({ error: e.message }) : responderErro(res, e, padrao));
 
 // ------------------------------------------------------------------ configuração
-const carregarConfig = async (tenant: number) => {
+export const carregarConfig = async (tenant: number) => {
   const [[c]]: any = await pool.execute(
     `SELECT c.*, TIME_FORMAT(hora_abre, '%H:%i') AS abre, TIME_FORMAT(hora_fecha, '%H:%i') AS fecha, TIME_FORMAT(sabado_fecha, '%H:%i') AS sabado
      FROM modulo_hidraulica_pocos_config c WHERE tenant_id = ?`, [tenant]);
@@ -38,8 +38,8 @@ const carregarConfig = async (tenant: number) => {
     horaAbre: c?.abre || '08:00', horaFecha: c?.fecha || '18:00', sabadoFecha: c ? c.sabado || null : '12:00', configurado: !!c,
   };
 };
-type Config = Awaited<ReturnType<typeof carregarConfig>>;
-const regras = (c: Config): ConfigProcesso => ({
+export type Config = Awaited<ReturnType<typeof carregarConfig>>;
+export const regras = (c: Config): ConfigProcesso => ({
   respostaLeadMin: c.respostaLeadMin, orcamentoHoras: c.orcamentoHoras, avaliacaoDias: c.avaliacaoDias, revisaoMeses: c.revisaoMeses,
   horario: { abre: c.horaAbre, fecha: c.horaFecha, sabadoFecha: c.sabadoFecha },
 });
@@ -236,7 +236,7 @@ const carregarObra = async (tenant: number, id: number) => {
   if (!o) throw new ErroObra('Obra não encontrada.', 404);
   return o;
 };
-const eventosDe = async (ids: number[]) => {
+export const eventosDe = async (ids: number[]) => {
   if (!ids.length) return new Map<number, EventoProcesso[]>();
   const [rows]: any = await pool.execute(
     `SELECT id_obra, etapa, situacao, DATE_FORMAT(feito_em, '%Y-%m-%d %H:%i:%s') AS feito_txt, observacao FROM modulo_hidraulica_pocos_processo
@@ -245,7 +245,7 @@ const eventosDe = async (ids: number[]) => {
   for (const r of rows) m.set(Number(r.id_obra), [...(m.get(Number(r.id_obra)) || []), { etapa: r.etapa, situacao: r.situacao, feitoEm: r.feito_txt, observacao: r.observacao }]);
   return m;
 };
-const fotosPorEtapa = async (ids: number[]) => {
+export const fotosPorEtapa = async (ids: number[]) => {
   if (!ids.length) return new Map<number, Partial<Record<EtapaFoto, number>>>();
   const [rows]: any = await pool.execute(
     `SELECT id_obra, etapa, COUNT(*) AS n FROM modulo_hidraulica_pocos_fotos WHERE id_obra IN (${ids.map(() => '?').join(',')}) GROUP BY id_obra, etapa`, ids);
@@ -253,7 +253,7 @@ const fotosPorEtapa = async (ids: number[]) => {
   for (const r of rows) m.set(Number(r.id_obra), { ...(m.get(Number(r.id_obra)) || {}), [r.etapa]: Number(r.n) });
   return m;
 };
-const paraProcesso = (o: any) => ({ situacao: o.situacao, criadaEm: o.criada_txt, dataInicio: o.inicio_txt || null, dataTermino: o.termino_txt || null, servicos: lerServicos(o.servicos) });
+export const paraProcesso = (o: any) => ({ situacao: o.situacao, criadaEm: o.criada_txt, dataInicio: o.inicio_txt || null, dataTermino: o.termino_txt || null, servicos: lerServicos(o.servicos) });
 const mensagens = (o: any, cfg: Config) => {
   const v = { cliente: (o.cliente || '').split(' ')[0], empresa: cfg.empresaNome || 'nossa empresa', link: cfg.linkAvaliacao || '', poco: o.poco || o.titulo || '', obra: o.id_obra };
   return {

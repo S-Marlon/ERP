@@ -154,3 +154,20 @@ Os 5 pontos combinados com o dono, cada um registrado no módulo (regras e teste
 - Etapas registradas em `_processo` (uma por obra e etapa, FEITO ou NAO_SE_APLICA). Checklist em cada obra,
   pendências de todas e indicadores (resposta no prazo, orçamento no prazo, obras com as 3 fotos, avaliações,
   conversão e valor fechado por origem). Não há envio automático de WhatsApp (precisaria da API paga).
+
+## Central (reformulação, 2026-10-24)
+O módulo abre na **Central** e as abas seguem o dia a dia (Central, Atendimento, Obras/poços/clientes, Agenda,
+Manutenção, Monitoramento, Mapa, Resultado, Relatório avulso); o mapa de etapas saiu da tela (todas prontas). Cobrança,
+materiais e processo continuam dentro da obra. Regras e pesos em `central.ts` (com teste); sem tabela nova.
+- **Hoje:** agenda do dia, contatos sem resposta, alertas dos sensores, a receber e vencido (atalhos para as abas).
+- **Contratos a finalizar** por fase (negociação, aguardando sinal, em execução, fechamento) com o que falta em cada um:
+  orçamento sem valor ou parado, sinal, início vencido, execução longa, saldo sem parcela, vencido, materiais não
+  lançados/conferidos, garantia, poço sem GPS/profundidade/vazão, cliente sem telefone e as etapas do processo (as do
+  orçamento só antes de começar; pós-venda fica no Atendimento). Obra concluída sem nada faltando sai da lista. Cada
+  pendência leva ao lugar de resolver.
+- **Informações a completar:** fichas de clientes (telefone, cidade, endereço, documento) e poços (dono, GPS,
+  profundidade, vazão, nível estático, diâmetro, data da perfuração) e a % da base completa.
+- **Prévia do plano mensal:** chance de assinar (pontos com motivo: poço nosso, recorrência, garantia vencida/vencendo,
+  idade e profundidade do poço, relacionamento, paga em dia, IoT; tiram pontos: inadimplência, sem telefone, sem poço)
+  e estimativa do valor (visitas/ano × poços × valor da visita — do cliente, da empresa ou o padrão — ÷ 12 + margem +
+  monitoramento). Pesos em `PESOS_PLANO` e valores em `BASE_PLANO`, para calibrar quando o plano existir.

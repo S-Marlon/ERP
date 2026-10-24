@@ -21,7 +21,7 @@ export interface NavPocos {
   focoCliente?: number | null;
 }
 
-let estado: NavPocos = { aba: 'obras', pedido: 0 };
+let estado: NavPocos = { aba: 'central', pedido: 0 };
 const ouvintes = new Set<() => void>();
 
 export const navPocos = {

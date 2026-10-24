@@ -8,6 +8,7 @@
 // Etapa 7: monitoramento remoto (aparelhos, rota das leituras com a chave do aparelho, quadro de comando, alertas, painel,
 // simulador, importação do poço sem internet, relatório do mês e fila de comandos remotos).
 // Processo: leads (prazo de resposta), checklist da obra, fotos, orçamento/laudo/adesivo, pós-venda e indicadores.
+// Central: contratos a finalizar, informações a completar e a prévia do plano mensal.
 import { Router } from 'express';
 import { criarObra, criarPoco, detalheObra, listarObras, listarPocos, mudarSituacao, salvarObra, salvarPoco, salvarRelatorio } from './obras.controller';
 import { criarCliente, detalheCliente, listarClientes, salvarCliente } from './clientes.controller';
@@ -33,6 +34,7 @@ import {
   apagarFoto, dadosDoDocumento, criarLead, desfazerEtapa, enviarFoto, galeria, listarLeads, marcarEtapa, marcarRespondido, mudarLead, obraDoLead, pendencias,
   processoDaObra, salvarConfig, salvarFoto, salvarLead, verConfig, verIndicadores,
 } from './processo.controller';
+import { central } from './central.controller';
 import { analiseDoMapa, pocosDoMapa, potencialDoMapa, referenciasDoMapa, resumoMapa } from './mapa.controller';
 
 const router = Router();
@@ -107,6 +109,7 @@ router.get('/mapa/pocos', pocosDoMapa);
 router.get('/mapa/referencias', referenciasDoMapa);
 router.get('/mapa/potencial', potencialDoMapa);
 router.get('/mapa/analise', analiseDoMapa);
+router.get('/central', central);
 router.get('/processo/config', verConfig);
 router.put('/processo/config', salvarConfig);
 router.get('/processo/pendencias', pendencias);

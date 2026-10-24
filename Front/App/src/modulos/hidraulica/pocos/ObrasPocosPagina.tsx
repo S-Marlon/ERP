@@ -1,11 +1,12 @@
-// Módulo Obras de poços: o mapa do módulo (etapas) e uma aba por funcionalidade. O relatório técnico (formulário e
-// impressões) já funciona; as outras abrem por etapas.
+// Módulo Obras de poços: abre na Central (contratos a finalizar, informações a completar e a prévia do plano mensal) e
+// tem uma aba para cada parte do dia a dia. O mapa de etapas do desenvolvimento ficou em planoObras.ts e
+// docs/plano-obras-pocos.md (todas prontas); as partes de cobrança, materiais e processo vivem dentro da obra.
 import React, { useEffect } from 'react';
+import { Tabs, Typography } from 'antd';
 import {
-  AimOutlined, ApiOutlined, BarChartOutlined, CalendarOutlined, CustomerServiceOutlined, DollarOutlined, EnvironmentOutlined, FileTextOutlined, HistoryOutlined, InboxOutlined,
+  AimOutlined, ApiOutlined, BarChartOutlined, CalendarOutlined, CustomerServiceOutlined, DashboardOutlined, EnvironmentOutlined, FileTextOutlined, HistoryOutlined,
 } from '@ant-design/icons';
-import ModuloEmEtapas from '../../../shared/components/mapaModulo/ModuloEmEtapas';
-import { FUNCIONALIDADES } from './planoObras';
+import CentralPocos from './CentralPocos';
 import RelatorioPocoPage from './RelatorioPocoPage';
 import ObrasAba from './ObrasAba';
 import MapaPocos from './MapaPocos';
@@ -16,22 +17,33 @@ import MonitoramentoPocos from './MonitoramentoPocos';
 import AtendimentoPocos from './AtendimentoPocos';
 import { navPocos, useNavPocos } from './navPocos';
 
-const ICONES: Record<string, React.ReactNode> = {
-  relatorio: <FileTextOutlined />, obras: <AimOutlined />, mapa: <EnvironmentOutlined />, cobranca: <DollarOutlined />, materiais: <InboxOutlined />,
-  agenda: <CalendarOutlined />, manutencao: <HistoryOutlined />, iot: <ApiOutlined />, resultado: <BarChartOutlined />, atendimento: <CustomerServiceOutlined />,
-};
+const { Title, Text } = Typography;
+
+const ABAS: { chave: string; titulo: string; icone: React.ReactNode; tela: React.ReactNode }[] = [
+  { chave: 'central', titulo: 'Central', icone: <DashboardOutlined />, tela: <CentralPocos /> },
+  { chave: 'atendimento', titulo: 'Atendimento e pós-venda', icone: <CustomerServiceOutlined />, tela: <AtendimentoPocos /> },
+  { chave: 'obras', titulo: 'Obras, poços e clientes', icone: <AimOutlined />, tela: <ObrasAba /> },
+  { chave: 'agenda', titulo: 'Agenda', icone: <CalendarOutlined />, tela: <AgendaPocos /> },
+  { chave: 'manutencao', titulo: 'Manutenção', icone: <HistoryOutlined />, tela: <ManutencoesPocos /> },
+  { chave: 'iot', titulo: 'Monitoramento', icone: <ApiOutlined />, tela: <MonitoramentoPocos /> },
+  { chave: 'mapa', titulo: 'Mapa', icone: <EnvironmentOutlined />, tela: <MapaPocos /> },
+  { chave: 'resultado', titulo: 'Resultado', icone: <BarChartOutlined />, tela: <PainelPocos /> },
+  { chave: 'relatorio', titulo: 'Relatório avulso', icone: <FileTextOutlined />, tela: <RelatorioPocoPage /> },
+];
 
 const ObrasPocosPagina: React.FC = () => {
-  const nav = useNavPocos();   // "ver no mapa" / "abrir obra" trocam a aba
-  useEffect(() => () => navPocos.trocarAba('obras'), []);   // ao sair do módulo, volta a abrir pelas obras
+  const nav = useNavPocos();   // "ver no mapa", "abrir obra" e os atalhos da Central trocam a aba
+  useEffect(() => () => navPocos.trocarAba('central'), []);   // ao sair do módulo, volta a abrir pela Central
+  const aba = ABAS.some(a => a.chave === nav.aba) ? nav.aba : 'central';
   return (
-    <ModuloEmEtapas
-      titulo={<><AimOutlined /> Obras de poços artesianos</>}
-      descricao="Da perfuração à manutenção: obras, ficha de cada poço, mapa regional, sinal e cobrança, materiais, agenda e monitoramento remoto."
-      funcionalidades={FUNCIONALIDADES} icones={ICONES} telas={{ relatorio: <RelatorioPocoPage />, obras: <ObrasAba />, mapa: <MapaPocos />, agenda: <AgendaPocos />, manutencao: <ManutencoesPocos />, iot: <MonitoramentoPocos />, atendimento: <AtendimentoPocos />, resultado: <PainelPocos /> }}
-      aba={nav.aba} onAba={navPocos.trocarAba}
-      textoAlertas="Obras paradas ou atrasadas ficam em Resultado e painel; manutenções vencendo e garantias em Histórico e manutenção; alertas dos sensores em Monitoramento remoto."
-    />
+    <div style={{ padding: 24 }}>
+      <div style={{ marginBottom: 12 }}>
+        <Title level={3} style={{ margin: 0 }}><AimOutlined /> Obras de poços artesianos</Title>
+        <Text type="secondary">Do primeiro contato à manutenção: contratos, obras, poços, agenda, monitoramento e pós-venda.</Text>
+      </div>
+      <Tabs activeKey={aba} onChange={navPocos.trocarAba} destroyOnHidden
+        items={ABAS.map(a => ({ key: a.chave, label: <span>{a.icone} {a.titulo}</span>, children: a.tela }))} />
+    </div>
   );
 };
 
