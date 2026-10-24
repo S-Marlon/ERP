@@ -6,6 +6,6 @@ const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok
 
 teste('obras de poços: o mapa do módulo está consistente', () => {
   assert.ok(mapaConsistente(FUNCIONALIDADES));
-  assert.deepStrictEqual(etapasDoPlano(FUNCIONALIDADES).map(e => e.etapa), [0, 1, 2, 3, 4, 5, 6, 7, 8]);
-  assert.strictEqual(etapaAtual(FUNCIONALIDADES), null);   // todas as etapas (0 a 8) prontas
+  assert.deepStrictEqual(etapasDoPlano(FUNCIONALIDADES).map(e => e.etapa), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  assert.strictEqual(etapaAtual(FUNCIONALIDADES), null);   // todas as etapas (0 a 9) prontas
 });

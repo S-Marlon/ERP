@@ -136,3 +136,21 @@ com a loja, se um dia for o caso, é uma decisão nova.
 - Comandos (`modulo_hidraulica_pocos_comandos`): BLOQUEAR (com motivo), LIBERAR, RECONHECER; um pendente por vez,
   vale 10 min, vai na resposta do envio e o aparelho confirma no seguinte. No quadro, o relé da placa é NF em série
   com a bobina: a placa só bloqueia/libera, nunca liga por cima das proteções.
+
+## Etapa 9 (atendimento e pós-venda: o processo da empresa)
+Os 5 pontos combinados com o dono, cada um registrado no módulo (regras e testes em `processo.ts`):
+1. **Atendimento:** todo contato vira lead (`_leads`) com origem; prazo de resposta em minutos de **horário
+   comercial** (padrão 60 min, seg–sex 8–18 h, sábado até 12 h); "Respondi" grava a hora. Do lead nasce a obra
+   (usa o cliente com o mesmo telefone ou cadastra). A situação do lead acompanha a obra (orçamento enviado,
+   convertido quando a obra sai do orçamento).
+2. **Orçamento:** obra ganhou escopo, prazo de execução, forma de pagamento e validade; o PDF sai da página para
+   imprimir (logo e dados da empresa em `_config`). Prazo: N horas (24) depois da visita (ou da criação).
+3. **Obra:** fotos de antes (cobradas ao iniciar), durante e depois (ao concluir) em `_fotos` (Backend/uploads/pocos),
+   com "pode divulgar" e a galeria de propaganda.
+4. **Entrega:** laudo (profundidade, vazão, NE/ND, bomba, garantia) e adesivo do quadro para imprimir; etapas com prazo
+   de 3 dias da conclusão; "não se aplica" quando não há quadro.
+5. **Pós-venda:** avaliação no Google pedida N dias (7) depois da conclusão e lembrete de revisão aos N meses (11),
+   com o WhatsApp aberto por link (wa.me) e a mensagem pronta (modelos com {cliente}, {empresa}, {link}, {poco}).
+- Etapas registradas em `_processo` (uma por obra e etapa, FEITO ou NAO_SE_APLICA). Checklist em cada obra,
+  pendências de todas e indicadores (resposta no prazo, orçamento no prazo, obras com as 3 fotos, avaliações,
+  conversão e valor fechado por origem). Não há envio automático de WhatsApp (precisaria da API paga).

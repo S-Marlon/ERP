@@ -7,6 +7,7 @@
 // Etapa 6: histórico (linha do tempo, medições) e plano de manutenção do poço; garantias vencendo.
 // Etapa 7: monitoramento remoto (aparelhos, rota das leituras com a chave do aparelho, quadro de comando, alertas, painel,
 // simulador, importação do poço sem internet, relatório do mês e fila de comandos remotos).
+// Processo: leads (prazo de resposta), checklist da obra, fotos, orçamento/laudo/adesivo, pós-venda e indicadores.
 import { Router } from 'express';
 import { criarObra, criarPoco, detalheObra, listarObras, listarPocos, mudarSituacao, salvarObra, salvarPoco, salvarRelatorio } from './obras.controller';
 import { criarCliente, detalheCliente, listarClientes, salvarCliente } from './clientes.controller';
@@ -28,6 +29,10 @@ import {
 import {
   criarPlano, criarRegistro, historicoDoPoco, listaManutencoes, removerRegistro, salvarPlano, salvarRegistro,
 } from './manutencao.controller';
+import {
+  apagarFoto, dadosDoDocumento, criarLead, desfazerEtapa, enviarFoto, galeria, listarLeads, marcarEtapa, marcarRespondido, mudarLead, obraDoLead, pendencias,
+  processoDaObra, salvarConfig, salvarFoto, salvarLead, verConfig, verIndicadores,
+} from './processo.controller';
 import { analiseDoMapa, pocosDoMapa, potencialDoMapa, referenciasDoMapa, resumoMapa } from './mapa.controller';
 
 const router = Router();
@@ -102,5 +107,23 @@ router.get('/mapa/pocos', pocosDoMapa);
 router.get('/mapa/referencias', referenciasDoMapa);
 router.get('/mapa/potencial', potencialDoMapa);
 router.get('/mapa/analise', analiseDoMapa);
+router.get('/processo/config', verConfig);
+router.put('/processo/config', salvarConfig);
+router.get('/processo/pendencias', pendencias);
+router.get('/processo/indicadores', verIndicadores);
+router.get('/processo/galeria', galeria);
+router.get('/leads', listarLeads);
+router.post('/leads', criarLead);
+router.put('/leads/:id', salvarLead);
+router.post('/leads/:id/respondido', marcarRespondido);
+router.post('/leads/:id/situacao', mudarLead);
+router.post('/leads/:id/obra', obraDoLead);
+router.get('/obras/:id/processo', processoDaObra);
+router.post('/obras/:id/processo/:etapa', marcarEtapa);
+router.delete('/obras/:id/processo/:etapa', desfazerEtapa);
+router.get('/obras/:id/documento', dadosDoDocumento);
+router.post('/obras/:id/fotos', enviarFoto);
+router.put('/fotos/:id', salvarFoto);
+router.delete('/fotos/:id', apagarFoto);
 
 export default router;

@@ -2,7 +2,7 @@
 // impressões) já funciona; as outras abrem por etapas.
 import React, { useEffect } from 'react';
 import {
-  AimOutlined, ApiOutlined, BarChartOutlined, CalendarOutlined, DollarOutlined, EnvironmentOutlined, FileTextOutlined, HistoryOutlined, InboxOutlined,
+  AimOutlined, ApiOutlined, BarChartOutlined, CalendarOutlined, CustomerServiceOutlined, DollarOutlined, EnvironmentOutlined, FileTextOutlined, HistoryOutlined, InboxOutlined,
 } from '@ant-design/icons';
 import ModuloEmEtapas from '../../../shared/components/mapaModulo/ModuloEmEtapas';
 import { FUNCIONALIDADES } from './planoObras';
@@ -13,11 +13,12 @@ import AgendaPocos from './AgendaPocos';
 import PainelPocos from './PainelPocos';
 import { ManutencoesPocos } from './ManutencaoPocos';
 import MonitoramentoPocos from './MonitoramentoPocos';
+import AtendimentoPocos from './AtendimentoPocos';
 import { navPocos, useNavPocos } from './navPocos';
 
 const ICONES: Record<string, React.ReactNode> = {
   relatorio: <FileTextOutlined />, obras: <AimOutlined />, mapa: <EnvironmentOutlined />, cobranca: <DollarOutlined />, materiais: <InboxOutlined />,
-  agenda: <CalendarOutlined />, manutencao: <HistoryOutlined />, iot: <ApiOutlined />, resultado: <BarChartOutlined />,
+  agenda: <CalendarOutlined />, manutencao: <HistoryOutlined />, iot: <ApiOutlined />, resultado: <BarChartOutlined />, atendimento: <CustomerServiceOutlined />,
 };
 
 const ObrasPocosPagina: React.FC = () => {
@@ -27,7 +28,7 @@ const ObrasPocosPagina: React.FC = () => {
     <ModuloEmEtapas
       titulo={<><AimOutlined /> Obras de poços artesianos</>}
       descricao="Da perfuração à manutenção: obras, ficha de cada poço, mapa regional, sinal e cobrança, materiais, agenda e monitoramento remoto."
-      funcionalidades={FUNCIONALIDADES} icones={ICONES} telas={{ relatorio: <RelatorioPocoPage />, obras: <ObrasAba />, mapa: <MapaPocos />, agenda: <AgendaPocos />, manutencao: <ManutencoesPocos />, iot: <MonitoramentoPocos />, resultado: <PainelPocos /> }}
+      funcionalidades={FUNCIONALIDADES} icones={ICONES} telas={{ relatorio: <RelatorioPocoPage />, obras: <ObrasAba />, mapa: <MapaPocos />, agenda: <AgendaPocos />, manutencao: <ManutencoesPocos />, iot: <MonitoramentoPocos />, atendimento: <AtendimentoPocos />, resultado: <PainelPocos /> }}
       aba={nav.aba} onAba={navPocos.trocarAba}
       textoAlertas="Obras paradas ou atrasadas ficam em Resultado e painel; manutenções vencendo e garantias em Histórico e manutenção; alertas dos sensores em Monitoramento remoto."
     />

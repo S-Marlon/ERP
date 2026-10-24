@@ -12,6 +12,7 @@ import { ClientePocoModal, ListaClientes } from './ClientesPoco';
 import { AReceberObras, CobrancaDaObra } from './CobrancaObra';
 import { CadastroMateriais, MateriaisDaObra } from './MateriaisObra';
 import { HistoricoDoPoco } from './ManutencaoPocos';
+import { ProcessoDaObra } from './ProcessoObra';
 import { lerGpsTexto, textoRaio } from './mapaRegional';
 import { abrirCliente, agendarObra, ParteObra, useNavPocos, verNoMapa, VistaObras } from './navPocos';
 
@@ -26,6 +27,7 @@ const pocoVazio = (): PocoForm => ({
 const obraVazia = (): ObraForm => ({
   idCliente: null, idPoco: null, servicos: ['PERFURACAO'], titulo: null, dataPrevisao: null, garantiaMeses: 12, metrosPrevistos: null,
   valorContratado: null, valorMetroExcedente: null, valorSinal: null, sinalQuando: 'ANTES', observacao: null,
+  escopo: null, prazoExecucaoDias: null, formaPagamento: null, validadeOrcamentoDias: null,
 });
 
 /** Campos de endereço e GPS do poço (usados no poço novo da obra e na ficha). */
@@ -244,6 +246,20 @@ const ObraModal: React.FC<{ obra: Obra | 'nova' | null; onFechar: () => void; on
           <Col span={6}><Text>Garantia</Text>{num('garantiaMeses', { suffix: 'meses', max: 120 })}</Col>
           <Col span={18}><Text>Observação</Text><Input maxLength={255} value={f.observacao || ''} onChange={e => mudar({ observacao: e.target.value || null })} /></Col>
         </Row>
+        <Text strong style={{ marginTop: 4 }}>Para o orçamento em PDF</Text>
+        <div><Text>Escopo (o que será feito)</Text>
+          <Input.TextArea rows={3} maxLength={5000} value={f.escopo || ''} onChange={e => mudar({ escopo: e.target.value || null })}
+            placeholder={'Ex.: Perfuração de até 120 m em 6"\nRevestimento geomecânico, pré-filtro e laje de proteção\nTeste de vazão de 6 h'} />
+        </div>
+        <Row gutter={8}>
+          <Col span={6}><Text>Prazo de execução</Text>
+            <InputNumber min={1} max={365} suffix="dias" style={{ width: '100%' }} value={f.prazoExecucaoDias ?? undefined} onChange={v => mudar({ prazoExecucaoDias: v === null ? null : Number(v) })} />
+          </Col>
+          <Col span={12}><Text>Forma de pagamento</Text><Input maxLength={255} value={f.formaPagamento || ''} onChange={e => mudar({ formaPagamento: e.target.value || null })} placeholder="Vazio = a padrão da configuração" /></Col>
+          <Col span={6}><Text>Validade</Text>
+            <InputNumber min={1} max={365} suffix="dias" placeholder="padrão" style={{ width: '100%' }} value={f.validadeOrcamentoDias ?? undefined} onChange={v => mudar({ validadeOrcamentoDias: v === null ? null : Number(v) })} />
+          </Col>
+        </Row>
         {obra === 'nova' && <Text type="secondary" style={{ fontSize: 12 }}>A obra começa como orçamento, com o relatório técnico já preenchido com o cliente, o poço e os valores.</Text>}
       </Space>
       <ClientePocoModal open={escolhendo} onFechar={() => setEscolhendo(false)}
@@ -312,7 +328,8 @@ const ObraAberta: React.FC<{ idObra: number; parte?: ParteObra; onVoltar: () => 
       </Card>
       <Flex justify="space-between" align="center" style={{ marginBottom: 8 }}>
         <Segmented value={parte} onChange={v => setParte(v as ParteObra)}
-          options={[{ value: 'RELATORIO', label: 'Relatório técnico' }, { value: 'COBRANCA', label: 'Sinal e cobrança' }, { value: 'MATERIAIS', label: 'Materiais' }]} />
+          options={[{ value: 'RELATORIO', label: 'Relatório técnico' }, { value: 'PROCESSO', label: 'Processo e fotos' }, { value: 'COBRANCA', label: 'Sinal e cobrança' },
+            { value: 'MATERIAIS', label: 'Materiais' }]} />
         {parte !== 'RELATORIO' && <Button onClick={onVoltar}>Voltar para as obras</Button>}
       </Flex>
       {parte === 'RELATORIO'
@@ -322,6 +339,8 @@ const ObraAberta: React.FC<{ idObra: number; parte?: ParteObra; onVoltar: () => 
               obra={{ dados: obra.relatorio || {}, salvar: dados => obrasApi.salvarRelatorio(obra.idObra, dados) }} />
           </div>
         )
+        : parte === 'PROCESSO'
+          ? <ProcessoDaObra idObra={obra.idObra} cancelada={obra.situacao === 'CANCELADA'} />
         : parte === 'COBRANCA'
           ? <CobrancaDaObra key={versaoCobranca} idObra={obra.idObra} cancelada={obra.situacao === 'CANCELADA'} />
           : <MateriaisDaObra idObra={obra.idObra} cancelada={obra.situacao === 'CANCELADA'} />}

@@ -109,6 +109,20 @@ export const FUNCIONALIDADES: Funcionalidade[] = [
     ligaCom: ['Histórico do poço (etapa 6)', 'Notificações'],
   },
   {
+    chave: 'atendimento', titulo: 'Atendimento e pós-venda', etapa: 9, situacao: 'PRONTA',
+    resumo: 'O processo da empresa: todo contato vira lead com origem, orçamento em PDF em 24 h, fotos de toda obra, laudo e adesivo na entrega, avaliação e revisão.',
+    oQueFaz: [
+      'Leads com origem (Google, indicação, placa, Instagram...) e prazo de resposta de 1 h em horário comercial; do lead nasce a obra',
+      'Orçamento em PDF com logo, escopo, prazo, garantia e pagamento; prazo de 24 h depois da visita',
+      'Fotos de antes, durante e depois em toda obra, com "pode divulgar" e galeria para propaganda',
+      'Laudo de entrega (profundidade, vazão, níveis) e adesivo do quadro para imprimir',
+      'Avaliação no Google pedida 7 dias depois e lembrete de revisão aos 11 meses, pelo WhatsApp com a mensagem pronta',
+      'Checklist do processo em cada obra, pendências de todas as obras e indicadores (resposta, orçamento, fotos, conversão por origem)',
+    ],
+    dados: ['lead (origem, contato, prazo, situação)', 'etapas do processo de cada obra', 'fotos da obra', 'configuração (empresa, logo, mensagens, prazos)'],
+    ligaCom: ['Obras e poços (o lead vira cliente e obra)', 'Agenda (visita de orçamento)'],
+  },
+  {
     chave: 'resultado', titulo: 'Resultado e painel', etapa: 8, situacao: 'PRONTA',
     resumo: 'Lucro de cada obra e o painel da empresa: metros perfurados, obras em andamento e atrasadas.',
     oQueFaz: [

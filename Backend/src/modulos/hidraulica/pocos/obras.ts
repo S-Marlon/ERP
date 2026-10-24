@@ -61,8 +61,19 @@ export const validarObra = (b: any) => {
     valorSinal: numero(b?.valorSinal, 'Sinal') || null,
     sinalQuando: String(b?.sinalQuando || '').toUpperCase() === 'NO_ATO' ? 'NO_ATO' : 'ANTES',
     observacao: texto(b?.observacao, 255),
+    // o que vai no orçamento em PDF
+    escopo: String(b?.escopo ?? '').replace(/\r\n/g, '\n').trim().slice(0, 5000) || null,
+    prazoExecucaoDias: diasOuNulo(b?.prazoExecucaoDias, 'Prazo de execução'), formaPagamento: texto(b?.formaPagamento, 255),
+    validadeOrcamentoDias: diasOuNulo(b?.validadeOrcamentoDias, 'Validade do orçamento'),
   };
 };
+
+function diasOuNulo(v: unknown, nome: string) {
+  if (v === undefined || v === null || v === '') return null;
+  const n = Math.floor(Number(v));
+  if (!Number.isFinite(n) || n < 1 || n > 365) throw new ErroObra(`${nome}: de 1 a 365 dias.`);
+  return n;
+}
 
 /** "-23.55, -46.63" (ou com espaço/ponto e vírgula) → latitude e longitude; null quando não dá para ler. */
 export const lerGps = (v: unknown): { latitude: number; longitude: number } | null => {

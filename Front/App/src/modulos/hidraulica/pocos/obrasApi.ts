@@ -26,6 +26,8 @@ export interface ObraForm {
   garantiaMeses: number | null; metrosPrevistos: number | null; valorContratado: number | null; valorMetroExcedente: number | null; observacao: string | null;
   /** Sinal combinado; ANTES = só começa com o sinal recebido, NO_ATO = pago no dia da perfuração. */
   valorSinal: number | null; sinalQuando: 'ANTES' | 'NO_ATO';
+  /** O que vai no orçamento em PDF. */
+  escopo?: string | null; prazoExecucaoDias?: number | null; formaPagamento?: string | null; validadeOrcamentoDias?: number | null;
 }
 export interface Obra extends Omit<ObraForm, 'idCliente'> {
   idObra: number; idCliente: number; cliente: string; telefone: string | null; poco: string | null; cidade: string | null;
@@ -389,6 +391,100 @@ export const haQuanto = (s: string | null, agora: Date) => {
   if (min < 48 * 60) return `há ${Math.round(min / 60)} h`;
   return `há ${Math.round(min / 1440)} dias`;
 };
+
+// ------------------------------------------------------------------ processo (atendimento, orçamento, obra, entrega, pós-venda)
+export type OrigemLead = 'GOOGLE' | 'INDICACAO' | 'PLACA' | 'INSTAGRAM' | 'FACEBOOK' | 'SITE' | 'WHATSAPP' | 'OUTRO';
+export type SituacaoLead = 'NOVO' | 'EM_CONTATO' | 'VISITA_AGENDADA' | 'ORCAMENTO_ENVIADO' | 'CONVERTIDO' | 'PERDIDO';
+export type EstadoPrazo = 'NO_PRAZO' | 'FORA_DO_PRAZO' | 'CORRENDO' | 'ATRASADO';
+export type EstadoEtapa = 'FEITO' | 'NAO_SE_APLICA' | 'PENDENTE' | 'ATRASADO' | 'AINDA_NAO' | 'OPCIONAL';
+export type EtapaFoto = 'ANTES' | 'DURANTE' | 'DEPOIS';
+export const ORIGENS_LEAD: Record<OrigemLead, string> = {
+  GOOGLE: 'Google', INDICACAO: 'Indicação', PLACA: 'Placa', INSTAGRAM: 'Instagram', FACEBOOK: 'Facebook', SITE: 'Site', WHATSAPP: 'WhatsApp', OUTRO: 'Outro',
+};
+export const SITUACOES_LEAD: Record<SituacaoLead, { texto: string; cor: string }> = {
+  NOVO: { texto: 'Novo', cor: 'blue' }, EM_CONTATO: { texto: 'Em contato', cor: 'cyan' }, VISITA_AGENDADA: { texto: 'Visita / orçamento', cor: 'geekblue' },
+  ORCAMENTO_ENVIADO: { texto: 'Orçamento enviado', cor: 'purple' }, CONVERTIDO: { texto: 'Convertido', cor: 'green' }, PERDIDO: { texto: 'Perdido', cor: 'default' },
+};
+export const ESTADOS_PRAZO: Record<EstadoPrazo, { texto: string; cor: string }> = {
+  NO_PRAZO: { texto: 'no prazo', cor: 'green' }, FORA_DO_PRAZO: { texto: 'fora do prazo', cor: 'orange' }, CORRENDO: { texto: 'aguardando', cor: 'blue' },
+  ATRASADO: { texto: 'atrasado', cor: 'red' },
+};
+export const ESTADOS_ETAPA: Record<EstadoEtapa, { texto: string; cor: string }> = {
+  FEITO: { texto: 'feito', cor: 'green' }, NAO_SE_APLICA: { texto: 'não se aplica', cor: 'default' }, PENDENTE: { texto: 'pendente', cor: 'gold' },
+  ATRASADO: { texto: 'atrasado', cor: 'red' }, AINDA_NAO: { texto: 'ainda não', cor: 'default' }, OPCIONAL: { texto: 'opcional', cor: 'default' },
+};
+export const ETAPAS_FOTO: Record<EtapaFoto, string> = { ANTES: 'Antes', DURANTE: 'Durante', DEPOIS: 'Depois' };
+
+export interface ConfigProcesso {
+  empresaNome: string | null; empresaDocumento: string | null; empresaTelefone: string | null; empresaWhatsapp: string | null; empresaEmail: string | null;
+  empresaEndereco: string | null; logo: string | null; textoGarantia: string | null; formaPagamentoPadrao: string | null; validadeOrcamentoDias: number;
+  linkAvaliacao: string | null; msgAvaliacao: string; msgRevisao: string; respostaLeadMin: number; orcamentoHoras: number; avaliacaoDias: number;
+  revisaoMeses: number; horaAbre: string; horaFecha: string; sabadoFecha: string | null; configurado: boolean;
+}
+export interface LeadForm { nome: string; telefone: string | null; origem: OrigemLead; indicadoPor: string | null; cidade: string | null; necessidade: string | null; recebidoEm: string | null; observacao: string | null }
+export interface Lead extends LeadForm {
+  idLead: number; recebidoEm: string; respondidoEm: string | null; prazoResposta: string; estadoResposta: EstadoPrazo; situacao: SituacaoLead;
+  situacaoGravada: SituacaoLead; motivoPerda: string | null; idCliente: number | null; cliente: string | null; idObra: number | null; obra: string | null;
+  obraSituacao: SituacaoObra | null; valorContratado: number | null; whatsapp: string | null; operador: string;
+}
+export interface ItemChecklist {
+  etapa: string; titulo: string; grupo: 'ORCAMENTO' | 'OBRA' | 'ENTREGA' | 'POS_VENDA'; estado: EstadoEtapa; prazo: string | null; feitoEm: string | null;
+  observacao: string | null; manual: boolean; noPrazo: boolean | null;
+}
+export interface FotoObra { idFoto: number; idObra: number; etapa: EtapaFoto; url: string; legenda: string | null; podeDivulgar: boolean; criadaEm: string; operador: string }
+export interface ProcessoObra {
+  checklist: ItemChecklist[]; resumo: { pendentes: number; atrasadas: number; feitas: number; emDia: boolean }; fotos: FotoObra[];
+  whatsapp: string | null; whatsappAvaliacao: string | null; whatsappRevisao: string | null; lead: { idLead: number; origem: OrigemLead } | null;
+}
+export interface PendenciaObra extends ItemChecklist { idObra: number; obra: string; cliente: string | null; telefone: string | null; situacaoObra: SituacaoObra; whatsapp: string | null }
+export interface IndicadoresProcesso {
+  de: string; ate: string; leads: number; respostaNoPrazo: number | null; respostaMedidos: number; orcamentoNoPrazo: number | null; orcamentos: number;
+  fotosCompletas: number | null; concluidas: number; avaliacoesPedidas: number; avaliacoesRecebidas: number;
+  porOrigem: { origem: OrigemLead; leads: number; convertidos: number; perdidos: number; conversao: number | null; valorFechado: number }[];
+}
+export interface DocumentoObra {
+  empresa: ConfigProcesso;
+  obra: {
+    idObra: number; titulo: string | null; servicos: Servico[]; situacao: SituacaoObra; criadaEm: string; dataInicio: string | null; dataTermino: string | null;
+    metrosPrevistos: number | null; valorContratado: number | null; valorMetroExcedente: number | null; valorSinal: number | null; sinalQuando: 'ANTES' | 'NO_ATO';
+    garantiaMeses: number | null; garantiaAte: string | null; escopo: string | null; prazoExecucaoDias: number | null; formaPagamento: string | null;
+    validadeOrcamentoDias: number; adicionais: { descricao: string; valor: number }[];
+  };
+  cliente: { nome: string; documento: string | null; telefone: string | null; endereco: string | null; cidade: string | null; uf: string | null } | null;
+  poco: {
+    idPoco: number; identificacao: string; endereco: string | null; cidade: string | null; uf: string | null; latitude: number | null; longitude: number | null;
+    profundidadeM: number | null; diametro: string | null; vazaoLh: number | null; nivelEstaticoM: number | null; nivelDinamicoM: number | null;
+    tipoSolo: string | null; dataPerfuracao: string | null;
+  } | null;
+  medido: { profundidadeM: number | null; vazaoLh: number | null; nivelEstaticoM: number | null; nivelDinamicoM: number | null; diametro: string | null; tipoSolo: string | null; bomba: string | null };
+}
+
+export const processoApi = {
+  config: () => pedir<ConfigProcesso>(`${API}/processo/config?tenant_id=1`, undefined, 'Erro ao ler a configuração.'),
+  salvarConfig: (c: Partial<ConfigProcesso> & { logoNovo?: string; tirarLogo?: boolean }) =>
+    pedir<ConfigProcesso>(`${API}/processo/config?tenant_id=1`, corpo('PUT', c), 'Erro ao salvar a configuração.'),
+  leads: (f: { busca?: string; todos?: boolean } = {}) => pedir<Lead[]>(`${API}/leads?${q({ busca: f.busca, todos: f.todos ? 1 : null })}`, undefined, 'Erro ao listar os leads.'),
+  criarLead: (l: LeadForm) => pedir<Lead>(`${API}/leads?tenant_id=1`, corpo('POST', l), 'Erro ao registrar o lead.'),
+  salvarLead: (id: number, l: LeadForm) => pedir<Lead>(`${API}/leads/${id}?tenant_id=1`, corpo('PUT', l), 'Erro ao salvar o lead.'),
+  respondido: (id: number) => pedir<Lead>(`${API}/leads/${id}/respondido?tenant_id=1`, corpo('POST', {}), 'Erro ao marcar a resposta.'),
+  mudarLead: (id: number, situacao: SituacaoLead, motivo?: string) => pedir<Lead>(`${API}/leads/${id}/situacao?tenant_id=1`, corpo('POST', { situacao, motivo }), 'Erro ao mudar o lead.'),
+  obraDoLead: (id: number, d: { idCliente?: number | null; servicos: Servico[]; titulo?: string | null }) =>
+    pedir<{ idObra: number; idCliente: number }>(`${API}/leads/${id}/obra?tenant_id=1`, corpo('POST', d), 'Erro ao criar a obra.'),
+  daObra: (idObra: number) => pedir<ProcessoObra>(`${API}/obras/${idObra}/processo?tenant_id=1`, undefined, 'Erro ao carregar o processo.'),
+  marcar: (idObra: number, etapa: string, d: { situacao?: 'FEITO' | 'NAO_SE_APLICA'; feitoEm?: string | null; observacao?: string | null } = {}) =>
+    pedir<{ ok: boolean }>(`${API}/obras/${idObra}/processo/${etapa}?tenant_id=1`, corpo('POST', d), 'Erro ao registrar a etapa.'),
+  desfazer: (idObra: number, etapa: string) => pedir<{ ok: boolean }>(`${API}/obras/${idObra}/processo/${etapa}?tenant_id=1`, { method: 'DELETE' }, 'Erro ao desfazer.'),
+  enviarFoto: (idObra: number, f: { etapa: EtapaFoto; conteudo: string; nome: string; legenda?: string | null; podeDivulgar?: boolean }) =>
+    pedir<{ idFoto: number; url: string }>(`${API}/obras/${idObra}/fotos?tenant_id=1`, corpo('POST', f), 'Erro ao enviar a foto.'),
+  salvarFoto: (id: number, f: { etapa: EtapaFoto; legenda: string | null; podeDivulgar: boolean }) => pedir<{ ok: boolean }>(`${API}/fotos/${id}?tenant_id=1`, corpo('PUT', f), 'Erro ao salvar a foto.'),
+  apagarFoto: (id: number) => pedir<{ ok: boolean }>(`${API}/fotos/${id}?tenant_id=1`, { method: 'DELETE' }, 'Erro ao apagar a foto.'),
+  galeria: () => pedir<(FotoObra & { obra: string; cidade: string | null; cliente: string | null })[]>(`${API}/processo/galeria?tenant_id=1`, undefined, 'Erro ao montar a galeria.'),
+  pendencias: () => pedir<{ leads: Lead[]; itens: PendenciaObra[] }>(`${API}/processo/pendencias?tenant_id=1`, undefined, 'Erro ao montar as pendências.'),
+  indicadores: (de?: string, ate?: string) => pedir<IndicadoresProcesso>(`${API}/processo/indicadores?${q({ de, ate })}`, undefined, 'Erro ao calcular os indicadores.'),
+  documento: (idObra: number) => pedir<DocumentoObra>(`${API}/obras/${idObra}/documento?tenant_id=1`, undefined, 'Erro ao montar o documento.'),
+};
+/** Endereço completo de um arquivo do servidor (/uploads/...). */
+export const urlArquivo = (caminho: string | null) => (!caminho ? null : /^https?:/.test(caminho) ? caminho : `${API_URL}${caminho}`);
 
 // ------------------------------------------------------------------ painel e resultado (etapa 8)
 export interface LucroObra {

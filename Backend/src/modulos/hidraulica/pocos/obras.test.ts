@@ -10,6 +10,9 @@ teste('obras de poços: obra e serviços', () => {
   assert.deepStrictEqual([o.valorSinal, o.sinalQuando], [null, 'ANTES']);
   const s = validarObra({ idCliente: 7, servicos: ['PERFURACAO'], valorSinal: '5000', sinalQuando: 'no_ato' });
   assert.deepStrictEqual([s.valorSinal, s.sinalQuando], [5000, 'NO_ATO']);
+  const orc = validarObra({ idCliente: 7, servicos: ['PERFURACAO'], escopo: '  Perfuração de 120 m\r\nRevestimento 6"  ', prazoExecucaoDias: '10', formaPagamento: '50% de sinal' });
+  assert.deepStrictEqual([orc.escopo, orc.prazoExecucaoDias, orc.formaPagamento, orc.validadeOrcamentoDias], ['Perfuração de 120 m\nRevestimento 6"', 10, '50% de sinal', null]);
+  assert.throws(() => validarObra({ idCliente: 7, servicos: ['PERFURACAO'], prazoExecucaoDias: 0 }), /1 a 365/);
   assert.deepStrictEqual(lerServicos('LIMPEZA, troca_bomba'), ['LIMPEZA', 'TROCA_BOMBA']);
   assert.throws(() => validarObra({ servicos: ['PERFURACAO'] }), /cliente/);
   assert.throws(() => validarObra({ idCliente: 1, servicos: [] }), /ao menos um serviço/);
