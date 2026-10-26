@@ -46,12 +46,13 @@ const precisaAtualizar = (f: any, taxa: { percentual: number; fator: number }) =
   return !precoSegueMarkup(Number(f.preco_unitario), Number(f.custo_gerencial) * Number(f.fator), Number(f.markup), taxa.fator);
 };
 
-/** GET /api/catalogo/precos/taxa/previa — itens cujo preço muda com a taxa embutida */
+/** GET /api/catalogo/precos/taxa/previa[?ids=1,2,3] — itens cujo preço muda com a taxa embutida (só os ids, se vierem) */
 export const previaPrecosComTaxa = async (req: Request, res: Response) => {
   try {
     const tenant = tenantDe(req);
+    const ids = String(req.query.ids || '').split(',').map(Number).filter(n => n > 0).slice(0, 2000);
     const taxa = await carregarTaxaPreco(pool as any, tenant);
-    const faixas = await carregarFaixas(pool as any, tenant, null);
+    const faixas = await carregarFaixas(pool as any, tenant, ids.length ? ids : null);
     const porItem = new Map<number, any>();
     for (const f of faixas) {
       const novo = calcularPrecoUnidade(Number(f.custo_gerencial), Number(f.fator), Number(f.markup), taxa.fator);

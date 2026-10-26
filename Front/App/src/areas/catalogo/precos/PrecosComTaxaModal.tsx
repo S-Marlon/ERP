@@ -15,16 +15,18 @@ interface FaixaPrevia {
 }
 interface ItemPrevia { idItem: number; sku: string; nome: string; custo: number; faixas: FaixaPrevia[] }
 
-export const PrecosComTaxaModal: React.FC<{ aberto: boolean; onFechar: () => void; onAplicado: () => void }> = ({ aberto, onFechar, onAplicado }) => {
+/** ids: só esses itens (ex.: os que o painel apontou como defasados); sem ids, todos os da prévia. */
+export const PrecosComTaxaModal: React.FC<{ aberto: boolean; onFechar: () => void; onAplicado: () => void; ids?: number[] | null }> = ({ aberto, onFechar, onAplicado, ids }) => {
   const [dados, setDados] = useState<{ taxaPercentual: number; itens: ItemPrevia[] } | null>(null);
+  const [soEstes, setSoEstes] = useState<number[] | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [selecionados, setSelecionados] = useState<React.Key[]>([]);
   const [aplicando, setAplicando] = useState(false);
 
-  const carregar = async () => {
+  const carregar = async (filtro = soEstes) => {
     setCarregando(true);
     try {
-      const r = await fetch(`${API}/previa`);
+      const r = await fetch(`${API}/previa${filtro?.length ? `?ids=${filtro.join(',')}` : ''}`);
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || (r.status === 404 ? 'Rota não encontrada: reinicie o backend.' : 'Erro na prévia.'));
       setDados(d);
@@ -35,7 +37,12 @@ export const PrecosComTaxaModal: React.FC<{ aberto: boolean; onFechar: () => voi
       setCarregando(false);
     }
   };
-  useEffect(() => { if (aberto) carregar(); }, [aberto]);
+  useEffect(() => {
+    if (!aberto) return;
+    const filtro = ids?.length ? ids : null;
+    setSoEstes(filtro);
+    carregar(filtro);
+  }, [aberto]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const aplicar = async () => {
     setAplicando(true);
@@ -67,6 +74,12 @@ export const PrecosComTaxaModal: React.FC<{ aberto: boolean; onFechar: () => voi
         </Button>,
       ]}>
       <Space direction="vertical" style={{ width: '100%' }}>
+        {soEstes && (
+          <Alert type="info" showIcon
+            message={`Mostrando só os ${soEstes.length} item(ns) que o painel aponta como defasados (preço de varejo da unidade base).`}
+            description="A lista completa também traz itens em que só o atacado ou outra unidade de venda está fora da taxa."
+            action={<Button size="small" onClick={() => { setSoEstes(null); carregar(null); }}>Ver todos</Button>} />
+        )}
         {dados && (
           dados.taxaPercentual > 0
             ? <Alert type="info" showIcon message={<span>Taxa de referência: <b>{dados.taxaPercentual.toFixed(2)}%</b>. Para receber o markup depois da taxa, o preço é dividido por {(1 - dados.taxaPercentual / 100).toFixed(4)}.</span>}

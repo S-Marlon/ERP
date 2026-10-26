@@ -74,6 +74,9 @@ export const ProductPricingModule: React.FC = () => {
   const [limit, setLimit] = useState(50);
   const [editando, setEditando] = useState<{ idItem?: number; titulo: string } | null>(null);
   const [precosTaxa, setPrecosTaxa] = useState(false);
+  // itens do botão "Corrigir N preço(s) defasado(s)": o modal abre só com eles (null = todos da prévia)
+  const [idsTaxa, setIdsTaxa] = useState<number[] | null>(null);
+  const [buscandoDefasados, setBuscandoDefasados] = useState(false);
 
   // Lista de precificação: itens juntados de qualquer filtro/busca, precificados de uma vez (guardada neste navegador)
   const [lista, setListaEstado] = useState<LinhaLote[]>(() => {
@@ -178,6 +181,26 @@ export const ProductPricingModule: React.FC = () => {
   const taxaPercentual = dados?.taxa?.percentual ?? taxaPreco.percentual;
   // Preços que a taxa deixou defasados (taxa mudou, preço sem taxa ou fora do markup)
   const paraCorrigir = (resumo?.porSituacao.TAXA_ANTIGA || 0) + (resumo?.porSituacao.SEM_TAXA || 0) + (resumo?.porSituacao.FORA_DO_MARKUP || 0);
+  const abrirDefasados = async () => {
+    setBuscandoDefasados(true);
+    try {
+      const ids = new Set<number>();
+      for (const s of ['TAXA_ANTIGA', 'SEM_TAXA', 'FORA_DO_MARKUP']) {
+        if (!resumo?.porSituacao[s]) continue;
+        for (let p = 1; p <= 20; p++) {
+          const r = await getPainel({ situacao: s, busca, page: p, limit: 200 });   // mesma busca do número do botão
+          r.data.forEach(i => ids.add(i.idItem));
+          if (p * 200 >= r.pagination.total || !r.data.length) break;
+        }
+      }
+      setIdsTaxa([...ids]);
+      setPrecosTaxa(true);
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : 'Erro ao buscar os preços defasados.');
+    } finally {
+      setBuscandoDefasados(false);
+    }
+  };
   const situacoes = dados?.situacoes || {};
   const filtrar = (s: string | null) => { setSituacao(situacao === s ? null : s); setPage(1); };
 
@@ -203,7 +226,7 @@ export const ProductPricingModule: React.FC = () => {
           </div>
           <Space>
             <Tooltip title={taxaPreco.percentual > 0 ? `O preço embute ${taxaPreco.percentual.toFixed(2)}% de taxa (Vendas › Taxas de pagamento)` : 'Nenhuma taxa embutida no preço'}>
-              <Button onClick={() => setPrecosTaxa(true)}>Preços com taxa{taxaPreco.percentual > 0 ? ` (${taxaPreco.percentual.toFixed(2)}%)` : ''}</Button>
+              <Button onClick={() => { setIdsTaxa(null); setPrecosTaxa(true); }}>Preços com taxa{taxaPreco.percentual > 0 ? ` (${taxaPreco.percentual.toFixed(2)}%)` : ''}</Button>
             </Tooltip>
             <Tooltip title="Itens com preço de mercado e lucro sobre o custo abaixo do alvo: custo-alvo e melhor oferta para negociar (Compra inteligente)">
               <Button onClick={() => navigate('/compras/inteligente?aba=margem')}>Margem abaixo do alvo</Button>
@@ -257,7 +280,7 @@ export const ProductPricingModule: React.FC = () => {
               value={buscaDigitada} onChange={e => setBuscaDigitada(e.target.value)} />
             {situacao && <Tag closable color="blue" onClose={() => filtrar(null)}>{situacoes[situacao]?.label || situacao}</Tag>}
             {paraCorrigir > 0 && (
-              <Button size="small" type="primary" ghost onClick={() => setPrecosTaxa(true)}>
+              <Button size="small" type="primary" ghost loading={buscandoDefasados} onClick={abrirDefasados}>
                 Corrigir {paraCorrigir} preço(s) defasado(s) pela taxa
               </Button>
             )}
@@ -413,7 +436,7 @@ export const ProductPricingModule: React.FC = () => {
       >
         {editando && <ProductCommercialSalesConfig idItem={editando.idItem} />}
       </Drawer>
-      <PrecosComTaxaModal aberto={precosTaxa} onFechar={() => setPrecosTaxa(false)} onAplicado={carregar} />
+      <PrecosComTaxaModal aberto={precosTaxa} ids={idsTaxa} onFechar={() => setPrecosTaxa(false)} onAplicado={carregar} />
       <ListaPrecificacao aberta={listaAberta} linhas={lista} onChange={setLista} onFechar={() => setListaAberta(false)}
         onSalvo={ids => {
           const s = new Set(ids);
