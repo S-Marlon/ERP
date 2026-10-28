@@ -7,6 +7,7 @@ import { obterTaxas, salvarTaxas } from './taxas/taxas.controller';
 import { painelVendas } from './painel/painelVendas.controller';
 import { criarAdiantamento, devolverAdiantamentoRota, listarAdiantamentos } from './adiantamentos/adiantamentos.controller';
 import { dadosDevolucao, detalheDevolucao, registrarDevolucao } from './devolucoes/devolucoes.controller';
+import { ajustarVenda, vendaCompleta } from './ajustes/ajustes.controller';
 import { detalhePedidoAberto, excluirPedidoAberto, listarPedidosAbertos, retomarPedidoAberto, salvarPedidoAberto } from './pdv/pedidosAbertos.controller';
 
 // Vendas no modelo novo (itens_core). Montado em /api/vendas
@@ -24,6 +25,9 @@ router.post('/pdv/vendas', registrarVenda);
 router.get('/pdv/vendas', listarVendas);
 router.get('/pdv/vendas/:idVenda', detalheVenda);
 router.post('/pdv/vendas/:idVenda/cancelar', cancelarVenda);
+// Venda completa e ajuste de venda a prazo (quantidade, preço, item incluído ou tirado)
+router.get('/pdv/vendas/:idVenda/completa', vendaCompleta);
+router.post('/pdv/vendas/:idVenda/ajustes', ajustarVenda);
 // Devolução parcial/total e troca
 router.get('/pdv/vendas/:idVenda/devolucao', dadosDevolucao);
 router.post('/pdv/vendas/:idVenda/devolucoes', registrarDevolucao);

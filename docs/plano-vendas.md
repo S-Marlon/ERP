@@ -108,6 +108,20 @@ testes → telas → commit.
 - Venda com nota autorizada só é cancelada depois de cancelar a nota; a que estava na fila sai dela.
 - Pendente: adaptador do provedor escolhido, NF-e de devolução e DANFE próprio (emissão direta).
 
+## Ajuste de venda a prazo (2026-10-28)
+
+- **Financeiro › Contas a Receber**: o nº da venda (na tabela e no detalhe da parcela) abre a venda completa: itens,
+  pagamentos, parcelas, histórico (ajustes e devoluções) e a situação da nota.
+- **Ajustar venda** (só a prazo e concluída, sem nota autorizada ou em emissão): muda quantidade e preço das linhas, tira
+  linha (fica na venda com quantidade 0, para o histórico) e inclui item (preço de tabela da faixa, como no PDV). Kit não
+  muda (use a devolução); a quantidade não fica abaixo do já devolvido.
+- O estoque acompanha (sai o que aumentou, volta o que diminuiu com o custo da venda), origem `AJUSTE_VENDA` com
+  `id_origem` = ajuste e `id_origem_item` = linha do histórico. Os totais da venda e o pagamento PRAZO são refeitos.
+- A diferença vai para as parcelas em aberto: espalhada, na última ou (acréscimo) numa parcela nova com vencimento.
+  Parcela paga não muda; redução maior que o saldo em aberto é recusada (devolução devolve o dinheiro). Acréscimo
+  respeita o limite de crédito. Histórico em `vendas_pedidos_ajustes(_itens)`; regras em `ajustes/ajustesVenda.ts`.
+- Nota na fila lê os itens na emissão (linha com 0 fica fora); impressão também não mostra a linha tirada.
+
 ## Critérios de pronto
 
 - **Fase 1:** abrir com R$ 100, vender R$ 50 em dinheiro, sangria de R$ 30 → fechamento espera R$ 120 em dinheiro e mostra a diferença contada.

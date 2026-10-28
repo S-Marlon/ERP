@@ -1,5 +1,6 @@
 // Financeiro › Contas a Receber: parcelas das vendas a prazo, recebimento (entra no caixa aberto),
-// estorno de recebimento e crédito do cliente (limite e bloqueio para venda a prazo).
+// estorno de recebimento, crédito do cliente (limite e bloqueio para venda a prazo) e a venda completa
+// (itens, parcelas, histórico) com o ajuste da venda (quantidade, preço, item incluído ou tirado).
 import React, { useEffect, useState } from 'react';
 import {
   Alert, Button, Card, Col, Descriptions, Drawer, Empty, Input, InputNumber, Modal, Row, Segmented, Select,
@@ -10,6 +11,7 @@ import { Baixa, dataBr, receberApi, ResumoReceber, ROTULO_SITUACAO, SituacaoClie
 import { ROTULO_FORMA } from '../vendas/caixa/caixaApi';
 import { caixaStore, useCaixa } from '../vendas/caixa/caixaStore';
 import { buscarClientesPdv, ClienteBusca } from '../vendas/pdv/services/api/products';
+import { VendaCompletaDrawer } from '../vendas/ajustes/VendaCompletaDrawer';
 
 const { Text, Title } = Typography;
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -77,7 +79,7 @@ const ModalReceber: React.FC<{ titulo: Titulo | null; onFechar: () => void; onRe
 // ---------------------------------------------------------------------------------------------
 // Detalhe da parcela: recebimentos e estorno
 // ---------------------------------------------------------------------------------------------
-const DrawerTitulo: React.FC<{ titulo: Titulo | null; onFechar: () => void; onAlterado: () => void }> = ({ titulo, onFechar, onAlterado }) => {
+const DrawerTitulo: React.FC<{ titulo: Titulo | null; onFechar: () => void; onAlterado: () => void; onVerVenda: (id: number) => void }> = ({ titulo, onFechar, onAlterado, onVerVenda }) => {
   const [baixas, setBaixas] = useState<Baixa[]>([]);
   const carregar = () => { if (titulo) receberApi.baixas(titulo.idTitulo).then(setBaixas).catch(() => setBaixas([])); };
   useEffect(carregar, [titulo]);
@@ -114,7 +116,7 @@ const DrawerTitulo: React.FC<{ titulo: Titulo | null; onFechar: () => void; onAl
       {titulo && (
         <Space direction="vertical" size={14} style={{ width: '100%' }}>
           <Descriptions size="small" column={2} bordered items={[
-            { key: 'v', label: 'Venda', children: titulo.idVenda ? `#${titulo.idVenda}` : '—' },
+            { key: 'v', label: 'Venda', children: titulo.idVenda ? <Space size={6}>#{titulo.idVenda}<Button size="small" onClick={() => onVerVenda(titulo.idVenda!)}>Ver venda e itens</Button></Space> : '—' },
             { key: 'd', label: 'Vencimento', children: titulo.vencimento ? dataBr(titulo.vencimento) : 'sem prazo (paga quando puder)' },
             { key: 'val', label: 'Valor', children: brl(titulo.valor) },
             { key: 'p', label: 'Pago', children: brl(titulo.valorPago) },
@@ -229,6 +231,7 @@ export const FinanceiroContasReceber: React.FC = () => {
   const [recebendo, setRecebendo] = useState<Titulo | null>(null);
   const [detalhe, setDetalhe] = useState<Titulo | null>(null);
   const [creditoAberto, setCreditoAberto] = useState(false);
+  const [vendaAberta, setVendaAberta] = useState<number | null>(null);
 
   const carregar = async () => {
     setCarregando(true);
@@ -298,7 +301,10 @@ export const FinanceiroContasReceber: React.FC = () => {
                 title: 'Cliente', dataIndex: 'cliente',
                 render: (c: string) => <a onClick={() => { setBusca(c); setTimeout(carregar, 0); }}>{c}</a>,
               },
-              { title: 'Venda', dataIndex: 'idVenda', width: 80, render: (v: number | null) => (v ? `#${v}` : '—') },
+              {
+                title: 'Venda', dataIndex: 'idVenda', width: 80,
+                render: (v: number | null) => (v ? <Tooltip title="Ver a venda, os itens e ajustar"><a onClick={() => setVendaAberta(v)}>#{v}</a></Tooltip> : '—'),
+              },
               { title: 'Parcela', key: 'p', width: 75, render: (_, t) => `${t.parcela}/${t.totalParcelas}` },
               { title: 'Valor', dataIndex: 'valor', align: 'right' as const, render: (v: number) => brl(v) },
               { title: 'Pago', dataIndex: 'valorPago', align: 'right' as const, render: (v: number) => (v ? brl(v) : '') },
@@ -327,7 +333,8 @@ export const FinanceiroContasReceber: React.FC = () => {
       </Space>
 
       <ModalReceber titulo={recebendo} onFechar={() => setRecebendo(null)} onRecebido={() => { setRecebendo(null); carregar(); }} />
-      <DrawerTitulo titulo={detalhe} onFechar={() => setDetalhe(null)} onAlterado={carregar} />
+      <DrawerTitulo titulo={detalhe} onFechar={() => setDetalhe(null)} onAlterado={carregar} onVerVenda={setVendaAberta} />
+      <VendaCompletaDrawer idVenda={vendaAberta} onFechar={() => setVendaAberta(null)} onAlterada={carregar} />
       <ModalCredito aberto={creditoAberto} onFechar={() => setCreditoAberto(false)} onSalvo={() => setCreditoAberto(false)} />
     </div>
   );

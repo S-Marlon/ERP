@@ -569,7 +569,8 @@ export const detalheVenda = async (req: Request, res: Response) => {
     const idVenda = Number(req.params.idVenda);
     const [[venda]]: any = await pool.execute(`SELECT * FROM vendas_pedidos WHERE id_venda = ? AND tenant_id = ?`, [idVenda, tenant]);
     if (!venda) return res.status(404).json({ error: 'Venda não encontrada.' });
-    const [itens] = await pool.execute(`SELECT * FROM vendas_pedidos_itens WHERE id_venda = ? AND tenant_id = ? ORDER BY id_venda_item`, [idVenda, tenant]);
+    // linha tirada num ajuste da venda fica com quantidade 0 (histórico): não aparece na impressão
+    const [itens] = await pool.execute(`SELECT * FROM vendas_pedidos_itens WHERE id_venda = ? AND tenant_id = ? AND quantidade > 0 ORDER BY id_venda_item`, [idVenda, tenant]);
     const [pagamentos] = await pool.execute(`SELECT * FROM vendas_pedidos_pagamentos WHERE id_venda = ? AND tenant_id = ? ORDER BY id_pagamento`, [idVenda, tenant]);
     return res.json({ ...venda, itens, pagamentos });
   } catch (error: any) {

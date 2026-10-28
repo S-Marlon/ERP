@@ -52,7 +52,7 @@ const itensFiscais = async (conn: any, tenant: number, idsVenda: number[]) => {
      FROM vendas_pedidos_itens vi
      INNER JOIN itens_core ic ON ic.id_item = vi.id_item
      LEFT JOIN itens_dados_fiscais fis ON fis.id_item = vi.id_item
-     WHERE vi.tenant_id = ? AND vi.id_venda IN (?)
+     WHERE vi.tenant_id = ? AND vi.id_venda IN (?) AND vi.quantidade > 0   -- linha tirada no ajuste da venda fica com 0
      ORDER BY vi.id_venda_item`,
     [tenant, idsVenda]
   );
