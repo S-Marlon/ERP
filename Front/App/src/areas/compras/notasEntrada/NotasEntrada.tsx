@@ -4,7 +4,10 @@ import {
   Alert,
   Button, Card, Col, Descriptions, Drawer, Dropdown, Input, Modal, Row, Segmented, Select, Space, Statistic, Switch, Table, Tag, Tooltip, Typography, message,
 } from 'antd';
-import { CopyOutlined, DownloadOutlined, EyeOutlined, FileSearchOutlined, MoreOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/icons';
+import {
+  CloseOutlined, CopyOutlined, DeleteOutlined, DownloadOutlined, EyeOutlined, FileSearchOutlined, FileTextOutlined, MoreOutlined, PrinterOutlined,
+  ReloadOutlined, WarningOutlined,
+} from '@ant-design/icons';
 
 // Sinais de que a linha entrou errada (a correção do vínculo/conversão fica no detalhe da nota)
 const ROTULO_ALERTA: Record<string, string> = {
@@ -18,6 +21,11 @@ import {
   descartarNota, detalheNota, DetalheNota, formatarCnpj, ItemNota, listarNotas, NotaEntrada, ResumoNotas, SITUACOES_NOTA,
 } from './notasEntradaApi';
 import ModalCorrigirLinha from './ModalCorrigirLinha';
+import { buscarEstadoLote } from '../api/comprasApi';
+import { parseNfeComplete } from '../entradaNf/xml/utils/nfeParser';
+import { gerarHtmlDanfe } from '../entradaNf/danfe/gerarDanfe';
+import { baixarArquivo, imprimirHtml } from '../../../shared/core/impressao/saida';
+import { csvItensDasNotas, htmlListaNotas, juntarDanfes, nomeArquivoXml, podeDescartar, totalSelecionado } from './operacoesNotas';
 
 const money = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const qtd = (v: number) => Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 4 });
@@ -221,6 +229,22 @@ const DetalheNotaDrawer: React.FC<{ idLote: number | null; onClose: () => void; 
   );
 };
 
+// Busca em paralelo, no máximo `limite` de cada vez (não afoga o servidor com 100 notas)
+const emLotes = async <T, R>(lista: T[], limite: number, fn: (x: T) => Promise<R>): Promise<R[]> => {
+  const saida: R[] = new Array(lista.length);
+  let proximo = 0;
+  const trabalhador = async () => { while (proximo < lista.length) { const i = proximo++; saida[i] = await fn(lista[i]); } };
+  await Promise.all(Array.from({ length: Math.min(limite, lista.length) }, trabalhador));
+  return saida;
+};
+
+// XML salvo de cada nota (null quando o lote não guardou o XML)
+const xmlsDasNotas = (notas: NotaEntrada[]) => emLotes(notas, 4, async nota => {
+  try { return { nota, xml: (await buscarEstadoLote({ loteId: nota.idLote })).lote?.xml_conteudo || null }; } catch { return { nota, xml: null }; }
+});
+
+const listaNfs = (notas: NotaEntrada[]) => notas.map(n => n.numero).join(', ');
+
 const exportarCsv = (notas: NotaEntrada[]) => {
   const cab = ['Numero', 'Serie', 'Fornecedor', 'CNPJ', 'Emissao', 'Entrada', 'Valor NF', 'Itens', 'Conferidos', 'Situacao', 'Chave'];
   const linhas = notas.map(n => [
@@ -244,6 +268,9 @@ const NotasEntrada: React.FC = () => {
   const [buscaDigitada, setBuscaDigitada] = useState('');
   const [filtros, setFiltros] = useState({ campoData: 'entrada' as 'entrada' | 'emissao', de: diasAtras(90), ate: hoje(), situacao: '', busca: '', incluirDescartadas: false });
   const [notaAberta, setNotaAberta] = useState<number | null>(null);
+  const [selecionadas, setSelecionadas] = useState<number[]>([]);
+  const [ocupado, setOcupado] = useState<string | null>(null);
+  const notasSelecionadas = notas.filter(n => selecionadas.includes(n.idLote));
 
   const carregar = async () => {
     setCarregando(true);
@@ -259,6 +286,65 @@ const NotasEntrada: React.FC = () => {
   };
 
   useEffect(() => { carregar(); }, [filtros]);
+  // Seleção só do que está na lista (mudou o filtro, some o que saiu)
+  useEffect(() => { setSelecionadas(s => s.filter(id => notas.some(n => n.idLote === id))); }, [notas]);
+
+  const executar = async (rotulo: string, fn: () => Promise<void>) => {
+    setOcupado(rotulo);
+    try { await fn(); } catch (e: any) { message.error(e.message || 'Erro na operação.'); } finally { setOcupado(null); }
+  };
+
+  const imprimirDanfes = (lista: NotaEntrada[]) => executar('danfe', async () => {
+    const xmls = await xmlsDasNotas(lista);
+    const htmls: string[] = [];
+    const falhas: NotaEntrada[] = [];
+    for (const { nota, xml } of xmls) {
+      try { if (!xml) throw new Error(); htmls.push(gerarHtmlDanfe(parseNfeComplete(xml))); } catch { falhas.push(nota); }
+    }
+    if (falhas.length) message.warning(`Sem XML salvo (DANFE não gerado): NF ${listaNfs(falhas)}`, 6);
+    if (htmls.length) await imprimirHtml(juntarDanfes(htmls));
+  });
+
+  const baixarXmls = (lista: NotaEntrada[]) => executar('xml', async () => {
+    const xmls = await xmlsDasNotas(lista);
+    const faltando = xmls.filter(x => !x.xml).map(x => x.nota);
+    for (const { nota, xml } of xmls) {
+      if (!xml) continue;
+      baixarArquivo(xml, nomeArquivoXml(nota), 'application/xml;charset=utf-8');
+      await new Promise(r => setTimeout(r, 250));   // o navegador recusa vários downloads no mesmo instante
+    }
+    if (faltando.length) message.warning(`Sem XML salvo: NF ${listaNfs(faltando)}`, 6);
+    else if (lista.length > 1) message.info('Se o navegador perguntar, permita baixar vários arquivos.');
+  });
+
+  const exportarItens = (lista: NotaEntrada[]) => executar('itens', async () => {
+    const detalhes = await emLotes(lista, 4, async nota => ({ nota, itens: (await detalheNota(nota.idLote)).itens }));
+    baixarArquivo(csvItensDasNotas(detalhes), `itens_notas_entrada_${hoje()}.csv`, 'text/csv;charset=utf-8');
+  });
+
+  const copiarChaves = async (lista: NotaEntrada[]) => {
+    try {
+      await navigator.clipboard.writeText(lista.map(n => n.chave).filter(Boolean).join('\n'));
+      message.success(`${lista.length} chave(s) copiada(s).`);
+    } catch { message.error('O navegador não deixou copiar.'); }
+  };
+
+  const descartarVarias = (lista: NotaEntrada[]) => {
+    const alvo = lista.filter(n => podeDescartar(n.situacao));
+    if (!alvo.length) { message.info('Nenhuma das selecionadas pode ser descartada (só as que ainda não entraram no estoque).'); return; }
+    Modal.confirm({
+      title: `Descartar ${alvo.length} nota(s)?`,
+      content: `NF ${listaNfs(alvo)}. A conferência é abandonada e nada entra no estoque.${alvo.length < lista.length ? ` As outras ${lista.length - alvo.length} já entraram ou já estão descartadas e ficam como estão.` : ''}`,
+      okText: 'Descartar', okType: 'danger',
+      onOk: async () => {
+        const erros: string[] = [];
+        for (const n of alvo) { try { await descartarNota(n.idLote); } catch (e: any) { erros.push(`NF ${n.numero}: ${e.message}`); } }
+        if (erros.length) Modal.error({ title: 'Algumas não foram descartadas', content: erros.join('\n') });
+        else message.success(`${alvo.length} nota(s) descartada(s).`);
+        carregar();
+      },
+    });
+  };
   useEffect(() => {
     const t = setTimeout(() => setFiltros(f => (f.busca === buscaDigitada ? f : { ...f, busca: buscaDigitada })), 400);
     return () => clearTimeout(t);
@@ -290,6 +376,9 @@ const NotasEntrada: React.FC = () => {
           <Space wrap>
             <Button type="primary" icon={<FileSearchOutlined />} onClick={() => navigate('/compras/entrada-nfe')}>Nova entrada de NF-e</Button>
             <Button icon={<DownloadOutlined />} onClick={() => exportarCsv(notas)} disabled={notas.length === 0}>Exportar CSV</Button>
+            <Tooltip title="Marque as notas na caixinha da esquerda para imprimir DANFEs, baixar XMLs e mais">
+              <span style={{ color: '#64748b', fontSize: 12 }}>{selecionadas.length ? `${selecionadas.length} marcada(s)` : 'Dica: marque notas para operar em lote'}</span>
+            </Tooltip>
             <Button icon={<ReloadOutlined />} onClick={carregar} loading={carregando}>Atualizar</Button>
           </Space>
         </div>
@@ -344,14 +433,62 @@ const NotasEntrada: React.FC = () => {
             <Space size={4}><Switch size="small" checked={filtros.incluirDescartadas} onChange={v => setFiltros(f => ({ ...f, incluirDescartadas: v }))} /> Descartadas</Space>
           </Space>
 
+          {notasSelecionadas.length > 0 && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '6px 10px', marginBottom: 8,
+              background: '#e6f4ff', border: '1px solid #91caff', borderRadius: 6, position: 'sticky', top: 0, zIndex: 3,
+            }}>
+              <b>{notasSelecionadas.length} selecionada(s)</b>
+              <span style={{ color: '#475569' }}>· {money(totalSelecionado(notasSelecionadas))}</span>
+              <Space wrap size={6} style={{ marginLeft: 'auto' }}>
+                <Tooltip title="Um DANFE por página. Na janela de impressão, escolha &quot;Salvar como PDF&quot; para ter o PDF.">
+                  <Button size="small" type="primary" icon={<PrinterOutlined />} loading={ocupado === 'danfe'} disabled={!!ocupado} onClick={() => imprimirDanfes(notasSelecionadas)}>
+                    DANFEs / PDF
+                  </Button>
+                </Tooltip>
+                <Button size="small" icon={<PrinterOutlined />} disabled={!!ocupado} onClick={() => imprimirHtml(htmlListaNotas(notasSelecionadas))}>Imprimir lista</Button>
+                <Button size="small" icon={<DownloadOutlined />} loading={ocupado === 'xml'} disabled={!!ocupado} onClick={() => baixarXmls(notasSelecionadas)}>Baixar XMLs</Button>
+                <Dropdown
+                  trigger={['click']}
+                  disabled={!!ocupado}
+                  menu={{
+                    items: [
+                      { key: 'csv', icon: <FileTextOutlined />, label: 'Exportar notas (CSV)' },
+                      { key: 'itens', icon: <FileTextOutlined />, label: 'Exportar itens das notas (CSV)' },
+                      { key: 'chaves', icon: <CopyOutlined />, label: 'Copiar chaves de acesso' },
+                      { type: 'divider' },
+                      { key: 'descartar', icon: <DeleteOutlined />, label: 'Descartar as não lançadas', danger: true },
+                    ],
+                    onClick: ({ key }) => {
+                      if (key === 'csv') exportarCsv(notasSelecionadas);
+                      if (key === 'itens') exportarItens(notasSelecionadas);
+                      if (key === 'chaves') copiarChaves(notasSelecionadas);
+                      if (key === 'descartar') descartarVarias(notasSelecionadas);
+                    },
+                  }}
+                >
+                  <Button size="small" loading={ocupado === 'itens'} icon={<MoreOutlined />}>Mais</Button>
+                </Dropdown>
+                <Tooltip title="Limpar seleção"><Button size="small" type="text" icon={<CloseOutlined />} onClick={() => setSelecionadas([])} /></Tooltip>
+              </Space>
+            </div>
+          )}
+
           <Table<NotaEntrada>
             rowKey="idLote"
             size="small"
             loading={carregando}
+            rowSelection={{
+              selectedRowKeys: selecionadas,
+              onChange: keys => setSelecionadas(keys.map(Number)),
+              selections: [Table.SELECTION_ALL, Table.SELECTION_INVERT, Table.SELECTION_NONE],
+            }}
+            onRow={n => ({
+              onDoubleClick: () => setNotaAberta(n.idLote),
+            })}
             dataSource={notas}
             scroll={{ x: 1000 }}
             pagination={{ pageSize: 30, hideOnSinglePage: true }}
-            onRow={n => ({ onDoubleClick: () => setNotaAberta(n.idLote) })}
             columns={[
               {
                 title: 'NF', key: 'nf', width: 110,
@@ -399,12 +536,16 @@ const NotasEntrada: React.FC = () => {
                         items: [
                           { key: 'abrir', label: n.situacao === 'IMPORTADA' ? 'Ver na Entrada de NF-e' : 'Continuar conferência' },
                           { key: 'staging', label: 'Revisar no Staging', disabled: n.situacao === 'IMPORTADA' || n.situacao === 'DESCARTADA' },
+                          { key: 'danfe', icon: <PrinterOutlined />, label: 'Imprimir DANFE / PDF' },
+                          { key: 'xml', icon: <DownloadOutlined />, label: 'Baixar XML' },
                           { type: 'divider' },
                           { key: 'descartar', label: 'Descartar', danger: true, disabled: n.situacao === 'IMPORTADA' || n.situacao === 'DESCARTADA' },
                         ],
                         onClick: ({ key }) => {
                           if (key === 'abrir') abrirEntrada(n.idLote);
                           if (key === 'staging') navigate('/stagings');
+                          if (key === 'danfe') imprimirDanfes([n]);
+                          if (key === 'xml') baixarXmls([n]);
                           if (key === 'descartar') descartar(n);
                         },
                       }}
