@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
-  Button, Card, Col, Descriptions, Drawer, Dropdown, Input, Modal, Row, Select, Space, Statistic, Switch, Table, Tag, Tooltip, Typography, message,
+  Button, Card, Col, Descriptions, Drawer, Dropdown, Input, Modal, Row, Segmented, Select, Space, Statistic, Switch, Table, Tag, Tooltip, Typography, message,
 } from 'antd';
 import { CopyOutlined, DownloadOutlined, EyeOutlined, FileSearchOutlined, MoreOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/icons';
 
@@ -25,6 +25,16 @@ const data = (v?: string | null) => (v ? new Date(v).toLocaleDateString('pt-BR')
 const dataHora = (v?: string | null) => (v ? new Date(v).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '-');
 const diasAtras = (d: number) => new Date(Date.now() - d * 86400000).toISOString().slice(0, 10);
 const hoje = () => new Date().toISOString().slice(0, 10);
+const isoLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+// Atalhos de período (de, até) para o filtro de data
+const PERIODOS: Array<{ label: string; faixa: () => [string, string] }> = [
+  { label: 'Este mês', faixa: () => { const d = new Date(); return [isoLocal(new Date(d.getFullYear(), d.getMonth(), 1)), hoje()]; } },
+  { label: 'Mês passado', faixa: () => { const d = new Date(); return [isoLocal(new Date(d.getFullYear(), d.getMonth() - 1, 1)), isoLocal(new Date(d.getFullYear(), d.getMonth(), 0))]; } },
+  { label: '90 dias', faixa: () => [diasAtras(90), hoje()] },
+  { label: 'Este ano', faixa: () => [`${new Date().getFullYear()}-01-01`, hoje()] },
+  { label: 'Tudo', faixa: () => ['', ''] },
+];
+const diaDe = (v?: string | null) => (v ? String(v).slice(0, 10) : '');
 
 // Detalhe da nota: cabeçalho, totais do XML e itens com o vínculo e a entrada no estoque
 const DetalheNotaDrawer: React.FC<{ idLote: number | null; onClose: () => void; onAbrirEntrada: (id: number) => void }> = ({ idLote, onClose, onAbrirEntrada }) => {
@@ -232,7 +242,7 @@ const NotasEntrada: React.FC = () => {
   const [resumo, setResumo] = useState<ResumoNotas | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [buscaDigitada, setBuscaDigitada] = useState('');
-  const [filtros, setFiltros] = useState({ de: diasAtras(90), ate: hoje(), situacao: '', busca: '', incluirDescartadas: false });
+  const [filtros, setFiltros] = useState({ campoData: 'entrada' as 'entrada' | 'emissao', de: diasAtras(90), ate: hoje(), situacao: '', busca: '', incluirDescartadas: false });
   const [notaAberta, setNotaAberta] = useState<number | null>(null);
 
   const carregar = async () => {
@@ -307,9 +317,21 @@ const NotasEntrada: React.FC = () => {
 
         <Card size="small">
           <Space wrap style={{ marginBottom: 8 }}>
-            <Input type="date" value={filtros.de} max={filtros.ate} onChange={e => setFiltros(f => ({ ...f, de: e.target.value }))} style={{ width: 150 }} />
+            <Segmented
+              value={filtros.campoData}
+              onChange={v => setFiltros(f => ({ ...f, campoData: v as 'entrada' | 'emissao' }))}
+              options={[{ value: 'entrada', label: 'Data de entrada' }, { value: 'emissao', label: 'Data de emissão' }]}
+            />
+            <Input type="date" value={filtros.de} max={filtros.ate || undefined} onChange={e => setFiltros(f => ({ ...f, de: e.target.value }))} style={{ width: 150 }} />
             <span>até</span>
-            <Input type="date" value={filtros.ate} min={filtros.de} onChange={e => setFiltros(f => ({ ...f, ate: e.target.value }))} style={{ width: 150 }} />
+            <Input type="date" value={filtros.ate} min={filtros.de || undefined} onChange={e => setFiltros(f => ({ ...f, ate: e.target.value }))} style={{ width: 150 }} />
+            <Select
+              style={{ width: 130 }}
+              placeholder="Período"
+              value={null}
+              onChange={(i: number) => { const [de, ate] = PERIODOS[i].faixa(); setFiltros(f => ({ ...f, de, ate })); }}
+              options={PERIODOS.map((p, i) => ({ value: i, label: p.label }))}
+            />
             <Select
               style={{ width: 200 }}
               value={filtros.situacao}
@@ -344,9 +366,15 @@ const NotasEntrada: React.FC = () => {
                   </div>
                 ),
               },
-              { title: 'Emissão', dataIndex: 'emissao', width: 100, render: (v: string | null) => data(v) },
-              { title: 'Entrada', dataIndex: 'entradaEm', width: 130, render: (v: string) => dataHora(v) },
-              { title: 'Valor NF', dataIndex: 'valorNf', width: 120, align: 'right' as const, render: (v: number) => <b>{money(v)}</b> },
+              {
+                title: 'Emissão', dataIndex: 'emissao', width: 110, render: (v: string | null) => data(v),
+                sorter: (a, b) => diaDe(a.emissao).localeCompare(diaDe(b.emissao)),
+              },
+              {
+                title: 'Entrada', dataIndex: 'entradaEm', width: 140, render: (v: string) => dataHora(v),
+                sorter: (a, b) => String(a.entradaEm).localeCompare(String(b.entradaEm)),
+              },
+              { title: 'Valor NF', dataIndex: 'valorNf', width: 120, align: 'right' as const, sorter: (a, b) => a.valorNf - b.valorNf, render: (v: number) => <b>{money(v)}</b> },
               {
                 title: 'Conferência', key: 'conf', width: 140,
                 render: (_, n) => (

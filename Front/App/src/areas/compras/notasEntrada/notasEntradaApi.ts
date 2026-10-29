@@ -88,7 +88,8 @@ const lerErro = async (r: Response, padrao: string) => {
   return new Error(d.error || d.message || padrao);
 };
 
-export const listarNotas = async (filtros: { de?: string; ate?: string; situacao?: string; busca?: string; incluirDescartadas?: boolean }) => {
+// campoData: 'entrada' (no sistema, padrão) ou 'emissao' (data da NF) para o período de/ate
+export const listarNotas = async (filtros: { campoData?: 'entrada' | 'emissao'; de?: string; ate?: string; situacao?: string; busca?: string; incluirDescartadas?: boolean }) => {
   const p = new URLSearchParams();
   Object.entries(filtros).forEach(([k, v]) => { if (v !== undefined && v !== '' && v !== false) p.append(k, String(v)); });
   const r = await fetch(`${API}/notas?${p.toString()}`);

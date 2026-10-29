@@ -28,7 +28,7 @@ const situacao = (status: string, total: number, conferidos: number, semVinculo:
 };
 
 /**
- * GET /api/compras/notas?de&ate (data de entrada no sistema), situacao, busca (nº, fornecedor, CNPJ, chave)
+ * GET /api/compras/notas?de&ate (data de entrada no sistema, ou de emissão com campoData=emissao), situacao, busca (nº, fornecedor, CNPJ, chave)
  */
 export const listarNotasEntrada = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
@@ -38,8 +38,15 @@ export const listarNotasEntrada = async (req: Request, res: Response) => {
     const data = (v: unknown) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? String(v) : null);
     const de = data(req.query.de);
     const ate = data(req.query.ate);
-    if (de) { where.push('l.created_at >= ?'); params.push(`${de} 00:00:00`); }
-    if (ate) { where.push('l.created_at <= ?'); params.push(`${ate} 23:59:59`); }
+    if (req.query.campoData === 'emissao') {
+      // Emissão vem da coluna ou do XML (ISO com hora e fuso): compara só o AAAA-MM-DD
+      const emissao = `LEFT(COALESCE(DATE_FORMAT(l.data_emissao, '%Y-%m-%d'), ${JSON_NF('$.dataEmissao')}), 10)`;
+      if (de) { where.push(`${emissao} >= ?`); params.push(de); }
+      if (ate) { where.push(`${emissao} <= ?`); params.push(ate); }
+    } else {
+      if (de) { where.push('l.created_at >= ?'); params.push(`${de} 00:00:00`); }
+      if (ate) { where.push('l.created_at <= ?'); params.push(`${ate} 23:59:59`); }
+    }
     if (req.query.incluirDescartadas !== 'true') where.push(`l.status <> 'DESCARTADO'`);
     const busca = String(req.query.busca || '').trim();
     if (busca) {
