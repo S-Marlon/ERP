@@ -25,7 +25,9 @@ import { buscarEstadoLote } from '../api/comprasApi';
 import { parseNfeComplete } from '../entradaNf/xml/utils/nfeParser';
 import { gerarHtmlDanfe } from '../entradaNf/danfe/gerarDanfe';
 import { baixarArquivo, imprimirHtml } from '../../../shared/core/impressao/saida';
-import { csvItensDasNotas, htmlListaNotas, juntarDanfes, nomeArquivoXml, podeDescartar, totalSelecionado } from './operacoesNotas';
+import {
+  csvDuplicatasDasNotas, csvItensDasNotas, htmlListaNotas, juntarDanfes, linhaDuplicata, nomeArquivoXml, podeDescartar, rotuloDuplicatas, totalSelecionado,
+} from './operacoesNotas';
 
 const money = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const qtd = (v: number) => Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 4 });
@@ -105,6 +107,28 @@ const DetalheNotaDrawer: React.FC<{ idLote: number | null; onClose: () => void; 
               </Col>
             ))}
           </Row>
+
+          {nota.duplicatas.length > 0 && (
+            <Card size="small" title={<span>Boletos / duplicatas <Tag color="purple" style={{ marginLeft: 6 }}>{rotuloDuplicatas(nota.duplicatas.length)}</Tag></span>}>
+              <Table
+                size="small"
+                rowKey="numero"
+                pagination={false}
+                dataSource={nota.duplicatas}
+                columns={[
+                  { title: 'Duplicata', dataIndex: 'numero', width: 110 },
+                  { title: 'Vencimento', dataIndex: 'vencimento', width: 130, render: (v: string | null) => (v ? v.split('-').reverse().join('/') : '-') },
+                  { title: 'Valor', dataIndex: 'valor', align: 'right' as const, render: (v: number) => money(v) },
+                ]}
+                summary={linhas => (
+                  <Table.Summary.Row>
+                    <Table.Summary.Cell index={0} colSpan={2}><b>Total</b></Table.Summary.Cell>
+                    <Table.Summary.Cell index={1} align="right"><b>{money(linhas.reduce((a, d) => a + Math.round(d.valor * 100), 0) / 100)}</b></Table.Summary.Cell>
+                  </Table.Summary.Row>
+                )}
+              />
+            </Card>
+          )}
 
           {(nota.resumo.comAlerta || 0) > 0 && (
             <Alert
@@ -246,10 +270,10 @@ const xmlsDasNotas = (notas: NotaEntrada[]) => emLotes(notas, 4, async nota => {
 const listaNfs = (notas: NotaEntrada[]) => notas.map(n => n.numero).join(', ');
 
 const exportarCsv = (notas: NotaEntrada[]) => {
-  const cab = ['Numero', 'Serie', 'Fornecedor', 'CNPJ', 'Emissao', 'Entrada', 'Valor NF', 'Itens', 'Conferidos', 'Situacao', 'Chave'];
+  const cab = ['Numero', 'Serie', 'Fornecedor', 'CNPJ', 'Emissao', 'Entrada', 'Valor NF', 'Itens', 'Conferidos', 'Boletos', 'Situacao', 'Chave'];
   const linhas = notas.map(n => [
     n.numero, n.serie || '', n.fornecedor, formatarCnpj(n.cnpj), data(n.emissao), dataHora(n.entradaEm),
-    n.valorNf.toFixed(2).replace('.', ','), n.totalItens, n.conferidos, SITUACOES_NOTA[n.situacao].label, n.chave,
+    n.valorNf.toFixed(2).replace('.', ','), n.totalItens, n.conferidos, n.duplicatas.length, SITUACOES_NOTA[n.situacao].label, n.chave,
   ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(';'));
   const blob = new Blob(['﻿' + [cab.join(';'), ...linhas].join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -266,7 +290,7 @@ const NotasEntrada: React.FC = () => {
   const [resumo, setResumo] = useState<ResumoNotas | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [buscaDigitada, setBuscaDigitada] = useState('');
-  const [filtros, setFiltros] = useState({ campoData: 'entrada' as 'entrada' | 'emissao', de: diasAtras(90), ate: hoje(), situacao: '', busca: '', incluirDescartadas: false });
+  const [filtros, setFiltros] = useState({ campoData: 'entrada' as 'entrada' | 'emissao', duplicatas: '' as '' | 'com' | 'sem', de: diasAtras(90), ate: hoje(), situacao: '', busca: '', incluirDescartadas: false });
   const [notaAberta, setNotaAberta] = useState<number | null>(null);
   const [selecionadas, setSelecionadas] = useState<number[]>([]);
   const [ocupado, setOcupado] = useState<string | null>(null);
@@ -429,6 +453,12 @@ const NotasEntrada: React.FC = () => {
                 .filter(([k]) => k !== 'DESCARTADA' || filtros.incluirDescartadas)
                 .map(([k, v]) => ({ value: k, label: v.label }))]}
             />
+            <Select
+              style={{ width: 170 }}
+              value={filtros.duplicatas}
+              onChange={v => setFiltros(f => ({ ...f, duplicatas: v }))}
+              options={[{ value: '', label: 'Com e sem boletos' }, { value: 'com', label: 'Com boletos' }, { value: 'sem', label: 'Sem boletos' }]}
+            />
             <Input.Search allowClear placeholder="Nº, fornecedor, CNPJ ou chave" style={{ width: 280 }} value={buscaDigitada} onChange={e => setBuscaDigitada(e.target.value)} />
             <Space size={4}><Switch size="small" checked={filtros.incluirDescartadas} onChange={v => setFiltros(f => ({ ...f, incluirDescartadas: v }))} /> Descartadas</Space>
           </Space>
@@ -440,6 +470,11 @@ const NotasEntrada: React.FC = () => {
             }}>
               <b>{notasSelecionadas.length} selecionada(s)</b>
               <span style={{ color: '#475569' }}>· {money(totalSelecionado(notasSelecionadas))}</span>
+              {notasSelecionadas.some(n => n.duplicatas.length) && (
+                <Tag color="purple" style={{ margin: 0 }}>
+                  {rotuloDuplicatas(notasSelecionadas.reduce((a, n) => a + n.duplicatas.length, 0))} em {notasSelecionadas.filter(n => n.duplicatas.length).length} nota(s)
+                </Tag>
+              )}
               <Space wrap size={6} style={{ marginLeft: 'auto' }}>
                 <Tooltip title="Um DANFE por página. Na janela de impressão, escolha &quot;Salvar como PDF&quot; para ter o PDF.">
                   <Button size="small" type="primary" icon={<PrinterOutlined />} loading={ocupado === 'danfe'} disabled={!!ocupado} onClick={() => imprimirDanfes(notasSelecionadas)}>
@@ -455,6 +490,10 @@ const NotasEntrada: React.FC = () => {
                     items: [
                       { key: 'csv', icon: <FileTextOutlined />, label: 'Exportar notas (CSV)' },
                       { key: 'itens', icon: <FileTextOutlined />, label: 'Exportar itens das notas (CSV)' },
+                      {
+                        key: 'boletos', icon: <FileTextOutlined />, label: 'Exportar boletos/duplicatas (CSV)',
+                        disabled: !notasSelecionadas.some(n => n.duplicatas.length),
+                      },
                       { key: 'chaves', icon: <CopyOutlined />, label: 'Copiar chaves de acesso' },
                       { type: 'divider' },
                       { key: 'descartar', icon: <DeleteOutlined />, label: 'Descartar as não lançadas', danger: true },
@@ -462,6 +501,7 @@ const NotasEntrada: React.FC = () => {
                     onClick: ({ key }) => {
                       if (key === 'csv') exportarCsv(notasSelecionadas);
                       if (key === 'itens') exportarItens(notasSelecionadas);
+                      if (key === 'boletos') baixarArquivo(csvDuplicatasDasNotas(notasSelecionadas), `boletos_notas_entrada_${hoje()}.csv`, 'text/csv;charset=utf-8');
                       if (key === 'chaves') copiarChaves(notasSelecionadas);
                       if (key === 'descartar') descartarVarias(notasSelecionadas);
                     },
@@ -512,6 +552,15 @@ const NotasEntrada: React.FC = () => {
                 sorter: (a, b) => String(a.entradaEm).localeCompare(String(b.entradaEm)),
               },
               { title: 'Valor NF', dataIndex: 'valorNf', width: 120, align: 'right' as const, sorter: (a, b) => a.valorNf - b.valorNf, render: (v: number) => <b>{money(v)}</b> },
+              {
+                title: 'Boletos', key: 'dup', width: 105,
+                sorter: (a, b) => a.duplicatas.length - b.duplicatas.length,
+                render: (_, n) => (n.duplicatas.length ? (
+                  <Tooltip title={<div>{n.duplicatas.map(d => <div key={d.numero}>{linhaDuplicata(d)}</div>)}</div>}>
+                    <Tag color="purple" style={{ margin: 0 }}>{rotuloDuplicatas(n.duplicatas.length)}</Tag>
+                  </Tooltip>
+                ) : <span style={{ color: '#cbd5e1' }}>—</span>),
+              },
               {
                 title: 'Conferência', key: 'conf', width: 140,
                 render: (_, n) => (

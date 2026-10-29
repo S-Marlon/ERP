@@ -1,11 +1,24 @@
 import assert from 'assert';
 import type { NotaEntrada } from './notasEntradaApi';
-import { csvItensDasNotas, htmlListaNotas, juntarDanfes, nomeArquivoXml, podeDescartar, totalSelecionado } from './operacoesNotas';
+import {
+  csvDuplicatasDasNotas, csvItensDasNotas, htmlListaNotas, juntarDanfes, linhaDuplicata, nomeArquivoXml, podeDescartar, rotuloDuplicatas, totalSelecionado,
+} from './operacoesNotas';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 const nota = (numero: string, valorNf: number, chave = ''): NotaEntrada => ({
   idLote: Number(numero), chave, numero, serie: '1', fornecedor: 'Forn & Cia', fantasia: null, cnpj: '123', emissao: '2026-10-07T11:42:55-03:00',
-  entradaEm: '2026-10-13T17:22:23.000Z', valorNf, freteAdicional: 0, custoEntrada: 0, totalItens: 2, conferidos: 2, semVinculo: 0, situacao: 'IMPORTADA',
+  entradaEm: '2026-10-13T17:22:23.000Z', valorNf, freteAdicional: 0, custoEntrada: 0, totalItens: 2, conferidos: 2, semVinculo: 0, situacao: 'IMPORTADA', duplicatas: [],
+});
+
+teste('boletos/duplicatas', () => {
+  assert.deepStrictEqual([rotuloDuplicatas(1), rotuloDuplicatas(3)], ['1 boleto', '3 boletos']);
+  const d = { numero: '001', vencimento: '2026-11-10', valor: 1234.5 };
+  assert.strictEqual(linhaDuplicata(d), '001 · 10/11/2026 · R$ 1.234,50');
+  const n = { ...nota('20', 2000), duplicatas: [d, { numero: '002', vencimento: null, valor: 765.5 }] };
+  const linhas = csvDuplicatasDasNotas([n, nota('21', 10)]).split('\r\n');
+  assert.strictEqual(linhas.length, 3);   // cabeçalho + 2 boletos (a nota sem boleto não entra)
+  assert.ok(linhas[1].includes('"001";"10/11/2026";"1234,50"') && linhas[2].includes('"002";"";"765,50"'));
+  assert.ok(htmlListaNotas([n]).includes('<td class="n">2</td>'));
 });
 
 teste('total e descarte da seleção', () => {

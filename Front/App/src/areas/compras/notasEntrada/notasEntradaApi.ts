@@ -4,6 +4,9 @@ const API = `${API_URL}/api/compras`;
 
 export type SituacaoNota = 'EM_CONFERENCIA' | 'PRONTA' | 'IMPORTADA' | 'DESCARTADA';
 
+// Duplicata (boleto/parcela) do grupo de cobrança do XML
+export interface DuplicataNota { numero: string; vencimento: string | null; valor: number }
+
 export interface NotaEntrada {
   idLote: number;
   chave: string;
@@ -21,6 +24,7 @@ export interface NotaEntrada {
   conferidos: number;
   semVinculo: number;
   situacao: SituacaoNota;
+  duplicatas: DuplicataNota[];
 }
 
 export interface ResumoNotas {
@@ -75,6 +79,7 @@ export interface DetalheNota {
   emissao: string | null;
   entradaEm: string;
   situacao: SituacaoNota;
+  duplicatas: DuplicataNota[];
   totais: {
     produtos: number; frete: number; seguro: number; desconto: number; ipi: number; icmsSt: number;
     outros: number; icms: number; nota: number; freteAdicional: number; freteAdicionalMetodo: string | null;
@@ -89,7 +94,7 @@ const lerErro = async (r: Response, padrao: string) => {
 };
 
 // campoData: 'entrada' (no sistema, padrão) ou 'emissao' (data da NF) para o período de/ate
-export const listarNotas = async (filtros: { campoData?: 'entrada' | 'emissao'; de?: string; ate?: string; situacao?: string; busca?: string; incluirDescartadas?: boolean }) => {
+export const listarNotas = async (filtros: { campoData?: 'entrada' | 'emissao'; duplicatas?: '' | 'com' | 'sem'; de?: string; ate?: string; situacao?: string; busca?: string; incluirDescartadas?: boolean }) => {
   const p = new URLSearchParams();
   Object.entries(filtros).forEach(([k, v]) => { if (v !== undefined && v !== '' && v !== false) p.append(k, String(v)); });
   const r = await fetch(`${API}/notas?${p.toString()}`);

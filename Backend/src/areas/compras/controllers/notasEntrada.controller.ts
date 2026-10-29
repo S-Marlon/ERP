@@ -4,6 +4,7 @@ import { Request, Response } from 'express';
 import db from '../../../infra/db';
 import { alertasDaLinha, AlertaEntrada } from '../staging/auditoriaEntrada';
 import { validarGtin } from '../staging/gtin';
+import { duplicatasDoXml, passaFiltroDuplicatas } from '../staging/duplicatasNfe';
 
 const tenantDe = (req: Request) => Number(req.query.tenant_id || req.headers['x-tenant-id'] || 1);
 const n = (v: unknown) => Number(v) || 0;
@@ -17,7 +18,11 @@ const CAMPOS_LOTE = `
   COALESCE(NULLIF(l.nome_fantasia_fornecedor, ''), ${JSON_NF('$.emitente.xFant')}) AS fantasia,
   COALESCE(l.data_emissao, ${JSON_NF('$.dataEmissao')}) AS data_emissao,
   COALESCE(NULLIF(l.valor_total_nf, 0), CAST(${JSON_NF('$.totais.icmsTot.vNF')} AS DECIMAL(15,2))) AS valor_nf,
-  COALESCE(l.frete_adicional_valor, 0) AS frete_adicional`;
+  COALESCE(l.frete_adicional_valor, 0) AS frete_adicional,
+  -- Só o grupo de cobrança do XML (duplicatas/boletos), sem trazer o XML inteiro
+  IF(LOCATE('<cobr>', l.xml_conteudo) > 0,
+     SUBSTRING(l.xml_conteudo, LOCATE('<cobr>', l.xml_conteudo), LOCATE('</cobr>', l.xml_conteudo) - LOCATE('<cobr>', l.xml_conteudo) + 7),
+     NULL) AS cobr_xml`;
 
 // Situação da nota para a tela (RASCUNHO pode estar pronta para aprovar)
 const situacao = (status: string, total: number, conferidos: number, semVinculo: number) => {
@@ -28,7 +33,7 @@ const situacao = (status: string, total: number, conferidos: number, semVinculo:
 };
 
 /**
- * GET /api/compras/notas?de&ate (data de entrada no sistema, ou de emissão com campoData=emissao), situacao, busca (nº, fornecedor, CNPJ, chave)
+ * GET /api/compras/notas?de&ate (data de entrada no sistema, ou de emissão com campoData=emissao), situacao, duplicatas (com|sem), busca (nº, fornecedor, CNPJ, chave)
  */
 export const listarNotasEntrada = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
@@ -97,8 +102,9 @@ export const listarNotasEntrada = async (req: Request, res: Response) => {
         conferidos,
         semVinculo,
         situacao: situacao(r.status, total, conferidos, semVinculo),
+        duplicatas: duplicatasDoXml(r.cobr_xml),
       };
-    }).filter(nota => !filtro || nota.situacao === filtro);
+    }).filter(nota => (!filtro || nota.situacao === filtro) && passaFiltroDuplicatas(req.query.duplicatas, nota.duplicatas.length));
 
     return res.json({
       data: notas,
@@ -275,6 +281,7 @@ export const detalheNotaEntrada = async (req: Request, res: Response) => {
       emissao: lote.data_emissao,
       entradaEm: lote.created_at,
       situacao: situacao(lote.status, total, conferidos, semVinculo),
+      duplicatas: duplicatasDoXml(lote.cobr_xml),
       totais: {
         produtos: n(t.vProd),
         frete: n(t.vFrete),
