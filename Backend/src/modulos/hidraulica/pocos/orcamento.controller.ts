@@ -16,7 +16,7 @@ const nulo = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 
 const formatarItem = (i: any) => ({
   idItem: Number(i.id_item), grupo: i.grupo, descricao: i.descricao, quantidade: Number(i.quantidade), unidade: i.unidade,
-  valorUnitario: Number(i.valor_unitario), valorTotal: Number(i.valor_total), opcional: !!i.opcional,
+  valorUnitario: Number(i.valor_unitario), valorTotal: Number(i.valor_total), opcional: !!i.opcional, incluso: !!i.incluso,
 });
 const carregarItens = async (conn: any, idObra: number) => {
   const [rows]: any = await conn.execute(`SELECT * FROM modulo_hidraulica_pocos_orcamento_itens WHERE id_obra = ? ORDER BY ordem, id_item`, [idObra]);
@@ -28,9 +28,9 @@ const gravarItens = async (conn: any, tenant: number, idObra: number, itens: Ite
   await conn.execute(`DELETE FROM modulo_hidraulica_pocos_orcamento_itens WHERE id_obra = ?`, [idObra]);
   for (const [i, it] of itens.entries()) {
     await conn.execute(
-      `INSERT INTO modulo_hidraulica_pocos_orcamento_itens (tenant_id, id_obra, ordem, grupo, descricao, quantidade, unidade, valor_unitario, valor_total, opcional, operador)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [tenant, idObra, i, it.grupo, it.descricao, it.quantidade, it.unidade, it.valorUnitario, it.valorTotal, it.opcional ? 1 : 0, operador]);
+      `INSERT INTO modulo_hidraulica_pocos_orcamento_itens (tenant_id, id_obra, ordem, grupo, descricao, quantidade, unidade, valor_unitario, valor_total, opcional, incluso, operador)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [tenant, idObra, i, it.grupo, it.descricao, it.quantidade, it.unidade, it.valorUnitario, it.valorTotal, it.opcional ? 1 : 0, it.incluso ? 1 : 0, operador]);
   }
   if (!itens.length) return null;
   const r = resumoDosItens(itens);
@@ -131,10 +131,10 @@ export const criarOrcamento = async (req: Request, res: Response) => {
     }
     const [obra]: any = await conn.execute(
       `INSERT INTO modulo_hidraulica_pocos_obras (tenant_id, id_cliente, id_poco, titulo, servicos, situacao, data_previsao, garantia_meses, metros_previstos,
-         valor_contratado, valor_metro_excedente, valor_sinal, sinal_quando, dados_relatorio, observacao, escopo, prazo_execucao_dias, forma_pagamento,
+         valor_contratado, valor_parcelado, valor_metro_excedente, valor_sinal, sinal_quando, dados_relatorio, observacao, escopo, prazo_execucao_dias, forma_pagamento,
          validade_orcamento_dias, operador)
-       VALUES (?, ?, ?, ?, ?, 'ORCAMENTO', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [tenant, idCliente, idPoco, o.titulo, o.servicos.join(','), o.dataPrevisao, o.garantiaMeses, o.metrosPrevistos, o.valorContratado, o.valorMetroExcedente,
+       VALUES (?, ?, ?, ?, ?, 'ORCAMENTO', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [tenant, idCliente, idPoco, o.titulo, o.servicos.join(','), o.dataPrevisao, o.garantiaMeses, o.metrosPrevistos, o.valorContratado, o.valorParcelado, o.valorMetroExcedente,
         o.valorSinal, o.sinalQuando, JSON.stringify(relatorioInicial(cli, poco, o)), o.observacao || (lead ? `Contato ${lead.id_lead} · ${String(lead.origem).toLowerCase()}` : null),
         o.escopo, o.prazoExecucaoDias, o.formaPagamento, o.validadeOrcamentoDias, operador]);
     const idObra = Number(obra.insertId);
@@ -169,16 +169,16 @@ export const duplicarOrcamento = async (req: Request, res: Response) => {
     const operador = operadorDe(req);
     const [ins]: any = await conn.execute(
       `INSERT INTO modulo_hidraulica_pocos_obras (tenant_id, id_cliente, id_poco, titulo, servicos, situacao, garantia_meses, metros_previstos, valor_contratado,
-         valor_metro_excedente, valor_sinal, sinal_quando, dados_relatorio, escopo, prazo_execucao_dias, forma_pagamento, validade_orcamento_dias, observacao, operador)
-       VALUES (?, ?, ?, ?, ?, 'ORCAMENTO', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         valor_parcelado, valor_metro_excedente, valor_sinal, sinal_quando, dados_relatorio, escopo, prazo_execucao_dias, forma_pagamento, validade_orcamento_dias, observacao, operador)
+       VALUES (?, ?, ?, ?, ?, 'ORCAMENTO', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [tenant, idClienteNovo, mesmoCliente ? o.id_poco : null, o.titulo ? `${o.titulo} (cópia)`.slice(0, 150) : null, o.servicos, o.garantia_meses,
-        o.metros_previstos, o.valor_contratado, o.valor_metro_excedente, o.valor_sinal, o.sinal_quando,
+        o.metros_previstos, o.valor_contratado, o.valor_parcelado, o.valor_metro_excedente, o.valor_sinal, o.sinal_quando,
         JSON.stringify(relatorioInicial(cli, null, { metrosPrevistos: nulo(o.metros_previstos), valorContratado: nulo(o.valor_contratado) })),
         o.escopo, o.prazo_execucao_dias, o.forma_pagamento, o.validade_orcamento_dias, `Cópia do orçamento ${id}`, operador]);
     const novo = Number(ins.insertId);
     await conn.execute(
-      `INSERT INTO modulo_hidraulica_pocos_orcamento_itens (tenant_id, id_obra, ordem, grupo, descricao, quantidade, unidade, valor_unitario, valor_total, opcional, operador)
-       SELECT tenant_id, ?, ordem, grupo, descricao, quantidade, unidade, valor_unitario, valor_total, opcional, ? FROM modulo_hidraulica_pocos_orcamento_itens WHERE id_obra = ?`,
+      `INSERT INTO modulo_hidraulica_pocos_orcamento_itens (tenant_id, id_obra, ordem, grupo, descricao, quantidade, unidade, valor_unitario, valor_total, opcional, incluso, operador)
+       SELECT tenant_id, ?, ordem, grupo, descricao, quantidade, unidade, valor_unitario, valor_total, opcional, incluso, ? FROM modulo_hidraulica_pocos_orcamento_itens WHERE id_obra = ?`,
       [novo, operador, id]);
     await acertarSinal(conn, tenant, novo, nulo(o.valor_sinal), operador);
     await conn.commit();

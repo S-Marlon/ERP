@@ -3,10 +3,11 @@
 // com os itens, o orçamento e o contrato completo em PDF, a assinatura do contrato e os termos aditivos.
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Alert, Button, Card, Checkbox, Col, Divider, Empty, Flex, Input, InputNumber, List, Modal, Popconfirm, Row, Segmented, Select, Space, Table, Tag, Tooltip, Typography, message,
+  Alert, Button, Card, Checkbox, Col, Divider, Dropdown, Empty, Flex, Input, InputNumber, List, Modal, Popconfirm, Row, Segmented, Select, Space, Table, Tag, Tooltip,
+  Typography, message,
 } from 'antd';
 import {
-  CheckOutlined, CopyOutlined, DeleteOutlined, FilePdfOutlined, FileTextOutlined, PlusOutlined, PrinterOutlined, SaveOutlined, UndoOutlined, UserOutlined,
+  CheckOutlined, CopyOutlined, DeleteOutlined, DownOutlined, FilePdfOutlined, FileTextOutlined, PlusOutlined, PrinterOutlined, SaveOutlined, UndoOutlined, UserOutlined,
 } from '@ant-design/icons';
 import {
   AdicionalDoAditivo, Aditivo, dataBr, GRUPOS_ITEM, GrupoItem, ItemOrcamentoForm, ITENS_PRONTOS, Lead, linhaItem, NovoOrcamento, Obra, obrasApi, orcamentoApi,
@@ -74,10 +75,21 @@ export const EditorItens: React.FC<{ itens: ItemOrcamentoForm[]; onChange: (i: I
                 onChange={v => mudar(it.k, { valorUnitario: Number(v) || 0 })} />
             ),
           },
-          { title: 'Total', width: 110, align: 'right', render: (_, it) => <Text type={it.opcional ? 'secondary' : undefined}>{it.opcional ? `${brl(it.valorUnitario)}/${it.unidade}` : brl(it.valorTotal)}</Text> },
+          {
+            title: 'Total', width: 110, align: 'right', render: (_, it) => (
+              <Text type={it.opcional || it.incluso ? 'secondary' : undefined}>
+                {it.opcional ? `${brl(it.valorUnitario)}/${it.unidade}` : it.incluso ? 'Incluso' : brl(it.valorTotal)}
+              </Text>
+            ),
+          },
+          {
+            title: <Tooltip title="Incluso no pacote: aparece no orçamento com o valor de referência, mas não soma no total (ex.: transporte, bomba)">Incluso</Tooltip>,
+            width: 64, align: 'center',
+            render: (_, it) => <Checkbox disabled={bloqueado} checked={!!it.incluso} onChange={e => mudar(it.k, { incluso: e.target.checked, opcional: e.target.checked ? false : it.opcional })} />,
+          },
           {
             title: <Tooltip title="Se necessário: aparece no orçamento, mas não entra no total (ex.: metro excedente)">Se nec.</Tooltip>, width: 64, align: 'center',
-            render: (_, it) => <Checkbox disabled={bloqueado} checked={it.opcional} onChange={e => mudar(it.k, { opcional: e.target.checked })} />,
+            render: (_, it) => <Checkbox disabled={bloqueado} checked={it.opcional} onChange={e => mudar(it.k, { opcional: e.target.checked, incluso: e.target.checked ? false : it.incluso })} />,
           },
           {
             title: '', width: 70, render: (_, it) => !bloqueado && (
@@ -90,7 +102,19 @@ export const EditorItens: React.FC<{ itens: ItemOrcamentoForm[]; onChange: (i: I
         ]} />
       {!bloqueado && (
         <Space wrap size={4}>
-          {ITENS_PRONTOS.map(p => <Button key={p.rotulo} size="small" icon={<PlusOutlined />} onClick={() => onChange([...itens, linhaItem(p.item)])}>{p.rotulo}</Button>)}
+          <Tooltip title="Todas as linhas da planilha da empresa (perfuração até 60 m por faixa de solo, inclusos e “se necessário”). Ajuste o que mudar neste cliente.">
+            <Button size="small" type="primary" ghost icon={<PlusOutlined />} onClick={() => onChange([...itens, ...ITENS_PRONTOS.map(p => linhaItem(p.item))])}>Modelo da empresa (60 m)</Button>
+          </Tooltip>
+          <Dropdown trigger={['click']} menu={{
+            style: { maxHeight: 360, overflow: 'auto' },
+            items: ITENS_PRONTOS.map((p, i) => ({
+              key: String(i),
+              label: <span>{p.rotulo}{p.item.incluso ? <Tag style={{ marginLeft: 6 }}>incluso</Tag> : p.item.opcional ? <Tag style={{ marginLeft: 6 }}>se nec.</Tag> : null}</span>,
+            })),
+            onClick: ({ key }) => onChange([...itens, linhaItem(ITENS_PRONTOS[Number(key)].item)]),
+          }}>
+            <Button size="small" icon={<PlusOutlined />}>Linha pronta <DownOutlined /></Button>
+          </Dropdown>
           <Button size="small" type="dashed" icon={<PlusOutlined />}
             onClick={() => onChange([...itens, linhaItem({ grupo: 'OUTRO', descricao: '', quantidade: 1, unidade: 'un', valorUnitario: 0, opcional: false })])}>Linha em branco</Button>
         </Space>
@@ -98,6 +122,7 @@ export const EditorItens: React.FC<{ itens: ItemOrcamentoForm[]; onChange: (i: I
       <Flex justify="flex-end" gap={16} wrap>
         {r.metrosPrevistos !== null && <Text type="secondary">{r.metrosPrevistos} m previstos{r.valorMetroExcedente ? ` · excedente ${brl(r.valorMetroExcedente)}/m` : ''}</Text>}
         {r.opcionais > 0 && <Text type="secondary">se necessário: {brl(r.opcionais)}</Text>}
+        {itens.some(i => i.incluso) && <Text type="secondary">{itens.filter(i => i.incluso).length} item(ns) incluso(s)</Text>}
         <Text strong style={{ fontSize: 15 }}>Total {brl(r.total)}</Text>
       </Flex>
     </Space>
@@ -108,7 +133,7 @@ export const EditorItens: React.FC<{ itens: ItemOrcamentoForm[]; onChange: (i: I
 
 interface Condicoes {
   servicos: Servico[]; titulo: string; escopo: string; valorSinal: number | null; sinalQuando: 'ANTES' | 'NO_ATO'; formaPagamento: string;
-  prazoExecucaoDias: number | null; validadeOrcamentoDias: number | null; garantiaMeses: number | null;
+  prazoExecucaoDias: number | null; validadeOrcamentoDias: number | null; garantiaMeses: number | null; valorParcelado: number | null;
 }
 const servicosDoTexto = (t: string | null | undefined): Servico[] =>
   /limp/i.test(t || '') ? ['LIMPEZA'] : /bomba/i.test(t || '') ? ['TROCA_BOMBA'] : /manuten/i.test(t || '') ? ['MANUTENCAO'] : ['PERFURACAO', 'INSTALACAO'];
@@ -135,7 +160,7 @@ export const OrcamentoRapido: React.FC<{
     setIdPoco('novo');
     const servicos = servicosDoTexto(lead?.necessidade);
     setItens(servicos.includes('PERFURACAO') ? [linhaItem(ITENS_PRONTOS[0].item), linhaItem(ITENS_PRONTOS[1].item)] : []);
-    setC({ servicos, titulo: '', escopo: '', valorSinal: null, sinalQuando: 'ANTES', formaPagamento: '', prazoExecucaoDias: null, validadeOrcamentoDias: null, garantiaMeses: 12 });
+    setC({ servicos, titulo: '', escopo: '', valorSinal: null, sinalQuando: 'ANTES', formaPagamento: '', prazoExecucaoDias: null, validadeOrcamentoDias: null, garantiaMeses: 12, valorParcelado: null });
     processoApi.config().then(cfg => setC(a => (a ? { ...a, formaPagamento: a.formaPagamento || cfg.formaPagamentoPadrao || '', validadeOrcamentoDias: a.validadeOrcamentoDias ?? cfg.validadeOrcamentoDias } : a)))
       .catch(() => undefined);
   }, [aberto]);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -154,7 +179,7 @@ export const OrcamentoRapido: React.FC<{
       idCliente: cliente?.idCliente ?? null, idLead: lead?.idLead ?? null, idPoco: idPoco === 'novo' ? null : idPoco,
       local: idPoco === 'novo' && (local.endereco || local.cidade || local.gps) ? { ...local, gps: local.gps || null } : null,
       servicos: c.servicos, titulo: c.titulo || null, escopo: c.escopo || null, valorSinal: c.valorSinal, sinalQuando: c.sinalQuando, formaPagamento: c.formaPagamento || null,
-      prazoExecucaoDias: c.prazoExecucaoDias, validadeOrcamentoDias: c.validadeOrcamentoDias, garantiaMeses: c.garantiaMeses, itens,
+      prazoExecucaoDias: c.prazoExecucaoDias, validadeOrcamentoDias: c.validadeOrcamentoDias, garantiaMeses: c.garantiaMeses, valorParcelado: c.valorParcelado, itens,
       valorContratado: itens.length ? undefined : null,
     };
     setSalvando(true);
@@ -224,6 +249,12 @@ export const OrcamentoRapido: React.FC<{
           <Col xs={8} md={4}><Text>Prazo</Text><InputNumber min={1} max={365} suffix="dias" style={{ width: '100%' }} value={c.prazoExecucaoDias} onChange={v => mudar({ prazoExecucaoDias: v === null ? null : Number(v) })} /></Col>
           <Col xs={8} md={5}><Text>Validade</Text><InputNumber min={1} max={365} suffix="dias" style={{ width: '100%' }} value={c.validadeOrcamentoDias} onChange={v => mudar({ validadeOrcamentoDias: v === null ? null : Number(v) })} /></Col>
           <Col xs={8} md={5}><Text>Garantia</Text><InputNumber min={0} max={120} suffix="meses" style={{ width: '100%' }} value={c.garantiaMeses} onChange={v => mudar({ garantiaMeses: v === null ? null : Number(v) })} /></Col>
+          <Col xs={12} md={6}>
+            <Tooltip title="Total se o cliente pagar parcelado no cartão (ex.: 18 mil à vista, 19 mil parcelado). Vazio = só o valor à vista.">
+              <Text>Total parcelado (cartão)</Text>
+            </Tooltip>
+            <InputNumber min={0} prefix="R$" style={{ width: '100%' }} value={c.valorParcelado} onChange={v => mudar({ valorParcelado: v === null ? null : Number(v) })} />
+          </Col>
           <Col xs={24} md={12}><Text>Forma de pagamento</Text>
             <Input.TextArea rows={2} maxLength={500} value={c.formaPagamento} onChange={e => mudar({ formaPagamento: e.target.value })} placeholder="Ex.: 30% de sinal e o saldo na entrega, no PIX" />
           </Col>

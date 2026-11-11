@@ -42,6 +42,7 @@ const ESTILO = `<style>
   p { margin: 4px 0; }
   .itens th { width: auto; } .itens td.n { text-align: right; white-space: nowrap; width: 1%; }
   .opcional td { color: #555; font-style: italic; }
+  .condicoes { margin: 4px 0; padding-left: 18px; font-size: 11px; color: #444; } .condicoes li { margin: 3px 0; }
   .contrato { font-size: 12px; line-height: 1.55; text-align: justify; }
   .contrato h3 { font-size: 12px; margin: 14px 0 4px; text-transform: uppercase; }
   .contrato p { margin: 5px 0; }
@@ -72,12 +73,16 @@ const linhaCliente = (d: DocumentoObra) => {
   </table>`;
 };
 
-/** Tabela dos itens: descrição, quantidade, unidade, valor unitário e total; os opcionais ("se necessário") ficam fora do total. */
+/**
+ * Tabela dos itens: descrição, quantidade, unidade, valor unitário e total. Os inclusos mostram o valor de referência e
+ * "Incluso" no total; os opcionais ("se necessário") vêm depois do total. Nenhum dos dois soma.
+ */
 export const tabelaItens = (itens: ItemOrcamentoForm[], adicionais: { descricao: string; valor: number }[] = []) => {
   const linha = (i: ItemOrcamentoForm) => `<tr${i.opcional ? ' class="opcional"' : ''}><td>${escapar(i.descricao)}${i.opcional ? ' <small>(se necessário, não incluso no total)</small>' : ''}</td>
-    <td class="n">${num(i.quantidade, i.unidade)}</td><td class="n">${brl(i.valorUnitario)}</td><td class="n">${i.opcional ? `${brl(i.valorUnitario)}/${escapar(i.unidade)}` : brl(i.valorTotal)}</td></tr>`;
+    <td class="n">${num(i.quantidade, i.unidade)}</td><td class="n">${i.valorUnitario ? brl(i.valorUnitario) : i.incluso ? '—' : brl(0)}</td>
+    <td class="n">${i.opcional ? `${brl(i.valorUnitario)}/${escapar(i.unidade)}` : i.incluso ? '<b>INCLUSO</b>' : brl(i.valorTotal)}</td></tr>`;
   const base = itens.filter(i => !i.opcional), opc = itens.filter(i => i.opcional);
-  const total = (base.reduce((s, i) => s + Math.round(i.valorTotal * 100), 0) + adicionais.reduce((s, a) => s + Math.round(a.valor * 100), 0)) / 100;
+  const total = (base.filter(i => !i.incluso).reduce((s, i) => s + Math.round(i.valorTotal * 100), 0) + adicionais.reduce((s, a) => s + Math.round(a.valor * 100), 0)) / 100;
   return `<table class="itens"><tr><th>Descrição</th><th>Qtd.</th><th>Valor unit.</th><th>Total</th></tr>
     ${base.map(linha).join('')}
     ${adicionais.map(a => `<tr><td>${escapar(a.descricao)} <small>(adicional aprovado)</small></td><td class="n"></td><td class="n"></td><td class="n">${brl(a.valor)}</td></tr>`).join('')}
@@ -85,6 +90,15 @@ export const tabelaItens = (itens: ItemOrcamentoForm[], adicionais: { descricao:
     ${opc.map(linha).join('')}
   </table>`;
 };
+
+/** Condições gerais do orçamento (das propostas da empresa): o que é do cliente, risco geológico, metragem adicional e autorização digital. */
+export const CONDICOES_ORCAMENTO = [
+  'Responsabilidade do cliente: garantir livre acesso ao local para as máquinas, fornecer água e energia elétrica para o apoio operacional e providenciar as licenças e outorgas necessárias.',
+  'Risco geológico (obrigação de meio): a perfuração depende das condições do subsolo. Aplicamos a melhor técnica disponível, mas não há garantia de vazão, quantidade ou qualidade da água, fatores que dependem da natureza geológica do local.',
+  'Metragem adicional: se a profundidade prevista for atingida sem vazão suficiente, a continuidade depende de nova autorização do cliente, pelo valor do metro excedente indicado, que pode ser readequado conforme o solo e a profundidade, com o preço final aprovado antes do reinício dos trabalhos.',
+  'Imprevistos no solo: em caso de rochas muito duras, cavernas, solo colapsável ou interferências não informadas (entulho, tubulações, fundações), o ponto de perfuração pode ser ajustado dentro da mesma propriedade, sem mudar o valor contratado.',
+  'Autorizações digitais: autorização de continuidade, alteração de escopo ou serviço adicional enviada por WhatsApp ou e-mail tem validade e força contratual para execução e cobrança.',
+];
 
 /** Orçamento: escopo, valores (itens ou pacote, metro excedente, sinal, adicionais aprovados), prazo, garantia, pagamento e validade. */
 export const htmlOrcamento = (d: DocumentoObra, logo: string | null, hoje: string) => {
@@ -107,12 +121,13 @@ export const htmlOrcamento = (d: DocumentoObra, logo: string | null, hoje: strin
       <tr class="total"><td>Total</td><td class="valor">${brl(total)}</td></tr>
     </table>`}
     <h2>Pagamento</h2>
+    ${o.valorParcelado ? `<table><tr><th>À vista</th><td class="valor">${brl(total)}</td></tr><tr><th>Parcelado (cartão de crédito)</th><td class="valor">${brl(o.valorParcelado)}</td></tr></table>` : ''}
     ${o.valorSinal ? `<p>Sinal de ${brl(o.valorSinal)} ${o.sinalQuando === 'NO_ATO' ? 'no dia do início da obra' : 'para agendar o início da obra'}.</p>` : ''}
     ${o.formaPagamento ? paragrafos(o.formaPagamento) : '<p>A combinar.</p>'}
     <h2>Prazo</h2><p>${o.prazoExecucaoDias ? `Execução em até ${o.prazoExecucaoDias} dia(s) a partir do início, salvo chuva ou condições do terreno.` : 'A combinar na aprovação.'}</p>
     <h2>Garantia</h2>${o.garantiaMeses ? `<p><b>${o.garantiaMeses} meses</b> a partir da conclusão.</p>` : ''}${paragrafos(d.empresa.textoGarantia)}
-    <div class="assinaturas"><div>${escapar(d.empresa.empresaNome || 'Empresa')}</div><div>De acordo: ${escapar(d.cliente?.nome || 'Cliente')}</div></div>
-    <p class="rodape">A profundidade final depende do terreno e do aquífero; metros além do previsto são cobrados pelo valor do metro excedente.</p>`);
+    <h2>Condições gerais</h2><ul class="condicoes">${CONDICOES_ORCAMENTO.map(t => `<li>${escapar(t)}</li>`).join('')}</ul>
+    <div class="assinaturas"><div>${escapar(d.empresa.empresaNome || 'Empresa')}</div><div>De acordo: ${escapar(d.cliente?.nome || 'Cliente')}</div></div>`);
 };
 
 /** Laudo de entrega: o poço como ficou (profundidade, vazão, níveis, diâmetro, bomba) e a garantia. */
@@ -221,7 +236,8 @@ export const qualificacaoCliente = (c: DocumentoObra['cliente']) => {
     endereco && `residente em ${endereco}`].filter(Boolean).join(', ');
 };
 const qualificacaoEmpresa = (d: DocumentoObra) => [(d.empresa.empresaNome || '__________').toUpperCase(),
-  d.empresa.empresaDocumento && `inscrita no CNPJ/CPF sob o nº ${doc(d.empresa.empresaDocumento)}`, d.empresa.empresaEndereco && `com endereço em ${d.empresa.empresaEndereco}`]
+  d.empresa.empresaDocumento && `inscrita no CNPJ/CPF sob o nº ${doc(d.empresa.empresaDocumento)}`, d.empresa.empresaEndereco && `com endereço em ${d.empresa.empresaEndereco}`,
+  d.empresa.empresaRepresentante && `neste ato representada por ${d.empresa.empresaRepresentante}${d.empresa.empresaRepresentanteCpf ? `, CPF nº ${doc(d.empresa.empresaRepresentanteCpf)}` : ''}`]
   .filter(Boolean).join(', ');
 
 /** Os {campos} que os modelos de contrato e aditivo podem usar (para a tela de configuração mostrar). */
@@ -230,13 +246,14 @@ export const CAMPOS_MODELO: Record<string, string> = {
   cliente_qualificacao: 'cliente com documento, estado civil, endereço…', local_obra: 'endereço/GPS do poço', servicos: 'serviços contratados',
   escopo: 'escopo do orçamento', tabela_itens: 'tabela dos itens (linha sozinha)', metros: 'profundidade prevista', valor_total: 'valor total',
   valor_total_extenso: 'valor total por extenso', valor_metro_excedente: 'valor do metro excedente', sinal: 'frase do sinal', forma_pagamento: 'forma de pagamento',
-  prazo_dias: 'prazo de execução em dias', garantia_meses: 'meses de garantia', texto_garantia: 'texto de garantia da configuração', foro: 'cidade do foro',
+  prazo_dias: 'prazo de execução em dias', data_inicio: 'início previsto da obra', condicao_parcelada: 'frase do valor parcelado (vazia se não houver)',
+  valor_parcelado: 'valor parcelado (cartão)', garantia_meses: 'meses de garantia', texto_garantia: 'texto de garantia da configuração', foro: 'cidade do foro',
   responsavel_tecnico: 'responsável técnico', registro_tecnico: 'CREA/registro', cidade_data: 'cidade e data por extenso',
   numero_aditivo: 'nº do aditivo', data_contrato: 'data do contrato', tabela_adicionais: 'tabela do aditivo (linha sozinha)', valor_aditivo: 'valor do aditivo',
   valor_aditivo_extenso: 'valor do aditivo por extenso', novo_total: 'novo valor do contrato', novo_total_extenso: 'novo valor por extenso', observacao: 'observação do aditivo',
 };
 
-export const MODELO_CONTRATO_PADRAO = `CONTRATO DE PRESTAÇÃO DE SERVIÇOS DE PERFURAÇÃO E INSTALAÇÃO DE POÇO TUBULAR Nº {numero}
+export const MODELO_CONTRATO_PADRAO = `CONTRATO PARTICULAR DE PRESTAÇÃO DE SERVIÇOS Nº {numero}
 
 CONTRATADA: {empresa_qualificacao}.
 CONTRATANTE: {cliente_qualificacao}.
@@ -244,46 +261,74 @@ CONTRATANTE: {cliente_qualificacao}.
 As partes acima identificadas têm entre si justo e contratado o seguinte:
 
 CLÁUSULA 1ª – DO OBJETO
-A CONTRATADA executará para o CONTRATANTE os serviços de {servicos}, no local: {local_obra}, conforme o orçamento nº {numero} e os itens abaixo:
+O presente contrato tem como objeto a prestação de serviços de {servicos}, com os materiais e serviços relacionados abaixo, nas condições aqui estabelecidas.
 {tabela_itens}
 {escopo}
+Parágrafo único – As especificações técnicas, a profundidade contratada, os prazos, os valores e as demais condições do serviço estão descritos neste contrato e, quando houver, na proposta comercial (orçamento nº {numero}) assinada pelas partes, que faz parte integrante deste instrumento. Tratativas, negociações ou entendimentos prévios, sejam verbais, por telefone, por mensagens eletrônicas ou presenciais, somente terão validade se transcritos por escrito e assinados por ambas as partes ou registrados em meio eletrônico com confirmação expressa.
 
-CLÁUSULA 2ª – DA PROFUNDIDADE E DO METRO EXCEDENTE
-A profundidade prevista é de {metros}. A profundidade final depende das condições geológicas e do aquífero encontrados. Se for necessário perfurar além do previsto, cada metro excedente custará {valor_metro_excedente}, mediante autorização do CONTRATANTE, registrada por mensagem escrita ou termo aditivo.
+CLÁUSULA 2ª – DO LOCAL DA PRESTAÇÃO DOS SERVIÇOS
+Os serviços serão executados em {local_obra}, ou em outro local indicado pelo CONTRATANTE, desde que previamente acordado entre as partes.
 
-CLÁUSULA 3ª – DO PREÇO E DO PAGAMENTO
-Pelos serviços o CONTRATANTE pagará o valor total de {valor_total} ({valor_total_extenso}). {sinal}
-Forma de pagamento: {forma_pagamento}
-O atraso no pagamento sujeita o valor devido a multa de 2% (dois por cento) e juros de 1% (um por cento) ao mês.
+CLÁUSULA 3ª – DO PRAZO DE EXECUÇÃO
+A execução dos serviços terá início em {data_inicio} e deverá ser concluída no prazo estimado de {prazo_dias} dias úteis, salvo prorrogação justificada em razão de condições climáticas adversas, dificuldades técnicas imprevistas, necessidade de manutenção de equipamentos, adversidades geológicas ou quaisquer outros fatores alheios à vontade da CONTRATADA que interfiram no andamento dos serviços.
 
-CLÁUSULA 4ª – DO PRAZO
-Os serviços terão início em data combinada entre as partes e serão executados em até {prazo_dias} dias, prorrogáveis por chuva, condições do terreno, falta de acesso ou de energia no local, sem culpa da CONTRATADA.
+CLÁUSULA 4ª – DO VALOR E DAS CONDIÇÕES DE PAGAMENTO
+O valor total do presente contrato é de {valor_total} ({valor_total_extenso}){condicao_parcelada}, referente aos serviços descritos na cláusula 1ª, com a profundidade prevista de {metros} e os materiais inclusos, pago pelo CONTRATANTE à CONTRATADA da seguinte forma:
+{sinal}
+{forma_pagamento}
+Metragem excedente: caso seja necessária a perfuração além da profundidade contratada de {metros}, será cobrado o valor adicional de {valor_metro_excedente} por metro perfurado a mais, mediante autorização do CONTRATANTE, nos termos da cláusula 5ª.
+Inadimplemento: o não cumprimento das condições de pagamento poderá implicar a suspensão dos serviços. Sobre o valor em atraso incidirão multa moratória de 2% (dois por cento), juros de mora de 1% (um por cento) ao mês e correção monetária pelo IPCA (Índice Nacional de Preços ao Consumidor Amplo), calculada pro rata die, do vencimento até o efetivo pagamento.
+Suspensão dos serviços: a inadimplência superior a 15 (quinze) dias autoriza a CONTRATADA a suspender os serviços até a regularização dos valores pendentes, sem prejuízo das demais sanções previstas neste contrato ou na legislação vigente.
 
-CLÁUSULA 5ª – DAS OBRIGAÇÕES DO CONTRATANTE
-a) garantir acesso livre e seguro ao local para a entrada da sonda, do caminhão e da equipe;
-b) informar a existência de redes enterradas (água, esgoto, energia) e fossas próximas ao ponto de perfuração;
-c) providenciar as autorizações exigidas pelo órgão gestor de recursos hídricos (outorga), salvo se contratadas à parte;
-d) efetuar os pagamentos nas datas combinadas.
+CLÁUSULA 5ª – DAS OBRIGAÇÕES DA CONTRATADA
+A CONTRATADA se compromete a:
+a) executar os serviços contratados com a melhor técnica disponível, utilizando materiais de qualidade e mão de obra especializada;
+b) respeitar as normas ambientais e de segurança aplicáveis;
+c) fornecer ao CONTRATANTE as informações necessárias sobre o andamento dos serviços;
+d) realizar a perfuração no solo até atingir o embasamento rochoso, sendo o limite da perfuração na parte de aluvião até o início da rocha, independentemente da metragem, observado o limite contratado de {metros};
+e) caso a perfuração atinja os {metros} contratados sem localizar um aquífero ou sem vazão suficiente, comunicar formalmente o CONTRATANTE sobre a necessidade de continuidade da perfuração;
+f) continuar a perfuração somente mediante anuência expressa do CONTRATANTE, que poderá ser formalizada por escrito, inclusive por termo aditivo ou por mensagens eletrônicas (como WhatsApp ou e-mail), as quais terão validade jurídica plena para todos os fins;
+g) informar o valor do metro adicional no momento da solicitação de autorização, considerando o tipo de solo, a profundidade atingida, os custos operacionais e a região, a partir de {valor_metro_excedente} por metro perfurado;
+h) garantir o bom funcionamento dos equipamentos utilizados, providenciando sua manutenção ou substituição quando necessário, sem prejuízo do previsto na cláusula 3ª.
+Parágrafo único – A autorização do CONTRATANTE para a continuidade da perfuração implica ciência e obrigação de pagamento integral do valor acordado referente à metragem adicional, conforme registrado no canal de comunicação utilizado.
 
-CLÁUSULA 6ª – DAS OBRIGAÇÕES DA CONTRATADA
-a) executar os serviços com equipe e equipamentos próprios, seguindo as boas práticas e as normas técnicas aplicáveis;
-b) entregar ao final o laudo do poço, com profundidade, diâmetro, vazão e níveis estático e dinâmico;
-c) deixar o local limpo e organizado ao fim dos serviços.
+CLÁUSULA 6ª – DAS OBRIGAÇÕES DO CONTRATANTE
+O CONTRATANTE se obriga a:
+a) fornecer as informações e os documentos necessários à execução dos serviços contratados;
+b) disponibilizar livre acesso ao local da perfuração, assegurando condições mínimas de segurança e o deslocamento de equipamentos e pessoal;
+c) garantir, quando necessário, o fornecimento de energia elétrica e água para apoio operacional;
+d) informar previamente a existência de obstáculos, estruturas subterrâneas, redes elétricas, hidráulicas ou de esgoto, rochas ou demais interferências que possam afetar os serviços; a omissão dessas informações poderá implicar custos adicionais e/ou prorrogação do prazo, conforme avaliação da CONTRATADA;
+e) obter, às suas expensas, as licenças, autorizações e outorgas exigidas pelos órgãos competentes para a utilização do poço, quando aplicável, isentando a CONTRATADA de qualquer responsabilidade decorrente da ausência desses documentos;
+f) efetuar os pagamentos nas condições combinadas.
 
-CLÁUSULA 7ª – DO RISCO GEOLÓGICO
-A quantidade e a qualidade da água dependem do aquífero e não podem ser garantidas pela CONTRATADA. Caso o poço resulte seco ou com vazão insuficiente, serão devidos os metros efetivamente perfurados e os serviços executados, salvo outro acordo escrito entre as partes.
-
-CLÁUSULA 8ª – DA GARANTIA
-Os serviços têm garantia de {garantia_meses} meses a partir da conclusão, cobrindo defeitos de execução. A garantia não cobre mau uso, bomba trabalhando a seco, descargas elétricas, falta ou oscilação de energia e alterações naturais do aquífero.
+CLÁUSULA 7ª – DA GARANTIA
+A CONTRATADA oferece garantia de {garantia_meses} meses para os serviços prestados, a contar da conclusão, cobrindo defeitos de execução ou de materiais, desde que utilizados em condições normais. A garantia não cobre danos causados por mau uso, falta de manutenção ou intervenções realizadas por terceiros.
 {texto_garantia}
 
+CLÁUSULA 8ª – DAS CONDIÇÕES GEOLÓGICAS E DAS INTERFERÊNCIAS NO LOCAL
+A perfuração depende das condições do subsolo. Por se tratar de obrigação de meio e não de resultado, a CONTRATADA não garante vazão, quantidade ou qualidade da água, fatores que dependem da natureza geológica local.
+Caso sejam identificadas condições geológicas adversas que impeçam ou dificultem significativamente a perfuração, tais como rochas extremamente duras, cavernas, lençol freático em profundidade atípica ou outras formações imprevistas, a CONTRATADA comunicará imediatamente o CONTRATANTE e os serviços serão suspensos até a avaliação da viabilidade de continuidade, podendo ser apresentada nova proposta técnica e financeira. A retomada dependerá da anuência expressa do CONTRATANTE.
+Na ausência de prospecção prévia pela CONTRATADA (sondagem geofísica, radiestesia ou outro método técnico), caso sejam identificadas interferências artificiais no ponto demarcado, como entulho, restos de construção ou compactação de terraplanagem, a CONTRATADA poderá ajustar o ponto de perfuração para local próximo, dentro da mesma propriedade, sem necessidade de anuência prévia, priorizando o posicionamento técnico mais adequado e informando o CONTRATANTE em seguida.
+A CONTRATADA não se responsabiliza por atrasos decorrentes das situações previstas nesta cláusula, que ficam sujeitos à prorrogação do prazo contratual.
+
 CLÁUSULA 9ª – DA RESCISÃO
-O contrato pode ser rescindido por descumprimento de qualquer cláusula. Se o CONTRATANTE desistir após a mobilização da equipe, o sinal ficará com a CONTRATADA para cobrir as despesas, sem prejuízo dos serviços já executados.
+Qualquer das partes poderá rescindir o presente contrato, a qualquer tempo, mediante comunicação por escrito à outra parte com antecedência mínima de 5 (cinco) dias úteis.
+Na rescisão por iniciativa do CONTRATANTE, este pagará à CONTRATADA o valor proporcional aos serviços já executados até a data da rescisão e ressarcirá os custos operacionais comprovadamente incorridos.
+Na rescisão por iniciativa da CONTRATADA, esta restituirá os valores pagos pelo CONTRATANTE, descontado o montante correspondente aos serviços efetivamente prestados e aos custos comprovadamente incorridos até a data da rescisão.
+O contrato poderá ser rescindido de forma imediata, por qualquer das partes, em caso de descumprimento de obrigações contratuais, atraso no pagamento superior a 15 (quinze) dias, situações que impeçam a continuidade dos serviços por motivos alheios à vontade da CONTRATADA ou atitudes que comprometam a segurança da equipe, dos equipamentos ou da obra.
+A rescisão não exime as partes das obrigações pendentes até a data em que se efetivar, incluindo os pagamentos devidos e a responsabilidade por eventuais danos.
 
-CLÁUSULA 10ª – DO FORO
-Fica eleito o foro da comarca de {foro} para resolver qualquer questão deste contrato.
+CLÁUSULA 10ª – DAS DISPOSIÇÕES GERAIS
+Este contrato constitui o entendimento integral entre as partes, substituindo acordos, negociações e entendimentos anteriores, verbais ou escritos, relacionados ao seu objeto.
+Qualquer alteração ou aditamento somente terá validade se feito por escrito e assinado por ambas as partes (termo aditivo), observado o previsto na cláusula 5ª para a metragem adicional.
+As comunicações entre as partes serão feitas por escrito, por e-mail, correspondência registrada, WhatsApp ou outro meio eletrônico que permita comprovar o envio e o recebimento, usando os contatos constantes neste contrato ou outros informados por escrito.
+As partes manterão sigilo sobre informações técnicas, comerciais, estratégicas ou confidenciais obtidas em razão deste contrato, salvo autorização expressa da outra parte ou determinação legal.
+A invalidade de qualquer cláusula não afetará as demais, que permanecerão em pleno vigor.
 
-E, por estarem de acordo, as partes assinam este contrato em duas vias de igual teor, na presença de duas testemunhas.
+CLÁUSULA 11ª – DO FORO
+Fica eleito o foro da Comarca de {foro}, com exclusão de qualquer outro, por mais privilegiado que seja, para dirimir dúvidas ou litígios decorrentes deste contrato.
+
+E, por estarem de acordo, as partes assinam este contrato em 2 (duas) vias de igual teor e forma, na presença das testemunhas abaixo.
 
 {cidade_data}`;
 
@@ -348,12 +393,15 @@ const camposBase = (d: DocumentoObra, hoje: string) => {
     garantia_meses: o.garantiaMeses ? String(o.garantiaMeses) : '__', texto_garantia: d.empresa.textoGarantia || '', foro: d.empresa.foroCidade || c?.cidade || '__________',
     responsavel_tecnico: d.empresa.responsavelTecnico || '', registro_tecnico: d.empresa.registroTecnico || '', cidade_data: dataPorExtenso(hoje, cidade),
     data_contrato: dataBr(o.contratoAssinadoEm || o.criadaEm.slice(0, 10)),
+    data_inicio: o.dataPrevisao ? dataBr(o.dataPrevisao) : 'data a combinar entre as partes',
+    valor_parcelado: o.valorParcelado ? brl(o.valorParcelado) : '',
+    condicao_parcelada: o.valorParcelado ? ` à vista, ou ${brl(o.valorParcelado)} (${valorPorExtenso(o.valorParcelado)}) se parcelado no cartão de crédito` : '',
   };
 };
 
 const assinaturasContrato = (d: DocumentoObra) => {
   const c = d.cliente;
-  const contratada = `CONTRATADA · ${escapar(d.empresa.empresaNome || '')}${d.empresa.responsavelTecnico ? `<br>${escapar(d.empresa.responsavelTecnico)}${d.empresa.registroTecnico ? ` · ${escapar(d.empresa.registroTecnico)}` : ''}` : ''}`;
+  const contratada = `CONTRATADA · ${escapar(d.empresa.empresaNome || '')}${d.empresa.empresaRepresentante ? `<br>${escapar(d.empresa.empresaRepresentante)}` : ''}${d.empresa.responsavelTecnico ? `<br>${escapar(d.empresa.responsavelTecnico)}${d.empresa.registroTecnico ? ` · ${escapar(d.empresa.registroTecnico)}` : ''}` : ''}`;
   const contratante = `CONTRATANTE · ${escapar(c?.nome || '')}${c?.tipoPessoa === 'PJ' && c.representante ? `<br>p.p. ${escapar(c.representante)}` : ''}`;
   return `<div class="assinaturas quatro"><div>${contratada}</div><div>${contratante}</div>
     <div>Testemunha 1 · nome e CPF</div><div>Testemunha 2 · nome e CPF</div></div>`;

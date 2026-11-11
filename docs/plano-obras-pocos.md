@@ -204,3 +204,19 @@ O módulo ainda não tinha dados lançados; a revisão foi para o uso no escrit�
   técnico, equipe, sonda, materiais, primeiro cliente e orçamento. Some quando tudo está feito (`primeirosPassos.ts`).
 - **Telas que se ligam:** Monitoramento (IoT) e Mapa só aparecem em "Mais ferramentas" quando ligados em Atendimento ›
   Configuração (`usa_monitoramento`, `usa_mapa` em `_config`, padrão desligado). Nada é apagado ao desligar.
+
+## Modelos da empresa: contrato, proposta e planilha de orçamento (2026-11-11)
+Feito a partir dos documentos que a empresa já usava (contrato completo, propostas e a planilha de orçamento).
+Colunas novas: `incluso` em `_orcamento_itens`, `valor_parcelado` em `_obras`, `empresa_representante(_cpf)` em `_config`.
+- **Contrato padrão** = o contrato completo da empresa, com campos: objeto, local, início (`{data_inicio}`, da data
+  prevista), prazo, valor à vista e parcelado (`{condicao_parcelada}`), metragem excedente com autorização (inclusive por
+  WhatsApp), multa 2% + juros 1% + IPCA, suspensão após 15 dias, obrigações das partes, garantia, condições geológicas
+  (obrigação de meio, troca do ponto), rescisão, disposições gerais e foro. Dados bancários do cliente ficaram fora.
+- **Item incluso:** aparece com o valor de referência e "INCLUSO", não soma (transporte, bomba, painel...).
+  "Se necessário" ganha de incluso. Perfuração por faixas de solo: metros previstos = soma das faixas; valor do metro =
+  o da última faixa.
+- **Linhas prontas** com os valores da planilha (6" até 60 m por faixa: 300/290/280/270; excedente 280; gerador 320 e
+  água 300 se necessário) e o botão "Modelo da empresa (60 m)" que põe todas de uma vez. São ponto de partida: cada
+  orçamento ajusta (cliente, cidade, solo).
+- **Orçamento PDF:** à vista × parcelado (cartão) e "Condições gerais" (cliente, risco geológico, metragem adicional,
+  imprevistos no solo, autorização digital).

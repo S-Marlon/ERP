@@ -108,7 +108,7 @@ const formatarObra = (r: any, comRelatorio = false) => {
     titulo: r.titulo || null, servicos: lerServicos(r.servicos), situacao: r.situacao as SituacaoObra, proximas: proximasSituacoes(r.situacao),
     dataPrevisao: r.data_previsao_txt || null, dataInicio: r.data_inicio_txt || null, dataTermino: termino,
     garantiaMeses: garantia, garantiaAte: garantiaAte(termino, garantia), metrosPrevistos: nulo(r.metros_previstos),
-    valorContratado: nulo(r.valor_contratado), valorMetroExcedente: nulo(r.valor_metro_excedente), observacao: r.observacao || null,
+    valorContratado: nulo(r.valor_contratado), valorParcelado: nulo(r.valor_parcelado), valorMetroExcedente: nulo(r.valor_metro_excedente), observacao: r.observacao || null,
     valorSinal: nulo(r.valor_sinal), sinalQuando: r.sinal_quando || 'ANTES',
     escopo: r.escopo || null, prazoExecucaoDias: nulo(r.prazo_execucao_dias), formaPagamento: r.forma_pagamento || null,
     validadeOrcamentoDias: nulo(r.validade_orcamento_dias),
@@ -182,10 +182,10 @@ export const criarObra = async (req: Request, res: Response) => {
     const relatorio = relatorioInicial(cliente, poco, o);
     const [ins]: any = await conn.execute(
       `INSERT INTO modulo_hidraulica_pocos_obras (tenant_id, id_cliente, id_poco, titulo, servicos, situacao, data_previsao, garantia_meses, metros_previstos,
-         valor_contratado, valor_metro_excedente, valor_sinal, sinal_quando, dados_relatorio, observacao, escopo, prazo_execucao_dias, forma_pagamento,
+         valor_contratado, valor_parcelado, valor_metro_excedente, valor_sinal, sinal_quando, dados_relatorio, observacao, escopo, prazo_execucao_dias, forma_pagamento,
          validade_orcamento_dias, operador)
-       VALUES (?, ?, ?, ?, ?, 'ORCAMENTO', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [tenant, o.idCliente, idPoco, o.titulo, o.servicos.join(','), o.dataPrevisao, o.garantiaMeses, o.metrosPrevistos, o.valorContratado,
+       VALUES (?, ?, ?, ?, ?, 'ORCAMENTO', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [tenant, o.idCliente, idPoco, o.titulo, o.servicos.join(','), o.dataPrevisao, o.garantiaMeses, o.metrosPrevistos, o.valorContratado, o.valorParcelado,
         o.valorMetroExcedente, o.valorSinal, o.sinalQuando, JSON.stringify(relatorio), o.observacao, o.escopo, o.prazoExecucaoDias, o.formaPagamento,
         o.validadeOrcamentoDias, operadorDe(req)]
     );
@@ -210,9 +210,9 @@ export const salvarObra = async (req: Request, res: Response) => {
     await conn.beginTransaction();
     await conn.execute(
       `UPDATE modulo_hidraulica_pocos_obras SET id_cliente = ?, id_poco = ?, titulo = ?, servicos = ?, data_previsao = ?, garantia_meses = ?, metros_previstos = ?,
-         valor_contratado = ?, valor_metro_excedente = ?, valor_sinal = ?, sinal_quando = ?, observacao = ?, escopo = ?, prazo_execucao_dias = ?,
+         valor_contratado = ?, valor_parcelado = ?, valor_metro_excedente = ?, valor_sinal = ?, sinal_quando = ?, observacao = ?, escopo = ?, prazo_execucao_dias = ?,
          forma_pagamento = ?, validade_orcamento_dias = ?, operador = ? WHERE id_obra = ? AND tenant_id = ?`,
-      [o.idCliente, o.idPoco, o.titulo, o.servicos.join(','), o.dataPrevisao, o.garantiaMeses, o.metrosPrevistos, o.valorContratado,
+      [o.idCliente, o.idPoco, o.titulo, o.servicos.join(','), o.dataPrevisao, o.garantiaMeses, o.metrosPrevistos, o.valorContratado, o.valorParcelado,
         o.valorMetroExcedente, o.valorSinal, o.sinalQuando, o.observacao, o.escopo, o.prazoExecucaoDias, o.formaPagamento, o.validadeOrcamentoDias,
         operadorDe(req), id, tenant]
     );

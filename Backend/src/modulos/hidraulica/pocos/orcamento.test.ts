@@ -10,7 +10,7 @@ teste('orçamento de poço: itens', () => {
     { grupo: 'REVESTIMENTO', descricao: 'Revestimento geomecânico 6"', quantidade: 48, unidade: 'm', valorUnitario: 95.333 },
     { grupo: 'BOMBA', descricao: 'Bomba submersa 1 cv', quantidade: 1, unidade: 'un', valorUnitario: 2450 },
   ]);
-  assert.deepStrictEqual(itens[0], { grupo: 'PERFURACAO', descricao: 'Perfuração 6"', quantidade: 50, unidade: 'm', valorUnitario: 180, valorTotal: 9000, opcional: false });
+  assert.deepStrictEqual(itens[0], { grupo: 'PERFURACAO', descricao: 'Perfuração 6"', quantidade: 50, unidade: 'm', valorUnitario: 180, valorTotal: 9000, opcional: false, incluso: false });
   assert.strictEqual(itens[2].valorTotal, 4575.98);                                  // 48 × 95,333 = 4.575,984 → 4.575,98
   assert.deepStrictEqual(resumoDosItens(itens), { total: 16025.98, opcionais: 200, metrosPrevistos: 50, valorMetro: 180, valorMetroExcedente: 200 });
   assert.deepStrictEqual(resumoDosItens(itens.filter(i => !i.opcional)).valorMetroExcedente, 180);   // sem item de excedente: o próprio metro
@@ -18,6 +18,25 @@ teste('orçamento de poço: itens', () => {
   assert.throws(() => validarItens([{ descricao: 'x', quantidade: 0 }]), /quantidade/);
   assert.throws(() => validarItens([{ descricao: 'x', unidade: 'cx' }]), /unidade/);
   assert.throws(() => validarItens('x'), /inválidos/);
+});
+
+teste('orçamento de poço: faixas de perfuração e itens inclusos (modelo da empresa)', () => {
+  const itens = validarItens([
+    { grupo: 'SERVICO', descricao: 'Transporte dos equipamentos', quantidade: 1, unidade: 'vb', valorUnitario: 0, incluso: true },
+    { grupo: 'SERVICO', descricao: 'Gerador de energia (se necessário)', quantidade: 1, unidade: 'vb', valorUnitario: 320, opcional: true },
+    { grupo: 'PERFURACAO', descricao: 'Diâm. 6" sedimento superficial (0 a 10 m)', quantidade: 10, unidade: 'm', valorUnitario: 300 },
+    { grupo: 'PERFURACAO', descricao: 'Diâm. 6" sedimento (10 a 30 m)', quantidade: 20, unidade: 'm', valorUnitario: 290 },
+    { grupo: 'PERFURACAO', descricao: 'Diâm. 6" rocha sã (30 a 40 m)', quantidade: 10, unidade: 'm', valorUnitario: 280 },
+    { grupo: 'PERFURACAO', descricao: 'Diâm. 6" rocha consolidada (40 a 60 m)', quantidade: 20, unidade: 'm', valorUnitario: 270 },
+    { grupo: 'REVESTIMENTO', descricao: 'Tubo liso 5"', quantidade: 6, unidade: 'un', valorUnitario: 260, incluso: true },
+    { grupo: 'BOMBA', descricao: 'Bomba submersa', quantidade: 1, unidade: 'un', valorUnitario: 1800, incluso: true, opcional: true },
+    { grupo: 'PERFURACAO', descricao: 'Metro excedente', quantidade: 1, unidade: 'm', valorUnitario: 280, opcional: true },
+  ]);
+  // o total é só a perfuração (R$ 17.000,00, como no orçamento modelo); incluso e "se necessário" não somam
+  const r = resumoDosItens(itens);
+  assert.deepStrictEqual([r.total, r.metrosPrevistos, r.valorMetro, r.valorMetroExcedente], [17000, 60, 270, 280]);
+  assert.strictEqual(itens[6].incluso, true);
+  assert.strictEqual(itens[7].incluso, false);   // "se necessário" ganha de incluso
 });
 
 teste('orçamento de poço: termo aditivo', () => {

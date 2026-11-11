@@ -24,6 +24,8 @@ export const SITUACOES_OBRA: Record<SituacaoObra, { texto: string; cor: string; 
 export interface ObraForm {
   idCliente: number | null; idPoco: number | null; servicos: Servico[]; titulo: string | null; dataPrevisao: string | null;
   garantiaMeses: number | null; metrosPrevistos: number | null; valorContratado: number | null; valorMetroExcedente: number | null; observacao: string | null;
+  /** Total se pago parcelado (cartão), ao lado do à vista; vazio = sem condição parcelada. */
+  valorParcelado?: number | null;
   /** Sinal combinado; ANTES = só começa com o sinal recebido, NO_ATO = pago no dia da perfuração. */
   valorSinal: number | null; sinalQuando: 'ANTES' | 'NO_ATO';
   /** O que vai no orçamento em PDF. */
@@ -429,6 +431,8 @@ export interface ConfigProcesso {
   revisaoMeses: number; horaAbre: string; horaFecha: string; sabadoFecha: string | null; configurado: boolean;
   /** Contrato e aditivo: modelos com {campos} (vazio = modelo padrão), foro e responsável técnico. */
   modeloContrato: string | null; modeloAditivo: string | null; foroCidade: string | null; responsavelTecnico: string | null; registroTecnico: string | null;
+  /** Representante legal da empresa (qualificação da CONTRATADA). */
+  empresaRepresentante: string | null; empresaRepresentanteCpf: string | null;
   /** Telas que só aparecem quando ligadas. */
   usaMonitoramento: boolean; usaMapa: boolean;
 }
@@ -457,6 +461,7 @@ export interface DocumentoObra {
   empresa: ConfigProcesso;
   obra: {
     idObra: number; titulo: string | null; servicos: Servico[]; situacao: SituacaoObra; criadaEm: string; dataInicio: string | null; dataTermino: string | null;
+    dataPrevisao?: string | null; valorParcelado?: number | null;
     metrosPrevistos: number | null; valorContratado: number | null; valorMetroExcedente: number | null; valorSinal: number | null; sinalQuando: 'ANTES' | 'NO_ATO';
     garantiaMeses: number | null; garantiaAte: string | null; escopo: string | null; prazoExecucaoDias: number | null; formaPagamento: string | null;
     validadeOrcamentoDias: number; adicionais: { descricao: string; valor: number }[];
@@ -508,6 +513,8 @@ export interface ItemOrcamentoForm {
   grupo: GrupoItem; descricao: string; quantidade: number; unidade: string; valorUnitario: number; valorTotal: number;
   /** "Se necessário": não entra no total (ex.: metro excedente). */
   opcional: boolean;
+  /** Incluso no pacote: mostra o valor de referência, não entra no total (ex.: transporte, bomba). */
+  incluso?: boolean;
 }
 export interface ResumoItens { total: number; opcionais: number; metrosPrevistos: number | null; valorMetro: number | null; valorMetroExcedente: number | null }
 export interface AdicionalDoAditivo { idAdicional: number; tipo: TipoAdicional; descricao: string; quantidade: number; valorUnitario: number; valor: number; situacao: SituacaoAdicional; aprovadoEm: string | null; idAditivo: number | null }
@@ -548,27 +555,53 @@ export const orcamentoApi = {
 /** Linha do orçamento com o total arredondado (quantidade × valor unitário). */
 export const linhaItem = (i: Omit<ItemOrcamentoForm, 'valorTotal'>): ItemOrcamentoForm =>
   ({ ...i, valorTotal: Math.round((Number(i.quantidade) || 0) * (Number(i.valorUnitario) || 0) * 100) / 100 });
-/** Mesmo cálculo do servidor: total sem os opcionais; metros e metro excedente pela linha de perfuração em metros. */
+/**
+ * Mesmo cálculo do servidor: total sem os opcionais nem os inclusos; perfuração por faixas (0–10 m, 10–30 m...) soma os
+ * metros previstos e o valor do metro é o da última faixa; metro excedente pela linha opcional de perfuração em metros.
+ */
 export const resumoItens = (itens: ItemOrcamentoForm[]): ResumoItens => {
   const c = (v: number) => Math.round(v * 100);
-  const perf = itens.find(i => i.grupo === 'PERFURACAO' && i.unidade === 'm' && !i.opcional);
+  const somam = itens.filter(i => !i.opcional && !i.incluso);
+  const faixas = somam.filter(i => i.grupo === 'PERFURACAO' && i.unidade === 'm');
+  const perf = faixas.length ? { quantidade: faixas.reduce((s, i) => s + i.quantidade, 0), valorUnitario: faixas[faixas.length - 1].valorUnitario } : null;
   const exc = itens.find(i => i.grupo === 'PERFURACAO' && i.unidade === 'm' && i.opcional);
   return {
-    total: itens.filter(i => !i.opcional).reduce((s, i) => s + c(i.valorTotal), 0) / 100,
+    total: somam.reduce((s, i) => s + c(i.valorTotal), 0) / 100,
     opcionais: itens.filter(i => i.opcional).reduce((s, i) => s + c(i.valorTotal), 0) / 100,
     metrosPrevistos: perf ? perf.quantidade : null, valorMetro: perf ? perf.valorUnitario : null,
     valorMetroExcedente: exc ? exc.valorUnitario : perf ? perf.valorUnitario : null,
   };
 };
-/** Linhas prontas para começar um orçamento (o operador ajusta quantidade e valor). */
-export const ITENS_PRONTOS: { rotulo: string; item: Omit<ItemOrcamentoForm, 'valorTotal'> }[] = [
-  { rotulo: 'Perfuração (m × R$)', item: { grupo: 'PERFURACAO', descricao: 'Perfuração do poço', quantidade: 50, unidade: 'm', valorUnitario: 0, opcional: false } },
-  { rotulo: 'Metro excedente', item: { grupo: 'PERFURACAO', descricao: 'Metro excedente (acima do previsto, se necessário)', quantidade: 1, unidade: 'm', valorUnitario: 0, opcional: true } },
-  { rotulo: 'Revestimento', item: { grupo: 'REVESTIMENTO', descricao: 'Tubo de revestimento', quantidade: 50, unidade: 'm', valorUnitario: 0, opcional: false } },
-  { rotulo: 'Bomba', item: { grupo: 'BOMBA', descricao: 'Bomba submersa', quantidade: 1, unidade: 'un', valorUnitario: 0, opcional: false } },
-  { rotulo: 'Instalação', item: { grupo: 'INSTALACAO', descricao: 'Instalação da bomba e do quadro de comando', quantidade: 1, unidade: 'vb', valorUnitario: 0, opcional: false } },
-  { rotulo: 'Materiais', item: { grupo: 'MATERIAL', descricao: 'Materiais (cabo, tubo edutor, conexões)', quantidade: 1, unidade: 'vb', valorUnitario: 0, opcional: false } },
-  { rotulo: 'Teste de vazão', item: { grupo: 'SERVICO', descricao: 'Teste de vazão', quantidade: 1, unidade: 'un', valorUnitario: 0, opcional: false } },
+type LinhaPronta = { rotulo: string; item: Omit<ItemOrcamentoForm, 'valorTotal'> };
+const pronta = (rotulo: string, grupo: GrupoItem, descricao: string, quantidade: number, unidade: string, valorUnitario: number,
+  tipo: 'SOMA' | 'INCLUSO' | 'SE_NECESSARIO' = 'SOMA'): LinhaPronta =>
+  ({ rotulo, item: { grupo, descricao, quantidade, unidade, valorUnitario, opcional: tipo === 'SE_NECESSARIO', incluso: tipo === 'INCLUSO' } });
+
+/**
+ * Linhas prontas do orçamento, com os valores de referência da planilha da empresa (perfuração 6" até 60 m por faixa de
+ * solo, metro excedente a R$ 280, o que vai incluso e o que é "se necessário"). São só o ponto de partida: quantidade e
+ * valor mudam em cada orçamento (cliente, cidade, solo).
+ */
+export const ITENS_PRONTOS: LinhaPronta[] = [
+  pronta('Transporte e montagem', 'SERVICO', 'Transporte e montagem do equipamento', 1, 'vb', 0, 'INCLUSO'),
+  pronta('Alimentação e hospedagem', 'SERVICO', 'Alimentação e hospedagem da equipe', 1, 'vb', 0, 'INCLUSO'),
+  pronta('Gerador (se nec.)', 'SERVICO', 'Uso de gerador de energia (se necessário)', 1, 'vb', 320, 'SE_NECESSARIO'),
+  pronta('Água (se nec.)', 'SERVICO', 'Água para a perfuração (se necessário)', 1, 'vb', 300, 'SE_NECESSARIO'),
+  pronta('Perfuração 0–10 m', 'PERFURACAO', 'Perfuração diâm. 6" · sedimento superficial (0 a 10 m)', 10, 'm', 300),
+  pronta('Perfuração 10–30 m', 'PERFURACAO', 'Perfuração diâm. 6" · sedimento (10 a 30 m)', 20, 'm', 290),
+  pronta('Perfuração 30–40 m', 'PERFURACAO', 'Perfuração diâm. 6" · rocha sã (30 a 40 m)', 10, 'm', 280),
+  pronta('Perfuração 40–60 m', 'PERFURACAO', 'Perfuração diâm. 6" · rocha consolidada (40 a 60 m)', 20, 'm', 270),
+  pronta('Metro excedente', 'PERFURACAO', 'Metro excedente (acima do previsto, se necessário)', 1, 'm', 280, 'SE_NECESSARIO'),
+  pronta('Revestimento 5"', 'REVESTIMENTO', 'Revestimento · tubo liso 5"', 6, 'un', 260, 'INCLUSO'),
+  pronta('Corda de segurança', 'MATERIAL', 'Corda de segurança', 60, 'm', 0, 'INCLUSO'),
+  pronta('Fiação elétrica', 'MATERIAL', 'Fiação elétrica', 60, 'm', 3.8, 'INCLUSO'),
+  pronta('Encanamento 1"', 'MATERIAL', 'Encanamento 1"', 10, 'un', 150, 'INCLUSO'),
+  pronta('Bomba submersa', 'BOMBA', 'Bomba submersa', 1, 'un', 1800, 'INCLUSO'),
+  pronta('Ensaio de vazão', 'SERVICO', 'Ensaio de vazão', 1, 'un', 0, 'INCLUSO'),
+  pronta('Cimentação (se nec.)', 'SERVICO', 'Cimentação do espaço anular (se necessário)', 1, 'vb', 0, 'SE_NECESSARIO'),
+  pronta('Tampa do poço', 'MATERIAL', 'Tampa do poço', 1, 'un', 100, 'INCLUSO'),
+  pronta('Painel elétrico', 'INSTALACAO', 'Painel elétrico', 1, 'un', 700, 'INCLUSO'),
+  pronta('Limpeza do local', 'SERVICO', 'Limpeza do local', 1, 'vb', 0, 'INCLUSO'),
 ];
 
 // ------------------------------------------------------------------ central (painel principal)

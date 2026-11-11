@@ -322,6 +322,8 @@ const Configuracao: React.FC = () => {
               {campo('empresaNome', 'Nome', 12)}{campo('empresaDocumento', 'CNPJ / CPF', 12)}
               {campo('empresaTelefone', 'Telefone', 8)}{campo('empresaWhatsapp', 'WhatsApp', 8)}{campo('empresaEmail', 'E-mail', 8)}
               {campo('empresaEndereco', 'Endereço', 24)}
+              {campo('empresaRepresentante', 'Representante legal (no contrato)', 16, { placeholder: 'Ex.: José Maurício dos Santos' })}
+              {campo('empresaRepresentanteCpf', 'CPF do representante', 8)}
             </Row>
           </Col>
           <Col span={24}><Text>Texto de garantia (orçamento e laudo)</Text>

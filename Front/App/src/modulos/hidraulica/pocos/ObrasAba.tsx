@@ -33,7 +33,7 @@ const pocoVazio = (): PocoForm => ({
 });
 const obraVazia = (): ObraForm => ({
   idCliente: null, idPoco: null, servicos: ['PERFURACAO'], titulo: null, dataPrevisao: null, garantiaMeses: 12, metrosPrevistos: null,
-  valorContratado: null, valorMetroExcedente: null, valorSinal: null, sinalQuando: 'ANTES', observacao: null,
+  valorContratado: null, valorParcelado: null, valorMetroExcedente: null, valorSinal: null, sinalQuando: 'ANTES', observacao: null,
   escopo: null, prazoExecucaoDias: null, formaPagamento: null, validadeOrcamentoDias: null,
 });
 
@@ -186,7 +186,7 @@ const ObraModal: React.FC<{ obra: Obra | 'nova' | null; onFechar: () => void; on
         + `${a.vazaoMediaM3h !== null ? `, vazão média ${a.vazaoMediaM3h} m³/h` : ''}${a.potencial !== null ? `, potencial ${a.potencial.toFixed(0)}` : ''}.`);
     } catch (e) { message.error(e instanceof Error ? e.message : 'Erro.'); }
   };
-  const num = (k: 'metrosPrevistos' | 'valorContratado' | 'valorMetroExcedente' | 'garantiaMeses' | 'valorSinal', props: object) => (
+  const num = (k: 'metrosPrevistos' | 'valorContratado' | 'valorParcelado' | 'valorMetroExcedente' | 'garantiaMeses' | 'valorSinal', props: object) => (
     <InputNumber min={0} style={{ width: '100%' }} decimalSeparator="," value={f[k] ?? undefined} onChange={v => mudar({ [k]: v === null ? null : Number(v) } as any)} {...props} />
   );
   return (
@@ -241,6 +241,7 @@ const ObraModal: React.FC<{ obra: Obra | 'nova' | null; onFechar: () => void; on
         {estimativa && <Alert type="info" showIcon style={{ padding: '4px 10px' }} message={<Text style={{ fontSize: 12 }}>{estimativa}</Text>} closable onClose={() => setEstimativa(null)} />}
         <Row gutter={8}>
           <Col span={6}><Text>Sinal</Text>{num('valorSinal', { prefix: 'R$', precision: 2 })}</Col>
+          <Col span={6}><Tooltip title="Total se pago parcelado no cartão; vazio = só à vista"><Text>Parcelado (cartão)</Text></Tooltip>{num('valorParcelado', { prefix: 'R$', precision: 2 })}</Col>
           <Col span={8}><Text>Quando paga o sinal</Text>
             <Select style={{ width: '100%' }} value={f.sinalQuando} onChange={sinalQuando => mudar({ sinalQuando })} disabled={!f.valorSinal}
               options={[{ value: 'ANTES', label: 'Antes (libera o início)' }, { value: 'NO_ATO', label: 'No ato da perfuração' }]} />

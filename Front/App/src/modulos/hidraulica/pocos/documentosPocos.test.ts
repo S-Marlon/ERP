@@ -12,7 +12,7 @@ const doc: DocumentoObra = {
     empresaEndereco: 'Rua A, 10', logo: null, textoGarantia: 'Cobre a perfuração.\nNão cobre a bomba.', formaPagamentoPadrao: null, validadeOrcamentoDias: 15,
     linkAvaliacao: null, msgAvaliacao: '', msgRevisao: '', respostaLeadMin: 60, orcamentoHoras: 24, avaliacaoDias: 7, revisaoMeses: 11,
     horaAbre: '08:00', horaFecha: '18:00', sabadoFecha: '12:00', configurado: true,
-    modeloContrato: null, modeloAditivo: null, foroCidade: 'Jundiaí', responsavelTecnico: 'Eng. Carlos', registroTecnico: 'CREA 123', usaMonitoramento: false, usaMapa: false,
+    modeloContrato: null, modeloAditivo: null, foroCidade: 'Jundiaí', responsavelTecnico: 'Eng. Carlos', registroTecnico: 'CREA 123', usaMonitoramento: false, usaMapa: false, empresaRepresentante: null, empresaRepresentanteCpf: null,
   },
   obra: {
     idObra: 15, titulo: 'Poço Sítio São José', servicos: ['PERFURACAO', 'INSTALACAO'], situacao: 'CONCLUIDA', criadaEm: '2026-10-01 09:00:00',
@@ -71,6 +71,13 @@ teste('documentos de poço: orçamento com itens (o opcional fica fora do total)
   const h = htmlOrcamento(d, null, '2026-10-24');
   assert.ok(/Total<\/td><td class="n">R\$\s11\.500,00/.test(h), 'total sem o opcional');
   assert.ok(h.includes('se necessário, não incluso no total') && /R\$\s200,00\/m/.test(h));
+  assert.ok(h.includes('Condições gerais') && h.includes('obrigação de meio'));
+  // item incluso: aparece com o valor de referência e "INCLUSO", fora do total
+  const d2 = { ...d, obra: { ...d.obra, valorParcelado: 12000, itens: [...d.obra.itens,
+    { grupo: 'BOMBA' as const, descricao: 'Painel elétrico', quantidade: 1, unidade: 'un', valorUnitario: 700, valorTotal: 700, opcional: false, incluso: true }] } };
+  const h2 = htmlOrcamento(d2, null, '2026-10-24');
+  assert.ok(/Total<\/td><td class="n">R\$\s11\.500,00/.test(h2) && h2.includes('<b>INCLUSO</b>') && /R\$\s700,00/.test(h2));
+  assert.ok(h2.includes('Parcelado (cartão de crédito)') && /R\$\s12\.000,00/.test(h2));
 });
 
 teste('documentos de poço: qualificação e modelo', () => {
@@ -84,7 +91,13 @@ teste('documentos de poço: qualificação e modelo', () => {
 
 teste('documentos de poço: contrato e aditivo', () => {
   const c = htmlContrato(doc, null, '2026-10-24');
-  assert.ok(c.includes('CONTRATO DE PRESTAÇÃO DE SERVIÇOS') && c.includes('<h3>CLÁUSULA 10ª – DO FORO</h3>') && c.includes('comarca de Jundiaí'));
+  assert.ok(c.includes('CONTRATO PARTICULAR DE PRESTAÇÃO DE SERVIÇOS') && c.includes('<h3>CLÁUSULA 11ª – DO FORO</h3>') && c.includes('Comarca de Jundiaí'));
+  assert.ok(c.includes('obrigação de meio') && c.includes('IPCA') && c.includes('data a combinar entre as partes'));
+  // representante da empresa e preço parcelado
+  const c2 = htmlContrato({ ...doc, empresa: { ...doc.empresa, empresaRepresentante: 'José M. Santos', empresaRepresentanteCpf: '12057232859' },
+    obra: { ...doc.obra, valorParcelado: 19000, dataPrevisao: '2026-09-02' } }, null, '2026-10-24');
+  assert.ok(c2.includes('neste ato representada por José M. Santos, CPF nº 120.572.328-59') && c2.includes('terá início em 02/09/2026'));
+  assert.ok(/à vista, ou R\$\s19\.000,00 \(dezenove mil reais\) se parcelado no cartão de crédito/.test(c2));
   assert.ok(/R\$\s20\.160,00 \(vinte mil cento e sessenta reais\)/.test(c), 'total com o adicional e por extenso');
   assert.ok(c.includes('JOSÉ, casado(a)') && c.includes('Jundiaí, 24 de outubro de 2026') && c.includes('Eng. Carlos · CREA 123') && c.includes('Testemunha 2'));
   assert.ok(!/\{[a-z_]+\}/.test(c), 'nenhum campo sobrando');

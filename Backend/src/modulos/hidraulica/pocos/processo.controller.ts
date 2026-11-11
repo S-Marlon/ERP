@@ -39,6 +39,7 @@ export const carregarConfig = async (tenant: number) => {
     modeloContrato: c?.modelo_contrato || null, modeloAditivo: c?.modelo_aditivo || null, foroCidade: c?.foro_cidade || null,
     responsavelTecnico: c?.responsavel_tecnico || null, registroTecnico: c?.registro_tecnico || null,
     usaMonitoramento: !!Number(c?.usa_monitoramento), usaMapa: !!Number(c?.usa_mapa),
+    empresaRepresentante: c?.empresa_representante || null, empresaRepresentanteCpf: c?.empresa_representante_cpf || null,
   };
 };
 export type Config = Awaited<ReturnType<typeof carregarConfig>>;
@@ -73,6 +74,7 @@ export const salvarConfig = async (req: Request, res: Response) => {
       ['avaliacao_dias', c.avaliacaoDias], ['revisao_meses', c.revisaoMeses], ['hora_abre', c.horaAbre], ['hora_fecha', c.horaFecha], ['sabado_fecha', c.sabadoFecha],
       ['modelo_contrato', c.modeloContrato], ['modelo_aditivo', c.modeloAditivo], ['foro_cidade', c.foroCidade], ['responsavel_tecnico', c.responsavelTecnico],
       ['registro_tecnico', c.registroTecnico], ['usa_monitoramento', c.usaMonitoramento ? 1 : 0], ['usa_mapa', c.usaMapa ? 1 : 0],
+      ['empresa_representante', c.empresaRepresentante], ['empresa_representante_cpf', c.empresaRepresentanteCpf],
       ['operador', operadorDe(req)],
     ];
     await pool.execute(
@@ -235,7 +237,8 @@ export const obraDoLead = async (req: Request, res: Response) => {
 const carregarObra = async (tenant: number, id: number) => {
   const [[o]]: any = await pool.execute(
     `SELECT o.*, DATE_FORMAT(o.created_at, '%Y-%m-%d %H:%i:%s') AS criada_txt, DATE_FORMAT(o.data_inicio, '%Y-%m-%d') AS inicio_txt,
-            DATE_FORMAT(o.data_termino, '%Y-%m-%d') AS termino_txt, c.nome AS cliente, c.telefone, po.identificacao AS poco
+            DATE_FORMAT(o.data_termino, '%Y-%m-%d') AS termino_txt, DATE_FORMAT(o.data_previsao, '%Y-%m-%d') AS previsao_txt,
+            c.nome AS cliente, c.telefone, po.identificacao AS poco
      FROM modulo_hidraulica_pocos_obras o LEFT JOIN modulo_hidraulica_pocos_clientes c ON c.id_cliente = o.id_cliente
      LEFT JOIN modulo_hidraulica_pocos_pocos po ON po.id_poco = o.id_poco WHERE o.id_obra = ? AND o.tenant_id = ?`, [id, tenant]);
   if (!o) throw new ErroObra('Obra não encontrada.', 404);
@@ -464,13 +467,14 @@ export const dadosDoDocumento = async (req: Request, res: Response) => {
       empresa: cfg,
       obra: {
         idObra: Number(o.id_obra), titulo: o.titulo || null, servicos: lerServicos(o.servicos), situacao: o.situacao, criadaEm: o.criada_txt,
-        dataInicio: o.inicio_txt || null, dataTermino: o.termino_txt || null, metrosPrevistos: nulo(o.metros_previstos), valorContratado: nulo(o.valor_contratado),
+        dataPrevisao: o.previsao_txt || null, dataInicio: o.inicio_txt || null, dataTermino: o.termino_txt || null, metrosPrevistos: nulo(o.metros_previstos),
+        valorContratado: nulo(o.valor_contratado), valorParcelado: nulo(o.valor_parcelado),
         valorMetroExcedente: nulo(o.valor_metro_excedente), valorSinal: nulo(o.valor_sinal), sinalQuando: o.sinal_quando, garantiaMeses: nulo(o.garantia_meses),
         garantiaAte: garantiaAte(o.termino_txt || null, nulo(o.garantia_meses)), escopo: o.escopo || null, prazoExecucaoDias: nulo(o.prazo_execucao_dias),
         formaPagamento: o.forma_pagamento || cfg.formaPagamentoPadrao, validadeOrcamentoDias: nulo(o.validade_orcamento_dias) ?? cfg.validadeOrcamentoDias,
         adicionais: adic.map((a: any) => ({ descricao: a.descricao, valor: Number(a.valor) })),
         itens: itens.map((i: any) => ({ grupo: i.grupo, descricao: i.descricao, quantidade: Number(i.quantidade), unidade: i.unidade,
-          valorUnitario: Number(i.valor_unitario), valorTotal: Number(i.valor_total), opcional: !!i.opcional })),
+          valorUnitario: Number(i.valor_unitario), valorTotal: Number(i.valor_total), opcional: !!i.opcional, incluso: !!i.incluso })),
         contratoAssinadoEm: contrato?.em || null,
       },
       cliente: cli ? {
