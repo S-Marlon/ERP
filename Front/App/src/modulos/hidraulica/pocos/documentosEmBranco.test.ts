@@ -20,6 +20,9 @@ teste('modelos em branco do kit de visita', () => {
   }
   const p = htmlEmBranco('PROPOSTA', empresa, null);
   assert.ok(p.includes('Metragem base') && /R\$\s280,00/.test(p), 'excedente de referência da planilha');
+  assert.ok(!p.includes('opção B') && !/R\$\s18\.000,00/.test(p), 'uma opção só, em branco');
+  const comPadrao = htmlEmBranco('PROPOSTA', empresa, null, { metros: 60, valorVista: 18000, valorParcelado: 19000 });
+  assert.ok(comPadrao.includes('<b>60 m</b>') && /<b>R\$\s18\.000,00<\/b>/.test(comPadrao) && /<b>R\$\s19\.000,00<\/b>/.test(comPadrao));
   const t = htmlEmBranco('TABELA', empresa, null);
   assert.ok(t.includes('rocha consolidada (40 a 60 m)') && t.includes('class="pill">Incluso') && /R\$\s1\.800,00/.test(t));
   const c = htmlEmBranco('CONTRATO', empresa, null);

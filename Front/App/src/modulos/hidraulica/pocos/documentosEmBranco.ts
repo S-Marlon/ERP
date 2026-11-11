@@ -11,7 +11,7 @@ import {
 export type ModeloBranco = 'PROPOSTA' | 'TABELA' | 'CONTRATO' | 'AUTORIZACAO';
 
 export const MODELOS_BRANCO: { id: ModeloBranco; titulo: string; descricao: string }[] = [
-  { id: 'PROPOSTA', titulo: 'Proposta comercial', descricao: 'Para negociar na visita: cliente, local, metragem base com duas opções de valor, motobomba, prazo, pagamento e condições gerais.' },
+  { id: 'PROPOSTA', titulo: 'Proposta comercial', descricao: 'Uma folha: cliente, local, metragem base e valor (em branco ou com o padrão), motobomba, prazo, pagamento e condições gerais.' },
   { id: 'TABELA', titulo: 'Tabela de preços de referência', descricao: 'Os itens da planilha da empresa com o valor de referência; quantidade e total em branco para calcular com o cliente.' },
   { id: 'CONTRATO', titulo: 'Contrato em branco', descricao: 'O contrato da configuração com os dados do cliente, valores e datas em linhas para preencher.' },
   { id: 'AUTORIZACAO', titulo: 'Autorização de metragem adicional', descricao: 'Para o cliente assinar na obra quando for preciso perfurar além do contratado.' },
@@ -41,18 +41,22 @@ const localData = () => `<p class="local-data">${L(22)}, ____ de ${L(14)} de ___
 /** Valor de referência do metro excedente (da planilha da empresa). */
 const excedenteReferencia = () => ITENS_PRONTOS.find(p => p.item.opcional && p.item.grupo === 'PERFURACAO')?.item.valorUnitario || null;
 
-const proposta = (e: ConfigProcesso, logo: string | null) => {
+/** Proposta já com o pacote padrão da empresa (ex.: 60 m · R$ 18.000 à vista · R$ 19.000 parcelado); sem ele, em branco. */
+export interface PadraoProposta { metros: number | null; valorVista: number | null; valorParcelado: number | null }
+export const PADRAO_PROPOSTA: PadraoProposta = { metros: 60, valorVista: 18000, valorParcelado: 19000 };
+
+const proposta = (e: ConfigProcesso, logo: string | null, padrao?: PadraoProposta | null) => {
   const exc = excedenteReferencia();
+  const metros = padrao?.metros ? `<b>${padrao.metros} m</b>` : `${L(6)} m`;
+  const valor = (v: number | null | undefined) => (v ? `<b>${brl(v)}</b>` : `R$ ${L(11)}`);
   return pagina('Proposta comercial', `<div class="compacta">${cabecalho({ empresa: e }, logo, { tipo: 'Proposta comercial', numero: `Nº ${L(6)}`, data: `Data: ${DATA}` })}
     <h1>Proposta comercial · perfuração de poço artesiano</h1>
     <div class="sub">Prestação de serviços de perfuração de poço tubular profundo</div>
     ${fichaClienteCurta()}
     <h2><span class="n">1</span>Escopo e investimento</h2>
     <table class="itens"><tr><th>Descrição do serviço</th><th class="n">Metragem base</th><th class="n">Valor à vista</th><th class="n">Valor parcelado</th></tr>
-      <tr><td>Perfuração de poço artesiano · opção A<br><span class="nota">Inclui os materiais da metragem base e o teste de vazão.</span></td>
-        <td class="n">${L(6)} m</td><td class="n">R$ ${L(11)}</td><td class="n">R$ ${L(11)}</td></tr>
-      <tr><td>Perfuração de poço artesiano · opção B<br><span class="nota">Inclui os materiais da metragem base e o teste de vazão.</span></td>
-        <td class="n">${L(6)} m</td><td class="n">R$ ${L(11)}</td><td class="n">R$ ${L(11)}</td></tr>
+      <tr><td>Perfuração de poço artesiano<br><span class="nota">Inclui os materiais da metragem base e o teste de vazão.</span></td>
+        <td class="n">${metros}</td><td class="n">${valor(padrao?.valorVista)}</td><td class="n">${valor(padrao?.valorParcelado)}</td></tr>
     </table>
     <div class="ficha branco" style="margin-top:3mm">
       ${celula('Conjunto motobomba', `${caixa}Incluso ${caixa}Não incluso ${caixa}À parte R$ ${L(7)}`)}
@@ -134,8 +138,8 @@ const autorizacao = (e: ConfigProcesso, logo: string | null) => pagina('Autoriza
   ${blocoAssinaturas([{ nome: '', papel: 'Cliente · nome e assinatura' }, { nome: escapar(e.empresaNome || ''), papel: 'Responsável pela obra' }])}`);
 
 /** Página HTML do modelo em branco (com a impressão automática, como os outros documentos). */
-export const htmlEmBranco = (id: ModeloBranco, empresa: ConfigProcesso, logo: string | null) =>
-  ({ PROPOSTA: proposta, TABELA: tabela, CONTRATO: contrato, AUTORIZACAO: autorizacao }[id](empresa, logo));
+export const htmlEmBranco = (id: ModeloBranco, empresa: ConfigProcesso, logo: string | null, padrao?: PadraoProposta | null) =>
+  (id === 'PROPOSTA' ? proposta(empresa, logo, padrao) : { TABELA: tabela, CONTRATO: contrato, AUTORIZACAO: autorizacao }[id](empresa, logo));
 
 /** Para a pré-visualização: a mesma página sem abrir a impressão sozinha. */
 export const semImpressao = (html: string) => html.replace(/<script>[\s\S]*?<\/script>/g, '');
