@@ -223,3 +223,7 @@ Colunas novas: `incluso` em `_orcamento_itens`, `valor_parcelado` em `_obras`, `
 - **Kit de visita** (Mais ferramentas e botão na Central): proposta comercial, tabela de preços de referência (itens da
   planilha), contrato do modelo configurado e autorização de metragem adicional, em branco para preencher à mão na
   visita; pré-visualização A4 de cada um e "imprimir os marcados" numa impressão só (`documentosEmBranco.ts`).
+- **Kit preenchido** (2026-11-11): cada modelo do kit sai "em branco" ou "preenchida". Preenchida mostra os campos
+  (`camposKit.ts`, marcação ⟦chave⟧ nos modelos); o que falta fica amarelo na pré-visualização e o campo em edição em
+  amarelo forte (só na tela); o vazio sai em linha para preencher à mão. Os valores valem para todos os modelos da
+  visita; valor por extenso, totais da tabela e total da autorização saem calculados. Proposta tem o atalho do padrão.

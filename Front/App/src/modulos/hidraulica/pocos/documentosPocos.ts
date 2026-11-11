@@ -86,6 +86,7 @@ const ESTILO = `<style>
   .campo { display: inline-block; border-bottom: 1px solid #6b7280; height: 4.3mm; vertical-align: bottom; max-width: 100%; }
   .caixa { display: inline-block; width: 3.3mm; height: 3.3mm; border: 1px solid #374151; border-radius: .6mm; vertical-align: -.5mm; margin: 0 1mm 0 3mm; }
   .caixa:first-child { margin-left: 0; }
+  .caixa.marcada { background: var(--a); box-shadow: inset 0 0 0 .55mm #fff; }   /* opção escolhida no modelo preenchido */
   .rodape { margin-top: 8mm; padding-top: 2mm; border-top: 1px solid var(--b); font-size: 7.5pt; color: var(--m); text-align: center; }
   /* documento de uma folha só (proposta "basicão"): menos respiro entre as partes */
   .compacta .topo { margin-bottom: 3.5mm; padding-bottom: 3mm; }

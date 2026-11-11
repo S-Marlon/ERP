@@ -1,13 +1,17 @@
-// Kit de visita: os modelos em branco (proposta, tabela de preços, contrato, autorização de metragem adicional) com a
-// pré-visualização A4 de cada um; marca os que vai levar e imprime todos de uma vez (ou só o que está vendo).
-import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Card, Checkbox, Col, Empty, Flex, InputNumber, Row, Segmented, Space, Typography, message } from 'antd';
-import { PrinterOutlined, SettingOutlined } from '@ant-design/icons';
-import { ConfigProcesso, processoApi, urlArquivo } from './obrasApi';
-import { htmlEmBranco, juntarPaginas, ModeloBranco, MODELOS_BRANCO, PADRAO_PROPOSTA, PadraoProposta, semImpressao } from './documentosEmBranco';
+// Kit de visita: os modelos (proposta, tabela de preços, contrato, autorização de metragem adicional), cada um em branco
+// ou preenchido com o que o vendedor já sabe. Preenchido, a pré-visualização marca de amarelo o que falta e em amarelo
+// forte o campo que está sendo editado; o que ficar vazio sai como linha para preencher à mão. Os valores valem para
+// todos os modelos da visita. Marca os que vai levar e imprime todos de uma vez (ou só o que está vendo).
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Button, Card, Checkbox, Col, Flex, Input, InputNumber, Row, Segmented, Select, Space, Tag, Typography, message } from 'antd';
+import { ClearOutlined, PrinterOutlined, SettingOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { ConfigProcesso, ITENS_PRONTOS, processoApi, urlArquivo } from './obrasApi';
+import { CAMPOS_DO_MODELO, htmlEmBranco, juntarPaginas, ModeloBranco, MODELOS_BRANCO, PADRAO_PROPOSTA, semImpressao } from './documentosEmBranco';
+import { campoDe, camposVazios, destaquePrevia, ValoresKit } from './camposKit';
 import { navPocos } from './navPocos';
 
 const { Text } = Typography;
+type Modo = 'BRANCO' | 'PREENCHIDA';
 
 const imprimir = (html: string) => {
   const w = window.open('', '_blank');
@@ -15,34 +19,62 @@ const imprimir = (html: string) => {
   w.document.open(); w.document.write(html); w.document.close();
 };
 
-// O pacote padrão da proposta fica lembrado neste navegador (é só uma comodidade: vale o que estiver na tela)
-const CHAVE_PADRAO = 'pocos.kit.padraoProposta';
-const lerPadrao = (): { usar: boolean; valores: PadraoProposta } => {
-  try { const s = JSON.parse(localStorage.getItem(CHAVE_PADRAO) || 'null'); if (s?.valores) return s; } catch { /* sem armazenamento */ }
-  return { usar: false, valores: PADRAO_PROPOSTA };
+const rotuloDoCampo = (k: string) => {
+  const m = /^qtd_(\d+)$/.exec(k);
+  if (m) { const p = ITENS_PRONTOS[Number(m[1])]; return p ? `${p.rotulo} (${p.item.unidade})` : k; }
+  return campoDe(k)?.rotulo || k;
 };
-const guardarPadrao = (p: { usar: boolean; valores: PadraoProposta }) => { try { localStorage.setItem(CHAVE_PADRAO, JSON.stringify(p)); } catch { /* sem armazenamento */ } };
+
+/** O campo do formulário conforme o tipo; o foco diz qual destacar na pré-visualização. */
+const EntradaCampo: React.FC<{ chave: string; valor: ValoresKit[string]; onChange: (v: ValoresKit[string]) => void; onFoco: (k: string | null) => void }> = ({ chave, valor, onChange, onFoco }) => {
+  const c = campoDe(chave)!;
+  const foco = { onFocus: () => onFoco(chave), onBlur: () => onFoco(null) };
+  if (c.tipo === 'longo') return <Input.TextArea size="small" autoSize={{ minRows: 2, maxRows: 5 }} value={(valor as string) || ''} onChange={e => onChange(e.target.value)} {...foco} />;
+  if (c.tipo === 'escolha') {
+    return <Select size="small" allowClear style={{ width: '100%' }} value={(valor as string) || undefined} onChange={v => onChange(v ?? null)} options={c.opcoes?.map(o => ({ value: o.valor, label: o.rotulo }))} {...foco} />;
+  }
+  if (c.tipo === 'numero' || c.tipo === 'moeda') {
+    return <InputNumber size="small" min={0} style={{ width: '100%' }} value={valor === null || valor === undefined || valor === '' ? null : Number(valor)}
+      prefix={c.tipo === 'moeda' ? 'R$' : undefined} suffix={c.sufixo} decimalSeparator="," onChange={v => onChange(v === null ? null : Number(v))} {...foco} />;
+  }
+  if (c.tipo === 'data' || c.tipo === 'extenso_data') return <Input size="small" type="date" value={(valor as string) || ''} onChange={e => onChange(e.target.value || null)} {...foco} />;
+  return <Input size="small" allowClear placeholder={c.dica} value={(valor as string) || ''} onChange={e => onChange(e.target.value)} {...foco} />;
+};
 
 const KitVisita: React.FC = () => {
   const [cfg, setCfg] = useState<ConfigProcesso | null>(null);
   const [vendo, setVendo] = useState<ModeloBranco>('PROPOSTA');
   const [marcados, setMarcados] = useState<ModeloBranco[]>(['PROPOSTA', 'TABELA']);
-  const [padrao, setPadrao] = useState(lerPadrao);
+  const [modos, setModos] = useState<Record<ModeloBranco, Modo>>({ PROPOSTA: 'BRANCO', TABELA: 'BRANCO', CONTRATO: 'BRANCO', AUTORIZACAO: 'BRANCO' });
+  const [valores, setValores] = useState<ValoresKit>({});
+  const [ativo, setAtivo] = useState<string | null>(null);
+  const quadro = useRef<HTMLIFrameElement>(null);
   useEffect(() => { processoApi.config().then(setCfg).catch(e => message.error(e.message)); }, []);
-  useEffect(() => guardarPadrao(padrao), [padrao]);
 
   const logo = cfg ? urlArquivo(cfg.logo) : null;
-  const pacote = padrao.usar ? padrao.valores : null;
-  const html = (id: ModeloBranco) => htmlEmBranco(id, cfg!, logo, pacote);
-  const previa = useMemo(() => (cfg ? semImpressao(htmlEmBranco(vendo, cfg, logo, pacote)) : ''), [cfg, vendo, logo, pacote]);
-  const valor = (k: keyof PadraoProposta, rotulo: string, props: object) => (
-    <div style={{ flex: 1 }}><Text type="secondary" style={{ fontSize: 11 }}>{rotulo}</Text>
-      <InputNumber size="small" min={0} style={{ width: '100%' }} value={padrao.valores[k]} {...props}
-        onChange={v => setPadrao(p => ({ ...p, valores: { ...p.valores, [k]: v === null ? null : Number(v) } }))} /></div>
-  );
+  const html = (id: ModeloBranco) => htmlEmBranco(id, cfg!, logo, modos[id] === 'PREENCHIDA' ? valores : null);
+  const preenchida = modos[vendo] === 'PREENCHIDA';
+  const previa = useMemo(() => (cfg ? destaquePrevia(semImpressao(htmlEmBranco(vendo, cfg, logo, preenchida ? valores : null)), preenchida ? ativo : null, preenchida) : ''),
+    [cfg, vendo, logo, preenchida, valores, ativo]);
+
+  // escreve a página no quadro sem recarregar o endereço; segura a rolagem e leva até o campo em edição
+  useEffect(() => {
+    const doc = quadro.current?.contentDocument;
+    if (!doc || !previa) return;
+    const rolagem = doc.scrollingElement?.scrollTop || 0;
+    doc.open(); doc.write(previa); doc.close();
+    const alvo = ativo && preenchida ? doc.querySelector(`[data-campo="${ativo}"]`) : null;
+    if (alvo) alvo.scrollIntoView({ block: 'center' });
+    else if (doc.scrollingElement) doc.scrollingElement.scrollTop = rolagem;
+  }, [previa]);   // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!cfg) return <Card loading />;
 
   const marcar = (id: ModeloBranco, sim: boolean) => setMarcados(m => (sim ? MODELOS_BRANCO.map(x => x.id).filter(x => x === id || m.includes(x)) : m.filter(x => x !== id)));
+  const mudar = (k: string, v: ValoresKit[string]) => setValores(a => ({ ...a, [k]: v }));
+  const chavesDe = (id: ModeloBranco) => CAMPOS_DO_MODELO[id].flatMap(g => g.chaves);
+  const titulo = MODELOS_BRANCO.find(m => m.id === vendo)?.titulo;
+
   return (
     <Space direction="vertical" size={12} style={{ width: '100%' }}>
       {!cfg.configurado && (
@@ -50,52 +82,74 @@ const KitVisita: React.FC = () => {
           action={<Button size="small" icon={<SettingOutlined />} onClick={() => navPocos.ir({ aba: 'atendimento', subvista: 'CONFIG' })}>Preencher</Button>} />
       )}
       <Row gutter={[12, 12]}>
-        <Col xs={24} lg={8}>
+        <Col xs={24} lg={9}>
           <Space direction="vertical" size={8} style={{ width: '100%' }}>
-            <Text type="secondary">Marque o que vai levar na visita. Clique num modelo para ver como ele sai na folha.</Text>
-            {MODELOS_BRANCO.map(m => (
-              <Card key={m.id} size="small" hoverable onClick={() => setVendo(m.id)}
-                style={{ borderColor: vendo === m.id ? '#1677ff' : undefined, background: vendo === m.id ? '#f0f7ff' : undefined }}>
-                <Flex gap={10} align="start">
-                  <Checkbox checked={marcados.includes(m.id)} onClick={e => e.stopPropagation()} onChange={e => marcar(m.id, e.target.checked)} />
-                  <div style={{ flex: 1 }}>
-                    <Text strong>{m.titulo}</Text>
-                    <div><Text type="secondary" style={{ fontSize: 12 }}>{m.descricao}</Text></div>
-                    {m.id === 'PROPOSTA' && (
+            <Text type="secondary">Marque o que vai levar. Cada modelo sai em branco ou preenchido com o que você já sabe; o que ficar vazio sai em linha para preencher à mão.</Text>
+            {MODELOS_BRANCO.map(m => {
+              const faltam = modos[m.id] === 'PREENCHIDA' ? camposVazios(chavesDe(m.id), valores) : 0;
+              return (
+                <Card key={m.id} size="small" hoverable onClick={() => setVendo(m.id)} styles={{ body: { padding: 10 } }}
+                  style={{ borderColor: vendo === m.id ? '#1677ff' : undefined, background: vendo === m.id ? '#f0f7ff' : undefined }}>
+                  <Flex gap={10} align="start">
+                    <Checkbox checked={marcados.includes(m.id)} onClick={e => e.stopPropagation()} onChange={e => marcar(m.id, e.target.checked)} />
+                    <div style={{ flex: 1 }}>
+                      <Flex justify="space-between" align="center" gap={6}>
+                        <Text strong>{m.titulo}</Text>
+                        {modos[m.id] === 'PREENCHIDA' && (faltam ? <Tag color="gold" style={{ margin: 0 }}>faltam {faltam}</Tag> : <Tag color="green" style={{ margin: 0 }}>completo</Tag>)}
+                      </Flex>
+                      <div><Text type="secondary" style={{ fontSize: 12 }}>{m.descricao}</Text></div>
                       <div onClick={e => e.stopPropagation()} style={{ marginTop: 6 }}>
-                        <Segmented size="small" block value={padrao.usar ? 'PADRAO' : 'BRANCO'}
-                          onChange={v => { setPadrao(p => ({ ...p, usar: v === 'PADRAO' })); setVendo('PROPOSTA'); }}
-                          options={[{ value: 'BRANCO', label: 'Em branco' }, { value: 'PADRAO', label: 'Com o padrão' }]} />
-                        {padrao.usar && (
-                          <Flex gap={6} style={{ marginTop: 6 }}>
-                            {valor('metros', 'Metragem', { suffix: 'm', max: 1000 })}
-                            {valor('valorVista', 'À vista', { prefix: 'R$', step: 500 })}
-                            {valor('valorParcelado', 'Parcelado', { prefix: 'R$', step: 500 })}
-                          </Flex>
-                        )}
+                        <Segmented size="small" block value={modos[m.id]} options={[{ value: 'BRANCO', label: 'Em branco' }, { value: 'PREENCHIDA', label: 'Preenchida' }]}
+                          onChange={v => { setModos(a => ({ ...a, [m.id]: v as Modo })); setVendo(m.id); }} />
                       </div>
-                    )}
-                  </div>
-                </Flex>
-              </Card>
-            ))}
-            <Button type="primary" block icon={<PrinterOutlined />} disabled={!marcados.length}
-              onClick={() => imprimir(juntarPaginas(marcados.map(html)))}>
+                    </div>
+                  </Flex>
+                </Card>
+              );
+            })}
+            <Button type="primary" block icon={<PrinterOutlined />} disabled={!marcados.length} onClick={() => imprimir(juntarPaginas(marcados.map(html)))}>
               Imprimir os marcados ({marcados.length})
             </Button>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              Os valores da tabela e o metro excedente da proposta vêm da planilha da empresa; o contrato segue o modelo da configuração.
-            </Text>
+
+            {preenchida && (
+              <Card size="small" title={`Preencher · ${titulo}`}
+                extra={<Space size={4}>
+                  {vendo === 'PROPOSTA' && (
+                    <Button size="small" icon={<ThunderboltOutlined />} onClick={() => setValores(a => ({ ...a, ...PADRAO_PROPOSTA }))}>Padrão 60 m · R$ 18.000</Button>
+                  )}
+                  <Button size="small" icon={<ClearOutlined />} onClick={() => setValores(a => ({ ...a, ...Object.fromEntries(chavesDe(vendo).map(k => [k, null])) }))}>Limpar</Button>
+                </Space>}>
+                <Space direction="vertical" size={10} style={{ width: '100%' }}>
+                  {CAMPOS_DO_MODELO[vendo].map(g => (
+                    <div key={g.grupo}>
+                      <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>{g.grupo}</Text>
+                      <Row gutter={[8, 6]} style={{ marginTop: 2 }}>
+                        {g.chaves.map(k => {
+                          const c = campoDe(k)!;
+                          const largo = c.tipo === 'longo' || (c.tipo === 'texto' && c.largura === 0) || c.largura >= 60;
+                          return (
+                            <Col key={k} span={largo ? 24 : 12}>
+                              <Text style={{ fontSize: 12, background: ativo === k ? '#ffca28' : undefined, padding: '0 2px', borderRadius: 2 }}>{rotuloDoCampo(k)}</Text>
+                              <EntradaCampo chave={k} valor={valores[k]} onChange={v => mudar(k, v)} onFoco={setAtivo} />
+                            </Col>
+                          );
+                        })}
+                      </Row>
+                    </div>
+                  ))}
+                  <Text type="secondary" style={{ fontSize: 12 }}>O que você preenche vale para todos os modelos desta visita (o cliente da proposta já aparece no contrato).</Text>
+                </Space>
+              </Card>
+            )}
           </Space>
         </Col>
-        <Col xs={24} lg={16}>
-          <Card size="small" title={`Pré-visualização (A4) · ${MODELOS_BRANCO.find(m => m.id === vendo)?.titulo}`}
+        <Col xs={24} lg={15}>
+          <Card size="small"
+            title={<Space>{`Pré-visualização (A4) · ${titulo}`}{preenchida && <Tag color="gold" style={{ margin: 0 }}>amarelo = falta preencher</Tag>}</Space>}
             extra={<Button icon={<PrinterOutlined />} onClick={() => imprimir(html(vendo))}>Imprimir este</Button>}
-            styles={{ body: { padding: 8, background: '#e5e7eb' } }}>
-            {previa
-              ? <iframe title="Pré-visualização do modelo" srcDoc={previa}
-                style={{ width: '100%', maxWidth: 820, height: '78vh', display: 'block', margin: '0 auto', border: '1px solid #d1d5db', background: '#fff' }} />
-              : <Empty />}
+            styles={{ body: { padding: 8, background: '#e5e7eb', position: 'sticky', top: 0 } }}>
+            <iframe ref={quadro} title="Pré-visualização do modelo"
+              style={{ width: '100%', maxWidth: 860, height: '80vh', display: 'block', margin: '0 auto', border: '1px solid #d1d5db', background: '#e5e7eb' }} />
           </Card>
         </Col>
       </Row>
