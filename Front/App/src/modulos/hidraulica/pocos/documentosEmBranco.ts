@@ -5,7 +5,7 @@ import type { ConfigProcesso } from './obrasApi';
 import { ITENS_PRONTOS } from './obrasApi';
 import {
   blocoAssinaturas, brl, cabecalho, celula, CONDICOES_ORCAMENTO, escapar, listaCondicoes, modeloEmHtml, MODELO_CONTRATO_PADRAO, pagina,
-  qualificacaoEmpresa,
+  qualificacaoEmpresa, RODAPE_PAGINAS, RODAPE_VISTO,
 } from './documentosPocos';
 
 export type ModeloBranco = 'PROPOSTA' | 'TABELA' | 'CONTRATO' | 'AUTORIZACAO';
@@ -30,6 +30,12 @@ const fichaCliente = () => `<div class="ficha branco">
   ${celula('Cidade / UF', LINHA)}${celula('Referência / GPS', LINHA)}
 </div>`;
 
+/** Proposta "basicão" (uma folha): só o essencial do cliente. */
+const fichaClienteCurta = () => `<div class="ficha branco">
+  ${celula('Cliente (contratante)', LINHA)}${celula('CPF / CNPJ', LINHA)}
+  ${celula('Local da obra (endereço e cidade)', LINHA)}${celula('Telefone / WhatsApp', LINHA)}
+</div>`;
+
 const localData = () => `<p class="local-data">${L(22)}, ____ de ${L(14)} de ________.</p>`;
 
 /** Valor de referência do metro excedente (da planilha da empresa). */
@@ -37,10 +43,10 @@ const excedenteReferencia = () => ITENS_PRONTOS.find(p => p.item.opcional && p.i
 
 const proposta = (e: ConfigProcesso, logo: string | null) => {
   const exc = excedenteReferencia();
-  return pagina('Proposta comercial', `${cabecalho({ empresa: e }, logo, { tipo: 'Proposta comercial', numero: `Nº ${L(6)}`, data: `Data: ${DATA}` })}
-    <h1>Proposta comercial de prestação de serviços</h1>
-    <div class="sub">Perfuração de poço tubular profundo (poço artesiano)</div>
-    ${fichaCliente()}
+  return pagina('Proposta comercial', `<div class="compacta">${cabecalho({ empresa: e }, logo, { tipo: 'Proposta comercial', numero: `Nº ${L(6)}`, data: `Data: ${DATA}` })}
+    <h1>Proposta comercial · perfuração de poço artesiano</h1>
+    <div class="sub">Prestação de serviços de perfuração de poço tubular profundo</div>
+    ${fichaClienteCurta()}
     <h2><span class="n">1</span>Escopo e investimento</h2>
     <table class="itens"><tr><th>Descrição do serviço</th><th class="n">Metragem base</th><th class="n">Valor à vista</th><th class="n">Valor parcelado</th></tr>
       <tr><td>Perfuração de poço artesiano · opção A<br><span class="nota">Inclui os materiais da metragem base e o teste de vazão.</span></td>
@@ -57,14 +63,13 @@ const proposta = (e: ConfigProcesso, logo: string | null) => {
     <h2><span class="n">2</span>Forma de pagamento</h2>
     <div class="ficha branco">
       ${celula('Sinal / entrada', `${L(4)}% = R$ ${L(11)} &nbsp; ${caixa}na assinatura ${caixa}na chegada do maquinário`, true)}
-      ${celula('Saldo', `R$ ${L(11)} &nbsp; ${caixa}ao final dos trabalhos ${caixa}parcelado em ${L(3)}× de R$ ${L(9)} no cartão`, true)}
+      ${celula('Saldo', `R$ ${L(11)} &nbsp; ${caixa}ao final dos trabalhos ${caixa}parcelado em ${L(3)}× de R$ ${L(9)} no cartão <small>(com o repasse das taxas da maquininha)</small>`, true)}
     </div>
-    <p class="nota">Parcelamentos no cartão de crédito podem ter o repasse das taxas da maquininha.</p>
     <h2><span class="n">3</span>Observações da negociação</h2>
-    <p>${LINHA}</p><p>${LINHA}</p><p>${LINHA}</p>
-    <h2><span class="n">4</span>Condições gerais</h2>${listaCondicoes(CONDICOES_ORCAMENTO)}
+    <p>${LINHA}</p><p>${LINHA}</p>
+    <h2><span class="n">4</span>Condições gerais</h2>${listaCondicoes(CONDICOES_ORCAMENTO.filter(t => !t.startsWith('Metragem adicional')))}
     ${localData()}
-    ${blocoAssinaturas([{ nome: escapar(e.empresaNome || 'Empresa'), papel: 'Contratada' }, { nome: '', papel: 'Cliente · nome e assinatura' }])}`);
+    ${blocoAssinaturas([{ nome: escapar(e.empresaNome || 'Empresa'), papel: 'Contratada' }, { nome: '', papel: 'Cliente · nome e assinatura' }])}</div>`);
 };
 
 const tabela = (e: ConfigProcesso, logo: string | null) => {
@@ -101,11 +106,11 @@ const contrato = (e: ConfigProcesso, logo: string | null) => {
     cidade_data: `${e.foroCidade || L(20)}, ____ de ${L(16)} de ________`, data_contrato: DATA,
   };
   const corpo = modeloEmHtml(e.modeloContrato || MODELO_CONTRATO_PADRAO, campos, { tabela_itens: '' });
-  return pagina('Contrato em branco', `${cabecalho({ empresa: e }, logo, { tipo: 'Contrato', numero: `Nº ${L(6)}`, data: `Data: ${DATA}` })}<div class="contrato">${corpo}</div>
+  return pagina('Contrato em branco', `<div class="pagina-contrato">${cabecalho({ empresa: e }, logo, { tipo: 'Contrato', numero: `Nº ${L(6)}`, data: `Data: ${DATA}` })}<div class="contrato" style="text-align:left">${corpo}</div>
     ${blocoAssinaturas([
       { nome: escapar(e.empresaNome || ''), papel: `CONTRATADA${e.empresaRepresentante ? `<br>${escapar(e.empresaRepresentante)}` : ''}` },
       { nome: '', papel: 'CONTRATANTE · nome e assinatura' }, { nome: '', papel: 'Testemunha 1 · nome e CPF' }, { nome: '', papel: 'Testemunha 2 · nome e CPF' },
-    ], true)}`);
+    ], true)}</div>`, RODAPE_VISTO + RODAPE_PAGINAS);
 };
 
 const autorizacao = (e: ConfigProcesso, logo: string | null) => pagina('Autorização de metragem adicional', `${cabecalho({ empresa: e }, logo,
@@ -140,5 +145,6 @@ export const juntarPaginas = (htmls: string[]) => {
   if (htmls.length <= 1) return htmls[0] || '';
   const corpo = (h: string) => semImpressao(h).match(/<body[^>]*>([\s\S]*)<\/body>/)?.[1] || '';
   const juntas = htmls.map((h, i) => `<div style="${i ? 'break-before: page; page-break-before: always;' : ''}">${corpo(h)}</div>`).join('');
-  return pagina(`Kit de visita (${htmls.length} documentos)`, juntas);
+  // impressos juntos, o contrato mantém o visto em todas as folhas; a paginação contaria o kit inteiro, então fica de fora
+  return pagina(`Kit de visita (${htmls.length} documentos)`, juntas, htmls.some(h => h.includes('pagina-contrato')) ? RODAPE_VISTO : '');
 };

@@ -87,6 +87,18 @@ const ESTILO = `<style>
   .caixa { display: inline-block; width: 3.3mm; height: 3.3mm; border: 1px solid #374151; border-radius: .6mm; vertical-align: -.5mm; margin: 0 1mm 0 3mm; }
   .caixa:first-child { margin-left: 0; }
   .rodape { margin-top: 8mm; padding-top: 2mm; border-top: 1px solid var(--b); font-size: 7.5pt; color: var(--m); text-align: center; }
+  /* documento de uma folha só (proposta "basicão"): menos respiro entre as partes */
+  .compacta .topo { margin-bottom: 3.5mm; padding-bottom: 3mm; }
+  .compacta h1 { font-size: 13pt; } .compacta .sub { margin-bottom: 2.5mm; font-size: 8.5pt; }
+  .compacta h2 { margin: 3.5mm 0 1.8mm; }
+  .compacta .ficha > div { padding: 1.2mm 3mm; }
+  .compacta table.itens td { padding: 1.2mm 2.5mm; }
+  .compacta .nota { font-size: 8pt; }
+  .compacta .condicoes { font-size: 7.3pt; padding: 2mm 3mm .5mm 6mm; line-height: 1.35; }
+  .compacta .condicoes li { margin-bottom: 1.1mm; }
+  .compacta .local-data { margin-top: 4mm; }
+  .compacta .assinaturas { margin-top: 10mm; }
+  .pagina-contrato { page: contrato; }
   .contrato { font-family: Cambria, 'Times New Roman', serif; font-size: 10pt; line-height: 1.6; text-align: justify; }
   .contrato h1 { font-family: 'Segoe UI', Arial, sans-serif; text-align: center; font-size: 12.5pt; letter-spacing: .6pt; margin: 1mm 0 5mm; }
   .contrato h3 { font-family: 'Segoe UI', Arial, sans-serif; font-size: 8.5pt; text-transform: uppercase; letter-spacing: .8pt; color: var(--a);
@@ -113,8 +125,18 @@ export const cabecalho = (d: Pick<DocumentoObra, 'empresa'>, logo: string | null
 const linhasDePreencher = (html: string) =>
   html.replace(/_{4,}/g, m => `<span class="campo" style="width:${Math.min(170, Math.round(m.length * 1.9))}mm"></span>`);
 
-export const pagina = (titulo: string, corpo: string) =>
-  `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${escapar(titulo)}</title>${ESTILO}</head><body>${linhasDePreencher(corpo)}<script>window.onload=function(){setTimeout(function(){window.print()},300)}</script></body></html>`;
+/**
+ * Rodapé das folhas do contrato (página nomeada "contrato"): o visto do CONTRATANTE e da CONTRATADA em todas as
+ * folhas e a paginação "3 de 5". Sai na impressão (margem da folha), não na pré-visualização da tela.
+ */
+const fonteRodape = `font-family: 'Segoe UI', Arial, sans-serif; font-size: 8pt; color: #374151;`;
+export const RODAPE_VISTO = `@page contrato { margin-bottom: 24mm;
+    @bottom-left { content: "CONTRATANTE: ________________________\\A CONTRATADA:  ________________________"; white-space: pre; ${fonteRodape} vertical-align: middle; }
+  }`;
+export const RODAPE_PAGINAS = `@page contrato { @bottom-right { content: counter(page) " de " counter(pages); ${fonteRodape} vertical-align: middle; } }`;
+
+export const pagina = (titulo: string, corpo: string, css = '') =>
+  `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${escapar(titulo)}</title>${ESTILO}${css ? `<style>${css}</style>` : ''}</head><body>${linhasDePreencher(corpo)}<script>window.onload=function(){setTimeout(function(){window.print()},300)}</script></body></html>`;
 
 /** Rótulo pequeno em cima e o valor embaixo (as "fichas" dos documentos). */
 export const celula = (rotulo: string, valor: string, largo = false) =>
@@ -496,7 +518,8 @@ const assinaturasContrato = (d: DocumentoObra) => {
 export const htmlContrato = (d: DocumentoObra, logo: string | null, hoje: string) => {
   const o = d.obra;
   const corpo = modeloEmHtml(d.empresa.modeloContrato || MODELO_CONTRATO_PADRAO, camposBase(d, hoje), { tabela_itens: o.itens?.length ? tabelaItens(o.itens, []) : '' });
-  return pagina(`Contrato ${o.idObra}`, `${cabecalho(d, logo, { tipo: 'Contrato', numero: `Nº ${o.idObra}`, data: o.contratoAssinadoEm ? `Assinado em ${dataBr(o.contratoAssinadoEm)}` : undefined })}<div class="contrato">${corpo}</div>${assinaturasContrato(d)}`);
+  return pagina(`Contrato ${o.idObra}`, `<div class="pagina-contrato">${cabecalho(d, logo, { tipo: 'Contrato', numero: `Nº ${o.idObra}`, data: o.contratoAssinadoEm ? `Assinado em ${dataBr(o.contratoAssinadoEm)}` : undefined })}<div class="contrato">${corpo}</div>${assinaturasContrato(d)}</div>`,
+    RODAPE_VISTO + RODAPE_PAGINAS);
 };
 
 /** Termo aditivo: os adicionais que entraram nele, o valor e o novo total do contrato (contrato + aditivos até este). */
@@ -512,5 +535,6 @@ export const htmlAditivo = (d: DocumentoObra, aditivo: Aditivo, todos: Aditivo[]
     novo_total: brl(novoTotal), novo_total_extenso: valorPorExtenso(novoTotal), observacao: aditivo.observacao || '',
   };
   const corpo = modeloEmHtml(d.empresa.modeloAditivo || MODELO_ADITIVO_PADRAO, campos, { tabela_adicionais: tabela });
-  return pagina(`Aditivo ${aditivo.numero} · obra ${o.idObra}`, `${cabecalho(d, logo, { tipo: 'Termo aditivo', numero: `Nº ${aditivo.numero}`, data: `Contrato nº ${o.idObra}` })}<div class="contrato">${corpo}</div>${assinaturasContrato(d)}`);
+  return pagina(`Aditivo ${aditivo.numero} · obra ${o.idObra}`, `<div class="pagina-contrato">${cabecalho(d, logo, { tipo: 'Termo aditivo', numero: `Nº ${aditivo.numero}`, data: `Contrato nº ${o.idObra}` })}<div class="contrato">${corpo}</div>${assinaturasContrato(d)}</div>`,
+    RODAPE_VISTO + RODAPE_PAGINAS);
 };
