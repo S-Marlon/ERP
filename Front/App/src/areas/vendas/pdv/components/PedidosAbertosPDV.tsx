@@ -1,8 +1,12 @@
 // PDV: salvar orçamento e a lista de vendas suspensas / orçamentos (retomar, converter, imprimir, excluir).
 import React, { useEffect, useState } from 'react';
-import { Button, Drawer, Empty, Form, Input, InputNumber, Modal, Popconfirm, Space, Table, Tabs, Tag, Tooltip, Typography, message } from 'antd';
-import { DeleteOutlined, PrinterOutlined, RollbackOutlined, ShoppingCartOutlined } from '@ant-design/icons';
+import {
+  Alert, Button, Checkbox, Drawer, Empty, Form, Input, InputNumber, Modal, Popconfirm, Space, Table, Tabs, Tag, Tooltip, Typography, message,
+} from 'antd';
+import { DeleteOutlined, PrinterOutlined, RollbackOutlined, ShoppingCartOutlined, UserAddOutlined } from '@ant-design/icons';
 import { imprimirOrcamento, PedidoAbertoResumo, pedidosAbertosApi } from '../services/pedidosAbertosApi';
+import { buscarClientesPdv, cadastrarClienteRapido, ClienteBusca } from '../services/api/products';
+import { formatarTelefone, telefoneBr } from '../../../../shared/utils/whatsapp';
 
 const { Text } = Typography;
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -19,24 +23,103 @@ export const SITUACAO_PEDIDO: Record<string, { label: string; color: string }> =
 // Salvar orçamento
 // ---------------------------------------------------------------------------------------------
 export interface DadosOrcamento { contato: string; validadeDias: number; observacao: string }
+type ClienteDoOrcamento = { id: number; nome: string };
 
+/**
+ * Sem cliente na venda, o telefone do contato serve para achar o cliente (o número já é de alguém) ou cadastrar um
+ * novo só com nome e telefone (cadastro rápido do PDV); o orçamento sai ligado a ele.
+ */
 export const ModalSalvarOrcamento: React.FC<{
-  aberto: boolean; cliente: string; total: number; salvando: boolean;
-  onFechar: () => void; onSalvar: (dados: DadosOrcamento) => void;
-}> = ({ aberto, cliente, total, salvando, onFechar, onSalvar }) => {
+  aberto: boolean; cliente: string; clienteId: number | null; total: number; salvando: boolean;
+  onFechar: () => void; onSalvar: (dados: DadosOrcamento, cliente?: ClienteDoOrcamento | null) => void;
+}> = ({ aberto, cliente, clienteId, total, salvando, onFechar, onSalvar }) => {
   const [form] = Form.useForm<DadosOrcamento>();
-  useEffect(() => { if (aberto) form.setFieldsValue({ contato: '', validadeDias: 7, observacao: '' }); }, [aberto]); // eslint-disable-line react-hooks/exhaustive-deps
+  const contato = Form.useWatch('contato', form) || '';
+  const [nomeNovo, setNomeNovo] = useState('');
+  const [cadastrar, setCadastrar] = useState(true);
+  const [achado, setAchado] = useState<ClienteBusca | null>(null);
+  const [usarAchado, setUsarAchado] = useState(true);
+  const [cadastrando, setCadastrando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const semCliente = !clienteId;
+  const telefone = telefoneBr(contato);
+
+  useEffect(() => {
+    if (!aberto) return;
+    form.setFieldsValue({ contato: '', validadeDias: 7, observacao: '' });
+    setNomeNovo(''); setCadastrar(true); setAchado(null); setUsarAchado(true); setErro(null);
+  }, [aberto]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // O número digitado já é de um cliente do cadastro?
+  useEffect(() => {
+    setAchado(null);
+    if (!aberto || !semCliente || !telefone) return;
+    const t = setTimeout(() => {
+      buscarClientesPdv(telefone).then(r => {
+        const mesmo = r.find(c => telefoneBr(c.telefone) === telefone) || null;
+        setAchado(mesmo);
+        setUsarAchado(true);
+      });
+    }, 300);
+    return () => clearTimeout(t);
+  }, [telefone, aberto, semCliente]);
+
+  const salvar = async () => {
+    const dados = await form.validateFields();
+    setErro(null);
+    if (!semCliente || !telefone) { onSalvar(dados); return; }
+    if (achado && usarAchado) { onSalvar(dados, { id: achado.id, nome: achado.nome }); return; }
+    if (!cadastrar || !nomeNovo.trim()) { onSalvar(dados); return; }
+    setCadastrando(true);
+    const r = await cadastrarClienteRapido(nomeNovo, telefone);
+    setCadastrando(false);
+    if (r.ok) {
+      message.success(`Cliente ${r.cliente.nome} cadastrado.`);
+      onSalvar(dados, { id: r.cliente.id, nome: r.cliente.nome });
+    } else if (r.cliente) {
+      message.info(`O telefone já é de ${r.cliente.nome}: o orçamento fica no nome dele.`);
+      onSalvar(dados, { id: r.cliente.id, nome: r.cliente.nome });
+    } else {
+      setErro(r.erro);
+    }
+  };
+
+  const textoBotao = semCliente && telefone && !(achado && usarAchado) && cadastrar && nomeNovo.trim()
+    ? 'Cadastrar cliente e salvar' : 'Salvar orçamento';
+
   return (
-    <Modal open={aberto} title="Salvar como orçamento" okText="Salvar orçamento" cancelText="Voltar" confirmLoading={salvando}
-      onCancel={onFechar} onOk={async () => onSalvar(await form.validateFields())} destroyOnHidden width={440}>
+    <Modal open={aberto} title="Salvar como orçamento" okText={textoBotao} cancelText="Voltar" confirmLoading={salvando || cadastrando}
+      onCancel={onFechar} onOk={salvar} destroyOnHidden width={460}>
       <Space direction="vertical" style={{ width: '100%' }} size={2}>
         <Text>Cliente: <b>{cliente || 'Consumidor final'}</b> · Total: <b>{brl(total)}</b></Text>
         <Text type="secondary" style={{ fontSize: 12 }}>Os preços ficam congelados até a validade. Não mexe no estoque nem no caixa.</Text>
       </Space>
       <Form form={form} layout="vertical" style={{ marginTop: 10 }}>
-        <Form.Item name="contato" label="Contato para retorno (telefone/WhatsApp)">
-          <Input placeholder="(11) 99999-0000" maxLength={100} />
+        <Form.Item name="contato" label="Contato para retorno (telefone/WhatsApp)" style={{ marginBottom: semCliente && telefone ? 8 : undefined }}>
+          <Input placeholder="(11) 99999-0000" maxLength={100}
+            onBlur={() => { if (telefone && /^[\d\s()+.-]+$/.test(contato)) form.setFieldValue('contato', formatarTelefone(telefone)); }} />
         </Form.Item>
+
+        {semCliente && telefone && (achado ? (
+          <Alert
+            type="success" showIcon style={{ marginBottom: 14 }}
+            message={<span>Este número é de <b>{achado.nome}</b>.</span>}
+            description={<Checkbox checked={usarAchado} onChange={e => setUsarAchado(e.target.checked)}>Salvar o orçamento no nome dele</Checkbox>}
+          />
+        ) : (
+          <div style={{ background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6, padding: '8px 10px', marginBottom: 14 }}>
+            <Checkbox checked={cadastrar} onChange={e => setCadastrar(e.target.checked)}>
+              <UserAddOutlined /> Cadastrar como cliente (nome e telefone)
+            </Checkbox>
+            {cadastrar && (
+              <Input style={{ marginTop: 6 }} placeholder="Nome do cliente (ex.: José da Silva)" maxLength={255}
+                value={nomeNovo} onChange={e => setNomeNovo(e.target.value)} status={erro ? 'error' : undefined} />
+            )}
+            {cadastrar && !nomeNovo.trim() && <Text type="secondary" style={{ fontSize: 12 }}>Sem nome, o orçamento é salvo só com o telefone, sem cadastrar.</Text>}
+            {erro && <Text type="danger" style={{ fontSize: 12, display: 'block' }}>{erro}</Text>}
+          </div>
+        ))}
+
         <Form.Item name="validadeDias" label="Válido por">
           <InputNumber min={1} max={180} addonAfter="dias" style={{ width: 160 }} />
         </Form.Item>

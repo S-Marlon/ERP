@@ -15,6 +15,13 @@ export const telefoneDoTexto = (texto?: string | null) => {
   return d.length >= 10 && d.length <= 13 ? d : null;
 };
 
+/** Telefone brasileiro com DDD só em dígitos (10 ou 11, sem o 55); null se não for um telefone completo. */
+export const telefoneBr = (v?: string | null) => {
+  let d = String(v || '').replace(/\D/g, '');
+  if (d.startsWith('55') && d.length >= 12) d = d.slice(2);
+  return d.length === 10 || d.length === 11 ? d : null;
+};
+
 /** Telefone com máscara para mostrar: (11) 98888-7777. */
 export const formatarTelefone = (v?: string | null) => {
   let d = String(v || '').replace(/\D/g, '');

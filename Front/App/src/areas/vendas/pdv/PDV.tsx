@@ -128,10 +128,13 @@ const PDVContent: React.FC = () => {
     }
   };
 
-  const salvarOrcamento = async (dados: DadosOrcamento) => {
+  const salvarOrcamento = async (dados: DadosOrcamento, clienteDoOrcamento?: { id: number; nome: string } | null) => {
     setSalvandoPedido(true);
     try {
-      const r = await pedidosAbertosApi.salvar({ tipo: 'ORCAMENTO', itens: itensParaSalvar(), clienteNome: cliente, idCliente: clienteId, ...dados });
+      const r = await pedidosAbertosApi.salvar({
+        tipo: 'ORCAMENTO', itens: itensParaSalvar(), ...dados,
+        clienteNome: clienteDoOrcamento?.nome ?? cliente, idCliente: clienteDoOrcamento?.id ?? clienteId,
+      });
       setModalOrcamento(false);
       novaVenda();
       Modal.confirm({
@@ -536,7 +539,7 @@ const PDVContent: React.FC = () => {
         />
       </div>
 
-      <ModalSalvarOrcamento aberto={modalOrcamento} cliente={cliente} total={total} salvando={salvandoPedido}
+      <ModalSalvarOrcamento aberto={modalOrcamento} cliente={cliente} clienteId={clienteId} total={total} salvando={salvandoPedido}
         onFechar={() => setModalOrcamento(false)} onSalvar={salvarOrcamento} />
       <DrawerPedidosAbertos aberto={drawerPedidos !== null} abaInicial={drawerPedidos || 'SUSPENSA'} carrinhoComItens={cart.length > 0}
         onFechar={() => setDrawerPedidos(null)} onAbrir={abrirPedido} onAlterado={atualizarSuspensas} />
