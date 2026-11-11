@@ -18,6 +18,7 @@ export const SECOES_POCOS: SecaoPocos[] = [
   { secao: 'pocos', titulo: 'Poços', aba: 'obras', vista: 'POCOS', grupo: 'clientes' },
   { secao: 'agenda', titulo: 'Agenda', aba: 'agenda', grupo: 'agenda' },
   { secao: 'ferramentas', titulo: 'Mais ferramentas', aba: 'ferramentas', grupo: 'mais' },
+  { secao: 'kit-visita', titulo: 'Kit de visita', aba: 'kit', grupo: 'mais', descricao: 'Proposta, tabela de preços, contrato e autorização em branco para levar ao cliente.' },
   { secao: 'manutencao', titulo: 'Manutenção', aba: 'manutencao', grupo: 'mais', descricao: 'Planos de manutenção, revisões a oferecer e garantias vencendo.' },
   { secao: 'resultado', titulo: 'Resultado', aba: 'resultado', grupo: 'mais', descricao: 'Recebido, faturado, lucro das obras e alertas.' },
   { secao: 'mapa', titulo: 'Mapa', aba: 'mapa', grupo: 'mais', descricao: 'Poços dos clientes e a base regional (profundidade e vazão da região).' },

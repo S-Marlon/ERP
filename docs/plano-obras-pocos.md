@@ -220,3 +220,6 @@ Colunas novas: `incluso` em `_orcamento_itens`, `valor_parcelado` em `_obras`, `
   orçamento ajusta (cliente, cidade, solo).
 - **Orçamento PDF:** à vista × parcelado (cartão) e "Condições gerais" (cliente, risco geológico, metragem adicional,
   imprevistos no solo, autorização digital).
+- **Kit de visita** (Mais ferramentas e botão na Central): proposta comercial, tabela de preços de referência (itens da
+  planilha), contrato do modelo configurado e autorização de metragem adicional, em branco para preencher à mão na
+  visita; pré-visualização A4 de cada um e "imprimir os marcados" numa impressão só (`documentosEmBranco.ts`).

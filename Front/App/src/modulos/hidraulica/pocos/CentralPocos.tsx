@@ -5,7 +5,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert, Badge, Button, Card, Col, Empty, Flex, Popover, Progress, Row, Segmented, Space, Statistic, Switch, Table, Tag, Tooltip, Typography, message,
 } from 'antd';
-import { ApiOutlined, CalculatorOutlined, CalendarOutlined, CustomerServiceOutlined, DollarOutlined, ReloadOutlined, WhatsAppOutlined } from '@ant-design/icons';
+import {
+  ApiOutlined, CalculatorOutlined, CalendarOutlined, CustomerServiceOutlined, DollarOutlined, FileTextOutlined, ReloadOutlined, WhatsAppOutlined,
+} from '@ant-design/icons';
 import {
   AcaoPendencia, Central, centralApi, ClientePlano, ContratoCentral, FaseContrato, FASES_CONTRATO, foneBr, GRAVIDADES, SERVICOS,
 } from './obrasApi';
@@ -204,6 +206,7 @@ const CentralPocos: React.FC = () => {
       <Flex justify="space-between" align="center">
         <Text type="secondary">Comece por aqui: o que precisa da sua atenção hoje e o que falta para fechar cada contrato.</Text>
         <Space>
+          <Button icon={<FileTextOutlined />} onClick={() => navPocos.ir({ aba: 'kit' })}>Kit de visita</Button>
           <Button type="primary" icon={<CalculatorOutlined />} onClick={() => setOrcamento(true)}>Orçamento rápido</Button>
           <Tooltip title="Recarregar"><Button icon={<ReloadOutlined />} loading={carregando} onClick={carregar} /></Tooltip>
         </Space>

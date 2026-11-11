@@ -8,7 +8,7 @@ const SERVICOS_TXT: Record<string, string> = {
   TESTE_VAZAO: 'Teste de vazão', OUTRO: 'Outro',
 };
 export const escapar = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
-const brl = (v: number | null | undefined) => (v === null || v === undefined ? '—' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
+export const brl = (v: number | null | undefined) => (v === null || v === undefined ? '—' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
 const num = (v: number | null | undefined, un: string) => (v === null || v === undefined ? '—' : `${v.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} ${un}`);
 const dataBr = (s: string | null | undefined) => (s ? `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(0, 4)}` : '—');
 const fone = (s: string | null | undefined) => {
@@ -20,7 +20,7 @@ const doc = (d: string | null | undefined) => {
   return x.length === 14 ? `${x.slice(0, 2)}.${x.slice(2, 5)}.${x.slice(5, 8)}/${x.slice(8, 12)}-${x.slice(12)}`
     : x.length === 11 ? `${x.slice(0, 3)}.${x.slice(3, 6)}.${x.slice(6, 9)}-${x.slice(9)}` : x;
 };
-const paragrafos = (t: string | null | undefined) => escapar(t || '').split('\n').filter(Boolean).map(p => `<p>${p}</p>`).join('');
+export const paragrafos = (t: string | null | undefined) => escapar(t || '').split('\n').filter(Boolean).map(p => `<p>${p}</p>`).join('');
 
 const ESTILO = `<style>
   @page { size: A4; margin: 16mm 14mm; }
@@ -50,7 +50,7 @@ const ESTILO = `<style>
   .assinaturas.quatro div { flex: 1 1 40%; }
 </style>`;
 
-const cabecalho = (d: DocumentoObra, logo: string | null) => {
+export const cabecalho = (d: Pick<DocumentoObra, 'empresa'>, logo: string | null) => {
   const e = d.empresa;
   return `<div class="topo">
     <div>${logo ? `<img src="${escapar(logo)}" alt="logo">` : `<b style="font-size:20px">${escapar(e.empresaNome || '')}</b>`}</div>
@@ -60,7 +60,7 @@ const cabecalho = (d: DocumentoObra, logo: string | null) => {
       ${e.empresaEmail ? `${escapar(e.empresaEmail)}<br>` : ''}${e.empresaEndereco ? escapar(e.empresaEndereco) : ''}
     </div></div>`;
 };
-const pagina = (titulo: string, corpo: string) =>
+export const pagina = (titulo: string, corpo: string) =>
   `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${escapar(titulo)}</title>${ESTILO}</head><body>${corpo}<script>window.onload=function(){setTimeout(function(){window.print()},300)}</script></body></html>`;
 const linhaCliente = (d: DocumentoObra) => {
   const c = d.cliente;
@@ -235,7 +235,7 @@ export const qualificacaoCliente = (c: DocumentoObra['cliente']) => {
   return [c.nome.toUpperCase(), c.estadoCivil, c.profissao, c.rgIe && `portador(a) do RG nº ${c.rgIe}`, c.documento && `inscrito(a) no CPF sob o nº ${doc(c.documento)}`,
     endereco && `residente em ${endereco}`].filter(Boolean).join(', ');
 };
-const qualificacaoEmpresa = (d: DocumentoObra) => [(d.empresa.empresaNome || '__________').toUpperCase(),
+export const qualificacaoEmpresa = (d: Pick<DocumentoObra, 'empresa'>) => [(d.empresa.empresaNome || '__________').toUpperCase(),
   d.empresa.empresaDocumento && `inscrita no CNPJ/CPF sob o nº ${doc(d.empresa.empresaDocumento)}`, d.empresa.empresaEndereco && `com endereço em ${d.empresa.empresaEndereco}`,
   d.empresa.empresaRepresentante && `neste ato representada por ${d.empresa.empresaRepresentante}${d.empresa.empresaRepresentanteCpf ? `, CPF nº ${doc(d.empresa.empresaRepresentanteCpf)}` : ''}`]
   .filter(Boolean).join(', ');
@@ -362,7 +362,7 @@ export const preencherModelo = (modelo: string, campos: Record<string, string>) 
   modelo.replace(/\{([a-z_]+)\}/g, (m, k: string) => (k in campos && !CAMPOS_HTML.includes(k) ? campos[k] : m));
 
 /** Texto do modelo já preenchido → HTML: linha "CLÁUSULA…" vira título, campos de tabela entram como tabela, o resto vira parágrafo. */
-const modeloEmHtml = (modelo: string, campos: Record<string, string>, html: Record<string, string>) => {
+export const modeloEmHtml = (modelo: string, campos: Record<string, string>, html: Record<string, string>) => {
   const texto = preencherModelo(modelo, campos);
   const linhas = texto.split(/\r?\n/);
   let primeiro = true;
