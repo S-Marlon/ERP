@@ -136,6 +136,8 @@ export const validarConfig = (b: any) => {
     // contrato e aditivo
     modeloContrato: textoLongo(b?.modeloContrato, 60000), modeloAditivo: textoLongo(b?.modeloAditivo, 20000), foroCidade: texto(b?.foroCidade, 60),
     responsavelTecnico: texto(b?.responsavelTecnico, 120), registroTecnico: texto(b?.registroTecnico, 30),
+    // telas que só aparecem quando ligadas (aparelho nos poços, base do mapa)
+    usaMonitoramento: b?.usaMonitoramento === true || b?.usaMonitoramento === 1, usaMapa: b?.usaMapa === true || b?.usaMapa === 1,
   };
   if (c.horaFecha <= c.horaAbre) throw new ErroObra('O horário de fechar tem de ser depois do de abrir.');
   if (c.sabadoFecha && c.sabadoFecha <= c.horaAbre) throw new ErroObra('O horário de sábado tem de ser depois do de abrir.');

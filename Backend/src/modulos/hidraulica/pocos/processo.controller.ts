@@ -38,6 +38,7 @@ export const carregarConfig = async (tenant: number) => {
     horaAbre: c?.abre || '08:00', horaFecha: c?.fecha || '18:00', sabadoFecha: c ? c.sabado || null : '12:00', configurado: !!c,
     modeloContrato: c?.modelo_contrato || null, modeloAditivo: c?.modelo_aditivo || null, foroCidade: c?.foro_cidade || null,
     responsavelTecnico: c?.responsavel_tecnico || null, registroTecnico: c?.registro_tecnico || null,
+    usaMonitoramento: !!Number(c?.usa_monitoramento), usaMapa: !!Number(c?.usa_mapa),
   };
 };
 export type Config = Awaited<ReturnType<typeof carregarConfig>>;
@@ -71,7 +72,7 @@ export const salvarConfig = async (req: Request, res: Response) => {
       ['msg_avaliacao', c.msgAvaliacao], ['msg_revisao', c.msgRevisao], ['resposta_lead_min', c.respostaLeadMin], ['orcamento_horas', c.orcamentoHoras],
       ['avaliacao_dias', c.avaliacaoDias], ['revisao_meses', c.revisaoMeses], ['hora_abre', c.horaAbre], ['hora_fecha', c.horaFecha], ['sabado_fecha', c.sabadoFecha],
       ['modelo_contrato', c.modeloContrato], ['modelo_aditivo', c.modeloAditivo], ['foro_cidade', c.foroCidade], ['responsavel_tecnico', c.responsavelTecnico],
-      ['registro_tecnico', c.registroTecnico],
+      ['registro_tecnico', c.registroTecnico], ['usa_monitoramento', c.usaMonitoramento ? 1 : 0], ['usa_mapa', c.usaMapa ? 1 : 0],
       ['operador', operadorDe(req)],
     ];
     await pool.execute(

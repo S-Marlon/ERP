@@ -3,7 +3,8 @@
 // propaganda e a configuração (dados da empresa, logo, mensagens e prazos).
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Alert, Button, Card, Checkbox, Col, Empty, Flex, Image, Input, InputNumber, Modal, Row, Segmented, Select, Space, Statistic, Table, Tag, Tooltip, Typography, Upload, message,
+  Alert, Button, Card, Checkbox, Col, Empty, Flex, Image, Input, InputNumber, Modal, Row, Segmented, Select, Space, Statistic, Switch, Table, Tag, Tooltip, Typography, Upload,
+  message,
 } from 'antd';
 import { CheckOutlined, FileSearchOutlined, PlusOutlined, ReloadOutlined, SettingOutlined, WhatsAppOutlined } from '@ant-design/icons';
 import {
@@ -11,6 +12,7 @@ import {
   SERVICOS, SITUACOES_LEAD, SITUACOES_OBRA, urlArquivo,
 } from './obrasApi';
 import { abrirObra, navPocos } from './navPocos';
+import { recursosPocos } from './recursosPocos';
 import { reduzirImagem } from './ProcessoObra';
 import { OrcamentoRapido } from './OrcamentoContrato';
 import { CAMPOS_MODELO, MODELO_ADITIVO_PADRAO, MODELO_CONTRATO_PADRAO } from './documentosPocos';
@@ -293,7 +295,10 @@ const Configuracao: React.FC = () => {
   );
   const salvar = async (tirarLogo = false) => {
     setSalvando(true);
-    try { const r = await processoApi.salvarConfig({ ...c, logoNovo: logoNovo || undefined, tirarLogo }); setC(r); setLogoNovo(null); message.success('Configuração salva.'); }
+    try {
+      const r = await processoApi.salvarConfig({ ...c, logoNovo: logoNovo || undefined, tirarLogo });
+      setC(r); setLogoNovo(null); recursosPocos.definir(r); message.success('Configuração salva.');
+    }
     catch (e) { erro(e); } finally { setSalvando(false); }
   };
   return (
@@ -370,6 +375,15 @@ const Configuracao: React.FC = () => {
           {campo('horaAbre', 'Abre', 6, { type: 'time' })}{campo('horaFecha', 'Fecha', 6, { type: 'time' })}
           {campo('sabadoFecha', 'Sábado fecha (vazio = não abre)', 8, { type: 'time' })}
         </Row>
+      </Card>
+      <Card size="small" title="Telas do módulo">
+        <Space direction="vertical" size={6}>
+          <Space><Switch checked={c.usaMonitoramento} onChange={v => setC({ ...c, usaMonitoramento: v })} />
+            <span><b>Monitoramento (IoT)</b> <Text type="secondary">· ligue quando houver aparelho medindo algum poço</Text></span></Space>
+          <Space><Switch checked={c.usaMapa} onChange={v => setC({ ...c, usaMapa: v })} />
+            <span><b>Mapa</b> <Text type="secondary">· poços dos clientes e a base regional (profundidade e vazão da região)</Text></span></Space>
+          <Text type="secondary" style={{ fontSize: 12 }}>Desligada, a tela sai de "Mais ferramentas". Nada é apagado: ligar de novo traz tudo de volta.</Text>
+        </Space>
       </Card>
       <Space><Button type="primary" icon={<SettingOutlined />} loading={salvando} onClick={() => salvar()}>Salvar configuração</Button></Space>
     </Space>

@@ -429,6 +429,8 @@ export interface ConfigProcesso {
   revisaoMeses: number; horaAbre: string; horaFecha: string; sabadoFecha: string | null; configurado: boolean;
   /** Contrato e aditivo: modelos com {campos} (vazio = modelo padrão), foro e responsável técnico. */
   modeloContrato: string | null; modeloAditivo: string | null; foroCidade: string | null; responsavelTecnico: string | null; registroTecnico: string | null;
+  /** Telas que só aparecem quando ligadas. */
+  usaMonitoramento: boolean; usaMapa: boolean;
 }
 export interface LeadForm { nome: string; telefone: string | null; origem: OrigemLead; indicadoPor: string | null; cidade: string | null; necessidade: string | null; recebidoEm: string | null; observacao: string | null }
 export interface Lead extends LeadForm {

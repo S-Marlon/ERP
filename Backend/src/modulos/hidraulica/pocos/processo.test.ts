@@ -37,6 +37,9 @@ teste('processo de poços: configuração', () => {
   const c = validarConfig({ empresaNome: 'Poços Silva', empresaWhatsapp: '(11) 9 9999-0000', linkAvaliacao: 'https://g.page/r/abc/review', horaAbre: '07:30', sabadoFecha: '' });
   assert.deepStrictEqual([c.empresaWhatsapp, c.horaAbre, c.horaFecha, c.sabadoFecha, c.respostaLeadMin, c.revisaoMeses], ['11999990000', '07:30', '18:00', null, 60, 11]);
   assert.throws(() => validarConfig({ linkAvaliacao: 'g.page/x' }), /http/);
+  assert.deepStrictEqual([c.usaMonitoramento, c.usaMapa], [false, false]);
+  const ligados = validarConfig({ usaMonitoramento: true, usaMapa: 1 });
+  assert.deepStrictEqual([ligados.usaMonitoramento, ligados.usaMapa], [true, true]);
   assert.throws(() => validarConfig({ horaAbre: '18:00', horaFecha: '08:00' }), /depois/);
   assert.throws(() => validarConfig({ revisaoMeses: 0 }), /1 a 60/);
 });

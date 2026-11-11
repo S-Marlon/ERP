@@ -1,13 +1,14 @@
 // Central › Primeiros passos (some quando tudo está feito) e a página "Mais ferramentas" (atalhos para as telas que
 // não têm item próprio na barra lateral).
 import React, { useEffect, useState } from 'react';
-import { Button, Card, Col, Flex, List, Progress, Row, Typography } from 'antd';
+import { Alert, Button, Card, Col, Flex, List, Progress, Row, Space, Typography } from 'antd';
 import { CheckCircleFilled, RightOutlined } from '@ant-design/icons';
 import { agendaApi, materiaisApi, obrasApi, processoApi } from './obrasApi';
 import { navPocos } from './navPocos';
 import { ChavePasso, faltaComecar, PassoInicial, primeirosPassos } from './primeirosPassos';
 import { enderecoDaSecao, secoesDoGrupo } from './secoesPocos';
 import { useNavigate } from 'react-router-dom';
+import { secaoLigada, useRecursosPocos } from './recursosPocos';
 
 const { Text } = Typography;
 
@@ -65,9 +66,12 @@ export const PrimeirosPassos: React.FC<{ onOrcamento: () => void }> = ({ onOrcam
 /** "Mais ferramentas": um cartão por tela do grupo, com o que ela faz. */
 export const MaisFerramentas: React.FC = () => {
   const navigate = useNavigate();
+  const recursos = useRecursosPocos();
+  const desligadas = secoesDoGrupo('mais').filter(s => s.descricao && !secaoLigada(s.secao, recursos));
   return (
+    <Space direction="vertical" size={12} style={{ width: '100%' }}>
     <Row gutter={[12, 12]}>
-      {secoesDoGrupo('mais').filter(s => s.descricao).map(s => (
+      {secoesDoGrupo('mais').filter(s => s.descricao && secaoLigada(s.secao, recursos)).map(s => (
         <Col key={s.secao} xs={24} md={12} lg={8}>
           <Card size="small" hoverable onClick={() => navigate(enderecoDaSecao(s))} style={{ height: '100%' }}>
             <Flex justify="space-between" align="center">
@@ -79,5 +83,11 @@ export const MaisFerramentas: React.FC = () => {
         </Col>
       ))}
     </Row>
+    {recursos.carregado && desligadas.length > 0 && (
+      <Alert type="info" showIcon
+        message={`${desligadas.map(s => s.titulo).join(' e ')} ${desligadas.length > 1 ? 'estão desligados' : 'está desligado'}.`}
+        action={<Button size="small" onClick={() => navPocos.ir({ aba: 'atendimento', subvista: 'CONFIG' })}>Ligar na configuração</Button>} />
+    )}
+    </Space>
   );
 };

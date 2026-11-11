@@ -18,6 +18,7 @@ import AtendimentoPocos from './AtendimentoPocos';
 import { navPocos, useNavPocos } from './navPocos';
 import { enderecoDaSecao, GRUPOS_POCOS, secaoDaAba, secaoDoEndereco, secoesDoGrupo } from './secoesPocos';
 import { MaisFerramentas } from './InicioPocos';
+import { secaoLigada, useRecursosPocos } from './recursosPocos';
 
 const { Title, Text } = Typography;
 const TELAS: Record<string, React.ReactNode> = {
@@ -48,7 +49,8 @@ const ObrasPocosPagina: React.FC = () => {
 
   useEffect(() => () => navPocos.trocarAba('central'), []);   // ao sair do módulo, volta a abrir pela Central
   // as outras telas do mesmo grupo da barra lateral viram abas no topo (ex.: Obras · A receber · Materiais)
-  const doGrupo = secoesDoGrupo(atual.grupo);
+  const recursos = useRecursosPocos();
+  const doGrupo = secoesDoGrupo(atual.grupo).filter(s => s.secao === atual.secao || secaoLigada(s.secao, recursos));
   const tituloGrupo = GRUPOS_POCOS.find(g => g.grupo === atual.grupo)?.titulo || atual.titulo;
   return (
     <div style={{ padding: 24 }}>

@@ -202,3 +202,5 @@ O módulo ainda não tinha dados lançados; a revisão foi para o uso no escrit�
   passo normal da situação) com o botão que leva até lá, e o resto que falta. Regras em `proximoPasso.ts` (com teste).
 - **Primeiros passos** na Central enquanto faltar algo para o primeiro orçamento: empresa e logo, foro e responsável
   técnico, equipe, sonda, materiais, primeiro cliente e orçamento. Some quando tudo está feito (`primeirosPassos.ts`).
+- **Telas que se ligam:** Monitoramento (IoT) e Mapa só aparecem em "Mais ferramentas" quando ligados em Atendimento ›
+  Configuração (`usa_monitoramento`, `usa_mapa` em `_config`, padrão desligado). Nada é apagado ao desligar.

@@ -12,7 +12,7 @@ const doc: DocumentoObra = {
     empresaEndereco: 'Rua A, 10', logo: null, textoGarantia: 'Cobre a perfuração.\nNão cobre a bomba.', formaPagamentoPadrao: null, validadeOrcamentoDias: 15,
     linkAvaliacao: null, msgAvaliacao: '', msgRevisao: '', respostaLeadMin: 60, orcamentoHoras: 24, avaliacaoDias: 7, revisaoMeses: 11,
     horaAbre: '08:00', horaFecha: '18:00', sabadoFecha: '12:00', configurado: true,
-    modeloContrato: null, modeloAditivo: null, foroCidade: 'Jundiaí', responsavelTecnico: 'Eng. Carlos', registroTecnico: 'CREA 123',
+    modeloContrato: null, modeloAditivo: null, foroCidade: 'Jundiaí', responsavelTecnico: 'Eng. Carlos', registroTecnico: 'CREA 123', usaMonitoramento: false, usaMapa: false,
   },
   obra: {
     idObra: 15, titulo: 'Poço Sítio São José', servicos: ['PERFURACAO', 'INSTALACAO'], situacao: 'CONCLUIDA', criadaEm: '2026-10-01 09:00:00',
