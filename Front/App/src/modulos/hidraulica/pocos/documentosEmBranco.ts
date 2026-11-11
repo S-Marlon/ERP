@@ -4,7 +4,8 @@
 import type { ConfigProcesso } from './obrasApi';
 import { ITENS_PRONTOS } from './obrasApi';
 import {
-  brl, cabecalho, CONDICOES_ORCAMENTO, escapar, modeloEmHtml, MODELO_CONTRATO_PADRAO, pagina, paragrafos, qualificacaoEmpresa,
+  blocoAssinaturas, brl, cabecalho, celula, CONDICOES_ORCAMENTO, escapar, listaCondicoes, modeloEmHtml, MODELO_CONTRATO_PADRAO, pagina,
+  qualificacaoEmpresa,
 } from './documentosPocos';
 
 export type ModeloBranco = 'PROPOSTA' | 'TABELA' | 'CONTRATO' | 'AUTORIZACAO';
@@ -16,63 +17,75 @@ export const MODELOS_BRANCO: { id: ModeloBranco; titulo: string; descricao: stri
   { id: 'AUTORIZACAO', titulo: 'Autorização de metragem adicional', descricao: 'Para o cliente assinar na obra quando for preciso perfurar além do contratado.' },
 ];
 
-const L = (n = 30) => '_'.repeat(n);
-const caixa = '&#9744;';   // ☐
+const L = (n = 30) => '_'.repeat(n);            // vira linha de preencher na página (pagina → linhasDePreencher)
+const LINHA = '<span class="campo" style="width:100%"></span>';
+const caixa = '<span class="caixa"></span>';
+const DATA = '____/____/________';
 
-const linhasCliente = () => `<table>
-  <tr><th>Cliente (contratante)</th><td>${L(45)}</td></tr>
-  <tr><th>CPF / CNPJ</th><td>${L(25)} &nbsp; RG / IE: ${L(18)}</td></tr>
-  <tr><th>Telefone / WhatsApp</th><td>${L(25)} &nbsp; E-mail: ${L(25)}</td></tr>
-  <tr><th>Local da obra</th><td>${L(45)}<br><br>${L(28)} Cidade: ${L(20)}</td></tr>
-</table>`;
+const fichaCliente = () => `<div class="ficha branco">
+  ${celula('Cliente (contratante)', LINHA, true)}
+  ${celula('CPF / CNPJ', LINHA)}${celula('RG / IE', LINHA)}
+  ${celula('Telefone / WhatsApp', LINHA)}${celula('E-mail', LINHA)}
+  ${celula('Local da obra (endereço)', LINHA, true)}
+  ${celula('Cidade / UF', LINHA)}${celula('Referência / GPS', LINHA)}
+</div>`;
 
-const assinaturas = (empresa: string) => `<p style="margin-top:22px">${L(20)}, ____ de ${L(16)} de ________.</p>
-  <div class="assinaturas"><div>${escapar(empresa || 'Empresa')}</div><div>Cliente: nome e assinatura</div></div>`;
+const localData = () => `<p class="local-data">${L(22)}, ____ de ${L(14)} de ________.</p>`;
 
 /** Valor de referência do metro excedente (da planilha da empresa). */
 const excedenteReferencia = () => ITENS_PRONTOS.find(p => p.item.opcional && p.item.grupo === 'PERFURACAO')?.item.valorUnitario || null;
 
 const proposta = (e: ConfigProcesso, logo: string | null) => {
   const exc = excedenteReferencia();
-  return pagina('Proposta comercial', `${cabecalho({ empresa: e }, logo)}
+  return pagina('Proposta comercial', `${cabecalho({ empresa: e }, logo, { tipo: 'Proposta comercial', numero: `Nº ${L(6)}`, data: `Data: ${DATA}` })}
     <h1>Proposta comercial de prestação de serviços</h1>
-    ${linhasCliente()}
-    <h2>1. Escopo dos serviços e investimento</h2>
-    <p>Prestação de serviços de perfuração de poço tubular profundo (poço artesiano), conforme as especificações abaixo:</p>
-    <table class="itens"><tr><th>Descrição do serviço</th><th>Metragem base</th><th>Valor à vista</th><th>Valor parcelado</th></tr>
-      <tr><td rowspan="2">Perfuração de poço artesiano, incluindo o fornecimento de materiais para a metragem base e o teste de vazão.</td>
-        <td class="n">${L(6)} m</td><td class="n">R$ ${L(12)}</td><td class="n">R$ ${L(12)}</td></tr>
-      <tr><td class="n">${L(6)} m</td><td class="n">R$ ${L(12)}</td><td class="n">R$ ${L(12)}</td></tr>
+    <div class="sub">Perfuração de poço tubular profundo (poço artesiano)</div>
+    ${fichaCliente()}
+    <h2><span class="n">1</span>Escopo e investimento</h2>
+    <table class="itens"><tr><th>Descrição do serviço</th><th class="n">Metragem base</th><th class="n">Valor à vista</th><th class="n">Valor parcelado</th></tr>
+      <tr><td>Perfuração de poço artesiano · opção A<br><span class="nota">Inclui os materiais da metragem base e o teste de vazão.</span></td>
+        <td class="n">${L(6)} m</td><td class="n">R$ ${L(11)}</td><td class="n">R$ ${L(11)}</td></tr>
+      <tr><td>Perfuração de poço artesiano · opção B<br><span class="nota">Inclui os materiais da metragem base e o teste de vazão.</span></td>
+        <td class="n">${L(6)} m</td><td class="n">R$ ${L(11)}</td><td class="n">R$ ${L(11)}</td></tr>
     </table>
-    <p style="margin-top:8px">Instalação do conjunto motobomba: ${caixa} Incluso &nbsp; ${caixa} Não incluso &nbsp; ${caixa} À parte: R$ ${L(12)}</p>
-    <p>Prazo estimado: ${L(4)} dias úteis após o início dos trabalhos (sujeito a condições climáticas ou geológicas).</p>
-    <p><b>Metragem adicional (caso necessário):</b> se a metragem base for atingida sem vazão suficiente, a continuidade dependerá de nova
+    <div class="ficha branco" style="margin-top:3mm">
+      ${celula('Conjunto motobomba', `${caixa}Incluso ${caixa}Não incluso ${caixa}À parte R$ ${L(7)}`)}
+      ${celula('Prazo estimado', `${L(4)} dias úteis após o início <small>· sujeito ao clima e ao solo</small>`)}
+    </div>
+    <p class="nota" style="margin-top:2.5mm"><b>Metragem adicional (caso necessário):</b> se a metragem base for atingida sem vazão suficiente, a continuidade dependerá de nova
       autorização do cliente, ao valor ${exc ? `inicial de ${brl(exc)}` : `de R$ ${L(10)}`} por metro, podendo ser readequado conforme o solo e a profundidade, com o preço final aprovado antes do reinício.</p>
-    <h2>2. Forma de pagamento</h2>
-    <p>Sinal / entrada: ${L(5)}% = R$ ${L(12)}, pago ${caixa} na assinatura &nbsp; ${caixa} na chegada do maquinário.</p>
-    <p>Saldo: R$ ${L(12)} &nbsp; ${caixa} ao final dos trabalhos &nbsp; ${caixa} parcelado em ${L(3)} vezes de R$ ${L(10)} no cartão de crédito.</p>
-    <p style="font-size:11px;color:#555">Parcelamentos no cartão de crédito podem ter o repasse das taxas da maquininha.</p>
-    <h2>3. Observações da negociação</h2>
-    <p>${L(95)}</p><p>${L(95)}</p><p>${L(95)}</p>
-    <h2>Condições gerais</h2><ul class="condicoes">${CONDICOES_ORCAMENTO.map(t => `<li>${escapar(t)}</li>`).join('')}</ul>
-    ${assinaturas(e.empresaNome || '')}`);
+    <h2><span class="n">2</span>Forma de pagamento</h2>
+    <div class="ficha branco">
+      ${celula('Sinal / entrada', `${L(4)}% = R$ ${L(11)} &nbsp; ${caixa}na assinatura ${caixa}na chegada do maquinário`, true)}
+      ${celula('Saldo', `R$ ${L(11)} &nbsp; ${caixa}ao final dos trabalhos ${caixa}parcelado em ${L(3)}× de R$ ${L(9)} no cartão`, true)}
+    </div>
+    <p class="nota">Parcelamentos no cartão de crédito podem ter o repasse das taxas da maquininha.</p>
+    <h2><span class="n">3</span>Observações da negociação</h2>
+    <p>${LINHA}</p><p>${LINHA}</p><p>${LINHA}</p>
+    <h2><span class="n">4</span>Condições gerais</h2>${listaCondicoes(CONDICOES_ORCAMENTO)}
+    ${localData()}
+    ${blocoAssinaturas([{ nome: escapar(e.empresaNome || 'Empresa'), papel: 'Contratada' }, { nome: '', papel: 'Cliente · nome e assinatura' }])}`);
 };
 
 const tabela = (e: ConfigProcesso, logo: string | null) => {
-  const tipo = (p: typeof ITENS_PRONTOS[number]) => (p.item.incluso ? 'Incluso' : p.item.opcional ? 'Se necessário' : '');
-  return pagina('Tabela de preços de referência', `${cabecalho({ empresa: e }, logo)}
+  const linha = (p: typeof ITENS_PRONTOS[number]) => `<tr${p.item.opcional ? ' class="opcional"' : ''}><td>${escapar(p.item.descricao)}</td>
+    <td class="n">${L(4)}</td><td class="n">${escapar(p.item.unidade)}</td><td class="n">${p.item.valorUnitario ? brl(p.item.valorUnitario) : '—'}</td>
+    <td class="n">${p.item.incluso ? '<span class="pill">Incluso</span>' : `R$ ${L(8)}`}</td></tr>`;
+  const base = ITENS_PRONTOS.filter(p => !p.item.opcional), opc = ITENS_PRONTOS.filter(p => p.item.opcional);
+  const livre = `<tr><td>${LINHA}</td><td class="n">${L(4)}</td><td class="n">${L(2)}</td><td class="n">R$ ${L(7)}</td><td class="n">R$ ${L(8)}</td></tr>`;
+  return pagina('Tabela de preços de referência', `${cabecalho({ empresa: e }, logo, { tipo: 'Tabela de preços', numero: 'Referência', data: `Data: ${DATA}` })}
     <h1>Tabela de preços de referência</h1>
-    <p>Cliente: ${L(40)} &nbsp; Data: ____/____/________</p>
-    <table class="itens"><tr><th>Item</th><th>Qtd.</th><th>Un.</th><th>Valor unit. (ref.)</th><th>Total</th><th></th></tr>
-      ${ITENS_PRONTOS.map(p => `<tr${p.item.opcional ? ' class="opcional"' : ''}><td>${escapar(p.item.descricao)}</td><td class="n">${L(5)}</td>
-        <td class="n">${escapar(p.item.unidade)}</td><td class="n">${p.item.valorUnitario ? brl(p.item.valorUnitario) : '—'}</td>
-        <td class="n">${p.item.incluso ? '<b>INCLUSO</b>' : `R$ ${L(9)}`}</td><td class="n">${tipo(p)}</td></tr>`).join('')}
-      <tr><td>${L(40)}</td><td class="n">${L(5)}</td><td></td><td class="n">R$ ${L(8)}</td><td class="n">R$ ${L(9)}</td><td></td></tr>
-      <tr><td>${L(40)}</td><td class="n">${L(5)}</td><td></td><td class="n">R$ ${L(8)}</td><td class="n">R$ ${L(9)}</td><td></td></tr>
-      <tr class="total"><td colspan="4">Total geral</td><td class="n">R$ ${L(9)}</td><td></td></tr>
+    <div class="sub">Perfuração 6" por faixa de solo, materiais e serviços · preencha a quantidade e o total com o cliente</div>
+    <div class="ficha branco">${celula('Cliente', LINHA)}${celula('Local da obra', LINHA)}</div>
+    <h2><span class="n">1</span>Itens</h2>
+    <table class="itens"><tr><th>Item</th><th class="n">Qtd.</th><th class="n">Un.</th><th class="n">Valor unit. (ref.)</th><th class="n">Total</th></tr>
+      ${base.map(linha).join('')}${livre}${livre}
+      <tr class="total"><td colspan="4">Total geral</td><td class="n">R$ ${L(9)}</td></tr>
+      <tr class="grupo"><td colspan="5">Se necessário, não incluso no total · cobrado só se for usado</td></tr>
+      ${opc.map(linha).join('')}
     </table>
-    <p class="rodape">Valores de referência da empresa: podem mudar conforme o solo, a profundidade, a cidade e o acesso ao local. Itens
-      "incluso" fazem parte do pacote e não somam no total; "se necessário" só são cobrados se usados.</p>`);
+    <p class="rodape">Valores de referência da empresa: podem mudar conforme o solo, a profundidade, a cidade e o acesso ao local. Itens "incluso" fazem parte
+      do pacote e não somam no total.</p>`);
 };
 
 const contrato = (e: ConfigProcesso, logo: string | null) => {
@@ -83,28 +96,37 @@ const contrato = (e: ConfigProcesso, logo: string | null) => {
     escopo: '', metros: `${L(6)} metros`, valor_total: `R$ ${L(12)}`, valor_total_extenso: L(40),
     condicao_parcelada: ` à vista, ou R$ ${L(12)} (${L(30)}) se parcelado no cartão de crédito`, valor_parcelado: `R$ ${L(12)}`,
     valor_metro_excedente: `R$ ${L(10)}`, sinal: `Sinal/entrada: R$ ${L(12)} (${L(4)}%), pago ${L(30)}.`,
-    forma_pagamento: `Saldo restante: R$ ${L(12)}, pago ${L(40)}.`, prazo_dias: L(4), data_inicio: '____/____/________', garantia_meses: L(4),
+    forma_pagamento: `Saldo restante: R$ ${L(12)}, pago ${L(40)}.`, prazo_dias: L(4), data_inicio: DATA, garantia_meses: L(4),
     texto_garantia: e.textoGarantia || '', foro: e.foroCidade || L(20), responsavel_tecnico: e.responsavelTecnico || '', registro_tecnico: e.registroTecnico || '',
-    cidade_data: `${e.foroCidade || L(20)}, ____ de ${L(16)} de ________`, data_contrato: '____/____/________',
+    cidade_data: `${e.foroCidade || L(20)}, ____ de ${L(16)} de ________`, data_contrato: DATA,
   };
   const corpo = modeloEmHtml(e.modeloContrato || MODELO_CONTRATO_PADRAO, campos, { tabela_itens: '' });
-  return pagina('Contrato em branco', `${cabecalho({ empresa: e }, logo)}<div class="contrato">${corpo}</div>
-    <div class="assinaturas quatro"><div>CONTRATADA · ${escapar(e.empresaNome || '')}${e.empresaRepresentante ? `<br>${escapar(e.empresaRepresentante)}` : ''}</div>
-      <div>CONTRATANTE · nome e assinatura</div><div>Testemunha 1 · nome e CPF</div><div>Testemunha 2 · nome e CPF</div></div>`);
+  return pagina('Contrato em branco', `${cabecalho({ empresa: e }, logo, { tipo: 'Contrato', numero: `Nº ${L(6)}`, data: `Data: ${DATA}` })}<div class="contrato">${corpo}</div>
+    ${blocoAssinaturas([
+      { nome: escapar(e.empresaNome || ''), papel: `CONTRATADA${e.empresaRepresentante ? `<br>${escapar(e.empresaRepresentante)}` : ''}` },
+      { nome: '', papel: 'CONTRATANTE · nome e assinatura' }, { nome: '', papel: 'Testemunha 1 · nome e CPF' }, { nome: '', papel: 'Testemunha 2 · nome e CPF' },
+    ], true)}`);
 };
 
-const autorizacao = (e: ConfigProcesso, logo: string | null) => pagina('Autorização de metragem adicional', `${cabecalho({ empresa: e }, logo)}
-  <h1>Autorização de continuidade da perfuração (metragem adicional)</h1>
-  <p>Contrato / orçamento nº ${L(8)}</p>
-  ${linhasCliente()}
-  <h2>Situação na obra</h2>
-  <p>Profundidade contratada: ${L(6)} m &nbsp; Profundidade atingida: ${L(6)} m &nbsp; Vazão observada: ${L(8)}</p>
-  <p>Condições do solo: ${L(70)}</p>
-  <h2>Autorização</h2>
-  ${paragrafos(`Eu, cliente acima identificado, autorizo ${e.empresaNome || 'a empresa contratada'} a continuar a perfuração do poço além da profundidade contratada, até no máximo ${L(6)} metros adicionais (profundidade total de até ${L(6)} m), ao valor de R$ ${L(10)} por metro adicional perfurado, totalizando no máximo R$ ${L(12)}.
-Estou ciente de que a perfuração é obrigação de meio e não de resultado: não há garantia de vazão, quantidade ou qualidade da água, e os metros efetivamente perfurados serão cobrados mesmo que não se encontre a vazão desejada.
-O valor da metragem adicional será pago ${L(45)}.`)}
-  ${assinaturas(e.empresaNome || '')}`);
+const autorizacao = (e: ConfigProcesso, logo: string | null) => pagina('Autorização de metragem adicional', `${cabecalho({ empresa: e }, logo,
+  { tipo: 'Autorização', numero: 'Metragem adicional', data: `Contrato nº ${L(6)}` })}
+  <h1>Autorização de continuidade da perfuração</h1>
+  <div class="sub">Metragem adicional além da profundidade contratada</div>
+  ${fichaCliente()}
+  <h2><span class="n">1</span>Situação na obra</h2>
+  <div class="ficha tres branco">
+    ${celula('Profundidade contratada', `${L(6)} m`)}${celula('Profundidade atingida', `${L(6)} m`)}${celula('Vazão observada', LINHA)}
+  </div>
+  <p style="margin-top:2.5mm">Condições do solo: ${L(70)}</p>
+  <h2><span class="n">2</span>Autorização</h2>
+  <p>Eu, cliente acima identificado, autorizo <b>${escapar(e.empresaNome || 'a empresa contratada')}</b> a continuar a perfuração do poço além da profundidade
+    contratada, até no máximo <b>${L(5)} metros adicionais</b> (profundidade total de até ${L(5)} m), ao valor de <b>R$ ${L(9)} por metro</b> adicional perfurado,
+    totalizando no máximo R$ ${L(11)}.</p>
+  <p>Estou ciente de que a perfuração é obrigação de meio e não de resultado: não há garantia de vazão, quantidade ou qualidade da água, e os metros
+    efetivamente perfurados serão cobrados mesmo que não se encontre a vazão desejada.</p>
+  <p>O valor da metragem adicional será pago ${L(45)}.</p>
+  ${localData()}
+  ${blocoAssinaturas([{ nome: '', papel: 'Cliente · nome e assinatura' }, { nome: escapar(e.empresaNome || ''), papel: 'Responsável pela obra' }])}`);
 
 /** Página HTML do modelo em branco (com a impressão automática, como os outros documentos). */
 export const htmlEmBranco = (id: ModeloBranco, empresa: ConfigProcesso, logo: string | null) =>

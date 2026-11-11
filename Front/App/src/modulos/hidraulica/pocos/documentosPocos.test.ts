@@ -36,7 +36,7 @@ teste('documentos de poço: orçamento', () => {
   assert.ok(/V.lido at. 08\/11\/2026 \(15 dias\)/.test(h), 'validade de 15 dias a partir de hoje');
   assert.ok(h.includes('Perfuração + Instalação da bomba') && h.includes('<p>Revestimento 6&quot;</p>'));
   assert.ok(/R\$\s20\.160,00/.test(h), 'total com o adicional');                    // 18.000 + 2.160 de adicional aprovado
-  assert.ok(h.includes('Sinal de') && h.includes('para agendar o início da obra') && h.includes('em até 10 dia(s)'));
+  assert.ok(h.includes('Sinal de') && h.includes('para agendar o início da obra') && h.includes('Em até 10 dia(s)'));
   assert.ok(h.includes('Poços &lt;Silva&gt;') && !h.includes('Poços <Silva>'));                // escapa o HTML
   assert.ok(h.includes('<img src="http://servidor/uploads/logo.png"') && h.includes('12.345.678/0001-90'));
 });
@@ -70,13 +70,13 @@ teste('documentos de poço: orçamento com itens (o opcional fica fora do total)
   ] } };
   const h = htmlOrcamento(d, null, '2026-10-24');
   assert.ok(/Total<\/td><td class="n">R\$\s11\.500,00/.test(h), 'total sem o opcional');
-  assert.ok(h.includes('se necessário, não incluso no total') && /R\$\s200,00\/m/.test(h));
+  assert.ok(h.includes('Se necessário, não incluso no total') && /R\$\s200,00\/m/.test(h));
   assert.ok(h.includes('Condições gerais') && h.includes('obrigação de meio'));
   // item incluso: aparece com o valor de referência e "INCLUSO", fora do total
   const d2 = { ...d, obra: { ...d.obra, valorParcelado: 12000, itens: [...d.obra.itens,
     { grupo: 'BOMBA' as const, descricao: 'Painel elétrico', quantidade: 1, unidade: 'un', valorUnitario: 700, valorTotal: 700, opcional: false, incluso: true }] } };
   const h2 = htmlOrcamento(d2, null, '2026-10-24');
-  assert.ok(/Total<\/td><td class="n">R\$\s11\.500,00/.test(h2) && h2.includes('<b>INCLUSO</b>') && /R\$\s700,00/.test(h2));
+  assert.ok(/Total<\/td><td class="n">R\$\s11\.500,00/.test(h2) && h2.includes('class="pill">Incluso') && /R\$\s700,00/.test(h2));
   assert.ok(h2.includes('Parcelado (cartão de crédito)') && /R\$\s12\.000,00/.test(h2));
 });
 

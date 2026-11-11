@@ -22,72 +22,138 @@ const doc = (d: string | null | undefined) => {
 };
 export const paragrafos = (t: string | null | undefined) => escapar(t || '').split('\n').filter(Boolean).map(p => `<p>${p}</p>`).join('');
 
+// Visual dos documentos: papel timbrado (logo e dados da empresa à esquerda, quadro do documento à direita), seções
+// numeradas, tabelas com cabeçalho escuro e o total em destaque. Na tela (pré-visualização) a página aparece como folha A4.
 const ESTILO = `<style>
-  @page { size: A4; margin: 16mm 14mm; }
-  body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #222; margin: 0; }
-  .topo { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1677ff; padding-bottom: 10px; margin-bottom: 14px; }
-  .topo img { max-height: 70px; max-width: 220px; }
-  .empresa { text-align: right; font-size: 11px; line-height: 1.5; }
-  .empresa b { font-size: 15px; }
-  h1 { font-size: 18px; margin: 4px 0 12px; }
-  h2 { font-size: 13px; margin: 16px 0 6px; color: #1677ff; text-transform: uppercase; letter-spacing: .5px; }
+  :root { --a: #12456b; --t: #1f2a37; --m: #5b6876; --b: #d6dee6; --c: #e8f0f7; }
+  @page { size: A4; margin: 13mm 14mm 15mm; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, Helvetica, sans-serif; font-size: 10pt; color: var(--t); margin: 0; line-height: 1.45;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  @media screen {
+    html { background: #e5e7eb; }
+    body { width: 210mm; min-height: 297mm; margin: 14px auto; padding: 13mm 14mm 15mm; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,.18); }
+  }
+  p { margin: 1.2mm 0; }
+  .topo { display: flex; justify-content: space-between; align-items: stretch; gap: 8mm; padding-bottom: 4mm; border-bottom: 2.5pt solid var(--a); margin-bottom: 6mm; }
+  .marca { display: flex; gap: 4mm; align-items: center; }
+  .marca img { max-height: 20mm; max-width: 50mm; }
+  .marca .nome { font-size: 15pt; font-weight: 700; color: var(--a); line-height: 1.15; }
+  .marca .dados { font-size: 8pt; color: var(--m); line-height: 1.55; margin-top: 1mm; }
+  .docbox { text-align: right; border-left: 1px solid var(--b); padding-left: 6mm; min-width: 48mm; display: flex; flex-direction: column; justify-content: center; }
+  .docbox .tipo { font-size: 7.5pt; text-transform: uppercase; letter-spacing: 1.2pt; color: var(--m); }
+  .docbox .num { font-size: 17pt; font-weight: 700; color: var(--a); line-height: 1.15; }
+  .docbox .data { font-size: 8pt; color: var(--m); }
+  h1 { font-size: 14pt; margin: 0 0 .5mm; font-weight: 700; }
+  .sub { color: var(--m); font-size: 9pt; margin-bottom: 5mm; }
+  h2 { font-size: 8.5pt; text-transform: uppercase; letter-spacing: 1pt; color: var(--a); margin: 6mm 0 2.5mm; padding-bottom: 1.2mm;
+    border-bottom: 1px solid var(--b); font-weight: 700; break-after: avoid; }
+  h2 .n { display: inline-block; min-width: 4.6mm; text-align: center; background: var(--a); color: #fff; border-radius: 2px; margin-right: 2mm; }
+  /* as linhas entre as células são o vão da grade (fundo cinza aparecendo), então nunca desalinham */
+  .ficha { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--b); border: 1px solid var(--b); border-radius: 1.5mm; overflow: hidden; break-inside: avoid; }
+  .ficha > div { padding: 1.8mm 3mm; background: #fff; }
+  .ficha .largo { grid-column: 1 / -1; }
+  .ficha.tres { grid-template-columns: 1fr 1fr 1fr; }
+  .ficha.branco .v { font-weight: 400; }
+  .r { font-size: 7pt; text-transform: uppercase; letter-spacing: .6pt; color: var(--m); }
+  .v { font-weight: 600; min-height: 5mm; }
+  .v small { font-weight: 400; color: var(--m); }
   table { border-collapse: collapse; width: 100%; }
-  td, th { border: 1px solid #ddd; padding: 5px 8px; text-align: left; vertical-align: top; }
-  th { background: #f5f7fa; width: 32%; font-weight: normal; color: #555; }
-  .valor { text-align: right; white-space: nowrap; }
-  .total td { font-weight: bold; background: #f5f7fa; }
-  .assinaturas { display: flex; gap: 40px; margin-top: 50px; }
-  .assinaturas div { flex: 1; border-top: 1px solid #555; text-align: center; padding-top: 4px; font-size: 11px; }
-  .rodape { margin-top: 20px; font-size: 10px; color: #777; }
-  p { margin: 4px 0; }
-  .itens th { width: auto; } .itens td.n { text-align: right; white-space: nowrap; width: 1%; }
-  .opcional td { color: #555; font-style: italic; }
-  .condicoes { margin: 4px 0; padding-left: 18px; font-size: 11px; color: #444; } .condicoes li { margin: 3px 0; }
-  .contrato { font-size: 12px; line-height: 1.55; text-align: justify; }
-  .contrato h3 { font-size: 12px; margin: 14px 0 4px; text-transform: uppercase; }
-  .contrato p { margin: 5px 0; }
-  .assinaturas.quatro { flex-wrap: wrap; row-gap: 46px; }
-  .assinaturas.quatro div { flex: 1 1 40%; }
+  table.itens th { background: var(--a); color: #fff; font-size: 7.5pt; text-transform: uppercase; letter-spacing: .5pt; font-weight: 600; padding: 1.8mm 2.5mm; text-align: left; }
+  table.itens th.n { text-align: right; }
+  table.itens td { padding: 1.6mm 2.5mm; border-bottom: 1px solid var(--b); vertical-align: top; }
+  table.itens tr:nth-child(even) td { background: #f7f9fb; }
+  table.itens .n { text-align: right; white-space: nowrap; width: 1%; }
+  table.itens tr.total td { background: var(--c); font-weight: 700; font-size: 10.5pt; border-top: 1.5pt solid var(--a); border-bottom: 0; color: var(--a); }
+  table.itens tr.grupo td { background: #fff; font-size: 7.5pt; text-transform: uppercase; letter-spacing: .5pt; color: var(--m); padding-top: 4mm; font-weight: 600; }
+  table.itens tr.opcional td { color: var(--m); }
+  tr { break-inside: avoid; }
+  .pill { display: inline-block; font-size: 6.8pt; font-weight: 700; letter-spacing: .5pt; text-transform: uppercase; padding: .2mm 1.8mm; border-radius: 8px; background: #e3f1e8; color: #1e6b3a; }
+  .resumo { display: flex; gap: 3mm; margin: 3mm 0; break-inside: avoid; }
+  .resumo > div { flex: 1; border: 1px solid var(--b); border-radius: 1.5mm; padding: 2.2mm 3mm; }
+  .resumo .v { font-size: 13pt; }
+  .resumo .destaque { background: var(--a); border-color: var(--a); color: #fff; } .resumo .destaque .r { color: rgba(255,255,255,.75); }
+  .nota { font-size: 8.5pt; color: var(--m); }
+  .condicoes { border: 1px solid var(--b); background: #fafbfc; border-radius: 1.5mm; padding: 3mm 4mm 2mm 7mm; margin: 0; font-size: 8pt; color: #374151;
+    column-count: 2; column-gap: 7mm; }
+  .condicoes li { margin: 0 0 1.6mm; break-inside: avoid; }
+  .condicoes b { color: var(--t); }
+  .local-data { margin-top: 8mm; }
+  .assinaturas { display: flex; gap: 12mm; margin-top: 16mm; break-inside: avoid; }
+  .assinaturas > div { flex: 1; border-top: 1px solid #374151; padding-top: 1.5mm; text-align: center; font-size: 8pt; color: var(--m); line-height: 1.4; }
+  .assinaturas b { display: block; color: var(--t); font-size: 9pt; }
+  .assinaturas.quatro { flex-wrap: wrap; row-gap: 16mm; } .assinaturas.quatro > div { flex: 1 1 40%; }
+  .campo { display: inline-block; border-bottom: 1px solid #6b7280; height: 4.3mm; vertical-align: bottom; max-width: 100%; }
+  .caixa { display: inline-block; width: 3.3mm; height: 3.3mm; border: 1px solid #374151; border-radius: .6mm; vertical-align: -.5mm; margin: 0 1mm 0 3mm; }
+  .caixa:first-child { margin-left: 0; }
+  .rodape { margin-top: 8mm; padding-top: 2mm; border-top: 1px solid var(--b); font-size: 7.5pt; color: var(--m); text-align: center; }
+  .contrato { font-family: Cambria, 'Times New Roman', serif; font-size: 10pt; line-height: 1.6; text-align: justify; }
+  .contrato h1 { font-family: 'Segoe UI', Arial, sans-serif; text-align: center; font-size: 12.5pt; letter-spacing: .6pt; margin: 1mm 0 5mm; }
+  .contrato h3 { font-family: 'Segoe UI', Arial, sans-serif; font-size: 8.5pt; text-transform: uppercase; letter-spacing: .8pt; color: var(--a);
+    margin: 5mm 0 1.5mm; break-after: avoid; }
+  .contrato p { margin: 1.4mm 0; }
+  .contrato table.itens { font-family: 'Segoe UI', Arial, sans-serif; font-size: 8.5pt; margin: 2mm 0; text-align: left; }
 </style>`;
 
-export const cabecalho = (d: Pick<DocumentoObra, 'empresa'>, logo: string | null) => {
+/** Papel timbrado: logo (ou nome) e dados da empresa à esquerda; à direita, o quadro do documento (tipo, número, data). */
+export const cabecalho = (d: Pick<DocumentoObra, 'empresa'>, logo: string | null, documento?: { tipo: string; numero?: string; data?: string }) => {
   const e = d.empresa;
+  const linha1 = [e.empresaDocumento && `CNPJ ${doc(e.empresaDocumento)}`, e.empresaTelefone && `Tel. ${fone(e.empresaTelefone)}`,
+    e.empresaWhatsapp && `WhatsApp ${fone(e.empresaWhatsapp)}`].filter(Boolean).map(escapar).join(' · ');
+  const linha2 = [e.empresaEmail, e.empresaEndereco].filter(Boolean).map(escapar).join(' · ');
   return `<div class="topo">
-    <div>${logo ? `<img src="${escapar(logo)}" alt="logo">` : `<b style="font-size:20px">${escapar(e.empresaNome || '')}</b>`}</div>
-    <div class="empresa"><b>${escapar(e.empresaNome || '')}</b><br>
-      ${e.empresaDocumento ? `CNPJ/CPF ${escapar(doc(e.empresaDocumento))}<br>` : ''}
-      ${[e.empresaTelefone && `Tel. ${fone(e.empresaTelefone)}`, e.empresaWhatsapp && `WhatsApp ${fone(e.empresaWhatsapp)}`].filter(Boolean).map(escapar).join(' · ')}<br>
-      ${e.empresaEmail ? `${escapar(e.empresaEmail)}<br>` : ''}${e.empresaEndereco ? escapar(e.empresaEndereco) : ''}
-    </div></div>`;
+    <div class="marca">${logo ? `<img src="${escapar(logo)}" alt="logo">` : ''}
+      <div><div class="nome">${escapar(e.empresaNome || '')}</div><div class="dados">${linha1}${linha1 && linha2 ? '<br>' : ''}${linha2}</div></div></div>
+    ${documento ? `<div class="docbox"><div class="tipo">${escapar(documento.tipo)}</div>${documento.numero ? `<div class="num">${escapar(documento.numero)}</div>` : ''}
+      ${documento.data ? `<div class="data">${escapar(documento.data)}</div>` : ''}</div>` : ''}
+  </div>`;
 };
+
+/** Sequências de "_____" viram linhas de preencher (para os modelos em branco e os campos que faltam). */
+const linhasDePreencher = (html: string) =>
+  html.replace(/_{4,}/g, m => `<span class="campo" style="width:${Math.min(170, Math.round(m.length * 1.9))}mm"></span>`);
+
 export const pagina = (titulo: string, corpo: string) =>
-  `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${escapar(titulo)}</title>${ESTILO}</head><body>${corpo}<script>window.onload=function(){setTimeout(function(){window.print()},300)}</script></body></html>`;
+  `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${escapar(titulo)}</title>${ESTILO}</head><body>${linhasDePreencher(corpo)}<script>window.onload=function(){setTimeout(function(){window.print()},300)}</script></body></html>`;
+
+/** Rótulo pequeno em cima e o valor embaixo (as "fichas" dos documentos). */
+export const celula = (rotulo: string, valor: string, largo = false) =>
+  `<div${largo ? ' class="largo"' : ''}><div class="r">${escapar(rotulo)}</div><div class="v">${valor}</div></div>`;
+
 const linhaCliente = (d: DocumentoObra) => {
   const c = d.cliente;
   const local = d.poco ? [d.poco.endereco, d.poco.cidade && `${d.poco.cidade}${d.poco.uf ? `/${d.poco.uf}` : ''}`].filter(Boolean).join(' · ')
     : [c?.endereco, c?.cidade && `${c.cidade}${c.uf ? `/${c.uf}` : ''}`].filter(Boolean).join(' · ');
-  return `<table>
-    <tr><th>Cliente</th><td>${escapar(c?.nome || '—')}${c?.documento ? ` · ${escapar(doc(c.documento))}` : ''}</td></tr>
-    <tr><th>Telefone</th><td>${escapar(fone(c?.telefone) || '—')}</td></tr>
-    <tr><th>Local da obra</th><td>${escapar(local || '—')}${d.poco?.latitude != null ? ` · GPS ${d.poco.latitude}, ${d.poco.longitude}` : ''}</td></tr>
-  </table>`;
+  return `<div class="ficha">
+    ${celula('Cliente', escapar(c?.nome || '—'))}${celula('CPF / CNPJ', escapar(doc(c?.documento) || '—'))}
+    ${celula('Telefone', escapar(fone(c?.telefone) || '—'))}${celula('E-mail', escapar(c?.email || '—'))}
+    ${celula('Local da obra', `${escapar(local || '—')}${d.poco?.latitude != null ? ` <small>· GPS ${d.poco.latitude}, ${d.poco.longitude}</small>` : ''}`, true)}
+  </div>`;
 };
+
+/** Condição com a primeira parte ("Risco geológico:") em negrito. */
+const condicao = (t: string) => { const i = t.indexOf(':'); return i > 0 ? `<b>${escapar(t.slice(0, i + 1))}</b>${escapar(t.slice(i + 1))}` : escapar(t); };
+export const listaCondicoes = (lista: string[]) => `<ul class="condicoes">${lista.map(t => `<li>${condicao(t)}</li>`).join('')}</ul>`;
+
+/** Blocos de assinatura: nome em cima da linha e o papel embaixo. */
+export const blocoAssinaturas = (blocos: { nome: string; papel: string }[], quatro = false) =>
+  `<div class="assinaturas${quatro ? ' quatro' : ''}">${blocos.map(b => `<div><b>${b.nome || '&nbsp;'}</b>${b.papel}</div>`).join('')}</div>`;
 
 /**
  * Tabela dos itens: descrição, quantidade, unidade, valor unitário e total. Os inclusos mostram o valor de referência e
- * "Incluso" no total; os opcionais ("se necessário") vêm depois do total. Nenhum dos dois soma.
+ * "Incluso" no total; os opcionais ("se necessário") vêm depois do total, num grupo à parte. Nenhum dos dois soma.
  */
 export const tabelaItens = (itens: ItemOrcamentoForm[], adicionais: { descricao: string; valor: number }[] = []) => {
-  const linha = (i: ItemOrcamentoForm) => `<tr${i.opcional ? ' class="opcional"' : ''}><td>${escapar(i.descricao)}${i.opcional ? ' <small>(se necessário, não incluso no total)</small>' : ''}</td>
+  const linha = (i: ItemOrcamentoForm) => `<tr${i.opcional ? ' class="opcional"' : ''}><td>${escapar(i.descricao)}</td>
     <td class="n">${num(i.quantidade, i.unidade)}</td><td class="n">${i.valorUnitario ? brl(i.valorUnitario) : i.incluso ? '—' : brl(0)}</td>
-    <td class="n">${i.opcional ? `${brl(i.valorUnitario)}/${escapar(i.unidade)}` : i.incluso ? '<b>INCLUSO</b>' : brl(i.valorTotal)}</td></tr>`;
+    <td class="n">${i.opcional ? `${brl(i.valorUnitario)}/${escapar(i.unidade)}` : i.incluso ? '<span class="pill">Incluso</span>' : brl(i.valorTotal)}</td></tr>`;
   const base = itens.filter(i => !i.opcional), opc = itens.filter(i => i.opcional);
   const total = (base.filter(i => !i.incluso).reduce((s, i) => s + Math.round(i.valorTotal * 100), 0) + adicionais.reduce((s, a) => s + Math.round(a.valor * 100), 0)) / 100;
-  return `<table class="itens"><tr><th>Descrição</th><th>Qtd.</th><th>Valor unit.</th><th>Total</th></tr>
+  return `<table class="itens"><tr><th>Descrição</th><th class="n">Qtd.</th><th class="n">Valor unit.</th><th class="n">Total</th></tr>
     ${base.map(linha).join('')}
-    ${adicionais.map(a => `<tr><td>${escapar(a.descricao)} <small>(adicional aprovado)</small></td><td class="n"></td><td class="n"></td><td class="n">${brl(a.valor)}</td></tr>`).join('')}
+    ${adicionais.map(a => `<tr><td>${escapar(a.descricao)} <span class="nota">(adicional aprovado)</span></td><td class="n"></td><td class="n"></td><td class="n">${brl(a.valor)}</td></tr>`).join('')}
     <tr class="total"><td colspan="3">Total</td><td class="n">${brl(total)}</td></tr>
-    ${opc.map(linha).join('')}
+    ${opc.length ? `<tr class="grupo"><td colspan="4">Se necessário, não incluso no total · cobrado só se for usado</td></tr>${opc.map(linha).join('')}` : ''}
   </table>`;
 };
 
@@ -104,30 +170,42 @@ export const CONDICOES_ORCAMENTO = [
 export const htmlOrcamento = (d: DocumentoObra, logo: string | null, hoje: string) => {
   const o = d.obra;
   const servicos = o.servicos.map(s => SERVICOS_TXT[s] || s).join(' + ');
-  const adic = o.adicionais.map(a => `<tr><td>${escapar(a.descricao)}</td><td class="valor">${brl(a.valor)}</td></tr>`).join('');
+  const adic = o.adicionais.map(a => `<tr><td>${escapar(a.descricao)}</td><td class="n"></td><td class="n"></td><td class="n">${brl(a.valor)}</td></tr>`).join('');
   const total = (o.valorContratado || 0) + o.adicionais.reduce((s, a) => s + a.valor, 0);
   const itens = o.itens || [];
   const validade = new Date(`${hoje}T12:00:00`); validade.setDate(validade.getDate() + o.validadeOrcamentoDias);
-  return pagina(`Orçamento ${o.idObra}`, `${cabecalho(d, logo)}
-    <h1>Orçamento nº ${o.idObra}${o.titulo ? ` · ${escapar(o.titulo)}` : ''}</h1>
-    <p>Data: ${dataBr(hoje)} · Válido até ${dataBr(validade.toISOString().slice(0, 10))} (${o.validadeOrcamentoDias} dias)</p>
+  const cartao = (rotulo: string, valor: string, destaque = false) => `<div${destaque ? ' class="destaque"' : ''}><div class="r">${rotulo}</div><div class="v">${valor}</div></div>`;
+  return pagina(`Orçamento ${o.idObra}`, `${cabecalho(d, logo, { tipo: 'Orçamento', numero: `Nº ${o.idObra}`, data: `Emitido em ${dataBr(hoje)}` })}
+    <h1>${escapar(o.titulo || servicos)}</h1>
+    <div class="sub">Orçamento nº ${o.idObra} · Válido até ${dataBr(validade.toISOString().slice(0, 10))} (${o.validadeOrcamentoDias} dias)</div>
     ${linhaCliente(d)}
-    <h2>Serviço</h2><p><b>${escapar(servicos)}</b>${o.metrosPrevistos ? ` · profundidade prevista: ${num(o.metrosPrevistos, 'm')}` : ''}</p>
+    <h2><span class="n">1</span>Serviço</h2>
+    <p><b>${escapar(servicos)}</b>${o.metrosPrevistos ? ` · profundidade prevista: ${num(o.metrosPrevistos, 'm')}` : ''}</p>
     ${o.escopo ? paragrafos(o.escopo) : ''}
-    <h2>Valores</h2>${itens.length ? tabelaItens(itens, o.adicionais) : `<table>
-      <tr><td>${escapar(servicos)}${o.metrosPrevistos ? ` (até ${num(o.metrosPrevistos, 'm')})` : ''}</td><td class="valor">${brl(o.valorContratado)}</td></tr>
-      ${o.valorMetroExcedente ? `<tr><td>Metro excedente (acima do previsto, se necessário)</td><td class="valor">${brl(o.valorMetroExcedente)} por metro</td></tr>` : ''}
+    <h2><span class="n">2</span>Valores</h2>${itens.length ? tabelaItens(itens, o.adicionais) : `<table class="itens"><tr><th>Descrição</th><th class="n"></th><th class="n"></th><th class="n">Valor</th></tr>
+      <tr><td>${escapar(servicos)}${o.metrosPrevistos ? ` (até ${num(o.metrosPrevistos, 'm')})` : ''}</td><td class="n"></td><td class="n"></td><td class="n">${brl(o.valorContratado)}</td></tr>
       ${adic}
-      <tr class="total"><td>Total</td><td class="valor">${brl(total)}</td></tr>
+      <tr class="total"><td colspan="3">Total</td><td class="n">${brl(total)}</td></tr>
+      ${o.valorMetroExcedente ? `<tr class="grupo"><td colspan="4">Se necessário, não incluso no total · cobrado só se for usado</td></tr>
+        <tr class="opcional"><td>Metro excedente (acima do previsto)</td><td class="n"></td><td class="n"></td><td class="n">${brl(o.valorMetroExcedente)}/m</td></tr>` : ''}
     </table>`}
-    <h2>Pagamento</h2>
-    ${o.valorParcelado ? `<table><tr><th>À vista</th><td class="valor">${brl(total)}</td></tr><tr><th>Parcelado (cartão de crédito)</th><td class="valor">${brl(o.valorParcelado)}</td></tr></table>` : ''}
+    <h2><span class="n">3</span>Pagamento</h2>
+    <div class="resumo">
+      ${cartao(o.valorParcelado ? 'Total à vista' : 'Total', brl(total), true)}
+      ${o.valorParcelado ? cartao('Parcelado (cartão de crédito)', brl(o.valorParcelado)) : ''}
+      ${o.valorSinal ? cartao('Sinal / entrada', brl(o.valorSinal)) : ''}
+    </div>
     ${o.valorSinal ? `<p>Sinal de ${brl(o.valorSinal)} ${o.sinalQuando === 'NO_ATO' ? 'no dia do início da obra' : 'para agendar o início da obra'}.</p>` : ''}
     ${o.formaPagamento ? paragrafos(o.formaPagamento) : '<p>A combinar.</p>'}
-    <h2>Prazo</h2><p>${o.prazoExecucaoDias ? `Execução em até ${o.prazoExecucaoDias} dia(s) a partir do início, salvo chuva ou condições do terreno.` : 'A combinar na aprovação.'}</p>
-    <h2>Garantia</h2>${o.garantiaMeses ? `<p><b>${o.garantiaMeses} meses</b> a partir da conclusão.</p>` : ''}${paragrafos(d.empresa.textoGarantia)}
-    <h2>Condições gerais</h2><ul class="condicoes">${CONDICOES_ORCAMENTO.map(t => `<li>${escapar(t)}</li>`).join('')}</ul>
-    <div class="assinaturas"><div>${escapar(d.empresa.empresaNome || 'Empresa')}</div><div>De acordo: ${escapar(d.cliente?.nome || 'Cliente')}</div></div>`);
+    <h2><span class="n">4</span>Prazo e garantia</h2>
+    <div class="ficha">
+      ${celula('Prazo de execução', o.prazoExecucaoDias ? `Em até ${o.prazoExecucaoDias} dia(s) a partir do início <small>· salvo chuva ou condições do terreno</small>` : 'A combinar na aprovação')}
+      ${celula('Garantia', o.garantiaMeses ? `${o.garantiaMeses} meses <small>a partir da conclusão</small>` : 'Conforme o contrato')}
+    </div>
+    ${paragrafos(d.empresa.textoGarantia)}
+    <h2><span class="n">5</span>Condições gerais</h2>${listaCondicoes(CONDICOES_ORCAMENTO)}
+    <p class="local-data">${escapar(d.empresa.foroCidade || d.cliente?.cidade || '')}${d.empresa.foroCidade || d.cliente?.cidade ? ', ' : ''}${dataPorExtenso(hoje).trim()}.</p>
+    ${blocoAssinaturas([{ nome: escapar(d.empresa.empresaNome || 'Empresa'), papel: 'Contratada' }, { nome: escapar(d.cliente?.nome || 'Cliente'), papel: 'De acordo do cliente' }])}`);
 };
 
 /** Laudo de entrega: o poço como ficou (profundidade, vazão, níveis, diâmetro, bomba) e a garantia. */
@@ -136,28 +214,32 @@ export const htmlLaudo = (d: DocumentoObra, logo: string | null, hoje: string) =
   const v = <T,>(a: T | null | undefined, b: T | null | undefined) => (a ?? b ?? null);
   const rebaixamento = v(m.nivelDinamicoM, p?.nivelDinamicoM) !== null && v(m.nivelEstaticoM, p?.nivelEstaticoM) !== null
     ? (v(m.nivelDinamicoM, p?.nivelDinamicoM) as number) - (v(m.nivelEstaticoM, p?.nivelEstaticoM) as number) : null;
-  return pagina(`Laudo ${o.idObra}`, `${cabecalho(d, logo)}
+  const solo = v(m.tipoSolo, p?.tipoSolo);
+  return pagina(`Laudo ${o.idObra}`, `${cabecalho(d, logo, { tipo: 'Laudo de entrega', numero: `Obra nº ${o.idObra}`, data: `Emitido em ${dataBr(hoje)}` })}
     <h1>Laudo de entrega · obra nº ${o.idObra}</h1>
-    <p>Emitido em ${dataBr(hoje)}${o.dataTermino ? ` · obra concluída em ${dataBr(o.dataTermino)}` : ''}</p>
+    <div class="sub">${escapar(o.servicos.map(s => SERVICOS_TXT[s] || s).join(' + '))}${o.dataTermino ? ` · obra concluída em ${dataBr(o.dataTermino)}` : ''}</div>
     ${linhaCliente(d)}
-    <h2>O poço</h2><table>
-      ${p ? `<tr><th>Identificação</th><td>${escapar(p.identificacao)}</td></tr>` : ''}
-      <tr><th>Serviço</th><td>${escapar(o.servicos.map(s => SERVICOS_TXT[s] || s).join(' + '))}</td></tr>
-      <tr><th>Profundidade</th><td>${num(v(m.profundidadeM, p?.profundidadeM), 'm')}</td></tr>
-      <tr><th>Diâmetro</th><td>${escapar(v(m.diametro, p?.diametro) || '—')}</td></tr>
-      <tr><th>Vazão</th><td>${num(v(m.vazaoLh, p?.vazaoLh), 'L/h')}</td></tr>
-      <tr><th>Nível estático</th><td>${num(v(m.nivelEstaticoM, p?.nivelEstaticoM), 'm')} <span style="color:#777">(água parada, a partir da boca do poço)</span></td></tr>
-      <tr><th>Nível dinâmico</th><td>${num(v(m.nivelDinamicoM, p?.nivelDinamicoM), 'm')} <span style="color:#777">(com a bomba ligada)</span></td></tr>
-      ${rebaixamento !== null ? `<tr><th>Rebaixamento</th><td>${num(rebaixamento, 'm')}</td></tr>` : ''}
-      ${v(m.tipoSolo, p?.tipoSolo) ? `<tr><th>Solo</th><td>${escapar(v(m.tipoSolo, p?.tipoSolo))}</td></tr>` : ''}
-      ${m.bomba ? `<tr><th>Bomba</th><td>${escapar(m.bomba)}</td></tr>` : ''}
-    </table>
-    <h2>Garantia</h2>
+    <h2><span class="n">1</span>O poço</h2>
+    <div class="ficha tres">
+      ${celula('Identificação', escapar(p?.identificacao || '—'))}${celula('Profundidade', num(v(m.profundidadeM, p?.profundidadeM), 'm'))}${celula('Diâmetro', escapar(v(m.diametro, p?.diametro) || '—'))}
+      ${celula('Vazão', num(v(m.vazaoLh, p?.vazaoLh), 'L/h'))}${celula('Nível estático', `${num(v(m.nivelEstaticoM, p?.nivelEstaticoM), 'm')} <small>água parada</small>`)}${celula('Nível dinâmico', `${num(v(m.nivelDinamicoM, p?.nivelDinamicoM), 'm')} <small>bomba ligada</small>`)}
+      ${celula('Rebaixamento', rebaixamento !== null ? num(rebaixamento, 'm') : '—')}${celula('Solo', escapar(solo || '—'))}${celula('Bomba', escapar(m.bomba || '—'))}
+    </div>
+    <p class="nota">Níveis medidos a partir da boca do poço.</p>
+    <h2><span class="n">2</span>Garantia</h2>
     <p>${o.garantiaMeses ? `<b>${o.garantiaMeses} meses</b>${o.garantiaAte ? `, até ${dataBr(o.garantiaAte)}` : ''}.` : 'Conforme o contrato.'}</p>${paragrafos(d.empresa.textoGarantia)}
-    <h2>Recomendações</h2>
-    <p>Não deixe a bomba trabalhar sem água (a seco); mantenha a tampa do poço fechada e o quadro protegido da chuva; em caso de queda de vazão,
-      água turva ou bomba desarmando, chame a assistência. Recomendamos uma revisão preventiva a cada 12 meses.</p>
-    <div class="assinaturas"><div>Responsável técnico · ${escapar(d.empresa.empresaNome || '')}</div><div>Recebido por: ${escapar(d.cliente?.nome || '')}</div></div>`);
+    <h2><span class="n">3</span>Recomendações</h2>
+    ${listaCondicoes([
+      'Bomba: não deixe trabalhar sem água (a seco); se desarmar com frequência, desligue e chame a assistência.',
+      'Poço: mantenha a tampa fechada e a área em volta limpa, sem fossa ou lixo por perto.',
+      'Quadro de comando: proteja da chuva e do sol direto; não altere as proteções.',
+      'Sinais de atenção: queda de vazão, água turva ou com cheiro, barulho diferente na bomba.',
+      'Revisão: recomendamos uma revisão preventiva a cada 12 meses.',
+    ])}
+    ${blocoAssinaturas([
+      { nome: escapar(d.empresa.responsavelTecnico || d.empresa.empresaNome || ''), papel: `Responsável técnico${d.empresa.registroTecnico ? ` · ${escapar(d.empresa.registroTecnico)}` : ''}` },
+      { nome: escapar(d.cliente?.nome || ''), papel: 'Recebido por (cliente)' },
+    ])}`);
 };
 
 /** Adesivo do quadro (10 × 6 cm): empresa, telefone e WhatsApp, nº da obra e do poço. Sai 4 por folha para recortar. */
@@ -166,16 +248,18 @@ export const htmlAdesivo = (d: DocumentoObra, logo: string | null) => {
   const um = `<div class="adesivo">
     ${logo ? `<img src="${escapar(logo)}" alt="">` : ''}
     <div class="nome">${escapar(e.empresaNome || '')}</div>
-    <div class="tel">${escapar(fone(e.empresaWhatsapp || e.empresaTelefone) || '')}</div>
     <div class="info">Assistência e manutenção do poço${e.empresaWhatsapp ? ' · WhatsApp' : ''}</div>
+    <div class="tel">${escapar(fone(e.empresaWhatsapp || e.empresaTelefone) || '')}</div>
     <div class="obra">Obra nº ${d.obra.idObra}${d.poco ? ` · Poço ${escapar(d.poco.identificacao)}` : ''}${d.obra.dataTermino ? ` · ${dataBr(d.obra.dataTermino)}` : ''}</div>
   </div>`;
   return pagina(`Adesivo ${d.obra.idObra}`, `<style>
       .folha { display: flex; flex-wrap: wrap; gap: 6mm; }
-      .adesivo { width: 100mm; height: 60mm; border: 1px dashed #999; border-radius: 4mm; box-sizing: border-box; padding: 4mm; text-align: center; display: flex; flex-direction: column; justify-content: center; }
-      .adesivo img { max-height: 16mm; max-width: 60mm; margin: 0 auto 2mm; }
-      .nome { font-weight: bold; font-size: 15px; } .tel { font-size: 24px; font-weight: bold; color: #1677ff; margin: 1mm 0; }
-      .info { font-size: 11px; } .obra { font-size: 10px; color: #555; margin-top: 2mm; }
+      .adesivo { width: 100mm; height: 60mm; border: 1px dashed #9aa5b1; border-radius: 4mm; padding: 4mm; text-align: center; display: flex;
+        flex-direction: column; justify-content: center; border-top: 3mm solid var(--a); }
+      .adesivo img { max-height: 15mm; max-width: 60mm; margin: 0 auto 2mm; }
+      .adesivo .nome { font-weight: 700; font-size: 13pt; color: var(--a); } .adesivo .tel { font-size: 21pt; font-weight: 800; color: var(--t); margin: 1mm 0; letter-spacing: .5pt; }
+      .adesivo .info { font-size: 8.5pt; color: var(--m); text-transform: uppercase; letter-spacing: .6pt; margin-top: 1.5mm; }
+      .adesivo .obra { font-size: 7.5pt; color: var(--m); margin-top: 2mm; }
     </style><div class="folha">${um}${um}${um}${um}</div>`);
 };
 
@@ -400,18 +484,19 @@ const camposBase = (d: DocumentoObra, hoje: string) => {
 };
 
 const assinaturasContrato = (d: DocumentoObra) => {
-  const c = d.cliente;
-  const contratada = `CONTRATADA · ${escapar(d.empresa.empresaNome || '')}${d.empresa.empresaRepresentante ? `<br>${escapar(d.empresa.empresaRepresentante)}` : ''}${d.empresa.responsavelTecnico ? `<br>${escapar(d.empresa.responsavelTecnico)}${d.empresa.registroTecnico ? ` · ${escapar(d.empresa.registroTecnico)}` : ''}` : ''}`;
-  const contratante = `CONTRATANTE · ${escapar(c?.nome || '')}${c?.tipoPessoa === 'PJ' && c.representante ? `<br>p.p. ${escapar(c.representante)}` : ''}`;
-  return `<div class="assinaturas quatro"><div>${contratada}</div><div>${contratante}</div>
-    <div>Testemunha 1 · nome e CPF</div><div>Testemunha 2 · nome e CPF</div></div>`;
+  const c = d.cliente, e = d.empresa;
+  return blocoAssinaturas([
+    { nome: escapar(e.empresaNome || ''), papel: `CONTRATADA${e.empresaRepresentante ? `<br>${escapar(e.empresaRepresentante)}` : ''}${e.responsavelTecnico ? `<br>${escapar(e.responsavelTecnico)}${e.registroTecnico ? ` · ${escapar(e.registroTecnico)}` : ''}` : ''}` },
+    { nome: escapar(c?.nome || ''), papel: `CONTRATANTE${c?.tipoPessoa === 'PJ' && c.representante ? `<br>p.p. ${escapar(c.representante)}` : ''}` },
+    { nome: '', papel: 'Testemunha 1 · nome e CPF' }, { nome: '', papel: 'Testemunha 2 · nome e CPF' },
+  ], true);
 };
 
 /** Contrato completo com cláusulas: o modelo da configuração (ou o padrão) preenchido com os dados da obra e do cliente. */
 export const htmlContrato = (d: DocumentoObra, logo: string | null, hoje: string) => {
   const o = d.obra;
   const corpo = modeloEmHtml(d.empresa.modeloContrato || MODELO_CONTRATO_PADRAO, camposBase(d, hoje), { tabela_itens: o.itens?.length ? tabelaItens(o.itens, []) : '' });
-  return pagina(`Contrato ${o.idObra}`, `${cabecalho(d, logo)}<div class="contrato">${corpo}</div>${assinaturasContrato(d)}`);
+  return pagina(`Contrato ${o.idObra}`, `${cabecalho(d, logo, { tipo: 'Contrato', numero: `Nº ${o.idObra}`, data: o.contratoAssinadoEm ? `Assinado em ${dataBr(o.contratoAssinadoEm)}` : undefined })}<div class="contrato">${corpo}</div>${assinaturasContrato(d)}`);
 };
 
 /** Termo aditivo: os adicionais que entraram nele, o valor e o novo total do contrato (contrato + aditivos até este). */
@@ -419,7 +504,7 @@ export const htmlAditivo = (d: DocumentoObra, aditivo: Aditivo, todos: Aditivo[]
   const o = d.obra;
   const ate = todos.filter(a => a.numero <= aditivo.numero).reduce((s, a) => s + Math.round(a.valor * 100), 0) / 100;
   const novoTotal = Math.round(((o.valorContratado || 0) + ate) * 100) / 100;
-  const tabela = `<table class="itens"><tr><th>Descrição</th><th>Qtd.</th><th>Valor unit.</th><th>Total</th></tr>
+  const tabela = `<table class="itens"><tr><th>Descrição</th><th class="n">Qtd.</th><th class="n">Valor unit.</th><th class="n">Total</th></tr>
     ${aditivo.adicionais.map(a => `<tr><td>${escapar(a.descricao)}</td><td class="n">${num(a.quantidade, '')}</td><td class="n">${brl(a.valorUnitario)}</td><td class="n">${brl(a.valor)}</td></tr>`).join('')}
     <tr class="total"><td colspan="3">Total do aditivo</td><td class="n">${brl(aditivo.valor)}</td></tr></table>`;
   const campos = {
@@ -427,5 +512,5 @@ export const htmlAditivo = (d: DocumentoObra, aditivo: Aditivo, todos: Aditivo[]
     novo_total: brl(novoTotal), novo_total_extenso: valorPorExtenso(novoTotal), observacao: aditivo.observacao || '',
   };
   const corpo = modeloEmHtml(d.empresa.modeloAditivo || MODELO_ADITIVO_PADRAO, campos, { tabela_adicionais: tabela });
-  return pagina(`Aditivo ${aditivo.numero} · obra ${o.idObra}`, `${cabecalho(d, logo)}<div class="contrato">${corpo}</div>${assinaturasContrato(d)}`);
+  return pagina(`Aditivo ${aditivo.numero} · obra ${o.idObra}`, `${cabecalho(d, logo, { tipo: 'Termo aditivo', numero: `Nº ${aditivo.numero}`, data: `Contrato nº ${o.idObra}` })}<div class="contrato">${corpo}</div>${assinaturasContrato(d)}`);
 };

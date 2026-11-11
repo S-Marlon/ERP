@@ -21,7 +21,7 @@ teste('modelos em branco do kit de visita', () => {
   const p = htmlEmBranco('PROPOSTA', empresa, null);
   assert.ok(p.includes('Metragem base') && /R\$\s280,00/.test(p), 'excedente de referência da planilha');
   const t = htmlEmBranco('TABELA', empresa, null);
-  assert.ok(t.includes('rocha consolidada (40 a 60 m)') && t.includes('<b>INCLUSO</b>') && /R\$\s1\.800,00/.test(t));
+  assert.ok(t.includes('rocha consolidada (40 a 60 m)') && t.includes('class="pill">Incluso') && /R\$\s1\.800,00/.test(t));
   const c = htmlEmBranco('CONTRATO', empresa, null);
   assert.ok(c.includes('CLÁUSULA 11ª – DO FORO') && c.includes('Comarca de Atibaia') && c.includes('neste ato representada por José M. Santos, CPF nº 120.572.328-59'));
   assert.ok(htmlEmBranco('AUTORIZACAO', empresa, null).includes('obrigação de meio'));
