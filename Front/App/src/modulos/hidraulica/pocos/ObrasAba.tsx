@@ -5,8 +5,13 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert, Button, Card, Checkbox, Col, Descriptions, Empty, Flex, Input, InputNumber, Modal, Popconfirm, Row, Segmented, Select, Space, Statistic, Steps, Table, Tag, Tooltip, Typography, message,
 } from 'antd';
-import { AimOutlined, CalculatorOutlined, CalendarOutlined, EditOutlined, EnvironmentOutlined, PlusOutlined, ReloadOutlined, UserOutlined } from '@ant-design/icons';
-import { contarObras, dataBr, foneBr, Obra, ObraForm, obrasApi, Poco, PocoForm, Servico, SERVICOS, SituacaoObra, SITUACOES_OBRA } from './obrasApi';
+import {
+  AimOutlined, ArrowRightOutlined, CalculatorOutlined, CalendarOutlined, CheckCircleOutlined, EditOutlined, EnvironmentOutlined, PlusOutlined, ReloadOutlined,
+  UserOutlined,
+} from '@ant-design/icons';
+import {
+  centralApi, ContratoCentral, contarObras, dataBr, foneBr, GRAVIDADES, Obra, ObraForm, obrasApi, Poco, PocoForm, Servico, SERVICOS, SituacaoObra, SITUACOES_OBRA,
+} from './obrasApi';
 import RelatorioPocoPage from './RelatorioPocoPage';
 import { ClientePocoModal, ListaClientes } from './ClientesPoco';
 import { AReceberObras, CobrancaDaObra } from './CobrancaObra';
@@ -15,7 +20,8 @@ import { HistoricoDoPoco } from './ManutencaoPocos';
 import { ProcessoDaObra } from './ProcessoObra';
 import { OrcamentoEContrato, OrcamentoRapido } from './OrcamentoContrato';
 import { lerGpsTexto, textoRaio } from './mapaRegional';
-import { abrirCliente, agendarObra, navPocos, ParteObra, useNavPocos, verNoMapa, VistaObras } from './navPocos';
+import { abrirCliente, abrirPoco, agendarObra, ParteObra, useNavPocos, verNoMapa, VistaObras } from './navPocos';
+import { DestinoPasso, parteDaSituacao, proximoPasso, rotuloDestino } from './proximoPasso';
 
 const { Text } = Typography;
 const brl = (v: number | null | undefined) => (v === null || v === undefined ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
@@ -272,13 +278,28 @@ const ObraModal: React.FC<{ obra: Obra | 'nova' | null; onFechar: () => void; on
 /** A obra aberta: a situação (com as passagens possíveis) e o relatório técnico gravando nela. */
 const ObraAberta: React.FC<{ idObra: number; parte?: ParteObra; onVoltar: () => void }> = ({ idObra, parte: parteInicial, onVoltar }) => {
   const [obra, setObra] = useState<Obra | null>(null);
-  const [parte, setParte] = useState<ParteObra>(parteInicial || 'RELATORIO');
+  // sem parte pedida, a obra abre onde está o trabalho da situação (orçamento, sinal, relatório, processo)
+  const [parteEscolhida, setParte] = useState<ParteObra | null>(parteInicial || null);
   const [versaoCobranca, setVersaoCobranca] = useState(0);
   const [editando, setEditando] = useState(false);
   const [versao, setVersao] = useState(0);
-  const carregar = useCallback(() => obrasApi.obra(idObra).then(setObra).catch(e => message.error(e.message)), [idObra]);
+  // o que falta nesta obra: as mesmas pendências da Central
+  const [pendencias, setPendencias] = useState<ContratoCentral['pendencias']>([]);
+  const carregar = useCallback(() => {
+    obrasApi.obra(idObra).then(setObra).catch(e => message.error(e.message));
+    centralApi.carregar().then(c => setPendencias(c.contratos.find(x => x.idObra === idObra)?.pendencias || [])).catch(() => setPendencias([]));
+  }, [idObra]);
   useEffect(() => { carregar(); }, [carregar]);
   if (!obra) return null;
+  const parte = parteEscolhida || parteDaSituacao(obra.situacao);
+  const passo = proximoPasso(obra.situacao, pendencias);
+  const outras = pendencias.filter(p => p.texto !== passo.texto);
+  const irPara = (d: DestinoPasso) => {
+    if (d === 'DADOS_OBRA') setEditando(true);
+    else if (d === 'POCO') { if (obra.idPoco) abrirPoco(obra.idPoco); else setEditando(true); }
+    else if (d === 'CLIENTE') abrirCliente(obra.idCliente);
+    else setParte(d);
+  };
   const mudar = async (s: SituacaoObra) => {
     try {
       const r = await obrasApi.mudarSituacao(obra.idObra, s);
@@ -326,6 +347,30 @@ const ObraAberta: React.FC<{ idObra: number; parte?: ParteObra; onVoltar: () => 
           { key: 'm', label: 'Metros', children: obra.metrosPrevistos ? `${obra.metrosPrevistos} m` : '—' },
           { key: 'v', label: 'Contratado', children: <>{brl(obra.valorContratado)}{obra.valorSinal ? <Text type="secondary" style={{ fontSize: 12 }}> · sinal {brl(obra.valorSinal)}</Text> : null}</> },
         ]} />
+        {obra.situacao !== 'CANCELADA' && (
+          <div style={{
+            marginTop: 8, padding: '8px 12px', borderRadius: 6,
+            background: passo.destino ? '#e6f4ff' : '#f6ffed', border: `1px solid ${passo.destino ? '#91caff' : '#b7eb8f'}`,
+          }}>
+            <Flex justify="space-between" align="center" wrap gap={8}>
+              <span>
+                {passo.destino ? <ArrowRightOutlined style={{ color: '#1677ff' }} /> : <CheckCircleOutlined style={{ color: '#52c41a' }} />}
+                <Text strong style={{ marginLeft: 6 }}>Próximo passo:</Text> {passo.texto}
+              </span>
+              {passo.destino && passo.botao && <Button size="small" type="primary" onClick={() => irPara(passo.destino!)}>{passo.botao}</Button>}
+            </Flex>
+            {outras.length > 0 && (
+              <div style={{ marginTop: 6 }}>
+                <Text type="secondary" style={{ fontSize: 12, marginRight: 6 }}>Também falta:</Text>
+                {outras.map((p, i) => (
+                  <Tooltip key={i} title={`Abrir ${rotuloDestino(p.acao).toLowerCase()}`}>
+                    <Tag color={GRAVIDADES[p.gravidade]} style={{ cursor: 'pointer', marginBottom: 3, whiteSpace: 'normal' }} onClick={() => irPara(p.acao)}>{p.texto}</Tag>
+                  </Tooltip>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </Card>
       <Flex justify="space-between" align="center" style={{ marginBottom: 8 }}>
         <Segmented value={parte} onChange={v => setParte(v as ParteObra)}
@@ -489,9 +534,6 @@ const ObrasAba: React.FC = () => {
   if (aberta) return <ObraAberta key={`${aberta}-${nav.pedido}`} idObra={aberta} parte={parte} onVoltar={() => setAberta(null)} />;
   return (
     <Space direction="vertical" size={12} style={{ width: '100%' }}>
-      <Segmented value={vista} onChange={v => navPocos.ir({ aba: 'obras', vista: v as VistaObras })}
-        options={[{ value: 'OBRAS', label: 'Obras' }, { value: 'RECEBER', label: 'A receber' }, { value: 'POCOS', label: 'Poços' }, { value: 'CLIENTES', label: 'Clientes de poço' },
-          { value: 'MATERIAIS', label: 'Materiais' }]} />
       {vista === 'OBRAS' && <ListaObras onAbrir={setAberta} />}
       {vista === 'POCOS' && <ListaPocos abrir={nav.abrirPoco} pedido={nav.pedido} />}
       {vista === 'CLIENTES' && <ListaClientes abrir={nav.abrirCliente} pedido={nav.pedido} />}

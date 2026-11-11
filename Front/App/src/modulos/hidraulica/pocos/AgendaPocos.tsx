@@ -312,7 +312,8 @@ const ListaEquipamentos: React.FC = () => {
 };
 
 const AgendaPocos: React.FC = () => {
-  const [vista, setVista] = useState<'AGENDA' | 'EQUIPE' | 'EQUIPAMENTOS'>('AGENDA');
+  const pedida = navPocos.get().subvista;
+  const [vista, setVista] = useState<'AGENDA' | 'EQUIPE' | 'EQUIPAMENTOS'>(pedida === 'EQUIPE' || pedida === 'EQUIPAMENTOS' ? pedida : 'AGENDA');
   return (
     <Space direction="vertical" size={12} style={{ width: '100%' }}>
       <Segmented value={vista} onChange={v => setVista(v as typeof vista)}

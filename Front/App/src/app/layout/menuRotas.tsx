@@ -12,6 +12,8 @@ export interface ItemMenu {
   rota?: string;        // grupo: tela principal do módulo (abre ao clicar no nome na barra lateral)
   icon?: React.ReactNode;
   children?: ItemMenu[];
+  /** Outras rotas que marcam este item (telas do mesmo grupo que não têm item próprio na barra lateral). */
+  tambem?: string[];
 }
 
 export const MENU_PRINCIPAL: ItemMenu[] = [
@@ -114,9 +116,12 @@ const folhas = (itens: ItemMenu[], pai?: ItemMenu): Array<{ item: ItemMenu; pai?
 
 /** Item do menu que corresponde à rota atual (a rota mais longa que é prefixo do caminho). */
 export const itemDaRota = (pathname: string) => {
-  const candidatos = folhas([...menuComModulos(MENU_PRINCIPAL, 'todos'), MENU_CONFIGURACOES]).filter(({ item }) =>
-    item.key === pathname || (item.key !== '/' && pathname.startsWith(`${item.key}/`)));
-  return candidatos.sort((a, b) => b.item.key.length - a.item.key.length)[0] || null;
+  const casa = (rota: string) => rota === pathname || (rota !== '/' && pathname.startsWith(`${rota}/`));
+  const candidatos = folhas([...menuComModulos(MENU_PRINCIPAL, 'todos'), MENU_CONFIGURACOES])
+    .map(f => ({ ...f, tamanho: Math.max(-1, ...[f.item.key, ...(f.item.tambem || [])].filter(casa).map(r => r.length)) }))
+    .filter(f => f.tamanho >= 0);
+  const melhor = candidatos.sort((a, b) => b.tamanho - a.tamanho)[0];
+  return melhor ? { item: melhor.item, pai: melhor.pai } : null;
 };
 
 /** Título da tela para o cabeçalho (ex.: "Estoque › Consulta de Saldo"). */

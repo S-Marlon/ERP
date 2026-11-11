@@ -19,6 +19,8 @@ export interface NavPocos {
   /** Abrir a agenda já com um compromisso novo para esta obra. */
   agendarObra?: number;
   focoCliente?: number | null;
+  /** Parte da tela que abre (ex.: Atendimento › Configuração, Agenda › Equipe). */
+  subvista?: string;
 }
 
 let estado: NavPocos = { aba: 'central', pedido: 0 };

@@ -11,6 +11,7 @@ import {
 } from './obrasApi';
 import { abrirCliente, abrirObra, abrirPoco, navPocos } from './navPocos';
 import { OrcamentoRapido } from './OrcamentoContrato';
+import { PrimeirosPassos } from './InicioPocos';
 
 const { Text } = Typography;
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -208,6 +209,7 @@ const CentralPocos: React.FC = () => {
         </Space>
       </Flex>
       <OrcamentoRapido aberto={orcamento} onFechar={() => setOrcamento(false)} />
+      <PrimeirosPassos onOrcamento={() => setOrcamento(true)} />
       <Row gutter={[12, 12]}>
         {atalho('Agenda de hoje', d.hoje.agenda, <CalendarOutlined />, 'agenda', undefined, d.hoje.agendaTitulos.join(' · ') || 'nada agendado')}
         {atalho('Contatos sem resposta', d.hoje.contatosSemResposta, <CustomerServiceOutlined />, 'atendimento', d.hoje.contatosSemResposta ? '#cf1322' : undefined)}

@@ -4,7 +4,7 @@
 import React, { lazy } from 'react';
 import type { ItemMenu } from '../app/layout/menuRotas';
 import type { MappingPayload } from '../areas/compras/entradaNf/itens/ProductMappingModal';
-import { SECOES_POCOS } from './hidraulica/pocos/secoesPocos';
+import { itensMenuPocos } from './hidraulica/pocos/secoesPocos';
 
 const MontagensPagina = lazy(() => import('./hidraulica/montagens/MontagensPagina'));
 const MontagemPdv = lazy(() => import('./hidraulica/montagens/MontagemPdv'));
@@ -77,8 +77,8 @@ export const MODULOS_FRONT: ModuloFront[] = [
   },
   {
     codigo: 'HIDRAULICA_POCOS',
-    // grupo próprio na barra lateral; cada parte do módulo tem endereço (/modulos/hidraulica/pocos/<secao>)
-    menu: [{ grupo: 'grp:pocos', itens: SECOES_POCOS.map(s => ({ key: s.secao ? `/modulos/hidraulica/pocos/${s.secao}` : '/modulos/hidraulica/pocos', label: s.titulo })) }],
+    // grupo próprio na barra lateral, com um item por grupo de telas (cada tela tem endereço /modulos/hidraulica/pocos/<secao>)
+    menu: [{ grupo: 'grp:pocos', itens: itensMenuPocos() }],
     // /relatorios/poco: endereço antigo da tela, mantido para quem tem o link salvo
     rotas: [
       { path: '/modulos/hidraulica/pocos', element: <ObrasPocosPagina /> },

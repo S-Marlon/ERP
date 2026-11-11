@@ -190,3 +190,15 @@ Tabelas novas: `_orcamento_itens`, `_aditivos` (e `id_aditivo` em `_adicionais`)
   assinado, aditivos, garantia), poços com ficha técnica, parcelas e recebimentos, linha do tempo (contato, obras,
   processo, alertas dos sensores) e a prévia do plano mensal (mesmo cálculo da Central). Lista com filtros (obra aberta,
   vencido, sem telefone, cidade). Orçamento ainda não aprovado não conta como "a receber".
+
+## Navegação e fluxo do escritório (2026-11-11)
+O módulo ainda não tinha dados lançados; a revisão foi para o uso no escritório (computador). Sem tabela nova.
+- **Barra lateral com 6 itens** (Central, Atendimento, Obras e orçamentos, Clientes e poços, Agenda, Mais ferramentas). As
+  outras telas do grupo viram abas no topo (Obras · A receber · Materiais; Clientes · Poços) e marcam o item do grupo
+  (`tambem` em `ItemMenu`). Os endereços antigos continuam valendo. Grupos em `secoesPocos.ts` (com teste).
+- **Mais ferramentas:** página com um cartão por tela (manutenção, resultado, mapa, monitoramento, relatório avulso).
+- **Obra aberta:** abre onde está o trabalho da situação (orçamento → orçamento e contrato, aguardando sinal → cobrança,
+  em execução → relatório, concluída → processo) e mostra o **próximo passo** (a pendência mais grave da Central ou o
+  passo normal da situação) com o botão que leva até lá, e o resto que falta. Regras em `proximoPasso.ts` (com teste).
+- **Primeiros passos** na Central enquanto faltar algo para o primeiro orçamento: empresa e logo, foro e responsável
+  técnico, equipe, sonda, materiais, primeiro cliente e orçamento. Some quando tudo está feito (`primeirosPassos.ts`).

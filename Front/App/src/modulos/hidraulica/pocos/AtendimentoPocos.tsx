@@ -10,7 +10,7 @@ import {
   ConfigProcesso, dataBr, ESTADOS_ETAPA, ESTADOS_PRAZO, foneBr, IndicadoresProcesso, Lead, LeadForm, ORIGENS_LEAD, OrigemLead, PendenciaObra, processoApi, Servico,
   SERVICOS, SITUACOES_LEAD, SITUACOES_OBRA, urlArquivo,
 } from './obrasApi';
-import { abrirObra } from './navPocos';
+import { abrirObra, navPocos } from './navPocos';
 import { reduzirImagem } from './ProcessoObra';
 import { OrcamentoRapido } from './OrcamentoContrato';
 import { CAMPOS_MODELO, MODELO_ADITIVO_PADRAO, MODELO_CONTRATO_PADRAO } from './documentosPocos';
@@ -376,8 +376,12 @@ const Configuracao: React.FC = () => {
   );
 };
 
+type VistaAtendimento = 'LEADS' | 'PENDENCIAS' | 'INDICADORES' | 'GALERIA' | 'CONFIG';
+const VISTAS_ATENDIMENTO: VistaAtendimento[] = ['LEADS', 'PENDENCIAS', 'INDICADORES', 'GALERIA', 'CONFIG'];
+
 const AtendimentoPocos: React.FC = () => {
-  const [vista, setVista] = useState<'LEADS' | 'PENDENCIAS' | 'INDICADORES' | 'GALERIA' | 'CONFIG'>('LEADS');
+  const pedida = navPocos.get().subvista as VistaAtendimento | undefined;
+  const [vista, setVista] = useState<VistaAtendimento>(pedida && VISTAS_ATENDIMENTO.includes(pedida) ? pedida : 'LEADS');
   return (
     <Space direction="vertical" size={12} style={{ width: '100%' }}>
       <Segmented value={vista} onChange={v => setVista(v as typeof vista)} options={[
