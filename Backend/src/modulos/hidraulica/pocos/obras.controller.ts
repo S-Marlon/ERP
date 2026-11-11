@@ -23,7 +23,7 @@ export const responderErro = (res: Response, e: any, padrao: string) => {
 const lerJson = (s: unknown) => { try { return s ? JSON.parse(String(s)) : {}; } catch { return {}; } };
 
 // ------------------------------------------------------------------ poços
-const formatarPoco = (r: any) => ({
+export const formatarPoco = (r: any) => ({
   idPoco: Number(r.id_poco), identificacao: r.identificacao, idProprietario: nulo(r.id_proprietario), proprietario: r.proprietario || null,
   endereco: r.endereco || null, bairro: r.bairro || null, cidade: r.cidade || null, uf: r.uf || null, cep: r.cep || null,
   latitude: nulo(r.latitude), longitude: nulo(r.longitude), profundidadeM: nulo(r.profundidade_m), diametro: r.diametro || null,
@@ -35,7 +35,7 @@ const SELECT_POCO = `SELECT p.*, DATE_FORMAT(p.data_perfuracao, '%Y-%m-%d') AS d
          (SELECT COUNT(*) FROM modulo_hidraulica_pocos_obras o WHERE o.id_poco = p.id_poco) AS obras
        FROM modulo_hidraulica_pocos_pocos p ${JOIN_PESSOA('p.id_proprietario')}`;
 
-const carregarPoco = async (tenant: number, id: number) => {
+export const carregarPoco = async (tenant: number, id: number) => {
   const [[p]]: any = await pool.execute(`${SELECT_POCO} WHERE p.id_poco = ? AND p.tenant_id = ?`, [id, tenant]);
   if (!p) throw new ErroObra('Poço não encontrado.', 404);
   return p;

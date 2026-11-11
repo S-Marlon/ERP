@@ -37,6 +37,7 @@ import {
 } from './processo.controller';
 import { central } from './central.controller';
 import { clienteCompleto } from './clienteCompleto.controller';
+import { buscar, pocoCompleto } from './busca.controller';
 import {
   aditivosDaObra, apagarAditivo, criarOrcamento, duplicarOrcamento, emitirAditivo, itensDaObra, marcarAditivoAssinado, salvarItens,
 } from './orcamento.controller';
@@ -124,6 +125,8 @@ router.post('/obras/:id/aditivos', emitirAditivo);
 router.post('/aditivos/:id/assinado', marcarAditivoAssinado);
 router.delete('/aditivos/:id', apagarAditivo);
 router.get('/clientes/:id/completo', clienteCompleto);
+router.get('/busca', buscar);
+router.get('/pocos/:id/completo', pocoCompleto);
 router.get('/processo/config', verConfig);
 router.put('/processo/config', salvarConfig);
 router.get('/processo/pendencias', pendencias);

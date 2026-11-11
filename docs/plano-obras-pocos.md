@@ -234,3 +234,10 @@ Colunas novas: `incluso` em `_orcamento_itens`, `valor_parcelado` em `_obras`, `
 - **Ficha de campo da perfuração** (2026-11-11): modelo do kit como os outros (em branco ou preenchida, campos em amarelo).
   Folha 1: obra, perfuração (etapas e revestimento em 3 linhas cada), motobomba. Folha 2: teste de vazão com 18 linhas de
   leitura de bombeamento e recuperação para anotar à mão, observações e assinaturas.
+- **Busca geral e ficha do poço** (2026-11-11): campo no topo de todas as telas do módulo acha cliente (nome, telefone,
+  CPF/CNPJ, cidade), poço (identificação, endereço, proprietário) e contrato (nº, título, cliente, poço) — `GET /busca?q=`,
+  regras em `busca.ts`. Cliente e poço abrem a ficha **por cima da tela atual** (store `fichasPocos` em `navPocos.ts`,
+  montada uma vez em `FichasPocos`); contrato abre a obra. Ficha do poço (`GET /pocos/:id/completo`): dados, GPS (mapa e
+  Google Maps), proprietário, contratos/obras do poço com o tipo do contrato — **formal** (assinado no processo) ou
+  **informal** (obra fechada sem contrato assinado) —, relatório técnico, documentos da obra e garantia, e o histórico.
+  O mapa, a Central, a lista de poços, a obra e a ficha do cliente passaram a abrir essas fichas.

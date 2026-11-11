@@ -11,7 +11,7 @@ import {
 import {
   AcaoPendencia, Central, centralApi, ClientePlano, ContratoCentral, FaseContrato, FASES_CONTRATO, foneBr, GRAVIDADES, SERVICOS,
 } from './obrasApi';
-import { abrirCliente, abrirObra, abrirPoco, navPocos } from './navPocos';
+import { abrirFichaCliente, abrirFichaPoco, abrirObra, navPocos } from './navPocos';
 import { OrcamentoRapido } from './OrcamentoContrato';
 import { PrimeirosPassos } from './InicioPocos';
 
@@ -23,8 +23,8 @@ const PESO = { ALTA: 0, MEDIA: 1, BAIXA: 2 };
 
 /** Vai para o lugar onde a pendência se resolve. */
 const resolver = (c: ContratoCentral, acao: AcaoPendencia) => {
-  if (acao === 'POCO' && c.idPoco) return abrirPoco(c.idPoco);
-  if (acao === 'CLIENTE') return abrirCliente(c.idCliente);
+  if (acao === 'POCO' && c.idPoco) return abrirFichaPoco(c.idPoco);
+  if (acao === 'CLIENTE') return abrirFichaCliente(c.idCliente);
   abrirObra(c.idObra, acao === 'PROCESSO' ? 'PROCESSO' : acao === 'COBRANCA' ? 'COBRANCA' : acao === 'MATERIAIS' ? 'MATERIAIS' : 'RELATORIO');
 };
 
@@ -96,7 +96,7 @@ const Completar: React.FC<{ d: Central['completar'] }> = ({ d }) => (
       <Col xs={24} lg={12}>
         <Table size="small" rowKey="idCliente" dataSource={d.clientes} pagination={{ pageSize: 8, hideOnSinglePage: true, size: 'small' }}
           locale={{ emptyText: 'Todos os clientes completos' }} title={() => <Text strong>Clientes ({d.clientes.length} de {d.totalClientes})</Text>}
-          onRow={c => ({ onClick: () => abrirCliente(c.idCliente), style: { cursor: 'pointer' } })}
+          onRow={c => ({ onClick: () => abrirFichaCliente(c.idCliente), style: { cursor: 'pointer' } })}
           columns={[
             { title: 'Cliente', dataIndex: 'nome' },
             { title: '', width: 70, render: (_, c) => <Progress percent={c.pct} size="small" showInfo={false} strokeColor={c.pct < 50 ? '#ff4d4f' : undefined} /> },
@@ -106,7 +106,7 @@ const Completar: React.FC<{ d: Central['completar'] }> = ({ d }) => (
       <Col xs={24} lg={12}>
         <Table size="small" rowKey="idPoco" dataSource={d.pocos} pagination={{ pageSize: 8, hideOnSinglePage: true, size: 'small' }}
           locale={{ emptyText: 'Todos os poços completos' }} title={() => <Text strong>Poços ({d.pocos.length} de {d.totalPocos})</Text>}
-          onRow={p => ({ onClick: () => abrirPoco(p.idPoco), style: { cursor: 'pointer' } })}
+          onRow={p => ({ onClick: () => abrirFichaPoco(p.idPoco), style: { cursor: 'pointer' } })}
           columns={[
             { title: 'Poço', render: (_, p) => <>{p.identificacao}<div><Text type="secondary" style={{ fontSize: 11 }}>{p.proprietario || 'sem dono'}</Text></div></> },
             { title: '', width: 70, render: (_, p) => <Progress percent={p.pct} size="small" showInfo={false} strokeColor={p.pct < 50 ? '#ff4d4f' : undefined} /> },
@@ -135,7 +135,7 @@ const PlanoMensal: React.FC<{ d: Central['plano'] }> = ({ d }) => {
         message="Estimativa para planejar, não é preço: os pesos da chance e a conta do valor ficam em central.ts e serão calibrados quando o plano for criado." />
       <Table<ClientePlano> size="small" rowKey="idCliente" dataSource={lista} pagination={{ pageSize: 20, hideOnSinglePage: true }}
         locale={{ emptyText: 'Nenhum cliente com poço ou obra ainda' }}
-        onRow={c => ({ onClick: () => abrirCliente(c.idCliente), style: { cursor: 'pointer' } })}
+        onRow={c => ({ onClick: () => abrirFichaCliente(c.idCliente), style: { cursor: 'pointer' } })}
         columns={[
           {
             title: 'Cliente', render: (_, c) => (

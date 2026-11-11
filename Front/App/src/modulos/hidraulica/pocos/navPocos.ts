@@ -42,3 +42,18 @@ export const abrirObra = (idObra: number, parteObra?: ParteObra) => navPocos.ir(
 export const abrirPoco = (idPoco: number) => navPocos.ir({ aba: 'obras', vista: 'POCOS', abrirPoco: idPoco });
 export const agendarObra = (idObra: number) => navPocos.ir({ aba: 'agenda', agendarObra: idObra });
 export const abrirCliente = (idCliente: number) => navPocos.ir({ aba: 'obras', vista: 'CLIENTES', abrirCliente: idCliente });
+
+// Fichas que abrem por cima de qualquer tela do módulo (busca geral, mapa, ficha do cliente): a do poço e a do cliente.
+export type FichaAberta = { tipo: 'POCO' | 'CLIENTE'; id: number } | null;
+let ficha: FichaAberta = null;
+const ouvintesFicha = new Set<() => void>();
+export const fichasPocos = {
+  get: () => ficha,
+  abrir: (f: FichaAberta) => { ficha = f; ouvintesFicha.forEach(x => x()); },
+  assinar: (f: () => void) => { ouvintesFicha.add(f); return () => { ouvintesFicha.delete(f); }; },
+};
+export const useFichaPocos = () => useSyncExternalStore(fichasPocos.assinar, fichasPocos.get);
+export const abrirFichaPoco = (idPoco: number) => fichasPocos.abrir({ tipo: 'POCO', id: idPoco });
+export const abrirFichaCliente = (idCliente: number) => fichasPocos.abrir({ tipo: 'CLIENTE', id: idCliente });
+/** Documentos de uma obra (Documentos › aba da obra, já com a obra escolhida). */
+export const documentosDaObra = (idObra: number) => navPocos.ir({ aba: 'documentos', subvista: 'OBRA', abrirObra: idObra });

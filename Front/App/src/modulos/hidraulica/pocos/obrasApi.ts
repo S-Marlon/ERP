@@ -106,6 +106,8 @@ export const obrasApi = {
   clientes: (busca = '', f: { cidade?: string; filtro?: FiltroClientes | null } = {}) =>
     pedir<ClientePoco[]>(`${API}/clientes?${q({ busca, cidade: f.cidade, filtro: f.filtro })}`, undefined, 'Erro ao listar os clientes de poço.'),
   clienteCompleto: (id: number) => pedir<ClienteCompleto>(`${API}/clientes/${id}/completo?tenant_id=1`, undefined, 'Erro ao abrir a ficha do cliente.'),
+  busca: (texto: string) => pedir<ResultadoBusca>(`${API}/busca?${q({ q: texto })}`, undefined, 'Erro na busca.'),
+  pocoCompleto: (id: number) => pedir<PocoCompleto>(`${API}/pocos/${id}/completo?tenant_id=1`, undefined, 'Erro ao abrir a ficha do poço.'),
   cliente: (id: number) => pedir<ClientePoco>(`${API}/clientes/${id}?tenant_id=1`, undefined, 'Erro ao abrir o cliente.'),
   criarCliente: (c: Partial<ClientePocoForm>) => pedir<ClientePoco>(`${API}/clientes?tenant_id=1`, corpo('POST', c), 'Erro ao cadastrar o cliente.'),
   salvarCliente: (id: number, c: ClientePocoForm) => pedir<ClientePoco>(`${API}/clientes/${id}?tenant_id=1`, corpo('PUT', c), 'Erro ao salvar o cliente.'),
@@ -524,6 +526,34 @@ export interface NovoOrcamento extends Partial<Omit<ObraForm, 'idCliente' | 'idP
   local?: { identificacao?: string | null; endereco?: string | null; cidade?: string | null; uf?: string | null; gps?: string | null } | null;
   itens: ItemOrcamentoForm[];
 }
+/** Formal = contrato assinado; informal = obra fechada sem contrato assinado no sistema (combinado de boca ou por mensagem). */
+export type TipoContrato = 'FORMAL' | 'INFORMAL' | 'ORCAMENTO' | 'CANCELADO';
+export const TIPOS_CONTRATO: Record<TipoContrato, { texto: string; cor: string; dica: string }> = {
+  FORMAL: { texto: 'contrato assinado', cor: 'green', dica: 'Contrato formal: marcado como assinado no processo da obra.' },
+  INFORMAL: { texto: 'informal', cor: 'orange', dica: 'Obra fechada sem contrato assinado no sistema (combinado de boca ou por mensagem).' },
+  ORCAMENTO: { texto: 'orçamento', cor: 'default', dica: 'Ainda não virou contrato.' },
+  CANCELADO: { texto: 'cancelado', cor: 'red', dica: 'Obra cancelada.' },
+};
+
+export interface ResultadoBusca {
+  clientes: { idCliente: number; nome: string; telefone: string | null; documento: string | null; cidade: string | null; pocos: number; obras: number }[];
+  pocos: { idPoco: number; identificacao: string; proprietario: string | null; idProprietario: number | null; local: string | null;
+    latitude: number | null; longitude: number | null; profundidadeM: number | null; situacao: string }[];
+  contratos: { idObra: number; titulo: string | null; servicos: Servico[]; situacao: SituacaoObra; tipoContrato: TipoContrato; cliente: string | null;
+    idCliente: number | null; poco: string | null; idPoco: number | null; valor: number | null; criadaEm: string }[];
+}
+
+export interface PocoCompleto {
+  poco: Poco & { bairro: string | null; uf: string | null; tipoSolo: string | null; observacao: string | null };
+  proprietario: { idCliente: number; nome: string; telefone: string | null; documento: string | null; cidade: string | null } | null;
+  contratos: {
+    idObra: number; titulo: string; servicos: Servico[]; situacao: SituacaoObra; tipoContrato: TipoContrato; cliente: string | null; idCliente: number | null;
+    criadaEm: string; dataInicio: string | null; dataTermino: string | null; total: number; recebido: number; aReceber: number; aditivos: number;
+    temRelatorio: boolean; garantiaAte: string | null;
+  }[];
+  resumo: { contratos: number; garantiaAte: string | null; emGarantia: boolean; sensores: boolean };
+}
+
 export interface ClienteCompleto {
   cliente: ClientePocoForm & { idCliente: number };
   resumo: { contratos: number; abertos: number; valorTotal: number; recebido: number; aReceber: number; vencido: number; pocos: number };

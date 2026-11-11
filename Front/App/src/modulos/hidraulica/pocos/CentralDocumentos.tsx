@@ -42,9 +42,11 @@ const documentosDaObra = (d: DocumentoObra, aditivos: Aditivo[]): ItemDoc[] => {
   ];
 };
 
-const DocumentosDaObra: React.FC = () => {
+/** pedida: obra que chegou escolhida (ficha do poço, busca); pedido muda a cada atalho para reagir mesmo se repetir. */
+const DocumentosDaObra: React.FC<{ pedida?: number; pedido?: number }> = ({ pedida, pedido }) => {
   const [obras, setObras] = useState<Obra[]>([]);
-  const [idObra, setIdObra] = useState<number | null>(null);
+  const [idObra, setIdObra] = useState<number | null>(pedida ?? null);
+  useEffect(() => { if (pedida) setIdObra(pedida); }, [pedida, pedido]);
   const [doc, setDoc] = useState<DocumentoObra | null>(null);
   const [aditivos, setAditivos] = useState<Aditivo[]>([]);
   const [vendo, setVendo] = useState('ORCAMENTO');
@@ -119,7 +121,7 @@ const CentralDocumentos: React.FC = () => {
         </Text>
       </Flex>
       {aba === 'KIT' && <KitVisita />}
-      {aba === 'OBRA' && <DocumentosDaObra />}
+      {aba === 'OBRA' && <DocumentosDaObra pedida={nav.aba === 'documentos' && nav.subvista === 'OBRA' ? nav.abrirObra : undefined} pedido={nav.pedido} />}
       {aba === 'RELATORIO' && <RelatorioPocoPage />}
     </Space>
   );

@@ -9,7 +9,7 @@ import { CalculatorOutlined, EnvironmentOutlined, PlusOutlined, ReloadOutlined, 
 import {
   ClienteCompleto, ClientePoco, ClientePocoForm, dataBr, ESTADOS_CIVIS, FiltroClientes, foneBr, obrasApi, SERVICOS, SITUACOES_OBRA,
 } from './obrasApi';
-import { abrirObra, abrirPoco, verClienteNoMapa } from './navPocos';
+import { abrirFichaPoco, abrirObra, verClienteNoMapa } from './navPocos';
 import { OrcamentoRapido } from './OrcamentoContrato';
 
 const { Text } = Typography;
@@ -179,7 +179,7 @@ export const ClienteFicha: React.FC<{ idCliente: number | 'novo' | null; onFecha
       {
         key: 'POCOS', label: `Poços (${d.pocos.length})`, children: (
           <List size="small" dataSource={d.pocos} locale={{ emptyText: 'Nenhum poço.' }} renderItem={p => (
-            <List.Item style={{ cursor: 'pointer' }} onClick={() => ir(() => abrirPoco(p.idPoco))}
+            <List.Item style={{ cursor: 'pointer' }} onClick={() => ir(() => abrirFichaPoco(p.idPoco))}
               extra={<Space size={4}>{p.iot && <Tag color="purple">sensores</Tag>}{p.planos > 0 && <Tag color="cyan">plano de manutenção</Tag>}<Tag>{p.situacao.toLowerCase()}</Tag></Space>}>
               <List.Item.Meta title={p.identificacao} description={[
                 p.profundidadeM && `${p.profundidadeM} m`, p.vazaoLh && `${p.vazaoLh.toLocaleString('pt-BR')} L/h`, p.nivelEstaticoM !== null && `NE ${p.nivelEstaticoM} m`,

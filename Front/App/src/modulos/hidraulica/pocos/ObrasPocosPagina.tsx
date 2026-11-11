@@ -3,7 +3,7 @@
 // "ver no mapa", os cartões da Central) mudam a seção pelo navPocos e o endereço acompanha; as partes de cobrança,
 // materiais, processo e orçamento/contrato vivem dentro da obra.
 import React, { useEffect, useRef } from 'react';
-import { Segmented, Typography } from 'antd';
+import { Flex, Segmented, Typography } from 'antd';
 import { AimOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import CentralPocos from './CentralPocos';
@@ -19,6 +19,8 @@ import { enderecoDaSecao, GRUPOS_POCOS, secaoDaAba, secaoDoEndereco, secoesDoGru
 import { MaisFerramentas } from './InicioPocos';
 import CentralDocumentos from './CentralDocumentos';
 import { secaoLigada, useRecursosPocos } from './recursosPocos';
+import BuscaPocos from './BuscaPocos';
+import { FichasPocos } from './FichaPoco';
 
 const { Title, Text } = Typography;
 const TELAS: Record<string, React.ReactNode> = {
@@ -57,7 +59,10 @@ const ObrasPocosPagina: React.FC = () => {
   return (
     <div style={{ padding: 24 }}>
       <div style={{ marginBottom: 12 }}>
-        <Title level={3} style={{ margin: 0 }}><AimOutlined /> Poços artesianos · {tituloGrupo}</Title>
+        <Flex justify="space-between" align="center" wrap gap={8}>
+          <Title level={3} style={{ margin: 0 }}><AimOutlined /> Poços artesianos · {tituloGrupo}</Title>
+          <BuscaPocos />
+        </Flex>
         {atual.aba === 'central' && <Text type="secondary">Do primeiro contato à manutenção: contratos, obras, poços, agenda, monitoramento e pós-venda.</Text>}
         {doGrupo.length > 1 && (
           <Segmented style={{ marginTop: 10 }} value={atual.secao} onChange={v => navigate(enderecoDaSecao({ secao: String(v) }))}
@@ -65,6 +70,7 @@ const ObrasPocosPagina: React.FC = () => {
         )}
       </div>
       <React.Fragment key={atual.aba}>{TELAS[atual.aba]}</React.Fragment>
+      <FichasPocos />
     </div>
   );
 };

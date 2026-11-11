@@ -20,7 +20,7 @@ import { HistoricoDoPoco } from './ManutencaoPocos';
 import { ProcessoDaObra } from './ProcessoObra';
 import { OrcamentoEContrato, OrcamentoRapido } from './OrcamentoContrato';
 import { lerGpsTexto, textoRaio } from './mapaRegional';
-import { abrirCliente, abrirPoco, agendarObra, ParteObra, useNavPocos, verNoMapa, VistaObras } from './navPocos';
+import { abrirFichaCliente, abrirFichaPoco, agendarObra, ParteObra, useNavPocos, verNoMapa, VistaObras } from './navPocos';
 import { DestinoPasso, parteDaSituacao, proximoPasso, rotuloDestino } from './proximoPasso';
 
 const { Text } = Typography;
@@ -96,7 +96,7 @@ const PocoModal: React.FC<{ poco: Poco | 'novo' | null; onFechar: () => void; on
             {poco.latitude !== null && poco.longitude !== null && (
               <Button size="small" icon={<EnvironmentOutlined />} onClick={() => { onFechar(); verNoMapa(poco.latitude!, poco.longitude!, poco.idPoco); }}>Ver no mapa</Button>
             )}
-            {poco.idProprietario && <Button size="small" icon={<UserOutlined />} onClick={() => { onFechar(); abrirCliente(poco.idProprietario!); }}>Ficha do cliente</Button>}
+            {poco.idProprietario && <Button size="small" icon={<UserOutlined />} onClick={() => { onFechar(); abrirFichaCliente(poco.idProprietario!); }}>Ficha do cliente</Button>}
           </Space>
         )}
         <Row gutter={8}>
@@ -297,8 +297,8 @@ const ObraAberta: React.FC<{ idObra: number; parte?: ParteObra; onVoltar: () => 
   const outras = pendencias.filter(p => p.texto !== passo.texto);
   const irPara = (d: DestinoPasso) => {
     if (d === 'DADOS_OBRA') setEditando(true);
-    else if (d === 'POCO') { if (obra.idPoco) abrirPoco(obra.idPoco); else setEditando(true); }
-    else if (d === 'CLIENTE') abrirCliente(obra.idCliente);
+    else if (d === 'POCO') { if (obra.idPoco) abrirFichaPoco(obra.idPoco); else setEditando(true); }
+    else if (d === 'CLIENTE') abrirFichaCliente(obra.idCliente);
     else setParte(d);
   };
   const mudar = async (s: SituacaoObra) => {
@@ -329,7 +329,7 @@ const ObraAberta: React.FC<{ idObra: number; parte?: ParteObra; onVoltar: () => 
               </Popconfirm>
             ))}
             <Button icon={<EditOutlined />} onClick={() => setEditando(true)}>Dados da obra</Button>
-            <Button icon={<UserOutlined />} onClick={() => abrirCliente(obra.idCliente)}>Cliente</Button>
+            <Button icon={<UserOutlined />} onClick={() => abrirFichaCliente(obra.idCliente)}>Cliente</Button>
             {obra.situacao !== 'CANCELADA' && <Button icon={<CalendarOutlined />} onClick={() => agendarObra(obra.idObra)}>Agendar</Button>}
             <Tooltip title={obra.latitude === null ? 'O poço desta obra ainda não tem GPS' : undefined}>
               <Button icon={<EnvironmentOutlined />} disabled={obra.latitude === null || obra.longitude === null}
@@ -489,7 +489,7 @@ const ListaPocos: React.FC<{ abrir?: number; pedido?: number }> = ({ abrir, pedi
       <Table<Poco>
         size="small" rowKey="idPoco" loading={carregando} dataSource={pocos} pagination={{ pageSize: 50, hideOnSinglePage: true }}
         locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Nenhum poço ainda: eles nascem das obras de perfuração ou cadastre os que vocês atendem" /> }}
-        onRow={p => ({ onClick: () => setEditando(p), style: { cursor: 'pointer' } })}
+        onRow={p => ({ onClick: () => abrirFichaPoco(p.idPoco), style: { cursor: 'pointer' } })}
         columns={[
           {
             title: 'Poço', render: (_, p) => (

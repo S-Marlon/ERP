@@ -11,7 +11,7 @@ import {
   dataBr, foneBr, GarantiaVencendo, HistoricoPoco, ManutencaoAOferecer, manutencaoApi, obrasApi, PlanoForm, PlanoManutencao, RegistroForm, RegistroPoco, SERVICOS,
   ServicoPlano, SITUACOES_OBRA, SITUACOES_PLANO, TipoRegistro, TIPOS_REGISTRO,
 } from './obrasApi';
-import { abrirObra, abrirPoco, agendarObra } from './navPocos';
+import { abrirFichaPoco, abrirObra, agendarObra } from './navPocos';
 
 const { Text } = Typography;
 const erro = (e: unknown) => message.error(e instanceof Error ? e.message : 'Erro.');
@@ -204,7 +204,7 @@ export const ManutencoesPocos: React.FC = () => {
             {
               title: 'Poço / cliente', render: (_, p) => (
                 <div style={{ lineHeight: 1.35 }}>
-                  <a onClick={() => abrirPoco(p.idPoco)}><EnvironmentOutlined /> {p.poco}</a>{p.cidade ? <Text type="secondary"> · {p.cidade}</Text> : null}
+                  <a onClick={() => abrirFichaPoco(p.idPoco)}><EnvironmentOutlined /> {p.poco}</a>{p.cidade ? <Text type="secondary"> · {p.cidade}</Text> : null}
                   <div><Text>{p.cliente || <Text type="warning">sem dono no cadastro</Text>}</Text>{p.telefone ? <Text type="secondary"> · {foneBr(p.telefone)}</Text> : null}</div>
                 </div>
               ),

@@ -10,7 +10,7 @@ import { Circle, CircleMarker, MapContainer, Rectangle, TileLayer, useMap, useMa
 import 'leaflet/dist/leaflet.css';
 import { AnaliseRegiao, CelulaPotencial, foneBr, obrasApi, PocoNoMapa, ReferenciaNoMapa, ResumoMapa, SERVICOS, SITUACOES_OBRA } from './obrasApi';
 import { Camadas, corDoPoco, corPotencial, enquadramento, FAIXAS_POTENCIAL, LEGENDA_POCOS, lerCamadas, lerGpsTexto, textoRaio } from './mapaRegional';
-import { abrirCliente, abrirObra, abrirPoco, useNavPocos } from './navPocos';
+import { abrirFichaCliente, abrirFichaPoco, abrirObra, useNavPocos } from './navPocos';
 
 const { Text } = Typography;
 const CHAVE_CAMADAS = 'pocos.mapa.camadas';
@@ -244,9 +244,9 @@ const MapaPocos: React.FC = () => {
                     : 'nenhuma' },
                 ]} />
                 <Space wrap style={{ marginTop: 6 }}>
-                  {selecionado.ultimaObra && <Button size="small" type="primary" icon={<FileSearchOutlined />} onClick={() => abrirObra(selecionado.ultimaObra!.idObra)}>Abrir obra</Button>}
-                  <Button size="small" icon={<EnvironmentOutlined />} onClick={() => abrirPoco(selecionado.idPoco)}>Ficha do poço</Button>
-                  {selecionado.idProprietario && <Button size="small" icon={<UserOutlined />} onClick={() => abrirCliente(selecionado.idProprietario!)}>Cliente</Button>}
+                  <Button size="small" type="primary" icon={<EnvironmentOutlined />} onClick={() => abrirFichaPoco(selecionado.idPoco)}>Ficha do poço</Button>
+                  {selecionado.idProprietario && <Button size="small" icon={<UserOutlined />} onClick={() => abrirFichaCliente(selecionado.idProprietario!)}>Cliente</Button>}
+                  {selecionado.ultimaObra && <Button size="small" icon={<FileSearchOutlined />} onClick={() => abrirObra(selecionado.ultimaObra!.idObra)}>Última obra</Button>}
                 </Space>
               </Card>
             )}
