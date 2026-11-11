@@ -25,6 +25,8 @@ export interface PedidoAbertoDetalhe {
   id: number; tipo: TipoPedidoAberto; situacao: SituacaoPedido; cliente: string; idCliente: number | null; contato: string | null;
   operador: string | null; observacao: string | null; validade: string | null; criadoEm: string;
   totalBruto: number; totalDesconto: number; total: number; itens: ItemPedidoAberto[];
+  /** Telefone principal do cliente cadastrado (só no detalhe). */
+  telefoneCliente?: string | null;
 }
 
 export interface NovoPedidoAberto {

@@ -78,12 +78,7 @@ export const mensagemDaNota = (n: NotaDaFila, loja: string, consultaUrl: string 
   return `Olá${nome}! Segue a nota fiscal da sua compra${loja ? ` na ${loja}` : ''} (venda Nº ${n.idVenda}, ${brl(n.total)}).\n${acesso}`;
 };
 
-/** Link do WhatsApp: número com DDD; sem DDI recebe o 55 do Brasil. */
-export const linkWhatsapp = (celular: string, texto: string) => {
-  let numero = String(celular).replace(/\D/g, '');
-  if (numero.length === 10 || numero.length === 11) numero = `55${numero}`;
-  return `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`;
-};
+export { linkWhatsapp } from '../../../shared/utils/whatsapp';
 
 export const linkEmail = (email: string, assunto: string, texto: string) =>
   `mailto:${email}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(texto)}`;

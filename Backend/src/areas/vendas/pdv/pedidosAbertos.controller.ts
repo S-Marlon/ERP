@@ -168,7 +168,17 @@ export const detalhePedidoAberto = async (req: Request, res: Response) => {
   try {
     const d = await carregarDetalhe(pool, tenantDe(req), Number(req.params.id));
     if (!d) return res.status(404).json({ error: 'Orçamento ou venda suspensa não encontrado.' });
-    return res.json(d);
+    // Telefone principal do cliente cadastrado (para mandar o orçamento pelo WhatsApp)
+    let telefoneCliente: string | null = null;
+    if (d.idCliente) {
+      const [t]: any = await pool.execute(
+        `SELECT telefone FROM pessoas_contatos WHERE id_cliente = ? AND deleted_at IS NULL AND COALESCE(telefone, '') <> ''
+         ORDER BY principal DESC, id_contato LIMIT 1`,
+        [d.idCliente]
+      );
+      telefoneCliente = t[0]?.telefone || null;
+    }
+    return res.json({ ...d, telefoneCliente });
   } catch (error) {
     return responderErro(res, error, 'Erro ao carregar.');
   }

@@ -1,10 +1,11 @@
-// Vendas › Orçamentos: válidos, vencidos e os que viraram venda; imprimir, vender (abre no PDV) e excluir.
+// Vendas › Orçamentos: válidos, vencidos e os que viraram venda; imprimir, PDF, WhatsApp, vender (abre no PDV) e excluir.
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card, Empty, Input, Popconfirm, Segmented, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
-import { DeleteOutlined, PrinterOutlined, ReloadOutlined, ShoppingCartOutlined } from '@ant-design/icons';
+import { DeleteOutlined, FilePdfOutlined, PrinterOutlined, ReloadOutlined, ShoppingCartOutlined, WhatsAppOutlined } from '@ant-design/icons';
 import { imprimirOrcamento, PedidoAbertoDetalhe, PedidoAbertoResumo, pedidosAbertosApi } from '../pdv/services/pedidosAbertosApi';
 import { SITUACAO_PEDIDO } from '../pdv/components/PedidosAbertosPDV';
+import { baixarPdfOrcamento, EnviarOrcamentoWhatsapp } from './EnviarOrcamento';
 
 const { Text, Title } = Typography;
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -34,6 +35,7 @@ const Orcamentos: React.FC = () => {
   const [busca, setBusca] = useState('');
   const [lista, setLista] = useState<PedidoAbertoResumo[]>([]);
   const [carregando, setCarregando] = useState(false);
+  const [enviando, setEnviando] = useState<number | null>(null);
 
   const carregar = async () => {
     setCarregando(true);
@@ -112,13 +114,17 @@ const Orcamentos: React.FC = () => {
                 ),
               },
               {
-                title: '', key: 'a', width: 200,
+                title: '', key: 'a', width: 270,
                 render: (_, o) => (
                   <Space size={4}>
                     {o.situacao === 'CONVERTIDO'
                       ? <Button size="small" type="link" onClick={() => navigate('/vendas/do-dia')}>venda Nº {o.idVendaGerada}</Button>
                       : <Button size="small" type="primary" icon={<ShoppingCartOutlined />} onClick={() => navigate(`/vendas/pdv?orcamento=${o.id}`)}>Vender</Button>}
                     <Tooltip title="Imprimir"><Button size="small" icon={<PrinterOutlined />} onClick={() => imprimir(o.id)} /></Tooltip>
+                    <Tooltip title="Baixar PDF"><Button size="small" icon={<FilePdfOutlined />} onClick={() => baixarPdfOrcamento(o.id)} /></Tooltip>
+                    <Tooltip title="Enviar o PDF pelo WhatsApp">
+                      <Button size="small" icon={<WhatsAppOutlined style={{ color: '#25d366' }} />} onClick={() => setEnviando(o.id)} />
+                    </Tooltip>
                     {o.situacao !== 'CONVERTIDO' && (
                       <Popconfirm title="Excluir o orçamento?" okText="Excluir" cancelText="Não" onConfirm={() => excluir(o.id)}>
                         <Button size="small" danger icon={<DeleteOutlined />} />
@@ -131,6 +137,7 @@ const Orcamentos: React.FC = () => {
           />
         </Card>
       </Space>
+      <EnviarOrcamentoWhatsapp id={enviando} onClose={() => setEnviando(null)} />
     </div>
   );
 };
