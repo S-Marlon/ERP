@@ -8,7 +8,7 @@ import { painelVendas } from './painel/painelVendas.controller';
 import { criarAdiantamento, devolverAdiantamentoRota, listarAdiantamentos } from './adiantamentos/adiantamentos.controller';
 import { dadosDevolucao, detalheDevolucao, registrarDevolucao } from './devolucoes/devolucoes.controller';
 import { ajustarVenda, vendaCompleta } from './ajustes/ajustes.controller';
-import { detalhePedidoAberto, excluirPedidoAberto, listarPedidosAbertos, retomarPedidoAberto, salvarPedidoAberto } from './pdv/pedidosAbertos.controller';
+import { definirClientePedidoAberto, detalhePedidoAberto, excluirPedidoAberto, listarPedidosAbertos, retomarPedidoAberto, salvarPedidoAberto } from './pdv/pedidosAbertos.controller';
 
 // Vendas no modelo novo (itens_core). Montado em /api/vendas
 const router = Router();
@@ -39,6 +39,7 @@ router.get('/pdv/pedidos-abertos', listarPedidosAbertos);
 router.get('/pdv/pedidos-abertos/:id', detalhePedidoAberto);
 router.post('/pdv/pedidos-abertos/:id/retomar', retomarPedidoAberto);
 router.delete('/pdv/pedidos-abertos/:id', excluirPedidoAberto);
+router.put('/pdv/pedidos-abertos/:id/cliente', definirClientePedidoAberto);
 
 // Caixa: abertura, sangria/suprimento, fechamento com conferência e histórico
 router.get('/caixa/atual', caixaAtual);

@@ -217,3 +217,30 @@ export const excluirPedidoAberto = async (req: Request, res: Response) => {
     return responderErro(res, error, 'Erro ao excluir.');
   }
 };
+
+/** PUT /api/vendas/pdv/pedidos-abertos/:id/cliente — liga um orçamento em aberto (ou venda suspensa) a um cliente do cadastro */
+export const definirClientePedidoAberto = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  try {
+    const idCliente = Number(req.body?.idCliente);
+    if (!idCliente) throw new ErroVenda('Informe o cliente.');
+    const [[c]]: any = await pool.execute(
+      `SELECT c.id_pessoa, COALESCE(pf.nome, pj.nome_fantasia, pj.razao_social) AS nome
+       FROM pessoas_core c
+       LEFT JOIN pessoas_pf pf ON pf.id_cliente = c.id_pessoa
+       LEFT JOIN pessoas_pj pj ON pj.id_cliente = c.id_pessoa
+       WHERE c.id_pessoa = ? AND c.tenant_id = ? AND c.deleted_at IS NULL`,
+      [idCliente, tenant]
+    );
+    if (!c) throw new ErroVenda('Cliente não encontrado.', 404);
+    const [r]: any = await pool.execute(
+      `UPDATE vendas_pedidos SET id_cliente = ?, cliente_nome = ?
+       WHERE id_venda = ? AND tenant_id = ? AND status IN ('ORCAMENTO', 'SUSPENSA')`,
+      [idCliente, String(c.nome || '').slice(0, 150), Number(req.params.id), tenant]
+    );
+    if (!r.affectedRows) throw new ErroVenda('Orçamento não encontrado (o que já virou venda não muda).', 404);
+    return res.json({ success: true, idCliente, cliente: c.nome });
+  } catch (error) {
+    return responderErro(res, error, 'Erro ao definir o cliente.');
+  }
+};

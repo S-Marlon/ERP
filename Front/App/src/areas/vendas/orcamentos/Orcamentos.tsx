@@ -2,10 +2,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card, Empty, Input, Popconfirm, Segmented, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
-import { DeleteOutlined, FilePdfOutlined, PrinterOutlined, ReloadOutlined, ShoppingCartOutlined, WhatsAppOutlined } from '@ant-design/icons';
+import { DeleteOutlined, FilePdfOutlined, PrinterOutlined, ReloadOutlined, ShoppingCartOutlined, UserAddOutlined, WhatsAppOutlined } from '@ant-design/icons';
 import { imprimirOrcamento, PedidoAbertoDetalhe, PedidoAbertoResumo, pedidosAbertosApi } from '../pdv/services/pedidosAbertosApi';
 import { SITUACAO_PEDIDO } from '../pdv/components/PedidosAbertosPDV';
 import { baixarPdfOrcamento, EnviarOrcamentoWhatsapp } from './EnviarOrcamento';
+import { ClientePdvModal } from '../pdv/components/ClientePdvModal';
+import { telefoneDoTexto } from '../../../shared/utils/whatsapp';
 
 const { Text, Title } = Typography;
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -36,6 +38,7 @@ const Orcamentos: React.FC = () => {
   const [lista, setLista] = useState<PedidoAbertoResumo[]>([]);
   const [carregando, setCarregando] = useState(false);
   const [enviando, setEnviando] = useState<number | null>(null);
+  const [semCliente, setSemCliente] = useState<PedidoAbertoResumo | null>(null);
 
   const carregar = async () => {
     setCarregando(true);
@@ -45,6 +48,17 @@ const Orcamentos: React.FC = () => {
 
   const imprimir = async (id: number) => {
     try { await imprimirOrcamento(await pedidosAbertosApi.detalhe(id)); } catch (e) { message.error(e instanceof Error ? e.message : 'Erro ao imprimir.'); }
+  };
+  // Orçamento sem cliente: acha pelo telefone anotado ou cadastra (nome e telefone) e liga o orçamento a ele
+  const definirCliente = async (c: { id: number; nome: string } | null) => {
+    const o = semCliente;
+    setSemCliente(null);
+    if (!o || !c) return;
+    try {
+      await pedidosAbertosApi.definirCliente(o.id, c.id);
+      message.success(`Orçamento Nº ${o.id} agora está no nome de ${c.nome}.`);
+      carregar();
+    } catch (e) { message.error(e instanceof Error ? e.message : 'Erro ao definir o cliente.'); }
   };
   const excluir = async (id: number) => {
     try { await pedidosAbertosApi.excluir(id); message.success('Orçamento excluído.'); carregar(); } catch (e) { message.error(e instanceof Error ? e.message : 'Erro ao excluir.'); }
@@ -93,7 +107,16 @@ const Orcamentos: React.FC = () => {
                 title: 'Cliente', key: 'c',
                 render: (_, o) => (
                   <div style={{ lineHeight: 1.2 }}>
-                    <div>{o.cliente}</div>
+                    <Space size={6}>
+                      <span>{o.cliente}</span>
+                      {!o.idCliente && o.situacao !== 'CONVERTIDO' && (
+                        <Tooltip title={o.contato ? 'Achar o cliente pelo telefone ou cadastrar com nome e telefone' : 'Escolher ou cadastrar o cliente'}>
+                          <Button size="small" type="link" icon={<UserAddOutlined />} style={{ padding: 0, height: 18 }} onClick={() => setSemCliente(o)}>
+                            Cadastrar cliente
+                          </Button>
+                        </Tooltip>
+                      )}
+                    </Space>
                     <Text type="secondary" style={{ fontSize: 11 }}>{[o.contato, `${o.qtdItens} item(ns)`, o.operador].filter(Boolean).join(' · ')}</Text>
                   </div>
                 ),
@@ -138,6 +161,13 @@ const Orcamentos: React.FC = () => {
         </Card>
       </Space>
       <EnviarOrcamentoWhatsapp id={enviando} onClose={() => setEnviando(null)} />
+      <ClientePdvModal
+        open={!!semCliente}
+        titulo={semCliente ? `Cliente do orçamento Nº ${semCliente.id}` : undefined}
+        buscaInicial={semCliente ? telefoneDoTexto(semCliente.contato) || '' : ''}
+        onSelecionar={definirCliente}
+        onFechar={() => setSemCliente(null)}
+      />
     </div>
   );
 };

@@ -16,11 +16,15 @@ const formatarDocumento = (doc: string) => {
 
 interface Props {
   open: boolean;
+  /** Já abre buscando isto (ex.: o telefone anotado no orçamento). */
+  buscaInicial?: string;
+  /** Título no lugar de "Cliente da venda". */
+  titulo?: string;
   onSelecionar: (c: ClientePdv | null) => void;
   onFechar: () => void;
 }
 
-export const ClientePdvModal: React.FC<Props> = ({ open, onSelecionar, onFechar }) => {
+export const ClientePdvModal: React.FC<Props> = ({ open, buscaInicial, titulo, onSelecionar, onFechar }) => {
   const [busca, setBusca] = useState('');
   const [resultados, setResultados] = useState<ClienteBusca[]>([]);
   const [carregando, setCarregando] = useState(false);
@@ -42,7 +46,7 @@ export const ClientePdvModal: React.FC<Props> = ({ open, onSelecionar, onFechar 
     return () => clearTimeout(t);
   }, [busca, open, novo]);
 
-  useEffect(() => { if (open) { setBusca(''); setNovo(null); setErroNovo(null); } }, [open]);
+  useEffect(() => { if (open) { setBusca(buscaInicial || ''); setNovo(null); setErroNovo(null); } }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const escolher = (c: ClienteBusca) => onSelecionar({ id: c.id, nome: c.nome, documento: c.documento, tipo: c.tipo });
 
@@ -68,12 +72,12 @@ export const ClientePdvModal: React.FC<Props> = ({ open, onSelecionar, onFechar 
   return (
     <Modal
       open={open}
-      title={<Space><UserOutlined /> {novo ? 'Cliente novo (rápido)' : 'Cliente da venda'}</Space>}
+      title={<Space><UserOutlined /> {novo ? 'Cliente novo (rápido)' : titulo || 'Cliente da venda'}</Space>}
       onCancel={onFechar}
       footer={novo ? (
         <Space>
           <Button onClick={() => setNovo(null)}>Voltar à busca</Button>
-          <Button type="primary" icon={<UserAddOutlined />} loading={salvando} onClick={salvarNovo}>Cadastrar e usar na venda</Button>
+          <Button type="primary" icon={<UserAddOutlined />} loading={salvando} onClick={salvarNovo}>{titulo ? 'Cadastrar e usar' : 'Cadastrar e usar na venda'}</Button>
         </Space>
       ) : (
         <Space>

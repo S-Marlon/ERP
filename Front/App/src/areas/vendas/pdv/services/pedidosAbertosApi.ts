@@ -52,6 +52,10 @@ export const pedidosAbertosApi = {
   detalhe: (id: number) => pedir<PedidoAbertoDetalhe>(`${API}/${id}`, undefined, 'Erro ao carregar.'),
   retomar: (id: number) => pedir<PedidoAbertoDetalhe>(`${API}/${id}/retomar`, { method: 'POST' }, 'Erro ao retomar.'),
   excluir: (id: number) => pedir<{ success: boolean }>(`${API}/${id}`, { method: 'DELETE' }, 'Erro ao excluir.'),
+  /** Liga o orçamento (ou venda suspensa) a um cliente do cadastro. */
+  definirCliente: (id: number, idCliente: number) => pedir<{ success: boolean; idCliente: number; cliente: string }>(`${API}/${id}/cliente`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idCliente }),
+  }, 'Erro ao definir o cliente.'),
 };
 
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
