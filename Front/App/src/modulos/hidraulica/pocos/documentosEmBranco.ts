@@ -9,14 +9,18 @@ import {
   qualificacaoEmpresa, RODAPE_PAGINAS, RODAPE_VISTO, valorPorExtenso,
 } from './documentosPocos';
 import { aplicarCampos, K, ValoresKit } from './camposKit';
+import { gerarModelo } from './templatesPoco';
+import { SECOES_PADRAO } from './relatorioPoco';
 
-export type ModeloBranco = 'PROPOSTA' | 'TABELA' | 'CONTRATO' | 'AUTORIZACAO';
+export type ModeloBranco = 'PROPOSTA' | 'TABELA' | 'CONTRATO' | 'AUTORIZACAO' | 'FICHA';
 
-export const MODELOS_BRANCO: { id: ModeloBranco; titulo: string; descricao: string }[] = [
+/** soBranco: o modelo só sai em branco (a ficha de campo é preenchida à mão na perfuração). */
+export const MODELOS_BRANCO: { id: ModeloBranco; titulo: string; descricao: string; soBranco?: boolean }[] = [
   { id: 'PROPOSTA', titulo: 'Proposta comercial', descricao: 'Uma folha: cliente, local, metragem base e valor, motobomba, prazo, pagamento e condições gerais.' },
   { id: 'TABELA', titulo: 'Tabela de preços de referência', descricao: 'Os itens da planilha da empresa com o valor de referência; com as quantidades, os totais saem calculados.' },
   { id: 'CONTRATO', titulo: 'Contrato', descricao: 'O contrato da configuração com os dados do cliente, valores (por extenso) e datas.' },
   { id: 'AUTORIZACAO', titulo: 'Autorização de metragem adicional', descricao: 'Para o cliente assinar na obra quando for preciso perfurar além do contratado.' },
+  { id: 'FICHA', titulo: 'Ficha de campo da perfuração', descricao: 'O relatório técnico em branco, para anotar a perfuração, o revestimento e o teste de vazão na obra.', soBranco: true },
 ];
 
 /** Campos de cada modelo, em grupos (a ordem do formulário). As quantidades da tabela são qtd_0, qtd_1... */
@@ -45,6 +49,7 @@ export const CAMPOS_DO_MODELO: Record<ModeloBranco, { grupo: string; chaves: str
     { grupo: 'Situação na obra', chaves: ['prof_contratada', 'prof_atingida', 'vazao', 'solo'] },
     { grupo: 'Autorização', chaves: ['metros_adicionais', 'valor_metro', 'pagamento_adicional', 'ass_cidade', 'ass_data'] },
   ],
+  FICHA: [],
 };
 
 /** Pacote padrão da proposta (das propostas da empresa): preenche metragem e valores de uma vez. */
@@ -178,6 +183,13 @@ const autorizacao = (e: ConfigProcesso, logo: string | null) => pagina('Autoriza
  * com valores, o que estiver preenchido sai escrito e o resto em linha para preencher à mão.
  */
 export const htmlEmBranco = (id: ModeloBranco, empresa: ConfigProcesso, logo: string | null, valores: ValoresKit | null = null) => {
+  // a ficha de campo é o formulário em branco do relatório técnico (tem o visual dele)
+  if (id === 'FICHA') {
+    return gerarModelo('branco', {}, {
+      secoes: SECOES_PADRAO,
+      empresa: { nome: empresa.empresaNome || undefined, documento: empresa.empresaDocumento || undefined, telefone: empresa.empresaTelefone || undefined, cidade: empresa.foroCidade || undefined },
+    }).replace('</body>', '<script>window.onload=function(){setTimeout(function(){window.print()},300)}</script></body>');
+  }
   const html = id === 'PROPOSTA' ? proposta(empresa, logo) : id === 'TABELA' ? tabela(empresa, logo, valores)
     : id === 'CONTRATO' ? contrato(empresa, logo) : autorizacao(empresa, logo);
   return aplicarCampos(html, valores, valorPorExtenso);
@@ -185,6 +197,9 @@ export const htmlEmBranco = (id: ModeloBranco, empresa: ConfigProcesso, logo: st
 
 /** Para a pré-visualização: a mesma página sem abrir a impressão sozinha. */
 export const semImpressao = (html: string) => html.replace(/<script>window\.onload[\s\S]*?<\/script>/g, '');
+
+/** Modelos com o visual do relatório técnico (estilo próprio): saem numa impressão separada dos outros. */
+export const impressaoSeparada = (id: ModeloBranco) => id === 'FICHA';
 
 /** Vários documentos numa impressão só: um estilo e cada documento começando numa folha nova. */
 export const juntarPaginas = (htmls: string[]) => {

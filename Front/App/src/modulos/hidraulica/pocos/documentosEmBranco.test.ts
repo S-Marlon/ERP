@@ -21,6 +21,7 @@ teste('modelos em branco do kit de visita', () => {
     // todo campo do formulário existe
     for (const g of CAMPOS_DO_MODELO[m.id]) for (const k of g.chaves) assert.ok(campoDe(k), `${m.id}: campo ${k}`);
   }
+  assert.ok(htmlEmBranco('FICHA', empresa, null).includes('Formulário'), 'ficha de campo = relatório em branco');
   const p = htmlEmBranco('PROPOSTA', empresa, null);
   assert.ok(p.includes('Metragem base') && /R\$\s280,00/.test(p), 'excedente de referência da planilha');
   assert.ok(!p.includes('opção B') && !/R\$\s18\.000,00/.test(p), 'uma opção só, em branco');

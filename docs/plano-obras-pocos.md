@@ -227,3 +227,7 @@ Colunas novas: `incluso` em `_orcamento_itens`, `valor_parcelado` em `_obras`, `
   (`camposKit.ts`, marcação ⟦chave⟧ nos modelos); o que falta fica amarelo na pré-visualização e o campo em edição em
   amarelo forte (só na tela); o vazio sai em linha para preencher à mão. Os valores valem para todos os modelos da
   visita; valor por extenso, totais da tabela e total da autorização saem calculados. Proposta tem o atalho do padrão.
+- **Documentos** (2026-11-11): "Kit de visita" e "Relatório avulso" viraram um item só, com três abas: kit de visita (agora
+  com a ficha de campo da perfuração, que sai em impressão separada por ter o visual do relatório), documentos de uma obra
+  (orçamento, contrato, aditivos, laudo e adesivo com pré-visualização A4) e o relatório técnico avulso. Endereços antigos
+  (`/kit-visita`, `/relatorio`) abrem a aba certa.

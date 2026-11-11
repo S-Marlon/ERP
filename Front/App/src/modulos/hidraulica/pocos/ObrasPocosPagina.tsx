@@ -7,7 +7,6 @@ import { Segmented, Typography } from 'antd';
 import { AimOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import CentralPocos from './CentralPocos';
-import RelatorioPocoPage from './RelatorioPocoPage';
 import ObrasAba from './ObrasAba';
 import MapaPocos from './MapaPocos';
 import AgendaPocos from './AgendaPocos';
@@ -18,13 +17,13 @@ import AtendimentoPocos from './AtendimentoPocos';
 import { navPocos, useNavPocos } from './navPocos';
 import { enderecoDaSecao, GRUPOS_POCOS, secaoDaAba, secaoDoEndereco, secoesDoGrupo } from './secoesPocos';
 import { MaisFerramentas } from './InicioPocos';
-import KitVisita from './KitVisita';
+import CentralDocumentos from './CentralDocumentos';
 import { secaoLigada, useRecursosPocos } from './recursosPocos';
 
 const { Title, Text } = Typography;
 const TELAS: Record<string, React.ReactNode> = {
   central: <CentralPocos />, atendimento: <AtendimentoPocos />, obras: <ObrasAba />, agenda: <AgendaPocos />, manutencao: <ManutencoesPocos />,
-  iot: <MonitoramentoPocos />, mapa: <MapaPocos />, resultado: <PainelPocos />, relatorio: <RelatorioPocoPage />, ferramentas: <MaisFerramentas />, kit: <KitVisita />,
+  iot: <MonitoramentoPocos />, mapa: <MapaPocos />, resultado: <PainelPocos />, ferramentas: <MaisFerramentas />, documentos: <CentralDocumentos />,
 };
 
 const ObrasPocosPagina: React.FC = () => {
@@ -36,9 +35,11 @@ const ObrasPocosPagina: React.FC = () => {
 
   // endereço → seção interna (clique na barra lateral, voltar do navegador, link salvo)
   useEffect(() => {
+    // endereço antigo (kit-visita, relatorio): abre a aba certa de Documentos e troca o endereço pelo novo
+    if (atual.subvista) { navPocos.ir({ aba: atual.aba, subvista: atual.subvista }); navigate(enderecoDaSecao(atual), { replace: true }); return; }
     if (nav.aba === atual.aba && (!atual.vista || nav.vista === atual.vista)) return;
     if (atual.vista) navPocos.ir({ aba: atual.aba, vista: atual.vista }); else navPocos.trocarAba(atual.aba);
-  }, [atual.secao]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [secao]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   // pedido interno ("abrir obra", "ver no mapa", atalhos da Central) → endereço
   useEffect(() => {

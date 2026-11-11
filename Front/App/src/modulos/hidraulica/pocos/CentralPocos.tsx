@@ -206,7 +206,7 @@ const CentralPocos: React.FC = () => {
       <Flex justify="space-between" align="center">
         <Text type="secondary">Comece por aqui: o que precisa da sua atenção hoje e o que falta para fechar cada contrato.</Text>
         <Space>
-          <Button icon={<FileTextOutlined />} onClick={() => navPocos.ir({ aba: 'kit' })}>Kit de visita</Button>
+          <Button icon={<FileTextOutlined />} onClick={() => navPocos.ir({ aba: 'documentos', subvista: 'KIT' })}>Kit de visita</Button>
           <Button type="primary" icon={<CalculatorOutlined />} onClick={() => setOrcamento(true)}>Orçamento rápido</Button>
           <Tooltip title="Recarregar"><Button icon={<ReloadOutlined />} loading={carregando} onClick={carregar} /></Tooltip>
         </Space>

@@ -18,5 +18,7 @@ teste('endereços antigos continuam abrindo a mesma tela', () => {
   assert.strictEqual(secaoDoEndereco('nao-existe').secao, '');
   assert.strictEqual(secaoDaAba('obras', 'RECEBER').secao, 'receber');
   assert.strictEqual(secaoDaAba('iot').secao, 'monitoramento');
-  assert.strictEqual(secaoDaAba('kit').secao, 'kit-visita');
+  assert.strictEqual(secaoDaAba('documentos').secao, 'documentos');
+  assert.deepStrictEqual([secaoDoEndereco('kit-visita').secao, secaoDoEndereco('kit-visita').subvista], ['documentos', 'KIT']);
+  assert.deepStrictEqual([secaoDoEndereco('relatorio').aba, secaoDoEndereco('relatorio').subvista], ['documentos', 'RELATORIO']);
 });

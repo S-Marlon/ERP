@@ -4,7 +4,7 @@
 import type { VistaObras } from './navPocos';
 
 export type GrupoPocos = 'central' | 'atendimento' | 'obras' | 'clientes' | 'agenda' | 'mais';
-export interface SecaoPocos { secao: string; titulo: string; aba: string; grupo: GrupoPocos; vista?: VistaObras; descricao?: string }
+export interface SecaoPocos { secao: string; titulo: string; aba: string; grupo: GrupoPocos; vista?: VistaObras; descricao?: string; subvista?: string }
 
 export const BASE_POCOS = '/modulos/hidraulica/pocos';
 
@@ -18,12 +18,12 @@ export const SECOES_POCOS: SecaoPocos[] = [
   { secao: 'pocos', titulo: 'Poços', aba: 'obras', vista: 'POCOS', grupo: 'clientes' },
   { secao: 'agenda', titulo: 'Agenda', aba: 'agenda', grupo: 'agenda' },
   { secao: 'ferramentas', titulo: 'Mais ferramentas', aba: 'ferramentas', grupo: 'mais' },
-  { secao: 'kit-visita', titulo: 'Kit de visita', aba: 'kit', grupo: 'mais', descricao: 'Proposta, tabela de preços, contrato e autorização em branco para levar ao cliente.' },
+  { secao: 'documentos', titulo: 'Documentos', aba: 'documentos', grupo: 'mais',
+    descricao: 'Tudo o que se imprime: kit de visita (em branco ou preenchido), documentos de uma obra e o relatório técnico avulso.' },
   { secao: 'manutencao', titulo: 'Manutenção', aba: 'manutencao', grupo: 'mais', descricao: 'Planos de manutenção, revisões a oferecer e garantias vencendo.' },
   { secao: 'resultado', titulo: 'Resultado', aba: 'resultado', grupo: 'mais', descricao: 'Recebido, faturado, lucro das obras e alertas.' },
   { secao: 'mapa', titulo: 'Mapa', aba: 'mapa', grupo: 'mais', descricao: 'Poços dos clientes e a base regional (profundidade e vazão da região).' },
   { secao: 'monitoramento', titulo: 'Monitoramento (IoT)', aba: 'iot', grupo: 'mais', descricao: 'Aparelhos nos poços, leituras, alertas e comandos.' },
-  { secao: 'relatorio', titulo: 'Relatório avulso', aba: 'relatorio', grupo: 'mais', descricao: 'Relatório técnico sem obra cadastrada.' },
 ];
 
 /** Grupos da barra lateral, na ordem. O primeiro item do grupo é a tela que o grupo abre. */
@@ -45,8 +45,17 @@ export const itensMenuPocos = () => GRUPOS_POCOS.map(g => {
   return { key: enderecoDaSecao(primeira), label: g.titulo, tambem: outras.map(enderecoDaSecao) };
 });
 
-/** Seção do endereço (desconhecida ou vazia = Central). */
-export const secaoDoEndereco = (secao: string | undefined) => SECOES_POCOS.find(s => s.secao === (secao || '')) || SECOES_POCOS[0];
+/** Endereços antigos que viraram uma aba de outra seção (o Kit de visita e o Relatório avulso agora são abas de Documentos). */
+const ENDERECOS_ANTIGOS: Record<string, { secao: string; subvista: string }> = {
+  'kit-visita': { secao: 'documentos', subvista: 'KIT' }, relatorio: { secao: 'documentos', subvista: 'RELATORIO' },
+};
+
+/** Seção do endereço (desconhecida ou vazia = Central). Endereço antigo devolve a seção nova com a aba (subvista). */
+export const secaoDoEndereco = (secao: string | undefined): SecaoPocos => {
+  const antigo = ENDERECOS_ANTIGOS[secao || ''];
+  if (antigo) return { ...SECOES_POCOS.find(s => s.secao === antigo.secao)!, subvista: antigo.subvista };
+  return SECOES_POCOS.find(s => s.secao === (secao || '')) || SECOES_POCOS[0];
+};
 
 /** Seção de uma aba/vista interna (para o endereço acompanhar "abrir obra", "ver no mapa"...). */
 export const secaoDaAba = (aba: string, vista?: VistaObras) =>
