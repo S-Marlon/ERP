@@ -241,3 +241,8 @@ Colunas novas: `incluso` em `_orcamento_itens`, `valor_parcelado` em `_obras`, `
   Google Maps), proprietário, contratos/obras do poço com o tipo do contrato — **formal** (assinado no processo) ou
   **informal** (obra fechada sem contrato assinado) —, relatório técnico, documentos da obra e garantia, e o histórico.
   O mapa, a Central, a lista de poços, a obra e a ficha do cliente passaram a abrir essas fichas.
+- **Configuração reorganizada** (2026-11-11): `ConfigPocos.tsx` com menu de seções (Empresa, Orçamento e garantia, Contrato,
+  Pós-venda, Horário e prazos, Telas do módulo) e uma seção por vez; o menu mostra quantos campos importantes faltam
+  (`secoesConfig.ts`). Modelos de contrato/aditivo num editor à parte (resumo: padrão ou personalizado, nº de cláusulas);
+  prazos de avaliação/revisão junto das mensagens; barra de salvar com "alterações não salvas" e Desfazer. Atalhos
+  abrem a seção certa (`subvista: 'CONFIG:CONTRATO'`).

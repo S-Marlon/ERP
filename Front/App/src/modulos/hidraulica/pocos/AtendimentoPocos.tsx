@@ -1,21 +1,19 @@
 // Obras de poços › atendimento e pós-venda: os leads (todo contato, com origem e o prazo de resposta em horário
 // comercial), as pendências do processo de todas as obras, os indicadores, a galeria de fotos liberadas para
-// propaganda e a configuração (dados da empresa, logo, mensagens e prazos).
+// propaganda e a configuração (ConfigPocos.tsx).
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Alert, Button, Card, Checkbox, Col, Empty, Flex, Image, Input, InputNumber, Modal, Row, Segmented, Select, Space, Statistic, Switch, Table, Tag, Tooltip, Typography, Upload,
+  Alert, Button, Card, Checkbox, Col, Empty, Image, Input, Modal, Row, Segmented, Select, Space, Statistic, Table, Tag, Tooltip, Typography,
   message,
 } from 'antd';
-import { CheckOutlined, FileSearchOutlined, PlusOutlined, ReloadOutlined, SettingOutlined, WhatsAppOutlined } from '@ant-design/icons';
+import { CheckOutlined, FileSearchOutlined, PlusOutlined, ReloadOutlined, WhatsAppOutlined } from '@ant-design/icons';
 import {
-  ConfigProcesso, dataBr, ESTADOS_ETAPA, ESTADOS_PRAZO, foneBr, IndicadoresProcesso, Lead, LeadForm, ORIGENS_LEAD, OrigemLead, PendenciaObra, processoApi, Servico,
+  dataBr, ESTADOS_ETAPA, ESTADOS_PRAZO, foneBr, IndicadoresProcesso, Lead, LeadForm, ORIGENS_LEAD, OrigemLead, PendenciaObra, processoApi, Servico,
   SERVICOS, SITUACOES_LEAD, SITUACOES_OBRA, urlArquivo,
 } from './obrasApi';
 import { abrirObra, navPocos } from './navPocos';
-import { recursosPocos } from './recursosPocos';
-import { reduzirImagem } from './ProcessoObra';
 import { OrcamentoRapido } from './OrcamentoContrato';
-import { CAMPOS_MODELO, MODELO_ADITIVO_PADRAO, MODELO_CONTRATO_PADRAO } from './documentosPocos';
+import ConfigPocos from './ConfigPocos';
 
 const { Text } = Typography;
 const erro = (e: unknown) => message.error(e instanceof Error ? e.message : 'Erro.');
@@ -280,123 +278,13 @@ const Galeria: React.FC = () => {
   );
 };
 
-// ------------------------------------------------------------------ configuração
-const Configuracao: React.FC = () => {
-  const [c, setC] = useState<ConfigProcesso | null>(null);
-  const [logoNovo, setLogoNovo] = useState<string | null>(null);
-  const [salvando, setSalvando] = useState(false);
-  useEffect(() => { processoApi.config().then(setC).catch(erro); }, []);
-  if (!c) return <Card loading />;
-  const campo = (k: keyof ConfigProcesso, rotulo: string, span: number, props: object = {}) => (
-    <Col span={span}><Text>{rotulo}</Text><Input value={(c[k] as string) || ''} onChange={e => setC({ ...c, [k]: e.target.value || null })} {...props} /></Col>
-  );
-  const n = (k: keyof ConfigProcesso, rotulo: string, suf: string, min: number, max: number) => (
-    <Col span={6}><Text>{rotulo}</Text><InputNumber min={min} max={max} suffix={suf} style={{ width: '100%' }} value={c[k] as number} onChange={v => setC({ ...c, [k]: Number(v) || min })} /></Col>
-  );
-  const salvar = async (tirarLogo = false) => {
-    setSalvando(true);
-    try {
-      const r = await processoApi.salvarConfig({ ...c, logoNovo: logoNovo || undefined, tirarLogo });
-      setC(r); setLogoNovo(null); recursosPocos.definir(r); message.success('Configuração salva.');
-    }
-    catch (e) { erro(e); } finally { setSalvando(false); }
-  };
-  return (
-    <Space direction="vertical" size={10} style={{ width: '100%' }}>
-      <Card size="small" title="Dados da empresa (orçamento, laudo e adesivo)">
-        <Row gutter={[8, 8]}>
-          <Col span={6}>
-            <Text>Logo</Text>
-            <div style={{ border: '1px dashed #d9d9d9', borderRadius: 6, height: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 4 }}>
-              {logoNovo || c.logo ? <img src={logoNovo || urlArquivo(c.logo) || ''} alt="logo" style={{ maxHeight: 80, maxWidth: '100%' }} /> : <Text type="secondary">sem logo</Text>}
-            </div>
-            <Space style={{ marginTop: 4 }}>
-              <Upload accept="image/png,image/jpeg,image/webp" showUploadList={false} beforeUpload={async f => { try { setLogoNovo(await reduzirImagem(f, 600, 0.9)); } catch (e) { erro(e); } return false; }}>
-                <Button size="small">Escolher</Button>
-              </Upload>
-              {c.logo && !logoNovo && <Button size="small" type="link" danger onClick={() => salvar(true)}>tirar</Button>}
-            </Space>
-          </Col>
-          <Col span={18}>
-            <Row gutter={[8, 8]}>
-              {campo('empresaNome', 'Nome', 12)}{campo('empresaDocumento', 'CNPJ / CPF', 12)}
-              {campo('empresaTelefone', 'Telefone', 8)}{campo('empresaWhatsapp', 'WhatsApp', 8)}{campo('empresaEmail', 'E-mail', 8)}
-              {campo('empresaEndereco', 'Endereço', 24)}
-              {campo('empresaRepresentante', 'Representante legal (no contrato)', 16, { placeholder: 'Ex.: José Maurício dos Santos' })}
-              {campo('empresaRepresentanteCpf', 'CPF do representante', 8)}
-            </Row>
-          </Col>
-          <Col span={24}><Text>Texto de garantia (orçamento e laudo)</Text>
-            <Input.TextArea rows={3} maxLength={2000} value={c.textoGarantia || ''} onChange={e => setC({ ...c, textoGarantia: e.target.value || null })}
-              placeholder="Ex.: A garantia cobre a execução da perfuração e do revestimento contra defeitos de construção. Não cobre: redução natural da vazão do aquífero..." />
-          </Col>
-          {campo('formaPagamentoPadrao', 'Forma de pagamento padrão', 18, { placeholder: 'Ex.: 30% de sinal, saldo na entrega ou em até 3 vezes' })}
-          {n('validadeOrcamentoDias', 'Validade do orçamento', 'dias', 1, 365)}
-        </Row>
-      </Card>
-      <Card size="small" title="Contrato e termo aditivo">
-        <Row gutter={[8, 8]}>
-          {campo('foroCidade', 'Foro (cidade da comarca)', 8, { maxLength: 60 })}
-          {campo('responsavelTecnico', 'Responsável técnico', 10, { maxLength: 120 })}
-          {campo('registroTecnico', 'CREA / registro', 6, { maxLength: 30 })}
-          {([['modeloContrato', 'Modelo do contrato', MODELO_CONTRATO_PADRAO, 14], ['modeloAditivo', 'Modelo do termo aditivo', MODELO_ADITIVO_PADRAO, 10]] as const).map(([k, rotulo, padrao, linhas]) => (
-            <Col span={24} key={k}>
-              <Flex justify="space-between" align="center">
-                <Text>{rotulo}{!c[k] && <Text type="secondary" style={{ fontSize: 12 }}> (usando o modelo padrão)</Text>}</Text>
-                {c[k] && <Button size="small" type="link" onClick={() => setC({ ...c, [k]: null })}>restaurar o padrão</Button>}
-              </Flex>
-              <Input.TextArea rows={linhas} maxLength={k === 'modeloContrato' ? 60000 : 20000} value={c[k] || padrao}
-                onChange={e => setC({ ...c, [k]: e.target.value.trim() && e.target.value !== padrao ? e.target.value : null })} />
-            </Col>
-          ))}
-          <Col span={24}>
-            <Alert type="warning" showIcon message="O modelo padrão é uma referência: peça para um advogado revisar as cláusulas antes de usar com clientes." />
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              Linhas que começam com "CLÁUSULA" viram título; {'{tabela_itens}'} e {'{tabela_adicionais}'} vão numa linha sozinha. Campos:{' '}
-              {Object.entries(CAMPOS_MODELO).map(([k, t]) => <Tooltip key={k} title={t}><Tag style={{ marginBottom: 2 }}>{`{${k}}`}</Tag></Tooltip>)}
-            </Text>
-          </Col>
-        </Row>
-      </Card>
-      <Card size="small" title="Pós-venda (mensagens de WhatsApp)">
-        <Row gutter={[8, 8]}>
-          {campo('linkAvaliacao', 'Link para avaliar no Google', 24, { placeholder: 'https://g.page/r/.../review (no Perfil da Empresa no Google: "Pedir avaliações")' })}
-          <Col span={12}><Text>Mensagem pedindo avaliação</Text>
-            <Input.TextArea rows={4} maxLength={1000} value={c.msgAvaliacao} onChange={e => setC({ ...c, msgAvaliacao: e.target.value })} />
-          </Col>
-          <Col span={12}><Text>Mensagem do lembrete de revisão</Text>
-            <Input.TextArea rows={4} maxLength={1000} value={c.msgRevisao} onChange={e => setC({ ...c, msgRevisao: e.target.value })} />
-          </Col>
-          <Col span={24}><Text type="secondary" style={{ fontSize: 12 }}>Use {'{cliente}'}, {'{empresa}'}, {'{link}'}, {'{poco}'} e {'{obra}'}: são trocados pelos dados de cada obra.</Text></Col>
-        </Row>
-      </Card>
-      <Card size="small" title="Prazos e horário comercial">
-        <Row gutter={[8, 8]}>
-          {n('respostaLeadMin', 'Responder contato em', 'min', 5, 1440)}{n('orcamentoHoras', 'Enviar orçamento em', 'h', 1, 240)}
-          {n('avaliacaoDias', 'Pedir avaliação após', 'dias', 1, 90)}{n('revisaoMeses', 'Lembrar revisão após', 'meses', 1, 60)}
-          {campo('horaAbre', 'Abre', 6, { type: 'time' })}{campo('horaFecha', 'Fecha', 6, { type: 'time' })}
-          {campo('sabadoFecha', 'Sábado fecha (vazio = não abre)', 8, { type: 'time' })}
-        </Row>
-      </Card>
-      <Card size="small" title="Telas do módulo">
-        <Space direction="vertical" size={6}>
-          <Space><Switch checked={c.usaMonitoramento} onChange={v => setC({ ...c, usaMonitoramento: v })} />
-            <span><b>Monitoramento (IoT)</b> <Text type="secondary">· ligue quando houver aparelho medindo algum poço</Text></span></Space>
-          <Space><Switch checked={c.usaMapa} onChange={v => setC({ ...c, usaMapa: v })} />
-            <span><b>Mapa</b> <Text type="secondary">· poços dos clientes e a base regional (profundidade e vazão da região)</Text></span></Space>
-          <Text type="secondary" style={{ fontSize: 12 }}>Desligada, a tela sai de "Mais ferramentas". Nada é apagado: ligar de novo traz tudo de volta.</Text>
-        </Space>
-      </Card>
-      <Space><Button type="primary" icon={<SettingOutlined />} loading={salvando} onClick={() => salvar()}>Salvar configuração</Button></Space>
-    </Space>
-  );
-};
-
 type VistaAtendimento = 'LEADS' | 'PENDENCIAS' | 'INDICADORES' | 'GALERIA' | 'CONFIG';
 const VISTAS_ATENDIMENTO: VistaAtendimento[] = ['LEADS', 'PENDENCIAS', 'INDICADORES', 'GALERIA', 'CONFIG'];
 
 const AtendimentoPocos: React.FC = () => {
-  const pedida = navPocos.get().subvista as VistaAtendimento | undefined;
+  // "CONFIG:CONTRATO" abre a configuração já na seção do contrato
+  const subvista = navPocos.get().subvista;
+  const pedida = subvista?.split(':')[0] as VistaAtendimento | undefined;
   const [vista, setVista] = useState<VistaAtendimento>(pedida && VISTAS_ATENDIMENTO.includes(pedida) ? pedida : 'LEADS');
   return (
     <Space direction="vertical" size={12} style={{ width: '100%' }}>
@@ -408,7 +296,7 @@ const AtendimentoPocos: React.FC = () => {
       {vista === 'PENDENCIAS' && <Pendencias />}
       {vista === 'INDICADORES' && <Indicadores />}
       {vista === 'GALERIA' && <Galeria />}
-      {vista === 'CONFIG' && <Configuracao />}
+      {vista === 'CONFIG' && <ConfigPocos pedido={subvista} />}
     </Space>
   );
 };

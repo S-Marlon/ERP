@@ -98,7 +98,7 @@ const KitVisita: React.FC = () => {
     <Space direction="vertical" size={12} style={{ width: '100%' }}>
       {!cfg.configurado && (
         <Alert type="info" showIcon message="Os modelos saem com o logo e os dados da empresa da configuração."
-          action={<Button size="small" icon={<SettingOutlined />} onClick={() => navPocos.ir({ aba: 'atendimento', subvista: 'CONFIG' })}>Preencher</Button>} />
+          action={<Button size="small" icon={<SettingOutlined />} onClick={() => navPocos.ir({ aba: 'atendimento', subvista: 'CONFIG:EMPRESA' })}>Preencher</Button>} />
       )}
       <Row gutter={[12, 12]}>
         <Col xs={24} lg={preenchida ? 5 : 7}>

@@ -13,8 +13,8 @@ import { secaoLigada, useRecursosPocos } from './recursosPocos';
 const { Text } = Typography;
 
 const IR: Record<Exclude<ChavePasso, 'ORCAMENTO'>, () => void> = {
-  EMPRESA: () => navPocos.ir({ aba: 'atendimento', subvista: 'CONFIG' }),
-  CONTRATO: () => navPocos.ir({ aba: 'atendimento', subvista: 'CONFIG' }),
+  EMPRESA: () => navPocos.ir({ aba: 'atendimento', subvista: 'CONFIG:EMPRESA' }),
+  CONTRATO: () => navPocos.ir({ aba: 'atendimento', subvista: 'CONFIG:CONTRATO' }),
   EQUIPE: () => navPocos.ir({ aba: 'agenda', subvista: 'EQUIPE' }),
   EQUIPAMENTOS: () => navPocos.ir({ aba: 'agenda', subvista: 'EQUIPAMENTOS' }),
   MATERIAIS: () => navPocos.ir({ aba: 'obras', vista: 'MATERIAIS' }),
@@ -86,7 +86,7 @@ export const MaisFerramentas: React.FC = () => {
     {recursos.carregado && desligadas.length > 0 && (
       <Alert type="info" showIcon
         message={`${desligadas.map(s => s.titulo).join(' e ')} ${desligadas.length > 1 ? 'estão desligados' : 'está desligado'}.`}
-        action={<Button size="small" onClick={() => navPocos.ir({ aba: 'atendimento', subvista: 'CONFIG' })}>Ligar na configuração</Button>} />
+        action={<Button size="small" onClick={() => navPocos.ir({ aba: 'atendimento', subvista: 'CONFIG:TELAS' })}>Ligar na configuração</Button>} />
     )}
     </Space>
   );
