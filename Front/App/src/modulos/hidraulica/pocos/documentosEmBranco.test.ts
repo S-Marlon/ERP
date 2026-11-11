@@ -21,7 +21,8 @@ teste('modelos em branco do kit de visita', () => {
     // todo campo do formulário existe
     for (const g of CAMPOS_DO_MODELO[m.id]) for (const k of g.chaves) assert.ok(campoDe(k), `${m.id}: campo ${k}`);
   }
-  assert.ok(htmlEmBranco('FICHA', empresa, null).includes('Formulário'), 'ficha de campo = relatório em branco');
+  const fb = htmlEmBranco('FICHA', empresa, null);
+  assert.ok(fb.includes('Ficha de campo da perfuração') && fb.includes('Recuperação') && /data-campo="rev_material_3"/.test(fb), 'ficha de campo em branco');
   const p = htmlEmBranco('PROPOSTA', empresa, null);
   assert.ok(p.includes('Metragem base') && /R\$\s280,00/.test(p), 'excedente de referência da planilha');
   assert.ok(!p.includes('opção B') && !/R\$\s18\.000,00/.test(p), 'uma opção só, em branco');
@@ -48,6 +49,10 @@ teste('modelos preenchidos em parte', () => {
   // autorização: profundidade total e valor máximo calculados
   const a = htmlEmBranco('AUTORIZACAO', empresa, null, { prof_contratada: 60, metros_adicionais: 20, valor_metro: 280 });
   assert.ok(a.includes('>80</span>') && /R\$\s5\.600,00/.test(a));
+  // ficha de campo: o cliente da proposta já aparece; números com a unidade
+  const f = htmlEmBranco('FICHA', empresa, null, { ...v, prof_atingida: 84, perf_de_1: 0, perf_ate_1: 12, perf_diam_1: '10"', ocorrencia: 'NENHUMA' });
+  assert.ok(f.includes('<b>José da Silva</b>') && f.includes('<b>84 m</b>') && f.includes('<b>0 m</b>') && f.includes('<b>10&quot;</b>') && f.includes('caixa marcada"></span>Nenhuma'));
+  assert.ok(/class="cp cp-vazio" data-campo="perf_de_2"/.test(f));
   assert.strictEqual(camposVazios(['metros', 'valor_vista', 'cliente_nome'], v), 0);
   assert.strictEqual(camposVazios(['cliente_doc', 'metros'], v), 1);
 });

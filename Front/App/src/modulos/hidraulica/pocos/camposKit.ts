@@ -45,6 +45,26 @@ export const CAMPOS_KIT: Record<string, CampoKit> = Object.fromEntries([
   C('metros_adicionais', 'Metros adicionais (máximo)', 'numero', 10), C('valor_metro', 'Valor por metro adicional', 'moeda', 18),
   C('pagamento_adicional', 'Pagamento da metragem adicional', 'texto', 85),
   C('ass_cidade', 'Cidade (assinatura)', 'texto', 40), C('ass_data', 'Data (assinatura)', 'extenso_data', 0),
+  // ficha de campo da perfuração
+  C('perf_inicio', 'Início da perfuração', 'data', 26), C('perf_termino', 'Conclusão da perfuração', 'data', 26),
+  C('perf_sonda', 'Sonda / equipe', 'texto', 0), C('perf_responsavel', 'Responsável técnico', 'texto', 0),
+  C('poco_diametro', 'Diâmetro interno', 'texto', 14, { dica: 'Ex.: 6"' }),
+  C('ocorrencia', 'Ocorrências na obra', 'escolha', 0, { opcoes: [{ valor: 'NENHUMA', rotulo: 'Nenhuma' }, { valor: 'CAIMENTO', rotulo: 'Caimento / desmoronamento' },
+    { valor: 'ESTRUTURAS', rotulo: 'Interferência com estruturas subterrâneas' }] }),
+  ...[1, 2, 3].flatMap(i => [
+    C(`perf_de_${i}`, `Etapa ${i} · de`, 'numero', 12, { sufixo: 'm' }), C(`perf_ate_${i}`, `Etapa ${i} · até`, 'numero', 12, { sufixo: 'm' }),
+    C(`perf_diam_${i}`, `Etapa ${i} · diâmetro`, 'texto', 0, { dica: 'Ex.: 10"' }),
+    C(`rev_de_${i}`, `Revestimento ${i} · de`, 'numero', 12, { sufixo: 'm' }), C(`rev_ate_${i}`, `Revestimento ${i} · até`, 'numero', 12, { sufixo: 'm' }),
+    C(`rev_diam_${i}`, `Revestimento ${i} · diâmetro`, 'texto', 0, { dica: 'Ex.: 6"' }),
+    C(`rev_material_${i}`, `Revestimento ${i} · material`, 'texto', 0, { dica: 'Ex.: PVC geomecânico, aço, filtro' }),
+  ]),
+  C('bomba_marca', 'Marca da bomba', 'texto', 0), C('bomba_motor', 'Motor (modelo / potência)', 'texto', 0), C('bomba_cabo', 'Cabo elétrico', 'texto', 0),
+  C('bomba_prof', 'Profundidade da bomba', 'numero', 14, { sufixo: 'm' }), C('nivel_estatico', 'Nível estático (NE)', 'numero', 14, { sufixo: 'm' }),
+  C('nivel_dinamico', 'Nível dinâmico (ND)', 'numero', 14, { sufixo: 'm' }), C('bomba_tubulacao', 'Tubulação edutora', 'texto', 0, { dica: 'Ex.: 12 barras de 6 m, 1¼"' }),
+  C('bomba_vazao', 'Vazão regulada', 'texto', 0, { dica: 'Ex.: 3.000 L/h' }), C('bomba_data', 'Instalação da bomba', 'data', 26),
+  C('teste_duracao', 'Duração do teste', 'numero', 14, { sufixo: 'h' }), C('teste_metodo', 'Método do teste', 'texto', 0),
+  C('teste_vazao', 'Vazão estabilizada', 'numero', 14, { sufixo: 'm³/h' }),
+  C('ficha_obs', 'Observações da obra', 'longo', 3),
 ].map(c => [c.chave, c]));
 
 /** O campo pela chave (as quantidades da tabela de preços são qtd_0, qtd_1...). */

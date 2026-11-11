@@ -6,7 +6,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Button, Card, Checkbox, Col, Flex, Input, InputNumber, Row, Segmented, Select, Space, Tag, Typography, message } from 'antd';
 import { ClearOutlined, PrinterOutlined, SettingOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { ConfigProcesso, ITENS_PRONTOS, processoApi, urlArquivo } from './obrasApi';
-import { CAMPOS_DO_MODELO, htmlEmBranco, impressaoSeparada, juntarPaginas, ModeloBranco, MODELOS_BRANCO, PADRAO_PROPOSTA, semImpressao } from './documentosEmBranco';
+import { CAMPOS_DO_MODELO, htmlEmBranco, juntarPaginas, ModeloBranco, MODELOS_BRANCO, PADRAO_PROPOSTA, semImpressao } from './documentosEmBranco';
 import { campoDe, camposVazios, destaquePrevia, ValoresKit } from './camposKit';
 import { navPocos } from './navPocos';
 
@@ -117,7 +117,7 @@ const KitVisita: React.FC = () => {
                         {modos[m.id] === 'PREENCHIDA' && (faltam ? <Tag color="gold" style={{ margin: 0 }}>faltam {faltam}</Tag> : <Tag color="green" style={{ margin: 0 }}>completo</Tag>)}
                       </Flex>
                       <div><Text type="secondary" style={{ fontSize: 12 }}>{m.descricao}</Text></div>
-                      <div onClick={e => e.stopPropagation()} style={{ marginTop: 6, display: m.soBranco ? 'none' : undefined }}>
+                      <div onClick={e => e.stopPropagation()} style={{ marginTop: 6 }}>
                         <Segmented size="small" block value={modos[m.id]} options={[{ value: 'BRANCO', label: 'Em branco' }, { value: 'PREENCHIDA', label: 'Preenchida' }]}
                           onChange={v => { setModos(a => ({ ...a, [m.id]: v as Modo })); setVendo(m.id); }} />
                       </div>
@@ -126,12 +126,7 @@ const KitVisita: React.FC = () => {
                 </Card>
               );
             })}
-            <Button type="primary" block icon={<PrinterOutlined />} disabled={!marcados.length} onClick={() => {
-              const juntos = marcados.filter(id => !impressaoSeparada(id)), aParte = marcados.filter(impressaoSeparada);
-              if (juntos.length) imprimir(juntarPaginas(juntos.map(html)));
-              aParte.forEach(id => imprimir(html(id)));
-              if (juntos.length && aParte.length) message.info('A ficha de campo sai numa impressão separada (tem o visual do relatório técnico).');
-            }}>
+            <Button type="primary" block icon={<PrinterOutlined />} disabled={!marcados.length} onClick={() => imprimir(juntarPaginas(marcados.map(html)))}>
               Imprimir os marcados ({marcados.length})
             </Button>
           </Space>

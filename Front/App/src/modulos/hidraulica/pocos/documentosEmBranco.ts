@@ -9,18 +9,15 @@ import {
   qualificacaoEmpresa, RODAPE_PAGINAS, RODAPE_VISTO, valorPorExtenso,
 } from './documentosPocos';
 import { aplicarCampos, K, ValoresKit } from './camposKit';
-import { gerarModelo } from './templatesPoco';
-import { SECOES_PADRAO } from './relatorioPoco';
 
 export type ModeloBranco = 'PROPOSTA' | 'TABELA' | 'CONTRATO' | 'AUTORIZACAO' | 'FICHA';
 
-/** soBranco: o modelo só sai em branco (a ficha de campo é preenchida à mão na perfuração). */
-export const MODELOS_BRANCO: { id: ModeloBranco; titulo: string; descricao: string; soBranco?: boolean }[] = [
+export const MODELOS_BRANCO: { id: ModeloBranco; titulo: string; descricao: string }[] = [
   { id: 'PROPOSTA', titulo: 'Proposta comercial', descricao: 'Uma folha: cliente, local, metragem base e valor, motobomba, prazo, pagamento e condições gerais.' },
   { id: 'TABELA', titulo: 'Tabela de preços de referência', descricao: 'Os itens da planilha da empresa com o valor de referência; com as quantidades, os totais saem calculados.' },
   { id: 'CONTRATO', titulo: 'Contrato', descricao: 'O contrato da configuração com os dados do cliente, valores (por extenso) e datas.' },
   { id: 'AUTORIZACAO', titulo: 'Autorização de metragem adicional', descricao: 'Para o cliente assinar na obra quando for preciso perfurar além do contratado.' },
-  { id: 'FICHA', titulo: 'Ficha de campo da perfuração', descricao: 'O relatório técnico em branco, para anotar a perfuração, o revestimento e o teste de vazão na obra.', soBranco: true },
+  { id: 'FICHA', titulo: 'Ficha de campo da perfuração', descricao: 'Para anotar na obra a perfuração, o revestimento, a motobomba e o teste de vazão (as leituras saem em tabela para anotar à mão).' },
 ];
 
 /** Campos de cada modelo, em grupos (a ordem do formulário). As quantidades da tabela são qtd_0, qtd_1... */
@@ -49,7 +46,15 @@ export const CAMPOS_DO_MODELO: Record<ModeloBranco, { grupo: string; chaves: str
     { grupo: 'Situação na obra', chaves: ['prof_contratada', 'prof_atingida', 'vazao', 'solo'] },
     { grupo: 'Autorização', chaves: ['metros_adicionais', 'valor_metro', 'pagamento_adicional', 'ass_cidade', 'ass_data'] },
   ],
-  FICHA: [],
+  FICHA: [
+    { grupo: 'Obra', chaves: ['doc_numero', 'doc_data', 'cliente_nome', 'cliente_tel', 'obra_endereco', 'obra_cidade', 'obra_ref'] },
+    { grupo: 'Perfuração', chaves: ['perf_inicio', 'perf_termino', 'perf_sonda', 'perf_responsavel', 'prof_contratada', 'prof_atingida', 'poco_diametro', 'vazao', 'ocorrencia', 'solo'] },
+    { grupo: 'Etapas de perfuração', chaves: [1, 2, 3].flatMap(i => [`perf_de_${i}`, `perf_ate_${i}`, `perf_diam_${i}`]) },
+    { grupo: 'Revestimento', chaves: [1, 2, 3].flatMap(i => [`rev_de_${i}`, `rev_ate_${i}`, `rev_diam_${i}`, `rev_material_${i}`]) },
+    { grupo: 'Conjunto motobomba', chaves: ['bomba_marca', 'bomba_motor', 'bomba_cabo', 'bomba_prof', 'nivel_estatico', 'nivel_dinamico', 'bomba_tubulacao', 'bomba_vazao', 'bomba_data'] },
+    { grupo: 'Teste de vazão', chaves: ['teste_duracao', 'teste_metodo', 'teste_vazao'] },
+    { grupo: 'Observações', chaves: ['ficha_obs'] },
+  ],
 };
 
 /** Pacote padrão da proposta (das propostas da empresa): preenche metragem e valores de uma vez. */
@@ -178,28 +183,71 @@ const autorizacao = (e: ConfigProcesso, logo: string | null) => pagina('Autoriza
   ${localData()}
   ${blocoAssinaturas([{ nome: K('nome_assinatura'), papel: 'Cliente · nome e assinatura' }, { nome: escapar(e.empresaNome || ''), papel: 'Responsável pela obra' }])}`);
 
+/** Tabela com linhas em branco para anotar à mão (as leituras do teste de vazão). */
+const tabelaMao = (titulo: string, colunas: string[], linhas: number) => `<table class="itens mao">
+  <tr><th colspan="${colunas.length}">${titulo}</th></tr><tr class="sub">${colunas.map(c => `<td>${c}</td>`).join('')}</tr>
+  ${Array.from({ length: linhas }, () => `<tr>${colunas.map(() => '<td></td>').join('')}</tr>`).join('')}</table>`;
+
+const ficha = (e: ConfigProcesso, logo: string | null) => {
+  const etapas = [1, 2, 3].map(i => `<tr><td>${K(`perf_de_${i}`)}</td><td>${K(`perf_ate_${i}`)}</td><td>${K(`perf_diam_${i}`)}</td></tr>`).join('');
+  const revest = [1, 2, 3].map(i => `<tr><td>${K(`rev_de_${i}`)}</td><td>${K(`rev_ate_${i}`)}</td><td>${K(`rev_diam_${i}`)}</td><td class="mat">${K(`rev_material_${i}`)}</td></tr>`).join('');
+  return pagina('Ficha de campo da perfuração', `<div class="compacta">${cabecalho({ empresa: e }, logo, { tipo: 'Ficha de campo', numero: `Obra nº ${K('doc_numero')}`, data: `Data: ${K('doc_data')}` })}
+    <h1>Ficha de campo da perfuração</h1>
+    <div class="sub">Anotações da obra: perfuração, revestimento, conjunto motobomba e teste de vazão</div>
+    <div class="ficha branco">
+      ${celula('Cliente', K('cliente_nome'))}${celula('Telefone / WhatsApp', K('cliente_tel'))}
+      ${celula('Local da obra (endereço)', K('obra_endereco'), true)}
+      ${celula('Cidade / UF', K('obra_cidade'))}${celula('Referência / GPS', K('obra_ref'))}
+    </div>
+    <h2><span class="n">1</span>Perfuração</h2>
+    <div class="ficha tres branco">
+      ${celula('Início', K('perf_inicio'))}${celula('Conclusão', K('perf_termino'))}${celula('Vazão observada', K('vazao'))}
+      ${celula('Profundidade contratada', K('prof_contratada'))}${celula('Profundidade atingida', K('prof_atingida'))}${celula('Diâmetro interno', K('poco_diametro'))}
+      ${celula('Sonda / equipe', K('perf_sonda'))}${celula('Responsável técnico', K('perf_responsavel')).replace('<div>', '<div style="grid-column: span 2">')}
+      ${celula('Ocorrências na obra', K('ocorrencia'), true)}
+      ${celula('Formação / solo', K('solo'), true)}
+    </div>
+    <div class="duas-tabelas">
+      <table class="itens"><tr><th>Perfuração · de</th><th>Até</th><th>Diâm.</th></tr>${etapas}</table>
+      <table class="itens"><tr><th>Revestimento · de</th><th>Até</th><th>Diâm.</th><th class="mat">Material</th></tr>${revest}</table>
+    </div>
+    <h2><span class="n">2</span>Conjunto motobomba</h2>
+    <div class="ficha tres branco">
+      ${celula('Marca da bomba', K('bomba_marca'))}${celula('Motor (modelo / potência)', K('bomba_motor'))}${celula('Cabo elétrico', K('bomba_cabo'))}
+      ${celula('Profundidade da bomba', K('bomba_prof'))}${celula('Nível estático (NE)', K('nivel_estatico'))}${celula('Nível dinâmico (ND)', K('nivel_dinamico'))}
+      ${celula('Tubulação edutora', K('bomba_tubulacao'))}${celula('Vazão regulada', K('bomba_vazao'))}${celula('Instalação', K('bomba_data'))}
+    </div>
+    <h2 class="nova-folha"><span class="n">3</span>Teste de vazão</h2>
+    <div class="ficha tres branco">
+      ${celula('Duração', K('teste_duracao'))}${celula('Método', K('teste_metodo'))}${celula('Vazão estabilizada', K('teste_vazao'))}
+    </div>
+    <div class="duas-tabelas">
+      ${tabelaMao('Bombeamento', ['Tempo (min)', 'Nível (m)', 'Vazão (L/h)'], 18)}
+      ${tabelaMao('Recuperação', ['Tempo (min)', 'Nível (m)'], 18)}
+    </div>
+    <h2><span class="n">4</span>Observações</h2>
+    ${K('ficha_obs')}
+    ${blocoAssinaturas([{ nome: '', papel: 'Responsável técnico' }, { nome: K('nome_assinatura'), papel: 'Cliente · ciente' }])}</div>`, `
+    .nova-folha { break-before: page; page-break-before: always; margin-top: 0; }
+    .duas-tabelas { display: grid; grid-template-columns: 1fr 1.7fr; gap: 4mm; margin-top: 2.5mm; break-inside: avoid; }
+    .duas-tabelas table.itens td { height: 6mm; vertical-align: bottom; }
+    .duas-tabelas table.itens th, .duas-tabelas table.itens td { white-space: nowrap; } .duas-tabelas table.itens .mat { white-space: normal; width: 40%; }
+    table.itens.mao th { text-align: center; } table.itens.mao tr.sub td { height: auto; font-size: 7pt; text-transform: uppercase; color: var(--m); background: #f7f9fb; }
+    table.itens.mao td { border: 1px solid var(--b); } table.itens.mao tr:nth-child(even) td { background: #fff; }`);
+};
+
 /**
  * Página HTML do modelo (com a impressão automática, como os outros documentos). valores = null: tudo em branco;
  * com valores, o que estiver preenchido sai escrito e o resto em linha para preencher à mão.
  */
 export const htmlEmBranco = (id: ModeloBranco, empresa: ConfigProcesso, logo: string | null, valores: ValoresKit | null = null) => {
-  // a ficha de campo é o formulário em branco do relatório técnico (tem o visual dele)
-  if (id === 'FICHA') {
-    return gerarModelo('branco', {}, {
-      secoes: SECOES_PADRAO,
-      empresa: { nome: empresa.empresaNome || undefined, documento: empresa.empresaDocumento || undefined, telefone: empresa.empresaTelefone || undefined, cidade: empresa.foroCidade || undefined },
-    }).replace('</body>', '<script>window.onload=function(){setTimeout(function(){window.print()},300)}</script></body>');
-  }
   const html = id === 'PROPOSTA' ? proposta(empresa, logo) : id === 'TABELA' ? tabela(empresa, logo, valores)
-    : id === 'CONTRATO' ? contrato(empresa, logo) : autorizacao(empresa, logo);
+    : id === 'CONTRATO' ? contrato(empresa, logo) : id === 'FICHA' ? ficha(empresa, logo) : autorizacao(empresa, logo);
   return aplicarCampos(html, valores, valorPorExtenso);
 };
 
 /** Para a pré-visualização: a mesma página sem abrir a impressão sozinha. */
 export const semImpressao = (html: string) => html.replace(/<script>window\.onload[\s\S]*?<\/script>/g, '');
-
-/** Modelos com o visual do relatório técnico (estilo próprio): saem numa impressão separada dos outros. */
-export const impressaoSeparada = (id: ModeloBranco) => id === 'FICHA';
 
 /** Vários documentos numa impressão só: um estilo e cada documento começando numa folha nova. */
 export const juntarPaginas = (htmls: string[]) => {
