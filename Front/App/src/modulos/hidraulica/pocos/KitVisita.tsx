@@ -25,10 +25,21 @@ const rotuloDoCampo = (k: string) => {
   return campoDe(k)?.rotulo || k;
 };
 
+const idDoCampo = (chave: string) => `kit-campo-${chave}`;
+
+/** Leva o cursor ao campo do formulário (clique na folha da pré-visualização). */
+const focarCampo = (chave: string) => {
+  const el = document.getElementById(idDoCampo(chave));
+  if (!el) return false;
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  el.focus({ preventScroll: true });
+  return true;
+};
+
 /** O campo do formulário conforme o tipo; o foco diz qual destacar na pré-visualização. */
 const EntradaCampo: React.FC<{ chave: string; valor: ValoresKit[string]; onChange: (v: ValoresKit[string]) => void; onFoco: (k: string | null) => void }> = ({ chave, valor, onChange, onFoco }) => {
   const c = campoDe(chave)!;
-  const foco = { onFocus: () => onFoco(chave), onBlur: () => onFoco(null) };
+  const foco = { id: idDoCampo(chave), onFocus: () => onFoco(chave), onBlur: () => onFoco(null) };
   if (c.tipo === 'longo') return <Input.TextArea size="small" autoSize={{ minRows: 2, maxRows: 5 }} value={(valor as string) || ''} onChange={e => onChange(e.target.value)} {...foco} />;
   if (c.tipo === 'escolha') {
     return <Select size="small" allowClear style={{ width: '100%' }} value={(valor as string) || undefined} onChange={v => onChange(v ?? null)} options={c.opcoes?.map(o => ({ value: o.valor, label: o.rotulo }))} {...foco} />;
@@ -66,6 +77,14 @@ const KitVisita: React.FC = () => {
     const alvo = ativo && preenchida ? doc.querySelector(`[data-campo="${ativo}"]`) : null;
     if (alvo) alvo.scrollIntoView({ block: 'center' });
     else if (doc.scrollingElement) doc.scrollingElement.scrollTop = rolagem;
+    if (!preenchida) return;
+    // clicar num campo da folha (amarelo ou já preenchido) leva o cursor direto para ele no formulário
+    const aoClicar = (ev: MouseEvent) => {
+      const chave = (ev.target as Element | null)?.closest?.('[data-campo]')?.getAttribute('data-campo');
+      if (chave && !focarCampo(chave)) message.info('Este campo não está no formulário deste modelo.');
+    };
+    doc.addEventListener('click', aoClicar);
+    return () => doc.removeEventListener('click', aoClicar);
   }, [previa]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!cfg) return <Card loading />;
@@ -82,7 +101,7 @@ const KitVisita: React.FC = () => {
           action={<Button size="small" icon={<SettingOutlined />} onClick={() => navPocos.ir({ aba: 'atendimento', subvista: 'CONFIG' })}>Preencher</Button>} />
       )}
       <Row gutter={[12, 12]}>
-        <Col xs={24} lg={9}>
+        <Col xs={24} lg={preenchida ? 5 : 7}>
           <Space direction="vertical" size={8} style={{ width: '100%' }}>
             <Text type="secondary">Marque o que vai levar. Cada modelo sai em branco ou preenchido com o que você já sabe; o que ficar vazio sai em linha para preencher à mão.</Text>
             {MODELOS_BRANCO.map(m => {
@@ -110,9 +129,21 @@ const KitVisita: React.FC = () => {
             <Button type="primary" block icon={<PrinterOutlined />} disabled={!marcados.length} onClick={() => imprimir(juntarPaginas(marcados.map(html)))}>
               Imprimir os marcados ({marcados.length})
             </Button>
-
-            {preenchida && (
-              <Card size="small" title={`Preencher · ${titulo}`}
+          </Space>
+        </Col>
+        <Col xs={24} lg={preenchida ? 12 : 17}>
+          <Card size="small"
+            title={<Space wrap>{`Pré-visualização (A4) · ${titulo}`}{preenchida && <Tag color="gold" style={{ margin: 0 }}>amarelo = falta · clique para preencher</Tag>}</Space>}
+            extra={<Button icon={<PrinterOutlined />} onClick={() => imprimir(html(vendo))}>Imprimir este</Button>}
+            styles={{ body: { padding: 8, background: '#e5e7eb' } }}>
+            <iframe ref={quadro} title="Pré-visualização do modelo"
+              style={{ width: '100%', maxWidth: 860, height: '80vh', display: 'block', margin: '0 auto', border: '1px solid #d1d5db', background: '#e5e7eb' }} />
+          </Card>
+        </Col>
+        {preenchida && (
+          <Col xs={24} lg={7}>
+              <Card size="small" title={`Preencher · ${titulo}`} style={{ position: 'sticky', top: 8 }}
+                styles={{ body: { maxHeight: 'calc(80vh + 40px)', overflowY: 'auto' } }}
                 extra={<Space size={4}>
                   {vendo === 'PROPOSTA' && (
                     <Button size="small" icon={<ThunderboltOutlined />} onClick={() => setValores(a => ({ ...a, ...PADRAO_PROPOSTA }))}>Padrão 60 m · R$ 18.000</Button>
@@ -140,18 +171,8 @@ const KitVisita: React.FC = () => {
                   <Text type="secondary" style={{ fontSize: 12 }}>O que você preenche vale para todos os modelos desta visita (o cliente da proposta já aparece no contrato).</Text>
                 </Space>
               </Card>
-            )}
-          </Space>
-        </Col>
-        <Col xs={24} lg={15}>
-          <Card size="small"
-            title={<Space>{`Pré-visualização (A4) · ${titulo}`}{preenchida && <Tag color="gold" style={{ margin: 0 }}>amarelo = falta preencher</Tag>}</Space>}
-            extra={<Button icon={<PrinterOutlined />} onClick={() => imprimir(html(vendo))}>Imprimir este</Button>}
-            styles={{ body: { padding: 8, background: '#e5e7eb', position: 'sticky', top: 0 } }}>
-            <iframe ref={quadro} title="Pré-visualização do modelo"
-              style={{ width: '100%', maxWidth: 860, height: '80vh', display: 'block', margin: '0 auto', border: '1px solid #d1d5db', background: '#e5e7eb' }} />
-          </Card>
-        </Col>
+          </Col>
+        )}
       </Row>
     </Space>
   );

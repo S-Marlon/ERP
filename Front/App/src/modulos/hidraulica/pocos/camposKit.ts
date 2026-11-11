@@ -121,7 +121,8 @@ export const K = (chave: string) => `⟦${chave}⟧`;
 /** Estilo só da pré-visualização: o que falta em amarelo claro e o campo em edição em amarelo forte. */
 export const destaquePrevia = (html: string, ativo: string | null, marcarVazios: boolean) => {
   const css = `<style>
-    ${marcarVazios ? '.cp-vazio { background: #fff59d; border-radius: 2px; box-shadow: 0 0 0 1px #fff59d; }' : ''}
+    ${marcarVazios ? `.cp-vazio { background: #fff59d; border-radius: 2px; box-shadow: 0 0 0 1px #fff59d; }
+      .cp { cursor: pointer; } .cp:hover { outline: 1.5px dashed #f59e0b; outline-offset: 1px; border-radius: 2px; }` : ''}
     ${ativo ? `[data-campo="${ativo}"], [data-origem~="${ativo}"] { background: #ffca28 !important; box-shadow: 0 0 0 2px #f59e0b !important; border-radius: 2px; }` : ''}
   </style>${ativo ? `<script>window.addEventListener('load',function(){var e=document.querySelector('[data-campo="${ativo}"]');if(e)e.scrollIntoView({block:'center'});});</script>` : ''}`;
   return html.replace('</head>', `${css}</head>`);
