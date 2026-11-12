@@ -100,7 +100,8 @@ const PocoModal: React.FC<{ poco: Poco | 'novo' | null; onFechar: () => void; on
           </Space>
         )}
         <Row gutter={8}>
-          <Col span={14}><Text>Identificação</Text><Input maxLength={100} value={p.identificacao} onChange={e => mudar({ identificacao: e.target.value })} placeholder="Ex.: Sítio São José - poço 1" /></Col>
+          <Col span={14}><Text>Identificação</Text><Input maxLength={100} value={p.identificacao} onChange={e => mudar({ identificacao: e.target.value })}
+            placeholder={cliente ? `Vazio = "Poço de ${cliente.nome}"` : 'Ex.: Sítio São José - poço 1'} /></Col>
           <Col span={10}>
             <Text>Proprietário</Text>
             <Button block icon={<UserOutlined />} onClick={() => setEscolhendo(true)}>{cliente?.nome || 'Escolher no cadastro'}</Button>
@@ -220,7 +221,7 @@ const ObraModal: React.FC<{ obra: Obra | 'nova' | null; onFechar: () => void; on
           {modoPoco === 'NOVO' && (
             <div style={{ marginTop: 6 }}>
               <Text>Identificação do poço</Text>
-              <Input value={novoPoco.identificacao || ''} onChange={e => setNovoPoco(p => ({ ...p, identificacao: e.target.value }))} placeholder="Ex.: Sítio São José - poço 1" />
+              <Input value={novoPoco.identificacao || ''} onChange={e => setNovoPoco(p => ({ ...p, identificacao: e.target.value }))} placeholder='Vazio = "Poço de <cliente>" (2º poço: #2)' />
               <CamposLocal p={novoPoco} mudar={x => setNovoPoco(p => ({ ...p, ...x }))} />
             </div>
           )}

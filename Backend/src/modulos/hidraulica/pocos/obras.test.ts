@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { garantiaAte, lerGps, lerServicos, podeIrPara, pocoDoRelatorio, relatorioInicial, validarCliente, validarObra, validarPoco } from './obras';
+import { garantiaAte, lerGps, nomePadraoPoco, lerServicos, podeIrPara, pocoDoRelatorio, relatorioInicial, validarCliente, validarObra, validarPoco } from './obras';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -62,4 +62,15 @@ teste('obras de poços: garantia', () => {
   assert.strictEqual(garantiaAte('2026-10-20', 12), '2027-10-20');
   assert.strictEqual(garantiaAte('2026-08-31', 6), '2027-02-28');
   assert.strictEqual(garantiaAte(null, 12), null);
+});
+
+teste('poço sem nome: "Poço de <cliente>" e depois #2', () => {
+  assert.strictEqual(nomePadraoPoco('José  da Silva', []), 'Poço de José da Silva');
+  assert.strictEqual(nomePadraoPoco('José da Silva', ['Poço de José da Silva']), 'Poço de José da Silva #2');
+  assert.strictEqual(nomePadraoPoco('José da Silva', ['poço de josé da silva', 'Poço de José da Silva #2', 'Sítio']), 'Poço de José da Silva #3');
+  assert.strictEqual(nomePadraoPoco('José da Silva', ['Poço de José da Silva #2']), 'Poço de José da Silva', 'o primeiro nome livre');
+  assert.strictEqual(nomePadraoPoco(null, []), 'Poço de cliente');
+  assert.ok(nomePadraoPoco('X'.repeat(200), []).length <= 94);
+  assert.strictEqual(validarPoco({ identificacao: '', idProprietario: 5 }).identificacao, null);
+  assert.throws(() => validarPoco({ identificacao: '' }), /proprietário/);
 });

@@ -6,7 +6,7 @@ import { operadorDe } from '../../../areas/vendas/caixa/caixa.controller';
 import { bloqueioDoSinal } from './cobranca';
 import { acertarSinal, parcelaDoSinal } from './cobrancaBanco';
 import {
-  ErroObra, garantiaAte, lerServicos, podeIrPara, pocoDoRelatorio, proximasSituacoes, relatorioInicial, SituacaoObra, SITUACOES_OBRA, validarObra, validarPoco,
+  ErroObra, garantiaAte, lerServicos, podeIrPara, pocoDoRelatorio, proximasSituacoes, relatorioInicial, SituacaoObra, SITUACOES_OBRA, nomePadraoPoco, validarObra, validarPoco,
 } from './obras';
 
 const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || req.body?.tenant_id || 1);
@@ -55,8 +55,18 @@ export const listarPocos = async (req: Request, res: Response) => {
   } catch (e) { return responderErro(res, e, 'Erro ao listar os poços.'); }
 };
 
+/** Nome automático do poço do cliente ("Poço de <cliente>", "#2"...), sem contar o próprio poço ao editar. */
+export const nomeLivreDoPoco = async (conn: any, tenant: number, idCliente: number | null, ignorar: number | null = null) => {
+  if (!idCliente) return 'Poço sem nome';
+  const [[c]]: any = await conn.execute(`SELECT nome FROM modulo_hidraulica_pocos_clientes WHERE id_cliente = ? AND tenant_id = ?`, [idCliente, tenant]);
+  const [rows]: any = await conn.execute(`SELECT identificacao FROM modulo_hidraulica_pocos_pocos WHERE id_proprietario = ? AND tenant_id = ? AND id_poco <> ?`,
+    [idCliente, tenant, ignorar || 0]);
+  return nomePadraoPoco(c?.nome, rows.map((r: any) => r.identificacao));
+};
+
 const gravarPoco = async (conn: any, tenant: number, b: any, id: number | null, operador: string) => {
   const p = validarPoco(b);
+  if (!p.identificacao) p.identificacao = await nomeLivreDoPoco(conn, tenant, p.idProprietario, id);
   const valores = [p.identificacao, p.idProprietario, p.endereco, p.bairro, p.cidade, p.uf, p.cep, p.latitude, p.longitude, p.profundidadeM, p.diametro,
     p.vazaoLh, p.nivelEstaticoM, p.nivelDinamicoM, p.tipoSolo, p.dataPerfuracao, p.perfuradoPor, p.perfuradoPorNome, p.situacao, p.observacao, operador];
   if (id) {
@@ -271,7 +281,7 @@ export const mudarSituacao = async (req: Request, res: Response) => {
       if (!idPoco) {
         const rel = lerJson(o.dados_relatorio);
         idPoco = await gravarPoco(conn, tenant, {
-          identificacao: o.titulo || `Poço de ${rel.cliente || 'cliente'} (obra ${id})`, idProprietario: o.id_cliente,
+          identificacao: '', idProprietario: o.id_cliente,
           endereco: rel.endereco, bairro: rel.bairro, cidade: rel.cidade, uf: rel.uf, cep: rel.cep, gps: rel.localizacao, perfuradoPor: 'NOS',
         }, null, operadorDe(req));
         await conn.execute(`UPDATE modulo_hidraulica_pocos_obras SET id_poco = ? WHERE id_obra = ?`, [idPoco, id]);
