@@ -160,7 +160,9 @@ export const calcularCentral = async (tenant: number) => {
       if (pm.niveis.length) {
         const ativos = dele.filter((p: any) => p.situacao === 'ATIVO');
         const cvs = conjDele.filter((k: any) => k.situacao === 'INSTALADO' && n(k.potencia_cv) > 0).map((k: any) => n(k.potencia_cv));
-        const poco = { profundidadeM: dados.profundidadeMaxM, potenciaCv: cvs.length ? Math.max(...cvs) : null, pocos: Math.max(1, ativos.length) };
+        const comGps = ativos.find((p: any) => p.latitude !== null && p.longitude !== null);
+        const poco = { profundidadeM: dados.profundidadeMaxM, potenciaCv: cvs.length ? Math.max(...cvs) : null, pocos: Math.max(1, ativos.length),
+          latitude: comGps ? nulo(comGps.latitude) : null, longitude: comGps ? nulo(comGps.longitude) : null };
         const precos = pm.niveis.map(nv => ({ nome: nv.nome, preco: precoDoPlano(pm.custos, nv, poco, pm.mediaVisitaEmpresa) }));
         const sug = planoSugerido_(precos);
         const viaveis = precos.filter(x => x.preco.viavel).map(x => x.preco.precoMensal);

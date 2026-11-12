@@ -14,7 +14,8 @@ type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
 
 const COLUNAS: Record<keyof CustosPlano, string> = {
   custoHoraEquipe: 'custo_hora_equipe', horasVisita: 'horas_visita', horasPor100m: 'horas_por_100m', kmMedio: 'km_medio', custoKm: 'custo_km',
-  materialVisita: 'material_visita', custoLimpeza: 'custo_limpeza', custoMonitoramentoMes: 'custo_monitoramento_mes', aparelhoValor: 'aparelho_valor',
+  materialVisita: 'material_visita', baseLatitude: 'base_latitude', baseLongitude: 'base_longitude', fatorEstrada: 'fator_estrada',
+  usoEmergenciasPct: 'uso_emergencias_pct', custoLimpeza: 'custo_limpeza', custoMonitoramentoMes: 'custo_monitoramento_mes', aparelhoValor: 'aparelho_valor',
   aparelhoMeses: 'aparelho_meses', bombaPrecoPorCv: 'bomba_preco_por_cv', bombaVidaAnos: 'bomba_vida_anos', precoVisitaAvulsa: 'preco_visita_avulsa',
   impostosPct: 'impostos_pct', taxaCobrancaPct: 'taxa_cobranca_pct', inadimplenciaPct: 'inadimplencia_pct', margemPct: 'margem_pct',
   margemMinimaPct: 'margem_minima_pct', arredondarPara: 'arredondar_para',
@@ -24,7 +25,8 @@ export interface NivelSalvo extends NivelPlano { idNivel: number }
 
 const formatarNivel = (r: any): NivelSalvo => ({
   idNivel: Number(r.id_nivel), nome: r.nome, descricao: r.descricao || null, visitasAno: n(r.visitas_ano), limpezaACadaMeses: nulo(r.limpeza_a_cada_meses),
-  chamadosAno: n(r.chamados_ano), descontoPecasPct: n(r.desconto_pecas_pct), monitoramento: !!r.monitoramento, reservaBombaPct: n(r.reserva_bomba_pct),
+  chamadosAno: n(r.chamados_ano), descontoPecasPct: n(r.desconto_pecas_pct), descontoLimpezaPct: n(r.desconto_limpeza_pct), prioridade: !!r.prioridade,
+  monitoramento: !!r.monitoramento, reservaBombaPct: n(r.reserva_bomba_pct),
   fidelidadeMeses: n(r.fidelidade_meses), ordem: n(r.ordem), ativo: !!r.ativo,
 });
 
@@ -32,7 +34,7 @@ const formatarNivel = (r: any): NivelSalvo => ({
 export const carregarPlanoMensal = async (conn: Conn, tenant: number, soAtivos = true) => {
   const [[c]]: any = await conn.execute(`SELECT * FROM modulo_hidraulica_pocos_plano_mensal_custos WHERE tenant_id = ?`, [tenant]);
   const custos: CustosPlano = { ...CUSTOS_PADRAO };
-  if (c) for (const [k, col] of Object.entries(COLUNAS)) (custos as any)[k] = k === 'precoVisitaAvulsa' ? nulo(c[col]) : n(c[col]);
+  if (c) for (const [k, col] of Object.entries(COLUNAS)) (custos as any)[k] = ['precoVisitaAvulsa', 'baseLatitude', 'baseLongitude'].includes(k) ? nulo(c[col]) : n(c[col]);
   const [niveis]: any = await conn.execute(
     `SELECT * FROM modulo_hidraulica_pocos_plano_mensal_niveis WHERE tenant_id = ?${soAtivos ? ' AND ativo = 1' : ''} ORDER BY ordem, id_nivel`, [tenant]);
   // visita avulsa de referência: média das obras concluídas só de limpeza/manutenção
@@ -46,13 +48,26 @@ export const carregarPlanoMensal = async (conn: Conn, tenant: number, soAtivos =
 /** O que pesa no preço de cada cliente: quantos poços ativos, o mais fundo e a bomba instalada mais forte. */
 export const pocosParaPlano = async (conn: Conn, tenant: number) => {
   const [rows]: any = await conn.execute(
-    `SELECT c.id_cliente, c.nome, COUNT(p.id_poco) AS pocos, MAX(p.profundidade_m) AS prof,
-            MAX((SELECT MAX(k.potencia_cv) FROM modulo_hidraulica_pocos_conjuntos k WHERE k.id_poco = p.id_poco AND k.situacao = 'INSTALADO')) AS cv
+    `SELECT c.id_cliente, c.nome, p.id_poco, p.profundidade_m, p.latitude, p.longitude,
+            (SELECT MAX(k.potencia_cv) FROM modulo_hidraulica_pocos_conjuntos k WHERE k.id_poco = p.id_poco AND k.situacao = 'INSTALADO') AS cv
      FROM modulo_hidraulica_pocos_clientes c JOIN modulo_hidraulica_pocos_pocos p ON p.id_proprietario = c.id_cliente AND p.situacao = 'ATIVO'
-     WHERE c.tenant_id = ? AND c.ativo = 1 GROUP BY c.id_cliente, c.nome ORDER BY c.nome`, [tenant]);
-  return rows.map((r: any) => ({
-    idCliente: Number(r.id_cliente), nome: r.nome, pocos: n(r.pocos), profundidadeM: r.prof === null ? null : n(r.prof), potenciaCv: r.cv === null ? null : n(r.cv),
-  }));
+     WHERE c.tenant_id = ? AND c.ativo = 1 ORDER BY c.nome, p.id_poco`, [tenant]);
+  return juntarPocos(rows.map((r: any) => ({ idCliente: Number(r.id_cliente), nome: r.nome, profundidadeM: nulo(r.profundidade_m), potenciaCv: nulo(r.cv),
+    latitude: nulo(r.latitude), longitude: nulo(r.longitude) })));
+};
+
+/** Um cliente por linha: quantos poços, o mais fundo, a bomba mais forte e o GPS de um poço (para medir o transporte). */
+export const juntarPocos = (pocos: { idCliente: number; nome: string; profundidadeM: number | null; potenciaCv: number | null; latitude: number | null; longitude: number | null }[]) => {
+  const por = new Map<number, { idCliente: number; nome: string; pocos: number; profundidadeM: number | null; potenciaCv: number | null; latitude: number | null; longitude: number | null }>();
+  for (const p of pocos) {
+    const c = por.get(p.idCliente) || { idCliente: p.idCliente, nome: p.nome, pocos: 0, profundidadeM: null, potenciaCv: null, latitude: null, longitude: null };
+    c.pocos++;
+    if (p.profundidadeM !== null && (c.profundidadeM === null || p.profundidadeM > c.profundidadeM)) c.profundidadeM = p.profundidadeM;
+    if (p.potenciaCv !== null && (c.potenciaCv === null || p.potenciaCv > c.potenciaCv)) c.potenciaCv = p.potenciaCv;
+    if (c.latitude === null && p.latitude !== null) { c.latitude = p.latitude; c.longitude = p.longitude; }
+    por.set(p.idCliente, c);
+  }
+  return [...por.values()];
 };
 
 const simulacao = (custos: CustosPlano, niveis: (NivelPlano & { idNivel?: number })[], poco: PocoDoPlano, media: number | null) =>
@@ -62,6 +77,8 @@ const lerPoco = (b: any): PocoDoPlano => ({
   profundidadeM: b?.profundidadeM === null || b?.profundidadeM === undefined || b.profundidadeM === '' ? null : Math.max(0, Number(b.profundidadeM) || 0),
   potenciaCv: b?.potenciaCv === null || b?.potenciaCv === undefined || b.potenciaCv === '' ? null : Math.max(0, Number(b.potenciaCv) || 0),
   pocos: Math.min(50, Math.max(1, Math.round(Number(b?.pocos) || 1))),
+  latitude: nulo(b?.latitude), longitude: nulo(b?.longitude),
+  kmIdaVolta: b?.kmIdaVolta === null || b?.kmIdaVolta === undefined || b.kmIdaVolta === '' ? null : Math.max(0, Number(b.kmIdaVolta) || 0),
 });
 
 // GET /plano-mensal — custos, planos (todos, com os desativados), referência da visita avulsa e os clientes com poço
@@ -90,19 +107,20 @@ export const salvarCustos = async (req: Request, res: Response) => {
 
 const gravarNivel = async (tenant: number, b: any, id: number | null, operador: string) => {
   const nv = validarNivel(b);
-  const valores = [nv.nome, nv.descricao, nv.visitasAno, nv.limpezaACadaMeses, nv.chamadosAno, nv.descontoPecasPct, nv.monitoramento ? 1 : 0, nv.reservaBombaPct,
-    nv.fidelidadeMeses, nv.ordem, nv.ativo ? 1 : 0, operador];
+  const valores = [nv.nome, nv.descricao, nv.visitasAno, nv.limpezaACadaMeses, nv.chamadosAno, nv.descontoPecasPct, nv.descontoLimpezaPct,
+    nv.monitoramento ? 1 : 0, nv.prioridade ? 1 : 0, nv.reservaBombaPct, nv.fidelidadeMeses, nv.ordem, nv.ativo ? 1 : 0, operador];
   if (id) {
     const [u]: any = await pool.execute(
       `UPDATE modulo_hidraulica_pocos_plano_mensal_niveis SET nome = ?, descricao = ?, visitas_ano = ?, limpeza_a_cada_meses = ?, chamados_ano = ?,
-         desconto_pecas_pct = ?, monitoramento = ?, reserva_bomba_pct = ?, fidelidade_meses = ?, ordem = ?, ativo = ?, operador = ?
+         desconto_pecas_pct = ?, desconto_limpeza_pct = ?, monitoramento = ?, prioridade = ?, reserva_bomba_pct = ?, fidelidade_meses = ?, ordem = ?, ativo = ?, operador = ?
        WHERE id_nivel = ? AND tenant_id = ?`, [...valores, id, tenant]);
     if (!u.affectedRows) throw new ErroObra('Plano não encontrado.', 404);
     return id;
   }
   const [ins]: any = await pool.execute(
     `INSERT INTO modulo_hidraulica_pocos_plano_mensal_niveis (nome, descricao, visitas_ano, limpeza_a_cada_meses, chamados_ano, desconto_pecas_pct,
-       monitoramento, reserva_bomba_pct, fidelidade_meses, ordem, ativo, operador, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [...valores, tenant]);
+       desconto_limpeza_pct, monitoramento, prioridade, reserva_bomba_pct, fidelidade_meses, ordem, ativo, operador, tenant_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [...valores, tenant]);
   return Number(ins.insertId);
 };
 

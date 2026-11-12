@@ -24,12 +24,15 @@ const GRUPOS: { titulo: string; campos: Campo[] }[] = [
     { k: 'horasPor100m', rotulo: 'Horas a mais por 100 m', sufixo: 'h', passo: 0.5, ajuda: 'Tirar e descer a bomba em poço fundo' },
   ] },
   { titulo: 'Deslocamento e material', campos: [
-    { k: 'kmMedio', rotulo: 'Km de ida e volta', sufixo: 'km', passo: 10 },
+    { k: 'kmMedio', rotulo: 'Km médio de ida e volta', sufixo: 'km', passo: 10, ajuda: 'Usado quando o poço não tem GPS ou a base não foi informada' },
     { k: 'custoKm', rotulo: 'Custo por km', prefixo: 'R$', passo: 0.1, ajuda: 'Combustível e desgaste do veículo' },
     { k: 'materialVisita', rotulo: 'Material por visita', prefixo: 'R$', passo: 10 },
+    { k: 'fatorEstrada', rotulo: 'Fator da estrada', sufixo: '×', passo: 0.05, ajuda: 'Distância em linha reta × fator = km de estrada (1,3 é o comum)' },
   ] },
   { titulo: 'Limpeza e monitoramento', campos: [
-    { k: 'custoLimpeza', rotulo: 'Custo de uma limpeza', prefixo: 'R$', passo: 50 },
+    { k: 'usoEmergenciasPct', rotulo: 'Emergências usadas de fato', sufixo: '%', pct: true, passo: 5,
+      ajuda: 'Dos atendimentos de emergência incluídos, quantos os clientes chamam (30% = 3 em cada 10)' },
+    { k: 'custoLimpeza', rotulo: 'Custo de uma limpeza programada', prefixo: 'R$', passo: 50, ajuda: 'Só entra no plano que incluir limpeza programada' },
     { k: 'custoMonitoramentoMes', rotulo: 'Monitoramento por mês', prefixo: 'R$', passo: 5, ajuda: 'Chip, dados e plataforma por poço' },
     { k: 'aparelhoValor', rotulo: 'Valor do aparelho', prefixo: 'R$', passo: 50 },
     { k: 'aparelhoMeses', rotulo: 'Pagar o aparelho em', sufixo: 'meses', passo: 6 },
@@ -51,7 +54,7 @@ const GRUPOS: { titulo: string; campos: Campo[] }[] = [
 ];
 
 const NIVEL_NOVO: NivelPlano = {
-  nome: 'Novo plano', descricao: null, visitasAno: 1, limpezaACadaMeses: null, chamadosAno: 0, descontoPecasPct: 0, monitoramento: false,
+  nome: 'Novo plano', descricao: null, visitasAno: 1, limpezaACadaMeses: null, chamadosAno: 0, descontoPecasPct: 0, descontoLimpezaPct: 0, prioridade: false, monitoramento: false,
   reservaBombaPct: 0, fidelidadeMeses: 12, ordem: 99, ativo: true,
 };
 
@@ -95,14 +98,17 @@ const CartaoNivel: React.FC<{
         {preco ? <Resultado p={preco} sugerido={sugerido} /> : <Text type="secondary">{n.ativo ? 'calculando…' : 'fora da oferta'}</Text>}
         <Divider style={{ margin: '4px 0' }} />
         {linha('Visitas preventivas por ano', <InputNumber size="small" min={0} max={24} value={n.visitasAno} onChange={v => set({ visitasAno: v ?? 0 })} style={{ width: 80 }} />)}
-        {linha('Limpeza a cada', <InputNumber size="small" min={0} max={120} value={n.limpezaACadaMeses ?? 0} onChange={v => set({ limpezaACadaMeses: v ? v : null })}
+        {linha('Limpeza programada a cada', <InputNumber size="small" min={0} max={120} value={n.limpezaACadaMeses ?? 0} onChange={v => set({ limpezaACadaMeses: v ? v : null })}
           suffix="meses" style={{ width: 110 }} placeholder="não" />)}
         {linha('Emergências por ano', <InputNumber size="small" min={0} max={24} value={n.chamadosAno} onChange={v => set({ chamadosAno: v ?? 0 })} style={{ width: 80 }} />)}
+        {linha('Atendimento prioritário', <Switch size="small" checked={n.prioridade} onChange={v => set({ prioridade: v })} />)}
         {linha('Monitoramento (IoT)', <Switch size="small" checked={n.monitoramento} onChange={v => set({ monitoramento: v })} />)}
         {linha('Cobre da troca da bomba', <InputNumber size="small" min={0} max={100} step={10} value={Math.round(n.reservaBombaPct * 100)}
           onChange={v => set({ reservaBombaPct: (v ?? 0) / 100 })} suffix="%" style={{ width: 90 }} />)}
-        {linha('Desconto em peças', <InputNumber size="small" min={0} max={90} value={Math.round(n.descontoPecasPct * 100)}
+        {linha('Desconto em bomba e material', <InputNumber size="small" min={0} max={90} value={Math.round(n.descontoPecasPct * 100)}
           onChange={v => set({ descontoPecasPct: (v ?? 0) / 100 })} suffix="%" style={{ width: 90 }} />)}
+        {linha('Desconto na limpeza', <InputNumber size="small" min={0} max={90} value={Math.round(n.descontoLimpezaPct * 100)}
+          onChange={v => set({ descontoLimpezaPct: (v ?? 0) / 100 })} suffix="%" style={{ width: 90 }} />)}
         {linha('Fidelidade', <InputNumber size="small" min={0} max={120} step={6} value={n.fidelidadeMeses} onChange={v => set({ fidelidadeMeses: v ?? 0 })} suffix="meses" style={{ width: 110 }} />)}
         <Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} maxLength={255} placeholder="Texto para o cliente (o que o plano oferece)"
           value={n.descricao || ''} onChange={e => set({ descricao: e.target.value || null })} />
@@ -166,7 +172,8 @@ const PlanoMensalPocos: React.FC = () => {
   const escolherCliente = (id: number | null) => {
     setCliente(id);
     const c = dados.clientes.find(x => x.idCliente === id);
-    if (c) setPoco({ profundidadeM: c.profundidadeM, potenciaCv: c.potenciaCv, pocos: Math.max(1, c.pocos) });
+    setPoco(c ? { profundidadeM: c.profundidadeM, potenciaCv: c.potenciaCv, pocos: Math.max(1, c.pocos), latitude: c.latitude, longitude: c.longitude, kmIdaVolta: null }
+      : { ...poco, latitude: null, longitude: null });
   };
   const salvarCustos = async () => {
     setSalvando(true);
@@ -212,6 +219,16 @@ const PlanoMensalPocos: React.FC = () => {
               <div key={g.titulo}>
                 <Divider titlePlacement="start" plain style={{ margin: '4px 0 6px' }}><Text type="secondary" style={{ fontSize: 12 }}>{g.titulo}</Text></Divider>
                 <Row gutter={[10, 6]}>
+                  {g.titulo === 'Deslocamento e material' && (
+                    <Col xs={24}>
+                      <Tooltip title="Cole a localização de onde a equipe sai (como no GPS do poço). Com ela, o transporte de cada cliente sai da distância até o poço." placement="topLeft">
+                        <Text style={{ fontSize: 12 }}>Base da empresa (GPS)</Text>
+                      </Tooltip>
+                      <Input size="small" allowClear placeholder="-23.1171, -46.5565 (vazio = usa o km médio)"
+                        value={custos.baseGps ?? (custos.baseLatitude !== null ? `${custos.baseLatitude}, ${custos.baseLongitude}` : '')}
+                        onChange={e => setCustos({ ...custos, baseGps: e.target.value })} />
+                    </Col>
+                  )}
                   {g.campos.map(c => (
                     <Col key={c.k} xs={24} sm={12}>
                       <Tooltip title={c.ajuda} placement="topLeft">
@@ -252,6 +269,20 @@ const PlanoMensalPocos: React.FC = () => {
                   onChange={v => { setCliente(null); setPoco({ ...poco, pocos: v || 1 }); }} />
               </Col>
             </Row>
+            <Flex align="center" gap={8} wrap style={{ marginTop: 8 }}>
+              <Text style={{ fontSize: 12 }}>Transporte (ida e volta)</Text>
+              <InputNumber size="small" min={0} max={5000} style={{ width: 120 }} suffix="km" value={poco.kmIdaVolta ?? null}
+                placeholder={sim?.planos[0] ? String(sim.planos[0].preco.km) : String(custos.kmMedio)}
+                onChange={v => setPoco({ ...poco, kmIdaVolta: v ?? null })} />
+              {sim?.planos[0] && (
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  {sim.planos[0].preco.kmOrigem === 'GPS' ? `${sim.planos[0].preco.km} km medidos da base até o poço`
+                    : sim.planos[0].preco.kmOrigem === 'INFORMADO' ? 'informado à mão (apague para voltar ao calculado)'
+                    : custos.baseLatitude === null && !custos.baseGps ? 'km médio (informe a base da empresa para medir pelo GPS)' : 'km médio (poço sem GPS)'}
+                  {' · '}{brl(sim.planos[0].preco.km * custos.custoKm)} por visita
+                </Text>
+              )}
+            </Flex>
             {cliente && (poco.profundidadeM === null || poco.potenciaCv === null) && (
               <Text type="secondary" style={{ fontSize: 12 }}>
                 {poco.profundidadeM === null ? 'Poço sem profundidade: a conta usa 80 m. ' : ''}{poco.potenciaCv === null ? 'Bomba não registrada: a conta usa 1,5 CV.' : ''}

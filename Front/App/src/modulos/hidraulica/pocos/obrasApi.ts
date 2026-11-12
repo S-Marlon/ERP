@@ -785,6 +785,8 @@ export const conjuntoApi = {
 /** Custos e variáveis da empresa. Percentuais de 0 a 1 (0,06 = 6%). */
 export interface CustosPlano {
   custoHoraEquipe: number; horasVisita: number; horasPor100m: number; kmMedio: number; custoKm: number; materialVisita: number;
+  /** Base da empresa (de onde a equipe sai); baseGps é o texto colado na tela (vai no lugar da latitude/longitude ao salvar). */
+  baseLatitude: number | null; baseLongitude: number | null; baseGps?: string; fatorEstrada: number; usoEmergenciasPct: number;
   custoLimpeza: number; custoMonitoramentoMes: number; aparelhoValor: number; aparelhoMeses: number;
   bombaPrecoPorCv: number; bombaVidaAnos: number; precoVisitaAvulsa: number | null;
   impostosPct: number; taxaCobrancaPct: number; inadimplenciaPct: number; margemPct: number; margemMinimaPct: number; arredondarPara: number;
@@ -792,16 +794,21 @@ export interface CustosPlano {
 /** Um plano oferecido e o que ele inclui. */
 export interface NivelPlano {
   idNivel?: number; nome: string; descricao: string | null; visitasAno: number; limpezaACadaMeses: number | null; chamadosAno: number;
-  descontoPecasPct: number; monitoramento: boolean; reservaBombaPct: number; fidelidadeMeses: number; ordem: number; ativo: boolean;
+  descontoPecasPct: number; descontoLimpezaPct: number; prioridade: boolean; monitoramento: boolean; reservaBombaPct: number;
+  fidelidadeMeses: number; ordem: number; ativo: boolean;
 }
 export interface PrecoPlano {
   precoMensal: number; custoMensal: number; custos: { item: string; anual: number }[]; lucroMensal: number; margemReal: number;
   avulsoAnual: number; economiaAnual: number; economiaPct: number | null; comparacaoEstimada: boolean; viavel: boolean; avisos: string[];
+  km: number; kmOrigem: 'INFORMADO' | 'GPS' | 'MEDIA';
 }
-export interface PocoSimulado { profundidadeM: number | null; potenciaCv: number | null; pocos: number }
+export interface PocoSimulado {
+  profundidadeM: number | null; potenciaCv: number | null; pocos: number;
+  latitude?: number | null; longitude?: number | null; kmIdaVolta?: number | null;
+}
 export interface PlanoMensalDados {
   custos: CustosPlano; salvo: boolean; niveis: NivelPlano[]; mediaVisitaEmpresa: number | null;
-  clientes: { idCliente: number; nome: string; pocos: number; profundidadeM: number | null; potenciaCv: number | null }[];
+  clientes: { idCliente: number; nome: string; pocos: number; profundidadeM: number | null; potenciaCv: number | null; latitude: number | null; longitude: number | null }[];
 }
 export const planoMensalApi = {
   carregar: () => pedir<PlanoMensalDados>(`${API}/plano-mensal?tenant_id=1`, undefined, 'Erro ao carregar o plano mensal.'),

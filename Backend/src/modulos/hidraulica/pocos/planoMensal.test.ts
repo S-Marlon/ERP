@@ -1,9 +1,9 @@
 import assert from 'assert';
-import { CUSTOS_PADRAO, custoVisita, divisor, NivelPlano, planoSugerido, precoDoPlano, validarCustos, validarNivel } from './planoMensal';
+import { CUSTOS_PADRAO, custoVisita, divisor, kmAteOPoco, kmDaVisita, NivelPlano, planoSugerido, precoDoPlano, validarCustos, validarNivel } from './planoMensal';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 const nivel = (x: Partial<NivelPlano>): NivelPlano => ({
-  nome: 'X', descricao: null, visitasAno: 1, limpezaACadaMeses: null, chamadosAno: 0, descontoPecasPct: 0, monitoramento: false,
+  nome: 'X', descricao: null, visitasAno: 1, limpezaACadaMeses: null, chamadosAno: 0, descontoPecasPct: 0, descontoLimpezaPct: 0, prioridade: false, monitoramento: false,
   reservaBombaPct: 0, fidelidadeMeses: 12, ordem: 0, ativo: true, ...x,
 });
 const poco = { profundidadeM: 80, potenciaCv: 1.5, pocos: 1 };
@@ -35,9 +35,10 @@ teste('plano mensal: preço, lucro e economia do cliente', () => {
 
 teste('plano mensal: o que cada item custa', () => {
   const p = precoDoPlano(CUSTOS_PADRAO, nivel({ visitasAno: 2, limpezaACadaMeses: 24, chamadosAno: 1, monitoramento: true, reservaBombaPct: 0.5 }), poco);
-  assert.deepStrictEqual(p.custos.map(c => c.anual), [952, 400, 476, 600, 187.5]);   // monitoramento: (25 + 900/36) × 12; bomba: 0,5 × 1,5 × 1500 ÷ 6
-  assert.strictEqual(p.custoMensal, 217.96);
-  assert.strictEqual(p.precoMensal, 345);
+  // emergência pelo uso esperado (30% de 476); monitoramento: (25 + 900/36) × 12; bomba: 0,5 × 1,5 × 1500 ÷ 6
+  assert.deepStrictEqual(p.custos.map(c => c.anual), [952, 400, 142.8, 600, 187.5]);
+  assert.strictEqual(p.custoMensal, 190.19);
+  assert.strictEqual(p.precoMensal, 300);
   // margem mínima: 30% de margem com arredondamento para baixo não fecha
   const apertado = precoDoPlano({ ...CUSTOS_PADRAO, margemPct: 0.1, margemMinimaPct: 0.1, arredondarPara: 50 }, nivel({}), poco);
   assert.strictEqual(apertado.precoMensal, 50);
@@ -59,4 +60,22 @@ teste('plano mensal: sugestão e validação', () => {
   assert.throws(() => validarNivel({ nome: '' }), /nome/);
   assert.throws(() => validarNivel({ nome: 'Nada', visitasAno: 0 }), /incluir/);
   assert.strictEqual(validarNivel({ nome: ' Completo ', visitasAno: 2, limpezaACadaMeses: 0 }).limpezaACadaMeses, null);
+});
+
+teste('plano mensal: transporte pela distância até o poço', () => {
+  const base = { ...CUSTOS_PADRAO, baseLatitude: -23.1, baseLongitude: -46.5 };
+  // 0,1° de latitude ≈ 11,1 km em linha reta × 1,3 da estrada × 2 = 29 km
+  assert.strictEqual(kmAteOPoco(base, -23.2, -46.5), 29);
+  assert.strictEqual(kmAteOPoco(CUSTOS_PADRAO, -23.2, -46.5), null, 'sem base');
+  assert.strictEqual(kmAteOPoco(base, null, null), null, 'poço sem GPS');
+  assert.deepStrictEqual(kmDaVisita(base, { latitude: -23.2, longitude: -46.5 }), { km: 29, origem: 'GPS' });
+  assert.deepStrictEqual(kmDaVisita(base, { latitude: -23.2, longitude: -46.5, kmIdaVolta: 100 }), { km: 100, origem: 'INFORMADO' });
+  assert.deepStrictEqual(kmDaVisita(base, {}), { km: 60, origem: 'MEDIA' });
+  // cliente perto: a visita sai 31 km × R$ 1,50 mais barata
+  const perto = precoDoPlano(base, nivel({}), { ...poco, latitude: -23.2, longitude: -46.5 });
+  assert.deepStrictEqual([perto.km, perto.kmOrigem, perto.custoMensal], [29, 'GPS', 35.79]);
+  const c = validarCustos({ ...CUSTOS_PADRAO, baseGps: '-23.1171, -46.5565' });
+  assert.deepStrictEqual([c.baseLatitude, c.baseLongitude], [-23.1171, -46.5565]);
+  assert.strictEqual(validarCustos({ ...CUSTOS_PADRAO, baseGps: '' }).baseLatitude, null);
+  assert.throws(() => validarCustos({ ...CUSTOS_PADRAO, baseGps: 'perto da praça' }), /Base da empresa/);
 });

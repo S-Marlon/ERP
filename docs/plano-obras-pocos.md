@@ -278,3 +278,9 @@ Colunas novas: `incluso` em `_orcamento_itens`, `valor_parcelado` em `_obras`, `
   ≥ mínima e o cliente paga menos do que avulso (sem preço avulso nem média de manutenções, a comparação é estimada e não
   reprova). A tela simula o que está sendo editado antes de salvar. A prévia da Central usa os planos: o sugerido é o viável
   que mais economiza para o cliente. Regras em `planoMensal.ts` (com teste). Próxima etapa: contratar o plano e cobrar todo mês.
+- **Plano mensal, ajuste** (2026-11-12, colunas `base_latitude`, `base_longitude`, `fator_estrada`, `uso_emergencias_pct` nos
+  custos e `desconto_limpeza_pct`, `prioridade` nos planos): o transporte (o custo maior) sai da distância da base da
+  empresa até o GPS do poço × fator da estrada × 2 (sem base ou sem GPS, o km médio; no simulador dá para informar à mão);
+  as emergências incluídas entram pelo uso esperado (30%); limpeza vira desconto (feita quando precisa) e o desconto em
+  bomba e material fica separado; "atendimento prioritário" é marcação sem custo. Planos refeitos: Essencial (1 preventiva/ano),
+  Completo (a cada 6 meses, prioridade, 1 emergência) e Monitorado (+ sensores).
