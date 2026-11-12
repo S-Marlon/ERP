@@ -260,9 +260,13 @@ export const ClienteFicha: React.FC<{ idCliente: number | 'novo' | null; onFecha
           <Col xs={12} md={4}><Statistic title="Poços" value={r.pocos} /></Col>
         </Row>
       )}
-      {d && (!f.documento || !f.endereco) && (
-        <Alert type="warning" showIcon style={{ marginBottom: 8 }}
-          message={`Para o contrato falta: ${[!f.documento && (f.tipoPessoa === 'PJ' ? 'CNPJ' : 'CPF'), !f.endereco && 'endereço'].filter(Boolean).join(' e ')}.`} />
+      {/* contrato informal só precisa de nome e telefone; CPF/CNPJ e endereço só para o contrato escrito */}
+      {d && !f.telefone && !f.telefone2 && (
+        <Alert type="warning" showIcon style={{ marginBottom: 8 }} message="Falta o telefone: é o mínimo para registrar o contrato, mesmo o informal." />
+      )}
+      {d && (f.telefone || f.telefone2) && (!f.documento || !f.endereco) && (
+        <Alert type="info" showIcon style={{ marginBottom: 8 }}
+          message={`Só para contrato escrito: falta ${[!f.documento && (f.tipoPessoa === 'PJ' ? 'CNPJ' : 'CPF'), !f.endereco && 'endereço'].filter(Boolean).join(' e ')}. O informal já pode ser registrado (nome e telefone).`} />
       )}
       <Tabs activeKey={aba} onChange={setAba} items={abas} />
       {d && (
