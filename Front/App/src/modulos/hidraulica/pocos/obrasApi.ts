@@ -664,6 +664,8 @@ export interface ClientePlano {
   temPlanoManutencao: boolean; parcelasVencidas: number; temTelefone: boolean; obraAberta: boolean;
   pontos: number; faixa: Gravidade; motivos: { texto: string; pontos: number }[];
   estimativa: { valorMensal: number; minimo: number; maximo: number; base: string };
+  /** Plano oferecido que mais vale para o cliente (null = sem planos cadastrados ou nenhum viável). */
+  planoSugerido?: string | null;
 }
 export interface Central {
   hoje: { agenda: number; agendaTitulos: string[]; contatosSemResposta: number; alertasIot: number; aReceber: number; vencido: number };
@@ -777,4 +779,38 @@ export const conjuntoApi = {
   salvarFoto: (id: number, f: { tipo: TipoFotoPoco; legenda: string | null; tiradaEm: string | null }) =>
     pedir<{ ok: boolean }>(`${API}/pocos-fotos/${id}?tenant_id=1`, corpo('PUT', f), 'Erro ao salvar a foto.'),
   apagarFoto: (id: number) => pedir<{ ok: boolean }>(`${API}/pocos-fotos/${id}?tenant_id=1`, { method: 'DELETE' }, 'Erro ao apagar a foto.'),
+};
+
+// ------------------------------------------------------------------ plano mensal (custos, planos oferecidos e simulador)
+/** Custos e variáveis da empresa. Percentuais de 0 a 1 (0,06 = 6%). */
+export interface CustosPlano {
+  custoHoraEquipe: number; horasVisita: number; horasPor100m: number; kmMedio: number; custoKm: number; materialVisita: number;
+  custoLimpeza: number; custoMonitoramentoMes: number; aparelhoValor: number; aparelhoMeses: number;
+  bombaPrecoPorCv: number; bombaVidaAnos: number; precoVisitaAvulsa: number | null;
+  impostosPct: number; taxaCobrancaPct: number; inadimplenciaPct: number; margemPct: number; margemMinimaPct: number; arredondarPara: number;
+}
+/** Um plano oferecido e o que ele inclui. */
+export interface NivelPlano {
+  idNivel?: number; nome: string; descricao: string | null; visitasAno: number; limpezaACadaMeses: number | null; chamadosAno: number;
+  descontoPecasPct: number; monitoramento: boolean; reservaBombaPct: number; fidelidadeMeses: number; ordem: number; ativo: boolean;
+}
+export interface PrecoPlano {
+  precoMensal: number; custoMensal: number; custos: { item: string; anual: number }[]; lucroMensal: number; margemReal: number;
+  avulsoAnual: number; economiaAnual: number; economiaPct: number | null; comparacaoEstimada: boolean; viavel: boolean; avisos: string[];
+}
+export interface PocoSimulado { profundidadeM: number | null; potenciaCv: number | null; pocos: number }
+export interface PlanoMensalDados {
+  custos: CustosPlano; salvo: boolean; niveis: NivelPlano[]; mediaVisitaEmpresa: number | null;
+  clientes: { idCliente: number; nome: string; pocos: number; profundidadeM: number | null; potenciaCv: number | null }[];
+}
+export const planoMensalApi = {
+  carregar: () => pedir<PlanoMensalDados>(`${API}/plano-mensal?tenant_id=1`, undefined, 'Erro ao carregar o plano mensal.'),
+  salvarCustos: (c: CustosPlano) => pedir<CustosPlano>(`${API}/plano-mensal/custos?tenant_id=1`, corpo('PUT', c), 'Erro ao salvar os custos.'),
+  salvarNivel: (n: NivelPlano) => (n.idNivel
+    ? pedir<NivelPlano>(`${API}/plano-mensal/niveis/${n.idNivel}?tenant_id=1`, corpo('PUT', n), 'Erro ao salvar o plano.')
+    : pedir<NivelPlano>(`${API}/plano-mensal/niveis?tenant_id=1`, corpo('POST', n), 'Erro ao salvar o plano.')),
+  apagarNivel: (id: number) => pedir<{ ok: boolean }>(`${API}/plano-mensal/niveis/${id}?tenant_id=1`, { method: 'DELETE' }, 'Erro ao apagar o plano.'),
+  simular: (custos: CustosPlano, niveis: NivelPlano[], poco: PocoSimulado) =>
+    pedir<{ planos: { idNivel: number | null; nome: string; preco: PrecoPlano }[]; mediaVisitaEmpresa: number | null }>(
+      `${API}/plano-mensal/simular?tenant_id=1`, corpo('POST', { custos, niveis, poco }), 'Erro ao simular.'),
 };

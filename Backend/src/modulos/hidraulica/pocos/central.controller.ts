@@ -14,9 +14,12 @@ import {
   ClienteParaPlano, completudeCliente, completudePoco, estimativaPlano, faseDoContrato, pendenciasDoContrato, propensaoPlano,
 } from './central';
 import { idadeEmAnos } from './conjuntos';
+import { carregarPlanoMensal } from './planoMensal.controller';
+import { planoSugerido as planoSugerido_, precoDoPlano } from './planoMensal';
 
 const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || req.body?.tenant_id || 1);
 const n = (v: unknown) => Number(v) || 0;
+const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const nulo = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 const agoraLocal = () => {
   const d = new Date(); const p = (x: number) => String(x).padStart(2, '0');
@@ -93,7 +96,7 @@ export const calcularCentral = async (tenant: number) => {
     const [iot]: any = await pool.execute(`SELECT DISTINCT id_poco FROM modulo_hidraulica_pocos_dispositivos WHERE tenant_id = ? AND situacao = 'ATIVO'`, [tenant]);
     const [planos]: any = await pool.execute(`SELECT DISTINCT id_poco FROM modulo_hidraulica_pocos_planos_manutencao WHERE tenant_id = ? AND ativo = 1`, [tenant]);
     const [conjuntos]: any = await pool.execute(
-      `SELECT id_poco, situacao, DATE_FORMAT(instalado_em, '%Y-%m-%d') AS instalado FROM modulo_hidraulica_pocos_conjuntos WHERE tenant_id = ?`, [tenant]);
+      `SELECT id_poco, situacao, potencia_cv, DATE_FORMAT(instalado_em, '%Y-%m-%d') AS instalado FROM modulo_hidraulica_pocos_conjuntos WHERE tenant_id = ?`, [tenant]);
     const comIot = new Set(iot.map((x: any) => Number(x.id_poco)));
     const comConjunto = new Set(conjuntos.filter((k: any) => k.situacao === 'INSTALADO').map((k: any) => Number(k.id_poco)));
     const comPlano = new Set(planos.map((x: any) => Number(x.id_poco)));
@@ -120,6 +123,8 @@ export const calcularCentral = async (tenant: number) => {
     const ehVisita = (s: string[]) => s.length > 0 && s.every(x => VISITA.includes(x));
     const concluidasManut = obras.filter((o: any) => o.situacao === 'CONCLUIDA' && ehVisita(lerServicos(o.servicos)) && n(o.valor_contratado) > 0);
     const visitaEmpresa = concluidasManut.length ? concluidasManut.reduce((s: number, o: any) => s + n(o.valor_contratado), 0) / concluidasManut.length : null;
+    // planos oferecidos (tela Plano mensal): com eles, a estimativa é o preço do plano sugerido para o poço do cliente
+    const pm = await carregarPlanoMensal(pool, tenant);
     const plano = clientes.map((c: any) => {
       const id = Number(c.id_cliente);
       const dele = pocos.filter((p: any) => Number(p.id_proprietario) === id);
@@ -150,9 +155,26 @@ export const calcularCentral = async (tenant: number) => {
       };
       const visitaCliente = manut.filter((o: any) => ehVisita(lerServicos(o.servicos)) && n(o.valor_contratado) > 0);
       const prop = propensaoPlano(dados);
+      let estimativa = estimativaPlano(dados, visitaCliente.length ? visitaCliente.reduce((s: number, o: any) => s + n(o.valor_contratado), 0) / visitaCliente.length : null, visitaEmpresa);
+      let planoSugerido: string | null = null;
+      if (pm.niveis.length) {
+        const ativos = dele.filter((p: any) => p.situacao === 'ATIVO');
+        const cvs = conjDele.filter((k: any) => k.situacao === 'INSTALADO' && n(k.potencia_cv) > 0).map((k: any) => n(k.potencia_cv));
+        const poco = { profundidadeM: dados.profundidadeMaxM, potenciaCv: cvs.length ? Math.max(...cvs) : null, pocos: Math.max(1, ativos.length) };
+        const precos = pm.niveis.map(nv => ({ nome: nv.nome, preco: precoDoPlano(pm.custos, nv, poco, pm.mediaVisitaEmpresa) }));
+        const sug = planoSugerido_(precos);
+        const viaveis = precos.filter(x => x.preco.viavel).map(x => x.preco.precoMensal);
+        if (sug) {
+          planoSugerido = sug.nome;
+          estimativa = {
+            valorMensal: sug.preco.precoMensal, minimo: Math.min(...viaveis), maximo: Math.max(...viaveis),
+            base: `Plano ${sug.nome}: custo ${brl(sug.preco.custoMensal)}/mês, lucro ${brl(sug.preco.lucroMensal)}/mês`
+              + `${sug.preco.economiaAnual > 0 ? `, o cliente economiza ${brl(sug.preco.economiaAnual)}/ano` : ''}`,
+          };
+        } else estimativa = { ...estimativa, base: `Nenhum plano viável para este poço (ver Plano mensal). ${estimativa.base}` };
+      }
       return {
-        idCliente: id, nome: c.nome, telefone: c.telefone || null, cidade: c.cidade || null, ...dados, ...prop,
-        estimativa: estimativaPlano(dados, visitaCliente.length ? visitaCliente.reduce((s: number, o: any) => s + n(o.valor_contratado), 0) / visitaCliente.length : null, visitaEmpresa),
+        idCliente: id, nome: c.nome, telefone: c.telefone || null, cidade: c.cidade || null, ...dados, ...prop, estimativa, planoSugerido,
       };
     }).filter((c: any) => c.pocos > 0 || c.obrasConcluidas > 0).sort((a: any, b: any) => b.pontos - a.pontos || b.valorGasto - a.valorGasto);
     const potencial = (faixa: string) => plano.filter((c: any) => c.faixa === faixa).reduce((s: number, c: any) => s + c.estimativa.valorMensal, 0);

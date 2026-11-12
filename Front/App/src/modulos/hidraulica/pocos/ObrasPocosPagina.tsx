@@ -18,6 +18,7 @@ import { navPocos, useNavPocos, useNiveisPocos } from './navPocos';
 import { enderecoDaSecao, GRUPOS_POCOS, secaoDaAba, secaoDoEndereco, secoesDoGrupo, trilhaDaSecao } from './secoesPocos';
 import { MaisFerramentas } from './InicioPocos';
 import CentralDocumentos from './CentralDocumentos';
+import PlanoMensalPocos from './PlanoMensalPocos';
 import { secaoLigada, useRecursosPocos } from './recursosPocos';
 import BuscaPocos from './BuscaPocos';
 import { FichasPocos } from './FichaPoco';
@@ -26,6 +27,7 @@ const { Title, Text } = Typography;
 const TELAS: Record<string, React.ReactNode> = {
   central: <CentralPocos />, atendimento: <AtendimentoPocos />, obras: <ObrasAba />, agenda: <AgendaPocos />, manutencao: <ManutencoesPocos />,
   iot: <MonitoramentoPocos />, mapa: <MapaPocos />, resultado: <PainelPocos />, ferramentas: <MaisFerramentas />, documentos: <CentralDocumentos />,
+  plano: <PlanoMensalPocos />,
 };
 
 const ObrasPocosPagina: React.FC = () => {

@@ -269,3 +269,12 @@ Colunas novas: `incluso` em `_orcamento_itens`, `valor_parcelado` em `_obras`, `
   As irmãs do mesmo grupo continuam como abas e sobem direto para a Central; as ferramentas sobem para Mais ferramentas.
   Sub-telas entram na trilha com `useNivelPocos` (obra aberta, Atendimento › Configuração, Agenda › Equipe/Equipamentos);
   a regra da parte fixa está em `trilhaDaSecao` (com teste).
+- **Plano mensal** (2026-11-12, tabelas `modulo_hidraulica_pocos_plano_mensal_custos` e `_plano_mensal_niveis`): tela em
+  Mais ferramentas com os custos da empresa (hora da equipe, horas da visita e a mais por 100 m, km e custo/km, material,
+  limpeza, monitoramento e aparelho, preço da bomba por CV e vida útil, impostos, cobrança, inadimplência, margem desejada e
+  mínima, arredondamento e o preço da visita avulsa), os planos oferecidos (visitas/ano, limpeza a cada N meses, emergências,
+  monitoramento, % da troca da bomba, desconto em peças, fidelidade) e o simulador por cliente ou poço digitado.
+  Preço = custo anual ÷ 12 ÷ (1 − impostos − cobrança − inadimplência − margem), arredondado; viável quando a margem real
+  ≥ mínima e o cliente paga menos do que avulso (sem preço avulso nem média de manutenções, a comparação é estimada e não
+  reprova). A tela simula o que está sendo editado antes de salvar. A prévia da Central usa os planos: o sugerido é o viável
+  que mais economiza para o cliente. Regras em `planoMensal.ts` (com teste). Próxima etapa: contratar o plano e cobrar todo mês.

@@ -117,12 +117,12 @@ const Completar: React.FC<{ d: Central['completar'] }> = ({ d }) => (
   </Card>
 );
 
-const PlanoMensal: React.FC<{ d: Central['plano'] }> = ({ d }) => {
+export const PlanoMensal: React.FC<{ d: Central['plano']; naTelaDoPlano?: boolean }> = ({ d, naTelaDoPlano }) => {
   const [faixa, setFaixa] = useState<'TODAS' | 'ALTA' | 'MEDIA' | 'BAIXA'>('TODAS');
   const lista = d.clientes.filter(c => faixa === 'TODAS' || c.faixa === faixa);
   const texto = { ALTA: 'alta', MEDIA: 'média', BAIXA: 'baixa' };
   return (
-    <Card size="small" title="Prévia do plano mensal (manutenção e monitoramento)"
+    <Card size="small" title={naTelaDoPlano ? 'Carteira: quem assinaria e quanto entraria por mês' : 'Prévia do plano mensal (manutenção e monitoramento)'}
       extra={<Segmented size="small" value={faixa} onChange={v => setFaixa(v as typeof faixa)}
         options={[{ value: 'TODAS', label: 'Todos' }, { value: 'ALTA', label: `Alta (${d.alta})` }, { value: 'MEDIA', label: `Média (${d.media})` }, { value: 'BAIXA', label: 'Baixa' }]} />}>
       <Row gutter={[10, 10]} style={{ marginBottom: 8 }}>
@@ -131,8 +131,11 @@ const PlanoMensal: React.FC<{ d: Central['plano'] }> = ({ d }) => {
         <Col xs={12} md={6}><Statistic title="Potencial (chance média)" value={brl0(d.potencialMedia)} suffix="/mês" /></Col>
         <Col xs={12} md={6}><Statistic title="Visita de manutenção (média)" value={d.visitaEmpresa ? brl0(d.visitaEmpresa) : '—'} /></Col>
       </Row>
-      <Alert type="warning" showIcon style={{ marginBottom: 8 }}
-        message="Estimativa para planejar, não é preço: os pesos da chance e a conta do valor ficam em central.ts e serão calibrados quando o plano for criado." />
+      {!naTelaDoPlano && (
+        <Alert type="info" showIcon style={{ marginBottom: 8 }}
+          message="O valor é o do plano que mais vale para cada cliente, pelos custos e planos de Mais ferramentas › Plano mensal. A chance de assinar é estimada."
+          action={<Button size="small" onClick={() => navPocos.ir({ aba: 'plano' })}>Ajustar o plano</Button>} />
+      )}
       <Table<ClientePlano> size="small" rowKey="idCliente" dataSource={lista} pagination={{ pageSize: 20, hideOnSinglePage: true }}
         locale={{ emptyText: 'Nenhum cliente com poço ou obra ainda' }}
         onRow={c => ({ onClick: () => abrirFichaCliente(c.idCliente), style: { cursor: 'pointer' } })}
@@ -163,6 +166,7 @@ const PlanoMensal: React.FC<{ d: Central['plano'] }> = ({ d }) => {
           {
             title: 'Plano estimado', width: 170, align: 'right', render: (_, c) => (
               <Tooltip title={c.estimativa.base}>
+                {c.planoSugerido && <div><Tag color="blue" style={{ margin: 0 }}>{c.planoSugerido}</Tag></div>}
                 <Text strong>{brl0(c.estimativa.valorMensal)}/mês</Text>
                 <div><Text type="secondary" style={{ fontSize: 11 }}>{brl0(c.estimativa.minimo)} a {brl0(c.estimativa.maximo)}</Text></div>
               </Tooltip>
