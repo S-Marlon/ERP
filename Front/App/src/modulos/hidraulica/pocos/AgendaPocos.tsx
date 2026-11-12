@@ -11,7 +11,7 @@ import {
   agendaApi, Compromisso, CompromissoForm, dataBr, diasDoCompromisso, Equipamento, EquipamentoForm, foneBr, FUNCOES_EQUIPE, FuncaoEquipe, Membro, MembroForm,
   Obra, obrasApi, SERVICOS, SITUACOES_AGENDA, SITUACOES_EQUIPAMENTO, SituacaoAgenda, SituacaoEquipamento, TIPOS_AGENDA, TIPOS_EQUIPAMENTO, TipoAgenda, TipoEquipamento,
 } from './obrasApi';
-import { abrirObra, navPocos, useNavPocos } from './navPocos';
+import { abrirObra, navPocos, useNavPocos, useNivelPocos } from './navPocos';
 
 const { Text } = Typography;
 const erro = (e: unknown) => message.error(e instanceof Error ? e.message : 'Erro.');
@@ -314,6 +314,8 @@ const ListaEquipamentos: React.FC = () => {
 const AgendaPocos: React.FC = () => {
   const pedida = navPocos.get().subvista;
   const [vista, setVista] = useState<'AGENDA' | 'EQUIPE' | 'EQUIPAMENTOS'>(pedida === 'EQUIPE' || pedida === 'EQUIPAMENTOS' ? pedida : 'AGENDA');
+  // equipe e equipamentos são cadastros da agenda: aparecem na trilha do topo e "subir" volta para a agenda
+  useNivelPocos(vista === 'EQUIPE' ? 'Equipe' : vista === 'EQUIPAMENTOS' ? 'Equipamentos' : null, () => setVista('AGENDA'));
   return (
     <Space direction="vertical" size={12} style={{ width: '100%' }}>
       <Segmented value={vista} onChange={v => setVista(v as typeof vista)}

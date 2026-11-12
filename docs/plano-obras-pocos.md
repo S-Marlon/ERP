@@ -264,3 +264,8 @@ Colunas novas: `incluso` em `_orcamento_itens`, `valor_parcelado` em `_obras`, `
   bombeamento" do relatório preenchido registra o conjunto sozinho (`registrarConjuntoDaObra`). Regras em `conjuntos.ts`.
   A **prévia do plano mensal** usa o conjunto: bomba com 5 anos ou mais de uso (+10 pontos e 2 visitas/ano) e trocas já
   feitas (+5); "Informações a completar" cobra a bomba do poço ativo.
+- **Trilha e "subir um nível"** (2026-11-12): no topo, "Central › seção › sub-tela" (ex.: Central › Mais ferramentas › Mapa;
+  Central › Obras e orçamentos › Obra nº 4 · cliente), cada degrau clicável, e o botão ↑ (ou Alt+↑) volta ao nível de cima.
+  As irmãs do mesmo grupo continuam como abas e sobem direto para a Central; as ferramentas sobem para Mais ferramentas.
+  Sub-telas entram na trilha com `useNivelPocos` (obra aberta, Atendimento › Configuração, Agenda › Equipe/Equipamentos);
+  a regra da parte fixa está em `trilhaDaSecao` (com teste).

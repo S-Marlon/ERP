@@ -1,6 +1,6 @@
 // Navegação dentro do módulo Obras de poços: "ver no mapa" a partir da obra, do poço ou do cliente, e "abrir obra" /
 // "ficha do poço" a partir do mapa. Estado compartilhado entre as abas (useSyncExternalStore).
-import { useSyncExternalStore } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 
 export type ParteObra = 'RELATORIO' | 'ORCAMENTO' | 'PROCESSO' | 'COBRANCA' | 'MATERIAIS';
 export type VistaObras = 'OBRAS' | 'POCOS' | 'CLIENTES' | 'RECEBER' | 'MATERIAIS';
@@ -57,3 +57,34 @@ export const abrirFichaPoco = (idPoco: number) => fichasPocos.abrir({ tipo: 'POC
 export const abrirFichaCliente = (idCliente: number) => fichasPocos.abrir({ tipo: 'CLIENTE', id: idCliente });
 /** Documentos de uma obra (Documentos › aba da obra, já com a obra escolhida). */
 export const documentosDaObra = (idObra: number) => navPocos.ir({ aba: 'documentos', subvista: 'OBRA', abrirObra: idObra });
+
+// Sub-telas abertas dentro de uma seção (obra aberta, Configuração do atendimento, Equipe da agenda...): entram na trilha
+// do topo depois da seção. Cada tela registra o seu nível enquanto está aberta e diz como fechá-lo (voltar ao nível de cima).
+export interface NivelPocos { id: number; profundidade: number; titulo: string; fechar: () => void }
+let niveis: NivelPocos[] = [];
+let proximoNivel = 1;
+const ouvintesNivel = new Set<() => void>();
+const avisarNiveis = () => ouvintesNivel.forEach(f => f());
+export const niveisPocos = {
+  get: () => niveis,
+  assinar: (f: () => void) => { ouvintesNivel.add(f); return () => { ouvintesNivel.delete(f); }; },
+};
+export const useNiveisPocos = () => useSyncExternalStore(niveisPocos.assinar, niveisPocos.get);
+
+/**
+ * Registra uma sub-tela na trilha enquanto `titulo` não for null. `profundidade` ordena (1 = logo abaixo da seção);
+ * `fechar` volta para o nível de cima (ex.: fechar a obra e voltar para a lista).
+ */
+export const useNivelPocos = (titulo: string | null, fechar: () => void, profundidade = 1) => {
+  const fecharRef = useRef(fechar);
+  fecharRef.current = fechar;
+  const idRef = useRef(0);
+  useEffect(() => {
+    if (titulo === null) return;
+    const id = idRef.current || (idRef.current = proximoNivel++);
+    niveis = [...niveis.filter(n => n.id !== id), { id, profundidade, titulo, fechar: () => fecharRef.current() }]
+      .sort((a, b) => a.profundidade - b.profundidade || a.id - b.id);
+    avisarNiveis();
+    return () => { niveis = niveis.filter(n => n.id !== id); avisarNiveis(); };
+  }, [titulo, profundidade]);
+};

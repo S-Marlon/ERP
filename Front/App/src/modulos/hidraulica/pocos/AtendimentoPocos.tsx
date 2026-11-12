@@ -11,7 +11,7 @@ import {
   dataBr, ESTADOS_ETAPA, ESTADOS_PRAZO, foneBr, IndicadoresProcesso, Lead, LeadForm, ORIGENS_LEAD, OrigemLead, PendenciaObra, processoApi, Servico,
   SERVICOS, SITUACOES_LEAD, SITUACOES_OBRA, urlArquivo,
 } from './obrasApi';
-import { abrirObra, navPocos } from './navPocos';
+import { abrirObra, navPocos, useNivelPocos } from './navPocos';
 import { OrcamentoRapido } from './OrcamentoContrato';
 import ConfigPocos from './ConfigPocos';
 
@@ -286,6 +286,8 @@ const AtendimentoPocos: React.FC = () => {
   const subvista = navPocos.get().subvista;
   const pedida = subvista?.split(':')[0] as VistaAtendimento | undefined;
   const [vista, setVista] = useState<VistaAtendimento>(pedida && VISTAS_ATENDIMENTO.includes(pedida) ? pedida : 'LEADS');
+  // a configuração é uma sub-tela: aparece na trilha do topo e "subir" volta para os contatos
+  useNivelPocos(vista === 'CONFIG' ? 'Configuração' : null, () => setVista('LEADS'));
   return (
     <Space direction="vertical" size={12} style={{ width: '100%' }}>
       <Segmented value={vista} onChange={v => setVista(v as typeof vista)} options={[

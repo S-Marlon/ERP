@@ -60,3 +60,18 @@ export const secaoDoEndereco = (secao: string | undefined): SecaoPocos => {
 /** Seção de uma aba/vista interna (para o endereço acompanhar "abrir obra", "ver no mapa"...). */
 export const secaoDaAba = (aba: string, vista?: VistaObras) =>
   SECOES_POCOS.find(s => s.aba === aba && (!s.vista || !vista || s.vista === vista)) || SECOES_POCOS[0];
+
+/** Um degrau da trilha do topo ("Central › Mais ferramentas › Mapa"): o título e a seção que ele abre. */
+export interface DegrauTrilha { titulo: string; secao: string }
+
+/**
+ * Trilha fixa da seção (sem as sub-telas, que cada tela acrescenta): a Central é a raiz; as ferramentas de "Mais
+ * ferramentas" ficam abaixo da tela de ferramentas (que é a lista delas); as outras seções ficam direto abaixo da Central
+ * (as irmãs do mesmo grupo aparecem como abas, não como degraus).
+ */
+export const trilhaDaSecao = (s: Pick<SecaoPocos, 'secao' | 'titulo' | 'grupo'>): DegrauTrilha[] => {
+  const raiz: DegrauTrilha = { titulo: 'Central', secao: '' };
+  if (!s.secao) return [raiz];
+  const meio = s.grupo === 'mais' && s.secao !== 'ferramentas' ? [{ titulo: 'Mais ferramentas', secao: 'ferramentas' }] : [];
+  return [raiz, ...meio, { titulo: s.titulo, secao: s.secao }];
+};

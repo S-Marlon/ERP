@@ -3,8 +3,8 @@
 // "ver no mapa", os cartões da Central) mudam a seção pelo navPocos e o endereço acompanha; as partes de cobrança,
 // materiais, processo e orçamento/contrato vivem dentro da obra.
 import React, { useEffect, useRef } from 'react';
-import { Flex, Segmented, Typography } from 'antd';
-import { AimOutlined } from '@ant-design/icons';
+import { Breadcrumb, Button, Flex, Segmented, Tooltip, Typography } from 'antd';
+import { AimOutlined, ArrowUpOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import CentralPocos from './CentralPocos';
 import ObrasAba from './ObrasAba';
@@ -14,8 +14,8 @@ import PainelPocos from './PainelPocos';
 import { ManutencoesPocos } from './ManutencaoPocos';
 import MonitoramentoPocos from './MonitoramentoPocos';
 import AtendimentoPocos from './AtendimentoPocos';
-import { navPocos, useNavPocos } from './navPocos';
-import { enderecoDaSecao, GRUPOS_POCOS, secaoDaAba, secaoDoEndereco, secoesDoGrupo } from './secoesPocos';
+import { navPocos, useNavPocos, useNiveisPocos } from './navPocos';
+import { enderecoDaSecao, GRUPOS_POCOS, secaoDaAba, secaoDoEndereco, secoesDoGrupo, trilhaDaSecao } from './secoesPocos';
 import { MaisFerramentas } from './InicioPocos';
 import CentralDocumentos from './CentralDocumentos';
 import { secaoLigada, useRecursosPocos } from './recursosPocos';
@@ -56,9 +56,40 @@ const ObrasPocosPagina: React.FC = () => {
   const recursos = useRecursosPocos();
   const doGrupo = secoesDoGrupo(atual.grupo).filter(s => s.secao === atual.secao || secaoLigada(s.secao, recursos));
   const tituloGrupo = GRUPOS_POCOS.find(g => g.grupo === atual.grupo)?.titulo || atual.titulo;
+
+  // trilha do topo: Central › seção › sub-telas abertas (obra, configuração...). Cada degrau leva de volta àquele nível.
+  const niveis = useNiveisPocos();
+  const degraus = [
+    ...trilhaDaSecao(atual).map(d => ({
+      titulo: d.titulo,
+      // a própria seção: fecha as sub-telas abertas (fechar a primeira fecha as de dentro)
+      ir: () => (d.secao === atual.secao ? niveis[0]?.fechar() : navigate(enderecoDaSecao(d))),
+    })),
+    ...niveis.map((n, i) => ({ titulo: n.titulo, ir: () => niveis[i + 1]?.fechar() })),
+  ];
+  const acima = degraus.length > 1 ? degraus[degraus.length - 2] : null;
+  const subirRef = useRef<(() => void) | null>(null);
+  subirRef.current = acima ? acima.ir : null;
+  // Alt+↑ sobe um nível (como a seta da trilha)
+  useEffect(() => {
+    const tecla = (e: KeyboardEvent) => { if (e.altKey && e.key === 'ArrowUp' && subirRef.current) { e.preventDefault(); subirRef.current(); } };
+    window.addEventListener('keydown', tecla);
+    return () => window.removeEventListener('keydown', tecla);
+  }, []);
+
   return (
     <div style={{ padding: 24 }}>
       <div style={{ marginBottom: 12 }}>
+        <Flex align="center" gap={8} style={{ marginBottom: 4, minHeight: 24 }}>
+          {acima && (
+            <Tooltip title={`Subir para ${acima.titulo} (Alt+↑)`}>
+              <Button size="small" icon={<ArrowUpOutlined />} onClick={acima.ir}>{acima.titulo}</Button>
+            </Tooltip>
+          )}
+          <Breadcrumb items={degraus.map((d, i) => ({
+            title: i < degraus.length - 1 ? <a onClick={d.ir}>{d.titulo}</a> : <Text strong>{d.titulo}</Text>,
+          }))} />
+        </Flex>
         <Flex justify="space-between" align="center" wrap gap={8}>
           <Title level={3} style={{ margin: 0 }}><AimOutlined /> Poços artesianos · {tituloGrupo}</Title>
           <BuscaPocos />

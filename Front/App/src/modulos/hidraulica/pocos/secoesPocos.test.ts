@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { itensMenuPocos, secaoDaAba, secaoDoEndereco, SECOES_POCOS } from './secoesPocos';
+import { itensMenuPocos, secaoDaAba, secaoDoEndereco, SECOES_POCOS, trilhaDaSecao } from './secoesPocos';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -21,4 +21,14 @@ teste('endereços antigos continuam abrindo a mesma tela', () => {
   assert.strictEqual(secaoDaAba('documentos').secao, 'documentos');
   assert.deepStrictEqual([secaoDoEndereco('kit-visita').secao, secaoDoEndereco('kit-visita').subvista], ['documentos', 'KIT']);
   assert.deepStrictEqual([secaoDoEndereco('relatorio').aba, secaoDoEndereco('relatorio').subvista], ['documentos', 'RELATORIO']);
+});
+
+teste('trilha do topo (subir um nível)', () => {
+  const t = (secao: string) => trilhaDaSecao(secaoDoEndereco(secao)).map(d => d.titulo).join(' › ');
+  assert.strictEqual(t(''), 'Central');
+  assert.strictEqual(t('obras'), 'Central › Obras e orçamentos');
+  assert.strictEqual(t('receber'), 'Central › A receber', 'irmã do grupo sobe direto para a Central');
+  assert.strictEqual(t('mapa'), 'Central › Mais ferramentas › Mapa');
+  assert.strictEqual(t('ferramentas'), 'Central › Mais ferramentas');
+  assert.strictEqual(trilhaDaSecao(secaoDoEndereco('mapa'))[1].secao, 'ferramentas');
 });

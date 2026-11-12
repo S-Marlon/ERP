@@ -21,7 +21,7 @@ import { HistoricoDoPoco } from './ManutencaoPocos';
 import { ProcessoDaObra } from './ProcessoObra';
 import { OrcamentoEContrato, OrcamentoRapido } from './OrcamentoContrato';
 import { lerGpsTexto, textoRaio } from './mapaRegional';
-import { abrirFichaCliente, abrirFichaPoco, agendarObra, ParteObra, useNavPocos, verNoMapa, VistaObras } from './navPocos';
+import { abrirFichaCliente, abrirFichaPoco, agendarObra, ParteObra, useNavPocos, useNivelPocos, verNoMapa, VistaObras } from './navPocos';
 import { DestinoPasso, parteDaSituacao, proximoPasso, rotuloDestino } from './proximoPasso';
 
 const { Text } = Typography;
@@ -294,6 +294,8 @@ const ObraAberta: React.FC<{ idObra: number; parte?: ParteObra; onVoltar: () => 
     centralApi.carregar().then(c => setPendencias(c.contratos.find(x => x.idObra === idObra)?.pendencias || [])).catch(() => setPendencias([]));
   }, [idObra]);
   useEffect(() => { carregar(); }, [carregar]);
+  // na trilha do topo: "Central › Obras e orçamentos › Obra nº 4 · cliente"; subir fecha a obra
+  useNivelPocos(`Obra nº ${idObra}${obra?.cliente ? ` · ${obra.cliente}` : ''}`, onVoltar);
   if (!obra) return null;
   const parte = parteEscolhida || parteDaSituacao(obra.situacao);
   const passo = proximoPasso(obra.situacao, pendencias);
