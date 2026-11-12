@@ -31,7 +31,12 @@ export interface ObraForm {
   /** O que vai no orçamento em PDF. */
   escopo?: string | null; prazoExecucaoDias?: number | null; formaPagamento?: string | null; validadeOrcamentoDias?: number | null;
 }
+/** Como o contrato foi fechado: todo serviço que sai do orçamento tem contrato, escrito (papel assinado) ou informal (de boca/WhatsApp). */
+export type FormaContrato = 'ESCRITO' | 'INFORMAL';
+export interface FechamentoContrato { formaContrato: FormaContrato; fechadoEm: string | null; combinadoComo: string | null }
+
 export interface Obra extends Omit<ObraForm, 'idCliente'> {
+  formaContrato: FormaContrato | null; fechadoEm: string | null; combinadoComo: string | null;
   idObra: number; idCliente: number; cliente: string; telefone: string | null; poco: string | null; cidade: string | null;
   latitude: number | null; longitude: number | null;
   situacao: SituacaoObra; proximas: SituacaoObra[]; dataInicio: string | null; dataTermino: string | null; garantiaAte: string | null;
@@ -97,8 +102,9 @@ export const obrasApi = {
   criarObra: (o: ObraForm & { novoPoco?: Partial<PocoForm> }) => pedir<Obra>(`${API}/obras?tenant_id=1`, corpo('POST', o), 'Erro ao criar a obra.'),
   salvarObra: (id: number, o: ObraForm) => pedir<Obra>(`${API}/obras/${id}?tenant_id=1`, corpo('PUT', o), 'Erro ao salvar a obra.'),
   salvarRelatorio: (id: number, dados: Dados) => pedir<{ salvoEm: string }>(`${API}/obras/${id}/relatorio?tenant_id=1`, corpo('PUT', { dados }), 'Erro ao salvar o relatório.'),
-  mudarSituacao: (id: number, situacao: SituacaoObra) =>
-    pedir<Obra & { pocoAtualizado: boolean }>(`${API}/obras/${id}/situacao?tenant_id=1`, corpo('POST', { situacao }), 'Erro ao mudar a situação.'),
+  mudarSituacao: (id: number, situacao: SituacaoObra, fechamento?: FechamentoContrato) =>
+    pedir<Obra & { pocoAtualizado: boolean }>(`${API}/obras/${id}/situacao?tenant_id=1`, corpo('POST', { situacao, ...fechamento }), 'Erro ao mudar a situação.'),
+  definirContrato: (id: number, f: FechamentoContrato) => pedir<Obra>(`${API}/obras/${id}/contrato?tenant_id=1`, corpo('PUT', f), 'Erro ao registrar o contrato.'),
   pocos: (f: { busca?: string; idProprietario?: number | null } = {}) => pedir<Poco[]>(`${API}/pocos?${q(f)}`, undefined, 'Erro ao listar os poços.'),
   criarPoco: (p: PocoForm) => pedir<Poco>(`${API}/pocos?tenant_id=1`, corpo('POST', p), 'Erro ao cadastrar o poço.'),
   salvarPoco: (id: number, p: PocoForm) => pedir<Poco>(`${API}/pocos/${id}?tenant_id=1`, corpo('PUT', p), 'Erro ao salvar o poço.'),
@@ -468,8 +474,9 @@ export interface DocumentoObra {
     garantiaMeses: number | null; garantiaAte: string | null; escopo: string | null; prazoExecucaoDias: number | null; formaPagamento: string | null;
     validadeOrcamentoDias: number; adicionais: { descricao: string; valor: number }[];
     itens: ItemOrcamentoForm[]; contratoAssinadoEm: string | null;
+    formaContrato?: FormaContrato | null; fechadoEm?: string | null; combinadoComo?: string | null;
   };
-  cliente: (Omit<ClientePocoForm, 'telefone2' | 'observacao'>) | null;
+  cliente: (Omit<ClientePocoForm, 'telefone2' | 'observacao'> & { telefone2?: string | null; observacao?: string | null }) | null;
   poco: {
     idPoco: number; identificacao: string; endereco: string | null; cidade: string | null; uf: string | null; latitude: number | null; longitude: number | null;
     profundidadeM: number | null; diametro: string | null; vazaoLh: number | null; nivelEstaticoM: number | null; nivelDinamicoM: number | null;

@@ -1,7 +1,7 @@
 // Obras de poços › documentos para imprimir (ou "Salvar como PDF" no navegador): o orçamento, o contrato, o termo aditivo,
 // o laudo de entrega e o adesivo do quadro, com o logo e os dados da empresa da configuração do processo. Funções puras:
 // recebem os dados da obra e devolvem a página HTML completa. Contrato e aditivo saem de modelos de texto com {campos}.
-import type { Aditivo, DocumentoObra, ItemOrcamentoForm } from './obrasApi';
+import type { Aditivo, CobrancaObra, DocumentoObra, ItemOrcamentoForm } from './obrasApi';
 
 const SERVICOS_TXT: Record<string, string> = {
   PERFURACAO: 'Perfuração', INSTALACAO: 'Instalação da bomba', LIMPEZA: 'Limpeza', MANUTENCAO: 'Manutenção', TROCA_BOMBA: 'Troca de bomba',
@@ -538,4 +538,60 @@ export const htmlAditivo = (d: DocumentoObra, aditivo: Aditivo, todos: Aditivo[]
   const corpo = modeloEmHtml(d.empresa.modeloAditivo || MODELO_ADITIVO_PADRAO, campos, { tabela_adicionais: tabela });
   return pagina(`Aditivo ${aditivo.numero} · obra ${o.idObra}`, `<div class="pagina-contrato">${cabecalho(d, logo, { tipo: 'Termo aditivo', numero: `Nº ${aditivo.numero}`, data: `Contrato nº ${o.idObra}` })}<div class="contrato">${corpo}</div>${assinaturasContrato(d)}</div>`,
     RODAPE_VISTO + RODAPE_PAGINAS);
+};
+
+// ------------------------------------------------------------------ contrato interno (controle da empresa)
+const FORMAS_PAGO: Record<string, string> = {
+  DINHEIRO: 'Dinheiro', PIX: 'PIX', DEBITO: 'Débito', CREDITO: 'Crédito', TRANSFERENCIA: 'Transferência', CHEQUE: 'Cheque', BOLETO: 'Boleto',
+};
+const SITUACAO_PARCELA: Record<string, string> = { VENCIDO: 'vencida', VENCE_HOJE: 'vence hoje', A_VENCER: 'a vencer', SEM_PRAZO: 'sem prazo', PAGO: 'paga', CANCELADO: 'cancelada' };
+
+/**
+ * Contrato interno: a ficha de controle de todo serviço fechado (escrito ou informal), com os dados fiscais do cliente,
+ * o serviço, os valores e condições combinados e a situação dos pagamentos. Não é para o cliente assinar.
+ */
+export const htmlContratoInterno = (d: DocumentoObra, cob: CobrancaObra | null, logo: string | null, hoje: string) => {
+  const o = d.obra, c = d.cliente, p = d.poco;
+  const forma = o.formaContrato === 'ESCRITO' ? `escrito (assinado${o.fechadoEm ? ` em ${dataBr(o.fechadoEm)}` : ''})`
+    : o.formaContrato === 'INFORMAL' ? `informal (combinado${o.fechadoEm ? ` em ${dataBr(o.fechadoEm)}` : ''})` : 'ainda não registrado';
+  const endereco = c ? [c.endereco, c.bairro, c.cidade && `${c.cidade}${c.uf ? `/${c.uf}` : ''}`, c.cep && `CEP ${c.cep}`].filter(Boolean).join(' · ') : '';
+  const local = p ? [p.identificacao, p.endereco, p.cidade && `${p.cidade}${p.uf ? `/${p.uf}` : ''}`].filter(Boolean).join(' · ') : '';
+  const adicionais = o.adicionais.reduce((s, a) => s + Math.round(a.valor * 100), 0) / 100;
+  const total = Math.round(((o.valorContratado || 0) + adicionais) * 100) / 100;
+  const parcelas = (cob?.parcelas || []).filter(x => x.status !== 'CANCELADO');
+  const recebimentos = (cob?.recebimentos || []).filter(r => !r.estornadoEm);
+  const linhaParcela = (x: typeof parcelas[number]) => `<tr><td>${escapar(x.descricao || (x.tipo === 'SINAL' ? 'Sinal' : `Parcela ${x.parcela}/${x.totalParcelas}`))}</td>
+    <td>${dataBr(x.vencimento)}</td><td class="n">${brl(x.valor)}</td><td class="n">${brl(x.valorPago)}</td><td>${SITUACAO_PARCELA[x.situacao] || x.situacao}</td></tr>`;
+  const linhaRecebido = (r: typeof recebimentos[number]) => `<tr><td>${dataBr(r.em)}</td><td>${escapar(r.parcela || '—')}</td><td>${FORMAS_PAGO[r.forma] || r.forma}${r.observacao ? ` · ${escapar(r.observacao)}` : ''}</td><td class="n">${brl(r.valor)}</td></tr>`;
+  return pagina(`Contrato interno · obra ${o.idObra}`, `${cabecalho(d, logo, { tipo: 'Contrato interno', numero: `Obra nº ${o.idObra}`, data: `Emitido em ${dataBr(hoje)}` })}
+    <h1>Contrato interno · obra nº ${o.idObra}</h1>
+    <div class="sub">Controle da empresa · contrato ${forma}</div>
+    ${o.formaContrato === 'INFORMAL' && o.combinadoComo ? `<p class="nota"><b>Como foi combinado:</b> ${escapar(o.combinadoComo)}</p>` : ''}
+    <h2><span class="n">1</span>Cliente (dados fiscais)</h2>
+    <div class="ficha">
+      ${celula(c?.tipoPessoa === 'PJ' ? 'Razão social' : 'Nome', escapar(c?.nome || '—'))}${celula(c?.tipoPessoa === 'PJ' ? 'CNPJ' : 'CPF', escapar(doc(c?.documento) || '—'))}
+      ${celula(c?.tipoPessoa === 'PJ' ? 'Inscrição estadual' : 'RG', escapar(c?.rgIe || '—'))}${celula('Telefones', escapar([fone(c?.telefone), fone(c?.telefone2)].filter(Boolean).join(' · ') || '—'))}
+      ${celula('E-mail', escapar(c?.email || '—'))}${celula('Representante', escapar(c?.representante ? `${c.representante}${c.representanteDocumento ? ` · CPF ${doc(c.representanteDocumento)}` : ''}` : '—'))}
+      ${celula('Endereço', escapar(endereco || '—'), true)}
+      ${c?.observacao ? celula('Observação', escapar(c.observacao), true) : ''}
+    </div>
+    <h2><span class="n">2</span>Serviço</h2>
+    <div class="ficha tres">
+      ${celula('Serviços', escapar(o.servicos.map(s => SERVICOS_TXT[s] || s).join(' + ')))}${celula('Metragem base', num(o.metrosPrevistos, 'm'))}${celula('Prazo', o.prazoExecucaoDias ? `${o.prazoExecucaoDias} dias úteis` : '—')}
+      ${celula('Início', dataBr(o.dataInicio || o.dataPrevisao))}${celula('Conclusão', dataBr(o.dataTermino))}${celula('Garantia', o.garantiaMeses ? `${o.garantiaMeses} meses${o.garantiaAte ? ` · até ${dataBr(o.garantiaAte)}` : ''}` : '—')}
+      ${celula('Local / poço', escapar(local || '—'), true)}
+    </div>
+    <h2><span class="n">3</span>Valores e condições</h2>
+    <div class="ficha tres">
+      ${celula('Valor contratado', brl(o.valorContratado))}${celula('Valor parcelado', brl(o.valorParcelado ?? null))}${celula('Metro excedente', o.valorMetroExcedente ? `${brl(o.valorMetroExcedente)}/m` : '—')}
+      ${celula('Sinal', o.valorSinal ? `${brl(o.valorSinal)} <small>${o.sinalQuando === 'NO_ATO' ? 'no ato' : 'antes do início'}</small>` : '—')}${celula('Adicionais aprovados', brl(adicionais))}${celula('Total da obra', `<b>${brl(total)}</b>`)}
+      ${celula('Forma de pagamento', escapar(o.formaPagamento || '—'), true)}
+    </div>
+    <h2><span class="n">4</span>Pagamentos</h2>
+    ${cob ? `<div class="ficha tres">${celula('Recebido', brl(cob.resumo.recebido))}${celula('A receber', `<b>${brl(cob.resumo.aReceber)}</b>`)}${celula('Sinal', cob.resumo.sinalPago ? 'pago' : cob.resumo.sinal ? 'em aberto' : '—')}</div>
+      <table class="itens" style="margin-top:3mm"><tr><th>Parcela</th><th>Vencimento</th><th class="n">Valor</th><th class="n">Pago</th><th>Situação</th></tr>
+        ${parcelas.map(linhaParcela).join('') || '<tr><td colspan="5">Nenhuma parcela lançada.</td></tr>'}</table>
+      ${recebimentos.length ? `<table class="itens" style="margin-top:3mm"><tr><th>Recebido em</th><th>Parcela</th><th>Forma</th><th class="n">Valor</th></tr>${recebimentos.map(linhaRecebido).join('')}</table>` : ''}`
+      : '<p class="nota">Sem dados de cobrança.</p>'}
+    <p class="rodape">Documento interno de controle da ${escapar(d.empresa.empresaNome || 'empresa')}: não substitui o contrato assinado e não é entregue ao cliente.</p>`);
 };

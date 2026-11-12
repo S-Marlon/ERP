@@ -246,3 +246,10 @@ Colunas novas: `incluso` em `_orcamento_itens`, `valor_parcelado` em `_obras`, `
   (`secoesConfig.ts`). Modelos de contrato/aditivo num editor à parte (resumo: padrão ou personalizado, nº de cláusulas);
   prazos de avaliação/revisão junto das mensagens; barra de salvar com "alterações não salvas" e Desfazer. Atalhos
   abrem a seção certa (`subvista: 'CONFIG:CONTRATO'`).
+- **Poço sem nome** (2026-11-11): vira "Poço de <cliente>", e do segundo em diante "#2", "#3" (`nomePadraoPoco`).
+- **Todo serviço fechado tem contrato** (2026-11-11, colunas `forma_contrato`, `fechado_em`, `combinado_como` em
+  `modulo_hidraulica_pocos_obras`): sair do orçamento pede "Como foi fechado?" — **escrito** (papel assinado; marca a etapa
+  Contrato assinado nesse dia) ou **informal** (de boca/WhatsApp, com como foi combinado). Corrigível depois pelo campo
+  Contrato no topo da obra (`PUT /obras/:id/contrato`). Documentos da obra ganhou o **Contrato interno** (controle da
+  empresa: dados fiscais do cliente, serviço, valores e condições, parcelas e recebimentos). A busca e a ficha do poço usam o
+  registro (antes: palpite pela etapa do processo). Obras antigas já fechadas sem registro não travam.

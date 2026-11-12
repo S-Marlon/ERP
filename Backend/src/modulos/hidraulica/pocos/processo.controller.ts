@@ -238,7 +238,7 @@ const carregarObra = async (tenant: number, id: number) => {
   const [[o]]: any = await pool.execute(
     `SELECT o.*, DATE_FORMAT(o.created_at, '%Y-%m-%d %H:%i:%s') AS criada_txt, DATE_FORMAT(o.data_inicio, '%Y-%m-%d') AS inicio_txt,
             DATE_FORMAT(o.data_termino, '%Y-%m-%d') AS termino_txt, DATE_FORMAT(o.data_previsao, '%Y-%m-%d') AS previsao_txt,
-            c.nome AS cliente, c.telefone, po.identificacao AS poco
+            DATE_FORMAT(o.fechado_em, '%Y-%m-%d') AS fechado_txt, c.nome AS cliente, c.telefone, po.identificacao AS poco
      FROM modulo_hidraulica_pocos_obras o LEFT JOIN modulo_hidraulica_pocos_clientes c ON c.id_cliente = o.id_cliente
      LEFT JOIN modulo_hidraulica_pocos_pocos po ON po.id_poco = o.id_poco WHERE o.id_obra = ? AND o.tenant_id = ?`, [id, tenant]);
   if (!o) throw new ErroObra('Obra não encontrada.', 404);
@@ -476,11 +476,13 @@ export const dadosDoDocumento = async (req: Request, res: Response) => {
         itens: itens.map((i: any) => ({ grupo: i.grupo, descricao: i.descricao, quantidade: Number(i.quantidade), unidade: i.unidade,
           valorUnitario: Number(i.valor_unitario), valorTotal: Number(i.valor_total), opcional: !!i.opcional, incluso: !!i.incluso })),
         contratoAssinadoEm: contrato?.em || null,
+        formaContrato: o.forma_contrato || null, fechadoEm: o.fechado_txt || null, combinadoComo: o.combinado_como || null,
       },
       cliente: cli ? {
         nome: cli.nome, tipoPessoa: cli.tipo_pessoa || 'PF', documento: cli.documento || null, rgIe: cli.rg_ie || null, estadoCivil: cli.estado_civil || null,
         profissao: cli.profissao || null, telefone: cli.telefone || null, email: cli.email || null, endereco: cli.endereco || null, bairro: cli.bairro || null,
         cidade: cli.cidade || null, uf: cli.uf || null, cep: cli.cep || null, representante: cli.representante || null, representanteDocumento: cli.representante_documento || null,
+        telefone2: cli.telefone2 || null, observacao: cli.observacao || null,
       } : null,
       poco: poco ? {
         idPoco: Number(poco.id_poco), identificacao: poco.identificacao, endereco: poco.endereco || null, cidade: poco.cidade || null, uf: poco.uf || null,

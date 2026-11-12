@@ -1,6 +1,6 @@
 import assert from 'assert';
 import {
-  escapar, htmlAditivo, htmlAdesivo, htmlContrato, htmlLaudo, htmlOrcamento, preencherModelo, qualificacaoCliente, valorPorExtenso,
+  escapar, htmlAditivo, htmlAdesivo, htmlContrato, htmlContratoInterno, htmlLaudo, htmlOrcamento, preencherModelo, qualificacaoCliente, valorPorExtenso,
 } from './documentosPocos';
 import type { Aditivo, DocumentoObra } from './obrasApi';
 
@@ -109,4 +109,21 @@ teste('documentos de poço: contrato e aditivo', () => {
   assert.ok(a.includes('TERMO ADITIVO Nº 2 AO CONTRATO Nº 15') && a.includes('de 05/10/2026') && a.includes('20 m a mais') && a.includes('<p>água mais funda</p>'));
   assert.ok(/passando o valor total a R\$\s21\.000,00 \(vinte e um mil reais\)/.test(a), '18.000 do contrato + 1.000 + 2.000 dos aditivos');
   assert.ok(!/\{[a-z_]+\}/.test(a));
+});
+
+teste('documentos de poço: contrato interno', () => {
+  const informal: DocumentoObra = { ...doc, obra: { ...doc.obra, formaContrato: 'INFORMAL', fechadoEm: '2026-10-03', combinadoComo: 'por WhatsApp com o José' },
+    cliente: { ...doc.cliente!, telefone2: '11988887777', observacao: 'Banco X' } };
+  const cob = {
+    resumo: { contratado: 18000, adicionaisAprovados: 2160, adicionaisPendentes: 0, total: 20160, sinal: 5000, sinalPago: true, recebido: 11000, aReceber: 9160, parcelado: 20160, semParcela: 0 },
+    sinalQuando: 'ANTES', adicionais: [], metrosPerfurados: null, sugestao: null,
+    parcelas: [{ idParcela: 1, idObra: 15, tipo: 'SINAL', parcela: 1, totalParcelas: 1, descricao: 'Sinal', vencimento: '2026-10-05', valor: 5000, valorPago: 5000, saldo: 0, status: 'PAGO', situacao: 'PAGO', diasAtraso: 0 }],
+    recebimentos: [{ idRecebimento: 1, idParcela: 1, parcela: 'Sinal', forma: 'CHEQUE', valor: 5000, observacao: 'cheque 1', operador: 'ADM', em: '2026-10-05 10:00:00', estornadoEm: null, estornoMotivo: null }],
+  } as any;
+  const h = htmlContratoInterno(informal, cob, null, '2026-11-11');
+  assert.ok(h.includes('contrato informal (combinado em 03/10/2026)') && h.includes('por WhatsApp com o José'));
+  assert.ok(h.includes('123.456.789-01') && h.includes('(11) 98888-7777') && h.includes('Banco X'), 'dados fiscais do cliente');
+  assert.ok(/R\$\s20\.160,00/.test(h) && h.includes('Cheque · cheque 1') && /R\$\s9\.160,00/.test(h), 'total, recebido e a receber');
+  const escrito = htmlContratoInterno({ ...doc, obra: { ...doc.obra, formaContrato: 'ESCRITO', fechadoEm: '2026-10-05' } }, null, null, '2026-11-11');
+  assert.ok(escrito.includes('contrato escrito (assinado em 05/10/2026)') && escrito.includes('Sem dados de cobrança'));
 });

@@ -38,6 +38,26 @@ const dataIso = (v: unknown, nome: string) => {
   return s;
 };
 
+// ------------------------------------------------------------------ fechamento do contrato
+/** Todo serviço que sai do orçamento tem contrato: escrito (papel assinado) ou informal (de boca/WhatsApp, só no controle interno). */
+export const FORMAS_CONTRATO = ['ESCRITO', 'INFORMAL'] as const;
+export type FormaContrato = typeof FORMAS_CONTRATO[number];
+
+/** Como o contrato foi fechado: forma, dia (hoje se vazio; nunca no futuro) e, no informal, como foi combinado. */
+export const validarFechamento = (b: any, hoje: string) => {
+  const forma = String(b?.formaContrato || '').toUpperCase();
+  if (!(FORMAS_CONTRATO as readonly string[]).includes(forma)) throw new ErroObra('Diga como o contrato foi fechado: escrito (assinado) ou informal (de boca ou WhatsApp).');
+  const fechadoEm = dataIso(b?.fechadoEm, 'Data do fechamento') || hoje;
+  if (fechadoEm > hoje) throw new ErroObra('A data do fechamento não pode ser no futuro.');
+  const combinadoComo = texto(b?.combinadoComo, 255);
+  if (forma === 'INFORMAL' && !combinadoComo) throw new ErroObra('No contrato informal, anote como foi combinado (ex.: por WhatsApp com o João).');
+  return { formaContrato: forma as FormaContrato, fechadoEm, combinadoComo };
+};
+
+/** Sair do orçamento para obra fechada (sinal, execução) pede o fechamento, se a obra ainda não tem. Cancelar não pede. */
+export const precisaFechamento = (de: SituacaoObra, para: SituacaoObra, formaAtual: string | null | undefined) =>
+  de === 'ORCAMENTO' && para !== 'CANCELADA' && para !== 'ORCAMENTO' && !formaAtual;
+
 /** Os serviços da obra: lista sem repetir, na ordem da lista padrão (vem como array ou "A,B"). */
 export const lerServicos = (v: unknown): Servico[] => {
   const lista = (Array.isArray(v) ? v : String(v ?? '').split(',')).map(x => String(x).trim().toUpperCase()).filter(Boolean);

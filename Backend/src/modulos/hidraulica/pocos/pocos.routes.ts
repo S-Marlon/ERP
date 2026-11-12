@@ -11,7 +11,7 @@
 // Central: contratos a finalizar, informações a completar e a prévia do plano mensal.
 // Orçamento rápido (itens), duplicar, termos aditivos e a ficha completa do cliente.
 import { Router } from 'express';
-import { criarObra, criarPoco, detalheObra, listarObras, listarPocos, mudarSituacao, salvarObra, salvarPoco, salvarRelatorio } from './obras.controller';
+import { criarObra, criarPoco, definirContrato, detalheObra, listarObras, listarPocos, mudarSituacao, salvarObra, salvarPoco, salvarRelatorio } from './obras.controller';
 import { criarCliente, detalheCliente, listarClientes, salvarCliente } from './clientes.controller';
 import {
   aReceberDeObras, cancelarParcela, cobrancaDaObra, criarAdicional, estornarRecebimento, lancarParcelas, mudarAdicional, receberParcela, salvarAdicional,
@@ -51,6 +51,7 @@ router.get('/obras/:id', detalheObra);
 router.put('/obras/:id', salvarObra);
 router.put('/obras/:id/relatorio', salvarRelatorio);
 router.post('/obras/:id/situacao', mudarSituacao);
+router.put('/obras/:id/contrato', definirContrato);
 router.get('/obras/:id/cobranca', cobrancaDaObra);
 router.post('/obras/:id/adicionais', criarAdicional);
 router.post('/obras/:id/parcelas', lancarParcelas);

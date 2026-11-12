@@ -10,10 +10,11 @@ import {
   UserOutlined,
 } from '@ant-design/icons';
 import {
-  centralApi, ContratoCentral, contarObras, dataBr, foneBr, GRAVIDADES, Obra, ObraForm, obrasApi, Poco, PocoForm, Servico, SERVICOS, SituacaoObra, SITUACOES_OBRA,
+  centralApi, ContratoCentral, contarObras, dataBr, FechamentoContrato, foneBr, GRAVIDADES, Obra, ObraForm, obrasApi, Poco, PocoForm, Servico, SERVICOS, SituacaoObra, SITUACOES_OBRA,
 } from './obrasApi';
 import RelatorioPocoPage from './RelatorioPocoPage';
 import { ClientePocoModal, ListaClientes } from './ClientesPoco';
+import { FechamentoModal } from './FechamentoContrato';
 import { AReceberObras, CobrancaDaObra } from './CobrancaObra';
 import { CadastroMateriais, MateriaisDaObra } from './MateriaisObra';
 import { HistoricoDoPoco } from './ManutencaoPocos';
@@ -285,6 +286,7 @@ const ObraAberta: React.FC<{ idObra: number; parte?: ParteObra; onVoltar: () => 
   const [versaoCobranca, setVersaoCobranca] = useState(0);
   const [editando, setEditando] = useState(false);
   const [versao, setVersao] = useState(0);
+  const [fechando, setFechando] = useState<{ para?: SituacaoObra } | null>(null);
   // o que falta nesta obra: as mesmas pendências da Central
   const [pendencias, setPendencias] = useState<ContratoCentral['pendencias']>([]);
   const carregar = useCallback(() => {
@@ -302,9 +304,12 @@ const ObraAberta: React.FC<{ idObra: number; parte?: ParteObra; onVoltar: () => 
     else if (d === 'CLIENTE') abrirFichaCliente(obra.idCliente);
     else setParte(d);
   };
-  const mudar = async (s: SituacaoObra) => {
+  // sair do orçamento pede o fechamento do contrato (escrito ou informal), se a obra ainda não tem
+  const pedeFechamento = (s: SituacaoObra) => obra.situacao === 'ORCAMENTO' && s !== 'CANCELADA' && !obra.formaContrato;
+  const mudar = async (s: SituacaoObra, fechamento?: FechamentoContrato) => {
     try {
-      const r = await obrasApi.mudarSituacao(obra.idObra, s);
+      const r = await obrasApi.mudarSituacao(obra.idObra, s, fechamento);
+      setFechando(null);
       message.success(`Obra ${SITUACOES_OBRA[s].texto.toLowerCase()}.${r.pocoAtualizado ? ' A ficha do poço recebeu o que o relatório mediu.' : ''}`);
       carregar();
       setVersaoCobranca(v => v + 1);
@@ -323,7 +328,9 @@ const ObraAberta: React.FC<{ idObra: number; parte?: ParteObra; onVoltar: () => 
             </div>
           </div>
           <Space wrap>
-            {obra.proximas.filter(s => s !== obra.situacao).map(s => (
+            {obra.proximas.filter(s => s !== obra.situacao).map(s => pedeFechamento(s) ? (
+              <Button key={s} type="primary" onClick={() => setFechando({ para: s })}>{SITUACOES_OBRA[s].acao}</Button>
+            ) : (
               <Popconfirm key={s} title={`${SITUACOES_OBRA[s].acao}?`} okText="Sim" cancelText="Voltar" onConfirm={() => mudar(s)}
                 description={s === 'CONCLUIDA' && obra.servicos.includes('PERFURACAO') ? 'A ficha do poço recebe a profundidade, a vazão e os níveis do relatório.' : undefined}>
                 <Button type={s === 'CANCELADA' || ORDEM.indexOf(s) < indice ? 'default' : 'primary'} danger={s === 'CANCELADA'}>{SITUACOES_OBRA[s].acao}</Button>
@@ -347,6 +354,16 @@ const ObraAberta: React.FC<{ idObra: number; parte?: ParteObra; onVoltar: () => 
           { key: 't', label: 'Conclusão', children: dataBr(obra.dataTermino) },
           { key: 'g', label: 'Garantia até', children: dataBr(obra.garantiaAte) },
           { key: 'm', label: 'Metros', children: obra.metrosPrevistos ? `${obra.metrosPrevistos} m` : '—' },
+          {
+            key: 'k', label: 'Contrato', children: obra.formaContrato
+              ? <Tooltip title={obra.combinadoComo || undefined}>
+                  <a onClick={() => setFechando({})}>
+                    <Tag color={obra.formaContrato === 'ESCRITO' ? 'green' : 'orange'} style={{ margin: 0 }}>{obra.formaContrato === 'ESCRITO' ? 'escrito' : 'informal'}</Tag>
+                    {obra.fechadoEm ? ` ${dataBr(obra.fechadoEm)}` : ''}
+                  </a>
+                </Tooltip>
+              : obra.situacao === 'ORCAMENTO' || obra.situacao === 'CANCELADA' ? '—' : <a onClick={() => setFechando({})}>registrar</a>,
+          },
           { key: 'v', label: 'Contratado', children: <>{brl(obra.valorContratado)}{obra.valorSinal ? <Text type="secondary" style={{ fontSize: 12 }}> · sinal {brl(obra.valorSinal)}</Text> : null}</> },
         ]} />
         {obra.situacao !== 'CANCELADA' && (
@@ -395,6 +412,14 @@ const ObraAberta: React.FC<{ idObra: number; parte?: ParteObra; onVoltar: () => 
         : parte === 'COBRANCA'
           ? <CobrancaDaObra key={versaoCobranca} idObra={obra.idObra} cancelada={obra.situacao === 'CANCELADA'} />
           : <MateriaisDaObra idObra={obra.idObra} cancelada={obra.situacao === 'CANCELADA'} />}
+      <FechamentoModal aberto={!!fechando} inicial={obra} onFechar={() => setFechando(null)}
+        titulo={fechando?.para ? `Como o contrato foi fechado? · ${SITUACOES_OBRA[fechando.para].acao}` : 'Contrato da obra'}
+        okTexto={fechando?.para ? SITUACOES_OBRA[fechando.para].acao : 'Salvar'}
+        onConfirmar={async f => {
+          if (fechando?.para) { await mudar(fechando.para, f); return; }
+          try { await obrasApi.definirContrato(obra.idObra, f); message.success('Contrato registrado.'); setFechando(null); carregar(); }
+          catch (e) { message.error(e instanceof Error ? e.message : 'Erro.'); }
+        }} />
       <ObraModal obra={editando ? obra : null} onFechar={() => setEditando(false)}
         onSalva={() => { setEditando(false); carregar(); setVersao(v => v + 1); setVersaoCobranca(v => v + 1); }} />
     </Space>

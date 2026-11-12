@@ -33,6 +33,8 @@ teste('busca: contrato formal ou informal', () => {
   assert.strictEqual(tipoDoContrato('CONCLUIDA', false), 'INFORMAL');
   assert.strictEqual(tipoDoContrato('ORCAMENTO', false), 'ORCAMENTO');
   assert.strictEqual(tipoDoContrato('CANCELADA', true), 'CANCELADO');
+  assert.strictEqual(tipoDoContrato('EM_EXECUCAO', false, 'ESCRITO'), 'FORMAL', 'o registrado ao fechar vale');
+  assert.strictEqual(tipoDoContrato('CONCLUIDA', true, 'INFORMAL'), 'INFORMAL');
 });
 
 teste('busca: relatório preenchido', () => {

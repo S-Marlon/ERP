@@ -39,7 +39,7 @@ export const buscar = async (req: Request, res: Response) => {
        ORDER BY p.identificacao LIMIT 40`,
       [tenant, like, like, like, like, like, ...paramDigitos(2)]);
     const [obras]: any = await pool.execute(
-      `SELECT o.id_obra, o.titulo, o.servicos, o.situacao, o.valor_contratado, o.id_cliente, c.nome AS cliente, c.telefone, o.id_poco,
+      `SELECT o.id_obra, o.titulo, o.servicos, o.situacao, o.forma_contrato, o.valor_contratado, o.id_cliente, c.nome AS cliente, c.telefone, o.id_poco,
               po.identificacao AS poco, po.cidade, ${ASSINADO} AS assinado, DATE_FORMAT(o.created_at, '%Y-%m-%d') AS criada
        FROM modulo_hidraulica_pocos_obras o
        LEFT JOIN modulo_hidraulica_pocos_clientes c ON c.id_cliente = o.id_cliente
@@ -62,7 +62,7 @@ export const buscar = async (req: Request, res: Response) => {
       contratos: ordenarPorRelevancia(obras, (o: any) => [t.numero !== null && Number(o.id_obra) === t.numero ? t.texto : null, o.titulo, o.cliente, o.poco, o.cidade, o.telefone], t)
         .map((o: any) => ({
           idObra: Number(o.id_obra), titulo: o.titulo || null, servicos: lerServicos(o.servicos), situacao: o.situacao,
-          tipoContrato: tipoDoContrato(o.situacao, !!Number(o.assinado)), cliente: o.cliente || null, idCliente: nulo(o.id_cliente),
+          tipoContrato: tipoDoContrato(o.situacao, !!Number(o.assinado), o.forma_contrato), cliente: o.cliente || null, idCliente: nulo(o.id_cliente),
           poco: o.poco || null, idPoco: nulo(o.id_poco), valor: nulo(o.valor_contratado), criadaEm: o.criada,
         })),
     });
@@ -78,7 +78,7 @@ export const pocoCompleto = async (req: Request, res: Response) => {
     const [[dono]]: any = p.id_proprietario ? await pool.execute(
       `SELECT id_cliente, nome, telefone, documento, cidade, uf FROM modulo_hidraulica_pocos_clientes WHERE id_cliente = ? AND tenant_id = ?`, [p.id_proprietario, tenant]) : [[]];
     const [obras]: any = await pool.execute(
-      `SELECT o.id_obra, o.titulo, o.servicos, o.situacao, o.valor_contratado, o.garantia_meses, o.dados_relatorio, o.id_cliente, c.nome AS cliente,
+      `SELECT o.id_obra, o.titulo, o.servicos, o.situacao, o.forma_contrato, o.valor_contratado, o.garantia_meses, o.dados_relatorio, o.id_cliente, c.nome AS cliente,
               DATE_FORMAT(o.created_at, '%Y-%m-%d') AS criada, DATE_FORMAT(o.data_inicio, '%Y-%m-%d') AS inicio, DATE_FORMAT(o.data_termino, '%Y-%m-%d') AS termino,
               ${ASSINADO} AS assinado,
               (SELECT COALESCE(SUM(a.valor), 0) FROM modulo_hidraulica_pocos_adicionais a WHERE a.id_obra = o.id_obra AND a.situacao = 'APROVADO') AS adicionais,
@@ -94,7 +94,7 @@ export const pocoCompleto = async (req: Request, res: Response) => {
       const valendo = !['ORCAMENTO', 'CANCELADA'].includes(o.situacao);
       return {
         idObra: Number(o.id_obra), titulo: o.titulo || `Obra ${o.id_obra}`, servicos: lerServicos(o.servicos), situacao: o.situacao,
-        tipoContrato: tipoDoContrato(o.situacao, !!Number(o.assinado)), cliente: o.cliente || null, idCliente: nulo(o.id_cliente),
+        tipoContrato: tipoDoContrato(o.situacao, !!Number(o.assinado), o.forma_contrato), cliente: o.cliente || null, idCliente: nulo(o.id_cliente),
         criadaEm: o.criada, dataInicio: o.inicio || null, dataTermino: o.termino || null, total, recebido: n(o.recebido),
         aReceber: valendo ? Math.round((total - n(o.recebido)) * 100) / 100 : 0, aditivos: n(o.aditivos),
         temRelatorio: relatorioPreenchido(lerJson(o.dados_relatorio)), garantiaAte: garantiaAte(o.termino || null, nulo(o.garantia_meses)),

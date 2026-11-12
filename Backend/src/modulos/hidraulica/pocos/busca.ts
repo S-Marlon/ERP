@@ -49,8 +49,11 @@ export type TipoContrato = 'FORMAL' | 'INFORMAL' | 'ORCAMENTO' | 'CANCELADO';
  * Formal = contrato assinado; informal = obra fechada (sinal, execução ou concluída) sem contrato assinado no sistema
  * (combinado de boca ou por mensagem). Orçamento ainda não virou contrato; cancelada fica à parte.
  */
-export const tipoDoContrato = (situacao: string, assinado: boolean): TipoContrato => {
+export const tipoDoContrato = (situacao: string, assinado: boolean, forma?: string | null): TipoContrato => {
   if (situacao === 'CANCELADA') return 'CANCELADO';
+  // registrado ao fechar (vale mais que a etapa do processo)
+  if (forma === 'ESCRITO') return 'FORMAL';
+  if (forma === 'INFORMAL') return 'INFORMAL';
   if (assinado) return 'FORMAL';
   return situacao === 'ORCAMENTO' ? 'ORCAMENTO' : 'INFORMAL';
 };

@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { garantiaAte, lerGps, nomePadraoPoco, lerServicos, podeIrPara, pocoDoRelatorio, relatorioInicial, validarCliente, validarObra, validarPoco } from './obras';
+import { garantiaAte, lerGps, nomePadraoPoco, precisaFechamento, validarFechamento, lerServicos, podeIrPara, pocoDoRelatorio, relatorioInicial, validarCliente, validarObra, validarPoco } from './obras';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -73,4 +73,17 @@ teste('poço sem nome: "Poço de <cliente>" e depois #2', () => {
   assert.ok(nomePadraoPoco('X'.repeat(200), []).length <= 94);
   assert.strictEqual(validarPoco({ identificacao: '', idProprietario: 5 }).identificacao, null);
   assert.throws(() => validarPoco({ identificacao: '' }), /proprietário/);
+});
+
+teste('fechamento do contrato: escrito ou informal', () => {
+  const hoje = '2026-11-11';
+  assert.deepStrictEqual(validarFechamento({ formaContrato: 'escrito' }, hoje), { formaContrato: 'ESCRITO', fechadoEm: hoje, combinadoComo: null });
+  assert.strictEqual(validarFechamento({ formaContrato: 'INFORMAL', fechadoEm: '2026-09-10', combinadoComo: 'por WhatsApp com o João' }, hoje).fechadoEm, '2026-09-10');
+  assert.throws(() => validarFechamento({ formaContrato: 'INFORMAL' }, hoje), /como foi combinado/);
+  assert.throws(() => validarFechamento({}, hoje), /escrito/);
+  assert.throws(() => validarFechamento({ formaContrato: 'ESCRITO', fechadoEm: '2026-12-01' }, hoje), /futuro/);
+  assert.strictEqual(precisaFechamento('ORCAMENTO', 'AGUARDANDO_SINAL', null), true);
+  assert.strictEqual(precisaFechamento('ORCAMENTO', 'EM_EXECUCAO', 'ESCRITO'), false);
+  assert.strictEqual(precisaFechamento('ORCAMENTO', 'CANCELADA', null), false);
+  assert.strictEqual(precisaFechamento('AGUARDANDO_SINAL', 'EM_EXECUCAO', null), false, 'obra antiga já fechada segue sem travar');
 });

@@ -6,8 +6,8 @@ import { Alert, Button, Card, Col, Empty, Flex, List, Row, Segmented, Select, Sp
 import { FileTextOutlined, FolderOpenOutlined, PrinterOutlined, ToolOutlined } from '@ant-design/icons';
 import KitVisita from './KitVisita';
 import RelatorioPocoPage from './RelatorioPocoPage';
-import { Aditivo, DocumentoObra, Obra, obrasApi, orcamentoApi, processoApi, SITUACOES_OBRA, urlArquivo } from './obrasApi';
-import { htmlAditivo, htmlAdesivo, htmlContrato, htmlLaudo, htmlOrcamento } from './documentosPocos';
+import { Aditivo, cobrancaApi, CobrancaObra, DocumentoObra, Obra, obrasApi, orcamentoApi, processoApi, SITUACOES_OBRA, urlArquivo } from './obrasApi';
+import { htmlAditivo, htmlAdesivo, htmlContrato, htmlContratoInterno, htmlLaudo, htmlOrcamento } from './documentosPocos';
 import { semImpressao } from './documentosEmBranco';
 import { abrirObra, navPocos, useNavPocos } from './navPocos';
 
@@ -25,11 +25,14 @@ const imprimir = (html: string) => {
 type ItemDoc = { chave: string; titulo: string; descricao: string; aviso?: string; html: () => string };
 
 /** Os documentos que a obra já pode gerar, com o aviso quando ainda é cedo (ex.: laudo de obra não concluída). */
-const documentosDaObra = (d: DocumentoObra, aditivos: Aditivo[]): ItemDoc[] => {
+const documentosDaObra = (d: DocumentoObra, aditivos: Aditivo[], cob: CobrancaObra | null): ItemDoc[] => {
   const logo = urlArquivo(d.empresa.logo), hoje = hojeIso(), o = d.obra;
   const concluida = o.situacao === 'CONCLUIDA';
   return [
     { chave: 'ORCAMENTO', titulo: 'Orçamento', descricao: 'Itens, valores, pagamento, prazo, garantia e condições gerais.', html: () => htmlOrcamento(d, logo, hoje) },
+    { chave: 'INTERNO', titulo: 'Contrato interno', descricao: 'Controle da empresa: dados fiscais do cliente, valores combinados e pagamentos (escrito ou informal).',
+      aviso: o.situacao === 'ORCAMENTO' ? 'ainda é orçamento' : !o.formaContrato ? 'forma do contrato não registrada' : undefined,
+      html: () => htmlContratoInterno(d, cob, logo, hoje) },
     { chave: 'CONTRATO', titulo: 'Contrato', descricao: 'O contrato da configuração preenchido com os dados da obra e do cliente.',
       aviso: o.contratoAssinadoEm ? undefined : 'contrato ainda não marcado como assinado', html: () => htmlContrato(d, logo, hoje) },
     ...aditivos.map(a => ({
@@ -49,6 +52,7 @@ const DocumentosDaObra: React.FC<{ pedida?: number; pedido?: number }> = ({ pedi
   useEffect(() => { if (pedida) setIdObra(pedida); }, [pedida, pedido]);
   const [doc, setDoc] = useState<DocumentoObra | null>(null);
   const [aditivos, setAditivos] = useState<Aditivo[]>([]);
+  const [cob, setCob] = useState<CobrancaObra | null>(null);
   const [vendo, setVendo] = useState('ORCAMENTO');
   const [carregando, setCarregando] = useState(false);
   useEffect(() => { obrasApi.obras().then(setObras).catch(e => message.error(e.message)); }, []);
@@ -56,12 +60,12 @@ const DocumentosDaObra: React.FC<{ pedida?: number; pedido?: number }> = ({ pedi
     setDoc(null); setAditivos([]);
     if (!idObra) return;
     setCarregando(true);
-    Promise.all([processoApi.documento(idObra), orcamentoApi.aditivos(idObra).catch(() => ({ aditivos: [] as Aditivo[] }))])
-      .then(([d, a]) => { setDoc(d); setAditivos(a.aditivos); setVendo('ORCAMENTO'); })
+    Promise.all([processoApi.documento(idObra), orcamentoApi.aditivos(idObra).catch(() => ({ aditivos: [] as Aditivo[] })), cobrancaApi.daObra(idObra).catch(() => null)])
+      .then(([d, a, c]) => { setDoc(d); setAditivos(a.aditivos); setCob(c); setVendo('ORCAMENTO'); })
       .catch(e => message.error(e.message)).finally(() => setCarregando(false));
   }, [idObra]);
 
-  const itens = useMemo(() => (doc ? documentosDaObra(doc, aditivos) : []), [doc, aditivos]);
+  const itens = useMemo(() => (doc ? documentosDaObra(doc, aditivos, cob) : []), [doc, aditivos, cob]);
   const atual = itens.find(i => i.chave === vendo) || itens[0];
   const previa = useMemo(() => (atual ? semImpressao(atual.html()) : ''), [atual]);
 

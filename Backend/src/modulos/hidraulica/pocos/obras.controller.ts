@@ -6,7 +6,7 @@ import { operadorDe } from '../../../areas/vendas/caixa/caixa.controller';
 import { bloqueioDoSinal } from './cobranca';
 import { acertarSinal, parcelaDoSinal } from './cobrancaBanco';
 import {
-  ErroObra, garantiaAte, lerServicos, podeIrPara, pocoDoRelatorio, proximasSituacoes, relatorioInicial, SituacaoObra, SITUACOES_OBRA, nomePadraoPoco, validarObra, validarPoco,
+  ErroObra, garantiaAte, lerServicos, podeIrPara, pocoDoRelatorio, proximasSituacoes, relatorioInicial, SituacaoObra, SITUACOES_OBRA, nomePadraoPoco, precisaFechamento, validarFechamento, validarObra, validarPoco,
 } from './obras';
 
 const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || req.body?.tenant_id || 1);
@@ -122,6 +122,8 @@ const formatarObra = (r: any, comRelatorio = false) => {
     valorSinal: nulo(r.valor_sinal), sinalQuando: r.sinal_quando || 'ANTES',
     escopo: r.escopo || null, prazoExecucaoDias: nulo(r.prazo_execucao_dias), formaPagamento: r.forma_pagamento || null,
     validadeOrcamentoDias: nulo(r.validade_orcamento_dias),
+    // como o contrato foi fechado (null = ainda orçamento ou obra antiga sem registro)
+    formaContrato: r.forma_contrato || null, fechadoEm: r.fechado_txt || null, combinadoComo: r.combinado_como || null,
     criadaEm: r.criada_txt,
     ...(comRelatorio ? { relatorio: lerJson(r.dados_relatorio) } : {}),
   };
@@ -129,7 +131,8 @@ const formatarObra = (r: any, comRelatorio = false) => {
 const SELECT_OBRA = `SELECT o.*, ${NOME_PESSOA} AS cliente, c.telefone,
          po.identificacao AS poco_identificacao, po.cidade AS poco_cidade, po.latitude AS poco_latitude, po.longitude AS poco_longitude,
          DATE_FORMAT(o.data_previsao, '%Y-%m-%d') AS data_previsao_txt, DATE_FORMAT(o.data_inicio, '%Y-%m-%d') AS data_inicio_txt,
-         DATE_FORMAT(o.data_termino, '%Y-%m-%d') AS data_termino_txt, DATE_FORMAT(o.created_at, '%Y-%m-%d') AS criada_txt
+         DATE_FORMAT(o.data_termino, '%Y-%m-%d') AS data_termino_txt, DATE_FORMAT(o.created_at, '%Y-%m-%d') AS criada_txt,
+         DATE_FORMAT(o.fechado_em, '%Y-%m-%d') AS fechado_txt
        FROM modulo_hidraulica_pocos_obras o ${JOIN_PESSOA('o.id_cliente')}
        LEFT JOIN modulo_hidraulica_pocos_pocos po ON po.id_poco = o.id_poco`;
 
@@ -253,6 +256,41 @@ export const salvarRelatorio = async (req: Request, res: Response) => {
  * POST /obras/:id/situacao { situacao } — muda a situação pelas passagens permitidas. Em execução marca o início;
  * concluída marca o fim e, na perfuração, passa o que o relatório mediu para a ficha do poço (criando o poço se faltar).
  */
+const hojeLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+
+/** Grava como o contrato foi fechado; o escrito também marca a etapa "Contrato assinado" do processo nesse dia. */
+const gravarFechamento = async (conn: any, tenant: number, id: number, f: ReturnType<typeof validarFechamento>, operador: string) => {
+  await conn.execute(`UPDATE modulo_hidraulica_pocos_obras SET forma_contrato = ?, fechado_em = ?, combinado_como = ? WHERE id_obra = ? AND tenant_id = ?`,
+    [f.formaContrato, f.fechadoEm, f.combinadoComo, id, tenant]);
+  if (f.formaContrato === 'ESCRITO') {
+    await conn.execute(
+      `INSERT INTO modulo_hidraulica_pocos_processo (tenant_id, id_obra, etapa, situacao, feito_em, observacao, operador) VALUES (?, ?, 'CONTRATO_ASSINADO', 'FEITO', ?, ?, ?)
+       ON DUPLICATE KEY UPDATE situacao = 'FEITO', feito_em = VALUES(feito_em), operador = VALUES(operador)`,
+      [tenant, id, `${f.fechadoEm} 12:00:00`, 'Contrato escrito', operador]);
+  } else {
+    // informal: não há papel assinado
+    await conn.execute(`DELETE FROM modulo_hidraulica_pocos_processo WHERE id_obra = ? AND etapa = 'CONTRATO_ASSINADO' AND tenant_id = ?`, [id, tenant]);
+  }
+};
+
+// PUT /obras/:id/contrato { formaContrato, fechadoEm, combinadoComo } (corrigir depois de fechada)
+export const definirContrato = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const conn: any = await pool.getConnection();
+  try {
+    const id = Number(req.params.id);
+    await conn.beginTransaction();
+    const [[o]]: any = await conn.execute(`SELECT situacao FROM modulo_hidraulica_pocos_obras WHERE id_obra = ? AND tenant_id = ? FOR UPDATE`, [id, tenant]);
+    if (!o) throw new ErroObra('Obra não encontrada.', 404);
+    await gravarFechamento(conn, tenant, id, validarFechamento(req.body, hojeLocal()), operadorDe(req));
+    await conn.commit();
+    return res.json(formatarObra(await carregarObra(tenant, id)));
+  } catch (e) {
+    await conn.rollback().catch(() => undefined);
+    return responderErro(res, e, 'Erro ao registrar o contrato.');
+  } finally { conn.release(); }
+};
+
 export const mudarSituacao = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
   const conn: any = await pool.getConnection();
@@ -263,6 +301,9 @@ export const mudarSituacao = async (req: Request, res: Response) => {
     const [[o]]: any = await conn.execute(`SELECT * FROM modulo_hidraulica_pocos_obras WHERE id_obra = ? AND tenant_id = ? FOR UPDATE`, [id, tenant]);
     if (!o) throw new ErroObra('Obra não encontrada.', 404);
     if (!podeIrPara(o.situacao, para)) throw new ErroObra(`A obra não pode ir de "${o.situacao}" para "${para}".`, 409);
+    // todo serviço fechado tem contrato: escrito ou informal
+    if (req.body?.formaContrato) await gravarFechamento(conn, tenant, id, validarFechamento(req.body, hojeLocal()), operadorDe(req));
+    else if (precisaFechamento(o.situacao, para, o.forma_contrato)) throw new ErroObra('Diga como o contrato foi fechado: escrito (assinado) ou informal (de boca ou WhatsApp).', 422);
     if (para === 'EM_EXECUCAO') {
       const bloqueio = bloqueioDoSinal(nulo(o.valor_sinal), o.sinal_quando, await parcelaDoSinal(conn, id));
       if (bloqueio) throw new ErroObra(bloqueio, 409);
