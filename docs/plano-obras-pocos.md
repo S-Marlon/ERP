@@ -253,3 +253,14 @@ Colunas novas: `incluso` em `_orcamento_itens`, `valor_parcelado` em `_obras`, `
   Contrato no topo da obra (`PUT /obras/:id/contrato`). Documentos da obra ganhou o **Contrato interno** (controle da
   empresa: dados fiscais do cliente, serviço, valores e condições, parcelas e recebimentos). A busca e a ficha do poço usam o
   registro (antes: palpite pela etapa do processo). Obras antigas já fechadas sem registro não travam.
+- **Contrato informal só pede nome e telefone** (2026-11-12): a ficha do cliente só avisa de CPF/CNPJ e endereço como
+  "só para contrato escrito"; o aviso forte é a falta de telefone.
+- **Conjunto motobomba e fotos do poço** (2026-11-12, tabelas `modulo_hidraulica_pocos_conjuntos` e
+  `modulo_hidraulica_pocos_pocos_fotos`): aba **Bomba e instalação** na ficha do poço com o conjunto instalado (bomba ou
+  motor + bombeador, CV, tensão, estágios, profundidade, tubo, fio, corda, quadro e cabeça do poço), **histórico de trocas**
+  (trocar retira o atual na data da nova instalação; "conjunto antigo" entra direto no histórico) com o tempo de uso de
+  cada um, e fotos do poço por tipo (bomba, cabeça, quadro, local; bomba/cabeça/quadro ficam ligadas ao conjunto da época),
+  além das fotos das obras do poço. Concluir obra de instalação, troca de bomba ou perfuração com o "Sistema de
+  bombeamento" do relatório preenchido registra o conjunto sozinho (`registrarConjuntoDaObra`). Regras em `conjuntos.ts`.
+  A **prévia do plano mensal** usa o conjunto: bomba com 5 anos ou mais de uso (+10 pontos e 2 visitas/ano) e trocas já
+  feitas (+5); "Informações a completar" cobra a bomba do poço ativo.

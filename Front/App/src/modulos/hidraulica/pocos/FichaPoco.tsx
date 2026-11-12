@@ -10,6 +10,7 @@ import { dataBr, foneBr, obrasApi, PocoCompleto, SERVICOS, SITUACOES_OBRA, TIPOS
 import { abrirFichaCliente, abrirObra, abrirPoco, documentosDaObra, fichasPocos, useFichaPocos, verNoMapa } from './navPocos';
 import { HistoricoDoPoco } from './ManutencaoPocos';
 import { ClienteFicha } from './ClientesPoco';
+import { ConjuntoPoco } from './ConjuntoPoco';
 
 const { Text } = Typography;
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -109,6 +110,7 @@ export const FichaPoco: React.FC<{ idPoco: number | null; onFechar: () => void }
         ]} />
       ),
     },
+    { key: 'BOMBA', label: 'Bomba e instalação', children: <ConjuntoPoco idPoco={p.idPoco} onAbrirObra={id => ir(() => abrirObra(id))} /> },
     { key: 'HISTORICO', label: 'Histórico e manutenção', children: <HistoricoDoPoco idPoco={p.idPoco} onAbrirObra={onFechar} /> },
   ] : [];
 
@@ -136,6 +138,9 @@ export const FichaPoco: React.FC<{ idPoco: number | null; onFechar: () => void }
           </Row>
           <Space direction="vertical" size={6} style={{ width: '100%', marginBottom: 8 }}>
             <Text type="secondary"><UserOutlined /> {dono ? `${dono.nome}${dono.telefone ? ` · ${foneBr(dono.telefone)}` : ''}` : 'sem proprietário'} · <EnvironmentOutlined /> {local || 'sem endereço'}</Text>
+            <Text type="secondary"><ToolOutlined /> {d.conjunto
+              ? <a onClick={() => setAba('BOMBA')}>{d.conjunto.resumo}{d.conjunto.anosDeUso !== null ? ` · ${d.conjunto.anosDeUso < 1 ? 'menos de 1 ano' : `${d.conjunto.anosDeUso} ano(s)`} de uso` : ''}</a>
+              : <a onClick={() => setAba('BOMBA')}>bomba não registrada</a>}</Text>
             {!gps && <Alert type="warning" showIcon message="Poço sem GPS: em Editar dados, cole a localização (ex.: do WhatsApp ou do Google Maps) para ele aparecer no mapa." />}
           </Space>
           <Tabs activeKey={aba} onChange={setAba} items={abas} />

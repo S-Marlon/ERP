@@ -3,6 +3,7 @@
 import { Request, Response } from 'express';
 import pool from '../../../infra/db';
 import { operadorDe } from '../../../areas/vendas/caixa/caixa.controller';
+import { registrarConjuntoDaObra } from './conjuntosBanco';
 import { bloqueioDoSinal } from './cobranca';
 import { acertarSinal, parcelaDoSinal } from './cobrancaBanco';
 import {
@@ -340,8 +341,16 @@ export const mudarSituacao = async (req: Request, res: Response) => {
         pocoAtualizado = true;
       }
     }
+    // instalação/troca de bomba (ou perfuração com bomba) concluída: o conjunto do relatório entra no poço
+    let conjuntoRegistrado = false;
+    if (para === 'CONCLUIDA') {
+      const [[agora]]: any = await conn.execute(
+        `SELECT id_poco, DATE_FORMAT(data_termino, '%Y-%m-%d') AS termino FROM modulo_hidraulica_pocos_obras WHERE id_obra = ?`, [id]);
+      conjuntoRegistrado = !!(await registrarConjuntoDaObra(conn, tenant, id, nulo(agora?.id_poco), lerServicos(o.servicos), lerJson(o.dados_relatorio),
+        agora?.termino || hojeLocal(), operadorDe(req)));
+    }
     await conn.commit();
-    return res.json({ ...formatarObra(await carregarObra(tenant, id)), pocoAtualizado });
+    return res.json({ ...formatarObra(await carregarObra(tenant, id)), pocoAtualizado, conjuntoRegistrado });
   } catch (e) {
     await conn.rollback().catch(() => undefined);
     return responderErro(res, e, 'Erro ao mudar a situação da obra.');

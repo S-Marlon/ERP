@@ -31,6 +31,8 @@ teste('central de poços: informações a completar', () => {
   assert.deepStrictEqual(completudeCliente({ telefone: '11999990000', documento: null, endereco: null, cidade: 'Itupeva' }), { pct: 50, faltando: ['endereço', 'CPF/CNPJ'] });
   assert.deepStrictEqual(completudePoco({ latitude: -23, profundidadeM: 120, vazaoLh: null, nivelEstaticoM: 18, diametro: '6"', dataPerfuracao: null, idProprietario: 3, perfuradoPor: 'DESCONHECIDO' }),
     { pct: 86, faltando: ['vazão'] });                                       // data da perfuração não é cobrada de poço de origem desconhecida
+  assert.deepStrictEqual(completudePoco({ latitude: -23, profundidadeM: 120, vazaoLh: 3000, nivelEstaticoM: 18, diametro: '6"', dataPerfuracao: null, idProprietario: 3, perfuradoPor: 'DESCONHECIDO', temConjunto: false }).faltando,
+    ['bomba (conjunto)']);
 });
 
 const cliente = (x: Partial<ClienteParaPlano>): ClienteParaPlano => ({
@@ -58,4 +60,14 @@ teste('central de poços: estimativa do valor mensal', () => {
   assert.strictEqual(estimativaPlano({ pocos: 1, profundidadeMaxM: 60, temIot: false }, null, 600).valorMensal, 60);
   assert.strictEqual(estimativaPlano({ pocos: 1, profundidadeMaxM: 60, temIot: true }, null, 600).valorMensal, 100);
   assert.ok(estimativaPlano({ pocos: 0, profundidadeMaxM: null, temIot: false }, null, null).base.includes('valor padrão'));
+});
+
+teste('central de poços: bomba velha e trocas no plano mensal', () => {
+  const base = cliente({ temTelefone: false, avaliou: false, obrasConcluidas: 1, garantiaVencida: false });
+  const velha = propensaoPlano({ ...base, bombaMaisVelhaAnos: 6, trocasBomba: 2 });
+  assert.strictEqual(velha.pontos - propensaoPlano(base).pontos, 15);
+  assert.ok(velha.motivos.some(m => m.texto === 'Bomba com 6 anos de uso (perto da troca)'));
+  assert.ok(!propensaoPlano({ ...base, bombaMaisVelhaAnos: 4 }).motivos.some(m => m.texto.startsWith('Bomba com')));
+  // poço raso, mas a bomba já tem 5 anos: 2 visitas/ano
+  assert.strictEqual(estimativaPlano({ pocos: 1, profundidadeMaxM: 60, temIot: false, bombaMaisVelhaAnos: 5 }, null, 600).valorMensal, 115);
 });

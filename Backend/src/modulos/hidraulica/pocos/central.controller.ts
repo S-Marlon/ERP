@@ -13,6 +13,7 @@ import { carregarConfig, eventosDe, fotosPorEtapa, paraProcesso, regras } from '
 import {
   ClienteParaPlano, completudeCliente, completudePoco, estimativaPlano, faseDoContrato, pendenciasDoContrato, propensaoPlano,
 } from './central';
+import { idadeEmAnos } from './conjuntos';
 
 const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || req.body?.tenant_id || 1);
 const n = (v: unknown) => Number(v) || 0;
@@ -91,7 +92,10 @@ export const calcularCentral = async (tenant: number) => {
        WHERE p.tenant_id = ? AND p.situacao <> 'DESATIVADO'`, [tenant]);
     const [iot]: any = await pool.execute(`SELECT DISTINCT id_poco FROM modulo_hidraulica_pocos_dispositivos WHERE tenant_id = ? AND situacao = 'ATIVO'`, [tenant]);
     const [planos]: any = await pool.execute(`SELECT DISTINCT id_poco FROM modulo_hidraulica_pocos_planos_manutencao WHERE tenant_id = ? AND ativo = 1`, [tenant]);
+    const [conjuntos]: any = await pool.execute(
+      `SELECT id_poco, situacao, DATE_FORMAT(instalado_em, '%Y-%m-%d') AS instalado FROM modulo_hidraulica_pocos_conjuntos WHERE tenant_id = ?`, [tenant]);
     const comIot = new Set(iot.map((x: any) => Number(x.id_poco)));
+    const comConjunto = new Set(conjuntos.filter((k: any) => k.situacao === 'INSTALADO').map((k: any) => Number(k.id_poco)));
     const comPlano = new Set(planos.map((x: any) => Number(x.id_poco)));
 
     const completar = {
@@ -100,14 +104,14 @@ export const calcularCentral = async (tenant: number) => {
       pocos: pocos.map((p: any) => ({
         idPoco: Number(p.id_poco), identificacao: p.identificacao, proprietario: p.proprietario || null,
         ...completudePoco({ latitude: nulo(p.latitude), profundidadeM: nulo(p.profundidade_m), vazaoLh: nulo(p.vazao_lh), nivelEstaticoM: nulo(p.nivel_estatico_m),
-          diametro: p.diametro || null, dataPerfuracao: p.perfuracao_txt || null, idProprietario: nulo(p.id_proprietario), perfuradoPor: p.perfurado_por }),
+          diametro: p.diametro || null, dataPerfuracao: p.perfuracao_txt || null, idProprietario: nulo(p.id_proprietario), perfuradoPor: p.perfurado_por, temConjunto: p.situacao === 'ATIVO' ? comConjunto.has(Number(p.id_poco)) : undefined }),
       })).filter((p: any) => p.pct < 100).sort((a: any, b: any) => a.pct - b.pct),
       totalClientes: clientes.length, totalPocos: pocos.length, pct: 0,
     };
     const somaPct = clientes.reduce((s: number, c: any) => s + completudeCliente(c).pct, 0)
       + pocos.reduce((s: number, p: any) => s + completudePoco({ latitude: nulo(p.latitude), profundidadeM: nulo(p.profundidade_m), vazaoLh: nulo(p.vazao_lh),
         nivelEstaticoM: nulo(p.nivel_estatico_m), diametro: p.diametro || null, dataPerfuracao: p.perfuracao_txt || null, idProprietario: nulo(p.id_proprietario),
-        perfuradoPor: p.perfurado_por }).pct, 0);
+        perfuradoPor: p.perfurado_por, temConjunto: p.situacao === 'ATIVO' ? comConjunto.has(Number(p.id_poco)) : undefined }).pct, 0);
     completar.pct = clientes.length + pocos.length ? Math.round(somaPct / (clientes.length + pocos.length)) : 100;
 
     const avaliacoes = new Set<number>();
@@ -130,6 +134,9 @@ export const calcularCentral = async (tenant: number) => {
       const ultimaGarantia = garantias.sort().pop() || null;
       const ultimaObra = concluidas.map((o: any) => o.termino_txt).filter(Boolean).sort().pop() || null;
       const ultimaManut = manut.map((o: any) => o.termino_txt).filter(Boolean).sort().pop() || null;
+      const idsPocos = new Set(dele.map((p: any) => Number(p.id_poco)));
+      const conjDele = conjuntos.filter((k: any) => idsPocos.has(Number(k.id_poco)));
+      const idadesBomba = conjDele.filter((k: any) => k.situacao === 'INSTALADO' && k.instalado).map((k: any) => idadeEmAnos(k.instalado, hoje) as number);
       const dados: ClienteParaPlano = {
         pocos: dele.length, pocosNossos: nossos, idadeMaisVelhoAnos: idades.length ? Math.max(...idades) : null,
         profundidadeMaxM: profundidades.length ? Math.max(...profundidades) : null, obrasConcluidas: concluidas.length, obrasManutencao: manut.length,
@@ -138,6 +145,7 @@ export const calcularCentral = async (tenant: number) => {
         garantiaVencida: !!ultimaGarantia && ultimaGarantia < hoje, garantiaVencendoMeses: ultimaGarantia && ultimaGarantia >= hoje ? meses(hoje, ultimaGarantia) : null,
         avaliou: obrasDele.some((o: any) => avaliacoes.has(Number(o.id_obra))), temIot: dele.some((p: any) => comIot.has(Number(p.id_poco))),
         temPlanoManutencao: dele.some((p: any) => comPlano.has(Number(p.id_poco))), parcelasVencidas: obrasDele.reduce((s: number, o: any) => s + n(o.parcelas_vencidas), 0),
+        bombaMaisVelhaAnos: idadesBomba.length ? Math.max(...idadesBomba) : null, trocasBomba: conjDele.filter((k: any) => k.situacao === 'RETIRADO').length,
         temTelefone: !!c.telefone, obraAberta: obrasDele.some((o: any) => ['ORCAMENTO', 'AGUARDANDO_SINAL', 'EM_EXECUCAO'].includes(o.situacao)),
       };
       const visitaCliente = manut.filter((o: any) => ehVisita(lerServicos(o.servicos)) && n(o.valor_contratado) > 0);

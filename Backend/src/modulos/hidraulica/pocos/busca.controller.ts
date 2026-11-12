@@ -4,6 +4,8 @@ import { Request, Response } from 'express';
 import pool from '../../../infra/db';
 import { garantiaAte, lerServicos } from './obras';
 import { carregarPoco, formatarPoco, responderErro } from './obras.controller';
+import { idadeEmAnos, resumoConjunto } from './conjuntos';
+import { conjuntoDaLinha } from './conjuntosBanco';
 import { interpretarBusca, ordenarPorRelevancia, relatorioPreenchido, tipoDoContrato } from './busca';
 
 const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || req.body?.tenant_id || 1);
@@ -86,6 +88,9 @@ export const pocoCompleto = async (req: Request, res: Response) => {
               (SELECT COUNT(*) FROM modulo_hidraulica_pocos_aditivos ad WHERE ad.id_obra = o.id_obra) AS aditivos
        FROM modulo_hidraulica_pocos_obras o LEFT JOIN modulo_hidraulica_pocos_clientes c ON c.id_cliente = o.id_cliente
        WHERE o.id_poco = ? AND o.tenant_id = ? ORDER BY o.id_obra DESC`, [id, tenant]);
+    const [[conj]]: any = await pool.execute(
+      `SELECT *, DATE_FORMAT(instalado_em, '%Y-%m-%d') AS instalado_txt FROM modulo_hidraulica_pocos_conjuntos
+       WHERE id_poco = ? AND tenant_id = ? AND situacao = 'INSTALADO' ORDER BY id_conjunto DESC LIMIT 1`, [id, tenant]);
     const [[iot]]: any = await pool.execute(
       `SELECT COUNT(*) AS q FROM modulo_hidraulica_pocos_dispositivos WHERE id_poco = ? AND situacao = 'ATIVO'`, [id]);
 
@@ -108,6 +113,8 @@ export const pocoCompleto = async (req: Request, res: Response) => {
         cidade: dono.cidade ? `${dono.cidade}${dono.uf ? `/${dono.uf}` : ''}` : null } : null,
       contratos,
       resumo: { contratos: contratos.length, garantiaAte: garantia, emGarantia: !!garantia && garantia >= hoje, sensores: n(iot?.q) > 0 },
+      // bomba instalada agora (a ficha mostra numa linha; o detalhe fica na aba "Bomba e instalação")
+      conjunto: conj ? { resumo: resumoConjunto(conjuntoDaLinha(conj)), anosDeUso: idadeEmAnos(conj.instalado_txt || null, hoje) } : null,
     });
   } catch (e) { return responderErro(res, e, 'Erro ao abrir a ficha do poço.'); }
 };

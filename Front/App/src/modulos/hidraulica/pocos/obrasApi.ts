@@ -103,7 +103,7 @@ export const obrasApi = {
   salvarObra: (id: number, o: ObraForm) => pedir<Obra>(`${API}/obras/${id}?tenant_id=1`, corpo('PUT', o), 'Erro ao salvar a obra.'),
   salvarRelatorio: (id: number, dados: Dados) => pedir<{ salvoEm: string }>(`${API}/obras/${id}/relatorio?tenant_id=1`, corpo('PUT', { dados }), 'Erro ao salvar o relatório.'),
   mudarSituacao: (id: number, situacao: SituacaoObra, fechamento?: FechamentoContrato) =>
-    pedir<Obra & { pocoAtualizado: boolean }>(`${API}/obras/${id}/situacao?tenant_id=1`, corpo('POST', { situacao, ...fechamento }), 'Erro ao mudar a situação.'),
+    pedir<Obra & { pocoAtualizado: boolean; conjuntoRegistrado?: boolean }>(`${API}/obras/${id}/situacao?tenant_id=1`, corpo('POST', { situacao, ...fechamento }), 'Erro ao mudar a situação.'),
   definirContrato: (id: number, f: FechamentoContrato) => pedir<Obra>(`${API}/obras/${id}/contrato?tenant_id=1`, corpo('PUT', f), 'Erro ao registrar o contrato.'),
   pocos: (f: { busca?: string; idProprietario?: number | null } = {}) => pedir<Poco[]>(`${API}/pocos?${q(f)}`, undefined, 'Erro ao listar os poços.'),
   criarPoco: (p: PocoForm) => pedir<Poco>(`${API}/pocos?tenant_id=1`, corpo('POST', p), 'Erro ao cadastrar o poço.'),
@@ -559,6 +559,8 @@ export interface PocoCompleto {
     temRelatorio: boolean; garantiaAte: string | null;
   }[];
   resumo: { contratos: number; garantiaAte: string | null; emGarantia: boolean; sensores: boolean };
+  /** Bomba instalada agora, numa linha. */
+  conjunto?: { resumo: string; anosDeUso: number | null } | null;
 }
 
 export interface ClienteCompleto {
@@ -738,3 +740,41 @@ export const contarObras = (lista: Obra[]) => {
   return c;
 };
 export const dataBr = (s: string | null | undefined) => (s ? `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(0, 4)}` : '—');
+
+// ------------------------------------------------------------------ conjunto motobomba e fotos do poço
+export type TipoBomba = 'SUBMERSA' | 'INJETORA' | 'SUPERFICIE' | 'OUTRA';
+export const TIPOS_BOMBA: Record<TipoBomba, string> = { SUBMERSA: 'Submersa', INJETORA: 'Injetora', SUPERFICIE: 'Superfície', OUTRA: 'Outra' };
+export type TipoFotoPoco = 'BOMBA' | 'CABECA' | 'QUADRO' | 'LOCAL' | 'OUTRO';
+export const TIPOS_FOTO_POCO: Record<TipoFotoPoco, string> = { BOMBA: 'Bomba', CABECA: 'Cabeça do poço', QUADRO: 'Quadro de comando', LOCAL: 'Local', OUTRO: 'Outra' };
+/** O que vai no poço: bomba (ou motor + bombeador), tubo, fio, corda, quadro e cabeça do poço. */
+export interface ConjuntoForm {
+  instaladoEm: string | null; retiradoEm: string | null; bombaTipo: TipoBomba | null;
+  bombaMarca: string | null; bombaModelo: string | null; potenciaCv: number | null; tensao: string | null; estagios: number | null;
+  motorMarca: string | null; motorModelo: string | null; bombeadorMarca: string | null; bombeadorModelo: string | null;
+  profundidadeBombaM: number | null; tuboMaterial: string | null; tuboDiametro: string | null; tuboBarras: number | null; tuboMetros: number | null;
+  fioTipo: string | null; fioBitola: string | null; fioMetros: number | null; cordaMaterial: string | null; cordaMetros: number | null;
+  quadroComando: string | null; cabecaPoco: string | null; observacao: string | null;
+}
+export interface Conjunto extends ConjuntoForm {
+  idConjunto: number; idPoco: number; idObra: number | null; obra: string | null; situacao: 'INSTALADO' | 'RETIRADO';
+  /** "Submersa Ebara 1,5 CV · a 60 m · tubo PVC 1¼" (10 barras) · fio 4 mm² 70 m" */
+  resumo: string; anosDeUso: number | null; operador: string;
+}
+export interface FotoPoco { idFoto: number; tipo: TipoFotoPoco; idConjunto: number | null; url: string; legenda: string | null; tiradaEm: string | null; criadaEm: string; operador: string }
+export interface ConjuntoDoPoco {
+  atual: Conjunto | null; historico: Conjunto[]; fotos: FotoPoco[];
+  fotosDasObras: { idFoto: number; idObra: number; obra: string; etapa: EtapaFoto; url: string; legenda: string | null; criadaEm: string }[];
+}
+export const conjuntoApi = {
+  doPoco: (idPoco: number) => pedir<ConjuntoDoPoco>(`${API}/pocos/${idPoco}/conjunto?tenant_id=1`, undefined, 'Erro ao carregar a bomba do poço.'),
+  criar: (idPoco: number, c: Partial<ConjuntoForm> & { substituir?: boolean }) =>
+    pedir<Conjunto>(`${API}/pocos/${idPoco}/conjuntos?tenant_id=1`, corpo('POST', c), 'Erro ao registrar o conjunto.'),
+  salvar: (id: number, c: Partial<ConjuntoForm>) => pedir<Conjunto>(`${API}/conjuntos/${id}?tenant_id=1`, corpo('PUT', c), 'Erro ao salvar o conjunto.'),
+  retirar: (id: number, retiradoEm: string) => pedir<Conjunto>(`${API}/conjuntos/${id}/retirar?tenant_id=1`, corpo('POST', { retiradoEm }), 'Erro ao retirar o conjunto.'),
+  apagar: (id: number) => pedir<{ ok: boolean }>(`${API}/conjuntos/${id}?tenant_id=1`, { method: 'DELETE' }, 'Erro ao apagar o conjunto.'),
+  enviarFoto: (idPoco: number, f: { tipo: TipoFotoPoco; conteudo: string; nome: string; legenda?: string | null; tiradaEm?: string | null }) =>
+    pedir<{ idFoto: number; url: string }>(`${API}/pocos/${idPoco}/fotos?tenant_id=1`, corpo('POST', f), 'Erro ao enviar a foto.'),
+  salvarFoto: (id: number, f: { tipo: TipoFotoPoco; legenda: string | null; tiradaEm: string | null }) =>
+    pedir<{ ok: boolean }>(`${API}/pocos-fotos/${id}?tenant_id=1`, corpo('PUT', f), 'Erro ao salvar a foto.'),
+  apagarFoto: (id: number) => pedir<{ ok: boolean }>(`${API}/pocos-fotos/${id}?tenant_id=1`, { method: 'DELETE' }, 'Erro ao apagar a foto.'),
+};

@@ -39,6 +39,9 @@ import { central } from './central.controller';
 import { clienteCompleto } from './clienteCompleto.controller';
 import { buscar, pocoCompleto } from './busca.controller';
 import {
+  apagarConjunto, apagarFotoPoco, conjuntoDoPoco, criarConjunto, enviarFotoPoco, retirarConjunto, salvarConjunto, salvarFotoPoco,
+} from './conjuntos.controller';
+import {
   aditivosDaObra, apagarAditivo, criarOrcamento, duplicarOrcamento, emitirAditivo, itensDaObra, marcarAditivoAssinado, salvarItens,
 } from './orcamento.controller';
 import { analiseDoMapa, pocosDoMapa, potencialDoMapa, referenciasDoMapa, resumoMapa } from './mapa.controller';
@@ -128,6 +131,14 @@ router.delete('/aditivos/:id', apagarAditivo);
 router.get('/clientes/:id/completo', clienteCompleto);
 router.get('/busca', buscar);
 router.get('/pocos/:id/completo', pocoCompleto);
+router.get('/pocos/:id/conjunto', conjuntoDoPoco);
+router.post('/pocos/:id/conjuntos', criarConjunto);
+router.put('/conjuntos/:id', salvarConjunto);
+router.post('/conjuntos/:id/retirar', retirarConjunto);
+router.delete('/conjuntos/:id', apagarConjunto);
+router.post('/pocos/:id/fotos', enviarFotoPoco);
+router.put('/pocos-fotos/:id', salvarFotoPoco);
+router.delete('/pocos-fotos/:id', apagarFotoPoco);
 router.get('/processo/config', verConfig);
 router.put('/processo/config', salvarConfig);
 router.get('/processo/pendencias', pendencias);

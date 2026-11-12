@@ -72,6 +72,8 @@ export interface ClienteParaCompletar { telefone: string | null; documento: stri
 export interface PocoParaCompletar {
   latitude: number | null; profundidadeM: number | null; vazaoLh: number | null; nivelEstaticoM: number | null; diametro: string | null;
   dataPerfuracao: string | null; idProprietario: number | null; perfuradoPor: string;
+  /** Conjunto motobomba registrado (undefined = não conta, para quem chama sem essa informação). */
+  temConjunto?: boolean;
 }
 const completude = (itens: [string, boolean][]) => {
   const faltando = itens.filter(([, ok]) => !ok).map(([n]) => n);
@@ -81,10 +83,11 @@ const completude = (itens: [string, boolean][]) => {
 export const completudeCliente = (c: ClienteParaCompletar) => completude([
   ['telefone', !!c.telefone], ['cidade', !!c.cidade], ['endereço', !!c.endereco], ['CPF/CNPJ', !!c.documento],
 ]);
-/** Poço: dono, GPS (mapa), profundidade, vazão, nível estático, diâmetro e data da perfuração (para a manutenção e o plano). */
+/** Poço: dono, GPS (mapa), profundidade, vazão, nível estático, diâmetro, data da perfuração e a bomba (para a manutenção e o plano). */
 export const completudePoco = (p: PocoParaCompletar) => completude([
   ['dono', !!p.idProprietario], ['GPS', p.latitude !== null], ['profundidade', !!p.profundidadeM], ['vazão', !!p.vazaoLh],
   ['nível estático', p.nivelEstaticoM !== null], ['diâmetro', !!p.diametro], ['data da perfuração', !!p.dataPerfuracao || p.perfuradoPor === 'DESCONHECIDO'],
+  ...(p.temConjunto === undefined ? [] : [['bomba (conjunto)', p.temConjunto] as [string, boolean]]),
 ]);
 
 // ------------------------------------------------------------------ prévia do plano mensal
@@ -93,14 +96,20 @@ export interface ClienteParaPlano {
   obrasConcluidas: number; obrasManutencao: number; valorGasto: number; mesesDesdeUltimaObra: number | null; mesesDesdeUltimaManutencao: number | null;
   garantiaVencida: boolean; garantiaVencendoMeses: number | null; avaliou: boolean; temIot: boolean; temPlanoManutencao: boolean;
   parcelasVencidas: number; temTelefone: boolean; obraAberta: boolean;
+  /** Conjunto motobomba: anos da bomba instalada mais antiga e quantas trocas já houve nos poços do cliente. */
+  bombaMaisVelhaAnos?: number | null; trocasBomba?: number;
 }
 export interface MotivoPonto { texto: string; pontos: number }
 
 /** Pesos da chance de assinar o plano (somam no máximo 100; os negativos tiram). Calibrar com os primeiros planos. */
 export const PESOS_PLANO = {
   pocoNosso: 20, recorrencia: 15, garantiaAcabando: 15, pocoVelho: 10, pocoFundo: 5, relacionamento: 10, pagaEmDia: 10, iot: 10, cliente: 5,
+  bombaVelha: 10, trocaBomba: 5,
   inadimplente: -25, semTelefone: -15, semPoco: -30,
 };
+
+/** A partir de quantos anos de uso a bomba pede mais atenção (mais pontos e 2 visitas por ano). */
+export const BOMBA_VELHA_ANOS = 5;
 
 /**
  * Chance de o cliente assinar um plano mensal de manutenção/monitoramento: soma de pontos com o motivo de cada um.
@@ -116,6 +125,8 @@ export const propensaoPlano = (c: ClienteParaPlano) => {
   else if (c.garantiaVencendoMeses !== null && c.garantiaVencendoMeses <= 3) m.push({ texto: `Garantia vence em ${c.garantiaVencendoMeses} mês(es)`, pontos: P.garantiaAcabando });
   if (c.idadeMaisVelhoAnos !== null && c.idadeMaisVelhoAnos >= 3) m.push({ texto: `Poço com ${c.idadeMaisVelhoAnos} anos`, pontos: P.pocoVelho });
   if (c.profundidadeMaxM !== null && c.profundidadeMaxM >= 100) m.push({ texto: `Poço fundo (${c.profundidadeMaxM} m): manutenção mais cara de pagar de uma vez`, pontos: P.pocoFundo });
+  if ((c.bombaMaisVelhaAnos ?? 0) >= BOMBA_VELHA_ANOS) m.push({ texto: `Bomba com ${c.bombaMaisVelhaAnos} anos de uso (perto da troca)`, pontos: P.bombaVelha });
+  if (c.trocasBomba) m.push({ texto: `Já trocou a bomba ${c.trocasBomba}× (sabe o custo de uma troca)`, pontos: P.trocaBomba });
   if (c.avaliou) m.push({ texto: 'Avaliou a empresa', pontos: P.relacionamento });
   else if (c.obrasConcluidas >= 2) m.push({ texto: `${c.obrasConcluidas} obras concluídas com a gente`, pontos: P.relacionamento });
   if (c.obrasConcluidas && !c.parcelasVencidas) m.push({ texto: 'Paga em dia', pontos: P.pagaEmDia });
@@ -132,13 +143,13 @@ export const BASE_PLANO = { visitaPadrao: 600, margem: 0.15, monitoramento: 40, 
 
 /**
  * Estimativa do plano mensal: visitas preventivas por ano × valor de uma visita (a média do que o cliente já pagou em
- * manutenção, ou a média da empresa, ou o padrão) ÷ 12, mais a margem e o monitoramento. Poço fundo (≥ 100 m) ou mais
- * de um poço pede 2 visitas por ano. Devolve o valor, a faixa (±20%) e a base do cálculo em texto.
+ * manutenção, ou a média da empresa, ou o padrão) ÷ 12, mais a margem e o monitoramento. Poço fundo (≥ 100 m), mais
+ * de um poço ou bomba com 5 anos ou mais de uso pede 2 visitas por ano. Devolve o valor, a faixa (±20%) e a base do cálculo em texto.
  */
-export const estimativaPlano = (c: Pick<ClienteParaPlano, 'pocos' | 'profundidadeMaxM' | 'temIot'>, visitaDoCliente: number | null, visitaDaEmpresa: number | null) => {
+export const estimativaPlano = (c: Pick<ClienteParaPlano, 'pocos' | 'profundidadeMaxM' | 'temIot' | 'bombaMaisVelhaAnos'>, visitaDoCliente: number | null, visitaDaEmpresa: number | null) => {
   const visita = visitaDoCliente || visitaDaEmpresa || BASE_PLANO.visitaPadrao;
   const origem = visitaDoCliente ? 'média do que ele já pagou' : visitaDaEmpresa ? 'média das manutenções da empresa' : 'valor padrão';
-  const visitasAno = (c.profundidadeMaxM ?? 0) >= 100 || c.pocos > 1 ? 2 : 1;
+  const visitasAno = (c.profundidadeMaxM ?? 0) >= 100 || c.pocos > 1 || (c.bombaMaisVelhaAnos ?? 0) >= BOMBA_VELHA_ANOS ? 2 : 1;
   const pocosNoPlano = Math.max(1, c.pocos);
   const manutencao = (visita * visitasAno * pocosNoPlano) / 12 * (1 + BASE_PLANO.margem);
   // de 5 em 5 reais, o meio sobe (o + 1e-9 evita 57,49999… do ponto flutuante)

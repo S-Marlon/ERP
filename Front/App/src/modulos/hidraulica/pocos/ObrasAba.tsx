@@ -310,7 +310,7 @@ const ObraAberta: React.FC<{ idObra: number; parte?: ParteObra; onVoltar: () => 
     try {
       const r = await obrasApi.mudarSituacao(obra.idObra, s, fechamento);
       setFechando(null);
-      message.success(`Obra ${SITUACOES_OBRA[s].texto.toLowerCase()}.${r.pocoAtualizado ? ' A ficha do poço recebeu o que o relatório mediu.' : ''}`);
+      message.success(`Obra ${SITUACOES_OBRA[s].texto.toLowerCase()}.${r.pocoAtualizado ? ' A ficha do poço recebeu o que o relatório mediu.' : ''}${r.conjuntoRegistrado ? ' A bomba do relatório entrou como instalada no poço.' : ''}`);
       carregar();
       setVersaoCobranca(v => v + 1);
     } catch (e) { message.error(e instanceof Error ? e.message : 'Erro.'); }
