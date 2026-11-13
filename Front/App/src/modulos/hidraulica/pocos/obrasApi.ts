@@ -106,7 +106,8 @@ export const obrasApi = {
     pedir<Obra & { pocoAtualizado: boolean; conjuntoRegistrado?: boolean }>(`${API}/obras/${id}/situacao?tenant_id=1`, corpo('POST', { situacao, ...fechamento }), 'Erro ao mudar a situação.'),
   definirContrato: (id: number, f: FechamentoContrato) => pedir<Obra>(`${API}/obras/${id}/contrato?tenant_id=1`, corpo('PUT', f), 'Erro ao registrar o contrato.'),
   pocos: (f: { busca?: string; idProprietario?: number | null } = {}) => pedir<Poco[]>(`${API}/pocos?${q(f)}`, undefined, 'Erro ao listar os poços.'),
-  criarPoco: (p: PocoForm) => pedir<Poco>(`${API}/pocos?tenant_id=1`, corpo('POST', p), 'Erro ao cadastrar o poço.'),
+  /** conjunto: a motobomba já instalada (opcional, só ao criar). */
+  criarPoco: (p: PocoForm & { conjunto?: Partial<ConjuntoForm> | null }) => pedir<Poco>(`${API}/pocos?tenant_id=1`, corpo('POST', p), 'Erro ao cadastrar o poço.'),
   salvarPoco: (id: number, p: PocoForm) => pedir<Poco>(`${API}/pocos/${id}?tenant_id=1`, corpo('PUT', p), 'Erro ao salvar o poço.'),
   obrasDe: (f: { idCliente?: number; idPoco?: number }) => pedir<Obra[]>(`${API}/obras?${q(f)}`, undefined, 'Erro ao listar as obras.'),
   clientes: (busca = '', f: { cidade?: string; filtro?: FiltroClientes | null } = {}) =>

@@ -115,7 +115,7 @@ export const criarOrcamento = async (req: Request, res: Response) => {
       const [ins]: any = await conn.execute(
         `INSERT INTO modulo_hidraulica_pocos_pocos (tenant_id, identificacao, id_proprietario, endereco, cidade, uf, latitude, longitude, perfurado_por, operador)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'NOS', ?)`,
-        [tenant, String(b.local.identificacao || await nomeLivreDoPoco(conn, tenant, idCliente)).slice(0, 100), idCliente, String(b.local.endereco || '').slice(0, 150) || null,
+        [tenant, String(b.local.identificacao || await nomeLivreDoPoco(conn, tenant, idCliente, null, b.local.cidade || b.local.bairro || null)).slice(0, 100), idCliente, String(b.local.endereco || '').slice(0, 150) || null,
           String(b.local.cidade || cli.cidade || '').slice(0, 60) || null, String(b.local.uf || '').toUpperCase().slice(0, 2) || null, gps?.latitude ?? null, gps?.longitude ?? null, operador]);
       idPoco = Number(ins.insertId);
     }

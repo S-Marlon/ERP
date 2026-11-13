@@ -3,11 +3,12 @@
 import { Request, Response } from 'express';
 import pool from '../../../infra/db';
 import { operadorDe } from '../../../areas/vendas/caixa/caixa.controller';
-import { registrarConjuntoDaObra } from './conjuntosBanco';
+import { inserirConjunto, registrarConjuntoDaObra } from './conjuntosBanco';
+import { validarConjunto } from './conjuntos';
 import { bloqueioDoSinal } from './cobranca';
 import { acertarSinal, parcelaDoSinal } from './cobrancaBanco';
 import {
-  ErroObra, garantiaAte, lerServicos, podeIrPara, pocoDoRelatorio, proximasSituacoes, relatorioInicial, SituacaoObra, SITUACOES_OBRA, nomePadraoPoco, precisaFechamento, validarFechamento, validarObra, validarPoco,
+  ErroObra, garantiaAte, lerServicos, podeIrPara, pocoDoRelatorio, proximasSituacoes, relatorioInicial, SituacaoObra, SITUACOES_OBRA, nomePadraoPoco, nomePadraoPocoSemDono, precisaFechamento, validarFechamento, validarObra, validarPoco,
 } from './obras';
 
 const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || req.body?.tenant_id || 1);
@@ -56,9 +57,16 @@ export const listarPocos = async (req: Request, res: Response) => {
   } catch (e) { return responderErro(res, e, 'Erro ao listar os poços.'); }
 };
 
-/** Nome automático do poço do cliente ("Poço de <cliente>", "#2"...), sem contar o próprio poço ao editar. */
-export const nomeLivreDoPoco = async (conn: any, tenant: number, idCliente: number | null, ignorar: number | null = null) => {
-  if (!idCliente) return 'Poço sem nome';
+/**
+ * Nome automático do poço: do cliente ("Poço de <cliente>", "#2"...) ou, sem dono, pela cidade ("Poço (Igaratá) #1"),
+ * sem contar o próprio poço ao editar.
+ */
+export const nomeLivreDoPoco = async (conn: any, tenant: number, idCliente: number | null, ignorar: number | null = null, local: string | null = null) => {
+  if (!idCliente) {
+    const [rows]: any = await conn.execute(`SELECT identificacao FROM modulo_hidraulica_pocos_pocos WHERE tenant_id = ? AND identificacao LIKE 'Poço (%' AND id_poco <> ?`,
+      [tenant, ignorar || 0]);
+    return nomePadraoPocoSemDono(local, rows.map((r: any) => r.identificacao));
+  }
   const [[c]]: any = await conn.execute(`SELECT nome FROM modulo_hidraulica_pocos_clientes WHERE id_cliente = ? AND tenant_id = ?`, [idCliente, tenant]);
   const [rows]: any = await conn.execute(`SELECT identificacao FROM modulo_hidraulica_pocos_pocos WHERE id_proprietario = ? AND tenant_id = ? AND id_poco <> ?`,
     [idCliente, tenant, ignorar || 0]);
@@ -67,7 +75,7 @@ export const nomeLivreDoPoco = async (conn: any, tenant: number, idCliente: numb
 
 const gravarPoco = async (conn: any, tenant: number, b: any, id: number | null, operador: string) => {
   const p = validarPoco(b);
-  if (!p.identificacao) p.identificacao = await nomeLivreDoPoco(conn, tenant, p.idProprietario, id);
+  if (!p.identificacao) p.identificacao = await nomeLivreDoPoco(conn, tenant, p.idProprietario, id, p.cidade || p.bairro);
   const valores = [p.identificacao, p.idProprietario, p.endereco, p.bairro, p.cidade, p.uf, p.cep, p.latitude, p.longitude, p.profundidadeM, p.diametro,
     p.vazaoLh, p.nivelEstaticoM, p.nivelDinamicoM, p.tipoSolo, p.dataPerfuracao, p.perfuradoPor, p.perfuradoPorNome, p.situacao, p.observacao, operador];
   if (id) {
@@ -92,7 +100,11 @@ const gravarPoco = async (conn: any, tenant: number, b: any, id: number | null, 
 export const criarPoco = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
   try {
+    // motobomba já instalada (opcional): confere antes de gravar o poço, para não sobrar poço sem o conjunto
+    const temConjunto = req.body?.conjunto && Object.values(req.body.conjunto).some(v => v !== null && v !== undefined && String(v).trim() !== '');
+    const conjunto = temConjunto ? validarConjunto(req.body.conjunto, hojeLocal()) : null;
     const id = await gravarPoco(pool, tenant, req.body, null, operadorDe(req));
+    if (conjunto) await inserirConjunto(pool, tenant, id, null, { ...conjunto, retiradoEm: null }, operadorDe(req));
     return res.status(201).json(formatarPoco(await carregarPoco(tenant, id)));
   } catch (e) { return responderErro(res, e, 'Erro ao cadastrar o poço.'); }
 };

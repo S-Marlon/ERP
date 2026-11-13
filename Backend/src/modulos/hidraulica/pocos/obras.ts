@@ -113,10 +113,16 @@ export const nomePadraoPoco = (cliente: string | null | undefined, existentes: A
   for (let n = 2; ; n++) { const nome = `${base} #${n}`; if (!usados.has(nome.toLowerCase())) return nome; }
 };
 
+/** Poço sem dono e sem nome: "Poço (<cidade>) #1", "#2"... pela cidade (ou bairro); sem local, "Poço (sem local) #1". */
+export const nomePadraoPocoSemDono = (local: string | null | undefined, existentes: Array<string | null>) => {
+  const base = `Poço (${String(local || '').trim().replace(/\s+/g, ' ').slice(0, 80) || 'sem local'})`;
+  const usados = new Set(existentes.filter(Boolean).map(s => String(s).trim().toLowerCase()));
+  for (let n = 1; ; n++) { const nome = `${base} #${n}`; if (!usados.has(nome.toLowerCase())) return nome; }
+};
+
 export const validarPoco = (b: any) => {
-  // sem identificação, o poço do cliente ganha o nome automático ("Poço de <cliente>", "#2"...) ao gravar
+  // sem identificação, o poço ganha o nome automático ao gravar: "Poço de <cliente>" ou, sem dono, "Poço (<cidade>) #1"
   const identificacao = texto(b?.identificacao, 100);
-  if (!identificacao && !(Number(b?.idProprietario) > 0)) throw new ErroObra('Dê uma identificação ao poço ou escolha o proprietário (o nome sai automático: "Poço de <cliente>").');
   const gps = b?.latitude !== undefined && b?.latitude !== null && b?.latitude !== '' ? lerGps(`${b.latitude}, ${b.longitude}`) : lerGps(b?.gps);
   if ((b?.gps || b?.latitude) && !gps) throw new ErroObra('Localização (GPS) inválida: use "-23.550520, -46.633308".');
   const opcao = <T extends readonly string[]>(lista: T, v: unknown, padrao: T[number]): T[number] =>

@@ -284,3 +284,6 @@ Colunas novas: `incluso` em `_orcamento_itens`, `valor_parcelado` em `_obras`, `
   as emergências incluídas entram pelo uso esperado (30%); limpeza vira desconto (feita quando precisa) e o desconto em
   bomba e material fica separado; "atendimento prioritário" é marcação sem custo. Planos refeitos: Essencial (1 preventiva/ano),
   Completo (a cada 6 meses, prioridade, 1 emergência) e Monitorado (+ sensores).
+- **Poço sem dono** (2026-11-13): sem nome e sem proprietário vira "Poço (<cidade>) #1", "#2"... (pela cidade ou bairro;
+  sem local, "Poço (sem local) #1") — `nomePadraoPocoSemDono`. O cadastro do poço ganhou o **CEP** e, no poço novo, a
+  **motobomba instalada** (opcional, os mesmos campos do conjunto); no poço já cadastrado, o botão leva à ficha › Bomba e instalação.

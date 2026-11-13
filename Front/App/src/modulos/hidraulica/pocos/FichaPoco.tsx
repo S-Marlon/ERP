@@ -16,13 +16,13 @@ const { Text } = Typography;
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const SITUACAO_POCO: Record<string, { texto: string; cor: string }> = { ATIVO: { texto: 'Ativo', cor: 'green' }, SECO: { texto: 'Seco', cor: 'default' }, DESATIVADO: { texto: 'Desativado', cor: 'default' } };
 
-export const FichaPoco: React.FC<{ idPoco: number | null; onFechar: () => void }> = ({ idPoco, onFechar }) => {
+export const FichaPoco: React.FC<{ idPoco: number | null; aba?: string; onFechar: () => void }> = ({ idPoco, aba: abaPedida, onFechar }) => {
   const [d, setD] = useState<PocoCompleto | null>(null);
   const [aba, setAba] = useState('DADOS');
   useEffect(() => {
     setD(null);
     if (!idPoco) return;
-    obrasApi.pocoCompleto(idPoco).then(r => { setD(r); setAba(r.contratos.length ? 'CONTRATOS' : 'DADOS'); }).catch(e => message.error(e.message));
+    obrasApi.pocoCompleto(idPoco).then(r => { setD(r); setAba(abaPedida || (r.contratos.length ? 'CONTRATOS' : 'DADOS')); }).catch(e => message.error(e.message));
   }, [idPoco]);
   const ir = (fn: () => void) => { onFechar(); fn(); };
   const p = d?.poco, dono = d?.proprietario;
@@ -156,7 +156,7 @@ export const FichasPocos: React.FC = () => {
   const fechar = () => fichasPocos.abrir(null);
   return (
     <>
-      <FichaPoco idPoco={f?.tipo === 'POCO' ? f.id : null} onFechar={fechar} />
+      <FichaPoco idPoco={f?.tipo === 'POCO' ? f.id : null} aba={f?.aba} onFechar={fechar} />
       <ClienteFicha idCliente={f?.tipo === 'CLIENTE' ? f.id : null} onFechar={fechar} onSalvo={() => undefined} />
     </>
   );

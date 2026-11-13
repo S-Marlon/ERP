@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { garantiaAte, lerGps, nomePadraoPoco, precisaFechamento, validarFechamento, lerServicos, podeIrPara, pocoDoRelatorio, relatorioInicial, validarCliente, validarObra, validarPoco } from './obras';
+import { garantiaAte, lerGps, nomePadraoPoco, nomePadraoPocoSemDono, precisaFechamento, validarFechamento, lerServicos, podeIrPara, pocoDoRelatorio, relatorioInicial, validarCliente, validarObra, validarPoco } from './obras';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -35,7 +35,7 @@ teste('obras de poços: ficha do poço e GPS', () => {
   const p = validarPoco({ identificacao: ' Sítio  São José - poço 1 ', gps: '-23.05, -47.04', uf: 'sp', perfuradoPor: 'terceiro', profundidadeM: '150' });
   assert.deepStrictEqual([p.identificacao, p.latitude, p.longitude, p.uf, p.perfuradoPor, p.profundidadeM, p.situacao],
     ['Sítio São José - poço 1', -23.05, -47.04, 'SP', 'TERCEIRO', 150, 'ATIVO']);
-  assert.throws(() => validarPoco({}), /identificação/);
+  assert.strictEqual(validarPoco({}).identificacao, null, 'sem nome: sai automático ao gravar');
   assert.throws(() => validarPoco({ identificacao: 'P1', gps: 'sem número' }), /GPS/);
 });
 
@@ -72,7 +72,7 @@ teste('poço sem nome: "Poço de <cliente>" e depois #2', () => {
   assert.strictEqual(nomePadraoPoco(null, []), 'Poço de cliente');
   assert.ok(nomePadraoPoco('X'.repeat(200), []).length <= 94);
   assert.strictEqual(validarPoco({ identificacao: '', idProprietario: 5 }).identificacao, null);
-  assert.throws(() => validarPoco({ identificacao: '' }), /proprietário/);
+  assert.strictEqual(validarPoco({ identificacao: '', cidade: 'Igaratá' }).identificacao, null, 'sem dono: nome pela cidade');
 });
 
 teste('fechamento do contrato: escrito ou informal', () => {
@@ -86,4 +86,12 @@ teste('fechamento do contrato: escrito ou informal', () => {
   assert.strictEqual(precisaFechamento('ORCAMENTO', 'EM_EXECUCAO', 'ESCRITO'), false);
   assert.strictEqual(precisaFechamento('ORCAMENTO', 'CANCELADA', null), false);
   assert.strictEqual(precisaFechamento('AGUARDANDO_SINAL', 'EM_EXECUCAO', null), false, 'obra antiga já fechada segue sem travar');
+});
+
+teste('poço sem dono: "Poço (<cidade>) #1", "#2"...', () => {
+  assert.strictEqual(nomePadraoPocoSemDono('Igaratá', []), 'Poço (Igaratá) #1');
+  assert.strictEqual(nomePadraoPocoSemDono(' Igaratá ', ['Poço (Igaratá) #1', 'poço (igaratá) #2', 'Poço (Atibaia) #1']), 'Poço (Igaratá) #3');
+  assert.strictEqual(nomePadraoPocoSemDono('Atibaia', ['Poço (Igaratá) #1']), 'Poço (Atibaia) #1');
+  assert.strictEqual(nomePadraoPocoSemDono(null, []), 'Poço (sem local) #1');
+  assert.ok(nomePadraoPocoSemDono('X'.repeat(200), []).length <= 100);
 });

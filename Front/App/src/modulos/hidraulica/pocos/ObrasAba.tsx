@@ -3,18 +3,20 @@
 // a ficha dos poços e os clientes de poço. "Ver no mapa" leva à aba do mapa (etapa 2) já no ponto.
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Alert, Button, Card, Checkbox, Col, Descriptions, Empty, Flex, Input, InputNumber, Modal, Popconfirm, Row, Segmented, Select, Space, Statistic, Steps, Table, Tag, Tooltip, Typography, message,
+  Alert, Button, Card, Checkbox, Col, Descriptions, Empty, Flex, Form, Input, InputNumber, Modal, Popconfirm, Row, Segmented, Select, Space, Statistic, Steps, Switch, Table, Tag, Tooltip,
+  Typography, message,
 } from 'antd';
 import {
   AimOutlined, ArrowRightOutlined, CalculatorOutlined, CalendarOutlined, CheckCircleOutlined, EditOutlined, EnvironmentOutlined, PlusOutlined, ReloadOutlined,
-  UserOutlined,
+  ToolOutlined, UserOutlined,
 } from '@ant-design/icons';
 import {
-  centralApi, ContratoCentral, contarObras, dataBr, FechamentoContrato, foneBr, GRAVIDADES, Obra, ObraForm, obrasApi, Poco, PocoForm, Servico, SERVICOS, SituacaoObra, SITUACOES_OBRA,
+  centralApi, ConjuntoForm, ContratoCentral, contarObras, dataBr, FechamentoContrato, foneBr, GRAVIDADES, Obra, ObraForm, obrasApi, Poco, PocoForm, Servico, SERVICOS, SituacaoObra, SITUACOES_OBRA,
 } from './obrasApi';
 import RelatorioPocoPage from './RelatorioPocoPage';
 import { ClientePocoModal, ListaClientes } from './ClientesPoco';
 import { FechamentoModal } from './FechamentoContrato';
+import { CamposConjunto } from './ConjuntoPoco';
 import { AReceberObras, CobrancaDaObra } from './CobrancaObra';
 import { CadastroMateriais, MateriaisDaObra } from './MateriaisObra';
 import { HistoricoDoPoco } from './ManutencaoPocos';
@@ -39,6 +41,9 @@ const obraVazia = (): ObraForm => ({
 });
 
 /** Campos de endereço e GPS do poço (usados no poço novo da obra e na ficha). */
+/** CEP enquanto digita: só números, com o traço depois do 5º. */
+const formatarCep = (v: string) => { const d = v.replace(/\D/g, '').slice(0, 8); return d ? (d.length > 5 ? `${d.slice(0, 5)}-${d.slice(5)}` : d) : null; };
+
 const CamposLocal: React.FC<{ p: Partial<PocoForm>; mudar: (x: Partial<PocoForm>) => void }> = ({ p, mudar }) => {
   const obterGps = () => navigator.geolocation?.getCurrentPosition(
     pos => mudar({ gps: `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}` }),
@@ -48,9 +53,10 @@ const CamposLocal: React.FC<{ p: Partial<PocoForm>; mudar: (x: Partial<PocoForm>
     <Row gutter={8}>
       <Col span={14}><Text>Endereço</Text><Input value={p.endereco || ''} onChange={e => mudar({ endereco: e.target.value || null })} placeholder="Estrada Municipal, km 4" /></Col>
       <Col span={10}><Text>Bairro</Text><Input value={p.bairro || ''} onChange={e => mudar({ bairro: e.target.value || null })} /></Col>
-      <Col span={10}><Text>Cidade</Text><Input value={p.cidade || ''} onChange={e => mudar({ cidade: e.target.value || null })} /></Col>
-      <Col span={4}><Text>UF</Text><Input maxLength={2} value={p.uf || ''} onChange={e => mudar({ uf: e.target.value.toUpperCase() || null })} /></Col>
-      <Col span={10}>
+      <Col span={8}><Text>Cidade</Text><Input value={p.cidade || ''} onChange={e => mudar({ cidade: e.target.value || null })} /></Col>
+      <Col span={3}><Text>UF</Text><Input maxLength={2} value={p.uf || ''} onChange={e => mudar({ uf: e.target.value.toUpperCase() || null })} /></Col>
+      <Col span={5}><Text>CEP</Text><Input maxLength={9} value={p.cep || ''} placeholder="00000-000" onChange={e => mudar({ cep: formatarCep(e.target.value) })} /></Col>
+      <Col span={8}>
         <Text>Localização (GPS)</Text>
         <Input value={p.gps || ''} onChange={e => mudar({ gps: e.target.value || null })} placeholder="-23.550520, -46.633308"
           suffix={<Button type="link" size="small" icon={<EnvironmentOutlined />} onClick={obterGps}>Obter</Button>} />
@@ -64,9 +70,14 @@ const PocoModal: React.FC<{ poco: Poco | 'novo' | null; onFechar: () => void; on
   const [cliente, setCliente] = useState<{ id: number; nome: string } | null>(null);
   const [escolhendo, setEscolhendo] = useState(false);
   const [parte, setParte] = useState<'FICHA' | 'HISTORICO'>('FICHA');
+  // motobomba já instalada (só no poço novo; depois fica na ficha do poço › Bomba e instalação)
+  const [formBomba] = Form.useForm<ConjuntoForm>();
+  const [comBomba, setComBomba] = useState(false);
   useEffect(() => {
     if (!poco) return;
     setParte('FICHA');
+    setComBomba(false);
+    formBomba.resetFields();
     if (poco === 'novo') { setP(pocoVazio()); setCliente(null); return; }
     setP({ ...poco, gps: poco.latitude !== null && poco.longitude !== null ? `${poco.latitude}, ${poco.longitude}` : null });
     setCliente(poco.idProprietario ? { id: poco.idProprietario, nome: poco.proprietario || '' } : null);
@@ -78,8 +89,11 @@ const PocoModal: React.FC<{ poco: Poco | 'novo' | null; onFechar: () => void; on
   const salvar = async () => {
     try {
       const dados = { ...p, idProprietario: cliente?.id ?? null };
-      if (poco === 'novo') await obrasApi.criarPoco(dados); else if (poco) await obrasApi.salvarPoco(poco.idPoco, dados);
-      message.success('Poço salvo.');
+      if (poco === 'novo') {
+        const conjunto = comBomba ? formBomba.getFieldsValue() : null;
+        const novo = await obrasApi.criarPoco({ ...dados, conjunto });
+        message.success(`Poço salvo: ${novo.identificacao}${conjunto ? ' (com a motobomba)' : ''}.`);
+      } else if (poco) { await obrasApi.salvarPoco(poco.idPoco, dados); message.success('Poço salvo.'); }
       onSalvo();
     } catch (e) { message.error(e instanceof Error ? e.message : 'Erro.'); }
   };
@@ -100,9 +114,12 @@ const PocoModal: React.FC<{ poco: Poco | 'novo' | null; onFechar: () => void; on
             {poco.idProprietario && <Button size="small" icon={<UserOutlined />} onClick={() => { onFechar(); abrirFichaCliente(poco.idProprietario!); }}>Ficha do cliente</Button>}
           </Space>
         )}
+        {poco && poco !== 'novo' && (
+          <Button size="small" icon={<ToolOutlined />} onClick={() => { onFechar(); abrirFichaPoco(poco.idPoco, 'BOMBA'); }}>Motobomba e fotos do poço</Button>
+        )}
         <Row gutter={8}>
           <Col span={14}><Text>Identificação</Text><Input maxLength={100} value={p.identificacao} onChange={e => mudar({ identificacao: e.target.value })}
-            placeholder={cliente ? `Vazio = "Poço de ${cliente.nome}"` : 'Ex.: Sítio São José - poço 1'} /></Col>
+            placeholder={cliente ? `Vazio = "Poço de ${cliente.nome}"` : p.cidade || p.bairro ? `Vazio = "Poço (${p.cidade || p.bairro}) #1"` : 'Vazio = "Poço (cidade) #1"'} /></Col>
           <Col span={10}>
             <Text>Proprietário</Text>
             <Button block icon={<UserOutlined />} onClick={() => setEscolhendo(true)}>{cliente?.nome || 'Escolher no cadastro'}</Button>
@@ -131,6 +148,16 @@ const PocoModal: React.FC<{ poco: Poco | 'novo' | null; onFechar: () => void; on
           </Col>
           {p.perfuradoPor === 'TERCEIRO' && <Col span={16}><Text>Empresa que perfurou</Text><Input value={p.perfuradoPorNome || ''} onChange={e => mudar({ perfuradoPorNome: e.target.value || null })} /></Col>}
         </Row>
+        {poco === 'novo' && (
+          <Card size="small" title={<Space><ToolOutlined />Motobomba instalada</Space>}
+            extra={<Switch size="small" checked={comBomba} onChange={setComBomba} checkedChildren="informar" unCheckedChildren="não sei agora" />}>
+            {comBomba ? (
+              <Form form={formBomba} layout="vertical" size="small" initialValues={{ bombaTipo: 'SUBMERSA' }}>
+                <CamposConjunto comDataDeInstalacao />
+              </Form>
+            ) : <Text type="secondary">Bomba, motor/bombeador, tubo, fio, corda, quadro e cabeça do poço. Dá para informar depois na ficha do poço.</Text>}
+          </Card>
+        )}
       </Space>
       )}
       <ClientePocoModal open={escolhendo} onFechar={() => setEscolhendo(false)}

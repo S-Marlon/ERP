@@ -31,6 +31,64 @@ const TITULOS: Record<Modo, string> = {
   ANTIGO: 'Registrar um conjunto que já saiu do poço',
 };
 
+/** Campos de um conjunto (dentro de um <Form>): o modal do conjunto e o "Novo poço" usam os mesmos. */
+const data = (label: string, name: keyof ConjuntoForm, obrigatoria = false) => (
+  <Form.Item label={label} name={name} rules={obrigatoria ? [{ required: true, message: 'Informe a data.' }] : undefined}
+    getValueFromEvent={e => e.target.value || null}>
+    <Input type="date" max={hojeIso()} />
+  </Form.Item>
+);
+const texto = (label: string, name: keyof ConjuntoForm, placeholder?: string, lista?: { value: string }[]) => (
+  <Form.Item label={label} name={name} normalize={v => (v ? v : null)}>
+    {lista ? <AutoComplete options={lista} placeholder={placeholder} allowClear filterOption={(t, o) => String(o?.value).toLowerCase().includes(t.toLowerCase())} />
+      : <Input placeholder={placeholder} />}
+  </Form.Item>
+);
+const numero = (label: string, name: keyof ConjuntoForm, sufixo?: string, passo = 1) => (
+  <Form.Item label={label} name={name}><InputNumber min={0} step={passo} decimalSeparator="," style={{ width: '100%' }} suffix={sufixo} /></Form.Item>
+);
+export const CamposConjunto: React.FC<{ comDataDeInstalacao?: boolean }> = ({ comDataDeInstalacao }) => (
+  <>
+      {comDataDeInstalacao && <Row gutter={10}><Col xs={12} md={6}>{data('Instalado em', 'instaladoEm')}</Col></Row>}
+      <Divider titlePlacement="start" plain style={{ margin: '4px 0 8px' }}>Bomba</Divider>
+      <Row gutter={10}>
+        <Col xs={12} md={6}><Form.Item label="Tipo" name="bombaTipo"><Select allowClear options={Object.entries(TIPOS_BOMBA).map(([value, label]) => ({ value, label }))} /></Form.Item></Col>
+        <Col xs={12} md={6}>{texto('Marca', 'bombaMarca', 'Ebara, Leão, Schneider')}</Col>
+        <Col xs={12} md={6}>{texto('Modelo', 'bombaModelo', '4BPS3-12')}</Col>
+        <Col xs={12} md={6}>{numero('Potência', 'potenciaCv', 'CV', 0.5)}</Col>
+        <Col xs={12} md={6}>{texto('Tensão', 'tensao', '220 V mono', TENSOES)}</Col>
+        <Col xs={12} md={6}>{numero('Estágios', 'estagios')}</Col>
+        <Col xs={12} md={6}>{numero('Profundidade da bomba', 'profundidadeBombaM', 'm')}</Col>
+      </Row>
+      <Divider titlePlacement="start" plain style={{ margin: '4px 0 8px' }}>Motor e bombeador <Text type="secondary" style={{ fontSize: 12 }}>(quando são peças separadas)</Text></Divider>
+      <Row gutter={10}>
+        <Col xs={12} md={6}>{texto('Motor: marca', 'motorMarca', 'Franklin, WEG')}</Col>
+        <Col xs={12} md={6}>{texto('Motor: modelo', 'motorModelo')}</Col>
+        <Col xs={12} md={6}>{texto('Bombeador: marca', 'bombeadorMarca')}</Col>
+        <Col xs={12} md={6}>{texto('Bombeador: modelo', 'bombeadorModelo', '3BPS2-14')}</Col>
+      </Row>
+      <Divider titlePlacement="start" plain style={{ margin: '4px 0 8px' }}>Tubo, fio e corda</Divider>
+      <Row gutter={10}>
+        <Col xs={12} md={6}>{texto('Tubo: material', 'tuboMaterial', 'PVC geomecânico', MATERIAIS_TUBO)}</Col>
+        <Col xs={12} md={6}>{texto('Tubo: diâmetro', 'tuboDiametro', '1 1/4"')}</Col>
+        <Col xs={12} md={6}>{numero('Tubo: barras', 'tuboBarras')}</Col>
+        <Col xs={12} md={6}>{numero('Tubo: metros', 'tuboMetros', 'm')}</Col>
+        <Col xs={12} md={6}>{texto('Fio: tipo', 'fioTipo', 'Cabo PP', FIOS)}</Col>
+        <Col xs={12} md={6}>{texto('Fio: bitola', 'fioBitola', '3 x 4 mm²', BITOLAS)}</Col>
+        <Col xs={12} md={6}>{numero('Fio: metros', 'fioMetros', 'm')}</Col>
+        <Col xs={12} md={6} />
+        <Col xs={12} md={6}>{texto('Corda', 'cordaMaterial', 'Corda de nylon 10 mm', CORDAS)}</Col>
+        <Col xs={12} md={6}>{numero('Corda: metros', 'cordaMetros', 'm')}</Col>
+      </Row>
+      <Divider titlePlacement="start" plain style={{ margin: '4px 0 8px' }}>Quadro e cabeça do poço</Divider>
+      <Row gutter={10}>
+        <Col xs={24} md={12}>{texto('Quadro de comando', 'quadroComando', 'Chave de partida, relé de nível, boia')}</Col>
+        <Col xs={24} md={12}>{texto('Cabeça do poço', 'cabecaPoco', 'Curva 90°, válvula de retenção, registro, manômetro, tampa')}</Col>
+        <Col xs={24}>{texto('Observação', 'observacao')}</Col>
+      </Row>
+  </>
+);
+
 const ConjuntoModal: React.FC<{
   aberto: { modo: Modo; base?: Conjunto | null } | null; idPoco: number; onFechar: () => void; onSalvo: () => void;
 }> = ({ aberto, idPoco, onFechar, onSalvo }) => {
@@ -61,21 +119,6 @@ const ConjuntoModal: React.FC<{
       onSalvo();
     } catch (e) { erro(e); } finally { setSalvando(false); }
   };
-  const data = (label: string, name: keyof ConjuntoForm, obrigatoria = false) => (
-    <Form.Item label={label} name={name} rules={obrigatoria ? [{ required: true, message: 'Informe a data.' }] : undefined}
-      getValueFromEvent={e => e.target.value || null}>
-      <Input type="date" max={hojeIso()} />
-    </Form.Item>
-  );
-  const texto = (label: string, name: keyof ConjuntoForm, placeholder?: string, lista?: { value: string }[]) => (
-    <Form.Item label={label} name={name} normalize={v => (v ? v : null)}>
-      {lista ? <AutoComplete options={lista} placeholder={placeholder} allowClear filterOption={(t, o) => String(o?.value).toLowerCase().includes(t.toLowerCase())} />
-        : <Input placeholder={placeholder} />}
-    </Form.Item>
-  );
-  const numero = (label: string, name: keyof ConjuntoForm, sufixo?: string, passo = 1) => (
-    <Form.Item label={label} name={name}><InputNumber min={0} step={passo} decimalSeparator="," style={{ width: '100%' }} suffix={sufixo} /></Form.Item>
-  );
   const comRetirada = modo === 'ANTIGO' || (modo === 'EDITAR' && aberto?.base?.situacao === 'RETIRADO');
 
   return (
@@ -87,42 +130,7 @@ const ConjuntoModal: React.FC<{
           <Col xs={12} md={6}>{data('Instalado em', 'instaladoEm')}</Col>
           {comRetirada && <Col xs={12} md={6}>{data('Retirado em', 'retiradoEm', modo === 'ANTIGO')}</Col>}
         </Row>
-        <Divider titlePlacement="start" plain style={{ margin: '4px 0 8px' }}>Bomba</Divider>
-        <Row gutter={10}>
-          <Col xs={12} md={6}><Form.Item label="Tipo" name="bombaTipo"><Select allowClear options={Object.entries(TIPOS_BOMBA).map(([value, label]) => ({ value, label }))} /></Form.Item></Col>
-          <Col xs={12} md={6}>{texto('Marca', 'bombaMarca', 'Ebara, Leão, Schneider')}</Col>
-          <Col xs={12} md={6}>{texto('Modelo', 'bombaModelo', '4BPS3-12')}</Col>
-          <Col xs={12} md={6}>{numero('Potência', 'potenciaCv', 'CV', 0.5)}</Col>
-          <Col xs={12} md={6}>{texto('Tensão', 'tensao', '220 V mono', TENSOES)}</Col>
-          <Col xs={12} md={6}>{numero('Estágios', 'estagios')}</Col>
-          <Col xs={12} md={6}>{numero('Profundidade da bomba', 'profundidadeBombaM', 'm')}</Col>
-        </Row>
-        <Divider titlePlacement="start" plain style={{ margin: '4px 0 8px' }}>Motor e bombeador <Text type="secondary" style={{ fontSize: 12 }}>(quando são peças separadas)</Text></Divider>
-        <Row gutter={10}>
-          <Col xs={12} md={6}>{texto('Motor: marca', 'motorMarca', 'Franklin, WEG')}</Col>
-          <Col xs={12} md={6}>{texto('Motor: modelo', 'motorModelo')}</Col>
-          <Col xs={12} md={6}>{texto('Bombeador: marca', 'bombeadorMarca')}</Col>
-          <Col xs={12} md={6}>{texto('Bombeador: modelo', 'bombeadorModelo', '3BPS2-14')}</Col>
-        </Row>
-        <Divider titlePlacement="start" plain style={{ margin: '4px 0 8px' }}>Tubo, fio e corda</Divider>
-        <Row gutter={10}>
-          <Col xs={12} md={6}>{texto('Tubo: material', 'tuboMaterial', 'PVC geomecânico', MATERIAIS_TUBO)}</Col>
-          <Col xs={12} md={6}>{texto('Tubo: diâmetro', 'tuboDiametro', '1 1/4"')}</Col>
-          <Col xs={12} md={6}>{numero('Tubo: barras', 'tuboBarras')}</Col>
-          <Col xs={12} md={6}>{numero('Tubo: metros', 'tuboMetros', 'm')}</Col>
-          <Col xs={12} md={6}>{texto('Fio: tipo', 'fioTipo', 'Cabo PP', FIOS)}</Col>
-          <Col xs={12} md={6}>{texto('Fio: bitola', 'fioBitola', '3 x 4 mm²', BITOLAS)}</Col>
-          <Col xs={12} md={6}>{numero('Fio: metros', 'fioMetros', 'm')}</Col>
-          <Col xs={12} md={6} />
-          <Col xs={12} md={6}>{texto('Corda', 'cordaMaterial', 'Corda de nylon 10 mm', CORDAS)}</Col>
-          <Col xs={12} md={6}>{numero('Corda: metros', 'cordaMetros', 'm')}</Col>
-        </Row>
-        <Divider titlePlacement="start" plain style={{ margin: '4px 0 8px' }}>Quadro e cabeça do poço</Divider>
-        <Row gutter={10}>
-          <Col xs={24} md={12}>{texto('Quadro de comando', 'quadroComando', 'Chave de partida, relé de nível, boia')}</Col>
-          <Col xs={24} md={12}>{texto('Cabeça do poço', 'cabecaPoco', 'Curva 90°, válvula de retenção, registro, manômetro, tampa')}</Col>
-          <Col xs={24}>{texto('Observação', 'observacao')}</Col>
-        </Row>
+        <CamposConjunto />
       </Form>
     </Modal>
   );
