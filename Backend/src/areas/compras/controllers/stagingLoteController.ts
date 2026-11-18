@@ -18,6 +18,7 @@ import {
   lerMapeamento,
   LoteRow,
   PenteFinoContexto,
+  DadosItemVinculado,
   StagingItemRow,
   STATUS_LOTE_FINALIZADO,
 } from '../staging/penteFino';
@@ -75,12 +76,25 @@ const montarContexto = async (conn: Conn, tenant: number, lote: any, itens: Stag
   const skus = [...new Set(itens.filter(isItemNovo).map(i => skuCustomizadoPlanejado(i)).filter((s): s is string => !!s))];
 
   const idsItensExistentes = new Set<number>();
+  const itensVinculados = new Map<number, DadosItemVinculado>();
   if (ids.length > 0) {
     const [rows] = await conn.execute(
-      `SELECT id_item FROM itens_core WHERE tenant_id = ? AND id_item IN (${ids.map(() => '?').join(',')})`,
+      `SELECT ic.id_item, um.sigla AS unidade_base, es.custo_medio, cpd.custo_gerencial
+       FROM itens_core ic
+       LEFT JOIN itens_unidades_medida um ON um.id_unidade = ic.id_unidade
+       LEFT JOIN comercial_produtos_dados cpd ON cpd.id_item = ic.id_item AND cpd.tenant_id = ic.tenant_id
+       LEFT JOIN estoque_saldos_itens es ON es.id_item = ic.id_item AND es.tenant_id = ic.tenant_id AND es.deposito = 'VENDA'
+       WHERE ic.tenant_id = ? AND ic.id_item IN (${ids.map(() => '?').join(',')})`,
       [tenant, ...ids]
     );
-    rows.forEach((r: any) => idsItensExistentes.add(Number(r.id_item)));
+    rows.forEach((r: any) => {
+      idsItensExistentes.add(Number(r.id_item));
+      itensVinculados.set(Number(r.id_item), {
+        unidadeBase: r.unidade_base || null,
+        custoMedio: r.custo_medio !== null ? Number(r.custo_medio) : null,
+        custoGerencial: r.custo_gerencial !== null ? Number(r.custo_gerencial) : null,
+      });
+    });
   }
 
   const skusExistentes = new Set<string>();
@@ -110,7 +124,7 @@ const montarContexto = async (conn: Conn, tenant: number, lote: any, itens: Stag
   const idFornecedor = await buscarFornecedorId(conn, lote.cnpj_fornecedor, tenant);
   const unidades = await carregarResolvedor(conn, tenant, idFornecedor);
   const cobranca = await situacaoCobrancaDoLote(conn, tenant, lote);
-  const ctx: PenteFinoContexto = { idsItensExistentes, skusExistentes, fornecedorCadastrado: idFornecedor !== null, gtinsEmUso, unidades, cobranca };
+  const ctx: PenteFinoContexto = { idsItensExistentes, skusExistentes, fornecedorCadastrado: idFornecedor !== null, gtinsEmUso, unidades, cobranca, itensVinculados };
   return { ctx, idFornecedor };
 };
 

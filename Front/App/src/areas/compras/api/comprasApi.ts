@@ -230,7 +230,7 @@ export const aprovarLoteStaging = async (loteId: number, tenantId: number = 1): 
 
 export const sugerirVinculos = async (
     cnpj: string,
-    itens: Array<{ chave: string; codigo?: string; ean?: string }>,
+    itens: Array<{ chave: string; codigo?: string; ean?: string; unidade?: string }>,
     tenantId: number = 1
 ): Promise<{ fornecedorCadastrado: boolean; sugestoes: Record<string, any> }> => {
     if (itens.length === 0) return { fornecedorCadastrado: false, sugestoes: {} };

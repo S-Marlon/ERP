@@ -40,7 +40,29 @@ export interface PenteFinoContexto {
   unidades?: ResolvedorUnidade;     // sigla da NF -> unidade interna (dicionário de unidades de entrada)
   // Duplicatas do XML x títulos lançados no contas a pagar (ausente = não verifica)
   cobranca?: { duplicatas: number; totalDuplicatas: number; titulos: number; totalTitulos: number; dispensado: boolean; motivoDispensa: string | null };
+  // Itens já cadastrados que a nota vincula: unidade base e custos de hoje (ausente = não verifica conversão nem custo)
+  itensVinculados?: Map<number, DadosItemVinculado>;
 }
+
+export interface DadosItemVinculado { unidadeBase: string | null; custoMedio: number | null; custoGerencial: number | null }
+
+/** Custo por unidade base desta nota tantas vezes acima ou abaixo do custo de hoje gera aviso de conversão. */
+export const VEZES_CUSTO_FORA_DO_PADRAO = 3;
+
+/**
+ * Nota numa unidade diferente da base do item com fator 1 ("1 UN = 1 MT"): quase sempre a conversão esquecida
+ * (ex.: rolo de 240 m vindo como UN). As siglas já estão traduzidas pelo dicionário de unidades.
+ */
+export const conversaoFaltando = (unidadeCompra: string, unidadeBase: string | null | undefined, fator: number) =>
+  !!unidadeBase && unidadeCompra.toUpperCase() !== unidadeBase.toUpperCase() && Math.abs(fator - 1) < 0.000001;
+
+/** Quantas vezes o custo por unidade base desta nota se afasta do custo de hoje (médio; sem ele, o gerencial). */
+export const desvioDoCusto = (custoNota: number, fator: number, item: DadosItemVinculado | undefined): number | null => {
+  const referencia = item && Number(item.custoMedio) > 0 ? Number(item.custoMedio) : Number(item?.custoGerencial) || 0;
+  if (!(referencia > 0) || !(custoNota > 0) || !(fator > 0)) return null;
+  const porBase = custoNota / fator;
+  return Math.max(porBase / referencia, referencia / porBase);
+};
 
 export interface Verificacao {
   codigo: string;
@@ -228,6 +250,29 @@ export const avaliarPenteFino = (
 
   coletar(bloqueios, 'FATOR_INVALIDO', 'Itens com fator de conversão de compra inválido (precisa ser maior que zero).',
     i => !(conversao(i).fator > 0));
+
+  // Item já cadastrado: a conversão é conferida contra a unidade base real dele (não a que veio no mapeamento)
+  const baseReal = (i: StagingItemRow) => {
+    const dados = isItemNovo(i) ? undefined : ctx.itensVinculados?.get(Number(i.produto_id_sistema));
+    return dados?.unidadeBase ? canon(normalizarSigla(dados.unidadeBase)) : null;
+  };
+  const desvio = (i: StagingItemRow) => (isItemNovo(i) || num(i.quantidade_recebida) <= 0 ? null
+    : desvioDoCusto(num(i.custo_unitario_final || i.preco_custo_unitario), conversao(i).fator, ctx.itensVinculados?.get(Number(i.produto_id_sistema))));
+  const custoForaDoPadrao = (i: StagingItemRow) => { const d = desvio(i); return d !== null && d > VEZES_CUSTO_FORA_DO_PADRAO; };
+  const semConversao = (i: StagingItemRow) => !isItemNovo(i) && conversaoFaltando(conversao(i).unidadeCompra, baseReal(i), conversao(i).fator);
+  // Unidade diferente com fator 1 e custo fora do padrão: conversão esquecida (rolo de 240 m entrando como 1 m)
+  coletar(bloqueios, 'CONVERSAO_FALTANDO', `Unidade da nota diferente da unidade do item, com fator 1, e custo por unidade mais de ${VEZES_CUSTO_FORA_DO_PADRAO}x fora do atual (ex.: rolo de 240 m vindo como UN). Na conferência, diga quanto da unidade do item vem em 1 unidade da nota (rolo de 240 m: fator 240).`,
+    i => semConversao(i) && custoForaDoPadrao(i));
+  // Só a unidade diferente (M x MT, UN x PC) com custo normal: costuma ser a mesma coisa com outro nome
+  coletar(avisos, 'UNIDADE_SEM_CONVERSAO', 'Unidade da nota diferente da unidade do item, com fator 1. Se for a mesma coisa (M e MT, UN e PC), está certo; se for embalagem (caixa, rolo, pacote), informe o fator na conferência.',
+    i => semConversao(i) && !custoForaDoPadrao(i));
+  coletar(bloqueios, 'UNIDADE_BASE_DIFERENTE', 'A conversão aponta para uma unidade base diferente da que o item usa no catálogo. Abra o item na conferência e refaça a conversão.',
+    i => {
+      const base = baseReal(i);
+      return !isItemNovo(i) && !!base && conversao(i).unidadeBase !== base && !semConversao(i);
+    });
+  coletar(avisos, 'CUSTO_FORA_DO_PADRAO', `Custo por unidade do item mais de ${VEZES_CUSTO_FORA_DO_PADRAO}x acima ou abaixo do custo atual: confira a conversão (fator) antes de dar entrada.`,
+    i => custoForaDoPadrao(i) && !semConversao(i));
 
   coletar(bloqueios, 'CONFIG_VENDAS_INCOERENTE', 'Configuração de vendas do item novo não bate com a conversão de compra (unidade base ou fator).',
     i => {

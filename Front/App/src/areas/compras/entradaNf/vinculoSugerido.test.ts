@@ -26,4 +26,15 @@ export const runVinculoSugeridoTests = (): void => {
   assert(r[2].mappedId === 'JA-VINCULADO' && !r[2].vinculoSugerido, 'Linha já vinculada não é alterada.');
   assert(!r[3].vinculoSugerido, 'Linha sem sugestão fica como está.');
   assert(r[0].isConfirmed === undefined, 'Sugestão não confere a linha.');
+
+  // Rolo que o fornecedor manda como UN e virou RL = 240 MT na conferência anterior: a nota nova em UN já vem assim
+  const corda = aplicarSugestoes([{ tempId: 'e', nItem: 8, sku: '386880', unidade: 'UN', quantidade: 1 }], {
+    '8': { ...base, unidadeBase: 'MT', idItem: 869, sku: '386880', nome: 'Corda', tipoRecurso: 'PRODUTO', origem: 'FORNECEDOR', ultimosDepositos: [], unidadeNota: 'UN', unidadeCompra: 'RL', fator: 240 },
+  }).itens[0].mapeamento.conversaoCompra;
+  assert(corda.unidade_compra === 'RL' && corda.unidade_base === 'MT' && corda.fator === 240, `conversão lembrada ${JSON.stringify(corda)}`);
+  // A mesma correção não vale para uma nota que veio em outra unidade
+  const outra = aplicarSugestoes([{ tempId: 'f', nItem: 9, sku: '386880', unidade: 'MT', quantidade: 240 }], {
+    '9': { ...base, unidadeBase: 'MT', idItem: 869, sku: '386880', nome: 'Corda', tipoRecurso: 'PRODUTO', origem: 'FORNECEDOR', ultimosDepositos: [], unidadeNota: 'UN', unidadeCompra: 'RL', fator: 240 },
+  }).itens[0].mapeamento.conversaoCompra;
+  assert(outra.unidade_compra === 'MT' && outra.fator === 1, `outra unidade ${JSON.stringify(outra)}`);
 };

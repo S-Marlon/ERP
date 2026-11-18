@@ -1,4 +1,4 @@
-import { avaliarPenteFino, calcularCustoMedio, chaveItemNovo, lerConversaoCompra, StagingItemRow } from './penteFino';
+import { avaliarPenteFino, calcularCustoMedio, desvioDoCusto, chaveItemNovo, lerConversaoCompra, StagingItemRow } from './penteFino';
 import { canonizar, criarResolvedor } from './unidadesEntrada';
 
 const assert = (condition: boolean, message: string): void => {
@@ -131,4 +131,30 @@ export const runPenteFinoTests = (): void => {
   // Unidade corrigida na conferência (fornecedor mandou UN num rolo): vale sobre a do XML
   const corrigida = lerConversaoCompra(item({ unidade_original: 'UN', mapeamento_json: JSON.stringify({ conversaoCompra: { unidade_compra: 'rl', unidade_base: 'RL', fator: 1 } }) }));
   assert(corrigida.unidadeCompra === 'RL' && corrigida.unidadeBase === 'RL' && corrigida.fator === 1, `unidade corrigida ${JSON.stringify(corrigida)}`);
+
+  // Corda em MT vindo como UN com fator 1 (NF 1687571): bloqueia; com fator 240 passa; custo 258x acima avisa
+  const itensVinculados = new Map([[7, { unidadeBase: 'MT', custoMedio: 0.81, custoGerencial: 0.8 }]]);
+  const ctxCorda = { ...ctx, itensVinculados };
+  const corda = (conv: any, custo = 206.82) => item({ unidade_original: 'UN', quantidade: 1, quantidade_recebida: 1, custo_unitario_final: custo, preco_custo_unitario: custo, valor_total_nfe: custo,
+    mapeamento_json: JSON.stringify({ conversaoCompra: conv }) });
+  const semFator = avaliarPenteFino(lote, [corda({ unidade_compra: 'UN', unidade_base: 'MT', fator: 1 })], ctxCorda);
+  assert(semFator.bloqueios.some(b => b.codigo === 'CONVERSAO_FALTANDO'), 'UN com fator 1 num item em MT deveria bloquear.');
+  // Mesma unidade com outro nome (UN x MT a preço de metro): só avisa
+  const sinonimo = avaliarPenteFino(lote, [corda({ unidade_compra: 'UN', unidade_base: 'MT', fator: 1 }, 0.85)], ctxCorda);
+  assert(sinonimo.aprovavel && sinonimo.avisos.some(a => a.codigo === 'UNIDADE_SEM_CONVERSAO'), 'Unidade diferente com custo normal só avisa.');
+  // Custo fora do padrão com unidade igual: só avisa
+  const caro = avaliarPenteFino(lote, [corda({ unidade_compra: 'MT', unidade_base: 'MT', fator: 1 }, 5)], ctxCorda);
+  assert(caro.aprovavel && caro.avisos.some(a => a.codigo === 'CUSTO_FORA_DO_PADRAO'), 'Custo 6x acima com a mesma unidade só avisa.');
+  const comFator = avaliarPenteFino(lote, [corda({ unidade_compra: 'RL', unidade_base: 'MT', fator: 240 })], ctxCorda);
+  assert(!comFator.bloqueios.some(b => ['CONVERSAO_FALTANDO', 'UNIDADE_BASE_DIFERENTE'].includes(b.codigo)) && !comFator.avisos.some(a => a.codigo === 'CUSTO_FORA_DO_PADRAO'),
+    `Rolo com fator 240 deveria passar ${JSON.stringify(comFator)}`);
+  // Rolo com fator 240 mas apontando para base UN num item em MT: bloqueia pela base errada
+  assert(avaliarPenteFino(lote, [corda({ unidade_compra: 'RL', unidade_base: 'UN', fator: 240 })], ctxCorda).bloqueios.some(b => b.codigo === 'UNIDADE_BASE_DIFERENTE'), 'Base diferente da do item deveria bloquear.');
+  // Mesma unidade do item, fator 1, custo normal: nada
+  const normal = avaliarPenteFino(lote, [corda({ unidade_compra: 'MT', unidade_base: 'MT', fator: 1 }, 0.9)], ctxCorda);
+  assert(normal.aprovavel && !normal.avisos.some(a => a.codigo === 'CUSTO_FORA_DO_PADRAO'), 'Metro a R$ 0,90 deveria passar sem aviso.');
+  // Sem custo de referência não avisa; sem dados do item não bloqueia (compatível)
+  assert(desvioDoCusto(10, 1, { unidadeBase: 'UN', custoMedio: 0, custoGerencial: null }) === null, 'Sem referência: sem desvio.');
+  assert(Math.abs((desvioDoCusto(1, 1, { unidadeBase: 'UN', custoMedio: 4, custoGerencial: null }) as number) - 4) < 1e-9, 'Custo 4x abaixo: desvio 4.');
+  assert(avaliarPenteFino(lote, [corda({ unidade_compra: 'UN', unidade_base: 'MT', fator: 1 })], ctx).aprovavel, 'Sem itensVinculados no contexto não verifica.');
 };

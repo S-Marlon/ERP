@@ -529,7 +529,7 @@ try {
 const semVinculo = itensDaNota.filter(i => !i.mapeamento && !i.mappedId && !i.produtoIdSistema && !i.skuSugerido);
 const resposta = await sugerirVinculos(
 parsed.emitente?.cnpj || '',
-semVinculo.map(i => ({ chave: chaveDaLinha(i), codigo: i.sku, ean: i.ean }))
+semVinculo.map(i => ({ chave: chaveDaLinha(i), codigo: i.sku, ean: i.ean, unidade: i.unidade }))
 );
 const aplicado = aplicarSugestoes(itensDaNota, resposta.sugestoes || {});
 if (aplicado.aplicadas > 0) {

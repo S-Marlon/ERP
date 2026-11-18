@@ -6,7 +6,7 @@ import db from '../../../infra/db';
 import { lancarMovimentoEstoque } from '../../estoque/depositos';
 import { obterOuCriarUnidade } from '../../catalogo/precos/configVendas.controller';
 import { buscarFornecedorId } from './stagingLoteController';
-import { gtinDoItem, lerConversaoCompra, lerMapeamento } from '../staging/penteFino';
+import { gtinDoItem, lerConversaoCompra, lerMapeamento, siglaDaNota } from '../staging/penteFino';
 import { validarGtin } from '../staging/gtin';
 import { ORIGEM_CORRECAO_ENTRADA, ORIGEM_CORRECAO_ESTORNO, planejarCorrecao, posicaoAtualDaLinha } from '../staging/correcaoEntrada';
 
@@ -18,6 +18,21 @@ class ErroNegocio extends Error {
 }
 
 const SKU_DO_ITEM = `COALESCE(NULLIF(TRIM(cpd.sku_customizado), ''), ic.sku)`;
+
+const unidadeDaCompra = async (conn: any, tenant: number, linha: any, idItem: number, base: string, fator: number, informada: unknown) => {
+  const escolhida = String(informada || '').trim().toUpperCase();
+  if (escolhida) return escolhida;
+  const daNota = siglaDaNota(linha).toUpperCase();
+  if (Math.abs(fator - 1) < 0.000001 || daNota === base.toUpperCase()) return daNota;
+  const [embalagens]: any = await conn.execute(
+    `SELECT UPPER(um.sigla) AS sigla, c.fator_conversao FROM itens_unidades_conversao c
+     INNER JOIN itens_unidades_medida um ON um.id_unidade = c.id_unidade_derivada
+     WHERE c.tenant_id = ? AND c.id_item = ?`, [tenant, idItem]
+  );
+  if (embalagens.some((e: any) => e.sigla === daNota)) return daNota;
+  const mesmaQuantidade = embalagens.filter((e: any) => Math.abs(Number(e.fator_conversao) - fator) < 0.000001);
+  return mesmaQuantidade.length === 1 ? String(mesmaQuantidade[0].sigla) : daNota;
+};
 
 /**
  * POST /compras/notas/:loteId/itens/:idStaging/correcao
@@ -111,7 +126,10 @@ export const corrigirLinhaNota = async (req: Request, res: Response) => {
       [tenant, loteId, idStaging, idAnterior, novo.id_item, fatorAnterior.toFixed(6), fator.toFixed(6), (motivo || 'simulação').slice(0, 255)]
     );
     const correcaoId = Number(registro.insertId);
-    const unidadeNf = String(linha.unidade_original || 'UN').trim().toUpperCase();
+    // Unidade da compra: a informada; senão a da conferência; se ela não é unidade do item e o item já tem uma
+    // embalagem com este fator (rolo vindo como UN, item com RL = 240 MT), usa a embalagem — nunca cria "UN = 240 MT"
+    const unidadeAnterior = siglaDaNota(linha).toUpperCase(); // como a linha entrou (o estorno sai igual)
+    const unidadeNf = await unidadeDaCompra(conn, tenant, linha, Number(novo.id_item), String(novo.unidade_base || ''), fator, req.body?.unidadeCompra);
     const observacao = `Correção NF ${lote?.numero_nf || ''} item ${linha.item_nfe_seq || ''}: ${motivo}`.slice(0, 255);
     const movimentos: any[] = [];
 
@@ -141,7 +159,7 @@ export const corrigirLinhaNota = async (req: Request, res: Response) => {
       const r = await lancarMovimentoEstoque(conn, {
         tenant, idItem: s.idItem, deposito: s.deposito, tipo: 'SAIDA', origem: ORIGEM_CORRECAO_ESTORNO,
         idOrigem: loteId, idOrigemItem: correcaoId, documento: lote?.chave_acesso, tipoRecurso: novo.tipo_recurso,
-        quantidade: s.quantidade, quantidadeDocumento: s.quantidadeDocumento, unidadeDocumento: unidadeNf,
+        quantidade: s.quantidade, quantidadeDocumento: s.quantidadeDocumento, unidadeDocumento: unidadeAnterior,
         fatorConversao: s.quantidadeDocumento > 0 ? s.quantidade / s.quantidadeDocumento : 1,
         custoUnitario: s.custoUnitario, observacao, estornoDeEntrada: true,
       });

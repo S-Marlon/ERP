@@ -11,6 +11,9 @@ export interface SugestaoVinculo {
   unidadeBase: string | null;
   origem: 'FORNECEDOR' | 'GTIN';
   ultimosDepositos: string[];
+  /** Unidade que veio na nota em que esta conversão foi usada (ex.: UN). */
+  unidadeNota?: string | null;
+  /** Unidade de compra depois da conferência (ex.: RL quando o fornecedor manda o rolo como UN). */
   unidadeCompra: string | null;
   fator: number;
   precoUltimaCompra: number | null;
@@ -27,8 +30,11 @@ export const aplicarSugestoes = (itens: any[], sugestoes: Record<string, Sugesta
     if (!s || linhaJaVinculada(item)) return item;
     aplicadas++;
     const unidadeNf = String(item.unidade || 'UN').toUpperCase();
-    // A conversão da última compra só vale se a unidade da nota for a mesma
-    const fator = s.unidadeCompra && s.unidadeCompra.toUpperCase() === unidadeNf ? s.fator : 1;
+    // A conversão da última compra só vale se a nota veio na mesma unidade (inclusive a correção UN -> RL feita na conferência)
+    const unidadeDaquelaNota = String(s.unidadeNota ?? s.unidadeCompra ?? '').toUpperCase();
+    const mesma = unidadeDaquelaNota === unidadeNf;
+    const fator = mesma ? s.fator : 1;
+    const unidadeCompra = mesma && s.unidadeCompra ? s.unidadeCompra.toUpperCase() : unidadeNf;
     const mapping: MappingPayload = {
       mode: 'EXISTING_DIRECT',
       existingProductId: s.idItem,
@@ -40,7 +46,7 @@ export const aplicarSugestoes = (itens: any[], sugestoes: Record<string, Sugesta
       },
       salesUnits: [],
       conversaoCompra: {
-        unidade_compra: unidadeNf,
+        unidade_compra: unidadeCompra,
         unidade_base: (s.unidadeBase || unidadeNf).toUpperCase(),
         fator,
       },

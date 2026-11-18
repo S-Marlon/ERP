@@ -1,6 +1,8 @@
 // Reconhecimento automático na entrada de NF-e: sugere o item do catálogo para cada linha da nota
 // 1º pelo código do produto no fornecedor (comercial_fornecedores_produtos, gravado nas entradas anteriores),
 // 2º pelo GTIN (comercial_unidades_venda). Traz também a conversão usada da última vez e o depósito da última entrada.
+// A conversão vem da última nota aprovada do mesmo fornecedor/código/item que veio NA MESMA UNIDADE da nota de agora:
+// se o fornecedor manda o rolo como "UN" e na conferência virou "RL = 240 MT", a próxima nota em "UN" já vem assim.
 import { Request, Response } from 'express';
 import db from '../../../infra/db';
 import { validarGtin } from '../staging/gtin';
@@ -47,7 +49,38 @@ const montar = (r: any, origem: 'FORNECEDOR' | 'GTIN', extra: Record<string, unk
   origem,
   ultimosDepositos: r.ultimos_depositos ? String(r.ultimos_depositos).split(',') : [],
   ...extra,
-});
+} as Record<string, any>);
+
+/**
+ * Conversão usada na última nota aprovada deste fornecedor, por código + item + unidade que veio na nota.
+ * Chave `codigo|idItem|UNIDADE_DA_NOTA`; vale a mais recente.
+ */
+const conversoesAnteriores = async (tenant: number, cnpj: unknown, codigos: string[]) => {
+  const mapa = new Map<string, { unidadeNota: string; unidadeCompra: string; fator: number }>();
+  const digitos = String(cnpj || '').replace(/\D/g, '');
+  if (!digitos || codigos.length === 0) return mapa;
+  const [rows]: any = await db.execute(
+    `SELECT TRIM(s.codigo_fornecedor) AS codigo, s.produto_id_sistema AS id_item, UPPER(TRIM(COALESCE(s.unidade_original, 'UN'))) AS unidade,
+            s.mapeamento_json
+     FROM importacao_produtos_staging s
+     INNER JOIN importacoes_lotes l ON l.id = s.lote_importacao_id AND l.tenant_id = s.tenant_id
+     WHERE s.tenant_id = ? AND s.status = 'IMPORTADO' AND s.produto_id_sistema IS NOT NULL
+       AND REPLACE(REPLACE(REPLACE(l.cnpj_fornecedor, '.', ''), '/', ''), '-', '') = ?
+       AND s.codigo_fornecedor IN (${codigos.map(() => '?').join(',')})
+     ORDER BY s.analisado_em DESC, s.id DESC`,
+    [tenant, digitos, ...codigos]
+  );
+  for (const r of rows) {
+    const chave = `${r.codigo}|${Number(r.id_item)}|${r.unidade}`;
+    if (mapa.has(chave)) continue;
+    let conv: any = null;
+    try { conv = JSON.parse(r.mapeamento_json || '{}')?.conversaoCompra || null; } catch { conv = null; }
+    const fator = Number(conv?.fator);
+    if (!(fator > 0)) continue;
+    mapa.set(chave, { unidadeNota: r.unidade, unidadeCompra: String(conv.unidade_compra || r.unidade).trim().toUpperCase(), fator });
+  }
+  return mapa;
+};
 
 /**
  * POST /api/compras/sugestoes-vinculo
@@ -56,7 +89,7 @@ const montar = (r: any, origem: 'FORNECEDOR' | 'GTIN', extra: Record<string, unk
 export const sugerirVinculos = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
   try {
-    const itens: Array<{ chave: string; codigo?: string; ean?: string }> = Array.isArray(req.body?.itens) ? req.body.itens : [];
+    const itens: Array<{ chave: string; codigo?: string; ean?: string; unidade?: string }> = Array.isArray(req.body?.itens) ? req.body.itens : [];
     if (itens.length === 0) return res.json({ sugestoes: {} });
     const idFornecedor = await buscarFornecedorId(tenant, req.body?.cnpj);
     const sugestoes: Record<string, any> = {};
@@ -72,14 +105,15 @@ export const sugerirVinculos = async (req: Request, res: Response) => {
       );
       const porCodigo = new Map<string, any>();
       for (const r of rows) if (!porCodigo.has(String(r.codigo))) porCodigo.set(String(r.codigo), r);
+      const historico = await conversoesAnteriores(tenant, req.body?.cnpj, codigos);
       for (const i of itens) {
         const r = porCodigo.get(String(i.codigo || '').trim());
         if (r) {
-          sugestoes[i.chave] = montar(r, 'FORNECEDOR', {
-            unidadeCompra: r.unidade_compra || null,
-            fator: Number(r.fator_compra) > 0 ? Number(r.fator_compra) : 1,
-            precoUltimaCompra: r.preco_ultima_compra !== null ? Number(r.preco_ultima_compra) : null,
-          });
+          const anterior = historico.get(`${String(i.codigo || '').trim()}|${Number(r.id_item)}|${String(i.unidade || '').trim().toUpperCase()}`);
+          sugestoes[i.chave] = montar(r, 'FORNECEDOR', anterior
+            ? { unidadeNota: anterior.unidadeNota, unidadeCompra: anterior.unidadeCompra, fator: anterior.fator }
+            : { unidadeNota: r.unidade_compra || null, unidadeCompra: r.unidade_compra || null, fator: Number(r.fator_compra) > 0 ? Number(r.fator_compra) : 1 });
+          sugestoes[i.chave].precoUltimaCompra = r.preco_ultima_compra !== null ? Number(r.preco_ultima_compra) : null;
         }
       }
     }
@@ -102,6 +136,7 @@ export const sugerirVinculos = async (req: Request, res: Response) => {
         const r = porGtin.get(String(i.ean || '').trim());
         if (r) {
           sugestoes[i.chave] = montar(r, 'GTIN', {
+            unidadeNota: r.unidade_gtin || null,
             unidadeCompra: r.unidade_gtin || null,
             fator: Number(r.eh_base) ? 1 : (Number(r.fator_conversao) > 0 ? Number(r.fator_conversao) : 1),
             precoUltimaCompra: null,
