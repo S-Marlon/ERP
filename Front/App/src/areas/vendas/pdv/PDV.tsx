@@ -26,6 +26,7 @@ import { caixaStore, useCaixa } from '../caixa/caixaStore';
 import { useSituacaoCliente } from '../../financeiro/receber/receberApi';
 import { imprimirOrcamento, pedidosAbertosApi } from './services/pedidosAbertosApi';
 import { DadosOrcamento, DrawerPedidosAbertos, ModalSalvarOrcamento } from './components/PedidosAbertosPDV';
+import { AberturaNegociacao, NegociacaoDrawer } from '../negociacao/NegociacaoDrawer';
 import { extensoesPdv } from '../../../modulos/registroModulos';
 import { devolucoesService } from './services/salesService';
 import { CHAVE_TROCA } from './components/ModalDevolucao';
@@ -80,6 +81,7 @@ const PDVContent: React.FC = () => {
   const [orcamentoAtual, setOrcamentoAtual] = useState<{ id: number; manterPreco: boolean } | null>(null);
   const [drawerPedidos, setDrawerPedidos] = useState<null | 'SUSPENSA' | 'ORCAMENTO'>(null);
   const [modalOrcamento, setModalOrcamento] = useState(false);
+  const [negociando, setNegociando] = useState<AberturaNegociacao | null>(null);
   const [salvandoPedido, setSalvandoPedido] = useState(false);
   const [qtdSuspensas, setQtdSuspensas] = useState(0);
   const atualizarSuspensas = useCallback(() => {
@@ -366,6 +368,10 @@ const PDVContent: React.FC = () => {
       onFinalizar={() => { setGavetaCarrinho(false); irParaPagamento(); }}
       onSuspender={suspender}
       onOrcamento={() => setModalOrcamento(true)}
+      onNegociar={() => setNegociando({
+        itens: itensParaSalvar().map(i => ({ idItem: i.idItem, quantidade: i.quantidade, idUnidade: i.idUnidade, componentes: (i as any).componentes })),
+        cliente: clienteId ? { id: clienteId, nome: cliente } : cliente && cliente !== 'CONSUMIDOR' ? { id: null, nome: cliente } : null,
+      })}
       salvandoPedido={salvandoPedido}
       onBack={() => setEstagio('SELECAO')}
       estagio={estagio}
@@ -541,6 +547,17 @@ const PDVContent: React.FC = () => {
 
       <ModalSalvarOrcamento aberto={modalOrcamento} cliente={cliente} clienteId={clienteId} total={total} salvando={salvandoPedido}
         onFechar={() => setModalOrcamento(false)} onSalvar={salvarOrcamento} />
+      <NegociacaoDrawer abrir={negociando} onFechar={() => setNegociando(null)}
+        onSalvo={(id, total) => {
+          setNegociando(null);
+          novaVenda();
+          Modal.confirm({
+            title: `Orçamento Nº ${id} salvo`,
+            content: `Total ${money.format(total)}. Ele fica em Vendas › Orçamentos (dá para renegociar e vender depois).`,
+            okText: 'Imprimir a proposta', cancelText: 'Fechar',
+            onOk: async () => imprimirOrcamento(await pedidosAbertosApi.detalhe(id)),
+          });
+        }} />
       <DrawerPedidosAbertos aberto={drawerPedidos !== null} abaInicial={drawerPedidos || 'SUSPENSA'} carrinhoComItens={cart.length > 0}
         onFechar={() => setDrawerPedidos(null)} onAbrir={abrirPedido} onAlterado={atualizarSuspensas} />
 

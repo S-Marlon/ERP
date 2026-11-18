@@ -21,6 +21,8 @@ interface CartAsideProps {
     // Guardar o carrinho sem vender: venda suspensa (retoma depois) ou orçamento (preço congelado)
     onSuspender?: () => void;
     onOrcamento?: () => void;
+    /** Orçamento de negociação (margens, faixas, condição). */
+    onNegociar?: () => void;
     salvandoPedido?: boolean;
     onBack: () => void;
     applyIndividualDiscount: (id: string | number, newPrice: number) => void;
@@ -45,7 +47,7 @@ export const CartAside: React.FC<CartAsideProps> = props => (
 );
 
 const CarrinhoConteudo: React.FC<CartAsideProps> = ({
-    cart, cliente, total, money, updateQuantity, changeUnit, removeItem, onFinalizar, onSuspender, onOrcamento,
+    cart, cliente, total, money, updateQuantity, changeUnit, removeItem, onFinalizar, onSuspender, onOrcamento, onNegociar,
     salvandoPedido, estagio, onBack, applyIndividualDiscount, onEditarKit, style,
 }) => {
     const { token } = theme.useToken();
@@ -281,6 +283,11 @@ const CarrinhoConteudo: React.FC<CartAsideProps> = ({
                         {onOrcamento && (
                             <Tooltip title="Salva com preços congelados e validade, para imprimir e vender depois">
                                 <Button block disabled={cart.length === 0} onClick={onOrcamento}>Orçamento</Button>
+                            </Tooltip>
+                        )}
+                        {onNegociar && (
+                            <Tooltip title="Orçamento de negociação: régua de margem por item, categoria e no total, última venda ao cliente e faixas por quantidade">
+                                <Button block disabled={cart.length === 0} onClick={onNegociar}>Negociar</Button>
                             </Tooltip>
                         )}
                     </Flex>

@@ -8,7 +8,11 @@ import { API_URL } from '../../../shared/api/config';
 const { Text, Title } = Typography;
 const API = `${API_URL}/api/vendas/configuracoes`;
 
-interface Regras { descontoMaxPercentual: number; politicaAbaixoCusto: 'PERMITIR' | 'AVISAR' | 'BLOQUEAR'; temSenha: boolean }
+interface Regras {
+  descontoMaxPercentual: number; politicaAbaixoCusto: 'PERMITIR' | 'AVISAR' | 'BLOQUEAR'; temSenha: boolean;
+  /** Orçamento de negociação (0,3 = 30%). */
+  margemAlvoPadrao: number; margemMinimaNegociacao: number;
+}
 
 const ler = async (r: Response, erro: string) => {
   const d = await r.json().catch(() => ({}));
@@ -26,7 +30,10 @@ const RegrasVenda: React.FC = () => {
     try {
       const r: Regras = await ler(await fetch(API), 'Erro ao carregar as regras.');
       setRegras(r);
-      form.setFieldsValue({ descontoMaxPercentual: r.descontoMaxPercentual, politicaAbaixoCusto: r.politicaAbaixoCusto, senhaAtual: '', novaSenha: '', confirmar: '' });
+      form.setFieldsValue({
+        descontoMaxPercentual: r.descontoMaxPercentual, politicaAbaixoCusto: r.politicaAbaixoCusto, senhaAtual: '', novaSenha: '', confirmar: '',
+        margemAlvoPct: Math.round((r.margemAlvoPadrao ?? 0.3) * 1000) / 10, margemMinimaPct: Math.round((r.margemMinimaNegociacao ?? 0.1) * 1000) / 10,
+      });
     } catch (e) {
       message.error(e instanceof Error ? e.message : 'Erro ao carregar as regras.');
     }
@@ -42,6 +49,8 @@ const RegrasVenda: React.FC = () => {
         body: JSON.stringify({
           descontoMaxPercentual: v.descontoMaxPercentual,
           politicaAbaixoCusto: v.politicaAbaixoCusto,
+          margemAlvoPadrao: Number(v.margemAlvoPct) / 100,
+          margemMinimaNegociacao: Number(v.margemMinimaPct) / 100,
           senhaAtual: v.senhaAtual || undefined,
           novaSenha: v.novaSenha || undefined,
         }),
@@ -86,6 +95,19 @@ const RegrasVenda: React.FC = () => {
                 </Space>
               </Radio.Group>
             </Form.Item>
+
+            <Card size="small" type="inner" title="Orçamento de negociação" style={{ marginBottom: 14 }}>
+              <Space wrap size={24}>
+                <Form.Item name="margemAlvoPct" label="Margem alvo do orçamento" style={{ marginBottom: 0 }}
+                  extra="Lucro ÷ preço que o orçamento busca (o vendedor baixa num item e recupera em outro)." rules={[{ required: true, message: 'Informe a margem.' }]}>
+                  <InputNumber min={0} max={90} precision={1} decimalSeparator="," addonAfter="%" style={{ width: 150 }} />
+                </Form.Item>
+                <Form.Item name="margemMinimaPct" label="Margem mínima por item" style={{ marginBottom: 0 }}
+                  extra="Abaixo disso, o orçamento só salva com a senha de autorização." rules={[{ required: true, message: 'Informe a margem.' }]}>
+                  <InputNumber min={0} max={90} precision={1} decimalSeparator="," addonAfter="%" style={{ width: 150 }} />
+                </Form.Item>
+              </Space>
+            </Card>
 
             <Card size="small" type="inner" title={<Space><SafetyCertificateOutlined /> Senha de autorização {regras?.temSenha ? <Tag color="green">definida</Tag> : <Tag color="red">não definida</Tag>}</Space>}>
               {regras?.temSenha && (

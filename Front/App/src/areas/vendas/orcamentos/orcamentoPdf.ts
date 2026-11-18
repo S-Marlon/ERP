@@ -3,6 +3,7 @@
 import { jsPDF } from 'jspdf';
 import type { DadosEmpresa } from '../../../shared/core/configuracoes/configuracoes';
 import type { PedidoAbertoDetalhe } from '../pdv/services/pedidosAbertosApi';
+import { codigoCliente, secoesDaProposta } from '../negociacao/propostaNegociacao';
 
 const brl = (v: number) => `R$ ${Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const dataBr = (iso?: string | null) => (iso ? String(iso).slice(0, 10).split('-').reverse().join('/') : '-');
@@ -48,7 +49,7 @@ export const gerarPdfOrcamento = (o: PedidoAbertoDetalhe, e: Partial<DadosEmpres
   ].filter(Boolean);
   linhasEmpresa.forEach((l, i) => doc.text(texto(l), M, y + 11 + i * 4.5));
 
-  doc.setFont('helvetica', 'bold').setFontSize(10).setTextColor(0).text('ORÇAMENTO', L, y + 3, { align: 'right' });
+  doc.setFont('helvetica', 'bold').setFontSize(10).setTextColor(0).text(o.margemAlvo !== null && o.margemAlvo !== undefined ? 'PROPOSTA COMERCIAL' : 'ORÇAMENTO', L, y + 3, { align: 'right' });
   doc.setFontSize(15).setTextColor(...azul).text(`Nº ${o.id}`, L, y + 10, { align: 'right' });
   doc.setFont('helvetica', 'normal').setFontSize(9).setTextColor(0).text(`Emitido em ${dataBr(o.criadoEm)}`, L, y + 15, { align: 'right' });
   doc.setFont('helvetica', 'bold').text(`Válido até ${dataBr(o.validade)}`, L, y + 19.5, { align: 'right' });
@@ -58,7 +59,9 @@ export const gerarPdfOrcamento = (o: PedidoAbertoDetalhe, e: Partial<DadosEmpres
 
   // Cliente
   doc.setFontSize(10).setTextColor(0);
-  const cliente = [['Cliente', o.cliente], ['Contato', o.contato], ['Atendente', o.operador]].filter(([, v]) => v);
+  const negociacao = o.margemAlvo !== null && o.margemAlvo !== undefined;
+  const cliente = [['Cliente', [negociacao ? codigoCliente(o.idCliente) : null, o.cliente].filter(Boolean).join(' - ')], ['Contato', o.contato],
+    [negociacao ? 'Vendedor' : 'Atendente', o.operador]].filter(([, v]) => v);
   let x = M;
   for (const [rotulo, valor] of cliente) {
     doc.setFont('helvetica', 'bold').text(`${rotulo}:`, x, y);
@@ -80,20 +83,36 @@ export const gerarPdfOrcamento = (o: PedidoAbertoDetalhe, e: Partial<DadosEmpres
     y += 6;
     doc.setFont('helvetica', 'normal');
   };
-  cabecalho();
-  for (const i of o.itens) {
-    const desc: string[] = doc.splitTextToSize(texto(i.nome), col.qtd - 22 - col.desc);
-    const altura = desc.length * 4 + 2;
-    if (y + altura > 297 - M - 10) { doc.addPage(); y = M + 5; cabecalho(); }
-    doc.setFontSize(9).setTextColor(0);
-    doc.text(texto(i.sku).slice(0, 18), col.cod, y);
-    doc.text(desc, col.desc, y);
-    doc.text(texto(`${qtd(i.quantidade)} ${i.unidade || ''}`.trim()), col.qtd, y, { align: 'right' });
-    doc.text(brl(i.precoUnitario), col.unit, y, { align: 'right' });
-    doc.setFont('helvetica', 'bold').text(brl(i.total), col.total, y, { align: 'right' }).setFont('helvetica', 'normal');
-    y += altura;
-    doc.setDrawColor(229).setLineWidth(0.2).line(M, y - 3, L, y - 3);
-  }
+  // Negociação: seções por categoria; embaixo do nome, o preço por unidade base e as faixas por quantidade
+  const grupos = negociacao
+    ? secoesDaProposta(o).map(sec => ({ titulo: sec.titulo, itens: sec.itens.map(p => ({ p, i: o.itens[p.indice] })) }))
+    : [{ titulo: '', itens: o.itens.map(i => ({ p: null as any, i })) }];
+  if (!negociacao) cabecalho();
+  grupos.forEach((g, n) => {
+    if (negociacao) {
+      if (y + 16 > 297 - M - 10) { doc.addPage(); y = M + 5; }
+      doc.setFont('helvetica', 'bold').setFontSize(10.5).setTextColor(212, 56, 13).text(texto(`${n + 1}. ${g.titulo.toUpperCase()}`), M, y);
+      y += 6;
+      cabecalho();
+    }
+    for (const { p, i } of g.itens) {
+      const extras: string[] = p ? [p.valorBase ? `${p.embalagem} · ${p.valorBase}` : '', ...p.faixas].filter(Boolean) : [];
+      const desc: string[] = doc.splitTextToSize(texto(i.nome), col.qtd - 22 - col.desc);
+      const linhasExtras: string[] = extras.flatMap(x => doc.splitTextToSize(texto(x), col.qtd - 22 - col.desc));
+      const altura = desc.length * 4 + linhasExtras.length * 3.6 + 2;
+      if (y + altura > 297 - M - 10) { doc.addPage(); y = M + 5; cabecalho(); }
+      doc.setFontSize(9).setTextColor(0);
+      doc.text(texto(i.sku).slice(0, 18), col.cod, y);
+      doc.text(desc, col.desc, y);
+      if (linhasExtras.length) doc.setFontSize(8).setTextColor(90).text(linhasExtras, col.desc, y + desc.length * 4).setFontSize(9).setTextColor(0);
+      doc.text(texto(`${qtd(i.quantidade)} ${i.unidade || ''}`.trim()), col.qtd, y, { align: 'right' });
+      doc.text(brl(i.precoUnitario), col.unit, y, { align: 'right' });
+      doc.setFont('helvetica', 'bold').text(brl(i.total), col.total, y, { align: 'right' }).setFont('helvetica', 'normal');
+      y += altura;
+      doc.setDrawColor(229).setLineWidth(0.2).line(M, y - 3, L, y - 3);
+    }
+    if (negociacao) y += 3;
+  });
 
   // Totais
   if (y > 297 - M - 40) { doc.addPage(); y = M + 5; }
@@ -115,8 +134,17 @@ export const gerarPdfOrcamento = (o: PedidoAbertoDetalhe, e: Partial<DadosEmpres
     doc.setTextColor(0).text(obs, M + 3, y);
     y += obs.length * 4 + 6;
   }
+  if (negociacao) {
+    if (y + 14 > 297 - M) { doc.addPage(); y = M + 5; }
+    doc.setFont('helvetica', 'bold').setFontSize(9.5).setTextColor(0).text('Condição de pagamento:', M, y);
+    doc.setTextColor(212, 56, 13).text(texto(o.condicaoPagamento || 'A combinar no fechamento'), M + doc.getTextWidth('Condição de pagamento: '), y);
+    doc.setFont('helvetica', 'normal').setTextColor(0);
+    y += 6;
+  }
   doc.setTextColor(110).setFontSize(8.5).text(
-    doc.splitTextToSize(`Preços válidos até ${dataBr(o.validade)}, sujeitos à disponibilidade de estoque. Formas de pagamento a combinar no fechamento.`, L - M),
+    doc.splitTextToSize(negociacao
+      ? `Proposta válida até ${dataBr(o.validade)}, sujeita à disponibilidade de estoque.`
+      : `Preços válidos até ${dataBr(o.validade)}, sujeitos à disponibilidade de estoque. Formas de pagamento a combinar no fechamento.`, L - M),
     M, Math.min(y + 4, 297 - M),
   );
 

@@ -44,3 +44,15 @@ teste('PDF do orçamento (com quebra de página)', () => {
   assert.ok(paginas >= 2, `páginas: ${paginas}`);
   if (process.env.SALVAR_PDF) writeFileSync(process.env.SALVAR_PDF, pdf);
 });
+
+teste('PDF da proposta de negociação (seções, unidade base, faixas e condição)', () => {
+  const o = orc(30);
+  const neg: PedidoAbertoDetalhe = {
+    ...o, margemAlvo: 0.3, condicaoPagamento: 'Boleto 21 dias (1 parcela)',
+    itens: o.itens.map((i, k) => ({ ...i, categoria: k % 2 ? 'Óleos' : 'Graxas', fator: 24, siglaBase: 'L', unidade: 'CX',
+      faixas: k === 0 ? [{ quantidadeMinima: 10, precoUnitario: 9 }] : [] })),
+  };
+  const pdf = gerarPdfOrcamento(neg, { nomeFantasia: 'Casa Hidráulica' });
+  assert.strictEqual(Buffer.from(pdf.slice(0, 5)).toString('latin1'), '%PDF-');
+  if (process.env.SALVAR_PDF_NEG) writeFileSync(process.env.SALVAR_PDF_NEG, pdf);
+});

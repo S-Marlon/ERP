@@ -8,6 +8,9 @@ import { operadorDe } from '../caixa/caixa.controller';
 import { nomeComTrocas } from '../../catalogo/kits/kits';
 import { carregarDadosComponentes } from '../../catalogo/kits/kitsBanco';
 import { escolhasDasLinhas, gravarEscolhasKit } from '../../catalogo/kits/kitsVenda';
+import { carregarMargensNegociacao, carregarRegras } from '../regras/regrasVenda.controller';
+import { conferirSenha } from '../regras/regrasVenda';
+import { abaixoDaMinima, normalizarFaixas } from '../negociacao/negociacao';
 
 const TIPOS = ['ORCAMENTO', 'SUSPENSA'] as const;
 type TipoAberto = typeof TIPOS[number];
@@ -25,6 +28,25 @@ const situacao = (status: string, valido: number | null) =>
   status === 'CONVERTIDO' ? 'CONVERTIDO' : status === 'SUSPENSA' ? 'SUSPENSA' : Number(valido) ? 'VALIDO' : 'VENCIDO';
 
 /**
+ * Custo de referência de cada linha (margem do orçamento), por unidade base: custo médio do depósito Venda, senão o
+ * gerencial; kit = custo dos componentes escolhidos.
+ */
+export const custoDasLinhas = async (conn: any, tenant: number, ids: number[], itensBanco: Map<number, any>) => {
+  const [saldos]: any = await conn.execute(
+    `SELECT id_item, custo_medio FROM estoque_saldos_itens WHERE tenant_id = ? AND deposito = 'VENDA' AND id_item IN (${ids.map(() => '?').join(',')})`,
+    [tenant, ...ids]
+  );
+  const medio = new Map<number, number>(saldos.map((s: any) => [Number(s.id_item), Number(s.custo_medio) || 0]));
+  const custoBase = (id: number) => medio.get(id) || Number(itensBanco.get(id)?.custo_gerencial) || 0;
+  return async (linhas: Array<{ idItem: number; kit?: { componentes: Array<{ idItem: number; quantidade: number }> } | null }>) => {
+    const componentes = await carregarDadosComponentes(conn, tenant, linhas.flatMap(l => (l.kit?.componentes || []).map(c => c.idItem)));
+    return (l: typeof linhas[number]) => (l.kit
+      ? l.kit.componentes.reduce((a, c) => a + Math.round((componentes.get(c.idItem)?.custo || 0) * c.quantidade * 10000) / 10000, 0)
+      : custoBase(l.idItem));
+  };
+};
+
+/**
  * POST /api/vendas/pdv/pedidos-abertos
  * { tipo: ORCAMENTO | SUSPENSA, itens: [{ idItem, quantidade, idUnidade?, precoUnitario? }], descontoGeral?,
  *   clienteNome?, idCliente?, contato?, observacao?, validadeDias? (orçamento, padrão 7) }
@@ -36,59 +58,103 @@ export const salvarPedidoAberto = async (req: Request, res: Response) => {
   const itens = req.body?.itens;
   if (!Array.isArray(itens) || itens.length === 0) return res.status(400).json({ error: 'Sem itens para salvar.' });
   const validadeDias = Math.min(180, Math.max(1, Math.floor(Number(req.body?.validadeDias) || 7)));
+  // Negociação (só orçamento): margem alvo, condição de pagamento, itens travados e faixas por quantidade
+  const neg = tipo === 'ORCAMENTO' && req.body?.negociacao ? req.body.negociacao : null;
+  const margemAlvo = neg ? Number(neg.margemAlvo) : null;
+  if (neg && !(Number.isFinite(margemAlvo) && margemAlvo! >= 0 && margemAlvo! <= 0.9)) return res.status(400).json({ error: 'Margem alvo inválida (0 a 90%).' });
+  // Orçamento já salvo sendo renegociado: mesmo número, itens trocados
+  const idExistente = tipo === 'ORCAMENTO' && Number(req.body?.idPedido) > 0 ? Number(req.body.idPedido) : null;
 
   const connection: any = await pool.getConnection();
   try {
     await connection.beginTransaction();
     const { ids, itensBanco, linhas } = await calcularItensDoPedido(connection, tenant, itens);
+    // Na negociação o preço combinado é o "de tabela" do orçamento (não conta como desconto ao vender)
+    if (neg) for (const l of linhas) l.precoTabela = l.precoPraticado;
     const venda = fecharVenda(linhas, Number(req.body?.descontoGeral) || 0);
 
-    // Custo de referência (margem do orçamento): custo médio do depósito Venda, senão o gerencial
-    const [saldos]: any = await connection.execute(
-      `SELECT id_item, custo_medio FROM estoque_saldos_itens WHERE tenant_id = ? AND deposito = 'VENDA' AND id_item IN (${ids.map(() => '?').join(',')})`,
-      [tenant, ...ids]
-    );
-    const medio = new Map<number, number>(saldos.map((s: any) => [Number(s.id_item), Number(s.custo_medio) || 0]));
-    // Kit: custo dos componentes escolhidos
-    const componentes = await carregarDadosComponentes(connection, tenant, venda.linhas.flatMap(l => (l.kit?.componentes || []).map(c => c.idItem)));
-    const custoBase = (id: number) => medio.get(id) || Number(itensBanco.get(id).custo_gerencial) || 0;
-    const custoDaLinha = (l: typeof venda.linhas[number]) => (l.kit
-      ? l.kit.componentes.reduce((a, c) => a + Math.round((componentes.get(c.idItem)?.custo || 0) * c.quantidade * 10000) / 10000, 0)
-      : custoBase(l.idItem));
+    const custoDaLinha = await (await custoDasLinhas(connection, tenant, ids, itensBanco))(venda.linhas);
     const totalCusto = venda.linhas.reduce((a, l) => a + custoDaLinha(l) * l.quantidadeBase, 0);
 
-    const [cab]: any = await connection.execute(
-      `INSERT INTO vendas_pedidos
-         (tenant_id, origem, status, operador, id_cliente, cliente_nome, contato, total_bruto, total_desconto, total_liquido, total_custo, observacao, validade)
-       VALUES (?, 'PDV', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${tipo === 'ORCAMENTO' ? 'CURDATE() + INTERVAL ? DAY' : 'NULL'})`,
-      [
-        tenant, tipo, operadorDe(req), req.body?.idCliente ? Number(req.body.idCliente) : null,
-        String(req.body?.clienteNome || '').trim().slice(0, 150) || 'CONSUMIDOR',
-        String(req.body?.contato || '').trim().slice(0, 100) || null,
-        f4(venda.totalBruto), f4(venda.totalDesconto), f4(venda.totalLiquido), f4(totalCusto),
-        String(req.body?.observacao || '').trim().slice(0, 255) || null,
-        ...(tipo === 'ORCAMENTO' ? [validadeDias] : []),
-      ]
-    );
-    const id = Number(cab.insertId);
-    for (const l of venda.linhas) {
+    // Negociação: item (ou faixa) abaixo da margem mínima precisa da senha de autorização
+    const faixasDe = (i: number) => (neg ? normalizarFaixas(itens[i]?.faixas) : []);
+    let autorizadoPor: string | null = null;
+    let motivoAutorizacao: string | null = null;
+    if (neg) {
+      const { margemMinimaNegociacao } = await carregarMargensNegociacao(connection, tenant);
+      const abaixo = abaixoDaMinima(venda.linhas.map((l, i) => ({
+        nome: itensBanco.get(l.idItem).nome_comercial || itensBanco.get(l.idItem).nome_item,
+        preco: l.precoUnitarioFinal, custoUnitario: custoDaLinha(l) * l.fator, faixas: faixasDe(i),
+      })), margemMinimaNegociacao);
+      if (abaixo.length) {
+        const regras = await carregarRegras(connection, tenant);
+        const detalhes = { codigo: 'AUTORIZACAO_NECESSARIA', motivos: abaixo, temSenha: Boolean(regras.senhaHash) };
+        if (!regras.senhaHash) throw new ErroVenda(`Abaixo da margem mínima: ${abaixo.join('; ')}. Defina a senha de autorização em Vendas › Regras de venda.`, 403, detalhes);
+        const aut = req.body?.autorizacao;
+        if (!aut) throw new ErroVenda(`Autorização necessária: ${abaixo.join('; ')}.`, 403, detalhes);
+        if (!conferirSenha(String(aut.senha || ''), regras.senhaHash)) throw new ErroVenda('Senha de autorização incorreta.', 403, { ...detalhes, senhaIncorreta: true });
+        autorizadoPor = String(aut.nome || '').trim().slice(0, 60);
+        motivoAutorizacao = String(aut.motivo || '').trim().slice(0, 255);
+        if (!autorizadoPor || !motivoAutorizacao) throw new ErroVenda('Informe quem autorizou e o motivo.', 403, detalhes);
+      }
+    }
+
+    const valoresCab = [
+      req.body?.idCliente ? Number(req.body.idCliente) : null,
+      String(req.body?.clienteNome || '').trim().slice(0, 150) || 'CONSUMIDOR',
+      String(req.body?.contato || '').trim().slice(0, 100) || null,
+      f4(venda.totalBruto), f4(venda.totalDesconto), f4(venda.totalLiquido), f4(totalCusto),
+      String(req.body?.observacao || '').trim().slice(0, 255) || null,
+      neg ? Number(margemAlvo).toFixed(4) : null, neg ? String(neg.condicaoPagamento || '').trim().slice(0, 150) || null : null,
+      autorizadoPor, motivoAutorizacao,
+    ];
+    let id: number;
+    if (idExistente) {
+      const [[atual]]: any = await connection.execute(
+        `SELECT status FROM vendas_pedidos WHERE id_venda = ? AND tenant_id = ? FOR UPDATE`, [idExistente, tenant]);
+      if (!atual || atual.status !== 'ORCAMENTO') throw new ErroVenda('Orçamento não encontrado ou já convertido em venda.', 409);
+      await connection.execute(
+        `UPDATE vendas_pedidos SET operador = ?, id_cliente = ?, cliente_nome = ?, contato = ?, total_bruto = ?, total_desconto = ?, total_liquido = ?,
+           total_custo = ?, observacao = ?, margem_alvo = ?, condicao_pagamento = ?, autorizado_por = ?, motivo_autorizacao = ?,
+           validade = CURDATE() + INTERVAL ? DAY WHERE id_venda = ?`,
+        [operadorDe(req), ...valoresCab, validadeDias, idExistente]);
+      await connection.execute(`DELETE FROM vendas_pedidos_itens_componentes WHERE id_venda = ? AND tenant_id = ?`, [idExistente, tenant]);
+      await connection.execute(`DELETE FROM vendas_pedidos_itens WHERE id_venda = ? AND tenant_id = ?`, [idExistente, tenant]);
+      id = idExistente;
+    } else {
+      const [cab]: any = await connection.execute(
+        `INSERT INTO vendas_pedidos
+           (tenant_id, origem, status, operador, id_cliente, cliente_nome, contato, total_bruto, total_desconto, total_liquido, total_custo, observacao,
+            margem_alvo, condicao_pagamento, autorizado_por, motivo_autorizacao, validade)
+         VALUES (?, 'PDV', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${tipo === 'ORCAMENTO' ? 'CURDATE() + INTERVAL ? DAY' : 'NULL'})`,
+        [tenant, tipo, operadorDe(req), ...valoresCab, ...(tipo === 'ORCAMENTO' ? [validadeDias] : [])]
+      );
+      id = Number(cab.insertId);
+    }
+    for (const [indice, l] of venda.linhas.entries()) {
       const item = itensBanco.get(l.idItem);
       const custo = custoDaLinha(l);
       const [insItem]: any = await connection.execute(
         `INSERT INTO vendas_pedidos_itens
            (tenant_id, id_venda, id_item, sku_snapshot, nome_snapshot, id_unidade, unidade_sigla, fator_conversao,
-            quantidade, quantidade_base, preco_tabela, preco_unitario, desconto_valor, total_item, custo_unitario_base, custo_total)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            quantidade, quantidade_base, preco_tabela, preco_unitario, desconto_valor, total_item, custo_unitario_base, custo_total, preco_travado)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           tenant, id, l.idItem, item.sku_customizado || item.sku_core, nomeComTrocas(item.nome_comercial || item.nome_item, l.kit),
           l.idUnidade, l.sigla, Number(l.fator).toFixed(6), f4(l.quantidade), f4(l.quantidadeBase),
           f4(l.precoTabela), f4(l.precoUnitarioFinal), f4(l.descontoValor), f4(l.totalItem), f4(custo), f4(custo * l.quantidadeBase),
+          neg && itens[indice]?.travado ? 1 : 0,
         ]
       );
       await gravarEscolhasKit(connection, tenant, id, Number(insItem.insertId), l.kit ?? null);
+      for (const f of faixasDe(indice)) {
+        await connection.execute(
+          `INSERT INTO vendas_pedidos_itens_faixas (tenant_id, id_venda_item, quantidade_minima, preco_unitario) VALUES (?, ?, ?, ?)`,
+          [tenant, Number(insItem.insertId), f4(f.quantidadeMinima), f4(f.precoUnitario)]);
+      }
     }
     await connection.commit();
-    return res.status(201).json({ success: true, id, tipo, totalLiquido: venda.totalLiquido });
+    return res.status(idExistente ? 200 : 201).json({ success: true, id, tipo, totalLiquido: venda.totalLiquido });
   } catch (error) {
     await connection.rollback().catch(() => undefined);
     return responderErro(res, error, 'Erro ao salvar.');
@@ -143,8 +209,21 @@ const carregarDetalhe = async (conn: any, tenant: number, id: number, trava = fa
   );
   if (!p || !['ORCAMENTO', 'SUSPENSA', 'CONVERTIDO'].includes(p.status)) return null;
   const [itens]: any = await conn.execute(
-    `SELECT id_venda_item, id_item, sku_snapshot, nome_snapshot, id_unidade, unidade_sigla, quantidade, preco_tabela, preco_unitario, desconto_valor, total_item
-     FROM vendas_pedidos_itens WHERE id_venda = ? AND tenant_id = ? ORDER BY id_venda_item`,
+    `SELECT i.id_venda_item, i.id_item, i.sku_snapshot, i.nome_snapshot, i.id_unidade, i.unidade_sigla, i.fator_conversao, i.quantidade, i.preco_tabela,
+            i.preco_unitario, i.desconto_valor, i.total_item, i.custo_unitario_base, i.preco_travado,
+            cat.nome AS categoria, ub.sigla AS sigla_base
+     FROM vendas_pedidos_itens i
+     LEFT JOIN itens_core ic ON ic.id_item = i.id_item
+     LEFT JOIN itens_unidades_medida ub ON ub.id_unidade = ic.id_unidade
+     LEFT JOIN comercial_produtos_dados cpd ON cpd.id_item = i.id_item AND cpd.tenant_id = i.tenant_id
+     LEFT JOIN comercial_familias fam ON fam.id = cpd.familia_id
+     LEFT JOIN comercial_categorias cat ON cat.id = COALESCE(fam.categoria_id, cpd.categoria_id)
+     WHERE i.id_venda = ? AND i.tenant_id = ? ORDER BY i.id_venda_item`,
+    [id, tenant]
+  );
+  const [faixas]: any = await conn.execute(
+    `SELECT f.id_venda_item, f.quantidade_minima, f.preco_unitario FROM vendas_pedidos_itens_faixas f
+     JOIN vendas_pedidos_itens i ON i.id_venda_item = f.id_venda_item WHERE i.id_venda = ? AND i.tenant_id = ? ORDER BY f.quantidade_minima`,
     [id, tenant]
   );
   // Kit configurável: as escolhas voltam com a linha (o carrinho remonta o kit igual)
@@ -153,12 +232,19 @@ const carregarDetalhe = async (conn: any, tenant: number, id: number, trava = fa
     id: Number(p.id_venda), tipo: p.status === 'SUSPENSA' ? 'SUSPENSA' : 'ORCAMENTO', situacao: situacao(p.status, p.valido),
     cliente: p.cliente_nome, idCliente: p.id_cliente ? Number(p.id_cliente) : null, contato: p.contato, operador: p.operador,
     observacao: p.observacao, validade: p.validade_txt, criadoEm: p.created_at,
+    // negociação (null = orçamento comum)
+    margemAlvo: p.margem_alvo === null || p.margem_alvo === undefined ? null : Number(p.margem_alvo), condicaoPagamento: p.condicao_pagamento || null,
+    autorizadoPor: p.autorizado_por || null,
     totalBruto: Number(p.total_bruto), totalDesconto: Number(p.total_desconto), total: Number(p.total_liquido),
     itens: itens.map((i: any) => ({
       idItem: Number(i.id_item), sku: i.sku_snapshot, nome: i.nome_snapshot, idUnidade: i.id_unidade ? Number(i.id_unidade) : null,
       unidade: i.unidade_sigla, quantidade: Number(i.quantidade), precoTabela: Number(i.preco_tabela), precoUnitario: Number(i.preco_unitario),
       desconto: Number(i.desconto_valor), total: Number(i.total_item),
       componentes: escolhas.get(Number(i.id_venda_item))?.escolhas,
+      fator: Number(i.fator_conversao) || 1, siglaBase: i.sigla_base || null, categoria: i.categoria || null,
+      custoUnitarioBase: Number(i.custo_unitario_base) || 0, travado: !!Number(i.preco_travado),
+      faixas: faixas.filter((f: any) => Number(f.id_venda_item) === Number(i.id_venda_item))
+        .map((f: any) => ({ quantidadeMinima: Number(f.quantidade_minima), precoUnitario: Number(f.preco_unitario) })),
     })),
   };
 };

@@ -122,6 +122,25 @@ testes → telas → commit.
   respeita o limite de crédito. Histórico em `vendas_pedidos_ajustes(_itens)`; regras em `ajustes/ajustesVenda.ts`.
 - Nota na fila lê os itens na emissão (linha com 0 fica fora); impressão também não mostra a linha tirada.
 
+## Orçamento de negociação (2026-11-17)
+
+- **Banco:** `margem_alvo_padrao` e `margem_minima_negociacao` em `vendas_configuracoes`; `margem_alvo` e `condicao_pagamento` em
+  `vendas_pedidos` (orçamento comum fica com `margem_alvo` NULL); `preco_travado` em `vendas_pedidos_itens`; faixas por
+  quantidade em `vendas_pedidos_itens_faixas`.
+- **Tela** (`areas/vendas/negociacao/NegociacaoDrawer.tsx`): botão **Negociar** no carrinho do PDV e em Vendas › Orçamentos
+  (renegociar mantém o número). Margem = lucro ÷ preço (markup ao lado), sobre o custo do item (custo médio do depósito
+  Venda, senão o gerencial). Margem do orçamento contra o alvo, régua geral, régua por categoria (marca a margem sugerida da
+  categoria), régua e preço por item, preço por unidade base, margem de tabela e da **última venda para o cliente**, cadeado
+  (travar) e **Equilibrar para o alvo** (livres na margem que fecha o orçamento no alvo; regra em `negociacao.ts`, cópia no
+  front para recalcular na hora). Faixas por quantidade por item.
+- **Servidor:** `POST /api/vendas/negociacao/preparar` (preço de tabela, custo da linha, categoria, unidade base, última venda);
+  salvar é o POST dos orçamentos com `negociacao` (+ `idPedido` para renegociar). Item ou faixa abaixo da margem mínima pede a
+  senha de autorização (quem e motivo ficam no orçamento). No orçamento negociado o preço combinado vira o "de tabela":
+  ao vender, não conta como desconto.
+- **Proposta** (impressão e PDF/WhatsApp): itens por categoria, embalagem e preço por unidade base, faixas, condição de
+  pagamento, validade, vendedor e código do cliente (`propostaNegociacao.ts`). Custo e margem não saem.
+- Pendente: na venda, a faixa por quantidade não muda o preço sozinha se a quantidade for diferente da orçada.
+
 ## Critérios de pronto
 
 - **Fase 1:** abrir com R$ 100, vender R$ 50 em dinheiro, sangria de R$ 30 → fechamento espera R$ 120 em dinheiro e mostra a diferença contada.

@@ -2,12 +2,14 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card, Empty, Input, Popconfirm, Segmented, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
-import { DeleteOutlined, FilePdfOutlined, PrinterOutlined, ReloadOutlined, ShoppingCartOutlined, UserAddOutlined, WhatsAppOutlined } from '@ant-design/icons';
+import { DeleteOutlined, FilePdfOutlined, PrinterOutlined, ReloadOutlined, ShoppingCartOutlined, SlidersOutlined, UserAddOutlined, WhatsAppOutlined } from '@ant-design/icons';
 import { imprimirOrcamento, PedidoAbertoDetalhe, PedidoAbertoResumo, pedidosAbertosApi } from '../pdv/services/pedidosAbertosApi';
 import { SITUACAO_PEDIDO } from '../pdv/components/PedidosAbertosPDV';
 import { baixarPdfOrcamento, EnviarOrcamentoWhatsapp } from './EnviarOrcamento';
 import { ClientePdvModal } from '../pdv/components/ClientePdvModal';
 import { telefoneDoTexto } from '../../../shared/utils/whatsapp';
+import { AberturaNegociacao, NegociacaoDrawer } from '../negociacao/NegociacaoDrawer';
+import { aberturaDoOrcamento } from '../negociacao/negociacaoApi';
 
 const { Text, Title } = Typography;
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -39,6 +41,10 @@ const Orcamentos: React.FC = () => {
   const [carregando, setCarregando] = useState(false);
   const [enviando, setEnviando] = useState<number | null>(null);
   const [semCliente, setSemCliente] = useState<PedidoAbertoResumo | null>(null);
+  const [negociando, setNegociando] = useState<AberturaNegociacao | null>(null);
+  const negociar = async (id: number) => {
+    try { setNegociando(aberturaDoOrcamento(await pedidosAbertosApi.detalhe(id))); } catch (e) { message.error(e instanceof Error ? e.message : 'Erro ao abrir.'); }
+  };
 
   const carregar = async () => {
     setCarregando(true);
@@ -143,6 +149,11 @@ const Orcamentos: React.FC = () => {
                     {o.situacao === 'CONVERTIDO'
                       ? <Button size="small" type="link" onClick={() => navigate('/vendas/do-dia')}>venda Nº {o.idVendaGerada}</Button>
                       : <Button size="small" type="primary" icon={<ShoppingCartOutlined />} onClick={() => navigate(`/vendas/pdv?orcamento=${o.id}`)}>Vender</Button>}
+                    {o.situacao !== 'CONVERTIDO' && (
+                      <Tooltip title="Negociar: margem por item, por categoria e do orçamento, faixas por quantidade">
+                        <Button size="small" icon={<SlidersOutlined />} onClick={() => negociar(o.id)} />
+                      </Tooltip>
+                    )}
                     <Tooltip title="Imprimir"><Button size="small" icon={<PrinterOutlined />} onClick={() => imprimir(o.id)} /></Tooltip>
                     <Tooltip title="Baixar PDF"><Button size="small" icon={<FilePdfOutlined />} onClick={() => baixarPdfOrcamento(o.id)} /></Tooltip>
                     <Tooltip title="Enviar o PDF pelo WhatsApp">
@@ -161,6 +172,8 @@ const Orcamentos: React.FC = () => {
         </Card>
       </Space>
       <EnviarOrcamentoWhatsapp id={enviando} onClose={() => setEnviando(null)} />
+      <NegociacaoDrawer abrir={negociando} onFechar={() => setNegociando(null)}
+        onSalvo={id => { setNegociando(null); message.success(`Orçamento Nº ${id} salvo.`); carregar(); }} />
       <ClientePdvModal
         open={!!semCliente}
         titulo={semCliente ? `Cliente do orçamento Nº ${semCliente.id}` : undefined}

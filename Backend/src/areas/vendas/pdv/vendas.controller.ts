@@ -132,7 +132,7 @@ export const registrarVenda = async (req: Request, res: Response) => {
     let congelados: PrecosCongelados | undefined;
     if (idOrcamento) {
       const [[orc]]: any = await connection.execute(
-        `SELECT id_venda, status, validade >= CURDATE() AS valido FROM vendas_pedidos WHERE id_venda = ? AND tenant_id = ? FOR UPDATE`,
+        `SELECT id_venda, status, margem_alvo, validade >= CURDATE() AS valido FROM vendas_pedidos WHERE id_venda = ? AND tenant_id = ? FOR UPDATE`,
         [idOrcamento, tenant]
       );
       if (!orc || orc.status !== 'ORCAMENTO') throw new ErroVenda('Orçamento não encontrado ou já convertido.', 409);
@@ -145,7 +145,8 @@ export const registrarVenda = async (req: Request, res: Response) => {
         const escolhasOrc = await escolhasDasLinhas(connection as any, tenant, idOrcamento);
         congelados = new Map(linhasOrc.map((l: any) => [
           chaveLinha(Number(l.id_item), l.id_unidade ? Number(l.id_unidade) : null, escolhasOrc.get(Number(l.id_venda_item))?.assinatura),
-          { precoTabela: Number(l.preco_tabela), precoUnitario: Number(l.preco_unitario) }]));
+          // orçamento negociado: o preço combinado vale como tabela (já foi autorizado na negociação, não é desconto)
+          { precoTabela: orc.margem_alvo !== null ? Number(l.preco_unitario) : Number(l.preco_tabela), precoUnitario: Number(l.preco_unitario) }]));
       }
     }
 
