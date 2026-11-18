@@ -11,6 +11,7 @@ import { escolhasDasLinhas, gravarEscolhasKit } from '../../catalogo/kits/kitsVe
 import { carregarMargensNegociacao, carregarRegras } from '../regras/regrasVenda.controller';
 import { conferirSenha } from '../regras/regrasVenda';
 import { abaixoDaMinima, normalizarFaixas } from '../negociacao/negociacao';
+import { condicaoDaLinha, lerCondicao, textoDaCondicao } from '../negociacao/condicaoPagamento';
 
 const TIPOS = ['ORCAMENTO', 'SUSPENSA'] as const;
 type TipoAberto = typeof TIPOS[number];
@@ -72,6 +73,11 @@ export const salvarPedidoAberto = async (req: Request, res: Response) => {
     // Na negociação o preço combinado é o "de tabela" do orçamento (não conta como desconto ao vender)
     if (neg) for (const l of linhas) l.precoTabela = l.precoPraticado;
     const venda = fecharVenda(linhas, Number(req.body?.descontoGeral) || 0);
+    // Condição de pagamento em campos (forma, parcelas, intervalo, entrada); o texto da proposta sai dela
+    let condicao: ReturnType<typeof lerCondicao> = null;
+    if (neg) {
+      try { condicao = lerCondicao(neg.condicao, venda.totalLiquido); } catch (e: any) { throw new ErroVenda(e.message); }
+    }
 
     const custoDaLinha = await (await custoDasLinhas(connection, tenant, ids, itensBanco))(venda.linhas);
     const totalCusto = venda.linhas.reduce((a, l) => a + custoDaLinha(l) * l.quantidadeBase, 0);
@@ -105,7 +111,9 @@ export const salvarPedidoAberto = async (req: Request, res: Response) => {
       String(req.body?.contato || '').trim().slice(0, 100) || null,
       f4(venda.totalBruto), f4(venda.totalDesconto), f4(venda.totalLiquido), f4(totalCusto),
       String(req.body?.observacao || '').trim().slice(0, 255) || null,
-      neg ? Number(margemAlvo).toFixed(4) : null, neg ? String(neg.condicaoPagamento || '').trim().slice(0, 150) || null : null,
+      neg ? Number(margemAlvo).toFixed(4) : null,
+      neg ? (condicao ? textoDaCondicao(condicao) : String(neg.condicaoPagamento || '').trim()).slice(0, 150) || null : null,
+      condicao?.forma ?? null, condicao ? condicao.parcelas : null, condicao?.intervaloDias ?? null, condicao && condicao.entrada > 0 ? f4(condicao.entrada) : null,
       autorizadoPor, motivoAutorizacao,
     ];
     let id: number;
@@ -115,7 +123,8 @@ export const salvarPedidoAberto = async (req: Request, res: Response) => {
       if (!atual || atual.status !== 'ORCAMENTO') throw new ErroVenda('Orçamento não encontrado ou já convertido em venda.', 409);
       await connection.execute(
         `UPDATE vendas_pedidos SET operador = ?, id_cliente = ?, cliente_nome = ?, contato = ?, total_bruto = ?, total_desconto = ?, total_liquido = ?,
-           total_custo = ?, observacao = ?, margem_alvo = ?, condicao_pagamento = ?, autorizado_por = ?, motivo_autorizacao = ?,
+           total_custo = ?, observacao = ?, margem_alvo = ?, condicao_pagamento = ?,
+           condicao_forma = ?, condicao_parcelas = ?, condicao_intervalo_dias = ?, condicao_entrada = ?, autorizado_por = ?, motivo_autorizacao = ?,
            validade = CURDATE() + INTERVAL ? DAY WHERE id_venda = ?`,
         [operadorDe(req), ...valoresCab, validadeDias, idExistente]);
       await connection.execute(`DELETE FROM vendas_pedidos_itens_componentes WHERE id_venda = ? AND tenant_id = ?`, [idExistente, tenant]);
@@ -125,8 +134,8 @@ export const salvarPedidoAberto = async (req: Request, res: Response) => {
       const [cab]: any = await connection.execute(
         `INSERT INTO vendas_pedidos
            (tenant_id, origem, status, operador, id_cliente, cliente_nome, contato, total_bruto, total_desconto, total_liquido, total_custo, observacao,
-            margem_alvo, condicao_pagamento, autorizado_por, motivo_autorizacao, validade)
-         VALUES (?, 'PDV', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${tipo === 'ORCAMENTO' ? 'CURDATE() + INTERVAL ? DAY' : 'NULL'})`,
+            margem_alvo, condicao_pagamento, condicao_forma, condicao_parcelas, condicao_intervalo_dias, condicao_entrada, autorizado_por, motivo_autorizacao, validade)
+         VALUES (?, 'PDV', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${tipo === 'ORCAMENTO' ? 'CURDATE() + INTERVAL ? DAY' : 'NULL'})`,
         [tenant, tipo, operadorDe(req), ...valoresCab, ...(tipo === 'ORCAMENTO' ? [validadeDias] : [])]
       );
       id = Number(cab.insertId);
@@ -234,6 +243,7 @@ const carregarDetalhe = async (conn: any, tenant: number, id: number, trava = fa
     observacao: p.observacao, validade: p.validade_txt, criadoEm: p.created_at,
     // negociação (null = orçamento comum)
     margemAlvo: p.margem_alvo === null || p.margem_alvo === undefined ? null : Number(p.margem_alvo), condicaoPagamento: p.condicao_pagamento || null,
+    condicao: condicaoDaLinha(p),
     autorizadoPor: p.autorizado_por || null,
     totalBruto: Number(p.total_bruto), totalDesconto: Number(p.total_desconto), total: Number(p.total_liquido),
     itens: itens.map((i: any) => ({

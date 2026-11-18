@@ -4,6 +4,7 @@ import { lerConfiguracoes } from '../../../../shared/core/configuracoes/configur
 import { imprimirHtml } from '../../../../shared/core/impressao/saida';
 import { API_URL } from '../../../../shared/api/config';
 import { codigoCliente, secoesDaProposta } from '../../negociacao/propostaNegociacao';
+import type { CondicaoPagamento } from '../../negociacao/condicaoPagamento';
 
 const API = `${API_URL}/api/vendas/pdv/pedidos-abertos`;
 
@@ -31,6 +32,8 @@ export interface PedidoAbertoDetalhe {
   totalBruto: number; totalDesconto: number; total: number; itens: ItemPedidoAberto[];
   /** Orçamento de negociação (null = orçamento comum). */
   margemAlvo?: number | null; condicaoPagamento?: string | null; autorizadoPor?: string | null;
+  /** Condição em campos (null = a combinar ou só o texto). */
+  condicao?: CondicaoPagamento | null;
   /** Telefone principal do cliente cadastrado (só no detalhe). */
   telefoneCliente?: string | null;
 }

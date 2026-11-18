@@ -13,7 +13,8 @@ import { salesService, VendaPdvPayload, FormaPagamentoPdv, ErroVendaPdv, Autoriz
 import { idItemDaLinha, isCartItemOS } from '../types/cart.types';
 import { caixaStore } from '../../caixa/caixaStore';
 import { useSituacaoCliente } from '../../../financeiro/receber/receberApi';
-import { acrescimoParcelamento, ajusteDaForma, descontoDaForma, useTaxasVenda } from '../../taxas/taxasVenda';
+import { acrescimoParcelamento, ajusteDaForma, descontoDaForma, taxaPara, useTaxasVenda } from '../../taxas/taxasVenda';
+import { CondicaoPagamento, pagamentoMaisCaro, pagamentosDaCondicao } from '../../negociacao/condicaoPagamento';
 import { useAdiantamentosAbertos } from '../services/adiantamentosApi';
 import { Calculadora, PreferenciasPdv, bipConfirmacao, guardarUltimoComprovante, lerPreferencias, salvarPreferencias, textoComprovante, ultimoComprovante } from './apoioPagamento';
 
@@ -99,7 +100,7 @@ interface FinalizarVendaProps {
     idOrcamento?: number | null;
     manterPrecoOrcamento?: boolean;
     /** Proposta negociada: preço fechado; não sugere o desconto da forma e mostra a condição combinada. */
-    negociacao?: { condicao: string | null } | null;
+    negociacao?: { texto: string | null; condicao: CondicaoPagamento | null } | null;
     // Sinais de uma origem (ex.: OS sendo entregue), além dos do cliente
     adiantamentosOrigem?: { origem: string; idOrigem: number } | null;
     itens: ItemVenda[];
@@ -332,6 +333,30 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
         setUsuarioInteragiu(true);
     };
 
+    // Proposta negociada no crédito: até as parcelas combinadas não há acréscimo (a taxa já entrou na negociação)
+    const acrescimoDoCredito = (forma: string, parcelas: number, valor: number) => {
+        const c = negociacao?.condicao;
+        if (c && c.forma === 'CREDITO' && forma === 'CREDITO' && parcelas <= c.parcelas) return 0;
+        return acrescimoParcelamento(taxasVenda, forma, parcelas, valor);
+    };
+
+    // Lança os pagamentos da condição combinada (o caixa confirma cada um como sempre)
+    const lancarCondicao = () => {
+        const c = negociacao?.condicao;
+        if (!c) return;
+        const metodoDe: Record<string, PaymentMethodType> = { PIX: 'pix', DINHEIRO: 'money', DEBITO: 'debit_card', CREDITO: 'credit_card', PRAZO: 'store_credit' };
+        if (c.forma === 'PRAZO' && !clienteId) { message.warning('Para vender a prazo, identifique o cliente (F4).'); return; }
+        setPagamentos(atual => [
+            ...atual.filter(p => p.status === 'paid' || p.status === 'processing'),
+            ...pagamentosDaCondicao(c, saldoRestante).filter(p => p.valor > 0).map(p => ({
+                id: crypto.randomUUID(), metodo: metodoDe[p.forma], valor: p.valor, parcelas: p.parcelas || 1,
+                ...(p.forma === 'PRAZO' ? { intervaloDias: p.intervaloDias || 30 } : {}),
+                status: 'pending' as PaymentStatus, createdAt: new Date(),
+            })),
+        ]);
+        escolherMetodo(null);
+    };
+
     const adicionarPagamento = () => {
         const valorNumerico = numero(valorInput);
         if (valorNumerico <= 0 || !metodoSelecionado) return;
@@ -343,7 +368,7 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
         if (metodoSelecionado === 'store_credit' && !clienteId) { message.warning('Para vender a prazo, identifique o cliente (F4: dá para cadastrar só com nome e telefone).'); return; }
 
         const parcelasDoPagamento = metodoSelecionado === 'credit_card' ? parcelasInput : 1;
-        const acrescimo = acrescimoParcelamento(taxasVenda, FORMA_POR_METODO[metodoSelecionado], parcelasDoPagamento, valorNumerico);
+        const acrescimo = acrescimoDoCredito(FORMA_POR_METODO[metodoSelecionado], parcelasDoPagamento, valorNumerico);
         setPagamentos(atual => [...atual, {
             id: crypto.randomUUID(),
             metodo: metodoSelecionado,
@@ -386,7 +411,7 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
             return (
                 <Select style={{ width: '100%' }} value={parcelasInput} onChange={setParcelasInput} popupMatchSelectWidth={false}
                     options={Array.from({ length: 12 }, (_, i) => i + 1).map(n => {
-                        const acr = acrescimoParcelamento(taxasVenda, 'CREDITO', n, valorDigitado);
+                        const acr = acrescimoDoCredito('CREDITO', n, valorDigitado);
                         return { value: n, label: `${n}x de ${brl((valorDigitado + acr) / n)} ${acr > 0 ? `(+ ${brl(acr)})` : '(sem juros)'}` };
                     })} />
             );
@@ -438,10 +463,21 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
     const descontoFormaAplicado = pctForma > 0 && tipoDesconto === 'porcent' && Math.abs(descontoValor - pctForma) < 0.001;
     const aplicarDescontoForma = () => { setTipoDesconto('porcent'); setDescontoValor(pctForma); setUsuarioInteragiu(false); };
     const removerDesconto = () => { setDescontoValor(0); setTipoDesconto('real'); setUsuarioInteragiu(false); };
+    // Pagamento lançado mais caro que o combinado (mais taxa ou mais prazo): avisa que vai pedir a senha ao concluir
+    const pagamentosLancados = pagamentos.filter(p => p.status !== 'cancelled' && p.status !== 'failed' && p.status !== 'refunded');
+    const maisCaro = negociacao?.condicao && taxasVenda && pagamentosLancados.length > 0
+        ? pagamentoMaisCaro((f, n) => taxaPara(taxasVenda, f, n), negociacao.condicao, totalLiquido,
+            pagamentosLancados.map(p => ({ forma: FORMA_POR_METODO[p.metodo], valor: Number(p.valor), parcelas: p.parcelas, intervaloDias: p.intervaloDias, semPrazo: p.semPrazo })))
+        : null;
     const sugestaoDescontoForma = negociacao ? (
-        <Alert type="warning" showIcon style={{ margin: '4px 0', padding: '4px 8px' }}
-            title={<span>Proposta negociada: preço fechado com o cliente. Condição combinada: <b>{negociacao.condicao || 'a combinar'}</b></span>}
-            description="Sem desconto da forma de pagamento. Crédito acima das parcelas sem juros ainda tem o acréscimo da maquininha." />
+        <Alert type={maisCaro ? 'error' : 'warning'} showIcon style={{ margin: '4px 0', padding: '4px 8px' }}
+            title={<span>Proposta negociada: preço fechado com o cliente. Condição combinada: <b>{negociacao.texto || 'a combinar'}</b></span>}
+            description={maisCaro
+                ? <>{maisCaro} Vai pedir a senha de autorização ao concluir.</>
+                : negociacao.condicao
+                    ? 'Sem desconto da forma de pagamento. Use "Lançar a condição" para preencher o pagamento combinado.'
+                    : 'Sem desconto da forma de pagamento. Crédito acima das parcelas sem juros ainda tem o acréscimo da maquininha.'}
+            action={negociacao.condicao && saldoRestante > 0 ? <Button size="small" type="primary" onClick={lancarCondicao}>Lançar a condição</Button> : undefined} />
     ) : pctForma > 0 && (
         <Flex justify="space-between" align="center" gap={6} wrap
             style={{ margin: '4px 0', padding: '4px 8px', borderRadius: token.borderRadius, background: token.colorSuccessBg, border: `1px solid ${token.colorSuccessBorder}` }}>

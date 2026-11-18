@@ -13,7 +13,8 @@ import { ErroReceber } from '../../financeiro/receber/receber';
 import { carregarRegras } from '../regras/regrasVenda.controller';
 import { avaliarRegras, conferirSenha } from '../regras/regrasVenda';
 import { carregarConfigTaxas } from '../taxas/taxas.controller';
-import { calcularTaxas, descontoEfetivoPct, liquidoParaRegra } from '../taxas/taxas';
+import { calcularTaxas, descontoEfetivoPct, liquidoParaRegra, taxaPara } from '../taxas/taxas';
+import { condicaoDaLinha, lerCondicao, pagamentoMaisCaro } from '../negociacao/condicaoPagamento';
 import { carregarDadosComponentes, saidasDoKitNaVenda } from '../../catalogo/kits/kitsBanco';
 import { ErroKit, nomeComTrocas, saidaDosComponentes } from '../../catalogo/kits/kits';
 import { escolhasDasLinhas, gravarEscolhasKit, resolverKitsDoPedido } from '../../catalogo/kits/kitsVenda';
@@ -130,9 +131,12 @@ export const registrarVenda = async (req: Request, res: Response) => {
 
     // Orçamento de origem: precisa estar em aberto; com "manter o preço" e dentro da validade, congela os preços
     let congelados: PrecosCongelados | undefined;
+    let condicaoCombinada: ReturnType<typeof lerCondicao> = null;
     if (idOrcamento) {
       const [[orc]]: any = await connection.execute(
-        `SELECT id_venda, status, margem_alvo, validade >= CURDATE() AS valido FROM vendas_pedidos WHERE id_venda = ? AND tenant_id = ? FOR UPDATE`,
+        `SELECT id_venda, status, margem_alvo, condicao_forma, condicao_parcelas, condicao_intervalo_dias, condicao_entrada,
+                validade >= CURDATE() AS valido
+         FROM vendas_pedidos WHERE id_venda = ? AND tenant_id = ? FOR UPDATE`,
         [idOrcamento, tenant]
       );
       if (!orc || orc.status !== 'ORCAMENTO') throw new ErroVenda('Orçamento não encontrado ou já convertido.', 409);
@@ -143,6 +147,8 @@ export const registrarVenda = async (req: Request, res: Response) => {
           [idOrcamento, tenant]
         );
         const escolhasOrc = await escolhasDasLinhas(connection as any, tenant, idOrcamento);
+        // Proposta negociada vendida pelos preços combinados: o pagamento é conferido com a condição combinada
+        if (orc.margem_alvo !== null) condicaoCombinada = lerCondicao(condicaoDaLinha(orc));
         congelados = new Map(linhasOrc.map((l: any) => [
           chaveLinha(Number(l.id_item), l.id_unidade ? Number(l.id_unidade) : null, escolhasOrc.get(Number(l.id_venda_item))?.assinatura),
           // orçamento negociado: o preço combinado vale como tabela (já foi autorizado na negociação, não é desconto)
@@ -253,6 +259,14 @@ export const registrarVenda = async (req: Request, res: Response) => {
       custoTotal: custoDaLinha(l) * l.quantidadeBase,
     })), regras, percentualEfetivo);
     if (avaliacao.bloqueio) throw new ErroVenda(avaliacao.bloqueio, 409, { codigo: 'ABAIXO_DO_CUSTO' });
+    // Proposta negociada: pagamento mais caro para a loja que o combinado (mais taxa ou mais prazo) também pede a senha
+    const motivoCondicao = condicaoCombinada
+      ? pagamentoMaisCaro((f, n) => taxaPara(cfgTaxas.taxas, f, n), condicaoCombinada, totalComFrete, pagamentosOk.map((p, i) => ({
+        forma: p.forma, valor: Math.round((p.valor - p.troco) * 100) / 100, parcelas: p.parcelas,
+        intervaloDias: Number((pagamentos as any[])[i]?.intervaloDias) || 30, semPrazo: Boolean((pagamentos as any[])[i]?.semPrazo),
+      })))
+      : null;
+    if (motivoCondicao) { avaliacao.motivos.push(motivoCondicao); avaliacao.exigeAutorizacao = true; }
     let autorizadoPor: string | null = null;
     let motivoAutorizacao: string | null = null;
     if (avaliacao.exigeAutorizacao) {

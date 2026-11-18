@@ -27,6 +27,7 @@ import { useSituacaoCliente } from '../../financeiro/receber/receberApi';
 import { imprimirOrcamento, pedidosAbertosApi } from './services/pedidosAbertosApi';
 import { DadosOrcamento, DrawerPedidosAbertos, ModalSalvarOrcamento } from './components/PedidosAbertosPDV';
 import { AberturaNegociacao, NegociacaoDrawer } from '../negociacao/NegociacaoDrawer';
+import type { CondicaoPagamento } from '../negociacao/condicaoPagamento';
 import { extensoesPdv } from '../../../modulos/registroModulos';
 import { devolucoesService } from './services/salesService';
 import { CHAVE_TROCA } from './components/ModalDevolucao';
@@ -82,7 +83,7 @@ const PDVContent: React.FC = () => {
   // ---------------------------------------------------------------- Orçamentos e vendas suspensas
   // Venda nascida de um orçamento (vai junto no envio; manterPreco = preços congelados do orçamento).
   // negociacao: proposta negociada (preços fechados com o cliente; sem desconto/acréscimo automático da forma)
-  const [orcamentoAtual, setOrcamentoAtual] = useState<{ id: number; manterPreco: boolean; negociacao?: { condicao: string | null } } | null>(null);
+  const [orcamentoAtual, setOrcamentoAtual] = useState<{ id: number; manterPreco: boolean; negociacao?: { texto: string | null; condicao: CondicaoPagamento | null } } | null>(null);
   const [drawerPedidos, setDrawerPedidos] = useState<null | 'SUSPENSA' | 'ORCAMENTO'>(null);
   const [modalOrcamento, setModalOrcamento] = useState(false);
   const [negociando, setNegociando] = useState<AberturaNegociacao | null>(null);
@@ -192,7 +193,7 @@ const PDVContent: React.FC = () => {
       if (d.idCliente) selecionarCliente({ id: d.idCliente, nome: d.cliente });
       else { selecionarCliente(null); if (d.cliente && d.cliente !== 'CONSUMIDOR') setCliente(d.cliente); }
       setOrcamentoAtual(tipo === 'ORCAMENTO'
-        ? { id: d.id, manterPreco, ...(negociado && manterPreco ? { negociacao: { condicao: d.condicaoPagamento ?? null } } : {}) }
+        ? { id: d.id, manterPreco, ...(negociado && manterPreco ? { negociacao: { texto: d.condicaoPagamento ?? null, condicao: d.condicao ?? null } } : {}) }
         : null);
       setEstagio('SELECAO');
       setDrawerPedidos(null);
@@ -459,7 +460,7 @@ const PDVContent: React.FC = () => {
           {orcamentoAtual?.negociacao ? (
             <Alert type="warning" showIcon style={{ padding: '2px 10px' }}
               title={<span>Vendendo a <b>proposta negociada Nº {orcamentoAtual.id}</b> · preços combinados com o cliente
-                {' · condição: '}<b>{orcamentoAtual.negociacao.condicao || 'a combinar'}</b></span>} />
+                {' · condição: '}<b>{orcamentoAtual.negociacao.texto || 'a combinar'}</b></span>} />
           ) : orcamentoAtual && (
             <Alert type="info" showIcon style={{ padding: '2px 10px' }}
               title={<span>Vendendo o <b>orçamento Nº {orcamentoAtual.id}</b> · {orcamentoAtual.manterPreco ? 'preços do orçamento mantidos' : 'preços atuais do catálogo'}</span>}

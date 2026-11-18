@@ -139,6 +139,13 @@ testes → telas → commit.
   ao vender, não conta como desconto.
 - **Proposta** (impressão e PDF/WhatsApp): itens por categoria, embalagem e preço por unidade base, faixas, condição de
   pagamento, validade, vendedor e código do cliente (`propostaNegociacao.ts`). Custo e margem não saem.
+- **Condição de pagamento em campos** (2026-11-18): `condicao_forma`, `condicao_parcelas`, `condicao_intervalo_dias` e
+  `condicao_entrada` em `vendas_pedidos` (o texto `condicao_pagamento` sai deles; "a combinar" continua texto livre). Regra
+  em `negociacao/condicaoPagamento.ts` (cópia no front): texto da proposta, custo da condição (taxa de Vendas › Taxas + prazo
+  médio para receber) mostrado como "margem depois da condição" na negociação, e a conferência na venda.
+- **Venda da proposta no PDV:** válida entra sempre pelos preços combinados (sem a pergunta "preços atuais"); sem a tabela de
+  desconto por forma; "Lançar a condição" preenche o pagamento combinado (sem acréscimo do crédito até as parcelas combinadas).
+  Pagamento mais caro para a loja que o combinado (mais taxa, ou mais prazo médio) pede a senha de autorização.
 - Pendente: na venda, a faixa por quantidade não muda o preço sozinha se a quantidade for diferente da orçada.
 
 ## Critérios de pronto

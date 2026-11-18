@@ -4,7 +4,7 @@
 // saem na proposta. Abaixo da margem mínima pede a senha de autorização (Vendas › Regras de venda).
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Alert, AutoComplete, Button, Card, Col, Drawer, Empty, Flex, Input, InputNumber, Modal, Progress, Row, Slider, Space, Statistic, Table, Tag,
+  Alert, AutoComplete, Button, Card, Col, Drawer, Empty, Flex, Input, InputNumber, Modal, Progress, Row, Select, Slider, Space, Statistic, Table, Tag,
   Tooltip, Typography, message,
 } from 'antd';
 import { DeleteOutlined, LockOutlined, PlusOutlined, SaveOutlined, ThunderboltOutlined, UnlockOutlined } from '@ant-design/icons';
@@ -12,6 +12,8 @@ import {
   aplicarMargem, equilibrar, FaixaQuantidade, margem as margemDe, markup as markupDe, precoParaMargem, resumoNegociacao,
 } from './negociacao';
 import { CONDICOES_PAGAMENTO, ConfigNegociacao, ErroNegociacao, ItemNegociacao, LinhaPreparada, negociacaoApi } from './negociacaoApi';
+import { CondicaoPagamento, custoDaCondicao, FormaCondicao, textoDaCondicao } from './condicaoPagamento';
+import { taxaPara, useTaxasVenda } from '../taxas/taxasVenda';
 
 const { Text } = Typography;
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -25,7 +27,7 @@ export interface AberturaNegociacao {
   idPedido?: number | null;
   inicial?: {
     precos: Array<number | null>; travados: boolean[]; faixas: FaixaQuantidade[][];
-    margemAlvo?: number | null; condicaoPagamento?: string | null; contato?: string | null; observacao?: string | null;
+    margemAlvo?: number | null; condicaoPagamento?: string | null; condicao?: CondicaoPagamento | null; contato?: string | null; observacao?: string | null;
   };
 }
 
@@ -41,6 +43,9 @@ export const NegociacaoDrawer: React.FC<{
   const [linhas, setLinhas] = useState<Linha[]>([]);
   const [alvo, setAlvo] = useState(0.3);
   const [condicao, setCondicao] = useState('');
+  // Condição em campos: forma ('' = a combinar / texto livre), parcelas, intervalo e entrada
+  const [cond, setCond] = useState<{ forma: FormaCondicao | ''; parcelas: number; intervaloDias: number; entrada: number }>({ forma: '', parcelas: 1, intervaloDias: 30, entrada: 0 });
+  const taxas = useTaxasVenda();
   const [validade, setValidade] = useState(7);
   const [contato, setContato] = useState('');
   const [observacao, setObservacao] = useState('');
@@ -56,7 +61,10 @@ export const NegociacaoDrawer: React.FC<{
     negociacaoApi.preparar(abrir.itens, abrir.cliente?.id).then(r => {
       setCfg(r.config);
       setAlvo(ini?.margemAlvo ?? r.config.margemAlvoPadrao);
-      setCondicao(ini?.condicaoPagamento || ''); setContato(ini?.contato || ''); setObservacao(ini?.observacao || ''); setValidade(7);
+      setCondicao(ini?.condicaoPagamento || ''); setContato(ini?.contato || '');
+      setCond(ini?.condicao
+        ? { forma: ini.condicao.forma, parcelas: ini.condicao.parcelas, intervaloDias: ini.condicao.intervaloDias || 30, entrada: ini.condicao.entrada || 0 }
+        : { forma: '', parcelas: 1, intervaloDias: 30, entrada: 0 }); setObservacao(ini?.observacao || ''); setValidade(7);
       setLinhas(r.linhas.map((l, i) => ({
         ...l, preco: ini?.precos[i] ?? l.precoTabela, travado: ini?.travados[i] ?? false, faixas: ini?.faixas[i] ?? [],
         componentes: abrir.itens[i]?.componentes,
@@ -75,6 +83,15 @@ export const NegociacaoDrawer: React.FC<{
     });
     return [...m.values()];
   }, [linhas]);
+
+  const condicaoAtual: CondicaoPagamento | null = cond.forma
+    ? {
+      forma: cond.forma,
+      parcelas: cond.forma === 'CREDITO' || cond.forma === 'PRAZO' ? Math.max(1, cond.parcelas) : 1,
+      intervaloDias: cond.forma === 'PRAZO' ? cond.intervaloDias : null,
+      entrada: cond.forma === 'CREDITO' || cond.forma === 'PRAZO' ? cond.entrada : 0,
+    }
+    : null;
 
   if (!abrir) return null;
   const mudar = (i: number, x: Partial<Linha>) => setLinhas(ls => ls.map((l, k) => (k === i ? { ...l, ...x } : l)));
@@ -96,7 +113,7 @@ export const NegociacaoDrawer: React.FC<{
     try {
       const r = await negociacaoApi.salvar({
         idPedido: abrir.idPedido, idCliente: abrir.cliente?.id ?? null, clienteNome: abrir.cliente?.nome, contato, observacao, validadeDias: validade,
-        margemAlvo: alvo, condicaoPagamento: condicao,
+        margemAlvo: alvo, condicaoPagamento: condicao, condicao: condicaoAtual,
         itens: linhas.map(l => ({ idItem: l.idItem, quantidade: l.quantidade, idUnidade: l.idUnidade, componentes: l.componentes, precoUnitario: l.preco, travado: l.travado, faixas: l.faixas })),
         autorizacao,
       });
@@ -215,6 +232,9 @@ export const NegociacaoDrawer: React.FC<{
   );
 
   const corResumo = cfg ? corDaMargem(resumo.margem, cfg, alvo) : undefined;
+  // Margem depois do custo da condição (taxa da maquininha) e o prazo médio para receber
+  const custoCond = condicaoAtual && taxas && resumo.receita > 0 ? custoDaCondicao((f, n) => taxaPara(taxas, f, n), condicaoAtual, resumo.receita) : null;
+  const margemLiquida = custoCond && resumo.custo > 0 ? (resumo.lucro - custoCond.taxa) / resumo.receita : null;
   const lucroNoAlvo = resumo.custo > 0 ? resumo.custo / (1 - alvo) - resumo.custo : 0;
 
   return (
@@ -232,6 +252,14 @@ export const NegociacaoDrawer: React.FC<{
                   <Progress percent={Math.max(0, Math.min(100, ((resumo.margem ?? 0) / Math.max(alvo, 0.01)) * 100))} showInfo={false} strokeColor={corResumo} style={{ flex: 1 }} />
                 </Flex>
                 <Text type="secondary" style={{ fontSize: 12 }}>markup {pct(resumo.markup)}{resumo.semCusto ? ` · ${resumo.semCusto} item(ns) sem custo fora da conta` : ''}</Text>
+                {custoCond && (
+                  <Tooltip title="Margem depois da taxa da forma combinada (Vendas › Taxas). O prazo médio é quanto tempo, em média, até o dinheiro entrar.">
+                    <Text style={{ fontSize: 12, display: 'block', color: cfg ? corDaMargem(margemLiquida, cfg, alvo) : undefined }}>
+                      Depois da condição: <b>{pct(margemLiquida)}</b>{custoCond.taxa > 0 ? ` · taxa ${brl(custoCond.taxa)}` : ' · sem taxa'}
+                      {custoCond.prazoMedioDias > 0 ? ` · recebe em ~${custoCond.prazoMedioDias.toLocaleString('pt-BR')} dias` : ''}
+                    </Text>
+                  </Tooltip>
+                )}
               </Col>
               <Col xs={8} lg={3}><Statistic title="Total" value={brl(resumo.receita)} valueStyle={{ fontSize: 17 }} /></Col>
               <Col xs={8} lg={3}><Statistic title="Lucro" value={brl(resumo.lucro)} valueStyle={{ fontSize: 17, color: corResumo }} /></Col>
@@ -292,8 +320,28 @@ export const NegociacaoDrawer: React.FC<{
             <Row gutter={[12, 8]}>
               <Col xs={24} md={9}>
                 <Text style={{ fontSize: 12 }}>Condição de pagamento</Text>
-                <AutoComplete style={{ width: '100%' }} options={CONDICOES_PAGAMENTO.map(value => ({ value }))} value={condicao} onChange={setCondicao}
-                  placeholder="Ex.: Boleto 21 dias (1 parcela)" maxLength={150} allowClear />
+                <Flex gap={6} wrap>
+                  <Select style={{ width: 170 }} value={cond.forma} onChange={v => setCond({ ...cond, forma: v })} popupMatchSelectWidth={false}
+                    options={[
+                      { value: '', label: 'A combinar / outra' }, { value: 'PIX', label: 'À vista no PIX' }, { value: 'DINHEIRO', label: 'À vista em dinheiro' },
+                      { value: 'DEBITO', label: 'Cartão de débito' }, { value: 'CREDITO', label: 'Cartão de crédito' }, { value: 'PRAZO', label: 'A prazo (boleto/crediário)' },
+                    ]} />
+                  {(cond.forma === 'CREDITO' || cond.forma === 'PRAZO') && (
+                    <InputNumber style={{ width: 82 }} min={1} max={24} value={cond.parcelas} suffix="x" onChange={v => setCond({ ...cond, parcelas: Number(v) || 1 })} />
+                  )}
+                  {cond.forma === 'PRAZO' && (
+                    <Select style={{ width: 120 }} value={cond.intervaloDias} onChange={v => setCond({ ...cond, intervaloDias: v })}
+                      options={[7, 10, 14, 15, 21, 28, 30, 35, 45, 60].map(d => ({ value: d, label: `a cada ${d} dias` }))} />
+                  )}
+                  {(cond.forma === 'CREDITO' || cond.forma === 'PRAZO') && (
+                    <InputNumber style={{ width: 140 }} min={0} value={cond.entrada || null} prefix="Entrada R$" decimalSeparator="," placeholder="0"
+                      onChange={v => setCond({ ...cond, entrada: Number(v) || 0 })} />
+                  )}
+                </Flex>
+                {condicaoAtual
+                  ? <Text type="secondary" style={{ fontSize: 12 }}>Na proposta: {textoDaCondicao(condicaoAtual)}</Text>
+                  : <AutoComplete style={{ width: '100%', marginTop: 6 }} options={CONDICOES_PAGAMENTO.map(value => ({ value }))} value={condicao} onChange={setCondicao}
+                    placeholder="Texto livre (ex.: a combinar no fechamento)" maxLength={150} allowClear />}
               </Col>
               <Col xs={12} md={4}>
                 <Text style={{ fontSize: 12 }}>Validade</Text>

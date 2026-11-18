@@ -3,6 +3,7 @@
 import { API_URL } from '../../../shared/api/config';
 import { operadorAtual } from '../caixa/caixaApi';
 import type { FaixaQuantidade } from './negociacao';
+import type { CondicaoPagamento } from './condicaoPagamento';
 import type { PedidoAbertoDetalhe } from '../pdv/services/pedidosAbertosApi';
 
 export interface LinhaPreparada {
@@ -19,6 +20,8 @@ export interface ItemNegociacao {
 export interface SalvarNegociacao {
   idPedido?: number | null; idCliente?: number | null; clienteNome?: string; contato?: string; observacao?: string; validadeDias: number;
   margemAlvo: number; condicaoPagamento?: string;
+  /** Condição em campos; com ela o texto da proposta é montado no servidor. */
+  condicao?: CondicaoPagamento | null;
   itens: Array<ItemNegociacao & { precoUnitario: number; travado: boolean; faixas: FaixaQuantidade[] }>;
   autorizacao?: { senha: string; nome: string; motivo: string };
 }
@@ -42,7 +45,7 @@ export const negociacaoApi = {
   salvar: (d: SalvarNegociacao) => pedir<{ id: number; totalLiquido: number }>(`${API_URL}/api/vendas/pdv/pedidos-abertos`, {
     tipo: 'ORCAMENTO', idPedido: d.idPedido || undefined, idCliente: d.idCliente, clienteNome: d.clienteNome, contato: d.contato,
     observacao: d.observacao, validadeDias: d.validadeDias, itens: d.itens, autorizacao: d.autorizacao, operador: operadorAtual(),
-    negociacao: { margemAlvo: d.margemAlvo, condicaoPagamento: d.condicaoPagamento },
+    negociacao: { margemAlvo: d.margemAlvo, condicaoPagamento: d.condicaoPagamento, condicao: d.condicao ?? null },
   }, 'Erro ao salvar a negociação.'),
 };
 
@@ -59,6 +62,6 @@ export const aberturaDoOrcamento = (d: PedidoAbertoDetalhe) => ({
   itens: d.itens.map(i => ({ idItem: i.idItem, quantidade: i.quantidade, idUnidade: i.idUnidade, componentes: i.componentes })),
   inicial: {
     precos: d.itens.map(i => i.precoUnitario), travados: d.itens.map(i => !!i.travado), faixas: d.itens.map(i => i.faixas || []),
-    margemAlvo: d.margemAlvo ?? null, condicaoPagamento: d.condicaoPagamento ?? null, contato: d.contato, observacao: d.observacao,
+    margemAlvo: d.margemAlvo ?? null, condicaoPagamento: d.condicaoPagamento ?? null, condicao: d.condicao ?? null, contato: d.contato, observacao: d.observacao,
   },
 });
