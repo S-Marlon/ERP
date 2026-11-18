@@ -9,6 +9,7 @@ import { FaixaPdv, faixaParaQuantidade, resolverPrecoPdv, UnidadeVendaPdv } from
 import { aplicarKitsNasLinhasPdv } from '../../catalogo/kits/kitsBanco';
 import { ErroVenda } from './vendaPdv';
 import { validarClienteRapido } from './clienteRapido';
+import { memoriaPorCarimbo } from '../../../infra/memoriaCatalogo';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
 
@@ -38,6 +39,8 @@ export const SELECT_ITENS = `
   LEFT JOIN comercial_categorias cat ON cat.id = COALESCE(f.categoria_id, cpd.categoria_id) AND cat.tenant_id = ic.tenant_id
   LEFT JOIN comercial_marcas mar ON mar.id = cpd.id_marca AND mar.tenant_id = ic.tenant_id
   LEFT JOIN estoque_saldos_itens es ON es.id_item = ic.id_item AND es.tenant_id = ic.tenant_id AND es.deposito = 'VENDA'`;
+/** Só o FROM (com os mesmos apelidos) do SELECT_ITENS: a busca filtra no banco e devolve id + estoque. */
+const FROM_ITENS = SELECT_ITENS.slice(SELECT_ITENS.lastIndexOf('FROM itens_core ic'));
 
 // Unidades de venda (e fator para a base) e faixas de preço dos itens
 export const carregarPrecos = async (conn: Conn, tenant: number, itens: any[]) => {
@@ -166,6 +169,36 @@ const montarProduto = (
   };
 };
 
+// ------------------------------------------------------------------ catálogo do PDV em memória
+// O que muda pouco (itens, unidades e faixas de preço, publicação, árvore de categorias, quais são kits) fica na memória
+// do servidor e só é relido quando alguma tabela do catálogo muda (CHECKSUM TABLE, ~20 ms). A cada busca vão ao banco só
+// os ids que passam no filtro e o estoque deles, fresco. Antes, toda busca trazia o catálogo inteiro do banco remoto.
+const TABELAS_CATALOGO = [
+  'itens_core', 'comercial_produtos_dados', 'comercial_familias', 'comercial_categorias', 'comercial_marcas', 'comercial_unidades_venda',
+  'itens_unidades_conversao', 'itens_unidades_medida', 'comercial_precos_faixas', 'itens_anexos', 'itens_composicoes',
+  'atributos_comercial_valores', 'atributos_core_entidades', 'atributos_comercial', 'atributos_comercial_unidades',
+];
+interface CatalogoPdv {
+  linhas: Map<number, any>; kits: Set<number>; arvore: Awaited<ReturnType<typeof carregarArvore>>;
+  publicacao: Map<number, any>; precos: Awaited<ReturnType<typeof carregarPrecos>>;
+}
+
+const montarCatalogo = async (tenant: number): Promise<CatalogoPdv> => {
+  const [rows]: any = await pool.execute(`${SELECT_ITENS} WHERE ic.tenant_id = ? AND ic.tipo_recurso IN ('PRODUTO', 'SERVICO')`, [tenant]);
+  const ids = rows.map((r: any) => Number(r.id_item));
+  const [publicacao, precos, arvore, [kits]] = await Promise.all([
+    ids.length ? avaliarPublicacaoItens(pool as any, tenant, ids) : Promise.resolve(new Map()),
+    carregarPrecos(pool as any, tenant, rows),
+    carregarArvore(pool as any, tenant),
+    pool.execute(`SELECT DISTINCT id_item_pai FROM itens_composicoes WHERE tenant_id = ? AND tipo_relacao = 'KIT'`, [tenant]) as Promise<any>,
+  ]);
+  return { linhas: new Map(rows.map((r: any) => [Number(r.id_item), r])), kits: new Set(kits.map((k: any) => Number(k.id_item_pai))), arvore, publicacao, precos };
+};
+
+const memoriaPdv = memoriaPorCarimbo<CatalogoPdv>(TABELAS_CATALOGO);
+/** O catálogo do PDV, da memória se nada mudou; `forcar` relê (ex.: a busca achou um item que a memória não tem). */
+const catalogoPdv = (tenant: number, forcar = false) => memoriaPdv(String(tenant), () => montarCatalogo(tenant), forcar);
+
 /**
  * GET /api/vendas/pdv/itens
  * query, category (nome ou id; inclui subcategorias), brand, status, minStock, onlyInStock, minPrice, maxPrice,
@@ -199,8 +232,9 @@ export const listarItensPdv = async (req: Request, res: Response) => {
       params.push(...filtro.params);
     }
 
+    let catalogo = await catalogoPdv(tenant);
     if (categoria && categoria !== 'Todas') {
-      const arvore = await carregarArvore(pool as any, tenant);
+      const arvore = catalogo.arvore;
       const raizes = arvore.filter(c => String(c.id) === categoria || String(c.nome || '').toLowerCase() === categoria.toLowerCase());
       const ids = new Set(raizes.map(c => String(c.id)));
       let cresceu = true;
@@ -223,17 +257,21 @@ export const listarItensPdv = async (req: Request, res: Response) => {
     if (onlyInStock) where.push(`(COALESCE(es.quantidade_atual, 0) > 0 OR ${ehKitSql})`);
     if (minStock !== undefined && minStock > 0) { where.push(`(COALESCE(es.quantidade_atual, 0) >= ? OR ${ehKitSql})`); params.push(minStock); }
 
-    const [rows] = await pool.execute(`${SELECT_ITENS} WHERE ${where.join(' AND ')}`, params);
-    const itens = (await aplicarKitsNasLinhasPdv(pool as any, tenant, rows as any[])).filter(i => !Number(i.eh_kit)
+    // no banco só o filtro: ids e o estoque de agora; o resto vem do catálogo em memória
+    const [achados]: any = await pool.execute(
+      `SELECT ic.id_item, COALESCE(es.quantidade_atual, 0) AS estoque_base, COALESCE(es.custo_medio, 0) AS custo_medio, es.localizacao
+       ${FROM_ITENS} WHERE ${where.join(' AND ')}`, params);
+    if (achados.some((a: any) => !catalogo.linhas.has(Number(a.id_item)))) catalogo = await catalogoPdv(tenant, true);
+    const rows = achados.filter((a: any) => catalogo.linhas.has(Number(a.id_item)))
+      .map((a: any) => ({ ...catalogo.linhas.get(Number(a.id_item)), estoque_base: a.estoque_base, custo_medio: a.custo_medio, localizacao: a.localizacao }));
+    // kit: o estoque é quantos dá para montar com os componentes de agora
+    await aplicarKitsNasLinhasPdv(pool as any, tenant, rows.filter((r: any) => catalogo.kits.has(Number(r.id_item))));
+    const itens = rows.filter((i: any) => !Number(i.eh_kit)
       || ((!onlyInStock || Number(i.estoque_base) > 0 || Number(i.pode_vender_sem_estoque)) && (!(minStock && minStock > 0) || Number(i.estoque_base) >= minStock)));
 
-    const ids = itens.map(i => Number(i.id_item));
-    const [publicacao, precos] = await Promise.all([
-      ids.length > 0 ? avaliarPublicacaoItens(pool as any, tenant, ids) : Promise.resolve(new Map()),
-      carregarPrecos(pool as any, tenant, itens),
-    ]);
+    const { publicacao, precos } = catalogo;
 
-    let produtos = itens.map(item => {
+    let produtos: ReturnType<typeof montarProduto>[] = itens.map((item: any) => {
       const id = Number(item.id_item);
       const unidades = precos.unidadesPorItem.get(id) || [];
       // Bipou o GTIN de uma embalagem: o item vem nessa unidade

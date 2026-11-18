@@ -9,6 +9,12 @@ const accessConfig: ConnectionOptions = {
     database: 'macso037_ERP', // Mude para o nome do seu banco
     waitForConnections: true,
     connectionLimit: 10,
+    // O banco é remoto: abrir conexão custa uma ida e volta a mais (bem mais na internet da loja). O padrão do mysql2
+    // fecha a conexão parada há 1 minuto; aqui ela fica aberta por 30 min (o servidor só derruba após wait_timeout = 1 h).
+    maxIdle: 10,
+    idleTimeout: 30 * 60 * 1000,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10000,
 };
 
 const pool: Pool = mysql.createPool(accessConfig);

@@ -3,6 +3,7 @@
 import { Request, Response } from 'express';
 import pool from '../../../infra/db';
 import { avaliarPublicacaoItens } from './publicacaoProdutos';
+import { memoriaPorCarimbo } from '../../../infra/memoriaCatalogo';
 
 /**
  * 📍 [READ] GET /produtos/search
@@ -97,6 +98,12 @@ export const searchProdutos = async (req: Request, res: Response) => {
  * 🔌 [READ] GET /produtos
  * Retorna array unificado aplicando precedência comercial e dados de marca
  */
+const memoriaProdutos = memoriaPorCarimbo<{ itens: any[]; publicacao: Awaited<ReturnType<typeof avaliarPublicacaoItens>> }>([
+  'itens_core', 'comercial_produtos_dados', 'comercial_familias', 'comercial_categorias', 'comercial_marcas', 'itens_unidades_medida',
+  'comercial_precos_faixas', 'itens_anexos', 'estoque_saldos_itens', 'atributos_comercial_valores', 'atributos_core_entidades', 'atributos_comercial',
+  'atributos_comercial_unidades',
+]);
+
 export const getProdutos = async (req: Request, res: Response) => {
   const rawTenantId = req.query.tenant_id || req.headers['x-tenant-id'] || 1;
   const tenantId = Number(rawTenantId);
@@ -150,15 +157,16 @@ export const getProdutos = async (req: Request, res: Response) => {
       ORDER BY COALESCE(NULLIF(TRIM(cpd.nome_comercial), ''), ic.nome_item) ASC
     `;
 
-    const [rows] = await pool.execute(query, [tenantId]);
-    const itens = rows as any[];
+    // A lista inteira fica na memória e só é relida quando o catálogo ou o estoque mudam (memoriaCatalogo.ts);
+    // a leitura e a publicação vão ao banco ao mesmo tempo.
+    const { itens, publicacao } = await memoriaProdutos(String(tenantId), async () => {
+      const [[rows], pub] = await Promise.all([pool.execute(query, [tenantId]), avaliarPublicacaoItens(pool as any, tenantId)]);
+      return { itens: rows as any[], publicacao: pub };
+    });
 
     if (itens.length === 0) {
       return res.json([]);
     }
-
-    // Gatekeeper: se o item pode ir para o PDV/canais e, se não, por quê
-    const publicacao = await avaliarPublicacaoItens(pool as any, tenantId);
 
     const skus = itens.map((item: any) => {
       const nomeItem = item.nome_comercial || item.nome_item || 'Produto sem nome';

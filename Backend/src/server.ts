@@ -1,5 +1,6 @@
 // Variáveis do Backend/.env (credenciais do Mercado Livre, fiscal...) antes de tudo
 import 'dotenv/config';
+import zlib from 'zlib';
 import path from 'path';
 import express from 'express';
 import cors from 'cors';
@@ -10,6 +11,21 @@ const app = express();
 app.use(cors());
 // A entrada de NF envia o XML inteiro + os dados de cada item (nota grande passa de 1 MB; o padrão do Express é 100 KB)
 app.use(express.json({ limit: '20mb' }));
+
+// Respostas JSON grandes vão comprimidas (gzip): a lista do catálogo (~1 MB) cai para uma fração na rede da loja.
+app.use((req, res, next) => {
+  if (!/gzip/.test(String(req.headers['accept-encoding'] || ''))) return next();
+  const json = res.json.bind(res);
+  res.json = (corpo: any) => {
+    const texto = JSON.stringify(corpo);
+    if (texto === undefined || texto.length < 8 * 1024) return json(corpo);
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Encoding', 'gzip');
+    res.setHeader('Vary', 'Accept-Encoding');
+    return res.send(zlib.gzipSync(texto, { level: 6 }));
+  };
+  next();
+});
 
 app.use('/api', routes);
 // Fotos e documentos enviados (itens_anexos aponta para cá)
