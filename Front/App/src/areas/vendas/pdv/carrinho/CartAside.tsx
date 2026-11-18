@@ -29,6 +29,8 @@ interface CartAsideProps {
     estagio: 'SELECAO' | 'PAGAMENTO';
     // Kit configurável: reabre a escolha das variações da linha
     onEditarKit?: (id: string | number) => void;
+    /** Proposta negociada no carrinho: sem a tabela de preço por forma (o preço é o combinado). */
+    negociado?: boolean;
     style?: React.CSSProperties;
 }
 
@@ -48,7 +50,7 @@ export const CartAside: React.FC<CartAsideProps> = props => (
 
 const CarrinhoConteudo: React.FC<CartAsideProps> = ({
     cart, cliente, total, money, updateQuantity, changeUnit, removeItem, onFinalizar, onSuspender, onOrcamento, onNegociar,
-    salvandoPedido, estagio, onBack, applyIndividualDiscount, onEditarKit, style,
+    salvandoPedido, estagio, onBack, applyIndividualDiscount, onEditarKit, negociado, style,
 }) => {
     const { token } = theme.useToken();
     // Fracionamento ligado à mão por item (unidades fracionáveis já vêm ligadas)
@@ -271,7 +273,7 @@ const CarrinhoConteudo: React.FC<CartAsideProps> = ({
                     <Typography.Text strong style={{ fontSize: 22 }}>{money.format(total)}</Typography.Text>
                 </Flex>
                 {/* À vista x parcelado: o que o cliente paga em cada forma (com as taxas) */}
-                {!emPagamento && <PrecosPorFormaPainel total={total} money={money} />}
+                {!emPagamento && !negociado && <PrecosPorFormaPainel total={total} money={money} />}
 
                 {!emPagamento && (onSuspender || onOrcamento) && (
                     <Flex gap={6} style={{ marginTop: 8 }}>

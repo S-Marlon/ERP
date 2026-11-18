@@ -71,14 +71,18 @@ const PDVContent: React.FC = () => {
   const buscaRef = useRef<any>(null);
   const buscaDebounce = useDebounce(searchTerm, 400);
 
-  // Nova venda começa pela identificação do cliente
+  // Nova venda começa pela identificação do cliente; vindo de um orçamento ou de uma troca o cliente vem deles
+  // (sem isto o modal abria e sumia logo depois, quando o orçamento carregava)
   useEffect(() => {
+    const url = new URLSearchParams(window.location.search);
+    if (url.get('orcamento') || url.get(CHAVE_TROCA)) return;
     if (!id && !cliente) setMostrarModalCliente(true);
   }, [id]);
 
   // ---------------------------------------------------------------- Orçamentos e vendas suspensas
-  // Venda nascida de um orçamento (vai junto no envio; manterPreco = preços congelados do orçamento)
-  const [orcamentoAtual, setOrcamentoAtual] = useState<{ id: number; manterPreco: boolean } | null>(null);
+  // Venda nascida de um orçamento (vai junto no envio; manterPreco = preços congelados do orçamento).
+  // negociacao: proposta negociada (preços fechados com o cliente; sem desconto/acréscimo automático da forma)
+  const [orcamentoAtual, setOrcamentoAtual] = useState<{ id: number; manterPreco: boolean; negociacao?: { condicao: string | null } } | null>(null);
   const [drawerPedidos, setDrawerPedidos] = useState<null | 'SUSPENSA' | 'ORCAMENTO'>(null);
   const [modalOrcamento, setModalOrcamento] = useState(false);
   const [negociando, setNegociando] = useState<AberturaNegociacao | null>(null);
@@ -158,10 +162,20 @@ const PDVContent: React.FC = () => {
       const d = tipo === 'SUSPENSA' ? await pedidosAbertosApi.retomar(idPedido) : await pedidosAbertosApi.detalhe(idPedido);
       if (d.situacao === 'CONVERTIDO') { message.info(`O orçamento ${d.id} já virou venda.`); return; }
       let manterPreco = false;
-      if (tipo === 'ORCAMENTO' && d.situacao === 'VALIDO') {
+      const negociado = tipo === 'ORCAMENTO' && d.margemAlvo !== null && d.margemAlvo !== undefined;
+      const validade = String(d.validade).split('-').reverse().join('/');
+      if (negociado && d.situacao === 'VALIDO') {
+        // Proposta negociada: o preço é o combinado com o cliente, sem pergunta (trocar pelos atuais desfaria a negociação)
+        manterPreco = true;
+      } else if (negociado) {
+        Modal.warning({
+          title: `Proposta negociada Nº ${d.id} vencida (valia até ${validade})`,
+          content: 'Os itens entram com os preços atuais do catálogo. Para vender pelos preços negociados, renove a validade: Vendas › Orçamentos › Negociar.',
+        });
+      } else if (tipo === 'ORCAMENTO' && d.situacao === 'VALIDO') {
         manterPreco = await new Promise<boolean>(resolve => Modal.confirm({
-          title: `Orçamento Nº ${d.id} (válido até ${String(d.validade).split('-').reverse().join('/')})`,
-          content: 'Vender com os preços do orçamento ou com os preços atuais do catálogo?',
+          title: `Orçamento Nº ${d.id} (válido até ${validade})`,
+          content: 'O orçamento ainda vale: o normal é vender pelos preços que o cliente recebeu. Use os preços atuais só se combinou isso com ele.',
           okText: 'Manter preços do orçamento', cancelText: 'Usar preços atuais', closable: false,
           onOk: () => resolve(true), onCancel: () => resolve(false),
         }));
@@ -177,7 +191,9 @@ const PDVContent: React.FC = () => {
       })));
       if (d.idCliente) selecionarCliente({ id: d.idCliente, nome: d.cliente });
       else { selecionarCliente(null); if (d.cliente && d.cliente !== 'CONSUMIDOR') setCliente(d.cliente); }
-      setOrcamentoAtual(tipo === 'ORCAMENTO' ? { id: d.id, manterPreco } : null);
+      setOrcamentoAtual(tipo === 'ORCAMENTO'
+        ? { id: d.id, manterPreco, ...(negociado && manterPreco ? { negociacao: { condicao: d.condicaoPagamento ?? null } } : {}) }
+        : null);
       setEstagio('SELECAO');
       setDrawerPedidos(null);
       setMostrarModalCliente(false);
@@ -377,6 +393,7 @@ const PDVContent: React.FC = () => {
       estagio={estagio}
       applyIndividualDiscount={applyIndividualDiscount}
       onEditarKit={editarKit}
+      negociado={Boolean(orcamentoAtual?.negociacao)}
       style={estilo}
     />
   );
@@ -439,7 +456,11 @@ const PDVContent: React.FC = () => {
             <Alert type="info" showIcon style={{ padding: '2px 10px' }} title={origemExterna.rotulo}
               action={<Button size="small" type="link" onClick={() => setOrigemExterna(null)}>desvincular</Button>} />
           )}
-          {orcamentoAtual && (
+          {orcamentoAtual?.negociacao ? (
+            <Alert type="warning" showIcon style={{ padding: '2px 10px' }}
+              title={<span>Vendendo a <b>proposta negociada Nº {orcamentoAtual.id}</b> · preços combinados com o cliente
+                {' · condição: '}<b>{orcamentoAtual.negociacao.condicao || 'a combinar'}</b></span>} />
+          ) : orcamentoAtual && (
             <Alert type="info" showIcon style={{ padding: '2px 10px' }}
               title={<span>Vendendo o <b>orçamento Nº {orcamentoAtual.id}</b> · {orcamentoAtual.manterPreco ? 'preços do orçamento mantidos' : 'preços atuais do catálogo'}</span>}
               action={<Button size="small" type="link" onClick={() => setOrcamentoAtual(null)}>desvincular</Button>} />
@@ -537,6 +558,7 @@ const PDVContent: React.FC = () => {
           onVendaConcluida={novaVenda}
           idOrcamento={orcamentoAtual?.id ?? null}
           manterPrecoOrcamento={Boolean(orcamentoAtual?.manterPreco)}
+          negociacao={orcamentoAtual?.negociacao ?? null}
           adiantamentosOrigem={origemExterna ? { origem: origemExterna.origem, idOrigem: origemExterna.idOrigem } : null}
           total={total}
           cliente={cliente}

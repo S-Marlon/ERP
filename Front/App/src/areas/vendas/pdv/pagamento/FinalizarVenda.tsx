@@ -98,6 +98,8 @@ interface FinalizarVendaProps {
     // Venda nascida de um orçamento (preços congelados quando manterPrecoOrcamento)
     idOrcamento?: number | null;
     manterPrecoOrcamento?: boolean;
+    /** Proposta negociada: preço fechado; não sugere o desconto da forma e mostra a condição combinada. */
+    negociacao?: { condicao: string | null } | null;
     // Sinais de uma origem (ex.: OS sendo entregue), além dos do cliente
     adiantamentosOrigem?: { origem: string; idOrigem: number } | null;
     itens: ItemVenda[];
@@ -126,7 +128,7 @@ const notasDoTroco = (valor: number) => {
 interface PedidoAutorizacao { motivos: string[]; senhaIncorreta?: boolean; resolver: (a: AutorizacaoVenda | null) => void }
 
 export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
-    onBack, onVendaConcluida, ativo = true, total, cliente, clienteId, itens, idOrcamento, manterPrecoOrcamento, adiantamentosOrigem,
+    onBack, onVendaConcluida, ativo = true, total, cliente, clienteId, itens, idOrcamento, manterPrecoOrcamento, adiantamentosOrigem, negociacao,
 }) => {
     const { token } = theme.useToken();
     const [isEnviando, setIsEnviando] = useState(false);
@@ -436,7 +438,11 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
     const descontoFormaAplicado = pctForma > 0 && tipoDesconto === 'porcent' && Math.abs(descontoValor - pctForma) < 0.001;
     const aplicarDescontoForma = () => { setTipoDesconto('porcent'); setDescontoValor(pctForma); setUsuarioInteragiu(false); };
     const removerDesconto = () => { setDescontoValor(0); setTipoDesconto('real'); setUsuarioInteragiu(false); };
-    const sugestaoDescontoForma = pctForma > 0 && (
+    const sugestaoDescontoForma = negociacao ? (
+        <Alert type="warning" showIcon style={{ margin: '4px 0', padding: '4px 8px' }}
+            title={<span>Proposta negociada: preço fechado com o cliente. Condição combinada: <b>{negociacao.condicao || 'a combinar'}</b></span>}
+            description="Sem desconto da forma de pagamento. Crédito acima das parcelas sem juros ainda tem o acréscimo da maquininha." />
+    ) : pctForma > 0 && (
         <Flex justify="space-between" align="center" gap={6} wrap
             style={{ margin: '4px 0', padding: '4px 8px', borderRadius: token.borderRadius, background: token.colorSuccessBg, border: `1px solid ${token.colorSuccessBorder}` }}>
             <Typography.Text style={{ fontSize: 12 }}>
