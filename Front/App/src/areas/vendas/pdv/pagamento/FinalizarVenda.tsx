@@ -172,6 +172,7 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
     // Totais: só pagamentos pagos/processando contam
     const pagamentosAtivos = pagamentos.filter(p => p.status === 'paid' || p.status === 'processing');
     const totalPago = pagamentosAtivos.reduce((acc, p) => acc + (Number(p.valor) || 0), 0);
+    const totalAPrazo = pagamentosAtivos.filter(p => p.metodo === 'store_credit').reduce((acc, p) => acc + (Number(p.valor) || 0), 0);
     const acrescimoTotal = Math.round(pagamentosAtivos.reduce((acc, p) => acc + (Number(p.acrescimo) || 0), 0) * 100) / 100;
     // Parte da venda coberta pelos pagamentos (sem o acréscimo do parcelamento)
     const totalCoberto = Math.round((totalPago - acrescimoTotal) * 100) / 100;
@@ -333,6 +334,9 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
         setUsuarioInteragiu(true);
     };
 
+    // A prazo não se recebe no caixa: vira conta a receber, então já conta no total (sem "marcar como pago")
+    const statusInicial = (metodo: PaymentMethodType): PaymentStatus => (metodo === 'store_credit' ? 'paid' : 'pending');
+
     // Proposta negociada no crédito: até as parcelas combinadas não há acréscimo (a taxa já entrou na negociação)
     const acrescimoDoCredito = (forma: string, parcelas: number, valor: number) => {
         const c = negociacao?.condicao;
@@ -351,7 +355,7 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
             ...pagamentosDaCondicao(c, saldoRestante).filter(p => p.valor > 0).map(p => ({
                 id: crypto.randomUUID(), metodo: metodoDe[p.forma], valor: p.valor, parcelas: p.parcelas || 1,
                 ...(p.forma === 'PRAZO' ? { intervaloDias: p.intervaloDias || 30 } : {}),
-                status: 'pending' as PaymentStatus, createdAt: new Date(),
+                status: statusInicial(metodoDe[p.forma]), createdAt: new Date(),
             })),
         ]);
         escolherMetodo(null);
@@ -379,7 +383,7 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
             ...(metodoSelecionado === 'store_credit'
                 ? semPrazo ? { semPrazo: true } : { intervaloDias: intervaloPrazo, primeiroVencimento: primeiroVencimento || undefined }
                 : {}),
-            status: 'pending',
+            status: statusInicial(metodoSelecionado),
             createdAt: new Date(),
         }]);
         setValorInput('');
@@ -578,7 +582,7 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
 
                     {pagamentos.length > 0 && (
                         <List size="small" bordered
-                            header={<Flex justify="space-between"><Typography.Text strong>Pagamentos ({pagamentos.length})</Typography.Text><Tag color="success" style={{ margin: 0 }}>Pago {brl(totalPago)}</Tag></Flex>}
+                            header={<Flex justify="space-between"><Typography.Text strong>Pagamentos ({pagamentos.length})</Typography.Text><Flex gap={4}>{totalAPrazo > 0 && <Tag color="blue" style={{ margin: 0 }}>A receber {brl(totalAPrazo)}</Tag>}<Tag color="success" style={{ margin: 0 }}>Pago {brl(totalPago - totalAPrazo)}</Tag></Flex></Flex>}
                             dataSource={pagamentos}
                             renderItem={(p, i) => {
                                 const inativo = p.status === 'cancelled' || p.status === 'failed';
@@ -598,9 +602,15 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
                                             </Flex>
                                         </Flex>
                                         <Flex gap={4} align="center">
+                                            {p.metodo === 'store_credit' ? (
+                                                <Tooltip title="Vai para Financeiro › Contas a receber ao concluir a venda">
+                                                    <Tag color="blue" style={{ margin: 0, width: 128, textAlign: 'center' }}>A receber</Tag>
+                                                </Tooltip>
+                                            ) : (
                                             <Select size="small" value={p.status} onChange={v => alterarStatus(p.id, v)} style={{ width: 128 }}
                                                 options={(['pending', 'processing', 'paid', 'failed', 'cancelled'] as PaymentStatus[]).map(s => ({ value: s, label: STATUS_LABELS[s] }))} />
-                                            {p.status === 'pending'
+                                            )}
+                                            {p.status === 'pending' || p.metodo === 'store_credit'
                                                 ? <Tooltip title="Remover pagamento"><Button size="small" type="text" danger icon={<DeleteOutlined />} onClick={() => removerPagamento(p.id)} /></Tooltip>
                                                 : <Tooltip title="Pagamento processado ou finalizado não pode ser removido"><Button size="small" type="text" disabled icon={<LockOutlined />} /></Tooltip>}
                                         </Flex>
@@ -609,7 +619,7 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
                             }} />
                     )}
                     {pagamentos.some(p => p.status === 'pending') && (
-                        <Alert type="info" showIcon title='Marque o pagamento como "Pago" quando confirmar o recebimento. Só pagamentos pagos ou em processamento contam no total.' />
+                        <Alert type="info" showIcon title='Marque o pagamento como "Pago" quando confirmar o recebimento. Só pagamentos pagos ou em processamento contam no total (a prazo já conta: vai para o contas a receber).' />
                     )}
                 </Flex>
             </div>
