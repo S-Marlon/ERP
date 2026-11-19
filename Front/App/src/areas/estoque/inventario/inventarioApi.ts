@@ -66,31 +66,61 @@ const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&am
 const qtd = (v: number) => Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
 const dataHora = (s: string) => `${s.slice(0, 10).split('-').reverse().join('/')} ${s.slice(11, 16)}`;
 
-/** Folha de conferência: saldo do sistema à vista; o conferente escreve a contagem só onde tiver diferença e assina. */
+/** Folha de conferência: saldo do sistema à vista; o conferente marca ✓ ou escreve a contagem, anota a hora e assina. */
 export const htmlFolha = (l: ListaInventario) => {
   const e = lerConfiguracoes().empresa;
   const empresa = e.nomeFantasia || e.razaoSocial || '';
-  return `<html><head><meta charset="utf-8"><title>Inventário ${l.id}</title><style>
-    @page { size: A4; margin: 11mm; } body { font-family: Arial, sans-serif; font-size: 11.5px; color: #111; }
-    .topo { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #111; padding-bottom: 6px; }
-    h1 { font-size: 17px; margin: 0; } .sub { color: #444; margin-top: 2px; }
-    .num { font-size: 22px; font-weight: bold; text-align: right; } .num small { display: block; font-size: 10px; font-weight: normal; color: #555; }
-    .inst { margin: 8px 0; padding: 6px 8px; background: #f2f2f2; font-size: 11px; }
-    table { width: 100%; border-collapse: collapse; } th { text-align: left; border-bottom: 1.5px solid #111; font-size: 10.5px; padding: 5px 4px; }
-    td { border-bottom: 1px solid #bbb; padding: 7px 4px; vertical-align: top; } .r { text-align: right; } .c { text-align: center; }
-    .caixa { border: 1px solid #555; height: 20px; width: 70px; display: inline-block; } .cat { font-size: 9.5px; color: #666; }
-    .mot { font-size: 9.5px; color: #a33; } .ass { display: flex; gap: 24px; margin-top: 26px; } .ass div { flex: 1; border-top: 1px solid #111; padding-top: 4px; font-size: 10.5px; }
+  const especiais = l.itens.filter(i => i.motivo === 'PEDIDO' || i.motivo === 'PROBLEMA').length;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Inventário · lista ${l.id}</title><style>
+    @page { size: A4; margin: 10mm 10mm 12mm; }
+    * { box-sizing: border-box; } table, td, th { font-size: inherit; } body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10px; color: #1a1a1a; margin: 0; }
+    .cab { display: grid; grid-template-columns: 1fr auto; border: 1.2px solid #1a1a1a; }
+    .cab .tit { padding: 6px 9px; } .cab h1 { font-size: 13.5px; margin: 0; letter-spacing: .2px; }
+    .cab .emp { font-size: 9px; color: #555; text-transform: uppercase; letter-spacing: .6px; margin-bottom: 1px; }
+    .cab .num { background: #1a1a1a; color: #fff; padding: 5px 12px; text-align: center; display: flex; flex-direction: column; justify-content: center; }
+    .cab .num b { font-size: 18px; line-height: 1; } .cab .num span { font-size: 8px; text-transform: uppercase; letter-spacing: .8px; opacity: .8; }
+    .info { display: grid; grid-template-columns: repeat(4, 1fr); border: 1.2px solid #1a1a1a; border-top: 0; }
+    .info div { padding: 3px 9px; border-right: 1px solid #ccc; } .info div:last-child { border-right: 0; }
+    .info label { display: block; font-size: 7.5px; text-transform: uppercase; letter-spacing: .6px; color: #666; }
+    .info .campo { height: 15px; }
+    .inst { font-size: 8.8px; color: #444; margin: 5px 1px 4px; }
+    table { width: 100%; border-collapse: collapse; } thead { display: table-header-group; } tr { page-break-inside: avoid; }
+    th { font-size: 7.8px; text-transform: uppercase; letter-spacing: .5px; color: #fff; background: #1a1a1a; padding: 3.5px 5px; text-align: left; font-weight: 600; }
+    td { padding: 3px 5px; border-bottom: 1px solid #ddd; vertical-align: middle; line-height: 1.25; }
+    tbody tr:nth-child(even) td { background: #f6f6f6; }
+    .n { color: #888; width: 18px; } .cod { width: 62px; font-family: Consolas, monospace; font-size: 9.3px; }
+    .nome { font-weight: 600; } .cat { color: #777; font-size: 8px; font-weight: 400; }
+    .mot { display: inline-block; font-size: 7.5px; font-weight: 600; color: #b42318; border: 1px solid #f2b8b5; background: #fef3f2; border-radius: 2px; padding: 0 3px; margin-left: 3px; }
+    .det { color: #b42318; font-size: 8px; }
+    .un { width: 28px; color: #555; } .sis { width: 52px; text-align: right; font-weight: 700; font-size: 10.5px; }
+    .ok { width: 26px; text-align: center; } .cont { width: 74px; } .obs { width: 120px; }
+    .bx { display: inline-block; width: 13px; height: 13px; border: 1.1px solid #333; border-radius: 2px; vertical-align: middle; }
+    .ln { display: block; height: 15px; border-bottom: 1px solid #555; }
+    .ass { display: grid; grid-template-columns: 1.2fr 1.2fr .8fr; gap: 0; margin-top: 10px; border: 1.2px solid #1a1a1a; page-break-inside: avoid; }
+    .ass div { padding: 18px 9px 4px; border-right: 1px solid #ccc; font-size: 7.5px; text-transform: uppercase; letter-spacing: .6px; color: #666; }
+    .ass div:last-child { border-right: 0; } .ass div::before { content: ''; display: block; border-bottom: 1px solid #555; margin-bottom: 3px; }
+    .rodape { margin-top: 5px; font-size: 7.5px; color: #888; display: flex; justify-content: space-between; }
   </style></head><body>
-    <div class="topo"><div><h1>Inventário rotativo · ${esc(l.area)}</h1><div class="sub">${esc([empresa, `emitida em ${dataHora(l.criada)}`, `${l.itens.length} itens`].filter(Boolean).join(' · '))}</div></div>
-      <div class="num">Lista Nº ${l.id}<small>lançar com este número</small></div></div>
-    <div class="inst">Conte cada item. Se a quantidade bater com o <b>sistema</b>, marque ✓. Se não bater, escreva a quantidade contada. Anote a hora em que contou.</div>
-    <table><thead><tr><th style="width:24px">#</th><th style="width:90px">Código</th><th>Produto</th><th style="width:34px">Un</th><th class="r" style="width:64px">Sistema</th>
-      <th class="c" style="width:28px">✓</th><th class="c" style="width:86px">Contado</th></tr></thead><tbody>
-      ${l.itens.map((i, k) => `<tr><td>${k + 1}</td><td>${esc(i.sku)}</td><td>${esc(i.nome)}<div class="cat">${esc([i.categoria, i.localizacao].filter(Boolean).join(' · '))}</div>
-        ${i.motivo === 'PEDIDO' || i.motivo === 'PROBLEMA' ? `<div class="mot">${esc(i.detalheMotivo || '')}</div>` : ''}</td>
-        <td>${esc(i.unidade || '')}</td><td class="r"><b>${qtd(i.saldoImpresso)}</b></td><td class="c"><span class="caixa" style="width:18px"></span></td>
-        <td class="c"><span class="caixa"></span></td></tr>`).join('')}
+    <div class="cab">
+      <div class="tit">${empresa ? `<div class="emp">${esc(empresa)}</div>` : ''}<h1>Inventário rotativo · ${esc(l.area)}</h1></div>
+      <div class="num"><span>Lista</span><b>${l.id}</b></div>
+    </div>
+    <div class="info">
+      <div><label>Emitida</label>${dataHora(l.criada)}</div>
+      <div><label>Itens</label>${l.itens.length}${especiais ? ` · ${especiais} com atenção` : ''}</div>
+      <div><label>Início da contagem</label><div class="campo"></div></div>
+      <div><label>Fim da contagem</label><div class="campo"></div></div>
+    </div>
+    <div class="inst">Conte cada item. Bateu com o <b>sistema</b>: marque ✓. Não bateu: escreva a quantidade contada. Itens marcados em vermelho pedem atenção.</div>
+    <table><thead><tr><th>#</th><th>Código</th><th>Produto</th><th>Un</th><th style="text-align:right">Sistema</th><th style="text-align:center">✓</th><th>Contado</th><th>Obs.</th></tr></thead><tbody>
+      ${l.itens.map((i, k) => `<tr><td class="n">${k + 1}</td><td class="cod">${esc(i.sku)}</td>
+        <td><span class="nome">${esc(i.nome)}</span>${i.motivo === 'PEDIDO' || i.motivo === 'PROBLEMA' ? `<span class="mot">${i.motivo === 'PEDIDO' ? 'CONFERIR' : 'ATENÇÃO'}</span>` : ''}
+          ${i.localizacao ? ` <span class="cat">· ${esc(i.localizacao)}</span>` : ''}
+          ${(i.motivo === 'PEDIDO' || i.motivo === 'PROBLEMA') && i.detalheMotivo ? `<div class="det">${esc(i.detalheMotivo)}</div>` : ''}</td>
+        <td class="un">${esc(i.unidade || '')}</td><td class="sis">${qtd(i.saldoImpresso)}</td>
+        <td class="ok"><span class="bx"></span></td><td class="cont"><span class="ln"></span></td><td class="obs"><span class="ln"></span></td></tr>`).join('')}
     </tbody></table>
-    <div class="ass"><div>Conferente (nome)</div><div>Assinatura</div><div style="flex:.7">Data e hora da contagem</div></div>
+    <div class="ass"><div>Conferente (nome legível)</div><div>Assinatura</div><div>Data</div></div>
+    <div class="rodape"><span>Lance em Estoque › Inventário rotativo › Lista ${l.id}. A diferença é calculada pelo saldo da hora da contagem.</span><span>${esc(l.area)}</span></div>
   </body></html>`;
 };
