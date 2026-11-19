@@ -23,6 +23,7 @@ import RelatorioPoco from '../shared/components/forms/specific/CadastroRelatorio
 import SaldoEstoque from '../areas/estoque/saldo/SaldoEstoque';
 import Movimentacoes from '../areas/estoque/movimentacoes/Movimentacoes';
 import Etiquetagem from '../areas/estoque/etiquetagem/Etiquetagem';
+import InventarioRotativo from '../areas/estoque/inventario/InventarioRotativo';
 import PDVContent from '../areas/vendas/pdv/PDV';
 import CentralVendas from '../areas/vendas/painel/CentralVendas';
 import VendasDoDia from '../areas/vendas/vendasDoDia/VendasDoDia';
@@ -181,6 +182,7 @@ export default function AppLayout() {
             <Route path="/vendas/notas-fiscais" element={<NotasFiscais />} />
             <Route path="/estoque" element={<Estoque />} />
             <Route path="/estoque/consulta" element={<SaldoEstoque />} />
+            <Route path="/estoque/inventario" element={<InventarioRotativo />} />
             <Route path="/estoque/gerenciamento" element={<StockEntryForm />} />
             {/* Notas de entrada agora ficam em Compras (endereço antigo redireciona) */}
             <Route path="/estoque/notas" element={<Navigate to="/compras/notas" replace />} />

@@ -116,7 +116,7 @@ docs/                      planos e decisões; docs/legado guarda material antig
 | Financeiro (receber, pagar) | `areas/financeiro` | `areas/financeiro` | `financeiro_*` |
 | Entrada de NF (staging) | `areas/compras` | `areas/compras/entradaNf`, `areas/compras/notasEntrada` | `importacoes_lotes`, `importacao_produtos_staging` |
 | Catálogo / PIM | `areas/catalogo` | `areas/catalogo` (`skus`, `familias`, `categorias`, `atributos`, `marcas`, `precos`, `staging`…) | `itens_core`, `comercial_*`, `atributos_*` |
-| Estoque | `areas/estoque` | `areas/estoque` | `estoque_movimentos`, `estoque_saldos_itens` |
+| Estoque (saldo, movimentos, inventário rotativo) | `areas/estoque` | `areas/estoque` (`inventario`…) | `estoque_movimentos`, `estoque_saldos_itens`, `estoque_inventario*` |
 | Parceiros (clientes, fornecedores) | `areas/parceiros` | `areas/parceiros` (`fornecedores`), `areas/clientes` | `pessoas_*` |
 | Módulo Hidráulica · Montagens | `modulos/hidraulica/montagens` | `modulos/hidraulica/montagens` | `modulo_hidraulica_montagens_*` |
 | Módulo Transmissão · Rolamentos | `modulos/transmissao/rolamentos` | `modulos/transmissao/rolamentos` | `modulo_transmissao_rolamentos_*` |
