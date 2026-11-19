@@ -195,7 +195,8 @@ export const listarPedidosAbertos = async (req: Request, res: Response) => {
       `SELECT p.id_venda, p.status, p.cliente_nome, p.id_cliente, p.contato, p.operador, p.total_liquido, p.total_custo, p.observacao,
               p.created_at, DATE_FORMAT(p.validade, '%Y-%m-%d') AS validade, p.validade >= CURDATE() AS valido,
               (SELECT COUNT(*) FROM vendas_pedidos_itens i WHERE i.id_venda = p.id_venda) AS qtd_itens,
-              (SELECT v.id_venda FROM vendas_pedidos v WHERE v.id_orcamento = p.id_venda LIMIT 1) AS id_venda_gerada
+              (SELECT v.id_venda FROM vendas_pedidos v WHERE v.id_orcamento = p.id_venda LIMIT 1) AS id_venda_gerada,
+              (SELECT v.origem = 'ERP' FROM vendas_pedidos v WHERE v.id_orcamento = p.id_venda LIMIT 1) AS virou_pedido
        FROM vendas_pedidos p WHERE ${filtros.join(' AND ')} ORDER BY p.id_venda DESC LIMIT 200`,
       params
     );
@@ -203,7 +204,7 @@ export const listarPedidosAbertos = async (req: Request, res: Response) => {
       id: Number(r.id_venda), tipo: r.status === 'SUSPENSA' ? 'SUSPENSA' : 'ORCAMENTO', situacao: situacao(r.status, r.valido),
       cliente: r.cliente_nome, idCliente: r.id_cliente ? Number(r.id_cliente) : null, contato: r.contato, operador: r.operador,
       total: Number(r.total_liquido), custo: Number(r.total_custo), observacao: r.observacao, criadoEm: r.created_at,
-      validade: r.validade, qtdItens: Number(r.qtd_itens), idVendaGerada: r.id_venda_gerada ? Number(r.id_venda_gerada) : null,
+      validade: r.validade, qtdItens: Number(r.qtd_itens), idVendaGerada: r.id_venda_gerada ? Number(r.id_venda_gerada) : null, virouPedido: Boolean(Number(r.virou_pedido)),
     })));
   } catch (error) {
     return responderErro(res, error, 'Erro ao listar.');

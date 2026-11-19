@@ -1,8 +1,10 @@
 // Vendas › Orçamentos: válidos, vencidos e os que viraram venda; imprimir, PDF, WhatsApp, vender (abre no PDV) e excluir.
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Card, Empty, Input, Popconfirm, Segmented, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
-import { DeleteOutlined, FilePdfOutlined, PrinterOutlined, ReloadOutlined, ShoppingCartOutlined, SlidersOutlined, UserAddOutlined, WhatsAppOutlined } from '@ant-design/icons';
+import { Alert, Button, Card, DatePicker, Empty, Input, Modal, Popconfirm, Segmented, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { CarOutlined, DeleteOutlined, FilePdfOutlined, PrinterOutlined, ReloadOutlined, ShoppingCartOutlined, SlidersOutlined, UserAddOutlined, WhatsAppOutlined } from '@ant-design/icons';
+import dayjs from 'dayjs';
+import { pedidosFaturadosApi } from '../pedidos/pedidosFaturadosApi';
 import { imprimirOrcamento, PedidoAbertoDetalhe, PedidoAbertoResumo, pedidosAbertosApi } from '../pdv/services/pedidosAbertosApi';
 import { SITUACAO_PEDIDO } from '../pdv/components/PedidosAbertosPDV';
 import { baixarPdfOrcamento, EnviarOrcamentoWhatsapp } from './EnviarOrcamento';
@@ -42,6 +44,21 @@ const Orcamentos: React.FC = () => {
   const [enviando, setEnviando] = useState<number | null>(null);
   const [semCliente, setSemCliente] = useState<PedidoAbertoResumo | null>(null);
   const [negociando, setNegociando] = useState<AberturaNegociacao | null>(null);
+  // Orçamento virando pedido faturado (empresa, entrega depois)
+  const [virandoPedido, setVirandoPedido] = useState<PedidoAbertoResumo | null>(null);
+  const [dadosPedido, setDadosPedido] = useState({ previsaoEntrega: null as string | null, enderecoEntrega: '', pedidoCliente: '' });
+  const [criandoPedido, setCriandoPedido] = useState(false);
+  const criarPedido = async () => {
+    if (!virandoPedido) return;
+    setCriandoPedido(true);
+    try {
+      const r = await pedidosFaturadosApi.criar({ idOrcamento: virandoPedido.id, ...dadosPedido });
+      setVirandoPedido(null);
+      if (r.faltas.length) message.warning(`Pedido Nº ${r.id} criado. Ainda sem saldo livre: ${r.faltas.map(f => f.nome).join(', ')}.`, 8);
+      else message.success(`Pedido Nº ${r.id} criado: material reservado.`);
+      navigate(`/vendas/pedidos-faturados?id=${r.id}`);
+    } catch (e) { message.error(e instanceof Error ? e.message : 'Erro ao criar o pedido.'); } finally { setCriandoPedido(false); }
+  };
   const negociar = async (id: number) => {
     try { setNegociando(aberturaDoOrcamento(await pedidosAbertosApi.detalhe(id))); } catch (e) { message.error(e instanceof Error ? e.message : 'Erro ao abrir.'); }
   };
@@ -143,12 +160,19 @@ const Orcamentos: React.FC = () => {
                 ),
               },
               {
-                title: '', key: 'a', width: 270,
+                title: '', key: 'a', width: 350,
                 render: (_, o) => (
                   <Space size={4}>
                     {o.situacao === 'CONVERTIDO'
-                      ? <Button size="small" type="link" onClick={() => navigate('/vendas/do-dia')}>venda Nº {o.idVendaGerada}</Button>
+                      ? o.virouPedido
+                        ? <Button size="small" type="link" onClick={() => navigate(`/vendas/pedidos-faturados?id=${o.idVendaGerada}`)}>pedido Nº {o.idVendaGerada}</Button>
+                        : <Button size="small" type="link" onClick={() => navigate('/vendas/do-dia')}>venda Nº {o.idVendaGerada}</Button>
                       : <Button size="small" type="primary" icon={<ShoppingCartOutlined />} onClick={() => navigate(`/vendas/pdv?orcamento=${o.id}`)}>Vender</Button>}
+                    {o.situacao === 'VALIDO' && (
+                      <Tooltip title="Pedido faturado: empresa, entrega depois, NF-e e boletos (reserva o material)">
+                        <Button size="small" icon={<CarOutlined />} onClick={() => { setDadosPedido({ previsaoEntrega: null, enderecoEntrega: '', pedidoCliente: '' }); setVirandoPedido(o); }}>Pedido</Button>
+                      </Tooltip>
+                    )}
                     {o.situacao !== 'CONVERTIDO' && (
                       <Tooltip title="Negociar: margem por item, por categoria e do orçamento, faixas por quantidade">
                         <Button size="small" icon={<SlidersOutlined />} onClick={() => negociar(o.id)} />
@@ -172,6 +196,20 @@ const Orcamentos: React.FC = () => {
         </Card>
       </Space>
       <EnviarOrcamentoWhatsapp id={enviando} onClose={() => setEnviando(null)} />
+      <Modal open={!!virandoPedido} title={`Orçamento Nº ${virandoPedido?.id ?? ''} → pedido faturado`} okText="Criar pedido" cancelText="Voltar"
+        confirmLoading={criandoPedido} onOk={criarPedido} onCancel={() => setVirandoPedido(null)} okButtonProps={{ disabled: !virandoPedido?.idCliente }} destroyOnHidden>
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <Text>O material fica <b>reservado</b> (o balcão não vende), pelos preços deste orçamento. Depois: faturar (NF-e e parcelas) e entregar.</Text>
+          {!virandoPedido?.idCliente && <Alert type="error" showIcon title="Defina o cliente do cadastro no orçamento antes (nota e contas a receber precisam dele)." />}
+          <Input addonBefore="Pedido de compra do cliente" placeholder="Nº da OC (opcional)" maxLength={60} value={dadosPedido.pedidoCliente}
+            onChange={e => setDadosPedido({ ...dadosPedido, pedidoCliente: e.target.value })} />
+          <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" placeholder="Previsão de entrega" disabledDate={d => d.isBefore(dayjs(), 'day')}
+            value={dadosPedido.previsaoEntrega ? dayjs(dadosPedido.previsaoEntrega) : null}
+            onChange={v => setDadosPedido({ ...dadosPedido, previsaoEntrega: v ? v.format('YYYY-MM-DD') : null })} />
+          <Input placeholder="Endereço de entrega (vazio = retira na loja)" maxLength={255} value={dadosPedido.enderecoEntrega}
+            onChange={e => setDadosPedido({ ...dadosPedido, enderecoEntrega: e.target.value })} />
+        </Space>
+      </Modal>
       <NegociacaoDrawer abrir={negociando} onFechar={() => setNegociando(null)}
         onSalvo={id => { setNegociando(null); message.success(`Orçamento Nº ${id} salvo.`); carregar(); }} />
       <ClientePdvModal

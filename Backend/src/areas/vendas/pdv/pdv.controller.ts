@@ -2,6 +2,7 @@
 // Devolve o mesmo formato de produto que a tela do PDV já consome (id, sku, name, salePrice, currentStock...).
 import { Request, Response } from 'express';
 import pool from '../../../infra/db';
+import { reservasPorItem } from '../pedidos/pedidosFaturados.controller';
 import { filtroBusca } from './buscaPdv';
 import { avaliarPublicacaoItens } from '../../catalogo/produtos/publicacaoProdutos';
 import { carregarArvore } from '../../catalogo/categorias/herancaCategorias';
@@ -258,12 +259,20 @@ export const listarItensPdv = async (req: Request, res: Response) => {
     if (minStock !== undefined && minStock > 0) { where.push(`(COALESCE(es.quantidade_atual, 0) >= ? OR ${ehKitSql})`); params.push(minStock); }
 
     // no banco só o filtro: ids e o estoque de agora; o resto vem do catálogo em memória
-    const [achados]: any = await pool.execute(
-      `SELECT ic.id_item, COALESCE(es.quantidade_atual, 0) AS estoque_base, COALESCE(es.custo_medio, 0) AS custo_medio, es.localizacao
-       ${FROM_ITENS} WHERE ${where.join(' AND ')}`, params);
+    const [[achados], reservas]: any = await Promise.all([
+      pool.execute(
+        `SELECT ic.id_item, COALESCE(es.quantidade_atual, 0) AS estoque_base, COALESCE(es.custo_medio, 0) AS custo_medio, es.localizacao
+         ${FROM_ITENS} WHERE ${where.join(' AND ')}`, params),
+      // reservado para pedidos faturados ainda não entregues: não aparece como disponível no balcão
+      reservasPorItem(pool, tenant),
+    ]);
     if (achados.some((a: any) => !catalogo.linhas.has(Number(a.id_item)))) catalogo = await catalogoPdv(tenant, true);
     const rows = achados.filter((a: any) => catalogo.linhas.has(Number(a.id_item)))
-      .map((a: any) => ({ ...catalogo.linhas.get(Number(a.id_item)), estoque_base: a.estoque_base, custo_medio: a.custo_medio, localizacao: a.localizacao }));
+      .map((a: any) => {
+        const reservado = reservas.get(Number(a.id_item)) || 0;
+        return { ...catalogo.linhas.get(Number(a.id_item)), estoque_base: Math.round((Number(a.estoque_base) - reservado) * 10000) / 10000, estoque_reservado: reservado,
+          custo_medio: a.custo_medio, localizacao: a.localizacao };
+      });
     // kit: o estoque é quantos dá para montar com os componentes de agora
     await aplicarKitsNasLinhasPdv(pool as any, tenant, rows.filter((r: any) => catalogo.kits.has(Number(r.id_item))));
     const itens = rows.filter((i: any) => !Number(i.eh_kit)

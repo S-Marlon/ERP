@@ -9,6 +9,7 @@ import { criarAdiantamento, devolverAdiantamentoRota, listarAdiantamentos } from
 import { dadosDevolucao, detalheDevolucao, registrarDevolucao } from './devolucoes/devolucoes.controller';
 import { ajustarVenda, vendaCompleta } from './ajustes/ajustes.controller';
 import { prepararNegociacao } from './negociacao/negociacao.controller';
+import pedidosFaturadosRoutes from './pedidos/pedidosFaturados.routes';
 import { definirClientePedidoAberto, detalhePedidoAberto, excluirPedidoAberto, listarPedidosAbertos, retomarPedidoAberto, salvarPedidoAberto } from './pdv/pedidosAbertos.controller';
 
 // Vendas no modelo novo (itens_core). Montado em /api/vendas
@@ -42,6 +43,9 @@ router.get('/pdv/pedidos-abertos/:id', detalhePedidoAberto);
 router.post('/pdv/pedidos-abertos/:id/retomar', retomarPedidoAberto);
 router.delete('/pdv/pedidos-abertos/:id', excluirPedidoAberto);
 router.put('/pdv/pedidos-abertos/:id/cliente', definirClientePedidoAberto);
+
+// Pedidos faturados (empresa, entrega depois): reserva, NF-e emitida fora, boletos no contas a receber
+router.use('/pedidos-faturados', pedidosFaturadosRoutes);
 
 // Caixa: abertura, sangria/suprimento, fechamento com conferência e histórico
 router.get('/caixa/atual', caixaAtual);

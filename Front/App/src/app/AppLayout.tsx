@@ -30,6 +30,7 @@ import CaixasHistorico from '../areas/vendas/caixa/historico/CaixasHistorico';
 import RegrasVenda from '../areas/vendas/regras/RegrasVenda';
 import TaxasPagamento from '../areas/vendas/taxas/taxasPagamento/TaxasPagamento';
 import Orcamentos from '../areas/vendas/orcamentos/Orcamentos';
+import PedidosFaturados from '../areas/vendas/pedidos/PedidosFaturados';
 import NotasFiscais from '../areas/fiscal/notasSaida/NotasFiscais';
 import { CaixaPaineis } from '../areas/vendas/caixa/CaixaPainel';
 import { carregarTaxaPreco } from '../shared/core/precos/taxaPreco';
@@ -176,6 +177,7 @@ export default function AppLayout() {
             <Route path="/vendas/regras" element={<RegrasVenda />} />
             <Route path="/vendas/taxas" element={<TaxasPagamento />} />
             <Route path="/vendas/orcamentos" element={<Orcamentos />} />
+            <Route path="/vendas/pedidos-faturados" element={<PedidosFaturados />} />
             <Route path="/vendas/notas-fiscais" element={<NotasFiscais />} />
             <Route path="/estoque" element={<Estoque />} />
             <Route path="/estoque/consulta" element={<SaldoEstoque />} />

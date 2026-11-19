@@ -111,7 +111,7 @@ docs/                      planos e decisões; docs/legado guarda material antig
 ## Mapa das áreas
 | Área | Backend (`Backend/src/`) | Front (`Front/App/src/`) | Tabelas principais |
 |---|---|---|---|
-| Vendas (PDV, caixa, orçamentos, devoluções, taxas, regras, painel) | `areas/vendas` | `areas/vendas` (`pdv`, `caixa`, `orcamentos`, `taxas`, `regras`, `painel`, `vendasDoDia`) | `vendas_*` |
+| Vendas (PDV, caixa, orçamentos, negociação, pedidos faturados, devoluções, taxas, regras, painel) | `areas/vendas` | `areas/vendas` (`pdv`, `caixa`, `orcamentos`, `negociacao`, `pedidos`, `taxas`, `regras`, `painel`, `vendasDoDia`) | `vendas_*` |
 | Notas fiscais de saída (NFC-e/NF-e) | `areas/fiscal` | `areas/fiscal/notasSaida` | `fiscal_*` |
 | Financeiro (receber, pagar) | `areas/financeiro` | `areas/financeiro` | `financeiro_*` |
 | Entrada de NF (staging) | `areas/compras` | `areas/compras/entradaNf`, `areas/compras/notasEntrada` | `importacoes_lotes`, `importacao_produtos_staging` |

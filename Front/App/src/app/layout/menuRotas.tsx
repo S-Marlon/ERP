@@ -25,6 +25,7 @@ export const MENU_PRINCIPAL: ItemMenu[] = [
       { key: '/vendas/pdv', label: 'PDV' },
       { key: '/vendas/do-dia', label: 'Vendas do Dia' },
       { key: '/vendas/orcamentos', label: 'Orçamentos' },
+      { key: '/vendas/pedidos-faturados', label: 'Pedidos faturados' },
       { key: '/vendas/notas-fiscais', label: 'Notas fiscais' },
       { key: '/vendas/caixas', label: 'Caixas' },
       { key: '/vendas/regras', label: 'Regras de venda' },

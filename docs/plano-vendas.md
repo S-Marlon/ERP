@@ -148,6 +148,27 @@ testes → telas → commit.
   Pagamento mais caro para a loja que o combinado (mais taxa, ou mais prazo médio) pede a senha de autorização.
 - Pendente: na venda, a faixa por quantidade não muda o preço sozinha se a quantidade for diferente da orçada.
 
+## Pedidos faturados (2026-11-18)
+
+Venda para empresa com entrega depois (Vendas › Pedidos faturados, `areas/vendas/pedidos`). Decidido com o dono: NF-e
+emitida **fora** do ERP (o emissor do ERP ainda é simulado), boleto gerado **no banco**, entrega **de uma vez**, material
+**reservado** desde a confirmação e baixado na entrega.
+
+- **Banco:** `vendas_pedidos` com `origem = 'ERP'` e status `PEDIDO` (confirmado) → `FATURADO` → `CONCLUIDA` (faturado e
+  entregue; aí conta no painel de vendas) ou `CANCELADA`; colunas `pedido_cliente` (OC), `previsao_entrega`,
+  `endereco_entrega`, `faturado_em`, `entregue_em`, `recebido_por`. Parcelas em `financeiro_contas_receber` com `forma` e
+  `codigo_barras` (linha digitável). A nota fica em `fiscal_documentos` (modelo 55, `AUTORIZADA`, emissor `EXTERNO`).
+- **Fluxo:** botão **Pedido** no orçamento válido com cliente (copia itens e preços; orçamento fica `CONVERTIDO`) →
+  **Faturar** (nº/série/chave da NF-e + parcelas sugeridas pela condição da proposta, editáveis) → linha digitável em cada
+  boleto (na hora ou depois) → **Registrar entrega** (quem recebeu; baixa o estoque pelo custo médio do momento, origem
+  `PEDIDO_ENTREGA`). Faturar e entregar podem vir em qualquer ordem. Não passa pelo caixa.
+- **Reserva:** calculada (pedidos `PEDIDO`/`FATURADO` sem `entregue_em`; kit reserva os componentes), sem tabela própria.
+  O PDV mostra o disponível sem ela e a venda de balcão não leva o reservado; a entrega de um pedido não concorre com a
+  própria reserva. Regras em `pedidosFaturados.ts` (com teste).
+- **Cancelar:** só antes da entrega (depois é devolução); parcelas sem recebimento são canceladas; a NF-e emitida fora
+  precisa ser cancelada no emissor (o operador confirma). "Vendas do dia" e o cancelamento do PDV não mexem em pedido.
+- Pendente: impressão do pedido/romaneio de entrega; entrega parcial; emissor fiscal real e boleto registrado pelo banco.
+
 ## Critérios de pronto
 
 - **Fase 1:** abrir com R$ 100, vender R$ 50 em dinheiro, sangria de R$ 30 → fechamento espera R$ 120 em dinheiro e mostra a diferença contada.

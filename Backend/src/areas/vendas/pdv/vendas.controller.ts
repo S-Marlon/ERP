@@ -15,6 +15,7 @@ import { avaliarRegras, conferirSenha } from '../regras/regrasVenda';
 import { carregarConfigTaxas } from '../taxas/taxas.controller';
 import { calcularTaxas, descontoEfetivoPct, liquidoParaRegra, taxaPara } from '../taxas/taxas';
 import { condicaoDaLinha, lerCondicao, pagamentoMaisCaro } from '../negociacao/condicaoPagamento';
+import { reservasPorItem } from '../pedidos/pedidosFaturados.controller';
 import { carregarDadosComponentes, saidasDoKitNaVenda } from '../../catalogo/kits/kitsBanco';
 import { ErroKit, nomeComTrocas, saidaDosComponentes } from '../../catalogo/kits/kits';
 import { escolhasDasLinhas, gravarEscolhasKit, resolverKitsDoPedido } from '../../catalogo/kits/kitsVenda';
@@ -196,12 +197,16 @@ export const registrarVenda = async (req: Request, res: Response) => {
     const podeSemEstoque = new Map(idsEstoque.map(id => [id, itensBanco.has(id)
       ? Boolean(Number(itensBanco.get(id).pode_vender_sem_estoque))
       : Boolean(componentes.get(id)?.podeVenderSemEstoque)]));
-    const estoque = conferirEstoque(linhasEstoque as any, saldos, podeSemEstoque);
+    // O que está reservado para pedidos faturados (ainda não entregues) não pode ser vendido no balcão
+    const reservas = idsEstoque.length ? await reservasPorItem(connection as any, tenant) : new Map<number, number>();
+    const saldosLivres = new Map(idsEstoque.map(id => [id, Math.round(((saldos.get(id) || 0) - (reservas.get(id) || 0)) * 10000) / 10000]));
+    const estoque = conferirEstoque(linhasEstoque as any, saldosLivres, podeSemEstoque);
     if (estoque.faltas.length > 0) {
       throw new ErroVenda(
         `Estoque insuficiente: ${estoque.faltas.map(f => {
           const sigla = itensBanco.get(f.idItem)?.sigla_base ?? componentes.get(f.idItem)?.sigla ?? '';
-          return `${nomeDe(f.idItem)} (saldo ${f.saldo} ${sigla}, venda ${f.saida})`;
+          const reservado = reservas.get(f.idItem) || 0;
+          return `${nomeDe(f.idItem)} (livre ${f.saldo} ${sigla}${reservado > 0 ? `, ${reservado} reservado em pedido faturado` : ''}, venda ${f.saida})`;
         }).join('; ')}.`,
         409,
         estoque.faltas
@@ -411,10 +416,11 @@ export const cancelarVenda = async (req: Request, res: Response) => {
   try {
     await connection.beginTransaction();
     const [[venda]]: any = await connection.execute(
-      `SELECT id_venda, status, id_caixa, total_devolvido FROM vendas_pedidos WHERE id_venda = ? AND tenant_id = ? FOR UPDATE`,
+      `SELECT id_venda, status, origem, id_caixa, total_devolvido FROM vendas_pedidos WHERE id_venda = ? AND tenant_id = ? FOR UPDATE`,
       [idVenda, tenant]
     );
     if (!venda) throw new ErroVenda('Venda não encontrada.', 404);
+    if (venda.origem === 'ERP') throw new ErroVenda('Este é um pedido faturado: cancele em Vendas › Pedidos faturados.', 409);
     if (venda.status !== 'CONCLUIDA') throw new ErroVenda(`A venda já está ${String(venda.status).toLowerCase()}.`, 409);
     if (Number(venda.total_devolvido) > 0) throw new ErroVenda('Esta venda já teve devolução: devolva o restante pela devolução (não dá para cancelar).', 409);
     // Nota autorizada precisa ser cancelada antes (Notas fiscais); a que ainda está na fila sai dela
@@ -550,7 +556,7 @@ export const listarVendas = async (req: Request, res: Response) => {
               (SELECT COUNT(*) FROM vendas_pedidos_itens i WHERE i.id_venda = v.id_venda) AS qtd_itens,
               (SELECT GROUP_CONCAT(DISTINCT p.forma) FROM vendas_pedidos_pagamentos p WHERE p.id_venda = v.id_venda) AS formas
        FROM vendas_pedidos v
-       WHERE v.tenant_id = ? AND v.status IN ('CONCLUIDA', 'CANCELADA') AND DATE(v.created_at) = COALESCE(?, CURDATE())
+       WHERE v.tenant_id = ? AND v.status IN ('CONCLUIDA', 'CANCELADA') AND v.origem <> 'ERP' AND DATE(v.created_at) = COALESCE(?, CURDATE())
        ORDER BY v.id_venda DESC`,
       [tenant, data]
     );

@@ -472,6 +472,9 @@ export const cancelarNota = async (req: Request, res: Response) => {
     if (motivo.length < 15) throw new ErroFiscal('A justificativa do cancelamento precisa de pelo menos 15 caracteres (regra da SEFAZ).');
     const doc = await carregarDocumento(tenant, Number(req.params.id));
     if (doc.status !== 'AUTORIZADA') throw new ErroFiscal('Só nota autorizada pode ser cancelada.', 409);
+    if (doc.emissor === 'EXTERNO') {
+      throw new ErroFiscal('Nota emitida fora do ERP (pedido faturado): cancele no emissor de vocês e depois cancele o pedido em Vendas › Pedidos faturados.', 409);
+    }
     const emissor = await emissorDoDocumento(tenant, doc);
     const r = await emissor.cancelar(paraDocumentoEmitido(doc), motivo);
     if (r.ok) {

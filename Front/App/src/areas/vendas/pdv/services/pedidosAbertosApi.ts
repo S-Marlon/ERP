@@ -15,6 +15,8 @@ export interface PedidoAbertoResumo {
   id: number; tipo: TipoPedidoAberto; situacao: SituacaoPedido; cliente: string; idCliente: number | null; contato: string | null;
   operador: string | null; total: number; custo: number; observacao: string | null; criadoEm: string; validade: string | null;
   qtdItens: number; idVendaGerada: number | null;
+  /** O orçamento virou pedido faturado (Vendas › Pedidos faturados), não venda de balcão. */
+  virouPedido?: boolean;
 }
 
 export interface ItemPedidoAberto {
