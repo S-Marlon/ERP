@@ -40,6 +40,12 @@ export const ondeFocarApi = {
   },
 };
 
+/** Desconto máximo (fração, para baixo em 1%) que ainda deixa a margem mínima — mesma conta do servidor (ondeFocar.ts). */
+export const descontoMaximo = (preco: number, custo: number, margemMinima: number) => {
+  if (!(preco > 0) || !(custo >= 0) || margemMinima >= 1) return 0;
+  return Math.max(0, Math.floor((1 - custo / (1 - margemMinima) / preco) * 100) / 100);
+};
+
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const brl0 = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 const pct = (v: number | null) => (v === null ? '—' : `${Math.round(v * 100)}%`);

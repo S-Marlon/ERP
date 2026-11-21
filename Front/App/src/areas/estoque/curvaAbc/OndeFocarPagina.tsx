@@ -5,7 +5,9 @@ import { Alert, Button, Card, Col, Empty, Flex, Modal, Row, Segmented, Space, St
 import { CopyOutlined, PrinterOutlined, ReloadOutlined, WhatsAppOutlined } from '@ant-design/icons';
 import { imprimirHtml } from '../../../shared/core/impressao/saida';
 import { reservasApi } from '../../financeiro/reservas/reservasApi';
-import { htmlRelatorioFoco, ItemPropaganda, ondeFocarApi, Quadrante, QUADRANTES, RelatorioFoco, textoPromocao } from './ondeFocarApi';
+import { CategoriaFoco, htmlRelatorioFoco, ItemPropaganda, ondeFocarApi, Quadrante, QUADRANTES, RelatorioFoco, textoPromocao } from './ondeFocarApi';
+import { curvaAbcApi, ItemCurvaTela } from './curvaAbcApi';
+import { CategoriaFocoDrawer } from './CategoriaFocoDrawer';
 
 const { Text, Title } = Typography;
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -19,13 +21,20 @@ const OndeFocarPagina: React.FC = () => {
   const [carregando, setCarregando] = useState(false);
   const [selecionados, setSelecionados] = useState<number[]>([]);
   const [texto, setTexto] = useState<string | null>(null);
+  // Gaveta da categoria: os produtos vêm da curva ABC do mesmo período (carregada uma vez, na primeira abertura)
+  const [categoriaAberta, setCategoriaAberta] = useState<CategoriaFoco | null>(null);
+  const [itensCurva, setItensCurva] = useState<ItemCurvaTela[] | null>(null);
+  const abrirCategoria = (c: CategoriaFoco) => {
+    setCategoriaAberta(c);
+    if (!itensCurva) curvaAbcApi.carregar(dias).then(x => setItensCurva(x.itens)).catch(e => message.error(e.message));
+  };
 
   const carregar = async () => {
     setCarregando(true);
     try { const x = await ondeFocarApi.carregar(dias); setR(x); setSelecionados(x.propaganda.slice(0, 6).map(i => i.idItem)); }
     catch (e) { message.error(e instanceof Error ? e.message : 'Erro.'); } finally { setCarregando(false); }
   };
-  useEffect(() => { carregar(); }, [dias]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { carregar(); setItensCurva(null); }, [dias]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const imprimir = async () => {
     if (!r) return;
@@ -39,6 +48,7 @@ const OndeFocarPagina: React.FC = () => {
 
   return (
     <div style={{ padding: 16 }}>
+      <style>{'.linha-categoria:hover { background: rgba(0,0,0,.04); }'}</style>
       <Space direction="vertical" size={12} style={{ width: '100%' }}>
         <Flex justify="space-between" align="center" wrap gap={8}>
           <div>
@@ -69,9 +79,10 @@ const OndeFocarPagina: React.FC = () => {
                 <div style={{ border: `1px solid ${QUADRANTES[g.q].cor}55`, borderLeft: `4px solid ${QUADRANTES[g.q].cor}`, borderRadius: 6, padding: '8px 10px', height: '100%' }}>
                   <Text strong style={{ color: QUADRANTES[g.q].cor }}>{QUADRANTES[g.q].titulo}</Text> <Text type="secondary" style={{ fontSize: 12 }}>· {QUADRANTES[g.q].acao}</Text>
                   {g.cats.length === 0 ? <div><Text type="secondary" style={{ fontSize: 12 }}>Nenhuma categoria.</Text></div> : g.cats.map(c => (
-                    <Tooltip key={c.categoria} title={c.motivo}>
-                      <Flex justify="space-between" style={{ marginTop: 4, fontSize: 13 }}>
-                        <Text>{c.categoria}</Text>
+                    <Tooltip key={c.categoria} title={`${c.motivo}. Clique para ver os produtos.`}>
+                      <Flex justify="space-between" className="linha-categoria" onClick={() => abrirCategoria(c)}
+                        style={{ marginTop: 2, fontSize: 13, cursor: 'pointer', padding: '2px 4px', borderRadius: 4 }}>
+                        <Text style={{ color: QUADRANTES[g.q].cor }} underline>{c.categoria}</Text>
                         <Text type="secondary">{c.receita ? `${brl0(c.receita)} · ` : ''}margem {pct(c.margem ?? c.margemTabela)}{c.parado ? ` · parado ${brl0(c.parado)}` : ''}</Text>
                       </Flex>
                     </Tooltip>
@@ -81,7 +92,10 @@ const OndeFocarPagina: React.FC = () => {
             ))}
           </Row>
           {porQuadrante.find(g => g.q === 'ACOMPANHAR')!.cats.length > 0 && (
-            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 8 }}>Acompanhar: {porQuadrante.find(g => g.q === 'ACOMPANHAR')!.cats.map(c => c.categoria).join(' · ')}</Text>
+            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 8 }}>Acompanhar:{' '}
+              {porQuadrante.find(g => g.q === 'ACOMPANHAR')!.cats.map((c, k) => (
+                <React.Fragment key={c.categoria}>{k > 0 && ' · '}<a onClick={() => abrirCategoria(c)}>{c.categoria}</a></React.Fragment>
+              ))}</Text>
           )}
         </Card>
 
@@ -135,6 +149,8 @@ const OndeFocarPagina: React.FC = () => {
         </Card>
       </Space>
 
+      <CategoriaFocoDrawer categoria={categoriaAberta} itens={itensCurva} margemMinima={r.margemMinima}
+        onFechar={() => setCategoriaAberta(null)} onPrecoMudou={() => { setItensCurva(null); curvaAbcApi.carregar(dias).then(x => setItensCurva(x.itens)).catch(() => undefined); }} />
       <Modal open={texto !== null} title="Texto da promoção" onCancel={() => setTexto(null)} footer={<Space>
         <Button icon={<CopyOutlined />} onClick={() => navigator.clipboard.writeText(texto || '').then(() => message.success('Texto copiado.')).catch(() => message.error('O navegador não deixou copiar.'))}>Copiar</Button>
         <Button type="primary" icon={<WhatsAppOutlined />} onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(texto || '')}`, '_blank')}>Abrir no WhatsApp</Button>

@@ -4,6 +4,8 @@ import type { ClasseExibida, ItemClassificado } from './curvaAbc';
 
 export interface ItemCurvaTela extends ItemClassificado {
   sku: string; nome: string; unidade: string | null; categoria: string | null; categoriaTopoNome: string | null;
+  /** Preço de venda da unidade base (cadastro). */
+  precoVenda?: number;
 }
 export interface RespostaCurva { dias: number; historicoDesde: string | null; diasDeHistorico: number; itens: ItemCurvaTela[] }
 
