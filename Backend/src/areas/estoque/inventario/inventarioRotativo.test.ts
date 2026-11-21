@@ -1,6 +1,6 @@
 import assert from 'assert';
 import {
-  areaDaCategoria, avaliarDivergencia, Candidato, categoriaDoTopo, CONFIG_PADRAO, curvaAbc, escolherLista, motivoDoItem, saldoNaHora, validarConfig,
+  areaDaCategoria, avaliarDivergencia, Candidato, categoriaDoTopo, CONFIG_PADRAO, escolherLista, motivoDoItem, saldoNaHora, validarConfig,
 } from './inventarioRotativo';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
@@ -22,11 +22,6 @@ teste('inventário: áreas pela categoria', () => {
   assert.strictEqual(categoriaDoTopo(2, pais), 2);
   // laço no cadastro não trava
   assert.strictEqual(areaDaCategoria(5, new Map([[5, 6], [6, 5]]), mapa), null);
-});
-
-teste('inventário: curva ABC', () => {
-  const c = curvaAbc(new Map([[1, 700], [2, 150], [3, 100], [4, 50]]), [1, 2, 3, 4, 5]);
-  assert.deepStrictEqual([...c.entries()], [[1, 'A'], [2, 'A'], [3, 'B'], [4, 'C'], [5, 'C']]);   // o que cruza os 80% ainda é A
 });
 
 teste('inventário: por que o item entra', () => {

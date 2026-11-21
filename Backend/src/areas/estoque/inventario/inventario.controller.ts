@@ -6,9 +6,10 @@ import { lancarMovimentoEstoque } from '../depositos';
 import { carregarRegras } from '../../vendas/regras/regrasVenda.controller';
 import { conferirSenha } from '../../vendas/regras/regrasVenda';
 import {
-  areaDaCategoria, avaliarDivergencia, Candidato, categoriaDoTopo, CONFIG_PADRAO, ConfigInventario, curvaAbc, ErroInventario, escolherLista,
+  areaDaCategoria, avaliarDivergencia, Candidato, categoriaDoTopo, CONFIG_PADRAO, ConfigInventario, ErroInventario, escolherLista,
   motivoDoItem, saldoNaHora, Selecao, validarConfig,
 } from './inventarioRotativo';
+import { classesDeVenda } from '../curvaAbc/curvaAbc.controller';
 
 const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || req.body?.tenant_id || 1);
 const operadorDe = (req: Request) => String(req.body?.operador || req.query.operador || '').trim().slice(0, 60) || 'ADM';
@@ -67,13 +68,8 @@ const candidatosDeHoje = async (conn: any, tenant: number, cfg: ConfigInventario
                        WHERE ii.id_item = ic.id_item AND li.status = 'ABERTA' AND li.tenant_id = ic.tenant_id)`,
     [tenant]
   );
-  const [giro]: any = await conn.execute(
-    `SELECT id_item, SUM(custo_total) AS valor FROM estoque_movimentos
-     WHERE tenant_id = ? AND deposito = 'VENDA' AND tipo_movimento = 'SAIDA' AND origem IN ('VENDA_PDV', 'PEDIDO_ENTREGA')
-       AND created_at >= NOW() - INTERVAL 90 DAY GROUP BY id_item`,
-    [tenant]
-  );
-  const curvas = curvaAbc(new Map(giro.map((g: any) => [Number(g.id_item), n(g.valor)])), rows.map((r: any) => Number(r.id_item)));
+  // Curva de venda dos últimos 90 dias (Estoque › Curva ABC); quem não vendeu é C
+  const curvas = await classesDeVenda(conn, tenant, 90);
   const areas = new Map<number, { nome: string; contar: boolean; ordem: number }>(base.areas.map((a: any) => [a.id, a]));
   const nomeCat = new Map<number, string>(base.categorias.map((c: any) => [c.id, c.nome]));
   const hoje = hojeIso();

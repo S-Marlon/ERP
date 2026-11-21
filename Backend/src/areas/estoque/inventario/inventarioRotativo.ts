@@ -62,21 +62,7 @@ export const categoriaDoTopo = (categoriaId: number | null, pais: Map<number, nu
   return categoriaId;
 };
 
-export type Curva = 'A' | 'B' | 'C';
-
-/** Curva ABC pelo valor que saiu (custo das saídas de venda): A = 80% do valor, B = até 95%, C = o resto e sem venda. */
-export const curvaAbc = (valores: Map<number, number>, ids: number[]): Map<number, Curva> => {
-  const comValor = ids.map(id => ({ id, v: Math.max(0, valores.get(id) || 0) })).filter(x => x.v > 0).sort((a, b) => b.v - a.v || a.id - b.id);
-  const total = comValor.reduce((a, x) => a + x.v, 0);
-  const curva = new Map<number, Curva>(ids.map(id => [id, 'C' as Curva]));
-  let acumulado = 0;
-  for (const x of comValor) {
-    const antes = acumulado / total;
-    acumulado += x.v;
-    curva.set(x.id, antes < 0.8 ? 'A' : antes < 0.95 ? 'B' : 'C');
-  }
-  return curva;
-};
+export type Curva = 'A' | 'B' | 'C';  // classe de venda (Estoque › Curva ABC)
 
 export const diasEntre = (de: string, ate: string) =>
   Math.round((new Date(`${ate}T12:00:00`).getTime() - new Date(`${de}T12:00:00`).getTime()) / 86400000);

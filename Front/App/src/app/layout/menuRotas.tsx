@@ -57,6 +57,7 @@ export const MENU_PRINCIPAL: ItemMenu[] = [
       { key: '/estoque', label: 'Painel de Estoque' },
       { key: '/estoque/consulta', label: 'Consulta de Saldo' },
       { key: '/estoque/inventario', label: 'Inventário rotativo' },
+      { key: '/estoque/curva-abc', label: 'Curva ABC' },
       { key: '/estoque/operacoes', label: 'Movimentações' },
       { key: '/estoque/etiquetagem', label: 'Etiquetagem' },
     ],

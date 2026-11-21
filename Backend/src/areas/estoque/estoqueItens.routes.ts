@@ -5,6 +5,7 @@ import {
   atualizarArea, cancelarLista, criarArea, detalheLista, excluirArea, gerarLista, lancarLista, listarListas, painelInventario, pedirConferencia,
   retirarPedidoConferencia, salvarConfig,
 } from './inventario/inventario.controller';
+import { curvaAbcItens } from './curvaAbc/curvaAbc.controller';
 
 // Estoque no modelo novo (itens_core). Montado em /api/estoque, antes das rotas legadas.
 const router = Router();
@@ -17,6 +18,9 @@ router.post('/transferencias', transferirEstoque);
 // Etiquetas de gôndola: última etiqueta impressa e as que ficaram com preço antigo
 router.post('/etiquetas/impressas', registrarImpressas);
 router.get('/etiquetas/desatualizadas', etiquetasDesatualizadas);
+
+// Curva ABC: venda, lucro e estoque parado por item, XYZ, parados e novos
+router.get('/curva-abc', curvaAbcItens);
 
 // Inventário rotativo: lista do dia por área, folha impressa, lançamento da contagem
 router.get('/inventario', painelInventario);
