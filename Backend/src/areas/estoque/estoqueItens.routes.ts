@@ -6,6 +6,7 @@ import {
   retirarPedidoConferencia, salvarConfig,
 } from './inventario/inventario.controller';
 import { curvaAbcItens, ondeFocarRelatorio } from './curvaAbc/curvaAbc.controller';
+import { gravarDecisaoCompra, marcarAtributoEquivalencia, relatorioEquivalencias } from './curvaAbc/equivalencias.controller';
 
 // Estoque no modelo novo (itens_core). Montado em /api/estoque, antes das rotas legadas.
 const router = Router();
@@ -22,6 +23,10 @@ router.get('/etiquetas/desatualizadas', etiquetasDesatualizadas);
 // Curva ABC: venda, lucro e estoque parado por item, XYZ, parados e novos
 router.get('/curva-abc', curvaAbcItens);
 router.get('/curva-abc/onde-focar', ondeFocarRelatorio);
+// Marcas e equivalentes: quem vende e quem trava entre itens que servem para a mesma coisa; decisão de compra do item
+router.get('/equivalencias', relatorioEquivalencias);
+router.put('/equivalencias/atributos/:id', marcarAtributoEquivalencia);
+router.put('/itens/:idItem/decisao-compra', gravarDecisaoCompra);
 
 // Inventário rotativo: lista do dia por área, folha impressa, lançamento da contagem
 router.get('/inventario', painelInventario);

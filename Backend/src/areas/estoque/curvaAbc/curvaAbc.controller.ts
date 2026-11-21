@@ -51,7 +51,7 @@ export const carregarCurva = async (tenant: number, dias: number) => {
   const [[itensRows], vendas, [cats], [[hist]]]: any = await Promise.all([
     pool.execute(
       `SELECT ic.id_item, COALESCE(NULLIF(TRIM(cpd.sku_customizado), ''), ic.sku) AS sku, COALESCE(NULLIF(TRIM(cpd.nome_comercial), ''), ic.nome_item) AS nome,
-              um.sigla AS unidade, COALESCE(f.categoria_id, cpd.categoria_id) AS categoria_id, cat.nome AS categoria, COALESCE(cpd.preco_venda, 0) AS preco_venda,
+              um.sigla AS unidade, COALESCE(f.categoria_id, cpd.categoria_id) AS categoria_id, cat.nome AS categoria, COALESCE(cpd.preco_venda, 0) AS preco_venda, cpd.decisao_compra,
               COALESCE(es.quantidade_atual, 0) AS estoque, COALESCE(NULLIF(es.custo_medio, 0), cpd.custo_gerencial, 0) AS custo,
               DATEDIFF(CURDATE(), COALESCE(
                 (SELECT MIN(m.created_at) FROM estoque_movimentos m WHERE m.tenant_id = ic.tenant_id AND m.id_item = ic.id_item AND m.tipo_movimento = 'ENTRADA'),
@@ -74,7 +74,7 @@ export const carregarCurva = async (tenant: number, dias: number) => {
     const topo = categoriaDoTopo(r.categoria_id !== null ? Number(r.categoria_id) : null, pais);
     return {
       idItem: Number(r.id_item), sku: r.sku as string, nome: r.nome as string, unidade: (r.unidade || null) as string | null, categoria: limpo(r.categoria),
-      categoriaTopo: topo, categoriaTopoNome: topo !== null ? nomeCat.get(topo) || null : null, precoVenda: n(r.preco_venda),
+      categoriaTopo: topo, categoriaTopoNome: topo !== null ? nomeCat.get(topo) || null : null, precoVenda: n(r.preco_venda), decisaoCompra: (r.decisao_compra || null) as string | null,
       receita: v?.receita || 0, lucro: v?.lucro || 0, quantidade: v?.qtd || 0, vendas: v?.vendas || 0, semanasComVenda: v?.semanas || 0,
       estoque: n(r.estoque), custoUnitario: n(r.custo), diasDesdeEntrada: r.dias_entrada !== null ? Number(r.dias_entrada) : null, ultimaVenda: v?.ultima || null,
     };
@@ -83,7 +83,7 @@ export const carregarCurva = async (tenant: number, dias: number) => {
   const diasDeHistorico = hist?.dias !== null && hist?.dias !== undefined ? Number(hist.dias) + 1 : 0;
   const itens = classificarItens(base as ItemCurva[], dias, undefined, diasDeHistorico).map(c => {
     const e = extras.get(c.idItem);
-    return { ...c, sku: e.sku, nome: e.nome, unidade: e.unidade, categoria: e.categoria, categoriaTopoNome: e.categoriaTopoNome, precoVenda: e.precoVenda };
+    return { ...c, sku: e.sku, nome: e.nome, unidade: e.unidade, categoria: e.categoria, categoriaTopoNome: e.categoriaTopoNome, precoVenda: e.precoVenda, decisaoCompra: e.decisaoCompra };
   }) as Array<ItemFoco & { categoria: string | null }>;
   return { dias, historicoDesde: (hist?.desde || null) as string | null, diasDeHistorico, itens };
 };

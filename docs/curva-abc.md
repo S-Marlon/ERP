@@ -62,6 +62,26 @@ correções); ajustes à mão. Nada disso é gravado: é calculado das vendas e 
 paga com o giro (aviso). **Data de início = hoje** ao criar (uma data antiga tira do fundo as compras antigas, como a carga
 inicial do estoque). Regras em `areas/financeiro/reservas/reservasReposicao.ts`.
 
+## Marcas e equivalentes (Estoque › Marcas e equivalentes, 2026-11-21)
+
+Exemplo que motivou: bomba 0,75 HP é a que mais sai, mas a Tetis encalha (o cliente prefere Ebara) e trava o estoque.
+
+- **Atributo que define equivalência** (`atributos_comercial.define_equivalencia`): itens da **mesma categoria** com os mesmos
+  valores em todos os atributos marcados que o item tem formam um grupo de equivalentes (valores normalizados: "0,75" = "0.75").
+  Só vira grupo com 2+ origens diferentes (marca; sem marca, a família). A marca "Sem Marca" conta como sem marca.
+  Marcados de início: potência (HP) da bomba, código do rolamento, perfil e número da correia, viscosidade. O modelo da
+  marca (ex.: 3BPS2-14) não se marca. Tamanho/tensão da bomba ainda estão só no nome da família.
+- **Quem vende e quem trava:** participação de cada item nas vendas (quantidade) e no estoque do grupo. VENDE = o que mais
+  vendeu; TRAVA = tem 50%+ do estoque do grupo e menos da metade dessa participação nas vendas. Confiança pelo nº de vendas
+  do grupo (< 5 fraco, 5–14 médio, 15+ forte). Preço para escoar = 10% abaixo do que mais vende, nunca abaixo do mínimo pela
+  margem mínima.
+- **Decisão de compra** (`comercial_produtos_dados.decisao_compra`: PREFERIDO / NAO_RECOMPRAR, com motivo, data e quem):
+  "não recomprar" sai do Repor e entra no Não recomprar do Onde focar; "preferido" nunca vai para o Não recomprar. Decisão
+  contrária aos números aparece como aviso no grupo.
+- **Demanda por atributo** (todas as marcas somadas: o que manter) e **giro por marca** (vendido ÷ estoque médio).
+- **Cadastro pendente:** itens das categorias com grupos sem marca ou sem atributo de equivalência.
+- Próximo: substituto no PDV ("sem estoque da Ebara: tem Tetis equivalente") e sugestão de equivalente na reposição.
+
 ## Próximos passos combinados
 
 - Usar a curva no estoque mínimo sugerido, na lista de compras, no PDV/catálogo (selo) e no Mercado Livre (anunciar parados e A).

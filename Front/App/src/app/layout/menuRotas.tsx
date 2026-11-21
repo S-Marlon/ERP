@@ -59,6 +59,7 @@ export const MENU_PRINCIPAL: ItemMenu[] = [
       { key: '/estoque/inventario', label: 'Inventário rotativo' },
       { key: '/estoque/curva-abc', label: 'Curva ABC' },
       { key: '/estoque/onde-focar', label: 'Onde focar' },
+      { key: '/estoque/equivalentes', label: 'Marcas e equivalentes' },
       { key: '/estoque/operacoes', label: 'Movimentações' },
       { key: '/estoque/etiquetagem', label: 'Etiquetagem' },
     ],

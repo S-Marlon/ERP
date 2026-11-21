@@ -1,6 +1,7 @@
 // Estoque › Onde focar: a curva ABC virando decisão. Categorias em quadrantes, o que divulgar (com desconto que respeita a
 // margem mínima e texto pronto para WhatsApp), chamarizes, o que repor e o que não recomprar, quem subiu/caiu, e o PDF do mês.
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Alert, Button, Card, Col, Empty, Flex, Modal, Row, Segmented, Space, Statistic, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { CopyOutlined, PrinterOutlined, ReloadOutlined, WhatsAppOutlined } from '@ant-design/icons';
 import { imprimirHtml } from '../../../shared/core/impressao/saida';
@@ -8,6 +9,7 @@ import { reservasApi } from '../../financeiro/reservas/reservasApi';
 import { CategoriaFoco, htmlRelatorioFoco, ItemPropaganda, ondeFocarApi, Quadrante, QUADRANTES, RelatorioFoco, textoPromocao } from './ondeFocarApi';
 import { curvaAbcApi, ItemCurvaTela } from './curvaAbcApi';
 import { CategoriaFocoDrawer } from './CategoriaFocoDrawer';
+import { equivalenciasApi, GrupoEquivalente } from './equivalenciasApi';
 
 const { Text, Title } = Typography;
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -21,6 +23,9 @@ const OndeFocarPagina: React.FC = () => {
   const [carregando, setCarregando] = useState(false);
   const [selecionados, setSelecionados] = useState<number[]>([]);
   const [texto, setTexto] = useState<string | null>(null);
+  const navigate = useNavigate();
+  // Marcas que travam estoque (grupos de equivalentes com alerta)
+  const [travando, setTravando] = useState<GrupoEquivalente[]>([]);
   // Gaveta da categoria: os produtos vêm da curva ABC do mesmo período (carregada uma vez, na primeira abertura)
   const [categoriaAberta, setCategoriaAberta] = useState<CategoriaFoco | null>(null);
   const [itensCurva, setItensCurva] = useState<ItemCurvaTela[] | null>(null);
@@ -34,7 +39,10 @@ const OndeFocarPagina: React.FC = () => {
     try { const x = await ondeFocarApi.carregar(dias); setR(x); setSelecionados(x.propaganda.slice(0, 6).map(i => i.idItem)); }
     catch (e) { message.error(e instanceof Error ? e.message : 'Erro.'); } finally { setCarregando(false); }
   };
-  useEffect(() => { carregar(); setItensCurva(null); }, [dias]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    carregar(); setItensCurva(null);
+    equivalenciasApi.carregar(dias).then(x => setTravando(x.grupos.filter(g => g.alerta))).catch(() => setTravando([]));
+  }, [dias]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const imprimir = async () => {
     if (!r) return;
@@ -98,6 +106,20 @@ const OndeFocarPagina: React.FC = () => {
               ))}</Text>
           )}
         </Card>
+
+        {travando.length > 0 && (
+          <Card size="small" title={`Marcas que travam estoque (${travando.length})`} style={{ borderColor: '#ffa39e' }}
+            extra={<Button size="small" type="link" onClick={() => navigate('/estoque/equivalentes')}>Decidir em Marcas e equivalentes →</Button>}>
+            <Space direction="vertical" size={4} style={{ width: '100%' }}>
+              {travando.slice(0, 6).map(g => (
+                <Flex key={g.chave} justify="space-between" gap={8} wrap>
+                  <Text><b>{g.valores.map(v => `${v.atributo} ${v.valor}`).join(' · ')}</b> <Text type="secondary">({g.categoria})</Text>: {g.alerta}</Text>
+                  <Text type="danger">{brl0(g.valorTravado)}</Text>
+                </Flex>
+              ))}
+            </Space>
+          </Card>
+        )}
 
         <Card size="small" title={`O que divulgar (${r.propaganda.length})`}
           extra={<Space>

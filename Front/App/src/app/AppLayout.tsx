@@ -26,6 +26,7 @@ import Etiquetagem from '../areas/estoque/etiquetagem/Etiquetagem';
 import InventarioRotativo from '../areas/estoque/inventario/InventarioRotativo';
 import CurvaAbc from '../areas/estoque/curvaAbc/CurvaAbcPagina';
 import OndeFocar from '../areas/estoque/curvaAbc/OndeFocarPagina';
+import Equivalencias from '../areas/estoque/curvaAbc/EquivalenciasPagina';
 import FundosReposicao from '../areas/financeiro/reservas/FundosReposicao';
 import PDVContent from '../areas/vendas/pdv/PDV';
 import CentralVendas from '../areas/vendas/painel/CentralVendas';
@@ -189,6 +190,7 @@ export default function AppLayout() {
             <Route path="/estoque/inventario" element={<InventarioRotativo />} />
             <Route path="/estoque/curva-abc" element={<CurvaAbc />} />
             <Route path="/estoque/onde-focar" element={<OndeFocar />} />
+            <Route path="/estoque/equivalentes" element={<Equivalencias />} />
             <Route path="/estoque/gerenciamento" element={<StockEntryForm />} />
             {/* Notas de entrada agora ficam em Compras (endereço antigo redireciona) */}
             <Route path="/estoque/notas" element={<Navigate to="/compras/notas" replace />} />

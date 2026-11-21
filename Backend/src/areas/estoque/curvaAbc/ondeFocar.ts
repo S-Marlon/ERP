@@ -6,6 +6,8 @@ import type { ClasseExibida, ItemClassificado } from './curvaAbc';
 
 export interface ItemFoco extends ItemClassificado {
   sku: string; nome: string; unidade: string | null; categoriaTopoNome: string | null; precoVenda: number;
+  /** Decisão de compra gravada no item (Marcas e equivalentes). */
+  decisaoCompra?: string | null;
 }
 
 export type Quadrante = 'PROTEGER' | 'REVER_PRECO' | 'DIVULGAR' | 'LIQUIDAR' | 'ACOMPANHAR';
@@ -91,17 +93,18 @@ export const chamarizes = (itens: ItemFoco[], limite = 8) => itens
   .sort((a, b) => b.receita - a.receita).slice(0, limite)
   .map(i => ({ idItem: i.idItem, sku: i.sku, nome: i.nome, categoria: i.categoriaTopoNome, receita: i.receita, preco: i.precoVenda, xyz: i.xyz }));
 
-/** Repor (vende e está acabando) e não recomprar (estoque para muito tempo, ou parado com valor alto). */
+/** Repor (vende e está acabando) e não recomprar (estoque para muito tempo, parado com valor alto, ou decidido "não recomprar"). */
 export const listasDeCompra = (itens: ItemFoco[], dias: number, limite = 40) => ({
   repor: itens
-    .filter(i => (i.venda === 'A' || i.venda === 'B') && (i.estoque <= 0 || (i.coberturaDias !== null && i.coberturaDias < 15)))
+    .filter(i => i.decisaoCompra !== 'NAO_RECOMPRAR' && (i.venda === 'A' || i.venda === 'B') && (i.estoque <= 0 || (i.coberturaDias !== null && i.coberturaDias < 15)))
     .sort((a, b) => b.receita - a.receita).slice(0, limite)
     .map(i => ({ idItem: i.idItem, sku: i.sku, nome: i.nome, categoria: i.categoriaTopoNome, classe: i.venda, estoque: i.estoque, coberturaDias: i.coberturaDias, vendidoNoPeriodo: i.quantidade, unidade: i.unidade })),
   naoRecomprar: itens
-    .filter(i => (i.coberturaDias !== null && i.coberturaDias > dias * 4 && i.valorEstoque >= 100) || (i.situacao === 'PARADO' && (i.estoqueClasse === 'A' || i.estoqueClasse === 'B')))
+    .filter(i => i.decisaoCompra === 'NAO_RECOMPRAR' || (i.decisaoCompra !== 'PREFERIDO'
+      && ((i.coberturaDias !== null && i.coberturaDias > dias * 4 && i.valorEstoque >= 100) || (i.situacao === 'PARADO' && (i.estoqueClasse === 'A' || i.estoqueClasse === 'B')))))
     .sort((a, b) => b.valorEstoque - a.valorEstoque).slice(0, limite)
     .map(i => ({ idItem: i.idItem, sku: i.sku, nome: i.nome, categoria: i.categoriaTopoNome, estoque: i.estoque, valorEstoque: i.valorEstoque, coberturaDias: i.coberturaDias, unidade: i.unidade,
-      motivo: i.situacao === 'PARADO' ? 'parado' : `estoque para ~${i.coberturaDias} dias` })),
+      motivo: i.decisaoCompra === 'NAO_RECOMPRAR' ? 'decidido: não recomprar' : i.situacao === 'PARADO' ? 'parado' : `estoque para ~${i.coberturaDias} dias` })),
 });
 
 /** Quem subiu para A e quem caiu de A desde a foto anterior (classe de venda). */

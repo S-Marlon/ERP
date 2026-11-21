@@ -46,6 +46,11 @@ teste('foco: propaganda, chamarizes e compras', () => {
   const c = listasDeCompra(itens, 90);
   assert.deepStrictEqual(c.repor.map(x => [x.idItem, x.coberturaDias]), [[1, 6]]);
   assert.deepStrictEqual(c.naoRecomprar.map(x => x.idItem), [4, 2]);
+  // decisão gravada: "não recomprar" sai do repor e entra no não recomprar; "preferido" nunca vai para o não recomprar
+  const decididos = itens.map(i => (i.idItem === 1 ? { ...i, decisaoCompra: 'NAO_RECOMPRAR' } : i.idItem === 2 ? { ...i, decisaoCompra: 'PREFERIDO' } : i));
+  const d = listasDeCompra(decididos, 90);
+  assert.deepStrictEqual(d.repor.map(x => x.idItem), []);
+  assert.deepStrictEqual(d.naoRecomprar.map(x => [x.idItem, x.motivo]), [[4, 'parado'], [1, 'decidido: não recomprar']]);
 });
 
 teste('foco: evolução desde a foto anterior', () => {
