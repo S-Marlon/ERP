@@ -5,6 +5,7 @@ import { Alert, Button, Drawer, Empty, Flex, Input, Segmented, Select, Space, St
 import { DollarOutlined, SwapOutlined } from '@ant-design/icons';
 import { API_URL } from '../../../shared/api/config';
 import ProductCommercialSalesConfig from '../precos/ProductCommercialSalesConfig';
+import { TagMarca } from '../../../shared/components/TagMarca';
 import type { Marca } from './services/comercialMarcas.service';
 
 const { Text } = Typography;
@@ -61,7 +62,7 @@ export const ProdutosDaMarcaDrawer: React.FC<{ marca: Marca | null; marcas: Marc
   const t = dados?.totais;
   return (
     <Drawer open={!!marca} onClose={onFechar} width="min(1200px, 100vw)" destroyOnHidden loading={!dados}
-      title={<Space>Produtos da marca <Tag color="purple" style={{ fontSize: 14, padding: '2px 10px' }}>{marca.nome}</Tag></Space>}
+      title={<Space>Produtos da marca <TagMarca marca={marca.nome} style={{ fontSize: 14, padding: '2px 10px' }} /></Space>}
       extra={<Segmented value={dias} onChange={v => setDias(Number(v))} options={[30, 90, 180, 365].map(d => ({ value: d, label: d === 365 ? '12 meses' : `${d} dias` }))} />}>
       {dados && t && (
         <Space direction="vertical" size={12} style={{ width: '100%' }}>

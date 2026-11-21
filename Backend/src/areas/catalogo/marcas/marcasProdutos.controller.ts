@@ -46,7 +46,9 @@ export const produtosDaMarca = async (req: Request, res: Response) => {
   }
 };
 
-/** PUT /api/catalogo/marcas/:id { nome, codigo, site, descricao, status } */
+const hex = (v: unknown) => (/^#[0-9a-f]{6}$/i.test(String(v || '').trim()) ? String(v).trim().toUpperCase() : null);
+
+/** PUT /api/catalogo/marcas/:id { nome, codigo, site, descricao, status, cor, corSecundaria } (cor vazia = automática) */
 export const atualizarMarca = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
   try {
@@ -54,9 +56,9 @@ export const atualizarMarca = async (req: Request, res: Response) => {
     if (!nome) return res.status(400).json({ error: 'O nome da marca é obrigatório.' });
     const status = req.body?.status === 'Inativo' ? 'Inativo' : 'Ativo';
     const [r]: any = await pool.execute(
-      `UPDATE comercial_marcas SET nome = ?, codigo = ?, site = ?, descricao = ?, status = ?, alterado_em = NOW() WHERE id = ? AND tenant_id = ?`,
+      `UPDATE comercial_marcas SET nome = ?, codigo = ?, site = ?, descricao = ?, status = ?, cor = ?, cor_secundaria = ?, alterado_em = NOW() WHERE id = ? AND tenant_id = ?`,
       [nome, String(req.body?.codigo || '').trim().slice(0, 10) || null, String(req.body?.site || '').trim().slice(0, 255) || null,
-        String(req.body?.descricao || '').trim() || null, status, Number(req.params.id), tenant]);
+        String(req.body?.descricao || '').trim() || null, status, hex(req.body?.cor), hex(req.body?.corSecundaria), Number(req.params.id), tenant]);
     if (!r.affectedRows) return res.status(404).json({ error: 'Marca não encontrada.' });
     return res.json({ success: true });
   } catch (error: any) {

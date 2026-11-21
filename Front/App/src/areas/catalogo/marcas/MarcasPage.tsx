@@ -49,6 +49,9 @@ import {
   CreateMarcaPayload 
 } from './services/comercialMarcas.service'; // Ajuste o caminho conforme a estrutura do seu projeto
 import { ProdutosDaMarcaDrawer } from './ProdutosDaMarcaDrawer';
+import { ColorPicker } from 'antd';
+import { estiloCores } from '../../../shared/components/TagMarca';
+import { invalidarCoresMarcas, textoSobre } from '../../../shared/core/marcas/coresMarcas';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -99,7 +102,7 @@ export const MarcasPage: React.FC = () => {
   const [editando, setEditando] = useState<Marca | null>(null);
   const abrirEdicao = (m: Marca) => {
     setEditando(m);
-    form.setFieldsValue({ nome: m.nome, site: m.site, status: m.status === 'Ativo', descricao: m.descricao, codigo: m.codigo });
+    form.setFieldsValue({ nome: m.nome, site: m.site, status: m.status === 'Ativo', descricao: m.descricao, codigo: m.codigo, cor: m.cor, corSecundaria: m.corSecundaria });
     setIsModalVisible(true);
   };
 
@@ -124,7 +127,7 @@ export const MarcasPage: React.FC = () => {
 
   const alternarStatus = async (m: Marca) => {
     try {
-      await atualizarMarca(m.id, { nome: m.nome, codigo: m.codigo, site: m.site, descricao: m.descricao, status: m.status === 'Ativo' ? 'Inativo' : 'Ativo' });
+      await atualizarMarca(m.id, { nome: m.nome, codigo: m.codigo, site: m.site, descricao: m.descricao, status: m.status === 'Ativo' ? 'Inativo' : 'Ativo', cor: m.cor, corSecundaria: m.corSecundaria });
       message.success(m.status === 'Ativo' ? `${m.nome} inativada.` : `${m.nome} ativada.`);
       carregarMarcas();
     } catch (e: any) { message.error(e.message || 'Erro ao mudar o status.'); }
@@ -163,7 +166,7 @@ export const MarcasPage: React.FC = () => {
       sorter: (a, b) => a.nome.localeCompare(b.nome),
       render: (_, record) => (
         <Space size="middle">
-          <Avatar style={{ backgroundColor: '#722ed1' }} icon={<TagsOutlined />}>
+          <Avatar style={{ backgroundColor: record.cor || '#722ed1', color: record.cor ? (record.corSecundaria || textoSobre(record.cor)) : undefined }} icon={record.cor ? undefined : <TagsOutlined />}>
             {record.nome.charAt(0)}
           </Avatar>
           <div>
@@ -232,10 +235,12 @@ export const MarcasPage: React.FC = () => {
           status: values.status ? 'Ativo' : 'Inativo',
           descricao: values.descricao || null,
           logoUrl: values.logoUrl || null,
+          cor: values.cor || null,
+          corSecundaria: values.corSecundaria || null,
         };
 
         if (editando) {
-          await atualizarMarca(editando.id, { nome: payload.nome, codigo: values.codigo || null, site: payload.site, descricao: payload.descricao, status: payload.status || 'Ativo' });
+          await atualizarMarca(editando.id, { nome: payload.nome, codigo: values.codigo || null, site: payload.site, descricao: payload.descricao, status: payload.status || 'Ativo', cor: payload.cor, corSecundaria: payload.corSecundaria });
           message.success('Marca salva.');
           setEditando(null);
         } else {
@@ -244,6 +249,7 @@ export const MarcasPage: React.FC = () => {
         }
         setIsModalVisible(false);
         form.resetFields();
+        invalidarCoresMarcas();
         carregarMarcas(); // Recarrega a listagem do backend
       } catch (error: any) {
         message.error(error.message || 'Erro ao cadastrar marca.');
@@ -364,7 +370,7 @@ export const MarcasPage: React.FC = () => {
             <Col xs={24} sm={12} md={8} lg={6} key={marca.id}>
               <Card
                 hoverable
-                style={styles.gridCard}
+                style={{ ...styles.gridCard, borderTop: marca.cor ? `4px solid ${marca.cor}` : undefined }}
                 actions={[
                   <Tooltip title="Ver Produtos" key="products">
                     <ShoppingOutlined onClick={() => setMarcaProdutos(marca)} />
@@ -378,7 +384,7 @@ export const MarcasPage: React.FC = () => {
                 ]}
               >
                 <Space align="start" style={{ width: '100%', justifyContent: 'space-between' }}>
-                  <Avatar size={48} style={{ backgroundColor: '#722ed1' }}>
+                  <Avatar size={48} style={{ backgroundColor: marca.cor || '#722ed1', color: marca.cor ? (marca.corSecundaria || textoSobre(marca.cor)) : undefined, border: marca.corSecundaria ? `2px solid ${marca.corSecundaria}` : undefined }}>
                     {marca.nome.charAt(0)}
                   </Avatar>
                   <Tag color={marca.status === 'Ativo' ? 'green' : 'red'}>
@@ -443,9 +449,39 @@ export const MarcasPage: React.FC = () => {
             <Input placeholder="Ex: Nike, Samsung, Dell" />
           </Form.Item>
 
-          <Form.Item name="codigo" label="Código (opcional)">
-            <Input maxLength={10} placeholder="Ex.: EBR" />
-          </Form.Item>
+          <Row gutter={16} align="bottom">
+            <Col span={8}>
+              <Form.Item name="codigo" label="Código (opcional)">
+                <Input maxLength={10} placeholder="Ex.: EBR" />
+              </Form.Item>
+            </Col>
+            <Col span={5}>
+              <Form.Item name="cor" label="Cor principal" tooltip="Fundo da etiqueta da marca. Vazio = cor automática."
+                getValueFromEvent={(c: any) => (c ? c.toHexString().toUpperCase() : null)}>
+                <ColorPicker allowClear format="hex" disabledAlpha onClear={() => form.setFieldValue('cor', null)} />
+              </Form.Item>
+            </Col>
+            <Col span={5}>
+              <Form.Item name="corSecundaria" label="Secundária" tooltip="Texto e borda da etiqueta. Vazio = branco ou preto, o que der para ler."
+                getValueFromEvent={(c: any) => (c ? c.toHexString().toUpperCase() : null)}>
+                <ColorPicker allowClear format="hex" disabledAlpha onClear={() => form.setFieldValue('corSecundaria', null)} />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item shouldUpdate noStyle>
+                {() => {
+                  const cor = form.getFieldValue('cor');
+                  const nome = form.getFieldValue('nome') || 'MARCA';
+                  return (
+                    <Form.Item label="Prévia">
+                      {cor ? <Tag style={{ fontWeight: 600, ...estiloCores(cor, form.getFieldValue('corSecundaria')) }}>{nome}</Tag>
+                        : <Tag>{nome} (automática)</Tag>}
+                    </Form.Item>
+                  );
+                }}
+              </Form.Item>
+            </Col>
+          </Row>
           <Row gutter={16}>
             <Col span={14}>
               <Form.Item name="site" label="Website Oficial">

@@ -30,12 +30,15 @@ export const createMarca = async (req: Request, res: Response) => {
     const logoUrl = dados.logo_url || null;
     const descricao = dados.descricao || null;
     const status = dados.status || 'Ativo';
+    const hex = (v: unknown) => (/^#[0-9a-f]{6}$/i.test(String(v || '').trim()) ? String(v).trim().toUpperCase() : null);
+    const cor = hex(dados.cor);
+    const corSecundaria = hex(dados.cor_secundaria);
 
     // 2. Insere na tabela comercial_marcas
     const queryInsert = `
       INSERT INTO comercial_marcas (
-        tenant_id, codigo, nome, slug, site, logo_url, descricao, status, criado_em, alterado_em
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        tenant_id, codigo, nome, slug, site, logo_url, cor, cor_secundaria, descricao, status, criado_em, alterado_em
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
     `;
 
     const [result]: any = await connection.execute(queryInsert, [
@@ -45,6 +48,8 @@ export const createMarca = async (req: Request, res: Response) => {
       slug,
       site,
       logoUrl,
+      cor,
+      corSecundaria,
       descricao,
       status
     ]);
@@ -98,6 +103,8 @@ export const getMarcas = async (req: Request, res: Response) => {
         m.slug,
         m.site,
         m.logo_url,
+        m.cor,
+        m.cor_secundaria,
         m.descricao,
         m.status,
         m.criado_em,

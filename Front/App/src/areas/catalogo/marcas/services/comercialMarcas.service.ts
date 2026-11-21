@@ -25,6 +25,9 @@ export interface Marca {
   slug: string;
   site: string | null;
   logoUrl: string | null;
+  /** Cor principal (#RRGGBB) e secundária da marca; null = automática. */
+  cor: string | null;
+  corSecundaria: string | null;
   descricao: string | null;
   status: 'Ativo' | 'Inativo';
   criadoEm: string;
@@ -38,6 +41,8 @@ export interface CreateMarcaPayload {
   slug?: string | null;
   site?: string | null;
   logoUrl?: string | null;
+  cor?: string | null;
+  corSecundaria?: string | null;
   descricao?: string | null;
   status?: 'Ativo' | 'Inativo';
 }
@@ -54,6 +59,8 @@ export const mapBackendToMarca = (backendData: any): Marca => ({
   slug: backendData.slug,
   site: backendData.site || null,
   logoUrl: backendData.logo_url || null,
+  cor: backendData.cor || null,
+  corSecundaria: backendData.cor_secundaria || null,
   descricao: backendData.descricao || null,
   status: backendData.status || 'Ativo',
   criadoEm: backendData.criado_em,
@@ -67,6 +74,8 @@ export const mapPayloadToBackendMarca = (data: CreateMarcaPayload) => ({
   slug: data.slug || null,
   site: data.site || null,
   logo_url: data.logoUrl || null,
+  cor: data.cor || null,
+  cor_secundaria: data.corSecundaria || null,
   descricao: data.descricao || null,
   status: data.status || 'Ativo',
 });
@@ -113,7 +122,7 @@ export const createMarca = async (
 };
 
 /** ✏️ [UPDATE] Editar a marca (nome, código, site, descrição, status). */
-export const atualizarMarca = async (id: string, dados: { nome: string; codigo?: string | null; site?: string | null; descricao?: string | null; status: 'Ativo' | 'Inativo' }) => {
+export const atualizarMarca = async (id: string, dados: { nome: string; codigo?: string | null; site?: string | null; descricao?: string | null; status: 'Ativo' | 'Inativo'; cor?: string | null; corSecundaria?: string | null }) => {
   const response = await fetch(`${API_BASE_URL}/marcas/${id}`, { method: 'PUT', headers: DEFAULT_HEADERS, body: JSON.stringify(dados) });
   return handleResponse<{ success: boolean }>(response, 'Erro ao salvar a marca.');
 };
