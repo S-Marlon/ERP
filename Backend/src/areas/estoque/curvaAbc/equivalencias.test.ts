@@ -31,6 +31,7 @@ teste('equivalentes: quem vende e quem trava (Ebara x Tetis 0,75)', () => {
   ], 0.1);
   assert.deepStrictEqual(g.itens.map(i => [i.idItem, i.papel, i.partVendas, i.partEstoque]), [[53, 'VENDE', 1, 0.222], [808, 'TRAVA', 0, 0.778]]);
   assert.strictEqual(g.alerta, 'TETIS tem 78% do estoque e 0% das vendas: o cliente prefere EBARA');
+  assert.deepStrictEqual(g.alertas, [{ trava: 'TETIS', partEstoque: 0.778, partVendas: 0, preferida: 'EBARA' }]);
   assert.strictEqual(g.confianca, 'BAIXA');
   assert.strictEqual(g.valorTravado, 3668);
   // escoar: 10% abaixo da Ebara (545,90) seria abaixo do mínimo da Tetis (524 / 0,9 = 582,22): fica no mínimo

@@ -7,7 +7,53 @@ import {
 } from 'antd';
 import { CheckCircleOutlined, DollarOutlined, ReloadOutlined, StopOutlined, WarningOutlined } from '@ant-design/icons';
 import ProductCommercialSalesConfig from '../../catalogo/precos/ProductCommercialSalesConfig';
-import { CONFIANCA, DecisaoCompra, equivalenciasApi, GrupoEquivalente, ItemGrupo, PAPEL, RelatorioEquivalencias } from './equivalenciasApi';
+import { TagMarca } from '../../../shared/components/TagMarca';
+import { AlertaGrupo, CONFIANCA, DecisaoCompra, equivalenciasApi, GrupoEquivalente, ItemGrupo, PAPEL, RelatorioEquivalencias, SugestaoMarca } from './equivalenciasApi';
+
+/** "[TETIS] tem 78% do estoque e 0% das vendas · o cliente prefere [EBARA]" com as marcas em etiqueta. */
+export const AlertaMarcas: React.FC<{ a: AlertaGrupo }> = ({ a }) => (
+  <Space size={4} wrap style={{ lineHeight: '22px' }}>
+    <TagMarca marca={a.trava} /><Text>tem</Text><Text strong type="danger">{Math.round(a.partEstoque * 100)}% do estoque</Text>
+    <Text>e</Text><Text strong>{Math.round(a.partVendas * 100)}% das vendas</Text><Text type="secondary">· o cliente prefere</Text><TagMarca marca={a.preferida} />
+  </Space>
+);
+
+const MarcaNoNome: React.FC<{ onAplicado: () => void }> = ({ onAplicado }) => {
+  const [dados, setDados] = React.useState<{ sugestoes: SugestaoMarca[]; semMarca: number } | null>(null);
+  const [selecionados, setSelecionados] = React.useState<number[]>([]);
+  const [aplicando, setAplicando] = React.useState(false);
+  const carregar = () => equivalenciasApi.sugestoesMarca().then(d => { setDados(d); setSelecionados(d.sugestoes.map(s => s.idItem)); }).catch(e => message.error(e.message));
+  React.useEffect(() => { carregar(); }, []);
+  if (!dados) return <Card loading size="small" />;
+  const aplicar = async () => {
+    setAplicando(true);
+    try {
+      const r = await equivalenciasApi.aplicarMarcas(dados.sugestoes.filter(s => selecionados.includes(s.idItem)).map(s => ({ idItem: s.idItem, marca: s.marca })));
+      message.success(`${r.atribuidas} item(ns) com marca${r.criadas.length ? ` · marcas criadas: ${r.criadas.join(', ')}` : ''}.`);
+      carregar(); onAplicado();
+    } catch (e) { message.error(e instanceof Error ? e.message : 'Erro.'); } finally { setAplicando(false); }
+  };
+  return (
+    <Space direction="vertical" style={{ width: '100%' }}>
+      <Alert type="info" showIcon title={`${dados.semMarca} itens sem marca; em ${dados.sugestoes.length} o nome cita a marca do próprio produto.`}
+        description='Marca de compatibilidade não entra (ex.: "escova p/ DeWALT", "terminal para Karcher": é a máquina, não quem fabricou). Desmarque o que não estiver certo antes de aplicar.' />
+      {dados.sugestoes.length > 0 && (
+        <Flex justify="space-between" align="center">
+          <Text type="secondary">{selecionados.length} selecionado(s)</Text>
+          <Button type="primary" loading={aplicando} disabled={!selecionados.length} onClick={aplicar}>Aplicar marcas</Button>
+        </Flex>
+      )}
+      <Table<SugestaoMarca> size="small" rowKey="idItem" dataSource={dados.sugestoes} pagination={{ pageSize: 50, hideOnSinglePage: true }}
+        rowSelection={{ selectedRowKeys: selecionados, onChange: k => setSelecionados(k as number[]) }}
+        locale={{ emptyText: <Empty description="Nenhum item sem marca cita uma marca no nome." /> }}
+        columns={[
+          { title: 'Marca', dataIndex: 'marca', width: 170, render: (v: string, s) => <Space size={4}><TagMarca marca={v} />{s.marcaNova && <Tag color="blue" style={{ margin: 0 }}>nova</Tag>}</Space> },
+          { title: 'Item', key: 'i', render: (_, s) => <><Text>{s.nome}</Text> <Text type="secondary" style={{ fontSize: 11 }}>{s.sku}</Text></> },
+          { title: 'Categoria', dataIndex: 'categoria', width: 240 },
+        ]} />
+    </Space>
+  );
+};
 
 const { Text, Title } = Typography;
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -22,10 +68,10 @@ const GrupoCard: React.FC<{ g: GrupoEquivalente; onDecidir: (i: ItemGrupo, d: De
       <Tooltip title={CONFIANCA[g.confianca].ajuda}><Tag color={CONFIANCA[g.confianca].cor}>{CONFIANCA[g.confianca].rotulo} · {g.vendas} {g.vendas === 1 ? 'venda' : 'vendas'}</Tag></Tooltip>
       {g.conflito && <Tooltip title="A decisão gravada vai contra o que os números mostram: vale revisar"><Tag color="orange" icon={<WarningOutlined />}>decisão x números</Tag></Tooltip>}</Space>}
     extra={g.valorTravado > 0 && <Text type="danger">travado {brl0(g.valorTravado)}</Text>}>
-    {g.alerta && <Alert type="warning" showIcon style={{ marginBottom: 8, padding: '4px 10px' }} title={g.alerta} />}
+    {g.alertas.length > 0 && <Alert type="warning" showIcon style={{ marginBottom: 8, padding: '4px 10px' }} title={<Space direction="vertical" size={2}>{g.alertas.map((a, k) => <AlertaMarcas key={k} a={a} />)}</Space>} />}
     <Table<ItemGrupo> size="small" rowKey="idItem" pagination={false} dataSource={g.itens} columns={[
       { title: '', dataIndex: 'papel', width: 70, render: (p: ItemGrupo['papel']) => <Tooltip title={PAPEL[p].ajuda}><Tag color={PAPEL[p].cor} style={{ margin: 0 }}>{PAPEL[p].rotulo}</Tag></Tooltip> },
-      { title: 'Item', key: 'i', render: (_, i) => <><Text strong style={{ fontSize: 13 }}>{i.marca || i.familia || '—'}</Text> <Text type="secondary" style={{ fontSize: 12 }}>{i.sku}</Text><div><Text type="secondary" style={{ fontSize: 11 }}>{i.nome}</Text></div></> },
+      { title: 'Item', key: 'i', render: (_, i) => <><TagMarca marca={i.marca} vazio={i.familia || 'sem marca'} /> <Text type="secondary" style={{ fontSize: 12 }}>{i.sku}</Text><div><Text type="secondary" style={{ fontSize: 11 }}>{i.nome}</Text></div></> },
       { title: 'Vendas', key: 'v', width: 130, render: (_, i) => <><Text>{qtd(i.quantidade)}</Text><Progress percent={Math.round(i.partVendas * 100)} size="small" strokeColor="#52c41a" format={() => pct(i.partVendas)} /></> },
       { title: 'Estoque', key: 'e', width: 130, render: (_, i) => <><Text>{qtd(i.estoque)} <Text type="secondary" style={{ fontSize: 11 }}>{brl0(i.valorEstoque)}</Text></Text><Progress percent={Math.round(i.partEstoque * 100)} size="small" strokeColor={i.papel === 'TRAVA' ? '#ff4d4f' : '#1677ff'} format={() => pct(i.partEstoque)} /></> },
       { title: <Tooltip title="Vendido no período ÷ estoque médio">Giro</Tooltip>, dataIndex: 'giro', width: 60, align: 'right' as const, render: (v: number | null) => (v === null ? '—' : v.toLocaleString('pt-BR')) },
@@ -143,7 +189,7 @@ const EquivalenciasPagina: React.FC = () => {
                   { title: 'Vendidos', dataIndex: 'quantidade', width: 90, align: 'right' as const, render: (v: number) => qtd(v) },
                   { title: 'Faturou', dataIndex: 'receita', width: 110, align: 'right' as const, render: (v: number) => (v ? brl(v) : '—') },
                   { title: 'Em estoque', dataIndex: 'estoque', width: 100, align: 'right' as const, render: (v: number) => qtd(v) },
-                  { title: 'Marcas', dataIndex: 'marcas', width: 200, render: (v: string[]) => v.map(m => <Tag key={m} style={{ marginBottom: 2 }}>{m}</Tag>) },
+                  { title: 'Marcas', dataIndex: 'marcas', width: 220, render: (v: string[]) => <Space size={4} wrap>{v.map(m => <TagMarca key={m} marca={m} />)}</Space> },
                 ]} />
               </Space>
             ),
@@ -151,7 +197,7 @@ const EquivalenciasPagina: React.FC = () => {
           {
             key: 'marcas', label: 'Marcas', children: (
               <Table size="small" rowKey="marca" dataSource={r.marcas} pagination={{ pageSize: 30, hideOnSinglePage: true }} columns={[
-                { title: 'Marca', dataIndex: 'marca', render: (v: string) => <Text strong>{v}</Text> },
+                { title: 'Marca', dataIndex: 'marca', render: (v: string) => <TagMarca marca={v} /> },
                 { title: 'Itens', dataIndex: 'itens', width: 70, align: 'right' as const },
                 { title: 'Vendidos', dataIndex: 'quantidade', width: 90, align: 'right' as const, render: (v: number) => qtd(v) },
                 { title: 'Faturou', dataIndex: 'receita', width: 110, align: 'right' as const, sorter: (a, b) => a.receita - b.receita, render: (v: number) => brl(v) },
@@ -180,6 +226,7 @@ const EquivalenciasPagina: React.FC = () => {
               </Space>
             ),
           },
+          { key: 'marcaNome', label: 'Marca no nome', children: <MarcaNoNome onAplicado={carregar} /> },
           {
             key: 'pendencias', label: `Cadastro pendente (${r.pendencias.length})`, children: (
               <Space direction="vertical" style={{ width: '100%' }}>

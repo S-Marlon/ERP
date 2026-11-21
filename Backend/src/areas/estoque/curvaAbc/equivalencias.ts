@@ -68,13 +68,15 @@ export const analisarGrupo = (itens: ItemEquivalencia[], margemMinima: number) =
   const travados = linhas.filter(l => l.papel === 'TRAVA');
   const pctTxt = (v: number) => `${Math.round(v * 100)}%`;
   const quem = (l: { marca: string | null; familia: string | null; sku: string }) => l.marca || l.familia || l.sku;
+  /** Cada item que trava, com a marca dele e a que o cliente prefere (a tela desenha as marcas como etiquetas). */
+  const alertas = vencedor ? travados.map(t => ({ trava: quem(t), partEstoque: t.partEstoque, partVendas: t.partVendas, preferida: quem(vencedor) })) : [];
   const alerta = travados.length && vencedor
     ? travados.map(t => `${quem(t)} tem ${pctTxt(t.partEstoque)} do estoque e ${pctTxt(t.partVendas)} das vendas: o cliente prefere ${quem(vencedor)}`).join('; ')
     : null;
   const valorTravado = r2(travados.reduce((a, t) => a + t.valorEstoque, 0));
   return {
     itens: linhas, quantidadeVendida: qtdTotal, estoque: estTotal, vendas: vendasTotal, confianca: confiancaDas(vendasTotal),
-    alerta, valorTravado, vencedor: vencedor ? { idItem: vencedor.idItem, nome: vencedor.nome, marca: quem(vencedor) } : null,
+    alerta, alertas, valorTravado, vencedor: vencedor ? { idItem: vencedor.idItem, nome: vencedor.nome, marca: quem(vencedor) } : null,
     /** Decisão gravada diferente do que os números dizem (ex.: preferido que trava): vale avisar. */
     conflito: linhas.some(l => (l.decisaoCompra === 'PREFERIDO' && l.papel === 'TRAVA') || (l.decisaoCompra === 'NAO_RECOMPRAR' && l.papel === 'VENDE')),
   };

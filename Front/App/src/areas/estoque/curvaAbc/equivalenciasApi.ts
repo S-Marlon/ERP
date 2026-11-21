@@ -11,10 +11,11 @@ export interface ItemGrupo {
   partVendas: number; partEstoque: number; giro: number | null; papel: Papel; precoEscoar: number | null; precoEscoarNoMinimo: boolean;
   decisaoCompra: DecisaoCompra; decisaoMotivo: string | null; decisaoEm: string | null; decisaoPor: string | null;
 }
+export interface AlertaGrupo { trava: string; partEstoque: number; partVendas: number; preferida: string }
 export interface GrupoEquivalente {
   chave: string; titulo: string; categoria: string | null; valores: Array<{ atributo: string; valor: string }>;
   itens: ItemGrupo[]; quantidadeVendida: number; estoque: number; vendas: number; confianca: 'BAIXA' | 'MEDIA' | 'ALTA';
-  alerta: string | null; valorTravado: number; vencedor: { idItem: number; nome: string; marca: string } | null; conflito: boolean;
+  alerta: string | null; alertas: AlertaGrupo[]; valorTravado: number; vencedor: { idItem: number; nome: string; marca: string } | null; conflito: boolean;
 }
 export interface RelatorioEquivalencias {
   dias: number; diasDeHistorico: number; margemMinima: number; grupos: GrupoEquivalente[];
@@ -34,7 +35,13 @@ const pedir = async <T,>(url: string, init?: RequestInit, erro = 'Erro nos equiv
 };
 const enviar = (corpo: unknown) => ({ method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...(corpo as object), operador: operadorAtual() }) });
 
+export interface SugestaoMarca { idItem: number; sku: string; nome: string; categoria: string | null; marca: string; marcaNova: boolean }
+
 export const equivalenciasApi = {
+  sugestoesMarca: () => pedir<{ sugestoes: SugestaoMarca[]; semMarca: number }>(`${API_URL}/api/catalogo/marcas/sugestoes`),
+  aplicarMarcas: (itens: Array<{ idItem: number; marca: string }>) => pedir<{ atribuidas: number; criadas: string[] }>(`${API_URL}/api/catalogo/marcas/sugestoes/aplicar`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itens }),
+  }, 'Erro ao aplicar as marcas.'),
   carregar: (dias: number) => pedir<RelatorioEquivalencias>(`${API_URL}/api/estoque/equivalencias?dias=${dias}`),
   marcarAtributo: (id: number, define: boolean) => pedir(`${API_URL}/api/estoque/equivalencias/atributos/${id}`, enviar({ define }), 'Erro ao salvar o atributo.'),
   decisao: (idItem: number, decisao: DecisaoCompra, motivo?: string) =>

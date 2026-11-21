@@ -10,6 +10,7 @@ import { CategoriaFoco, htmlRelatorioFoco, ItemPropaganda, ondeFocarApi, Quadran
 import { curvaAbcApi, ItemCurvaTela } from './curvaAbcApi';
 import { CategoriaFocoDrawer } from './CategoriaFocoDrawer';
 import { equivalenciasApi, GrupoEquivalente } from './equivalenciasApi';
+import { AlertaMarcas } from './EquivalenciasPagina';
 
 const { Text, Title } = Typography;
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -113,7 +114,10 @@ const OndeFocarPagina: React.FC = () => {
             <Space direction="vertical" size={4} style={{ width: '100%' }}>
               {travando.slice(0, 6).map(g => (
                 <Flex key={g.chave} justify="space-between" gap={8} wrap>
-                  <Text><b>{g.valores.map(v => `${v.atributo} ${v.valor}`).join(' · ')}</b> <Text type="secondary">({g.categoria})</Text>: {g.alerta}</Text>
+                  <Space size={6} wrap>
+                    <Text strong>{g.valores.map(v => `${v.atributo} ${v.valor}`).join(' · ')}</Text><Text type="secondary">({g.categoria})</Text>
+                    {g.alertas.map((a, k) => <AlertaMarcas key={k} a={a} />)}
+                  </Space>
                   <Text type="danger">{brl0(g.valorTravado)}</Text>
                 </Flex>
               ))}
