@@ -38,7 +38,30 @@ mínimo · AZ → venda pontual, não estocar além · cobertura > 4× o períod
 - Tela Estoque › Curva ABC (troca de curva e filtros no navegador; regra copiada no front).
 - Inventário rotativo: a frequência de recontagem (A 30 dias, B 90, C 180) usa a classe de venda dos últimos 90 dias.
 
+## Onde focar (Estoque › Onde focar, 2026-11-21)
+
+- **Quadrantes por categoria (do topo):** vende bem = 10%+ do faturamento ou tem item A; margem boa = pelo menos a margem
+  alvo das Regras de venda (sem venda, a margem de tabela ponderada pelo estoque); parado alto = R$ 500+ e 60%+ do estoque.
+  Proteger (vende + margem) · Rever preço (vende, margem baixa) · Divulgar (parado, margem boa) · Liquidar (parado, margem
+  baixa) · Acompanhar.
+- **Propaganda:** parados com R$ 50+ em estoque e margem de tabela 10 pontos acima da mínima; ordem = valor parado ×
+  margem; desconto máximo = o que ainda deixa a margem mínima (preço mínimo = custo ÷ (1 − mínima)); sugerido = até 15%,
+  para baixo em 5%. Texto pronto para WhatsApp (não muda o cadastro).
+- **Chamarizes:** A com frequência X/Y e estoque. **Repor:** A/B sem estoque ou cobertura < 15 dias. **Não recomprar:**
+  cobertura > 4× o período (R$ 100+) ou parado com estoque A/B.
+- **Foto mensal** (`estoque_curva_abc_fotos`): curva de 90 dias de cada item, tirada no primeiro acesso do mês à curva ou ao
+  Onde focar; a evolução (subiram para A / caíram de A) compara com a foto do mês anterior.
+- **PDF do mês:** resumo, quadrantes, propaganda, compras, evolução e os fundos de reposição.
+
+## Fundos de reposição (Financeiro › Fundos de reposição, 2026-11-21)
+
+Dinheiro que o dono separa do capital de giro para recomprar itens caros (fios/cabos PP, bombas, irrigação, rolamentos,
+óleos). Cada fundo tem categorias (a subcategoria herda), percentual do custo (padrão 100%), saldo inicial e data de início.
+Entradas = custo das vendas das categorias (× percentual) − devoluções; saídas = compras pela NF (entrada aprovada e
+correções); ajustes à mão. Nada disso é gravado: é calculado das vendas e notas. Compra que deixa o saldo negativo foi
+paga com o giro (aviso). **Data de início = hoje** ao criar (uma data antiga tira do fundo as compras antigas, como a carga
+inicial do estoque). Regras em `areas/financeiro/reservas/reservasReposicao.ts`.
+
 ## Próximos passos combinados
 
-- Foto mensal da classe de cada item (tabela própria, script a aprovar) para ver quem sobe e quem cai.
 - Usar a curva no estoque mínimo sugerido, na lista de compras, no PDV/catálogo (selo) e no Mercado Livre (anunciar parados e A).

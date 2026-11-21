@@ -113,7 +113,7 @@ docs/                      planos e decisões; docs/legado guarda material antig
 |---|---|---|---|
 | Vendas (PDV, caixa, orçamentos, negociação, pedidos faturados, devoluções, taxas, regras, painel) | `areas/vendas` | `areas/vendas` (`pdv`, `caixa`, `orcamentos`, `negociacao`, `pedidos`, `taxas`, `regras`, `painel`, `vendasDoDia`) | `vendas_*` |
 | Notas fiscais de saída (NFC-e/NF-e) | `areas/fiscal` | `areas/fiscal/notasSaida` | `fiscal_*` |
-| Financeiro (receber, pagar) | `areas/financeiro` | `areas/financeiro` | `financeiro_*` |
+| Financeiro (receber, pagar, fundos de reposição) | `areas/financeiro` | `areas/financeiro` (`reservas`…) | `financeiro_*` |
 | Entrada de NF (staging) | `areas/compras` | `areas/compras/entradaNf`, `areas/compras/notasEntrada` | `importacoes_lotes`, `importacao_produtos_staging` |
 | Catálogo / PIM | `areas/catalogo` | `areas/catalogo` (`skus`, `familias`, `categorias`, `atributos`, `marcas`, `precos`, `staging`…) | `itens_core`, `comercial_*`, `atributos_*` |
 | Estoque (saldo, movimentos, inventário rotativo) | `areas/estoque` | `areas/estoque` (`inventario`…) | `estoque_movimentos`, `estoque_saldos_itens`, `estoque_inventario*` |

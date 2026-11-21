@@ -25,6 +25,8 @@ import Movimentacoes from '../areas/estoque/movimentacoes/Movimentacoes';
 import Etiquetagem from '../areas/estoque/etiquetagem/Etiquetagem';
 import InventarioRotativo from '../areas/estoque/inventario/InventarioRotativo';
 import CurvaAbc from '../areas/estoque/curvaAbc/CurvaAbcPagina';
+import OndeFocar from '../areas/estoque/curvaAbc/OndeFocarPagina';
+import FundosReposicao from '../areas/financeiro/reservas/FundosReposicao';
 import PDVContent from '../areas/vendas/pdv/PDV';
 import CentralVendas from '../areas/vendas/painel/CentralVendas';
 import VendasDoDia from '../areas/vendas/vendasDoDia/VendasDoDia';
@@ -158,6 +160,7 @@ export default function AppLayout() {
 
             <Route path="/financeiro" element={<FinanceiroContasReceber />} />
             <Route path="/financeiro/pagar" element={<FinanceiroContasPagar />} />
+            <Route path="/financeiro/fundos" element={<FundosReposicao />} />
             <Route path="/financeiro/painel" element={<PainelFinanceiro />} />
             <Route path="/financeiro/contas-fixas" element={<ContasFixas />} />
             <Route path="/financeiro/resultado" element={<ResultadoMes />} />
@@ -185,6 +188,7 @@ export default function AppLayout() {
             <Route path="/estoque/consulta" element={<SaldoEstoque />} />
             <Route path="/estoque/inventario" element={<InventarioRotativo />} />
             <Route path="/estoque/curva-abc" element={<CurvaAbc />} />
+            <Route path="/estoque/onde-focar" element={<OndeFocar />} />
             <Route path="/estoque/gerenciamento" element={<StockEntryForm />} />
             {/* Notas de entrada agora ficam em Compras (endereço antigo redireciona) */}
             <Route path="/estoque/notas" element={<Navigate to="/compras/notas" replace />} />

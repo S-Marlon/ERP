@@ -9,6 +9,7 @@ import vendasRoutes from './areas/vendas/vendas.routes';
 import estoqueItensRoutes from './areas/estoque/estoqueItens.routes';
 import receberRoutes from './areas/financeiro/receber/receber.routes';
 import pagarRoutes from './areas/financeiro/pagar/pagar.routes';
+import reservasRoutes from './areas/financeiro/reservas/reservas.routes';
 import { painelFinanceiro } from './areas/financeiro/painel/painelFinanceiro.controller';
 import categoriasFinanceiroRoutes from './areas/financeiro/categorias.routes';
 import { resultadoDosMeses } from './areas/financeiro/resultado/resultadoMes.controller';
@@ -30,6 +31,7 @@ router.use('/fiscal', fiscalRoutes);
 // Contas a receber no modelo novo antes das rotas legadas do financeiro
 router.use('/financeiro/receber', receberRoutes);
 router.use('/financeiro/pagar', pagarRoutes);
+router.use('/financeiro/reservas', reservasRoutes);
 router.get('/financeiro/painel', painelFinanceiro);
 router.get('/financeiro/resultado', resultadoDosMeses);
 router.use('/financeiro/categorias', categoriasFinanceiroRoutes);

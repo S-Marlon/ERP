@@ -1,6 +1,7 @@
 // Estoque › Curva ABC: três curvas (venda, lucro, estoque parado), frequência XYZ, parados (P) e novos (N), a curva dentro
 // da categoria e o que fazer com cada item. A troca de curva/filtro é toda no navegador (cópia da regra em curvaAbc.ts).
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Alert, Button, Card, Col, Empty, Flex, Input, Progress, Row, Segmented, Select, Space, Switch, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { DownloadOutlined, ReloadOutlined } from '@ant-design/icons';
 import { baixarArquivo } from '../../../shared/core/impressao/saida';
@@ -26,6 +27,7 @@ const Selo: React.FC<{ c: ClasseExibida | null | undefined; pequeno?: boolean }>
   : <Text type="secondary">—</Text>);
 
 const CurvaAbc: React.FC = () => {
+  const navigate = useNavigate();
   const [dados, setDados] = useState<RespostaCurva | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [dias, setDias] = useState(90);
@@ -71,6 +73,7 @@ const CurvaAbc: React.FC = () => {
           <Space wrap>
             <Segmented value={dias} onChange={v => setDias(Number(v))} options={[30, 90, 180, 365].map(d => ({ value: d, label: d === 365 ? '12 meses' : `${d} dias` }))} />
             <Button icon={<ReloadOutlined />} onClick={carregar} loading={carregando} />
+            <Button type="primary" onClick={() => navigate('/estoque/onde-focar')}>Onde focar</Button>
           </Space>
         </Flex>
 
