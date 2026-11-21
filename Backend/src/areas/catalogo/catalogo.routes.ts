@@ -67,6 +67,7 @@ import {
   createMarca
 } from './marcas/comercialMarcas.controller';
 import { aplicarSugestoesDeMarca, sugestoesDeMarca } from './marcas/marcaNoNome.controller';
+import { atualizarMarca, produtosDaMarca, trocarMarcaDoItem } from './marcas/marcasProdutos.controller';
 import { getAtributosPorProduto } from './atributos/atributos.controller';
 import { getConfigVendas, salvarConfigVendas, atualizarCustoGerencial, listarUnidadesItens, criarUnidadeItem } from './precos/configVendas.controller';
 import { listarPendenciasPim } from './produtos/pendencias.controller';
@@ -278,6 +279,9 @@ router.get('/parceiros', (req: Request, res: Response) => {
 // Marca citada no nome de itens sem marca (sugestão e aplicação em lote) — antes de /marcas/:id
 router.get('/marcas/sugestoes', sugestoesDeMarca);
 router.post('/marcas/sugestoes/aplicar', aplicarSugestoesDeMarca);
+router.put('/marcas/itens/:idItem', trocarMarcaDoItem);
+router.get('/marcas/:id/produtos', produtosDaMarca);
+router.put('/marcas/:id', atualizarMarca);
 router.get('/marcas', getMarcas);
 router.post('/marcas', createMarca);
 router.get('/cadastros/marcas', getMarcas);

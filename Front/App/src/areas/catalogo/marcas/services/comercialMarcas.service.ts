@@ -111,3 +111,9 @@ export const createMarca = async (
 
   return handleResponse(res, 'Erro ao cadastrar marca comercial');
 };
+
+/** ✏️ [UPDATE] Editar a marca (nome, código, site, descrição, status). */
+export const atualizarMarca = async (id: string, dados: { nome: string; codigo?: string | null; site?: string | null; descricao?: string | null; status: 'Ativo' | 'Inativo' }) => {
+  const response = await fetch(`${API_BASE_URL}/marcas/${id}`, { method: 'PUT', headers: DEFAULT_HEADERS, body: JSON.stringify(dados) });
+  return handleResponse<{ success: boolean }>(response, 'Erro ao salvar a marca.');
+};

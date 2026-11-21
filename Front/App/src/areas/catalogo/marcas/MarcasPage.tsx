@@ -44,9 +44,11 @@ import type { ColumnsType } from 'antd/es/table';
 import { 
   getMarcas, 
   createMarca, 
+  atualizarMarca, 
   Marca, 
   CreateMarcaPayload 
 } from './services/comercialMarcas.service'; // Ajuste o caminho conforme a estrutura do seu projeto
+import { ProdutosDaMarcaDrawer } from './ProdutosDaMarcaDrawer';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -92,6 +94,14 @@ export const MarcasPage: React.FC = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [confirmLoading, setConfirmLoading] = useState(false);
   const [form] = Form.useForm();
+  // Produtos da marca (gaveta) e edição (o mesmo modal do cadastro)
+  const [marcaProdutos, setMarcaProdutos] = useState<Marca | null>(null);
+  const [editando, setEditando] = useState<Marca | null>(null);
+  const abrirEdicao = (m: Marca) => {
+    setEditando(m);
+    form.setFieldsValue({ nome: m.nome, site: m.site, status: m.status === 'Ativo', descricao: m.descricao, codigo: m.codigo });
+    setIsModalVisible(true);
+  };
 
   const tenantId = 1; // Você pode puxar do seu contexto de autenticação/tenant atual
 
@@ -112,19 +122,27 @@ export const MarcasPage: React.FC = () => {
     carregarMarcas();
   }, [carregarMarcas]);
 
+  const alternarStatus = async (m: Marca) => {
+    try {
+      await atualizarMarca(m.id, { nome: m.nome, codigo: m.codigo, site: m.site, descricao: m.descricao, status: m.status === 'Ativo' ? 'Inativo' : 'Ativo' });
+      message.success(m.status === 'Ativo' ? `${m.nome} inativada.` : `${m.nome} ativada.`);
+      carregarMarcas();
+    } catch (e: any) { message.error(e.message || 'Erro ao mudar o status.'); }
+  };
+
   // Menu de ações da linha/card
   const getActionMenuItems = (record: Marca): MenuProps['items'] => [
     {
       key: 'edit',
       label: 'Editar Marca',
       icon: <EditOutlined />,
-      onClick: () => message.info(`Editando ${record.nome}`),
+      onClick: () => abrirEdicao(record),
     },
     {
       key: 'products',
       label: 'Ver Produtos Vinc.',
       icon: <ShoppingOutlined />,
-      onClick: () => message.info(`Filtrando produtos da marca ${record.nome}`),
+      onClick: () => setMarcaProdutos(record),
     },
     { type: 'divider' },
     {
@@ -132,10 +150,7 @@ export const MarcasPage: React.FC = () => {
       label: record.status === 'Ativo' ? 'Inativar' : 'Ativar',
       icon: record.status === 'Ativo' ? <StopOutlined /> : <CheckCircleOutlined />,
       danger: record.status === 'Ativo',
-      onClick: () => {
-        // Futuramente mapear para update se necessário
-        message.info(`Alteração de status rápida pendente de rota dedicada.`);
-      },
+      onClick: () => alternarStatus(record),
     },
   ];
 
@@ -181,8 +196,8 @@ export const MarcasPage: React.FC = () => {
       dataIndex: 'qtdProdutos',
       key: 'qtdProdutos',
       sorter: (a, b) => (a.qtdProdutos || 0) - (b.qtdProdutos || 0),
-      render: (qtd: number = 0) => (
-        <Tag color={qtd > 0 ? 'blue' : 'default'}>{qtd} produtos</Tag>
+      render: (qtd: number = 0, record: Marca) => (
+        <a onClick={() => setMarcaProdutos(record)}><Tag color={qtd > 0 ? 'blue' : 'default'} style={{ cursor: 'pointer' }}>{qtd} produtos</Tag></a>
       ),
     },
     {
@@ -219,8 +234,14 @@ export const MarcasPage: React.FC = () => {
           logoUrl: values.logoUrl || null,
         };
 
-        await createMarca(payload, tenantId);
-        message.success('Marca cadastrada com sucesso!');
+        if (editando) {
+          await atualizarMarca(editando.id, { nome: payload.nome, codigo: values.codigo || null, site: payload.site, descricao: payload.descricao, status: payload.status || 'Ativo' });
+          message.success('Marca salva.');
+          setEditando(null);
+        } else {
+          await createMarca(payload, tenantId);
+          message.success('Marca cadastrada com sucesso!');
+        }
         setIsModalVisible(false);
         form.resetFields();
         carregarMarcas(); // Recarrega a listagem do backend
@@ -258,7 +279,7 @@ export const MarcasPage: React.FC = () => {
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
-                onClick={() => setIsModalVisible(true)}
+                onClick={() => { setEditando(null); form.resetFields(); setIsModalVisible(true); }}
               >
                 Nova Marca
               </Button>
@@ -346,10 +367,10 @@ export const MarcasPage: React.FC = () => {
                 style={styles.gridCard}
                 actions={[
                   <Tooltip title="Ver Produtos" key="products">
-                    <ShoppingOutlined onClick={() => message.info(`Produtos da marca ${marca.nome}`)} />
+                    <ShoppingOutlined onClick={() => setMarcaProdutos(marca)} />
                   </Tooltip>,
                   <Tooltip title="Editar" key="edit">
-                    <EditOutlined onClick={() => message.info(`Editando ${marca.nome}`)} />
+                    <EditOutlined onClick={() => abrirEdicao(marca)} />
                   </Tooltip>,
                   <Dropdown menu={{ items: getActionMenuItems(marca) }} trigger={['click']} key="more">
                     <MoreOutlined />
@@ -382,10 +403,10 @@ export const MarcasPage: React.FC = () => {
                 </div>
 
                 <div style={{ marginTop: 12, borderTop: '1px solid #f0f0f0', paddingTop: 8 }}>
-                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                  <a style={{ fontSize: '12px' }} onClick={() => setMarcaProdutos(marca)}>
                     <ShoppingOutlined style={{ marginRight: 4 }} />
-                    {marca.qtdProdutos || 0} produtos vinculados
-                  </Text>
+                    {marca.qtdProdutos || 0} produtos vinculados · ver
+                  </a>
                 </div>
               </Card>
             </Col>
@@ -405,11 +426,11 @@ export const MarcasPage: React.FC = () => {
 
       {/* Modal de Nova Marca */}
       <Modal
-        title="Cadastrar Nova Marca"
+        title={editando ? `Editar marca · ${editando.nome}` : 'Cadastrar Nova Marca'}
         open={isModalVisible}
         onOk={handleCreateSubmit}
         confirmLoading={confirmLoading}
-        onCancel={() => setIsModalVisible(false)}
+        onCancel={() => { setIsModalVisible(false); setEditando(null); }}
         okText="Salvar Marca"
         cancelText="Cancelar"
       >
@@ -422,6 +443,9 @@ export const MarcasPage: React.FC = () => {
             <Input placeholder="Ex: Nike, Samsung, Dell" />
           </Form.Item>
 
+          <Form.Item name="codigo" label="Código (opcional)">
+            <Input maxLength={10} placeholder="Ex.: EBR" />
+          </Form.Item>
           <Row gutter={16}>
             <Col span={14}>
               <Form.Item name="site" label="Website Oficial">
@@ -446,6 +470,7 @@ export const MarcasPage: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
+      <ProdutosDaMarcaDrawer marca={marcaProdutos} marcas={marcas} onFechar={() => setMarcaProdutos(null)} onMudou={carregarMarcas} />
     </div>
   );
 };
