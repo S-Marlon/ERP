@@ -21,7 +21,7 @@ const responderErro = (res: Response, error: any, padrao: string) => {
 };
 
 /** Fundos, categorias e os movimentos (vendas, devoluções, compras, ajustes) de cada fundo, já com saldo. */
-const calcularFundos = async (tenant: number) => {
+export const calcularFundos = async (tenant: number) => {
   const [[fundos], [mapa], [cats], [itens], [ajustes]]: any = await Promise.all([
     pool.execute(`SELECT id_reserva, nome, percentual_custo, saldo_inicial, DATE_FORMAT(data_inicio, '%Y-%m-%d') AS inicio, ativo FROM financeiro_reservas_reposicao WHERE tenant_id = ? ORDER BY nome`, [tenant]),
     pool.execute(`SELECT categoria_id, id_reserva FROM financeiro_reservas_reposicao_categorias WHERE tenant_id = ?`, [tenant]),
@@ -114,6 +114,7 @@ const calcularFundos = async (tenant: number) => {
 
   const mes = mesAtual();
   return {
+    fundoDoItem,
     categorias: cats.map((c: any) => ({ id: Number(c.id), nome: limpo(c.nome), pai: c.categoria_pai_id !== null ? Number(c.categoria_pai_id) : null })),
     fundos: fundos.map((f: any) => {
       const id = Number(f.id_reserva);

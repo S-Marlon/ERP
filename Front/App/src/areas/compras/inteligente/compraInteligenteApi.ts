@@ -7,7 +7,15 @@ export interface ResumoFornecedor {
   idFornecedor: number; nome: string; cnpj: string; itensVinculados: number; itensRepor: number; abaixoMinimo: number;
   valorSugerido: number; pedidoMinimo: number; prazoEntregaDias: number; atingeMinimo: boolean;
   ultimoPedido: string | null; pedidosAbertos: number;
+  /** Qual pedir primeiro: urgência × curva ABC (maior = antes). */
+  prioridade: number; motivoPrioridade: string; urgentes: number;
+  fundos: CoberturaFundo[];
 }
+
+/** Quanto do pedido o fundo de reposição cobre. */
+export interface CoberturaFundo { id: number; nome: string; valor: number; saldo: number; cobre: number; falta: number }
+export type ClasseCurva = 'A' | 'B' | 'C' | 'P' | 'N' | '-';
+export type UrgenciaCompra = 'FALTA_PEDIDO' | 'SEM_ESTOQUE' | 'ACABANDO' | 'REPOR';
 
 export interface ItemSugestao {
   idItem: number; sku: string; nome: string; unidade: string; saldo: number; minimo: number | null; maximo: number | null;
@@ -22,6 +30,11 @@ export interface ItemSugestao {
   outrosFornecedores: OutroFornecedor[];
   precoBase: number; // por unidade de estoque
   emPedidos: Array<{ idPedido: number; idFornecedor: number; fornecedor: string; status: string; quantidade: number; unidade: string }>;
+  // Curva ABC, pedidos faturados, equivalentes e fundos
+  classe: ClasseCurva | null; seguranca: number; urgencia: UrgenciaCompra | null;
+  saldoLivre: number; reservado: number; faltaPedido: number;
+  naoRecomprar: boolean; substitui: string[]; demandaExtra: number;
+  fundo: { id: number; nome: string } | null;
 }
 
 export interface OutroFornecedor {
@@ -36,6 +49,7 @@ export interface AnaliseFornecedor {
   condicoes: CondicoesFornecedor;
   parametros: { dias: number; coberturaDias: number; prazoEntregaDias: number };
   itens: ItemSugestao[];
+  fundos?: CoberturaFundo[];
 }
 
 export type StatusPedido = 'RASCUNHO' | 'ENVIADO' | 'COTADO' | 'COMPRADO' | 'CANCELADO';

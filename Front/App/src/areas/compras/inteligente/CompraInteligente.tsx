@@ -18,6 +18,12 @@ const { Title, Text } = Typography;
 const brl = (v: number) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const num = (v: number) => (Number(v) || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 });
 
+const COR_CLASSE: Record<string, string> = { A: '#389e0d', B: '#d48806', C: '#8c8c8c', P: '#cf1322', N: '#1677ff', '-': '#bfbfbf' };
+const URGENCIA: Record<string, { rotulo: string; cor: string }> = {
+  FALTA_PEDIDO: { rotulo: 'falta p/ pedido faturado', cor: 'magenta' }, SEM_ESTOQUE: { rotulo: 'sem estoque', cor: 'red' },
+  ACABANDO: { rotulo: 'acabando', cor: 'orange' }, REPOR: { rotulo: 'repor', cor: 'blue' },
+};
+
 const PERIODOS = [{ label: '30 dias', value: 30 }, { label: '90 dias', value: 90 }, { label: '6 meses', value: 180 }, { label: '1 ano', value: 365 }];
 
 // Rascunho do pedido por fornecedor (só neste navegador: não perde ao trocar de tela)
@@ -240,7 +246,16 @@ const CompraInteligente: React.FC = () => {
         return (
           <Space direction="vertical" size={0}>
             {/* Como a loja conhece o item: nome do catálogo + código do fornecedor principal */}
-            <Text strong>{i.nome}</Text>
+            <Space size={4} wrap>
+              {i.classe && (
+                <Tooltip title={i.classe === 'P' ? 'Parado: tem estoque e não vendeu' : `Curva de venda ${i.classe}${i.seguranca ? ` · +${i.seguranca} dias de segurança` : ''}`}>
+                  <Tag color={COR_CLASSE[i.classe]} style={{ margin: 0, fontWeight: 600, fontSize: 10 }}>{i.classe}</Tag>
+                </Tooltip>
+              )}
+              <Text strong>{i.nome}</Text>
+              {i.naoRecomprar && <Tooltip title="Decisão em Estoque › Marcas e equivalentes: só compra o que faltar para pedido faturado"><Tag color="red" style={{ margin: 0, fontSize: 10 }}>não recomprar</Tag></Tooltip>}
+              {i.substitui?.length > 0 && <Tooltip title={`As vendas de ${i.substitui.join(', ')} (marcado "não recomprar") passam para este item`}><Tag color="green" style={{ margin: 0, fontSize: 10 }}>recebe a demanda de {i.substitui.join(', ')}</Tag></Tooltip>}
+            </Space>
             <Space size={4} wrap>
               <Text type="secondary" style={{ fontSize: 11 }}>{i.sku}</Text>
               {i.principal && !i.ehPrincipal && (
@@ -276,7 +291,16 @@ const CompraInteligente: React.FC = () => {
         );
       },
     },
-    { title: 'Saldo', key: 'saldo', width: 90, align: 'right' as const, sorter: (a: ItemSugestao, b: ItemSugestao) => a.saldo - b.saldo, render: (_: unknown, i: ItemSugestao) => `${num(i.saldo)} ${i.unidade}` },
+    {
+      title: 'Saldo', key: 'saldo', width: 100, align: 'right' as const, sorter: (a: ItemSugestao, b: ItemSugestao) => a.saldo - b.saldo,
+      render: (_: unknown, i: ItemSugestao) => (i.reservado > 0 ? (
+        <Tooltip title={`${num(i.reservado)} reservado para pedidos faturados ainda não entregues`}>
+          <Space direction="vertical" size={0} style={{ alignItems: 'flex-end' }}>
+            <span>{num(i.saldo)} {i.unidade}</span><Text type={i.saldoLivre < 0 ? 'danger' : 'secondary'} style={{ fontSize: 10 }}>livre {num(i.saldoLivre)} · res. {num(i.reservado)}</Text>
+          </Space>
+        </Tooltip>
+      ) : `${num(i.saldo)} ${i.unidade}`),
+    },
     {
       title: `Vendido (${dias}d)`, key: 'vend', width: 110, align: 'right' as const, sorter: (a: ItemSugestao, b: ItemSugestao) => a.vendido - b.vendido,
       render: (_: unknown, i: ItemSugestao) => (i.vendido > 0 ? <Tooltip title={`${num(i.consumoDia * 30)} ${i.unidade}/mês`}>{num(i.vendido)} {i.unidade}</Tooltip> : <Text type="secondary">—</Text>),
@@ -291,7 +315,11 @@ const CompraInteligente: React.FC = () => {
       render: (_: unknown, i: ItemSugestao) => (i.quantidade > 0 ? (
         <Space direction="vertical" size={0}>
           <Text>{num(i.quantidade)} {i.unidadeCompra}</Text>
-          <Tag color={i.motivo === 'ABAIXO_MINIMO' ? 'red' : 'orange'} style={{ fontSize: 10 }}>{i.motivo === 'ABAIXO_MINIMO' ? 'abaixo do mínimo' : `p/ ${cobertura + (analise?.parametros.prazoEntregaDias || 0)} dias`}</Tag>
+          {i.urgencia
+            ? <Tooltip title={i.motivo === 'ABAIXO_MINIMO' ? 'Abaixo do mínimo cadastrado' : `Para ${cobertura + (i.seguranca || 0) + (analise?.parametros.prazoEntregaDias || 0)} dias (cobertura${i.seguranca ? ` + ${i.seguranca} de segurança da curva ${i.classe}` : ''}${analise?.parametros.prazoEntregaDias ? ' + prazo de entrega' : ''})`}>
+                <Tag color={URGENCIA[i.urgencia].cor} style={{ fontSize: 10 }}>{URGENCIA[i.urgencia].rotulo}</Tag>
+              </Tooltip>
+            : <Tag color={i.motivo === 'ABAIXO_MINIMO' ? 'red' : 'orange'} style={{ fontSize: 10 }}>{i.motivo === 'ABAIXO_MINIMO' ? 'abaixo do mínimo' : `p/ ${cobertura + (analise?.parametros.prazoEntregaDias || 0)} dias`}</Tag>}
         </Space>
       ) : <Text type="secondary">—</Text>),
     },
@@ -330,8 +358,17 @@ const CompraInteligente: React.FC = () => {
                 title: 'Fornecedor', key: 'f',
                 render: (_, r) => (
                   <Space direction="vertical" size={0}>
-                    <Text strong={r.itensRepor > 0}>{r.nome}</Text>
+                    <Space size={4}>
+                      <Text strong={r.itensRepor > 0}>{r.nome}</Text>
+                      {r.prioridade > 0 && r.idFornecedor === resumo.find(x => x.prioridade > 0)?.idFornecedor && (
+                        <Tooltip title="Mais urgente pela curva ABC: itens que mais vendem sem estoque e faltas de pedidos faturados"><Tag color="red" style={{ margin: 0, fontSize: 10 }}>pedir primeiro</Tag></Tooltip>
+                      )}
+                    </Space>
+                    {r.motivoPrioridade && <Text type={r.urgentes > 0 ? 'danger' : 'secondary'} style={{ fontSize: 11 }}>{r.motivoPrioridade}</Text>}
                     <Text type="secondary" style={{ fontSize: 11 }}>{r.itensVinculados} itens · mín. {r.pedidoMinimo > 0 ? brl(r.pedidoMinimo) : '—'}{r.pedidosAbertos ? ` · ${r.pedidosAbertos} pedido(s) em aberto` : ''}</Text>
+                    {(r.fundos || []).map(f => (
+                      <Text key={f.id} style={{ fontSize: 11 }} type={f.falta > 0 ? 'warning' : 'success'}>fundo {f.nome}: cobre {brl(f.cobre)} de {brl(f.valor)}</Text>
+                    ))}
                   </Space>
                 ),
               },
@@ -353,6 +390,10 @@ const CompraInteligente: React.FC = () => {
           <Card><Empty description="Escolha um fornecedor para montar o pedido" /></Card>
         ) : (
           <Space direction="vertical" size={12} style={{ width: '100%' }}>
+            {(analise.fundos || []).length > 0 && (
+              <Alert type={(analise.fundos || []).some(f => f.falta > 0) ? 'warning' : 'success'} showIcon
+                title={(analise.fundos || []).map(f => `Fundo ${f.nome}: cobre ${brl(f.cobre)} de ${brl(f.valor)} sugeridos${f.falta > 0 ? ` (faltam ${brl(f.falta)}, sai do capital de giro)` : ''}`).join(' · ')} />
+            )}
             <Card size="small" title={<Space>{analise.fornecedor.nome}<Text type="secondary" style={{ fontSize: 12 }}>{analise.fornecedor.cnpj}</Text></Space>}
               extra={<Button size="small" icon={<SaveOutlined />} onClick={salvarCondicoes}>Salvar condições</Button>}>
               <Row gutter={[12, 12]} align="middle">

@@ -12,13 +12,11 @@ const operadorDe = (req: Request) => String(req.body?.operador || req.query.oper
 const n = (v: unknown) => Number(v) || 0;
 const limpo = (s: unknown) => String(s ?? '').replace(/^[^\p{L}\p{N}]+/u, '').trim();
 
-/** GET /api/estoque/equivalencias?dias=90 */
-export const relatorioEquivalencias = async (req: Request, res: Response) => {
-  const tenant = tenantDe(req);
-  try {
-    const dias = PERIODOS.includes(Number(req.query.dias)) ? Number(req.query.dias) : 90;
+/** Grupos de equivalentes, demanda por atributo, giro por marca, atributos e pendências (relatório e sugestão de compra). */
+export const montarEquivalencias = async (tenant: number, dias: number, curvaPronta?: Awaited<ReturnType<typeof carregarCurva>>) => {
+  {
     const [curva, margens, [extras], [atributos], [valores], [uso]]: any = await Promise.all([
-      carregarCurva(tenant, dias),
+      curvaPronta ?? carregarCurva(tenant, dias),
       carregarMargensNegociacao(pool, tenant),
       pool.execute(
         `SELECT cpd.id_item, COALESCE(f.categoria_id, cpd.categoria_id) AS categoria_id, cat.nome AS categoria, mar.nome AS marca, f.nome AS familia,
@@ -86,7 +84,7 @@ export const relatorioEquivalencias = async (req: Request, res: Response) => {
       .slice(0, 100).map(i => ({ idItem: i.idItem, sku: i.sku, nome: i.nome, categoria: i.categoria, falta: [!i.marca && 'marca', !i.atributos.size && 'atributo de equivalência'].filter(Boolean).join(' e ') }));
     const usoDe = new Map<number, any>(uso.map((u: any) => [Number(u.atributo_id), u]));
 
-    return res.json({
+    return {
       dias, diasDeHistorico: curva.diasDeHistorico, margemMinima: margens.margemMinimaNegociacao,
       grupos,
       demanda: demandaPorAtributo(itens.filter(i => i.atributos.size), nomes, rotulos).slice(0, 60),
@@ -97,7 +95,15 @@ export const relatorioEquivalencias = async (req: Request, res: Response) => {
       })).sort((x: any, y: any) => Number(y.define) - Number(x.define) || y.itens - x.itens),
       pendencias,
       itensSemMarca: itens.filter(i => !i.marca).length,
-    });
+    };
+  }
+};
+
+/** GET /api/estoque/equivalencias?dias=90 */
+export const relatorioEquivalencias = async (req: Request, res: Response) => {
+  try {
+    const dias = PERIODOS.includes(Number(req.query.dias)) ? Number(req.query.dias) : 90;
+    return res.json(await montarEquivalencias(tenantDe(req), dias));
   } catch (error: any) {
     console.error('Erro nas equivalências:', error);
     return res.status(500).json({ error: 'Erro ao montar os equivalentes.', details: error?.message });

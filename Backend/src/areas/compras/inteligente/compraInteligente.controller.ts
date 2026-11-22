@@ -8,9 +8,14 @@ import { carregarTaxaPreco } from '../../vendas/taxas/taxas.controller';
 import { colunaTaxaEmbutida, temTaxaEmbutida } from '../../catalogo/precos/taxaEmbutida';
 import { alvoEfetivo, analisarMargem, melhorOferta, OfertaCusto } from './margemAlvo';
 import {
-  completarPedidoMinimo, escolherPrincipal, ItemDoFornecedor, precoPorUnidadeBase, sugerirItem, SugestaoItem, textoDoPedido, totalDoPedido,
-  VinculoFornecedor,
+  coberturaDosFundos, completarPedidoMinimo, CONTEXTO_VAZIO, ContextoDoItem, escolherPrincipal, ItemDoFornecedor, precoPorUnidadeBase, prioridadeDoFornecedor,
+  sugerirComCurva, sugerirItem, SugestaoItem, textoDoPedido, totalDoPedido, transferirDemanda, VinculoFornecedor,
 } from './compraInteligente';
+import { carregarCurva } from '../../estoque/curvaAbc/curvaAbc.controller';
+import { classeExibida } from '../../estoque/curvaAbc/curvaAbc';
+import { montarEquivalencias } from '../../estoque/curvaAbc/equivalencias.controller';
+import { reservasPorItem } from '../../vendas/pedidos/pedidosFaturados.controller';
+import { calcularFundos } from '../../financeiro/reservas/reservas.controller';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
 
@@ -58,7 +63,7 @@ const vendidoNoPeriodo = async (conn: Conn, tenant: number, dias: number, ids?: 
             SUM(CASE WHEN tipo_movimento = 'SAIDA' THEN quantidade ELSE -quantidade END) AS vendido
      FROM estoque_movimentos
      WHERE tenant_id = ? AND deposito = 'VENDA' AND created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
-       AND ((origem = 'VENDA_PDV' AND tipo_movimento = 'SAIDA')
+       AND ((origem IN ('VENDA_PDV', 'PEDIDO_ENTREGA') AND tipo_movimento = 'SAIDA')
          OR (origem IN ('CANCELAMENTO_VENDA', 'DEVOLUCAO_VENDA') AND tipo_movimento = 'ENTRADA')) ${filtro}
      GROUP BY id_item`,
     [tenant, dias, ...(ids || [])]
@@ -142,11 +147,43 @@ const pedidosAbertosDosItens = async (conn: Conn, tenant: number, ids: number[])
   return mapa;
 };
 
+/**
+ * Contexto da curva para a compra (carregado uma vez por consulta): classe de venda do item, reservado para pedidos
+ * faturados, decisão "não recomprar" com a demanda passando para o equivalente preferido, e o fundo de reposição do item.
+ */
+export interface ContextoCurva { diasDeVenda: number; de: (idItem: number) => ContextoDoItem; fundoDe: (idItem: number) => { id: number; nome: string } | null; saldosFundos: Map<number, number> }
+const carregarContextoCurva = async (tenant: number, dias: number): Promise<ContextoCurva> => {
+  const curva = await carregarCurva(tenant, dias);
+  const [reservas, eq, fundos] = await Promise.all([reservasPorItem(pool, tenant), montarEquivalencias(tenant, dias, curva), calcularFundos(tenant)]);
+  const substituto = new Map<number, number>();
+  for (const g of eq.grupos as any[]) {
+    const alvo = g.itens.find((i: any) => i.decisaoCompra === 'PREFERIDO') || g.itens.find((i: any) => i.papel === 'VENDE' && i.decisaoCompra !== 'NAO_RECOMPRAR');
+    if (!alvo) continue;
+    for (const i of g.itens) if (i.decisaoCompra === 'NAO_RECOMPRAR' && i.idItem !== alvo.idItem) substituto.set(i.idItem, alvo.idItem);
+  }
+  const porItem = new Map(curva.itens.map((i: any) => [i.idItem, i]));
+  const extra = transferirDemanda(curva.itens.map((i: any) => ({ idItem: i.idItem, sku: i.sku, vendido: i.quantidade, naoRecomprar: i.decisaoCompra === 'NAO_RECOMPRAR' })), substituto);
+  const nomeFundo = new Map<number, string>(fundos.fundos.map((f: any) => [f.id, f.nome]));
+  return {
+    // histórico curto: o ritmo usa os dias de venda que existem (senão divide por um período maior que o histórico)
+    diasDeVenda: Math.max(1, curva.diasDeHistorico || dias),
+    de: (idItem: number) => {
+      const i: any = porItem.get(idItem);
+      if (!i) return { ...CONTEXTO_VAZIO, reservado: reservas.get(idItem) || 0 };
+      const x = extra.get(idItem);
+      return { classe: classeExibida(i, 'VENDA'), reservado: reservas.get(idItem) || 0, demandaExtra: x?.quantidade || 0, substitui: x?.de || [], naoRecomprar: i.decisaoCompra === 'NAO_RECOMPRAR' };
+    },
+    fundoDe: (idItem: number) => { const f = fundos.fundoDoItem.get(idItem); return f !== undefined && nomeFundo.has(f) ? { id: f, nome: nomeFundo.get(f)! } : null; },
+    saldosFundos: new Map<number, number>(fundos.fundos.filter((f: any) => f.ativo).map((f: any) => [f.id, f.resumo.saldo])),
+  };
+};
+
 /** Itens do fornecedor com giro, saldo, preço e sugestão. */
 const analisarFornecedor = async (
   conn: Conn, tenant: number, idFornecedor: number, p: { dias: number; coberturaDias: number; prazoEntregaDias: number },
   vendidoPronto?: Map<number, number>,
-  detalhado = true // vínculos de outros fornecedores e pedidos abertos (o resumo não precisa)
+  detalhado = true, // vínculos de outros fornecedores e pedidos abertos (o resumo não precisa)
+  ctx?: ContextoCurva, // curva ABC, pedidos faturados, equivalentes e fundos
 ) => {
   const [rows] = await conn.execute(
     `SELECT cfp.id_item, cfp.codigo_produto_fornecedor, cfp.unidade_compra, cfp.fator_compra, cfp.preco_ultima_compra, cfp.padrao,
@@ -192,7 +229,8 @@ const analisarFornecedor = async (
     const principal = escolherPrincipal(todos);
     const deste = todos.find(v => v.idFornecedor === idFornecedor);
     return {
-      ...sugerirItem(item, p),
+      ...(ctx ? sugerirComCurva(item, { ...p, dias: Math.min(p.dias, ctx.diasDeVenda) }, ctx.de(id)) : { ...sugerirItem(item, p), ...CONTEXTO_VAZIO, saldoLivre: item.saldo, faltaPedido: 0, seguranca: 0, urgencia: null }),
+      fundo: ctx ? ctx.fundoDe(id) : null,
       origemPreco: cotacao ? 'COTACAO' : 'NOTA',
       dataCotacao: cotacao?.data || null,
       precoUltimaNota: n(r.preco_ultima_compra),
@@ -229,13 +267,14 @@ export const resumoFornecedores = async (req: Request, res: Response) => {
        FROM compras_pedidos WHERE tenant_id = ? GROUP BY id_fornecedor`, [tenant]
     );
     const pedidos = new Map<number, any>(ultimos.map((u: any) => [Number(u.id_fornecedor), u]));
-    // Vendas do período: uma consulta só para todos os fornecedores
-    const vendido = await vendidoNoPeriodo(pool as any, tenant, parametros(req).dias);
+    // Vendas do período e contexto da curva: uma vez só para todos os fornecedores
+    const [vendido, ctx] = await Promise.all([vendidoNoPeriodo(pool as any, tenant, parametros(req).dias), carregarContextoCurva(tenant, parametros(req).dias)]);
     const saida = [];
     for (const f of forn) {
       const c = condicoes.get(Number(f.id));
-      const itens = await analisarFornecedor(pool as any, tenant, Number(f.id), parametros(req, c?.prazoEntregaDias || 0), vendido, false);
+      const itens = await analisarFornecedor(pool as any, tenant, Number(f.id), parametros(req, c?.prazoEntregaDias || 0), vendido, false, ctx);
       const repor = itens.filter(i => i.quantidade > 0);
+      const prioridade = prioridadeDoFornecedor(repor);
       const valor = totalDoPedido(repor);
       saida.push({
         idFornecedor: Number(f.id), nome: f.nome, cnpj: f.cnpj, itensVinculados: Number(f.itens),
@@ -243,9 +282,12 @@ export const resumoFornecedores = async (req: Request, res: Response) => {
         valorSugerido: valor, pedidoMinimo: c?.pedidoMinimo || 0, prazoEntregaDias: c?.prazoEntregaDias || 0,
         atingeMinimo: !c?.pedidoMinimo || valor >= c.pedidoMinimo,
         ultimoPedido: pedidos.get(Number(f.id))?.ultimo || null, pedidosAbertos: n(pedidos.get(Number(f.id))?.abertos),
+        // qual pedir primeiro (urgência × curva ABC) e quanto os fundos de reposição cobrem
+        prioridade: prioridade.pontos, motivoPrioridade: prioridade.motivo, urgentes: prioridade.urgentes,
+        fundos: coberturaDosFundos(repor, ctx.saldosFundos),
       });
     }
-    saida.sort((a, b) => b.itensRepor - a.itensRepor || b.valorSugerido - a.valorSugerido);
+    saida.sort((a, b) => b.prioridade - a.prioridade || b.itensRepor - a.itensRepor || b.valorSugerido - a.valorSugerido);
     return res.json(saida);
   } catch (error) {
     return responderErro(res, error, 'Erro ao analisar os fornecedores.');
@@ -262,10 +304,13 @@ export const analiseFornecedor = async (req: Request, res: Response) => {
     const c = (await carregarCondicoes(pool as any, tenant, [idFornecedor])).get(idFornecedor)
       || { pedidoMinimo: 0, prazoEntregaDias: 0, contato: '', observacao: '' };
     const p = parametros(req, c.prazoEntregaDias);
-    const itens = await analisarFornecedor(pool as any, tenant, idFornecedor, p);
+    const ctx = await carregarContextoCurva(tenant, p.dias);
+    const itens = await analisarFornecedor(pool as any, tenant, idFornecedor, p, undefined, true, ctx);
+    const ordemUrg: Record<string, number> = { FALTA_PEDIDO: 0, SEM_ESTOQUE: 1, ACABANDO: 2, REPOR: 3 };
     itens.sort((a, b) => (b.quantidade > 0 ? 1 : 0) - (a.quantidade > 0 ? 1 : 0)
+      || (ordemUrg[a.urgencia || ''] ?? 9) - (ordemUrg[b.urgencia || ''] ?? 9)
       || (a.coberturaAtual ?? 1e9) - (b.coberturaAtual ?? 1e9) || b.vendido - a.vendido);
-    return res.json({ fornecedor: { idFornecedor, nome: f.nome, cnpj: f.cnpj }, condicoes: c, parametros: p, itens });
+    return res.json({ fornecedor: { idFornecedor, nome: f.nome, cnpj: f.cnpj }, condicoes: c, parametros: p, itens, fundos: coberturaDosFundos(itens.filter(i => i.quantidade > 0), ctx.saldosFundos) });
   } catch (error) {
     return responderErro(res, error, 'Erro ao analisar o fornecedor.');
   }
@@ -282,7 +327,9 @@ export const completarMinimo = async (req: Request, res: Response) => {
     const c = (await carregarCondicoes(pool as any, tenant, [idFornecedor])).get(idFornecedor);
     const minimo = Number(req.body?.pedidoMinimo) || c?.pedidoMinimo || 0;
     if (!(minimo > 0)) throw new ErroCompra('Informe o pedido mínimo deste fornecedor.');
-    const itens: SugestaoItem[] = await analisarFornecedor(pool as any, tenant, idFornecedor, parametros(req, c?.prazoEntregaDias || 0));
+    const p = parametros(req, c?.prazoEntregaDias || 0);
+    const ctx = await carregarContextoCurva(tenant, p.dias);
+    const itens: SugestaoItem[] = (await analisarFornecedor(pool as any, tenant, idFornecedor, p, undefined, true, ctx)).filter(i => !i.naoRecomprar);
     const atuais = new Map<number, number>(Object.entries(req.body?.quantidades || {}).map(([k, v]) => [Number(k), Math.max(0, Number(v) || 0)]));
     const limite = Math.min(365, Math.max(15, Number(req.body?.limiteCobertura) || 120));
     const r = completarPedidoMinimo(itens, atuais, minimo, limite);
