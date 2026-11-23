@@ -4,13 +4,16 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Alert, Button, Card, Checkbox, Col, DatePicker, Descriptions, Drawer, Empty, Flex, Input, Modal, Row, Segmented, Select, Space, Steps, Table, Tag, Tooltip, Typography, message } from 'antd';
-import { CarOutlined, CopyOutlined, DeleteOutlined, FileDoneOutlined, PlusOutlined, ReloadOutlined, SaveOutlined, StopOutlined } from '@ant-design/icons';
+import { CarOutlined, CopyOutlined, DeleteOutlined, FileDoneOutlined, PlusOutlined, PrinterOutlined, ReloadOutlined, SaveOutlined, StopOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
   ErroPedido, ETAPAS, formatarLinhaDigitavel, ParcelaPedido, PedidoFaturadoDetalhe, PedidoFaturadoResumo, pedidosFaturadosApi,
 } from './pedidosFaturadosApi';
 import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
 import { FORMATOS_DATA } from '../../../shared/formularios/numeros';
+import { htmlRomaneio } from './romaneio';
+import { imprimirHtml } from '../../../shared/core/impressao/saida';
+import { lerConfiguracoes } from '../../../shared/core/configuracoes/configuracoes';
 
 const { Text, Title } = Typography;
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -68,7 +71,21 @@ const FichaPedido: React.FC<{ id: number | null; onFechar: () => void; onMudou: 
   return (
     <Drawer open={!!id} onClose={onFechar} width="min(1100px, 100vw)" destroyOnHidden loading={!d}
       title={d ? <Space wrap>Pedido faturado Nº {d.id}<Tag color={ETAPAS[d.etapa].cor}>{ETAPAS[d.etapa].rotulo}</Tag><Text type="secondary">{d.cliente}</Text></Space> : 'Pedido'}
-      extra={d && aberto && !entregue && <Button danger icon={<StopOutlined />} onClick={() => setCancelando(true)}>Cancelar pedido</Button>}>
+      extra={d && (
+        <Space>
+          {d.etapa !== 'CANCELADO' && (
+            <Space.Compact>
+              <Tooltip title="Folha para separar, conferir e entregar (sem valores, vai com o motorista), com a assinatura de quem recebe">
+                <Button icon={<PrinterOutlined />} onClick={() => imprimirHtml(htmlRomaneio(d, lerConfiguracoes().empresa))}>Romaneio</Button>
+              </Tooltip>
+              <Tooltip title="Via do cliente: com preços e total do pedido">
+                <Button onClick={() => imprimirHtml(htmlRomaneio(d, lerConfiguracoes().empresa, { comValores: true }))}>com valores</Button>
+              </Tooltip>
+            </Space.Compact>
+          )}
+          {aberto && !entregue && <Button danger icon={<StopOutlined />} onClick={() => setCancelando(true)}>Cancelar pedido</Button>}
+        </Space>
+      )}>
       {d && (
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
           <Steps size="small" current={passo} status={d.etapa === 'CANCELADO' ? 'error' : undefined} items={[

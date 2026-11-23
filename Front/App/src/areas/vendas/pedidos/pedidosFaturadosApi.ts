@@ -31,7 +31,10 @@ export interface ParcelaPedido {
 
 export interface PedidoFaturadoDetalhe extends PedidoFaturadoResumo {
   itens: Array<{ idItem: number; sku: string; nome: string; unidade: string | null; fator: number; siglaBase: string | null; quantidade: number;
-    quantidadeBase: number; precoUnitario: number; total: number; servico: boolean; componentes: Array<{ idItem: number; nome: string; quantidade: number }> }>;
+    quantidadeBase: number; precoUnitario: number; total: number; servico: boolean; localizacao?: string | null;
+    componentes: Array<{ idItem: number; nome: string; quantidade: number; localizacao?: string | null }> }>;
+  /** Do cadastro do cliente, para o romaneio (documento e telefone só com números). */
+  clienteDados?: { documento: string | null; telefone: string | null; endereco: string | null } | null;
   estoque: Array<{ idItem: number; nome: string; sai: number; saldo: number; reservadoOutros: number; podeSemEstoque: boolean }>;
   faltas: Array<{ idItem: number; nome: string; sai: number; disponivel: number }>;
   nota: { idDocumento: number; status: string; serie: number | null; numero: number | null; chave: string | null; emissor: string; emitidaEm: string | null; motivoCancelamento: string | null } | null;

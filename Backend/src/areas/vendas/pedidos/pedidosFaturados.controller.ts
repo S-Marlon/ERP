@@ -191,14 +191,33 @@ export const detalhePedidoFaturado = async (req: Request, res: Response) => {
     ]);
     const faltas = p.entregue_em ? [] : faltasNaEntrega(saidas, new Map([...saldos].map(([k, v]) => [k, v.saldo])), reservasOutros, new Map([...info].map(([k, v]) => [k, v.podeSem])));
     const resumo = resumoDoPedido(p);
+    // Romaneio: onde cada item fica (separação) e os dados do cliente (documento, telefone, endereço do cadastro)
+    const idsLocal = [...new Set([...itens.map((i: any) => Number(i.id_item)), ...itens.flatMap((i: any) => i.componentes.map((c: any) => Number(c.id_item)))])];
+    const [[locais], [[cli]]]: any = await Promise.all([
+      idsLocal.length
+        ? pool.query(`SELECT id_item, localizacao FROM estoque_saldos_itens WHERE tenant_id = ? AND deposito = 'VENDA' AND id_item IN (?)`, [tenant, idsLocal])
+        : Promise.resolve([[]]),
+      p.id_cliente
+        ? pool.execute(
+          `SELECT COALESCE(pj.cnpj, pf.cpf) AS documento,
+                  (SELECT t.telefone FROM pessoas_contatos t WHERE t.id_cliente = c.id_pessoa AND t.deleted_at IS NULL AND COALESCE(t.telefone, '') <> '' ORDER BY t.principal DESC, t.id_contato LIMIT 1) AS telefone,
+                  (SELECT CONCAT_WS(' · ', CONCAT_WS(', ', NULLIF(e.logradouro, ''), NULLIF(e.numero, '')), NULLIF(e.complemento, ''), NULLIF(e.bairro, ''),
+                                    CONCAT_WS('/', NULLIF(e.cidade, ''), NULLIF(e.estado, '')), NULLIF(e.cep, ''))
+                   FROM pessoas_enderecos e WHERE e.id_cliente = c.id_pessoa AND e.deleted_at IS NULL ORDER BY e.principal DESC, e.id_endereco LIMIT 1) AS endereco
+           FROM pessoas_core c LEFT JOIN pessoas_pj pj ON pj.id_cliente = c.id_pessoa LEFT JOIN pessoas_pf pf ON pf.id_cliente = c.id_pessoa
+           WHERE c.id_pessoa = ? AND c.tenant_id = ?`, [p.id_cliente, tenant])
+        : Promise.resolve([[null]]),
+    ]);
+    const localDe = new Map<number, string | null>(locais.map((l: any) => [Number(l.id_item), l.localizacao || null]));
     return res.json({
       ...resumo,
       itens: itens.map((i: any) => ({
         idItem: Number(i.id_item), sku: i.sku_snapshot, nome: i.nome_snapshot, unidade: i.unidade_sigla, fator: n(i.fator_conversao), siglaBase: i.sigla_base,
         quantidade: n(i.quantidade), quantidadeBase: n(i.quantidade_base), precoUnitario: n(i.preco_unitario), total: n(i.total_item),
-        servico: i.tipo_recurso === 'SERVICO' && !i.componentes.length,
-        componentes: i.componentes.map((c: any) => ({ idItem: Number(c.id_item), nome: c.nome, quantidade: n(c.quantidade) })),
+        servico: i.tipo_recurso === 'SERVICO' && !i.componentes.length, localizacao: localDe.get(Number(i.id_item)) ?? null,
+        componentes: i.componentes.map((c: any) => ({ idItem: Number(c.id_item), nome: c.nome, quantidade: n(c.quantidade), localizacao: localDe.get(Number(c.id_item)) ?? null })),
       })),
+      clienteDados: cli ? { documento: cli.documento || null, telefone: cli.telefone || null, endereco: cli.endereco || null } : null,
       estoque: [...saidas.entries()].map(([idItem, sai]) => ({
         idItem, nome: info.get(idItem)?.nome, sai, saldo: saldos.get(idItem)?.saldo ?? 0, reservadoOutros: reservasOutros.get(idItem) ?? 0,
         podeSemEstoque: !!info.get(idItem)?.podeSem,
