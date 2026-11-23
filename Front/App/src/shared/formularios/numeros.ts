@@ -4,8 +4,8 @@
 
 /**
  * Texto digitado → número em texto com ponto ("1234.56"), que é o que o InputNumber do antd espera do parser.
- * Com vírgula: os pontos são de milhar. Sem vírgula e com um ponto só: é decimal, menos quando tem exatamente
- * 3 números depois e não começa com 0 ("1.500" = mil e quinhentos, como se escreve no Brasil). Vários pontos: milhar.
+ * Vírgula e ponto valem como decimal ("1,5" = "1.5"). Milhar só quando não tem como ser decimal: ponto junto com
+ * vírgula ("1.234,56") ou vários pontos ("1.234.567"). Um ponto sozinho é sempre decimal ("1.500" = 1,5).
  */
 export const lerNumeroBr = (texto: unknown): string => {
   let t = String(texto ?? '').replace(/[^\d,.-]/g, '');
@@ -17,11 +17,7 @@ export const lerNumeroBr = (texto: unknown): string => {
     t = t.slice(0, i).replace(/,/g, '') + '.' + t.slice(i + 1);
   } else {
     const partes = t.split('.');
-    if (partes.length === 2) {
-      const [int, dec] = partes;
-      const milhar = dec.length === 3 && int.length > 0 && int.length <= 3 && !/^0/.test(int);
-      t = milhar ? int + dec : `${int}.${dec}`;
-    } else if (partes.length > 2) {
+    if (partes.length > 2) {
       t = partes.join('');
     }
   }

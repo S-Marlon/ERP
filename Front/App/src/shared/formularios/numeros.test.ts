@@ -8,7 +8,8 @@ teste('ler número digitado ou colado', () => {
   assert.strictEqual(lerNumeroBr('1.5'), '1.5');
   assert.strictEqual(lerNumeroBr('1.234,56'), '1234.56');
   assert.strictEqual(lerNumeroBr('R$ 1.234,56'), '1234.56');
-  assert.strictEqual(lerNumeroBr('1.500'), '1500');          // milhar, como se escreve no Brasil
+  assert.strictEqual(lerNumeroBr('1.500'), '1.500');         // ponto sozinho é decimal (1,5), como a vírgula
+  assert.strictEqual(lerNumeroBr('1,500'), '1.500');
   assert.strictEqual(lerNumeroBr('0.500'), '0.500');         // começa com 0: decimal
   assert.strictEqual(lerNumeroBr('1.50'), '1.50');
   assert.strictEqual(lerNumeroBr('1.234.567'), '1234567');
