@@ -35,6 +35,7 @@ interface PDVContextType {
   confirmarKit: (escolhas: EscolhaKitPdv[]) => void;
   cancelarKit: () => void;
   editarKit: (id: string | number) => void;
+  aplicarAtacado: (id: string | number, aplicar: boolean, quantidade?: number) => void;
 
   // PDV State
   estagio: 'SELECAO' | 'PAGAMENTO';

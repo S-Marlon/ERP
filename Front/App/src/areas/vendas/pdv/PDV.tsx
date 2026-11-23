@@ -50,7 +50,7 @@ const bip = () => {
 const PDVContent: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const {
-    cart, addToCart, updateQuantity, removeItem, changeUnit, applyIndividualDiscount, clearCart, carregarItens,
+    cart, addToCart, updateQuantity, removeItem, changeUnit, applyIndividualDiscount, clearCart, carregarItens, aplicarAtacado,
     kitPendente, confirmarKit, cancelarKit, editarKit,
     estagio, setEstagio, cliente, setCliente, clienteId, clienteDocumento, selecionarCliente,
     mostrarModalCliente, setMostrarModalCliente,
@@ -98,6 +98,8 @@ const PDVContent: React.FC = () => {
     .filter((i: any) => i.type !== 'service' && i.type !== 'os')
     .map((i: any) => ({
       idItem: idItemDaLinha(i), quantidade: Number(i.quantity), idUnidade: i.idUnidadeVenda ?? null, precoUnitario: i.precoManual ? Number(i.price) : undefined,
+      // Atacado só se o operador aplicou
+      ...(i.atacado ? {} : { semAtacado: true }),
       ...(i.kitEscolhas ? { componentes: i.kitEscolhas } : {}),
     }));
 
@@ -184,7 +186,7 @@ const PDVContent: React.FC = () => {
         message.info(`Orçamento ${d.id} vencido: os itens entram com os preços atuais.`);
       }
       const falhas = await carregarItens(d.itens.map(i => ({
-        idItem: i.idItem, nome: i.nome, quantidade: i.quantidade, idUnidade: i.idUnidade, componentes: i.componentes,
+        idItem: i.idItem, nome: i.nome, quantidade: i.quantidade, idUnidade: i.idUnidade, componentes: i.componentes, precoTabelaAnterior: i.precoTabela,
         // Orçamento mantido: preço congelado; suspensa: mantém só o desconto manual que havia
         ...(manterPreco
           ? { precoFixo: i.precoUnitario, precoTabelaFixa: i.precoTabela }
@@ -380,6 +382,7 @@ const PDVContent: React.FC = () => {
       total={total}
       money={money}
       updateQuantity={updateQuantity}
+      aplicarAtacado={aplicarAtacado}
       changeUnit={changeUnit}
       removeItem={removeItem}
       onFinalizar={() => { setGavetaCarrinho(false); irParaPagamento(); }}

@@ -28,9 +28,21 @@ export const faixaVigente = (unidade: UnidadeCarrinho, quantidade: number): Faix
     .filter(f => quantidade >= f.quantidadeMinima && (f.quantidadeMaxima === null || quantidade <= f.quantidadeMaxima))
     .sort((a, b) => b.quantidadeMinima - a.quantidadeMinima || a.ordem - b.ordem)[0] || null;
 
-export const precoTabelaCarrinho = (unidade: UnidadeCarrinho, quantidade: number): number => {
-  const faixa = faixaVigente(unidade, Math.max(quantidade, 0) || 1);
+/**
+ * Preço de tabela da linha. O atacado só vale quando o operador aplicou (`comAtacado`): a quantidade alcançar a faixa
+ * não muda o preço sozinha, o carrinho oferece o botão "aplicar atacado".
+ */
+export const precoTabelaCarrinho = (unidade: UnidadeCarrinho, quantidade: number, comAtacado = true): number => {
+  const u = comAtacado ? unidade : { ...unidade, faixas: unidade.faixas.filter(f => f.tipoFaixa !== 'ATACADO') };
+  const faixa = faixaVigente(u, Math.max(quantidade, 0) || 1);
   return faixa && faixa.precoUnitario > 0 ? faixa.precoUnitario : unidade.preco;
+};
+
+/** Atacado que a quantidade já alcança e ainda não foi aplicado (preço menor que o de varejo); null se não houver. */
+export const atacadoDisponivel = (unidade: UnidadeCarrinho, quantidade: number, aplicado: boolean): number | null => {
+  if (aplicado || !emAtacado(unidade, quantidade)) return null;
+  const preco = precoTabelaCarrinho(unidade, quantidade, true);
+  return preco < precoTabelaCarrinho(unidade, quantidade, false) - 0.00005 ? preco : null;
 };
 
 // Próxima faixa mais barata ainda não alcançada (para sugerir "leve X e pague Y")

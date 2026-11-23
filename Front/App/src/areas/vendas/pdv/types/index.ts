@@ -48,6 +48,8 @@ export interface CartItem extends SaleItem {
   unidades?: UnidadeCarrinho[];
   precoTabela?: number;
   precoManual?: boolean;
+  /** O operador aplicou o preço de atacado. */
+  atacado?: boolean;
   type: ItemType;
   osData?: any;
   originalPrice?: number;

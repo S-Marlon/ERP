@@ -219,6 +219,8 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
                 idUnidade: item.idUnidadeVenda ?? null,
                 // Sem desconto manual o servidor aplica a tabela (varejo/atacado) pela quantidade
                 precoUnitario: item.precoManual ? Number(item.price) : undefined,
+                // Atacado só se o operador aplicou no carrinho
+                ...((item as any).atacado ? {} : { semAtacado: true }),
                 // Kit configurável: o servidor confere as escolhas e recalcula a diferença
                 ...(item.kitEscolhas ? { componentes: item.kitEscolhas } : {}),
             })),

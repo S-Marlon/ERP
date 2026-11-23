@@ -21,6 +21,7 @@ export interface LinhaPedido {
   quantidade: number;
   idUnidade?: number | null;
   precoUnitario?: number | null;   // preço praticado (desconto individual); ausente = preço de tabela
+  semAtacado?: boolean;            // PDV: o operador não aplicou o atacado (a faixa de atacado não vale para a linha)
 }
 
 export interface DadosItemVenda {
@@ -56,7 +57,8 @@ export const calcularLinha = (linha: LinhaPedido, dados: DadosItemVenda): LinhaC
   if (linha.idUnidade && !unidade) throw new ErroVenda(`A unidade informada não está liberada para venda no item ${linha.idItem}.`);
 
   const fator = unidade?.fator || 1;
-  const faixa = unidade ? faixaParaQuantidade(dados.faixas, unidade.idUnidade, quantidade) : null;
+  const faixas = linha.semAtacado ? dados.faixas.filter(f => f.tipoFaixa !== 'ATACADO') : dados.faixas;
+  const faixa = unidade ? faixaParaQuantidade(faixas, unidade.idUnidade, quantidade) : null;
   const precoTabela = faixa && faixa.precoUnitario > 0
     ? faixa.precoUnitario
     : arred4((dados.precoCadastro || 0) * fator);

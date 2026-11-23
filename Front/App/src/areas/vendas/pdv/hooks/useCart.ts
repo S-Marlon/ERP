@@ -4,7 +4,7 @@ import { CartItem, SaleItem, isCartItemOS } from '../types/cart.types';
 import Swal from 'sweetalert2';
 import { message } from 'antd';
 import { getPdvProductDetail } from '../services/api/products';
-import { podeFracionar, precoTabelaCarrinho, UnidadeCarrinho } from '../utils/precoCarrinho';
+import { emAtacado, podeFracionar, precoTabelaCarrinho, UnidadeCarrinho } from '../utils/precoCarrinho';
 import { calcularKit, chaveLinhaKit, EscolhaKitPdv, escolhasPadrao, PosicaoKit } from '../utils/kitPdv';
 import { opcoesDoKit } from '../services/kitsPdvApi';
 import type { KitPendente } from '../components/KitConfiguradorModal';
@@ -15,15 +15,17 @@ const ehProduto = (item: { type?: string }) => item.type !== 'service' && item.t
 const unidadeAtual = (item: CartItem): UnidadeCarrinho | undefined =>
   item.unidades?.find(u => u.idUnidade === item.idUnidadeVenda);
 
-// Reaplica o preço de tabela (faixa de varejo/atacado) para a unidade e quantidade da linha.
+// Reaplica o preço de tabela para a unidade e quantidade da linha. Atacado só se o operador aplicou e a quantidade
+// ainda alcança a faixa (abaixo dela o atacado sai e, voltando a alcançar, precisa aplicar de novo).
 // Com desconto manual, o preço praticado fica e só a referência de tabela muda.
 const reprecificar = (item: CartItem): CartItem => {
   const unidade = unidadeAtual(item);
   if (!unidade) return item;
+  const atacado = !!item.atacado && emAtacado(unidade, item.quantity);
   // Kit configurável: tabela do kit + diferença das trocas (por kit na unidade base, convertida para a unidade da linha)
-  const tabela = Math.max(0, Math.round((precoTabelaCarrinho(unidade, item.quantity) + (item.ajusteKit || 0) * (unidade.fator || 1)) * 10000) / 10000);
-  if (item.precoManual) return { ...item, precoTabela: tabela, originalPrice: tabela };
-  return { ...item, precoTabela: tabela, price: tabela, originalPrice: undefined };
+  const tabela = Math.max(0, Math.round((precoTabelaCarrinho(unidade, item.quantity, atacado) + (item.ajusteKit || 0) * (unidade.fator || 1)) * 10000) / 10000);
+  if (item.precoManual) return { ...item, atacado, precoTabela: tabela, originalPrice: tabela };
+  return { ...item, atacado, precoTabela: tabela, price: tabela, originalPrice: undefined };
 };
 
 /** Linha de kit configurável a partir da linha padrão e das escolhas do cliente. */
@@ -180,7 +182,16 @@ export const useCart = () => {
         stock: unidade.estoque,
         quantity,
         precoManual: false,
+        atacado: false,
       });
+    }));
+  }, []);
+
+  /** Aplica (ou tira) o preço de atacado da linha; com `quantidade`, leva a linha até a faixa e aplica. */
+  const aplicarAtacado = useCallback((id: string | number, aplicar: boolean, quantidade?: number) => {
+    setCart(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      return reprecificar({ ...item, atacado: aplicar, ...(quantidade !== undefined ? { quantity: quantidade } : {}), ...(aplicar ? { precoManual: false } : {}) });
     }));
   }, []);
 
@@ -252,7 +263,7 @@ export const useCart = () => {
    * Devolve os nomes que não puderam ser carregados.
    */
   const carregarItens = useCallback(async (
-    linhas: Array<{ idItem: number; nome: string; quantidade: number; idUnidade: number | null; precoFixo?: number; precoTabelaFixa?: number; unidadeBase?: boolean; componentes?: EscolhaKitPdv[] }>,
+    linhas: Array<{ idItem: number; nome: string; quantidade: number; idUnidade: number | null; precoFixo?: number; precoTabelaFixa?: number; unidadeBase?: boolean; componentes?: EscolhaKitPdv[]; precoTabelaAnterior?: number }>,
     opcoes: { acrescentar?: boolean } = {}
   ) => {
     const novos: CartItem[] = [];
@@ -282,6 +293,9 @@ export const useCart = () => {
           publicavel: productData.publicavel,
           precoManual: false,
         } as CartItem;
+        // Venda suspensa / orçamento: o atacado que estava aplicado (tabela gravada = preço de atacado) continua aplicado
+        if (unidade && l.precoTabelaAnterior !== undefined && emAtacado(unidade, l.quantidade)
+          && Math.abs(precoTabelaCarrinho(unidade, l.quantidade, true) - l.precoTabelaAnterior) < 0.005) item.atacado = true;
         item = reprecificar(item);
         // Kit configurável (orçamento/suspensa): remonta com as escolhas gravadas
         if (productData.kitConfiguravel || l.componentes?.length) {
@@ -326,6 +340,7 @@ export const useCart = () => {
     applyIndividualDiscount,
     clearCart,
     carregarItens,
+    aplicarAtacado,
     kitPendente,
     confirmarKit,
     cancelarKit,

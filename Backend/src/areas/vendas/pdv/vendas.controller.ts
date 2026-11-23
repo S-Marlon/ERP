@@ -49,6 +49,7 @@ export const calcularItensDoPedido = async (conn: ConnVenda, tenant: number, ite
     quantidade: Number(i.quantidade),
     idUnidade: i.idUnidade ? Number(i.idUnidade) : null,
     precoUnitario: i.precoUnitario === undefined || i.precoUnitario === null ? null : Number(i.precoUnitario),
+    semAtacado: i.semAtacado === true,
   }));
   if (pedidos.some(p => !Number.isInteger(p.idItem) || p.idItem <= 0)) throw new ErroVenda('Item inválido na venda.');
   // Kit configurável: escolhas do cliente por posição ({ slot, idItem, quantidade })

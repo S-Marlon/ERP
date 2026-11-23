@@ -5,7 +5,7 @@ import { CopyOutlined, DeleteOutlined, ExportOutlined, MoreOutlined, PrinterOutl
 import { ajusteDaLinha, ajustesDoCarrinho, precoBaseLinha } from '../utils/ajustesCarrinho';
 
 import { CartItem } from '../types';
-import { emAtacado, podeFracionar, proximaFaixa } from '../utils/precoCarrinho';
+import { atacadoDisponivel, podeFracionar, proximaFaixa } from '../utils/precoCarrinho';
 import { faltaNaLinha } from '../utils/estoqueCarrinho';
 import { PrecosPorFormaPainel } from './PrecosPorFormaPainel';
 import { CampoDinheiro, CampoNumero } from '../../../../shared/formularios/CamposNumero';
@@ -30,6 +30,8 @@ interface CartAsideProps {
     estagio: 'SELECAO' | 'PAGAMENTO';
     // Kit configurável: reabre a escolha das variações da linha
     onEditarKit?: (id: string | number) => void;
+    /** Aplica/tira o preço de atacado da linha (com quantidade: leva até a faixa e aplica). */
+    aplicarAtacado?: (id: string | number, aplicar: boolean, quantidade?: number) => void;
     /** Proposta negociada no carrinho: sem a tabela de preço por forma (o preço é o combinado). */
     negociado?: boolean;
     style?: React.CSSProperties;
@@ -51,7 +53,7 @@ export const CartAside: React.FC<CartAsideProps> = props => (
 
 const CarrinhoConteudo: React.FC<CartAsideProps> = ({
     cart, cliente, total, money, updateQuantity, changeUnit, removeItem, onFinalizar, onSuspender, onOrcamento, onNegociar,
-    salvandoPedido, estagio, onBack, applyIndividualDiscount, onEditarKit, negociado, style,
+    salvandoPedido, estagio, onBack, applyIndividualDiscount, onEditarKit, aplicarAtacado, negociado, style,
 }) => {
     const { token } = theme.useToken();
     // Fracionamento ligado à mão por item (unidades fracionáveis já vêm ligadas)
@@ -157,7 +159,8 @@ const CarrinhoConteudo: React.FC<CartAsideProps> = ({
                             const ehProduto = item.type !== 'service' && item.type !== 'os';
                             const falta = faltaNaLinha(item);
                             const unidade = item.unidades?.find(u => u.idUnidade === item.idUnidadeVenda);
-                            const atacado = unidade ? emAtacado(unidade, item.quantity) : false;
+                            const atacado = !!item.atacado;
+                            const disponivel = unidade && !item.precoManual ? atacadoDisponivel(unidade, item.quantity, atacado) : null;
                             const proxima = unidade && !item.precoManual ? proximaFaixa(unidade, item.quantity) : null;
                             const un = item.unitOfMeasure || 'un';
 
@@ -209,10 +212,22 @@ const CarrinhoConteudo: React.FC<CartAsideProps> = ({
                                                 }))} />
                                         )}
                                         {item.precoManual && <Tag color="orange" style={{ margin: 0 }}>Preço manual</Tag>}
-                                        {atacado && <Tag color="green" style={{ margin: 0 }}>Atacado aplicado</Tag>}
+                                        {atacado && (
+                                            <Tooltip title="Clique para voltar ao preço de varejo">
+                                                <Tag color="green" style={{ margin: 0, cursor: 'pointer' }} onClick={() => aplicarAtacado?.(item.id, false)}>Atacado aplicado ×</Tag>
+                                            </Tooltip>
+                                        )}
+                                        {disponivel !== null && (
+                                            <Tooltip title={`A quantidade alcança o atacado: ${money.format(disponivel)}/${un}. O preço só muda se você aplicar.`}>
+                                                <Tag color="gold" style={{ margin: 0, cursor: 'pointer' }} onClick={() => aplicarAtacado?.(item.id, true)}>
+                                                    Aplicar atacado: {money.format(disponivel)}
+                                                </Tag>
+                                            </Tooltip>
+                                        )}
                                         {proxima && (
-                                            <Tooltip title={`Faltam ${Number(proxima.quantidadeMinima - item.quantity).toLocaleString('pt-BR')} ${un} para o preço de atacado. Clique para usar.`}>
-                                                <Tag color="orange" style={{ margin: 0, cursor: 'pointer' }} onClick={() => updateQuantity(item.id, proxima.quantidadeMinima)}>
+                                            <Tooltip title={`Faltam ${Number(proxima.quantidadeMinima - item.quantity).toLocaleString('pt-BR')} ${un} para o preço de atacado. Clique para levar a quantidade até a faixa e aplicar.`}>
+                                                <Tag color="orange" style={{ margin: 0, cursor: 'pointer' }}
+                                                    onClick={() => (aplicarAtacado ? aplicarAtacado(item.id, true, proxima.quantidadeMinima) : updateQuantity(item.id, proxima.quantidadeMinima))}>
                                                     Atacado {Number(proxima.quantidadeMinima).toLocaleString('pt-BR')}+: {money.format(proxima.precoUnitario)}
                                                 </Tag>
                                             </Tooltip>

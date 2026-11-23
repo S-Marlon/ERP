@@ -27,6 +27,7 @@ export const runVendaPdvTests = (): void => {
   const l1 = calcularLinha({ idItem: 1, quantidade: 3 }, mangueira);
   assert(l1.sigla === 'M' && l1.precoTabela === 10 && l1.quantidadeBase === 3, 'Sem unidade, vende na padrão do PDV com preço de varejo.');
   assert(calcularLinha({ idItem: 1, quantidade: 60 }, mangueira).precoTabela === 8, 'Quantidade de atacado aplica a faixa de atacado.');
+  assert(calcularLinha({ idItem: 1, quantidade: 60, semAtacado: true }, mangueira).precoTabela !== 8, 'PDV sem o atacado aplicado: fica no varejo.');
   const rolo = calcularLinha({ idItem: 1, quantidade: 2, idUnidade: 2 }, mangueira);
   assert(rolo.quantidadeBase === 300 && rolo.precoTabela === 1425, 'Rolo sem faixa: preço do cadastro x fator e baixa 300 m.');
   lanca(() => calcularLinha({ idItem: 1, quantidade: 1, idUnidade: 3 }, mangueira), 'não está liberada', 'Unidade que não permite venda é recusada.');
