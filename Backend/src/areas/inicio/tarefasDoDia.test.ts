@@ -1,7 +1,7 @@
 import assert from 'assert';
 import {
   diasEntre, nivelDoPrazo, ordenarTarefas, semAdiadas, tarefasCaixa, tarefasCurva, tarefasInventario, tarefasNotas, tarefasOrcamentos,
-  tarefasPagar, tarefasPedidos, tarefasPrecos,
+  tarefasPagar, tarefasPedidos, tarefasPrecos, validarLembrete, nivelDoLembrete, tarefasLembretes, dataDoAdiamento,
 } from './tarefasDoDia';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
@@ -72,4 +72,30 @@ teste('ordem e adiadas', () => {
   const r = semAdiadas(t, new Map([['PRECO_CUSTO', '2026-11-30'], ['NF:7', HOJE]]), HOJE);
   assert.deepStrictEqual(r.visiveis.map(x => x.chave), ['CAIXA:1', 'NF:7']);   // adiada até hoje já volta
   assert.strictEqual(r.adiadas, 1);
+});
+
+teste('lembretes: validar, nível pela data e prioridade, agendados', () => {
+  assert.deepStrictEqual(validarLembrete({ titulo: '  Ligar   para a IMDEPA ', vencimento: '2026-11-27', prioridade: 'alta' }),
+    { titulo: 'Ligar para a IMDEPA', prioridade: 'ALTA', vencimento: '2026-11-27', descricao: null, responsavel: null });
+  assert.throws(() => validarLembrete({ titulo: 'ok' }), /ao menos 3/);
+  assert.throws(() => validarLembrete({ titulo: 'Ligar', vencimento: '27/11/2026' }), /Data inválida/);
+  assert.strictEqual(nivelDoLembrete(null, 'ALTA', HOJE), 'HOJE');
+  assert.strictEqual(nivelDoLembrete(null, 'NORMAL', HOJE), 'SEMANA');
+  assert.strictEqual(nivelDoLembrete('2026-11-20', 'BAIXA', HOJE), 'URGENTE');
+  assert.strictEqual(nivelDoLembrete('2026-12-20', 'ALTA', HOJE), null);
+  const r = tarefasLembretes([
+    { id: 1, titulo: 'Conferir 1ª venda do ML', descricao: null, vencimento: null, prioridade: 'NORMAL', responsavel: null },
+    { id: 2, titulo: 'Renovar alvará', descricao: null, vencimento: '2027-01-10', prioridade: 'NORMAL', responsavel: null },
+    { id: 3, titulo: 'Pagar o contador', descricao: 'Boleto no e-mail', vencimento: HOJE, prioridade: 'ALTA', responsavel: 'Marlon' },
+  ], HOJE);
+  assert.deepStrictEqual(r.visiveis.map(t => [t.chave, t.nivel]), [['LEMBRETE:3', 'HOJE'], ['LEMBRETE:1', 'SEMANA']]);
+  assert.strictEqual(r.visiveis[0].detalhe, 'Boleto no e-mail · Para hoje');
+  assert.deepStrictEqual(r.agendados.map(l => l.id), [2]);
+});
+
+teste('adiar: amanhã, semana, data', () => {
+  assert.strictEqual(dataDoAdiamento('AMANHA', HOJE), '2026-11-24');
+  assert.strictEqual(dataDoAdiamento('SEMANA', '2026-11-28'), '2026-12-05');
+  assert.strictEqual(dataDoAdiamento('2026-12-01', HOJE), '2026-12-01');
+  assert.throws(() => dataDoAdiamento(HOJE, HOJE), /depois de hoje/);
 });

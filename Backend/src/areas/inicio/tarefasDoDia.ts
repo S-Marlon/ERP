@@ -19,6 +19,8 @@ export interface Tarefa {
   valor?: number;
   /** Até 3 exemplos (itens, clientes...) para saber do que se trata sem abrir. */
   exemplos?: string[];
+  /** Lembrete do operador (área MANUAL): id, data, prioridade e responsável. */
+  idTarefa?: number; vencimento?: string | null; prioridade?: Prioridade; responsavel?: string | null; descricao?: string | null;
 }
 
 const ORDEM_NIVEL: Record<Nivel, number> = { URGENTE: 0, HOJE: 1, SEMANA: 2, SUGESTAO: 3 };
@@ -203,4 +205,66 @@ export const tarefasEstoqueNegativo = (quantidade: number): Tarefa[] => (quantid
 export const semAdiadas = (lista: Tarefa[], adiadas: Map<string, string>, hoje: string) => {
   const visiveis = lista.filter(t => { const ate = adiadas.get(t.chave); return !ate || ate <= hoje; });
   return { visiveis, adiadas: lista.length - visiveis.length };
+};
+
+// ---------------------------------------------------------------- lembretes do operador e adiar
+export type Prioridade = 'ALTA' | 'NORMAL' | 'BAIXA';
+export class ErroTarefa extends Error { constructor(message: string, public status = 400) { super(message); } }
+
+const dataValida = (v: unknown) => {
+  const t = String(v ?? '').trim();
+  if (!t) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(t) || Number.isNaN(Date.parse(`${t}T12:00:00Z`))) throw new ErroTarefa('Data inválida.');
+  return t;
+};
+
+/** Lembrete digitado: título obrigatório; data, prioridade e responsável opcionais (tamanhos das colunas). */
+export const validarLembrete = (b: any) => {
+  const titulo = String(b?.titulo ?? '').replace(/\s+/g, ' ').trim().slice(0, 150);
+  if (titulo.length < 3) throw new ErroTarefa('Escreva o que precisa ser feito (ao menos 3 letras).');
+  const prioridade = String(b?.prioridade || 'NORMAL').toUpperCase() as Prioridade;
+  if (!['ALTA', 'NORMAL', 'BAIXA'].includes(prioridade)) throw new ErroTarefa('Prioridade inválida.');
+  return {
+    titulo, prioridade, vencimento: dataValida(b?.vencimento),
+    descricao: String(b?.descricao ?? '').trim().slice(0, 500) || null,
+    responsavel: String(b?.responsavel ?? '').trim().slice(0, 60) || null,
+  };
+};
+
+/**
+ * Nível do lembrete: vencido = atrasado; de hoje (ou alta sem data) = hoje; até 7 dias ou sem data = esta semana;
+ * mais longe fica agendado (fora da lista até chegar perto).
+ */
+export const nivelDoLembrete = (vencimento: string | null, prioridade: Prioridade, hoje: string): Nivel | null => {
+  if (!vencimento) return prioridade === 'ALTA' ? 'HOJE' : 'SEMANA';
+  return nivelDoPrazo(vencimento, hoje);
+};
+
+export interface Lembrete { id: number; titulo: string; descricao: string | null; vencimento: string | null; prioridade: Prioridade; responsavel: string | null }
+export const tarefasLembretes = (lista: Lembrete[], hoje: string) => {
+  const visiveis: Tarefa[] = [];
+  const agendados: Lembrete[] = [];
+  for (const l of lista) {
+    const nivel = nivelDoLembrete(l.vencimento, l.prioridade, hoje);
+    if (!nivel) { agendados.push(l); continue; }
+    visiveis.push({
+      chave: `LEMBRETE:${l.id}`, area: 'MANUAL', nivel, titulo: l.titulo,
+      detalhe: [l.descricao, l.vencimento ? (l.vencimento < hoje ? `Venceu em ${dataBr(l.vencimento)}` : l.vencimento === hoje ? 'Para hoje' : `Até ${dataBr(l.vencimento)}`) : null]
+        .filter(Boolean).join(' · ') || null,
+      rota: '', acao: 'Feito', idTarefa: l.id, vencimento: l.vencimento, prioridade: l.prioridade, responsavel: l.responsavel, descricao: l.descricao,
+    });
+  }
+  // Alta primeiro dentro do mesmo nível (a ordem geral põe MANUAL antes das outras áreas)
+  visiveis.sort((a, b) => ORDEM_NIVEL[a.nivel] - ORDEM_NIVEL[b.nivel] || (a.prioridade === 'ALTA' ? 0 : 1) - (b.prioridade === 'ALTA' ? 0 : 1));
+  return { visiveis, agendados };
+};
+
+/** Adiar: amanhã, daqui a 7 dias (próxima semana) ou uma data escolhida (depois de hoje). */
+export const dataDoAdiamento = (opcao: unknown, hoje: string) => {
+  const mais = (dias: number) => new Date(Date.parse(`${hoje}T12:00:00Z`) + dias * 86400000).toISOString().slice(0, 10);
+  if (opcao === 'AMANHA') return mais(1);
+  if (opcao === 'SEMANA') return mais(7);
+  const d = dataValida(opcao);
+  if (!d || d <= hoje) throw new ErroTarefa('Escolha uma data depois de hoje.');
+  return d;
 };
