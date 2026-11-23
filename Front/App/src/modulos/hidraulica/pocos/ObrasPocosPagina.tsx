@@ -3,7 +3,8 @@
 // "ver no mapa", os cartões da Central) mudam a seção pelo navPocos e o endereço acompanha; as partes de cobrança,
 // materiais, processo e orçamento/contrato vivem dentro da obra.
 import React, { useEffect, useRef } from 'react';
-import { Breadcrumb, Button, Flex, Segmented, Tooltip, Typography } from 'antd';
+import { Breadcrumb, Button, Flex, Menu, Segmented, Tooltip, Typography } from 'antd';
+import type { MenuProps } from 'antd';
 import { AimOutlined, ArrowUpOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import CentralPocos from './CentralPocos';
@@ -58,6 +59,18 @@ const ObrasPocosPagina: React.FC = () => {
   const recursos = useRecursosPocos();
   const doGrupo = secoesDoGrupo(atual.grupo).filter(s => s.secao === atual.secao || secaoLigada(s.secao, recursos));
   const tituloGrupo = GRUPOS_POCOS.find(g => g.grupo === atual.grupo)?.titulo || atual.titulo;
+  // Menu do topo: todas as telas do módulo a um clique (o grupo com mais de uma tela abre as irmãs; clicar no nome do
+  // grupo abre a primeira), para não depender da barra lateral
+  const menuTopo: MenuProps['items'] = GRUPOS_POCOS.map(g => {
+    const telas = secoesDoGrupo(g.grupo).filter(s => secaoLigada(s.secao, recursos));
+    const primeira = telas[0];
+    if (!primeira) return null;
+    if (telas.length === 1) return { key: primeira.secao || 'central', label: g.titulo };
+    return {
+      key: `grupo:${g.grupo}`, label: g.titulo, onTitleClick: () => navigate(enderecoDaSecao(primeira)),
+      children: telas.map(s => ({ key: s.secao || 'central', label: s.titulo })),
+    };
+  }).filter(Boolean) as MenuProps['items'];
 
   // trilha do topo: Central › seção › sub-telas abertas (obra, configuração...). Cada degrau leva de volta àquele nível.
   const niveis = useNiveisPocos();
@@ -96,6 +109,9 @@ const ObrasPocosPagina: React.FC = () => {
           <Title level={3} style={{ margin: 0 }}><AimOutlined /> Poços artesianos · {tituloGrupo}</Title>
           <BuscaPocos />
         </Flex>
+        <Menu mode="horizontal" style={{ marginTop: 6, background: 'transparent' }} items={menuTopo}
+          selectedKeys={[atual.secao || 'central', `grupo:${atual.grupo}`]}
+          onClick={({ key }) => navigate(enderecoDaSecao({ secao: key === 'central' ? '' : String(key) }))} />
         {atual.aba === 'central' && <Text type="secondary">Do primeiro contato à manutenção: contratos, obras, poços, agenda, monitoramento e pós-venda.</Text>}
         {doGrupo.length > 1 && (
           <Segmented style={{ marginTop: 10 }} value={atual.secao} onChange={v => navigate(enderecoDaSecao({ secao: String(v) }))}
