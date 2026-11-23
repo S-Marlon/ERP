@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { barrasDoConjunto, conferirConjunto, svgConjunto, textoTubo } from './desenhoConjunto';
+import { barrasDoConjunto, conferirConjunto, precisaCorda, sugestoesTubo, svgConjunto, textoTubo } from './desenhoConjunto';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -25,7 +25,8 @@ teste('conjunto: conferência', () => {
   const textos = ruim.filter(x => !x.ok).map(x => x.texto);
   assert.ok(textos.some(t => t.startsWith('Tubos somam 30 m e a bomba está a 36 m (faltam 6 m)')), textos.join(' | '));
   assert.ok(textos.includes('Fio de 34 m não chega à bomba a 36 m.'));
-  assert.ok(textos.includes('Sem corda de segurança registrada.'));
+  assert.ok(!textos.some(t => t.includes('corda')), 'PVC geomecânico (rosca): corda opcional');
+  assert.ok(conferirConjunto({ ...c, tuboMaterial: 'PVC irrigação (soldado)', cordaMetros: null }).some(x => !x.ok && x.texto.includes('sem corda')));
   assert.ok(textos.includes('Bomba a 1 m do fundo: risco de puxar areia.'));
   assert.ok(textos.some(t => t.includes('acima do nível dinâmico')));
 });
@@ -36,4 +37,17 @@ teste('conjunto: desenho com as emendas', () => {
   assert.strictEqual((svg.match(/Emenda /g) || []).length, 5);   // 6 barras = 5 emendas
   assert.ok(svg.includes('6 barras de 6 m = 36 m') && svg.includes('Bomba a 36 m') && svg.includes('Fio Cabo PP 3 x 4 mm² · 46 m'));
   assert.ok(!svgConjunto({}).includes('NaN'));
+});
+
+teste('conjunto: corda só no tubo que pede e regra de 3 do tubo', () => {
+  assert.strictEqual(precisaCorda('PVC irrigação (soldado)'), true);
+  assert.strictEqual(precisaCorda('Tubo flexível (Subteck/PEX)'), true);
+  assert.strictEqual(precisaCorda('PVC geomecânico (rosca)'), false);
+  assert.strictEqual(precisaCorda('Aço galvanizado'), false);
+  assert.strictEqual(precisaCorda('PVC'), null);
+  assert.deepStrictEqual(sugestoesTubo(64, null, 4), { barras: { valor: 16, exata: true }, comprimento: null, profundidade: null });
+  assert.deepStrictEqual(sugestoesTubo(65, null, 6).barras, { valor: 11, exata: false });
+  assert.strictEqual(sugestoesTubo(64, 16, null).comprimento, 4);
+  assert.strictEqual(sugestoesTubo(null, 16, 4).profundidade, 64);
+  assert.deepStrictEqual(sugestoesTubo(64, 16, 4), { barras: null, comprimento: null, profundidade: null });
 });

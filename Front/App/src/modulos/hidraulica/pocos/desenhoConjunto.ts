@@ -35,6 +35,32 @@ export const textoTubo = (c: ConjuntoDesenho) => {
 
 export interface Conferencia { ok: boolean; texto: string }
 
+/**
+ * A corda de segurança é para o tubo que não aguenta o peso sozinho (PVC de irrigação soldado, PEAD, mangueira, flexível);
+ * no tubo de rosca com luva (geomecânico, galvanizado) é opcional. null = material não diz (não cobra).
+ */
+export const precisaCorda = (material: unknown): boolean | null => {
+  const t = String(material ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  if (!t.trim()) return null;
+  if (/solda|irriga|pead|polietileno|mangueira|flex|subteck|pex/.test(t)) return true;
+  if (/rosca|luva|geomec|galvan|aco|inox/.test(t)) return false;
+  return null;
+};
+
+/**
+ * Regra de 3 do tubo: com dois de (profundidade da bomba, barras, comprimento da barra) sugere o terceiro.
+ * Barras sempre inteiras (arredondadas para cima, e avisa quando a conta não é exata).
+ */
+export const sugestoesTubo = (profundidade: unknown, barras: unknown, comprimento: unknown) => {
+  const p = num(profundidade), b = num(barras), c = num(comprimento);
+  const r2 = (v: number) => Math.round(v * 100) / 100;
+  return {
+    barras: p > 0 && c > 0 && !b ? { valor: Math.ceil(p / c - 1e-6), exata: Math.abs(p / c - Math.round(p / c)) < 1e-6 } : null,
+    comprimento: p > 0 && b > 0 && !c ? r2(p / b) : null,
+    profundidade: b > 0 && c > 0 && !p ? r2(b * c) : null,
+  };
+};
+
 /** O que dá para conferir com o que foi registrado (só aparece o que tem dado). */
 export const conferirConjunto = (c: ConjuntoDesenho, p: PocoDoConjunto = {}): Conferencia[] => {
   const r: Conferencia[] = [];
@@ -54,7 +80,8 @@ export const conferirConjunto = (c: ConjuntoDesenho, p: PocoDoConjunto = {}): Co
   }
   const corda = num(c.cordaMetros);
   if (bomba && corda) r.push(corda < bomba ? { ok: false, texto: `Corda de ${fmt(corda)} m não chega à bomba a ${fmt(bomba)} m.` } : { ok: true, texto: `Corda de ${fmt(corda)} m segura a bomba.` });
-  if (bomba && !corda && c.bombaTipo !== 'SUPERFICIE') r.push({ ok: false, texto: 'Sem corda de segurança registrada.' });
+  // corda: só cobra no tubo que pede (soldado, PEAD, flexível); no de rosca com luva é opcional
+  if (bomba && !corda && c.bombaTipo !== 'SUPERFICIE' && precisaCorda(c.tuboMaterial)) r.push({ ok: false, texto: 'Tubo soldado/flexível sem corda de segurança registrada.' });
   const fundo = num(p.profundidadeM), nd = num(p.nivelDinamicoM);
   if (bomba && fundo && bomba > fundo) r.push({ ok: false, texto: `Bomba a ${fmt(bomba)} m, abaixo do fundo do poço (${fmt(fundo)} m): confira.` });
   else if (bomba && fundo && fundo - bomba < 2) r.push({ ok: false, texto: `Bomba a ${fmt(fundo - bomba)} m do fundo: risco de puxar areia.` });

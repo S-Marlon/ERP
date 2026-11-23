@@ -10,7 +10,7 @@ import {
 } from './obrasApi';
 import { reduzirImagem } from './ProcessoObra';
 import { CampoNumero } from '../../../shared/formularios/CamposNumero';
-import { conferirConjunto, PocoDoConjunto, svgConjunto, textoTubo } from './desenhoConjunto';
+import { conferirConjunto, PocoDoConjunto, precisaCorda, sugestoesTubo, svgConjunto, textoTubo } from './desenhoConjunto';
 
 const { Text } = Typography;
 const erro = (e: unknown) => message.error(e instanceof Error ? e.message : 'Erro.');
@@ -20,7 +20,8 @@ const num = (v: number | null) => (v === null ? '' : String(v).replace('.', ',')
 const BOMBA_VELHA_ANOS = 5;
 
 const opcoes = (l: string[]) => l.map(v => ({ value: v }));
-const MATERIAIS_TUBO = opcoes(['PVC geomecânico', 'Aço galvanizado', 'PEAD', 'Tubo flexível (Subteck/PEX)', 'Mangueira']);
+// (rosca) com luva aguenta o peso: corda opcional; (soldado), PEAD, flexível e mangueira pedem corda
+const MATERIAIS_TUBO = opcoes(['PVC geomecânico (rosca)', 'Aço galvanizado (rosca)', 'PVC irrigação (soldado)', 'PEAD', 'Tubo flexível (Subteck/PEX)', 'Mangueira']);
 const TENSOES = opcoes(['220 V mono', '220 V tri', '380 V tri', '127 V mono']);
 const FIOS = opcoes(['Cabo PP', 'Cabo plano', 'Paralelo']);
 const BITOLAS = opcoes(['3 x 1,5 mm²', '3 x 2,5 mm²', '3 x 4 mm²', '3 x 6 mm²', '4 x 4 mm²', '4 x 6 mm²']);
@@ -56,7 +57,12 @@ const TuboPorBarra: React.FC = () => {
   const form = Form.useFormInstance();
   const barras = Number(Form.useWatch('tuboBarras', form)) || 0;
   const metros = Number(Form.useWatch('tuboMetros', form)) || 0;
+  const profundidade = Number(Form.useWatch('profundidadeBombaM', form)) || 0;
   const [comprimento, setComprimento] = useState<number | null>(null);
+  // regra de 3 com a profundidade da bomba: falta as barras ou o comprimento, sugere
+  const sug = sugestoesTubo(profundidade, barras, comprimento);
+  const compPelaBomba = profundidade > 0 && barras > 0 && !comprimento ? Math.round((profundidade / barras) * 100) / 100 : null;
+  const link = (texto: string, acao: () => void) => <Button type="link" size="small" style={{ padding: 0, height: 'auto' }} onClick={acao}>{texto}</Button>;
   const r2 = (v: number) => Math.round(v * 100) / 100;
   // abrindo um conjunto salvo: o comprimento sai do total ÷ barras
   useEffect(() => { if (comprimento === null && barras > 0 && metros > 0) setComprimento(r2(metros / barras)); }, [barras, metros]);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -68,9 +74,24 @@ const TuboPorBarra: React.FC = () => {
   }, [barras, comprimento]);   // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <>
-      <Col xs={12} md={6}>{numero('Tubo: barras', 'tuboBarras')}</Col>
       <Col xs={12} md={6}>
-        <Form.Item label="Comprimento da barra" extra={barras > 0 && !comprimento ? <Text type="secondary" style={{ fontSize: 12 }}>vazio = 6 m (o comum)</Text> : null}>
+        <Form.Item label="Tubo: barras" name="tuboBarras"
+          extra={sug.barras || (!barras && profundidade > 0)
+            ? (() => {
+                const c = comprimento || 6;
+                const n = Math.ceil(profundidade / c - 1e-6);
+                const exata = Math.abs(profundidade / c - Math.round(profundidade / c)) < 1e-6;
+                return link(`${exata ? '' : '≈ '}${n} barras de ${String(c).replace('.', ',')} m (bomba a ${String(profundidade).replace('.', ',')} m)`, () => form.setFieldValue('tuboBarras', n));
+              })()
+            : null}>
+          <CampoNumero min={0} style={{ width: '100%' }} />
+        </Form.Item>
+      </Col>
+      <Col xs={12} md={6}>
+        <Form.Item label="Comprimento da barra"
+          extra={compPelaBomba && compPelaBomba !== 6
+            ? link(`usar ${String(compPelaBomba).replace('.', ',')} m (${String(profundidade).replace('.', ',')} m ÷ ${barras} barras)`, () => setComprimento(compPelaBomba))
+            : barras > 0 && !comprimento ? <Text type="secondary" style={{ fontSize: 12 }}>vazio = 6 m (o comum)</Text> : null}>
           <CampoNumero min={0} max={100} style={{ width: '100%' }} suffix="m" placeholder="6" value={comprimento ?? undefined}
             onChange={v => setComprimento(v === null || v === undefined ? null : Number(v))} />
         </Form.Item>
@@ -166,9 +187,16 @@ export const CamposConjunto: React.FC<{ comDataDeInstalacao?: boolean }> = ({ co
               <CampoNumero min={0} style={{ width: '100%' }} suffix="m" />
             </Form.Item>
           </Col>
-          <Col xs={12} md={16}>{texto('Corda', 'cordaMaterial', 'Corda de nylon 10 mm', CORDAS)}</Col>
+          <Col xs={12} md={16}>
+            <Form.Item label="Corda" name="cordaMaterial" normalize={x => (x ? x : null)}
+              extra={precisaCorda(v.tuboMaterial) === false ? <Text type="secondary" style={{ fontSize: 12 }}>Tubo de rosca com luva aguenta a bomba: corda opcional.</Text>
+                : precisaCorda(v.tuboMaterial) ? <Text type="warning" style={{ fontSize: 12 }}>Tubo soldado/flexível: use corda de segurança.</Text> : null}>
+              <AutoComplete options={CORDAS} placeholder="Corda de nylon 10 mm (opcional no tubo de rosca)" allowClear
+                filterOption={(t, o) => String(o?.value).toLowerCase().includes(t.toLowerCase())} />
+            </Form.Item>
+          </Col>
           <Col xs={12} md={8}>
-            <Form.Item label="Corda: metros" name="cordaMetros" extra={sugestao('cordaMetros', Math.ceil(bomba + 5), `sugerido ${Math.ceil(bomba + 5)} m (bomba + 5 m)`)}>
+            <Form.Item label="Corda: metros" name="cordaMetros" extra={precisaCorda(v.tuboMaterial) === false && !v.cordaMetros ? null : sugestao('cordaMetros', Math.ceil(bomba + 5), `sugerido ${Math.ceil(bomba + 5)} m (bomba + 5 m)`)}>
               <CampoNumero min={0} style={{ width: '100%' }} suffix="m" />
             </Form.Item>
           </Col>
