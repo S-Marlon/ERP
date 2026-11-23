@@ -1,6 +1,7 @@
 // Obras de poços › busca geral (cliente, poço e contrato num campo só) e ficha completa do poço (dados, proprietário,
 // contratos/obras do poço com o tipo do contrato, relatório e garantia). As regras ficam em busca.ts.
 import { Request, Response } from 'express';
+import { marcadas, ocorrenciasDoPoco } from './ocorrencias';
 import pool from '../../../infra/db';
 import { garantiaAte, lerServicos } from './obras';
 import { carregarPoco, formatarPoco, responderErro } from './obras.controller';
@@ -107,11 +108,16 @@ export const pocoCompleto = async (req: Request, res: Response) => {
     });
     const hoje = new Date().toISOString().slice(0, 10);
     const garantia = contratos.map((c: any) => c.garantiaAte).filter(Boolean).sort().pop() || null;
+    // Checklist marcado nos relatórios técnicos das obras do poço (problema que se repete = crônico)
+    const ocorrencias = ocorrenciasDoPoco(obras.map((o: any) => ({
+      codigos: marcadas(lerJson(o.dados_relatorio)), data: o.termino || o.inicio || o.criada || null, origem: o.titulo || `Obra ${o.id_obra}`,
+    })));
     return res.json({
       poco: formatarPoco(p),
       proprietario: dono ? { idCliente: Number(dono.id_cliente), nome: dono.nome, telefone: dono.telefone || null, documento: dono.documento || null,
         cidade: dono.cidade ? `${dono.cidade}${dono.uf ? `/${dono.uf}` : ''}` : null } : null,
       contratos,
+      ocorrencias,
       resumo: { contratos: contratos.length, garantiaAte: garantia, emGarantia: !!garantia && garantia >= hoje, sensores: n(iot?.q) > 0 },
       // bomba instalada agora (a ficha mostra numa linha; o detalhe fica na aba "Bomba e instalação")
       conjunto: conj ? { resumo: resumoConjunto(conjuntoDaLinha(conj)), anosDeUso: idadeEmAnos(conj.instalado_txt || null, hoje) } : null,

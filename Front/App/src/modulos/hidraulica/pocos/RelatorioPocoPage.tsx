@@ -9,9 +9,10 @@ import {
 } from '@ant-design/icons';
 import { RelatorioDaObra, useRelatorioPoco } from './useRelatorioPoco';
 import {
-  ANOMALIAS, brl, calcularFinanceiro, dataGarantia, FORMAS_PAGAMENTO, OCORRENCIAS_OBRA, progresso, resumoTeste, SecaoId, TEXTO_GARANTIA_PADRAO,
+  ANOMALIAS, brl, calcularFinanceiro, dataGarantia, FORMAS_PAGAMENTO, progresso, resumoTeste, SecaoId, TEXTO_GARANTIA_PADRAO,
 } from './relatorioPoco';
 import { MODELOS, ModeloId } from './templatesPoco';
+import { GRUPOS_OCORRENCIA, GrupoOcorrencia, itensDosGrupos } from './ocorrencias';
 import { mascaraCep, mascaraCnpj, mascaraCpfCnpj, mascaraTelefone, UFS } from '../../../shared/formularios/documentos';
 import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
 import { FORMATOS_DATA } from '../../../shared/formularios/numeros';
@@ -134,6 +135,22 @@ export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: R
       <Col xs={24} sm={12} md={8} key={k}><Form.Item name={k} valuePropName="checked" style={{ margin: 0 }}><Checkbox>{t}</Checkbox></Form.Item></Col>
     ))}</Row>
   );
+  // Checklist por grupo, com a contagem de marcados no título
+  const grupos = (titulo: string, lista: GrupoOcorrencia[]) => (
+    <Card size="small" title={titulo} styles={{ body: { padding: '8px 12px' } }}>
+      <Flex vertical gap={8}>{lista.map(g => {
+        const itens = itensDosGrupos(g);
+        const quantos = itens.filter(([k]) => valores[k]).length;
+        return (
+          <div key={g}>
+            <Text strong style={{ fontSize: 12 }}>{GRUPOS_OCORRENCIA[g].titulo}</Text>
+            {quantos > 0 && <Tag color="red" style={{ marginLeft: 6, fontSize: 10 }}>{quantos} marcada{quantos > 1 ? 's' : ''}</Tag>}
+            {checks(itens)}
+          </div>
+        );
+      })}</Flex>
+    </Card>
+  );
 
   const secoes = [
     {
@@ -205,7 +222,10 @@ export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: R
             <Col xs={24} xl={10}><Card size="small" title="Etapas de perfuração">{camadas('perfuracoes')}</Card></Col>
             <Col xs={24} xl={14}><Card size="small" title="Revestimento">{camadas('revestimentos')}</Card></Col>
           </Row>
-          <div><Text type="secondary" style={{ fontSize: 12 }}>Ocorrências na obra</Text>{checks(OCORRENCIAS_OBRA)}</div>
+          {grupos('Ocorrências na obra (checklist)', ['PERFURACAO', 'LOCAL'])}
+          <Form.Item label="Outras ocorrências na obra" name="obsOcorrencias" style={{ marginBottom: 0 }}>
+            <TextArea autoSize={{ minRows: 1, maxRows: 4 }} placeholder="O que não está na lista: o que aconteceu, a profundidade, o que foi feito..." />
+          </Form.Item>
           <Row gutter={12}>
             <Col xs={24} md={12}><Form.Item label="Equipe / sonda" name="equipePerfuracao"><Input /></Form.Item></Col>
             <Col xs={24} md={12}><Form.Item label="Responsável técnico" name="respNomePerf"><Input placeholder="Nome e registro (CREA/CFT)" /></Form.Item></Col>
@@ -218,7 +238,7 @@ export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: R
       key: 'diagnostico', label: cabecalho(<ExperimentOutlined style={{ color: '#08979c' }} />, 'Diagnóstico técnico', 'diagnostico', 'diagnostico'),
       children: (
         <Flex vertical gap={12}>
-          <div><Text type="secondary" style={{ fontSize: 12 }}>Anomalias encontradas (as marcadas saem em destaque)</Text>{checks(ANOMALIAS)}</div>
+          {grupos('Anomalias encontradas (checklist; só as marcadas saem na impressão)', ['AGUA', 'POCO', 'BOMBA'])}
           <Row gutter={12}>
             <Col xs={12} md={6}><Form.Item label="Amperagem (leitura)" name="manutAmperagem"><CampoNumero min={0} style={{ width: '100%' }} suffix="A" /></Form.Item></Col>
             <Col xs={12} md={6}><Form.Item label="Isolamento (megômetro)" name="manutMegometro"><CampoNumero min={0} style={{ width: '100%' }} suffix="MΩ" /></Form.Item></Col>

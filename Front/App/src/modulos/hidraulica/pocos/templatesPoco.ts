@@ -1,8 +1,9 @@
 // Modelos de impressão do módulo Poços: relatório completo (várias páginas), cobrança, teste de vazão,
 // certificado de garantia e formulário de campo em branco. Mesmo cabeçalho (empresa) e estilo em todos.
 import dayjs, { Dayjs } from 'dayjs';
+import { GRUPOS_OCORRENCIA, GrupoOcorrencia, itensDosGrupos } from './ocorrencias';
 import {
-  ANOMALIAS, brl, calcularFinanceiro, com, Dados, data, dataGarantia, Empresa, escapar, Leitura, num, OCORRENCIAS_OBRA, profundidadeFinal,
+  brl, calcularFinanceiro, com, Dados, data, dataGarantia, Empresa, escapar, Leitura, num, profundidadeFinal,
   resumoTeste, SecaoId, TEXTO_GARANTIA_PADRAO, vazao, vazio,
 } from './relatorioPoco';
 
@@ -160,8 +161,16 @@ const completo = (d: Dados, op: OpcoesModelo, b: boolean) => {
   const rev: Dados[] = b ? [{}, {}, {}] : (d.revestimentos || []).filter((r: Dados) => !vazio(r?.revAte) || !vazio(r?.revDiam) || !vazio(r?.revMaterial));
   const v = (x: string) => (b ? '' : x);
   const vazia = (cols: number, msg: string) => `<tr><td colspan="${cols}" style="text-align:center;color:#718096">${msg}</td></tr>`;
-  const marca = (ligado: boolean) => (b ? '<span class="marca"></span>sim <span class="marca"></span>não' : `<span class="marca">${ligado ? '✓' : ''}</span>`);
+  // Checklist: no formulário em branco, uma caixa por item para marcar o que aconteceu
+  const marca = (ligado: boolean) => `<span class="marca">${!b && ligado ? '✓' : ''}</span>`;
   const lista = (itens: Array<[string, string]>) => `<div class="anomalias">${itens.map(([k, t]) => `<span class="anomalia ${!b && d[k] ? 'sim' : ''}">${marca(!!d[k])} ${escapar(t)}</span>`).join('')}</div>`;
+  // Checklist por grupo: em branco, todas as caixas para marcar à mão; preenchido, só as marcadas (ou "nenhuma")
+  const checklist = (grupos: GrupoOcorrencia[], vazio: string) => {
+    if (b) return `<div class="label" style="text-transform:none">Marque o que aconteceu:</div>` + grupos.map(g => `<div class="label">${escapar(GRUPOS_OCORRENCIA[g].titulo)}</div>${lista(itensDosGrupos(g))}`).join('');
+    const partes = grupos.map(g => ({ g, itens: itensDosGrupos(g).filter(([k]) => d[k]) })).filter(x => x.itens.length);
+    if (!partes.length) return `<div class="anomalias"><span class="anomalia">${escapar(vazio)}</span></div>`;
+    return partes.map(x => `<div class="label">${escapar(GRUPOS_OCORRENCIA[x.g].titulo)}</div>${lista(x.itens)}`).join('');
+  };
   const tubos = !b && (d.bombaQtdTubos || d.bombaTamTubo)
     ? `${num(d.bombaQtdTubos) || 0} barra(s) de ${num(d.bombaTamTubo) || 0} m${d.bombaMedidaTubo ? ` · ${d.bombaMedidaTubo}${d.bombaTuboUnidade || '"'}` : ''}${d.bombaTubulacao ? ` · ${d.bombaTubulacao}` : ''}`
     : '';
@@ -188,13 +197,14 @@ const completo = (d: Dados, op: OpcoesModelo, b: boolean) => {
     <div class="c6"><div class="label">Revestimento</div><table><thead><tr><th>De (m)</th><th>Até (m)</th><th>Diâmetro</th><th>Material</th><th>União</th></tr></thead><tbody>
       ${rev.map(r => `<tr><td>${v(num(r.revDe))}</td><td>${v(num(r.revAte))}</td><td>${v(com(r.revDiam, r.revDiamUnidade || '"'))}</td><td>${v(escapar(r.revMaterial || ''))}</td><td>${v(escapar(r.revUniao || ''))}</td></tr>`).join('') || vazia(5, 'Nenhum revestimento registrado')}
     </tbody></table></div>
-    <div class="c12"><div class="label">Ocorrências na obra</div>${lista(OCORRENCIAS_OBRA)}</div>
+    <div class="c12"><div class="label">Ocorrências na obra</div>${checklist(['PERFURACAO', 'LOCAL'], 'Nenhuma ocorrência na obra.')}</div>
+    ${comMarca('Outras ocorrências na obra', 'obsOcorrencias')}
     ${f('c4', 'Equipe / sonda', d.equipePerfuracao)}${f('c4', 'Responsável técnico', d.respNomePerf)}
     ${comMarca('Observações geológicas', 'obsGeraisPerfuracao')}
   </div></div>` : ''}
 
   ${s.diagnostico ? `<div class="section"><div class="section-title">Diagnóstico técnico</div>
-    ${lista(ANOMALIAS)}
+    ${checklist(['AGUA', 'POCO', 'BOMBA'], 'Nenhuma anomalia encontrada.')}
     <div class="grid">
       ${f('c3', 'Amperagem (leitura)', com(d.manutAmperagem, ' A'))}${f('c3', 'Isolamento (megômetro)', com(d.manutMegometro, ' MΩ'))}
       ${f('c3', 'Limpeza química', ({ '6_meses': 'A cada 6 meses', '12_meses': 'Anual' } as Record<string, string>)[d.manutPeriodicidadeLimpeza] || d.manutPeriodicidadeLimpeza || '')}

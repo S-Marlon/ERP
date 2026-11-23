@@ -4,13 +4,14 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, Button, Col, Descriptions, Drawer, Empty, Row, Space, Statistic, Table, Tabs, Tag, Tooltip, Typography, message } from 'antd';
 import {
-  CopyOutlined, EditOutlined, EnvironmentOutlined, FileTextOutlined, FolderOpenOutlined, GlobalOutlined, ToolOutlined, UserOutlined, WhatsAppOutlined,
+  CopyOutlined, EditOutlined, EnvironmentOutlined, FileTextOutlined, FolderOpenOutlined, GlobalOutlined, ToolOutlined, UserOutlined, WarningOutlined, WhatsAppOutlined,
 } from '@ant-design/icons';
 import { dataBr, foneBr, obrasApi, PocoCompleto, SERVICOS, SITUACOES_OBRA, TIPOS_CONTRATO } from './obrasApi';
 import { abrirFichaCliente, abrirObra, abrirPoco, documentosDaObra, fichasPocos, useFichaPocos, verNoMapa } from './navPocos';
 import { HistoricoDoPoco } from './ManutencaoPocos';
 import { ClienteFicha } from './ClientesPoco';
 import { ConjuntoPoco } from './ConjuntoPoco';
+import { GRUPOS_OCORRENCIA } from './ocorrencias';
 
 const { Text } = Typography;
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -142,6 +143,19 @@ export const FichaPoco: React.FC<{ idPoco: number | null; aba?: string; onFechar
               ? <a onClick={() => setAba('BOMBA')}>{d.conjunto.resumo}{d.conjunto.anosDeUso !== null ? ` · ${d.conjunto.anosDeUso < 1 ? 'menos de 1 ano' : `${d.conjunto.anosDeUso} ano(s)`} de uso` : ''}</a>
               : <a onClick={() => setAba('BOMBA')}>bomba não registrada</a>}</Text>
             {!gps && <Alert type="warning" showIcon message="Poço sem GPS: em Editar dados, cole a localização (ex.: do WhatsApp ou do Google Maps) para ele aparecer no mapa." />}
+            {/* Ocorrências do checklist dos relatórios: o que já deu problema neste poço (o que se repete fica em destaque) */}
+            {!!d.ocorrencias?.length && (
+              <div>
+                <Text type="secondary" style={{ fontSize: 12 }}><WarningOutlined /> Ocorrências registradas nos relatórios:</Text>
+                <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {d.ocorrencias.map(o => (
+                    <Tooltip key={o.codigo} title={`${GRUPOS_OCORRENCIA[o.grupo]?.titulo || ''} · ${o.vezes > 1 ? `${o.vezes} vezes, a última` : 'marcada'} em ${o.ultimaVez ? dataBr(o.ultimaVez) : 'data não informada'} (${o.origem})`}>
+                      <Tag color={o.vezes > 1 ? 'red' : GRUPOS_OCORRENCIA[o.grupo]?.cor} style={{ margin: 0 }}>{o.rotulo}{o.vezes > 1 ? ` ×${o.vezes}` : ''}</Tag>
+                    </Tooltip>
+                  ))}
+                </div>
+              </div>
+            )}
           </Space>
           <Tabs activeKey={aba} onChange={setAba} items={abas} />
         </>

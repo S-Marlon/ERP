@@ -1,6 +1,7 @@
 // API do módulo Obras de poços (/api/modulos/hidraulica/pocos): obras, poços, clientes de poço, o mapa regional e a
 // cobrança das obras (sinal, adicionais, parcelas e recebimentos), os materiais (cadastro do módulo e de cada obra) e a
 // agenda (equipe e equipamentos do módulo).
+import type { GrupoOcorrencia } from './ocorrencias';
 import { API_URL } from '../../../shared/api/config';
 import type { Dados } from './relatorioPoco';
 
@@ -560,6 +561,8 @@ export interface PocoCompleto {
     temRelatorio: boolean; garantiaAte: string | null;
   }[];
   resumo: { contratos: number; garantiaAte: string | null; emGarantia: boolean; sensores: boolean };
+  /** Checklist marcado nos relatórios das obras do poço: quantas vezes, a última data e onde. */
+  ocorrencias?: Array<{ codigo: string; rotulo: string; grupo: GrupoOcorrencia; vezes: number; ultimaVez: string | null; origem: string }>;
   /** Bomba instalada agora, numa linha. */
   conjunto?: { resumo: string; anosDeUso: number | null } | null;
 }

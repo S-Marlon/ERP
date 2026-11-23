@@ -1,6 +1,7 @@
 // Módulo Poços (HIDRAULICA_POCOS): regras puras, sem banco. Os dados vivem no navegador (rascunho) e em arquivo XML;
 // os modelos de impressão estão em templatesPoco.ts.
 import dayjs, { Dayjs } from 'dayjs';
+import { itensDosGrupos } from './ocorrencias';
 
 export type Dados = Record<string, any>;
 
@@ -32,13 +33,9 @@ export const CAMPOS_DATA = ['dtLimpeza', 'dtInicio', 'dtTermino', 'bombaDtInstal
 // Datas dentro das listas
 export const LISTAS_DATA: Record<string, string[]> = { finPagamentos: ['data'] };
 
-export const ANOMALIAS: Array<[string, string]> = [
-  ['chkReducaoVazao', 'Queda de vazão'], ['chkPresencaFerro', 'Água vermelha / ferro'], ['chkAguaNaoLimpou', 'Água turva / areia'],
-  ['chkLajeInfiltracao', 'Risco de infiltração na laje'], ['chkEnergiaRuim', 'Oscilação de energia'], ['chkAquecimentoBomba', 'Superaquecimento do motor'],
-];
-export const OCORRENCIAS_OBRA: Array<[string, string]> = [
-  ['chkCaimento', 'Caimento / desmoronamento'], ['chkEstruturas', 'Interferência com estruturas subterrâneas'],
-];
+// Checklist (catálogo em ocorrencias.ts): o diagnóstico tem água, poço e bomba/elétrica; a obra, perfuração e local
+export const ANOMALIAS: Array<[string, string]> = itensDosGrupos('AGUA', 'POCO', 'BOMBA');
+export const OCORRENCIAS_OBRA: Array<[string, string]> = itensDosGrupos('PERFURACAO', 'LOCAL');
 export const FORMAS_PAGAMENTO = ['PIX', 'Dinheiro', 'Transferência', 'Boleto', 'Cartão', 'Cheque'];
 
 export const VALORES_INICIAIS: Dados = {
