@@ -5,7 +5,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Button, Card, Checkbox, Col, Descriptions, Empty, Flex, Form, Input, Modal, Popconfirm, Row, Segmented, Select, Space, Statistic, Steps, Switch, Table, Tag, Tooltip, Typography, message } from 'antd';
 import {
   AimOutlined, ArrowRightOutlined, CalculatorOutlined, CalendarOutlined, CheckCircleOutlined, EditOutlined, EnvironmentOutlined, PlusOutlined, ReloadOutlined,
-  ToolOutlined, UserOutlined,
+  ColumnHeightOutlined, ThunderboltOutlined, ToolOutlined, UserOutlined,
 } from '@ant-design/icons';
 import {
   centralApi, ConjuntoForm, ContratoCentral, contarObras, dataBr, FechamentoContrato, foneBr, GRAVIDADES, Obra, ObraForm, obrasApi, Poco, PocoForm, Servico, SERVICOS, SituacaoObra, SITUACOES_OBRA,
@@ -14,7 +14,12 @@ import RelatorioPocoPage from './RelatorioPocoPage';
 import { CampoCep, CampoUf } from '../../../shared/formularios/Campos';
 import { ClientePocoModal, ListaClientes } from './ClientesPoco';
 import { FechamentoModal } from './FechamentoContrato';
-import { CamposConjunto } from './ConjuntoPoco';
+import { Bloco, CamposConjunto } from './ConjuntoPoco';
+import { conferirConjunto, svgConjunto } from './desenhoConjunto';
+import { svgPerfil } from './estruturaPoco';
+import { diametroEmNumero } from './materiaisPoco';
+import { CampoData } from '../../../shared/formularios/CamposNumero';
+import dayjs from 'dayjs';
 import { AReceberObras, CobrancaDaObra } from './CobrancaObra';
 import { CadastroMateriais, MateriaisDaObra } from './MateriaisObra';
 import { HistoricoDoPoco } from './ManutencaoPocos';
@@ -47,7 +52,7 @@ const CamposLocal: React.FC<{ p: Partial<PocoForm>; mudar: (x: Partial<PocoForm>
     () => message.warning('Não deu para pegar a localização deste aparelho.'),
   );
   return (
-    <Row gutter={8}>
+    <Row gutter={[10, 8]}>
       <Col span={14}><Text>Endereço</Text><Input value={p.endereco || ''} onChange={e => mudar({ endereco: e.target.value || null })} placeholder="Estrada Municipal, km 4" /></Col>
       <Col span={10}><Text>Bairro</Text><Input value={p.bairro || ''} onChange={e => mudar({ bairro: e.target.value || null })} /></Col>
       <Col span={8}><Text>Cidade</Text><Input value={p.cidade || ''} onChange={e => mudar({ cidade: e.target.value || null })} /></Col>
@@ -83,6 +88,15 @@ const PocoModal: React.FC<{ poco: Poco | 'novo' | null; onFechar: () => void; on
     setCliente(poco.idProprietario ? { id: poco.idProprietario, nome: poco.proprietario || '' } : null);
   }, [poco]);
   const mudar = (x: Partial<PocoForm>) => setP(a => ({ ...a, ...x }));
+  // prévia: o poço pelo cadastro (profundidade, diâmetro e níveis) e, com a motobomba, o conjunto
+  const bombaValores: Partial<ConjuntoForm> = Form.useWatch([], formBomba) || {};
+  const niveis = { profundidadeM: p.profundidadeM, nivelEstaticoM: p.nivelEstaticoM, nivelDinamicoM: p.nivelDinamicoM };
+  const diam = diametroEmNumero(p.diametro);
+  const pocoDesenho = Number(p.profundidadeM) > 0 ? {
+    perfuracoes: [{ perfDe: 0, perfAte: p.profundidadeM, perfDiam: diam?.valor, perfDiamUnidade: diam?.unidade || '"' }], revestimentos: [], revestimentoDesconhecido: true,
+    bombaNivelEstatico: p.nivelEstaticoM, bombaNivelDinamico: p.nivelDinamicoM,
+  } : null;
+  const novo = poco === 'novo';
   const num = (k: 'profundidadeM' | 'vazaoLh' | 'nivelEstaticoM' | 'nivelDinamicoM', suf: string) => (
     <CampoNumero min={0} style={{ width: '100%' }} suffix={suf} value={p[k] ?? undefined} onChange={v => mudar({ [k]: v === null ? null : Number(v) } as any)} />
   );
@@ -99,66 +113,98 @@ const PocoModal: React.FC<{ poco: Poco | 'novo' | null; onFechar: () => void; on
   };
   return (
     <Modal open={!!poco} title={poco === 'novo' ? 'Novo poço' : `Poço · ${poco && poco.identificacao}`} okText="Salvar" cancelText="Voltar" onOk={salvar} onCancel={onFechar}
-      width={parte === 'HISTORICO' ? 900 : 720} okButtonProps={{ style: parte === 'HISTORICO' ? { display: 'none' } : undefined }} destroyOnHidden>
+      width={parte === 'HISTORICO' ? 900 : 'min(1180px, 96vw)'} okButtonProps={{ style: parte === 'HISTORICO' ? { display: 'none' } : undefined }} destroyOnHidden
+      styles={{ body: { maxHeight: '78vh', overflowY: 'auto', paddingRight: 8 } }}>
       {poco && poco !== 'novo' && (
         <Segmented style={{ marginBottom: 10 }} value={parte} onChange={v => setParte(v as 'FICHA' | 'HISTORICO')}
           options={[{ value: 'FICHA', label: 'Ficha' }, { value: 'HISTORICO', label: 'Histórico e manutenção' }]} />
       )}
       {parte === 'HISTORICO' && poco && poco !== 'novo' ? <HistoricoDoPoco idPoco={poco.idPoco} onAbrirObra={onFechar} /> : (
-      <Space direction="vertical" style={{ width: '100%' }} size={10}>
-        {poco && poco !== 'novo' && (poco.latitude !== null || poco.idProprietario) && (
-          <Space wrap>
-            {poco.latitude !== null && poco.longitude !== null && (
-              <Button size="small" icon={<EnvironmentOutlined />} onClick={() => { onFechar(); verNoMapa(poco.latitude!, poco.longitude!, poco.idPoco); }}>Ver no mapa</Button>
+      <Row gutter={16}>
+        <Col xs={24} lg={15}>
+          <Flex vertical gap={10}>
+            {poco && poco !== 'novo' && (
+              <Space wrap>
+                {poco.latitude !== null && poco.longitude !== null && (
+                  <Button size="small" icon={<EnvironmentOutlined />} onClick={() => { onFechar(); verNoMapa(poco.latitude!, poco.longitude!, poco.idPoco); }}>Ver no mapa</Button>
+                )}
+                {poco.idProprietario && <Button size="small" icon={<UserOutlined />} onClick={() => { onFechar(); abrirFichaCliente(poco.idProprietario!); }}>Ficha do cliente</Button>}
+                <Button size="small" icon={<ToolOutlined />} onClick={() => { onFechar(); abrirFichaPoco(poco.idPoco, 'BOMBA'); }}>Motobomba e fotos do poço</Button>
+              </Space>
             )}
-            {poco.idProprietario && <Button size="small" icon={<UserOutlined />} onClick={() => { onFechar(); abrirFichaCliente(poco.idProprietario!); }}>Ficha do cliente</Button>}
-          </Space>
-        )}
-        {poco && poco !== 'novo' && (
-          <Button size="small" icon={<ToolOutlined />} onClick={() => { onFechar(); abrirFichaPoco(poco.idPoco, 'BOMBA'); }}>Motobomba e fotos do poço</Button>
-        )}
-        <Row gutter={8}>
-          <Col span={14}><Text>Identificação</Text><Input maxLength={100} value={p.identificacao} onChange={e => mudar({ identificacao: e.target.value })}
-            placeholder={cliente ? `Vazio = "Poço de ${cliente.nome}"` : p.cidade || p.bairro ? `Vazio = "Poço (${p.cidade || p.bairro}) #1"` : 'Vazio = "Poço (cidade) #1"'} /></Col>
-          <Col span={10}>
-            <Text>Proprietário</Text>
-            <Button block icon={<UserOutlined />} onClick={() => setEscolhendo(true)}>{cliente?.nome || 'Escolher no cadastro'}</Button>
-          </Col>
-        </Row>
-        <CamposLocal p={p} mudar={mudar} />
-        <Row gutter={8}>
-          <Col span={6}><Text>Profundidade</Text>{num('profundidadeM', 'm')}</Col>
-          <Col span={6}><Text>Vazão</Text>{num('vazaoLh', 'L/h')}</Col>
-          <Col span={6}><Text>Nível estático</Text>{num('nivelEstaticoM', 'm')}</Col>
-          <Col span={6}><Text>Nível dinâmico</Text>{num('nivelDinamicoM', 'm')}</Col>
-        </Row>
-        <Row gutter={8}>
-          <Col span={6}><Text>Diâmetro</Text><Input value={p.diametro || ''} placeholder='6"' onChange={e => mudar({ diametro: e.target.value || null })} /></Col>
-          <Col span={6}><Text>Solo</Text><Input value={p.tipoSolo || ''} onChange={e => mudar({ tipoSolo: e.target.value || null })} /></Col>
-          <Col span={6}><Text>Perfurado em</Text><Input type="date" value={p.dataPerfuracao || ''} onChange={e => mudar({ dataPerfuracao: e.target.value || null })} /></Col>
-          <Col span={6}><Text>Situação</Text>
-            <Select style={{ width: '100%' }} value={p.situacao} onChange={situacao => mudar({ situacao })}
-              options={[{ value: 'ATIVO', label: 'Ativo' }, { value: 'SECO', label: 'Seco' }, { value: 'DESATIVADO', label: 'Desativado' }]} />
-          </Col>
-        </Row>
-        <Row gutter={8}>
-          <Col span={8}><Text>Quem perfurou</Text>
-            <Select style={{ width: '100%' }} value={p.perfuradoPor} onChange={perfuradoPor => mudar({ perfuradoPor })}
-              options={[{ value: 'NOS', label: 'Nós' }, { value: 'TERCEIRO', label: 'Outra empresa' }, { value: 'DESCONHECIDO', label: 'Não sei' }]} />
-          </Col>
-          {p.perfuradoPor === 'TERCEIRO' && <Col span={16}><Text>Empresa que perfurou</Text><Input value={p.perfuradoPorNome || ''} onChange={e => mudar({ perfuradoPorNome: e.target.value || null })} /></Col>}
-        </Row>
-        {poco === 'novo' && (
-          <Card size="small" title={<Space><ToolOutlined />Motobomba instalada</Space>}
-            extra={<Switch size="small" checked={comBomba} onChange={setComBomba} checkedChildren="informar" unCheckedChildren="não sei agora" />}>
-            {comBomba ? (
-              <Form form={formBomba} layout="vertical" size="small" initialValues={{ bombaTipo: 'SUBMERSA' }}>
-                <CamposConjunto comDataDeInstalacao />
-              </Form>
-            ) : <Text type="secondary">Bomba, motor/bombeador, tubo, fio, corda, quadro e cabeça do poço. Dá para informar depois na ficha do poço.</Text>}
-          </Card>
-        )}
-      </Space>
+
+            <Bloco icone={<UserOutlined />} titulo="Identificação e proprietário" cor="#006d77">
+              <Row gutter={[10, 8]} style={{ marginBottom: 8 }}>
+                <Col xs={24} md={14}><Text>Identificação</Text><Input maxLength={100} value={p.identificacao} onChange={e => mudar({ identificacao: e.target.value })}
+                  placeholder={cliente ? `Vazio = "Poço de ${cliente.nome}"` : p.cidade || p.bairro ? `Vazio = "Poço (${p.cidade || p.bairro}) #1"` : 'Vazio = "Poço (cidade) #1"'} /></Col>
+                <Col xs={24} md={10}><Text>Proprietário</Text>
+                  <Button block icon={<UserOutlined />} onClick={() => setEscolhendo(true)}>{cliente?.nome || 'Escolher no cadastro'}</Button>
+                </Col>
+                <Col span={24}><Text>Situação</Text>
+                  <Segmented block value={p.situacao} onChange={situacao => mudar({ situacao: situacao as PocoForm['situacao'] })}
+                    options={[{ value: 'ATIVO', label: 'Ativo' }, { value: 'SECO', label: 'Seco' }, { value: 'DESATIVADO', label: 'Desativado' }]} />
+                </Col>
+              </Row>
+            </Bloco>
+
+            <Bloco icone={<EnvironmentOutlined />} titulo="Localização" cor="#13a8a8">
+              <div style={{ marginBottom: 8 }}><CamposLocal p={p} mudar={mudar} /></div>
+            </Bloco>
+
+            <Bloco icone={<ColumnHeightOutlined />} titulo="Dados do poço" cor="#722ed1">
+              <Row gutter={[10, 8]} style={{ marginBottom: 8 }}>
+                <Col xs={12} md={6}><Text>Profundidade</Text>{num('profundidadeM', 'm')}</Col>
+                <Col xs={12} md={6}><Text>Diâmetro</Text><Input value={p.diametro || ''} placeholder='6"' onChange={e => mudar({ diametro: e.target.value || null })} /></Col>
+                <Col xs={12} md={6}><Text>Vazão</Text>{num('vazaoLh', 'L/h')}</Col>
+                <Col xs={12} md={6}><Text>Solo</Text><Input value={p.tipoSolo || ''} placeholder="Rocha, argila..." onChange={e => mudar({ tipoSolo: e.target.value || null })} /></Col>
+                <Col xs={12} md={6}><Text>Nível estático</Text>{num('nivelEstaticoM', 'm')}</Col>
+                <Col xs={12} md={6}><Text>Nível dinâmico</Text>{num('nivelDinamicoM', 'm')}</Col>
+                <Col xs={12} md={12}><Text>Perfurado em</Text>
+                  <CampoData style={{ width: '100%' }} value={p.dataPerfuracao ? dayjs(p.dataPerfuracao) : null}
+                    disabledDate={d => d.isAfter(dayjs(), 'day')}
+                    onChange={d => { const x = Array.isArray(d) ? d[0] : d; mudar({ dataPerfuracao: x ? x.format('YYYY-MM-DD') : null }); }} />
+                </Col>
+                <Col span={24}><Text>Quem perfurou</Text>
+                  <Segmented block value={p.perfuradoPor} onChange={perfuradoPor => mudar({ perfuradoPor: perfuradoPor as PocoForm['perfuradoPor'] })}
+                    options={[{ value: 'NOS', label: 'Nós' }, { value: 'TERCEIRO', label: 'Outra empresa' }, { value: 'DESCONHECIDO', label: 'Não sei' }]} />
+                </Col>
+                {p.perfuradoPor === 'TERCEIRO' && <Col span={24}><Text>Empresa que perfurou</Text><Input value={p.perfuradoPorNome || ''} onChange={e => mudar({ perfuradoPorNome: e.target.value || null })} /></Col>}
+              </Row>
+            </Bloco>
+
+            {novo && (
+              <Bloco icone={<ThunderboltOutlined />} titulo="Motobomba instalada" cor="#2f54eb"
+                extra={<Switch size="small" checked={comBomba} onChange={setComBomba} checkedChildren="informar" unCheckedChildren="não sei agora" />}>
+                {comBomba ? (
+                  <Form form={formBomba} layout="vertical" initialValues={{ bombaTipo: 'SUBMERSA' }} style={{ marginBottom: 8 }}>
+                    <CamposConjunto comDataDeInstalacao />
+                  </Form>
+                ) : <Text type="secondary" style={{ display: 'block', marginBottom: 10 }}>Bomba, tubo (barras), fio, corda, quadro e cabeça do poço. Dá para informar depois na ficha do poço › Bomba e instalação.</Text>}
+              </Bloco>
+            )}
+          </Flex>
+        </Col>
+        <Col xs={24} lg={9}>
+          {/* o desenho acompanha o que está sendo preenchido */}
+          <div style={{ position: 'sticky', top: 0 }}>
+            <Card size="small" title="Como fica">
+              {novo && comBomba ? (
+                <>
+                  <div style={{ overflowX: 'auto' }} dangerouslySetInnerHTML={{ __html: svgConjunto(bombaValores, niveis, { altura: 440, largura: 420 }) }} />
+                  <ul style={{ paddingLeft: 18, margin: '6px 0 0', fontSize: 12 }}>
+                    {conferirConjunto(bombaValores, niveis).map(x => <li key={x.texto} style={{ color: x.ok ? undefined : '#d46b08' }}>{x.ok ? '✓ ' : '⚠ '}{x.texto}</li>)}
+                  </ul>
+                </>
+              ) : pocoDesenho ? (
+                <>
+                  <div style={{ overflowX: 'auto' }} dangerouslySetInnerHTML={{ __html: svgPerfil(pocoDesenho, { altura: 420, largura: 420 }) }} />
+                  <Text type="secondary" style={{ fontSize: 12 }}>Desenho pelo cadastro. O revestimento e o perfil geológico entram em ficha › Estrutura.</Text>
+                </>
+              ) : <Text type="secondary">Informe a profundidade (e o diâmetro) para ver o desenho do poço.</Text>}
+            </Card>
+          </div>
+        </Col>
+      </Row>
       )}
       <ClientePocoModal open={escolhendo} onFechar={() => setEscolhendo(false)}
         onSelecionar={c => { setEscolhendo(false); setCliente({ id: c.idCliente, nome: c.nome }); }} />

@@ -112,7 +112,7 @@ const TuboPorBarra: React.FC = () => {
 };
 
 /** Bloco do formulário do conjunto: borda colorida, ícone e título (Bomba, Tubo, Fio e corda, Superfície). */
-const Bloco: React.FC<{ icone: React.ReactNode; titulo: string; cor: string; extra?: React.ReactNode; children: React.ReactNode }> = ({ icone, titulo, cor, extra, children }) => {
+export const Bloco: React.FC<{ icone: React.ReactNode; titulo: string; cor: string; extra?: React.ReactNode; children: React.ReactNode }> = ({ icone, titulo, cor, extra, children }) => {
   const { token } = theme.useToken();
   return (
     <div style={{ border: `1px solid ${token.colorBorderSecondary}`, borderLeft: `3px solid ${cor}`, borderRadius: token.borderRadiusLG, padding: '10px 12px 2px', background: token.colorBgContainer }}>
