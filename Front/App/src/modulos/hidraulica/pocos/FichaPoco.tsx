@@ -119,7 +119,11 @@ export const FichaPoco: React.FC<{ idPoco: number | null; aba?: string; onFechar
           <Col xs={24} lg={12}>
             <Text strong>Como o poço é por dentro</Text>
             <ul style={{ paddingLeft: 18, marginTop: 6 }}>{resumoEstrutura(d.estrutura).map(l => <li key={l} style={{ marginBottom: 4 }}>{l}</li>)}</ul>
-            <Text type="secondary" style={{ fontSize: 12 }}>Montado com os relatórios técnicos das obras deste poço (perfuração, complementos, troca de bomba). Para corrigir, edite o relatório da obra.</Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {d.estrutura.soCadastro
+                ? 'Desenho básico pelo cadastro do poço (profundidade e diâmetro). O detalhe (revestimento, perfil geológico) vem do relatório técnico da obra.'
+                : 'Montado com os relatórios técnicos das obras deste poço (perfuração, complementos, troca de bomba) e, no que faltar, o cadastro. Para corrigir, edite o relatório da obra.'}
+            </Text>
           </Col>
         </Row>
       ) : <Empty description="Ainda sem estrutura: preencha a perfuração e o revestimento no relatório técnico da obra do poço." />,

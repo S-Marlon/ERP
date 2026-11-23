@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { estruturaDasObras } from './estrutura';
+import { diametroDoTexto, estruturaDasObras, estruturaDoPoco } from './estrutura';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -26,4 +26,18 @@ teste('estrutura do poço: uma obra só não marca a origem; sem dados = null', 
   assert.strictEqual(e.revestimentos[0].origem, undefined);
   assert.strictEqual(estruturaDasObras([{ origem: 'Obra 1', data: null, dados: { cliente: 'x' } }]), null);
   assert.strictEqual(estruturaDasObras([]), null);
+});
+
+teste('estrutura do poço: sem relatório, o cadastro (profundidade e diâmetro)', () => {
+  assert.deepStrictEqual(diametroDoTexto('5"'), { perfDiam: 5, perfDiamUnidade: '"' });
+  assert.deepStrictEqual(diametroDoTexto('152 mm'), { perfDiam: 152, perfDiamUnidade: 'mm' });
+  assert.strictEqual(diametroDoTexto('—'), null);
+  const so = estruturaDoPoco([{ origem: 'Obra 4', data: '2025-01-01', dados: { profundidade: 130 } }], { profundidadeM: 130, diametro: '5', nivelEstaticoM: 22 })!;
+  assert.deepStrictEqual(so.perfuracoes, [{ perfDe: 0, perfAte: 130, perfDiam: 5, perfDiamUnidade: '"' }]);
+  assert.ok(so.soCadastro && so.revestimentoDesconhecido && so.bombaNivelEstatico === 22);
+  assert.strictEqual(estruturaDoPoco([], { profundidadeM: null, diametro: null, nivelEstaticoM: null }), null);
+  // relatório só com revestimento: a perfuração vem do cadastro
+  const mix = estruturaDoPoco([{ origem: 'Obra 1', data: '2025-01-01', dados: { revestimentos: [{ revDe: 0, revAte: 40, revDiam: 6 }] } }], { profundidadeM: 100, diametro: '6"', nivelEstaticoM: null })!;
+  assert.strictEqual(mix.perfuracoes[0].perfAte, 100);
+  assert.ok(!mix.revestimentoDesconhecido && !mix.soCadastro);
 });

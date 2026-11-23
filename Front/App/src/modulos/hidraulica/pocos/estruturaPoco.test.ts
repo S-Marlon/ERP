@@ -49,3 +49,10 @@ teste('estrutura: desenho', () => {
   assert.ok(svg.startsWith('<svg') && svg.includes('NE (nível estático) · 18 m') && svg.includes('Bomba · 72 m') && svg.includes('Sem revestimento · 48–120 m'));
   assert.ok(!svgPerfil({ revestimentos: [{ revDe: 0, revAte: 30, revDiam: 6 }] }).includes('NaN'));
 });
+
+teste('estrutura: só o cadastro (revestimento não informado)', () => {
+  const so = { perfuracoes: [{ perfDe: 0, perfAte: 130, perfDiam: 5 }], revestimentos: [], revestimentoDesconhecido: true, bombaNivelEstatico: 22 };
+  assert.deepStrictEqual(trechosSemRevestimento(so), []);
+  assert.ok(resumoEstrutura(so).includes('Revestimento ainda não informado.'));
+  assert.ok(temEstrutura(so) && !svgPerfil(so).includes('Sem revestimento'));
+});

@@ -42,3 +42,35 @@ export const estruturaDasObras = (obras: RelatorioDaObra[]) => {
   };
   return estrutura.perfuracoes.length || revestimentos.length ? estrutura : null;
 };
+
+// ---------------------------------------------------------------- com o cadastro do poço
+export interface CadastroPoco { profundidadeM: number | null; diametro: string | null; nivelEstaticoM: number | null }
+
+/** "5", "5\"", "6 pol", "152 mm" → número e unidade do relatório (" ou mm); sem número, null. */
+export const diametroDoTexto = (t: unknown) => {
+  const m = String(t ?? '').replace(',', '.').match(/(\d+(?:\.\d+)?)/);
+  if (!m) return null;
+  return { perfDiam: Number(m[1]), perfDiamUnidade: /mm/i.test(String(t)) ? 'mm' : '"' };
+};
+
+/**
+ * Estrutura da ficha: a das obras e, no que faltar, o cadastro do poço (profundidade e diâmetro viram a perfuração;
+ * o nível estático, o NE). Sem revestimento em lugar nenhum, `revestimentoDesconhecido` (não dá para dizer que é
+ * parede na rocha); `soCadastro` quando nada veio dos relatórios.
+ */
+export const estruturaDoPoco = (obras: RelatorioDaObra[], cadastro: CadastroPoco) => {
+  const prof = num(cadastro.profundidadeM);
+  const base = prof > 0 ? [{ perfDe: 0, perfAte: prof, ...(diametroDoTexto(cadastro.diametro) || {}) }] : [];
+  const e: Dados | null = estruturaDasObras(obras);
+  if (!e) {
+    if (!base.length) return null;
+    return { perfuracoes: base, revestimentos: [], perfilGeologico: [], profundidade: prof, bombaNivelEstatico: num(cadastro.nivelEstaticoM) || null,
+      bombaProfundidade: null, revestimentoDesconhecido: true, soCadastro: true };
+  }
+  if (!e.perfuracoes?.length && base.length) e.perfuracoes = base;
+  if (!e.bombaNivelEstatico && num(cadastro.nivelEstaticoM)) e.bombaNivelEstatico = num(cadastro.nivelEstaticoM);
+  e.profundidade = Math.max(num(e.profundidade), prof);
+  e.revestimentoDesconhecido = !e.revestimentos.length;
+  e.soCadastro = false;
+  return e;
+};

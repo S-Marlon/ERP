@@ -58,6 +58,8 @@ export const fundoDoPoco = (d: Dados) => Math.max(num(d.profundidade), ...perfur
 
 /** Trechos perfurados sem nenhum revestimento (parede direto na formação). */
 export const trechosSemRevestimento = (d: Dados): Trecho[] => {
+  // revestimento não informado (só o cadastro do poço): não dá para dizer que é parede na rocha
+  if (d.revestimentoDesconhecido) return [];
   const fundo = Math.max(...perfuracoesDe(d).map(p => p.ate), 0) || num(d.profundidade);
   if (!fundo) return [];
   const cobertos = revestimentosDe(d).map(r => ({ de: r.de, ate: Math.min(r.ate, fundo) })).sort((a, b) => a.de - b.de);
@@ -90,6 +92,7 @@ export const resumoEstrutura = (d: Dados): string[] => {
     const f = formacaoNoTrecho(d, t);
     linhas.push(`Sem revestimento de ${fmt(t.de)} a ${fmt(t.ate)} m: parede ${f ? `em ${f}` : 'na formação'}.`);
   }
+  if (d.revestimentoDesconhecido) linhas.push('Revestimento ainda não informado.');
   const fraturas = camadasDe(d).filter(c => c.tipo === 'Fratura com água');
   if (fraturas.length) linhas.push(`Entradas de água (fraturas): ${fraturas.map(c => `${fmt(c.de)}${c.ate !== c.de ? `–${fmt(c.ate)}` : ''} m`).join(', ')}.`);
   const extra = [num(d.bombaNivelEstatico) ? `nível estático ${fmt(num(d.bombaNivelEstatico))} m` : '', num(d.bombaProfundidade) ? `bomba a ${fmt(num(d.bombaProfundidade))} m` : ''].filter(Boolean);
