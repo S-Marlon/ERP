@@ -6,7 +6,7 @@ import { CheckCircleFilled, RightOutlined } from '@ant-design/icons';
 import { agendaApi, materiaisApi, obrasApi, processoApi } from './obrasApi';
 import { navPocos } from './navPocos';
 import { ChavePasso, faltaComecar, PassoInicial, primeirosPassos } from './primeirosPassos';
-import { enderecoDaSecao, secoesDoGrupo } from './secoesPocos';
+import { enderecoDaSecao, SECOES_POCOS, secoesDoGrupo } from './secoesPocos';
 import { useNavigate } from 'react-router-dom';
 import { secaoLigada, useRecursosPocos } from './recursosPocos';
 
@@ -67,7 +67,8 @@ export const PrimeirosPassos: React.FC<{ onOrcamento: () => void }> = ({ onOrcam
 export const MaisFerramentas: React.FC = () => {
   const navigate = useNavigate();
   const recursos = useRecursosPocos();
-  const desligadas = secoesDoGrupo('mais').filter(s => s.descricao && !secaoLigada(s.secao, recursos));
+  // Desligadas de qualquer grupo (o Mapa fica em Clientes e poços): o aviso de como ligar continua aqui
+  const desligadas = SECOES_POCOS.filter(s => s.descricao && !secaoLigada(s.secao, recursos));
   return (
     <Space direction="vertical" size={12} style={{ width: '100%' }}>
     <Row gutter={[12, 12]}>

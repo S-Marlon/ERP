@@ -3,7 +3,7 @@
 // grupo aparecem como abas no topo da tela e também marcam o item do grupo na barra lateral.
 import type { VistaObras } from './navPocos';
 
-export type GrupoPocos = 'central' | 'atendimento' | 'obras' | 'clientes' | 'agenda' | 'mais';
+export type GrupoPocos = 'central' | 'atendimento' | 'obras' | 'clientes' | 'agenda' | 'documentos' | 'mais';
 export interface SecaoPocos { secao: string; titulo: string; aba: string; grupo: GrupoPocos; vista?: VistaObras; descricao?: string; subvista?: string }
 
 export const BASE_POCOS = '/modulos/hidraulica/pocos';
@@ -16,15 +16,15 @@ export const SECOES_POCOS: SecaoPocos[] = [
   { secao: 'materiais', titulo: 'Materiais', aba: 'obras', vista: 'MATERIAIS', grupo: 'obras' },
   { secao: 'clientes', titulo: 'Clientes de poço', aba: 'obras', vista: 'CLIENTES', grupo: 'clientes' },
   { secao: 'pocos', titulo: 'Poços', aba: 'obras', vista: 'POCOS', grupo: 'clientes' },
+  { secao: 'mapa', titulo: 'Mapa', aba: 'mapa', grupo: 'clientes', descricao: 'Poços dos clientes e a base regional (profundidade e vazão da região).' },
   { secao: 'agenda', titulo: 'Agenda', aba: 'agenda', grupo: 'agenda' },
+  { secao: 'manutencao', titulo: 'Manutenção', aba: 'manutencao', grupo: 'agenda', descricao: 'Planos de manutenção, revisões a oferecer e garantias vencendo.' },
   { secao: 'ferramentas', titulo: 'Mais ferramentas', aba: 'ferramentas', grupo: 'mais' },
-  { secao: 'documentos', titulo: 'Documentos', aba: 'documentos', grupo: 'mais',
+  { secao: 'documentos', titulo: 'Documentos', aba: 'documentos', grupo: 'documentos',
     descricao: 'Tudo o que se imprime: kit de visita (em branco ou preenchido), documentos de uma obra e o relatório técnico avulso.' },
   { secao: 'plano', titulo: 'Plano mensal', aba: 'plano', grupo: 'mais',
     descricao: 'Custos, planos oferecidos e o preço de cada plano para o poço do cliente (viável para a empresa e para o cliente).' },
-  { secao: 'manutencao', titulo: 'Manutenção', aba: 'manutencao', grupo: 'mais', descricao: 'Planos de manutenção, revisões a oferecer e garantias vencendo.' },
   { secao: 'resultado', titulo: 'Resultado', aba: 'resultado', grupo: 'mais', descricao: 'Recebido, faturado, lucro das obras e alertas.' },
-  { secao: 'mapa', titulo: 'Mapa', aba: 'mapa', grupo: 'mais', descricao: 'Poços dos clientes e a base regional (profundidade e vazão da região).' },
   { secao: 'monitoramento', titulo: 'Monitoramento (IoT)', aba: 'iot', grupo: 'mais', descricao: 'Aparelhos nos poços, leituras, alertas e comandos.' },
 ];
 
@@ -34,7 +34,8 @@ export const GRUPOS_POCOS: Array<{ grupo: GrupoPocos; titulo: string }> = [
   { grupo: 'atendimento', titulo: 'Atendimento e pós-venda' },
   { grupo: 'obras', titulo: 'Obras e orçamentos' },
   { grupo: 'clientes', titulo: 'Clientes e poços' },
-  { grupo: 'agenda', titulo: 'Agenda' },
+  { grupo: 'agenda', titulo: 'Agenda e manutenção' },
+  { grupo: 'documentos', titulo: 'Documentos' },
   { grupo: 'mais', titulo: 'Mais ferramentas' },
 ];
 
@@ -63,7 +64,7 @@ export const secaoDoEndereco = (secao: string | undefined): SecaoPocos => {
 export const secaoDaAba = (aba: string, vista?: VistaObras) =>
   SECOES_POCOS.find(s => s.aba === aba && (!s.vista || !vista || s.vista === vista)) || SECOES_POCOS[0];
 
-/** Um degrau da trilha do topo ("Central › Mais ferramentas › Mapa"): o título e a seção que ele abre. */
+/** Um degrau da trilha do topo ("Central › Mais ferramentas › Resultado"): o título e a seção que ele abre. */
 export interface DegrauTrilha { titulo: string; secao: string }
 
 /**
