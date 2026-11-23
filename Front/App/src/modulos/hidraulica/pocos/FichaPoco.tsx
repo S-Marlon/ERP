@@ -14,6 +14,7 @@ import { ConjuntoPoco } from './ConjuntoPoco';
 import { GRUPOS_OCORRENCIA } from './ocorrencias';
 import { resumoEstrutura, svgPerfil, temEstrutura } from './estruturaPoco';
 import { EstruturaEditor } from './EstruturaEditor';
+import { RelatorioClienteModal } from './RelatorioClienteModal';
 
 const { Text } = Typography;
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -23,6 +24,7 @@ export const FichaPoco: React.FC<{ idPoco: number | null; aba?: string; onFechar
   const [d, setD] = useState<PocoCompleto | null>(null);
   const [aba, setAba] = useState('DADOS');
   const [editandoEstrutura, setEditandoEstrutura] = useState(false);
+  const [relatorioCliente, setRelatorioCliente] = useState(false);
   useEffect(() => {
     setD(null);
     if (!idPoco) return;
@@ -149,6 +151,9 @@ export const FichaPoco: React.FC<{ idPoco: number | null; aba?: string; onFechar
       title={p ? <Space wrap><EnvironmentOutlined />{p.identificacao}<Tag color={SITUACAO_POCO[p.situacao]?.cor}>{SITUACAO_POCO[p.situacao]?.texto || p.situacao}</Tag>
         {d?.resumo.sensores && <Tag color="purple">sensores</Tag>}</Space> : 'Poço'}
       extra={p && <Space wrap>
+        <Tooltip title="Relatório com os dados do poço, a estrutura, a bomba, a garantia e as fotos, para mandar ao cliente (confere antes o que falta)">
+          <Button type="primary" icon={<FileTextOutlined />} disabled={!d} onClick={() => setRelatorioCliente(true)}>Relatório para o cliente</Button>
+        </Tooltip>
         {fone.length >= 10 && <Button icon={<WhatsAppOutlined />} onClick={() => window.open(`https://wa.me/55${fone}`, '_blank')}>WhatsApp</Button>}
         {dono && <Button icon={<UserOutlined />} onClick={() => abrirFichaCliente(dono.idCliente)}>Cliente</Button>}
         {gps && <Button icon={<EnvironmentOutlined />} onClick={() => ir(() => verNoMapa(p.latitude!, p.longitude!, p.idPoco))}>Mapa</Button>}
@@ -187,6 +192,7 @@ export const FichaPoco: React.FC<{ idPoco: number | null; aba?: string; onFechar
             )}
           </Space>
           <Tabs activeKey={aba} onChange={setAba} items={abas} />
+          <RelatorioClienteModal aberto={relatorioCliente} ficha={d} onFechar={() => setRelatorioCliente(false)} />
           <EstruturaEditor idPoco={editandoEstrutura ? p.idPoco : null}
             inicial={d.estruturaPropria || (d.estrutura?.soCadastro ? { perfuracoes: d.estrutura.perfuracoes } : null)}
             extras={{ bombaNivelEstatico: d.estrutura?.bombaNivelEstatico ?? p.nivelEstaticoM, bombaProfundidade: d.estrutura?.bombaProfundidade ?? null }}

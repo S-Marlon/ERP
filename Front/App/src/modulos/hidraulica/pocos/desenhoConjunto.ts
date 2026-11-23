@@ -90,7 +90,7 @@ export const conferirConjunto = (c: ConjuntoDesenho, p: PocoDoConjunto = {}): Co
   const fio = num(c.fioMetros);
   if (bomba && fio) {
     r.push(fio < bomba ? { ok: false, texto: `Fio de ${fmt(fio)} m não chega à bomba a ${fmt(bomba)} m.` }
-      : fio - bomba < 3 ? { ok: false, texto: `Fio com só ${fmt(fio - bomba)} m de sobra até o quadro.` }
+      : fio - bomba < 3 ? { ok: false, texto: fio === bomba ? `Fio de ${fmt(fio)} m: sem sobra até o quadro (bomba a ${fmt(bomba)} m).` : `Fio com só ${fmt(fio - bomba)} m de sobra até o quadro.` }
         : { ok: true, texto: `Fio de ${fmt(fio)} m: sobram ${fmt(fio - bomba)} m até o quadro.` });
   }
   const corda = num(c.cordaMetros);
@@ -196,11 +196,21 @@ export const svgConjunto = (c: ConjuntoDesenho, p: PocoDoConjunto = {}, opcoes: 
   partes.push(`<text x="${cx}" y="${topo - 54}" font-size="9" text-anchor="middle" fill="#7c5c2c">${esc(c.cabecaPoco ? 'cabeça do poço' : 'superfície')}</text>`);
 
   // legendas à direita, sem sobrepor
+  // legenda longa quebra em duas linhas (no " · " mais perto do meio), para não cortar na borda
+  const caberLinha = Math.max(24, Math.floor((W - (cx + larg + 14)) / 5.4));
+  const quebrar = (t: string) => {
+    if (t.length <= caberLinha) return [t];
+    const partesTxt = t.split(' · ');
+    let a = partesTxt[0], i = 1;
+    while (i < partesTxt.length && (a + ' · ' + partesTxt[i]).length <= caberLinha) { a += ' · ' + partesTxt[i]; i++; }
+    return i < partesTxt.length ? [a, partesTxt.slice(i).join(' · ')] : [t];
+  };
   let ultimo = -99;
   for (const l of legendas.sort((a, b) => a.y - b.y)) {
+    const linhas = quebrar(l.texto);
     const ly = Math.min(Math.max(l.y, ultimo + 13), base);
-    ultimo = ly;
-    partes.push(`<text x="${cx + larg + 14}" y="${ly + 3}" font-size="9.5" fill="${l.cor}"${l.negrito ? ' font-weight="600"' : ''}>${esc(l.texto)}</text>`);
+    ultimo = ly + (linhas.length - 1) * 11;
+    partes.push(`<text x="${cx + larg + 14}" y="${ly + 3}" font-size="9.5" fill="${l.cor}"${l.negrito ? ' font-weight="600"' : ''}>${linhas.map((t, k) => `<tspan x="${cx + larg + 14}" dy="${k ? 11 : 0}">${esc(t)}</tspan>`).join('')}</text>`);
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" font-family="Segoe UI, Arial, sans-serif">${partes.join('')}</svg>`;
 };
