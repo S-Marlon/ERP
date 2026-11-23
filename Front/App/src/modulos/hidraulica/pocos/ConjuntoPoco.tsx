@@ -46,6 +46,48 @@ const texto = (label: string, name: keyof ConjuntoForm, placeholder?: string, li
 const numero = (label: string, name: keyof ConjuntoForm, sufixo?: string, passo = 1) => (
   <Form.Item label={label} name={name}><CampoNumero min={0} step={passo} style={{ width: '100%' }} suffix={sufixo} /></Form.Item>
 );
+/**
+ * Tubo contado por barra: informa as barras e o comprimento de cada uma (6 m quando vazio) e o total sai sozinho
+ * (gravado em tuboMetros). Sem saber as barras, dá para informar só o total.
+ */
+const TuboPorBarra: React.FC = () => {
+  const form = Form.useFormInstance();
+  const barras = Number(Form.useWatch('tuboBarras', form)) || 0;
+  const metros = Number(Form.useWatch('tuboMetros', form)) || 0;
+  const [comprimento, setComprimento] = useState<number | null>(null);
+  const r2 = (v: number) => Math.round(v * 100) / 100;
+  // abrindo um conjunto salvo: o comprimento sai do total ÷ barras
+  useEffect(() => { if (comprimento === null && barras > 0 && metros > 0) setComprimento(r2(metros / barras)); }, [barras, metros]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // barras ou comprimento mudou: recalcula o total (barra de 6 m quando não informada)
+  useEffect(() => {
+    if (!(barras > 0)) return;
+    const total = r2(barras * (comprimento || 6));
+    if (total !== metros) form.setFieldValue('tuboMetros', total);
+  }, [barras, comprimento]);   // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <>
+      <Col xs={12} md={6}>{numero('Tubo: barras', 'tuboBarras')}</Col>
+      <Col xs={12} md={6}>
+        <Form.Item label="Comprimento da barra" extra={barras > 0 && !comprimento ? <Text type="secondary" style={{ fontSize: 12 }}>vazio = 6 m (o comum)</Text> : null}>
+          <CampoNumero min={0} max={100} style={{ width: '100%' }} suffix="m" placeholder="6" value={comprimento ?? undefined}
+            onChange={v => setComprimento(v === null || v === undefined ? null : Number(v))} />
+        </Form.Item>
+      </Col>
+      {barras > 0 ? (
+        <Col xs={12} md={6}>
+          <Form.Item label="Tubo: total">
+            <Text strong>{String(metros).replace('.', ',')} m</Text>
+            <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>{textoTubo({ tuboBarras: barras, tuboMetros: metros })}</Text>
+          </Form.Item>
+          <Form.Item name="tuboMetros" hidden><CampoNumero /></Form.Item>
+        </Col>
+      ) : (
+        <Col xs={12} md={6}>{numero('Tubo: total (sem as barras)', 'tuboMetros', 'm')}</Col>
+      )}
+    </>
+  );
+};
+
 export const CamposConjunto: React.FC<{ comDataDeInstalacao?: boolean }> = ({ comDataDeInstalacao }) => (
   <>
       {comDataDeInstalacao && <Row gutter={10}><Col xs={12} md={6}>{data('Instalado em', 'instaladoEm')}</Col></Row>}
@@ -70,28 +112,10 @@ export const CamposConjunto: React.FC<{ comDataDeInstalacao?: boolean }> = ({ co
       <Row gutter={10}>
         <Col xs={12} md={6}>{texto('Tubo: material', 'tuboMaterial', 'PVC geomecânico', MATERIAIS_TUBO)}</Col>
         <Col xs={12} md={6}>{texto('Tubo: diâmetro', 'tuboDiametro', '1 1/4"')}</Col>
-        <Col xs={12} md={6}>{numero('Tubo: barras', 'tuboBarras')}</Col>
-        <Col xs={12} md={6}>
-          <Form.Item noStyle shouldUpdate={(a, b) => a.tuboBarras !== b.tuboBarras || a.tuboMetros !== b.tuboMetros}>
-            {f => {
-              const barras = Number(f.getFieldValue('tuboBarras')) || 0;
-              const metros = Number(f.getFieldValue('tuboMetros')) || 0;
-              return (
-                <Form.Item label="Tubo: metros (total)" name="tuboMetros"
-                  extra={barras > 0 && metros > 0 ? <Text type="secondary" style={{ fontSize: 12 }}>{textoTubo({ tuboBarras: barras, tuboMetros: metros })}</Text>
-                    : barras > 0 ? <Space size={4} wrap>{[6, 3].map(c => (
-                        <Button key={c} size="small" type="link" style={{ padding: 0 }} onClick={() => f.setFieldValue('tuboMetros', barras * c)}>barras de {c} m = {barras * c} m</Button>
-                      ))}</Space> : null}>
-                  <CampoNumero min={0} style={{ width: '100%' }} suffix="m" />
-                </Form.Item>
-              );
-            }}
-          </Form.Item>
-        </Col>
+        <TuboPorBarra />
         <Col xs={12} md={6}>{texto('Fio: tipo', 'fioTipo', 'Cabo PP', FIOS)}</Col>
         <Col xs={12} md={6}>{texto('Fio: bitola', 'fioBitola', '3 x 4 mm²', BITOLAS)}</Col>
         <Col xs={12} md={6}>{numero('Fio: metros', 'fioMetros', 'm')}</Col>
-        <Col xs={12} md={6} />
         <Col xs={12} md={6}>{texto('Corda', 'cordaMaterial', 'Corda de nylon 10 mm', CORDAS)}</Col>
         <Col xs={12} md={6}>{numero('Corda: metros', 'cordaMetros', 'm')}</Col>
       </Row>
