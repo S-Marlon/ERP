@@ -11,6 +11,7 @@ import { aplicarKitsNasLinhasPdv } from '../../catalogo/kits/kitsBanco';
 import { ErroVenda } from './vendaPdv';
 import { validarClienteRapido } from './clienteRapido';
 import { memoriaPorCarimbo } from '../../../infra/memoriaCatalogo';
+import { equivalentesDe, normalizarValor, ordenarParaBalcao } from '../../estoque/curvaAbc/equivalencias';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
 
@@ -351,6 +352,71 @@ export const detalheItemPdv = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Erro ao carregar item do PDV:', error);
     return res.status(500).json({ error: 'Erro ao carregar item do PDV', details: error.message });
+  }
+};
+
+/**
+ * GET /api/vendas/pdv/itens/:idItem/equivalentes — itens que servem para a mesma coisa (mesma categoria e mesmos valores
+ * nos atributos marcados como "define equivalência", ex.: bomba 0,75 HP 220 V), no formato de produto do PDV, para o
+ * balcão oferecer outro quando o pedido está sem estoque ("sem Ebara: tem Tetis"). Ordem: com estoque, o que é para
+ * escoar (não recomprar), o preferido, os outros, pelo menor preço.
+ */
+export const equivalentesItemPdv = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  const idItem = Number(req.params.idItem);
+  try {
+    const [[alvo]]: any = await pool.execute(
+      `SELECT COALESCE(f.categoria_id, cpd.categoria_id) AS categoria_id FROM comercial_produtos_dados cpd
+       LEFT JOIN comercial_familias f ON f.id = cpd.familia_id
+       WHERE cpd.tenant_id = ? AND cpd.id_item = ?`, [tenant, idItem]);
+    if (!alvo || alvo.categoria_id === null) return res.json({ data: [], criterio: null, motivo: 'SEM_CATEGORIA' });
+    const [valores]: any = await pool.execute(
+      `SELECT v.id_entidade AS id_item, v.atributo_id, a.nome AS atributo, COALESCE(NULLIF(v.valor_texto, ''), v.valor_decimal, v.valor_numero, o.valor) AS valor
+       FROM comercial_produtos_dados cpd
+       LEFT JOIN comercial_familias f ON f.id = cpd.familia_id
+       INNER JOIN atributos_comercial_valores v ON v.id_entidade = cpd.id_item AND v.tenant_id = cpd.tenant_id AND v.tipo_entidade = 'produto'
+       INNER JOIN atributos_comercial a ON a.id = v.atributo_id AND a.define_equivalencia = 1
+       LEFT JOIN atributos_comercial_opcoes o ON o.id = v.opcao_id
+       WHERE cpd.tenant_id = ? AND COALESCE(f.categoria_id, cpd.categoria_id) = ?`, [tenant, alvo.categoria_id]);
+    const porItem = new Map<number, { idItem: number; categoriaId: number; atributos: Map<number, string> }>();
+    const rotulos: string[] = [];
+    for (const v of valores) {
+      if (v.valor === null || String(v.valor).trim() === '') continue;
+      const id = Number(v.id_item);
+      if (!porItem.has(id)) porItem.set(id, { idItem: id, categoriaId: Number(alvo.categoria_id), atributos: new Map() });
+      porItem.get(id)!.atributos.set(Number(v.atributo_id), normalizarValor(v.valor));
+      if (id === idItem) rotulos.push(`${v.atributo} ${String(v.valor).trim()}`);
+    }
+    const doAlvo = porItem.get(idItem);
+    if (!doAlvo) return res.json({ data: [], criterio: null, motivo: 'SEM_ATRIBUTO' });
+    const ids = equivalentesDe(doAlvo, [...porItem.values()]).map(x => x.idItem);
+    if (!ids.length) return res.json({ data: [], criterio: rotulos.join(' · '), motivo: 'SEM_EQUIVALENTE' });
+
+    const ph = ids.map(() => '?').join(',');
+    const [[achados], reservas, [decisoes]]: any = await Promise.all([
+      pool.execute(
+        `SELECT ic.id_item, COALESCE(es.quantidade_atual, 0) AS estoque_base, COALESCE(es.custo_medio, 0) AS custo_medio, es.localizacao
+         ${FROM_ITENS} WHERE ic.tenant_id = ? AND ic.status = 'ATIVO' AND ic.id_item IN (${ph})`, [tenant, ...ids]),
+      reservasPorItem(pool, tenant),
+      pool.execute(`SELECT id_item, decisao_compra FROM comercial_produtos_dados WHERE tenant_id = ? AND id_item IN (${ph})`, [tenant, ...ids]),
+    ]);
+    let catalogo = await catalogoPdv(tenant);
+    if (achados.some((a: any) => !catalogo.linhas.has(Number(a.id_item)))) catalogo = await catalogoPdv(tenant, true);
+    const rows = achados.filter((a: any) => catalogo.linhas.has(Number(a.id_item))).map((a: any) => {
+      const reservado = reservas.get(Number(a.id_item)) || 0;
+      return { ...catalogo.linhas.get(Number(a.id_item)), estoque_base: Math.round((Number(a.estoque_base) - reservado) * 10000) / 10000, custo_medio: a.custo_medio, localizacao: a.localizacao };
+    });
+    await aplicarKitsNasLinhasPdv(pool as any, tenant, rows.filter((r: any) => catalogo.kits.has(Number(r.id_item))));
+    const decisao = new Map<number, string | null>(decisoes.map((d: any) => [Number(d.id_item), d.decisao_compra || null]));
+    const produtos = rows.map((item: any) => {
+      const id = Number(item.id_item);
+      const p = montarProduto(item, catalogo.precos.unidadesPorItem.get(id) || [], catalogo.precos.faixasPorItem.get(id) || [], catalogo.publicacao.get(id));
+      return { ...p, decisaoCompra: decisao.get(id) ?? null, estoque: p.currentStock, preco: p.salePrice };
+    }).filter((p: any) => p.publicavel);
+    return res.json({ data: ordenarParaBalcao(produtos).map(({ estoque, preco, ...p }: any) => p), criterio: rotulos.join(' · '), motivo: null });
+  } catch (error: any) {
+    console.error('Erro ao buscar equivalentes no PDV:', error);
+    return res.status(500).json({ error: 'Erro ao buscar equivalentes', details: error.message });
   }
 };
 

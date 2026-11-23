@@ -6,6 +6,8 @@ import { ajusteDaLinha, ajustesDoCarrinho, precoBaseLinha } from '../utils/ajust
 
 import { CartItem } from '../types';
 import { atacadoDisponivel, podeFracionar, proximaFaixa } from '../utils/precoCarrinho';
+import { EquivalentesModal, TagEquivalente } from '../components/EquivalentesPdv';
+import type { ProdutoEquivalente } from '../services/equivalentesPdvApi';
 import { faltaNaLinha } from '../utils/estoqueCarrinho';
 import { PrecosPorFormaPainel } from './PrecosPorFormaPainel';
 import { CampoDinheiro, CampoNumero } from '../../../../shared/formularios/CamposNumero';
@@ -32,6 +34,8 @@ interface CartAsideProps {
     onEditarKit?: (id: string | number) => void;
     /** Aplica/tira o preço de atacado da linha (com quantidade: leva até a faixa e aplica). */
     aplicarAtacado?: (id: string | number, aplicar: boolean, quantidade?: number) => void;
+    /** Equivalente escolhido para a linha sem estoque: `trocar` substitui a linha, senão acrescenta. */
+    onEquivalente?: (linha: CartItem, produto: ProdutoEquivalente, trocar: boolean) => void;
     /** Proposta negociada no carrinho: sem a tabela de preço por forma (o preço é o combinado). */
     negociado?: boolean;
     style?: React.CSSProperties;
@@ -53,13 +57,15 @@ export const CartAside: React.FC<CartAsideProps> = props => (
 
 const CarrinhoConteudo: React.FC<CartAsideProps> = ({
     cart, cliente, total, money, updateQuantity, changeUnit, removeItem, onFinalizar, onSuspender, onOrcamento, onNegociar,
-    salvandoPedido, estagio, onBack, applyIndividualDiscount, onEditarKit, aplicarAtacado, negociado, style,
+    salvandoPedido, estagio, onBack, applyIndividualDiscount, onEditarKit, aplicarAtacado, onEquivalente, negociado, style,
 }) => {
     const { token } = theme.useToken();
     // Fracionamento ligado à mão por item (unidades fracionáveis já vêm ligadas)
     const [fracionados, setFracionados] = useState<Record<string | number, boolean>>({});
     // Preço por item (desconto ou acréscimo): item aberto no modal e o preço digitado
     const [itemDesconto, setItemDesconto] = useState<CartItem | null>(null);
+    // Linha sem estoque com a janela de equivalentes aberta
+    const [equivalenteDe, setEquivalenteDe] = useState<CartItem | null>(null);
     const [novoPreco, setNovoPreco] = useState<number | null>(null);
 
     const precoBase = (item: CartItem) => precoBaseLinha(item);
@@ -202,6 +208,9 @@ const CarrinhoConteudo: React.FC<CartAsideProps> = ({
                                                 </Tag>
                                             </Tooltip>
                                         )}
+                                        {falta > 0 && ehProduto && !item.kitPosicoes && onEquivalente && (
+                                            <TagEquivalente idItem={Number(item.idItemCatalogo ?? item.id)} onAbrir={() => setEquivalenteDe(item)} />
+                                        )}
                                         {ehProduto && (item.unidades?.length || 0) > 1 && (
                                             <Select size="small" style={{ minWidth: 120 }} popupMatchSelectWidth={false}
                                                 value={item.idUnidadeVenda ?? undefined}
@@ -315,6 +324,13 @@ const CarrinhoConteudo: React.FC<CartAsideProps> = ({
                     {emPagamento ? 'Voltar ao carrinho' : 'Finalizar venda (F2)'}
                 </Button>
             </div>
+
+            <EquivalentesModal
+                alvo={equivalenteDe ? { idItem: Number(equivalenteDe.idItemCatalogo ?? equivalenteDe.id), nome: equivalenteDe.name, quantidade: equivalenteDe.quantity, unidade: equivalenteDe.unitOfMeasure } : null}
+                podeTrocar
+                onFechar={() => setEquivalenteDe(null)}
+                onEscolher={(p, trocar) => { if (equivalenteDe) onEquivalente?.(equivalenteDe, p, trocar); setEquivalenteDe(null); }}
+            />
 
             <Modal open={!!itemDesconto} title="Preço do item" okText="Aplicar" cancelText="Cancelar" destroyOnHidden width={380}
                 onOk={aplicarDesconto} onCancel={() => setItemDesconto(null)}

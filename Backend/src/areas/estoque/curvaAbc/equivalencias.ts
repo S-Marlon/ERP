@@ -24,11 +24,17 @@ const origem = (i: ItemEquivalencia) => (i.marca || i.familia || `item ${i.idIte
  * Grupos de equivalentes: mesma categoria + mesmos valores em TODOS os atributos de equivalência que o item tem. Só vira
  * grupo com 2+ itens de origens diferentes (marca/família) — senão não há escolha a fazer.
  */
+/** Chave de equivalência: categoria + todos os atributos de equivalência do item; null se faltar um dos dois. */
+export const chaveEquivalencia = (i: { categoriaId: number | null; atributos: Map<number, string> }) =>
+  !i.atributos.size || i.categoriaId === null
+    ? null
+    : `${i.categoriaId}|${[...i.atributos.entries()].sort((a, b) => a[0] - b[0]).map(([a, v]) => `${a}=${v}`).join('&')}`;
+
 export const montarGrupos = (itens: ItemEquivalencia[]) => {
   const grupos = new Map<string, ItemEquivalencia[]>();
   for (const i of itens) {
-    if (!i.atributos.size || i.categoriaId === null) continue;
-    const chave = `${i.categoriaId}|${[...i.atributos.entries()].sort((a, b) => a[0] - b[0]).map(([a, v]) => `${a}=${v}`).join('&')}`;
+    const chave = chaveEquivalencia(i);
+    if (!chave) continue;
     if (!grupos.has(chave)) grupos.set(chave, []);
     grupos.get(chave)!.push(i);
   }
@@ -110,4 +116,20 @@ export const giroPorMarca = (itens: Array<{ marca: string | null; quantidade: nu
     ...x, receita: r2(x.receita), valorEstoque: r2(x.valorEstoque),
     giro: x.estoque + x.quantidade > 0 ? Math.round((x.quantidade / (x.estoque + x.quantidade / 2)) * 100) / 100 : null,
   })).sort((a, b) => b.receita - a.receita || b.valorEstoque - a.valorEstoque);
+};
+
+// ---------------------------------------------------------------- equivalente no balcão (PDV)
+/** Itens equivalentes a `alvo` (mesma chave de equivalência), sem ele mesmo. */
+export const equivalentesDe = <T extends { idItem: number; categoriaId: number | null; atributos: Map<number, string> }>(alvo: T, candidatos: T[]) => {
+  const chave = chaveEquivalencia(alvo);
+  return chave ? candidatos.filter(c => c.idItem !== alvo.idItem && chaveEquivalencia(c) === chave) : [];
+};
+
+/**
+ * Ordem da sugestão no balcão: primeiro quem tem estoque; entre eles, o que está para escoar (não recomprar, o estoque
+ * parado que a loja quer vender), depois o preferido nas compras, depois os outros; empate pelo menor preço.
+ */
+export const ordenarParaBalcao = <T extends { estoque: number; decisaoCompra: string | null; preco: number }>(lista: T[]) => {
+  const peso = (d: string | null) => (d === 'NAO_RECOMPRAR' ? 0 : d === 'PREFERIDO' ? 1 : 2);
+  return [...lista].sort((a, b) => Number(b.estoque > 0) - Number(a.estoque > 0) || peso(a.decisaoCompra) - peso(b.decisaoCompra) || a.preco - b.preco);
 };

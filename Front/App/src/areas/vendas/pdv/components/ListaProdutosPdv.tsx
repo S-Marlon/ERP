@@ -6,6 +6,7 @@ import { AppstoreOutlined, EnvironmentOutlined, InfoCircleOutlined, PlusOutlined
 import ImageDisplay from '../../../../shared/components/ui/ImageGallery/ImageDysplay';
 import { Product } from '../types/product.types';
 import { descontoDaForma, useTaxasVenda } from '../../taxas/taxasVenda';
+import { SwapOutlined } from '@ant-design/icons';
 
 export type ModoLista = 'lista' | 'cards';
 
@@ -48,11 +49,13 @@ interface Props {
   onAtualizar: () => void;
   onIncluir: (p: Product) => void;
   onDetalhe: (id: number) => void;
+  /** Item sem estoque: abre os equivalentes (mesma categoria e atributos). */
+  onEquivalentes?: (p: Product) => void;
 }
 
 export const ListaProdutosPdv: React.FC<Props> = ({
   produtos, total, carregando, busca, pagina, porPagina, ordem, modo, compacto,
-  onModo, onPagina, onOrdem, onAtualizar, onIncluir, onDetalhe,
+  onModo, onPagina, onOrdem, onAtualizar, onIncluir, onDetalhe, onEquivalentes,
 }) => {
   const { token } = theme.useToken();
   const rolagem = useRef<HTMLDivElement>(null);
@@ -89,6 +92,11 @@ export const ListaProdutosPdv: React.FC<Props> = ({
         {qtd(p.currentStock)} <Typography.Text type="secondary" style={{ fontWeight: 400 }}>{p.unitOfMeasure}</Typography.Text>
       </Typography.Text>
       {p.location && <Tag icon={<EnvironmentOutlined />} style={{ margin: 0, fontSize: 10 }}>{p.location}</Tag>}
+      {Number(p.currentStock) <= 0 && !p.podeVenderSemEstoque && onEquivalentes && (
+        <Tooltip title="Sem estoque: ver itens que servem para a mesma coisa">
+          <Button size="small" type="link" icon={<SwapOutlined />} style={{ padding: 0, height: 'auto', fontSize: 11 }} onClick={() => onEquivalentes(p)}>equivalentes</Button>
+        </Tooltip>
+      )}
     </Flex>
   );
 

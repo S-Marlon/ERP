@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { analisarGrupo, confiancaDas, demandaPorAtributo, giroPorMarca, ItemEquivalencia, montarGrupos, normalizarValor } from './equivalencias';
+import { analisarGrupo, confiancaDas, demandaPorAtributo, equivalentesDe, giroPorMarca, ItemEquivalencia, montarGrupos, normalizarValor, ordenarParaBalcao } from './equivalencias';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 const POT = 225;
@@ -58,4 +58,19 @@ teste('equivalentes: demanda por atributo e giro por marca', () => {
   assert.deepStrictEqual(d.map(x => [x.valor, x.quantidade, x.estoque, x.marcas]), [['0,75', 3, 9, ['EBARA', 'TETIS']], ['1', 1, 3, ['EBARA']]]);
   const m = giroPorMarca(itens.map(i => ({ ...i, valorEstoque: i.estoque * 500 })));
   assert.deepStrictEqual(m.map(x => [x.marca, x.quantidade, x.giro]), [['EBARA', 4, 0.57], ['TETIS', 0, 0]]);
+});
+
+teste('equivalente no balcão: mesma categoria e mesmos atributos, ordem de sugestão', () => {
+  const it = (idItem: number, categoriaId: number | null, attrs: Array<[number, string]>) => ({ idItem, categoriaId, atributos: new Map(attrs) });
+  const ebara = it(1, 10, [[5, '0.75hp'], [6, '220v']]);
+  const lista = [ebara, it(2, 10, [[5, '0.75hp'], [6, '220v']]), it(3, 10, [[5, '1hp'], [6, '220v']]), it(4, 11, [[5, '0.75hp'], [6, '220v']]), it(5, 10, [[5, '0.75hp']])];
+  assert.deepStrictEqual(equivalentesDe(ebara, lista).map(x => x.idItem), [2]);
+  assert.deepStrictEqual(equivalentesDe(it(9, 10, []), lista), []);           // sem atributo de equivalência: nada
+  const ord = ordenarParaBalcao([
+    { id: 'a', estoque: 0, decisaoCompra: 'NAO_RECOMPRAR', preco: 100 },
+    { id: 'b', estoque: 3, decisaoCompra: null, preco: 90 },
+    { id: 'c', estoque: 2, decisaoCompra: 'PREFERIDO', preco: 120 },
+    { id: 'd', estoque: 5, decisaoCompra: 'NAO_RECOMPRAR', preco: 130 },
+  ]);
+  assert.deepStrictEqual(ord.map(x => x.id), ['d', 'c', 'b', 'a']);
 });

@@ -17,6 +17,8 @@ import { FinalizarVenda } from './pagamento/FinalizarVenda';
 import { PDVProvider, usePDV } from './contexts/PDVContext';
 import { ListaProdutosPdv, ModoLista } from './components/ListaProdutosPdv';
 import { ClientePdvModal, formatarDocumento } from './components/ClientePdvModal';
+import { EquivalentesModal } from './components/EquivalentesPdv';
+import type { ProdutoEquivalente } from './services/equivalentesPdvApi';
 import { ItemPdvDrawer } from './components/ItemPdvDrawer';
 import KitConfiguradorModal from './components/KitConfiguradorModal';
 import { idItemDaLinha } from './types/cart.types';
@@ -265,6 +267,15 @@ const PDVContent: React.FC = () => {
   // Total da venda: só itens (mão de obra/OS ficam para o módulo de OS)
   const total = useMemo(() => cart.reduce((acc, i) => acc + i.price * i.quantity, 0), [cart]);
 
+  // Equivalentes de um item da lista (sem estoque) e troca da linha do carrinho pelo equivalente escolhido
+  const [equivalentesDe, setEquivalentesDe] = useState<{ idItem: number; nome: string } | null>(null);
+  const trocarPorEquivalente = useCallback(async (linha: any, p: ProdutoEquivalente, trocar: boolean) => {
+    if (trocar) removeItem(linha.id);
+    const falhas = await carregarItens([{ idItem: Number(p.id), nome: p.name, quantidade: Number(linha.quantity) || 1, idUnidade: p.idUnidadeVenda ?? null }], { acrescentar: true });
+    if (falhas.length) message.error(`Não foi possível carregar ${p.name}.`);
+    else message.success(trocar ? `Trocado por ${p.name}.` : `${p.name} acrescentado.`);
+  }, [removeItem, carregarItens]);
+
   const incluir = useCallback((p: any, idUnidade?: number | null) => {
     addToCart({
       id: p.id,
@@ -383,6 +394,7 @@ const PDVContent: React.FC = () => {
       money={money}
       updateQuantity={updateQuantity}
       aplicarAtacado={aplicarAtacado}
+      onEquivalente={trocarPorEquivalente}
       changeUnit={changeUnit}
       removeItem={removeItem}
       onFinalizar={() => { setGavetaCarrinho(false); irParaPagamento(); }}
@@ -528,7 +540,10 @@ const PDVContent: React.FC = () => {
           onAtualizar={() => setRecarga(n => n + 1)}
           onIncluir={p => incluir(p)}
           onDetalhe={setItemDetalhe}
+          onEquivalentes={p => setEquivalentesDe({ idItem: Number(p.id), nome: p.name })}
         />
+        <EquivalentesModal alvo={equivalentesDe} onFechar={() => setEquivalentesDe(null)}
+          onEscolher={p => { incluir(p); setEquivalentesDe(null); message.success(`${p.name} no carrinho.`); }} />
       </Flex>
 
       {/* Carrinho: coluna fixa ou gaveta (janela estreita). No pagamento em janela estreita, só o pagamento aparece. */}
