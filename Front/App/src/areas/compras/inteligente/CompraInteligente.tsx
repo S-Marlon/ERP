@@ -128,6 +128,29 @@ const CompraInteligente: React.FC = () => {
 
   const itens = analise?.itens || [];
   const nomeDoFornecedor = useMemo(() => new Map(resumo.map(r => [r.idFornecedor, r.nome])), [resumo]);
+  // Filiais da mesma empresa (mesma raiz do CNPJ) numa linha só, com os totais somados; cada filial segue com o seu pedido
+  const linhasResumo = useMemo(() => {
+    const porRaiz = new Map<string, ResumoFornecedor[]>();
+    for (const r of resumo) if (r.raiz) porRaiz.set(r.raiz, [...(porRaiz.get(r.raiz) || []), r]);
+    const usados = new Set<number>();
+    const linhas: ResumoFornecedor[] = [];
+    for (const r of resumo) {
+      if (usados.has(r.idFornecedor)) continue;
+      const irmaos = r.raiz ? porRaiz.get(r.raiz) || [] : [];
+      if (irmaos.length < 2) { linhas.push(r); continue; }
+      irmaos.forEach(x => usados.add(x.idFornecedor));
+      const soma = (f: (x: ResumoFornecedor) => number) => irmaos.reduce((a, x) => a + f(x), 0);
+      linhas.push({
+        ...r, grupo: true, idFornecedor: -Number(r.raiz), nome: [...irmaos].map(x => x.nome).sort((a, b) => a.length - b.length)[0],
+        itensVinculados: soma(x => x.itensVinculados), itensRepor: soma(x => x.itensRepor), abaixoMinimo: soma(x => x.abaixoMinimo),
+        valorSugerido: Math.round(soma(x => x.valorSugerido) * 100) / 100, prioridade: soma(x => x.prioridade), urgentes: soma(x => x.urgentes),
+        pedidosAbertos: soma(x => x.pedidosAbertos), pedidoMinimo: 0, fundos: [],
+        motivoPrioridade: irmaos.filter(x => x.motivoPrioridade).map(x => `${x.estabelecimento}: ${x.motivoPrioridade}`).join(' · '),
+        children: [...irmaos].sort((a, b) => b.prioridade - a.prioridade || b.itensRepor - a.itensRepor),
+      });
+    }
+    return linhas.sort((a, b) => b.prioridade - a.prioridade || b.itensRepor - a.itensRepor || b.valorSugerido - a.valorSugerido);
+  }, [resumo]);
   // Item já colocado na lista (rascunho) de outro fornecedor neste navegador
   const outrasListas = useMemo(() => rascunhosDeOutros(idFornecedor), [idFornecedor, quantidades, analise]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -351,15 +374,18 @@ const CompraInteligente: React.FC = () => {
       <Col xs={24} xl={8}>
         <Card size="small" title="Fornecedores" extra={<Button size="small" icon={<ReloadOutlined />} onClick={carregarResumo} loading={carregandoResumo} />}>
           <Table<ResumoFornecedor>
-            size="small" rowKey="idFornecedor" loading={carregandoResumo} dataSource={resumo} pagination={false}
-            onRow={r => ({ onClick: () => abrir(r.idFornecedor), style: { cursor: 'pointer', background: r.idFornecedor === idFornecedor ? '#e6f4ff' : undefined } })}
+            size="small" rowKey="idFornecedor" loading={carregandoResumo} dataSource={linhasResumo} pagination={false}
+            expandable={{ defaultExpandAllRows: true, indentSize: 12 }}
+            onRow={r => ({ onClick: () => { if (!r.grupo) abrir(r.idFornecedor); }, style: { cursor: r.grupo ? 'default' : 'pointer', background: r.idFornecedor === idFornecedor ? '#e6f4ff' : r.grupo ? '#fafafa' : undefined } })}
             columns={[
               {
                 title: 'Fornecedor', key: 'f',
                 render: (_, r) => (
                   <Space direction="vertical" size={0}>
-                    <Space size={4}>
-                      <Text strong={r.itensRepor > 0}>{r.nome}</Text>
+                    <Space size={4} wrap>
+                      <Text strong={r.itensRepor > 0 || r.grupo}>{r.nome}</Text>
+                      {r.grupo && <Tooltip title="Mesma empresa (mesma raiz do CNPJ), estabelecimentos diferentes: cada um tem o seu pedido"><Tag color="purple" style={{ margin: 0, fontSize: 10 }}>{r.children?.length} estabelecimentos</Tag></Tooltip>}
+                      {!r.grupo && r.raiz && linhasResumo.some(g => g.grupo && g.raiz === r.raiz) && <Tag style={{ margin: 0, fontSize: 10 }}>{r.estabelecimento}</Tag>}
                       {r.prioridade > 0 && r.idFornecedor === resumo.find(x => x.prioridade > 0)?.idFornecedor && (
                         <Tooltip title="Mais urgente pela curva ABC: itens que mais vendem sem estoque e faltas de pedidos faturados"><Tag color="red" style={{ margin: 0, fontSize: 10 }}>pedir primeiro</Tag></Tooltip>
                       )}

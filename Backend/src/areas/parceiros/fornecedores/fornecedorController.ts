@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { CNPJ_COMPRA_AVULSA, cnpjValido, estabelecimentoCnpj, raizCnpj } from '../cnpj';
 import pool from '../../../infra/db';
 
 // 🟢 [READ] Verificar se o fornecedor existe pelo CNPJ (Usado pelo Front para o Modal via GET)
@@ -49,6 +50,9 @@ export const obterOuCriarFornecedorPorCnpj = async (req: Request, res: Response)
 
   if (!cnpj) {
     return res.status(400).json({ success: false, error: 'CNPJ do fornecedor é obrigatório.' });
+  }
+  if (cnpj !== CNPJ_COMPRA_AVULSA && !cnpjValido(cnpj)) {
+    return res.status(400).json({ success: false, error: 'CNPJ do fornecedor inválido: confira os números (dígitos verificadores).' });
   }
 
   const connection = await pool.getConnection();
@@ -299,11 +303,20 @@ export const detalheFornecedor = async (req: Request, res: Response) => {
       [tenantId, id]
     );
 
+    // Outros estabelecimentos da mesma empresa (mesma raiz do CNPJ): matriz e filiais cadastradas
+    const raiz = raizCnpj(cnpj);
+    const [irmaos]: any = raiz ? await pool.execute(
+      `SELECT pj.id_cliente, REPLACE(REPLACE(REPLACE(pj.cnpj, '.', ''), '/', ''), '-', '') AS cnpj, COALESCE(NULLIF(TRIM(pj.nome_fantasia), ''), pj.razao_social) AS nome,
+              (SELECT e.cidade FROM pessoas_enderecos e WHERE e.id_cliente = pj.id_cliente AND e.deleted_at IS NULL ORDER BY e.principal DESC LIMIT 1) AS cidade
+       FROM pessoas_pj pj INNER JOIN pessoas_core c ON c.id_pessoa = pj.id_cliente AND c.deleted_at IS NULL
+       WHERE c.tenant_id = ? AND pj.id_cliente <> ? AND LEFT(REPLACE(REPLACE(REPLACE(pj.cnpj, '.', ''), '/', ''), '-', ''), 8) = ?`, [tenantId, id, raiz]) : [[]];
     const importadas = notas.filter((n: any) => n.status === 'IMPORTADO');
     const abertos = titulos.filter((t: any) => t.status === 'ABERTO');
     return res.json({
       idPessoa: Number(f.id_pessoa), status: f.status, observacoes: f.observacoes, criadoEm: dataIso(f.created_at),
       razaoSocial: f.razao_social, nomeFantasia: f.nome_fantasia, cnpj, inscricaoEstadual: f.inscricao_estadual, inscricaoMunicipal: f.inscricao_municipal,
+      estabelecimento: estabelecimentoCnpj(cnpj),
+      outrosEstabelecimentos: irmaos.map((x: any) => ({ idPessoa: Number(x.id_cliente), nome: x.nome, cnpj: x.cnpj, estabelecimento: estabelecimentoCnpj(x.cnpj), cidade: x.cidade || null })),
       email: email?.email || null, telefone: contato?.telefone || null, whatsapp: Boolean(Number(contato?.whatsapp)), nomeContato: contato?.nome_contato || null,
       endereco: endereco ? { ...endereco } : null,
       resumo: {

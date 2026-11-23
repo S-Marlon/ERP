@@ -16,6 +16,7 @@ import { classeExibida } from '../../estoque/curvaAbc/curvaAbc';
 import { montarEquivalencias } from '../../estoque/curvaAbc/equivalencias.controller';
 import { reservasPorItem } from '../../vendas/pedidos/pedidosFaturados.controller';
 import { calcularFundos } from '../../financeiro/reservas/reservas.controller';
+import { estabelecimentoCnpj, raizCnpj } from '../../parceiros/cnpj';
 
 type Conn = { execute: (sql: string, params?: any[]) => Promise<any> };
 
@@ -107,7 +108,7 @@ const vinculosDosItens = async (conn: Conn, tenant: number, ids: number[]) => {
             SUBSTRING_INDEX(GROUP_CONCAT(s.nome_fornecedor ORDER BY l.id DESC SEPARATOR '\n'), '\n', 1) AS descricao
      FROM importacao_produtos_staging s
      INNER JOIN importacoes_lotes l ON l.id = s.lote_importacao_id AND l.status = 'IMPORTADO'
-     INNER JOIN pessoas_pj pj ON pj.cnpj = l.cnpj_fornecedor
+     INNER JOIN pessoas_pj pj ON REPLACE(REPLACE(REPLACE(pj.cnpj, '.', ''), '/', ''), '-', '') = REPLACE(REPLACE(REPLACE(l.cnpj_fornecedor, '.', ''), '/', ''), '-', '')
      WHERE s.tenant_id = ? AND s.produto_id_sistema IN (${marc})
      GROUP BY s.produto_id_sistema, pj.id_cliente`,
     [tenant, ...ids]
@@ -278,6 +279,8 @@ export const resumoFornecedores = async (req: Request, res: Response) => {
       const valor = totalDoPedido(repor);
       saida.push({
         idFornecedor: Number(f.id), nome: f.nome, cnpj: f.cnpj, itensVinculados: Number(f.itens),
+        // mesma empresa = mesma raiz do CNPJ (a tela agrupa as filiais)
+        raiz: raizCnpj(f.cnpj), estabelecimento: estabelecimentoCnpj(f.cnpj),
         itensRepor: repor.length, abaixoMinimo: repor.filter(i => i.motivo === 'ABAIXO_MINIMO').length,
         valorSugerido: valor, pedidoMinimo: c?.pedidoMinimo || 0, prazoEntregaDias: c?.prazoEntregaDias || 0,
         atingeMinimo: !c?.pedidoMinimo || valor >= c.pedidoMinimo,
@@ -576,7 +579,7 @@ export const historicoPrecos = async (req: Request, res: Response) => {
               cfp.fator_compra
        FROM importacao_produtos_staging s
        INNER JOIN importacoes_lotes l ON l.id = s.lote_importacao_id AND l.status = 'IMPORTADO'
-       LEFT JOIN pessoas_pj pj ON pj.cnpj = l.cnpj_fornecedor
+       LEFT JOIN pessoas_pj pj ON REPLACE(REPLACE(REPLACE(pj.cnpj, '.', ''), '/', ''), '-', '') = REPLACE(REPLACE(REPLACE(l.cnpj_fornecedor, '.', ''), '/', ''), '-', '')
        LEFT JOIN comercial_fornecedores_produtos cfp ON cfp.tenant_id = s.tenant_id AND cfp.id_item = s.produto_id_sistema AND cfp.id_fornecedor = pj.id_cliente
        WHERE s.tenant_id = ? AND s.produto_id_sistema = ?
        ORDER BY data DESC LIMIT 50`,

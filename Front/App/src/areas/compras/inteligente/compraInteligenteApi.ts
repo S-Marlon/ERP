@@ -10,6 +10,10 @@ export interface ResumoFornecedor {
   /** Qual pedir primeiro: urgência × curva ABC (maior = antes). */
   prioridade: number; motivoPrioridade: string; urgentes: number;
   fundos: CoberturaFundo[];
+  /** Raiz do CNPJ (empresa) e "Matriz"/"Filial 0009": filiais da mesma empresa aparecem juntas na lista. */
+  raiz: string | null; estabelecimento: string | null;
+  /** Linha da empresa (agrupa as filiais) montada na tela. */
+  grupo?: boolean; children?: ResumoFornecedor[];
 }
 
 /** Quanto do pedido o fundo de reposição cobre. */

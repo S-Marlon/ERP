@@ -191,6 +191,7 @@ export default function Fornecedores() {
                     <div><Text type="secondary">{detalhe.razaoSocial}</Text></div>
                     <Space size={12} style={{ marginTop: 4 }} wrap>
                       <Text copyable={{ text: detalhe.cnpj, icon: <CopyOutlined style={{ fontSize: 12 }} /> }} style={{ fontSize: 13 }}>CNPJ {formatarCnpj(detalhe.cnpj)}</Text>
+                      {detalhe.estabelecimento && <Tag color={detalhe.estabelecimento === 'Matriz' ? 'blue' : 'purple'} style={{ margin: 0 }}>{detalhe.estabelecimento}</Tag>}
                       {detalhe.inscricaoEstadual && <Text type="secondary" style={{ fontSize: 13 }}>IE {detalhe.inscricaoEstadual}</Text>}
                       {detalhe.telefone && <Text type="secondary" style={{ fontSize: 13 }}><PhoneOutlined /> {detalhe.telefone}</Text>}
                       {detalhe.email && <Text type="secondary" style={{ fontSize: 13 }}><MailOutlined /> {detalhe.email}</Text>}
@@ -226,7 +227,19 @@ export default function Fornecedores() {
                       <Descriptions bordered size="small" column={{ xs: 1, md: 2 }}>
                         <Descriptions.Item label="Apelido (nome fantasia)">{detalhe.nomeFantasia || <Text type="secondary">—</Text>}</Descriptions.Item>
                         <Descriptions.Item label="Razão social">{detalhe.razaoSocial}</Descriptions.Item>
-                        <Descriptions.Item label="CNPJ">{formatarCnpj(detalhe.cnpj)}</Descriptions.Item>
+                        <Descriptions.Item label="CNPJ">{formatarCnpj(detalhe.cnpj)}{detalhe.estabelecimento && <Tag style={{ marginLeft: 8 }}>{detalhe.estabelecimento}</Tag>}</Descriptions.Item>
+                        {(detalhe.outrosEstabelecimentos || []).length > 0 && (
+                          <Descriptions.Item label="Mesma empresa (outros CNPJs)" span={2}>
+                            <Space direction="vertical" size={2}>
+                              {detalhe.outrosEstabelecimentos!.map(o => (
+                                <a key={o.idPessoa} onClick={() => { setIdAtivo(o.idPessoa); carregarDetalhe(o.idPessoa); }}>
+                                  {o.estabelecimento} · {formatarCnpj(o.cnpj)} · {o.nome}{o.cidade ? ` (${o.cidade})` : ''}
+                                </a>
+                              ))}
+                              <Text type="secondary" style={{ fontSize: 12 }}>Cada estabelecimento tem nota, inscrição estadual e boletos próprios; na Compra inteligente eles aparecem juntos.</Text>
+                            </Space>
+                          </Descriptions.Item>
+                        )}
                         <Descriptions.Item label="Inscrição estadual">{detalhe.inscricaoEstadual || 'Isento / não informada'}</Descriptions.Item>
                         <Descriptions.Item label="Inscrição municipal">{detalhe.inscricaoMunicipal || '—'}</Descriptions.Item>
                         <Descriptions.Item label="Situação"><Tag color={detalhe.status === 'ATIVO' ? 'green' : 'red'}>{detalhe.status === 'ATIVO' ? 'Ativo' : 'Inativo'}</Tag></Descriptions.Item>

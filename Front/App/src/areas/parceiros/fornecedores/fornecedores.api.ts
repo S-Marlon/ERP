@@ -114,6 +114,9 @@ export interface EnderecoFornecedor { logradouro: string; numero: string; comple
 export interface FornecedorDetalhe {
     idPessoa: number; status: 'ATIVO' | 'INATIVO'; observacoes: string | null; criadoEm: string | null;
     razaoSocial: string; nomeFantasia: string | null; cnpj: string; inscricaoEstadual: string | null; inscricaoMunicipal: string | null;
+    /** "Matriz" ou "Filial 0009" (pelo CNPJ) e os outros estabelecimentos da mesma empresa (mesma raiz do CNPJ). */
+    estabelecimento?: string | null;
+    outrosEstabelecimentos?: Array<{ idPessoa: number; nome: string; cnpj: string; estabelecimento: string | null; cidade: string | null }>;
     email: string | null; telefone: string | null; whatsapp: boolean; nomeContato: string | null; endereco: EnderecoFornecedor | null;
     resumo: { qtdNotas: number; totalComprado: number; ultimaCompra: string | null; aPagar: number; vencido: number };
     notas: Array<{ idLote: number; numero: string | null; serie: string | null; emissao: string | null; status: string; financeiro: string | null; valor: number }>;

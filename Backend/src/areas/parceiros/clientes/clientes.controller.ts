@@ -1,10 +1,18 @@
 import { Request, Response } from 'express';
 import pool from '../../../infra/db'; // Ajuste o caminho do seu pool do banco
+import { cnpjValido, limparCnpj } from '../cnpj';
 
 // 🟢 [CREATE] Cadastrar Pessoa Completa (PJ/PF com Endereços, E-mails e Telefones normalizados)
 export const createCliente = async (req: Request, res: Response) => {
   const tenantId = Number(req.query.tenant_id || req.body.tenant_id || 1);
   const dados = req.body;
+  // CNPJ grava só com números (a chave única e as buscas comparam os dígitos) e precisa ter os dígitos verificadores certos
+  if ((dados.tipo_pessoa || 'PJ') === 'PJ' && dados.documento) {
+    dados.documento = limparCnpj(dados.documento);
+    if (!cnpjValido(dados.documento)) return res.status(400).json({ success: false, error: 'CNPJ inválido: confira os números (dígitos verificadores).' });
+  } else if (dados.documento) {
+    dados.documento = String(dados.documento).replace(/\D/g, '');
+  }
 
   const connection = await pool.getConnection();
   try {
