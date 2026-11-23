@@ -9,7 +9,7 @@ import PDVHeader from './layout/AppHeader/PDVHeader';
 import Panel from './layout/AppContent/panel';
 
 // Páginas Principais
-import Dashboard from "../areas/dashboard/Dashboard";
+import CentralDoDia from "../areas/inicio/CentralDoDia";
 import Estoque from "../areas/estoque/Estoque";
 import { AjudaSuporte, CentralNotificacoes, DadosDaEmpresa, MeuPerfil, PreferenciasSistema } from "../areas/configuracoes/Configuracoes";
 import { ObrasModule } from '../areas/obras/ObrasModule';
@@ -156,7 +156,7 @@ export default function AppLayout() {
         <Panel isDarkMode={isDarkMode}  
           >
           <Routes>
-            <Route path="/" element={<Dashboard text={"Pagina inicial"} />} />
+            <Route path="/" element={<CentralDoDia />} />
             <Route path="/pedidos" element={<Pedidos />} />
 
             <Route path="/financeiro" element={<FinanceiroContasReceber />} />

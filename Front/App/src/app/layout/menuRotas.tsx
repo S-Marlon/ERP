@@ -17,7 +17,7 @@ export interface ItemMenu {
 }
 
 export const MENU_PRINCIPAL: ItemMenu[] = [
-  { key: '/', icon: <HomeOutlined />, label: 'Dashboard' },
+  { key: '/', icon: <HomeOutlined />, label: 'Início' },
   {
     key: 'grp:vendas', icon: <ShopTwoTone />, label: 'Vendas', rota: '/vendas',
     children: [

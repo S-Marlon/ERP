@@ -6,6 +6,7 @@ import catalogoRoutes from './areas/catalogo/catalogo.routes';
 import parceirosRoutes from './areas/parceiros/parceiros.routes';
 import comprasRoutes from './areas/compras/compras.routes'
 import vendasRoutes from './areas/vendas/vendas.routes';
+import inicioRoutes from './areas/inicio/inicio.routes';
 import estoqueItensRoutes from './areas/estoque/estoqueItens.routes';
 import receberRoutes from './areas/financeiro/receber/receber.routes';
 import pagarRoutes from './areas/financeiro/pagar/pagar.routes';
@@ -41,6 +42,7 @@ router.use('/parceiros', parceirosRoutes); // Adicione esta linha para incluir a
 router.use('/compras' , comprasRoutes)
 // PDV e vendas no modelo novo (itens_core)
 router.use('/vendas', vendasRoutes);
+router.use('/inicio', inicioRoutes);
 // /sistema/modulos e /modulos/<area>/<assunto>
 router.use(modulosRoutes);
 
