@@ -15,6 +15,7 @@ const nulo = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 const formatarMaterial = (m: any) => ({
   idMaterial: Number(m.id_material), nome: m.nome, categoria: m.categoria, unidade: m.unidade, custo: Number(m.custo),
   precoVenda: nulo(m.preco_venda), observacao: m.observacao || null, ativo: !!m.ativo, usos: Number(m.usos) || 0,
+  diametro: m.diametro || null, comprimentoM: nulo(m.comprimento_m), marca: m.marca || null, classe: m.classe || null, cor: m.cor || null,
 });
 
 // GET /materiais?busca=&todos=1 (sem "todos", só os ativos)
@@ -40,15 +41,17 @@ const gravarMaterial = async (req: Request, res: Response, id: number | null) =>
     const [[mesmo]]: any = await pool.execute(
       `SELECT id_material FROM modulo_hidraulica_pocos_materiais WHERE tenant_id = ? AND nome = ? AND id_material <> ?`, [tenant, m.nome, id || 0]);
     if (mesmo) throw new ErroObra(`Já existe um material chamado "${m.nome}".`, 409);
-    const valores = [m.nome, m.categoria, m.unidade, m.custo, m.precoVenda, m.observacao, m.ativo, operadorDe(req)];
+    const valores = [m.nome, m.categoria, m.unidade, m.custo, m.precoVenda, m.observacao, m.ativo, m.diametro, m.comprimentoM, m.marca, m.classe, m.cor, operadorDe(req)];
     if (id) {
       const [r]: any = await pool.execute(
-        `UPDATE modulo_hidraulica_pocos_materiais SET nome = ?, categoria = ?, unidade = ?, custo = ?, preco_venda = ?, observacao = ?, ativo = ?, operador = ?
+        `UPDATE modulo_hidraulica_pocos_materiais SET nome = ?, categoria = ?, unidade = ?, custo = ?, preco_venda = ?, observacao = ?, ativo = ?,
+           diametro = ?, comprimento_m = ?, marca = ?, classe = ?, cor = ?, operador = ?
          WHERE id_material = ? AND tenant_id = ?`, [...valores, id, tenant]);
       if (!r.affectedRows) throw new ErroObra('Material não encontrado.', 404);
     } else {
       const [ins]: any = await pool.execute(
-        `INSERT INTO modulo_hidraulica_pocos_materiais (nome, categoria, unidade, custo, preco_venda, observacao, ativo, operador, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO modulo_hidraulica_pocos_materiais (nome, categoria, unidade, custo, preco_venda, observacao, ativo, diametro, comprimento_m, marca, classe, cor, operador, tenant_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [...valores, tenant]);
       id = Number(ins.insertId);
     }

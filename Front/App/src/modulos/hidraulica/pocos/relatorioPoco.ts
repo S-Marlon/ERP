@@ -204,7 +204,9 @@ export const paraXml = (dados: Dados): string => {
 // Campos e subcampos numéricos (o resto volta como texto)
 const NUMEROS = new Set(['profundidade', 'diametroInterno', 'vazaoAprox', 'garantiaMeses', 'manutAmperagem', 'manutMegometro', 'bombaQtdTubos', 'bombaTamTubo',
   'bombaProfundidade', 'bombaNivelEstatico', 'bombaNivelDinamico', 'bombaVazaoEstimada', 'testeVazaoDuracao', 'testeVazaoEstabilizada',
-  'perfDe', 'perfAte', 'perfDiam', 'revDe', 'revAte', 'revDiam', 'geoDe', 'geoAte', 'finMetrosContratados', 'finValorContratado', 'finValorMetroExcedente', 'finValorMetroFalta',
+  'perfDe', 'perfAte', 'perfDiam', 'revDe', 'revAte', 'revDiam', 'geoDe', 'geoAte', 'revIdMaterial', 'revComprimentoBarra',
+  'compPreFiltroDe', 'compPreFiltroAte', 'compPreFiltroQtd', 'compCimentoDe', 'compCimentoAte', 'compCimentoQtd', 'compIdPreFiltro', 'compIdCimento',
+  'bombaIdTubo', 'bombaIdCabo', 'bombaIdCorda', 'bombaCaboMetros', 'bombaCordaMetros', 'bombaNivelDinamico', 'finMetrosContratados', 'finValorContratado', 'finValorMetroExcedente', 'finValorMetroFalta',
   'valor', 'tempo', 'nivel', 'vazao']);
 const valorDe = (k: string, txt: string): any => {
   if (txt === 'true' || txt === 'false') return txt === 'true';

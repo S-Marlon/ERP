@@ -3,6 +3,8 @@
 // texto ("48 a 120 m: parede em rocha sã, sem revestimento") e o desenho do perfil (SVG) para a tela, a impressão e a
 // ficha do poço. Puro, com teste.
 
+import { barrasDoTrecho, textoBarras } from './materiaisPoco';
+
 export type Dados = Record<string, any>;
 
 export const TIPOS_REVESTIMENTO: Array<{ valor: string; rotulo: string; curto: string }> = [
@@ -34,7 +36,11 @@ export const emPolegadas = (diam: unknown, unidade: unknown) => (unidade === 'mm
 const textoDiametro = (diam: unknown, unidade: unknown) => (num(diam) ? `${fmt(num(diam))}${unidade === 'mm' ? ' mm' : '"'}` : '');
 
 export interface Trecho { de: number; ate: number }
-export interface Revestimento extends Trecho { tipo: string; diametro: number; texto: string; material: string; obs: string; origem?: string }
+export interface Revestimento extends Trecho {
+  tipo: string; diametro: number; texto: string; material: string; obs: string; origem?: string;
+  /** Cor do material (cadastro) e as barras do trecho, quando o material tem comprimento de barra. */
+  cor: string | null; barras: string;
+}
 export interface Perfuracao extends Trecho { diametro: number; texto: string }
 export interface Camada extends Trecho { tipo: string; obs: string }
 
@@ -47,7 +53,16 @@ export const revestimentosDe = (d: Dados): Revestimento[] => (d.revestimentos ||
   .map((r: Dados) => ({
     de: num(r.revDe), ate: num(r.revAte), tipo: tipoRevestimento(r.revTipo).valor, diametro: emPolegadas(r.revDiam, r.revDiamUnidade),
     texto: textoDiametro(r.revDiam, r.revDiamUnidade), material: String(r.revMaterial || '').trim(), obs: String(r.revObs || '').trim(), origem: r.origem,
+    cor: /^#[0-9a-f]{6}$/i.test(String(r.revCor || '')) ? String(r.revCor) : null,
+    barras: textoBarras(barrasDoTrecho(r.revDe, r.revAte, r.revComprimentoBarra), r.revComprimentoBarra),
   }));
+
+/** Completação: pré-filtro (cascalho no espaço entre o furo e o tubo) e cimentação / selo sanitário. */
+export const completacaoDe = (d: Dados) => ({
+  preFiltro: num(d.compPreFiltroAte) > num(d.compPreFiltroDe) ? { de: num(d.compPreFiltroDe), ate: num(d.compPreFiltroAte) } : null,
+  cimento: num(d.compCimentoAte) > num(d.compCimentoDe) ? { de: num(d.compCimentoDe), ate: num(d.compCimentoAte) } : null,
+  laje: String(d.compLaje || '').trim(), tampa: String(d.compTampa || '').trim(),
+});
 
 export const camadasDe = (d: Dados): Camada[] => (d.perfilGeologico || [])
   .filter((c: Dados) => num(c?.geoAte) > num(c?.geoDe) && c?.geoTipo)
@@ -86,16 +101,33 @@ export const resumoEstrutura = (d: Dados): string[] => {
   const perf = perfuracoesDe(d);
   if (perf.length) linhas.push(`Perfuração: ${perf.map(p => `${fmt(p.de)} a ${fmt(p.ate)} m${p.texto ? ` em ${p.texto}` : ''}`).join('; ')}.`);
   for (const r of revestimentosDe(d).sort((a, b) => a.de - b.de || b.diametro - a.diametro)) {
-    linhas.push(`${tipoRevestimento(r.tipo).rotulo}${r.texto ? ` ${r.texto}` : ''}${r.material ? ` ${r.material}` : ''} de ${fmt(r.de)} a ${fmt(r.ate)} m${r.obs ? ` (${r.obs})` : ''}${r.origem ? ` · ${r.origem}` : ''}.`);
+    const detalhes = [r.barras, r.obs].filter(Boolean).join('; ');
+    // o diâmetro não se repete quando o nome do material já traz ("Tubo 5\" Asperbras")
+    const diam = r.texto && !r.material.includes(r.texto) ? ` ${r.texto}` : '';
+    linhas.push(`${tipoRevestimento(r.tipo).rotulo}${diam}${r.material ? ` ${r.material}` : ''} de ${fmt(r.de)} a ${fmt(r.ate)} m${detalhes ? ` (${detalhes})` : ''}${r.origem ? ` · ${r.origem}` : ''}.`);
   }
   for (const t of trechosSemRevestimento(d)) {
     const f = formacaoNoTrecho(d, t);
     linhas.push(`Sem revestimento de ${fmt(t.de)} a ${fmt(t.ate)} m: parede ${f ? `em ${f}` : 'na formação'}.`);
   }
   if (d.revestimentoDesconhecido) linhas.push('Revestimento ainda não informado.');
+  const comp = completacaoDe(d);
+  if (comp.preFiltro) linhas.push(`Pré-filtro (cascalho) de ${fmt(comp.preFiltro.de)} a ${fmt(comp.preFiltro.ate)} m${d.compPreFiltroMaterial ? ` · ${d.compPreFiltroMaterial}` : ''}.`);
+  if (comp.cimento) linhas.push(`Cimentação / selo sanitário de ${fmt(comp.cimento.de)} a ${fmt(comp.cimento.ate)} m.`);
+  if (comp.laje || comp.tampa) linhas.push([comp.laje && `Laje de proteção: ${comp.laje}`, comp.tampa && `tampa: ${comp.tampa}`].filter(Boolean).join(' · ') + '.');
   const fraturas = camadasDe(d).filter(c => c.tipo === 'Fratura com água');
   if (fraturas.length) linhas.push(`Entradas de água (fraturas): ${fraturas.map(c => `${fmt(c.de)}${c.ate !== c.de ? `–${fmt(c.ate)}` : ''} m`).join(', ')}.`);
-  const extra = [num(d.bombaNivelEstatico) ? `nível estático ${fmt(num(d.bombaNivelEstatico))} m` : '', num(d.bombaProfundidade) ? `bomba a ${fmt(num(d.bombaProfundidade))} m` : ''].filter(Boolean);
+  const tubos = num(d.bombaQtdTubos) && num(d.bombaTamTubo)
+    ? `${(() => {
+      // o nome do material já diz o que é ("Tubo edutor 1 1/4\""): não repete
+      const medida = d.bombaMedidaTubo ? `${d.bombaMedidaTubo}${d.bombaTuboUnidade === 'mm' ? ' mm' : '"'}` : '';
+      const nome = String(d.bombaTubulacao || '').trim();
+      if (!nome) return `tubo edutor${medida ? ` ${medida}` : ''}`;
+      return `${/edutor/i.test(nome) ? '' : 'tubo edutor '}${medida && !nome.includes(medida) ? `${medida} ` : ''}${nome}`;
+    })()}: ${textoBarras(num(d.bombaQtdTubos), d.bombaTamTubo)} = ${fmt(num(d.bombaQtdTubos) * num(d.bombaTamTubo))} m`
+    : '';
+  const extra = [num(d.bombaNivelEstatico) ? `nível estático ${fmt(num(d.bombaNivelEstatico))} m` : '', num(d.bombaNivelDinamico) ? `nível dinâmico ${fmt(num(d.bombaNivelDinamico))} m` : '',
+    num(d.bombaProfundidade) ? `bomba a ${fmt(num(d.bombaProfundidade))} m` : '', tubos].filter(Boolean);
   if (extra.length) linhas.push(`${extra.join(' · ').replace(/^./, c => c.toUpperCase())}.`);
   return linhas;
 };
@@ -125,7 +157,8 @@ export const svgPerfil = (d: Dados, opcoes: { largura?: number; altura?: number 
   const meia = (pol: number) => Math.max(4, (pol || maiorPol * 0.6) * k);
 
   const partes: string[] = [];
-  partes.push(`<defs><pattern id="rocha" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#8c8c8c" stroke-width="1.2"/></pattern></defs>`);
+  partes.push(`<defs><pattern id="rocha" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#8c8c8c" stroke-width="1.2"/></pattern>`
+    + `<pattern id="cascalho" width="5" height="5" patternUnits="userSpaceOnUse"><circle cx="2.5" cy="2.5" r="1.1" fill="#ad8b00"/></pattern></defs>`);
 
   // escala
   const passo = passoDaEscala(fundo);
@@ -149,6 +182,22 @@ export const svgPerfil = (d: Dados, opcoes: { largura?: number; altura?: number 
     const p = furo.find(f => f.ate > t.de && f.de < t.ate) || furo[furo.length - 1];
     partes.push(`<rect x="${cx - meia(p.diametro)}" y="${y(t.de)}" width="${meia(p.diametro) * 2}" height="${y(t.ate) - y(t.de)}" fill="url(#rocha)" opacity="0.55"/>`);
   }
+  // completação no espaço entre o furo e o revestimento: cimento (cinza) e pré-filtro (pontilhado)
+  const comp = completacaoDe(d);
+  for (const [t, fill] of [[comp.cimento, '#bfbfbf'], [comp.preFiltro, 'url(#cascalho)']] as const) {
+    if (!t) continue;
+    const p = furo.find(f => f.ate > t.de && f.de < t.ate) || furo[0];
+    // só no espaço anelar: da parede do furo até o maior tubo que passa ali (sem tubo, o furo todo)
+    const tubo = Math.max(0, ...revs.filter(r => r.ate > t.de && r.de < t.ate).map(r => r.diametro));
+    const ext = meia(p.diametro);
+    const int = tubo ? Math.min(meia(tubo), ext) : 0;
+    const alt = Math.max(1.5, y(t.ate) - y(t.de));
+    if (!int) partes.push(`<rect x="${cx - ext}" y="${y(t.de)}" width="${ext * 2}" height="${alt}" fill="${fill}" opacity="0.85"/>`);
+    else if (ext - int > 0.5) {
+      partes.push(`<rect x="${cx - ext}" y="${y(t.de)}" width="${ext - int}" height="${alt}" fill="${fill}" opacity="0.85"/>`);
+      partes.push(`<rect x="${cx + int}" y="${y(t.de)}" width="${ext - int}" height="${alt}" fill="${fill}" opacity="0.85"/>`);
+    }
+  }
   // água a partir do NE (dentro do menor diâmetro)
   const ne = num(d.bombaNivelEstatico);
   if (ne > 0 && ne < fundo) {
@@ -156,27 +205,38 @@ export const svgPerfil = (d: Dados, opcoes: { largura?: number; altura?: number 
     partes.push(`<rect x="${cx - meia(menor) + 2}" y="${y(ne)}" width="${meia(menor) * 2 - 4}" height="${y(fundo) - y(ne)}" fill="#91caff" opacity="0.45"/>`);
     partes.push(`<line x1="${cx - meia(maiorPol) - 8}" x2="${cx + meia(maiorPol) + 8}" y1="${y(ne)}" y2="${y(ne)}" stroke="#1677ff" stroke-dasharray="4 3"/>`);
   }
+  const nd = num(d.bombaNivelDinamico);
+  if (nd > 0 && nd < fundo) partes.push(`<line x1="${cx - meia(maiorPol) - 8}" x2="${cx + meia(maiorPol) + 8}" y1="${y(nd)}" y2="${y(nd)}" stroke="#d46b08" stroke-dasharray="2 3"/>`);
   // revestimentos: o de fora mais grosso, o interno azul, o filtro tracejado
-  const estilo = (t: string) => (t === 'INTERNO' ? 'stroke="#0958d9" stroke-width="2.5"' : t === 'FILTRO' ? 'stroke="#555" stroke-width="2.5" stroke-dasharray="3 3"' : 'stroke="#333" stroke-width="3"');
+  // cor do material (cadastro) ou a do tipo; filtro sempre tracejado
+  const estilo = (r: Revestimento) => {
+    const cor = r.cor || (r.tipo === 'INTERNO' ? '#0958d9' : r.tipo === 'FILTRO' ? '#555' : '#333');
+    return r.tipo === 'FILTRO' ? `stroke="${cor}" stroke-width="2.5" stroke-dasharray="3 3"` : `stroke="${cor}" stroke-width="${r.tipo === 'INTERNO' ? 2.5 : 3}"`;
+  };
   for (const r of [...revs].sort((a, b) => b.diametro - a.diametro)) {
     const x = meia(r.diametro);
     partes.push(`<g><title>${esc(`${tipoRevestimento(r.tipo).rotulo} ${r.texto} ${r.material}: ${fmt(r.de)} a ${fmt(r.ate)} m`)}</title>`
-      + `<line x1="${cx - x}" x2="${cx - x}" y1="${y(r.de)}" y2="${y(r.ate)}" ${estilo(r.tipo)}/><line x1="${cx + x}" x2="${cx + x}" y1="${y(r.de)}" y2="${y(r.ate)}" ${estilo(r.tipo)}/></g>`);
+      + `<line x1="${cx - x}" x2="${cx - x}" y1="${y(r.de)}" y2="${y(r.ate)}" ${estilo(r)}/><line x1="${cx + x}" x2="${cx + x}" y1="${y(r.de)}" y2="${y(r.ate)}" ${estilo(r)}/></g>`);
   }
   // bomba
   const bomba = num(d.bombaProfundidade);
   if (bomba > 0) {
     const menor = Math.min(...revs.map(r => r.diametro || 99), ...furo.map(f => f.diametro));
     const lb = Math.max(4, meia(menor) * 0.55);
-    partes.push(`<line x1="${cx}" x2="${cx}" y1="${topo}" y2="${y(bomba) - 10}" stroke="#595959" stroke-width="1.5"/>`);
+    // tubo edutor na cor do material até a bomba
+    const corTubo = /^#[0-9a-f]{6}$/i.test(String(d.bombaTuboCor || '')) ? d.bombaTuboCor : '#595959';
+    partes.push(`<line x1="${cx}" x2="${cx}" y1="${topo}" y2="${y(bomba) - 10}" stroke="${corTubo}" stroke-width="${d.bombaTuboCor ? 3 : 1.5}"><title>${esc(`Tubo edutor até ${fmt(bomba)} m`)}</title></line>`);
     partes.push(`<rect x="${cx - lb}" y="${y(bomba) - 10}" width="${lb * 2}" height="20" rx="3" fill="#434343"><title>Bomba a ${fmt(bomba)} m</title></rect>`);
   }
 
   // legendas à direita, sem sobrepor (mínimo 13 px entre elas)
   const legendas: Array<{ y: number; texto: string; cor: string }> = [
-    ...revs.map(r => ({ y: y((r.de + r.ate) / 2), texto: `${tipoRevestimento(r.tipo).curto} ${r.texto} · ${fmt(r.de)}–${fmt(r.ate)} m`, cor: r.tipo === 'INTERNO' ? '#0958d9' : '#333' })),
+    ...revs.map(r => ({ y: y((r.de + r.ate) / 2), texto: `${tipoRevestimento(r.tipo).curto} ${r.texto} · ${fmt(r.de)}–${fmt(r.ate)} m`, cor: r.cor || (r.tipo === 'INTERNO' ? '#0958d9' : '#333') })),
     ...trechosSemRevestimento(d).map(t => ({ y: y((t.de + t.ate) / 2), texto: `Sem revestimento · ${fmt(t.de)}–${fmt(t.ate)} m`, cor: '#8c6d3f' })),
     ...(ne > 0 && ne < fundo ? [{ y: y(ne), texto: `NE (nível estático) · ${fmt(ne)} m`, cor: '#1677ff' }] : []),
+    ...(nd > 0 && nd < fundo ? [{ y: y(nd), texto: `ND (nível dinâmico) · ${fmt(nd)} m`, cor: '#d46b08' }] : []),
+    ...(comp.preFiltro ? [{ y: y((comp.preFiltro.de + comp.preFiltro.ate) / 2), texto: `Pré-filtro · ${fmt(comp.preFiltro.de)}–${fmt(comp.preFiltro.ate)} m`, cor: '#ad8b00' }] : []),
+    ...(comp.cimento ? [{ y: y((comp.cimento.de + comp.cimento.ate) / 2), texto: `Cimentação · ${fmt(comp.cimento.de)}–${fmt(comp.cimento.ate)} m`, cor: '#8c8c8c' }] : []),
     ...(bomba > 0 ? [{ y: y(bomba), texto: `Bomba · ${fmt(bomba)} m`, cor: '#434343' }] : []),
   ].sort((a, b) => a.y - b.y);
   let ultimo = -99;

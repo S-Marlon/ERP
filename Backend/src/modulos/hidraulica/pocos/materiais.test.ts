@@ -5,7 +5,12 @@ const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok
 
 teste('materiais de poço: cadastro', () => {
   assert.deepStrictEqual(validarMaterial({ nome: ' Cabo PP  3x4 ', categoria: 'cabo', unidade: 'M', custo: '8,5' }),
-    { nome: 'Cabo PP 3x4', categoria: 'CABO', unidade: 'm', custo: 8.5, precoVenda: null, observacao: null, ativo: 1 });
+    { nome: 'Cabo PP 3x4', categoria: 'CABO', unidade: 'm', custo: 8.5, precoVenda: null, observacao: null, ativo: 1,
+      diametro: null, comprimentoM: null, marca: null, classe: null, cor: null });
+  const t = validarMaterial({ nome: 'Tubo 5" Asperbras', categoria: 'TUBO', diametro: ' 5" ', comprimentoM: '6', marca: 'Asperbras', classe: 'PN80', cor: '#2F54EB' });
+  assert.deepStrictEqual([t.diametro, t.comprimentoM, t.marca, t.classe, t.cor], ['5"', 6, 'Asperbras', 'PN80', '#2f54eb']);
+  assert.throws(() => validarMaterial({ nome: 'X', cor: 'azul' }), /Cor/);
+  assert.throws(() => validarMaterial({ nome: 'X', comprimentoM: 500 }), /100 m/);
   assert.strictEqual(validarMaterial({ nome: 'Bomba', ativo: false }).ativo, 0);
   assert.throws(() => validarMaterial({}), /nome/);
   assert.throws(() => validarMaterial({ nome: 'X', categoria: 'PNEU' }), /Categoria/);

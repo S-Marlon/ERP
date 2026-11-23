@@ -3,6 +3,7 @@
 // (Front/App/src/modulos/hidraulica/pocos/estruturaPoco.ts). Puro, com teste.
 
 type Dados = Record<string, any>;
+const CAMPOS_COMPLETACAO = ['compPreFiltroDe', 'compPreFiltroAte', 'compPreFiltroMaterial', 'compPreFiltroQtd', 'compCimentoDe', 'compCimentoAte', 'compCimentoQtd', 'compLaje', 'compTampa'];
 const num = (v: unknown) => { const x = Number(String(v ?? '').replace(',', '.')); return Number.isFinite(x) ? x : 0; };
 const fundoDaLista = (l: unknown, campo: string) => (Array.isArray(l) ? l.reduce((m: number, x: any) => Math.max(m, num(x?.[campo])), 0) : 0);
 
@@ -32,13 +33,22 @@ export const estruturaDasObras = (obras: RelatorioDaObra[]) => {
     }
   }
   const recente = (campo: string) => [...lista].reverse().map(o => num(o.dados![campo])).find(v => v > 0) || null;
+  const recenteTexto = (campo: string) => [...lista].reverse().map(o => o.dados![campo]).find(v => v !== undefined && v !== null && String(v).trim() !== '') ?? null;
+  // completação: a do relatório mais recente que a informou (pré-filtro e cimentação andam juntos)
+  const comComp = [...lista].reverse().find(o => num(o.dados!.compPreFiltroAte) > 0 || num(o.dados!.compCimentoAte) > 0 || o.dados!.compLaje || o.dados!.compTampa);
+  const completacao = comComp ? Object.fromEntries(CAMPOS_COMPLETACAO.map(k => [k, comComp.dados![k] ?? null])) : {};
   const estrutura = {
     perfuracoes: perf ? perf.dados!.perfuracoes : [],
     perfilGeologico: geo ? geo.dados!.perfilGeologico : [],
     revestimentos,
     profundidade: Math.max(...lista.map(o => num(o.dados!.profundidade)), fundoDaLista(perf?.dados?.perfuracoes, 'perfAte')),
     bombaNivelEstatico: recente('bombaNivelEstatico'),
+    bombaNivelDinamico: recente('bombaNivelDinamico'),
     bombaProfundidade: recente('bombaProfundidade'),
+    // tubo edutor do relatório mais recente (desenho e resumo)
+    bombaQtdTubos: recente('bombaQtdTubos'), bombaTamTubo: recente('bombaTamTubo'), bombaMedidaTubo: recenteTexto('bombaMedidaTubo'),
+    bombaTuboUnidade: recenteTexto('bombaTuboUnidade'), bombaTubulacao: recenteTexto('bombaTubulacao'), bombaTuboCor: recenteTexto('bombaTuboCor'),
+    ...completacao,
   };
   return estrutura.perfuracoes.length || revestimentos.length ? estrutura : null;
 };
@@ -98,11 +108,21 @@ export const limparEstrutura = (b: any) => {
   const revestimentos = lista(b?.revestimentos)
     .map((r: any) => ({
       revTipo: TIPOS_REV.includes(r?.revTipo) ? r.revTipo : 'EXTERNO', revDe: numOuNulo(r?.revDe) ?? 0, revAte: numOuNulo(r?.revAte),
-      revDiam: numOuNulo(r?.revDiam), revDiamUnidade: unidade(r?.revDiamUnidade), revMaterial: texto(r?.revMaterial, 60), revUniao: texto(r?.revUniao, 40), revObs: texto(r?.revObs, 120),
+      revDiam: numOuNulo(r?.revDiam), revDiamUnidade: unidade(r?.revDiamUnidade), revMaterial: texto(r?.revMaterial, 120), revUniao: texto(r?.revUniao, 40), revObs: texto(r?.revObs, 120),
+      // material do cadastro: id, cor do desenho e comprimento da barra
+      revIdMaterial: Number(r?.revIdMaterial) > 0 ? Number(r.revIdMaterial) : null,
+      revCor: /^#[0-9a-f]{6}$/i.test(String(r?.revCor || '')) ? String(r.revCor) : null,
+      revComprimentoBarra: numOuNulo(r?.revComprimentoBarra),
     }))
     .filter((r: any) => valida(r.revDe, r.revAte));
   const perfilGeologico = lista(b?.perfilGeologico)
     .map((c: any) => ({ geoDe: numOuNulo(c?.geoDe) ?? 0, geoAte: numOuNulo(c?.geoAte), geoTipo: texto(c?.geoTipo, 40), geoObs: texto(c?.geoObs, 120) }))
     .filter((c: any) => valida(c.geoDe, c.geoAte) && c.geoTipo).sort((a: any, c: any) => a.geoDe - c.geoDe);
-  return { perfuracoes, revestimentos, perfilGeologico };
+  // completação (pré-filtro, cimentação, laje e tampa)
+  const completacao = {
+    compPreFiltroDe: numOuNulo(b?.compPreFiltroDe), compPreFiltroAte: numOuNulo(b?.compPreFiltroAte), compPreFiltroMaterial: texto(b?.compPreFiltroMaterial, 120),
+    compPreFiltroQtd: numOuNulo(b?.compPreFiltroQtd), compCimentoDe: numOuNulo(b?.compCimentoDe), compCimentoAte: numOuNulo(b?.compCimentoAte),
+    compCimentoQtd: numOuNulo(b?.compCimentoQtd), compLaje: texto(b?.compLaje, 60), compTampa: texto(b?.compTampa, 60),
+  };
+  return { perfuracoes, revestimentos, perfilGeologico, ...completacao };
 };

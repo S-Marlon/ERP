@@ -19,6 +19,7 @@ teste('estrutura do poço: perfuração original + complemento anos depois', () 
   assert.strictEqual(e.profundidade, 120);
   assert.strictEqual(e.bombaProfundidade, 90);      // a mais recente
   assert.strictEqual(e.bombaNivelEstatico, 25);
+  assert.strictEqual((e as any).compPreFiltroAte, undefined);   // ninguém informou completação
 });
 
 teste('estrutura do poço: uma obra só não marca a origem; sem dados = null', () => {
@@ -53,6 +54,8 @@ teste('estrutura do poço: editada na ficha', () => {
   assert.deepStrictEqual(e.revestimentos.map((r: any) => [r.revTipo, r.revDe, r.revAte, r.revDiamUnidade, r.revMaterial]), [['EXTERNO', 0, 48, '"', 'PVC'], ['INTERNO', 0, 120, 'mm', '']]);
   assert.strictEqual(e.perfilGeologico.length, 1);
   assert.ok(!('lixo' in e));
+  const m = limparEstrutura({ revestimentos: [{ revDe: 0, revAte: 48, revIdMaterial: '1', revCor: '#2F54EB', revComprimentoBarra: '6' }], compPreFiltroDe: 30, compPreFiltroAte: '60', compLaje: '1x1 m' });
+  assert.deepStrictEqual([m.revestimentos[0].revIdMaterial, m.revestimentos[0].revCor, m.revestimentos[0].revComprimentoBarra, m.compPreFiltroAte, m.compLaje], [1, '#2F54EB', 6, 60, '1x1 m']);
   // a do poço é a base; o complemento da obra entra por cima
   const f = estruturaDoPoco([{ origem: 'Obra 12', data: '2026-09-01', dados: { revestimentos: [{ revTipo: 'INTERNO', revDe: 0, revAte: 120, revDiam: 4 }] } }],
     { profundidadeM: 120, diametro: '6', nivelEstaticoM: null }, { perfuracoes: e.perfuracoes, revestimentos: [e.revestimentos[0]], perfilGeologico: [] })!;

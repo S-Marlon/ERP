@@ -1,13 +1,15 @@
 // Obras de poços › materiais (etapa 4): os materiais de cada obra (previsto, usado e o custo real) e o cadastro de
 // materiais do módulo. Não usa o catálogo nem o estoque da loja. Material cobrado à parte vira adicional da obra.
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Button, Card, Checkbox, Col, Empty, Input, Modal, Popconfirm, Row, Select, Space, Statistic, Switch, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { Alert, Button, Card, Checkbox, Col, ColorPicker, Empty, Input, Modal, Popconfirm, Row, Select, Space, Statistic, Switch, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { CopyOutlined, DeleteOutlined, DollarOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import {
   CATEGORIAS_MATERIAL, CategoriaMaterial, LinhaMaterialObra, MaterialForm, MaterialPoco, materiaisApi, obrasApi, ResumoMateriais, SITUACOES_ADICIONAL,
   UNIDADES_MATERIAL, Obra,
 } from './obrasApi';
 import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
+import { Bolinha, catalogoMateriais } from './CampoMaterial';
+import { corDoMaterial, corPadrao, sugerirDadosTecnicos } from './materiaisPoco';
 
 const { Text } = Typography;
 const brl = (v: number | null | undefined) => (v === null || v === undefined ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
@@ -183,8 +185,23 @@ export const CadastroMateriais: React.FC = () => {
   const salvar = async () => {
     try {
       if (aberto === 'novo') await materiaisApi.criar(f); else if (aberto) await materiaisApi.salvar(aberto.idMaterial, f);
-      message.success('Material salvo.'); setAberto(null); carregar();
+      message.success('Material salvo.'); setAberto(null); carregar(); catalogoMateriais.carregar(true);
     } catch (e) { erro(e); }
+  };
+  // Completa os dados técnicos vazios (diâmetro, barra, classe, cor) pelo nome de cada material; o que já foi preenchido fica
+  const [completando, setCompletando] = useState(false);
+  const faltando = lista.filter(m => ['TUBO', 'FILTRO', 'CABO', 'PRE_FILTRO'].includes(m.categoria) && (!m.cor || (!m.diametro && sugerirDadosTecnicos(m.nome, m.categoria).diametro)
+    || (!m.comprimentoM && sugerirDadosTecnicos(m.nome, m.categoria).comprimentoM)));
+  const completarPeloNome = async () => {
+    setCompletando(true);
+    try {
+      for (const m of faltando) {
+        const s = sugerirDadosTecnicos(m.nome, m.categoria);
+        await materiaisApi.salvar(m.idMaterial, { ...m, diametro: m.diametro || s.diametro, comprimentoM: m.comprimentoM || s.comprimentoM, classe: m.classe || s.classe, cor: m.cor || s.cor });
+      }
+      message.success(`${faltando.length} material(is) completado(s): confira o comprimento da barra e a cor de cada um.`);
+      carregar(); catalogoMateriais.carregar(true);
+    } catch (e) { erro(e); } finally { setCompletando(false); }
   };
   return (
     <Card size="small"
@@ -192,13 +209,22 @@ export const CadastroMateriais: React.FC = () => {
         <Checkbox checked={todos} onChange={e => setTodos(e.target.checked)}>mostrar inativos</Checkbox></Space>}
       extra={<Space>
         <Tooltip title="Recarregar"><Button icon={<ReloadOutlined />} loading={carregando} onClick={carregar} /></Tooltip>
+        {faltando.length > 0 && (
+          <Tooltip title="Diâmetro, comprimento da barra, classe (PN80) e cor tirados do nome, só onde está vazio (ex.: Tubo geomecânico 6&quot; (barra) → 6&quot;, barra de 6 m, azul)">
+            <Button loading={completando} onClick={completarPeloNome}>Completar pelo nome ({faltando.length})</Button>
+          </Tooltip>
+        )}
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setAberto('novo')}>Novo material</Button>
       </Space>}>
       <Alert type="info" showIcon style={{ marginBottom: 8 }} message="Materiais do módulo de poços: separados do catálogo e do estoque da loja. O custo daqui é o sugerido ao lançar na obra." />
       <Table<MaterialPoco> size="small" rowKey="idMaterial" loading={carregando} dataSource={lista} pagination={{ pageSize: 50, hideOnSinglePage: true }}
         onRow={m => ({ onClick: () => setAberto(m), style: { cursor: 'pointer', opacity: m.ativo ? 1 : 0.55 } })}
         columns={[
-          { title: 'Material', dataIndex: 'nome' },
+          { title: 'Material', render: (_, m) => (
+            <Space size={6}><Bolinha cor={corDoMaterial(m)} /><span>{m.nome}</span>
+              <Text type="secondary" style={{ fontSize: 11 }}>{[m.diametro, m.comprimentoM ? `barra ${String(m.comprimentoM).replace('.', ',')} m` : null, m.marca, m.classe].filter(Boolean).join(' · ')}</Text>
+            </Space>
+          ) },
           { title: 'Categoria', width: 160, render: (_, m) => CATEGORIAS_MATERIAL[m.categoria] },
           { title: 'Un.', width: 60, dataIndex: 'unidade' },
           { title: 'Custo', width: 120, align: 'right', render: (_, m) => (m.custo ? brl(m.custo) : <Text type="warning">sem custo</Text>) },
@@ -225,6 +251,24 @@ export const CadastroMateriais: React.FC = () => {
               <CampoDinheiro min={0} precision={2} style={{ width: '100%' }} value={f.precoVenda ?? undefined} onChange={v => setF({ ...f, precoVenda: v === null ? null : Number(v) })} />
             </Col>
           </Row>
+          {/* Dados técnicos: desenho do poço (cor) e contas de barras (comprimento) */}
+          <Row gutter={8}>
+            <Col span={6}><Text>Diâmetro</Text><Input maxLength={20} placeholder='6"' value={f.diametro || ''} onChange={e => setF({ ...f, diametro: e.target.value || null })} /></Col>
+            <Col span={6}><Text>Barra (m)</Text>
+              <CampoNumero min={0} max={100} style={{ width: '100%' }} placeholder="6" value={f.comprimentoM ?? undefined} onChange={v => setF({ ...f, comprimentoM: v === null ? null : Number(v) })} />
+            </Col>
+            <Col span={6}><Text>Marca</Text><Input maxLength={60} placeholder="Asperbras" value={f.marca || ''} onChange={e => setF({ ...f, marca: e.target.value || null })} /></Col>
+            <Col span={6}><Text>Classe</Text><Input maxLength={20} placeholder="PN80" value={f.classe || ''} onChange={e => setF({ ...f, classe: e.target.value || null })} /></Col>
+          </Row>
+          <Space align="center" wrap>
+            <Text>Cor no desenho do poço</Text>
+            <ColorPicker value={f.cor || corPadrao(f.nome, f.categoria)} onChangeComplete={c => setF({ ...f, cor: c.toHexString() })} showText
+              presets={[{ label: 'Comuns', colors: ['#2f54eb', '#69b1ff', '#595959', '#bfbfbf', '#262626', '#13a8a8', '#fa8c16', '#cf1322', '#ad8b00', '#d4b106'] }]} />
+            {f.cor && <Button size="small" type="link" onClick={() => setF({ ...f, cor: null })}>usar a padrão</Button>}
+            <Button size="small" onClick={() => { const s = sugerirDadosTecnicos(f.nome, f.categoria); setF({ ...f, diametro: f.diametro || s.diametro, comprimentoM: f.comprimentoM || s.comprimentoM, classe: f.classe || s.classe }); }}>
+              Preencher pelo nome
+            </Button>
+          </Space>
           <div><Text>Observação</Text><Input maxLength={255} value={f.observacao || ''} onChange={e => setF({ ...f, observacao: e.target.value || null })} /></div>
           <Space><Switch checked={f.ativo} onChange={ativo => setF({ ...f, ativo })} /><Text>{f.ativo ? 'Ativo (aparece ao lançar na obra)' : 'Inativo'}</Text></Space>
         </Space>

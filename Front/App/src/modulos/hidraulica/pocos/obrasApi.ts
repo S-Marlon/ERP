@@ -196,6 +196,8 @@ export const UNIDADES_MATERIAL = ['m', 'un', 'kg', 'sc', 'L'] as const;
 
 export interface MaterialForm {
   nome: string; categoria: CategoriaMaterial; unidade: string; custo: number; precoVenda: number | null; observacao: string | null; ativo: boolean;
+  /** Dados técnicos: diâmetro ("5\""), comprimento da barra em m, marca, classe (PN80) e a cor no desenho do poço. */
+  diametro?: string | null; comprimentoM?: number | null; marca?: string | null; classe?: string | null; cor?: string | null;
 }
 export interface MaterialPoco extends MaterialForm { idMaterial: number; usos: number }
 export interface LinhaMaterialObra {

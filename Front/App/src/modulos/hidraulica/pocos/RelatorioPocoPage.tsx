@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button, Card, Checkbox, Col, Collapse, DatePicker, Descriptions, Drawer, Dropdown, Flex, Form, Input, message, Row, Segmented, Select, Space, Statistic, Switch, Tag, Tooltip, Typography, Upload, theme } from 'antd';
 import {
   ArrowLeftOutlined, BuildOutlined, CompassOutlined, DashboardOutlined, DeleteOutlined, DollarOutlined, DownloadOutlined, ExperimentOutlined, EyeOutlined,
-  FileAddOutlined, LineChartOutlined, PlusOutlined, PrinterOutlined, SettingOutlined, UploadOutlined, UserOutlined,
+  FileAddOutlined, LineChartOutlined, PlusOutlined, PrinterOutlined, SettingOutlined, UnorderedListOutlined, UploadOutlined, UserOutlined,
 } from '@ant-design/icons';
 import { RelatorioDaObra, useRelatorioPoco } from './useRelatorioPoco';
 import {
@@ -13,7 +13,11 @@ import {
 } from './relatorioPoco';
 import { MODELOS, ModeloId } from './templatesPoco';
 import { GRUPOS_OCORRENCIA, GrupoOcorrencia, itensDosGrupos } from './ocorrencias';
-import { CAMADAS_GEOLOGICAS, resumoEstrutura, svgPerfil, temEstrutura, TIPOS_REVESTIMENTO } from './estruturaPoco';
+import { CAMADAS_GEOLOGICAS, resumoEstrutura, revestimentosDe, svgPerfil, temEstrutura, TIPOS_REVESTIMENTO } from './estruturaPoco';
+import { CampoMaterial, useCatalogoMateriais } from './CampoMaterial';
+import { barrasDoTrecho, caboSugerido, corDoMaterial, diametroEmNumero, textoBarras } from './materiaisPoco';
+import { LancarMateriais } from './LancarMateriais';
+import type { MaterialPoco } from './obrasApi';
 import { mascaraCep, mascaraCnpj, mascaraCpfCnpj, mascaraTelefone, UFS } from '../../../shared/formularios/documentos';
 import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
 import { FORMATOS_DATA } from '../../../shared/formularios/numeros';
@@ -23,7 +27,6 @@ const { TextArea } = Input;
 
 const UNIDADES = [{ value: '"', label: 'pol (")' }, { value: 'mm', label: 'mm' }];
 const SOLOS = ['Arenoso', 'Argiloso', 'Silte (caxeta)', 'Rocha alterada', 'Rocha sã (cristalino)', 'Sedimentar (misto)'];
-const MATERIAIS_TUBO = ['Aço galvanizado', 'PVC geomecânico', 'Tubo flexível (Subteck/PEX)', 'PEAD'];
 const ROTULO_CURTO: Record<ModeloId, string> = { completo: 'Completo', cobranca: 'Cobrança', vazao: 'Teste de vazão', garantia: 'Garantia', branco: 'Em branco' };
 
 export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: RelatorioDaObra; titulo?: string; onVoltar?: () => void } = {}) {
@@ -65,6 +68,24 @@ export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: R
     );
   };
 
+  const catalogo = useCatalogoMateriais();
+  const [lancando, setLancando] = useState(false);
+  /** Material escolhido na linha do revestimento: guarda o id, a cor e o comprimento da barra; o diâmetro, se estiver vazio. */
+  const aplicarMaterial = (idx: number, m: MaterialPoco | null) => {
+    const linhas = [...(form.getFieldValue('revestimentos') || [])];
+    const l = { ...linhas[idx], revIdMaterial: m?.idMaterial ?? null, revCor: m ? corDoMaterial(m) : null, revComprimentoBarra: m?.comprimentoM ?? null };
+    const d = m ? diametroEmNumero(m.diametro) : null;
+    if (d && !l.revDiam) { l.revDiam = d.valor; l.revDiamUnidade = d.unidade; }
+    linhas[idx] = l;
+    form.setFieldValue('revestimentos', linhas);
+    p.aoMudar({});
+  };
+  /** Material de um campo simples (tubo edutor, cabo, corda, pré-filtro, cimento): guarda o id (e a cor) no campo dado. */
+  const aplicarSimples = (campoId: string, m: MaterialPoco | null, extra: Record<string, unknown> = {}) => {
+    form.setFieldsValue({ [campoId]: m?.idMaterial ?? null, ...extra });
+    p.aoMudar({});
+  };
+
   // Lista de camadas (perfuração/revestimento): "De" vem da camada anterior
   const camadas = (nome: 'perfuracoes' | 'revestimentos') => {
     const perf = nome === 'perfuracoes';
@@ -74,7 +95,8 @@ export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: R
         {(campos, { add, remove }) => (
           <Flex vertical gap={6}>
             {campos.map(({ key, name }, i) => (
-              <Row key={key} gutter={6} align="bottom" wrap={false}>
+              <Flex key={key} vertical gap={2}>
+              <Row gutter={6} align="bottom" wrap={false}>
                 {!perf && <Col flex="150px"><Form.Item label={i === 0 ? 'Tipo' : ''} name={[name, 'revTipo']} initialValue="EXTERNO" style={{ marginBottom: 0 }}>
                   <Select popupMatchSelectWidth={false} options={TIPOS_REVESTIMENTO.map(t => ({ value: t.valor, label: t.rotulo }))} />
                 </Form.Item></Col>}
@@ -88,15 +110,28 @@ export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: R
                     </Space.Compact>
                   </Form.Item>
                 </Col>
-                {!perf && <>
-                  <Col flex="120px"><Form.Item label={i === 0 ? 'Material' : ''} name={[name, 'revMaterial']} style={{ marginBottom: 0 }}><Input placeholder="PVC geomec." /></Form.Item></Col>
-                  <Col flex="90px"><Form.Item label={i === 0 ? 'União' : ''} name={[name, 'revUniao']} style={{ marginBottom: 0 }}><Input placeholder="Rosca" /></Form.Item></Col>
-                  <Col flex="160px"><Form.Item label={i === 0 ? 'Motivo / obs.' : ''} name={[name, 'revObs']} style={{ marginBottom: 0 }}><Input placeholder="Ex.: caimento aos 60 m" /></Form.Item></Col>
-                </>}
+                {!perf && (
+                  <Col flex="230px"><Form.Item label={i === 0 ? 'Material (cadastro)' : ''} name={[name, 'revMaterial']} style={{ marginBottom: 0 }}>
+                    <CampoMaterial categorias={['TUBO', 'FILTRO']} placeholder="Tubo geomecânico 6&quot;..." cor={valores.revestimentos?.[name]?.revCor}
+                      onEscolher={m => aplicarMaterial(name, m)} style={{ width: '100%' }} />
+                  </Form.Item></Col>
+                )}
                 <Col flex="32px">
                   <Button type="text" danger icon={<DeleteOutlined />} disabled={campos.length === 1} onClick={() => { remove(name); p.aoMudar({ [nome]: true }); }} />
                 </Col>
               </Row>
+              {!perf && (() => {
+                const l = valores.revestimentos?.[name] || {};
+                const barras = textoBarras(barrasDoTrecho(l.revDe, l.revAte, l.revComprimentoBarra), l.revComprimentoBarra);
+                return (
+                  <Row gutter={6} wrap={false} align="middle" style={{ paddingLeft: 156 }}>
+                    <Col flex="110px"><Form.Item name={[name, 'revUniao']} style={{ marginBottom: 0 }}><Input size="small" placeholder="União (rosca)" /></Form.Item></Col>
+                    <Col flex="auto"><Form.Item name={[name, 'revObs']} style={{ marginBottom: 0 }}><Input size="small" placeholder="Motivo / obs. (ex.: caimento aos 60 m)" /></Form.Item></Col>
+                    <Col flex="190px">{barras ? <Tag color="blue" style={{ margin: 0 }}>{barras}</Tag> : <Text type="secondary" style={{ fontSize: 11 }}>{l.revIdMaterial ? 'sem comprimento de barra no cadastro' : ''}</Text>}</Col>
+                  </Row>
+                );
+              })()}
+              </Flex>
             ))}
             <Space wrap>
               <Button type="dashed" icon={<PlusOutlined />} onClick={() => { const l = form.getFieldValue(nome) || []; add({ [de]: Number(l[l.length - 1]?.[ate]) || 0, [un]: '"', ...(perf ? {} : { revTipo: 'EXTERNO' }) }); }}>
@@ -220,7 +255,13 @@ export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: R
             </Form.Item>
           </Col>
           <Col xs={12} md={4}>
-            <Form.Item label="Diâmetro interno">
+            <Form.Item label="Diâmetro interno" extra={(() => {
+              const menor = revestimentosDe(valores).filter(r => r.diametro > 0).sort((a, b) => a.diametro - b.diametro)[0];
+              if (!menor) return null;
+              const original = (valores.revestimentos || []).find((r: any) => Number(r?.revAte) === menor.ate && Number(r?.revDe) === menor.de);
+              if (!original || Number(valores.diametroInterno) === Number(original.revDiam)) return null;
+              return <Button type="link" size="small" style={{ padding: 0 }} onClick={() => { form.setFieldsValue({ diametroInterno: original.revDiam, diamInternoUnidade: original.revDiamUnidade || '"' }); p.aoMudar({}); }}>usar {menor.texto} do revestimento</Button>;
+            })()}>
               <Space.Compact style={{ width: '100%' }}>
                 <Form.Item name="diametroInterno" noStyle><CampoNumero min={0} style={{ width: '100%' }} /></Form.Item>{unidade('diamInternoUnidade')}
               </Space.Compact>
@@ -267,6 +308,23 @@ export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: R
               </Card>
             </Col>
           </Row>
+          <Card size="small" title="Completação (pré-filtro, cimentação, laje e tampa)">
+            <Row gutter={10}>
+              <Col xs={8} md={3}><Form.Item label="Pré-filtro de" name="compPreFiltroDe"><CampoNumero min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
+              <Col xs={8} md={3}><Form.Item label="até" name="compPreFiltroAte"><CampoNumero min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
+              <Col xs={16} md={6}><Form.Item label="Material (cascalho)" name="compPreFiltroMaterial">
+                <CampoMaterial categorias={['PRE_FILTRO']} onEscolher={m => aplicarSimples('compIdPreFiltro', m)} style={{ width: '100%' }} />
+              </Form.Item></Col>
+              <Col xs={8} md={3}><Form.Item label="Quantidade" name="compPreFiltroQtd"><CampoNumero min={0} style={{ width: '100%' }} placeholder="sacos" /></Form.Item></Col>
+              <Col xs={8} md={3}><Form.Item label="Cimentação de" name="compCimentoDe"><CampoNumero min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
+              <Col xs={8} md={3}><Form.Item label="até" name="compCimentoAte"><CampoNumero min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
+              <Col xs={8} md={3}><Form.Item label="Cimento" name="compCimentoQtd" tooltip="Sacos de cimento (o material é o 'Cimento' do cadastro)">
+                <CampoNumero min={0} style={{ width: '100%' }} placeholder="sacos" />
+              </Form.Item></Col>
+              <Col xs={12} md={6}><Form.Item label="Laje de proteção" name="compLaje"><Input placeholder="Ex.: 1 x 1 m, 10 cm" /></Form.Item></Col>
+              <Col xs={12} md={6}><Form.Item label="Tampa" name="compTampa"><Input placeholder="Ex.: tampa 6&quot; com cadeado" /></Form.Item></Col>
+            </Row>
+          </Card>
           {grupos('Ocorrências na obra (checklist)', ['PERFURACAO', 'LOCAL'])}
           <Form.Item label="Outras ocorrências na obra" name="obsOcorrencias" style={{ marginBottom: 0 }}>
             <TextArea autoSize={{ minRows: 1, maxRows: 4 }} placeholder="O que não está na lista: o que aconteceu, a profundidade, o que foi feito..." />
@@ -312,11 +370,49 @@ export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: R
               <Space.Compact style={{ width: '100%' }}><Form.Item name="bombaMedidaTubo" noStyle><Input placeholder="1" /></Form.Item>{unidade('bombaTuboUnidade')}</Space.Compact>
             </Form.Item>
           </Col>
-          <Col xs={12} md={6}><Form.Item label="Material do tubo" name="bombaTubulacao"><Select allowClear options={MATERIAIS_TUBO.map(m => ({ value: m, label: m }))} /></Form.Item></Col>
-          <Col xs={12} md={5}><Form.Item label="Profundidade da bomba" name="bombaProfundidade"
-            extra={Number(valores.bombaQtdTubos) > 0 && Number(valores.bombaTamTubo) > 0 ? `tubos somam ${Number(valores.bombaQtdTubos) * Number(valores.bombaTamTubo)} m` : null}>
-            <CampoNumero min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
-          <Col xs={12} md={6}><Form.Item label="Cabo elétrico" name="bombaCabeamento"><Input placeholder="3 x 4 mm²" /></Form.Item></Col>
+          <Col xs={12} md={6}><Form.Item label="Tubo edutor (cadastro)" name="bombaTubulacao">
+            <CampoMaterial categorias={['TUBO']} cor={valores.bombaTuboCor} style={{ width: '100%' }}
+              onEscolher={m => aplicarSimples('bombaIdTubo', m, m ? {
+                bombaTuboCor: corDoMaterial(m), ...(m.comprimentoM ? { bombaTamTubo: m.comprimentoM } : {}),
+                ...(m.diametro ? { bombaMedidaTubo: String(m.diametro).replace(/["”]/g, '').trim(), bombaTuboUnidade: /mm/i.test(m.diametro) ? 'mm' : '"' } : {}),
+              } : { bombaTuboCor: null })} />
+          </Form.Item></Col>
+          <Col xs={12} md={5}>
+            {(() => {
+              const total = Number(valores.bombaQtdTubos) * Number(valores.bombaTamTubo);
+              const prof = Number(valores.bombaProfundidade) || 0;
+              const difere = total > 0 && prof > 0 && Math.abs(total - prof) > 1;
+              return (
+                <Form.Item label="Profundidade da bomba" name="bombaProfundidade" validateStatus={difere ? 'warning' : undefined}
+                  extra={total > 0 ? (
+                    <Space size={4} wrap>
+                      <Text type={difere ? 'warning' : 'secondary'} style={{ fontSize: 12 }}>
+                        {textoBarras(Number(valores.bombaQtdTubos), valores.bombaTamTubo)} = {String(total).replace('.', ',')} m{difere ? ' (não bate com a bomba)' : ''}
+                      </Text>
+                      {total !== prof && <Button type="link" size="small" style={{ padding: 0 }} onClick={() => { form.setFieldValue('bombaProfundidade', total); p.aoMudar({}); }}>usar {String(total).replace('.', ',')} m</Button>}
+                    </Space>
+                  ) : null}>
+                  <CampoNumero min={0} style={{ width: '100%' }} suffix="m" />
+                </Form.Item>
+              );
+            })()}
+          </Col>
+          <Col xs={12} md={6}><Form.Item label="Cabo elétrico (cadastro)" name="bombaCabeamento">
+            <CampoMaterial categorias={['CABO']} placeholder="Cabo PP 3x4 mm" style={{ width: '100%' }} onEscolher={m => aplicarSimples('bombaIdCabo', m)} />
+          </Form.Item></Col>
+          <Col xs={12} md={4}>
+            <Form.Item label="Metros de cabo" name="bombaCaboMetros"
+              extra={caboSugerido(valores.bombaProfundidade) && Number(valores.bombaCaboMetros) !== caboSugerido(valores.bombaProfundidade)
+                ? <Button type="link" size="small" style={{ padding: 0 }} onClick={() => { form.setFieldValue('bombaCaboMetros', caboSugerido(valores.bombaProfundidade)); p.aoMudar({}); }}>
+                    sugerido {caboSugerido(valores.bombaProfundidade)} m (bomba + 10 m)</Button>
+                : null}>
+              <CampoNumero min={0} style={{ width: '100%' }} suffix="m" />
+            </Form.Item>
+          </Col>
+          <Col xs={12} md={6}><Form.Item label="Corda de segurança" name="bombaCorda">
+            <CampoMaterial categorias={['CABO']} placeholder="Corda de segurança" style={{ width: '100%' }} onEscolher={m => aplicarSimples('bombaIdCorda', m)} />
+          </Form.Item></Col>
+          <Col xs={12} md={4}><Form.Item label="Metros de corda" name="bombaCordaMetros"><CampoNumero min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
           <Col xs={12} md={6}><Form.Item label="Cavalete de saída" name="bombaCavalete"><Input placeholder="PEAD / galvanizado" /></Form.Item></Col>
           <Col xs={12} md={6}><Form.Item label="Nível estático (NE)" name="bombaNivelEstatico"><CampoNumero min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
           <Col xs={12} md={6}><Form.Item label="Nível dinâmico (ND)" name="bombaNivelDinamico"><CampoNumero min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
@@ -449,6 +545,11 @@ export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: R
             <Upload accept=".xml" showUploadList={false} beforeUpload={p.importar}><Button icon={<UploadOutlined />}>Abrir arquivo</Button></Upload>
             <Button icon={<DownloadOutlined />} onClick={p.exportar}>Salvar arquivo</Button>
             <Button icon={<EyeOutlined />} onClick={() => setPrevia('completo')}>Pré-visualizar</Button>
+            {obra?.idObra && (
+              <Tooltip title="Barras de revestimento e filtro, tubo edutor, cabo, corda, pré-filtro e cimento do relatório em Materiais da obra">
+                <Button icon={<UnorderedListOutlined />} onClick={() => setLancando(true)}>Lançar materiais na obra</Button>
+              </Tooltip>
+            )}
             <Dropdown.Button type="primary" icon={<PrinterOutlined />} onClick={() => p.imprimir('completo')}
               menu={{
                 items: MODELOS.map(m => ({
@@ -464,6 +565,7 @@ export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: R
         </Flex>
       </Card>
 
+      {obra?.idObra && <LancarMateriais aberto={lancando} idObra={obra.idObra} dados={valores} catalogo={catalogo} onFechar={() => setLancando(false)} />}
       <Form form={form} layout="vertical" onValuesChange={p.aoMudar}>
         <Row gutter={12}>
           <Col xs={24} xl={18}>

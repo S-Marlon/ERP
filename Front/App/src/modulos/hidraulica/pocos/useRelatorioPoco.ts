@@ -19,7 +19,7 @@ const gravar = (chave: string, valor: unknown) => {
 };
 
 /** Relatório de uma obra: os dados gravados e como gravar (o hook chama a cada alteração, com uma pausa). */
-export interface RelatorioDaObra { dados: Dados; salvar: (dados: Dados) => Promise<unknown> }
+export interface RelatorioDaObra { dados: Dados; salvar: (dados: Dados) => Promise<unknown>; /** Para lançar os materiais do relatório na obra. */ idObra?: number }
 
 export function useRelatorioPoco(obra?: RelatorioDaObra) {
   const [form] = Form.useForm();

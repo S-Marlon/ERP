@@ -2,12 +2,14 @@
 // ou de outra empresa). Perfuração por diâmetro, revestimentos (o de fora, o interno de complemento, filtro, tubo de boca)
 // e o perfil geológico, com o desenho atualizando enquanto preenche. O que as obras registrarem depois entra por cima.
 import React, { useEffect, useState } from 'react';
-import { Button, Card, Col, Flex, Form, Input, Modal, Row, Select, Space, Tooltip, Typography, message } from 'antd';
+import { Button, Card, Col, Flex, Form, Input, Modal, Row, Select, Space, Tag, Tooltip, Typography, message } from 'antd';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 import { CAMADAS_GEOLOGICAS, resumoEstrutura, svgPerfil, temEstrutura, TIPOS_REVESTIMENTO } from './estruturaPoco';
 import { encadear } from './relatorioPoco';
-import { obrasApi } from './obrasApi';
+import { obrasApi, MaterialPoco } from './obrasApi';
+import { CampoMaterial } from './CampoMaterial';
+import { barrasDoTrecho, corDoMaterial, diametroEmNumero, textoBarras } from './materiaisPoco';
 
 const { Text } = Typography;
 type Dados = Record<string, any>;
@@ -34,6 +36,8 @@ export const EstruturaEditor: React.FC<Props> = ({ idPoco, inicial, extras, onFe
       perfuracoes: inicial?.perfuracoes?.length ? inicial.perfuracoes : [{ perfDe: 0, perfDiamUnidade: '"' }],
       revestimentos: inicial?.revestimentos || [],
       perfilGeologico: inicial?.perfilGeologico || [],
+      ...Object.fromEntries(['compPreFiltroDe', 'compPreFiltroAte', 'compPreFiltroMaterial', 'compPreFiltroQtd', 'compCimentoDe', 'compCimentoAte', 'compCimentoQtd', 'compLaje', 'compTampa']
+        .map(k => [k, inicial?.[k] ?? null])),
     });
   }, [idPoco]);   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -45,6 +49,16 @@ export const EstruturaEditor: React.FC<Props> = ({ idPoco, inicial, extras, onFe
       const ajustada = encadear(atual, de, ate);
       if (JSON.stringify(ajustada) !== JSON.stringify(atual)) form.setFieldValue(lista, ajustada);
     }
+  };
+
+  /** Material do cadastro na linha do revestimento: id, cor, comprimento da barra e o diâmetro se estiver vazio. */
+  const aplicarMaterial = (idx: number, m: MaterialPoco | null) => {
+    const linhas = [...(form.getFieldValue('revestimentos') || [])];
+    const l = { ...linhas[idx], revIdMaterial: m?.idMaterial ?? null, revCor: m ? corDoMaterial(m) : null, revComprimentoBarra: m?.comprimentoM ?? null };
+    const d = m ? diametroEmNumero(m.diametro) : null;
+    if (d && !l.revDiam) { l.revDiam = d.valor; l.revDiamUnidade = d.unidade; }
+    linhas[idx] = l;
+    form.setFieldValue('revestimentos', linhas);
   };
 
   const salvar = async () => {
@@ -103,11 +117,21 @@ export const EstruturaEditor: React.FC<Props> = ({ idPoco, inicial, extras, onFe
                           <Col flex="85px"><Form.Item label={i === 0 ? 'De' : ''} name={[name, 'revDe']} style={{ marginBottom: 0 }}><CampoNumero min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
                           <Col flex="90px"><Form.Item label={i === 0 ? 'Até' : ''} name={[name, 'revAte']} style={{ marginBottom: 0 }}><CampoNumero min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
                           <Col flex="150px"><Form.Item label={i === 0 ? 'Diâmetro' : ''} style={{ marginBottom: 0 }}>{diametro(name, 'revDiam', 'revDiamUnidade')}</Form.Item></Col>
-                          <Col flex="auto"><Form.Item label={i === 0 ? 'Material / motivo' : ''} style={{ marginBottom: 0 }}>
-                            <Space.Compact style={{ width: '100%' }}>
-                              <Form.Item name={[name, 'revMaterial']} noStyle><Input placeholder="PVC geomec." style={{ width: '45%' }} /></Form.Item>
-                              <Form.Item name={[name, 'revObs']} noStyle><Input placeholder="motivo (ex.: caimento)" style={{ width: '55%' }} /></Form.Item>
-                            </Space.Compact>
+                          <Col flex="auto"><Form.Item label={i === 0 ? 'Material (cadastro) / motivo' : ''} style={{ marginBottom: 0 }}>
+                            <Flex vertical gap={3}>
+                              <Form.Item name={[name, 'revMaterial']} noStyle>
+                                <CampoMaterial categorias={['TUBO', 'FILTRO']} placeholder="Tubo geomecânico 6&quot;..." cor={valores.revestimentos?.[name]?.revCor}
+                                  onEscolher={m => aplicarMaterial(name, m)} style={{ width: '100%' }} />
+                              </Form.Item>
+                              <Space.Compact style={{ width: '100%' }}>
+                                <Form.Item name={[name, 'revObs']} noStyle><Input size="small" placeholder="motivo (ex.: caimento aos 60 m)" /></Form.Item>
+                              </Space.Compact>
+                              {(() => {
+                                const l = valores.revestimentos?.[name] || {};
+                                const barras = textoBarras(barrasDoTrecho(l.revDe, l.revAte, l.revComprimentoBarra), l.revComprimentoBarra);
+                                return barras ? <Tag color="blue" style={{ margin: 0, width: 'fit-content' }}>{barras}</Tag> : null;
+                              })()}
+                            </Flex>
                           </Form.Item></Col>
                           <Col flex="32px">{apagar(() => remove(name))}</Col>
                         </Row>
@@ -121,6 +145,17 @@ export const EstruturaEditor: React.FC<Props> = ({ idPoco, inicial, extras, onFe
                     </Flex>
                   )}
                 </Form.List>
+              </Card>
+
+              <Card size="small" title="Completação (pré-filtro, cimentação, laje e tampa)">
+                <Row gutter={8}>
+                  <Col span={4}><Form.Item label="Pré-filtro de" name="compPreFiltroDe" style={{ marginBottom: 6 }}><CampoNumero min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
+                  <Col span={4}><Form.Item label="até" name="compPreFiltroAte" style={{ marginBottom: 6 }}><CampoNumero min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
+                  <Col span={4}><Form.Item label="Cimentação de" name="compCimentoDe" style={{ marginBottom: 6 }}><CampoNumero min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
+                  <Col span={4}><Form.Item label="até" name="compCimentoAte" style={{ marginBottom: 6 }}><CampoNumero min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
+                  <Col span={4}><Form.Item label="Laje" name="compLaje" style={{ marginBottom: 6 }}><Input placeholder="1 x 1 m" /></Form.Item></Col>
+                  <Col span={4}><Form.Item label="Tampa" name="compTampa" style={{ marginBottom: 6 }}><Input placeholder="6&quot; c/ cadeado" /></Form.Item></Col>
+                </Row>
               </Card>
 
               <Card size="small" title="Perfil geológico (o que a perfuração atravessou)">

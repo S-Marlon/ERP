@@ -431,7 +431,7 @@ const ObraAberta: React.FC<{ idObra: number; parte?: ParteObra; onVoltar: () => 
         ? (
           <div style={{ margin: '0 -16px' }}>
             <RelatorioPocoPage key={versao} titulo={`Relatório técnico · obra ${obra.idObra}`} onVoltar={onVoltar}
-              obra={{ dados: obra.relatorio || {}, salvar: dados => obrasApi.salvarRelatorio(obra.idObra, dados) }} />
+              obra={{ idObra: obra.idObra, dados: obra.relatorio || {}, salvar: dados => obrasApi.salvarRelatorio(obra.idObra, dados) }} />
           </div>
         )
         : parte === 'ORCAMENTO'

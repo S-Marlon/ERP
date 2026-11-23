@@ -304,3 +304,10 @@ Colunas novas: `incluso` em `_orcamento_itens`, `valor_parcelado` em `_obras`, `
 - **Navegação** (2026-11-23): o que se usa todo dia saiu de "Mais ferramentas": Mapa virou aba de Clientes e poços,
   Manutenção virou aba de "Agenda e manutenção" e Documentos ganhou item próprio na barra lateral. Em Mais ferramentas
   ficam Resultado, Plano mensal e Monitoramento (o aviso de tela desligada continua lá, também para o Mapa).
+- **Materiais no relatório** (2026-11-23, colunas `diametro`, `comprimento_m`, `marca`, `classe`, `cor` em
+  `modulo_hidraulica_pocos_materiais`): o revestimento, o tubo edutor, o cabo, a corda e o pré-filtro escolhem do cadastro
+  (`CampoMaterial`, com a cor; digitar livre continua valendo) e guardam id, cor e comprimento da barra na linha. Barras
+  calculadas pelo trecho ("8 barras de 6 m"), tubo edutor conferido com a profundidade da bomba, cabo sugerido (bomba +
+  10 m). Completação no relatório (pré-filtro, cimentação, laje, tampa), desenhada no espaço anelar. "Lançar materiais
+  na obra" leva o consumo do relatório para Materiais da obra (`consumoDoRelatorio`). No cadastro, "Completar pelo nome"
+  preenche diâmetro, barra, classe e cor vazios (`sugerirDadosTecnicos`, cor padrão por tipo em `corPadrao`).

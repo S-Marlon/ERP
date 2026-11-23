@@ -56,3 +56,21 @@ teste('estrutura: só o cadastro (revestimento não informado)', () => {
   assert.ok(resumoEstrutura(so).includes('Revestimento ainda não informado.'));
   assert.ok(temEstrutura(so) && !svgPerfil(so).includes('Sem revestimento'));
 });
+
+teste('estrutura: material com cor e barras, completação, ND e edutor', () => {
+  const d = {
+    perfuracoes: [{ perfDe: 0, perfAte: 60, perfDiam: 8 }],
+    revestimentos: [{ revDe: 0, revAte: 48, revDiam: 6, revMaterial: 'Tubo geomecânico Asperbras PN80', revCor: '#2f54eb', revComprimentoBarra: 6 },
+      { revTipo: 'FILTRO', revDe: 48, revAte: 60, revDiam: 6, revCor: '#13a8a8', revComprimentoBarra: 3 }],
+    compPreFiltroDe: 30, compPreFiltroAte: 60, compCimentoDe: 0, compCimentoAte: 6, compLaje: '1 x 1 m', compTampa: 'Tampa 6" com cadeado',
+    bombaNivelEstatico: 12, bombaNivelDinamico: 25, bombaProfundidade: 36, bombaQtdTubos: 6, bombaTamTubo: 6, bombaMedidaTubo: '1 1/4', bombaTuboCor: '#fa8c16',
+  };
+  const r = resumoEstrutura(d);
+  assert.ok(r.includes('Revestimento 6" Tubo geomecânico Asperbras PN80 de 0 a 48 m (8 barras de 6 m).'), r.join('\n'));
+  assert.ok(r.includes('Filtro (tubo ranhurado) 6" de 48 a 60 m (4 barras de 3 m).'));
+  assert.ok(r.includes('Pré-filtro (cascalho) de 30 a 60 m.') && r.includes('Cimentação / selo sanitário de 0 a 6 m.'));
+  assert.ok(r.includes('Laje de proteção: 1 x 1 m · tampa: Tampa 6" com cadeado.'));
+  assert.ok(r.some(l => l.includes('tubo edutor 1 1/4": 6 barras de 6 m = 36 m')), r.join('\n'));
+  const svg = svgPerfil(d);
+  assert.ok(svg.includes('stroke="#2f54eb"') && svg.includes('stroke="#fa8c16"') && svg.includes('ND (nível dinâmico) · 25 m') && svg.includes('url(#cascalho)'));
+});

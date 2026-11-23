@@ -27,9 +27,15 @@ export const validarMaterial = (b: any) => {
   if (!nome) throw new ErroObra('Dê um nome ao material (ex.: Tubo geomecânico 6").');
   const categoria = String(b?.categoria || 'OUTRO').toUpperCase();
   if (!(CATEGORIAS_MATERIAL as readonly string[]).includes(categoria)) throw new ErroObra(`Categoria inválida: ${b?.categoria}.`);
+  const cor = String(b?.cor ?? '').trim();
+  if (cor && !/^#[0-9a-f]{6}$/i.test(cor)) throw new ErroObra('Cor inválida (use #RRGGBB).');
+  const comprimentoM = naoNegativo(b?.comprimentoM, 'Comprimento da barra', null);
+  if (comprimentoM !== null && comprimentoM > 100) throw new ErroObra('Comprimento da barra: no máximo 100 m.');
   return {
     nome, categoria, unidade: unidade(b?.unidade), custo: naoNegativo(b?.custo, 'Custo') as number,
     precoVenda: naoNegativo(b?.precoVenda, 'Preço de venda', null), observacao: texto(b?.observacao, 255), ativo: b?.ativo === false || b?.ativo === 0 ? 0 : 1,
+    // dados técnicos (desenho do poço e contas de barras)
+    diametro: texto(b?.diametro, 20), comprimentoM: comprimentoM || null, marca: texto(b?.marca, 60), classe: texto(b?.classe, 20), cor: cor ? cor.toLowerCase() : null,
   };
 };
 
