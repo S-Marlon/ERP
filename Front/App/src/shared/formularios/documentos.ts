@@ -115,7 +115,7 @@ export const regraTelefone = regra(telefoneValido, 'Telefone com DDD: 10 ou 11 n
 export const regraCep = regra(cepValido, 'CEP com 8 números (ex.: 01310-100).');
 
 // ---------------------------------------------------------------- ViaCEP
-export type EnderecoDoCep = { cep: string; logradouro: string; complemento: string; bairro: string; cidade: string; uf: string };
+export type EnderecoDoCep = { cep: string; logradouro: string; complemento: string; bairro: string; cidade: string; uf: string; ibge: string };
 
 /** Endereço do CEP pelo ViaCEP; null se o CEP não existe. Erro de rede sobe (a tela avisa e o operador digita). */
 export const buscarCep = async (cep: unknown): Promise<EnderecoDoCep | null> => {
@@ -125,5 +125,5 @@ export const buscarCep = async (cep: unknown): Promise<EnderecoDoCep | null> => 
   if (!resp.ok) throw new Error('Não foi possível consultar o CEP agora.');
   const d = await resp.json();
   if (d?.erro) return null;
-  return { cep: c, logradouro: d.logradouro || '', complemento: d.complemento || '', bairro: d.bairro || '', cidade: d.localidade || '', uf: d.uf || '' };
+  return { cep: c, logradouro: d.logradouro || '', complemento: d.complemento || '', bairro: d.bairro || '', cidade: d.localidade || '', uf: d.uf || '', ibge: d.ibge || '' };
 };

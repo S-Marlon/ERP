@@ -3,10 +3,11 @@ import React, { useEffect, useState } from 'react';
 import { Alert, AutoComplete, Button, Card, Col, Form, Input, InputNumber, Radio, Row, Select, Space, Spin, Typography, message } from 'antd';
 import { CheckCircleTwoTone, CloseCircleTwoTone } from '@ant-design/icons';
 import { ConfigFiscal, DadosConfiguracao, EmitenteFiscal, fiscalApi } from './fiscalApi';
+import { CampoCep, CampoCpfCnpj, CampoTelefone, CampoUf } from '../../../shared/formularios/Campos';
+import { regraCep, regraCnpj, regraTelefone } from '../../../shared/formularios/documentos';
 
 const { Text } = Typography;
 
-const UFS = ['AC', 'AL', 'AM', 'AP', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MG', 'MS', 'MT', 'PA', 'PB', 'PE', 'PI', 'PR', 'RJ', 'RN', 'RO', 'RR', 'RS', 'SC', 'SE', 'SP', 'TO'];
 
 interface Valores { emitente: Partial<EmitenteFiscal>; configuracao: ConfigFiscal }
 
@@ -50,7 +51,7 @@ export const ConfiguracaoFiscal: React.FC<{ onSalvo?: (d: DadosConfiguracao) => 
         <Col xs={24} xl={13}>
           <Card size="small" title="Empresa emitente">
             <Row gutter={10}>
-              <Col xs={24} md={8}><Form.Item name={['emitente', 'cnpj']} label="CNPJ" rules={[{ required: true }]}><Input placeholder="00.000.000/0000-00" /></Form.Item></Col>
+              <Col xs={24} md={8}><Form.Item name={['emitente', 'cnpj']} label="CNPJ" rules={[{ required: true, message: 'Informe o CNPJ.' }, regraCnpj()]}><CampoCpfCnpj tipo="CNPJ" /></Form.Item></Col>
               <Col xs={24} md={8}><Form.Item name={['emitente', 'inscricaoEstadual']} label="Inscrição estadual" rules={[{ required: true }]}><Input /></Form.Item></Col>
               <Col xs={24} md={8}>
                 <Form.Item name={['emitente', 'crt']} label="Regime">
@@ -63,15 +64,21 @@ export const ConfiguracaoFiscal: React.FC<{ onSalvo?: (d: DadosConfiguracao) => 
               <Col xs={8} md={4}><Form.Item name={['emitente', 'numero']} label="Número"><Input maxLength={20} /></Form.Item></Col>
               <Col xs={16} md={6}><Form.Item name={['emitente', 'complemento']} label="Complemento"><Input maxLength={60} /></Form.Item></Col>
               <Col xs={24} md={8}><Form.Item name={['emitente', 'bairro']} label="Bairro"><Input maxLength={60} /></Form.Item></Col>
-              <Col xs={12} md={5}><Form.Item name={['emitente', 'cep']} label="CEP"><Input placeholder="00000-000" /></Form.Item></Col>
+              <Col xs={12} md={5}><Form.Item name={['emitente', 'cep']} label="CEP" rules={[regraCep]}>
+                <CampoCep onEndereco={e => {
+                  const a = form.getFieldValue('emitente') || {};
+                  form.setFieldsValue({ emitente: { ...a, logradouro: e.logradouro || a.logradouro, bairro: e.bairro || a.bairro, municipio: e.cidade || a.municipio,
+                    uf: e.uf || a.uf, codigoMunicipioIbge: e.ibge || a.codigoMunicipioIbge } });
+                }} />
+              </Form.Item></Col>
               <Col xs={12} md={7}><Form.Item name={['emitente', 'municipio']} label="Município"><Input maxLength={60} /></Form.Item></Col>
-              <Col xs={12} md={4}><Form.Item name={['emitente', 'uf']} label="UF"><Select showSearch options={UFS.map(u => ({ value: u, label: u }))} /></Form.Item></Col>
+              <Col xs={12} md={4}><Form.Item name={['emitente', 'uf']} label="UF"><CampoUf allowClear={false} /></Form.Item></Col>
               <Col xs={12} md={8}>
-                <Form.Item name={['emitente', 'codigoMunicipioIbge']} label="Código IBGE do município" tooltip="7 dígitos. São Paulo capital: 3550308. Consulte em ibge.gov.br › Códigos dos municípios.">
+                <Form.Item name={['emitente', 'codigoMunicipioIbge']} label="Código IBGE do município" tooltip="7 dígitos; vem sozinho ao digitar o CEP. São Paulo capital: 3550308.">
                   <Input maxLength={7} />
                 </Form.Item>
               </Col>
-              <Col xs={12} md={8}><Form.Item name={['emitente', 'telefone']} label="Telefone"><Input maxLength={20} /></Form.Item></Col>
+              <Col xs={12} md={8}><Form.Item name={['emitente', 'telefone']} label="Telefone" rules={[regraTelefone]}><CampoTelefone /></Form.Item></Col>
               <Col xs={12} md={8}><Form.Item name={['emitente', 'email']} label="E-mail"><Input maxLength={120} /></Form.Item></Col>
             </Row>
           </Card>

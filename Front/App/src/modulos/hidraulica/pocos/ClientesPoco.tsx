@@ -10,6 +10,8 @@ import {
   ClienteCompleto, ClientePoco, ClientePocoForm, dataBr, ESTADOS_CIVIS, FiltroClientes, foneBr, obrasApi, SERVICOS, SITUACOES_OBRA,
 } from './obrasApi';
 import { abrirFichaPoco, abrirObra, verClienteNoMapa } from './navPocos';
+import { CampoCep, CampoCpfCnpj, CampoTelefone, CampoUf } from '../../../shared/formularios/Campos';
+import { formatarDocumento } from '../../../shared/formularios/documentos';
 import { OrcamentoRapido } from './OrcamentoContrato';
 
 const { Text } = Typography;
@@ -19,11 +21,7 @@ const vazio = (): ClientePocoForm => ({
   bairro: null, cidade: null, uf: null, cep: null, representante: null, representanteDocumento: null, observacao: null,
 });
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-const docBr = (d: string | null | undefined) => {
-  const x = String(d ?? '').replace(/\D/g, '');
-  return x.length === 14 ? `${x.slice(0, 2)}.${x.slice(2, 5)}.${x.slice(5, 8)}/${x.slice(8, 12)}-${x.slice(12)}`
-    : x.length === 11 ? `${x.slice(0, 3)}.${x.slice(3, 6)}.${x.slice(6, 9)}-${x.slice(9)}` : x;
-};
+const docBr = formatarDocumento;
 
 /** Escolher o cliente da obra (ou do poço): busca por nome, telefone, documento ou cidade, e cadastro rápido. */
 export const ClientePocoModal: React.FC<{ open: boolean; onSelecionar: (c: ClientePoco) => void; onFechar: () => void }> = ({ open, onSelecionar, onFechar }) => {
@@ -69,7 +67,7 @@ export const ClientePocoModal: React.FC<{ open: boolean; onSelecionar: (c: Clien
             <Card size="small" title="Cliente novo (o resto da ficha dá para completar depois)">
               <Row gutter={8} align="bottom">
                 <Col span={12}><Text>Nome</Text><Input autoFocus value={novo.nome} onChange={e => setNovo({ ...novo, nome: e.target.value })} /></Col>
-                <Col span={7}><Text>Telefone</Text><Input value={novo.telefone} placeholder="(11) 99999-9999" onChange={e => setNovo({ ...novo, telefone: e.target.value })} /></Col>
+                <Col span={7}><Text>Telefone</Text><CampoTelefone value={novo.telefone} onChange={telefone => setNovo({ ...novo, telefone })} /></Col>
                 <Col span={5}><Button type="primary" block loading={salvando} disabled={!novo.nome.trim()} onClick={cadastrar}>Cadastrar</Button></Col>
               </Row>
             </Card>
@@ -91,7 +89,7 @@ const DadosCliente: React.FC<{ f: ClientePocoForm; mudar: (x: Partial<ClientePoc
         <Segmented block value={f.tipoPessoa} onChange={v => mudar({ tipoPessoa: v as 'PF' | 'PJ' })} options={[{ value: 'PF', label: 'Pessoa' }, { value: 'PJ', label: 'Empresa' }]} />
       </Col>
       {campo('nome', pj ? 'Razão social' : 'Nome completo', 12, { maxLength: 120 })}
-      <Col xs={24} md={7}><Text>{pj ? 'CNPJ' : 'CPF'}</Text><Input value={docBr(f.documento) || f.documento || ''} onChange={e => mudar({ documento: e.target.value || null })} /></Col>
+      <Col xs={24} md={7}><Text>{pj ? 'CNPJ' : 'CPF'}</Text><CampoCpfCnpj tipo={pj ? 'CNPJ' : 'CPF'} value={f.documento} onChange={documento => mudar({ documento: documento || null })} /></Col>
       {campo('rgIe', pj ? 'Inscrição estadual' : 'RG', 6, { maxLength: 20 })}
       {!pj && (
         <Col xs={24} md={6}><Text>Estado civil</Text>
@@ -103,17 +101,20 @@ const DadosCliente: React.FC<{ f: ClientePocoForm; mudar: (x: Partial<ClientePoc
       {pj && campo('representante', 'Representante (quem assina)', 11, { maxLength: 120 })}
       {pj && (
         <Col xs={24} md={7}><Text>CPF do representante</Text>
-          <Input value={docBr(f.representanteDocumento) || f.representanteDocumento || ''} onChange={e => mudar({ representanteDocumento: e.target.value || null })} />
+          <CampoCpfCnpj tipo="CPF" value={f.representanteDocumento} onChange={d => mudar({ representanteDocumento: d || null })} />
         </Col>
       )}
-      <Col xs={12} md={6}><Text>Telefone (WhatsApp)</Text><Input value={foneBr(f.telefone) || f.telefone || ''} onChange={e => mudar({ telefone: e.target.value || null })} /></Col>
-      <Col xs={12} md={6}><Text>Outro telefone</Text><Input value={foneBr(f.telefone2) || f.telefone2 || ''} onChange={e => mudar({ telefone2: e.target.value || null })} /></Col>
+      <Col xs={12} md={6}><Text>Telefone (WhatsApp)</Text><CampoTelefone value={f.telefone} onChange={t => mudar({ telefone: t || null })} /></Col>
+      <Col xs={12} md={6}><Text>Outro telefone</Text><CampoTelefone value={f.telefone2} onChange={t => mudar({ telefone2: t || null })} /></Col>
       {campo('email', 'E-mail', 12, { maxLength: 120 })}
       {campo('endereco', 'Endereço', 10, { maxLength: 150 })}
       {campo('bairro', 'Bairro', 5, { maxLength: 60 })}
       {campo('cidade', 'Cidade', 4, { maxLength: 60 })}
-      {campo('uf', 'UF', 2, { maxLength: 2 })}
-      {campo('cep', 'CEP', 3, { maxLength: 9 })}
+      <Col xs={8} md={2}><Text>UF</Text><CampoUf style={{ width: '100%' }} value={f.uf || undefined} onChange={v => mudar({ uf: v || null })} /></Col>
+      <Col xs={16} md={3}><Text>CEP</Text>
+        <CampoCep value={f.cep} onChange={cep => mudar({ cep: cep || null })}
+          onEndereco={e => mudar({ endereco: f.endereco || e.logradouro || null, bairro: e.bairro || f.bairro, cidade: e.cidade || f.cidade, uf: e.uf || f.uf })} />
+      </Col>
       {campo('observacao', 'Observação', 24, { maxLength: 255 })}
     </Row>
   );

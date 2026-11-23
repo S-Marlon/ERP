@@ -2,6 +2,7 @@
 import { operadorAtual } from '../../caixa/caixaApi';
 import { lerConfiguracoes } from '../../../../shared/core/configuracoes/configuracoes';
 import { imprimirHtml } from '../../../../shared/core/impressao/saida';
+import { formatarDocumento, formatarTelefone } from '../../../../shared/formularios/documentos';
 import { API_URL } from '../../../../shared/api/config';
 import { codigoCliente, secoesDaProposta } from '../../negociacao/propostaNegociacao';
 import type { CondicaoPagamento } from '../../negociacao/condicaoPagamento';
@@ -91,7 +92,7 @@ export const imprimirOrcamento = (o: PedidoAbertoDetalhe) => {
   </style></head><body>
     <div class="topo">
       <div><h1>${esc(nomeEmpresa)}</h1>
-        <div>${esc([e.cnpj && `CNPJ ${e.cnpj}`, e.telefone, e.email].filter(Boolean).join(' · '))}</div>
+        <div>${esc([e.cnpj && `CNPJ ${formatarDocumento(e.cnpj)}`, e.telefone && formatarTelefone(e.telefone), e.email].filter(Boolean).join(' · '))}</div>
         <div>${esc(endereco)}</div></div>
       <div class="num">ORÇAMENTO<br><b>Nº ${o.id}</b><br>Emitido em ${dataBr(String(o.criadoEm))}<br><b style="font-size:12px;color:#222">Válido até ${dataBr(o.validade)}</b></div>
     </div>
@@ -132,8 +133,8 @@ export const htmlProposta = (o: PedidoAbertoDetalhe) => {
   </style></head><body>
     <div class="faixa">PROPOSTA COMERCIAL Nº ${o.id}</div>
     <div class="caixas">
-      <div><b class="t">EMPRESA EMISSORA:</b><b>${esc(nomeEmpresa)}</b><br>${esc([e.cnpj && `CNPJ: ${e.cnpj}`].filter(Boolean).join(''))}<br>${esc(endereco)}<br>
-        ${esc([e.telefone && `Tel: ${e.telefone}`, e.email].filter(Boolean).join(' · '))}${o.operador ? `<br>Vendedor: ${esc(o.operador)}` : ''}</div>
+      <div><b class="t">EMPRESA EMISSORA:</b><b>${esc(nomeEmpresa)}</b><br>${esc([e.cnpj && `CNPJ: ${formatarDocumento(e.cnpj)}`].filter(Boolean).join(''))}<br>${esc(endereco)}<br>
+        ${esc([e.telefone && `Tel: ${formatarTelefone(e.telefone)}`, e.email].filter(Boolean).join(' · '))}${o.operador ? `<br>Vendedor: ${esc(o.operador)}` : ''}</div>
       <div><b class="t">CLIENTE:</b><b>${esc([codigo, o.cliente].filter(Boolean).join(' - '))}</b>${o.contato ? `<br>Contato: ${esc(o.contato)}` : ''}
         ${o.telefoneCliente ? `<br>Tel: ${esc(o.telefoneCliente)}` : ''}<br>Emitida em ${dataBr(String(o.criadoEm))}</div>
     </div>

@@ -9,7 +9,9 @@ import {
   BellOutlined, BookOutlined, CheckOutlined, QuestionCircleOutlined, ReloadOutlined, SaveOutlined, ShopOutlined, SlidersOutlined, UserOutlined,
 } from '@ant-design/icons';
 import { useConfiguracoes } from '../../shared/core/configuracoes/ConfiguracoesContext';
-import { cnpjValido, DadosEmpresa, formatarCnpj, Perfil, Preferencias, TipoNotificacao } from '../../shared/core/configuracoes/configuracoes';
+import { DadosEmpresa, Perfil, Preferencias, TipoNotificacao } from '../../shared/core/configuracoes/configuracoes';
+import { CampoCep, CampoCpfCnpj, CampoTelefone, CampoUf } from '../../shared/formularios/Campos';
+import { regraCep, regraCnpj, regraTelefone } from '../../shared/formularios/documentos';
 import { useNotificacoes } from '../../shared/core/notificacoes/NotificacoesContext';
 import { TIPOS_NOTIFICACAO } from '../../shared/core/notificacoes/notificacoes';
 
@@ -59,7 +61,7 @@ export const MeuPerfil: React.FC = () => {
                 <Col span={12}><Form.Item name="nome" label="Nome" rules={[{ required: true, message: 'Informe o nome' }]}><Input /></Form.Item></Col>
                 <Col span={12}><Form.Item name="cargo" label="Cargo / função"><Input placeholder="Ex.: Comprador, Caixa, Gerente" /></Form.Item></Col>
                 <Col span={12}><Form.Item name="email" label="E-mail" rules={[{ type: 'email', message: 'E-mail inválido' }]}><Input /></Form.Item></Col>
-                <Col span={12}><Form.Item name="telefone" label="Telefone"><Input /></Form.Item></Col>
+                <Col span={12}><Form.Item name="telefone" label="Telefone" rules={[regraTelefone]}><CampoTelefone /></Form.Item></Col>
               </Row>
               <Button type="primary" htmlType="submit" icon={<SaveOutlined />}>Salvar</Button>
             </Form>
@@ -88,9 +90,8 @@ export const DadosDaEmpresa: React.FC = () => {
             <Col xs={24} md={12}><Form.Item name="razaoSocial" label="Razão social" rules={[{ required: true, message: 'Informe a razão social' }]}><Input /></Form.Item></Col>
             <Col xs={24} md={12}><Form.Item name="nomeFantasia" label="Nome fantasia"><Input /></Form.Item></Col>
             <Col xs={24} md={8}>
-              <Form.Item name="cnpj" label="CNPJ" normalize={formatarCnpj}
-                rules={[{ validator: (_, v) => (!v || cnpjValido(v) ? Promise.resolve() : Promise.reject(new Error('CNPJ inválido'))) }]}>
-                <Input placeholder="00.000.000/0000-00" />
+              <Form.Item name="cnpj" label="CNPJ" rules={[regraCnpj()]}>
+                <CampoCpfCnpj tipo="CNPJ" />
               </Form.Item>
             </Col>
             <Col xs={12} md={8}><Form.Item name="inscricaoEstadual" label="Inscrição estadual"><Input /></Form.Item></Col>
@@ -100,7 +101,7 @@ export const DadosDaEmpresa: React.FC = () => {
                 <Select allowClear options={[{ value: 'SIMPLES', label: 'Simples Nacional' }, { value: 'PRESUMIDO', label: 'Lucro Presumido' }, { value: 'REAL', label: 'Lucro Real' }]} />
               </Form.Item>
             </Col>
-            <Col xs={24} md={8}><Form.Item name="telefone" label="Telefone"><Input /></Form.Item></Col>
+            <Col xs={24} md={8}><Form.Item name="telefone" label="Telefone" rules={[regraTelefone]}><CampoTelefone /></Form.Item></Col>
             <Col xs={24} md={8}><Form.Item name="email" label="E-mail" rules={[{ type: 'email', message: 'E-mail inválido' }]}><Input /></Form.Item></Col>
           </Row>
           <Divider titlePlacement="start" plain>Endereço</Divider>
@@ -109,8 +110,15 @@ export const DadosDaEmpresa: React.FC = () => {
             <Col xs={8} md={4}><Form.Item name="numero" label="Número"><Input /></Form.Item></Col>
             <Col xs={16} md={6}><Form.Item name="bairro" label="Bairro"><Input /></Form.Item></Col>
             <Col xs={14} md={10}><Form.Item name="cidade" label="Cidade"><Input /></Form.Item></Col>
-            <Col xs={4} md={4}><Form.Item name="uf" label="UF" normalize={(v: string) => String(v || '').toUpperCase().slice(0, 2)}><Input /></Form.Item></Col>
-            <Col xs={6} md={6}><Form.Item name="cep" label="CEP"><Input /></Form.Item></Col>
+            <Col xs={4} md={4}><Form.Item name="uf" label="UF"><CampoUf /></Form.Item></Col>
+            <Col xs={6} md={6}>
+              <Form.Item name="cep" label="CEP" rules={[regraCep]}>
+                <CampoCep onEndereco={e => {
+                  const a = form.getFieldsValue();
+                  form.setFieldsValue({ logradouro: e.logradouro || a.logradouro, bairro: e.bairro || a.bairro, cidade: e.cidade || a.cidade, uf: e.uf || a.uf });
+                }} />
+              </Form.Item>
+            </Col>
           </Row>
           <Divider titlePlacement="start" plain>Logotipo</Divider>
           <Row gutter={12} align="middle">

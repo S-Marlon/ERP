@@ -1,6 +1,7 @@
 // OS de montagem em A4: dados da empresa, cliente, cada mangueira com a ficha e os materiais, sinal e saldo.
 import { lerConfiguracoes } from '../../../shared/core/configuracoes/configuracoes';
 import { imprimirHtml } from '../../../shared/core/impressao/saida';
+import { formatarDocumento, formatarTelefone } from '../../../shared/formularios/documentos';
 import { ETAPAS_OS, OsDetalhe } from './montagensApi';
 
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -29,7 +30,7 @@ export const imprimirOs = (os: OsDetalhe) => {
     .ass { margin-top: 40px; display: flex; gap: 40px; } .ass div { flex: 1; border-top: 1px solid #333; text-align: center; padding-top: 3px; }
   </style></head><body>
     <div class="topo">
-      <div><h1>${esc(nome)}</h1><div>${esc([e.cnpj && `CNPJ ${e.cnpj}`, e.telefone, e.email].filter(Boolean).join(' · '))}</div></div>
+      <div><h1>${esc(nome)}</h1><div>${esc([e.cnpj && `CNPJ ${formatarDocumento(e.cnpj)}`, e.telefone && formatarTelefone(e.telefone), e.email].filter(Boolean).join(' · '))}</div></div>
       <div class="num">ORDEM DE SERVIÇO<br><b>Nº ${os.idOs}</b><br>${ETAPAS_OS[os.status].label} · aberta em ${dataBr(os.criadoEm)}${os.previsao ? `<br>Previsão: <b>${dataBr(os.previsao)}</b>` : ''}</div>
     </div>
     <div><b>Cliente:</b> ${esc(os.cliente)}${os.contato ? ` · <b>Contato:</b> ${esc(os.contato)}` : ''}${os.equipamento ? ` · <b>Equipamento:</b> ${esc(os.equipamento)}` : ''}</div>

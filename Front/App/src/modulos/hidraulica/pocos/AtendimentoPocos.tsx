@@ -12,6 +12,7 @@ import {
   SERVICOS, SITUACOES_LEAD, SITUACOES_OBRA, urlArquivo,
 } from './obrasApi';
 import { abrirObra, navPocos, useNivelPocos } from './navPocos';
+import { CampoTelefone } from '../../../shared/formularios/Campos';
 import { OrcamentoRapido } from './OrcamentoContrato';
 import ConfigPocos from './ConfigPocos';
 
@@ -42,7 +43,7 @@ const LeadModal: React.FC<{ aberto: Lead | 'novo' | null; onFechar: () => void; 
       <Space direction="vertical" style={{ width: '100%' }} size={10}>
         <Row gutter={8}>
           <Col span={12}><Text>Nome</Text><Input maxLength={120} value={f.nome} onChange={e => setF({ ...f, nome: e.target.value })} /></Col>
-          <Col span={12}><Text>Telefone / WhatsApp</Text><Input value={foneBr(f.telefone) || f.telefone || ''} onChange={e => setF({ ...f, telefone: e.target.value || null })} /></Col>
+          <Col span={12}><Text>Telefone / WhatsApp</Text><CampoTelefone value={f.telefone} onChange={t => setF({ ...f, telefone: t || null })} /></Col>
         </Row>
         <Row gutter={8}>
           <Col span={8}><Text>Origem</Text>

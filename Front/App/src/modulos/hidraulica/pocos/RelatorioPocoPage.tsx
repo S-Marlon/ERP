@@ -15,6 +15,7 @@ import {
   ANOMALIAS, brl, calcularFinanceiro, dataGarantia, FORMAS_PAGAMENTO, OCORRENCIAS_OBRA, progresso, resumoTeste, SecaoId, TEXTO_GARANTIA_PADRAO,
 } from './relatorioPoco';
 import { MODELOS, ModeloId } from './templatesPoco';
+import { mascaraCep, mascaraCnpj, mascaraCpfCnpj, mascaraTelefone, UFS } from '../../../shared/formularios/documentos';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -141,13 +142,13 @@ export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: R
       children: (
         <Row gutter={12}>
           <Col xs={24} md={12}><Form.Item label="Nome / razão social" name="cliente"><Input placeholder="Nome completo" /></Form.Item></Col>
-          <Col xs={12} md={6}><Form.Item label="CPF / CNPJ" name="documento"><Input placeholder="000.000.000-00" /></Form.Item></Col>
-          <Col xs={12} md={6}><Form.Item label="Telefone" name="celular"><Input placeholder="(00) 00000-0000" /></Form.Item></Col>
+          <Col xs={12} md={6}><Form.Item label="CPF / CNPJ" name="documento" normalize={v => mascaraCpfCnpj(v)}><Input inputMode="numeric" placeholder="CPF ou CNPJ" /></Form.Item></Col>
+          <Col xs={12} md={6}><Form.Item label="Telefone" name="celular" normalize={v => mascaraTelefone(v)}><Input inputMode="tel" placeholder="(00) 00000-0000" /></Form.Item></Col>
           <Col xs={24} md={10}><Form.Item label="Endereço (rua, nº)" name="endereco"><Input placeholder="Estrada Municipal, km 4" /></Form.Item></Col>
           <Col xs={12} md={5}><Form.Item label="Bairro" name="bairro"><Input /></Form.Item></Col>
           <Col xs={12} md={4}><Form.Item label="Cidade" name="cidade"><Input /></Form.Item></Col>
-          <Col xs={8} md={2}><Form.Item label="UF" name="uf" normalize={v => String(v || '').toUpperCase()}><Input maxLength={2} /></Form.Item></Col>
-          <Col xs={16} md={3}><Form.Item label="CEP" name="cep"><Input placeholder="00000-000" /></Form.Item></Col>
+          <Col xs={8} md={2}><Form.Item label="UF" name="uf"><Select showSearch allowClear options={UFS.map(u => ({ value: u, label: u }))} /></Form.Item></Col>
+          <Col xs={16} md={3}><Form.Item label="CEP" name="cep" normalize={v => mascaraCep(v)}><Input inputMode="numeric" placeholder="00000-000" /></Form.Item></Col>
         </Row>
       ),
     },
@@ -422,8 +423,8 @@ export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: R
               <Card size="small" title="Empresa no cabeçalho">
                 <Flex vertical gap={6}>
                   <Input size="small" placeholder="Nome da empresa" value={p.empresa.nome} onChange={e => p.setEmpresa({ nome: e.target.value })} />
-                  <Input size="small" placeholder="CNPJ" value={p.empresa.documento} onChange={e => p.setEmpresa({ documento: e.target.value })} />
-                  <Input size="small" placeholder="Telefone" value={p.empresa.telefone} onChange={e => p.setEmpresa({ telefone: e.target.value })} />
+                  <Input size="small" placeholder="CNPJ" value={p.empresa.documento} onChange={e => p.setEmpresa({ documento: mascaraCnpj(e.target.value) })} />
+                  <Input size="small" placeholder="Telefone" value={p.empresa.telefone} onChange={e => p.setEmpresa({ telefone: mascaraTelefone(e.target.value) })} />
                   <Input size="small" placeholder="Cidade / UF" value={p.empresa.cidade} onChange={e => p.setEmpresa({ cidade: e.target.value })} />
                   <Input size="small" placeholder="Chave PIX (sai na cobrança)" value={p.empresa.pix} onChange={e => p.setEmpresa({ pix: e.target.value })} />
                   <TextArea size="small" autoSize={{ minRows: 1, maxRows: 3 }} placeholder="Outros dados para pagamento (banco, agência...)"

@@ -14,6 +14,7 @@ import {
   centralApi, ConjuntoForm, ContratoCentral, contarObras, dataBr, FechamentoContrato, foneBr, GRAVIDADES, Obra, ObraForm, obrasApi, Poco, PocoForm, Servico, SERVICOS, SituacaoObra, SITUACOES_OBRA,
 } from './obrasApi';
 import RelatorioPocoPage from './RelatorioPocoPage';
+import { CampoCep, CampoUf } from '../../../shared/formularios/Campos';
 import { ClientePocoModal, ListaClientes } from './ClientesPoco';
 import { FechamentoModal } from './FechamentoContrato';
 import { CamposConjunto } from './ConjuntoPoco';
@@ -41,8 +42,6 @@ const obraVazia = (): ObraForm => ({
 });
 
 /** Campos de endereço e GPS do poço (usados no poço novo da obra e na ficha). */
-/** CEP enquanto digita: só números, com o traço depois do 5º. */
-const formatarCep = (v: string) => { const d = v.replace(/\D/g, '').slice(0, 8); return d ? (d.length > 5 ? `${d.slice(0, 5)}-${d.slice(5)}` : d) : null; };
 
 const CamposLocal: React.FC<{ p: Partial<PocoForm>; mudar: (x: Partial<PocoForm>) => void }> = ({ p, mudar }) => {
   const obterGps = () => navigator.geolocation?.getCurrentPosition(
@@ -54,8 +53,11 @@ const CamposLocal: React.FC<{ p: Partial<PocoForm>; mudar: (x: Partial<PocoForm>
       <Col span={14}><Text>Endereço</Text><Input value={p.endereco || ''} onChange={e => mudar({ endereco: e.target.value || null })} placeholder="Estrada Municipal, km 4" /></Col>
       <Col span={10}><Text>Bairro</Text><Input value={p.bairro || ''} onChange={e => mudar({ bairro: e.target.value || null })} /></Col>
       <Col span={8}><Text>Cidade</Text><Input value={p.cidade || ''} onChange={e => mudar({ cidade: e.target.value || null })} /></Col>
-      <Col span={3}><Text>UF</Text><Input maxLength={2} value={p.uf || ''} onChange={e => mudar({ uf: e.target.value.toUpperCase() || null })} /></Col>
-      <Col span={5}><Text>CEP</Text><Input maxLength={9} value={p.cep || ''} placeholder="00000-000" onChange={e => mudar({ cep: formatarCep(e.target.value) })} /></Col>
+      <Col span={3}><Text>UF</Text><CampoUf style={{ width: '100%' }} value={p.uf || undefined} onChange={v => mudar({ uf: v || null })} /></Col>
+      <Col span={5}><Text>CEP</Text>
+        <CampoCep value={p.cep} onChange={cep => mudar({ cep: cep || null })}
+          onEndereco={e => mudar({ endereco: p.endereco || e.logradouro || null, bairro: p.bairro || e.bairro || null, cidade: e.cidade || p.cidade || null, uf: e.uf || p.uf || null })} />
+      </Col>
       <Col span={8}>
         <Text>Localização (GPS)</Text>
         <Input value={p.gps || ''} onChange={e => mudar({ gps: e.target.value || null })} placeholder="-23.550520, -46.633308"

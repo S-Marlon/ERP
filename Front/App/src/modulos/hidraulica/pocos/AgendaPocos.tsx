@@ -12,6 +12,7 @@ import {
   Obra, obrasApi, SERVICOS, SITUACOES_AGENDA, SITUACOES_EQUIPAMENTO, SituacaoAgenda, SituacaoEquipamento, TIPOS_AGENDA, TIPOS_EQUIPAMENTO, TipoAgenda, TipoEquipamento,
 } from './obrasApi';
 import { abrirObra, navPocos, useNavPocos, useNivelPocos } from './navPocos';
+import { CampoTelefone } from '../../../shared/formularios/Campos';
 
 const { Text } = Typography;
 const erro = (e: unknown) => message.error(e instanceof Error ? e.message : 'Erro.');
@@ -259,7 +260,7 @@ const ListaEquipe: React.FC = () => {
               <Select style={{ width: '100%' }} value={f.funcao} onChange={funcao => setF({ ...f, funcao })}
                 options={(Object.keys(FUNCOES_EQUIPE) as FuncaoEquipe[]).map(x => ({ value: x, label: FUNCOES_EQUIPE[x] }))} />
             </Col>
-            <Col span={12}><Text>Telefone</Text><Input value={foneBr(f.telefone) || f.telefone || ''} onChange={e => setF({ ...f, telefone: e.target.value || null })} /></Col>
+            <Col span={12}><Text>Telefone</Text><CampoTelefone value={f.telefone} onChange={t => setF({ ...f, telefone: t || null })} /></Col>
           </Row>
           <div><Text>Observação</Text><Input maxLength={255} value={f.observacao || ''} onChange={e => setF({ ...f, observacao: e.target.value || null })} /></div>
           <Space><Switch checked={f.ativo} onChange={ativo => setF({ ...f, ativo })} /><Text>{f.ativo ? 'Ativo' : 'Inativo (some da escala)'}</Text></Space>

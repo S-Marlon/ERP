@@ -1,6 +1,7 @@
 // Orçamento em arquivo PDF (A4) para baixar ou mandar pelo WhatsApp, e a mensagem que acompanha o arquivo.
 // Mesmo conteúdo do orçamento impresso (pedidosAbertosApi.imprimirOrcamento). Sem acesso a tela: roda também no teste.
 import { jsPDF } from 'jspdf';
+import { formatarDocumento, formatarTelefone } from '../../../shared/formularios/documentos';
 import type { DadosEmpresa } from '../../../shared/core/configuracoes/configuracoes';
 import type { PedidoAbertoDetalhe } from '../pdv/services/pedidosAbertosApi';
 import { codigoCliente, secoesDaProposta } from '../negociacao/propostaNegociacao';
@@ -44,7 +45,7 @@ export const gerarPdfOrcamento = (o: PedidoAbertoDetalhe, e: Partial<DadosEmpres
   doc.text(texto(nomeEmpresa(e) || 'Orçamento'), M, y + 5);
   doc.setFont('helvetica', 'normal').setFontSize(9).setTextColor(70);
   const linhasEmpresa = [
-    [e.cnpj && `CNPJ ${e.cnpj}`, e.telefone, e.email].filter(Boolean).join('  ·  '),
+    [e.cnpj && `CNPJ ${formatarDocumento(e.cnpj)}`, e.telefone && formatarTelefone(e.telefone), e.email].filter(Boolean).join('  ·  '),
     [e.logradouro && `${e.logradouro}${e.numero ? `, ${e.numero}` : ''}`, e.bairro, e.cidade && `${e.cidade}${e.uf ? `/${e.uf}` : ''}`].filter(Boolean).join('  ·  '),
   ].filter(Boolean);
   linhasEmpresa.forEach((l, i) => doc.text(texto(l), M, y + 11 + i * 4.5));

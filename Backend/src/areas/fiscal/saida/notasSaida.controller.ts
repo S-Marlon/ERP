@@ -3,6 +3,8 @@
 import { Request, Response } from 'express';
 import pool from '../../../infra/db';
 import { operadorDe } from '../../vendas/caixa/caixa.controller';
+import { cnpjValido } from '../../parceiros/cnpj';
+import { cepDoCadastro, ErroCadastro, telefoneDoCadastro, ufDoCadastro } from '../../parceiros/documentos';
 import { criarEmissor, PROVEDORES_DISPONIVEIS, segredosConfigurados } from './emissores';
 import {
   CONFIG_PADRAO, ConfigFiscal, Destinatario, Emitente, ErroFiscal, ItemVendaFiscal, Modelo, modeloSugerido, montarNota,
@@ -174,7 +176,14 @@ export const salvarConfiguracao = async (req: Request, res: Response) => {
 
     const cnpj = somenteDigitos(e.cnpj);
     if (cnpj || e.razaoSocial) {
-      if (cnpj.length !== 14) throw new ErroFiscal('CNPJ da empresa deve ter 14 dígitos.');
+      if (!cnpjValido(cnpj)) throw new ErroFiscal('CNPJ da empresa inválido: confira os números (dígitos verificadores).');
+      let cep: string, uf: string, telefone: string | null;
+      try {
+        cep = cepDoCadastro(e.cep); uf = ufDoCadastro(e.uf); telefone = telefoneDoCadastro(e.telefone);
+      } catch (erro) {
+        if (erro instanceof ErroCadastro) throw new ErroFiscal(erro.message);
+        throw erro;
+      }
       if (!texto(e.razaoSocial, 120)) throw new ErroFiscal('Informe a razão social.');
       await pool.execute(
         `INSERT INTO fiscal_emitentes (tenant_id, cnpj, inscricao_estadual, razao_social, nome_fantasia, crt, logradouro, numero, complemento, bairro, cep,
@@ -185,9 +194,9 @@ export const salvarConfiguracao = async (req: Request, res: Response) => {
            complemento = VALUES(complemento), bairro = VALUES(bairro), cep = VALUES(cep), municipio = VALUES(municipio),
            codigo_municipio_ibge = VALUES(codigo_municipio_ibge), uf = VALUES(uf), telefone = VALUES(telefone), email = VALUES(email)`,
         [tenant, cnpj, somenteDigitos(e.inscricaoEstadual) || null, texto(e.razaoSocial, 120), texto(e.nomeFantasia, 60), Number(e.crt) || 4,
-          texto(e.logradouro, 120), texto(e.numero, 20), texto(e.complemento, 60), texto(e.bairro, 60), somenteDigitos(e.cep).slice(0, 8) || null,
-          texto(e.municipio, 60), somenteDigitos(e.codigoMunicipioIbge).slice(0, 7) || null, texto(e.uf, 2)?.toUpperCase() ?? null,
-          texto(e.telefone, 20), texto(e.email, 120)]
+          texto(e.logradouro, 120), texto(e.numero, 20), texto(e.complemento, 60), texto(e.bairro, 60), cep || null,
+          texto(e.municipio, 60), somenteDigitos(e.codigoMunicipioIbge).slice(0, 7) || null, uf || null,
+          telefone, texto(e.email, 120)]
       );
     }
     const dados = await carregarConfiguracao(pool, tenant);
