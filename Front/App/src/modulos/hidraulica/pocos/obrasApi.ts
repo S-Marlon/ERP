@@ -769,6 +769,8 @@ export interface ConjuntoForm {
   bombaMarca: string | null; bombaModelo: string | null; potenciaCv: number | null; tensao: string | null; estagios: number | null;
   motorMarca: string | null; motorModelo: string | null; bombeadorMarca: string | null; bombeadorModelo: string | null;
   profundidadeBombaM: number | null; tuboMaterial: string | null; tuboDiametro: string | null; tuboBarras: number | null; tuboMetros: number | null;
+  /** União das barras: luva de PVC, galvanizada, inox, latão ou soldado. */
+  tuboLuva?: string | null;
   fioTipo: string | null; fioBitola: string | null; fioMetros: number | null; cordaMaterial: string | null; cordaMetros: number | null;
   quadroComando: string | null; cabecaPoco: string | null; observacao: string | null;
 }

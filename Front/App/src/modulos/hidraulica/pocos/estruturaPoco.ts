@@ -124,7 +124,7 @@ export const resumoEstrutura = (d: Dados): string[] => {
       const nome = String(d.bombaTubulacao || '').trim();
       if (!nome) return `tubo edutor${medida ? ` ${medida}` : ''}`;
       return `${/edutor/i.test(nome) ? '' : 'tubo edutor '}${medida && !nome.includes(medida) ? `${medida} ` : ''}${nome}`;
-    })()}: ${textoBarras(num(d.bombaQtdTubos), d.bombaTamTubo)} = ${fmt(num(d.bombaQtdTubos) * num(d.bombaTamTubo))} m`
+    })()}: ${textoBarras(num(d.bombaQtdTubos), d.bombaTamTubo)} = ${fmt(num(d.bombaQtdTubos) * num(d.bombaTamTubo))} m${d.bombaLuva ? ` (${String(d.bombaLuva).toLowerCase()})` : ''}`
     : '';
   const extra = [num(d.bombaNivelEstatico) ? `nível estático ${fmt(num(d.bombaNivelEstatico))} m` : '', num(d.bombaNivelDinamico) ? `nível dinâmico ${fmt(num(d.bombaNivelDinamico))} m` : '',
     num(d.bombaProfundidade) ? `bomba a ${fmt(num(d.bombaProfundidade))} m` : '', tubos].filter(Boolean);

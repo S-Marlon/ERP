@@ -2,7 +2,7 @@
 // impressão (completo, cobrança, teste de vazão, garantia, em branco) com pré-visualização e arquivo XML para guardar/reabrir.
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Card, Checkbox, Col, Collapse, DatePicker, Descriptions, Drawer, Dropdown, Flex, Form, Input, message, Row, Segmented, Select, Space, Statistic, Switch, Tag, Tooltip, Typography, Upload, theme } from 'antd';
+import { AutoComplete, Button, Card, Checkbox, Col, Collapse, DatePicker, Descriptions, Drawer, Dropdown, Flex, Form, Input, message, Row, Segmented, Select, Space, Statistic, Switch, Tag, Tooltip, Typography, Upload, theme } from 'antd';
 import {
   ArrowLeftOutlined, BuildOutlined, CompassOutlined, DashboardOutlined, DeleteOutlined, DollarOutlined, DownloadOutlined, ExperimentOutlined, EyeOutlined,
   FileAddOutlined, LineChartOutlined, PlusOutlined, PrinterOutlined, SettingOutlined, UnorderedListOutlined, UploadOutlined, UserOutlined,
@@ -17,6 +17,7 @@ import { CAMADAS_GEOLOGICAS, resumoEstrutura, revestimentosDe, svgPerfil, temEst
 import { CampoMaterial, useCatalogoMateriais } from './CampoMaterial';
 import { barrasDoTrecho, caboSugerido, corDoMaterial, diametroEmNumero, textoBarras } from './materiaisPoco';
 import { LancarMateriais } from './LancarMateriais';
+import { LUVAS } from './desenhoConjunto';
 import type { MaterialPoco } from './obrasApi';
 import { mascaraCep, mascaraCnpj, mascaraCpfCnpj, mascaraTelefone, UFS } from '../../../shared/formularios/documentos';
 import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
@@ -397,6 +398,9 @@ export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: R
               );
             })()}
           </Col>
+          <Col xs={12} md={5}><Form.Item label="Luva (união das barras)" name="bombaLuva">
+            <AutoComplete options={LUVAS.map(value => ({ value }))} placeholder="Luva galvanizada" allowClear />
+          </Form.Item></Col>
           <Col xs={12} md={6}><Form.Item label="Cabo elétrico (cadastro)" name="bombaCabeamento">
             <CampoMaterial categorias={['CABO']} placeholder="Cabo PP 3x4 mm" style={{ width: '100%' }} onEscolher={m => aplicarSimples('bombaIdCabo', m)} />
           </Form.Item></Col>

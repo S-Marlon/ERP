@@ -9,7 +9,7 @@ export type TipoFotoPoco = typeof TIPOS_FOTO_POCO[number];
 /** Campos de texto do conjunto e o tamanho da coluna (o banco corta em silêncio, então corta aqui). */
 const TEXTOS: Record<string, number> = {
   bombaMarca: 60, bombaModelo: 60, tensao: 20, motorMarca: 60, motorModelo: 60, bombeadorMarca: 60, bombeadorModelo: 60,
-  tuboMaterial: 40, tuboDiametro: 20, fioTipo: 40, fioBitola: 20, cordaMaterial: 40, quadroComando: 150, cabecaPoco: 255, observacao: 255,
+  tuboMaterial: 40, tuboDiametro: 20, tuboLuva: 30, fioTipo: 40, fioBitola: 20, cordaMaterial: 40, quadroComando: 150, cabecaPoco: 255, observacao: 255,
 };
 const NUMEROS = ['potenciaCv', 'profundidadeBombaM', 'tuboMetros', 'fioMetros', 'cordaMetros'] as const;
 const INTEIROS = ['estagios', 'tuboBarras'] as const;
@@ -19,6 +19,8 @@ export interface Conjunto {
   bombaMarca: string | null; bombaModelo: string | null; potenciaCv: number | null; tensao: string | null; estagios: number | null;
   motorMarca: string | null; motorModelo: string | null; bombeadorMarca: string | null; bombeadorModelo: string | null;
   profundidadeBombaM: number | null; tuboMaterial: string | null; tuboDiametro: string | null; tuboBarras: number | null; tuboMetros: number | null;
+  /** União das barras: luva de PVC, galvanizada, inox, latão ou soldado. */
+  tuboLuva: string | null;
   fioTipo: string | null; fioBitola: string | null; fioMetros: number | null; cordaMaterial: string | null; cordaMetros: number | null;
   quadroComando: string | null; cabecaPoco: string | null; observacao: string | null;
 }
@@ -77,7 +79,7 @@ export const conjuntoDoRelatorio = (r: Record<string, any> | null | undefined): 
     profundidadeBombaM: pos(r.bombaProfundidade), tuboBarras: barras ? Math.round(barras) : null,
     tuboMetros: barras && comp ? Math.round(barras * comp * 100) / 100 : null,
     tuboDiametro: r.bombaMedidaTubo ? texto(`${r.bombaMedidaTubo}${r.bombaTuboUnidade || '"'}`, 20) : null,
-    tuboMaterial: texto(r.bombaTubulacao, 40), cabecaPoco: texto(r.bombaCavalete ? `Cavalete: ${r.bombaCavalete}` : null, 255),
+    tuboMaterial: texto(r.bombaTubulacao, 40), tuboLuva: texto(r.bombaLuva, 30), cabecaPoco: texto(r.bombaCavalete ? `Cavalete: ${r.bombaCavalete}` : null, 255),
     // cabo (do cadastro: "Cabo PP 3x4 mm") com a metragem, e a corda de segurança
     ...(String(r.bombaCabeamento || '').length > 20 ? { fioTipo: texto(r.bombaCabeamento, 40) } : { fioBitola: texto(r.bombaCabeamento, 20) }),
     fioMetros: pos(r.bombaCaboMetros), cordaMaterial: texto(r.bombaCorda, 40), cordaMetros: pos(r.bombaCordaMetros),
@@ -99,7 +101,7 @@ export const resumoConjunto = (c: Partial<Conjunto>) => {
   const bomba = [c.bombaTipo ? TIPO_TEXTO[c.bombaTipo] : null, c.bombaMarca, c.bombaModelo, c.potenciaCv ? `${fmt(c.potenciaCv)} CV` : null].filter(Boolean).join(' ');
   const motor = c.motorMarca || c.motorModelo ? `motor ${[c.motorMarca, c.motorModelo].filter(Boolean).join(' ')}` : null;
   const tubo = c.tuboMaterial || c.tuboDiametro || c.tuboBarras || c.tuboMetros
-    ? ['tubo', c.tuboMaterial, c.tuboDiametro, c.tuboBarras ? `(${c.tuboBarras} barras)` : c.tuboMetros ? `${fmt(c.tuboMetros)} m` : null].filter(Boolean).join(' ')
+    ? ['tubo', c.tuboMaterial, c.tuboDiametro, c.tuboBarras ? `(${c.tuboBarras} barras)` : c.tuboMetros ? `${fmt(c.tuboMetros)} m` : null, c.tuboLuva ? `· ${c.tuboLuva.toLowerCase()}` : null].filter(Boolean).join(' ')
     : null;
   const fio = c.fioBitola || c.fioMetros ? ['fio', c.fioTipo, c.fioBitola, c.fioMetros ? `${fmt(c.fioMetros)} m` : null].filter(Boolean).join(' ') : null;
   return [bomba || null, motor, c.profundidadeBombaM ? `a ${fmt(c.profundidadeBombaM)} m` : null, tubo, fio].filter(Boolean).join(' · ') || 'Conjunto sem descrição';

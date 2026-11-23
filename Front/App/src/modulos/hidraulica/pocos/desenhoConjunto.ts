@@ -8,6 +8,7 @@ export interface ConjuntoDesenho {
   bombaTipo?: string | null; bombaMarca?: string | null; bombaModelo?: string | null; potenciaCv?: number | null; tensao?: string | null; estagios?: number | null;
   motorMarca?: string | null; motorModelo?: string | null; bombeadorMarca?: string | null; bombeadorModelo?: string | null;
   profundidadeBombaM?: number | null; tuboMaterial?: string | null; tuboDiametro?: string | null; tuboBarras?: number | null; tuboMetros?: number | null;
+  tuboLuva?: string | null; anosDeUso?: number | null;
   fioTipo?: string | null; fioBitola?: string | null; fioMetros?: number | null; cordaMaterial?: string | null; cordaMetros?: number | null;
   quadroComando?: string | null; cabecaPoco?: string | null;
 }
@@ -34,6 +35,20 @@ export const textoTubo = (c: ConjuntoDesenho) => {
 };
 
 export interface Conferencia { ok: boolean; texto: string }
+
+/** Opções de união das barras do tubo edutor. */
+export const LUVAS = ['Luva de PVC', 'Luva galvanizada', 'Luva de inox', 'Luva de latão', 'Soldado (sem luva)'];
+/** Tipo da luva pelo texto: metal (oxida), PVC (pode trincar no aperto) ou soldado; null = não informado. */
+export const tipoLuva = (luva: unknown): 'METAL' | 'PVC' | 'SOLDADO' | null => {
+  const t = String(luva ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  if (!t.trim()) return null;
+  if (/solda/.test(t)) return 'SOLDADO';
+  if (/galvan|inox|latao|metal|\baco\b|ferro|bronze/.test(t)) return 'METAL';
+  if (/pvc|plastic/.test(t)) return 'PVC';
+  return null;
+};
+/** Material soldado (PVC de irrigação) já diz que não tem luva. */
+export const luvaPeloMaterial = (material: unknown) => (/solda/i.test(String(material ?? '')) ? 'Soldado (sem luva)' : null);
 
 /**
  * A corda de segurança é para o tubo que não aguenta o peso sozinho (PVC de irrigação soldado, PEAD, mangueira, flexível);
@@ -82,6 +97,7 @@ export const conferirConjunto = (c: ConjuntoDesenho, p: PocoDoConjunto = {}): Co
   if (bomba && corda) r.push(corda < bomba ? { ok: false, texto: `Corda de ${fmt(corda)} m não chega à bomba a ${fmt(bomba)} m.` } : { ok: true, texto: `Corda de ${fmt(corda)} m segura a bomba.` });
   // corda: só cobra no tubo que pede (soldado, PEAD, flexível); no de rosca com luva é opcional
   if (bomba && !corda && c.bombaTipo !== 'SUPERFICIE' && precisaCorda(c.tuboMaterial)) r.push({ ok: false, texto: 'Tubo soldado/flexível sem corda de segurança registrada.' });
+  if (tipoLuva(c.tuboLuva) === 'METAL' && num(c.anosDeUso) >= 5) r.push({ ok: false, texto: `Luvas de metal com ${num(c.anosDeUso)} anos: confira oxidação na próxima retirada.` });
   const fundo = num(p.profundidadeM), nd = num(p.nivelDinamicoM);
   if (bomba && fundo && bomba > fundo) r.push({ ok: false, texto: `Bomba a ${fmt(bomba)} m, abaixo do fundo do poço (${fmt(fundo)} m): confira.` });
   else if (bomba && fundo && fundo - bomba < 2) r.push({ ok: false, texto: `Bomba a ${fmt(fundo - bomba)} m do fundo: risco de puxar areia.` });
@@ -144,11 +160,13 @@ export const svgConjunto = (c: ConjuntoDesenho, p: PocoDoConjunto = {}, opcoes: 
       for (let i = 1; i < barras; i++) {
         const m = i * comprimento;
         if (m >= fimTubo) break;
-        partes.push(`<rect x="${cx - 5}" y="${y(m) - 2}" width="10" height="4" fill="#262626"><title>Emenda ${i}/${i + 1} · ${fmt(m)} m</title></rect>`);
+        const tl = tipoLuva(c.tuboLuva);
+        const corLuva = tl === 'PVC' ? '#e8e8e8' : tl === 'SOLDADO' ? corTubo : '#262626';
+        partes.push(`<rect x="${cx - 5}" y="${y(m) - 2}" width="10" height="${tl === 'SOLDADO' ? 2 : 4}" fill="${corLuva}" stroke="${tl === 'PVC' ? '#8c8c8c' : 'none'}" stroke-width="0.6"><title>Emenda ${i}/${i + 1} · ${fmt(m)} m${c.tuboLuva ? ` · ${esc(String(c.tuboLuva).toLowerCase())}` : ''}</title></rect>`);
         if (barras <= 20) partes.push(`<text x="${cx - larg - 4}" y="${y(m) + 3}" font-size="8" text-anchor="end" fill="#8c8c8c">${fmt(m)} m</text>`);
       }
     }
-    legendas.push({ y: y(Math.max(bomba * 0.5, 2)), texto: junta('Tubo edutor', c.tuboDiametro, c.tuboMaterial, textoTubo(c) ? `· ${textoTubo(c)}` : ''), cor: corTubo, negrito: true });
+    legendas.push({ y: y(Math.max(bomba * 0.5, 2)), texto: junta('Tubo edutor', c.tuboDiametro, c.tuboMaterial, textoTubo(c) ? `· ${textoTubo(c)}` : '', c.tuboLuva ? `· ${String(c.tuboLuva).toLowerCase()}` : ''), cor: corTubo, negrito: true });
   }
   // bomba: bombeador em cima, motor embaixo
   if (bomba || c.bombaMarca || c.bombaModelo) {

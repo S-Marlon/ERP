@@ -10,7 +10,7 @@ import {
 } from './obrasApi';
 import { reduzirImagem } from './ProcessoObra';
 import { CampoNumero } from '../../../shared/formularios/CamposNumero';
-import { conferirConjunto, PocoDoConjunto, precisaCorda, sugestoesTubo, svgConjunto, textoTubo } from './desenhoConjunto';
+import { conferirConjunto, LUVAS, luvaPeloMaterial, PocoDoConjunto, precisaCorda, sugestoesTubo, svgConjunto, textoTubo, tipoLuva } from './desenhoConjunto';
 
 const { Text } = Typography;
 const erro = (e: unknown) => message.error(e instanceof Error ? e.message : 'Erro.');
@@ -133,6 +133,8 @@ export const CamposConjunto: React.FC<{ comDataDeInstalacao?: boolean }> = ({ co
   useEffect(() => { if (v.motorMarca || v.motorModelo || v.bombeadorMarca || v.bombeadorModelo) setSeparados(true); }, [v.motorMarca, v.motorModelo, v.bombeadorMarca, v.bombeadorModelo]);
   const bomba = Number(v.profundidadeBombaM) || 0;
   const tubos = Number(v.tuboMetros) || 0;
+  // material soldado (PVC de irrigação) não tem luva: preenche sozinho
+  useEffect(() => { const l = luvaPeloMaterial(v.tuboMaterial); if (l && !v.tuboLuva) form.setFieldValue('tuboLuva', l); }, [v.tuboMaterial]);   // eslint-disable-line react-hooks/exhaustive-deps
   const sugestao = (campo: keyof ConjuntoForm, valor: number, texto: string) => (
     bomba > 0 && Number(v[campo]) !== valor
       ? <Button type="link" size="small" style={{ padding: 0, height: 'auto' }} onClick={() => form.setFieldValue(campo, valor)}>{texto}</Button>
@@ -175,6 +177,14 @@ export const CamposConjunto: React.FC<{ comDataDeInstalacao?: boolean }> = ({ co
           <Col xs={12} md={8}>{texto('Material do tubo', 'tuboMaterial', 'PVC geomecânico', MATERIAIS_TUBO)}</Col>
           <Col xs={12} md={8}>{texto('Diâmetro', 'tuboDiametro', '1 1/4"')}</Col>
           <TuboPorBarra />
+          <Col xs={12} md={6}>
+            <Form.Item label="Luva (união das barras)" name="tuboLuva" normalize={x => (x ? x : null)}
+              extra={tipoLuva(v.tuboLuva) === 'METAL' ? <Text type="secondary" style={{ fontSize: 12 }}>metal: conferir oxidação nas retiradas</Text>
+                : tipoLuva(v.tuboLuva) === 'PVC' ? <Text type="secondary" style={{ fontSize: 12 }}>PVC: cuidado com o aperto</Text> : null}>
+              <AutoComplete options={LUVAS.map(value => ({ value }))} placeholder="Luva galvanizada" allowClear
+                filterOption={(t, o) => String(o?.value).toLowerCase().includes(t.toLowerCase())} />
+            </Form.Item>
+          </Col>
         </Row>
       </Bloco>
 
@@ -237,7 +247,7 @@ const ConjuntoModal: React.FC<{
     // na troca, tubo, fio, corda, quadro e cabeça costumam ficar: já vêm preenchidos
     else if (modo === 'TROCAR' && b) form.setFieldsValue({
       instaladoEm: hojeIso(), profundidadeBombaM: b.profundidadeBombaM, tuboMaterial: b.tuboMaterial, tuboDiametro: b.tuboDiametro, tuboBarras: b.tuboBarras,
-      tuboMetros: b.tuboMetros, fioTipo: b.fioTipo, fioBitola: b.fioBitola, fioMetros: b.fioMetros, cordaMaterial: b.cordaMaterial, cordaMetros: b.cordaMetros,
+      tuboMetros: b.tuboMetros, tuboLuva: b.tuboLuva, fioTipo: b.fioTipo, fioBitola: b.fioBitola, fioMetros: b.fioMetros, cordaMaterial: b.cordaMaterial, cordaMetros: b.cordaMetros,
       quadroComando: b.quadroComando, cabecaPoco: b.cabecaPoco, tensao: b.tensao,
     });
     else if (modo === 'NOVO') form.setFieldsValue({ bombaTipo: 'SUBMERSA' });
@@ -313,7 +323,7 @@ const Detalhe: React.FC<{ c: Conjunto }> = ({ c }) => {
     { key: 'm', label: 'Motor / bombeador', children: junta([c.motorMarca, c.motorModelo].filter(Boolean).join(' ') && `motor ${[c.motorMarca, c.motorModelo].filter(Boolean).join(' ')}`,
       [c.bombeadorMarca, c.bombeadorModelo].filter(Boolean).join(' ') && `bombeador ${[c.bombeadorMarca, c.bombeadorModelo].filter(Boolean).join(' ')}`) },
     { key: 'p', label: 'Profundidade da bomba', children: c.profundidadeBombaM !== null ? `${num(c.profundidadeBombaM)} m` : '' },
-    { key: 't', label: 'Tubo', children: junta(c.tuboMaterial, c.tuboDiametro, textoTubo(c)) },
+    { key: 't', label: 'Tubo', children: junta(c.tuboMaterial, c.tuboDiametro, textoTubo(c), c.tuboLuva) },
     { key: 'f', label: 'Fio', children: junta(c.fioTipo, c.fioBitola, c.fioMetros !== null && `${num(c.fioMetros)} m`) },
     { key: 'c', label: 'Corda', children: junta(c.cordaMaterial, c.cordaMetros !== null && `${num(c.cordaMetros)} m`) },
     { key: 'q', label: 'Quadro de comando', children: c.quadroComando || '' },

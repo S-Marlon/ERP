@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { barrasDoConjunto, conferirConjunto, precisaCorda, sugestoesTubo, svgConjunto, textoTubo } from './desenhoConjunto';
+import { barrasDoConjunto, conferirConjunto, luvaPeloMaterial, precisaCorda, sugestoesTubo, svgConjunto, textoTubo, tipoLuva } from './desenhoConjunto';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -50,4 +50,18 @@ teste('conjunto: corda só no tubo que pede e regra de 3 do tubo', () => {
   assert.strictEqual(sugestoesTubo(64, 16, null).comprimento, 4);
   assert.strictEqual(sugestoesTubo(null, 16, 4).profundidade, 64);
   assert.deepStrictEqual(sugestoesTubo(64, 16, 4), { barras: null, comprimento: null, profundidade: null });
+});
+
+teste('conjunto: luva de PVC ou de metal', () => {
+  assert.strictEqual(tipoLuva('Luva galvanizada'), 'METAL');
+  assert.strictEqual(tipoLuva('Luva de latão'), 'METAL');
+  assert.strictEqual(tipoLuva('Luva de PVC'), 'PVC');
+  assert.strictEqual(tipoLuva('Soldado (sem luva)'), 'SOLDADO');
+  assert.strictEqual(tipoLuva(''), null);
+  assert.strictEqual(luvaPeloMaterial('PVC irrigação (soldado)'), 'Soldado (sem luva)');
+  assert.strictEqual(luvaPeloMaterial('PVC geomecânico (rosca)'), null);
+  assert.ok(conferirConjunto({ ...c, tuboLuva: 'Luva galvanizada', anosDeUso: 6 }).some(x => !x.ok && x.texto.startsWith('Luvas de metal com 6 anos')));
+  assert.ok(!conferirConjunto({ ...c, tuboLuva: 'Luva de PVC', anosDeUso: 6 }).some(x => x.texto.includes('Luvas')));
+  const svg = svgConjunto({ ...c, tuboLuva: 'Luva de PVC' });
+  assert.ok(svg.includes('fill="#e8e8e8"') && svg.includes('· luva de pvc'));
 });

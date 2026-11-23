@@ -8,7 +8,7 @@ export const COLUNAS_CONJUNTO: Record<keyof Conjunto, string> = {
   instaladoEm: 'instalado_em', retiradoEm: 'retirado_em', bombaTipo: 'bomba_tipo', bombaMarca: 'bomba_marca', bombaModelo: 'bomba_modelo',
   potenciaCv: 'potencia_cv', tensao: 'tensao', estagios: 'estagios', motorMarca: 'motor_marca', motorModelo: 'motor_modelo',
   bombeadorMarca: 'bombeador_marca', bombeadorModelo: 'bombeador_modelo', profundidadeBombaM: 'profundidade_bomba_m',
-  tuboMaterial: 'tubo_material', tuboDiametro: 'tubo_diametro', tuboBarras: 'tubo_barras', tuboMetros: 'tubo_metros',
+  tuboMaterial: 'tubo_material', tuboDiametro: 'tubo_diametro', tuboBarras: 'tubo_barras', tuboMetros: 'tubo_metros', tuboLuva: 'tubo_luva',
   fioTipo: 'fio_tipo', fioBitola: 'fio_bitola', fioMetros: 'fio_metros', cordaMaterial: 'corda_material', cordaMetros: 'corda_metros',
   quadroComando: 'quadro_comando', cabecaPoco: 'cabeca_poco', observacao: 'observacao',
 };

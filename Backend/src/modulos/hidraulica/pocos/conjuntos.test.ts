@@ -19,6 +19,7 @@ teste('conjunto: vindo do relatório da obra', () => {
   assert.strictEqual(conjuntoDoRelatorio(null), null);
   const doRel = conjuntoDoRelatorio({ bombaProfundidade: 36, bombaQtdTubos: 6, bombaTamTubo: 6, bombaCabeamento: 'Cabo PP 3x4 mm', bombaCaboMetros: 46, bombaCorda: 'Corda de segurança', bombaCordaMetros: 40 })!;
   assert.deepStrictEqual([doRel.tuboBarras, doRel.tuboMetros, doRel.fioBitola, doRel.fioMetros, doRel.cordaMaterial, doRel.cordaMetros], [6, 36, 'Cabo PP 3x4 mm', 46, 'Corda de segurança', 40]);
+  assert.strictEqual(conjuntoDoRelatorio({ bombaQtdTubos: 6, bombaTamTubo: 6, bombaLuva: 'Luva galvanizada' })!.tuboLuva, 'Luva galvanizada');
   assert.strictEqual(conjuntoDoRelatorio({ bombaTuboUnidade: '"', cliente: 'José' }), null, 'só a unidade padrão não é bomba');
   const c = conjuntoDoRelatorio({ bombaMarca: 'Ebara', bombaQtdTubos: 10, bombaTamTubo: 6, bombaMedidaTubo: '1 1/4', bombaTuboUnidade: '"',
     bombaTubulacao: 'PVC geomecânico', bombaCabeamento: '3 x 4 mm²', bombaCavalete: 'galvanizado', bombaDtInstalacao: '2026-09-09T03:00:00Z' })!;

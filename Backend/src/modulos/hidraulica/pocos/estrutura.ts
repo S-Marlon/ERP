@@ -47,7 +47,7 @@ export const estruturaDasObras = (obras: RelatorioDaObra[]) => {
     bombaProfundidade: recente('bombaProfundidade'),
     // tubo edutor do relatório mais recente (desenho e resumo)
     bombaQtdTubos: recente('bombaQtdTubos'), bombaTamTubo: recente('bombaTamTubo'), bombaMedidaTubo: recenteTexto('bombaMedidaTubo'),
-    bombaTuboUnidade: recenteTexto('bombaTuboUnidade'), bombaTubulacao: recenteTexto('bombaTubulacao'), bombaTuboCor: recenteTexto('bombaTuboCor'),
+    bombaTuboUnidade: recenteTexto('bombaTuboUnidade'), bombaTubulacao: recenteTexto('bombaTubulacao'), bombaTuboCor: recenteTexto('bombaTuboCor'), bombaLuva: recenteTexto('bombaLuva'),
     ...completacao,
   };
   return estrutura.perfuracoes.length || revestimentos.length ? estrutura : null;
