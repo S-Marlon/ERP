@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { CNPJ_COMPRA_AVULSA, cnpjValido, estabelecimentoCnpj, raizCnpj } from '../cnpj';
+import { cepDoCadastro, ErroCadastro, limparTelefone, telefoneDoCadastro, ufDoCadastro } from '../documentos';
 import pool from '../../../infra/db';
 
 // 🟢 [READ] Verificar se o fornecedor existe pelo CNPJ (Usado pelo Front para o Modal via GET)
@@ -128,8 +129,8 @@ export const obterOuCriarFornecedorPorCnpj = async (req: Request, res: Response)
         );
       }
 
-      // Telefone da nota
-      const telefone = String(dados.telefone || '').trim();
+      // Telefone da nota: só os números (o da NF-e não é recusado, só limpo)
+      const telefone = limparTelefone(dados.telefone);
       if (telefone) {
         await connection.execute(
           `INSERT INTO pessoas_contatos (id_cliente, tenant_id, nome_contato, tipo, telefone, principal, whatsapp, nome_referencia, created_at)
@@ -358,6 +359,16 @@ export const atualizarFornecedor = async (req: Request, res: Response) => {
   if (!['ATIVO', 'INATIVO'].includes(status)) return res.status(400).json({ error: 'Situação inválida.' });
   const email = textoOuNulo(d.email, 150);
   if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ error: 'E-mail inválido.' });
+  // Telefone, CEP e UF: só números/sigla, conferidos (DDD, 8 números, UF que existe)
+  let telefone: string | null, cep: string, uf: string;
+  try {
+    telefone = telefoneDoCadastro(d.telefone);
+    cep = cepDoCadastro(d.endereco?.cep);
+    uf = ufDoCadastro(d.endereco?.estado);
+  } catch (e: any) {
+    if (e instanceof ErroCadastro) return res.status(e.status).json({ error: e.message });
+    throw e;
+  }
 
   const connection: any = await pool.getConnection();
   try {
@@ -382,8 +393,8 @@ export const atualizarFornecedor = async (req: Request, res: Response) => {
     else if (emailAtual) await connection.execute(`UPDATE pessoas_emails SET deleted_at = NOW() WHERE id_email = ?`, [emailAtual.id_email]);
     else if (email) await connection.execute(`INSERT INTO pessoas_emails (id_cliente, tenant_id, email, principal, created_at) VALUES (?, ?, ?, 1, NOW())`, [id, tenantId, email]);
 
-    // Telefone principal
-    const telefone = textoOuNulo(d.telefone, 20);
+    // Telefone principal: só os números, com DDD
+    // (conferido antes da transação)
     const whatsapp = d.whatsapp ? 1 : 0;
     const [[telAtual]]: any = await connection.execute(
       `SELECT id_contato FROM pessoas_contatos WHERE id_cliente = ? AND deleted_at IS NULL ORDER BY principal DESC, id_contato LIMIT 1`, [id]
@@ -404,7 +415,7 @@ export const atualizarFornecedor = async (req: Request, res: Response) => {
     const e = d.endereco || {};
     const temEndereco = ['logradouro', 'cidade', 'cep'].some(k => String(e[k] || '').trim());
     const valoresEnd = [textoOuNulo(e.logradouro, 150) || '', textoOuNulo(e.numero, 20) || '', textoOuNulo(e.complemento, 100), textoOuNulo(e.bairro, 100) || '',
-      textoOuNulo(e.cidade, 100) || '', (textoOuNulo(e.estado, 2) || '').toUpperCase(), String(e.cep || '').replace(/\D/g, '').slice(0, 8)];
+      textoOuNulo(e.cidade, 100) || '', uf, cep];
     const [[endAtual]]: any = await connection.execute(
       `SELECT id_endereco FROM pessoas_enderecos WHERE id_cliente = ? AND deleted_at IS NULL ORDER BY principal DESC, id_endereco LIMIT 1`, [id]
     );

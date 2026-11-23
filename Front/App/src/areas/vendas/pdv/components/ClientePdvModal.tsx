@@ -6,13 +6,8 @@ import type { InputRef } from 'antd';
 import { PhoneOutlined, UserAddOutlined, UserOutlined } from '@ant-design/icons';
 import { buscarClientesPdv, cadastrarClienteRapido, ClienteBusca } from '../services/api/products';
 import { ClientePdv } from '../hooks/usePDVState';
-
-const formatarDocumento = (doc: string) => {
-  const d = String(doc || '').replace(/\D/g, '');
-  if (d.length === 11) return d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-  if (d.length === 14) return d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
-  return doc;
-};
+import { CampoTelefone } from '../../../../shared/formularios/Campos';
+import { formatarDocumento, formatarTelefone, limparTelefone } from '../../../../shared/formularios/documentos';
 
 interface Props {
   open: boolean;
@@ -54,7 +49,7 @@ export const ClientePdvModal: React.FC<Props> = ({ open, buscaInicial, titulo, o
   const abrirNovo = () => {
     const t = busca.trim();
     const soNumeros = /^[\d\s()+-]+$/.test(t);
-    setNovo({ nome: soNumeros ? '' : t, telefone: soNumeros ? t : '' });
+    setNovo({ nome: soNumeros ? '' : t, telefone: soNumeros ? limparTelefone(t).slice(0, 11) : '' });
     setErroNovo(null);
     setTimeout(() => nomeRef.current?.focus(), 50);
   };
@@ -99,8 +94,8 @@ export const ClientePdvModal: React.FC<Props> = ({ open, buscaInicial, titulo, o
           </div>
           <div>
             <Typography.Text>Telefone (com DDD)</Typography.Text>
-            <Input prefix={<PhoneOutlined />} placeholder="Ex.: 54 99707-7069" maxLength={20} value={novo.telefone}
-              onChange={e => setNovo(n => n && { ...n, telefone: e.target.value })} onPressEnter={salvarNovo} />
+            <CampoTelefone prefix={<PhoneOutlined />} value={novo.telefone}
+              onChange={telefone => setNovo(n => n && { ...n, telefone })} onPressEnter={salvarNovo} />
           </div>
           {erroNovo && (
             <Alert type={erroNovo.cliente ? 'warning' : 'error'} showIcon message={erroNovo.texto}
@@ -143,7 +138,7 @@ export const ClientePdvModal: React.FC<Props> = ({ open, buscaInicial, titulo, o
                   <div>
                     <div style={{ fontWeight: 600 }}>{c.nome}</div>
                     {c.razaoSocial && c.razaoSocial !== c.nome && <div style={{ fontSize: 11, color: '#64748b' }}>{c.razaoSocial}</div>}
-                    {c.telefone && <div style={{ fontSize: 11, color: '#64748b' }}><PhoneOutlined /> {c.telefone}</div>}
+                    {c.telefone && <div style={{ fontSize: 11, color: '#64748b' }}><PhoneOutlined /> {formatarTelefone(c.telefone)}</div>}
                   </div>
                   <Space>
                     <Tag>{c.tipo}</Tag>

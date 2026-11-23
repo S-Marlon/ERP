@@ -473,7 +473,7 @@ export const cadastrarClienteRapido = async (req: Request, res: Response) => {
     await conn.execute(`INSERT INTO pessoas_pf (id_cliente, tenant_id, nome, cpf, created_at) VALUES (?, ?, ?, NULL, NOW())`, [id, tenant, c.nome]);
     await conn.execute(
       `INSERT INTO pessoas_contatos (id_cliente, tenant_id, nome_contato, tipo, telefone, principal, whatsapp, created_at) VALUES (?, ?, ?, ?, ?, 1, ?, NOW())`,
-      [id, tenant, c.nome, c.celular ? 'CELULAR' : 'FIXO', c.telefone, c.celular ? 1 : 0]
+      [id, tenant, c.nome, c.celular ? 'CELULAR' : 'FIXO', c.digitos, c.celular ? 1 : 0]
     );
     await conn.execute(
       `INSERT INTO pessoas_papeis_atribuido (tenant_id, id_cliente, id_cliente_papel, created_at) VALUES (?, ?, ?, NOW())`,

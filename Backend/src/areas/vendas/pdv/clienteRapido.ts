@@ -16,5 +16,6 @@ export const validarClienteRapido = (b: any) => {
   let telefone = soDigitos(b?.telefone);
   if (telefone.startsWith('55') && telefone.length >= 12) telefone = telefone.slice(2);   // +55 colado
   if (telefone.length !== 10 && telefone.length !== 11) throw new ErroVenda('Telefone com DDD: 10 ou 11 números (ex.: 11 98888-7777).');
+  // No banco só os números (como os outros cadastros); a tela formata
   return { nome, digitos: telefone, telefone: formatarTelefone(telefone), celular: telefone.length === 11 };
 };

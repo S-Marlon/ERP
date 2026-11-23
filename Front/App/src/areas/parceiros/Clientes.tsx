@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
-import { getClientes, createCliente } from './utils/cliente.service'; 
+import { getClientes, createCliente } from './utils/cliente.service';
 import Swal from 'sweetalert2';
+import { CampoCep, CampoCpfCnpj, CampoTelefone, CampoUf } from '../../shared/formularios/Campos';
+import { formatarCep, formatarDocumento, formatarTelefone, regraCep, regraCnpj, regraCpf, regraTelefone, soDigitos } from '../../shared/formularios/documentos';
 import {
   Layout,
   Input,
@@ -106,7 +108,7 @@ export default function Clientes() {
   const fetchClientes = async () => {
     setLoading(true);
     try {
-      const data = await getClientes(1); 
+      const data = await getClientes(1);
       setClientes(data || []);
       if (data && data.length > 0) {
         setClienteAtivo(data[0]);
@@ -127,62 +129,27 @@ export default function Clientes() {
 
   const clientesFiltrados = useMemo(() => {
     const termo = searchTerm.toLowerCase();
-    return clientes.filter(c => 
-      (c.nome_razao && c.nome_razao.toLowerCase().includes(termo)) || 
-      (c.documento && c.documento.includes(termo)) ||
+    return clientes.filter(c =>
+      (c.nome_razao && c.nome_razao.toLowerCase().includes(termo)) ||
+      (c.documento && !!soDigitos(termo) && soDigitos(c.documento).includes(soDigitos(termo))) ||
       (c.nome_fantasia && c.nome_fantasia.toLowerCase().includes(termo))
     );
   }, [clientes, searchTerm]);
-
-  const maskCPF_CNPJ = (value: string) => {
-    const v = value.replace(/\D/g, '');
-    if (v.length <= 11) {
-      return v.replace(/(\d{3})(\d)/, '$1.$2')
-              .replace(/(\d{3})(\d)/, '$1.$2')
-              .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-    } else {
-      return v.replace(/^(\d{2})(\d)/, '$1.$2')
-              .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
-              .replace(/\.(\d{3})(\d)/, '.$1/$2')
-              .replace(/(\d{4})(\d)/, '$1-$2')
-              .substring(0, 18);
-    }
-  };
-
-  const maskCEP = (value: string) => {
-    return value.replace(/\D/g, '')
-                .replace(/^(\d{5})(\d)/, '$1-$2')
-                .substring(0, 9);
-  };
 
   const handleReload = async () => {
     await fetchClientes();
     message.success('Lista sincronizada com sucesso!');
   };
 
-  const buscarCepApi = async (cepLimpo: string, index: number) => {
-    if (!cepLimpo || cepLimpo.replace(/\D/g, '').length < 8) return;
-    try {
-      const response = await fetch(`https://viacep.com.br/ws/${cepLimpo.replace(/\D/g, '')}/json/`);
-      const data = await response.json();
-      
-      if (!data.erro) {
-        const enderecosAtuais = form.getFieldValue('enderecos') || [];
-        enderecosAtuais[index] = {
-          ...enderecosAtuais[index],
-          logradouro: data.logradouro,
-          bairro: data.bairro,
-          cidade: data.localidade,
-          estado: data.uf,
-        };
-        form.setFieldsValue({ enderecos: enderecosAtuais });
-        message.success('CEP encontrado com sucesso!');
-      } else {
-        message.warning('CEP não encontrado.');
-      }
-    } catch (error) {
-      console.error('Erro ao buscar CEP:', error);
-    }
+  // Endereço do CEP (ViaCEP) no endereço da linha `index`; o que o operador já digitou e o CEP não traz fica
+  const preencherPeloCep = (index: number, e: { logradouro: string; bairro: string; cidade: string; uf: string }) => {
+    const enderecosAtuais = [...(form.getFieldValue('enderecos') || [])];
+    const atual = enderecosAtuais[index] || {};
+    enderecosAtuais[index] = {
+      ...atual,
+      logradouro: e.logradouro || atual.logradouro, bairro: e.bairro || atual.bairro, cidade: e.cidade || atual.cidade, estado: e.uf || atual.estado,
+    };
+    form.setFieldsValue({ enderecos: enderecosAtuais });
   };
 
   const handleCreateCliente = async (values: any) => {
@@ -200,7 +167,7 @@ export default function Clientes() {
       Swal.fire('Sucesso!', 'Cliente cadastrado com sucesso.', 'success');
       setIsModalOpen(false);
       form.resetFields();
-      fetchClientes(); 
+      fetchClientes();
     } catch (error: any) {
       Swal.fire('Erro', error.message || 'Não foi possível cadastrar o cliente.', 'error');
     }
@@ -213,21 +180,21 @@ export default function Clientes() {
         <Row justify="space-between" align="middle" style={{ marginBottom: '16px' }}>
           <Col><Title level={4} style={{ margin: 0 }}>Clientes & Parceiros</Title></Col>
           <Col>
-            <Button 
-              type="primary" 
-              shape="circle" 
-              icon={<PlusOutlined />} 
-              onClick={() => { 
-                setTipoPessoaModal('PJ'); 
+            <Button
+              type="primary"
+              shape="circle"
+              icon={<PlusOutlined />}
+              onClick={() => {
+                setTipoPessoaModal('PJ');
                 form.resetFields();
-                form.setFieldsValue({ 
+                form.setFieldsValue({
                   tipo_pessoa: 'PJ',
                   enderecos: [{ tipo: 'PRINCIPAL' }],
                   telefones: [{ tipo: 'CELULAR' }],
                   emails: [{ tipo: 'PESSOAL' }]
                 });
-                setIsModalOpen(true); 
-              }} 
+                setIsModalOpen(true);
+              }}
             />
           </Col>
         </Row>
@@ -275,7 +242,7 @@ export default function Clientes() {
                   }
                   description={
                     <div style={{ fontSize: '12px' }}>
-                      <div>{item.documento}</div>
+                      <div>{formatarDocumento(item.documento)}</div>
                       <Text type="secondary">{item.enderecos?.[0]?.cidade || 'Sem cidade'} - {item.enderecos?.[0]?.estado || ''}</Text>
                     </div>
                   }
@@ -311,13 +278,13 @@ export default function Clientes() {
                     <Space>
                       <Button icon={<CalculatorOutlined />} onClick={() => message.info(`Orçamento para ${clienteAtivo.nome_razao}`)}>Orçamento</Button>
                       <Button type="primary" icon={<ShoppingCartOutlined />}>Pedidos</Button>
-                      <Dropdown 
-                        menu={{ 
+                      <Dropdown
+                        menu={{
                           items: [
                             { key: '1', label: 'Imprimir Ficha Cadastral' },
                             { key: '2', label: 'Bloquear Cliente', danger: true }
-                          ] 
-                        }} 
+                          ]
+                        }}
                         trigger={['click']}
                       >
                         <Button icon={<EllipsisOutlined />} />
@@ -342,7 +309,7 @@ export default function Clientes() {
                           <Descriptions.Item label="Razão Social / Nome" span={2}>{clienteAtivo.nome_razao}</Descriptions.Item>
                           <Descriptions.Item label="Nome Fantasia">{clienteAtivo.nome_fantasia || '-'}</Descriptions.Item>
                           <Descriptions.Item label="Tipo Entidade"><Tag color={clienteAtivo.tipo_pessoa === 'PJ' ? 'cyan' : 'orange'}>{clienteAtivo.tipo_pessoa}</Tag></Descriptions.Item>
-                          <Descriptions.Item label="Documento">{clienteAtivo.documento}</Descriptions.Item>
+                          <Descriptions.Item label="Documento">{formatarDocumento(clienteAtivo.documento)}</Descriptions.Item>
                           <Descriptions.Item label="Inscrição Estadual">{clienteAtivo.inscricao_estadual || 'Isento / Não se aplica'}</Descriptions.Item>
                           <Descriptions.Item label="Inscrição Municipal">{clienteAtivo.inscricao_municipal || '-'}</Descriptions.Item>
                           <Descriptions.Item label="Status"><Tag color={clienteAtivo.status === 'ATIVO' ? 'green' : 'red'}>{clienteAtivo.status}</Tag></Descriptions.Item>
@@ -367,7 +334,7 @@ export default function Clientes() {
                             {clienteAtivo.telefones && clienteAtivo.telefones.length > 0 ? (
                               clienteAtivo.telefones.map((t, i) => (
                                 <div key={i} style={{ marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid #f0f0f0' }}>
-                                  <Text strong>{t.telefone}</Text> <Tag>{t.tipo}</Tag> {t.whatsapp ? <Tag color="success">WhatsApp</Tag> : null}
+                                  <Text strong>{formatarTelefone(t.telefone)}</Text> <Tag>{t.tipo}</Tag> {t.whatsapp ? <Tag color="success">WhatsApp</Tag> : null}
                                   {t.nome_contato && <div style={{ fontSize: '12px' }}><Text type="secondary">Ref: {t.nome_contato}</Text></div>}
                                 </div>
                               ))
@@ -385,7 +352,7 @@ export default function Clientes() {
                                 <p><strong>Logradouro:</strong> {end.logradouro}, nº {end.numero} {end.complemento ? `(${end.complemento})` : ''}</p>
                                 <p><strong>Bairro:</strong> {end.bairro}</p>
                                 <p><strong>Cidade/UF:</strong> {end.cidade} - {end.estado}</p>
-                                <p><strong>CEP:</strong> {end.cep}</p>
+                                <p><strong>CEP:</strong> {formatarCep(end.cep)}</p>
                               </Card>
                             </Col>
                           ))}
@@ -455,7 +422,7 @@ export default function Clientes() {
       </Content>
 
       {/* MODAL DE CADASTRO COMPLETO (COM SEÇÕES SECUNDÁRIAS) */}
-   
+
 
 <Modal
 title={
@@ -478,17 +445,17 @@ styles={{
 body: { maxHeight: '75vh', overflowY: 'auto', paddingRight: '8px' }
 }}
 >
-<Form 
-form={form} 
-layout="vertical" 
-initialValues={{ 
+<Form
+form={form}
+layout="vertical"
+initialValues={{
 tipo_pessoa: 'PJ',
 indicador_ie: '1',
 consumidor_final: true,
 telefones: [{}],
 emails: [{}],
 enderecos: [{}]
-}} 
+}}
 onFinish={handleCreateCliente}
 style={{ marginTop: 16 }}
 >
@@ -500,8 +467,8 @@ style={{ marginTop: 16 }}
 {/* BLOCO 1: DADOS PRINCIPAIS E FISCAIS DO CLIENTE */}
 <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: 16 }}>
 <Form.Item name="tipo_pessoa" label={<span style={{ fontWeight: 600 }}>Modelo de Entidade Jurídica</span>} style={{ marginBottom: 16 }}>
-<Radio.Group 
-onChange={(e) => setTipoPessoaModal(e.target.value)} 
+<Radio.Group
+onChange={(e) => setTipoPessoaModal(e.target.value)}
 buttonStyle="solid"
 style={{ width: '100%', display: 'flex' }}
 >
@@ -519,14 +486,8 @@ style={{ width: '100%', display: 'flex' }}
 </Form.Item>
 </Col>
 <Col span={10}>
-<Form.Item label="CNPJ" name="documento" rules={[{ required: true, message: 'Informe o documento' }]} style={{ marginBottom: 12 }}>
-<Input 
-placeholder="00.000.000/0000-00" 
-onChange={(e) => {
-const masked = maskCPF_CNPJ(e.target.value);
-form.setFieldsValue({ documento: masked });
-}} 
-/>
+<Form.Item label="CNPJ" name="documento" rules={[{ required: true, message: 'Informe o documento' }, regraCnpj()]} style={{ marginBottom: 12 }}>
+<CampoCpfCnpj tipo="CNPJ" />
 </Form.Item>
 </Col>
 <Col span={12}>
@@ -599,14 +560,8 @@ form.setFieldsValue({ documento: masked });
 </Form.Item>
 </Col>
 <Col span={10}>
-<Form.Item label="CPF" name="documento" rules={[{ required: true, message: 'Informe o documento' }]} style={{ marginBottom: 0 }}>
-<Input 
-placeholder="000.000.000-00" 
-onChange={(e) => {
-const masked = maskCPF_CNPJ(e.target.value);
-form.setFieldsValue({ documento: masked });
-}} 
-/>
+<Form.Item label="CPF" name="documento" rules={[{ required: true, message: 'Informe o documento' }, regraCpf]} style={{ marginBottom: 0 }}>
+<CampoCpfCnpj tipo="CPF" />
 </Form.Item>
 </Col>
 </>
@@ -652,21 +607,8 @@ form.setFieldsValue({ documento: masked });
 
 {/* CEP DINÂMICO CORRIGIDO */}
 <Col span={8}>
-<Form.Item {...restField} name={[name, 'cep']} label="CEP" style={{ marginBottom: 8 }}>
-<Input 
-  placeholder="00000-000"
-  onChange={(e) => {
-    const masked = maskCEP(e.target.value);
-    const enderecosAtuais = form.getFieldValue('enderecos') || [];
-    enderecosAtuais[name] = { ...enderecosAtuais[name], cep: masked };
-    form.setFieldsValue({ enderecos: enderecosAtuais });
-
-    const numerosCep = masked.replace(/\D/g, '');
-    if (numerosCep.length === 8) {
-      buscarCepApi(numerosCep, name); // Passa o índice correto aqui
-    }
-  }}
-/>
+<Form.Item {...restField} name={[name, 'cep']} label="CEP" rules={[regraCep]} style={{ marginBottom: 8 }}>
+<CampoCep onEndereco={e => preencherPeloCep(name, e)} />
 </Form.Item>
 </Col>
 <Col span={12}>
@@ -692,13 +634,7 @@ form.setFieldsValue({ documento: masked });
 </Col>
 <Col span={4}>
 <Form.Item {...restField} name={[name, 'estado']} label="UF" style={{ marginBottom: 0 }}>
-<Select placeholder="UF">
-<Select.Option value="SP">SP</Select.Option>
-<Select.Option value="RJ">RJ</Select.Option>
-<Select.Option value="MG">MG</Select.Option>
-<Select.Option value="SC">SC</Select.Option>
-<Select.Option value="RS">RS</Select.Option>
-</Select>
+<CampoUf />
 </Form.Item>
 </Col>
 </Row>
@@ -774,8 +710,8 @@ Adicionar E-mail
 </Form.Item>
 </Col>
 <Col span={10}>
-<Form.Item {...restField} name={[name, 'telefone']} style={{ marginBottom: 4 }}>
-<Input placeholder="(00) 00000-0000" size="small" />
+<Form.Item {...restField} name={[name, 'telefone']} rules={[regraTelefone]} style={{ marginBottom: 4 }}>
+<CampoTelefone size="small" />
 </Form.Item>
 </Col>
 <Col span={3} style={{ textAlign: 'center' }}>

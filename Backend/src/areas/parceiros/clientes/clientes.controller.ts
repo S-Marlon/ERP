@@ -1,17 +1,24 @@
 import { Request, Response } from 'express';
 import pool from '../../../infra/db'; // Ajuste o caminho do seu pool do banco
-import { cnpjValido, limparCnpj } from '../cnpj';
+import { cepDoCadastro, documentoDaPessoa, ErroCadastro, limparRg, telefoneDoCadastro, ufDoCadastro } from '../documentos';
 
 // 🟢 [CREATE] Cadastrar Pessoa Completa (PJ/PF com Endereços, E-mails e Telefones normalizados)
 export const createCliente = async (req: Request, res: Response) => {
   const tenantId = Number(req.query.tenant_id || req.body.tenant_id || 1);
   const dados = req.body;
-  // CNPJ grava só com números (a chave única e as buscas comparam os dígitos) e precisa ter os dígitos verificadores certos
-  if ((dados.tipo_pessoa || 'PJ') === 'PJ' && dados.documento) {
-    dados.documento = limparCnpj(dados.documento);
-    if (!cnpjValido(dados.documento)) return res.status(400).json({ success: false, error: 'CNPJ inválido: confira os números (dígitos verificadores).' });
-  } else if (dados.documento) {
-    dados.documento = String(dados.documento).replace(/\D/g, '');
+  // CPF/CNPJ, telefone e CEP gravam só com números (as buscas comparam os dígitos; a tela formata) e são conferidos:
+  // dígitos verificadores do documento, DDD no telefone, 8 números no CEP, UF que existe
+  try {
+    dados.documento = documentoDaPessoa((dados.tipo_pessoa || 'PJ') === 'PJ' ? 'PJ' : 'PF', dados.documento);
+    dados.rg = limparRg(dados.rg) || null;
+    for (const end of Array.isArray(dados.enderecos) ? dados.enderecos : []) {
+      end.cep = cepDoCadastro(end.cep);
+      end.estado = ufDoCadastro(end.estado);
+    }
+    for (const tel of Array.isArray(dados.telefones) ? dados.telefones : []) tel.telefone = telefoneDoCadastro(tel.telefone);
+  } catch (e: any) {
+    if (e instanceof ErroCadastro) return res.status(e.status).json({ success: false, error: e.message });
+    throw e;
   }
 
   const connection = await pool.getConnection();
@@ -63,7 +70,7 @@ export const createCliente = async (req: Request, res: Response) => {
         idPessoa,
         tenantId,
         dados.nome_pf || '',
-        String(dados.documento || '').trim() || null, // CPF (vazio = sem CPF)
+        dados.documento || null, // CPF (vazio = sem CPF)
         dados.rg || null
       ]);
     }

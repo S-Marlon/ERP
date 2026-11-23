@@ -12,23 +12,17 @@ import {
 } from '@ant-design/icons';
 import { useFornecedores, NovoFornecedor } from './useFornecedores';
 import { FornecedorDetalhe, FornecedorEdicao, getFornecedor, updateFornecedor } from './fornecedores.api';
+import { CampoCep, CampoCpfCnpj, CampoTelefone, CampoUf } from '../../../shared/formularios/Campos';
+import { formatarCep, formatarDocumento, formatarTelefone, regraCep, regraCnpj, regraTelefone } from '../../../shared/formularios/documentos';
 
 const { Sider, Content } = Layout;
 const { Title, Text } = Typography;
 
-const UFS = ['AC', 'AL', 'AM', 'AP', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MG', 'MS', 'MT', 'PA', 'PB', 'PE', 'PI', 'PR', 'RJ', 'RN', 'RO', 'RR', 'RS', 'SC', 'SE', 'SP', 'TO'];
 const CORES = ['#722ed1', '#1677ff', '#13c2c2', '#52c41a', '#fa8c16', '#eb2f96', '#2f54eb', '#a0d911'];
 
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const dataBr = (v: string | null | undefined) => (v ? new Date(v.length === 10 ? `${v}T12:00:00` : v).toLocaleDateString('pt-BR') : '—');
-const formatarCnpj = (v: string) => {
-  const d = String(v || '').replace(/\D/g, '');
-  return d.length === 14 ? d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5') : v;
-};
-const formatarCep = (v: string | null | undefined) => {
-  const d = String(v || '').replace(/\D/g, '');
-  return d.length === 8 ? `${d.slice(0, 5)}-${d.slice(5)}` : d;
-};
+const formatarCnpj = formatarDocumento;
 const iniciais = (nome: string) => nome.replace(/[^\p{L}\s]/gu, ' ').trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase() || '?';
 const corDo = (id: number) => CORES[id % CORES.length];
 
@@ -77,7 +71,7 @@ export default function Fornecedores() {
       razaoSocial: detalhe.razaoSocial, nomeFantasia: detalhe.nomeFantasia, inscricaoEstadual: detalhe.inscricaoEstadual,
       inscricaoMunicipal: detalhe.inscricaoMunicipal, status: detalhe.status, observacoes: detalhe.observacoes, email: detalhe.email,
       telefone: detalhe.telefone, whatsapp: detalhe.whatsapp, nomeContato: detalhe.nomeContato,
-      endereco: detalhe.endereco ? { ...detalhe.endereco, cep: formatarCep(detalhe.endereco.cep) } : {},
+      endereco: detalhe.endereco || {},
     });
     setEditando(true);
   };
@@ -193,7 +187,7 @@ export default function Fornecedores() {
                       <Text copyable={{ text: detalhe.cnpj, icon: <CopyOutlined style={{ fontSize: 12 }} /> }} style={{ fontSize: 13 }}>CNPJ {formatarCnpj(detalhe.cnpj)}</Text>
                       {detalhe.estabelecimento && <Tag color={detalhe.estabelecimento === 'Matriz' ? 'blue' : 'purple'} style={{ margin: 0 }}>{detalhe.estabelecimento}</Tag>}
                       {detalhe.inscricaoEstadual && <Text type="secondary" style={{ fontSize: 13 }}>IE {detalhe.inscricaoEstadual}</Text>}
-                      {detalhe.telefone && <Text type="secondary" style={{ fontSize: 13 }}><PhoneOutlined /> {detalhe.telefone}</Text>}
+                      {detalhe.telefone && <Text type="secondary" style={{ fontSize: 13 }}><PhoneOutlined /> {formatarTelefone(detalhe.telefone)}</Text>}
                       {detalhe.email && <Text type="secondary" style={{ fontSize: 13 }}><MailOutlined /> {detalhe.email}</Text>}
                     </Space>
                   </div>
@@ -247,7 +241,7 @@ export default function Fornecedores() {
                         <Descriptions.Item label="Telefone">
                           {detalhe.telefone ? (
                             <Space>
-                              {detalhe.telefone}
+                              {formatarTelefone(detalhe.telefone)}
                               {detalhe.whatsapp && (
                                 <a href={`https://wa.me/55${detalhe.telefone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer"><WhatsAppOutlined style={{ color: '#25d366' }} /></a>
                               )}
@@ -365,20 +359,25 @@ export default function Fornecedores() {
           <Text strong>Contato</Text>
           <Row gutter={12} style={{ marginTop: 8 }}>
             <Col span={9}><Form.Item name="email" label="E-mail" rules={[{ type: 'email', message: 'E-mail inválido.' }]}><Input placeholder="vendas@fornecedor.com.br" /></Form.Item></Col>
-            <Col span={7}><Form.Item name="telefone" label="Telefone"><Input placeholder="(00) 00000-0000" maxLength={20} /></Form.Item></Col>
+            <Col span={7}><Form.Item name="telefone" label="Telefone" rules={[regraTelefone]}><CampoTelefone /></Form.Item></Col>
             <Col span={8}><Form.Item name="nomeContato" label="Falar com"><Input placeholder="Nome do vendedor" maxLength={100} /></Form.Item></Col>
             <Col span={24} style={{ marginTop: -12 }}><Form.Item name="whatsapp" valuePropName="checked"><Checkbox>Telefone tem WhatsApp</Checkbox></Form.Item></Col>
           </Row>
 
           <Text strong>Endereço</Text>
           <Row gutter={12} style={{ marginTop: 8 }}>
-            <Col span={5}><Form.Item name={['endereco', 'cep']} label="CEP"><Input placeholder="00000-000" maxLength={9} /></Form.Item></Col>
+            <Col span={5}><Form.Item name={['endereco', 'cep']} label="CEP" rules={[regraCep]}>
+              <CampoCep onEndereco={e => {
+                const atual = formEdicao.getFieldValue('endereco') || {};
+                formEdicao.setFieldsValue({ endereco: { ...atual, logradouro: e.logradouro || atual.logradouro, bairro: e.bairro || atual.bairro, cidade: e.cidade || atual.cidade, estado: e.uf || atual.estado } });
+              }} />
+            </Form.Item></Col>
             <Col span={13}><Form.Item name={['endereco', 'logradouro']} label="Logradouro"><Input maxLength={150} /></Form.Item></Col>
             <Col span={6}><Form.Item name={['endereco', 'numero']} label="Número"><Input maxLength={20} /></Form.Item></Col>
             <Col span={8}><Form.Item name={['endereco', 'complemento']} label="Complemento"><Input maxLength={100} /></Form.Item></Col>
             <Col span={7}><Form.Item name={['endereco', 'bairro']} label="Bairro"><Input maxLength={100} /></Form.Item></Col>
             <Col span={6}><Form.Item name={['endereco', 'cidade']} label="Cidade"><Input maxLength={100} /></Form.Item></Col>
-            <Col span={3}><Form.Item name={['endereco', 'estado']} label="UF"><Select showSearch allowClear options={UFS.map(u => ({ value: u, label: u }))} /></Form.Item></Col>
+            <Col span={3}><Form.Item name={['endereco', 'estado']} label="UF"><CampoUf /></Form.Item></Col>
           </Row>
 
           <Form.Item name="observacoes" label="Observações">
@@ -396,17 +395,17 @@ export default function Fornecedores() {
         <Form form={formNovo} layout="vertical" requiredMark={false} style={{ marginTop: 12 }}>
           <Row gutter={12}>
             <Col span={10}>
-              <Form.Item name="cnpj" label="CNPJ" rules={[{ required: true, message: 'Informe o CNPJ.' }, { validator: (_, v) => (!v || String(v).replace(/\D/g, '').length === 14 ? Promise.resolve() : Promise.reject(new Error('CNPJ deve ter 14 dígitos.'))) }]}>
-                <Input placeholder="00.000.000/0000-00" />
+              <Form.Item name="cnpj" label="CNPJ" rules={[{ required: true, message: 'Informe o CNPJ.' }, regraCnpj()]}>
+                <CampoCpfCnpj tipo="CNPJ" />
               </Form.Item>
             </Col>
             <Col span={14}><Form.Item name="razao_social" label="Razão social" rules={[{ required: true, whitespace: true, message: 'Informe a razão social.' }]}><Input /></Form.Item></Col>
             <Col span={12}><Form.Item name="nome_fantasia" label="Apelido (nome fantasia)"><Input placeholder="Nome curto para as listas" /></Form.Item></Col>
             <Col span={12}><Form.Item name="inscricao_estadual" label="Inscrição estadual"><Input /></Form.Item></Col>
             <Col span={12}><Form.Item name="email" label="E-mail" rules={[{ type: 'email', message: 'E-mail inválido.' }]}><Input /></Form.Item></Col>
-            <Col span={12}><Form.Item name="telefone" label="Telefone"><Input placeholder="(00) 00000-0000" /></Form.Item></Col>
+            <Col span={12}><Form.Item name="telefone" label="Telefone" rules={[regraTelefone]}><CampoTelefone /></Form.Item></Col>
             <Col span={16}><Form.Item name="cidade" label="Cidade"><Input /></Form.Item></Col>
-            <Col span={8}><Form.Item name="estado" label="UF"><Select showSearch allowClear options={UFS.map(u => ({ value: u, label: u }))} /></Form.Item></Col>
+            <Col span={8}><Form.Item name="estado" label="UF"><CampoUf /></Form.Item></Col>
           </Row>
         </Form>
       </Modal>
