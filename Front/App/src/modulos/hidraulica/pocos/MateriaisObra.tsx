@@ -1,14 +1,13 @@
 // Obras de poços › materiais (etapa 4): os materiais de cada obra (previsto, usado e o custo real) e o cadastro de
 // materiais do módulo. Não usa o catálogo nem o estoque da loja. Material cobrado à parte vira adicional da obra.
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  Alert, Button, Card, Checkbox, Col, Empty, Input, InputNumber, Modal, Popconfirm, Row, Select, Space, Statistic, Switch, Table, Tag, Tooltip, Typography, message,
-} from 'antd';
+import { Alert, Button, Card, Checkbox, Col, Empty, Input, Modal, Popconfirm, Row, Select, Space, Statistic, Switch, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { CopyOutlined, DeleteOutlined, DollarOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import {
   CATEGORIAS_MATERIAL, CategoriaMaterial, LinhaMaterialObra, MaterialForm, MaterialPoco, materiaisApi, obrasApi, ResumoMateriais, SITUACOES_ADICIONAL,
   UNIDADES_MATERIAL, Obra,
 } from './obrasApi';
+import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 const brl = (v: number | null | undefined) => (v === null || v === undefined ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
@@ -20,7 +19,7 @@ const CelulaNumero: React.FC<{ valor: number | null; onSalvar: (v: number | null
   useEffect(() => setV(valor), [valor]);
   const gravar = () => { if (v !== valor) onSalvar(v); };
   return (
-    <InputNumber size="small" min={0} style={{ width: '100%' }} decimalSeparator="," prefix={prefixo} placeholder={vazio} disabled={disabled}
+    <CampoNumero size="small" min={0} style={{ width: '100%' }} prefix={prefixo} placeholder={vazio} disabled={disabled}
       value={v ?? undefined} onChange={x => setV(x === null || x === undefined ? null : Number(x))} onBlur={gravar} onPressEnter={gravar} />
   );
 };
@@ -44,7 +43,7 @@ const CobrarModal: React.FC<{ linha: LinhaMaterialObra | null; onFechar: () => v
           <Text>{linha.descricao}: {String(qtd).replace('.', ',')} {linha.unidade} {linha.qtdUsada === null ? <Text type="secondary">(previsto; ainda não conferido)</Text> : null}</Text>
           <Row gutter={8} align="bottom">
             <Col span={12}><Text>Preço por {linha.unidade}</Text>
-              <InputNumber min={0} prefix="R$" precision={2} decimalSeparator="," style={{ width: '100%' }} value={preco ?? undefined} onChange={v => setPreco(v === null ? null : Number(v))} />
+              <CampoDinheiro min={0} precision={2} style={{ width: '100%' }} value={preco ?? undefined} onChange={v => setPreco(v === null ? null : Number(v))} />
             </Col>
             <Col span={12}><Text strong>Total: {brl(preco ? Math.round(qtd * preco * 100) / 100 : 0)}</Text></Col>
           </Row>
@@ -113,7 +112,7 @@ export const MateriaisDaObra: React.FC<{ idObra: number; cancelada: boolean }> =
               ? <>
                   <Col flex="auto"><Input placeholder="Descrição do item" value={novo.descricao} onChange={e => setNovo({ ...novo, descricao: e.target.value })} /></Col>
                   <Col flex="90px"><Select style={{ width: '100%' }} value={novo.unidade} onChange={unidade => setNovo({ ...novo, unidade })} options={UNIDADES_MATERIAL.map(u => ({ value: u, label: u }))} /></Col>
-                  <Col flex="130px"><InputNumber min={0} prefix="R$" precision={2} decimalSeparator="," placeholder="custo" style={{ width: '100%' }} value={novo.custo ?? undefined} onChange={v => setNovo({ ...novo, custo: v === null ? null : Number(v) })} /></Col>
+                  <Col flex="130px"><CampoDinheiro min={0} precision={2} placeholder="custo" style={{ width: '100%' }} value={novo.custo ?? undefined} onChange={v => setNovo({ ...novo, custo: v === null ? null : Number(v) })} /></Col>
                 </>
               : <Col flex="auto">
                   <Select showSearch optionFilterProp="label" style={{ width: '100%' }} placeholder="Material do cadastro" value={novo.idMaterial}
@@ -123,7 +122,7 @@ export const MateriaisDaObra: React.FC<{ idObra: number; cancelada: boolean }> =
                       options: cadastro.filter(m => m.categoria === cat).map(m => ({ value: m.idMaterial, label: `${m.nome} · ${brl(m.custo)}/${m.unidade}` })),
                     })).filter(g => g.options.length)} />
                 </Col>}
-            <Col flex="130px"><InputNumber min={0} decimalSeparator="," placeholder="previsto" suffix={novo.avulso ? novo.unidade : escolhido?.unidade} style={{ width: '100%' }}
+            <Col flex="130px"><CampoNumero min={0} placeholder="previsto" suffix={novo.avulso ? novo.unidade : escolhido?.unidade} style={{ width: '100%' }}
               value={novo.qtd ?? undefined} onChange={v => setNovo({ ...novo, qtd: v === null ? null : Number(v) })} onPressEnter={adicionar} /></Col>
             <Col flex="none"><Button type="primary" icon={<PlusOutlined />} onClick={adicionar} disabled={novo.avulso ? !novo.descricao.trim() : !novo.idMaterial}>Lançar</Button></Col>
           </Row>
@@ -220,10 +219,10 @@ export const CadastroMateriais: React.FC = () => {
           </Row>
           <Row gutter={8}>
             <Col span={12}><Text>Custo por {f.unidade}</Text>
-              <InputNumber min={0} prefix="R$" precision={4} decimalSeparator="," style={{ width: '100%' }} value={f.custo} onChange={v => setF({ ...f, custo: Number(v) || 0 })} />
+              <CampoDinheiro min={0} precision={4} style={{ width: '100%' }} value={f.custo} onChange={v => setF({ ...f, custo: Number(v) || 0 })} />
             </Col>
             <Col span={12}><Text>Preço quando cobrado à parte</Text>
-              <InputNumber min={0} prefix="R$" precision={2} decimalSeparator="," style={{ width: '100%' }} value={f.precoVenda ?? undefined} onChange={v => setF({ ...f, precoVenda: v === null ? null : Number(v) })} />
+              <CampoDinheiro min={0} precision={2} style={{ width: '100%' }} value={f.precoVenda ?? undefined} onChange={v => setF({ ...f, precoVenda: v === null ? null : Number(v) })} />
             </Col>
           </Row>
           <div><Text>Observação</Text><Input maxLength={255} value={f.observacao || ''} onChange={e => setF({ ...f, observacao: e.target.value || null })} /></div>

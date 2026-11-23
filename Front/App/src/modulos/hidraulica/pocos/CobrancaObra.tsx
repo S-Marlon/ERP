@@ -2,15 +2,14 @@
 // sinal, os adicionais com a aprovação do cliente, as parcelas do saldo e os recebimentos. E a lista "a receber de
 // obras". Tudo fica só no módulo: não passa pelo caixa nem pelo financeiro da loja.
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  Alert, Button, Card, Col, Empty, Input, InputNumber, Modal, Popconfirm, Row, Segmented, Select, Space, Statistic, Table, Tag, Tooltip, Typography, message,
-} from 'antd';
+import { Alert, Button, Card, Col, Empty, Input, Modal, Popconfirm, Row, Segmented, Select, Space, Statistic, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { CheckOutlined, CloseOutlined, DollarOutlined, PlusOutlined, ReloadOutlined, RollbackOutlined, StopOutlined } from '@ant-design/icons';
 import {
   Adicional, AdicionalForm, AReceberObra, cobrancaApi, CobrancaObra as Cobranca, dataBr, foneBr, FORMAS_RECEBIMENTO, FormaRecebimento, MEIOS_APROVACAO,
   MeioAprovacao, ParcelaObra, SITUACOES_ADICIONAL, SITUACOES_OBRA, SITUACOES_PARCELA, TipoAdicional, TIPOS_ADICIONAL, totaisAReceber,
 } from './obrasApi';
 import { abrirObra } from './navPocos';
+import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 const brl = (v: number | null | undefined) => (v === null || v === undefined ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
@@ -43,8 +42,8 @@ const AdicionalModal: React.FC<{ aberto: Adicional | AdicionalForm | 'novo' | nu
           <Col span={15}><Text>Descrição</Text><Input maxLength={150} value={f.descricao} onChange={e => setF({ ...f, descricao: e.target.value })} placeholder="Ex.: 12 m excedentes, 2 conexões extras" /></Col>
         </Row>
         <Row gutter={8}>
-          <Col span={8}><Text>Quantidade</Text><InputNumber min={0} style={{ width: '100%' }} decimalSeparator="," value={f.quantidade} onChange={v => setF({ ...f, quantidade: Number(v) || 0 })} /></Col>
-          <Col span={8}><Text>Valor unitário</Text><InputNumber min={0} prefix="R$" precision={2} style={{ width: '100%' }} decimalSeparator="," value={f.valorUnitario} onChange={v => setF({ ...f, valorUnitario: Number(v) || 0 })} /></Col>
+          <Col span={8}><Text>Quantidade</Text><CampoNumero min={0} style={{ width: '100%' }} value={f.quantidade} onChange={v => setF({ ...f, quantidade: Number(v) || 0 })} /></Col>
+          <Col span={8}><Text>Valor unitário</Text><CampoDinheiro min={0} precision={2} style={{ width: '100%' }} value={f.valorUnitario} onChange={v => setF({ ...f, valorUnitario: Number(v) || 0 })} /></Col>
           <Col span={8}><Text>Total</Text><div style={{ padding: '5px 0' }}><Text strong>{brl(total)}</Text></div></Col>
         </Row>
         <Text type="secondary" style={{ fontSize: 12 }}>O adicional só entra no saldo depois que o cliente aprovar (o meio da aprovação fica registrado).</Text>
@@ -106,7 +105,7 @@ const ReceberModal: React.FC<{ parcela: ParcelaObra | null; onFechar: () => void
               <Select style={{ width: '100%' }} value={forma} onChange={setForma}
                 options={(Object.keys(FORMAS_RECEBIMENTO) as FormaRecebimento[]).map(f => ({ value: f, label: FORMAS_RECEBIMENTO[f] }))} />
             </Col>
-            <Col span={12}><Text>Valor</Text><InputNumber min={0.01} max={parcela.saldo} prefix="R$" precision={2} decimalSeparator="," style={{ width: '100%' }} value={valor} onChange={v => setValor(Number(v) || 0)} /></Col>
+            <Col span={12}><Text>Valor</Text><CampoDinheiro min={0.01} max={parcela.saldo} precision={2} style={{ width: '100%' }} value={valor} onChange={v => setValor(Number(v) || 0)} /></Col>
           </Row>
           <div><Text>Observação</Text><Input maxLength={255} value={obs} onChange={e => setObs(e.target.value)} /></div>
         </Space>
@@ -137,9 +136,9 @@ const SaldoModal: React.FC<{ aberto: boolean; idObra: number; semParcela: number
           options={[{ value: 'VISTA', label: 'À vista' }, { value: 'PARCELADO', label: 'Parcelado' }, { value: 'SEM_PRAZO', label: 'Sem prazo' }]} />
         <Row gutter={8}>
           <Col span={modo === 'PARCELADO' ? 8 : 12}><Text>Valor</Text>
-            <InputNumber min={0.01} max={semParcela} prefix="R$" precision={2} decimalSeparator="," style={{ width: '100%' }} value={valor} onChange={v => setValor(Number(v) || 0)} />
+            <CampoDinheiro min={0.01} max={semParcela} precision={2} style={{ width: '100%' }} value={valor} onChange={v => setValor(Number(v) || 0)} />
           </Col>
-          {modo === 'PARCELADO' && <Col span={6}><Text>Parcelas</Text><InputNumber min={2} max={36} style={{ width: '100%' }} value={qtd} onChange={v => setQtd(Number(v) || 2)} /></Col>}
+          {modo === 'PARCELADO' && <Col span={6}><Text>Parcelas</Text><CampoNumero min={2} max={36} style={{ width: '100%' }} value={qtd} onChange={v => setQtd(Number(v) || 2)} /></Col>}
           {modo !== 'SEM_PRAZO' && (
             <Col span={modo === 'PARCELADO' ? 10 : 12}><Text>{modo === 'VISTA' ? 'Vencimento' : '1º vencimento'}</Text>
               <Input type="date" value={venc} onChange={e => setVenc(e.target.value)} />

@@ -1,8 +1,9 @@
 // Gestor de frotas › Veículos (etapa 1): a frota da loja com km e situação, cadastro, edição e ajuste do km.
 import React, { useCallback, useEffect, useState } from 'react';
-import { Button, Card, Checkbox, Col, Flex, Input, InputNumber, Modal, Row, Segmented, Select, Space, Statistic, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { Button, Card, Checkbox, Col, Flex, Input, Modal, Row, Segmented, Select, Space, Statistic, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { CarOutlined, DashboardOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { COMBUSTIVEIS, frotaApi, resumoFrota, SITUACOES, SituacaoVeiculo, TIPOS, Veiculo, VeiculoForm } from './frotaApi';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 const km = (n: number) => `${n.toLocaleString('pt-BR')} km`;
@@ -33,7 +34,7 @@ const VeiculoModal: React.FC<{ veiculo: Veiculo | 'novo' | null; onFechar: () =>
     <Input maxLength={max} placeholder={ph} value={(f[k] as string) || ''} onChange={e => mudar({ [k]: e.target.value || null } as any)} />
   );
   const num = (k: 'anoFabricacao' | 'anoModelo' | 'tanqueLitros' | 'cargaKg' | 'kmAtual', props: object = {}) => (
-    <InputNumber style={{ width: '100%' }} value={f[k] ?? undefined} onChange={v => mudar({ [k]: v === null || v === undefined ? null : Number(v) } as any)} {...props} />
+    <CampoNumero style={{ width: '100%' }} value={f[k] ?? undefined} onChange={v => mudar({ [k]: v === null || v === undefined ? null : Number(v) } as any)} {...props} />
   );
   return (
     <Modal open={veiculo !== null} title={veiculo === 'novo' ? 'Novo veículo' : `Editar ${veiculo && veiculo.placaFormatada}`} okText="Salvar" cancelText="Voltar"
@@ -165,7 +166,7 @@ const VeiculosAba: React.FC = () => {
         {ajuste && (
           <Space direction="vertical" style={{ width: '100%' }}>
             <Text type="secondary">Atual: {km(ajuste.v.kmAtual)}</Text>
-            <InputNumber min={0} style={{ width: '100%' }} addonAfter="km" value={ajuste.km ?? undefined}
+            <CampoNumero min={0} style={{ width: '100%' }} addonAfter="km" value={ajuste.km ?? undefined}
               formatter={v => (v === undefined || v === null || String(v) === '' ? '' : Number(v).toLocaleString('pt-BR'))}
               parser={v => Number(String(v || '').replace(/\D/g, '')) as unknown as number}
               onChange={v => setAjuste(a => a && { ...a, km: v === null ? null : Number(v) })} />

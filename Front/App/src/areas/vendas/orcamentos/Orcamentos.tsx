@@ -12,6 +12,7 @@ import { ClientePdvModal } from '../pdv/components/ClientePdvModal';
 import { telefoneDoTexto } from '../../../shared/utils/whatsapp';
 import { AberturaNegociacao, NegociacaoDrawer } from '../negociacao/NegociacaoDrawer';
 import { aberturaDoOrcamento } from '../negociacao/negociacaoApi';
+import { FORMATOS_DATA } from '../../../shared/formularios/numeros';
 
 const { Text, Title } = Typography;
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -203,7 +204,7 @@ const Orcamentos: React.FC = () => {
           {!virandoPedido?.idCliente && <Alert type="error" showIcon title="Defina o cliente do cadastro no orçamento antes (nota e contas a receber precisam dele)." />}
           <Input addonBefore="Pedido de compra do cliente" placeholder="Nº da OC (opcional)" maxLength={60} value={dadosPedido.pedidoCliente}
             onChange={e => setDadosPedido({ ...dadosPedido, pedidoCliente: e.target.value })} />
-          <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" placeholder="Previsão de entrega" disabledDate={d => d.isBefore(dayjs(), 'day')}
+          <DatePicker style={{ width: '100%' }} format={FORMATOS_DATA} placeholder="Previsão de entrega" disabledDate={d => d.isBefore(dayjs(), 'day')}
             value={dadosPedido.previsaoEntrega ? dayjs(dadosPedido.previsaoEntrega) : null}
             onChange={v => setDadosPedido({ ...dadosPedido, previsaoEntrega: v ? v.format('YYYY-MM-DD') : null })} />
           <Input placeholder="Endereço de entrega (vazio = retira na loja)" maxLength={255} value={dadosPedido.enderecoEntrega}

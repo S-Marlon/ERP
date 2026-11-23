@@ -1,29 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import {
-  Drawer,
-  Tabs,
-  Form,
-  Input,
-  InputNumber,
-  Select,
-  Switch,
-  Button,
-  Space,
-  Row,
-  Col,
-  Alert,
-  Tag,
-  Typography,
-  Modal,
-  Table,
-  Badge,
-  Tooltip,
-  message,
-  Card,
-  Statistic,
-  Spin,
-  Empty
-} from 'antd';
+import { Drawer, Tabs, Form, Input, Select, Switch, Button, Space, Row, Col, Alert, Tag, Typography, Modal, Table, Badge, Tooltip, message, Card, Statistic, Spin, Empty } from 'antd';
 import {
   DollarOutlined,
   InboxOutlined,
@@ -43,6 +19,7 @@ import { Alteracao, alteracoesParaPayload, calcularAlteracoes, CAMPOS_FICHA, det
 import { getTipoRecursoConfig } from '../../compras/entradaNf/tipoRecurso';
 import AnexosCard from './AnexosCard';
 import FichaTecnicaCard from './FichaTecnicaCard';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text, Title } = Typography;
 
@@ -310,11 +287,11 @@ export default function ProductDetailsDrawer({ open, product, onClose, onSave }:
 
           <Card size="small" title="Pesos e Dimensões" bordered={false} style={{ background: '#fafafa' }}>
             <Row gutter={16}>
-              <Col span={6}><Form.Item name="pesoLiquido" label="Peso Líquido (kg)"><InputNumber style={{ width: '100%' }} min={0} step={0.001} precision={4} /></Form.Item></Col>
-              <Col span={6}><Form.Item name="pesoBruto" label="Peso Bruto (kg)"><InputNumber style={{ width: '100%' }} min={0} step={0.001} precision={4} /></Form.Item></Col>
-              <Col span={4}><Form.Item name="comprimentoCm" label="Comp. (cm)"><InputNumber style={{ width: '100%' }} min={0} /></Form.Item></Col>
-              <Col span={4}><Form.Item name="larguraCm" label="Larg. (cm)"><InputNumber style={{ width: '100%' }} min={0} /></Form.Item></Col>
-              <Col span={4}><Form.Item name="alturaCm" label="Alt. (cm)"><InputNumber style={{ width: '100%' }} min={0} /></Form.Item></Col>
+              <Col span={6}><Form.Item name="pesoLiquido" label="Peso Líquido (kg)"><CampoNumero style={{ width: '100%' }} min={0} step={0.001} precision={4} /></Form.Item></Col>
+              <Col span={6}><Form.Item name="pesoBruto" label="Peso Bruto (kg)"><CampoNumero style={{ width: '100%' }} min={0} step={0.001} precision={4} /></Form.Item></Col>
+              <Col span={4}><Form.Item name="comprimentoCm" label="Comp. (cm)"><CampoNumero style={{ width: '100%' }} min={0} /></Form.Item></Col>
+              <Col span={4}><Form.Item name="larguraCm" label="Larg. (cm)"><CampoNumero style={{ width: '100%' }} min={0} /></Form.Item></Col>
+              <Col span={4}><Form.Item name="alturaCm" label="Alt. (cm)"><CampoNumero style={{ width: '100%' }} min={0} /></Form.Item></Col>
             </Row>
           </Card>
         </Space>

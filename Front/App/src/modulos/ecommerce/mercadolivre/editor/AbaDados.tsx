@@ -1,10 +1,11 @@
 // Aba Anúncio do editor: título (e o de cada item), categoria, tipo, condição, ajuste de preço e descrição.
 // Tudo vai para o rascunho, menos a categoria (troca na hora: ela muda os atributos que o ML pede).
 import React from 'react';
-import { Alert, Button, Card, Col, Flex, Form, Input, InputNumber, Row, Segmented, Tag, Tooltip, Typography } from 'antd';
+import { Alert, Button, Card, Col, Flex, Form, Input, Row, Segmented, Tag, Tooltip, Typography } from 'antd';
 import { AnuncioDetalhe } from '../mercadoLivreApi';
 import { DescricaoCampo, ModeloTituloCampo, ModoPublicacaoAviso } from '../TituloMl';
 import type { RascunhoAnuncio } from '../rascunhoAnuncio';
+import { CampoNumero } from '../../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 
@@ -80,7 +81,7 @@ const AbaDados: React.FC<Props> = ({ salvo, det, rascunho, onMudar, onTrocarCate
               label={<>Ajuste sobre o preço do ERP<Marca mudou={'ajustePreco' in rascunho} /></>} style={{ marginBottom: 14 }}
               tooltip="Ex.: 15% cobre a comissão. Item com preço próprio (aba Itens) ignora o ajuste."
             >
-              <InputNumber value={det.ajustePreco} suffix="%" min={-50} max={300} step={1} style={{ width: '100%' }} decimalSeparator=","
+              <CampoNumero value={det.ajustePreco} suffix="%" min={-50} max={300} step={1} style={{ width: '100%' }}
                 onChange={v => onMudar('ajustePreco', Number(v) || 0)} />
             </Form.Item>
           </Col>

@@ -2,13 +2,11 @@
 // inclui) e o simulador do preço para o poço do cliente — viável quando a empresa lucra a margem mínima e o cliente paga
 // menos do que pagaria avulso. A conta fica no backend (planoMensal.ts); a tela simula o que está sendo editado, antes de salvar.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Alert, Button, Card, Col, Descriptions, Divider, Empty, Flex, Input, InputNumber, Popconfirm, Row, Select, Space, Statistic, Switch, Table, Tag,
-  Tooltip, Typography, message,
-} from 'antd';
+import { Alert, Button, Card, Col, Descriptions, Divider, Empty, Flex, Input, Popconfirm, Row, Select, Space, Statistic, Switch, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { CheckCircleOutlined, DeleteOutlined, PlusOutlined, SaveOutlined, UndoOutlined, WarningOutlined } from '@ant-design/icons';
 import { Central, centralApi, CustosPlano, NivelPlano, planoMensalApi, PlanoMensalDados, PocoSimulado, PrecoPlano } from './obrasApi';
 import { PlanoMensal as Carteira } from './CentralPocos';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 const erro = (e: unknown) => message.error(e instanceof Error ? e.message : 'Erro.');
@@ -97,19 +95,19 @@ const CartaoNivel: React.FC<{
       <Space direction="vertical" size={6} style={{ width: '100%' }}>
         {preco ? <Resultado p={preco} sugerido={sugerido} /> : <Text type="secondary">{n.ativo ? 'calculando…' : 'fora da oferta'}</Text>}
         <Divider style={{ margin: '4px 0' }} />
-        {linha('Visitas preventivas por ano', <InputNumber size="small" min={0} max={24} value={n.visitasAno} onChange={v => set({ visitasAno: v ?? 0 })} style={{ width: 80 }} />)}
-        {linha('Limpeza programada a cada', <InputNumber size="small" min={0} max={120} value={n.limpezaACadaMeses ?? 0} onChange={v => set({ limpezaACadaMeses: v ? v : null })}
+        {linha('Visitas preventivas por ano', <CampoNumero size="small" min={0} max={24} value={n.visitasAno} onChange={v => set({ visitasAno: v ?? 0 })} style={{ width: 80 }} />)}
+        {linha('Limpeza programada a cada', <CampoNumero size="small" min={0} max={120} value={n.limpezaACadaMeses ?? 0} onChange={v => set({ limpezaACadaMeses: v ? v : null })}
           suffix="meses" style={{ width: 110 }} placeholder="não" />)}
-        {linha('Emergências por ano', <InputNumber size="small" min={0} max={24} value={n.chamadosAno} onChange={v => set({ chamadosAno: v ?? 0 })} style={{ width: 80 }} />)}
+        {linha('Emergências por ano', <CampoNumero size="small" min={0} max={24} value={n.chamadosAno} onChange={v => set({ chamadosAno: v ?? 0 })} style={{ width: 80 }} />)}
         {linha('Atendimento prioritário', <Switch size="small" checked={n.prioridade} onChange={v => set({ prioridade: v })} />)}
         {linha('Monitoramento (IoT)', <Switch size="small" checked={n.monitoramento} onChange={v => set({ monitoramento: v })} />)}
-        {linha('Cobre da troca da bomba', <InputNumber size="small" min={0} max={100} step={10} value={Math.round(n.reservaBombaPct * 100)}
+        {linha('Cobre da troca da bomba', <CampoNumero size="small" min={0} max={100} step={10} value={Math.round(n.reservaBombaPct * 100)}
           onChange={v => set({ reservaBombaPct: (v ?? 0) / 100 })} suffix="%" style={{ width: 90 }} />)}
-        {linha('Desconto em bomba e material', <InputNumber size="small" min={0} max={90} value={Math.round(n.descontoPecasPct * 100)}
+        {linha('Desconto em bomba e material', <CampoNumero size="small" min={0} max={90} value={Math.round(n.descontoPecasPct * 100)}
           onChange={v => set({ descontoPecasPct: (v ?? 0) / 100 })} suffix="%" style={{ width: 90 }} />)}
-        {linha('Desconto na limpeza', <InputNumber size="small" min={0} max={90} value={Math.round(n.descontoLimpezaPct * 100)}
+        {linha('Desconto na limpeza', <CampoNumero size="small" min={0} max={90} value={Math.round(n.descontoLimpezaPct * 100)}
           onChange={v => set({ descontoLimpezaPct: (v ?? 0) / 100 })} suffix="%" style={{ width: 90 }} />)}
-        {linha('Fidelidade', <InputNumber size="small" min={0} max={120} step={6} value={n.fidelidadeMeses} onChange={v => set({ fidelidadeMeses: v ?? 0 })} suffix="meses" style={{ width: 110 }} />)}
+        {linha('Fidelidade', <CampoNumero size="small" min={0} max={120} step={6} value={n.fidelidadeMeses} onChange={v => set({ fidelidadeMeses: v ?? 0 })} suffix="meses" style={{ width: 110 }} />)}
         <Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} maxLength={255} placeholder="Texto para o cliente (o que o plano oferece)"
           value={n.descricao || ''} onChange={e => set({ descricao: e.target.value || null })} />
         <Flex justify="space-between">
@@ -234,7 +232,7 @@ const PlanoMensalPocos: React.FC = () => {
                       <Tooltip title={c.ajuda} placement="topLeft">
                         <Text style={{ fontSize: 12 }}>{c.rotulo}</Text>
                       </Tooltip>
-                      <InputNumber size="small" style={{ width: '100%' }} min={0} step={c.passo || 1} decimalSeparator="," value={valorCampo(c)}
+                      <CampoNumero size="small" style={{ width: '100%' }} min={0} step={c.passo || 1} value={valorCampo(c)}
                         prefix={c.prefixo} suffix={c.sufixo} placeholder={c.k === 'precoVisitaAvulsa' && dados.mediaVisitaEmpresa ? `média ${brl(dados.mediaVisitaEmpresa)}` : undefined}
                         onChange={v => mudarCampo(c, v as number | null)} />
                     </Col>
@@ -255,23 +253,23 @@ const PlanoMensalPocos: React.FC = () => {
               </Col>
               <Col xs={8} md={5}>
                 <Text style={{ fontSize: 12 }}>Profundidade</Text>
-                <InputNumber size="small" min={0} max={1000} style={{ width: '100%' }} suffix="m" value={poco.profundidadeM} placeholder="80"
+                <CampoNumero size="small" min={0} max={1000} style={{ width: '100%' }} suffix="m" value={poco.profundidadeM} placeholder="80"
                   onChange={v => { setCliente(null); setPoco({ ...poco, profundidadeM: v ?? null }); }} />
               </Col>
               <Col xs={8} md={5}>
                 <Text style={{ fontSize: 12 }}>Bomba</Text>
-                <InputNumber size="small" min={0} max={200} step={0.5} decimalSeparator="," style={{ width: '100%' }} suffix="CV" value={poco.potenciaCv} placeholder="1,5"
+                <CampoNumero size="small" min={0} max={200} step={0.5} style={{ width: '100%' }} suffix="CV" value={poco.potenciaCv} placeholder="1,5"
                   onChange={v => { setCliente(null); setPoco({ ...poco, potenciaCv: v ?? null }); }} />
               </Col>
               <Col xs={8} md={4}>
                 <Text style={{ fontSize: 12 }}>Poços</Text>
-                <InputNumber size="small" min={1} max={50} style={{ width: '100%' }} value={poco.pocos}
+                <CampoNumero size="small" min={1} max={50} style={{ width: '100%' }} value={poco.pocos}
                   onChange={v => { setCliente(null); setPoco({ ...poco, pocos: v || 1 }); }} />
               </Col>
             </Row>
             <Flex align="center" gap={8} wrap style={{ marginTop: 8 }}>
               <Text style={{ fontSize: 12 }}>Transporte (ida e volta)</Text>
-              <InputNumber size="small" min={0} max={5000} style={{ width: 120 }} suffix="km" value={poco.kmIdaVolta ?? null}
+              <CampoNumero size="small" min={0} max={5000} style={{ width: 120 }} suffix="km" value={poco.kmIdaVolta ?? null}
                 placeholder={sim?.planos[0] ? String(sim.planos[0].preco.km) : String(custos.kmMedio)}
                 onChange={v => setPoco({ ...poco, kmIdaVolta: v ?? null })} />
               {sim?.planos[0] && (

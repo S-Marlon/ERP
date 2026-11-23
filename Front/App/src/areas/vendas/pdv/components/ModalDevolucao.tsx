@@ -1,9 +1,10 @@
 // Devolução parcial/total de uma venda e troca (devolução em crédito na loja + nova venda no PDV).
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Alert, Button, Checkbox, Input, InputNumber, Modal, Radio, Space, Spin, Table, Tag, Typography, message } from 'antd';
+import { Alert, Button, Checkbox, Input, Modal, Radio, Space, Spin, Table, Tag, Typography, message } from 'antd';
 import { DadosDevolucao, devolucoesService, ReembolsoDevolucao } from '../services/salesService';
 import { caixaStore } from '../../caixa/caixaStore';
+import { CampoNumero } from '../../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -90,7 +91,7 @@ export const ModalDevolucao: React.FC<{ idVenda: number | null; onFechar: () => 
               title: 'Devolver', key: 'd', width: 150,
               render: (_, i) => (i.restante <= 0
                 ? <Text type="secondary">tudo devolvido</Text>
-                : <InputNumber size="small" min={0} max={i.restante} precision={3} decimalSeparator="," style={{ width: 130 }} placeholder={`até ${i.restante}`}
+                : <CampoNumero size="small" min={0} max={i.restante} precision={3} style={{ width: 130 }} placeholder={`até ${i.restante}`}
                     value={qtd[i.idVendaItem] ?? null} onChange={v => setQtd(x => ({ ...x, [i.idVendaItem]: v }))}
                     addonAfter={<a onClick={() => setQtd(x => ({ ...x, [i.idVendaItem]: i.restante }))}>tudo</a>} />),
             },

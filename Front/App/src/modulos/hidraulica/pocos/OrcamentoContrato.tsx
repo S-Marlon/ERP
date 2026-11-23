@@ -2,10 +2,7 @@
 // "50 metros × R$ 180", condições) com o PDF para imprimir ou mandar; dentro da obra, a parte "Orçamento e contrato"
 // com os itens, o orçamento e o contrato completo em PDF, a assinatura do contrato e os termos aditivos.
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  Alert, Button, Card, Checkbox, Col, Divider, Dropdown, Empty, Flex, Input, InputNumber, List, Modal, Popconfirm, Row, Segmented, Select, Space, Table, Tag, Tooltip,
-  Typography, message,
-} from 'antd';
+import { Alert, Button, Card, Checkbox, Col, Divider, Dropdown, Empty, Flex, Input, List, Modal, Popconfirm, Row, Segmented, Select, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
 import {
   CheckOutlined, CopyOutlined, DeleteOutlined, DownOutlined, FilePdfOutlined, FileTextOutlined, PlusOutlined, PrinterOutlined, SaveOutlined, UndoOutlined, UserOutlined,
 } from '@ant-design/icons';
@@ -16,6 +13,7 @@ import {
 import { htmlAditivo, htmlContrato, htmlOrcamento } from './documentosPocos';
 import { ClientePocoModal } from './ClientesPoco';
 import { abrirObra } from './navPocos';
+import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 const erro = (e: unknown) => message.error(e instanceof Error ? e.message : 'Erro.');
@@ -62,7 +60,7 @@ export const EditorItens: React.FC<{ itens: ItemOrcamentoForm[]; onChange: (i: I
                 options={Object.entries(GRUPOS_ITEM).map(([value, label]) => ({ value, label }))} />
             ),
           },
-          { title: 'Qtd.', width: 90, render: (_, it) => <InputNumber size="small" disabled={bloqueado} min={0} style={{ width: '100%' }} value={it.quantidade} onChange={v => mudar(it.k, { quantidade: Number(v) || 0 })} /> },
+          { title: 'Qtd.', width: 90, render: (_, it) => <CampoNumero size="small" disabled={bloqueado} min={0} style={{ width: '100%' }} value={it.quantidade} onChange={v => mudar(it.k, { quantidade: Number(v) || 0 })} /> },
           {
             title: 'Un.', width: 72, render: (_, it) => (
               <Select size="small" disabled={bloqueado} style={{ width: '100%' }} value={it.unidade} onChange={v => mudar(it.k, { unidade: v })}
@@ -71,7 +69,7 @@ export const EditorItens: React.FC<{ itens: ItemOrcamentoForm[]; onChange: (i: I
           },
           {
             title: 'Valor unit.', width: 130, render: (_, it) => (
-              <InputNumber size="small" disabled={bloqueado} min={0} step={10} prefix="R$" decimalSeparator="," style={{ width: '100%' }} value={it.valorUnitario}
+              <CampoDinheiro size="small" disabled={bloqueado} min={0} step={10} style={{ width: '100%' }} value={it.valorUnitario}
                 onChange={v => mudar(it.k, { valorUnitario: Number(v) || 0 })} />
             ),
           },
@@ -242,18 +240,18 @@ export const OrcamentoRapido: React.FC<{
         <EditorItens itens={itens} onChange={setItens} />
         <Divider style={{ margin: '4px 0' }} titlePlacement="start" plain>Condições</Divider>
         <Row gutter={[8, 8]}>
-          <Col xs={12} md={5}><Text>Sinal</Text><InputNumber min={0} prefix="R$" style={{ width: '100%' }} value={c.valorSinal} onChange={v => mudar({ valorSinal: v === null ? null : Number(v) })} /></Col>
+          <Col xs={12} md={5}><Text>Sinal</Text><CampoDinheiro min={0} style={{ width: '100%' }} value={c.valorSinal} onChange={v => mudar({ valorSinal: v === null ? null : Number(v) })} /></Col>
           <Col xs={12} md={5}><Text>Sinal pago</Text>
             <Segmented block value={c.sinalQuando} onChange={v => mudar({ sinalQuando: v as Condicoes['sinalQuando'] })} options={[{ value: 'ANTES', label: 'Antes' }, { value: 'NO_ATO', label: 'No dia' }]} />
           </Col>
-          <Col xs={8} md={4}><Text>Prazo</Text><InputNumber min={1} max={365} suffix="dias" style={{ width: '100%' }} value={c.prazoExecucaoDias} onChange={v => mudar({ prazoExecucaoDias: v === null ? null : Number(v) })} /></Col>
-          <Col xs={8} md={5}><Text>Validade</Text><InputNumber min={1} max={365} suffix="dias" style={{ width: '100%' }} value={c.validadeOrcamentoDias} onChange={v => mudar({ validadeOrcamentoDias: v === null ? null : Number(v) })} /></Col>
-          <Col xs={8} md={5}><Text>Garantia</Text><InputNumber min={0} max={120} suffix="meses" style={{ width: '100%' }} value={c.garantiaMeses} onChange={v => mudar({ garantiaMeses: v === null ? null : Number(v) })} /></Col>
+          <Col xs={8} md={4}><Text>Prazo</Text><CampoNumero min={1} max={365} suffix="dias" style={{ width: '100%' }} value={c.prazoExecucaoDias} onChange={v => mudar({ prazoExecucaoDias: v === null ? null : Number(v) })} /></Col>
+          <Col xs={8} md={5}><Text>Validade</Text><CampoNumero min={1} max={365} suffix="dias" style={{ width: '100%' }} value={c.validadeOrcamentoDias} onChange={v => mudar({ validadeOrcamentoDias: v === null ? null : Number(v) })} /></Col>
+          <Col xs={8} md={5}><Text>Garantia</Text><CampoNumero min={0} max={120} suffix="meses" style={{ width: '100%' }} value={c.garantiaMeses} onChange={v => mudar({ garantiaMeses: v === null ? null : Number(v) })} /></Col>
           <Col xs={12} md={6}>
             <Tooltip title="Total se o cliente pagar parcelado no cartão (ex.: 18 mil à vista, 19 mil parcelado). Vazio = só o valor à vista.">
               <Text>Total parcelado (cartão)</Text>
             </Tooltip>
-            <InputNumber min={0} prefix="R$" style={{ width: '100%' }} value={c.valorParcelado} onChange={v => mudar({ valorParcelado: v === null ? null : Number(v) })} />
+            <CampoDinheiro min={0} style={{ width: '100%' }} value={c.valorParcelado} onChange={v => mudar({ valorParcelado: v === null ? null : Number(v) })} />
           </Col>
           <Col xs={24} md={12}><Text>Forma de pagamento</Text>
             <Input.TextArea rows={2} maxLength={500} value={c.formaPagamento} onChange={e => mudar({ formaPagamento: e.target.value })} placeholder="Ex.: 30% de sinal e o saldo na entrega, no PIX" />

@@ -1,12 +1,11 @@
 // Editor de kit: itens usados (com quantidade na unidade base), custo ao vivo, quantos dá para montar e preço.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Alert, Button, Card, Checkbox, Col, Drawer, Empty, Form, Input, InputNumber, Row, Select, Space, Statistic, Table, Tag, Tooltip, Typography, message,
-} from 'antd';
+import { Alert, Button, Card, Checkbox, Col, Drawer, Empty, Form, Input, Row, Select, Space, Statistic, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { DeleteOutlined, SaveOutlined } from '@ant-design/icons';
 import { atualizarKit, buscarItensParaKit, criarKit, ItemParaKit, Kit } from './kitsApi';
 import { adicionarLinha, custoDaLinha, custoDoKit, LinhaKit, podeMontar, precoPorMarkup } from './kitsCalculo';
 import { fatorTaxaPreco, lucroLiquido, margemLiquidaPct, useTaxaPreco } from '../../../shared/core/precos/taxaPreco';
+import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 const brl = (v: number) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -128,7 +127,7 @@ const KitEditorDrawer: React.FC<Props> = ({ aberto, kit, onFechar, onSalvo }) =>
     {
       title: 'Qtd. no kit', key: 'qtd', width: 140,
       render: (_: unknown, l: Linha) => (
-        <InputNumber
+        <CampoNumero
           size="small" min={0.0001} step={1} value={l.quantidade} style={{ width: '100%' }} addonAfter={l.unidade || undefined}
           onChange={v => setLinhas(ls => ls.map(x => (x.idItem === l.idItem ? { ...x, quantidade: Number(v) || 0 } : x)))}
         />
@@ -237,12 +236,12 @@ const KitEditorDrawer: React.FC<Props> = ({ aberto, kit, onFechar, onSalvo }) =>
           </Col>
           <Col xs={24} md={12}>
             <Text type="secondary">Preço de venda</Text>
-            <InputNumber style={{ width: '100%' }} min={0} step={1} precision={2} prefix="R$" value={preco} onChange={v => { setPreco(v); setMarkup(null); }} />
+            <CampoDinheiro style={{ width: '100%' }} min={0} step={1} precision={2} value={preco} onChange={v => { setPreco(v); setMarkup(null); }} />
           </Col>
           <Col xs={24} md={12}>
             <Text type="secondary">Sugerir pelo markup (líquido, com a taxa)</Text>
             <Space.Compact style={{ width: '100%' }}>
-              <InputNumber style={{ width: '100%' }} min={1} step={0.1} precision={2} placeholder="ex.: 1,8" value={markup} onChange={v => aplicarMarkup(v)} />
+              <CampoNumero style={{ width: '100%' }} min={1} step={0.1} precision={2} placeholder="ex.: 1,8" value={markup} onChange={v => aplicarMarkup(v)} />
               {[1.5, 1.8, 2].map(m => <Button key={m} onClick={() => aplicarMarkup(m)} disabled={!(custo > 0)}>{String(m).replace('.', ',')}x</Button>)}
             </Space.Compact>
           </Col>

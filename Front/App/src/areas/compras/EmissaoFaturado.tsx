@@ -1,19 +1,5 @@
 import { useState, useEffect } from 'react';
-import { 
-  Form, 
-  Input, 
-  Select, 
-  InputNumber, 
-  Button, 
-  Card, 
-  Table, 
-  Space, 
-  Typography, 
-  Modal, 
-  message, 
-  Tag,
-  Divider
-} from 'antd';
+import { Form, Input, Select, Button, Card, Table, Space, Typography, Modal, message, Tag, Divider } from 'antd';
 import { 
   FileTextOutlined, 
   PrinterOutlined, 
@@ -22,6 +8,7 @@ import {
   ThunderboltOutlined 
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import { CampoNumero } from '../../shared/formularios/CamposNumero';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -258,7 +245,7 @@ export default function EmissaoFaturado() {
                 rules={[{ required: true, message: 'Informe' }]}
                 style={{ flex: 1 }}
               >
-                <InputNumber min={1} max={12} style={{ width: '100%' }} />
+                <CampoNumero min={1} max={12} style={{ width: '100%' }} />
               </Form.Item>
 
               <Form.Item 
@@ -267,7 +254,7 @@ export default function EmissaoFaturado() {
                 rules={[{ required: true, message: 'Informe' }]}
                 style={{ flex: 1 }}
               >
-                <InputNumber min={1} max={365} style={{ width: '100%' }} />
+                <CampoNumero min={1} max={365} style={{ width: '100%' }} />
               </Form.Item>
 
               <Form.Item 
@@ -276,7 +263,7 @@ export default function EmissaoFaturado() {
                 rules={[{ required: true, message: 'Informe' }]}
                 style={{ flex: 1 }}
               >
-                <InputNumber min={0} max={365} style={{ width: '100%' }} />
+                <CampoNumero min={0} max={365} style={{ width: '100%' }} />
               </Form.Item>
             </div>
 
@@ -351,10 +338,10 @@ export default function EmissaoFaturado() {
             <Input placeholder="Ex: Peça / Insumo X" />
           </Form.Item>
           <Form.Item name="quantidade" label="Quantidade" rules={[{ required: true }]}>
-            <InputNumber min={1} style={{ width: '100%' }} />
+            <CampoNumero min={1} style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="valorUnitario" label="Valor Unitário (R$)" rules={[{ required: true }]}>
-            <InputNumber min={0.01} step={0.01} style={{ width: '100%' }} />
+            <CampoNumero min={0.01} step={0.01} style={{ width: '100%' }} />
           </Form.Item>
         </Form>
       </Modal>

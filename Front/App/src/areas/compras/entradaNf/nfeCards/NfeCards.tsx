@@ -1,22 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  Card, 
-  Row, 
-  Col, 
-  Typography, 
-  Badge, 
-  Button, 
-  Space, 
-  Modal, 
-  Descriptions, 
-  Tooltip,
-  Table,
-  Divider,
-  Alert,
-  InputNumber,
-  Input,
-  Select
-} from 'antd';
+import { Card, Row, Col, Typography, Badge, Button, Space, Modal, Descriptions, Tooltip, Table, Divider, Alert, Input, Select } from 'antd';
 import { 
   InfoCircleOutlined, 
   PlusOutlined, 
@@ -35,6 +18,7 @@ import { CobrancaNota } from '../cobranca/CobrancaNota';
 import { CobrancaDaNota, pagarApi } from '../../../financeiro/pagar/pagarApi';
 import { ehEntradaSemNota } from '../semNota/entradaSemNota';
 import { situacaoDoProtocolo, traduzirAmbiente, traduzirModelo, traduzirProcessoEmissao, traduzirTipoEmissao } from '../xml/utils/10-protocoloParser';
+import { CampoNumero } from '../../../../shared/formularios/CamposNumero';
 
 interface NfeCardsProps {
   data: NfeDataFromXML;
@@ -370,12 +354,11 @@ const [valorFreteAdicional, setValorFreteAdicional] = useState(freteAdicionalDat
         width={420}
       >
         <Space direction="vertical" size={10} style={{ width: '100%' }}>
-          <InputNumber
+          <CampoNumero
             value={valorFreteAdicional}
             onChange={(val) => setValorFreteAdicional(Number(val) || 0)}
             min={0}
             precision={2}
-            decimalSeparator=","
             addonBefore="R$"
             style={{ width: '100%' }}
           />

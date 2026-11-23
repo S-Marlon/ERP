@@ -2,11 +2,12 @@
 // custo-alvo (quanto pagar para chegar no alvo sem mexer no preço), a melhor oferta conhecida (notas e cotações)
 // e manda para a lista de trabalho como "Comprar" para negociar na próxima cotação.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Card, Col, Empty, Flex, Input, InputNumber, Row, Segmented, Space, Statistic, Switch, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { Alert, Button, Card, Col, Empty, Flex, Input, Row, Segmented, Space, Statistic, Switch, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { HistoryOutlined, ReloadOutlined, ShoppingCartOutlined } from '@ant-design/icons';
 import { compraInteligenteApi, ItemMargemBaixa } from './compraInteligenteApi';
 import HistoricoPrecosDrawer from './HistoricoPrecosDrawer';
 import { useListaTrabalho } from '../../../shared/core/listaTrabalho/ListaTrabalhoContext';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 const brl = (v: number) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 4 });
@@ -151,7 +152,7 @@ const MargemAbaixoAlvo: React.FC<{ dias: number }> = ({ dias }) => {
       <Card size="small">
         <Flex gap={8} wrap align="center" style={{ marginBottom: 12 }}>
           <Tooltip title="Para itens cuja família não tem margem mínima (Famílias › Editar dados › Comercial)">
-            <InputNumber min={1} max={1000} value={alvoPadrao} addonBefore="Alvo padrão" addonAfter="% s/ custo" style={{ width: 230 }}
+            <CampoNumero min={1} max={1000} value={alvoPadrao} addonBefore="Alvo padrão" addonAfter="% s/ custo" style={{ width: 230 }}
               onChange={v => { const n = Number(v) || 30; setAlvoPadrao(n); try { localStorage.setItem(CHAVE_ALVO, String(n)); } catch { /* sem armazenamento */ } }} />
           </Tooltip>
           <Segmented value={filtro} onChange={v => setFiltro(v as typeof filtro)} options={[

@@ -1,28 +1,5 @@
 import { useState, useMemo } from 'react';
-import { 
-  Layout, 
-  Input, 
-  List, 
-  Avatar, 
-  Tag, 
-  Button, 
-  Typography, 
-  Card, 
-  Row, 
-  Col, 
-  Descriptions, 
-  Table, 
-  Modal, 
-  Form, 
-  Select, 
-  InputNumber,
-  message,
-  Divider,
-  Empty,
-  Space,
-  Upload,
-  Dropdown
-} from 'antd';
+import { Layout, Input, List, Avatar, Tag, Button, Typography, Card, Row, Col, Descriptions, Table, Modal, Form, Select, message, Divider, Empty, Space, Upload, Dropdown } from 'antd';
 import { 
   SearchOutlined, 
   PlusOutlined, 
@@ -33,6 +10,7 @@ import {
   EditOutlined, 
   DeleteOutlined
 } from '@ant-design/icons';
+import { CampoNumero } from '../../shared/formularios/CamposNumero';
 
 const { Sider, Content } = Layout;
 const { Title, Text } = Typography;
@@ -474,10 +452,10 @@ export default function Pedidos() {
                       <Input placeholder="Descrição do produto ou serviço" style={{ width: 280 }} />
                     </Form.Item>
                     <Form.Item {...restField} name={[name, 'quantidade']} rules={[{ required: true, message: 'Qtd' }]}>
-                      <InputNumber placeholder="Qtd" min={1} style={{ width: 80 }} />
+                      <CampoNumero placeholder="Qtd" min={1} style={{ width: 80 }} />
                     </Form.Item>
                     <Form.Item {...restField} name={[name, 'valor_unitario']} rules={[{ required: true, message: 'Preço' }]}>
-                      <InputNumber placeholder="Valor Unit. (R$)" min={0} step={0.10} style={{ width: 140 }} />
+                      <CampoNumero placeholder="Valor Unit. (R$)" min={0} step={0.10} style={{ width: 140 }} />
                     </Form.Item>
                     <Button type="text" danger onClick={() => remove(name)}>Excluir</Button>
                   </Space>

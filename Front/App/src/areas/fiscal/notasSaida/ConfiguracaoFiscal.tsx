@@ -1,10 +1,11 @@
 // Configuração fiscal: dados da empresa emitente e como emitir (ambiente, provedor ou direto, fila ou automático, numeração, tributação)
 import React, { useEffect, useState } from 'react';
-import { Alert, AutoComplete, Button, Card, Col, Form, Input, InputNumber, Radio, Row, Select, Space, Spin, Typography, message } from 'antd';
+import { Alert, AutoComplete, Button, Card, Col, Form, Input, Radio, Row, Select, Space, Spin, Typography, message } from 'antd';
 import { CheckCircleTwoTone, CloseCircleTwoTone } from '@ant-design/icons';
 import { ConfigFiscal, DadosConfiguracao, EmitenteFiscal, fiscalApi } from './fiscalApi';
 import { CampoCep, CampoCpfCnpj, CampoTelefone, CampoUf } from '../../../shared/formularios/Campos';
 import { regraCep, regraCnpj, regraTelefone } from '../../../shared/formularios/documentos';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 
@@ -106,10 +107,10 @@ export const ConfiguracaoFiscal: React.FC<{ onSalvo?: (d: DadosConfiguracao) => 
                 </Form.Item>
               )}
               <Row gutter={10}>
-                <Col span={6}><Form.Item name={['configuracao', 'serieNfce']} label="Série NFC-e"><InputNumber min={1} style={{ width: '100%' }} /></Form.Item></Col>
-                <Col span={6}><Form.Item name={['configuracao', 'proximoNumeroNfce']} label="Próx. nº"><InputNumber min={1} style={{ width: '100%' }} /></Form.Item></Col>
-                <Col span={6}><Form.Item name={['configuracao', 'serieNfe']} label="Série NF-e"><InputNumber min={1} style={{ width: '100%' }} /></Form.Item></Col>
-                <Col span={6}><Form.Item name={['configuracao', 'proximoNumeroNfe']} label="Próx. nº"><InputNumber min={1} style={{ width: '100%' }} /></Form.Item></Col>
+                <Col span={6}><Form.Item name={['configuracao', 'serieNfce']} label="Série NFC-e"><CampoNumero min={1} style={{ width: '100%' }} /></Form.Item></Col>
+                <Col span={6}><Form.Item name={['configuracao', 'proximoNumeroNfce']} label="Próx. nº"><CampoNumero min={1} style={{ width: '100%' }} /></Form.Item></Col>
+                <Col span={6}><Form.Item name={['configuracao', 'serieNfe']} label="Série NF-e"><CampoNumero min={1} style={{ width: '100%' }} /></Form.Item></Col>
+                <Col span={6}><Form.Item name={['configuracao', 'proximoNumeroNfe']} label="Próx. nº"><CampoNumero min={1} style={{ width: '100%' }} /></Form.Item></Col>
               </Row>
               <Form.Item name={['configuracao', 'cscId']} label="Id do CSC (token do QR Code da NFC-e, gerado no portal da SEFAZ)"><Input maxLength={10} style={{ width: 160 }} /></Form.Item>
             </Card>

@@ -12,6 +12,7 @@ import dayjs, { Dayjs } from 'dayjs';
 import { caixaStore } from '../caixa/caixaStore';
 import { ROTULO_FORMA } from '../caixa/caixaApi';
 import GraficoBarras from '../../../shared/components/graficos/GraficoBarras';
+import { FORMATOS_DATA } from '../../../shared/formularios/numeros';
 
 const { Text, Title } = Typography;
 const API = `${API_URL}/api/vendas/painel`;
@@ -118,7 +119,7 @@ const CentralVendas: React.FC = () => {
           <Space wrap>
             <Segmented value={periodo} onChange={v => setPeriodo(String(v))} options={[...PERIODOS, { value: 'personalizado', label: 'Período' }]} />
             {periodo === 'personalizado' && (
-              <DatePicker.RangePicker format="DD/MM/YYYY" value={personalizado} allowClear={false}
+              <DatePicker.RangePicker format={FORMATOS_DATA} value={personalizado} allowClear={false}
                 onChange={v => v && v[0] && v[1] && setPersonalizado([v[0], v[1]])} />
             )}
             <Button icon={<ReloadOutlined />} onClick={carregar} loading={carregando} />

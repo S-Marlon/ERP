@@ -2,9 +2,10 @@
 // (nota paga à vista) ou desfaz. Enquanto houver duplicata sem lançamento, a aprovação da nota fica bloqueada.
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Alert, Button, Input, InputNumber, Popconfirm, Select, Space, Table, Tag, Typography, message } from 'antd';
+import { Alert, Button, Input, Popconfirm, Select, Space, Table, Tag, Typography, message } from 'antd';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { CobrancaDaNota, dataBr, FORMAS_PAGAMENTO, FormaPagamento, ParcelaLancamento, pagarApi } from '../../../financeiro/pagar/pagarApi';
+import { CampoNumero } from '../../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -116,7 +117,7 @@ export const CobrancaNota: React.FC<{ idLote: number; dados: CobrancaDaNota | nu
               { title: 'Vencimento', key: 'v', width: 140, render: (_, l) => <Input size="small" type="date" value={l.vencimento} onChange={e => alterar(l.chave, { vencimento: e.target.value })} /> },
               {
                 title: 'Valor', key: 'valor', width: 120,
-                render: (_, l) => <InputNumber size="small" min={0} precision={2} decimalSeparator="," style={{ width: '100%' }} value={l.valor} onChange={v => alterar(l.chave, { valor: Number(v) || 0 })} />,
+                render: (_, l) => <CampoNumero size="small" min={0} precision={2} style={{ width: '100%' }} value={l.valor} onChange={v => alterar(l.chave, { valor: Number(v) || 0 })} />,
               },
               {
                 title: 'Forma', key: 'f', width: 120,

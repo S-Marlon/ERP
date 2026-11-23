@@ -2,10 +2,11 @@
 // produto de venda -> Venda (pode separar parte para o Almoxarifado, ex.: 30 graxas = 20 venda + 10 uso interno),
 // consumo/insumo -> Almoxarifado, ativo -> Patrimônio. null = tudo no depósito do tipo.
 import React, { useEffect, useState } from 'react';
-import { Button, InputNumber, Popover, Space, Tag, Tooltip, Typography } from 'antd';
+import { Button, Popover, Space, Tag, Tooltip, Typography } from 'antd';
 import { ScissorOutlined, WarningOutlined } from '@ant-design/icons';
 
 import { DEPOSITOS, Deposito, DestinoLinha, depositoPadraoDoTipo, destinoIncompativel, destinosEfetivos, podeSepararUsoInterno } from '../depositos';
+import { CampoNumero } from '../../../../shared/formularios/CamposNumero';
 export { DEPOSITOS, depositoPadraoDoTipo, destinosEfetivos };
 export type { Deposito, DestinoLinha };
 
@@ -54,7 +55,7 @@ export const DestinosEditor: React.FC<Props> = ({ destinos, recebida, unidade, t
       </Typography.Text>
       <Space>
         <span style={{ fontSize: 12 }}>Uso interno:</span>
-        <InputNumber size="small" min={0} max={recebida} value={usoInterno} onChange={v => setUsoInterno(Number(v) || 0)} addonAfter={un} style={{ width: 130 }} />
+        <CampoNumero size="small" min={0} max={recebida} value={usoInterno} onChange={v => setUsoInterno(Number(v) || 0)} addonAfter={un} style={{ width: 130 }} />
       </Space>
       <Typography.Text style={{ fontSize: 12, color: valido ? '#16a34a' : '#dc2626' }}>
         {valido ? `Venda: ${venda} ${un} · Almoxarifado: ${usoInterno || 0} ${un}` : 'Deixe ao menos uma unidade para venda (ou mude o tipo para Consumo).'}

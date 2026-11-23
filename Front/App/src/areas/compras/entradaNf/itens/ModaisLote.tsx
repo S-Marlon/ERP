@@ -1,13 +1,14 @@
 // Ações em lote da conferência: cadastro rápido de itens novos e classificação (família/categoria/atributos).
 // Os valores de atributos são preenchidos item a item numa tabela (grade costuma mudar de um item para outro).
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Button, InputNumber, Modal, Space, Table, Tag, Tooltip, Typography } from 'antd';
+import { Alert, Button, Modal, Space, Table, Tag, Tooltip, Typography } from 'antd';
 import { ThunderboltFilled, VerticalAlignBottomOutlined } from '@ant-design/icons';
 import { ClassificacaoPim, ClassificacaoItem, CLASSIFICACAO_VAZIA } from './ClassificacaoPim';
 import { foraDaVenda, linhaItemNovo, linhaSemVinculo } from '../edicaoLote';
 import { getTipoRecursoConfig } from '../tipoRecurso';
 import type { AtributoFicha } from '../../../catalogo/skus/CatalogSku.service';
 import CampoAtributo, { PAPEL_ATRIBUTO, valorVazio } from '../../../catalogo/skus/CampoAtributo';
+import { CampoNumero } from '../../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -160,7 +161,7 @@ export const ModalCadastroRapido: React.FC<CadastroRapidoProps> = ({ open, itens
         )}
         <Space align="center">
           <Text>Markup de varejo:</Text>
-          <InputNumber min={0.01} step={0.1} precision={2} value={markup} onChange={v => setMarkup(Number(v) || 0)} addonAfter="×" style={{ width: 130 }} />
+          <CampoNumero min={0.01} step={0.1} precision={2} value={markup} onChange={v => setMarkup(Number(v) || 0)} addonAfter="×" style={{ width: 130 }} />
           <Text type="secondary" style={{ fontSize: 12 }}>preço = custo final da nota × markup (atacado e embalagens ficam para o editor)</Text>
         </Space>
 

@@ -34,6 +34,7 @@ import {
   CalendarOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
+import { FORMATOS_DATA } from '../../shared/formularios/numeros';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -529,7 +530,7 @@ export const FuncionariosPage: React.FC = () => {
                 label="Data de Admissão"
                 rules={[{ required: true, message: 'Selecione a data' }]}
               >
-                <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" placeholder="Selecione" />
+                <DatePicker style={{ width: '100%' }} format={FORMATOS_DATA} placeholder="Selecione" />
               </Form.Item>
             </Col>
             <Col span={12}>

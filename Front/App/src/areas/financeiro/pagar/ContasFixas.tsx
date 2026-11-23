@@ -2,12 +2,13 @@
 // sozinho no contas a pagar o mês atual e os 2 seguintes; conta de valor que varia vai estimada e se confirma quando chega.
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Card, Checkbox, Col, Input, InputNumber, Modal, Popconfirm, Row, Select, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { Button, Card, Checkbox, Col, Input, Modal, Popconfirm, Row, Select, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { EditOutlined, PauseCircleOutlined, PlayCircleOutlined, PlusOutlined, ReloadOutlined, StopOutlined, TagsOutlined } from '@ant-design/icons';
 import { ContaFixa, ContaFixaForm, dataBr, FORMAS_PAGAMENTO, hojeIso, pagarApi, PERIODICIDADES } from './pagarApi';
 import { QuemRecebe, SelectCategoria, useDadosConta } from './camposConta';
 import { primeiroMesSugerido } from './contasForm';
 import CategoriasDrawer from './CategoriasDrawer';
+import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text, Title } = Typography;
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -62,7 +63,7 @@ const ContaFixaModal: React.FC<{ conta: ContaFixa | 'nova' | null; onFechar: () 
         <Row gutter={10}>
           <Col span={9}>
             <Text>{f.valorVariavel ? 'Valor estimado' : 'Valor'}</Text>
-            <InputNumber min={0} precision={2} decimalSeparator="," prefix="R$" style={{ width: '100%' }} value={f.valor} onChange={v => mudar({ valor: Number(v) || 0 })} />
+            <CampoDinheiro min={0} precision={2} style={{ width: '100%' }} value={f.valor} onChange={v => mudar({ valor: Number(v) || 0 })} />
           </Col>
           <Col span={15} style={{ paddingTop: 22 }}>
             <Checkbox checked={f.valorVariavel} onChange={e => mudar({ valorVariavel: e.target.checked })}>Valor varia todo mês (água, luz)</Checkbox>
@@ -70,7 +71,7 @@ const ContaFixaModal: React.FC<{ conta: ContaFixa | 'nova' | null; onFechar: () 
         </Row>
         {f.valorVariavel && <Text type="secondary" style={{ fontSize: 12 }}>Os meses entram com a estimativa e a marca "estimado"; quando a conta chegar, confirme o valor no contas a pagar.</Text>}
         <Row gutter={10}>
-          <Col span={8}><Text>Vence no dia</Text><InputNumber min={1} max={31} style={{ width: '100%' }} value={f.diaVencimento} onChange={v => mudar({ diaVencimento: Number(v) || 1 })} /></Col>
+          <Col span={8}><Text>Vence no dia</Text><CampoNumero min={1} max={31} style={{ width: '100%' }} value={f.diaVencimento} onChange={v => mudar({ diaVencimento: Number(v) || 1 })} /></Col>
           <Col span={16}><Text>Repete</Text><Select style={{ width: '100%' }} value={f.periodicidade} options={PERIODICIDADES} onChange={periodicidade => mudar({ periodicidade })} /></Col>
         </Row>
         <Row gutter={10}>

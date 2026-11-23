@@ -2,9 +2,7 @@
 // plano de manutenção de cada poço (dentro da ficha do poço), e a lista de manutenções vencidas/a vencer e garantias
 // vencendo, com o cliente para oferecer o serviço e o atalho para criar a obra (e agendar).
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  Alert, Button, Card, Checkbox, Col, Empty, Input, InputNumber, Modal, Popconfirm, Row, Segmented, Select, Space, Switch, Table, Tag, Timeline, Tooltip, Typography, message,
-} from 'antd';
+import { Alert, Button, Card, Checkbox, Col, Empty, Input, Modal, Popconfirm, Row, Segmented, Select, Space, Switch, Table, Tag, Timeline, Tooltip, Typography, message } from 'antd';
 import { CalendarOutlined, EnvironmentOutlined, PlusOutlined, ReloadOutlined, ToolOutlined } from '@ant-design/icons';
 import GraficoBarras from '../../../shared/components/graficos/GraficoBarras';
 import {
@@ -12,6 +10,7 @@ import {
   ServicoPlano, SITUACOES_OBRA, SITUACOES_PLANO, TipoRegistro, TIPOS_REGISTRO,
 } from './obrasApi';
 import { abrirFichaPoco, abrirObra, agendarObra } from './navPocos';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 const erro = (e: unknown) => message.error(e instanceof Error ? e.message : 'Erro.');
@@ -29,7 +28,7 @@ const RegistroModal: React.FC<{ idPoco: number; aberto: RegistroPoco | 'novo' | 
     } catch (e) { erro(e); }
   };
   const medida = (k: 'nivelEstaticoM' | 'nivelDinamicoM' | 'vazaoLh', rotulo: string, suf: string) => (
-    <Col span={8}><Text>{rotulo}</Text><InputNumber min={0} decimalSeparator="," suffix={suf} style={{ width: '100%' }} value={f[k] ?? undefined} onChange={v => setF({ ...f, [k]: v === null ? null : Number(v) })} /></Col>
+    <Col span={8}><Text>{rotulo}</Text><CampoNumero min={0} suffix={suf} style={{ width: '100%' }} value={f[k] ?? undefined} onChange={v => setF({ ...f, [k]: v === null ? null : Number(v) })} /></Col>
   );
   return (
     <Modal open={!!aberto} title={aberto === 'novo' ? 'Novo registro do poço' : 'Registro do poço'} okText="Salvar" cancelText="Voltar" onOk={salvar} onCancel={onFechar} destroyOnHidden
@@ -77,7 +76,7 @@ const PlanoModal: React.FC<{ idPoco: number; aberto: PlanoManutencao | 'novo' | 
           <Col span={12}><Text>Serviço</Text>
             <Select style={{ width: '100%' }} value={f.servico} onChange={servico => setF({ ...f, servico })} options={SERVICOS_PLANO.map(s => ({ value: s, label: SERVICOS[s] }))} />
           </Col>
-          <Col span={12}><Text>A cada</Text><InputNumber min={1} max={120} suffix="meses" style={{ width: '100%' }} value={f.aCadaMeses} onChange={v => setF({ ...f, aCadaMeses: Number(v) || 1 })} /></Col>
+          <Col span={12}><Text>A cada</Text><CampoNumero min={1} max={120} suffix="meses" style={{ width: '100%' }} value={f.aCadaMeses} onChange={v => setF({ ...f, aCadaMeses: Number(v) || 1 })} /></Col>
         </Row>
         <div><Text>Descrição</Text><Input maxLength={150} value={f.descricao || ''} onChange={e => setF({ ...f, descricao: e.target.value || null })} placeholder="Ex.: limpeza química, revisão da bomba" /></div>
         <div><Text>Última vez feita fora do sistema (opcional)</Text>

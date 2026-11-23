@@ -2,9 +2,7 @@
 // Perfil, empresa e preferências ficam salvos neste navegador até existir login e tabela de configurações.
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Alert, Avatar, Button, Card, Col, Divider, Empty, Form, Input, InputNumber, List, Row, Select, Space, Switch, Tag, Typography, message,
-} from 'antd';
+import { Alert, Avatar, Button, Card, Col, Divider, Empty, Form, Input, List, Row, Select, Space, Switch, Tag, Typography, message } from 'antd';
 import {
   BellOutlined, BookOutlined, CheckOutlined, QuestionCircleOutlined, ReloadOutlined, SaveOutlined, ShopOutlined, SlidersOutlined, UserOutlined,
 } from '@ant-design/icons';
@@ -14,6 +12,7 @@ import { CampoCep, CampoCpfCnpj, CampoTelefone, CampoUf } from '../../shared/for
 import { regraCep, regraCnpj, regraTelefone } from '../../shared/formularios/documentos';
 import { useNotificacoes } from '../../shared/core/notificacoes/NotificacoesContext';
 import { TIPOS_NOTIFICACAO } from '../../shared/core/notificacoes/notificacoes';
+import { CampoNumero } from '../../shared/formularios/CamposNumero';
 
 const { Text, Title, Paragraph } = Typography;
 const COR_NIVEL = { critico: 'red', atencao: 'orange', info: 'blue' } as const;
@@ -151,8 +150,8 @@ export const PreferenciasSistema: React.FC = () => {
                 <Select options={[20, 50, 100, 200].map(n => ({ value: n, label: n }))} />
               </Form.Item>
             </Col>
-            <Col xs={12} md={8}><Form.Item name="casasDecimaisPreco" label="Casas decimais de preço"><InputNumber min={2} max={4} style={{ width: '100%' }} /></Form.Item></Col>
-            <Col xs={12} md={8}><Form.Item name="casasDecimaisQuantidade" label="Casas decimais de quantidade"><InputNumber min={0} max={4} style={{ width: '100%' }} /></Form.Item></Col>
+            <Col xs={12} md={8}><Form.Item name="casasDecimaisPreco" label="Casas decimais de preço"><CampoNumero min={2} max={4} style={{ width: '100%' }} /></Form.Item></Col>
+            <Col xs={12} md={8}><Form.Item name="casasDecimaisQuantidade" label="Casas decimais de quantidade"><CampoNumero min={0} max={4} style={{ width: '100%' }} /></Form.Item></Col>
             <Col xs={24} md={12}>
               <Form.Item name="somNoPdv" label="Som ao bipar no PDV" valuePropName="checked"><Switch /></Form.Item>
             </Col>

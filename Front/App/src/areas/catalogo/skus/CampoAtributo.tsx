@@ -1,8 +1,10 @@
 // Campo de edição de um atributo pelo tipo (lista, número, sim/não, data, texto).
 // Usado na Ficha Técnica do catálogo e na classificação do item novo na entrada de NF.
-import { DatePicker, Input, InputNumber, Select, Switch, Tag, Typography } from 'antd';
+import { DatePicker, Input, Select, Switch, Tag, Typography } from 'antd';
 import dayjs from 'dayjs';
 import type { AtributoFicha } from './CatalogSku.service';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
+import { FORMATOS_DATA } from '../../../shared/formularios/numeros';
 
 export const PAPEL_ATRIBUTO: Record<string, { label: string; color: string; ordem: number; ajuda: string }> = {
   dna: { label: 'DNA', color: 'blue', ordem: 0, ajuda: 'Igual para toda a família' },
@@ -38,14 +40,14 @@ export default function CampoAtributo({ atributo: a, valor, onChange, disabled }
     case 'numero':
     case 'decimal':
       return (
-        <InputNumber size="small" style={{ width: '100%' }} status={status} precision={a.tipo === 'numero' ? 0 : undefined} disabled={disabled}
-          value={vazio ? null : Number(valor)} onChange={v => onChange(v ?? null)} decimalSeparator="," />
+        <CampoNumero size="small" style={{ width: '100%' }} status={status} precision={a.tipo === 'numero' ? 0 : undefined} disabled={disabled}
+          value={vazio ? null : Number(valor)} onChange={v => onChange(v ?? null)} />
       );
     case 'boolean':
       return <Switch size="small" disabled={disabled} checked={String(valor) === 'Sim' || valor === true} onChange={v => onChange(v ? 'Sim' : 'Não')} />;
     case 'data':
       return (
-        <DatePicker size="small" format="DD/MM/YYYY" status={status} disabled={disabled} value={vazio ? null : dayjs(String(valor))}
+        <DatePicker size="small" format={FORMATOS_DATA} status={status} disabled={disabled} value={vazio ? null : dayjs(String(valor))}
           onChange={d => onChange(d ? d.format('YYYY-MM-DD') : null)} />
       );
     default:

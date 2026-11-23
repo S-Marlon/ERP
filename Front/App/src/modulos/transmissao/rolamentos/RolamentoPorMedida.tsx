@@ -1,10 +1,11 @@
 // PDV › "Rolamento por medida": o cliente traz o rolamento (às vezes só o anel interno); digita o que mediu
 // (vazio = qualquer), com margem, e adiciona ao carrinho. Mostra também os códigos padrão que batem e não estão cadastrados.
 import React, { useEffect, useState } from 'react';
-import { Button, Checkbox, Drawer, Empty, InputNumber, Segmented, Select, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { Button, Checkbox, Drawer, Empty, Segmented, Select, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { ColumnWidthOutlined, PlusOutlined } from '@ant-design/icons';
 import type { PdvExtensaoProps } from '../../registroModulos';
 import { rolamentosApi, TIPOS, TipoRolamento, VEDACOES } from './rolamentosApi';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 const mm = (v: number | null | undefined) => (v === null || v === undefined ? '—' : v.toLocaleString('pt-BR', { maximumFractionDigits: 3 }));
@@ -69,7 +70,7 @@ const RolamentoPorMedida: React.FC<PdvExtensaoProps> = ({ adicionarItens }) => {
   const campo = (c: keyof Medidas, rotulo: string, dica: string, foco = false) => (
     <div>
       <Tooltip title={dica}><Text type="secondary" style={{ fontSize: 12 }}>{rotulo}</Text></Tooltip>
-      <InputNumber autoFocus={foco} min={0} step={0.5} precision={3} decimalSeparator="," controls={false} placeholder="qualquer" style={{ width: 110, display: 'block' }}
+      <CampoNumero autoFocus={foco} min={0} step={0.5} precision={3} controls={false} placeholder="qualquer" style={{ width: 110, display: 'block' }}
         value={alvo[c]} onChange={v => setAlvo(a => ({ ...a, [c]: v === null || v === undefined ? null : Number(v) }))} addonAfter="mm" />
     </div>
   );

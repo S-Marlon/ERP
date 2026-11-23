@@ -1,7 +1,8 @@
 // Escolha das variações de um kit configurável ao colocar no carrinho (ex.: CV da bomba, bitola e metros do fio).
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Card, InputNumber, Modal, Select, Space, Statistic, Tag, Typography } from 'antd';
+import { Alert, Card, Modal, Select, Space, Statistic, Tag, Typography } from 'antd';
 import { calcularKit, EscolhaKitPdv, escolhasPadrao, PosicaoKit } from '../utils/kitPdv';
+import { CampoNumero } from '../../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 const brl = (v: number) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -101,7 +102,7 @@ const KitConfiguradorModal: React.FC<Props> = ({ pendente, onConfirmar, onCancel
                 <div style={{ width: 150 }}>
                   <Text type="secondary" style={{ fontSize: 12 }}>Quantidade</Text>
                   {p.permiteAlterarQtd ? (
-                    <InputNumber
+                    <CampoNumero
                       style={{ width: '100%' }} min={0.001} step={1} value={e?.quantidade}
                       addonAfter={escolhida.unidade || undefined}
                       onChange={v => mudar(p.slot, { quantidade: Number(v) || 0 })}

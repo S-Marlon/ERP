@@ -3,7 +3,7 @@
 // aplicado em todos os itens (variações), cada um com a sua medida, e salvo no cadastro do ERP. Ao abrir, escolhe-se a
 // foto que vai ser editada (da família ou de um item). Usado pela família (catálogo) e pelo anúncio do ML.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Checkbox, Divider, Empty, Flex, Input, InputNumber, Modal, Progress, Segmented, Select, Slider, Space, Spin, Switch, Tag, Tooltip, Typography, Upload, message } from 'antd';
+import { Button, Checkbox, Divider, Empty, Flex, Input, Modal, Progress, Segmented, Select, Slider, Space, Spin, Switch, Tag, Tooltip, Typography, Upload, message } from 'antd';
 import {
   AppstoreOutlined, ArrowRightOutlined, BgColorsOutlined, BorderOutlined, ColumnWidthOutlined, CommentOutlined, CopyOutlined, DeleteOutlined, DownloadOutlined,
   ExpandOutlined, FileImageOutlined, FontSizeOutlined, PictureOutlined, RedoOutlined, SaveOutlined, ScissorOutlined, UndoOutlined, UploadOutlined,
@@ -21,6 +21,7 @@ import {
 } from './elementos';
 import { CORTE_INTEIRO, corteDoQuadro } from './fotoPixels';
 import { limparModelo } from './modeloSalvo';
+import { CampoNumero } from '../../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 const LADO = 1200;
@@ -882,7 +883,7 @@ const EditorImagemModal: React.FC<Props> = ({ entrada, onFechar, onSalvo }) => {
                       <Tooltip title="Repete o produto N vezes em grade, como nos anúncios de kit (copia a foto da unidade; com fundo branco não dá diferença). Salva como foto do kit c/N: no ML ela vai como 2ª foto só no anúncio do kit (a unidade continua com a foto normal). O ML recomenda, como foto principal do kit, uma foto real das N unidades juntas.">
                         <Space size={6} wrap>
                           <Text style={{ fontSize: 12 }}><AppstoreOutlined /> repetir a foto</Text>
-                          <InputNumber size="small" min={1} max={48} precision={0} value={vezesDaFoto(d)} disabled={tratandoFoto}
+                          <CampoNumero size="small" min={1} max={48} precision={0} value={vezesDaFoto(d)} disabled={tratandoFoto}
                             onChange={v => { if (v && v !== vezesDaFoto(d)) mudarMultiplicar(Number(v)); }} style={{ width: 70 }} />
                           <Text type="secondary" style={{ fontSize: 12 }}>vezes</Text>
                         </Space>

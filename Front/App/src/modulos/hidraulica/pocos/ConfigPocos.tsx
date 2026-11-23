@@ -1,9 +1,7 @@
 // Atendimento › Configuração do módulo Poços: menu de seções à esquerda (com o que falta em cada uma) e uma seção por
 // vez à direita. Os modelos de contrato e aditivo abrem num editor à parte; a barra de salvar avisa o que não foi salvo.
 import React, { useEffect, useState } from 'react';
-import {
-  Alert, Badge, Button, Card, Col, Collapse, Empty, Flex, Form, Input, InputNumber, Modal, Row, Space, Switch, Tag, TimePicker, Tooltip, Typography, Upload, message,
-} from 'antd';
+import { Alert, Badge, Button, Card, Col, Collapse, Empty, Flex, Form, Input, Modal, Row, Space, Switch, Tag, TimePicker, Tooltip, Typography, Upload, message } from 'antd';
 import {
   AppstoreOutlined, CheckCircleFilled, ClockCircleOutlined, EditOutlined, FileProtectOutlined, FileTextOutlined, MessageOutlined, ShopOutlined, UndoOutlined,
 } from '@ant-design/icons';
@@ -13,6 +11,7 @@ import { recursosPocos } from './recursosPocos';
 import { reduzirImagem } from './ProcessoObra';
 import { CAMPOS_MODELO, MODELO_ADITIVO_PADRAO, MODELO_CONTRATO_PADRAO } from './documentosPocos';
 import { contarClausulas, faltasDaSecao, SecaoConfig, SECOES_CONFIG, secaoDoPedido, temAlteracao } from './secoesConfig';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text, Title } = Typography;
 const erro = (e: unknown) => message.error(e instanceof Error ? e.message : 'Erro.');
@@ -32,7 +31,7 @@ const Texto: React.FC<{ c: ConfigProcesso; k: keyof ConfigProcesso; mudar: Mudar
 const Numero: React.FC<{ c: ConfigProcesso; k: keyof ConfigProcesso; mudar: Mudar; rotulo: string; sufixo: string; min: number; max: number; dica?: string }> =
   ({ c, k, mudar, rotulo, sufixo, min, max, dica }) => (
     <Form.Item label={rotulo} extra={dica} style={{ marginBottom: 12 }}>
-      <InputNumber min={min} max={max} suffix={sufixo} style={{ width: '100%' }} value={c[k] as number} onChange={v => mudar({ [k]: Number(v) || min } as Partial<ConfigProcesso>)} />
+      <CampoNumero min={min} max={max} suffix={sufixo} style={{ width: '100%' }} value={c[k] as number} onChange={v => mudar({ [k]: Number(v) || min } as Partial<ConfigProcesso>)} />
     </Form.Item>
   );
 const Hora: React.FC<{ valor: string | null; onChange: (v: string | null) => void; disabled?: boolean }> = ({ valor, onChange, disabled }) => (

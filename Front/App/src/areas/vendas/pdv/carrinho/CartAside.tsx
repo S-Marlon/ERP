@@ -1,6 +1,6 @@
 // Carrinho do PDV: itens com unidade, quantidade, preço por item (desconto ou acréscimo) e faixa de atacado; rodapé com total e ações.
 import React, { useState } from 'react';
-import { Button, ConfigProvider, Divider, Dropdown, Empty, Flex, InputNumber, Modal, Popconfirm, Select, Tag, Tooltip, Typography, message, theme } from 'antd';
+import { Button, ConfigProvider, Divider, Dropdown, Empty, Flex, Modal, Popconfirm, Select, Tag, Tooltip, Typography, message, theme } from 'antd';
 import { CopyOutlined, DeleteOutlined, ExportOutlined, MoreOutlined, PrinterOutlined, SplitCellsOutlined } from '@ant-design/icons';
 import { ajusteDaLinha, ajustesDoCarrinho, precoBaseLinha } from '../utils/ajustesCarrinho';
 
@@ -8,6 +8,7 @@ import { CartItem } from '../types';
 import { emAtacado, podeFracionar, proximaFaixa } from '../utils/precoCarrinho';
 import { faltaNaLinha } from '../utils/estoqueCarrinho';
 import { PrecosPorFormaPainel } from './PrecosPorFormaPainel';
+import { CampoDinheiro, CampoNumero } from '../../../../shared/formularios/CamposNumero';
 
 interface CartAsideProps {
     cart: CartItem[];
@@ -239,7 +240,7 @@ const CarrinhoConteudo: React.FC<CartAsideProps> = ({
                                                     {temDesconto ? `-${pctOff}%` : temAcrescimo ? `+${pctOff}%` : '%'}
                                                 </Button>
                                             </Tooltip>
-                                            <InputNumber size="small" min={0} step={fracionado ? 0.1 : 1}
+                                            <CampoNumero size="small" min={0} step={fracionado ? 0.1 : 1}
                                                 value={item.quantity} onChange={val => updateQuantity(item.id, val ?? 0)} style={{ width: 80 }} />
                                         </Flex>
                                         <Typography.Text strong style={{ minWidth: 80, textAlign: 'right', whiteSpace: 'nowrap' }}>
@@ -314,7 +315,7 @@ const CarrinhoConteudo: React.FC<CartAsideProps> = ({
                     <Flex vertical gap={8}>
                         <Typography.Text strong>{itemDesconto.name}</Typography.Text>
                         <Typography.Text type="secondary">Preço de tabela: {money.format(precoBase(itemDesconto))} · abaixo dá desconto, acima dá acréscimo</Typography.Text>
-                        <InputNumber autoFocus prefix="R$" min={0.01} step={0.01} precision={2} decimalSeparator=","
+                        <CampoDinheiro autoFocus min={0.01} step={0.01} precision={2}
                             value={novoPreco} onChange={v => setNovoPreco(v)} onPressEnter={aplicarDesconto} style={{ width: '100%' }} />
                         {novoPreco !== null && novoPreco > 0 && novoPreco < precoBase(itemDesconto) - 0.004 && (
                             <Typography.Text type="success">

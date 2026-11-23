@@ -2,12 +2,13 @@
 // vencimentos, pagamento e ajuste (inclusive confirmar o valor da conta que entrou estimada).
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Alert, Button, Card, Col, Input, InputNumber, Modal, Row, Segmented, Select, Space, Statistic, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { Alert, Button, Card, Col, Input, Modal, Row, Segmented, Select, Space, Statistic, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { CheckOutlined, CopyOutlined, EditOutlined, PlusOutlined, ReloadOutlined, RetweetOutlined, RollbackOutlined } from '@ant-design/icons';
 import { dataBr, FORMAS_PAGAMENTO, FormaPagamento, hojeIso, pagarApi, TituloPagar } from './pagarApi';
 import NovaContaModal from './NovaContaModal';
 import { SelectCategoria, useDadosConta } from './camposConta';
 import { opcoesDeCategoria } from './contasForm';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text, Title } = Typography;
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -214,7 +215,7 @@ export const FinanceiroContasPagar: React.FC = () => {
           <span>Vencimento</span>
           <Input type="date" value={ajuste.vencimento} onChange={e => setAjuste(a => ({ ...a, vencimento: e.target.value }))} />
           <span>Valor</span>
-          <InputNumber min={0} precision={2} decimalSeparator="," style={{ width: '100%' }} value={ajuste.valor} onChange={v => setAjuste(a => ({ ...a, valor: Number(v) || 0 }))} />
+          <CampoNumero min={0} precision={2} style={{ width: '100%' }} value={ajuste.valor} onChange={v => setAjuste(a => ({ ...a, valor: Number(v) || 0 }))} />
           <span>Linha digitável</span>
           <Input value={ajuste.codigoBarras} placeholder="cole a linha digitável do boleto" onChange={e => setAjuste(a => ({ ...a, codigoBarras: e.target.value }))} />
           <span>Categoria</span>

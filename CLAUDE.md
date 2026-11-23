@@ -88,6 +88,12 @@ por essa conexão (commit/rollback viram no-op), chamar os controllers com `req/
   Estado compartilhado com `useSyncExternalStore` (ex.: `caixaStore`, `modulosStore`).
 - antd 6: `destroyOnHidden`, `styles={{ body: ... }}`, `popupMatchSelectWidth`; ícones de `@ant-design/icons`.
 - Dinheiro: arredondar por linha antes de somar; `decimal(18,4)` no banco.
+- **Formulários (front):** usar o kit de `shared/formularios/` em vez de `Input`/`InputNumber`/máscara própria:
+  `CampoCpfCnpj`, `CampoTelefone`, `CampoCep` (preenche pelo ViaCEP), `CampoUf` (guardam só os números; regras
+  `regraCpf`, `regraCnpj()`, `regraTelefone`, `regraCep`; mostrar com `formatarDocumento`/`formatarTelefone`/`formatarCep`)
+  e `CampoDinheiro`, `CampoQuantidade`, `CampoPercentual`, `CampoNumero` (vírgula decimal, aceita colar "1.234,56"),
+  `CampoData`/`FORMATOS_DATA` (digita a data sem barras). Backend: `areas/parceiros/documentos.ts` e `cnpj.ts`
+  (CPF/CNPJ, telefone e CEP gravados só com números e conferidos no cadastro manual).
 
 ## Estrutura de pastas
 Backend e front seguem a mesma divisão por área de negócio:

@@ -2,16 +2,15 @@
 // prazo, "Ajustar venda" muda quantidade e preço das linhas, tira linha e inclui item; a diferença vai para as parcelas
 // em aberto (espalhada, na última ou numa parcela nova) e o estoque acompanha.
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  Alert, Button, Card, Col, DatePicker, Descriptions, Drawer, Empty, Flex, Input, InputNumber, Row, Segmented, Select, Space, Statistic, Table, Tabs, Tag, Tooltip,
-  Typography, message,
-} from 'antd';
+import { Alert, Button, Card, Col, DatePicker, Descriptions, Drawer, Empty, Flex, Input, Row, Segmented, Select, Space, Statistic, Table, Tabs, Tag, Tooltip, Typography, message } from 'antd';
 import { DeleteOutlined, EditOutlined, SaveOutlined, UndoOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { DESTINOS_AJUSTE, DestinoAjuste, ItemNovo, ItemVenda, previaAjuste, vendaApi, VendaCompleta } from './vendaCompletaApi';
 import { ROTULO_FORMA } from '../caixa/caixaApi';
 import { getPdvProducts } from '../pdv/services/api/products';
 import type { Product } from '../pdv/types/product.types';
+import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
+import { FORMATOS_DATA } from '../../../shared/formularios/numeros';
 
 const { Text } = Typography;
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -94,13 +93,13 @@ export const VendaCompletaDrawer: React.FC<{ idVenda: number | null; onFechar: (
     },
     {
       title: 'Qtd.', key: 'q', width: 140, align: 'right' as const, render: (_: unknown, i: ItemVenda) => (editando && !i.kit
-        ? <InputNumber size="small" min={i.devolvido} step={1} value={linha(i).quantidade} style={{ width: 110 }} addonAfter={i.unidade || undefined}
+        ? <CampoNumero size="small" min={i.devolvido} step={1} value={linha(i).quantidade} style={{ width: 110 }} addonAfter={i.unidade || undefined}
             onChange={x => mudar(i, { quantidade: Number(x) || 0 })} />
         : `${qtd(i.quantidade)} ${i.unidade || ''}`),
     },
     {
       title: 'Preço', key: 'p', width: 140, align: 'right' as const, render: (_: unknown, i: ItemVenda) => (editando && !i.kit
-        ? <InputNumber size="small" min={0} prefix="R$" decimalSeparator="," value={linha(i).precoUnitario} style={{ width: 120 }} onChange={x => mudar(i, { precoUnitario: Number(x) || 0 })} />
+        ? <CampoDinheiro size="small" min={0} value={linha(i).precoUnitario} style={{ width: 120 }} onChange={x => mudar(i, { precoUnitario: Number(x) || 0 })} />
         : <Tooltip title={i.precoTabela !== i.precoUnitario ? `Tabela ${brl(i.precoTabela)}` : undefined}>{brl(i.precoUnitario)}</Tooltip>),
     },
     {
@@ -158,9 +157,9 @@ export const VendaCompletaDrawer: React.FC<{ idVenda: number | null; onFechar: (
                       {novos.length > 0 && (
                         <Table<ItemNovo & { k: number }> size="small" pagination={false} rowKey="k" dataSource={novos.map((n, k) => ({ ...n, k }))} columns={[
                           { title: 'Item incluído', render: (_, n) => <>{n.nome} <Tag color="green">novo</Tag><div><Text type="secondary" style={{ fontSize: 11 }}>{n.sku}</Text></div></> },
-                          { title: 'Qtd.', width: 140, align: 'right', render: (_, n) => <InputNumber size="small" min={0.0001} value={n.quantidade} style={{ width: 110 }} addonAfter={n.unidade || undefined}
+                          { title: 'Qtd.', width: 140, align: 'right', render: (_, n) => <CampoNumero size="small" min={0.0001} value={n.quantidade} style={{ width: 110 }} addonAfter={n.unidade || undefined}
                             onChange={x => setNovos(l => l.map((y, k) => (k === n.k ? { ...y, quantidade: Number(x) || 0 } : y)))} /> },
-                          { title: 'Preço', width: 140, align: 'right', render: (_, n) => <InputNumber size="small" min={0} prefix="R$" decimalSeparator="," value={n.precoUnitario} style={{ width: 120 }}
+                          { title: 'Preço', width: 140, align: 'right', render: (_, n) => <CampoDinheiro size="small" min={0} value={n.precoUnitario} style={{ width: 120 }}
                             onChange={x => setNovos(l => l.map((y, k) => (k === n.k ? { ...y, precoUnitario: Number(x) || 0 } : y)))} /> },
                           { title: 'Total', width: 110, align: 'right', render: (_, n) => brl(Math.round(n.quantidade * n.precoUnitario * 100) / 100) },
                           { title: '', width: 44, render: (_, n) => <Button size="small" type="text" danger icon={<DeleteOutlined />} onClick={() => setNovos(l => l.filter((_, k) => k !== n.k))} /> },
@@ -179,7 +178,7 @@ export const VendaCompletaDrawer: React.FC<{ idVenda: number | null; onFechar: (
                           <Segmented value={destino} onChange={x => setDestino(x as DestinoAjuste)}
                             options={(Object.keys(DESTINOS_AJUSTE) as DestinoAjuste[]).filter(d => previa.diferenca > 0 || d !== 'NOVA').map(d => ({ value: d, label: DESTINOS_AJUSTE[d] }))} />
                           {destino === 'NOVA' && previa.diferenca > 0 && (
-                            <DatePicker format="DD/MM/YYYY" placeholder="Vencimento" value={vencimentoNova ? dayjs(vencimentoNova) : null}
+                            <DatePicker format={FORMATOS_DATA} placeholder="Vencimento" value={vencimentoNova ? dayjs(vencimentoNova) : null}
                               onChange={d => setVencimentoNova(d ? d.format('YYYY-MM-DD') : null)} />
                           )}
                           {!abertas.length && destino !== 'NOVA' && previa.diferenca > 0 && <Text type="danger" style={{ fontSize: 12 }}>Nenhuma parcela em aberto: use "parcela nova".</Text>}

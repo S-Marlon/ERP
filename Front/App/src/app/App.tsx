@@ -4,9 +4,17 @@ import { ListaTrabalhoProvider } from '../shared/core/listaTrabalho/ListaTrabalh
 import { ConfiguracoesProvider } from '../shared/core/configuracoes/ConfiguracoesContext';
 import { NotificacoesProvider } from '../shared/core/notificacoes/NotificacoesContext';
 import AppLayout from './AppLayout';
+import { ConfigProvider } from 'antd';
+import ptBR from 'antd/locale/pt_BR';
+import dayjs from 'dayjs';
+import 'dayjs/locale/pt-br';
+
+// Sistema todo em português: calendário (meses, dias, "Hoje"), textos padrão dos componentes e datas do dayjs
+dayjs.locale('pt-br');
 
 export default function App() {
   return (
+    <ConfigProvider locale={ptBR}>
     <UIProvider>
       {/* Lista de trabalho global (etiquetar, comprar, conferir...): vale em todas as telas */}
       <ConfiguracoesProvider>
@@ -20,5 +28,6 @@ export default function App() {
         </NotificacoesProvider>
       </ConfiguracoesProvider>
     </UIProvider>
+    </ConfigProvider>
   );
 }

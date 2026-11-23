@@ -1,13 +1,12 @@
 // Financeiro › Fundos de reposição: dinheiro separado do capital de giro para recomprar itens caros (fios, bombas,
 // irrigação, rolamentos, óleos). Cada venda das categorias do fundo soma o custo; cada compra pela NF tira; ajustes à mão.
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  Alert, Button, Card, Col, DatePicker, Drawer, Empty, Flex, Input, InputNumber, Modal, Popconfirm, Progress, Row, Space, Statistic, Switch, Table, Tag,
-  Tooltip, TreeSelect, Typography, message,
-} from 'antd';
+import { Alert, Button, Card, Col, DatePicker, Drawer, Empty, Flex, Input, Modal, Popconfirm, Progress, Row, Space, Statistic, Switch, Table, Tag, Tooltip, TreeSelect, Typography, message } from 'antd';
 import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { DadosFundo, Fundo, ListaFundos, MovimentoFundo, reservasApi } from './reservasApi';
+import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
+import { FORMATOS_DATA } from '../../../shared/formularios/numeros';
 
 const { Text, Title } = Typography;
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -51,16 +50,16 @@ const ModalFundo: React.FC<{ aberto: Fundo | 'NOVO' | null; lista: ListaFundos; 
           }} />
         <Flex gap={8} wrap align="center">
           <Text style={{ width: 210 }}>Separar do custo vendido</Text>
-          <InputNumber min={1} max={300} suffix="%" value={Math.round(d.percentualCusto * 100)} onChange={v => setD({ ...d, percentualCusto: (Number(v) || 100) / 100 })} />
+          <CampoNumero min={1} max={300} suffix="%" value={Math.round(d.percentualCusto * 100)} onChange={v => setD({ ...d, percentualCusto: (Number(v) || 100) / 100 })} />
           <Text type="secondary" style={{ fontSize: 12 }}>100% = o custo; 110% cobre aumento do fornecedor</Text>
         </Flex>
         <Flex gap={8} wrap align="center">
           <Text style={{ width: 210 }}>Já separado hoje (saldo inicial)</Text>
-          <InputNumber prefix="R$" decimalSeparator="," style={{ width: 160 }} value={d.saldoInicial} onChange={v => setD({ ...d, saldoInicial: Number(v) || 0 })} />
+          <CampoDinheiro style={{ width: 160 }} value={d.saldoInicial} onChange={v => setD({ ...d, saldoInicial: Number(v) || 0 })} />
         </Flex>
         <Flex gap={8} wrap align="center">
           <Text style={{ width: 210 }}>Contar vendas e compras desde</Text>
-          <DatePicker format="DD/MM/YYYY" value={dayjs(d.dataInicio)} allowClear={false} onChange={v => v && setD({ ...d, dataInicio: v.format('YYYY-MM-DD') })} />
+          <DatePicker format={FORMATOS_DATA} value={dayjs(d.dataInicio)} allowClear={false} onChange={v => v && setD({ ...d, dataInicio: v.format('YYYY-MM-DD') })} />
         </Flex>
         <Alert type="info" showIcon title="Use a data de hoje e informe o que já está separado. Uma data antiga faz as compras de antes (como a carga inicial do estoque) saírem do fundo." />
         {aberto !== 'NOVO' && <Space><Switch checked={d.ativo} onChange={v => setD({ ...d, ativo: v })} /><Text>Ativo (entra no total separado)</Text></Space>}
@@ -91,8 +90,8 @@ const ExtratoFundo: React.FC<{ id: number | null; onFechar: () => void; onMudou:
           </Row>
           <Card size="small" title="Lançar ajuste">
             <Flex gap={8} wrap>
-              <DatePicker format="DD/MM/YYYY" value={dayjs(aj.data)} allowClear={false} onChange={v => v && setAj({ ...aj, data: v.format('YYYY-MM-DD') })} />
-              <InputNumber prefix="R$" decimalSeparator="," style={{ width: 150 }} placeholder="+ soma / − tira" value={aj.valor} onChange={v => setAj({ ...aj, valor: v === null ? null : Number(v) })} />
+              <DatePicker format={FORMATOS_DATA} value={dayjs(aj.data)} allowClear={false} onChange={v => v && setAj({ ...aj, data: v.format('YYYY-MM-DD') })} />
+              <CampoDinheiro style={{ width: 150 }} placeholder="+ soma / − tira" value={aj.valor} onChange={v => setAj({ ...aj, valor: v === null ? null : Number(v) })} />
               <Input style={{ flex: '1 1 240px' }} placeholder="Motivo (ex.: transferi para a conta reserva, usei para pagar o aluguel)" maxLength={150} value={aj.motivo} onChange={e => setAj({ ...aj, motivo: e.target.value })} />
               <Button type="primary" icon={<PlusOutlined />} disabled={!aj.valor || !aj.motivo.trim()} onClick={lancar}>Lançar</Button>
             </Flex>

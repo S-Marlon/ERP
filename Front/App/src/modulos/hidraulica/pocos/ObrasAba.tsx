@@ -2,10 +2,7 @@
 // cadastrado, novo ou criado ao concluir a perfuração), a obra aberta com a situação e o relatório técnico gravando nela,
 // a ficha dos poços e os clientes de poço. "Ver no mapa" leva à aba do mapa (etapa 2) já no ponto.
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  Alert, Button, Card, Checkbox, Col, Descriptions, Empty, Flex, Form, Input, InputNumber, Modal, Popconfirm, Row, Segmented, Select, Space, Statistic, Steps, Switch, Table, Tag, Tooltip,
-  Typography, message,
-} from 'antd';
+import { Alert, Button, Card, Checkbox, Col, Descriptions, Empty, Flex, Form, Input, Modal, Popconfirm, Row, Segmented, Select, Space, Statistic, Steps, Switch, Table, Tag, Tooltip, Typography, message } from 'antd';
 import {
   AimOutlined, ArrowRightOutlined, CalculatorOutlined, CalendarOutlined, CheckCircleOutlined, EditOutlined, EnvironmentOutlined, PlusOutlined, ReloadOutlined,
   ToolOutlined, UserOutlined,
@@ -26,6 +23,7 @@ import { OrcamentoEContrato, OrcamentoRapido } from './OrcamentoContrato';
 import { lerGpsTexto, textoRaio } from './mapaRegional';
 import { abrirFichaCliente, abrirFichaPoco, agendarObra, ParteObra, useNavPocos, useNivelPocos, verNoMapa, VistaObras } from './navPocos';
 import { DestinoPasso, parteDaSituacao, proximoPasso, rotuloDestino } from './proximoPasso';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 const brl = (v: number | null | undefined) => (v === null || v === undefined ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
@@ -86,7 +84,7 @@ const PocoModal: React.FC<{ poco: Poco | 'novo' | null; onFechar: () => void; on
   }, [poco]);
   const mudar = (x: Partial<PocoForm>) => setP(a => ({ ...a, ...x }));
   const num = (k: 'profundidadeM' | 'vazaoLh' | 'nivelEstaticoM' | 'nivelDinamicoM', suf: string) => (
-    <InputNumber min={0} style={{ width: '100%' }} suffix={suf} decimalSeparator="," value={p[k] ?? undefined} onChange={v => mudar({ [k]: v === null ? null : Number(v) } as any)} />
+    <CampoNumero min={0} style={{ width: '100%' }} suffix={suf} value={p[k] ?? undefined} onChange={v => mudar({ [k]: v === null ? null : Number(v) } as any)} />
   );
   const salvar = async () => {
     try {
@@ -218,7 +216,7 @@ const ObraModal: React.FC<{ obra: Obra | 'nova' | null; onFechar: () => void; on
     } catch (e) { message.error(e instanceof Error ? e.message : 'Erro.'); }
   };
   const num = (k: 'metrosPrevistos' | 'valorContratado' | 'valorParcelado' | 'valorMetroExcedente' | 'garantiaMeses' | 'valorSinal', props: object) => (
-    <InputNumber min={0} style={{ width: '100%' }} decimalSeparator="," value={f[k] ?? undefined} onChange={v => mudar({ [k]: v === null ? null : Number(v) } as any)} {...props} />
+    <CampoNumero min={0} style={{ width: '100%' }} value={f[k] ?? undefined} onChange={v => mudar({ [k]: v === null ? null : Number(v) } as any)} {...props} />
   );
   return (
     <Modal open={!!obra} title={obra === 'nova' ? 'Nova obra' : `Obra ${obra && (obra as Obra).idObra}`} okText={obra === 'nova' ? 'Criar obra' : 'Salvar'} cancelText="Voltar"
@@ -292,11 +290,11 @@ const ObraModal: React.FC<{ obra: Obra | 'nova' | null; onFechar: () => void; on
         </div>
         <Row gutter={8}>
           <Col span={6}><Text>Prazo de execução</Text>
-            <InputNumber min={1} max={365} suffix="dias" style={{ width: '100%' }} value={f.prazoExecucaoDias ?? undefined} onChange={v => mudar({ prazoExecucaoDias: v === null ? null : Number(v) })} />
+            <CampoNumero min={1} max={365} suffix="dias" style={{ width: '100%' }} value={f.prazoExecucaoDias ?? undefined} onChange={v => mudar({ prazoExecucaoDias: v === null ? null : Number(v) })} />
           </Col>
           <Col span={12}><Text>Forma de pagamento</Text><Input maxLength={255} value={f.formaPagamento || ''} onChange={e => mudar({ formaPagamento: e.target.value || null })} placeholder="Vazio = a padrão da configuração" /></Col>
           <Col span={6}><Text>Validade</Text>
-            <InputNumber min={1} max={365} suffix="dias" placeholder="padrão" style={{ width: '100%' }} value={f.validadeOrcamentoDias ?? undefined} onChange={v => mudar({ validadeOrcamentoDias: v === null ? null : Number(v) })} />
+            <CampoNumero min={1} max={365} suffix="dias" placeholder="padrão" style={{ width: '100%' }} value={f.validadeOrcamentoDias ?? undefined} onChange={v => mudar({ validadeOrcamentoDias: v === null ? null : Number(v) })} />
           </Col>
         </Row>
         {obra === 'nova' && <Text type="secondary" style={{ fontSize: 12 }}>A obra começa como orçamento, com o relatório técnico já preenchido com o cliente, o poço e os valores.</Text>}

@@ -1,7 +1,7 @@
 // Entrada sem nota (compra avulsa): o operador digita os itens; vira um XML interno e segue o fluxo da entrada de NF.
 // Só a entrada sem nota tem lista editável — nota com XML de verdade não se edita.
 import React, { useEffect, useState } from 'react';
-import { Alert, Button, DatePicker, Descriptions, Divider, Flex, Form, Input, InputNumber, Modal, Select, Tooltip, Typography, message, theme } from 'antd';
+import { Alert, Button, DatePicker, Descriptions, Divider, Flex, Form, Input, Modal, Select, Tooltip, Typography, message, theme } from 'antd';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import { createSupplier, getFornecedores, FornecedorLista } from '../../../parceiros/fornecedores/fornecedores.api';
@@ -9,6 +9,8 @@ import SeletorUnidade from '../../../catalogo/unidades/SeletorUnidade';
 import {
   CNPJ_COMPRA_AVULSA, DadosSemNota, ItemSemNota, NOME_COMPRA_AVULSA, alteracoesDaLista, montarXmlSemNota, validarSemNota,
 } from './entradaSemNota';
+import { CampoDinheiro, CampoNumero } from '../../../../shared/formularios/CamposNumero';
+import { FORMATOS_DATA } from '../../../../shared/formularios/numeros';
 
 const brl = (v: number) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const cnpjFmt = (c: string) => (c === CNPJ_COMPRA_AVULSA ? 'sem fornecedor' : c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5'));
@@ -125,7 +127,7 @@ export const EntradaSemNotaModal: React.FC<Props> = ({ open, onClose, onGerar, b
               ]} />
             </Form.Item>
             <Form.Item name="data" label="Data da compra" rules={[{ required: true, message: 'Informe a data' }]} style={{ flex: '0 1 160px', marginBottom: 8 }}>
-              <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} disabledDate={d => d.isAfter(dayjs(), 'day')} />
+              <DatePicker format={FORMATOS_DATA} style={{ width: '100%' }} disabledDate={d => d.isAfter(dayjs(), 'day')} />
             </Form.Item>
             <Form.Item name="observacao" label="Observação" style={{ flex: '2 1 240px', marginBottom: 8 }}>
               <Input maxLength={200} placeholder="Ex.: loja, recibo nº, quem comprou" />
@@ -144,7 +146,7 @@ export const EntradaSemNotaModal: React.FC<Props> = ({ open, onClose, onGerar, b
                 return (
                   <Flex key={key} gap={6} wrap align="flex-start"
                     style={{ padding: 8, borderRadius: token.borderRadius, background: nova ? token.colorSuccessBg : token.colorFillQuaternary }}>
-                    <Form.Item name={[name, 'nItem']} hidden><InputNumber /></Form.Item>
+                    <Form.Item name={[name, 'nItem']} hidden><CampoNumero /></Form.Item>
                     <Tooltip title={nova ? 'Item novo' : `Linha ${linha?.nItem ?? n + 1}`}>
                       <Typography.Text type="secondary" style={{ width: 24, paddingTop: 5 }}>{nova ? '+' : (linha?.nItem ?? n + 1)}</Typography.Text>
                     </Tooltip>
@@ -152,13 +154,13 @@ export const EntradaSemNotaModal: React.FC<Props> = ({ open, onClose, onGerar, b
                       <Input placeholder="Descrição do item" maxLength={120} />
                     </Form.Item>
                     <Form.Item name={[name, 'quantidade']} rules={[{ required: true, message: 'Qtd' }]} style={{ flex: '0 0 90px', margin: 0 }}>
-                      <InputNumber placeholder="Qtd" min={0.0001} decimalSeparator="," style={{ width: '100%' }} />
+                      <CampoNumero placeholder="Qtd" min={0.0001} style={{ width: '100%' }} />
                     </Form.Item>
                     <Form.Item name={[name, 'unidade']} rules={[{ required: true, message: 'Un' }]} style={{ flex: '0 0 130px', margin: 0 }}>
                       <SeletorUnidade placeholder="Un" style={{ width: '100%' }} />
                     </Form.Item>
                     <Form.Item name={[name, 'custoUnitario']} rules={[{ required: true, message: 'Custo' }]} style={{ flex: '0 0 130px', margin: 0 }}>
-                      <InputNumber placeholder="Custo unit." prefix="R$" min={0} precision={2} decimalSeparator="," style={{ width: '100%' }} />
+                      <CampoDinheiro placeholder="Custo unit." min={0} precision={2} style={{ width: '100%' }} />
                     </Form.Item>
                     <Tooltip title="Código do produto (opcional): se você já usa um código, ele ajuda a reconhecer o item nas próximas compras">
                       <Form.Item name={[name, 'codigo']} style={{ flex: '1 1 100px', margin: 0 }}>
@@ -187,10 +189,10 @@ export const EntradaSemNotaModal: React.FC<Props> = ({ open, onClose, onGerar, b
 
         <Flex gap={12} wrap justify="flex-end" align="flex-end" style={{ marginTop: 12 }}>
           <Form.Item name="frete" label="Frete pago" style={{ width: 150, marginBottom: 0 }}>
-            <InputNumber prefix="R$" min={0} precision={2} decimalSeparator="," style={{ width: '100%' }} />
+            <CampoDinheiro min={0} precision={2} style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="desconto" label="Desconto" style={{ width: 150, marginBottom: 0 }}>
-            <InputNumber prefix="R$" min={0} precision={2} decimalSeparator="," style={{ width: '100%' }} />
+            <CampoDinheiro min={0} precision={2} style={{ width: '100%' }} />
           </Form.Item>
           <Flex vertical align="flex-end" style={{ minWidth: 180 }}>
             <Typography.Text type="secondary">{itens.length} item(ns) · produtos {brl(totalProdutos)}</Typography.Text>

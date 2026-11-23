@@ -2,11 +2,12 @@
 // no ML: tarifa, frete, você recebe, custo, lucro, % sobre o custo, preço para o alvo, situação e degraus de preço.
 // As colunas acompanham o rascunho: mudou o preço, a linha recalcula.
 import React, { useEffect, useState } from 'react';
-import { Button, Card, InputNumber, Space, Spin, Table, Tag, Tooltip, Typography } from 'antd';
+import { Button, Card, Space, Spin, Table, Tag, Tooltip, Typography } from 'antd';
 import { LineChartOutlined, RollbackOutlined } from '@ant-design/icons';
 import { AnuncioDetalhe, anunciosApi, FinanceiroItem, formatarMoeda, ItemDoAnuncio, ROTULO_STATUS_ML } from '../mercadoLivreApi';
 import { colunasLucro } from '../colunasLucro';
 import type { RascunhoItem } from '../rascunhoAnuncio';
+import { CampoDinheiro } from '../../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 
@@ -100,8 +101,8 @@ const TabelaPrecos: React.FC<Props> = ({ salvo, det, rascunhoItens, onMudarPreco
             width: 150, sorter: (a, b) => (a.precoMl ?? a.precoAnuncio) - (b.precoMl ?? b.precoAnuncio),
             render: (_, i) => (
               <div style={{ lineHeight: 1.3 }}>
-                <InputNumber
-                  size="small" style={{ width: '100%' }} min={0.01} step={0.01} precision={2} decimalSeparator="," prefix="R$"
+                <CampoDinheiro
+                  size="small" style={{ width: '100%' }} min={0.01} step={0.01} precision={2}
                   value={i.precoMl ?? i.precoAnuncio}
                   onChange={v => onMudarPreco(i.idLinha, v === null ? null : Number(v))}
                 />

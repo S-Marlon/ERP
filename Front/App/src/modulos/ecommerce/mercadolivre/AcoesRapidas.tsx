@@ -1,11 +1,12 @@
 // Ações rápidas da lista de anúncios: preço na linha (confirma com ✓), estoque que vai ao ML (reserva e teto) e
 // ativo/pausado no ML. Cada uma grava na hora e já manda ao Mercado Livre.
 import React, { useEffect, useState } from 'react';
-import { Button, Flex, InputNumber, Popover, Space, Spin, Switch, Tooltip, Typography } from 'antd';
+import { Button, Flex, Popover, Space, Spin, Switch, Tooltip, Typography } from 'antd';
 import { AimOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import { anunciosApi, FinanceiroItem, foraDoMl, formatarMoeda, PrevisaoPreco } from './mercadoLivreApi';
 import { precoComercial } from './listaAnuncios';
 import { AlertasPreco } from './colunasLucro';
+import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 
@@ -80,8 +81,8 @@ export const PrecoRapido: React.FC<{
     <div style={{ lineHeight: 1.3 }}>
       <Space.Compact size="small" style={{ width: mudou ? 172 : 112 }}>
         <Tooltip title={proprio ? 'Preço só do ML' : 'Preço do ERP com o ajuste do anúncio. Mudar aqui grava um preço só do ML.'}>
-          <InputNumber
-            size="small" prefix="R$" min={0.01} step={0.5} precision={2} decimalSeparator="," value={v} onChange={setV} style={{ width: 112 }}
+          <CampoDinheiro
+            size="small" min={0.01} step={0.5} precision={2} value={v} onChange={setV} style={{ width: 112 }}
             onPressEnter={confirmar} onKeyDown={e => { if (e.key === 'Escape') setV(valor); }}
           />
         </Tooltip>
@@ -120,11 +121,11 @@ export const EstoqueRapido: React.FC<{
           <Flex gap={8}>
             <div style={{ flex: 1 }}>
               <Text style={{ fontSize: 12 }}>Reserva da loja</Text>
-              <InputNumber style={{ width: '100%' }} min={0} precision={0} value={r} onChange={setR} />
+              <CampoNumero style={{ width: '100%' }} min={0} precision={0} value={r} onChange={setR} />
             </div>
             <div style={{ flex: 1 }}>
               <Text style={{ fontSize: 12 }}>Teto no ML</Text>
-              <InputNumber style={{ width: '100%' }} min={0} precision={0} value={m} onChange={setM} placeholder="sem teto" />
+              <CampoNumero style={{ width: '100%' }} min={0} precision={0} value={m} onChange={setM} placeholder="sem teto" />
             </div>
           </Flex>
           <Flex justify="end" gap={8}>

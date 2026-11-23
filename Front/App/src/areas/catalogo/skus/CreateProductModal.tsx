@@ -2,9 +2,7 @@
 // classificados e com preço, e a compra entra pela entrada de NF (staging) — estoque e custo entram na aprovação.
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Button, Collapse, DatePicker, Divider, Flex, Form, Input, InputNumber, Modal, Select, Tag, Typography, message, theme,
-} from 'antd';
+import { Button, Collapse, DatePicker, Divider, Flex, Form, Input, Modal, Select, Tag, Typography, message, theme } from 'antd';
 import type { FormInstance } from 'antd';
 import { DeleteOutlined, PlusOutlined, ShoppingCartOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
@@ -17,6 +15,8 @@ import type { MappingPayload } from '../../compras/entradaNf/itens/ProductMappin
 import { createSupplier, getFornecedores, FornecedorLista } from '../../parceiros/fornecedores/fornecedores.api';
 import { fatorTaxaPreco } from '../../../shared/core/precos/taxaPreco';
 import SeletorUnidade from '../unidades/SeletorUnidade';
+import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
+import { FORMATOS_DATA } from '../../../shared/formularios/numeros';
 
 const brl = (v: number) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const MARKUP_PADRAO = 1.8;
@@ -93,23 +93,23 @@ const CamposItem: React.FC<{ form: FormInstance<Valores>; nome: number }> = ({ f
 
       <Flex gap={12} wrap align="flex-end">
         <Form.Item name={[nome, 'quantidade']} label="Quantidade" rules={[{ required: true, message: 'Quantidade' }]} style={{ flex: '1 1 110px' }}>
-          <InputNumber min={0.0001} decimalSeparator="," style={{ width: '100%' }} />
+          <CampoNumero min={0.0001} style={{ width: '100%' }} />
         </Form.Item>
         <Form.Item name={[nome, 'unidade']} label="Unidade" rules={[{ required: true, message: 'Unidade' }]} style={{ flex: '0 1 100px' }}>
           <SeletorUnidade style={{ width: '100%' }} />
         </Form.Item>
         <Form.Item name={[nome, 'custoUnitario']} label="Custo unitário" rules={[{ required: true, message: 'Custo' }]} style={{ flex: '1 1 130px' }}>
-          <InputNumber prefix="R$" min={0} precision={2} decimalSeparator="," style={{ width: '100%' }}
+          <CampoDinheiro min={0} precision={2} style={{ width: '100%' }}
             onChange={c => definir('precoVenda', c ? precoDoMarkup(Number(c), Number(item.markup) || MARKUP_PADRAO) : undefined)} />
         </Form.Item>
         {vendavel && (
           <>
             <Form.Item name={[nome, 'markup']} label="Markup" style={{ flex: '0 1 120px' }}>
-              <InputNumber min={0.01} step={0.1} precision={4} decimalSeparator="," suffix="×" style={{ width: '100%' }}
+              <CampoNumero min={0.01} step={0.1} precision={4} suffix="×" style={{ width: '100%' }}
                 onChange={m => definir('precoVenda', m && custo ? precoDoMarkup(custo, Number(m)) : undefined)} />
             </Form.Item>
             <Form.Item name={[nome, 'precoVenda']} label="Preço de venda" style={{ flex: '1 1 140px' }}>
-              <InputNumber prefix="R$" min={0} precision={2} decimalSeparator="," style={{ width: '100%' }}
+              <CampoDinheiro min={0} precision={2} style={{ width: '100%' }}
                 onChange={p => { if (p && custo > 0) definir('markup', Math.round((Number(p) / (custo * fatorTaxaPreco())) * 10000) / 10000); }} />
             </Form.Item>
           </>
@@ -220,7 +220,7 @@ export default function CreateProductModal({ open, onClose }: CreateProductModal
             ]} />
           </Form.Item>
           <Form.Item name="data" label="Data da compra" rules={[{ required: true, message: 'Informe a data' }]} style={{ flex: '0 1 150px' }}>
-            <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} disabledDate={d => d.isAfter(dayjs(), 'day')} />
+            <DatePicker format={FORMATOS_DATA} style={{ width: '100%' }} disabledDate={d => d.isAfter(dayjs(), 'day')} />
           </Form.Item>
           <Form.Item name="observacao" label="Observação" style={{ flex: '2 1 220px' }}>
             <Input maxLength={200} placeholder="Ex.: loja, recibo nº, quem comprou" />
@@ -274,10 +274,10 @@ export default function CreateProductModal({ open, onClose }: CreateProductModal
         <Flex gap={12} wrap justify="flex-end" align="flex-end"
           style={{ marginTop: 12, padding: '10px 12px', borderRadius: token.borderRadiusLG, background: token.colorFillQuaternary }}>
           <Form.Item name="frete" label="Frete pago" tooltip="Dividido entre os itens: entra no custo" style={{ width: 140, marginBottom: 0 }}>
-            <InputNumber prefix="R$" min={0} precision={2} decimalSeparator="," style={{ width: '100%' }} />
+            <CampoDinheiro min={0} precision={2} style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="desconto" label="Desconto" style={{ width: 140, marginBottom: 0 }}>
-            <InputNumber prefix="R$" min={0} precision={2} decimalSeparator="," style={{ width: '100%' }} />
+            <CampoDinheiro min={0} precision={2} style={{ width: '100%' }} />
           </Form.Item>
           <Flex vertical align="flex-end" style={{ minWidth: 190 }}>
             <Typography.Text type="secondary">{itens.length} item(ns) · produtos {brl(totalProdutos)}</Typography.Text>

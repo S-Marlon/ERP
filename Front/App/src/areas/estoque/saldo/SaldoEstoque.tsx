@@ -1,8 +1,6 @@
 // Consulta de saldo (modelo novo): saldos por item, extrato, ajuste avulso e inventário em lote.
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  Button, Card, Col, Drawer, Dropdown, Input, InputNumber, Modal, Radio, Row, Segmented, Select, Space, Statistic, Switch, Table, Tag, Tooltip, message,
-} from 'antd';
+import { Button, Card, Col, Drawer, Dropdown, Input, Modal, Radio, Row, Segmented, Select, Space, Statistic, Switch, Table, Tag, Tooltip, message } from 'antd';
 import {
   AuditOutlined, EnvironmentOutlined, FireOutlined, HistoryOutlined, PlusSquareOutlined, ReloadOutlined, SettingOutlined, SlidersOutlined,
   SwapOutlined, UnorderedListOutlined,
@@ -15,6 +13,7 @@ import {
   AjusteItem, Deposito, DEPOSITOS_ESTOQUE, getCategoriasEstoque, getMovimentos, getSaldos, lancarAjuste, Movimento, ORIGENS_MOVIMENTO,
   ResumoSaldos, ROTULO_SITUACAO, SaldoItem, salvarParametrosEstoque, TipoAjuste, transferirEstoque,
 } from '../api/estoqueItensApi';
+import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const money = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const qtd = (v: number) => Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 4 });
@@ -356,7 +355,7 @@ const SaldoEstoque: React.FC = () => {
       base.push({
         title: 'Contado', key: 'contado', width: 130, fixed: 'right' as const,
         render: (_: unknown, i: SaldoItem) => (
-          <InputNumber
+          <CampoNumero
             size="small"
             min={0}
             style={{ width: '100%' }}
@@ -543,12 +542,12 @@ const SaldoEstoque: React.FC = () => {
             <Space wrap>
               <div>
                 <div style={{ fontSize: 12, color: '#475569' }}>Estoque mínimo</div>
-                <InputNumber min={0} value={parametros.minimo} placeholder={itemParametros.minimoFamilia !== null ? `família: ${qtd(itemParametros.minimoFamilia)}` : 'sem mínimo'}
+                <CampoNumero min={0} value={parametros.minimo} placeholder={itemParametros.minimoFamilia !== null ? `família: ${qtd(itemParametros.minimoFamilia)}` : 'sem mínimo'}
                   onChange={v => setParametros(p => ({ ...p, minimo: v === null ? null : Number(v) }))} addonAfter={itemParametros.unidade || undefined} />
               </div>
               <div>
                 <div style={{ fontSize: 12, color: '#475569' }}>Estoque máximo</div>
-                <InputNumber min={0} value={parametros.maximo} placeholder="sem máximo"
+                <CampoNumero min={0} value={parametros.maximo} placeholder="sem máximo"
                   onChange={v => setParametros(p => ({ ...p, maximo: v === null ? null : Number(v) }))} addonAfter={itemParametros.unidade || undefined} />
               </div>
             </Space>
@@ -585,7 +584,7 @@ const SaldoEstoque: React.FC = () => {
               </div>
               <div>
                 <div style={{ fontSize: 12, color: '#475569' }}>Quantidade</div>
-                <InputNumber min={0} max={itemTransferir.quantidade} value={transf.quantidade}
+                <CampoNumero min={0} max={itemTransferir.quantidade} value={transf.quantidade}
                   onChange={v => setTransf(t => ({ ...t, quantidade: v === null ? null : Number(v) }))} addonAfter={itemTransferir.unidade || undefined} />
               </div>
             </Space>
@@ -611,7 +610,7 @@ const SaldoEstoque: React.FC = () => {
               {itemConsumo.nome}<br />
               No almoxarifado: <b>{qtd(itemConsumo.quantidade)} {itemConsumo.unidade}</b>
             </div>
-            <InputNumber min={0} max={itemConsumo.quantidade} value={consumo.quantidade} placeholder="Quantidade usada"
+            <CampoNumero min={0} max={itemConsumo.quantidade} value={consumo.quantidade} placeholder="Quantidade usada"
               onChange={v => setConsumo(c => ({ ...c, quantidade: v === null ? null : Number(v) }))} addonAfter={itemConsumo.unidade || undefined} />
             <Input.TextArea rows={2} placeholder="Onde / para que foi usado (obrigatório)" value={consumo.motivo}
               onChange={e => setConsumo(c => ({ ...c, motivo: e.target.value }))} />
@@ -648,12 +647,12 @@ const SaldoEstoque: React.FC = () => {
             <Space wrap>
               <div>
                 <div style={{ fontSize: 12, color: '#475569' }}>{ajuste.tipo === 'CONTAGEM' ? 'Quantidade contada' : 'Quantidade'}</div>
-                <InputNumber min={0} value={ajuste.quantidade} onChange={v => setAjuste(a => ({ ...a, quantidade: v === null ? null : Number(v) }))} addonAfter={itemAjuste.unidade || undefined} />
+                <CampoNumero min={0} value={ajuste.quantidade} onChange={v => setAjuste(a => ({ ...a, quantidade: v === null ? null : Number(v) }))} addonAfter={itemAjuste.unidade || undefined} />
               </div>
               {ajuste.tipo === 'ENTRADA' && (
                 <div>
                   <div style={{ fontSize: 12, color: '#475569' }}>Custo unitário (opcional)</div>
-                  <InputNumber min={0} step={0.01} value={ajuste.custo} onChange={v => setAjuste(a => ({ ...a, custo: v === null ? null : Number(v) }))} placeholder="custo médio" prefix="R$" />
+                  <CampoDinheiro min={0} step={0.01} value={ajuste.custo} onChange={v => setAjuste(a => ({ ...a, custo: v === null ? null : Number(v) }))} placeholder="custo médio" />
                 </div>
               )}
             </Space>

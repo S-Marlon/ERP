@@ -2,10 +2,7 @@
 // saldo à vista; o conferente marca ✓ ou escreve a contagem, assina e anota a hora; aqui se lança (só o que mudou) e o
 // estoque é ajustado pela diferença em relação ao saldo daquela hora. Divergência grande pede a senha de autorização.
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  Alert, AutoComplete, Button, Card, Col, DatePicker, Drawer, Empty, Flex, Input, InputNumber, Modal, Popconfirm, Row, Select, Space, Statistic,
-  Switch, Table, Tabs, Tag, Tooltip, TreeSelect, Typography, message,
-} from 'antd';
+import { Alert, AutoComplete, Button, Card, Col, DatePicker, Drawer, Empty, Flex, Input, Modal, Popconfirm, Row, Select, Space, Statistic, Switch, Table, Tabs, Tag, Tooltip, TreeSelect, Typography, message } from 'antd';
 import { CheckOutlined, DeleteOutlined, PlusOutlined, PrinterOutlined, ReloadOutlined, SaveOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { imprimirHtml } from '../../../shared/core/impressao/saida';
@@ -13,6 +10,7 @@ import { getSaldos } from '../api/estoqueItensApi';
 import {
   AreaInventario, ConfigInventario, ErroInventario, htmlFolha, inventarioApi, ListaHistorico, ListaInventario, PainelInventario, ROTULO_MOTIVO,
 } from './inventarioApi';
+import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text, Title } = Typography;
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -108,7 +106,7 @@ const LancarLista: React.FC<{ id: number | null; onFechar: () => void; onLancado
               {
                 title: 'Contado', key: 'c', width: 190, render: (_, i) => lancada ? <b>{qtd(i.contado)}</b> : (
                   <Space size={4}>
-                    <InputNumber size="small" min={0} style={{ width: 96 }} decimalSeparator="," disabled={naoContados[i.idItem]}
+                    <CampoNumero size="small" min={0} style={{ width: 96 }} disabled={naoContados[i.idItem]}
                       value={contados[i.idItem] ?? null} onChange={v => setContados({ ...contados, [i.idItem]: v === null ? null : Number(v) })} />
                     <Button size="small" type={naoContados[i.idItem] ? 'primary' : 'text'} onClick={() => setNaoContados({ ...naoContados, [i.idItem]: !naoContados[i.idItem] })}>
                       não contou</Button>
@@ -164,7 +162,7 @@ const AbaAreas: React.FC<{ p: PainelInventario; onMudou: () => void }> = ({ p, o
         return (
           <Card key={orig.id} size="small" title={<Space>
             <Input value={a.nome} maxLength={80} style={{ width: 300 }} onChange={e => mudar({ nome: e.target.value })} />
-            <Tooltip title="Ordem no percurso da loja"><InputNumber value={a.ordem} style={{ width: 80 }} prefix="#" onChange={v => mudar({ ordem: Number(v) || 0 })} /></Tooltip>
+            <Tooltip title="Ordem no percurso da loja"><CampoNumero value={a.ordem} style={{ width: 80 }} prefix="#" onChange={v => mudar({ ordem: Number(v) || 0 })} /></Tooltip>
             <Switch checked={a.contar} checkedChildren="conta" unCheckedChildren="não conta" onChange={v => mudar({ contar: v })} />
           </Space>} extra={<Space>
             {mudou && <Button type="primary" size="small" icon={<SaveOutlined />} onClick={() => salvar(a)}>Salvar</Button>}
@@ -333,18 +331,18 @@ const InventarioRotativo: React.FC = () => {
               <Card size="small" style={{ maxWidth: 640 }}>
                 <Space direction="vertical" style={{ width: '100%' }}>
                   <Flex gap={8} align="center"><Text style={{ width: 260 }}>Itens por lista</Text>
-                    <InputNumber min={1} max={200} value={cfg.itensPorDia} onChange={v => setCfg({ ...cfg, itensPorDia: Number(v) || 1 })} /></Flex>
+                    <CampoNumero min={1} max={200} value={cfg.itensPorDia} onChange={v => setCfg({ ...cfg, itensPorDia: Number(v) || 1 })} /></Flex>
                   <Flex gap={8} align="center"><Text style={{ width: 260 }}>Divergência que pede senha (R$)</Text>
-                    <InputNumber min={0} prefix="R$" decimalSeparator="," value={cfg.limiteDivergenciaValor} onChange={v => setCfg({ ...cfg, limiteDivergenciaValor: Number(v) || 0 })} /></Flex>
+                    <CampoDinheiro min={0} value={cfg.limiteDivergenciaValor} onChange={v => setCfg({ ...cfg, limiteDivergenciaValor: Number(v) || 0 })} /></Flex>
                   <Flex gap={8} align="center"><Text style={{ width: 260 }}>Ou acima de (% do saldo)</Text>
-                    <InputNumber min={0} max={100} suffix="%" value={Math.round(cfg.limiteDivergenciaPct * 100)} onChange={v => setCfg({ ...cfg, limiteDivergenciaPct: (Number(v) || 0) / 100 })} /></Flex>
+                    <CampoNumero min={0} max={100} suffix="%" value={Math.round(cfg.limiteDivergenciaPct * 100)} onChange={v => setCfg({ ...cfg, limiteDivergenciaPct: (Number(v) || 0) / 100 })} /></Flex>
                   <Text type="secondary" style={{ fontSize: 12 }}>O % só vale com diferença de pelo menos 20% do limite em R$ (para não pedir senha por centavos).</Text>
                   <Flex gap={8} align="center"><Text style={{ width: 260 }}>Recontar curva A (mais vendidos) a cada</Text>
-                    <InputNumber min={1} suffix="dias" value={cfg.diasCurvaA} onChange={v => setCfg({ ...cfg, diasCurvaA: Number(v) || 1 })} /></Flex>
+                    <CampoNumero min={1} suffix="dias" value={cfg.diasCurvaA} onChange={v => setCfg({ ...cfg, diasCurvaA: Number(v) || 1 })} /></Flex>
                   <Flex gap={8} align="center"><Text style={{ width: 260 }}>Curva B a cada</Text>
-                    <InputNumber min={1} suffix="dias" value={cfg.diasCurvaB} onChange={v => setCfg({ ...cfg, diasCurvaB: Number(v) || 1 })} /></Flex>
+                    <CampoNumero min={1} suffix="dias" value={cfg.diasCurvaB} onChange={v => setCfg({ ...cfg, diasCurvaB: Number(v) || 1 })} /></Flex>
                   <Flex gap={8} align="center"><Text style={{ width: 260 }}>Curva C a cada</Text>
-                    <InputNumber min={1} suffix="dias" value={cfg.diasCurvaC} onChange={v => setCfg({ ...cfg, diasCurvaC: Number(v) || 1 })} /></Flex>
+                    <CampoNumero min={1} suffix="dias" value={cfg.diasCurvaC} onChange={v => setCfg({ ...cfg, diasCurvaC: Number(v) || 1 })} /></Flex>
                   <Button type="primary" icon={<SaveOutlined />} style={{ width: 'fit-content' }}
                     onClick={() => inventarioApi.salvarConfig(cfg).then(() => { message.success('Configuração salva.'); carregar(); }).catch(e => message.error(e.message))}>Salvar</Button>
                 </Space>

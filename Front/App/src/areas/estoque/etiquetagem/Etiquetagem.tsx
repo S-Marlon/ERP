@@ -2,9 +2,7 @@
 // Saídas: PRN para a térmica Elgin (a etiqueta vai como imagem: sai igual à pré-visualização) ou impressão pelo
 // navegador (qualquer impressora / PDF), com código de barras real.
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  AutoComplete, Button, Card, Checkbox, Col, Collapse, Empty, Input, InputNumber, Modal, Row, Segmented, Select, Slider, Space, Switch, Table, Tag, Tooltip, message,
-} from 'antd';
+import { AutoComplete, Button, Card, Checkbox, Col, Collapse, Empty, Input, Modal, Row, Segmented, Select, Slider, Space, Switch, Table, Tag, Tooltip, message } from 'antd';
 import { CheckOutlined, DeleteOutlined, FileImageOutlined, DownloadOutlined, PrinterOutlined, SettingOutlined, TagsOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { useListaTrabalho } from '../../../shared/core/listaTrabalho/ListaTrabalhoContext';
 import { ListaTrabalhoDrawer } from '../../../shared/core/listaTrabalho/ListaTrabalhoDrawer';
@@ -21,6 +19,7 @@ import {
 } from '../api/etiquetasApi';
 import { operadorAtual } from '../../vendas/caixa/caixaApi';
 import CartazesAtacado from './CartazesAtacado';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const money = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -372,7 +371,7 @@ const Etiquetagem: React.FC = () => {
                   {
                     title: 'Cópias', key: 'copias', width: 90,
                     render: (_, i) => (
-                      <InputNumber size="small" min={1} max={999} style={{ width: '100%' }} value={i.etiqueta?.copias || 1}
+                      <CampoNumero size="small" min={1} max={999} style={{ width: '100%' }} value={i.etiqueta?.copias || 1}
                         onChange={v => atualizarEtiqueta(i, { copias: Math.max(1, Number(v) || 1) })} />
                     ),
                   },
@@ -447,31 +446,31 @@ const Etiquetagem: React.FC = () => {
                         <Col span={12}>
                           <Tooltip title="+ empurra para a direita, − para a esquerda">
                             <div style={{ fontSize: 12 }}>Posição horizontal (mm)</div>
-                            <InputNumber size="small" step={0.5} min={-20} max={20} style={{ width: '100%' }} value={perfil.deslocXmm} onChange={v => ajustar({ deslocXmm: Number(v) || 0 })} />
+                            <CampoNumero size="small" step={0.5} min={-20} max={20} style={{ width: '100%' }} value={perfil.deslocXmm} onChange={v => ajustar({ deslocXmm: Number(v) || 0 })} />
                           </Tooltip>
                         </Col>
                         <Col span={12}>
                           <Tooltip title="+ desce, − sobe">
                             <div style={{ fontSize: 12 }}>Posição vertical (mm)</div>
-                            <InputNumber size="small" step={0.5} min={-20} max={20} style={{ width: '100%' }} value={perfil.deslocYmm} onChange={v => ajustar({ deslocYmm: Number(v) || 0 })} />
+                            <CampoNumero size="small" step={0.5} min={-20} max={20} style={{ width: '100%' }} value={perfil.deslocYmm} onChange={v => ajustar({ deslocYmm: Number(v) || 0 })} />
                           </Tooltip>
                         </Col>
                       </Row>
                       <Row gutter={8}>
                         <Col span={8}>
                           <div style={{ fontSize: 12 }}>Altura (mm)</div>
-                          <InputNumber size="small" min={10} max={200} style={{ width: '100%' }} value={perfil.alturaMm} onChange={v => ajustar({ alturaMm: Number(v) || PERFIL_PADRAO[modelo].alturaMm })} />
+                          <CampoNumero size="small" min={10} max={200} style={{ width: '100%' }} value={perfil.alturaMm} onChange={v => ajustar({ alturaMm: Number(v) || PERFIL_PADRAO[modelo].alturaMm })} />
                         </Col>
                         <Col span={8}>
                           <Tooltip title="Espaço entre uma etiqueta e a próxima no rolo">
                             <div style={{ fontSize: 12 }}>Espaço (mm)</div>
-                            <InputNumber size="small" min={0} max={20} step={0.5} style={{ width: '100%' }} value={perfil.espacoMm} onChange={v => ajustar({ espacoMm: Number(v) || 0 })} />
+                            <CampoNumero size="small" min={0} max={20} step={0.5} style={{ width: '100%' }} value={perfil.espacoMm} onChange={v => ajustar({ espacoMm: Number(v) || 0 })} />
                           </Tooltip>
                         </Col>
                         <Col span={8}>
                           <Tooltip title="Largura máxima que a cabeça da impressora imprime (L42: 104 mm)">
                             <div style={{ fontSize: 12 }}>Cabeça (mm)</div>
-                            <InputNumber size="small" min={40} max={120} style={{ width: '100%' }} value={perfil.larguraMaxMm} onChange={v => ajustar({ larguraMaxMm: Number(v) || 104 })} />
+                            <CampoNumero size="small" min={40} max={120} style={{ width: '100%' }} value={perfil.larguraMaxMm} onChange={v => ajustar({ larguraMaxMm: Number(v) || 104 })} />
                           </Tooltip>
                         </Col>
                       </Row>

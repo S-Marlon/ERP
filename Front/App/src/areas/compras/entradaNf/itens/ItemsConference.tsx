@@ -1,28 +1,7 @@
 import React, { Suspense, useMemo, useState, useEffect } from 'react';
 import { useSelecaoPlanilha } from './selecaoPlanilha';
 import { AvisoUnidadesNaoReconhecidas, ModalDefinirUnidade, normalizarSiglaNota, UnidadeNotaTag, useUnidadesEntrada } from './UnidadesEntrada';
-import {
-Table,
-Button,
-Checkbox,
-Radio,
-Space,
-Typography,
-Modal,
-Input,
-Tag,
-Tooltip,
-Row,
-Col,
-InputNumber,
-Alert,
-Descriptions,
-Statistic,
-Dropdown,
-message,
-Badge,
-Progress
-} from 'antd';
+import { Table, Button, Checkbox, Radio, Space, Typography, Modal, Input, Tag, Tooltip, Row, Col, Alert, Descriptions, Statistic, Dropdown, message, Badge, Progress } from 'antd';
 import {
 CheckOutlined,
 UndoOutlined,
@@ -52,6 +31,7 @@ import { buscarClassificacaoItens } from '../../api/comprasApi';
 import { TIPOS_RECURSO, TIPO_RECURSO_PADRAO, TipoRecurso, getTipoRecursoConfig } from '../tipoRecurso';
 import { hasCodigoInterno, MSG_SEM_CODIGO_INTERNO } from '../conferencia';
 import { gtinEfetivo, normalizarGtin, situacaoGtin, validarGtin } from '../gtin';
+import { CampoNumero } from '../../../../shared/formularios/CamposNumero';
 
 interface Props {
 items?: Item[];
@@ -485,7 +465,7 @@ return (
 </div>
 <div style={{ textAlign: 'center' }}>
 <Text type="secondary" style={{ fontSize: 10, display: 'block', lineHeight: 1 }}>Rec.</Text>
-<InputNumber
+<CampoNumero
 size="small"
 min={0}
 disabled={readOnly}

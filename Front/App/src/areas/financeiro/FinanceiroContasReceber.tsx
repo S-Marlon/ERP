@@ -2,16 +2,14 @@
 // estorno de recebimento, crédito do cliente (limite e bloqueio para venda a prazo) e a venda completa
 // (itens, parcelas, histórico) com o ajuste da venda (quantidade, preço, item incluído ou tirado).
 import React, { useEffect, useState } from 'react';
-import {
-  Alert, Button, Card, Col, Descriptions, Drawer, Empty, Input, InputNumber, Modal, Row, Segmented, Select,
-  Space, Switch, Table, Tag, Tooltip, Typography, message,
-} from 'antd';
+import { Alert, Button, Card, Col, Descriptions, Drawer, Empty, Input, Modal, Row, Segmented, Select, Space, Switch, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { CreditCardOutlined, DollarOutlined, ReloadOutlined, RollbackOutlined, SearchOutlined } from '@ant-design/icons';
 import { Baixa, dataBr, receberApi, ResumoReceber, ROTULO_SITUACAO, SituacaoCliente, Titulo } from './receber/receberApi';
 import { ROTULO_FORMA } from '../vendas/caixa/caixaApi';
 import { caixaStore, useCaixa } from '../vendas/caixa/caixaStore';
 import { buscarClientesPdv, ClienteBusca } from '../vendas/pdv/services/api/products';
 import { VendaCompletaDrawer } from '../vendas/ajustes/VendaCompletaDrawer';
+import { CampoDinheiro } from '../../shared/formularios/CamposNumero';
 
 const { Text, Title } = Typography;
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -66,7 +64,7 @@ const ModalReceber: React.FC<{ titulo: Titulo | null; onFechar: () => void; onRe
               action={<Button size="small" onClick={() => caixaStore.mostrar('abrir')}>Abrir caixa</Button>} />
           )}
           <Select value={forma} onChange={setForma} style={{ width: '100%' }} options={FORMAS.map(f => ({ value: f, label: ROTULO_FORMA[f] || f }))} />
-          <InputNumber prefix="R$" min={0} max={titulo.saldo} precision={2} decimalSeparator="," style={{ width: '100%' }} size="large"
+          <CampoDinheiro min={0} max={titulo.saldo} precision={2} style={{ width: '100%' }} size="large"
             value={valor} onChange={setValor} />
           {Number(valor) > 0 && Number(valor) < titulo.saldo && <Text type="secondary" style={{ fontSize: 12 }}>Recebimento parcial: fica {brl(titulo.saldo - Number(valor))} em aberto.</Text>}
           <Input placeholder="Observação (opcional)" value={observacao} onChange={e => setObservacao(e.target.value)} maxLength={255} />
@@ -207,7 +205,7 @@ const ModalCredito: React.FC<{ aberto: boolean; onFechar: () => void; onSalvo: (
             </Text>
             <Space><Switch checked={!semLimite} onChange={v => setSemLimite(!v)} /> Definir limite de crédito</Space>
             {!semLimite && (
-              <InputNumber prefix="R$" min={0} precision={2} decimalSeparator="," style={{ width: '100%' }} value={limite} onChange={setLimite}
+              <CampoDinheiro min={0} precision={2} style={{ width: '100%' }} value={limite} onChange={setLimite}
                 addonAfter={limite !== null ? `disponível ${brl(Math.max(0, Number(limite) - situacao.emAberto))}` : undefined} />
             )}
             <Space><Switch checked={bloqueado} onChange={setBloqueado} /> Bloquear compras a prazo</Space>

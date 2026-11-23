@@ -1,12 +1,11 @@
 // PDV: salvar orçamento e a lista de vendas suspensas / orçamentos (retomar, converter, imprimir, excluir).
 import React, { useEffect, useState } from 'react';
-import {
-  Alert, Button, Checkbox, Drawer, Empty, Form, Input, InputNumber, Modal, Popconfirm, Space, Table, Tabs, Tag, Tooltip, Typography, message,
-} from 'antd';
+import { Alert, Button, Checkbox, Drawer, Empty, Form, Input, Modal, Popconfirm, Space, Table, Tabs, Tag, Tooltip, Typography, message } from 'antd';
 import { DeleteOutlined, PrinterOutlined, RollbackOutlined, ShoppingCartOutlined, UserAddOutlined } from '@ant-design/icons';
 import { imprimirOrcamento, PedidoAbertoResumo, pedidosAbertosApi } from '../services/pedidosAbertosApi';
 import { buscarClientesPdv, cadastrarClienteRapido, ClienteBusca } from '../services/api/products';
 import { formatarTelefone, telefoneBr } from '../../../../shared/utils/whatsapp';
+import { CampoNumero } from '../../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -121,7 +120,7 @@ export const ModalSalvarOrcamento: React.FC<{
         ))}
 
         <Form.Item name="validadeDias" label="Válido por">
-          <InputNumber min={1} max={180} addonAfter="dias" style={{ width: 160 }} />
+          <CampoNumero min={1} max={180} addonAfter="dias" style={{ width: 160 }} />
         </Form.Item>
         <Form.Item name="observacao" label="Observações (saem no orçamento impresso)">
           <Input.TextArea rows={2} maxLength={255} placeholder="Ex.: prazo de entrega, condições" />

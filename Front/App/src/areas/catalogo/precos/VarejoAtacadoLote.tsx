@@ -3,13 +3,12 @@
 // prévia com o preço e o lucro de cada faixa e aplica nos itens marcados. Só a unidade base de cada item.
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Alert, Button, Card, Checkbox, Col, Empty, Flex, InputNumber, Popconfirm, Row, Segmented, Space, Table, Tag, Tooltip, Typography, message,
-} from 'antd';
+import { Alert, Button, Card, Checkbox, Col, Empty, Flex, Popconfirm, Row, Segmented, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { ArrowLeftOutlined, CheckOutlined, DeleteOutlined, EyeOutlined, PlusOutlined, WarningOutlined } from '@ant-design/icons';
 import { FaixaPrevia, FiltroPolitica, ItemPrevia, NivelAtacado, OpcoesPolitica, Politica, politicaPrecoApi, RegraVarejo } from './politicaPrecoApi';
 import { resumoPrevia } from './politicaPrecoTela';
 import FiltroItensLote from '../FiltroItensLote';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text, Title } = Typography;
 const brl = (v: number | null | undefined) => (v === null || v === undefined ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
@@ -113,7 +112,7 @@ const VarejoAtacadoLote: React.FC = () => {
                   options={[{ value: 'MANTER', label: 'Manter' }, { value: 'MARKUP', label: 'Markup fixo' }, { value: 'POR_CUSTO', label: 'Por custo' }]} />
                 {modoVarejo === 'MANTER' && <Text type="secondary" style={{ fontSize: 12 }}>O varejo de cada item fica como está.</Text>}
                 {modoVarejo === 'MARKUP' && (
-                  <InputNumber min={1} step={0.1} decimalSeparator="," addonAfter="x" style={{ width: 140 }} value={markupVarejo} onChange={v => setMarkupVarejo(Number(v) || 0)} />
+                  <CampoNumero min={1} step={0.1} addonAfter="x" style={{ width: 140 }} value={markupVarejo} onChange={v => setMarkupVarejo(Number(v) || 0)} />
                 )}
                 {modoVarejo === 'POR_CUSTO' && (
                   <Space direction="vertical" size={4} style={{ width: '100%' }}>
@@ -122,9 +121,9 @@ const VarejoAtacadoLote: React.FC = () => {
                       <Flex key={k} gap={6} align="center">
                         {f.ateCusto === null
                           ? <Text style={{ width: 128 }}>acima disso</Text>
-                          : <InputNumber size="small" min={0} step={0.5} decimalSeparator="," prefix="até R$" style={{ width: 128 }} value={f.ateCusto}
+                          : <CampoNumero size="small" min={0} step={0.5} prefix="até R$" style={{ width: 128 }} value={f.ateCusto}
                               onChange={v => mudarFaixaCusto(k, { ateCusto: Number(v) || 0 })} />}
-                        <InputNumber size="small" min={1} step={0.1} decimalSeparator="," addonAfter="x" style={{ width: 100 }} value={f.markup}
+                        <CampoNumero size="small" min={1} step={0.1} addonAfter="x" style={{ width: 100 }} value={f.markup}
                           onChange={v => mudarFaixaCusto(k, { markup: Number(v) || 0 })} />
                         {f.ateCusto !== null && faixasCusto.length > 2 && (
                           <Button size="small" type="text" icon={<DeleteOutlined />} onClick={() => setFaixasCusto(l => l.filter((_, i) => i !== k))} />
@@ -149,13 +148,13 @@ const VarejoAtacadoLote: React.FC = () => {
                   <Space direction="vertical" size={6} style={{ width: '100%', marginTop: 8 }}>
                     <Flex gap={6} align="center">
                       <Text style={{ width: 70 }}>Atacado 1</Text>
-                      <InputNumber size="small" min={2} prefix="a partir de" style={{ width: 150 }} value={a1.quantidade} onChange={v => setA1(a => ({ ...a, quantidade: Number(v) || 0 }))} />
-                      <InputNumber size="small" min={0.5} step={0.1} decimalSeparator="," addonAfter="x" style={{ width: 100 }} value={a1.markup} onChange={v => setA1(a => ({ ...a, markup: Number(v) || 0 }))} />
+                      <CampoNumero size="small" min={2} prefix="a partir de" style={{ width: 150 }} value={a1.quantidade} onChange={v => setA1(a => ({ ...a, quantidade: Number(v) || 0 }))} />
+                      <CampoNumero size="small" min={0.5} step={0.1} addonAfter="x" style={{ width: 100 }} value={a1.markup} onChange={v => setA1(a => ({ ...a, markup: Number(v) || 0 }))} />
                     </Flex>
                     <Flex gap={6} align="center">
                       <Checkbox style={{ width: 70 }} checked={usarA2} onChange={e => setUsarA2(e.target.checked)}>2</Checkbox>
-                      <InputNumber size="small" min={2} disabled={!usarA2} prefix="a partir de" style={{ width: 150 }} value={a2.quantidade} onChange={v => setA2(a => ({ ...a, quantidade: Number(v) || 0 }))} />
-                      <InputNumber size="small" min={0.5} step={0.1} decimalSeparator="," disabled={!usarA2} addonAfter="x" style={{ width: 100 }} value={a2.markup} onChange={v => setA2(a => ({ ...a, markup: Number(v) || 0 }))} />
+                      <CampoNumero size="small" min={2} disabled={!usarA2} prefix="a partir de" style={{ width: 150 }} value={a2.quantidade} onChange={v => setA2(a => ({ ...a, quantidade: Number(v) || 0 }))} />
+                      <CampoNumero size="small" min={0.5} step={0.1} disabled={!usarA2} addonAfter="x" style={{ width: 100 }} value={a2.markup} onChange={v => setA2(a => ({ ...a, markup: Number(v) || 0 }))} />
                     </Flex>
                     <Text type="secondary" style={{ fontSize: 12 }}>A quantidade é na unidade base (ex.: 10 = a embalagem de 10 peças). O PDV usa o atacado quando a venda chega na quantidade.</Text>
                     <Checkbox checked={pularQuemTem} onChange={e => setPularQuemTem(e.target.checked)}>Não mexer no atacado de quem já tem um próprio</Checkbox>

@@ -1,9 +1,10 @@
 // Nova conta da loja no contas a pagar (água, luz, seguro em 10x, conserto...): uma ou várias parcelas mensais.
 // Conta que se repete todo mês vai melhor como conta fixa (o ERP lança sozinho).
 import React, { useEffect, useState } from 'react';
-import { Alert, Checkbox, Col, Input, InputNumber, Modal, Row, Select, Space, Typography, message } from 'antd';
+import { Alert, Checkbox, Col, Input, Modal, Row, Select, Space, Typography, message } from 'antd';
 import { FORMAS_PAGAMENTO, hojeIso, NovaConta, pagarApi } from './pagarApi';
 import { QuemRecebe, SelectCategoria, useDadosConta } from './camposConta';
+import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -41,9 +42,9 @@ const NovaContaModal: React.FC<{ aberto: boolean; onFechar: () => void; onSalvo:
           <Col span={9}><Text>{c.parcelas > 1 ? '1º vencimento' : 'Vencimento'}</Text><Input type="date" value={c.vencimento} onChange={e => mudar({ vencimento: e.target.value })} /></Col>
           <Col span={9}>
             <Text>{c.parcelas > 1 ? 'Valor de cada parcela' : 'Valor'}</Text>
-            <InputNumber min={0} precision={2} decimalSeparator="," prefix="R$" style={{ width: '100%' }} value={c.valor} onChange={v => mudar({ valor: Number(v) || 0 })} />
+            <CampoDinheiro min={0} precision={2} style={{ width: '100%' }} value={c.valor} onChange={v => mudar({ valor: Number(v) || 0 })} />
           </Col>
-          <Col span={6}><Text>Parcelas</Text><InputNumber min={1} max={60} style={{ width: '100%' }} value={c.parcelas} onChange={v => mudar({ parcelas: Number(v) || 1 })} /></Col>
+          <Col span={6}><Text>Parcelas</Text><CampoNumero min={1} max={60} style={{ width: '100%' }} value={c.parcelas} onChange={v => mudar({ parcelas: Number(v) || 1 })} /></Col>
         </Row>
         {c.parcelas > 1 && <Text type="secondary" style={{ fontSize: 12 }}>{c.parcelas} parcelas mensais de {brl(c.valor)} = {brl(c.valor * c.parcelas)}, no mesmo dia de cada mês.</Text>}
         <Row gutter={10}>

@@ -6,6 +6,7 @@ import dayjs, { Dayjs } from 'dayjs';
 import { Caixa, caixaApi, CaixaHistorico, LinhaConferencia, ResumoCaixa } from '../caixaApi';
 import { brl, imprimirFechamento, ListaMovimentosCaixa, TabelaResumoCaixa } from '../CaixaPainel';
 import { caixaStore } from '../caixaStore';
+import { FORMATOS_DATA } from '../../../../shared/formularios/numeros';
 
 const { Text, Title } = Typography;
 const hora = (d?: string | null) => (d ? new Date(d).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—');
@@ -47,7 +48,7 @@ const CaixasHistorico: React.FC = () => {
             <Text type="secondary">Abertura, fechamento e conferência de cada caixa do PDV.</Text>
           </div>
           <Space wrap>
-            <DatePicker.RangePicker format="DD/MM/YYYY" value={periodo} allowClear={false}
+            <DatePicker.RangePicker format={FORMATOS_DATA} value={periodo} allowClear={false}
               onChange={v => v && v[0] && v[1] && setPeriodo([v[0], v[1]])} />
             <Button icon={<ReloadOutlined />} onClick={carregar} loading={carregando}>Atualizar</Button>
             <Button type="primary" icon={<UnlockOutlined />} onClick={() => { caixaStore.recarregar(); caixaStore.mostrar('resumo'); }}>Caixa atual</Button>

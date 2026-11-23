@@ -1,11 +1,12 @@
 // Correção de uma linha de nota já aprovada: item errado (vínculo) ou conversão errada (fator).
 // Primeiro simula (mostra o que sai de onde e entra onde); só depois confirma.
 import React, { useEffect, useState } from 'react';
-import { Alert, Button, Checkbox, Empty, Input, InputNumber, Modal, Space, Spin, Table, Tag, Typography, message } from 'antd';
+import { Alert, Button, Checkbox, Empty, Input, Modal, Space, Spin, Table, Tag, Typography, message } from 'antd';
 import { SearchOutlined, SwapOutlined } from '@ant-design/icons';
 import { buscarItensCatalogo, ItemCatalogoBusca } from '../api/comprasApi';
 import { getTipoRecursoConfig } from '../entradaNf/tipoRecurso';
 import { corrigirLinhaNota, ItemNota, ResultadoCorrecao } from './notasEntradaApi';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 const money = (v: number, casas = 2) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: casas });
@@ -157,7 +158,7 @@ export const ModalCorrigirLinha: React.FC<Props> = ({ idLote, linha, onClose, on
         <Space align="center" wrap>
           <Text strong style={{ fontSize: 12 }}>Conversão:</Text>
           <Text>1 <b>{unidadeNf}</b> =</Text>
-          <InputNumber min={0.000001} value={fator} onChange={v => setFator(Number(v) || 0)} style={{ width: 100 }} />
+          <CampoNumero min={0.000001} value={fator} onChange={v => setFator(Number(v) || 0)} style={{ width: 100 }} />
           <Text>{item?.unidade || linha.unidadeBase || 'unidade base'}</Text>
           {fator > 0 && (
             <Text type="secondary" style={{ fontSize: 12 }}>

@@ -2,10 +2,11 @@
 // Escolhe o item que fica e junta cada outro nele: estoque, vínculos de fornecedor e códigos de barras vão junto,
 // o duplicado é inativado e o histórico (vendas, notas) continua nele. Sempre com simulação antes de gravar.
 import React, { useEffect, useState } from 'react';
-import { Alert, Button, Empty, Input, InputNumber, Modal, Radio, Space, Spin, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { Alert, Button, Empty, Input, Modal, Radio, Space, Spin, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { MergeCellsOutlined } from '@ant-design/icons';
 import { getTipoRecursoConfig } from '../../compras/entradaNf/tipoRecurso';
 import { getItensParaJuntar, ItemSuspeito, ResultadoUnificacao, unificarItens } from './duplicadosApi';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 const qtd = (v: number) => Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 4 });
@@ -117,7 +118,7 @@ export const ModalUnificar: React.FC<{ origem: ItemSuspeito; destino: ItemSuspei
         <Space align="center" wrap>
           <Text strong style={{ fontSize: 12 }}>Conversão:</Text>
           <Text>1 {origem.unidadeBase || 'un'} de {origem.sku} =</Text>
-          <InputNumber min={0.000001} value={fator} onChange={v => setFator(Number(v) || 0)} style={{ width: 100 }} />
+          <CampoNumero min={0.000001} value={fator} onChange={v => setFator(Number(v) || 0)} style={{ width: 100 }} />
           <Text>{destino.unidadeBase || 'un'} de {destino.sku}</Text>
         </Space>
         {unidadesDiferentes && (

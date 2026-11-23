@@ -1,15 +1,13 @@
 // Obras de poços › ficha do poço › "Bomba e instalação": o conjunto motobomba instalado (bomba ou motor + bombeador, tubo,
 // fio, corda, quadro e cabeça do poço), o histórico de trocas e as fotos do poço (bomba, cabeça, quadro, local).
 import React, { useEffect, useState } from 'react';
-import {
-  AutoComplete, Button, Card, Col, Descriptions, Divider, Empty, Form, Image, Input, InputNumber, Modal, Popconfirm, Row, Select, Space, Table, Tag,
-  Tooltip, Typography, Upload, message,
-} from 'antd';
+import { AutoComplete, Button, Card, Col, Descriptions, Divider, Empty, Form, Image, Input, Modal, Popconfirm, Row, Select, Space, Table, Tag, Tooltip, Typography, Upload, message } from 'antd';
 import { CameraOutlined, DeleteOutlined, EditOutlined, HistoryOutlined, PlusOutlined, SwapOutlined, ToolOutlined } from '@ant-design/icons';
 import {
   Conjunto, conjuntoApi, ConjuntoDoPoco, ConjuntoForm, dataBr, ETAPAS_FOTO, FotoPoco, TIPOS_BOMBA, TIPOS_FOTO_POCO, TipoFotoPoco, urlArquivo,
 } from './obrasApi';
 import { reduzirImagem } from './ProcessoObra';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 const erro = (e: unknown) => message.error(e instanceof Error ? e.message : 'Erro.');
@@ -45,7 +43,7 @@ const texto = (label: string, name: keyof ConjuntoForm, placeholder?: string, li
   </Form.Item>
 );
 const numero = (label: string, name: keyof ConjuntoForm, sufixo?: string, passo = 1) => (
-  <Form.Item label={label} name={name}><InputNumber min={0} step={passo} decimalSeparator="," style={{ width: '100%' }} suffix={sufixo} /></Form.Item>
+  <Form.Item label={label} name={name}><CampoNumero min={0} step={passo} style={{ width: '100%' }} suffix={sufixo} /></Form.Item>
 );
 export const CamposConjunto: React.FC<{ comDataDeInstalacao?: boolean }> = ({ comDataDeInstalacao }) => (
   <>

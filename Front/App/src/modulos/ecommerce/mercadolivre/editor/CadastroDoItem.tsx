@@ -1,12 +1,13 @@
 // Na linha do item do anúncio: código de barras (GTIN) e peso/medidas da embalagem, que o ML pede e que ficam no
 // cadastro do produto. Mostra o que já tem e, faltando, um botão para preencher ali mesmo (grava no cadastro do ERP).
 import React, { useState } from 'react';
-import { Button, Flex, InputNumber, Input, Popover, Space, Tooltip, Typography, message } from 'antd';
+import { Button, Flex, Input, Popover, Space, Tooltip, Typography, message } from 'antd';
 import { BarcodeOutlined, InboxOutlined } from '@ant-design/icons';
 import type { ItemDoAnuncio } from '../mercadoLivreApi';
 import { salvarGtin, updateProduto } from '../../../../areas/catalogo/skus/CatalogSku.service';
 import { normalizarGtin, validarGtin } from '../../../../areas/compras/entradaNf/gtin';
 import { rotuloDaUnidade } from '../linhasAnuncio';
+import { CampoNumero } from '../../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 
@@ -88,7 +89,7 @@ export const EmbalagemDoItem: React.FC<Props> = ({ item, disabled, onSalvo }) =>
   const campo = (chave: 'altura' | 'largura' | 'comprimento', rotulo: string) => (
     <div style={{ flex: 1 }}>
       <Text type="secondary" style={{ fontSize: 11 }}>{rotulo}</Text>
-      <InputNumber min={0.1} step={0.5} value={v[chave] ?? undefined} onChange={x => setV(o => ({ ...o, [chave]: x ?? null }))} style={{ width: '100%' }} />
+      <CampoNumero min={0.1} step={0.5} value={v[chave] ?? undefined} onChange={x => setV(o => ({ ...o, [chave]: x ?? null }))} style={{ width: '100%' }} />
     </div>
   );
   const conteudo = (
@@ -98,7 +99,7 @@ export const EmbalagemDoItem: React.FC<Props> = ({ item, disabled, onSalvo }) =>
       </Text>
       <div>
         <Text type="secondary" style={{ fontSize: 11 }}>Peso (kg)</Text>
-        <InputNumber min={0.001} step={0.05} value={v.peso ?? undefined} onChange={x => setV(o => ({ ...o, peso: x ?? null }))} style={{ width: '100%' }} addonAfter="kg" />
+        <CampoNumero min={0.001} step={0.05} value={v.peso ?? undefined} onChange={x => setV(o => ({ ...o, peso: x ?? null }))} style={{ width: '100%' }} addonAfter="kg" />
       </div>
       <Space.Compact style={{ width: '100%', gap: 6 }}>
         {campo('altura', 'Altura (cm)')}

@@ -1,8 +1,9 @@
 // Estoque no Mercado Livre: quanto fica para a loja (reserva), o teto no ML e a atualização automática.
 import React, { useEffect, useState } from 'react';
-import { Button, Card, Col, Flex, InputNumber, Popover, Row, Select, Space, Switch, Tag, Tooltip, Typography } from 'antd';
+import { Button, Card, Col, Flex, Popover, Row, Select, Space, Switch, Tag, Tooltip, Typography } from 'antd';
 import { SyncOutlined } from '@ant-design/icons';
 import type { AnuncioDetalhe, ItemDoAnuncio } from './mercadoLivreApi';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 
@@ -32,14 +33,14 @@ export const EstoqueAnuncioCard: React.FC<CardProps> = ({ det, onSalvar, onSincr
       <Row gutter={16} align="bottom">
         <Col xs={12} md={6}>
           <Text type="secondary" style={{ fontSize: 12 }}>Reserva da loja (por item)</Text>
-          <InputNumber
+          <CampoNumero
             style={{ width: '100%' }} min={0} precision={0} suffix="un." value={reserva}
             onChange={v => setReserva(v)} onBlur={() => { const v = reserva ?? 0; if (v !== det.estoqueReserva) onSalvar({ estoqueReserva: v }); }}
           />
         </Col>
         <Col xs={12} md={6}>
           <Text type="secondary" style={{ fontSize: 12 }}>Teto no ML (por item)</Text>
-          <InputNumber
+          <CampoNumero
             style={{ width: '100%' }} min={0} precision={0} suffix="un." placeholder="sem teto" value={maximo}
             onChange={v => setMaximo(v)} onBlur={() => { if ((maximo ?? null) !== det.estoqueMaximo) onSalvar({ estoqueMaximo: maximo ?? null }); }}
           />
@@ -110,11 +111,11 @@ export const EstoqueItemCelula: React.FC<CelulaProps> = ({ item, det, onSalvarRe
       <Flex gap={8}>
         <div style={{ flex: 1 }}>
           <Text style={{ fontSize: 12 }}>Reserva da loja</Text>
-          <InputNumber style={{ width: '100%' }} min={0} precision={0} value={reserva} placeholder={String(det.estoqueReserva)} onChange={setReserva} />
+          <CampoNumero style={{ width: '100%' }} min={0} precision={0} value={reserva} placeholder={String(det.estoqueReserva)} onChange={setReserva} />
         </div>
         <div style={{ flex: 1 }}>
           <Text style={{ fontSize: 12 }}>Teto no ML</Text>
-          <InputNumber style={{ width: '100%' }} min={0} precision={0} value={maximo} placeholder={det.estoqueMaximo === null ? 'sem teto' : String(det.estoqueMaximo)} onChange={setMaximo} />
+          <CampoNumero style={{ width: '100%' }} min={0} precision={0} value={maximo} placeholder={det.estoqueMaximo === null ? 'sem teto' : String(det.estoqueMaximo)} onChange={setMaximo} />
         </div>
       </Flex>
       <Flex justify="space-between">

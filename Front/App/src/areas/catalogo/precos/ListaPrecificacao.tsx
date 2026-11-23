@@ -1,7 +1,7 @@
 // Lista de precificação: vários itens numa grade, com ações em massa (custo, markup, ajuste %, arredondamento)
 // e gravação de uma vez. As ações valem para as linhas marcadas (ou para todas, se nenhuma estiver marcada).
 import React, { useMemo, useState } from 'react';
-import { Alert, Button, Drawer, Empty, Flex, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag, Tooltip, Typography, message, theme } from 'antd';
+import { Alert, Button, Drawer, Empty, Flex, Modal, Popconfirm, Select, Space, Table, Tag, Tooltip, Typography, message, theme } from 'antd';
 import { DeleteOutlined, SaveOutlined, SlidersOutlined, UndoOutlined } from '@ant-design/icons';
 import { API_URL } from '../../../shared/api/config';
 import ProductCommercialSalesConfig from './ProductCommercialSalesConfig';
@@ -11,6 +11,7 @@ import {
 } from './precificacaoLote';
 import SeletorUnidade from '../unidades/SeletorUnidade';
 import { salvarPrecosLote } from './precificacaoLote.api';
+import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const brl = (v: number | null | undefined, casas = 2) => (v === null || v === undefined ? '—'
   : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: casas }));
@@ -119,12 +120,12 @@ export const ListaPrecificacao: React.FC<Props> = ({ aberta, linhas, onChange, o
             </Space>
             <Space size={4}>
               <span>Markup:</span>
-              <InputNumber size="small" min={0.01} step={0.1} precision={4} decimalSeparator="," style={{ width: 90 }} value={markupMassa} onChange={setMarkupMassa} />
+              <CampoNumero size="small" min={0.01} step={0.1} precision={4} style={{ width: 90 }} value={markupMassa} onChange={setMarkupMassa} />
               <Button size="small" disabled={!markupMassa} onClick={() => markupMassa && aplicar({ tipo: 'MARKUP', valor: markupMassa })}>Aplicar</Button>
             </Space>
             <Space size={4}>
               <span>Preço:</span>
-              <InputNumber size="small" step={1} precision={2} decimalSeparator="," suffix="%" style={{ width: 95 }} value={ajustePct} onChange={setAjustePct} />
+              <CampoNumero size="small" step={1} precision={2} suffix="%" style={{ width: 95 }} value={ajustePct} onChange={setAjustePct} />
               <Button size="small" disabled={!ajustePct} onClick={() => ajustePct && aplicar({ tipo: 'AJUSTE_PCT', pct: ajustePct })}>Ajustar</Button>
             </Space>
             <Space size={4}>
@@ -186,7 +187,7 @@ export const ListaPrecificacao: React.FC<Props> = ({ aberta, linhas, onChange, o
                 title: 'Custo', key: 'custo', width: 210,
                 render: (_, l) => (
                   <Flex vertical gap={2}>
-                    <InputNumber size="small" min={0} precision={4} decimalSeparator="," prefix="R$" style={{ width: '100%' }}
+                    <CampoDinheiro size="small" min={0} precision={4} style={{ width: '100%' }}
                       value={l.custo} onChange={v => editar(l.idItem, x => comCusto(x, v, fator))} />
                     <Flex gap={4} wrap style={{ fontSize: 11 }}>
                       {l.ultimoCusto !== null && Math.abs((l.ultimoCusto || 0) - (l.custo || 0)) >= 0.0001 && (
@@ -202,7 +203,7 @@ export const ListaPrecificacao: React.FC<Props> = ({ aberta, linhas, onChange, o
               {
                 title: 'Markup', key: 'markup', width: 110,
                 render: (_, l) => (
-                  <InputNumber size="small" min={0.01} step={0.1} precision={4} decimalSeparator="," style={{ width: '100%' }}
+                  <CampoNumero size="small" min={0.01} step={0.1} precision={4} style={{ width: '100%' }}
                     value={l.markup} onChange={v => editar(l.idItem, x => comMarkup(x, v, fator))} />
                 ),
               },
@@ -210,7 +211,7 @@ export const ListaPrecificacao: React.FC<Props> = ({ aberta, linhas, onChange, o
                 title: 'Preço novo', key: 'preco', width: 170,
                 render: (_, l) => (
                   <Flex vertical gap={2}>
-                    <InputNumber size="small" min={0} precision={2} decimalSeparator="," prefix="R$" style={{ width: '100%', fontWeight: 600 }}
+                    <CampoDinheiro size="small" min={0} precision={2} style={{ width: '100%', fontWeight: 600 }}
                       value={l.preco} onChange={v => editar(l.idItem, x => comPreco(x, v, fator))} />
                     <Typography.Text type="secondary" style={{ fontSize: 11 }}>atual {brl(l.precoAtual)}</Typography.Text>
                   </Flex>

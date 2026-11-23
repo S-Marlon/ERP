@@ -1,10 +1,11 @@
 // Painel da lista de trabalho (será aberto pela toolbar; já usado na Consulta de Saldo e na Etiquetagem).
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Drawer, Empty, InputNumber, Popconfirm, Segmented, Space, Table, Tag, Tooltip } from 'antd';
+import { Button, Drawer, Empty, Popconfirm, Segmented, Space, Table, Tag, Tooltip } from 'antd';
 import { DeleteOutlined, EditOutlined } from '@ant-design/icons';
 import { useListaTrabalho } from './ListaTrabalhoContext';
 import { ItemListaTrabalho, TAGS_LISTA, TagLista } from './listaTrabalho';
+import { CampoNumero } from '../../formularios/CamposNumero';
 
 interface Props {
   open: boolean;
@@ -94,7 +95,7 @@ export const ListaTrabalhoDrawer: React.FC<Props> = ({ open, onClose, tagInicial
           {
             title: 'Qtd', key: 'qtd', width: 90,
             render: (_, i) => (
-              <InputNumber
+              <CampoNumero
                 size="small"
                 min={0}
                 style={{ width: '100%' }}

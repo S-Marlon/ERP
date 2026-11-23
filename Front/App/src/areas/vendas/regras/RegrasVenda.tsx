@@ -1,9 +1,10 @@
 // Vendas › Regras de venda: limite de desconto sem autorização, senha de autorização e
 // o que fazer com venda abaixo do custo. Valem no servidor (o PDV não consegue contornar).
 import React, { useEffect, useState } from 'react';
-import { Alert, Button, Card, Form, Input, InputNumber, Radio, Space, Tag, Typography, message } from 'antd';
+import { Alert, Button, Card, Form, Input, Radio, Space, Tag, Typography, message } from 'antd';
 import { LockOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 import { API_URL } from '../../../shared/api/config';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text, Title } = Typography;
 const API = `${API_URL}/api/vendas/configuracoes`;
@@ -83,7 +84,7 @@ const RegrasVenda: React.FC = () => {
             <Form.Item name="descontoMaxPercentual" label="Desconto máximo sem autorização"
               extra="Soma do desconto nos itens e no total, sobre o preço de tabela (varejo/atacado). Acima disso, pede a senha."
               rules={[{ required: true, message: 'Informe o limite.' }]}>
-              <InputNumber min={0} max={100} precision={2} decimalSeparator="," addonAfter="%" style={{ width: 180 }} />
+              <CampoNumero min={0} max={100} precision={2} addonAfter="%" style={{ width: 180 }} />
             </Form.Item>
 
             <Form.Item name="politicaAbaixoCusto" label="Venda abaixo do custo (custo médio do estoque)">
@@ -100,11 +101,11 @@ const RegrasVenda: React.FC = () => {
               <Space wrap size={24}>
                 <Form.Item name="margemAlvoPct" label="Margem alvo do orçamento" style={{ marginBottom: 0 }}
                   extra="Lucro ÷ preço que o orçamento busca (o vendedor baixa num item e recupera em outro)." rules={[{ required: true, message: 'Informe a margem.' }]}>
-                  <InputNumber min={0} max={90} precision={1} decimalSeparator="," addonAfter="%" style={{ width: 150 }} />
+                  <CampoNumero min={0} max={90} precision={1} addonAfter="%" style={{ width: 150 }} />
                 </Form.Item>
                 <Form.Item name="margemMinimaPct" label="Margem mínima por item" style={{ marginBottom: 0 }}
                   extra="Abaixo disso, o orçamento só salva com a senha de autorização." rules={[{ required: true, message: 'Informe a margem.' }]}>
-                  <InputNumber min={0} max={90} precision={1} decimalSeparator="," addonAfter="%" style={{ width: 150 }} />
+                  <CampoNumero min={0} max={90} precision={1} addonAfter="%" style={{ width: 150 }} />
                 </Form.Item>
               </Space>
             </Card>

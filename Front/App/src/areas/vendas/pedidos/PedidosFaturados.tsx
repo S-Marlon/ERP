@@ -3,15 +3,14 @@
 // cola a linha digitável), e é entregue de uma vez (baixa do estoque). Não passa pelo caixa.
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import {
-  Alert, Button, Card, Checkbox, Col, DatePicker, Descriptions, Drawer, Empty, Flex, Input, InputNumber, Modal, Row, Segmented, Select, Space,
-  Steps, Table, Tag, Tooltip, Typography, message,
-} from 'antd';
+import { Alert, Button, Card, Checkbox, Col, DatePicker, Descriptions, Drawer, Empty, Flex, Input, Modal, Row, Segmented, Select, Space, Steps, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { CarOutlined, CopyOutlined, DeleteOutlined, FileDoneOutlined, PlusOutlined, ReloadOutlined, SaveOutlined, StopOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
   ErroPedido, ETAPAS, formatarLinhaDigitavel, ParcelaPedido, PedidoFaturadoDetalhe, PedidoFaturadoResumo, pedidosFaturadosApi,
 } from './pedidosFaturadosApi';
+import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
+import { FORMATOS_DATA } from '../../../shared/formularios/numeros';
 
 const { Text, Title } = Typography;
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -93,7 +92,7 @@ const FichaPedido: React.FC<{ id: number | null; onFechar: () => void; onMudou: 
               </Col>
               <Col xs={12} md={7}>
                 <Text style={{ fontSize: 12 }}>Previsão de entrega</Text>
-                <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" disabled={!aberto || entregue} value={dados.previsaoEntrega ? dayjs(dados.previsaoEntrega) : null}
+                <DatePicker style={{ width: '100%' }} format={FORMATOS_DATA} disabled={!aberto || entregue} value={dados.previsaoEntrega ? dayjs(dados.previsaoEntrega) : null}
                   onChange={v => setDados({ ...dados, previsaoEntrega: v ? v.format('YYYY-MM-DD') : null })} />
               </Col>
               <Col xs={24} md={12}>
@@ -159,9 +158,9 @@ const FichaPedido: React.FC<{ id: number | null; onFechar: () => void; onMudou: 
                   <Space direction="vertical" style={{ width: '100%' }}>
                     <Text type="secondary" style={{ fontSize: 12 }}>Emita a NF-e no emissor de vocês e informe aqui o número (a chave é opcional, mas ajuda na conferência).</Text>
                     <Flex gap={8} wrap>
-                      <InputNumber placeholder="Nº da NF-e" min={1} style={{ width: 130 }} value={nota.numero} onChange={v => setNota({ ...nota, numero: v ? Number(v) : null })} />
-                      <InputNumber placeholder="Série" min={0} max={999} style={{ width: 80 }} prefix="Série" value={nota.serie} onChange={v => setNota({ ...nota, serie: Number(v) || 0 })} />
-                      <DatePicker format="DD/MM/YYYY" style={{ width: 140 }} value={dayjs(nota.emitidaEm)} disabledDate={x => x.isAfter(dayjs(), 'day')}
+                      <CampoNumero placeholder="Nº da NF-e" min={1} style={{ width: 130 }} value={nota.numero} onChange={v => setNota({ ...nota, numero: v ? Number(v) : null })} />
+                      <CampoNumero placeholder="Série" min={0} max={999} style={{ width: 80 }} prefix="Série" value={nota.serie} onChange={v => setNota({ ...nota, serie: Number(v) || 0 })} />
+                      <DatePicker format={FORMATOS_DATA} style={{ width: 140 }} value={dayjs(nota.emitidaEm)} disabledDate={x => x.isAfter(dayjs(), 'day')}
                         onChange={v => setNota({ ...nota, emitidaEm: v ? v.format('YYYY-MM-DD') : hoje() })} />
                       <Input placeholder="Chave de acesso (44 dígitos, opcional)" style={{ flex: '1 1 260px' }} value={nota.chave} onChange={e => setNota({ ...nota, chave: e.target.value })} />
                     </Flex>
@@ -169,9 +168,9 @@ const FichaPedido: React.FC<{ id: number | null; onFechar: () => void; onMudou: 
                     {parcelas.map((p, i) => (
                       <Flex key={i} gap={6} align="center" wrap>
                         <Tag style={{ margin: 0, width: 34, textAlign: 'center' }}>{i + 1}</Tag>
-                        <DatePicker format="DD/MM/YYYY" style={{ width: 130 }} value={p.vencimento ? dayjs(p.vencimento) : null} allowClear={false}
+                        <DatePicker format={FORMATOS_DATA} style={{ width: 130 }} value={p.vencimento ? dayjs(p.vencimento) : null} allowClear={false}
                           onChange={v => v && mudarParcela(i, { vencimento: v.format('YYYY-MM-DD') })} />
-                        <InputNumber style={{ width: 120 }} min={0.01} prefix="R$" decimalSeparator="," value={p.valor} onChange={v => mudarParcela(i, { valor: Number(v) || 0 })} />
+                        <CampoDinheiro style={{ width: 120 }} min={0.01} value={p.valor} onChange={v => mudarParcela(i, { valor: Number(v) || 0 })} />
                         <Select style={{ width: 110 }} value={p.forma} onChange={v => mudarParcela(i, { forma: v })} options={d.formasParcela.map(f => ({ value: f, label: ROTULO_FORMA[f] || f }))} />
                         {p.forma === 'BOLETO' && (
                           <Input style={{ flex: '1 1 200px' }} placeholder="Linha digitável (pode colar depois)" value={p.codigoBarras || ''} onChange={e => mudarParcela(i, { codigoBarras: e.target.value })} />

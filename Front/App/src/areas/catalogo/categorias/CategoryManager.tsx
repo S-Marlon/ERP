@@ -1,8 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import {
-  Layout, Tree, TreeSelect, Button, Row, Col, Input, InputNumber, Select, Switch, Table, Space, Spin, Card, Tag,
-  message, Modal, Tooltip, Badge, Breadcrumb
-} from 'antd';
+import { Layout, Tree, TreeSelect, Button, Row, Col, Input, Select, Switch, Table, Space, Spin, Card, Tag, message, Modal, Tooltip, Badge, Breadcrumb } from 'antd';
 import {
   PlusOutlined, DeleteOutlined, SaveOutlined, DeploymentUnitOutlined, CloseOutlined, ThunderboltOutlined,
   InfoCircleOutlined, FileTextOutlined, SafetyCertificateOutlined, StopOutlined, UndoOutlined, BranchesOutlined
@@ -16,6 +13,7 @@ import {
 import {
   AtributoEfetivoCategoria, alterarAtributoNaCategoria, cadeiaCategorias, idsDescendentes, visaoAtributosCategoria
 } from './categoriaHeranca';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Sider, Content } = Layout;
 const tenantIdGlobal = 1;
@@ -569,7 +567,7 @@ export const CategoryManager: React.FC = () => {
                 </Col>
                 <Col xs={12} md={3}>
                   {rotulo('Margem sug. %')}
-                  <InputNumber style={{ width: '100%' }} min={0} max={1000} value={cat.percentualMargemSugerida ?? undefined}
+                  <CampoNumero style={{ width: '100%' }} min={0} max={1000} value={cat.percentualMargemSugerida ?? undefined}
                     onChange={v => state.handleAtualizarCategoria('percentualMargemSugerida', v ?? null)} />
                 </Col>
                 <Col xs={24} md={18}>

@@ -1,18 +1,7 @@
 import React, { useState } from 'react';
-import { 
-  Modal, 
-  Form, 
-  Select, 
-  InputNumber, 
-  Table, 
-  Button, 
-  Space, 
-  Typography, 
-  Divider, 
-  message,
-  Input
-} from 'antd';
+import { Modal, Form, Select, Table, Button, Space, Typography, Divider, message, Input } from 'antd';
 import { PlusOutlined, DeleteOutlined, ShoppingCartOutlined, CodeOutlined, CheckOutlined } from '@ant-design/icons';
+import { CampoNumero } from '../../shared/formularios/CamposNumero';
 
 const { Text, Title } = Typography;
 const { TextArea } = Input;
@@ -177,7 +166,7 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({ visible, onClo
       key: 'quantidade',
       width: '80px',
       render: (qtd: number, record: ItemPedido) => (
-        <InputNumber 
+        <CampoNumero 
           min={1} 
           size="small"
           value={qtd} 
@@ -192,7 +181,7 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({ visible, onClo
       key: 'precoUnitario',
       width: '120px',
       render: (val: number, record: ItemPedido) => (
-        <InputNumber 
+        <CampoNumero 
           min={0} 
           precision={2}
           size="small"

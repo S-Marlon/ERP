@@ -1,8 +1,9 @@
 // Aba Atributos do editor: de onde vem cada atributo que o ML pede (cadastro, marca ou valor fixo) e o valor que
 // sai em cada item. As mudanças vão para o rascunho.
 import React, { useEffect, useMemo, useState } from 'react';
-import { AutoComplete, Button, Card, Empty, InputNumber, Select, Space, Switch, Table, Tag, Tooltip, Typography } from 'antd';
+import { AutoComplete, Button, Card, Empty, Select, Space, Switch, Table, Tag, Tooltip, Typography } from 'antd';
 import { AnuncioDetalhe, AtributoML, ItemDoAnuncio, ValorAtributo } from '../mercadoLivreApi';
+import { CampoNumero } from '../../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 
@@ -23,13 +24,13 @@ const ValorFixo: React.FC<{ atributo: AtributoML; valor: Extract<ValorAtributo, 
   if (atributo.tipo === 'number_unit') {
     return (
       <Space.Compact style={{ width: '100%' }}>
-        <InputNumber style={{ width: '100%' }} value={texto === '' ? null : Number(texto)} onChange={v => setTexto(v === null ? '' : String(v))} onBlur={() => confirmar()} decimalSeparator="," />
+        <CampoNumero style={{ width: '100%' }} value={texto === '' ? null : Number(texto)} onChange={v => setTexto(v === null ? '' : String(v))} onBlur={() => confirmar()} />
         <Select style={{ width: 90 }} value={unidade} options={atributo.unidades.map(u => ({ value: u, label: u }))} onChange={u => { setUnidade(u); confirmar(texto, u); }} />
       </Space.Compact>
     );
   }
   if (atributo.tipo === 'number') {
-    return <InputNumber style={{ width: '100%' }} value={texto === '' ? null : Number(texto)} onChange={v => setTexto(v === null ? '' : String(v))} onBlur={() => confirmar()} decimalSeparator="," />;
+    return <CampoNumero style={{ width: '100%' }} value={texto === '' ? null : Number(texto)} onChange={v => setTexto(v === null ? '' : String(v))} onBlur={() => confirmar()} />;
   }
   if (atributo.tipo === 'boolean') {
     const opcoes = atributo.valores.length ? atributo.valores : [{ id: '', nome: 'Sim' }, { id: '', nome: 'Não' }];

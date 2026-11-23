@@ -1,9 +1,7 @@
 // Compra inteligente: o que vendeu × saldo × fornecedor. Escolhe o fornecedor, parte da sugestão pelo giro,
 // completa o pedido mínimo com os itens que acabam primeiro e envia só "código do fornecedor + quantidade".
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Alert, Button, Card, Col, Empty, Input, InputNumber, Popover, Progress, Row, Segmented, Space, Statistic, Switch, Table, Tabs, Tag, Tooltip, Typography, message,
-} from 'antd';
+import { Alert, Button, Card, Col, Empty, Input, Popover, Progress, Row, Segmented, Space, Statistic, Switch, Table, Tabs, Tag, Tooltip, Typography, message } from 'antd';
 import {
   CopyOutlined, DownloadOutlined, HistoryOutlined, ReloadOutlined, SaveOutlined, ThunderboltOutlined, ClearOutlined, StarFilled,
 } from '@ant-design/icons';
@@ -13,6 +11,7 @@ import HistoricoPrecosDrawer from './HistoricoPrecosDrawer';
 import PedidosCompra, { copiarTexto } from './PedidosCompra';
 import MargemAbaixoAlvo from './MargemAbaixoAlvo';
 import { useSearchParams } from 'react-router-dom';
+import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Title, Text } = Typography;
 const brl = (v: number) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -350,7 +349,7 @@ const CompraInteligente: React.FC = () => {
       title: 'Pedido', key: 'ped', width: 150,
       render: (_: unknown, i: ItemSugestao) => (
         <Tooltip title={i.fatorCompra !== 1 ? `1 ${i.unidadeCompra} = ${num(i.fatorCompra)} ${i.unidade}` : undefined}>
-          <InputNumber size="small" min={0} step={1} style={{ width: '100%' }} value={quantidades[i.idItem] || null} placeholder="0"
+          <CampoNumero size="small" min={0} step={1} style={{ width: '100%' }} value={quantidades[i.idItem] || null} placeholder="0"
             addonAfter={i.unidadeCompra} onChange={v => mudarQtd(i.idItem, Number(v) || 0)}
             status={origem[i.idItem] === 'COMPLETAR' ? 'warning' : undefined} />
         </Tooltip>
@@ -425,11 +424,11 @@ const CompraInteligente: React.FC = () => {
               <Row gutter={[12, 12]} align="middle">
                 <Col xs={12} md={6}>
                   <Text type="secondary" style={{ fontSize: 12 }}>Pedido mínimo</Text>
-                  <InputNumber style={{ width: '100%' }} min={0} prefix="R$" value={condicoes.pedidoMinimo} onChange={v => setCondicoes(c => ({ ...c, pedidoMinimo: Number(v) || 0 }))} />
+                  <CampoDinheiro style={{ width: '100%' }} min={0} value={condicoes.pedidoMinimo} onChange={v => setCondicoes(c => ({ ...c, pedidoMinimo: Number(v) || 0 }))} />
                 </Col>
                 <Col xs={12} md={5}>
                   <Text type="secondary" style={{ fontSize: 12 }}>Prazo de entrega</Text>
-                  <InputNumber style={{ width: '100%' }} min={0} addonAfter="dias" value={condicoes.prazoEntregaDias} onChange={v => setCondicoes(c => ({ ...c, prazoEntregaDias: Number(v) || 0 }))} />
+                  <CampoNumero style={{ width: '100%' }} min={0} addonAfter="dias" value={condicoes.prazoEntregaDias} onChange={v => setCondicoes(c => ({ ...c, prazoEntregaDias: Number(v) || 0 }))} />
                 </Col>
                 <Col xs={24} md={6}>
                   <Text type="secondary" style={{ fontSize: 12 }}>Contato para pedido</Text>
@@ -461,7 +460,7 @@ const CompraInteligente: React.FC = () => {
                       <Button type="primary" ghost icon={<ThunderboltOutlined />} loading={ocupado} onClick={completar} disabled={minimo.atinge && condicoes.pedidoMinimo > 0}>
                         Completar mínimo
                       </Button>
-                      <InputNumber style={{ width: 90 }} min={15} max={365} value={limiteCobertura} onChange={v => setLimiteCobertura(Number(v) || 120)} addonAfter="d" />
+                      <CampoNumero style={{ width: 90 }} min={15} max={365} value={limiteCobertura} onChange={v => setLimiteCobertura(Number(v) || 120)} addonAfter="d" />
                     </Space.Compact>
                   </Tooltip>
                 </Space>
@@ -511,7 +510,7 @@ const CompraInteligente: React.FC = () => {
             <Text type="secondary">Vendas de</Text>
             <Segmented options={PERIODOS} value={dias} onChange={v => setDias(Number(v))} />
             <Tooltip title="Quer estoque para quantos dias depois que a mercadoria chegar">
-              <InputNumber min={0} max={365} value={cobertura} onChange={v => setCobertura(Number(v) || 0)} addonBefore="Estoque p/" addonAfter="dias" style={{ width: 200 }} />
+              <CampoNumero min={0} max={365} value={cobertura} onChange={v => setCobertura(Number(v) || 0)} addonBefore="Estoque p/" addonAfter="dias" style={{ width: 200 }} />
             </Tooltip>
           </Space>
         </Col>

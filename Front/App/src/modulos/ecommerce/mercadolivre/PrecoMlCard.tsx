@@ -3,7 +3,7 @@
 // abas, sem rolar: formas de venda, Clássico × Premium, mercado, preço por quantidade (CNPJ) e a conta com o frete.
 // O preço vai para o rascunho do editor (desfaz e salva como o resto).
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Collapse, Flex, InputNumber, Progress, Segmented, Space, Spin, Table, Tag, Tooltip, Typography } from 'antd';
+import { Alert, Button, Collapse, Flex, Progress, Segmented, Space, Spin, Table, Tag, Tooltip, Typography } from 'antd';
 import {
   AimOutlined, BarChartOutlined, BulbOutlined, CalculatorOutlined, CarOutlined, RollbackOutlined, ShoppingCartOutlined, TeamOutlined, ThunderboltOutlined, WarningOutlined,
 } from '@ant-design/icons';
@@ -16,6 +16,7 @@ import AjudaCenarios from './AjudaCenarios';
 import { rotuloDaUnidade } from './linhasAnuncio';
 import CascataLucro from './CascataLucro';
 import CurvaPreco from './CurvaPreco';
+import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 
@@ -181,7 +182,7 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEsc
           <Text type="secondary" style={{ fontSize: 12 }}>A {formatarMoeda(l.preco)}: qual tipo de anúncio e se vale ligar o frete grátis. "Usar" põe nas alterações.</Text>
           <Space size={8} wrap>
             <Tooltip title="Quantas vendas por mês você faz (ou espera fazer) do jeito de hoje. A tabela mostra quanto cada cenário precisaria vender para lucrar o mesmo.">
-              <InputNumber size="small" min={1} max={100000} precision={0} value={vendasMes} onChange={v => setVendasMes(Math.max(1, Number(v) || 1))} addonAfter="vendas/mês hoje" style={{ width: 190 }} />
+              <CampoNumero size="small" min={1} max={100000} precision={0} value={vendasMes} onChange={v => setVendasMes(Math.max(1, Number(v) || 1))} addonAfter="vendas/mês hoje" style={{ width: 190 }} />
             </Tooltip>
             <AjudaCenarios />
           </Space>
@@ -369,7 +370,7 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEsc
           {carregando && <Spin size="small" />}
         </Space>
         <Tooltip title="Para testar outro frete (ex.: o que a tela do ML mostra). Vazio = frete calculado pelo ML para cada preço.">
-          <InputNumber size="small" prefix="frete R$" min={0} step={0.5} precision={2} decimalSeparator="," placeholder="do ML" value={frete} onChange={setFrete} style={{ width: 150 }} />
+          <CampoNumero size="small" prefix="frete R$" min={0} step={0.5} precision={2} placeholder="do ML" value={frete} onChange={setFrete} style={{ width: 150 }} />
         </Tooltip>
       </Flex>
 
@@ -380,7 +381,7 @@ const PrecoMlCard: React.FC<Props> = ({ salvo, det, idLinha, onMudarPreco, onEsc
           <Space.Compact style={{ display: 'flex', marginTop: 2 }}>
             <Tooltip title="−R$ 0,10"><Button onClick={() => passo(-0.1)}>−0,10</Button></Tooltip>
             <Tooltip title="−R$ 0,01"><Button onClick={() => passo(-0.01)}>−0,01</Button></Tooltip>
-            <InputNumber style={{ width: 120 }} prefix="R$" min={0.01} step={0.01} precision={2} decimalSeparator="," value={preco} onChange={v => mudar(v === null ? null : Number(v))} />
+            <CampoDinheiro style={{ width: 120 }} min={0.01} step={0.01} precision={2} value={preco} onChange={v => mudar(v === null ? null : Number(v))} />
             <Tooltip title="+R$ 0,01"><Button onClick={() => passo(0.01)}>+0,01</Button></Tooltip>
             <Tooltip title="+R$ 0,10"><Button onClick={() => passo(0.1)}>+0,10</Button></Tooltip>
           </Space.Compact>

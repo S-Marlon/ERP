@@ -3,14 +3,13 @@
 // que entra no lucro de cada envio.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import {
-  Alert, Button, Card, Col, Empty, Flex, Input, InputNumber, Modal, Popover, Row, Segmented, Select, Space, Table, Tag, Tooltip, Typography, message,
-} from 'antd';
+import { Alert, Button, Card, Col, Empty, Flex, Input, Modal, Popover, Row, Segmented, Select, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { DeleteOutlined, InboxOutlined, PlusOutlined, SaveOutlined, SearchOutlined } from '@ant-design/icons';
 import FiltroItensLote from '../FiltroItensLote';
 import { FiltroPolitica, OpcoesPolitica, politicaPrecoApi } from '../precos/politicaPrecoApi';
 import { EmbalagemCatalogo, FaltaLogistica, ItemLogistica, logisticaApi, RegraEmbalagem, ROTULO_FALTA, textoMedidas } from './logisticaApi';
 import { alteracoes, aplicarNosMarcados, Rascunho, ValoresLogistica, valoresDaLinha } from './logisticaTela';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text, Title } = Typography;
 const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -23,7 +22,7 @@ const EditorRegras: React.FC<{ regras: RegraEmbalagem[]; embalagens: EmbalagemCa
   <Space direction="vertical" style={{ width: '100%' }} size={6}>
     {regras.map((r, k) => (
       <Flex key={k} gap={6} align="center">
-        <InputNumber min={1} prefix="até" addonAfter="un." style={{ width: 150 }} value={r.quantidadeAte}
+        <CampoNumero min={1} prefix="até" addonAfter="un." style={{ width: 150 }} value={r.quantidadeAte}
           onChange={v => onChange(regras.map((x, i) => (i === k ? { ...x, quantidadeAte: Number(v) || 0 } : x)))} />
         <Select showSearch optionFilterProp="label" style={{ flex: 1 }} placeholder="Embalagem" value={r.idEmbalagem || undefined}
           options={embalagens.map(e => ({ value: e.idEmbalagem, label: nomeEmb(e) }))}
@@ -111,7 +110,7 @@ const LogisticaLote: React.FC = () => {
   };
 
   const numero = (v: number | null, onChange: (v: number | null) => void, w = 72, passo = 0.1) => (
-    <InputNumber size="small" min={0} step={passo} decimalSeparator="," style={{ width: w }} value={v ?? undefined} onChange={x => onChange(x === null || x === undefined ? null : Number(x))} />
+    <CampoNumero size="small" min={0} step={passo} style={{ width: w }} value={v ?? undefined} onChange={x => onChange(x === null || x === undefined ? null : Number(x))} />
   );
 
   return (

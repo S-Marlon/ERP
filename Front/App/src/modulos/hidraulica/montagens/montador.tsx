@@ -1,9 +1,10 @@
 // Peças compartilhadas da montagem de mangueira (PDV e OS): seletor de item do catálogo, montador
 // (mangueira + terminais + capas + prensagem opcional), ficha técnica e memória dos últimos itens usados.
 import React, { useEffect, useState } from 'react';
-import { Checkbox, Input, InputNumber, Select, Typography } from 'antd';
+import { Checkbox, Input, Select, Typography } from 'antd';
 import { getPdvProducts } from '../../../areas/vendas/pdv/services/api/products';
 import type { FichaMangueira } from './montagensApi';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 export const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -88,11 +89,11 @@ export const CamposMontagem: React.FC<{ valor: EstadoMontagem; onChange: (e: Est
     <>
       <div style={grade}>
         <Text strong>Peças iguais</Text>
-        <InputNumber min={1} max={99} value={e.pecas} onChange={v => alterar({ pecas: Number(v) || 1 })} style={{ width: 100 }} />
+        <CampoNumero min={1} max={99} value={e.pecas} onChange={v => alterar({ pecas: Number(v) || 1 })} style={{ width: 100 }} />
         <span />
         <Text strong>Mangueira</Text>
         <SeletorItem valor={e.mangueira} onChange={i => alterar({ mangueira: i })} placeholder="Ex.: mangueira R2 3/4" />
-        <InputNumber min={0} step={0.1} precision={3} decimalSeparator="," addonAfter="m/peça" value={e.comprimento} onChange={v => alterar({ comprimento: v })} />
+        <CampoNumero min={0} step={0.1} precision={3} addonAfter="m/peça" value={e.comprimento} onChange={v => alterar({ comprimento: v })} />
         <Text strong>Terminal A</Text>
         <SeletorItem valor={e.terminalA} onChange={i => alterar({ terminalA: i })} placeholder="Terminal da ponta A" />
         <Text type="secondary" style={{ fontSize: 12 }}>1 por peça</Text>
@@ -101,7 +102,7 @@ export const CamposMontagem: React.FC<{ valor: EstadoMontagem; onChange: (e: Est
         <Checkbox checked={e.bIgualA} onChange={x => alterar({ bIgualA: x.target.checked })}>igual ao A</Checkbox>
         <Text strong>Capas</Text>
         <SeletorItem valor={e.capa} onChange={i => alterar({ capa: i })} placeholder="Capa (opcional)" />
-        <InputNumber min={0} max={10} value={e.capasPorPeca} onChange={v => alterar({ capasPorPeca: Number(v) || 0 })} addonAfter="/peça" />
+        <CampoNumero min={0} max={10} value={e.capasPorPeca} onChange={v => alterar({ capasPorPeca: Number(v) || 0 })} addonAfter="/peça" />
       </div>
       <Checkbox checked={e.cobrarPrensagem} onChange={x => alterar({ cobrarPrensagem: x.target.checked })} style={{ marginTop: 8 }}>
         Cobrar prensagem (cliente trouxe mangueira/terminais) <Text type="secondary" style={{ fontSize: 12 }}>— normalmente já está no preço dos terminais e capas</Text>
@@ -110,7 +111,7 @@ export const CamposMontagem: React.FC<{ valor: EstadoMontagem; onChange: (e: Est
         <div style={{ ...grade, marginTop: 8 }}>
           <Text strong>Prensagem</Text>
           <SeletorItem valor={e.prensagem} onChange={i => alterar({ prensagem: i })} placeholder="Serviço de prensagem" />
-          <InputNumber min={0} max={10} value={e.prensagensPorPeca} onChange={v => alterar({ prensagensPorPeca: Number(v) || 0 })} addonAfter="/peça" />
+          <CampoNumero min={0} max={10} value={e.prensagensPorPeca} onChange={v => alterar({ prensagensPorPeca: Number(v) || 0 })} addonAfter="/peça" />
         </div>
       )}
     </>
@@ -133,7 +134,7 @@ export const CamposFicha: React.FC<{ valor: FichaMangueira; onChange: (f: FichaM
       {comComprimento && (
         <div>
           <Text type="secondary" style={{ fontSize: 11 }}>Comprimento (m)</Text>
-          <InputNumber size="small" min={0} step={0.1} precision={3} decimalSeparator="," style={{ width: '100%' }}
+          <CampoNumero size="small" min={0} step={0.1} precision={3} style={{ width: '100%' }}
             value={f.comprimentoM ?? null} onChange={v => onChange({ ...f, comprimentoM: v })} />
         </div>
       )}

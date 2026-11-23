@@ -2,13 +2,12 @@
 // embute, até quantas parcelas a loja absorve e o simulador (quanto cobrar e quanto recebe em cada forma).
 import { API_URL } from '../../../../shared/api/config';
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  Alert, Button, Card, Col, Dropdown, Empty, Input, InputNumber, Modal, Row, Segmented, Select, Space, Switch, Table, Tag, Tooltip, Typography, message,
-} from 'antd';
+import { Alert, Button, Card, Col, Dropdown, Empty, Input, Modal, Row, Segmented, Select, Space, Switch, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { CalculatorOutlined, DeleteOutlined, InfoCircleOutlined, PlusOutlined, SaveOutlined } from '@ant-design/icons';
 import { ConfigTaxas, invalidarTaxas, ROTULO_FORMA_TAXA, TaxaPagamento, taxasApi } from '../taxasVenda';
 import { carregarTaxaPreco, percentualTaxaPreco } from '../../../../shared/core/precos/taxaPreco';
+import { CampoDinheiro, CampoNumero } from '../../../../shared/formularios/CamposNumero';
 
 const { Text, Title } = Typography;
 const FORMAS = ['CREDITO', 'DEBITO', 'PIX', 'DINHEIRO', 'TRANSFERENCIA', 'PRAZO'];
@@ -186,8 +185,8 @@ const TaxasPagamento: React.FC = () => {
 
   const campoFixa = (l: Linha) => (
     <Space.Compact size="small">
-      <InputNumber size="small" min={0} max={l.tipoFixa === 'PCT' ? 49.99 : undefined} step={l.tipoFixa === 'PCT' ? 0.1 : 0.05}
-        precision={2} decimalSeparator="," style={{ width: 82 }}
+      <CampoNumero size="small" min={0} max={l.tipoFixa === 'PCT' ? 49.99 : undefined} step={l.tipoFixa === 'PCT' ? 0.1 : 0.05}
+        precision={2} style={{ width: 82 }}
         value={l.tipoFixa === 'PCT' ? l.vendaPercentual || 0 : l.fixa}
         onChange={x => alterar(l.chave, l.tipoFixa === 'PCT' ? 'vendaPercentual' : 'fixa', Number(x) || 0)} />
       <Select size="small" value={l.tipoFixa} style={{ width: 58 }}
@@ -222,15 +221,15 @@ const TaxasPagamento: React.FC = () => {
               title: 'Parcelas', key: 'p', width: 130,
               render: (_: unknown, l: Linha) => (
                 <Space size={4}>
-                  <InputNumber size="small" min={1} max={36} value={l.parcelasDe} style={{ width: 52 }} onChange={v => alterar(l.chave, 'parcelasDe', Number(v) || 1)} />
+                  <CampoNumero size="small" min={1} max={36} value={l.parcelasDe} style={{ width: 52 }} onChange={v => alterar(l.chave, 'parcelasDe', Number(v) || 1)} />
                   <Text type="secondary">a</Text>
-                  <InputNumber size="small" min={1} max={36} value={l.parcelasAte} style={{ width: 52 }} onChange={v => alterar(l.chave, 'parcelasAte', Number(v) || 1)} />
+                  <CampoNumero size="small" min={1} max={36} value={l.parcelasAte} style={{ width: 52 }} onChange={v => alterar(l.chave, 'parcelasAte', Number(v) || 1)} />
                 </Space>
               ),
             }] : []),
             {
               title: <Tooltip title="Taxa de parcelamento da faixa (no 1x costuma ser 0%)">Parcelamento <InfoCircleOutlined /></Tooltip>, dataIndex: 'percentual', width: 110,
-              render: (v: number, l: Linha) => <InputNumber size="small" min={0} max={49.99} step={0.1} precision={2} decimalSeparator="," addonAfter="%" style={{ width: 100 }} value={v} onChange={x => alterar(l.chave, 'percentual', Number(x) || 0)} />,
+              render: (v: number, l: Linha) => <CampoNumero size="small" min={0} max={49.99} step={0.1} precision={2} addonAfter="%" style={{ width: 100 }} value={v} onChange={x => alterar(l.chave, 'percentual', Number(x) || 0)} />,
             },
             {
               title: <Tooltip title="Taxa de venda: cobrada em toda venda, além do parcelamento. Em % (ex.: 2,99%) ou em R$ fixo por venda">Taxa de venda <InfoCircleOutlined /></Tooltip>, key: 'fixa', width: 150,
@@ -296,7 +295,7 @@ const TaxasPagamento: React.FC = () => {
             extra={(
               <Space wrap>
                 <Space.Compact size="small">
-                  <InputNumber size="small" min={0} max={49.99} step={0.1} precision={2} decimalSeparator="," addonAfter="%" placeholder="Taxa de venda"
+                  <CampoNumero size="small" min={0} max={49.99} step={0.1} precision={2} addonAfter="%" placeholder="Taxa de venda"
                     style={{ width: 140 }} value={vendaEmLote} onChange={v => setVendaEmLote(v)} />
                   <Button size="small" disabled={vendaEmLote === null}
                     onClick={() => setLinhas(ls => ls.map(l => (['DEBITO', 'CREDITO'].includes(l.forma)
@@ -334,7 +333,7 @@ const TaxasPagamento: React.FC = () => {
                   <Text strong>O preço de tabela já cobre a taxa do</Text>
                   <Select value={formaRef} style={{ width: 130 }} onChange={setFormaRef} options={FORMAS.map(f => ({ value: f, label: ROTULO_FORMA_TAXA[f] }))} />
                   <Text strong>em</Text>
-                  <InputNumber min={1} max={36} value={parcelasRef} onChange={v => setParcelasRef(Number(v) || 1)} style={{ width: 70 }} addonAfter="x" />
+                  <CampoNumero min={1} max={36} value={parcelasRef} onChange={v => setParcelasRef(Number(v) || 1)} style={{ width: 70 }} addonAfter="x" />
                   <Tag color="blue" style={{ fontSize: 13 }}>{pct(prev.ref)}</Tag>
                 </Space>
                 <div><Text type="secondary" style={{ fontSize: 12 }}>
@@ -344,7 +343,7 @@ const TaxasPagamento: React.FC = () => {
               <div>
                 <Space wrap align="center">
                   <Text strong>Crédito sem juros até</Text>
-                  <InputNumber min={1} max={36} value={semJuros} onChange={v => setSemJuros(Number(v) || 1)} style={{ width: 70 }} addonAfter="x" />
+                  <CampoNumero min={1} max={36} value={semJuros} onChange={v => setSemJuros(Number(v) || 1)} style={{ width: 70 }} addonAfter="x" />
                 </Space>
                 <div><Text type="secondary" style={{ fontSize: 12 }}>
                   Até aqui o cliente paga o preço de tabela e a loja absorve a diferença de taxa. Acima disso, o PDV soma o acréscimo.
@@ -371,7 +370,7 @@ const TaxasPagamento: React.FC = () => {
             <Space direction="vertical" style={{ width: '100%' }} size={10}>
               <Segmented block value={modoSimulacao} onChange={v => setModoSimulacao(v as 'TABELA' | 'RECEBER')}
                 options={[{ value: 'TABELA', label: 'Tenho o preço de tabela' }, { value: 'RECEBER', label: 'Quero receber' }]} />
-              <InputNumber size="large" min={0} precision={2} decimalSeparator="," prefix="R$" style={{ width: '100%' }}
+              <CampoDinheiro size="large" min={0} precision={2} style={{ width: '100%' }}
                 value={valorSimulado} onChange={setValorSimulado} />
               <div style={{ background: '#e6f4ff', borderRadius: 8, padding: '8px 12px' }}>
                 <Text type="secondary" style={{ fontSize: 12 }}>Preço de tabela</Text>

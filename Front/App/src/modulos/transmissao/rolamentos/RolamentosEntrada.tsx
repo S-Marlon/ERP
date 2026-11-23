@@ -4,7 +4,7 @@
 // 2ª linha num item só esteja ligada (6205-ZZ/2L).
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Alert, Badge, Button, Checkbox, Input, InputNumber, Modal, Select, Space, Spin, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { Alert, Badge, Button, Checkbox, Input, Modal, Select, Space, Spin, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { PlusOutlined, ToolOutlined } from '@ant-design/icons';
 import type { EntradaNfExtensaoProps, LinhaEntradaNf } from '../../registroModulos';
 import type { MappingPayload } from '../../../areas/compras/entradaNf/itens/ProductMappingModal';
@@ -14,6 +14,7 @@ import { createMarca } from '../../../areas/catalogo/marcas/services/comercialMa
 import {
   ConfigRolamentos, ItemExistente, MarcaModulo, montarDescricao, montarNome, montarSku, rolamentosApi, siglaDaMarca, Sufixo, TIPOS, TipoRolamento, VEDACOES,
 } from './rolamentosApi';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 const PARECE_ROLAMENTO = /\b(ROL|ROLAMENTO|ROLAMENTOS|ROLAM|MANCAL|BUCHA)\b/i;
@@ -249,7 +250,7 @@ const RolamentosEntrada: React.FC<EntradaNfExtensaoProps> = ({ linhas: linhasNot
     { label: 'Outras marcas do sistema', options: marcas.filter(m => marcaUtil(m) && !m.linha && !linhaDasMarcas[m.id]).map(m => ({ value: m.id, label: m.nome })) },
   ].filter(g => g.options.length);
   const medida = (l: Linha, campo: 'd' | 'D' | 'B') => (
-    <InputNumber size="small" min={0} precision={3} decimalSeparator="," controls={false} style={{ width: 62 }} value={l[campo]}
+    <CampoNumero size="small" min={0} precision={3} controls={false} style={{ width: 62 }} value={l[campo]}
       onChange={v => alterar(l.tempId, { [campo]: v === null ? null : Number(v), origemMedidas: 'MANUAL' } as Partial<Linha>)} />
   );
 
@@ -267,7 +268,7 @@ const RolamentosEntrada: React.FC<EntradaNfExtensaoProps> = ({ linhas: linhasNot
         footer={[
           <Space key="markup" style={{ float: 'left' }}>
             <Text>Markup dos itens novos</Text>
-            <InputNumber size="small" min={1} step={0.1} precision={2} decimalSeparator="," value={markup} onChange={v => setMarkup(Number(v) || 2)} style={{ width: 80 }} />
+            <CampoNumero size="small" min={1} step={0.1} precision={2} value={markup} onChange={v => setMarkup(Number(v) || 2)} style={{ width: 80 }} />
           </Space>,
           <Button key="v" onClick={() => setAberto(false)}>Cancelar</Button>,
           <Button key="a" type="primary" loading={salvando} disabled={!selecionadas.length || configIncompleta} onClick={aplicar}>

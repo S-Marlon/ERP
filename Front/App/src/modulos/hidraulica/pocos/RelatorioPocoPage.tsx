@@ -2,10 +2,7 @@
 // impressão (completo, cobrança, teste de vazão, garantia, em branco) com pré-visualização e arquivo XML para guardar/reabrir.
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Button, Card, Checkbox, Col, Collapse, DatePicker, Descriptions, Drawer, Dropdown, Flex, Form, Input, InputNumber, message, Row, Segmented, Select, Space,
-  Statistic, Switch, Tag, Tooltip, Typography, Upload, theme,
-} from 'antd';
+import { Button, Card, Checkbox, Col, Collapse, DatePicker, Descriptions, Drawer, Dropdown, Flex, Form, Input, message, Row, Segmented, Select, Space, Statistic, Switch, Tag, Tooltip, Typography, Upload, theme } from 'antd';
 import {
   ArrowLeftOutlined, BuildOutlined, CompassOutlined, DashboardOutlined, DeleteOutlined, DollarOutlined, DownloadOutlined, ExperimentOutlined, EyeOutlined,
   FileAddOutlined, LineChartOutlined, PlusOutlined, PrinterOutlined, SettingOutlined, UploadOutlined, UserOutlined,
@@ -16,6 +13,8 @@ import {
 } from './relatorioPoco';
 import { MODELOS, ModeloId } from './templatesPoco';
 import { mascaraCep, mascaraCnpj, mascaraCpfCnpj, mascaraTelefone, UFS } from '../../../shared/formularios/documentos';
+import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
+import { FORMATOS_DATA } from '../../../shared/formularios/numeros';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -74,12 +73,12 @@ export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: R
           <Flex vertical gap={6}>
             {campos.map(({ key, name }, i) => (
               <Row key={key} gutter={6} align="bottom" wrap={false}>
-                <Col flex="90px"><Form.Item label={i === 0 ? 'De' : ''} name={[name, de]} style={{ marginBottom: 0 }}><InputNumber disabled style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
-                <Col flex="100px"><Form.Item label={i === 0 ? 'Até' : ''} name={[name, ate]} style={{ marginBottom: 0 }}><InputNumber min={0} style={{ width: '100%' }} suffix="m" placeholder="35" /></Form.Item></Col>
+                <Col flex="90px"><Form.Item label={i === 0 ? 'De' : ''} name={[name, de]} style={{ marginBottom: 0 }}><CampoNumero disabled style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
+                <Col flex="100px"><Form.Item label={i === 0 ? 'Até' : ''} name={[name, ate]} style={{ marginBottom: 0 }}><CampoNumero min={0} style={{ width: '100%' }} suffix="m" placeholder="35" /></Form.Item></Col>
                 <Col flex="auto">
                   <Form.Item label={i === 0 ? 'Diâmetro' : ''} style={{ marginBottom: 0 }}>
                     <Space.Compact style={{ width: '100%' }}>
-                      <Form.Item name={[name, diam]} noStyle><InputNumber min={0} style={{ width: '100%' }} placeholder="6" /></Form.Item>
+                      <Form.Item name={[name, diam]} noStyle><CampoNumero min={0} style={{ width: '100%' }} placeholder="6" /></Form.Item>
                       {unidade([name, un])}
                     </Space.Compact>
                   </Form.Item>
@@ -109,9 +108,9 @@ export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: R
         <Flex vertical gap={6}>
           {campos.map(({ key, name }, i) => (
             <Row key={key} gutter={6} align="bottom" wrap={false}>
-              <Col flex="1"><Form.Item label={i === 0 ? 'Tempo' : ''} name={[name, 'tempo']} style={{ marginBottom: 0 }}><InputNumber min={0} style={{ width: '100%' }} suffix="min" /></Form.Item></Col>
-              <Col flex="1"><Form.Item label={i === 0 ? 'Nível' : ''} name={[name, 'nivel']} style={{ marginBottom: 0 }}><InputNumber min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
-              {comVazao && <Col flex="1"><Form.Item label={i === 0 ? 'Vazão' : ''} name={[name, 'vazao']} style={{ marginBottom: 0 }}><InputNumber min={0} style={{ width: '100%' }} suffix="L/h" /></Form.Item></Col>}
+              <Col flex="1"><Form.Item label={i === 0 ? 'Tempo' : ''} name={[name, 'tempo']} style={{ marginBottom: 0 }}><CampoNumero min={0} style={{ width: '100%' }} suffix="min" /></Form.Item></Col>
+              <Col flex="1"><Form.Item label={i === 0 ? 'Nível' : ''} name={[name, 'nivel']} style={{ marginBottom: 0 }}><CampoNumero min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
+              {comVazao && <Col flex="1"><Form.Item label={i === 0 ? 'Vazão' : ''} name={[name, 'vazao']} style={{ marginBottom: 0 }}><CampoNumero min={0} style={{ width: '100%' }} suffix="L/h" /></Form.Item></Col>}
               <Col flex="32px"><Button type="text" danger icon={<DeleteOutlined />} onClick={() => { remove(name); p.aoMudar({}); }} /></Col>
             </Row>
           ))}
@@ -166,21 +165,21 @@ export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: R
               extra={fundoPerfuracao > 0 && Number(valores.profundidade) !== fundoPerfuracao
                 ? <Button type="link" size="small" style={{ padding: 0 }} onClick={() => { form.setFieldValue('profundidade', fundoPerfuracao); p.aoMudar({}); }}>usar {fundoPerfuracao} m da perfuração</Button>
                 : null}>
-              <InputNumber min={0} style={{ width: '100%' }} suffix="m" />
+              <CampoNumero min={0} style={{ width: '100%' }} suffix="m" />
             </Form.Item>
           </Col>
           <Col xs={12} md={4}>
             <Form.Item label="Diâmetro interno">
               <Space.Compact style={{ width: '100%' }}>
-                <Form.Item name="diametroInterno" noStyle><InputNumber min={0} style={{ width: '100%' }} /></Form.Item>{unidade('diamInternoUnidade')}
+                <Form.Item name="diametroInterno" noStyle><CampoNumero min={0} style={{ width: '100%' }} /></Form.Item>{unidade('diamInternoUnidade')}
               </Space.Compact>
             </Form.Item>
           </Col>
-          <Col xs={12} md={5}><Form.Item label="Última limpeza" name="dtLimpeza"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item></Col>
+          <Col xs={12} md={5}><Form.Item label="Última limpeza" name="dtLimpeza"><DatePicker format={FORMATOS_DATA} style={{ width: '100%' }} /></Form.Item></Col>
           <Col xs={12} md={8}>
             <Form.Item label="Vazão na perfuração">
               <Space.Compact style={{ width: '100%' }}>
-                <Form.Item name="vazaoAprox" noStyle><InputNumber min={0} style={{ width: '100%' }} suffix="L/h" /></Form.Item>
+                <Form.Item name="vazaoAprox" noStyle><CampoNumero min={0} style={{ width: '100%' }} suffix="L/h" /></Form.Item>
               </Space.Compact>
               <Form.Item name="vazaoAproxAproximada" valuePropName="checked" noStyle><Checkbox style={{ marginTop: 4 }}>valor aproximado (~)</Checkbox></Form.Item>
             </Form.Item>
@@ -193,8 +192,8 @@ export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: R
       children: (
         <Flex vertical gap={12}>
           <Row gutter={12}>
-            <Col xs={12} md={5}><Form.Item label="Início" name="dtInicio"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item></Col>
-            <Col xs={12} md={5}><Form.Item label="Conclusão" name="dtTermino"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item></Col>
+            <Col xs={12} md={5}><Form.Item label="Início" name="dtInicio"><DatePicker format={FORMATOS_DATA} style={{ width: '100%' }} /></Form.Item></Col>
+            <Col xs={12} md={5}><Form.Item label="Conclusão" name="dtTermino"><DatePicker format={FORMATOS_DATA} style={{ width: '100%' }} /></Form.Item></Col>
             <Col xs={12} md={6}><Form.Item label="Formação / solo" name="tipoSolo"><Select allowClear options={SOLOS.map(s => ({ value: s, label: s }))} /></Form.Item></Col>
             <Col xs={12} md={8}>
               <Form.Item label="Garantia" name="garantiaMeses" extra={garantiaAte ? <Text type="success">válida até {garantiaAte}</Text> : 'informe a conclusão e os meses'}>
@@ -221,8 +220,8 @@ export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: R
         <Flex vertical gap={12}>
           <div><Text type="secondary" style={{ fontSize: 12 }}>Anomalias encontradas (as marcadas saem em destaque)</Text>{checks(ANOMALIAS)}</div>
           <Row gutter={12}>
-            <Col xs={12} md={6}><Form.Item label="Amperagem (leitura)" name="manutAmperagem"><InputNumber min={0} style={{ width: '100%' }} suffix="A" /></Form.Item></Col>
-            <Col xs={12} md={6}><Form.Item label="Isolamento (megômetro)" name="manutMegometro"><InputNumber min={0} style={{ width: '100%' }} suffix="MΩ" /></Form.Item></Col>
+            <Col xs={12} md={6}><Form.Item label="Amperagem (leitura)" name="manutAmperagem"><CampoNumero min={0} style={{ width: '100%' }} suffix="A" /></Form.Item></Col>
+            <Col xs={12} md={6}><Form.Item label="Isolamento (megômetro)" name="manutMegometro"><CampoNumero min={0} style={{ width: '100%' }} suffix="MΩ" /></Form.Item></Col>
             <Col xs={24} md={12}>
               <Form.Item label="Limpeza química" name="manutPeriodicidadeLimpeza">
                 <Select allowClear options={[{ value: '6_meses', label: 'A cada 6 meses' }, { value: '12_meses', label: 'Anual' }]} />
@@ -240,9 +239,9 @@ export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: R
           <Col xs={12} md={6}><Form.Item label="Marca da bomba" name="bombaMarca"><Input placeholder="Ebara" /></Form.Item></Col>
           <Col xs={12} md={6}><Form.Item label="Motor (modelo / potência)" name="imgMotorModelo"><Input placeholder="Franklin 1 HP" /></Form.Item></Col>
           <Col xs={12} md={6}><Form.Item label="Bombeador" name="imgBombeadorModelo"><Input placeholder="3BPS2-14" /></Form.Item></Col>
-          <Col xs={12} md={6}><Form.Item label="Instalação" name="bombaDtInstalacao"><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item></Col>
-          <Col xs={8} md={4}><Form.Item label="Tubos (barras)" name="bombaQtdTubos"><InputNumber min={0} style={{ width: '100%' }} /></Form.Item></Col>
-          <Col xs={8} md={4}><Form.Item label="Comp. do tubo" name="bombaTamTubo"><InputNumber min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
+          <Col xs={12} md={6}><Form.Item label="Instalação" name="bombaDtInstalacao"><DatePicker format={FORMATOS_DATA} style={{ width: '100%' }} /></Form.Item></Col>
+          <Col xs={8} md={4}><Form.Item label="Tubos (barras)" name="bombaQtdTubos"><CampoNumero min={0} style={{ width: '100%' }} /></Form.Item></Col>
+          <Col xs={8} md={4}><Form.Item label="Comp. do tubo" name="bombaTamTubo"><CampoNumero min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
           <Col xs={8} md={5}>
             <Form.Item label="Diâmetro do tubo">
               <Space.Compact style={{ width: '100%' }}><Form.Item name="bombaMedidaTubo" noStyle><Input placeholder="1" /></Form.Item>{unidade('bombaTuboUnidade')}</Space.Compact>
@@ -251,14 +250,14 @@ export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: R
           <Col xs={12} md={6}><Form.Item label="Material do tubo" name="bombaTubulacao"><Select allowClear options={MATERIAIS_TUBO.map(m => ({ value: m, label: m }))} /></Form.Item></Col>
           <Col xs={12} md={5}><Form.Item label="Profundidade da bomba" name="bombaProfundidade"
             extra={Number(valores.bombaQtdTubos) > 0 && Number(valores.bombaTamTubo) > 0 ? `tubos somam ${Number(valores.bombaQtdTubos) * Number(valores.bombaTamTubo)} m` : null}>
-            <InputNumber min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
+            <CampoNumero min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
           <Col xs={12} md={6}><Form.Item label="Cabo elétrico" name="bombaCabeamento"><Input placeholder="3 x 4 mm²" /></Form.Item></Col>
           <Col xs={12} md={6}><Form.Item label="Cavalete de saída" name="bombaCavalete"><Input placeholder="PEAD / galvanizado" /></Form.Item></Col>
-          <Col xs={12} md={6}><Form.Item label="Nível estático (NE)" name="bombaNivelEstatico"><InputNumber min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
-          <Col xs={12} md={6}><Form.Item label="Nível dinâmico (ND)" name="bombaNivelDinamico"><InputNumber min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
+          <Col xs={12} md={6}><Form.Item label="Nível estático (NE)" name="bombaNivelEstatico"><CampoNumero min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
+          <Col xs={12} md={6}><Form.Item label="Nível dinâmico (ND)" name="bombaNivelDinamico"><CampoNumero min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
           <Col xs={24} md={8}>
             <Form.Item label="Vazão regulada">
-              <Form.Item name="bombaVazaoEstimada" noStyle><InputNumber min={0} style={{ width: '100%' }} suffix="L/h" /></Form.Item>
+              <Form.Item name="bombaVazaoEstimada" noStyle><CampoNumero min={0} style={{ width: '100%' }} suffix="L/h" /></Form.Item>
               <Form.Item name="bombaVazaoAproximada" valuePropName="checked" noStyle><Checkbox style={{ marginTop: 4 }}>valor aproximado (~)</Checkbox></Form.Item>
             </Form.Item>
           </Col>
@@ -272,13 +271,13 @@ export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: R
       key: 'testeVazao', label: cabecalho(<DashboardOutlined style={{ color: '#1d39c4' }} />, 'Teste de vazão', 'testeVazao', 'testeVazao'),
       children: (
         <Row gutter={12}>
-          <Col xs={12} md={8}><Form.Item label="Duração do ensaio" name="testeVazaoDuracao"><InputNumber min={0} style={{ width: '100%' }} suffix="h" /></Form.Item></Col>
+          <Col xs={12} md={8}><Form.Item label="Duração do ensaio" name="testeVazaoDuracao"><CampoNumero min={0} style={{ width: '100%' }} suffix="h" /></Form.Item></Col>
           <Col xs={12} md={8}>
             <Form.Item label="Método" name="testeVazaoMetodo">
               <Select allowClear options={['Fluxo contínuo', 'Estágios', 'Air-lift (compressor)'].map(m => ({ value: m, label: m }))} />
             </Form.Item>
           </Col>
-          <Col xs={24} md={8}><Form.Item label="Vazão estabilizada" name="testeVazaoEstabilizada"><InputNumber min={0} style={{ width: '100%' }} suffix="m³/h" /></Form.Item></Col>
+          <Col xs={24} md={8}><Form.Item label="Vazão estabilizada" name="testeVazaoEstabilizada"><CampoNumero min={0} style={{ width: '100%' }} suffix="m³/h" /></Form.Item></Col>
           <Col xs={24} lg={14}><Card size="small" title="Leituras do bombeamento">{leituras('testeLeituras', true)}</Card></Col>
           <Col xs={24} lg={10}><Card size="small" title="Leituras da recuperação (após desligar)">{leituras('testeRecuperacao', false)}</Card></Col>
           <Col xs={24} style={{ marginTop: 8 }}>
@@ -298,15 +297,15 @@ export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: R
       children: (
         <Flex vertical gap={12}>
           <Row gutter={12}>
-            <Col xs={12} md={6}><Form.Item label="Metros contratados" name="finMetrosContratados"><InputNumber min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
-            <Col xs={12} md={6}><Form.Item label="Valor contratado (pacote)" name="finValorContratado"><InputNumber min={0} style={{ width: '100%' }} prefix="R$" precision={2} decimalSeparator="," /></Form.Item></Col>
-            <Col xs={12} md={6}><Form.Item label="Valor do metro excedente" name="finValorMetroExcedente"><InputNumber min={0} style={{ width: '100%' }} prefix="R$" precision={2} decimalSeparator="," /></Form.Item></Col>
+            <Col xs={12} md={6}><Form.Item label="Metros contratados" name="finMetrosContratados"><CampoNumero min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
+            <Col xs={12} md={6}><Form.Item label="Valor contratado (pacote)" name="finValorContratado"><CampoDinheiro min={0} style={{ width: '100%' }} precision={2} /></Form.Item></Col>
+            <Col xs={12} md={6}><Form.Item label="Valor do metro excedente" name="finValorMetroExcedente"><CampoDinheiro min={0} style={{ width: '100%' }} precision={2} /></Form.Item></Col>
             <Col xs={12} md={6}>
               <Form.Item label="Poço mais raso que o contratado">
                 <Form.Item name="finAbaterFalta" valuePropName="checked" noStyle><Checkbox>abater os metros a menos</Checkbox></Form.Item>
                 {valores.finAbaterFalta && (
                   <Form.Item name="finValorMetroFalta" noStyle>
-                    <InputNumber min={0} size="small" style={{ width: '100%', marginTop: 4 }} prefix="R$"
+                    <CampoDinheiro min={0} size="small" style={{ width: '100%', marginTop: 4 }}
                       placeholder={fin.contratados ? `${(fin.valorContratado / fin.contratados).toFixed(2)} (média)` : 'valor do metro'} />
                   </Form.Item>
                 )}
@@ -322,7 +321,7 @@ export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: R
                       {campos.map(({ key, name }) => (
                         <Row key={key} gutter={6} wrap={false}>
                           <Col flex="auto"><Form.Item name={[name, 'descricao']} noStyle><Input placeholder="Descrição" /></Form.Item></Col>
-                          <Col flex="130px"><Form.Item name={[name, 'valor']} noStyle><InputNumber min={0} style={{ width: '100%' }} prefix="R$" precision={2} decimalSeparator="," /></Form.Item></Col>
+                          <Col flex="130px"><Form.Item name={[name, 'valor']} noStyle><CampoDinheiro min={0} style={{ width: '100%' }} precision={2} /></Form.Item></Col>
                           <Col flex="32px"><Button type="text" danger icon={<DeleteOutlined />} onClick={() => { remove(name); p.aoMudar({}); }} /></Col>
                         </Row>
                       ))}
@@ -339,9 +338,9 @@ export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: R
                     <Flex vertical gap={6}>
                       {campos.map(({ key, name }) => (
                         <Row key={key} gutter={6} wrap={false}>
-                          <Col flex="130px"><Form.Item name={[name, 'data']} noStyle><DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} /></Form.Item></Col>
+                          <Col flex="130px"><Form.Item name={[name, 'data']} noStyle><DatePicker format={FORMATOS_DATA} style={{ width: '100%' }} /></Form.Item></Col>
                           <Col flex="120px"><Form.Item name={[name, 'forma']} noStyle><Select style={{ width: '100%' }} options={FORMAS_PAGAMENTO.map(x => ({ value: x, label: x }))} /></Form.Item></Col>
-                          <Col flex="130px"><Form.Item name={[name, 'valor']} noStyle><InputNumber min={0} style={{ width: '100%' }} prefix="R$" precision={2} decimalSeparator="," /></Form.Item></Col>
+                          <Col flex="130px"><Form.Item name={[name, 'valor']} noStyle><CampoDinheiro min={0} style={{ width: '100%' }} precision={2} /></Form.Item></Col>
                           <Col flex="auto"><Form.Item name={[name, 'obs']} noStyle><Input placeholder="Obs. (entrada, parcela...)" /></Form.Item></Col>
                           <Col flex="32px"><Button type="text" danger icon={<DeleteOutlined />} onClick={() => { remove(name); p.aoMudar({}); }} /></Col>
                         </Row>

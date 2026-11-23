@@ -2,7 +2,7 @@
 // no painel "Alterações não salvas" (antes → depois, com desfazer) e só vão para o banco/ML ao salvar.
 // Fotos, itens, categoria e as ações no ML (conferir, publicar, pausar, encerrar) valem na hora.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Badge, Button, Col, Flex, InputNumber, Modal, Row, Space, Spin, Tabs, Tag, Tooltip, Typography, message } from 'antd';
+import { Badge, Button, Col, Flex, Modal, Row, Space, Spin, Tabs, Tag, Tooltip, Typography, message } from 'antd';
 import { CheckCircleOutlined, CloudUploadOutlined, LinkOutlined, SaveOutlined, ShopOutlined, UndoOutlined } from '@ant-design/icons';
 import { adicionarAnexo, enviarArquivoAnexo, updateProduto } from '../../../areas/catalogo/skus/CatalogSku.service';
 import { AnuncioDetalhe, anunciosApi, ConferenciaItem, DivergenciasLinha, ItemDoAnuncio, PacoteMl, resumoSincronizacao, SecaoPreco } from './mercadoLivreApi';
@@ -27,6 +27,7 @@ import FichaDoProduto from './editor/FichaDoProduto';
 import CategoriaMlModal from './CategoriaMlModal';
 import AdicionarAnuncioModal from './AdicionarAnuncioModal';
 import SituacaoTag from './SituacaoTag';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 
@@ -441,7 +442,7 @@ const AnuncioEditor: React.FC<Props> = ({ id, onFechar, onAlterado, abrirEm }) =
                     Para quando o anúncio que já está no ML vende outra quantidade (ex.: o par a R$ 24,90 cadastrado como 1 unidade).
                     O anúncio do ML continua o mesmo; o preço de lá fica como preço desta linha e o estoque passa a ir dividido.
                   </p>
-                  <InputNumber min={1} max={999} precision={0} defaultValue={quantidade} onChange={v => { quantidade = Number(v) || 1; }} addonAfter="unidades" />
+                  <CampoNumero min={1} max={999} precision={0} defaultValue={quantidade} onChange={v => { quantidade = Number(v) || 1; }} addonAfter="unidades" />
                 </div>
               ),
               onOk: () => executar(() => anunciosApi.corrigirUnidade(salvo.id, i.idLinha, quantidade),

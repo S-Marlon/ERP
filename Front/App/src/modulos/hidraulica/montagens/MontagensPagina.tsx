@@ -3,9 +3,7 @@
 // montador), itens avulsos; etapas, sinal (entra no caixa), impressão, cancelamento e entrega pelo PDV.
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Alert, Button, Card, Checkbox, DatePicker, Drawer, Empty, Input, InputNumber, Modal, Popconfirm, Segmented, Select, Space, Steps, Table, Tag, Tooltip, Typography, message,
-} from 'antd';
+import { Alert, Button, Card, Checkbox, DatePicker, Drawer, Empty, Input, Modal, Popconfirm, Segmented, Select, Space, Steps, Table, Tag, Tooltip, Typography, message } from 'antd';
 import {
   CopyOutlined, DeleteOutlined, DollarOutlined, PlusOutlined, PrinterOutlined, ReloadOutlined, ShoppingCartOutlined, StopOutlined, ToolOutlined,
 } from '@ant-design/icons';
@@ -17,6 +15,8 @@ import { EtapaOs, ETAPAS_OS, FichaMangueira, OsDetalhe, OsResumo, osApi } from '
 import { brl, CamposFicha, CamposMontagem, EstadoMontagem, estadoInicialMontagem, fichaDaMontagem, gravarUltimos, ItemEscolhido, linhasDaMontagem, SeletorItem } from './montador';
 import { imprimirOs } from './impressaoOs';
 import { CHAVE_ENTREGAR_OS } from './MontagemPdv';
+import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
+import { FORMATOS_DATA } from '../../../shared/formularios/numeros';
 
 const { Text, Title } = Typography;
 const dataBr = (iso?: string | null) => (iso ? String(iso).slice(0, 10).split('-').reverse().join('/') : '—');
@@ -82,7 +82,7 @@ const TabelaItens: React.FC<{ itens: ItemEdit[]; editavel: boolean; onChange: (i
       {
         title: 'Qtd', key: 'q', width: 130,
         render: (_, i) => (editavel
-          ? <InputNumber size="small" min={0} precision={3} decimalSeparator="," value={i.quantidade} addonAfter={i.unidade || undefined} style={{ width: 120 }}
+          ? <CampoNumero size="small" min={0} precision={3} value={i.quantidade} addonAfter={i.unidade || undefined} style={{ width: 120 }}
               onChange={v => onChange(itens.map(x => (x.chave === i.chave ? { ...x, quantidade: Number(v) || 0, precoUnitario: undefined } : x)))} />
           : `${i.quantidade.toLocaleString('pt-BR')} ${i.unidade || ''}`),
       },
@@ -289,7 +289,7 @@ const DrawerOs: React.FC<{ idOs: number | 'nova' | null; onFechar: () => void; o
             </div>
             <div>
               <Text type="secondary" style={{ fontSize: 11 }}>Previsão de entrega</Text>
-              <DatePicker disabled={!editavel} format="DD/MM/YYYY" style={{ width: '100%' }} value={cab.previsao} onChange={v => setCabM({ ...cab, previsao: v })} />
+              <DatePicker disabled={!editavel} format={FORMATOS_DATA} style={{ width: '100%' }} value={cab.previsao} onChange={v => setCabM({ ...cab, previsao: v })} />
             </div>
             <div>
               <Text type="secondary" style={{ fontSize: 11 }}>Observação</Text>
@@ -326,7 +326,7 @@ const DrawerOs: React.FC<{ idOs: number | 'nova' | null; onFechar: () => void; o
           {editavel && (
             <Space.Compact style={{ width: '100%', marginBottom: 8 }}>
               <div style={{ flex: 1 }}><SeletorItem valor={novoAvulso} onChange={setNovoAvulso} placeholder="Buscar item ou serviço" /></div>
-              <InputNumber min={0} precision={3} decimalSeparator="," value={qtdAvulso} onChange={setQtdAvulso} style={{ width: 100 }} />
+              <CampoNumero min={0} precision={3} value={qtdAvulso} onChange={setQtdAvulso} style={{ width: 100 }} />
               <Button icon={<PlusOutlined />} disabled={!novoAvulso || !(Number(qtdAvulso) > 0)}
                 onClick={() => { if (!novoAvulso) return; setAvulsosM([...avulsos, { chave: novaChave(), idItem: novoAvulso.id, descricao: novoAvulso.nome, idUnidade: null, quantidade: Number(qtdAvulso) }]); setNovoAvulso(null); setQtdAvulso(1); }}>
                 Adicionar
@@ -370,7 +370,7 @@ const DrawerOs: React.FC<{ idOs: number | 'nova' | null; onFechar: () => void; o
           <Space.Compact style={{ width: '100%' }}>
             <Select value={sinal.forma} onChange={f => setSinal(s => ({ ...s, forma: f }))} style={{ width: 150 }}
               options={['DINHEIRO', 'PIX', 'DEBITO', 'CREDITO', 'TRANSFERENCIA'].map(f => ({ value: f, label: ROTULO_FORMA[f] }))} />
-            <InputNumber prefix="R$" min={0} precision={2} decimalSeparator="," style={{ width: '100%' }} value={sinal.valor} onChange={v => setSinal(s => ({ ...s, valor: v }))} />
+            <CampoDinheiro min={0} precision={2} style={{ width: '100%' }} value={sinal.valor} onChange={v => setSinal(s => ({ ...s, valor: v }))} />
           </Space.Compact>
         </Space>
       </Modal>

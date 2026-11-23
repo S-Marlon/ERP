@@ -1,6 +1,6 @@
 // Pagamento da venda no PDV: formas (com taxas, parcelamento, a prazo e sinal), lista de pagamentos, troco e conclusão.
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Badge, Button, Checkbox, DatePicker, Divider, Flex, Form, Input, InputNumber, List, Modal, Popover, Segmented, Select, Steps, Switch, Tag, Tooltip, Typography, message, theme } from 'antd';
+import { Alert, Badge, Button, Checkbox, DatePicker, Divider, Flex, Form, Input, List, Modal, Popover, Segmented, Select, Steps, Switch, Tag, Tooltip, Typography, message, theme } from 'antd';
 import type { InputRef } from 'antd';
 import {
     ArrowLeftOutlined, BankOutlined, CalculatorOutlined, CalendarOutlined, CheckOutlined, CreditCardOutlined, DeleteOutlined, DollarOutlined,
@@ -17,6 +17,8 @@ import { acrescimoParcelamento, ajusteDaForma, descontoDaForma, taxaPara, useTax
 import { CondicaoPagamento, pagamentoMaisCaro, pagamentosDaCondicao } from '../../negociacao/condicaoPagamento';
 import { useAdiantamentosAbertos } from '../services/adiantamentosApi';
 import { Calculadora, PreferenciasPdv, bipConfirmacao, guardarUltimoComprovante, lerPreferencias, salvarPreferencias, textoComprovante, ultimoComprovante } from './apoioPagamento';
+import { CampoDinheiro, CampoNumero } from '../../../../shared/formularios/CamposNumero';
+import { FORMATOS_DATA } from '../../../../shared/formularios/numeros';
 
 export interface ItemVenda {
     id: string | number;
@@ -437,7 +439,7 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
                             options={Array.from({ length: 12 }, (_, i) => i + 1).map(n => ({ value: n, label: `${n}x de ${brl(valorDigitado / n)}` }))} />
                         <Select style={{ width: 120 }} value={intervaloPrazo} onChange={setIntervaloPrazo}
                             options={[7, 10, 14, 15, 21, 28, 30, 45, 60].map(d => ({ value: d, label: `a cada ${d} dias` }))} />
-                        <DatePicker format="DD/MM/YYYY" placeholder="1º vencimento" style={{ width: 140 }}
+                        <DatePicker format={FORMATOS_DATA} placeholder="1º vencimento" style={{ width: 140 }}
                             value={primeiroVencimento ? dayjs(primeiroVencimento) : null}
                             disabledDate={d => d.isBefore(dayjs(), 'day')}
                             onChange={d => setPrimeiroVencimento(d ? d.format('YYYY-MM-DD') : '')} />
@@ -694,7 +696,7 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
                 <Flex vertical gap={8}>
                     <Segmented block value={descontoEdicao.tipo} onChange={v => setDescontoEdicao(d => ({ ...d, tipo: v as 'real' | 'porcent' }))}
                         options={[{ value: 'real', label: 'Em reais (R$)' }, { value: 'porcent', label: 'Em porcentagem (%)' }]} />
-                    <InputNumber autoFocus style={{ width: '100%' }} min={0} step={descontoEdicao.tipo === 'porcent' ? 0.5 : 1} precision={2} decimalSeparator=","
+                    <CampoNumero autoFocus style={{ width: '100%' }} min={0} step={descontoEdicao.tipo === 'porcent' ? 0.5 : 1} precision={2}
                         prefix={descontoEdicao.tipo === 'porcent' ? '%' : 'R$'} value={descontoEdicao.valor}
                         onChange={v => setDescontoEdicao(d => ({ ...d, valor: v }))} />
                     <Typography.Text type="secondary" style={{ fontSize: 12 }}>
@@ -716,27 +718,27 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
                     <Segmented block value={freteEdicao.modo} onChange={v => setFreteEdicao(f => ({ ...f, modo: v as 'valor' | 'km' | 'pct' }))}
                         options={[{ value: 'valor', label: 'Valor' }, { value: 'km', label: 'Por km' }, { value: 'pct', label: '% da venda' }]} />
                     {freteEdicao.modo === 'valor' && (
-                        <InputNumber autoFocus style={{ width: '100%' }} min={0} precision={2} decimalSeparator="," prefix="R$" placeholder="Valor do frete"
+                        <CampoDinheiro autoFocus style={{ width: '100%' }} min={0} precision={2} placeholder="Valor do frete"
                             value={freteEdicao.valor} onChange={v => setFreteEdicao(f => ({ ...f, valor: v }))} onPressEnter={aplicarFrete} />
                     )}
                     {freteEdicao.modo === 'km' && (
                         <>
                             <Flex gap={8}>
-                                <InputNumber autoFocus style={{ flex: 1 }} min={0} precision={1} decimalSeparator="," suffix="km" placeholder="Distância"
+                                <CampoNumero autoFocus style={{ flex: 1 }} min={0} precision={1} suffix="km" placeholder="Distância"
                                     value={freteEdicao.km} onChange={v => setFreteEdicao(f => ({ ...f, km: v }))} />
-                                <InputNumber style={{ flex: 1 }} min={0} precision={2} decimalSeparator="," prefix="R$" suffix="/km" placeholder="Valor do km"
+                                <CampoDinheiro style={{ flex: 1 }} min={0} precision={2} suffix="/km" placeholder="Valor do km"
                                     value={freteEdicao.valorKm} onChange={v => setFreteEdicao(f => ({ ...f, valorKm: v }))} />
                             </Flex>
                             <Flex gap={8} align="center" justify="space-between" wrap>
                                 <Checkbox checked={freteEdicao.idaVolta} onChange={e => setFreteEdicao(f => ({ ...f, idaVolta: e.target.checked }))}>Cobrar ida e volta</Checkbox>
-                                <InputNumber style={{ width: 170 }} min={0} precision={2} decimalSeparator="," prefix="Mín. R$" placeholder="Frete mínimo"
+                                <CampoNumero style={{ width: 170 }} min={0} precision={2} prefix="Mín. R$" placeholder="Frete mínimo"
                                     value={freteEdicao.minimo} onChange={v => setFreteEdicao(f => ({ ...f, minimo: v }))} />
                             </Flex>
                             <Typography.Text type="secondary" style={{ fontSize: 12 }}>O valor do km e o mínimo ficam lembrados neste computador.</Typography.Text>
                         </>
                     )}
                     {freteEdicao.modo === 'pct' && (
-                        <InputNumber autoFocus style={{ width: '100%' }} min={0} max={100} precision={2} decimalSeparator="," suffix="%" placeholder="Percentual sobre os produtos"
+                        <CampoNumero autoFocus style={{ width: '100%' }} min={0} max={100} precision={2} suffix="%" placeholder="Percentual sobre os produtos"
                             value={freteEdicao.pct} onChange={v => setFreteEdicao(f => ({ ...f, pct: v }))} onPressEnter={aplicarFrete} />
                     )}
                     <Flex justify="space-between" style={{ padding: '6px 10px', borderRadius: token.borderRadius, background: token.colorFillTertiary }}>

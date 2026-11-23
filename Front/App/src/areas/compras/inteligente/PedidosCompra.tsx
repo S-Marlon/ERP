@@ -1,12 +1,12 @@
 // Pedidos de compra e cotações: o pedido enviado ao fornecedor recebe os preços da resposta (cotação),
 // que ficam como referência de preço do item mesmo que a compra não aconteça.
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  Button, DatePicker, Drawer, Empty, InputNumber, Popconfirm, Segmented, Space, Statistic, Table, Tag, Typography, message,
-} from 'antd';
+import { Button, DatePicker, Drawer, Empty, Popconfirm, Segmented, Space, Statistic, Table, Tag, Typography, message } from 'antd';
 import { CopyOutlined, DeleteOutlined, ReloadOutlined, SaveOutlined, SendOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { compraInteligenteApi, PedidoDetalhe, PedidoResumo, StatusPedido } from './compraInteligenteApi';
+import { CampoDinheiro } from '../../../shared/formularios/CamposNumero';
+import { FORMATOS_DATA } from '../../../shared/formularios/numeros';
 
 const { Text } = Typography;
 const brl = (v: number | null | undefined) => (v === null || v === undefined ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
@@ -89,7 +89,7 @@ const PedidoDrawer: React.FC<{ id: number | null; onFechar: () => void; onAltera
             <Statistic title="Cotado" value={totalCotado} precision={2} prefix="R$" valueStyle={{ color: '#1677ff' }} />
             <div>
               <Text type="secondary" style={{ display: 'block', fontSize: 12 }}>Cotação válida até</Text>
-              <DatePicker format="DD/MM/YYYY" value={validade ? dayjs(validade) : null} onChange={d => setValidade(d ? d.format('YYYY-MM-DD') : null)} />
+              <DatePicker format={FORMATOS_DATA} value={validade ? dayjs(validade) : null} onChange={d => setValidade(d ? d.format('YYYY-MM-DD') : null)} />
             </div>
             <Text type="secondary" style={{ maxWidth: 360, fontSize: 12 }}>
               Digite o preço que o fornecedor respondeu (por unidade de compra). Fica guardado como referência do item, mesmo que você não compre.
@@ -116,7 +116,7 @@ const PedidoDrawer: React.FC<{ id: number | null; onFechar: () => void; onAltera
               {
                 title: 'Preço cotado', key: 'c', width: 140,
                 render: (_, i) => (
-                  <InputNumber size="small" min={0} step={0.01} precision={4} style={{ width: '100%' }} prefix="R$"
+                  <CampoDinheiro size="small" min={0} step={0.01} precision={4} style={{ width: '100%' }}
                     value={precos[i.idPedidoItem] ?? null} disabled={p.status === 'CANCELADO'}
                     onChange={v => setPrecos(x => ({ ...x, [i.idPedidoItem]: v === null ? null : Number(v) }))} />
                 ),

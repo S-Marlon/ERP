@@ -1,9 +1,10 @@
 // Preço por quantidade no ML (compradores empresa / B2B): até 5 faixas "a partir de N un., X% de desconto".
 // No anúncio aparecem como botões 1 · 5 · 10 · 24... para quem compra com CNPJ. As mudanças vão para o rascunho do editor.
 import React, { useState } from 'react';
-import { Alert, Button, Card, Flex, InputNumber, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { Alert, Button, Card, Flex, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { AnuncioDetalhe, anunciosApi, FaixaQuantidade, formatarMoeda } from './mercadoLivreApi';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 const PADRAO: FaixaQuantidade[] = [{ minimo: 5, desconto: 5 }, { minimo: 10, desconto: 8 }, { minimo: 24, desconto: 10 }];
@@ -49,8 +50,8 @@ const FaixasQuantidadeCard: React.FC<Props> = ({ det, onMudar, embutido }) => {
         size="small" pagination={false} rowKey="k" dataSource={faixas.map((f, k) => ({ ...f, k }))}
         locale={{ emptyText: 'Sem faixas: o comprador empresa paga o preço normal em qualquer quantidade.' }}
         columns={[
-          { title: 'A partir de', width: 150, render: (_, f) => <InputNumber min={2} max={100} precision={0} value={f.minimo} suffix="un." style={{ width: '100%' }} onChange={v => mudar(f.k, 'minimo', v)} onBlur={() => onMudar(ordenar(faixas))} /> },
-          { title: 'Desconto', width: 140, render: (_, f) => <InputNumber min={0.01} max={99.99} step={0.5} precision={2} decimalSeparator="," value={f.desconto} suffix="%" style={{ width: '100%' }} onChange={v => mudar(f.k, 'desconto', v)} /> },
+          { title: 'A partir de', width: 150, render: (_, f) => <CampoNumero min={2} max={100} precision={0} value={f.minimo} suffix="un." style={{ width: '100%' }} onChange={v => mudar(f.k, 'minimo', v)} onBlur={() => onMudar(ordenar(faixas))} /> },
+          { title: 'Desconto', width: 140, render: (_, f) => <CampoNumero min={0.01} max={99.99} step={0.5} precision={2} value={f.desconto} suffix="%" style={{ width: '100%' }} onChange={v => mudar(f.k, 'desconto', v)} /> },
           {
             title: 'Preço por unidade',
             render: (_, f) => (preco > 0

@@ -1,13 +1,14 @@
 // Caixa do PDV: indicador no cabeçalho e os painéis (abrir, resumo, sangria/suprimento, fechar).
 // Os painéis ficam montados no cabeçalho do PDV; qualquer tela abre um deles por caixaStore.mostrar(...).
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Descriptions, Drawer, Empty, Input, InputNumber, Modal, Select, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { Alert, Button, Descriptions, Drawer, Empty, Input, Modal, Select, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { MinusCircleOutlined, PlusCircleOutlined, PrinterOutlined, LockOutlined, UnlockOutlined } from '@ant-design/icons';
 import { caixaApi, FORMAS_SEM_CONFERENCIA, LinhaConferencia, operadorAtual, ResumoCaixa, ROTULO_FORMA, ROTULO_MOVIMENTO, Caixa } from './caixaApi';
 import { caixaStore, useCaixa } from './caixaStore';
 import { imprimirHtml } from '../../../shared/core/impressao/saida';
 import { adiantamentosApi } from '../pdv/services/adiantamentosApi';
 import { buscarClientesPdv, ClienteBusca } from '../pdv/services/api/products';
+import { CampoDinheiro } from '../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 export const brl = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -143,7 +144,7 @@ const ModalAbrir: React.FC = () => {
       <Space direction="vertical" style={{ width: '100%' }}>
         <Text>Operador: <b>{operadorAtual()}</b> <Text type="secondary" style={{ fontSize: 11 }}>(Configurações › Meu Perfil)</Text></Text>
         <Text strong>Troco inicial na gaveta</Text>
-        <InputNumber autoFocus prefix="R$" min={0} step={10} precision={2} decimalSeparator="," style={{ width: '100%' }} size="large"
+        <CampoDinheiro autoFocus min={0} step={10} precision={2} style={{ width: '100%' }} size="large"
           value={valor} onChange={setValor} onPressEnter={abrir} />
       </Space>
     </Modal>
@@ -179,7 +180,7 @@ const ModalMovimento: React.FC = () => {
       okButtonProps={{ disabled: !(Number(valor) > 0) || (tipo === 'SANGRIA' && !motivo.trim()) }} width={400} destroyOnHidden>
       <Space direction="vertical" style={{ width: '100%' }}>
         {tipo === 'SANGRIA' && <Text type="secondary">Dinheiro esperado na gaveta: <b>{brl(resumo?.dinheiroEsperado || 0)}</b></Text>}
-        <InputNumber autoFocus prefix="R$" min={0} precision={2} decimalSeparator="," style={{ width: '100%' }} size="large" value={valor} onChange={setValor} />
+        <CampoDinheiro autoFocus min={0} precision={2} style={{ width: '100%' }} size="large" value={valor} onChange={setValor} />
         <Input placeholder={tipo === 'SANGRIA' ? 'Motivo (obrigatório): depósito, pagamento de frete...' : 'Motivo (opcional)'}
           value={motivo} onChange={e => setMotivo(e.target.value)} maxLength={255} onPressEnter={salvar} />
       </Space>
@@ -242,7 +243,7 @@ const ModalFechar: React.FC = () => {
           {
             title: 'Contado', key: 'contado', width: 150,
             render: (_, l) => (
-              <InputNumber size="small" prefix="R$" min={0} precision={2} decimalSeparator="," style={{ width: '100%' }}
+              <CampoDinheiro size="small" min={0} precision={2} style={{ width: '100%' }}
                 value={contagem[l.forma] ?? null} onChange={v => setContagem(c => ({ ...c, [l.forma]: v }))} />
             ),
           },
@@ -300,7 +301,7 @@ const ModalSinal: React.FC = () => {
         <Space.Compact style={{ width: '100%' }}>
           <Select value={forma} onChange={setForma} style={{ width: 150 }}
             options={['DINHEIRO', 'PIX', 'DEBITO', 'CREDITO', 'TRANSFERENCIA'].map(f => ({ value: f, label: ROTULO_FORMA[f] }))} />
-          <InputNumber prefix="R$" min={0} precision={2} decimalSeparator="," style={{ width: '100%' }} value={valor} onChange={setValor} />
+          <CampoDinheiro min={0} precision={2} style={{ width: '100%' }} value={valor} onChange={setValor} />
         </Space.Compact>
         <Input placeholder="Observação (ex.: sinal da encomenda de ...)" value={observacao} onChange={e => setObservacao(e.target.value)} maxLength={255} />
       </Space>

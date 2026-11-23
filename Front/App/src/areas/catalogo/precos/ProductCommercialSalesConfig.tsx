@@ -1,23 +1,4 @@
-import {
-Card,
-Input,
-InputNumber,
-Select,
-Button,
-Row,
-Col,
-Space,
-Typography,
-Modal,
-message,
-Tag,
-Alert,
-Switch,
-Radio,
-Spin,
-Empty,
-Tooltip
-} from 'antd';
+import { Card, Input, Select, Button, Row, Col, Space, Typography, Modal, message, Tag, Alert, Switch, Radio, Spin, Empty, Tooltip } from 'antd';
 import {
 AppstoreAddOutlined,
 DeleteOutlined,
@@ -50,6 +31,7 @@ TierRuleRecord
 import { validarGtin } from '../../compras/entradaNf/gtin';
 import SeletorUnidade from '../unidades/SeletorUnidade';
 import { lucroLiquido, margemLiquidaPct, markupPorPreco, precoSegueMarkup, useTaxaPreco } from '../../../shared/core/precos/taxaPreco';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 
@@ -583,7 +565,7 @@ Custo base por {baseLabel}
 {modoRascunho ? (
 <Text strong style={{ fontSize: 14, color: '#d4380d' }}>{formatBRL(purchaseCost)}</Text>
 ) : (
-<InputNumber
+<CampoNumero
 prefix={<DollarOutlined style={{ color: '#bfbfbf' }} />}
 value={purchaseCost}
 precision={4}
@@ -926,7 +908,7 @@ boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(0,0,0,0.06)', paddingBottom: 4 }}>
 <Space size={4}>
 <span style={{ color: '#8c8c8c', fontSize: 11 }}>De</span>
-<InputNumber
+<CampoNumero
 min={1}
 step={1}
 precision={0}
@@ -941,7 +923,7 @@ onChange={(v) => handleUpdateTierLimit(rule.key, 'minQuantity', v ?? 0)}
 {isLastGomo ? (
 <span style={{ fontWeight: 'bold', padding: '0 4px', color: '#595959', fontSize: 12 }}>∞</span>
 ) : (
-<InputNumber
+<CampoNumero
 min={1}
 size="small"
 value={typeof rule.maxQuantity === 'number' ? rule.maxQuantity : 0}
@@ -983,7 +965,7 @@ style={{ padding: '0 4px', height: 20 }}
 </Tooltip>
 </td>
 <td style={{ padding: '4px 2px' }}>
-<InputNumber
+<CampoNumero
 min={0}
 step={0.1}
 precision={2}
@@ -1042,7 +1024,7 @@ setTierRules(updated);
 
 
 <td style={{ padding: '4px 2px' }}>
-<InputNumber
+<CampoNumero
 size="small"
 min={0}
 precision={2}
@@ -1163,7 +1145,7 @@ onChange={(e) => setFormUnitName(e.target.value)}
 <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
 {formIsBase ? 'Unidade base de estoque (fator fixo 1):' : `Fator de Conversão (1 ${formUnitKey || 'unidade'} = X ${baseLabel}):`}
 </Text>
-<InputNumber
+<CampoNumero
 style={{ width: '100%' }}
 min={0.001}
 step={1}
@@ -1183,7 +1165,7 @@ onChange={(e) => setFormGtin(e.target.value.replace(/\D/g, ''))}
 </div>
 <div>
 <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>Markup Inicial de Varejo:</Text>
-<InputNumber
+<CampoNumero
 style={{ width: '100%' }}
 min={1}
 step={0.1}

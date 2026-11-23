@@ -3,10 +3,7 @@
 // combinados; "equilibrar" leva os livres para a margem que fecha no alvo; faixas por quantidade. Custo e margem nunca
 // saem na proposta. Abaixo da margem mínima pede a senha de autorização (Vendas › Regras de venda).
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  Alert, AutoComplete, Button, Card, Col, Drawer, Empty, Flex, Input, InputNumber, Modal, Progress, Row, Select, Slider, Space, Statistic, Table, Tag,
-  Tooltip, Typography, message,
-} from 'antd';
+import { Alert, AutoComplete, Button, Card, Col, Drawer, Empty, Flex, Input, Modal, Progress, Row, Select, Slider, Space, Statistic, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { DeleteOutlined, LockOutlined, PlusOutlined, SaveOutlined, ThunderboltOutlined, UnlockOutlined } from '@ant-design/icons';
 import {
   aplicarMargem, equilibrar, FaixaQuantidade, margem as margemDe, markup as markupDe, precoParaMargem, resumoNegociacao,
@@ -14,6 +11,7 @@ import {
 import { CONDICOES_PAGAMENTO, ConfigNegociacao, ErroNegociacao, ItemNegociacao, LinhaPreparada, negociacaoApi } from './negociacaoApi';
 import { CondicaoPagamento, custoDaCondicao, FormaCondicao, textoDaCondicao } from './condicaoPagamento';
 import { taxaPara, useTaxasVenda } from '../taxas/taxasVenda';
+import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -139,7 +137,7 @@ export const NegociacaoDrawer: React.FC<{
     },
     {
       title: 'Qtd', key: 'q', width: 80, render: (_: unknown, l: Linha & { i: number }) => (
-        <InputNumber size="small" min={0.001} value={l.quantidade} style={{ width: 70 }} decimalSeparator="," onChange={v => v && mudar(l.i, { quantidade: Number(v) })} />
+        <CampoNumero size="small" min={0.001} value={l.quantidade} style={{ width: 70 }} onChange={v => v && mudar(l.i, { quantidade: Number(v) })} />
       ),
     },
     {
@@ -170,7 +168,7 @@ export const NegociacaoDrawer: React.FC<{
               marks={{ [Math.round(cfgN.margemMinimaNegociacao * 100)]: ' ', [Math.round(alvo * 100)]: ' ' }}
               tooltip={{ formatter: v => `${v}% → ${brl(precoParaMargem(l.custoUnitario, (v ?? 0) / 100))}` }}
               onChange={v => mudar(l.i, { preco: precoParaMargem(l.custoUnitario, v / 100) })} />
-            <InputNumber size="small" style={{ width: 72 }} value={m === null ? null : Math.round(m * 1000) / 10} suffix="%" decimalSeparator="," disabled={l.travado}
+            <CampoNumero size="small" style={{ width: 72 }} value={m === null ? null : Math.round(m * 1000) / 10} suffix="%" disabled={l.travado}
               onChange={v => v !== null && mudar(l.i, { preco: precoParaMargem(l.custoUnitario, Number(v) / 100) })} />
           </Flex>
         );
@@ -181,7 +179,7 @@ export const NegociacaoDrawer: React.FC<{
         const m = margemDe(l.preco, l.custoUnitario);
         return (
           <Space direction="vertical" size={0}>
-            <InputNumber size="small" min={0} step={0.5} style={{ width: 120, borderColor: corDaMargem(m, cfgN, alvo) }} prefix="R$" decimalSeparator="," precision={2}
+            <CampoDinheiro size="small" min={0} step={0.5} style={{ width: 120, borderColor: corDaMargem(m, cfgN, alvo) }} precision={2}
               value={l.preco} disabled={l.travado} onChange={v => v !== null && mudar(l.i, { preco: Number(v) })} />
             <Text type="secondary" style={{ fontSize: 11 }}>
               <Text style={{ fontSize: 11, color: corDaMargem(m, cfgN, alvo) }}>{pct(m)}</Text>
@@ -211,12 +209,12 @@ export const NegociacaoDrawer: React.FC<{
         return (
           <Flex key={k} gap={8} align="center" wrap>
             <Text style={{ fontSize: 12 }}>A partir de</Text>
-            <InputNumber size="small" min={2} value={f.quantidadeMinima} style={{ width: 80 }} onChange={v => v && set({ quantidadeMinima: Number(v) })} suffix={l.sigla} />
+            <CampoNumero size="small" min={2} value={f.quantidadeMinima} style={{ width: 80 }} onChange={v => v && set({ quantidadeMinima: Number(v) })} suffix={l.sigla} />
             {l.custoUnitario > 0 && (
-              <InputNumber size="small" style={{ width: 80 }} value={m === null ? null : Math.round(m * 1000) / 10} suffix="%" decimalSeparator=","
+              <CampoNumero size="small" style={{ width: 80 }} value={m === null ? null : Math.round(m * 1000) / 10} suffix="%"
                 onChange={v => v !== null && set({ precoUnitario: precoParaMargem(l.custoUnitario, Number(v) / 100) })} />
             )}
-            <InputNumber size="small" min={0} precision={2} prefix="R$" decimalSeparator="," style={{ width: 120, borderColor: cfg ? corDaMargem(m, cfg, alvo) : undefined }}
+            <CampoDinheiro size="small" min={0} precision={2} style={{ width: 120, borderColor: cfg ? corDaMargem(m, cfg, alvo) : undefined }}
               value={f.precoUnitario} onChange={v => v !== null && set({ precoUnitario: Number(v) })} />
             <Button size="small" type="text" danger icon={<DeleteOutlined />} onClick={() => mudar(l.i, { faixas: l.faixas.filter((_, j) => j !== k) })} />
           </Flex>
@@ -271,7 +269,7 @@ export const NegociacaoDrawer: React.FC<{
               <Col xs={24} lg={8}>
                 <Flex gap={8} align="center" wrap>
                   <Text>Alvo</Text>
-                  <InputNumber size="small" min={0} max={90} value={Math.round(alvo * 1000) / 10} suffix="%" decimalSeparator="," style={{ width: 84 }}
+                  <CampoNumero size="small" min={0} max={90} value={Math.round(alvo * 1000) / 10} suffix="%" style={{ width: 84 }}
                     onChange={v => v !== null && setAlvo(Number(v) / 100)} />
                   <Tooltip title="Os itens travados ficam; os outros vão para a margem que fecha o orçamento no alvo">
                     <Button type="primary" ghost icon={<ThunderboltOutlined />} onClick={equilibrarAlvo}>Equilibrar para o alvo</Button>
@@ -327,14 +325,14 @@ export const NegociacaoDrawer: React.FC<{
                       { value: 'DEBITO', label: 'Cartão de débito' }, { value: 'CREDITO', label: 'Cartão de crédito' }, { value: 'PRAZO', label: 'A prazo (boleto/crediário)' },
                     ]} />
                   {(cond.forma === 'CREDITO' || cond.forma === 'PRAZO') && (
-                    <InputNumber style={{ width: 82 }} min={1} max={24} value={cond.parcelas} suffix="x" onChange={v => setCond({ ...cond, parcelas: Number(v) || 1 })} />
+                    <CampoNumero style={{ width: 82 }} min={1} max={24} value={cond.parcelas} suffix="x" onChange={v => setCond({ ...cond, parcelas: Number(v) || 1 })} />
                   )}
                   {cond.forma === 'PRAZO' && (
                     <Select style={{ width: 120 }} value={cond.intervaloDias} onChange={v => setCond({ ...cond, intervaloDias: v })}
                       options={[7, 10, 14, 15, 21, 28, 30, 35, 45, 60].map(d => ({ value: d, label: `a cada ${d} dias` }))} />
                   )}
                   {(cond.forma === 'CREDITO' || cond.forma === 'PRAZO') && (
-                    <InputNumber style={{ width: 140 }} min={0} value={cond.entrada || null} prefix="Entrada R$" decimalSeparator="," placeholder="0"
+                    <CampoNumero style={{ width: 140 }} min={0} value={cond.entrada || null} prefix="Entrada R$" placeholder="0"
                       onChange={v => setCond({ ...cond, entrada: Number(v) || 0 })} />
                   )}
                 </Flex>
@@ -345,7 +343,7 @@ export const NegociacaoDrawer: React.FC<{
               </Col>
               <Col xs={12} md={4}>
                 <Text style={{ fontSize: 12 }}>Validade</Text>
-                <InputNumber style={{ width: '100%' }} min={1} max={180} value={validade} onChange={v => setValidade(v || 1)} suffix={validade === 1 ? 'dia' : 'dias'} />
+                <CampoNumero style={{ width: '100%' }} min={1} max={180} value={validade} onChange={v => setValidade(v || 1)} suffix={validade === 1 ? 'dia' : 'dias'} />
               </Col>
               <Col xs={12} md={5}>
                 <Text style={{ fontSize: 12 }}>Contato</Text>

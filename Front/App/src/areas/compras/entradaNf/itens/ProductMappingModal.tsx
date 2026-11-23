@@ -1,9 +1,7 @@
 // Mapeamento de uma linha da NF (ou de uma fila de linhas): vincular a um item do catálogo ou cadastrar item novo,
 // e depois definir como a nota vira estoque (conversão), o custo base e, para item novo de venda, o preço.
 import React, { useEffect, useRef, useState } from "react";
-import {
-  Alert, Button, Col, Empty, Input, InputNumber, Modal, Progress, Row, Space, Spin, Steps, Tag, Tooltip, Typography,
-} from "antd";
+import { Alert, Button, Col, Empty, Input, Modal, Progress, Row, Space, Spin, Steps, Tag, Tooltip, Typography } from 'antd';
 import {
   ArrowLeftOutlined, ArrowRightOutlined, CheckCircleFilled, CheckOutlined, EditOutlined, FileAddOutlined, LinkOutlined,
   LockOutlined, RollbackOutlined, SearchOutlined, StepForwardOutlined,
@@ -15,6 +13,7 @@ import type { SalvarConfigPayload } from "../../../catalogo/precos/configVendas.
 import { ClassificacaoPim, ClassificacaoItem, CLASSIFICACAO_VAZIA } from "./ClassificacaoPim";
 import { classificacaoNoRascunho, foraDaVenda } from "../edicaoLote";
 import { DEPOSITOS, depositoPadraoDoTipo } from "../depositos";
+import { CampoNumero } from '../../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 
@@ -492,7 +491,7 @@ const ProductMappingModal: React.FC<MappingModalProps> = ({ items = [], onMap, o
                 </Text>
               </Tooltip>
             )}
-            <InputNumber min={0.000001} value={convFator} onChange={v => setConvFator(Number(v) || 0)} style={{ width: 100 }} />
+            <CampoNumero min={0.000001} value={convFator} onChange={v => setConvFator(Number(v) || 0)} style={{ width: 100 }} />
             {unidadeBaseTravada ? (
               <Tooltip title="Unidade de estoque do item já cadastrado"><Tag color="purple" style={{ margin: 0, padding: "2px 10px" }}>{convUnidadeBase}</Tag></Tooltip>
             ) : (

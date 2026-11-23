@@ -3,10 +3,7 @@
 // alertas, o cadastro dos aparelhos (com a chave para o firmware) e o guia de como montar o quadro e ligar a placa.
 // O servidor não depende da placa (ESP-01, ESP32, 4G, LoRa ou arquivo): vale o formato do envio.
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  Alert, Badge, Button, Card, Col, Descriptions, Drawer, Empty, Input, InputNumber, Modal, Row, Segmented, Select, Space, Statistic, Switch, Table, Tag, Tooltip, Typography,
-  Upload, message,
-} from 'antd';
+import { Alert, Badge, Button, Card, Col, Descriptions, Drawer, Empty, Input, Modal, Row, Segmented, Select, Space, Statistic, Switch, Table, Tag, Tooltip, Typography, Upload, message } from 'antd';
 import {
   ApiOutlined, BellOutlined, DownloadOutlined, ExperimentOutlined, EyeOutlined, FileTextOutlined, KeyOutlined, PlusOutlined, PrinterOutlined, ReloadOutlined,
   SendOutlined, ThunderboltOutlined, UploadOutlined,
@@ -18,6 +15,7 @@ import {
   URL_LEITURAS,
 } from './obrasApi';
 import { abrirPoco } from './navPocos';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text, Paragraph } = Typography;
 const erro = (e: unknown) => message.error(e instanceof Error ? e.message : 'Erro.');
@@ -65,7 +63,7 @@ const Simulador: React.FC<{ d: Dispositivo; onEnviado: () => void }> = ({ d, onE
   };
   const campo = (k: keyof LeituraEnvio, rotulo: string, suf: string, span = 6) => (
     <Col span={span}><Text style={{ fontSize: 12 }}>{rotulo}</Text>
-      <InputNumber size="small" decimalSeparator="," suffix={suf} style={{ width: '100%' }} value={(l[k] as number | null) ?? undefined}
+      <CampoNumero size="small" suffix={suf} style={{ width: '100%' }} value={(l[k] as number | null) ?? undefined}
         onChange={v => setL({ ...l, [k]: v === null ? null : Number(v) })} />
     </Col>
   );
@@ -371,7 +369,7 @@ const Aparelhos: React.FC<{ novo: boolean; onNovoFeito: () => void }> = ({ novo,
   const verChave = async (d: Dispositivo) => { try { setChave(await iotApi.chave(d.idDispositivo)); } catch (e) { erro(e); } };
   const n = (k: keyof DispositivoForm, rotulo: string, suf: string, dica?: string) => (
     <Col span={8}><Tooltip title={dica}><Text>{rotulo}{dica ? ' ⓘ' : ''}</Text></Tooltip>
-      <InputNumber min={0} decimalSeparator="," suffix={suf} style={{ width: '100%' }} value={(f[k] as number | null) ?? undefined}
+      <CampoNumero min={0} suffix={suf} style={{ width: '100%' }} value={(f[k] as number | null) ?? undefined}
         onChange={v => setF({ ...f, [k]: v === null ? null : Number(v) })} />
     </Col>
   );
@@ -405,7 +403,7 @@ const Aparelhos: React.FC<{ novo: boolean; onNovoFeito: () => void }> = ({ novo,
               <Select style={{ width: '100%' }} value={f.alimentacao} onChange={alimentacao => setF({ ...f, alimentacao })} options={(Object.keys(ALIMENTACOES_IOT) as AlimentacaoIot[]).map(a => ({ value: a, label: ALIMENTACOES_IOT[a] }))} />
             </Col>
             <Col span={5}><Tooltip title="De quanto em quanto tempo o aparelho mede (e, com internet, envia)"><Text>Mede a cada ⓘ</Text></Tooltip>
-              <InputNumber min={1} max={1440} suffix="min" style={{ width: '100%' }} value={f.intervaloMin} onChange={v => setF({ ...f, intervaloMin: Number(v) || 15 })} />
+              <CampoNumero min={1} max={1440} suffix="min" style={{ width: '100%' }} value={f.intervaloMin} onChange={v => setF({ ...f, intervaloMin: Number(v) || 15 })} />
             </Col>
           </Row>
           {f.conexao === 'OFFLINE' && <Alert type="info" showIcon message="Sem internet: as leituras entram pelo botão Importar arquivo (no detalhe do aparelho). Não gera alerta de sem sinal." />}
@@ -420,8 +418,8 @@ const Aparelhos: React.FC<{ novo: boolean; onNovoFeito: () => void }> = ({ novo,
             {n('correnteMaxA', 'Corrente máxima', 'A', 'Acima da corrente nominal da placa do motor (ex.: +15%).')}
             <Col span={8}><Text>Tensão (mín. / máx.)</Text>
               <Space.Compact style={{ width: '100%' }}>
-                <InputNumber min={0} style={{ width: '50%' }} value={f.tensaoMinV ?? undefined} onChange={v => setF({ ...f, tensaoMinV: v === null ? null : Number(v) })} />
-                <InputNumber min={0} style={{ width: '50%' }} value={f.tensaoMaxV ?? undefined} onChange={v => setF({ ...f, tensaoMaxV: v === null ? null : Number(v) })} />
+                <CampoNumero min={0} style={{ width: '50%' }} value={f.tensaoMinV ?? undefined} onChange={v => setF({ ...f, tensaoMinV: v === null ? null : Number(v) })} />
+                <CampoNumero min={0} style={{ width: '50%' }} value={f.tensaoMaxV ?? undefined} onChange={v => setF({ ...f, tensaoMaxV: v === null ? null : Number(v) })} />
               </Space.Compact>
             </Col>
           </Row>

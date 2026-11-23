@@ -1,9 +1,7 @@
 // Cartazes de atacado em A4: lista de cartazes, pré-visualização da folha e editor do cartaz escolhido.
 // O preço vem sempre da precificação (não se edita aqui); o editor ajusta só textos e o que aparece no cartaz.
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  Alert, AutoComplete, Button, Card, Checkbox, Col, DatePicker, Divider, Empty, Flex, Input, InputNumber, List, Modal, Row, Select, Space, Switch, Tag, Tooltip, Typography, message, theme,
-} from 'antd';
+import { Alert, AutoComplete, Button, Card, Checkbox, Col, DatePicker, Divider, Empty, Flex, Input, List, Modal, Row, Select, Space, Switch, Tag, Tooltip, Typography, message, theme } from 'antd';
 import { DeleteOutlined, LeftOutlined, PrinterOutlined, RightOutlined, TagsOutlined, UndoOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useListaTrabalho } from '../../../shared/core/listaTrabalho/ListaTrabalhoContext';
@@ -12,6 +10,8 @@ import {
 } from '../../../shared/core/impressao/cartazes';
 import { imprimirHtml } from '../../../shared/core/impressao/saida';
 import { buscarItensEtiqueta, getDadosEtiquetas, ItemEtiquetaApi } from '../api/etiquetasApi';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
+import { FORMATOS_DATA } from '../../../shared/formularios/numeros';
 
 const { Text } = Typography;
 const money = (v: number) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -195,7 +195,7 @@ const CartazesAtacado: React.FC<Props> = ({ onVoltar }) => {
                       <List.Item onClick={() => setSelecionado(i.idItem)}
                         style={{ cursor: 'pointer', paddingInline: 8, borderRadius: 6, background: ativo ? token.colorPrimaryBg : undefined }}
                         actions={[
-                          <InputNumber key="c" size="small" min={1} max={99} style={{ width: 58 }} value={i.copias} title="Cópias"
+                          <CampoNumero key="c" size="small" min={1} max={99} style={{ width: 58 }} value={i.copias} title="Cópias"
                             onClick={e => e.stopPropagation()} onChange={v => mudarItem(i.idItem, { copias: Math.max(1, Number(v) || 1) })} />,
                           <Button key="x" size="small" type="text" danger icon={<DeleteOutlined />} onClick={e => { e.stopPropagation(); tirar(i.idItem); }} />,
                         ]}>
@@ -260,7 +260,7 @@ const CartazesAtacado: React.FC<Props> = ({ onVoltar }) => {
                 <Flex gap={12} wrap align="center">
                   <div>
                     <Text style={{ fontSize: 12 }}>Preços válidos até</Text><br />
-                    <DatePicker format="DD/MM/YYYY" allowClear value={opcoes.validade ? dayjs(opcoes.validade) : null}
+                    <DatePicker format={FORMATOS_DATA} allowClear value={opcoes.validade ? dayjs(opcoes.validade) : null}
                       onChange={d => mudar({ opcoes: { ...opcoes, validade: d ? d.format('YYYY-MM-DD') : undefined } })} />
                   </div>
                   <Tooltip title="Sem fundos chapados: a cor fica só em contornos e textos">

@@ -1,6 +1,7 @@
 import React from "react";
-import { Card, Button, Table, Tooltip, Empty, Tag, Dropdown, MenuProps, Switch, InputNumber, Input, Select } from "antd";
+import { Card, Button, Table, Tooltip, Empty, Tag, Dropdown, MenuProps, Switch, Input, Select } from 'antd';
 import { PlusOutlined, DeleteOutlined, InfoCircleOutlined, StarFilled, SwapOutlined } from "@ant-design/icons";
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 export type PapelAtributo = "dna" | "grade" | "ficha";
 
@@ -127,7 +128,7 @@ export const AtributosCard: React.FC<AtributosCardProps> = ({
               onChange={(v) => onAlterar?.(record, { compoeSku: v, ordemSku: v ? Math.max(1, Number(record.ordemSku) || 1) : 0 })}
             />
             {record.compoeSku && (
-              <InputNumber
+              <CampoNumero
                 size="small"
                 min={1}
                 max={20}

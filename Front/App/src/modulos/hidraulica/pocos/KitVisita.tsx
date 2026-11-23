@@ -3,12 +3,13 @@
 // forte o campo que está sendo editado; o que ficar vazio sai como linha para preencher à mão. Os valores valem para
 // todos os modelos da visita. Marca os que vai levar e imprime todos de uma vez (ou só o que está vendo).
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Button, Card, Checkbox, Col, Flex, Input, InputNumber, Row, Segmented, Select, Space, Tag, Typography, message } from 'antd';
+import { Alert, Button, Card, Checkbox, Col, Flex, Input, Row, Segmented, Select, Space, Tag, Typography, message } from 'antd';
 import { ClearOutlined, PrinterOutlined, SettingOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { ConfigProcesso, ITENS_PRONTOS, processoApi, urlArquivo } from './obrasApi';
 import { CAMPOS_DO_MODELO, htmlEmBranco, juntarPaginas, ModeloBranco, MODELOS_BRANCO, PADRAO_PROPOSTA, semImpressao } from './documentosEmBranco';
 import { campoDe, camposVazios, destaquePrevia, ValoresKit } from './camposKit';
 import { navPocos } from './navPocos';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 type Modo = 'BRANCO' | 'PREENCHIDA';
@@ -45,8 +46,8 @@ const EntradaCampo: React.FC<{ chave: string; valor: ValoresKit[string]; onChang
     return <Select size="small" allowClear style={{ width: '100%' }} value={(valor as string) || undefined} onChange={v => onChange(v ?? null)} options={c.opcoes?.map(o => ({ value: o.valor, label: o.rotulo }))} {...foco} />;
   }
   if (c.tipo === 'numero' || c.tipo === 'moeda') {
-    return <InputNumber size="small" min={0} style={{ width: '100%' }} value={valor === null || valor === undefined || valor === '' ? null : Number(valor)}
-      prefix={c.tipo === 'moeda' ? 'R$' : undefined} suffix={c.sufixo} decimalSeparator="," onChange={v => onChange(v === null ? null : Number(v))} {...foco} />;
+    return <CampoNumero size="small" min={0} style={{ width: '100%' }} value={valor === null || valor === undefined || valor === '' ? null : Number(valor)}
+      prefix={c.tipo === 'moeda' ? 'R$' : undefined} suffix={c.sufixo} onChange={v => onChange(v === null ? null : Number(v))} {...foco} />;
   }
   if (c.tipo === 'data' || c.tipo === 'extenso_data') return <Input size="small" type="date" value={(valor as string) || ''} onChange={e => onChange(e.target.value || null)} {...foco} />;
   return <Input size="small" allowClear placeholder={c.dica} value={(valor as string) || ''} onChange={e => onChange(e.target.value)} {...foco} />;

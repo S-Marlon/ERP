@@ -1,9 +1,7 @@
 // Dicionário de atributos do PIM: lista com uso real e alertas (duplicados, sem uso, sem grupo),
 // edição detalhada numa gaveta (EditorAtributoDrawer: travas, opções no lugar, texto → lista) e grupos.
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  Button, Card, Col, Empty, Flex, Form, Input, InputNumber, Modal, Row, Segmented, Select, Space, Spin, Table, Tag, Tooltip, Typography, message,
-} from 'antd';
+import { Button, Card, Col, Empty, Flex, Form, Input, Modal, Row, Segmented, Select, Space, Spin, Table, Tag, Tooltip, Typography, message } from 'antd';
 import {
   CloseOutlined, DeleteOutlined, EditOutlined, FolderAddOutlined, InfoCircleOutlined, MergeCellsOutlined, PlusOutlined, RobotOutlined, SearchOutlined,
 } from '@ant-design/icons';
@@ -15,6 +13,7 @@ import {
 import { GrupoVisualAPIResponse, IAtributoGlobal, UnidadeAPIResponse } from './GlobalAttributeManager.types';
 import { ImportarAtributosModal } from './ImportarAtributosModal';
 import EditorAtributoDrawer from './EditorAtributoDrawer';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Title, Text } = Typography;
 
@@ -339,7 +338,7 @@ export const GlobalAttributeManager: React.FC<Props> = ({ tenantId = 1 }) => {
         <Form form={formGrupo} layout="vertical" onFinish={salvarGrupo} initialValues={{ ordemExibicao: 0 }}>
           <Flex gap={12}>
             <Form.Item name="nome" label="Nome" rules={[{ required: true }]} style={{ flex: 1 }}><Input placeholder="Ex.: Medidas" /></Form.Item>
-            <Form.Item name="ordemExibicao" label="Ordem"><InputNumber min={0} /></Form.Item>
+            <Form.Item name="ordemExibicao" label="Ordem"><CampoNumero min={0} /></Form.Item>
           </Flex>
           <Form.Item name="descricao" label="Descrição"><Input.TextArea rows={2} /></Form.Item>
           <Flex justify="flex-end" gap={8}>

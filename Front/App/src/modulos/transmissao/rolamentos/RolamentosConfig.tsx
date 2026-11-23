@@ -1,12 +1,13 @@
 // Compras › Rolamentos (módulo TRANSMISSAO_ROLAMENTOS): estrutura no catálogo, linha (1ª/2ª) e apelidos das
 // marcas, markup padrão, teste de leitura de descrição e medidas aprendidas.
 import React, { useEffect, useState } from 'react';
-import { Alert, Button, Card, Col, Collapse, Descriptions, Input, InputNumber, Modal, Popconfirm, Row, Select, Space, Spin, Switch, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { Alert, Button, Card, Col, Collapse, Descriptions, Input, Modal, Popconfirm, Row, Select, Space, Spin, Switch, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { BuildOutlined, DeleteOutlined, ExperimentOutlined, PlusOutlined } from '@ant-design/icons';
 import { ModalNovaMarca } from '../../../areas/compras/entradaNf/itens/DefinicoesPimRapidas';
 import { garantirFamilias, montarEstrutura } from './estruturaRolamentos';
 import { updateFamilia } from '../../../areas/catalogo/familias/FamilyManager.api';
 import { ConfigRolamentos, LinhaAnalisada, MarcaModulo, MedidaAprendida, nomeFamiliaDoCodigo, rolamentosApi, TIPOS, TipoRolamento } from './rolamentosApi';
+import { CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Title, Text } = Typography;
 const mm = (v: number | null) => (v === null ? '—' : v.toLocaleString('pt-BR', { maximumFractionDigits: 3 }));
@@ -229,7 +230,7 @@ const RolamentosConfig: React.FC = () => {
             </Descriptions>
             <Space style={{ marginTop: 10 }}>
               <Text>Markup padrão dos itens novos</Text>
-              <InputNumber min={1} step={0.1} precision={2} decimalSeparator="," value={config.markup ?? 2} style={{ width: 90 }}
+              <CampoNumero min={1} step={0.1} precision={2} value={config.markup ?? 2} style={{ width: 90 }}
                 onChange={v => setConfig(c => ({ ...c, markup: Number(v) || 2 }))} />
               <Button size="small" onClick={() => rolamentosApi.salvarConfig({ markup: config.markup ?? 2 }).then(() => message.success('Markup salvo.')).catch(e => message.error(e.message))}>Salvar</Button>
             </Space>

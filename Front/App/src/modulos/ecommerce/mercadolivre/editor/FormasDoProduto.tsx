@@ -2,12 +2,13 @@
 // quantidade DAQUELA forma. Cada forma é um anúncio separado no ML e a quantidade da escada conta na unidade dele: no
 // kit c/10, "a partir de 3" = 3 kits = 30 peças. O cartão mostra isso em cada degrau e avisa degrau com muitas peças.
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Card, Empty, Flex, InputNumber, Popconfirm, Space, Spin, Switch, Table, Tag, Tooltip, Typography } from 'antd';
+import { Alert, Button, Card, Empty, Flex, Popconfirm, Space, Spin, Switch, Table, Tag, Tooltip, Typography } from 'antd';
 import { BarChartOutlined, DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import { AnuncioDetalhe, anunciosApi, DegrauEscada, EscadaLinha, FaixaQuantidade, foraDoMl, formatarMoeda, ItemDoAnuncio, ROTULO_STATUS_ML } from '../mercadoLivreApi';
 import { rotuloDaUnidade } from '../linhasAnuncio';
 import { SITUACAO_LUCRO } from '../colunasLucro';
 import { AvisoMl } from '../AvisoMl';
+import { CampoNumero } from '../../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
 const MAX_DEGRAUS = 5;
@@ -92,9 +93,9 @@ const EditorEscada: React.FC<{
         {faixas.map((f, k) => (
           <Flex key={k} gap={8} align="center" wrap>
             <Text style={{ width: 70 }}>a partir de</Text>
-            <InputNumber min={2} max={100} precision={0} value={f.minimo} onChange={v => mudar(k, 'minimo', v)} style={{ width: 90 }} addonAfter={fator > 1 ? 'kits' : sigla} />
+            <CampoNumero min={2} max={100} precision={0} value={f.minimo} onChange={v => mudar(k, 'minimo', v)} style={{ width: 90 }} addonAfter={fator > 1 ? 'kits' : sigla} />
             {fator > 1 && <Text type="secondary" style={{ fontSize: 12, width: 80 }}>= {f.minimo * fator} {sigla}</Text>}
-            <InputNumber min={0.5} max={99} step={0.5} value={f.desconto} onChange={v => mudar(k, 'desconto', v)} style={{ width: 110 }} addonAfter="% off" />
+            <CampoNumero min={0.5} max={99} step={0.5} value={f.desconto} onChange={v => mudar(k, 'desconto', v)} style={{ width: 110 }} addonAfter="% off" />
             <Button type="text" danger size="small" icon={<DeleteOutlined />} onClick={() => setFaixas(fs => fs.filter((_, i) => i !== k))} />
           </Flex>
         ))}
@@ -209,7 +210,7 @@ const FormasDoProduto: React.FC<{
       <Card size="small" style={{ borderStyle: 'dashed' }}>
         <Flex align="center" gap={8} wrap>
           <Text>Vender também em kit com</Text>
-          <InputNumber min={2} max={999} precision={0} value={quantidade} onChange={v => setQuantidade(Number(v) || 2)} style={{ width: 90 }} addonAfter={base.siglaBase || 'un'} />
+          <CampoNumero min={2} max={999} precision={0} value={quantidade} onChange={v => setQuantidade(Number(v) || 2)} style={{ width: 90 }} addonAfter={base.siglaBase || 'un'} />
           <Popconfirm
             title={`Criar o kit c/${quantidade}?`} okText="Criar"
             description={det.itens.some(l => (l.unidadeMl?.fator || 1) === quantidade) ? 'Essa forma já existe neste produto.' : 'Vira uma forma nova (anúncio próprio no ML, com SKU e título próprios).'}
