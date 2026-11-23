@@ -316,3 +316,10 @@ Colunas novas: `incluso` em `_orcamento_itens`, `valor_parcelado` em `_obras`, `
   serve para trocar a tubulação ou subir/baixar a bomba), fio do quadro até o motor, corda, bombeador sobre o motor, NE/ND
   e o fundo. Conferência: tubos × profundidade da bomba, fio e corda chegam, sobra do fio, bomba abaixo do ND e longe do
   fundo. No formulário, "barras de 6 m" calcula os metros. O conjunto registrado pela obra leva também cabo (metros) e corda.
+- **Custo e margem da obra** (2026-11-23, tabelas `modulo_hidraulica_pocos_custos_perfuracao` e `_custos_obra`, coluna
+  `estimativa_custo` nas obras): em Plano mensal › "Custos da obra", o custo por metro e o rendimento da sonda (m/h) de cada
+  formação e as horas fixas (montar a sonda, revestir 100 m, limpeza, instalar a bomba), a jornada e a despesa por dia. No
+  orçamento da obra, "Custo e margem" soma perfuração por formação (parte do perfil geológico do relatório), materiais da
+  estrutura prevista a custo do cadastro, bomba, equipe (horas × hora da equipe), deslocamento (km pelo GPS × dias) e
+  despesas por dia; com impostos, cobrança e inadimplência dá o preço mínimo (margem mínima), o sugerido (margem desejada) e
+  a margem do contratado. A estimativa fica gravada na obra (próximo passo: comparar com o custo real). Regra em `custoObra.ts`.

@@ -138,7 +138,7 @@ const formatarObra = (r: any, comRelatorio = false) => {
     // como o contrato foi fechado (null = ainda orçamento ou obra antiga sem registro)
     formaContrato: r.forma_contrato || null, fechadoEm: r.fechado_txt || null, combinadoComo: r.combinado_como || null,
     criadaEm: r.criada_txt,
-    ...(comRelatorio ? { relatorio: lerJson(r.dados_relatorio) } : {}),
+    ...(comRelatorio ? { relatorio: lerJson(r.dados_relatorio), estimativaCusto: r.estimativa_custo ? lerJson(r.estimativa_custo) : null } : {}),
   };
 };
 const SELECT_OBRA = `SELECT o.*, ${NOME_PESSOA} AS cliente, c.telefone,

@@ -7,6 +7,7 @@ import { CheckCircleOutlined, DeleteOutlined, PlusOutlined, SaveOutlined, UndoOu
 import { Central, centralApi, CustosPlano, NivelPlano, planoMensalApi, PlanoMensalDados, PocoSimulado, PrecoPlano } from './obrasApi';
 import { PlanoMensal as Carteira } from './CentralPocos';
 import { CampoNumero } from '../../../shared/formularios/CamposNumero';
+import { CustosObraConfig } from './CustosObraConfig';
 
 const { Text } = Typography;
 const erro = (e: unknown) => message.error(e instanceof Error ? e.message : 'Erro.');
@@ -339,6 +340,8 @@ const PlanoMensalPocos: React.FC = () => {
           ))}
         </Row>
       </Card>
+
+      <CustosObraConfig />
 
       {central && <Carteira d={central.plano} naTelaDoPlano />}
     </Space>

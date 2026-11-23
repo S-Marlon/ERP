@@ -13,6 +13,7 @@ import {
 import { htmlAditivo, htmlContrato, htmlOrcamento } from './documentosPocos';
 import { ClientePocoModal } from './ClientesPoco';
 import { abrirObra } from './navPocos';
+import { CustoMargemObra } from './CustoMargemObra';
 import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
@@ -368,6 +369,7 @@ export const OrcamentoEContrato: React.FC<{ obra: Obra; onMudou: () => void }> =
         {!itens.length && obra.valorContratado ? <Alert type="info" showIcon style={{ marginBottom: 8 }} message={`Esta obra tem só o valor fechado (${brl(obra.valorContratado)}). Ao salvar itens, o total deles passa a ser o valor contratado.`} /> : null}
         <EditorItens itens={itens} bloqueado={bloqueado} onChange={i => { setItens(i); setMudou(true); }} />
       </Card>
+      <CustoMargemObra obra={obra} onSalvo={onMudou} />
       <Card size="small" title="Contrato"
         extra={<Button type="primary" icon={<FileTextOutlined />} onClick={() => antesDeImprimir('CONTRATO')}>Contrato completo (PDF)</Button>}>
         <Flex gap={8} align="center" wrap>

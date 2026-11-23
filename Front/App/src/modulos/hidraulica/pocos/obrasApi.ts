@@ -42,6 +42,8 @@ export interface Obra extends Omit<ObraForm, 'idCliente'> {
   latitude: number | null; longitude: number | null;
   situacao: SituacaoObra; proximas: SituacaoObra[]; dataInicio: string | null; dataTermino: string | null; garantiaAte: string | null;
   criadaEm: string; relatorio?: Dados;
+  /** Estimativa de custo guardada no orçamento (entrada, resultado, quando e quem). */
+  estimativaCusto?: Dados | null;
 }
 export interface PocoForm {
   identificacao: string; idProprietario: number | null; endereco: string | null; bairro: string | null; cidade: string | null; uf: string | null;
@@ -827,6 +829,18 @@ export interface PlanoMensalDados {
   custos: CustosPlano; salvo: boolean; niveis: NivelPlano[]; mediaVisitaEmpresa: number | null;
   clientes: { idCliente: number; nome: string; pocos: number; profundidadeM: number | null; potenciaCv: number | null; latitude: number | null; longitude: number | null }[];
 }
+// ------------------------------------------------------------------ custos da obra (perfuração e instalação)
+export interface CustosObraDados {
+  formacoes: Array<{ formacao: string; custoMetro: number; rendimentoMH: number }>;
+  parametros: { horasMobilizacao: number; horasRevestimento100m: number; horasLimpeza: number; horasInstalacaoBomba: number; horasPorDia: number; custoDia: number };
+  configurado: boolean;
+}
+export const custosObraApi = {
+  carregar: () => pedir<CustosObraDados>(`${API}/custos-obra?tenant_id=1`, undefined, 'Erro ao carregar os custos da obra.'),
+  salvar: (d: CustosObraDados) => pedir<CustosObraDados>(`${API}/custos-obra?tenant_id=1`, corpo('PUT', d), 'Erro ao salvar os custos da obra.'),
+  salvarEstimativa: (idObra: number, dados: Dados) => pedir<{ ok: true }>(`${API}/obras/${idObra}/estimativa-custo?tenant_id=1`, corpo('PUT', { dados }), 'Erro ao salvar a estimativa.'),
+};
+
 export const planoMensalApi = {
   carregar: () => pedir<PlanoMensalDados>(`${API}/plano-mensal?tenant_id=1`, undefined, 'Erro ao carregar o plano mensal.'),
   salvarCustos: (c: CustosPlano) => pedir<CustosPlano>(`${API}/plano-mensal/custos?tenant_id=1`, corpo('PUT', c), 'Erro ao salvar os custos.'),
