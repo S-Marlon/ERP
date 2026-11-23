@@ -53,7 +53,7 @@ export const fichasPocos = {
   assinar: (f: () => void) => { ouvintesFicha.add(f); return () => { ouvintesFicha.delete(f); }; },
 };
 export const useFichaPocos = () => useSyncExternalStore(fichasPocos.assinar, fichasPocos.get);
-export const abrirFichaPoco = (idPoco: number, aba?: 'CONTRATOS' | 'DADOS' | 'BOMBA' | 'HISTORICO') => fichasPocos.abrir({ tipo: 'POCO', id: idPoco, aba });
+export const abrirFichaPoco = (idPoco: number, aba?: 'CONTRATOS' | 'DADOS' | 'ESTRUTURA' | 'BOMBA' | 'HISTORICO') => fichasPocos.abrir({ tipo: 'POCO', id: idPoco, aba });
 export const abrirFichaCliente = (idCliente: number) => fichasPocos.abrir({ tipo: 'CLIENTE', id: idCliente });
 /** Documentos de uma obra (Documentos › aba da obra, já com a obra escolhida). */
 export const documentosDaObra = (idObra: number) => navPocos.ir({ aba: 'documentos', subvista: 'OBRA', abrirObra: idObra });

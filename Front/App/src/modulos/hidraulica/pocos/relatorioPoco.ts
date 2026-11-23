@@ -42,7 +42,8 @@ export const VALORES_INICIAIS: Dados = {
   diamInternoUnidade: '"',
   bombaTuboUnidade: '"',
   perfuracoes: [{ perfDe: 0, perfDiamUnidade: '"' }],
-  revestimentos: [{ revDe: 0, revDiamUnidade: '"' }],
+  revestimentos: [{ revDe: 0, revDiamUnidade: '"', revTipo: 'EXTERNO' }],
+  perfilGeologico: [],
   finAdicionais: [],
   finPagamentos: [],
   testeLeituras: [],
@@ -181,7 +182,7 @@ export const deRascunho = (v: Dados): Dados => converter(v, paraData);
 
 // ---------------------------------------------------------------- arquivo (XML): tudo, inclusive as listas
 const LISTAS_XML: Record<string, string> = {
-  perfuracoes: 'perfuracao', revestimentos: 'revestimento', finAdicionais: 'adicional', finPagamentos: 'pagamento',
+  perfuracoes: 'perfuracao', revestimentos: 'revestimento', perfilGeologico: 'camada', finAdicionais: 'adicional', finPagamentos: 'pagamento',
   testeLeituras: 'leitura', testeRecuperacao: 'leitura',
 };
 const cdata = (t: unknown) => `<![CDATA[${String(t ?? '').replace(/]]>/g, ']]]]><![CDATA[>')}]]>`;
@@ -203,7 +204,7 @@ export const paraXml = (dados: Dados): string => {
 // Campos e subcampos numéricos (o resto volta como texto)
 const NUMEROS = new Set(['profundidade', 'diametroInterno', 'vazaoAprox', 'garantiaMeses', 'manutAmperagem', 'manutMegometro', 'bombaQtdTubos', 'bombaTamTubo',
   'bombaProfundidade', 'bombaNivelEstatico', 'bombaNivelDinamico', 'bombaVazaoEstimada', 'testeVazaoDuracao', 'testeVazaoEstabilizada',
-  'perfDe', 'perfAte', 'perfDiam', 'revDe', 'revAte', 'revDiam', 'finMetrosContratados', 'finValorContratado', 'finValorMetroExcedente', 'finValorMetroFalta',
+  'perfDe', 'perfAte', 'perfDiam', 'revDe', 'revAte', 'revDiam', 'geoDe', 'geoAte', 'finMetrosContratados', 'finValorContratado', 'finValorMetroExcedente', 'finValorMetroFalta',
   'valor', 'tempo', 'nivel', 'vazao']);
 const valorDe = (k: string, txt: string): any => {
   if (txt === 'true' || txt === 'false') return txt === 'true';

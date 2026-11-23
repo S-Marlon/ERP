@@ -12,6 +12,7 @@ import { HistoricoDoPoco } from './ManutencaoPocos';
 import { ClienteFicha } from './ClientesPoco';
 import { ConjuntoPoco } from './ConjuntoPoco';
 import { GRUPOS_OCORRENCIA } from './ocorrencias';
+import { resumoEstrutura, svgPerfil, temEstrutura } from './estruturaPoco';
 
 const { Text } = Typography;
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -110,6 +111,18 @@ export const FichaPoco: React.FC<{ idPoco: number | null; aba?: string; onFechar
           { key: 'obs', label: 'Observação', span: 2, children: p.observacao || '—' },
         ]} />
       ),
+    },
+    {
+      key: 'ESTRUTURA', label: 'Estrutura', children: d.estrutura && temEstrutura(d.estrutura) ? (
+        <Row gutter={16}>
+          <Col xs={24} lg={12}><div style={{ overflowX: 'auto' }} dangerouslySetInnerHTML={{ __html: svgPerfil(d.estrutura) }} /></Col>
+          <Col xs={24} lg={12}>
+            <Text strong>Como o poço é por dentro</Text>
+            <ul style={{ paddingLeft: 18, marginTop: 6 }}>{resumoEstrutura(d.estrutura).map(l => <li key={l} style={{ marginBottom: 4 }}>{l}</li>)}</ul>
+            <Text type="secondary" style={{ fontSize: 12 }}>Montado com os relatórios técnicos das obras deste poço (perfuração, complementos, troca de bomba). Para corrigir, edite o relatório da obra.</Text>
+          </Col>
+        </Row>
+      ) : <Empty description="Ainda sem estrutura: preencha a perfuração e o revestimento no relatório técnico da obra do poço." />,
     },
     { key: 'BOMBA', label: 'Bomba e instalação', children: <ConjuntoPoco idPoco={p.idPoco} onAbrirObra={id => ir(() => abrirObra(id))} /> },
     { key: 'HISTORICO', label: 'Histórico e manutenção', children: <HistoricoDoPoco idPoco={p.idPoco} onAbrirObra={onFechar} /> },

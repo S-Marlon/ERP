@@ -2,6 +2,7 @@
 // certificado de garantia e formulário de campo em branco. Mesmo cabeçalho (empresa) e estilo em todos.
 import dayjs, { Dayjs } from 'dayjs';
 import { GRUPOS_OCORRENCIA, GrupoOcorrencia, itensDosGrupos } from './ocorrencias';
+import { camadasDe, resumoEstrutura, svgPerfil, temEstrutura, tipoRevestimento } from './estruturaPoco';
 import {
   brl, calcularFinanceiro, com, Dados, data, dataGarantia, Empresa, escapar, Leitura, num, profundidadeFinal,
   resumoTeste, SecaoId, TEXTO_GARANTIA_PADRAO, vazao, vazio,
@@ -194,9 +195,15 @@ const completo = (d: Dados, op: OpcoesModelo, b: boolean) => {
     <div class="c6"><div class="label">Etapas de perfuração</div><table><thead><tr><th>De (m)</th><th>Até (m)</th><th>Diâmetro</th></tr></thead><tbody>
       ${perf.map(p => `<tr><td>${v(num(p.perfDe))}</td><td>${v(num(p.perfAte))}</td><td>${v(com(p.perfDiam, p.perfDiamUnidade || '"'))}</td></tr>`).join('') || vazia(3, 'Nenhuma etapa registrada')}
     </tbody></table></div>
-    <div class="c6"><div class="label">Revestimento</div><table><thead><tr><th>De (m)</th><th>Até (m)</th><th>Diâmetro</th><th>Material</th><th>União</th></tr></thead><tbody>
-      ${rev.map(r => `<tr><td>${v(num(r.revDe))}</td><td>${v(num(r.revAte))}</td><td>${v(com(r.revDiam, r.revDiamUnidade || '"'))}</td><td>${v(escapar(r.revMaterial || ''))}</td><td>${v(escapar(r.revUniao || ''))}</td></tr>`).join('') || vazia(5, 'Nenhum revestimento registrado')}
+    <div class="c6"><div class="label">Revestimento</div><table><thead><tr><th>Tipo</th><th>De (m)</th><th>Até (m)</th><th>Diâmetro</th><th>Material</th><th>União</th></tr></thead><tbody>
+      ${rev.map(r => `<tr><td>${v(escapar(tipoRevestimento(r.revTipo).curto))}${!b && r.revObs ? `<br><span style="color:#718096">${escapar(r.revObs)}</span>` : ''}</td><td>${v(num(r.revDe))}</td><td>${v(num(r.revAte))}</td><td>${v(com(r.revDiam, r.revDiamUnidade || '"'))}</td><td>${v(escapar(r.revMaterial || ''))}</td><td>${v(escapar(r.revUniao || ''))}</td></tr>`).join('') || vazia(6, 'Nenhum revestimento registrado')}
     </tbody></table></div>
+    ${b ? `<div class="c12"><div class="label">Perfil geológico</div><table><thead><tr><th>De (m)</th><th>Até (m)</th><th>Formação (solo, argila, rocha alterada, rocha sã, fratura com água)</th></tr></thead><tbody>${'<tr><td></td><td></td><td></td></tr>'.repeat(4)}</tbody></table></div>`
+      : temEstrutura(d) ? `<div class="c12"><div class="label">Estrutura do poço</div><div style="display:flex;gap:14px;align-items:flex-start">
+        <div style="flex:0 0 auto">${svgPerfil(d, { altura: 400 })}</div>
+        <div style="flex:1;font-size:10.5px">${resumoEstrutura(d).map(l => `<div style="margin-bottom:4px">• ${escapar(l)}</div>`).join('')}
+          ${camadasDe(d).length ? `<table style="margin-top:6px"><thead><tr><th>De (m)</th><th>Até (m)</th><th>Formação</th></tr></thead><tbody>${camadasDe(d).map(c => `<tr><td>${num(c.de)}</td><td>${num(c.ate)}</td><td>${escapar(c.tipo)}${c.obs ? ` · ${escapar(c.obs)}` : ''}</td></tr>`).join('')}</tbody></table>` : ''}
+        </div></div></div>` : ''}
     <div class="c12"><div class="label">Ocorrências na obra</div>${checklist(['PERFURACAO', 'LOCAL'], 'Nenhuma ocorrência na obra.')}</div>
     ${comMarca('Outras ocorrências na obra', 'obsOcorrencias')}
     ${f('c4', 'Equipe / sonda', d.equipePerfuracao)}${f('c4', 'Responsável técnico', d.respNomePerf)}

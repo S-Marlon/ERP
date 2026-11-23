@@ -2,6 +2,7 @@
 // contratos/obras do poço com o tipo do contrato, relatório e garantia). As regras ficam em busca.ts.
 import { Request, Response } from 'express';
 import { marcadas, ocorrenciasDoPoco } from './ocorrencias';
+import { estruturaDasObras } from './estrutura';
 import pool from '../../../infra/db';
 import { garantiaAte, lerServicos } from './obras';
 import { carregarPoco, formatarPoco, responderErro } from './obras.controller';
@@ -118,6 +119,10 @@ export const pocoCompleto = async (req: Request, res: Response) => {
         cidade: dono.cidade ? `${dono.cidade}${dono.uf ? `/${dono.uf}` : ''}` : null } : null,
       contratos,
       ocorrencias,
+      // Estrutura (perfil construtivo) juntando os relatórios das obras do poço (perfuração, complementos, bomba)
+      estrutura: estruturaDasObras(obras.filter((o: any) => o.situacao !== 'CANCELADA').map((o: any) => ({
+        dados: lerJson(o.dados_relatorio), data: o.termino || o.inicio || o.criada || null, origem: o.titulo || `Obra ${o.id_obra}`,
+      }))),
       resumo: { contratos: contratos.length, garantiaAte: garantia, emGarantia: !!garantia && garantia >= hoje, sensores: n(iot?.q) > 0 },
       // bomba instalada agora (a ficha mostra numa linha; o detalhe fica na aba "Bomba e instalação")
       conjunto: conj ? { resumo: resumoConjunto(conjuntoDaLinha(conj)), anosDeUso: idadeEmAnos(conj.instalado_txt || null, hoje) } : null,

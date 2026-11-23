@@ -563,6 +563,8 @@ export interface PocoCompleto {
   resumo: { contratos: number; garantiaAte: string | null; emGarantia: boolean; sensores: boolean };
   /** Checklist marcado nos relatórios das obras do poço: quantas vezes, a última data e onde. */
   ocorrencias?: Array<{ codigo: string; rotulo: string; grupo: GrupoOcorrencia; vezes: number; ultimaVez: string | null; origem: string }>;
+  /** Estrutura (perfil construtivo) juntando os relatórios das obras do poço; null se ainda não há perfuração/revestimento. */
+  estrutura?: Record<string, any> | null;
   /** Bomba instalada agora, numa linha. */
   conjunto?: { resumo: string; anosDeUso: number | null } | null;
 }

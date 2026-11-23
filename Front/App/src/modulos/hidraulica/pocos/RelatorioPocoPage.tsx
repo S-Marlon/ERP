@@ -13,6 +13,7 @@ import {
 } from './relatorioPoco';
 import { MODELOS, ModeloId } from './templatesPoco';
 import { GRUPOS_OCORRENCIA, GrupoOcorrencia, itensDosGrupos } from './ocorrencias';
+import { CAMADAS_GEOLOGICAS, resumoEstrutura, svgPerfil, temEstrutura, TIPOS_REVESTIMENTO } from './estruturaPoco';
 import { mascaraCep, mascaraCnpj, mascaraCpfCnpj, mascaraTelefone, UFS } from '../../../shared/formularios/documentos';
 import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
 import { FORMATOS_DATA } from '../../../shared/formularios/numeros';
@@ -74,7 +75,10 @@ export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: R
           <Flex vertical gap={6}>
             {campos.map(({ key, name }, i) => (
               <Row key={key} gutter={6} align="bottom" wrap={false}>
-                <Col flex="90px"><Form.Item label={i === 0 ? 'De' : ''} name={[name, de]} style={{ marginBottom: 0 }}><CampoNumero disabled style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
+                {!perf && <Col flex="150px"><Form.Item label={i === 0 ? 'Tipo' : ''} name={[name, 'revTipo']} initialValue="EXTERNO" style={{ marginBottom: 0 }}>
+                  <Select popupMatchSelectWidth={false} options={TIPOS_REVESTIMENTO.map(t => ({ value: t.valor, label: t.rotulo }))} />
+                </Form.Item></Col>}
+                <Col flex="90px"><Form.Item label={i === 0 ? 'De' : ''} name={[name, de]} style={{ marginBottom: 0 }}><CampoNumero disabled={perf} min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
                 <Col flex="100px"><Form.Item label={i === 0 ? 'Até' : ''} name={[name, ate]} style={{ marginBottom: 0 }}><CampoNumero min={0} style={{ width: '100%' }} suffix="m" placeholder="35" /></Form.Item></Col>
                 <Col flex="auto">
                   <Form.Item label={i === 0 ? 'Diâmetro' : ''} style={{ marginBottom: 0 }}>
@@ -87,20 +91,50 @@ export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: R
                 {!perf && <>
                   <Col flex="120px"><Form.Item label={i === 0 ? 'Material' : ''} name={[name, 'revMaterial']} style={{ marginBottom: 0 }}><Input placeholder="PVC geomec." /></Form.Item></Col>
                   <Col flex="90px"><Form.Item label={i === 0 ? 'União' : ''} name={[name, 'revUniao']} style={{ marginBottom: 0 }}><Input placeholder="Rosca" /></Form.Item></Col>
+                  <Col flex="160px"><Form.Item label={i === 0 ? 'Motivo / obs.' : ''} name={[name, 'revObs']} style={{ marginBottom: 0 }}><Input placeholder="Ex.: caimento aos 60 m" /></Form.Item></Col>
                 </>}
                 <Col flex="32px">
                   <Button type="text" danger icon={<DeleteOutlined />} disabled={campos.length === 1} onClick={() => { remove(name); p.aoMudar({ [nome]: true }); }} />
                 </Col>
               </Row>
             ))}
-            <Button type="dashed" icon={<PlusOutlined />} onClick={() => { const l = form.getFieldValue(nome) || []; add({ [de]: Number(l[l.length - 1]?.[ate]) || 0, [un]: '"' }); }}>
-              {perf ? 'Adicionar etapa de perfuração' : 'Adicionar revestimento'}
-            </Button>
+            <Space wrap>
+              <Button type="dashed" icon={<PlusOutlined />} onClick={() => { const l = form.getFieldValue(nome) || []; add({ [de]: Number(l[l.length - 1]?.[ate]) || 0, [un]: '"', ...(perf ? {} : { revTipo: 'EXTERNO' }) }); }}>
+                {perf ? 'Adicionar etapa de perfuração' : 'Adicionar revestimento'}
+              </Button>
+              {!perf && (
+                <Tooltip title="Tubo mais fino colocado por dentro (ex.: o poço desmoronou e foi revestido de novo até o fundo)">
+                  <Button type="dashed" icon={<PlusOutlined />} onClick={() => { add({ revDe: 0, revDiamUnidade: '"', revTipo: 'INTERNO' }); p.aoMudar({}); }}>Revestimento interno (complemento)</Button>
+                </Tooltip>
+              )}
+            </Space>
           </Flex>
         )}
       </Form.List>
     );
   };
+
+  // Perfil geológico: camadas de cima para baixo (cada uma começa onde a anterior terminou)
+  const perfilGeologico = (
+    <Form.List name="perfilGeologico">
+      {(campos, { add, remove }) => (
+        <Flex vertical gap={6}>
+          {campos.map(({ key, name }, i) => (
+            <Row key={key} gutter={6} align="bottom" wrap={false}>
+              <Col flex="90px"><Form.Item label={i === 0 ? 'De' : ''} name={[name, 'geoDe']} style={{ marginBottom: 0 }}><CampoNumero disabled style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
+              <Col flex="100px"><Form.Item label={i === 0 ? 'Até' : ''} name={[name, 'geoAte']} style={{ marginBottom: 0 }}><CampoNumero min={0} style={{ width: '100%' }} suffix="m" /></Form.Item></Col>
+              <Col flex="170px"><Form.Item label={i === 0 ? 'Formação' : ''} name={[name, 'geoTipo']} style={{ marginBottom: 0 }}>
+                <Select options={CAMADAS_GEOLOGICAS.map(c => ({ value: c.valor, label: <Space size={6}><span style={{ display: 'inline-block', width: 10, height: 10, background: c.cor, borderRadius: 2 }} />{c.valor}</Space> }))} />
+              </Form.Item></Col>
+              <Col flex="auto"><Form.Item label={i === 0 ? 'Observação' : ''} name={[name, 'geoObs']} style={{ marginBottom: 0 }}><Input placeholder="Ex.: granito, entrada de água forte" /></Form.Item></Col>
+              <Col flex="32px"><Button type="text" danger icon={<DeleteOutlined />} onClick={() => { remove(name); p.aoMudar({ perfilGeologico: true }); }} /></Col>
+            </Row>
+          ))}
+          <Button type="dashed" icon={<PlusOutlined />} onClick={() => { const l = form.getFieldValue('perfilGeologico') || []; add({ geoDe: Number(l[l.length - 1]?.geoAte) || 0 }); }}>Adicionar camada</Button>
+        </Flex>
+      )}
+    </Form.List>
+  );
 
   // Leituras do teste de vazão: tempo (min), nível (m) e, no bombeamento, vazão (L/h)
   const leituras = (nome: 'testeLeituras' | 'testeRecuperacao', comVazao: boolean) => (
@@ -221,6 +255,17 @@ export default function RelatorioPocoPage({ obra, titulo, onVoltar }: { obra?: R
           <Row gutter={12}>
             <Col xs={24} xl={10}><Card size="small" title="Etapas de perfuração">{camadas('perfuracoes')}</Card></Col>
             <Col xs={24} xl={14}><Card size="small" title="Revestimento">{camadas('revestimentos')}</Card></Col>
+            <Col xs={24} xl={14}><Card size="small" title="Perfil geológico (o que a perfuração atravessou)">{perfilGeologico}</Card></Col>
+            <Col xs={24} xl={10}>
+              <Card size="small" title="Estrutura do poço">
+                {temEstrutura(valores) ? (
+                  <Flex vertical gap={6}>
+                    <div style={{ overflowX: 'auto' }} dangerouslySetInnerHTML={{ __html: svgPerfil(valores, { altura: 420 }) }} />
+                    <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12 }}>{resumoEstrutura(valores).map(l => <li key={l}>{l}</li>)}</ul>
+                  </Flex>
+                ) : <Text type="secondary">Preencha a perfuração e o revestimento para ver o desenho do poço.</Text>}
+              </Card>
+            </Col>
           </Row>
           {grupos('Ocorrências na obra (checklist)', ['PERFURACAO', 'LOCAL'])}
           <Form.Item label="Outras ocorrências na obra" name="obsOcorrencias" style={{ marginBottom: 0 }}>

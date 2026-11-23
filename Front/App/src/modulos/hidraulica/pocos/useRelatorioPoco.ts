@@ -60,17 +60,18 @@ export function useRelatorioPoco(obra?: RelatorioDaObra) {
     setSalvoEm(agora);
   }, [form, obra]);
 
-  // Cada camada de perfuração/revestimento começa onde a anterior terminou; o rascunho salva sozinho
+  // Cada etapa de perfuração e camada geológica começa onde a anterior terminou; o revestimento é livre (o interno de
+  // complemento começa em 0 dentro do de fora). O rascunho salva sozinho.
   const aoMudar = (mudou: Dados) => {
     if (mudou.perfuracoes) {
       const atual = form.getFieldValue('perfuracoes');
       const ajustada = encadear(atual, 'perfDe', 'perfAte');
       if (JSON.stringify(ajustada) !== JSON.stringify(atual)) form.setFieldValue('perfuracoes', ajustada);
     }
-    if (mudou.revestimentos) {
-      const atual = form.getFieldValue('revestimentos');
-      const ajustada = encadear(atual, 'revDe', 'revAte');
-      if (JSON.stringify(ajustada) !== JSON.stringify(atual)) form.setFieldValue('revestimentos', ajustada);
+    if (mudou.perfilGeologico) {
+      const atual = form.getFieldValue('perfilGeologico');
+      const ajustada = encadear(atual, 'geoDe', 'geoAte');
+      if (JSON.stringify(ajustada) !== JSON.stringify(atual)) form.setFieldValue('perfilGeologico', ajustada);
     }
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(salvarRascunho, 600);
