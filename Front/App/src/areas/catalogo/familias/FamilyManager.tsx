@@ -655,9 +655,9 @@ optionFilterProp="label"
 );
 
 return (
-<div style={{ padding: 24 }}>
+<div style={{ padding: 12 }}>
 {/* Cabeçalho da página */}
-<Flex justify="space-between" align="center" wrap gap={12} style={{ marginBottom: 16 }}>
+<Flex justify="space-between" align="center" wrap gap={12} style={{ marginBottom: 12 }}>
 <div>
 <Title level={3} style={{ margin: 0 }}>Famílias de produtos</Title>
 <Text type="secondary">Agrupa as variações de um produto: atributos (DNA, grade, ficha), modelo de nome e SKU, marca e os itens.</Text>
@@ -673,9 +673,9 @@ return (
 action={<Button size="small" danger onClick={() => window.location.reload()}>Recarregar</Button>} />
 )}
 
-<Row gutter={[16, 16]}>
+<Row gutter={[6, 6]}>
 {/* Lista de famílias */}
-<Col xs={24} lg={7} xl={6}>
+<Col xs={24} lg={7} xl={5}>
 <ListaFamiliasAtivas
 brandColor={brandColor}
 categoriaFiltroId={categoriaFiltroId}
@@ -693,9 +693,9 @@ handleCriarGrupo={handleCriarFamilia}
 </Col>
 
 {/* Família selecionada */}
-<Col xs={24} lg={17} xl={18}>
+<Col xs={24} lg={17} xl={19}>
 {familiaSelecionadaLocal ? (
-<Space direction="vertical" size={12} style={{ width: "100%" }}>
+<Space direction="vertical" size={4} style={{ width: "100%" }}>
 {/* Cabeçalho da família: identidade, categoria, marca, dados, regras e ações */}
 <FamiliaIdentidadeCard
 grupoSelecionado={familiaSelecionadaLocal}
