@@ -5,7 +5,6 @@ import { salvarModulo, useModulos } from "../../../modulos/modulosStore";
 import { relatoriosDosModulos } from "../../../modulos/registroModulos";
 import {
   FileTextOutlined,
-  BarChartOutlined,
   BuildOutlined,
   LineChartOutlined,
   SolutionOutlined,
@@ -31,25 +30,13 @@ export default function RelatoriosPage() {
   // Configuração dos grupos de relatórios e seus respectivos caminhos (rotas)
   const reportSections: ReportSection[] = [
     {
-      category: "Serviços Técnicos e Obras",
-      icon: <BuildOutlined style={{ color: "#1890ff" }} />,
-      reports: [
-        {
-          title: "Cronograma de Obras Ativas",
-          description: "Visão consolidada de prazos, equipe e status das perfurações.",
-          path: "/obras/relatorio-cronograma",
-          icon: <BarChartOutlined />
-        }
-      ]
-    },
-    {
       category: "Estoque e Suprimentos",
       icon: <SolutionOutlined style={{ color: "#52c41a" }} />,
       reports: [
         {
           title: "Análise de Curva ABC e Giro",
           description: "Identificação de produtos de alto impacto e itens sem giro no estoque.",
-          path: "/estoque/analise-abc",
+          path: "/estoque/curva-abc",
           icon: <PieChartOutlined />
         },
         {

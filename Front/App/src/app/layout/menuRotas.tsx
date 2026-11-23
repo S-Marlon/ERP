@@ -3,7 +3,7 @@ import React from 'react';
 import { menuComModulos } from '../../modulos/registroModulos';
 import {
   AimOutlined, AppstoreOutlined, CarOutlined, DollarOutlined, FileTextOutlined, HomeOutlined, InboxOutlined, ShopOutlined,
-  ShoppingCartOutlined, ShopTwoTone, TeamOutlined, ToolOutlined,
+  ShoppingCartOutlined, ShopTwoTone, TeamOutlined,
 } from '@ant-design/icons';
 
 export interface ItemMenu {
@@ -101,7 +101,6 @@ export const MENU_PRINCIPAL: ItemMenu[] = [
   { key: 'grp:frota', icon: <CarOutlined />, label: 'Frota', children: [] },
   { key: 'grp:pocos', icon: <AimOutlined />, label: 'Poços artesianos', rota: '/modulos/hidraulica/pocos', children: [] },
   { key: '/relatorios', icon: <FileTextOutlined />, label: 'Relatórios' },
-  { key: '/obras', icon: <ToolOutlined />, label: 'Obras / Projetos' },
 ];
 
 // Telas de configuração (abertas pelo botão Configurações da barra lateral): entram no título e na busca

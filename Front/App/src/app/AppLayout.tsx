@@ -12,14 +12,10 @@ import Panel from './layout/AppContent/panel';
 import CentralDoDia from "../areas/inicio/CentralDoDia";
 import Estoque from "../areas/estoque/Estoque";
 import { AjudaSuporte, CentralNotificacoes, DadosDaEmpresa, MeuPerfil, PreferenciasSistema } from "../areas/configuracoes/Configuracoes";
-import { ObrasModule } from '../areas/obras/ObrasModule';
 
 // Contexts
 
 // Formulários e subpáginas
-import CadastroCliente from '../shared/components/forms/specific/CadastroCliente/CadastroCliente'; 
-import CadastroContrato from '../shared/components/forms/specific/CadastroContrato/CadastroContrato';
-import RelatorioPoco from '../shared/components/forms/specific/CadastroRelatorio/CadastroRelatorio';
 import SaldoEstoque from '../areas/estoque/saldo/SaldoEstoque';
 import Movimentacoes from '../areas/estoque/movimentacoes/Movimentacoes';
 import Etiquetagem from '../areas/estoque/etiquetagem/Etiquetagem';
@@ -173,9 +169,6 @@ export default function AppLayout() {
             <Route path="/parceiros/clientes" element={<Clientes />} />
             <Route path="/parceiros/funcionarios" element={<FuncionariosPage />} />
 
-            <Route path="/clientes/novo" element={<CadastroCliente />} /> 
-            <Route path="/contratos/novo" element={<CadastroContrato />} />
-            <Route path="/pocos/novo" element={<RelatorioPoco />} />
             <Route path="/vendas" element={<CentralVendas />} />
             <Route path="/vendas/pdv" element={<PDVContent />} />
             <Route path="/vendas/do-dia" element={<VendasDoDia />} />
@@ -228,7 +221,6 @@ export default function AppLayout() {
             <Route path="/compras/fornecedores" element={<FornecedoresList />} />
             <Route path="/compras/Faturamento" element={<EmissaoFaturado/>} />
             <Route path="/relatorios" element={<RelatoriosPage />} />
-            <Route path="/obras" element={<ObrasModule />} />
 
             <Route path="/stagings" element={<StockEntryStagingView/>} />
 

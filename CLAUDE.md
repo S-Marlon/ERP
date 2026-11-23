@@ -137,6 +137,6 @@ Planos e decisões: `docs/` (`plano-vendas.md`, `entrada-nf.md`). Relatórios de
 
 ## Pendências conhecidas (não "consertar" sem combinar)
 - Tenant fixo em 1 (sem login).
-- Telas com dados de exemplo fixos (Financeiro › Faturamento, Emissão Faturado, Obras, Funcionários, modal antigo
+- Telas com dados de exemplo fixos (Financeiro › Faturamento, Emissão Faturado, Funcionários, modal antigo
   de novo produto do catálogo).
 - Erros de TypeScript antigos no front (concentrados em telas legadas).
