@@ -110,9 +110,14 @@ export const pocoCompleto = async (req: Request, res: Response) => {
     const hoje = new Date().toISOString().slice(0, 10);
     const garantia = contratos.map((c: any) => c.garantiaAte).filter(Boolean).sort().pop() || null;
     // Checklist marcado nos relatórios técnicos das obras do poço (problema que se repete = crônico)
-    const ocorrencias = ocorrenciasDoPoco(obras.map((o: any) => ({
-      codigos: marcadas(lerJson(o.dados_relatorio)), data: o.termino || o.inicio || o.criada || null, origem: o.titulo || `Obra ${o.id_obra}`,
-    })));
+    const [regs]: any = await pool.execute(
+      `SELECT tipo, ocorrencias, DATE_FORMAT(data, '%Y-%m-%d') AS data_txt FROM modulo_hidraulica_pocos_historico
+       WHERE id_poco = ? AND tenant_id = ? AND COALESCE(ocorrencias, '') <> ''`, [id, tenant]);
+    const NOME_REGISTRO: Record<string, string> = { VISITA: 'Visita', PROBLEMA: 'Problema', MEDICAO: 'Medição', OBSERVACAO: 'Observação' };
+    const ocorrencias = ocorrenciasDoPoco([
+      ...obras.map((o: any) => ({ codigos: marcadas(lerJson(o.dados_relatorio)), data: o.termino || o.inicio || o.criada || null, origem: o.titulo || `Obra ${o.id_obra}` })),
+      ...regs.map((r: any) => ({ codigos: String(r.ocorrencias).split(','), data: r.data_txt, origem: NOME_REGISTRO[r.tipo] || 'Registro' })),
+    ]);
     return res.json({
       poco: formatarPoco(p),
       proprietario: dono ? { idCliente: Number(dono.id_cliente), nome: dono.nome, telefone: dono.telefone || null, documento: dono.documento || null,

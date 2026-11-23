@@ -51,6 +51,7 @@ export const OCORRENCIAS: Array<{ codigo: string; rotulo: string; grupo: GrupoOc
 ];
 
 const PORCODIGO = new Map(OCORRENCIAS.map(o => [o.codigo, o]));
+export const rotuloOcorrencia = (codigo: string) => PORCODIGO.get(codigo)?.rotulo || codigo;
 
 /** Códigos marcados num relatório (campos booleanos chk...). */
 export const marcadas = (dados: Record<string, unknown> | null | undefined) =>

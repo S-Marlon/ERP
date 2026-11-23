@@ -282,7 +282,11 @@ export const SITUACOES_PLANO: Record<SituacaoPlano, { texto: string; cor: string
   VENCIDA: { texto: 'Vencida', cor: 'red' }, A_VENCER: { texto: 'Vence em até 30 dias', cor: 'orange' }, EM_DIA: { texto: 'Em dia', cor: 'green' },
   SEM_BASE: { texto: 'Nunca feita', cor: 'default' },
 };
-export interface RegistroForm { tipo: TipoRegistro; data: string; descricao: string | null; nivelEstaticoM: number | null; nivelDinamicoM: number | null; vazaoLh: number | null }
+export interface RegistroForm {
+  tipo: TipoRegistro; data: string; descricao: string | null; nivelEstaticoM: number | null; nivelDinamicoM: number | null; vazaoLh: number | null;
+  /** Checklist marcado na visita (códigos de ocorrencias.ts). */
+  ocorrencias?: string[];
+}
 export interface RegistroPoco extends RegistroForm { idRegistro: number; operador: string }
 export interface PlanoForm { servico: ServicoPlano; descricao: string | null; aCadaMeses: number; ultimaInformada: string | null; ativo: boolean }
 export interface PlanoManutencao extends PlanoForm {

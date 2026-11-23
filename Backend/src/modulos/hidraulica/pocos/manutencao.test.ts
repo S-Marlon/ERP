@@ -6,7 +6,9 @@ const hoje = '2026-10-22';
 
 teste('manutenção de poço: registros avulsos', () => {
   const m = validarRegistro({ tipo: 'medicao', nivelEstaticoM: '18,5', vazaoLh: 4200 }, hoje);
-  assert.deepStrictEqual(m, { tipo: 'MEDICAO', data: hoje, descricao: null, nivelEstaticoM: 18.5, nivelDinamicoM: null, vazaoLh: 4200 });
+  assert.deepStrictEqual(m, { tipo: 'MEDICAO', data: hoje, descricao: null, nivelEstaticoM: 18.5, nivelDinamicoM: null, vazaoLh: 4200, ocorrencias: [] });
+  // visita só com o checklist (sem texto) vale; código que não existe é descartado
+  assert.deepStrictEqual(validarRegistro({ tipo: 'VISITA', ocorrencias: ['chkEnergiaRuim', 'chkInventado'] }, hoje).ocorrencias, ['chkEnergiaRuim']);
   assert.throws(() => validarRegistro({ tipo: 'MEDICAO' }, hoje), /ao menos uma medida/);
   assert.throws(() => validarRegistro({ tipo: 'PROBLEMA' }, hoje), /Descreva/);
   assert.throws(() => validarRegistro({ tipo: 'VISITA', descricao: 'x', data: '2026-10-30' }, hoje), /futuro/);

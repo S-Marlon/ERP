@@ -2,6 +2,7 @@
 // registros avulsos (medição, visita, observação, problema); o plano de manutenção calcula a próxima data pela última
 // obra concluída com o serviço (ou pela data informada, para poço antigo); e a garantia vencendo vira aviso.
 import { ErroObra, garantiaAte } from './obras';
+import { codigosValidos, rotuloOcorrencia } from './ocorrencias';
 
 export const TIPOS_REGISTRO = ['MEDICAO', 'VISITA', 'OBSERVACAO', 'PROBLEMA'] as const;
 export const SERVICOS_PLANO = ['LIMPEZA', 'MANUTENCAO', 'TROCA_BOMBA', 'TESTE_VAZAO', 'OUTRO'] as const;
@@ -27,7 +28,10 @@ const opcao = <T extends readonly string[]>(lista: T, v: unknown, padrao: T[numb
   return s as T[number];
 };
 
-/** Registro avulso: a medição precisa de ao menos um número; os outros tipos, de uma descrição. Data no futuro, não. */
+/**
+ * Registro avulso: a medição precisa de ao menos um número; os outros tipos, de uma descrição ou do checklist de
+ * ocorrências (água turva, oscilação de energia...). Data no futuro, não.
+ */
 export const validarRegistro = (b: any, hoje: string) => {
   const tipo = opcao(TIPOS_REGISTRO, b?.tipo, 'OBSERVACAO', 'Tipo');
   const data = lerDia(b?.data || hoje, 'Data');
@@ -35,9 +39,10 @@ export const validarRegistro = (b: any, hoje: string) => {
   const r = {
     tipo, data, descricao: texto(b?.descricao, 255),
     nivelEstaticoM: numero(b?.nivelEstaticoM, 'Nível estático', 2000), nivelDinamicoM: numero(b?.nivelDinamicoM, 'Nível dinâmico', 2000), vazaoLh: numero(b?.vazaoLh, 'Vazão'),
+    ocorrencias: codigosValidos(b?.ocorrencias),
   };
   if (tipo === 'MEDICAO' && r.nivelEstaticoM === null && r.nivelDinamicoM === null && r.vazaoLh === null) throw new ErroObra('Informe ao menos uma medida (nível estático, dinâmico ou vazão).');
-  if (tipo !== 'MEDICAO' && !r.descricao) throw new ErroObra('Descreva o registro.');
+  if (tipo !== 'MEDICAO' && !r.descricao && !r.ocorrencias.length) throw new ErroObra('Descreva o registro ou marque o que foi encontrado.');
   return r;
 };
 
@@ -79,7 +84,7 @@ export interface EventoPoco { data: string; tipo: string; titulo: string; detalh
 /** Linha do tempo do poço, do mais recente para o mais antigo: obras (pela conclusão, início ou criação) e registros. */
 export const linhaDoTempo = (
   obras: { idObra: number; titulo: string; situacao: string; servicos: string[]; criadaEm: string; dataInicio: string | null; dataTermino: string | null; garantiaAte: string | null }[],
-  registros: { idRegistro: number; data: string; tipo: string; descricao: string | null; nivelEstaticoM: number | null; nivelDinamicoM: number | null; vazaoLh: number | null }[],
+  registros: { idRegistro: number; data: string; tipo: string; descricao: string | null; nivelEstaticoM: number | null; nivelDinamicoM: number | null; vazaoLh: number | null; ocorrencias?: string[] }[],
 ): EventoPoco[] => {
   const medidas = (r: typeof registros[number]) => [
     r.nivelEstaticoM !== null ? `NE ${String(r.nivelEstaticoM).replace('.', ',')} m` : null,
@@ -95,7 +100,7 @@ export const linhaDoTempo = (
     ...registros.map(r => ({
       data: r.data, tipo: r.tipo, idRegistro: r.idRegistro,
       titulo: r.tipo === 'MEDICAO' ? 'Medição' : r.tipo === 'VISITA' ? 'Visita' : r.tipo === 'PROBLEMA' ? 'Problema' : 'Observação',
-      detalhe: [medidas(r), r.descricao].filter(Boolean).join(' · ') || null,
+      detalhe: [medidas(r), (r.ocorrencias || []).map(rotuloOcorrencia).join(', '), r.descricao].filter(Boolean).join(' · ') || null,
     })),
   ];
   return ev.sort((a, b) => (a.data < b.data ? 1 : a.data > b.data ? -1 : (b.idObra ?? 0) - (a.idObra ?? 0)));

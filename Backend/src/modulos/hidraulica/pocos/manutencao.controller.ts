@@ -23,6 +23,7 @@ const formatarObra = (o: any) => ({
 const formatarRegistro = (r: any) => ({
   idRegistro: Number(r.id_registro), data: r.data_txt, tipo: r.tipo, descricao: r.descricao || null,
   nivelEstaticoM: nulo(r.nivel_estatico_m), nivelDinamicoM: nulo(r.nivel_dinamico_m), vazaoLh: nulo(r.vazao_lh), operador: r.operador,
+  ocorrencias: String(r.ocorrencias || '').split(',').filter(Boolean),
 });
 const formatarPlano = (p: any, ultimaObra: string | null, hoje: string) => ({
   idPlano: Number(p.id_plano), idPoco: Number(p.id_poco), servico: p.servico, descricao: p.descricao || null, aCadaMeses: Number(p.a_cada_meses),
@@ -94,8 +95,8 @@ export const criarRegistro = async (req: Request, res: Response) => {
     await carregarPoco(tenant, id);
     const r = validarRegistro(req.body, hojeIso());
     const [ins]: any = await pool.execute(
-      `INSERT INTO modulo_hidraulica_pocos_historico (tenant_id, id_poco, data, tipo, descricao, nivel_estatico_m, nivel_dinamico_m, vazao_lh, operador)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [tenant, id, r.data, r.tipo, r.descricao, r.nivelEstaticoM, r.nivelDinamicoM, r.vazaoLh, operadorDe(req)]);
+      `INSERT INTO modulo_hidraulica_pocos_historico (tenant_id, id_poco, data, tipo, descricao, ocorrencias, nivel_estatico_m, nivel_dinamico_m, vazao_lh, operador)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [tenant, id, r.data, r.tipo, r.descricao, r.ocorrencias.join(',') || null, r.nivelEstaticoM, r.nivelDinamicoM, r.vazaoLh, operadorDe(req)]);
     return res.status(201).json({ idRegistro: Number(ins.insertId) });
   } catch (e) { return responderErro(res, e, 'Erro ao registrar.'); }
 };
@@ -106,8 +107,8 @@ export const salvarRegistro = async (req: Request, res: Response) => {
   try {
     const r = validarRegistro(req.body, hojeIso());
     const [u]: any = await pool.execute(
-      `UPDATE modulo_hidraulica_pocos_historico SET data = ?, tipo = ?, descricao = ?, nivel_estatico_m = ?, nivel_dinamico_m = ?, vazao_lh = ?, operador = ?
-       WHERE id_registro = ? AND tenant_id = ?`, [r.data, r.tipo, r.descricao, r.nivelEstaticoM, r.nivelDinamicoM, r.vazaoLh, operadorDe(req), Number(req.params.id), tenant]);
+      `UPDATE modulo_hidraulica_pocos_historico SET data = ?, tipo = ?, descricao = ?, ocorrencias = ?, nivel_estatico_m = ?, nivel_dinamico_m = ?, vazao_lh = ?, operador = ?
+       WHERE id_registro = ? AND tenant_id = ?`, [r.data, r.tipo, r.descricao, r.ocorrencias.join(',') || null, r.nivelEstaticoM, r.nivelDinamicoM, r.vazaoLh, operadorDe(req), Number(req.params.id), tenant]);
     if (!u.affectedRows) throw new ErroObra('Registro não encontrado.', 404);
     return res.json({ ok: true });
   } catch (e) { return responderErro(res, e, 'Erro ao salvar o registro.'); }

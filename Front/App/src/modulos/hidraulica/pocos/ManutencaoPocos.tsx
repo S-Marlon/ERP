@@ -11,6 +11,7 @@ import {
 } from './obrasApi';
 import { abrirFichaPoco, abrirObra, agendarObra } from './navPocos';
 import { CampoNumero } from '../../../shared/formularios/CamposNumero';
+import { GRUPOS_OCORRENCIA, GrupoOcorrencia, itensDosGrupos } from './ocorrencias';
 
 const { Text } = Typography;
 const erro = (e: unknown) => message.error(e instanceof Error ? e.message : 'Erro.');
@@ -19,8 +20,9 @@ const SERVICOS_PLANO: ServicoPlano[] = ['LIMPEZA', 'MANUTENCAO', 'TROCA_BOMBA', 
 const num = (v: number | null) => (v === null ? '—' : String(v).replace('.', ','));
 
 const RegistroModal: React.FC<{ idPoco: number; aberto: RegistroPoco | 'novo' | null; onFechar: () => void; onSalvo: () => void }> = ({ idPoco, aberto, onFechar, onSalvo }) => {
-  const [f, setF] = useState<RegistroForm>({ tipo: 'MEDICAO', data: hoje(), descricao: null, nivelEstaticoM: null, nivelDinamicoM: null, vazaoLh: null });
-  useEffect(() => { if (aberto) setF(aberto === 'novo' ? { tipo: 'MEDICAO', data: hoje(), descricao: null, nivelEstaticoM: null, nivelDinamicoM: null, vazaoLh: null } : { ...aberto }); }, [aberto]);
+  const vazio = (): RegistroForm => ({ tipo: 'VISITA', data: hoje(), descricao: null, nivelEstaticoM: null, nivelDinamicoM: null, vazaoLh: null, ocorrencias: [] });
+  const [f, setF] = useState<RegistroForm>(vazio);
+  useEffect(() => { if (aberto) setF(aberto === 'novo' ? vazio() : { ...aberto, ocorrencias: aberto.ocorrencias || [] }); }, [aberto]);
   const salvar = async () => {
     try {
       if (aberto === 'novo') await manutencaoApi.criarRegistro(idPoco, f); else if (aberto) await manutencaoApi.salvarRegistro(aberto.idRegistro, f);
@@ -31,7 +33,7 @@ const RegistroModal: React.FC<{ idPoco: number; aberto: RegistroPoco | 'novo' | 
     <Col span={8}><Text>{rotulo}</Text><CampoNumero min={0} suffix={suf} style={{ width: '100%' }} value={f[k] ?? undefined} onChange={v => setF({ ...f, [k]: v === null ? null : Number(v) })} /></Col>
   );
   return (
-    <Modal open={!!aberto} title={aberto === 'novo' ? 'Novo registro do poço' : 'Registro do poço'} okText="Salvar" cancelText="Voltar" onOk={salvar} onCancel={onFechar} destroyOnHidden
+    <Modal open={!!aberto} title={aberto === 'novo' ? 'Novo registro do poço' : 'Registro do poço'} okText="Salvar" cancelText="Voltar" onOk={salvar} onCancel={onFechar} destroyOnHidden width={640}
       footer={(botoes) => (
         <Space style={{ width: '100%', justifyContent: 'space-between' }}>
           {aberto && aberto !== 'novo'
@@ -53,6 +55,18 @@ const RegistroModal: React.FC<{ idPoco: number; aberto: RegistroPoco | 'novo' | 
         {f.tipo === 'MEDICAO' && (
           <Row gutter={8}>{medida('nivelEstaticoM', 'Nível estático', 'm')}{medida('nivelDinamicoM', 'Nível dinâmico', 'm')}{medida('vazaoLh', 'Vazão', 'L/h')}</Row>
         )}
+        {/* Checklist do que foi encontrado (entra no histórico de ocorrências da ficha do poço) */}
+        <div>
+          <Text>O que foi encontrado <Text type="secondary" style={{ fontSize: 12 }}>(marque; vale como descrição)</Text></Text>
+          <Checkbox.Group style={{ width: '100%' }} value={f.ocorrencias || []} onChange={v => setF({ ...f, ocorrencias: v as string[] })}>
+            {(['AGUA', 'POCO', 'BOMBA', 'LOCAL'] as GrupoOcorrencia[]).map(g => (
+              <div key={g} style={{ marginTop: 6 }}>
+                <Text strong style={{ fontSize: 12 }}>{GRUPOS_OCORRENCIA[g].titulo}</Text>
+                <Row gutter={[8, 2]}>{itensDosGrupos(g).map(([k, t]) => <Col xs={24} sm={12} key={k}><Checkbox value={k}>{t}</Checkbox></Col>)}</Row>
+              </div>
+            ))}
+          </Checkbox.Group>
+        </div>
         <div><Text>{f.tipo === 'MEDICAO' ? 'Observação' : 'Descrição'}</Text>
           <Input.TextArea maxLength={255} rows={2} value={f.descricao || ''} onChange={e => setF({ ...f, descricao: e.target.value || null })}
             placeholder={f.tipo === 'PROBLEMA' ? 'Ex.: cliente relata água turva depois da chuva' : undefined} />
