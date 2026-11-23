@@ -8,6 +8,7 @@ import {
 } from './obrasApi';
 import { reduzirImagem } from './ProcessoObra';
 import { CampoNumero } from '../../../shared/formularios/CamposNumero';
+import { conferirConjunto, PocoDoConjunto, svgConjunto, textoTubo } from './desenhoConjunto';
 
 const { Text } = Typography;
 const erro = (e: unknown) => message.error(e instanceof Error ? e.message : 'Erro.');
@@ -70,7 +71,23 @@ export const CamposConjunto: React.FC<{ comDataDeInstalacao?: boolean }> = ({ co
         <Col xs={12} md={6}>{texto('Tubo: material', 'tuboMaterial', 'PVC geomecânico', MATERIAIS_TUBO)}</Col>
         <Col xs={12} md={6}>{texto('Tubo: diâmetro', 'tuboDiametro', '1 1/4"')}</Col>
         <Col xs={12} md={6}>{numero('Tubo: barras', 'tuboBarras')}</Col>
-        <Col xs={12} md={6}>{numero('Tubo: metros', 'tuboMetros', 'm')}</Col>
+        <Col xs={12} md={6}>
+          <Form.Item noStyle shouldUpdate={(a, b) => a.tuboBarras !== b.tuboBarras || a.tuboMetros !== b.tuboMetros}>
+            {f => {
+              const barras = Number(f.getFieldValue('tuboBarras')) || 0;
+              const metros = Number(f.getFieldValue('tuboMetros')) || 0;
+              return (
+                <Form.Item label="Tubo: metros (total)" name="tuboMetros"
+                  extra={barras > 0 && metros > 0 ? <Text type="secondary" style={{ fontSize: 12 }}>{textoTubo({ tuboBarras: barras, tuboMetros: metros })}</Text>
+                    : barras > 0 ? <Space size={4} wrap>{[6, 3].map(c => (
+                        <Button key={c} size="small" type="link" style={{ padding: 0 }} onClick={() => f.setFieldValue('tuboMetros', barras * c)}>barras de {c} m = {barras * c} m</Button>
+                      ))}</Space> : null}>
+                  <CampoNumero min={0} style={{ width: '100%' }} suffix="m" />
+                </Form.Item>
+              );
+            }}
+          </Form.Item>
+        </Col>
         <Col xs={12} md={6}>{texto('Fio: tipo', 'fioTipo', 'Cabo PP', FIOS)}</Col>
         <Col xs={12} md={6}>{texto('Fio: bitola', 'fioBitola', '3 x 4 mm²', BITOLAS)}</Col>
         <Col xs={12} md={6}>{numero('Fio: metros', 'fioMetros', 'm')}</Col>
@@ -135,6 +152,25 @@ const ConjuntoModal: React.FC<{
 };
 
 /** Descrição do conjunto em blocos (só o que foi preenchido). */
+/** Desenho do que desce no poço e a conferência (tubos × bomba, fio, corda, nível dinâmico, fundo). */
+const DesenhoConjunto: React.FC<{ c: Conjunto; poco?: PocoDoConjunto; altura?: number }> = ({ c, poco, altura }) => {
+  const conf = conferirConjunto(c, poco);
+  return (
+    <Row gutter={12}>
+      <Col xs={24} lg={14}><div style={{ overflowX: 'auto' }} dangerouslySetInnerHTML={{ __html: svgConjunto(c, poco, { altura }) }} /></Col>
+      <Col xs={24} lg={10}>
+        <Text strong>Conferência</Text>
+        {conf.length ? (
+          <ul style={{ paddingLeft: 18, marginTop: 6 }}>
+            {conf.map(x => <li key={x.texto} style={{ color: x.ok ? undefined : '#d46b08', marginBottom: 4 }}>{x.ok ? '✓ ' : '⚠ '}{x.texto}</li>)}
+          </ul>
+        ) : <div><Text type="secondary">Informe a profundidade da bomba, o tubo (barras e metros), o fio e a corda para conferir.</Text></div>}
+        {textoTubo(c) && <Text type="secondary" style={{ fontSize: 12 }}>Tubo: {textoTubo(c)}. Numa troca de tubulação ou para subir/baixar a bomba, é a altura de cada emenda no desenho.</Text>}
+      </Col>
+    </Row>
+  );
+};
+
 const Detalhe: React.FC<{ c: Conjunto }> = ({ c }) => {
   const junta = (...v: (string | null | false | undefined)[]) => v.filter(Boolean).join(' · ');
   const itens = [
@@ -143,7 +179,7 @@ const Detalhe: React.FC<{ c: Conjunto }> = ({ c }) => {
     { key: 'm', label: 'Motor / bombeador', children: junta([c.motorMarca, c.motorModelo].filter(Boolean).join(' ') && `motor ${[c.motorMarca, c.motorModelo].filter(Boolean).join(' ')}`,
       [c.bombeadorMarca, c.bombeadorModelo].filter(Boolean).join(' ') && `bombeador ${[c.bombeadorMarca, c.bombeadorModelo].filter(Boolean).join(' ')}`) },
     { key: 'p', label: 'Profundidade da bomba', children: c.profundidadeBombaM !== null ? `${num(c.profundidadeBombaM)} m` : '' },
-    { key: 't', label: 'Tubo', children: junta(c.tuboMaterial, c.tuboDiametro, c.tuboBarras !== null && `${c.tuboBarras} barras`, c.tuboMetros !== null && `${num(c.tuboMetros)} m`) },
+    { key: 't', label: 'Tubo', children: junta(c.tuboMaterial, c.tuboDiametro, textoTubo(c)) },
     { key: 'f', label: 'Fio', children: junta(c.fioTipo, c.fioBitola, c.fioMetros !== null && `${num(c.fioMetros)} m`) },
     { key: 'c', label: 'Corda', children: junta(c.cordaMaterial, c.cordaMetros !== null && `${num(c.cordaMetros)} m`) },
     { key: 'q', label: 'Quadro de comando', children: c.quadroComando || '' },
@@ -224,7 +260,7 @@ const FotosDoPoco: React.FC<{ idPoco: number; d: ConjuntoDoPoco; onMudou: () => 
   );
 };
 
-export const ConjuntoPoco: React.FC<{ idPoco: number; onAbrirObra?: (idObra: number) => void }> = ({ idPoco, onAbrirObra }) => {
+export const ConjuntoPoco: React.FC<{ idPoco: number; onAbrirObra?: (idObra: number) => void; poco?: PocoDoConjunto }> = ({ idPoco, onAbrirObra, poco }) => {
   const [d, setD] = useState<ConjuntoDoPoco | null>(null);
   const [editando, setEditando] = useState<{ modo: Modo; base?: Conjunto | null } | null>(null);
   const [retirando, setRetirando] = useState<string | null>(null);
@@ -250,6 +286,7 @@ export const ConjuntoPoco: React.FC<{ idPoco: number; onAbrirObra?: (idObra: num
               {a.instaladoEm && <Text type="secondary">instalado em {dataBr(a.instaladoEm)}</Text>}
               {a.idObra && <Text type="secondary">· {obraLink(a)}</Text>}
             </Space>
+            <DesenhoConjunto c={a} poco={poco} />
             <Detalhe c={a} />
           </Space>
         ) : (
@@ -264,7 +301,7 @@ export const ConjuntoPoco: React.FC<{ idPoco: number; onAbrirObra?: (idObra: num
         extra={<Button size="small" onClick={() => setEditando({ modo: 'ANTIGO' })}>Registrar conjunto antigo</Button>}>
         {d.historico.length ? (
           <Table size="small" rowKey="idConjunto" pagination={false} dataSource={d.historico}
-            expandable={{ expandedRowRender: c => <Detalhe c={c} /> }}
+            expandable={{ expandedRowRender: c => <Space direction="vertical" style={{ width: '100%' }}><DesenhoConjunto c={c} poco={poco} altura={380} /><Detalhe c={c} /></Space> }}
             columns={[
               { title: 'Período', key: 'p', width: 200, render: (_, c) => `${c.instaladoEm ? dataBr(c.instaladoEm) : '?'} → ${c.retiradoEm ? dataBr(c.retiradoEm) : '?'}` },
               { title: 'Uso', key: 'u', width: 130, render: (_, c) => <Uso c={c} /> },

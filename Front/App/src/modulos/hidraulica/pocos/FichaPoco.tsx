@@ -139,7 +139,8 @@ export const FichaPoco: React.FC<{ idPoco: number | null; aba?: string; onFechar
       ) : <Empty description="Ainda sem estrutura: use Informar a estrutura, ou preencha a perfuração e o revestimento no relatório técnico da obra do poço." />}
       </>,
     },
-    { key: 'BOMBA', label: 'Bomba e instalação', children: <ConjuntoPoco idPoco={p.idPoco} onAbrirObra={id => ir(() => abrirObra(id))} /> },
+    { key: 'BOMBA', label: 'Bomba e instalação', children: <ConjuntoPoco idPoco={p.idPoco} onAbrirObra={id => ir(() => abrirObra(id))}
+        poco={{ profundidadeM: p.profundidadeM ?? d.estrutura?.profundidade ?? null, nivelEstaticoM: p.nivelEstaticoM ?? d.estrutura?.bombaNivelEstatico ?? null, nivelDinamicoM: p.nivelDinamicoM ?? d.estrutura?.bombaNivelDinamico ?? null }} /> },
     { key: 'HISTORICO', label: 'Histórico e manutenção', children: <HistoricoDoPoco idPoco={p.idPoco} onAbrirObra={onFechar} /> },
   ] : [];
 

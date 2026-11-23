@@ -77,12 +77,15 @@ export const conjuntoDoRelatorio = (r: Record<string, any> | null | undefined): 
     profundidadeBombaM: pos(r.bombaProfundidade), tuboBarras: barras ? Math.round(barras) : null,
     tuboMetros: barras && comp ? Math.round(barras * comp * 100) / 100 : null,
     tuboDiametro: r.bombaMedidaTubo ? texto(`${r.bombaMedidaTubo}${r.bombaTuboUnidade || '"'}`, 20) : null,
-    tuboMaterial: texto(r.bombaTubulacao, 40), fioBitola: texto(r.bombaCabeamento, 20), cabecaPoco: texto(r.bombaCavalete ? `Cavalete: ${r.bombaCavalete}` : null, 255),
+    tuboMaterial: texto(r.bombaTubulacao, 40), cabecaPoco: texto(r.bombaCavalete ? `Cavalete: ${r.bombaCavalete}` : null, 255),
+    // cabo (do cadastro: "Cabo PP 3x4 mm") com a metragem, e a corda de segurança
+    ...(String(r.bombaCabeamento || '').length > 20 ? { fioTipo: texto(r.bombaCabeamento, 40) } : { fioBitola: texto(r.bombaCabeamento, 20) }),
+    fioMetros: pos(r.bombaCaboMetros), cordaMaterial: texto(r.bombaCorda, 40), cordaMetros: pos(r.bombaCordaMetros),
     instaladoEm: /^\d{4}-\d{2}-\d{2}/.test(String(r.bombaDtInstalacao || '')) ? String(r.bombaDtInstalacao).slice(0, 10) : null,
     observacao: texto(r.bombaObsGerais, 255),
   };
-  const tem = ['bombaMarca', 'motorModelo', 'bombeadorModelo', 'profundidadeBombaM', 'tuboBarras', 'tuboDiametro', 'tuboMaterial', 'fioBitola']
-    .some(k => (c as any)[k] !== null);
+  const tem = ['bombaMarca', 'motorModelo', 'bombeadorModelo', 'profundidadeBombaM', 'tuboBarras', 'tuboDiametro', 'tuboMaterial', 'fioBitola', 'fioTipo', 'fioMetros', 'cordaMetros']
+    .some(k => (c as any)[k] !== null && (c as any)[k] !== undefined);
   if (!tem) return null;
   if (c.profundidadeBombaM === null && c.tuboMetros) c.profundidadeBombaM = c.tuboMetros;
   return c;

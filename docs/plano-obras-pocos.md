@@ -311,3 +311,8 @@ Colunas novas: `incluso` em `_orcamento_itens`, `valor_parcelado` em `_obras`, `
   10 m). Completação no relatório (pré-filtro, cimentação, laje, tampa), desenhada no espaço anelar. "Lançar materiais
   na obra" leva o consumo do relatório para Materiais da obra (`consumoDoRelatorio`). No cadastro, "Completar pelo nome"
   preenche diâmetro, barra, classe e cor vazios (`sugerirDadosTecnicos`, cor padrão por tipo em `corPadrao`).
+- **Desenho do conjunto instalado** (2026-11-23, `desenhoConjunto.ts`): na ficha › Bomba e instalação (e no histórico de
+  trocas), o que desce no poço: tubo edutor contado por barra com as emendas marcadas na altura (6 barras de 6 m = 36 m:
+  serve para trocar a tubulação ou subir/baixar a bomba), fio do quadro até o motor, corda, bombeador sobre o motor, NE/ND
+  e o fundo. Conferência: tubos × profundidade da bomba, fio e corda chegam, sobra do fio, bomba abaixo do ND e longe do
+  fundo. No formulário, "barras de 6 m" calcula os metros. O conjunto registrado pela obra leva também cabo (metros) e corda.
