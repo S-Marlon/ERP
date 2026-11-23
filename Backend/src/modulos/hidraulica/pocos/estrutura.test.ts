@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { diametroDoTexto, estruturaDasObras, estruturaDoPoco } from './estrutura';
+import { diametroDoTexto, estruturaDasObras, estruturaDoPoco, limparEstrutura } from './estrutura';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -40,4 +40,23 @@ teste('estrutura do poço: sem relatório, o cadastro (profundidade e diâmetro)
   const mix = estruturaDoPoco([{ origem: 'Obra 1', data: '2025-01-01', dados: { revestimentos: [{ revDe: 0, revAte: 40, revDiam: 6 }] } }], { profundidadeM: 100, diametro: '6"', nivelEstaticoM: null })!;
   assert.strictEqual(mix.perfuracoes[0].perfAte, 100);
   assert.ok(!mix.revestimentoDesconhecido && !mix.soCadastro);
+});
+
+teste('estrutura do poço: editada na ficha', () => {
+  const e = limparEstrutura({
+    perfuracoes: [{ perfDe: 48, perfAte: '120', perfDiam: '6' }, { perfDe: 0, perfAte: 48, perfDiam: 8 }, { perfDe: 10, perfAte: 5 }],
+    revestimentos: [{ revTipo: 'XYZ', revDe: 0, revAte: 48, revDiam: 6, revMaterial: ' PVC ' }, { revTipo: 'INTERNO', revDe: '', revAte: 120, revDiam: 4, revDiamUnidade: 'mm' }],
+    perfilGeologico: [{ geoDe: 0, geoAte: 30, geoTipo: 'Argila' }, { geoDe: 30, geoAte: 120 }],
+    lixo: 1,
+  });
+  assert.deepStrictEqual(e.perfuracoes.map((p: any) => [p.perfDe, p.perfAte, p.perfDiam]), [[0, 48, 8], [48, 120, 6]]);
+  assert.deepStrictEqual(e.revestimentos.map((r: any) => [r.revTipo, r.revDe, r.revAte, r.revDiamUnidade, r.revMaterial]), [['EXTERNO', 0, 48, '"', 'PVC'], ['INTERNO', 0, 120, 'mm', '']]);
+  assert.strictEqual(e.perfilGeologico.length, 1);
+  assert.ok(!('lixo' in e));
+  // a do poço é a base; o complemento da obra entra por cima
+  const f = estruturaDoPoco([{ origem: 'Obra 12', data: '2026-09-01', dados: { revestimentos: [{ revTipo: 'INTERNO', revDe: 0, revAte: 120, revDiam: 4 }] } }],
+    { profundidadeM: 120, diametro: '6', nivelEstaticoM: null }, { perfuracoes: e.perfuracoes, revestimentos: [e.revestimentos[0]], perfilGeologico: [] })!;
+  assert.deepStrictEqual(f.revestimentos.map((r: any) => r.origem), ['Cadastro do poço', 'Obra 12']);
+  assert.strictEqual(f.perfuracoes.length, 2);
+  assert.ok(!f.soCadastro && !f.revestimentoDesconhecido);
 });

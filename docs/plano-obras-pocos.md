@@ -291,13 +291,16 @@ Colunas novas: `incluso` em `_orcamento_itens`, `valor_parcelado` em `_obras`, `
   elétrica, local) em `ocorrencias.ts` (front e backend); os 8 códigos antigos (`chkCaimento`, `chkAguaNaoLimpou`...)
   continuam. No relatório: perfuração/local na seção Perfuração (+ "outras ocorrências" em texto), água/poço/bomba no
   Diagnóstico; a impressão traz só as marcadas (o formulário em branco traz todas). A ficha do poço mostra o histórico das
-  ocorrências dos relatórios (o que se repete em vermelho, "×2"). Pendente: o checklist no registro de visita (coluna
-  `ocorrencias` em `modulo_hidraulica_pocos_historico`, script enviado).
+  ocorrências dos relatórios e das visitas (o que se repete em vermelho, "×2").
 - **Estrutura do poço** (2026-11-23): o revestimento tem tipo (externo, interno de complemento, filtro, tubo de boca),
   início livre (não encadeia: o interno começa em 0 dentro do de fora) e motivo; o relatório ganhou o perfil geológico
   (camadas encadeadas). `estruturaPoco.ts` monta o resumo ("sem revestimento de 48 a 120 m: parede em rocha sã") e o
   desenho (SVG) para a tela, a impressão e a aba **Estrutura** da ficha, que junta as obras do poço (`estrutura.ts` no
   backend: perfuração e geologia da obra mais funda, revestimentos de todas com a obra de origem, NE e bomba mais recentes).
+  Sem relatório detalhado, o desenho básico sai do cadastro (profundidade, diâmetro e NE; revestimento "não informado").
+  A estrutura também pode ser informada **direto no poço** (ficha › Estrutura › Informar a estrutura; coluna
+  `dados_estrutura` em `modulo_hidraulica_pocos_pocos`, `limparEstrutura`): vale como base (a mais antiga) e o que as
+  obras registram depois entra por cima. O registro de visita ganhou o checklist (coluna `ocorrencias`).
 - **Navegação** (2026-11-23): o que se usa todo dia saiu de "Mais ferramentas": Mapa virou aba de Clientes e poços,
   Manutenção virou aba de "Agenda e manutenção" e Documentos ganhou item próprio na barra lateral. Em Mais ferramentas
   ficam Resultado, Plano mensal e Monitoramento (o aviso de tela desligada continua lá, também para o Mapa).

@@ -2,7 +2,7 @@
 // contratos/obras do poço com o tipo do contrato, relatório e garantia). As regras ficam em busca.ts.
 import { Request, Response } from 'express';
 import { marcadas, ocorrenciasDoPoco } from './ocorrencias';
-import { estruturaDoPoco } from './estrutura';
+import { estruturaDoPoco, limparEstrutura } from './estrutura';
 import pool from '../../../infra/db';
 import { garantiaAte, lerServicos } from './obras';
 import { carregarPoco, formatarPoco, responderErro } from './obras.controller';
@@ -128,10 +128,26 @@ export const pocoCompleto = async (req: Request, res: Response) => {
       // (sem relatório detalhado, o desenho básico sai do cadastro: profundidade, diâmetro e nível estático)
       estrutura: estruturaDoPoco(obras.filter((o: any) => o.situacao !== 'CANCELADA').map((o: any) => ({
         dados: lerJson(o.dados_relatorio), data: o.termino || o.inicio || o.criada || null, origem: o.titulo || `Obra ${o.id_obra}`,
-      })), { profundidadeM: nulo(p.profundidade_m), diametro: p.diametro || null, nivelEstaticoM: nulo(p.nivel_estatico_m) }),
+      })), { profundidadeM: nulo(p.profundidade_m), diametro: p.diametro || null, nivelEstaticoM: nulo(p.nivel_estatico_m) }, lerJson(p.dados_estrutura)),
+      // a estrutura informada direto no poço (para editar)
+      estruturaPropria: p.dados_estrutura ? lerJson(p.dados_estrutura) : null,
       resumo: { contratos: contratos.length, garantiaAte: garantia, emGarantia: !!garantia && garantia >= hoje, sensores: n(iot?.q) > 0 },
       // bomba instalada agora (a ficha mostra numa linha; o detalhe fica na aba "Bomba e instalação")
       conjunto: conj ? { resumo: resumoConjunto(conjuntoDaLinha(conj)), anosDeUso: idadeEmAnos(conj.instalado_txt || null, hoje) } : null,
     });
   } catch (e) { return responderErro(res, e, 'Erro ao abrir a ficha do poço.'); }
+};
+
+/** PUT /pocos/:id/estrutura { dados } — estrutura informada direto no poço (perfuração, revestimentos, perfil geológico). */
+export const salvarEstruturaPoco = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  try {
+    const id = Number(req.params.id);
+    await carregarPoco(tenant, id);
+    const e = limparEstrutura(req.body?.dados || {});
+    const vazia = !e.perfuracoes.length && !e.revestimentos.length && !e.perfilGeologico.length;
+    await pool.execute(`UPDATE modulo_hidraulica_pocos_pocos SET dados_estrutura = ? WHERE id_poco = ? AND tenant_id = ?`,
+      [vazia ? null : JSON.stringify(e), id, tenant]);
+    return res.json({ ok: true, estrutura: vazia ? null : e });
+  } catch (e) { return responderErro(res, e, 'Erro ao salvar a estrutura do poço.'); }
 };

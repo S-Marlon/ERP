@@ -37,7 +37,7 @@ import {
 } from './processo.controller';
 import { central } from './central.controller';
 import { clienteCompleto } from './clienteCompleto.controller';
-import { buscar, pocoCompleto } from './busca.controller';
+import { buscar, pocoCompleto, salvarEstruturaPoco } from './busca.controller';
 import { apagarNivel, salvarCustos, salvarNivel, simular, verPlanoMensal } from './planoMensal.controller';
 import {
   apagarConjunto, apagarFotoPoco, conjuntoDoPoco, criarConjunto, enviarFotoPoco, retirarConjunto, salvarConjunto, salvarFotoPoco,
@@ -132,6 +132,7 @@ router.delete('/aditivos/:id', apagarAditivo);
 router.get('/clientes/:id/completo', clienteCompleto);
 router.get('/busca', buscar);
 router.get('/pocos/:id/completo', pocoCompleto);
+router.put('/pocos/:id/estrutura', salvarEstruturaPoco);
 router.get('/pocos/:id/conjunto', conjuntoDoPoco);
 router.get('/plano-mensal', verPlanoMensal);
 router.put('/plano-mensal/custos', salvarCustos);

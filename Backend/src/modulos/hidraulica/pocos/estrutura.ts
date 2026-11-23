@@ -58,7 +58,11 @@ export const diametroDoTexto = (t: unknown) => {
  * o nível estático, o NE). Sem revestimento em lugar nenhum, `revestimentoDesconhecido` (não dá para dizer que é
  * parede na rocha); `soCadastro` quando nada veio dos relatórios.
  */
-export const estruturaDoPoco = (obras: RelatorioDaObra[], cadastro: CadastroPoco) => {
+export const estruturaDoPoco = (obras: RelatorioDaObra[], cadastro: CadastroPoco, propria?: Dados | null) => {
+  // A estrutura informada direto no poço vale como a mais antiga (base); o que as obras registraram depois entra por cima
+  if (propria && (propria.perfuracoes?.length || propria.revestimentos?.length || propria.perfilGeologico?.length)) {
+    obras = [{ dados: propria, data: '0000-00-00', origem: 'Cadastro do poço' }, ...obras];
+  }
   const prof = num(cadastro.profundidadeM);
   const base = prof > 0 ? [{ perfDe: 0, perfAte: prof, ...(diametroDoTexto(cadastro.diametro) || {}) }] : [];
   const e: Dados | null = estruturaDasObras(obras);
@@ -73,4 +77,32 @@ export const estruturaDoPoco = (obras: RelatorioDaObra[], cadastro: CadastroPoco
   e.revestimentoDesconhecido = !e.revestimentos.length;
   e.soCadastro = false;
   return e;
+};
+
+// ---------------------------------------------------------------- edição direta no poço
+const TIPOS_REV = ['EXTERNO', 'INTERNO', 'FILTRO', 'BOCA'];
+const texto = (v: unknown, max: number) => String(v ?? '').trim().slice(0, max);
+const numOuNulo = (v: unknown) => { const t = String(v ?? '').trim(); if (!t) return null; const x = num(t); return x >= 0 && x <= 5000 ? x : null; };
+const unidade = (v: unknown) => (v === 'mm' ? 'mm' : '"');
+
+/**
+ * Estrutura digitada na ficha do poço: só as três listas, com os campos conhecidos e números de verdade; linha sem "até"
+ * maior que o "de" é descartada. Perfuração e geologia ficam em ordem de profundidade.
+ */
+export const limparEstrutura = (b: any) => {
+  const lista = (v: unknown) => (Array.isArray(v) ? v.slice(0, 50) : []);
+  const valida = (de: number | null, ate: number | null) => ate !== null && ate > (de ?? 0);
+  const perfuracoes = lista(b?.perfuracoes)
+    .map((p: any) => ({ perfDe: numOuNulo(p?.perfDe) ?? 0, perfAte: numOuNulo(p?.perfAte), perfDiam: numOuNulo(p?.perfDiam), perfDiamUnidade: unidade(p?.perfDiamUnidade) }))
+    .filter((p: any) => valida(p.perfDe, p.perfAte)).sort((a: any, c: any) => a.perfDe - c.perfDe);
+  const revestimentos = lista(b?.revestimentos)
+    .map((r: any) => ({
+      revTipo: TIPOS_REV.includes(r?.revTipo) ? r.revTipo : 'EXTERNO', revDe: numOuNulo(r?.revDe) ?? 0, revAte: numOuNulo(r?.revAte),
+      revDiam: numOuNulo(r?.revDiam), revDiamUnidade: unidade(r?.revDiamUnidade), revMaterial: texto(r?.revMaterial, 60), revUniao: texto(r?.revUniao, 40), revObs: texto(r?.revObs, 120),
+    }))
+    .filter((r: any) => valida(r.revDe, r.revAte));
+  const perfilGeologico = lista(b?.perfilGeologico)
+    .map((c: any) => ({ geoDe: numOuNulo(c?.geoDe) ?? 0, geoAte: numOuNulo(c?.geoAte), geoTipo: texto(c?.geoTipo, 40), geoObs: texto(c?.geoObs, 120) }))
+    .filter((c: any) => valida(c.geoDe, c.geoAte) && c.geoTipo).sort((a: any, c: any) => a.geoDe - c.geoDe);
+  return { perfuracoes, revestimentos, perfilGeologico };
 };

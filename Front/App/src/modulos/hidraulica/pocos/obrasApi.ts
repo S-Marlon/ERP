@@ -116,6 +116,7 @@ export const obrasApi = {
   clienteCompleto: (id: number) => pedir<ClienteCompleto>(`${API}/clientes/${id}/completo?tenant_id=1`, undefined, 'Erro ao abrir a ficha do cliente.'),
   busca: (texto: string) => pedir<ResultadoBusca>(`${API}/busca?${q({ q: texto })}`, undefined, 'Erro na busca.'),
   pocoCompleto: (id: number) => pedir<PocoCompleto>(`${API}/pocos/${id}/completo?tenant_id=1`, undefined, 'Erro ao abrir a ficha do poço.'),
+  salvarEstruturaPoco: (id: number, dados: Dados) => pedir<{ ok: true }>(`${API}/pocos/${id}/estrutura?tenant_id=1`, corpo('PUT', { dados }), 'Erro ao salvar a estrutura do poço.'),
   cliente: (id: number) => pedir<ClientePoco>(`${API}/clientes/${id}?tenant_id=1`, undefined, 'Erro ao abrir o cliente.'),
   criarCliente: (c: Partial<ClientePocoForm>) => pedir<ClientePoco>(`${API}/clientes?tenant_id=1`, corpo('POST', c), 'Erro ao cadastrar o cliente.'),
   salvarCliente: (id: number, c: ClientePocoForm) => pedir<ClientePoco>(`${API}/clientes/${id}?tenant_id=1`, corpo('PUT', c), 'Erro ao salvar o cliente.'),
@@ -569,6 +570,8 @@ export interface PocoCompleto {
   ocorrencias?: Array<{ codigo: string; rotulo: string; grupo: GrupoOcorrencia; vezes: number; ultimaVez: string | null; origem: string }>;
   /** Estrutura (perfil construtivo) juntando os relatórios das obras do poço; null se ainda não há perfuração/revestimento. */
   estrutura?: Record<string, any> | null;
+  /** A estrutura informada direto no poço (para editar). */
+  estruturaPropria?: Record<string, any> | null;
   /** Bomba instalada agora, numa linha. */
   conjunto?: { resumo: string; anosDeUso: number | null } | null;
 }

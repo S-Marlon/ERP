@@ -2,7 +2,7 @@
 // localização, proprietário, os contratos/obras do poço (formal ou informal, relatório, documentos, garantia) e o
 // histórico com a manutenção. Também o "hospedeiro" das fichas globais (poço e cliente), montado uma vez na página.
 import React, { useEffect, useState } from 'react';
-import { Alert, Button, Col, Descriptions, Drawer, Empty, Row, Space, Statistic, Table, Tabs, Tag, Tooltip, Typography, message } from 'antd';
+import { Alert, Button, Col, Descriptions, Drawer, Empty, Flex, Row, Space, Statistic, Table, Tabs, Tag, Tooltip, Typography, message } from 'antd';
 import {
   CopyOutlined, EditOutlined, EnvironmentOutlined, FileTextOutlined, FolderOpenOutlined, GlobalOutlined, ToolOutlined, UserOutlined, WarningOutlined, WhatsAppOutlined,
 } from '@ant-design/icons';
@@ -13,6 +13,7 @@ import { ClienteFicha } from './ClientesPoco';
 import { ConjuntoPoco } from './ConjuntoPoco';
 import { GRUPOS_OCORRENCIA } from './ocorrencias';
 import { resumoEstrutura, svgPerfil, temEstrutura } from './estruturaPoco';
+import { EstruturaEditor } from './EstruturaEditor';
 
 const { Text } = Typography;
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -21,11 +22,14 @@ const SITUACAO_POCO: Record<string, { texto: string; cor: string }> = { ATIVO: {
 export const FichaPoco: React.FC<{ idPoco: number | null; aba?: string; onFechar: () => void }> = ({ idPoco, aba: abaPedida, onFechar }) => {
   const [d, setD] = useState<PocoCompleto | null>(null);
   const [aba, setAba] = useState('DADOS');
+  const [editandoEstrutura, setEditandoEstrutura] = useState(false);
   useEffect(() => {
     setD(null);
     if (!idPoco) return;
     obrasApi.pocoCompleto(idPoco).then(r => { setD(r); setAba(abaPedida || (r.contratos.length ? 'CONTRATOS' : 'DADOS')); }).catch(e => message.error(e.message));
   }, [idPoco]);
+  // Recarrega a ficha mantendo a aba (depois de editar a estrutura)
+  const recarregar = () => { if (idPoco) obrasApi.pocoCompleto(idPoco).then(setD).catch(e => message.error(e.message)); };
   const ir = (fn: () => void) => { onFechar(); fn(); };
   const p = d?.poco, dono = d?.proprietario;
   const gps = p && p.latitude !== null && p.longitude !== null ? `${p.latitude}, ${p.longitude}` : null;
@@ -113,7 +117,13 @@ export const FichaPoco: React.FC<{ idPoco: number | null; aba?: string; onFechar
       ),
     },
     {
-      key: 'ESTRUTURA', label: 'Estrutura', children: d.estrutura && temEstrutura(d.estrutura) ? (
+      key: 'ESTRUTURA', label: 'Estrutura', children: <>
+      <Flex justify="flex-end" style={{ marginBottom: 8 }}>
+        <Tooltip title="Perfuração, revestimentos e perfil geológico informados direto no poço (para o poço sem obra no sistema). O que as obras registrarem entra por cima.">
+          <Button icon={<EditOutlined />} onClick={() => setEditandoEstrutura(true)}>{d.estruturaPropria ? 'Editar estrutura' : 'Informar a estrutura'}</Button>
+        </Tooltip>
+      </Flex>
+      {d.estrutura && temEstrutura(d.estrutura) ? (
         <Row gutter={16}>
           <Col xs={24} lg={12}><div style={{ overflowX: 'auto' }} dangerouslySetInnerHTML={{ __html: svgPerfil(d.estrutura) }} /></Col>
           <Col xs={24} lg={12}>
@@ -126,7 +136,8 @@ export const FichaPoco: React.FC<{ idPoco: number | null; aba?: string; onFechar
             </Text>
           </Col>
         </Row>
-      ) : <Empty description="Ainda sem estrutura: preencha a perfuração e o revestimento no relatório técnico da obra do poço." />,
+      ) : <Empty description="Ainda sem estrutura: use Informar a estrutura, ou preencha a perfuração e o revestimento no relatório técnico da obra do poço." />}
+      </>,
     },
     { key: 'BOMBA', label: 'Bomba e instalação', children: <ConjuntoPoco idPoco={p.idPoco} onAbrirObra={id => ir(() => abrirObra(id))} /> },
     { key: 'HISTORICO', label: 'Histórico e manutenção', children: <HistoricoDoPoco idPoco={p.idPoco} onAbrirObra={onFechar} /> },
@@ -175,6 +186,10 @@ export const FichaPoco: React.FC<{ idPoco: number | null; aba?: string; onFechar
             )}
           </Space>
           <Tabs activeKey={aba} onChange={setAba} items={abas} />
+          <EstruturaEditor idPoco={editandoEstrutura ? p.idPoco : null}
+            inicial={d.estruturaPropria || (d.estrutura?.soCadastro ? { perfuracoes: d.estrutura.perfuracoes } : null)}
+            extras={{ bombaNivelEstatico: d.estrutura?.bombaNivelEstatico ?? p.nivelEstaticoM, bombaProfundidade: d.estrutura?.bombaProfundidade ?? null }}
+            onFechar={() => setEditandoEstrutura(false)} onSalvo={() => { setEditandoEstrutura(false); recarregar(); }} />
         </>
       )}
     </Drawer>
