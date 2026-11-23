@@ -1,8 +1,10 @@
 // Obras de poços › ficha do poço › "Bomba e instalação": o conjunto motobomba instalado (bomba ou motor + bombeador, tubo,
 // fio, corda, quadro e cabeça do poço), o histórico de trocas e as fotos do poço (bomba, cabeça, quadro, local).
 import React, { useEffect, useState } from 'react';
-import { AutoComplete, Button, Card, Col, Descriptions, Divider, Empty, Form, Image, Input, Modal, Popconfirm, Row, Select, Space, Table, Tag, Tooltip, Typography, Upload, message } from 'antd';
-import { CameraOutlined, DeleteOutlined, EditOutlined, HistoryOutlined, PlusOutlined, SwapOutlined, ToolOutlined } from '@ant-design/icons';
+import { Alert, AutoComplete, Button, Card, Col, Descriptions, Divider, Empty, Flex, Form, Image, Input, Modal, Popconfirm, Row, Segmented, Select, Space, Switch, Table, Tag, Tooltip, Typography, Upload, message, theme } from 'antd';
+import {
+  ApiOutlined, CameraOutlined, ColumnHeightOutlined, DeleteOutlined, EditOutlined, HistoryOutlined, HomeOutlined, PlusOutlined, SwapOutlined, ThunderboltOutlined, ToolOutlined,
+} from '@ant-design/icons';
 import {
   Conjunto, conjuntoApi, ConjuntoDoPoco, ConjuntoForm, dataBr, ETAPAS_FOTO, FotoPoco, TIPOS_BOMBA, TIPOS_FOTO_POCO, TipoFotoPoco, urlArquivo,
 } from './obrasApi';
@@ -88,50 +90,115 @@ const TuboPorBarra: React.FC = () => {
   );
 };
 
-export const CamposConjunto: React.FC<{ comDataDeInstalacao?: boolean }> = ({ comDataDeInstalacao }) => (
-  <>
-      {comDataDeInstalacao && <Row gutter={10}><Col xs={12} md={6}>{data('Instalado em', 'instaladoEm')}</Col></Row>}
-      <Divider titlePlacement="start" plain style={{ margin: '4px 0 8px' }}>Bomba</Divider>
-      <Row gutter={10}>
-        <Col xs={12} md={6}><Form.Item label="Tipo" name="bombaTipo"><Select allowClear options={Object.entries(TIPOS_BOMBA).map(([value, label]) => ({ value, label }))} /></Form.Item></Col>
-        <Col xs={12} md={6}>{texto('Marca', 'bombaMarca', 'Ebara, Leão, Schneider')}</Col>
-        <Col xs={12} md={6}>{texto('Modelo', 'bombaModelo', '4BPS3-12')}</Col>
-        <Col xs={12} md={6}>{numero('Potência', 'potenciaCv', 'CV', 0.5)}</Col>
-        <Col xs={12} md={6}>{texto('Tensão', 'tensao', '220 V mono', TENSOES)}</Col>
-        <Col xs={12} md={6}>{numero('Estágios', 'estagios')}</Col>
-        <Col xs={12} md={6}>{numero('Profundidade da bomba', 'profundidadeBombaM', 'm')}</Col>
-      </Row>
-      <Divider titlePlacement="start" plain style={{ margin: '4px 0 8px' }}>Motor e bombeador <Text type="secondary" style={{ fontSize: 12 }}>(quando são peças separadas)</Text></Divider>
-      <Row gutter={10}>
-        <Col xs={12} md={6}>{texto('Motor: marca', 'motorMarca', 'Franklin, WEG')}</Col>
-        <Col xs={12} md={6}>{texto('Motor: modelo', 'motorModelo')}</Col>
-        <Col xs={12} md={6}>{texto('Bombeador: marca', 'bombeadorMarca')}</Col>
-        <Col xs={12} md={6}>{texto('Bombeador: modelo', 'bombeadorModelo', '3BPS2-14')}</Col>
-      </Row>
-      <Divider titlePlacement="start" plain style={{ margin: '4px 0 8px' }}>Tubo, fio e corda</Divider>
-      <Row gutter={10}>
-        <Col xs={12} md={6}>{texto('Tubo: material', 'tuboMaterial', 'PVC geomecânico', MATERIAIS_TUBO)}</Col>
-        <Col xs={12} md={6}>{texto('Tubo: diâmetro', 'tuboDiametro', '1 1/4"')}</Col>
-        <TuboPorBarra />
-        <Col xs={12} md={6}>{texto('Fio: tipo', 'fioTipo', 'Cabo PP', FIOS)}</Col>
-        <Col xs={12} md={6}>{texto('Fio: bitola', 'fioBitola', '3 x 4 mm²', BITOLAS)}</Col>
-        <Col xs={12} md={6}>{numero('Fio: metros', 'fioMetros', 'm')}</Col>
-        <Col xs={12} md={6}>{texto('Corda', 'cordaMaterial', 'Corda de nylon 10 mm', CORDAS)}</Col>
-        <Col xs={12} md={6}>{numero('Corda: metros', 'cordaMetros', 'm')}</Col>
-      </Row>
-      <Divider titlePlacement="start" plain style={{ margin: '4px 0 8px' }}>Quadro e cabeça do poço</Divider>
-      <Row gutter={10}>
-        <Col xs={24} md={12}>{texto('Quadro de comando', 'quadroComando', 'Chave de partida, relé de nível, boia')}</Col>
-        <Col xs={24} md={12}>{texto('Cabeça do poço', 'cabecaPoco', 'Curva 90°, válvula de retenção, registro, manômetro, tampa')}</Col>
-        <Col xs={24}>{texto('Observação', 'observacao')}</Col>
-      </Row>
-  </>
-);
+/** Bloco do formulário do conjunto: borda colorida, ícone e título (Bomba, Tubo, Fio e corda, Superfície). */
+const Bloco: React.FC<{ icone: React.ReactNode; titulo: string; cor: string; extra?: React.ReactNode; children: React.ReactNode }> = ({ icone, titulo, cor, extra, children }) => {
+  const { token } = theme.useToken();
+  return (
+    <div style={{ border: `1px solid ${token.colorBorderSecondary}`, borderLeft: `3px solid ${cor}`, borderRadius: token.borderRadiusLG, padding: '10px 12px 2px', background: token.colorBgContainer }}>
+      <Flex justify="space-between" align="center" style={{ marginBottom: 8 }}>
+        <Space size={6}><span style={{ color: cor, fontSize: 15 }}>{icone}</span><Text strong>{titulo}</Text></Space>
+        {extra}
+      </Flex>
+      {children}
+    </div>
+  );
+};
+
+export const CamposConjunto: React.FC<{ comDataDeInstalacao?: boolean }> = ({ comDataDeInstalacao }) => {
+  const form = Form.useFormInstance();
+  const v: Partial<ConjuntoForm> = Form.useWatch([], form) || {};
+  // motor e bombeador separados: aparece aberto se já tem algum preenchido
+  const [separados, setSeparados] = useState(false);
+  useEffect(() => { if (v.motorMarca || v.motorModelo || v.bombeadorMarca || v.bombeadorModelo) setSeparados(true); }, [v.motorMarca, v.motorModelo, v.bombeadorMarca, v.bombeadorModelo]);
+  const bomba = Number(v.profundidadeBombaM) || 0;
+  const tubos = Number(v.tuboMetros) || 0;
+  const sugestao = (campo: keyof ConjuntoForm, valor: number, texto: string) => (
+    bomba > 0 && Number(v[campo]) !== valor
+      ? <Button type="link" size="small" style={{ padding: 0, height: 'auto' }} onClick={() => form.setFieldValue(campo, valor)}>{texto}</Button>
+      : null
+  );
+  return (
+    <Flex vertical gap={10}>
+      {comDataDeInstalacao && <Row gutter={10}><Col xs={12} md={8}>{data('Instalado em', 'instaladoEm')}</Col></Row>}
+
+      <Bloco icone={<ThunderboltOutlined />} titulo="Bomba" cor="#2f54eb"
+        extra={<Space size={6}><Text type="secondary" style={{ fontSize: 12 }}>motor e bombeador separados</Text><Switch size="small" checked={separados} onChange={setSeparados} /></Space>}>
+        <Form.Item name="bombaTipo" style={{ marginBottom: 10 }}>
+          <Segmented block options={Object.entries(TIPOS_BOMBA).map(([value, label]) => ({ value, label }))} />
+        </Form.Item>
+        <Row gutter={10}>
+          <Col xs={12} md={8}>{texto('Marca', 'bombaMarca', 'Ebara, Leão, Schneider')}</Col>
+          <Col xs={12} md={8}>{texto('Modelo', 'bombaModelo', '3BPS2-14')}</Col>
+          <Col xs={8} md={8}>{numero('Potência', 'potenciaCv', 'CV', 0.5)}</Col>
+          <Col xs={8} md={8}>{texto('Tensão', 'tensao', '220 V mono', TENSOES)}</Col>
+          <Col xs={8} md={8}>{numero('Estágios', 'estagios')}</Col>
+        </Row>
+        {separados && (
+          <Row gutter={10}>
+            <Col xs={12} md={6}>{texto('Motor: marca', 'motorMarca', 'Franklin, WEG')}</Col>
+            <Col xs={12} md={6}>{texto('Motor: modelo', 'motorModelo')}</Col>
+            <Col xs={12} md={6}>{texto('Bombeador: marca', 'bombeadorMarca')}</Col>
+            <Col xs={12} md={6}>{texto('Bombeador: modelo', 'bombeadorModelo', '3BPS2-14')}</Col>
+          </Row>
+        )}
+      </Bloco>
+
+      <Bloco icone={<ColumnHeightOutlined />} titulo="Profundidade e tubo edutor" cor="#fa8c16">
+        <Row gutter={10}>
+          <Col xs={12} md={8}>
+            <Form.Item label="Profundidade da bomba" name="profundidadeBombaM"
+              extra={tubos > 0 && Math.abs(tubos - bomba) > 0.01 ? sugestao('profundidadeBombaM', tubos, `usar ${String(tubos).replace('.', ',')} m dos tubos`) || (bomba ? null : <Button type="link" size="small" style={{ padding: 0, height: 'auto' }} onClick={() => form.setFieldValue('profundidadeBombaM', tubos)}>usar {String(tubos).replace('.', ',')} m dos tubos</Button>) : null}>
+              <CampoNumero min={0} style={{ width: '100%' }} suffix="m" />
+            </Form.Item>
+          </Col>
+          <Col xs={12} md={8}>{texto('Material do tubo', 'tuboMaterial', 'PVC geomecânico', MATERIAIS_TUBO)}</Col>
+          <Col xs={12} md={8}>{texto('Diâmetro', 'tuboDiametro', '1 1/4"')}</Col>
+          <TuboPorBarra />
+        </Row>
+      </Bloco>
+
+      <Bloco icone={<ApiOutlined />} titulo="Fio e corda (o que desce junto)" cor="#cf1322">
+        <Row gutter={10}>
+          <Col xs={12} md={8}>{texto('Fio: tipo', 'fioTipo', 'Cabo PP', FIOS)}</Col>
+          <Col xs={12} md={8}>{texto('Fio: bitola', 'fioBitola', '3 x 4 mm²', BITOLAS)}</Col>
+          <Col xs={12} md={8}>
+            <Form.Item label="Fio: metros" name="fioMetros" extra={sugestao('fioMetros', Math.ceil(bomba + 10), `sugerido ${Math.ceil(bomba + 10)} m (bomba + 10 m)`)}>
+              <CampoNumero min={0} style={{ width: '100%' }} suffix="m" />
+            </Form.Item>
+          </Col>
+          <Col xs={12} md={16}>{texto('Corda', 'cordaMaterial', 'Corda de nylon 10 mm', CORDAS)}</Col>
+          <Col xs={12} md={8}>
+            <Form.Item label="Corda: metros" name="cordaMetros" extra={sugestao('cordaMetros', Math.ceil(bomba + 5), `sugerido ${Math.ceil(bomba + 5)} m (bomba + 5 m)`)}>
+              <CampoNumero min={0} style={{ width: '100%' }} suffix="m" />
+            </Form.Item>
+          </Col>
+        </Row>
+      </Bloco>
+
+      <Bloco icone={<HomeOutlined />} titulo="Superfície: quadro e cabeça do poço" cor="#595959">
+        <Row gutter={10}>
+          <Col xs={24} md={12}>
+            <Form.Item label="Quadro de comando" name="quadroComando" normalize={x => (x ? x : null)}>
+              <Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} placeholder="Chave de partida, relé de nível, boia" />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={12}>
+            <Form.Item label="Cabeça do poço" name="cabecaPoco" normalize={x => (x ? x : null)}>
+              <Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} placeholder="Curva 90°, válvula de retenção, registro, manômetro, tampa" />
+            </Form.Item>
+          </Col>
+          <Col xs={24}>{texto('Observação', 'observacao')}</Col>
+        </Row>
+      </Bloco>
+    </Flex>
+  );
+};
 
 const ConjuntoModal: React.FC<{
-  aberto: { modo: Modo; base?: Conjunto | null } | null; idPoco: number; onFechar: () => void; onSalvo: () => void;
-}> = ({ aberto, idPoco, onFechar, onSalvo }) => {
+  aberto: { modo: Modo; base?: Conjunto | null } | null; idPoco: number; onFechar: () => void; onSalvo: () => void; poco?: PocoDoConjunto;
+}> = ({ aberto, idPoco, onFechar, onSalvo, poco }) => {
   const [form] = Form.useForm<ConjuntoForm>();
+  const valores: Partial<ConjuntoForm> = Form.useWatch([], form) || {};
   const [salvando, setSalvando] = useState(false);
   const modo = aberto?.modo;
   useEffect(() => {
@@ -162,14 +229,29 @@ const ConjuntoModal: React.FC<{
 
   return (
     <Modal open={!!aberto} title={modo ? TITULOS[modo] : ''} onCancel={onFechar} onOk={salvar} okText="Salvar" cancelText="Voltar"
-      confirmLoading={salvando} destroyOnHidden width={820} styles={{ body: { maxHeight: '70vh', overflowY: 'auto', paddingRight: 8 } }}>
-      {modo === 'TROCAR' && <Text type="secondary">Tubo, fio, corda, quadro e cabeça vieram do conjunto atual: mude só o que foi trocado.</Text>}
-      <Form form={form} layout="vertical" size="small" style={{ marginTop: 8 }}>
-        <Row gutter={10}>
-          <Col xs={12} md={6}>{data('Instalado em', 'instaladoEm')}</Col>
-          {comRetirada && <Col xs={12} md={6}>{data('Retirado em', 'retiradoEm', modo === 'ANTIGO')}</Col>}
+      confirmLoading={salvando} destroyOnHidden width="min(1180px, 96vw)" styles={{ body: { maxHeight: '76vh', overflowY: 'auto', paddingRight: 8 } }}>
+      {modo === 'TROCAR' && <Alert type="info" showIcon style={{ marginBottom: 8 }} message="Tubo, fio, corda, quadro e cabeça vieram do conjunto atual: mude só o que foi trocado." />}
+      <Form form={form} layout="vertical" style={{ marginTop: 4 }}>
+        <Row gutter={16}>
+          <Col xs={24} lg={15}>
+            <Row gutter={10}>
+              <Col xs={12} md={8}>{data('Instalado em', 'instaladoEm')}</Col>
+              {comRetirada && <Col xs={12} md={8}>{data('Retirado em', 'retiradoEm', modo === 'ANTIGO')}</Col>}
+            </Row>
+            <CamposConjunto />
+          </Col>
+          <Col xs={24} lg={9}>
+            {/* o desenho e a conferência acompanham o que está sendo preenchido */}
+            <div style={{ position: 'sticky', top: 0 }}>
+              <Card size="small" title="Como fica no poço">
+                <div style={{ overflowX: 'auto' }} dangerouslySetInnerHTML={{ __html: svgConjunto(valores, poco, { altura: 440, largura: 420 }) }} />
+                <ul style={{ paddingLeft: 18, margin: '6px 0 0', fontSize: 12 }}>
+                  {conferirConjunto(valores, poco).map(x => <li key={x.texto} style={{ color: x.ok ? undefined : '#d46b08' }}>{x.ok ? '✓ ' : '⚠ '}{x.texto}</li>)}
+                </ul>
+              </Card>
+            </div>
+          </Col>
         </Row>
-        <CamposConjunto />
       </Form>
     </Modal>
   );
@@ -344,7 +426,7 @@ export const ConjuntoPoco: React.FC<{ idPoco: number; onAbrirObra?: (idObra: num
         ) : <Text type="secondary">As trocas aparecem aqui com o tempo de uso de cada bomba: ajuda a prever a próxima troca e a calcular o plano mensal.</Text>}
       </Card>
 
-      <ConjuntoModal aberto={editando} idPoco={idPoco} onFechar={() => setEditando(null)} onSalvo={() => { setEditando(null); carregar(); }} />
+      <ConjuntoModal aberto={editando} idPoco={idPoco} poco={poco} onFechar={() => setEditando(null)} onSalvo={() => { setEditando(null); carregar(); }} />
       <Modal open={retirando !== null} title="Retirar o conjunto sem pôr outro no lugar" okText="Retirar" cancelText="Voltar" destroyOnHidden
         onCancel={() => setRetirando(null)}
         onOk={async () => { try { await conjuntoApi.retirar(a!.idConjunto, retirando!); setRetirando(null); carregar(); } catch (e) { erro(e); } }}>

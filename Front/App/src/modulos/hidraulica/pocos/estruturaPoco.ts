@@ -222,11 +222,14 @@ export const svgPerfil = (d: Dados, opcoes: { largura?: number; altura?: number 
   const bomba = num(d.bombaProfundidade);
   if (bomba > 0) {
     const menor = Math.min(...revs.map(r => r.diametro || 99), ...furo.map(f => f.diametro));
-    const lb = Math.max(4, meia(menor) * 0.55);
+    // bomba "palito": estreita e comprida, presa na ponta do tubo (bombeador azul, motor cinza)
+    const lb = Math.max(3, Math.min(meia(menor) * 0.45, 8));
+    const alt = Math.max(28, Math.min(70, (base - topo) * 0.12));
     // tubo edutor na cor do material até a bomba
     const corTubo = /^#[0-9a-f]{6}$/i.test(String(d.bombaTuboCor || '')) ? d.bombaTuboCor : '#595959';
-    partes.push(`<line x1="${cx}" x2="${cx}" y1="${topo}" y2="${y(bomba) - 10}" stroke="${corTubo}" stroke-width="${d.bombaTuboCor ? 3 : 1.5}"><title>${esc(`Tubo edutor até ${fmt(bomba)} m`)}</title></line>`);
-    partes.push(`<rect x="${cx - lb}" y="${y(bomba) - 10}" width="${lb * 2}" height="20" rx="3" fill="#434343"><title>Bomba a ${fmt(bomba)} m</title></rect>`);
+    partes.push(`<line x1="${cx}" x2="${cx}" y1="${topo}" y2="${y(bomba)}" stroke="${corTubo}" stroke-width="${d.bombaTuboCor ? 3 : 1.5}"><title>${esc(`Tubo edutor até ${fmt(bomba)} m`)}</title></line>`);
+    partes.push(`<rect x="${cx - lb}" y="${y(bomba)}" width="${lb * 2}" height="${alt * 0.6}" rx="${lb}" fill="#2f54eb"><title>Bomba a ${fmt(bomba)} m</title></rect>`);
+    partes.push(`<rect x="${cx - lb}" y="${y(bomba) + alt * 0.6}" width="${lb * 2}" height="${alt * 0.4}" rx="${lb}" fill="#434343"><title>Motor</title></rect>`);
   }
 
   // legendas à direita, sem sobrepor (mínimo 13 px entre elas)

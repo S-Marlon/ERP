@@ -67,11 +67,12 @@ export const conferirConjunto = (c: ConjuntoDesenho, p: PocoDoConjunto = {}): Co
 export const svgConjunto = (c: ConjuntoDesenho, p: PocoDoConjunto = {}, opcoes: { largura?: number; altura?: number } = {}) => {
   const W = opcoes.largura || 460, H = opcoes.altura || 480;
   const bomba = num(c.profundidadeBombaM);
-  const fundo = Math.max(num(p.profundidadeM), bomba + 6, num(c.tuboMetros), 10);
+  // a bomba fica pendurada na ponta do tubo e desce dali (o fundo do desenho dá espaço para ela)
+  const fundo = Math.max(num(p.profundidadeM), bomba * 1.12 + 3, num(c.tuboMetros), 10);
   const topo = 70, base = H - 16;
   const y = (m: number) => topo + (Math.min(Math.max(m, 0), fundo) / fundo) * (base - topo);
   const cx = 130, larg = 38;
-  const partes: string[] = [];
+  const partes: string[] = [`<defs><pattern id="grade" width="3" height="3" patternUnits="userSpaceOnUse"><rect width="3" height="3" fill="#d9d9d9"/><circle cx="1.5" cy="1.5" r="0.7" fill="#434343"/></pattern></defs>`];
   const legendas: Array<{ y: number; texto: string; cor: string; negrito?: boolean }> = [];
 
   // superfície: quadro de comando e cabeça do poço
@@ -92,11 +93,12 @@ export const svgConjunto = (c: ConjuntoDesenho, p: PocoDoConjunto = {}, opcoes: 
     legendas.push({ y: y(nd), texto: `ND · ${fmt(nd)} m`, cor: '#d46b08' });
   }
 
-  const alturaBomba = 34;
-  const topoBomba = bomba ? y(bomba) - alturaBomba : y(fundo) - alturaBomba;
+  // bomba "palito" (submersa): estreita e comprida, presa na ponta do tubo
+  const alturaBomba = Math.min(110, Math.max(64, (base - topo) * 0.2));
+  const topoBomba = bomba ? y(bomba) : y(fundo) - alturaBomba;
   // fio da bomba (do quadro até o motor) e corda
   if (num(c.fioMetros) || c.fioBitola || c.fioTipo) {
-    partes.push(`<polyline points="46,${topo - 12} 46,${topo + 4} ${cx + 10},${topo + 4} ${cx + 10},${topoBomba + alturaBomba * 0.6}" fill="none" stroke="#cf1322" stroke-width="1.6"><title>${esc(junta('Fio', c.fioTipo, c.fioBitola, c.fioMetros ? `${fmt(num(c.fioMetros))} m` : ''))}</title></polyline>`);
+    partes.push(`<polyline points="46,${topo - 12} 46,${topo + 4} ${cx + 10},${topo + 4} ${cx + 10},${topoBomba + alturaBomba * 0.7}" fill="none" stroke="#cf1322" stroke-width="1.6"><title>${esc(junta('Fio', c.fioTipo, c.fioBitola, c.fioMetros ? `${fmt(num(c.fioMetros))} m` : ''))}</title></polyline>`);
     legendas.push({ y: y(Math.max(bomba * 0.5, 2)) + 13, texto: junta('Fio', c.fioTipo, c.fioBitola, c.fioMetros ? `· ${fmt(num(c.fioMetros))} m` : ''), cor: '#cf1322' });
   }
   if (num(c.cordaMetros) || c.cordaMaterial) {
@@ -123,13 +125,26 @@ export const svgConjunto = (c: ConjuntoDesenho, p: PocoDoConjunto = {}, opcoes: 
   }
   // bomba: bombeador em cima, motor embaixo
   if (bomba || c.bombaMarca || c.bombaModelo) {
-    const metade = alturaBomba / 2;
-    partes.push(`<rect x="${cx - 13}" y="${topoBomba}" width="26" height="${metade}" rx="3" fill="#1d39c4"><title>${esc(junta('Bombeador', c.bombeadorMarca || c.bombaMarca, c.bombeadorModelo || c.bombaModelo, c.estagios ? `${c.estagios} estágios` : ''))}</title></rect>`);
-    partes.push(`<rect x="${cx - 13}" y="${topoBomba + metade}" width="26" height="${metade}" rx="3" fill="#434343"><title>${esc(junta('Motor', c.motorMarca, c.motorModelo, c.potenciaCv ? `${fmt(num(c.potenciaCv))} CV` : '', c.tensao))}</title></rect>`);
+    // bombeador (com os estágios), grade de sucção e motor; largura de uma bomba de 4" dentro do poço
+    const lb = 9, bombeador = alturaBomba * 0.55, grade = alturaBomba * 0.08, motorAlt = alturaBomba - bombeador - grade;
+    const tituloBomb = esc(junta('Bombeador', c.bombeadorMarca || c.bombaMarca, c.bombeadorModelo || c.bombaModelo, c.estagios ? `${c.estagios} estágios` : ''));
+    const tituloMotor = esc(junta('Motor', c.motorMarca, c.motorModelo, c.potenciaCv ? `${fmt(num(c.potenciaCv))} CV` : '', c.tensao));
+    partes.push(`<rect x="${cx - 5}" y="${topoBomba - 3}" width="10" height="5" rx="1" fill="#1d39c4"/>`);   // bocal de recalque
+    partes.push(`<rect x="${cx - lb}" y="${topoBomba + 2}" width="${lb * 2}" height="${bombeador}" rx="${lb}" fill="#2f54eb"><title>${tituloBomb}</title></rect>`);
+    const estagios = Math.min(Math.max(num(c.estagios) || 6, 3), 24);
+    for (let i = 1; i < estagios; i++) {
+      const ly = topoBomba + 2 + (bombeador * i) / estagios;
+      partes.push(`<line x1="${cx - lb + 2}" x2="${cx + lb - 2}" y1="${ly}" y2="${ly}" stroke="#adc6ff" stroke-width="0.8"/>`);
+    }
+    const yGrade = topoBomba + 2 + bombeador;
+    partes.push(`<rect x="${cx - lb}" y="${yGrade}" width="${lb * 2}" height="${grade}" fill="url(#grade)" stroke="#595959" stroke-width="0.6"><title>Grade de sucção</title></rect>`);
+    partes.push(`<rect x="${cx - lb}" y="${yGrade + grade}" width="${lb * 2}" height="${motorAlt}" rx="${lb}" fill="#434343"><title>${tituloMotor}</title></rect>`);
+    partes.push(`<rect x="${cx - 3}" y="${yGrade + grade + motorAlt - 2}" width="6" height="4" rx="1" fill="#262626"/>`);
+    const metade = bombeador / 2;
     const bombaTexto = junta(c.bombaMarca || c.bombeadorMarca, c.bombaModelo || c.bombeadorModelo, c.potenciaCv ? `· ${fmt(num(c.potenciaCv))} CV` : '', c.tensao ? `· ${c.tensao}` : '', c.estagios ? `· ${c.estagios} estágios` : '');
     legendas.push({ y: topoBomba + metade, texto: `Bomba${bomba ? ` a ${fmt(bomba)} m` : ''}${bombaTexto ? ` · ${bombaTexto}` : ''}`, cor: '#1d39c4', negrito: true });
     const motor = junta(c.motorMarca, c.motorModelo);
-    if (motor) legendas.push({ y: topoBomba + alturaBomba, texto: `Motor ${motor}`, cor: '#434343' });
+    if (motor) legendas.push({ y: topoBomba + alturaBomba * 0.82, texto: `Motor ${motor}`, cor: '#434343' });
   }
   // fundo
   if (num(p.profundidadeM)) legendas.push({ y: y(fundo), texto: `Fundo · ${fmt(fundo)} m`, cor: '#8c6d3f' });
