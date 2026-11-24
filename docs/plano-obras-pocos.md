@@ -372,3 +372,6 @@ Colunas novas: `incluso` em `_orcamento_itens`, `valor_parcelado` em `_obras`, `
 - **Desconto de adesão** (2026-11-23, `adesaoPlano.ts`, só tela): no simulador, serviço cheio × cobrado agora × meses de
   fidelidade; para cada plano, em quantos meses o desconto volta pelo lucro (esperado e pessimista), o que sobra no fim,
   o preço que paga o desconto no prazo e a multa proporcional (desconto × meses que faltam ÷ meses).
+- **Bomba e material separados** (2026-11-24, colunas `material_metro`, `material_vida_anos`): a bomba fica só em "Cobre
+  da troca da bomba" (a escadinha); o desconto do plano é só em material (tubo edutor, fio, conexões) =
+  desconto × (até a bomba × R$/m ÷ vida útil + conexões do ano). Sem a profundidade da bomba registrada, 70% da do poço.

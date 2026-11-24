@@ -815,8 +815,8 @@ export interface CustosPlano {
   baseLatitude: number | null; baseLongitude: number | null; baseGps?: string; fatorEstrada: number; usoEmergenciasPct: number;
   custoLimpeza: number; custoMonitoramentoMes: number; aparelhoValor: number; aparelhoMeses: number;
   bombaPrecoPorCv: number; bombaVidaAnos: number; precoVisitaAvulsa: number | null;
-  /** Gasto esperado do cliente com material por poço por ano (a preço de venda): base do desconto em bomba e material. */
-  materialAnoPoco: number;
+  /** Conexões e peças por poço por ano; tubo + fio + corda por metro e a vida útil deles (base do desconto em material). */
+  materialAnoPoco: number; materialMetro: number; materialVidaAnos: number;
   impostosPct: number; taxaCobrancaPct: number; inadimplenciaPct: number; margemPct: number; margemMinimaPct: number; arredondarPara: number;
 }
 /** Um plano oferecido e o que ele inclui. */
@@ -837,7 +837,7 @@ export interface PrecoPlano {
 }
 export interface PocoSimulado {
   profundidadeM: number | null; potenciaCv: number | null; pocos: number;
-  latitude?: number | null; longitude?: number | null; kmIdaVolta?: number | null;
+  latitude?: number | null; longitude?: number | null; kmIdaVolta?: number | null; profundidadeBombaM?: number | null;
 }
 /** Lucro por mês num cenário (custo, lucro e margem sobre o preço). */
 export interface CenarioPlano { custoMensal: number; lucroMensal: number; margem: number }
@@ -854,7 +854,8 @@ export interface ClienteAnalisado {
 }
 export interface PlanoMensalDados {
   custos: CustosPlano; salvo: boolean; niveis: NivelPlano[]; mediaVisitaEmpresa: number | null;
-  clientes: { idCliente: number; nome: string; pocos: number; profundidadeM: number | null; potenciaCv: number | null; latitude: number | null; longitude: number | null }[];
+  clientes: { idCliente: number; nome: string; pocos: number; profundidadeM: number | null; potenciaCv: number | null; latitude: number | null; longitude: number | null;
+    profundidadeBombaM?: number | null }[];
 }
 // ------------------------------------------------------------------ custos da obra (perfuração e instalação)
 export interface CustosObraDados {

@@ -30,14 +30,16 @@ export interface CustosPlano {
   usoEmergenciasPct: number;
   custoLimpeza: number; custoMonitoramentoMes: number; aparelhoValor: number; aparelhoMeses: number;
   bombaPrecoPorCv: number; bombaVidaAnos: number; precoVisitaAvulsa: number | null;
-  /** Gasto esperado do cliente com material (conexões, fio, peças) por poço por ano, a preço de venda: base do desconto. */
+  /** Conexões e peças pequenas por poço por ano (a preço de venda), fora o tubo e o fio. */
   materialAnoPoco: number;
+  /** Tubo edutor + fio + corda por metro (a preço de venda) e de quantos em quantos anos se troca: base do desconto em material. */
+  materialMetro: number; materialVidaAnos: number;
   impostosPct: number; taxaCobrancaPct: number; inadimplenciaPct: number; margemPct: number; margemMinimaPct: number; arredondarPara: number;
 }
 export interface NivelPlano {
   nome: string; descricao: string | null; visitasAno: number; limpezaACadaMeses: number | null; chamadosAno: number;
-  /** Desconto em bomba e material (entra no custo: o que deixa de entrar na troca da bomba e no material do ano) e na
-   *  limpeza (feita quando precisa, fora do plano: sai da margem da venda). */
+  /** Desconto em material — tubo edutor, fio, conexões (entra no custo: o que deixa de entrar no material do ano; a
+   *  bomba vai em reservaBombaPct) — e na limpeza (feita quando precisa, fora do plano: sai da margem da venda). */
   descontoPecasPct: number; descontoLimpezaPct: number;
   /** Prioridade: atende domingo e feriado (sem ela, o chamado entra na fila do próximo dia útil). */
   prioridade: boolean;
@@ -50,6 +52,8 @@ export interface PocoDoPlano {
   profundidadeM: number | null; potenciaCv: number | null; pocos: number;
   /** GPS do poço (o mais distante do cliente), para medir o transporte; e o km informado à mão, que vale mais. */
   latitude?: number | null; longitude?: number | null; kmIdaVolta?: number | null;
+  /** Profundidade da bomba (o tubo e o fio vão até ela); sem ela, 70% da profundidade do poço. */
+  profundidadeBombaM?: number | null;
 }
 
 /** Valores padrão (os mesmos do script do banco), usados enquanto a loja não grava os dela. */
@@ -58,11 +62,19 @@ export const CUSTOS_PADRAO: CustosPlano = {
   pessoasPreventiva: 1, pessoasTroca: 3, horasTroca: 4, chamadosPocoAno: 1, domingoFeriadoPct: 0.17, adicionalDomingoPct: 1, taxaUrgencia: 0,
   custoPipa: 0, pipaPct: 0.1, custoEquipeDedicada: 0, metaAssinantes: 15, metaReceita: 5000, capacidadeSemana: 3,
   baseLatitude: null, baseLongitude: null, fatorEstrada: 1.3, usoEmergenciasPct: 0.3, custoLimpeza: 800,
-  custoMonitoramentoMes: 25, aparelhoValor: 900, aparelhoMeses: 36, bombaPrecoPorCv: 1500, bombaVidaAnos: 6, precoVisitaAvulsa: null, materialAnoPoco: 0,
+  custoMonitoramentoMes: 25, aparelhoValor: 900, aparelhoMeses: 36, bombaPrecoPorCv: 1500, bombaVidaAnos: 6, precoVisitaAvulsa: null, materialAnoPoco: 0, materialMetro: 0, materialVidaAnos: 10,
   impostosPct: 0.06, taxaCobrancaPct: 0.03, inadimplenciaPct: 0.03, margemPct: 0.25, margemMinimaPct: 0.1, arredondarPara: 5,
 };
 /** Sem profundidade nem bomba informadas, a conta usa um poço comum. */
 export const POCO_PADRAO = { profundidadeM: 80, potenciaCv: 1.5 };
+/** Sem a profundidade da bomba, o tubo e o fio vão até 70% da profundidade do poço. */
+export const BOMBA_NO_POCO = 0.7;
+
+/** Material do poço por ano: tubo + fio + corda até a bomba (por metro, ÷ vida útil) e as conexões do ano. */
+export const materialAnual = (c: Pick<CustosPlano, 'materialMetro' | 'materialVidaAnos' | 'materialAnoPoco'>, profundidadeM: number | null, profundidadeBombaM?: number | null) => {
+  const ate = profundidadeBombaM ?? (profundidadeM ?? POCO_PADRAO.profundidadeM) * BOMBA_NO_POCO;
+  return r2(ate * c.materialMetro / (c.materialVidaAnos || 10) + c.materialAnoPoco);
+};
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
@@ -112,7 +124,9 @@ export const validarCustos = (b: any): CustosPlano => {
     aparelhoMeses: Math.round(numero(b?.aparelhoMeses, 'Meses para pagar o aparelho', 1, 240)),
     bombaPrecoPorCv: numero(b?.bombaPrecoPorCv, 'Preço da bomba por CV', 0, 1000000),
     bombaVidaAnos: numero(b?.bombaVidaAnos, 'Vida útil da bomba', 0.5, 50),
-    materialAnoPoco: numero(b?.materialAnoPoco ?? 0, 'Material por poço por ano', 0, 1000000),
+    materialAnoPoco: numero(b?.materialAnoPoco ?? 0, 'Conexões e peças por ano', 0, 1000000),
+    materialMetro: numero(b?.materialMetro ?? 0, 'Material por metro', 0, 100000),
+    materialVidaAnos: numero(b?.materialVidaAnos ?? 10, 'Vida útil do material', 0.5, 50),
     precoVisitaAvulsa: b?.precoVisitaAvulsa === null || b?.precoVisitaAvulsa === undefined || String(b.precoVisitaAvulsa).trim() === ''
       ? null : numero(b.precoVisitaAvulsa, 'Preço da visita avulsa', 0, 1000000),
     impostosPct: pct(b?.impostosPct, 'Impostos'), taxaCobrancaPct: pct(b?.taxaCobrancaPct, 'Taxa de cobrança'),
@@ -135,7 +149,7 @@ export const validarNivel = (b: any): NivelPlano => {
     nome, descricao: String(b?.descricao ?? '').trim().slice(0, 255) || null,
     visitasAno: Math.round(numero(b?.visitasAno ?? 0, 'Visitas por ano', 0, 24)), limpezaACadaMeses: limpeza,
     chamadosAno: Math.round(numero(b?.chamadosAno ?? 0, 'Emergências por ano', 0, 24)),
-    descontoPecasPct: pct(b?.descontoPecasPct ?? 0, 'Desconto em bomba e material', 1),
+    descontoPecasPct: pct(b?.descontoPecasPct ?? 0, 'Desconto em material', 1),
     descontoLimpezaPct: pct(b?.descontoLimpezaPct ?? 0, 'Desconto na limpeza', 0.9), prioridade: !!b?.prioridade, aguaEmergencial: !!b?.aguaEmergencial,
     monitoramento: !!b?.monitoramento,
     reservaBombaPct: pct(b?.reservaBombaPct ?? 0, 'Troca da bomba coberta', 1), fidelidadeMeses: Math.round(numero(b?.fidelidadeMeses ?? 12, 'Fidelidade (meses)', 0, 120)),
@@ -228,9 +242,8 @@ export const precoDoPlano = (c: CustosPlano, n: NivelPlano, p: PocoDoPlano, medi
   const porChamado = r2((1 - f) * util.total + f * domingo.total + (n.aguaEmergencial ? c.pipaPct * c.custoPipa : 0));
   const maoChamado = (1 - f) * util.maoDeObra + f * domingo.maoDeObra;
   const limpezasAno = n.limpezaACadaMeses ? 12 / n.limpezaACadaMeses : 0;
-  // desconto em bomba e material: o que deixa de entrar por ano — na troca da bomba só a parte que a reserva não cobre
-  // (para não contar duas vezes) e no material do ano por poço
-  const descontoAnual = r2(n.descontoPecasPct * ((1 - n.reservaBombaPct) * cv * c.bombaPrecoPorCv / c.bombaVidaAnos + c.materialAnoPoco) * pocos);
+  // desconto em material: o que deixa de entrar por ano no tubo, fio e conexões (a bomba vai pela reserva)
+  const descontoAnual = r2(n.descontoPecasPct * materialAnual(c, prof, p.profundidadeBombaM) * pocos);
   const custos: LinhaCusto[] = [
     { item: `${n.visitasAno} visita(s) preventiva(s) por ano`, anual: r2(n.visitasAno * visita) },
     { item: `Limpeza a cada ${n.limpezaACadaMeses} meses`, anual: r2(limpezasAno * c.custoLimpeza * pocos) },
@@ -239,7 +252,7 @@ export const precoDoPlano = (c: CustosPlano, n: NivelPlano, p: PocoDoPlano, medi
     { item: 'Monitoramento (dados e aparelho)', anual: n.monitoramento ? r2((c.custoMonitoramentoMes + c.aparelhoValor / c.aparelhoMeses) * 12 * pocos) : 0 },
     { item: `${Math.round(n.reservaBombaPct * 100)}% da troca da bomba (${String(cv).replace('.', ',')} CV)`,
       anual: r2((n.reservaBombaPct * cv * c.bombaPrecoPorCv / c.bombaVidaAnos) * pocos) },
-    { item: `Desconto de ${Math.round(n.descontoPecasPct * 100)}% em bomba e material`, anual: descontoAnual },
+    { item: `Desconto de ${Math.round(n.descontoPecasPct * 100)}% em material (tubo, fio, conexões)`, anual: descontoAnual },
   ].filter(l => l.anual > 0);
   const custoAnual = custos.reduce((s, l) => s + l.anual, 0);
   const custoMensal = r2(custoAnual / 12);

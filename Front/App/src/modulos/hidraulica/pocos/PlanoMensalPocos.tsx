@@ -52,8 +52,10 @@ const GRUPOS: { titulo: string; campos: Campo[] }[] = [
   { titulo: 'Bomba e material', campos: [
     { k: 'bombaPrecoPorCv', rotulo: 'Preço da bomba por CV', prefixo: 'R$', passo: 100 },
     { k: 'bombaVidaAnos', rotulo: 'Vida útil da bomba', sufixo: 'anos', passo: 0.5 },
-    { k: 'materialAnoPoco', rotulo: 'Material por poço por ano', prefixo: 'R$', passo: 50,
-      ajuda: 'O que um cliente compra de conexões, fio e peças num ano (a preço de venda): base do desconto em bomba e material dos planos' },
+    { k: 'materialMetro', rotulo: 'Material por metro de poço', prefixo: 'R$', passo: 5,
+      ajuda: 'Tubo edutor + fio + corda por metro, a preço de venda (vai até a bomba; sem ela, 70% da profundidade)' },
+    { k: 'materialVidaAnos', rotulo: 'Vida útil do material', sufixo: 'anos', passo: 1, ajuda: 'De quantos em quantos anos se troca a tubulação e o fio' },
+    { k: 'materialAnoPoco', rotulo: 'Conexões e peças por ano', prefixo: 'R$', passo: 50, ajuda: 'Peças pequenas por poço por ano (fora o tubo e o fio), a preço de venda' },
   ] },
   { titulo: 'Planejamento', campos: [
     { k: 'metaAssinantes', rotulo: 'Meta de assinantes', passo: 1 },
@@ -129,7 +131,7 @@ const CartaoNivel: React.FC<{
         {linha('Monitoramento (IoT)', <Switch size="small" checked={n.monitoramento} onChange={v => set({ monitoramento: v })} />)}
         {linha('Cobre da troca da bomba', <CampoNumero size="small" min={0} max={100} step={10} value={Math.round(n.reservaBombaPct * 100)}
           onChange={v => set({ reservaBombaPct: (v ?? 0) / 100 })} suffix="%" style={{ width: 90 }} />)}
-        {linha('Desconto em bomba e material', <CampoNumero size="small" min={0} max={100} value={Math.round(n.descontoPecasPct * 100)}
+        {linha('Desconto em material (tubo, fio, conexões)', <CampoNumero size="small" min={0} max={100} value={Math.round(n.descontoPecasPct * 100)}
           onChange={v => set({ descontoPecasPct: (v ?? 0) / 100 })} suffix="%" style={{ width: 90 }} />)}
         {linha('Desconto na limpeza', <CampoNumero size="small" min={0} max={90} value={Math.round(n.descontoLimpezaPct * 100)}
           onChange={v => set({ descontoLimpezaPct: (v ?? 0) / 100 })} suffix="%" style={{ width: 90 }} />)}
@@ -199,7 +201,8 @@ const PlanoMensalPocos: React.FC = () => {
   const escolherCliente = (id: number | null) => {
     setCliente(id); setCombinados({});
     const c = dados.clientes.find(x => x.idCliente === id);
-    setPoco(c ? { profundidadeM: c.profundidadeM, potenciaCv: c.potenciaCv, pocos: Math.max(1, c.pocos), latitude: c.latitude, longitude: c.longitude, kmIdaVolta: null }
+    setPoco(c ? { profundidadeM: c.profundidadeM, potenciaCv: c.potenciaCv, pocos: Math.max(1, c.pocos), latitude: c.latitude, longitude: c.longitude, kmIdaVolta: null,
+        profundidadeBombaM: c.profundidadeBombaM ?? null }
       : { ...poco, latitude: null, longitude: null });
   };
   const salvarCustos = async () => {
@@ -420,6 +423,10 @@ const PlanoMensalPocos: React.FC = () => {
         <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
           O preço de cada cartão é para o poço do simulador. Mude o que o plano inclui e veja se continua viável antes de salvar.
         </Text>
+        {niveis.some(n => n.descontoPecasPct > 0 && !n.reservaBombaPct) && (
+          <Alert type="info" showIcon style={{ marginBottom: 8 }}
+            message="O desconto agora vale só para o material (tubo, fio, conexões). Para o plano cobrir parte da bomba, use “Cobre da troca da bomba” (ex.: 20%, 50%, 100%)." />
+        )}
         <Row gutter={[12, 12]}>
           {niveis.map(n => (
             <Col key={n.chave} xs={24} md={12} xl={8}>

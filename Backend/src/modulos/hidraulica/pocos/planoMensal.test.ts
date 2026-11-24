@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { CUSTOS_PADRAO, custoChamado, custoVisita, riscoDoPlano, divisor, kmAteOPoco, kmDaVisita, NivelPlano, planoSugerido, precoDoPlano, validarCustos, validarNivel } from './planoMensal';
+import { CUSTOS_PADRAO, custoChamado, custoVisita, materialAnual, riscoDoPlano, divisor, kmAteOPoco, kmDaVisita, NivelPlano, planoSugerido, precoDoPlano, validarCustos, validarNivel } from './planoMensal';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 const nivel = (x: Partial<NivelPlano>): NivelPlano => ({
@@ -115,17 +115,23 @@ teste('plano mensal: risco, faixa de lucro e raio da distância', () => {
   assert.deepStrictEqual([sem.estimados.length, sem.precisao], [2, 'BAIXA']);
 });
 
-teste('plano mensal: escadinha do desconto em bomba e material entra no custo', () => {
-  const c = { ...CUSTOS_PADRAO, materialAnoPoco: 300, precoVisitaAvulsa: 900 };
-  const linha = (d: number, reserva = 0) => precoDoPlano(c, nivel({ descontoPecasPct: d, reservaBombaPct: reserva }), poco).custos.find(l => l.item.startsWith('Desconto'));
-  // bomba 1,5 CV × R$ 1.500 ÷ 6 anos = R$ 375/ano + material R$ 300/ano
-  assert.deepStrictEqual([linha(0.2)?.anual, linha(0.5)?.anual, linha(1)?.anual], [135, 337.5, 675]);
+teste('plano mensal: desconto em material pela profundidade da bomba (a bomba vai pela reserva)', () => {
+  const c = { ...CUSTOS_PADRAO, materialMetro: 35, materialVidaAnos: 10, materialAnoPoco: 50, precoVisitaAvulsa: 900 };
+  // sem a profundidade da bomba: 70% de 80 m = 56 m × R$ 35 ÷ 10 anos = 196 + 50 de conexões = 246 por ano
+  assert.strictEqual(materialAnual(c, 80), 246);
+  // bomba a 60 m: 210 + 50; poço de 160 m sem bomba registrada: 112 m → 392 + 50
+  assert.deepStrictEqual([materialAnual(c, 80, 60), materialAnual(c, 160)], [260, 442]);
+  const linha = (d: number, reserva = 0, p: any = poco) => precoDoPlano(c, nivel({ descontoPecasPct: d, reservaBombaPct: reserva }), p).custos.find(l => l.item.startsWith('Desconto'));
+  assert.deepStrictEqual([linha(0.2)?.anual, linha(0.5)?.anual, linha(1)?.anual], [49.2, 123, 246]);
   assert.strictEqual(linha(0), undefined, 'sem desconto, sem linha');
-  // com a troca da bomba toda coberta pela reserva, o desconto só pesa no material (não conta a bomba duas vezes)
-  assert.strictEqual(linha(1, 1)?.anual, 300);
-  // o preço sobe com o desconto, e o cliente compara com a peça cheia (avulso)
+  // a reserva da bomba não mexe mais no desconto (ela cobre a bomba; o desconto, o material)
+  assert.strictEqual(linha(1, 1)?.anual, 246);
+  assert.strictEqual(linha(1, 0, { ...poco, profundidadeBombaM: 60 })?.anual, 260);
+  assert.ok(linha(0.5)!.item.includes('material (tubo, fio, conexões)'));
+  // o preço sobe com o desconto, e o cliente compara com o material cheio (avulso)
   const sem = precoDoPlano(c, nivel({}), poco), cem = precoDoPlano(c, nivel({ descontoPecasPct: 1 }), poco);
-  assert.ok(cem.precoMensal > sem.precoMensal && cem.avulsoAnual === sem.avulsoAnual + 675, JSON.stringify([sem.precoMensal, cem.precoMensal, sem.avulsoAnual, cem.avulsoAnual]));
+  assert.ok(cem.precoMensal > sem.precoMensal && cem.avulsoAnual === sem.avulsoAnual + 246, JSON.stringify([sem.precoMensal, cem.precoMensal, sem.avulsoAnual, cem.avulsoAnual]));
   assert.strictEqual(validarNivel({ nome: 'Top', visitasAno: 1, descontoPecasPct: 1 }).descontoPecasPct, 1);
-  assert.throws(() => validarNivel({ nome: 'Top', visitasAno: 1, descontoPecasPct: 1.1 }), /Desconto em bomba e material/);
+  assert.throws(() => validarNivel({ nome: 'Top', visitasAno: 1, descontoPecasPct: 1.1 }), /Desconto em material/);
+  assert.deepStrictEqual([validarCustos({ ...c }).materialMetro, validarCustos({ ...CUSTOS_PADRAO }).materialVidaAnos], [35, 10]);
 });

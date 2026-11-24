@@ -17,7 +17,7 @@ const COLUNAS: Record<keyof CustosPlano, string> = {
   materialVisita: 'material_visita', baseLatitude: 'base_latitude', baseLongitude: 'base_longitude', fatorEstrada: 'fator_estrada',
   usoEmergenciasPct: 'uso_emergencias_pct', custoLimpeza: 'custo_limpeza', custoMonitoramentoMes: 'custo_monitoramento_mes', aparelhoValor: 'aparelho_valor',
   aparelhoMeses: 'aparelho_meses', bombaPrecoPorCv: 'bomba_preco_por_cv', bombaVidaAnos: 'bomba_vida_anos', precoVisitaAvulsa: 'preco_visita_avulsa',
-  materialAnoPoco: 'material_ano_poco',
+  materialAnoPoco: 'material_ano_poco', materialMetro: 'material_metro', materialVidaAnos: 'material_vida_anos',
   pessoasPreventiva: 'pessoas_preventiva', pessoasTroca: 'pessoas_troca', horasTroca: 'horas_troca', chamadosPocoAno: 'chamados_poco_ano',
   domingoFeriadoPct: 'domingo_feriado_pct', adicionalDomingoPct: 'adicional_domingo_pct', taxaUrgencia: 'taxa_urgencia', custoPipa: 'custo_pipa',
   pipaPct: 'pipa_pct', custoEquipeDedicada: 'custo_equipe_dedicada', metaAssinantes: 'meta_assinantes', metaReceita: 'meta_receita',
@@ -55,19 +55,23 @@ export const carregarPlanoMensal = async (conn: Conn, tenant: number, soAtivos =
 export const pocosParaPlano = async (conn: Conn, tenant: number) => {
   const [rows]: any = await conn.execute(
     `SELECT c.id_cliente, c.nome, p.id_poco, p.profundidade_m, p.latitude, p.longitude,
-            (SELECT MAX(k.potencia_cv) FROM modulo_hidraulica_pocos_conjuntos k WHERE k.id_poco = p.id_poco AND k.situacao = 'INSTALADO') AS cv
+            (SELECT MAX(k.potencia_cv) FROM modulo_hidraulica_pocos_conjuntos k WHERE k.id_poco = p.id_poco AND k.situacao = 'INSTALADO') AS cv,
+            (SELECT MAX(k.profundidade_bomba_m) FROM modulo_hidraulica_pocos_conjuntos k WHERE k.id_poco = p.id_poco AND k.situacao = 'INSTALADO') AS prof_bomba
      FROM modulo_hidraulica_pocos_clientes c JOIN modulo_hidraulica_pocos_pocos p ON p.id_proprietario = c.id_cliente AND p.situacao = 'ATIVO'
      WHERE c.tenant_id = ? AND c.ativo = 1 ORDER BY c.nome, p.id_poco`, [tenant]);
   return juntarPocos(rows.map((r: any) => ({ idCliente: Number(r.id_cliente), nome: r.nome, profundidadeM: nulo(r.profundidade_m), potenciaCv: nulo(r.cv),
-    latitude: nulo(r.latitude), longitude: nulo(r.longitude) })));
+    latitude: nulo(r.latitude), longitude: nulo(r.longitude), profundidadeBombaM: nulo(r.prof_bomba) })));
 };
 
-/** Um cliente por linha: quantos poços, o mais fundo, a bomba mais forte e o GPS de um poço (para medir o transporte). */
-export const juntarPocos = (pocos: { idCliente: number; nome: string; profundidadeM: number | null; potenciaCv: number | null; latitude: number | null; longitude: number | null }[]) => {
-  const por = new Map<number, { idCliente: number; nome: string; pocos: number; profundidadeM: number | null; potenciaCv: number | null; latitude: number | null; longitude: number | null }>();
+type PocoLinha = { idCliente: number; nome: string; profundidadeM: number | null; potenciaCv: number | null; latitude: number | null; longitude: number | null; profundidadeBombaM?: number | null };
+/** Um cliente por linha: quantos poços, o mais fundo, a bomba mais forte (e a mais funda) e o GPS de um poço (para medir o transporte). */
+export const juntarPocos = (pocos: PocoLinha[]) => {
+  const por = new Map<number, Omit<PocoLinha, 'profundidadeBombaM'> & { pocos: number; profundidadeBombaM: number | null }>();
   for (const p of pocos) {
-    const c = por.get(p.idCliente) || { idCliente: p.idCliente, nome: p.nome, pocos: 0, profundidadeM: null, potenciaCv: null, latitude: null, longitude: null };
+    const c = por.get(p.idCliente) || { idCliente: p.idCliente, nome: p.nome, pocos: 0, profundidadeM: null, potenciaCv: null, latitude: null, longitude: null, profundidadeBombaM: null };
     c.pocos++;
+    const pb = p.profundidadeBombaM ?? null;
+    if (pb !== null && (c.profundidadeBombaM === null || pb > c.profundidadeBombaM)) c.profundidadeBombaM = pb;
     if (p.profundidadeM !== null && (c.profundidadeM === null || p.profundidadeM > c.profundidadeM)) c.profundidadeM = p.profundidadeM;
     if (p.potenciaCv !== null && (c.potenciaCv === null || p.potenciaCv > c.potenciaCv)) c.potenciaCv = p.potenciaCv;
     if (c.latitude === null && p.latitude !== null) { c.latitude = p.latitude; c.longitude = p.longitude; }
@@ -100,6 +104,7 @@ const lerPoco = (b: any): PocoDoPlano => ({
   pocos: Math.min(50, Math.max(1, Math.round(Number(b?.pocos) || 1))),
   latitude: nulo(b?.latitude), longitude: nulo(b?.longitude),
   kmIdaVolta: b?.kmIdaVolta === null || b?.kmIdaVolta === undefined || b.kmIdaVolta === '' ? null : Math.max(0, Number(b.kmIdaVolta) || 0),
+  profundidadeBombaM: b?.profundidadeBombaM === null || b?.profundidadeBombaM === undefined || b.profundidadeBombaM === '' ? null : Math.max(0, Number(b.profundidadeBombaM) || 0),
 });
 
 // GET /plano-mensal — custos, planos (todos, com os desativados), referência da visita avulsa e os clientes com poço
@@ -184,7 +189,8 @@ export const analisarCarteira = async (req: Request, res: Response) => {
     const clientes = await pocosParaPlano(pool, tenant);
     return res.json({
       clientes: clientes.map(cl => {
-        const poco: PocoDoPlano = { profundidadeM: cl.profundidadeM, potenciaCv: cl.potenciaCv, pocos: Math.max(1, cl.pocos), latitude: cl.latitude, longitude: cl.longitude };
+        const poco: PocoDoPlano = { profundidadeM: cl.profundidadeM, potenciaCv: cl.potenciaCv, pocos: Math.max(1, cl.pocos), latitude: cl.latitude, longitude: cl.longitude,
+          profundidadeBombaM: cl.profundidadeBombaM };
         const planos = simulacao(custos, niveis, poco, media);
         const sugerido = planoSugerido(planos);
         return { ...cl, km: planos[0]?.preco.km ?? null, kmOrigem: planos[0]?.preco.kmOrigem ?? null, sugerido: sugerido?.nome ?? null, planos };
