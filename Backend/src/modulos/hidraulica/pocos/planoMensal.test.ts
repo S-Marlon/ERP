@@ -45,6 +45,8 @@ teste('plano mensal: o que cada item custa', () => {
   assert.strictEqual(p.custoMensal, 187.96);
   assert.strictEqual(p.precoMensal, 300);
   assert.deepStrictEqual([p.chamadosAno, p.custoUmChamado, p.atendimentosAno], [1, 608, 3]);
+  assert.deepStrictEqual(p.custos.map(c => c.tipo), ['PREVENTIVA', 'LIMPEZA', 'CHAMADOS', 'MONITORAMENTO', 'BOMBA']);
+  assert.deepStrictEqual([p.custoUmaPreventiva, p.custoChamadoDomingo], [230, 1076]);
   // com prioridade, 17% dos chamados no domingo (1076) e caminhão-pipa de R$ 400 em 10% deles:
   // 0,83 × 608 + 0,17 × 1076 + 40 = 727,56
   const top = precoDoPlano({ ...CUSTOS_PADRAO, custoPipa: 400 }, nivel({ chamadosAno: 5, prioridade: true, aguaEmergencial: true }), poco);

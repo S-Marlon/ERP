@@ -68,3 +68,29 @@ export const planejamentoCarteira = (
     },
   };
 };
+
+/** Fatias do preço mensal no visor dos custos: cada tipo de custo, os impostos/taxas e o lucro (cor e rótulo fixos). */
+export const FATIAS: Record<string, { rotulo: string; cor: string }> = {
+  PREVENTIVA: { rotulo: 'Preventivas', cor: '#4096ff' }, CHAMADOS: { rotulo: 'Chamados', cor: '#fa8c16' }, LIMPEZA: { rotulo: 'Limpeza', cor: '#13c2c2' },
+  MONITORAMENTO: { rotulo: 'Monitoramento', cor: '#722ed1' }, BOMBA: { rotulo: 'Bomba (reserva)', cor: '#eb2f96' }, MATERIAL: { rotulo: 'Material (desconto)', cor: '#a0d911' },
+  DEDUCOES: { rotulo: 'Impostos e taxas', cor: '#bfbfbf' }, LUCRO: { rotulo: 'Lucro', cor: '#52c41a' },
+};
+
+/**
+ * Para onde vai o preço mensal de um plano: os custos por tipo (por mês), os impostos/taxas sobre o preço e o lucro;
+ * cada fatia em % do preço. Com prejuízo, o lucro sai negativo e a soma dos custos passa do preço (excesso).
+ */
+export const composicaoDoPreco = (preco: number, custos: Array<{ tipo: string; anual: number }>, deducoesPct: number) => {
+  const porTipo = new Map<string, number>();
+  for (const l of custos) porTipo.set(l.tipo, (porTipo.get(l.tipo) || 0) + l.anual / 12);
+  const deducoes = r2(preco * deducoesPct);
+  const custoMes = r2([...porTipo.values()].reduce((s, v) => s + v, 0));
+  const lucro = r2(preco - deducoes - custoMes);
+  const fatias = [...Object.keys(FATIAS).filter(t => porTipo.has(t)).map(t => ({ tipo: t, valor: r2(porTipo.get(t)!) })), { tipo: 'DEDUCOES', valor: deducoes },
+    ...(lucro > 0 ? [{ tipo: 'LUCRO', valor: lucro }] : [])].filter(f => f.valor > 0);
+  const base = Math.max(preco, custoMes + deducoes) || 1;
+  return {
+    fatias: fatias.map(f => ({ ...f, pct: Math.round((f.valor / base) * 1000) / 10, ...FATIAS[f.tipo] })),
+    custoMes, deducoes, lucro, excesso: lucro < 0 ? r2(-lucro) : 0,
+  };
+};

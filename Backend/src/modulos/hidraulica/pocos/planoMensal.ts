@@ -205,7 +205,9 @@ export const custoChamado = (c: CustosPlano, profundidadeM: number | null, km: n
 export const visitaAvulsa = (c: CustosPlano, mediaDaEmpresa: number | null, profundidadeM: number | null, km: number = c.kmMedio) =>
   c.precoVisitaAvulsa || mediaDaEmpresa || r2(custoVisita(c, profundidadeM, 1, km) / divisor(c));
 
-export interface LinhaCusto { item: string; anual: number }
+/** Tipo da linha (para o visor dos custos agrupar por cor). */
+export type TipoLinhaCusto = 'PREVENTIVA' | 'LIMPEZA' | 'CHAMADOS' | 'MONITORAMENTO' | 'BOMBA' | 'MATERIAL';
+export interface LinhaCusto { item: string; anual: number; tipo: TipoLinhaCusto }
 export interface PrecoPlano {
   precoMensal: number; custoMensal: number; custos: LinhaCusto[];
   /** Parte do custo que é mão de obra (para ver quando vale ter uma equipe só para os planos). */
@@ -214,6 +216,8 @@ export interface PrecoPlano {
   atendimentosAno: number;
   /** Chamados esperados por ano neste cliente e o custo de um (dia útil). */
   chamadosAno: number; custoUmChamado: number;
+  /** Custo de uma preventiva e de um chamado no domingo/feriado (para o visor dos custos). */
+  custoUmaPreventiva: number; custoChamadoDomingo: number;
   /** O que fica com a empresa por mês depois de impostos, cobrança e inadimplência, menos os custos. */
   lucroMensal: number; margemReal: number;
   /** Quanto o cliente gastaria no ano pagando o mesmo avulso, e quanto economiza com o plano (negativo = paga mais). */
@@ -245,15 +249,15 @@ export const precoDoPlano = (c: CustosPlano, n: NivelPlano, p: PocoDoPlano, medi
   // desconto em material: o que deixa de entrar por ano no tubo, fio e conexões (a bomba vai pela reserva)
   const descontoAnual = r2(n.descontoPecasPct * materialAnual(c, prof, p.profundidadeBombaM) * pocos);
   const custos: LinhaCusto[] = [
-    { item: `${n.visitasAno} visita(s) preventiva(s) por ano`, anual: r2(n.visitasAno * visita) },
-    { item: `Limpeza a cada ${n.limpezaACadaMeses} meses`, anual: r2(limpezasAno * c.custoLimpeza * pocos) },
+    { item: `${n.visitasAno} visita(s) preventiva(s) por ano`, anual: r2(n.visitasAno * visita), tipo: 'PREVENTIVA' },
+    { item: `Limpeza a cada ${n.limpezaACadaMeses} meses`, anual: r2(limpezasAno * c.custoLimpeza * pocos), tipo: 'LIMPEZA' },
     { item: `Chamados: até ${n.chamadosAno} por ano, esperado ${String(r2(chamados)).replace('.', ',')}${n.prioridade ? ' (com domingo/feriado)' : ''}${n.aguaEmergencial ? ' + pipa' : ''}`,
-      anual: r2(chamados * porChamado) },
-    { item: 'Monitoramento (dados e aparelho)', anual: n.monitoramento ? r2((c.custoMonitoramentoMes + c.aparelhoValor / c.aparelhoMeses) * 12 * pocos) : 0 },
+      anual: r2(chamados * porChamado), tipo: 'CHAMADOS' },
+    { item: 'Monitoramento (dados e aparelho)', anual: n.monitoramento ? r2((c.custoMonitoramentoMes + c.aparelhoValor / c.aparelhoMeses) * 12 * pocos) : 0, tipo: 'MONITORAMENTO' },
     { item: `${Math.round(n.reservaBombaPct * 100)}% da troca da bomba (${String(cv).replace('.', ',')} CV)`,
-      anual: r2((n.reservaBombaPct * cv * c.bombaPrecoPorCv / c.bombaVidaAnos) * pocos) },
-    { item: `Desconto de ${Math.round(n.descontoPecasPct * 100)}% em material (tubo, fio, conexões)`, anual: descontoAnual },
-  ].filter(l => l.anual > 0);
+      anual: r2((n.reservaBombaPct * cv * c.bombaPrecoPorCv / c.bombaVidaAnos) * pocos), tipo: 'BOMBA' },
+    { item: `Desconto de ${Math.round(n.descontoPecasPct * 100)}% em material (tubo, fio, conexões)`, anual: descontoAnual, tipo: 'MATERIAL' },
+  ].filter(l => l.anual > 0) as LinhaCusto[];
   const custoAnual = custos.reduce((s, l) => s + l.anual, 0);
   const custoMensal = r2(custoAnual / 12);
   const maoDeObraMensal = r2((n.visitasAno * c.horasVisita * c.pessoasPreventiva * c.custoHoraEquipe * pocos + chamados * maoChamado) / 12);
@@ -276,7 +280,7 @@ export const precoDoPlano = (c: CustosPlano, n: NivelPlano, p: PocoDoPlano, medi
   if (economiaAnual < 0 && !comparacaoEstimada) avisos.push('O cliente paga mais do que pagaria avulso: o plano não se vende');
   if (!custos.length) avisos.push('O plano não inclui nada que custe');
   return {
-    precoMensal, custoMensal, custos, maoDeObraMensal, atendimentosAno: r2(n.visitasAno + chamados), chamadosAno: r2(chamados), custoUmChamado: util.total,
+    precoMensal, custoMensal, custos, maoDeObraMensal, atendimentosAno: r2(n.visitasAno + chamados), chamadosAno: r2(chamados), custoUmChamado: util.total, custoUmaPreventiva: visita, custoChamadoDomingo: domingo.total,
     lucroMensal, margemReal, avulsoAnual, economiaAnual,
     economiaPct: avulsoAnual > 0 ? Math.round((economiaAnual / avulsoAnual) * 1000) / 1000 : null, comparacaoEstimada,
     viavel: !avisos.length, avisos, km, kmOrigem: origem,

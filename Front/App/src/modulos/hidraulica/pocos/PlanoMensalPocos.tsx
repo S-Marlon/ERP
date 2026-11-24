@@ -11,6 +11,7 @@ import { PlanoMensal as Carteira } from './CentralPocos';
 import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
 import { AnalisePlanoCarteira, FaixaLucro, TagRisco } from './AnalisePlanoCarteira';
 import { DescontoAdesao } from './DescontoAdesao';
+import { VisorCustosPlanos } from './VisorCustosPlanos';
 import { CustosObraConfig } from './CustosObraConfig';
 
 const { Text } = Typography;
@@ -162,6 +163,7 @@ const PlanoMensalPocos: React.FC = () => {
   const [aba, setAba] = useState<'ANALISE' | 'SIMULAR' | 'PLANOS' | 'CUSTOS' | 'CARTEIRA'>('ANALISE');
   /** Preço fechado com o cliente, por plano (para ver o risco com desconto). */
   const [combinados, setCombinados] = useState<Record<string, number>>({});
+  const [simulando, setSimulando] = useState(false);
   const [erroSim, setErroSim] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [central, setCentral] = useState<Central | null>(null);
@@ -178,10 +180,11 @@ const PlanoMensalPocos: React.FC = () => {
   useEffect(() => {
     if (!custos) return;
     const minha = ++vez.current;
+    setSimulando(true);
     const t = setTimeout(() => {
       planoMensalApi.simular(custos, niveis.filter(n => n.ativo && n.nome.trim()), poco, combinados)
-        .then(r => { if (minha === vez.current) { setSim(r); setErroSim(null); } })
-        .catch(e => { if (minha === vez.current) setErroSim(e instanceof Error ? e.message : 'Erro ao simular.'); });
+        .then(r => { if (minha === vez.current) { setSim(r); setErroSim(null); setSimulando(false); } })
+        .catch(e => { if (minha === vez.current) { setErroSim(e instanceof Error ? e.message : 'Erro ao simular.'); setSimulando(false); } });
     }, 500);
     return () => clearTimeout(t);
   }, [custos, niveis, poco, combinados]);
@@ -252,8 +255,8 @@ const PlanoMensalPocos: React.FC = () => {
       {aba === 'ANALISE' && <AnalisePlanoCarteira custos={custos} niveis={ativos} onSimular={simularCliente} onIrCustos={() => setAba('CUSTOS')} />}
 
       {aba === 'CUSTOS' && <>
-      <Row gutter={[12, 12]}>
-        <Col xs={24}>
+      <Row gutter={[12, 12]} align="top">
+        <Col xs={24} xl={15}>
           <Card size="small" title="Custos e variáveis da empresa"
             extra={<Space size={4}>
               {custosMudaram && <Button size="small" icon={<UndoOutlined />} onClick={() => setCustos(dados.custos)}>Desfazer</Button>}
@@ -274,7 +277,7 @@ const PlanoMensalPocos: React.FC = () => {
                     </Col>
                   )}
                   {g.campos.map(c => (
-                    <Col key={c.k} xs={24} sm={12} lg={6}>
+                    <Col key={c.k} xs={24} sm={12} lg={8}>
                       <Tooltip title={c.ajuda} placement="topLeft">
                         <Text style={{ fontSize: 12 }}>{c.rotulo}</Text>
                       </Tooltip>
@@ -287,6 +290,10 @@ const PlanoMensalPocos: React.FC = () => {
               </div>
             ))}
           </Card>
+        </Col>
+        <Col xs={24} xl={9}>
+          <VisorCustosPlanos planos={sim?.planos || []} custos={custos} poco={poco} carregando={simulando} erro={erroSim}
+            onPoco={p => { setCliente(null); setPoco(p); }} />
         </Col>
       </Row>
       <CustosObraConfig />

@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { analisarCarteira, planejamentoCarteira, planoDoCliente } from './planoMensalAnalise';
+import { analisarCarteira, composicaoDoPreco, planejamentoCarteira, planoDoCliente } from './planoMensalAnalise';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -47,4 +47,16 @@ teste('análise do plano: meta, capacidade e equipe dedicada', () => {
   assert.deepStrictEqual(p.capacidade, { atendimentosMes: 0.42, capacidadeMes: 13, uso: 0.032 });
   // para a equipe: (40,37 + 45) + (−2 + 10) = 93,37 → R$ 1.000 pede 22 assinantes (46,69 cada)
   assert.deepStrictEqual(p.equipe, { custo: 1000, paraEquipe: 93.37, cobre: false, assinantesNecessarios: 22 });
+});
+
+teste('análise do plano: composição do preço no visor', () => {
+  // plano de R$ 300: preventivas 460/ano, chamados 608/ano, bomba 187,50/ano; 12% de impostos/taxas
+  const c = composicaoDoPreco(300, [{ tipo: 'PREVENTIVA', anual: 460 }, { tipo: 'CHAMADOS', anual: 608 }, { tipo: 'BOMBA', anual: 187.5 }], 0.12);
+  assert.deepStrictEqual(c.fatias.map(f => [f.tipo, f.valor, f.pct]), [
+    ['PREVENTIVA', 38.33, 12.8], ['CHAMADOS', 50.67, 16.9], ['BOMBA', 15.63, 5.2], ['DEDUCOES', 36, 12], ['LUCRO', 159.37, 53.1],
+  ]);
+  assert.deepStrictEqual([c.custoMes, c.lucro, c.excesso], [104.63, 159.37, 0]);
+  // prejuízo: custos + impostos passam do preço → sem fatia de lucro, mostra o excesso (50,67 ÷ 56,67 = 89,4%)
+  const p = composicaoDoPreco(50, [{ tipo: 'CHAMADOS', anual: 608 }], 0.12);
+  assert.deepStrictEqual([p.fatias.map(f => f.tipo), p.lucro, p.excesso, p.fatias[0].pct], [['CHAMADOS', 'DEDUCOES'], -6.67, 6.67, 89.4]);
 });

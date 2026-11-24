@@ -829,9 +829,10 @@ export interface NivelPlano {
   aguaEmergencial: boolean;
   monitoramento: boolean; reservaBombaPct: number; fidelidadeMeses: number; ordem: number; ativo: boolean;
 }
+export type TipoLinhaCusto = 'PREVENTIVA' | 'LIMPEZA' | 'CHAMADOS' | 'MONITORAMENTO' | 'BOMBA' | 'MATERIAL';
 export interface PrecoPlano {
-  precoMensal: number; custoMensal: number; custos: { item: string; anual: number }[]; lucroMensal: number; margemReal: number;
-  maoDeObraMensal: number; atendimentosAno: number; chamadosAno: number; custoUmChamado: number;
+  precoMensal: number; custoMensal: number; custos: { item: string; anual: number; tipo: TipoLinhaCusto }[]; lucroMensal: number; margemReal: number;
+  maoDeObraMensal: number; atendimentosAno: number; chamadosAno: number; custoUmChamado: number; custoUmaPreventiva: number; custoChamadoDomingo: number;
   avulsoAnual: number; economiaAnual: number; economiaPct: number | null; comparacaoEstimada: boolean; viavel: boolean; avisos: string[];
   km: number; kmOrigem: 'INFORMADO' | 'GPS' | 'MEDIA';
 }

@@ -375,3 +375,7 @@ Colunas novas: `incluso` em `_orcamento_itens`, `valor_parcelado` em `_obras`, `
 - **Bomba e material separados** (2026-11-24, colunas `material_metro`, `material_vida_anos`): a bomba fica só em "Cobre
   da troca da bomba" (a escadinha); o desconto do plano é só em material (tubo edutor, fio, conexões) =
   desconto × (até a bomba × R$/m ÷ vida útil + conexões do ano). Sem a profundidade da bomba registrada, 70% da do poço.
+- **Visor dos custos** (2026-11-24, `VisorCustosPlanos.tsx`, `composicaoDoPreco`): na aba Custos, ao lado dos campos, um
+  poço de referência (raso/comum/fundo ou digitado) com o custo de 1 preventiva, 1 chamado e no domingo, e a barra de
+  cada plano mostrando para onde vai o preço (preventivas, chamados, limpeza, monitoramento, bomba, material, impostos e
+  lucro). As linhas de custo do plano ganharam o `tipo` para isso.
