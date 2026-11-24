@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { analisarCarteira, planoDoCliente } from './planoMensalAnalise';
+import { analisarCarteira, planejamentoCarteira, planoDoCliente } from './planoMensalAnalise';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -31,4 +31,20 @@ teste('análise do plano: totais da carteira e faixa', () => {
   });
   const todosEssencial = analisarCarteira(clientes, 'Essencial');
   assert.deepStrictEqual([todosEssencial.totais.receita, todosEssencial.totais.lucro, todosEssencial.totais.baixo], [130, 13, 1]);
+});
+
+teste('análise do plano: meta, capacidade e equipe dedicada', () => {
+  const comMao = (p: any, mao: number, atend: number) => ({ ...p, preco: { ...p.preco, maoDeObraMensal: mao, atendimentosAno: atend } });
+  const cl = [
+    { ...clientes[0], planos: [comMao(clientes[0].planos[1], 45, 3)] },
+    { ...clientes[1], planos: [comMao(clientes[1].planos[0], 10, 2)] },
+  ];
+  const { linhas } = analisarCarteira(cl, 'SUGERIDO');
+  const p = planejamentoCarteira(linhas, { metaAssinantes: 15, metaReceita: 5000, capacidadeSemana: 3, custoEquipeDedicada: 1000 });
+  // ticket de hoje (160 + 70) ÷ 2 = 115; a meta pede 333,33 por assinante, ou 44 assinantes com o ticket de hoje
+  assert.deepStrictEqual(p.meta, { assinantes: 15, receita: 5000, ticketPedido: 333.33, ticketMedio: 115, assinantesParaReceita: 44 });
+  // idas: (3 + 2) ÷ 12 = 0,42 por mês; capacidade 3 × 52 ÷ 12 = 13
+  assert.deepStrictEqual(p.capacidade, { atendimentosMes: 0.42, capacidadeMes: 13, uso: 0.032 });
+  // para a equipe: (40,37 + 45) + (−2 + 10) = 93,37 → R$ 1.000 pede 22 assinantes (46,69 cada)
+  assert.deepStrictEqual(p.equipe, { custo: 1000, paraEquipe: 93.37, cobre: false, assinantesNecessarios: 22 });
 });

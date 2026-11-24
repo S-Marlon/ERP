@@ -11,6 +11,8 @@ export interface ParametrosObra {
 }
 /** O que vem do Plano mensal (hora da equipe, km, deduções e margens). */
 export interface CustosDaEmpresa {
+  /** Hora de uma pessoa; a obra usa a equipe da troca (pessoasTroca) e a visita técnica a da preventiva. Sem elas, 1. */
+  pessoasTroca?: number; pessoasPreventiva?: number;
   custoHoraEquipe: number; custoKm: number; impostosPct: number; taxaCobrancaPct: number; inadimplenciaPct: number;
   margemPct: number; margemMinimaPct: number; arredondarPara: number;
 }
@@ -59,14 +61,15 @@ export const estimarCusto = (e: EntradaCusto, formacoes: CustoFormacao[], p: Par
   };
   const horasTotal = r2(Object.values(horas).reduce((s, h) => s + h, 0));
   const dias = horasTotal > 0 ? Math.max(1, Math.ceil(horasTotal / (n(p.horasPorDia) || 8) - 1e-9)) : 0;
-  const equipe = r2(horasTotal * n(emp.custoHoraEquipe));
+  const horaEquipe = n(emp.custoHoraEquipe) * (n(emp.pessoasTroca) || 1);
+  const equipe = r2(horasTotal * horaEquipe);
   const deslocamento = r2(n(e.km) * dias * n(emp.custoKm));
   const despesasDia = r2(dias * n(p.custoDia));
   const materiais = r2(n(e.materiais) + n(e.outrosMateriais));
   const bomba = e.incluir.bomba ? r2(n(e.bombaCusto)) : 0;
   if (e.incluir.bomba && !bomba) alertas.push('Bomba sem custo: informe o valor ou a potência.');
   // visita técnica: as horas da visita e uma viagem (ida e volta) no carro da equipe
-  const visita = e.incluir.visita ? r2(n(p.horasVisitaTecnica) * n(emp.custoHoraEquipe) + n(e.km) * n(emp.custoKm)) : 0;
+  const visita = e.incluir.visita ? r2(n(p.horasVisitaTecnica) * n(emp.custoHoraEquipe) * (n(emp.pessoasPreventiva) || 1) + n(e.km) * n(emp.custoKm)) : 0;
   // transporte das máquinas: o caminhão leva e busca a sonda/compressor (idas e voltas × km) + o custo fixo de cada transporte
   const viagens = p.viagensMaquina === undefined || p.viagensMaquina === null ? 1 : n(p.viagensMaquina);
   const transporte = e.incluir.transporte ? r2(viagens * (n(e.km) * n(p.custoKmCaminhao) + n(p.custoFixoTransporte))) : 0;
@@ -87,7 +90,7 @@ export const estimarCusto = (e: EntradaCusto, formacoes: CustoFormacao[], p: Par
 
   return {
     metros, perfuracao, custoPerfuracao, horas, horasTotal, dias, equipe, deslocamento, despesasDia, materiais, bomba, visita, transporte, custo,
-    deducoesPct: Math.round(deducoes * 10000) / 10000, impostosSobrePreco: preco > 0 ? r2(preco * deducoes) : null,
+    horaEquipe: r2(horaEquipe), deducoesPct: Math.round(deducoes * 10000) / 10000, impostosSobrePreco: preco > 0 ? r2(preco * deducoes) : null,
     precoMinimo, precoSugerido, lucro, margem, situacao, alertas,
   };
 };

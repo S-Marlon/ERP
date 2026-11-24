@@ -18,6 +18,10 @@ const COLUNAS: Record<keyof CustosPlano, string> = {
   usoEmergenciasPct: 'uso_emergencias_pct', custoLimpeza: 'custo_limpeza', custoMonitoramentoMes: 'custo_monitoramento_mes', aparelhoValor: 'aparelho_valor',
   aparelhoMeses: 'aparelho_meses', bombaPrecoPorCv: 'bomba_preco_por_cv', bombaVidaAnos: 'bomba_vida_anos', precoVisitaAvulsa: 'preco_visita_avulsa',
   materialAnoPoco: 'material_ano_poco',
+  pessoasPreventiva: 'pessoas_preventiva', pessoasTroca: 'pessoas_troca', horasTroca: 'horas_troca', chamadosPocoAno: 'chamados_poco_ano',
+  domingoFeriadoPct: 'domingo_feriado_pct', adicionalDomingoPct: 'adicional_domingo_pct', taxaUrgencia: 'taxa_urgencia', custoPipa: 'custo_pipa',
+  pipaPct: 'pipa_pct', custoEquipeDedicada: 'custo_equipe_dedicada', metaAssinantes: 'meta_assinantes', metaReceita: 'meta_receita',
+  capacidadeSemana: 'capacidade_semana',
   impostosPct: 'impostos_pct', taxaCobrancaPct: 'taxa_cobranca_pct', inadimplenciaPct: 'inadimplencia_pct', margemPct: 'margem_pct',
   margemMinimaPct: 'margem_minima_pct', arredondarPara: 'arredondar_para',
 };
@@ -27,6 +31,7 @@ export interface NivelSalvo extends NivelPlano { idNivel: number }
 const formatarNivel = (r: any): NivelSalvo => ({
   idNivel: Number(r.id_nivel), nome: r.nome, descricao: r.descricao || null, visitasAno: n(r.visitas_ano), limpezaACadaMeses: nulo(r.limpeza_a_cada_meses),
   chamadosAno: n(r.chamados_ano), descontoPecasPct: n(r.desconto_pecas_pct), descontoLimpezaPct: n(r.desconto_limpeza_pct), prioridade: !!r.prioridade,
+  aguaEmergencial: !!r.agua_emergencial,
   monitoramento: !!r.monitoramento, reservaBombaPct: n(r.reserva_bomba_pct),
   fidelidadeMeses: n(r.fidelidade_meses), ordem: n(r.ordem), ativo: !!r.ativo,
 });
@@ -124,19 +129,19 @@ export const salvarCustos = async (req: Request, res: Response) => {
 const gravarNivel = async (tenant: number, b: any, id: number | null, operador: string) => {
   const nv = validarNivel(b);
   const valores = [nv.nome, nv.descricao, nv.visitasAno, nv.limpezaACadaMeses, nv.chamadosAno, nv.descontoPecasPct, nv.descontoLimpezaPct,
-    nv.monitoramento ? 1 : 0, nv.prioridade ? 1 : 0, nv.reservaBombaPct, nv.fidelidadeMeses, nv.ordem, nv.ativo ? 1 : 0, operador];
+    nv.monitoramento ? 1 : 0, nv.prioridade ? 1 : 0, nv.aguaEmergencial ? 1 : 0, nv.reservaBombaPct, nv.fidelidadeMeses, nv.ordem, nv.ativo ? 1 : 0, operador];
   if (id) {
     const [u]: any = await pool.execute(
       `UPDATE modulo_hidraulica_pocos_plano_mensal_niveis SET nome = ?, descricao = ?, visitas_ano = ?, limpeza_a_cada_meses = ?, chamados_ano = ?,
-         desconto_pecas_pct = ?, desconto_limpeza_pct = ?, monitoramento = ?, prioridade = ?, reserva_bomba_pct = ?, fidelidade_meses = ?, ordem = ?, ativo = ?, operador = ?
+         desconto_pecas_pct = ?, desconto_limpeza_pct = ?, monitoramento = ?, prioridade = ?, agua_emergencial = ?, reserva_bomba_pct = ?, fidelidade_meses = ?, ordem = ?, ativo = ?, operador = ?
        WHERE id_nivel = ? AND tenant_id = ?`, [...valores, id, tenant]);
     if (!u.affectedRows) throw new ErroObra('Plano não encontrado.', 404);
     return id;
   }
   const [ins]: any = await pool.execute(
     `INSERT INTO modulo_hidraulica_pocos_plano_mensal_niveis (nome, descricao, visitas_ano, limpeza_a_cada_meses, chamados_ano, desconto_pecas_pct,
-       desconto_limpeza_pct, monitoramento, prioridade, reserva_bomba_pct, fidelidade_meses, ordem, ativo, operador, tenant_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [...valores, tenant]);
+       desconto_limpeza_pct, monitoramento, prioridade, agua_emergencial, reserva_bomba_pct, fidelidade_meses, ordem, ativo, operador, tenant_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [...valores, tenant]);
   return Number(ins.insertId);
 };
 

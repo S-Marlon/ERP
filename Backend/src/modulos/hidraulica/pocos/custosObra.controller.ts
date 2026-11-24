@@ -107,7 +107,7 @@ export const verCustosReais = async (req: Request, res: Response) => {
                            COUNT(*) AS linhas, COALESCE(SUM(l.qtd_usada IS NULL), 0) AS sem_conferir
                     FROM modulo_hidraulica_pocos_obras_materiais l LEFT JOIN modulo_hidraulica_pocos_materiais m ON m.id_material = l.id_material
                     WHERE l.id_obra = ?`, [id]),
-      pool.execute(`SELECT custo_hora_equipe, custo_km, impostos_pct, taxa_cobranca_pct, inadimplencia_pct, margem_minima_pct
+      pool.execute(`SELECT custo_hora_equipe, pessoas_troca, custo_km, impostos_pct, taxa_cobranca_pct, inadimplencia_pct, margem_minima_pct
                     FROM modulo_hidraulica_pocos_plano_mensal_custos WHERE tenant_id = ?`, [tenant]),
     ]);
     let estimativa: any = null;
@@ -119,7 +119,8 @@ export const verCustosReais = async (req: Request, res: Response) => {
       situacao: o.situacao, inicio: o.inicio || null,
       estimativa,
       empresa: {
-        custoHoraEquipe: n(emp?.custo_hora_equipe), custoKm: n(emp?.custo_km), margemMinimaPct: n(emp?.margem_minima_pct),
+        // a hora do plano mensal é por pessoa; na obra, a hora é a da equipe (pessoas da troca)
+        custoHoraEquipe: Math.round(n(emp?.custo_hora_equipe) * (n(emp?.pessoas_troca) || 1) * 100) / 100, custoKm: n(emp?.custo_km), margemMinimaPct: n(emp?.margem_minima_pct),
         deducoesPct: n(emp?.impostos_pct) + n(emp?.taxa_cobranca_pct) + n(emp?.inadimplencia_pct),
       },
     });

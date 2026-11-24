@@ -20,10 +20,21 @@ const pctTxt = (v: number) => `${(v * 100).toLocaleString('pt-BR', { maximumFrac
 /** Campos dos custos: rótulo, sufixo, passo e se é percentual (a tela mostra 6, o banco guarda 0,06). */
 type Campo = { k: keyof CustosPlano; rotulo: string; sufixo?: string; prefixo?: string; passo?: number; pct?: boolean; ajuda?: string; opcional?: boolean };
 const GRUPOS: { titulo: string; campos: Campo[] }[] = [
-  { titulo: 'Visita (equipe)', campos: [
-    { k: 'custoHoraEquipe', rotulo: 'Custo por hora da equipe', prefixo: 'R$', ajuda: 'Técnico + ajudante, com encargos' },
-    { k: 'horasVisita', rotulo: 'Horas de uma visita', sufixo: 'h', passo: 0.5, ajuda: 'Revisão preventiva em poço raso' },
-    { k: 'horasPor100m', rotulo: 'Horas a mais por 100 m', sufixo: 'h', passo: 0.5, ajuda: 'Tirar e descer a bomba em poço fundo' },
+  { titulo: 'Equipe: preventiva e chamado', campos: [
+    { k: 'custoHoraEquipe', rotulo: 'Custo por hora (por pessoa)', prefixo: 'R$', ajuda: 'Salário + encargos e benefícios de uma pessoa ÷ horas produtivas do mês (120 a 150 h)' },
+    { k: 'pessoasPreventiva', rotulo: 'Pessoas na preventiva', passo: 1, ajuda: 'Normalmente 1: a preventiva não tira a bomba' },
+    { k: 'horasVisita', rotulo: 'Horas da preventiva', sufixo: 'h', passo: 0.5, ajuda: 'No local, com o teste de vazão (sem a viagem)' },
+    { k: 'pessoasTroca', rotulo: 'Pessoas no chamado/troca', passo: 1, ajuda: 'A equipe que tira e desce a bomba (2 ou 3)' },
+    { k: 'horasTroca', rotulo: 'Horas do chamado (poço raso)', sufixo: 'h', passo: 0.5, ajuda: 'Meio período; passou de 8 h, volta no dia seguinte (2ª viagem)' },
+    { k: 'horasPor100m', rotulo: 'Horas a mais por 100 m', sufixo: 'h', passo: 0.5, ajuda: 'Tirar e descer o tubo no chamado/troca (≈ 17 barras de 6 m)' },
+  ] },
+  { titulo: 'Chamados e urgência', campos: [
+    { k: 'chamadosPocoAno', rotulo: 'Chamados esperados por poço/ano', passo: 0.5, ajuda: 'Quantas vezes um poço "para" por ano; o pessimista usa o limite do plano' },
+    { k: 'domingoFeriadoPct', rotulo: 'Chamados em domingo/feriado', sufixo: '%', pct: true, passo: 1, ajuda: 'Só pesa nos planos com prioridade (os outros esperam o dia útil)' },
+    { k: 'adicionalDomingoPct', rotulo: 'Hora extra no domingo/feriado', sufixo: '%', pct: true, passo: 10, ajuda: 'CLT: 100%' },
+    { k: 'taxaUrgencia', rotulo: 'Taxa de urgência', prefixo: 'R$', passo: 10, ajuda: 'Cobrada no domingo/feriado de quem não tem prioridade (fora do plano)' },
+    { k: 'custoPipa', rotulo: 'Caminhão-pipa', prefixo: 'R$', passo: 50, ajuda: 'Só nos planos com água emergencial' },
+    { k: 'pipaPct', rotulo: 'Chance de precisar do pipa', sufixo: '%', pct: true, passo: 5, ajuda: 'Em quantos chamados leva o pipa' },
   ] },
   { titulo: 'Deslocamento e material', campos: [
     { k: 'kmMedio', rotulo: 'Km médio de ida e volta', sufixo: 'km', passo: 10, ajuda: 'Usado quando o poço não tem GPS ou a base não foi informada' },
@@ -32,8 +43,6 @@ const GRUPOS: { titulo: string; campos: Campo[] }[] = [
     { k: 'fatorEstrada', rotulo: 'Fator da estrada', sufixo: '×', passo: 0.05, ajuda: 'Distância em linha reta × fator = km de estrada (1,3 é o comum)' },
   ] },
   { titulo: 'Limpeza e monitoramento', campos: [
-    { k: 'usoEmergenciasPct', rotulo: 'Emergências usadas de fato', sufixo: '%', pct: true, passo: 5,
-      ajuda: 'Dos atendimentos de emergência incluídos, quantos os clientes chamam (30% = 3 em cada 10)' },
     { k: 'custoLimpeza', rotulo: 'Custo de uma limpeza programada', prefixo: 'R$', passo: 50, ajuda: 'Só entra no plano que incluir limpeza programada' },
     { k: 'custoMonitoramentoMes', rotulo: 'Monitoramento por mês', prefixo: 'R$', passo: 5, ajuda: 'Chip, dados e plataforma por poço' },
     { k: 'aparelhoValor', rotulo: 'Valor do aparelho', prefixo: 'R$', passo: 50 },
@@ -44,6 +53,12 @@ const GRUPOS: { titulo: string; campos: Campo[] }[] = [
     { k: 'bombaVidaAnos', rotulo: 'Vida útil da bomba', sufixo: 'anos', passo: 0.5 },
     { k: 'materialAnoPoco', rotulo: 'Material por poço por ano', prefixo: 'R$', passo: 50,
       ajuda: 'O que um cliente compra de conexões, fio e peças num ano (a preço de venda): base do desconto em bomba e material dos planos' },
+  ] },
+  { titulo: 'Planejamento', campos: [
+    { k: 'metaAssinantes', rotulo: 'Meta de assinantes', passo: 1 },
+    { k: 'metaReceita', rotulo: 'Meta de receita por mês', prefixo: 'R$', passo: 500 },
+    { k: 'capacidadeSemana', rotulo: 'Serviços da equipe por semana', passo: 1, ajuda: 'Preventivas e chamados que cabem sem atrasar o "amanhã"' },
+    { k: 'custoEquipeDedicada', rotulo: 'Equipe só para os planos (mês)', prefixo: 'R$', passo: 500, ajuda: 'Salários + encargos + veículo: para ver a partir de quantos assinantes vale' },
   ] },
   { titulo: 'Preço', campos: [
     { k: 'impostosPct', rotulo: 'Impostos', sufixo: '%', pct: true, passo: 0.5 },
@@ -58,7 +73,7 @@ const GRUPOS: { titulo: string; campos: Campo[] }[] = [
 ];
 
 const NIVEL_NOVO: NivelPlano = {
-  nome: 'Novo plano', descricao: null, visitasAno: 1, limpezaACadaMeses: null, chamadosAno: 0, descontoPecasPct: 0, descontoLimpezaPct: 0, prioridade: false, monitoramento: false,
+  nome: 'Novo plano', descricao: null, visitasAno: 1, limpezaACadaMeses: null, chamadosAno: 2, descontoPecasPct: 0, descontoLimpezaPct: 0, prioridade: false, aguaEmergencial: false, monitoramento: false,
   reservaBombaPct: 0, fidelidadeMeses: 12, ordem: 99, ativo: true,
 };
 
@@ -84,9 +99,9 @@ const Resultado: React.FC<{ p: PrecoPlano; sugerido: boolean }> = ({ p, sugerido
 );
 
 const CartaoNivel: React.FC<{
-  n: NivelPlano; original: NivelPlano | null; preco?: PrecoPlano; sugerido: boolean;
+  n: NivelPlano; original: NivelPlano | null; preco?: PrecoPlano; sugerido: boolean; taxaUrgencia: number;
   onMudar: (n: NivelPlano) => void; onSalvar: () => void; onApagar: () => void; onDesfazer: () => void;
-}> = ({ n, original, preco, sugerido, onMudar, onSalvar, onApagar, onDesfazer }) => {
+}> = ({ n, original, preco, sugerido, taxaUrgencia, onMudar, onSalvar, onApagar, onDesfazer }) => {
   const mudou = !original || JSON.stringify(original) !== JSON.stringify(n);
   const set = (x: Partial<NivelPlano>) => onMudar({ ...n, ...x });
   const linha = (rotulo: string, campo: React.ReactNode) => (
@@ -104,8 +119,12 @@ const CartaoNivel: React.FC<{
         {linha('Visitas preventivas por ano', <CampoNumero size="small" min={0} max={24} value={n.visitasAno} onChange={v => set({ visitasAno: v ?? 0 })} style={{ width: 80 }} />)}
         {linha('Limpeza programada a cada', <CampoNumero size="small" min={0} max={120} value={n.limpezaACadaMeses ?? 0} onChange={v => set({ limpezaACadaMeses: v ? v : null })}
           suffix="meses" style={{ width: 110 }} placeholder="não" />)}
-        {linha('Emergências por ano', <CampoNumero size="small" min={0} max={24} value={n.chamadosAno} onChange={v => set({ chamadosAno: v ?? 0 })} style={{ width: 80 }} />)}
-        {linha('Atendimento prioritário', <Switch size="small" checked={n.prioridade} onChange={v => set({ prioridade: v })} />)}
+        {linha('Chamados inclusos por ano (limite)', <CampoNumero size="small" min={0} max={24} value={n.chamadosAno} onChange={v => set({ chamadosAno: v ?? 0 })} style={{ width: 80 }} />)}
+        {linha('Prioridade: domingo e feriado', <Switch size="small" checked={n.prioridade} onChange={v => set({ prioridade: v })} />)}
+        {!n.prioridade && <Text type="secondary" style={{ fontSize: 11, marginTop: -4 }}>
+          Chamado entra na fila do próximo dia útil{taxaUrgencia ? `; domingo/feriado com taxa de ${brl(taxaUrgencia)}` : ''}.
+        </Text>}
+        {linha('Água emergencial (caminhão-pipa)', <Switch size="small" checked={n.aguaEmergencial} onChange={v => set({ aguaEmergencial: v })} />)}
         {linha('Monitoramento (IoT)', <Switch size="small" checked={n.monitoramento} onChange={v => set({ monitoramento: v })} />)}
         {linha('Cobre da troca da bomba', <CampoNumero size="small" min={0} max={100} step={10} value={Math.round(n.reservaBombaPct * 100)}
           onChange={v => set({ reservaBombaPct: (v ?? 0) / 100 })} suffix="%" style={{ width: 90 }} />)}
@@ -338,9 +357,9 @@ const PlanoMensalPocos: React.FC = () => {
                         </Flex>
                         <Table size="small" pagination={false} rowKey="k"
                           dataSource={[
-                            { k: 'Pessimista', c: p.risco.pessimista, d: 'todas as emergências, visita +25%, inadimplência dobrada, km no maior erro' },
+                            { k: 'Pessimista', c: p.risco.pessimista, d: 'todos os chamados do limite, serviço +25%, inadimplência dobrada, km no maior erro' },
                             { k: 'Esperado', c: p.risco.esperado, d: 'os custos da empresa' },
-                            { k: 'Otimista', c: p.risco.otimista, d: 'sem emergências nem inadimplência, km no menor erro' },
+                            { k: 'Otimista', c: p.risco.otimista, d: 'metade dos chamados esperados, sem inadimplência, km no menor erro' },
                           ]}
                           columns={[
                             { title: 'Cenário', dataIndex: 'k', width: 100 },
@@ -401,7 +420,7 @@ const PlanoMensalPocos: React.FC = () => {
         <Row gutter={[12, 12]}>
           {niveis.map(n => (
             <Col key={n.chave} xs={24} md={12} xl={8}>
-              <CartaoNivel n={n} original={dados.niveis.find(x => x.idNivel === n.idNivel) || null} preco={precoDe(n)} sugerido={n.nome === sugerido}
+              <CartaoNivel n={n} original={dados.niveis.find(x => x.idNivel === n.idNivel) || null} preco={precoDe(n)} sugerido={n.nome === sugerido} taxaUrgencia={custos.taxaUrgencia}
                 onMudar={x => setNiveis(l => l.map(y => (y.chave === n.chave ? { ...x, chave: n.chave } : y)))}
                 onDesfazer={() => { const o = dados.niveis.find(x => x.idNivel === n.idNivel); if (o) setNiveis(l => l.map(y => (y.chave === n.chave ? { ...o, chave: n.chave } : y))); }}
                 onSalvar={() => salvarNivel(n)} onApagar={() => apagarNivel(n)} />

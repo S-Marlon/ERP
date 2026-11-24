@@ -2,10 +2,10 @@
 // sugerido dele ou um escolhido para todos), o preço, a faixa de lucro por mês (pessimista · esperado · otimista), até
 // onde a distância compensa e o risco com os motivos. No topo, o que a carteira daria por mês se todos assinassem.
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Card, Col, Empty, Popover, Row, Segmented, Select, Space, Statistic, Table, Tag, Tooltip, Typography } from 'antd';
+import { Alert, Button, Card, Col, Empty, Popover, Progress, Row, Segmented, Select, Space, Statistic, Table, Tag, Tooltip, Typography } from 'antd';
 import { EnvironmentOutlined, ExperimentOutlined } from '@ant-design/icons';
 import { ClienteAnalisado, CustosPlano, NivelPlano, planoMensalApi, RiscoPlano } from './obrasApi';
-import { analisarCarteira, EscolhaPlano, LinhaAnalise } from './planoMensalAnalise';
+import { analisarCarteira, EscolhaPlano, LinhaAnalise, planejamentoCarteira } from './planoMensalAnalise';
 
 const { Text } = Typography;
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -73,6 +73,8 @@ export const AnalisePlanoCarteira: React.FC<{
   if (erro) return <Alert type="error" showIcon message={erro} />;
   if (!clientes) return <Card loading />;
   const { linhas, totais } = analisarCarteira(clientes, escolha);
+  const plan = planejamentoCarteira(linhas, custos);
+  const faltaAssinantes = Math.max(0, plan.meta.assinantes - totais.clientes);
   const visiveis = linhas.filter(l => filtro === 'TODOS' || l.plano?.risco.nivel === filtro);
   const semBase = custos.baseLatitude === null && !custos.baseGps;
   const nomes = [...new Set(clientes.flatMap(c => c.planos.map(p => p.nome)))];
@@ -110,6 +112,44 @@ export const AnalisePlanoCarteira: React.FC<{
           </Card>
         </Col>
       </Row>
+
+      <Card size="small" title="Planejamento" extra={<Button size="small" type="link" onClick={onIrCustos}>ajustar meta, capacidade e equipe</Button>}>
+        <Row gutter={[16, 12]}>
+          <Col xs={24} md={8}>
+            <Text strong>Meta: {plan.meta.assinantes} assinantes · {brl0(plan.meta.receita)}/mês</Text>
+            <Progress percent={Math.min(100, Math.round((totais.receita / (plan.meta.receita || 1)) * 100))} size="small"
+              format={() => `${brl0(totais.receita)}`} status={totais.receita >= plan.meta.receita ? 'success' : 'normal'} />
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {totais.clientes} cliente(s) com poço hoje{faltaAssinantes ? `, faltam ${faltaAssinantes} para a meta` : ''}.
+              {plan.meta.ticketPedido !== null && plan.meta.ticketMedio !== null && ` A meta pede ${brl0(plan.meta.ticketPedido)} por assinante; o plano de hoje dá ${brl0(plan.meta.ticketMedio)}`}
+              {plan.meta.assinantesParaReceita !== null && plan.meta.ticketMedio !== null && plan.meta.ticketPedido !== null && plan.meta.ticketMedio < plan.meta.ticketPedido
+                ? ` (com esse valor, a receita da meta pede ${plan.meta.assinantesParaReceita} assinantes).` : '.'}
+            </Text>
+          </Col>
+          <Col xs={24} md={8}>
+            <Text strong>Capacidade da equipe</Text>
+            <Progress percent={Math.round((plan.capacidade.uso ?? 0) * 100)} size="small" status={(plan.capacidade.uso ?? 0) > 1 ? 'exception' : 'normal'} />
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Se todos assinarem: {String(plan.capacidade.atendimentosMes).replace('.', ',')} ida(s) por mês (preventivas e chamados) de {String(plan.capacidade.capacidadeMes).replace('.', ',')} que
+              cabem ({custos.capacidadeSemana} por semana).{(plan.capacidade.uso ?? 0) > 1 ? ' Passa da capacidade: o "amanhã" vai atrasar.' : ''}
+            </Text>
+          </Col>
+          <Col xs={24} md={8}>
+            <Text strong>Equipe só para os planos</Text>
+            {plan.equipe.custo > 0 ? (
+              <>
+                <Progress percent={Math.min(100, Math.round((plan.equipe.paraEquipe / plan.equipe.custo) * 100))} size="small" status={plan.equipe.cobre ? 'success' : 'normal'}
+                  format={() => `${brl0(plan.equipe.paraEquipe)}`} />
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  Sobra {brl0(plan.equipe.paraEquipe)}/mês para pagar uma equipe de {brl0(plan.equipe.custo)}.
+                  {plan.equipe.cobre ? ' Já cobre.' : plan.equipe.assinantesNecessarios ? ` Com planos assim, vale a partir de ${plan.equipe.assinantesNecessarios} assinantes.` : ''}
+                  {' '}Até lá, a equipe é compartilhada e os planos pagam as horas que usam.
+                </Text>
+              </>
+            ) : <div><Text type="secondary" style={{ fontSize: 12 }}>Informe o custo de uma equipe só para os planos (aba Custos › Planejamento) para ver a partir de quantos assinantes ela se paga.</Text></div>}
+          </Col>
+        </Row>
+      </Card>
 
       <Card size="small" title="Cliente a cliente"
         extra={<Space wrap>
@@ -166,7 +206,7 @@ export const AnalisePlanoCarteira: React.FC<{
             },
           ]} />
         <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 6 }}>
-          Faixa: o pessimista conta todas as emergências usadas, visita 25% mais demorada, inadimplência dobrada, bomba durando 25% menos e o
+          Faixa: o pessimista conta todos os chamados do limite do plano, serviço 25% mais demorado, inadimplência dobrada, bomba durando 25% menos e o
           erro da distância (±15% pelo GPS, ±40% pelo km médio); profundidade ou bomba não informadas vão de 50 a 150 m e de 1 a 3 CV. O otimista, o contrário.
         </Text>
       </Card>

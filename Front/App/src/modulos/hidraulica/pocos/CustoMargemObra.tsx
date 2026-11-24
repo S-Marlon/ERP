@@ -80,7 +80,7 @@ export const CustoMargemObra: React.FC<{ obra: Obra; preco?: number; onSalvo?: (
     { k: 'perf', item: 'Perfuração', detalhe: r.perfuracao.map(p => `${p.metros} m ${p.formacao.toLowerCase()}`).join(' · '), valor: r.custoPerfuracao },
     { k: 'mat', item: 'Materiais', detalhe: materiais.linhas.length ? `${materiais.linhas.length} itens do relatório${e.outrosMateriais ? ' + outros' : ''}` : 'sem materiais no relatório', valor: r.materiais },
     { k: 'bomba', item: 'Bomba', detalhe: e.incluir.bomba ? '' : 'não incluída', valor: r.bomba },
-    { k: 'eq', item: 'Equipe', detalhe: `${String(r.horasTotal).replace('.', ',')} h × ${brl(empresa.custoHoraEquipe)}`, valor: r.equipe },
+    { k: 'eq', item: 'Equipe', detalhe: `${String(r.horasTotal).replace('.', ',')} h × ${brl(r.horaEquipe)} (${empresa.pessoasTroca || 1} pessoa(s))`, valor: r.equipe },
     { k: 'km', item: 'Deslocamento', detalhe: `${e.km} km × ${r.dias} dia(s) × ${brl(empresa.custoKm)}/km`, valor: r.deslocamento },
     { k: 'dia', item: 'Despesas por dia', detalhe: `${r.dias} dia(s) × ${brl(custos.parametros.custoDia)}`, valor: r.despesasDia },
     ...(e.incluir.transporte ? [{ k: 'transp', item: 'Transporte das máquinas',

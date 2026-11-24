@@ -805,7 +805,12 @@ export const conjuntoApi = {
 // ------------------------------------------------------------------ plano mensal (custos, planos oferecidos e simulador)
 /** Custos e variáveis da empresa. Percentuais de 0 a 1 (0,06 = 6%). */
 export interface CustosPlano {
+  /** Hora de UMA pessoa (com encargos). Preventiva: horas no local × pessoas da preventiva; chamado: (horas da troca +
+   *  horas por 100 m) × pessoas da troca, com hora extra no domingo/feriado e 2ª viagem se passar do dia. */
   custoHoraEquipe: number; horasVisita: number; horasPor100m: number; kmMedio: number; custoKm: number; materialVisita: number;
+  pessoasPreventiva: number; pessoasTroca: number; horasTroca: number; chamadosPocoAno: number;
+  domingoFeriadoPct: number; adicionalDomingoPct: number; taxaUrgencia: number; custoPipa: number; pipaPct: number;
+  custoEquipeDedicada: number; metaAssinantes: number; metaReceita: number; capacidadeSemana: number;
   /** Base da empresa (de onde a equipe sai); baseGps é o texto colado na tela (vai no lugar da latitude/longitude ao salvar). */
   baseLatitude: number | null; baseLongitude: number | null; baseGps?: string; fatorEstrada: number; usoEmergenciasPct: number;
   custoLimpeza: number; custoMonitoramentoMes: number; aparelhoValor: number; aparelhoMeses: number;
@@ -817,11 +822,16 @@ export interface CustosPlano {
 /** Um plano oferecido e o que ele inclui. */
 export interface NivelPlano {
   idNivel?: number; nome: string; descricao: string | null; visitasAno: number; limpezaACadaMeses: number | null; chamadosAno: number;
-  descontoPecasPct: number; descontoLimpezaPct: number; prioridade: boolean; monitoramento: boolean; reservaBombaPct: number;
-  fidelidadeMeses: number; ordem: number; ativo: boolean;
+  descontoPecasPct: number; descontoLimpezaPct: number;
+  /** Atende domingo e feriado (sem prioridade, o chamado espera o próximo dia útil). */
+  prioridade: boolean;
+  /** Leva caminhão-pipa se a bomba parar e demorar. */
+  aguaEmergencial: boolean;
+  monitoramento: boolean; reservaBombaPct: number; fidelidadeMeses: number; ordem: number; ativo: boolean;
 }
 export interface PrecoPlano {
   precoMensal: number; custoMensal: number; custos: { item: string; anual: number }[]; lucroMensal: number; margemReal: number;
+  maoDeObraMensal: number; atendimentosAno: number; chamadosAno: number; custoUmChamado: number;
   avulsoAnual: number; economiaAnual: number; economiaPct: number | null; comparacaoEstimada: boolean; viavel: boolean; avisos: string[];
   km: number; kmOrigem: 'INFORMADO' | 'GPS' | 'MEDIA';
 }

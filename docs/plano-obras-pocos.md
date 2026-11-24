@@ -360,3 +360,12 @@ Colunas novas: `incluso` em `_orcamento_itens`, `valor_parcelado` em `_obras`, `
 - **Desconto em bomba e material no custo** (2026-11-23, coluna `material_ano_poco` em `_plano_mensal_custos`): o desconto
   (até 100%, para a escadinha 20/50/100%) vira linha de custo do plano = desconto × (troca da bomba por ano na parte que a
   reserva não cobre + material do cliente por poço por ano); o avulso compara com a peça cheia.
+- **Equipe, chamados e urgência no plano** (2026-11-23, colunas novas em `_plano_mensal_custos` e `agua_emergencial` nos
+  níveis): a hora passa a ser **por pessoa**. Preventiva = horas × pessoas da preventiva (1, sem tirar a bomba, sem peso
+  da profundidade). Chamado/troca (`custoChamado`) = (horas da troca + horas por 100 m) × pessoas da troca, com hora
+  extra no domingo/feriado e uma viagem por dia de serviço (jornada de 8 h). O atendimento urgente é de todos os planos:
+  chamados esperados por poço até o limite do plano (o pessimista usa o limite); só os planos com prioridade pagam
+  domingo/feriado (os outros esperam o dia útil; taxa de urgência fora do plano); caminhão-pipa nos planos com água
+  emergencial. Na obra, a hora da equipe = hora por pessoa × pessoas da troca. A análise mostra o planejamento: meta
+  (assinantes, receita e o ticket que ela pede), capacidade (idas por mês × serviços por semana) e a partir de quantos
+  assinantes uma equipe só para os planos se paga (lucro + mão de obra já no custo).

@@ -1,14 +1,32 @@
 // Obras de poços › plano mensal: o preço de cada plano oferecido (nível) para um cliente, a partir dos custos da empresa
-// (visita, deslocamento, limpeza, monitoramento, reserva da bomba) e do poço (profundidade, potência da bomba, quantos
-// poços). O plano é viável quando a empresa lucra a margem mínima e o cliente paga menos do que pagaria avulso.
+// (preventiva com 1 pessoa sem tirar a bomba; chamado/troca com a equipe, mais tempo em poço fundo e 2ª viagem se passar
+// do dia; domingo/feriado com hora extra só nos planos com prioridade; caminhão-pipa; limpeza, monitoramento, reserva e
+// desconto da bomba) e do poço (profundidade, potência da bomba, quantos poços). O plano é viável quando a empresa lucra
+// a margem mínima e o cliente paga menos do que pagaria avulso.
 // Regras puras (sem banco), com teste.
 import { ErroObra, lerGps } from './obras';
 
 export interface CustosPlano {
-  custoHoraEquipe: number; horasVisita: number; horasPor100m: number; kmMedio: number; custoKm: number; materialVisita: number;
+  /** Custo da hora de UMA pessoa (com encargos); a preventiva e o chamado multiplicam pelas pessoas que vão. */
+  custoHoraEquipe: number;
+  /** Preventiva: horas no local (sem tirar a bomba). Chamado/troca: horas por 100 m de poço (tirar e descer o tubo). */
+  horasVisita: number; horasPor100m: number; kmMedio: number; custoKm: number; materialVisita: number;
+  pessoasPreventiva: number; pessoasTroca: number;
+  /** Horas base do chamado/troca em poço raso (as horas por 100 m somam por cima); passou da jornada, 2ª viagem. */
+  horasTroca: number;
+  /** Chamados esperados por poço por ano (o pessimista usa o limite do plano). */
+  chamadosPocoAno: number;
+  /** Parte dos chamados em domingo/feriado e a hora extra nesses dias (só nos planos com prioridade). */
+  domingoFeriadoPct: number; adicionalDomingoPct: number;
+  /** Cobrada no domingo/feriado de quem não tem prioridade (fora do custo do plano). */
+  taxaUrgencia: number;
+  /** Caminhão-pipa (planos com água emergencial): custo e chance de precisar por chamado. */
+  custoPipa: number; pipaPct: number;
+  /** Planejamento: equipe só para os planos (custo/mês), meta de assinantes e receita, serviços por semana. */
+  custoEquipeDedicada: number; metaAssinantes: number; metaReceita: number; capacidadeSemana: number;
   /** Base da empresa (de onde a equipe sai): com ela, o transporte sai da distância até o poço; sem ela, do km médio. */
   baseLatitude: number | null; baseLongitude: number | null; fatorEstrada: number;
-  /** Parte das emergências incluídas que os clientes usam de fato (0,3 = 30%). */
+  /** Antigo (parte das emergências usadas); substituído por chamadosPocoAno. Fica gravado, sem uso na conta. */
   usoEmergenciasPct: number;
   custoLimpeza: number; custoMonitoramentoMes: number; aparelhoValor: number; aparelhoMeses: number;
   bombaPrecoPorCv: number; bombaVidaAnos: number; precoVisitaAvulsa: number | null;
@@ -20,7 +38,12 @@ export interface NivelPlano {
   nome: string; descricao: string | null; visitasAno: number; limpezaACadaMeses: number | null; chamadosAno: number;
   /** Desconto em bomba e material (entra no custo: o que deixa de entrar na troca da bomba e no material do ano) e na
    *  limpeza (feita quando precisa, fora do plano: sai da margem da venda). */
-  descontoPecasPct: number; descontoLimpezaPct: number; prioridade: boolean; monitoramento: boolean; reservaBombaPct: number; fidelidadeMeses: number; ordem: number; ativo: boolean;
+  descontoPecasPct: number; descontoLimpezaPct: number;
+  /** Prioridade: atende domingo e feriado (sem ela, o chamado entra na fila do próximo dia útil). */
+  prioridade: boolean;
+  /** Leva caminhão-pipa se a bomba parar e demorar. */
+  aguaEmergencial: boolean;
+  monitoramento: boolean; reservaBombaPct: number; fidelidadeMeses: number; ordem: number; ativo: boolean;
 }
 /** O que pesa no preço: o poço mais fundo, a bomba mais forte e quantos poços entram no plano. */
 export interface PocoDoPlano {
@@ -31,7 +54,9 @@ export interface PocoDoPlano {
 
 /** Valores padrão (os mesmos do script do banco), usados enquanto a loja não grava os dela. */
 export const CUSTOS_PADRAO: CustosPlano = {
-  custoHoraEquipe: 80, horasVisita: 3, horasPor100m: 1.5, kmMedio: 60, custoKm: 1.5, materialVisita: 50,
+  custoHoraEquipe: 30, horasVisita: 3, horasPor100m: 1.5, kmMedio: 60, custoKm: 1.5, materialVisita: 50,
+  pessoasPreventiva: 1, pessoasTroca: 3, horasTroca: 4, chamadosPocoAno: 1, domingoFeriadoPct: 0.17, adicionalDomingoPct: 1, taxaUrgencia: 0,
+  custoPipa: 0, pipaPct: 0.1, custoEquipeDedicada: 0, metaAssinantes: 15, metaReceita: 5000, capacidadeSemana: 3,
   baseLatitude: null, baseLongitude: null, fatorEstrada: 1.3, usoEmergenciasPct: 0.3, custoLimpeza: 800,
   custoMonitoramentoMes: 25, aparelhoValor: 900, aparelhoMeses: 36, bombaPrecoPorCv: 1500, bombaVidaAnos: 6, precoVisitaAvulsa: null, materialAnoPoco: 0,
   impostosPct: 0.06, taxaCobrancaPct: 0.03, inadimplenciaPct: 0.03, margemPct: 0.25, margemMinimaPct: 0.1, arredondarPara: 5,
@@ -62,7 +87,20 @@ export const validarCustos = (b: any): CustosPlano => {
     baseLatitude: base?.latitude ?? null, baseLongitude: base?.longitude ?? null,
     fatorEstrada: numero(b?.fatorEstrada ?? 1.3, 'Fator da estrada', 1, 3),
     usoEmergenciasPct: pct(b?.usoEmergenciasPct ?? 0.3, 'Uso das emergências', 1),
-    custoHoraEquipe: numero(b?.custoHoraEquipe, 'Custo por hora da equipe', 0, 10000),
+    custoHoraEquipe: numero(b?.custoHoraEquipe, 'Custo por hora (por pessoa)', 0, 10000),
+    pessoasPreventiva: Math.round(numero(b?.pessoasPreventiva ?? 1, 'Pessoas na preventiva', 1, 10)),
+    pessoasTroca: Math.round(numero(b?.pessoasTroca ?? 3, 'Pessoas no chamado/troca', 1, 10)),
+    horasTroca: numero(b?.horasTroca ?? 4, 'Horas do chamado/troca', 0, 48),
+    chamadosPocoAno: numero(b?.chamadosPocoAno ?? 1, 'Chamados por poço por ano', 0, 24),
+    domingoFeriadoPct: pct(b?.domingoFeriadoPct ?? 0.17, 'Chamados em domingo/feriado', 1),
+    adicionalDomingoPct: numero(b?.adicionalDomingoPct ?? 1, 'Hora extra em domingo/feriado', 0, 3),
+    taxaUrgencia: numero(b?.taxaUrgencia ?? 0, 'Taxa de urgência', 0, 100000),
+    custoPipa: numero(b?.custoPipa ?? 0, 'Custo do caminhão-pipa', 0, 100000),
+    pipaPct: pct(b?.pipaPct ?? 0.1, 'Chance de precisar do pipa', 1),
+    custoEquipeDedicada: numero(b?.custoEquipeDedicada ?? 0, 'Custo da equipe dedicada', 0, 10000000),
+    metaAssinantes: Math.round(numero(b?.metaAssinantes ?? 15, 'Meta de assinantes', 0, 100000)),
+    metaReceita: numero(b?.metaReceita ?? 5000, 'Meta de receita', 0, 100000000),
+    capacidadeSemana: Math.round(numero(b?.capacidadeSemana ?? 3, 'Serviços por semana', 0, 100)),
     horasVisita: numero(b?.horasVisita, 'Horas da visita', 0, 48),
     horasPor100m: numero(b?.horasPor100m, 'Horas a mais por 100 m', 0, 48),
     kmMedio: numero(b?.kmMedio, 'Km de ida e volta', 0, 5000),
@@ -98,7 +136,8 @@ export const validarNivel = (b: any): NivelPlano => {
     visitasAno: Math.round(numero(b?.visitasAno ?? 0, 'Visitas por ano', 0, 24)), limpezaACadaMeses: limpeza,
     chamadosAno: Math.round(numero(b?.chamadosAno ?? 0, 'Emergências por ano', 0, 24)),
     descontoPecasPct: pct(b?.descontoPecasPct ?? 0, 'Desconto em bomba e material', 1),
-    descontoLimpezaPct: pct(b?.descontoLimpezaPct ?? 0, 'Desconto na limpeza', 0.9), prioridade: !!b?.prioridade, monitoramento: !!b?.monitoramento,
+    descontoLimpezaPct: pct(b?.descontoLimpezaPct ?? 0, 'Desconto na limpeza', 0.9), prioridade: !!b?.prioridade, aguaEmergencial: !!b?.aguaEmergencial,
+    monitoramento: !!b?.monitoramento,
     reservaBombaPct: pct(b?.reservaBombaPct ?? 0, 'Troca da bomba coberta', 1), fidelidadeMeses: Math.round(numero(b?.fidelidadeMeses ?? 12, 'Fidelidade (meses)', 0, 120)),
     ordem: Math.round(Number(b?.ordem) || 0), ativo: b?.ativo === undefined ? true : !!b.ativo,
   };
@@ -128,13 +167,24 @@ export const kmDaVisita = (c: CustosPlano, p: Partial<PocoDoPlano>): { km: numbe
 };
 
 /**
- * Custo de uma ida ao cliente: horas da equipe (mais tempo em poço fundo, para tirar e descer a bomba) e material para
- * cada poço; o deslocamento uma vez só (o km médio, ou o informado/medido).
+ * Custo de uma visita preventiva: as horas no local (sem tirar a bomba, por isso a profundidade não pesa) × as pessoas
+ * da preventiva × a hora, e o material, para cada poço; o deslocamento uma vez só (o km médio, ou o informado/medido).
  */
-export const custoVisita = (c: CustosPlano, profundidadeM: number | null, pocos = 1, km: number = c.kmMedio) => {
-  const prof = profundidadeM ?? POCO_PADRAO.profundidadeM;
-  const horas = c.horasVisita + c.horasPor100m * (prof / 100);
-  return r2((horas * c.custoHoraEquipe + c.materialVisita) * Math.max(1, pocos) + km * c.custoKm);
+export const custoVisita = (c: CustosPlano, _profundidadeM: number | null = null, pocos = 1, km: number = c.kmMedio) =>
+  r2((c.horasVisita * c.pessoasPreventiva * c.custoHoraEquipe + c.materialVisita) * Math.max(1, pocos) + km * c.custoKm);
+
+/** Jornada da equipe: o chamado que passa disso volta no dia seguinte (mais uma viagem). */
+export const JORNADA_HORAS = 8;
+
+/**
+ * Custo de um chamado (bomba parou, água suja, troca): a equipe da troca pelas horas base mais o tempo de tirar e descer
+ * o tubo (por 100 m), com hora extra no domingo/feriado; o material e uma viagem por dia de serviço.
+ */
+export const custoChamado = (c: CustosPlano, profundidadeM: number | null, km: number = c.kmMedio, domingo = false) => {
+  const horas = c.horasTroca + c.horasPor100m * ((profundidadeM ?? POCO_PADRAO.profundidadeM) / 100);
+  const viagens = Math.max(1, Math.ceil(horas / JORNADA_HORAS - 1e-9));
+  const maoDeObra = r2(horas * c.pessoasTroca * c.custoHoraEquipe * (domingo ? 1 + c.adicionalDomingoPct : 1));
+  return { total: r2(maoDeObra + c.materialVisita + km * c.custoKm * viagens), maoDeObra, horas: r2(horas), viagens };
 };
 
 /** Preço de uma visita avulsa: o informado, a média das manutenções da empresa ou o custo com a margem. */
@@ -144,6 +194,12 @@ export const visitaAvulsa = (c: CustosPlano, mediaDaEmpresa: number | null, prof
 export interface LinhaCusto { item: string; anual: number }
 export interface PrecoPlano {
   precoMensal: number; custoMensal: number; custos: LinhaCusto[];
+  /** Parte do custo que é mão de obra (para ver quando vale ter uma equipe só para os planos). */
+  maoDeObraMensal: number;
+  /** Idas ao cliente esperadas por ano (preventivas + chamados), para a capacidade da equipe. */
+  atendimentosAno: number;
+  /** Chamados esperados por ano neste cliente e o custo de um (dia útil). */
+  chamadosAno: number; custoUmChamado: number;
   /** O que fica com a empresa por mês depois de impostos, cobrança e inadimplência, menos os custos. */
   lucroMensal: number; margemReal: number;
   /** Quanto o cliente gastaria no ano pagando o mesmo avulso, e quanto economiza com o plano (negativo = paga mais). */
@@ -164,8 +220,13 @@ export const precoDoPlano = (c: CustosPlano, n: NivelPlano, p: PocoDoPlano, medi
   const cv = p.potenciaCv ?? POCO_PADRAO.potenciaCv;
   const { km, origem } = kmDaVisita(c, p);
   const visita = custoVisita(c, prof, pocos, km);
-  // emergência incluída não é usada por todo cliente: entra pelo uso esperado
-  const emergencias = n.chamadosAno * c.usoEmergenciasPct;
+  // chamados: os esperados por poço, até o limite do plano; com prioridade, parte cai no domingo/feriado (hora extra);
+  // sem prioridade, espera o próximo dia útil. Com água emergencial, a chance do caminhão-pipa em cada chamado.
+  const chamados = Math.min(n.chamadosAno, c.chamadosPocoAno * pocos);
+  const util = custoChamado(c, prof, km), domingo = custoChamado(c, prof, km, true);
+  const f = n.prioridade ? c.domingoFeriadoPct : 0;
+  const porChamado = r2((1 - f) * util.total + f * domingo.total + (n.aguaEmergencial ? c.pipaPct * c.custoPipa : 0));
+  const maoChamado = (1 - f) * util.maoDeObra + f * domingo.maoDeObra;
   const limpezasAno = n.limpezaACadaMeses ? 12 / n.limpezaACadaMeses : 0;
   // desconto em bomba e material: o que deixa de entrar por ano — na troca da bomba só a parte que a reserva não cobre
   // (para não contar duas vezes) e no material do ano por poço
@@ -173,7 +234,8 @@ export const precoDoPlano = (c: CustosPlano, n: NivelPlano, p: PocoDoPlano, medi
   const custos: LinhaCusto[] = [
     { item: `${n.visitasAno} visita(s) preventiva(s) por ano`, anual: r2(n.visitasAno * visita) },
     { item: `Limpeza a cada ${n.limpezaACadaMeses} meses`, anual: r2(limpezasAno * c.custoLimpeza * pocos) },
-    { item: `${n.chamadosAno} emergência(s) por ano (uso esperado ${Math.round(c.usoEmergenciasPct * 100)}%)`, anual: r2(emergencias * visita) },
+    { item: `Chamados: até ${n.chamadosAno} por ano, esperado ${String(r2(chamados)).replace('.', ',')}${n.prioridade ? ' (com domingo/feriado)' : ''}${n.aguaEmergencial ? ' + pipa' : ''}`,
+      anual: r2(chamados * porChamado) },
     { item: 'Monitoramento (dados e aparelho)', anual: n.monitoramento ? r2((c.custoMonitoramentoMes + c.aparelhoValor / c.aparelhoMeses) * 12 * pocos) : 0 },
     { item: `${Math.round(n.reservaBombaPct * 100)}% da troca da bomba (${String(cv).replace('.', ',')} CV)`,
       anual: r2((n.reservaBombaPct * cv * c.bombaPrecoPorCv / c.bombaVidaAnos) * pocos) },
@@ -181,6 +243,7 @@ export const precoDoPlano = (c: CustosPlano, n: NivelPlano, p: PocoDoPlano, medi
   ].filter(l => l.anual > 0);
   const custoAnual = custos.reduce((s, l) => s + l.anual, 0);
   const custoMensal = r2(custoAnual / 12);
+  const maoDeObraMensal = r2((n.visitasAno * c.horasVisita * c.pessoasPreventiva * c.custoHoraEquipe * pocos + chamados * maoChamado) / 12);
   const precoMensal = arredondar(custoMensal / divisor(c), c.arredondarPara);
   const liquido = precoMensal * (1 - c.impostosPct - c.taxaCobrancaPct - c.inadimplenciaPct);
   const lucroMensal = r2(liquido - custoMensal);
@@ -189,7 +252,7 @@ export const precoDoPlano = (c: CustosPlano, n: NivelPlano, p: PocoDoPlano, medi
   // o mesmo serviço pago avulso: visitas e emergências pelo preço avulso, limpeza com a mesma margem, a parte da bomba
   // pelo preço dela (monitoramento não se compra avulso: entra pelo preço de custo com margem)
   const avulso = visitaAvulsa(c, mediaVisitaEmpresa, prof, km) * pocos;
-  const avulsoAnual = r2((n.visitasAno + emergencias) * avulso + limpezasAno * c.custoLimpeza * pocos / divisor(c)
+  const avulsoAnual = r2(n.visitasAno * avulso + chamados * util.total / divisor(c) + limpezasAno * c.custoLimpeza * pocos / divisor(c)
     + (n.monitoramento ? (c.custoMonitoramentoMes + c.aparelhoValor / c.aparelhoMeses) * 12 * pocos / divisor(c) : 0)
     + n.reservaBombaPct * cv * c.bombaPrecoPorCv / c.bombaVidaAnos * pocos
     + descontoAnual);   // sem o plano, o cliente pagaria a peça cheia
@@ -200,7 +263,8 @@ export const precoDoPlano = (c: CustosPlano, n: NivelPlano, p: PocoDoPlano, medi
   if (economiaAnual < 0 && !comparacaoEstimada) avisos.push('O cliente paga mais do que pagaria avulso: o plano não se vende');
   if (!custos.length) avisos.push('O plano não inclui nada que custe');
   return {
-    precoMensal, custoMensal, custos, lucroMensal, margemReal, avulsoAnual, economiaAnual,
+    precoMensal, custoMensal, custos, maoDeObraMensal, atendimentosAno: r2(n.visitasAno + chamados), chamadosAno: r2(chamados), custoUmChamado: util.total,
+    lucroMensal, margemReal, avulsoAnual, economiaAnual,
     economiaPct: avulsoAnual > 0 ? Math.round((economiaAnual / avulsoAnual) * 1000) / 1000 : null, comparacaoEstimada,
     viavel: !avisos.length, avisos, km, kmOrigem: origem,
   };
@@ -228,8 +292,9 @@ export interface RiscoPlano {
 
 /** O que muda em cada cenário (sobre os custos da empresa). Ajustar com a experiência. */
 export const CENARIOS = {
-  otimista: { usoEmergencias: 0, horas: 1, inadimplencia: 0, vidaBomba: 1 },
-  pessimista: { usoEmergencias: 1, horas: 1.25, inadimplencia: 2, vidaBomba: 0.75 },
+  /** chamados: parte dos esperados (pessimista: todos os do limite do plano); horas: preventiva e troca. */
+  otimista: { chamados: 0.5, horas: 1, inadimplencia: 0, vidaBomba: 1 },
+  pessimista: { chamados: null as number | null, horas: 1.25, inadimplencia: 2, vidaBomba: 0.75 },
 };
 /** Erro esperado do km de ida e volta por origem: informado, GPS (estrada × linha reta) ou o km médio (sem GPS). */
 export const ERRO_KM = { INFORMADO: 0.05, GPS: 0.15, MEDIA: 0.4 };
@@ -259,11 +324,13 @@ export const riscoDoPlano = (c: CustosPlano, n: NivelPlano, p: PocoDoPlano, prec
   const esperado = cenario(c, { ...p, kmIdaVolta: km }, c.inadimplenciaPct);
   const o = CENARIOS.otimista, q = CENARIOS.pessimista;
   const otimista = cenario(
-    { ...c, usoEmergenciasPct: o.usoEmergencias, horasVisita: c.horasVisita * o.horas, horasPor100m: c.horasPor100m * o.horas, bombaVidaAnos: c.bombaVidaAnos * o.vidaBomba },
+    { ...c, chamadosPocoAno: c.chamadosPocoAno * o.chamados, horasVisita: c.horasVisita * o.horas, horasPor100m: c.horasPor100m * o.horas,
+      horasTroca: c.horasTroca * o.horas, bombaVidaAnos: c.bombaVidaAnos * o.vidaBomba },
     { ...p, kmIdaVolta: Math.round(km * (1 - erroKm)), profundidadeM: p.profundidadeM ?? 50, potenciaCv: p.potenciaCv ?? 1 },
     c.inadimplenciaPct * o.inadimplencia);
   const pessimista = cenario(
-    { ...c, usoEmergenciasPct: q.usoEmergencias, horasVisita: c.horasVisita * q.horas, horasPor100m: c.horasPor100m * q.horas, bombaVidaAnos: c.bombaVidaAnos * q.vidaBomba },
+    { ...c, chamadosPocoAno: q.chamados ?? Math.max(c.chamadosPocoAno, n.chamadosAno), horasVisita: c.horasVisita * q.horas, horasPor100m: c.horasPor100m * q.horas,
+      horasTroca: c.horasTroca * q.horas, bombaVidaAnos: c.bombaVidaAnos * q.vidaBomba },
     { ...p, kmIdaVolta: Math.round(km * (1 + erroKm)), profundidadeM: p.profundidadeM ?? 150, potenciaCv: p.potenciaCv ?? 3 },
     c.inadimplenciaPct * q.inadimplencia);
 
@@ -280,7 +347,7 @@ export const riscoDoPlano = (c: CustosPlano, n: NivelPlano, p: PocoDoPlano, prec
   if (kmMargemMinima !== null && km > kmMargemMinima) fatores.push(`Longe: ${km} km ida e volta, acima dos ${kmMargemMinima} km que mantêm a margem mínima com este preço.`);
   else if (kmMargemMinima !== null && km > kmMargemMinima * 0.8) fatores.push(`Perto do limite da distância: ${km} de ${kmMargemMinima} km.`);
   if (n.chamadosAno > 0 && pessimista.lucroMensal < esperado.lucroMensal) {
-    fatores.push(`Se usar as ${n.chamadosAno} emergência(s) do ano (e a visita demorar mais), o lucro vai a ${brlTxt(pessimista.lucroMensal)}/mês.`);
+    fatores.push(`Se usar os ${n.chamadosAno} chamados do ano (e o serviço demorar mais), o lucro vai a ${brlTxt(pessimista.lucroMensal)}/mês.`);
   }
   if (n.reservaBombaPct >= 0.5 && (p.potenciaCv ?? 0) >= 3) fatores.push(`Bomba forte (${p.potenciaCv} CV) com ${Math.round(n.reservaBombaPct * 100)}% da troca coberta.`);
   if ((p.profundidadeM ?? 0) >= 150) fatores.push(`Poço fundo (${p.profundidadeM} m): visita mais longa.`);
