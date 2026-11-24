@@ -333,3 +333,9 @@ Colunas novas: `incluso` em `_orcamento_itens`, `valor_parcelado` em `_obras`, `
   da estimativa (`faltaDaEstimativa`), diesel, desgaste, despesas e terceiros, o aviso de material sem conferir e a margem
   real ao vivo; "Lançar e concluir" grava um por vez (erro no meio não duplica) e conclui. No Resultado, alerta
   "concluída sem o custo real" só para obra com estimativa guardada (as antigas não viram alerta).
+- **Trava do preço mínimo** (2026-11-23, `travaPrecoMinimo`): no orçamento, o Custo e margem acompanha o total dos itens
+  ainda não salvo; abaixo do preço mínimo (aviso laranja) ou no prejuízo (o total, sem impostos/taxas, não cobre o custo;
+  aviso vermelho), "Salvar itens" pede confirmação. Sem custos da obra configurados, não trava.
+- **Ficha de campo do poço** (2026-11-23, `fichaCampoPoco.ts`): na ficha do poço, "Ficha de campo" abre a pré-visualização
+  A4 da ficha de campo da perfuração (o modelo do Kit de visita) preenchida com cliente, local e GPS, profundidade,
+  diâmetro, vazão, níveis, solo, etapas de perfuração e revestimentos da estrutura (até 3) e a bomba instalada; ou em branco.

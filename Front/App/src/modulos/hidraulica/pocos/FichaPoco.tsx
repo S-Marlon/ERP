@@ -4,7 +4,7 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, Button, Col, Descriptions, Drawer, Empty, Flex, Row, Space, Statistic, Table, Tabs, Tag, Tooltip, Typography, message } from 'antd';
 import {
-  CopyOutlined, EditOutlined, EnvironmentOutlined, FileTextOutlined, FolderOpenOutlined, GlobalOutlined, ToolOutlined, UserOutlined, WarningOutlined, WhatsAppOutlined,
+  CopyOutlined, EditOutlined, EnvironmentOutlined, FileTextOutlined, FolderOpenOutlined, GlobalOutlined, PrinterOutlined, ToolOutlined, UserOutlined, WarningOutlined, WhatsAppOutlined,
 } from '@ant-design/icons';
 import { dataBr, foneBr, obrasApi, PocoCompleto, SERVICOS, SITUACOES_OBRA, TIPOS_CONTRATO } from './obrasApi';
 import { abrirFichaCliente, abrirObra, abrirPoco, documentosDaObra, fichasPocos, useFichaPocos, verNoMapa } from './navPocos';
@@ -15,6 +15,7 @@ import { GRUPOS_OCORRENCIA } from './ocorrencias';
 import { resumoEstrutura, svgPerfil, temEstrutura } from './estruturaPoco';
 import { EstruturaEditor } from './EstruturaEditor';
 import { RelatorioClienteModal } from './RelatorioClienteModal';
+import { FichaCampoPocoModal } from './FichaCampoPocoModal';
 
 const { Text } = Typography;
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -25,6 +26,7 @@ export const FichaPoco: React.FC<{ idPoco: number | null; aba?: string; onFechar
   const [aba, setAba] = useState('DADOS');
   const [editandoEstrutura, setEditandoEstrutura] = useState(false);
   const [relatorioCliente, setRelatorioCliente] = useState(false);
+  const [fichaCampo, setFichaCampo] = useState(false);
   useEffect(() => {
     setD(null);
     if (!idPoco) return;
@@ -154,6 +156,9 @@ export const FichaPoco: React.FC<{ idPoco: number | null; aba?: string; onFechar
         <Tooltip title="Relatório com os dados do poço, a estrutura, a bomba, a garantia e as fotos, para mandar ao cliente (confere antes o que falta)">
           <Button type="primary" icon={<FileTextOutlined />} disabled={!d} onClick={() => setRelatorioCliente(true)}>Relatório para o cliente</Button>
         </Tooltip>
+        <Tooltip title="Ficha de campo da perfuração (A4) com os dados do poço, para levar na obra e anotar à mão">
+          <Button icon={<PrinterOutlined />} disabled={!d} onClick={() => setFichaCampo(true)}>Ficha de campo</Button>
+        </Tooltip>
         {fone.length >= 10 && <Button icon={<WhatsAppOutlined />} onClick={() => window.open(`https://wa.me/55${fone}`, '_blank')}>WhatsApp</Button>}
         {dono && <Button icon={<UserOutlined />} onClick={() => abrirFichaCliente(dono.idCliente)}>Cliente</Button>}
         {gps && <Button icon={<EnvironmentOutlined />} onClick={() => ir(() => verNoMapa(p.latitude!, p.longitude!, p.idPoco))}>Mapa</Button>}
@@ -193,6 +198,7 @@ export const FichaPoco: React.FC<{ idPoco: number | null; aba?: string; onFechar
           </Space>
           <Tabs activeKey={aba} onChange={setAba} items={abas} />
           <RelatorioClienteModal aberto={relatorioCliente} ficha={d} onFechar={() => setRelatorioCliente(false)} />
+          <FichaCampoPocoModal aberto={fichaCampo} ficha={d} onFechar={() => setFichaCampo(false)} />
           <EstruturaEditor idPoco={editandoEstrutura ? p.idPoco : null}
             inicial={d.estruturaPropria || (d.estrutura?.soCadastro ? { perfuracoes: d.estrutura.perfuracoes } : null)}
             extras={{ bombaNivelEstatico: d.estrutura?.bombaNivelEstatico ?? p.nivelEstaticoM, bombaProfundidade: d.estrutura?.bombaProfundidade ?? null }}
