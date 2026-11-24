@@ -349,3 +349,11 @@ Colunas novas: `incluso` em `_orcamento_itens`, `valor_parcelado` em `_obras`, `
   sugerido e margem do total; a mesma trava ao gravar; a estimativa é guardada na obra criada.
 - **Relatório para o cliente no papel timbrado** (2026-11-23): o mesmo estilo dos documentos da obra (cabeçalho com o
   quadro do documento, resumo em destaque, fichas, seções numeradas, cuidados com o poço, assinatura e rodapé).
+- **Plano mensal: risco e análise por cliente** (2026-11-23, `riscoDoPlano` em `planoMensal.ts`, `POST /plano-mensal/analise`):
+  a tela virou abas (Análise por cliente, Simular caso a caso, Planos oferecidos, Custos, Carteira). Para cada cliente e
+  plano: distância (GPS do poço até a base, ou km médio), lucro por mês esperado e a faixa pessimista–otimista
+  (`CENARIOS`: emergências todas usadas, visita +25%, inadimplência dobrada, bomba 25% menos; erro do km `ERRO_KM`: ±5%
+  informado, ±15% GPS, ±40% km médio; profundidade/bomba não informadas de 50 a 150 m e 1 a 3 CV), o raio (até quantos km
+  dá lucro e mantém a margem mínima com o preço), o risco (alto = esperado abaixo da margem mínima; médio = pessimista
+  negativo) com os motivos e a precisão dos dados. A análise soma a carteira (receita, lucro e faixa se todos assinarem).
+  No simulador, "Fechar por" testa um preço combinado (desconto) e mostra os cenários.

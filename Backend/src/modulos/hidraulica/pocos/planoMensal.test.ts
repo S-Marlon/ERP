@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { CUSTOS_PADRAO, custoVisita, divisor, kmAteOPoco, kmDaVisita, NivelPlano, planoSugerido, precoDoPlano, validarCustos, validarNivel } from './planoMensal';
+import { CUSTOS_PADRAO, custoVisita, riscoDoPlano, divisor, kmAteOPoco, kmDaVisita, NivelPlano, planoSugerido, precoDoPlano, validarCustos, validarNivel } from './planoMensal';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 const nivel = (x: Partial<NivelPlano>): NivelPlano => ({
@@ -78,4 +78,29 @@ teste('plano mensal: transporte pela distância até o poço', () => {
   assert.deepStrictEqual([c.baseLatitude, c.baseLongitude], [-23.1171, -46.5565]);
   assert.strictEqual(validarCustos({ ...CUSTOS_PADRAO, baseGps: '' }).baseLatitude, null);
   assert.throws(() => validarCustos({ ...CUSTOS_PADRAO, baseGps: 'perto da praça' }), /Base da empresa/);
+});
+
+teste('plano mensal: risco, faixa de lucro e raio da distância', () => {
+  // 1 visita/ano a 80 m, km médio 60 (sem GPS), preço R$ 65: líquido 65 × 0,88 = 57,20
+  const r = riscoDoPlano(CUSTOS_PADRAO, nivel({}), poco, 65);
+  assert.deepStrictEqual([r.esperado.custoMensal, r.esperado.lucroMensal, r.esperado.margem], [39.67, 17.53, 0.2697]);
+  // otimista: km −40% (36 km), sem inadimplência: 440/12 = 36,67; 65 × 0,91 = 59,15 → 22,48
+  assert.strictEqual(r.otimista.lucroMensal, 22.48);
+  // pessimista: km +40% (84 km), visita 25% mais longa (5,25 h), inadimplência 6%: 596/12 = 49,67; 65 × 0,85 = 55,25 → 5,58
+  assert.strictEqual(r.pessimista.lucroMensal, 5.58);
+  // R$ 0,125 por km/mês: lucro zera em 200 km e a margem mínima (R$ 6,50) vai até 148 km
+  assert.deepStrictEqual([r.kmEquilibrio, r.kmMargemMinima, r.nivel, r.precisao], [200, 148, 'BAIXO', 'BAIXA']);
+  assert.ok(r.estimados[0].startsWith('distância pelo km médio'));
+  // longe (180 km informados): margem esperada de 3,9% → risco alto, com o motivo da distância
+  const longe = riscoDoPlano(CUSTOS_PADRAO, nivel({}), { ...poco, kmIdaVolta: 180 }, 65);
+  assert.deepStrictEqual([longe.esperado.lucroMensal, longe.nivel, longe.precisao], [2.53, 'ALTO', 'BOA']);
+  assert.ok(longe.fatores.some(f => f.startsWith('Longe: 180 km')), JSON.stringify(longe.fatores));
+  // emergências incluídas: o pessimista conta todas usadas; se ficar negativo, risco médio
+  const comEmerg = { ...poco, kmIdaVolta: 60 };
+  const emerg = riscoDoPlano(CUSTOS_PADRAO, nivel({ chamadosAno: 2 }), comEmerg, precoDoPlano(CUSTOS_PADRAO, nivel({ chamadosAno: 2 }), comEmerg).precoMensal);
+  assert.ok(emerg.pessimista.lucroMensal < 0 && emerg.esperado.lucroMensal > 0 && emerg.nivel === 'MEDIO', JSON.stringify(emerg));
+  assert.ok(emerg.fatores.some(f => f.startsWith('Se usar as 2 emergência')));
+  // sem profundidade e sem bomba com reserva: os dois entram como estimados
+  const sem = riscoDoPlano(CUSTOS_PADRAO, nivel({ reservaBombaPct: 0.5 }), { profundidadeM: null, potenciaCv: null, pocos: 1, kmIdaVolta: 50 }, 120);
+  assert.deepStrictEqual([sem.estimados.length, sem.precisao], [2, 'BAIXA']);
 });

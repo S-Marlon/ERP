@@ -5,7 +5,7 @@ import pool from '../../../infra/db';
 import { operadorDe } from '../../../areas/vendas/caixa/caixa.controller';
 import { ErroObra, lerServicos } from './obras';
 import { responderErro } from './obras.controller';
-import { CUSTOS_PADRAO, CustosPlano, NivelPlano, PocoDoPlano, precoDoPlano, validarCustos, validarNivel } from './planoMensal';
+import { CUSTOS_PADRAO, CustosPlano, NivelPlano, planoSugerido, PocoDoPlano, precoDoPlano, riscoDoPlano, validarCustos, validarNivel } from './planoMensal';
 
 const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || req.body?.tenant_id || 1);
 const n = (v: unknown) => Number(v) || 0;
@@ -70,8 +70,23 @@ export const juntarPocos = (pocos: { idCliente: number; nome: string; profundida
   return [...por.values()];
 };
 
-const simulacao = (custos: CustosPlano, niveis: (NivelPlano & { idNivel?: number })[], poco: PocoDoPlano, media: number | null) =>
-  niveis.map(nv => ({ idNivel: nv.idNivel ?? null, nome: nv.nome, preco: precoDoPlano(custos, nv, poco, media) }));
+/** Cada plano para o poço: o preço calculado e o risco (com o preço combinado com o cliente, quando houver). */
+const simulacao = (custos: CustosPlano, niveis: (NivelPlano & { idNivel?: number })[], poco: PocoDoPlano, media: number | null, combinados: Record<string, number> = {}) =>
+  niveis.map(nv => {
+    const preco = precoDoPlano(custos, nv, poco, media);
+    const combinado = Number(combinados[nv.nome]) > 0 ? Number(combinados[nv.nome]) : null;
+    return { idNivel: nv.idNivel ?? null, nome: nv.nome, preco, combinado, risco: riscoDoPlano(custos, nv, poco, combinado ?? preco.precoMensal, media) };
+  });
+
+/** Custos e planos do corpo (o que está na tela, ainda não salvo) ou os gravados. */
+const custosENiveis = async (tenant: number, body: any) => {
+  const salvo = await carregarPlanoMensal(pool, tenant);
+  const custos = body?.custos ? validarCustos(body.custos) : salvo.custos;
+  const niveis: (NivelPlano & { idNivel?: number })[] = Array.isArray(body?.niveis)
+    ? body.niveis.map((x: any) => ({ ...validarNivel(x), idNivel: nulo(x?.idNivel) ?? undefined })).filter((x: NivelPlano) => x.ativo)
+    : salvo.niveis;
+  return { custos, niveis, media: salvo.mediaVisitaEmpresa };
+};
 
 const lerPoco = (b: any): PocoDoPlano => ({
   profundidadeM: b?.profundidadeM === null || b?.profundidadeM === undefined || b.profundidadeM === '' ? null : Math.max(0, Number(b.profundidadeM) || 0),
@@ -147,11 +162,27 @@ export const apagarNivel = async (req: Request, res: Response) => {
 export const simular = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
   try {
-    const salvo = await carregarPlanoMensal(pool, tenant);
-    const custos = req.body?.custos ? validarCustos(req.body.custos) : salvo.custos;
-    const niveis = Array.isArray(req.body?.niveis)
-      ? req.body.niveis.map((x: any) => ({ ...validarNivel(x), idNivel: nulo(x?.idNivel) ?? undefined })).filter((x: NivelPlano) => x.ativo)
-      : salvo.niveis;
-    return res.json({ planos: simulacao(custos, niveis, lerPoco(req.body?.poco), salvo.mediaVisitaEmpresa), mediaVisitaEmpresa: salvo.mediaVisitaEmpresa });
+    const { custos, niveis, media } = await custosENiveis(tenant, req.body);
+    return res.json({ planos: simulacao(custos, niveis, lerPoco(req.body?.poco), media, req.body?.combinados || {}), mediaVisitaEmpresa: media });
   } catch (e) { return responderErro(res, e, 'Erro ao simular o plano.'); }
+};
+
+/**
+ * POST /plano-mensal/analise { custos?, niveis? } — todos os clientes com poço ativo: a distância (GPS ou km médio) e,
+ * para cada plano, o preço, a faixa de lucro e o risco; o sugerido de cada um (o que mais economiza entre os viáveis).
+ */
+export const analisarCarteira = async (req: Request, res: Response) => {
+  const tenant = tenantDe(req);
+  try {
+    const { custos, niveis, media } = await custosENiveis(tenant, req.body);
+    const clientes = await pocosParaPlano(pool, tenant);
+    return res.json({
+      clientes: clientes.map(cl => {
+        const poco: PocoDoPlano = { profundidadeM: cl.profundidadeM, potenciaCv: cl.potenciaCv, pocos: Math.max(1, cl.pocos), latitude: cl.latitude, longitude: cl.longitude };
+        const planos = simulacao(custos, niveis, poco, media);
+        const sugerido = planoSugerido(planos);
+        return { ...cl, km: planos[0]?.preco.km ?? null, kmOrigem: planos[0]?.preco.kmOrigem ?? null, sugerido: sugerido?.nome ?? null, planos };
+      }),
+    });
+  } catch (e) { return responderErro(res, e, 'Erro ao analisar a carteira.'); }
 };

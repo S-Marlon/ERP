@@ -827,6 +827,19 @@ export interface PocoSimulado {
   profundidadeM: number | null; potenciaCv: number | null; pocos: number;
   latitude?: number | null; longitude?: number | null; kmIdaVolta?: number | null;
 }
+/** Lucro por mês num cenário (custo, lucro e margem sobre o preço). */
+export interface CenarioPlano { custoMensal: number; lucroMensal: number; margem: number }
+/** Risco do plano para um cliente: faixa de lucro (otimista, esperado, pessimista), raio da distância e motivos. */
+export interface RiscoPlano {
+  preco: number; otimista: CenarioPlano; esperado: CenarioPlano; pessimista: CenarioPlano;
+  kmEquilibrio: number | null; kmMargemMinima: number | null; nivel: 'BAIXO' | 'MEDIO' | 'ALTO'; fatores: string[];
+  precisao: 'BOA' | 'MEDIA' | 'BAIXA'; estimados: string[];
+}
+export interface PlanoSimulado { idNivel: number | null; nome: string; preco: PrecoPlano; combinado: number | null; risco: RiscoPlano }
+export interface ClienteAnalisado {
+  idCliente: number; nome: string; pocos: number; profundidadeM: number | null; potenciaCv: number | null; latitude: number | null; longitude: number | null;
+  km: number | null; kmOrigem: PrecoPlano['kmOrigem'] | null; sugerido: string | null; planos: PlanoSimulado[];
+}
 export interface PlanoMensalDados {
   custos: CustosPlano; salvo: boolean; niveis: NivelPlano[]; mediaVisitaEmpresa: number | null;
   clientes: { idCliente: number; nome: string; pocos: number; profundidadeM: number | null; potenciaCv: number | null; latitude: number | null; longitude: number | null }[];
@@ -873,7 +886,11 @@ export const planoMensalApi = {
     ? pedir<NivelPlano>(`${API}/plano-mensal/niveis/${n.idNivel}?tenant_id=1`, corpo('PUT', n), 'Erro ao salvar o plano.')
     : pedir<NivelPlano>(`${API}/plano-mensal/niveis?tenant_id=1`, corpo('POST', n), 'Erro ao salvar o plano.')),
   apagarNivel: (id: number) => pedir<{ ok: boolean }>(`${API}/plano-mensal/niveis/${id}?tenant_id=1`, { method: 'DELETE' }, 'Erro ao apagar o plano.'),
-  simular: (custos: CustosPlano, niveis: NivelPlano[], poco: PocoSimulado) =>
-    pedir<{ planos: { idNivel: number | null; nome: string; preco: PrecoPlano }[]; mediaVisitaEmpresa: number | null }>(
-      `${API}/plano-mensal/simular?tenant_id=1`, corpo('POST', { custos, niveis, poco }), 'Erro ao simular.'),
+  /** combinados: preço fechado com o cliente por plano (nome → R$/mês), para ver o risco com desconto. */
+  simular: (custos: CustosPlano, niveis: NivelPlano[], poco: PocoSimulado, combinados: Record<string, number> = {}) =>
+    pedir<{ planos: PlanoSimulado[]; mediaVisitaEmpresa: number | null }>(
+      `${API}/plano-mensal/simular?tenant_id=1`, corpo('POST', { custos, niveis, poco, combinados }), 'Erro ao simular.'),
+  /** Todos os clientes com poço: distância, preço, faixa de lucro e risco de cada plano (com os custos e planos da tela). */
+  analise: (custos: CustosPlano, niveis: NivelPlano[]) =>
+    pedir<{ clientes: ClienteAnalisado[] }>(`${API}/plano-mensal/analise?tenant_id=1`, corpo('POST', { custos, niveis }), 'Erro ao analisar a carteira.'),
 };

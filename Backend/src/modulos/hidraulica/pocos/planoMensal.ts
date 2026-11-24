@@ -201,3 +201,83 @@ export const precoDoPlano = (c: CustosPlano, n: NivelPlano, p: PocoDoPlano, medi
 export const planoSugerido = <T extends { preco: PrecoPlano }>(planos: T[]): T | null =>
   planos.filter(x => x.preco.viavel)
     .sort((a, b) => b.preco.economiaAnual - a.preco.economiaAnual || a.preco.precoMensal - b.preco.precoMensal)[0] || null;
+
+// ------------------------------------------------------------------ risco e faixa de lucro (caso a caso)
+export interface CenarioPlano { custoMensal: number; lucroMensal: number; margem: number }
+export interface RiscoPlano {
+  /** Preço usado na análise (o calculado ou o combinado com o cliente). */
+  preco: number;
+  otimista: CenarioPlano; esperado: CenarioPlano; pessimista: CenarioPlano;
+  /** Até quantos km (ida e volta) o plano ainda dá lucro, e até quantos mantém a margem mínima, com este preço. */
+  kmEquilibrio: number | null; kmMargemMinima: number | null;
+  nivel: 'BAIXO' | 'MEDIO' | 'ALTO';
+  /** O que pesa no risco, em frases curtas. */
+  fatores: string[];
+  /** Precisão da conta: dados estimados alargam a faixa (sem GPS, sem profundidade, sem bomba registrada). */
+  precisao: 'BOA' | 'MEDIA' | 'BAIXA'; estimados: string[];
+}
+
+/** O que muda em cada cenário (sobre os custos da empresa). Ajustar com a experiência. */
+export const CENARIOS = {
+  otimista: { usoEmergencias: 0, horas: 1, inadimplencia: 0, vidaBomba: 1 },
+  pessimista: { usoEmergencias: 1, horas: 1.25, inadimplencia: 2, vidaBomba: 0.75 },
+};
+/** Erro esperado do km de ida e volta por origem: informado, GPS (estrada × linha reta) ou o km médio (sem GPS). */
+export const ERRO_KM = { INFORMADO: 0.05, GPS: 0.15, MEDIA: 0.4 };
+
+const brlTxt = (v: number) => `R$ ${Math.round(v).toLocaleString('pt-BR')}`;
+
+/**
+ * Risco do plano para um cliente, com um preço (o calculado ou o combinado): o lucro por mês no cenário otimista,
+ * esperado e pessimista (emergências, tempo de visita, inadimplência, vida da bomba e o erro dos dados — km sem GPS,
+ * profundidade e bomba não informadas), até onde a distância compensa e o nível de risco com os motivos.
+ */
+export const riscoDoPlano = (c: CustosPlano, n: NivelPlano, p: PocoDoPlano, preco: number, media: number | null = null): RiscoPlano => {
+  const base = precoDoPlano(c, n, p, media);
+  const { km, origem } = { km: base.km, origem: base.kmOrigem };
+  const erroKm = ERRO_KM[origem];
+  const estimados: string[] = [];
+  if (origem === 'MEDIA') estimados.push(`distância pelo km médio (${c.kmMedio} km), sem GPS do poço${c.baseLatitude === null ? ' ou da base' : ''}`);
+  if (p.profundidadeM === null) estimados.push(`profundidade não informada (conta com ${POCO_PADRAO.profundidadeM} m)`);
+  if (p.potenciaCv === null && n.reservaBombaPct > 0) estimados.push(`bomba não registrada (conta com ${String(POCO_PADRAO.potenciaCv).replace('.', ',')} CV)`);
+
+  const liquido = (inad: number) => preco * (1 - c.impostosPct - c.taxaCobrancaPct - Math.min(0.5, inad));
+  const cenario = (cc: CustosPlano, pp: PocoDoPlano, inad: number): CenarioPlano => {
+    const custoMensal = precoDoPlano(cc, n, pp, media).custoMensal;
+    const lucroMensal = r2(liquido(inad) - custoMensal);
+    return { custoMensal, lucroMensal, margem: preco > 0 ? Math.round((lucroMensal / preco) * 10000) / 10000 : 0 };
+  };
+  const esperado = cenario(c, { ...p, kmIdaVolta: km }, c.inadimplenciaPct);
+  const o = CENARIOS.otimista, q = CENARIOS.pessimista;
+  const otimista = cenario(
+    { ...c, usoEmergenciasPct: o.usoEmergencias, horasVisita: c.horasVisita * o.horas, horasPor100m: c.horasPor100m * o.horas, bombaVidaAnos: c.bombaVidaAnos * o.vidaBomba },
+    { ...p, kmIdaVolta: Math.round(km * (1 - erroKm)), profundidadeM: p.profundidadeM ?? 50, potenciaCv: p.potenciaCv ?? 1 },
+    c.inadimplenciaPct * o.inadimplencia);
+  const pessimista = cenario(
+    { ...c, usoEmergenciasPct: q.usoEmergencias, horasVisita: c.horasVisita * q.horas, horasPor100m: c.horasPor100m * q.horas, bombaVidaAnos: c.bombaVidaAnos * q.vidaBomba },
+    { ...p, kmIdaVolta: Math.round(km * (1 + erroKm)), profundidadeM: p.profundidadeM ?? 150, potenciaCv: p.potenciaCv ?? 3 },
+    c.inadimplenciaPct * q.inadimplencia);
+
+  // o custo cresce em linha reta com o km: acha onde o lucro zera e onde fica na margem mínima
+  const custoEm = (k: number) => precoDoPlano(c, n, { ...p, kmIdaVolta: k }, media).custoMensal;
+  const c0 = custoEm(0), porKm = (custoEm(1000) - c0) / 1000;
+  const liq = liquido(c.inadimplenciaPct);
+  const kmAte = (alvo: number) => (porKm > 0 ? Math.max(0, Math.floor((liq - alvo - c0) / porKm)) : null);
+  const kmEquilibrio = kmAte(0), kmMargemMinima = kmAte(c.margemMinimaPct * preco);
+
+  const fatores: string[] = [];
+  if (esperado.lucroMensal < 0) fatores.push(`Prejuízo já no esperado: ${brlTxt(esperado.lucroMensal)}/mês.`);
+  else if (esperado.margem < c.margemMinimaPct) fatores.push(`Margem esperada de ${(esperado.margem * 100).toFixed(1).replace('.', ',')}%, abaixo da mínima (${Math.round(c.margemMinimaPct * 100)}%).`);
+  if (kmMargemMinima !== null && km > kmMargemMinima) fatores.push(`Longe: ${km} km ida e volta, acima dos ${kmMargemMinima} km que mantêm a margem mínima com este preço.`);
+  else if (kmMargemMinima !== null && km > kmMargemMinima * 0.8) fatores.push(`Perto do limite da distância: ${km} de ${kmMargemMinima} km.`);
+  if (n.chamadosAno > 0 && pessimista.lucroMensal < esperado.lucroMensal) {
+    fatores.push(`Se usar as ${n.chamadosAno} emergência(s) do ano (e a visita demorar mais), o lucro vai a ${brlTxt(pessimista.lucroMensal)}/mês.`);
+  }
+  if (n.reservaBombaPct >= 0.5 && (p.potenciaCv ?? 0) >= 3) fatores.push(`Bomba forte (${p.potenciaCv} CV) com ${Math.round(n.reservaBombaPct * 100)}% da troca coberta.`);
+  if ((p.profundidadeM ?? 0) >= 150) fatores.push(`Poço fundo (${p.profundidadeM} m): visita mais longa.`);
+  if (estimados.length) fatores.push(`Dados estimados: ${estimados.join('; ')}.`);
+
+  const nivel: RiscoPlano['nivel'] = esperado.lucroMensal < 0 || esperado.margem < c.margemMinimaPct ? 'ALTO' : pessimista.lucroMensal < 0 ? 'MEDIO' : 'BAIXO';
+  const precisao: RiscoPlano['precisao'] = origem === 'MEDIA' || estimados.length >= 2 ? 'BAIXA' : estimados.length ? 'MEDIA' : 'BOA';
+  return { preco, otimista, esperado, pessimista, kmEquilibrio, kmMargemMinima, nivel, fatores, precisao, estimados };
+};

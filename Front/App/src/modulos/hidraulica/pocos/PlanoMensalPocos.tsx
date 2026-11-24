@@ -1,12 +1,15 @@
-// Obras de poços › Mais ferramentas › Plano mensal: custos e variáveis da empresa, planos oferecidos (o que cada um
-// inclui) e o simulador do preço para o poço do cliente — viável quando a empresa lucra a margem mínima e o cliente paga
-// menos do que pagaria avulso. A conta fica no backend (planoMensal.ts); a tela simula o que está sendo editado, antes de salvar.
+// Obras de poços › Mais ferramentas › Plano mensal, em abas: análise por cliente (distância, preço, faixa de lucro e
+// risco de cada um, e o total da carteira), simulador caso a caso (com o preço combinado e o raio da distância), planos
+// oferecidos, custos (da empresa e da obra) e a carteira (chance de assinar). Viável quando a empresa lucra a margem
+// mínima e o cliente paga menos do que avulso. A conta fica no backend (planoMensal.ts); a tela usa o que está sendo
+// editado, antes de salvar.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Button, Card, Col, Descriptions, Divider, Empty, Flex, Input, Popconfirm, Row, Select, Space, Statistic, Switch, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { Alert, Button, Card, Col, Descriptions, Divider, Empty, Flex, Input, Popconfirm, Row, Segmented, Select, Space, Statistic, Switch, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { CheckCircleOutlined, DeleteOutlined, PlusOutlined, SaveOutlined, UndoOutlined, WarningOutlined } from '@ant-design/icons';
-import { Central, centralApi, CustosPlano, NivelPlano, planoMensalApi, PlanoMensalDados, PocoSimulado, PrecoPlano } from './obrasApi';
+import { Central, centralApi, ClienteAnalisado, CustosPlano, NivelPlano, planoMensalApi, PlanoMensalDados, PlanoSimulado, PocoSimulado, PrecoPlano } from './obrasApi';
 import { PlanoMensal as Carteira } from './CentralPocos';
-import { CampoNumero } from '../../../shared/formularios/CamposNumero';
+import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
+import { AnalisePlanoCarteira, FaixaLucro, TagRisco } from './AnalisePlanoCarteira';
 import { CustosObraConfig } from './CustosObraConfig';
 
 const { Text } = Typography;
@@ -131,7 +134,10 @@ const PlanoMensalPocos: React.FC = () => {
   const [niveis, setNiveis] = useState<(NivelPlano & { chave: string })[]>([]);
   const [cliente, setCliente] = useState<number | null>(null);
   const [poco, setPoco] = useState<PocoSimulado>({ profundidadeM: 80, potenciaCv: 1.5, pocos: 1 });
-  const [sim, setSim] = useState<{ planos: { idNivel: number | null; nome: string; preco: PrecoPlano }[] } | null>(null);
+  const [sim, setSim] = useState<{ planos: PlanoSimulado[] } | null>(null);
+  const [aba, setAba] = useState<'ANALISE' | 'SIMULAR' | 'PLANOS' | 'CUSTOS' | 'CARTEIRA'>('ANALISE');
+  /** Preço fechado com o cliente, por plano (para ver o risco com desconto). */
+  const [combinados, setCombinados] = useState<Record<string, number>>({});
   const [erroSim, setErroSim] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [central, setCentral] = useState<Central | null>(null);
@@ -149,12 +155,12 @@ const PlanoMensalPocos: React.FC = () => {
     if (!custos) return;
     const minha = ++vez.current;
     const t = setTimeout(() => {
-      planoMensalApi.simular(custos, niveis.filter(n => n.ativo && n.nome.trim()), poco)
+      planoMensalApi.simular(custos, niveis.filter(n => n.ativo && n.nome.trim()), poco, combinados)
         .then(r => { if (minha === vez.current) { setSim(r); setErroSim(null); } })
         .catch(e => { if (minha === vez.current) setErroSim(e instanceof Error ? e.message : 'Erro ao simular.'); });
     }, 500);
     return () => clearTimeout(t);
-  }, [custos, niveis, poco]);
+  }, [custos, niveis, poco, combinados]);
 
   const precoDe = (n: NivelPlano & { chave: string }) => {
     if (!sim || !n.ativo) return undefined;
@@ -169,7 +175,7 @@ const PlanoMensalPocos: React.FC = () => {
   if (!dados || !custos) return <Card loading />;
   const custosMudaram = JSON.stringify(custos) !== JSON.stringify(dados.custos);
   const escolherCliente = (id: number | null) => {
-    setCliente(id);
+    setCliente(id); setCombinados({});
     const c = dados.clientes.find(x => x.idCliente === id);
     setPoco(c ? { profundidadeM: c.profundidadeM, potenciaCv: c.potenciaCv, pocos: Math.max(1, c.pocos), latitude: c.latitude, longitude: c.longitude, kmIdaVolta: null }
       : { ...poco, latitude: null, longitude: null });
@@ -202,13 +208,27 @@ const PlanoMensalPocos: React.FC = () => {
   };
   const mudarCampo = (c: Campo, v: number | null) =>
     setCustos({ ...custos, [c.k]: v === null ? (c.opcional ? null : 0) : c.pct ? Math.round(v * 100) / 10000 : v });
-  const simulado = sim?.planos.find(p => p.nome === sugerido)?.preco;
+  const simulado = sim?.planos.find(p => p.nome === sugerido);
+
+  const simularCliente = (c: ClienteAnalisado) => { escolherCliente(c.idCliente); setAba('SIMULAR'); };
+  const naoSalvos = custosMudaram || niveis.some(n => JSON.stringify(dados.niveis.find(x => x.idNivel === n.idNivel) || null) !== JSON.stringify((({ chave, ...x }) => x)(n)));
+  const ativos = niveis.filter(n => n.ativo && n.nome.trim());
 
   return (
     <Space direction="vertical" size={12} style={{ width: '100%' }}>
-      {!dados.salvo && <Alert type="info" showIcon message="Os custos abaixo são valores padrão (palpites). Troque pelos seus custos reais e salve: o preço de cada plano muda na hora." />}
+      {!dados.salvo && <Alert type="info" showIcon message="Os custos são valores padrão (palpites). Troque pelos seus custos reais (aba Custos) e salve: o preço de cada plano muda na hora." />}
+      <Flex justify="space-between" align="center" wrap gap={8}>
+        <Segmented value={aba} onChange={v => setAba(v as typeof aba)}
+          options={[{ value: 'ANALISE', label: 'Análise por cliente' }, { value: 'SIMULAR', label: 'Simular caso a caso' }, { value: 'PLANOS', label: 'Planos oferecidos' },
+            { value: 'CUSTOS', label: 'Custos' }, { value: 'CARTEIRA', label: 'Carteira (chance de assinar)' }]} />
+        {naoSalvos && <Tag color="gold" style={{ margin: 0 }}>há mudanças não salvas: as contas já usam o que está na tela</Tag>}
+      </Flex>
+
+      {aba === 'ANALISE' && <AnalisePlanoCarteira custos={custos} niveis={ativos} onSimular={simularCliente} onIrCustos={() => setAba('CUSTOS')} />}
+
+      {aba === 'CUSTOS' && <>
       <Row gutter={[12, 12]}>
-        <Col xs={24} lg={10}>
+        <Col xs={24}>
           <Card size="small" title="Custos e variáveis da empresa"
             extra={<Space size={4}>
               {custosMudaram && <Button size="small" icon={<UndoOutlined />} onClick={() => setCustos(dados.custos)}>Desfazer</Button>}
@@ -219,7 +239,7 @@ const PlanoMensalPocos: React.FC = () => {
                 <Divider titlePlacement="start" plain style={{ margin: '4px 0 6px' }}><Text type="secondary" style={{ fontSize: 12 }}>{g.titulo}</Text></Divider>
                 <Row gutter={[10, 6]}>
                   {g.titulo === 'Deslocamento e material' && (
-                    <Col xs={24}>
+                    <Col xs={24} lg={12}>
                       <Tooltip title="Cole a localização de onde a equipe sai (como no GPS do poço). Com ela, o transporte de cada cliente sai da distância até o poço." placement="topLeft">
                         <Text style={{ fontSize: 12 }}>Base da empresa (GPS)</Text>
                       </Tooltip>
@@ -229,7 +249,7 @@ const PlanoMensalPocos: React.FC = () => {
                     </Col>
                   )}
                   {g.campos.map(c => (
-                    <Col key={c.k} xs={24} sm={12}>
+                    <Col key={c.k} xs={24} sm={12} lg={6}>
                       <Tooltip title={c.ajuda} placement="topLeft">
                         <Text style={{ fontSize: 12 }}>{c.rotulo}</Text>
                       </Tooltip>
@@ -243,7 +263,13 @@ const PlanoMensalPocos: React.FC = () => {
             ))}
           </Card>
         </Col>
-        <Col xs={24} lg={14}>
+      </Row>
+      <CustosObraConfig />
+      </>}
+
+      {aba === 'SIMULAR' && (
+      <Row gutter={[12, 12]}>
+        <Col xs={24}>
           <Card size="small" title="Simular para um cliente ou poço">
             <Row gutter={[10, 8]}>
               <Col xs={24} md={10}>
@@ -292,18 +318,53 @@ const PlanoMensalPocos: React.FC = () => {
               locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Nenhum plano oferecido: crie um abaixo." /> }}
               expandable={{
                 expandedRowRender: p => (
-                  <Descriptions size="small" column={1} bordered items={[
-                    ...p.preco.custos.map((c, i) => ({ key: String(i), label: c.item, children: `${brl(c.anual)}/ano · ${brl(c.anual / 12)}/mês` })),
-                    { key: 't', label: <Text strong>Custo total</Text>, children: <Text strong>{brl(p.preco.custoMensal)}/mês</Text> },
-                    { key: 'd', label: 'Impostos, cobrança e inadimplência', children: `${brl(p.preco.precoMensal * (custos.impostosPct + custos.taxaCobrancaPct + custos.inadimplenciaPct))}/mês` },
-                  ]} />
+                  <Row gutter={[16, 10]}>
+                    <Col xs={24} lg={12}>
+                      <Descriptions size="small" column={1} bordered items={[
+                        ...p.preco.custos.map((c, i) => ({ key: String(i), label: c.item, children: `${brl(c.anual)}/ano · ${brl(c.anual / 12)}/mês` })),
+                        { key: 't', label: <Text strong>Custo total</Text>, children: <Text strong>{brl(p.preco.custoMensal)}/mês</Text> },
+                        { key: 'd', label: 'Impostos, cobrança e inadimplência', children: `${brl(p.risco.preco * (custos.impostosPct + custos.taxaCobrancaPct + custos.inadimplenciaPct))}/mês` },
+                      ]} />
+                    </Col>
+                    <Col xs={24} lg={12}>
+                      <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                        <Flex gap={8} align="center" wrap>
+                          <Text strong>Fechar por</Text>
+                          <CampoDinheiro size="small" min={0} style={{ width: 140 }} placeholder={brl(p.preco.precoMensal)} value={combinados[p.nome] ?? null}
+                            onChange={v => setCombinados(c => { const x = { ...c }; if (v) x[p.nome] = Number(v); else delete x[p.nome]; return x; })} />
+                          <Text type="secondary" style={{ fontSize: 12 }}>por mês {p.combinado ? `(${p.combinado < p.preco.precoMensal ? 'desconto de' : 'acima em'} ${brl(Math.abs(p.preco.precoMensal - p.combinado))})` : '— vazio = o preço calculado'}</Text>
+                        </Flex>
+                        <Table size="small" pagination={false} rowKey="k"
+                          dataSource={[
+                            { k: 'Pessimista', c: p.risco.pessimista, d: 'todas as emergências, visita +25%, inadimplência dobrada, km no maior erro' },
+                            { k: 'Esperado', c: p.risco.esperado, d: 'os custos da empresa' },
+                            { k: 'Otimista', c: p.risco.otimista, d: 'sem emergências nem inadimplência, km no menor erro' },
+                          ]}
+                          columns={[
+                            { title: 'Cenário', dataIndex: 'k', width: 100 },
+                            { title: 'Custo', align: 'right', render: (_, x) => brl(x.c.custoMensal) },
+                            { title: 'Lucro/mês', align: 'right', render: (_, x) => <Text style={{ color: x.c.lucroMensal < 0 ? '#cf1322' : '#389e0d' }}>{brl(x.c.lucroMensal)}</Text> },
+                            { title: 'Margem', align: 'right', render: (_, x) => pctTxt(x.c.margem) },
+                            { title: '', render: (_, x) => <Text type="secondary" style={{ fontSize: 11 }}>{x.d}</Text> },
+                          ]} />
+                        <Text style={{ fontSize: 12 }}>
+                          Distância: com {brl(p.risco.preco)}/mês, dá lucro até <b>{p.risco.kmEquilibrio ?? '—'} km</b> (ida e volta) e mantém a margem mínima
+                          até <b>{p.risco.kmMargemMinima ?? '—'} km</b>. Este poço: {p.preco.km} km.
+                        </Text>
+                        {!!p.risco.fatores.length && <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12 }}>{p.risco.fatores.map(f => <li key={f}>{f}</li>)}</ul>}
+                      </Space>
+                    </Col>
+                  </Row>
                 ),
               }}
               columns={[
                 { title: 'Plano', dataIndex: 'nome', render: (v: string, p) => <Space size={4}>{v}{p.nome === sugerido && <Tag color="green" style={{ margin: 0 }}>sugerido</Tag>}</Space> },
-                { title: 'Preço', align: 'right', render: (_, p) => <Text strong>{brl(p.preco.precoMensal)}/mês</Text> },
+                { title: 'Preço', align: 'right', render: (_, p) => (
+                  <div><Text strong>{brl(p.risco.preco)}/mês</Text>{p.combinado && <div><Text type="secondary" style={{ fontSize: 11 }}>combinado · calculado {brl(p.preco.precoMensal)}</Text></div>}</div>
+                ) },
                 { title: 'Custo', align: 'right', render: (_, p) => brl(p.preco.custoMensal) },
-                { title: 'Lucro', align: 'right', render: (_, p) => <Text style={{ color: p.preco.lucroMensal >= 0 ? '#389e0d' : '#cf1322' }}>{brl(p.preco.lucroMensal)} <Text type="secondary" style={{ fontSize: 11 }}>{pctTxt(p.preco.margemReal)}</Text></Text> },
+                { title: 'Lucro por mês (faixa)', width: 170, render: (_, p) => <FaixaLucro r={p.risco} /> },
+                { title: 'Risco', width: 120, render: (_, p) => <TagRisco r={p.risco} /> },
                 { title: 'Cliente economiza', align: 'right', render: (_, p) => (
                   <Text style={{ color: p.preco.economiaAnual >= 0 ? '#389e0d' : '#cf1322' }}>{brl(p.preco.economiaAnual)}/ano{p.preco.comparacaoEstimada ? '*' : ''}</Text>
                 ) },
@@ -313,17 +374,23 @@ const PlanoMensalPocos: React.FC = () => {
             {sim?.planos.some(p => p.preco.comparacaoEstimada) && (
               <Text type="secondary" style={{ fontSize: 12 }}>* Sem o preço da visita avulsa: informe em "Visita avulsa" para a comparação valer.</Text>
             )}
+            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>Abra a linha do plano para ver os cenários, o raio da distância e testar um preço combinado.</Text>
             {simulado && (
               <Row gutter={10} style={{ marginTop: 10 }}>
-                <Col span={8}><Statistic title={`${sugerido} · por ano`} value={brl(simulado.precoMensal * 12)} valueStyle={{ fontSize: 16 }} /></Col>
-                <Col span={8}><Statistic title="Lucro por ano" value={brl(simulado.lucroMensal * 12)} valueStyle={{ fontSize: 16, color: '#389e0d' }} /></Col>
-                <Col span={8}><Statistic title="Cliente economiza por ano" value={brl(simulado.economiaAnual)} valueStyle={{ fontSize: 16 }} /></Col>
+                <Col span={8}><Statistic title={`${sugerido} · por ano`} value={brl(simulado.risco.preco * 12)} valueStyle={{ fontSize: 16 }} /></Col>
+                <Col span={8}>
+                  <Statistic title="Lucro por ano (esperado)" value={brl(simulado.risco.esperado.lucroMensal * 12)} valueStyle={{ fontSize: 16, color: '#389e0d' }} />
+                  <Text type="secondary" style={{ fontSize: 11 }}>{brl(simulado.risco.pessimista.lucroMensal * 12)} a {brl(simulado.risco.otimista.lucroMensal * 12)}</Text>
+                </Col>
+                <Col span={8}><Statistic title="Cliente economiza por ano" value={brl(simulado.preco.economiaAnual)} valueStyle={{ fontSize: 16 }} /></Col>
               </Row>
             )}
           </Card>
         </Col>
       </Row>
+      )}
 
+      {aba === 'PLANOS' && (
       <Card size="small" title="Planos oferecidos"
         extra={<Button size="small" icon={<PlusOutlined />} onClick={() => setNiveis(l => [...l, { ...NIVEL_NOVO, ordem: l.length + 1, chave: `novo-${Date.now()}` }])}>Novo plano</Button>}>
         <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
@@ -340,10 +407,9 @@ const PlanoMensalPocos: React.FC = () => {
           ))}
         </Row>
       </Card>
+      )}
 
-      <CustosObraConfig />
-
-      {central && <Carteira d={central.plano} naTelaDoPlano />}
+      {aba === 'CARTEIRA' && (central ? <Carteira d={central.plano} naTelaDoPlano /> : <Card loading />)}
     </Space>
   );
 };
