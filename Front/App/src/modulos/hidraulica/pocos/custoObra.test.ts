@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { compararEstimadoReal, faltaDaEstimativa, estimarCusto, incluirPelosServicos, kmAteOPoco, trechosIniciais } from './custoObra';
+import { compararEstimadoReal, faltaDaEstimativa, travaPrecoMinimo, estimarCusto, incluirPelosServicos, kmAteOPoco, trechosIniciais } from './custoObra';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -84,4 +84,14 @@ teste('custo da obra: o que falta lançar pela estimativa', () => {
   assert.deepStrictEqual(faltaDaEstimativa({ horasTotal: 24.5, dias: 3 }, { km: 42 }, [{ tipo: 'EQUIPE', quantidade: 10 }, { tipo: 'KM', quantidade: 130 }, { tipo: 'DESPESA', quantidade: null }]),
     { horas: 14.5, km: 0 });
   assert.deepStrictEqual(faltaDaEstimativa(null, null, []), { horas: null, km: null });
+});
+
+teste('custo da obra: trava do preço mínimo', () => {
+  const r = { custo: 10000, deducoesPct: 0.1, precoMinimo: 14000 };
+  assert.deepStrictEqual(travaPrecoMinimo(15000, r), { nivel: 'OK', falta: 0 });
+  assert.deepStrictEqual(travaPrecoMinimo(14000, r), { nivel: 'OK', falta: 0 });
+  assert.deepStrictEqual(travaPrecoMinimo(12000, r), { nivel: 'ABAIXO_MINIMO', falta: 2000 });   // 12000 × 0,9 = 10800: cobre o custo
+  assert.deepStrictEqual(travaPrecoMinimo(11000, r), { nivel: 'PREJUIZO', falta: 3000 });        // 11000 × 0,9 = 9900 < 10000
+  assert.deepStrictEqual(travaPrecoMinimo(11000, { custo: 0, deducoesPct: 0.1, precoMinimo: null }).nivel, 'SEM_ESTIMATIVA');
+  assert.deepStrictEqual(travaPrecoMinimo(0, r).nivel, 'SEM_ESTIMATIVA');
 });

@@ -6,7 +6,7 @@ import { Alert, Button, Card, Checkbox, Col, Flex, Row, Select, Space, Statistic
 import { DeleteOutlined, PlusOutlined, SaveOutlined } from '@ant-design/icons';
 import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
 import { CustosObraDados, custosObraApi, CustosPlano, Obra, planoMensalApi } from './obrasApi';
-import { EntradaCusto, estimarCusto, incluirPelosServicos, kmAteOPoco, trechosIniciais } from './custoObra';
+import { EntradaCusto, EstimativaCusto, estimarCusto, incluirPelosServicos, kmAteOPoco, trechosIniciais } from './custoObra';
 import { useCatalogoMateriais } from './CampoMaterial';
 import { consumoDoRelatorio } from './materiaisPoco';
 import { CAMADAS_GEOLOGICAS } from './estruturaPoco';
@@ -16,7 +16,8 @@ const brl = (v: number | null | undefined) => (v === null || v === undefined ? '
 const pct = (v: number | null) => (v === null ? '—' : `${(v * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`);
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
-export const CustoMargemObra: React.FC<{ obra: Obra; onSalvo?: () => void }> = ({ obra, onSalvo }) => {
+/** preco: o total dos itens na tela (ainda não salvo); onResultado: a estimativa para a trava do preço mínimo. */
+export const CustoMargemObra: React.FC<{ obra: Obra; preco?: number; onSalvo?: () => void; onResultado?: (r: EstimativaCusto | null) => void }> = ({ obra, preco, onSalvo, onResultado }) => {
   const [custos, setCustos] = useState<CustosObraDados | null>(null);
   const [empresa, setEmpresa] = useState<CustosPlano | null>(null);
   const [entrada, setEntrada] = useState<EntradaCusto | null>(null);
@@ -44,11 +45,14 @@ export const CustoMargemObra: React.FC<{ obra: Obra; onSalvo?: () => void }> = (
     }).catch(e => message.error(e instanceof Error ? e.message : 'Erro ao carregar os custos.'));
   }, [obra.idObra]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!custos || !empresa || !entrada) return <Card size="small" title="Custo e margem" loading />;
-  // materiais sempre os do relatório (atualizam sozinhos); o preço acompanha o contratado
-  const e: EntradaCusto = { ...entrada, materiais: materiais.total, preco: obra.valorContratado || 0 };
-  const r = estimarCusto(e, custos.formacoes, custos.parametros, empresa);
-  const mudar = (x: Partial<EntradaCusto>) => { setEntrada({ ...entrada, ...x }); setMudou(true); };
+  // materiais sempre os do relatório (atualizam sozinhos); o preço acompanha o total dos itens (ou o contratado)
+  const precoAtual = preco ?? (obra.valorContratado || 0);
+  const e: EntradaCusto | null = entrada ? { ...entrada, materiais: materiais.total, preco: precoAtual } : null;
+  const r = e && custos && empresa ? estimarCusto(e, custos.formacoes, custos.parametros, empresa) : null;
+  const chave = r ? `${r.custo}|${r.precoMinimo}|${r.deducoesPct}` : '';
+  useEffect(() => { onResultado?.(r); }, [chave]);   // eslint-disable-line react-hooks/exhaustive-deps
+  if (!custos || !empresa || !e || !r) return <Card size="small" title="Custo e margem" loading />;
+  const mudar = (x: Partial<EntradaCusto>) => { setEntrada({ ...entrada!, ...x }); setMudou(true); };
   const kmGps = kmAteOPoco(empresa, obra.latitude, obra.longitude);
   const bombaPorCv = (cv: number) => r2(cv * empresa.bombaPrecoPorCv);
 
@@ -145,7 +149,8 @@ export const CustoMargemObra: React.FC<{ obra: Obra; onSalvo?: () => void }> = (
           <Row gutter={[10, 10]}>
             <Col span={12}><Statistic title="Custo estimado" value={brl(r.custo)} valueStyle={{ fontSize: 18 }} /></Col>
             <Col span={12}>
-              <Statistic title="Contratado" value={obra.valorContratado ? brl(obra.valorContratado) : 'sem preço'} valueStyle={{ fontSize: 18 }} />
+              <Statistic title={precoAtual !== (obra.valorContratado || 0) ? 'Total dos itens (não salvo)' : 'Contratado'}
+                value={precoAtual ? brl(precoAtual) : 'sem preço'} valueStyle={{ fontSize: 18 }} />
             </Col>
             <Col span={12}>
               <Tooltip title={`Cobre o custo, ${pct(r.deducoesPct)} de impostos/taxas e a margem mínima de ${pct(empresa.margemMinimaPct)}`}>

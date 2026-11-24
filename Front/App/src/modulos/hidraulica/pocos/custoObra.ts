@@ -179,3 +179,16 @@ export const faltaDaEstimativa = (
     km: kmEst ? Math.max(0, Math.round(kmEst - ja('KM'))) : null,
   };
 };
+
+/**
+ * Trava do preço mínimo no orçamento: compara o total dos itens com a estimativa. PREJUIZO = o preço não cobre o custo
+ * depois de impostos/taxas; ABAIXO_MINIMO = cobre, mas fica abaixo do preço mínimo (margem mínima). Sem custo estimado
+ * (custos da obra não configurados) não trava.
+ */
+export const travaPrecoMinimo = (total: number, r: Pick<EstimativaCusto, 'custo' | 'deducoesPct' | 'precoMinimo'> | null | undefined) => {
+  const t = n(total);
+  if (!r || !(r.custo > 0) || !(t > 0)) return { nivel: 'SEM_ESTIMATIVA' as const, falta: 0 };
+  if (t * (1 - n(r.deducoesPct)) < r.custo) return { nivel: 'PREJUIZO' as const, falta: r2((r.precoMinimo ?? t) - t) };
+  if (r.precoMinimo !== null && t < r.precoMinimo) return { nivel: 'ABAIXO_MINIMO' as const, falta: r2(r.precoMinimo - t) };
+  return { nivel: 'OK' as const, falta: 0 };
+};

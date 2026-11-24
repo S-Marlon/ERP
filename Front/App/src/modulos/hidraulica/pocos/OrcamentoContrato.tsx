@@ -14,6 +14,7 @@ import { htmlAditivo, htmlContrato, htmlOrcamento } from './documentosPocos';
 import { ClientePocoModal } from './ClientesPoco';
 import { abrirObra } from './navPocos';
 import { CustoMargemObra } from './CustoMargemObra';
+import { EstimativaCusto, travaPrecoMinimo } from './custoObra';
 import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
 
 const { Text } = Typography;
@@ -336,9 +337,28 @@ export const OrcamentoEContrato: React.FC<{ obra: Obra; onMudou: () => void }> =
     }).catch(() => setContrato(null));
   }, [obra.idObra]);
   useEffect(() => { carregar(); }, [carregar]);
+  const [estimativa, setEstimativa] = useState<EstimativaCusto | null>(null);
   if (!itens) return <Card size="small" loading />;
   const bloqueado = obra.situacao === 'CONCLUIDA' || obra.situacao === 'CANCELADA';
-  const salvar = async () => {
+  const totalItens = resumoItens(itens).total;
+  // trava do preço mínimo (Custo e margem, logo abaixo): abaixo do mínimo ou no prejuízo, salvar pede confirmação
+  const trava = itens.length ? travaPrecoMinimo(totalItens, estimativa) : { nivel: 'SEM_ESTIMATIVA' as const, falta: 0 };
+  const salvar = () => {
+    if (trava.nivel !== 'PREJUIZO' && trava.nivel !== 'ABAIXO_MINIMO') { gravar(); return; }
+    const prejuizo = trava.nivel === 'PREJUIZO';
+    Modal.confirm({
+      title: prejuizo ? 'Este preço dá prejuízo' : 'Abaixo do preço mínimo',
+      content: <>
+        Total dos itens: <b>{brl(totalItens)}</b> · preço mínimo: <b>{brl(estimativa?.precoMinimo ?? 0)}</b> (faltam {brl(trava.falta)}).
+        <div style={{ marginTop: 6 }}>{prejuizo
+          ? `Depois de impostos e taxas, o valor não cobre o custo estimado de ${brl(estimativa?.custo ?? 0)}.`
+          : 'Cobre o custo, mas fica abaixo da margem mínima da empresa.'} Salvar mesmo assim?</div>
+      </>,
+      okText: 'Salvar mesmo assim', cancelText: 'Rever o preço', okButtonProps: { danger: prejuizo },
+      onOk: gravar,
+    });
+  };
+  const gravar = async () => {
     setSalvando(true);
     try { const r = await orcamentoApi.salvarItens(obra.idObra, itens); setItens(r.itens); setMudou(false); message.success('Itens salvos: o total virou o valor contratado.'); onMudou(); }
     catch (e) { erro(e); } finally { setSalvando(false); }
@@ -368,8 +388,15 @@ export const OrcamentoEContrato: React.FC<{ obra: Obra; onMudou: () => void }> =
         {bloqueado && <Alert type="info" showIcon style={{ marginBottom: 8 }} message="Obra concluída ou cancelada: os itens ficam como estão (o que mudou de preço entra como adicional e termo aditivo)." />}
         {!itens.length && obra.valorContratado ? <Alert type="info" showIcon style={{ marginBottom: 8 }} message={`Esta obra tem só o valor fechado (${brl(obra.valorContratado)}). Ao salvar itens, o total deles passa a ser o valor contratado.`} /> : null}
         <EditorItens itens={itens} bloqueado={bloqueado} onChange={i => { setItens(i); setMudou(true); }} />
+        {(trava.nivel === 'PREJUIZO' || trava.nivel === 'ABAIXO_MINIMO') && (
+          <Alert type={trava.nivel === 'PREJUIZO' ? 'error' : 'warning'} showIcon style={{ marginTop: 8 }}
+            message={trava.nivel === 'PREJUIZO'
+              ? `Este total dá prejuízo: depois de impostos e taxas não cobre o custo estimado (${brl(estimativa?.custo ?? 0)}).`
+              : `Abaixo do preço mínimo de ${brl(estimativa?.precoMinimo ?? 0)} (faltam ${brl(trava.falta)}).`}
+            description="Veja o detalhe em Custo e margem, logo abaixo. Dá para salvar, mas pede confirmação." />
+        )}
       </Card>
-      <CustoMargemObra obra={obra} onSalvo={onMudou} />
+      <CustoMargemObra obra={obra} preco={itens.length ? totalItens : undefined} onSalvo={onMudou} onResultado={setEstimativa} />
       <Card size="small" title="Contrato"
         extra={<Button type="primary" icon={<FileTextOutlined />} onClick={() => antesDeImprimir('CONTRATO')}>Contrato completo (PDF)</Button>}>
         <Flex gap={8} align="center" wrap>
