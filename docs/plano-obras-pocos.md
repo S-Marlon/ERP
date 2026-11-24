@@ -344,3 +344,8 @@ Colunas novas: `incluso` em `_orcamento_itens`, `valor_parcelado` em `_obras`, `
   ou da localização colada (obra sem poço ainda; fica na estimativa) até a base da empresa. Visita técnica = horas × hora
   da equipe + uma viagem; transporte das máquinas (marcado em perfuração e limpeza) = transportes × (km × custo/km do
   caminhão + fixo). Viram linhas próprias no estimado × real, com os tipos de custo real TRANSPORTE e VISITA.
+- **Orçamento rápido com o custo** (2026-11-23, `CustoRapido.tsx`): bloco "Custo e preço" com a conta do Custo e margem
+  (metros dos itens por formação, km pelo GPS do poço escolhido ou digitado, serviços, bomba, materiais), preço mínimo,
+  sugerido e margem do total; a mesma trava ao gravar; a estimativa é guardada na obra criada.
+- **Relatório para o cliente no papel timbrado** (2026-11-23): o mesmo estilo dos documentos da obra (cabeçalho com o
+  quadro do documento, resumo em destaque, fichas, seções numeradas, cuidados com o poço, assinatura e rodapé).

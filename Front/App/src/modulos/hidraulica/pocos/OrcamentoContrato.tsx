@@ -8,8 +8,10 @@ import {
 } from '@ant-design/icons';
 import {
   AdicionalDoAditivo, Aditivo, dataBr, GRUPOS_ITEM, GrupoItem, ItemOrcamentoForm, ITENS_PRONTOS, Lead, linhaItem, NovoOrcamento, Obra, obrasApi, orcamentoApi,
-  Poco, processoApi, resumoItens, Servico, SERVICOS, UNIDADES_ITEM, urlArquivo,
+  Poco, processoApi, resumoItens, Servico, SERVICOS, UNIDADES_ITEM, urlArquivo, custosObraApi,
 } from './obrasApi';
+import { CustoRapido, EstimativaRapida } from './CustoRapido';
+import { lerGpsTexto } from './mapaRegional';
 import { htmlAditivo, htmlContrato, htmlOrcamento } from './documentosPocos';
 import { ClientePocoModal } from './ClientesPoco';
 import { abrirObra } from './navPocos';
@@ -153,6 +155,7 @@ export const OrcamentoRapido: React.FC<{
   const [itens, setItens] = useState<ItemOrcamentoForm[]>([]);
   const [c, setC] = useState<Condicoes | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [estimativa, setEstimativa] = useState<EstimativaRapida | null>(null);
   useEffect(() => {
     if (!aberto) return;
     setCliente(clienteInicial || (lead?.idCliente && lead.cliente ? { idCliente: lead.idCliente, nome: lead.cliente } : null));
@@ -170,8 +173,28 @@ export const OrcamentoRapido: React.FC<{
   }, [cliente]);
   if (!c) return null;
   const mudar = (x: Partial<Condicoes>) => setC({ ...c, ...x });
-  const total = resumoItens(itens).total;
-  const salvar = async (pdf: boolean) => {
+  const resumo = resumoItens(itens);
+  const total = resumo.total;
+  // local para o km: o GPS do poço escolhido ou o digitado no local novo
+  const pocoEscolhido = idPoco === 'novo' ? null : pocos.find(p => p.idPoco === idPoco) || null;
+  const coords = pocoEscolhido ? (pocoEscolhido.latitude !== null && pocoEscolhido.longitude !== null ? { latitude: pocoEscolhido.latitude, longitude: pocoEscolhido.longitude } : null)
+    : lerGpsTexto(local.gps);
+  const trava = itens.length ? travaPrecoMinimo(total, estimativa?.resultado) : { nivel: 'SEM_ESTIMATIVA' as const, falta: 0 };
+  // abaixo do preço mínimo ou no prejuízo: confirma antes de gravar (a mesma trava do orçamento da obra)
+  const salvar = (pdf: boolean) => {
+    if (trava.nivel !== 'PREJUIZO' && trava.nivel !== 'ABAIXO_MINIMO') { gravar(pdf); return; }
+    const prejuizo = trava.nivel === 'PREJUIZO';
+    Modal.confirm({
+      title: prejuizo ? 'Este preço dá prejuízo' : 'Abaixo do preço mínimo',
+      content: <>
+        Total: <b>{brl(total)}</b> · preço mínimo: <b>{brl(estimativa?.resultado.precoMinimo ?? 0)}</b> (faltam {brl(trava.falta)}).
+        <div style={{ marginTop: 6 }}>{prejuizo ? 'Depois de impostos e taxas, não cobre o custo estimado.' : 'Cobre o custo, mas fica abaixo da margem mínima.'} Gravar mesmo assim?</div>
+      </>,
+      okText: 'Gravar mesmo assim', cancelText: 'Rever o preço', okButtonProps: { danger: prejuizo },
+      onOk: () => gravar(pdf),
+    });
+  };
+  const gravar = async (pdf: boolean) => {
     if (!cliente && !lead) { message.warning('Escolha ou cadastre o cliente.'); return; }
     if (!c.servicos.length) { message.warning('Marque ao menos um serviço.'); return; }
     if (itens.some(i => !i.descricao.trim())) { message.warning('Toda linha precisa de descrição.'); return; }
@@ -184,7 +207,12 @@ export const OrcamentoRapido: React.FC<{
     };
     setSalvando(true);
     let idObra = 0;
-    const criar = async () => { const r = await orcamentoApi.criar(corpo); idObra = r.idObra; return r; };
+    const criar = async () => {
+      const r = await orcamentoApi.criar(corpo); idObra = r.idObra;
+      // a estimativa vai junto: o orçamento completo da obra já abre com o Custo e margem preenchido
+      if (estimativa) await custosObraApi.salvarEstimativa(idObra, estimativa as any).catch(() => undefined);
+      return r;
+    };
     try {
       if (pdf) {
         const ok = await imprimirQuandoPronto(async () => {
@@ -240,6 +268,12 @@ export const OrcamentoRapido: React.FC<{
         </Row>
         <Divider style={{ margin: '4px 0' }} titlePlacement="start" plain>Itens (quantidade × valor)</Divider>
         <EditorItens itens={itens} onChange={setItens} />
+        <CustoRapido servicos={c.servicos} metros={resumo.metrosPrevistos} local={coords} gps={pocoEscolhido ? null : local.gps || null} preco={total} onEstimativa={setEstimativa} />
+        {(trava.nivel === 'PREJUIZO' || trava.nivel === 'ABAIXO_MINIMO') && (
+          <Alert type={trava.nivel === 'PREJUIZO' ? 'error' : 'warning'} showIcon
+            message={trava.nivel === 'PREJUIZO' ? 'Este total dá prejuízo: depois de impostos e taxas não cobre o custo estimado.'
+              : `Abaixo do preço mínimo de ${brl(estimativa?.resultado.precoMinimo ?? 0)} (faltam ${brl(trava.falta)}).`} />
+        )}
         <Divider style={{ margin: '4px 0' }} titlePlacement="start" plain>Condições</Divider>
         <Row gutter={[8, 8]}>
           <Col xs={12} md={5}><Text>Sinal</Text><CampoDinheiro min={0} style={{ width: '100%' }} value={c.valorSinal} onChange={v => mudar({ valorSinal: v === null ? null : Number(v) })} /></Col>
