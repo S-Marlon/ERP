@@ -810,6 +810,8 @@ export interface CustosPlano {
   baseLatitude: number | null; baseLongitude: number | null; baseGps?: string; fatorEstrada: number; usoEmergenciasPct: number;
   custoLimpeza: number; custoMonitoramentoMes: number; aparelhoValor: number; aparelhoMeses: number;
   bombaPrecoPorCv: number; bombaVidaAnos: number; precoVisitaAvulsa: number | null;
+  /** Gasto esperado do cliente com material por poço por ano (a preço de venda): base do desconto em bomba e material. */
+  materialAnoPoco: number;
   impostosPct: number; taxaCobrancaPct: number; inadimplenciaPct: number; margemPct: number; margemMinimaPct: number; arredondarPara: number;
 }
 /** Um plano oferecido e o que ele inclui. */

@@ -17,6 +17,7 @@ const COLUNAS: Record<keyof CustosPlano, string> = {
   materialVisita: 'material_visita', baseLatitude: 'base_latitude', baseLongitude: 'base_longitude', fatorEstrada: 'fator_estrada',
   usoEmergenciasPct: 'uso_emergencias_pct', custoLimpeza: 'custo_limpeza', custoMonitoramentoMes: 'custo_monitoramento_mes', aparelhoValor: 'aparelho_valor',
   aparelhoMeses: 'aparelho_meses', bombaPrecoPorCv: 'bomba_preco_por_cv', bombaVidaAnos: 'bomba_vida_anos', precoVisitaAvulsa: 'preco_visita_avulsa',
+  materialAnoPoco: 'material_ano_poco',
   impostosPct: 'impostos_pct', taxaCobrancaPct: 'taxa_cobranca_pct', inadimplenciaPct: 'inadimplencia_pct', margemPct: 'margem_pct',
   margemMinimaPct: 'margem_minima_pct', arredondarPara: 'arredondar_para',
 };

@@ -39,9 +39,11 @@ const GRUPOS: { titulo: string; campos: Campo[] }[] = [
     { k: 'aparelhoValor', rotulo: 'Valor do aparelho', prefixo: 'R$', passo: 50 },
     { k: 'aparelhoMeses', rotulo: 'Pagar o aparelho em', sufixo: 'meses', passo: 6 },
   ] },
-  { titulo: 'Troca da bomba', campos: [
+  { titulo: 'Bomba e material', campos: [
     { k: 'bombaPrecoPorCv', rotulo: 'Preço da bomba por CV', prefixo: 'R$', passo: 100 },
     { k: 'bombaVidaAnos', rotulo: 'Vida útil da bomba', sufixo: 'anos', passo: 0.5 },
+    { k: 'materialAnoPoco', rotulo: 'Material por poço por ano', prefixo: 'R$', passo: 50,
+      ajuda: 'O que um cliente compra de conexões, fio e peças num ano (a preço de venda): base do desconto em bomba e material dos planos' },
   ] },
   { titulo: 'Preço', campos: [
     { k: 'impostosPct', rotulo: 'Impostos', sufixo: '%', pct: true, passo: 0.5 },
@@ -107,7 +109,7 @@ const CartaoNivel: React.FC<{
         {linha('Monitoramento (IoT)', <Switch size="small" checked={n.monitoramento} onChange={v => set({ monitoramento: v })} />)}
         {linha('Cobre da troca da bomba', <CampoNumero size="small" min={0} max={100} step={10} value={Math.round(n.reservaBombaPct * 100)}
           onChange={v => set({ reservaBombaPct: (v ?? 0) / 100 })} suffix="%" style={{ width: 90 }} />)}
-        {linha('Desconto em bomba e material', <CampoNumero size="small" min={0} max={90} value={Math.round(n.descontoPecasPct * 100)}
+        {linha('Desconto em bomba e material', <CampoNumero size="small" min={0} max={100} value={Math.round(n.descontoPecasPct * 100)}
           onChange={v => set({ descontoPecasPct: (v ?? 0) / 100 })} suffix="%" style={{ width: 90 }} />)}
         {linha('Desconto na limpeza', <CampoNumero size="small" min={0} max={90} value={Math.round(n.descontoLimpezaPct * 100)}
           onChange={v => set({ descontoLimpezaPct: (v ?? 0) / 100 })} suffix="%" style={{ width: 90 }} />)}

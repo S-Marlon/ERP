@@ -12,11 +12,14 @@ export interface CustosPlano {
   usoEmergenciasPct: number;
   custoLimpeza: number; custoMonitoramentoMes: number; aparelhoValor: number; aparelhoMeses: number;
   bombaPrecoPorCv: number; bombaVidaAnos: number; precoVisitaAvulsa: number | null;
+  /** Gasto esperado do cliente com material (conexões, fio, peças) por poço por ano, a preço de venda: base do desconto. */
+  materialAnoPoco: number;
   impostosPct: number; taxaCobrancaPct: number; inadimplenciaPct: number; margemPct: number; margemMinimaPct: number; arredondarPara: number;
 }
 export interface NivelPlano {
   nome: string; descricao: string | null; visitasAno: number; limpezaACadaMeses: number | null; chamadosAno: number;
-  /** Desconto em bomba e material, e na limpeza (feita quando precisa, fora do plano). Não custam: saem da margem da venda. */
+  /** Desconto em bomba e material (entra no custo: o que deixa de entrar na troca da bomba e no material do ano) e na
+   *  limpeza (feita quando precisa, fora do plano: sai da margem da venda). */
   descontoPecasPct: number; descontoLimpezaPct: number; prioridade: boolean; monitoramento: boolean; reservaBombaPct: number; fidelidadeMeses: number; ordem: number; ativo: boolean;
 }
 /** O que pesa no preço: o poço mais fundo, a bomba mais forte e quantos poços entram no plano. */
@@ -30,7 +33,7 @@ export interface PocoDoPlano {
 export const CUSTOS_PADRAO: CustosPlano = {
   custoHoraEquipe: 80, horasVisita: 3, horasPor100m: 1.5, kmMedio: 60, custoKm: 1.5, materialVisita: 50,
   baseLatitude: null, baseLongitude: null, fatorEstrada: 1.3, usoEmergenciasPct: 0.3, custoLimpeza: 800,
-  custoMonitoramentoMes: 25, aparelhoValor: 900, aparelhoMeses: 36, bombaPrecoPorCv: 1500, bombaVidaAnos: 6, precoVisitaAvulsa: null,
+  custoMonitoramentoMes: 25, aparelhoValor: 900, aparelhoMeses: 36, bombaPrecoPorCv: 1500, bombaVidaAnos: 6, precoVisitaAvulsa: null, materialAnoPoco: 0,
   impostosPct: 0.06, taxaCobrancaPct: 0.03, inadimplenciaPct: 0.03, margemPct: 0.25, margemMinimaPct: 0.1, arredondarPara: 5,
 };
 /** Sem profundidade nem bomba informadas, a conta usa um poço comum. */
@@ -71,6 +74,7 @@ export const validarCustos = (b: any): CustosPlano => {
     aparelhoMeses: Math.round(numero(b?.aparelhoMeses, 'Meses para pagar o aparelho', 1, 240)),
     bombaPrecoPorCv: numero(b?.bombaPrecoPorCv, 'Preço da bomba por CV', 0, 1000000),
     bombaVidaAnos: numero(b?.bombaVidaAnos, 'Vida útil da bomba', 0.5, 50),
+    materialAnoPoco: numero(b?.materialAnoPoco ?? 0, 'Material por poço por ano', 0, 1000000),
     precoVisitaAvulsa: b?.precoVisitaAvulsa === null || b?.precoVisitaAvulsa === undefined || String(b.precoVisitaAvulsa).trim() === ''
       ? null : numero(b.precoVisitaAvulsa, 'Preço da visita avulsa', 0, 1000000),
     impostosPct: pct(b?.impostosPct, 'Impostos'), taxaCobrancaPct: pct(b?.taxaCobrancaPct, 'Taxa de cobrança'),
@@ -93,7 +97,7 @@ export const validarNivel = (b: any): NivelPlano => {
     nome, descricao: String(b?.descricao ?? '').trim().slice(0, 255) || null,
     visitasAno: Math.round(numero(b?.visitasAno ?? 0, 'Visitas por ano', 0, 24)), limpezaACadaMeses: limpeza,
     chamadosAno: Math.round(numero(b?.chamadosAno ?? 0, 'Emergências por ano', 0, 24)),
-    descontoPecasPct: pct(b?.descontoPecasPct ?? 0, 'Desconto em bomba e material', 0.9),
+    descontoPecasPct: pct(b?.descontoPecasPct ?? 0, 'Desconto em bomba e material', 1),
     descontoLimpezaPct: pct(b?.descontoLimpezaPct ?? 0, 'Desconto na limpeza', 0.9), prioridade: !!b?.prioridade, monitoramento: !!b?.monitoramento,
     reservaBombaPct: pct(b?.reservaBombaPct ?? 0, 'Troca da bomba coberta', 1), fidelidadeMeses: Math.round(numero(b?.fidelidadeMeses ?? 12, 'Fidelidade (meses)', 0, 120)),
     ordem: Math.round(Number(b?.ordem) || 0), ativo: b?.ativo === undefined ? true : !!b.ativo,
@@ -163,6 +167,9 @@ export const precoDoPlano = (c: CustosPlano, n: NivelPlano, p: PocoDoPlano, medi
   // emergência incluída não é usada por todo cliente: entra pelo uso esperado
   const emergencias = n.chamadosAno * c.usoEmergenciasPct;
   const limpezasAno = n.limpezaACadaMeses ? 12 / n.limpezaACadaMeses : 0;
+  // desconto em bomba e material: o que deixa de entrar por ano — na troca da bomba só a parte que a reserva não cobre
+  // (para não contar duas vezes) e no material do ano por poço
+  const descontoAnual = r2(n.descontoPecasPct * ((1 - n.reservaBombaPct) * cv * c.bombaPrecoPorCv / c.bombaVidaAnos + c.materialAnoPoco) * pocos);
   const custos: LinhaCusto[] = [
     { item: `${n.visitasAno} visita(s) preventiva(s) por ano`, anual: r2(n.visitasAno * visita) },
     { item: `Limpeza a cada ${n.limpezaACadaMeses} meses`, anual: r2(limpezasAno * c.custoLimpeza * pocos) },
@@ -170,6 +177,7 @@ export const precoDoPlano = (c: CustosPlano, n: NivelPlano, p: PocoDoPlano, medi
     { item: 'Monitoramento (dados e aparelho)', anual: n.monitoramento ? r2((c.custoMonitoramentoMes + c.aparelhoValor / c.aparelhoMeses) * 12 * pocos) : 0 },
     { item: `${Math.round(n.reservaBombaPct * 100)}% da troca da bomba (${String(cv).replace('.', ',')} CV)`,
       anual: r2((n.reservaBombaPct * cv * c.bombaPrecoPorCv / c.bombaVidaAnos) * pocos) },
+    { item: `Desconto de ${Math.round(n.descontoPecasPct * 100)}% em bomba e material`, anual: descontoAnual },
   ].filter(l => l.anual > 0);
   const custoAnual = custos.reduce((s, l) => s + l.anual, 0);
   const custoMensal = r2(custoAnual / 12);
@@ -183,7 +191,8 @@ export const precoDoPlano = (c: CustosPlano, n: NivelPlano, p: PocoDoPlano, medi
   const avulso = visitaAvulsa(c, mediaVisitaEmpresa, prof, km) * pocos;
   const avulsoAnual = r2((n.visitasAno + emergencias) * avulso + limpezasAno * c.custoLimpeza * pocos / divisor(c)
     + (n.monitoramento ? (c.custoMonitoramentoMes + c.aparelhoValor / c.aparelhoMeses) * 12 * pocos / divisor(c) : 0)
-    + n.reservaBombaPct * cv * c.bombaPrecoPorCv / c.bombaVidaAnos * pocos);
+    + n.reservaBombaPct * cv * c.bombaPrecoPorCv / c.bombaVidaAnos * pocos
+    + descontoAnual);   // sem o plano, o cliente pagaria a peça cheia
   const economiaAnual = r2(avulsoAnual - precoMensal * 12);
   const avisos: string[] = [];
   if (margemReal < c.margemMinimaPct) avisos.push(`Margem de ${(margemReal * 100).toFixed(1).replace('.', ',')}% abaixo da mínima (${Math.round(c.margemMinimaPct * 100)}%)`);

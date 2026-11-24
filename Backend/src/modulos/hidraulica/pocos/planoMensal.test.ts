@@ -104,3 +104,18 @@ teste('plano mensal: risco, faixa de lucro e raio da distância', () => {
   const sem = riscoDoPlano(CUSTOS_PADRAO, nivel({ reservaBombaPct: 0.5 }), { profundidadeM: null, potenciaCv: null, pocos: 1, kmIdaVolta: 50 }, 120);
   assert.deepStrictEqual([sem.estimados.length, sem.precisao], [2, 'BAIXA']);
 });
+
+teste('plano mensal: escadinha do desconto em bomba e material entra no custo', () => {
+  const c = { ...CUSTOS_PADRAO, materialAnoPoco: 300, precoVisitaAvulsa: 900 };
+  const linha = (d: number, reserva = 0) => precoDoPlano(c, nivel({ descontoPecasPct: d, reservaBombaPct: reserva }), poco).custos.find(l => l.item.startsWith('Desconto'));
+  // bomba 1,5 CV × R$ 1.500 ÷ 6 anos = R$ 375/ano + material R$ 300/ano
+  assert.deepStrictEqual([linha(0.2)?.anual, linha(0.5)?.anual, linha(1)?.anual], [135, 337.5, 675]);
+  assert.strictEqual(linha(0), undefined, 'sem desconto, sem linha');
+  // com a troca da bomba toda coberta pela reserva, o desconto só pesa no material (não conta a bomba duas vezes)
+  assert.strictEqual(linha(1, 1)?.anual, 300);
+  // o preço sobe com o desconto, e o cliente compara com a peça cheia (avulso)
+  const sem = precoDoPlano(c, nivel({}), poco), cem = precoDoPlano(c, nivel({ descontoPecasPct: 1 }), poco);
+  assert.ok(cem.precoMensal > sem.precoMensal && cem.avulsoAnual === sem.avulsoAnual + 675, JSON.stringify([sem.precoMensal, cem.precoMensal, sem.avulsoAnual, cem.avulsoAnual]));
+  assert.strictEqual(validarNivel({ nome: 'Top', visitasAno: 1, descontoPecasPct: 1 }).descontoPecasPct, 1);
+  assert.throws(() => validarNivel({ nome: 'Top', visitasAno: 1, descontoPecasPct: 1.1 }), /Desconto em bomba e material/);
+});

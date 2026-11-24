@@ -357,3 +357,6 @@ Colunas novas: `incluso` em `_orcamento_itens`, `valor_parcelado` em `_obras`, `
   dá lucro e mantém a margem mínima com o preço), o risco (alto = esperado abaixo da margem mínima; médio = pessimista
   negativo) com os motivos e a precisão dos dados. A análise soma a carteira (receita, lucro e faixa se todos assinarem).
   No simulador, "Fechar por" testa um preço combinado (desconto) e mostra os cenários.
+- **Desconto em bomba e material no custo** (2026-11-23, coluna `material_ano_poco` em `_plano_mensal_custos`): o desconto
+  (até 100%, para a escadinha 20/50/100%) vira linha de custo do plano = desconto × (troca da bomba por ano na parte que a
+  reserva não cobre + material do cliente por poço por ano); o avulso compara com a peça cheia.
