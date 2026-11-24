@@ -105,3 +105,61 @@ export const kmAteOPoco = (base: { baseLatitude: number | null; baseLongitude: n
   const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(base.baseLatitude)) * Math.cos(rad(latitude)) * Math.sin(dLon / 2) ** 2;
   return Math.round(2 * 6371 * Math.asin(Math.sqrt(a)) * (base.fatorEstrada || 1) * 2);
 };
+
+// ------------------------------------------------------------------ estimado × real (depois da obra)
+export type TipoCustoReal = 'EQUIPE' | 'KM' | 'COMBUSTIVEL' | 'DESGASTE' | 'DESPESA' | 'TERCEIRO' | 'OUTRO';
+export const TIPOS_CUSTO_REAL: Record<TipoCustoReal, { texto: string; dica: string }> = {
+  EQUIPE: { texto: 'Horas da equipe', dica: 'horas trabalhadas × custo da hora' },
+  KM: { texto: 'Km rodados', dica: 'km × custo do km' },
+  COMBUSTIVEL: { texto: 'Diesel da sonda', dica: 'sonda e compressor' },
+  DESGASTE: { texto: 'Desgaste', dica: 'broca, martelo, bits' },
+  DESPESA: { texto: 'Despesas', dica: 'alimentação, estadia, pedágio' },
+  TERCEIRO: { texto: 'Terceiros', dica: 'retroescavadeira, munck, frete' },
+  OUTRO: { texto: 'Outro', dica: '' },
+};
+
+/** Cada grupo da estimativa e os lançamentos reais que caem nele. */
+const GRUPOS = [
+  { grupo: 'PERFURACAO', rotulo: 'Perfuração (diesel e desgaste)', estimado: 'custoPerfuracao', tipos: ['COMBUSTIVEL', 'DESGASTE'] },
+  { grupo: 'MATERIAIS', rotulo: 'Materiais', estimado: 'materiais', tipos: [] },
+  { grupo: 'BOMBA', rotulo: 'Bomba', estimado: 'bomba', tipos: [] },
+  { grupo: 'EQUIPE', rotulo: 'Equipe', estimado: 'equipe', tipos: ['EQUIPE'] },
+  { grupo: 'DESLOCAMENTO', rotulo: 'Deslocamento', estimado: 'deslocamento', tipos: ['KM'] },
+  { grupo: 'DESPESAS', rotulo: 'Despesas', estimado: 'despesasDia', tipos: ['DESPESA'] },
+  { grupo: 'OUTROS', rotulo: 'Terceiros e outros', estimado: null, tipos: ['TERCEIRO', 'OUTRO'] },
+] as const;
+
+export interface RealDaObra {
+  /** Materiais da obra (usado, ou previsto onde não conferiu), separando a bomba (categoria Bomba). */
+  materiais: number; bomba: number;
+  lancamentos: Array<{ tipo: TipoCustoReal; valor: number; quantidade: number | null }>;
+}
+
+/**
+ * Compara o que o orçamento estimou com o que a obra custou, grupo a grupo, e as margens pela mesma conta da estimativa
+ * (preço × (1 − impostos/taxas) − custo, sobre o preço). O preço real é o cobrado (contrato + adicionais aprovados).
+ */
+export const compararEstimadoReal = (est: Partial<EstimativaCusto> | null | undefined, real: RealDaObra, total: number, deducoesPct: number) => {
+  const soma = (tipos: readonly string[]) => r2(real.lancamentos.filter(l => tipos.includes(l.tipo)).reduce((s, l) => s + n(l.valor), 0));
+  const linhas = GRUPOS.map(g => {
+    const realG = g.grupo === 'MATERIAIS' ? r2(n(real.materiais)) : g.grupo === 'BOMBA' ? r2(n(real.bomba)) : soma(g.tipos);
+    const estimado = est ? (g.estimado ? r2(n((est as any)[g.estimado])) : 0) : null;
+    const diferenca = estimado === null ? null : r2(realG - estimado);
+    return { grupo: g.grupo, rotulo: g.rotulo, estimado, real: realG, diferenca, diferencaPct: estimado ? Math.round((diferenca! / estimado) * 1000) / 10 : null };
+  }).filter(l => l.real > 0 || (l.estimado ?? 0) > 0);
+  const custoReal = r2(linhas.reduce((s, l) => s + l.real, 0));
+  const custoEstimado = est ? r2(n(est.custo)) : null;
+  const ded = est && est.deducoesPct !== undefined ? n(est.deducoesPct) : n(deducoesPct);
+  const preco = n(total);
+  const lucroReal = preco > 0 ? r2(preco * (1 - ded) - custoReal) : null;
+  const horas = (tipo: TipoCustoReal) => r2(real.lancamentos.filter(l => l.tipo === tipo).reduce((s, l) => s + n(l.quantidade), 0));
+  return {
+    linhas, custoReal, custoEstimado, diferenca: custoEstimado === null ? null : r2(custoReal - custoEstimado),
+    deducoesPct: ded, impostos: preco > 0 ? r2(preco * ded) : null, lucroReal,
+    margemReal: preco > 0 && lucroReal !== null ? Math.round((lucroReal / preco) * 1000) / 1000 : null,
+    margemEstimada: est?.margem ?? null,
+    horasReais: horas('EQUIPE'), horasEstimadas: est ? n(est.horasTotal) : null,
+    kmReais: horas('KM'),
+  };
+};
+export type ComparacaoCusto = ReturnType<typeof compararEstimadoReal>;

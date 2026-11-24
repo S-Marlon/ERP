@@ -1,6 +1,6 @@
 // Obras de poços › resultado e painel (etapa 8): números do próprio módulo (fora do Resultado do mês da loja).
 // GET /painel?de=&ate= — situação das obras, a receber, recebido e faturado no período, metros perfurados, lucro de
-// cada obra (contrato + adicionais aprovados − materiais) e os alertas de obra parada ou atrasada.
+// cada obra (contrato + adicionais aprovados − materiais − outros custos) e os alertas de obra parada ou atrasada.
 import { Request, Response } from 'express';
 import pool from '../../../infra/db';
 import { ErroObra, pocoDoRelatorio } from './obras';
@@ -12,6 +12,11 @@ const dia = /^\d{4}-\d{2}-\d{2}$/;
 const hojeIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const lerJson = (s: unknown) => { try { return s ? JSON.parse(String(s)) : {}; } catch { return {}; } };
 const n = (v: unknown) => Number(v) || 0;
+/** Margem que o orçamento estimava, na mesma conta do painel (preço − custo estimado, sobre o preço), em %. */
+const margemDaEstimativa = (s: unknown) => {
+  const e = lerJson(s); const preco = n(e?.entrada?.preco), custo = n(e?.resultado?.custo);
+  return s && preco > 0 && custo > 0 ? Math.round(((preco - custo) / preco) * 1000) / 10 : null;
+};
 
 export const painelPocos = async (req: Request, res: Response) => {
   const tenant = tenantDe(req);
@@ -30,6 +35,8 @@ export const painelPocos = async (req: Request, res: Response) => {
               (SELECT COALESCE(SUM(p.valor_pago), 0) FROM modulo_hidraulica_pocos_parcelas p WHERE p.id_obra = o.id_obra AND p.status <> 'CANCELADO') AS recebido,
               (SELECT COALESCE(SUM(p.valor), 0) FROM modulo_hidraulica_pocos_parcelas p WHERE p.id_obra = o.id_obra AND p.status <> 'CANCELADO') AS parcelado,
               (SELECT COALESCE(SUM(ROUND(COALESCE(l.qtd_usada, l.qtd_prevista) * l.custo_unitario, 2)), 0) FROM modulo_hidraulica_pocos_obras_materiais l WHERE l.id_obra = o.id_obra) AS custo,
+              (SELECT COALESCE(SUM(x.valor), 0) FROM modulo_hidraulica_pocos_obras_custos x WHERE x.id_obra = o.id_obra) AS custo_outros,
+              o.estimativa_custo,
               (SELECT COUNT(*) FROM modulo_hidraulica_pocos_obras_materiais l WHERE l.id_obra = o.id_obra) AS linhas,
               (SELECT COUNT(*) FROM modulo_hidraulica_pocos_obras_materiais l WHERE l.id_obra = o.id_obra AND l.qtd_usada IS NULL) AS sem_conferir
        FROM modulo_hidraulica_pocos_obras o
@@ -46,11 +53,12 @@ export const painelPocos = async (req: Request, res: Response) => {
       if (o.situacao === 'CANCELADA') continue;
       const total = n(o.valor_contratado) + n(o.adicionais);
       const titulo = o.titulo || `Obra ${o.id_obra} · ${o.cliente || ''}`;
-      const l = lucroDaObra({ total, recebido: n(o.recebido), custoMateriais: n(o.custo), materiaisConferidos: n(o.sem_conferir) === 0, linhasMateriais: n(o.linhas) });
+      const l = lucroDaObra({ total, recebido: n(o.recebido), custoMateriais: n(o.custo), custoOutros: n(o.custo_outros), materiaisConferidos: n(o.sem_conferir) === 0, linhasMateriais: n(o.linhas) });
       const concluidaNoPeriodo = o.situacao === 'CONCLUIDA' && o.termino >= de && o.termino <= ate;
       linhas.push({
         idObra: Number(o.id_obra), titulo, cliente: o.cliente || null, situacao: o.situacao, servicos: String(o.servicos || '').split(',').filter(Boolean),
         inicio: o.inicio || null, termino: o.termino || null, concluidaNoPeriodo, ...l,
+        margemEstimada: margemDaEstimativa(o.estimativa_custo),
       });
       alertas.push(...alertasDaObra({ idObra: Number(o.id_obra), titulo, situacao: o.situacao, criadaEm: o.criada, dataPrevisao: o.previsao || null,
         dataInicio: o.inicio || null, semParcela: Math.round((total - n(o.parcelado)) * 100) / 100, aReceber: l.aReceber }, hoje));

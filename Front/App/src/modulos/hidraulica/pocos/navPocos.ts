@@ -2,7 +2,7 @@
 // "ficha do poço" a partir do mapa. Estado compartilhado entre as abas (useSyncExternalStore).
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 
-export type ParteObra = 'RELATORIO' | 'ORCAMENTO' | 'PROCESSO' | 'COBRANCA' | 'MATERIAIS';
+export type ParteObra = 'RELATORIO' | 'ORCAMENTO' | 'PROCESSO' | 'COBRANCA' | 'MATERIAIS' | 'CUSTOS';
 export type VistaObras = 'OBRAS' | 'POCOS' | 'CLIENTES' | 'RECEBER' | 'MATERIAIS';
 export interface NavPocos {
   aba: string;

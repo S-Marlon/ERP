@@ -97,7 +97,7 @@ com a loja, se um dia for o caso, é uma decisão nova.
   do relatório das perfurações concluídas). Gráfico dos últimos 12 meses (recebido × faturado).
 - Alertas: orçamento sem resposta > 30 dias, início previsto vencido sem começar, em execução > 15 dias, concluída com
   valor sem parcela lançada.
-- Ainda não entram outros custos da obra (combustível, diárias, terceiros): ficariam numa tabela própria, se quiser.
+- Outros custos da obra (horas, km, diesel, despesas, terceiros) entram desde 2026-11-23 (ver "Custo real × estimado").
 
 ## Etapa 6 (histórico e manutenção do poço)
 - `modulo_hidraulica_pocos_historico`: registros avulsos do poço (medição com NE/ND/vazão, visita, observação,
@@ -322,4 +322,10 @@ Colunas novas: `incluso` em `_orcamento_itens`, `valor_parcelado` em `_obras`, `
   orçamento da obra, "Custo e margem" soma perfuração por formação (parte do perfil geológico do relatório), materiais da
   estrutura prevista a custo do cadastro, bomba, equipe (horas × hora da equipe), deslocamento (km pelo GPS × dias) e
   despesas por dia; com impostos, cobrança e inadimplência dá o preço mínimo (margem mínima), o sugerido (margem desejada) e
-  a margem do contratado. A estimativa fica gravada na obra (próximo passo: comparar com o custo real). Regra em `custoObra.ts`.
+  a margem do contratado. A estimativa fica gravada na obra. Regra em `custoObra.ts`.
+- **Custo real × estimado** (2026-11-23, tabela `modulo_hidraulica_pocos_obras_custos`): aba "Custos e resultado" da obra
+  com os custos além dos materiais — horas da equipe e km (quantidade × custo do Plano mensal, congelado no lançamento;
+  sugere o que falta da estimativa), diesel da sonda, desgaste, despesas, terceiros e outros. Compara grupo a grupo com a
+  estimativa (perfuração = diesel + desgaste; bomba = materiais da categoria Bomba) e mostra a sobra e a margem real pela
+  mesma conta (cobrado × (1 − deduções) − custo). No Resultado, o lucro passa a descontar também esses custos, com a
+  margem estimada ao lado (preço − custo estimado, a mesma conta do painel). Regras em `custoObra.ts` e `custosReais.ts`.

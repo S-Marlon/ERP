@@ -1,20 +1,26 @@
 // Obras de poços › resultado e painel (etapa 8): regras puras. Tudo do próprio módulo (fora do Resultado do mês da
-// loja): o lucro de cada obra (contrato + adicionais aprovados − materiais), os alertas de obra parada ou atrasada e o
+// loja): o lucro de cada obra (contrato + adicionais aprovados − materiais − outros custos), os alertas de obra parada ou atrasada e o
 // recebido mês a mês.
 
 const c = (v: number) => Math.round((Number(v) || 0) * 100);
 const r = (v: number) => v / 100;
 
-export interface ObraParaLucro { total: number; recebido: number; custoMateriais: number; materiaisConferidos: boolean; linhasMateriais: number }
+export interface ObraParaLucro {
+  total: number; recebido: number; custoMateriais: number; materiaisConferidos: boolean; linhasMateriais: number;
+  /** Custos reais além dos materiais (horas, km, diesel, despesas, terceiros). */
+  custoOutros?: number;
+}
 
 /**
- * Lucro da obra: o total cobrado (contrato + adicionais aprovados) menos o custo dos materiais. O custo usa o usado de
- * cada linha e, onde ainda não foi conferido, o previsto (por isso "estimado" enquanto faltar conferir).
+ * Lucro da obra: o total cobrado (contrato + adicionais aprovados) menos o custo dos materiais e os outros custos
+ * lançados. O material usa o usado de cada linha e, onde ainda não foi conferido, o previsto ("estimado").
  */
 export const lucroDaObra = (o: ObraParaLucro) => {
-  const lucro = c(o.total) - c(o.custoMateriais);
+  const custo = c(o.custoMateriais) + c(o.custoOutros || 0);
+  const lucro = c(o.total) - custo;
   return {
-    total: r(c(o.total)), recebido: r(c(o.recebido)), aReceber: r(c(o.total) - c(o.recebido)), custo: r(c(o.custoMateriais)), lucro: r(lucro),
+    total: r(c(o.total)), recebido: r(c(o.recebido)), aReceber: r(c(o.total) - c(o.recebido)),
+    custoMateriais: r(c(o.custoMateriais)), custoOutros: r(c(o.custoOutros || 0)), custo: r(custo), lucro: r(lucro),
     margem: c(o.total) > 0 ? Math.round((lucro / c(o.total)) * 1000) / 10 : null,
     custoEstimado: o.linhasMateriais > 0 && !o.materiaisConferidos, semMateriais: o.linhasMateriais === 0,
   };

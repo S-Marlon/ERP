@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { estimarCusto, incluirPelosServicos, kmAteOPoco, trechosIniciais } from './custoObra';
+import { compararEstimadoReal, estimarCusto, incluirPelosServicos, kmAteOPoco, trechosIniciais } from './custoObra';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -56,4 +56,25 @@ teste('custo da obra: km até o poço', () => {
   assert.ok(km > 20 && km < 30, String(km));                 // ~8,9 km em linha reta × 1,3 × 2
   assert.strictEqual(kmAteOPoco({ ...base, baseLatitude: null }, -23, -46), null);
   assert.strictEqual(kmAteOPoco(base, null, null), null);
+});
+
+teste('custo da obra: estimado × real', () => {
+  const est = { custoPerfuracao: 2000, materiais: 3000, bomba: 1500, equipe: 1200, deslocamento: 300, despesasDia: 200, custo: 8200, deducoesPct: 0.1, margem: 0.2, horasTotal: 24 };
+  const c = compararEstimadoReal(est, {
+    materiais: 3300, bomba: 1500,
+    lancamentos: [
+      { tipo: 'COMBUSTIVEL', valor: 1500, quantidade: null }, { tipo: 'DESGASTE', valor: 700, quantidade: null },
+      { tipo: 'EQUIPE', valor: 1600, quantidade: 32 }, { tipo: 'KM', valor: 300, quantidade: 250 }, { tipo: 'TERCEIRO', valor: 400, quantidade: null },
+    ],
+  }, 12000, 0.2);
+  assert.deepStrictEqual(c.linhas.map(l => [l.grupo, l.estimado, l.real, l.diferenca, l.diferencaPct]), [
+    ['PERFURACAO', 2000, 2200, 200, 10], ['MATERIAIS', 3000, 3300, 300, 10], ['BOMBA', 1500, 1500, 0, 0], ['EQUIPE', 1200, 1600, 400, 33.3],
+    ['DESLOCAMENTO', 300, 300, 0, 0], ['DESPESAS', 200, 0, -200, -100], ['OUTROS', 0, 400, 400, null],
+  ]);
+  // custo real 9300; deduções da estimativa (10%): 12000 × 0,9 − 9300 = 1500 → 12,5%
+  assert.deepStrictEqual([c.custoReal, c.custoEstimado, c.diferenca, c.lucroReal, c.margemReal, c.margemEstimada, c.horasReais, c.horasEstimadas, c.kmReais],
+    [9300, 8200, 1100, 1500, 0.125, 0.2, 32, 24, 250]);
+  // sem estimativa: só o real, com as deduções da empresa
+  const s = compararEstimadoReal(null, { materiais: 1000, bomba: 0, lancamentos: [] }, 2000, 0.2);
+  assert.deepStrictEqual([s.linhas.length, s.linhas[0].estimado, s.custoEstimado, s.lucroReal, s.margemReal, s.margemEstimada], [1, null, null, 600, 0.3, null]);
 });

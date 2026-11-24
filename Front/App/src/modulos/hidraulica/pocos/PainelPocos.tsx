@@ -1,5 +1,5 @@
 // Obras de poços › resultado e painel (etapa 8): os números do próprio módulo (fora do Resultado do mês da loja).
-// Obras por situação, a receber, recebido e faturado no período, metros perfurados, lucro de cada obra e os alertas de
+// Obras por situação, a receber, recebido e faturado no período, metros perfurados, lucro de cada obra (materiais e custos lançados) e os alertas de
 // obra parada ou atrasada. Clicar numa obra abre ela.
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Button, Card, Col, Empty, Input, List, Row, Segmented, Space, Statistic, Table, Tag, Tooltip, Typography, message } from 'antd';
@@ -67,7 +67,7 @@ const PainelPocos: React.FC = () => {
         </Row>
         <Row gutter={[12, 12]}>
           <Col xs={12} md={6}>{cartao('Faturado (obras concluídas)', r.faturado, `${r.concluidas} obra(s) concluída(s)`)}</Col>
-          <Col xs={12} md={6}>{cartao('Custo de materiais', r.custo, 'das obras concluídas no período')}</Col>
+          <Col xs={12} md={6}>{cartao('Custos das obras', r.custo, 'materiais e custos lançados das concluídas')}</Col>
           <Col xs={12} md={6}>{cartao('Lucro das concluídas', r.lucro, r.faturado ? `margem ${(Math.round((r.lucro / r.faturado) * 1000) / 10).toLocaleString('pt-BR')}%` : undefined, r.lucro < 0 ? '#cf1322' : '#389e0d')}</Col>
           <Col xs={12} md={6}>{cartao('Metros perfurados', r.metrosPerfurados, `${r.perfuracoes} perfuração(ões) concluída(s)`, undefined, false)}</Col>
         </Row>
@@ -94,7 +94,7 @@ const PainelPocos: React.FC = () => {
           extra={<Segmented size="small" value={filtro} onChange={v => setFiltro(v as FiltroObras)}
             options={[{ value: 'PERIODO', label: 'Concluídas no período' }, { value: 'ANDAMENTO', label: 'Em andamento' }, { value: 'TODAS', label: 'Todas' }]} />}>
           <Alert type="info" showIcon style={{ marginBottom: 8 }}
-            message="Lucro = contrato + adicionais aprovados − materiais. Onde o material ainda não foi conferido, entra o previsto (custo estimado)." />
+            message="Lucro = contrato + adicionais aprovados − materiais − custos lançados (horas, km, diesel, despesas, terceiros; aba Custos e resultado da obra). Onde o material ainda não foi conferido, entra o previsto. Estimada = a margem do orçamento (Custo e margem), na mesma conta." />
           <Table<LucroObra> size="small" rowKey="idObra" dataSource={obras} pagination={{ pageSize: 50, hideOnSinglePage: true }}
             locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Nenhuma obra neste filtro" /> }}
             onRow={o => ({ onClick: () => abrirObra(o.idObra), style: { cursor: 'pointer' } })}
@@ -108,6 +108,7 @@ const PainelPocos: React.FC = () => {
                   <Table.Summary.Cell index={4} align="right">{brl(s('custo'))}</Table.Summary.Cell>
                   <Table.Summary.Cell index={5} align="right"><Text strong>{brl(s('lucro'))}</Text></Table.Summary.Cell>
                   <Table.Summary.Cell index={6} />
+                  <Table.Summary.Cell index={7} />
                 </Table.Summary.Row>
               ) : null;
             }}
@@ -124,11 +125,19 @@ const PainelPocos: React.FC = () => {
               { title: 'Total', width: 120, align: 'right', render: (_, o) => brl(o.total) },
               { title: 'Recebido', width: 120, align: 'right', render: (_, o) => <>{brl(o.recebido)}{o.aReceber > 0 && <div><Text type="secondary" style={{ fontSize: 11 }}>falta {brl(o.aReceber)}</Text></div>}</> },
               {
-                title: 'Materiais', width: 130, align: 'right', render: (_, o) => (o.semMateriais ? <Text type="secondary">sem lançar</Text>
-                  : <Tooltip title={o.custoEstimado ? 'Tem material sem conferir: entrou o previsto' : undefined}>{brl(o.custo)}{o.custoEstimado && <Text type="warning"> *</Text>}</Tooltip>),
+                title: 'Custos', width: 130, align: 'right', render: (_, o) => (o.semMateriais && !o.custoOutros ? <Text type="secondary">sem lançar</Text>
+                  : (
+                    <Tooltip title={<>Materiais {brl(o.custoMateriais)}{o.custoEstimado ? ' (com previsto: falta conferir)' : ''}<br />Outros custos {brl(o.custoOutros)}</>}>
+                      {brl(o.custo)}{o.custoEstimado && <Text type="warning"> *</Text>}
+                    </Tooltip>
+                  )),
               },
               { title: 'Lucro', width: 120, align: 'right', render: (_, o) => <Text strong style={{ color: o.lucro < 0 ? '#cf1322' : undefined }}>{brl(o.lucro)}</Text> },
               { title: 'Margem', width: 80, align: 'right', render: (_, o) => (o.margem === null ? '—' : `${o.margem.toLocaleString('pt-BR')}%`) },
+              {
+                title: 'Estimada', width: 85, align: 'right', render: (_, o) => (o.margemEstimada === null ? <Text type="secondary">—</Text>
+                  : <Text type={o.margem !== null && o.margem < o.margemEstimada ? 'danger' : 'secondary'}>{o.margemEstimada.toLocaleString('pt-BR')}%</Text>),
+              },
             ]} />
         </Card>
       </>}

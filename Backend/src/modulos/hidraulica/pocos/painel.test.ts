@@ -5,7 +5,9 @@ const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok
 
 teste('painel de poços: lucro da obra', () => {
   assert.deepStrictEqual(lucroDaObra({ total: 20250, recebido: 5000, custoMateriais: 2869.25, materiaisConferidos: true, linhasMateriais: 3 }),
-    { total: 20250, recebido: 5000, aReceber: 15250, custo: 2869.25, lucro: 17380.75, margem: 85.8, custoEstimado: false, semMateriais: false });
+    { total: 20250, recebido: 5000, aReceber: 15250, custoMateriais: 2869.25, custoOutros: 0, custo: 2869.25, lucro: 17380.75, margem: 85.8, custoEstimado: false, semMateriais: false });
+  const outros = lucroDaObra({ total: 10000, recebido: 0, custoMateriais: 2500, custoOutros: 1999.99, materiaisConferidos: true, linhasMateriais: 2 });
+  assert.deepStrictEqual([outros.custo, outros.lucro, outros.margem], [4499.99, 5500.01, 55]);
   const est = lucroDaObra({ total: 10000, recebido: 0, custoMateriais: 2500, materiaisConferidos: false, linhasMateriais: 2 });
   assert.deepStrictEqual([est.lucro, est.margem, est.custoEstimado], [7500, 75, true]);
   const sem = lucroDaObra({ total: 0, recebido: 0, custoMateriais: 0, materiaisConferidos: false, linhasMateriais: 0 });

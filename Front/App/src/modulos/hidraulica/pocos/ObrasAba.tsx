@@ -25,6 +25,7 @@ import { CadastroMateriais, MateriaisDaObra } from './MateriaisObra';
 import { HistoricoDoPoco } from './ManutencaoPocos';
 import { ProcessoDaObra } from './ProcessoObra';
 import { OrcamentoEContrato, OrcamentoRapido } from './OrcamentoContrato';
+import { CustosResultadoObra } from './CustosResultadoObra';
 import { lerGpsTexto, textoRaio } from './mapaRegional';
 import { abrirFichaCliente, abrirFichaPoco, agendarObra, ParteObra, useNavPocos, useNivelPocos, verNoMapa, VistaObras } from './navPocos';
 import { DestinoPasso, parteDaSituacao, proximoPasso, rotuloDestino } from './proximoPasso';
@@ -470,7 +471,7 @@ const ObraAberta: React.FC<{ idObra: number; parte?: ParteObra; onVoltar: () => 
         <Segmented value={parte} onChange={v => setParte(v as ParteObra)}
           options={[{ value: 'ORCAMENTO', label: 'Orçamento e contrato' }, { value: 'RELATORIO', label: 'Relatório técnico' }, { value: 'PROCESSO', label: 'Processo e fotos' },
             { value: 'COBRANCA', label: 'Sinal e cobrança' },
-            { value: 'MATERIAIS', label: 'Materiais' }]} />
+            { value: 'MATERIAIS', label: 'Materiais' }, { value: 'CUSTOS', label: 'Custos e resultado' }]} />
         {parte !== 'RELATORIO' && <Button onClick={onVoltar}>Voltar para as obras</Button>}
       </Flex>
       {parte === 'RELATORIO'
@@ -486,6 +487,8 @@ const ObraAberta: React.FC<{ idObra: number; parte?: ParteObra; onVoltar: () => 
           ? <ProcessoDaObra idObra={obra.idObra} cancelada={obra.situacao === 'CANCELADA'} />
         : parte === 'COBRANCA'
           ? <CobrancaDaObra key={versaoCobranca} idObra={obra.idObra} cancelada={obra.situacao === 'CANCELADA'} />
+        : parte === 'CUSTOS'
+          ? <CustosResultadoObra idObra={obra.idObra} cancelada={obra.situacao === 'CANCELADA'} />
           : <MateriaisDaObra idObra={obra.idObra} cancelada={obra.situacao === 'CANCELADA'} />}
       <FechamentoModal aberto={!!fechando} inicial={obra} onFechar={() => setFechando(null)}
         titulo={fechando?.para ? `Como o contrato foi fechado? · ${SITUACOES_OBRA[fechando.para].acao}` : 'Contrato da obra'}

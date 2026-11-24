@@ -45,7 +45,7 @@ import {
 import {
   aditivosDaObra, apagarAditivo, criarOrcamento, duplicarOrcamento, emitirAditivo, itensDaObra, marcarAditivoAssinado, salvarItens,
 } from './orcamento.controller';
-import { salvarCustosObra, salvarEstimativaCusto, verCustosObra } from './custosObra.controller';
+import { apagarCustoReal, criarCustoReal, salvarCustoReal, salvarCustosObra, salvarEstimativaCusto, verCustosObra, verCustosReais } from './custosObra.controller';
 import { analiseDoMapa, pocosDoMapa, potencialDoMapa, referenciasDoMapa, resumoMapa } from './mapa.controller';
 
 const router = Router();
@@ -138,6 +138,10 @@ router.get('/pocos/:id/conjunto', conjuntoDoPoco);
 router.get('/custos-obra', verCustosObra);
 router.put('/custos-obra', salvarCustosObra);
 router.put('/obras/:id/estimativa-custo', salvarEstimativaCusto);
+router.get('/obras/:id/custos', verCustosReais);
+router.post('/obras/:id/custos', criarCustoReal);
+router.put('/obras-custos/:idCusto', salvarCustoReal);
+router.delete('/obras-custos/:idCusto', apagarCustoReal);
 router.get('/plano-mensal', verPlanoMensal);
 router.put('/plano-mensal/custos', salvarCustos);
 router.post('/plano-mensal/niveis', salvarNivel);

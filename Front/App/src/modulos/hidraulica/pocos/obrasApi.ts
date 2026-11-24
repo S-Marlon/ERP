@@ -4,6 +4,7 @@
 import type { GrupoOcorrencia } from './ocorrencias';
 import { API_URL } from '../../../shared/api/config';
 import type { Dados } from './relatorioPoco';
+import type { TipoCustoReal } from './custoObra';
 
 const API = `${API_URL}/api/modulos/hidraulica/pocos`;
 
@@ -701,6 +702,7 @@ export interface LucroObra {
   idObra: number; titulo: string; cliente: string | null; situacao: SituacaoObra; servicos: Servico[]; inicio: string | null; termino: string | null;
   concluidaNoPeriodo: boolean; total: number; recebido: number; aReceber: number; custo: number; lucro: number; margem: number | null;
   custoEstimado: boolean; semMateriais: boolean;
+  custoMateriais: number; custoOutros: number; margemEstimada: number | null;
 }
 export interface PainelPocos {
   periodo: { de: string; ate: string };
@@ -839,6 +841,26 @@ export const custosObraApi = {
   carregar: () => pedir<CustosObraDados>(`${API}/custos-obra?tenant_id=1`, undefined, 'Erro ao carregar os custos da obra.'),
   salvar: (d: CustosObraDados) => pedir<CustosObraDados>(`${API}/custos-obra?tenant_id=1`, corpo('PUT', d), 'Erro ao salvar os custos da obra.'),
   salvarEstimativa: (idObra: number, dados: Dados) => pedir<{ ok: true }>(`${API}/obras/${idObra}/estimativa-custo?tenant_id=1`, corpo('PUT', { dados }), 'Erro ao salvar a estimativa.'),
+};
+
+/** Lançamento de custo real da obra além dos materiais. */
+export interface CustoRealForm {
+  data: string; tipo: TipoCustoReal; descricao: string | null; quantidade: number | null; valorUnitario: number | null; valor: number | null;
+}
+export interface CustoReal extends CustoRealForm { idCusto: number; valor: number; operador?: string }
+export interface CustosReaisDados {
+  lancamentos: CustoReal[];
+  materiais: { materiais: number; bomba: number; linhas: number; semConferir: number };
+  /** Contrato + adicionais aprovados. */
+  total: number; situacao: SituacaoObra; inicio: string | null;
+  estimativa: Dados | null;
+  empresa: { custoHoraEquipe: number; custoKm: number; margemMinimaPct: number; deducoesPct: number };
+}
+export const custosReaisApi = {
+  carregar: (idObra: number) => pedir<CustosReaisDados>(`${API}/obras/${idObra}/custos?tenant_id=1`, undefined, 'Erro ao carregar os custos da obra.'),
+  lancar: (idObra: number, c: CustoRealForm) => pedir<CustoReal>(`${API}/obras/${idObra}/custos?tenant_id=1`, corpo('POST', c), 'Erro ao lançar o custo.'),
+  salvar: (idCusto: number, c: CustoRealForm) => pedir<CustoReal>(`${API}/obras-custos/${idCusto}?tenant_id=1`, corpo('PUT', c), 'Erro ao salvar o custo.'),
+  apagar: (idCusto: number) => pedir<{ ok: true }>(`${API}/obras-custos/${idCusto}?tenant_id=1`, { method: 'DELETE' }, 'Erro ao apagar o custo.'),
 };
 
 export const planoMensalApi = {
