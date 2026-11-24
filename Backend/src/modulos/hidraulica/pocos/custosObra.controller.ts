@@ -24,6 +24,8 @@ const carregarCustos = async (tenant: number) => {
     parametros: par ? {
       horasMobilizacao: n(par.horas_mobilizacao), horasRevestimento100m: n(par.horas_revestimento_100m), horasLimpeza: n(par.horas_limpeza),
       horasInstalacaoBomba: n(par.horas_instalacao_bomba), horasPorDia: n(par.horas_por_dia) || 8, custoDia: n(par.custo_dia),
+      horasVisitaTecnica: n(par.horas_visita_tecnica), custoKmCaminhao: n(par.custo_km_caminhao), custoFixoTransporte: n(par.custo_fixo_transporte),
+      viagensMaquina: par.viagens_maquina === null || par.viagens_maquina === undefined ? 1 : n(par.viagens_maquina),
     } : PARAMETROS_PADRAO,
     configurado: rows.some((r: any) => n(r.custo_metro) > 0) && !!par,
   };
@@ -50,12 +52,15 @@ export const salvarCustosObra = async (req: Request, res: Response) => {
         [tenant, f.formacao, f.custoMetro, f.rendimentoMH, op]);
     }
     await conn.execute(
-      `INSERT INTO modulo_hidraulica_pocos_custos_obra (tenant_id, horas_mobilizacao, horas_revestimento_100m, horas_limpeza, horas_instalacao_bomba, horas_por_dia, custo_dia, operador)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO modulo_hidraulica_pocos_custos_obra (tenant_id, horas_mobilizacao, horas_revestimento_100m, horas_limpeza, horas_instalacao_bomba, horas_por_dia, custo_dia,
+         horas_visita_tecnica, custo_km_caminhao, custo_fixo_transporte, viagens_maquina, operador)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE horas_mobilizacao = VALUES(horas_mobilizacao), horas_revestimento_100m = VALUES(horas_revestimento_100m),
          horas_limpeza = VALUES(horas_limpeza), horas_instalacao_bomba = VALUES(horas_instalacao_bomba), horas_por_dia = VALUES(horas_por_dia),
-         custo_dia = VALUES(custo_dia), operador = VALUES(operador)`,
-      [tenant, p.horasMobilizacao, p.horasRevestimento100m, p.horasLimpeza, p.horasInstalacaoBomba, p.horasPorDia, p.custoDia, op]);
+         custo_dia = VALUES(custo_dia), horas_visita_tecnica = VALUES(horas_visita_tecnica), custo_km_caminhao = VALUES(custo_km_caminhao),
+         custo_fixo_transporte = VALUES(custo_fixo_transporte), viagens_maquina = VALUES(viagens_maquina), operador = VALUES(operador)`,
+      [tenant, p.horasMobilizacao, p.horasRevestimento100m, p.horasLimpeza, p.horasInstalacaoBomba, p.horasPorDia, p.custoDia,
+        p.horasVisitaTecnica, p.custoKmCaminhao, p.custoFixoTransporte, p.viagensMaquina, op]);
     await conn.commit();
     return res.json(await carregarCustos(tenant));
   } catch (e) {

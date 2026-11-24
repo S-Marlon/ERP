@@ -1,9 +1,9 @@
 // Obras de poços › custos reais da obra além dos materiais (tabela modulo_hidraulica_pocos_obras_custos): horas da
 // equipe e km rodados (quantidade × custo congelado no lançamento) e lançamentos só em R$ (diesel da sonda, desgaste
-// de broca/martelo, despesas, terceiros). Regras puras, com teste.
+// de broca/martelo, despesas, transporte das máquinas, visita técnica, terceiros). Regras puras, com teste.
 import { ErroObra } from './obras';
 
-export const TIPOS_CUSTO = ['EQUIPE', 'KM', 'COMBUSTIVEL', 'DESGASTE', 'DESPESA', 'TERCEIRO', 'OUTRO'] as const;
+export const TIPOS_CUSTO = ['EQUIPE', 'KM', 'COMBUSTIVEL', 'DESGASTE', 'DESPESA', 'TRANSPORTE', 'VISITA', 'TERCEIRO', 'OUTRO'] as const;
 export type TipoCusto = typeof TIPOS_CUSTO[number];
 /** Tipos lançados por quantidade (horas ou km) × custo unitário. */
 export const POR_QUANTIDADE: TipoCusto[] = ['EQUIPE', 'KM'];

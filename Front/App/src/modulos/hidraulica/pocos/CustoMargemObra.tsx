@@ -2,14 +2,15 @@
 // estrutura prevista, bomba, equipe, dias, deslocamento e despesas) e mostra o preço mínimo, o sugerido e a margem do
 // valor contratado. A estimativa fica gravada na obra para comparar com o real depois. Regras em custoObra.ts.
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Card, Checkbox, Col, Flex, Row, Select, Space, Statistic, Table, Tag, Tooltip, Typography, message } from 'antd';
-import { DeleteOutlined, PlusOutlined, SaveOutlined } from '@ant-design/icons';
+import { Alert, Button, Card, Checkbox, Col, Flex, Input, Row, Select, Space, Statistic, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { DeleteOutlined, EnvironmentOutlined, PlusOutlined, SaveOutlined } from '@ant-design/icons';
 import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
 import { CustosObraDados, custosObraApi, CustosPlano, Obra, planoMensalApi } from './obrasApi';
 import { EntradaCusto, EstimativaCusto, estimarCusto, incluirPelosServicos, kmAteOPoco, trechosIniciais } from './custoObra';
 import { useCatalogoMateriais } from './CampoMaterial';
 import { consumoDoRelatorio } from './materiaisPoco';
 import { CAMADAS_GEOLOGICAS } from './estruturaPoco';
+import { lerGpsTexto } from './mapaRegional';
 
 const { Text } = Typography;
 const brl = (v: number | null | undefined) => (v === null || v === undefined ? '—' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
@@ -53,7 +54,17 @@ export const CustoMargemObra: React.FC<{ obra: Obra; preco?: number; onSalvo?: (
   useEffect(() => { onResultado?.(r); }, [chave]);   // eslint-disable-line react-hooks/exhaustive-deps
   if (!custos || !empresa || !e || !r) return <Card size="small" title="Custo e margem" loading />;
   const mudar = (x: Partial<EntradaCusto>) => { setEntrada({ ...entrada!, ...x }); setMudou(true); };
-  const kmGps = kmAteOPoco(empresa, obra.latitude, obra.longitude);
+  // local: o GPS do poço ou o colado aqui (obra sem poço cadastrado ainda); sem a base da empresa, não dá para medir
+  const gpsColado = obra.latitude === null || obra.longitude === null ? lerGpsTexto(e.gps) : null;
+  const local = obra.latitude !== null && obra.longitude !== null ? { latitude: obra.latitude, longitude: obra.longitude } : gpsColado;
+  const semBase = empresa.baseLatitude === null || empresa.baseLongitude === null;
+  const kmGps = local ? kmAteOPoco(empresa, local.latitude, local.longitude) : null;
+  const colarGps = (texto: string) => {
+    const g = lerGpsTexto(texto);
+    const km = g ? kmAteOPoco(empresa, g.latitude, g.longitude) : null;
+    mudar({ gps: texto || null, ...(km !== null ? { km } : {}) });
+  };
+  const par = custos.parametros;
   const bombaPorCv = (cv: number) => r2(cv * empresa.bombaPrecoPorCv);
 
   const salvar = async () => {
@@ -72,6 +83,10 @@ export const CustoMargemObra: React.FC<{ obra: Obra; preco?: number; onSalvo?: (
     { k: 'eq', item: 'Equipe', detalhe: `${String(r.horasTotal).replace('.', ',')} h × ${brl(empresa.custoHoraEquipe)}`, valor: r.equipe },
     { k: 'km', item: 'Deslocamento', detalhe: `${e.km} km × ${r.dias} dia(s) × ${brl(empresa.custoKm)}/km`, valor: r.deslocamento },
     { k: 'dia', item: 'Despesas por dia', detalhe: `${r.dias} dia(s) × ${brl(custos.parametros.custoDia)}`, valor: r.despesasDia },
+    ...(e.incluir.transporte ? [{ k: 'transp', item: 'Transporte das máquinas',
+      detalhe: `${par.viagensMaquina ?? 1} × (${e.km} km × ${brl(par.custoKmCaminhao || 0)}/km + ${brl(par.custoFixoTransporte || 0)})`, valor: r.transporte }] : []),
+    ...(e.incluir.visita ? [{ k: 'visita', item: 'Visita técnica',
+      detalhe: `${String(par.horasVisitaTecnica || 0).replace('.', ',')} h + ${e.km} km`, valor: r.visita }] : []),
   ];
 
   return (
@@ -87,8 +102,9 @@ export const CustoMargemObra: React.FC<{ obra: Obra; preco?: number; onSalvo?: (
             <div>
               <Text strong>O que a obra tem</Text>
               <div>
-                {([['perfuracao', 'Perfuração'], ['revestimento', 'Revestimento'], ['limpeza', 'Limpeza'], ['bomba', 'Instalação da bomba']] as const).map(([k, t]) => (
-                  <Checkbox key={k} checked={e.incluir[k]} onChange={x => mudar({ incluir: { ...e.incluir, [k]: x.target.checked } })}>{t}</Checkbox>
+                {([['perfuracao', 'Perfuração'], ['revestimento', 'Revestimento'], ['limpeza', 'Limpeza'], ['bomba', 'Instalação da bomba'],
+                  ['transporte', 'Transporte das máquinas'], ['visita', 'Visita técnica']] as const).map(([k, t]) => (
+                  <Checkbox key={k} checked={!!e.incluir[k]} onChange={x => mudar({ incluir: { ...e.incluir, [k]: x.target.checked } })}>{t}</Checkbox>
                 ))}
               </div>
             </div>
@@ -131,12 +147,27 @@ export const CustoMargemObra: React.FC<{ obra: Obra; preco?: number; onSalvo?: (
                   ))}</Space>
                 </Col>
               )}
-              <Col xs={12} md={8}>
-                <Text>Km ida e volta</Text>
-                <CampoNumero min={0} style={{ width: '100%' }} suffix="km" value={e.km} onChange={v => mudar({ km: Number(v) || 0 })} />
-                <Text type="secondary" style={{ fontSize: 11 }}>{kmGps !== null ? `pelo GPS: ${kmGps} km` : 'sem GPS do poço ou da base: km médio'}</Text>
-              </Col>
             </Row>
+            <div>
+              <Text strong><EnvironmentOutlined /> Local da obra e distância</Text>
+              <Row gutter={[10, 6]} style={{ marginTop: 4 }}>
+                <Col xs={24} md={16}>
+                  {obra.latitude !== null && obra.longitude !== null
+                    ? <Input disabled value={`GPS do poço: ${obra.latitude.toFixed(6)}, ${obra.longitude.toFixed(6)}`} />
+                    : <Input allowClear placeholder="Cole a localização (WhatsApp, Google Maps ou -23.05, -46.62)" value={e.gps || ''}
+                        status={e.gps && !gpsColado ? 'warning' : undefined} onChange={x => colarGps(x.target.value)} />}
+                </Col>
+                <Col xs={24} md={8}>
+                  <CampoNumero min={0} style={{ width: '100%' }} suffix="km ida e volta" value={e.km} onChange={v => mudar({ km: Number(v) || 0 })} />
+                </Col>
+              </Row>
+              <Text type="secondary" style={{ fontSize: 11 }}>
+                {semBase ? 'Sem a base da empresa (Plano mensal › Custos e variáveis): use o km à mão.'
+                  : kmGps !== null ? `Pelo GPS: ${kmGps} km ida e volta (linha reta × fator da estrada ${String(empresa.fatorEstrada).replace('.', ',')})${kmGps !== e.km ? ' · o km acima foi mudado à mão' : ''}.`
+                  : e.gps ? 'Não consegui ler a localização colada.' : `Sem GPS do local: km médio da empresa (${empresa.kmMedio} km).`}
+                {' '}O km vale para o deslocamento diário, o transporte das máquinas e a visita técnica.
+              </Text>
+            </div>
             {materiais.linhas.length > 0 && (
               <Text type="secondary" style={{ fontSize: 12 }}>
                 Materiais do relatório: {materiais.linhas.map(l => `${l.nome} ${l.quantidade} ${l.unidade}`).join(' · ')}

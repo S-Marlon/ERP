@@ -834,7 +834,10 @@ export interface PlanoMensalDados {
 // ------------------------------------------------------------------ custos da obra (perfuração e instalação)
 export interface CustosObraDados {
   formacoes: Array<{ formacao: string; custoMetro: number; rendimentoMH: number }>;
-  parametros: { horasMobilizacao: number; horasRevestimento100m: number; horasLimpeza: number; horasInstalacaoBomba: number; horasPorDia: number; custoDia: number };
+  parametros: {
+    horasMobilizacao: number; horasRevestimento100m: number; horasLimpeza: number; horasInstalacaoBomba: number; horasPorDia: number; custoDia: number;
+    horasVisitaTecnica: number; custoKmCaminhao: number; custoFixoTransporte: number; viagensMaquina: number;
+  };
   configurado: boolean;
 }
 export const custosObraApi = {

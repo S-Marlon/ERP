@@ -8,8 +8,13 @@ export const FORMACOES = ['Solo / aterro', 'Argila', 'Areia', 'Silte (caxeta)', 
 export interface CustoFormacao { formacao: string; custoMetro: number; rendimentoMH: number }
 export interface ParametrosObra {
   horasMobilizacao: number; horasRevestimento100m: number; horasLimpeza: number; horasInstalacaoBomba: number; horasPorDia: number; custoDia: number;
+  /** Visita técnica (horas, uma viagem) e transporte das máquinas (caminhão: custo/km, fixo por transporte, idas e voltas). */
+  horasVisitaTecnica: number; custoKmCaminhao: number; custoFixoTransporte: number; viagensMaquina: number;
 }
-export const PARAMETROS_PADRAO: ParametrosObra = { horasMobilizacao: 4, horasRevestimento100m: 3, horasLimpeza: 4, horasInstalacaoBomba: 4, horasPorDia: 8, custoDia: 0 };
+export const PARAMETROS_PADRAO: ParametrosObra = {
+  horasMobilizacao: 4, horasRevestimento100m: 3, horasLimpeza: 4, horasInstalacaoBomba: 4, horasPorDia: 8, custoDia: 0,
+  horasVisitaTecnica: 2, custoKmCaminhao: 0, custoFixoTransporte: 0, viagensMaquina: 1,
+};
 
 const numero = (v: unknown, nome: string, max: number) => {
   if (v === undefined || v === null || v === '') return 0;
@@ -32,5 +37,8 @@ export const validarParametros = (b: any): ParametrosObra => {
     horasMobilizacao: numero(b?.horasMobilizacao, 'Horas para montar a sonda', 200), horasRevestimento100m: numero(b?.horasRevestimento100m, 'Horas de revestimento por 100 m', 200),
     horasLimpeza: numero(b?.horasLimpeza, 'Horas de limpeza', 200), horasInstalacaoBomba: numero(b?.horasInstalacaoBomba, 'Horas de instalação da bomba', 200),
     horasPorDia, custoDia: numero(b?.custoDia, 'Despesa por dia', 100000),
+    horasVisitaTecnica: numero(b?.horasVisitaTecnica, 'Horas da visita técnica', 100), custoKmCaminhao: numero(b?.custoKmCaminhao, 'Custo por km do caminhão', 1000),
+    custoFixoTransporte: numero(b?.custoFixoTransporte, 'Custo fixo do transporte', 100000),
+    viagensMaquina: Math.round(numero(b?.viagensMaquina === undefined || b?.viagensMaquina === null || b?.viagensMaquina === '' ? 1 : b.viagensMaquina, 'Viagens da máquina', 20)),
   };
 };

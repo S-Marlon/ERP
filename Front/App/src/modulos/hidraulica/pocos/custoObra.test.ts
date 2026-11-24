@@ -44,7 +44,7 @@ teste('custo da obra: alertas e partida', () => {
     materiais: 0, outrosMateriais: 0, bombaCusto: 0, km: 0, preco: 0 }, formacoes, par, emp);
   assert.ok(e.alertas.some(a => a.includes('Rocha alterada')) && e.alertas.some(a => a.startsWith('Bomba sem custo')));
   assert.strictEqual(e.situacao, 'SEM_PRECO');
-  assert.deepStrictEqual(incluirPelosServicos(['INSTALACAO']), { perfuracao: false, revestimento: false, limpeza: false, bomba: true });
+  assert.deepStrictEqual(incluirPelosServicos(['INSTALACAO']), { perfuracao: false, revestimento: false, limpeza: false, bomba: true, visita: false, transporte: false });
   assert.deepStrictEqual(trechosIniciais({ perfilGeologico: [{ geoDe: 0, geoAte: 30, geoTipo: 'Argila' }, { geoDe: 30, geoAte: 31, geoTipo: 'Fratura com água' }, { geoDe: 31, geoAte: 120, geoTipo: 'Rocha sã' }] }, 120, 'Argila'),
     [{ formacao: 'Argila', metros: 30 }, { formacao: 'Rocha sã', metros: 89 }]);
   assert.deepStrictEqual(trechosIniciais(null, 100, 'Argila'), [{ formacao: 'Argila', metros: 100 }]);
@@ -94,4 +94,22 @@ teste('custo da obra: trava do preço mínimo', () => {
   assert.deepStrictEqual(travaPrecoMinimo(11000, r), { nivel: 'PREJUIZO', falta: 3000 });        // 11000 × 0,9 = 9900 < 10000
   assert.deepStrictEqual(travaPrecoMinimo(11000, { custo: 0, deducoesPct: 0.1, precoMinimo: null }).nivel, 'SEM_ESTIMATIVA');
   assert.deepStrictEqual(travaPrecoMinimo(0, r).nivel, 'SEM_ESTIMATIVA');
+});
+
+teste('custo da obra: visita técnica e transporte das máquinas pelo km', () => {
+  const p2 = { ...par, horasVisitaTecnica: 2, custoKmCaminhao: 6, custoFixoTransporte: 250, viagensMaquina: 1 };
+  const base = { trechos: [{ formacao: 'Argila', metros: 40 }], materiais: 0, outrosMateriais: 0, bombaCusto: 0, km: 50, preco: 0 };
+  const sem = estimarCusto({ ...base, incluir: { perfuracao: true, revestimento: false, limpeza: false, bomba: false } }, formacoes, p2, emp);
+  const com = estimarCusto({ ...base, incluir: { perfuracao: true, revestimento: false, limpeza: false, bomba: false, visita: true, transporte: true } }, formacoes, p2, emp);
+  assert.strictEqual(com.visita, 2 * 80 + 50 * 1.5);                         // 235
+  assert.strictEqual(com.transporte, 50 * 6 + 250);                          // 550
+  assert.strictEqual(com.custo, sem.custo + 235 + 550);
+  assert.strictEqual(estimarCusto({ ...base, incluir: { perfuracao: true, revestimento: false, limpeza: false, bomba: false, transporte: true } }, formacoes,
+    { ...p2, viagensMaquina: 2 }, emp).transporte, 1100);                     // leva e busca em 2 viagens
+  assert.ok(estimarCusto({ ...base, incluir: { perfuracao: true, revestimento: false, limpeza: false, bomba: false, transporte: true } }, formacoes, par, emp)
+    .alertas.some(a => /Transporte das máquinas sem custo/.test(a)));
+  // no estimado × real, transporte e visita viram linhas próprias
+  const c = compararEstimadoReal(com, { materiais: 0, bomba: 0, lancamentos: [{ tipo: 'TRANSPORTE', valor: 600, quantidade: null }] }, 5000, 0.1);
+  assert.deepStrictEqual(c.linhas.filter(l => ['TRANSPORTE', 'VISITA'].includes(l.grupo)).map(l => [l.grupo, l.estimado, l.real]), [['TRANSPORTE', 550, 600], ['VISITA', 235, 0]]);
+  assert.deepStrictEqual(incluirPelosServicos(['PERFURACAO']).transporte, true);
 });

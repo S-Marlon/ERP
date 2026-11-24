@@ -26,6 +26,13 @@ export const CustosObraConfig: React.FC = () => {
         onChange={v => { setD({ ...d, parametros: { ...d.parametros, [k]: Number(v) || 0 } }); setMudou(true); }} />
     </Col>
   );
+  const din = (k: keyof CustosObraDados['parametros'], rotulo: string, dica?: string) => (
+    <Col xs={12} md={8} xl={4}>
+      <Text>{rotulo}</Text>
+      <CampoDinheiro min={0} style={{ width: '100%' }} value={d.parametros[k]} title={dica}
+        onChange={v => { setD({ ...d, parametros: { ...d.parametros, [k]: Number(v) || 0 } }); setMudou(true); }} />
+    </Col>
+  );
   const salvar = async () => {
     setSalvando(true);
     try { setD(await custosObraApi.salvar(d)); setMudou(false); message.success('Custos da obra salvos.'); }
@@ -54,15 +61,18 @@ export const CustosObraConfig: React.FC = () => {
             {par('horasLimpeza', 'Limpeza do poço', 'h')}
             {par('horasInstalacaoBomba', 'Instalar a bomba', 'h')}
             {par('horasPorDia', 'Jornada', 'h/dia')}
-            <Col xs={12} md={8} xl={4}>
-              <Text>Despesa por dia</Text>
-              <CampoDinheiro min={0} style={{ width: '100%' }} value={d.parametros.custoDia}
-                onChange={v => { setD({ ...d, parametros: { ...d.parametros, custoDia: Number(v) || 0 } }); setMudou(true); }} />
-            </Col>
+            {din('custoDia', 'Despesa por dia')}
+          </Row>
+          <Text strong style={{ display: 'block', marginTop: 12 }}>Visita técnica e transporte das máquinas</Text>
+          <Row gutter={[10, 10]} style={{ marginTop: 4 }}>
+            {par('horasVisitaTecnica', 'Visita técnica', 'h', 'Horas da visita antes da obra (medir, ver o acesso); a viagem sai do km')}
+            {din('custoKmCaminhao', 'Caminhão (por km)', 'Custo por km do caminhão que leva a sonda e o compressor')}
+            {din('custoFixoTransporte', 'Fixo por transporte', 'Carregar, descarregar, munck, a cada transporte')}
+            {par('viagensMaquina', 'Transportes', 'por obra', '1 = o caminhão leva e busca numa ida e volta; 2 = vai e volta duas vezes')}
           </Row>
           <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 8 }}>
             A hora da equipe, o custo por km, a base da empresa, os impostos e as margens vêm de "Custos e variáveis da empresa", acima.
-            Despesa por dia: alimentação, estadia, pedágio.
+            Despesa por dia: alimentação, estadia, pedágio. A visita técnica e o transporte das máquinas usam o km da base até o local da obra (pelo GPS).
           </Text>
         </Col>
       </Row>

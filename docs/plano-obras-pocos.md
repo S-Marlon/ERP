@@ -339,3 +339,8 @@ Colunas novas: `incluso` em `_orcamento_itens`, `valor_parcelado` em `_obras`, `
 - **Ficha de campo do poço** (2026-11-23, `fichaCampoPoco.ts`): na ficha do poço, "Ficha de campo" abre a pré-visualização
   A4 da ficha de campo da perfuração (o modelo do Kit de visita) preenchida com cliente, local e GPS, profundidade,
   diâmetro, vazão, níveis, solo, etapas de perfuração e revestimentos da estrutura (até 3) e a bomba instalada; ou em branco.
+- **Local, visita técnica e transporte das máquinas** (2026-11-23, colunas `horas_visita_tecnica`, `custo_km_caminhao`,
+  `custo_fixo_transporte`, `viagens_maquina` em `_custos_obra`): no Custo e margem, o km de ida e volta sai do GPS do poço
+  ou da localização colada (obra sem poço ainda; fica na estimativa) até a base da empresa. Visita técnica = horas × hora
+  da equipe + uma viagem; transporte das máquinas (marcado em perfuração e limpeza) = transportes × (km × custo/km do
+  caminhão + fixo). Viram linhas próprias no estimado × real, com os tipos de custo real TRANSPORTE e VISITA.

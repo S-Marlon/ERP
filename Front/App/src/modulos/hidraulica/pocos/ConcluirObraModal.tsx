@@ -15,7 +15,7 @@ const num = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 2 
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
 /** Linhas do fechamento: horas e km por quantidade; os demais em R$. */
-const SO_VALOR: TipoCustoReal[] = ['COMBUSTIVEL', 'DESGASTE', 'DESPESA', 'TERCEIRO'];
+const SO_VALOR: TipoCustoReal[] = ['COMBUSTIVEL', 'DESGASTE', 'DESPESA', 'TRANSPORTE', 'TERCEIRO'];
 interface Rascunho { horas: number | null; custoHora: number | null; km: number | null; custoKm: number | null; valores: Partial<Record<TipoCustoReal, number | null>>; terceiroDescricao: string }
 
 /** O que o rascunho vira de lançamentos (só o que tem valor). */

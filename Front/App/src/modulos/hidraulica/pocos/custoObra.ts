@@ -6,6 +6,8 @@
 export interface CustoFormacao { formacao: string; custoMetro: number; rendimentoMH: number }
 export interface ParametrosObra {
   horasMobilizacao: number; horasRevestimento100m: number; horasLimpeza: number; horasInstalacaoBomba: number; horasPorDia: number; custoDia: number;
+  /** Visita técnica (horas, uma viagem) e transporte das máquinas (caminhão: custo/km, fixo por transporte, idas e voltas). */
+  horasVisitaTecnica?: number; custoKmCaminhao?: number; custoFixoTransporte?: number; viagensMaquina?: number;
 }
 /** O que vem do Plano mensal (hora da equipe, km, deduções e margens). */
 export interface CustosDaEmpresa {
@@ -16,7 +18,9 @@ export interface CustosDaEmpresa {
 export interface EntradaCusto {
   trechos: Array<{ formacao: string; metros: number }>;
   /** O que a obra tem (vem dos serviços: perfuração revestida e limpa, instalação da bomba...). */
-  incluir: { perfuracao: boolean; revestimento: boolean; limpeza: boolean; bomba: boolean };
+  incluir: { perfuracao: boolean; revestimento: boolean; limpeza: boolean; bomba: boolean; visita?: boolean; transporte?: boolean };
+  /** GPS do local quando o poço ainda não tem (colado do WhatsApp/Google Maps); o km sai dele. */
+  gps?: string | null;
   /** Materiais da estrutura prevista (a custo do cadastro) e outros, em R$. */
   materiais: number; outrosMateriais: number;
   bombaCusto: number;
@@ -61,7 +65,14 @@ export const estimarCusto = (e: EntradaCusto, formacoes: CustoFormacao[], p: Par
   const materiais = r2(n(e.materiais) + n(e.outrosMateriais));
   const bomba = e.incluir.bomba ? r2(n(e.bombaCusto)) : 0;
   if (e.incluir.bomba && !bomba) alertas.push('Bomba sem custo: informe o valor ou a potência.');
-  const custo = r2(custoPerfuracao + materiais + bomba + equipe + deslocamento + despesasDia);
+  // visita técnica: as horas da visita e uma viagem (ida e volta) no carro da equipe
+  const visita = e.incluir.visita ? r2(n(p.horasVisitaTecnica) * n(emp.custoHoraEquipe) + n(e.km) * n(emp.custoKm)) : 0;
+  // transporte das máquinas: o caminhão leva e busca a sonda/compressor (idas e voltas × km) + o custo fixo de cada transporte
+  const viagens = p.viagensMaquina === undefined || p.viagensMaquina === null ? 1 : n(p.viagensMaquina);
+  const transporte = e.incluir.transporte ? r2(viagens * (n(e.km) * n(p.custoKmCaminhao) + n(p.custoFixoTransporte))) : 0;
+  if (e.incluir.transporte && !n(p.custoKmCaminhao) && !n(p.custoFixoTransporte)) alertas.push('Transporte das máquinas sem custo: preencha o custo do caminhão (Custos da obra).');
+  if (e.incluir.visita && !n(p.horasVisitaTecnica)) alertas.push('Visita técnica sem horas: preencha em Custos da obra.');
+  const custo = r2(custoPerfuracao + materiais + bomba + equipe + deslocamento + despesasDia + visita + transporte);
 
   // deduções sobre o preço (impostos, taxa de cobrança, inadimplência) e as margens
   const deducoes = n(emp.impostosPct) + n(emp.taxaCobrancaPct) + n(emp.inadimplenciaPct);
@@ -75,7 +86,7 @@ export const estimarCusto = (e: EntradaCusto, formacoes: CustoFormacao[], p: Par
     preco <= 0 ? 'SEM_PRECO' : lucro! < 0 ? 'PREJUIZO' : margem! < n(emp.margemMinimaPct) ? 'ABAIXO_MINIMA' : 'OK';
 
   return {
-    metros, perfuracao, custoPerfuracao, horas, horasTotal, dias, equipe, deslocamento, despesasDia, materiais, bomba, custo,
+    metros, perfuracao, custoPerfuracao, horas, horasTotal, dias, equipe, deslocamento, despesasDia, materiais, bomba, visita, transporte, custo,
     deducoesPct: Math.round(deducoes * 10000) / 10000, impostosSobrePreco: preco > 0 ? r2(preco * deducoes) : null,
     precoMinimo, precoSugerido, lucro, margem, situacao, alertas,
   };
@@ -88,6 +99,9 @@ export const incluirPelosServicos = (servicos: string[]) => ({
   revestimento: servicos.includes('PERFURACAO'),
   limpeza: servicos.includes('PERFURACAO') || servicos.includes('LIMPEZA'),
   bomba: servicos.includes('INSTALACAO') || servicos.includes('TROCA_BOMBA'),
+  visita: false,
+  // a sonda (perfuração) ou o compressor (limpeza) vão de caminhão
+  transporte: servicos.includes('PERFURACAO') || servicos.includes('LIMPEZA'),
 });
 
 /** Trechos de partida: o perfil geológico do relatório (se houver) ou os metros previstos numa formação só. */
@@ -107,13 +121,15 @@ export const kmAteOPoco = (base: { baseLatitude: number | null; baseLongitude: n
 };
 
 // ------------------------------------------------------------------ estimado × real (depois da obra)
-export type TipoCustoReal = 'EQUIPE' | 'KM' | 'COMBUSTIVEL' | 'DESGASTE' | 'DESPESA' | 'TERCEIRO' | 'OUTRO';
+export type TipoCustoReal = 'EQUIPE' | 'KM' | 'COMBUSTIVEL' | 'DESGASTE' | 'DESPESA' | 'TRANSPORTE' | 'VISITA' | 'TERCEIRO' | 'OUTRO';
 export const TIPOS_CUSTO_REAL: Record<TipoCustoReal, { texto: string; dica: string }> = {
   EQUIPE: { texto: 'Horas da equipe', dica: 'horas trabalhadas × custo da hora' },
   KM: { texto: 'Km rodados', dica: 'km × custo do km' },
   COMBUSTIVEL: { texto: 'Diesel da sonda', dica: 'sonda e compressor' },
   DESGASTE: { texto: 'Desgaste', dica: 'broca, martelo, bits' },
   DESPESA: { texto: 'Despesas', dica: 'alimentação, estadia, pedágio' },
+  TRANSPORTE: { texto: 'Transporte das máquinas', dica: 'caminhão da sonda/compressor' },
+  VISITA: { texto: 'Visita técnica', dica: 'ida para medir e ver o acesso' },
   TERCEIRO: { texto: 'Terceiros', dica: 'retroescavadeira, munck, frete' },
   OUTRO: { texto: 'Outro', dica: '' },
 };
@@ -126,6 +142,8 @@ const GRUPOS = [
   { grupo: 'EQUIPE', rotulo: 'Equipe', estimado: 'equipe', tipos: ['EQUIPE'] },
   { grupo: 'DESLOCAMENTO', rotulo: 'Deslocamento', estimado: 'deslocamento', tipos: ['KM'] },
   { grupo: 'DESPESAS', rotulo: 'Despesas', estimado: 'despesasDia', tipos: ['DESPESA'] },
+  { grupo: 'TRANSPORTE', rotulo: 'Transporte das máquinas', estimado: 'transporte', tipos: ['TRANSPORTE'] },
+  { grupo: 'VISITA', rotulo: 'Visita técnica', estimado: 'visita', tipos: ['VISITA'] },
   { grupo: 'OUTROS', rotulo: 'Terceiros e outros', estimado: null, tipos: ['TERCEIRO', 'OUTRO'] },
 ] as const;
 
