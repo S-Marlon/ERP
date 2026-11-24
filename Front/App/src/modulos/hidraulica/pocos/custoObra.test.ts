@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { compararEstimadoReal, estimarCusto, incluirPelosServicos, kmAteOPoco, trechosIniciais } from './custoObra';
+import { compararEstimadoReal, faltaDaEstimativa, estimarCusto, incluirPelosServicos, kmAteOPoco, trechosIniciais } from './custoObra';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
 
@@ -77,4 +77,11 @@ teste('custo da obra: estimado × real', () => {
   // sem estimativa: só o real, com as deduções da empresa
   const s = compararEstimadoReal(null, { materiais: 1000, bomba: 0, lancamentos: [] }, 2000, 0.2);
   assert.deepStrictEqual([s.linhas.length, s.linhas[0].estimado, s.custoEstimado, s.lucroReal, s.margemReal, s.margemEstimada], [1, null, null, 600, 0.3, null]);
+});
+
+teste('custo da obra: o que falta lançar pela estimativa', () => {
+  assert.deepStrictEqual(faltaDaEstimativa({ horasTotal: 24.5, dias: 3 }, { km: 42 }, []), { horas: 24.5, km: 126 });
+  assert.deepStrictEqual(faltaDaEstimativa({ horasTotal: 24.5, dias: 3 }, { km: 42 }, [{ tipo: 'EQUIPE', quantidade: 10 }, { tipo: 'KM', quantidade: 130 }, { tipo: 'DESPESA', quantidade: null }]),
+    { horas: 14.5, km: 0 });
+  assert.deepStrictEqual(faltaDaEstimativa(null, null, []), { horas: null, km: null });
 });

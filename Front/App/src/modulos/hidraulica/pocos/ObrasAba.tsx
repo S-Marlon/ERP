@@ -26,6 +26,7 @@ import { HistoricoDoPoco } from './ManutencaoPocos';
 import { ProcessoDaObra } from './ProcessoObra';
 import { OrcamentoEContrato, OrcamentoRapido } from './OrcamentoContrato';
 import { CustosResultadoObra } from './CustosResultadoObra';
+import { ConcluirObraModal } from './ConcluirObraModal';
 import { lerGpsTexto, textoRaio } from './mapaRegional';
 import { abrirFichaCliente, abrirFichaPoco, agendarObra, ParteObra, useNavPocos, useNivelPocos, verNoMapa, VistaObras } from './navPocos';
 import { DestinoPasso, parteDaSituacao, proximoPasso, rotuloDestino } from './proximoPasso';
@@ -361,6 +362,7 @@ const ObraAberta: React.FC<{ idObra: number; parte?: ParteObra; onVoltar: () => 
   const [editando, setEditando] = useState(false);
   const [versao, setVersao] = useState(0);
   const [fechando, setFechando] = useState<{ para?: SituacaoObra } | null>(null);
+  const [concluindo, setConcluindo] = useState(false);
   // o que falta nesta obra: as mesmas pendências da Central
   const [pendencias, setPendencias] = useState<ContratoCentral['pendencias']>([]);
   const carregar = useCallback(() => {
@@ -389,7 +391,8 @@ const ObraAberta: React.FC<{ idObra: number; parte?: ParteObra; onVoltar: () => 
       message.success(`Obra ${SITUACOES_OBRA[s].texto.toLowerCase()}.${r.pocoAtualizado ? ' A ficha do poço recebeu o que o relatório mediu.' : ''}${r.conjuntoRegistrado ? ' A bomba do relatório entrou como instalada no poço.' : ''}`);
       carregar();
       setVersaoCobranca(v => v + 1);
-    } catch (e) { message.error(e instanceof Error ? e.message : 'Erro.'); }
+      return true;
+    } catch (e) { message.error(e instanceof Error ? e.message : 'Erro.'); return false; }
   };
   const indice = ORDEM.indexOf(obra.situacao);
   return (
@@ -406,9 +409,10 @@ const ObraAberta: React.FC<{ idObra: number; parte?: ParteObra; onVoltar: () => 
           <Space wrap>
             {obra.proximas.filter(s => s !== obra.situacao).map(s => pedeFechamento(s) ? (
               <Button key={s} type="primary" onClick={() => setFechando({ para: s })}>{SITUACOES_OBRA[s].acao}</Button>
+            ) : s === 'CONCLUIDA' ? (
+              <Button key={s} type="primary" onClick={() => setConcluindo(true)}>{SITUACOES_OBRA[s].acao}</Button>
             ) : (
-              <Popconfirm key={s} title={`${SITUACOES_OBRA[s].acao}?`} okText="Sim" cancelText="Voltar" onConfirm={() => mudar(s)}
-                description={s === 'CONCLUIDA' && obra.servicos.includes('PERFURACAO') ? 'A ficha do poço recebe a profundidade, a vazão e os níveis do relatório.' : undefined}>
+              <Popconfirm key={s} title={`${SITUACOES_OBRA[s].acao}?`} okText="Sim" cancelText="Voltar" onConfirm={() => mudar(s)}>
                 <Button type={s === 'CANCELADA' || ORDEM.indexOf(s) < indice ? 'default' : 'primary'} danger={s === 'CANCELADA'}>{SITUACOES_OBRA[s].acao}</Button>
               </Popconfirm>
             ))}
@@ -490,6 +494,9 @@ const ObraAberta: React.FC<{ idObra: number; parte?: ParteObra; onVoltar: () => 
         : parte === 'CUSTOS'
           ? <CustosResultadoObra idObra={obra.idObra} cancelada={obra.situacao === 'CANCELADA'} />
           : <MateriaisDaObra idObra={obra.idObra} cancelada={obra.situacao === 'CANCELADA'} />}
+      <ConcluirObraModal aberto={concluindo} idObra={obra.idObra} perfuracao={obra.servicos.includes('PERFURACAO')}
+        onFechar={() => setConcluindo(false)} onVerMateriais={() => { setConcluindo(false); setParte('MATERIAIS'); }}
+        onConcluir={async () => { if (await mudar('CONCLUIDA')) setConcluindo(false); }} />
       <FechamentoModal aberto={!!fechando} inicial={obra} onFechar={() => setFechando(null)}
         titulo={fechando?.para ? `Como o contrato foi fechado? · ${SITUACOES_OBRA[fechando.para].acao}` : 'Contrato da obra'}
         okTexto={fechando?.para ? SITUACOES_OBRA[fechando.para].acao : 'Salvar'}

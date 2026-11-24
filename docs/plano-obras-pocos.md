@@ -329,3 +329,7 @@ Colunas novas: `incluso` em `_orcamento_itens`, `valor_parcelado` em `_obras`, `
   estimativa (perfuração = diesel + desgaste; bomba = materiais da categoria Bomba) e mostra a sobra e a margem real pela
   mesma conta (cobrado × (1 − deduções) − custo). No Resultado, o lucro passa a descontar também esses custos, com a
   margem estimada ao lado (preço − custo estimado, a mesma conta do painel). Regras em `custoObra.ts` e `custosReais.ts`.
+- **Fechamento com custo real** (2026-11-23): "Concluir a obra" abre uma janela com horas e km já sugeridos pelo que falta
+  da estimativa (`faltaDaEstimativa`), diesel, desgaste, despesas e terceiros, o aviso de material sem conferir e a margem
+  real ao vivo; "Lançar e concluir" grava um por vez (erro no meio não duplica) e conclui. No Resultado, alerta
+  "concluída sem o custo real" só para obra com estimativa guardada (as antigas não viram alerta).

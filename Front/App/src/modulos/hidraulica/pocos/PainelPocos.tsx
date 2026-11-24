@@ -75,7 +75,7 @@ const PainelPocos: React.FC = () => {
         {!!dados.alertas.length && (
           <Card size="small" title={<Space><WarningOutlined style={{ color: '#d48806' }} />Obras para olhar ({dados.alertas.length})</Space>}>
             <List size="small" dataSource={dados.alertas} renderItem={a => (
-              <List.Item style={{ cursor: 'pointer' }} onClick={() => abrirObra(a.idObra, a.tipo === 'SALDO_NAO_LANCADO' ? 'COBRANCA' : undefined)}>
+              <List.Item style={{ cursor: 'pointer' }} onClick={() => abrirObra(a.idObra, a.tipo === 'SALDO_NAO_LANCADO' ? 'COBRANCA' : a.tipo === 'SEM_CUSTO_REAL' ? 'CUSTOS' : undefined)}>
                 <Text strong>Nº {a.idObra} · {a.titulo}</Text><Text type="secondary">{a.texto}</Text>
               </List.Item>
             )} />

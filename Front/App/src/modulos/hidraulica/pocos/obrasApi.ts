@@ -711,7 +711,7 @@ export interface PainelPocos {
   periodoResumo: { recebido: number; recebimentos: number; concluidas: number; faturado: number; custo: number; lucro: number; metrosPerfurados: number; perfuracoes: number };
   serie: { chave: string; rotulo: string; recebido: number; faturado: number }[];
   obras: LucroObra[];
-  alertas: { idObra: number; titulo: string; tipo: 'ORCAMENTO_PARADO' | 'INICIO_ATRASADO' | 'EXECUCAO_LONGA' | 'SALDO_NAO_LANCADO'; texto: string }[];
+  alertas: { idObra: number; titulo: string; tipo: 'ORCAMENTO_PARADO' | 'INICIO_ATRASADO' | 'EXECUCAO_LONGA' | 'SALDO_NAO_LANCADO' | 'SEM_CUSTO_REAL'; texto: string }[];
 }
 export const painelApi = {
   carregar: (de: string, ate: string) => pedir<PainelPocos>(`${API}/painel?${q({ de, ate })}`, undefined, 'Erro ao montar o painel.'),

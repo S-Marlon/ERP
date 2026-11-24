@@ -29,8 +29,10 @@ export const lucroDaObra = (o: ObraParaLucro) => {
 export interface ObraParaAlerta {
   idObra: number; titulo: string; situacao: string; criadaEm: string; dataPrevisao: string | null; dataInicio: string | null;
   semParcela: number; aReceber: number;
+  /** Tem estimativa de custo guardada e quantos custos reais foram lançados (concluída sem lançar = alerta). */
+  temEstimativa?: boolean; custosLancados?: number;
 }
-export interface AlertaObra { idObra: number; titulo: string; tipo: 'ORCAMENTO_PARADO' | 'INICIO_ATRASADO' | 'EXECUCAO_LONGA' | 'SALDO_NAO_LANCADO'; texto: string }
+export interface AlertaObra { idObra: number; titulo: string; tipo: 'ORCAMENTO_PARADO' | 'INICIO_ATRASADO' | 'EXECUCAO_LONGA' | 'SALDO_NAO_LANCADO' | 'SEM_CUSTO_REAL'; texto: string }
 
 const dias = (de: string, hoje: string) => Math.round((new Date(`${hoje}T12:00:00`).getTime() - new Date(`${de.slice(0, 10)}T12:00:00`).getTime()) / 86400000);
 const br = (s: string) => `${s.slice(8, 10)}/${s.slice(5, 7)}`;
@@ -54,6 +56,10 @@ export const alertasDaObra = (o: ObraParaAlerta, hoje: string): AlertaObra[] => 
   }
   if (o.situacao === 'CONCLUIDA' && c(o.semParcela) > 0) {
     a.push({ ...base, tipo: 'SALDO_NAO_LANCADO', texto: `Concluída com R$ ${r(c(o.semParcela)).toFixed(2).replace('.', ',')} sem parcela lançada.` });
+  }
+  // só cobra de quem estimou o custo (as obras antigas, sem estimativa, não viram alerta)
+  if (o.situacao === 'CONCLUIDA' && o.temEstimativa && !o.custosLancados) {
+    a.push({ ...base, tipo: 'SEM_CUSTO_REAL', texto: 'Concluída sem o custo real lançado (horas, km, diesel): o lucro está só com os materiais.' });
   }
   return a;
 };

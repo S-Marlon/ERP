@@ -163,3 +163,19 @@ export const compararEstimadoReal = (est: Partial<EstimativaCusto> | null | unde
   };
 };
 export type ComparacaoCusto = ReturnType<typeof compararEstimadoReal>;
+
+/**
+ * O que falta lançar pela estimativa (para sugerir no lançamento e no fechamento da obra): horas da equipe estimadas −
+ * já lançadas, e km (ida e volta × dias de obra) − já lançados. Null quando não há estimativa para comparar.
+ */
+export const faltaDaEstimativa = (
+  est: { horasTotal?: number; dias?: number } | null | undefined, entrada: { km?: number } | null | undefined,
+  lancamentos: Array<{ tipo: TipoCustoReal; quantidade: number | null }>,
+) => {
+  const ja = (tipo: TipoCustoReal) => lancamentos.filter(l => l.tipo === tipo).reduce((s, l) => s + n(l.quantidade), 0);
+  const horasEst = n(est?.horasTotal), kmEst = n(entrada?.km) * n(est?.dias);
+  return {
+    horas: horasEst ? r2(Math.max(0, horasEst - ja('EQUIPE'))) : null,
+    km: kmEst ? Math.max(0, Math.round(kmEst - ja('KM'))) : null,
+  };
+};

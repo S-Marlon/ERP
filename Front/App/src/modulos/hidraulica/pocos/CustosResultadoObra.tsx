@@ -7,7 +7,7 @@ import { DeleteOutlined, EditOutlined, PlusOutlined, SaveOutlined } from '@ant-d
 import dayjs from 'dayjs';
 import { CampoData, CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
 import { CustoReal, CustoRealForm, custosReaisApi, CustosReaisDados } from './obrasApi';
-import { compararEstimadoReal, TIPOS_CUSTO_REAL, TipoCustoReal } from './custoObra';
+import { compararEstimadoReal, faltaDaEstimativa, TIPOS_CUSTO_REAL, TipoCustoReal } from './custoObra';
 
 const { Text } = Typography;
 const brl = (v: number | null | undefined) => (v === null || v === undefined ? '—' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
@@ -33,15 +33,9 @@ export const CustosResultadoObra: React.FC<{ idObra: number; cancelada?: boolean
   // ponto de partida de cada tipo: horas e km pelo que falta da estimativa, custo unitário do plano mensal
   const novo = (tipo: TipoCustoReal): CustoRealForm => {
     const hoje = dayjs().format('YYYY-MM-DD');
-    if (tipo === 'EQUIPE') {
-      const falta = c.horasEstimadas ? Math.max(0, Math.round((c.horasEstimadas - c.horasReais) * 100) / 100) : null;
-      return { data: hoje, tipo, descricao: null, quantidade: falta || null, valorUnitario: d.empresa.custoHoraEquipe || null, valor: null };
-    }
-    if (tipo === 'KM') {
-      const kmEst = entradaEst && est ? Number(entradaEst.km || 0) * Number(est.dias || 0) : 0;
-      const falta = kmEst ? Math.max(0, Math.round(kmEst - c.kmReais)) : null;
-      return { data: hoje, tipo, descricao: null, quantidade: falta || null, valorUnitario: d.empresa.custoKm || null, valor: null };
-    }
+    const falta = faltaDaEstimativa(est, entradaEst, d.lancamentos);
+    if (tipo === 'EQUIPE') return { data: hoje, tipo, descricao: null, quantidade: falta.horas || null, valorUnitario: d.empresa.custoHoraEquipe || null, valor: null };
+    if (tipo === 'KM') return { data: hoje, tipo, descricao: null, quantidade: falta.km || null, valorUnitario: d.empresa.custoKm || null, valor: null };
     return { data: hoje, tipo, descricao: null, quantidade: null, valorUnitario: null, valor: null };
   };
   const abrirNovo = (tipo: TipoCustoReal) => { setEditando(null); setForm(novo(tipo)); };

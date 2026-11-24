@@ -26,6 +26,11 @@ teste('painel de poços: alertas de obra', () => {
   assert.deepStrictEqual(alertasDaObra(o({ situacao: 'EM_EXECUCAO', dataInicio: '2026-10-25' }), hoje), []);
   assert.deepStrictEqual(alertasDaObra(o({ situacao: 'CONCLUIDA', semParcela: 2250 }), hoje).map(a => a.texto), ['Concluída com R$ 2250,00 sem parcela lançada.']);
   assert.deepStrictEqual(alertasDaObra(o({ situacao: 'CANCELADA', dataPrevisao: '2026-10-01' }), hoje), []);
+  // concluída com estimativa e sem custo real lançado; sem estimativa (obra antiga) ou com custo lançado, nada
+  assert.deepStrictEqual(alertasDaObra(o({ situacao: 'CONCLUIDA', temEstimativa: true, custosLancados: 0 }), hoje).map(a => a.tipo), ['SEM_CUSTO_REAL']);
+  assert.deepStrictEqual(alertasDaObra(o({ situacao: 'CONCLUIDA', temEstimativa: false, custosLancados: 0 }), hoje), []);
+  assert.deepStrictEqual(alertasDaObra(o({ situacao: 'CONCLUIDA', temEstimativa: true, custosLancados: 2 }), hoje), []);
+  assert.deepStrictEqual(alertasDaObra(o({ situacao: 'EM_EXECUCAO', dataInicio: '2026-11-01', temEstimativa: true, custosLancados: 0 }), hoje), []);
 });
 
 teste('painel de poços: série dos últimos meses', () => {

@@ -37,6 +37,7 @@ export const painelPocos = async (req: Request, res: Response) => {
               (SELECT COALESCE(SUM(ROUND(COALESCE(l.qtd_usada, l.qtd_prevista) * l.custo_unitario, 2)), 0) FROM modulo_hidraulica_pocos_obras_materiais l WHERE l.id_obra = o.id_obra) AS custo,
               (SELECT COALESCE(SUM(x.valor), 0) FROM modulo_hidraulica_pocos_obras_custos x WHERE x.id_obra = o.id_obra) AS custo_outros,
               o.estimativa_custo,
+              (SELECT COUNT(*) FROM modulo_hidraulica_pocos_obras_custos x WHERE x.id_obra = o.id_obra) AS custos_lancados,
               (SELECT COUNT(*) FROM modulo_hidraulica_pocos_obras_materiais l WHERE l.id_obra = o.id_obra) AS linhas,
               (SELECT COUNT(*) FROM modulo_hidraulica_pocos_obras_materiais l WHERE l.id_obra = o.id_obra AND l.qtd_usada IS NULL) AS sem_conferir
        FROM modulo_hidraulica_pocos_obras o
@@ -61,7 +62,7 @@ export const painelPocos = async (req: Request, res: Response) => {
         margemEstimada: margemDaEstimativa(o.estimativa_custo),
       });
       alertas.push(...alertasDaObra({ idObra: Number(o.id_obra), titulo, situacao: o.situacao, criadaEm: o.criada, dataPrevisao: o.previsao || null,
-        dataInicio: o.inicio || null, semParcela: Math.round((total - n(o.parcelado)) * 100) / 100, aReceber: l.aReceber }, hoje));
+        dataInicio: o.inicio || null, temEstimativa: !!o.estimativa_custo, custosLancados: n(o.custos_lancados), semParcela: Math.round((total - n(o.parcelado)) * 100) / 100, aReceber: l.aReceber }, hoje));
       if (concluidaNoPeriodo && String(o.servicos || '').includes('PERFURACAO')) {
         const m = Number(pocoDoRelatorio(lerJson(o.relatorio_periodo)).profundidadeM) || 0;
         if (m > 0) { metrosPeriodo += m; perfuracoesPeriodo++; }
