@@ -369,3 +369,6 @@ Colunas novas: `incluso` em `_orcamento_itens`, `valor_parcelado` em `_obras`, `
   emergencial. Na obra, a hora da equipe = hora por pessoa × pessoas da troca. A análise mostra o planejamento: meta
   (assinantes, receita e o ticket que ela pede), capacidade (idas por mês × serviços por semana) e a partir de quantos
   assinantes uma equipe só para os planos se paga (lucro + mão de obra já no custo).
+- **Desconto de adesão** (2026-11-23, `adesaoPlano.ts`, só tela): no simulador, serviço cheio × cobrado agora × meses de
+  fidelidade; para cada plano, em quantos meses o desconto volta pelo lucro (esperado e pessimista), o que sobra no fim,
+  o preço que paga o desconto no prazo e a multa proporcional (desconto × meses que faltam ÷ meses).

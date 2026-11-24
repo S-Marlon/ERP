@@ -10,6 +10,7 @@ import { Central, centralApi, ClienteAnalisado, CustosPlano, NivelPlano, planoMe
 import { PlanoMensal as Carteira } from './CentralPocos';
 import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
 import { AnalisePlanoCarteira, FaixaLucro, TagRisco } from './AnalisePlanoCarteira';
+import { DescontoAdesao } from './DescontoAdesao';
 import { CustosObraConfig } from './CustosObraConfig';
 
 const { Text } = Typography;
@@ -410,6 +411,8 @@ const PlanoMensalPocos: React.FC = () => {
         </Col>
       </Row>
       )}
+
+      {aba === 'SIMULAR' && <DescontoAdesao planos={sim?.planos || []} custos={custos} />}
 
       {aba === 'PLANOS' && (
       <Card size="small" title="Planos oferecidos"
