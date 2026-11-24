@@ -20,7 +20,9 @@ teste('relatório para o cliente: seções e conteúdo', () => {
   const h = htmlRelatorioCliente(d, todas);
   assert.ok(h.startsWith('<!doctype html>'));
   assert.ok(h.includes('Poço de &lt;Carlos&gt;'));                         // escapa
-  assert.ok(h.includes('Garantia válida até <b>20/11/2027</b>'));
+  assert.ok(h.includes('Garantia válida até <b>20/11/2027</b>') && h.includes('até 20/11/2027'));
+  // papel timbrado dos documentos, seções numeradas e sem imprimir sozinho (a tela imprime pela prévia)
+  assert.ok(h.includes('class="topo"') && h.includes('<span class="n">1</span>Serviços realizados') && !h.includes('window.print'));
   assert.ok(h.includes('<svg') && h.includes('16 barras de 4 m = 64 m'));
   assert.ok(h.includes('Água turva / areia (2 vezes)'));
   assert.ok(h.includes('Sem corda') === false);                            // geomecânico/galvanizado: corda opcional
@@ -29,9 +31,10 @@ teste('relatório para o cliente: seções e conteúdo', () => {
 
 teste('relatório para o cliente: seções desligadas e sem dados', () => {
   const h = htmlRelatorioCliente(d, { ...todas, fotos: false, estrutura: false });
-  assert.ok(!h.includes('<img src="http://x') && !h.includes('<h2>Estrutura do poço</h2>'));
+  assert.ok(!h.includes('<img src="http://x') && !h.includes('Estrutura do poço</h2>'));
   const vazio = htmlRelatorioCliente({ ...d, servicos: [], estrutura: null, conjunto: null, ocorrencias: [], fotos: [] }, todas);
-  assert.ok(!vazio.includes('<h2>Serviços realizados</h2>') && !vazio.includes('<h2>Fotos</h2>') && vazio.includes('<h2>Cliente e poço</h2>'));
+  assert.ok(!vazio.includes('Serviços realizados</h2>') && !vazio.includes('Fotos</h2>') && vazio.includes('<h2>Cliente e poço</h2>')
+    && vazio.includes('<span class="n">1</span>Observações e cuidados'));
 });
 
 teste('relatório para o cliente: verificação antes de mandar', () => {

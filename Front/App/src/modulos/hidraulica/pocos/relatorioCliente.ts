@@ -3,6 +3,7 @@
 // observações técnicas, recomendações, garantia e as fotos. HTML para imprimir ou salvar em PDF. Puro, com teste.
 import { resumoEstrutura, svgPerfil, temEstrutura } from './estruturaPoco';
 import { conferirConjunto, ConjuntoDesenho, svgConjunto, textoTubo } from './desenhoConjunto';
+import { blocoAssinaturas, cabecalho, celula, listaCondicoes, pagina } from './documentosPocos';
 
 export type SecaoCliente = 'servicos' | 'estrutura' | 'conjunto' | 'observacoes' | 'fotos';
 export const SECOES_CLIENTE: Array<{ id: SecaoCliente; titulo: string }> = [
@@ -14,7 +15,7 @@ export const SECOES_CLIENTE: Array<{ id: SecaoCliente; titulo: string }> = [
 ];
 
 export interface DadosRelatorioCliente {
-  empresa: { nome?: string | null; documento?: string | null; telefone?: string | null; email?: string | null; endereco?: string | null; logo?: string | null;
+  empresa: { nome?: string | null; documento?: string | null; telefone?: string | null; whatsapp?: string | null; email?: string | null; endereco?: string | null; logo?: string | null;
     textoGarantia?: string | null; responsavelTecnico?: string | null; registroTecnico?: string | null };
   poco: { identificacao: string; endereco?: string | null; bairro?: string | null; cidade?: string | null; uf?: string | null; latitude?: number | null; longitude?: number | null;
     profundidadeM?: number | null; diametro?: string | null; vazaoLh?: number | null; nivelEstaticoM?: number | null; nivelDinamicoM?: number | null; dataPerfuracao?: string | null };
@@ -30,32 +31,56 @@ export interface DadosRelatorioCliente {
 const esc = (t: unknown) => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
 const num = (v: unknown) => (v === null || v === undefined || v === '' ? '' : Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 2 }));
 const dataBr = (s: string | null | undefined) => (s ? s.slice(0, 10).split('-').reverse().join('/') : '');
-const campo = (rotulo: string, valor: unknown) => (valor === null || valor === undefined || String(valor).trim() === '' ? ''
-  : `<div class="campo"><label>${esc(rotulo)}</label><div>${esc(valor)}</div></div>`);
+/** Telefone só com números → (11) 98888-7777. */
+const fone = (t: string | null | undefined) => {
+  const d = String(t || '').replace(/\D/g, '');
+  return d.length === 11 ? `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}` : d.length === 10 ? `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}` : t || '';
+};
 const junta = (...v: unknown[]) => v.filter(x => x !== null && x !== undefined && String(x).trim() !== '').join(' · ');
 
+/** Cuidados de sempre com o poço (os mesmos do laudo de entrega). */
+const CUIDADOS = [
+  'Bomba: não deixe trabalhar sem água (a seco); se desarmar com frequência, desligue e chame a assistência.',
+  'Poço: mantenha a tampa fechada e a área em volta limpa, sem fossa ou lixo por perto.',
+  'Quadro de comando: proteja da chuva e do sol direto; não altere as proteções.',
+  'Sinais de atenção: queda de vazão, água turva ou com cheiro, barulho diferente na bomba.',
+  'Revisão: recomendamos uma revisão preventiva a cada 12 meses.',
+];
+
+/**
+ * O relatório no papel timbrado dos documentos da obra (o mesmo da proposta, do laudo e da ficha de campo): cabeçalho
+ * com o quadro do documento, resumo do poço em destaque, fichas em grade, seções numeradas, desenhos ao lado dos dados,
+ * cuidados, fotos e a assinatura do responsável técnico. Sem a impressão automática (a tela imprime pela prévia).
+ */
 export const htmlRelatorioCliente = (d: DadosRelatorioCliente, secoes: Record<SecaoCliente, boolean>) => {
   const e = d.empresa;
   const p = d.poco;
   const local = junta(p.endereco, p.bairro, p.cidade && `${p.cidade}${p.uf ? `/${p.uf}` : ''}`);
-  const gps = p.latitude !== null && p.latitude !== undefined && p.longitude !== null && p.longitude !== undefined ? `${p.latitude}, ${p.longitude}` : '';
+  const temGps = p.latitude !== null && p.latitude !== undefined && p.longitude !== null && p.longitude !== undefined;
   const garantia = d.servicos.map(s => s.garantiaAte).filter(Boolean).sort().pop() || null;
   const c = d.conjunto;
   const conferencia = c ? conferirConjunto(c, { profundidadeM: p.profundidadeM, nivelDinamicoM: p.nivelDinamicoM }) : [];
   // para o cliente, só o que é dele cuidar (bomba perto do fundo ou acima do nível, luva de metal antiga); conferência
   // de cadastro (fio, corda, tubos) fica só na verificação interna
-  const recomendacoes = conferencia.filter(x => !x.ok && /fundo|nível dinâmico|oxidação/.test(x.texto)).map(x => x.texto);
+  const recomendacoes = conferencia.filter(x => !x.ok && /fundo|nível dinâmico|oxidação/.test(x.texto)).map(x => `Atenção: ${x.texto}`);
+  const v = (x: unknown, un = '') => (x === null || x === undefined || x === '' || (typeof x === 'number' && !x) ? '—' : `${esc(typeof x === 'number' ? num(x) : x)}${un}`);
 
+  let n = 0;
+  const titulo = (t: string) => `<h2><span class="n">${++n}</span>${esc(t)}</h2>`;
   const blocos: string[] = [];
   if (secoes.servicos && (d.servicos.length || garantia)) {
-    blocos.push(`<section><h2>Serviços realizados</h2><table><thead><tr><th>Serviço</th><th>O que foi feito</th><th>Conclusão</th><th>Garantia até</th></tr></thead><tbody>
-      ${d.servicos.map(s => `<tr><td>${esc(s.titulo)}</td><td>${esc(s.servicos)}</td><td>${dataBr(s.conclusao) || '—'}</td><td>${dataBr(s.garantiaAte) || '—'}</td></tr>`).join('')}
-    </tbody></table>${garantia ? `<p class="destaque">Garantia válida até <b>${dataBr(garantia)}</b>.</p>` : ''}</section>`);
+    blocos.push(`${titulo('Serviços realizados')}
+      <table class="itens"><tr><th>Serviço</th><th>O que foi feito</th><th class="n">Conclusão</th><th class="n">Garantia até</th></tr>
+      ${d.servicos.map(s => `<tr><td>${esc(s.titulo)}</td><td>${esc(s.servicos)}</td><td class="n">${dataBr(s.conclusao) || '—'}</td><td class="n">${dataBr(s.garantiaAte) || '—'}</td></tr>`).join('')}
+      </table>
+      ${garantia ? `<p class="garantia">Garantia válida até <b>${dataBr(garantia)}</b>.</p>` : ''}
+      ${e.textoGarantia ? `<p class="nota">${esc(e.textoGarantia)}</p>` : ''}`);
   }
   if (secoes.estrutura && d.estrutura && temEstrutura(d.estrutura)) {
-    blocos.push(`<section class="quebra-evitar"><h2>Estrutura do poço</h2><div class="lado">
-      <div class="desenho">${svgPerfil(d.estrutura, { altura: 420, largura: 420 })}</div>
-      <ul>${resumoEstrutura(d.estrutura).map(l => `<li>${esc(l)}</li>`).join('')}</ul></div></section>`);
+    blocos.push(`<div class="bloco">${titulo('Estrutura do poço')}<div class="lado">
+      <div class="desenho">${svgPerfil(d.estrutura, { altura: 400, largura: 400 })}</div>
+      <div class="texto"><div class="r">Como o poço foi construído</div>
+        <ul>${resumoEstrutura(d.estrutura).map(l => `<li>${esc(l)}</li>`).join('')}</ul></div></div></div>`);
   }
   if (secoes.conjunto && c) {
     const linhas = [
@@ -66,58 +91,53 @@ export const htmlRelatorioCliente = (d: DadosRelatorioCliente, secoes: Record<Se
       ['Fio', junta(c.fioTipo, c.fioBitola, c.fioMetros ? `${num(c.fioMetros)} m` : '')],
       ['Corda', junta(c.cordaMaterial, c.cordaMetros ? `${num(c.cordaMetros)} m` : '')],
       ['Quadro de comando', c.quadroComando], ['Cabeça do poço', c.cabecaPoco], ['Instalado em', dataBr(c.instaladoEm)],
-    ].filter(([, v]) => v && String(v).trim());
-    blocos.push(`<section class="quebra-evitar"><h2>Bomba e instalação</h2><div class="lado">
-      <div class="desenho">${svgConjunto(c, { profundidadeM: p.profundidadeM, nivelEstaticoM: p.nivelEstaticoM, nivelDinamicoM: p.nivelDinamicoM }, { altura: 420, largura: 420 })}</div>
-      <div class="dados">${linhas.map(([r, v]) => campo(String(r), v)).join('')}</div></div></section>`);
+    ].filter(([, x]) => x && String(x).trim());
+    blocos.push(`<div class="bloco">${titulo('Bomba e instalação')}<div class="lado">
+      <div class="desenho">${svgConjunto(c, { profundidadeM: p.profundidadeM, nivelEstaticoM: p.nivelEstaticoM, nivelDinamicoM: p.nivelDinamicoM }, { altura: 400, largura: 400 })}</div>
+      <div class="texto"><div class="ficha um">${linhas.map(([r, x]) => celula(String(r), esc(x))).join('')}</div></div></div></div>`);
   }
-  if (secoes.observacoes && ((d.ocorrencias || []).length || recomendacoes.length)) {
-    blocos.push(`<section><h2>Observações e recomendações</h2>
-      ${(d.ocorrencias || []).length ? `<p><b>Registrado nas visitas e obras:</b> ${(d.ocorrencias || []).map(o => `${esc(o.rotulo)}${o.vezes > 1 ? ` (${o.vezes} vezes)` : ''}`).join(' · ')}.</p>` : ''}
-      ${recomendacoes.length ? `<ul>${recomendacoes.map(r => `<li>${esc(r)}</li>`).join('')}</ul>` : ''}</section>`);
+  if (secoes.observacoes) {
+    const ocorrencias = d.ocorrencias || [];
+    blocos.push(`${titulo('Observações e cuidados')}
+      ${ocorrencias.length ? `<p><b>Registrado nas visitas e obras:</b> ${ocorrencias.map(o => `${esc(o.rotulo)}${o.vezes > 1 ? ` (${o.vezes} vezes)` : ''}`).join(' · ')}.</p>` : ''}
+      ${listaCondicoes([...recomendacoes, ...CUIDADOS])}`);
   }
   if (secoes.fotos && d.fotos.length) {
-    blocos.push(`<section><h2>Fotos</h2><div class="fotos">${d.fotos.map(f => `<figure><img src="${esc(f.url)}" alt=""><figcaption>${esc(f.legenda)}</figcaption></figure>`).join('')}</div></section>`);
+    blocos.push(`${titulo('Fotos')}<div class="fotos">${d.fotos.map(f => `<figure><img src="${esc(f.url)}" alt=""><figcaption>${esc(f.legenda)}</figcaption></figure>`).join('')}</div>`);
   }
 
-  return `<!doctype html><html><head><meta charset="utf-8"><title>Relatório do poço · ${esc(p.identificacao)}</title><style>
-    @page { size: A4; margin: 12mm; } * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    table, td, th { font-size: inherit; } body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; color: #1f2933; margin: 0; }
-    header { display: flex; justify-content: space-between; align-items: center; gap: 12px; border-bottom: 3px solid #006d77; padding-bottom: 8px; margin-bottom: 10px; }
-    header img { max-height: 54px; max-width: 160px; } header .emp { font-size: 10px; color: #52606d; }
-    header h1 { margin: 0; font-size: 18px; color: #006d77; } header .num { text-align: right; font-size: 10px; color: #52606d; }
-    section { margin-bottom: 12px; } h2 { font-size: 12.5px; color: #006d77; text-transform: uppercase; letter-spacing: .4px; border-bottom: 1px solid #d9e2ec; padding-bottom: 3px; margin: 0 0 6px; }
-    .grade { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px 12px; }
-    .campo label { display: block; font-size: 8.5px; text-transform: uppercase; color: #7b8794; letter-spacing: .4px; } .campo div { font-weight: 600; }
-    table { width: 100%; border-collapse: collapse; } th { background: #f0f4f8; text-align: left; font-size: 9.5px; text-transform: uppercase; color: #52606d; }
-    th, td { padding: 4px 6px; border-bottom: 1px solid #e4e7eb; }
-    .destaque { background: #e6fffb; border: 1px solid #87e8de; padding: 5px 8px; border-radius: 4px; margin: 6px 0 0; }
-    .lado { display: flex; gap: 14px; align-items: flex-start; } .lado .desenho { flex: 0 0 auto; } .lado ul, .lado .dados { flex: 1; }
-    .lado .dados { display: grid; grid-template-columns: 1fr; gap: 6px; } ul { margin: 0; padding-left: 16px; } li { margin-bottom: 3px; }
-    .quebra-evitar { page-break-inside: avoid; }
-    .fotos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; } figure { margin: 0; page-break-inside: avoid; }
-    figure img { width: 100%; height: 150px; object-fit: cover; border-radius: 4px; border: 1px solid #e4e7eb; } figcaption { font-size: 9.5px; color: #52606d; margin-top: 2px; }
-    footer { margin-top: 14px; border-top: 1px solid #d9e2ec; padding-top: 8px; font-size: 9.5px; color: #52606d; }
-    .assinatura { margin-top: 26px; width: 260px; border-top: 1px solid #52606d; padding-top: 3px; text-align: center; color: #1f2933; }
-  </style></head><body>
-    <header>
-      <div style="display:flex;gap:10px;align-items:center">${e.logo ? `<img src="${esc(e.logo)}" alt="">` : ''}
-        <div><h1>Relatório do poço</h1><div class="emp">${esc(junta(e.nome, e.documento, e.telefone, e.email))}</div></div></div>
-      <div class="num"><b style="font-size:12px;color:#1f2933">${esc(p.identificacao)}</b><br>emitido em ${dataBr(d.hoje)}</div>
-    </header>
-    <section><h2>Cliente e poço</h2><div class="grade">
-      ${campo('Cliente', d.cliente?.nome)}${campo('Telefone', d.cliente?.telefone)}${campo('Local', local)}${campo('GPS', gps)}
-      ${campo('Profundidade', p.profundidadeM ? `${num(p.profundidadeM)} m` : '')}${campo('Diâmetro', p.diametro)}
-      ${campo('Vazão', p.vazaoLh ? `${num(p.vazaoLh)} L/h` : '')}${campo('Nível estático / dinâmico', p.nivelEstaticoM || p.nivelDinamicoM ? `${num(p.nivelEstaticoM) || '—'} / ${num(p.nivelDinamicoM) || '—'} m` : '')}
-      ${campo('Perfurado em', dataBr(p.dataPerfuracao))}
-    </div></section>
+  const empresa = { empresaNome: e.nome, empresaDocumento: e.documento, empresaTelefone: e.telefone, empresaWhatsapp: e.whatsapp, empresaEmail: e.email, empresaEndereco: e.endereco } as any;
+  const corpo = `${cabecalho({ empresa }, e.logo || null, { tipo: 'Relatório do poço', numero: p.identificacao, data: `Emitido em ${dataBr(d.hoje)}` })}
+    <h1>Relatório técnico do poço</h1>
+    <div class="sub">Dados do poço, serviços realizados${secoes.estrutura ? ', estrutura' : ''}${secoes.conjunto ? ' e instalação da bomba' : ''}</div>
+    <div class="resumo">
+      <div><div class="r">Profundidade</div><div class="v">${v(p.profundidadeM, ' m')}</div></div>
+      <div><div class="r">Vazão</div><div class="v">${v(p.vazaoLh, ' L/h')}</div></div>
+      <div><div class="r">Nível estático · dinâmico</div><div class="v">${v(p.nivelEstaticoM)} · ${v(p.nivelDinamicoM, ' m')}</div></div>
+      <div class="destaque"><div class="r">Garantia</div><div class="v">${garantia ? `até ${dataBr(garantia)}` : '—'}</div></div>
+    </div>
+    <h2>Cliente e poço</h2>
+    <div class="ficha tres">
+      ${celula('Cliente', v(d.cliente?.nome))}${celula('Telefone', v(fone(d.cliente?.telefone)))}${celula('Perfurado em', v(dataBr(p.dataPerfuracao)))}
+      ${celula('Diâmetro', v(p.diametro))}${celula('Identificação', esc(p.identificacao)).replace('<div>', '<div style="grid-column: span 2">')}
+      ${celula('Local', `${v(local)}${temGps ? ` <small>· GPS ${p.latitude}, ${p.longitude}</small>` : ''}`, true)}
+    </div>
     ${blocos.join('')}
-    <footer>
-      ${e.textoGarantia ? `<p>${esc(e.textoGarantia)}</p>` : ''}
-      ${e.responsavelTecnico ? `<div class="assinatura">${esc(e.responsavelTecnico)}${e.registroTecnico ? `<br><span style="color:#7b8794">${esc(e.registroTecnico)}</span>` : ''}</div>` : ''}
-      <p>${esc(junta(e.nome, e.endereco, e.telefone, e.email))}</p>
-    </footer>
-  </body></html>`;
+    ${e.responsavelTecnico ? blocoAssinaturas([{ nome: esc(e.responsavelTecnico), papel: `Responsável técnico${e.registroTecnico ? ` · ${esc(e.registroTecnico)}` : ''}` }]) : ''}
+    <div class="rodape">${esc(junta(e.nome, e.endereco, fone(e.telefone), e.email))}</div>`;
+  return pagina(`Relatório do poço · ${p.identificacao}`, corpo, `
+    .garantia { background: #e3f1e8; border: 1px solid #b7dcc4; color: #1e6b3a; padding: 1.6mm 3mm; border-radius: 1.5mm; margin: 2.5mm 0 1mm; }
+    .bloco { break-inside: avoid; }
+    .lado { display: flex; gap: 5mm; align-items: flex-start; }
+    .lado .desenho { flex: 0 0 auto; border: 1px solid var(--b); border-radius: 1.5mm; padding: 2mm; background: #fbfcfd; }
+    .lado .desenho svg { display: block; max-width: 92mm; height: auto; }
+    .lado .texto { flex: 1; min-width: 0; } .lado ul { margin: 1mm 0 0; padding-left: 4.5mm; } .lado li { margin-bottom: 1.4mm; }
+    .ficha.um { grid-template-columns: 1fr; }
+    .assinaturas { justify-content: flex-end; } .assinaturas > div { flex: 0 0 75mm; }
+    .fotos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3mm; }
+    figure { margin: 0; break-inside: avoid; }
+    figure img { width: 100%; height: 45mm; object-fit: cover; border-radius: 1.5mm; border: 1px solid var(--b); display: block; }
+    figcaption { font-size: 7.5pt; color: var(--m); margin-top: .8mm; }`).replace(/<script>window\.onload[\s\S]*?<\/script>/, '');
 };
 
 // ---------------------------------------------------------------- verificação antes de mandar

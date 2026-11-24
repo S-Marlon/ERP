@@ -40,7 +40,8 @@ export const RelatorioClienteModal: React.FC<{ aberto: boolean; ficha: PocoCompl
     const a = conj?.atual;
     return {
       empresa: {
-        nome: config?.empresaNome, documento: config?.empresaDocumento, telefone: config?.empresaTelefone || config?.empresaWhatsapp, email: config?.empresaEmail,
+        nome: config?.empresaNome, documento: config?.empresaDocumento, telefone: config?.empresaTelefone || config?.empresaWhatsapp,
+        whatsapp: config?.empresaTelefone ? config?.empresaWhatsapp : null, email: config?.empresaEmail,
         endereco: config?.empresaEndereco, logo: config?.logo ? urlArquivo(config.logo) : null, textoGarantia: config?.textoGarantia,
         responsavelTecnico: config?.responsavelTecnico, registroTecnico: config?.registroTecnico,
       },
