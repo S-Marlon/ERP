@@ -218,6 +218,15 @@ const PDVContent: React.FC = () => {
       setSearchParams({}, { replace: true });
       abrirPedido(idOrc, 'ORCAMENTO');
     }
+    // Vindo da ficha do cliente (?cliente=ID&nome=...): já escolhe o cliente para montar o orçamento ou a venda
+    const idCli = Number(searchParams.get('cliente'));
+    if (idCli > 0) {
+      const nomeCli = searchParams.get('nome') || `Cliente ${idCli}`;
+      setSearchParams({}, { replace: true });
+      selecionarCliente({ id: idCli, nome: nomeCli, documento: searchParams.get('doc') || undefined });
+      setMostrarModalCliente(false);
+      message.info(`${nomeCli} escolhido: monte os itens e salve como orçamento (ou finalize a venda).`);
+    }
     // Troca vinda de Vendas do Dia (?troca=ID da devolução): cliente e crédito gerado ficam disponíveis no pagamento
     const idTroca = Number(searchParams.get(CHAVE_TROCA));
     if (idTroca > 0) {

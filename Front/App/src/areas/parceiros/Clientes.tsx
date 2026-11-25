@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getClientes, createCliente, getHistoricoCliente, HistoricoCliente } from './utils/cliente.service';
 import { imprimirEspelhoNf } from '../vendas/vendasDoDia/impressaoVenda';
 import Swal from 'sweetalert2';
@@ -114,6 +115,12 @@ export default function Clientes() {
   const [clientes, setClientes] = useState<ClienteAggregate[]>([]);
   const [clienteAtivo, setClienteAtivo] = useState<ClienteAggregate | null>(null);
   const [abaCliente, setAbaCliente] = useState<string>('geral');
+  const navigate = useNavigate();
+  // abre o PDV já com o cliente escolhido (para montar o orçamento ou a venda)
+  const abrirNoPdv = (c: ClienteAggregate) => {
+    const doc = String((c as any).cnpj || (c as any).cpf || '').replace(/\D/g, '');
+    navigate(`/vendas/pdv?cliente=${c.id_pessoa}&nome=${encodeURIComponent(c.nome_razao || '')}${doc ? `&doc=${doc}` : ''}`);
+  };
   const [historico, setHistorico] = useState<HistoricoCliente | null>(null);
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
 
@@ -302,7 +309,7 @@ export default function Clientes() {
                       <Text type="secondary" code>ID: {clienteAtivo.id_pessoa}</Text>
                     </Space>
                     <Space>
-                      <Button icon={<CalculatorOutlined />} onClick={() => message.info(`Orçamento para ${clienteAtivo.nome_razao}`)}>Orçamento</Button>
+                      <Button icon={<CalculatorOutlined />} title="Abre o PDV com este cliente para montar o orçamento" onClick={() => abrirNoPdv(clienteAtivo)}>Orçamento</Button>
                       <Button type="primary" icon={<ShoppingCartOutlined />} onClick={() => setAbaCliente('historico')}>
                         Pedidos{historico?.vendas.length ? ` (${historico.vendas.length})` : ''}
                       </Button>
