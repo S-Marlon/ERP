@@ -542,7 +542,7 @@ export const espelhoDaVenda = async (req: Request, res: Response) => {
   try {
     const { emitente, config } = await carregarConfiguracao(pool, tenant);
     const [[venda]]: any = await pool.execute(
-      `SELECT id_venda, status, id_cliente, cliente_nome, total_liquido, observacao, operador,
+      `SELECT id_venda, status, id_cliente, cliente_nome, total_liquido, total_bruto, total_desconto, autorizado_por, motivo_autorizacao, observacao, operador,
               condicao_forma, condicao_parcelas, condicao_entrada, condicao_intervalo_dias,
               DATE_FORMAT(created_at, '%d/%m/%Y %H:%i') AS data_fmt, DATE_FORMAT(validade, '%d/%m/%Y') AS validade_fmt
        FROM vendas_pedidos WHERE id_venda = ? AND tenant_id = ?`,
@@ -578,7 +578,8 @@ export const espelhoDaVenda = async (req: Request, res: Response) => {
     }) : null;
     const doc = await documentoAtual(pool, tenant, idVenda);
     return res.json({
-      venda: { idVenda, status: venda.status, cliente: venda.cliente_nome, data: venda.data_fmt, total: Number(venda.total_liquido), observacao: venda.observacao, operador: venda.operador },
+      venda: { idVenda, status: venda.status, cliente: venda.cliente_nome, data: venda.data_fmt, total: Number(venda.total_liquido), observacao: venda.observacao, operador: venda.operador,
+        bruto: Number(venda.total_bruto) || 0, desconto: Number(venda.total_desconto) || 0, autorizadoPor: venda.autorizado_por || null, motivoDesconto: venda.motivo_autorizacao || null },
       orcamento: ehOrcamento ? { validade: venda.validade_fmt || null, condicao: condicao?.texto || null } : null,
       modelo, pendencias, nota, emitente,
       servicos: itens.filter(i => i.servico).map(i => ({ descricao: i.descricao, quantidade: i.quantidade, total: i.totalItem })),

@@ -41,6 +41,7 @@ const TPAG: Record<string, string> = {
   '01': 'Dinheiro', '03': 'Cartão de crédito', '04': 'Cartão de débito', '05': 'Crédito loja (crediário)', '17': 'PIX',
   '18': 'Transferência bancária', '90': 'Sem pagamento', '99': 'Outros',
 };
+const CRT: Record<number, string> = { 1: '1 – Simples Nacional', 2: '2 – Simples (excesso de sublimite)', 3: '3 – Regime normal', 4: '4 – MEI' };
 const ORIGEM: Record<number, string> = {
   0: 'Nacional', 1: 'Estrangeira – importação direta', 2: 'Estrangeira – mercado interno', 3: 'Nacional, importado 40–70%',
   4: 'Nacional, processo básico', 5: 'Nacional, importado ≤ 40%', 6: 'Estrangeira – importação direta, sem similar', 7: 'Estrangeira – mercado interno, sem similar', 8: 'Nacional, importado > 70%',
@@ -55,6 +56,8 @@ const doc = (d: string | null | undefined) => {
   return s;
 };
 const cep = (c: string | null | undefined) => String(c || '').replace(/\D/g, '').replace(/(\d{5})(\d{3})/, '$1-$2');
+/** "8,0%" do desconto sobre o valor bruto do item. */
+const pctDesc = (desc: number, bruto: number) => (bruto > 0 ? `${((desc / bruto) * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%` : '');
 const campo = (rotulo: string, valor: unknown, falta = false) =>
   `<div class="campo${falta ? ' falta' : ''}"><span>${esc(rotulo)}</span><b>${valor === null || valor === undefined || valor === '' ? (falta ? 'FALTA' : '—') : esc(valor)}</b></div>`;
 
@@ -87,7 +90,7 @@ export const imprimirEspelhoNf = async (idVenda: number, modelo?: '55' | '65') =
       <td class="c${i.ncm ? '' : ' falta'}">${i.ncm || 'FALTA'}</td><td class="c">${i.cest || ''}</td><td class="c">${i.cfop}</td><td class="c">${i.csosn}</td>
       <td class="c" title="${esc(ORIGEM[i.origem] || '')}">${i.origem}</td><td class="c">${esc(i.unidade)}</td>
       <td class="r">${qtd(i.quantidade)}</td><td class="r">${moeda(i.valorUnitario)}</td><td class="r">${moeda(i.valorBruto)}</td>
-      <td class="r">${i.desconto ? moeda(i.desconto) : ''}</td><td class="r">${i.outros ? moeda(i.outros) : ''}</td>
+      <td class="r">${i.desconto ? `${moeda(i.desconto)}<div class="pct">${pctDesc(i.desconto, i.valorBruto)}</div>` : ''}</td><td class="r">${i.outros ? moeda(i.outros) : ''}</td>
       <td class="r b">${moeda(i.valorBruto - i.desconto + i.outros)}</td>
     </tr>`).join('');
 
@@ -96,23 +99,27 @@ export const imprimirEspelhoNf = async (idVenda: number, modelo?: '55' | '65') =
 
   janela.document.open();
   janela.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Espelho NF - ${orc ? 'orçamento' : 'venda'} ${idVenda}</title><style>
-    @page { size: A4 landscape; margin: 10mm; }
+    @page { size: A4 portrait; margin: 9mm 8mm; }
     * { box-sizing: border-box; }
-    body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #111; margin: 0; padding: 12px; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 10.5px; color: #111; margin: 0; padding: 8px; }
+    @media screen { body { max-width: 210mm; margin: 0 auto; } }
     h1 { font-size: 16px; margin: 0; } h2 { font-size: 12px; margin: 14px 0 6px; text-transform: uppercase; letter-spacing: .4px; color: #731717; border-bottom: 1px solid #731717; padding-bottom: 2px; }
     .topo { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #731717; padding-bottom: 8px; }
     .aviso { background: #fff7e6; border: 1px solid #ffd591; padding: 6px 10px; margin-top: 8px; font-size: 11px; }
     .pend { background: #fff1f0; border: 1px solid #ffa39e; padding: 6px 10px; margin-top: 8px; }
     .pend li { margin: 2px 0; }
-    .grade { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px 12px; }
+    .desconto { background: #f0f5ff; border: 1px solid #adc6ff; padding: 6px 10px; margin-top: 6px; font-size: 10px; line-height: 1.45; }
+    td .pct { font-size: 8px; color: #666; }
+    .grade { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px 10px; }
     .campo { display: flex; flex-direction: column; border-bottom: 1px dotted #bbb; padding: 2px 0; }
     .campo span { font-size: 9px; color: #666; text-transform: uppercase; } .campo b { font-size: 12px; }
     .campo.falta b, td.falta { color: #cf1322; }
     .larga { grid-column: span 2; }
     table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid #ccc; padding: 3px 4px; vertical-align: top; }
-    th { background: #f3f3f3; font-size: 9px; text-transform: uppercase; } td.c { text-align: center; } td.r { text-align: right; white-space: nowrap; } td.b { font-weight: bold; }
-    td.desc { min-width: 220px; }
-    .baixo { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+    th { background: #f3f3f3; font-size: 7.5px; text-transform: uppercase; padding: 3px 2px; } td.c { text-align: center; } td.r { text-align: right; white-space: nowrap; } td.b { font-weight: bold; }
+    table.produtos td { font-size: 9px; padding: 2px 3px; } tr { break-inside: avoid; }
+    td.desc { min-width: 0; word-break: break-word; }
+    .baixo { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; } .baixo .inteira { grid-column: 1 / -1; }
     .tot td { font-size: 12px; } .tot tr:last-child td { font-weight: bold; font-size: 14px; background: #fafafa; }
     .rodape { margin-top: 12px; font-size: 9px; color: #777; display: flex; justify-content: space-between; }
     @media print { .naoimprime { display: none; } }
@@ -135,7 +142,7 @@ export const imprimirEspelhoNf = async (idVenda: number, modelo?: '55' | '65') =
 
     <h2>Emitente</h2>
     <div class="grade">
-      ${campo('Razão social', em?.razaoSocial, !em)} ${campo('CNPJ', doc(em?.cnpj), !em)} ${campo('Inscrição estadual', em?.inscricaoEstadual, !em)} ${campo('Regime (CRT)', em ? (Number(em.crt) === 1 ? '1 – Simples Nacional' : em.crt) : null)}
+      ${campo('Razão social', em?.razaoSocial, !em)} ${campo('CNPJ', doc(em?.cnpj), !em)} ${campo('Inscrição estadual', em?.inscricaoEstadual, !em)} ${campo('Regime (CRT)', em ? (CRT[Number(em.crt)] || em.crt) : null)}
       ${campo('Endereço', em ? `${em.logradouro || ''}, ${em.numero || ''}${em.complemento ? ` ${em.complemento}` : ''} – ${em.bairro || ''}` : null)} ${campo('Município / UF', em ? `${em.municipio || ''} / ${em.uf || ''}` : null)} ${campo('CEP', cep(em?.cep))} ${campo('Telefone', em?.telefone)}
     </div>
 
@@ -149,23 +156,30 @@ export const imprimirEspelhoNf = async (idVenda: number, modelo?: '55' | '65') =
     </div>` : '<div>Consumidor não identificado (NFC-e sem CPF).</div>'}
 
     <h2>Produtos</h2>
-    ${n ? `<table>
+    ${n ? `<table class="produtos">
       <thead><tr><th>#</th><th>Código</th><th>Descrição</th><th>NCM</th><th>CEST</th><th>CFOP</th><th>CSOSN</th><th>Orig.</th><th>Un</th><th>Qtd</th><th>V. unit.</th><th>V. bruto</th><th>Desconto</th><th>Outras</th><th>V. líquido</th></tr></thead>
       <tbody>${linhas}</tbody>
     </table>` : '<div>Venda só de serviço: não tem nota de produto (o serviço vai em nota de serviço/ISS).</div>'}
+    ${n && n.totais.desconto > 0 ? `<div class="desconto"><b>Como lançar o desconto no emissor:</b> em cada produto, <b>Valor unitário = V. unit.</b> (preço de tabela) e
+      <b>Desconto = a coluna Desconto</b> daquele item. A nota soma os descontos dos itens: <b>R$ ${moeda(n.totais.desconto)}</b> (${pctDesc(n.totais.desconto, n.totais.produtos)}).
+      <b>Não lance o desconto de novo no total da nota</b> — ficaria em dobro.
+      ${new Set((n.itens || []).filter((i: any) => i.desconto).map((i: any) => pctDesc(i.desconto, i.valorBruto))).size > 1
+        ? '<br>Os itens têm porcentagens diferentes porque o desconto foi dado no preço de cada item (ex.: um item com preço especial e o resto no fechamento).' : ''}
+      ${e.venda.autorizadoPor ? `<br>Desconto autorizado por <b>${esc(e.venda.autorizadoPor)}</b>${e.venda.motivoDesconto ? `: ${esc(e.venda.motivoDesconto)}` : ''} (uso interno, não vai na nota).` : ''}
+      <br><span style="color:#666">Outra forma aceita: lançar como valor unitário o V. líquido ÷ Qtd, sem desconto. O total fica igual, mas o cliente não vê o desconto na nota.</span></div>` : ''}
     ${e.servicos?.length ? `<div class="aviso">Serviços da venda fora desta nota (ISS): ${e.servicos.map((s: any) => `${esc(s.descricao)} (${qtd(s.quantidade)}) R$ ${moeda(s.total)}`).join('; ')}.</div>` : ''}
 
     ${n ? `<div class="baixo">
       <div><h2>Totais</h2><table class="tot">
         <tr><td>Valor dos produtos</td><td class="r">${moeda(n.totais.produtos)}</td></tr>
-        <tr><td>Desconto</td><td class="r">${moeda(n.totais.desconto)}</td></tr>
+        <tr><td>Desconto${n.totais.desconto ? ` (${pctDesc(n.totais.desconto, n.totais.produtos)})` : ''}</td><td class="r">${moeda(n.totais.desconto)}</td></tr>
         <tr><td>Outras despesas acessórias</td><td class="r">${moeda(n.totais.outros)}</td></tr>
         <tr><td>Frete / seguro</td><td class="r">0,00</td></tr>
         <tr><td>Valor total da nota</td><td class="r">${moeda(n.totais.total)}</td></tr>
       </table></div>
       <div><h2>Pagamento (tPag)${orc ? ' · condição do orçamento' : ''}</h2><table>${pagamentos}${n.troco ? `<tr><td>Troco</td><td class="r">${moeda(n.troco)}</td></tr>` : ''}</table>
         <div style="margin-top:6px;font-size:10px;color:#555">Simples Nacional: CSOSN 102/103 sem destaque de ICMS; 500 para itens com ST (CEST).</div></div>
-      <div><h2>Informações complementares</h2><div style="border:1px solid #ccc;padding:6px;min-height:60px">${esc(n.informacoesComplementares)}${e.venda.observacao ? `<br>${esc(e.venda.observacao)}` : ''}</div>
+      <div class="inteira"><h2>Informações complementares</h2><div style="border:1px solid #ccc;padding:6px;min-height:60px">${esc(n.informacoesComplementares)}${e.venda.observacao ? `<br>${esc(e.venda.observacao)}` : ''}</div>
         <div style="margin-top:6px;font-size:10px;color:#555">Origem: ${[...new Set((n.itens || []).map((i: any) => i.origem))].map((o: any) => `${o} = ${ORIGEM[o] || ''}`).join('; ')}</div></div>
     </div>` : ''}
 
