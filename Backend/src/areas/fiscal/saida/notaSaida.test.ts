@@ -64,7 +64,10 @@ assert(sem.pagamentos.length === 1 && sem.pagamentos[0].forma === 'A COMBINAR' &
 const pix = pagamentosDoOrcamento(1500, { forma: 'PIX', parcelas: 1, entrada: 0, intervaloDias: null });
 assert(pix.pagamentos.length === 1 && pix.pagamentos[0].forma === 'PIX' && pix.texto.replace(/\s/g, ' ') === 'R$ 1.500,00 no PIX', `orçamento à vista: ${pix.texto}`);
 const parc = pagamentosDoOrcamento(1500, { forma: 'PRAZO', parcelas: 3, entrada: 300, intervaloDias: 30 });
-assert(parc.pagamentos.map(p => `${p.forma}:${p.valor}`).join(' ') === 'DINHEIRO:300 PRAZO:1200', 'orçamento com entrada');
+assert(parc.pagamentos.map(p => `${p.forma}:${p.valor}`).join(' ') === 'PIX:300 PRAZO:1200', 'orçamento com entrada (no PIX, como na negociação)');
+const etapas = pagamentosDoOrcamento(210, { forma: 'PIX', parcelas: 1, entrada: 70, intervaloDias: null });
+assert(etapas.pagamentos.map(p => `${p.forma}:${p.valor}`).join(' ') === 'PIX:70 PIX:140', 'PIX em duas etapas');
+assert(etapas.texto.replace(/\s/g, ' ') === 'R$ 70,00 antecipado no PIX + R$ 140,00 no PIX na conclusão e entrega', `texto etapas: ${etapas.texto}`);
 assert(parc.texto.replace(/\s/g, ' ') === 'Entrada de R$ 300,00 + 3x de R$ 400,00 a prazo (a cada 30 dias)', `texto: ${parc.texto}`);
 assert(pagamentosDoOrcamento(100, { forma: 'PIX', parcelas: 1, entrada: 500, intervaloDias: null }).pagamentos.map(p => p.valor).join() === '100', 'entrada maior que o total');
 

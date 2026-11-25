@@ -13,7 +13,8 @@ const taxaDe = (forma: string, parcelas: number) => ({
 teste('condição: leitura e texto', () => {
   assert.strictEqual(lerCondicao(null), null);
   assert.strictEqual(lerCondicao({ forma: '' }), null);
-  assert.deepStrictEqual(lerCondicao({ forma: 'pix', parcelas: 5, entrada: 50 }), { forma: 'PIX', parcelas: 1, intervaloDias: null, entrada: 0 });
+  // PIX: parcelas não valem; a entrada vale (é o antecipado, com o saldo na conclusão e entrega)
+  assert.deepStrictEqual(lerCondicao({ forma: 'pix', parcelas: 5, entrada: 50 }), { forma: 'PIX', parcelas: 1, intervaloDias: null, entrada: 50 });
   const prazo = lerCondicao({ forma: 'PRAZO', parcelas: 2, intervaloDias: 28 })!;
   assert.strictEqual(textoDaCondicao(prazo), 'A prazo 28/56 dias (2 parcelas)');
   assert.strictEqual(textoDaCondicao(lerCondicao({ forma: 'CREDITO', parcelas: 3, entrada: 100 })!), 'Entrada de R$ 100,00 + cartão de crédito em 3x');
@@ -52,4 +53,18 @@ teste('condição: pagamento mais caro que o combinado', () => {
   assert.strictEqual(pagamentoMaisCaro(taxaDe, prazo, 1000, [{ forma: 'PRAZO', valor: 1000, parcelas: 2, intervaloDias: 28 }]), null);
   assert.match(pagamentoMaisCaro(taxaDe, prazo, 1000, [{ forma: 'PRAZO', valor: 1000, parcelas: 3, intervaloDias: 30 }])!, /60 dias em média contra 42/);
   assert.match(pagamentoMaisCaro(taxaDe, prazo, 1000, [{ forma: 'PRAZO', valor: 1000, semPrazo: true }])!, /sem data/);
+});
+
+teste('condição: PIX em duas etapas (antecipado + saldo na conclusão e entrega)', () => {
+  const c = lerCondicao({ forma: 'PIX', entrada: 70 }, 210)!;
+  assert.strictEqual(c.entrada, 70);
+  const txt = (x: string) => x.replace(/\s/g, ' ');
+  assert.strictEqual(txt(textoDaCondicao(c, 210)), '1/3 antecipado no PIX (R$ 70,00) + 2/3 na conclusão e entrega (R$ 140,00)');
+  assert.strictEqual(txt(textoDaCondicao(c)), 'R$ 70,00 antecipado no PIX + o saldo no PIX na conclusão e entrega');
+  assert.strictEqual(txt(textoDaCondicao(lerCondicao({ forma: 'DINHEIRO', entrada: 300 }, 1000)!, 1000)), '30% antecipado em dinheiro (R$ 300,00) + 70% na conclusão e entrega (R$ 700,00)');
+  assert.deepStrictEqual(pagamentosDaCondicao(c, 210).map(p => [p.forma, p.valor]), [['PIX', 70], ['PIX', 140]]);
+  assert.deepStrictEqual(pagamentosDaCondicao(lerCondicao({ forma: 'DINHEIRO', entrada: 50 }, 100)!, 100).map(p => p.forma), ['DINHEIRO', 'DINHEIRO']);
+  // débito continua sem entrada; antecipado do tamanho do total não vale
+  assert.strictEqual(lerCondicao({ forma: 'DEBITO', entrada: 50 }, 100)!.entrada, 0);
+  assert.throws(() => lerCondicao({ forma: 'PIX', entrada: 210 }, 210), /entrada precisa ser menor/);
 });

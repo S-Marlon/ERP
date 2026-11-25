@@ -12,7 +12,7 @@ export interface CondicaoPagamento {
   parcelas: number;
   /** A prazo: dias entre as parcelas (o 1º vencimento também). */
   intervaloDias: number | null;
-  /** Entrada no ato (PIX/dinheiro), só no crédito e no a prazo. */
+  /** Crédito e a prazo: entrada no ato (PIX). PIX e dinheiro: o antecipado (o saldo na conclusão e entrega). */
   entrada: number;
 }
 
@@ -35,14 +35,36 @@ export const lerCondicao = (c: any, total?: number): CondicaoPagamento | null =>
   if (parcelas < 1 || parcelas > 24) throw new Error('Parcelas da condição: de 1 a 24.');
   const intervaloDias = forma === 'PRAZO' ? Math.floor(Number(c.intervaloDias) || 30) : null;
   if (intervaloDias !== null && (intervaloDias < 1 || intervaloDias > 180)) throw new Error('Intervalo entre as parcelas: de 1 a 180 dias.');
-  const entrada = parcelada ? r2(Math.max(0, Number(c.entrada) || 0)) : 0;
+  // PIX e dinheiro também podem ir em duas etapas: antecipado (a "entrada") e o saldo na conclusão e entrega
+  const comEntrada = parcelada || forma === 'PIX' || forma === 'DINHEIRO';
+  const entrada = comEntrada ? r2(Math.max(0, Number(c.entrada) || 0)) : 0;
   if (total !== undefined && entrada > 0 && entrada >= total - 0.004) throw new Error('A entrada precisa ser menor que o total da proposta.');
   return { forma, parcelas, intervaloDias, entrada };
 };
 
-/** Texto da proposta: "A prazo 28/56 dias (2 parcelas)", "Entrada de R$ 100,00 + cartão de crédito em 3x"... */
-export const textoDaCondicao = (c: CondicaoPagamento): string => {
+/** Fração "bonita" do antecipado: 1/3 e 2/3, 1/2... ou a porcentagem (30% e 70%). */
+const fracaoDoAntecipado = (parte: number) => {
+  const comuns: Array<[number, string, string]> = [[1 / 4, '1/4', '3/4'], [1 / 3, '1/3', '2/3'], [1 / 2, '1/2', '1/2'], [2 / 3, '2/3', '1/3'], [3 / 4, '3/4', '1/4']];
+  const f = comuns.find(([v]) => Math.abs(v - parte) < 0.005);
+  if (f) return { antes: f[1], depois: f[2] };
+  const pct = Math.round(parte * 100);
+  return { antes: `${pct}%`, depois: `${100 - pct}%` };
+};
+
+/**
+ * Texto da proposta: "A prazo 28/56 dias (2 parcelas)", "Entrada de R$ 100,00 + cartão de crédito em 3x", "1/3 antecipado
+ * no PIX (R$ 70,00) + 2/3 na conclusão e entrega (R$ 140,00)"... Com o total, o PIX/dinheiro em etapas mostra a fração e os valores.
+ */
+export const textoDaCondicao = (c: CondicaoPagamento, total?: number): string => {
   const p = c.parcelas;
+  if ((c.forma === 'PIX' || c.forma === 'DINHEIRO') && c.entrada > 0) {
+    const onde = c.forma === 'PIX' ? 'no PIX' : 'em dinheiro';
+    if (total && total > c.entrada) {
+      const f = fracaoDoAntecipado(c.entrada / total);
+      return `${f.antes} antecipado ${onde} (${brl(c.entrada)}) + ${f.depois} na conclusão e entrega (${brl(r2(total - c.entrada))})`;
+    }
+    return `${brl(c.entrada)} antecipado ${onde} + o saldo ${onde} na conclusão e entrega`;
+  }
   const base = c.forma === 'PIX' ? 'À vista no PIX'
     : c.forma === 'DINHEIRO' ? 'À vista em dinheiro'
       : c.forma === 'DEBITO' ? 'Cartão de débito'
@@ -65,11 +87,12 @@ const taxaDoValor = (taxaDe: TaxaDe, forma: string, parcelas: number, valor: num
   return r2(valor * (Number(t.percentual) || 0) / 100 + (Number(t.fixa) || 0));
 };
 
-/** Pagamentos que cumprem a condição: entrada no PIX + o resto na forma combinada. */
+/** Pagamentos que cumprem a condição: entrada no PIX (ou o antecipado na própria forma, no PIX/dinheiro) + o resto na forma combinada. */
 export const pagamentosDaCondicao = (c: CondicaoPagamento, total: number): PagamentoFeito[] => {
   const resto = r2(total - c.entrada);
+  const formaEntrada = c.forma === 'DINHEIRO' ? 'DINHEIRO' : 'PIX';
   return [
-    ...(c.entrada > 0 ? [{ forma: 'PIX', valor: c.entrada, parcelas: 1 }] : []),
+    ...(c.entrada > 0 ? [{ forma: formaEntrada, valor: c.entrada, parcelas: 1 }] : []),
     { forma: c.forma, valor: resto, parcelas: c.parcelas, ...(c.forma === 'PRAZO' ? { intervaloDias: c.intervaloDias } : {}) },
   ];
 };

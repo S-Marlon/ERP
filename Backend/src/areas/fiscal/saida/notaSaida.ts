@@ -208,13 +208,18 @@ export const pagamentosDoOrcamento = (total: number, c: CondicaoOrcamento): { pa
   const entrada = Math.min(valor, Math.max(0, Math.round((Number(c.entrada) || 0) * 100) / 100));
   const parcelas = Math.max(1, Math.round(Number(c.parcelas) || 1));
   const resto = Math.round((valor - entrada) * 100) / 100;
+  // como na negociação: no PIX/dinheiro o antecipado vai na própria forma; no crédito/a prazo a entrada é no PIX
+  const aVista = ['PIX', 'DINHEIRO'].includes(c.forma.toUpperCase());
   const pagamentos: PagamentoVenda[] = [
-    ...(entrada > 0 ? [{ forma: 'DINHEIRO', valor: entrada, troco: 0 }] : []),
+    ...(entrada > 0 ? [{ forma: aVista ? c.forma.toUpperCase() : 'PIX', valor: entrada, troco: 0 }] : []),
     ...(resto > 0 ? [{ forma: c.forma, valor: resto, troco: 0 }] : []),
   ];
   const nomes: Record<string, string> = { PIX: 'no PIX', DINHEIRO: 'em dinheiro', DEBITO: 'no débito', CREDITO: 'no cartão de crédito', PRAZO: 'a prazo' };
   const forma = nomes[c.forma.toUpperCase()] || `em ${c.forma.toLowerCase()}`;
   const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  if (aVista && entrada > 0 && resto > 0) {
+    return { pagamentos, texto: `${brl(entrada)} antecipado ${forma} + ${brl(resto)} ${forma} na conclusão e entrega` };
+  }
   const texto = `${entrada > 0 ? `Entrada de ${brl(entrada)} + ` : ''}${parcelas > 1 ? `${parcelas}x de ${brl(Math.round((resto / parcelas) * 100) / 100)} ${forma}` : `${brl(resto)} ${forma}`}`
     + (parcelas > 1 && c.intervaloDias ? ` (a cada ${c.intervaloDias} dias)` : '');
   return { pagamentos, texto };

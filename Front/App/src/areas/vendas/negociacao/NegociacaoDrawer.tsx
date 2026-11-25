@@ -87,7 +87,8 @@ export const NegociacaoDrawer: React.FC<{
       forma: cond.forma,
       parcelas: cond.forma === 'CREDITO' || cond.forma === 'PRAZO' ? Math.max(1, cond.parcelas) : 1,
       intervaloDias: cond.forma === 'PRAZO' ? cond.intervaloDias : null,
-      entrada: cond.forma === 'CREDITO' || cond.forma === 'PRAZO' ? cond.entrada : 0,
+      // crédito/a prazo: entrada; PIX/dinheiro: o antecipado (saldo na conclusão e entrega); débito: sem
+      entrada: cond.forma === 'DEBITO' ? 0 : cond.entrada,
     }
     : null;
 
@@ -335,9 +336,24 @@ export const NegociacaoDrawer: React.FC<{
                     <CampoNumero style={{ width: 140 }} min={0} value={cond.entrada || null} prefix="Entrada R$" placeholder="0"
                       onChange={v => setCond({ ...cond, entrada: Number(v) || 0 })} />
                   )}
+                  {(cond.forma === 'PIX' || cond.forma === 'DINHEIRO') && (
+                    <Tooltip title="Pagamento em duas etapas: o antecipado agora e o saldo na conclusão e entrega. Vazio = tudo à vista.">
+                      <CampoNumero style={{ width: 150 }} min={0} value={cond.entrada || null} prefix="Antecipado R$" placeholder="0"
+                        onChange={v => setCond({ ...cond, entrada: Number(v) || 0 })} />
+                    </Tooltip>
+                  )}
                 </Flex>
+                {(cond.forma === 'PIX' || cond.forma === 'DINHEIRO') && resumo.receita > 0 && (
+                  <Flex gap={4} wrap style={{ marginTop: 4 }}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>Dividir:</Text>
+                    {([['tudo à vista', 0], ['1/3 antes', 1 / 3], ['1/2 antes', 1 / 2], ['2/3 antes', 2 / 3]] as const).map(([rotulo, f]) => (
+                      <Button key={rotulo} size="small" type={Math.abs(cond.entrada - Math.round(resumo.receita * f * 100) / 100) < 0.01 ? 'primary' : 'default'}
+                        onClick={() => setCond({ ...cond, entrada: Math.round(resumo.receita * f * 100) / 100 })}>{rotulo}</Button>
+                    ))}
+                  </Flex>
+                )}
                 {condicaoAtual
-                  ? <Text type="secondary" style={{ fontSize: 12 }}>Na proposta: {textoDaCondicao(condicaoAtual)}</Text>
+                  ? <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>Na proposta: {textoDaCondicao(condicaoAtual, resumo.receita || undefined)}</Text>
                   : <AutoComplete style={{ width: '100%', marginTop: 6 }} options={CONDICOES_PAGAMENTO.map(value => ({ value }))} value={condicao} onChange={setCondicao}
                     placeholder="Texto livre (ex.: a combinar no fechamento)" maxLength={150} allowClear />}
               </Col>

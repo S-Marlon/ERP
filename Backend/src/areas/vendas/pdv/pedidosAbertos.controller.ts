@@ -112,7 +112,7 @@ export const salvarPedidoAberto = async (req: Request, res: Response) => {
       f4(venda.totalBruto), f4(venda.totalDesconto), f4(venda.totalLiquido), f4(totalCusto),
       String(req.body?.observacao || '').trim().slice(0, 255) || null,
       neg ? Number(margemAlvo).toFixed(4) : null,
-      neg ? (condicao ? textoDaCondicao(condicao) : String(neg.condicaoPagamento || '').trim()).slice(0, 150) || null : null,
+      neg ? (condicao ? textoDaCondicao(condicao, Number(venda.totalLiquido)) : String(neg.condicaoPagamento || '').trim()).slice(0, 150) || null : null,
       condicao?.forma ?? null, condicao ? condicao.parcelas : null, condicao?.intervaloDias ?? null, condicao && condicao.entrada > 0 ? f4(condicao.entrada) : null,
       autorizadoPor, motivoAutorizacao,
     ];
