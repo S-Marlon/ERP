@@ -3,8 +3,9 @@
 import { API_URL } from '../../../shared/api/config';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button, Card, Col, Dropdown, Empty, Input, Row, Space, Spin, Statistic, Table, Tag, Tooltip, message } from 'antd';
-import { FilePdfOutlined, PrinterOutlined, ReloadOutlined, StopOutlined } from '@ant-design/icons';
+import { FilePdfOutlined, PrinterOutlined, ReloadOutlined, StopOutlined, RiseOutlined } from '@ant-design/icons';
 import { imprimirEspelhoNf, reimprimirComprovante } from './impressaoVenda';
+import { ResultadoPedidoModal } from '../resultado/ResultadoPedidoModal';
 import Swal from 'sweetalert2';
 import { ModalDevolucao } from '../pdv/components/ModalDevolucao';
 import { salesService, VendaResumo } from '../pdv/services/salesService';
@@ -109,6 +110,7 @@ const DetalheLinha: React.FC<{ idVenda: number }> = ({ idVenda }) => {
 };
 
 const VendasDoDia: React.FC = () => {
+  const [resultado, setResultado] = useState<number | null>(null);
   const [devolvendo, setDevolvendo] = useState<number | null>(null);
   const [numeroVenda, setNumeroVenda] = useState('');
   const [data, setData] = useState<string>(hoje());
@@ -235,6 +237,9 @@ const VendasDoDia: React.FC = () => {
                 title: '', key: 'acoes', width: 190, align: 'center' as const,
                 render: (_: unknown, venda) => (
                   <Space size={2}>
+                    <Tooltip title="Resultado: quanto a venda deixou de lucro e se está bom">
+                      <Button type="text" size="small" icon={<RiseOutlined />} onClick={() => setResultado(venda.idVenda)} />
+                    </Tooltip>
                     <Tooltip title="Reimprimir o comprovante da venda">
                       <Button type="text" size="small" icon={<PrinterOutlined />}
                         onClick={() => reimprimirComprovante(venda.idVenda).catch((e: Error) => message.error(e.message))} />
@@ -277,6 +282,7 @@ const VendasDoDia: React.FC = () => {
         </Card>
       </Space>
       <ModalDevolucao idVenda={devolvendo} onFechar={() => { setDevolvendo(null); setNumeroVenda(''); }} onConcluido={carregar} />
+      <ResultadoPedidoModal idVenda={resultado} onFechar={() => setResultado(null)} />
     </div>
   );
 };

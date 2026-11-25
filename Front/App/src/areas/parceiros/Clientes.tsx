@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getClientes, createCliente, getHistoricoCliente, HistoricoCliente } from './utils/cliente.service';
 import { imprimirEspelhoNf } from '../vendas/vendasDoDia/impressaoVenda';
+import { ResultadoPedidoModal } from '../vendas/resultado/ResultadoPedidoModal';
 import Swal from 'sweetalert2';
 import { CampoCep, CampoCpfCnpj, CampoTelefone, CampoUf } from '../../shared/formularios/Campos';
 import { formatarCep, formatarDocumento, formatarTelefone, regraCep, regraCnpj, regraCpf, regraTelefone, soDigitos } from '../../shared/formularios/documentos';
@@ -49,6 +50,7 @@ import {
   DeleteOutlined,
   BankOutlined,
   PaperClipOutlined,
+  RiseOutlined,
 } from '@ant-design/icons';
 
 const { Sider, Content } = Layout;
@@ -123,6 +125,7 @@ export default function Clientes() {
   };
   const [historico, setHistorico] = useState<HistoricoCliente | null>(null);
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
+  const [resultadoId, setResultadoId] = useState<number | null>(null);
 
   // vendas e orçamentos do cliente escolhido (o id da pessoa é o mesmo cliente das vendas)
   useEffect(() => {
@@ -444,9 +447,12 @@ export default function Clientes() {
                               : <Text type="secondary">{v.status === 'CONCLUIDA' ? 'sem nota' : '—'}</Text>),
                           },
                           {
-                            title: '', width: 60, render: (_, v) => (v.status === 'CONCLUIDA' || v.status === 'ORCAMENTO') && (
+                            title: '', width: 80, render: (_, v) => (v.status === 'CONCLUIDA' || v.status === 'ORCAMENTO') && (
+                              <Space size={0}>
+                              <Button size="small" type="text" icon={<RiseOutlined />} title="Resultado: lucro e se está bom" onClick={() => setResultadoId(v.idVenda)} />
                               <Button size="small" type="text" icon={<FileTextOutlined />} title="Espelho da nota (dados para emitir)"
                                 onClick={() => imprimirEspelhoNf(v.idVenda).catch(e => message.error(e instanceof Error ? e.message : 'Erro ao montar o espelho.'))} />
+                              </Space>
                             ),
                           },
                         ]}
@@ -818,6 +824,7 @@ Adicionar Telefone
 </Form>
 </Modal>
 
+      <ResultadoPedidoModal idVenda={resultadoId} onFechar={() => setResultadoId(null)} />
     </Layout>
   );
 }

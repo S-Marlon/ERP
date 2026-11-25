@@ -9,6 +9,7 @@ import { criarAdiantamento, devolverAdiantamentoRota, listarAdiantamentos } from
 import { dadosDevolucao, detalheDevolucao, registrarDevolucao } from './devolucoes/devolucoes.controller';
 import { ajustarVenda, vendaCompleta } from './ajustes/ajustes.controller';
 import { prepararNegociacao } from './negociacao/negociacao.controller';
+import { resultadoPedido } from './resultado/resultadoPedido.controller';
 import pedidosFaturadosRoutes from './pedidos/pedidosFaturados.routes';
 import { definirClientePedidoAberto, detalhePedidoAberto, excluirPedidoAberto, listarPedidosAbertos, retomarPedidoAberto, salvarPedidoAberto } from './pdv/pedidosAbertos.controller';
 
@@ -41,6 +42,7 @@ router.post('/pdv/pedidos-abertos', salvarPedidoAberto);
 router.post('/negociacao/preparar', prepararNegociacao);
 router.get('/pdv/pedidos-abertos', listarPedidosAbertos);
 router.get('/pdv/pedidos-abertos/:id', detalhePedidoAberto);
+router.get('/pedidos/:idVenda/resultado', resultadoPedido);   // fechamento: lucro, margem e avaliação (só leitura)
 router.post('/pdv/pedidos-abertos/:id/retomar', retomarPedidoAberto);
 router.delete('/pdv/pedidos-abertos/:id', excluirPedidoAberto);
 router.put('/pdv/pedidos-abertos/:id/cliente', definirClientePedidoAberto);

@@ -2,13 +2,14 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Alert, Button, Card, DatePicker, Dropdown, Empty, Input, Modal, Popconfirm, Segmented, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
-import { CarOutlined, DeleteOutlined, FilePdfOutlined, FileTextOutlined, PrinterOutlined, ReloadOutlined, ShoppingCartOutlined, SlidersOutlined, UserAddOutlined, WhatsAppOutlined } from '@ant-design/icons';
+import { CarOutlined, DeleteOutlined, FilePdfOutlined, FileTextOutlined, PrinterOutlined, ReloadOutlined, ShoppingCartOutlined, SlidersOutlined, UserAddOutlined, WhatsAppOutlined, RiseOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { pedidosFaturadosApi } from '../pedidos/pedidosFaturadosApi';
 import { imprimirOrcamento, PedidoAbertoDetalhe, PedidoAbertoResumo, pedidosAbertosApi } from '../pdv/services/pedidosAbertosApi';
 import { SITUACAO_PEDIDO } from '../pdv/components/PedidosAbertosPDV';
 import { baixarPdfOrcamento, EnviarOrcamentoWhatsapp } from './EnviarOrcamento';
 import { imprimirEspelhoNf } from '../vendasDoDia/impressaoVenda';
+import { ResultadoPedidoModal } from '../resultado/ResultadoPedidoModal';
 import { ClientePdvModal } from '../pdv/components/ClientePdvModal';
 import { telefoneDoTexto } from '../../../shared/utils/whatsapp';
 import { AberturaNegociacao, NegociacaoDrawer } from '../negociacao/NegociacaoDrawer';
@@ -40,6 +41,7 @@ const ItensDoOrcamento: React.FC<{ id: number }> = ({ id }) => {
 const Orcamentos: React.FC = () => {
   const navigate = useNavigate();
   const [situacao, setSituacao] = useState('ABERTOS');
+  const [resultado, setResultado] = useState<number | null>(null);
   const [busca, setBusca] = useState('');
   const [lista, setLista] = useState<PedidoAbertoResumo[]>([]);
   const [carregando, setCarregando] = useState(false);
@@ -185,6 +187,7 @@ const Orcamentos: React.FC = () => {
                     )}
                     <Tooltip title="Imprimir"><Button size="small" icon={<PrinterOutlined />} onClick={() => imprimir(o.id)} /></Tooltip>
                     <Tooltip title="Baixar PDF"><Button size="small" icon={<FilePdfOutlined />} onClick={() => baixarPdfOrcamento(o.id)} /></Tooltip>
+                    <Tooltip title="Resultado: quanto o pedido deixa de lucro e se está bom"><Button size="small" icon={<RiseOutlined />} onClick={() => setResultado(o.id)} /></Tooltip>
                     <Dropdown trigger={['click']} menu={{
                       items: [
                         { key: 'auto', label: 'Espelho da nota (modelo pelo cliente)' },
@@ -236,6 +239,7 @@ const Orcamentos: React.FC = () => {
         onSelecionar={definirCliente}
         onFechar={() => setSemCliente(null)}
       />
+      <ResultadoPedidoModal idVenda={resultado} onFechar={() => setResultado(null)} />
     </div>
   );
 };
