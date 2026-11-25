@@ -8,7 +8,7 @@ import { cepDoCadastro, ErroCadastro, telefoneDoCadastro, ufDoCadastro } from '.
 import { criarEmissor, PROVEDORES_DISPONIVEIS, segredosConfigurados } from './emissores';
 import {
   CONFIG_PADRAO, ConfigFiscal, Destinatario, Emitente, ErroFiscal, ItemVendaFiscal, Modelo, modeloSugerido, montarNota,
-  pendenciasDaNota, somenteDigitos,
+  pagamentosDoOrcamento, pendenciasDaNota, somenteDigitos,
 } from './notaSaida';
 
 const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || req.body?.tenant_id || 1);
@@ -543,7 +543,8 @@ export const espelhoDaVenda = async (req: Request, res: Response) => {
     const { emitente, config } = await carregarConfiguracao(pool, tenant);
     const [[venda]]: any = await pool.execute(
       `SELECT id_venda, status, id_cliente, cliente_nome, total_liquido, observacao, operador,
-              DATE_FORMAT(created_at, '%d/%m/%Y %H:%i') AS data_fmt
+              condicao_forma, condicao_parcelas, condicao_entrada, condicao_intervalo_dias,
+              DATE_FORMAT(created_at, '%d/%m/%Y %H:%i') AS data_fmt, DATE_FORMAT(validade, '%d/%m/%Y') AS validade_fmt
        FROM vendas_pedidos WHERE id_venda = ? AND tenant_id = ?`,
       [idVenda, tenant]
     );
@@ -561,7 +562,15 @@ export const espelhoDaVenda = async (req: Request, res: Response) => {
       destinatario = { documento: null, nome: venda.cliente_nome, email: null, celular: null, endereco: null };
     }
     const pendencias = pendenciasDaNota(emitente, itens, modelo, destinatario);
-    const [pagamentos]: any = await pool.execute(`SELECT forma, valor, troco, parcelas FROM vendas_pedidos_pagamentos WHERE id_venda = ? AND tenant_id = ?`, [idVenda, tenant]);
+    const [lancados]: any = await pool.execute(`SELECT forma, valor, troco, parcelas FROM vendas_pedidos_pagamentos WHERE id_venda = ? AND tenant_id = ?`, [idVenda, tenant]);
+    // orçamento ainda não tem pagamento: usa a condição combinada (para o espelho de emissão à mão)
+    const ehOrcamento = venda.status === 'ORCAMENTO';
+    const condicao = ehOrcamento ? pagamentosDoOrcamento(Number(venda.total_liquido), {
+      forma: venda.condicao_forma || null, parcelas: venda.condicao_parcelas === null ? null : Number(venda.condicao_parcelas),
+      entrada: venda.condicao_entrada === null ? null : Number(venda.condicao_entrada),
+      intervaloDias: venda.condicao_intervalo_dias === null ? null : Number(venda.condicao_intervalo_dias),
+    }) : null;
+    const pagamentos: any[] = condicao && !lancados.length ? condicao.pagamentos.map(p => ({ ...p, parcelas: 1 })) : lancados;
     const nota = itens.some(i => !i.servico) ? montarNota({
       modelo, config, emitente: emitente as Emitente, serie: modelo === '65' ? config.serieNfce : config.serieNfe, numero: 0, emissao: new Date(),
       itens, pagamentos: pagamentos.map((p: any) => ({ forma: p.forma, valor: Number(p.valor), troco: Number(p.troco) || 0 })),
@@ -570,6 +579,7 @@ export const espelhoDaVenda = async (req: Request, res: Response) => {
     const doc = await documentoAtual(pool, tenant, idVenda);
     return res.json({
       venda: { idVenda, status: venda.status, cliente: venda.cliente_nome, data: venda.data_fmt, total: Number(venda.total_liquido), observacao: venda.observacao, operador: venda.operador },
+      orcamento: ehOrcamento ? { validade: venda.validade_fmt || null, condicao: condicao?.texto || null } : null,
       modelo, pendencias, nota, emitente,
       servicos: itens.filter(i => i.servico).map(i => ({ descricao: i.descricao, quantidade: i.quantidade, total: i.totalItem })),
       pagamentos: pagamentos.map((p: any) => ({ forma: p.forma, valor: Number(p.valor), troco: Number(p.troco) || 0, parcelas: Number(p.parcelas) || 1 })),

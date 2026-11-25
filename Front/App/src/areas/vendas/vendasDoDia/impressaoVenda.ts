@@ -75,6 +75,10 @@ export const imprimirEspelhoNf = async (idVenda: number, modelo?: '55' | '65') =
   const d = n?.destinatario;
   const end = d?.endereco;
   const nomeModelo = e.modelo === '55' ? 'NF-e (modelo 55)' : 'NFC-e (modelo 65)';
+  // orçamento: ainda não é venda (sem pagamento lançado: vai a condição combinada)
+  const orc = e.orcamento as { validade: string | null; condicao: string | null } | null;
+  const origem = orc ? `Orçamento <b>Nº ${idVenda}</b> · ${esc(e.venda.data)}${orc.validade ? ` · válido até ${esc(orc.validade)}` : ''}`
+    : `Venda <b>Nº ${idVenda}</b> · ${esc(e.venda.data)}`;
   const pj = String(d?.documento || '').replace(/\D/g, '').length === 14;
 
   const linhas = (n?.itens || []).map((i: any) => `
@@ -91,7 +95,7 @@ export const imprimirEspelhoNf = async (idVenda: number, modelo?: '55' | '65') =
     `<tr><td>${p.tPag} – ${esc(p.descricao || TPAG[p.tPag] || '')}</td><td class="r">${moeda(p.valor)}</td></tr>`).join('');
 
   janela.document.open();
-  janela.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Espelho NF - venda ${idVenda}</title><style>
+  janela.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Espelho NF - ${orc ? 'orçamento' : 'venda'} ${idVenda}</title><style>
     @page { size: A4 landscape; margin: 10mm; }
     * { box-sizing: border-box; }
     body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #111; margin: 0; padding: 12px; }
@@ -116,7 +120,7 @@ export const imprimirEspelhoNf = async (idVenda: number, modelo?: '55' | '65') =
     <div class="topo">
       <div>
         <h1>Espelho para emissão da nota fiscal</h1>
-        <div>Venda <b>Nº ${idVenda}</b> · ${esc(e.venda.data)} · operador ${esc(e.venda.operador || '—')} · total da venda <b>R$ ${moeda(e.venda.total)}</b></div>
+        <div>${origem} · operador ${esc(e.venda.operador || '—')} · total <b>R$ ${moeda(e.venda.total)}</b></div>
       </div>
       <div style="text-align:right">
         <div style="font-size:13px"><b>${nomeModelo}</b></div>
@@ -125,6 +129,7 @@ export const imprimirEspelhoNf = async (idVenda: number, modelo?: '55' | '65') =
       </div>
     </div>
     <div class="aviso"><b>Não é documento fiscal.</b> Use estes dados para digitar a nota no emissor (SEFAZ / emissor gratuito).
+      ${orc ? `<br><b>Feito a partir do orçamento</b> (ainda não é venda): o pagamento é a condição combinada — <b>${esc(orc.condicao || 'a combinar')}</b>. Confira as quantidades e os preços antes de emitir; se o cliente fechar, transforme em venda no PDV para a baixa no estoque e no caixa.` : ''}
       ${e.notaEmitida ? `<br>Esta venda já tem nota no ERP: <b>${esc(e.notaEmitida.status)}</b> (modelo ${esc(e.notaEmitida.modelo)}${e.notaEmitida.numero ? `, nº ${esc(e.notaEmitida.numero)}` : ''}).` : ''}</div>
     ${e.pendencias?.length ? `<div class="pend"><b>Falta no cadastro (resolva antes de emitir):</b><ul style="margin:4px 0 0 18px;padding:0">${e.pendencias.map((p: string) => `<li>${esc(p)}</li>`).join('')}</ul></div>` : ''}
 
@@ -158,7 +163,7 @@ export const imprimirEspelhoNf = async (idVenda: number, modelo?: '55' | '65') =
         <tr><td>Frete / seguro</td><td class="r">0,00</td></tr>
         <tr><td>Valor total da nota</td><td class="r">${moeda(n.totais.total)}</td></tr>
       </table></div>
-      <div><h2>Pagamento (tPag)</h2><table>${pagamentos}${n.troco ? `<tr><td>Troco</td><td class="r">${moeda(n.troco)}</td></tr>` : ''}</table>
+      <div><h2>Pagamento (tPag)${orc ? ' · condição do orçamento' : ''}</h2><table>${pagamentos}${n.troco ? `<tr><td>Troco</td><td class="r">${moeda(n.troco)}</td></tr>` : ''}</table>
         <div style="margin-top:6px;font-size:10px;color:#555">Simples Nacional: CSOSN 102/103 sem destaque de ICMS; 500 para itens com ST (CEST).</div></div>
       <div><h2>Informações complementares</h2><div style="border:1px solid #ccc;padding:6px;min-height:60px">${esc(n.informacoesComplementares)}${e.venda.observacao ? `<br>${esc(e.venda.observacao)}` : ''}</div>
         <div style="margin-top:6px;font-size:10px;color:#555">Origem: ${[...new Set((n.itens || []).map((i: any) => i.origem))].map((o: any) => `${o} = ${ORIGEM[o] || ''}`).join('; ')}</div></div>

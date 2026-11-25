@@ -1,4 +1,4 @@
-import { CONFIG_PADRAO, digitoChave, Emitente, gerarChaveAcesso, ItemVendaFiscal, modeloSugerido, montarNota, pendenciasDaNota, ratear, tributacaoDoItem } from './notaSaida';
+import { CONFIG_PADRAO, digitoChave, Emitente, gerarChaveAcesso, ItemVendaFiscal, modeloSugerido, montarNota, pagamentosDoOrcamento, pendenciasDaNota, ratear, tributacaoDoItem } from './notaSaida';
 
 const assert = (condition: boolean, message: string): void => {
   if (!condition) throw new Error(message);
@@ -57,5 +57,15 @@ nota = montarNota({ ...base, itens: [item({ quantidade: 2, precoTabela: 10, tota
 assert(nota.itens[0].valorUnitario === 12.5 && nota.itens[0].desconto === 0, 'acima da tabela');
 
 falha(() => montarNota({ ...base, itens: [item({ ncm: '' })], pagamentos: [] }), 'pendência bloqueia');
+
+// orçamento: o pagamento sai da condição combinada (entrada em dinheiro + o resto na forma); sem condição, a combinar
+const sem = pagamentosDoOrcamento(1500, { forma: null, parcelas: null, entrada: null, intervaloDias: null });
+assert(sem.pagamentos.length === 1 && sem.pagamentos[0].forma === 'A COMBINAR' && sem.pagamentos[0].valor === 1500 && sem.texto === 'Pagamento a combinar', 'orçamento sem condição');
+const pix = pagamentosDoOrcamento(1500, { forma: 'PIX', parcelas: 1, entrada: 0, intervaloDias: null });
+assert(pix.pagamentos.length === 1 && pix.pagamentos[0].forma === 'PIX' && pix.texto.replace(/\s/g, ' ') === 'R$ 1.500,00 no PIX', `orçamento à vista: ${pix.texto}`);
+const parc = pagamentosDoOrcamento(1500, { forma: 'PRAZO', parcelas: 3, entrada: 300, intervaloDias: 30 });
+assert(parc.pagamentos.map(p => `${p.forma}:${p.valor}`).join(' ') === 'DINHEIRO:300 PRAZO:1200', 'orçamento com entrada');
+assert(parc.texto.replace(/\s/g, ' ') === 'Entrada de R$ 300,00 + 3x de R$ 400,00 a prazo (a cada 30 dias)', `texto: ${parc.texto}`);
+assert(pagamentosDoOrcamento(100, { forma: 'PIX', parcelas: 1, entrada: 500, intervaloDias: null }).pagamentos.map(p => p.valor).join() === '100', 'entrada maior que o total');
 
 console.log('notaSaida: ok');

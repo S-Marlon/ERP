@@ -194,3 +194,28 @@ export const gerarChaveAcesso = (a: { uf: string; emissao: Date; cnpj: string; m
   if (base.length !== 43) throw new ErroFiscal('Dados insuficientes para a chave de acesso.');
   return base + digitoChave(base);
 };
+
+// ---------------------------------------------------------------- espelho a partir do orçamento
+export interface CondicaoOrcamento { forma: string | null; parcelas: number | null; entrada: number | null; intervaloDias: number | null }
+
+/**
+ * Orçamento ainda não tem pagamento lançado: o espelho usa a condição combinada (a forma pelo total; com entrada, a
+ * entrada em dinheiro e o resto na forma). Sem condição, "a combinar" (tPag 99). E o texto da condição para a nota.
+ */
+export const pagamentosDoOrcamento = (total: number, c: CondicaoOrcamento): { pagamentos: PagamentoVenda[]; texto: string } => {
+  const valor = Math.round(total * 100) / 100;
+  if (!c.forma) return { pagamentos: [{ forma: 'A COMBINAR', valor, troco: 0 }], texto: 'Pagamento a combinar' };
+  const entrada = Math.min(valor, Math.max(0, Math.round((Number(c.entrada) || 0) * 100) / 100));
+  const parcelas = Math.max(1, Math.round(Number(c.parcelas) || 1));
+  const resto = Math.round((valor - entrada) * 100) / 100;
+  const pagamentos: PagamentoVenda[] = [
+    ...(entrada > 0 ? [{ forma: 'DINHEIRO', valor: entrada, troco: 0 }] : []),
+    ...(resto > 0 ? [{ forma: c.forma, valor: resto, troco: 0 }] : []),
+  ];
+  const nomes: Record<string, string> = { PIX: 'no PIX', DINHEIRO: 'em dinheiro', DEBITO: 'no débito', CREDITO: 'no cartão de crédito', PRAZO: 'a prazo' };
+  const forma = nomes[c.forma.toUpperCase()] || `em ${c.forma.toLowerCase()}`;
+  const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const texto = `${entrada > 0 ? `Entrada de ${brl(entrada)} + ` : ''}${parcelas > 1 ? `${parcelas}x de ${brl(Math.round((resto / parcelas) * 100) / 100)} ${forma}` : `${brl(resto)} ${forma}`}`
+    + (parcelas > 1 && c.intervaloDias ? ` (a cada ${c.intervaloDias} dias)` : '');
+  return { pagamentos, texto };
+};

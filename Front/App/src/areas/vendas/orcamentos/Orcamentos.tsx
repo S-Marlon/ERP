@@ -1,13 +1,14 @@
 // Vendas › Orçamentos: válidos, vencidos e os que viraram venda; imprimir, PDF, WhatsApp, vender (abre no PDV) e excluir.
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Alert, Button, Card, DatePicker, Empty, Input, Modal, Popconfirm, Segmented, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
-import { CarOutlined, DeleteOutlined, FilePdfOutlined, PrinterOutlined, ReloadOutlined, ShoppingCartOutlined, SlidersOutlined, UserAddOutlined, WhatsAppOutlined } from '@ant-design/icons';
+import { Alert, Button, Card, DatePicker, Dropdown, Empty, Input, Modal, Popconfirm, Segmented, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { CarOutlined, DeleteOutlined, FilePdfOutlined, FileTextOutlined, PrinterOutlined, ReloadOutlined, ShoppingCartOutlined, SlidersOutlined, UserAddOutlined, WhatsAppOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { pedidosFaturadosApi } from '../pedidos/pedidosFaturadosApi';
 import { imprimirOrcamento, PedidoAbertoDetalhe, PedidoAbertoResumo, pedidosAbertosApi } from '../pdv/services/pedidosAbertosApi';
 import { SITUACAO_PEDIDO } from '../pdv/components/PedidosAbertosPDV';
 import { baixarPdfOrcamento, EnviarOrcamentoWhatsapp } from './EnviarOrcamento';
+import { imprimirEspelhoNf } from '../vendasDoDia/impressaoVenda';
 import { ClientePdvModal } from '../pdv/components/ClientePdvModal';
 import { telefoneDoTexto } from '../../../shared/utils/whatsapp';
 import { AberturaNegociacao, NegociacaoDrawer } from '../negociacao/NegociacaoDrawer';
@@ -72,6 +73,9 @@ const Orcamentos: React.FC = () => {
 
   const imprimir = async (id: number) => {
     try { await imprimirOrcamento(await pedidosAbertosApi.detalhe(id)); } catch (e) { message.error(e instanceof Error ? e.message : 'Erro ao imprimir.'); }
+  };
+  const espelhoNf = async (id: number, modelo?: '55' | '65') => {
+    try { await imprimirEspelhoNf(id, modelo); } catch (e) { message.error(e instanceof Error ? e.message : 'Erro ao montar o espelho da nota.'); }
   };
   // Orçamento sem cliente: acha pelo telefone anotado ou cadastra (nome e telefone) e liga o orçamento a ele
   const definirCliente = async (c: { id: number; nome: string } | null) => {
@@ -181,6 +185,18 @@ const Orcamentos: React.FC = () => {
                     )}
                     <Tooltip title="Imprimir"><Button size="small" icon={<PrinterOutlined />} onClick={() => imprimir(o.id)} /></Tooltip>
                     <Tooltip title="Baixar PDF"><Button size="small" icon={<FilePdfOutlined />} onClick={() => baixarPdfOrcamento(o.id)} /></Tooltip>
+                    <Dropdown trigger={['click']} menu={{
+                      items: [
+                        { key: 'auto', label: 'Espelho da nota (modelo pelo cliente)' },
+                        { key: '55', label: 'Espelho NF-e (modelo 55, cliente com CNPJ/endereço)' },
+                        { key: '65', label: 'Espelho NFC-e (modelo 65, consumidor)' },
+                      ],
+                      onClick: ({ key }) => espelhoNf(o.id, key === 'auto' ? undefined : key as '55' | '65'),
+                    }}>
+                      <Tooltip title="Dados para emitir a nota à mão (produtos com NCM, CFOP, CSOSN, cliente e pagamento)">
+                        <Button size="small" icon={<FileTextOutlined />} />
+                      </Tooltip>
+                    </Dropdown>
                     <Tooltip title="Enviar o PDF pelo WhatsApp">
                       <Button size="small" icon={<WhatsAppOutlined style={{ color: '#25d366' }} />} onClick={() => setEnviando(o.id)} />
                     </Tooltip>
