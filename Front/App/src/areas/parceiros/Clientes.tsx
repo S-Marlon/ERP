@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
-import { getClientes, createCliente } from './utils/cliente.service';
+import { getClientes, createCliente, getHistoricoCliente, HistoricoCliente } from './utils/cliente.service';
+import { imprimirEspelhoNf } from '../vendas/vendasDoDia/impressaoVenda';
 import Swal from 'sweetalert2';
 import { CampoCep, CampoCpfCnpj, CampoTelefone, CampoUf } from '../../shared/formularios/Campos';
 import { formatarCep, formatarDocumento, formatarTelefone, regraCep, regraCnpj, regraCpf, regraTelefone, soDigitos } from '../../shared/formularios/documentos';
@@ -94,6 +95,14 @@ interface ClienteAggregate {
   enderecos: Endereco[];
 }
 
+const brlCliente = (v: number) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+/** "2026-11-24 15:42" → "24/11/2026 15:42" */
+const dataHoraBr = (s: string) => (s ? `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(0, 4)}${s.length > 10 ? ` ${s.slice(11, 16)}` : ''}` : '');
+const SITUACAO_VENDA: Record<string, { texto: string; cor: string }> = {
+  CONCLUIDA: { texto: 'Venda concluída', cor: 'green' }, ORCAMENTO: { texto: 'Orçamento', cor: 'blue' }, CONVERTIDO: { texto: 'Orçamento vendido', cor: 'cyan' },
+  CANCELADA: { texto: 'Cancelada', cor: 'red' },
+};
+
 export default function Clientes() {
   const [form] = Form.useForm();
 
@@ -104,6 +113,23 @@ export default function Clientes() {
 
   const [clientes, setClientes] = useState<ClienteAggregate[]>([]);
   const [clienteAtivo, setClienteAtivo] = useState<ClienteAggregate | null>(null);
+  const [abaCliente, setAbaCliente] = useState<string>('geral');
+  const [historico, setHistorico] = useState<HistoricoCliente | null>(null);
+  const [carregandoHistorico, setCarregandoHistorico] = useState(false);
+
+  // vendas e orçamentos do cliente escolhido (o id da pessoa é o mesmo cliente das vendas)
+  useEffect(() => {
+    const id = clienteAtivo?.id_pessoa;
+    setHistorico(null);
+    if (!id) return;
+    let vale = true;
+    setCarregandoHistorico(true);
+    getHistoricoCliente(Number(id))
+      .then(h => { if (vale) setHistorico(h); })
+      .catch(e => { if (vale) message.error(e instanceof Error ? e.message : 'Erro ao carregar o histórico.'); })
+      .finally(() => { if (vale) setCarregandoHistorico(false); });
+    return () => { vale = false; };
+  }, [clienteAtivo?.id_pessoa]);
 
   const fetchClientes = async () => {
     setLoading(true);
@@ -277,7 +303,9 @@ export default function Clientes() {
                     </Space>
                     <Space>
                       <Button icon={<CalculatorOutlined />} onClick={() => message.info(`Orçamento para ${clienteAtivo.nome_razao}`)}>Orçamento</Button>
-                      <Button type="primary" icon={<ShoppingCartOutlined />}>Pedidos</Button>
+                      <Button type="primary" icon={<ShoppingCartOutlined />} onClick={() => setAbaCliente('historico')}>
+                        Pedidos{historico?.vendas.length ? ` (${historico.vendas.length})` : ''}
+                      </Button>
                       <Dropdown
                         menu={{
                           items: [
@@ -297,7 +325,8 @@ export default function Clientes() {
 
             <Tabs
               type="card"
-              defaultActiveKey="geral"
+              activeKey={abaCliente}
+              onChange={setAbaCliente}
               items={[
                 {
                   key: 'geral',
@@ -373,17 +402,47 @@ export default function Clientes() {
                   key: 'historico',
                   label: (<span><HistoryOutlined /> Histórico de Vendas</span>),
                   children: (
-                    <Card bordered={false} title="Pedidos e Faturamento Recentes">
+                    <Card bordered={false} title="Vendas e orçamentos do cliente" loading={carregandoHistorico && !historico}>
+                      {historico && (
+                        <Row gutter={16} style={{ marginBottom: 12 }}>
+                          <Col xs={12} md={6}><Text type="secondary">Compras</Text><div><Text strong style={{ fontSize: 18 }}>{historico.resumo.compras}</Text></div></Col>
+                          <Col xs={12} md={6}><Text type="secondary">Total comprado</Text><div><Text strong style={{ fontSize: 18 }}>{brlCliente(historico.resumo.totalComprado)}</Text></div></Col>
+                          <Col xs={12} md={6}><Text type="secondary">Última compra</Text><div><Text strong style={{ fontSize: 18 }}>{historico.resumo.ultimaCompra ? dataHoraBr(historico.resumo.ultimaCompra) : '—'}</Text></div></Col>
+                          <Col xs={12} md={6}><Text type="secondary">Orçamentos abertos</Text><div><Text strong style={{ fontSize: 18 }}>{historico.resumo.orcamentosAbertos}</Text></div></Col>
+                        </Row>
+                      )}
                       <Table
                         size="small"
-                        pagination={false}
-                        locale={{ emptyText: 'Nenhum pedido faturado para este cliente.' }}
+                        rowKey="idVenda"
+                        pagination={{ pageSize: 15, hideOnSinglePage: true }}
+                        locale={{ emptyText: 'Nenhuma venda ou orçamento para este cliente.' }}
+                        dataSource={historico?.vendas || []}
                         columns={[
-                          { title: 'Pedido / NF', dataIndex: 'pedido' },
-                          { title: 'Data Faturamento', dataIndex: 'data' },
-                          { title: 'Valor Total', dataIndex: 'valor' }
+                          { title: 'Nº', dataIndex: 'idVenda', width: 70 },
+                          { title: 'Data', dataIndex: 'data', width: 140, render: (d: string) => dataHoraBr(d) },
+                          {
+                            title: 'Situação', dataIndex: 'status', width: 150,
+                            render: (s: string, v) => (
+                              <Space direction="vertical" size={0}>
+                                <Tag color={SITUACAO_VENDA[s]?.cor || 'default'} style={{ margin: 0 }}>{SITUACAO_VENDA[s]?.texto || s}</Tag>
+                                {s === 'ORCAMENTO' && v.validade && <Text type="secondary" style={{ fontSize: 11 }}>válido até {dataHoraBr(v.validade).slice(0, 10)}</Text>}
+                              </Space>
+                            ),
+                          },
+                          { title: 'Itens', dataIndex: 'itens', width: 70, align: 'right' },
+                          { title: 'Total', dataIndex: 'total', width: 120, align: 'right', render: (t: number) => <Text strong>{brlCliente(t)}</Text> },
+                          {
+                            title: 'Nota', width: 150, render: (_, v) => (v.nota
+                              ? <Tag color={v.nota.status === 'AUTORIZADA' ? 'green' : 'gold'}>{v.nota.modelo === '55' ? 'NF-e' : 'NFC-e'}{v.nota.numero ? ` nº ${v.nota.numero}` : ''} · {v.nota.status.toLowerCase()}</Tag>
+                              : <Text type="secondary">{v.status === 'CONCLUIDA' ? 'sem nota' : '—'}</Text>),
+                          },
+                          {
+                            title: '', width: 60, render: (_, v) => (v.status === 'CONCLUIDA' || v.status === 'ORCAMENTO') && (
+                              <Button size="small" type="text" icon={<FileTextOutlined />} title="Espelho da nota (dados para emitir)"
+                                onClick={() => imprimirEspelhoNf(v.idVenda).catch(e => message.error(e instanceof Error ? e.message : 'Erro ao montar o espelho.'))} />
+                            ),
+                          },
                         ]}
-                        dataSource={[]}
                       />
                     </Card>
                   ),

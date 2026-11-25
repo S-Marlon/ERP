@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { getClientes, createCliente } from './clientes/clientes.controller';
+import { getClientes, createCliente, historicoDoCliente } from './clientes/clientes.controller';
 import {
   atualizarFornecedor,
   detalheFornecedor,
@@ -17,6 +17,7 @@ router.get('/', (req: Request, res: Response) => {
 // --- Clientes ---
 router.get('/clientes', getClientes);
 router.post('/clientes', createCliente);
+router.get('/clientes/:id/vendas', historicoDoCliente);   // vendas, orçamentos e notas do cliente
 
 // --- Fornecedores (Centralizados em Parceiros) ---
 router.get('/fornecedores/verificar', verificarFornecedorPorCnpj); // GET /api/parceiros/fornecedores/verificar?cnpj=...

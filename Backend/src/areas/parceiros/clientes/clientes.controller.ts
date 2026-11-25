@@ -259,3 +259,44 @@ export const getClientes = async (req: Request, res: Response) => {
     connection.release();
   }
 };
+/**
+ * GET /clientes/:id/vendas — histórico do cliente: as vendas (concluídas e canceladas) e os orçamentos, com a nota
+ * emitida de cada venda e o resumo (quantas compras, total comprado, a última). Pedidos suspensos no PDV ficam de fora.
+ */
+export const historicoDoCliente = async (req: Request, res: Response) => {
+  const tenantId = Number(req.query.tenant_id || req.headers['x-tenant-id'] || 1);
+  const idCliente = Number(req.params.id);
+  try {
+    if (!Number.isInteger(idCliente) || idCliente <= 0) return res.status(400).json({ error: 'Cliente inválido.' });
+    const [rows]: any = await pool.execute(
+      `SELECT v.id_venda, v.status, v.total_liquido, v.observacao, v.operador,
+              DATE_FORMAT(v.created_at, '%Y-%m-%d %H:%i') AS data, DATE_FORMAT(v.validade, '%Y-%m-%d') AS validade,
+              (SELECT COUNT(*) FROM vendas_pedidos_itens i WHERE i.id_venda = v.id_venda AND i.quantidade > 0) AS itens,
+              (SELECT CONCAT(d.modelo, '|', d.status, '|', IFNULL(d.numero, '')) FROM fiscal_documentos d
+                WHERE d.id_venda = v.id_venda AND d.tenant_id = v.tenant_id AND d.status <> 'CANCELADA' ORDER BY d.id_documento DESC LIMIT 1) AS nota
+       FROM vendas_pedidos v
+       WHERE v.tenant_id = ? AND v.id_cliente = ? AND v.status <> 'SUSPENSA'
+       ORDER BY v.id_venda DESC LIMIT 200`, [tenantId, idCliente]);
+    const vendas = rows.map((r: any) => {
+      const [modelo, status, numero] = r.nota ? String(r.nota).split('|') : [];
+      return {
+        idVenda: Number(r.id_venda), status: r.status, data: r.data, validade: r.validade || null, total: Number(r.total_liquido) || 0,
+        itens: Number(r.itens) || 0, observacao: r.observacao || null, operador: r.operador || null,
+        nota: r.nota ? { modelo, status, numero: numero ? Number(numero) : null } : null,
+      };
+    });
+    const concluidas = vendas.filter((v: any) => v.status === 'CONCLUIDA');
+    return res.json({
+      resumo: {
+        compras: concluidas.length,
+        totalComprado: Math.round(concluidas.reduce((s: number, v: any) => s + v.total, 0) * 100) / 100,
+        ultimaCompra: concluidas[0]?.data || null,
+        orcamentosAbertos: vendas.filter((v: any) => v.status === 'ORCAMENTO').length,
+      },
+      vendas,
+    });
+  } catch (e: any) {
+    console.error('Erro ao carregar o histórico do cliente', e);
+    return res.status(500).json({ error: 'Erro ao carregar o histórico do cliente.', details: e?.message });
+  }
+};
