@@ -8,7 +8,7 @@ import { cepDoCadastro, ErroCadastro, telefoneDoCadastro, ufDoCadastro } from '.
 import { criarEmissor, PROVEDORES_DISPONIVEIS, segredosConfigurados } from './emissores';
 import {
   CONFIG_PADRAO, ConfigFiscal, Destinatario, Emitente, ErroFiscal, ItemVendaFiscal, Modelo, modeloSugerido, montarNota,
-  pagamentosDoOrcamento, pendenciasDaNota, somenteDigitos,
+  aplicarDescontoNosItens, pagamentosDoOrcamento, pendenciasDaNota, somenteDigitos,
 } from './notaSaida';
 
 const tenantDe = (req: Request): number => Number(req.query.tenant_id || req.headers['x-tenant-id'] || req.body?.tenant_id || 1);
@@ -543,13 +543,16 @@ export const espelhoDaVenda = async (req: Request, res: Response) => {
     const { emitente, config } = await carregarConfiguracao(pool, tenant);
     const [[venda]]: any = await pool.execute(
       `SELECT id_venda, status, id_cliente, cliente_nome, total_liquido, total_bruto, total_desconto, autorizado_por, motivo_autorizacao, observacao, operador,
-              condicao_forma, condicao_parcelas, condicao_entrada, condicao_intervalo_dias,
+              condicao_forma, condicao_parcelas, condicao_entrada, condicao_intervalo_dias, condicao_desconto_pct,
               DATE_FORMAT(created_at, '%d/%m/%Y %H:%i') AS data_fmt, DATE_FORMAT(validade, '%d/%m/%Y') AS validade_fmt
        FROM vendas_pedidos WHERE id_venda = ? AND tenant_id = ?`,
       [idVenda, tenant]
     );
     if (!venda) throw new ErroFiscal('Venda não encontrada.', 404);
-    const itens = (await itensFiscais(pool, tenant, [idVenda])).get(idVenda) || [];
+    const ehOrcamento = venda.status === 'ORCAMENTO';
+    // orçamento com desconto por pagar na forma combinada (ex.: 10% no PIX): o desconto vai para os produtos
+    const descontoForma = ehOrcamento ? Number(venda.condicao_desconto_pct) || 0 : 0;
+    const itens = aplicarDescontoNosItens((await itensFiscais(pool, tenant, [idVenda])).get(idVenda) || [], descontoForma);
     const idCliente = venda.id_cliente ? Number(venda.id_cliente) : null;
     const cliente = idCliente ? (await clientesDasVendas(pool, tenant, [idCliente])).get(idCliente) : undefined;
     const pedido = String(req.query.modelo || '');
@@ -563,9 +566,9 @@ export const espelhoDaVenda = async (req: Request, res: Response) => {
     }
     const pendencias = pendenciasDaNota(emitente, itens, modelo, destinatario);
     const [lancados]: any = await pool.execute(`SELECT forma, valor, troco, parcelas FROM vendas_pedidos_pagamentos WHERE id_venda = ? AND tenant_id = ?`, [idVenda, tenant]);
-    // orçamento ainda não tem pagamento: usa a condição combinada (para o espelho de emissão à mão)
-    const ehOrcamento = venda.status === 'ORCAMENTO';
-    const condicao = ehOrcamento ? pagamentosDoOrcamento(Number(venda.total_liquido), {
+    // orçamento ainda não tem pagamento: usa a condição combinada (para o espelho de emissão à mão), sobre o total com o desconto da forma
+    const totalAPagar = Math.round(Number(venda.total_liquido) * (1 - descontoForma) * 100) / 100;
+    const condicao = ehOrcamento ? pagamentosDoOrcamento(totalAPagar, {
       forma: venda.condicao_forma || null, parcelas: venda.condicao_parcelas === null ? null : Number(venda.condicao_parcelas),
       entrada: venda.condicao_entrada === null ? null : Number(venda.condicao_entrada),
       intervaloDias: venda.condicao_intervalo_dias === null ? null : Number(venda.condicao_intervalo_dias),
@@ -580,7 +583,7 @@ export const espelhoDaVenda = async (req: Request, res: Response) => {
     return res.json({
       venda: { idVenda, status: venda.status, cliente: venda.cliente_nome, data: venda.data_fmt, total: Number(venda.total_liquido), observacao: venda.observacao, operador: venda.operador,
         bruto: Number(venda.total_bruto) || 0, desconto: Number(venda.total_desconto) || 0, autorizadoPor: venda.autorizado_por || null, motivoDesconto: venda.motivo_autorizacao || null },
-      orcamento: ehOrcamento ? { validade: venda.validade_fmt || null, condicao: condicao?.texto || null } : null,
+      orcamento: ehOrcamento ? { validade: venda.validade_fmt || null, condicao: condicao?.texto || null, descontoForma: descontoForma || null, totalAPagar } : null,
       modelo, pendencias, nota, emitente,
       servicos: itens.filter(i => i.servico).map(i => ({ descricao: i.descricao, quantidade: i.quantidade, total: i.totalItem })),
       pagamentos: pagamentos.map((p: any) => ({ forma: p.forma, valor: Number(p.valor), troco: Number(p.troco) || 0, parcelas: Number(p.parcelas) || 1 })),

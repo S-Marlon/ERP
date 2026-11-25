@@ -14,7 +14,13 @@ export interface CondicaoPagamento {
   intervaloDias: number | null;
   /** Crédito e a prazo: entrada no ato (PIX). PIX e dinheiro: o antecipado (o saldo na conclusão e entrega). */
   entrada: number;
+  /** Desconto por pagar nesta forma (PIX/dinheiro), sobre o total da proposta: 0,10 = 10%. Sem ele, 0. */
+  descontoPct?: number;
 }
+
+/** Total a pagar na condição: o da proposta menos o desconto da forma (PIX/dinheiro). */
+export const totalComDesconto = (c: Pick<CondicaoPagamento, 'descontoPct'> | null | undefined, total: number) =>
+  r2(total * (1 - (Number(c?.descontoPct) || 0)));
 
 /** Taxa da forma (a configurada em Vendas › Taxas): % sobre o valor + R$ fixo. */
 export type TaxaDe = (forma: string, parcelas: number) => { percentual: number; fixa: number };
@@ -38,9 +44,16 @@ export const lerCondicao = (c: any, total?: number): CondicaoPagamento | null =>
   // PIX e dinheiro também podem ir em duas etapas: antecipado (a "entrada") e o saldo na conclusão e entrega
   const comEntrada = parcelada || forma === 'PIX' || forma === 'DINHEIRO';
   const entrada = comEntrada ? r2(Math.max(0, Number(c.entrada) || 0)) : 0;
-  if (total !== undefined && entrada > 0 && entrada >= total - 0.004) throw new Error('A entrada precisa ser menor que o total da proposta.');
-  return { forma, parcelas, intervaloDias, entrada };
+  // desconto só no PIX e no dinheiro (as formas sem taxa), até 50%
+  const descontoPct = forma === 'PIX' || forma === 'DINHEIRO' ? Math.round(Math.max(0, Number(c.descontoPct) || 0) * 10000) / 10000 : 0;
+  if (descontoPct > 0.5) throw new Error('Desconto da forma de pagamento: até 50%.');
+  const aPagar = total !== undefined ? r2(total * (1 - descontoPct)) : undefined;
+  if (aPagar !== undefined && entrada > 0 && entrada >= aPagar - 0.004) throw new Error('A entrada precisa ser menor que o total da proposta.');
+  return { forma, parcelas, intervaloDias, entrada, ...(descontoPct > 0 ? { descontoPct } : {}) };
 };
+
+/** "10%", "7,5%" */
+const pctTexto = (d: number) => `${(d * 100).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`;
 
 /** Fração "bonita" do antecipado: 1/3 e 2/3, 1/2... ou a porcentagem (30% e 70%). */
 const fracaoDoAntecipado = (parte: number) => {
@@ -57,14 +70,20 @@ const fracaoDoAntecipado = (parte: number) => {
  */
 export const textoDaCondicao = (c: CondicaoPagamento, total?: number): string => {
   const p = c.parcelas;
+  const d = Number(c.descontoPct) || 0;
+  const onde = c.forma === 'PIX' ? 'no PIX' : 'em dinheiro';
+  // com desconto da forma: "No PIX com 10% de desconto: R$ 189,00" e as etapas sobre o total com desconto
+  const comDesconto = d > 0 ? `${onde === 'no PIX' ? 'No PIX' : 'Em dinheiro'} com ${pctTexto(d)} de desconto${total ? `: ${brl(r2(total * (1 - d)))}` : ''}` : '';
+  const aPagar = total ? r2(total * (1 - d)) : undefined;
   if ((c.forma === 'PIX' || c.forma === 'DINHEIRO') && c.entrada > 0) {
-    const onde = c.forma === 'PIX' ? 'no PIX' : 'em dinheiro';
-    if (total && total > c.entrada) {
-      const f = fracaoDoAntecipado(c.entrada / total);
-      return `${f.antes} antecipado ${onde} (${brl(c.entrada)}) + ${f.depois} na conclusão e entrega (${brl(r2(total - c.entrada))})`;
+    if (aPagar && aPagar > c.entrada) {
+      const f = fracaoDoAntecipado(c.entrada / aPagar);
+      const etapas = `${f.antes} antecipado${d ? '' : ` ${onde}`} (${brl(c.entrada)}) + ${f.depois} na conclusão e entrega (${brl(r2(aPagar - c.entrada))})`;
+      return d ? `${comDesconto} — ${etapas}` : etapas;
     }
-    return `${brl(c.entrada)} antecipado ${onde} + o saldo ${onde} na conclusão e entrega`;
+    return `${comDesconto ? `${comDesconto} — ` : ''}${brl(c.entrada)} antecipado ${onde} + o saldo ${onde} na conclusão e entrega`;
   }
+  if (comDesconto) return comDesconto;
   const base = c.forma === 'PIX' ? 'À vista no PIX'
     : c.forma === 'DINHEIRO' ? 'À vista em dinheiro'
       : c.forma === 'DEBITO' ? 'Cartão de débito'
@@ -129,5 +148,9 @@ export const pagamentoMaisCaro = (taxaDe: TaxaDe, c: CondicaoPagamento, total: n
 
 /** Condição em campos gravada no orçamento (colunas condicao_*); null = a combinar ou orçamento antigo só com o texto. */
 export const condicaoDaLinha = (p: any) => (p?.condicao_forma
-  ? { forma: p.condicao_forma, parcelas: Number(p.condicao_parcelas) || 1, intervaloDias: p.condicao_intervalo_dias !== null && p.condicao_intervalo_dias !== undefined ? Number(p.condicao_intervalo_dias) : null, entrada: Number(p.condicao_entrada) || 0 }
+  ? {
+    forma: p.condicao_forma, parcelas: Number(p.condicao_parcelas) || 1,
+    intervaloDias: p.condicao_intervalo_dias !== null && p.condicao_intervalo_dias !== undefined ? Number(p.condicao_intervalo_dias) : null,
+    entrada: Number(p.condicao_entrada) || 0, ...(Number(p.condicao_desconto_pct) > 0 ? { descontoPct: Number(p.condicao_desconto_pct) } : {}),
+  }
   : null);

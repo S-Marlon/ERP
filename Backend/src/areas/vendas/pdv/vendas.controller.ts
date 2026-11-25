@@ -136,7 +136,7 @@ export const registrarVenda = async (req: Request, res: Response) => {
     let condicaoCombinada: ReturnType<typeof lerCondicao> = null;
     if (idOrcamento) {
       const [[orc]]: any = await connection.execute(
-        `SELECT id_venda, status, margem_alvo, condicao_forma, condicao_parcelas, condicao_intervalo_dias, condicao_entrada,
+        `SELECT id_venda, status, margem_alvo, condicao_forma, condicao_parcelas, condicao_intervalo_dias, condicao_entrada, condicao_desconto_pct,
                 validade >= CURDATE() AS valido
          FROM vendas_pedidos WHERE id_venda = ? AND tenant_id = ? FOR UPDATE`,
         [idOrcamento, tenant]
@@ -258,12 +258,21 @@ export const registrarVenda = async (req: Request, res: Response) => {
 
     // Regras de desconto e margem (servidor): acima do limite ou abaixo do custo exige autorização
     const regras = await carregarRegras(connection as any, tenant);
+    // Proposta negociada com desconto por pagar na forma (ex.: 10% no PIX), paga nessa forma (ou com o sinal): esse
+    // desconto já foi combinado e autorizado na negociação, então não conta para o limite de desconto
+    const descontoCombinadoPct = condicaoCombinada?.descontoPct
+      && pagamentosOk.every(p => p.forma === condicaoCombinada!.forma || p.forma === 'ADIANTAMENTO')
+      ? condicaoCombinada.descontoPct * 100 : 0;
+    const nominalPct = venda.totalBruto > 0 ? (venda.totalDesconto / venda.totalBruto) * 100 : 0;
+    const percentualParaRegra = descontoCombinadoPct > 0
+      ? Math.max(0, Number(((percentualEfetivo ?? nominalPct) - descontoCombinadoPct).toFixed(2)))
+      : percentualEfetivo;
     const avaliacao = avaliarRegras(venda.totalBruto, venda.totalDesconto, venda.linhas.map(l => ({
       idItem: l.idItem,
       nome: itensBanco.get(l.idItem).nome_comercial || itensBanco.get(l.idItem).nome_item,
       totalItem: l.totalItem,
       custoTotal: custoDaLinha(l) * l.quantidadeBase,
-    })), regras, percentualEfetivo);
+    })), regras, percentualParaRegra);
     if (avaliacao.bloqueio) throw new ErroVenda(avaliacao.bloqueio, 409, { codigo: 'ABAIXO_DO_CUSTO' });
     // Proposta negociada: pagamento mais caro para a loja que o combinado (mais taxa ou mais prazo) também pede a senha
     const motivoCondicao = condicaoCombinada

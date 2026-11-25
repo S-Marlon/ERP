@@ -1,6 +1,6 @@
 import assert from 'assert';
 import {
-  custoDaCondicao, custoDosPagamentos, lerCondicao, pagamentoMaisCaro, pagamentosDaCondicao, prazoMedioDias, textoDaCondicao,
+  condicaoDaLinha, custoDaCondicao, custoDosPagamentos, lerCondicao, pagamentoMaisCaro, pagamentosDaCondicao, prazoMedioDias, textoDaCondicao, totalComDesconto,
 } from './condicaoPagamento';
 
 const teste = (nome: string, fn: () => void) => { fn(); console.log(`${nome}: ok`); };
@@ -67,4 +67,23 @@ teste('condição: PIX em duas etapas (antecipado + saldo na conclusão e entreg
   // débito continua sem entrada; antecipado do tamanho do total não vale
   assert.strictEqual(lerCondicao({ forma: 'DEBITO', entrada: 50 }, 100)!.entrada, 0);
   assert.throws(() => lerCondicao({ forma: 'PIX', entrada: 210 }, 210), /entrada precisa ser menor/);
+});
+
+teste('condição: desconto por pagar no PIX (com e sem etapas)', () => {
+  const txt = (x: string) => x.replace(/\s/g, ' ');
+  const c = lerCondicao({ forma: 'PIX', descontoPct: 0.1 }, 210)!;
+  assert.strictEqual(c.descontoPct, 0.1);
+  assert.strictEqual(totalComDesconto(c, 210), 189);
+  assert.strictEqual(txt(textoDaCondicao(c, 210)), 'No PIX com 10% de desconto: R$ 189,00');
+  // 1/3 antecipado sobre o total com desconto (189 → 63 + 126)
+  const etapas = lerCondicao({ forma: 'PIX', descontoPct: 0.1, entrada: 63 }, 210)!;
+  assert.strictEqual(txt(textoDaCondicao(etapas, 210)), 'No PIX com 10% de desconto: R$ 189,00 — 1/3 antecipado (R$ 63,00) + 2/3 na conclusão e entrega (R$ 126,00)');
+  assert.deepStrictEqual(pagamentosDaCondicao(etapas, totalComDesconto(etapas, 210)).map(p => p.valor), [63, 126]);
+  // só no PIX e no dinheiro; até 50%; o antecipado tem de caber no total com desconto
+  assert.strictEqual(lerCondicao({ forma: 'CREDITO', parcelas: 3, descontoPct: 0.1 })!.descontoPct, undefined);
+  assert.throws(() => lerCondicao({ forma: 'PIX', descontoPct: 0.6 }), /até 50%/);
+  assert.throws(() => lerCondicao({ forma: 'PIX', descontoPct: 0.1, entrada: 190 }, 210), /entrada precisa ser menor/);
+  // gravado no orçamento e lido de volta
+  assert.deepStrictEqual(condicaoDaLinha({ condicao_forma: 'PIX', condicao_parcelas: 1, condicao_entrada: '63.0000', condicao_desconto_pct: '0.1000' }),
+    { forma: 'PIX', parcelas: 1, intervaloDias: null, entrada: 63, descontoPct: 0.1 });
 });

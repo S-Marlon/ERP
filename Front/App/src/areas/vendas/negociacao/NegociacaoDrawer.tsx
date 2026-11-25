@@ -9,7 +9,7 @@ import {
   aplicarMargem, equilibrar, FaixaQuantidade, margem as margemDe, markup as markupDe, precoParaMargem, resumoNegociacao,
 } from './negociacao';
 import { CONDICOES_PAGAMENTO, ConfigNegociacao, ErroNegociacao, ItemNegociacao, LinhaPreparada, negociacaoApi } from './negociacaoApi';
-import { CondicaoPagamento, custoDaCondicao, FormaCondicao, textoDaCondicao } from './condicaoPagamento';
+import { CondicaoPagamento, custoDaCondicao, FormaCondicao, textoDaCondicao, totalComDesconto } from './condicaoPagamento';
 import { taxaPara, useTaxasVenda } from '../taxas/taxasVenda';
 import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
 
@@ -42,7 +42,7 @@ export const NegociacaoDrawer: React.FC<{
   const [alvo, setAlvo] = useState(0.3);
   const [condicao, setCondicao] = useState('');
   // Condição em campos: forma ('' = a combinar / texto livre), parcelas, intervalo e entrada
-  const [cond, setCond] = useState<{ forma: FormaCondicao | ''; parcelas: number; intervaloDias: number; entrada: number }>({ forma: '', parcelas: 1, intervaloDias: 30, entrada: 0 });
+  const [cond, setCond] = useState<{ forma: FormaCondicao | ''; parcelas: number; intervaloDias: number; entrada: number; descontoPct: number }>({ forma: '', parcelas: 1, intervaloDias: 30, entrada: 0, descontoPct: 0 });
   const taxas = useTaxasVenda();
   const [validade, setValidade] = useState(7);
   const [contato, setContato] = useState('');
@@ -61,8 +61,8 @@ export const NegociacaoDrawer: React.FC<{
       setAlvo(ini?.margemAlvo ?? r.config.margemAlvoPadrao);
       setCondicao(ini?.condicaoPagamento || ''); setContato(ini?.contato || '');
       setCond(ini?.condicao
-        ? { forma: ini.condicao.forma, parcelas: ini.condicao.parcelas, intervaloDias: ini.condicao.intervaloDias || 30, entrada: ini.condicao.entrada || 0 }
-        : { forma: '', parcelas: 1, intervaloDias: 30, entrada: 0 }); setObservacao(ini?.observacao || ''); setValidade(7);
+        ? { forma: ini.condicao.forma, parcelas: ini.condicao.parcelas, intervaloDias: ini.condicao.intervaloDias || 30, entrada: ini.condicao.entrada || 0, descontoPct: ini.condicao.descontoPct || 0 }
+        : { forma: '', parcelas: 1, intervaloDias: 30, entrada: 0, descontoPct: 0 }); setObservacao(ini?.observacao || ''); setValidade(7);
       setLinhas(r.linhas.map((l, i) => ({
         ...l, preco: ini?.precos[i] ?? l.precoTabela, travado: ini?.travados[i] ?? false, faixas: ini?.faixas[i] ?? [],
         componentes: abrir.itens[i]?.componentes,
@@ -89,6 +89,8 @@ export const NegociacaoDrawer: React.FC<{
       intervaloDias: cond.forma === 'PRAZO' ? cond.intervaloDias : null,
       // crédito/a prazo: entrada; PIX/dinheiro: o antecipado (saldo na conclusão e entrega); débito: sem
       entrada: cond.forma === 'DEBITO' ? 0 : cond.entrada,
+      // desconto por pagar nesta forma: só PIX e dinheiro
+      ...((cond.forma === 'PIX' || cond.forma === 'DINHEIRO') && cond.descontoPct > 0 ? { descontoPct: cond.descontoPct } : {}),
     }
     : null;
 
@@ -232,8 +234,11 @@ export const NegociacaoDrawer: React.FC<{
 
   const corResumo = cfg ? corDaMargem(resumo.margem, cfg, alvo) : undefined;
   // Margem depois do custo da condição (taxa da maquininha) e o prazo médio para receber
-  const custoCond = condicaoAtual && taxas && resumo.receita > 0 ? custoDaCondicao((f, n) => taxaPara(taxas, f, n), condicaoAtual, resumo.receita) : null;
-  const margemLiquida = custoCond && resumo.custo > 0 ? (resumo.lucro - custoCond.taxa) / resumo.receita : null;
+  // o que o cliente paga na condição (com o desconto da forma, se houver) e a margem depois da taxa e do desconto
+  const aPagar = condicaoAtual ? totalComDesconto(condicaoAtual, resumo.receita) : resumo.receita;
+  const descontoDaForma = Math.round((resumo.receita - aPagar) * 100) / 100;
+  const custoCond = condicaoAtual && taxas && resumo.receita > 0 ? custoDaCondicao((f, n) => taxaPara(taxas, f, n), condicaoAtual, aPagar) : null;
+  const margemLiquida = custoCond && resumo.custo > 0 && aPagar > 0 ? (resumo.lucro - descontoDaForma - custoCond.taxa) / aPagar : null;
   const lucroNoAlvo = resumo.custo > 0 ? resumo.custo / (1 - alvo) - resumo.custo : 0;
 
   return (
@@ -254,7 +259,7 @@ export const NegociacaoDrawer: React.FC<{
                 {custoCond && (
                   <Tooltip title="Margem depois da taxa da forma combinada (Vendas › Taxas). O prazo médio é quanto tempo, em média, até o dinheiro entrar.">
                     <Text style={{ fontSize: 12, display: 'block', color: cfg ? corDaMargem(margemLiquida, cfg, alvo) : undefined }}>
-                      Depois da condição: <b>{pct(margemLiquida)}</b>{custoCond.taxa > 0 ? ` · taxa ${brl(custoCond.taxa)}` : ' · sem taxa'}
+                      Depois da condição: <b>{pct(margemLiquida)}</b>{descontoDaForma > 0 ? ` · desconto ${brl(descontoDaForma)}` : ''}{custoCond.taxa > 0 ? ` · taxa ${brl(custoCond.taxa)}` : ' · sem taxa'}
                       {custoCond.prazoMedioDias > 0 ? ` · recebe em ~${custoCond.prazoMedioDias.toLocaleString('pt-BR')} dias` : ''}
                     </Text>
                   </Tooltip>
@@ -337,6 +342,18 @@ export const NegociacaoDrawer: React.FC<{
                       onChange={v => setCond({ ...cond, entrada: Number(v) || 0 })} />
                   )}
                   {(cond.forma === 'PIX' || cond.forma === 'DINHEIRO') && (
+                    <Tooltip title="Desconto por pagar nesta forma, sobre o total da proposta (a proposta mostra o total com desconto)">
+                      <CampoNumero style={{ width: 120 }} min={0} max={50} value={cond.descontoPct ? Math.round(cond.descontoPct * 10000) / 100 : null} prefix="Desc." suffix="%" placeholder="0"
+                        onChange={v => {
+                          const d = Math.min(0.5, Math.max(0, (Number(v) || 0) / 100));
+                          // o antecipado acompanha a fração que estava escolhida (1/3 continua 1/3 do novo total)
+                          const antes = totalComDesconto({ descontoPct: cond.descontoPct }, resumo.receita);
+                          const fr = antes > 0 && cond.entrada > 0 ? cond.entrada / antes : 0;
+                          setCond({ ...cond, descontoPct: d, entrada: fr ? Math.round(totalComDesconto({ descontoPct: d }, resumo.receita) * fr * 100) / 100 : cond.entrada });
+                        }} />
+                    </Tooltip>
+                  )}
+                  {(cond.forma === 'PIX' || cond.forma === 'DINHEIRO') && (
                     <Tooltip title="Pagamento em duas etapas: o antecipado agora e o saldo na conclusão e entrega. Vazio = tudo à vista.">
                       <CampoNumero style={{ width: 150 }} min={0} value={cond.entrada || null} prefix="Antecipado R$" placeholder="0"
                         onChange={v => setCond({ ...cond, entrada: Number(v) || 0 })} />
@@ -347,8 +364,8 @@ export const NegociacaoDrawer: React.FC<{
                   <Flex gap={4} wrap style={{ marginTop: 4 }}>
                     <Text type="secondary" style={{ fontSize: 12 }}>Dividir:</Text>
                     {([['tudo à vista', 0], ['1/3 antes', 1 / 3], ['1/2 antes', 1 / 2], ['2/3 antes', 2 / 3]] as const).map(([rotulo, f]) => (
-                      <Button key={rotulo} size="small" type={Math.abs(cond.entrada - Math.round(resumo.receita * f * 100) / 100) < 0.01 ? 'primary' : 'default'}
-                        onClick={() => setCond({ ...cond, entrada: Math.round(resumo.receita * f * 100) / 100 })}>{rotulo}</Button>
+                      <Button key={rotulo} size="small" type={Math.abs(cond.entrada - Math.round(aPagar * f * 100) / 100) < 0.01 ? 'primary' : 'default'}
+                        onClick={() => setCond({ ...cond, entrada: Math.round(aPagar * f * 100) / 100 })}>{rotulo}</Button>
                     ))}
                   </Flex>
                 )}

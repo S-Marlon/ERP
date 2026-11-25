@@ -224,3 +224,16 @@ export const pagamentosDoOrcamento = (total: number, c: CondicaoOrcamento): { pa
     + (parcelas > 1 && c.intervaloDias ? ` (a cada ${c.intervaloDias} dias)` : '');
   return { pagamentos, texto };
 };
+
+/**
+ * Desconto por pagar na forma combinada (ex.: 10% no PIX) num orçamento: vira desconto nos produtos, rateado pelo valor
+ * de cada um (centavos exatos), para o total da nota bater com o que o cliente paga. Serviços ficam como estão.
+ */
+export const aplicarDescontoNosItens = (itens: ItemVendaFiscal[], pct: number): ItemVendaFiscal[] => {
+  if (!(pct > 0)) return itens;
+  const produtos = itens.filter(i => !i.servico);
+  const base = produtos.reduce((s, i) => s + i.totalItem, 0);
+  const partes = ratear(Math.round(base * pct * 100) / 100, produtos.map(i => i.totalItem));
+  let k = 0;
+  return itens.map(i => (i.servico ? i : { ...i, totalItem: Math.round((i.totalItem - partes[k++]) * 100) / 100 }));
+};

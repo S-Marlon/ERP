@@ -1,4 +1,4 @@
-import { CONFIG_PADRAO, digitoChave, Emitente, gerarChaveAcesso, ItemVendaFiscal, modeloSugerido, montarNota, pagamentosDoOrcamento, pendenciasDaNota, ratear, tributacaoDoItem } from './notaSaida';
+import { CONFIG_PADRAO, digitoChave, Emitente, gerarChaveAcesso, ItemVendaFiscal, aplicarDescontoNosItens, modeloSugerido, montarNota, pagamentosDoOrcamento, pendenciasDaNota, ratear, tributacaoDoItem } from './notaSaida';
 
 const assert = (condition: boolean, message: string): void => {
   if (!condition) throw new Error(message);
@@ -70,5 +70,11 @@ assert(etapas.pagamentos.map(p => `${p.forma}:${p.valor}`).join(' ') === 'PIX:70
 assert(etapas.texto.replace(/\s/g, ' ') === 'R$ 70,00 antecipado no PIX + R$ 140,00 no PIX na conclusão e entrega', `texto etapas: ${etapas.texto}`);
 assert(parc.texto.replace(/\s/g, ' ') === 'Entrada de R$ 300,00 + 3x de R$ 400,00 a prazo (a cada 30 dias)', `texto: ${parc.texto}`);
 assert(pagamentosDoOrcamento(100, { forma: 'PIX', parcelas: 1, entrada: 500, intervaloDias: null }).pagamentos.map(p => p.valor).join() === '100', 'entrada maior que o total');
+
+// orçamento com 10% no PIX: o desconto vai para os produtos, rateado (centavos exatos); serviço fica de fora
+const comServico = [item({ idItem: 1, totalItem: 100 }), item({ idItem: 2, totalItem: 110 }), { ...item({ idItem: 3, totalItem: 50 }), servico: true }];
+const descontados = aplicarDescontoNosItens(comServico, 0.1);
+assert(descontados.map(i => i.totalItem).join(' ') === '90 99 50', `desconto rateado: ${descontados.map(i => i.totalItem).join(' ')}`);
+assert(aplicarDescontoNosItens(comServico, 0) === comServico, 'sem desconto, os mesmos itens');
 
 console.log('notaSaida: ok');

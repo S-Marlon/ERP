@@ -354,9 +354,17 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
         if (!c) return;
         const metodoDe: Record<string, PaymentMethodType> = { PIX: 'pix', DINHEIRO: 'money', DEBITO: 'debit_card', CREDITO: 'credit_card', PRAZO: 'store_credit' };
         if (c.forma === 'PRAZO' && !clienteId) { message.warning('Para vender a prazo, identifique o cliente (F4).'); return; }
+        // desconto combinado por pagar nesta forma (ex.: 10% no PIX): entra junto, e os pagamentos já saem pelo total com desconto
+        const d = Number(c.descontoPct) || 0;
+        let saldo = saldoRestante;
+        if (d > 0) {
+            const novoDesconto = Math.round(total * d * 100) / 100;
+            setTipoDesconto('porcent'); setDescontoValor(Math.round(d * 10000) / 100); setUsuarioInteragiu(false);
+            saldo = Math.max(0, Math.round((saldoRestante + descontoCalculado - novoDesconto) * 100) / 100);
+        }
         setPagamentos(atual => [
             ...atual.filter(p => p.status === 'paid' || p.status === 'processing'),
-            ...pagamentosDaCondicao(c, saldoRestante).filter(p => p.valor > 0).map(p => ({
+            ...pagamentosDaCondicao(c, saldo).filter(p => p.valor > 0).map(p => ({
                 id: crypto.randomUUID(), metodo: metodoDe[p.forma], valor: p.valor, parcelas: p.parcelas || 1,
                 ...(p.forma === 'PRAZO' ? { intervaloDias: p.intervaloDias || 30 } : {}),
                 status: statusInicial(metodoDe[p.forma]), createdAt: new Date(),
@@ -482,7 +490,9 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
             title={<span>Proposta negociada: preço fechado com o cliente. Condição combinada: <b>{negociacao.texto || 'a combinar'}</b></span>}
             description={maisCaro
                 ? <>{maisCaro} Vai pedir a senha de autorização ao concluir.</>
-                : negociacao.condicao
+                : negociacao.condicao?.descontoPct
+                    ? `Desconto combinado: ${Math.round(negociacao.condicao.descontoPct * 10000) / 100}% pagando ${negociacao.condicao.forma === 'PIX' ? 'no PIX' : 'em dinheiro'}. "Lançar a condição" aplica o desconto e preenche o pagamento.`
+                    : negociacao.condicao
                     ? 'Sem desconto da forma de pagamento. Use "Lançar a condição" para preencher o pagamento combinado.'
                     : 'Sem desconto da forma de pagamento. Crédito acima das parcelas sem juros ainda tem o acréscimo da maquininha.'}
             action={negociacao.condicao && saldoRestante > 0 ? <Button size="small" type="primary" onClick={lancarCondicao}>Lançar a condição</Button> : undefined} />

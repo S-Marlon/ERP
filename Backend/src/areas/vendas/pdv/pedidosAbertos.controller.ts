@@ -88,9 +88,12 @@ export const salvarPedidoAberto = async (req: Request, res: Response) => {
     let motivoAutorizacao: string | null = null;
     if (neg) {
       const { margemMinimaNegociacao } = await carregarMargensNegociacao(connection, tenant);
+      // com desconto por pagar na forma (ex.: 10% no PIX), a margem é a do preço com esse desconto
+      const fatorForma = 1 - (Number(condicao?.descontoPct) || 0);
       const abaixo = abaixoDaMinima(venda.linhas.map((l, i) => ({
         nome: itensBanco.get(l.idItem).nome_comercial || itensBanco.get(l.idItem).nome_item,
-        preco: l.precoUnitarioFinal, custoUnitario: custoDaLinha(l) * l.fator, faixas: faixasDe(i),
+        preco: l.precoUnitarioFinal * fatorForma, custoUnitario: custoDaLinha(l) * l.fator,
+        faixas: faixasDe(i).map(f => ({ ...f, precoUnitario: f.precoUnitario * fatorForma })),
       })), margemMinimaNegociacao);
       if (abaixo.length) {
         const regras = await carregarRegras(connection, tenant);
@@ -114,6 +117,7 @@ export const salvarPedidoAberto = async (req: Request, res: Response) => {
       neg ? Number(margemAlvo).toFixed(4) : null,
       neg ? (condicao ? textoDaCondicao(condicao, Number(venda.totalLiquido)) : String(neg.condicaoPagamento || '').trim()).slice(0, 150) || null : null,
       condicao?.forma ?? null, condicao ? condicao.parcelas : null, condicao?.intervaloDias ?? null, condicao && condicao.entrada > 0 ? f4(condicao.entrada) : null,
+      condicao?.descontoPct ? Number(condicao.descontoPct).toFixed(4) : null,
       autorizadoPor, motivoAutorizacao,
     ];
     let id: number;
@@ -124,7 +128,7 @@ export const salvarPedidoAberto = async (req: Request, res: Response) => {
       await connection.execute(
         `UPDATE vendas_pedidos SET operador = ?, id_cliente = ?, cliente_nome = ?, contato = ?, total_bruto = ?, total_desconto = ?, total_liquido = ?,
            total_custo = ?, observacao = ?, margem_alvo = ?, condicao_pagamento = ?,
-           condicao_forma = ?, condicao_parcelas = ?, condicao_intervalo_dias = ?, condicao_entrada = ?, autorizado_por = ?, motivo_autorizacao = ?,
+           condicao_forma = ?, condicao_parcelas = ?, condicao_intervalo_dias = ?, condicao_entrada = ?, condicao_desconto_pct = ?, autorizado_por = ?, motivo_autorizacao = ?,
            validade = CURDATE() + INTERVAL ? DAY WHERE id_venda = ?`,
         [operadorDe(req), ...valoresCab, validadeDias, idExistente]);
       await connection.execute(`DELETE FROM vendas_pedidos_itens_componentes WHERE id_venda = ? AND tenant_id = ?`, [idExistente, tenant]);
@@ -134,8 +138,8 @@ export const salvarPedidoAberto = async (req: Request, res: Response) => {
       const [cab]: any = await connection.execute(
         `INSERT INTO vendas_pedidos
            (tenant_id, origem, status, operador, id_cliente, cliente_nome, contato, total_bruto, total_desconto, total_liquido, total_custo, observacao,
-            margem_alvo, condicao_pagamento, condicao_forma, condicao_parcelas, condicao_intervalo_dias, condicao_entrada, autorizado_por, motivo_autorizacao, validade)
-         VALUES (?, 'PDV', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${tipo === 'ORCAMENTO' ? 'CURDATE() + INTERVAL ? DAY' : 'NULL'})`,
+            margem_alvo, condicao_pagamento, condicao_forma, condicao_parcelas, condicao_intervalo_dias, condicao_entrada, condicao_desconto_pct, autorizado_por, motivo_autorizacao, validade)
+         VALUES (?, 'PDV', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${tipo === 'ORCAMENTO' ? 'CURDATE() + INTERVAL ? DAY' : 'NULL'})`,
         [tenant, tipo, operadorDe(req), ...valoresCab, ...(tipo === 'ORCAMENTO' ? [validadeDias] : [])]
       );
       id = Number(cab.insertId);

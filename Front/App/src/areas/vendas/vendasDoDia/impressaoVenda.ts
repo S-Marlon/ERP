@@ -79,7 +79,7 @@ export const imprimirEspelhoNf = async (idVenda: number, modelo?: '55' | '65') =
   const end = d?.endereco;
   const nomeModelo = e.modelo === '55' ? 'NF-e (modelo 55)' : 'NFC-e (modelo 65)';
   // orçamento: ainda não é venda (sem pagamento lançado: vai a condição combinada)
-  const orc = e.orcamento as { validade: string | null; condicao: string | null } | null;
+  const orc = e.orcamento as { validade: string | null; condicao: string | null; descontoForma?: number | null; totalAPagar?: number } | null;
   const origem = orc ? `Orçamento <b>Nº ${idVenda}</b> · ${esc(e.venda.data)}${orc.validade ? ` · válido até ${esc(orc.validade)}` : ''}`
     : `Venda <b>Nº ${idVenda}</b> · ${esc(e.venda.data)}`;
   const pj = String(d?.documento || '').replace(/\D/g, '').length === 14;
@@ -136,7 +136,7 @@ export const imprimirEspelhoNf = async (idVenda: number, modelo?: '55' | '65') =
       </div>
     </div>
     <div class="aviso"><b>Não é documento fiscal.</b> Use estes dados para digitar a nota no emissor (SEFAZ / emissor gratuito).
-      ${orc ? `<br><b>Feito a partir do orçamento</b> (ainda não é venda): o pagamento é a condição combinada — <b>${esc(orc.condicao || 'a combinar')}</b>. Confira as quantidades e os preços antes de emitir; se o cliente fechar, transforme em venda no PDV para a baixa no estoque e no caixa.` : ''}
+      ${orc ? `<br><b>Feito a partir do orçamento</b> (ainda não é venda): o pagamento é a condição combinada — <b>${esc(orc.condicao || 'a combinar')}</b>.${orc.descontoForma ? ` O desconto de <b>${(orc.descontoForma * 100).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%</b> por pagar na forma combinada já está nos produtos (total a pagar R$ ${moeda(orc.totalAPagar || 0)}).` : ''} Confira as quantidades e os preços antes de emitir; se o cliente fechar, transforme em venda no PDV para a baixa no estoque e no caixa.` : ''}
       ${e.notaEmitida ? `<br>Esta venda já tem nota no ERP: <b>${esc(e.notaEmitida.status)}</b> (modelo ${esc(e.notaEmitida.modelo)}${e.notaEmitida.numero ? `, nº ${esc(e.notaEmitida.numero)}` : ''}).` : ''}</div>
     ${e.pendencias?.length ? `<div class="pend"><b>Falta no cadastro (resolva antes de emitir):</b><ul style="margin:4px 0 0 18px;padding:0">${e.pendencias.map((p: string) => `<li>${esc(p)}</li>`).join('')}</ul></div>` : ''}
 
