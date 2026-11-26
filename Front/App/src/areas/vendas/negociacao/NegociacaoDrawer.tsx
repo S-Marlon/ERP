@@ -315,6 +315,7 @@ export const NegociacaoDrawer: React.FC<{
             {aviso && <Alert type="warning" showIcon style={{ marginTop: 8 }} message={aviso} closable onClose={() => setAviso(null)} />}
           </Card>
 
+          <AdicionarItemNegociacao onAdicionar={adicionarItem} />
           {secoes.map(sec => {
             const ms = margemSecao(sec.indices);
             return (
@@ -343,7 +344,6 @@ export const NegociacaoDrawer: React.FC<{
             );
           })}
           {!linhas.length && <Empty description="Sem itens." />}
-          <AdicionarItemNegociacao onAdicionar={adicionarItem} />
 
           <Card size="small" title="O que vai na proposta">
             <Row gutter={[12, 8]}>
