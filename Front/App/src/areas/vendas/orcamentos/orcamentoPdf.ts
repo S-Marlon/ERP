@@ -33,91 +33,87 @@ export const mensagemOrcamento = (o: Pick<PedidoAbertoDetalhe, 'id' | 'cliente' 
 
 /** Monta o PDF do orçamento e devolve os bytes. */
 export const gerarPdfOrcamento = (o: PedidoAbertoDetalhe, e: Partial<DadosEmpresa>): Uint8Array => {
-  // o mesmo modelo da impressão (modeloOrcamento): cabeçalho, ORÇAMENTO, cliente, seções com subtotal, total e condições
+  // o mesmo modelo da impressão (modeloOrcamento), compacto para caber numa folha: uma tabela só, com cada categoria
+  // numa faixa fina (número, nome e subtotal), e os totais ao lado das condições
   const m = modeloOrcamento(o, e);
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  const M = 15, L = 210 - M, FIM = 297 - 16;
+  const M = 13, L = 210 - M, FIM = 297 - 12;
   const azul: [number, number, number] = [31, 58, 95];
-  let y = 18;
-  const novaPagina = (precisa: number) => { if (y + precisa > FIM) { doc.addPage(); y = 18; return true; } return false; };
+  let y = 15;
+  const novaPagina = (precisa: number) => { if (y + precisa > FIM) { doc.addPage(); y = 15; return true; } return false; };
 
-  // cabeçalho da empresa
-  doc.setFont('helvetica', 'bold').setFontSize(13).setTextColor(...azul).text(texto(m.empresa.nome), M, y);
-  doc.setFont('helvetica', 'normal').setFontSize(8.5).setTextColor(85);
-  for (const l of [m.empresa.razao, m.empresa.documentos, m.empresa.endereco, m.empresa.contato].filter(Boolean) as string[]) { y += 4; doc.text(texto(l), M, y); }
-  y += 4;
-  doc.setDrawColor(...azul).setLineWidth(0.45).line(M, y, L, y);
-  y += 11;
-
-  // título, data e validade, cliente
-  doc.setFont('helvetica', 'bold').setFontSize(24).setTextColor(...azul).text(texto(m.titulo), M, y);
-  y += 6;
-  doc.setFontSize(9.5).setTextColor(...azul).text(`Nº ${m.numero}`, M, y);
-  doc.setFont('helvetica', 'normal').setTextColor(40)
-    .text(texto(`   |   Data: ${m.data}${m.validade ? `   |   Validade: ${m.validade}` : ''}`), M + doc.getTextWidth(`Nº ${m.numero}`), y);
-  y += 6;
-  doc.setFontSize(10).text('Cliente: ', M, y);
+  // cabeçalho: empresa à esquerda, ORÇAMENTO / Nº / data / validade à direita
+  doc.setFont('helvetica', 'bold').setFontSize(12).setTextColor(...azul).text(texto(m.empresa.nome), M, y);
+  doc.setFontSize(17).text(texto(m.titulo), L, y + 1, { align: 'right' });
+  doc.setFont('helvetica', 'normal').setFontSize(7.8).setTextColor(85);
+  let yE = y;
+  for (const l of [m.empresa.razao, m.empresa.documentos, m.empresa.endereco, m.empresa.contato].filter(Boolean) as string[]) { yE += 3.4; doc.text(texto(l), M, yE); }
+  const meta = `Nº ${m.numero}  ·  ${m.data}${m.validade ? `  ·  Validade: ${m.validade}` : ''}`;
+  doc.setFontSize(8.5).setTextColor(40).text(texto(meta), L, y + 6, { align: 'right' });
+  y = Math.max(yE, y + 6) + 2.5;
+  doc.setDrawColor(...azul).setLineWidth(0.4).line(M, y, L, y);
+  y += 5;
+  doc.setFontSize(9).setTextColor(30).text('Cliente: ', M, y);
   doc.setFont('helvetica', 'bold').text(texto(m.cliente), M + doc.getTextWidth('Cliente: '), y);
-  const extrasCli = [m.contato && `Contato: ${m.contato}`, m.atendente && `Atendente: ${m.atendente}`].filter(Boolean).join('   ·   ');
-  if (extrasCli) { y += 5; doc.setFont('helvetica', 'normal').setFontSize(9).setTextColor(90).text(texto(extrasCli), M, y); }
-  y += 9;
+  const extrasCli = [m.contato && `Contato: ${m.contato}`, m.atendente && `Atendente: ${m.atendente}`].filter(Boolean).join('  ·  ');
+  if (extrasCli) doc.setFont('helvetica', 'normal').setTextColor(90).text(texto(`  ·  ${extrasCli}`), M + doc.getTextWidth('Cliente: ') + doc.setFont('helvetica', 'bold').getTextWidth(texto(m.cliente)), y);
+  y += 5;
 
-  // seções: título, cabeçalho azul, linhas zebradas e o subtotal
-  const col = { n: M + 2.5, desc: M + 10, qtd: 130, un: 134, unit: 166, total: L - 2.5 };
-  const larguraDesc = col.qtd - 8 - col.desc;
+  // tabela única
+  const col = { n: M + 2, desc: M + 8.5, qtd: 136, un: 139.5, unit: 168, total: L - 2 };
+  const larguraDesc = col.qtd - 9 - col.desc;
   const cabecalho = () => {
-    doc.setFillColor(...azul).rect(M, y - 5, L - M, 8, 'F');
-    doc.setFont('helvetica', 'bold').setFontSize(9).setTextColor(255);
+    doc.setFillColor(...azul).rect(M, y - 3.8, L - M, 6, 'F');
+    doc.setFont('helvetica', 'bold').setFontSize(8.3).setTextColor(255);
     doc.text('#', col.n, y); doc.text('Descrição', col.desc, y); doc.text('Qtd', col.qtd, y, { align: 'right' }); doc.text('Un', col.un, y);
     doc.text('Valor unit.', col.unit, y, { align: 'right' }); doc.text('Total', col.total, y, { align: 'right' });
-    y += 8;
+    y += 5.6;
   };
+  cabecalho();
   for (const s of m.secoes) {
-    novaPagina(24);
-    doc.setFont('helvetica', 'bold').setFontSize(11.5).setTextColor(...azul).text(texto(`${s.numero}. ${s.titulo}`), M, y);
-    y += 6.5;
-    cabecalho();
-    s.linhas.forEach((l, k) => {
-      doc.setFont('helvetica', 'normal').setFontSize(9.5);
+    if (m.secoes.length > 1) {
+      if (novaPagina(10)) cabecalho();
+      doc.setFillColor(238, 242, 246).rect(M, y - 3.4, L - M, 5, 'F');
+      doc.setFont('helvetica', 'bold').setFontSize(8.3).setTextColor(...azul)
+        .text(texto(`${s.numero}. ${s.titulo}`), col.n, y).text(texto(s.subtotal), col.total, y, { align: 'right' });
+      y += 5;
+    }
+    for (const l of s.linhas) {
+      doc.setFont('helvetica', 'normal').setFontSize(8.8);
       const desc: string[] = doc.splitTextToSize(texto(l.descricao), larguraDesc);
-      doc.setFontSize(8);
+      doc.setFontSize(7.5);
       const extras: string[] = l.extras.flatMap(x => doc.splitTextToSize(texto(x), larguraDesc));
-      const altura = Math.max(8, desc.length * 4.3 + extras.length * 3.5 + 3.8);
+      const altura = desc.length * 3.7 + extras.length * 3.1 + 1.6;
       if (novaPagina(altura)) cabecalho();
-      if (k % 2 === 1) doc.setFillColor(243, 246, 249).rect(M, y - 5, L - M, altura, 'F');
-      doc.setFontSize(9.5).setTextColor(60).text(String(l.n), col.n, y);
+      doc.setFontSize(8.8).setTextColor(100).text(String(l.n), col.n, y);
       doc.setTextColor(30).text(desc, col.desc, y);
-      if (extras.length) doc.setFontSize(8).setTextColor(105).text(extras, col.desc, y + desc.length * 4.3);
-      doc.setFontSize(9.5).setTextColor(30);
+      if (extras.length) doc.setFontSize(7.5).setTextColor(105).text(extras, col.desc, y + desc.length * 3.7);
+      doc.setFontSize(8.8).setTextColor(30);
       doc.text(texto(l.qtd), col.qtd, y, { align: 'right' }); doc.text(texto(l.un), col.un, y);
       doc.text(texto(l.unitario), col.unit, y, { align: 'right' }); doc.text(texto(l.total), col.total, y, { align: 'right' });
       y += altura;
-      doc.setDrawColor(227, 231, 236).setLineWidth(0.2).line(M, y - 5, L, y - 5);
-    });
-    novaPagina(8);
-    doc.setFont('helvetica', 'bold').setFontSize(9.5).setTextColor(30).text('Subtotal', col.unit, y, { align: 'right' }).text(texto(s.subtotal), col.total, y, { align: 'right' });
-    y += 9;
+      doc.setDrawColor(232, 235, 239).setLineWidth(0.15).line(M, y - 3.3, L, y - 3.3);
+    }
   }
 
-  // totais
-  novaPagina(10 + m.totais.length * 7);
-  doc.setDrawColor(...azul).setLineWidth(0.45).line(M, y - 3, L, y - 3);
-  y += 4;
+  // condições à esquerda e totais à direita, lado a lado
+  const xTot = 128;
+  doc.setFontSize(8.5);
+  const linhasCond: string[] = m.condicoes.flatMap(c => doc.splitTextToSize(texto(`${c.rotulo}: ${c.valor}`), xTot - 8 - M));
+  const alturaFim = Math.max(5 + linhasCond.length * 3.6, 4 + m.totais.length * 4.8);
+  novaPagina(alturaFim + 4);
+  y += 2;
+  doc.setDrawColor(...azul).setLineWidth(0.4).line(xTot, y - 2.5, L, y - 2.5);
+  doc.setFont('helvetica', 'bold').setFontSize(8.5).setTextColor(...azul).text('Condições', M, y + 1);
+  doc.setFont('helvetica', 'normal').setTextColor(40).text(linhasCond, M, y + 5);
+  let yT = y + 1.5;
   for (const t of m.totais) {
-    if (t.destaque) doc.setFont('helvetica', 'bold').setFontSize(13).setTextColor(...azul);
-    else if (t.secundario) doc.setFont('helvetica', 'normal').setFontSize(9).setTextColor(105);
-    else doc.setFont('helvetica', 'normal').setFontSize(10).setTextColor(30);
-    // o rótulo fica a 40 mm do valor: cabe o total em destaque (fonte maior) sem encostar
-    doc.text(texto(t.rotulo), col.total - 40, y, { align: 'right' }).text(texto(t.valor), col.total, y, { align: 'right' });
-    y += t.destaque ? 7.5 : 5.5;
+    if (t.destaque) doc.setFont('helvetica', 'bold').setFontSize(11.5).setTextColor(...azul);
+    else if (t.secundario) doc.setFont('helvetica', 'normal').setFontSize(8).setTextColor(105);
+    else doc.setFont('helvetica', 'normal').setFontSize(9).setTextColor(30);
+    doc.text(texto(t.rotulo), xTot, yT).text(texto(t.valor), L, yT, { align: 'right' });
+    yT += t.destaque ? 5.6 : 4.4;
   }
-
-  // condições
-  y += 6;
-  const linhasCond: string[] = m.condicoes.flatMap(c => doc.setFontSize(10).splitTextToSize(texto(`${c.rotulo}: ${c.valor}`), L - M));
-  novaPagina(8 + linhasCond.length * 5);
-  doc.setFont('helvetica', 'bold').setFontSize(10).setTextColor(30).text('Condições', M, y);
-  doc.setFont('helvetica', 'normal').text(linhasCond, M, y + 5.5);
 
   return new Uint8Array(doc.output('arraybuffer'));
 };
