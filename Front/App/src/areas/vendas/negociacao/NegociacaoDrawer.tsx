@@ -13,6 +13,7 @@ import { CondicaoPagamento, custoDaCondicao, FormaCondicao, textoDaCondicao, tot
 import { taxaPara, useTaxasVenda } from '../taxas/taxasVenda';
 import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
 import { AdicionarItemNegociacao, ItemBuscado } from './AdicionarItemNegociacao';
+import { conclusaoDaProposta } from './conclusaoProposta';
 
 const { Text } = Typography;
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -263,6 +264,9 @@ export const NegociacaoDrawer: React.FC<{
   const descontoDaForma = Math.round((resumo.receita - aPagar) * 100) / 100;
   const custoCond = condicaoAtual && taxas && resumo.receita > 0 ? custoDaCondicao((f, n) => taxaPara(taxas, f, n), condicaoAtual, aPagar) : null;
   const margemLiquida = custoCond && resumo.custo > 0 && aPagar > 0 ? (resumo.lucro - descontoDaForma - custoCond.taxa) / aPagar : null;
+  // fechamento como o cliente vai pagar (total com o desconto da forma, etapas) e o que fica para a loja
+  const conclusao = cfg ? conclusaoDaProposta(linhas.map(l => ({ quantidade: l.quantidade, preco: l.preco, precoTabela: l.precoTabela, custoUnitario: l.custoUnitario })),
+    condicaoAtual, custoCond?.taxa ?? 0, alvo, cfg.margemMinimaNegociacao) : null;
   const lucroNoAlvo = resumo.custo > 0 ? resumo.custo / (1 - alvo) - resumo.custo : 0;
 
   return (
@@ -289,8 +293,19 @@ export const NegociacaoDrawer: React.FC<{
                   </Tooltip>
                 )}
               </Col>
-              <Col xs={8} lg={3}><Statistic title="Total" value={brl(resumo.receita)} valueStyle={{ fontSize: 17 }} /></Col>
-              <Col xs={8} lg={3}><Statistic title="Lucro" value={brl(resumo.lucro)} valueStyle={{ fontSize: 17, color: corResumo }} /></Col>
+              <Col xs={8} lg={3}>
+                {conclusao && conclusao.descontoForma > 0 ? (
+                  <Tooltip title={`Total cheio ${brl(conclusao.totalItens)} − ${brl(conclusao.descontoForma)} do desconto da forma de pagamento`}>
+                    <Statistic title={`Total ${condicaoAtual?.forma === 'PIX' ? 'no PIX' : 'em dinheiro'}`} value={brl(conclusao.aPagar)} valueStyle={{ fontSize: 17 }} />
+                    <Text type="secondary" delete style={{ fontSize: 11 }}>{brl(conclusao.totalItens)}</Text>
+                  </Tooltip>
+                ) : <Statistic title="Total" value={brl(resumo.receita)} valueStyle={{ fontSize: 17 }} />}
+              </Col>
+              <Col xs={8} lg={3}>
+                <Tooltip title={conclusao ? 'Lucro final: o que o cliente paga − custo − taxas da condição' : undefined}>
+                  <Statistic title="Lucro" value={brl(conclusao ? conclusao.lucro : resumo.lucro)} valueStyle={{ fontSize: 17, color: conclusao && cfg ? corDaMargem(conclusao.margem, cfg, alvo) : corResumo }} />
+                </Tooltip>
+              </Col>
               <Col xs={8} lg={3}>
                 <Tooltip title="Lucro que o orçamento teria na margem alvo">
                   <Statistic title="No alvo" value={brl(lucroNoAlvo)} valueStyle={{ fontSize: 17, color: '#8c8c8c' }} />
@@ -416,6 +431,63 @@ export const NegociacaoDrawer: React.FC<{
               O cliente vê: itens por categoria, preço por unidade base, faixas por quantidade, condição, validade, vendedor e código do cliente. Custo e margem não saem.
             </Text>
           </Card>
+
+          {conclusao && linhas.length > 0 && (
+            <Card size="small" title="Conclusão da proposta" styles={{ body: { paddingTop: 8 } }}
+              extra={<Tag color={conclusao.nivel === 'NO_ALVO' ? 'green' : conclusao.nivel === 'ABAIXO_ALVO' ? 'gold' : conclusao.nivel === 'ABAIXO_MINIMA' ? 'orange' : 'red'} style={{ margin: 0 }}>
+                {conclusao.nivel === 'NO_ALVO' ? 'No alvo' : conclusao.nivel === 'ABAIXO_ALVO' ? 'Abaixo do alvo' : conclusao.nivel === 'ABAIXO_MINIMA' ? 'Abaixo da mínima' : 'Prejuízo'} · {pct(conclusao.margem)}
+              </Tag>}>
+              <Row gutter={[24, 12]}>
+                <Col xs={24} md={12}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>O que o cliente paga</Text>
+                  <Table size="small" pagination={false} showHeader={false} rowKey="k" style={{ marginTop: 4 }}
+                    dataSource={[
+                      { k: 't', rotulo: 'Preço de tabela', valor: conclusao.tabela, cls: '' },
+                      ...(conclusao.descontoPrecos > 0 ? [{ k: 'd', rotulo: 'Desconto nos preços', valor: -conclusao.descontoPrecos, cls: '' }] : []),
+                      { k: 'i', rotulo: 'Total dos itens', valor: conclusao.totalItens, cls: conclusao.descontoForma > 0 ? '' : 'forte' },
+                      ...(conclusao.descontoForma > 0 ? [
+                        { k: 'f', rotulo: `Desconto ${condicaoAtual?.forma === 'PIX' ? 'no PIX' : 'em dinheiro'} (${pct(condicaoAtual?.descontoPct ?? 0)})`, valor: -conclusao.descontoForma, cls: '' },
+                        { k: 'p', rotulo: 'Total a pagar', valor: conclusao.aPagar, cls: 'forte' },
+                      ] : []),
+                      ...conclusao.etapas.length > 1 ? conclusao.etapas.map((e, i) => ({ k: `e${i}`, rotulo: `↳ ${e.rotulo}`, valor: e.valor, cls: 'etapa' })) : [],
+                    ]}
+                    columns={[
+                      { dataIndex: 'rotulo', render: (v: string, x: any) => <Text strong={x.cls === 'forte'} type={x.cls === 'etapa' ? 'secondary' : undefined}>{v}</Text> },
+                      { dataIndex: 'valor', align: 'right' as const, render: (v: number, x: any) => (
+                        <Text strong={x.cls === 'forte'} type={x.cls === 'etapa' ? 'secondary' : undefined} style={{ color: v < 0 ? '#389e0d' : undefined, fontSize: x.cls === 'forte' ? 15 : undefined }}>
+                          {v < 0 ? `− ${brl(-v)}` : brl(v)}
+                        </Text>
+                      ) },
+                    ]} />
+                  {conclusao.descontoTotal > 0 && <Text type="secondary" style={{ fontSize: 12 }}>Desconto total para o cliente: {brl(conclusao.descontoTotal)} ({pct(conclusao.descontoTotalPct)} da tabela).</Text>}
+                </Col>
+                <Col xs={24} md={12}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>O que fica para a loja</Text>
+                  <Table size="small" pagination={false} showHeader={false} rowKey="k" style={{ marginTop: 4 }}
+                    dataSource={[
+                      { k: 'r', rotulo: 'Recebe', valor: conclusao.aPagar },
+                      { k: 'c', rotulo: `Custo das mercadorias${conclusao.semCusto ? ` (${conclusao.semCusto} sem custo)` : ''}`, valor: -conclusao.custo },
+                      { k: 'x', rotulo: 'Taxas da condição', valor: -conclusao.taxa },
+                      { k: 'l', rotulo: 'Lucro final', valor: conclusao.lucro, forte: true },
+                    ]}
+                    columns={[
+                      { dataIndex: 'rotulo', render: (v: string, x: any) => <Text strong={x.forte}>{v}</Text> },
+                      { dataIndex: 'valor', align: 'right' as const, render: (v: number, x: any) => (
+                        <Text strong={x.forte} style={{ fontSize: x.forte ? 15 : undefined, color: x.forte ? (v < 0 ? '#cf1322' : '#389e0d') : undefined }}>{v < 0 && !x.forte ? `− ${brl(-v)}` : brl(v)}</Text>
+                      ) },
+                    ]} />
+                  <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>
+                    Margem final {pct(conclusao.margem)} · alvo {pct(alvo)} · mínima {pct(cfg?.margemMinimaNegociacao ?? 0)}
+                    {conclusao.faltaParaAlvo > 0 ? ` · para o alvo faltam ${brl(conclusao.faltaParaAlvo)} no total a pagar` : ''}
+                  </Text>
+                  {conclusao.semCusto > 0 && <Text type="warning" style={{ fontSize: 12, display: 'block' }}>Item sem custo cadastrado: o lucro real é menor.</Text>}
+                </Col>
+              </Row>
+              {conclusao.texto && (
+                <Alert type="info" showIcon style={{ marginTop: 10 }} message={<span>Na proposta: <b>{conclusao.texto}</b></span>} />
+              )}
+            </Card>
+          )}
         </Space>
       )}
 
