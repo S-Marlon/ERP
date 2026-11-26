@@ -14,6 +14,8 @@ import { taxaPara, useTaxasVenda } from '../taxas/taxasVenda';
 import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
 import { AdicionarItemNegociacao, ItemBuscado } from './AdicionarItemNegociacao';
 import { conclusaoDaProposta } from './conclusaoProposta';
+import { PagamentosRecebidos, totalRecebido } from './PagamentosRecebidos';
+import type { Adiantamento } from '../pdv/services/adiantamentosApi';
 
 const { Text } = Typography;
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -44,6 +46,7 @@ export const NegociacaoDrawer: React.FC<{
   const [alvo, setAlvo] = useState(0.3);
   const [condicao, setCondicao] = useState('');
   // Condição em campos: forma ('' = a combinar / texto livre), parcelas, intervalo e entrada
+  const [recebidos, setRecebidos] = useState<Adiantamento[]>([]);
   const [cond, setCond] = useState<{ forma: FormaCondicao | ''; parcelas: number; intervaloDias: number; entrada: number; descontoPct: number }>({ forma: '', parcelas: 1, intervaloDias: 30, entrada: 0, descontoPct: 0 });
   const taxas = useTaxasVenda();
   const [validade, setValidade] = useState(7);
@@ -450,6 +453,10 @@ export const NegociacaoDrawer: React.FC<{
                         { k: 'p', rotulo: 'Total a pagar', valor: conclusao.aPagar, cls: 'forte' },
                       ] : []),
                       ...conclusao.etapas.length > 1 ? conclusao.etapas.map((e, i) => ({ k: `e${i}`, rotulo: `↳ ${e.rotulo}`, valor: e.valor, cls: 'etapa' })) : [],
+                      ...(totalRecebido(recebidos) > 0 ? [
+                        { k: 'rc', rotulo: 'Já recebido', valor: -totalRecebido(recebidos), cls: '' },
+                        { k: 'fa', rotulo: 'Falta receber', valor: Math.max(0, Math.round((conclusao.aPagar - totalRecebido(recebidos)) * 100) / 100), cls: 'forte' },
+                      ] : []),
                     ]}
                     columns={[
                       { dataIndex: 'rotulo', render: (v: string, x: any) => <Text strong={x.cls === 'forte'} type={x.cls === 'etapa' ? 'secondary' : undefined}>{v}</Text> },
@@ -487,6 +494,14 @@ export const NegociacaoDrawer: React.FC<{
                 <Alert type="info" showIcon style={{ marginTop: 10 }} message={<span>Na proposta: <b>{conclusao.texto}</b></span>} />
               )}
             </Card>
+          )}
+
+          {conclusao && abrir.idPedido ? (
+            <PagamentosRecebidos idPedido={abrir.idPedido} cliente={abrir.cliente?.id ? { id: abrir.cliente.id, nome: abrir.cliente.nome } : null}
+              valorSugerido={conclusao.etapas.length > 1 ? conclusao.etapas[0].valor : conclusao.aPagar} formaSugerida={condicaoAtual?.forma ?? null}
+              aPagar={conclusao.aPagar} onMudou={setRecebidos} />
+          ) : conclusao && (
+            <Text type="secondary" style={{ fontSize: 12 }}>Salve o orçamento para poder registrar pagamentos já recebidos (sinal).</Text>
           )}
         </Space>
       )}

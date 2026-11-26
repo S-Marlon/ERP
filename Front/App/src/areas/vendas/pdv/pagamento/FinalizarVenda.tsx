@@ -362,9 +362,18 @@ export const FinalizarVenda: React.FC<FinalizarVendaProps> = ({
             setTipoDesconto('porcent'); setDescontoValor(Math.round(d * 10000) / 100); setUsuarioInteragiu(false);
             saldo = Math.max(0, Math.round((saldoRestante + descontoCalculado - novoDesconto) * 100) / 100);
         }
+        // pagamentos já recebidos deste orçamento (sinais): abatem primeiro; o antecipado da condição já foi pago
+        const sinais: Array<{ id: number; valor: number }> = [];
+        let resta = saldo;
+        for (const a of adiantamentos.filter(x => x.origem === 'ORCAMENTO' && x.idOrigem === idOrcamento)) {
+            const v = Math.min(saldoAdiantamento(a.idAdiantamento), resta);
+            if (v > 0.004) { sinais.push({ id: a.idAdiantamento, valor: Math.round(v * 100) / 100 }); resta = Math.round((resta - v) * 100) / 100; }
+        }
+        const condRestante = sinais.length ? { ...c, entrada: 0 } : c;
         setPagamentos(atual => [
             ...atual.filter(p => p.status === 'paid' || p.status === 'processing'),
-            ...pagamentosDaCondicao(c, saldo).filter(p => p.valor > 0).map(p => ({
+            ...sinais.map(s => ({ id: crypto.randomUUID(), metodo: 'advance' as PaymentMethodType, valor: s.valor, idAdiantamento: s.id, parcelas: 1, status: statusInicial('advance'), createdAt: new Date() })),
+            ...pagamentosDaCondicao(condRestante, resta).filter(p => p.valor > 0).map(p => ({
                 id: crypto.randomUUID(), metodo: metodoDe[p.forma], valor: p.valor, parcelas: p.parcelas || 1,
                 ...(p.forma === 'PRAZO' ? { intervaloDias: p.intervaloDias || 30 } : {}),
                 status: statusInicial(metodoDe[p.forma]), createdAt: new Date(),

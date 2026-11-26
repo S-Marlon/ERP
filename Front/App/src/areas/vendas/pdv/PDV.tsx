@@ -587,7 +587,7 @@ const PDVContent: React.FC = () => {
           idOrcamento={orcamentoAtual?.id ?? null}
           manterPrecoOrcamento={Boolean(orcamentoAtual?.manterPreco)}
           negociacao={orcamentoAtual?.negociacao ?? null}
-          adiantamentosOrigem={origemExterna ? { origem: origemExterna.origem, idOrigem: origemExterna.idOrigem } : null}
+          adiantamentosOrigem={origemExterna ? { origem: origemExterna.origem, idOrigem: origemExterna.idOrigem } : orcamentoAtual ? { origem: 'ORCAMENTO', idOrigem: orcamentoAtual.id } : null}
           total={total}
           cliente={cliente}
           clienteId={clienteId}
