@@ -3,7 +3,7 @@
 // combinados; "equilibrar" leva os livres para a margem que fecha no alvo; faixas por quantidade. Custo e margem nunca
 // saem na proposta. Abaixo da margem mínima pede a senha de autorização (Vendas › Regras de venda).
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, AutoComplete, Button, Card, Col, Drawer, Empty, Flex, Input, Modal, Progress, Row, Select, Slider, Space, Statistic, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { Alert, AutoComplete, Button, Card, Col, Drawer, Empty, Flex, Input, Modal, Popconfirm, Progress, Row, Select, Slider, Space, Statistic, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { DeleteOutlined, LockOutlined, PlusOutlined, SaveOutlined, ThunderboltOutlined, UnlockOutlined } from '@ant-design/icons';
 import {
   aplicarMargem, equilibrar, FaixaQuantidade, margem as margemDe, markup as markupDe, precoParaMargem, resumoNegociacao,
@@ -12,6 +12,7 @@ import { CONDICOES_PAGAMENTO, ConfigNegociacao, ErroNegociacao, ItemNegociacao, 
 import { CondicaoPagamento, custoDaCondicao, FormaCondicao, textoDaCondicao, totalComDesconto } from './condicaoPagamento';
 import { taxaPara, useTaxasVenda } from '../taxas/taxasVenda';
 import { CampoDinheiro, CampoNumero } from '../../../shared/formularios/CamposNumero';
+import { AdicionarItemNegociacao, ItemBuscado } from './AdicionarItemNegociacao';
 
 const { Text } = Typography;
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -200,7 +201,30 @@ export const NegociacaoDrawer: React.FC<{
         </Tooltip>
       ),
     },
+    {
+      key: 'tirar', width: 40, render: (_: unknown, l: Linha & { i: number }) => (
+        <Popconfirm title="Tirar este item do orçamento?" okText="Tirar" cancelText="Não" disabled={linhas.length <= 1}
+          onConfirm={() => setLinhas(ls => ls.filter((_, k) => k !== l.i))}>
+          <Tooltip title={linhas.length <= 1 ? 'O orçamento precisa de ao menos um item' : 'Tirar do orçamento'}>
+            <Button size="small" type="text" danger icon={<DeleteOutlined />} disabled={linhas.length <= 1} />
+          </Tooltip>
+        </Popconfirm>
+      ),
+    },
   ];
+
+  // incluir um item: busca no catálogo (como no PDV) e prepara a linha com o custo, a tabela e a última venda para o cliente
+  const adicionarItem = async (p: ItemBuscado, quantidade: number) => {
+    if (p.ehKit) { message.info('Kit: adicione pelo PDV (para escolher as peças) e negocie de novo.'); return; }
+    if (linhas.some(l => l.idItem === p.idItem && l.idUnidade === p.idUnidade)) { message.info(`${p.sku} já está no orçamento: mude a quantidade na linha.`); return; }
+    try {
+      const r = await negociacaoApi.preparar([{ idItem: p.idItem, quantidade, idUnidade: p.idUnidade }], abrir.cliente?.id);
+      const nova = r.linhas[0];
+      if (!nova) { message.error('Não foi possível preparar o item.'); return; }
+      setLinhas(ls => [...ls, { ...nova, indice: ls.length, preco: nova.precoTabela, travado: false, faixas: [] }]);
+      message.success(`${p.sku} incluído pelo preço de tabela.`);
+    } catch (e) { message.error(e instanceof Error ? e.message : 'Erro ao incluir o item.'); }
+  };
 
   /** Faixas por quantidade de um item: "a partir de X" com a margem/preço de cada faixa. */
   const faixasDe = (l: Linha & { i: number }) => (
@@ -319,6 +343,7 @@ export const NegociacaoDrawer: React.FC<{
             );
           })}
           {!linhas.length && <Empty description="Sem itens." />}
+          <AdicionarItemNegociacao onAdicionar={adicionarItem} />
 
           <Card size="small" title="O que vai na proposta">
             <Row gutter={[12, 8]}>
